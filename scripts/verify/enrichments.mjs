@@ -13,6 +13,7 @@
 // hit-tests), a real WheelEvent zoom, the screenshots and the console-error
 // gate. Dev server only (dev hooks).
 import { launchVerifyBrowser, assertBackend } from './_browser.mjs'
+import { frameShutter, captureFrame } from './frameSubject.mjs'
 import { fileURLToPath } from 'node:url'
 import sharp from 'sharp'
 
@@ -73,6 +74,11 @@ const waitForFamily = (timeout = 30000) =>
 
 const browser = await launchVerifyBrowser()
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
+// Point 375: every frame written below declares what it must show — the place
+// it is named after, the settlement, the staged animal, the overlay — and the
+// shutter projects that subject through the live camera before the file is
+// written. A frame that deliberately photographs a general view says so.
+const shot = frameShutter(page, OUT)
 const errors = []
 page.on('console', (m) => {
   if (m.type() === 'error') errors.push(m.text())
@@ -246,8 +252,7 @@ const village = await page.evaluate(() => ({
 }))
 check('Village: inhabitants with daily routines present', village.walkers >= 3, `${village.walkers} walkers`)
 check('Village: landscape backdrop mesh present', village.backdrop > 1000, `${village.backdrop} vertices`)
-await page.screenshot({ path: `${OUT}77-enrich-village-life.png` })
-console.log('shot 77-enrich-village-life.png')
+await shot('77-enrich-village-life', { place: 'maasai-village', label: 'the inhabited village' })
 
 // Point 14: the backdrop of a mountainous settlement (Berber Village, at the
 // Atlas) must read as a distant range on the horizon, not loom over the camera
@@ -264,8 +269,7 @@ check(
   berber.maxElevationDeg < 25,
   `max elevation ${berber.maxElevationDeg?.toFixed(1)}°`,
 )
-await page.screenshot({ path: `${OUT}86-berber-backdrop.png` })
-console.log('shot 86-berber-backdrop.png')
+await shot('86-berber-backdrop', { place: 'berber-village', label: 'the Atlas backdrop over the Berber village' })
 
 // === Travel view =============================================================
 await page.evaluate(() => window.__game.getState().leavePlace())
@@ -357,8 +361,7 @@ const meroeRevealed = await page.evaluate(() =>
   [...document.querySelectorAll('.map-label')].some((l) => /Mero/.test(l.textContent)),
 )
 check('the Meroë pyramids reveal their name once sighted', meroeRevealed, '')
-await page.screenshot({ path: `${OUT}91-cultural-landmark-meroe.png` })
-console.log('shot 91-cultural-landmark-meroe.png')
+await shot('91-cultural-landmark-meroe', { world: { lat: 16.94, lon: 33.75 }, label: 'the Meroe pyramids' })
 
 // Stage-2 evidence: one new cultural site (Aksum stelae) and one natural site
 // (Ngorongoro crater) with their labels revealed.
@@ -371,8 +374,7 @@ const aksumRevealed = await page.evaluate(() =>
   [...document.querySelectorAll('.map-label')].some((l) => /Aksum/.test(l.textContent)),
 )
 check('the Aksum stelae reveal their name once sighted', aksumRevealed, '')
-await page.screenshot({ path: `${OUT}94-cultural-landmark-aksum.png` })
-console.log('shot 94-cultural-landmark-aksum.png')
+await shot('94-cultural-landmark-aksum', { world: { lat: 14.13, lon: 38.72 }, label: 'the Aksum stelae' })
 await page.evaluate(() => window.__game.getState().debugJumpTo(-3.16, 35.58)) // Ngorongoro
 await page.evaluate(() =>
   window.__game.setState({ landmarksSeen: [...window.__game.getState().landmarksSeen, 'ngorongoro'] }),
@@ -382,8 +384,7 @@ const ngoroRevealed = await page.evaluate(() =>
   [...document.querySelectorAll('.map-label')].some((l) => /Ngorongoro/.test(l.textContent)),
 )
 check('the Ngorongoro crater reveals its name once sighted', ngoroRevealed, '')
-await page.screenshot({ path: `${OUT}95-natural-site-ngorongoro.png` })
-console.log('shot 95-natural-site-ngorongoro.png')
+await shot('95-natural-site-ngorongoro', { world: { lat: -3.16, lon: 35.58 }, label: 'the Ngorongoro crater' })
 
 // --- Exploration map: parchment look + fog of war (§7.1.3, design.md §19) -----
 // Explore a swath of the north, open the map and confirm the explored area is a
@@ -410,8 +411,7 @@ check(
   mapPix !== null && mapPix.explored > mapPix.fogged + 25,
   JSON.stringify(mapPix),
 )
-await page.locator('.map-overlay').screenshot({ path: `${OUT}92-map-fog-of-war.png` })
-console.log('shot 92-map-fog-of-war.png')
+await shot('92-map-fog-of-war', { element: '.map-overlay', locator: '.map-overlay', label: 'the exploration map under its fog' })
 
 // Point 89: the opened map sits BOTTOM-LEFT, clear of the inventory bar and the
 // bottom-right camp/map/journal buttons, and shows a "you are here" marker.
@@ -531,8 +531,7 @@ for (const [name, lat, lon] of [
 ]) {
   await page.evaluate(([a, o]) => window.__game.getState().debugJumpTo(a, o), [lat, lon])
   await page.waitForTimeout(1500) // let the chunks and water surfaces stream in
-  await page.screenshot({ path: `${OUT}${name}.png` })
-  console.log(`shot ${name}.png`)
+  await shot(name, { world: { lat, lon }, label: name })
 }
 
 // --- Region border labels (§7.1.3) -------------------------------------------
@@ -597,8 +596,7 @@ if (jungleSpot) {
       barBottom: Math.round(br.bottom),
     }
   })
-  await page.screenshot({ path: `${OUT}84-movement-penalty.png` })
-  console.log('shot 84-movement-penalty.png')
+  await shot('84-movement-penalty', { element: '.movement-penalty', label: 'the movement-penalty hint' })
   check('Movement penalty hint sits centred inside the status bar', hint.centred === true, `centreOff ${hint.centreOff}, hintTop ${hint.hintTop} vs barBottom ${hint.barBottom}`)
 } else {
   check('Movement penalty hint: a jungle tile was found', false, 'no jungle tile located')
@@ -673,8 +671,7 @@ if (waterSpot && landSpot) {
   // shot catches a mid-transition view instead of the close-up.
   await page.evaluate(() => window.__ui.getState().setTravelZoom(0.3))
   await page.waitForTimeout(1800)
-  await page.screenshot({ path: `${OUT}88-canoe-ride.png` })
-  console.log('shot 88-canoe-ride.png')
+  await shot('88-canoe-ride', { world: { lat: waterSpot.lat, lon: waterSpot.lon }, label: 'the canoe ride on the water', settle: false })
 
   // On land with the canoe still in the pack: it is dragged behind, not ridden.
   await page.evaluate((s) => window.__game.getState().debugJumpTo(s.lat, s.lon), landSpot)
@@ -696,8 +693,7 @@ if (waterSpot && landSpot) {
       Math.abs(drag.drag.roll) <= 0.36,
     JSON.stringify(drag?.drag),
   )
-  await page.screenshot({ path: `${OUT}89-canoe-carry.png` })
-  console.log('shot 89-canoe-carry.png')
+  await shot('89-canoe-carry', { world: { lat: landSpot.lat, lon: landSpot.lon }, label: 'the dragged canoe on land', settle: false })
   await page.evaluate(() => window.__ui.getState().setTravelZoom(1))
 
   // Stow the canoe (remove it): neither ridden nor dragged.
@@ -740,7 +736,12 @@ if (waterSpot && landSpot) {
       Math.abs(swimGap - 0.35) < 0.12, // immersion, within the swim bob
     JSON.stringify({ spot: swim.spot, swimming: swim.player?.swimming, swimGap, surfOverBed: swim.found ? swim.player.surfaceY - swim.player.refY : null }),
   )
-  await page.screenshot({ path: `${OUT}125-swim-lake-edward.png` })
+  await shot(
+    '125-swim-lake-edward',
+    swim.found
+      ? { world: { lat: swim.spot[0], lon: swim.spot[1] }, label: 'the swimmer on Lake Edward', settle: false }
+      : { general: 'Lake Edward was not found in the data, so there is no spot to aim at' },
+  )
   // State hygiene: the swim check leaves the player mid-Lake-Edward; jump
   // back to the Cairo reach so the downstream checks (vicinity seeding,
   // scripted hunts) run over their usual streamed chunks.
@@ -789,8 +790,10 @@ if (waterSpot && landSpot) {
   await page.waitForTimeout(500)
   const hurt = await page.evaluate(() => window.__player)
   check('Injured figure: a severe wound shows on the explorer', hurt?.wounds === 2, JSON.stringify(hurt))
-  await page.screenshot({ path: `${OUT}90-wounded-explorer.png` })
-  console.log('shot 90-wounded-explorer.png')
+  // The traveller himself is the subject: read where he stands and require the
+  // camera to hold him (point 375), rather than trusting the earlier jump.
+  const hurtAt = await page.evaluate(() => window.__game.getState().pos)
+  await shot('90-wounded-explorer', { world: { x: hurtAt.x, z: hurtAt.z }, label: 'the wounded explorer', settle: false })
   await page.evaluate(() => {
     const g = window.__game.getState()
     window.__game.setState({ afflictions: { ...g.afflictions, wounds: 0 } })
@@ -1081,8 +1084,12 @@ const stainPixels = await (async () => {
     y: Math.min(VH - 300, Math.max(0, Math.round(box.y + box.height / 2 - 150))),
     width: 420, height: 300,
   }
-  await page.screenshot({ path: `${OUT}137-blood-ground-tint.png`, clip: shot })
-  console.log('shot 137-blood-ground-tint.png')
+  await captureFrame(page, OUT, '137-blood-ground-tint', {
+    world: { x: spot.x, z: spot.z },
+    label: 'the blood stain soaked into the ground',
+    settle: false,
+    clip: shot,
+  })
   await page.evaluate((prev) => window.__ui.getState().setSeasonWetnessOverride(prev.wet), prevState)
   // A pixel counts as soaked when the blood REDDENED it — the signature of the
   // tint and of nothing else on this ground (a strayed animal or its shadow
@@ -2340,7 +2347,7 @@ check(
   grassFire.trapped && grassFire.calfDead && grassFire.parentDead && grassFire.resolved,
   JSON.stringify(grassFire),
 )
-await page.screenshot({ path: `${OUT}131-burning-grass.png` })
+await shot('131-burning-grass', { world: { lat: 13.5, lon: 5.0 }, label: 'the Sahel fire line', settle: false })
 
 // --- Point 145b: the broken-wing lure -----------------------------------------
 // A plover nest planted beside the traveller: standing close starts the act
@@ -2397,7 +2404,7 @@ check(
   brokenWing.lured && brokenWing.maxFromNest > 5 && brokenWing.tookOff && brokenWing.resolved && brokenWing.homeAgain,
   JSON.stringify(brokenWing),
 )
-await page.screenshot({ path: `${OUT}132-broken-wing.png` })
+await shot('132-broken-wing', { world: { lat: -2.5, lon: 34.0 }, label: 'the plover feigning the broken wing', settle: false })
 
 // --- Carcasses do not accumulate off-screen (freeze fix) ---------------------
 // A single scavenger cannot keep up with every kill, so carcasses left far off
@@ -4068,8 +4075,9 @@ await page.evaluate(() => {
 // Let the hyena close and the lioness take up the shield, but capture before
 // the drive-off scatters them.
 await page.waitForTimeout(1600)
-await page.screenshot({ path: `${OUT}133-lioness-defends-cub.png` })
-console.log('shot 133-lioness-defends-cub.png')
+// The scene is staged AT the traveller, so his own spot is what must be framed.
+const cubSceneAt = await page.evaluate(() => window.__game.getState().pos)
+await shot('133-lioness-defends-cub', { world: { x: cubSceneAt.x, z: cubSceneAt.z }, label: 'the lioness shielding her cub', settle: false })
 await page.evaluate(() => {
   const herds = window.__wildlife.herdsRef.current
   herds.lion = herds.lion.filter((a) => !a.__cubShot && !a.__cubTest)
@@ -4286,7 +4294,7 @@ check(
   mourn.found && mourn.closed !== null && mourn.closed < 10 && mourn.held !== null && mourn.held < 3 && mourn.released,
   JSON.stringify(mourn),
 )
-await page.screenshot({ path: `${OUT}128-elephant-mourning.png` })
+await shot('128-elephant-mourning', { world: { lat: -4.9, lon: 36.6 }, label: 'the elephant graveyard', settle: false })
 
 // --- Point 130: the crocodile ambush ------------------------------------------
 // (1) Natural placement: after a restock at a water-rich reach, crocodiles
@@ -4552,7 +4560,13 @@ if (
   const hiddenClips = await crocClips(true) // re-derived from the LIVE croc
   const bodyHidden = await sample(hiddenClips.bodyClip)
   const eyeHidden = await sample(hiddenClips.eyeClip)
-  await page.screenshot({ path: `${OUT}129-crocodile-hidden.png` })
+  const stagedCroc = await page.evaluate(() => (window.__stagedCrocPos ? { x: window.__stagedCrocPos.x, z: window.__stagedCrocPos.z } : null))
+  await shot(
+    '129-crocodile-hidden',
+    stagedCroc
+      ? { world: stagedCroc, label: 'the hidden crocodile', settle: false }
+      : { general: 'no crocodile was staged, so the water cell itself is all this frame can show' },
+  )
   // (c) STRIKING control — the SAME croc forced fully out. A gripped lunge holds
   // it in place (the AI settles it at its own spot with the victim 0.6 ahead) and
   // reads as striking (fully out, opaque); a live `caught` keeps
@@ -4840,7 +4854,12 @@ const crocDrama = async (mode, attempt = 0) =>
   }, { kind: mode, attempt })
 
 const crocLunge = await crocDrama('lunge')
-await page.screenshot({ path: `${OUT}130-crocodile-lunge.png` })
+await shot(
+  '130-crocodile-lunge',
+  crocLunge?.calfAt
+    ? { world: { x: crocLunge.calfAt.x, z: crocLunge.calfAt.z }, label: 'the lunging crocodile at the bank', settle: false }
+    : { general: 'the lunge staging reported no position, so the bank scene as a whole is the subject' },
+)
 check(
   'the hidden crocodile lunges visibly (no teleport) and grips the bank drinker (point 130)',
   crocLunge.staged && crocLunge.lunged && crocLunge.noTeleport && crocLunge.gripped && !crocLunge.calfAlive && !crocLunge.lionTouched,
@@ -6171,12 +6190,12 @@ check(
 // July gradient (123: the Gezira between the Nile arms; 124: the Nile at 18N).
 await page.evaluate(() => window.__game.getState().debugJumpTo(13.4, 31.8))
 await page.waitForTimeout(1500)
-await page.screenshot({ path: `${OUT}123-season-field-gezira-june.png` })
+await shot('123-season-field-gezira-june', { world: { lat: 13.4, lon: 31.8 }, label: 'the Gezira fields in June' })
 await page.evaluate(() => window.__game.getState().debugJumpToMonth(7))
 await page.waitForTimeout(3000)
 await page.evaluate(() => window.__game.getState().debugJumpTo(18.1, 33.9))
 await page.waitForTimeout(1500)
-await page.screenshot({ path: `${OUT}124-season-field-nile-july.png` })
+await shot('124-season-field-nile-july', { world: { lat: 18.1, lon: 33.9 }, label: 'the Nile fields in July' })
 // Restore the calendar for the downstream checks (state hygiene: the later
 // sections set their own months/overrides but must not START skewed).
 await page.evaluate(() => window.__game.getState().debugJumpToMonth(1))
@@ -6307,9 +6326,9 @@ const settleScalar = async (read, rel = 0.003) => {
     }))
   }
   const apr = await surfAt(4)
-  await page.screenshot({ path: `${OUT}117-nile-low-april.png` })
+  await shot('117-nile-low-april', { world: { lat: 24.09, lon: 32.9 }, label: 'the Aswan reach at low water' })
   const oct = await surfAt(10)
-  await page.screenshot({ path: `${OUT}118-nile-flood-october.png` })
+  await shot('118-nile-flood-october', { world: { lat: 24.09, lon: 32.9 }, label: 'the Aswan reach at the flood crest' })
   console.log('shot 117-nile-low-april.png, 118-nile-flood-october.png')
   check(
     'the Nile crests in October and sits low in April (point 138, remote-fed)',
@@ -6344,9 +6363,9 @@ const settleScalar = async (read, rel = 0.003) => {
     }))
   }
   const jan = await deltaAt(1) // Botswana's own rains — and LOW water
-  await page.screenshot({ path: `${OUT}119-okavango-low-january.png` })
+  await shot('119-okavango-low-january', { world: { lat: -19.2, lon: 22.9 }, label: 'the Okavango delta at low water' })
   const jul = await deltaAt(7) // the local dry season — and the FLOOD
-  await page.screenshot({ path: `${OUT}120-okavango-flood-july.png` })
+  await shot('120-okavango-flood-july', { world: { lat: -19.2, lon: 22.9 }, label: 'the Okavango delta in flood' })
   console.log('shot 119-okavango-low-january.png, 120-okavango-flood-july.png')
   check(
     'the Okavango delta is FULLER in the local dry season than in the local rains (point 139)',
@@ -6373,7 +6392,7 @@ const settleScalar = async (read, rel = 0.003) => {
     }))
   }
   const jan = await at(1)
-  await page.screenshot({ path: `${OUT}121-harmattan-pall-january.png` })
+  await shot('121-harmattan-pall-january', { world: { lat: 12.5, lon: 8.0 }, label: 'the Sahel under the harmattan pall' })
   console.log('shot 121-harmattan-pall-january.png')
   const aug = await at(8)
   check(
@@ -6443,7 +6462,10 @@ const settleScalar = async (read, rel = 0.003) => {
     return { ready: true, mode, first, second }
   })
   await page.evaluate(() => window.__climate?.forceStrike?.(1)) // a fresh bolt for the screenshot
-  await page.screenshot({ path: `${OUT}134-thunderstorm.png` })
+  await shot('134-thunderstorm', {
+    general: 'the storm sky and its forced bolt fill the whole frame - there is no ground subject to aim at',
+    scene: 'travel',
+  })
   console.log('shot 134-thunderstorm.png')
   check(
     'a lightning strike flashes and fires thunder delayed 1-4 s (point 166)',
@@ -6515,7 +6537,7 @@ const settleScalar = async (read, rel = 0.003) => {
     return white / px
   }
   const feb = await whiteFrac(2)
-  await page.screenshot({ path: `${OUT}122-atlas-snow-february.png` })
+  await shot('122-atlas-snow-february', { world: { lat: 31.06, lon: -7.91 }, label: 'Toubkal under February snow' })
   console.log('shot 122-atlas-snow-february.png')
   const jul = await whiteFrac(7)
   check(
@@ -6560,9 +6582,9 @@ const gx = (c) => c[1] - (c[0] + c[2]) / 2
 // dry-season gathering (the very features of 120e/135c) parked a herd in it,
 // drowning the ground's green-excess signal in animal and water pixels.
 const savDry = await groundRGB(-20.0, 27.8, 7) // Matabele plateau, July — bone dry
-await page.screenshot({ path: `${OUT}115-savanna-dry.png` })
+await shot('115-savanna-dry', { world: { lat: -20.0, lon: 27.8 }, label: 'the Matabele plateau in July' })
 const savWet = await groundRGB(-20.0, 27.8, 1) // January — the summer rains
-await page.screenshot({ path: `${OUT}116-savanna-wet.png` })
+await shot('116-savanna-wet', { world: { lat: -20.0, lon: 27.8 }, label: 'the Matabele plateau in January' })
 console.log('shot 115-savanna-dry.png, 116-savanna-wet.png')
 const congoDry = await groundRGB(1.5, 24.5, 8) // basin, its driest month
 const congoWet = await groundRGB(1.5, 24.5, 5) // and its wettest — the swing is small
@@ -6725,8 +6747,10 @@ check('zoomed out, the water plane scale uniform tracks the mesh scale (no sea/l
 check('zoomed out, the chunk-bound dressing hides (no dressed chunk rectangle)',
   zoomedWalk.vegVisible === false, JSON.stringify(zoomedWalk))
 await page.waitForTimeout(1200)
-await page.screenshot({ path: `${OUT}87-continent-zoom.png` })
-console.log('shot 87-continent-zoom.png')
+await shot('87-continent-zoom', {
+  general: 'the whole continent at the unlocked wide zoom is the subject - no single place is claimed',
+  scene: 'travel',
+})
 const zoomBack = await page.evaluate(async () => {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
   window.__ui.getState().setTravelZoom(1)
@@ -6907,8 +6931,7 @@ check('elephant graveyard has strewn ivory tusks', !!graveyard && graveyard.tusk
 check('elephant graveyard has scattered bones', !!graveyard && graveyard.bones >= 8, graveyard ? `${graveyard.bones} bones` : 'no dev hook')
 await page.evaluate(() => window.__game.getState().debugJumpTo(-4.9, 36.6)) // onto the graveyard
 await page.waitForTimeout(2600)
-await page.screenshot({ path: `${OUT}85-elephant-graveyard.png` })
-console.log('shot 85-elephant-graveyard.png')
+await shot('85-elephant-graveyard', { world: { lat: -4.9, lon: 36.6 }, label: 'the elephant graveyard' })
 
 // --- Modal dialogs render above the in-scene labels (user request) -----------
 // In a settlement the buildings carry floating map-labels (drei <Html>); an
@@ -7069,8 +7092,7 @@ check(
   borderLum !== null && borderLum > 45 && borderLum < 245,
   `mean luminance ${borderLum === null ? 'n/a' : borderLum.toFixed(1)} at ${JSON.stringify(probe)}`,
 )
-await page.screenshot({ path: `${OUT}104-region-border-river.png` })
-console.log('shot 104-region-border-river.png')
+await shot('104-region-border-river', { world: { lat: 2.28, lon: 31.68 }, label: 'the region border where it meets the river', settle: false })
 
 // --- Point 258: the debug menu's event-trigger dropdown ----------------------
 // The §19.8/§19.16 dramas are rare by design, so the debug menu stages the

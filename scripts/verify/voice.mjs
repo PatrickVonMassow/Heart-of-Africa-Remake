@@ -13,6 +13,7 @@
 // runs the faster WebGPU path, whose cold load the game pre-warms; point 117).
 // Dev server only (dev hooks).
 import { launchVerifyBrowser, assertBackend } from './_browser.mjs'
+import { frameShutter } from './frameSubject.mjs'
 import { installTtsCache, markTtsCacheComplete } from './ttsCache.mjs'
 import { attributeBlocks, maxGap } from './liveness.mjs'
 import { fileURLToPath } from 'node:url'
@@ -27,6 +28,9 @@ const check = (name, ok, detail) => {
 
 const browser = await launchVerifyBrowser()
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
+// Point 375: each frame is named after a journal state (clean German prose, a
+// narration running), so the shutter proves that state is on screen.
+const shot = frameShutter(page, OUT)
 // TTS assets come from the local cache (point 88): first run records, later
 // runs replay strictly offline-from-CDN.
 const ttsStats = await installTtsCache(page)
@@ -97,8 +101,7 @@ await page.waitForTimeout(4000)
 // (pt. 17), so switch to German explicitly for the shot.
 await page.evaluate(() => window.__setLang('de'))
 await page.waitForTimeout(600)
-await page.screenshot({ path: `${OUT}64-voice-german-journal-clean.png` })
-console.log('shot 64-voice-german-journal-clean.png')
+await shot('64-voice-german-journal-clean', { element: '.journal', label: 'the German journal without a visible marker' })
 
 // --- Back to English for the read-aloud (TTS) checks -------------------------
 await page.evaluate(() => window.__setLang('en'))
@@ -221,8 +224,8 @@ try {
   speaking = false
 }
 check('English read-aloud reaches speaking state (audio playing)', speaking, '')
-await page.screenshot({ path: `${OUT}65-voice-english-readaloud.png` })
-console.log('shot 65-voice-english-readaloud.png')
+// The stop glyph on the speak control IS the narrating state this frame claims.
+await shot('65-voice-english-readaloud', { element: '.journal .speak', label: 'the journal narrating aloud' })
 // Stop narration via the same control.
 await page.locator('.journal .speak').first().click()
 await page.waitForTimeout(500)
@@ -247,8 +250,7 @@ try {
   autoSpoke = false
 }
 check('English: new journal entry auto-narrates without a click', autoSpoke, '')
-await page.screenshot({ path: `${OUT}66-voice-auto-narration.png` })
-console.log('shot 66-voice-auto-narration.png')
+await shot('66-voice-auto-narration', { element: '.journal .entry:last-child', label: 'the new entry narrating itself' })
 await page.locator('.journal .speak').last().click()
 await page.waitForTimeout(400)
 

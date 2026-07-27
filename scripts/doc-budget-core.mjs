@@ -30,7 +30,7 @@
 export const DOC_BUDGETS = [
   {
     path: 'CLAUDE.md',
-    maxLines: 1092,
+    maxLines: 1100,
     // RAISED by the 50 measured words of the §7.2 rule that screenshot diffing
     // is not available as a shortcut (point 361). That is the mechanism working
     // as designed rather than a concession: the words buy a NEW standing rule
@@ -55,7 +55,16 @@ export const DOC_BUDGETS = [
     // and a new verify suite on both backends. The alternative — leaving
     // §7.1 describing a popup that no longer exists — is the drift this
     // budget is not meant to buy.
-    maxWords: 9835,
+    // RAISED by the 98 measured words (8 lines) of the §7.2 shutter rule
+    // (point 375): a verify frame declares its subject and is REFUSED when the
+    // subject is not in the rendered picture. A NEW standing rule with a new
+    // mechanism and a new gate — not a longer telling of the projection rule it
+    // stands beside, which says how to judge "is it in view" but never demanded
+    // that the evidence itself be judged. It is cheap to hold and expensive to
+    // omit: the case behind it (two runs photographing different places, both
+    // green) is invisible to every existing check, so a session that did not
+    // read the rule would file the wrong picture as evidence again.
+    maxWords: 9933,
     why: 'loaded at every session start — the most expensive document in the project',
   },
   {

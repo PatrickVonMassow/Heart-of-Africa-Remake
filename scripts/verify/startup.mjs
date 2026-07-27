@@ -28,6 +28,7 @@
 // Dev server only (dev hooks).
 import { launchVerifyBrowser, assertBackend, VERIFY_GL } from './_browser.mjs'
 import { attributeBlocks, maxGap, pictureSettled, SETTLE_DEFAULTS } from './liveness.mjs'
+import { frameShutter } from './frameSubject.mjs'
 import { fileURLToPath } from 'node:url'
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:5173/'
@@ -165,8 +166,11 @@ console.log(
     `picture settled: ${settled}; backend ${VERIFY_GL}`,
 )
 
-await page.screenshot({ path: `${OUT}142-startup-picture-live.png` })
-console.log('shot 142-startup-picture-live.png')
+// The subject is the running game itself — the picture after the loading
+// freeze — so the status bar standing on screen is what the frame must show
+// (point 375); a boot that never reached the game would otherwise be filed as
+// evidence that it did.
+await frameShutter(page, OUT)('142-startup-picture-live', { element: '.status-bar', label: 'the live game picture after boot' })
 
 console.log('console errors:', errors.length)
 for (const e of errors) console.log('ERR:', e.slice(0, 300))

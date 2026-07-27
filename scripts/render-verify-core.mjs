@@ -38,6 +38,8 @@ export const NON_RENDER_VERIFY = new Set([
   'baseline-classify.mjs',
   'docs.mjs',
   'fixedWaits.mjs',
+  'frameSubject-core.mjs',
+  'frameSubject.mjs', // the frame shutter's decision layer; the suites hand it their page
   'liveness.mjs', // main-thread liveness ATTRIBUTION; the suites do the driving
   'machine-load-core.mjs',
   'machine-load.mjs',
