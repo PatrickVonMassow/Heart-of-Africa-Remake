@@ -259,6 +259,14 @@ Der dritte Posten war der unauffälligste: blockierende Wächter. Einer, der am 
 
 **Lehren:** Eine Kostenrechnung erbt die Annahmen ihres Modells — hier die, dass eine Aufräumhandlung stattfindet; prüfe deshalb die Voraussetzung, nicht nur die Rechnung. Wo etwas Großes wiederholt gelesen wird, ist **Zustellung billiger als Suche**. Und die teuersten Züge sind die, in denen nichts entsteht: Ist die Bedingung eines Wächters vorher prüfbar, gehört sie vorher geprüft.
 
+### 3.32 Ein Durchsetzer, der zu spät greift — und einer, der zu früh anschlägt
+
+Zwei Befunde desselben Tages, die zusammengehören, weil beide die *Platzierung* eines Mechanismus betreffen, nicht seine Regel.
+
+Der erste: Sämtliche Board-Wächter hängen am Zug-**Ende**. Sie sichern zu, dass die Anzeige stimmt, sobald ein Zug fertig ist — über die Stunde davor sagen sie nichts. Genau diese Stunde ist aber die, in der der Nutzer hinsieht: Er las „Pausiert", während längst zwei Vorgänge liefen, und musste es zweimal anmahnen. Der Fehler war nicht Nachlässigkeit, sondern eine Zusicherung, die am falschen Ende des Vorgangs sitzt. **Lehre:** Ein Versprechen über den *laufenden* Zustand muss dort durchgesetzt werden, wo der Zustand entsteht, nicht dort, wo er abgeschlossen wird.
+
+Der zweite: Der Wächter über die Auftrags-Formulierung suchte seine Verbotsphrasen als bloße Teilzeichenketten und las deshalb „is **unchanged from**" als Revisionsspur „changed from". Er blockierte einen völlig sauberen Punkt, und zwar wiederholt, bis die Ursache gefunden war. Eine Wortgrenze kostete zwei Zeilen. **Lehre:** Ein Wächter, der bei gewöhnlicher Sprache anschlägt, verliert genau das, wovon er lebt — dass man ihm glaubt. Fehlalarme sind keine Kosmetik; sie erziehen dazu, den Durchsetzer zu umgehen, und damit fällt die ganze Konstruktion in sich zusammen.
+
 ---
 
 ## 4. Die Guards als Immunsystem
@@ -343,7 +351,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Sonntag, 26.07.2026, 21:45 · Quellen-Fingerprint: `2503f55bd4d5…`
+Zuletzt aktualisiert: Montag, 27.07.2026, 10:32 · Quellen-Fingerprint: `1a95eb357bdc…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -412,10 +420,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Standing licence to move, REMOVE or ADD villages when it helps — but every change must be checked against the other requirements first, and the check has already caught a real bug | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Keep the visual QA eye open for functionally-fine but weird-LOOKING oddities, not just functional bugs | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | CORRECTED 19.07.2026 — WebGPU IS testable headless/autonomously via system Chrome (channel:'chrome') + --headless=new; the 'untestable' belief held only for Playwright's BUNDLED Chromium | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
-| Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 2 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
+| Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
 Erfasste Quellen: 63 Feedback-/Projekt-Memories · 31 Guard-/Hook-Skripte · 2 Revert-/Reapply-Commits · 15 Prozess-/Meta-TASKS-Punkte (davon 8 offen).
 
-<!-- RETRO-FINGERPRINT: 2503f55bd4d5c2d5de4c2dca50d5f3f0cbbfcdc9433729ea76e2200eec90e129 -->
-<!-- RETRO-LAST-REFRESHED: 2026-07-26T19:45:35.766Z -->
+<!-- RETRO-FINGERPRINT: 1a95eb357bdc3cd42fe437c510e220590b002526d7401e028d709256a3fd44e8 -->
+<!-- RETRO-LAST-REFRESHED: 2026-07-27T08:32:32.135Z -->
 <!-- AUTO-GENERATED:END -->

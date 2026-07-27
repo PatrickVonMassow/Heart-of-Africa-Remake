@@ -123,10 +123,10 @@ selbstbewusst Attrappen.
 
 6. **Fortschritt sichtbar machen (wenn du mitlesen willst).**
    > „Führe ein knappes Fortschritts-Board (eine Datei oder Seite) und **etabliere einen
-   > Mechanismus, der seine Aktualität erzwingt**: Es zeigt **immer den echten Stand** —
-   > woran du gerade arbeitest, was offen ist, was erledigt ist —, seine Struktur bleibt
-   > stabil, und der Mechanismus muss auch merken, wenn der Text unverändert bleibt,
-   > während sich die Arbeit weiterbewegt hat."
+   > Mechanismus, der seine Aktualität erzwingt**: Es zeigt **immer den echten Stand**.
+   > Er greift, **bevor** die Arbeit beginnt, nicht erst am Ende — sonst ist die Stunde
+   > ungesichert, in der ich hinsehe — und merkt auch, wenn der Text steht, während die
+   > Arbeit weiterlief."
 
 ---
 
