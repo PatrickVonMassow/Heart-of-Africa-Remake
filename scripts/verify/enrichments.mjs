@@ -276,10 +276,15 @@ await page.evaluate(() => window.__game.getState().setJournalOpen(false))
 // Every place/landmark label is rendered; an undiscovered one shows a muted,
 // kind-aware placeholder (point 318 — "Unbekanntes Dorf", "Unbekannter Berg"),
 // a visited place (Cairo) shows its real name, and sighting a landmark reveals it.
-const labelsBefore = await page.evaluate(() => {
+const labelsBefore = await page.evaluate(async () => {
+  // Language-agnostic on purpose: this suite runs in ENGLISH, flow.mjs in German,
+  // so the placeholder is matched against the language FILES rather than one
+  // hard-coded wording (point 318 — a German-only regex failed here first).
+  const [{ en }, { de }] = await Promise.all([import('/src/i18n/en.ts'), import('/src/i18n/de.ts')])
+  const placeholders = new Set([...Object.values(en.unknownPlaces), ...Object.values(de.unknownPlaces)])
   const labels = [...document.querySelectorAll('.map-label')]
   return {
-    undiscovered: labels.filter((l) => l.classList.contains('undiscovered') && /^Unbekannt/.test(l.textContent.trim())).length,
+    undiscovered: labels.filter((l) => l.classList.contains('undiscovered') && placeholders.has(l.textContent.trim())).length,
     bareQuestionMarks: labels.filter((l) => l.textContent.trim() === '?').length,
     cairoNamed: labels.some((l) => !l.classList.contains('undiscovered') && /Kair|Cairo/.test(l.textContent)),
     kiliHidden: !labels.some((l) => /Kilim/.test(l.textContent)),
