@@ -421,3 +421,70 @@ observed real signal, on every frame. `scripts/picture-stability.mjs` measures
 exactly that. Until it reports a floor under that bar, no diff-gated review is
 worth building — and `12-worldmodel-lake-victoria` says the first work is not a
 tolerance knob but making the capture wait for the picture it names.
+
+---
+
+## 5. What the render set must CONTAIN (point 376, 27.07.2026)
+
+§1–§4 asked how to make a picture check cheaper. This section asks the prior
+question: **which changes owe one at all.** It was forced by a hole the corpus
+itself exposes — `scripts/render-verify-core.mjs` did not classify
+`src/world/redSea.ts` as a render path, so **the guard would not have demanded a
+picture for corpus row 1**, the stepped coast that is the reason it exists.
+
+The same evening produced the mirror error. Commits that touched only
+`scripts/verify/*.mjs` — a baseline classifier, a machine-load probe, an
+extracted server helper — each demanded a full both-backend picture check. None
+of them can move a pixel: the harness *runs* the suites, it does not draw. Each
+demand cost a real suite run and a turn, and a rule that cries wolf is one you
+learn to work around.
+
+### 5.1 The method
+
+Four path predicates were replayed over `git log --first-parent main`, taking
+each commit's own diff (`<sha>^..<sha>`, so a merge counts as the feature that
+landed):
+
+- **current** — `isRenderPath` as it stood before this point.
+- **narrow** — current, minus the `scripts/verify/` scripts that drive no
+  browser. Membership is a DENYLIST, not an allowlist, so an unrecognised verify
+  script stays IN the set: a new suite must be safe by default, and only a new
+  *helper* needs a list entry (`render-verify-core.test.mjs` re-derives the list
+  from the directory and fails when it drifts).
+- **(a)** — narrow, plus every world-geometry source (`src/world/`).
+- **(b)** — narrow, plus a named exception list from the historical corpus,
+  which names exactly one such file: `src/world/redSea.ts`.
+
+### 5.2 The numbers
+
+| window | current | (a) ADD / REMOVE | (b) ADD / REMOVE |
+| --- | --- | --- | --- |
+| last 100 commits (all of 27.07.2026) | 13 | **+0 / −8** | **+0 / −8** |
+| whole first-parent history (1 220, 06.07.–27.07.) | 491 | **+18 / −2** | **+4 / −2** |
+
+The point's own window — the last 100 commits — cannot separate the two options:
+a day of process work touches no world geometry, so both are pure subtraction
+there, removing 8 of 13 demands. The whole history separates them: (a) costs 18
+commits over three weeks, 1.5 % of all commits and about one a day; (b) costs 4.
+
+### 5.3 The decision: (a), the whole class
+
+The 14 commits (a) adds and (b) does not are not a grey zone. Their subjects:
+*sample DEM elevation bicubically so terrain relief reads without facets*,
+*smooth the sea coast from the vector signed distance*, *level every lake bed so
+no sheet floats over its shore*, *shift the Meroë pyramid field off the Nile*,
+*grade the Red-Sea trim coast into a smooth underwater shelf*, *every village
+keeps a minimum clearance to river water*. Every one of them changes what the
+player sees; several ARE the visible-geometry defects other points were opened
+to fix. A rule that demanded a picture for `redSea.ts` alone would still have
+waved through the file carrying the terrain heightfield.
+
+Replaying the corpus confirms the shape: under (a) **all seven rows with a fixing
+commit demand the picture check**, row 1 included, where the old rule missed it.
+Row 8 (the texture dip, fixed in `scripts/verify/settings.mjs`) stays in under
+the harness narrowing, because `settings.mjs` drives a browser.
+
+The two numbers together are why this is not a cost increase at all. In the
+window that reflects how the project works *now*, the narrowing removes 8 of 13
+demands while the widening adds none; across the whole history the net is +16 on
+491, and it buys the one class that has already broken the picture in public.
