@@ -1355,6 +1355,15 @@ read that as "the criterion and its evidence section".
   daylight under the body from any standpoint a player can reach, and no sheet
   extending beyond the drift — matching the ~1890 state in which only the head and
   upper back stood clear of the sand. The collidable mass stays as it is.
+  THE DECISIVE CLUE ARRIVED 27.07.2026 (user, third screenshot with the area marked):
+  the pale sheet FLICKERS — it and the surface behind it trade places frame by frame
+  across a band at the body's base, the unmistakable signature of two faces at the SAME
+  depth fighting for the front. That answers the diagnosis question above: there are
+  two coplanar surfaces there, not one misshapen mesh, and the fix is to remove the
+  duplicate or separate the planes — not to reshape a wedge. A z-offset that merely
+  hides the fight is NOT the fix; the sheet has no business spreading past the body at
+  all. The flicker is also the sharpest acceptance signal available: it is visible in
+  MOTION, so the live check must move the camera rather than take one still.
   VERIFIABLE: the existing `buildSphinx` / site-layout pure tests keep passing, plus a
   new one for the mound envelope — the mound meets the ground plane, every body face
   except head and upper back sits below the mound crest, and the drift's own footprint
