@@ -448,6 +448,8 @@ export const de: Strings = {
     calfEscapeSeconds: 'Fluchtdauer des befreiten Jungtiers (s)',
     calfReunionSeconds: 'Trennungsfenster des Jungtiers (s)',
     benchmarkStart: 'Render-Benchmark starten',
+    crocDragSpeed: 'Krokodil: Tempo beim Ins-Wasser-Ziehen',
+    crocDragSeconds: 'Krokodil: Zieh-Deadline (s)',
     crocGripSeconds: 'Krokodil: Griff-Deadline (s)',
     crocDriveOffRest: 'Krokodil: Ruhe nach Vertreiben (s)',
     huntLeaveOvertime: 'Jagd: Abzugs-Überzeit (s)',

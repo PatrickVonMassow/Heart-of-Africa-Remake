@@ -1147,6 +1147,157 @@ export function crocodileMouthAnchor(
 }
 
 /**
+ * The crocodile's own body length in geometry-local units (design.md §19.16):
+ * from the snout tip (the jaw tubes reach local z ~1.55) to the tail tip
+ * (`tailBaseZ` −0.7 less the 1.45-long tail cone, ~−2.15). Used as the yardstick
+ * for "the carcass lies BESIDE the feeding crocodile" — a catch further than its
+ * own body from it is not a catch it is holding.
+ */
+export const CROCODILE_BODY_LENGTH_LOCAL = 3.7
+
+/** Turn rate (rad/s) while hauling a catch back to the water: the crocodile
+ *  swings its prey around toward its channel; a facing never snaps (design.md
+ *  §19). */
+export const CROCODILE_DRAG_TURN = 2.2
+/** World units within which the haul counts its home water as reached. */
+export const CROCODILE_DRAG_ARRIVED = 0.2
+/** Headings scanned when the jaws must be turned onto water (see below). */
+const CROCODILE_JAW_HEADINGS = 12
+
+/**
+ * Where a crocodile's FEEDING PAIR may legally stand (design.md §19.16, point
+ * 383): the ambusher takes its catch BACK INTO the water — its own body centre
+ * on a water cell and the carcass beside it, within its own body length, on
+ * water too. The reported picture was the exact inverse (the crocodile wholly on
+ * the sand, the carcass at the waterline), because nothing ever tied the two to
+ * each other or to the shoreline. Pure over an `isWater` probe so both the sweep
+ * test and the in-game invariant assert can share one rule.
+ */
+export function crocodileFeedPairValid(
+  cx: number,
+  cz: number,
+  vx: number,
+  vz: number,
+  scale: number,
+  isWater: (x: number, z: number) => boolean,
+): boolean {
+  if (!isWater(cx, cz) || !isWater(vx, vz)) return false
+  return Math.hypot(vx - cx, vz - cz) <= CROCODILE_BODY_LENGTH_LOCAL * scale
+}
+
+/** Nearest heading (to `rot`) whose jaws anchor lies on water, or null when no
+ *  heading does — the degenerate channel narrower than the crocodile's reach. */
+function jawHeadingOnWater(
+  cx: number,
+  cz: number,
+  rot: number,
+  scale: number,
+  mouthOffsetLocal: number,
+  isWater: (x: number, z: number) => boolean,
+): number | null {
+  let best: number | null = null
+  let bestTurn = Infinity
+  for (let i = 0; i < CROCODILE_JAW_HEADINGS; i++) {
+    const r = (i / CROCODILE_JAW_HEADINGS) * Math.PI * 2
+    const [mx, mz] = crocodileMouthAnchor(cx, cz, r, scale, mouthOffsetLocal)
+    if (!isWater(mx, mz)) continue
+    let dh = r - rot
+    while (dh > Math.PI) dh -= Math.PI * 2
+    while (dh < -Math.PI) dh += Math.PI * 2
+    if (Math.abs(dh) < bestTurn) {
+      bestTurn = Math.abs(dh)
+      best = r
+    }
+  }
+  return best
+}
+
+/**
+ * THE DRAG-INTO-WATER LEG (design.md §19.16, point 383) — one step of it, and of
+ * the feeding hold it settles into.
+ *
+ * §19.16's ambusher comes OUT of the water for the burst and takes its catch
+ * BACK IN: "it drags the body under, and the river keeps it". That leg did not
+ * exist. The seizure left both where the strike happened — on the bank — and the
+ * grip then pulled the CROCODILE to its victim (the inverse coupling), so the
+ * pair fed on dry land while the render drew the catch at the crocodile's stale
+ * water height: the reported screenshot, crocodile on sand, carcass sunk at the
+ * waterline.
+ *
+ * Called every frame from the seizure until the carcass is gone, so the pair can
+ * never drift apart or out of the water — even if the water mask itself moves
+ * under them (the calibratable river width factor is edited at runtime).
+ *
+ *  - NOT yet settled: step toward the home water it lunged from (a validated
+ *    water cell) at `dragSpeed`, turning toward it at a capped rate — a visible
+ *    haul, never a teleport. The catch rides the jaws throughout.
+ *  - Home reached but the jaws still off the water (a channel narrower than the
+ *    crocodile's own reach): turn the HEAD onto the water rather than haul
+ *    further, so the catch still ends up in the river.
+ *  - Settled (body centre AND jaws on water): hold — the feed happens here.
+ *
+ * Pure over an `isWater` probe so the whole placement is unit-testable.
+ */
+export interface CrocodileHold {
+  /** The crocodile's body centre after this step. */
+  x: number
+  z: number
+  /** Its facing after this step. */
+  rot: number
+  /** Where the held catch lies — at the jaws. */
+  victimX: number
+  victimZ: number
+  /** True while the catch is still being hauled back into the water. */
+  dragging: boolean
+  /** Settled although the rule CANNOT be met here — a puddle smaller than the
+   *  crocodile's own reach, or a home spot that is no longer water at all. The
+   *  haul always terminates (I4); the caller's invariant assert stands down for
+   *  this case rather than accusing the world of a bug the placement cannot fix. */
+  stranded: boolean
+}
+export function crocodileHaulStep(
+  cx: number,
+  cz: number,
+  rot: number,
+  scale: number,
+  homeX: number,
+  homeZ: number,
+  mouthOffsetLocal: number,
+  dragSpeed: number,
+  dt: number,
+  isWater: (x: number, z: number) => boolean,
+): CrocodileHold {
+  const jaws = (x: number, z: number, r: number): [number, number] =>
+    crocodileMouthAnchor(x, z, r, scale, mouthOffsetLocal)
+  const settled = (x: number, z: number, r: number): boolean => {
+    const [mx, mz] = jaws(x, z, r)
+    return isWater(x, z) && isWater(mx, mz)
+  }
+  const hold = (x: number, z: number, r: number, dragging: boolean, stranded = false): CrocodileHold => {
+    const [mx, mz] = jaws(x, z, r)
+    return { x, z, rot: r, victimX: mx, victimZ: mz, dragging, stranded }
+  }
+  if (settled(cx, cz, rot)) return hold(cx, cz, rot, false)
+  const dx = homeX - cx
+  const dz = homeZ - cz
+  const d = Math.hypot(dx, dz)
+  if (d <= CROCODILE_DRAG_ARRIVED) {
+    // Home reached and still not settled: the body is in its water but the jaws
+    // reach past the far bank. Turn the HEAD onto the water rather than haul on.
+    if (!isWater(cx, cz)) return hold(cx, cz, rot, false, true) // the home itself dried up
+    const target = jawHeadingOnWater(cx, cz, rot, scale, mouthOffsetLocal, isWater)
+    if (target === null) return hold(cx, cz, rot, false, true) // nothing better exists
+    const r2 = turnToward(rot, target, CROCODILE_DRAG_TURN * dt)
+    return hold(cx, cz, r2, !settled(cx, cz, r2))
+  }
+  const step = Math.min(d, dragSpeed * dt)
+  const nx = cx + (dx / d) * step
+  const nz = cz + (dz / d) * step
+  const nrot = turnToward(rot, Math.atan2(dx, dz), CROCODILE_DRAG_TURN * dt)
+  return hold(nx, nz, nrot, !settled(nx, nz, nrot))
+}
+
+/**
  * The feeding motion of a crocodile that has seized a victim (design.md §19.16,
  * point 268): while it grips and consumes, the croc animates as EATING — the
  * classic death-roll / head thrash paired with a gulp bob — so the meal reads as

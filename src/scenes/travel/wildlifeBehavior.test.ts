@@ -63,6 +63,9 @@ import {
   crocodileAmbushResting,
   crocodileWaterlinePrey,
   crocodileMouthAnchor,
+  crocodileHaulStep,
+  crocodileFeedPairValid,
+  CROCODILE_BODY_LENGTH_LOCAL,
   crocodileFeedPose,
   CROCODILE_FEED_THRASH_AMP,
   CROCODILE_FEED_GULP_PITCH,
@@ -911,6 +914,179 @@ describe('crocodile feed depiction (design.md §19.16, point 268)', () => {
     expect(p0.rollYaw).toBeCloseTo(0, 6)
     expect(p0.pitch).toBeCloseTo(0, 6)
     expect(p0.bobY).toBeCloseTo(0, 6)
+  })
+})
+
+// THE KILL GOES INTO THE WATER (design.md §19.16, point 383). Reported from the
+// deployed build: the crocodile stood WHOLLY on the sandy bank feeding, while the
+// carcass lay at the waterline with its head under — the exact inverse of the
+// ambusher that takes its catch back into the river. Nothing tied the two to each
+// other or to the shoreline: the seizure left both where the strike happened and
+// the grip then pulled the CROCODILE to its victim on the bank.
+describe('crocodile drag-into-water and feeding hold (design.md §19.16, point 383)', () => {
+  const SCALE = 0.55
+  const MOUTH = 1.15
+  const DRAG = 5
+  const DT = 1 / 60
+  /** A straight bank: water at x < edge, land beyond — the channel to the -x side. */
+  const bankAt = (edge: number) => (x: number) => x < edge
+  /** A river BAND of the given half-width about x = 0 (the calibratable width
+   *  factor widens exactly this): water inside, land on both banks. */
+  const bandOf = (halfWidth: number) => (x: number) => Math.abs(x) < halfWidth
+
+  /** Run the haul from a seizure until it settles; returns the final pair. */
+  const haulToRest = (
+    croc: { x: number; z: number; rot: number },
+    home: { x: number; z: number },
+    isWater: (x: number, z: number) => boolean,
+    maxSteps = 900,
+  ) => {
+    let c = { ...croc }
+    let victim: [number, number] = [c.x, c.z]
+    let steps = 0
+    let dragging = true
+    while (dragging && steps < maxSteps) {
+      const hold = crocodileHaulStep(c.x, c.z, c.rot, SCALE, home.x, home.z, MOUTH, DRAG, DT, isWater)
+      // Never a teleport: one step covers at most the drag speed's own distance.
+      expect(Math.hypot(hold.x - c.x, hold.z - c.z)).toBeLessThanOrEqual(DRAG * DT + 1e-9)
+      c = { x: hold.x, z: hold.z, rot: hold.rot }
+      victim = [hold.victimX, hold.victimZ]
+      dragging = hold.dragging
+      steps++
+    }
+    return { croc: c, victim, steps, dragging }
+  }
+
+  it('THE REPORTED ARRANGEMENT IS ILLEGAL: crocodile on the sand, carcass in the water', () => {
+    const isWater = (x: number) => bankAt(0)(x)
+    // The screenshot: the croc wholly on land (x > 0), the carcass at the
+    // waterline (x < 0). Both halves wrong, and in opposite directions.
+    expect(crocodileFeedPairValid(1.4, 0, -0.2, 0, SCALE, isWater)).toBe(false)
+    // The inverse arrangement is just as illegal — a carcass left on the bank.
+    expect(crocodileFeedPairValid(-0.6, 0, 0.4, 0, SCALE, isWater)).toBe(false)
+    // Far apart on the same water is no feeding pair either.
+    expect(crocodileFeedPairValid(-1, 0, -1, 9, SCALE, isWater)).toBe(false)
+    // What §19.16 asks for: both in the channel, the catch beside the croc.
+    expect(crocodileFeedPairValid(-1, 0, -1 + MOUTH * SCALE, 0, SCALE, isWater)).toBe(true)
+  })
+
+  it('the PRE-FIX placement fails the rule for every bank strike (the regression case)', () => {
+    // What the code did until point 383: the victim stayed at the strike point
+    // on the bank and the crocodile was pulled to it (0.6 back along its facing).
+    // Both end up on land — the feed on the beach the user photographed.
+    for (let inland = 0.1; inland <= 4; inland += 0.3) {
+      const isWater = bankAt(0)
+      const vx = inland // the bank visitor, on land
+      const preFixCrocX = vx - 0.6 // pulled to the victim, facing +x
+      expect(
+        crocodileFeedPairValid(preFixCrocX, 0, vx, 0, SCALE, (x) => isWater(x)),
+      ).toBe(false)
+    }
+  })
+
+  it('hauls every bank strike back into the water — pair on water, catch at the jaws', () => {
+    for (const edge of [0, 1.5]) { // a plain bank, and the widened river band
+      const isWater = (x: number) => bankAt(edge)(x)
+      for (let inland = 0.1; inland <= 4.001; inland += 0.3) {
+        for (const zOff of [-3, 0, 4]) {
+          const home = { x: edge - 1.2, z: zOff } // the water it lunged from
+          // Where the burst left it: just short of the victim, facing the bank.
+          const vx = edge + inland
+          const rot = Math.atan2(vx - home.x, 0)
+          const croc = { x: vx - 0.85, z: zOff, rot }
+          const out = haulToRest(croc, home, (x) => isWater(x))
+          expect(out.dragging).toBe(false)
+          expect(
+            crocodileFeedPairValid(out.croc.x, out.croc.z, out.victim[0], out.victim[1], SCALE, (x) => isWater(x)),
+          ).toBe(true)
+          // The catch lies AT the jaws (point 268), not on the croc's back.
+          const sep = Math.hypot(out.victim[0] - out.croc.x, out.victim[1] - out.croc.z)
+          expect(sep).toBeCloseTo(MOUTH * SCALE, 6)
+          // And it got there in a haul, not a hop: bounded by the drag deadline.
+          expect(out.steps * DT).toBeLessThan(balance.crocodile.dragSeconds)
+        }
+      }
+    }
+  })
+
+  it('holds the settled pair still — the feed does not wander back out of the water', () => {
+    const isWater = bankAt(0)
+    let c = { x: -1.5, z: 3, rot: Math.PI } // in the channel, facing -x (deeper)
+    const home = { x: -1.5, z: 3 }
+    for (let i = 0; i < 300; i++) {
+      const hold = crocodileHaulStep(c.x, c.z, c.rot, SCALE, home.x, home.z, MOUTH, DRAG, DT, (x) => isWater(x))
+      expect(hold.dragging).toBe(false)
+      expect(hold.x).toBe(c.x)
+      expect(hold.z).toBe(c.z)
+      expect(crocodileFeedPairValid(hold.x, hold.z, hold.victimX, hold.victimZ, SCALE, (x) => isWater(x))).toBe(true)
+      c = { x: hold.x, z: hold.z, rot: hold.rot }
+    }
+  })
+
+  it('resumes the haul when the water moves out from under a feeding pair', () => {
+    // The river width is a calibratable, debug-editable value: a narrowed band
+    // can leave a settled feed on dry land. The hold is re-run every frame, so
+    // the crocodile simply hauls its catch back in rather than eating on sand.
+    const wide = bandOf(3)
+    const narrow = bandOf(1)
+    const home = { x: 0, z: 0 }
+    const settled = crocodileHaulStep(2.4, 0, Math.PI, SCALE, home.x, home.z, MOUTH, DRAG, DT, wide)
+    expect(settled.dragging).toBe(false)
+    const out = haulToRest({ x: settled.x, z: settled.z, rot: settled.rot }, home, narrow)
+    expect(out.dragging).toBe(false)
+    expect(crocodileFeedPairValid(out.croc.x, out.croc.z, out.victim[0], out.victim[1], SCALE, narrow)).toBe(true)
+  })
+
+  it('turns its head onto the water instead of hauling forever in a narrow channel', () => {
+    // A channel barely wider than the crocodile itself: the home water is
+    // reached but the jaws still point at the bank. It turns the head rather
+    // than dragging out the other side — and the haul always terminates.
+    const narrow = bandOf(0.7)
+    const home = { x: 0, z: 0 }
+    const out = haulToRest({ x: 0.4, z: 0, rot: Math.PI / 2 }, home, narrow) // facing +x, at the bank
+    expect(out.dragging).toBe(false)
+    expect(narrow(out.croc.x)).toBe(true)
+    expect(narrow(out.victim[0])).toBe(true)
+    expect(crocodileFeedPairValid(out.croc.x, out.croc.z, out.victim[0], out.victim[1], SCALE, narrow)).toBe(true)
+  })
+
+  it('terminates even where no heading can put the jaws on water', () => {
+    // Degenerate: a puddle smaller than the crocodile's own reach. Nothing can
+    // satisfy the rule, so the haul settles instead of running forever (I4).
+    const puddle = (x: number, z: number) => Math.hypot(x, z) < 0.3
+    const out = haulToRest({ x: 0.05, z: 0, rot: 0 }, { x: 0, z: 0 }, puddle)
+    expect(out.dragging).toBe(false)
+    expect(out.steps).toBeLessThan(200)
+    // And it SAYS so, so the in-game invariant stands down instead of accusing
+    // the placement of a bug the world cannot let it fix.
+    const last = crocodileHaulStep(out.croc.x, out.croc.z, out.croc.rot, SCALE, 0, 0, MOUTH, DRAG, DT, puddle)
+    expect(last.stranded).toBe(true)
+    // A home spot that is no longer water at all strands it too, rather than
+    // hauling forever at a target that cannot help.
+    const dry = crocodileHaulStep(0, 0, 0, SCALE, 0, 0, MOUTH, DRAG, DT, () => false)
+    expect(dry.stranded).toBe(true)
+    expect(dry.dragging).toBe(false)
+    // An ordinary settled feed is never flagged stranded.
+    expect(crocodileHaulStep(-2, 0, Math.PI, SCALE, -2, 0, MOUTH, DRAG, DT, bankAt(0)).stranded).toBe(false)
+  })
+
+  it('a body length is the yardstick — the jaws reach is well inside it', () => {
+    expect(MOUTH).toBeLessThan(CROCODILE_BODY_LENGTH_LOCAL)
+    const isWater = () => true
+    // Just inside its own body length passes, just outside fails.
+    const L = CROCODILE_BODY_LENGTH_LOCAL * SCALE
+    expect(crocodileFeedPairValid(0, 0, L - 0.01, 0, SCALE, isWater)).toBe(true)
+    expect(crocodileFeedPairValid(0, 0, L + 0.01, 0, SCALE, isWater)).toBe(false)
+    // It scales with the animal: a bigger crocodile holds a catch further out.
+    expect(crocodileFeedPairValid(0, 0, L + 0.01, 0, SCALE * 2, isWater)).toBe(true)
+  })
+
+  it('the drag speed and its deadline are calibratable balance values', () => {
+    expect(balance.crocodile.dragSpeed).toBeGreaterThan(0)
+    // A haul of the whole ambush band must fit inside the deadline with margin.
+    expect(balance.crocodile.ambushBankBand / balance.crocodile.dragSpeed).toBeLessThan(
+      balance.crocodile.dragSeconds,
+    )
   })
 })
 

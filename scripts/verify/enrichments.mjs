@@ -5015,11 +5015,16 @@ const crocJaws = await page.evaluate(async () => {
       gripped = true
       const r = victim.jawAnchor // dev hook: the last RENDERED jaws position
       if (r) {
-        // Project onto the croc heading (rot 0 -> +z is "ahead").
+        // Project onto the croc's LIVE heading — point 383 lets a gripping croc
+        // turn (it hauls its catch back into the water, and may turn its head onto
+        // the water in a narrow channel), so the staged rot 0 is no longer the
+        // heading it still has when the jaws are read back.
         const dx = r[0] - croc.x
         const dz = r[1] - croc.z
-        aheadSum += dz // ahead component (sin0,cos0 => (0,1))
-        lateralSum += Math.abs(dx)
+        const fx = Math.sin(croc.rot)
+        const fz = Math.cos(croc.rot)
+        aheadSum += dx * fx + dz * fz // ahead component along the facing
+        lateralSum += Math.abs(dx * fz - dz * fx)
         n++
       }
     }

@@ -104,7 +104,8 @@ import {
   crocodileLungeReady,
   crocodileAmbushResting,
   crocodileWaterlinePrey,
-  crocodileMouthAnchor,
+  crocodileHaulStep,
+  crocodileFeedPairValid,
   crocodileFeedPose,
   crocodileIdleYaw,
   crocodileGripExpired,
@@ -329,7 +330,23 @@ interface Animal {
    *  absent = hidden at its spot; set = lunging at / gripping a victim or
    *  slinking back home. Its own state — the scripted LION hunt is never
    *  touched by an ambush. */
-  lunge?: { victim: Animal | null; timer: number; homeX: number; homeZ: number; gripped: boolean; retreat?: boolean }
+  lunge?: {
+    victim: Animal | null
+    timer: number
+    homeX: number
+    homeZ: number
+    gripped: boolean
+    /** The DRAG-INTO-WATER leg (point 383): seized, but still being hauled off
+     *  the bank back into the channel. `gripped` — the feeding hold — only
+     *  begins once crocodile and catch are both on water. */
+    dragging?: boolean
+    /** Where the catch was SEIZED — the bank spot the drag started from (point
+     *  383). The body itself ends up in the river, so a keeper's vigil stands
+     *  here, at the waterline, rather than out in the channel. */
+    seizeX?: number
+    seizeZ?: number
+    retreat?: boolean
+  }
   /** Elapsed time a DRIVEN-OFF crocodile's rest expires at (point 130 under the
    *  broadened waterline trigger): while it holds, this crocodile takes no new
    *  ambush target, so a repelled ambusher truly withdraws instead of re-seizing
@@ -2146,7 +2163,13 @@ function Herds() {
               // The vigil (design.md §19.8, point 121): a parent that stayed
               // clear of the kill does not resume grazing — it walks to the
               // carcass and stands over it (behaviour in the vigil pre-pass).
-              par.vigil = { x: a.x, z: a.z, carcass: a, time: 0 }
+              // A CROCODILE kill has been hauled into the river (point 383), so
+              // the keeper stands at the WATERLINE its calf was seized from —
+              // never out in the channel over a body the river has taken.
+              const seized = croc
+                ? herds.crocodile.find((k) => k.lunge?.victim === a)?.lunge
+                : undefined
+              par.vigil = { x: seized?.seizeX ?? a.x, z: seized?.seizeZ ?? a.z, carcass: a, time: 0 }
               par.child = undefined
               a.parent = undefined
             }
@@ -2876,6 +2899,39 @@ function Herds() {
     const crocByVictim = new Map<Animal, Animal>()
     {
       const bc = balance.crocodile
+      // The one water probe the drag leg and its invariant share (point 383):
+      // a crocodile's home is a water cell and nothing else (crocodileAllowedAt).
+      const isWaterAt = (x: number, z: number): boolean => {
+        const ll = worldToLatLon(x, z)
+        return crocodileAllowedAt(sampleTerrain(ll.lat, ll.lon, seed).type)
+      }
+      // Re-seat a crocodile that just moved onto the DRAWN water sheet at its
+      // new spot (the same derivation the resting re-anchor uses — never the
+      // canoe-float surface, whose local-bed floor stands proud of the ribbon).
+      const seatOnWater = (c: Animal) => {
+        const wll = worldToLatLon(c.x, c.z)
+        const wt = sampleTerrain(wll.lat, wll.lon, seed)
+        c.y = renderedSheetY(wll.lat, wll.lon, seed) ?? waterSurfaceY(wll.lat, wll.lon, seed, wt.height) ?? wt.height + 0.3
+      }
+      // One step of the haul/hold, and the catch carried with it (point 383):
+      // the crocodile owns the pair's placement from the seizure until the
+      // carcass is gone, so the two can never end up on opposite sides of the
+      // shoreline — the reported picture. The catch rides the JAWS throughout
+      // (point 268) and at the crocodile's own waterline, so a dead one dissolves
+      // in the river beside it rather than on the sand where it fell.
+      const haulCatch = (c: Animal, v: Animal) => {
+        const hold = crocodileHaulStep(
+          c.x, c.z, c.rot, c.scale, c.lunge!.homeX, c.lunge!.homeZ,
+          bc.mouthOffsetLocal, bc.dragSpeed, dt, isWaterAt,
+        )
+        c.x = hold.x
+        c.z = hold.z
+        c.rot = hold.rot
+        v.x = hold.victimX
+        v.z = hold.victimZ
+        v.y = c.y
+        return hold
+      }
       for (const c of herds.crocodile) {
         if (c.dead) continue
         // Keep every RESTING crocodile ON water (design.md §19.16, point 242): a
@@ -2973,12 +3029,13 @@ function Herds() {
           c.lunge.retreat ||
           c.lunge.victim === null ||
           c.lunge.victim.gone === true ||
-          // Gripping: slink home only once the catch is fully RESOLVED — the croc
-          // stays coupled to its victim through the struggle AND the sink that
-          // follows the kill (point 250: no swimming away while the prey still
-          // dissolves on its own). Mid-burst (not yet gripped): a victim that died
-          // or vanished before contact ends the run.
-          (c.lunge.gripped
+          // Gripping (or still hauling the catch in, point 383): slink home only
+          // once the catch is fully RESOLVED — the croc stays coupled to its
+          // victim through the struggle AND the sink that follows the kill (point
+          // 250: no swimming away while the prey still dissolves on its own).
+          // Mid-burst (nothing seized yet): a victim that died or vanished before
+          // contact ends the run.
+          (c.lunge.gripped || c.lunge.dragging
             ? !crocodileHoldsCatch(true, c.lunge.victim.caught, c.lunge.victim.dead === true, c.lunge.victim.dissolve)
             : c.lunge.victim.dead)
         ) {
@@ -2992,7 +3049,7 @@ function Herds() {
             c.z += (dz / d) * Math.min(d, bc.lungeSpeed * 0.3 * dt)
             c.rot = Math.atan2(dx, dz)
           }
-        } else if (!c.lunge.gripped) {
+        } else if (!c.lunge.gripped && !c.lunge.dragging) {
           // The burst: fast, short and visible — never a teleport.
           c.lunge.timer += dt
           const v = c.lunge.victim
@@ -3004,55 +3061,97 @@ function Herds() {
           if (c.lunge.timer > 4) {
             c.lunge.retreat = true // the moment passed — back under
           } else if (d < 0.9) {
-            // Seized AT the waterline: the victim struggles there through the
-            // shared window while a parent may still charge in and save it.
+            // Seized AT the waterline: the victim struggles through the shared
+            // window while a parent may still charge in and save it — but the
+            // ambusher does not eat it on the beach. The seizure hands straight
+            // over to the DRAG-INTO-WATER leg (point 383): §19.16's kill goes
+            // back into the river, and only there does the feeding grip begin.
             v.x = tx
             v.z = tz
             v.drink = undefined
             v.caught = CAUGHT_DURATION
             v.caughtBy = 'crocodile'
-            c.lunge.gripped = true
-            c.lunge.timer = 0 // restart the clock for the grip's hard deadline (point 186)
+            c.lunge.dragging = true
+            c.lunge.seizeX = tx
+            c.lunge.seizeZ = tz
+            c.lunge.timer = 0 // the haul's own clock (its I4 deadline)
           } else {
             c.x += (dx / d) * bc.lungeSpeed * dt
             c.z += (dz / d) * bc.lungeSpeed * dt
             c.rot = Math.atan2(dx, dz)
           }
+        } else if (c.lunge.dragging) {
+          // THE DRAG INTO THE WATER (design.md §19.16, point 383): the ambusher
+          // hauls its catch off the bank and back into its channel — the leg that
+          // did not exist, which is why the pair used to feed where the strike
+          // happened. The catch rides the jaws the whole way; the parent's rescue
+          // window runs on unchanged (its charge simply follows the calf to the
+          // water). Bounded by dragSeconds (I4): a haul that cannot reach water
+          // settles rather than pinning the drama.
+          c.lunge.timer += dt
+          const v = c.lunge.victim
+          devAssert(c.lunge.timer <= bc.dragSeconds + 2, 'croc-drag-bounded', () => `drag ${c.lunge?.timer.toFixed(1)}s`)
+          const hauled = haulCatch(c, v)
+          crocByVictim.set(v, c)
+          if (!hauled.dragging || c.lunge.timer > bc.dragSeconds) {
+            // In the water: seat the body on the sheet it now lies in, hand the
+            // catch its waterline, and start the feeding grip (and its own
+            // point-186 deadline) here.
+            seatOnWater(c)
+            v.y = c.y
+            c.lunge.dragging = false
+            c.lunge.gripped = true
+            c.lunge.timer = 0
+          }
         } else {
-          // Gripping — two coupled phases, the croc holding its victim throughout
-          // (point 250), so the prey's removal is the croc's own feed:
+          // Feeding IN THE WATER (design.md §19.16, points 250/383) — two coupled
+          // phases, the croc holding its victim throughout, so the prey's removal
+          // is the croc's own feed:
           //  (1) STRUGGLE (caught still counting): hold the thrashing victim at
-          //      the waterline. The point-186 hard deadline releases a VANISHED
+          //      the jaws. The point-186 hard deadline releases a VANISHED
           //      victim whose countdown froze (streamed out in a chunk despawn,
           //      taken by another system) so the drama can never pin the croc —
           //      the §19.8 "every started drama resolves" rule (invariant I4).
           //  (2) SINK (the kill resolved, caught cleared, the body dissolving in
-          //      the water): the croc drags it under through the dissolve
+          //      the water): the croc keeps it under through the dissolve
           //      (design.md §19.16 — the river keeps the body, no bank carcass);
           //      the retreat branch above releases the croc only once the body is
           //      gone. The dissolve is self-bounded (CARCASS_DISSOLVE_SECONDS), so
           //      the grip deadline is not applied here (it would cut the croc loose
           //      mid-sink and re-decouple the carcass — the point-250 bug).
+          // The PAIR's placement is the croc's, in BOTH phases (point 383): the
+          // catch is carried at its jaws on the water beside it — never the old
+          // inverse coupling, which pulled the CROCODILE to a victim standing on
+          // the bank and fed it there. Re-run every frame, so a water mask that
+          // moves under them (the calibratable river width is debug-editable)
+          // simply resumes the haul instead of stranding the meal on land.
           const v = c.lunge.victim
+          // (Kept inside the feeding phase rather than flipping back to the drag
+          // phase: the grip's own deadline must keep running, so a flapping mask
+          // can never restart it and pin the croc.)
+          const hold = haulCatch(c, v)
           if (v.caught !== undefined) {
             c.lunge.timer += dt
             // Point 207(i): the grip deadline is a hard invariant — a timer past
             // it (while still struggling) means the release below failed.
             devAssert(c.lunge.timer <= bc.gripSeconds + 2, 'croc-grip-bounded', () => `grip ${c.lunge?.timer.toFixed(1)}s`)
-            if (crocodileGripExpired(c.lunge.timer, bc.gripSeconds)) {
-              c.lunge.retreat = true
-            } else {
-              c.x = v.x - Math.sin(c.rot) * 0.6
-              c.z = v.z - Math.cos(c.rot) * 0.6
-              // The victim renders AT the jaws (point 268): register this croc as
-              // its holder so the render draws it at the mouth anchor, not on the
-              // back. Purely a render lookup — the drama-driving v.x/v.z (which the
-              // parent charge measures) is untouched.
-              crocByVictim.set(v, c)
-            }
+            if (crocodileGripExpired(c.lunge.timer, bc.gripSeconds)) c.lunge.retreat = true
+            // The victim renders AT the jaws (point 268): register this croc as
+            // its holder so the render draws it where the sim just placed it.
+            else crocByVictim.set(v, c)
           }
-          // SINK phase (v.caught === undefined, v.dead): hold position over the
-          // sinking body — no move, no deadline; released by the retreat branch.
+          // Point 383 as an in-game invariant: a settled feed has BOTH bodies on
+          // water, the carcass within a body length of the croc. A violation is
+          // exactly the reported picture and fails any suite through the assert
+          // channel. Skipped while the haul still runs — that is the fix working —
+          // and where the world itself cannot satisfy the rule (a puddle narrower
+          // than the crocodile), which is the placement's limit, not a defect.
+          if (!hold.dragging && !hold.stranded)
+            devAssert(
+              crocodileFeedPairValid(c.x, c.z, v.x, v.z, c.scale, isWaterAt),
+              'croc-feeds-in-water',
+              () => `croc ${c.x.toFixed(1)},${c.z.toFixed(1)} catch ${v.x.toFixed(1)},${v.z.toFixed(1)}`,
+            )
         }
       }
     }
@@ -3867,19 +3966,17 @@ function Herds() {
             // still reach the predator and save it (§19). Not young-gated:
             // the seized vigil-keeper (point 121 (f)) is the one ADULT that
             // can be caught, and it thrashes like any taken prey.
-            // Point 268: a crocodile's catch lies AT ITS JAWS. When a gripping
-            // croc holds this victim, anchor the thrash at the croc's mouth
-            // (ahead of the croc along its facing) instead of the victim's own
-            // spot on the water — so the prey reads as being eaten in the mouth,
-            // not resting on the croc's back. Land prey (lion/fire) is unchanged.
+            // Point 268: a crocodile's catch lies AT ITS JAWS. The SIM places it
+            // there — at the jaws of the crocodile that holds it, on the water it
+            // hauled the catch into (point 383) — so the render simply thrashes
+            // it around that spot. It recomputed the mouth anchor here until
+            // point 383; sim and render owning the same placement separately is
+            // precisely how the pair drifted onto opposite sides of the shoreline.
+            // Land prey (lion/fire) is unchanged.
             const holdingCroc = a.caughtBy === 'crocodile' ? crocByVictim.get(a) : undefined
             if (holdingCroc) {
-              const [mx, mz] = crocodileMouthAnchor(
-                holdingCroc.x, holdingCroc.z, holdingCroc.rot, holdingCroc.scale,
-                balance.crocodile.mouthOffsetLocal,
-              )
-              px = mx + Math.sin(t * 13 + a.phase) * 0.1
-              pz = mz + Math.cos(t * 11 + a.phase) * 0.1
+              px = a.x + Math.sin(t * 13 + a.phase) * 0.1
+              pz = a.z + Math.cos(t * 11 + a.phase) * 0.1
               bodyY = holdingCroc.y + 0.05 // riding at the croc's waterline, gripped
               a.jawAnchor = [px, pz] // dev observability (point 268)
             } else {

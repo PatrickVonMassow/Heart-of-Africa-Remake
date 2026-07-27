@@ -409,6 +409,8 @@ export interface Strings {
     calfEscapeSeconds: string
     calfReunionSeconds: string
     benchmarkStart: string
+    crocDragSpeed: string
+    crocDragSeconds: string
     crocGripSeconds: string
     crocDriveOffRest: string
     huntLeaveOvertime: string
