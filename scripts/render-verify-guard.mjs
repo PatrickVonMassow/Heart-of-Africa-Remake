@@ -31,6 +31,7 @@ import {
 } from './render-verify-state.mjs'
 import { isRenderPath, evaluate, BACKENDS, coveringRun, baselineFor } from './render-verify-core.mjs'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
+import { isMainModule } from './is-main.mjs'
 
 function git(cmd) {
   return execSync(cmd, { cwd: REPO_ROOT, encoding: 'utf8' }).trim()
@@ -118,7 +119,45 @@ function advanceBaseline(state, branch, head, extra = {}) {
   })
 }
 
-const arg = process.argv[2]
+/**
+ * Everything evaluate() needs — HEAD, the per-branch baseline, the pending render
+ * paths and their latest change time — exported so the preflight (point 365 D)
+ * judges the gate from the SAME gathering the Stop hook uses; a second copy of
+ * this git work would drift and report a false "clean". Read-only: the baseline
+ * bootstrap and its advancement stay in the main path, and `bootstrap: true`
+ * tells the caller the gate has no baseline yet.
+ */
+export function gatherRenderVerifyInputs({ sessionId = '' } = {}) {
+  // Hard singleton: a session that does not own the live batch lock stands down.
+  if (heldByOtherLiveOwner(sessionId)) {
+    return { applicable: false, why: 'another live session owns the batch lock' }
+  }
+  const head = git('git rev-parse HEAD')
+  const branch = currentBranch()
+  const state = readRenderState() ?? {}
+  const cleared = baselineFor(state, branch)
+  if (!cleared) {
+    return { applicable: false, why: 'no verified baseline yet — the gate bootstraps at this HEAD', head, branch, state }
+  }
+  const { paths, base } = changedRenderPaths(cleared, head)
+  return {
+    applicable: true,
+    head,
+    branch,
+    state,
+    cleared,
+    inputs: {
+      head,
+      clearedHead: cleared,
+      changedRenderPaths: paths,
+      latestChangeAt: paths.length ? latestChangeAt(paths, head, base) : 0,
+      runs: state.runs,
+      deferral: state.deferral,
+    },
+  }
+}
+
+const arg = isMainModule(import.meta.url) ? process.argv[2] : '__imported__'
 
 // --defer "<reason>": the LOUD escape valve for the honest case where one
 // backend genuinely cannot be judged headless. Covers the CURRENT head only —
@@ -210,66 +249,61 @@ if (arg === 'status') {
 }
 
 // Stop-hook mode.
-try {
-  let sessionId = ''
+if (isMainModule(import.meta.url)) {
   try {
-    sessionId = JSON.parse(readFileSync(0, 'utf8')).session_id || ''
-  } catch {
-    /* no/non-JSON stdin (manual run) — the gate is global truth, not session-local */
-  }
-
-  // Hard singleton: a session that does not own the live batch lock stands
-  // down — it neither advances the baseline nor gets blocked into batch work.
-  if (heldByOtherLiveOwner(sessionId)) process.exit(0)
-
-  const head = git('git rev-parse HEAD')
-  const branch = currentBranch()
-  const state = readRenderState() ?? {}
-  const cleared = baselineFor(state, branch)
-
-  // Bootstrap: first ever evaluation baselines at the current HEAD (the gate
-  // audits work from now on, not history).
-  if (!cleared) {
-    advanceBaseline(state, branch, head, { clearedAt: Date.now(), clearedBy: sessionId || 'bootstrap' })
-    process.exit(0)
-  }
-
-  let changed
-  let base
-  try {
-    ;({ paths: changed, base } = changedRenderPaths(cleared, head))
-  } catch (e) {
-    // The baseline commit no longer resolves (rebase/gc): re-baseline rather
-    // than block forever on an undiffable window — fail-open, logged.
-    console.error(`render-verify-guard: diff vs ${String(cleared).slice(0, 7)} failed (${e && e.message}) — re-baselining`)
-    advanceBaseline(state, branch, head, { clearedAt: Date.now(), clearedBy: 'rebaseline' })
-    process.exit(0)
-  }
-
-  const result = evaluate({
-    head,
-    clearedHead: cleared,
-    changedRenderPaths: changed,
-    latestChangeAt: changed.length ? latestChangeAt(changed, head, base) : 0,
-    runs: state.runs,
-    deferral: state.deferral,
-  })
-
-  if (result.decision === 'block') {
-    process.stdout.write(JSON.stringify({ decision: 'block', reason: result.reason }))
-    process.exit(0)
-  }
-  if (result.clear && head !== cleared) {
-    const extra = { clearedAt: Date.now(), clearedBy: sessionId || 'stop-hook' }
-    if (result.deferred) {
-      // Consume the deferral but keep it visible (status shows lastDeferral).
-      extra.lastDeferral = state.deferral
-      extra.deferral = undefined
+    let sessionId = ''
+    try {
+      sessionId = JSON.parse(readFileSync(0, 'utf8')).session_id || ''
+    } catch {
+      /* no/non-JSON stdin (manual run) — the gate is global truth, not session-local */
     }
-    advanceBaseline(state, branch, head, extra)
+
+    let gathered
+    try {
+      gathered = gatherRenderVerifyInputs({ sessionId })
+    } catch (e) {
+      // The baseline commit no longer resolves (rebase/gc): re-baseline rather
+      // than block forever on an undiffable window — fail-open, logged.
+      console.error(`render-verify-guard: gathering failed (${e && e.message}) — re-baselining`)
+      const state = readRenderState() ?? {}
+      advanceBaseline(state, currentBranch(), git('git rev-parse HEAD'), {
+        clearedAt: Date.now(),
+        clearedBy: 'rebaseline',
+      })
+      process.exit(0)
+    }
+
+    // A non-owner session stands down; a gate without a baseline bootstraps at
+    // the current HEAD (it audits work from now on, not history).
+    if (!gathered.applicable) {
+      if (gathered.head) {
+        advanceBaseline(gathered.state, gathered.branch, gathered.head, {
+          clearedAt: Date.now(),
+          clearedBy: sessionId || 'bootstrap',
+        })
+      }
+      process.exit(0)
+    }
+
+    const { head, branch, state, cleared } = gathered
+    const result = evaluate(gathered.inputs)
+
+    if (result.decision === 'block') {
+      process.stdout.write(JSON.stringify({ decision: 'block', reason: result.reason }))
+      process.exit(0)
+    }
+    if (result.clear && head !== cleared) {
+      const extra = { clearedAt: Date.now(), clearedBy: sessionId || 'stop-hook' }
+      if (result.deferred) {
+        // Consume the deferral but keep it visible (status shows lastDeferral).
+        extra.lastDeferral = state.deferral
+        extra.deferral = undefined
+      }
+      advanceBaseline(state, branch, head, extra)
+    }
+    process.exit(0)
+  } catch (e) {
+    console.error(`render-verify-guard error (allowing stop): ${e && e.message}`)
+    process.exit(0)
   }
-  process.exit(0)
-} catch (e) {
-  console.error(`render-verify-guard error (allowing stop): ${e && e.message}`)
-  process.exit(0)
 }
