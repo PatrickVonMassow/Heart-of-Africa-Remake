@@ -15,6 +15,10 @@
 //   scripts/verify/*.mjs           — static screenshot-path templates per suite
 //   .claude/render-verify-state.json — the recorder's run log (runtime, shots)
 //
+// That run log is untracked session state and lives in the MAIN tree only, so a
+// run from inside a worktree reports 0.0 s runtimes and 0 recorded runs. That is
+// the missing input, not a measurement of zero — run this from the main tree.
+//
 // TOKEN RULE (platform.claude.com/docs/en/build-with-claude/vision, fetched
 // 2026-07-27): "Claude views images in patches instead of pixels. Each patch is
 // a 28x28-pixel block of the image, referred to as a visual token. An image,
