@@ -111,7 +111,9 @@ describe('offScreenReason', () => {
   it('names the edge the subject went past', () => {
     expect(offScreenReason({ x: 1.4, y: 0, z: 0.5 })).toBe('off the right edge of the frame')
     expect(offScreenReason({ x: -1.2, y: -3, z: 0.5 })).toBe('off the left and bottom edge of the frame')
-    expect(offScreenReason({ x: 0, y: 0, z: 1.2 })).toBe('BEHIND the camera')
+    expect(offScreenReason({ x: 0, y: 0, z: 1.2 })).toMatch(/outside the depth range/)
+    // The live self-test case: past the far plane AND above the frame.
+    expect(offScreenReason({ x: -0.13, y: 4.25, z: 1 })).toMatch(/depth range.*, and off the top edge/)
     expect(offScreenReason(null)).toMatch(/could not be projected/)
   })
 })

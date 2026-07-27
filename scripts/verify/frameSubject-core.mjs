@@ -131,13 +131,19 @@ export function describeSubject(d) {
 /** Which frame edge an off-screen NDC point lies past (for the failure text). */
 export function offScreenReason(ndc) {
   if (!ndc) return 'the subject could not be projected'
-  if (!(ndc.z < 1)) return 'BEHIND the camera'
   const past = []
   if (ndc.x > 1) past.push('right')
   else if (ndc.x < -1) past.push('left')
   if (ndc.y > 1) past.push('top')
   else if (ndc.y < -1) past.push('bottom')
-  return past.length ? `off the ${past.join(' and ')} edge of the frame` : 'in frame'
+  const edges = past.length ? `off the ${past.join(' and ')} edge of the frame` : ''
+  // NDC z outside [0, 1] is the depth verdict: the subject sits behind the
+  // camera or past the far plane. Both mean it is not in the picture, and the
+  // two cannot be told apart from the projection alone — so say both rather
+  // than assert the wrong one.
+  const depth = ndc.z < 1 ? '' : 'outside the depth range (behind the camera or beyond the far plane)'
+  if (depth && edges) return `${depth}, and ${edges}`
+  return depth || edges || 'in frame'
 }
 
 /**
