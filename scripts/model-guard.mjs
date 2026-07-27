@@ -13,15 +13,13 @@
 // Manual drive: node scripts/model-guard.mjs --status
 import { readFileSync, writeFileSync, existsSync } from 'node:fs'
 import { execSync } from 'node:child_process'
-import { fileURLToPath } from 'node:url'
 import { findForbiddenCommits } from './model-guard-core.mjs'
 import { notify } from './notify.mjs'
 import { isMainModule } from './is-main.mjs'
+import { REPO_ROOT, repoPath } from './repo-paths.mjs'
 
-const R = (p) => fileURLToPath(new URL(p, import.meta.url))
-const REPO_ROOT = R('..')
-const BASELINE = R('../.claude/model-guard-baseline.json')
-const PAUSE = R('../.claude/batch-paused')
+const BASELINE = repoPath('.claude/model-guard-baseline.json')
+const PAUSE = repoPath('.claude/batch-paused')
 
 /** Baseline timestamp; self-arms to NOW on first run so historic degraded
  *  commits (the acknowledged 24.07 incident) never re-trigger. `arm: false` reads

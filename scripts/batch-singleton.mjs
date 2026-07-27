@@ -39,8 +39,8 @@ import {
   statSync,
 } from 'node:fs'
 import { execFileSync } from 'node:child_process'
-import { fileURLToPath } from 'node:url'
 import os from 'node:os'
+import { repoPath } from './repo-paths.mjs'
 
 // --- Constants (exported for tests and callers) -------------------------------
 
@@ -69,12 +69,11 @@ export const REAP_MUTEX_STALE_MS = 60 * 1000
  *  detection). */
 export const PID_START_TOLERANCE_MS = 2000
 
-const R = (p) => fileURLToPath(new URL(p, import.meta.url))
-export const LOCK_PATH = R('../.claude/batch-lock.json')
-export const SESSIONS_SEEN_PATH = R('../.claude/sessions-seen.json')
-export const SESSION_ACTIVITY_PATH = R('../.claude/session-activity.json')
-export const PARALLEL_ALERT_PATH = R('../.claude/parallel-alert.json')
-export const DOCTOR_STATE_PATH = R('../.claude/doctor-state.json')
+export const LOCK_PATH = repoPath('.claude/batch-lock.json')
+export const SESSIONS_SEEN_PATH = repoPath('.claude/sessions-seen.json')
+export const SESSION_ACTIVITY_PATH = repoPath('.claude/session-activity.json')
+export const PARALLEL_ALERT_PATH = repoPath('.claude/parallel-alert.json')
+export const DOCTOR_STATE_PATH = repoPath('.claude/doctor-state.json')
 
 // --- Small IO helpers ----------------------------------------------------------
 

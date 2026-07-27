@@ -7,14 +7,14 @@
 // this wrapper only reads the two files and is fail-OPEN: any internal error →
 // allow, so a guard bug never traps the session.
 import { readFileSync, existsSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
 import { evaluate } from './queue-order-guard-core.mjs'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
 import { isMainModule } from './is-main.mjs'
+import { repoPath } from './repo-paths.mjs'
 
-const TASKS = fileURLToPath(new URL('../TASKS.md', import.meta.url))
-const DASHBOARD = fileURLToPath(new URL('../.batch-dashboard.html', import.meta.url))
-const PAUSE = fileURLToPath(new URL('../.claude/batch-paused', import.meta.url))
+const TASKS = repoPath('TASKS.md')
+const DASHBOARD = repoPath('.batch-dashboard.html')
+const PAUSE = repoPath('.claude/batch-paused')
 
 /** The guard's I/O half, shared with the preflight (point 365 D). */
 export function gatherQueueOrderInputs({ sessionId = '' } = {}) {
