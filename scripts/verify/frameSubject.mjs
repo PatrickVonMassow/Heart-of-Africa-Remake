@@ -28,7 +28,12 @@ import {
   formatFramePass,
 } from './frameSubject-core.mjs'
 
-const DEFAULT_TIMEOUT = 8000
+// How long the shutter gives the picture to arrive before it judges. Generous
+// on purpose: the bird's-eye camera settles in a fixed number of FRAMES, so on
+// a machine carrying three agents that stretch is wall-clock long, and a tight
+// budget would fail a frame the player would have seen. It costs nothing on a
+// quiet machine (the wait ends on the condition) and only delays a real refusal.
+const DEFAULT_TIMEOUT = 15000
 
 /**
  * Runs INSIDE the page. Returns the probe when the subject is in the picture,

@@ -136,9 +136,9 @@ export function describeSubject(d) {
     case 'local':
       return `${label}inside the settlement at (${d.local.x.toFixed(1)}, ${d.local.z.toFixed(1)})`
     case 'place':
-      return `${label}the interior of ${d.place}`
+      return d.label ? `${d.label} (inside ${d.place})` : `the interior of ${d.place}`
     case 'element':
-      return `${label}the element ${d.element}`
+      return d.label ? `${d.label} (${d.element})` : `the element ${d.element}`
     default:
       return `a general view — ${d.why}`
   }
@@ -225,13 +225,20 @@ export function formatFrameFailure(d, probe, judgement) {
   ].join('\n')
 }
 
-/** The success line, in the existing `shot <name>` log style. */
+/**
+ * The success line, in the existing `shot <name>` log style.
+ * A frame whose subject IS in the picture passes even if the camera was still
+ * easing toward its target — the picture shows what it claims, which is what
+ * this gate is about — but it says so, because a busy machine is the usual
+ * reason and the note is the trace of it.
+ */
 export function formatFramePass(d, probe) {
   const detail =
     d.kind === 'general'
       ? `general view — ${d.why}`
       : `subject in frame: ${describeSubject(d)}${probe?.ndc ? ` @ ndc (${fmt(probe.ndc.x)}, ${fmt(probe.ndc.y)})` : ''}`
-  return `shot ${d.frame} — ${detail}`
+  const note = probe?.settled === false && d.settle ? ' [camera still easing — shot anyway, the subject is in frame]' : ''
+  return `shot ${d.frame} — ${detail}${note}`
 }
 
 /**

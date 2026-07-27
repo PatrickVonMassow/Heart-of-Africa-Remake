@@ -115,11 +115,15 @@ describe('judgeFrameSubject', () => {
     expect(judgeFrameSubject(d, { mode: 'place', placeId: 'timbuktu' }).ok).toBe(false)
   })
 
-  it('holds a frame back while the camera is still travelling to its target', () => {
+  it('waits for the camera to settle but does not FAIL a settled-late frame that shows its subject', () => {
     const d = lakeVictoria()
-    // The page-side probe reports ok=false for an unsettled camera; the judge
-    // sees only what it was handed, so the settle rule is asserted there.
-    expect(d.settle).toBe(true)
+    expect(d.settle).toBe(true) // the page-side probe polls on it
+    // …while the verdict turns on the picture alone: a subject in frame passes
+    // even if the camera was still easing, with the note saying so. A busy
+    // machine must not turn a correct frame into a red run.
+    const probe = { mode: 'travel', onScreen: true, settled: false, ndc: { x: 0.2, y: 0.1, z: 0.9 } }
+    expect(judgeFrameSubject(d, probe).ok).toBe(true)
+    expect(formatFramePass(d, probe)).toContain('camera still easing')
   })
 })
 
