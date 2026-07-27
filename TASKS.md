@@ -3040,6 +3040,16 @@ read that as "the criterion and its evidence section".
   sessions running 8+ HOURS, and 94 % at >150k CONTEXT ("longer sessions are more
   expensive even when cached"). Measured document sizes: CLAUDE.md ~16k tokens,
   design.md ~46k, TASKS.md (open points only) ~59k, docs/tasks-archive.md ~187k.
+  THE WEEK VIEW REFINES WHERE THE COST SITS, and it is the figure that decides the
+  order of work: over 7 days the same three characteristics read 99 % / 96 % / 87 %,
+  but the per-type shares — general-purpose 25 %, claude 3 %, workflow-subagent 2 % —
+  put ALL subagents at ~30 % of the usage, which leaves ~70 % with the MAIN session.
+  (The panel calls the first three "independent characteristics of your usage, not a
+  breakdown"; the per-type shares are the only additive numbers, and both views are
+  local-session approximations.) So "subagent-heavy" describes the SESSIONS, not where
+  the tokens went: (B) is the biggest single lever, and (A) is not an agent-only fix —
+  the main session looks points up in the same whole documents and must use the brief
+  as well.
   WHAT IS NOT THE TARGET: parallelism. One point costs ONE context fill whichever
   process runs it, so the pool size is throughput, not cost — this was settled on
   26.07.2026 (`docs/analysis_de/retrospektive-zusammenarbeit.md` §3.27) and must not
