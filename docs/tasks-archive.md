@@ -10499,3 +10499,52 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   DOCS in the same commit: `scripts/doc-budget-core.mjs` (the new ceiling with its
   written justification), CLAUDE.md §4 if a moved block changes where a thing lives, and
   the retrospective only if the run produces a NEW lesson rather than confirming §3.30.
+
+- [x] 372. ONE COMMAND FOR THE BOARD, NOT SIX (user 27.07.2026, arising from the 24/7
+  plan). Keeping the board current costs SIX tool calls every time — edit, publish,
+  Artifact, `--synced`, focus, prep — and it happens several times per point. At the
+  measured rate that ritual is a large share of the main session's requests, and every
+  request is billed at the whole context. It is also the reason the board sometimes lags:
+  a six-step ritual gets postponed, a one-step one does not.
+  BUILD `scripts/board.mjs`: one command that takes the card change, applies it,
+  rotates the Erledigt overflow (`board-archive-rotate`), publishes to the scratchpad,
+  runs the consistency audit, and prints the ONE thing the caller still has to do by
+  hand — the Artifact publish, which is tool-bound and cannot be scripted. Subcommands
+  for what actually happens: `now <point> <status>`, `queue <point>`, `done <point>`,
+  `vdzk-remove <title>`, `status <point> <text>`. Each stamps the status time itself, so
+  the date the guard demands can never be forgotten.
+  MEASURE IT: count the tool calls a board update takes before and after on one real
+  point, and record both numbers in the point. A saving claimed without the count is
+  exactly what this project does not accept.
+  WHAT MUST NOT CHANGE: the four sections, their order, the card shapes, the
+  no-`open` rule and the reader's remembered folds. The command is a faster way to
+  obey the structure, never a new structure.
+  VERIFIABLE: pure Vitest on the card-editing core (each subcommand produces the exact
+  markup the guard accepts; a malformed request fails loudly rather than writing a
+  broken board); the existing dashboard audit passes on every generated board; and the
+  before/after tool-call count is recorded.
+  MEASURED (27.07.2026, on one real update): SIX tool calls before — edit,
+  publish, Artifact, `--synced`, focus, prep — and THREE after: the one editing
+  command, the Artifact call, `attest`. The Artifact publish is tool-bound and
+  stays by hand; the other five collapsed into two.
+
+- [x] 374. THE BOARD'S FOOTER COUNTS ITSELF (27.07.2026, from the first real use of
+  the one-command board). The footer carries the number of open points, and nothing
+  computes it: every tick makes it wrong, and `attest` then REFUSES with
+  `footer-stale` — the audit catches the drift, but the caller pays a blocked step
+  and a hand edit for a figure the repository already knows. Three of the four
+  numbers in that line are of the same kind.
+  FIX IT WHERE THE LINE IS WRITTEN: `scripts/dashboard-publish.mjs` rewrites the
+  footer before it publishes — the open-point count from `readTasksAll`
+  (`scripts/tasks-source.mjs`, the same source the audit compares against, so the two
+  can never disagree) and the Berlin stamp from the clock. The tag names stay as
+  written; they are a statement, not a count. A footer that does not match the
+  expected shape is REPLACED rather than patched, and a missing footer is an error,
+  not a silent no-op.
+  VERIFIABLE: pure Vitest — the rewrite produces the exact footer shape the audit
+  accepts, derives the count from the work order rather than from the old text,
+  leaves the tag statement untouched, and fails loudly on a board without a footer.
+  Plus: `auditDashboard` reports no `footer-stale` on a freshly published board, run
+  against the LIVE board file (the sweep pattern of `scripts/board-core.test.mjs`).
+  DOCS: the comment block at the head of `scripts/board.mjs`, where the loop is
+  described.
