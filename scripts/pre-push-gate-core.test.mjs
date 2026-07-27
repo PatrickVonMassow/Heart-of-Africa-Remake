@@ -44,13 +44,21 @@ describe('parsePushInput', () => {
   })
 })
 
-describe('isProseOnlyPath', () => {
-  it('accepts prose, the archive and the local board', () => {
-    expect(isProseOnlyPath('docs/analysis_de/retrospektive-zusammenarbeit.md')).toBe(true)
-    expect(isProseOnlyPath('TASKS.md')).toBe(true)
-    expect(isProseOnlyPath('CLAUDE.md')).toBe(true)
+describe('isProseOnlyPath — deliberately tiny, because docs are measured here', () => {
+  it('accepts only what no test can read: the git-ignored board and the frames', () => {
     expect(isProseOnlyPath('.batch-dashboard.html')).toBe(true)
     expect(isProseOnlyPath('verification/travel-webgpu.png')).toBe(true)
+  })
+
+  it('refuses the documents this repository measures in its unit layer', () => {
+    // Each of these is READ by a test that runs in npm run test:unit, so a
+    // prose fast path over them would be green locally and red in CI — the
+    // exact failure this gate exists to prevent (second-model finding).
+    expect(isProseOnlyPath('TASKS.md')).toBe(false)
+    expect(isProseOnlyPath('docs/tasks-archive.md')).toBe(false)
+    expect(isProseOnlyPath('CLAUDE.md')).toBe(false)
+    expect(isProseOnlyPath('design.md')).toBe(false)
+    expect(isProseOnlyPath('docs/graphics-detail-levels.md')).toBe(false)
   })
 
   it('refuses everything a gate step can measure', () => {
@@ -58,14 +66,11 @@ describe('isProseOnlyPath', () => {
     expect(isProseOnlyPath('scripts/board-core.mjs')).toBe(false)
     expect(isProseOnlyPath('package.json')).toBe(false)
     expect(isProseOnlyPath('.github/workflows/ci.yml')).toBe(false)
-    // A markdown file INSIDE a source tree is not prose-only — a doc test may
-    // read it (docs/graphics-detail-levels.md has a sync test).
-    expect(isProseOnlyPath('src/notes.md')).toBe(false)
     expect(isProseOnlyPath('')).toBe(false)
   })
 
   it('reads a Windows path the same as a POSIX one', () => {
-    expect(isProseOnlyPath('docs\\analysis_de\\x.md')).toBe(true)
+    expect(isProseOnlyPath('verification\\shot.png')).toBe(true)
     expect(isProseOnlyPath('src\\App.tsx')).toBe(false)
   })
 })
@@ -76,14 +81,14 @@ describe('gatePlan', () => {
     expect(plan.steps).toEqual(FULL_GATE)
   })
 
-  it('takes the light gate for a prose-only push to main — but never skips the audit', () => {
-    const plan = gatePlan({ remoteRef: PROTECTED_REF, files: ['TASKS.md', 'docs/x.md'] })
+  it('takes the light gate only for the board and the frames, and never skips the audit', () => {
+    const plan = gatePlan({ remoteRef: PROTECTED_REF, files: ['.batch-dashboard.html', 'verification/a.png'] })
     expect(plan.steps).toEqual(LIGHT_GATE)
     expect(plan.steps).toContain('audit')
   })
 
   it('takes the full gate when ONE file among the prose can break something', () => {
-    const plan = gatePlan({ remoteRef: PROTECTED_REF, files: ['TASKS.md', 'src/App.tsx'] })
+    const plan = gatePlan({ remoteRef: PROTECTED_REF, files: ['.batch-dashboard.html', 'src/App.tsx'] })
     expect(plan.steps).toEqual(FULL_GATE)
   })
 
@@ -136,11 +141,13 @@ describe('decide', () => {
 })
 
 describe('formatVerdict', () => {
-  it('names the failing command and the deliberate way past it', () => {
+  it('names the failing command, and does NOT advertise its own bypass', () => {
     const msg = formatVerdict({ blocked: true, failed: ['unit'] }, { reason: 'push to the deployed branch' })
     expect(msg).toMatch(/PUSH BLOCKED/)
     expect(msg).toContain(GATE_COMMANDS.unit.join(' '))
-    expect(msg).toMatch(/--no-verify/)
+    // Most pushes here are made by autonomous agents; a failure message that
+    // names the escape hatch invites the escape (second-model finding).
+    expect(msg).not.toMatch(/--no-verify/)
   })
 
   it('says why it passed, so a light gate is never mistaken for a full one', () => {

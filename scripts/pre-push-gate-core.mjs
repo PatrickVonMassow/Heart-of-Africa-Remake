@@ -28,20 +28,24 @@ export const GATE_COMMANDS = {
 }
 
 /**
- * Paths that cannot change what any gate step measures: prose and the local
- * board. Everything else — source, scripts, configuration, workflows, assets —
- * takes the full gate, because "surely that cannot break a test" is precisely
- * the assumption that produced the red runs.
+ * Paths that cannot change what any gate step measures.
+ *
+ * This list is deliberately TINY, and the second review is why: the documents
+ * that look most like prose are exactly the ones this repository measures.
+ * `TASKS.md` and `docs/tasks-archive.md` are read by the archive-guard tests,
+ * `CLAUDE.md` and `design.md` by the brief and design-section tests,
+ * `docs/graphics-detail-levels.md` by the quality-preset sync test. A fast path
+ * that waved those through would have been green locally and red in CI — the
+ * exact failure the gate exists to prevent, on its own flagship case.
+ *
+ * So only what NO test can read qualifies: the git-ignored board and the
+ * screenshot corpus.
  */
 export function isProseOnlyPath(path) {
   const p = String(path ?? '').replace(/\\/g, '/')
   if (!p) return false
   if (p.startsWith('.batch-dashboard')) return true
-  if (p.startsWith('verification/')) return true
-  if (p.startsWith('docs/') && p.endsWith('.md')) return true
-  // Top-level prose (README.md, TASKS.md, design.md, CLAUDE.md): no directory
-  // component, and a markdown extension.
-  return !p.includes('/') && p.endsWith('.md')
+  return p.startsWith('verification/')
 }
 
 /**
@@ -114,10 +118,12 @@ export function decide(results) {
 /** The message the developer sees — it must say what to run, not only what broke. */
 export function formatVerdict({ blocked, failed }, { reason } = {}) {
   if (!blocked) return `pre-push gate: green (${reason ?? 'gate passed'})`
+  // The bypass is documented in the hook's own comment and NOT advertised here:
+  // most pushes in this repository are made by autonomous agents, and a failure
+  // message that names its escape hatch invites the escape.
   return [
     `PUSH BLOCKED — the fast gate is red: ${failed.join(', ')}`,
     'CI would fail on this state and mail the failure. Fix it, then push again.',
     `  ${failed.map((f) => (GATE_COMMANDS[f] ?? []).join(' ')).join('\n  ')}`,
-    'Deliberate exception (a broken state you WANT on the remote): git push --no-verify',
   ].join('\n')
 }
