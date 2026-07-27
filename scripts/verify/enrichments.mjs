@@ -5049,7 +5049,7 @@ check(
 // natural crocs stand down, the lion is parked, the prey is a lone ADULT so no
 // family drama or adoption can claim it), then the terrain under BOTH bodies is
 // read back across the whole feed — struggle, kill and sink.
-const crocFeedsInWater = await page.evaluate(async () => {
+await page.evaluate(async () => {
   const herds = window.__wildlife.herdsRef.current
   const seed = window.__game.getState().seed
   const U = 10
@@ -5092,10 +5092,22 @@ const crocFeedsInWater = await page.evaluate(async () => {
     return false
   })
   if (out.seized) {
-    // The haul is a moment of the seizure; then the feed must hold in the water
-    // for as long as anything is left of the catch.
+    // The haul is a moment of the seizure; the feed holds once it is done.
     await window.__pollSim(window.__balance.crocodile.dragSeconds + 4, () => croc.lunge?.gripped === true)
     out.feeding = croc.lunge?.gripped === true
+  }
+  // Hand the stage to the frame capture below — the PICTURE has to be taken
+  // mid-feed, so the sampling continues in a second call after the screenshot.
+  window.__crocFeedStage = { croc, prey, naturals, out, terrainAt }
+  return out
+})
+await page.screenshot({ path: `${OUT}383-crocodile-feeds-in-water.png` })
+const crocFeedsInWater = await page.evaluate(async () => {
+  const st = window.__crocFeedStage
+  if (!st) return { staged: false, noStage: true }
+  const { croc, prey, naturals, out, terrainAt } = st
+  const herds = window.__wildlife.herdsRef.current
+  if (out.seized) {
     await window.__pollSim(20, () => {
       // Sample the whole feed: struggle, kill and the sink under it. It ends
       // when the body is gone and the crocodile lets go (retreat) — from there
@@ -5116,9 +5128,9 @@ const crocFeedsInWater = await page.evaluate(async () => {
   croc.lunge = undefined
   herds.zebra = herds.zebra.filter((a) => a !== prey)
   herds.crocodile = naturals
+  window.__crocFeedStage = undefined
   return out
 })
-await page.screenshot({ path: `${OUT}383-crocodile-feeds-in-water.png` })
 check(
   'the crocodile eats its catch IN the water: both bodies on water cells, the carcass beside it, through the whole feed (point 383)',
   crocFeedsInWater.staged && crocFeedsInWater.seized && crocFeedsInWater.feeding &&
