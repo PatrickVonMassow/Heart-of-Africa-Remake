@@ -991,9 +991,10 @@ After completion and after every major system:
   of the work order), `doc-budget-guard` (the constantly-read documents stay
   within measured ceilings — this file, design.md, and the work order's
   preamble; its budgets and the two honest ways out live in
-  `scripts/doc-budget-core.mjs`), `commit-scope-guard` (a PRE-COMMIT hook via the versioned
-  `scripts/git-hooks/`: no stray file, foreign directory or large binary rides
-  along in a commit), `ci-status-guard` (a
+  `scripts/doc-budget-core.mjs`), `commit-scope-guard` and `pre-push-gate`
+  (PRE-COMMIT/PRE-PUSH hooks in the versioned `scripts/git-hooks/`, wired by
+  `npm install`: no stray file rides along in a commit, and no push to main
+  lands a state CI would reject), `ci-status-guard` (a
   red CI is noticed), `timestamp-guard` (the chat timestamp) and
   `retro-currency-guard` (the retrospective document stays current), followed
   by `dashboard-sync`. Separately, PreToolUse hooks run `closing-guard` (§9),
