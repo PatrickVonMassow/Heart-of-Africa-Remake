@@ -288,6 +288,39 @@ Consequences for anyone extending this directory:
   until the view has settled rather than a fixed wait (see `fixedWaits.mjs`);
   that is also the first work any future determinism effort has to do.
 
+## A frame must show what its name claims (point 375)
+
+The consequence above has teeth now. Two runs of `world` on identical code
+photographed different places — `12-worldmodel-lake-victoria` caught the settled
+lake once and a mid-travel landscape the other time — and both exited 0. So the
+check moved to the SHUTTER: `frameShutter(page, OUT)` returns
+`shot(name, declaration)`, and before the PNG is written the declared subject is
+projected through the LIVE camera (`__camera.onScreen`/`ndc` in the bird's-eye
+view, the place camera's own matrices inside a settlement), never against an
+assumed radius. A subject that is not in the picture FAILS the suite, naming the
+frame, what it claimed and what was found instead — and the file is not written.
+
+| Declaration | Subject | Checked by |
+|---|---|---|
+| `{ world: { lat, lon } }` or `{ world: { x, z } }` | a place, a landmark, a live thing in the scene | projected to NDC through `__camera`; the camera must also have SETTLED (`settle: false` for a deliberately moving frame) |
+| `{ local: { x, z, y? } }` | a building, prop or silhouette inside a settlement | projected through `__placeCamera`'s own matrices |
+| `{ place: '<id>' }` | the interior of that settlement | the game stands in it |
+| `{ element: '<selector>' }` | a HUD/overlay/dialog frame | present, shown and inside the viewport (`locator:` also shoots that element) |
+| `{ general: '<why>' }` | a deliberate general view | nothing — but the REASON is mandatory, so a missing subject check is never an oversight |
+
+`scene: 'travel' \| 'place'` is implied by the first three and may be added to
+any of them. The judgement, the message and the declaration rules are pure
+(`frameSubject-core.mjs`, pinned by `frameSubject.test.mjs`); only the probe, the
+settle poll and the write live in `frameSubject.mjs`. The same test file carries
+the GATE: a `page.screenshot({ path })` anywhere in this directory outside the
+shutter fails the unit layer, so a new frame cannot skip its declaration. (A
+screenshot WITHOUT a path is a pixel probe and is left alone; `shot()` returns
+the buffer for the few frames that are both.)
+
+`FRAME_SUBJECT_SELFTEST=1 node scripts/verify/world.mjs` proves the gate still
+bites — it stands the traveller in Cairo, claims Lake Victoria, and requires the
+capture to be refused and no file written.
+
 ## Headless limitations
 
 WebGPU IS drivable headless — but only through **system Chrome**
