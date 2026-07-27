@@ -581,6 +581,25 @@ Verifiable (`scripts/verify/settings.mjs`,
   `scripts/verify/enrichments.mjs`: hidden -> lunge -> catch, the
   three family endings, the vanish -> deadline release, and lion-hunt
   independence, with screenshots 129/130.
+  THE KILL GOES INTO THE WATER (point 383, user-reported from the
+  deployed build): the seizure hands over to a DRAG leg — the
+  crocodile hauls its catch back to the water it lunged from
+  (`balance.crocodile.dragSpeed`/`dragSeconds`, debug-editable), and
+  the feeding grip begins only once its body centre AND the jaws lie
+  on water. The pair's placement is the crocodile's from the seizure
+  until the carcass is gone, so the body dissolves in the river beside
+  it and never on the bank, and a keeper's vigil stands at the
+  waterline its calf was seized from. Pure-tested in
+  `src/scenes/travel/wildlifeBehavior.test.ts` (`crocodileHaulStep` /
+  `crocodileFeedPairValid`): a sweep of bank strikes over a plain bank
+  and the widened river band ends with both bodies on water within one
+  body length, the PRE-FIX placement is asserted to FAIL that rule,
+  the haul always terminates (I4) and resumes when a debug-edited
+  river width moves the water out from under a feeding pair. The rule
+  is armed in-game as the `croc-feeds-in-water` assert, so any suite
+  catches a regression. Live in `scripts/verify/enrichments.mjs`: a
+  staged feed whose terrain is read back under BOTH bodies through
+  struggle, kill and sink, with screenshot 383.
 OPEN: tree-climbing-to-flee remains to be implemented (§9 open item);
 and the one seasonal-dress reading the research allows but the
 figures cannot yet show — a wrap worn DIFFERENTLY in the cold rather

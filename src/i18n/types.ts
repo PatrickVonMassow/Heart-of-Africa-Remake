@@ -410,6 +410,8 @@ export interface Strings {
     calfReunionSeconds: string
     calfMourningSeconds: string
     benchmarkStart: string
+    crocDragSpeed: string
+    crocDragSeconds: string
     crocGripSeconds: string
     crocDriveOffRest: string
     huntLeaveOvertime: string

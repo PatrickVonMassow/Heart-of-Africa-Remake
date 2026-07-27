@@ -5171,11 +5171,16 @@ const crocJaws = await page.evaluate(async () => {
       gripped = true
       const r = victim.jawAnchor // dev hook: the last RENDERED jaws position
       if (r) {
-        // Project onto the croc heading (rot 0 -> +z is "ahead").
+        // Project onto the croc's LIVE heading — point 383 lets a gripping croc
+        // turn (it hauls its catch back into the water, and may turn its head onto
+        // the water in a narrow channel), so the staged rot 0 is no longer the
+        // heading it still has when the jaws are read back.
         const dx = r[0] - croc.x
         const dz = r[1] - croc.z
-        aheadSum += dz // ahead component (sin0,cos0 => (0,1))
-        lateralSum += Math.abs(dx)
+        const fx = Math.sin(croc.rot)
+        const fz = Math.cos(croc.rot)
+        aheadSum += dx * fx + dz * fz // ahead component along the facing
+        lateralSum += Math.abs(dx * fz - dz * fx)
         n++
       }
     }
@@ -5194,6 +5199,102 @@ check(
     crocJaws.ahead !== null && crocJaws.ahead > 0.4,
   JSON.stringify(crocJaws),
 )
+// --- Point 383: the kill is EATEN IN THE WATER, never on the bank ------------
+// Reported from the deployed build: the crocodile stood wholly on the sand
+// feeding while the carcass lay at the waterline. Staged like crocDrama (the
+// natural crocs stand down, the lion is parked, the prey is a lone ADULT so no
+// family drama or adoption can claim it), then the terrain under BOTH bodies is
+// read back across the whole feed — struggle, kill and sink.
+await page.evaluate(async () => {
+  const herds = window.__wildlife.herdsRef.current
+  const seed = window.__game.getState().seed
+  const U = 10
+  const p0 = window.__game.getState().pos
+  const terrainAt = (x, z) => window.__terrainType(-z / U, x / U, seed)
+  let water = null
+  let bank = null
+  outer: for (let r = 4; r <= 40 && !water; r += 3) {
+    for (let k = 0; k < 16; k++) {
+      const ang = (k / 16) * Math.PI * 2
+      const x = p0.x + Math.cos(ang) * r
+      const z = p0.z + Math.sin(ang) * r
+      if (terrainAt(x, z) !== 'water') continue
+      for (let n = 0; n < 8; n++) {
+        const na = (n / 8) * Math.PI * 2
+        const nx = x + Math.cos(na) * 1.8
+        const nz = z + Math.sin(na) * 1.8
+        const nt = terrainAt(nx, nz)
+        if (nt !== 'water' && nt !== 'ocean') { water = { x, z }; bank = { x: nx, z: nz }; break outer }
+      }
+    }
+  }
+  if (!water || !bank) return { staged: false, noWater: true }
+  const naturals = herds.crocodile.splice(0)
+  const stageWs = window.__rivers?.sheetAt(-water.z / U, water.x / U) ?? window.__rivers?.surfaceAt(-water.z / U, water.x / U)
+  const croc = { x: water.x, z: water.z, y: stageWs ?? 0.4, rot: 0, scale: 1, phase: 0.1, chunk: undefined }
+  herds.crocodile.push(croc)
+  // An ADULT victim: no parent, no calf — nothing else can enter this drama.
+  const prey = { x: bank.x, z: bank.z, y: 0.2, rot: 0, scale: 1, phase: 0, chunk: undefined }
+  prey.drink = { tx: bank.x, tz: bank.z }
+  herds.zebra.push(prey)
+  const lion = window.__lionHunt.state
+  lion.mode = 'idle'; lion.timer = 9999; lion.victim = null; lion.victimHunt = false
+  const out = { staged: true, seized: false, feeding: false, samples: 0, onLand: 0, tooFar: 0, sawSink: false }
+  await window.__pollSim(30, () => {
+    prey.phase = (prey.phase + 0.1) % 75
+    if (!prey.drink) prey.drink = { tx: bank.x, tz: bank.z }
+    if (prey.caught === undefined && Math.hypot(prey.x - bank.x, prey.z - bank.z) > 3) { prey.x = bank.x; prey.z = bank.z }
+    if (prey.caught !== undefined && prey.caughtBy === 'crocodile') { out.seized = true; return true }
+    return false
+  })
+  if (out.seized) {
+    // The haul is a moment of the seizure; the feed holds once it is done.
+    await window.__pollSim(window.__balance.crocodile.dragSeconds + 4, () => croc.lunge?.gripped === true)
+    out.feeding = croc.lunge?.gripped === true
+  }
+  // Hand the stage to the frame capture below — the PICTURE has to be taken
+  // mid-feed, so the sampling continues in a second call after the screenshot.
+  window.__crocFeedStage = { croc, prey, naturals, out, terrainAt }
+  return out
+})
+await page.screenshot({ path: `${OUT}383-crocodile-feeds-in-water.png` })
+const crocFeedsInWater = await page.evaluate(async () => {
+  const st = window.__crocFeedStage
+  if (!st) return { staged: false, noStage: true }
+  const { croc, prey, naturals, out, terrainAt } = st
+  const herds = window.__wildlife.herdsRef.current
+  if (out.seized) {
+    await window.__pollSim(20, () => {
+      // Sample the whole feed: struggle, kill and the sink under it. It ends
+      // when the body is gone and the crocodile lets go (retreat) — from there
+      // the two are no longer a pair and nothing is being held.
+      if (croc.lunge === undefined || croc.lunge.retreat === true || prey.gone === true) return true
+      out.samples++
+      if (terrainAt(croc.x, croc.z) !== 'water') out.onLand++
+      if (terrainAt(prey.x, prey.z) !== 'water') out.onLand++
+      // 3.7 = CROCODILE_BODY_LENGTH_LOCAL (wildlifeBehavior.ts): the catch lies
+      // beside the crocodile, never adrift somewhere else in the river.
+      if (Math.hypot(prey.x - croc.x, prey.z - croc.z) > 3.7 * croc.scale) out.tooFar++
+      if (prey.dead) out.sawSink = true
+      return false
+    })
+  }
+  out.crocAt = { x: +croc.x.toFixed(1), z: +croc.z.toFixed(1), t: terrainAt(croc.x, croc.z) }
+  out.preyAt = { x: +prey.x.toFixed(1), z: +prey.z.toFixed(1), t: terrainAt(prey.x, prey.z) }
+  croc.lunge = undefined
+  herds.zebra = herds.zebra.filter((a) => a !== prey)
+  herds.crocodile = naturals
+  window.__crocFeedStage = undefined
+  return out
+})
+check(
+  'the crocodile eats its catch IN the water: both bodies on water cells, the carcass beside it, through the whole feed (point 383)',
+  crocFeedsInWater.staged && crocFeedsInWater.seized && crocFeedsInWater.feeding &&
+    crocFeedsInWater.samples > 10 && crocFeedsInWater.onLand === 0 && crocFeedsInWater.tooFar === 0 &&
+    crocFeedsInWater.sawSink,
+  JSON.stringify(crocFeedsInWater),
+)
+
 await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(null))
 await page.waitForTimeout(300)
 

@@ -448,6 +448,8 @@ export const en: Strings = {
     calfReunionSeconds: 'Calf separation window (s)',
     calfMourningSeconds: 'Orphan mourning window (s)',
     benchmarkStart: 'Start the render benchmark',
+    crocDragSpeed: 'Crocodile: drag-into-water speed',
+    crocDragSeconds: 'Crocodile: drag deadline (s)',
     crocGripSeconds: 'Crocodile: grip deadline (s)',
     crocDriveOffRest: 'Crocodile: rest after being driven off (s)',
     huntLeaveOvertime: 'Hunt: walk-off overtime (s)',

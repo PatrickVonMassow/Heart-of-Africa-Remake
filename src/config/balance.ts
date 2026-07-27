@@ -300,6 +300,13 @@ export interface BalanceConfig {
     mouthOffsetLocal: number
     /** Speed of the lunge burst (units/s) — visible motion, never a teleport. */
     lungeSpeed: number
+    /** Speed (units/s) of the DRAG-INTO-WATER leg (point 383): §19.16's kill is
+     *  hauled back into the river — the feed never happens on the bank. Fast
+     *  enough to read as part of the seizure, slow enough to be seen. */
+    dragSpeed: number
+    /** Hard deadline on that haul (s, invariant I4): a drag that cannot reach
+     *  water settles where it stands rather than pinning the drama forever. */
+    dragSeconds: number
     /** Hard cap on the gripped hold (s, point 186): the grip normally ends with the
      *  victim's caught-countdown, but a victim that VANISHES mid-grip (streamed out
      *  in a chunk despawn, taken by another system) would freeze it forever, so the
@@ -709,6 +716,8 @@ export const balance: BalanceConfig = {
     ambushBankBand: 4, // calibratable (point 275): a prey at the waterline within this of a hidden croc is a legal target even without drinking — kept < strikeRadius so the ambush stays occasional
     mouthOffsetLocal: 1.15, // calibratable (point 268): local forward reach to the jaws (snout tip ~1.5), so the seized victim lies IN the mouth, gripped
     lungeSpeed: 12, // calibratable: the burst speed of the lunge — fast and short, never a teleport
+    dragSpeed: 5, // calibratable (point 383): how fast the catch is hauled back into the water — a visible drag, not a snap
+    dragSeconds: 6, // calibratable (point 383): hard deadline on that haul (I4) — far above the ~1 s a bank kill needs
     gripSeconds: 8, // calibratable: hard release cap on the grip (> the ~5 s caught window) so a vanished victim never pins the crocodile (point 186)
     driveOffRestSeconds: 20, // calibratable: a repelled crocodile keeps to its water this long — long enough for the freed victim to leave the bank, so a rescue is not undone the next frame
   },

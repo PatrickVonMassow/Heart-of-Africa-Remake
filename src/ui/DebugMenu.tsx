@@ -322,6 +322,10 @@ export function DebugMenu() {
         onChange={(v) => { balance.crocodile.ambushBankBand = Math.max(0, v); bump() }} />
       <NumberField label={t.debug.crocMouthOffset} value={balance.crocodile.mouthOffsetLocal} step={0.05}
         onChange={(v) => { balance.crocodile.mouthOffsetLocal = Math.max(0, v); bump() }} />
+      <NumberField label={t.debug.crocDragSpeed} value={balance.crocodile.dragSpeed} step={0.5}
+        onChange={(v) => { balance.crocodile.dragSpeed = Math.max(0.5, v); bump() }} />
+      <NumberField label={t.debug.crocDragSeconds} value={balance.crocodile.dragSeconds} step={0.5}
+        onChange={(v) => { balance.crocodile.dragSeconds = Math.max(0.5, v); bump() }} />
       <NumberField label={t.debug.crocGripSeconds} value={balance.crocodile.gripSeconds} step={0.5}
         onChange={(v) => { balance.crocodile.gripSeconds = Math.max(0.5, v); bump() }} />
       <NumberField label={t.debug.crocDriveOffRest} value={balance.crocodile.driveOffRestSeconds} step={1}
