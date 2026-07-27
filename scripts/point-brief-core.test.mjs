@@ -304,6 +304,25 @@ describe('resolveSectionRefs — which document a § belongs to', () => {
     expect(resolveIn('§99.9 applies')[0].how).toBe('dangling')
   })
 
+  it('reads a § standing ALONE in backticks as the notation, not a citation', () => {
+    // Point 365 itself writes "including a LETTERED section (`§B`)". That is the
+    // form being named, not a reference — and hard-failing on it would block the
+    // brief for a perfectly healthy point.
+    expect(resolveIn('including a LETTERED section (`§99.9`)')[0].how).toBe('notation')
+  })
+
+  it('still resolves a backticked reference that DOES exist — only failure is downgraded', () => {
+    // Skipping backticked references outright would be a silent omission, which
+    // is exactly the class this tool must not have.
+    expect(mapOf('see `§4.2` for the rule')).toEqual({ 'design.md|4.2': 'design-default' })
+  })
+
+  it('does NOT downgrade a § inside a code span that holds more than the reference', () => {
+    // "`docs/x.md` §3.5" and the like are ordinary citations; only a span whose
+    // whole content is the reference is the notation.
+    expect(resolveIn('`docs/peoples-1890.md §99.9` applies')[0].how).toBe('dangling')
+  })
+
   it('counts repeated occurrences of one reference once', () => {
     const refs = resolveIn('§4.2 and later §4.2 again')
     expect(refs).toHaveLength(1)

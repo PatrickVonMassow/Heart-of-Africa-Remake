@@ -92,6 +92,29 @@ const SECTION_REF_RE = /§+\s*((?:[A-Z](?:\d+(?:\.\d+)*)?)|(?:\d+(?:\.\d+)*))(?!
 const SECTION_RANGE_RE = /§\s*((?:[A-Z])?\d+(?:\.\d+)*)\s*[-–—]\s*§\s*((?:[A-Z])?\d+(?:\.\d+)*)/g
 
 /**
+ * Inline-code spans holding NOTHING but a `§` reference. The work order shows the
+ * notation that way when it talks ABOUT references rather than making one — point
+ * 365 itself writes "including a LETTERED section (`§B`)". Measured over the whole
+ * corpus, that is the only such span, and every other backticked span containing a
+ * `§` also holds a filename, i.e. is a real citation.
+ *
+ * These are not skipped outright, which would be a silent omission: they are
+ * resolved like any other reference, and only their FAILURE is downgraded — a
+ * reference that resolves nowhere is a hard failure, unless it stands alone in
+ * backticks, in which case it is reported as notation. So a real citation written
+ * that way still reaches the reader, and a real renumbering still fails loudly.
+ */
+function notationSpans(text) {
+  const spans = []
+  for (const m of text.matchAll(/`([^`\n]*)`/g)) {
+    if (/^§+\s*(?:[A-Z](?:\d+(?:\.\d+)*)?|\d+(?:\.\d+)*)$/.test(m[1].trim())) {
+      spans.push([m.index, m.index + m[0].length])
+    }
+  }
+  return spans
+}
+
+/**
  * Every point of the work order (open TASKS.md and archived, concatenated by
  * readTasksAll). A point starts at `- [ ] N.` / `- [x] N.` and runs until the
  * next such line or the next `## ` section heading — EXCEPT inside a fenced code
@@ -324,6 +347,8 @@ export function resolveSectionRefs(spec, registry, { pointNumbers = new Set() } 
   const text = normalise(spec)
   const mentions = docMentions(text, registry)
   const namedDocs = [...new Set(mentions.map((m) => m.doc))]
+  const notation = notationSpans(text)
+  const isNotation = (at) => notation.some(([from, to]) => at >= from && at < to)
   const refs = []
   const seen = new Map()
 
@@ -374,6 +399,7 @@ export function resolveSectionRefs(spec, registry, { pointNumbers = new Set() } 
     if (!hit && /^\d+$/.test(id) && pointNumbers.has(Number(id))) {
       hit = { how: 'work-order-point', doc: null, found: null }
     }
+    if (!hit && isNotation(at)) hit = { how: 'notation', doc: null, found: null }
     const key = `${hit?.doc?.path ?? hit?.how ?? 'dangling'}|${id}`
     if (seen.has(key)) {
       seen.get(key).occurrences.push(at)
@@ -521,6 +547,10 @@ export function buildBrief({ tasksText, designText, claudeText = '', docs = [], 
     .map((r) => ({ ...r.section, docPath: r.docPath }))
 
   const describe = (r) => {
+    if (r.how === 'notation') {
+      return `§${r.id} → the NOTATION itself, quoted in backticks — the spec talks about the form of a ` +
+        'reference here, it does not make one'
+    }
     if (r.how === 'work-order-point') {
       return `§${r.id} → WORK-ORDER POINT ${r.id} (not a section; listed under the cross-referenced points)`
     }
