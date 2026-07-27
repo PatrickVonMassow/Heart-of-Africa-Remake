@@ -280,7 +280,22 @@ Verifiable (`scripts/verify/settings.mjs`,
   the exact window boundary, the clock reset inside the follow radius,
   the freeze inside a running ending, the resolved calf's adoption and
   its parentless ending where no adult is eligible) and staged live in
-  `scripts/verify/enrichments.mjs`. Calf predation
+  `scripts/verify/enrichments.mjs`. An ORPHAN MOURNS before it plays
+  again (§19.8, point 369): only a parent that DIED opens the
+  calibratable `balance.family.mourningSeconds` window — a bond that
+  merely resolved is not grieved — and for its length the juvenile
+  keeps to the spot its parent fell and does not gambol, while the
+  adoption changes WHO it follows and not its demeanour and every
+  danger response overrides the watch;
+  `orphanMourns`/`tickMourning`/`calfMayPlay`/`juvenileAnchor`
+  pure-tested in `src/scenes/travel/wildlifeBehavior.test.ts` (the
+  death-only trigger against the separated and streamed-out endings,
+  the play gate shut for the whole window and open after it, the
+  adoption running its own clock, a second bereavement, the flight
+  still resolving while mourning, and the always-resolving window) and
+  staged live in `scripts/verify/enrichments.mjs` (the subdued calf
+  beside the body over a whole play cycle, the release back into play,
+  and a predator staged mid-window still making it run). Calf predation
   (§19.8): a caught calf struggles alive (no stain or shrink) for a
   few seconds before the kill, a parent that reaches the predator is
   eaten in the calf's place while the calf escapes, a parent that
