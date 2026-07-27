@@ -339,9 +339,11 @@ function docMentions(text, registry) {
  *      §4.0.5 hundreds of characters below, which no fixed window can reach;
  *   3. design.md, the documented default for a bare `§`;
  *   4. CLAUDE.md (§7.1/§7.2 are cited constantly without naming the file);
- *   5. exactly one other document the spec named that has it;
+ *   5. the first other document the spec named that has it — an arbitrary pick if
+ *      two do, which the reference map makes visible by naming the winner;
  *   6. a work-order POINT number (`§264 combat` — sloppy, but a real habit);
- *   7. nothing — the hard failure, which names every document searched.
+ *   7. the notation itself, if the reference stands alone in backticks;
+ *   8. nothing — the hard failure, which names every document searched.
  */
 export function resolveSectionRefs(spec, registry, { pointNumbers = new Set() } = {}) {
   const text = normalise(spec)
