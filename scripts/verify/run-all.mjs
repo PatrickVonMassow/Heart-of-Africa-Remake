@@ -15,6 +15,10 @@ import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { killTree, launchServer } from './_server.mjs'
 import { changeRelatedness, failedChecks, formatRepeatReport, repeatSignature } from './baseline-classify-core.mjs'
+import {
+  LEVEL, annotateResult, annotateStageFailure, decideRun, formatLoadReport, onLoadMode,
+} from './machine-load-core.mjs'
+import { readMachine } from './machine-load.mjs'
 import { DEV_SUITES, needsDevServer, parseArgs, planBackends, selectBackend, skippedSuites, suitesFor } from './tiers.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -45,7 +49,7 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const VERIFY_GL = selectBackend(process.env.VERIFY_GL)
 
 const args = process.argv.slice(2)
-const { tier, filter, fullRun, isLargeEquivalent, baseline } = parseArgs(args)
+const { tier, filter, flags, fullRun, isLargeEquivalent, baseline } = parseArgs(args)
 const wantBaseline = baseline || process.env.VERIFY_BASELINE === '1'
 
 // point 204(b): a bare LARGE run (`npm test` / `npm run test:large`) covers BOTH
@@ -88,6 +92,30 @@ if (backendPlan.length > 0) {
 // preflight (build/lint/unit) and the prod preview were already proven on the
 // first pass — skip them and run only the render browser suites.
 const skipPreflight = process.env.RVA_SKIP_PREFLIGHT === '1'
+
+// Is the machine QUIET enough for this run's verdict to be evidence (point 296)?
+// The other half of the point-294 triage, and the half today's damage came from:
+// `enrichments` was judged "a real failure, not a flake" while a unit run and two
+// agents shared the machine (the same suite was green on a quiet one), and a unit
+// run produced four "Test timed out in 5000ms" failures because a dev server from
+// an earlier verify run had never been shut down. So the machine is read BEFORE
+// the run: a leftover is named with the command that ends it, and a timing
+// verdict taken under load is labelled rather than reported as a plain red.
+// Default `flag` (never blocks); `--on-load=defer` / VERIFY_ON_LOAD=defer skips
+// such a run outright, `off` disables the check. Probed once here, before the
+// minutes of build/lint the preflight costs.
+const loadMode = onLoadMode({ flags, env: process.env.VERIFY_ON_LOAD })
+let machine = { level: LEVEL.unknown, strays: [] }
+if (loadMode !== 'off') {
+  machine = await readMachine()
+  const plannedSuites = suitesFor({ tier, filter, backend: VERIFY_GL })
+  const decision = decideRun({ suites: plannedSuites, level: machine.level, mode: loadMode })
+  for (const line of formatLoadReport({ load: machine, decision, mode: loadMode })) console.log(line)
+  if (decision.action === 'defer') {
+    console.log(`\nDEFERRED — not run (exit ${decision.exitCode}). Nothing failed; nothing was proven either.`)
+    process.exit(decision.exitCode)
+  }
+}
 
 // Per-suite wall timeout (point 249): a GENEROUS backstop so a genuinely hung
 // suite (a frozen renderer, a dead server) is killed and reported rather than
@@ -290,6 +318,10 @@ if (!skipPreflight && (fullRun || filter.includes('unit'))) {
   if (!unitOk) {
     console.log(out)
     console.log('\n1 SUITE(S) FAILED — vitest failed, skipping the browser suites')
+    // The fail-fast path never reaches the end-of-run label, and this is exactly
+    // where the 27.07. leftover dev server did its damage (four 5000 ms timeouts
+    // in tests that pass in 582 ms alone) — so say it here.
+    if (loadMode !== 'off') for (const line of annotateStageFailure({ stage: 'unit', ...machine })) console.log(line)
     process.exit(1) // fail fast
   }
   results.push(unitOk)
@@ -356,4 +388,16 @@ else if (redSuites.length > 0) {
 
 const failed = results.filter((r) => !r).length
 console.log(`\n${failed === 0 ? 'ALL GREEN' : failed + ' SUITE(S) FAILED'} — ${results.length} suites run`)
+// What the machine's state means for THIS result (point 296). The asymmetry is
+// the content: a green under load still counts — load produces false REDS, not
+// false greens — while a red from a timing-sensitive suite under load is not
+// evidence and names the command that re-runs it alone.
+if (loadMode !== 'off') {
+  for (const line of annotateResult({
+    level: machine.level,
+    strays: machine.strays ?? [],
+    redSuites: redSuites.map((r) => r.suite),
+    green: failed === 0,
+  })) console.log(line)
+}
 process.exit(failed === 0 ? 0 : 1)
