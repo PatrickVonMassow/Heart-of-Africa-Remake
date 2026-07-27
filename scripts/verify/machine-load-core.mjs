@@ -60,6 +60,24 @@ export const HEAVY_CPU = 0.7
 export const ELEVATED_LOADAVG = 0.7
 export const HEAVY_LOADAVG = 1.0
 
+/**
+ * The same question asked of the GPU (point 386). The CPU thresholds do not
+ * transfer: the process table deliberately ignores a person's ordinary browser —
+ * right for CPU work, wrong for the device these suites draw with. A video is
+ * decoded and composited on the GPU while the CPU stays near idle, which is
+ * exactly what the probe reported as "QUIET, CPU 4 %" on the evening it was
+ * believed (user 27.07.2026).
+ *
+ * The bar sits LOWER than the CPU's on purpose. A GPU is a serialised device: a
+ * steady fifth of it held by another client is queue time our frames wait behind,
+ * and hardware video decode plus compositing reads well under a third of a modern
+ * adapter while still moving every frame time we measure. The asymmetry of point
+ * 296 makes an eager bar cheap — this LABELS, it never blocks, and a green under
+ * GPU load still counts.
+ */
+export const ELEVATED_GPU = 0.2
+export const HEAVY_GPU = 0.55
+
 /** What to do when the machine is not quiet. Default `flag` never blocks. */
 export const ON_LOAD = { flag: 'flag', defer: 'defer', off: 'off' }
 
@@ -300,6 +318,64 @@ export function cpuBusyFraction(a, b) {
   return Math.min(1, Math.max(0, (total - idle) / total))
 }
 
+// ---------------------------------------------------------------------------
+// GPU engine counters → utilisation (point 386)
+// ---------------------------------------------------------------------------
+
+/**
+ * The probe's GPU payload → `{ samples, count, error }`. `count` is the number of
+ * counter instances the machine offered BEFORE the zero rows were dropped, so an
+ * adapter genuinely at 0 % is distinguishable from a counter that does not exist.
+ * Junk in yields an error rather than a throw — this feeds a fail-open probe.
+ */
+export function parseGpuCounterJson(text) {
+  let data
+  try {
+    data = JSON.parse(String(text ?? '').trim() || 'null')
+  } catch {
+    return { samples: [], count: 0, error: 'the GPU counter reply was not readable' }
+  }
+  if (!data || typeof data !== 'object') return { samples: [], count: 0, error: 'the GPU counter reply was empty' }
+  if (data.error) return { samples: [], count: 0, error: String(data.error).replace(/\s+/g, ' ').trim().slice(0, 160) }
+  const rows = Array.isArray(data.samples) ? data.samples : []
+  return {
+    samples: rows
+      .map((r) => ({ instance: String(r?.i ?? r?.instance ?? ''), value: Number(r?.v ?? r?.value) }))
+      .filter((r) => r.instance && Number.isFinite(r.value)),
+    count: Number(data.count) || 0,
+    error: null,
+  }
+}
+
+/**
+ * The busiest ENGINE on the busiest adapter, as a fraction in [0,1] — the number
+ * the task manager's GPU graph shows, computed the same way. Each instance name
+ * carries an adapter (`luid_…_phys_N`) and an engine type (`engtype_3d`,
+ * `engtype_videodecode`, …); the per-process rows of one engine are SUMMED (that
+ * engine's total occupancy), and the engines are then MAXed rather than summed,
+ * because a copy engine running beside a 3-D engine costs no extra device time.
+ *
+ * The pid in the instance name is dropped on the way in and never leaves this
+ * function. What is measured is the device's load, not what the person is doing.
+ *
+ * Returns null when there is no counter to read — never a comforting zero.
+ */
+export function gpuEngineUtilisation({ samples = [], count = 0 } = {}) {
+  const perEngine = new Map()
+  for (const s of samples) {
+    const name = String(s?.instance ?? '').toLowerCase()
+    const value = Number(s?.value)
+    if (!Number.isFinite(value) || value <= 0) continue
+    const engine = /engtype_([a-z0-9]+)/.exec(name)
+    if (!engine) continue
+    const adapter = /luid_([0-9a-fx]+_[0-9a-fx]+)_phys_(\d+)/.exec(name)
+    const key = `${adapter ? `${adapter[1]}#${adapter[2]}` : 'adapter'}|${engine[1]}`
+    perEngine.set(key, (perEngine.get(key) ?? 0) + value)
+  }
+  if (perEngine.size === 0) return count > 0 ? 0 : null
+  return Math.min(1, Math.max(0, Math.max(...perEngine.values()) / 100))
+}
+
 /**
  * The verdict on the machine. `ok: false` (a probe that threw or timed out)
  * yields `unknown` — reported, never silently treated as quiet.
@@ -308,14 +384,24 @@ export function cpuBusyFraction(a, b) {
  * leftover dev server that produced the four 5000 ms unit timeouts was idle by
  * every CPU measure: it holds ports, file watchers and a node heap, and the
  * damage it does is not visible as load.
+ *
+ * `gpuBusyFraction` (point 386) is the same judgement on the device the render
+ * suites draw with; `gpuUnreadable` is the reason a machine that WAS asked could
+ * not answer, and it costs the machine its quiet certificate rather than being
+ * swallowed. Both absent means the GPU was not part of this reading at all, which
+ * leaves the CPU/process verdict exactly as it was.
  */
-export function classifyLoad({ ok = true, cpuBusyFraction: cpu = null, loadAvgPerCore = null, cpuCount = null, strays = [] } = {}) {
+export function classifyLoad({
+  ok = true, cpuBusyFraction: cpu = null, loadAvgPerCore = null, cpuCount = null, strays = [],
+  gpuBusyFraction: gpu = null, gpuUnreadable = null,
+} = {}) {
   if (!ok) {
     return {
       level: LEVEL.unknown,
       reasons: ['the load probe could not read the machine — treat the quiet of this run as UNKNOWN, not as proven'],
       strays,
       cpuBusyFraction: null,
+      gpuBusyFraction: null,
     }
   }
   const reasons = []
@@ -335,6 +421,15 @@ export function classifyLoad({ ok = true, cpuBusyFraction: cpu = null, loadAvgPe
   } else {
     reasons.push('no CPU reading available')
   }
+  // The GPU, in the same two steps. The wording names a number and what follows
+  // from it — never the application, and never a list of the person's windows.
+  // One wording for both thresholds: the level above it already says how bad it
+  // is, and a second sentence would be an invitation to speculate about WHAT is
+  // drawing. The number and its consequence, nothing else.
+  if (typeof gpu === 'number' && gpu >= ELEVATED_GPU) {
+    reasons.push(`GPU ${pct(gpu)} — a video or another 3-D application is using the device`)
+    raise(gpu >= HEAVY_GPU ? LEVEL.loaded : LEVEL.busy)
+  }
   if (typeof loadAvgPerCore === 'number' && loadAvgPerCore > 0) {
     if (loadAvgPerCore >= HEAVY_LOADAVG) {
       reasons.push(`run queue ${loadAvgPerCore.toFixed(2)} per core`)
@@ -351,8 +446,21 @@ export function classifyLoad({ ok = true, cpuBusyFraction: cpu = null, loadAvgPe
     // server or browser is a strong warning but not proof the machine is pinned.
     raise(kind === STRAY_KIND.verifyRun || kind === STRAY_KIND.unitRun ? LEVEL.loaded : LEVEL.busy)
   }
-  if (level === LEVEL.quiet) reasons.push(`quiet: CPU ${typeof cpu === 'number' ? pct(cpu) : '?'}, no competing run or leftover found`)
-  return { level, reasons, strays, cpuBusyFraction: cpu }
+  // A machine whose GPU could not be read is not a quiet machine — it is an
+  // unmeasured one. Said, not swallowed: the whole point of 386 is that a
+  // confident "QUIET, CPU 4 %" was believed while the device was busy. Where some
+  // OTHER signal already found load, that finding is the more useful answer and
+  // keeps its level; only an otherwise-clean reading loses its certificate.
+  if (gpuUnreadable) {
+    reasons.push(`GPU load NOT measured (${gpuUnreadable}) — the device the render suites draw with was not read`)
+    if (level === LEVEL.quiet) level = LEVEL.unknown
+  }
+  if (level === LEVEL.quiet) {
+    reasons.push(
+      `quiet: CPU ${typeof cpu === 'number' ? pct(cpu) : '?'}${typeof gpu === 'number' ? `, GPU ${pct(gpu)}` : ''}, no competing run or leftover found`,
+    )
+  }
+  return { level, reasons, strays, cpuBusyFraction: cpu, gpuBusyFraction: typeof gpu === 'number' ? gpu : null }
 }
 
 // ---------------------------------------------------------------------------

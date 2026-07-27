@@ -127,23 +127,40 @@ had shut down.
 
 So `run-all.mjs` reads the machine ONCE, before the preflight, through the pure
 module `machine-load-core.mjs` (probe in `machine-load.mjs`, pinned by
-`machine-load.test.mjs`). Two things are read: the CPU busy DELTA over a short
-window, and the process table — for another verify or vitest run, a build, a
-vite dev/preview server, or an automation browser. The run's own process tree is
-excluded; **a sibling is not**, because a second agent under the same session is
-exactly the load worth seeing. Each leftover is reported once per process TREE
-(raw, one dev server counts as two and one headless browser as five), ours first,
-with the `taskkill`/`kill` line that ends it.
+`machine-load.test.mjs`). Three things are read: the CPU busy DELTA over a short
+window, the GPU engine utilisation, and the process table — for another verify or
+vitest run, a build, a vite dev/preview server, or an automation browser. The
+run's own process tree is excluded; **a sibling is not**, because a second agent
+under the same session is exactly the load worth seeing. Each leftover is reported
+once per process TREE (raw, one dev server counts as two and one headless browser
+as five), ours first, with the `taskkill`/`kill` line that ends it.
+
+**The GPU is read because it is what these suites actually compete for (point
+386).** The process table deliberately ignores a person's ordinary browser — right
+for CPU work, wrong for the device the render suites draw with. A video is decoded
+and composited on the GPU while the CPU stays near idle, and on the evening of
+27.07.2026 the probe reported "QUIET, CPU 4 %" during exactly such a session and
+was believed. On Windows the per-adapter engine counters (the ones the task
+manager's GPU graph is drawn from) are readable without a new dependency: the
+per-process rows of one engine are summed, the engines are then MAXed rather than
+summed, and the pid never leaves the parsing function. The report says a number
+and its consequence — `GPU 44 % — a video or another 3-D application is using the
+device` — and nothing about which application it is or what the person has open.
+The bar sits lower than the CPU's (20 % / 55 % against 35 % / 70 %) because a GPU
+is a serialised device: another client's steady fifth is queue time our frames
+wait behind. Where no such counter exists the probe SAYS so and the machine is
+`unknown` — never quiet on an unmeasured device.
 
 | Level | When | Effect on a pick containing `settings, enrichments, polish, startup, voice, benchmark` |
 |---|---|---|
-| `quiet` | CPU below 35 %, nothing of ours running | run; its verdict is evidence |
-| `busy` | CPU ≥ 35 %, or ANY leftover — an idle dev server counts, its damage is invisible to a CPU reading | run + FLAG (default), or defer |
-| `loaded` | CPU ≥ 70 %, or a competing verify/vitest run | run + FLAG (default), or defer |
-| `unknown` | the probe could not read the machine | run; reported as unproven, never as quiet |
+| `quiet` | CPU below 35 %, GPU below 20 %, nothing of ours running | run; its verdict is evidence |
+| `busy` | CPU ≥ 35 %, GPU ≥ 20 %, or ANY leftover — an idle dev server counts, its damage is invisible to a CPU reading | run + FLAG (default), or defer |
+| `loaded` | CPU ≥ 70 %, GPU ≥ 55 %, or a competing verify/vitest run | run + FLAG (default), or defer |
+| `unknown` | the probe could not read the machine, or the GPU counter was unavailable | run; reported as unproven, never as quiet |
 
 The label at the END of the run is asymmetric, and that asymmetry is the content:
-**load produces false REDS, not false greens.** A green under load still counts. A
+**load produces false REDS, not false greens.** A green under load still counts —
+under GPU load too; the new signal labels, it never blocks and never voids a green. A
 red from a timing-sensitive suite under load is `UNDER LOAD — NOT AUTHORITATIVE`
 and prints the command to re-run it alone. A failure with no red suite (a broken
 build, a lint finding) is left unlabelled — load did not cause it, and a label

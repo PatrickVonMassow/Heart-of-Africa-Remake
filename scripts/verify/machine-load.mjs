@@ -1,9 +1,10 @@
-// Probe the machine, then let machine-load-core.mjs judge it (point 296).
+// Probe the machine, then let machine-load-core.mjs judge it (point 296/386).
 //
 // Everything impure lives here: two `os.cpus()` samples a moment apart, the OS
-// process table, and the repo path a leftover is matched against. The verdict,
-// the stray classification and the proceed/flag/defer decision are pure and
-// pinned in scripts/verify/machine-load.test.mjs.
+// process table, the per-adapter GPU engine counters, and the repo path a
+// leftover is matched against. The verdict, the stray classification and the
+// proceed/flag/defer decision are pure and pinned in
+// scripts/verify/machine-load.test.mjs.
 //
 // Standalone — ask BEFORE you spend a browser run (CLAUDE.md §7.2, "ask the
 // guards before the action"):
@@ -21,8 +22,8 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { isMainModule } from '../is-main.mjs'
 import {
-  LEVEL, classifyLoad, cpuBusyFraction, decideRun, forcedLevel, formatLoadReport, onLoadMode,
-  parsePsOutput, parseWindowsProcessJson, strayProcesses,
+  LEVEL, classifyLoad, cpuBusyFraction, decideRun, forcedLevel, formatLoadReport, gpuEngineUtilisation,
+  onLoadMode, parseGpuCounterJson, parsePsOutput, parseWindowsProcessJson, strayProcesses,
 } from './machine-load-core.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -34,6 +35,71 @@ const SAMPLE_MS = Number(process.env.VERIFY_LOAD_SAMPLE_MS) || 600
 /** The process table is a means, not the goal: a slow WMI call must never hold
  *  a regression, so it is killed and the probe carries on without strays. */
 const PS_TIMEOUT_MS = 15000
+/** The GPU counter read costs ~1.5 s here; anything beyond this is a hung
+ *  performance-counter service, which is a "not measured", not a reason to wait. */
+const GPU_TIMEOUT_MS = 10000
+
+/**
+ * Read the per-adapter GPU engine utilisation — the counters the task manager's
+ * GPU graph is drawn from, available on Windows without a new dependency.
+ *
+ * Zero rows are dropped on the PowerShell side (the table is ~250 instances, of
+ * which a handful are non-zero) but their COUNT is carried across, so an adapter
+ * genuinely idle stays distinguishable from a machine with no such counter.
+ *
+ * A localized Windows names its counters in the UI language. Perflib keeps the
+ * English list under `009` and the localized one under `CurrentLanguage`, both as
+ * (id, name) pairs, so the English name is tried first and resolved through the
+ * ID when it misses. The join is on the ID rather than on the array position:
+ * identical ordering is usual but nothing guarantees it, and a positional join
+ * that slipped would build a plausible WRONG path instead of failing.
+ */
+const GPU_COUNTER_PS = `
+$ErrorActionPreference = 'Stop'
+try {
+  try { $s = (Get-Counter '\\GPU Engine(*)\\Utilization Percentage' -ErrorAction Stop).CounterSamples }
+  catch {
+    $base = 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Perflib'
+    $en = (Get-ItemProperty "$base\\009").Counter
+    $loc = (Get-ItemProperty "$base\\CurrentLanguage").Counter
+    $localizedById = @{}
+    for ($i = 0; $i -lt $loc.Length - 1; $i += 2) { $localizedById[$loc[$i]] = $loc[$i + 1] }
+    $map = @{}
+    for ($i = 0; $i -lt $en.Length - 1; $i += 2) { if (-not $map.ContainsKey($en[$i + 1])) { $map[$en[$i + 1]] = $localizedById[$en[$i]] } }
+    $path = '\\{0}(*)\\{1}' -f $map['GPU Engine'], $map['Utilization Percentage']
+    $s = (Get-Counter $path -ErrorAction Stop).CounterSamples
+  }
+  @{
+    count = @($s).Count
+    samples = @($s | Where-Object { $_.CookedValue -gt 0 } | ForEach-Object { @{ i = $_.InstanceName; v = [double]$_.CookedValue } })
+  } | ConvertTo-Json -Compress -Depth 4
+} catch {
+  @{ error = "$($_.Exception.Message)" } | ConvertTo-Json -Compress
+}
+`
+
+/**
+ * `{ fraction, unreadable }` — the busiest engine as a fraction in [0,1], or a
+ * one-line reason why the device could not be read. Never throws.
+ */
+export function readGpuUtilisation() {
+  if (process.platform !== 'win32') {
+    return { fraction: null, unreadable: 'no per-adapter GPU engine counter on this platform' }
+  }
+  try {
+    const res = spawnSync('powershell', ['-NoProfile', '-NonInteractive', '-Command', GPU_COUNTER_PS], {
+      encoding: 'utf8', timeout: GPU_TIMEOUT_MS, maxBuffer: 16 * 1024 * 1024, windowsHide: true,
+    })
+    const parsed = parseGpuCounterJson(res.stdout ?? '')
+    if (parsed.error) return { fraction: null, unreadable: parsed.error }
+    const fraction = gpuEngineUtilisation(parsed)
+    return fraction === null
+      ? { fraction: null, unreadable: 'the GPU engine counter reported no adapter' }
+      : { fraction, unreadable: null }
+  } catch {
+    return { fraction: null, unreadable: 'the GPU counter read failed' }
+  }
+}
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
@@ -88,10 +154,11 @@ export function listProcesses() {
  */
 export async function probeMachine({ sampleMs = SAMPLE_MS, pid = process.pid } = {}) {
   try {
-    // The process table FIRST and outside the CPU window: the WMI/ps call costs
-    // a core for about a second, and sampling across it would charge the probe's
-    // own cost to the machine it is judging.
+    // The process table and the GPU counters FIRST, outside the CPU window: both
+    // calls cost a core for about a second, and sampling across them would charge
+    // the probe's own cost to the machine it is judging.
     const processes = listProcesses()
+    const gpu = readGpuUtilisation()
     const before = os.cpus()
     await sleep(Math.max(0, sampleMs))
     const after = os.cpus()
@@ -100,15 +167,20 @@ export async function probeMachine({ sampleMs = SAMPLE_MS, pid = process.pid } =
     const cores = os.cpus()?.length || 1
     const strays = processes.length ? strayProcesses({ processes, pid, repoMarker: repoMarker() }) : []
     return {
-      ok: cpu !== null || processes.length > 0,
+      ok: cpu !== null || processes.length > 0 || gpu.fraction !== null,
       cpuBusyFraction: cpu,
+      gpuBusyFraction: gpu.fraction,
+      gpuUnreadable: gpu.unreadable,
       loadAvgPerCore: load > 0 ? load / cores : null,
       cpuCount: cores,
       processTable: processes.length > 0,
       strays,
     }
   } catch {
-    return { ok: false, cpuBusyFraction: null, loadAvgPerCore: null, cpuCount: null, processTable: false, strays: [] }
+    return {
+      ok: false, cpuBusyFraction: null, gpuBusyFraction: null, gpuUnreadable: null,
+      loadAvgPerCore: null, cpuCount: null, processTable: false, strays: [],
+    }
   }
 }
 
@@ -142,7 +214,14 @@ if (isMainModule(import.meta.url)) {
   const load = await readMachine()
   const decision = decideRun({ suites, level: load.level, mode: onLoadMode({ flags: argv, env: process.env.VERIFY_ON_LOAD }) })
   if (argv.includes('--json')) {
-    console.log(JSON.stringify({ level: load.level, reasons: load.reasons, strays: load.strays, decision }, null, 2))
+    console.log(JSON.stringify({
+      level: load.level,
+      reasons: load.reasons,
+      cpuBusyFraction: load.cpuBusyFraction ?? null,
+      gpuBusyFraction: load.gpuBusyFraction ?? null,
+      strays: load.strays,
+      decision,
+    }, null, 2))
   } else {
     for (const line of formatLoadReport({ load, decision })) console.log(line)
   }
