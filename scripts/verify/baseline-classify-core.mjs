@@ -295,6 +295,39 @@ export function classifyAgainstBaseline({ currentFailed, baselineFailed, baselin
   })
 }
 
+/**
+ * Fold the outputs of REPEATED baseline runs into the three inputs above.
+ * The baseline is re-run because a single baseline pass is exactly as flake-prone
+ * as the run being triaged, and BOTH of its wrong readings are dangerous (see
+ * `baseline-flaky`). A check counts as red on the baseline only when it failed in
+ * EVERY baseline run; failing in some is instability, not a baseline verdict.
+ */
+export function foldBaselineRuns(outputs) {
+  const runs = (outputs ?? []).map((o) => ({ failed: failedChecks(o), checks: allChecks(o) }))
+  const checks = []
+  const seen = new Set()
+  for (const r of runs) {
+    for (const c of r.checks) {
+      if (seen.has(c.key)) continue
+      seen.add(c.key)
+      checks.push(c)
+    }
+  }
+  const counts = new Map()
+  const label = new Map()
+  for (const r of runs) {
+    for (const c of r.failed) {
+      counts.set(c.key, (counts.get(c.key) ?? 0) + 1)
+      if (!label.has(c.key)) label.set(c.key, c)
+    }
+  }
+  const failed = []
+  const flaky = []
+  for (const [key, n] of counts) (n === runs.length ? failed : flaky).push(label.get(key))
+  const ran = runs.length > 0 && runs.every((r) => r.checks.length > 0 || r.failed.length > 0)
+  return { failed, flaky, checks, ran, runs: runs.length }
+}
+
 const VERDICT_LABEL = {
   'real-regression': 'REAL REGRESSION (green on baseline, red now)',
   'pre-existing': 'PRE-EXISTING / STALE ASSUMPTION (already red on baseline)',

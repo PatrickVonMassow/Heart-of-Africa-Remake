@@ -10,6 +10,7 @@ import {
   classifyAgainstBaseline,
   consoleErrorChecks,
   failedChecks,
+  foldBaselineRuns,
   formatBaselineReport,
   formatRepeatReport,
   normaliseErrorText,
@@ -190,6 +191,22 @@ describe('classifying against the baseline', () => {
   it('never reads a baseline run that died early as a clean bill of health', () => {
     const classified = classifyAgainstBaseline({ currentFailed: current, baselineFailed: [], baselineChecks: [] })
     expect(classified.every((c) => c.verdict === 'inconclusive')).toBe(true)
+  })
+
+  it('folds repeated baseline runs: red in every run is red, red in some is unstable', () => {
+    const folded = foldBaselineRuns([
+      'PASS  a river notch appears\nFAIL  the ground edge is dark\nFAIL  a herd gathers',
+      'PASS  a river notch appears\nFAIL  the ground edge is dark\nPASS  a herd gathers',
+    ])
+    expect(folded.failed.map((c) => c.name)).toEqual(['the ground edge is dark'])
+    expect(folded.flaky.map((c) => c.name)).toEqual(['a herd gathers'])
+    expect(folded.checks).toHaveLength(3)
+    expect(folded.ran).toBe(true)
+  })
+
+  it('reports a baseline run that produced nothing as not-run', () => {
+    expect(foldBaselineRuns(['PASS  a check', 'Error: Target closed']).ran).toBe(false)
+    expect(foldBaselineRuns([]).ran).toBe(false)
   })
 
   it('resolves nothing when the check flaked on the baseline itself', () => {
