@@ -3205,6 +3205,42 @@ read that as "the criterion and its evidence section".
   DOCS in the same commit: the check's own comment block in `scripts/verify/
   enrichments.mjs` and, if the criterion changes what §19.16 promises, design.md.
 
+- [ ] 383. THE CROCODILE FEEDS ON DRY LAND WITH ITS CATCH IN THE WATER (user 27.07.2026,
+  reported from the deployed build with a screenshot: the traveller sits in his canoe on
+  the river, and on the sandy bank beside him stands the crocodile — WHOLLY on land, all
+  four legs on sand — while the carcass it is feeding on lies at the waterline with its
+  head submerged). Both halves are wrong, and they are wrong in opposite directions: the
+  ambusher of §19.16 comes OUT of the water and takes its catch BACK into it; it does not
+  stand on a beach to eat, and its prey does not end up in the water while it does not.
+  THE RULE THE PICTURE BREAKS: a crocodile's kill is dragged into the water (§19.16 —
+  the ambush from the water) and the feeding happens with the crocodile IN the water,
+  the carcass at or just under the surface beside it. The arrangement the player saw is
+  the exact inverse, so whatever places the pair after a kill is placing them
+  independently of each other and independently of the shoreline.
+  DIAGNOSE THE PLACEMENT, do not nudge the model: establish whether (a) the crocodile
+  walks out of the water while a feed is running, (b) the carcass is dropped at the
+  strike point while the crocodile retreats to its own resting spot, (c) the water mask
+  the two consult disagrees (the river band widened by the calibratable width factor is
+  a known source of edge disagreement), or (d) the drag-into-water leg does not exist at
+  all for a bank kill. Name which in the commit; each has a different fix and three of
+  them would leave the picture unchanged.
+  TARGET: from the moment the grip holds until the carcass is gone, the crocodile's body
+  centre stays on a water cell, and the carcass stays within its own body length of that
+  body and on a water cell too. A crocodile that ends a feed may return to land as
+  §19.16 allows it to bask — but never while a carcass it is feeding on lies in the
+  water, and never with the two on opposite sides of the shoreline.
+  WATCH THE NEIGHBOURING CASE: the same question for a kill made ON the bank (the
+  drinking-victim drama) — the drag leg is what puts it right, and if that leg is
+  missing this is where it shows.
+  VERIFIABLE: pure Vitest on the placement — for a sweep of strike positions along a
+  bank (including the widened river band), the feeding pair's cells are both water and
+  their separation stays inside a body length, across the whole feed; a regression case
+  built from the reported arrangement (crocodile on land, carcass in water) must FAIL
+  before the fix. Live: one bird's-eye frame at in-game zoom of a staged feed on BOTH
+  backends, judged by the picture, plus the existing crocodile-drama checks unchanged.
+  DOCS in the same commit: design.md §19.16 if the drag-and-feed rule is not yet written
+  there explicitly, CLAUDE.md §7.1 pt 12 and its evidence section.
+
 ## Closing (only after all points)
 
 New points are appended BEFORE this section — it stays last in the file.
