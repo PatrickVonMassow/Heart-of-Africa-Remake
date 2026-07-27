@@ -10935,3 +10935,28 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   refused rather than saved.
   DOCS in the same commit: CLAUDE.md §7.2 beside the projection rule, and
   `scripts/verify/README.md`.
+
+- [x] 386. THE QUIET-MACHINE PROBE IS BLIND TO THE GPU (user 27.07.2026: "maybe it
+  disturbed things that I was watching YouTube videos"). The probe built under point 296
+  reads the CPU busy delta, the run queue and the process table, and it deliberately does
+  NOT count a person's ordinary browser — a rule that is right for CPU work and wrong for
+  the thing these suites actually contend for. A video plays on the GPU: hardware decode
+  plus compositing, on the same device the headless render suites draw with, while the
+  CPU stays near idle. On the evening this was noticed the probe reported "QUIET, CPU 4 %"
+  during exactly such a session, and a suite's verdicts were believed on that basis.
+  MEASURE WHAT THE SUITES COMPETE FOR: add a GPU-side signal to the probe — on Windows
+  the per-adapter engine utilisation (the same counters the task manager shows) is
+  readable without a new dependency; where no such counter exists the probe says so
+  rather than reporting quiet. A high GPU load makes the machine NOT quiet even when the
+  process table is empty and the CPU is idle, and the reason is named in the line
+  ("GPU 71 % — a video or another 3-D application is using the device").
+  KEEP THE ASYMMETRY of point 296: this labels, it does not block, and a GREEN under GPU
+  load still counts. Only a timing-sensitive RED loses its standing.
+  DO NOT NAME THE APPLICATION, and do not start listing the user's own windows: the
+  measurement is the device's load, not a report on what the person is doing. A number
+  and its consequence, nothing else.
+  VERIFIABLE: pure Vitest on the classification (a high GPU reading with an empty process
+  table classifies as busy; a missing counter classifies as unknown and says why; the
+  existing CPU/process paths unchanged), and one live reading taken while something is
+  deliberately using the GPU, recorded with its figure.
+  DOCS in the same commit: `scripts/verify/README.md` beside the quiet-machine section.
