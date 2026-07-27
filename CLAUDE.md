@@ -1012,6 +1012,12 @@ After completion and after every major system:
   --session <id>` reports read-only whether one would block — advisory, the guard
   itself stays the authority. A blocked turn produces nothing, and one such loop
   has already cost ~30 turns; asking first is a cheap process run.
+- **Screenshot diffing is NOT available as a shortcut (point 361).** Every
+  pixel-metric way to cheapen this check was replayed against the bugs the
+  picture caught and REJECTED: two runs of one suite on identical code move
+  11–98 % of a frame, the smallest real defect moved 0.75 %. No golden-image
+  gate until `node scripts/picture-stability.mjs <suite>` reports STABLE;
+  verdicts in `docs/picture-check-levers.md`.
 - Fix deviations, do not paper over them. An unfulfilled criterion is
   reported as such.
 
