@@ -48,9 +48,11 @@ const GPU_TIMEOUT_MS = 10000
  * genuinely idle stays distinguishable from a machine with no such counter.
  *
  * A localized Windows names its counters in the UI language. Perflib keeps the
- * English list under `009` and the localized one under `CurrentLanguage`,
- * index-aligned, so the English name is tried first and resolved through that map
- * when it misses.
+ * English list under `009` and the localized one under `CurrentLanguage`, both as
+ * (id, name) pairs, so the English name is tried first and resolved through the
+ * ID when it misses. The join is on the ID rather than on the array position:
+ * identical ordering is usual but nothing guarantees it, and a positional join
+ * that slipped would build a plausible WRONG path instead of failing.
  */
 const GPU_COUNTER_PS = `
 $ErrorActionPreference = 'Stop'
@@ -60,8 +62,10 @@ try {
     $base = 'HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Perflib'
     $en = (Get-ItemProperty "$base\\009").Counter
     $loc = (Get-ItemProperty "$base\\CurrentLanguage").Counter
+    $localizedById = @{}
+    for ($i = 0; $i -lt $loc.Length - 1; $i += 2) { $localizedById[$loc[$i]] = $loc[$i + 1] }
     $map = @{}
-    for ($i = 1; $i -lt $en.Length; $i += 2) { if (-not $map.ContainsKey($en[$i])) { $map[$en[$i]] = $loc[$i] } }
+    for ($i = 0; $i -lt $en.Length - 1; $i += 2) { if (-not $map.ContainsKey($en[$i + 1])) { $map[$en[$i + 1]] = $localizedById[$en[$i]] } }
     $path = '\\{0}(*)\\{1}' -f $map['GPU Engine'], $map['Utilization Percentage']
     $s = (Get-Counter $path -ErrorAction Stop).CounterSamples
   }
@@ -163,7 +167,7 @@ export async function probeMachine({ sampleMs = SAMPLE_MS, pid = process.pid } =
     const cores = os.cpus()?.length || 1
     const strays = processes.length ? strayProcesses({ processes, pid, repoMarker: repoMarker() }) : []
     return {
-      ok: cpu !== null || processes.length > 0,
+      ok: cpu !== null || processes.length > 0 || gpu.fraction !== null,
       cpuBusyFraction: cpu,
       gpuBusyFraction: gpu.fraction,
       gpuUnreadable: gpu.unreadable,
