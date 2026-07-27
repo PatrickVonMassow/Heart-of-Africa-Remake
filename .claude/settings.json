@@ -118,6 +118,15 @@
     ],
     "PreToolUse": [
       {
+        "matcher": "Edit|Write|NotebookEdit|Agent|Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/board-first-guard.mjs"
+          }
+        ]
+      },
+      {
         "matcher": "Agent",
         "hooks": [
           {

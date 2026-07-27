@@ -10320,3 +10320,50 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   lost in the split (count before == count after, asserted by the migration itself).
   DOCS: the dashboard's structure rule is the user's mandate and lives in the session
   instructions rather than in a repository document; nothing in CLAUDE.md changes.
+
+- [x] 366. THE BOARD IS CURRENT BEFORE THE WORK STARTS, NOT AFTER IT ENDS (user
+  27.07.2026). The user watches the published board to see what is happening RIGHT
+  NOW, and today it can lag a long turn: on 27.07.2026 the "Woran ich gerade arbeite"
+  card still read "Pausiert — Wochenkontingent erschöpft" while a review agent and a
+  branch cleanup were already running, and the user had to say so twice.
+  WHY THE EXISTING MECHANISM DOES NOT COVER THIS: every board enforcer in
+  `.claude/settings.json` is a STOP hook — `dashboard-guard`,
+  `dashboard-integrity-guard`, `dashboard-conciseness-guard`,
+  `dashboard-card-topic-guard` and the focus review all fire when the turn ENDS. They
+  guarantee the board is honest by the time the turn is over; they say nothing about
+  the hour in between, which is exactly the window the user reads. The gap is
+  structural, not a lapse of discipline — so it gets a mechanism, per the project's
+  own "enforce, don't remind" principle.
+  THE MECHANISM: a PreToolUse gate (`scripts/board-first-guard.mjs`, pure core in
+  `scripts/board-first-core.mjs`) that DENIES the FIRST state-changing tool call of a
+  turn while the board does not yet describe the work that is starting. State-changing
+  means Edit/Write/NotebookEdit, an Agent launch, and a Bash/PowerShell call that
+  mutates (git commit/merge/push, rm, npm run …); the decision core classifies it.
+  THE CONDITION, and it must be mechanically checkable: `UserPromptSubmit` already runs
+  a hook chain, so it stamps `turnStartedAt` into the dashboard state; the gate then
+  requires (i) a `focus set|confirm` recorded AFTER that stamp and (ii) the published
+  hash equal to the repo file's hash (the invariant `dashboard-publish` already
+  maintains). Both are already-recorded facts — the gate reads state, it does not judge
+  prose.
+  THE ESCAPE PATH IS PART OF THE DESIGN, not an afterthought: a gate that can trap the
+  session is worse than the staleness it fixes (point 365 (D) prices a block-loop at
+  ~30 turns). So the gate NEVER denies the tools needed to satisfy it — reads of any
+  kind, `scripts/focus.mjs`, `scripts/dashboard-publish.mjs`, `dashboard-guard
+  --synced`, an edit of the dashboard file itself — and it is fail-OPEN like every
+  other guard here: an internal error allows the call. It also denies at most once per
+  turn: after the first denial it records that it fired, so a session that ignores it
+  cannot be locked out of working entirely — the Stop chain still catches the end state.
+  ANCHORS: `.claude/settings.json` (the hook registration — a protected path, so this
+  point is attended-only), `scripts/dashboard-state.mjs` (where the stamps live),
+  `scripts/focus.mjs`, `scripts/dashboard-guard.mjs`, and the existing pure-core +
+  fail-open pattern of any `scripts/*-core.mjs`.
+  VERIFIABLE: pure Vitest on the core — a mutating call before any focus stamp DENIES;
+  the same call after a focus stamp newer than `turnStartedAt` ALLOWS; a read-only call
+  always allows; each escape-path command allows even in the denying state; a second
+  mutating call in the same turn allows after the gate has fired once; an unparseable
+  or missing state file ALLOWS (fail-open). Plus a `guard-health` entry so the new
+  enforcer cannot sit in the tree uninvoked.
+  FOUR EYES: a guard is high-criticality (model-diverse-by-criticality), so the second
+  model reviews plan AND result before it goes live.
+  DOCS in the same commit: CLAUDE.md §7.2 (the Stop-chain list gains its first
+  PreToolUse board gate) and the retrospective's guard table.
