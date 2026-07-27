@@ -10548,3 +10548,250 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   against the LIVE board file (the sweep pattern of `scripts/board-core.test.mjs`).
   DOCS: the comment block at the head of `scripts/board.mjs`, where the loop is
   described.
+
+- [x] 361. CHEAPER PICTURE VERIFICATION — WITHOUT LOSING WHAT IT CATCHES (user
+  26.07.2026). The rendered-picture check is the most expensive
+  control in this project, and it dominates the cost of the work that is left: 42
+  of the 67 open points touch the canvas, so they need the full check, and the
+  scoping of 26.07. (DOM changes need one backend, Vitest files none) helped the
+  minority. What was NOT touched is the price of a SINGLE check — the suite run
+  and, above all, the screenshots that must be looked at. Reduce that price
+  without weakening the control.
+  MEASURE FIRST, then change. The current cost per check is unmeasured; without a
+  before-figure no after-figure means anything. Record, for a representative
+  suite on one backend: how many screenshots it produces, their sizes, and how
+  much of the reviewing context they consume. The project rule holds — only
+  measured numbers are communicated as measured.
+  CANDIDATE LEVERS, to be evaluated rather than assumed: crop each screenshot to
+  the region the change can affect instead of shipping the full frame; reduce
+  resolution before inspection (a stepped coast may still read at half size —
+  prove it, do not assume it); a MACHINE PRE-FILTER that decides whether a human
+  look is needed at all (a pixel metric against the previous accepted frame, so
+  only a changed picture is inspected — note this is close to the golden-image
+  method already listed as open under point 207 (ii), so build one thing, not
+  two); inspect one view per change instead of every screenshot a suite emits;
+  emit fewer frames per run. Combinations are allowed; each lever is judged
+  separately by the replay below.
+  THE ACCEPTANCE TEST IS A REPLAY OF REAL BUGS, and it is the point of the whole
+  exercise (user's requirement): the cheaper method must be shown to catch what
+  the current one caught. Build a corpus from the bugs this project found through
+  the picture — the stepped coast that read "done" on one backend, the flora
+  jitter, the floating horizon strip at the monument site, the doubled Giza
+  label, the season that was invisible while three rounds of value checks passed,
+  the haze that only failed at the default zoom, the sunken sphinx, the texture
+  count that dipped rather than leaked. For each: check out the commit BEFORE its
+  fix, run the candidate method against that state, and require it to FAIL. A
+  lever that misses even one of them is rejected for that class, and the rejection
+  is recorded with the case that killed it — not quietly dropped.
+  FOUR EYES, in the two modes of §355: the candidate levers are a DIVERGENT
+  question, so both models list them independently and blind, and the union is
+  evaluated. The replay result is CONVERGENT — one model runs it, the other reads
+  the evidence before the author's rationale.
+  ONLY THEN IMPLEMENT. If the replay holds for a lever, wire it into
+  `scripts/verify/*` and the render-verify guard's expectations, and record the
+  measured before/after. If no lever survives the replay, that IS the outcome:
+  record it and leave the check as it is — an expensive control that works beats
+  a cheap one that misses.
+  ANCHORS: the suites and their screenshot helpers in `scripts/verify/`, the
+  recorder and classifier in `scripts/render-verify-*.mjs`, the screenshots in
+  `verification/`, and the historical cases in `docs/analysis_de/
+  retrospektive-zusammenarbeit.md` §3.5/§3.6 and `docs/tasks-archive.md`.
+  DOCS in the same commit: CLAUDE.md §7.2 (the picture rule) and its evidence
+  section, plus a tip in the beginner's guide if a lever generalises.
+
+- [x] 307. FULL AUDIT OF EVERY RULE AND MECHANISM — HEALTH, NOT JUST COVERAGE
+  (user 25.07.2026, widening the original "find the missing mechanisms" scope after
+  a day that exposed how disordered the rule corpus has become). The corpus now
+  spans ~65 memories, 25 guard/hook scripts, CLAUDE.md §2/§4/§6/§7/§9, design.md
+  process sections, the analysis docs and the standing batch instructions — grown
+  by accretion, never once reviewed AS A WHOLE. Evidence that it needs it: today a
+  single rule change had to be applied in SIX places; two memories had to be
+  retired outright; a doc gained a SECOND copy of a rule it already stated (caught
+  only by re-reading); the coherence audit found a memory claiming enforcement by a
+  guard that was never built; and four separate checks accused the product of bugs
+  that were their own stale assumptions.
+  AUDIT EVERY RULE ON SIX AXES, one row per rule in a delivered table:
+  (1) CLEAN — is it stated once, in the right place, unambiguously?
+  (2) CURRENT — does it still match how the project actually works?
+  (3) REDUNDANT — is the same rule stated elsewhere (in another memory, doc or
+  guard message)? Merge to a single authoritative statement, others reference it.
+  (4) CONTRADICTORY — does it conflict with another rule, or with the code?
+  (5) INEFFECTIVE — does its mechanism actually fire? A guard that cannot block,
+  a check whose assertion cannot fail, a memory claiming an enforcement that does
+  not exist (the model-diverse-by-criticality case) all count as ineffective.
+  (6) OBSOLETE — has it been superseded (mark RETIRED with what survives, do not
+  silently delete — a reader who knows the old rule must see it was dropped on
+  purpose; that convention was set today).
+  THEN CONVERT: for every rule that is worth keeping but rests on intention alone,
+  BUILD the enforcing mechanism (pure core + Vitest + fail-open wrapper + wiring,
+  the project guard schema). Prioritise by how often compliance has actually
+  slipped, not by how easy the check is. The unguarded candidates already named:
+  push-after-every-commit, one-atomic-commit-per-point, both-languages-for-every-
+  player-text, voice-markup-in-every-journal-text, 1890-valid-names,
+  English-no-germanisms, commit-messages-no-point-number, new-tasks-append-and-
+  defer, tasks-spec-final-state-only — several are pure-checkable.
+  THE SAME CONVERSION IS OWED FOR THE BEGINNER GUIDE'S OWN ADVICE (user 25.07.2026:
+  "haben wir alle Tipps umgesetzt?"). docs/analysis_de/vibe-coding-anleitung.md hands
+  out prompts that ORDER a mechanism; every one of them must therefore exist here, or
+  its absence must be a recorded decision. Already built: progress-board currency
+  (dashboard chain), large-tier-before-release (closing-guard), picture-verified render
+  changes (render-verify-guard), no silent stop (batch-progress-guard), never block on
+  the user (defer-for-user), arrival proven not reported (push-arrival-guard), periodic
+  rule-corpus review (rule-review-guard), guide brevity (guide-brevity-guard). STILL
+  UNBUILT, in the order the guide implies:
+  (a) EVERY FEATURE HAS A TEST ON THE RIGHT LAYER — a check that fires when product
+  code changed with no corresponding test added on either layer.
+  (b) FOUR-EYES WHEN A MECHANISM IS ADDED OR CHANGED — the guide's own prompt; a
+  Stop check that a new/changed *-guard/*-core carries a recorded secondary-model
+  review before it goes live. Note the ordering trap: the reviewing model must not
+  be the authoring one, so the check records WHICH model reviewed.
+  (c) GUARD HEALTH — has each guard ever fired, can it fire at all, does it duplicate
+  another, is its message actionable? Two live examples of the failure: prep-guard
+  armed only on Bash while the project's shell is PowerShell, and scripts/
+  pre-push-gate.mjs exists while core.hooksPath is unset, so it can never run (that
+  one belongs to point 302, not here).
+  (d) ONE AUTHORITATIVE PLACE PER FACT — doc/code drift caught by checking prose
+  against the CODE that owns the fact (src/config/qualityDoc.test.ts is the pattern
+  to generalise; it currently covers only the quality presets).
+  (e) RED-TEST TRIAGE — before changing product code on a red check, decide by
+  EXPERIMENT whether the finding accuses the product or the measurement.
+  (f) NO FIXED WALL-CLOCK WAITS in tests — a detector; waiting is on a condition or
+  the app's clock.
+  (g) ONLY MEASURED NUMBERS are communicated (runtimes, performance, cost).
+  Where a mechanism is genuinely impossible (e.g. "does this look right to a human?"),
+  record that verdict explicitly instead of leaving the row silently empty.
+  ALSO AUDIT THE GUARDS THEMSELVES, not only the rules: 25 scripts now run on every
+  turn end. Which of them have ever fired? Which duplicate another's job? Is the
+  Stop chain's ORDER sensible (the most actionable message first — today a
+  structure violation was reported as "36 points missing" by an earlier guard)? Is
+  any of them so noisy that it trains the reader to ignore it? A guard that never
+  fires and a guard that always fires are both broken.
+  METHOD — FOUR EYES per the 25.07 model policy: one model scans and proposes,
+  the OTHER reviews the inventory for completeness and each verdict for
+  correctness (an incomplete inventory is the failure mode, and a rule audit that
+  checks rules against neighbouring prose rather than against the CODE makes drift
+  worse — that happened on 17.07 and is recorded in point 333's root causes).
+  VERIFIABLE: the rule×axis table with a verdict and an action per row; every
+  RETIRED rule marked as such with its surviving insight; every merged duplicate
+  leaving exactly one authoritative statement; each newly built guard with a
+  passing Vitest core test and its wiring; a short report of what was left
+  unenforced and why; and the guard-health verdict per script. No player-visible
+  text changes.
+
+- [x] 302. NEVER PUSH A STATE THAT FAILS CI — a pre-push fast-gate mechanism (user
+  24.07.2026: recurring pipeline-failure emails). The user gets GitHub failure emails when
+  a push lands a state CI rejects (a new npm-audit CVE, a lint/build/test regression); it
+  "works again afterwards" only because I fix + re-push, but the failed run already emailed.
+  ASSURE via a MECHANISM that a failing state never reaches main: a git PRE-PUSH hook (or an
+  equivalent enforced guard) that runs the fast gate — `npm run build && npm run lint &&
+  node scripts/audit-check.mjs && npm run test:unit` — before a push to main and BLOCKS it
+  on any red, so CI only ever sees green. Keep it proportionate: a docs/dashboard-only push
+  (no `src/`/`scripts/` change) may run a lighter subset (lint + audit-check), but
+  audit-check ALWAYS runs (new CVEs are the usual surprise). ANCHORS: `.git/hooks/pre-push`
+  or `scripts/pre-push-gate(-core).mjs` wired via git config / husky, docs (CLAUDE.md §6 —
+  "fast gate before every main push, enforced"). VERIFIABLE: a pure test of the gate
+  decision (red on any gate fail, green on all pass, doc-only fast-path) and a synthetic
+  failing state blocked from pushing. This is a must-work guard → build under the point-298
+  criticality rule (Fable plan-review before, safety-review after, merge only when green).
+  Until built, RUN the fast gate locally before every main push. No player-visible text.
+  DELIVERED 27.07.2026, and the four-eyes review is part of the record: the second
+  model (Fable 5) reviewed the built gate, returned MERGE-WITH-FIXES over eight
+  findings, and re-reviewed the repairs to MERGE. Two residuals are recorded here so
+  they are not rediscovered as surprises:
+  (R1) THE GATE MEASURES THE WORKING TREE, not the commit being pushed. A broken
+  commit with an uncommitted fix beside it still passes. The verdict now PRINTS that
+  it measured the tree, and names a dirty tree or a HEAD that is not the pushed
+  commit — reported rather than closed, because pinning the state (a stash, or a
+  temporary checkout of the pushed sha on every push) costs more per push than this
+  repository wants to pay. Revisit if a push ever lands red for exactly this reason.
+  (R2) `changedFiles` in the wrapper has no test, because testing it needs an
+  injected git runner. After the new-ref fix every failure mode of it collapses to an
+  empty list, which widens the plan to the FULL gate on main — a defect there can
+  only over-gate, never under-gate. Test debt, not a hole.
+
+- [x] 370. EVERY LESSON GETS A MECHANISM DECISION, AND THE DECISION IS ENFORCED (user
+  27.07.2026). A lesson written into the retrospective is not thereby obeyed — the
+  project's own core thesis says so (§1: enforcement beats memory), and today's session
+  proved it twice by repeating a mistake that was already written down. So a change to
+  the analysis documents must carry a DECISION about its mechanism, and that decision
+  must itself be enforced rather than remembered.
+  THE DECISION HAS EXACTLY THREE LEGITIMATE OUTCOMES, per lesson:
+  (1) an EXISTING enforcer is extended or adjusted to cover it — the PREFERRED outcome;
+  (2) a NEW enforcer, only where no existing one fits;
+  (3) DELIBERATELY NONE, with a written reason — the honest outcome for a lesson no
+  machine can check ("does this look right to a human?"), and it must be stated, not
+  left blank.
+  DO NOT ACCRETE. The guard chain already runs at every turn end and the retrospective
+  itself names guard sprawl as an open risk. So the decision explicitly asks, in this
+  order: does an existing enforcer already cover this? can one be widened instead of a
+  sibling added? does this lesson make an OLDER rule redundant, so the corpus shrinks
+  rather than grows? A new guard is the last resort, never the reflex, and a decision
+  that consolidates two rules into one counts as the best possible answer.
+  THE MECHANISM — extend `retro-currency-guard`, do not add a guard beside it. It already
+  parses the retrospective and knows when the sources moved, so it is the natural host.
+  It gains a LEDGER check against a machine-readable map (`docs/analysis_de/
+  lesson-mechanisms.md` with a parseable table, or a JSON beside it — pick one and say
+  why): every prose subsection of the retrospective has a ledger entry naming its
+  outcome (1), (2) or (3) with the enforcer's name or the written reason. A subsection
+  with no entry BLOCKS the turn end, which is exactly the moment the decision is cheap.
+  BACKFILL IS THE REAL WORK, and it is the point's most valuable output: every existing
+  lesson gets its entry. Expect the backfill to reveal lessons with NO enforcement at
+  all — those findings are reported as a list rather than silently marked (3), and the
+  worst of them become their own queued points.
+  FOUR EYES, both modes (user's explicit instruction): the second model reviews the
+  MECHANISM DESIGN before it is built (a gate that blocks every turn is high-criticality)
+  and the finished ledger afterwards, reading for entries that claim an enforcer which
+  does not actually cover the lesson — the failure mode a self-audit cannot see. The
+  existing `guard-health-guard` already fails on an enforcer nothing invokes; the review
+  must check the INVERSE, a claim without teeth.
+  VERIFIABLE: pure Vitest on the extended core — a retrospective subsection without a
+  ledger entry blocks; one with each of the three outcomes passes; an entry naming a
+  guard script that does not exist FAILS (a claim must point at something real); a
+  malformed ledger fails OPEN like every other guard here, so a parse bug cannot trap the
+  session. Plus one live check that the guard actually fires on a synthetic new
+  subsection.
+  DOCS in the same commit: CLAUDE.md §7.2 (the Stop-chain description gains the ledger
+  duty) and the retrospective's guard table.
+
+- [x] 337. THE STARTUP FRAME STALLS THE PICTURE ~15 s WHILE SHADERS COMPILE (found
+  25.07.2026 by the point-304 measurement, reported-not-gated there because it
+  reproduces with the TTS entirely absent and was out of that point's scope). On the
+  WebGL 2 backend on real NVIDIA hardware, ONE startup frame awaits about 149
+  shader-program links — a CDP trace attributes ~27 s to GetProgramiv /
+  CommandBufferHelper::Finish / WaitForGetOffset plus 508 ANGLE compile jobs — and
+  because three.js's async render yields between the awaits, that single FRAME spans
+  ~15 s. Scripts, timers and promises keep running the whole time (a 50 ms timer
+  train showed a 63 ms maximum gap), so nothing is "blocked" in the usual sense —
+  but the PLAYER sees a frozen picture for a quarter of a minute at load. Same class
+  as the §7.1 pt 2 leave-transition freeze that surgical dispose opt-outs fixed, but
+  at initial load, and currently unguarded. INVESTIGATE: how much of the program set
+  is actually needed for the FIRST frame versus compiled eagerly (material variants
+  for scenes not yet entered, the post chain, flora/fauna instance materials); can
+  the set be warmed progressively across frames, or the first frame drawn with a
+  reduced set and the rest linked behind it? Measure on the user's real hardware
+  (the F8 benchmark's environment block already records adapter and backend) — and
+  on WebGPU too, where the pipeline model differs and the number may be quite
+  different. VERIFIABLE: a live check that the initial-load picture is never frozen
+  longer than a calibratable budget, measured with the point-304 attribution module
+  (scripts/verify/liveness.mjs) so a busy renderer cannot hide the stall; the budget
+  is a balance value; the improvement demonstrated on both backends with before/after
+  numbers, and no visual regression at first frame.
+
+- [x] 294. AUTO-BASELINE CLASSIFICATION FOR VERIFY FAILURES (user 24.07.2026, from the
+  retrospective §3.12/§8). When a browser-verify check (`scripts/verify/*.mjs`) goes RED,
+  automatically re-run THAT failed check against the pre-change BASELINE (the branch's
+  merge-base with main, or main's HEAD) and CLASSIFY the red: "REAL REGRESSION (green on
+  baseline, red now)" vs "PRE-EXISTING / STALE-ASSUMPTION (already red on baseline)". Print
+  the classification in the verify output so a red is triaged instantly instead of by hand.
+  This mechanizes the manual baseline-diff done on 24.07. (the SSAO-off ground-edge check =
+  stale check assumption; the proximity-call-fade = pre-existing — point 292). DESIGN care:
+  re-running a browser suite is expensive and needs the baseline's `node_modules`/checkout —
+  so make it OPT-IN (a flag / on-demand for the failed checks only, not every run), reuse a
+  baseline worktree where possible, and keep the classification core PURE and Vitest-tested.
+  ANCHORS: `scripts/verify/run-all.mjs`, a new `scripts/verify/baseline-classify*.mjs` (pure
+  core + wrapper). VERIFIABLE: a pure test of the classify logic (green→red = regression;
+  red→red = pre-existing) and a live check that a known pre-existing red is labelled
+  pre-existing while an injected fresh regression is labelled real. No player-visible text.
+  PROCESS (user 24.07.2026): BEFORE building, a Fable-5 subagent reviews the PLAN; AFTER
+  building, a Fable-5 subagent evaluates whether it is truly safe, works in ALL cases and has
+  NO negative side effects; merge to main ONLY when everything is green.

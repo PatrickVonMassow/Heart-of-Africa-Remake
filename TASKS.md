@@ -999,25 +999,6 @@ read that as "the criterion and its evidence section".
   workflows-token-budget rule) — scope Prong A inline first, then run Prong B's
   harness. Implementation-ready.
 
-- [ ] 294. AUTO-BASELINE CLASSIFICATION FOR VERIFY FAILURES (user 24.07.2026, from the
-  retrospective §3.12/§8). When a browser-verify check (`scripts/verify/*.mjs`) goes RED,
-  automatically re-run THAT failed check against the pre-change BASELINE (the branch's
-  merge-base with main, or main's HEAD) and CLASSIFY the red: "REAL REGRESSION (green on
-  baseline, red now)" vs "PRE-EXISTING / STALE-ASSUMPTION (already red on baseline)". Print
-  the classification in the verify output so a red is triaged instantly instead of by hand.
-  This mechanizes the manual baseline-diff done on 24.07. (the SSAO-off ground-edge check =
-  stale check assumption; the proximity-call-fade = pre-existing — point 292). DESIGN care:
-  re-running a browser suite is expensive and needs the baseline's `node_modules`/checkout —
-  so make it OPT-IN (a flag / on-demand for the failed checks only, not every run), reuse a
-  baseline worktree where possible, and keep the classification core PURE and Vitest-tested.
-  ANCHORS: `scripts/verify/run-all.mjs`, a new `scripts/verify/baseline-classify*.mjs` (pure
-  core + wrapper). VERIFIABLE: a pure test of the classify logic (green→red = regression;
-  red→red = pre-existing) and a live check that a known pre-existing red is labelled
-  pre-existing while an injected fresh regression is labelled real. No player-visible text.
-  PROCESS (user 24.07.2026): BEFORE building, a Fable-5 subagent reviews the PLAN; AFTER
-  building, a Fable-5 subagent evaluates whether it is truly safe, works in ALL cases and has
-  NO negative side effects; merge to main ONLY when everything is green.
-
 - [ ] 295. DEV-BUILD RENDER-RESOURCE LEAK INVARIANT (user 24.07.2026, from the retrospective
   §3.12/§8 — the in-game-assert principle applied to GPU resources). A `import.meta.env.DEV`
   invariant that asserts the renderer's render-target / texture counts (`renderer.info`)
@@ -1159,23 +1140,6 @@ read that as "the criterion and its evidence section".
   panoramaGaitDistance, points 255/286), the settlement-walker gait, `src/render/fauna.ts` (the
   leg pivots). No player-visible text.
 
-- [ ] 302. NEVER PUSH A STATE THAT FAILS CI — a pre-push fast-gate mechanism (user
-  24.07.2026: recurring pipeline-failure emails). The user gets GitHub failure emails when
-  a push lands a state CI rejects (a new npm-audit CVE, a lint/build/test regression); it
-  "works again afterwards" only because I fix + re-push, but the failed run already emailed.
-  ASSURE via a MECHANISM that a failing state never reaches main: a git PRE-PUSH hook (or an
-  equivalent enforced guard) that runs the fast gate — `npm run build && npm run lint &&
-  node scripts/audit-check.mjs && npm run test:unit` — before a push to main and BLOCKS it
-  on any red, so CI only ever sees green. Keep it proportionate: a docs/dashboard-only push
-  (no `src/`/`scripts/` change) may run a lighter subset (lint + audit-check), but
-  audit-check ALWAYS runs (new CVEs are the usual surprise). ANCHORS: `.git/hooks/pre-push`
-  or `scripts/pre-push-gate(-core).mjs` wired via git config / husky, docs (CLAUDE.md §6 —
-  "fast gate before every main push, enforced"). VERIFIABLE: a pure test of the gate
-  decision (red on any gate fail, green on all pass, doc-only fast-path) and a synthetic
-  failing state blocked from pushing. This is a must-work guard → build under the point-298
-  criticality rule (Fable plan-review before, safety-review after, merge only when green).
-  Until built, RUN the fast gate locally before every main push. No player-visible text.
-
 - [ ] 303. CODE REVIEW OF ALL CHANGES SINCE v0.1 — validate every test is still VALID (user
   24.07.2026). QUEUE POSITION: the NEXT task after 224. Stale tests keep surfacing only as
   incidental findings (today alone: a strict type-check, heavy fuzz timeouts, and checks that
@@ -1228,85 +1192,6 @@ read that as "the criterion and its evidence section".
   wrapper + a report of what drifts the guard catches (e.g. card says »306« but HEAD is on
   »feat/224-…«). This guard exemplifies point 307's mechanism-first principle: instead of relying
   on memory, a technical gate enforces rule compliance.
-
-- [ ] 307. FULL AUDIT OF EVERY RULE AND MECHANISM — HEALTH, NOT JUST COVERAGE
-  (user 25.07.2026, widening the original "find the missing mechanisms" scope after
-  a day that exposed how disordered the rule corpus has become). The corpus now
-  spans ~65 memories, 25 guard/hook scripts, CLAUDE.md §2/§4/§6/§7/§9, design.md
-  process sections, the analysis docs and the standing batch instructions — grown
-  by accretion, never once reviewed AS A WHOLE. Evidence that it needs it: today a
-  single rule change had to be applied in SIX places; two memories had to be
-  retired outright; a doc gained a SECOND copy of a rule it already stated (caught
-  only by re-reading); the coherence audit found a memory claiming enforcement by a
-  guard that was never built; and four separate checks accused the product of bugs
-  that were their own stale assumptions.
-  AUDIT EVERY RULE ON SIX AXES, one row per rule in a delivered table:
-  (1) CLEAN — is it stated once, in the right place, unambiguously?
-  (2) CURRENT — does it still match how the project actually works?
-  (3) REDUNDANT — is the same rule stated elsewhere (in another memory, doc or
-  guard message)? Merge to a single authoritative statement, others reference it.
-  (4) CONTRADICTORY — does it conflict with another rule, or with the code?
-  (5) INEFFECTIVE — does its mechanism actually fire? A guard that cannot block,
-  a check whose assertion cannot fail, a memory claiming an enforcement that does
-  not exist (the model-diverse-by-criticality case) all count as ineffective.
-  (6) OBSOLETE — has it been superseded (mark RETIRED with what survives, do not
-  silently delete — a reader who knows the old rule must see it was dropped on
-  purpose; that convention was set today).
-  THEN CONVERT: for every rule that is worth keeping but rests on intention alone,
-  BUILD the enforcing mechanism (pure core + Vitest + fail-open wrapper + wiring,
-  the project guard schema). Prioritise by how often compliance has actually
-  slipped, not by how easy the check is. The unguarded candidates already named:
-  push-after-every-commit, one-atomic-commit-per-point, both-languages-for-every-
-  player-text, voice-markup-in-every-journal-text, 1890-valid-names,
-  English-no-germanisms, commit-messages-no-point-number, new-tasks-append-and-
-  defer, tasks-spec-final-state-only — several are pure-checkable.
-  THE SAME CONVERSION IS OWED FOR THE BEGINNER GUIDE'S OWN ADVICE (user 25.07.2026:
-  "haben wir alle Tipps umgesetzt?"). docs/analysis_de/vibe-coding-anleitung.md hands
-  out prompts that ORDER a mechanism; every one of them must therefore exist here, or
-  its absence must be a recorded decision. Already built: progress-board currency
-  (dashboard chain), large-tier-before-release (closing-guard), picture-verified render
-  changes (render-verify-guard), no silent stop (batch-progress-guard), never block on
-  the user (defer-for-user), arrival proven not reported (push-arrival-guard), periodic
-  rule-corpus review (rule-review-guard), guide brevity (guide-brevity-guard). STILL
-  UNBUILT, in the order the guide implies:
-  (a) EVERY FEATURE HAS A TEST ON THE RIGHT LAYER — a check that fires when product
-  code changed with no corresponding test added on either layer.
-  (b) FOUR-EYES WHEN A MECHANISM IS ADDED OR CHANGED — the guide's own prompt; a
-  Stop check that a new/changed *-guard/*-core carries a recorded secondary-model
-  review before it goes live. Note the ordering trap: the reviewing model must not
-  be the authoring one, so the check records WHICH model reviewed.
-  (c) GUARD HEALTH — has each guard ever fired, can it fire at all, does it duplicate
-  another, is its message actionable? Two live examples of the failure: prep-guard
-  armed only on Bash while the project's shell is PowerShell, and scripts/
-  pre-push-gate.mjs exists while core.hooksPath is unset, so it can never run (that
-  one belongs to point 302, not here).
-  (d) ONE AUTHORITATIVE PLACE PER FACT — doc/code drift caught by checking prose
-  against the CODE that owns the fact (src/config/qualityDoc.test.ts is the pattern
-  to generalise; it currently covers only the quality presets).
-  (e) RED-TEST TRIAGE — before changing product code on a red check, decide by
-  EXPERIMENT whether the finding accuses the product or the measurement.
-  (f) NO FIXED WALL-CLOCK WAITS in tests — a detector; waiting is on a condition or
-  the app's clock.
-  (g) ONLY MEASURED NUMBERS are communicated (runtimes, performance, cost).
-  Where a mechanism is genuinely impossible (e.g. "does this look right to a human?"),
-  record that verdict explicitly instead of leaving the row silently empty.
-  ALSO AUDIT THE GUARDS THEMSELVES, not only the rules: 25 scripts now run on every
-  turn end. Which of them have ever fired? Which duplicate another's job? Is the
-  Stop chain's ORDER sensible (the most actionable message first — today a
-  structure violation was reported as "36 points missing" by an earlier guard)? Is
-  any of them so noisy that it trains the reader to ignore it? A guard that never
-  fires and a guard that always fires are both broken.
-  METHOD — FOUR EYES per the 25.07 model policy: one model scans and proposes,
-  the OTHER reviews the inventory for completeness and each verdict for
-  correctness (an incomplete inventory is the failure mode, and a rule audit that
-  checks rules against neighbouring prose rather than against the CODE makes drift
-  worse — that happened on 17.07 and is recorded in point 333's root causes).
-  VERIFIABLE: the rule×axis table with a verdict and an action per row; every
-  RETIRED rule marked as such with its surviving insight; every merged duplicate
-  leaving exactly one authoritative statement; each newly built guard with a
-  passing Vitest core test and its wiring; a short report of what was left
-  unenforced and why; and the guard-health verdict per script. No player-visible
-  text changes.
 
 - [ ] 309. SERVING-MODEL DEGRADATION: REPAIR + TRIPWIRE (user 25.07.2026). REPAIR: the
   late-evening session of 24.07 ran silently on Haiku 4.5 (proven by the Co-Authored-By
@@ -1842,30 +1727,6 @@ read that as "the criterion and its evidence section".
   their real outcome (no masking). RELATED: this is the concrete first slice of point
   200's flake work, and point 294's auto-classification would have labelled all four
   reds "staging, not product" without a manual repeat each time.
-
-- [ ] 337. THE STARTUP FRAME STALLS THE PICTURE ~15 s WHILE SHADERS COMPILE (found
-  25.07.2026 by the point-304 measurement, reported-not-gated there because it
-  reproduces with the TTS entirely absent and was out of that point's scope). On the
-  WebGL 2 backend on real NVIDIA hardware, ONE startup frame awaits about 149
-  shader-program links — a CDP trace attributes ~27 s to GetProgramiv /
-  CommandBufferHelper::Finish / WaitForGetOffset plus 508 ANGLE compile jobs — and
-  because three.js's async render yields between the awaits, that single FRAME spans
-  ~15 s. Scripts, timers and promises keep running the whole time (a 50 ms timer
-  train showed a 63 ms maximum gap), so nothing is "blocked" in the usual sense —
-  but the PLAYER sees a frozen picture for a quarter of a minute at load. Same class
-  as the §7.1 pt 2 leave-transition freeze that surgical dispose opt-outs fixed, but
-  at initial load, and currently unguarded. INVESTIGATE: how much of the program set
-  is actually needed for the FIRST frame versus compiled eagerly (material variants
-  for scenes not yet entered, the post chain, flora/fauna instance materials); can
-  the set be warmed progressively across frames, or the first frame drawn with a
-  reduced set and the rest linked behind it? Measure on the user's real hardware
-  (the F8 benchmark's environment block already records adapter and backend) — and
-  on WebGPU too, where the pipeline model differs and the number may be quite
-  different. VERIFIABLE: a live check that the initial-load picture is never frozen
-  longer than a calibratable budget, measured with the point-304 attribution module
-  (scripts/verify/liveness.mjs) so a busy renderer cannot hide the stall; the budget
-  is a balance value; the improvement demonstrated on both backends with before/after
-  numbers, and no visual regression at first frame.
 
 - [ ] 338. GIZA IS LABELLED TWICE IN THE BIRD'S-EYE VIEW, FROM TWO DEFINITIONS OF THE
   SAME SITE (user 25.07.2026, screenshot: the italic cultural-landmark label »Pyramids
@@ -2806,56 +2667,6 @@ read that as "the criterion and its evidence section".
   targets are still reached afterwards; no walker is left standing past its window.
   DOCS: design.md §19.10 beside the existing village vignettes.
 
-- [ ] 361. CHEAPER PICTURE VERIFICATION — WITHOUT LOSING WHAT IT CATCHES (user
-  26.07.2026). The rendered-picture check is the most expensive
-  control in this project, and it dominates the cost of the work that is left: 42
-  of the 67 open points touch the canvas, so they need the full check, and the
-  scoping of 26.07. (DOM changes need one backend, Vitest files none) helped the
-  minority. What was NOT touched is the price of a SINGLE check — the suite run
-  and, above all, the screenshots that must be looked at. Reduce that price
-  without weakening the control.
-  MEASURE FIRST, then change. The current cost per check is unmeasured; without a
-  before-figure no after-figure means anything. Record, for a representative
-  suite on one backend: how many screenshots it produces, their sizes, and how
-  much of the reviewing context they consume. The project rule holds — only
-  measured numbers are communicated as measured.
-  CANDIDATE LEVERS, to be evaluated rather than assumed: crop each screenshot to
-  the region the change can affect instead of shipping the full frame; reduce
-  resolution before inspection (a stepped coast may still read at half size —
-  prove it, do not assume it); a MACHINE PRE-FILTER that decides whether a human
-  look is needed at all (a pixel metric against the previous accepted frame, so
-  only a changed picture is inspected — note this is close to the golden-image
-  method already listed as open under point 207 (ii), so build one thing, not
-  two); inspect one view per change instead of every screenshot a suite emits;
-  emit fewer frames per run. Combinations are allowed; each lever is judged
-  separately by the replay below.
-  THE ACCEPTANCE TEST IS A REPLAY OF REAL BUGS, and it is the point of the whole
-  exercise (user's requirement): the cheaper method must be shown to catch what
-  the current one caught. Build a corpus from the bugs this project found through
-  the picture — the stepped coast that read "done" on one backend, the flora
-  jitter, the floating horizon strip at the monument site, the doubled Giza
-  label, the season that was invisible while three rounds of value checks passed,
-  the haze that only failed at the default zoom, the sunken sphinx, the texture
-  count that dipped rather than leaked. For each: check out the commit BEFORE its
-  fix, run the candidate method against that state, and require it to FAIL. A
-  lever that misses even one of them is rejected for that class, and the rejection
-  is recorded with the case that killed it — not quietly dropped.
-  FOUR EYES, in the two modes of §355: the candidate levers are a DIVERGENT
-  question, so both models list them independently and blind, and the union is
-  evaluated. The replay result is CONVERGENT — one model runs it, the other reads
-  the evidence before the author's rationale.
-  ONLY THEN IMPLEMENT. If the replay holds for a lever, wire it into
-  `scripts/verify/*` and the render-verify guard's expectations, and record the
-  measured before/after. If no lever survives the replay, that IS the outcome:
-  record it and leave the check as it is — an expensive control that works beats
-  a cheap one that misses.
-  ANCHORS: the suites and their screenshot helpers in `scripts/verify/`, the
-  recorder and classifier in `scripts/render-verify-*.mjs`, the screenshots in
-  `verification/`, and the historical cases in `docs/analysis_de/
-  retrospektive-zusammenarbeit.md` §3.5/§3.6 and `docs/tasks-archive.md`.
-  DOCS in the same commit: CLAUDE.md §7.2 (the picture rule) and its evidence
-  section, plus a tip in the beginner's guide if a lever generalises.
-
 - [ ] 362. THE CROSSING TURNED BACK — the crocodile takes a calf mid-channel
   (user 26.07.2026; design.md §19.8 states the target). Two systems exist and have
   never met: the purposeful water crossing (`crossingTarget`/`shouldStartCrossing`
@@ -3177,50 +2988,6 @@ read that as "the criterion and its evidence section".
   beside the body rather than hopping, and a predator staged during that window still
   makes it run.
 
-- [ ] 370. EVERY LESSON GETS A MECHANISM DECISION, AND THE DECISION IS ENFORCED (user
-  27.07.2026). A lesson written into the retrospective is not thereby obeyed — the
-  project's own core thesis says so (§1: enforcement beats memory), and today's session
-  proved it twice by repeating a mistake that was already written down. So a change to
-  the analysis documents must carry a DECISION about its mechanism, and that decision
-  must itself be enforced rather than remembered.
-  THE DECISION HAS EXACTLY THREE LEGITIMATE OUTCOMES, per lesson:
-  (1) an EXISTING enforcer is extended or adjusted to cover it — the PREFERRED outcome;
-  (2) a NEW enforcer, only where no existing one fits;
-  (3) DELIBERATELY NONE, with a written reason — the honest outcome for a lesson no
-  machine can check ("does this look right to a human?"), and it must be stated, not
-  left blank.
-  DO NOT ACCRETE. The guard chain already runs at every turn end and the retrospective
-  itself names guard sprawl as an open risk. So the decision explicitly asks, in this
-  order: does an existing enforcer already cover this? can one be widened instead of a
-  sibling added? does this lesson make an OLDER rule redundant, so the corpus shrinks
-  rather than grows? A new guard is the last resort, never the reflex, and a decision
-  that consolidates two rules into one counts as the best possible answer.
-  THE MECHANISM — extend `retro-currency-guard`, do not add a guard beside it. It already
-  parses the retrospective and knows when the sources moved, so it is the natural host.
-  It gains a LEDGER check against a machine-readable map (`docs/analysis_de/
-  lesson-mechanisms.md` with a parseable table, or a JSON beside it — pick one and say
-  why): every prose subsection of the retrospective has a ledger entry naming its
-  outcome (1), (2) or (3) with the enforcer's name or the written reason. A subsection
-  with no entry BLOCKS the turn end, which is exactly the moment the decision is cheap.
-  BACKFILL IS THE REAL WORK, and it is the point's most valuable output: every existing
-  lesson gets its entry. Expect the backfill to reveal lessons with NO enforcement at
-  all — those findings are reported as a list rather than silently marked (3), and the
-  worst of them become their own queued points.
-  FOUR EYES, both modes (user's explicit instruction): the second model reviews the
-  MECHANISM DESIGN before it is built (a gate that blocks every turn is high-criticality)
-  and the finished ledger afterwards, reading for entries that claim an enforcer which
-  does not actually cover the lesson — the failure mode a self-audit cannot see. The
-  existing `guard-health-guard` already fails on an enforcer nothing invokes; the review
-  must check the INVERSE, a claim without teeth.
-  VERIFIABLE: pure Vitest on the extended core — a retrospective subsection without a
-  ledger entry blocks; one with each of the three outcomes passes; an entry naming a
-  guard script that does not exist FAILS (a claim must point at something real); a
-  malformed ledger fails OPEN like every other guard here, so a parse bug cannot trap the
-  session. Plus one live check that the guard actually fires on a synthetic new
-  subsection.
-  DOCS in the same commit: CLAUDE.md §7.2 (the Stop-chain description gains the ledger
-  duty) and the retrospective's guard table.
-
 - [ ] 373. THE SESSION BOUNDARY BECOMES AUTONOMOUS (user 27.07.2026: "implement it the
   way you recommend", against the plan to run the batch 24/7). Measured: 80 % of the
   token spend sits above 150k context, because one session carries point after point.
@@ -3256,6 +3023,182 @@ read that as "the criterion and its evidence section".
   MEASURE THE RESULT: report the %/h rate for the first full day after the change
   against today's 1.25 %/h. The point counts as delivered when the rate is measured, not
   when the mechanism runs.
+
+- [ ] 375. A VERIFICATION FRAME MUST SHOW WHAT ITS NAME CLAIMS (27.07.2026, found
+  while measuring the picture check under point 361). Two runs of the `world` suite on
+  IDENTICAL code photographed different places: `12-worldmodel-lake-victoria` captured a
+  settled lake view in one run and a mid-travel landscape in the other, and BOTH runs
+  exited 0. The reviewer is then handed a frame that does not show its subject, and no
+  assertion notices — the picture check's own evidence is unreliable in a way no test
+  reports.
+  FIX IT AT THE SHUTTER: before a frame is written, its subject is asserted to be IN the
+  rendered picture, projected through `__camera.onScreen`/`ndc` exactly as the §7.2 rule
+  already demands of every in-view claim — never through an assumed radius. A frame whose
+  subject is absent FAILS the suite, naming the frame and what was found instead; it is
+  never written as if it were the evidence.
+  SCOPE: the named-subject frames of `scripts/verify/*` (a place, a landmark, a
+  settlement). A frame that deliberately photographs a general view declares that, so the
+  requirement is explicit rather than inferred from a filename.
+  VERIFIABLE: pure Vitest on the subject check (present → pass, absent → a loud failure
+  naming the frame), plus one live suite run proving a deliberately mis-aimed frame is
+  refused rather than saved.
+  DOCS in the same commit: CLAUDE.md §7.2 beside the projection rule, and
+  `scripts/verify/README.md`.
+
+- [ ] 376. THE RENDER SET MUST CONTAIN THE FILE THAT ONCE BROKE THE PICTURE (27.07.2026,
+  found under point 361). `scripts/render-verify-core.mjs` classifies `src/world/redSea.ts`
+  as NOT a render path, yet the point-210 stepped coast — the founding case of the
+  both-backend picture rule — touched that file and nothing else. The guard would not have
+  demanded a picture check for the bug it exists because of.
+  DECIDE BY MEASUREMENT, not by instinct, and record the figure either way: (a) widen the
+  classification to the world-geometry sources that FEED the rendered terrain, or (b) keep
+  the narrow set and add those sources as a named exception list derived from the
+  historical corpus. (a) is safer and costs more checks; (b) is cheaper and covers only
+  what has already burned us once. Measure how many of the last 100 commits each option
+  would newly force into a picture check, and choose on that number.
+  VERIFIABLE: `scripts/render-verify-core.test.mjs` gains the point-210 commit as a case —
+  the classification must demand the picture check for it — and the measured commit counts
+  are recorded with the decision.
+  DOCS in the same commit: CLAUDE.md §7.2 (the classification sentence) and the rationale
+  beside `isBackendSensitivePath`.
+
+- [ ] 377. THE FOUR-EYES RULE FOR A NEW MECHANISM GETS ITS OWN MECHANISM
+  (27.07.2026, from the rule-corpus audit of point 307). The rule "a new or changed
+  guard is reviewed by the SECOND model before it goes live" is the project's own
+  exemplar for enforcing rather than remembering — and the audit found it was claimed
+  to have a Stop check that never existed. It has been carried by intention alone, and
+  it was skipped in exactly the cases where it mattered: the pre-push gate went live
+  before its review, which then found two defects that defeated its purpose.
+  BUILD IT AS A STOP CHECK, in the shape every other guard here has (a pure,
+  Vitest-covered `*-core.mjs` plus a fail-open wrapper, standing down for a non-owner
+  session and a paused batch): when the turn's commits add or change a
+  `scripts/*-guard*.mjs`, `scripts/*-gate*.mjs`, a `*-core.mjs` beside one, or a git
+  hook under `scripts/git-hooks/`, the turn may not end until a review is RECORDED for
+  that change — which model reviewed, its verdict, and the commit it judged.
+  THE RECORD IS THE HARD PART, so keep it cheap and honest: `node
+  scripts/mechanism-review.mjs --record <sha> --model <name> --verdict <merge|
+  merge-with-fixes|do-not-merge> --evidence "<one line>"`, stored beside the other
+  batch state. The reviewing model must NOT be the authoring one — the record carries
+  both, and a match is refused rather than warned about. A verdict of
+  `do-not-merge` blocks as loudly as a missing record.
+  NOT RETROACTIVE: guards that already exist are grandfathered by a one-off baseline,
+  exactly as `model-guard` handles its own history — the point is the next mechanism,
+  not a review debt for twenty-eight of them.
+  VERIFIABLE: pure Vitest — a changed guard without a record blocks; with a record by a
+  DIFFERENT model it passes; a record by the authoring model is refused; a
+  `do-not-merge` verdict blocks; a turn that changed no mechanism is untouched; the
+  baseline grandfathering holds. Plus the spawned-hook test the Stop chain's other
+  guards have (`scripts/guard-hooks.test.mjs`), because reading a wrapper is not
+  evidence that it fires.
+  DOCS in the same commit: CLAUDE.md §7.2's guard list (the file is at its measured
+  ceiling — pay for the entry by trimming, not by raising) and the beginner's guide,
+  whose prompt 5 already asks for exactly this and can then cite it as built.
+
+- [ ] 378. THE ANIMAL'S COLLISION SITS BESIDE THE ANIMAL (user 27.07.2026, reported on
+  the deployed build with a screenshot: in the bird's-eye view the traveller walks
+  STRAIGHT THROUGH the drawn body, and is blocked on empty ground NEXT TO it). The
+  §7.1 pt 4 rule is that the bird's-eye traveller collides with animals; today he
+  collides with something that is not where the animal is drawn, which is worse than
+  no collision at all — the picture and the feel contradict each other, and the player
+  cannot learn a rule from it.
+  THE FIX IS THE POINT-129 PRINCIPLE, APPLIED TO ANIMALS: a collider is DERIVED from
+  the SAME transform the renderer draws, never from a parallel quantity that is
+  merely expected to match. `nearAnimalObstacles` in `src/scenes/travel/Wildlife.tsx`
+  builds its circles from `a.x`/`a.z` and `BODY_RADIUS[species] * a.scale`; the
+  rendered body is placed by the instanced draw for that species. FIND where the two
+  diverge and make the collider read the drawn placement — do not "correct" it by an
+  offset constant, which would drift again the next time the rendering moves.
+  THE REPORT CARRIES ITS OWN REPRODUCTION, so start there rather than hunting for a
+  case: `local/reports/378-animal-collider-report.json` is the state dump taken at the
+  moment of the report (git-ignored, outside the repo's tracked content). World seed
+  3241103702, traveller at x 330.707 / z −233.274 in the north region, 29.01.1890,
+  travel speed 5.6, detail level medium — the same seed and spot re-streams the same
+  herd, so the offending animal can be walked into again instead of being waited for.
+  A related in-game assert fired during an unrelated verification run the same
+  evening and points at the same seam: `animal-buried — wildebeest bodyY=1.13
+  ground=1.92`, i.e. a body DRAWN below the ground it stands on. Check whether one
+  cause explains both before treating them as two.
+  MEASURE THE DIVERGENCE FIRST, so the fix is aimed rather than guessed: for a
+  standing and a moving animal of several species, log the drawn world position of the
+  instance and the circle the collider reports, and record the delta. A per-species
+  constant offset, a lag of one frame, a herd-anchor instead of the individual, and a
+  facing-dependent body offset all produce the reported symptom and are told apart by
+  that measurement.
+  WATCH FOR THE NEIGHBOURING CASE: whatever the cause, check the SAME question for the
+  crocodile in water and for a juvenile beside its parent — both draw with their own
+  placement rules, and a fix that only lines up the plain grazers would leave the
+  reported class half open.
+  VERIFIABLE: pure Vitest — for a sampled set of species and states, the collider
+  circle's centre equals the position the renderer places that instance at, within a
+  tight tolerance, and the radius scales with the drawn body; a moving animal keeps
+  that identity across frames (the lag case). Plus one Playwright check in the
+  bird's-eye view that walks the traveller INTO the drawn body (blocked) and past its
+  flank (free), judged by PROJECTING the animal to the frame per §7.2, never by an
+  assumed radius.
+  DOCS in the same commit: CLAUDE.md §7.1 pt 4 (the collider-derived-from-the-drawing
+  rule, already stated for flora, extended to animals) and its evidence section.
+
+- [ ] 379. ABU SIMBEL JOINS THE CULTURAL LANDMARKS (user 27.07.2026). The world carries
+  eight built cultural landmarks (Meroë, Giza, Great Zimbabwe, Lalibela, Kilwa, Aksum,
+  Gondar, Bandiagara) and four natural ones; the rock temples of Abu Simbel are absent,
+  and they belong: in 1890 they stood — cleared of sand by Belzoni in 1817 and a fixed
+  point of every Nile journey — at the Nubian reach the traveller passes on the way
+  south, in their ORIGINAL place beside the river (the 1960s relocation is far outside
+  this game's window, so the site sits at the historical coordinates, not the modern
+  ones).
+  BUILD IT AS THE OTHER EIGHT ARE BUILT, not as a special case: an entry in
+  `src/world/data/landmarks.ts` with its ~1890-correct coordinates, the field radius and
+  water clearance the §4.2 sweep in `src/world/world.test.ts` applies to every landmark,
+  a localized name in BOTH language files, a first-sighting journal entry in the §10
+  kind-flavoured shape (both languages, §15 voice markup, once per landmark), the
+  discovery bounty, and the debug-menu jump-to entry in its alphabetical place.
+  THE FRAMING IS THE §4.4 ONE: an African achievement seen by a traveller, not a
+  curiosity. Four colossal seated figures cut from the cliff face, a smaller temple
+  beside them, the river below — the entry says what the traveller SEES and what it
+  meant, in the register the other seven use.
+  RESEARCH BEFORE PLACING: confirm the coordinates and the 1890 state against
+  `docs/peoples-1890.md` (it already mentions the site) and the sources that document
+  the other landmarks; if the research contradicts anything here, the research wins and
+  the point is corrected rather than forced.
+  VERIFIABLE: the existing landmark sweeps in `src/world/world.test.ts` cover it
+  automatically once it is in the data (clearance, no overlap, the label rules); add the
+  i18n completeness case both languages already have, and the first-sighting entry test
+  beside the other landmarks'. One bird's-eye screenshot at in-game zoom showing the
+  site labelled where it belongs on the Nile.
+  DOCS in the same commit: `design.md` §4.4 (the landmark list is design content — this
+  is a genuine addition and pays its measured words), CLAUDE.md §7.1 pt 25 where the
+  eight are enumerated, and the evidence section.
+
+- [ ] 380. THE SURROUNDINGS SHOW THE NEIGHBOUR THAT IS REALLY THERE (user 27.07.2026,
+  reported from the deployed build). Standing at the Giza monument site the traveller
+  does NOT see Cairo on the horizon, while standing in Cairo he does see the pyramids —
+  and in 1890 the two are barely fifteen kilometres apart, in flat desert, in plain
+  view of each other. The asymmetry is the report; the rule it breaks is §2.5, which
+  promises the surroundings panorama of the real map landscape.
+  DIAGNOSE BEFORE BUILDING, because the two directions probably have DIFFERENT causes:
+  the backdrop band (`src/scenes/place/backdrop.ts`) is built from `sampleTerrain`
+  alone — relief, no settlements and no monuments — so it cannot be what shows the
+  pyramids from Cairo; that view is far more likely Cairo's own local dressing. Confirm
+  which mechanism draws each side before deciding where the fix belongs. A fix in the
+  wrong one produces a pyramid that hangs in the sky, which is exactly the class points
+  92/94/181 already paid for.
+  THE TARGET: a settlement or monument that is genuinely within sight distance reads on
+  the horizon from the other, at the right BEARING and the right apparent size, sitting
+  on the ground the backdrop draws (`panoramaStandY`/`discHorizonY`, the point-181
+  footing rule) — never floating, never a black sliver. Sight distance is a
+  calibratable balance value, debug-editable, and the rule is symmetric by construction
+  rather than by two hand-written cases.
+  SCOPE HONESTLY: if the research shows the general case (every neighbouring place
+  within sight) costs far more than the Giza↔Cairo pair the user reported, say so with
+  the measured reason and deliver the general mechanism only if it is affordable —
+  a hard-coded pair is NOT an acceptable substitute, because the next pair reopens it.
+  VERIFIABLE: pure Vitest on the bearing/size/footing computation for a neighbour at a
+  given distance (present within sight, absent beyond it, correct bearing on both
+  sides — the symmetry pinned as a property, not as two examples); plus one Playwright
+  frame from each side, judged by PROJECTING the neighbour into the picture per §7.2,
+  never by an assumed radius.
+  DOCS in the same commit: `design.md` §2.5 (what the panorama shows is design content)
+  and CLAUDE.md §7.1 pt 31 with its evidence section.
 
 ## Closing (only after all points)
 

@@ -39,7 +39,7 @@ Vitest+SMALL / Vitest+LARGE; the **closing cycle ALWAYS runs LARGE**):
 | Tier | Command | Browser suites | Preview |
 |------|---------|----------------|---------|
 | **SMALL** (everyday gate) | `npm run test:small` | `docs, i18n, flow, health, events, collision, voice` — fast, low-flake, core coverage (doc/i18n consistency, the one E2E core loop, health/events/collision, TTS) | no |
-| **LARGE** (default) | `npm test` / `npm run test:large` | **all 16** — SMALL plus the heavier scene/geometry/screenshot suites (`world, handwriting, polish, gamepad, touch, settings, invariants`), `benchmark` (the in-game F8 measurement run) and `enrichments` (the wildlife/atmosphere staging, which carries the rotating family flakes) | yes |
+| **LARGE** (default) | `npm test` / `npm run test:large` | **all 17** — SMALL plus the heavier scene/geometry/screenshot suites (`world, handwriting, polish, gamepad, touch, settings, invariants`), `startup` (the point-337 loading-picture freeze budget), `benchmark` (the in-game F8 measurement run) and `enrichments` (the wildlife/atmosphere staging, which carries the rotating family flakes) | yes |
 
 Both tiers run the same Vitest + build + lint preflight. SMALL is a strict subset
 of `DEV_SUITES`; keep it that way. New heavy or flaky browser scenarios join
@@ -83,10 +83,94 @@ page's own frame callbacks is the renderer's and is reported, the rest is what
 the gate binds. `VOICE_STALL_SELFTEST=5000` injects a real 5 s main-thread busy
 loop into the cold-load window to prove the gate still bites.
 
+`startup.mjs` (point 337) is the other side of that same coin, and it uses the
+same module for the opposite verdict. The startup shader compile that point 304
+correctly *excused* is itself the defect — a frozen picture is a frozen picture
+however free the thread is — so this suite measures both trains from document
+start and gates their MAXIMUM against the balance value
+`balance.startup.pictureFreezeBudgetMs`, reporting the attribution split
+instead of subtracting it. That matters because the defect has two different
+shapes: on WebGL 2 it blocked the thread for 21 s inside two animation frames,
+on WebGPU the thread stayed free (worst stall 1.0 s) while nothing was painted
+for 12.4 s. `STARTUP_STALL_SELFTEST=1` restores the old blocking path through
+the dev hook `__asyncPipelinesOff` and asserts the gate goes red — 17.5 s
+(WebGL 2) and 6.7 s unpainted (WebGPU) against 2.7 s and 1.4 s with the fix on,
+re-measured 27.07.2026 on a quiet machine. The attributed block stayed at
+0.3-0.5 s throughout, which is exactly the number that must NOT be the one
+gated; the full table is in `docs/acceptance-evidence.md` §14.
+
+Its measurement window closes on the picture, never on a clock. A fixed tail is
+a wall-clock guess of the very quantity being measured: on a slower machine it
+ends mid-stall and under-reports the standstill the gate exists to catch. So the
+window closes on `pictureSettled` (`liveness.mjs`) — a trailing stretch in which
+the tick train never gapped and frames kept being painted, required to reach
+BOTH edges of that stretch so the quiet tail of a freeze that just ended cannot
+pass for a live picture. The predicate is pure and unit-tested
+(`liveness.test.mjs`), including the case that it survives being stringified
+into the page, which is how the suite runs it where the sample trains live.
+
 The same run found that the suite's "neutral" first-gesture key had stopped
 being neutral: F8 starts the in-game render benchmark (point 277), which swept
 ten graphics configs inside the measurement. A verification's filler inputs need
 re-checking whenever the game binds a new key.
+
+## Triaging a RED run (point 294)
+
+A red is now read, not asserted. Two signals, both decided in the pure module
+`baseline-classify-core.mjs` (pinned by `baseline-classify.test.mjs`):
+
+**1. The repeat signature — free, always on.** A failed browser suite is retried
+once (point 200). The runner used to conclude from "it failed twice" that this
+was "a real failure, not a flake". That is not what two failures prove: on
+27.07.2026 `enrichments` failed two staging checks, then a completely different
+one (the crocodile eye knobs) on the retry, on a machine carrying a unit run and
+two agents — and none of the three checks had anything to do with the change
+under test. So the verdict now comes from the failing check NAMES:
+
+| Both runs failed at… | Verdict |
+|---|---|
+| the SAME check | `CANDIDATE REAL FAILURE` — it reproduces; find out whether the change caused it |
+| DISJOINT checks | `LOAD/FLAKE SIGNATURE` — the fingerprint of a busy machine, not of a defect; re-run the suite alone on a quiet machine before believing it |
+| no parseable FAIL line (crash, wall-timeout kill) | `UNCLASSIFIED` — say so, never guess |
+
+Check identity folds measured numbers away (`12 vultures circle` is the same
+check as `9 vultures circle`), and the console-error texts count as pseudo-checks
+so the console-gated suites (`world`, `i18n`) can be triaged at all. Each check
+is annotated with whether its name touches the branch diff — a weak
+corroborating hint, never a verdict.
+
+**2. The baseline classification — OPT-IN, because it is a second browser run.**
+
+```
+npm test -- --baseline                 # classify every suite that failed twice
+VERIFY_BASELINE=1 npm run test:small   # same, via the environment
+node scripts/verify/baseline-classify.mjs enrichments          # one suite, on demand
+node scripts/verify/baseline-classify.mjs polish --ref HEAD~1  # against a named commit
+```
+
+It re-runs the failing suite against the pre-change baseline (the merge-base with
+`main` by default) in a REUSED detached worktree under the git-ignored
+`local/verify-baseline/<sha>` — no second `npm install`: Node resolves
+`node_modules` up the ancestor directories, and the checkout lives inside the
+repo. At most two baselines are kept. Each currently failing check comes back as
+**REAL REGRESSION** (green on the baseline), **PRE-EXISTING / STALE ASSUMPTION**
+(already red there — the 24.07. SSAO ground-edge and proximity-fade cases),
+**UNSTABLE ON BASELINE** (it flaked there too, so the baseline decides nothing —
+which is why the baseline runs twice by default, `--runs n`), or
+**INCONCLUSIVE** (the baseline never ran that check).
+
+It runs the CURRENT check against the BASELINE app, so only the product differs
+— and it prints what can bend that reading: a suite file that changed since the
+baseline, moved dependencies or shared boot helpers, and the backend the
+comparison ran on (`VERIFY_GL` is honoured; a WebGPU red must be classified on
+WebGPU). It refuses when the baseline resolves to the current commit, and it
+fails soft: a triage aid must never turn a readable red into a crashed run. The
+suite result stays the gate — `--strict` is there for a caller that wants a
+non-zero exit on a real regression.
+
+`docs` is a pure-Node suite, so it needs no server on either side
+(`SERVERLESS_SUITES` in `tiers.mjs`; a `docs`-only run starts no vite at all) and
+the baseline runs the baseline tree's OWN copy of it.
 
 ## Adding tests for a new feature (do this every time)
 
@@ -129,6 +213,7 @@ ported asserts now live in Vitest:
 
 | Trimmed script | Kept (browser-only) | Moved to Vitest |
 |---|---|---|
+| `startup.mjs` | the loading picture's freeze budget: tick train + painted-frame gaps from document start, attributed via `liveness.mjs`, gated on `balance.startup.pictureFreezeBudgetMs`; screenshot 142 | `src/render/asyncPipelines.test.ts`, `src/ui/DebugMenu.test.tsx` (the budget field), `scripts/verify/liveness.test.mjs` |
 | `world.mjs` | 8 bird's-eye screenshots + console gate | `src/world/world.test.ts` (counts, terrain-on-land, hydrology) |
 | `i18n.mjs` | 5 localization screenshots + console gate | `src/i18n/i18n.test.ts`, `src/ui/{StatusBar,JournalPanel,Dialogs,DebugMenu}.test.tsx` |
 | `health.mjs` | vultures at poor condition (RAF) + console gate | `src/state/store.health.test.ts`, `src/ui/Hud.test.tsx` (veil, defeat) |
@@ -178,6 +263,30 @@ VERIFY_GL=webgl  node scripts/verify/run-all.mjs polish   # WebGL 2 pass of one 
 VERIFY_GL=webgpu node scripts/verify/run-all.mjs polish   # WebGPU pass of one suite
 npm test -- large polish                                  # the same suite on BOTH, preflighted
 ```
+
+## Screenshots are NOT comparable between runs (point 361)
+
+The frames these suites write cannot be diffed against a stored baseline, and
+this is measured, not suspected. `node scripts/picture-stability.mjs <suite>`
+runs a suite twice on identical code and reports how far each frame moved:
+`world` on WebGL 2 moved **every one of its eight frames** between 11 % and 98 %
+of pixels, in a different rank order each time, while the smallest real defect
+in the project's historical picture-caught bugs moved 0.75 %. One pair had
+captured different views of different places — the capture races the camera
+settle under load, and the suite passes either way because its assertions never
+look at the frame.
+
+Consequences for anyone extending this directory:
+
+- **A screenshot is documentation, not an assertion.** Assert on the DOM, on
+  `window.__camera` projections or on numeric probes; never on a stored image.
+- **No golden-image gate, no cross-backend pixel diff, no diff-derived crop**
+  until the probe reports STABLE. The rejected levers and the case that killed
+  each are in `docs/picture-check-levers.md` §3.4; what the check costs is in
+  `docs/picture-check-cost.md`.
+- **A new frame should wait for the picture it names.** Poll the app's own state
+  until the view has settled rather than a fixed wait (see `fixedWaits.mjs`);
+  that is also the first work any future determinism effort has to do.
 
 ## Headless limitations
 

@@ -153,6 +153,8 @@ Die alte Selbstheilungsregel lautete: Mechanismus bauen, wenn derselbe Fehler ei
 
 **Bindend:** Jede Regel, die wirklich gelten soll, bekommt **von Anfang an** einen erzwingenden Mechanismus; der Aufwand richtet sich nach der Wichtigkeit der Regel, die Grundhaltung heißt „erzwingen statt erinnern".
 
+Seit dem 27.07.2026 gilt das auch für diesen Satz selbst: Er war bis dahin die einzige Regel des Dokuments ohne Durchsetzung — eine Regel, die Mechanismen fordert und selbst keiner ist. Jede Lektion dieses Abschnitts trägt jetzt eine erfasste Entscheidung in `lesson-mechanisms.md` (bestehender Durchsetzer verbreitert / neuer / bewusst keiner mit Begründung), und `retro-currency-guard` blockiert das Zug-Ende, solange eine fehlt. Zwei Lektionen kamen dabei als **ungedeckt** heraus, statt stillschweigend als „bewusst keine" durchzugehen; sie stehen als Lücken am Fuß des Registers.
+
 ### 3.17 Stille Modell-Degradation — der Arbeiter selbst kann das Problem sein
 
 Eine Batch-Session lief unbemerkt auf einem schwächeren Modell (Beleg: die Commit-Trailer) und produzierte in 14 Minuten drei als „fertig" getickte Punkte, die keiner Spec genügten: ein Placebo-Fix mit Schein-Tests, ein unverdrahteter Stub, ein Selbstbestätigungs-„Audit". Alle bisherigen Guards prüften die *Arbeit*, keiner den *Arbeiter*. Ein degradiertes Modell scheitert nicht laut, sondern liefert selbstbewusst Attrappen — und befolgt gerade dann die Regeln am wenigsten.
@@ -334,6 +336,16 @@ Die zweite Lehre betrifft das Verhalten der Aufsicht: Nach dem dritten Ausfall a
 
 **Lehren:** Gegen eine unzuverlässige Umgebung hilft keine Vermeidung, sondern **kleine, sofort gesicherte Schritte** — dieselbe Antwort wie auf jeden anderen Verlustfall in diesem Projekt. Und: Wenn ein Weg dreimal an derselben äußeren Ursache scheitert, wechsle den Weg, statt den Versuch zu wiederholen.
 
+### 3.40 Eine Prüfung, die zu spät kommt, ist eine Benachrichtigung
+
+Am 27.07.2026 meldete die Pipeline mehrfach Rot, und jedes Mal war die Ursache klein und die Reparatur schnell — einmal ein neuer Test, der eine Datei las, die lokal existiert und im Repository absichtlich nicht. Der Schaden lag nicht im Fehler, sondern im **Zeitpunkt** der Entdeckung: Der Stand war da schon draußen, und die Fehlermail beim Nutzer lässt sich durch keine spätere Reparatur zurücknehmen.
+
+Die naheliegende Antwort — „vor dem Push die Prüfungen laufen lassen" — war seit Wochen als Regel notiert und wurde trotzdem im Alltag übersprungen; sie kostet Minuten und ist genau dann lästig, wenn man es eilig hat. Als Mechanismus kostet sie dieselben Minuten und ist nicht mehr überspringbar: Ein Pre-Push-Hook fährt den schnellen Riegel, bevor der Push die Maschine verlässt.
+
+Zwei Details entscheiden, ob so ein Riegel wirkt. Erstens die **Verdrahtung**: Ein früherer Versuch lag als Skript im Projekt und konnte nie auslösen, weil die Hook-Einstellung nie gesetzt war — Vorhandensein ist keine Wirkung, deshalb setzt sie jetzt die Installation, und ein Test prüft die Verdrahtung selbst. Zweitens die **Verhältnismäßigkeit**: Der volle Riegel gilt dem veröffentlichten Zweig, ein Feature-Zweig bekommt die schnelle Teilmenge, denn Agenten pushen nach jedem Schritt — ein Mechanismus, der die Arbeit lähmt, wird umgangen und ist damit wieder eine Regel.
+
+**Lehre:** Eine Prüfung gehört vor die Handlung, die sie absichern soll. Läuft sie danach, ist sie eine Benachrichtigung — und die Kosten des Fehlers sind bereits entstanden. Dasselbe Muster fand sich am selben Tag in der Einsteiger-Anleitung: Ausgerechnet der Merksatz „jede Regel braucht einen Mechanismus" stand dort zwischen den Aufträgen und war selbst nur ein Merksatz.
+
 ---
 
 ## 4. Die Guards als Immunsystem
@@ -359,6 +371,7 @@ Jedes Guard-Skript ist die geronnene Lösung eines real aufgetretenen, wiederhol
 | `tasks-archive-guard` | Arbeitsauftrag bleibt geteilt: offen in TASKS.md, erledigt im Archiv | 13.000-Zeilen-Datei je Zug |
 | `doc-budget-guard` | gemessene Obergrenze für die ständig gelesenen Dokumente | 3.30 |
 | `retro-currency-guard` | dieses Dokument bleibt aktuell zu seinen Quellen | 3.21 |
+| `retro-currency-guard` (Register) | **jede** Lektion aus Abschnitt 3 trägt eine erfasste Mechanismus-Entscheidung (`lesson-mechanisms.md`): bestehender Durchsetzer verbreitert, neuer Durchsetzer, oder bewusst keiner mit Begründung | 3.16 |
 | `guide-brevity-guard` | Anleitung bleibt kurz und projekt-neutral | 3.26 |
 | `rule-review-guard` | periodische Durchsicht des ganzen Regelbestands | 3.25 |
 | `guard-health-guard` | kein Durchsetzer im Baum, den nichts aufruft | 3.25 (4) |
@@ -422,7 +435,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Montag, 27.07.2026, 16:19 · Quellen-Fingerprint: `f6e0643a3098…`
+Zuletzt aktualisiert: Montag, 27.07.2026, 17:34 · Quellen-Fingerprint: `6a8140772131…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -433,10 +446,10 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | User's rulings on the point-205 plausibility audit (what to fix vs. accept, 21.07.2026) | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | For code audits/reviews, mix in a DIFFERENT model than the one that wrote the code — different blind spots find more bugs | 1 | niedrig | model-guard.mjs | ✔ Mechanismus |
 | The hardened batch-autonomy system — never idle-stop, resurrect after crash/reboot, signal on failure, never block on the user | 1 | niedrig | batch-autostart.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs | ✔ Mechanismus |
-| The private claude.ai batch dashboard — its BINDING four-section structure (never change without explicit user go) and update discipline | 5 | hoch | batch-autostart.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs, dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
-| Autonomer TASKS.md-Batch: Stand 16.07.2026 22:45 — 151 (Saisonfeld) als WIP gepusht (2055350), Wiederaufnahme an der TASKS-151-WIP-Note; Reihenfolge 151→152→156→123→149→150→121…→153-157 | 1 | niedrig | batch-autostart.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs | ✔ Mechanismus |
+| The private claude.ai batch dashboard — its BINDING four-section structure (never change without explicit user go) and update discipline | 7 | hoch | batch-autostart.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs, dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
+| RETIRED 27.07.2026 — this was a 16.07. work-in-progress handoff, not a rule; what survives is the research foundation, the accuracy principle and the §13-placeholder carve-out | 3 | mittel | batch-autostart.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs | ✔ Mechanismus |
 | Delegate via `node scripts/point-brief.mjs <N>` — the AGENT generates its own brief; board changes go through `scripts/board.mjs`; expect 529 agent deaths and commit-per-step | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
-| Jede Chat-Antwort mit einem Zeitstempel nach deutscher Zeit (Europe/Berlin, DST-korrekt) beginnen | 10 | hoch | timestamp-guard.mjs | ✔ Mechanismus |
+| Jede Chat-Antwort mit einem Zeitstempel nach deutscher Zeit (Europe/Berlin, DST-korrekt) beginnen | 11 | hoch | timestamp-guard.mjs | ✔ Mechanismus |
 | CLAUDE.md §7.1 references design.md instead of retelling it; future doc edits must preserve the verifiable conditions, script mappings, numbering and checked numbers | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Autonomously insert a full CLOSING cycle (regression + dead-code/stale-doc cleanup + .md audit) when warranted — after extensive rework or many small completed tasks — without waiting for the user to ask | 1 | niedrig | closing-guard.mjs | ✔ Mechanismus |
 | hoa commit messages must not reference the TASKS point (\"Point N\") | 1 | niedrig | commit-scope-guard.mjs | ✔ Mechanismus |
@@ -446,7 +459,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Never put a hardcoded `open` attribute on a dashboard `<details>` card — default all closed; localStorage persistence keeps user-opened cards open across refresh | 1 | niedrig | batch-autostart.mjs, dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
 | The batch dashboard \"Von dir zu klären\" section holds ONLY genuine user decisions — no done items, no announcements for in-progress work | 1 | niedrig | dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
 | RETIRED 25.07.2026 — the blanket authorization to spin up Fable for hard analyses is withdrawn; Opus 5 does that work, Fable only reviews or stands in as fallback | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
-| Work at High effort by default; the user reserves Extra high for research and design decisions, not implementation | 2 | mittel | — (Regel/Memory) | ◐ Regel |
+| Work at High effort by default; the user reserves Extra high for research and design decisions, not implementation | 3 | mittel | — (Regel/Memory) | ◐ Regel |
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Fable is ONLY for four-eyes review and as the first fallback when Opus 5 is unavailable — never for \"hard\" tasks; Opus 5 handles those (user rule 25.07.2026, supersedes the earlier hard-task delegation) | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Two test layers — Vitest (jsdom) for logic/store/HUD, Playwright for browser-only; add a test per new feature on the right layer | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -454,48 +467,48 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | All journal texts (de + en) must carry emotional voice markup; English read-aloud runs via Kokoro TTS | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Immer auf Deutsch mit dem Nutzer kommunizieren | 3 | mittel | — (Regel/Memory) | ◐ Regel |
 | After every change, npm run lint (oxlint) and npm audit must be clean — zero lint errors/warnings, zero CVEs. Standing user directive. | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
-| hoa PERMANENT process — delegate as much implementation as possible to worktree-isolated subagents; keep only picture-verify + merge at the main session; run a pool of parallel agents on non-overlapping files | 3 | mittel | — (Regel/Memory) | ◐ Regel |
+| hoa PERMANENT process — delegate as much implementation as possible to worktree-isolated subagents; keep only picture-verify + merge at the main session; run a pool of parallel agents on non-overlapping files | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | The \"Maximum QA\" QA process and the \"new demo\" trigger (append it + closing + increment tag + publish) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
-| Before building, triage difficulty × criticality; for HIGH/critical work bring in a second, different model (Fable) to review plan + result — proactively, not only for audits or when stuck | 1 | niedrig | model-guard.mjs | ✔ Mechanismus |
-| Standing licence to use Fable 5 and adjust effort for suitable pending tasks; Opus 4.8 on High stays the default | 1 | niedrig | model-guard.mjs | ✔ Mechanismus |
+| Before building, triage difficulty × criticality; for HIGH/critical work bring in a second, different model (Fable) to review plan + result — proactively, not only for audits or when stuck | 2 | mittel | model-guard.mjs | ✔ Mechanismus |
+| RETIRED 27.07.2026 — its model half (Fable at my discretion, Opus 4.8 as default) was withdrawn on 25.07.; what survives is never trading model or effort down on load-bearing work | 4 | hoch | model-guard.mjs | ✔ Mechanismus |
 | A user question is an INTERRUPT, not a new task — after answering, the last action of the turn must resume the batch; only an explicit stop or a genuine block on user input ends it | 3 | mittel | batch-autostart.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs | ✔ Mechanismus |
 | EVERY user change request is a TASKS.md point appended at the END, done only after the current work finishes — never interleaved or mass-committed | 5 | hoch | tasks-archive-guard.mjs, tasks-spec-guard.mjs | ✔ Mechanismus |
-| 2026-07-14: a second Claude instance ran the hoa batch in parallel (SessionStart hook auto-resume) — caused edit clobbering and test runs against half-finished states; needs a lock before autonomous resume | 1 | niedrig | batch-autostart.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs | ✔ Mechanismus |
+| RETIRED 27.07.2026 — merged into parallel-session-root-cause, which holds the confirmed cause and the one detection recipe; the advisory-lock analysis here was superseded by the hard singleton | 3 | mittel | batch-autostart.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs | ✔ Mechanismus |
 | Parallel batch sessions are spawned by the HoA-Batch-Autostart scheduled task after a reboot; the advisory lock never stopped it — a hard singleton is being built | 2 | mittel | — (Regel/Memory) | ◐ Regel |
-| 24.07.2026 — TWO claude batch sessions ran in the SAME working dir at once (OS autostart duplicated a live session); how to detect + the safe posture | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
+| RETIRED 27.07.2026 — merged into parallel-session-root-cause; what survives is that the lock file alone is never proof of exclusivity, and the four signals that actually detect a second writer | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Per-point QA runs scoped (Vitest always, browser suites by diff mapping, flake-retry single suites) — WATCHDOG duty to report any bug that slips through | 3 | mittel | — (Regel/Memory) | ◐ Regel |
 | Edits to .claude/settings.json and .git/hooks ALWAYS trigger a permission prompt (harness safety layer, allowlist cannot override); never schedule such work for unattended night batches | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | hoa uses a feature-branch workflow — each TASKS point on feat/<point>-<slug>, push the branch after every commit, merge to main only when done+verified; cross-cutting changes go straight to main | 2 | mittel | commit-scope-guard.mjs, push-arrival-guard.mjs | ✔ Mechanismus |
 | Order the TASKS/queue so known-bug fixes + user-requested extensions come BEFORE the big bug-FINDING / QA-framework tickets | 1 | niedrig | queue-order-guard.mjs | ✔ Mechanismus |
-| Before the 224 demo checkpoint queue ONLY bugfixes + almost-done points; new features go to v0.3 (after 224) | 1 | niedrig | queue-order-guard.mjs | ✔ Mechanismus |
+| Before the 224 demo checkpoint queue ONLY bugfixes + almost-done points; new features go to v0.3 (after 224) | 2 | mittel | queue-order-guard.mjs | ✔ Mechanismus |
 | Console warning \"THREE.Clock deprecated, use THREE.Timer\" comes from R3F v9 internals — fix by updating @react-three/fiber once it migrates to Timer | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Choose the browser-regression tier per task at my discretion (Vitest-only / Vitest+small / Vitest+large); the closing cycle ALWAYS runs Vitest+large | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
-| RESUME/handoff — current batch state, what is merged, the in-flight delegated branches, and the path to the v0.2 (224) demo | 1 | niedrig | batch-resume-hook.mjs | ✔ Mechanismus |
+| RETIRED 27.07.2026 — a 23.07. session handoff whose branches all merged; what survives is the file-collision map habit and the closing-freeze housekeeping | 3 | mittel | batch-resume-hook.mjs | ✔ Mechanismus |
 | 24.07.2026 evening chaos — serving model silently degraded to Haiku 4.5; verify the serving model before batch work, Haiku-class must pause instead of working | 2 | mittel | model-guard.mjs | ✔ Mechanismus |
-| Every new optical/graphics feature must be sorted into the low/medium/high detail presets, enforced by a pure completeness test — a new quality key with no preset entries fails the gate | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
+| Every new optical/graphics feature must be sorted into the low/medium/high detail presets, enforced by a pure completeness test — a new quality key with no preset entries fails the gate | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Never access paths outside the project directory unless strictly necessary (e.g. the global ~/.claude rules); keep local non-versioned artefacts in a git-ignored local/ folder inside the repo | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | RETIRED 25.07.2026 — a stuck Opus no longer hands the task to Fable; re-attack with Opus or let Fable REVIEW the stuck attempt (Fable is review + fallback only) | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Release tags are re-pointed ONLY on the user's explicit request — never automatically after a fix; a cut vX.Y is frozen | 3 | mittel | — (Regel/Memory) | ◐ Regel |
 | TASKS.md and all new entries in it are written in English | 1 | niedrig | tasks-archive-guard.mjs, tasks-spec-guard.mjs | ✔ Mechanismus |
 | TASKS.md entries state the final correct target directly — never keep a 'first defined wrong, then clarified/corrected' trail in the spec | 1 | niedrig | tasks-archive-guard.mjs, tasks-spec-guard.mjs | ✔ Mechanismus |
-| TASKS.md points get [*] when started and a tracking line (start, finish, minutes, ~tokens) when done — mandated 2026-07-14 | 2 | mittel | tasks-archive-guard.mjs, tasks-spec-guard.mjs, timestamp-guard.mjs | ✔ Mechanismus |
+| TASKS.md points get [*] when started and a tracking line (start, finish, minutes, ~tokens) when done — mandated 2026-07-14 | 3 | mittel | tasks-archive-guard.mjs, tasks-spec-guard.mjs, timestamp-guard.mjs | ✔ Mechanismus |
 | Think harder about what to test; when in doubt add MORE tests — never skimp on fast browserless Vitest cases | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Tests and probes must use IN-GAME-achievable zoom (non-debug 0.125–0.5 at least), never a debug-only zoom — testing at an unrealistic zoom has passed while the player still saw the bug, repeatedly | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Permissions are deliberately maximally broad (whole-tool allows incl. Bash); NEVER narrow or \"tidy\" them again — standing user directive | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | On every user change request, also update CLAUDE.md and design.md where appropriate — standing directive for all future sessions. | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Every place/landmark/settlement name in the game uses the name that was VALID IN 1890, not a later renaming | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Run the both-backend browser verify on the feat BRANCH before merging to main — merging an unverified render change first triggers a render-verify Stop-guard block-loop | 1 | niedrig | render-verify-guard.mjs | ✔ Mechanismus |
-| Headless probes must screenshot the DEFAULT zoom too (zoom-gated dressing like haze only shows there); headless WebGPU is impossible, so WebGPU-only branches stay user-checked | 1 | niedrig | render-verify-guard.mjs | ✔ Mechanismus |
+| Headless probes must screenshot the DEFAULT zoom too (zoom-gated dressing like haze only shows there); headless WebGPU is impossible, so WebGPU-only branches stay user-checked | 2 | mittel | render-verify-guard.mjs | ✔ Mechanismus |
 | Every GUI/rendering fix must be verified on BOTH WebGPU and WebGL2 before it counts as done — never mark a render fix done on one path | 2 | mittel | render-verify-guard.mjs | ✔ Mechanismus |
 | Wildlife/atmosphere verify suites produce ROTATING false failures under parallel agent load — judge a red only on a quiet machine | 1 | niedrig | render-verify-guard.mjs | ✔ Mechanismus |
 | The named \"version release\" process and its trigger — queue/run a version release for a version the user names (full closing → user approval → tag → mirror poc → publish /TAG/ and /poc/) | 1 | niedrig | lock-release-hook.mjs | ✔ Mechanismus |
 | Standing licence to move, REMOVE or ADD villages when it helps — but every change must be checked against the other requirements first, and the check has already caught a real bug | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
-| Keep the visual QA eye open for functionally-fine but weird-LOOKING oddities, not just functional bugs | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
+| Keep the visual QA eye open for functionally-fine but weird-LOOKING oddities, not just functional bugs | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | CORRECTED 19.07.2026 — WebGPU IS testable headless/autonomously via system Chrome (channel:'chrome') + --headless=new; the 'untestable' belief held only for Playwright's BUNDLED Chromium | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 64 Feedback-/Projekt-Memories · 33 Guard-/Hook-Skripte · 3 Revert-/Reapply-Commits · 15 Prozess-/Meta-TASKS-Punkte (davon 8 offen).
+Erfasste Quellen: 64 Feedback-/Projekt-Memories · 34 Guard-/Hook-Skripte · 3 Revert-/Reapply-Commits · 15 Prozess-/Meta-TASKS-Punkte (davon 8 offen).
 
-<!-- RETRO-FINGERPRINT: f6e0643a30988902b43c054911c37c78d141ba19ceb891e97dc371d63f1e2be8 -->
-<!-- RETRO-LAST-REFRESHED: 2026-07-27T14:19:15.019Z -->
+<!-- RETRO-FINGERPRINT: 6a814077213162b8cd7590f545ce60a28ea294f0273e98dbe4790d9c873f3a03 -->
+<!-- RETRO-LAST-REFRESHED: 2026-07-27T15:34:08.531Z -->
 <!-- AUTO-GENERATED:END -->

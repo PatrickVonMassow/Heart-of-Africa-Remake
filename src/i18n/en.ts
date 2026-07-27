@@ -394,6 +394,7 @@ export const en: Strings = {
     walkSpeed: 'Walk speed (in places)',
     strafeFactor: 'Strafe/backward factor',
     walkerUnstuck: 'Inhabitant unstuck (s)',
+    startupFreezeBudget: 'Loading-picture freeze budget (ms)',
     mouseSensitivity: 'Mouse sensitivity (first-person)',
     ambienceVolume: 'Ambience volume',
     footstepVolume: 'Footstep volume',

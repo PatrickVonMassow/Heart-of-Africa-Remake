@@ -42,6 +42,20 @@ import {
   PENDING_STALE_MS,
 } from './batch-singleton.mjs'
 
+// IMPORT-PROOF (27.07.2026). Everything below runs at MODULE LOAD, so merely
+// importing this file — a syntax check, a test, a tooling scan — SPAWNS a
+// headless claude session. That happened: `node -e "import('./scripts/batch-
+// autostart.mjs')"` launched a session inside a worktree, which then claimed
+// that worktree's batch lock. Throwing before the first side effect makes the
+// mistake loud and free (the same treatment scripts/retro-refresh.mjs got after
+// it rewrote a document as empty from a worktree).
+if (!(process.argv[1] && import.meta.url === new URL(`file://${process.argv[1].replace(/\\/g, '/')}`).href)) {
+  throw new Error(
+    'scripts/batch-autostart.mjs is a CLI, not a module — importing it would SPAWN a batch session. ' +
+      'Run it as `node scripts/batch-autostart.mjs`; use `node --check` to syntax-check it.',
+  )
+}
+
 const R = (p) => fileURLToPath(new URL(p, import.meta.url))
 const REPO = R('..')
 const C = (n) => join(REPO, '.claude', n)
@@ -221,7 +235,11 @@ const prompt =
   'Merge nach main NUR wenn der Punkt fertig und verifiziert ist (Tests gruen; Render-/GUI-Aenderungen ' +
   'auf BEIDEN Backends am Bild geprueft); TASKS.md nur auf main abhaken (beim Merge); ' +
   'Querschnitts-Aenderungen (Guards, Docs, Dashboard, Prozessdateien) direkt auf main. Dashboard-Guard + ' +
-  'prep-guard gruen halten, Vorarbeit waehrend jeder Validierung. Halte NICHT still an. Wenn ein git push ' +
+  'prep-guard gruen halten, Vorarbeit waehrend jeder Validierung. PUNKT-GRENZE (27.07.2026): der Kontext ' +
+  'ist der groesste Kostenfaktor des Batches — wenn der gemergte und abgehakte Punkt fertig ist UND kein ' +
+  'delegierter Agent mehr laeuft (Pool erst leerlaufen lassen), fuehre `node scripts/batch-boundary.mjs ' +
+  '<punkt>` aus und BEENDE die Session, statt den naechsten Punkt in denselben Kontext zu ziehen; der ' +
+  'OS-Task startet die naechste Session. Halte sonst NICHT still an. Wenn ein git push ' +
   'scheitert, schreibe .claude/push-failed und benachrichtige via scripts/notify.mjs. WICHTIG: Wenn der ' +
   'SessionStart-Hook meldet, dass eine ANDERE Session den Batch-Lock haelt (STAND DOWN), dann arbeite ' +
   'NICHT am Batch und beende dich sofort. Wenn alles erledigt ist: Closing fahren.'

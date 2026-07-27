@@ -12,7 +12,7 @@
  * Node check that rides along for a single report.
  */
 export const DEV_SUITES = [
-  'docs', 'world', 'i18n', 'flow', 'health', 'events', 'collision', 'handwriting',
+  'docs', 'startup', 'world', 'i18n', 'flow', 'health', 'events', 'collision', 'handwriting',
   'polish', 'gamepad', 'touch', 'voice', 'settings', 'enrichments', 'invariants',
   'benchmark',
 ]
@@ -33,25 +33,47 @@ export const SMALL_SUITES = ['docs', 'i18n', 'flow', 'health', 'events', 'collis
  */
 export const WEBGL_ONLY_SUITES = ['touch', 'voice']
 
+/**
+ * Suites that need NO dev server: pure Node checks that read the checkout
+ * itself. Naming them keeps a `docs`-only run free of a vite start-up (and lets
+ * the baseline classifier run the BASELINE tree's own copy of such a script,
+ * since there is no server whose code could differ instead).
+ */
+export const SERVERLESS_SUITES = ['docs']
+
+/** Does this suite selection need a dev server at all? */
+export function needsDevServer(suites) {
+  return (suites ?? []).some((s) => !SERVERLESS_SUITES.includes(s))
+}
+
 /** The renderer backend a VERIFY_GL value selects (mirrored from _browser.mjs). */
 export function selectBackend(verifyGl) {
   return String(verifyGl ?? 'webgl').toLowerCase() === 'webgpu' ? 'webgpu' : 'webgl'
 }
 
 /**
- * Split the CLI args into the tier token and the suite-name filter, and derive
- * the two run shapes that follow from them:
+ * Split the CLI args into the tier token, the suite-name filter and the flags,
+ * and derive the two run shapes that follow from them:
  *   fullRun          — do the preflight (build + lint + unit): the bare default
  *                      or an explicit tier; a bare suite filter skips it.
  *   isLargeEquivalent — this command runs the WHOLE LARGE set (+ preview), so
  *                      it is the one that covers BOTH backends.
+ *   baseline         — `--baseline` (or VERIFY_BASELINE=1): classify a suite
+ *                      that failed twice against the pre-change baseline
+ *                      (point 294). Flags are VALUE-LESS on purpose: a
+ *                      `--flag <value>` pair would leave the value looking like
+ *                      a suite filter and silently turn a LARGE run into a
+ *                      single-suite, single-backend one.
  */
 export function parseArgs(argv) {
   const tier = argv.includes('small') ? 'small' : argv.includes('large') ? 'large' : null
-  const filter = argv.filter((a) => a !== 'small' && a !== 'large')
+  const flags = argv.filter((a) => a.startsWith('-'))
+  const filter = argv.filter((a) => a !== 'small' && a !== 'large' && !a.startsWith('-'))
   return {
     tier,
     filter,
+    flags,
+    baseline: flags.includes('--baseline'),
     fullRun: tier !== null || filter.length === 0,
     isLargeEquivalent: tier === 'large' || (tier === null && filter.length === 0),
   }

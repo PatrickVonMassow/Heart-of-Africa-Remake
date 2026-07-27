@@ -125,8 +125,38 @@ export function baselineFor(state, branch) {
   }
 }
 
-/** A concrete suite name for the block message: the most recently run one. */
-export function suggestSuite(runs) {
+/**
+ * A concrete suite name for the block message.
+ *
+ * The old rule was "whatever ran last, else `enrichments`", which ignored the
+ * change entirely and ratcheted: one `enrichments` run made the project's most
+ * expensive suite (37 frames, 60,687 reviewing tokens, 951 s) the standing
+ * suggestion for every later, unrelated change. Point 361 measured that price
+ * and replayed the cheaper candidates against the historical picture-caught
+ * bugs; a GENERAL path→suite map was rejected there — the flora jitter and the
+ * invisible season both turn on src/scenes/travel/TravelScene.tsx, whose frames
+ * live in `world` AND `enrichments` AND `polish`, so a map that routes it
+ * correctly routes it everywhere and saves nothing (docs/picture-check-levers.md
+ * §3.4).
+ *
+ * The one narrowing that survived the replay is the DOM-only class. When EVERY
+ * changed render path is under src/ui/, the change is HTML — the class this
+ * file already trusts enough to drop the second backend (isBackendSensitivePath)
+ * and that src/ui/domOnly.test.ts keeps free of three.js. `flow` covers the HUD
+ * and the end-to-end flow in 8 frames: 10,672 tokens and 140 s, i.e. 5.7× the
+ * tokens and 6.8× the wall clock off that class. No corpus row contradicts it —
+ * none of the eight is a src/ui/-only change.
+ *
+ * Anything else keeps the old behaviour exactly.
+ */
+export function suggestSuite(runs, changedRenderPaths) {
+  if (
+    Array.isArray(changedRenderPaths) &&
+    changedRenderPaths.length > 0 &&
+    changedRenderPaths.every((p) => isRenderPath(p) && !isBackendSensitivePath(p))
+  ) {
+    return 'flow'
+  }
   if (Array.isArray(runs)) {
     for (let i = runs.length - 1; i >= 0; i--) {
       const s = runs[i] && runs[i].suite
@@ -192,7 +222,7 @@ export function evaluate(input) {
 
   const shown =
     changedRenderPaths.slice(0, 6).join(', ') + (changedRenderPaths.length > 6 ? ', …' : '')
-  const suite = suggestSuite(runs)
+  const suite = suggestSuite(runs, changedRenderPaths)
   const cmds = missing
     .map((b) => `VERIFY_GL=${b} node scripts/verify/run-all.mjs ${suite}`)
     .join('  AND  ')

@@ -606,6 +606,56 @@ console errors on both the WebGPU and WebGL 2 paths; the remaining
 simplification (true water refraction) is named as an open item (see
 pt. 32; SSR was tried and removed).
 
+**Shader programs off the startup critical path (point 337).** three.js links a
+render pipeline synchronously the first frame each material combination is
+drawn, so the scene's ~62 startup pipelines froze the picture — on WebGL 2 a
+blocked main thread for 21 s inside two animation frames, on WebGPU a perfectly
+free thread (worst stall 1.0 s) with nothing PAINTED for 12.4 s. Both backends
+already carry the asynchronous half (`KHR_parallel_shader_compile` /
+`createRenderPipelineAsync`) and `Renderer._renderObjectDirect` already SKIPS an
+object whose pipeline is not ready; three.js only ever reaches that half from
+`compileAsync()`, which the render loop never calls. Handing the render path the
+promise array switches it over (`src/render/asyncPipelines.ts`). On WebGL 2 that
+alone only moves the cost — ANGLE defers the real compile to a program's first
+USE — so the linked programs' completions are additionally released one per
+animation frame, which is what keeps the frames painting (worst unpainted gap
+8.5 s → 1.8 s; two per frame measured worse). Neither remaining standstill is a
+shader compile any more.
+
+Measured before/after, both backends, re-run 27.07.2026 on a quiet machine
+(3 % CPU, no parallel agents) against the dev server, "before" being the same
+build with the fix switched off through `__asyncPipelinesOff`:
+
+| Backend | before | after | budget |
+|---|---|---|---|
+| WebGL 2 | 17 532 ms | 2 682 ms (1 064 ms on a second run) | 4 000 ms |
+| WebGPU | 6 747 ms | 1 354 ms | 4 000 ms |
+
+The attribution split is what makes the WebGPU row worth reading: at 6 747 ms
+its blocked thread was 542 ms and its longest animation frame 654 ms — the
+picture was unpainted for the whole 6.7 s while the thread stayed free. That is
+the shape a liveness-only metric excuses and this gate does not. 61–64 pipelines
+went async per run, 0 dropped, and the screenshot shows the settled scene
+complete (buildings, flora, shadows, HUD, journal) — no object is missing, so
+nothing regressed at first frame.
+
+Verifiable: `scripts/verify/startup.mjs` runs a tick train and a painted-frame
+train from document start, attributes the stalls with the point-304 module
+(`scripts/verify/liveness.mjs`) and gates their MAXIMUM against the balance value
+`balance.startup.pictureFreezeBudgetMs` (debug-editable, `design.md` §21.2) —
+reporting the attribution split rather than subtracting it, because the
+frame-covered part is exactly how a busy renderer would hide this stall;
+`STARTUP_STALL_SELFTEST=1` restores the blocking path via the dev hook
+`__asyncPipelinesOff` and proves the gate still bites — it went red on both
+backends at the "before" figures above, while the attributed block stayed at
+0.3–0.5 s, which is exactly the number that must NOT be the one gated.
+Screenshot `verification/142-startup-picture-live.png`.
+The wiring — which calls are diverted, that three.js's own `compileAsync` is left
+alone, the one-per-frame release, its bookkeeping and the drop of a completion
+whose pipeline was released meanwhile — is pure-tested in
+`src/render/asyncPipelines.test.ts`, the budget field's write-through in
+`src/ui/DebugMenu.test.tsx`.
+
 ## 15. Lively, densely built settlements.
 
 Verifiable: the layout invariants are pure-tested across every place and

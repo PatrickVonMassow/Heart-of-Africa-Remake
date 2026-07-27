@@ -17,12 +17,17 @@
 // git failure, a broken memory dir — allows the stop; this guard must never
 // trap the session.
 import { existsSync, readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { isAbsolute, resolve } from 'node:path'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
-import { computeFingerprint, evaluateCurrency } from './retro-core.mjs'
-import { collectSources, DOC_PATH, GUIDE_PATH, REPO_ROOT } from './retro-sources.mjs'
+import { computeFingerprint, evaluateCurrency, evaluateLedger } from './retro-core.mjs'
+import { collectSources, DOC_PATH, GUIDE_PATH, LEDGER_PATH, REPO_ROOT } from './retro-sources.mjs'
 
 const PAUSE = resolve(REPO_ROOT, '.claude', 'batch-paused')
+
+/** A ledger cell's file reference, resolved against the repo root. Absolute or
+ *  escaping paths are refused rather than probed. */
+const pathExists = (rel) =>
+  !isAbsolute(rel) && !rel.split('/').includes('..') && existsSync(resolve(REPO_ROOT, rel))
 
 try {
   let sessionId = ''
@@ -36,13 +41,46 @@ try {
   if (!existsSync(DOC_PATH)) process.exit(0)
   if (heldByOtherLiveOwner(sessionId)) process.exit(0)
 
-  const verdict = evaluateCurrency({
-    docText: readFileSync(DOC_PATH, 'utf8'),
-    // Guide absent (worktree, other machine) → undefined, which skips its half.
-    guideText: existsSync(GUIDE_PATH) ? readFileSync(GUIDE_PATH, 'utf8') : undefined,
-    currentFingerprint: computeFingerprint(collectSources()),
-  })
-  if (verdict) process.stdout.write(JSON.stringify(verdict) + '\n')
+  const docText = readFileSync(DOC_PATH, 'utf8')
+  const reasons = []
+
+  // LEDGER FIRST, and in its OWN try. `collectSources()` below THROWS in every
+  // git worktree (the memory dir is keyed on the checkout path), which the outer
+  // catch turns into exit 0 — so a ledger check wired behind the fingerprint
+  // would be permanently blind exactly where the delegated agents work. The
+  // ledger needs only the two documents and a file probe, none of which throws
+  // there. (Found by the four-eyes design review, 27.07.2026.)
+  try {
+    const ledger = evaluateLedger({
+      retroText: docText,
+      ledgerText: existsSync(LEDGER_PATH) ? readFileSync(LEDGER_PATH, 'utf8') : null,
+      pathExists,
+    })
+    if (ledger?.decision === 'block') reasons.push(ledger.reason)
+    else if (ledger?.warning) console.error(ledger.warning)
+  } catch (e) {
+    console.error(`retro-currency-guard ledger check errored (allowing): ${e && e.message}`)
+  }
+
+  // Currency second, likewise isolated: a worktree's throw must not swallow a
+  // ledger verdict that was already decided.
+  try {
+    const verdict = evaluateCurrency({
+      docText,
+      // Guide absent (worktree, other machine) → undefined, which skips its half.
+      guideText: existsSync(GUIDE_PATH) ? readFileSync(GUIDE_PATH, 'utf8') : undefined,
+      currentFingerprint: computeFingerprint(collectSources()),
+    })
+    if (verdict) reasons.push(verdict.reason)
+  } catch (e) {
+    console.error(`retro-currency-guard currency check errored (allowing): ${e && e.message}`)
+  }
+
+  // BOTH verdicts in ONE message. Reporting them serially would make the second
+  // defect cost a whole extra turn — §3.32's "an enforcer that grips too late".
+  if (reasons.length) {
+    process.stdout.write(JSON.stringify({ decision: 'block', reason: reasons.join('\n\n') }) + '\n')
+  }
   process.exit(0)
 } catch (e) {
   console.error(`retro-currency-guard error (allowing stop): ${e && e.message}`)

@@ -117,6 +117,13 @@ const RESUME_BODY =
   'CLOSING FREEZE (user decision 22.07.2026): during a closing run the code is FROZEN — ' +
   'no parallel agent work lands/merges while the closing runs; merge or park in-flight ' +
   'branches first, resume the pool only after. ' +
+  'POINT BOUNDARY (user 27.07.2026): the context is the batch\'s dominant cost, so a session ' +
+  'carries ONE stretch of work, not point after point. Once the merged-and-ticked point is done ' +
+  'AND no delegated agent is still in flight (let the pool drain — ending mid-flight throws its ' +
+  'work away), run `node scripts/batch-boundary.mjs <point>` and END THE SESSION instead of ' +
+  'starting the next point here. The OS task HoA-Batch-Autostart brings up a fresh session and ' +
+  'this hook re-orients it; batch-progress-guard permits that stop only against a verifiably ' +
+  'closed point and an armed launcher, and blocks every other end as before. ' +
   'First check git status AND the checked-out branch above for work already underway, and ' +
   'do not double-start regressions. This session now holds the batch lock ' +
   '(.claude/batch-lock.json); the PostToolUse heartbeat keeps it fresh while you work.'

@@ -275,15 +275,15 @@ old→new coverage map live in `scripts/verify/README.md`.
   documents it prints BOTH — no resolver can decide that, so the reader is told
   instead of being handed a plausible wrong answer. Every brief carries the
   revision it was cut from; regenerate rather than reuse an old one.
-- **Context boundary at a point boundary (attended sessions).** 87–94 % of the
-  measured token spend sat above 150k context because one session carried point
-  after point. The session cannot clear itself — `/clear` is the user's command —
-  so at a point boundary in an ATTENDED session ASK for it above a measured
-  context size; `batch-resume-hook` re-orients the fresh session. The autonomous
-  variant is a USER decision (it needs either the disabled autostart back or a
-  session spawning its successor, both of which reopen the double-session class)
-  and is not implemented without an explicit go. The usage panel's "cheaper model
-  for simpler subagents" stays REJECTED; the §6 allowlist is unchanged.
+- **Context boundary at a point boundary (user 27.07.2026).** 87–94 % of the
+  spend sat above 150k context because one session carried point after point. A
+  batch session therefore ENDS at its point boundary: after the merge and the
+  tick, run `node scripts/batch-boundary.mjs <point>` and stop rather than pull
+  the next point in. `batch-progress-guard` permits that ONLY while the work
+  order confirms the point closed and `HoA-Batch-Autostart` is armed; unarmed
+  blocks, so a disabled launcher cannot strand the batch. The launcher starts
+  the successor, `batch-resume-hook` re-orients it. Attended, ask for `/clear`.
+  The "cheaper model for simpler subagents" idea stays REJECTED.
 - **Model policy (user decision 25.07.2026, points 309 + the role revision).**
   ONLY three models may author work on this project, each with its own role:
   **Opus 5** is the WORKER at any difficulty; **Fable 5** is used ONLY for the
@@ -511,8 +511,13 @@ changes with it in the same commit.
     sun, cascaded shadows in the bird's-eye view, screen-space AO, bloom,
     filmic tone mapping with color grading and a subtle vignette, and the
     water feature set: wave field, depth-dependent absorption over real
-    bathymetry, shore/crest foam).
+    bathymetry, shore/crest foam). Its shader programs build OFF the startup
+    critical path: the first frames draw the ready set and the rest links
+    behind them, so the loading picture stands still no longer than the
+    calibratable `balance.startup.pictureFreezeBudgetMs`, which counts the
+    WHOLE standstill — a renderer busy inside one long frame included.
    Evidence: docs/acceptance-evidence.md §14.
+
 
 15. **Lively, densely built settlements.** `design.md` §2.6 (dense
     non-functional building fabric, a recognizable path network,
@@ -958,12 +963,12 @@ After completion and after every major system:
   radius can hide a real bug the player sees (points 164/171/172).
 - **Backend coverage is UNIVERSAL where it is possible (point 204).** WebGPU is
   the player's real backend and WebGL 2 the shipped fallback, so both are
-  verified, not just the one that happens to launch:
+  verified:
   - Every browser suite launches through `launchVerifyBrowser()` and asserts the
     backend it actually got (`assertBackend`, right after the `window.__renderer`
     wait). A `VERIFY_GL=webgpu` run that silently fell back to WebGL 2 — or a
-    `webgl` run that came up on WebGPU — FAILS LOUD instead of giving false
-    confidence. The only exceptions are `docs` (pure Node, no browser) and
+    `webgl` run that came up on WebGPU — FAILS LOUD.
+    The only exceptions are `docs` (pure Node, no browser) and
     `preview` (production build, where `__renderer` is dev-only).
   - A LARGE run (`npm test` / `npm run test:large`, no `VERIFY_GL` pinned) covers
     BOTH backends in one command: the whole LARGE on WebGL 2 (with preflight and
@@ -975,27 +980,30 @@ After completion and after every major system:
     pinned by `scripts/verify/tiers.test.mjs` in the Vitest layer; change it
     there and in `scripts/verify/README.md` together.
 - **The Stop chain gates the turn end, not only the test run.** Beyond the
-  suites above, a chain of Stop hooks (registered in `.claude/settings.json`,
-  which is the authoritative list) BLOCKS finishing a turn while the working
+  suites, a chain of Stop hooks (the authoritative list is
+  `.claude/settings.json`) BLOCKS finishing a turn while the working
   state contradicts a standing rule — the "enforce, don't remind" model, each
-  adopted because a reminder had already failed. Currently: `model-guard`
+  adopted after a reminder failed. Currently: `model-guard`
   (no commit authored outside the §6 model allowlist), `dashboard-guard`,
   `dashboard-conciseness-guard`, `dashboard-card-topic-guard` and
   `dashboard-integrity-guard` (the progress board is published, concise,
   one-topic-per-card and consistent with the real state), `prep-guard` (no
   idle wait while a background validation runs), `batch-progress-guard` (no
-  idle stop), `render-verify-guard` (no GUI/render change finished without the
-  picture check — on both backends where they can differ, on one where they
+  idle stop bar a verified point boundary), `render-verify-guard` (no
+  GUI/render change finished without the picture check — both backends where
+  they can differ, one where they
   cannot), `queue-order-guard`, `tasks-spec-guard` and `tasks-archive-guard`
   (the queue order, the final-state-only spec rule, and the open/archived split
   of the work order), `doc-budget-guard` (the constantly-read documents stay
   within measured ceilings — this file, design.md, and the work order's
-  preamble; its budgets and the two honest ways out live in
-  `scripts/doc-budget-core.mjs`), `commit-scope-guard` (a PRE-COMMIT hook via the versioned
-  `scripts/git-hooks/`: no stray file, foreign directory or large binary rides
-  along in a commit), `ci-status-guard` (a
+  preamble; budgets and both honest exits in
+  `scripts/doc-budget-core.mjs`), `commit-scope-guard` and `pre-push-gate`
+  (versioned `scripts/git-hooks/`, wired by `npm install`: no stray file rides
+  along, no push lands a state CI would reject), `ci-status-guard` (a
   red CI is noticed), `timestamp-guard` (the chat timestamp) and
-  `retro-currency-guard` (the retrospective document stays current), followed
+  `retro-currency-guard` (the retrospective stays current, and each lesson in
+  it carries a mechanism decision — an enforcer widened, a new one, or none
+  with a reason: `docs/analysis_de/lesson-mechanisms.md`), followed
   by `dashboard-sync`. Separately, PreToolUse hooks run `closing-guard` (§9),
   which denies a version tag until every closing step is recorded, and
   `board-first-guard`, the first board gate that fires BEFORE the work rather
@@ -1011,6 +1019,12 @@ After completion and after every major system:
   --session <id>` reports read-only whether one would block — advisory, the guard
   itself stays the authority. A blocked turn produces nothing, and one such loop
   has already cost ~30 turns; asking first is a cheap process run.
+- **Screenshot diffing is NOT available as a shortcut (point 361).** Every
+  pixel-metric way to cheapen this check was replayed against the bugs the
+  picture caught and REJECTED: two runs of one suite on identical code move
+  11–98 % of a frame, the smallest real defect moved 0.75 %. No golden-image
+  gate until `node scripts/picture-stability.mjs <suite>` reports STABLE;
+  verdicts in `docs/picture-check-levers.md`.
 - Fix deviations, do not paper over them. An unfulfilled criterion is
   reported as such.
 

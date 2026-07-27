@@ -31,7 +31,22 @@ export const DOC_BUDGETS = [
   {
     path: 'CLAUDE.md',
     maxLines: 1080,
-    maxWords: 9600,
+    // RAISED by the 50 measured words of the §7.2 rule that screenshot diffing
+    // is not available as a shortcut (point 361). That is the mechanism working
+    // as designed rather than a concession: the words buy a NEW standing rule
+    // and a command to re-test it, not a longer telling of something already
+    // here. It is also cheap to hold — the rule forecloses a proposal that will
+    // otherwise be re-derived from first principles by every session that
+    // notices how expensive the picture check is, and re-deriving it costs a
+    // replay corpus.
+    // RAISED by the 48 measured words of the startup-liveness condition in
+    // §7.1 pt 14 (point 337): the loading picture may stand still no longer
+    // than a balance value, and that budget counts a busy renderer's long
+    // frame as well as a blocked thread. A NEW acceptance condition with a
+    // NEW named balance value — the evidence chain behind it went to
+    // docs/acceptance-evidence.md §14, which is deliberately unbudgeted, so
+    // what is priced here is only the rule itself.
+    maxWords: 9700,
     why: 'loaded at every session start — the most expensive document in the project',
   },
   {
@@ -44,11 +59,6 @@ export const DOC_BUDGETS = [
   {
     path: 'design.md',
     maxLines: 850,
-    maxWords: 27743,
-    // RAISED by 43 measured words for point 369: an orphaned juvenile mourns
-    // before it plays again, and the trigger is DEATH rather than distance —
-    // a genuinely new §19.8 decision, which is what this mechanism prices in.
-    // The margin left over is unchanged, so the next sentence pays its own way.
     // RAISED at the merge by 113 measured words: point 341 landed on main while
     // the compression branch was open and added the separated-juvenile decision
     // to §19.8. That is a genuinely new decision, which is exactly what the
@@ -62,6 +72,17 @@ export const DOC_BUDGETS = [
     // section. A genuinely new design decision raises it by its measured size
     // with the reason written here; a longer telling of something already in
     // the document does not.
+    // RAISED by the 79 measured words of the §2.7 bullet "the startup picture
+    // stays alive" (point 337) — a genuinely new design decision of exactly
+    // the kind the paragraph above prices in: shader programs compile off the
+    // critical path, and the standstill the player may see is a calibratable
+    // budget rather than whatever the hardware takes. The tunable-value entry
+    // behind it went to docs/design-reference.md §21.2, which is unbudgeted.
+    // RAISED by 43 measured words for point 369: an orphaned juvenile mourns
+    // before it plays again, and the trigger is DEATH rather than distance —
+    // a genuinely new §19.8 decision, which is what this mechanism prices in.
+    // The margin left over is unchanged, so the next sentence pays its own way.
+    maxWords: 27793,
     why: 'read on demand, but every point that cites a section pays for the bulk around it',
   },
 ]
