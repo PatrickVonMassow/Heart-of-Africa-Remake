@@ -449,7 +449,12 @@ describe('render-verify-guard', () => {
 // whole promise is that it fires on the NEXT guard someone writes, and the rule
 // it enforces was believed enforced for weeks while nothing was wired at all —
 // so "the code looks right" is precisely the evidence that failed here before.
-describe('mechanism-review-guard: the four-eyes gate on mechanisms', () => {
+// The 5 s default is too thin here: a single case spawns a handful of git
+// commands, the record CLI, the preflight and the hook itself, and this machine
+// regularly runs a browser suite alongside the unit layer. A timeout under load
+// is a load verdict, not a defect — and one that rotates teaches people to
+// re-run rather than to read.
+describe('mechanism-review-guard: the four-eyes gate on mechanisms', { timeout: 60_000 }, () => {
   const BASELINE = '.claude/mechanism-review-baseline.json'
   const LEDGER = '.claude/mechanism-reviews.jsonl'
   const branch = () => git('rev-parse', '--abbrev-ref', 'HEAD').stdout.trim()
@@ -518,6 +523,73 @@ describe('mechanism-review-guard: the four-eyes gate on mechanisms', () => {
     commit(`a feature change\n\n${AUTHOR}`)
     baselineAt(before)
     expectHookAgrees('mechanism-review-guard.mjs', 'mechanism-review-guard', { blocks: false })
+  })
+
+  it('lets ONE record on a DESCENDANT cover the mechanism commits below it', () => {
+    // The promise printed in the block message — "reviewing the branch head is
+    // enough" — resolved through real git ancestry rather than a synthetic list.
+    const from = head()
+    write('scripts/demo2-guard.mjs', '// a second enforcer\n')
+    commit(`add a second demo guard\n\n${AUTHOR}`)
+    write('scripts/demo2-guard.mjs', '// a second enforcer, sharpened\n')
+    commit(`sharpen the second demo guard\n\n${AUTHOR}`)
+    const branchHead = head()
+    baselineAt(from)
+    expectHookAgrees('mechanism-review-guard.mjs', 'mechanism-review-guard', { blocks: true })
+
+    const r = review([
+      '--record', branchHead,
+      '--model', 'Fable 5',
+      '--verdict', 'merge-with-fixes',
+      '--evidence', 'reviewed both commits of the branch at its head',
+    ])
+    expect(r.status, r.stderr).toBe(0)
+    baselineAt(from)
+    expectHookAgrees('mechanism-review-guard.mjs', 'mechanism-review-guard', { blocks: false })
+  })
+
+  it('SEES a guard rewritten INSIDE a merge commit, where no side commit shows it', () => {
+    // `git log --name-only` prints no files for a merge by default, so a guard
+    // rewritten while resolving a conflict — the exact case CLAUDE.md §6 warns
+    // the merging session about — was invisible: the turn cleared and the
+    // baseline advanced past it for good. The arrangement isolates that delta:
+    // the guard exists BEFORE the window (grandfathered), both side commits
+    // touch only ordinary files, and the rewrite happens in the merge alone.
+    write(LEDGER, '')
+    write('scripts/demo3-guard.mjs', '// a third enforcer\n')
+    write('conflict.txt', 'common\n')
+    commit(`add a third demo guard\n\n${AUTHOR}`)
+    const from = head()
+    const trunk = branch()
+
+    git('checkout', '-q', '-b', 'side')
+    write('conflict.txt', 'side\n')
+    commit(`ordinary work on the side branch\n\n${AUTHOR}`)
+    git('checkout', '-q', trunk)
+    write('conflict.txt', 'trunk\n')
+    commit(`ordinary work on the trunk\n\n${AUTHOR}`)
+
+    const merge = git('merge', '--no-ff', '--no-commit', 'side')
+    expect(merge.status, 'the fixture needs a real conflict to resolve').not.toBe(0)
+    write('conflict.txt', 'resolved\n')
+    write('scripts/demo3-guard.mjs', '// rewritten while resolving the conflict\n')
+    commit(`merge the side branch\n\n${AUTHOR}`)
+    baselineAt(from)
+
+    const hook = expectHookAgrees('mechanism-review-guard.mjs', 'mechanism-review-guard', { blocks: true })
+    expect(hook.decision.reason).toContain('scripts/demo3-guard.mjs')
+    expect(hook.decision.reason).toMatch(/merge the side branch/)
+  })
+
+  it('does NOT advance the baseline while it is blocking', () => {
+    // A gate that pins its baseline on a blocked turn clears itself on the next
+    // one — the block would be a single-turn nuisance instead of a gate.
+    write(LEDGER, '')
+    baselineAt(base)
+    const before = readFileSync(resolve(repo, BASELINE), 'utf8')
+    const hook = runHook('mechanism-review-guard.mjs')
+    expect(hook.decision?.decision).toBe('block')
+    expect(readFileSync(resolve(repo, BASELINE), 'utf8')).toBe(before)
   })
 
   it('grandfathers what predates the baseline, and arms itself at HEAD', () => {

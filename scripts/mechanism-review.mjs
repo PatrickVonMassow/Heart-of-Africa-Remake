@@ -29,8 +29,10 @@ import { modelFromTrailers, validateRecord, VERDICTS } from './mechanism-review-
 /** The tracked ledger of recorded mechanism reviews (JSON Lines). */
 export const RECORDS_PATH = repoPath('.claude/mechanism-reviews.jsonl')
 
-// Unit separator: git writes it via %x1f, so no raw control byte rides in the command.
-const UNIT = String.fromCharCode(31)
+// Field separator for the one `git show` below. Plain ASCII on purpose: a
+// `%X%` pair in a cmd.exe command line is an environment-variable expansion
+// waiting to happen, and this runs on Windows (four-eyes review, 27.07.2026).
+const FLD = '__F__'
 
 const git = (cmd) => execSync(`git ${cmd}`, { cwd: REPO_ROOT, encoding: 'utf8' }).trim()
 
@@ -48,7 +50,10 @@ export function readRecords(path = RECORDS_PATH) {
     if (!line.trim()) continue
     try {
       const rec = JSON.parse(line)
-      if (rec && typeof rec.sha === 'string') out.push(rec)
+      // The sha shape is checked HERE, not only where it is used: the guard
+      // interpolates it into a `git merge-base` command line, and a ledger is a
+      // file anyone can hand-edit (four-eyes review, 27.07.2026).
+      if (rec && typeof rec.sha === 'string' && /^[0-9a-f]{7,40}$/i.test(rec.sha)) out.push(rec)
     } catch {
       /* a corrupted line is not a review; the gate then simply lacks it */
     }
@@ -104,9 +109,9 @@ export function buildRecord({ sha, model, verdict, evidence, now = Date.now(), r
 export function resolveCommit(sha) {
   const full = git(`rev-parse "${String(sha).trim()}^{commit}"`)
   const line = git(
-    `show -s --format="%H%x1f%s%x1f%(trailers:key=Co-Authored-By,valueonly,separator=;)" ${full}`,
+    `show -s --format="%H${FLD}%s${FLD}%(trailers:key=Co-Authored-By,valueonly,separator=;)" ${full}`,
   )
-  const [resolved, subject, trailers] = line.split(UNIT)
+  const [resolved, subject, trailers] = line.split(FLD)
   return {
     sha: resolved || full,
     subject: subject ?? '',

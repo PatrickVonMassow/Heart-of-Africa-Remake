@@ -90,6 +90,29 @@ export function baselineFor(state, branch) {
   return map[branch] ?? map.main ?? state?.baseline ?? null
 }
 
+/**
+ * Where a tree with NO baseline at all starts judging. The baseline file is
+ * local bookkeeping, so a fresh clone or a fresh worktree has none — and arming
+ * at HEAD would grandfather whatever mechanism work is already on the branch
+ * (four-eyes review, 27.07.2026). The fork point from the integration branch is
+ * the honest answer: everything on main is genuinely old, everything this branch
+ * added is genuinely new. Falls back to HEAD where no such branch resolves,
+ * which is the grandfathering the point asks for.
+ */
+export function bootstrapBase(head, revParse = (r) => git(`rev-parse ${r}`)) {
+  for (const ref of ['main', 'origin/main']) {
+    try {
+      const base = revParse(`--verify --quiet ${ref}^{commit}`)
+      if (!base) continue
+      const fork = execSync(`git merge-base ${base} ${head}`, { cwd: REPO_ROOT, encoding: 'utf8' }).trim()
+      if (fork) return fork
+    } catch {
+      /* no such branch here — try the next, then fall back to HEAD */
+    }
+  }
+  return head
+}
+
 /** The current scripts/ listing — needed for the "a core beside a guard" rule. */
 function scriptFiles() {
   try {
@@ -99,11 +122,17 @@ function scriptFiles() {
   }
 }
 
-/** Commits in base..head that touch a mechanism path, oldest first. */
+/** Commits in base..head that touch a mechanism path, oldest first.
+ *
+ *  `--diff-merges=first-parent` is load-bearing (four-eyes review, 27.07.2026):
+ *  by default `git log --name-only` prints NO files for a merge commit, so a
+ *  guard rewritten while resolving a conflict — the case CLAUDE.md §6 explicitly
+ *  tells the merging session to be careful about — was invisible to this gate,
+ *  the turn cleared, and the baseline advanced past it for good. */
 function mechanismCommits(base, head, files) {
   const out = git(
     `log --format="${REC}%H${FLD}%ct${FLD}%s${FLD}%(trailers:key=Co-Authored-By,valueonly,separator=;)" ` +
-      `--name-only --reverse ${base}..${head}`,
+      `--name-only --diff-merges=first-parent --reverse ${base}..${head}`,
   )
   const commits = []
   for (const chunk of out.split(REC)) {
@@ -151,10 +180,8 @@ export function gatherMechanismReviewInputs({ sessionId = '' } = {}) {
     /* detached or unborn — the 'HEAD' key is as good a bucket as any */
   }
   const state = readBaselineState()
-  const baseline = baselineFor(state, branch)
-  if (!baseline) {
-    return { applicable: true, head, branch, bootstrap: true, inputs: { baseline: null, head } }
-  }
+  const stored = baselineFor(state, branch)
+  const baseline = stored || bootstrapBase(head)
 
   // Diff from merge-base, never the raw baseline: on a feature branch the
   // baseline sits on main, and a two-dot diff would re-show main's own (already
@@ -163,10 +190,20 @@ export function gatherMechanismReviewInputs({ sessionId = '' } = {}) {
   try {
     base = git(`merge-base ${baseline} ${head}`)
   } catch {
-    /* unrelated or gc'd baseline — the raw range below still answers */
+    /* unrelated baseline — the raw range below decides, or re-arms us at HEAD */
   }
-  const pendingCommits =
-    base === head ? [] : mechanismCommits(base, head, scriptFiles())
+  let pendingCommits = []
+  if (base !== head) {
+    try {
+      pendingCommits = mechanismCommits(base, head, scriptFiles())
+    } catch {
+      // A baseline that no longer resolves (rebased away, gc'd) makes the range
+      // undiffable. Falling through to the wrapper's fail-open would disable the
+      // gate FOREVER, because nothing would ever re-arm the baseline — so the
+      // gate re-arms at HEAD instead: fail-open ONCE, not permanently.
+      return { applicable: true, head, branch, bootstrap: true, inputs: { baseline: null, head } }
+    }
+  }
 
   // Which recorded reviews CONTAIN each pending commit. A record only counts when
   // it is reachable from HEAD — a review recorded on an abandoned branch judged a

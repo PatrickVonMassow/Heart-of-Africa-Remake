@@ -24,6 +24,20 @@ export const VERDICTS = Object.freeze(['merge', 'merge-with-fixes', 'do-not-merg
 export const BLOCKING_VERDICT = 'do-not-merge'
 
 /**
+ * Mechanism files the NAME rules below cannot reach, named one by one because
+ * each is a silent kill of the whole chain (four-eyes review, 27.07.2026):
+ *   .claude/settings.json      the authoritative Stop-chain list — deleting one
+ *                              line disarms any guard in the project
+ *   scripts/guard-hooks.test.mjs  the only proof that the hooks actually FIRE
+ *                              when spawned; weaken it and every guard's wiring
+ *                              rests on a source review again
+ */
+export const NAMED_MECHANISM_FILES = Object.freeze([
+  '.claude/settings.json',
+  'scripts/guard-hooks.test.mjs',
+])
+
+/**
  * Is `path` part of a mechanism — something that ENFORCES a rule rather than
  * implementing a feature?
  *
@@ -33,6 +47,8 @@ export const BLOCKING_VERDICT = 'do-not-merge'
  *   scripts/<stem>*.mjs         anything BESIDE such a guard/gate by name —
  *                               `<stem>-core.mjs`, and the CLI half `<stem>.mjs`
  *   scripts/git-hooks/*         the versioned git hooks themselves
+ * plus NAMED_MECHANISM_FILES, the two files that no naming rule reaches and that
+ * disarm the whole chain in one line.
  *
  * Deliberately NAME-based, not import-based: a shared helper a guard happens to
  * import (`notify.mjs`, `batch-singleton.mjs`) would drag half the tooling into
@@ -50,6 +66,7 @@ export const BLOCKING_VERDICT = 'do-not-merge'
  */
 export function isMechanismPath(path, { scriptFiles = [] } = {}) {
   const p = String(path ?? '').replace(/\\/g, '/')
+  if (NAMED_MECHANISM_FILES.includes(p)) return true
   if (p.startsWith('scripts/git-hooks/') && p.length > 'scripts/git-hooks/'.length) return true
   const m = /^scripts\/([A-Za-z0-9._-]+)\.mjs$/.exec(p)
   if (!m) return false

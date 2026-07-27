@@ -67,6 +67,14 @@ describe('isMechanismPath', () => {
     expect(isMechanismPath('scripts/render-verify-state.mjs', opts)).toBe(false)
   })
 
+  it('catches the two files that disarm the chain without matching any name rule', () => {
+    // The Stop-chain registration and the spawned-hook proof: deleting one line
+    // of the first silently kills any guard, and gutting the second removes the
+    // only evidence that the hooks fire at all.
+    expect(isMechanismPath('.claude/settings.json', opts)).toBe(true)
+    expect(isMechanismPath('scripts/guard-hooks.test.mjs', opts)).toBe(true)
+  })
+
   it('leaves ordinary code, docs and unrelated tooling alone', () => {
     for (const p of [
       'src/render/water.ts',
