@@ -2910,42 +2910,6 @@ read that as "the criterion and its evidence section".
     reason: 367's brief is 11.9k tokens because it carries §19 verbatim, and pasting it
     would charge the main session that amount a second time. Answers pending.
 
-- [ ] 369. AN ORPHANED JUVENILE DOES NOT PLAY YET (user 27.07.2026). A calf whose
-  parent has just died in front of it goes straight back to gambolling, and it reads
-  wrong — the picture says nothing happened. It needs a SUBDUED window first.
-  THE TRIGGER IS DEATH, NOT DISTANCE. The bond can end two ways: the parent DIES in the
-  world (§19.8), or the pair is separated and the bond resolves administratively (point
-  341 — the parent was streamed out and the calf never saw anything). Only the first
-  case mourns; a calf that simply lost track of its parent has nothing to grieve, and
-  giving it a mourning pose would be a lie about what the player watched.
-  WHAT CHANGES. For a calibratable `balance.family.mourningSeconds` (debug-editable) the
-  juvenile does not run the play/gambol behaviour: it stays near the body and moves
-  subdued, then returns to normal. Reuse the existing vigil rather than inventing a
-  second one — the elephant mourning at the graveyard and the §19.8 death watch already
-  model standing-by-a-body; this is that behaviour applied to a juvenile at its parent.
-  FEAR STILL WINS. Flight, the crocodile grab and every danger response override the
-  subdued state immediately — a grieving calf must never stand still for a predator.
-  That ordering is the one hard rule here; a mournful calf that gets itself eaten is a
-  worse picture than a cheerful one.
-  ADOPTION RUNS ON ITS OWN CLOCK. Being adopted (point 341 / §19.8 `findAdopter`) changes
-  WHO the juvenile follows, not its demeanour: the window keeps running, so a calf can
-  follow its new parent subdued and only later play again. The two mechanics must not
-  cancel each other.
-  SEQUENCING: after point 341, which is where the bond's endings are being sorted out —
-  this point adds the demeanour on one of those endings and would otherwise collide.
-  ANCHORS: the play/gambol selector for young animals and the death-watch/mourning
-  behaviour in `src/scenes/travel/wildlifeBehavior.ts`; `balance.family` in
-  `src/config/balance.ts`; the family section of `src/ui/DebugMenu.tsx`.
-  DOCS in the same commit: design.md §19.8 gains one sentence — an orphan mourns before
-  it plays, and fear overrides it.
-  VERIFIABLE: pure — with a parent that died this instant the play selector is false for
-  the whole window and true after it; a danger stimulus during the window produces
-  flight, not standing; a bond ended by SEPARATION (point 341) never enters the window;
-  adoption during the window leaves the window running. Live
-  (`scripts/verify/enrichments.mjs`): a staged parent death leaves the calf subdued
-  beside the body rather than hopping, and a predator staged during that window still
-  makes it run.
-
 - [ ] 373. THE SESSION BOUNDARY BECOMES AUTONOMOUS (user 27.07.2026: "implement it the
   way you recommend", against the plan to run the batch 24/7). Measured: 80 % of the
   token spend sits above 150k context, because one session carries point after point.
@@ -3109,40 +3073,6 @@ read that as "the criterion and its evidence section".
   DOCS in the same commit: `design.md` §2.5 (what the panorama shows is design content)
   and CLAUDE.md §7.1 pt 31 with its evidence section.
 
-- [ ] 381. THE HORIZON AT THE GIZA SITE IS TORN OPEN (user 27.07.2026, reported twice
-  with screenshots from the deployed build, standing at "North · The Pyramids of Giza").
-  Just left of centre the ground ends in a HARD STRAIGHT EDGE and gives way to black:
-  a pale slab with a visible thickness sits in front of a dark, speckled wedge, and a
-  thin grey sliver runs off to the right before the brown relief resumes. Nothing about
-  that reads as landscape — §2.5 promises the surroundings panorama of the real map
-  landscape, and here the seam between the walkable ground and that panorama stands
-  open.
-  THE SUSPECT SEAM, to be confirmed rather than assumed: `src/scenes/place/backdrop.ts`
-  builds the band from `sampleTerrain` with a capped slope
-  (`BACKDROP_MAX_SLOPE`), an inner rim that tucks BELOW the settlement ground disc
-  (`BACKDROP_DISC_OVERLAP` and the rim-tuck constant beside it), and a double-sided
-  material. A straight edge with a lit top and an unlit face is what an OPEN rim looks
-  like from inside: the disc ends, the band's inner rim does not reach under it, and
-  the camera sees the band's back face and the void behind it. Point 181 fixed the
-  neighbouring symptom (silhouettes standing in the sky over that same gap) — the gap
-  itself was never closed, only worked around.
-  IT IS NOT A GIZA SPECIAL CASE UNTIL PROVEN ONE: the site is a monument disc rather
-  than a settlement, and its ground radius, relief and camera height differ. Determine
-  whether the seam opens at every place under some condition (a small disc, a flat
-  surround, a particular camera height) or only here, and fix the CONDITION — a
-  per-site constant would leave the next site open.
-  THE TARGET: from eye height, at any place, the walkable ground meets the panorama
-  without a visible edge, an unlit face or a hole; the band's inner rim stays under the
-  disc across the full ring, whatever the disc's radius and the surrounding relief.
-  VERIFIABLE: pure Vitest on the rim geometry — for a sweep of disc radii, camera
-  heights and relief profiles (including the flat desert of this report), the band's
-  inner rim sits below the disc rim across every segment, with a margin, and the first
-  visible band row is never higher than the disc edge; plus one Playwright frame at
-  eye height at the Giza site on BOTH backends, judged by the picture, showing an
-  unbroken horizon. The reported view is the acceptance case: same place, same heading.
-  DOCS in the same commit: CLAUDE.md §7.1 pt 31 (the panorama footing rule already
-  written there) and its evidence section.
-
 - [ ] 382. THE CROCODILE'S EYE-KNOB CHECK SITS ON ITS OWN THRESHOLD (27.07.2026, found
   while triaging point 369). The `enrichments` check "a lurking crocodile shows its eye
   knobs while its body reads as WATER, and a strike does not" (point 274) failed TWICE
@@ -3170,42 +3100,6 @@ read that as "the criterion and its evidence section".
   hidden-body frame, and the measured spread recorded beside the new criterion.
   DOCS in the same commit: the check's own comment block in `scripts/verify/
   enrichments.mjs` and, if the criterion changes what §19.16 promises, design.md.
-
-- [ ] 383. THE CROCODILE FEEDS ON DRY LAND WITH ITS CATCH IN THE WATER (user 27.07.2026,
-  reported from the deployed build with a screenshot: the traveller sits in his canoe on
-  the river, and on the sandy bank beside him stands the crocodile — WHOLLY on land, all
-  four legs on sand — while the carcass it is feeding on lies at the waterline with its
-  head submerged). Both halves are wrong, and they are wrong in opposite directions: the
-  ambusher of §19.16 comes OUT of the water and takes its catch BACK into it; it does not
-  stand on a beach to eat, and its prey does not end up in the water while it does not.
-  THE RULE THE PICTURE BREAKS: a crocodile's kill is dragged into the water (§19.16 —
-  the ambush from the water) and the feeding happens with the crocodile IN the water,
-  the carcass at or just under the surface beside it. The arrangement the player saw is
-  the exact inverse, so whatever places the pair after a kill is placing them
-  independently of each other and independently of the shoreline.
-  DIAGNOSE THE PLACEMENT, do not nudge the model: establish whether (a) the crocodile
-  walks out of the water while a feed is running, (b) the carcass is dropped at the
-  strike point while the crocodile retreats to its own resting spot, (c) the water mask
-  the two consult disagrees (the river band widened by the calibratable width factor is
-  a known source of edge disagreement), or (d) the drag-into-water leg does not exist at
-  all for a bank kill. Name which in the commit; each has a different fix and three of
-  them would leave the picture unchanged.
-  TARGET: from the moment the grip holds until the carcass is gone, the crocodile's body
-  centre stays on a water cell, and the carcass stays within its own body length of that
-  body and on a water cell too. A crocodile that ends a feed may return to land as
-  §19.16 allows it to bask — but never while a carcass it is feeding on lies in the
-  water, and never with the two on opposite sides of the shoreline.
-  WATCH THE NEIGHBOURING CASE: the same question for a kill made ON the bank (the
-  drinking-victim drama) — the drag leg is what puts it right, and if that leg is
-  missing this is where it shows.
-  VERIFIABLE: pure Vitest on the placement — for a sweep of strike positions along a
-  bank (including the widened river band), the feeding pair's cells are both water and
-  their separation stays inside a body length, across the whole feed; a regression case
-  built from the reported arrangement (crocodile on land, carcass in water) must FAIL
-  before the fix. Live: one bird's-eye frame at in-game zoom of a staged feed on BOTH
-  backends, judged by the picture, plus the existing crocodile-drama checks unchanged.
-  DOCS in the same commit: design.md §19.16 if the drag-and-feed rule is not yet written
-  there explicitly, CLAUDE.md §7.1 pt 12 and its evidence section.
 
 - [ ] 384. RAIN THAT TOUCHES THE WORLD — WET GROUND, IMPACTS, LIT DROPS (user 27.07.2026,
   after looking at the settlement rain on the deployed build: "the rain is simply painted
