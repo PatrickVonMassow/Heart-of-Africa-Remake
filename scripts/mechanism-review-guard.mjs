@@ -102,7 +102,11 @@ export function baselineFor(state, branch) {
 export function bootstrapBase(head, revParse = (r) => git(`rev-parse ${r}`)) {
   for (const ref of ['main', 'origin/main']) {
     try {
-      const base = revParse(`--verify --quiet ${ref}^{commit}`)
+      // The revision MUST stay quoted: execSync goes through cmd.exe on Windows,
+      // where `^` is the escape character — unquoted, git received `main{commit}`
+      // and the fallback to HEAD silently grandfathered the branch's own work.
+      // render-verify-guard carries the same note from the same bite.
+      const base = revParse(`--verify --quiet "${ref}^{commit}"`)
       if (!base) continue
       const fork = execSync(`git merge-base ${base} ${head}`, { cwd: REPO_ROOT, encoding: 'utf8' }).trim()
       if (fork) return fork
