@@ -3276,9 +3276,9 @@ read that as "the criterion and its evidence section".
   anything: (1) COMPLETE — is every lesson the recent work produced actually written
   down? (2) NON-REDUNDANT — is any lesson told twice, in two sections or across the two
   documents, where one place would do? (3) CURRENT — does any older lesson CONTRADICT a
-  newer one or stand superseded by it? A superseded lesson is not deleted silently: it
-  is rewritten to state the current rule, with the correction visible where the history
-  matters (that is what §3.27 → §3.31 already models — the newer section attacked the
+  newer one, or has a newer one replaced it? An outdated lesson is not deleted silently:
+  it is rewritten to state the current rule, with the correction visible where the
+  history matters (that is what §3.27 → §3.31 already models — the newer section attacked the
   older one's PREMISE and said so, instead of quietly replacing it).
   THE LESSONS THIS SESSION PRODUCED, to check against the documents (the audit looks for
   more; this list is the known minimum):
@@ -3292,6 +3292,10 @@ read that as "the criterion and its evidence section".
   · The work order writes `§` for FOUR different documents. A tool that guesses can feed
     an agent a silently WRONG section — the loud failure is the harmless case, the silent
     substitution is the dangerous one.
+  · The spec guard blocked twice in one day on innocent prose — once on "is unchanged
+    from", once on a point whose SUBJECT was outdated lessons. A phrase list cannot tell
+    a revision trail from a text about revisions; the lesson belongs in the documents
+    even though the mechanism fix is not this point.
   · Broadening a catch turned fail-open-ONCE into fail-open-FOREVER (a gather error
     re-baselined a pending render gate). When refactoring an error path, preserve WHICH
     error is allowed to write state.
