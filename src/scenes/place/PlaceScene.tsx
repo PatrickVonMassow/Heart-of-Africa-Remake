@@ -40,13 +40,11 @@ import { placeById, type RegionId } from '../../world/geo'
 import { sampleTerrain } from '../../world/terrain'
 import {
   BACKDROP_HEIGHT,
-  BACKDROP_MAX_SLOPE,
-  BACKDROP_OUTER,
   BACKDROP_RINGS,
   BACKDROP_SCALE,
   BACKDROP_SEGS,
-  backdropBase,
-  backdropTaper,
+  backdropRingRadius,
+  backdropSurfaceY,
   panoramaStandY,
 } from './backdrop'
 import { createBackdropMaterial } from './backdropMaterial'
@@ -97,6 +95,10 @@ import { getStrings, useStrings } from '../../i18n'
 
 const PLAYER_RADIUS = 0.35 // collision radius of player and inhabitants
 const EYE_HEIGHT = 1.5 // first-person camera height in meters
+/** Radial segments of the walkable ground disc: enough that its ground line
+ *  reads as a curve, not as the straight chords of point 381 (at the largest
+ *  disc, Giza's 74 m, a chord is 2.4 m and its inset 0.01 m). */
+const GROUND_DISC_SEGS = 192
 
 /** Sun direction shared by the sky dome disc and the shadow light. */
 const SUN_DIR: [number, number, number] = [0.52, 0.68, 0.34]
@@ -1528,33 +1530,24 @@ function TravelPanorama({ placeId }: { placeId: string }) {
 function LandscapeBackdrop({ lat, lon, seed, innerRadius }: { lat: number; lon: number; seed: number; innerRadius: number }) {
   const geometry = useMemo(() => {
     const r0 = innerRadius
-    const r1 = BACKDROP_OUTER
     const centerH = sampleTerrain(lat, lon, seed).height
     const positions: number[] = []
     const colors: number[] = []
     const indices: number[] = []
     for (let ri = 0; ri < BACKDROP_RINGS; ri++) {
-      // Logarithmic ring spacing: more detail near the settlement.
-      const r = r0 * Math.pow(r1 / r0, ri / (BACKDROP_RINGS - 1))
-      // The inner rim tucks below the settlement ground and fades upward
-      // (pure radius function, so it matches backdropHeightAt exactly).
-      const taper = backdropTaper(r, r0)
-      // Base offset feathers the tucked rim up to the ground-disc plane across
-      // the disc overhang, so the horizon meets the walkable ground with no step
-      // (point 236). Shared with backdropHeightAt so mesh and sampler agree.
-      const base = backdropBase(r, r0)
+      // Logarithmic ring spacing with a ring pinned on the ground-disc edge.
+      const r = backdropRingRadius(ri, r0)
       for (let si = 0; si < BACKDROP_SEGS; si++) {
         const a = (si / BACKDROP_SEGS) * Math.PI * 2
         const x = Math.cos(a) * r
         const z = Math.sin(a) * r
         const smp = sampleTerrain(lat - z * BACKDROP_SCALE, lon + x * BACKDROP_SCALE, seed)
-        const relief = (smp.height - centerH) * BACKDROP_HEIGHT
-        // Cap the height to a fraction of the ring's distance so even mountainous
-        // surroundings (e.g. the Atlas behind Berber Village) read as a distant
-        // range on the horizon instead of looming up and arcing over the camera
-        // (which showed as a dark overhanging "ceiling" with gaps).
-        const capped = Math.min(r * BACKDROP_MAX_SLOPE, Math.max(-6, relief))
-        const y = capped * taper + base
+        // ONE shape formula (backdrop.ts): the rim tucks under the ground disc
+        // and feathers up to its plane (point 236), a mountainous surround is
+        // capped to a distant range, and the fall is clamped at that same plane
+        // so the horizon can never tear open (point 381). Shared with
+        // backdropHeightAt so mesh, sampler and silhouette footing agree.
+        const y = backdropSurfaceY(r, r0, (smp.height - centerH) * BACKDROP_HEIGHT)
         positions.push(x, y, z)
         colors.push(smp.color[0], smp.color[1], smp.color[2])
       }
@@ -2335,9 +2328,13 @@ export function PlaceScene() {
       <GizaSkyline placeId={place.id} />
       <PanoramaWildlife region={place.region} placeId={place.id} seed={seed} innerRadius={layout.radius + 12} lat={place.lat} lon={place.lon} skyHorizon={sky.horizon} />
 
-      {/* Ground disc with procedural mottling */}
+      {/* Ground disc with procedural mottling. GROUND_DISC_SEGS, not 48: a
+          48-gon around a 74 m plateau puts 9.7 m straight chords on the ground
+          line, and from a few metres away that reads as the hard straight edge
+          of point 381 — while its 0.16 m inset also uncovered the backdrop's
+          tucked rim ramp as a scalloped hairline. */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow material={mats.ground}>
-        <circleGeometry args={[layout.radius + 14, 48]} />
+        <circleGeometry args={[layout.radius + 14, GROUND_DISC_SEGS]} />
       </mesh>
 
       {layout.interactives.map((it, i) => {
