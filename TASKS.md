@@ -3149,7 +3149,41 @@ read that as "the criterion and its evidence section".
   rather than citing the incident as a refutation.
   FOUR EYES: done 27.07.2026 (Fable 5 reviewed the Opus 5 spec, verdict
   GREEN-WITH-CONDITIONS); the conditions are folded into the text above. The
-  IMPLEMENTATION is reviewed the same way before it merges.
+  IMPLEMENTATION is reviewed the same way before it merges — the first such review
+  returned MERGE-WITH-FIXES with two serious defects, which is why the bar below exists.
+  HARDENING — THIS TOOLING BECOMES THE BASE PROCESS FOR PULLING WORK, so a quiet defect
+  in it corrupts every task that follows (user 27.07.2026: spend more effort here rather
+  than risk that). The unit tests are not enough; the following gates are part of the
+  point and it does not merge without them.
+  (H1) FAITHFULNESS OVER THE WHOLE CORPUS, not a sample. For EVERY point, open and
+  archived: the brief carries the spec text VERBATIM (a diff against `readTasksAll`'s
+  body, so no truncation or paraphrase can creep in); every `§` reference in that spec is
+  either carried with content from the document the spec actually NAMED, or named in the
+  notes; and NO section is carried from a document the spec never named. The silent wrong
+  substitution — not the loud failure — is the defect class that must be impossible.
+  (H2) THE `§` CORPUS IS FOUR DOCUMENTS WIDE, not three: design.md, CLAUDE.md, a
+  work-order point, AND the research documents (`docs/*-1890.md`, cited in prose as
+  "peoples-1890 §8", "climate §1.1"). Resolve all four, including a LETTERED section
+  (`§B`). A reference that resolves nowhere fails loudly and names the documents it
+  searched — never "a renumbering?" when the section never was in that document.
+  (H3) THE GUARD CHAIN IS PROVEN BY BEHAVIOUR, not by inspection. A test spawns each
+  refactored wrapper AS A HOOK (child process, hook JSON on stdin) and asserts the same
+  decision, message and exit code as before the refactor, for both a blocking and a
+  clean state. `isMainModule` is the single point of failure for the whole Stop chain;
+  reading it is not evidence, running it is.
+  (H4) ERROR PATHS PRESERVE WHICH ERROR WRITES STATE. The render-verify re-baseline may
+  fire ONLY on the specific baseline-resolution failure it was written for; every other
+  gather error allows the stop WITHOUT touching state. Pin it with a test per error
+  source, because the regression here is invisible — it converts fail-open-once into
+  fail-open-forever, silently clearing an unverified render gate.
+  (H5) A BLIND SECOND SET OF TEST SCENARIOS (§355's divergent mode): the second model
+  designs, independently and without seeing the first, its own complete list of ways the
+  brief could mislead a reader; the union is implemented. A review of a finished list
+  checks the list — it does not produce what is missing from it.
+  (H6) DOGFOOD IT BEFORE TRUSTING IT: the next three delegated points are briefed with
+  the tool, and each agent is asked whether the brief was sufficient. Their answers are
+  recorded with the point. A tool that reads correctly but omits what a builder needs
+  fails this and must be widened.
 
 - [ ] 366. THE BOARD IS CURRENT BEFORE THE WORK STARTS, NOT AFTER IT ENDS (user
   27.07.2026). The user watches the published board to see what is happening RIGHT
@@ -3236,7 +3270,8 @@ read that as "the criterion and its evidence section".
   the retrospective only if the run produces a NEW lesson rather than confirming §3.30.
 
 - [ ] 368. THE ANALYSIS DOCUMENTS HOLD EVERY LESSON ONCE, AND NO SUPERSEDED ONE (user
-  27.07.2026, after point 318). Audit `docs/analysis_de/` — the retrospective and the
+  27.07.2026; runs AFTER point 365, whose hardening produces the last of the lessons
+  below). Audit `docs/analysis_de/` — the retrospective and the
   beginner's guide — on three axes, and deliver the result as a table before changing
   anything: (1) COMPLETE — is every lesson the recent work produced actually written
   down? (2) NON-REDUNDANT — is any lesson told twice, in two sections or across the two
