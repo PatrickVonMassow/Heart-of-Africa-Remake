@@ -511,8 +511,13 @@ changes with it in the same commit.
     sun, cascaded shadows in the bird's-eye view, screen-space AO, bloom,
     filmic tone mapping with color grading and a subtle vignette, and the
     water feature set: wave field, depth-dependent absorption over real
-    bathymetry, shore/crest foam).
+    bathymetry, shore/crest foam). Its shader programs build OFF the startup
+    critical path: the first frames draw the ready set and the rest links
+    behind them, so the loading picture stands still no longer than the
+    calibratable `balance.startup.pictureFreezeBudgetMs`, which counts the
+    WHOLE standstill — a renderer busy inside one long frame included.
    Evidence: docs/acceptance-evidence.md §14.
+
 
 15. **Lively, densely built settlements.** `design.md` §2.6 (dense
     non-functional building fabric, a recognizable path network,

@@ -161,6 +161,10 @@ are adjustable at runtime). The complete set, grouped as the menu presents it:
 - Mouse-look sensitivity in the first-person view.
 - The inhabitant unstuck window (§2.6): the seconds a settlement walker may stay physically pinned before it is nudged to free ground.
 
+**Loading** (§2.7)
+
+- The loading picture's freeze budget in milliseconds: how long the picture may stand still while the game starts up. The verification binds this value, counting the WHOLE standstill — both a blocked main thread and a renderer stuck inside one long frame — so a busy renderer cannot excuse a freeze the player plainly sees.
+
 **Audio** (§19.1)
 
 - Ambience volume (default 0.1): the master control for the whole soundscape — the noise beds (wind, surf, crowd murmur), their gust/swell modulation and the proximity animal calls all scale under it.

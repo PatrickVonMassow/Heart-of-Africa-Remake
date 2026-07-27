@@ -96,3 +96,42 @@ export function attributeBlocks(ticks, frames) {
   }
   return { blockMs, blockAtMs, frameBlockMs, tickGapMs: maxGap(ticks) }
 }
+
+/** Defaults for `pictureSettled`, shared with its caller so the suite reports
+ *  the same numbers it gates on. */
+export const SETTLE_DEFAULTS = { settleMs: 1500, quietGapMs: 250, minFrames: 10 }
+
+/**
+ * Has the picture been demonstrably LIVE for the last `settleMs`? (point 337)
+ *
+ * A startup measurement window must close on the picture's own signal rather
+ * than a wall clock: a fixed tail can end mid-stall on a slow machine, which
+ * under-reports exactly the standstill the gate exists to catch. This is that
+ * signal — over the trailing window, the tick train never gapped by more than
+ * `quietGapMs` AND at least `minFrames` frames were painted.
+ *
+ * The stretch must reach BOTH edges of the window: without that, a stall that
+ * ended a moment ago leaves a short quiet tail that would read as settled. So
+ * the first sample must sit within `quietGapMs` of the window's start and the
+ * last within `quietGapMs` of `now`.
+ *
+ * `ticks` and `raf` are timestamps on one clock; `now` is that clock's reading.
+ * Total on missing input — an unarmed probe is "not settled", never a crash.
+ *
+ * DELIBERATELY SELF-CONTAINED: startup.mjs stringifies this function into the
+ * page, where the sample trains live, so it must close over nothing — no
+ * imports, no module constants. `SETTLE_DEFAULTS` is therefore repeated as
+ * literal fallbacks here; `liveness.test.mjs` pins the two together so they
+ * cannot drift.
+ */
+export function pictureSettled(ticks, raf, now, options = {}) {
+  const settleMs = options.settleMs ?? 1500
+  const quietGapMs = options.quietGapMs ?? 250
+  const minFrames = options.minFrames ?? 10
+  const since = now - settleMs
+  const t = (ticks ?? []).filter((x) => x >= since)
+  const f = (raf ?? []).filter((x) => x >= since)
+  if (t.length < 2 || f.length < minFrames) return false
+  for (let i = 1; i < t.length; i++) if (t[i] - t[i - 1] > quietGapMs) return false
+  return t[0] - since < quietGapMs && now - t[t.length - 1] < quietGapMs
+}
