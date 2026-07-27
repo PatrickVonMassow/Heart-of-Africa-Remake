@@ -906,6 +906,73 @@ for (const [placeId, shot] of [
       bandGaps === null ? 'no capture to read' : `${bandGaps.splitColumns}/${bandGaps.width} columns split, worst gap ${bandGaps.worstGapRows} rows`,
     )
 
+    // Point 381: the seam between the walkable ground and the §2.5 panorama
+    // must be CLOSED. The reported picture had the plateau end in a hard
+    // straight edge and give way to the captured band's low rows and the sky
+    // behind them — because the geometry backdrop sank up to 6 units below the
+    // ground plane just past the disc rim and never rose back into the eye's
+    // grazing line inside its own reach.
+    //
+    // Read the rendered scene, not the formula: from each standpoint sweep the
+    // elevation upward through the horizon and record which surface the frame
+    // draws. A closed horizon reads ground-disc → landscape-backdrop → band/sky.
+    // A torn one steps straight from the disc to the band or to nothing, which
+    // is what this asserts against. Standpoints include the rim, where the
+    // grazing line is shallowest and the tear was worst.
+    {
+      const siteR = await page.evaluate(() => window.__placeLayout?.radius ?? 60)
+      const seamBad = []
+      let seamProbed = 0
+      for (const stand of [
+        [0, 0],
+        [0, siteR * 0.8],
+        [siteR * 0.8, 0],
+      ]) {
+        await page.evaluate(([x, z]) => {
+          const p = window.__placePlayer
+          p.x = x
+          p.z = z
+          p.pitch = 0
+        }, stand)
+        // Let the camera follow the teleport: the ray probe casts from IT.
+        await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))))
+        const res = await page.evaluate(() => {
+          const cam = window.__placeCamera
+          const bad = []
+          let probed = 0
+          for (let ai = 0; ai < 24; ai++) {
+            const yaw = (ai / 24) * Math.PI * 2
+            const seq = []
+            for (let i = 0; i <= 60; i++) {
+              const t = ((-6 + i * 0.1) * Math.PI) / 180
+              const dx = -Math.sin(yaw) * Math.cos(t)
+              const dz = -Math.cos(yaw) * Math.cos(t)
+              const dy = Math.sin(t)
+              const L = 3500
+              const h = window.__placeRayHit(cam.position.x + dx * L, cam.position.y + dy * L, cam.position.z + dz * L)
+              const name = h.hitDistance == null ? 'nothing' : h.hitName
+              if (seq[seq.length - 1] !== name) seq.push(name)
+            }
+            probed++
+            const disc = seq.indexOf('ground-disc')
+            if (disc < 0) continue // a building or monument fills this bearing
+            const next = seq[disc + 1]
+            if (next === 'panorama-band' || next === 'nothing' || next === undefined) {
+              bad.push({ yawDeg: Math.round((yaw * 180) / Math.PI), seq })
+            }
+          }
+          return { probed, bad }
+        })
+        seamProbed += res.probed
+        for (const b of res.bad) seamBad.push({ stand, ...b })
+      }
+      check(
+        'the walkable ground meets the panorama with no torn horizon (point 381)',
+        seamProbed > 0 && seamBad.length === 0,
+        `${seamProbed} bearings probed, ${seamBad.length} torn${seamBad.length ? ' — ' + JSON.stringify(seamBad.slice(0, 3)) : ''}`,
+      )
+    }
+
     // Human-viewable evidence from two standpoints on the site.
     const radius = await page.evaluate(() => window.__placeLayout?.radius ?? 60)
     const posts = [

@@ -1524,7 +1524,7 @@ function TravelPanorama({ placeId }: { placeId: string }) {
     }
   }, [capture])
   if (!geometry || !material) return null
-  return <mesh geometry={geometry} material={material} position={[0, EYE_HEIGHT, 0]} />
+  return <mesh name="panorama-band" geometry={geometry} material={material} position={[0, EYE_HEIGHT, 0]} />
 }
 
 function LandscapeBackdrop({ lat, lon, seed, innerRadius }: { lat: number; lon: number; seed: number; innerRadius: number }) {
@@ -1598,7 +1598,9 @@ function LandscapeBackdrop({ lat, lon, seed, innerRadius }: { lat: number; lon: 
     }
   }, [geometry])
 
-  return <mesh geometry={geometry} material={material} receiveShadow />
+  // Named so the §7.2 ray probe can tell the three horizon surfaces apart
+  // (point 381): walkable disc, geometry backdrop, captured band.
+  return <mesh name="landscape-backdrop" geometry={geometry} material={material} receiveShadow />
 }
 
 // --- Giza monument site (design.md §4.4, point 273) ---------------------------
@@ -2333,7 +2335,7 @@ export function PlaceScene() {
           line, and from a few metres away that reads as the hard straight edge
           of point 381 — while its 0.16 m inset also uncovered the backdrop's
           tucked rim ramp as a scalloped hairline. */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow material={mats.ground}>
+      <mesh name="ground-disc" rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow material={mats.ground}>
         <circleGeometry args={[layout.radius + 14, GROUND_DISC_SEGS]} />
       </mesh>
 
