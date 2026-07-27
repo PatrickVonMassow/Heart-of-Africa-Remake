@@ -3108,6 +3108,16 @@ read that as "the criterion and its evidence section".
   rendered body is placed by the instanced draw for that species. FIND where the two
   diverge and make the collider read the drawn placement — do not "correct" it by an
   offset constant, which would drift again the next time the rendering moves.
+  THE REPORT CARRIES ITS OWN REPRODUCTION, so start there rather than hunting for a
+  case: `local/reports/378-animal-collider-report.json` is the state dump taken at the
+  moment of the report (git-ignored, outside the repo's tracked content). World seed
+  3241103702, traveller at x 330.707 / z −233.274 in the north region, 29.01.1890,
+  travel speed 5.6, detail level medium — the same seed and spot re-streams the same
+  herd, so the offending animal can be walked into again instead of being waited for.
+  A related in-game assert fired during an unrelated verification run the same
+  evening and points at the same seam: `animal-buried — wildebeest bodyY=1.13
+  ground=1.92`, i.e. a body DRAWN below the ground it stands on. Check whether one
+  cause explains both before treating them as two.
   MEASURE THE DIVERGENCE FIRST, so the fix is aimed rather than guessed: for a
   standing and a moving animal of several species, log the drawn world position of the
   instance and the circle the collider reports, and record the delta. A per-species
