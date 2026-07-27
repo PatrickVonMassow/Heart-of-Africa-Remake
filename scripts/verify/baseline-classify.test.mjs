@@ -1,0 +1,264 @@
+// Pins the red-triage logic of scripts/verify/baseline-classify-core.mjs
+// (point 294): the repeat signature (same check twice vs different checks), the
+// baseline classification (green→red = regression, red→red = pre-existing), the
+// weak changed-file relatedness, and the printed report.
+import { describe, expect, it } from 'vitest'
+import {
+  allChecks,
+  changeRelatedness,
+  checkKey,
+  classifyAgainstBaseline,
+  consoleErrorChecks,
+  failedChecks,
+  formatBaselineReport,
+  formatRepeatReport,
+  normaliseErrorText,
+  parseCheckLines,
+  repeatSignature,
+} from './baseline-classify-core.mjs'
+
+// The live 27.07.2026 case: enrichments failed twice at DIFFERENT checks.
+const RUN_1 = [
+  'PASS  the traveller reaches the savanna — 12 objects',
+  'FAIL  the streamed dressing does not grow — 0 objects at all',
+  'FAIL  an elephant herd mourns at the graveyard — released:false',
+  'PASS  the crocodile eye knobs sit above the snout — 2 knobs',
+  'console errors: 0',
+].join('\n')
+
+const RUN_2 = [
+  'PASS  the traveller reaches the savanna — 11 objects',
+  'PASS  the streamed dressing does not grow — 41 objects',
+  'PASS  an elephant herd mourns at the graveyard — released:true',
+  'FAIL  the crocodile eye knobs sit above the snout — 0 knobs',
+].join('\n')
+
+describe('parsing a suite output', () => {
+  it('reads name and detail from every result line', () => {
+    const checks = parseCheckLines(RUN_1)
+    expect(checks).toHaveLength(4)
+    expect(checks[1]).toMatchObject({ status: 'FAIL', name: 'the streamed dressing does not grow', detail: '0 objects at all' })
+    expect(checks[3].status).toBe('PASS')
+  })
+
+  it('ignores lines that are not result lines', () => {
+    expect(parseCheckLines('# starting dev server\nPASSING through the desert\nERR: boom')).toEqual([])
+  })
+
+  it('takes a name without a detail', () => {
+    expect(parseCheckLines('FAIL  the map opens')[0]).toMatchObject({ name: 'the map opens', detail: '' })
+  })
+
+  it('folds measured numbers into the comparison key so the same check matches across runs', () => {
+    expect(checkKey('12 vultures circle')).toBe(checkKey('4 vultures circle'))
+    expect(checkKey('the  map   opens')).toBe('the map opens')
+    expect(checkKey('vultures circle')).not.toBe(checkKey('vultures land'))
+  })
+
+  it('does not mistake the suites own summary lines for checks', () => {
+    // flow.mjs ends with `FAILURES: 2`, preview.mjs prints a bare `FAIL`.
+    expect(parseCheckLines('FAILURES: 2\nFAIL\nALL CHECKS PASSED')).toEqual([])
+    // flow.mjs prints its checks without a detail — those ARE checks.
+    expect(parseCheckLines('FAIL  the ferry sails to Zanzibar')).toHaveLength(1)
+  })
+
+  it('lists failing and all-reached checks de-duplicated', () => {
+    expect(failedChecks(RUN_1).map((c) => c.name)).toEqual([
+      'the streamed dressing does not grow',
+      'an elephant herd mourns at the graveyard',
+    ])
+    expect(allChecks(RUN_1)).toHaveLength(4)
+    expect(failedChecks('FAIL  a — 1\nFAIL  a — 2')).toHaveLength(1)
+  })
+})
+
+describe('the repeat signature of two runs', () => {
+  it('calls DIFFERENT checks in the two runs a load signature, not a real failure', () => {
+    const sig = repeatSignature({ first: RUN_1, second: RUN_2 })
+    expect(sig.verdict).toBe('load-signature')
+    expect(sig.stable).toEqual([])
+    expect(sig.onlyFirst.map((c) => c.name)).toEqual([
+      'the streamed dressing does not grow',
+      'an elephant herd mourns at the graveyard',
+    ])
+    expect(sig.onlySecond.map((c) => c.name)).toEqual(['the crocodile eye knobs sit above the snout'])
+    expect(sig.headline).toMatch(/LOAD/)
+  })
+
+  it('calls the SAME check failing twice a candidate real failure', () => {
+    const sig = repeatSignature({ first: RUN_1, second: 'FAIL  an elephant herd mourns at the graveyard — released:false' })
+    expect(sig.verdict).toBe('candidate-real')
+    expect(sig.stable.map((c) => c.name)).toEqual(['an elephant herd mourns at the graveyard'])
+    expect(sig.onlyFirst.map((c) => c.name)).toEqual(['the streamed dressing does not grow'])
+  })
+
+  it('matches a stable check across runs even when its detail numbers differ', () => {
+    const sig = repeatSignature({ first: 'FAIL  12 vultures circle — 3 seen', second: 'FAIL  9 vultures circle — 1 seen' })
+    expect(sig.verdict).toBe('candidate-real')
+  })
+
+  it('reports a green retry as cleared', () => {
+    const sig = repeatSignature({ first: RUN_1, second: RUN_2, secondOk: true })
+    expect(sig.verdict).toBe('flake-cleared')
+  })
+
+  it('refuses a verdict when a run printed no FAIL line at all (crash, timeout kill)', () => {
+    const crash = repeatSignature({ first: RUN_1, second: 'Error: page.evaluate: Target closed' })
+    expect(crash.verdict).toBe('unknown')
+    expect(crash.headline).toMatch(/run 2/)
+    expect(repeatSignature({ first: RUN_1, second: '', secondRan: false }).verdict).toBe('unknown')
+  })
+})
+
+describe('console errors as pseudo-checks (world and i18n print no FAIL line)', () => {
+  const OUT = [
+    'console errors: 2',
+    'ERR: TypeError: r.dispose is not a function at http://localhost:52311/src/render/pipeline.ts:42:9',
+    'ERR: WebGL: INVALID_OPERATION',
+  ].join('\n')
+
+  it('reads the ERR lines and folds URL, port and line numbers out of the identity', () => {
+    const errs = consoleErrorChecks(OUT)
+    expect(errs).toHaveLength(2)
+    expect(errs[0].kind).toBe('console')
+    expect(errs[0].name).toContain('<url>')
+    expect(errs[0].name).not.toContain('52311')
+    expect(normaliseErrorText('boom at http://localhost:1/a.ts:1:2')).toBe('boom at <url>')
+  })
+
+  it('reads the texts from a console-errors line that carries them, and ignores a bare count', () => {
+    expect(consoleErrorChecks("console errors: [ 'a broken shader', 'a missing texture' ]")).toHaveLength(2)
+    expect(consoleErrorChecks('CONSOLE ERRORS: first one | second one')).toHaveLength(2)
+    expect(consoleErrorChecks('console errors: 0\nCONSOLE ERRORS: none')).toEqual([])
+  })
+
+  it('gives a console-only red a repeat signature instead of "unknown"', () => {
+    const sig = repeatSignature({ first: OUT, second: 'ERR: WebGL: INVALID_OPERATION' })
+    expect(sig.verdict).toBe('candidate-real')
+    expect(sig.stable[0].name).toContain('INVALID_OPERATION')
+  })
+
+  it('counts a console error the baseline never produced as a real regression', () => {
+    const baseline = 'PASS  the map draws\nconsole errors: 0'
+    const classified = classifyAgainstBaseline({
+      currentFailed: failedChecks(OUT),
+      baselineFailed: failedChecks(baseline),
+      baselineChecks: allChecks(baseline),
+    })
+    expect(classified.map((c) => c.verdict)).toEqual(['real-regression', 'real-regression'])
+  })
+
+  it('can be switched off for a caller that only wants the printed checks', () => {
+    expect(failedChecks(OUT, { includeConsoleErrors: false })).toEqual([])
+  })
+})
+
+describe('the weak changed-file relatedness signal', () => {
+  it('marks a check whose name meets the diff, and one that does not', () => {
+    const rel = changeRelatedness({
+      checks: failedChecks(RUN_1),
+      changedFiles: ['src/scenes/travel/floraStreaming.ts', 'src/config/balance.ts'],
+    })
+    expect(rel[0]).toMatchObject({ related: true })
+    expect(rel[0].tokens).toContain('stream')
+    expect(rel[1].related).toBe(false)
+  })
+
+  it('splits camelCase file names into words', () => {
+    const rel = changeRelatedness({ checks: ['the crocodile eye knobs'], changedFiles: ['src/systems/CrocodileBody.tsx'] })
+    expect(rel[0].tokens).toEqual(['crocodile'])
+  })
+
+  it('says nothing rather than false when there is no diff list', () => {
+    expect(changeRelatedness({ checks: ['anything at all'], changedFiles: [] })[0].related).toBeNull()
+  })
+})
+
+describe('classifying against the baseline', () => {
+  const current = failedChecks('FAIL  a river notch appears\nFAIL  the ground edge is dark\nFAIL  a brand new check')
+  const baselineOut = 'PASS  a river notch appears\nFAIL  the ground edge is dark'
+
+  it('separates a real regression, a pre-existing red and a check the baseline never ran', () => {
+    const classified = classifyAgainstBaseline({
+      currentFailed: current,
+      baselineFailed: failedChecks(baselineOut),
+      baselineChecks: allChecks(baselineOut),
+    })
+    expect(classified.map((c) => c.verdict)).toEqual(['real-regression', 'pre-existing', 'inconclusive'])
+  })
+
+  it('never reads a baseline run that died early as a clean bill of health', () => {
+    const classified = classifyAgainstBaseline({ currentFailed: current, baselineFailed: [], baselineChecks: [] })
+    expect(classified.every((c) => c.verdict === 'inconclusive')).toBe(true)
+  })
+
+  it('resolves nothing when the check flaked on the baseline itself', () => {
+    const classified = classifyAgainstBaseline({
+      currentFailed: ['the ground edge is dark'],
+      baselineFailed: [],
+      baselineChecks: ['the ground edge is dark'],
+      baselineFlaky: ['the ground edge is dark'],
+    })
+    expect(classified[0].verdict).toBe('baseline-flaky')
+  })
+
+  it('accepts plain check names as well as parsed checks', () => {
+    const classified = classifyAgainstBaseline({
+      currentFailed: ['the ground edge is dark'],
+      baselineFailed: ['the ground edge is dark'],
+      baselineChecks: ['the ground edge is dark'],
+    })
+    expect(classified[0].verdict).toBe('pre-existing')
+  })
+})
+
+describe('the printed report', () => {
+  it('names the load signature and points at the quiet-machine rule', () => {
+    const lines = formatRepeatReport({ suite: 'enrichments', signature: repeatSignature({ first: RUN_1, second: RUN_2 }) })
+    expect(lines[0]).toContain('DIFFERENT checks')
+    expect(lines.join('\n')).toContain('QUIET machine')
+    expect(lines.join('\n')).not.toContain('a real failure, not a flake')
+  })
+
+  it('names the stable check and the baseline command on a candidate real failure', () => {
+    const sig = repeatSignature({ first: RUN_1, second: 'FAIL  the streamed dressing does not grow — 0 objects' })
+    const lines = formatRepeatReport({
+      suite: 'enrichments',
+      signature: sig,
+      relatedness: changeRelatedness({ checks: sig.stable, changedFiles: ['src/scenes/travel/floraStreaming.ts'] }),
+    })
+    expect(lines[0]).toContain('CANDIDATE REAL FAILURE')
+    expect(lines.join('\n')).toContain('touches the diff: stream')
+    expect(lines.join('\n')).toContain('baseline-classify.mjs enrichments')
+  })
+
+  it('names the rotating checks beside a stable one', () => {
+    const sig = repeatSignature({
+      first: 'FAIL  the stable one\nFAIL  a rotating one',
+      second: 'FAIL  the stable one\nFAIL  another rotating one',
+    })
+    expect(sig.verdict).toBe('candidate-real')
+    expect(sig.headline).toContain('rotated between the runs')
+  })
+
+  it('prints one verdict line per check, the backend, and flags a changed suite file', () => {
+    const lines = formatBaselineReport({
+      suite: 'polish',
+      ref: 'abc1234',
+      backend: 'webgpu',
+      classified: [{ check: 'the ground edge is dark', key: 'k', verdict: 'pre-existing' }],
+      suiteFileChanged: true,
+      infraChanged: ['package-lock.json'],
+    })
+    expect(lines[0]).toContain('backend WebGPU')
+    expect(lines[1]).toContain('PRE-EXISTING')
+    expect(lines.join('\n')).toContain('scripts/verify/polish.mjs itself differs')
+    expect(lines.join('\n')).toContain('package-lock.json')
+  })
+
+  it('says NOT classified when the baseline run produced nothing', () => {
+    const lines = formatBaselineReport({ suite: 'polish', ref: 'abc1234', classified: [], baselineRan: false, note: 'dev server never bound' })
+    expect(lines.join('\n')).toContain('NOT classified')
+    expect(lines.join('\n')).toContain('dev server never bound')
+  })
+})
