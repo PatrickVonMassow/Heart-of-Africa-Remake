@@ -214,7 +214,9 @@ export function evaluate({ toolName, command, filePath, state, focus, repoHash =
         '  3. node scripts/dashboard-publish.mjs  → publish the scratchpad file via the Artifact tool\n' +
         '  4. node scripts/dashboard-guard.mjs --synced <board path>\n' +
         'Reads, those four commands and an edit of the board file are never blocked, and this gate ' +
-        'fires at most ONCE per turn — the next call goes through either way.',
+        'fires at most ONCE per turn — the next call goes through either way.\n' +
+        'IF YOU ARE A SUBAGENT: the board is not yours to keep. A subagent inherits the parent ' +
+        'session id, so this gate cannot tell you apart — just repeat the call, it will go through.',
     }
   } catch {
     return { block: false, reason: '' } // total by contract

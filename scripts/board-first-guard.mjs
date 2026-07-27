@@ -16,8 +16,11 @@
 //   2. `--status`: what the gate would say right now, without a tool call.
 //
 // Ownership-aware like every guard since the hard singleton: a session that does
-// not own the live batch lock has no board duty (this also exempts subagents,
-// which carry their own session id), and a paused batch is never gated.
+// not own the live batch lock has no board duty, and a paused batch is never
+// gated. NOTE: a subagent is NOT exempt by that rule — its tool calls carry the
+// PARENT session id, so it is judged like the owner (four-eyes review,
+// 27.07.2026). The deny text therefore tells a subagent to simply repeat the
+// call: the gate fires at most once per turn, so the repeat goes through.
 import { readFileSync, existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 import {
@@ -96,11 +99,26 @@ try {
   if (decision.block) {
     // Record that the gate fired, so it denies AT MOST ONCE per turn — a session
     // that ignores it must never be locked out of working.
+    //
+    // The deny is emitted ONLY if that record was written. If the state file is
+    // readable but unwritable, the release could never be recorded and every
+    // mutating call would be denied for the rest of the turn — and the remedy
+    // itself needs that same file (the publish hash is written there), so the
+    // session could not even satisfy the gate. Failing OPEN on an unwritable
+    // state is the only honest direction (four-eyes review, 27.07.2026).
+    //
+    // The stamp is clamped to the turn's start: a backward wall-clock step (an
+    // NTP correction) would otherwise leave `fired < turnStartedAt`, which reads
+    // as "not yet fired" for the rest of the turn while a fresh focus stamp is
+    // equally in the past — armed with no way to disarm.
+    let released = false
     try {
-      mergeState({ boardFirstFiredAt: Date.now() })
+      mergeState({ boardFirstFiredAt: Math.max(Date.now(), Number(state && state.turnStartedAt) || 0) })
+      released = true
     } catch {
-      /* best effort — a failed write only means the gate may fire again */
+      /* unwritable state — fall through to allow */
     }
+    if (!released) process.exit(0) // unwritable state → allow, never trap the turn
     process.stdout.write(
       JSON.stringify({
         hookSpecificOutput: {
