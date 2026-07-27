@@ -3257,27 +3257,6 @@ read that as "the criterion and its evidence section".
   against today's 1.25 %/h. The point counts as delivered when the rate is measured, not
   when the mechanism runs.
 
-- [ ] 374. THE BOARD'S FOOTER COUNTS ITSELF (27.07.2026, from the first real use of
-  the one-command board). The footer carries the number of open points, and nothing
-  computes it: every tick makes it wrong, and `attest` then REFUSES with
-  `footer-stale` — the audit catches the drift, but the caller pays a blocked step
-  and a hand edit for a figure the repository already knows. Three of the four
-  numbers in that line are of the same kind.
-  FIX IT WHERE THE LINE IS WRITTEN: `scripts/dashboard-publish.mjs` rewrites the
-  footer before it publishes — the open-point count from `readTasksAll`
-  (`scripts/tasks-source.mjs`, the same source the audit compares against, so the two
-  can never disagree) and the Berlin stamp from the clock. The tag names stay as
-  written; they are a statement, not a count. A footer that does not match the
-  expected shape is REPLACED rather than patched, and a missing footer is an error,
-  not a silent no-op.
-  VERIFIABLE: pure Vitest — the rewrite produces the exact footer shape the audit
-  accepts, derives the count from the work order rather than from the old text,
-  leaves the tag statement untouched, and fails loudly on a board without a footer.
-  Plus: `auditDashboard` reports no `footer-stale` on a freshly published board, run
-  against the LIVE board file (the sweep pattern of `scripts/board-core.test.mjs`).
-  DOCS: the comment block at the head of `scripts/board.mjs`, where the loop is
-  described.
-
 ## Closing (only after all points)
 
 New points are appended BEFORE this section — it stays last in the file.
