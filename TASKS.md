@@ -2096,6 +2096,25 @@ read that as "the criterion and its evidence section".
   already made the fire answer to a place's own COLD, harmattan and karif; RAIN is the
   driver it never got, and rain is the one that contradicts the picture outright — an
   open fire in the open does not burn through a downpour.
+  TWO MORE FAULTS IN THE SAME OBJECT, reported 27.07.2026 with a screenshot of the
+  Mbuti village under rain, and they must be fixed WITH the rain behaviour rather than
+  after it — a shrinking flame that keeps them would only shrink the fault:
+  (a) THE FLAME FLOATS. A fire reduced by the weather still stands ON the ground: its
+  base sits in the hearth, on the fire pit's own surface, at every size the rain rule
+  produces. Whatever scales it must scale it about its base, not its centre — check the
+  full range the rule can reach, including the smallest, because the gap grows as the
+  flame shrinks.
+  (b) THE VILLAGERS WALK THROUGH IT. The fire needs a collider — the user's own
+  suggestion, and the right one: the hearth plus a calibratable clearance radius
+  ( value, debug-editable) joins the settlement's collider set, so inhabitants
+  path AROUND it and the player cannot stand in the flames either. The §2.6 rule that no
+  walker may be trapped applies: adding an obstacle in the middle of a yard must not
+  strand anyone, so the errand-target validation runs against the widened set.
+  VERIFIABLE for both: pure Vitest — the flame's base stays at hearth height across the
+  whole scale range (the floating case fails before the fix), and the hearth collider is
+  in the set every walker path is validated against, with no walker target left inside
+  it; live, one first-person frame in the rain showing flame on ground, and a walker
+  observed pathing around the hearth rather than through it.
   RESEARCH FIRST, then build — this is a people question, not a graphics question.
   Establish from `docs/peoples-1890.md` (extending it where it is silent) where each
   people's cooking fire actually SAT around 1890: a hearth inside the dwelling, a
