@@ -28,6 +28,16 @@ const check = (name, ok, detail) => {
 const probeSilhouetteFooting = async (page, check, label) => {
   const count = await page.evaluate(() => Object.keys(window.__placePanoramaWildlifeInfo ?? {}).length)
   const rows = []
+  // The probe BORROWS the camera — it walks the player onto every silhouette's
+  // bearing — so it hands the pose back exactly as it found it. It used to reset
+  // only x/z and leave the yaw on the last silhouette, and every frame taken
+  // afterwards inherited that arbitrary aim: `93-orientation-highlight` was then
+  // photographed from a camera facing a panorama animal, and whether a building
+  // marker happened to be in the picture was luck (point 375 caught it).
+  const pose = await page.evaluate(() => {
+    const p = window.__placePlayer
+    return p ? { x: p.x, z: p.z, yaw: p.yaw, pitch: p.pitch } : null
+  })
   for (let i = 0; i < count; i++) {
     const stood = await page.evaluate((idx) => {
       const it = (window.__placePanoramaWildlifeInfo ?? {})[idx]
@@ -55,11 +65,19 @@ const probeSilhouetteFooting = async (page, check, label) => {
     }, i)
     if (row) rows.push(row)
   }
-  await page.evaluate(() => {
+  await page.evaluate((saved) => {
     const p = window.__placePlayer
-    p.x = 0
-    p.z = 0
-  })
+    if (!p || !saved) return
+    p.x = saved.x
+    p.z = saved.z
+    p.yaw = saved.yaw
+    // `pitch` is not part of the place camera's pose (PlaceScene builds the
+    // rotation from yaw alone) and the live object does not carry it — the
+    // probe adds it. Hand the object back as it was found rather than leaving
+    // a stray field behind.
+    if (saved.pitch === undefined) delete p.pitch
+    else p.pitch = saved.pitch
+  }, pose)
   check(
     `${label}: every panorama silhouette's feet meet drawn ground (point 181)`,
     rows.length >= 2 && rows.every((r) => r.ratio <= 1.05),
@@ -298,8 +316,32 @@ const after = await page.evaluate(() => document.querySelectorAll('.building-hig
 check('the gift unlocks the building markers', after >= 1, `${after} markers`)
 check('the orientation announces itself', !!toast && toast.length > 0, `"${toast}"`)
 await page.evaluate(() => window.__game.getState().setJournalOpen(false))
+// AIM the camera at a marked building before photographing its marker. The
+// frame used to be shot from wherever the previous check had left the camera,
+// so whether a marker was in the picture at all was chance — the shutter
+// (point 375) refused the frame and that is how the missing aim was found.
+// The chief's hut is the marker the shutter judges (it is the first
+// `.building-highlight` in DOM order, the layout's first non-villager
+// interactive), so stand back from it on its own bearing and face it.
+const marked = await page.evaluate(() => {
+  const it = (window.__placeLayout?.interactives ?? []).find((i) => i.type !== 'villager')
+  if (!it) return null
+  const p = window.__placePlayer
+  const [mx, mz] = it.pos
+  const d = Math.hypot(mx, mz) || 1
+  // Stand 14 m from the hut on the line toward the settlement centre — the open
+  // ground every layout keeps clear — and far enough back that the marker at
+  // ~5.6 m sits well inside the vertical field of view (the place camera builds
+  // its rotation from yaw alone, so there is no pitch to tilt up with).
+  p.x = mx - (mx / d) * 14
+  p.z = mz - (mz / d) * 14
+  // Place-camera yaw 0 looks toward -Z, so aim with the +PI complement.
+  p.yaw = Math.atan2(mx - p.x, mz - p.z) + Math.PI
+  return { type: it.type, x: mx, z: mz }
+})
+check('the settlement offers a marked building to photograph', !!marked, JSON.stringify(marked))
 await page.waitForTimeout(400)
-await frame('93-orientation-highlight', { element: '.building-highlight', label: 'the unlocked building marker' })
+await frame('93-orientation-highlight', { element: '.building-highlight', label: `the marker over the ${marked?.type ?? 'important'} building` })
 
 // Persistence: leaving and re-entering keeps the orientation.
 await page.evaluate(() => {
