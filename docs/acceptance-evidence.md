@@ -31,7 +31,8 @@ the whole travel program set synchronously, freezing the main thread
 
 Verifiable: near
 a border, `.region-label` elements name both regions on their sides;
-undiscovered `.map-label` elements read "?", a visited place (Cairo)
+undiscovered `.map-label` elements read their localized kind placeholder
+("Unknown village"/"Unknown mountain", point 318), a visited place (Cairo)
 shows its name, and sighting a landmark reveals its name; the opened
 exploration map's explored area reads lighter (cleared) than the
 unexplored area (under fog) with a screenshot (92)

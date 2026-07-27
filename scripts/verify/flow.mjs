@@ -186,10 +186,10 @@ await page.waitForFunction(() => window.__ui.getState().enterPlaceId === 'cairo'
 await page.waitForTimeout(400)
 check('standing on the marker does not auto-enter (Space required)', (await state()).mode === 'travel')
 // Point 287: Cairo is a known-from-start port, so its enter hint names it —
-// never "?". The prompt is localized (German here): "Space — Kairo betreten".
+// never a kind placeholder. The prompt is localized (German): "Space — Kairo betreten".
 await page.waitForFunction(() => (window.__ui.getState().prompt ?? '').includes('Kairo'), null, { timeout: 5000 })
 const cairoPrompt = await page.evaluate(() => window.__ui.getState().prompt ?? '')
-check('discovered port enter hint names it (no "?")', cairoPrompt.includes('Kairo') && !cairoPrompt.includes('?'))
+check('discovered port enter hint names it (no placeholder)', cairoPrompt.includes('Kairo') && !cairoPrompt.includes('?'))
 // Point 317: the enter hint sits a little BELOW the screen centre — close to
 // the action, but clear of the centre so it never covers the traveller — and
 // still clear of the status bar and the inventory bar. Measured on the RENDERED
@@ -246,8 +246,8 @@ const village = await page.evaluate(async () => {
   const v = geo.PLACES.find((p) => p.id === id)
   return { id, lat: v.lat, lon: v.lon }
 })
-// Point 287: the localized German name of this village, to prove the enter
-// hint hides it while the place is still undiscovered ("?").
+// Points 287/318: the localized German name of this village, to prove the enter
+// hint hides it behind the kind placeholder while the place is undiscovered.
 const villageName = await page.evaluate(async (id) => (await import('/src/i18n/de.ts')).de.places[id], village.id)
 // 0.5° ≈ 5 world units: outside the enter radius (2.5), so real walking
 // (movement, time, provisions) is required to get in.
@@ -261,12 +261,12 @@ await page.keyboard.down('KeyS')
 await page
   .waitForFunction((id) => window.__ui.getState().enterPlaceId === id, village.id, { timeout: 60000 })
   .finally(() => page.keyboard.up('KeyS'))
-// Point 287: this village is not yet discovered, so its enter hint must read
-// "?" (matching its §17.2 "?" map label) — never the real name.
+// Points 287/318: this village is not yet discovered, so its enter hint must
+// read "Unbekanntes Dorf" (matching its §17.2 map label) — never the real name.
 const villagePrompt = await page.evaluate(() => window.__ui.getState().prompt ?? '')
 check(
-  'undiscovered village enter hint hides its name (shows "?")',
-  villagePrompt.includes('?') && !villagePrompt.includes(villageName),
+  'undiscovered village enter hint hides its name (shows "Unbekanntes Dorf")',
+  villagePrompt.includes('Unbekanntes Dorf') && !villagePrompt.includes('?') && !villagePrompt.includes(villageName),
 )
 await page.keyboard.press('Space')
 // The mode switch is synchronous on the press, but the FIRST entry into this

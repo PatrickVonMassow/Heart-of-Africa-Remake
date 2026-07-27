@@ -337,9 +337,9 @@ changes with it in the same commit.
    radius the localized hint "Space to enter <name>" shows (the map name-label
    hidden while it does) and a SPACE press enters; reaching the radius alone
    never enters. The hint honours the §17.2 discovery gate (point 287): an
-   UNDISCOVERED settlement's name stays hidden — the hint reads "?" (matching
-   its "?" map label) until the place is discovered, while a known-from-start
-   port always names itself. The accidental-entry debounce/clearance is removed (no
+   UNDISCOVERED settlement's name stays hidden — the hint reads its localized
+   KIND placeholder ("Unknown village", matching its map label; point 318) until
+   the place is discovered, while a known-from-start port always names itself. The accidental-entry debounce/clearance is removed (no
    just-left re-entry lock, no move-clear timing). A SPACE press while the
    traveller is on a water cell still does not enter, so a river passage never
    pulls him in. Entering focuses the controls without an extra click per
@@ -355,7 +355,7 @@ changes with it in the same commit.
    the line in both views (§3.2); map-point labels are discovery-gated
    (§17.2) EXCEPT the known-from-start places of §17.2 — the ten port
    cities and the Giza monument site (point 273) — which show their names
-   from the outset (never "?"), a legacy save migrating
+   from the outset (never a kind placeholder), a legacy save migrating
    to mark them discovered (§3.2/§17.2, point 288); coordinates are read
    out on demand via the position query
    (§3.2, pt. 30), never shown permanently. The exploration map is

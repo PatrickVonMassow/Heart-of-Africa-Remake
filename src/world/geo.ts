@@ -281,7 +281,7 @@ export function placeById(id: string): PlaceDef {
 
 // Settlements an ~1890 explorer already knew and could name from the outset
 // (design.md §3.2/§17.2): the ten port cities. They start DISCOVERED — their
-// map labels show their names from the start (never "?", §17.2) and returning to
+// map labels show their names from the start (never a placeholder, §17.2) and returning to
 // them credits no discovery bounty (design.md §10). Every period-famous inland
 // centre in the model is itself one of these ports (Timbuktu, Khartoum on the
 // caravan/Nile routes). The Giza monument site is likewise world-famous and
