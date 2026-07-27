@@ -9,29 +9,27 @@ ausführlichen Erfahrungen dahinter stehen in `retrospektive-zusammenarbeit.md`.
 
 ## Die eine Kernlehre
 
-**Zuverlässigkeit ist eine Infrastrukturfrage, keine Charakterfrage.** Solange ein
-Problem nur „gemerkt" wurde, kam es wieder. Sobald ein **Mechanismus** dastand (ein
-automatischer Check, ein Hook, ein Test), verschwand es. Merksatz:
+**Zuverlässigkeit ist eine Infrastrukturfrage, keine Charakterfrage.** Nur „gemerkte"
+Probleme kamen wieder; sobald ein **Mechanismus** dastand (Check, Hook, Test),
+verschwanden sie. Fordere deshalb bei allem, was dir wichtig ist, im Prompt einen
+Mechanismus — nicht eine Regel:
 
-> *Jede Regel, die wirklich gelten soll, bekommt von Anfang an einen erzwingenden
-> Mechanismus — nicht ein Versprechen.*
+> *Prompt-Zusatz:* „Sichere das mit einem Mechanismus zu, der die Verletzung
+> unmöglich macht, und zeig mir, wo er blockiert."
 
-Der Aufwand richtet sich nach der Wichtigkeit der Regel — ein leichter Check für
-eine leichte Regel —, aber die Haltung ist **erzwingen statt erinnern**, und zwar
-ab der ersten Formulierung. Nicht erst beim zweiten Schaden.
-
-Fast alles Folgende ist eine Anwendung davon.
+Der Aufwand richtet sich nach der Wichtigkeit — ein leichter Check für eine leichte
+Regel —, die Haltung ist **erzwingen statt erinnern**, ab der ersten Formulierung
+und nicht erst beim zweiten Schaden. Fast alles Folgende wendet das an.
 
 ### Wie die Prompts in dieser Anleitung formuliert sind
 
-Die Prompts unten sind bewusst **Aufträge, einen Mechanismus zu bauen** — keine
-Merksätze. „Jedes neue Feature bekommt einen Test" ist eine *Regel*, die vergessen
-wird; „Etabliere einen Mechanismus, der das garantiert" ist ein *Auftrag*, an dessen
-Ende etwas steht, das die Regel erzwingt. Formuliere deine eigenen Anweisungen genauso.
+Die Prompts unten sind **Aufträge, einen Mechanismus zu bauen** — keine Merksätze.
+„Jedes neue Feature bekommt einen Test" ist eine *Regel*, die vergessen wird;
+„Etabliere einen Mechanismus, der das garantiert" ist ein *Auftrag*, an dessen Ende
+etwas steht, das die Regel erzwingt. Formuliere deine eigenen genauso.
 
 Wo ein Mechanismus prinzipiell **nicht** möglich ist (etwa „sieht das für einen
-Menschen richtig aus?"), steht das ausdrücklich dabei — dann hält der Merksatz nur
-so gut wie die Aufmerksamkeit des Moments.
+Menschen richtig aus?"), steht das dabei — dann trägt nur die Aufmerksamkeit.
 
 Manche Tipps kosten spürbar mehr Token. Die tragen eine grobe **Schätzung** wie
 *(Kosten ≈ 2x)* — gemeint ist der Mehrverbrauch für die betroffene Arbeit, nicht
@@ -103,17 +101,17 @@ selbstbewusst Attrappen.
    > Fehlschlag — zeig mir den konkreten Output."
 
 5. **Regeln mechanisch erzwingen — nicht auf Vorsätze vertrauen (das Kernprinzip).**
-   Auch bei bester Absicht fällt unter Druck genau der nicht-erzwungene Schritt weg.
-   Warte deshalb **nicht**, bis derselbe Fehler ein zweites Mal passiert.
+   Unter Druck fällt genau der nicht-erzwungene Schritt weg; warte **nicht** auf den
+   zweiten Schaden.
    > „Für **jede** Regel, die wirklich gelten soll, baue von Anfang an einen **Mechanismus**,
    > der ihre Verletzung unmöglich macht — einen Test, einen Git-Hook oder einen Stop-/
    > PreToolUse-Hook, der abbricht bzw. die Aktion verweigert, wenn die Regel gebrochen würde.
-   > Der Aufwand des Mechanismus soll zur Wichtigkeit passen (ein leichter Guard für eine
-   > leichte Regel), aber die Grundhaltung ist: **erzwingen statt erinnern**. Ein Vorsatz — und
-   > selbst eine ausführlich niedergeschriebene Regel — reicht nicht."
+   > Der Aufwand soll zur Wichtigkeit passen (ein leichter Guard für eine leichte Regel),
+   > aber die Grundhaltung ist: **erzwingen statt erinnern**. Ein Vorsatz — auch ein
+   > ausführlich niedergeschriebener — reicht nicht."
 
-   Ein Mechanismus kann selbst falsch gebaut sein — Gegenprüfungen finden darin
-   erfahrungsgemäß mehr Fehler als in gewöhnlichem Code:
+   Ein Mechanismus kann selbst falsch gebaut sein; Gegenprüfungen finden darin mehr
+   Fehler als in gewöhnlichem Code:
    > „Etabliere einen Mechanismus, der beim Hinzufügen oder Ändern eines
    > Mechanismus **immer das Vier-Augen-Prinzip** erzwingt: Plan und Ergebnis
    > werden vom sekundären Modell gegengeprüft, bevor der neue Mechanismus scharf
