@@ -97,8 +97,9 @@ selbstbewusst Attrappen.
    > „Etabliere einen Mechanismus, der einen unsauberen Stand gar nicht erst
    > durchlässt: Build, Linter und Abhängigkeits-Audit müssen nach jeder Änderung
    > null Fehler, Warnungen und bekannte Lücken melden, und ein Fehlschlag muss die
-   > Weiterarbeit blockieren statt nur gemeldet zu werden. Überdecke nie einen
-   > Fehlschlag — zeig mir den konkreten Output."
+   > Weiterarbeit blockieren, und **kein Stand darf hochgeladen werden, den die
+   > Pipeline ablehnen würde** — sonst ist die Prüfung keine Absicherung, sondern
+   > eine Fehlermail. Überdecke nie einen Fehlschlag — zeig mir den Output."
 
 5. **Regeln mechanisch erzwingen — nicht auf Vorsätze vertrauen (das Kernprinzip).**
    Unter Druck fällt genau der nicht-erzwungene Schritt weg; warte **nicht** auf den
@@ -391,4 +392,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 Wenn du diese eine Nachricht an den Anfang stellst, hast du 80 % der Lehren dieses
 Projekts eingebaut, bevor die erste Zeile Code entsteht.
 
-<!-- GUIDE-FINGERPRINT: f6e0643a30988902b43c054911c37c78d141ba19ceb891e97dc371d63f1e2be8 -->
+<!-- GUIDE-FINGERPRINT: 730f6c517a12d7e2e7291d52584c89fa17e30fd0c2d470246b872f99671b7243 -->
