@@ -327,10 +327,14 @@ export function resolveSectionRefs(spec, registry, { pointNumbers = new Set() } 
   const refs = []
   const seen = new Map()
 
+  // `continue`, not `break`: two aliases of one document overlap (the filename
+  // `docs/peoples-1890.md` contains the basename `peoples-1890`), so a mention
+  // that ends after `at` may still be followed by one that does not.
   const nearOwner = (at) => {
     let best = null
     for (const m of mentions) {
-      if (m.end > at) break
+      if (m.at >= at) break
+      if (m.end > at) continue
       const gap = at - m.end
       if (m.style === 'stem' ? /^\s*$/.test(text.slice(m.end, at)) : gap <= DOC_WINDOW[m.style]) {
         if (!best || m.at >= best.at) best = m
@@ -341,8 +345,9 @@ export function resolveSectionRefs(spec, registry, { pointNumbers = new Set() } 
   const stickyOwner = (at) => {
     let best = null
     for (const m of mentions) {
-      if (m.end > at) break
-      if (m.style !== 'stem' && (!best || m.at >= best.at)) best = m
+      if (m.at >= at) break
+      if (m.end > at || m.style === 'stem') continue
+      if (!best || m.at >= best.at) best = m
     }
     return best?.doc ?? null
   }
