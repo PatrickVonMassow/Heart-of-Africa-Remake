@@ -5,10 +5,11 @@
 // while a red does not.
 import { describe, it, expect } from 'vitest'
 import {
-  DEFERRED_EXIT, ELEVATED_CPU, HEAVY_CPU, LEVEL, MAX_LISTED_STRAYS, ON_LOAD, STRAY_KIND, TIMING_SENSITIVE_SUITES,
+  DEFERRED_EXIT, ELEVATED_CPU, ELEVATED_GPU, HEAVY_CPU, HEAVY_GPU, LEVEL, MAX_LISTED_STRAYS, ON_LOAD,
+  STRAY_KIND, TIMING_SENSITIVE_SUITES,
   annotateResult, annotateStageFailure, classifyLoad, classifyProcess, cpuBusyFraction, decideRun,
-  forcedLevel, formatLoadReport, isTimingSensitive, killAdvice, onLoadMode, ownTree, parsePsOutput,
-  parseWindowsProcessJson, strayProcesses,
+  forcedLevel, formatLoadReport, gpuEngineUtilisation, isTimingSensitive, killAdvice, onLoadMode, ownTree,
+  parseGpuCounterJson, parsePsOutput, parseWindowsProcessJson, strayProcesses,
 } from './machine-load-core.mjs'
 import { DEV_SUITES } from './tiers.mjs'
 
@@ -166,6 +167,72 @@ describe('cpuBusyFraction', () => {
   })
 })
 
+describe('gpuEngineUtilisation (point 386)', () => {
+  const inst = (pid, engine, adapter = '0x00000000_0x00014044', phys = 0, eng = 0) =>
+    `pid_${pid}_luid_${adapter}_phys_${phys}_eng_${eng}_engtype_${engine}`
+
+  it('sums one engine across processes, then takes the busiest ENGINE rather than the sum', () => {
+    // 3-D: 40 + 20 = 60 across two clients. Copy runs beside it and costs no extra
+    // device time, so the answer is 60 %, not 70 %.
+    const samples = [
+      { instance: inst(111, '3d'), value: 40 },
+      { instance: inst(222, '3d'), value: 20 },
+      { instance: inst(111, 'copy', '0x00000000_0x00014044', 0, 4), value: 10 },
+    ]
+    expect(gpuEngineUtilisation({ samples, count: samples.length })).toBeCloseTo(0.6, 6)
+  })
+
+  it('sees a video decode engine the CPU reading misses — the 27.07. evening', () => {
+    const samples = [
+      { instance: inst(900, 'videodecode', '0x00000000_0x00014044', 0, 2), value: 38 },
+      { instance: inst(900, '3d'), value: 12 },
+    ]
+    expect(gpuEngineUtilisation({ samples, count: 251 })).toBeCloseTo(0.38, 6)
+  })
+
+  it('keeps two adapters apart instead of adding an iGPU to a dGPU', () => {
+    const samples = [
+      { instance: inst(1, '3d', '0x00000000_0x0000aaaa'), value: 30 },
+      { instance: inst(2, '3d', '0x00000000_0x0000bbbb'), value: 30 },
+    ]
+    expect(gpuEngineUtilisation({ samples, count: 2 })).toBeCloseTo(0.3, 6)
+  })
+
+  it('distinguishes an IDLE adapter from a machine with no such counter', () => {
+    expect(gpuEngineUtilisation({ samples: [], count: 251 })).toBe(0) // counters exist, all at rest
+    expect(gpuEngineUtilisation({ samples: [], count: 0 })).toBe(null) // no counter at all
+    expect(gpuEngineUtilisation()).toBe(null)
+  })
+
+  it('clamps and ignores junk rows rather than throwing', () => {
+    expect(gpuEngineUtilisation({ samples: [{ instance: inst(1, '3d'), value: 180 }], count: 1 })).toBe(1)
+    expect(gpuEngineUtilisation({ samples: [{ instance: 'nonsense', value: 90 }, { instance: '', value: 5 }], count: 0 })).toBe(null)
+    expect(gpuEngineUtilisation({ samples: [{ instance: inst(1, '3d'), value: Number.NaN }], count: 1 })).toBe(0)
+  })
+})
+
+describe('parseGpuCounterJson', () => {
+  it('reads the probe payload, including the short key names', () => {
+    const p = parseGpuCounterJson('{"count":251,"samples":[{"i":"pid_1_luid_0x0_0x1_phys_0_eng_0_engtype_3d","v":43.18}]}')
+    expect(p.error).toBe(null)
+    expect(p.count).toBe(251)
+    expect(p.samples).toEqual([{ instance: 'pid_1_luid_0x0_0x1_phys_0_eng_0_engtype_3d', value: 43.18 }])
+  })
+
+  it('carries a counter error across as a ONE-LINE reason', () => {
+    const p = parseGpuCounterJson('{"error":"The specified object was not found\\non the computer."}')
+    expect(p.error).toBe('The specified object was not found on the computer.')
+    expect(p.samples).toEqual([])
+  })
+
+  it('turns junk into an error instead of throwing — the probe must fail open', () => {
+    expect(parseGpuCounterJson('not json').error).toBeTruthy()
+    expect(parseGpuCounterJson('').error).toBeTruthy()
+    expect(parseGpuCounterJson(null).error).toBeTruthy()
+    expect(parseGpuCounterJson('{"count":3}').samples).toEqual([])
+  })
+})
+
 describe('classifyLoad', () => {
   it('calls an idle machine with nothing running QUIET', () => {
     const v = classifyLoad({ cpuBusyFraction: 0.05, cpuCount: 8, strays: [] })
@@ -207,6 +274,58 @@ describe('classifyLoad', () => {
   it('uses the POSIX run queue where it exists and ignores the Windows 0', () => {
     expect(classifyLoad({ cpuBusyFraction: 0.1, loadAvgPerCore: 1.4, strays: [] }).level).toBe(LEVEL.loaded)
     expect(classifyLoad({ cpuBusyFraction: 0.1, loadAvgPerCore: 0, strays: [] }).level).toBe(LEVEL.quiet)
+  })
+})
+
+describe('classifyLoad — the GPU signal (point 386)', () => {
+  it('calls a high GPU reading BUSY with an empty process table and an idle CPU', () => {
+    // The evening the probe said "QUIET, CPU 4 %" while a video held the device.
+    const v = classifyLoad({ cpuBusyFraction: 0.04, cpuCount: 8, strays: [], gpuBusyFraction: 0.44 })
+    expect(v.level).toBe(LEVEL.busy)
+    expect(v.reasons.join(' ')).toMatch(/GPU 44 %/)
+    expect(v.gpuBusyFraction).toBe(0.44)
+  })
+
+  it('escalates across the two GPU thresholds', () => {
+    expect(classifyLoad({ cpuBusyFraction: 0.04, gpuBusyFraction: ELEVATED_GPU - 0.01, strays: [] }).level).toBe(LEVEL.quiet)
+    expect(classifyLoad({ cpuBusyFraction: 0.04, gpuBusyFraction: ELEVATED_GPU, strays: [] }).level).toBe(LEVEL.busy)
+    expect(classifyLoad({ cpuBusyFraction: 0.04, gpuBusyFraction: HEAVY_GPU, strays: [] }).level).toBe(LEVEL.loaded)
+  })
+
+  it('reports a number and its consequence — never the application, never a pid', () => {
+    const reason = classifyLoad({ cpuBusyFraction: 0.04, gpuBusyFraction: 0.71, strays: [] })
+      .reasons.find((r) => r.startsWith('GPU'))
+    expect(reason).toBe('GPU 71 % — a video or another 3-D application is using the device')
+    expect(reason).not.toMatch(/pid|\.exe|chrome|youtube/i)
+  })
+
+  it('names the GPU in the quiet line, so a quiet verdict says what it measured', () => {
+    const v = classifyLoad({ cpuBusyFraction: 0.03, cpuCount: 8, gpuBusyFraction: 0.02, strays: [] })
+    expect(v.level).toBe(LEVEL.quiet)
+    expect(v.reasons.join(' ')).toMatch(/quiet: CPU 3 %, GPU 2 %/)
+  })
+
+  it('refuses to certify a machine whose GPU it could not read — UNKNOWN, and why', () => {
+    const v = classifyLoad({
+      cpuBusyFraction: 0.03, cpuCount: 8, strays: [],
+      gpuUnreadable: 'no per-adapter GPU engine counter on this platform',
+    })
+    expect(v.level).toBe(LEVEL.unknown)
+    expect(v.reasons.join(' ')).toMatch(/GPU load NOT measured \(no per-adapter GPU engine counter on this platform\)/)
+    expect(v.reasons.join(' ')).not.toMatch(/quiet:/)
+  })
+
+  it('keeps the more useful finding when another signal already found load', () => {
+    const v = classifyLoad({ cpuBusyFraction: 0.9, cpuCount: 8, strays: [], gpuUnreadable: 'the GPU counter read failed' })
+    expect(v.level).toBe(LEVEL.loaded)
+    expect(v.reasons.join(' ')).toMatch(/GPU load NOT measured/)
+  })
+
+  it('leaves the CPU/process paths exactly as they were when no GPU was read at all', () => {
+    const v = classifyLoad({ cpuBusyFraction: 0.05, cpuCount: 8, strays: [] })
+    expect(v.level).toBe(LEVEL.quiet)
+    expect(v.gpuBusyFraction).toBe(null)
+    expect(v.reasons.join(' ')).not.toMatch(/GPU/)
   })
 })
 
@@ -354,6 +473,18 @@ describe('formatLoadReport', () => {
     expect(listed[0]).toMatch(/…$/) // the 300-char command line is truncated, not dumped
     expect(listed[0].length).toBeLessThan(220)
     expect(out.join('\n')).toMatch(/… and 3 more/)
+  })
+
+  it('reports a GPU-only busy machine, flags it and lists no process at all', () => {
+    const load = classifyLoad({ cpuBusyFraction: 0.04, cpuCount: 8, gpuBusyFraction: 0.44, strays: [] })
+    const decision = decideRun({ suites: ['enrichments'], level: load.level })
+    const out = formatLoadReport({ load, decision }).join('\n')
+    expect(out).toMatch(/MACHINE NOT QUIET/)
+    expect(out).toMatch(/GPU 44 % — a video or another 3-D application is using the device/)
+    expect(out).not.toMatch(/leftover pid/)
+    // It labels; it never blocks. A green taken here still counts.
+    expect(decision.action).toBe('flag')
+    expect(annotateResult({ level: load.level, green: true }).join('\n')).toMatch(/GREEN still counts/)
   })
 
   it('is deterministic — the same input prints the same lines', () => {
