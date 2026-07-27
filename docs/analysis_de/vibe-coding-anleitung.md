@@ -337,6 +337,15 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   wissen will, was zu tun ist, liest die offene; wer erkennen muss, dass etwas
   **abgeschlossen** ist, braucht beide."
 
+- **Im Präsens behauptet, nie nachgesehen.** In deiner Anweisung steht „das Feld wird
+  bereits gesetzt", weil du es dir so vorstellst — im Code steht es nicht. Eine Lücke
+  im Auftrag führt zur Rückfrage; eine falsche Tatsachenbehauptung führt zu einer
+  Lieferung, die genau das tut, was dasteht: nichts — und dabei grün ist.
+  → *Prompt:* „Was du in einem Auftrag im **Präsens** behauptest, sieh vorher nach. Was
+  erst gebaut werden muss, schreib in die Zukunftsform oder ausdrücklich unter ‚das
+  existiert noch nicht'. Und prüfe jede Zusicherung, die ein Dokument über den Code
+  macht, gegen den Code — oder kennzeichne sie als Absicht."
+
 ---
 
 ## Drei Meta-Regeln, die alles zusammenhalten
@@ -356,9 +365,13 @@ Zwei Mechanismen, die das Netz ehrlich halten:
    — aber erst mit Isolierung und Exklusivität, sonst vervielfacht sie das Chaos. Die
    Grenze setzt nicht dein Kontingent, sondern der **Haupt-Agent**: Bei ihm endet jeder
    Strang, und je mehr Fremdstoff sein Kontext aufnimmt, desto schlechter urteilt er.
-   Drei ist ein guter Start, kein Optimum — die Zahl korrigiert die Erfahrung.
+   Drei ist ein guter Start, kein Optimum — die Zahl korrigiert die Erfahrung. Und
+   verlass dich nie auf die Anweisung „nur lesen": Isolierung ist eine Eigenschaft der
+   **Umgebung**, nicht des Auftrags — was ein Helfer anfassen kann, fasst er irgendwann an.
    > *Prompt:* „Arbeite jede Aufgabe auf einem eigenen Feature-Branch mit eigener
    > Arbeitskopie und führe sie erst nach `main`, wenn sie fertig und verifiziert ist.
+   > Gib auch jedem nur lesenden Helfer eine eigene Arbeitskopie, statt es ihm bloß
+   > aufzutragen.
    > Teile parallele Aufgaben so auf, dass sie **nicht dieselben Dateien** anfassen, und
    > arbeite an höchstens **drei** gleichzeitig. Reduziere die Zahl, sobald das
    > Zusammenführen Nacharbeit erzeugt oder du Bekanntes nachlesen musst."

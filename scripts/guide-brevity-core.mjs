@@ -25,14 +25,17 @@
 // budgeting the documents that are read at every start (+10 lines, +92 words),
 // and again on 26.07.2026 by the tip on the QUOTA being the real limit — deliver
 // each helper's brief instead of letting it search, and start a fresh context per
-// task (+10 lines, +101 words).
+// task (+10 lines, +101 words), and on 27.07.2026 by two more: isolation is a property
+// of the environment rather than of an instruction (in the concurrency meta-rule, whose
+// prompt gains the clause), and the pitfall of asserting an intended state in the
+// present tense (+13 lines, +146 words together).
 export const LIMITS = {
-  maxLines: 383,
+  maxLines: 396,
   // Deliberately a little loose (~5 % headroom): a budget with almost no room
   // blocks a clarifying half-sentence, and a guard that fires on legitimate
   // edits teaches people to raise the number instead of to cut. It must bite on
   // a growing case study, not on an honest rewording.
-  maxWords: 3206,
+  maxWords: 3352,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,
