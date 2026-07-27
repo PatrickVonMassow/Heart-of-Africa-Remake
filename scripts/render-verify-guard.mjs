@@ -120,26 +120,65 @@ function advanceBaseline(state, branch, head, extra = {}) {
 }
 
 /**
+ * The ONE gather failure that may clear a pending gate: the recorded baseline no
+ * longer diffs against HEAD (rebased away, gc'd, or a baseline from an unrelated
+ * history). Blocking forever on a window that cannot be diffed would trap the
+ * session, so that case re-baselines — fail-open ONCE, logged.
+ *
+ * It is a distinct type because every OTHER failure in the gathering must NOT
+ * write state. A transient `git` failure (index.lock contention is real on this
+ * machine) or a throwing ownership probe would otherwise permanently clear a
+ * pending, unverified render gate — fail-open-once turned into fail-open-forever,
+ * and a NON-owner session could overwrite the owner's baseline. Those allow the
+ * stop with the state untouched, so the gate is still there on the next turn.
+ */
+export class BaselineDiffError extends Error {
+  constructor(baseline, cause) {
+    super(`diff vs ${String(baseline).slice(0, 7)} failed (${(cause && cause.message) || cause})`)
+    this.name = 'BaselineDiffError'
+    this.baseline = baseline
+    this.cause = cause
+  }
+}
+
+/**
  * Everything evaluate() needs — HEAD, the per-branch baseline, the pending render
  * paths and their latest change time — exported so the preflight (point 365 D)
  * judges the gate from the SAME gathering the Stop hook uses; a second copy of
  * this git work would drift and report a false "clean". Read-only: the baseline
- * bootstrap and its advancement stay in the main path, and `bootstrap: true`
- * tells the caller the gate has no baseline yet.
+ * bootstrap and its advancement stay in the main path.
+ *
+ * `deps` overrides the I/O sources one by one; the H4 tests use it to make each
+ * source throw and pin which error re-baselines and which merely allows.
  */
-export function gatherRenderVerifyInputs({ sessionId = '' } = {}) {
+export function gatherRenderVerifyInputs({ sessionId = '', deps = {} } = {}) {
+  const {
+    heldByOther = heldByOtherLiveOwner,
+    revParseHead = () => git('git rev-parse HEAD'),
+    branchOf = currentBranch,
+    readState = readRenderState,
+    diffRenderPaths = changedRenderPaths,
+    changeTimeOf = latestChangeAt,
+  } = deps
   // Hard singleton: a session that does not own the live batch lock stands down.
-  if (heldByOtherLiveOwner(sessionId)) {
-    return { applicable: false, why: 'another live session owns the batch lock' }
+  if (heldByOther(sessionId)) {
+    return { applicable: false, why: 'another live session owns the batch lock', cause: 'not-lock-owner' }
   }
-  const head = git('git rev-parse HEAD')
-  const branch = currentBranch()
-  const state = readRenderState() ?? {}
+  const head = revParseHead()
+  const branch = branchOf()
+  const state = readState() ?? {}
   const cleared = baselineFor(state, branch)
   if (!cleared) {
     return { applicable: false, why: 'no verified baseline yet — the gate bootstraps at this HEAD', head, branch, state }
   }
-  const { paths, base } = changedRenderPaths(cleared, head)
+  let paths
+  let base
+  try {
+    ;({ paths, base } = diffRenderPaths(cleared, head))
+  } catch (e) {
+    // Typed on purpose: ONLY this failure is allowed to advance the baseline.
+    throw new BaselineDiffError(cleared, e)
+  }
   return {
     applicable: true,
     head,
@@ -150,7 +189,7 @@ export function gatherRenderVerifyInputs({ sessionId = '' } = {}) {
       head,
       clearedHead: cleared,
       changedRenderPaths: paths,
-      latestChangeAt: paths.length ? latestChangeAt(paths, head, base) : 0,
+      latestChangeAt: paths.length ? changeTimeOf(paths, head, base) : 0,
       runs: state.runs,
       deferral: state.deferral,
     },
@@ -262,11 +301,13 @@ if (isMainModule(import.meta.url)) {
     try {
       gathered = gatherRenderVerifyInputs({ sessionId })
     } catch (e) {
-      // The baseline commit no longer resolves (rebase/gc): re-baseline rather
-      // than block forever on an undiffable window — fail-open, logged.
-      console.error(`render-verify-guard: gathering failed (${e && e.message}) — re-baselining`)
-      const state = readRenderState() ?? {}
-      advanceBaseline(state, currentBranch(), git('git rev-parse HEAD'), {
+      // ONLY an undiffable baseline re-baselines (see BaselineDiffError). Any
+      // other gather failure — a transient git error, a throwing ownership probe
+      // — falls through to the outer catch, which allows the stop and leaves the
+      // state ALONE, so a pending gate survives to the next turn.
+      if (!(e instanceof BaselineDiffError)) throw e
+      console.error(`render-verify-guard: ${e.message} — re-baselining`)
+      advanceBaseline(readRenderState() ?? {}, currentBranch(), git('git rev-parse HEAD'), {
         clearedAt: Date.now(),
         clearedBy: 'rebaseline',
       })
