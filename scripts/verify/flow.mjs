@@ -5,6 +5,7 @@
 // the default game language; journal entries are asserted by their
 // language-neutral keys (design.md §17).
 import { launchVerifyBrowser, assertBackend } from './_browser.mjs'
+import { frameShutter } from './frameSubject.mjs'
 import { fileURLToPath } from 'node:url'
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:5173/'
@@ -21,7 +22,9 @@ function check(name, cond) {
   console.log((cond ? 'PASS' : 'FAIL') + '  ' + name)
   if (!cond) failCount++
 }
-const shot = (name) => page.screenshot({ path: `${OUT}${name}.png` })
+// Point 375: a frame states what it must show and the shutter proves it is in
+// the picture — the dialog open, the settlement entered, the overlay up.
+const shot = frameShutter(page, OUT)
 const state = () => page.evaluate(() => window.__game.getState())
 const titleKey = (e) => (typeof e.title === 'object' ? e.title.key : e.title)
 const moveTo = (x, z) =>
@@ -118,13 +121,13 @@ check('Journal open with departure entry', s.journalOpen &&
 check('Starting money $250', s.money === 250)
 check('Provisions 35 days', s.foodDays === 35)
 check('2 starting gifts', Object.values(s.gifts).reduce((a, b) => a + b, 0) === 2)
-await shot('06-start-journal')
+await shot('06-start-journal', { element: '.journal', label: 'the departure journal' })
 await page.evaluate(() => window.__game.getState().setJournalOpen(false))
 await page.waitForTimeout(300)
 
 // --- 2. Trade in Cairo (criterion 5): enter a building with Space at its door ---
 await enterBuilding('tools')
-await shot('02-port-cairo-trade')
+await shot('02-port-cairo-trade', { element: '.dialog', label: 'the Cairo trade dialog' })
 // Buy prices are laid out as a table: the price cells share a column, so their
 // left edges line up (design.md §9).
 const priceAligned = await page.evaluate(() => {
@@ -170,7 +173,10 @@ await leaveByWalking()
 s = await state()
 check('Left the place → bird\'s-eye view', s.mode === 'travel')
 await page.waitForTimeout(600)
-await shot('01-birdseye-view')
+await shot('01-birdseye-view', {
+  general: 'the bird\'s-eye view itself is the subject — this frame shows the mode, not one place',
+  scene: 'travel',
+})
 
 // --- 4. Re-enter Cairo with the Space use key → checkpoint (criteria 2/5). ---
 // Entry is a deliberate Space press now (design.md §2.3): standing on the marker
@@ -216,7 +222,7 @@ check(
   hintBox.hint !== null && !overlaps(hintBox.hint, hintBox.bar) && !overlaps(hintBox.hint, hintBox.inv),
   JSON.stringify(hintBox),
 )
-await shot('140-enter-hint-position')
+await shot('140-enter-hint-position', { element: '.prompt', label: 'the enter hint' })
 // Re-anchor on the marker immediately before the press: the river current's idle
 // drift (design.md §11) sweeps the traveller a little every frame, and Cairo sits
 // on the Nile, so over the wait above it could drift off the marker or onto a
@@ -291,7 +297,7 @@ check('Village journal entry', s.journal.some((e) =>
   titleKey(e) === 'journal.titles.village' && e.title.params?.place === village.id))
 await page.evaluate(() => window.__game.getState().setJournalOpen(false))
 await page.waitForTimeout(200)
-await shot('03-village-nubians')
+await shot('03-village-nubians', { place: village.id, label: 'the village interior' })
 
 // --- 5b. Regression guard (design.md §16): the open, non-modal journal must
 // not block entering a hut with Space at its door. A fresh village-discovered
@@ -332,7 +338,7 @@ await page.waitForTimeout(200)
 // --- 7. Chief audience: culturally correct gift → hint (criteria 6, 7) ---
 await enterBuilding('chief')
 await page.waitForTimeout(300)
-await shot('04-chief-hut-audience')
+await shot('04-chief-hut-audience', { element: '.dialog', label: 'the audience with the chief' })
 await page.locator('.dialog .row', { hasText: 'Goldschmuck' }).locator('button').click()
 await page.waitForTimeout(400)
 s = await state()
@@ -342,7 +348,7 @@ check('Hint stores grave coordinates (language-neutral)',
   !!hint && typeof hint.text === 'object' && typeof hint.text.params?.lat === 'number')
 check('Learned language deciphers the hint (latitude)', s.decodedGiven.north === true &&
   s.journal.some((e) => titleKey(e) === 'journal.titles.decoded'))
-await shot('05-journal-hint')
+await shot('05-journal-hint', { element: '.journal', label: 'the journal holding the hint' })
 await closeDialog()
 await page.evaluate(() => window.__game.getState().setJournalOpen(false))
 await page.waitForTimeout(200)
@@ -391,7 +397,7 @@ await page.locator('.inventory-bar button', { hasText: 'Schaufel' }).click()
 await page.waitForTimeout(400)
 s = await state()
 check('Victory state after digging at the site (shovel clicked)', s.victory === true)
-await shot('07-victory')
+await shot('07-victory', { element: '.overlay', label: 'the victory overlay' })
 
 // --- Point 59: mouse-look is not grabbed while the start-choice overlay is up -
 // (design.md §17.5) A checkpoint at startup shows the StartOverlay; the pointer

@@ -52,6 +52,11 @@ export function probeFrameSubject(d) {
     probe.ok = true
     return done()
   }
+  if (d.kind === 'place') {
+    probe.ok = probe.placeId === d.place
+    if (!probe.ok) probe.reason = 'the game stood in ' + (probe.placeId || 'no settlement') + ', not in ' + d.place
+    return done()
+  }
   if (d.kind === 'element') {
     const el = document.querySelector(d.element)
     if (!el) {
@@ -133,10 +138,11 @@ export async function captureFrame(page, outDir, name, decl, { timeout = DEFAULT
   }
   const path = `${outDir}${d.frame}.png`
   const options = decl.clip ? { path, clip: decl.clip } : { path }
-  if (decl.locator) await page.locator(decl.locator).screenshot(options)
-  else await page.screenshot(options)
+  // Returns the PNG buffer, like `page.screenshot` itself — a few frames are
+  // ALSO a pixel probe (settings.mjs reads the TRAA frame's mean luma).
+  const buffer = decl.locator ? await page.locator(decl.locator).screenshot(options) : await page.screenshot(options)
   console.log(formatFramePass(d, probe))
-  return probe
+  return buffer
 }
 
 /** Bind the shutter to a page and an output directory: `shot(name, declaration)`. */

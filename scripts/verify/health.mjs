@@ -8,6 +8,7 @@
 // (window.__vultures), the remains-report screenshot (§7.2 evidence) and the
 // console-error gate. Dev server only (dev hooks).
 import { launchVerifyBrowser, assertBackend } from './_browser.mjs'
+import { frameShutter } from './frameSubject.mjs'
 import { fileURLToPath } from 'node:url'
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:5173/'
@@ -20,6 +21,9 @@ const check = (name, ok, detail) => {
 
 const browser = await launchVerifyBrowser()
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
+// Point 375: the frame must show the remains report it is named after — a run
+// where the character survived would otherwise file the travel view as proof.
+const shot = frameShutter(page, OUT)
 const errors = []
 page.on('console', (m) => {
   if (m.type() === 'error') errors.push(m.text())
@@ -79,8 +83,7 @@ await g(() => {
 })
 await walk(30)
 await page.waitForTimeout(400)
-await page.screenshot({ path: `${OUT}78-health-remains-report.png` })
-console.log('shot 78-health-remains-report.png')
+await shot('78-health-remains-report', { element: '.overlay.defeat', label: 'the remains report' })
 
 console.log('console errors:', errors.length)
 for (const e of errors) console.log('ERR:', e.slice(0, 300))

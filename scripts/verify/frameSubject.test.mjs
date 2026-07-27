@@ -33,8 +33,15 @@ describe('normaliseDeclaration', () => {
     expect(normaliseDeclaration('99', { general: 'the whole savanna dressing is the subject' }).kind).toBe('general')
   })
 
+  it('takes a live scene position in world units as well as a lat/lon', () => {
+    const d = normaliseDeclaration('68-lion-feeding', { world: { x: 330, z: 8 }, label: 'the feeding lion' })
+    expect(d.point).toEqual({ x: 330, z: 8 })
+    expect(d.world.lat).toBeCloseTo(-0.8, 6)
+    expect(d.world.lon).toBeCloseTo(33, 6)
+  })
+
   it('refuses a malformed world or settlement subject', () => {
-    expect(() => normaliseDeclaration('99', { world: { lat: 1 } })).toThrow(/finite lat\/lon/)
+    expect(() => normaliseDeclaration('99', { world: { lat: 1 } })).toThrow(/finite lat\/lon or x\/z/)
     expect(() => normaliseDeclaration('99', { local: { x: 3 } })).toThrow(/finite x\/z/)
     expect(() => normaliseDeclaration('99', { element: '  ' })).toThrow(/without a selector/)
   })
@@ -83,6 +90,15 @@ describe('judgeFrameSubject', () => {
     expect(v.ok).toBe(false)
     expect(v.reason).toContain('__camera')
     expect(judgeFrameSubject(lakeVictoria(), null).ok).toBe(false)
+  })
+
+  it('judges a settlement subject by the settlement the game actually stands in', () => {
+    const d = normaliseDeclaration('03-village-nubians', { place: 'nubians-village' })
+    expect(d.scene).toBe('place')
+    expect(judgeFrameSubject(d, { mode: 'place', placeId: 'nubians-village' }).ok).toBe(true)
+    const v = judgeFrameSubject(d, { mode: 'place', placeId: 'maasai-village' })
+    expect(v.ok).toBe(false)
+    expect(v.reason).toContain('stood in maasai-village')
   })
 
   it('judges an element subject by its visibility in the viewport', () => {

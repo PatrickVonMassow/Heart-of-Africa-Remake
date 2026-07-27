@@ -3,6 +3,7 @@
 // the wound level, wounded entries keep blood traces, a click finishes the
 // entry, and do-not-disturb writes silently. Dev server only.
 import { launchVerifyBrowser, assertBackend } from './_browser.mjs'
+import { frameShutter } from './frameSubject.mjs'
 import { fileURLToPath } from 'node:url'
 import { installTtsCache } from './ttsCache.mjs'
 
@@ -16,6 +17,9 @@ const check = (name, ok, detail) => {
 
 const browser = await launchVerifyBrowser()
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
+// The frames document the writing animation, so the shutter (point 375) asserts
+// the very element each one names is on screen before it is written.
+const shot = frameShutter(page, OUT)
 // TTS assets from the local point-88 cache: adding an entry auto-narrates,
 // and a cold CDN model download stalls the reveal start past the check's
 // timing (observed ~14 s under today's CDN throttling). The cache is owned
@@ -83,8 +87,7 @@ check(
   early.len > 0 && laterLen > early.len,
   `${early.len} → ${laterLen} chars`,
 )
-await page.screenshot({ path: `${OUT}81-handwriting.png` })
-console.log('shot 81-handwriting.png')
+await shot('81-handwriting', { element: '.journal .entry.writing', label: 'the entry being written' })
 // Wait for the stroke animation to END (a fixed sleep undershoots when the
 // throttled headless RAF slows the reveal under full-regression load).
 await page.waitForFunction(() => document.querySelectorAll('.journal .entry.writing').length === 0, null, { timeout: 25000 }).catch(() => {})
@@ -111,8 +114,7 @@ const bloody = await page.evaluate(() => ({
 }))
 check('a severely wounded hand writes bloody', bloody.bloodyHand === 1, '')
 check('the entry carries blood traces', bloody.marks >= 3, `${bloody.marks} marks`)
-await page.screenshot({ path: `${OUT}82-handwriting-blood.png` })
-console.log('shot 82-handwriting-blood.png')
+await shot('82-handwriting-blood', { element: '.writing-hand.bloody', label: 'the bloody writing hand' })
 
 // A click finishes the handwriting immediately. DND is raised around the
 // click: it is the page's first user gesture and would otherwise start the
@@ -185,8 +187,7 @@ check(
   scroll.bottomGap < 10 && scroll.writingVisible,
   `bottomGap ${scroll.bottomGap.toFixed(0)}px, writingVisible ${scroll.writingVisible}`,
 )
-await page.screenshot({ path: `${OUT}83-handwriting-autoscroll.png` })
-console.log('shot 83-handwriting-autoscroll.png')
+await shot('83-handwriting-autoscroll', { element: '.journal .entry.writing', label: 'the still-writing entry the journal scrolled to' })
 
 console.log('console errors:', errors.length)
 for (const e of errors) console.log('ERR:', e.slice(0, 300))

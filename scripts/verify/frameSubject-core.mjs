@@ -31,7 +31,7 @@
 export const UNITS_PER_DEGREE = 10
 
 /** The subject kinds a frame may declare. */
-export const SUBJECT_KINDS = ['world', 'local', 'element', 'general']
+export const SUBJECT_KINDS = ['world', 'local', 'place', 'element', 'general']
 
 /** Ground point of a lat/lon subject, in world units (equirectangular, §3.1). */
 export function worldPointOf(lat, lon) {
@@ -49,6 +49,7 @@ const isNum = (v) => typeof v === 'number' && Number.isFinite(v)
  * Shapes:
  *   { world: { lat, lon, y? }, label? }  a place/landmark in the bird's-eye view
  *   { local: { x, z, y? }, label? }      a building/prop inside a settlement
+ *   { place: '<place id>', label? }      the interior of that settlement
  *   { element: '<css selector>', label? } a HUD/overlay/modal subject
  *   { general: '<why>' }                 a deliberate general view
  * Optional on every kind: `scene` ('travel' | 'place'), `clip`, `locator`.
@@ -78,10 +79,18 @@ export function normaliseDeclaration(frame, decl) {
     scene: decl.scene ?? null,
   }
   if (kind === 'world') {
-    const { lat, lon, y } = decl.world
-    if (!isNum(lat) || !isNum(lon)) throw new Error(`captureFrame: frame "${name}" declares a world subject without a finite lat/lon.`)
-    out.world = { lat, lon, y: isNum(y) ? y : 0 }
-    out.point = worldPointOf(lat, lon)
+    // Either geographic (a place, a landmark — how the world is written down)
+    // or straight world units (a live thing the suite just read out of the
+    // scene, e.g. the lion it is photographing).
+    const { lat, lon, x, z, y } = decl.world
+    const geographic = isNum(lat) && isNum(lon)
+    if (!geographic && !(isNum(x) && isNum(z))) {
+      throw new Error(`captureFrame: frame "${name}" declares a world subject without a finite lat/lon or x/z.`)
+    }
+    out.point = geographic ? worldPointOf(lat, lon) : { x, z }
+    out.world = geographic
+      ? { lat, lon, y: isNum(y) ? y : 0 }
+      : { lat: -out.point.z / UNITS_PER_DEGREE, lon: out.point.x / UNITS_PER_DEGREE, y: isNum(y) ? y : 0 }
     out.scene = out.scene ?? 'travel'
     // The bird's-eye camera eases toward its target over a fixed number of
     // frames, so a frame taken mid-lerp shows a different picture than the one
@@ -94,6 +103,11 @@ export function normaliseDeclaration(frame, decl) {
     // Default y is chest height: a building CENTRE at ground level projects
     // below the frame when the camera looks slightly up at it.
     out.local = { x, z, y: isNum(y) ? y : 1.5 }
+    out.scene = out.scene ?? 'place'
+  } else if (kind === 'place') {
+    const id = String(decl.place).trim()
+    if (!id) throw new Error(`captureFrame: frame "${name}" declares a settlement subject without a place id.`)
+    out.place = id
     out.scene = out.scene ?? 'place'
   } else if (kind === 'element') {
     if (typeof decl.element !== 'string' || !decl.element.trim()) {
@@ -121,6 +135,8 @@ export function describeSubject(d) {
       return `${label}at lat ${d.world.lat.toFixed(2)}, lon ${d.world.lon.toFixed(2)} (world ${d.point.x.toFixed(1)}, ${d.point.z.toFixed(1)})`
     case 'local':
       return `${label}inside the settlement at (${d.local.x.toFixed(1)}, ${d.local.z.toFixed(1)})`
+    case 'place':
+      return `${label}the interior of ${d.place}`
     case 'element':
       return `${label}the element ${d.element}`
     default:
@@ -159,6 +175,11 @@ export function judgeFrameSubject(d, probe) {
   }
   if (d.kind === 'general') return { ok: true, reason: `general view — ${d.why}` }
   if (probe.available === false) return { ok: false, reason: probe.reason || 'the subject could not be probed' }
+  if (d.kind === 'place') {
+    return probe.placeId === d.place
+      ? { ok: true, reason: `the game stands inside ${d.place}` }
+      : { ok: false, reason: `the game stood in ${probe.placeId ?? 'no settlement'}, not in ${d.place}` }
+  }
   if (d.kind === 'element') {
     return probe.visible
       ? { ok: true, reason: `${d.element} is on screen` }
