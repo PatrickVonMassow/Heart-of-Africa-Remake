@@ -426,6 +426,7 @@ export const en: Strings = {
     juvenileDrinkCrocBias: 'Crocodile: drinking-juvenile preference',
     calfAdoptionRadius: 'Orphan adoption radius',
     calfEscapeSeconds: 'Freed calf escape run (s)',
+    calfReunionSeconds: 'Calf separation window (s)',
     benchmarkStart: 'Start the render benchmark',
     crocGripSeconds: 'Crocodile: grip deadline (s)',
     crocDriveOffRest: 'Crocodile: rest after being driven off (s)',

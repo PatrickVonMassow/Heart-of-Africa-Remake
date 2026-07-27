@@ -269,7 +269,18 @@ Verifiable (`scripts/verify/settings.mjs`,
   `findAdopter`/`isPredatorSpecies` pure-tested in
   `src/scenes/travel/wildlifeBehavior.test.ts` (nearest pick, the
   radius as the gate, each exclusion, and a homogeneous predator pool
-  finding no adopter). Calf predation
+  finding no adopter). A SEPARATED juvenile's bond resolves the same
+  way (§19.8, point 341): the streaming cull and the carcass removal
+  sever the parent↔child link on both sides, so no survivor holds a
+  removed animal and no calf walks to a phantom parent, and a young
+  out of reach of a living parent past the calibratable
+  `balance.family.reunionSeconds` has its bond released to this same
+  adoption — `severFamilyLinks`/`tickFamilySeparation` pure-tested in
+  `src/scenes/travel/wildlifeBehavior.test.ts` (both link directions,
+  the exact window boundary, the clock reset inside the follow radius,
+  the freeze inside a running ending, the resolved calf's adoption and
+  its parentless ending where no adult is eligible) and staged live in
+  `scripts/verify/enrichments.mjs`. Calf predation
   (§19.8): a caught calf struggles alive (no stain or shrink) for a
   few seconds before the kill, a parent that reaches the predator is
   eaten in the calf's place while the calf escapes, a parent that

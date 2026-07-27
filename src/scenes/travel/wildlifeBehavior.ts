@@ -2053,6 +2053,83 @@ export function adoptionHeld(juvenile: { caught?: number; escape?: number }): bo
   return juvenile.caught !== undefined || inEscapeRun(juvenile)
 }
 
+/** A minimal structural view of the §19.8 parent↔child bond — kept narrow so
+ *  the link bookkeeping is unit-testable without the render `Animal` type. */
+export interface FamilyLinked {
+  parent?: FamilyLinked
+  child?: FamilyLinked
+}
+
+/**
+ * Clear the §19.8 parent↔child bond on BOTH sides (point 341). Called wherever
+ * an animal LEAVES the herd arrays — the streaming cull of design.md §19.4 and
+ * the carcass removal — and by the separation resolve below.
+ *
+ * The cull removes an animal by distance from the player and used to clear
+ * NEITHER side, which is where the family phantom was born: a calf kept its
+ * streamed-out parent, and the follow branch only tests `!parent.dead` — a
+ * culled parent is not dead — so the calf walked to a frozen phantom position
+ * and nursed at nothing, while the orphan adoption (which waits for a DEAD
+ * parent) never fired. With both sides cleared the very next adoption pass sees
+ * a parentless juvenile and hands it a living herd-mate.
+ *
+ * Symmetric on purpose: a removed CALF must not leave its parent shielding a
+ * ghost either. A back-reference that points elsewhere (a re-parented calf) is
+ * left untouched, so severing one pair can never cut another's.
+ */
+export function severFamilyLinks(a: FamilyLinked): void {
+  const parent = a.parent
+  if (parent !== undefined) {
+    if (parent.child === a) parent.child = undefined
+    a.parent = undefined
+  }
+  const child = a.child
+  if (child !== undefined) {
+    if (child.parent === a) child.parent = undefined
+    a.child = undefined
+  }
+}
+
+/**
+ * The separation window (design.md §19.8, point 341): how long this juvenile
+ * has been out of reach of its parent, and whether the bond must now RESOLVE.
+ *
+ * The bond's own ending. A calf beyond its leash walks straight back to its
+ * parent, and since the §19.5 water revision no river or lake stops that walk —
+ * but a walk toward a parent it can never reach has no ending at all. So the
+ * separation gets a hard deadline like every other §19.8 drama (invariant I4):
+ * out of reach — farther than the follow radius — for longer than
+ * `windowSeconds` resolves the bond, and the caller severs both links and hands
+ * the calf to the orphan adoption (`findAdopter`), which gives it a living
+ * parent nearby or leaves it an ordinary parentless juvenile.
+ *
+ * The clock runs ONLY while the calf is genuinely out of reach: back inside the
+ * follow radius resets it, so a gambol at the leash edge or a short flight never
+ * trips the window. A §19.8 ending already running on the young (`held` — caught
+ * by a predator, or escaping after its parent's sacrifice) FREEZES the clock:
+ * that drama owns the pair until it resolves (point 311's ordering).
+ *
+ * Boundary: the window is over once the accumulated time REACHES it (a tick
+ * landing exactly on `windowSeconds` resolves), mirroring the escape run's hard
+ * deadline. A `windowSeconds` of zero or less switches the window OFF — a debug
+ * edit to zero must not sever every family bond on the next frame.
+ */
+export function tickFamilySeparation(
+  separated: number | undefined,
+  distance: number,
+  followRadius: number,
+  dt: number,
+  windowSeconds: number,
+  held = false,
+): { separated: number | undefined; resolve: boolean } {
+  if (held) return { separated, resolve: false } // the running ending owns the pair
+  if (distance <= followRadius) return { separated: undefined, resolve: false } // in reach → clock reset
+  if (windowSeconds <= 0) return { separated: undefined, resolve: false } // window off
+  const t = (separated ?? 0) + dt
+  if (t >= windowSeconds) return { separated: undefined, resolve: true }
+  return { separated: t, resolve: false }
+}
+
 /** Orphan adoption (design.md §19.8, point 262): the nearest ELIGIBLE adult
  *  that can take in `juvenile`, or `null` when none is within `radius`. Eligible
  *  is a LIVE adult (not another juvenile) of the young's OWN species — the herds
@@ -2073,17 +2150,26 @@ export function findAdopter<A extends AdoptionAdult>(
   juvenile: { species?: string; x: number; z: number; caught?: number; escape?: number },
   adults: readonly A[],
   radius: number,
-  opts: { isPredator?: (species: string) => boolean; killer?: A | null } = {},
+  opts: {
+    isPredator?: (species: string) => boolean
+    killer?: A | null
+    /** One further candidate barred from THIS adoption (point 341): the parent a
+     *  separation resolve just released, so the freed calf is not handed straight
+     *  back to the adult it spent the whole window failing to reach. */
+    exclude?: A | null
+  } = {},
 ): A | null {
   if (adoptionHeld(juvenile)) return null // the §19.8 ending resolves first (point 311)
   const isPredator = opts.isPredator ?? isPredatorSpecies
   const killer = opts.killer ?? null
+  const excluded = opts.exclude ?? null
   const r2 = radius * radius
   let best: A | null = null
   let bestD2 = Infinity
   for (const a of adults) {
     if ((a as unknown) === (juvenile as unknown)) continue // never itself
     if (a === killer) continue // never the hunter that killed the parent
+    if (a === excluded) continue // never the parent a separation just released (point 341)
     if (a.dead) continue // never a dead adult
     if (a.young) continue // must be an adult, not another juvenile
     if (a.species !== undefined) {

@@ -1787,6 +1787,90 @@ check('the adoption re-establishes the parent↔child link so a §19.8 drama can
 check('with no adult in range the orphan simply stays parentless (point 262)',
   adoption.stayedOrphan, JSON.stringify(adoption))
 
+// Point 341: a juvenile's bond RESOLVES, never hangs. The streaming cull removes
+// an animal by distance from the player, and a culled parent is NOT dead — so a
+// calf used to keep it, walk to its frozen phantom position and nurse at nothing
+// while the point-262 adoption (which waits for a dead parent) never fired. Two
+// staged cases: the parent is driven out of the despawn ring (the cull must clear
+// both link directions, and the calf ends with a LIVING herd-mate — or nothing at
+// all where none is eligible), and a calf left out of reach of a living parent
+// past balance.family.reunionSeconds has its bond released to the same adoption.
+const bond = await page.evaluate(async () => {
+  const STAGE = [-2.5, 34.0] // Serengeti savanna
+  const AWAY = [5.0, 20.0] // far off in another region: the staged pair is left behind
+  const jump = (ll) => window.__game.getState().debugJumpTo(ll[0], ll[1])
+  jump(STAGE)
+  await window.__sleepSim(0.5)
+  const herds = window.__wildlife.herdsRef.current
+  const clear = () => { for (const sp of Object.keys(herds)) herds[sp].length = 0 }
+  const at = () => window.__game.getState().pos
+  const mk = (p, dx, dz, over = {}) => ({ x: p.x + dx, z: p.z + dz, y: 0.2, rot: 0, scale: 1, phase: 0, ...over })
+  const live = (a) => !!a && a.dead !== true && a.young !== true && herds.zebra.includes(a)
+
+  // --- The cull takes the parent: the calf keeps no phantom ---
+  // Driving AWAY is what removes it, exactly as in the report — the despawn ring
+  // is a distance from the player, and the on-screen backstop only holds an
+  // animal inside the rendered frame. `chunk` is what makes the cull judge it at
+  // all (an injected, untagged animal is always kept), so the staged calf and its
+  // herd-mate survive the drive while the tagged parent is streamed out.
+  clear()
+  const p0 = at()
+  const parent = mk(p0, 0, 0, { chunk: '999999,999999' })
+  const calf = mk(p0, 1, 0, { young: true, scale: 0.55, parent })
+  parent.child = calf
+  const adopter = mk(p0, 3, 0) // a childless zebra adult beside the calf
+  herds.zebra.unshift(parent, calf, adopter)
+  await window.__sleepSim(0.3)
+  jump(AWAY)
+  await window.__pollSim(6, () => !herds.zebra.includes(parent) && !!calf.parent && calf.parent !== parent)
+  const culled = !herds.zebra.includes(parent)
+  const noPhantom = culled && calf.parent !== parent && parent.child !== calf
+  const reAdopted = culled && calf.parent !== parent && live(calf.parent) && calf.parent.child === calf
+
+  // --- No eligible adult: the calf roams on parentless, never bonded to a ghost ---
+  const prevR = window.__balance.family.adoptionRadius
+  window.__balance.family.adoptionRadius = 0.001 // nothing is in reach, not even a streamed-in herd-mate
+  clear()
+  jump(STAGE)
+  await window.__sleepSim(0.3)
+  const p1 = at()
+  const lone = mk(p1, 0, 0, { chunk: '999999,999999' })
+  const stray = mk(p1, 1, 0, { young: true, scale: 0.55, parent: lone })
+  lone.child = stray
+  herds.zebra.unshift(lone, stray)
+  await window.__sleepSim(0.3)
+  jump(AWAY)
+  await window.__pollSim(6, () => !herds.zebra.includes(lone) && !stray.parent)
+  const freeRoamer = !herds.zebra.includes(lone) && !stray.parent && lone.child !== stray
+  window.__balance.family.adoptionRadius = prevR
+
+  // --- The separation window: a living parent it cannot reach ---
+  const prevW = window.__balance.family.reunionSeconds
+  window.__balance.family.reunionSeconds = 1 // debug-editable; shortened so the check stays quick
+  clear()
+  jump(STAGE)
+  await window.__sleepSim(0.3)
+  const p2 = at()
+  const distant = mk(p2, 0, 0) // alive and well, but far outside the follow radius
+  const left = mk(p2, 40, 0, { young: true, scale: 0.55, parent: distant })
+  distant.child = left
+  herds.zebra.unshift(distant, left, mk(p2, 38, 0)) // an eligible adult beside the stray calf
+  await window.__pollSim(8, () => !!left.parent && left.parent !== distant)
+  const separated = live(left.parent) && left.parent.child === left && distant.child !== left
+  window.__balance.family.reunionSeconds = prevW
+  clear()
+
+  return { culled, noPhantom, reAdopted, freeRoamer, separated }
+})
+check('the streaming cull clears the family link on both sides (point 341)',
+  bond.culled && bond.noPhantom, JSON.stringify(bond))
+check('a calf whose parent was culled is adopted by a living herd-mate (point 341)',
+  bond.reAdopted, JSON.stringify(bond))
+check('with no eligible adult that calf roams on parentless, never bonded to a ghost (point 341)',
+  bond.freeRoamer, JSON.stringify(bond))
+check('a calf out of reach past the reunion window is handed to the adoption (point 341)',
+  bond.separated, JSON.stringify(bond))
+
 // --- Scavenging of a non-lion carcass (point 5) ------------------------------
 // A carcass that was not eaten by the lion (e.g. trampled) draws a vulture that
 // flies in, lands and consumes it, dissolving it as a lion kill does.
