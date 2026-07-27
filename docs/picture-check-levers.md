@@ -210,6 +210,24 @@ already wrote. It was caught by someone going to look, and the frame that shows
 it exists only because of that. A cheaper *review* of the standing frame set
 would not have missed this bug; the standing frame set missed it.
 
+### 3.1b A finding the replay produced on the way past
+
+Assembling the corpus meant listing the files each fix touched, and row 1's list
+is two entries long: `src/world/redSea.ts` and its test. That path is **not in
+the render set** — `isRenderPath` covers `src/render/`, `src/scenes/`,
+`src/ui/`, `src/App.tsx`, TSL modules and the browser suites, and `src/world/`
+is none of them. Checked against the shipped code:
+
+```
+src/world/redSea.ts    render=false  dual=false
+```
+
+So the point-210 stepped coast — the incident named in the header of
+`render-verify-core.mjs` as the reason the guard exists — **would not trip the
+guard today.** It is recorded here and not fixed: widening the render set
+*raises* the cost this point was opened to lower, so it is a decision, not a
+tidy-up.
+
 ### 3.2 The noise floor — the result that decided the exercise
 
 Every diff-based lever (A6, A7, A8, B-D, B-G) rests on one unstated assumption:
