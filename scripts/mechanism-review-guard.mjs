@@ -129,7 +129,7 @@ export function bootstrapBase(head, revParse = (r) => git(`rev-parse ${r}`)) {
       // render-verify-guard carries the same note from the same bite.
       const base = revParse(`--verify --quiet "${ref}^{commit}"`)
       if (!base) continue
-      const fork = execSync(`git merge-base ${base} ${head}`, { cwd: REPO_ROOT, encoding: 'utf8' }).trim()
+      const fork = execSync(`git merge-base "${base}" "${head}"`, { cwd: REPO_ROOT, encoding: 'utf8' }).trim()
       if (fork) return fork
     } catch {
       /* no such branch here — try the next, then fall back to HEAD */
@@ -165,7 +165,7 @@ function scriptFiles() {
 function mechanismCommits(base, head, files) {
   const out = git(
     `log --format="${REC}%H${FLD}%ct${FLD}%s${FLD}%(trailers:key=Co-Authored-By,valueonly,separator=;)" ` +
-      `--name-only --diff-merges=cc --reverse ${base}..${head}`,
+      `--name-only --diff-merges=cc --reverse "${base}..${head}"`,
   )
   const commits = []
   for (const chunk of out.split(REC)) {
@@ -221,7 +221,7 @@ export function gatherMechanismReviewInputs({ sessionId = '' } = {}) {
   // confirmed) mechanism work as pending.
   let base = baseline
   try {
-    base = git(`merge-base ${baseline} ${head}`)
+    base = git(`merge-base "${baseline}" "${head}"`)
   } catch {
     /* unrelated baseline — the raw range below decides, or re-arms us at HEAD */
   }
@@ -250,7 +250,7 @@ export function gatherMechanismReviewInputs({ sessionId = '' } = {}) {
       effective = bootstrapBase(head)
       base = effective
       try {
-        base = git(`merge-base ${effective} ${head}`)
+        base = git(`merge-base "${effective}" "${head}"`)
       } catch {
         /* the raw range below decides */
       }
