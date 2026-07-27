@@ -32,9 +32,10 @@ const node = (args, opts = {}) =>
   spawnSync(process.execPath, args, { encoding: 'utf8', cwd: repo, maxBuffer: 64 * 1024 * 1024, ...opts })
 
 /** `node <repo>/scripts/<name>` with a Stop-hook payload on stdin. */
-function runHook(name, { args = [], session = SESSION } = {}) {
+function runHook(name, { args = [], session = SESSION, env } = {}) {
   const r = node([resolve(repo, 'scripts', name), ...args], {
     input: JSON.stringify({ session_id: session, hook_event_name: 'Stop' }),
+    ...(env ? { env: { ...process.env, ...env } } : {}),
   })
   let decision = null
   try {
@@ -207,6 +208,20 @@ describe('retro-currency-guard: the lesson ledger', () => {
     expect(hook.decision.reason).toMatch(/imaginary-guard\.mjs.*does not exist/s)
   })
 
+  // RETRO_LEDGER_PATH exists so a check can point the guard at a ledger of its
+  // own. An override nothing exercises is a claim, not a lever, so it is used
+  // here rather than merely declared.
+  it('honours RETRO_LEDGER_PATH', () => {
+    write(RETRO, retro('### 3.99 Eine brandneue Lehre\nprose'))
+    write(LEDGER, ledger(ROW_31)) // incomplete: the default path would BLOCK
+    write('elsewhere/ledger.md', ledger(ROW_31, '| 3.99 | Eine brandneue Lehre | 3 | Bewusst keiner: reine Urteilsfrage. |'))
+    const hook = runHook('retro-currency-guard.mjs', {
+      env: { RETRO_LEDGER_PATH: resolve(repo, 'elsewhere/ledger.md') },
+    })
+    expect(hook.status).toBe(0)
+    expect(hook.stdout.trim()).toBe('')
+  })
+
   it('stands down silently while the batch is paused', () => {
     write(RETRO, retro('### 3.99 Eine brandneue Lehre\nprose'))
     write(LEDGER, ledger(ROW_31))
@@ -216,6 +231,7 @@ describe('retro-currency-guard: the lesson ledger', () => {
     } finally {
       rmSync(resolve(repo, '.claude/batch-paused'), { force: true })
       rmSync(resolve(repo, 'docs/analysis_de'), { recursive: true, force: true })
+      rmSync(resolve(repo, 'elsewhere'), { recursive: true, force: true })
     }
   })
 })
