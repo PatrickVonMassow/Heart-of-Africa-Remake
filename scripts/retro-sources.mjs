@@ -89,6 +89,18 @@ export function collectSources({
   tasksPath = resolve(repoRoot, 'TASKS.md'),
 } = {}) {
   const memories = collectMemories(memoryDir)
+  // A memory directory that resolves to NOTHING is never a real state — the
+  // corpus has dozens. It means the path was derived wrongly, which happens in
+  // a git WORKTREE: the project key is built from the checkout path, so a
+  // worktree looks up a directory that does not exist, and the refresh then
+  // rewrote the appendix as empty and exited 0 (27.07.2026, caught only in a
+  // diff review after ~65 rows had already been deleted). Refuse loudly instead.
+  if (memories.length === 0) {
+    throw new Error(
+      `retro-sources: no memories under ${memoryDir} — refusing to rewrite the appendix from an empty ` +
+        'source. Run this from the MAIN worktree, or set RETRO_MEMORY_DIR to the real directory.',
+    )
+  }
   const guards = existsSync(scriptsDir) ? guardScriptNames(readdirSync(scriptsDir)) : []
   // Full-history subjects; a git failure throws (see the failure contract above).
   const log = execSync('git log --format="%H %s"', {

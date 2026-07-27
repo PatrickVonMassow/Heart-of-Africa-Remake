@@ -6,6 +6,7 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
+import { collectSources } from './retro-sources.mjs'
 import {
   AUTO_END,
   AUTO_START,
@@ -368,4 +369,17 @@ describe('collectSources / collectMemories (fs-level, temp fixtures)', () => {
       expect(dir).toMatch(/\/\.claude\/projects\/c--Users-Patri-Documents-Developing-hoa\/memory$/)
     },
   )
+})
+
+// A source directory that resolves to NOTHING is never a real state: it means
+// the path was derived wrongly. In a git worktree that really happened — the
+// project key is built from the checkout path, the lookup missed, and the
+// refresh rewrote the appendix as EMPTY and exited 0. Sixty-five rows were gone
+// before a diff review caught it (27.07.2026).
+describe('collectSources refuses an empty memory directory', () => {
+  it('throws instead of reporting zero memories', () => {
+    expect(() => collectSources({ memoryDir: join(tmpdir(), 'hoa-no-such-memory-dir-371') })).toThrow(
+      /no memories under/i,
+    )
+  })
 })
