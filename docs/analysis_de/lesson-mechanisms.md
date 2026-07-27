@@ -62,7 +62,7 @@ sind maschinell auszählbar (`ledgerGaps`) und stehen unten noch einmal als List
 | 3.5 | „Grüner Test, falsches Bild" — die gefährlichste Falle | 1 | `scripts/render-verify-guard.mjs` deckt die **sichtbare** Klasse ab (Bild auf beiden Backends). Der allgemeine Satz „reales Signal, erreichbarer Zustand" bleibt urteilsgetragen — `docs/rule-corpus-audit.md` D-l hält fest, dass die nicht-visuellen Klassen offen sind. |
 | 3.6 | Backend-Divergenz WebGPU/WebGL2 | 2 | `scripts/render-verify-guard.mjs`, `scripts/verify/tiers.mjs` — ein stiller Backend-Fallback schlägt seit `assertBackend` laut fehl. |
 | 3.7 | Feature-Regressionen im Spielcode | 1 | `scripts/pre-push-gate.mjs` erzwingt das schnelle Gate vor jedem Push auf den ausgelieferten Zweig — die Regel „Fast-Gate nach **jedem** Merge" hing vorher am Gedächtnis. Die Exit-Pfad-Testdisziplin selbst bleibt Auftragsregel. |
-| 3.8 | Flakes unter Last — „ruhige Maschine" | 3 | Bewusst keiner: Der Guard müsste die Systemlast der **Nutzer**-Maschine messen und ein Rot verwerfen — genau die Vermischung von Messung und Urteil, vor der §3.22 warnt. Die Unterscheidung „gleiche Fehlschlagmenge zweimal = echtes Signal" ist Urteilssache. |
+| 3.8 | Flakes unter Last — „ruhige Maschine" | 3 | `LÜCKE:` Zwei Hälften, und nur eine ist wirklich entschieden. Die **Urteils**-Hälfte („gleiche Fehlschlagmenge zweimal = echtes Signal") ist bewusst ohne Mechanismus — ein Guard müsste die Systemlast der Nutzer-Maschine messen und ein Rot verwerfen, also genau Messung und Urteil vermischen (§3.22). Die **Zeitschranken**-Hälfte ist es nicht: `docs/rule-corpus-audit.md` D-h führt lastabhängige statt fest verdrahteter Zeitschranken als gebaut-werden-müssend und ungebaut. |
 | 3.9 | „Wieso muss ich dich auf Bugs hinweisen?" | 3 | Bewusst keiner: Das QS-Framework (`docs/maximum-qa.md`) ist eine **Phasenreihenfolge**, kein prüfbarer Zustand; seine harte Kante ist der Closing-Vollständigkeits-Gate (§3.15). Die Pflichtfrage „sieht das für einen Menschen richtig aus?" ist per Definition menschlich. |
 | 3.10 | Kleinere, aber lehrreiche Klassen | 3 | Sammelabschnitt aus sechs Kleinklassen. Die durchgesetzten Teile liegen bei ihren eigenen Lektionen (Deploy-Hygiene → `scripts/pre-push-gate.mjs`, Doku-Drift → 3.21, Token-Budget → 3.31). Eigenständig bleiben hier gemessene-statt-geschätzte Zahlen, Kommunikationsregeln und stille Verschlechterung — alle drei prüfen ein Urteil, keinen Zustand. |
 | 3.11 | Nachweise sind zustandsgebunden | 1 | `scripts/render-verify-state.mjs`, `scripts/render-verify-guard.mjs` — der Nachweis war schon HEAD-gebunden; die Lektion schärfte den **Umgang** damit (gegen den Zielzustand laufen lassen), nicht den Mechanismus. |
@@ -88,12 +88,12 @@ sind maschinell auszählbar (`ledgerGaps`) und stehen unten noch einmal als List
 | 3.31 | Die Rechnung stimmte, ihre Voraussetzung nicht — gemessene Verbrauchstreiber | 2 | `scripts/point-brief.mjs` (Zustellung statt Suche) und `scripts/guard-preflight.mjs` (die Bedingung eines Wächters vorher prüfen, statt einen vollen Zug hineinzulaufen). Die dritte Lehre — die Sitzungsgrenze — ist ein **Nutzerbefehl** und deshalb hier nicht durchsetzbar. |
 | 3.32 | Ein Durchsetzer, der zu spät greift — und einer, der zu früh anschlägt | 2 | `scripts/board-first-core.mjs`, `scripts/board-first-guard.mjs` — das Versprechen über den *laufenden* Zustand wird jetzt vor der Arbeit durchgesetzt (PreToolUse), nicht am Zug-Ende. Die Fehlalarm-Hälfte sitzt als Wortgrenze in `scripts/tasks-spec-guard-core.mjs`. |
 | 3.33 | Eine Ersparnis, die Nacharbeit auslöst, ist keine Ersparnis | 3 | Bewusst keiner: eine **Kostenregel** für Entscheidungen über Maßnahmen, kein prüfbarer Repo-Zustand. Ihr konkretester Fall — der zu schwache Arbeiter — ist bei 3.17 durchgesetzt. |
-| 3.34 | Die Attrappe, die den Fehler verdeckt | 1 | `scripts/guard-hooks.test.mjs` — die Wächter werden gestartet, wie die Umgebung sie startet (echter Prozess, echtes stdin, echter Verdikt), statt hinter Attrappen geprüft. Die allgemeine Fassung („jedes real ausgeführte Kommando braucht einen Test, der es ausführt") ist damit für die Guard-Kette erfüllt, für beliebigen Code nicht. |
-| 3.35 | Der beabsichtigte Zustand, im Präsens geschrieben | 1 | `scripts/point-brief-core.mjs`, `scripts/point-brief.mjs` scheitern laut an einem Verweis, der nirgends aufgeht — die **Referenz**-Klasse. Die **Behauptungs**-Klasse (eine Präsens-Zusicherung über den Code) bleibt offen, `docs/rule-corpus-audit.md` D-i. |
-| 3.36 | Isolierung ist eine Eigenschaft der Umgebung, keine Anweisung | 1 | `scripts/worktree-reminder.mjs`, `scripts/worktree-reminder-core.mjs` plus die Worktree-Isolierung der Delegation selbst: Der Agent kann den Hauptbaum nicht anfassen, statt es zugesagt zu bekommen. |
-| 3.37 | Ein Werkzeug, das rät, ersetzt still | 2 | `scripts/point-brief-core.mjs` — jeder mitgelieferte Abschnitt trägt sein Herkunftsdokument, eine Referenzkarte nennt jede Auflösung, und was nirgends aufgeht, scheitert unter Nennung aller durchsuchten Dokumente. |
+| 3.34 | Die Attrappe, die den Fehler verdeckt | 2 | `scripts/guard-hooks.test.mjs` — die Wächter werden gestartet, wie die Umgebung sie startet (echter Prozess, echtes stdin, echter Verdikt), statt hinter Attrappen geprüft. Die allgemeine Fassung („jedes real ausgeführte Kommando braucht einen Test, der es ausführt") ist damit für die Guard-Kette erfüllt, für beliebigen Code nicht. |
+| 3.35 | Der beabsichtigte Zustand, im Präsens geschrieben | 3 | `LÜCKE:` Kein Durchsetzer. Die Lektion verlangt, dass eine im **Präsens** geschriebene Zusicherung über den Code nachgesehen ist — `docs/rule-corpus-audit.md` D-i führt genau das als ungebaut. Das laute Scheitern des Kurzbriefs an einem toten Verweis deckt die **Referenz**-Klasse ab, und die gehört zu 3.37; für die Behauptungs-Klasse dieser Lektion ist die Deckung null. (Erste Fassung dieser Zeile buchte sie als „1" — die Gegenlesung hat es gefunden, und es ist genau der Fehler, den dieses Register verhindern soll.) |
+| 3.36 | Isolierung ist eine Eigenschaft der Umgebung, keine Anweisung | 1 | Der eigentliche Durchsetzer ist die **Worktree-Isolierung der Delegation selbst** — eine Eigenschaft der Umgebung, die einen Schreibzugriff außerhalb des eigenen Baums verweigert (beim Bau dieses Registers zweimal live erlebt). Sie liegt außerhalb des Repos und ist deshalb hier nicht maschinell prüfbar. `scripts/worktree-reminder-core.mjs` ist die Repo-Hälfte und **blockiert nichts** (Kopfkommentar Zeile 12), sie spielt die Regel nur ein — als alleiniger Beleg wäre sie genau die zahnlose Behauptung, gegen die dieses Register gebaut ist. |
+| 3.37 | Ein Werkzeug, das rät, ersetzt still | 1 | `scripts/point-brief-core.mjs` — jeder mitgelieferte Abschnitt trägt sein Herkunftsdokument, eine Referenzkarte nennt jede Auflösung, und was nirgends aufgeht, scheitert unter Nennung aller durchsuchten Dokumente. |
 | 3.38 | Fail-open EINMAL ist nicht fail-open FÜR IMMER | 1 | `scripts/render-verify-core.mjs`, `scripts/render-verify-guard.mjs` — derselbe Guard, repariert an der entscheidenden Stelle: Er lässt im Fehlerfall durch, schreibt aber keinen Zustand fort; eine unbeantwortbare Frage zählt als „vorhanden". |
-| 3.39 | Neun Ausfälle an einem Tag — und was den Schaden bestimmt hat | 1 | `scripts/push-arrival-guard.mjs` sichert die zweite Hälfte („sofort gesichert"); die erste Hälfte — nach **jedem** zusammenhängenden Schritt committen — steht als bindende Zeile im Delegations-Auftrag (`scripts/point-brief.mjs`). Der Unterschied zwischen Totalverlust und Fortsetzung war genau diese Zeile. |
+| 3.39 | Neun Ausfälle an einem Tag — und was den Schaden bestimmt hat | 1 | `scripts/push-arrival-guard.mjs` sichert die Hälfte „sofort gesichert": Kein Zug endet, solange Commits in keiner Remote-Ref liegen. Die andere Hälfte — nach **jedem** zusammenhängenden Schritt committen — hat **keinen** Mechanismus: Sie steht in handgeschriebenen Delegations-Prompts, nicht im generierten Kurzbrief (`scripts/point-brief-core.mjs` enthält keine solche Zeile). Die erste Fassung dieser Zeile behauptete das Gegenteil; die Gegenlesung hat es nachgeschlagen und widerlegt. Siehe Teil-Deckungen unten. |
 | 3.40 | Eine Prüfung, die zu spät kommt, ist eine Benachrichtigung | 2 | `scripts/pre-push-gate-core.mjs`, `scripts/pre-push-gate.mjs`, `scripts/git-hooks/pre-push`, verdrahtet über `scripts/enable-hooks.mjs` — die Prüfung sitzt jetzt **vor** der Handlung, und ein Test prüft die Verdrahtung selbst. |
 
 ---
@@ -112,8 +112,32 @@ Aus der Rückerfassung, nicht stillschweigend als „bewusst keine" abgelegt:
    erzwungen, aber nur für die Auslieferung (`scripts/closing-guard-core.mjs`).
    Die billige Fassung ist eine zweite Schrittliste im **selben** Guard — kein
    neuer Guard.
+3. **3.35 — Präsens-Zusicherungen im Auftrag.** Ungebaut
+   (`docs/rule-corpus-audit.md` D-i). Der Kurzbrief prüft Verweise, nicht
+   Behauptungen — und eine falsche Tatsachenbehauptung führt zu einer Lieferung,
+   die genau nichts tut.
+4. **3.8 — lastabhängige Zeitschranken.** Ungebaut
+   (`docs/rule-corpus-audit.md` D-h). Nur die Urteilshälfte dieser Lektion ist
+   bewusst mechanismusfrei.
+5. **3.39 — Commit je Schritt.** Die Sicherung ist erzwungen, die
+   **Schrittweite** nicht: Sie lebt in handgeschriebenen Prompts. Am 27.07.2026
+   war genau diese Zeile der Unterschied zwischen einem Agenten, der alles
+   verlor, und einem, der nichts verlor — der billigste denkbare Ort dafür ist
+   der generierte Kurzbrief.
 
 Teil-Deckungen, die keine Lücke im Sinne dieser Liste sind, aber in der
 periodischen Regel-Durchsicht wieder aufzurufen sind: 3.5 (nur die sichtbare
 Klasse), 3.21 (nur dokumentseitig, nicht im Memory-Korpus), 3.34 (nur die
-Guard-Kette), 3.35 (nur die Referenz-, nicht die Behauptungsklasse).
+Guard-Kette), 3.36 (der wirksame Teil liegt außerhalb des Repos), 3.31 (beide
+genannten Werkzeuge sind beratend, nicht blockierend).
+
+## Wie diese Liste entstanden ist
+
+Die Rückerfassung wurde nach dem Vier-Augen-Prinzip gegengelesen (ein zweites
+Modell, das jede genannte Datei geöffnet und gegen die Lektion geprüft hat).
+Diese Prüfung fand genau das, was die maschinelle nicht finden kann: **drei
+Zeilen, deren benannter Durchsetzer die Lektion nicht deckt** (3.39 verwies auf
+eine Zeile, die es im Kurzbrief nicht gibt; 3.35 verbuchte die Deckung einer
+Nachbarlektion; 3.36 nannte einen Wächter, der nichts blockiert) und zwei falsch
+kodierte Ergebnisse (3.34, 3.37). Das ist der Beleg für den Vorbehalt weiter
+oben — die Existenz einer Datei ist billig prüfbar, ihre Deckung nicht.

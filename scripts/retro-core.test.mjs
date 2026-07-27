@@ -505,10 +505,25 @@ describe('lesson→mechanism ledger', () => {
     expect(v.reason).toMatch(/§3\.3/)
   })
 
-  it('fails OPEN when not one row parses — a parser reading nothing is likelier broken', () => {
+  it('counts a lesson demoted to ####, so a level-DOWN cannot escape either', () => {
+    const { lessons } = parseLessonSubsections('#### 3.9 Eine tief gehängte Lektion\ntext\n')
+    expect(lessons.map((l) => l.id)).toEqual(['3.9'])
+  })
+
+  it('fails OPEN on a file with no table at all — that shape is a parser fault', () => {
     const v = evaluateLedger({ retroText: retro, ledgerText: '# Ledger\n\n(no table yet)\n', pathExists: exists })
     expect(v.decision).toBe('allow')
-    expect(v.warning).toMatch(/not one row parsed/)
+    expect(v.warning).toMatch(/shows no table at all/)
+  })
+
+  it('BLOCKS a gutted table — corruption must not escape where a parse fault may', () => {
+    const v = evaluateLedger({
+      retroText: retro,
+      ledgerText: '| Lektion | Titel |\n|---|---|\n| irgendwas | prosa |\n',
+      pathExists: exists,
+    })
+    expect(v.decision).toBe('block')
+    expect(v.reason).toMatch(/not one of them parses/)
   })
 
   it('fails OPEN when no lesson parses out of the retrospective', () => {
@@ -540,6 +555,13 @@ describe('lesson→mechanism ledger', () => {
 
   it('skips the header and separator rows of the table', () => {
     expect(parseLedger(ledger(full)).entries).toHaveLength(3)
+  })
+
+  it('BLOCKS two rows for one lesson, rather than silently taking the last', () => {
+    const rows = [...full, '| 3.1 | Der Batch, der stehen blieb | 3 | Eine widersprechende zweite Entscheidung. |']
+    expect(evaluateLedger({ retroText: retro, ledgerText: ledger(rows), pathExists: exists }).reason).toMatch(
+      /§3\.1 has more than one ledger row/,
+    )
   })
 })
 

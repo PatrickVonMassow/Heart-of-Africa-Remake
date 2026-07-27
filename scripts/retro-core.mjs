@@ -333,12 +333,14 @@ export function refreshedDoc(existingDocText, sources, { refreshedStamp = '', re
 // `render-verify-guard` shares a token with "Grüner Test, falsches Bild").
 // Coverage stays review-borne, and the ledger's own header says so.
 
-/** A lesson subsection: a `##`/`###` heading in the PROSE region whose title
- *  starts with a `N.M` id. Level 2 counts too so a lesson written one level up
- *  cannot silently escape the ledger. */
-export const LESSON_HEADING_RE = /^(#{2,3})\s+(\d+\.\d+)\s+(.*)$/
-/** A `###` heading in the prose region — every one of these must be a lesson. */
-const SUB_HEADING_RE = /^###\s+(.*)$/
+/** A lesson subsection: a heading in the PROSE region whose title starts with a
+ *  `N.M` id. Every level from `##` down counts, so a lesson written one level UP
+ *  or DOWN cannot silently escape the ledger — the four-eyes review found that a
+ *  `####` demotion slipped through the first cut of both patterns. */
+export const LESSON_HEADING_RE = /^(#{2,6})\s+(\d+\.\d+)\s+(.*)$/
+/** A heading BELOW `##` in the prose region — every one of these must be a
+ *  lesson, or it is an unledgerable bypass. */
+const SUB_HEADING_RE = /^#{3,6}\s+(.*)$/
 
 /** Repo-relative file references inside a ledger cell. A claim must point at
  *  something real, so every one of these is existence-checked. The extension
@@ -450,18 +452,39 @@ export function evaluateLedger({ retroText, ledgerText, pathExists = () => true 
 
   const { entries } = parseLedger(ledgerText)
   if (entries.length === 0) {
+    // A file with table syntax in it but no readable row is a CORRUPTED table,
+    // not a parser fault — allowing there would let "gut the table to prose"
+    // escape the gate, which the four-eyes review found as the one remaining
+    // hole. Fail open only where the file shows no table at all.
+    if (/^\s*\|/m.test(ledgerText)) {
+      return {
+        decision: 'block',
+        reason:
+          'Lesson-mechanism ledger: docs/analysis_de/lesson-mechanisms.md contains table rows but not one ' +
+          'of them parses as a decision. A row is `| N.M | Titel | 1|2|3 | Durchsetzer oder Begründung |`. ' +
+          'Repair the table — a corrupted register decides nothing.',
+      }
+    }
     return {
       decision: 'allow',
       warning:
-        'lesson-ledger: the ledger file exists but not one row parsed. A parser that reads nothing is ' +
-        'likelier broken than a corpus that is empty, so the check is skipped this turn — but VERIFY ' +
-        'the table by hand: docs/analysis_de/lesson-mechanisms.md.',
+        'lesson-ledger: the ledger file exists and shows no table at all, so the check is skipped this ' +
+        'turn rather than blocking on what may be a parser fault — but VERIFY it by hand: ' +
+        'docs/analysis_de/lesson-mechanisms.md.',
     }
   }
 
   const byId = new Map(entries.map((e) => [e.id, e]))
   const problems = []
   const advisories = []
+
+  // Two rows for one lesson: last-wins would silently pick one of two possibly
+  // CONTRADICTORY decisions, and the register would read as if it had decided.
+  const seen = new Set()
+  for (const entry of entries) {
+    if (seen.has(entry.id)) problems.push(`§${entry.id} has more than one ledger row — one lesson, one decision`)
+    seen.add(entry.id)
+  }
 
   for (const name of unledgerable) {
     problems.push(
