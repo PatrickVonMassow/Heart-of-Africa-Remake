@@ -1067,7 +1067,47 @@ scale-normalised gait distance pure-tested in
 `src/scenes/place/panoramaWildlife.test.ts`, the ground-line math in
 `src/scenes/place/backdrop.test.ts` (the sight-line geometry, the drop as
 the viewer nears, relief-following on a dune, and both old failure modes
-swept round Cairo); and that in Cairo no
+swept round Cairo).
+
+The seam that footing worked around is CLOSED (point 381). What tore it: the
+backdrop's relief floor was a flat −6 while `backdropTaper` reaches 1 within
+~40 % of the inner radius, so a surround sampling lower than the place centre
+plunged six units within a few metres — and the eye's grazing line over the
+ground-disc edge descends only `eyeHeight / (2 · discEdge)` per unit (≈0.01 at
+the 74 m Giza plateau, the shallowest line being the one from the OPPOSITE rim).
+The surface never met that line again inside `BACKDROP_OUTER`, so past the disc
+rim nothing was drawn at all: the frame showed the disc's hard edge, then the
+captured band's low rows and the sky behind them — the user's "pale slab with a
+visible thickness in front of a dark, speckled wedge". Established by reading
+the live mesh rather than the formula: per azimuth, does the surface ever rise
+back into the sight line before the band? Before the fix it did not in 48/320
+azimuths from Giza's centre and in 3–241/320 from the far rim at EVERY enterable
+place — the condition is a wide disc plus a lower surround, never a site — and
+after it in 0/320 everywhere, centre and rim alike (measured on the running
+game, both figures).
+
+Three parts, all in `src/scenes/place/backdrop.ts` and pinned by
+`src/scenes/place/backdrop.test.ts`: `backdropSurfaceY` clamps the FALL at the
+base curve (outside the disc the surroundings may rise but never sink below the
+plane the player walks on — swept over disc radii 28–96, eye heights 1.2–1.9 and
+six relief profiles, and against the REAL terrain at every place in `PLACES`),
+carries no relief at all under the disc overhang (so a steep surround cannot push
+the rim through the plate), and `backdropRingRadius` pins a mesh ring exactly on
+the disc edge — the log ladder cleared it (74.4 against Giza's 74), so the strip
+interpolated the join a third of a unit low. The walkable disc's `circleGeometry`
+also gets `GROUND_DISC_SEGS` segments instead of 48: a 48-gon put 9.7 m straight
+chords on the ground line of the largest disc, which from a few metres away IS a
+hard straight edge. In the rendered frame, `scripts/verify/polish.mjs` sweeps the
+elevation through the horizon at the Giza site from the centre and two rim
+standpoints over 72 bearings and asserts the surfaces read
+`ground-disc → landscape-backdrop → band/sky`, never disc → band or disc →
+nothing (the meshes are named for it); screenshots 141-giza-horizon-1/2 are the
+reported view, and 139-giza-walkable-site the site from the south. The point-181
+gate above now reports `landscape-backdrop` as the surface behind every
+silhouette's feet, and its `max()` no longer has to fire — pinned as such
+(`onLine === 0`), so a reopened seam fails the pure layer too.
+
+And that in Cairo no
 visible silhouette's azimuth lies inside the Giza skyline span
 (`__placeSkylineExclusion`/`__placePanoramaWildlifeInfo`, point 102),
 the azimuth-exclusion helper (span from placement, margin, inside/
