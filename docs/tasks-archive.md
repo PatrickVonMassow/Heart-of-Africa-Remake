@@ -10865,3 +10865,20 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   + flag), a pure load-classification helper. VERIFIABLE: a pure test of the load-detect/flag
   decision. No player-visible text. (Lighter point — no Fable sandwich required unless it
   grows.)
+
+- [x] 376. THE RENDER SET MUST CONTAIN THE FILE THAT ONCE BROKE THE PICTURE (27.07.2026,
+  found under point 361). `scripts/render-verify-core.mjs` classifies `src/world/redSea.ts`
+  as NOT a render path, yet the point-210 stepped coast — the founding case of the
+  both-backend picture rule — touched that file and nothing else. The guard would not have
+  demanded a picture check for the bug it exists because of.
+  DECIDE BY MEASUREMENT, not by instinct, and record the figure either way: (a) widen the
+  classification to the world-geometry sources that FEED the rendered terrain, or (b) keep
+  the narrow set and add those sources as a named exception list derived from the
+  historical corpus. (a) is safer and costs more checks; (b) is cheaper and covers only
+  what has already burned us once. Measure how many of the last 100 commits each option
+  would newly force into a picture check, and choose on that number.
+  VERIFIABLE: `scripts/render-verify-core.test.mjs` gains the point-210 commit as a case —
+  the classification must demand the picture check for it — and the measured commit counts
+  are recorded with the decision.
+  DOCS in the same commit: CLAUDE.md §7.2 (the classification sentence) and the rationale
+  beside `isBackendSensitivePath`.
