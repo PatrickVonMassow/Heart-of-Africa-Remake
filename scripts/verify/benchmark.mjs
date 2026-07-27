@@ -10,6 +10,7 @@
 // Math.random included (the run installs a seeded PRNG over it, and a leaked
 // one would silently derandomise every later session).
 import { launchVerifyBrowser, assertBackend } from './_browser.mjs'
+import { frameShutter } from './frameSubject.mjs'
 import { fileURLToPath } from 'node:url'
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:5173/'
@@ -227,7 +228,9 @@ check(
   `seed ${report.seed}, day ${report.day}, dt ${report.dt}`,
 )
 
-await page.screenshot({ path: OUT + '136-benchmark-report.png' })
+// Point 375: the frame is named after the report panel, so the panel must be
+// the thing on screen when it is written.
+await frameShutter(page, OUT)('136-benchmark-report', { element: '.bench-report', label: 'the benchmark result panel' })
 
 // --- everything restored -----------------------------------------------------
 const after = await page.evaluate(() => {

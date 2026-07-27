@@ -13,6 +13,7 @@
 // rebuild + frame check), the screenshots and the console-error gate.
 // Dev server only (dev hooks).
 import { launchVerifyBrowser, assertBackend } from './_browser.mjs'
+import { frameShutter } from './frameSubject.mjs'
 import { leakVerdict } from './textureLeak.mjs'
 import { fileURLToPath } from 'node:url'
 import sharp from 'sharp'
@@ -27,6 +28,7 @@ const check = (name, ok, detail) => {
 
 const browser = await launchVerifyBrowser()
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
+const shot = frameShutter(page, OUT)
 const errors = []
 page.on('console', (m) => {
   if (m.type() === 'error') errors.push(m.text())
@@ -216,8 +218,9 @@ const select = await page.evaluate(() => {
 })
 check('GUI text is not selectable', select.bar === 'none' && select.label === 'none', JSON.stringify(select))
 check('form inputs keep normal text selection', select.input === 'text', JSON.stringify(select))
-await page.screenshot({ path: `${OUT}67-settings-debug-menu.png` })
-console.log('shot 67-settings-debug-menu.png')
+// Point 375: the frames prove the thing they are named after is on screen —
+// the open debug menu, the feeding lion, the rendered TRAA frame.
+await shot('67-settings-debug-menu', { element: '.debug-menu', label: 'the German debug menu' })
 
 // Close the debug menu and restore English before the scene checks.
 await page.evaluate(() => window.__setLang('en'))
@@ -290,8 +293,11 @@ check('feeding: tearing movement animates', pitchSwing > 0.005,
 check('feeding: prey lies on its side', feedA.preyOnSide > 1.0, `${feedA.preyOnSide?.toFixed(2)}`)
 check('feeding: stain beneath the carcass', feedA.stainActive === true && feedA.stainRadius > 0.3,
   `radius ${feedA.stainRadius?.toFixed(2)}`)
-await page.screenshot({ path: `${OUT}68-lion-feeding.png` })
-console.log('shot 68-lion-feeding.png')
+const lionAt = await page.evaluate(() => {
+  const l = window.__lionHunt?.lion.current
+  return l ? { x: l.position.x, z: l.position.z } : null
+})
+await shot('68-lion-feeding', { world: lionAt ?? { x: 0, z: 0 }, label: 'the feeding lion', settle: false })
 
 // --- Tab toggles the journal without focus problems (design.md §17) ----------
 // The journalOpen toggle itself is asserted in Vitest (store.debug.test.ts);
@@ -410,8 +416,10 @@ const meanLuma = async (png) => {
 const errsBeforeTraa = errors.length
 await page.evaluate(() => window.__ui.getState().setTraaEnabled(true))
 await page.waitForTimeout(2500)
-const traaShot = await page.screenshot({ path: `${OUT}69-traa-on.png` })
-console.log('shot 69-traa-on.png')
+const traaShot = await shot('69-traa-on', {
+  general: 'the TRAA pipeline rebuild is judged by the mean luma of this whole frame, which is therefore the subject',
+  scene: 'travel',
+})
 const traaMean = await meanLuma(traaShot)
 check('TRAA on: scene renders non-black', traaMean > 8, `mean ${traaMean.toFixed(1)}`)
 check('TRAA on: no new console errors', errors.length === errsBeforeTraa,

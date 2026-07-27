@@ -973,6 +973,14 @@ After completion and after every major system:
   hard-coded distance) — clearView pushes the fog to the horizon at a wide zoom,
   so no radius stands in for the picture. A green assertion against a computed
   radius can hide a real bug the player sees (points 164/171/172).
+- **A frame must show what its name claims (point 375).** The same projection
+  decides at the SHUTTER: every frame a verify script writes declares its
+  subject — a place/landmark (`world`), something inside a settlement (`local`/
+  `place`), a HUD element, or explicitly a `general` view WITH its reason — and
+  the shutter (`scripts/verify/frameSubject.mjs`) refuses to write a frame whose
+  subject is not in the picture, naming what was found instead. Two `world` runs
+  on identical code had photographed different places, both exiting 0. A pure
+  gate in the unit layer fails on any screenshot written outside the shutter.
 - **Backend coverage is UNIVERSAL where it is possible (point 204).** WebGPU is
   the player's real backend and WebGL 2 the shipped fallback, so both are
   verified:
