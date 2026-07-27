@@ -10,7 +10,8 @@
 // error, which the Stop hook lets fall through to its outer catch — stop allowed,
 // state untouched, gate still pending on the next turn.
 import { describe, it, expect } from 'vitest'
-import { BaselineDiffError, gatherRenderVerifyInputs } from './render-verify-guard.mjs'
+import { execSync } from 'node:child_process'
+import { BaselineDiffError, commitMissing, gatherRenderVerifyInputs } from './render-verify-guard.mjs'
 
 const boom = (what) => () => {
   throw new Error(`${what} exploded`)
@@ -132,5 +133,17 @@ describe('the Stop hook re-baselines on that error and only that one', () => {
     expect(wouldRebaseline(new TypeError('probe blew up'))).toBe(false)
     // A message that merely LOOKS like the diff failure must not count either.
     expect(wouldRebaseline(new Error('diff vs abc123 failed'))).toBe(false)
+  })
+})
+
+// The probe runs a REAL git command, so it needs a real-git test: the injected
+// `baselineGone` of the suite above cannot see a quoting bug in the command
+// itself, and one slipped through exactly that gap (27.07.2026 — cmd.exe eats
+// an unquoted `^`, so every existing baseline read as "gone").
+describe('commitMissing runs a real git probe (no injection)', () => {
+  it('says PRESENT for the current HEAD and GONE for a sha that does not exist', () => {
+    const head = execSync('git rev-parse HEAD', { encoding: 'utf8' }).trim()
+    expect(commitMissing(head)).toBe(false)
+    expect(commitMissing('0'.repeat(40))).toBe(true)
   })
 })

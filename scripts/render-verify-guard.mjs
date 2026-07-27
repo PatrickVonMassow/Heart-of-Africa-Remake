@@ -43,9 +43,13 @@ function git(cmd) {
  * tell", which counts as PRESENT: the gate then stays where it is rather than
  * clearing itself on a question it could not answer.
  */
-function commitMissing(sha) {
+export function commitMissing(sha) {
   try {
-    git(`git cat-file -e ${sha}^{commit}`)
+    // The revision MUST stay quoted: execSync goes through cmd.exe on Windows,
+    // where `^` is the escape character — unquoted, git received `<sha>{commit}`
+    // and answered "Not a valid object name" for a commit that exists, so this
+    // function called every baseline gone and the narrowing protected nothing.
+    git(`git cat-file -e "${sha}^{commit}"`)
     return false
   } catch (e) {
     return /Not a valid object name|could not be found|bad file|unknown revision/i.test(
