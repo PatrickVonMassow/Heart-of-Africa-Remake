@@ -999,25 +999,6 @@ read that as "the criterion and its evidence section".
   workflows-token-budget rule) — scope Prong A inline first, then run Prong B's
   harness. Implementation-ready.
 
-- [ ] 294. AUTO-BASELINE CLASSIFICATION FOR VERIFY FAILURES (user 24.07.2026, from the
-  retrospective §3.12/§8). When a browser-verify check (`scripts/verify/*.mjs`) goes RED,
-  automatically re-run THAT failed check against the pre-change BASELINE (the branch's
-  merge-base with main, or main's HEAD) and CLASSIFY the red: "REAL REGRESSION (green on
-  baseline, red now)" vs "PRE-EXISTING / STALE-ASSUMPTION (already red on baseline)". Print
-  the classification in the verify output so a red is triaged instantly instead of by hand.
-  This mechanizes the manual baseline-diff done on 24.07. (the SSAO-off ground-edge check =
-  stale check assumption; the proximity-call-fade = pre-existing — point 292). DESIGN care:
-  re-running a browser suite is expensive and needs the baseline's `node_modules`/checkout —
-  so make it OPT-IN (a flag / on-demand for the failed checks only, not every run), reuse a
-  baseline worktree where possible, and keep the classification core PURE and Vitest-tested.
-  ANCHORS: `scripts/verify/run-all.mjs`, a new `scripts/verify/baseline-classify*.mjs` (pure
-  core + wrapper). VERIFIABLE: a pure test of the classify logic (green→red = regression;
-  red→red = pre-existing) and a live check that a known pre-existing red is labelled
-  pre-existing while an injected fresh regression is labelled real. No player-visible text.
-  PROCESS (user 24.07.2026): BEFORE building, a Fable-5 subagent reviews the PLAN; AFTER
-  building, a Fable-5 subagent evaluates whether it is truly safe, works in ALL cases and has
-  NO negative side effects; merge to main ONLY when everything is green.
-
 - [ ] 295. DEV-BUILD RENDER-RESOURCE LEAK INVARIANT (user 24.07.2026, from the retrospective
   §3.12/§8 — the in-game-assert principle applied to GPU resources). A `import.meta.env.DEV`
   invariant that asserts the renderer's render-target / texture counts (`renderer.info`)
