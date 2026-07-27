@@ -63,6 +63,27 @@ export function isAncestor(a, b) {
   }
 }
 
+/**
+ * True when `sha` names no reachable commit — the ONE condition under which an
+ * undiffable range may move the gate. A git failure here answers "cannot tell",
+ * which counts as PRESENT: the gate then stays where it is rather than
+ * recovering on a question it could not answer.
+ *
+ * The revision stays QUOTED for the same reason `bootstrapBase` does: cmd.exe
+ * eats a bare `^`, and an unquoted probe would call every baseline gone.
+ */
+export function commitMissing(sha, run = (cmd) => execSync(cmd, { cwd: REPO_ROOT, encoding: 'utf8' })) {
+  try {
+    run(`git rev-parse --verify --quiet "${sha}^{commit}"`)
+    return false
+  } catch (e) {
+    // Exit 1 is git's own quiet "no such revision". Anything else — 128, or a
+    // spawn failure with no status at all under parallel-agent load — means the
+    // probe could not answer, and an unanswered question counts as PRESENT.
+    return e?.status === 1
+  }
+}
+
 function readBaselineState() {
   try {
     const s = JSON.parse(readFileSync(BASELINE_PATH, 'utf8'))
@@ -128,15 +149,23 @@ function scriptFiles() {
 
 /** Commits in base..head that touch a mechanism path, oldest first.
  *
- *  `--diff-merges=first-parent` is load-bearing (four-eyes review, 27.07.2026):
- *  by default `git log --name-only` prints NO files for a merge commit, so a
- *  guard rewritten while resolving a conflict — the case CLAUDE.md §6 explicitly
- *  tells the merging session to be careful about — was invisible to this gate,
- *  the turn cleared, and the baseline advanced past it for good. */
+ *  `--diff-merges=cc` is load-bearing, and the WEAKER `first-parent` was worse
+ *  than none (four-eyes review, 27.07.2026, both readings measured on real
+ *  history). By default `git log --name-only` prints NO files for a merge, so a
+ *  guard rewritten while RESOLVING a conflict — the case CLAUDE.md §6 tells the
+ *  merging session to be careful about — was invisible: the turn cleared and the
+ *  baseline advanced past it for good. But `first-parent` lists everything the
+ *  merge brought in, so every clean merge of a mechanism branch became a pending
+ *  commit that no branch-head record can cover (a merge is not an ancestor of the
+ *  branch it merges) — the gate would have blocked its own landing, every time,
+ *  and merges carry no model trailer, so the self-review refusal could not even
+ *  bite on the record the trapped session would write. `cc` shows only what the
+ *  merge changed against ALL its parents: nothing for a clean merge, the
+ *  resolution delta for an evil one. */
 function mechanismCommits(base, head, files) {
   const out = git(
     `log --format="${REC}%H${FLD}%ct${FLD}%s${FLD}%(trailers:key=Co-Authored-By,valueonly,separator=;)" ` +
-      `--name-only --diff-merges=first-parent --reverse ${base}..${head}`,
+      `--name-only --diff-merges=cc --reverse ${base}..${head}`,
   )
   const commits = []
   for (const chunk of out.split(REC)) {
@@ -196,16 +225,36 @@ export function gatherMechanismReviewInputs({ sessionId = '' } = {}) {
   } catch {
     /* unrelated baseline — the raw range below decides, or re-arms us at HEAD */
   }
+  let effective = baseline
   let pendingCommits = []
   if (base !== head) {
     try {
       pendingCommits = mechanismCommits(base, head, scriptFiles())
-    } catch {
-      // A baseline that no longer resolves (rebased away, gc'd) makes the range
-      // undiffable. Falling through to the wrapper's fail-open would disable the
-      // gate FOREVER, because nothing would ever re-arm the baseline — so the
-      // gate re-arms at HEAD instead: fail-open ONCE, not permanently.
-      return { applicable: true, head, branch, bootstrap: true, inputs: { baseline: null, head } }
+    } catch (e) {
+      // ONLY a baseline that is genuinely GONE may move the gate. A baseline
+      // rebased away or gc'd makes the range undiffable forever, and falling
+      // through to the wrapper's fail-open would disable the gate permanently,
+      // because nothing would ever move the baseline again.
+      //
+      // Every OTHER failure must NOT move it: a spawn error under parallel-agent
+      // load and execSync's 1 MiB buffer on a long log are both real here, and
+      // recovering from those would forgive pending unreviewed commits for good —
+      // fail-open ONCE turned into fail-open FOREVER (the lesson render-verify
+      // learned with its typed BaselineDiffError). Those rethrow into the
+      // wrapper's per-turn fail-open, which leaves the gate exactly where it was.
+      if (!commitMissing(baseline)) throw e
+      // Recover at the FORK POINT, not at HEAD: HEAD would grandfather this
+      // branch's own pending mechanism work in the act of recovering. The range
+      // is then judged for real — a recovery that reported "clear" without
+      // looking would be the same silent pass in a new place.
+      effective = bootstrapBase(head)
+      base = effective
+      try {
+        base = git(`merge-base ${effective} ${head}`)
+      } catch {
+        /* the raw range below decides */
+      }
+      pendingCommits = base === head ? [] : mechanismCommits(base, head, scriptFiles())
     }
   }
 
@@ -225,8 +274,8 @@ export function gatherMechanismReviewInputs({ sessionId = '' } = {}) {
     applicable: true,
     head,
     branch,
-    baseline,
-    inputs: { baseline, head, pendingCommits, records },
+    baseline: effective,
+    inputs: { baseline: effective, head, pendingCommits, records },
   }
 }
 

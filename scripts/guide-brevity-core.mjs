@@ -25,12 +25,12 @@
 // budgeting the documents that are read at every start (+10 lines, +92 words),
 // and again on 26.07.2026 by the tip on the QUOTA being the real limit — deliver
 // each helper's brief instead of letting it search, and start a fresh context per
-// task (+10 lines, +101 words), and on 27.07.2026 by two more: isolation is a property
-// of the environment rather than of an instruction (in the concurrency meta-rule, whose
-// prompt gains the clause), and the pitfall of asserting an intended state in the
-// present tense (+13 lines, +146 words together), and on 27.07.2026 by the tip that the
-// four-eyes counter-check on a MECHANISM needs its own enforcement — what the record has
-// to name, and that the author's own "looks fine" is not one (+5 lines, +46 words).
+// task (+10 lines, +101 words). Raised again on 27.07.2026 by three tips: isolation is a
+// property of the environment rather than of an instruction (in the concurrency meta-rule,
+// whose prompt gains the clause), the pitfall of asserting an intended state in the
+// present tense (+13 lines, +146 words for those two together), and the four-eyes
+// counter-check on a MECHANISM needing its own enforcement — what the record has to name,
+// and that the author's own "looks fine" is not one (+5 lines, +46 words).
 export const LIMITS = {
   maxLines: 401,
   // Deliberately a little loose (~5 % headroom): a budget with almost no room
