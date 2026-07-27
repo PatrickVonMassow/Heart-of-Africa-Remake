@@ -4799,6 +4799,19 @@ const crocDrama = async (mode, attempt = 0) =>
     herds.zebra.push(calf)
     const pf = window.__balance.parentDefense.predatorFlight
     const prevPf = pf.crocodile
+    // NO THIRD PARENT (27.07.2026). The staged calf stands at the bank ALONE for
+    // up to 30 sim seconds while the drink phase is swept — and a parentless
+    // juvenile is exactly what the point-262 adoption looks for: any childless
+    // zebra adult that has roamed within balance.family.adoptionRadius (20) takes
+    // it in, and THAT adult then charges the crocodile when the grip lands. Its
+    // sacrifice frees the calf, so the lunge case read calf ALIVE, staged parent
+    // alive, crocodile retreated — the drive-off picture, from an animal the
+    // staging never placed. The scenario pins WHICH parent resolves it (the one
+    // it parks and links), so it must pin that there is only one: no adoption for
+    // the length of the drama. Same class as the 25.07. lunge-distance and
+    // outcome pins — the staging is made deterministic, no assertion is relaxed.
+    const prevAdoption = window.__balance.family.adoptionRadius
+    window.__balance.family.adoptionRadius = 0.001
     if (MODE.kind === 'rescue') pf.crocodile = 100 // force the drive-off band
     if (MODE.kind === 'sacrifice' || MODE.kind === 'toolate') pf.crocodile = 0 // force taken
     // Park the scripted lion hunt for the staged scenario (point 194): the two
@@ -4810,7 +4823,7 @@ const crocDrama = async (mode, attempt = 0) =>
     lion.timer = 9999
     lion.victim = null
     lion.victimHunt = false
-    const out = { staged: true, lunged: false, noTeleport: true, gripped: false, calfAlive: null, parentAlive: null, crocRetreated: false, lionTouched: false }
+    const out = { staged: true, lunged: false, noTeleport: true, gripped: false, calfAlive: null, parentAlive: null, crocRetreated: false, lionTouched: false, foreignParent: false }
     // Sweep the drink phase so the bank window comes around quickly, watching
     // the croc for motion and teleports until it grips.
     let lastX = croc.x
@@ -4838,6 +4851,11 @@ const crocDrama = async (mode, attempt = 0) =>
       lastX = croc.x; lastZ = croc.z; lastSimT = nowSim
       if (calf.caught !== undefined && calf.caughtBy === 'crocodile') {
         out.gripped = true
+        // Did the adoption pin hold? Any OTHER animal holding this calf as its
+        // child would charge the crocodile itself and resolve the drama the
+        // staging means to resolve — reported, so a future occurrence names its
+        // cause instead of leaving an inexplicable "the calf survived the grip".
+        out.foreignParent = herds.zebra.some((z) => z !== parent && z.child === calf)
         // Now the parent enters the drama: linked and pushed only here, so
         // the pre-grip stand was never disturbed by the follow drive.
         parent.child = calf
@@ -4923,6 +4941,7 @@ const crocDrama = async (mode, attempt = 0) =>
         out.lionTouched = lion.victim === calf || lion.victim === parent
         window.__balance.parentDefense.forceOutcome = undefined
         pf.crocodile = prevPf
+        window.__balance.family.adoptionRadius = prevAdoption
         herds.zebra = herds.zebra.filter((a) => a !== parent && a !== calf)
         herds.crocodile = naturals
         out.calfAt = { x: +calf.x.toFixed(1), z: +calf.z.toFixed(1), bankX: +bankX.toFixed(1), bankZ: +bankZ.toFixed(1) }
@@ -4950,6 +4969,7 @@ const crocDrama = async (mode, attempt = 0) =>
     out.lionTouched = lion.victim === calf || lion.victim === parent
     window.__balance.parentDefense.forceOutcome = undefined // clear the forced rescue outcome
     pf.crocodile = prevPf
+    window.__balance.family.adoptionRadius = prevAdoption // the herds adopt again
     herds.zebra = herds.zebra.filter((a) => a !== parent && a !== calf)
     herds.crocodile = naturals // the staged croc retires, the naturals return
     out.calfAt = { x: +calf.x.toFixed(1), z: +calf.z.toFixed(1), bankX: +bankX.toFixed(1), bankZ: +bankZ.toFixed(1) }
