@@ -1747,30 +1747,6 @@ read that as "the criterion and its evidence section".
   200's flake work, and point 294's auto-classification would have labelled all four
   reds "staging, not product" without a manual repeat each time.
 
-- [ ] 337. THE STARTUP FRAME STALLS THE PICTURE ~15 s WHILE SHADERS COMPILE (found
-  25.07.2026 by the point-304 measurement, reported-not-gated there because it
-  reproduces with the TTS entirely absent and was out of that point's scope). On the
-  WebGL 2 backend on real NVIDIA hardware, ONE startup frame awaits about 149
-  shader-program links — a CDP trace attributes ~27 s to GetProgramiv /
-  CommandBufferHelper::Finish / WaitForGetOffset plus 508 ANGLE compile jobs — and
-  because three.js's async render yields between the awaits, that single FRAME spans
-  ~15 s. Scripts, timers and promises keep running the whole time (a 50 ms timer
-  train showed a 63 ms maximum gap), so nothing is "blocked" in the usual sense —
-  but the PLAYER sees a frozen picture for a quarter of a minute at load. Same class
-  as the §7.1 pt 2 leave-transition freeze that surgical dispose opt-outs fixed, but
-  at initial load, and currently unguarded. INVESTIGATE: how much of the program set
-  is actually needed for the FIRST frame versus compiled eagerly (material variants
-  for scenes not yet entered, the post chain, flora/fauna instance materials); can
-  the set be warmed progressively across frames, or the first frame drawn with a
-  reduced set and the rest linked behind it? Measure on the user's real hardware
-  (the F8 benchmark's environment block already records adapter and backend) — and
-  on WebGPU too, where the pipeline model differs and the number may be quite
-  different. VERIFIABLE: a live check that the initial-load picture is never frozen
-  longer than a calibratable budget, measured with the point-304 attribution module
-  (scripts/verify/liveness.mjs) so a busy renderer cannot hide the stall; the budget
-  is a balance value; the improvement demonstrated on both backends with before/after
-  numbers, and no visual regression at first frame.
-
 - [ ] 338. GIZA IS LABELLED TWICE IN THE BIRD'S-EYE VIEW, FROM TWO DEFINITIONS OF THE
   SAME SITE (user 25.07.2026, screenshot: the italic cultural-landmark label »Pyramids
   of Giza« and the map-point label »The Pyramids of Giza« overlap each other west of
