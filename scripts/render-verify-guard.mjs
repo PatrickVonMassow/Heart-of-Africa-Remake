@@ -37,6 +37,23 @@ function git(cmd) {
   return execSync(cmd, { cwd: REPO_ROOT, encoding: 'utf8' }).trim()
 }
 
+/**
+ * True when `sha` names no reachable commit — the one condition under which a
+ * failed baseline diff may advance the gate. A git failure here answers "cannot
+ * tell", which counts as PRESENT: the gate then stays where it is rather than
+ * clearing itself on a question it could not answer.
+ */
+function commitMissing(sha) {
+  try {
+    git(`git cat-file -e ${sha}^{commit}`)
+    return false
+  } catch (e) {
+    return /Not a valid object name|could not be found|bad file|unknown revision/i.test(
+      String(e.stderr ?? e.message ?? e),
+    )
+  }
+}
+
 /** Current branch name ('HEAD' when detached) — the per-branch baseline key. */
 function currentBranch() {
   try {
@@ -159,6 +176,7 @@ export function gatherRenderVerifyInputs({ sessionId = '', deps = {} } = {}) {
     readState = readRenderState,
     diffRenderPaths = changedRenderPaths,
     changeTimeOf = latestChangeAt,
+    baselineGone = commitMissing,
   } = deps
   // Hard singleton: a session that does not own the live batch lock stands down.
   if (heldByOther(sessionId)) {
@@ -176,8 +194,14 @@ export function gatherRenderVerifyInputs({ sessionId = '', deps = {} } = {}) {
   try {
     ;({ paths, base } = diffRenderPaths(cleared, head))
   } catch (e) {
-    // Typed on purpose: ONLY this failure is allowed to advance the baseline.
-    throw new BaselineDiffError(cleared, e)
+    // Typed on purpose: ONLY a baseline that is genuinely GONE may advance the
+    // gate. The diff step can also fail transiently — a spawn error while the
+    // machine is loaded, which is a documented reality here — and re-baselining
+    // on that would clear an unverified render change for good. So confirm the
+    // commit is really unreachable first; every other failure falls through to
+    // the fail-open path, which allows the stop and writes NO state.
+    if (baselineGone(cleared)) throw new BaselineDiffError(cleared, e)
+    throw e
   }
   return {
     applicable: true,

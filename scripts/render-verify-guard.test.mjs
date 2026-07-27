@@ -24,6 +24,9 @@ const okDeps = () => ({
   readState: () => ({ clearedHeads: { 'feat/x': 'basesha' }, runs: [] }),
   diffRenderPaths: () => ({ paths: ['src/render/a.ts'], base: 'basesha' }),
   changeTimeOf: () => 1000,
+  // Default: the baseline really is gone, so a diff failure re-baselines. The
+  // transient case sets this false — see the pair of tests below.
+  baselineGone: () => true,
 })
 
 const gatherWith = (broken) =>
@@ -81,6 +84,21 @@ describe('ONLY the baseline diff may re-baseline (F1)', () => {
     expect(caught.message).toMatch(/merge-base exploded/)
     // The main path keys on the type, so the name must stay stable too.
     expect(caught.name).toBe('BaselineDiffError')
+  })
+
+  it('does NOT raise BaselineDiffError when the diff fails but the baseline is STILL THERE', () => {
+    // A spawn failure under machine load is not a vanished baseline. Re-baselining
+    // on it would clear an unverified render change for good, so the gate must
+    // survive the turn instead: a plain error, which the hook allows without a write.
+    let caught
+    try {
+      gatherWith({ diffRenderPaths: boom('spawn EAGAIN'), baselineGone: () => false })
+    } catch (e) {
+      caught = e
+    }
+    expect(caught).toBeDefined()
+    expect(caught).not.toBeInstanceOf(BaselineDiffError)
+    expect(String(caught.message)).toMatch(/spawn EAGAIN/)
   })
 
   // One case per remaining error source. Each of these used to re-baseline.
