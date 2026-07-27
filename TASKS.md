@@ -3198,6 +3198,43 @@ read that as "the criterion and its evidence section".
   DOCS in the same commit: CLAUDE.md §7.2 (the Stop-chain list gains its first
   PreToolUse board gate) and the retrospective's guard table.
 
+- [ ] 367. SHORTEN design.md WITHOUT LOSING A DECISION (user 27.07.2026). The design
+  document has grown to 994 lines / ~30.5k words (~46k tokens) — under its 1100-line
+  ceiling, so no guard complains, but the user reads it as verbose and every point that
+  cites a section pays for the bulk around it. It is also the SOLE SOURCE OF TRUTH for
+  the target state, which makes a careless cut the most expensive possible edit here.
+  MEASURE FIRST, then cut. Deliver a table of the 21 top-level sections by word count,
+  and classify each block as: (a) REFERENCE read on demand rather than at the start —
+  the candidate to MOVE to a neighbour document under the SAME numbers, exactly as the
+  acceptance-evidence split did on 26.07.2026; (b) DUPLICATION of what CLAUDE.md, the
+  research documents (`docs/*-1890.md`) or a sibling section already state — the
+  candidate to delete and cross-reference; (c) NARRATIVE around a decision, where the
+  decision stays and the telling shortens. No cut is made outside that classification.
+  THE METHOD IS SETTLED BY EXPERIENCE (`docs/analysis_de/retrospektive-zusammenarbeit.md`
+  §3.30), and departing from it is how the last compression cost more than it saved:
+  MOVE, do not rewrite — reformulating 32 criteria was what threatened to lose the very
+  assurances at stake; cut at the SENTENCE boundary, never at the line (a first machine
+  pass cut at lines and tore sentences in half); and afterwards find EVERY READER of the
+  old location — the dangerous one does not fail, it just quietly stops finding anything.
+  WHAT MUST SURVIVE, and it is testable: every existing §-number keeps its number and
+  its meaning (CLAUDE.md §7.1 and dozens of specs cite them by number), and every stated
+  DECISION — a value, a rule, a target-state sentence — survives verbatim, whether it
+  stays or moves. Only framing, repetition and narrative may go.
+  VERIFIABLE: a pure Vitest that the set of §-numbers in design.md before the change is
+  a subset of what is resolvable after it (a moved section resolves through its new
+  home, so nothing vanishes silently), and that every design.md §-reference appearing in
+  CLAUDE.md still resolves. Point 365's brief generator already fails loudly on a
+  dangling design.md section — run it across the open points as the second net, which is
+  why this point comes AFTER 365. Plus the doc-budget gate, whose design.md ceiling is
+  LOWERED to the achieved size in the same commit: a compression that leaves the old
+  ceiling standing just refills.
+  FOUR EYES: the second model reads the diff for lost decisions BEFORE it merges — on the
+  last compression it was the second model, not the author, that found every stale
+  reader left behind.
+  DOCS in the same commit: `scripts/doc-budget-core.mjs` (the new ceiling with its
+  written justification), CLAUDE.md §4 if a moved block changes where a thing lives, and
+  the retrospective only if the run produces a NEW lesson rather than confirming §3.30.
+
 ## Closing (only after all points)
 
 New points are appended BEFORE this section — it stays last in the file.
