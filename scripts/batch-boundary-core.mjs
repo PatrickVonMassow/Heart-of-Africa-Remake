@@ -1,0 +1,122 @@
+// Pure core of the AUTONOMOUS SESSION BOUNDARY (user 27.07.2026).
+//
+// WHY: 80 % of the token spend sits above 150k context, because one batch
+// session carries point after point. Run 24/7 that is the dominant cost
+// (1.25 %/h of the weekly quota against the ~0.6 %/h that fits). The cure is the
+// mechanism that already exists: the session ENDS at a point boundary and the OS
+// task `HoA-Batch-Autostart` brings up a fresh one, which `batch-resume-hook`
+// re-orients. Nothing new drives the batch — what changes is that ending is now
+// a LEGAL way to finish a turn.
+//
+// The danger this core exists to remove is the obvious one: `batch-progress-guard`
+// hard-blocks every turn end while open points remain, so without it the guard
+// would block exactly the behaviour the change wants; and if the guard simply
+// stopped blocking, a disabled launcher would strand the batch forever. So a
+// boundary stop is legal only when BOTH hold:
+//
+//   1. The point the session claims to have closed is VERIFIABLY closed — gone
+//      from TASKS.md's open list AND ticked in docs/tasks-archive.md. The claim
+//      alone proves nothing; the work order is the authority.
+//   2. The launcher is ARMED (the scheduled task's real state, probed, not
+//      assumed). Unknown counts as NOT armed: erring toward "keep working" can
+//      cost context, erring toward "stop" can cost the whole batch.
+//
+// Deliberately NOT part of the boundary: releasing the batch lock. A session that
+// frees the lock while its own process is still winding down invites the launcher
+// to spawn a successor next to it — the double-session class this project already
+// paid for once. The lock is left to expire the honest way (the successor's
+// `assessOwner` sees the dead pid), which costs a few minutes and guarantees the
+// old session is gone.
+
+/** How long a recorded boundary marker stays usable. Long enough for the merge,
+ *  the tick, the push and the closing report of a point; short enough that a
+ *  marker from an abandoned attempt cannot authorise a stop an hour later. */
+export const BOUNDARY_FRESH_MS = 60 * 60 * 1000
+
+/** The OS scheduled task that resurrects the batch. */
+export const LAUNCHER_TASK_NAME = 'HoA-Batch-Autostart'
+
+/**
+ * Map a raw `Get-ScheduledTask ... .State` value to armed / disabled / unknown.
+ * Accepts both the string names and the numeric ScheduledTask states
+ * (0 Unknown, 1 Disabled, 2 Queued, 3 Ready, 4 Running), because PowerShell
+ * hands back either depending on how the value is formatted.
+ *
+ * ARMED means "this task will fire again on its own": Ready, Queued and Running
+ * all do. Disabled does not, and Unknown is not evidence that it will.
+ */
+export function classifyLauncherState(raw) {
+  if (raw === null || raw === undefined) return 'unknown'
+  const s = String(raw).trim().toLowerCase()
+  if (s === '') return 'unknown'
+  if (s === 'ready' || s === 'queued' || s === 'running' || s === '2' || s === '3' || s === '4') {
+    return 'armed'
+  }
+  if (s === 'disabled' || s === '1') return 'disabled'
+  return 'unknown'
+}
+
+/**
+ * Is point `n` closed, judged by the split work order (point 365 / the 26.07.2026
+ * split)? `tasksOpenText` is TASKS.md, `archiveText` is docs/tasks-archive.md.
+ * Returns 'open' | 'closed' | 'unknown'.
+ *
+ * "Closed" needs BOTH halves: absent from the open list and present, ticked, in
+ * the archive. Absence alone would read a point that was never written — or one
+ * lost to a bad edit — as finished.
+ */
+export function pointClosure(n, tasksOpenText, archiveText) {
+  const num = Number(n)
+  if (!Number.isInteger(num) || num <= 0) return 'unknown'
+  const open = new RegExp(`^- \\[ \\] ${num}\\.`, 'm')
+  const ticked = new RegExp(`^- \\[x\\] ${num}\\.`, 'm')
+  if (open.test(String(tasksOpenText ?? ''))) return 'open'
+  if (ticked.test(String(archiveText ?? ''))) return 'closed'
+  // A tick that has not been archived yet still counts as closed — the archive
+  // move follows the tick, and the two are not always one commit apart.
+  if (ticked.test(String(tasksOpenText ?? ''))) return 'closed'
+  return 'unknown'
+}
+
+/**
+ * Judge a recorded boundary marker. Inputs are plain data:
+ *   marker    — { sessionId, point, at } or null
+ *   sid       — the session asking (the Stop hook's own session id)
+ *   now       — epoch ms
+ *   closure   — 'open' | 'closed' | 'unknown' from pointClosure()
+ *   freshMs   — override for tests
+ * Returns { valid, point, reason }.
+ */
+export function assessBoundary({ marker, sid, now, closure, freshMs = BOUNDARY_FRESH_MS }) {
+  if (!marker || typeof marker !== 'object') {
+    return { valid: false, point: null, reason: 'no-marker' }
+  }
+  const point = Number(marker.point)
+  if (!Number.isInteger(point) || point <= 0) {
+    return { valid: false, point: null, reason: 'marker-malformed' }
+  }
+  if (typeof marker.at !== 'number' || !(now - marker.at < freshMs)) {
+    return { valid: false, point, reason: 'marker-stale' }
+  }
+  // Bound to the session that recorded it: a marker left by a previous session
+  // must never authorise this one's stop.
+  if (!sid || marker.sessionId !== sid) {
+    return { valid: false, point, reason: 'marker-foreign-session' }
+  }
+  if (closure === 'open') return { valid: false, point, reason: 'point-still-open' }
+  if (closure !== 'closed') return { valid: false, point, reason: 'point-not-verifiable' }
+  return { valid: true, point, reason: 'boundary' }
+}
+
+/**
+ * Should the recorded boundary be honoured, and if not, why? Returns
+ *   'allow-boundary'  — end the session here; the launcher brings up the next one
+ *   'block-launcher'  — a valid boundary but nothing would restart the batch
+ *   null              — no boundary claimed (the caller falls through to its
+ *                       ordinary decision)
+ */
+export function boundaryVerdict({ boundary, launcher }) {
+  if (!boundary || boundary.reason === 'no-marker') return null
+  if (!boundary.valid) return null
+  return launcher === 'armed' ? 'allow-boundary' : 'block-launcher'
+}

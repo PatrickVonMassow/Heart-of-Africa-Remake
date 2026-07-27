@@ -182,8 +182,17 @@ export function classifyParallel({ sessionsSeen, activity, ownerSid, now }) {
  *   'allow'            — paused / batch complete / nothing to enforce
  *   'stand-down'       — this session must NOT drive the batch (not the owner)
  *   'block-remediate'  — owner + parallel session detected → verify first
+ *   'allow-boundary'   — owner at a POINT BOUNDARY with an ARMED launcher: ending
+ *                        here is the intended behaviour (point 373), not an idle
+ *                        stop — the OS task brings up a fresh session
+ *   'block-launcher'   — a boundary was claimed but the launcher is not armed, so
+ *                        nothing would restart the batch: keep working
  *   'block-continue'   — owner + open points → keep working
  *   'block-format'     — TASKS.md unparseable → warn, never read as complete
+ *
+ * `boundary`/`launcher` come from scripts/batch-boundary-core.mjs
+ * (`assessBoundary`, `classifyLauncherState`); omitting them keeps the old
+ * behaviour exactly, which is what every non-boundary turn end wants.
  */
 export function progressGuardDecision({
   sid,
@@ -192,6 +201,8 @@ export function progressGuardDecision({
   formatSuspect,
   ownership, // 'mine' | 'held' | 'acquired' | 'lost-race' | 'none'
   unhandledAlert,
+  boundary = null, // { valid, point, reason } | null
+  launcher = 'unknown', // 'armed' | 'disabled' | 'unknown'
 }) {
   if (paused) return 'allow'
   if (formatSuspect) return 'block-format'
@@ -203,6 +214,11 @@ export function progressGuardDecision({
   if (!sid) return 'stand-down'
   if (ownership !== 'mine' && ownership !== 'acquired') return 'stand-down'
   if (unhandledAlert) return 'block-remediate'
+  // The point boundary (point 373). A valid boundary is only ever honoured with
+  // an armed launcher — an unarmed one would turn "end the session" into "end the
+  // batch", so it blocks instead. An INVALID claim falls through to the ordinary
+  // block: the work order, not the marker, decides whether a point is closed.
+  if (boundary && boundary.valid) return launcher === 'armed' ? 'allow-boundary' : 'block-launcher'
   return 'block-continue'
 }
 
