@@ -26,6 +26,11 @@ import {
   revertCommits,
   severityFor,
   skeletonDoc,
+  LEDGER_GAP_MARK,
+  evaluateLedger,
+  ledgerGaps,
+  parseLedger,
+  parseLessonSubsections,
 } from './retro-core.mjs'
 import { collectMemories, collectSources, defaultMemoryDir } from './retro-sources.mjs'
 
@@ -380,5 +385,178 @@ describe('collectSources refuses an empty memory directory', () => {
     expect(() => collectSources({ memoryDir: join(tmpdir(), 'hoa-no-such-memory-dir-371') })).toThrow(
       /no memories under/i,
     )
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Lesson→mechanism ledger (point 370). A lesson written down is not thereby
+// obeyed: every lesson subsection must carry a recorded decision, and the gate
+// fires at the moment that decision is still cheap.
+describe('lesson→mechanism ledger', () => {
+  const retro = [
+    '# Retro',
+    '',
+    '## 1. Kernthese',
+    'prose',
+    '',
+    '### 3.1 Der Batch, der stehen blieb',
+    'prose',
+    '',
+    '### 3.2 Parallele Sessions',
+    'prose',
+    '',
+    '### 3.3 Berechtigungs-Rückfragen',
+    'prose',
+    '',
+    AUTO_START,
+    '### 9.9 A generated heading that decides nothing',
+    AUTO_END,
+  ].join('\n')
+
+  const ledger = (rows) =>
+    ['| Lektion | Titel | Ergebnis | Durchsetzer / Begründung |', '|---|---|---|---|', ...rows].join('\n')
+
+  const exists = (p) => ['scripts/a-guard.mjs', 'scripts/b-guard.mjs'].includes(p)
+  const REASON = 'Bewusst keine: Urteilssache, maschinell nicht prüfbar.'
+  const full = [
+    '| 3.1 | Der Batch, der stehen blieb | 1 | scripts/a-guard.mjs |',
+    '| 3.2 | Parallele Sessions | 2 | scripts/b-guard.mjs |',
+    `| 3.3 | Berechtigungs-Rückfragen | 3 | ${REASON} |`,
+  ]
+
+  it('reads the lesson subsections out of the PROSE region only', () => {
+    const { lessons, unledgerable } = parseLessonSubsections(retro)
+    expect(lessons.map((l) => l.id)).toEqual(['3.1', '3.2', '3.3'])
+    expect(lessons[0].title).toBe('Der Batch, der stehen blieb')
+    expect(unledgerable).toEqual([])
+  })
+
+  it('counts a lesson written one heading level up, so it cannot escape the gate', () => {
+    const { lessons } = parseLessonSubsections('## 3.9 Eine Lektion als Level-2\ntext\n')
+    expect(lessons.map((l) => l.id)).toEqual(['3.9'])
+  })
+
+  it('passes when each of the three outcomes is recorded', () => {
+    expect(evaluateLedger({ retroText: retro, ledgerText: ledger(full), pathExists: exists })).toBeNull()
+  })
+
+  it('BLOCKS a subsection with no ledger entry', () => {
+    const v = evaluateLedger({ retroText: retro, ledgerText: ledger(full.slice(0, 2)), pathExists: exists })
+    expect(v.decision).toBe('block')
+    expect(v.reason).toMatch(/§3\.3 .* has NO ledger entry/)
+  })
+
+  it('BLOCKS an entry naming an enforcer that does not exist', () => {
+    const rows = [...full]
+    rows[0] = '| 3.1 | Der Batch, der stehen blieb | 1 | scripts/never-built-guard.mjs |'
+    const v = evaluateLedger({ retroText: retro, ledgerText: ledger(rows), pathExists: exists })
+    expect(v.decision).toBe('block')
+    expect(v.reason).toMatch(/never-built-guard\.mjs.*does not exist/s)
+  })
+
+  it('BLOCKS an outcome outside 1/2/3', () => {
+    const rows = [...full]
+    rows[1] = '| 3.2 | Parallele Sessions | 4 | scripts/b-guard.mjs |'
+    expect(evaluateLedger({ retroText: retro, ledgerText: ledger(rows), pathExists: exists }).reason).toMatch(
+      /outcome "4" is not one of 1, 2 or 3/,
+    )
+  })
+
+  it('BLOCKS outcome 1/2 that names no enforcing file at all', () => {
+    const rows = [...full]
+    rows[0] = '| 3.1 | Der Batch, der stehen blieb | 1 | irgendein Guard halt |'
+    expect(evaluateLedger({ retroText: retro, ledgerText: ledger(rows), pathExists: exists }).reason).toMatch(
+      /names an enforcer but the cell contains no file path/,
+    )
+  })
+
+  it('BLOCKS outcome 3 with a blank reason — a dash is not a decision', () => {
+    const rows = [...full]
+    rows[2] = '| 3.3 | Berechtigungs-Rückfragen | 3 | — |'
+    expect(evaluateLedger({ retroText: retro, ledgerText: ledger(rows), pathExists: exists }).reason).toMatch(
+      /outcome 3 needs a WRITTEN reason/,
+    )
+  })
+
+  it('BLOCKS an orphan row that refers to no lesson', () => {
+    const rows = [...full, `| 3.9 | Eine gelöschte Lektion | 3 | ${REASON} |`]
+    expect(evaluateLedger({ retroText: retro, ledgerText: ledger(rows), pathExists: exists }).reason).toMatch(
+      /orphan row/,
+    )
+  })
+
+  it('BLOCKS an unnumbered ### subsection, which would otherwise bypass the ledger', () => {
+    const text = retro.replace('### 3.3 Berechtigungs-Rückfragen', '### Eine namenlose Lehre')
+    const v = evaluateLedger({ retroText: text, ledgerText: ledger(full.slice(0, 2)), pathExists: exists })
+    expect(v.reason).toMatch(/carries no N\.M id/)
+  })
+
+  it('BLOCKS a missing ledger file — absent is not exempt', () => {
+    const v = evaluateLedger({ retroText: retro, ledgerText: null, pathExists: exists })
+    expect(v.decision).toBe('block')
+    expect(v.reason).toMatch(/is MISSING/)
+  })
+
+  it('reports EVERY problem in one message, never one per turn', () => {
+    const rows = ['| 3.1 | Der Batch, der stehen blieb | 7 | scripts/a-guard.mjs |']
+    const v = evaluateLedger({ retroText: retro, ledgerText: ledger(rows), pathExists: exists })
+    expect(v.reason).toMatch(/§3\.1/)
+    expect(v.reason).toMatch(/§3\.2/)
+    expect(v.reason).toMatch(/§3\.3/)
+  })
+
+  it('fails OPEN when not one row parses — a parser reading nothing is likelier broken', () => {
+    const v = evaluateLedger({ retroText: retro, ledgerText: '# Ledger\n\n(no table yet)\n', pathExists: exists })
+    expect(v.decision).toBe('allow')
+    expect(v.warning).toMatch(/not one row parsed/)
+  })
+
+  it('fails OPEN when no lesson parses out of the retrospective', () => {
+    const v = evaluateLedger({ retroText: '# Nothing here\n', ledgerText: ledger(full), pathExists: exists })
+    expect(v.decision).toBe('allow')
+    expect(v.warning).toMatch(/no lesson subsections parsed/)
+  })
+
+  it('never fabricates a dead-path failure when it cannot check paths', () => {
+    const rows = ['| 3.1 | Der Batch, der stehen blieb | 1 | scripts/whatever.mjs |', ...full.slice(1)]
+    expect(evaluateLedger({ retroText: retro, ledgerText: ledger(rows) })).toBeNull()
+  })
+
+  it('reports a retitled lesson as an advisory, never as a block', () => {
+    const rows = [...full]
+    rows[0] = '| 3.1 | Der alte Titel | 1 | scripts/a-guard.mjs |'
+    const v = evaluateLedger({ retroText: retro, ledgerText: ledger(rows), pathExists: exists })
+    expect(v.decision).toBe('allow')
+    expect(v.warning).toMatch(/retitled/)
+  })
+
+  it('surfaces the admitted gaps, so "no enforcement" is reported and never silently a 3', () => {
+    const rows = [...full]
+    rows[2] = `| 3.3 | Berechtigungs-Rückfragen | 3 | ${LEDGER_GAP_MARK} kein Durchsetzer vorhanden, Punkt offen |`
+    const { entries } = parseLedger(ledger(rows))
+    expect(ledgerGaps(entries).map((e) => e.id)).toEqual(['3.3'])
+    expect(evaluateLedger({ retroText: retro, ledgerText: ledger(rows), pathExists: exists })).toBeNull()
+  })
+
+  it('skips the header and separator rows of the table', () => {
+    expect(parseLedger(ledger(full)).entries).toHaveLength(3)
+  })
+})
+
+// The REAL documents must satisfy the gate that governs them — §3.34's lesson:
+// a suite that only exercises injected doubles never touches the thing that
+// actually runs. This one reads the shipped retrospective and ledger off disk
+// and checks every claimed enforcer against the real tree.
+describe('the shipped retrospective and ledger', () => {
+  it('carries a mechanism decision for every lesson, each pointing at a real file', async () => {
+    const { readFileSync, existsSync } = await import('node:fs')
+    const { resolve, isAbsolute } = await import('node:path')
+    const { DOC_PATH, LEDGER_PATH, REPO_ROOT } = await import('./retro-sources.mjs')
+    const verdict = evaluateLedger({
+      retroText: readFileSync(DOC_PATH, 'utf8'),
+      ledgerText: existsSync(LEDGER_PATH) ? readFileSync(LEDGER_PATH, 'utf8') : null,
+      pathExists: (p) => !isAbsolute(p) && !p.split('/').includes('..') && existsSync(resolve(REPO_ROOT, p)),
+    })
+    expect(verdict?.decision === 'block' ? verdict.reason : 'clean').toBe('clean')
   })
 })

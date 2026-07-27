@@ -306,6 +306,236 @@ export function refreshedDoc(existingDocText, sources, { refreshedStamp = '', re
 }
 
 // ---------------------------------------------------------------------------
+// Lesson→mechanism ledger (point 370).
+//
+// A lesson written into the retrospective is not thereby obeyed — §1 of the
+// document itself says enforcement beats memory, and a rule that merely states
+// "every rule needs a mechanism" is itself just a rule. What makes it real is a
+// DECISION recorded per lesson, plus something that notices when the decision is
+// missing. That is this ledger: docs/analysis_de/lesson-mechanisms.md holds one
+// row per lesson subsection, naming exactly one of three outcomes —
+//   (1) an EXISTING enforcer was extended/adjusted to cover it (PREFERRED),
+//   (2) a NEW enforcer was built, only where none fitted,
+//   (3) DELIBERATELY NONE, with a written reason.
+// The ledger lives in its own file rather than as a line under each lesson so
+// the two documents keep their roles (§3.26: a document drifts into its
+// neighbour's role) — the retrospective ANALYSES, the ledger DECIDES — and so
+// "which lessons have no enforcement" is answerable at a glance, which is the
+// register's most valuable output. Markdown over JSON because outcome (3) is
+// prose, and because the project's machine-checked tables are Markdown already
+// (docs/graphics-detail-levels.md ↔ src/config/qualityDoc.test.ts).
+//
+// WHAT THE CHECK PROVES, and what it does not: it proves a decision EXISTS for
+// every lesson and that a claimed enforcer POINTS AT A REAL FILE — the exact
+// defect docs/rule-corpus-audit.md A29 records, a rule claiming a guard that was
+// never built. It does NOT prove the named enforcer actually covers the lesson;
+// no cheap check can, and a token-overlap heuristic would cry wolf (nothing in
+// `render-verify-guard` shares a token with "Grüner Test, falsches Bild").
+// Coverage stays review-borne, and the ledger's own header says so.
+
+/** A lesson subsection: a `##`/`###` heading in the PROSE region whose title
+ *  starts with a `N.M` id. Level 2 counts too so a lesson written one level up
+ *  cannot silently escape the ledger. */
+export const LESSON_HEADING_RE = /^(#{2,3})\s+(\d+\.\d+)\s+(.*)$/
+/** A `###` heading in the prose region — every one of these must be a lesson. */
+const SUB_HEADING_RE = /^###\s+(.*)$/
+
+/** Repo-relative file references inside a ledger cell. A claim must point at
+ *  something real, so every one of these is existence-checked. The extension
+ *  alternation is LONGEST-FIRST: with `js` before `json`, `.claude/settings.json`
+ *  matched as `.claude/settings.js` and the guard reported a live file as dead
+ *  (caught by the against-the-real-documents check below, not by the unit cases). */
+export const LEDGER_PATH_RE = /(?:[\w.-]+\/)+[\w.-]+\.(?:json|mjs|cjs|jsx|tsx|ts|js|md)/g
+
+/** Marker that a (3) row is an ADMITTED GAP rather than a considered "none" —
+ *  the point's instruction that a lesson with no enforcement is REPORTED, never
+ *  silently marked (3). */
+export const LEDGER_GAP_MARK = 'LÜCKE:'
+
+/** Minimum written reason for outcome (3). A dash is not a decision. */
+const MIN_REASON_CHARS = 25
+
+/**
+ * The retrospective's lesson subsections as [{id, title}], plus the `###`
+ * headings that carry no `N.M` id (`unledgerable` — they would otherwise be a
+ * free bypass of the gate). Only the PROSE region is inspected: the
+ * marker-delimited appendix is machine-generated and decides nothing.
+ */
+export function parseLessonSubsections(docText) {
+  if (typeof docText !== 'string') return { lessons: [], unledgerable: [] }
+  const cut = docText.indexOf(AUTO_START)
+  const prose = cut >= 0 ? docText.slice(0, cut) : docText
+  const lessons = []
+  const unledgerable = []
+  for (const raw of prose.split('\n')) {
+    const line = raw.trimEnd()
+    const m = LESSON_HEADING_RE.exec(line)
+    if (m) {
+      lessons.push({ id: m[2], title: m[3].trim() })
+      continue
+    }
+    const sub = SUB_HEADING_RE.exec(line)
+    if (sub) unledgerable.push(sub[1].trim())
+  }
+  return { lessons, unledgerable }
+}
+
+/**
+ * Ledger rows from the Markdown table. A row is any table line whose first cell
+ * is a bare `N.M` id — which skips the header and the `|---|` separator without
+ * needing to know where the table starts.
+ */
+export function parseLedger(ledgerText) {
+  if (typeof ledgerText !== 'string') return { entries: [] }
+  const entries = []
+  for (const raw of ledgerText.split('\n')) {
+    const line = raw.trim()
+    if (!line.startsWith('|')) continue
+    const cells = line.replace(/^\|/, '').replace(/\|$/, '').split('|').map((c) => c.trim())
+    if (cells.length < 4) continue
+    if (!/^\d+\.\d+$/.test(cells[0])) continue
+    entries.push({ id: cells[0], title: cells[1], outcome: cells[2], detail: cells[3] })
+  }
+  return { entries }
+}
+
+/** The `LÜCKE:`-marked rows — lessons with no enforcement, admitted as such. */
+export function ledgerGaps(entries = []) {
+  return entries.filter((e) => String(e.detail).includes(LEDGER_GAP_MARK))
+}
+
+/**
+ * Ledger verdict: null (allow), {decision:'block', reason} or
+ * {decision:'allow', warning} for the soft cases.
+ *
+ * FAILURE MODEL — deliberately narrower than "malformed fails open", and the
+ * reinterpretation is the four-eyes review's (27.07.2026): fail-open must mean
+ * "a parse BUG cannot trap the session", not "corrupting the table escapes the
+ * gate". So:
+ *   - ledger file ABSENT → BLOCK. The precedent is one function down: a doc
+ *     without its fingerprint stamp is stale by definition, never exempt.
+ *   - a row present but WRONG (bad outcome, empty reason, dead path) → BLOCK.
+ *     It is a one-edit fix and can never trap.
+ *   - the file exists but NOT ONE row parses → ALLOW with a loud warning. A
+ *     parser that reads nothing is far likelier broken than a corpus that is
+ *     genuinely empty, and this is the only shape a parse bug can take here.
+ *   - no lessons parsed out of the retrospective → ALLOW with a warning, same
+ *     argument in the other direction.
+ * A thrown exception is the wrapper's fail-open, as for every guard here.
+ *
+ * `pathExists` is injected so the core stays pure; it defaults to accepting
+ * everything, because a guard must never fabricate a failure it cannot check.
+ */
+export function evaluateLedger({ retroText, ledgerText, pathExists = () => true } = {}) {
+  const { lessons, unledgerable } = parseLessonSubsections(retroText)
+  if (lessons.length === 0) {
+    return {
+      decision: 'allow',
+      warning:
+        'lesson-ledger: no lesson subsections parsed out of the retrospective — treating that as a ' +
+        'parse fault rather than an empty corpus, so the ledger check is skipped this turn.',
+    }
+  }
+
+  if (ledgerText == null) {
+    return {
+      decision: 'block',
+      reason:
+        'Lesson-mechanism ledger: docs/analysis_de/lesson-mechanisms.md is MISSING, so no lesson of the ' +
+        'retrospective carries a mechanism decision. Every lesson needs one of three outcomes — ' +
+        '(1) an existing enforcer extended, (2) a new enforcer, (3) deliberately none with a written ' +
+        'reason. Restore the ledger (it is tracked in git) before ending the turn.',
+    }
+  }
+
+  const { entries } = parseLedger(ledgerText)
+  if (entries.length === 0) {
+    return {
+      decision: 'allow',
+      warning:
+        'lesson-ledger: the ledger file exists but not one row parsed. A parser that reads nothing is ' +
+        'likelier broken than a corpus that is empty, so the check is skipped this turn — but VERIFY ' +
+        'the table by hand: docs/analysis_de/lesson-mechanisms.md.',
+    }
+  }
+
+  const byId = new Map(entries.map((e) => [e.id, e]))
+  const problems = []
+  const advisories = []
+
+  for (const name of unledgerable) {
+    problems.push(
+      `the subsection "${name}" carries no N.M id, so it cannot be ledgered — number it (### 3.N …) ` +
+        'or the gate has a free bypass',
+    )
+  }
+
+  for (const lesson of lessons) {
+    const entry = byId.get(lesson.id)
+    if (!entry) {
+      problems.push(
+        `§${lesson.id} "${lesson.title}" has NO ledger entry — decide its mechanism now, while the ` +
+          'decision is cheap: (1) widen an existing enforcer, (2) build a new one, or (3) none, with a reason',
+      )
+      continue
+    }
+    if (!['1', '2', '3'].includes(entry.outcome)) {
+      problems.push(`§${lesson.id}: outcome "${entry.outcome}" is not one of 1, 2 or 3`)
+      continue
+    }
+    const claimed = String(entry.detail).match(LEDGER_PATH_RE) ?? []
+    const dead = claimed.filter((p) => !pathExists(p))
+    if (dead.length) {
+      problems.push(
+        `§${lesson.id} claims ${dead.map((p) => `\`${p}\``).join(', ')}, which does not exist — a rule ` +
+          'that claims an enforcer nobody built is the defect docs/rule-corpus-audit.md A29 records',
+      )
+      continue
+    }
+    if (entry.outcome !== '3' && claimed.length === 0) {
+      problems.push(
+        `§${lesson.id}: outcome ${entry.outcome} names an enforcer but the cell contains no file path — ` +
+          'name the enforcing file, or record outcome 3 with a reason',
+      )
+      continue
+    }
+    if (entry.outcome === '3' && String(entry.detail).replace(LEDGER_PATH_RE, '').trim().length < MIN_REASON_CHARS) {
+      problems.push(`§${lesson.id}: outcome 3 needs a WRITTEN reason, not a blank or a dash`)
+      continue
+    }
+    if (entry.title && lesson.title && entry.title !== lesson.title) {
+      advisories.push(`§${lesson.id} was retitled ("${entry.title}" → "${lesson.title}")`)
+    }
+  }
+
+  const lessonIds = new Set(lessons.map((l) => l.id))
+  for (const entry of entries) {
+    if (!lessonIds.has(entry.id)) {
+      problems.push(
+        `ledger row §${entry.id} refers to no lesson in the retrospective — delete the orphan row ` +
+          '(a claim without a referent is a claim without teeth)',
+      )
+    }
+  }
+
+  if (problems.length) {
+    return {
+      decision: 'block',
+      reason:
+        'Lesson-mechanism ledger (docs/analysis_de/lesson-mechanisms.md): a lesson without a recorded ' +
+        'mechanism decision is a rule without a mechanism.\n' +
+        problems.map((p) => `  - ${p}`).join('\n') +
+        '\nAsk in this order: does an EXISTING enforcer already cover it (widen it — the preferred ' +
+        'outcome)? does this lesson make an OLDER rule redundant, so the corpus shrinks? A new guard is ' +
+        'the last resort. A lesson with no enforcement at all is marked 3 with ' +
+        `"${LEDGER_GAP_MARK} …" and REPORTED, never silently passed off as a considered "none".` +
+        (advisories.length ? `\n  (advisory: ${advisories.join('; ')})` : ''),
+    }
+  }
+  return advisories.length ? { decision: 'allow', warning: `lesson-ledger advisory: ${advisories.join('; ')}` } : null
+}
+
+// ---------------------------------------------------------------------------
 // Guard decision.
 
 /** The guide's review stamp (see GUIDE_FINGERPRINT_RE), or null. */
