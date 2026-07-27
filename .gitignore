@@ -33,6 +33,7 @@ scripts/.tile-cache
 .claude/batch-lock.json
 .claude/batch-paused
 .batch-dashboard.html
+.batch-dashboard-archive.html
 .claude/dashboard-state.json
 .claude/current-focus.json
 .claude/focus-check-pending.json

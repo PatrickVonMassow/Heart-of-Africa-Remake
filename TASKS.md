@@ -3383,6 +3383,38 @@ read that as "the criterion and its evidence section".
   DOCS in the same commit: CLAUDE.md §7.2 (the Stop-chain description gains the ledger
   duty) and the retrospective's guard table.
 
+- [ ] 371. THE BOARD STOPS GROWING, FOLDS AWAY, AND DATES ITS OWN STATUS (user
+  27.07.2026, three requirements plus the mechanism that keeps them).
+  (a) THE DONE ARCHIVE MOVES OUT. Measured: the board is 228 KB, of which 167 KB is
+  the Erledigt section alone (214 cards) — so the cost of every board review grows
+  with every finished point. The board KEEPS THE NEWEST 20 done cards and links to a
+  second published page holding the rest. The four sections and their behaviour are
+  untouched; only the tail moves. The archive page is published as its own artifact
+  under its own stable URL, linked from the Erledigt section.
+  (b) EVERY SECTION FOLDS, not only Erledigt. All four headings become
+  `<details class="sect"><summary><h2>…</h2></summary>`. Erledigt stays closed by
+  default; the other three stay OPEN by default, because a board whose current work is
+  hidden behind a click defeats its purpose. The reader's own open/closed choices keep
+  being remembered by the existing localStorage script.
+  (c) EVERY CARD DATES ITS STATUS. A card's body says WHEN its status was written
+  ("Stand 14:12 — …"), so a reader can tell a fresh assessment from one that has been
+  standing for hours. The collapsed header keeps carrying only what it carries today
+  (start/expected end for current work, the estimate for a queue card, start/end for a
+  finished one) — the date belongs to the STATUS TEXT, which is the part that ages.
+  THE MECHANISM, and it is the point of the exercise: extend `dashboard-guard`'s
+  consistency audit (do not add a fourth board guard beside the three that exist) to
+  FAIL when a now-card body carries no status date, when the Erledigt section holds
+  more than 20 cards, when the archive link is missing, or when a section heading is
+  not foldable. All four are structural facts a parser can see; the guard already reads
+  this file for other invariants, so it is the right host.
+  VERIFIABLE: pure Vitest on the guard's core — a board missing a status date fails, one
+  with 21 done cards fails, a missing archive link fails, a non-foldable heading fails,
+  and a correct board passes; plus the existing invariants still hold. The archive page
+  is checked by opening it: every moved card is present exactly once and nothing was
+  lost in the split (count before == count after, asserted by the migration itself).
+  DOCS: the dashboard's structure rule is the user's mandate and lives in the session
+  instructions rather than in a repository document; nothing in CLAUDE.md changes.
+
 ## Closing (only after all points)
 
 New points are appended BEFORE this section — it stays last in the file.
