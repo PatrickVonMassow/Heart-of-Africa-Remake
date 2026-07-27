@@ -2,7 +2,7 @@
 // the markup the board guard accepts — a stamped status — and refuse the cases
 // where silently doing nothing would leave the reader with a stale card.
 import { describe, it, expect } from 'vitest'
-import { berlinStamp, setCardStatus } from './board-core.mjs'
+import { berlinStamp, promoteToNow, setCardStatus } from './board-core.mjs'
 
 const board = (point = 361) =>
   `<main>\n<details class="now">\n  <summary><span class="t">${point} — Etwas</span>` +
@@ -45,5 +45,38 @@ describe('berlinStamp', () => {
     expect(berlinStamp(new Date('2026-07-27T12:48:00Z'))).toBe('14:48')
     // …and in winter the same UTC hour is 13:48 (CET).
     expect(berlinStamp(new Date('2026-01-27T12:48:00Z'))).toBe('13:48')
+  })
+})
+
+describe('promoteToNow', () => {
+  const withQueue = (n = 369) =>
+    `<main>\n<details class="sect"><summary><h2>Woran ich gerade arbeite</h2></summary>\n</details>\n` +
+    `<details class="sect"><summary><h2>Warteschlange</h2></summary>\n` +
+    `<details>\n  <summary><span class="num">${n}</span><span class="t">Titel</span>` +
+    `<span class="right"><span class="meta">~2 h</span></span></summary>\n` +
+    `  <div class="body"><p>Text</p></div>\n</details>\n</details>\n</main>`
+
+  it('moves the queue card into the current-work section as a stamped now-card', () => {
+    const out = promoteToNow(withQueue(), 369, {
+      title: 'Etwas',
+      times: '15:41 · ~17:30',
+      status: 'läuft',
+      stamp: '15:41',
+    })
+    expect(out).toContain('<span class="t">369 — Etwas</span>')
+    expect(out).toContain('<span class="stamp">Stand 15:41</span> läuft')
+    // the queue card is gone, and the now-card sits inside the first section
+    expect(out.match(/class="num">369/g)).toBeNull()
+    const nowAt = out.indexOf('369 — Etwas')
+    expect(nowAt).toBeGreaterThan(out.indexOf('Woran ich gerade arbeite'))
+    expect(nowAt).toBeLessThan(out.indexOf('Warteschlange'))
+  })
+
+  it('throws instead of silently matching nothing when the point is not queued', () => {
+    expect(() => promoteToNow(withQueue(369), 999, { title: 'X', status: 'y' })).toThrow(/no queue card/)
+  })
+
+  it('demands a title and a status', () => {
+    expect(() => promoteToNow(withQueue(), 369, { title: '', status: 'y' })).toThrow(/title and a status/)
   })
 })

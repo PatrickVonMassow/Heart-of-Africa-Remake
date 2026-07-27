@@ -15,7 +15,7 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { resolve } from 'node:path'
 import { REPO_ROOT } from './repo-paths.mjs'
-import { berlinStamp, setCardStatus } from './board-core.mjs'
+import { berlinStamp, promoteToNow, setCardStatus } from './board-core.mjs'
 
 const BOARD = resolve(REPO_ROOT, '.batch-dashboard.html')
 const run = (args) => execFileSync(process.execPath, args, { cwd: REPO_ROOT, encoding: 'utf8' })
@@ -29,6 +29,19 @@ try {
     const at = berlinStamp()
     writeFileSync(BOARD, setCardStatus(readFileSync(BOARD, 'utf8'), point, words.join(' '), at))
     console.log(`status of ${point} restated (Stand ${at})`)
+    console.log(run(['scripts/dashboard-publish.mjs']).trim().split('\n').pop())
+    console.log('NEXT: publish the scratchpad file via the Artifact tool, then: node scripts/board.mjs attest')
+  } else if (cmd === 'promote') {
+    const [point, times, title, ...words] = rest
+    if (!point || !times || !title || words.length === 0) {
+      throw new Error('usage: board.mjs promote <point> "<times>" "<title>" "<status>"')
+    }
+    writeFileSync(
+      BOARD,
+      promoteToNow(readFileSync(BOARD, 'utf8'), point, { title, times, status: words.join(' ') }),
+    )
+    console.log(`${point} promoted to current work`)
+    console.log(run(['scripts/board-archive-rotate.mjs']).trim().split('\n')[0])
     console.log(run(['scripts/dashboard-publish.mjs']).trim().split('\n').pop())
     console.log('NEXT: publish the scratchpad file via the Artifact tool, then: node scripts/board.mjs attest')
   } else if (cmd === 'focus') {
