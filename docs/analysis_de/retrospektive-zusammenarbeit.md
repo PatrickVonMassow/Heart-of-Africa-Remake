@@ -277,6 +277,16 @@ Daraus folgt, wo Vorbeugung sich lohnt und wo nicht: **Mechanische, wiederkehren
 
 **Lehre:** Bevor eine Maßnahme als „zu teuer" verworfen wird, muss der Preis des Fehlers danebenstehen, den sie verhindert — inklusive der Erkennungs- und Wiederholungskosten. Und umgekehrt: Jede Sparmaßnahme wird gegen ihre Wirkung auf die Fehlerrate geprüft, nicht nur gegen ihren Verbrauch. Eine Ersparnis, die die Nacharbeitsquote hebt, ist ein Verlust mit besserer Buchführung.
 
+### 3.34 Die Attrappe, die den Fehler verdeckt
+
+Eine Absicherung im Bildprüfungs-Wächter sollte fragen, ob ein Bezugs-Commit noch existiert: `git cat-file -e <sha>^{commit}`. Vierzehn Tests liefen grün darüber, alle 3.400 Tests des Projekts ebenfalls — und der Code tat auf dieser Maschine **das Gegenteil dessen, was er sollte**. Der Kommandointerpreter von Windows behandelt das Dach als Escape-Zeichen, git bekam also `<sha>{commit}` zu sehen und antwortete „kein gültiger Objektname" — für einen Commit, der existiert. Die Funktion hielt damit *jede* Basis für verschwunden und schützte exakt nichts.
+
+Grün blieben die Tests, weil sie die Abhängigkeit **einspeisen**: Sie ersetzen die Prüffunktion durch eine Attrappe und prüfen die Verzweigungen darum herum. Das ist gute Praxis für die Logik — und blind genau für die Stelle, an der der Fehler saß, nämlich im Kommando selbst. Der Fehler war nicht im Verhalten, sondern in der Zeichenkette, die nie ausgeführt wurde.
+
+Gefunden hat es die dritte Gegenlesung, nicht der Autor, und der Autor war in diesem Fall der Hauptprozess selbst — geschrieben unter Zeitdruck, nachdem vier Subagenten nacheinander an Schnittstellenfehlern gestorben waren. Zwei Umstände, die man beim nächsten Mal zusammen lesen sollte: *selbst gebaut* und *unter Druck* ist genau die Kombination, die eine Gegenlesung braucht, nicht die, die sie überspringen darf.
+
+**Lehre:** Wo eine Abhängigkeit für den Test ersetzt wird, bleibt der ersetzte Teil ungeprüft — also braucht **jedes real ausgeführte Kommando mindestens einen Test, der es wirklich ausführt**. Eine Attrappe prüft die Logik um ein Werkzeug herum, nie das Werkzeug. Und ein Fix, der eine Plattform-Eigenheit betrifft, ist erst dann belegt, wenn er auf der Plattform gelaufen ist, auf der er wirkt.
+
 ---
 
 ## 4. Die Guards als Immunsystem
@@ -361,7 +371,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Montag, 27.07.2026, 12:03 · Quellen-Fingerprint: `1a95eb357bdc…`
+Zuletzt aktualisiert: Montag, 27.07.2026, 14:13 · Quellen-Fingerprint: `e05f4a2ef81a…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -432,8 +442,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | CORRECTED 19.07.2026 — WebGPU IS testable headless/autonomously via system Chrome (channel:'chrome') + --headless=new; the 'untestable' belief held only for Playwright's BUNDLED Chromium | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 63 Feedback-/Projekt-Memories · 31 Guard-/Hook-Skripte · 2 Revert-/Reapply-Commits · 15 Prozess-/Meta-TASKS-Punkte (davon 8 offen).
+Erfasste Quellen: 63 Feedback-/Projekt-Memories · 32 Guard-/Hook-Skripte · 2 Revert-/Reapply-Commits · 15 Prozess-/Meta-TASKS-Punkte (davon 8 offen).
 
-<!-- RETRO-FINGERPRINT: 1a95eb357bdc3cd42fe437c510e220590b002526d7401e028d709256a3fd44e8 -->
-<!-- RETRO-LAST-REFRESHED: 2026-07-27T10:03:58.748Z -->
+<!-- RETRO-FINGERPRINT: e05f4a2ef81ad9173e519ff8d4109edbe48ec73768a0723ccec2162fd1878047 -->
+<!-- RETRO-LAST-REFRESHED: 2026-07-27T12:13:22.589Z -->
 <!-- AUTO-GENERATED:END -->
