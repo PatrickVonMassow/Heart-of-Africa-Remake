@@ -75,6 +75,12 @@ that row.)
 Aggregate over all 97 files on disk: **79,171,897 bytes (75.5 MiB), 157,153
 visual tokens**, mean 816,205 bytes per frame.
 
+All 97 are **tracked in git** (`git ls-files verification/` returns 98 entries —
+the 97 frames plus a README), the four stale ones included. The 75.5 MiB is
+therefore repository weight carried by every clone, not scratch output; and each
+re-baselined frame writes a new blob into history rather than replacing one.
+History size was not measured.
+
 ### Tier totals
 
 Suite membership from `scripts/verify/tiers.mjs`.
