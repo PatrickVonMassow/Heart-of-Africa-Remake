@@ -17,16 +17,43 @@
 /** Both renderer backends the game ships; each needs a passing verify run. */
 export const BACKENDS = ['webgpu', 'webgl']
 
-// Verify suites that are NOT rendering code (pure-node runner/checks): a change
-// there does not require a dual-backend picture.
-const NON_RENDER_VERIFY = new Set(['run-all.mjs', 'docs.mjs', 'ttsCache.mjs', 'fixedWaits.mjs'])
+/**
+ * The scripts under scripts/verify/ that DRIVE NO BROWSER: the orchestrator,
+ * the server plumbing, the pure decision cores and the Node-only checks. The
+ * harness RUNS the suites, it does not draw, so a change here cannot move a
+ * pixel and owes no picture — three such commits on 27.07.2026 each cost a real
+ * suite run and a turn before this list existed (docs/picture-check-levers.md
+ * §5).
+ *
+ * A DENYLIST, deliberately, not an allowlist: an unrecognised verify script
+ * stays IN the render set, so a NEW browser suite is covered from its first
+ * commit and only a new HELPER needs an entry here. render-verify-core.test.mjs
+ * re-derives the membership from the directory (a file is in the render set iff
+ * it imports playwright or the shared browser/boot helpers) and fails when this
+ * list drifts from the files.
+ */
+export const NON_RENDER_VERIFY = new Set([
+  '_server.mjs', // vite start/stop plumbing shared by the runner and the classifier
+  'baseline-classify-core.mjs',
+  'baseline-classify.mjs',
+  'docs.mjs',
+  'fixedWaits.mjs',
+  'liveness.mjs', // main-thread liveness ATTRIBUTION; the suites do the driving
+  'machine-load-core.mjs',
+  'machine-load.mjs',
+  'run-all.mjs',
+  'textureLeak.mjs', // the texture-delta decision layer; settings.mjs runs it
+  'tiers.mjs',
+  'ttsCache.mjs',
+])
 
 /**
  * Is this repo path part of the RENDER SET — code whose change can alter the
  * rendered picture on either backend? Covers the scene/render/HUD trees, the
- * renderer entry, TSL shader files, and the browser verify suites' own
- * screenshot/measurement code (a suite change can mask a backend bug just as a
- * shader change can cause one). Paths are git-style; backslashes are tolerated.
+ * renderer entry, TSL shader files, the WORLD-GEOMETRY sources that feed the
+ * rendered terrain, and the browser verify suites' own screenshot/measurement
+ * code (a suite change can mask a backend bug just as a shader change can cause
+ * one). Paths are git-style; backslashes are tolerated.
  */
 export function isRenderPath(path) {
   if (typeof path !== 'string' || path === '') return false
@@ -39,6 +66,19 @@ export function isRenderPath(path) {
   // wave through.
   if (/\.test\.(ts|tsx|mjs|js)$/.test(p)) return false
   if (p.startsWith('src/render/') || p.startsWith('src/scenes/') || p.startsWith('src/ui/')) return true
+  // World geometry IS the picture's first draft: the coast contour, the terrain
+  // heightfield, the river courses and the landmark coordinates all reach the
+  // frame through the renderer without ever mentioning it. The founding case of
+  // the whole both-backend rule — the point-210 stepped coast, still stepped on
+  // WebGPU after a WebGL2-only "done" — changed src/world/redSea.ts and nothing
+  // else, and the guard as first written would not have demanded a picture for
+  // it. Measured before widening (docs/picture-check-levers.md §5): the class
+  // adds 18 of 1220 first-parent commits, of which 14 the corpus-derived
+  // exception list would have missed — every one a visible-geometry change
+  // (bicubic DEM sampling, the smoothed coast, levelled lake beds, the moved
+  // Meroë field). No exception for the text-only module here: the whole
+  // directory is one sentence, and lore.ts has never been touched alone.
+  if (p.startsWith('src/world/')) return true
   if (p === 'src/App.tsx') return true // renderer setup / scene switch
   if (p.includes('.tsl.')) return true // TSL shader modules wherever they live
   // A *.test.mjs beside the suites is a VITEST file: it runs in jsdom, never
@@ -69,10 +109,14 @@ export function isRenderPath(path) {
  * per backend.
  *
  * Everything else stays dual, including the pure geometry/behaviour modules
- * under src/scenes/. That is not caution for its own sake — the flora jitter of
- * point 175 (a per-instance attribute racing its re-upload) and the texture-count
- * dip of point 334 both appeared on ONE backend from code that looks
- * backend-neutral. A cleverer rule would have missed them.
+ * under src/scenes/ and the world-geometry sources under src/world/. That is not
+ * caution for its own sake — the flora jitter of point 175 (a per-instance
+ * attribute racing its re-upload) and the texture-count dip of point 334 both
+ * appeared on ONE backend from code that looks backend-neutral, and src/world/
+ * carries the strongest witness of all: point 210's coast was cut in redSea.ts,
+ * looked right on WebGL 2, and was still stepped on WebGPU. A file needs no
+ * renderer API in it to render differently on the two backends. A cleverer rule
+ * would have missed every one of them.
  */
 export function isBackendSensitivePath(path) {
   if (!isRenderPath(path)) return false

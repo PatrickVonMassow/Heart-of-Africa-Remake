@@ -1002,9 +1002,9 @@ After completion and after every major system:
   one-topic-per-card and consistent with the real state), `prep-guard` (no
   idle wait while a background validation runs), `batch-progress-guard` (no
   idle stop bar a verified point boundary), `render-verify-guard` (no
-  GUI/render change finished without the picture check — both backends where
-  they can differ, one where they
-  cannot), `queue-order-guard`, `tasks-spec-guard` and `tasks-archive-guard`
+  render-set change — scene/shader/HUD, `src/world/` geometry, the browser
+  suites — finished without the picture check; both backends where they can
+  differ, one where they cannot), `queue-order-guard`, `tasks-spec-guard` and `tasks-archive-guard`
   (the queue order, the final-state-only spec rule, and the open/archived split
   of the work order), `doc-budget-guard` (the constantly-read documents stay
   within measured ceilings — this file, design.md, and the work order's
