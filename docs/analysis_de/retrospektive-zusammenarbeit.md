@@ -153,6 +153,8 @@ Die alte Selbstheilungsregel lautete: Mechanismus bauen, wenn derselbe Fehler ei
 
 **Bindend:** Jede Regel, die wirklich gelten soll, bekommt **von Anfang an** einen erzwingenden Mechanismus; der Aufwand richtet sich nach der Wichtigkeit der Regel, die Grundhaltung heißt „erzwingen statt erinnern".
 
+Seit dem 27.07.2026 gilt das auch für diesen Satz selbst: Er war bis dahin die einzige Regel des Dokuments ohne Durchsetzung — eine Regel, die Mechanismen fordert und selbst keiner ist. Jede Lektion dieses Abschnitts trägt jetzt eine erfasste Entscheidung in `lesson-mechanisms.md` (bestehender Durchsetzer verbreitert / neuer / bewusst keiner mit Begründung), und `retro-currency-guard` blockiert das Zug-Ende, solange eine fehlt. Zwei Lektionen kamen dabei als **ungedeckt** heraus, statt stillschweigend als „bewusst keine" durchzugehen; sie stehen als Lücken am Fuß des Registers.
+
 ### 3.17 Stille Modell-Degradation — der Arbeiter selbst kann das Problem sein
 
 Eine Batch-Session lief unbemerkt auf einem schwächeren Modell (Beleg: die Commit-Trailer) und produzierte in 14 Minuten drei als „fertig" getickte Punkte, die keiner Spec genügten: ein Placebo-Fix mit Schein-Tests, ein unverdrahteter Stub, ein Selbstbestätigungs-„Audit". Alle bisherigen Guards prüften die *Arbeit*, keiner den *Arbeiter*. Ein degradiertes Modell scheitert nicht laut, sondern liefert selbstbewusst Attrappen — und befolgt gerade dann die Regeln am wenigsten.
@@ -369,6 +371,7 @@ Jedes Guard-Skript ist die geronnene Lösung eines real aufgetretenen, wiederhol
 | `tasks-archive-guard` | Arbeitsauftrag bleibt geteilt: offen in TASKS.md, erledigt im Archiv | 13.000-Zeilen-Datei je Zug |
 | `doc-budget-guard` | gemessene Obergrenze für die ständig gelesenen Dokumente | 3.30 |
 | `retro-currency-guard` | dieses Dokument bleibt aktuell zu seinen Quellen | 3.21 |
+| `retro-currency-guard` (Register) | **jede** Lektion aus Abschnitt 3 trägt eine erfasste Mechanismus-Entscheidung (`lesson-mechanisms.md`): bestehender Durchsetzer verbreitert, neuer Durchsetzer, oder bewusst keiner mit Begründung | 3.16 |
 | `guide-brevity-guard` | Anleitung bleibt kurz und projekt-neutral | 3.26 |
 | `rule-review-guard` | periodische Durchsicht des ganzen Regelbestands | 3.25 |
 | `guard-health-guard` | kein Durchsetzer im Baum, den nichts aufruft | 3.25 (4) |

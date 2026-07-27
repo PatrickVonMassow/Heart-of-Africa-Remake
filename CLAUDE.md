@@ -958,12 +958,12 @@ After completion and after every major system:
   radius can hide a real bug the player sees (points 164/171/172).
 - **Backend coverage is UNIVERSAL where it is possible (point 204).** WebGPU is
   the player's real backend and WebGL 2 the shipped fallback, so both are
-  verified, not just the one that happens to launch:
+  verified:
   - Every browser suite launches through `launchVerifyBrowser()` and asserts the
     backend it actually got (`assertBackend`, right after the `window.__renderer`
     wait). A `VERIFY_GL=webgpu` run that silently fell back to WebGL 2 — or a
-    `webgl` run that came up on WebGPU — FAILS LOUD instead of giving false
-    confidence. The only exceptions are `docs` (pure Node, no browser) and
+    `webgl` run that came up on WebGPU — FAILS LOUD.
+    The only exceptions are `docs` (pure Node, no browser) and
     `preview` (production build, where `__renderer` is dev-only).
   - A LARGE run (`npm test` / `npm run test:large`, no `VERIFY_GL` pinned) covers
     BOTH backends in one command: the whole LARGE on WebGL 2 (with preflight and
@@ -975,10 +975,10 @@ After completion and after every major system:
     pinned by `scripts/verify/tiers.test.mjs` in the Vitest layer; change it
     there and in `scripts/verify/README.md` together.
 - **The Stop chain gates the turn end, not only the test run.** Beyond the
-  suites above, a chain of Stop hooks (registered in `.claude/settings.json`,
-  which is the authoritative list) BLOCKS finishing a turn while the working
+  suites, a chain of Stop hooks (the authoritative list is
+  `.claude/settings.json`) BLOCKS finishing a turn while the working
   state contradicts a standing rule — the "enforce, don't remind" model, each
-  adopted because a reminder had already failed. Currently: `model-guard`
+  adopted after a reminder failed. Currently: `model-guard`
   (no commit authored outside the §6 model allowlist), `dashboard-guard`,
   `dashboard-conciseness-guard`, `dashboard-card-topic-guard` and
   `dashboard-integrity-guard` (the progress board is published, concise,
@@ -990,12 +990,14 @@ After completion and after every major system:
   (the queue order, the final-state-only spec rule, and the open/archived split
   of the work order), `doc-budget-guard` (the constantly-read documents stay
   within measured ceilings — this file, design.md, and the work order's
-  preamble; its budgets and the two honest ways out live in
+  preamble; budgets and both honest exits in
   `scripts/doc-budget-core.mjs`), `commit-scope-guard` and `pre-push-gate`
   (versioned `scripts/git-hooks/`, wired by `npm install`: no stray file rides
   along, no push lands a state CI would reject), `ci-status-guard` (a
   red CI is noticed), `timestamp-guard` (the chat timestamp) and
-  `retro-currency-guard` (the retrospective document stays current), followed
+  `retro-currency-guard` (the retrospective stays current, and each lesson in
+  it carries a mechanism decision — an enforcer widened, a new one, or none
+  with a reason: `docs/analysis_de/lesson-mechanisms.md`), followed
   by `dashboard-sync`. Separately, PreToolUse hooks run `closing-guard` (§9),
   which denies a version tag until every closing step is recorded, and
   `board-first-guard`, the first board gate that fires BEFORE the work rather
