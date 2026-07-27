@@ -275,15 +275,17 @@ old→new coverage map live in `scripts/verify/README.md`.
   documents it prints BOTH — no resolver can decide that, so the reader is told
   instead of being handed a plausible wrong answer. Every brief carries the
   revision it was cut from; regenerate rather than reuse an old one.
-- **Context boundary at a point boundary (attended sessions).** 87–94 % of the
+- **Context boundary at a point boundary (user 27.07.2026).** 87–94 % of the
   measured token spend sat above 150k context because one session carried point
-  after point. The session cannot clear itself — `/clear` is the user's command —
-  so at a point boundary in an ATTENDED session ASK for it above a measured
-  context size; `batch-resume-hook` re-orients the fresh session. The autonomous
-  variant is a USER decision (it needs either the disabled autostart back or a
-  session spawning its successor, both of which reopen the double-session class)
-  and is not implemented without an explicit go. The usage panel's "cheaper model
-  for simpler subagents" stays REJECTED; the §6 allowlist is unchanged.
+  after point. A batch session therefore ENDS at its point boundary: after the
+  merge and the tick, run `node scripts/batch-boundary.mjs <point>` and stop
+  rather than pull the next point in. `batch-progress-guard` permits it ONLY
+  while the work order confirms the point closed and the task
+  `HoA-Batch-Autostart` is armed; unarmed blocks, so a disabled launcher cannot
+  strand the batch. The launcher, not this session, starts the successor;
+  `batch-resume-hook` re-orients it. Attended, ask for `/clear` instead.
+  The usage panel's "cheaper model for simpler subagents" stays
+  REJECTED; the §6 allowlist is unchanged.
 - **Model policy (user decision 25.07.2026, points 309 + the role revision).**
   ONLY three models may author work on this project, each with its own role:
   **Opus 5** is the WORKER at any difficulty; **Fable 5** is used ONLY for the
@@ -984,7 +986,8 @@ After completion and after every major system:
   `dashboard-integrity-guard` (the progress board is published, concise,
   one-topic-per-card and consistent with the real state), `prep-guard` (no
   idle wait while a background validation runs), `batch-progress-guard` (no
-  idle stop), `render-verify-guard` (no GUI/render change finished without the
+  idle stop bar a verified point boundary), `render-verify-guard` (no
+  GUI/render change finished without the
   picture check — on both backends where they can differ, on one where they
   cannot), `queue-order-guard`, `tasks-spec-guard` and `tasks-archive-guard`
   (the queue order, the final-state-only spec rule, and the open/archived split

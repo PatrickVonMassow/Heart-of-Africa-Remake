@@ -14,7 +14,9 @@ outside the agent's control.
    is absent, it **hard-blocks the turn from ending** — the agent must continue
    the next item (waiting on a validation by polling within the turn, never by
    yielding to idle). It also refreshes the lock heartbeat (below) each turn-end.
-   Fail-open: any error → allow (so a guard bug can never freeze the session).
+   Since 27.07.2026 it makes ONE exception, the point boundary — see the section
+   further down. Fail-open: any error → allow (a guard bug can never freeze the
+   session).
 2. **Recurring heartbeat cron** (this-session only). Fires every ~15–20 min while
    the REPL is idle and re-invokes the agent. A backstop for a live session whose
    Stop-hook is not yet active (hooks load at the NEXT session start after they are
@@ -51,6 +53,8 @@ outside the agent's control.
 | 10 | `claude.exe` moved by an app update | launcher globs `claude-code\*\claude.exe` and picks the newest | none |
 | 11 | Batch stuck on one item (needs data / a user decision) | the guard says "pick a DIFFERENT open item"; only if ALL are user-blocked does it pause with a `Von dir zu klären` card | correct behaviour — nothing to do without the user |
 | 12 | Scheduled task deleted (by the user or a cleanup tool) | — | not recoverable by the agent; re-create with the command below |
+| 13 | Session ENDS at a point boundary (27.07.2026, deliberate — the context is the batch's dominant cost) | (4) the launcher spawns the successor once the old pid is provably dead; `batch-progress-guard` allows the stop only against a verified-closed point AND an armed task | a few idle minutes per point, traded for a fresh context |
+| 14 | The scheduled task is DISABLED while the boundary is in use | the guard reads the task's REAL state each time and blocks the stop when it is not armed (`unknown` counts as unarmed), so the session keeps working instead of stranding the batch | the user must re-arm it (`Enable-ScheduledTask`, elevated) |
 
 ## The hard singleton (24.07.2026 — replaces the advisory lock)
 
@@ -87,6 +91,55 @@ from advisory claim-and-check to a HARD mutual exclusion in
 - **Trust self-heals.** A headless `claude -p` in an untrusted workspace ignores
   the allow-list (a permission prompt would hang the unattended run). The launcher
   sets `hasTrustDialogAccepted` for the repo in `~/.claude.json` before spawning.
+
+## The point boundary — ending a session is now part of the design (27.07.2026)
+
+Until point 373 every mechanism above pushed in ONE direction: keep the session
+alive. That was right against the idle stop and wrong against the bill. Measured,
+80–94 % of the token spend sat above 150k of context, because one session carried
+point after point; run 24/7 that is 1.25 %/h of the weekly quota where ~0.6 %/h is
+what fits. The context, not the work, is the dominant cost.
+
+So a batch session now **ends deliberately at a point boundary** and the launcher
+(mechanism 4) brings up a fresh one, which `batch-resume-hook` re-orients from
+TASKS.md. Nothing new drives the batch — the loop is the one that already existed;
+what changed is that ending became a legal way to finish a turn.
+
+How it works:
+
+1. The session merges the point, ticks it on `main`, and runs
+   `node scripts/batch-boundary.mjs <point>`. That command REFUSES unless the work
+   order confirms the point closed and the scheduled task is armed, so the session
+   finds out at the boundary rather than at a blocked turn end. On success it
+   writes `.claude/batch-boundary.json` (session id + point + timestamp).
+2. At the turn end `batch-progress-guard` re-judges the claim itself — the marker
+   is a claim, not proof. It ALLOWS the stop only when the point is closed per
+   `TASKS.md` + `docs/tasks-archive.md`, the marker is fresh and belongs to this
+   session, and `Get-ScheduledTask -TaskName HoA-Batch-Autostart` reports an armed
+   state. It then consumes the marker.
+3. Anything else blocks exactly as before: a point still open, a stale or foreign
+   marker, an unhandled parallel-session alert, an unparseable work order — and,
+   the important one, an **unarmed launcher**. A disabled task must never be able
+   to turn "end this session" into "end the batch", so `disabled` and `unknown`
+   both block and the message names the fix
+   (`Enable-ScheduledTask -TaskName 'HoA-Batch-Autostart'`, elevated, by the user).
+
+Two decisions worth keeping in view:
+
+- **The session does NOT release the batch lock, and does NOT spawn its own
+  successor.** Either would put a fresh session next to a still-winding-down one —
+  the double-session class of the e9407cae incident. The successor takes over the
+  honest way: the old process dies, its pid reads dead past the `DEAD_CONFIRM_MS`
+  grace, and the next launcher tick spawns. The price is a few idle minutes per
+  point; the alternative is a class of failure this project has already paid for.
+- **Unknown counts as unarmed.** Erring toward "keep working" costs context; erring
+  toward "stop" can cost the whole batch. The asymmetry decides it.
+
+Pure logic and its witnesses: `scripts/batch-boundary-core.mjs` +
+`scripts/batch-boundary-core.test.mjs` (launcher-state classification, point
+closure against the split work order, marker assessment, and the three verdicts
+the point names: closed point + armed launcher → allow, work still open → block,
+unarmed launcher → block).
 
 ## The two true residuals (NOT in the agent's control)
 
