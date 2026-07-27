@@ -310,6 +310,7 @@ Jedes Guard-Skript ist die geronnene Lösung eines real aufgetretenen, wiederhol
 | `dashboard-integrity-guard` | Now-Karte = tatsächliche Arbeit (gegen die Fokus-Deklaration) | 3.4 |
 | `dashboard-conciseness-guard` | Karten kurz, keine Text-Tapeten | 3.4 |
 | `dashboard-card-topic-guard` | eine Karte = ein Thema | 3.4 |
+| `board-first-guard` | erste zustandsändernde Aktion eines Zuges erst, wenn das Board die beginnende Arbeit beschreibt (PreToolUse statt Stop) | 3.32 |
 | `queue-order-guard` | Fixes vor Findern | Abarbeitungsreihenfolge |
 | `tasks-spec-guard` | keine „erst falsch, dann korrigiert"-Trails in Specs | verwirrende Aufträge |
 | `render-verify-guard` | Render-Change nur mit grünem Lauf auf BEIDEN Backends | 3.6 |
