@@ -130,6 +130,37 @@ describe('the harness itself', () => {
       expect(r.status, `${id}.mjs is not spawnable: ${r.stderr}`).toBe(0)
     }
   })
+
+  it('spawns every Stop hook that depends on isMainModule — read from settings.json', () => {
+    // The loop above iterates the PREFLIGHT registry, which is a different list
+    // from the authoritative Stop chain in .claude/settings.json. A guard added
+    // to the chain, put behind isMainModule and NOT registered with the preflight
+    // would go untested here — and isMainModule is precisely the helper that can
+    // silence a whole hook without an error. So the chain itself is the source.
+    const settings = JSON.parse(readFileSync(resolve(process.cwd(), '.claude/settings.json'), 'utf8'))
+    const chain = (settings.hooks?.Stop ?? [])
+      .flatMap((entry) => entry.hooks ?? [])
+      .map((h) => /scripts[\\/]([\w.-]+\.mjs)/.exec(h.command ?? '')?.[1])
+      .filter(Boolean)
+    expect(chain.length, 'no Stop hooks found in .claude/settings.json').toBeGreaterThan(5)
+
+    const covered = new Set(Object.keys(preflight()).map((id) => `${id}.mjs`))
+    const uncovered = chain.filter((name) => {
+      if (covered.has(name)) return false
+      let source
+      try {
+        source = readFileSync(resolve(SOURCE_SCRIPTS, name), 'utf8')
+      } catch {
+        return false // not a script in scripts/ — nothing this suite could spawn
+      }
+      return source.includes('isMainModule')
+    })
+    expect(
+      uncovered,
+      'these Stop hooks gate their body on isMainModule but are spawned by no case above — ' +
+        'register them with guard-preflight.mjs, or add an explicit spawn test',
+    ).toEqual([])
+  })
 })
 
 describe('tasks-spec-guard', () => {
