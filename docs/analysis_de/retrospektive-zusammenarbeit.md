@@ -322,6 +322,16 @@ Der Unterschied liegt nicht im Durchlassen, sondern im **Schreiben**. Fail-open 
 
 **Lehre:** Beim Umbau eines Fehlerpfads gehört die Frage dazu, **welcher** Fehler Zustand schreiben darf — die Menge der gefangenen Fehler ist Teil der Spezifikation, nicht Aufräumarbeit. Und ein Ausfallverhalten wird nach seiner Dauer beurteilt: einmal durchlassen ist eine Nachsicht, dauerhaft durchlassen ist eine Abschaffung.
 
+### 3.39 Neun Ausfälle an einem Tag — und was den Schaden bestimmt hat
+
+Am 27.07.2026 starben **neun** Subagenten an vorübergehenden Überlastungsfehlern der Modell-Schnittstelle. Nichts davon lag am Projekt: Die Hauptsitzung lief durch, nur das Eröffnen *neuer* Sitzungen scheiterte, in Wellen.
+
+Interessant ist nicht der Ausfall, sondern die Streuung des Schadens. Ein Agent, der erst am Ende committen wollte, verlor alles — ein anderer, der nach jedem zusammenhängenden Schritt committet und gepusht hatte, verlor nichts und wurde beim Neustart einfach fortgesetzt. Dieselbe Störung, zwei völlig verschiedene Kosten. Der Unterschied war eine Zeile im Auftrag.
+
+Die zweite Lehre betrifft das Verhalten der Aufsicht: Nach dem dritten Ausfall an derselben Aufgabe ist ein vierter Versuch keine Beharrlichkeit mehr, sondern Aberglaube. Die Arbeit selbst zu machen war jedes Mal die billigere Entscheidung — die eigene Sitzung existierte ja bereits.
+
+**Lehren:** Gegen eine unzuverlässige Umgebung hilft keine Vermeidung, sondern **kleine, sofort gesicherte Schritte** — dieselbe Antwort wie auf jeden anderen Verlustfall in diesem Projekt. Und: Wenn ein Weg dreimal an derselben äußeren Ursache scheitert, wechsle den Weg, statt den Versuch zu wiederholen.
+
 ---
 
 ## 4. Die Guards als Immunsystem
@@ -410,7 +420,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Montag, 27.07.2026, 15:05 · Quellen-Fingerprint: `a74566dd3d76…`
+Zuletzt aktualisiert: Montag, 27.07.2026, 16:05 · Quellen-Fingerprint: `d057f2aeeb72…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -423,6 +433,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | The hardened batch-autonomy system — never idle-stop, resurrect after crash/reboot, signal on failure, never block on the user | 1 | niedrig | batch-autostart.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs | ✔ Mechanismus |
 | The private claude.ai batch dashboard — its BINDING four-section structure (never change without explicit user go) and update discipline | 5 | hoch | batch-autostart.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs, dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
 | Autonomer TASKS.md-Batch: Stand 16.07.2026 22:45 — 151 (Saisonfeld) als WIP gepusht (2055350), Wiederaufnahme an der TASKS-151-WIP-Note; Reihenfolge 151→152→156→123→149→150→121…→153-157 | 1 | niedrig | batch-autostart.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs | ✔ Mechanismus |
+| Delegate via `node scripts/point-brief.mjs <N>` — the AGENT generates its own brief; board changes go through `scripts/board.mjs`; expect 529 agent deaths and commit-per-step | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Jede Chat-Antwort mit einem Zeitstempel nach deutscher Zeit (Europe/Berlin, DST-korrekt) beginnen | 10 | hoch | timestamp-guard.mjs | ✔ Mechanismus |
 | CLAUDE.md §7.1 references design.md instead of retelling it; future doc edits must preserve the verifiable conditions, script mappings, numbering and checked numbers | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Autonomously insert a full CLOSING cycle (regression + dead-code/stale-doc cleanup + .md audit) when warranted — after extensive rework or many small completed tasks — without waiting for the user to ask | 1 | niedrig | closing-guard.mjs | ✔ Mechanismus |
@@ -481,8 +492,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | CORRECTED 19.07.2026 — WebGPU IS testable headless/autonomously via system Chrome (channel:'chrome') + --headless=new; the 'untestable' belief held only for Playwright's BUNDLED Chromium | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 63 Feedback-/Projekt-Memories · 33 Guard-/Hook-Skripte · 3 Revert-/Reapply-Commits · 15 Prozess-/Meta-TASKS-Punkte (davon 8 offen).
+Erfasste Quellen: 64 Feedback-/Projekt-Memories · 33 Guard-/Hook-Skripte · 3 Revert-/Reapply-Commits · 15 Prozess-/Meta-TASKS-Punkte (davon 8 offen).
 
-<!-- RETRO-FINGERPRINT: a74566dd3d760b2ba91ab2cdfbe43e11e271fa462888cf37afa03fce673e6751 -->
-<!-- RETRO-LAST-REFRESHED: 2026-07-27T13:05:32.839Z -->
+<!-- RETRO-FINGERPRINT: d057f2aeeb7286728f9f70f67bfd70bf9dbb1a0e2ffecf52cb470dabfb8e45de -->
+<!-- RETRO-LAST-REFRESHED: 2026-07-27T14:05:23.559Z -->
 <!-- AUTO-GENERATED:END -->
