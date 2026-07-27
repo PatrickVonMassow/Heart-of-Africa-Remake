@@ -1015,16 +1015,6 @@ read that as "the criterion and its evidence section".
   player-visible text. PROCESS: Fable-5 plan-review BEFORE, Fable-5 safety-review AFTER
   (safe / all cases / no side effects), merge to main ONLY when all green (user 24.07.2026).
 
-- [ ] 296. QUIET-MACHINE FLAG FOR TIMING-SENSITIVE VERIFY SUITES (user 24.07.2026,
-  retrospective class 12; hygiene/observation). A pre-verify check that detects concurrent
-  agent builds / high CPU load and, for the timing-sensitive suites (settings, enrichments,
-  polish), either DEFERS the run or FLAGS the result "under load — not authoritative" instead
-  of emitting an ambiguous red. Mechanizes the "judge a red only on a quiet machine"
-  heuristic so it does not rely on memory. ANCHORS: `scripts/verify/run-all.mjs` (load probe
-  + flag), a pure load-classification helper. VERIFIABLE: a pure test of the load-detect/flag
-  decision. No player-visible text. (Lighter point — no Fable sandwich required unless it
-  grows.)
-
 - [ ] 297. PERIODIC GUARD-CHAIN & MEMORY AUDIT (user 24.07.2026, retrospective §7;
   hygiene/observation). A repeatable consolidation pass over the Stop-hook guard chain (11+
   hooks run every turn end) and the memory files (contradictory/tempering pairs like

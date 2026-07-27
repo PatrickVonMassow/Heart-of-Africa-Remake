@@ -10855,3 +10855,13 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   suite) presses F6 in a real scene, types a description, triggers the download and
   asserts a non-empty zip whose PNG member decodes to a NON-uniform image, on BOTH
   backends.
+
+- [x] 296. QUIET-MACHINE FLAG FOR TIMING-SENSITIVE VERIFY SUITES (user 24.07.2026,
+  retrospective class 12; hygiene/observation). A pre-verify check that detects concurrent
+  agent builds / high CPU load and, for the timing-sensitive suites (settings, enrichments,
+  polish), either DEFERS the run or FLAGS the result "under load — not authoritative" instead
+  of emitting an ambiguous red. Mechanizes the "judge a red only on a quiet machine"
+  heuristic so it does not rely on memory. ANCHORS: `scripts/verify/run-all.mjs` (load probe
+  + flag), a pure load-classification helper. VERIFIABLE: a pure test of the load-detect/flag
+  decision. No player-visible text. (Lighter point — no Fable sandwich required unless it
+  grows.)
