@@ -13,28 +13,33 @@
 // Manual drive: node scripts/model-guard.mjs --status
 import { readFileSync, writeFileSync, existsSync } from 'node:fs'
 import { execSync } from 'node:child_process'
-import { fileURLToPath } from 'node:url'
 import { findForbiddenCommits } from './model-guard-core.mjs'
 import { notify } from './notify.mjs'
+import { isMainModule } from './is-main.mjs'
+import { REPO_ROOT, repoPath } from './repo-paths.mjs'
 
-const R = (p) => fileURLToPath(new URL(p, import.meta.url))
-const REPO_ROOT = R('..')
-const BASELINE = R('../.claude/model-guard-baseline.json')
-const PAUSE = R('../.claude/batch-paused')
+const BASELINE = repoPath('.claude/model-guard-baseline.json')
+const PAUSE = repoPath('.claude/batch-paused')
 
 /** Baseline timestamp; self-arms to NOW on first run so historic degraded
- *  commits (the acknowledged 24.07 incident) never re-trigger. */
-function baselineMs() {
+ *  commits (the acknowledged 24.07 incident) never re-trigger. `arm: false` reads
+ *  the same value without WRITING it: the read-only preflight may report, but it
+ *  must not decide the moment the guard's baseline is pinned. (It would pin it
+ *  EARLIER, which hides fewer commits, not more — so the harm is the surprise
+ *  write, not a missed detection.) */
+function baselineMs({ arm = true } = {}) {
   try {
     const t = Date.parse(JSON.parse(readFileSync(BASELINE, 'utf8')).since)
     if (!Number.isNaN(t)) return t
   } catch {
     /* fall through to self-arm */
   }
-  try {
-    writeFileSync(BASELINE, JSON.stringify({ since: new Date().toISOString() }, null, 2) + '\n')
-  } catch {
-    /* fail open */
+  if (arm) {
+    try {
+      writeFileSync(BASELINE, JSON.stringify({ since: new Date().toISOString() }, null, 2) + '\n')
+    } catch {
+      /* fail open */
+    }
   }
   return Date.now()
 }
@@ -50,30 +55,51 @@ function recentLog() {
   }
 }
 
-try {
-  const hits = findForbiddenCommits(recentLog(), baselineMs())
-  if (process.argv[2] === '--status') {
-    console.log(JSON.stringify({ baseline: new Date(baselineMs()).toISOString(), hits }, null, 2))
+/**
+ * The guard's I/O half — the git log window and the baseline — exported so the
+ * preflight (point 365 D) judges from the SAME gathering rather than a second
+ * copy of it. The ntfy ping and the block text stay in the main path below: a
+ * read-only preflight must not notify.
+ */
+export function gatherModelGuardInputs({ arm = true } = {}) {
+  // The inputs are gathered either way so `--status` can still report on a paused
+  // batch; `applicable` is what tells a caller whether the guard has duty here.
+  const inputs = { log: recentLog(), baselineMs: baselineMs({ arm }) }
+  if (existsSync(PAUSE)) return { applicable: false, why: 'the batch is paused', inputs }
+  return { applicable: true, inputs }
+}
+
+if (isMainModule(import.meta.url)) {
+  try {
+    // The main path uses the SAME gather step the preflight does — recomputing
+    // the log and the baseline here would let the two drift apart with nothing
+    // to notice it (the identity test can only see a shared function).
+    const gathered = gatherModelGuardInputs()
+    const { log, baselineMs: baseline } = gathered.inputs
+    const hits = findForbiddenCommits(log, baseline)
+    if (process.argv[2] === '--status') {
+      console.log(JSON.stringify({ baseline: new Date(baseline).toISOString(), hits }, null, 2))
+      process.exit(0)
+    }
+    if (hits.length && gathered.applicable) {
+      const list = hits.map((h) => `${h.sha.slice(0, 7)} (${h.trailer})`).join(', ')
+      await notify('FORBIDDEN MODEL', `Non-allowlisted model commit(s): ${list} — pausing the batch`, 'high')
+      process.stdout.write(
+        JSON.stringify({
+          decision: 'block',
+          reason:
+            `SERVING-MODEL TRIPWIRE: commit(s) ${list} carry a co-author trailer outside the model ` +
+            'allowlist (only Opus 5, Opus 4.8 and Fable 5 may run the batch — Sonnet and Haiku are ' +
+            'NOT acceptable; user policy 25.07.2026). Do NOT continue batch work: create ' +
+            '.claude/batch-paused (reason: forbidden serving model) and stop. Only after the user ' +
+            'has confirmed an allowed model may .claude/model-guard-baseline.json be advanced past ' +
+            'these commits.',
+        }),
+      )
+    }
+    process.exit(0)
+  } catch (e) {
+    console.error(`model-guard error (allowing stop): ${e && e.message}`)
     process.exit(0)
   }
-  if (hits.length && !existsSync(PAUSE)) {
-    const list = hits.map((h) => `${h.sha.slice(0, 7)} (${h.trailer})`).join(', ')
-    await notify('FORBIDDEN MODEL', `Non-allowlisted model commit(s): ${list} — pausing the batch`, 'high')
-    process.stdout.write(
-      JSON.stringify({
-        decision: 'block',
-        reason:
-          `SERVING-MODEL TRIPWIRE: commit(s) ${list} carry a co-author trailer outside the model ` +
-          'allowlist (only Opus 5, Opus 4.8 and Fable 5 may run the batch — Sonnet and Haiku are ' +
-          'NOT acceptable; user policy 25.07.2026). Do NOT continue batch work: create ' +
-          '.claude/batch-paused (reason: forbidden serving model) and stop. Only after the user ' +
-          'has confirmed an allowed model may .claude/model-guard-baseline.json be advanced past ' +
-          'these commits.',
-      }),
-    )
-  }
-  process.exit(0)
-} catch (e) {
-  console.error(`model-guard error (allowing stop): ${e && e.message}`)
-  process.exit(0)
 }

@@ -10,6 +10,7 @@
 // git error seen by only one side would fabricate a fingerprint mismatch —
 // the guard wrapper's fail-open catches the throw and allows the stop.
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { readTasksAll } from './tasks-source.mjs'
 import { execSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { basename, resolve } from 'node:path'
@@ -88,6 +89,18 @@ export function collectSources({
   tasksPath = resolve(repoRoot, 'TASKS.md'),
 } = {}) {
   const memories = collectMemories(memoryDir)
+  // A memory directory that resolves to NOTHING is never a real state — the
+  // corpus has dozens. It means the path was derived wrongly, which happens in
+  // a git WORKTREE: the project key is built from the checkout path, so a
+  // worktree looks up a directory that does not exist, and the refresh then
+  // rewrote the appendix as empty and exited 0 (27.07.2026, caught only in a
+  // diff review after ~65 rows had already been deleted). Refuse loudly instead.
+  if (memories.length === 0) {
+    throw new Error(
+      `retro-sources: no memories under ${memoryDir} — refusing to rewrite the appendix from an empty ` +
+        'source. Run this from the MAIN worktree, or set RETRO_MEMORY_DIR to the real directory.',
+    )
+  }
   const guards = existsSync(scriptsDir) ? guardScriptNames(readdirSync(scriptsDir)) : []
   // Full-history subjects; a git failure throws (see the failure contract above).
   const log = execSync('git log --format="%H %s"', {
@@ -97,8 +110,13 @@ export function collectSources({
     windowsHide: true,
   })
   const reverts = revertCommits(log)
+  // The FULL point universe, open and archived: the process/meta points this
+  // inventories are mostly FINISHED, and reading only the open file made the
+  // digest report "8 process points, 8 of them open" where it had been "14, 7
+  // open" — the done dimension silently collapsed to zero (found by the
+  // four-eyes review, 26.07.2026; exactly the failure tasks-source.mjs warns of).
   const processPoints = existsSync(tasksPath)
-    ? processTaskPoints(readFileSync(tasksPath, 'utf8'))
+    ? processTaskPoints(readTasksAll(tasksPath, resolve(repoRoot, 'docs/tasks-archive.md')))
     : []
   return { memories, guards, reverts, processPoints }
 }

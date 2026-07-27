@@ -108,8 +108,11 @@ const RESUME_BODY =
   'fast-gate -> tick -> deploy -> cleanup, and the Artifact publish. Every defect the user ' +
   'reports on the deployed build during the batch is APPENDED as its own implementation-ready ' +
   'TASKS point (append-and-defer) on main and delegated in turn — never fixed ad hoc or ' +
-  'dropped; keep the agent pool MODERATE (about 2-3 concurrent), reduce parallelism if the ' +
-  'report volume threatens context (user grant 22.07.2026), and delegate tightly-coupled ' +
+  'dropped; the agent pool is capped at AT MOST 3 concurrent agents (user 26.07.2026 — ' +
+  'parallel strands multiply the RATE of consumption and the throughput together, not ' +
+  'the cost per finished point; the real surcharge is rework where two strands touch the ' +
+  'same code); throttle DOWN further if the report volume ' +
+  'threatens context (user grant 22.07.2026), never up, and delegate tightly-coupled ' +
   'same-file points TOGETHER on ONE branch sequentially so shared files never collide. ' +
   'CLOSING FREEZE (user decision 22.07.2026): during a closing run the code is FROZEN — ' +
   'no parallel agent work lands/merges while the closing runs; merge or park in-flight ' +

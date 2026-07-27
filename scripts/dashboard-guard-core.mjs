@@ -125,6 +125,24 @@ export function parseKlaerungPoints(html) {
 /** The four binding sections, in the user's mandated order (18.07.2026). */
 export const SECTION_TITLES = ['Woran ich gerade arbeite', 'Von dir zu klären', 'Warteschlange', 'Erledigt']
 
+/** Sections whose whole body collapses behind their heading (user 26.07.2026).
+ *  Erledigt is the archive: it dwarfs the board and is the least-read part, so
+ *  its heading is the toggle and it starts CLOSED like every card. */
+/** Every section folds behind its own heading (user 27.07.2026); only Erledigt
+ *  starts closed, and the `open` ban plus the board's script handle that. */
+export const COLLAPSIBLE_SECTIONS = [
+  'Woran ich gerade arbeite',
+  'Von dir zu klären',
+  'Warteschlange',
+  'Erledigt',
+]
+
+/** The board keeps only the newest finished cards; the rest live on their own
+ *  published page (user 27.07.2026). Measured reason: at 214 cards the archive
+ *  was three quarters of the file, so every review of the board grew with every
+ *  closed point. */
+export const ERLEDIGT_ON_BOARD = 20
+
 // cp1252: byte → displayed char (the 0x80-0x9F block; every other byte shows
 // its own code point). The detector uses it REVERSED.
 const CP1252_HIGH = {
@@ -214,6 +232,13 @@ export function parseCards(sectionHtml) {
       .map(Number)
   for (const part of sectionHtml.split(/<details/).slice(1)) {
     const summary = (part.match(/<summary>([\s\S]*?)<\/summary>/) ?? [])[1] ?? ''
+    // A collapsible SECTION wrapper is not a card: its summary holds the <h2>
+    // heading. Without this it would enter the PRECEDING section's card list as
+    // a card with no point, no body and no duration meta — the slice ends AT
+    // the <h2>, so the wrapper's opening tag falls just before the boundary and
+    // its summary is cut open mid-tag. Hence both tests: an intact wrapper is
+    // recognised by the heading, a cut one by the missing `</summary>`.
+    if (/<h2[\s>]/.test(summary) || !part.includes('</summary>')) continue
     const meta = (summary.match(/class="meta">([^<]*)</) ?? [])[1] ?? null
     // The body slice must survive a container child, so take everything after
     // the body div's opening tag (the card ends at the next <details anyway).
@@ -266,10 +291,54 @@ export function auditDashboard(html, input = {}) {
     })
   }
 
+  // COLLAPSIBLE SECTION — user 26.07.2026: Erledigt collapses behind its own
+  // heading and starts closed. The `open` ban above already covers "closed", so
+  // this rule only pins that the wrapper still EXISTS: a republish that dropped
+  // it would silently unfold the longest part of the board again.
+  for (const title of COLLAPSIBLE_SECTIONS) {
+    const wrapped = new RegExp(`<details\\b[^>]*>\\s*<summary>\\s*<h2>${title}</h2>\\s*</summary>`).test(html)
+    if (!wrapped && html.includes(`<h2>${title}</h2>`)) {
+      v.push({
+        code: 'section-not-collapsible',
+        msg: `the "${title}" heading is not wrapped in <details><summary><h2>…</h2></summary> — that section collapses behind its heading (user 26.07.2026)`,
+      })
+    }
+  }
+
+  // THE ARCHIVE STAYS OUT (user 27.07.2026): the board carries the newest
+  // finished cards and links the rest. Both halves are checked — a board that
+  // kept everything, and one that dropped the link and orphaned the archive.
+  const erledigtSection = sections[SECTION_TITLES[3]] ?? ''
+  const doneOnBoard = parseCards(erledigtSection).length
+  if (doneOnBoard > ERLEDIGT_ON_BOARD) {
+    v.push({
+      code: 'erledigt-overflow',
+      msg: `the Erledigt section holds ${doneOnBoard} cards — the board keeps ${ERLEDIGT_ON_BOARD}, the older ones move to the archive page`,
+    })
+  }
+  if (doneOnBoard > 0 && !/<a\s[^>]*href="https?:\/\/[^"]+"[^>]*>/.test(erledigtSection)) {
+    v.push({
+      code: 'archive-link-missing',
+      msg: 'the Erledigt section links no archive page — the moved cards would be unreachable',
+    })
+  }
+
   const nowCards = parseCards(sections[SECTION_TITLES[0]] ?? '')
   const vdzkCards = parseCards(sections[SECTION_TITLES[1]] ?? '')
   const queueCards = parseCards(sections[SECTION_TITLES[2]] ?? '')
   const erledigtCards = parseCards(sections[SECTION_TITLES[3]] ?? '')
+
+  // THE STATUS CARRIES ITS DATE (user 27.07.2026): a current-work card says WHEN
+  // its status was written, so a reader can tell a fresh assessment from one
+  // that has stood for hours. The collapsed header keeps only start/expected
+  // end; it is the status TEXT that ages, so the stamp belongs in the body.
+  const undated = nowCards.filter((c) => !/\b\d{1,2}[:.]\d{2}\b/.test(c.body ?? '')).length
+  if (undated) {
+    v.push({
+      code: 'now-card-undated',
+      msg: `${undated} current-work card(s) carry no status time in the body — a status without its time cannot be judged for freshness`,
+    })
+  }
 
   // EMPTY BODY — a card must explain itself when expanded.
   const empty = [nowCards, vdzkCards, queueCards, erledigtCards].flat().filter((c) => !c.body).length

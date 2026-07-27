@@ -27,13 +27,18 @@ function git(args) {
 }
 
 try {
-  let sid = ''
-  try {
-    sid = JSON.parse(readFileSync(0, 'utf8')).session_id || ''
-  } catch {
-    /* manual run — the rule binds regardless */
+  // --status answers regardless of who owns the lock: a probe that stays silent
+  // under another owner is indistinguishable from "nothing unpushed".
+  const status = process.argv[2] === '--status'
+  if (!status) {
+    let sid = ''
+    try {
+      sid = JSON.parse(readFileSync(0, 'utf8')).session_id || ''
+    } catch {
+      /* manual run — the rule binds regardless */
+    }
+    if (heldByOtherLiveOwner(sid)) process.exit(0)
   }
-  if (heldByOtherLiveOwner(sid)) process.exit(0)
 
   const branch = git('symbolic-ref --short -q HEAD') ?? ''
   // Commits reachable from HEAD but from NO remote ref: the real question is
@@ -48,7 +53,7 @@ try {
     hasUpstream,
     paused: existsSync(PAUSE),
   })
-  if (process.argv[2] === '--status') {
+  if (status) {
     console.log(JSON.stringify({ branch, ahead, hasUpstream, verdict }, null, 2))
     process.exit(0)
   }

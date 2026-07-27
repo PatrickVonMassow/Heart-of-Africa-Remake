@@ -3,8 +3,8 @@
 Shared boot helpers for suites and probes live in `_boot.mjs` (bootGame,
 enterTravel, jumpAndEnter) — new scripts use them instead of repeating the
 launch/clear/wait boilerplate. Per-point runs are SCOPED (Vitest always,
-browser suites by the diff mapping in TASKS.md); the full 16-suite chain runs
-at scene-core diffs, every ~4th point, and before every Closing.
+browser suites by the diff mapping in TASKS.md); when the full chain is
+mandatory is stated once, in TASKS.md beside that mapping.
 
 The regression is split in two layers so the bulk runs in **seconds** and can
 never flicker on RAF/browser timing, while the handful of things that truly
@@ -193,6 +193,30 @@ VERIFY_GL=webgl  node scripts/verify/run-all.mjs polish   # WebGL 2 pass of one 
 VERIFY_GL=webgpu node scripts/verify/run-all.mjs polish   # WebGPU pass of one suite
 npm test -- large polish                                  # the same suite on BOTH, preflighted
 ```
+
+## Screenshots are NOT comparable between runs (point 361)
+
+The frames these suites write cannot be diffed against a stored baseline, and
+this is measured, not suspected. `node scripts/picture-stability.mjs <suite>`
+runs a suite twice on identical code and reports how far each frame moved:
+`world` on WebGL 2 moved **every one of its eight frames** between 11 % and 98 %
+of pixels, in a different rank order each time, while the smallest real defect
+in the project's historical picture-caught bugs moved 0.75 %. One pair had
+captured different views of different places — the capture races the camera
+settle under load, and the suite passes either way because its assertions never
+look at the frame.
+
+Consequences for anyone extending this directory:
+
+- **A screenshot is documentation, not an assertion.** Assert on the DOM, on
+  `window.__camera` projections or on numeric probes; never on a stored image.
+- **No golden-image gate, no cross-backend pixel diff, no diff-derived crop**
+  until the probe reports STABLE. The rejected levers and the case that killed
+  each are in `docs/picture-check-levers.md` §3.4; what the check costs is in
+  `docs/picture-check-cost.md`.
+- **A new frame should wait for the picture it names.** Poll the app's own state
+  until the view has settled rather than a fixed wait (see `fixedWaits.mjs`);
+  that is also the first work any future determinism effort has to do.
 
 ## Headless limitations
 

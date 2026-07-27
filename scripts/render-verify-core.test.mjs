@@ -10,6 +10,7 @@ import { describe, it, expect } from 'vitest'
 import {
   BACKENDS,
   isRenderPath,
+  isBackendSensitivePath,
   coveringRun,
   suggestSuite,
   baselineFor,
@@ -57,7 +58,16 @@ describe('isRenderPath', () => {
     expect(isRenderPath('scripts/verify/run-all.mjs')).toBe(false)
     expect(isRenderPath('scripts/verify/docs.mjs')).toBe(false)
     expect(isRenderPath('scripts/verify/ttsCache.mjs')).toBe(false)
+    expect(isRenderPath('scripts/verify/fixedWaits.mjs')).toBe(false)
     expect(isRenderPath('scripts/verify/README.md')).toBe(false)
+  })
+  // Regression witness: a *.test.mjs beside the suites runs in jsdom and never
+  // opens a browser. Treating it as a render path demanded a two-backend
+  // browser run for editing a pure text scanner.
+  it('never treats a Vitest file beside the suites as a render path', () => {
+    expect(isRenderPath('scripts/verify/fixedWaits.test.mjs')).toBe(false)
+    expect(isRenderPath('scripts/verify/tiers.test.mjs')).toBe(false)
+    expect(isRenderPath('scripts/verify/textureLeak.test.mjs')).toBe(false)
   })
   it('ignores logic/store/docs paths (a pure logic change needs no dual picture)', () => {
     expect(isRenderPath('src/state/store.ts')).toBe(false)
@@ -103,6 +113,37 @@ describe('suggestSuite', () => {
     expect(suggestSuite([])).toBe('enrichments')
     expect(suggestSuite([run('webgl', 1, { suite: 'unknown' })])).toBe('enrichments')
     expect(suggestSuite(null)).toBe('enrichments')
+  })
+
+  // Point 361: the old rule ignored the change and ratcheted — one enrichments
+  // run made the 37-frame, 951-second suite the standing suggestion forever.
+  // Only the DOM-only narrowing survived the historical replay.
+  it('sends a DOM-only change to flow instead of the 37-frame suite', () => {
+    const runs = [run('webgl', 1, { suite: 'enrichments' })]
+    expect(suggestSuite(runs, ['src/ui/Hud.tsx'])).toBe('flow')
+    expect(suggestSuite([], ['src/ui/Hud.tsx', 'src/ui/DebugMenu.tsx'])).toBe('flow')
+  })
+  it('does not narrow when any changed path can render per backend', () => {
+    const runs = [run('webgl', 1, { suite: 'polish' })]
+    expect(suggestSuite(runs, ['src/ui/Hud.tsx', 'src/render/water.ts'])).toBe('polish')
+    expect(suggestSuite(runs, ['src/scenes/travel/TravelScene.tsx'])).toBe('polish')
+    // The general path→suite map was REJECTED by the replay; travel-scene code
+    // must keep the old suggestion, not acquire a new one.
+    expect(suggestSuite([], ['src/scenes/travel/TravelScene.tsx'])).toBe('enrichments')
+  })
+  it('ignores a path list that is empty, absent or not render paths', () => {
+    expect(suggestSuite([], [])).toBe('enrichments')
+    expect(suggestSuite([], null)).toBe('enrichments')
+    expect(suggestSuite([], ['README.md'])).toBe('enrichments')
+    // A jsdom test under src/ui/ is not a render path at all (isRenderPath),
+    // so it must not smuggle a suite suggestion out of this branch.
+    expect(suggestSuite([], ['src/ui/Hud.test.tsx'])).toBe('enrichments')
+  })
+  it('names flow in the block message for a DOM-only change', () => {
+    const r = evaluate(renderChange({ changedRenderPaths: ['src/ui/Hud.tsx'] }))
+    expect(r.decision).toBe('block')
+    expect(r.reason).toContain('run-all.mjs flow')
+    expect(r.reason).not.toContain('run-all.mjs enrichments')
   })
 })
 
@@ -227,5 +268,88 @@ describe('evaluate — totality and fail-open posture', () => {
   it('accepts any recorded passing runs when no edit time is known (NaN → since 0)', () => {
     const r = evaluate(renderChange({ latestChangeAt: NaN, runs: [run('webgpu', 5), run('webgl', 5)] }))
     expect(r.decision).toBe('allow')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// The DOM exemption (user 26.07.2026): the HUD renders identically under either
+// backend, so a change there owes ONE picture, not two. Everything else in the
+// render set stays dual — the witnesses are point 175 and point 334, which both
+// appeared on a single backend from code that looks backend-neutral.
+describe('isBackendSensitivePath — where two pictures are actually needed', () => {
+  it('exempts the DOM overlays but still counts them as render paths', () => {
+    for (const p of ['src/ui/Hud.tsx', 'src/ui/Dialogs.tsx', 'src/ui/MapOverlay.tsx']) {
+      expect(isRenderPath(p)).toBe(true)
+      expect(isBackendSensitivePath(p)).toBe(false)
+    }
+  })
+
+  it('keeps everything that draws into the canvas dual-backend', () => {
+    for (const p of [
+      'src/render/materials.ts',
+      'src/render/water.tsl.ts',
+      'src/App.tsx',
+      'src/scenes/travel/waterSurface.ts',
+      'src/scenes/place/PlaceScene.tsx',
+      'scripts/verify/polish.mjs',
+    ]) {
+      expect(isBackendSensitivePath(p)).toBe(true)
+    }
+  })
+
+  it('says no to paths outside the render set entirely', () => {
+    for (const p of ['src/state/store.ts', 'TASKS.md', '', null]) {
+      expect(isBackendSensitivePath(p)).toBe(false)
+    }
+  })
+
+  it('a HUD-only change is cleared by ONE passing run, either backend', () => {
+    const base = {
+      head: 'head123',
+      clearedHead: 'old1234',
+      changedRenderPaths: ['src/ui/Hud.tsx'],
+      latestChangeAt: 1000,
+    }
+    for (const backend of ['webgpu', 'webgl']) {
+      const r = evaluate({ ...base, runs: [run(backend, 2000)] })
+      expect(r.decision).toBe('allow')
+    }
+    expect(evaluate({ ...base, runs: [] }).decision).toBe('block')
+  })
+
+  it('a canvas change is NOT cleared by one run — the point-210 rule is intact', () => {
+    const r = evaluate({
+      head: 'head123',
+      clearedHead: 'old1234',
+      changedRenderPaths: ['src/ui/Hud.tsx', 'src/render/materials.ts'],
+      latestChangeAt: 1000,
+      runs: [run('webgl', 2000)],
+    })
+    expect(r.decision).toBe('block')
+    expect(r.reason).toMatch(/WEBGPU/)
+  })
+})
+
+// Regression witness (26.07.2026): a Vitest file added under src/ui/ demanded a
+// browser picture, because the rule that exempts them was written only for the
+// files beside the browser suites. A jsdom test cannot move a pixel wherever it
+// lives.
+describe('isRenderPath — Vitest files are never render paths', () => {
+  it('exempts them under the render trees too, not only beside the suites', () => {
+    for (const p of [
+      'src/ui/domOnly.test.ts',
+      'src/ui/Hud.test.tsx',
+      'src/render/fauna.test.ts',
+      'src/scenes/place/layout.test.ts',
+      'scripts/verify/tiers.test.mjs',
+    ]) {
+      expect(isRenderPath(p)).toBe(false)
+      expect(isBackendSensitivePath(p)).toBe(false)
+    }
+  })
+
+  it('still catches the production files beside them', () => {
+    expect(isRenderPath('src/ui/Hud.tsx')).toBe(true)
+    expect(isRenderPath('src/render/fauna.ts')).toBe(true)
   })
 })

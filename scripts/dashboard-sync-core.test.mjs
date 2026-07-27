@@ -74,6 +74,31 @@ describe('parseCardTitle / cardTitle', () => {
     expect(c.points).toEqual([306, 308])
   })
 
+  it('reads the »NNN: …« card form the board actually uses', () => {
+    const c = parseCardTitle('337: Ladebild friert beim Start ein')
+    expect(c.point).toBe(337)
+    expect(c.points).toEqual([337])
+    expect(c.label).toBe('Ladebild friert beim Start ein')
+  })
+
+  // Regression witness: a number inside the PROSE is not a point reference. The
+  // old "every standalone number" rule read the 15 of »~15 Sekunden« as point
+  // 15, found it ticked done, and blocked the turn calling a current card stale.
+  it('ignores numbers inside the prose, so a current card is not called stale', () => {
+    expect(parseCardTitle('337: Ladebild steht ~15 Sekunden still').points).toEqual([337])
+    expect(parseCardTitle('312: Flucht ins Wasser zündet in 3 von 10 Fällen').points).toEqual([312])
+  })
+
+  it('accepts the other list forms of a combined card', () => {
+    expect(parseCardTitle('316/319 — Mündung und Krokodil').points).toEqual([316, 319])
+    expect(parseCardTitle('121, 130 und 146: Familien-Dramen').points).toEqual([121, 130, 146])
+  })
+
+  it('does not take a clock time or a version at the start for a point', () => {
+    expect(parseCardTitle('22:29 Uhr weitergemacht').points).toEqual([])
+    expect(parseCardTitle('0.2 nachgezogen').points).toEqual([])
+  })
+
   it('cardTitle reads the FIRST now-card of the real markup, never the meta time or other sections', () => {
     const c = cardTitle(boardHtml(['306 — Closing-Completeness-Guard', '308 — Sync-Guard']))
     expect(c.point).toBe(306)

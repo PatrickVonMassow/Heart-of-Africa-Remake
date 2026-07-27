@@ -13,14 +13,13 @@
 // write concurrently with a CLI command in the same turn.
 import { readFileSync, writeFileSync, renameSync, rmSync } from 'node:fs'
 import { createHash } from 'node:crypto'
-import { fileURLToPath } from 'node:url'
+import { REPO_ROOT, repoPath } from './repo-paths.mjs'
 
-const R = (p) => fileURLToPath(new URL(p, import.meta.url))
-export const REPO_ROOT = R('..')
-export const STATE_PATH = R('../.claude/dashboard-state.json')
-export const FOCUS_PATH = R('../.claude/current-focus.json')
-export const PENDING_PATH = R('../.claude/focus-check-pending.json')
-export const ACTIVITY_PATH = R('../.claude/tool-activity.json')
+export { REPO_ROOT }
+export const STATE_PATH = repoPath('.claude/dashboard-state.json')
+export const FOCUS_PATH = repoPath('.claude/current-focus.json')
+export const PENDING_PATH = repoPath('.claude/focus-check-pending.json')
+export const ACTIVITY_PATH = repoPath('.claude/tool-activity.json')
 
 /** Parse a JSON file; null when absent/unreadable/torn (caller decides). */
 export function readJson(path) {

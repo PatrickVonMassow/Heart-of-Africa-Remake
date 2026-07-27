@@ -272,21 +272,29 @@ await page.evaluate(() => window.__game.getState().leavePlace())
 await page.waitForTimeout(1500)
 await page.evaluate(() => window.__game.getState().setJournalOpen(false))
 
-// --- Point 12: map points show "?" until discovered --------------------------
-// Every place/landmark label is rendered; an undiscovered one shows a muted "?",
+// --- Point 12: map points name their KIND until discovered -------------------
+// Every place/landmark label is rendered; an undiscovered one shows a muted,
+// kind-aware placeholder (point 318 — "Unbekanntes Dorf", "Unbekannter Berg"),
 // a visited place (Cairo) shows its real name, and sighting a landmark reveals it.
-const labelsBefore = await page.evaluate(() => {
+const labelsBefore = await page.evaluate(async () => {
+  // Language-agnostic on purpose: this suite runs in ENGLISH, flow.mjs in German,
+  // so the placeholder is matched against the language FILES rather than one
+  // hard-coded wording (point 318 — a German-only regex failed here first).
+  const [{ en }, { de }] = await Promise.all([import('/src/i18n/en.ts'), import('/src/i18n/de.ts')])
+  const placeholders = new Set([...Object.values(en.unknownPlaces), ...Object.values(de.unknownPlaces)])
   const labels = [...document.querySelectorAll('.map-label')]
   return {
-    undiscovered: labels.filter((l) => l.classList.contains('undiscovered') && l.textContent.trim() === '?').length,
+    undiscovered: labels.filter((l) => l.classList.contains('undiscovered') && placeholders.has(l.textContent.trim())).length,
+    bareQuestionMarks: labels.filter((l) => l.textContent.trim() === '?').length,
     cairoNamed: labels.some((l) => !l.classList.contains('undiscovered') && /Kair|Cairo/.test(l.textContent)),
     kiliHidden: !labels.some((l) => /Kilim/.test(l.textContent)),
     seen: window.__game.getState().landmarksSeen.includes('kilimanjaro'),
   }
 })
-check('undiscovered map points show a "?" label', labelsBefore.undiscovered > 0, JSON.stringify(labelsBefore))
+check('undiscovered map points name their kind', labelsBefore.undiscovered > 0, JSON.stringify(labelsBefore))
+check('no map label is a bare "?" any more (point 318)', labelsBefore.bareQuestionMarks === 0, JSON.stringify(labelsBefore))
 check('a visited place (Cairo) shows its real name', labelsBefore.cairoNamed, JSON.stringify(labelsBefore))
-check('an unsighted landmark (Kilimanjaro) is hidden behind "?"', labelsBefore.kiliHidden && !labelsBefore.seen, JSON.stringify(labelsBefore))
+check('an unsighted landmark (Kilimanjaro) is hidden behind its kind label', labelsBefore.kiliHidden && !labelsBefore.seen, JSON.stringify(labelsBefore))
 await page.evaluate(() =>
   window.__game.setState({ landmarksSeen: [...window.__game.getState().landmarksSeen, 'kilimanjaro'] }),
 )
@@ -1778,6 +1786,90 @@ check('the adoption re-establishes the parent↔child link so a §19.8 drama can
   adoption.dramaCanFire, JSON.stringify(adoption))
 check('with no adult in range the orphan simply stays parentless (point 262)',
   adoption.stayedOrphan, JSON.stringify(adoption))
+
+// Point 341: a juvenile's bond RESOLVES, never hangs. The streaming cull removes
+// an animal by distance from the player, and a culled parent is NOT dead — so a
+// calf used to keep it, walk to its frozen phantom position and nurse at nothing
+// while the point-262 adoption (which waits for a dead parent) never fired. Two
+// staged cases: the parent is driven out of the despawn ring (the cull must clear
+// both link directions, and the calf ends with a LIVING herd-mate — or nothing at
+// all where none is eligible), and a calf left out of reach of a living parent
+// past balance.family.reunionSeconds has its bond released to the same adoption.
+const bond = await page.evaluate(async () => {
+  const STAGE = [-2.5, 34.0] // Serengeti savanna
+  const AWAY = [5.0, 20.0] // far off in another region: the staged pair is left behind
+  const jump = (ll) => window.__game.getState().debugJumpTo(ll[0], ll[1])
+  jump(STAGE)
+  await window.__sleepSim(0.5)
+  const herds = window.__wildlife.herdsRef.current
+  const clear = () => { for (const sp of Object.keys(herds)) herds[sp].length = 0 }
+  const at = () => window.__game.getState().pos
+  const mk = (p, dx, dz, over = {}) => ({ x: p.x + dx, z: p.z + dz, y: 0.2, rot: 0, scale: 1, phase: 0, ...over })
+  const live = (a) => !!a && a.dead !== true && a.young !== true && herds.zebra.includes(a)
+
+  // --- The cull takes the parent: the calf keeps no phantom ---
+  // Driving AWAY is what removes it, exactly as in the report — the despawn ring
+  // is a distance from the player, and the on-screen backstop only holds an
+  // animal inside the rendered frame. `chunk` is what makes the cull judge it at
+  // all (an injected, untagged animal is always kept), so the staged calf and its
+  // herd-mate survive the drive while the tagged parent is streamed out.
+  clear()
+  const p0 = at()
+  const parent = mk(p0, 0, 0, { chunk: '999999,999999' })
+  const calf = mk(p0, 1, 0, { young: true, scale: 0.55, parent })
+  parent.child = calf
+  const adopter = mk(p0, 3, 0) // a childless zebra adult beside the calf
+  herds.zebra.unshift(parent, calf, adopter)
+  await window.__sleepSim(0.3)
+  jump(AWAY)
+  await window.__pollSim(6, () => !herds.zebra.includes(parent) && !!calf.parent && calf.parent !== parent)
+  const culled = !herds.zebra.includes(parent)
+  const noPhantom = culled && calf.parent !== parent && parent.child !== calf
+  const reAdopted = culled && calf.parent !== parent && live(calf.parent) && calf.parent.child === calf
+
+  // --- No eligible adult: the calf roams on parentless, never bonded to a ghost ---
+  const prevR = window.__balance.family.adoptionRadius
+  window.__balance.family.adoptionRadius = 0.001 // nothing is in reach, not even a streamed-in herd-mate
+  clear()
+  jump(STAGE)
+  await window.__sleepSim(0.3)
+  const p1 = at()
+  const lone = mk(p1, 0, 0, { chunk: '999999,999999' })
+  const stray = mk(p1, 1, 0, { young: true, scale: 0.55, parent: lone })
+  lone.child = stray
+  herds.zebra.unshift(lone, stray)
+  await window.__sleepSim(0.3)
+  jump(AWAY)
+  await window.__pollSim(6, () => !herds.zebra.includes(lone) && !stray.parent)
+  const freeRoamer = !herds.zebra.includes(lone) && !stray.parent && lone.child !== stray
+  window.__balance.family.adoptionRadius = prevR
+
+  // --- The separation window: a living parent it cannot reach ---
+  const prevW = window.__balance.family.reunionSeconds
+  window.__balance.family.reunionSeconds = 1 // debug-editable; shortened so the check stays quick
+  clear()
+  jump(STAGE)
+  await window.__sleepSim(0.3)
+  const p2 = at()
+  const distant = mk(p2, 0, 0) // alive and well, but far outside the follow radius
+  const left = mk(p2, 40, 0, { young: true, scale: 0.55, parent: distant })
+  distant.child = left
+  herds.zebra.unshift(distant, left, mk(p2, 38, 0)) // an eligible adult beside the stray calf
+  await window.__pollSim(8, () => !!left.parent && left.parent !== distant)
+  const separated = live(left.parent) && left.parent.child === left && distant.child !== left
+  window.__balance.family.reunionSeconds = prevW
+  clear()
+
+  return { culled, noPhantom, reAdopted, freeRoamer, separated }
+})
+check('the streaming cull clears the family link on both sides (point 341)',
+  bond.culled && bond.noPhantom, JSON.stringify(bond))
+check('a calf whose parent was culled is adopted by a living herd-mate (point 341)',
+  bond.reAdopted, JSON.stringify(bond))
+check('with no eligible adult that calf roams on parentless, never bonded to a ghost (point 341)',
+  bond.freeRoamer, JSON.stringify(bond))
+check('a calf out of reach past the reunion window is handed to the adoption (point 341)',
+  bond.separated, JSON.stringify(bond))
 
 // --- Scavenging of a non-lion carcass (point 5) ------------------------------
 // A carcass that was not eaten by the lion (e.g. trampled) draws a vulture that

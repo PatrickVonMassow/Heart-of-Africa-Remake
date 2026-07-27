@@ -1,12 +1,18 @@
-<img width="1168" height="784" alt="Grok 1" src="https://github.com/user-attachments/assets/4ee7611d-eb48-458f-8689-38f59a48cd15" />
+<img width="1168" height="784" alt="Grok 2" src="https://github.com/user-attachments/assets/07cc05d9-7a8d-427c-88a7-adbd0ea372cf" />
 
 # The Heart of Africa — Modern Remake
 
-A single-player 3D remake of the 1985 exploration classic *The Heart of Africa*,
-built as a web application. You start in Cairo in 1890 with $250 and a journal,
+A single-player 3D remake of the 1985 exploration classic *The Heart of Africa*
+— Ozark Softscape's follow-up to *The Seven Cities of Gold* (1984) — built as a
+web application. You start in Cairo in 1890 with $250 and a journal,
 and travel across a geographically authentic Africa in search of a lost tomb —
 trading in port cities, offering culturally appropriate gifts to village chiefs,
 and decoding direction hints given in the regions' own language system.
+
+If you remember *The Seven Cities of Gold*, you know the DNA: the same design
+team, and the same loop of walking into an unmapped continent, watching the map
+fill itself in behind you, and getting along — or not — with the peoples who
+already live there. Where that game had the Americas, this one has Africa.
 
 This repository contains the proof of concept: the core gameplay loop end to
 end, not the complete game. `design.md` is the authoritative design document;

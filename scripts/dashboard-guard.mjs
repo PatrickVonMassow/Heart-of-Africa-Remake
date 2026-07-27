@@ -55,6 +55,8 @@ import {
 const nowHash = (html) => createHash('sha256').update(nowCardText(html)).digest('hex')
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
 import { specSnapshots } from './dashboard-integrity-guard-core.mjs'
+import { readTasksAll } from './tasks-source.mjs'
+import { isMainModule } from './is-main.mjs'
 
 const TASKS = resolve(REPO_ROOT, 'TASKS.md')
 const PAUSE = resolve(REPO_ROOT, '.claude', 'batch-paused')
@@ -67,10 +69,62 @@ function head() {
   }
 }
 
+/**
+ * Everything evaluate() needs, gathered from disk and git — exported so the
+ * preflight (point 365 D) can ask "would the dashboard guard block?" from the
+ * SAME inputs the Stop hook uses. This gathering is where a reimplementation
+ * would drift and report a false "clean", so there is exactly one of it.
+ */
+export function gatherDashboardInputs({ sessionId = '' } = {}) {
+  // Hard singleton: a session that does not own the live batch lock has no
+  // dashboard duty — it must stand down entirely, not be pushed to publish.
+  if (heldByOtherLiveOwner(sessionId)) {
+    return { applicable: false, why: 'another live session owns the batch lock', cause: 'not-lock-owner' }
+  }
+
+  const marker = readJson(STATE_PATH)
+  const dashboardFile = marker && marker.dashboardPath ? resolve(REPO_ROOT, marker.dashboardPath) : null
+  const markerFileExists = !!(dashboardFile && existsSync(dashboardFile))
+  const html = markerFileExists ? readFileSync(dashboardFile, 'utf8') : null
+
+  // Only THIS session's tool activity drives the focus-freshness invariant —
+  // a parallel chat window's calls must not nag the batch session (and vice versa).
+  const activity = readJson(ACTIVITY_PATH)
+  const lastToolAt =
+    activity && (!activity.sessionId || !sessionId || activity.sessionId === sessionId)
+      ? Number(activity.lastToolAt ?? 0)
+      : 0
+
+  return {
+    applicable: true,
+    inputs: {
+      paused: existsSync(PAUSE),
+      ...parseTasks(readTasksAll(TASKS)),
+      marker,
+      markerFileExists,
+      head: head(),
+      html,
+      repoHash: markerFileExists ? sha256File(dashboardFile) : null,
+      focus: readJson(FOCUS_PATH),
+      pending: readJson(PENDING_PATH),
+      sessionId,
+      lastToolAt,
+      nowCardHash: html ? nowHash(html) : null,
+      now: Date.now(),
+      // Calibratable without a code change: minutes in dashboard-state.json.
+      freshMs: marker && marker.focusFreshMinutes ? Number(marker.focusFreshMinutes) * 60000 : undefined,
+    },
+  }
+}
+
+// Everything below is the CLI/hook behaviour and must not run on import (the
+// preflight imports this file for gatherDashboardInputs).
+const RUN_AS_SCRIPT = isMainModule(import.meta.url)
+
 // --waive-audit "<reason>": emergency bypass for the consistency audit, bound
 // to exactly the CURRENT registered file's hash (point 313 escape hatch — the
 // only alternative used to be pausing the whole batch).
-if (process.argv[2] === '--waive-audit') {
+if (RUN_AS_SCRIPT && process.argv[2] === '--waive-audit') {
   const reason = process.argv[3]
   const marker = readJson(STATE_PATH)
   // Falls back to the default board path so the hatch also works BEFORE the
@@ -89,7 +143,7 @@ if (process.argv[2] === '--waive-audit') {
 }
 
 // --synced <path>: record that the dashboard at <path> was reviewed at this HEAD.
-if (process.argv[2] === '--synced') {
+if (RUN_AS_SCRIPT && process.argv[2] === '--synced') {
   const p = process.argv[3]
   if (!p || !existsSync(p)) {
     console.error(`dashboard-guard --synced: file not found: ${p}`)
@@ -98,7 +152,7 @@ if (process.argv[2] === '--synced') {
 
   // VALIDATE FIRST (point 313): a board that fails the consistency audit can
   // not be attested — nothing is written, the violations are the work list.
-  const { open, done } = parseTasks(readFileSync(TASKS, 'utf8'))
+  const { open, done } = parseTasks(readTasksAll(TASKS))
   const priorState = readJson(STATE_PATH) ?? {}
   const violations = auditDashboard(readFileSync(p, 'utf8'), { open, done, doneSeen: priorState.doneSeen ?? null })
   const waived = priorState.auditWaived && priorState.auditWaived.repoHash === sha256File(p)
@@ -139,7 +193,7 @@ if (process.argv[2] === '--synced') {
   // later spec change with an unchanged card then flags at turn end until the
   // next reviewed --synced refreshes these snapshots.
   try {
-    const snaps = specSnapshots(readFileSync(TASKS, 'utf8'), readFileSync(p, 'utf8'))
+    const snaps = specSnapshots(readTasksAll(TASKS), readFileSync(p, 'utf8'))
     mergeState({ integritySnapshots: snaps })
     console.log(`integrity snapshots recorded for ${Object.keys(snaps).length} queue card(s)`)
   } catch (e) {
@@ -170,51 +224,23 @@ if (process.argv[2] === '--synced') {
 }
 
 // Stop-hook mode.
-try {
-  let sessionId = ''
+if (RUN_AS_SCRIPT) {
   try {
-    sessionId = JSON.parse(readFileSync(0, 'utf8')).session_id || ''
-  } catch {
-    // no/non-JSON stdin (manual run) — invariant 7 then binds regardless of session
+    let sessionId = ''
+    try {
+      sessionId = JSON.parse(readFileSync(0, 'utf8')).session_id || ''
+    } catch {
+      // no/non-JSON stdin (manual run) — invariant 7 then binds regardless of session
+    }
+
+    const gathered = gatherDashboardInputs({ sessionId })
+    if (!gathered.applicable) process.exit(0)
+
+    const result = evaluate(gathered.inputs)
+    if (result.decision === 'block') process.stdout.write(JSON.stringify(result))
+    process.exit(0)
+  } catch (e) {
+    console.error(`dashboard-guard error (allowing stop): ${e && e.message}`)
+    process.exit(0)
   }
-
-  // Hard singleton: a session that does not own the live batch lock has no
-  // dashboard duty — it must stand down entirely, not be pushed to publish.
-  if (heldByOtherLiveOwner(sessionId)) process.exit(0)
-
-  const marker = readJson(STATE_PATH)
-  const dashboardFile = marker && marker.dashboardPath ? resolve(REPO_ROOT, marker.dashboardPath) : null
-  const markerFileExists = !!(dashboardFile && existsSync(dashboardFile))
-  const html = markerFileExists ? readFileSync(dashboardFile, 'utf8') : null
-
-  // Only THIS session's tool activity drives the focus-freshness invariant —
-  // a parallel chat window's calls must not nag the batch session (and vice versa).
-  const activity = readJson(ACTIVITY_PATH)
-  const lastToolAt =
-    activity && (!activity.sessionId || !sessionId || activity.sessionId === sessionId)
-      ? Number(activity.lastToolAt ?? 0)
-      : 0
-
-  const result = evaluate({
-    paused: existsSync(PAUSE),
-    ...parseTasks(readFileSync(TASKS, 'utf8')),
-    marker,
-    markerFileExists,
-    head: head(),
-    html,
-    repoHash: markerFileExists ? sha256File(dashboardFile) : null,
-    focus: readJson(FOCUS_PATH),
-    pending: readJson(PENDING_PATH),
-    sessionId,
-    lastToolAt,
-    nowCardHash: html ? nowHash(html) : null,
-    now: Date.now(),
-    // Calibratable without a code change: minutes in dashboard-state.json.
-    freshMs: marker && marker.focusFreshMinutes ? Number(marker.focusFreshMinutes) * 60000 : undefined,
-  })
-  if (result.decision === 'block') process.stdout.write(JSON.stringify(result))
-  process.exit(0)
-} catch (e) {
-  console.error(`dashboard-guard error (allowing stop): ${e && e.message}`)
-  process.exit(0)
 }

@@ -123,6 +123,13 @@ export const de: Strings = {
   places: PLACES,
   peoples: PEOPLES,
   landmarks: LANDMARKS,
+  // Adjective agreement is written out per gender, never assembled from parts:
+  // der Berg/Wasserfall/See, das Dorf/Denkmal, die Stätte/Ruinen.
+  unknownPlaces: {
+    port: 'Unbekannter Hafen', monument: 'Unbekanntes Denkmal', village: 'Unbekanntes Dorf',
+    mountain: 'Unbekannter Berg', waterfall: 'Unbekannter Wasserfall', lake: 'Unbekannter See',
+    cultural: 'Unbekannte Ruinen', natural: 'Unbekanntes Wahrzeichen', site: 'Unbekannte Stätte',
+  },
   equipment: {
     shovel: 'Schaufel', rope: 'Seil', machete: 'Machete', rifle: 'Gewehr',
     medicine: 'Medizin', canteen: 'Feldflasche', canoe: 'Kanu',
@@ -421,6 +428,7 @@ export const de: Strings = {
     juvenileDrinkCrocBias: 'Krokodil: Vorzug trinkender Jungtiere',
     calfAdoptionRadius: 'Adoptionsradius für Waisen',
     calfEscapeSeconds: 'Fluchtdauer des befreiten Jungtiers (s)',
+    calfReunionSeconds: 'Trennungsfenster des Jungtiers (s)',
     benchmarkStart: 'Render-Benchmark starten',
     crocGripSeconds: 'Krokodil: Griff-Deadline (s)',
     crocDriveOffRest: 'Krokodil: Ruhe nach Vertreiben (s)',

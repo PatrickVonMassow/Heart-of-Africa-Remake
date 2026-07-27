@@ -33,6 +33,7 @@ scripts/.tile-cache
 .claude/batch-lock.json
 .claude/batch-paused
 .batch-dashboard.html
+.batch-dashboard-archive.html
 .claude/dashboard-state.json
 .claude/current-focus.json
 .claude/focus-check-pending.json
@@ -60,3 +61,14 @@ scripts/.tile-cache
 
 # Local, non-versioned artefacts (retrospectives, scratch notes) — never on git
 /local/
+
+# Personal working material that must not reach the repository (25.07.2026):
+# a voice reference recording and the music sources were swept in by commits
+# that staged everything. scripts/commit-scope-guard now blocks that class.
+/Referenzstimme*.wav
+/music/
+
+# Cover/marketing images are working material, not project source (27.07.2026):
+# they were swept in by a commit that staged everything (a0c599b) and the README
+# serves its picture from the GitHub attachment CDN, not from here.
+/cover/

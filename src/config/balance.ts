@@ -383,6 +383,15 @@ export interface BalanceConfig {
      *  past the feeding predator instead of escaping. A hard deadline — the
      *  adoption resumes the moment it expires. Calibratable/debug-editable. */
     escapeSeconds: number
+    /** Separation window (design.md §19.8/§21.2, point 341): how long (seconds) a
+     *  juvenile may stay OUT OF REACH of its parent — farther than followRadius —
+     *  before the bond RESOLVES: both links are cleared and the young goes through
+     *  the orphan adoption, so it gains a living parent nearby or roams on
+     *  parentless instead of walking at a parent it can never reach. The clock
+     *  runs only while the calf is genuinely out of reach, so a gambol at the
+     *  leash edge never trips it. Zero switches the window off.
+     *  Calibratable/debug-editable. */
+    reunionSeconds: number
   }
   /** Rivers (design.md §11.3, point 136). */
   river: {
@@ -672,6 +681,13 @@ export const balance: BalanceConfig = {
     // 14-unit flee radius with room to spare — and well above the ~5 s struggle
     // window, so the escape is never cut short by the drama it follows.
     escapeSeconds: 12,
+    // Calibratable (point 341): the bond's deadline. Sized well above one whole
+    // play cycle — a bout runs 8 s and the idle gap 12 s (20 s), and the follow
+    // leg back from the gambol edge (18 units at 4.5 units/s against a walking
+    // parent) adds a few more — so a healthy pair, which drops inside the leash
+    // once per cycle, never approaches it, while a calf that genuinely cannot
+    // reach its parent is re-homed inside a minute of play.
+    reunionSeconds: 45,
   },
   crocodile: {
     strikeRadius: 5, // calibratable: bank visitors inside this of a hidden crocodile trigger the lunge

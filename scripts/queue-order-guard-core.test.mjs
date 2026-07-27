@@ -94,6 +94,17 @@ describe('finderBeforeOpenFix', () => {
     // 211 was closed in TASKS but still queued after the finder — no open fix follows.
     expect(finderBeforeOpenFix([203, 211], new Set([203]))).toEqual([])
   })
+  it('orders only the pre-release stretch — work queued after the tag is free', () => {
+    // Deliberately deferred past the release (user 26.07.2026): 362/363/364 sit
+    // behind 174, so the finder ahead of them is correctly ordered, not misordered.
+    expect(
+      finderBeforeOpenFix([210, 203, 174, 362, 363], new Set([210, 203, 174, 362, 363])),
+    ).toEqual([])
+    // The same finder DOES still block when the fix sits before the tag.
+    expect(
+      finderBeforeOpenFix([203, 362, 174, 363], new Set([203, 362, 174, 363])),
+    ).toEqual([203])
+  })
   it('exempts the release tag on both sides and ignores closed finders', () => {
     // Only 174 after the finder — exempt, not "open fix work".
     expect(finderBeforeOpenFix([203, 174], new Set([203, 174]))).toEqual([])

@@ -124,6 +124,11 @@ export const en: Strings = {
   places: PLACES,
   peoples: PEOPLES,
   landmarks: LANDMARKS,
+  unknownPlaces: {
+    port: 'Unknown port', monument: 'Unknown monument', village: 'Unknown village',
+    mountain: 'Unknown mountain', waterfall: 'Unknown waterfall', lake: 'Unknown lake',
+    cultural: 'Unknown ruins', natural: 'Unknown landmark', site: 'Unknown site',
+  },
   equipment: {
     shovel: 'Shovel', rope: 'Rope', machete: 'Machete', rifle: 'Rifle',
     medicine: 'Medicine', canteen: 'Canteen', canoe: 'Canoe',
@@ -422,6 +427,7 @@ export const en: Strings = {
     juvenileDrinkCrocBias: 'Crocodile: drinking-juvenile preference',
     calfAdoptionRadius: 'Orphan adoption radius',
     calfEscapeSeconds: 'Freed calf escape run (s)',
+    calfReunionSeconds: 'Calf separation window (s)',
     benchmarkStart: 'Start the render benchmark',
     crocGripSeconds: 'Crocodile: grip deadline (s)',
     crocDriveOffRest: 'Crocodile: rest after being driven off (s)',

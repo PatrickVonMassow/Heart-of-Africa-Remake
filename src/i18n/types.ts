@@ -12,6 +12,18 @@ import type { SketchId } from '../journal/sketches'
 /** Params for journal text templates (values are ids or numbers). */
 export type TextParams = Record<string, string | number>
 
+/** Map-point kinds an undiscovered label can name (point 318). */
+export type UnknownPlaceKind =
+  | 'port'
+  | 'monument'
+  | 'village'
+  | 'mountain'
+  | 'waterfall'
+  | 'lake'
+  | 'cultural'
+  | 'natural'
+  | 'site'
+
 export interface Strings {
   /** BCP-47-ish tag, e.g. "de", "en". */
   lang: string
@@ -34,6 +46,14 @@ export interface Strings {
   places: Record<string, string>
   peoples: Record<string, string>
   landmarks: Record<string, string>
+  /**
+   * Placeholders for a map point that is still UNDISCOVERED (design.md §17.2).
+   * Kind-aware instead of a bare "?" (point 318): the traveller can tell a
+   * village from a mountain without being told which one it is. `site` is the
+   * deliberately NEUTRAL term for a point whose kind would itself be a spoiler
+   * — the elephant graveyard names no elephants before it is found.
+   */
+  unknownPlaces: Record<UnknownPlaceKind, string>
   equipment: Record<EquipmentId, string>
   gifts: Record<Material, string>
   /** Treasure finds/valuables (design.md §8). */
@@ -363,6 +383,7 @@ export interface Strings {
     juvenileDrinkCrocBias: string
     calfAdoptionRadius: string
     calfEscapeSeconds: string
+    calfReunionSeconds: string
     benchmarkStart: string
     crocGripSeconds: string
     crocDriveOffRest: string

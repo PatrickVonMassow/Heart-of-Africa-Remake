@@ -1956,7 +1956,7 @@ export const useGame = create<GameState>()((set, get) => ({
         explored: snap.explored ?? {},
         // The ten ports are known from the start (point 288): a legacy save from
         // before this rule migrates by marking them discovered, so their labels
-        // never regress to "?" on load.
+        // never regress to a kind placeholder on load.
         visitedPlaces: Array.from(new Set([...KNOWN_FROM_START_PLACES, ...(snap.visitedPlaces ?? [])])),
         villagePhases: snap.villagePhases ?? {}, // legacy saves lack it (point 170)
         health: snap.health ?? balance.health.max,

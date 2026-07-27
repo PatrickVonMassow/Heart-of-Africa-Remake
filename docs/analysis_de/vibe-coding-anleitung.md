@@ -9,29 +9,32 @@ ausführlichen Erfahrungen dahinter stehen in `retrospektive-zusammenarbeit.md`.
 
 ## Die eine Kernlehre
 
-**Zuverlässigkeit ist eine Infrastrukturfrage, keine Charakterfrage.** Solange ein
-Problem nur „gemerkt" wurde, kam es wieder. Sobald ein **Mechanismus** dastand (ein
-automatischer Check, ein Hook, ein Test), verschwand es. Merksatz:
+**Zuverlässigkeit ist eine Infrastrukturfrage, keine Charakterfrage.** Nur „gemerkte"
+Probleme kamen wieder; sobald ein **Mechanismus** dastand (Check, Hook, Test),
+verschwanden sie. Fordere deshalb bei allem, was dir wichtig ist, im Prompt einen
+Mechanismus — nicht eine Regel:
 
-> *Jede Regel, die wirklich gelten soll, bekommt von Anfang an einen erzwingenden
-> Mechanismus — nicht ein Versprechen.*
+> *Prompt-Zusatz:* „Sichere das mit einem Mechanismus zu, der die Verletzung
+> unmöglich macht, und zeig mir, wo er blockiert."
 
-Der Aufwand richtet sich nach der Wichtigkeit der Regel — ein leichter Check für
-eine leichte Regel —, aber die Haltung ist **erzwingen statt erinnern**, und zwar
-ab der ersten Formulierung. Nicht erst beim zweiten Schaden.
-
-Fast alles Folgende ist eine Anwendung davon.
+Der Aufwand richtet sich nach der Wichtigkeit — ein leichter Check für eine leichte
+Regel —, die Haltung ist **erzwingen statt erinnern**, ab der ersten Formulierung
+und nicht erst beim zweiten Schaden. Fast alles Folgende wendet das an.
 
 ### Wie die Prompts in dieser Anleitung formuliert sind
 
-Die Prompts unten sind bewusst **Aufträge, einen Mechanismus zu bauen** — keine
-Merksätze. „Jedes neue Feature bekommt einen Test" ist eine *Regel*, die vergessen
-wird; „Etabliere einen Mechanismus, der das garantiert" ist ein *Auftrag*, an dessen
-Ende etwas steht, das die Regel erzwingt. Formuliere deine eigenen Anweisungen genauso.
+Die Prompts unten sind **Aufträge, einen Mechanismus zu bauen** — keine Merksätze.
+„Jedes neue Feature bekommt einen Test" ist eine *Regel*, die vergessen wird;
+„Etabliere einen Mechanismus, der das garantiert" ist ein *Auftrag*, an dessen Ende
+etwas steht, das die Regel erzwingt. Formuliere deine eigenen genauso.
 
 Wo ein Mechanismus prinzipiell **nicht** möglich ist (etwa „sieht das für einen
-Menschen richtig aus?"), steht das ausdrücklich dabei — dann hält der Merksatz nur
-so gut wie die Aufmerksamkeit des Moments.
+Menschen richtig aus?"), steht das dabei — dann trägt nur die Aufmerksamkeit.
+
+Manche Tipps kosten spürbar mehr Token. Die tragen eine grobe **Schätzung** wie
+*(Kosten ≈ 2x)* — gemeint ist der Mehrverbrauch für die betroffene Arbeit, nicht
+fürs ganze Projekt. Sie sind es meist wert; wenn dein Kontingent knapp wird, weißt
+du damit, wo du zuerst drehst.
 
 ### Primäres und sekundäres Modell
 
@@ -94,32 +97,35 @@ selbstbewusst Attrappen.
    > „Etabliere einen Mechanismus, der einen unsauberen Stand gar nicht erst
    > durchlässt: Build, Linter und Abhängigkeits-Audit müssen nach jeder Änderung
    > null Fehler, Warnungen und bekannte Lücken melden, und ein Fehlschlag muss die
-   > Weiterarbeit blockieren statt nur gemeldet zu werden. Überdecke nie einen
-   > Fehlschlag — zeig mir den konkreten Output."
+   > Weiterarbeit blockieren, und **kein Stand darf hochgeladen werden, den die
+   > Pipeline ablehnen würde** — sonst ist die Prüfung keine Absicherung, sondern
+   > eine Fehlermail. Überdecke nie einen Fehlschlag — zeig mir den Output."
 
 5. **Regeln mechanisch erzwingen — nicht auf Vorsätze vertrauen (das Kernprinzip).**
-   Auch bei bester Absicht fällt unter Druck genau der nicht-erzwungene Schritt weg.
-   Warte deshalb **nicht**, bis derselbe Fehler ein zweites Mal passiert.
+   Unter Druck fällt genau der nicht-erzwungene Schritt weg; warte **nicht** auf den
+   zweiten Schaden.
    > „Für **jede** Regel, die wirklich gelten soll, baue von Anfang an einen **Mechanismus**,
    > der ihre Verletzung unmöglich macht — einen Test, einen Git-Hook oder einen Stop-/
    > PreToolUse-Hook, der abbricht bzw. die Aktion verweigert, wenn die Regel gebrochen würde.
-   > Der Aufwand des Mechanismus soll zur Wichtigkeit passen (ein leichter Guard für eine
-   > leichte Regel), aber die Grundhaltung ist: **erzwingen statt erinnern**. Ein Vorsatz — und
-   > selbst eine ausführlich niedergeschriebene Regel — reicht nicht."
+   > Der Aufwand soll zur Wichtigkeit passen (ein leichter Guard für eine leichte Regel),
+   > aber die Grundhaltung ist: **erzwingen statt erinnern**. Ein Vorsatz — auch ein
+   > ausführlich niedergeschriebener — reicht nicht."
 
-   Ein Mechanismus kann selbst falsch gebaut sein — Gegenprüfungen finden darin
-   erfahrungsgemäß mehr Fehler als in gewöhnlichem Code:
+   Ein Mechanismus kann selbst falsch gebaut sein; Gegenprüfungen finden darin mehr
+   Fehler als in gewöhnlichem Code:
    > „Etabliere einen Mechanismus, der beim Hinzufügen oder Ändern eines
    > Mechanismus **immer das Vier-Augen-Prinzip** erzwingt: Plan und Ergebnis
    > werden vom sekundären Modell gegengeprüft, bevor der neue Mechanismus scharf
    > geschaltet wird — und das Ergebnis dieser Prüfung wird festgehalten."
 
+   *(Kosten ≈ 2x)*
+
 6. **Fortschritt sichtbar machen (wenn du mitlesen willst).**
    > „Führe ein knappes Fortschritts-Board (eine Datei oder Seite) und **etabliere einen
-   > Mechanismus, der seine Aktualität erzwingt**: Es zeigt **immer den echten Stand** —
-   > woran du gerade arbeitest, was offen ist, was erledigt ist —, seine Struktur bleibt
-   > stabil, und der Mechanismus muss auch merken, wenn der Text unverändert bleibt,
-   > während sich die Arbeit weiterbewegt hat."
+   > Mechanismus, der seine Aktualität erzwingt**: Es zeigt **immer den echten Stand**.
+   > Er greift, **bevor** die Arbeit beginnt, nicht erst am Ende — sonst ist die Stunde
+   > ungesichert, in der ich hinsehe — und merkt auch, wenn der Text steht, während die
+   > Arbeit weiterlief."
 
 ---
 
@@ -127,8 +133,7 @@ selbstbewusst Attrappen.
 
 Automatische Tests sind das Rückgrat; ohne sie ist „Vibe Coding" ein Blindflug. Aber
 nicht jede Änderung braucht die volle Batterie — sonst wird Testen so langsam, dass es
-umgangen wird. Bewährt haben sich **abgestufte Umfänge**, aus denen du je nach Änderung
-wählst:
+umgangen wird. Bewährt haben sich **abgestufte Umfänge**:
 
 - **Schnell (nach JEDER Änderung):** die Unit-Schicht ohne Browser — Logik, Zustand, reine
   Funktionen. Läuft in Sekunden, kann nie durch Browser-Timing flackern. Hierhin gehört
@@ -143,6 +148,8 @@ wählst:
 > Browsertests) und groß (volle Regression auf allen Ziel-Backends). Wähl pro Änderung die
 > passende Stufe und nenn mir kurz warum; **etabliere einen Mechanismus, der die große
 > Stufe vor einem Release erzwingt** und eine Freigabe ohne sie verweigert."
+
+*(Kosten ≈ 1,5x)*
 
 Zwei Mechanismen, die das Netz ehrlich halten:
 
@@ -163,9 +170,8 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Etabliere einen Mechanismus, der eine sichtbare Änderung erst als fertig
   gelten lässt, wenn sie am **echten gerenderten Bild** unter einer Bedingung geprüft
   wurde, die ein Nutzer wirklich erreicht — nicht an einem Hilfswert und nicht in einem
-  Debug-Zustand." *(Der letzte Schritt bleibt menschlich und lässt sich nicht
-  mechanisieren: Sieh dir den Screenshot an und frag dich, ob das für einen Menschen
-  richtig aussieht.)*
+  Debug-Zustand." *(Kosten ≈ 1,5x — Bilder sind teuer.)* *(Der letzte Schritt bleibt menschlich:
+  Sieh dir den Screenshot an und frag dich, ob das für einen Menschen richtig aussieht.)*
 
 - **Neue Features zerbrechen alte.** Eine Änderung repariert X und bricht das
   unbeobachtete Y.
@@ -185,6 +191,16 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Etabliere einen Mechanismus, der ungemessene Zahlen abfängt: Laufzeiten,
   Performance und Kosten werden nur **gemessen** kommuniziert — Performance auf der
   **Ziel-Hardware**, nicht auf der Build-Maschine."
+
+- **Das Kontingent ist die Grenze, nicht die Zeit.** Der Verbrauch hängt nicht an den
+  Stunden, sondern an der Größe jedes Kontexts: lange Sitzungen, die jede Aufgabe im
+  selben Fenster mitschleppen, und Helfer, die ihren Auftrag in großen Dokumenten erst
+  *suchen* müssen.
+  → *Prompt:* „Lies die Verbrauchsanzeige und nenne mir die **gemessenen** Treiber. Schicke
+  jedem Helfer seinen Auftrag als fertigen Kurzbrief mit, statt ihn in den Projektdokumenten
+  suchen zu lassen, und fang für jede neue Aufgabe einen **frischen Kontext** an."
+  *(Ein billigeres Modell für ‚einfache' Aufgaben ist der falsche Hebel: Die Nacharbeit an
+  einer schwachen Lieferung kostet mehr als die Ersparnis.)*
 
 - **Der Assistent bleibt still stehen / schläft ein.** Bei langen, autonomen Läufen endet
   der Fortschritt unbemerkt.
@@ -247,7 +263,7 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   Durchsicht zwingt — nicht nur auf Lücken, sondern auf Sauberkeit, Aktualität,
   Dopplung, Widerspruch, **Wirkungslosigkeit** und Veralterung. Jede Regel wird gegen
   den Code geprüft, nicht gegen die Nachbarregel; zuerst die Texte, die am häufigsten
-  eingeblendet werden."
+  eingeblendet werden." *(Kosten: einmalig hoch)*
 
 - **Ein Wächter, der nie auslöst, ist so kaputt wie einer, der immer auslöst.**
   Ein Mechanismus kann existieren und wirkungslos sein — dann gilt die Regel als
@@ -290,15 +306,51 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Etabliere einen Mechanismus, der vor dem Bau **Schwierigkeit ×
   Kritikalität** einschätzt und bei Kritischem **ein anderes Modell** erst den Plan und
   danach das fertige Ergebnis gegenprüfen lässt — gegen die echten Daten, nicht gegen
-  die Beschreibung, und bevor zusammengeführt wird."
+  die Beschreibung, und bevor zusammengeführt wird." *(Kosten ≈ 2x)*
+
+- **Die teuerste Prüfung großflächig verlangt.** Bildbegutachtung, ein zweiter
+  Lauf auf einer anderen Plattform, ein zweites Modell: Solche Kontrollen kosten
+  ein Vielfaches der übrigen. Wird eine davon pauschal für ganze Verzeichnisse
+  gefordert, zahlst du sie auch für Änderungen, bei denen sie nichts beweisen kann.
+  → *Prompt:* „Verlange die teuerste Prüfung nur für Änderungen, die dort wirklich
+  abweichen können. Nimm dabei nur aus, was **beweisbar** nichts beitragen kann —
+  nicht, was plausibel nichts beiträgt —, und schreib die Grenze samt Begründung
+  in den prüfenden Code, nicht in eine Regel daneben."
+
+- **Das Regeldokument wird bei jedem Start geladen — und wächst trotzdem.** Jede
+  einzelne Ergänzung ist berechtigt; die Summe macht das Dokument zu einem Posten,
+  den du bei jeder Sitzung bezahlst.
+  → *Prompt:* „Gib den Dokumenten, die bei jedem Start oder jedem Vorgang gelesen
+  werden, eine **gemessene Obergrenze** mit genau zwei Auswegen: Detail in eine
+  Nachbardatei auslagern, oder die Grenze anheben und die Begründung danebenschreiben.
+  Beim Auslagern wird **verschoben, nicht umformuliert** — und danach jeder Leser der
+  alten Stelle nachgezogen; der gefährlichste ist der, der nicht scheitert, sondern
+  nur nichts mehr findet."
+
+- **Die Aufgabenliste wächst und wird trotzdem jedes Mal ganz gelesen.** Was
+  erledigt ist, bleibt darin stehen; nach ein paar Wochen ist der größte Teil der
+  Datei Geschichte, die bei jedem Vorgang mitgelesen wird.
+  → *Prompt:* „Halte in der Aufgabenliste nur die OFFENEN Aufgaben. Eine erledigte
+  wandert wortgleich und mit ihrer Nummer in ein Archiv, und ein Mechanismus
+  erzwingt das. Prüfe beim Trennen, welcher Leser welche Hälfte braucht: Wer nur
+  wissen will, was zu tun ist, liest die offene; wer erkennen muss, dass etwas
+  **abgeschlossen** ist, braucht beide."
+
+- **Im Präsens behauptet, nie nachgesehen.** In deiner Anweisung steht „das Feld wird
+  bereits gesetzt", weil du es dir so vorstellst — im Code steht es nicht. Eine Lücke
+  im Auftrag führt zur Rückfrage; eine falsche Tatsachenbehauptung führt zu einer
+  Lieferung, die genau das tut, was dasteht: nichts — und dabei grün ist.
+  → *Prompt:* „Was du in einem Auftrag im **Präsens** behauptest, sieh vorher nach. Was
+  erst gebaut werden muss, schreib in die Zukunftsform oder ausdrücklich unter ‚das
+  existiert noch nicht'. Und prüfe jede Zusicherung, die ein Dokument über den Code
+  macht, gegen den Code — oder kennzeichne sie als Absicht."
 
 ---
 
 ## Drei Meta-Regeln, die alles zusammenhalten
 
-1. **Root-Cause vor Fix.** Die besten Wendepunkte begannen mit einer schonungslosen
-   Analyse des eigenen Versagens. Ausreden-freie Ursachennotizen sind der Rohstoff, aus
-   dem gute Mechanismen entstehen.
+1. **Root-Cause vor Fix.** Ausreden-freie Ursachennotizen sind der Rohstoff, aus dem
+   gute Mechanismen entstehen.
    > *Prompt:* „Bevor du etwas Wiederkehrendes reparierst: schreib mir in 3–5 Sätzen die
    > **mechanische** Ursache — was genau war die Annahme, die brach?"
 
@@ -308,16 +360,22 @@ Zwei Mechanismen, die das Netz ehrlich halten:
    > *Prompt:* „Struktur von Dingen, die ich festgelegt habe, friert ein. Schlag
    > Änderungen vor, setz sie nicht ungefragt um."
 
-3. **Autonomie/Parallelität skaliert nur mit Infrastruktur.** Viel Delegation ist ein
-   Vervielfacher — aber erst, wenn Isolierung und Exklusivität stehen; sonst
-   vervielfacht sie das Chaos. Das Werkzeug dafür sind **Feature-Branches** mit je
-   einer **eigenen Arbeitskopie** (Git-Worktree), und die Bedingung fürs echte
-   Parallelisieren ist, dass die Stränge sich **nicht dieselben Dateien** teilen.
-   > *Prompt:* „Arbeite jede Aufgabe auf einem eigenen Feature-Branch von `main` und führe
-   > sie erst nach `main` zusammen, wenn sie fertig und verifiziert ist, damit `main` immer
-   > lauffähig bleibt. Wenn du mehrere Aufgaben parallel bearbeitest, gib jeder eine eigene
-   > Arbeitskopie (Git-Worktree) und teile sie so auf, dass sie **nicht dieselben Dateien**
-   > anfassen. Isolierung und Exklusivität **vor** Redundanz."
+3. **Autonomie/Parallelität skaliert nur mit Infrastruktur.** Delegation vervielfacht
+   — aber erst mit Isolierung und Exklusivität, sonst vervielfacht sie das Chaos. Die
+   Grenze setzt nicht dein Kontingent, sondern der **Haupt-Agent**: Bei ihm endet jeder
+   Strang, und je mehr Fremdstoff sein Kontext aufnimmt, desto schlechter urteilt er.
+   Drei ist ein guter Start, kein Optimum — die Zahl korrigiert die Erfahrung. Und
+   verlass dich nie auf die Anweisung „nur lesen": Isolierung ist eine Eigenschaft der
+   **Umgebung**, nicht des Auftrags — was ein Helfer anfassen kann, fasst er irgendwann an.
+   > *Prompt:* „Arbeite jede Aufgabe auf einem eigenen Feature-Branch mit eigener
+   > Arbeitskopie und führe sie erst nach `main`, wenn sie fertig und verifiziert ist.
+   > Gib auch jedem nur lesenden Helfer eine eigene Arbeitskopie, statt es ihm bloß
+   > aufzutragen.
+   > Teile parallele Aufgaben so auf, dass sie **nicht dieselben Dateien** anfassen, und
+   > arbeite an höchstens **drei** gleichzeitig. Reduziere die Zahl, sobald das
+   > Zusammenführen Nacharbeit erzeugt oder du Bekanntes nachlesen musst."
+
+   *(Aufschlag ≈ 10–25 % je zusätzlichem Strang, geschätzt — Nacharbeit + Aufsicht)*
 
 ---
 
@@ -334,4 +392,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 Wenn du diese eine Nachricht an den Anfang stellst, hast du 80 % der Lehren dieses
 Projekts eingebaut, bevor die erste Zeile Code entsteht.
 
-<!-- GUIDE-FINGERPRINT: a1959f540f0f0e63610a46cbd0b6197d429bc38d6ab624cd845727c3f5bfb460 -->
+<!-- GUIDE-FINGERPRINT: 6a814077213162b8cd7590f545ce60a28ea294f0273e98dbe4790d9c873f3a03 -->

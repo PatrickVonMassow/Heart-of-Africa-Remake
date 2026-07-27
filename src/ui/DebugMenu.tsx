@@ -312,6 +312,8 @@ export function DebugMenu() {
         onChange={(v) => { balance.family.adoptionRadius = Math.max(0, v); bump() }} />
       <NumberField label={t.debug.calfEscapeSeconds} value={balance.family.escapeSeconds} step={0.5}
         onChange={(v) => { balance.family.escapeSeconds = Math.max(0, v); bump() }} />
+      <NumberField label={t.debug.calfReunionSeconds} value={balance.family.reunionSeconds} step={1}
+        onChange={(v) => { balance.family.reunionSeconds = Math.max(0, v); bump() }} />
       <NumberField label={t.debug.crocStrikeRadius} value={balance.crocodile.strikeRadius} step={0.5}
         onChange={(v) => { balance.crocodile.strikeRadius = Math.max(0.5, v); bump() }} />
       <NumberField label={t.debug.crocAmbushBankBand} value={balance.crocodile.ambushBankBand} step={0.5}
