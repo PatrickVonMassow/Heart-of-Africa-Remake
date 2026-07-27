@@ -1,4 +1,6 @@
 {
+  "_boot.mjs": 4,
+  "_server.mjs": 1,
   "benchmark.mjs": 2,
   "collision.mjs": 11,
   "crossbrowser.mjs": 1,
@@ -12,11 +14,9 @@
   "invariants.mjs": 1,
   "polish.mjs": 34,
   "preview.mjs": 1,
-  "run-all.mjs": 1,
   "settings.mjs": 25,
   "touch.mjs": 8,
   "visualsweep.mjs": 3,
   "voice.mjs": 6,
-  "world.mjs": 2,
-  "_boot.mjs": 4
+  "world.mjs": 2
 }

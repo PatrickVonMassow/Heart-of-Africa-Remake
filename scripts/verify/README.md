@@ -114,6 +114,64 @@ being neutral: F8 starts the in-game render benchmark (point 277), which swept
 ten graphics configs inside the measurement. A verification's filler inputs need
 re-checking whenever the game binds a new key.
 
+## Triaging a RED run (point 294)
+
+A red is now read, not asserted. Two signals, both decided in the pure module
+`baseline-classify-core.mjs` (pinned by `baseline-classify.test.mjs`):
+
+**1. The repeat signature — free, always on.** A failed browser suite is retried
+once (point 200). The runner used to conclude from "it failed twice" that this
+was "a real failure, not a flake". That is not what two failures prove: on
+27.07.2026 `enrichments` failed two staging checks, then a completely different
+one (the crocodile eye knobs) on the retry, on a machine carrying a unit run and
+two agents — and none of the three checks had anything to do with the change
+under test. So the verdict now comes from the failing check NAMES:
+
+| Both runs failed at… | Verdict |
+|---|---|
+| the SAME check | `CANDIDATE REAL FAILURE` — it reproduces; find out whether the change caused it |
+| DISJOINT checks | `LOAD/FLAKE SIGNATURE` — the fingerprint of a busy machine, not of a defect; re-run the suite alone on a quiet machine before believing it |
+| no parseable FAIL line (crash, wall-timeout kill) | `UNCLASSIFIED` — say so, never guess |
+
+Check identity folds measured numbers away (`12 vultures circle` is the same
+check as `9 vultures circle`), and the console-error texts count as pseudo-checks
+so the console-gated suites (`world`, `i18n`) can be triaged at all. Each check
+is annotated with whether its name touches the branch diff — a weak
+corroborating hint, never a verdict.
+
+**2. The baseline classification — OPT-IN, because it is a second browser run.**
+
+```
+npm test -- --baseline                 # classify every suite that failed twice
+VERIFY_BASELINE=1 npm run test:small   # same, via the environment
+node scripts/verify/baseline-classify.mjs enrichments          # one suite, on demand
+node scripts/verify/baseline-classify.mjs polish --ref HEAD~1  # against a named commit
+```
+
+It re-runs the failing suite against the pre-change baseline (the merge-base with
+`main` by default) in a REUSED detached worktree under the git-ignored
+`local/verify-baseline/<sha>` — no second `npm install`: Node resolves
+`node_modules` up the ancestor directories, and the checkout lives inside the
+repo. At most two baselines are kept. Each currently failing check comes back as
+**REAL REGRESSION** (green on the baseline), **PRE-EXISTING / STALE ASSUMPTION**
+(already red there — the 24.07. SSAO ground-edge and proximity-fade cases),
+**UNSTABLE ON BASELINE** (it flaked there too, so the baseline decides nothing —
+which is why the baseline runs twice by default, `--runs n`), or
+**INCONCLUSIVE** (the baseline never ran that check).
+
+It runs the CURRENT check against the BASELINE app, so only the product differs
+— and it prints what can bend that reading: a suite file that changed since the
+baseline, moved dependencies or shared boot helpers, and the backend the
+comparison ran on (`VERIFY_GL` is honoured; a WebGPU red must be classified on
+WebGPU). It refuses when the baseline resolves to the current commit, and it
+fails soft: a triage aid must never turn a readable red into a crashed run. The
+suite result stays the gate — `--strict` is there for a caller that wants a
+non-zero exit on a real regression.
+
+`docs` is a pure-Node suite, so it needs no server on either side
+(`SERVERLESS_SUITES` in `tiers.mjs`; a `docs`-only run starts no vite at all) and
+the baseline runs the baseline tree's OWN copy of it.
+
 ## Adding tests for a new feature (do this every time)
 
 Every new feature must get a test on **one or both** layers — pick by what the

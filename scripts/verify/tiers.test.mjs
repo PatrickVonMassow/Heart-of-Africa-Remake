@@ -32,24 +32,37 @@ describe('tier sets (point 173)', () => {
 
 describe('argument parsing', () => {
   it('reads the bare default as a full LARGE-equivalent run', () => {
-    expect(parseArgs([])).toEqual({ tier: null, filter: [], fullRun: true, isLargeEquivalent: true })
+    expect(parseArgs([])).toEqual({ tier: null, filter: [], flags: [], baseline: false, fullRun: true, isLargeEquivalent: true })
   })
 
   it('reads an explicit tier token, leaving no filter behind', () => {
-    expect(parseArgs(['small'])).toEqual({ tier: 'small', filter: [], fullRun: true, isLargeEquivalent: false })
-    expect(parseArgs(['large'])).toEqual({ tier: 'large', filter: [], fullRun: true, isLargeEquivalent: true })
+    expect(parseArgs(['small'])).toEqual({ tier: 'small', filter: [], flags: [], baseline: false, fullRun: true, isLargeEquivalent: false })
+    expect(parseArgs(['large'])).toEqual({ tier: 'large', filter: [], flags: [], baseline: false, fullRun: true, isLargeEquivalent: true })
   })
 
   it('reads a bare suite filter as a quick single run (no preflight, not LARGE)', () => {
     const a = parseArgs(['flow', 'polish'])
-    expect(a).toEqual({ tier: null, filter: ['flow', 'polish'], fullRun: false, isLargeEquivalent: false })
+    expect(a).toEqual({ tier: null, filter: ['flow', 'polish'], flags: [], baseline: false, fullRun: false, isLargeEquivalent: false })
   })
 
   it('reads an explicit `large` WITH a filter as a preflighted both-backends run of that suite', () => {
     const a = parseArgs(['large', 'polish'])
-    expect(a).toEqual({ tier: 'large', filter: ['polish'], fullRun: true, isLargeEquivalent: true })
+    expect(a).toEqual({ tier: 'large', filter: ['polish'], flags: [], baseline: false, fullRun: true, isLargeEquivalent: true })
+  })
+
+  it('reads --baseline as a flag, never as a suite filter (point 294)', () => {
+    const a = parseArgs(['--baseline'])
+    expect(a.baseline).toBe(true)
+    // The flag must not look like a filter: a bare `npm test -- --baseline`
+    // stays the full LARGE run with its preflight and both backends.
+    expect(a.filter).toEqual([])
+    expect(a.fullRun).toBe(true)
+    expect(a.isLargeEquivalent).toBe(true)
+    expect(parseArgs(['large', '--baseline', 'polish']).filter).toEqual(['polish'])
+    expect(parseArgs(['polish']).baseline).toBe(false)
   })
 })
+
 
 describe('backend selection (mirrors _browser.mjs)', () => {
   it('defaults to WebGL 2 and only "webgpu" (any case) selects WebGPU', () => {
