@@ -18,10 +18,10 @@
 //   - PREAMBLE ONLY for the work order: its POINTS are legitimate growth (a
 //     queue may be long), while its framing sections are where rules pile up.
 //     A line budget on the whole file would punish appending work.
-//   - Not budgeted: docs/acceptance-evidence.md and the archive (reference
-//     material, read on demand — their size costs nothing per turn), and the
-//     retrospective (its job is to hold every problem class; capping it would
-//     trade the wrong thing away).
+//   - Not budgeted: docs/acceptance-evidence.md, docs/design-reference.md and
+//     the archive (reference material, read on demand — their size costs
+//     nothing per turn), and the retrospective (its job is to hold every
+//     problem class; capping it would trade the wrong thing away).
 
 /**
  * The budgets. `headingRe` limits the measurement to the part of a file BEFORE
@@ -43,9 +43,17 @@ export const DOC_BUDGETS = [
   },
   {
     path: 'design.md',
-    maxLines: 1100,
-    maxWords: 32000,
-    why: 'read on demand, so its ceiling is generous — it exists to stop a doubling',
+    maxLines: 850,
+    maxWords: 27600,
+    // LOWERED to the size point 367 actually achieved (839 lines / 27 555
+    // words, down from 995 / 30 512). The old 1100/32000 ceiling was set to
+    // stop a doubling and left ~14 % of headroom standing right after the
+    // compression — which a compression simply refills. The margin left here
+    // is the same shape CLAUDE.md carries: enough for a sentence, not for a
+    // section. A genuinely new design decision raises it by its measured size
+    // with the reason written here; a longer telling of something already in
+    // the document does not.
+    why: 'read on demand, but every point that cites a section pays for the bulk around it',
   },
 ]
 

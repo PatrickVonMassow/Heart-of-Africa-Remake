@@ -111,7 +111,7 @@ must be justified in its commit.
 ```
 project-root/
 ├── CLAUDE.md          (this file)
-├── design.md          (target state; updated on user change requests)
+├── design.md          (target state; §19.14/§19.15/§21.2 → docs/design-reference.md)
 ├── package.json
 ├── index.html
 ├── vite.config.ts
