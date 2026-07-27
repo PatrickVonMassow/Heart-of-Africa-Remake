@@ -10499,3 +10499,31 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   DOCS in the same commit: `scripts/doc-budget-core.mjs` (the new ceiling with its
   written justification), CLAUDE.md §4 if a moved block changes where a thing lives, and
   the retrospective only if the run produces a NEW lesson rather than confirming §3.30.
+
+- [x] 372. ONE COMMAND FOR THE BOARD, NOT SIX (user 27.07.2026, arising from the 24/7
+  plan). Keeping the board current costs SIX tool calls every time — edit, publish,
+  Artifact, `--synced`, focus, prep — and it happens several times per point. At the
+  measured rate that ritual is a large share of the main session's requests, and every
+  request is billed at the whole context. It is also the reason the board sometimes lags:
+  a six-step ritual gets postponed, a one-step one does not.
+  BUILD `scripts/board.mjs`: one command that takes the card change, applies it,
+  rotates the Erledigt overflow (`board-archive-rotate`), publishes to the scratchpad,
+  runs the consistency audit, and prints the ONE thing the caller still has to do by
+  hand — the Artifact publish, which is tool-bound and cannot be scripted. Subcommands
+  for what actually happens: `now <point> <status>`, `queue <point>`, `done <point>`,
+  `vdzk-remove <title>`, `status <point> <text>`. Each stamps the status time itself, so
+  the date the guard demands can never be forgotten.
+  MEASURE IT: count the tool calls a board update takes before and after on one real
+  point, and record both numbers in the point. A saving claimed without the count is
+  exactly what this project does not accept.
+  WHAT MUST NOT CHANGE: the four sections, their order, the card shapes, the
+  no-`open` rule and the reader's remembered folds. The command is a faster way to
+  obey the structure, never a new structure.
+  VERIFIABLE: pure Vitest on the card-editing core (each subcommand produces the exact
+  markup the guard accepts; a malformed request fails loudly rather than writing a
+  broken board); the existing dashboard audit passes on every generated board; and the
+  before/after tool-call count is recorded.
+  MEASURED (27.07.2026, on one real update): SIX tool calls before — edit,
+  publish, Artifact, `--synced`, focus, prep — and THREE after: the one editing
+  command, the Artifact call, `attest`. The Artifact publish is tool-bound and
+  stays by hand; the other five collapsed into two.
