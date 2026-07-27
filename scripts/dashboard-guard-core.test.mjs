@@ -19,6 +19,7 @@ import {
   parseCards,
   auditDashboard,
   evaluate,
+  ERLEDIGT_ON_BOARD,
 } from './dashboard-guard-core.mjs'
 
 /** Minimal dashboard HTML in the real board's markup (incl. an Erledigt section
@@ -71,16 +72,23 @@ function boardHtml({
 <div class="body"><p>Status (Stand 09:00): der point-200-Vergleich darf hier NICHT zählen.</p></div></details>`,
     )
     .join('\n')
+  // Every section folds behind its heading and the Erledigt section links its
+  // archive page (point 371) — the fixture has to be a VALID board, or the
+  // pre-existing invariant tests would read violations that are the fixture's.
   return `<main><h1>Dashboard</h1>
-<h2>Woran ich gerade arbeite</h2>
+<details class="sect"><summary><h2>Woran ich gerade arbeite</h2></summary>
 ${now}
-<h2>Von dir zu klären</h2>
+</details>
+<details class="sect"><summary><h2>Von dir zu klären</h2></summary>
 ${k}
-<h2>Warteschlange</h2>
+</details>
+<details class="sect"><summary><h2>Warteschlange</h2></summary>
 ${q}
+</details>
 <details class="sect">
 <summary><h2>Erledigt</h2></summary>
 ${d}
+<p class="archive-link">Ältere im <a href="https://example.invalid/archiv">Archiv</a>.</p>
 </details>
 </main>`
 }
@@ -800,5 +808,52 @@ describe('evaluate — check ordering and totality', () => {
     ).not.toThrow()
     // No open-points info at all reads as "nothing enforceable" → allow.
     expect(evaluate({}).decision).toBe('allow')
+  })
+})
+
+// Point 371 — the board stops growing, folds away, and dates its own status.
+// Each case is the shape the guard must FAIL on, because each of the three
+// requirements was lost once already by a plain republish.
+describe('the board keeps its shape (point 371)', () => {
+  const card = (n, body) =>
+    `<details>\n  <summary><span class="num">${n}</span><span class="t">T${n}</span><span class="right"><span class="meta">~1 h</span></span></summary>\n  <div class="body"><p>${body}</p></div>\n</details>\n`
+  const board = ({ done = 1, link = true, nowBody = 'Stand 14:12 — läuft' } = {}) =>
+    `<main><h1>B</h1>` +
+    `<details class="sect"><summary><h2>Woran ich gerade arbeite</h2></summary>\n<details class="now"><summary><span class="t">1 — X</span></summary><div class="body"><p>${nowBody}</p></div></details>\n</details>` +
+    `<details class="sect"><summary><h2>Von dir zu klären</h2></summary>\n</details>` +
+    `<details class="sect"><summary><h2>Warteschlange</h2></summary>\n</details>` +
+    `<details class="sect"><summary><h2>Erledigt</h2></summary>\n` +
+    Array.from({ length: done }, (_, i) => card(900 + i, 'fertig')).join('') +
+    (link ? '<p class="archive-link">im <a href="https://example.invalid/a">Archiv</a>.</p>' : '') +
+    `</details>` +
+    `<footer>Stand: 27.07.2026 · 1 offene Punkte</footer></main>`
+  // auditDashboard(html, input) returns the violation ARRAY; these structural
+  // cases need no point lists beyond the one open point the fixture names.
+  const codes = (html) => auditDashboard(html, { open: [1], done: [] }).map((x) => x.code)
+
+  it('passes a board that keeps its twenty, links the archive and dates its status', () => {
+    expect(codes(board())).not.toContain('erledigt-overflow')
+    expect(codes(board())).not.toContain('archive-link-missing')
+    expect(codes(board())).not.toContain('now-card-undated')
+  })
+
+  it('fails when the Erledigt section grew past the twenty the board keeps', () => {
+    expect(codes(board({ done: ERLEDIGT_ON_BOARD + 1 }))).toContain('erledigt-overflow')
+  })
+
+  it('fails when the archive link is gone, which would orphan the moved cards', () => {
+    expect(codes(board({ link: false }))).toContain('archive-link-missing')
+  })
+
+  it('fails when a current-work card states no time for its status', () => {
+    expect(codes(board({ nowBody: 'läuft noch' }))).toContain('now-card-undated')
+  })
+
+  it('demands every section fold, not only Erledigt', () => {
+    const flat = board().replace(
+      '<details class="sect"><summary><h2>Warteschlange</h2></summary>',
+      '<h2>Warteschlange</h2>',
+    )
+    expect(codes(flat)).toContain('section-not-collapsible')
   })
 })
