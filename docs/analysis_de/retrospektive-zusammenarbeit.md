@@ -267,6 +267,16 @@ Der erste: Sämtliche Board-Wächter hängen am Zug-**Ende**. Sie sichern zu, da
 
 Der zweite: Der Wächter über die Auftrags-Formulierung suchte seine Verbotsphrasen als bloße Teilzeichenketten und las deshalb „is **unchanged from**" als Revisionsspur „changed from". Er blockierte einen völlig sauberen Punkt, und zwar wiederholt, bis die Ursache gefunden war. Eine Wortgrenze kostete zwei Zeilen. **Lehre:** Ein Wächter, der bei gewöhnlicher Sprache anschlägt, verliert genau das, wovon er lebt — dass man ihm glaubt. Fehlalarme sind keine Kosmetik; sie erziehen dazu, den Durchsetzer zu umgehen, und damit fällt die ganze Konstruktion in sich zusammen.
 
+### 3.33 Eine Ersparnis, die Nacharbeit auslöst, ist keine Ersparnis
+
+Am Abend des 24.07. lieferte eine still herabgestufte Sitzung drei Punkte in vierzehn Minuten ab; alle drei waren defekt und mussten neu gebaut werden. Der Wiederaufbau kostete mehr, als sämtliche Sparmaßnahmen davor eingebracht hatten. Das ist keine Anekdote über Modelle — §3.17 hat diesen Teil schon —, sondern eine **Kostenregel**: Eine Qualitätsmaßnahme rechnet sich nicht gegen ihren eigenen Preis, sondern gegen den Preis dessen, was sie verhindert.
+
+Nacharbeit trägt dabei einen Multiplikator, den die Ersparnis nie hat. Eine falsche Lieferung wird nicht nur neu gebaut. Sie muss zuerst **als falsch erkannt** werden — und sie sieht fertig aus, sonst wäre sie nicht durchgegangen —, dann erneut geprüft, erneut zusammengeführt, und alles, was inzwischen darauf aufbaute, wandert mit. Der sichtbare Posten ist der Neubau; der teure ist der Weg dorthin.
+
+Daraus folgt, wo Vorbeugung sich lohnt und wo nicht: **Mechanische, wiederkehrende Prüfung ist billig** — ein Test kostet Rechenzeit, keine Aufmerksamkeit, und er kostet beim tausendsten Lauf dasselbe wie beim ersten. **Menschliche Prüfung ist teuer** und muss deshalb dorthin, wo keine Maschine hinsieht (sieht das Bild für einen Menschen richtig aus?). Eine Sparidee, die an der mechanischen Schicht ansetzt, spart am falschen Ende.
+
+**Lehre:** Bevor eine Maßnahme als „zu teuer" verworfen wird, muss der Preis des Fehlers danebenstehen, den sie verhindert — inklusive der Erkennungs- und Wiederholungskosten. Und umgekehrt: Jede Sparmaßnahme wird gegen ihre Wirkung auf die Fehlerrate geprüft, nicht nur gegen ihren Verbrauch. Eine Ersparnis, die die Nacharbeitsquote hebt, ist ein Verlust mit besserer Buchführung.
+
 ---
 
 ## 4. Die Guards als Immunsystem
@@ -351,7 +361,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Montag, 27.07.2026, 10:32 · Quellen-Fingerprint: `1a95eb357bdc…`
+Zuletzt aktualisiert: Montag, 27.07.2026, 12:03 · Quellen-Fingerprint: `1a95eb357bdc…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -425,5 +435,5 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 Erfasste Quellen: 63 Feedback-/Projekt-Memories · 31 Guard-/Hook-Skripte · 2 Revert-/Reapply-Commits · 15 Prozess-/Meta-TASKS-Punkte (davon 8 offen).
 
 <!-- RETRO-FINGERPRINT: 1a95eb357bdc3cd42fe437c510e220590b002526d7401e028d709256a3fd44e8 -->
-<!-- RETRO-LAST-REFRESHED: 2026-07-27T08:32:32.135Z -->
+<!-- RETRO-LAST-REFRESHED: 2026-07-27T10:03:58.748Z -->
 <!-- AUTO-GENERATED:END -->

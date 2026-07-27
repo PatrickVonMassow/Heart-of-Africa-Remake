@@ -3292,6 +3292,11 @@ read that as "the criterion and its evidence section".
   · The work order writes `§` for FOUR different documents. A tool that guesses can feed
     an agent a silently WRONG section — the loud failure is the harmless case, the silent
     substitution is the dangerous one.
+  · §3.33 (written 27.07.2026) states the cost rule behind the whole hardening debate:
+    a saving is judged against the cost of what it prevents, and rework carries a
+    multiplier — a wrong delivery must first be RECOGNISED as wrong. The audit checks it
+    against §3.17 and §3.31 for overlap: all three touch the same evening, and only one
+    of them may own the economics.
   · The spec guard blocked twice in one day on innocent prose — once on "is unchanged
     from", once on a point whose SUBJECT was outdated lessons. A phrase list cannot tell
     a revision trail from a text about revisions; the lesson belongs in the documents
