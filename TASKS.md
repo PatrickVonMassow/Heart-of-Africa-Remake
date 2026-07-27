@@ -3003,38 +3003,6 @@ read that as "the criterion and its evidence section".
   DOCS in the same commit: CLAUDE.md §7.2 beside the projection rule, and
   `scripts/verify/README.md`.
 
-- [ ] 377. THE FOUR-EYES RULE FOR A NEW MECHANISM GETS ITS OWN MECHANISM
-  (27.07.2026, from the rule-corpus audit of point 307). The rule "a new or changed
-  guard is reviewed by the SECOND model before it goes live" is the project's own
-  exemplar for enforcing rather than remembering — and the audit found it was claimed
-  to have a Stop check that never existed. It has been carried by intention alone, and
-  it was skipped in exactly the cases where it mattered: the pre-push gate went live
-  before its review, which then found two defects that defeated its purpose.
-  BUILD IT AS A STOP CHECK, in the shape every other guard here has (a pure,
-  Vitest-covered `*-core.mjs` plus a fail-open wrapper, standing down for a non-owner
-  session and a paused batch): when the turn's commits add or change a
-  `scripts/*-guard*.mjs`, `scripts/*-gate*.mjs`, a `*-core.mjs` beside one, or a git
-  hook under `scripts/git-hooks/`, the turn may not end until a review is RECORDED for
-  that change — which model reviewed, its verdict, and the commit it judged.
-  THE RECORD IS THE HARD PART, so keep it cheap and honest: `node
-  scripts/mechanism-review.mjs --record <sha> --model <name> --verdict <merge|
-  merge-with-fixes|do-not-merge> --evidence "<one line>"`, stored beside the other
-  batch state. The reviewing model must NOT be the authoring one — the record carries
-  both, and a match is refused rather than warned about. A verdict of
-  `do-not-merge` blocks as loudly as a missing record.
-  NOT RETROACTIVE: guards that already exist are grandfathered by a one-off baseline,
-  exactly as `model-guard` handles its own history — the point is the next mechanism,
-  not a review debt for twenty-eight of them.
-  VERIFIABLE: pure Vitest — a changed guard without a record blocks; with a record by a
-  DIFFERENT model it passes; a record by the authoring model is refused; a
-  `do-not-merge` verdict blocks; a turn that changed no mechanism is untouched; the
-  baseline grandfathering holds. Plus the spawned-hook test the Stop chain's other
-  guards have (`scripts/guard-hooks.test.mjs`), because reading a wrapper is not
-  evidence that it fires.
-  DOCS in the same commit: CLAUDE.md §7.2's guard list (the file is at its measured
-  ceiling — pay for the entry by trimming, not by raising) and the beginner's guide,
-  whose prompt 5 already asks for exactly this and can then cite it as built.
-
 - [ ] 378. THE ANIMAL'S COLLISION SITS BESIDE THE ANIMAL (user 27.07.2026, reported on
   the deployed build with a screenshot: in the bird's-eye view the traveller walks
   STRAIGHT THROUGH the drawn body, and is blocked on empty ground NEXT TO it). The
