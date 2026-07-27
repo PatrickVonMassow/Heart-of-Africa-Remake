@@ -3407,6 +3407,42 @@ read that as "the criterion and its evidence section".
   broken board); the existing dashboard audit passes on every generated board; and the
   before/after tool-call count is recorded.
 
+- [ ] 373. THE SESSION BOUNDARY BECOMES AUTONOMOUS (user 27.07.2026: "implement it the
+  way you recommend", against the plan to run the batch 24/7). Measured: 80 % of the
+  token spend sits above 150k context, because one session carries point after point.
+  At 24/7 that is the dominant cost — 1.25 %/h of the weekly quota, which is 210 % of it
+  over a full week, where 0.6 %/h is the ceiling that fits.
+  THE MECHANISM IS THE ONE THAT EXISTS: the batch session ENDS at a point boundary and
+  the OS task `HoA-Batch-Autostart` brings up a fresh one, which `batch-resume-hook`
+  re-orients from TASKS.md and the batch state. Nothing new is built; what changes is
+  that the launcher is armed again.
+  WHY THAT IS NOW SAFE, and it is the whole question — the task was disabled after the
+  e9407cae double-session incident. Since then the hard singleton was built AND is
+  verified live (27.07.2026): with this session holding the lock, `node
+  scripts/batch-autostart.mjs` answered `skip: owner alive (fresh-heartbeat, heartbeat
+  0 min old, pid 18492)` and spawned nothing. The launcher wins a `pending-spawn` lock
+  before spawning, a losing session stands down through `heldByOtherLiveOwner`, the
+  detector runs at every turn end AND every launcher tick, and `batch-doctor` remediates
+  a damaged repo. The alternative — a live session spawning its own successor —
+  GUARANTEES a window with two live sessions and is therefore rejected.
+  THE ONE STEP THE ASSISTANT CANNOT DO: enabling the OS task is a system change the
+  harness blocks. The user runs it once, in an elevated PowerShell:
+  `Enable-ScheduledTask -TaskName 'HoA-Batch-Autostart'`. Until then the boundary stays
+  attended (ask for `/clear`), and this point stays open.
+  THEN, AND ONLY THEN, the loop changes: after a point is merged and ticked, the session
+  ends deliberately instead of pulling the next point into the same context. That end is
+  NOT an idle stop — `batch-progress-guard` must learn the difference, or it will block
+  exactly the behaviour this point wants. Extend it: ending is legal when the current
+  point is CLOSED and the launcher is armed; it stays illegal otherwise.
+  VERIFIABLE: pure Vitest on the guard's core — a boundary stop with a closed point and
+  an armed launcher ALLOWS, the same stop with work still open BLOCKS, and an unarmed
+  launcher BLOCKS (so a disabled task can never strand the batch). Live: after the first
+  autonomous boundary, `.claude/autostart.log` shows the spawn and the new session's
+  first turn picks the next point.
+  MEASURE THE RESULT: report the %/h rate for the first full day after the change
+  against today's 1.25 %/h. The point counts as delivered when the rate is measured, not
+  when the mechanism runs.
+
 ## Closing (only after all points)
 
 New points are appended BEFORE this section — it stays last in the file.

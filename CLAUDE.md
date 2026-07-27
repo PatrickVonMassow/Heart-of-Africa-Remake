@@ -322,6 +322,10 @@ old→new coverage map live in `scripts/verify/README.md`.
   `src/journal/ttsWorker.ts`) turns it into
   prosody. This rule applies to German too, even while no German TTS voice
   exists yet.
+- **Let a subprocess answer, never the context (point 365, generalised).** A question
+  about the repository is answered by a command whose OUTPUT is small — a count, a
+  section, a brief — never by lifting a whole file into a context. The brief is this
+  rule applied to work orders; it holds for every other document too.
 - Keep comments brief and factual. Mark placeholder values as such.
 - After each major system, run the self-verification (§7.2) and record the
   result.
