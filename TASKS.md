@@ -3060,7 +3060,8 @@ read that as "the criterion and its evidence section".
   DOCS in the same commit: CLAUDE.md §7.1 pt 4 (the collider-derived-from-the-drawing
   rule, already stated for flora, extended to animals) and its evidence section.
 
-- [ ] 379. ABU SIMBEL JOINS THE CULTURAL LANDMARKS (user 27.07.2026). The world carries
+- [ ] 379. ABU SIMBEL BECOMES A WALKABLE SITE (user 27.07.2026; a FEATURE, and the user's
+  own instruction is that the open DEFECTS come first — it waits behind them). The world carries
   eight built cultural landmarks (Meroë, Giza, Great Zimbabwe, Lalibela, Kilwa, Aksum,
   Gondar, Bandiagara) and four natural ones; the rock temples of Abu Simbel are absent,
   and they belong: in 1890 they stood — cleared of sand by Belzoni in 1817 and a fixed
@@ -3068,7 +3069,13 @@ read that as "the criterion and its evidence section".
   south, in their ORIGINAL place beside the river (the 1960s relocation is far outside
   this game's window, so the site sits at the historical coordinates, not the modern
   ones).
-  BUILD IT AS THE OTHER EIGHT ARE BUILT, not as a special case: an entry in
+  IT IS ENTERABLE, LIKE THE PYRAMIDS (user 27.07.2026): the traveller walks up to it in
+  the bird's-eye view and enters with SPACE, exactly as point 273 made the Giza monument
+  site walkable — the same enter radius, the same discovery gate, the same non-overlap
+  rule against every other place's enter disc, and a first-person site the player can
+  cross. Point 273 is the pattern to follow rather than a second mechanism to invent;
+  read what it built before designing anything.
+  BUILD THE REST AS THE OTHER EIGHT ARE BUILT, not as a special case: an entry in
   `src/world/data/landmarks.ts` with its ~1890-correct coordinates, the field radius and
   water clearance the §4.2 sweep in `src/world/world.test.ts` applies to every landmark,
   a localized name in BOTH language files, a first-sighting journal entry in the §10
