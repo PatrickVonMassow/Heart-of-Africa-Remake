@@ -5,8 +5,11 @@
 // drift and hand back a false "clean". These tests fail if anyone replaces a
 // wrapper's gather step with a local copy.
 import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import {
   ACTIONS,
+  CAUSE,
   STATUS,
   formatPreflightReport,
   isKnownAction,
@@ -15,7 +18,7 @@ import {
   selectGuards,
   summarise,
 } from './guard-preflight-core.mjs'
-import { GUARDS } from './guard-preflight.mjs'
+import { GUARDS, resolveSessionId } from './guard-preflight.mjs'
 import { isMainModule } from './is-main.mjs'
 
 import { gatherDashboardInputs } from './dashboard-guard.mjs'
@@ -77,6 +80,29 @@ describe('runPreflight', () => {
       sessionId: 'sid-1',
     })
     expect(calls).toEqual([{ id: 'z-guard', opts: { sessionId: 'sid-1' } }])
+  })
+
+  it('does NOT call a lock stand-down "not-applicable" when the session is unknown', () => {
+    // Without a session id, heldByOtherLiveOwner('') calls the OWNING session a
+    // stranger, and four guards then read as cleanly inapplicable for the very
+    // session that owns the batch. That is a false all-clear, so it is UNKNOWN.
+    const guard = {
+      id: 'lock-keyed',
+      gather: () => ({ applicable: false, why: 'another live session owns the batch lock', cause: CAUSE.notLockOwner }),
+      decide: () => ({ block: true }),
+    }
+    const blind = runPreflight([guard], { sessionId: '', sessionKnown: false })
+    expect(blind[0].status).toBe(STATUS.unknown)
+    expect(blind[0].reason).toMatch(/no session id available/)
+
+    const known = runPreflight([guard], { sessionId: 'sid-1', sessionKnown: true })
+    expect(known[0].status).toBe(STATUS.skip)
+    expect(known[0].reason).toBe('another live session owns the batch lock')
+  })
+
+  it('keeps an unrelated stand-down not-applicable even with an unknown session', () => {
+    const guard = { id: 'paused', gather: () => ({ applicable: false, why: 'the batch is paused' }), decide: () => ({}) }
+    expect(runPreflight([guard], { sessionKnown: false })[0].status).toBe(STATUS.skip)
   })
 
   it('never lets one broken guard cost the run', () => {
@@ -167,6 +193,43 @@ describe('formatPreflightReport', () => {
     expect(summarise('  \n first line \n second')).toBe('first line')
     expect(summarise('x'.repeat(400)).length).toBe(220)
   })
+
+  it('says outright that an unjudged guard is not cleared by the report', () => {
+    const text = formatPreflightReport([
+      { id: 'lock-keyed', status: STATUS.unknown, reason: 'no session id available' },
+    ])
+    expect(text).toMatch(/UNJUDGED/)
+    expect(text).toMatch(/--session/)
+    // "nothing would block" must not read as an all-clear next to an unknown.
+    expect(text).toMatch(/does not clear them/)
+  })
+})
+
+describe('resolveSessionId (F4)', () => {
+  const noLock = () => null
+
+  it('prefers an explicit --session over everything else', () => {
+    expect(resolveSessionId(['--session', 'sid-cli'], { CLAUDE_SESSION_ID: 'sid-env' }, () => ({ sessionId: 'sid-lock' }))).toEqual(
+      { sessionId: 'sid-cli', source: '--session', sessionKnown: true },
+    )
+  })
+
+  it('ignores a --session with no value, rather than swallowing the next flag', () => {
+    expect(resolveSessionId(['--session', '--json'], {}, noLock).sessionKnown).toBe(false)
+  })
+
+  it('falls back to the environment, then to the batch lock’s own owner', () => {
+    expect(resolveSessionId([], { CLAUDE_SESSION_ID: 'sid-env' }, noLock).source).toBe('CLAUDE_SESSION_ID')
+    const fromLock = resolveSessionId([], {}, () => ({ sessionId: 'sid-lock' }))
+    expect(fromLock).toEqual({ sessionId: 'sid-lock', source: 'batch lock owner', sessionKnown: true })
+  })
+
+  it('reports the session as UNKNOWN rather than inventing an empty one', () => {
+    expect(resolveSessionId([], {}, noLock)).toEqual({ sessionId: '', source: null, sessionKnown: false })
+    expect(resolveSessionId([], {}, () => {
+      throw new Error('torn lock file')
+    }).sessionKnown).toBe(false)
+  })
 })
 
 describe('GATHER-STEP REUSE (the drift guard)', () => {
@@ -212,6 +275,30 @@ describe('GATHER-STEP REUSE (the drift guard)', () => {
     expect(byId['doc-budget-guard'].decide.toString()).toContain('evaluateDocBudgets')
     expect(byId['model-guard'].decide.toString()).toContain('findForbiddenCommits')
     expect(typeof findForbiddenCommits).toBe('function')
+  })
+
+  it('has each wrapper’s MAIN path go through its own gather step too (F5)', () => {
+    // A source-shape check, deliberately: a main path that recomputes its inputs
+    // still produces the right answer today, so no behavioural test can see the
+    // divergence — only that the two halves would drift apart tomorrow. The
+    // spawned-hook tests in guard-hooks.test.mjs cover the behaviour.
+    const src = (name) => readFileSync(resolve(process.cwd(), 'scripts', name), 'utf8')
+    const mainOf = (name) => src(name).slice(src(name).indexOf('isMainModule(import.meta.url)'))
+    for (const [file, gather] of [
+      ['model-guard.mjs', 'gatherModelGuardInputs'],
+      ['dashboard-guard.mjs', 'gatherDashboardInputs'],
+      ['tasks-spec-guard.mjs', 'gatherTasksSpecInputs'],
+      ['queue-order-guard.mjs', 'gatherQueueOrderInputs'],
+      ['tasks-archive-guard.mjs', 'gatherTasksArchiveInputs'],
+      ['doc-budget-guard.mjs', 'gatherDocBudgetInputs'],
+      ['render-verify-guard.mjs', 'gatherRenderVerifyInputs'],
+    ]) {
+      expect(mainOf(file), `${file} main path must call ${gather}`).toContain(`${gather}(`)
+    }
+    // The one that had a second copy: no direct call to either input source left.
+    const modelMain = mainOf('model-guard.mjs')
+    expect(modelMain).not.toMatch(/\brecentLog\(/)
+    expect(modelMain).not.toMatch(/\bbaselineMs\(/)
   })
 
   it('holds each gather step to the applicable/inputs contract on the REAL repo', () => {

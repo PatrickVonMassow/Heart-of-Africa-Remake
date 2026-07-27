@@ -18,8 +18,18 @@ export const STATUS = {
   block: 'would-block',
   clean: 'clean',
   skip: 'not-applicable',
+  unknown: 'session-unknown',
   error: 'error',
 }
+
+/**
+ * Why a guard stood down, when the caller has to treat the answer differently.
+ * `not-lock-owner` is the one that matters: those guards key on the session id,
+ * and without one `heldByOtherLiveOwner('')` treats the OWNING session as a
+ * stranger — four guards then report "not-applicable" for the very session that
+ * owns the batch. That is a false all-clear, so it is reported as UNKNOWN.
+ */
+export const CAUSE = { notLockOwner: 'not-lock-owner' }
 
 /**
  * Which guards govern which action. `turn-end` is every guard (the Stop chain
@@ -64,14 +74,26 @@ export function normaliseVerdict(verdict) {
  * Run gather + decide per guard descriptor `{ id, gather, decide, why }`.
  * A guard that throws is reported as `error` and never takes the preflight down:
  * the tool exists to save turns, so it must not cost one itself.
+ *
+ * `sessionKnown: false` says the caller could not determine the session id. A
+ * singleton stand-down is then not evidence of anything (see CAUSE) and is
+ * reported as `session-unknown` rather than as a clean not-applicable.
  */
-export function runPreflight(guards, { sessionId = '' } = {}) {
+export function runPreflight(guards, { sessionId = '', sessionKnown = true } = {}) {
   const results = []
   for (const guard of guards) {
     try {
       const gathered = guard.gather({ sessionId }) ?? {}
       if (gathered.applicable === false) {
-        results.push({ id: guard.id, status: STATUS.skip, reason: gathered.why ?? 'stands down here' })
+        const blind = !sessionKnown && gathered.cause === CAUSE.notLockOwner
+        results.push({
+          id: guard.id,
+          status: blind ? STATUS.unknown : STATUS.skip,
+          reason: blind
+            ? 'no session id available, so the batch lock cannot say whether THIS session owns it — ' +
+              'the guard was not judged. Pass --session <id> to get a real answer.'
+            : (gathered.why ?? 'stands down here'),
+        })
         continue
       }
       const { block, reason } = normaliseVerdict(guard.decide(gathered.inputs ?? {}))
@@ -98,7 +120,13 @@ export function formatPreflightReport(results, { action = 'turn-end' } = {}) {
   const width = Math.max(0, ...results.map((r) => r.id.length))
   const lines = [`guard preflight — would a guard block "${action}" right now?`, '']
   for (const r of results) {
-    const mark = { [STATUS.block]: '✗', [STATUS.clean]: '✓', [STATUS.skip]: '–', [STATUS.error]: '!' }[r.status]
+    const mark = {
+      [STATUS.block]: '✗',
+      [STATUS.clean]: '✓',
+      [STATUS.skip]: '–',
+      [STATUS.unknown]: '?',
+      [STATUS.error]: '!',
+    }[r.status]
     lines.push(
       `  ${mark} ${r.id.padEnd(width)}  ${r.status}${r.reason ? `: ${summarise(r.reason)}` : ''}`,
     )
@@ -116,6 +144,14 @@ export function formatPreflightReport(results, { action = 'turn-end' } = {}) {
   const errors = results.filter((r) => r.status === STATUS.error)
   if (errors.length) {
     lines.push('', `NOTE: ${errors.map((e) => e.id).join(', ')} could not be evaluated — treat as unknown.`)
+  }
+  const blind = results.filter((r) => r.status === STATUS.unknown)
+  if (blind.length) {
+    lines.push(
+      '',
+      `NOTE: ${blind.map((b) => b.id).join(', ')} went UNJUDGED because no session id was available — ` +
+        'this report does not clear them. Re-run with --session <id>.',
+    )
   }
   lines.push(
     '',

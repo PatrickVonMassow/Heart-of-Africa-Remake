@@ -22,7 +22,9 @@ const PAUSE = repoPath('.claude/batch-paused')
  */
 export function gatherTasksSpecInputs({ sessionId = '' } = {}) {
   if (existsSync(PAUSE)) return { applicable: false, why: 'the batch is paused' }
-  if (heldByOtherLiveOwner(sessionId)) return { applicable: false, why: 'another live session owns the batch lock' }
+  if (heldByOtherLiveOwner(sessionId)) {
+    return { applicable: false, why: 'another live session owns the batch lock', cause: 'not-lock-owner' }
+  }
   if (!existsSync(TASKS)) return { applicable: false, why: 'no TASKS.md in this checkout' }
   return { applicable: true, inputs: { tasksMd: readFileSync(TASKS, 'utf8') } }
 }

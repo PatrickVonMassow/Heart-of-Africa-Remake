@@ -23,8 +23,10 @@ const PAUSE = repoPath('.claude/batch-paused')
 
 /** Baseline timestamp; self-arms to NOW on first run so historic degraded
  *  commits (the acknowledged 24.07 incident) never re-trigger. `arm: false` reads
- *  without writing — the read-only preflight must not arm a baseline the guard
- *  itself has not armed yet, which would hide the very commits it looks for. */
+ *  the same value without WRITING it: the read-only preflight may report, but it
+ *  must not decide the moment the guard's baseline is pinned. (It would pin it
+ *  EARLIER, which hides fewer commits, not more — so the harm is the surprise
+ *  write, not a missed detection.) */
 function baselineMs({ arm = true } = {}) {
   try {
     const t = Date.parse(JSON.parse(readFileSync(BASELINE, 'utf8')).since)
@@ -60,18 +62,26 @@ function recentLog() {
  * read-only preflight must not notify.
  */
 export function gatherModelGuardInputs({ arm = true } = {}) {
-  if (existsSync(PAUSE)) return { applicable: false, why: 'the batch is paused' }
-  return { applicable: true, inputs: { log: recentLog(), baselineMs: baselineMs({ arm }) } }
+  // The inputs are gathered either way so `--status` can still report on a paused
+  // batch; `applicable` is what tells a caller whether the guard has duty here.
+  const inputs = { log: recentLog(), baselineMs: baselineMs({ arm }) }
+  if (existsSync(PAUSE)) return { applicable: false, why: 'the batch is paused', inputs }
+  return { applicable: true, inputs }
 }
 
 if (isMainModule(import.meta.url)) {
   try {
-    const hits = findForbiddenCommits(recentLog(), baselineMs())
+    // The main path uses the SAME gather step the preflight does — recomputing
+    // the log and the baseline here would let the two drift apart with nothing
+    // to notice it (the identity test can only see a shared function).
+    const gathered = gatherModelGuardInputs()
+    const { log, baselineMs: baseline } = gathered.inputs
+    const hits = findForbiddenCommits(log, baseline)
     if (process.argv[2] === '--status') {
-      console.log(JSON.stringify({ baseline: new Date(baselineMs()).toISOString(), hits }, null, 2))
+      console.log(JSON.stringify({ baseline: new Date(baseline).toISOString(), hits }, null, 2))
       process.exit(0)
     }
-    if (hits.length && !existsSync(PAUSE)) {
+    if (hits.length && gathered.applicable) {
       const list = hits.map((h) => `${h.sha.slice(0, 7)} (${h.trailer})`).join(', ')
       await notify('FORBIDDEN MODEL', `Non-allowlisted model commit(s): ${list} — pausing the batch`, 'high')
       process.stdout.write(

@@ -3,6 +3,7 @@
 //
 //   node scripts/guard-preflight.mjs                 # the whole Stop chain
 //   node scripts/guard-preflight.mjs --for merge     # merge / tick / commit / tag
+//   node scripts/guard-preflight.mjs --session <id>  # whose session is asking
 //   node scripts/guard-preflight.mjs --json          # machine-readable
 //
 // WHY: a guard that blocks costs a whole turn at full context; the render-verify
@@ -45,6 +46,38 @@ import {
   selectGuards,
 } from './guard-preflight-core.mjs'
 import { isMainModule } from './is-main.mjs'
+import { readOwnerLock } from './batch-singleton.mjs'
+
+/**
+ * Whose session is asking. Four of the guards stand down for a session that does
+ * not own the batch lock, and `heldByOtherLiveOwner('')` calls an EMPTY id a
+ * stranger — so with no id the report used to read "not-applicable" for the very
+ * session that owns the batch: a false all-clear.
+ *
+ * `--session` first (the caller knows), then the environment, then the lock's own
+ * owner — asking the batch lock who holds it is the honest last resort, because a
+ * preflight run from inside the owning session is the normal case. When none of
+ * the three answers, the session is UNKNOWN and the report says so rather than
+ * clearing anything.
+ */
+export function resolveSessionId(args = [], env = process.env, readLock = readOwnerLock) {
+  const i = args.indexOf('--session')
+  if (i >= 0 && args[i + 1] && !args[i + 1].startsWith('--')) {
+    return { sessionId: args[i + 1], source: '--session', sessionKnown: true }
+  }
+  if (env.CLAUDE_SESSION_ID) {
+    return { sessionId: env.CLAUDE_SESSION_ID, source: 'CLAUDE_SESSION_ID', sessionKnown: true }
+  }
+  try {
+    const lock = readLock()
+    if (lock && lock.sessionId) {
+      return { sessionId: lock.sessionId, source: 'batch lock owner', sessionKnown: true }
+    }
+  } catch {
+    /* unreadable lock — the unknown case below is the honest answer */
+  }
+  return { sessionId: '', source: null, sessionKnown: false }
+}
 
 /**
  * The registered guards: id, the WRAPPER's gather step, the CORE's decide step.
@@ -104,11 +137,18 @@ if (isMainModule(import.meta.url)) {
   const asJson = args.includes('--json')
 
   const guards = selectGuards(GUARDS, action)
-  const results = runPreflight(guards, { sessionId: process.env.CLAUDE_SESSION_ID ?? '' })
+  const { sessionId, source, sessionKnown } = resolveSessionId(args)
+  const results = runPreflight(guards, { sessionId, sessionKnown })
 
   if (asJson) {
-    console.log(JSON.stringify({ action, known: isKnownAction(action), results }, null, 2))
+    console.log(JSON.stringify({ action, known: isKnownAction(action), session: { known: sessionKnown, source }, results }, null, 2))
   } else {
+    console.log(
+      sessionKnown
+        ? `session id from ${source}.\n`
+        : 'session id UNKNOWN (no --session, no CLAUDE_SESSION_ID, no batch lock owner) — the ' +
+            'lock-keyed guards below cannot be judged.\n',
+    )
     if (!isKnownAction(action)) {
       // Report MORE rather than less on a typo, but say so — a silently widened
       // scope would read like the narrow one the caller asked for.

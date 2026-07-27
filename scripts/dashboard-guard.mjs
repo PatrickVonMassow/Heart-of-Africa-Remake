@@ -79,7 +79,7 @@ export function gatherDashboardInputs({ sessionId = '' } = {}) {
   // Hard singleton: a session that does not own the live batch lock has no
   // dashboard duty — it must stand down entirely, not be pushed to publish.
   if (heldByOtherLiveOwner(sessionId)) {
-    return { applicable: false, why: 'another live session owns the batch lock' }
+    return { applicable: false, why: 'another live session owns the batch lock', cause: 'not-lock-owner' }
   }
 
   const marker = readJson(STATE_PATH)

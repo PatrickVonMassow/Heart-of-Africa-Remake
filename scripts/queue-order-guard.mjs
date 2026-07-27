@@ -19,13 +19,21 @@ const PAUSE = repoPath('.claude/batch-paused')
 /** The guard's I/O half, shared with the preflight (point 365 D). */
 export function gatherQueueOrderInputs({ sessionId = '' } = {}) {
   if (existsSync(PAUSE)) return { applicable: false, why: 'the batch is paused' }
-  if (heldByOtherLiveOwner(sessionId)) return { applicable: false, why: 'another live session owns the batch lock' }
+  if (heldByOtherLiveOwner(sessionId)) {
+    return { applicable: false, why: 'another live session owns the batch lock', cause: 'not-lock-owner' }
+  }
   if (!existsSync(DASHBOARD)) return { applicable: false, why: 'no dashboard yet — dashboard-guard owns that case' }
+  // A checkout without TASKS.md STANDS DOWN — deliberately, and not the same as
+  // reading it as empty: the core would then see every queue card as pointing at
+  // a point that does not exist and block on a broken checkout, which is a guard
+  // bug trapping the session. The pre-refactor code threw here and fell open;
+  // this keeps that outcome, but says so instead of relying on the throw.
+  if (!existsSync(TASKS)) return { applicable: false, why: 'no TASKS.md in this checkout' }
   return {
     applicable: true,
     inputs: {
       dashboardHtml: readFileSync(DASHBOARD, 'utf8'),
-      tasksMd: existsSync(TASKS) ? readFileSync(TASKS, 'utf8') : '',
+      tasksMd: readFileSync(TASKS, 'utf8'),
     },
   }
 }
