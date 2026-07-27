@@ -604,8 +604,25 @@ promise array switches it over (`src/render/asyncPipelines.ts`). On WebGL 2 that
 alone only moves the cost — ANGLE defers the real compile to a program's first
 USE — so the linked programs' completions are additionally released one per
 animation frame, which is what keeps the frames painting (worst unpainted gap
-8.5 s → 1.8 s; two per frame measured worse). After: worst standstill 2.1 s
-(WebGL 2) and 1.1 s (WebGPU), and neither is a shader compile any more.
+8.5 s → 1.8 s; two per frame measured worse). Neither remaining standstill is a
+shader compile any more.
+
+Measured before/after, both backends, re-run 27.07.2026 on a quiet machine
+(3 % CPU, no parallel agents) against the dev server, "before" being the same
+build with the fix switched off through `__asyncPipelinesOff`:
+
+| Backend | before | after | budget |
+|---|---|---|---|
+| WebGL 2 | 17 532 ms | 2 682 ms (1 064 ms on a second run) | 4 000 ms |
+| WebGPU | 6 747 ms | 1 354 ms | 4 000 ms |
+
+The attribution split is what makes the WebGPU row worth reading: at 6 747 ms
+its blocked thread was 542 ms and its longest animation frame 654 ms — the
+picture was unpainted for the whole 6.7 s while the thread stayed free. That is
+the shape a liveness-only metric excuses and this gate does not. 61–64 pipelines
+went async per run, 0 dropped, and the screenshot shows the settled scene
+complete (buildings, flora, shadows, HUD, journal) — no object is missing, so
+nothing regressed at first frame.
 
 Verifiable: `scripts/verify/startup.mjs` runs a tick train and a painted-frame
 train from document start, attributes the stalls with the point-304 module
@@ -614,9 +631,10 @@ train from document start, attributes the stalls with the point-304 module
 reporting the attribution split rather than subtracting it, because the
 frame-covered part is exactly how a busy renderer would hide this stall;
 `STARTUP_STALL_SELFTEST=1` restores the blocking path via the dev hook
-`__asyncPipelinesOff` and proves the gate still bites (40 s WebGL 2, 8.4 s
-unpainted WebGPU, attributed block 0.3–0.4 s in both — exactly the number that
-must NOT be the one gated). Screenshot `verification/142-startup-picture-live.png`.
+`__asyncPipelinesOff` and proves the gate still bites — it went red on both
+backends at the "before" figures above, while the attributed block stayed at
+0.3–0.5 s, which is exactly the number that must NOT be the one gated.
+Screenshot `verification/142-startup-picture-live.png`.
 The wiring — which calls are diverted, that three.js's own `compileAsync` is left
 alone, the one-per-frame release, its bookkeeping and the drop of a completion
 whose pipeline was released meanwhile — is pure-tested in

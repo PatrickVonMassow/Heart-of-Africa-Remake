@@ -93,9 +93,11 @@ instead of subtracting it. That matters because the defect has two different
 shapes: on WebGL 2 it blocked the thread for 21 s inside two animation frames,
 on WebGPU the thread stayed free (worst stall 1.0 s) while nothing was painted
 for 12.4 s. `STARTUP_STALL_SELFTEST=1` restores the old blocking path through
-the dev hook `__asyncPipelinesOff` and asserts the gate goes red — measured 40 s
-(WebGL 2) and 8.4 s unpainted (WebGPU), with the attributed block at 0.3-0.4 s
-in both — exactly the number that must NOT be the one gated.
+the dev hook `__asyncPipelinesOff` and asserts the gate goes red — 17.5 s
+(WebGL 2) and 6.7 s unpainted (WebGPU) against 2.7 s and 1.4 s with the fix on,
+re-measured 27.07.2026 on a quiet machine. The attributed block stayed at
+0.3-0.5 s throughout, which is exactly the number that must NOT be the one
+gated; the full table is in `docs/acceptance-evidence.md` §14.
 
 Its measurement window closes on the picture, never on a clock. A fixed tail is
 a wall-clock guess of the very quantity being measured: on a slower machine it
