@@ -445,6 +445,110 @@ describe('render-verify-guard', () => {
   })
 })
 
+// The four-eyes gate on mechanisms (point 377), spawned rather than read. Its
+// whole promise is that it fires on the NEXT guard someone writes, and the rule
+// it enforces was believed enforced for weeks while nothing was wired at all —
+// so "the code looks right" is precisely the evidence that failed here before.
+describe('mechanism-review-guard: the four-eyes gate on mechanisms', () => {
+  const BASELINE = '.claude/mechanism-review-baseline.json'
+  const LEDGER = '.claude/mechanism-reviews.jsonl'
+  const branch = () => git('rev-parse', '--abbrev-ref', 'HEAD').stdout.trim()
+  const head = () => git('rev-parse', 'HEAD').stdout.trim()
+  const baselineAt = (sha) => write(BASELINE, JSON.stringify({ baselines: { [branch()]: sha } }))
+  const review = (args) => node([resolve(repo, 'scripts', 'mechanism-review.mjs'), ...args])
+  const AUTHOR = 'Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>'
+
+  let base = ''
+  let guardSha = ''
+
+  it('BLOCKS a committed guard that no second model has reviewed', () => {
+    write(LEDGER, '')
+    base = head()
+    write('scripts/demo-guard.mjs', '// a brand-new enforcer\n')
+    commit(`add a demo guard\n\n${AUTHOR}`)
+    guardSha = head()
+    baselineAt(base)
+
+    const hook = expectHookAgrees('mechanism-review-guard.mjs', 'mechanism-review-guard', { blocks: true })
+    expect(hook.decision.reason).toMatch(/FOUR-EYES GATE ON MECHANISMS/)
+    expect(hook.decision.reason).toContain('scripts/demo-guard.mjs')
+    expect(hook.decision.reason).toContain(guardSha.slice(0, 7))
+  })
+
+  it('ALLOWS once a DIFFERENT model has recorded a review', () => {
+    const r = review([
+      '--record', guardSha,
+      '--model', 'Fable 5',
+      '--verdict', 'merge',
+      '--evidence', 'read the core and the wrapper against the spec, ran the pure cases',
+    ])
+    expect(r.status, r.stderr).toBe(0)
+    baselineAt(base)
+    expectHookAgrees('mechanism-review-guard.mjs', 'mechanism-review-guard', { blocks: false })
+  })
+
+  it('REFUSES to record a self-review instead of warning about it', () => {
+    const r = review([
+      '--record', guardSha,
+      '--model', 'Claude Opus 5',
+      '--verdict', 'merge',
+      '--evidence', 'I have read my own work again and it still looks right',
+    ])
+    expect(r.status).toBe(1)
+    expect(r.stderr).toMatch(/SELF-REVIEW is refused/)
+  })
+
+  it('BLOCKS on a do-not-merge verdict as loudly as on a missing record', () => {
+    const r = review([
+      '--record', guardSha,
+      '--model', 'Fable 5',
+      '--verdict', 'do-not-merge',
+      '--evidence', 'the fast path waves through the files the unit layer measures',
+    ])
+    expect(r.status, r.stderr).toBe(0)
+    baselineAt(base)
+    const hook = expectHookAgrees('mechanism-review-guard.mjs', 'mechanism-review-guard', { blocks: true })
+    expect(hook.decision.reason).toMatch(/DO-NOT-MERGE/)
+    expect(hook.decision.reason).toMatch(/the unit layer measures/)
+  })
+
+  it('leaves a turn that changed no mechanism completely alone', () => {
+    const before = head()
+    write('src/ui/Panel.tsx', '// ordinary feature work\n')
+    commit(`a feature change\n\n${AUTHOR}`)
+    baselineAt(before)
+    expectHookAgrees('mechanism-review-guard.mjs', 'mechanism-review-guard', { blocks: false })
+  })
+
+  it('grandfathers what predates the baseline, and arms itself at HEAD', () => {
+    // The unreviewed demo guard is still in history and the ledger is empty —
+    // exactly the state the twenty-odd existing guards are in. Nothing is owed,
+    // and the gate pins the baseline so it audits from here on.
+    write(LEDGER, '')
+    rmSync(resolve(repo, BASELINE), { force: true })
+    const at = head()
+    const hook = runHook('mechanism-review-guard.mjs')
+    expect(hook.status, hook.stderr).toBe(0)
+    expect(hook.stdout.trim()).toBe('')
+    const state = JSON.parse(readFileSync(resolve(repo, BASELINE), 'utf8'))
+    expect(Object.values(state.baselines)).toContain(at)
+  })
+
+  it('stands down silently while the batch is paused', () => {
+    write(LEDGER, '')
+    baselineAt(base) // the unreviewed demo guard is pending again
+    write('.claude/batch-paused', 'test')
+    try {
+      expect(preflight()['mechanism-review-guard'].status).toBe('not-applicable')
+      const hook = runHook('mechanism-review-guard.mjs')
+      expect(hook.status, hook.stderr).toBe(0)
+      expect(hook.stdout.trim()).toBe('')
+    } finally {
+      rmSync(resolve(repo, '.claude/batch-paused'), { force: true })
+    }
+  })
+})
+
 describe('the CLI half of the tooling, spawned', () => {
   const filler = (n) => `${'  a filler line of specification prose.\n'.repeat(n)}`
 

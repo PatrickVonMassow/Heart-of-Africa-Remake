@@ -38,10 +38,23 @@ export const CAUSE = { notLockOwner: 'not-lock-owner' }
  */
 export const ACTIONS = {
   'turn-end': null, // null = all registered guards
-  merge: ['model-guard', 'render-verify-guard', 'tasks-archive-guard', 'doc-budget-guard'],
+  merge: [
+    'model-guard',
+    'render-verify-guard',
+    'mechanism-review-guard',
+    'tasks-archive-guard',
+    'doc-budget-guard',
+  ],
   tick: ['tasks-archive-guard', 'tasks-spec-guard', 'queue-order-guard', 'dashboard-guard'],
-  commit: ['model-guard', 'doc-budget-guard', 'tasks-spec-guard'],
-  tag: ['model-guard', 'render-verify-guard', 'tasks-archive-guard', 'dashboard-guard', 'doc-budget-guard'],
+  commit: ['model-guard', 'mechanism-review-guard', 'doc-budget-guard', 'tasks-spec-guard'],
+  tag: [
+    'model-guard',
+    'render-verify-guard',
+    'mechanism-review-guard',
+    'tasks-archive-guard',
+    'dashboard-guard',
+    'doc-budget-guard',
+  ],
 }
 
 /** Is this an action the map knows? (`turn-end` and friends.) */
