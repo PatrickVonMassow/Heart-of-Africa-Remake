@@ -18,9 +18,11 @@
 //   --defer "<reason>"    logged escape valve for sessions that genuinely lack
 //                         the Artifact tool (headless resume); covers the
 //                         CURRENT content only — any further edit re-blocks.
-import { copyFileSync, existsSync } from 'node:fs'
+import { copyFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { REPO_ROOT, STATE_PATH, readJson, mergeState, sha256File } from './dashboard-state.mjs'
+import { refreshFooter } from './board-core.mjs'
+import { parseTasks } from './dashboard-guard-core.mjs'
 
 const state = readJson(STATE_PATH) ?? {}
 const repoFile = resolve(REPO_ROOT, state.dashboardPath ?? '.batch-dashboard.html')
@@ -70,6 +72,23 @@ if (!target) {
       'hoa-batch-dashboard.html).',
   )
   process.exit(1)
+}
+
+// The footer's date and open-point count are derived, not typed: every tick
+// otherwise left a stale figure that the audit refused two steps later, after
+// the Artifact call. Same parse as the audit, so the two cannot disagree.
+try {
+  const html = readFileSync(repoFile, 'utf8')
+  const { open } = parseTasks(readFileSync(resolve(REPO_ROOT, 'TASKS.md'), 'utf8'))
+  const refreshed = refreshFooter(html, { openCount: open.length })
+  if (refreshed !== html) {
+    writeFileSync(repoFile, refreshed)
+    console.log(`footer refreshed: ${open.length} open point(s)`)
+  }
+} catch (e) {
+  // A publish must never be blocked by the footer; the audit still catches a
+  // stale one, and saying why beats failing silently.
+  console.error(`dashboard-publish: footer not refreshed (${e.message})`)
 }
 
 copyFileSync(repoFile, target)
