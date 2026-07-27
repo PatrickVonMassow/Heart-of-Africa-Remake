@@ -30,7 +30,7 @@
 export const DOC_BUDGETS = [
   {
     path: 'CLAUDE.md',
-    maxLines: 1080,
+    maxLines: 1092,
     // RAISED by the 50 measured words of the §7.2 rule that screenshot diffing
     // is not available as a shortcut (point 361). That is the mechanism working
     // as designed rather than a concession: the words buy a NEW standing rule
@@ -46,7 +46,16 @@ export const DOC_BUDGETS = [
     // NEW named balance value — the evidence chain behind it went to
     // docs/acceptance-evidence.md §14, which is deliberately unbudgeted, so
     // what is priced here is only the rule itself.
-    maxWords: 9700,
+    // RAISED by the 122 measured words (8 lines) that turn §7.1 pt 20's F6
+    // from a state dump into the COMPLETE bug report (point 339): a new
+    // DELIVERABLE (one zip carrying picture, state, overlay list and the
+    // player's description), a new capture MECHANISM that must be stated
+    // because the obvious implementation is wrong (the readback happens
+    // inside a rendered frame; `preserveDrawingBuffer` is refused on cost),
+    // and a new verify suite on both backends. The alternative — leaving
+    // §7.1 describing a popup that no longer exists — is the drift this
+    // budget is not meant to buy.
+    maxWords: 9835,
     why: 'loaded at every session start — the most expensive document in the project',
   },
   {
@@ -78,7 +87,16 @@ export const DOC_BUDGETS = [
     // critical path, and the standstill the player may see is a calibratable
     // budget rather than whatever the hardware takes. The tunable-value entry
     // behind it went to docs/design-reference.md §21.2, which is unbudgeted.
-    maxWords: 27750,
+    // RAISED by the 176 measured words of the rewritten §21.1 F6 bullet
+    // (point 339, user 25.07.2026): the key stops opening a state popup and
+    // starts producing a whole bug report, so the bullet must name the
+    // archive's four members and their one stem, the reproduction summary
+    // at the top of the state, and — the part no reader can infer — that
+    // the picture is the 3-D scene ALONE, since every label and the HUD are
+    // HTML. Without that last sentence a missing label in the image reads
+    // as evidence of a bug that is not there. Not a longer telling of
+    // something already here: the old bullet described a different feature.
+    maxWords: 27940,
     why: 'read on demand, but every point that cites a section pays for the bulk around it',
   },
 ]

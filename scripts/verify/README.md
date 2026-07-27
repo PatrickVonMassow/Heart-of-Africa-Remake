@@ -39,7 +39,7 @@ Vitest+SMALL / Vitest+LARGE; the **closing cycle ALWAYS runs LARGE**):
 | Tier | Command | Browser suites | Preview |
 |------|---------|----------------|---------|
 | **SMALL** (everyday gate) | `npm run test:small` | `docs, i18n, flow, health, events, collision, voice` — fast, low-flake, core coverage (doc/i18n consistency, the one E2E core loop, health/events/collision, TTS) | no |
-| **LARGE** (default) | `npm test` / `npm run test:large` | **all 17** — SMALL plus the heavier scene/geometry/screenshot suites (`world, handwriting, polish, gamepad, touch, settings, invariants`), `startup` (the point-337 loading-picture freeze budget), `benchmark` (the in-game F8 measurement run) and `enrichments` (the wildlife/atmosphere staging, which carries the rotating family flakes) | yes |
+| **LARGE** (default) | `npm test` / `npm run test:large` | **all 18** — SMALL plus the heavier scene/geometry/screenshot suites (`world, handwriting, polish, gamepad, touch, settings, invariants`), `startup` (the point-337 loading-picture freeze budget), `benchmark` (the in-game F8 measurement run), `report` (the F6 bug-report archive, whose PNG member is decoded and checked for real scene content) and `enrichments` (the wildlife/atmosphere staging, which carries the rotating family flakes) | yes |
 
 Both tiers run the same Vitest + build + lint preflight. SMALL is a strict subset
 of `DEV_SUITES`; keep it that way. New heavy or flaky browser scenarios join
