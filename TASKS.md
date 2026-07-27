@@ -3075,6 +3075,18 @@ read that as "the criterion and its evidence section".
   rule against every other place's enter disc, and a first-person site the player can
   cross. Point 273 is the pattern to follow rather than a second mechanism to invent;
   read what it built before designing anything.
+  ONE PLACE, ONE LABEL — do not repeat the Giza mistake (user 27.07.2026). Making the
+  pyramids walkable left the site defined TWICE, as a cultural landmark AND as a map
+  point, so the bird's-eye view carries two overlapping names for one thing (that is
+  work-order point 338, still open). Abu Simbel is entered into the world ONCE, in
+  whichever of the two forms carries an enterable site, and it must NOT also stand as a
+  second definition. Point 338 decides which form survives for Giza; this point follows
+  that decision rather than inventing a third arrangement — and if 338 is still open
+  when this is built, it is fixed FIRST, because building a second double label while
+  the first is being removed is the same defect twice.
+  VERIFIABLE for that half: a pure test asserting the site appears EXACTLY ONCE across
+  the landmark and map-point definitions, and one bird's-eye frame at in-game zoom
+  showing a single label.
   BUILD THE REST AS THE OTHER EIGHT ARE BUILT, not as a special case: an entry in
   `src/world/data/landmarks.ts` with its ~1890-correct coordinates, the field radius and
   water clearance the §4.2 sweep in `src/world/world.test.ts` applies to every landmark,
