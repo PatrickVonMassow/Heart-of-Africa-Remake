@@ -15,36 +15,20 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { resolve } from 'node:path'
 import { REPO_ROOT } from './repo-paths.mjs'
+import { berlinStamp, setCardStatus } from './board-core.mjs'
 
 const BOARD = resolve(REPO_ROOT, '.batch-dashboard.html')
 const run = (args) => execFileSync(process.execPath, args, { cwd: REPO_ROOT, encoding: 'utf8' })
 
-/** Berlin wall clock, the stamp every status carries (point 371). */
-function stamp() {
-  return new Intl.DateTimeFormat('de-DE', {
-    timeZone: 'Europe/Berlin',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(new Date())
-}
-
-/** Replace a now-card's body with `text`, stamped. The card is found by its
- *  leading point number, which is how every other board tool identifies one. */
-function setStatus(point, text) {
-  const html = readFileSync(BOARD, 'utf8')
-  const re = new RegExp(`(<summary><span class="t">${point} —[\\s\\S]*?<div class="body">)[\\s\\S]*?(</div>\\s*</details>)`)
-  if (!re.test(html)) throw new Error(`no current-work card for point ${point} — add the card first`)
-  const body = `    <p><span class="stamp">Stand ${stamp()}</span> ${text}</p>`
-  writeFileSync(BOARD, html.replace(re, `$1\n${body}\n  $2`))
-  console.log(`status of ${point} restated (Stand ${stamp()})`)
-}
 
 const [cmd, ...rest] = process.argv.slice(2)
 try {
   if (cmd === 'status') {
     const [point, ...words] = rest
     if (!point || words.length === 0) throw new Error('usage: board.mjs status <point> "<text>"')
-    setStatus(point, words.join(' '))
+    const at = berlinStamp()
+    writeFileSync(BOARD, setCardStatus(readFileSync(BOARD, 'utf8'), point, words.join(' '), at))
+    console.log(`status of ${point} restated (Stand ${at})`)
     console.log(run(['scripts/dashboard-publish.mjs']).trim().split('\n').pop())
     console.log('NEXT: publish the scratchpad file via the Artifact tool, then: node scripts/board.mjs attest')
   } else if (cmd === 'focus') {
