@@ -10548,3 +10548,53 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   against the LIVE board file (the sweep pattern of `scripts/board-core.test.mjs`).
   DOCS: the comment block at the head of `scripts/board.mjs`, where the loop is
   described.
+
+- [x] 361. CHEAPER PICTURE VERIFICATION — WITHOUT LOSING WHAT IT CATCHES (user
+  26.07.2026). The rendered-picture check is the most expensive
+  control in this project, and it dominates the cost of the work that is left: 42
+  of the 67 open points touch the canvas, so they need the full check, and the
+  scoping of 26.07. (DOM changes need one backend, Vitest files none) helped the
+  minority. What was NOT touched is the price of a SINGLE check — the suite run
+  and, above all, the screenshots that must be looked at. Reduce that price
+  without weakening the control.
+  MEASURE FIRST, then change. The current cost per check is unmeasured; without a
+  before-figure no after-figure means anything. Record, for a representative
+  suite on one backend: how many screenshots it produces, their sizes, and how
+  much of the reviewing context they consume. The project rule holds — only
+  measured numbers are communicated as measured.
+  CANDIDATE LEVERS, to be evaluated rather than assumed: crop each screenshot to
+  the region the change can affect instead of shipping the full frame; reduce
+  resolution before inspection (a stepped coast may still read at half size —
+  prove it, do not assume it); a MACHINE PRE-FILTER that decides whether a human
+  look is needed at all (a pixel metric against the previous accepted frame, so
+  only a changed picture is inspected — note this is close to the golden-image
+  method already listed as open under point 207 (ii), so build one thing, not
+  two); inspect one view per change instead of every screenshot a suite emits;
+  emit fewer frames per run. Combinations are allowed; each lever is judged
+  separately by the replay below.
+  THE ACCEPTANCE TEST IS A REPLAY OF REAL BUGS, and it is the point of the whole
+  exercise (user's requirement): the cheaper method must be shown to catch what
+  the current one caught. Build a corpus from the bugs this project found through
+  the picture — the stepped coast that read "done" on one backend, the flora
+  jitter, the floating horizon strip at the monument site, the doubled Giza
+  label, the season that was invisible while three rounds of value checks passed,
+  the haze that only failed at the default zoom, the sunken sphinx, the texture
+  count that dipped rather than leaked. For each: check out the commit BEFORE its
+  fix, run the candidate method against that state, and require it to FAIL. A
+  lever that misses even one of them is rejected for that class, and the rejection
+  is recorded with the case that killed it — not quietly dropped.
+  FOUR EYES, in the two modes of §355: the candidate levers are a DIVERGENT
+  question, so both models list them independently and blind, and the union is
+  evaluated. The replay result is CONVERGENT — one model runs it, the other reads
+  the evidence before the author's rationale.
+  ONLY THEN IMPLEMENT. If the replay holds for a lever, wire it into
+  `scripts/verify/*` and the render-verify guard's expectations, and record the
+  measured before/after. If no lever survives the replay, that IS the outcome:
+  record it and leave the check as it is — an expensive control that works beats
+  a cheap one that misses.
+  ANCHORS: the suites and their screenshot helpers in `scripts/verify/`, the
+  recorder and classifier in `scripts/render-verify-*.mjs`, the screenshots in
+  `verification/`, and the historical cases in `docs/analysis_de/
+  retrospektive-zusammenarbeit.md` §3.5/§3.6 and `docs/tasks-archive.md`.
+  DOCS in the same commit: CLAUDE.md §7.2 (the picture rule) and its evidence
+  section, plus a tip in the beginner's guide if a lever generalises.
