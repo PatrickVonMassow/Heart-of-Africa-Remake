@@ -2018,48 +2018,6 @@ read that as "the criterion and its evidence section".
   end-to-end `acquire` against a directory seeded with both kinds removes exactly the
   dead one. The five hard-singleton scenarios already pinned in that file stay green.
 
-- [ ] 341. A JUVENILE'S BOND TO ITS PARENT MUST RESOLVE, NEVER HANG (user 25.07.2026).
-  A calf beyond its leash walks straight back to its parent, and with the §19.5 water
-  revision (point 312) that walk is no longer stopped by a river or lake — it will now
-  almost always arrive. What still has no ending is the case where the PARENT is not
-  there to arrive AT. The streaming cull removes an animal by distance from the player,
-  so a player who drives a calf far enough — the despawn ring is the zoom-aware view
-  plus a margin, about 110 units at the default zoom — leaves its parent behind. The
-  cull clears NEITHER `a.parent` NOR `parent.child`, and the follow branch tests only
-  `!a.parent.dead`, never whether the parent still exists: the calf then walks to a
-  frozen phantom position and nurses at nothing. The §19.8 orphan adoption does not
-  catch it either — that fires on a DEAD parent, and a culled one is not dead.
-  TARGET — the §19.8 house rule (invariant I4: every drama resolves, as the crocodile
-  grip deadline of point 186 does) applied to the family bond.
-  (a) THE CULL CLEARS THE PAIR. Removing an animal clears the links on BOTH sides, so a
-  surviving animal can never hold a removed one. This is where the phantom is actually
-  born, and it needs no window at all.
-  (b) A SEPARATION WINDOW COVERS THE REST. A juvenile out of reach of its parent —
-  beyond the follow radius — for longer than a calibratable
-  `balance.family.reunionSeconds` (debug-editable) has its bond RESOLVED: links cleared
-  both ways and the calf handed to the existing orphan adoption (`findAdopter`, §19.8 /
-  point 262), so it gains a living parent nearby, or roams on as an ordinary juvenile
-  where no adult is eligible. The clock runs only while the calf is genuinely out of
-  reach, so a gambol at the leash edge or a short flight never trips it.
-  DELIBERATELY NOT BUILT: exempting a parent from the streaming cull while its calf
-  lives, so the pair could still reunite. It was weighed and dropped — it would write a
-  permanent exception into the streaming rule for a situation the player has to create
-  on purpose, and the adoption already leaves that calf with a living parent. Do not
-  reintroduce it without a fresh decision.
-  ANCHORS: `keepStreamedAnimal` and the per-species filter that applies it in
-  `src/scenes/travel/Wildlife.tsx`; the calf follow branch guarded by `a.young &&
-  a.parent && !a.parent.dead`; `findAdopter` and the adoption pass in
-  `src/scenes/travel/wildlifeBehavior.ts`.
-  DOCS in the same commit: design.md §19.8 gains one sentence beside the orphan
-  adoption — a separated juvenile's bond resolves rather than hangs.
-  VERIFIABLE: pure — the cull clears both link directions (a survivor never references
-  a removed animal); the separation predicate fires exactly at the window boundary and
-  never while the calf is within the follow radius; a resolved calf goes through the
-  adoption, and with no eligible adult ends parentless rather than bonded to a ghost.
-  Live (`scripts/verify/enrichments.mjs`): a staged pair whose parent is removed leaves
-  the calf adopted by a nearby adult or roaming free — never walking at a fixed empty
-  spot, never nursing at nothing.
-
 - [ ] 342. HOLD CTRL TO NAME WHAT ACTS ON SCREEN (user 25.07.2026; design.md §17.8
   states the target). While Ctrl is held, every animal, person and usable object on
   screen carries a small floating label naming WHAT it is — "Adult giraffe", "Dead
