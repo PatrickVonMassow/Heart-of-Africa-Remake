@@ -3277,7 +3277,7 @@ read that as "the criterion and its evidence section".
   DOCS in the same commit: design.md §19.13, `docs/graphics-detail-levels.md`, CLAUDE.md
   §7.1 pt 12 and its evidence section.
 
-- [ ] 387. FOUR CHECKS IN THE POLISH SUITE ARE RED ON MAIN (27.07.2026, established with
+- [ ] 387. THE CHECKS THAT ARE RED ON MAIN ITSELF (27.07.2026, established with
   the baseline lane of point 294 — two runs against the merge-base, all four labelled
   PRE-EXISTING). The suite therefore cannot exit 0, and because `render-verify-guard`
   counts only a PASSING run, every backend-sensitive change that picks `polish` has to be
@@ -3295,6 +3295,12 @@ read that as "the criterion and its evidence section".
   · fire shadows ON: the ground behind a ring stone is measurably darker than beside it
     (design.md §19.10) — reported at 1.6 against a threshold of 2, the same
     sitting-on-its-own-edge shape as point 382's eye-knob check.
+  · AND IN THE ENRICHMENTS SUITE, measured the same night on a quiet machine and
+    labelled PRE-EXISTING by the baseline lane: the High Atlas whitens in February and
+    bares in July (seasonal snow, point 141) — reported at 1.3 % white in February
+    against 0.0 % in July, i.e. the CONTRAST exists and the check still refuses it, the
+    third instance of a criterion deciding on a figure near its own bar. The crocodile
+    eye-knob red in the same suite has its own point (382) and is not repeated here.
   FOR EACH: say whether the PRODUCT is wrong, the CHECK asserts something never
   promised, or the THRESHOLD decides on noise — and fix accordingly. Loosening an
   assertion to reach green is refused; a check that waits for unbuilt work is marked as
