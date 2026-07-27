@@ -287,6 +287,16 @@ Gefunden hat es die dritte Gegenlesung, nicht der Autor, und der Autor war in di
 
 **Lehre:** Wo eine Abhängigkeit für den Test ersetzt wird, bleibt der ersetzte Teil ungeprüft — also braucht **jedes real ausgeführte Kommando mindestens einen Test, der es wirklich ausführt**. Eine Attrappe prüft die Logik um ein Werkzeug herum, nie das Werkzeug. Und ein Fix, der eine Plattform-Eigenheit betrifft, ist erst dann belegt, wenn er auf der Plattform gelaufen ist, auf der er wirkt.
 
+### 3.35 Der beabsichtigte Zustand, im Präsens geschrieben
+
+Ein Auftrag beschrieb den Maßstab, an dem eine neue Sperre messen sollte, mit den Worten: „der Prompt-Hook stempelt bereits den Zugbeginn in den Zustand". Er tat es nicht. Der Satz beschrieb, was ich beim Schreiben vor Augen hatte, nicht was im Code stand — und er stand im **Präsens**, also las er sich wie eine geprüfte Tatsache.
+
+Der Helfer bemerkte es und baute den Stempel nach. Die Formulierung seines Befundes ist die Lehre: Ein schwächerer Leser hätte gegen ein Feld programmiert, das immer leer ist, hätte eine Sperre ausgeliefert, die **niemals auslösen kann**, und wäre dabei in jedem Test grün gewesen — denn ein Test gegen einen nie gesetzten Wert prüft brav, dass nichts passiert.
+
+Das ist die teuerste Sorte Fehler in einem Auftrag, weil sie sich nicht wie ein Fehler liest. Eine Lücke im Auftrag führt zu einer Rückfrage; eine falsche Tatsachenbehauptung führt zu einer Lieferung, die genau das tut, was dasteht — nichts.
+
+**Lehre:** Was im Auftrag im Präsens steht, muss beim Schreiben nachgesehen sein. Was noch gebaut werden muss, gehört in die Zukunftsform oder ausdrücklich unter „das existiert noch nicht" — die zwei Sekunden für ein `grep` sind billiger als eine Lieferung, die ins Leere greift. Und weil das nicht nur für Aufträge gilt: Jede Zusicherung, die ein Dokument über den Code macht, ist entweder nachgesehen oder als Absicht gekennzeichnet.
+
 ---
 
 ## 4. Die Guards als Immunsystem
@@ -371,7 +381,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Montag, 27.07.2026, 14:13 · Quellen-Fingerprint: `e05f4a2ef81a…`
+Zuletzt aktualisiert: Montag, 27.07.2026, 14:46 · Quellen-Fingerprint: `e05f4a2ef81a…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -445,5 +455,5 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 Erfasste Quellen: 63 Feedback-/Projekt-Memories · 32 Guard-/Hook-Skripte · 2 Revert-/Reapply-Commits · 15 Prozess-/Meta-TASKS-Punkte (davon 8 offen).
 
 <!-- RETRO-FINGERPRINT: e05f4a2ef81ad9173e519ff8d4109edbe48ec73768a0723ccec2162fd1878047 -->
-<!-- RETRO-LAST-REFRESHED: 2026-07-27T12:13:22.589Z -->
+<!-- RETRO-LAST-REFRESHED: 2026-07-27T12:46:50.582Z -->
 <!-- AUTO-GENERATED:END -->
