@@ -11,10 +11,38 @@
 // rebuild costs far more than the failed run. Over the token ceiling is a
 // failure too — a brief nobody notices is over budget is how the saving quietly
 // disappears.
+import { spawnSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
-import { readTasksAll } from './tasks-source.mjs'
+import { relative } from 'node:path'
+import { ARCHIVE_PATH, readTasksAll, TASKS_PATH } from './tasks-source.mjs'
 import { BriefError, buildBrief, BRIEF_TOKEN_CEILING } from './point-brief-core.mjs'
-import { CLAUDE_PATH, DESIGN_PATH, readDocCorpus } from './doc-corpus.mjs'
+import { CLAUDE_PATH, DESIGN_PATH, REPO_ROOT, readDocCorpus } from './doc-corpus.mjs'
+
+/**
+ * The git half of the brief's provenance stamp: which commit, and whether the
+ * documents it is cut from are modified on top of it. Only the SOURCE documents
+ * count for the dirty flag — a modified src/ says nothing about a brief's
+ * freshness, while a modified TASKS.md says everything.
+ *
+ * Failure is reported as unknown, never as clean: a missing git is not evidence
+ * of a pristine tree, and this line exists precisely to be trusted.
+ */
+function gitRevision() {
+  const git = (...args) =>
+    spawnSync('git', args, { cwd: REPO_ROOT, encoding: 'utf8', windowsHide: true })
+  const rel = (p) => relative(REPO_ROOT, p).split('\\').join('/')
+  try {
+    const head = git('rev-parse', '--short', 'HEAD')
+    const sources = [rel(TASKS_PATH), rel(ARCHIVE_PATH), rel(DESIGN_PATH), rel(CLAUDE_PATH), 'docs']
+    const status = git('status', '--porcelain', '--', ...sources)
+    return {
+      head: head.status === 0 ? head.stdout.trim() : null,
+      dirty: status.status === 0 ? status.stdout.trim().length > 0 : null,
+    }
+  } catch {
+    return { head: null, dirty: null }
+  }
+}
 
 const args = process.argv.slice(2)
 const number = args.find((a) => /^\d+$/.test(a))
@@ -36,6 +64,7 @@ try {
     claudeText: existsSync(CLAUDE_PATH) ? readFileSync(CLAUDE_PATH, 'utf8') : '',
     docs: readDocCorpus(),
     number,
+    revision: gitRevision(),
   })
   process.stdout.write(brief.endsWith('\n') ? brief : `${brief}\n`)
   if (showTokens || tokens > BRIEF_TOKEN_CEILING) {

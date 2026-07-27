@@ -31,6 +31,7 @@
 //
 // This module is pure: text in, text out, no I/O. scripts/point-brief.mjs is the
 // I/O wrapper (same split as doc-budget-core.mjs / doc-budget-guard.mjs).
+import { createHash } from 'node:crypto'
 
 /** Thrown for a failure the reader must see: unknown point, dangling section. */
 export class BriefError extends Error {
@@ -513,11 +514,34 @@ const HEADER = [
   '  expensive than the question.',
 ]
 
+/**
+ * Fingerprint of the work order a brief was cut from — the first 12 hex of the
+ * sha256 over the concatenated (normalised) TASKS.md + archive text.
+ *
+ * WHY a content hash and not just the commit: a brief is pasted into prompts and
+ * files and outlives its source. HEAD alone LIES here — TASKS.md is normally
+ * dirty on main, and a batch session edits it mid-run, so two briefs with the
+ * same HEAD can carry different specs. The hash is the part that cannot.
+ */
+export function workOrderFingerprint(tasksText) {
+  return createHash('sha256').update(normalise(tasksText)).digest('hex').slice(0, 12)
+}
+
+/** The one-line provenance stamp. Unknown parts are named as unknown, never faked. */
+export function formatRevisionLine({ head = null, dirty = null, workOrder = null } = {}) {
+  const dirtyMark = dirty === true ? ' +dirty' : dirty === false ? '' : ' +dirty?'
+  return (
+    `SOURCE REVISION: HEAD ${head || 'unknown'}${dirtyMark} · work-order ${workOrder || 'unknown'} — ` +
+    'a brief carries no expiry date; re-generate if either differs from the repo you are working in.'
+  )
+}
+
 /** Assemble the brief text from already-resolved parts (pure, no lookups). */
-export function assembleBrief({ point, sections = [], referenced = [], notes = [], referenceMap = [] }) {
+export function assembleBrief({ point, sections = [], referenced = [], notes = [], referenceMap = [], revision }) {
   const out = [
     `=== DELEGATION BRIEF — WORK-ORDER POINT ${point.number} (${point.done ? 'DONE/ARCHIVED' : 'OPEN'}) ===`,
     'Assembled by scripts/point-brief.mjs from the work order, design.md and the research docs.',
+    formatRevisionLine(revision ?? {}),
     '',
     ...HEADER,
     '',
@@ -573,7 +597,7 @@ export function assembleBrief({ point, sections = [], referenced = [], notes = [
  * The whole job: point number → brief text. Throws BriefError on an unknown point
  * number and on a `§` that resolves in none of the documents searched.
  */
-export function buildBrief({ tasksText, designText, claudeText = '', docs = [], number, registry }) {
+export function buildBrief({ tasksText, designText, claudeText = '', docs = [], number, registry, revision = {} }) {
   const all = parseWorkOrderPoints(tasksText)
   const point = all.find((p) => p.number === Number(number)) ?? null
   if (!point) {
@@ -694,9 +718,13 @@ export function buildBrief({ tasksText, designText, claudeText = '', docs = [], 
       `${point.number}`,
   )
 
-  const brief = assembleBrief({ point, sections: carried, referenced, notes, referenceMap })
+  // The caller supplies the git half (it needs I/O); the content half is computed
+  // here, so a brief built through the library can never lack its fingerprint.
+  const stamp = { head: null, dirty: null, ...revision, workOrder: workOrderFingerprint(tasksText) }
+  const brief = assembleBrief({ point, sections: carried, referenced, notes, referenceMap, revision: stamp })
   return {
     brief,
+    revision: stamp,
     point,
     refs,
     sections: carried,

@@ -31,6 +31,7 @@ import {
   parseWorkOrderPoints,
   pointTitle,
   resolveSectionRefs,
+  workOrderFingerprint,
 } from './point-brief-core.mjs'
 
 const ROOT = resolve(process.cwd())
@@ -414,6 +415,37 @@ describe('a bare §N that may be a CLAUDE.md §7.1 criterion (fix 2)', () => {
   })
 })
 
+describe('the SOURCE REVISION stamp (fix 3)', () => {
+  it('fingerprints the work-order CONTENT, line endings normalised', () => {
+    expect(workOrderFingerprint(ALL)).toBe(workOrderFingerprint(ALL.replace(/\n/g, '\r\n')))
+    expect(workOrderFingerprint(ALL)).not.toBe(workOrderFingerprint(`${ALL}\n- [ ] 402. New.`))
+  })
+
+  it('prints ONE header line with HEAD, the dirty flag and the fingerprint', () => {
+    const { brief } = buildBrief({ ...args, number: 401, revision: { head: 'abc1234', dirty: true } })
+    const line = brief.split('\n').find((l) => l.startsWith('SOURCE REVISION:'))
+    expect(line).toContain('HEAD abc1234 +dirty')
+    expect(line).toContain(`work-order ${workOrderFingerprint(ALL)}`)
+    expect(brief.split('\n').filter((l) => l.startsWith('SOURCE REVISION:'))).toHaveLength(1)
+  })
+
+  it('distinguishes a CLEAN tree from an UNKNOWN one — no git answer is not clean', () => {
+    const clean = buildBrief({ ...args, number: 401, revision: { head: 'abc1234', dirty: false } }).brief
+    expect(clean).toContain('HEAD abc1234 · work-order')
+    const unknown = buildBrief({ ...args, number: 401 }).brief
+    expect(unknown).toMatch(/HEAD unknown \+dirty\?/)
+  })
+
+  it('changes under the SAME HEAD when the work order was edited — the reason it exists', () => {
+    const rev = { head: 'abc1234', dirty: true }
+    const stampOf = (text) =>
+      buildBrief({ ...args, tasksText: text, number: 401, revision: rev }).brief
+        .split('\n')
+        .find((l) => l.startsWith('SOURCE REVISION:'))
+    expect(stampOf(ALL)).not.toBe(stampOf(ALL.replace('no references at all', 'no references, revised')))
+  })
+})
+
 describe('aliasesFor', () => {
   it('derives the filename, the hyphenated basename and the prose stem', () => {
     expect(aliasesFor('docs/peoples-1890.md').map((a) => a.style)).toEqual(['file', 'basename', 'stem'])
@@ -782,6 +814,15 @@ describe('faithfulness over the WHOLE work order', () => {
     }
     expect(missing).toEqual([])
     expect(flagged).toBeGreaterThan(0)
+  })
+
+  it('stamps every brief with the work order it was cut from', () => {
+    const fingerprint = workOrderFingerprint(tasksText)
+    for (const { point, result } of built) {
+      const line = result.brief.split('\n').find((l) => l.startsWith('SOURCE REVISION:'))
+      expect(line, `point ${point.number} has no revision stamp`).toBeTruthy()
+      expect(line).toContain(`work-order ${fingerprint}`)
+    }
   })
 
   it('resolves references into the research documents at all (H2)', () => {

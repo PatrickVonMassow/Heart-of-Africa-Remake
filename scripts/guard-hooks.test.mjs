@@ -376,6 +376,18 @@ describe('the CLI half of the tooling, spawned', () => {
     expect((r.stdout.match(/a filler line of specification prose\./g) ?? []).length).toBe(5000)
   })
 
+  it('stamps the brief with the revision it was cut from', () => {
+    // A brief is pasted into prompts and files and outlives its source. HEAD
+    // alone would lie here: the work order below is written on top of the last
+    // commit, exactly as TASKS.md normally is on main.
+    const r = node([resolve(repo, 'scripts', 'point-brief.mjs'), '3'])
+    const head = git('rev-parse', '--short', 'HEAD').stdout.trim()
+    const line = r.stdout.split('\n').find((l) => l.startsWith('SOURCE REVISION:'))
+    expect(line, 'the brief carries no revision stamp').toBeTruthy()
+    expect(line).toContain(`HEAD ${head} +dirty`)
+    expect(line).toMatch(/work-order [0-9a-f]{12}/)
+  })
+
   it('exits 1 on a point number that does not exist', () => {
     const r = node([resolve(repo, 'scripts', 'point-brief.mjs'), '9999'])
     expect(r.status).toBe(1)
