@@ -97,12 +97,14 @@ describe('snapshotOverlay', () => {
     expect(items[1].offScreen).toBe(true)
   })
 
-  it('skips the report modal and other dialog layers covering the scene', () => {
+  it('skips the report modal itself but keeps an ordinary dialog', () => {
     const root = build(
-      '<div class="map-label">Kilwa</div><div class="dialog-backdrop state-dump-backdrop"><h3>Game State</h3></div>',
+      '<div class="map-label">Kilwa</div>' +
+        '<div class="dialog-backdrop"><h3>Trading post</h3></div>' +
+        '<div class="dialog-backdrop state-dump-backdrop"><h3>Bug Report</h3></div>',
     )
     place('.map-label, .dialog-backdrop, h3', { x: 0, y: 0, width: 50, height: 20 })
-    expect(snapshotOverlay(root, { rectOf }).map((i) => i.text)).toEqual(['Kilwa'])
+    expect(snapshotOverlay(root, { rectOf }).map((i) => i.text)).toEqual(['Kilwa', 'Trading post'])
   })
 
   it('cuts an over-long text but keeps the entry', () => {

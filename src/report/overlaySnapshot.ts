@@ -40,8 +40,8 @@ export interface SnapshotOptions {
    *  Returning false skips the whole subtree — a hidden parent hides its
    *  children. */
   visible?: (el: Element) => boolean
-  /** Subtrees never part of the report: the report modal itself and any other
-   *  dialog covering the scene at capture time. */
+  /** Subtree never part of the report: the report modal itself. Other
+   *  dialogs and overlays STAY in — a bug can sit in one of those too. */
   skipSelector?: string
   /** Viewport the rectangles are judged against for `offScreen`. */
   viewport?: { width: number; height: number }
@@ -50,8 +50,9 @@ export interface SnapshotOptions {
   maxTextLength?: number
 }
 
-/** Dialog layers and the report modal — never the subject of the report. */
-export const DEFAULT_SKIP_SELECTOR = '.dialog-backdrop, .state-dump-backdrop, .overlay'
+/** The report modal itself — it covers the scene and is never its subject.
+ *  Everything else the player can see stays in, dialogs included. */
+export const DEFAULT_SKIP_SELECTOR = '.state-dump-backdrop'
 
 const DEFAULT_MAX_TEXT = 240
 

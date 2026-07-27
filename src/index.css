@@ -981,16 +981,43 @@ textarea {
   padding: 10px 22px;
 }
 
-/* --- State dump (design.md §21.1, F6) ------------------------------------- */
+/* --- Bug report (design.md §21.1, F6) ------------------------------------- */
 
 /* Reuses the modal dialog frame; wider, since it shows a full JSON document. */
 .state-dump {
   width: min(720px, 94vw);
 }
 
+.state-dump-label {
+  display: block;
+  margin: 6px 0 4px;
+  font-weight: 600;
+}
+
+/* Autofocused, so the user types straight into it (design.md §21.1). */
+.state-dump-description {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  background: rgba(10, 12, 18, 0.92);
+  color: inherit;
+  border: 1px solid var(--hud-border);
+  border-radius: 4px;
+  padding: 8px 10px;
+  font: inherit;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.state-dump-contents {
+  margin: 6px 0 0;
+  font-size: 13px;
+  opacity: 0.75;
+}
+
 .state-dump-json {
   margin: 8px 0 0;
-  max-height: 55vh;
+  max-height: 34vh;
   overflow: auto;
   background: rgba(10, 12, 18, 0.92);
   border: 1px solid var(--hud-border);
