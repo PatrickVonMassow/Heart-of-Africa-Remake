@@ -367,3 +367,6 @@ This record moved to design.md §19.14 on the user's decision (17.07.2026):
 it documents the game design, not the research, so design.md is its home.
 The live finding→game→verification table and its notes (incl. the standing
 keep-current rule) live there; this document remains the underlying research.
+Since 27.07.2026 (point 367) the record itself sits one document further out,
+in `docs/design-reference.md` §19.14 — same number, same text, still design
+rather than research; design.md §19.14 is the pointer to it.
