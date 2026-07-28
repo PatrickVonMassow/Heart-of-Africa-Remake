@@ -3615,6 +3615,34 @@ read that as "the criterion and its evidence section".
   guarantees in each mode) and CLAUDE.md §6, where the singleton and the launcher are
   described.
 
+- [ ] 408. A RESCUE COMMIT MUST NOT MAIL THE USER (28.07.2026, user reported the
+  inbox spam and it was earned). When a delegated agent is killed mid-build, its
+  uncommitted work is committed and pushed at once — durability first, nothing may
+  stay only local. But the branch push starts CI, CI fails on the half-finished
+  state, and GitHub mails the repository owner. That happened tonight on
+  `feat/300-gait-matches-speed`: the rescue push went red, the follow-up commit went
+  green, and in between the user got the failure mail for a state nobody claimed was
+  finished. `main` was green throughout — the noise is entirely branch-side.
+  THE FIX IS A COMMIT-MESSAGE CONVENTION, NOT A WORKFLOW CHANGE: a rescue commit
+  carries `[skip ci]` in its SUBJECT, which GitHub Actions honours for push events.
+  Durability is unaffected — the commit still exists, still pushes, still survives the
+  session — only the run (and therefore the mail) is skipped for a state that is
+  explicitly not a claim of completeness. The NEXT commit on that branch, the one
+  that finishes the work, runs CI normally.
+  WHERE IT BELONGS: CLAUDE.md §6, in the feature-branch rules beside "push after every
+  commit" — the same paragraph that demands the rescue must state its one condition.
+  ENFORCE IT, DO NOT REMEMBER IT: `scripts/git-hooks/commit-scope-guard` already
+  inspects commits. It gains one check — a commit whose message declares a rescue
+  (a `Rescue:` trailer, machine-readable) MUST carry `[skip ci]`, and one that carries
+  `[skip ci]` MUST declare why. Neither half alone is honest: an unmarked rescue mails
+  the user, and a bare `[skip ci]` on ordinary work silently skips a real gate.
+  VERIFIABLE: pure Vitest on the decision — a rescue-trailered message without
+  `[skip ci]` is rejected naming the fix, one with it passes, a `[skip ci]` without the
+  trailer is rejected, an ordinary message is untouched, and a garbled message never
+  throws (fail-open, like every guard here).
+  DOCS in the same commit: CLAUDE.md §6 as above, and `scripts/verify/README.md` where
+  the hooks are described.
+
 ## Closing (only after all points)
 
 New points are appended BEFORE this section — it stays last in the file.
