@@ -31,7 +31,12 @@ import {
   LOCK_PATH,
   IN_FLIGHT_PATH,
 } from './batch-singleton.mjs'
-import { assessInFlight, describeInFlight, IN_FLIGHT_MAX_AGE_MS } from './batch-in-flight-core.mjs'
+import {
+  assessInFlight,
+  describeInFlight,
+  selfReferentialEvidence,
+  IN_FLIGHT_MAX_AGE_MS,
+} from './batch-in-flight-core.mjs'
 
 export { IN_FLIGHT_PATH }
 
@@ -136,6 +141,23 @@ export function mtimeOf(path) {
   }
 }
 
+/** The branch this checkout has checked out, or null when it cannot be read (a
+ *  detached HEAD, or no git at all). Only used to REFUSE naming it as evidence,
+ *  so an unreadable answer refuses nothing extra. */
+export function currentBranchOf({ cwd = REPO_ROOT } = {}) {
+  try {
+    const out = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {
+      cwd,
+      encoding: 'utf8',
+      timeout: 8000,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim()
+    return out && out !== 'HEAD' ? out : null
+  } catch {
+    return null
+  }
+}
+
 // The FULL probe, not the cheap one: `cheapProbePid` answers existence only (and
 // true on EPERM), so a reused pid would keep a declaration alive on a stranger's
 // process. The start time is what makes a pid an identity.
@@ -214,6 +236,25 @@ if (isMain) {
       else if (flag === '--worktree') evidence.push({ kind: 'worktree', path: value })
       else if (flag === '--log') evidence.push({ kind: 'log', path: value })
       else fail(`unknown option "${flag}".\n${usage}`)
+    }
+    // Evidence that cannot go quiet is refused HERE (four-eyes review
+    // 28.07.2026): the repo root is git-active whenever the session runs any git
+    // command, and `main` / this checkout's own branch move on work that is not
+    // the work being waited for. Such a declaration would hold indefinitely AND
+    // silence the launcher's silent-owner report, leaving the session less
+    // observed than declaring nothing.
+    const selfReferential = selfReferentialEvidence({
+      evidence,
+      repoRoot: REPO_ROOT,
+      currentBranch: currentBranchOf(),
+    })
+    if (selfReferential.length > 0) {
+      fail(
+        'this evidence cannot go quiet, so it proves nothing:\n' +
+          selfReferential.map((p) => `  --${p.kind} ${p.value} — ${p.why}`).join('\n') +
+          '\nName what the DELEGATED work touches instead: the agent\'s own feat/… branch, its own worktree ' +
+          'path, the pid of the background run, or the log file that run writes to. Nothing recorded.',
+      )
     }
     if (evidence.length === 0) {
       fail(
