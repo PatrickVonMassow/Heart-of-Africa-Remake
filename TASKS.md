@@ -2671,52 +2671,6 @@ read that as "the criterion and its evidence section".
   targets are still reached afterwards; no walker is left standing past its window.
   DOCS: design.md §19.10 beside the existing village vignettes.
 
-- [ ] 390. THE SAND AROUND THE PYRAMIDS IS NOT WALKABLE (user 28.07.2026, screenshot from
-  the deployed build inside the Giza monument site: standing beside a pyramid, the desert
-  reaches unbroken to the horizon and the traveller cannot go out into it — "man sollte
-  über den Sand laufen können"). CAUSE: the site is a walkable DISC. `GIZA_SITE_RADIUS`
-  (`src/scenes/place/gizaSite.ts`) is 60 m, and `PlaceScene` leaves the place the moment
-  `hypot(p.x, p.z)` exceeds `layout.radius` — position-based by design (design.md §2.3,
-  no exit key). At Giza that edge falls in the MIDDLE of a flat, empty, visibly continuous
-  plain, so the picture promises ground the rules do not grant: the player either meets an
-  invisible boundary or is thrown back to the bird's-eye view while still standing on the
-  same sand.
-  THE RULE TO HOLD, stated for every place and not only for Giza: the walkable ground must
-  reach to where the PICTURE stops offering ground. Where the surroundings are a built or
-  broken edge (a village's fence line, a port's quay, a slope) the disc may end there,
-  because the eye reads a boundary. Where the surroundings are an open plain that continues
-  unbroken — the desert sites are that case — the disc must extend far enough that a player
-  walking outward meets the transition as a DISTANCE, not as a wall a few strides from the
-  monument.
-  DO IT IN THIS ORDER. (1) MEASURE, do not guess: from the site centre, at the in-game eye
-  height, find the distance at which the drawn ground stops being flat open sand — the
-  backdrop ring and the §2.5 panorama band are the reference (`panoramaStandY` /
-  `discHorizonY` in `src/scenes/place/backdrop.ts`), and point 381 already pins that the
-  backdrop meets the disc edge with no seam. Record the number. (2) RAISE the desert
-  monument radius to that measured distance rather than to a round guess, and check what it
-  costs: the disc carries ground detail, flora scatter and the walker errand grid, so
-  report the frame time at the new radius on BOTH backends (the F8 benchmark does not route
-  through settlements — measure with the FPS counter at the site, at LOW and at MEDIUM). If
-  the cost is real, cap the radius at what the measurement affords and SAY SO with the
-  number, rather than quietly leaving the wall closer than the picture promises. (3) The
-  EXIT must stay findable: a player who walks outward has to reach the bird's-eye view
-  without a hunt, so keep the position-based rule and, if the radius grows large, decide
-  whether the §17.4 hint layer should name the direction. Do NOT add an exit key — the
-  movement-based switch is design.md §2.3 and is not up for revision here.
-  BEWARE THE COUPLED RULES, each already enforced elsewhere: the backdrop must still meet
-  the ground with no hole and no unlit face at the new radius (point 381 —
-  `src/scenes/place/backdrop.test.ts` sweeps a set of disc radii, add the new one), the
-  panorama silhouettes stand on the higher of backdrop relief and the visible ground line
-  (point 181) and must not end up inside the walkable area, and the settlement-entry disc
-  separation between Giza and Cairo (`src/scenes/travel/settlementEntry.test.ts`) is a
-  BIRD'S-EYE distance untouched by the site radius — do not "fix" it.
-  VERIFIABLE: pure Vitest — the desert monument radius equals the measured open-plain
-  distance (one constant, derived rather than written twice), and the backdrop sweep covers
-  it. Plus the picture on BOTH backends: a frame from the site centre looking outward and
-  one taken at the new edge, showing that the ground the player stands on runs to where the
-  backdrop takes over.
-  DOCS in the same commit: the `GIZA_SITE_RADIUS` comment states its measured basis, and
-  `docs/acceptance-evidence.md` §15 gains the chain.
 - [ ] 362. THE CROSSING TURNED BACK — the crocodile takes a calf mid-channel
   (user 26.07.2026; design.md §19.8 states the target). Two systems exist and have
   never met: the purposeful water crossing (`crossingTarget`/`shouldStartCrossing`
