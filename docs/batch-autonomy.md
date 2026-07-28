@@ -170,8 +170,8 @@ Three changes, and none of them loosens the singleton:
      reached only after a fresh session-bound marker, a point the work order
      confirms closed and an armed launcher. A crash, a wedge or an ordinary turn
      end never reaches it.
-   - It is **withdrawn the moment the session shows life again**: `heartbeat()`
-     deletes the fields on every tool call, a PreToolUse withdrawal (piggy-backed
+   - It is **withdrawn the moment the session goes back to WORK**: `heartbeat()`
+     deletes the fields on a tool call, a PreToolUse withdrawal (piggy-backed
      on `board-first-guard`, whose matcher already covers every state-changing
      tool) clears it BEFORE a long call starts, and the UserPromptSubmit hook
      clears it on the user's first word — earlier than any tool call, and it
@@ -179,6 +179,8 @@ Three changes, and none of them loosens the singleton:
      Stop hooks run after `batch-progress-guard` and several can block: the
      session's first act after such a block may be one 40-minute verification,
      during which no heartbeat would land (four-eyes review, findings 1 and 4).
+   - …but NOT by the work those guards DEMANDED (live finding 2, below): the
+     handover and its marker survive a call confined to the CLOSING SET.
    - While the process is still alive the successor waits `HANDOVER_GRACE_MS`
      (15 minutes, one full launcher tick). A headless `claude -p` exits and is
      taken over at once by the ordinary dead-pid path, so the grace only ever
@@ -195,6 +197,25 @@ Three changes, and none of them loosens the singleton:
    kills the launcher's OWN headless spawn is left standing (four-eyes review,
    finding 5) — it can never catch a verify run, and an unattended `claude -p`
    that hangs has nobody to read a notification.
+
+### What the first live run found (28.07.2026)
+
+The mechanism above ran for a morning and produced three boundary stops, none of
+which handed anything over. The evidence is in `.claude/boundary.log`; each
+finding and its fix:
+
+| # | What the log shows | Why | Fix |
+| --- | --- | --- | --- |
+| 1 | `FAIL-OPEN: the guard errored and allowed the stop (EPERM … rename batch-lock.json.tmp-<pid> -> batch-lock.json)`, five times | The guard rewrote the lock three times within milliseconds (acquire's heartbeat, an explicit heartbeat, `markHandover`) and a scanner still held the file the previous rename had replaced. The throw escaped into the fail-open catch — with the marker ALREADY consumed | The redundant heartbeat is gone; the write retries over a short backoff (`scripts/atomic-write.mjs`) and stays atomic; `markHandover` reports instead of throwing; the marker is consumed only if the handover landed; and a failure is stated in the same breath as the allow, so a session never stops believing it passed the batch on |
+| 2 | `HANDOVER point 378` at 08:56:12, `WITHDRAWN point 378` at 08:56:16 — twice | The Stop chain sent the session back for a timestamp, a review record, a dashboard republish, and each round un-took the handover. A boundary that survives only a turn with nothing left to do is not a mechanism | The withdrawal distinguishes work that CONTINUES the batch from work a Stop guard DEMANDED: a call confined to the CLOSING SET (the board, the review ledger, the work order's own entry, the boundary's own bookkeeping, and the scripts that satisfy those guards) carries the handover AND its marker forward; anything else ends both. Narrow on purpose — an unknown tool, an unparseable command or one non-closing segment in a chain all withdraw (`handoverSurvivesCall`) |
+| 3 | `WITHDRAWN point 388 by s1` — `s1` is a TEST session id | The unit suite reached into the live `.claude/`: `withdrawHandover` defaulted its log path to the repo while the test had redirected only the lock. The pre-push gate runs that suite on every push | Every state file is derived from the caller's lock path (`statePathsFor`), so a redirected lock redirects the whole family; a pure test pins that none of them lands in the repository |
+| 4 | the marker consumed while the lock kept no flag | Suspected a compaction renaming the session id under the lock. The evidence did NOT support it — the consumed marker proves ownership resolved fine, and #1 explains the state completely | Kept as a HARDENING, not a fix: ownership resolves on the recorded process when the id no longer matches, and re-stamps the lock. It cannot widen — the pid must be our own ancestor with a matching start time, so a second window is still a second window, and an unestablished ancestry falls back to the id |
+
+The marker's lifecycle follows from #2: it is no longer consumed by the stop it
+authorises, so a blocked turn end leaves the session something to stop on. What
+retires it is the withdrawal, or the session's own `SessionEnd`
+(`clearOwnBoundary`) — a successor must never meet a marker naming a point it
+did not close.
 
 **Known residuals, named rather than hidden.** A delegated agent still in flight
 at a handover can wake the old session after the successor has spawned; its tool
