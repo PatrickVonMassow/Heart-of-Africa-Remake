@@ -29,6 +29,15 @@
 // ticks in a row. The handover is written HERE and nowhere else: only this branch
 // has established a fresh session-bound marker, a verifiably closed point and an
 // armed launcher. A crash, a wedge or an ordinary turn end never reaches it.
+// WAITING IS NOT IDLING (28.07.2026, point 388, fifth live finding): this guard
+// could not see work it had HANDED OUT. With three delegated agents building and
+// a browser suite running, it blocked eight turn ends in a row demanding the next
+// queue item — which the session could not start (pool at its cap, the suite on
+// the machine the next item needed), so eight replies reached nobody. A session
+// may now DECLARE what it waits on (scripts/batch-in-flight.mjs) and the stop is
+// allowed while a probe still confirms that work is running. It is not a way off
+// the block: the declaration expires, its evidence is re-proved every turn end,
+// and the lock stays HELD, so nothing is handed over to anyone.
 // Format-safe: a TASKS.md whose checkboxes no longer parse blocks with a warning
 // instead of silently reading "complete". Fail-open on any error.
 import { appendFileSync, readFileSync } from 'node:fs'
@@ -44,6 +53,8 @@ import {
 } from './batch-singleton.mjs'
 import { gatherBoundary } from './batch-boundary.mjs'
 import { LAUNCHER_TASK_NAME } from './batch-boundary-core.mjs'
+import { gatherInFlight } from './batch-in-flight.mjs'
+import { describeInFlight } from './batch-in-flight-core.mjs'
 import { isPaused } from './batch-lock.mjs'
 
 const TASKS = fileURLToPath(new URL('../TASKS.md', import.meta.url))
@@ -144,6 +155,18 @@ try {
     }
   }
 
+  // Declared in-flight work (point 388, fifth live finding) — gathered only for
+  // the owner, and it returns before any probe runs when nothing is declared, so
+  // an ordinary turn end pays nothing for it.
+  let inFlight = { live: false, reason: 'not-gathered', summary: '', declaration: null }
+  if (ownership === 'mine' || ownership === 'acquired') {
+    try {
+      inFlight = gatherInFlight(sid)
+    } catch {
+      /* an unreadable declaration is simply no declaration → the ordinary block */
+    }
+  }
+
   const decision = progressGuardDecision({
     sid,
     paused,
@@ -154,7 +177,25 @@ try {
     boundary: bound.boundary,
     launcher: bound.launcher,
     boundaryDue: bound.due,
+    inFlight: inFlight.live === true,
   })
+
+  if (decision === 'allow-in-flight') {
+    // The stop is allowed because the session is WAITING, and it says on what —
+    // in the log and to the session — so a later reader of the transcript can see
+    // why the turn ended instead of guessing at another silent stop.
+    const what = describeInFlight(inFlight, inFlight.declaration)
+    record(`WAIT by ${sid} — stop allowed while declared work runs: ${what}`)
+    warn(
+      `THE BATCH IS WAITING, NOT IDLE: ${what}. This turn may end; the batch lock stays HELD and nothing was ` +
+        `handed over, so no successor will be spawned beside you. The declaration stops holding the moment any ` +
+        `of that evidence stops checking out, and it expires on its own — so when the work lands, ACT on it ` +
+        `(merge the agent, read the suite result), then either re-declare what is still running ` +
+        `(\`node scripts/batch-in-flight.mjs --waiting-on …\`) or clear it (\`--clear\`).` +
+        (bound.due ? ` Note: the boundary for point ${bound.due} is still DUE — take it once the wait is over.` : ''),
+    )
+    process.exit(0)
+  }
 
   if (decision === 'allow-boundary') {
     // HAND THE BATCH OVER (point 388). Waiting for the old process to die was
@@ -205,7 +246,10 @@ try {
         `\`node scripts/batch-boundary.mjs ${bound.due}\` and then stop — the batch is passed to a fresh session ` +
         `that the OS task starts and batch-resume-hook re-orients, which is how the context cost stays down. ` +
         `(b) If work is still in flight (an agent pool draining, a verification running, the merge unfinished), ` +
-        `CONTINUE it in this turn — poll, never idle — and take the boundary when it is done.`,
+        `CONTINUE it in this turn — poll, never idle — and take the boundary when it is done. If you cannot ` +
+        `poll it inside this turn, DECLARE the wait instead: \`node scripts/batch-in-flight.mjs --waiting-on ` +
+        `"<what>" --branch <agent branch> --pid <background run> --log <its log>\`. The stop is then allowed ` +
+        `while a probe still finds that work running — and blocked again the moment it does not.`,
     )
   }
 
@@ -255,6 +299,11 @@ try {
       `is running, WAIT by POLLING within this turn (read the log file / TaskOutput), never by ending the ` +
       `turn to idle. Keep the dashboard current as you go. The batch went idle for HOURS after silent ` +
       `stops; that must not recur. The legitimate ways to end this turn: (a) every point is done; ` +
+      `(a2) you are WAITING on work already handed out that you cannot poll further in this turn — a ` +
+      `delegated agent still building, a suite occupying the machine: DECLARE it with \`node ` +
+      `scripts/batch-in-flight.mjs --waiting-on "<what>" --branch <agent branch> --worktree <its worktree> ` +
+      `--pid <background run> --log <its log>\` and the stop is allowed while a probe still finds that work ` +
+      `alive (it expires, and one dead item ends it — so act as soon as the work lands); ` +
       `(b) the user asked you to stop — then create .claude/batch-paused and stop; (c) you have just ` +
       `MERGED AND TICKED a point, and NO delegated agent is still in flight — that is a POINT BOUNDARY, so ` +
       `END THE SESSION instead of pulling the next point into this context (the context is the batch's ` +

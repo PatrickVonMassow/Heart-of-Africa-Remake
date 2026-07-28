@@ -1,0 +1,158 @@
+// DECLARING WORK THAT IS IN FLIGHT (point 388, fifth live finding 28.07.2026) —
+// the decision half, pure and dependency-injected.
+//
+// WHY: `batch-progress-guard` cannot see work that has been HANDED OUT. On
+// 28.07.2026 a session with three delegated agents building and a browser suite
+// running tried to end its turn eight times in a row and was blocked every time
+// with "DO NOT STOP THE BATCH — continue the NEXT queue item now". It could not:
+// the agent pool was at its cap and the next item needed the machine the suite
+// was using. The guard's own text names polling as the sanctioned way to wait,
+// but a polling session satisfies nothing it checks — so eight replies were
+// written that reached nobody. The batch was not idle; the guard had no way to
+// know.
+//
+// THE SHAPE, deliberately the one `prep-guard --prepped` already uses: the
+// session DECLARES what it is waiting on, and the guard allows the stop while
+// that work is PROVABLY still running. It is emphatically NOT a way to switch the
+// block off — that block exists because the batch stood still for five and a half
+// hours on the night of 28.07.2026, and an abandoned wait must not become an idle
+// night. Three properties keep the two apart:
+//
+//   1. EVIDENCE, NOT ASSERTION. A declaration names things a probe can answer:
+//      a background pid that must still be alive, a branch that must exist, a
+//      worktree directory that must exist, a log file that must have been written
+//      to recently. Nothing here takes the session's word for anything.
+//   2. ALL of it must check out, not some. When one of three agents finishes, the
+//      declaration stops holding and the guard blocks again — which is right: the
+//      finished agent's work is now the session's next action (merge it), and
+//      re-declaring the remaining two is one command. Erring the other way would
+//      let a session sleep behind an evidence list it long outgrew.
+//   3. IT EXPIRES. Past `IN_FLIGHT_MAX_AGE_MS` the guard blocks exactly as
+//      before, whatever the declaration says and however live its evidence looks.
+//      A wait that outlives the work it was declared for is an idle night with
+//      paperwork.
+//
+// Where the two verdicts are close, this file chooses the BLOCK: a wrong block
+// costs one command, a wrong allow cost five and a half hours.
+import { resolveOwnership } from './batch-singleton.mjs'
+
+/** How old a declaration may be before the guard stops honouring it. Wide enough
+ *  for a LARGE browser regression or a delegated agent building a point (both run
+ *  well past half an hour), short enough that a forgotten declaration cannot
+ *  cover a night. Calibratable via HOA_IN_FLIGHT_MAX_MIN (scripts/batch-in-flight.mjs). */
+export const IN_FLIGHT_MAX_AGE_MS = 45 * 60 * 1000
+
+/** How recently a declared LOG file must have been written to count as proof that
+ *  the run behind it is alive. A suite that has not appended a line in this long
+ *  is not something to keep waiting on without saying so again. */
+export const LOG_FRESH_MS = 15 * 60 * 1000
+
+/** The evidence kinds a probe can actually answer. An unknown kind is never
+ *  "assume fine": it fails, and the declaration with it. */
+export const EVIDENCE_KINDS = ['pid', 'branch', 'worktree', 'log']
+
+/**
+ * ONE piece of evidence, checked. PURE — every probe is injected:
+ *   probePid  — (pid) => { exists: boolean }        (scripts/batch-singleton.mjs)
+ *   refExists — (ref) => boolean                    (git show-ref)
+ *   dirExists — (path) => boolean
+ *   mtimeOf   — (path) => number|null               (epoch ms, null when absent)
+ *
+ * Returns { ok, kind, describe, detail } — `describe` is what the guard's allow
+ * message says out loud, so a later reader of the transcript can see what the
+ * turn ended on.
+ */
+export function checkEvidence(item, { now, probePid, refExists, dirExists, mtimeOf, logFreshMs = LOG_FRESH_MS } = {}) {
+  const kind = String(item?.kind ?? '')
+  const label = typeof item?.label === 'string' && item.label.trim() ? ` (${item.label.trim()})` : ''
+  const no = (describe, detail) => ({ ok: false, kind, describe, detail })
+  const yes = (describe, detail) => ({ ok: true, kind, describe, detail })
+
+  if (kind === 'pid') {
+    const pid = Number(item.pid)
+    if (!Number.isInteger(pid) || pid <= 0) return no(`pid ${item.pid}${label}`, 'not-a-pid')
+    const alive = !!probePid && probePid(pid).exists === true
+    return alive ? yes(`pid ${pid}${label}`, 'alive') : no(`pid ${pid}${label}`, 'process-gone')
+  }
+  if (kind === 'branch') {
+    const ref = String(item.ref ?? '').trim()
+    if (!ref) return no(`branch ?${label}`, 'no-ref')
+    const there = !!refExists && refExists(ref) === true
+    return there ? yes(`branch ${ref}${label}`, 'exists') : no(`branch ${ref}${label}`, 'branch-gone')
+  }
+  if (kind === 'worktree') {
+    const path = String(item.path ?? '').trim()
+    if (!path) return no(`worktree ?${label}`, 'no-path')
+    const there = !!dirExists && dirExists(path) === true
+    return there ? yes(`worktree ${path}${label}`, 'exists') : no(`worktree ${path}${label}`, 'worktree-gone')
+  }
+  if (kind === 'log') {
+    const path = String(item.path ?? '').trim()
+    if (!path) return no(`log ?${label}`, 'no-path')
+    const mtime = mtimeOf ? mtimeOf(path) : null
+    if (typeof mtime !== 'number') return no(`log ${path}${label}`, 'log-missing')
+    const idle = now - mtime
+    const fresh = Number.isFinite(item.freshMs) && item.freshMs > 0 ? item.freshMs : logFreshMs
+    return idle <= fresh
+      ? yes(`log ${path}${label}`, `written ${Math.round(idle / 1000)}s ago`)
+      : no(`log ${path}${label}`, `silent for ${Math.round(idle / 60000)} min`)
+  }
+  return no(`${kind || 'unnamed'}${label}`, 'unknown-kind')
+}
+
+/**
+ * IS THE DECLARED WORK PROVABLY STILL RUNNING? PURE.
+ *
+ * Inputs:
+ *   declaration — the parsed marker, or null
+ *   sid         — the session id the Stop hook was called with
+ *   ancestor    — { pid, startedAt } of the claude process we run under, or null.
+ *                 Ownership is resolved by `resolveOwnership` — the SAME notion
+ *                 the lock uses — so a context compaction that mints a new
+ *                 session id does not orphan a declaration this very process
+ *                 wrote, while a genuinely second window still fails it.
+ *   now, maxAgeMs, and the four probes of `checkEvidence`.
+ *
+ * Returns { live, reason, ageMs, summary, items }. `live` true is the ONLY value
+ * that may relax the block; every other path leaves the guard exactly as it was.
+ */
+export function assessInFlight({
+  declaration,
+  sid,
+  ancestor = null,
+  now,
+  maxAgeMs = IN_FLIGHT_MAX_AGE_MS,
+  ...probes
+} = {}) {
+  const out = (live, reason, extra = {}) => ({ live, reason, ageMs: null, summary: '', items: [], ...extra })
+  if (!declaration || typeof declaration !== 'object') return out(false, 'no-declaration')
+  if (typeof declaration.at !== 'number') return out(false, 'malformed')
+
+  // Only for the session that WROTE it — and by the lock's own identity rules,
+  // never a second notion of liveness invented here.
+  const owner = resolveOwnership({ lock: declaration, sessionId: sid, ancestor })
+  if (!owner.mine) return out(false, `not-mine:${owner.via}`)
+
+  const ageMs = now - declaration.at
+  // A declaration from the future is a clock the guard cannot reason about →
+  // block. Costs one re-declaration; the other direction costs a night.
+  if (!(ageMs >= 0)) return out(false, 'clock-skew', { ageMs })
+  if (ageMs > maxAgeMs) return out(false, 'expired', { ageMs })
+
+  const evidence = Array.isArray(declaration.evidence) ? declaration.evidence : []
+  if (evidence.length === 0) return out(false, 'no-evidence', { ageMs })
+
+  const items = evidence.map((e) => checkEvidence(e, { now, ...probes }))
+  const dead = items.filter((i) => !i.ok)
+  const summary = items.map((i) => `${i.describe} — ${i.detail}`).join('; ')
+  if (dead.length > 0) return out(false, 'evidence-gone', { ageMs, summary, items })
+  return out(true, 'live', { ageMs, summary, items })
+}
+
+/** The one line the guard puts in the boundary log and in its allow message. */
+export function describeInFlight(assessment, declaration) {
+  const what = declaration?.waitingOn ? String(declaration.waitingOn) : 'in-flight work'
+  const mins = Number.isFinite(assessment?.ageMs) ? Math.round(assessment.ageMs / 60000) : null
+  const age = mins === null ? '' : ` (declared ${mins} min ago)`
+  return `${what}${age}: ${assessment?.summary || 'no evidence'}`
+}

@@ -229,6 +229,63 @@ And for the first time `acquire()` reaps a lock whose owner can still write: a
 delayed `heartbeat()` rename can clobber a freshly created pending-spawn lock, a
 millisecond-wide race that both traced interleavings self-heal (finding 3).
 
+### Waiting is not idling — declaring work that is in flight (fifth live finding)
+
+The guard can see the work order, the lock and the launcher. It could not see work
+the session had **handed out**. On 28.07.2026, with three delegated agents
+building and a browser suite occupying the machine, every attempt to end the turn
+was met with *"DO NOT STOP THE BATCH — continue the NEXT queue item now"*, eight
+times in a row. The queue item could not be continued (the pool was at its cap and
+the next item needed the machine the suite was using) and the turn could not end,
+so the session wrote eight replies that reached nobody. Its own text names polling
+as the sanctioned way to wait, but nothing a polling session does satisfies it.
+
+So the session may now **declare** what it is waiting on, in the shape
+`prep-guard --prepped` already uses:
+
+```
+node scripts/batch-in-flight.mjs --waiting-on "<what>" \
+     [--pid <background process>] [--branch <agent branch>] \
+     [--worktree <agent worktree>] [--log <file the run writes to>]
+node scripts/batch-in-flight.mjs --status    # what the Stop hook would decide
+node scripts/batch-in-flight.mjs --clear     # the wait is over
+```
+
+`batch-progress-guard` then returns `allow-in-flight` instead of
+`block-continue`/`block-take-boundary`, and **says in the allow what it is waiting
+on** (and in `.claude/boundary.log` as a `WAIT` line), so a later reader of the
+transcript can see why the turn ended. It does not touch the lock: a waiting
+session is still the working session, the launcher keeps seeing a live owner and
+no successor is spawned beside it.
+
+It is deliberately not a way off the block — the five-and-a-half-hour standstill
+is what that block exists for. Four properties keep an abandoned wait from
+becoming an idle night:
+
+| property | how |
+| --- | --- |
+| **Evidence, not assertion** | Every item is answered by a probe: a `pid` must pass a real signal-0 probe (`cheapProbePid`), a `branch` must resolve (`git rev-parse --verify`), a `worktree` must be an existing directory, a `log` must have been written to within `LOG_FRESH_MS` (15 min, per-item overridable). An unknown kind never passes — an unanswerable claim is not evidence. Declaring is verified up front, so a typo fails at the command, not at a turn end |
+| **All of it, not some** | One finished agent ends the declaration. That is the point: the finished agent's work is now the session's next action, and re-declaring the rest is one command |
+| **It expires** | `IN_FLIGHT_MAX_AGE_MS` (45 min, `HOA_IN_FLIGHT_MAX_MIN` to tune). Past it the guard blocks exactly as before, whatever the declaration says and however live its evidence looks |
+| **Ownership, by the lock's own rules** | Honoured only for the session that holds the batch lock **and** wrote the declaration — resolved by `resolveOwnership`, the same function the lock uses, so a context compaction that mints a new session id keeps it while a genuinely second window fails it. No second notion of liveness was invented for this |
+
+What it never overrides: a parallel-session alert (remediation cannot wait on an
+agent), an unarmed launcher, or a boundary already taken. A due boundary it does
+pass — ending mid-flight would throw the agents' work away — and the allow says so,
+naming the point still to be taken once the wait is over.
+
+Strength differs by kind, and the choice is the session's: a `pid` or a `log`
+proves a run is alive right now; a `branch` or a `worktree` only proves the work
+was set up, and it is the expiry plus the cleanup at merge that bound them. Prefer
+a pid or a log where one exists; declare a worktree for a delegated agent, which
+has no pid of its own.
+
+Decision logic: `scripts/batch-in-flight-core.mjs` (pure, dependency-injected,
+Vitest-covered in `scripts/batch-in-flight-core.test.mjs`). IO and probes:
+`scripts/batch-in-flight.mjs`. The marker is `.claude/batch-in-flight.json`,
+derived from the caller's lock path via `statePathsFor`, so a redirected lock
+redirects it too (finding 3).
+
 ### Observing one handover end to end
 
 Every part of this worked on the night it failed, so the acceptance is not a green
