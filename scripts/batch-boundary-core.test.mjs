@@ -9,10 +9,13 @@
 import { describe, it, expect } from 'vitest'
 import {
   BOUNDARY_FRESH_MS,
+  BOUNDARY_DUE_MS,
   assessBoundary,
+  boundaryDueFrom,
   boundaryVerdict,
   classifyLauncherState,
   pointClosure,
+  tickedPointsInDiff,
 } from './batch-boundary-core.mjs'
 import { progressGuardDecision } from './batch-singleton.mjs'
 
@@ -205,5 +208,78 @@ describe('progressGuardDecision at a point boundary (the point-373 witnesses)', 
     expect(
       progressGuardDecision({ ...base, formatSuspect: true, boundary: closed, launcher: 'armed' }),
     ).toBe('block-format')
+  })
+
+  // --- point 388: the boundary is TAKEN, not offered -------------------------
+  it('BLOCKS a closed point with no marker, and says so as its own verdict', () => {
+    expect(progressGuardDecision({ ...base, boundaryDue: 387 })).toBe('block-take-boundary')
+  })
+
+  it('a REAL marker still outranks the reminder', () => {
+    expect(progressGuardDecision({ ...base, boundary: closed, launcher: 'armed', boundaryDue: 373 })).toBe(
+      'allow-boundary',
+    )
+  })
+
+  it('the reminder never overrides a stand-down, a pause or a remediation', () => {
+    expect(progressGuardDecision({ ...base, ownership: 'held', boundaryDue: 387 })).toBe('stand-down')
+    expect(progressGuardDecision({ ...base, paused: true, boundaryDue: 387 })).toBe('allow')
+    expect(progressGuardDecision({ ...base, unhandledAlert: true, boundaryDue: 387 })).toBe('block-remediate')
+    expect(progressGuardDecision({ ...base, formatSuspect: true, boundaryDue: 387 })).toBe('block-format')
+  })
+
+  it('a junk due value falls back to the ordinary block', () => {
+    for (const bad of [null, 0, -3, '387', 1.5]) {
+      expect(progressGuardDecision({ ...base, boundaryDue: bad })).toBe('block-continue')
+    }
+  })
+})
+
+// ---------------------------------------------------------------------------
+describe('tickedPointsInDiff — a tick, not the archive housekeeping', () => {
+  it('reads the points a commit newly ticked', () => {
+    expect(tickedPointsInDiff('+- [x] 386. A thing\n+- [x] 387. Another\n context')).toEqual([386, 387])
+  })
+
+  it('ignores an open point and a mere mention', () => {
+    expect(tickedPointsInDiff('+- [ ] 390. Still open\n+see - [x] 12. in the prose')).toEqual([])
+  })
+
+  it('MOVING an already-ticked point into the archive is not a fresh close', () => {
+    const move = '--- a/TASKS.md\n-- [x] 380. Older point\n+++ b/docs/tasks-archive.md\n+- [x] 380. Older point'
+    expect(tickedPointsInDiff(move)).toEqual([])
+  })
+
+  it('a commit that ticks one point while archiving another reports only the tick', () => {
+    expect(tickedPointsInDiff('-- [x] 380. moved\n+- [x] 380. moved\n+- [x] 388. closed now')).toEqual([388])
+  })
+})
+
+// ---------------------------------------------------------------------------
+describe('boundaryDueFrom — only for a point THIS session closed, and only while fresh', () => {
+  const ownerSince = NOW - 3 * 3600_000
+
+  it('a point ticked during this ownership, minutes ago → due', () => {
+    expect(boundaryDueFrom({ tick: { point: 388, at: NOW - 60_000 }, ownerSince, now: NOW })).toBe(388)
+  })
+
+  it('THE PING-PONG GUARD: a successor is never sent home for its predecessor\'s tick', () => {
+    // The launcher spawns a fresh session minutes after the previous one ticked.
+    // Without this rule it would take a boundary for a point it never closed and
+    // end having done nothing — session ping-pong instead of work.
+    expect(boundaryDueFrom({ tick: { point: 388, at: NOW - 20 * 60_000 }, ownerSince: NOW - 60_000, now: NOW })).toBe(
+      null,
+    )
+  })
+
+  it('an old tick stops nagging — a session an hour and a half on has moved to other work', () => {
+    expect(boundaryDueFrom({ tick: { point: 388, at: NOW - BOUNDARY_DUE_MS - 1 }, ownerSince, now: NOW })).toBe(null)
+  })
+
+  it('no tick, an unusable tick or an unknown ownership start → nothing', () => {
+    expect(boundaryDueFrom({ tick: null, ownerSince, now: NOW })).toBe(null)
+    expect(boundaryDueFrom({ tick: { point: 0, at: NOW }, ownerSince, now: NOW })).toBe(null)
+    expect(boundaryDueFrom({ tick: { point: 388, at: 'yesterday' }, ownerSince, now: NOW })).toBe(null)
+    expect(boundaryDueFrom({ tick: { point: 388, at: NOW - 60_000 }, ownerSince: undefined, now: NOW })).toBe(null)
   })
 })

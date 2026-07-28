@@ -25,10 +25,16 @@ import {
   readOwnerLock,
   heldByOtherLiveOwner,
   convertPendingSpawn,
+  markHandover,
+  withdrawHandover,
+  wedgeNotifyDecision,
+  wedgeOwnerKey,
   DEAD_CONFIRM_MS,
   LEGACY_STALE_MS,
   WEDGED_MS,
   PARALLEL_FRESH_MS,
+  HANDOVER_GRACE_MS,
+  WEDGE_NOTIFY_MS,
 } from './batch-singleton.mjs'
 
 const NOW = 1_784_900_000_000
@@ -104,6 +110,118 @@ describe('assessOwner (liveness = heartbeat AND real pid, never age alone)', () 
 
   it('no lock → dead (free to claim)', () => {
     expect(assessOwner(null, { now: NOW, bootTime: BOOT, probe: null }).alive).toBe(false)
+  })
+
+  // --- THE HANDOVER (point 388) ---------------------------------------------
+  // The night of 28.07.2026: the turn ended at a permitted boundary, the process
+  // lived on, the lock stayed held and the launcher skipped 21 ticks. A handover
+  // is the ONE case where a live pid does not mean a live owner — and it must
+  // never widen into the age heuristic that caused the e9407cae incident.
+  const handed = (over = {}) =>
+    lock({ claimedAt: NOW - 60_000, handedOver: true, handedOverAt: NOW - 60_000 + 1, ...over })
+
+  it('a handed-over lock whose process has ALREADY exited is free at once', () => {
+    const a = assessOwner(handed(), { now: NOW, bootTime: BOOT, probe: deadProbe })
+    expect(a.alive).toBe(false)
+    expect(a.reason).toBe('handed-over')
+    expect(spawnDecision(a)).toBe('spawn')
+  })
+
+  it('a handed-over lock with a LIVE process waits out the grace, then frees', () => {
+    const at = NOW - HANDOVER_GRACE_MS + 60_000 // handed over, grace not yet elapsed
+    const inGrace = assessOwner(handed({ claimedAt: at - 1, handedOverAt: at }), {
+      now: NOW,
+      bootTime: BOOT,
+      probe: aliveProbe,
+    })
+    expect(inGrace.alive).toBe(true)
+    expect(inGrace.reason).toBe('handover-grace')
+    expect(spawnDecision(inGrace)).toBe('skip-alive')
+
+    const past = NOW - HANDOVER_GRACE_MS - 1000
+    const elapsed = assessOwner(handed({ claimedAt: past - 1, handedOverAt: past }), {
+      now: NOW,
+      bootTime: BOOT,
+      probe: aliveProbe,
+    })
+    expect(elapsed.alive).toBe(false)
+    expect(elapsed.reason).toBe('handed-over')
+  })
+
+  it('THE SAFETY INVARIANT: a session that kept working WITHDRAWS its own handover', () => {
+    // A later Stop hook in the chain blocked the turn end, the session carried on
+    // and its PostToolUse heartbeat stamped claimedAt past the handover. The lock
+    // must read ALIVE again — no successor may be spawned beside a working session.
+    const at = NOW - 30 * 60_000
+    const a = assessOwner(handed({ handedOverAt: at, claimedAt: at + 1000 }), {
+      now: NOW,
+      bootTime: BOOT,
+      probe: aliveProbe,
+    })
+    expect(a.alive).toBe(true)
+    expect(a.reason).toBe('pid-alive')
+    expect(spawnDecision(a)).toBe('skip-alive')
+  })
+
+  it('a half-written or forged handover flag alone frees nothing', () => {
+    for (const bad of [{ handedOver: true, handedOverAt: undefined }, { handedOver: 'yes' }, { handedOver: false }]) {
+      const a = assessOwner(lock({ claimedAt: NOW - 30 * 60_000, ...bad }), {
+        now: NOW,
+        bootTime: BOOT,
+        probe: aliveProbe,
+      })
+      expect(a.alive).toBe(true)
+    }
+  })
+
+  it('a CRASH and a WEDGE still hold the lock — only a taken boundary hands it over', () => {
+    const crashed = assessOwner(lock({ claimedAt: NOW - 30 * 60_000 }), { now: NOW, bootTime: BOOT, probe: aliveProbe })
+    expect(crashed.alive).toBe(true)
+    const wedged = assessOwner(lock({ claimedAt: NOW - WEDGED_MS - 60_000 }), {
+      now: NOW,
+      bootTime: BOOT,
+      probe: aliveProbe,
+    })
+    expect(wedged.alive).toBe(true)
+    expect(spawnDecision(wedged)).toBe('skip-wedged')
+  })
+})
+
+// ---------------------------------------------------------------------------
+describe('wedgeNotifyDecision (point 388 (c): diagnose AND report, once per silence)', () => {
+  const key = 'owner-1#4242#1000'
+
+  it('reports an alive owner past the threshold', () => {
+    expect(wedgeNotifyDecision({ alive: true, ageMs: WEDGE_NOTIFY_MS, ownerKey: key }).notify).toBe(true)
+  })
+
+  it('stays quiet below the threshold — a long verify run is not a wedge', () => {
+    const d = wedgeNotifyDecision({ alive: true, ageMs: 40 * 60_000, ownerKey: key })
+    expect(d.notify).toBe(false)
+    expect(d.reason).toBe('below-threshold')
+  })
+
+  it('does not repeat itself for the same silence, tick after tick', () => {
+    const d = wedgeNotifyDecision({ alive: true, ageMs: 5 * 3600_000, ownerKey: key, lastNotifiedKey: key })
+    expect(d.notify).toBe(false)
+    expect(d.reason).toBe('already-notified')
+  })
+
+  it('but reports a SECOND stall of the same session — the key carries the heartbeat it fell silent at', () => {
+    const first = wedgeOwnerKey({ sessionId: 'owner-1', pid: 4242, claimedAt: 1000 })
+    const second = wedgeOwnerKey({ sessionId: 'owner-1', pid: 4242, claimedAt: 9_000_000 })
+    expect(first).not.toBe(second)
+    expect(wedgeNotifyDecision({ alive: true, ageMs: 5 * 3600_000, ownerKey: second, lastNotifiedKey: first }).notify).toBe(true)
+  })
+
+  it('says nothing about a dead owner (the launcher simply takes over) or a nameless lock', () => {
+    expect(wedgeNotifyDecision({ alive: false, ageMs: 9 * 3600_000, ownerKey: key }).notify).toBe(false)
+    expect(wedgeNotifyDecision({ alive: true, ageMs: 9 * 3600_000, ownerKey: '' }).notify).toBe(false)
+    expect(wedgeOwnerKey(null)).toBe('')
+  })
+
+  it('the calibratable threshold clears the longest legitimate silence (a LARGE regression, ~40 min)', () => {
+    expect(WEDGE_NOTIFY_MS).toBeGreaterThan(60 * 60 * 1000)
   })
 })
 
@@ -210,6 +328,52 @@ describe('acquire (atomic test-and-set on the real filesystem)', () => {
     const lock = readOwnerLock(lockPath)
     expect(lock.sessionId).toBe('spawned')
     expect(lock.kind).toBe('session')
+  })
+
+  it('markHandover: only the owner may hand over, and it does not touch the heartbeat', () => {
+    acquire('s1', opts())
+    const before = readOwnerLock(lockPath).claimedAt
+    expect(markHandover('s2', { lockPath })).toBe(false)
+    expect(readOwnerLock(lockPath).handedOver).toBeUndefined()
+    expect(markHandover('s1', { lockPath, point: 388, now: before + 1000 })).toBe(true)
+    const lock = readOwnerLock(lockPath)
+    expect(lock.handedOver).toBe(true)
+    expect(lock.handedOverAt).toBe(before + 1000)
+    expect(lock.handoverPoint).toBe(388)
+    expect(lock.claimedAt).toBe(before) // the heartbeat is NOT bumped
+    expect(lock.sessionId).toBe('s1') // and it is not a release
+  })
+
+  it('a heartbeat WITHDRAWS the handover — working is proof the session is not finished', () => {
+    acquire('s1', opts())
+    markHandover('s1', { lockPath, point: 388 })
+    heartbeat('s1', { lockPath, now: Date.now() + 5000, skipBackfill: true })
+    const lock = readOwnerLock(lockPath)
+    expect(lock.handedOver).toBeUndefined()
+    expect(lock.handedOverAt).toBeUndefined()
+    expect(lock.handoverPoint).toBeUndefined()
+  })
+
+  it('withdrawHandover: the owner takes it back before a long tool call; a stranger cannot', () => {
+    acquire('s1', opts())
+    markHandover('s1', { lockPath, point: 388 })
+    expect(withdrawHandover('s2', { lockPath })).toBe(false)
+    expect(readOwnerLock(lockPath).handedOver).toBe(true)
+    expect(withdrawHandover('s1', { lockPath })).toBe(true)
+    expect(readOwnerLock(lockPath).handedOver).toBeUndefined()
+    expect(withdrawHandover('s1', { lockPath })).toBe(false) // nothing left to withdraw
+  })
+
+  it('after the successor claims, the old session can neither heartbeat nor withdraw', () => {
+    acquire('s1', opts())
+    markHandover('s1', { lockPath, point: 388 })
+    // The launcher reaps the handed-over lock and the successor owns it.
+    rmSync(lockPath)
+    acquire('successor', opts())
+    expect(withdrawHandover('s1', { lockPath })).toBe(false)
+    expect(heartbeat('s1', { lockPath, skipBackfill: true })).toBe(false)
+    expect(readOwnerLock(lockPath).sessionId).toBe('successor')
+    expect(acquire('s1', opts({ probePidFn: () => aliveProbe }))).toBe('held') // → stand-down
   })
 
   it('heldByOtherLiveOwner: true for a foreign live lock, false for mine/free/dead', () => {

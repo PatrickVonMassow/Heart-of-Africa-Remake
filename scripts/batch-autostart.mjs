@@ -39,7 +39,10 @@ import {
   spawnDecision,
   detectParallel,
   raiseParallelAlert,
+  wedgeNotifyDecision,
+  wedgeOwnerKey,
   PENDING_STALE_MS,
+  WEDGE_NOTIFY_MS,
 } from './batch-singleton.mjs'
 
 // IMPORT-PROOF (27.07.2026). Everything below runs at MODULE LOAD, so merely
@@ -150,6 +153,38 @@ if (
   await notify('Rogue spawn killed', `The launcher killed its own previous spawn (pid ${state.lastPid}) — it was alive but not the batch owner.`, 'high')
 }
 
+// --- SILENT OWNER: diagnose AND report (point 388 (c)) ------------------------
+// The launcher could already NAME this state — it logged "WEDGED owner: pid alive
+// but heartbeat N min old" twenty-one times on the night of 28.07.2026 and told
+// nobody. It still may not act on the age: a long verify run legitimately starves
+// the heartbeat, so the age alone may neither spawn a successor NOR kill the
+// owner. What it can do is SAY so, once per silence.
+if (assessment.alive) {
+  const ageMs = now - lock.claimedAt
+  const thresholdMin = Number(process.env.HOA_WEDGE_NOTIFY_MIN)
+  const thresholdMs = Number.isFinite(thresholdMin) && thresholdMin > 0 ? thresholdMin * 60000 : WEDGE_NOTIFY_MS
+  const ownerKey = wedgeOwnerKey(lock)
+  const w = wedgeNotifyDecision({
+    alive: true,
+    ageMs,
+    thresholdMs,
+    ownerKey,
+    lastNotifiedKey: state.wedgeNotifiedKey,
+  })
+  if (w.notify) {
+    const mins = Math.round(ageMs / 60000)
+    log(`SILENT owner: ${lock.sessionId} (pid ${lock.pid ?? 'unknown'}) has not moved in ${mins} min — notifying`)
+    await notify(
+      'Batch session SILENT',
+      `The owning session (pid ${lock.pid ?? 'unknown'}) has made no tool call in ${mins} minutes but its process ` +
+        'is alive, so the launcher may not take over. Either it is inside a very long run, or it stopped while ' +
+        'holding the batch lock — the batch is making no progress until someone looks.',
+      'high',
+    )
+    state.wedgeNotifiedKey = ownerKey
+  }
+}
+
 // --- Runaway / stuck watchdog: pause + signal ----------------------------------
 if (state.failCount >= 3) {
   log(`RUNAWAY: ${state.failCount} spawns with no git progress — pausing the batch and notifying`)
@@ -168,16 +203,30 @@ if (verdict === 'skip-alive') {
 }
 if (verdict === 'skip-wedged') {
   log(`WEDGED owner: pid ${lock.pid} alive but heartbeat ${Math.round((now - lock.claimedAt) / 60000)} min old`)
+  // The new consequence of point 388 (c) is the NOTIFICATION above, and it never
+  // kills: at 90 minutes a silent owner may well be inside a long verification.
+  // This valve is the pre-existing one and is left standing (four-eyes review,
+  // finding 5): it fires only on the launcher's OWN headless spawn, only past
+  // WEDGED_MS = four hours, and never on an interactive window. No tool call runs
+  // four hours, and an unattended `claude -p` that hangs has nobody to read the
+  // notification — removing it would trade one silent night for another.
   if (lock.pid && lock.pid === state.lastPid) {
     try { process.kill(lock.pid) } catch { /* gone */ }
     log(`killed wedged own spawn pid ${lock.pid} — next tick may take over`)
-  } else {
-    await notify('Batch session WEDGED', `The owning claude process (pid ${lock.pid}) is alive but has not heartbeat in hours. Check the session; the launcher will not kill an interactive window.`, 'urgent')
   }
   writeJsonAtomic(C('autostart-state.json'), state)
   process.exit(0)
 }
-if (lock) log(`owner provably dead (${assessment.reason}) — taking over`)
+if (lock) {
+  // "handed-over" is not death: the owner finished a point and passed the batch
+  // on (point 388). Logged distinctly so the end-to-end chain can be READ out of
+  // this file rather than inferred.
+  log(
+    assessment.reason === 'handed-over'
+      ? `HANDOVER accepted: ${lock.sessionId} handed the batch over${lock.handoverPoint ? ` at point ${lock.handoverPoint}` : ''} — spawning the successor`
+      : `owner provably dead (${assessment.reason}) — taking over`,
+  )
+}
 
 // Debounce: a spawn less than 10 min ago is still coming up.
 const lastSpawn = readJson(C('autostart-last.json'))
