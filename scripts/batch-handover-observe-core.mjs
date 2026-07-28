@@ -8,7 +8,7 @@
 // inference — which link of that chain fired and which one broke.
 //
 // The chain, in order:
-//   1. CLOSE     a point is ticked on main
+//   1. CLOSE     the point the handover names is closed in the work order
 //   2. TAKE      the boundary is taken and the lock marked handed-over
 //   3. SPAWN     the launcher's next tick accepts the handover and spawns
 //   4. TAKEOVER  the successor converts the lock to itself
@@ -89,11 +89,20 @@ export function parseLauncherLog(text) {
 
 const link = (id, title, status, evidence, broken) => ({ id, title, status, evidence, broken })
 
+const CLOSE_TITLE = 'a point is closed on main'
+const CLOSE_BROKEN = 'no tick, or the tick is only an archive move'
+const TAKE_TITLE = 'the boundary is taken and the lock handed over'
+const iso = (at) => new Date(at).toISOString()
+
+/** The closure of a point as the caller read it, keyed either way round. */
+const closureFor = (closures, point) => closures?.[point] ?? closures?.[String(point)] ?? 'unknown'
+
 /**
  * Judge the whole chain. Every input is plain data:
- *   tick        { point, at, sha } | null       — the newest tick on main
+ *   tick        { point, at, sha } | null       — the tick commit, for evidence
  *   handovers   parseHandoverLog(...)
  *   launcher    parseLauncherLog(...)
+ *   closures    { [point]: 'closed' | 'open' | 'unknown' } from closureOf()
  *   lock        the current .claude/batch-lock.json | null
  *   commits     [{ at, sha, subject }] on main, newest first
  *   now
@@ -103,6 +112,7 @@ export function assessChain({
   tick,
   handovers = [],
   launcher = [],
+  closures = {},
   lock = null,
   commits = [],
   now = Date.now(),
@@ -111,30 +121,68 @@ export function assessChain({
 }) {
   const links = []
 
-  // 1. CLOSE
-  if (!tick) {
+  // 1 + 2. CLOSE and TAKE, off ONE anchor: the handover that was actually TAKEN.
+  //
+  // The anchor used to be "the newest tick in the last few work-order commits",
+  // and that is measurably too narrow: on 28.07.2026 the tick of point 338 fell
+  // out of that window behind eight commits that only APPENDED points, and a
+  // handover that demonstrably completed became unreadable ("no ticked point
+  // found on main"). A handover line names its own point, so the honest question
+  // is whether THAT point is closed — a state, asked of the split work order via
+  // closureOf(), not an event that has to be caught in a log window.
+  //
+  // The observer therefore reports the handover that was taken; it does not ask
+  // whether a NEWER boundary is still outstanding — that is batch-progress-guard's
+  // job, and this instrument's acceptance is one observed handover end to end.
+  const taken = handovers.length ? handovers[handovers.length - 1] : null
+  const takenClosure = taken ? closureFor(closures, taken.point) : 'unknown'
+  let handover = null
+
+  if (taken && takenClosure === 'closed') {
+    const ticked =
+      tick && tick.point === taken.point
+        ? ` — ticked ${iso(tick.at)}${tick.sha ? ` (${tick.sha.slice(0, 7)})` : ''}`
+        : ''
+    links.push(link('close', CLOSE_TITLE, 'pass', `point ${taken.point} is closed in the work order${ticked}`, CLOSE_BROKEN))
+    handover = taken
+  } else if (taken && takenClosure === 'open') {
+    // A handover for a point nobody ticked is not a closed point, whatever any
+    // other tick says — this must never read as a pass.
     links.push(
-      link('close', 'a point is closed on main', 'pending', 'no ticked point found on main', 'no tick lands at all'),
+      link(
+        'close',
+        CLOSE_TITLE,
+        'pending',
+        `point ${taken.point} was handed over ${iso(taken.at)} but is still OPEN in the work order`,
+        CLOSE_BROKEN,
+      ),
     )
     return { ok: false, links }
+  } else {
+    // No handover to anchor on (or its closure could not be read at all): fall
+    // back to the tick, which is all the observer ever had — and keep the honest
+    // "pending" when there is nothing to anchor on either way.
+    if (!tick) {
+      links.push(link('close', CLOSE_TITLE, 'pending', 'no ticked point found on main', 'no tick lands at all'))
+      return { ok: false, links }
+    }
+    links.push(
+      link(
+        'close',
+        CLOSE_TITLE,
+        'pass',
+        `point ${tick.point} ticked ${iso(tick.at)}${tick.sha ? ` (${tick.sha.slice(0, 7)})` : ''}`,
+        CLOSE_BROKEN,
+      ),
+    )
+    handover = handovers.filter((h) => h.point === tick.point && h.at >= tick.at).pop() ?? null
   }
-  links.push(
-    link(
-      'close',
-      'a point is closed on main',
-      'pass',
-      `point ${tick.point} ticked ${new Date(tick.at).toISOString()}${tick.sha ? ` (${tick.sha.slice(0, 7)})` : ''}`,
-      'no tick, or the tick is only an archive move',
-    ),
-  )
 
-  // 2. TAKE — the guard allowed a boundary stop and marked the lock handed over.
-  const handover = handovers.filter((h) => h.point === tick.point && h.at >= tick.at).pop() ?? null
   if (!handover) {
     links.push(
       link(
         'take',
-        'the boundary is taken and the lock handed over',
+        TAKE_TITLE,
         'pending',
         `no HANDOVER line for point ${tick.point} in .claude/boundary.log`,
         'the session stops without running batch-boundary.mjs — the failure of 28.07.2026; ' +
@@ -143,7 +191,7 @@ export function assessChain({
     )
     return { ok: false, links }
   }
-  links.push(link('take', 'the boundary is taken and the lock handed over', 'pass', handover.line, 'no HANDOVER line'))
+  links.push(link('take', TAKE_TITLE, 'pass', handover.line, 'no HANDOVER line'))
 
   // 3. SPAWN — the launcher took the batch over on one of its next ticks. Two
   // shapes are healthy, because two paths are: it ACCEPTS the handover on a lock

@@ -224,3 +224,73 @@ describe('assessChain — one observed handover, end to end', () => {
     expect(linkOf(r, 'close').status).toBe('pending')
   })
 })
+
+// ---------------------------------------------------------------------------
+// THE ANCHOR. Measured on 28.07.2026: a handover that demonstrably completed
+// read as "no ticked point found on main", because the anchor was the newest
+// tick in the last five work-order commits and eight append-only commits had
+// buried it. The handover names its own point; that point's CLOSURE — a state,
+// not an event inside a log window — is what the close link must ask.
+describe('assessChain anchors on the handover that was taken', () => {
+  const anchored = (over = {}) =>
+    assessChain({
+      tick: null,
+      handovers,
+      closures: { 388: 'closed' },
+      launcher: launcherLog(ACCEPT, SPAWN),
+      lock: successorLock,
+      commits: commit,
+      now: T('2026-07-29T11:00:00.000Z'),
+      ...over,
+    })
+
+  it('THE MEASURED DEFECT: a tick older than the newest work-order commits still completes the chain', () => {
+    const r = anchored()
+    expect(r.ok).toBe(true)
+    expect(linkOf(r, 'close').status).toBe('pass')
+    expect(linkOf(r, 'close').evidence).toContain('point 388 is closed')
+    expect(linkOf(r, 'take').evidence).toBe(HANDOVER_LINE)
+  })
+
+  it('and names the tick commit when it was found, as evidence rather than as the judgement', () => {
+    const r = anchored({ tick })
+    expect(linkOf(r, 'close').evidence).toContain('abcdef1')
+    expect(r.ok).toBe(true)
+  })
+
+  it('a handover for a point that is NOT closed never reads as pass', () => {
+    for (const over of [{}, { tick }, { tick: { point: 999, at: TICK_AT, sha: 'ffffff1' } }]) {
+      const r = anchored({ closures: { 388: 'open' }, ...over })
+      expect(linkOf(r, 'close').status).toBe('pending')
+      expect(linkOf(r, 'close').evidence).toMatch(/still OPEN/)
+      expect(r.links).toHaveLength(1)
+      expect(r.ok).toBe(false)
+    }
+  })
+
+  it('a closure that could not be read at all falls back to the tick, never inventing one', () => {
+    expect(anchored({ closures: { 388: 'unknown' }, tick }).ok).toBe(true) // the tick still anchors
+    const blind = anchored({ closures: {} })
+    expect(linkOf(blind, 'close').status).toBe('pending')
+    expect(linkOf(blind, 'close').evidence).toBe('no ticked point found on main')
+  })
+
+  it('no handover anywhere still reports the honest pending', () => {
+    const r = anchored({ handovers: [], closures: {}, launcher: [], commits: [] })
+    expect(linkOf(r, 'close').status).toBe('pending')
+    expect(r.links).toHaveLength(1)
+    expect(r.ok).toBe(false)
+  })
+
+  it('the NEWEST handover is the anchor when several were recorded', () => {
+    const many = parseHandoverLog(
+      [
+        '[2026-07-29T08:00:00.000Z] HANDOVER point 300 by session-older — lock marked handed-over.',
+        HANDOVER_LINE,
+      ].join('\n'),
+    )
+    const r = anchored({ handovers: many, closures: { 300: 'closed', 388: 'closed' } })
+    expect(linkOf(r, 'close').evidence).toContain('point 388')
+    expect(r.ok).toBe(true)
+  })
+})

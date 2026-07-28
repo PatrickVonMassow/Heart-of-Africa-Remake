@@ -296,14 +296,41 @@ complete / 1 pending / 2 broken:
 
 | link | proved by | a broken link looks like |
 | --- | --- | --- |
-| `close` | the newest work-order commit on `main` adds `- [x] N.` without removing it elsewhere (an archive move cancels out) | only `- [ ] N.` lines, or a pure archive move |
+| `close` | the point the NEWEST `HANDOVER` line names is closed in the split work order (`closureOf`: gone from `TASKS.md`, ticked in `docs/tasks-archive.md`), with the commit that ticked it printed alongside as evidence where it is still findable — an archive move cancels out and is never a tick | the handed-over point still reads `- [ ] N.`, or there is no handover line to anchor on and no tick either |
 | `take` | `.claude/boundary.log`: `HANDOVER point N by <sid>` | no such line — the session stopped without taking the boundary, the failure of 28.07.2026; the guard must have blocked with "TAKE THE POINT BOUNDARY" |
 | `spawn` | `.claude/autostart.log`: `launched pid <pid>` after the handover, preceded by `HANDOVER accepted: …` when the process still lived, or by `no owner lock — taking over` on the headless path, where a `claude -p` has already exited and SessionEnd freed the lock | `skip: owner alive` more than one grace window (15 min) after the handover — the handover never reached the lock, or a `WITHDRAWN` line in `boundary.log` says a tool call took it back. A `handover-grace` skip is the mechanism waiting on purpose and never counts. A spawn preceded by `owner provably dead` also counts as broken: the batch continued, but by the old route — the lock EXPIRED rather than being handed over |
 | `takeover` | `.claude/batch-lock.json` names a DIFFERENT session, kind `session`, with a heartbeat after the handover | still the old session, or still the launcher's own `pending-spawn` lock, ten minutes after the spawn — the successor never converted it |
 | `work` | a commit on `main` after the spawn: the next point's branch or its first atomic commit | nothing committed — the successor stood down (lock) or `batch-resume-hook` never oriented it |
 
+The anchor is the HANDOVER, never "the newest tick": a tick falls out of any log
+window behind append-only work-order commits — eight of them buried the tick of
+point 338 on 28.07.2026, and a handover that had demonstrably completed read as
+"no ticked point found on main" — whereas the closure of the point a handover
+names does not expire.
+
 `work` is the one link a machine cannot close: no commit names the session that
 wrote it, so the observer prints the commit and the reader confirms the hand.
+
+#### The observed run — 28.07.2026, all five links
+
+The acceptance of point 388, read out of the logs rather than inferred. Point 338
+was merged and ticked at 11:12:27Z (`23000d7`); the session then took the boundary
+and ended:
+
+| link | evidence, with its time |
+| --- | --- |
+| `close` | point 338 closed in the work order, ticked 11:12:27Z (`23000d7`) |
+| `take` | `boundary.log` 12:34:39.809Z — `HANDOVER point 338 by b1498420-…` |
+| `spawn` | `autostart.log` 12:51:15.440Z — `HANDOVER accepted: … spawning the successor`, then `launched pid 32680` |
+| `takeover` | `batch-lock.json` held by `5be59bde-…`, kind `session`, pid 32680 |
+| `work` | `652a8ba` — the successor's first commit, confirmed by hand |
+
+Two costs the run made visible, both by design rather than defects. The launcher
+spent one full `HANDOVER_GRACE_MS` (15 min, 12:34 → 12:51) because the handing-over
+process was an interactive window that stays alive; a headless `claude -p` exits
+and is taken over at the next tick. And the boundary was taken and withdrawn ten
+times between 11:27Z and 12:34Z before one held — eight of those withdrawals were
+the session legitimately working on, two were the race recorded as point 396.
 
 The run itself belongs to the MAIN session in the main tree: it needs the live
 batch lock, and no worktree agent may take or release it. The natural occasion is

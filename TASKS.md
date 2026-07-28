@@ -3276,6 +3276,157 @@ read that as "the criterion and its evidence section".
   DOCS in the same commit: CLAUDE.md §6's context-boundary bullet (it currently
   describes the half that exists) and `docs/batch-autonomy.md`.
 
+- [ ] 396. A HANDOVER IS UN-TAKEN BY THE TOOL CALL THAT CAME BEFORE IT (28.07.2026,
+  measured in `.claude/boundary.log`, found while closing point 388). Two of the ten
+  boundary attempts that morning were cancelled 117 ms and 154 ms after they were
+  written: `HANDOVER point 338` at 11:42:00.469Z, `WITHDRAWN point 338` at 11:42:00.586Z,
+  and the same shape at 11:52:08.478Z/11:52:08.632Z. A withdrawal means "the session is
+  working again", and no session works again within 117 ms — a continuation needs a model
+  round trip and cannot be that fast.
+  THE MECHANISM: `batch-progress-guard` writes the handover in the Stop chain, while the
+  PostToolUse `lock-heartbeat-hook` of the turn's LAST tool call is still in flight (the
+  same file contention that produced that morning's EPERM retries delays it). That
+  heartbeat then calls `heartbeat(sid)` without `preserveHandover`, and `clearOwnBoundary`
+  both strips the handover flag AND deletes the boundary marker. The session had done
+  nothing wrong — it had stopped. The next turn is told to take the boundary again, which
+  is precisely the loop point 388 was opened on; it cost that run roughly an hour and ten
+  launcher ticks before a round happened to survive.
+  THE FIX: a withdrawal may only ever be caused by work that happened AFTER the handover
+  was written. Where the hook payload carries the tool call's own timestamp, compare it
+  with `handedOverAt` and ignore a call that predates the handover. Where it does not, a
+  calibratable settle window (start at ~1 s) does the same job: a handover younger than
+  the window is never withdrawn. The marker file must survive the same test as the flag —
+  deleting it is what forces the re-take.
+  DO NOT widen this into "ignore withdrawals": a session that genuinely carries on working
+  must still withdraw its boundary, or the five-and-a-half-hour standstill of 28.07.2026
+  comes back. The rule stays "work after the handover withdraws it", only measured
+  honestly.
+  VERIFIABLE: pure Vitest on `clearOwnBoundary`/`heartbeat` with injected clocks — a
+  heartbeat dated BEFORE `handedOverAt` (or inside the settle window) leaves both the flag
+  and the marker file untouched; one dated after withdraws exactly as today, marker
+  included; the closing-set rule of point 388 is unchanged by either; and a session that
+  does not own the lock still cannot withdraw anything. Live: the next real boundary shows
+  a single `HANDOVER` line with no `WITHDRAWN` behind it in `.claude/boundary.log`.
+  DOCS in the same commit: `docs/batch-autonomy.md`, in the section on what a taken
+  boundary survives.
+
+- [ ] 397. AN UNNAMED AUTHOR IS NOT A FORBIDDEN ONE — THE TRAILER THAT COST A ROUND
+  (28.07.2026, observed live). Commit 652a8ba carried `Co-Authored-By: Claude
+  <noreply@anthropic.com>` — the trailer with no model name. `isPolicyBreach` in
+  `scripts/model-guard-core.mjs` tests `ALLOWED = /\b(opus|fable)\b/i` against the
+  trailer, so a trailer naming NOTHING fails exactly as a trailer naming Haiku does, and
+  the Stop hook demanded the full breach ritual: pause the batch, stop, wait for the user.
+  It was Opus 5 — every session live in that window shows `claude-opus-5` and nothing
+  else. The alarm cost a full round and a user interruption, and it will recur, because
+  nothing stops the next agent from stamping the same bare trailer.
+  THE POINT IS NOT TO SOFTEN THE GUARD. A bare trailer is not proof of compliance either,
+  and the 24.07.2026 incident — a session degraded to Haiku merging three defective
+  deliveries in 14 minutes — is what the guard exists for. What is wrong is that the guard
+  collapses two different states into one verdict.
+  THE FIX, both halves in one point:
+  (a) CLASSIFY THREE WAYS, not two. `model-guard-core.mjs` gains `classifyTrailer` →
+  `'allowed' | 'unidentified' | 'forbidden'`: a Claude trailer matching `ALLOWED` is
+  allowed, one naming a model outside it is forbidden, one carrying NO model name at all
+  is unidentified. `findForbiddenCommits` keeps returning only the forbidden ones; a new
+  `findUnidentifiedCommits` returns the rest. The Stop hook stops HARD on a forbidden hit
+  exactly as today (pause file, no batch work), and on an unidentified hit it blocks with a
+  DIFFERENT, resolvable message: name the commit, and instruct the session to resolve it
+  from the local transcripts before anything else — `~/.claude/projects/<repo-slug>/
+  *.jsonl` carries the true `message.model` per turn, so a commit's authoring model is
+  READABLE, not a matter of assumption. Resolves to an allowed model → advance the
+  baseline past it and carry on, no user interruption. Resolves to a forbidden one, or the
+  transcripts do not cover it → the forbidden path, unchanged.
+  (b) CATCH IT AT THE SOURCE. A versioned `commit-msg` hook in `scripts/git-hooks/`
+  (wired by `npm install` like `commit-scope-guard` and `pre-push-gate`) REJECTS a commit
+  whose `Co-Authored-By: Claude …` trailer carries no model name, naming the three allowed
+  spellings in its message. An unnamed trailer then cannot reach history at all, and (a)
+  stays the net under the commits already in it.
+  MECHANISM REVIEW REQUIRED: both halves change a guard and add a git hook, so
+  `scripts/mechanism-review.mjs --record` with the OTHER model's verdict is part of the
+  point (CLAUDE.md §7.2), and the hook file needs the user attended — `.git/hooks` and
+  versioned hook paths always prompt.
+  VERIFIABLE: pure Vitest on `model-guard-core.mjs` — `classifyTrailer` over the three
+  shapes incl. the real `Claude <noreply@anthropic.com>` string, a multi-trailer commit
+  (one named + one bare) classified by its worst trailer, `findForbiddenCommits` NOT
+  returning an unidentified commit, and a non-Claude co-author (a human) ignored by both.
+  A hook test drives the `commit-msg` script over a rejected and an accepted message.
+  Live: a commit attempted with the bare trailer is refused by the hook.
+  DOCS in the same commit: CLAUDE.md §6 (the model-policy paragraph states that the
+  trailer must NAME the model and that the hook enforces it) and §7.2 (the Stop-chain list
+  gains the unidentified/forbidden split).
+
+- [ ] 398. THE FAST GATE CANNOT BE RUN WHILE THE AGENT POOL WORKS (28.07.2026, measured
+  twice within ten minutes on `main`). `npm run test:unit` is the gate every push and
+  several Stop guards lean on, and with delegated agents building it goes red — 2 failures
+  in the first run, 5 in the second, and EVERY one of them the same line: `Test timed out
+  in 5000ms`. Not one was an assertion. Run alone on the same commit, the same files pass:
+  `src/render/water.test.ts` in 1.55 s and the `crocodileIdleYaw` case in
+  `src/scenes/travel/wildlifeBehavior.test.ts` in 2.27 s. The others that tipped —
+  `scripts/pre-push-gate-core.test.mjs` (the load-probe contract) and
+  `scripts/render-verify-guard.test.mjs` (a real git probe) — have the same shape: honest
+  work against an external process or a heavy constructor.
+  THE CAUSE IS THE MARGIN, not the tests. Vitest's default `testTimeout` is 5000 ms
+  (`vitest.config.ts` sets none) and the slowest cases sit at 1.5–2.3 s of it. Any load at
+  all — three worktree agents building, which is this project's DESIGNED steady state —
+  doubles them past the bar. The consequence is not a flaky number on a report:
+  `pre-push-gate` blocks the push, and its retry does not save it, because the load probe
+  is asked AFTER the step and by then the machine reads quiet again ("pre-push gate:
+  machine quiet (red reading, 2.8s)"). So `main` cannot be pushed while the pool it is
+  meant to feed is working.
+  THE FIX: give the unit layer a timeout that is load-proof rather than tight. These are
+  deterministic pure-logic and jsdom tests — a case that passes in 2 s and one that hangs
+  are orders of magnitude apart, so a generous `testTimeout` (start at 20 s, set once in
+  `vitest.config.ts` with the reason written beside it) costs nothing on a green run and
+  still catches a real hang. A single case that needs longer gets its own explicit
+  timeout rather than raising the floor a second time.
+  DO NOT paper over the slow cases: keep them measurable. The suite must still REPORT its
+  slowest cases (vitest's slow-test threshold), so a test quietly growing from 2 s to 15 s
+  stays visible instead of hiding inside the larger budget — the change is meant to stop
+  the timeouts under load, not to stop noticing cost.
+  ALSO FIX THE PROBE'S TIMING, since it is the same defect one layer up: `pre-push-gate`
+  must judge the load DURING the step it is judging (sample while it runs, or record the
+  probe's verdict at the start and the end and take the worse), never only afterwards — a
+  reading taken once the load has gone is what turned a load-flake into a hard block here.
+  VERIFIABLE: `npm run test:unit` green while three worktree agents build — measured, with
+  the load probe's own verdict quoted for that run — a deliberately hanging case still
+  failing rather than stalling the suite, a pure test pinning the configured timeout, and
+  a pure test of the gate's load judgement over a run that was loaded at the start and
+  quiet at the end (it must read as loaded). Live: one real `git push` of `main` passing
+  the gate under that same load.
+  DOCS in the same commit: `scripts/verify/README.md`, where the test architecture
+  describes the fast layer, gains the timeout and its reason.
+
+- [ ] 399. THE GUARD STOPS DEMANDING THE BOUNDARY AS SOON AS THE QUEUE GROWS
+  (28.07.2026, found while fixing the handover observer, and it is the same blind spot
+  one layer up — where it costs more). `boundaryDueFrom` in `gatherBoundary`
+  (`scripts/batch-boundary.mjs`) asks `lastWorkOrderTick()` when a boundary became due,
+  and that function scans only the newest FIVE work-order commits for a tick. A batch
+  turn routinely appends points: on 28.07.2026 eight append-only commits landed after the
+  tick of point 338, and the tick fell out of the window. On the OBSERVER that made a
+  completed handover unreadable, and it was fixed there. On the GUARD it does worse:
+  `boundaryDueFrom` returns null, so within the 90-minute `BOUNDARY_DUE_MS` window in
+  which `batch-progress-guard` should be demanding the point boundary, it demands
+  nothing — and a session that is not told to hand over keeps the lock and carries the
+  next point in the same context, which is exactly the cost point 373 exists to avoid.
+  THE FIX: give the guard's due-check an anchor that cannot fall out of a window. The
+  question it needs answered is "was a point ticked within `BOUNDARY_DUE_MS`", so it must
+  look back by TIME, not by a commit count — `git log --since` over the two work-order
+  paths, taking the newest commit whose diff actually ticks a point (`tickedPointsInDiff`
+  keeps the rule that an archive move is not a tick). The count-limited
+  `lastWorkOrderTick` may keep its shape for any caller that wants "the most recent
+  closure, cheaply", but the guard must not be that caller.
+  MIND THE COST: this runs in a Stop hook on every turn end, so the probe must stay
+  bounded — one `git log` over two paths, limited by the same window the answer is
+  scoped to, and no `git show` per commit beyond the candidates inside it.
+  VERIFIABLE: pure Vitest with an injected git — a tick inside the window followed by
+  twenty append-only work-order commits still reports the boundary as due; a tick older
+  than the window reports nothing due; an archive-move-only commit is not a tick; and an
+  unreadable git answers "not due" rather than throwing (the guard fails open). Plus one
+  live check in this repository: after a point is ticked and several points appended,
+  `node scripts/batch-boundary.mjs --status` names the due boundary instead of `null`.
+  DOCS in the same commit: `docs/batch-autonomy.md`, where the point boundary describes
+  when it falls due.
+
 ## Closing (only after all points)
 
 New points are appended BEFORE this section — it stays last in the file.
