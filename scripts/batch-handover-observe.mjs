@@ -15,7 +15,8 @@ import { readFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { repoPath } from './repo-paths.mjs'
 import { readOwnerLock, HANDOVER_GRACE_MS } from './batch-singleton.mjs'
-import { lastWorkOrderTick } from './batch-boundary.mjs'
+import { lastWorkOrderTick, closureOf } from './batch-boundary.mjs'
+import { tickedPointsInDiff } from './batch-boundary-core.mjs'
 import { assessChain, parseHandoverLog, parseLauncherLog } from './batch-handover-observe-core.mjs'
 
 const read = (p) => {
@@ -46,22 +47,56 @@ function commitsSince(sinceMs) {
   }
 }
 
-const tick = lastWorkOrderTick()
+/**
+ * The commit that TICKED one named point on main: { point, at, sha } or null.
+ * Unlike `lastWorkOrderTick` — which answers "what was closed most recently" for
+ * the guard's due-heuristic and deliberately looks only a few commits back — this
+ * hunts ONE known point, so it may look far enough back to find it: on 28.07.2026
+ * eight append-only work-order commits had already buried the tick this observer
+ * needed. `tickedPointsInDiff` keeps the archive-move rule: moving an already
+ * ticked point into the archive is not a tick.
+ */
+function tickCommitFor(point, { cwd = repoPath('.'), ref = 'main', limit = 50 } = {}) {
+  if (!Number.isInteger(point) || point <= 0) return null
+  const git = (args) =>
+    execFileSync('git', args, { cwd, encoding: 'utf8', timeout: 8000, stdio: ['ignore', 'pipe', 'ignore'] }).trim()
+  const paths = ['--', 'TASKS.md', 'docs/tasks-archive.md']
+  try {
+    for (const row of git(['log', `-${limit}`, '--format=%H %ct', ref, ...paths]).split('\n')) {
+      const m = row.trim().match(/^([0-9a-f]{7,40}) (\d+)$/)
+      if (!m) continue
+      if (tickedPointsInDiff(git(['show', '--format=', '--unified=0', m[1], ...paths])).includes(point)) {
+        return { point, at: Number(m[2]) * 1000, sha: m[1] }
+      }
+    }
+  } catch {
+    /* no such ref / not a repo — the tick is evidence, never the judgement */
+  }
+  return null
+}
+
 const handovers = parseHandoverLog(read(repoPath('.claude/boundary.log')))
 const launcher = parseLauncherLog(read(repoPath('.claude/autostart.log')))
 const lock = readOwnerLock()
+// The anchor is the handover that was TAKEN, and the question asked of it is
+// whether ITS point is closed — a state, read from the split work order, rather
+// than a tick that has to be caught inside a log window.
+const takenPoint = handovers.length ? handovers[handovers.length - 1].point : null
+const closures = takenPoint === null ? {} : { [takenPoint]: closureOf(takenPoint) }
+const tick = (takenPoint === null ? null : tickCommitFor(takenPoint)) ?? lastWorkOrderTick()
 const since = handovers.length ? handovers[handovers.length - 1].at : (tick?.at ?? Date.now() - 86400_000)
 const result = assessChain({
   tick,
   handovers,
   launcher,
+  closures,
   lock,
   commits: commitsSince(since),
   graceMs: HANDOVER_GRACE_MS, // the real constant, never a copy that can drift
 })
 
 if (process.argv.includes('--json')) {
-  console.log(JSON.stringify({ tick, lock, ...result }, null, 2))
+  console.log(JSON.stringify({ tick, closures, lock, ...result }, null, 2))
 } else {
   const mark = { pass: 'PASS   ', pending: 'pending', broken: 'BROKEN ' }
   console.log('handover chain (point 388) — read out of the logs, never inferred\n')
