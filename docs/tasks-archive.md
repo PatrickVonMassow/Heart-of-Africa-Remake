@@ -11339,3 +11339,43 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   assumed radius.
   DOCS in the same commit: CLAUDE.md §7.1 pt 4 (the collider-derived-from-the-drawing
   rule, already stated for flora, extended to animals) and its evidence section.
+- [x] 340. THE LOCK HEARTBEAT MUST NOT LOSE ITS WRITE TO A TRANSIENT RENAME FAILURE
+  (user 25.07.2026). EVIDENCE: fourteen orphaned `.claude/batch-lock.json.tmp-<pid>`
+  files accreted between 19:36 and 20:52 on 25.07.2026 — one per failed write, each
+  holding the same session's lock snapshot. `writeJsonAtomic`
+  (scripts/batch-singleton.mjs:88) writes `${p}.tmp-${process.pid}` and then
+  `renameSync`s it over the lock; on Windows that rename fails with a sharing violation
+  whenever another reader (the resume hook, a second session, a virus scanner) holds the
+  lock file open at that instant. Against a per-tool-call heartbeat that was roughly
+  every fifth write.
+  WHY IT MATTERS MORE THAN THE LITTER: `heartbeat()` (line 455) neither retries nor
+  catches, so a failed rename leaves `claimedAt` at its OLD value while reporting
+  nothing. Liveness is decided on exactly that timestamp (`assessOwner`,
+  `DEAD_CONFIRM_MS`), so a run of failures ages a LIVE session's heartbeat toward the
+  "provably dead" verdict — and a takeover on a false-dead reading is precisely the
+  24.07.2026 parallel-session incident. The pid probe is the second gate that held here;
+  that is not a reason to let the first one rot silently.
+  TARGET, TWO PARTS. (a) RETRY: the rename is attempted a bounded number of times with a
+  short backoff, because the collision is transient by nature; if every attempt fails the
+  tmp file is removed and the error PROPAGATES — a heartbeat that did not land must never
+  read as one that did, so no silent swallow. (b) SWEEP: acquiring the lock removes
+  orphaned `<lockPath>.tmp-*` files, but ONLY where the owning pid is provably dead AND
+  the file has settled (the `REAP_MUTEX_STALE_MS` age gate is the natural one) — a live
+  process mid-write must never have its tmp taken from under it.
+  Both decisions are PURE and dependency-injected (rename/remove/sleep for the retry; the
+  sweep predicate over directory entries plus a pid probe), matching the rest of this
+  module, so the failure paths are tested without provoking a real sharing violation.
+  KEEP INTACT: the write stays ATOMIC — tmp plus rename, never an in-place truncate, so a
+  concurrent reader can never see half a lock; the pid-backed liveness gates,
+  `DEAD_CONFIRM_MS`/`WEDGED_MS` and the reap mutex are untouched; `heartbeat()` keeps its
+  one-shot pid backfill and the `skipBackfill` fast path.
+  DOCS in the same commit: `docs/batch-singleton-analysis.md` records this write-failure
+  mode and its fix in its failure-path table — the analysis is the place where the
+  singleton's known ways of failing are enumerated.
+  VERIFIABLE: pure (`scripts/batch-singleton-core.test.mjs`) — a rename that fails twice
+  and then succeeds leaves the lock written and NO tmp behind; a rename that fails every
+  attempt throws and STILL leaves no tmp; the retry gives up after its bounded attempts
+  (no unbounded loop); the sweep predicate takes an orphan whose pid is dead, spares one
+  whose pid is alive, and spares a just-written tmp that has not settled; and an
+  end-to-end `acquire` against a directory seeded with both kinds removes exactly the
+  dead one. The five hard-singleton scenarios already pinned in that file stay green.
