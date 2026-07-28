@@ -3511,8 +3511,8 @@ read that as "the criterion and its evidence section".
   reading a state file.
   DOCS in the same commit: `docs/batch-autonomy.md` (what the board guarantees in
   each mode, and the new transport), CLAUDE.md §7.2, where the Stop-chain list
-  names the new deny, and the memory entry `batch-dashboard-artifact`, whose
-  transport half is superseded by this point while its structure half stands.
+  names the new deny, and the memory entry `batch-dashboard-artifact`, which keeps
+  its binding four-section structure and states the transport this point settles.
 
 ## Closing (only after all points)
 
