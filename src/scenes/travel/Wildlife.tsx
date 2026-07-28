@@ -3888,15 +3888,19 @@ function Herds() {
       let sIdx = 0
       let crocStrikeThis = false
       const write = (a: Animal) => {
-        // Point 378: the collider's single source is the matrix written here.
-        recordDrawnBody(a, mtx.elements, drawFrame)
         if (a.young && calfMesh) {
-          if (cIdx < MAX_CALF_INSTANCES) calfMesh.setMatrixAt(cIdx++, mtx)
+          // Over the calf budget: this juvenile is NOT drawn this frame, so it
+          // must not be stamped either — an undrawn body may never leave a
+          // collider behind (point 378/129).
+          if (cIdx >= MAX_CALF_INSTANCES) return
+          calfMesh.setMatrixAt(cIdx++, mtx)
         } else if (crocStrikeThis) {
           pool.crocStrike.setMatrixAt(sIdx++, mtx)
         } else {
           mesh.setMatrixAt(aIdx++, mtx)
         }
+        // Point 378: the collider's single source is the matrix just written.
+        recordDrawnBody(a, mtx.elements, drawFrame)
       }
       let eIdx = 0
       for (let i = 0; i < n; i++) {
