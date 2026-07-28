@@ -4126,6 +4126,7 @@ function Herds() {
             }
             px = a.x
             pz = a.z
+            bodyY = a.y // the height just derived for THIS spot (see the kick branch)
             yaw = Math.atan2(cdx, cdz)
             pitch = 0.08
             familyHeld = true
@@ -4231,6 +4232,7 @@ function Herds() {
             }
             px = a.x
             pz = a.z
+            bodyY = a.y // resync off any drink slide (see the kick branch)
             yaw = Math.atan2(dxm, dzm)
             pitch = -0.15 // head down toward the stuck calf
             familyHeld = true
