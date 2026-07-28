@@ -41,8 +41,9 @@ import {
   raiseParallelAlert,
   wedgeNotifyDecision,
   wedgeOwnerKey,
-  wedgeStage,
+  silenceStage,
   wedgeAction,
+  isOwnSpawn,
   PENDING_STALE_MS,
   WEDGE_NOTIFY_MS,
   WORK_STALL_MS,
@@ -51,7 +52,7 @@ import { readClaim, maxAgeMs as claimMaxAgeMs } from './batch-claim.mjs'
 import { assessClaim } from './batch-claim-core.mjs'
 import { readDeclaration, refTipAt, worktreeActiveAt, mtimeOf } from './batch-in-flight.mjs'
 import { assessOwnerWork, describeInFlight } from './batch-in-flight-core.mjs'
-import { buildSpawnArgs, buildSpawnOptions } from './batch-autostart-core.mjs'
+import { buildSpawnArgs, buildSpawnOptions, recordSpawn, reapableSpawns, pruneSpawns } from './batch-autostart-core.mjs'
 
 // IMPORT-PROOF (27.07.2026). Everything below runs at MODULE LOAD, so merely
 // importing this file — a syntax check, a test, a tooling scan — SPAWNS a
@@ -139,7 +140,8 @@ if (open === 0) { log('skip: batch complete (0 open points)'); process.exit(0) }
   }
 }
 
-const state = readJson(C('autostart-state.json')) ?? { failCount: 0, lastHead: '', lastSpawnAt: 0, lastPid: 0, lastTickAt: 0 }
+const state = readJson(C('autostart-state.json')) ?? { failCount: 0, lastHead: '', lastSpawnAt: 0, lastPid: 0, lastTickAt: 0, spawns: [] }
+state.spawns = Array.isArray(state.spawns) ? state.spawns : []
 const curHead = head()
 
 // --- Owner liveness (the hard-singleton assessment) ---------------------------
@@ -183,9 +185,13 @@ if (parallel.length > 0) {
 }
 // Remediation for a rogue spawn of OUR OWN making: our child is alive but is
 // NOT the owner (its lock conversion failed or another session owns) → kill it.
+// "OUR OWN" is judged by pid AND start time (`isOwnSpawn`), never by the pid
+// alone: `state.lastPid` persists indefinitely and Windows recycles pids, so a
+// days-old spawn's number inherited by an interactive window would otherwise be
+// killed here (four-eyes review 28.07.2026, finding 1.3).
 if (
   state.lastPid &&
-  pidAlive(state.lastPid) &&
+  isOwnSpawn({ pid: state.lastPid, probe: probePid(state.lastPid), lastSpawnPid: state.lastPid, lastSpawnAt: state.lastSpawnAt }) &&
   now - state.lastSpawnAt > PENDING_STALE_MS &&
   assessment.alive &&
   lock &&
@@ -195,6 +201,31 @@ if (
   try { process.kill(state.lastPid) } catch { /* gone */ }
   log(`REMEDIATED: killed own rogue spawn pid ${state.lastPid} (alive but not the lock owner)`)
   await notify('Rogue spawn killed', `The launcher killed its own previous spawn (pid ${state.lastPid}) — it was alive but not the batch owner.`, 'high')
+}
+
+// --- LEAKED SPAWNS: reap what the removed runtime ceiling used to reap --------
+// `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0` means a `claude -p` waits forever for
+// a background task — including one that never exits, which a left-running dev
+// server routinely is. The 600-second ceiling used to end exactly those, and
+// `state.lastPid` alone cannot track them because a handover overwrites it. A
+// leaked session holds ports, and that breaks the next session's verify suites.
+// Narrow by construction (see reapableSpawns): our own spawn by pid AND start
+// time, past its boot window, not the lock owner, and superseded.
+{
+  const leaked = reapableSpawns({ spawns: state.spawns, now, lock, probePid, isOwnSpawn })
+  for (const s of leaked) {
+    try { process.kill(s.pid) } catch { /* gone */ }
+    log(`REAPED leaked spawn pid ${s.pid} (spawned ${Math.round(s.ageMs / 60000)} min ago, not the batch owner)`)
+  }
+  if (leaked.length > 0) {
+    await notify(
+      'Leaked worker reaped',
+      `The launcher reaped ${leaked.length} of its own earlier headless spawn(s) (pid ${leaked.map((s) => s.pid).join(', ')}) ` +
+        'that were still running without owning the batch — a background task the session was waiting on never exited.',
+      'low',
+    )
+  }
+  state.spawns = pruneSpawns({ spawns: state.spawns, probePid })
 }
 
 // --- SILENT OWNER: diagnose AND report (point 388 (c)) ------------------------
@@ -207,21 +238,33 @@ if (
 // this alarm was written for (point 402): it is waiting on an agent that is still
 // committing, and reporting that as a stall would train the user to ignore the
 // channel. The stall verdict below is what covers the case where it stops moving.
-if (assessment.alive && !work.advancing) {
+// PAST THE HOURS-LONG THRESHOLD IT IS REPORTED ANYWAY (four-eyes review, finding
+// 1.2): a declaration is evidence, not a permanent exemption from being looked
+// at, and an eternally-fresh piece of evidence must never be able to buy silence
+// from BOTH the wedge verdict and this notification at once. Notify only — this
+// path has never killed anything and still does not.
+if (assessment.alive) {
   const ageMs = now - lock.claimedAt
   const thresholdMin = Number(process.env.HOA_WEDGE_NOTIFY_MIN)
   const notifyMs = Number.isFinite(thresholdMin) && thresholdMin > 0 ? thresholdMin * 60000 : WEDGE_NOTIFY_MS
-  const stage = wedgeStage(ageMs, { notifyMs })
+  const stage = silenceStage({ ageMs, advancing: work.advancing, notifyMs })
   const ownerKey = wedgeOwnerKey(lock, stage ?? '')
   const w = wedgeNotifyDecision({ alive: true, stage, ownerKey, lastNotifiedKey: state.wedgeNotifiedKey })
   if (w.notify) {
     const mins = Math.round(ageMs / 60000)
-    log(`SILENT owner: ${lock.sessionId} (pid ${lock.pid ?? 'unknown'}) has not moved in ${mins} min — notifying (${stage})`)
+    log(
+      `SILENT owner: ${lock.sessionId} (pid ${lock.pid ?? 'unknown'}) has not moved in ${mins} min — notifying (${stage}` +
+        `${work.advancing ? '; declared work still advancing' : ''})`,
+    )
     await notify(
       stage === 'wedged' ? 'Batch session WEDGED' : 'Batch session SILENT',
       `The owning session (pid ${lock.pid ?? 'unknown'}) has made no tool call in ${mins} minutes but its process ` +
         'is alive, so the launcher may neither take over nor kill it. Either it is inside a very long run, or it ' +
-        'stopped while holding the batch lock — the batch is making no progress until someone looks.',
+        'stopped while holding the batch lock — the batch is making no progress until someone looks.' +
+        // Past the hours-long threshold the report goes out even with live
+        // evidence (finding 1.2), so it must SAY what that evidence is — an
+        // eternally-fresh declaration looks identical to a working one from here.
+        (work.advancing ? ` It still declares advancing work (${work.summary}) — check that this is real.` : ''),
       stage === 'wedged' ? 'urgent' : 'high',
     )
     state.wedgeNotifiedKey = ownerKey
@@ -247,7 +290,9 @@ if (verdict === 'skip-alive') {
 }
 let takeoverAfterKill = false
 if (verdict === 'skip-wedged') {
-  const act = wedgeAction({ assessment, lock, lastSpawnPid: state.lastPid })
+  // `probe` is the lock owner's own { exists, startedAt } — the identity half of
+  // "is this really the process we spawned" (four-eyes finding 1.3).
+  const act = wedgeAction({ assessment, lock, lastSpawnPid: state.lastPid, lastSpawnAt: state.lastSpawnAt, probe })
   if (act.stalled) {
     // NOT a clock reading (point 402 (d)): the owner has made no tool call for
     // two launcher ticks AND every piece of work it declared has stopped moving.
@@ -376,7 +421,15 @@ updateOwnLock(launcherSid, { spawnedPid: child.pid, pid: child.pid, pidStartedAt
 // One-shot bind helper for the spawned session's SessionStart hook.
 writeJsonAtomic(C('autostart-authorized.json'), { at: now, pid: child.pid })
 writeJsonAtomic(C('autostart-last.json'), { at: now, head: curHead, pid: child.pid })
-writeJsonAtomic(C('autostart-state.json'), { ...state, lastHead: curHead, lastSpawnAt: now, lastPid: child.pid })
+writeJsonAtomic(C('autostart-state.json'), {
+  ...state,
+  lastHead: curHead,
+  lastSpawnAt: now,
+  lastPid: child.pid,
+  // The ledger, so a handover overwriting lastPid can no longer lose track of a
+  // process that is still running (four-eyes finding 1.4).
+  spawns: recordSpawn(state.spawns, { pid: child.pid, at: now }),
+})
 log(`launched pid ${child.pid} under pending-spawn lock ${launcherSid}`)
 await notify('Resurrected', `No live session — launched a headless worker to continue the batch (${open} open, failCount ${state.failCount}). Progress on GitHub.`, 'low')
 process.exit(0)

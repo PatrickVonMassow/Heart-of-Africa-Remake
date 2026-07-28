@@ -12,9 +12,56 @@
 // witness — and it is safe precisely because the throw comes before the first side
 // effect, which is the property being pinned.
 import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 
 describe('batch-autostart is import-proof', () => {
   it('throws instead of spawning when it is imported rather than run', async () => {
     await expect(import('./batch-autostart.mjs')).rejects.toThrow(/CLI, not a module/)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// THE PURE BUILDERS ARE ACTUALLY USED (four-eyes review 28.07.2026).
+//
+// Everything provable about the spawn — argv, the model chain and, above all, the
+// environment that switches the 600-second background-task execution off — lives
+// in scripts/batch-autostart-core.mjs and is pinned there. But the launcher is the
+// only file that ever spawns, and it cannot be imported by a test (the assertion
+// above is exactly why). So a future edit could re-inline the `spawn` call, drop
+// the `env`, and every unit test would stay green while the four deaths of
+// 28.07.2026 came straight back. Reading the source is the only witness available
+// for that, so this is the one place the repository greps a file's text.
+describe('the launcher uses the pure spawn builders', () => {
+  const source = readFileSync(resolve(process.cwd(), 'scripts', 'batch-autostart.mjs'), 'utf8')
+  // Prose ABOUT the fix is wanted; only the code may be judged for having it.
+  const codeLines = source.split('\n').filter((l) => !l.trimStart().startsWith('//'))
+  const code = codeLines.join('\n')
+
+  it('imports buildSpawnArgs and buildSpawnOptions from the core', () => {
+    const imports = source.match(/import\s*\{[^}]*\}\s*from\s*'\.\/batch-autostart-core\.mjs'/)
+    expect(imports, 'no import from ./batch-autostart-core.mjs').not.toBeNull()
+    expect(imports[0]).toMatch(/\bbuildSpawnArgs\b/)
+    expect(imports[0]).toMatch(/\bbuildSpawnOptions\b/)
+  })
+
+  it('CALLS them at the one spawn site — a re-inlined call would drop the env fix', () => {
+    // Every statement that actually launches a process: `spawn(<ident>, …`.
+    const spawnSites = codeLines.filter((l) => /(?<![\w.])spawn\(\s*[A-Za-z_$][\w$]*\s*,/.test(l))
+    expect(spawnSites, 'the launcher must have exactly one spawn( site').toHaveLength(1)
+    expect(spawnSites[0]).toMatch(/buildSpawnArgs\(/)
+    expect(spawnSites[0]).toMatch(/buildSpawnOptions\(/)
+  })
+
+  it('never names the runtime ceiling variable in CODE — the core owns that policy', () => {
+    // A literal assignment here would sit outside every test in
+    // batch-autostart-core.test.mjs, including the one that stops an inherited
+    // value from re-arming the kill.
+    expect(code).not.toMatch(/CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS/)
+  })
+
+  it('records every spawn in the ledger and reaps from it (finding 1.4)', () => {
+    expect(source).toMatch(/spawns:\s*recordSpawn\(/)
+    expect(source).toMatch(/reapableSpawns\(/)
   })
 })

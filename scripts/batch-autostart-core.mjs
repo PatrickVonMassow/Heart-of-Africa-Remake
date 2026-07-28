@@ -101,3 +101,83 @@ export function buildSpawnOptions({ cwd, stdio, env = process.env } = {}) {
     env: { ...env, [BG_WAIT_CEILING_ENV]: ceiling },
   }
 }
+
+// --- THE LEDGER OF SPAWNS (four-eyes review 28.07.2026, finding 1.4) ----------
+//
+// "Wait indefinitely" has a cost the ceiling used to pay for: a `claude -p` whose
+// turn ended while a background task never exits — a dev server left running is
+// routine here — used to be terminated at 600 s. Now it waits forever, and after
+// a HANDOVER the launcher OVERWRITES `state.lastPid`, so nothing tracks it any
+// more. A leaked session holds ports, which breaks the next session's verify
+// suites, and holds memory for as long as the machine is up.
+//
+// So the launcher keeps a short LEDGER of what it spawned, with the moment it
+// spawned it, and reaps from that instead of from a single overwritten pid. It is
+// deliberately narrow: identity is pid AND start time (`isOwnSpawn`), an entry
+// must be well past its boot window, it must not be the lock owner or the child a
+// pending-spawn lock names, and it must be SUPERSEDED — either someone else holds
+// the lock now, or the launcher has spawned again since. That last clause is what
+// keeps a lock file that merely went missing from turning a healthy worker into a
+// target.
+
+/** How many spawns the ledger remembers. Small on purpose: it exists to find a
+ *  leak within a tick or two, not to keep a history. */
+export const SPAWN_LEDGER_MAX = 8
+
+/** A spawn may not be reaped until it is well past its boot window — the same
+ *  bound the pre-existing rogue-spawn remediation uses. */
+export const SPAWN_REAP_MIN_AGE_MS = 10 * 60 * 1000
+
+/** Append a spawn to the ledger. PURE: returns a new array, newest last, one
+ *  entry per pid (a recycled pid replaces the stale entry), capped. */
+export function recordSpawn(spawns, { pid, at }) {
+  const kept = (Array.isArray(spawns) ? spawns : []).filter(
+    (s) => s && typeof s.pid === 'number' && typeof s.at === 'number' && s.pid !== pid,
+  )
+  kept.push({ pid, at })
+  return kept.slice(-SPAWN_LEDGER_MAX)
+}
+
+/**
+ * WHICH LEDGER ENTRIES ARE LEAKED PROCESSES THE LAUNCHER MAY REAP? PURE —
+ * `probePid` and `isOwnSpawn` are injected.
+ *
+ * Inputs: the ledger, `now`, the current lock (for its pid and its pending-spawn
+ * child), and the probe. Returns [{ pid, at, ageMs }] — every one of them a
+ * process this launcher started, that is still alive under the same identity, and
+ * that is provably not the session doing the work.
+ */
+export function reapableSpawns({
+  spawns,
+  now,
+  lock = null,
+  probePid,
+  isOwnSpawn,
+  minAgeMs = SPAWN_REAP_MIN_AGE_MS,
+} = {}) {
+  const entries = (Array.isArray(spawns) ? spawns : []).filter(
+    (s) => s && typeof s.pid === 'number' && s.pid > 0 && typeof s.at === 'number',
+  )
+  const lockPid = typeof lock?.pid === 'number' && lock.pid > 0 ? lock.pid : null
+  const pendingChild = lock?.kind === 'pending-spawn' && typeof lock.spawnedPid === 'number' ? lock.spawnedPid : null
+  const newest = entries.reduce((m, s) => Math.max(m, s.at), 0)
+  const out = []
+  for (const s of entries) {
+    if (s.pid === lockPid || s.pid === pendingChild) continue
+    if (now - s.at <= minAgeMs) continue
+    // Superseded: somebody else owns the batch now, or a later spawn exists. A
+    // sole, unsuperseded spawn with no readable lock is left alone — it may be a
+    // healthy worker whose lock file the launcher simply could not read.
+    if (!(lockPid !== null || s.at < newest)) continue
+    if (!isOwnSpawn({ pid: s.pid, probe: probePid(s.pid), lastSpawnPid: s.pid, lastSpawnAt: s.at })) continue
+    out.push({ pid: s.pid, at: s.at, ageMs: now - s.at })
+  }
+  return out
+}
+
+/** Drop entries whose process is gone, so the ledger does not accumulate. PURE. */
+export function pruneSpawns({ spawns, probePid } = {}) {
+  return (Array.isArray(spawns) ? spawns : []).filter(
+    (s) => s && typeof s.pid === 'number' && typeof s.at === 'number' && probePid(s.pid)?.exists === true,
+  )
+}

@@ -17,13 +17,19 @@ import { describe, it, expect } from 'vitest'
 import {
   buildSpawnArgs,
   buildSpawnOptions,
+  recordSpawn,
+  reapableSpawns,
+  pruneSpawns,
   RESUME_PROMPT,
   SPAWN_MODEL,
   SPAWN_FALLBACK_MODEL,
   BG_WAIT_CEILING_ENV,
   BG_WAIT_CEILING_OVERRIDE_ENV,
   BG_WAIT_CEILING_DEFAULT,
+  SPAWN_LEDGER_MAX,
+  SPAWN_REAP_MIN_AGE_MS,
 } from './batch-autostart-core.mjs'
+import { isOwnSpawn } from './batch-singleton.mjs'
 
 describe('buildSpawnOptions — the ten-minute execution is switched off', () => {
   it('THE FIX: the child carries the background-wait ceiling as 0 (wait indefinitely)', () => {
@@ -93,5 +99,126 @@ describe('the resume prompt', () => {
   it('still carries the point boundary and the stand-down instruction', () => {
     expect(RESUME_PROMPT).toMatch(/batch-boundary\.mjs/)
     expect(RESUME_PROMPT).toMatch(/STAND DOWN/)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// THE LEDGER OF SPAWNS (four-eyes review 28.07.2026, finding 1.4). Switching the
+// runtime ceiling off removed the only thing that ever ended a `claude -p` whose
+// turn had finished but whose background task never exits — a left-running dev
+// server is routine here, and a leaked session holds the ports the next session's
+// verify suites need. `state.lastPid` cannot track them: a handover overwrites it.
+// So the launcher remembers what it spawned, and reaps from that.
+describe('recordSpawn (a short, honest ledger)', () => {
+  const NOW = 1_785_200_000_000
+
+  it('appends newest-last and survives a missing or malformed ledger', () => {
+    expect(recordSpawn(undefined, { pid: 1, at: NOW })).toEqual([{ pid: 1, at: NOW }])
+    expect(recordSpawn([{ pid: 1, at: NOW }, null, { pid: 'x' }], { pid: 2, at: NOW + 1 })).toEqual([
+      { pid: 1, at: NOW },
+      { pid: 2, at: NOW + 1 },
+    ])
+  })
+
+  it('a RECYCLED pid replaces its stale entry rather than shadowing it', () => {
+    expect(recordSpawn([{ pid: 7, at: NOW - 86_400_000 }], { pid: 7, at: NOW })).toEqual([{ pid: 7, at: NOW }])
+  })
+
+  it('stays capped — it exists to find a leak within a tick or two, not to keep history', () => {
+    let led = []
+    for (let i = 0; i < SPAWN_LEDGER_MAX + 5; i++) led = recordSpawn(led, { pid: 100 + i, at: NOW + i })
+    expect(led).toHaveLength(SPAWN_LEDGER_MAX)
+    expect(led.at(-1)).toEqual({ pid: 100 + SPAWN_LEDGER_MAX + 4, at: NOW + SPAWN_LEDGER_MAX + 4 })
+  })
+})
+
+describe('reapableSpawns (what the removed runtime ceiling used to reap)', () => {
+  const NOW = 1_785_200_000_000
+  const OLD = NOW - 3 * 60 * 60_000
+  const NEWER = NOW - 30 * 60_000
+  // The leak: an earlier spawn still alive after a handover, superseded by the
+  // spawn that now owns the batch.
+  const ledger = [
+    { pid: 800, at: OLD },
+    { pid: 900, at: NEWER },
+  ]
+  const probe = (starts) => (pid) =>
+    pid in starts ? { exists: true, startedAt: starts[pid] } : { exists: false, startedAt: null }
+  const reap = (over = {}) =>
+    reapableSpawns({
+      spawns: ledger,
+      now: NOW,
+      lock: { pid: 900, sessionId: 's' },
+      probePid: probe({ 800: OLD + 300, 900: NEWER + 300 }),
+      isOwnSpawn,
+      ...over,
+    })
+
+  it('THE LEAK: an old spawn still alive while another session owns the batch is reaped', () => {
+    expect(reap().map((s) => s.pid)).toEqual([800])
+  })
+
+  it('the CURRENT OWNER is never reaped, nor the child a pending-spawn lock names', () => {
+    // Whoever holds the lock is doing the work; the other entry is the leak.
+    expect(reap({ lock: { pid: 800 } }).map((s) => s.pid)).toEqual([900])
+    expect(reap({ lock: { kind: 'pending-spawn', spawnedPid: 800, pid: 900 } }).map((s) => s.pid)).toEqual([])
+  })
+
+  it('A RECYCLED PID IS NOT OUR SPAWN — identity is pid AND start time', () => {
+    // The number was inherited by a stranger (an interactive window, say). It
+    // must not be killed on the strength of the pid alone.
+    expect(reap({ probePid: probe({ 800: NOW - 60_000, 900: NEWER + 300 }) }).map((s) => s.pid)).toEqual([])
+    // A start time that cannot be established is likewise never a licence.
+    expect(reap({ probePid: (pid) => ({ exists: true, startedAt: pid === 800 ? null : NEWER }) })).toEqual([])
+  })
+
+  it('a spawn still inside its boot window is left alone', () => {
+    expect(
+      reapableSpawns({
+        spawns: [
+          { pid: 800, at: NOW - 60_000 },
+          { pid: 900, at: NOW },
+        ],
+        now: NOW,
+        lock: { pid: 900 },
+        probePid: probe({ 800: NOW - 60_000, 900: NOW }),
+        isOwnSpawn,
+      }),
+    ).toEqual([])
+    expect(SPAWN_REAP_MIN_AGE_MS).toBeGreaterThanOrEqual(10 * 60_000)
+  })
+
+  it('AN UNSUPERSEDED SOLE SPAWN WITH NO READABLE LOCK IS LEFT ALONE', () => {
+    // The narrowness that keeps a lock file which merely went missing from
+    // turning a healthy worker into a target: reaping needs either another owner
+    // holding the lock now, or a later spawn to have superseded this one.
+    const args = { spawns: [{ pid: 900, at: OLD }], now: NOW, probePid: probe({ 900: OLD + 300 }), isOwnSpawn }
+    expect(reapableSpawns({ ...args, lock: null })).toEqual([])
+    expect(reapableSpawns({ ...args, lock: { pid: 0 } })).toEqual([])
+    // …but once a NEWER spawn exists, the older one is a leak even with no lock.
+    expect(reap({ lock: null }).map((s) => s.pid)).toEqual([800])
+  })
+
+  it('an empty or malformed ledger reaps nothing', () => {
+    for (const spawns of [undefined, [], [null, { pid: 'x' }, { at: 1 }]]) {
+      expect(
+        reapableSpawns({
+          spawns,
+          now: NOW,
+          lock: { pid: 900 },
+          probePid: () => ({ exists: true, startedAt: 1 }),
+          isOwnSpawn,
+        }),
+      ).toEqual([])
+    }
+  })
+})
+
+describe('pruneSpawns', () => {
+  it('drops entries whose process is gone so the ledger cannot accumulate', () => {
+    const probePid = (pid) => ({ exists: pid === 900, startedAt: 1 })
+    expect(pruneSpawns({ spawns: [{ pid: 800, at: 1 }, { pid: 900, at: 2 }, null], probePid })).toEqual([
+      { pid: 900, at: 2 },
+    ])
   })
 })
