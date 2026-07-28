@@ -1940,12 +1940,29 @@ read that as "the criterion and its evidence section".
   June winter). One hour later breaks it — at 17:00 the Cape sun in June is BELOW the
   horizon, and a fixed hour must never put the sun under the horizon anywhere in the
   world window (lat -37..38, all 365 days).
+  ONE DEFINITION, READ BY BOTH SCENES. The two constants above are not merely stale,
+  they DISAGREE (~45° against ~48°) — the same sun stands at two heights depending on
+  which view holds the camera. The derivation therefore lands in ONE place that travel
+  and settlement both read; neither scene keeps a sun of its own, or they drift apart
+  again the first time one of them is touched.
   EVERYTHING THE SUN FEEDS MUST FOLLOW IT, or the picture contradicts itself: the
   directional light AND its shadow camera in both scenes, the sky dome's disc and halo
   (`src/render/sky.tsx`, whose `sunDirection` must keep agreeing with the light — its
   own comment says so), and the baked environment light
   (`createEnvironmentTexture`/`IBL_SUN` in `src/render/Effects.tsx`), re-derived when
   the date or the position changes and NEVER per frame.
+  THE SETTLEMENT IS THE STRICTER OF THE TWO (user 28.07.2026). Point 344's eye
+  adaptation and sun glare build DIRECTLY on this angle, and at eye height a wrong sun
+  is not a subtlety — it decides whether the traveller is dazzled turning west, and
+  where every wall's shadow falls in a lane he walks through. The settlement sun is
+  therefore derived from the SETTLEMENT's own latitude and the current date, never from
+  a scene default, and the acceptance below judges it at eye height.
+  AND THE JOURNEY MUST SHOW IT (user 28.07.2026). The bird's-eye view is where the
+  change becomes legible: walking the continent from the Mediterranean to the Cape at
+  one date, the shadows must visibly turn and lengthen as the latitude runs out — and
+  the same place in June and in December must not look alike. A sun that is merely
+  CORRECT per frame but whose change no traveller notices misses the point of this
+  ticket; the live acceptance therefore measures a TRAVERSE, not only a single spot.
   THE SKY PRESETS ARE THE REAL WORK, not the arithmetic. They are authored for a high
   sun; a low sun under an unchanged noon-blue dome reads as a bug — the same failure
   the overcast handling already guards against (a dimmed sun under a bright blue sky,
@@ -1964,11 +1981,15 @@ read that as "the criterion and its evidence section".
   hemispheres invert across the year, and a SWEEP over the full world bounds × all 365
   days asserts the sun never falls to or below the horizon at the default hour (the
   17:00 counter-case is pinned as the witness that the bound is real); the azimuth is
-  westerly in the afternoon for both hemispheres. Live (`scripts/verify/
-  enrichments.mjs` + `polish.mjs`, BOTH backends, screenshots): the same place rendered
-  in June and in December differs measurably in pixels and in shadow direction; a
-  settlement's shadows agree with its sky-dome sun disc rather than pointing elsewhere;
-  no console errors.
+  westerly in the afternoon for both hemispheres; and a NORTH-SOUTH SWEEP at one date
+  returns a monotonically changing elevation, so the traverse below has something to
+  show. Live (`scripts/verify/enrichments.mjs` + `polish.mjs`, BOTH backends,
+  screenshots): the same place rendered in June and in December differs measurably in
+  pixels and in shadow direction; a TRAVERSE of at least three widely separated
+  latitudes at one date yields shadows whose measured direction and length differ
+  between the stops — the check the user's "you should notice it while walking" asks
+  for; inside a settlement, at EYE HEIGHT, the shadows agree with the sky-dome sun disc
+  rather than pointing elsewhere; no console errors.
   DOCS: design.md §2.7 already states it; CLAUDE.md §7.1 point 14 gains the built
   behaviour when this lands.
 
