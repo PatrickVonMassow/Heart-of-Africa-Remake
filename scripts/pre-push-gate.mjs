@@ -24,19 +24,30 @@
 // real intermittent defect, which is exactly what the house rule about visible
 // retries exists to prevent — and the wrapper times the second attempt, so the
 // cost of the retry is measured rather than assumed.
+// A PASSING COUNT OVER A SET THAT SILENTLY SHRANK (point 404). The unit step's
+// output is CAPTURED as well as printed, so the gate can read how many test
+// FILES actually ran and compare that with the last green run's own count. A
+// suite that cannot load does not fail — it vanishes from the totals — so a
+// damaged dependency tree reports greener than a red run unless someone counts.
 import { execFileSync, spawnSync } from 'node:child_process'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { REPO_ROOT } from './repo-paths.mjs'
 import {
+  GATE_STATE_FILE,
   LOAD_LEVELS,
   PROTECTED_REF,
   UNAVAILABLE,
   decide,
+  evaluateTestFileCount,
   formatVerdict,
   gatePlanForPush,
+  parseGateState,
+  parseUnitTotals,
   parsePushInput,
   runGate,
+  testFileBaseline,
+  withTestFileBaseline,
 } from './pre-push-gate-core.mjs'
 
 const git = (args) => execFileSync('git', args, { cwd: REPO_ROOT, encoding: 'utf8' })
@@ -95,6 +106,34 @@ function readLoadLevel({ when } = {}) {
     // fact about this verdict, and it is what buys the re-run.
     console.log(`pre-push gate: the load probe could not be read (${when} reading) — treating the machine as unmeasured`)
     return { level: 'unknown', reasons: ['the load probe could not be read'] }
+  }
+}
+
+/**
+ * The gate's own memory of the last green unit run (point 404). Git-ignored and
+ * per checkout, because each checkout has its own dependency tree and its own
+ * branch — a baseline shared across them would compare two different worlds.
+ *
+ * FAIL-OPEN on every I/O error: a missing, unreadable or garbled state file
+ * yields "no baseline", which records and passes rather than blocking.
+ */
+const gateStatePath = () => resolve(REPO_ROOT, GATE_STATE_FILE)
+
+function readGateState() {
+  try {
+    return parseGateState(readFileSync(gateStatePath(), 'utf8'))
+  } catch {
+    return {}
+  }
+}
+
+function writeGateState(state) {
+  try {
+    writeFileSync(gateStatePath(), `${JSON.stringify(state, null, 2)}\n`)
+  } catch (e) {
+    // Said out loud rather than swallowed: a baseline that cannot be written is
+    // a gate that will never notice the next shrink either.
+    console.log(`pre-push gate: the test-count baseline could not be written (${e.message})`)
   }
 }
 
@@ -161,11 +200,28 @@ try {
   if (warning) console.log(warning)
 
   console.log(`pre-push gate: ${plan.steps.join(' → ')} (${plan.reason})`)
+  // The LAST unit attempt's output — a re-run replaces it, because the second
+  // run is the one the verdict is taken from.
+  let unitOutput = ''
   const results = runGate(
     plan.steps,
     (step, [cmd, ...args], { attempt = 1 } = {}) => {
       const started = Date.now()
-      const run = spawnSync(cmd, args, { cwd: REPO_ROOT, stdio: 'inherit', shell: process.platform === 'win32' })
+      // Only the unit step is captured, and it is echoed straight afterwards, so
+      // nothing is lost from the scrollback. The cost is that its output arrives
+      // in one block instead of streaming — paid for the one step whose totals
+      // have to be counted (point 404).
+      const capture = step === 'unit'
+      const run = spawnSync(cmd, args, {
+        cwd: REPO_ROOT,
+        stdio: capture ? ['inherit', 'pipe', 'pipe'] : 'inherit',
+        ...(capture ? { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 } : {}),
+        shell: process.platform === 'win32',
+      })
+      if (capture) {
+        unitOutput = `${run.stdout ?? ''}${run.stderr ?? ''}`
+        process.stdout.write(unitOutput)
+      }
       // What the retry COSTS, measured rather than estimated (point 389).
       if (attempt > 1) console.log(`pre-push gate: the re-run of ${step} took ${((Date.now() - started) / 1000).toFixed(1)}s`)
       // audit-check exits 3 when the audit could not RUN (offline, registry
@@ -176,7 +232,21 @@ try {
     { readLoad: readLoadLevel, onNotice: (line) => console.log(line) },
   )
 
-  const verdict = decide(results)
+  // How large the evidence base actually was, against the last green run's own
+  // count (point 404). Only taken where the unit step ran at all — the light
+  // gate has no unit step, and a build that failed first never reaches one.
+  let fileCount = null
+  const unitResult = results.find((r) => r?.step === 'unit')
+  if (unitResult) {
+    const state = readGateState()
+    const totals = parseUnitTotals(unitOutput)
+    fileCount = evaluateTestFileCount({ totals, baseline: testFileBaseline(state), unitOk: unitResult.ok === true })
+    if (fileCount.nextBaseline !== null && fileCount.nextBaseline !== fileCount.baseline) {
+      writeGateState(withTestFileBaseline(state, { files: fileCount.nextBaseline, tests: fileCount.tests }))
+    }
+  }
+
+  const verdict = decide(results, fileCount)
   console.log(formatVerdict(verdict, plan))
   process.exit(verdict.blocked ? 1 : 0)
 } catch (e) {

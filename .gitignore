@@ -66,6 +66,10 @@ scripts/.tile-cache
 # ledger it is judged against (.claude/mechanism-reviews.jsonl) IS tracked: a
 # review happens on a branch and the gate bites in the session that merges it.
 .claude/mechanism-review-baseline.json
+# The pre-push gate's memory of the last green unit run (test-file count). Per
+# CHECKOUT on purpose: each worktree has its own dependency tree, and a baseline
+# shared across them would compare two different worlds.
+.claude/pre-push-gate-state.json
 
 # Local GitHub PAT (ci-status-guard.mjs probes this path) — never committed
 .secrets/

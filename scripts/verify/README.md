@@ -269,6 +269,45 @@ with nothing red to notice it, so the shape is pinned by a test that runs the CL
 with `VERIFY_LOAD_FORCE=busy` (asynchronously — a `spawnSync` inside a vitest
 worker starves its own `onTaskUpdate` RPC and reddens the whole run).
 
+### The gate also counts HOW MUCH ran (point 404)
+
+A red run is not the only broken run. On 28.07.2026 one unit run reported **3546
+passing tests while 34 test FILES had failed to load**; the run an hour earlier
+had **4214 tests over 153 files**. A damaged dependency tree — a platform package
+missing its entry file — makes whole suites unloadable, and an unloadable suite
+does not fail: it VANISHES from the totals, so the report reads *greener* than a
+red run. The same night the tree was destroyed outright (`node_modules` in the
+main tree went empty when stale worktrees were removed, and the build failed with
+"tsc is not recognized") — the same failure class, one step louder. Nothing in the
+chain compared the number of EXECUTED files with the last known state, so every
+gate waved it through; it was noticed only because a review agent could not start
+the tests either and said so.
+
+So the gate now captures the unit step's output as well as printing it, reads its
+`Test Files` / `Tests` summary, and compares the file count with the **last green
+run's own count** — never a hard-coded number, which would rot with every added
+suite. The baseline lives in `.claude/pre-push-gate-state.json` (git-ignored, per
+CHECKOUT: each worktree has its own dependency tree). Both numbers appear in the
+gate's own line — `unit ran 153 files / 4214 tests` — so the size of the evidence
+base is visible on a green push too, not only when it blocks.
+
+| This run vs. the last green one | Verdict |
+|---|---|
+| more files | passes, baseline advances |
+| the same | passes |
+| FEWER files | **blocks**, naming both counts — and records the drop |
+| no baseline recorded | passes and records; a first run never blocks |
+| summary unreadable | passes, compares nothing, records nothing |
+| the unit step itself was red | already blocked; its count is not taken as a baseline |
+
+A shrink blocks **once**. The drop is recorded as it blocks, so a deliberate
+reduction (a suite genuinely deleted) is accepted by pushing again once the drop
+is understood — a permanent wall would make the repository unpushable over a
+legitimate change, while the incident's actual gap was that nothing said anything
+at all. The comparison, the parse (colour escapes and all) and the state shape are
+pure in `pre-push-gate-core.mjs` and pinned in `pre-push-gate-core.test.mjs`; a
+garbled summary yields nulls and never throws.
+
 ## Triaging a RED run (point 294)
 
 A red is now read, not asserted. Two signals, both decided in the pure module

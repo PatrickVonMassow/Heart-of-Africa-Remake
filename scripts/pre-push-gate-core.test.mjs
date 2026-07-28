@@ -25,6 +25,13 @@ import {
   runGate,
   shouldRetryAfterRed,
   worseLoad,
+  GATE_STATE_FILE,
+  evaluateTestFileCount,
+  formatUnitTotals,
+  parseGateState,
+  parseUnitTotals,
+  testFileBaseline,
+  withTestFileBaseline,
 } from './pre-push-gate-core.mjs'
 
 describe('parsePushInput', () => {
@@ -480,5 +487,238 @@ describe('the commands are the ones CI runs', () => {
     for (const step of new Set([...FULL_GATE, ...LIGHT_GATE])) {
       expect(GATE_COMMANDS[step], `no command for gate step ${step}`).toBeTruthy()
     }
+  })
+})
+
+// ---------------------------------------------------------------------------
+// A passing count over a set that silently SHRANK (point 404).
+//
+// 28.07.2026: one unit run reported 3546 passing tests while 34 test FILES had
+// failed to load; the run an hour earlier had 4214 tests over 153 files. An
+// unloadable suite does not fail — it vanishes from the totals — so the report
+// read GREENER than a red run and every gate waved it through.
+// ---------------------------------------------------------------------------
+
+const ESC = String.fromCharCode(27)
+/** A vitest summary as it really arrives: coloured, even through a pipe. */
+const summary = (files, tests) =>
+  `${ESC}[2m Test Files ${ESC}[22m ${ESC}[1m${ESC}[32m${files} passed${ESC}[39m${ESC}[22m${ESC}[90m (${files})${ESC}[39m\n` +
+  `${ESC}[2m      Tests ${ESC}[22m ${ESC}[1m${ESC}[32m${tests} passed${ESC}[39m${ESC}[22m${ESC}[90m (${tests})${ESC}[39m\n`
+
+describe('parseUnitTotals — reading how large the evidence base was', () => {
+  it('reads both numbers out of a plain summary', () => {
+    expect(parseUnitTotals(' Test Files  153 passed (153)\n      Tests  4214 passed (4214)\n')).toEqual({
+      files: 153,
+      tests: 4214,
+    })
+  })
+
+  it('strips the colour escapes vitest emits even through a pipe', () => {
+    expect(parseUnitTotals(summary(153, 4214))).toEqual({ files: 153, tests: 4214 })
+  })
+
+  it('takes the parenthesised TOTAL, not only what passed', () => {
+    const out = ' Test Files  34 failed | 119 passed (153)\n      Tests  3 failed | 4211 passed (4214)\n'
+    expect(parseUnitTotals(out)).toEqual({ files: 153, tests: 4214 })
+  })
+
+  it('sums the named categories where a line carries no total', () => {
+    expect(parseUnitTotals(' Test Files  2 failed | 5 passed\n      Tests  9 passed | 1 skipped\n')).toEqual({
+      files: 7,
+      tests: 10,
+    })
+  })
+
+  it('never mistakes the "Test Files" line for the "Tests" line', () => {
+    // The labels overlap; a sloppy regex reads the file count as the test count.
+    expect(parseUnitTotals(' Test Files  1 passed (1)\n').tests).toBeNull()
+  })
+
+  it('takes the LAST summary, because a failure report prints the words earlier', () => {
+    const out = 'Test Files 3 failed\nsome noise\n Test Files  153 passed (153)\n      Tests  4214 passed (4214)\n'
+    expect(parseUnitTotals(out).files).toBe(153)
+  })
+
+  it('a garbled parse yields nulls and NEVER throws', () => {
+    for (const input of ['', null, undefined, 'no summary here at all', 'Test Files  who knows', {}, 42]) {
+      expect(() => parseUnitTotals(input)).not.toThrow()
+      expect(parseUnitTotals(input).files).toBeNull()
+    }
+  })
+})
+
+describe('formatUnitTotals — both numbers in the gate own line', () => {
+  it('reads "153 files / 4214 tests"', () => {
+    expect(formatUnitTotals({ files: 153, tests: 4214 })).toBe('153 files / 4214 tests')
+  })
+
+  it('says what it could not read instead of inventing a zero', () => {
+    expect(formatUnitTotals({ files: null, tests: 4214 })).toBe('an unreadable file count / 4214 tests')
+    expect(formatUnitTotals()).toBe('an unreadable file count / an unreadable test count')
+  })
+})
+
+describe('the baseline state — the gate own memory of the last green run', () => {
+  it('is a git-ignored path, so it is never pushed between checkouts', () => {
+    expect(GATE_STATE_FILE).toBe('.claude/pre-push-gate-state.json')
+    expect(readFileSync(resolve(REPO_ROOT, '.gitignore'), 'utf8')).toContain(GATE_STATE_FILE)
+  })
+
+  it('survives a missing, empty or garbled file rather than throwing', () => {
+    for (const input of ['', null, undefined, 'not json', '[]', '"a string"', '7']) {
+      expect(() => parseGateState(input)).not.toThrow()
+      expect(testFileBaseline(parseGateState(input))).toBeNull()
+    }
+  })
+
+  it('round-trips a recorded count', () => {
+    const state = withTestFileBaseline({}, { files: 153, tests: 4214, at: '2026-07-28T00:00:00.000Z' })
+    expect(testFileBaseline(state)).toBe(153)
+    expect(testFileBaseline(parseGateState(JSON.stringify(state)))).toBe(153)
+  })
+
+  it('keeps whatever else the file carried, so the state can grow', () => {
+    const state = withTestFileBaseline({ somethingElse: 'kept' }, { files: 10, tests: 20 })
+    expect(state.somethingElse).toBe('kept')
+  })
+
+  it('refuses a nonsense count rather than recording it as a baseline', () => {
+    expect(testFileBaseline(withTestFileBaseline({}, { files: 'lots' }))).toBeNull()
+    expect(testFileBaseline(withTestFileBaseline({}, { files: -1 }))).toBeNull()
+    expect(testFileBaseline(withTestFileBaseline({}, {}))).toBeNull()
+  })
+})
+
+describe('evaluateTestFileCount — a shrinking evidence base is as serious as a failure', () => {
+  const run = (files, baseline, tests = 4214, unitOk = true) =>
+    evaluateTestFileCount({ totals: { files, tests }, baseline, unitOk })
+
+  it('a HIGHER count passes and advances the baseline', () => {
+    const v = run(160, 153)
+    expect(v.blocked).toBe(false)
+    expect(v.status).toBe('grew')
+    expect(v.nextBaseline).toBe(160)
+    expect(v.line).toContain('160 files / 4214 tests')
+  })
+
+  it('an EQUAL count passes and leaves the baseline where it is', () => {
+    const v = run(153, 153)
+    expect(v.blocked).toBe(false)
+    expect(v.status).toBe('same')
+    expect(v.nextBaseline).toBe(153)
+  })
+
+  it('a LOWER count is RED and names BOTH numbers', () => {
+    // The incident, replayed: 153 files / 4214 tests became 119 / 3546.
+    const v = run(119, 153, 3546)
+    expect(v.blocked).toBe(true)
+    expect(v.status).toBe('shrank')
+    expect(v.line).toMatch(/PUSH BLOCKED/)
+    expect(v.line).toContain('119')
+    expect(v.line).toContain('153')
+    // Both totals, not only the file count — the report that read greener said
+    // 3546 tests, and that number is the reader own anchor to the incident.
+    expect(v.line).toContain('119 files / 3546 tests')
+    expect(v.line).toContain(GATE_COMMANDS.unit.join(' '))
+  })
+
+  it('a MISSING baseline records and passes — the first run never blocks', () => {
+    const v = run(153, null)
+    expect(v.blocked).toBe(false)
+    expect(v.status).toBe('first')
+    expect(v.nextBaseline).toBe(153)
+    expect(v.line).toContain('153 files / 4214 tests')
+    // Fail-open on first use, stated in the line the developer reads.
+    expect(v.line).toMatch(/never blocks/i)
+    expect(evaluateTestFileCount({ totals: { files: 153 } }).blocked).toBe(false)
+  })
+
+  it('records the drop as it blocks, so a DELIBERATE reduction is accepted by re-running', () => {
+    // A permanent wall would make the repository unpushable over a suite that
+    // was genuinely deleted; a loud one-time stop is what the incident lacked.
+    const first = run(119, 153)
+    expect(first.blocked).toBe(true)
+    expect(first.nextBaseline).toBe(119)
+    expect(run(119, first.nextBaseline).blocked).toBe(false)
+  })
+
+  it('does NOT compare against a hard-coded number — only against the last green run', () => {
+    // The same count is fine under one baseline and red under another; nothing
+    // in the module knows how many suites this repository "should" have.
+    expect(run(500, 400).blocked).toBe(false)
+    expect(run(500, 600).blocked).toBe(true)
+  })
+
+  it('never blocks on an unreadable count, and never records one', () => {
+    const v = evaluateTestFileCount({ totals: parseUnitTotals('garbage'), baseline: 153 })
+    expect(v.blocked).toBe(false)
+    expect(v.status).toBe('unreadable')
+    expect(v.nextBaseline).toBe(153)
+    expect(v.line).toContain('153 files')
+  })
+
+  it('takes no baseline from a RED unit run — its count says nothing about the true size', () => {
+    const v = run(119, 153, 3546, false)
+    expect(v.status).toBe('red-run')
+    expect(v.nextBaseline).toBe(153)
+    // Already blocked by the step itself; a second block would only add noise.
+    expect(v.blocked).toBe(false)
+  })
+
+  it('survives being called with nothing at all', () => {
+    expect(() => evaluateTestFileCount()).not.toThrow()
+    expect(evaluateTestFileCount().blocked).toBe(false)
+  })
+})
+
+describe('the count reaches the verdict (point 404)', () => {
+  const green = FULL_GATE.map((step) => ({ step, ok: true }))
+
+  it('blocks the push on a shrink even though every step passed', () => {
+    const count = evaluateTestFileCount({ totals: { files: 119, tests: 3546 }, baseline: 153 })
+    const verdict = decide(green, count)
+    expect(verdict.blocked).toBe(true)
+    expect(verdict.failed).toEqual([])
+    const msg = formatVerdict(verdict, { reason: 'push to the deployed branch' })
+    expect(msg).toMatch(/PUSH BLOCKED/)
+    expect(msg).toContain('119')
+    expect(msg).toContain('153')
+    // Blocked by the count ALONE: no empty "the fast gate is red: " headline.
+    expect(msg).not.toMatch(/the fast gate is red: *$/m)
+  })
+
+  it('reports both numbers on a GREEN push too, so a shrink is visible before it blocks', () => {
+    const count = evaluateTestFileCount({ totals: { files: 153, tests: 4214 }, baseline: 153 })
+    const msg = formatVerdict(decide(green, count), { reason: 'push to the deployed branch' })
+    expect(msg).toContain('153 files / 4214 tests')
+    expect(msg).toMatch(/pre-push gate: green/)
+  })
+
+  it('still names a red STEP when both it and the count are unhappy', () => {
+    const count = evaluateTestFileCount({ totals: { files: 119 }, baseline: 153 })
+    const msg = formatVerdict(decide([{ step: 'lint', ok: false }], count), { reason: 'push to the deployed branch' })
+    expect(msg).toContain('the fast gate is red: lint')
+    expect(msg).toContain('119')
+  })
+
+  it('leaves the verdict shape untouched where no count was taken', () => {
+    expect(decide(green)).toEqual({ blocked: false, failed: [], unavailable: [], retried: [] })
+    expect(decide(green, null)).toEqual({ blocked: false, failed: [], unavailable: [], retried: [] })
+  })
+})
+
+describe('the wrapper actually asks the question', () => {
+  const wrapper = readFileSync(resolve(REPO_ROOT, 'scripts/pre-push-gate.mjs'), 'utf8')
+
+  it('captures the unit output rather than only inheriting it', () => {
+    // Without a captured stream there is nothing to count, and the gate would be
+    // present but blind — the failure mode this repository already had once.
+    expect(wrapper).toContain('evaluateTestFileCount')
+    expect(wrapper).toContain('parseUnitTotals')
+    expect(wrapper).toMatch(/'inherit', 'pipe', 'pipe'/)
+  })
+
+  it('prints the captured output, so nothing disappears from the scrollback', () => {
+    expect(wrapper).toContain('process.stdout.write(unitOutput)')
   })
 })
