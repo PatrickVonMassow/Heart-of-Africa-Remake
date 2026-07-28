@@ -1327,41 +1327,62 @@ read that as "the criterion and its evidence section".
   BOTH backends), plus the screenshot pair before/after; pure test for whichever
   sampling rule was wrong.
 
-- [ ] 315. GIZA SITE: THE BURIED SPHINX READS WRONG ON THE GROUND (user 25.07.2026,
-  reported TWICE from the deployed build; the second screenshot is the sharper
-  evidence and defines the target). What the player sees standing on the plateau is
-  not a couchant lion half-buried in sand but a **stone TABLE or gate**: a horizontal
-  slab carried on posts, with daylight visible UNDER it, and a pale flat sheet at that
-  same height spreading sideways FAR BEYOND the body rather than hugging it. The
-  point-279 pass fixed the SKYLINE cues (point 82) and left this ground-level read
-  untouched.
-  DIAGNOSE BEFORE RESHAPING — the first spec called the pale sheet "a wedge at its
-  base", and the new picture shows it reaching well past the animal on both sides.
-  Establish WHAT it actually is (the drift geometry itself, the site disc seen from
-  below eye height, or a separate plane) and say so in the commit; reshaping the
-  wrong object would leave the picture unchanged while the tests turn green.
-  TARGET at SITE scale: head, neck and upper back emerge from a sand MOUND that HUGS
-  the body — a drift envelope meeting the desert floor with no floating slab, no
-  daylight under the body from any standpoint a player can reach, and no sheet
-  extending beyond the drift — matching the ~1890 state in which only the head and
-  upper back stood clear of the sand. The collidable mass stays as it is.
-  THE DECISIVE CLUE ARRIVED 27.07.2026 (user, third screenshot with the area marked):
-  the pale sheet FLICKERS — it and the surface behind it trade places frame by frame
-  across a band at the body's base, the unmistakable signature of two faces at the SAME
-  depth fighting for the front. That answers the diagnosis question above: there are
-  two coplanar surfaces there, not one misshapen mesh, and the fix is to remove the
-  duplicate or separate the planes — not to reshape a wedge. A z-offset that merely
-  hides the fight is NOT the fix; the sheet has no business spreading past the body at
-  all. The flicker is also the sharpest acceptance signal available: it is visible in
-  MOTION, so the live check must move the camera rather than take one still.
-  VERIFIABLE: the existing `buildSphinx` / site-layout pure tests keep passing, plus a
-  new one for the mound envelope — the mound meets the ground plane, every body face
-  except head and upper back sits below the mound crest, and the drift's own footprint
-  does not exceed the body's by more than its skirt (the sideways-sheet witness);
-  live, a screenshot SET from several standpoints inside the site — including one
-  close enough to look under the body — on BOTH backends, judged by the picture; the
-  skyline variant (point 82) unchanged.
-
+- [ ] 315. THE SPHINX IS REBUILT FROM SCRATCH, FAR MORE ELABORATE (user 28.07.2026,
+  superseding every earlier display report about it — the flicker, the shape and the
+  half-buried read are all answered by the new model, not by patching the old one). The
+  user's verdict on the deployed build: "die Darstellung der Sphinx gefällt mir allgemein
+  nicht … man kann sie kaum als Sphinx erkennen", and the screenshot shows why — a stack
+  of plain boxes with a slab on top, reading as a gate or a table, at a monument every
+  player recognises on sight. The FIRST-PERSON view is what matters most; the bird's-eye
+  landmark and the §2.5 skyline silhouette are named as "auch nicht schön" and are part of
+  the same job.
+  THE TARGET: a Great Sphinx that is recognisable at a glance from any standpoint a player
+  can reach, and worth walking up to — a couchant lion body with the forepaws stretched
+  forward, a human head in the nemes headdress with its brow band and the folded lappets
+  falling to the chest, the broken nose and the missing beard of the real monument, the
+  chest between the paws, and the weathered horizontal banding of the limestone courses.
+  It is the one built landmark in the game with a FACE; it must not be the crudest.
+  ACCURACY AND RECOGNISABILITY, and how to hold both: `docs/giza-1890.md` records the
+  ~1890 state — the body buried to the shoulders, only head, neck and upper back standing
+  clear, which is exactly what makes the current model unreadable. Do NOT dig it out; the
+  period state is researched and stands. Buy the recognisability from DETAIL and from the
+  drift's own shape instead: the emergent head carries the nemes, the face and the neck at
+  a resolution that reads from across the site, and the sand mound is modelled as a body
+  UNDER sand — a long couchant swell with the shoulders' shape showing through and the
+  back ridge breaking the surface — rather than a heap beside a box. A player who has
+  never seen the site must be able to say "that is the Sphinx"; a player who knows it must
+  find the 1890 burial line where the photographs put it. If, once built, those two
+  genuinely cannot be reconciled, say so with the pictures rather than quietly abandoning
+  either — the choice is then the user's.
+  ALL THREE SCALES, one model, three levels of detail: (a) FIRST-PERSON at the site, the
+  full model; (b) the BIRD'S-EYE landmark, seen from above and far — the silhouette from
+  that angle is what carries it, so the paws, the body swell and the head must be
+  distinguishable at the travel scale rather than a lump; (c) the §2.5 SKYLINE silhouette
+  from Cairo (point 82), where only the outline exists and it must still read as a
+  crouching figure with a raised head. Derive them from ONE definition so the three cannot
+  drift apart, the way the Giza plateau's two records did (point 338).
+  COST IS PART OF THE JOB: the site model may be elaborate, but it is drawn every frame at
+  a place the player stands in. Sort it into the quality levels like every other optical
+  feature (§21, `QUALITY_PRESETS` in `src/config/quality.ts`) — a fuller mesh on high, a
+  reduced one on low — and report the measured frame cost at the site on BOTH backends at
+  LOW and at MEDIUM. A level that cannot afford the full mesh gets the reduced one, named
+  and tested, never a silent downgrade.
+  WHAT THIS REPLACES: the old spec asked for a mound envelope and blamed a coplanar sheet
+  for a flicker at the body's base. Both die with the old geometry — but the flicker is
+  still the sharpest acceptance signal available, so the live check MOVES the camera
+  rather than taking one still, and no z-offset may be used to hide a fight that the new
+  model should not have.
+  VERIFIABLE: pure Vitest on the shared definition — the three levels of detail come from
+  one source, the burial line matches the documented ~1890 state, head and upper back
+  stand clear of the drift while every other body part sits below it, the drift's
+  footprint does not exceed the body's by more than its skirt, and the collidable mass
+  still matches the drawn body (point 378's rule). Live on BOTH backends: a screenshot SET
+  from several standpoints inside the site — face on, in profile, from behind, and one low
+  enough to look along the drift — plus the bird's-eye landmark and the Cairo skyline
+  frame, judged by the picture; and a moving-camera pass that shows no flicker anywhere on
+  the model.
+  DOCS in the same commit: `docs/acceptance-evidence.md` §15/§25 gain the chain, and
+  `docs/graphics-detail-levels.md` the new per-level entries.
 - [ ] 316. SWIMMER TRAPPED IN A RIVER-MOUTH NOTCH (user 25.07.2026, screenshot at the
   Nile delta mouth ~31.4N/30.4E: swimming without a canoe, the downstream current
   outruns the swim speed so he cannot go back upstream, and the ocean boundary
