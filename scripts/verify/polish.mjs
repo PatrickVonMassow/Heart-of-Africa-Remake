@@ -330,8 +330,6 @@ await probeSilhouetteFooting(page, check, 'maasai-village (no capture)')
         slips.push(foot / body)
       }
     }
-    console.log('DIAG', label, 'first', JSON.stringify(samples[0]).slice(0, 600))
-    console.log('DIAG', label, 'slips', JSON.stringify(slips.map((x) => +x.toFixed(3))))
     const worst = slips.length ? Math.max(...slips) : Infinity
     check(
       `${label}: the planted foot holds its ground spot while the body walks over it (point 300)`,

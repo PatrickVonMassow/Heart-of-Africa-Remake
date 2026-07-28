@@ -107,7 +107,8 @@ export function strideLength(legLength: number, amp = GAIT_SWING): number {
  * division blow-up.
  */
 export function gaitCadence(legLength: number, amp = GAIT_SWING): number {
-  return legLength > 0 ? 11.0 : 0
+  const s = strideLength(legLength, amp)
+  return s > 0 ? (2 * Math.PI) / s : 0
 }
 
 /** Wrap a phase into (−π, π]. */
@@ -174,7 +175,8 @@ export function gaitPhase(distanceTravelled: number, cadence: number): number {
  * mid-swing), so a resting animal never twitches its legs.
  */
 export function legSwingAngle(phase: number, phaseOffset: number, amp = GAIT_SWING): number {
-  return Math.sin(phase + phaseOffset) * amp
+  const s = Math.sin(amp) * gaitFootFraction(phase + phaseOffset)
+  return -Math.asin(Math.max(-1, Math.min(1, s)))
 }
 
 /**
@@ -240,7 +242,6 @@ export function groundPitch(frontY: number, backY: number, wheelbase: number, ma
   const p = Math.atan2(backY - frontY, wheelbase)
   return Math.max(-maxPitch, Math.min(maxPitch, p))
 }
-
 
 /**
  * Facing yaw (rad) that tracks the velocity direction (point 228): an animal
