@@ -275,15 +275,15 @@ old→new coverage map live in `scripts/verify/README.md`.
   documents it prints BOTH — no resolver can decide that, so the reader is told
   instead of being handed a plausible wrong answer. Every brief carries the
   revision it was cut from; regenerate rather than reuse an old one.
-- **Context boundary at a point boundary (user 27.07.2026).** 87–94 % of the
-  spend sat above 150k context because one session carried point after point. A
-  batch session therefore ENDS at its point boundary: after the merge and the
-  tick, run `node scripts/batch-boundary.mjs <point>` and stop rather than pull
-  the next point in. `batch-progress-guard` permits that ONLY while the work
-  order confirms the point closed and `HoA-Batch-Autostart` is armed; unarmed
-  blocks, so a disabled launcher cannot strand the batch. The launcher starts
-  the successor, `batch-resume-hook` re-orients it. Attended, ask for `/clear`.
-  The "cheaper model for simpler subagents" idea stays REJECTED.
+- **Context boundary at a point boundary (users 27./28.07.2026).** 87–94 % of
+  the spend sat above 150k context — one session carried point after
+  point. A batch session ENDS at its boundary, and the boundary is
+  TAKEN: after merge and tick run `node scripts/batch-boundary.mjs
+  <point>` and stop. `batch-progress-guard` BLOCKS a stop that closed a point
+  without that marker, allows one only against the work order and an armed
+  `HoA-Batch-Autostart`, then marks the lock HANDED OVER so the launcher spawns
+  the successor — five hours were lost to a session that stopped holding it.
+  Attended, ask for `/clear`. The "cheaper model" idea stays REJECTED.
 - **Model policy (user decision 25.07.2026, points 309 + the role revision).**
   ONLY three models may author work on this project, each with its own role:
   **Opus 5** is the WORKER at any difficulty; **Fable 5** is used ONLY for the

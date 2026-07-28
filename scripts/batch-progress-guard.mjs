@@ -20,14 +20,24 @@
 // ARMED, this guard ALLOWS the stop — the fresh session the launcher brings up
 // carries the next point at a fraction of the context cost. A boundary claim for
 // a point still open, or with an unarmed launcher, blocks exactly as before.
+// TAKING it (28.07.2026, point 388) is the other half, and the half that was
+// missing: permission to stop and the ACT of handing over are different things.
+// A session that closed a point and recorded NO marker is now BLOCKED with the
+// one command that takes the boundary, and the stop this guard allows RELEASES
+// the batch to the launcher (markHandover) — the night of 28.07.2026 the turn
+// ended, the process lived on, the lock stayed held and the launcher skipped 21
+// ticks in a row. The handover is written HERE and nowhere else: only this branch
+// has established a fresh session-bound marker, a verifiably closed point and an
+// armed launcher. A crash, a wedge or an ordinary turn end never reaches it.
 // Format-safe: a TASKS.md whose checkboxes no longer parse blocks with a warning
 // instead of silently reading "complete". Fail-open on any error.
-import { readFileSync } from 'node:fs'
+import { appendFileSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import {
   acquire,
   heartbeat,
   detectParallel,
+  markHandover,
   raiseParallelAlert,
   readUnhandledAlert,
   progressGuardDecision,
@@ -37,6 +47,17 @@ import { LAUNCHER_TASK_NAME } from './batch-boundary-core.mjs'
 import { isPaused } from './batch-lock.mjs'
 
 const TASKS = fileURLToPath(new URL('../TASKS.md', import.meta.url))
+const BOUNDARY_LOG = fileURLToPath(new URL('../.claude/boundary.log', import.meta.url))
+
+/** Leave a trace of every handover — the acceptance evidence for point 388, and
+ *  the line that tells a later reader why the launcher took over a live pid. */
+const record = (line) => {
+  try {
+    appendFileSync(BOUNDARY_LOG, `[${new Date().toISOString()}] ${line}\n`)
+  } catch {
+    /* best effort — a guard never fails over its own bookkeeping */
+  }
+}
 
 let sid = ''
 try {
@@ -89,7 +110,7 @@ try {
 
   // Boundary claim (point 373) — only ever gathered for the owning session, and
   // only that path probes the OS scheduled task.
-  let bound = { marker: null, boundary: null, launcher: 'unknown' }
+  let bound = { marker: null, boundary: null, launcher: 'unknown', due: null }
   if (ownership === 'mine' || ownership === 'acquired') {
     try {
       bound = gatherBoundary(sid)
@@ -107,17 +128,40 @@ try {
     unhandledAlert: !!unhandledAlert,
     boundary: bound.boundary,
     launcher: bound.launcher,
+    boundaryDue: bound.due,
   })
 
   if (decision === 'allow-boundary') {
-    // Consume the marker: it authorised THIS stop, not the next one. The batch
-    // LOCK is deliberately NOT released — a session that frees it while its own
-    // process is still winding down invites the launcher to spawn a successor
-    // beside it, which is the double-session class this project already paid
-    // for. The successor takes over the honest way, once the pid is provably
-    // dead.
+    // Consume the marker: it authorised THIS stop, not the next one.
     clearBoundary()
+    // AND HAND THE BATCH OVER (point 388). Waiting for the old process to die
+    // was the flaw: an interactive window fires no SessionEnd, so the lock could
+    // outlive the work by hours. The handover is not a release — the lock keeps
+    // naming this session, a later tool call of ours withdraws it again by
+    // stamping the heartbeat past it, and a still-live pid buys the successor's
+    // spawn a grace window. The singleton therefore still admits exactly one
+    // working session.
+    const point = bound.boundary?.point ?? null
+    const handed = markHandover(sid, { point })
+    record(
+      handed
+        ? `HANDOVER point ${point ?? '?'} by ${sid} — lock marked handed-over; the launcher may spawn the successor.`
+        : `boundary stop by ${sid} for point ${point ?? '?'} but the lock was not ours to hand over.`,
+    )
     process.exit(0)
+  }
+
+  if (decision === 'block-take-boundary') {
+    block(
+      `TAKE THE POINT BOUNDARY — point ${bound.due} was closed in this session and no boundary is recorded, so ` +
+        `ending here would leave the batch STANDING STILL: the session would sit alive on the batch lock and the ` +
+        `launcher would skip every tick (that cost five and a half idle hours on 28.07.2026). Do ONE of two ` +
+        `things. (a) If the point is finished and NO delegated agent is still in flight, hand over: run ` +
+        `\`node scripts/batch-boundary.mjs ${bound.due}\` and then stop — the batch is passed to a fresh session ` +
+        `that the OS task starts and batch-resume-hook re-orients, which is how the context cost stays down. ` +
+        `(b) If work is still in flight (an agent pool draining, a verification running, the merge unfinished), ` +
+        `CONTINUE it in this turn — poll, never idle — and take the boundary when it is done.`,
+    )
   }
 
   if (decision === 'block-launcher') {
@@ -175,6 +219,10 @@ try {
       `user decision for EVERY open item, that is also a legitimate pause: create .claude/batch-paused with ` +
       `a reason and add a "Von dir zu klären" dashboard card. Otherwise pick a DIFFERENT open item.`,
   )
-} catch {
-  process.exit(0) // never hard-block on a guard error
+} catch (e) {
+  // Never hard-block on a guard error — but never allow a stop SILENTLY either:
+  // this path is indistinguishable from "the batch may end", and a night was
+  // lost to a stop nobody could account for afterwards.
+  record(`FAIL-OPEN: the guard errored and allowed the stop (${(e && e.message) || e}).`)
+  process.exit(0)
 }

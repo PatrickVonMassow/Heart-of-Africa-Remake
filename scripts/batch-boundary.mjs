@@ -18,8 +18,10 @@ import { readOwnerLock } from './batch-singleton.mjs'
 import {
   LAUNCHER_TASK_NAME,
   assessBoundary,
+  boundaryDueFrom,
   classifyLauncherState,
   pointClosure,
+  tickedPointsInDiff,
 } from './batch-boundary-core.mjs'
 
 export const BOUNDARY_PATH = repoPath('.claude/batch-boundary.json')
@@ -80,9 +82,65 @@ export function probeLauncherState({ taskName = LAUNCHER_TASK_NAME } = {}) {
   }
 }
 
-/** Is point N closed, per the split work order? */
-export function closureOf(point) {
-  return pointClosure(point, readTasksOpen(TASKS_PATH), readText(ARCHIVE_PATH))
+/**
+ * The newest work-order TICK in git: { point, at } or null. Ticks are main-only
+ * (CLAUDE.md §6), so `main` is what is asked — never the checked-out HEAD, which
+ * during a point is a feature branch (four-eyes review, finding 4). A checkout
+ * without that ref simply reports nothing, which only costs the reminder.
+ *
+ * execFile, never a shell: the revision never reaches cmd.exe, where a bare `^`
+ * in a revision is eaten. Any git failure answers null — this is advisory input
+ * to a guard, never a reason to fail one.
+ */
+export function lastWorkOrderTick({ cwd = repoPath('.'), refs = ['main'] } = {}) {
+  const git = (args) =>
+    execFileSync('git', args, { cwd, encoding: 'utf8', timeout: 8000, stdio: ['ignore', 'pipe', 'ignore'] }).trim()
+  const paths = ['--', 'TASKS.md', 'docs/tasks-archive.md']
+  for (const ref of refs) {
+    try {
+      // The newest few work-order commits, not just the last: appending a new
+      // point after ticking one would otherwise mask the tick.
+      const log = git(['log', '-5', '--format=%H %ct', ref, ...paths])
+      for (const row of log.split('\n')) {
+        const m = row.trim().match(/^([0-9a-f]{7,40}) (\d+)$/)
+        if (!m) continue
+        const points = tickedPointsInDiff(git(['show', '--format=', '--unified=0', m[1], ...paths]))
+        if (points.length > 0) {
+          return { point: points[points.length - 1], at: Number(m[2]) * 1000, sha: m[1] }
+        }
+      }
+      return null
+    } catch {
+      /* no such ref / not a repo — try the next */
+    }
+  }
+  return null
+}
+
+/**
+ * Is point N closed, per the split work order? The WORKING TREE is asked first,
+ * and `main` second — a feature-branch checkout carries the work order as it was
+ * when the branch was cut, so a point ticked on main after that reads "still
+ * OPEN" there. Without the fallback the guard (which reads main) would demand a
+ * boundary the CLI (which read the checkout) refuses: a contradiction that loops
+ * (four-eyes review, finding 6). Ticks are main-only, so main is the authority.
+ */
+export function closureOf(point, { cwd = repoPath('.') } = {}) {
+  const local = pointClosure(point, readTasksOpen(TASKS_PATH), readText(ARCHIVE_PATH))
+  if (local === 'closed') return local
+  try {
+    const show = (path) =>
+      execFileSync('git', ['show', `main:${path}`], {
+        cwd,
+        encoding: 'utf8',
+        timeout: 8000,
+        stdio: ['ignore', 'pipe', 'ignore'],
+      })
+    const onMain = pointClosure(point, show('TASKS.md'), show('docs/tasks-archive.md'))
+    return onMain === 'closed' ? 'closed' : local
+  } catch {
+    return local // no main ref / not a repo — the checkout is all there is
+  }
 }
 
 /**
@@ -97,8 +155,29 @@ export function gatherBoundary(sid, { now = Date.now(), path = BOUNDARY_PATH } =
   // Probe the OS only when a boundary is actually claimed — this runs at every
   // turn end of the owning session, and a PowerShell round-trip per turn for a
   // question nobody asked would be pure waste.
-  const launcher = boundary.valid ? probeLauncherState() : 'unknown'
-  return { marker, closure, boundary, launcher }
+  let launcher = boundary.valid ? probeLauncherState() : 'unknown'
+  // Is one DUE (point 388)? Asked at every turn end that has no valid marker —
+  // that is the whole failure case — at the cost of two short git calls, and
+  // only ever for the owning session (the guard gathers nothing for the others).
+  let due = null
+  if (!boundary.valid) {
+    const lock = readOwnerLock()
+    const ownerSince =
+      lock && lock.sessionId === sid
+        ? (typeof lock.acquiredAt === 'number' ? lock.acquiredAt : lock.startedAt)
+        : undefined
+    const candidate = boundaryDueFrom({ tick: lastWorkOrderTick(), ownerSince, now })
+    if (candidate) {
+      // Never DEMAND a boundary the CLI would refuse. With an unarmed launcher
+      // `batch-boundary.mjs` says "keep working" while the guard would keep
+      // saying "take the boundary" — a contradiction that loops for as long as
+      // the tick stays fresh (four-eyes review, finding 4). The probe costs a
+      // PowerShell round trip, and only in the rare window after a tick.
+      launcher = probeLauncherState()
+      if (launcher === 'armed') due = candidate
+    }
+  }
+  return { marker, closure, boundary, launcher, due }
 }
 
 // --- CLI ----------------------------------------------------------------------

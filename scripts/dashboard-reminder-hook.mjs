@@ -11,7 +11,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { PENDING_PATH, writeJsonAtomic, mergeState } from './dashboard-state.mjs'
-import { heldByOtherLiveOwner } from './batch-singleton.mjs'
+import { heldByOtherLiveOwner, withdrawHandover } from './batch-singleton.mjs'
 
 // Hard singleton (24.07.2026): a session that does not own the live batch lock
 // has NO dashboard/focus duty — arming the pivot check or issuing the board
@@ -28,6 +28,16 @@ try {
   standDown = heldByOtherLiveOwner(sid)
 } catch {
   standDown = false
+}
+// A user prompt is the earliest possible proof that a session which took a point
+// boundary is alive and about to work again — earlier than any tool call, and it
+// arrives even for a turn that never calls one (point 388, four-eyes finding 4).
+// Withdrawing the handover here keeps the launcher from spawning a successor
+// beside it. Owner-guarded, so it is a no-op once the successor holds the lock.
+try {
+  withdrawHandover(sid)
+} catch {
+  /* best effort */
 }
 
 // Arm the pivot check for THIS session (fail-soft: the reminder text below is
