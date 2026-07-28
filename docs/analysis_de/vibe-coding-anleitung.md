@@ -319,24 +319,16 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   nicht, was plausibel nichts beiträgt —, und schreib die Grenze samt Begründung
   in den prüfenden Code, nicht in eine Regel daneben."
 
-- **Das Regeldokument wird bei jedem Start geladen — und wächst trotzdem.** Jede
-  einzelne Ergänzung ist berechtigt; die Summe macht das Dokument zu einem Posten,
-  den du bei jeder Sitzung bezahlst.
-  → *Prompt:* „Gib den Dokumenten, die bei jedem Start oder jedem Vorgang gelesen
-  werden, eine **gemessene Obergrenze** mit genau zwei Auswegen: Detail in eine
-  Nachbardatei auslagern, oder die Grenze anheben und die Begründung danebenschreiben.
-  Beim Auslagern wird **verschoben, nicht umformuliert** — und danach jeder Leser der
-  alten Stelle nachgezogen; der gefährlichste ist der, der nicht scheitert, sondern
-  nur nichts mehr findet."
-
-- **Die Aufgabenliste wächst und wird trotzdem jedes Mal ganz gelesen.** Was
-  erledigt ist, bleibt darin stehen; nach ein paar Wochen ist der größte Teil der
-  Datei Geschichte, die bei jedem Vorgang mitgelesen wird.
-  → *Prompt:* „Halte in der Aufgabenliste nur die OFFENEN Aufgaben. Eine erledigte
-  wandert wortgleich und mit ihrer Nummer in ein Archiv, und ein Mechanismus
-  erzwingt das. Prüfe beim Trennen, welcher Leser welche Hälfte braucht: Wer nur
-  wissen will, was zu tun ist, liest die offene; wer erkennen muss, dass etwas
-  **abgeschlossen** ist, braucht beide."
+- **Was bei jedem Start mitgelesen wird, wächst — und du bezahlst es jedes Mal.**
+  Jede einzelne Ergänzung am Regeldokument ist berechtigt; und in der Aufgabenliste
+  bleibt Erledigtes stehen, bis der größte Teil der Datei Geschichte ist.
+  → *Prompt:* „Gib jedem Dokument, das bei jedem Start oder Vorgang gelesen wird, eine
+  **gemessene Obergrenze** mit genau zwei Auswegen: Detail auslagern, oder die Grenze
+  anheben und die Begründung danebenschreiben. Ausgelagert wird **verschoben, nicht
+  umformuliert**, und jeder Leser der alten Stelle wird nachgezogen — der gefährlichste
+  ist der, der nicht scheitert, sondern nur nichts mehr findet. In der Aufgabenliste
+  steht nur Offenes, Erledigtes wandert wortgleich ins Archiv; prüfe dabei, welcher
+  Leser welche Hälfte braucht."
 
 - **Im Präsens behauptet, nie nachgesehen.** „Das Feld wird bereits gesetzt" — im Code
   steht es nicht. Eine Lücke im Auftrag führt zur Rückfrage; eine falsche
@@ -350,6 +342,13 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Was aus mehreren Schritten besteht, spiel **einmal vollständig durch**
   und lies das Ergebnis aus den Protokollen, nicht aus den Tests. Wo eine Prüfung auch
   etwas ausführt, melde ein Scheitern im selben Atemzug wie die Freigabe."
+
+- **Das Prüfgerät schaut durch ein zu schmales Fenster.** Es sieht nur die letzten *n*
+  Einträge an oder misst erst *nach* dem Vorgang — und meldet „nichts gefunden".
+  → *Prompt:* „Leite das Fenster jeder Messung aus dem **Gegenstand** ab: eine Frage über
+  einen Zeitraum wird nach Zeit gestellt, nie nach Anzahl; eine über einen Lauf
+  **während** des Laufs. Irrt eine Heuristik zur Entwarnung hin, braucht sie einen
+  zweiten Beleg."
 
 ---
 
@@ -398,4 +397,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 Wenn du diese eine Nachricht an den Anfang stellst, hast du 80 % der Lehren dieses
 Projekts eingebaut, bevor die erste Zeile Code entsteht.
 
-<!-- GUIDE-FINGERPRINT: 7888bb7ea8b03da9e8b5f47fc3a63416a97950e6fd044854d215fd68d684e303 -->
+<!-- GUIDE-FINGERPRINT: 29f1a1831b260ca9608158885158639c127dfe7f0857ada831af9a35a183b293 -->
