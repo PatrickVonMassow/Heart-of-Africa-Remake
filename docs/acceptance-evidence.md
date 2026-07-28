@@ -802,10 +802,21 @@ nemes (proportions and part count pure-tested via `buildSphinx` in
 Timbuktu builds the Djinguereber mosque as a collidable dwelling
 (`scripts/verify/polish.mjs`, screenshots 96/97/100); and the Giza
 plateau is an ENTERABLE first-person monument site (§4.4, point 273):
-its own map point south-west of Cairo, known from the start and reached
-with the SPACE use key like a settlement (the enter candidate + the
+its own map point west of Cairo across the Nile, known from the start and
+reached with the SPACE use key like a settlement (the enter candidate + the
 Giza-vs-Cairo disc separation pure-tested in
-`src/scenes/travel/settlementEntry.test.ts`), where the traveller walks
+`src/scenes/travel/settlementEntry.test.ts`); the plateau is ONE site with
+ONE position — map point and §4.4 cultural landmark both derive from
+`src/world/data/gizaPlateau.ts`, which is why the bird's-eye view no longer
+labels Giza twice — and ONE label, the map point's, suppressed on the
+landmark by shared IDENTITY rather than by proximity
+(`landmarkLabelHiddenByMapPoint`, the equal coordinate and the
+never-otherwise sweep pure-tested in `src/world/world.test.ts`); BOTH halves
+are known from the start (§17.2, point 338), so a fresh game has Giza in
+`landmarksSeen`, it earns neither a discovery bounty nor a first-sighting
+entry while an ordinary landmark still earns both, and a legacy save
+migrates to include it (`src/state/store.economy.test.ts`,
+`src/state/store.saveload.test.ts`); where the traveller walks
 AROUND the three great pyramids and the sand-buried Sphinx as giant
 COLLIDABLE monuments on a bare desert disc — the layout, the collidable
 masses, a clear spawn standpoint, the Giza-vs-Meroë slope contrast and
