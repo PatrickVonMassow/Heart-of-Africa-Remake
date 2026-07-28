@@ -59,6 +59,11 @@ blinde Flecken** hat — diesen Wert hebt nur eine Prüfung, keine Übergabe. De
 bei einem fremden Modell ist wichtig: Ein unbemerkt schwächeres Modell liefert
 selbstbewusst Attrappen.
 
+Und die **Obergrenze**: Eine Gegenprüfung kostet etwa so viel wie die Arbeit. Die
+Grenze zieht die **Sichtbarkeit des Fehlers** — was den Ablauf steuert oder Arbeit
+vernichten kann (Wächter, Sperren, Speichern/Laden, Veröffentlichungen), wird immer
+gegengeprüft; was ein schneller Test sofort zeigt, nie.
+
 ---
 
 ## So setzt du ein Projekt auf (Prompts zum Kopieren)
@@ -178,8 +183,7 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   Debug-Zustand." *(Kosten ≈ 1,5x — Bilder sind teuer.)* *(Der letzte Schritt bleibt menschlich:
   Sieh dir den Screenshot an und frag dich, ob das für einen Menschen richtig aussieht.)*
 
-- **Neue Features zerbrechen alte.** Eine Änderung repariert X und bricht das
-  unbeobachtete Y.
+- **Neue Features zerbrechen alte.** Eine Änderung repariert X und bricht das unbeobachtete Y.
   → *Prompt:* „Etabliere einen Mechanismus, der jede Mechanik auch im
   **Ausgangs-/Danach-Zustand** prüft und nach jedem Zusammenführen die schnelle
   Testschicht erzwingt. Bau dazu ‚Invarianten' ein, die im Entwicklungsmodus laut
@@ -191,8 +195,7 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   zweimal am selben Problem fest, wechsle die Perspektive — anderes Modell, frische
   Read-only-Diagnose zuerst."
 
-- **Zahlen geschätzt statt gemessen.** ‚Das dauert ~2 Minuten', ‚das ist schneller' —
-  ohne Messung.
+- **Zahlen geschätzt statt gemessen.** ‚Das dauert ~2 Minuten', ‚das ist schneller'.
   → *Prompt:* „Etabliere einen Mechanismus, der ungemessene Zahlen abfängt: Laufzeiten,
   Performance und Kosten werden nur **gemessen** kommuniziert — Performance auf der
   **Ziel-Hardware**, nicht auf der Build-Maschine."
@@ -205,25 +208,23 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   *(Ein billigeres Modell für ‚einfache' Aufgaben ist der falsche Hebel: die Nacharbeit
   kostet mehr als die Ersparnis.)*
 
-- **Der Assistent bleibt still stehen / schläft ein.** Bei langen, autonomen Läufen endet
-  der Fortschritt unbemerkt.
-  → *Prompt:* „Wenn du eine Daueraufgabe autonom abarbeitest, sei die **letzte Aktion
-  jedes Schritts** immer ein Schritt an der Aufgabe. Baue einen Mechanismus, der ein
-  stilles Anhalten verhindert, statt dich darauf zu verlassen."
+- **Der Assistent bleibt still stehen.** Bei langen, autonomen Läufen endet der
+  Fortschritt unbemerkt.
+  → *Prompt:* „Bei einer autonomen Daueraufgabe sei die **letzte Aktion jedes Schritts**
+  immer ein Schritt an der Aufgabe, und baue einen Mechanismus, der ein stilles Anhalten
+  verhindert."
 
-- **Auf eine Rückfrage warten, statt weiterzuarbeiten.** Genauso schlimm wie ein stiller
-  Stopp: der Assistent stellt eine Frage und bleibt stehen, obwohl er weiterarbeiten
-  könnte — gerade wenn du weg bist.
+- **Auf eine Rückfrage warten, statt weiterzuarbeiten.** So schlimm wie ein stiller
+  Stopp — gerade wenn du weg bist.
   → *Prompt:* „Wenn ich weg bin, arbeite die Aufgabenliste **eigenständig** weiter und
   bleib **nie mit einer Rückfrage an mich stehen**. Triff bei Unklarheit die vernünftigste
-  Annahme und mach weiter; nur was wirklich meine Entscheidung braucht, hältst du kurz an
-  sichtbarer Stelle fest und **gehst zum nächsten offenen Punkt über**, statt zu warten."
+  Annahme; nur was wirklich meine Entscheidung braucht, hältst du an sichtbarer Stelle
+  fest und **gehst zum nächsten offenen Punkt über**."
 
-- **Kommunikation verfehlt.** Zu technisch, zu lang, falsche Sprache, an der Zielgruppe
-  vorbei.
+- **Kommunikation verfehlt.** Zu technisch, zu lang, an der Zielgruppe vorbei.
   → *Prompt:* „Beschreibe Bugs/Status in der Sprache der Zielgruppe (Symptom zuerst, kurz,
-  fürs Handy lesbar). Halte dich an meine Format- und Sprachvorgaben auf **allen**
-  sichtbaren Ausgaben."
+  fürs Handy lesbar) und halte meine Format- und Sprachvorgaben auf **allen** sichtbaren
+  Ausgaben ein."
 
 - **Ein Werkzeug versteht nur genau eine Eingabeform.** Ein Skript läuft mit dem Format,
   an dem es gebaut wurde, und scheitert bei jeder Variante **lautlos** — der Folgefehler
@@ -258,24 +259,20 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   (Hochladen, Veröffentlichen, Ausliefern) den **Zielzustand** belegt statt der
   Erfolgsmeldung — er muss zeigen, dass mein Stand wirklich angekommen ist."
 
-- **Deine Regelsammlung verrottet — nur merkt es niemand.** Regeln wachsen an und
-  werden nie durchgesehen: Widersprüche (auch innerhalb *einer* Datei), Doppelungen,
-  und Regeln, die eine Absicherung behaupten, die nie gebaut wurde. Am teuersten sind
-  Fehler in den Texten, die am häufigsten eingeblendet werden.
+- **Deine Regelsammlung verrottet — nur merkt es niemand.** Regeln wachsen an: Widersprüche
+  (auch innerhalb *einer* Datei), Doppelungen, und Regeln, die eine nie gebaute
+  Absicherung behaupten.
   → *Prompt:* „Etabliere einen Mechanismus, der den ganzen Regelbestand periodisch zur
-  Durchsicht zwingt — nicht nur auf Lücken, sondern auf Sauberkeit, Aktualität,
-  Dopplung, Widerspruch, **Wirkungslosigkeit** und Veralterung. Jede Regel wird gegen
-  den Code geprüft, nicht gegen die Nachbarregel; zuerst die Texte, die am häufigsten
-  eingeblendet werden." *(Kosten: einmalig hoch)*
+  Durchsicht zwingt — auf Aktualität, Dopplung, Widerspruch und **Wirkungslosigkeit**.
+  Jede Regel wird gegen den Code geprüft, nicht gegen die Nachbarregel; zuerst die
+  Texte, die am häufigsten eingeblendet werden." *(Kosten: einmalig hoch)*
 
 - **Ein Wächter, der nie auslöst, ist so kaputt wie einer, der immer auslöst.**
-  Ein Mechanismus kann existieren und wirkungslos sein — dann gilt die Regel als
-  abgesichert, ohne es zu sein. Und wer bei jedem Schritt blockiert, erzieht zum
-  Überlesen.
-  → *Prompt:* „Etabliere einen Mechanismus, der die Schutzmechanismen selbst mitprüft: Hat jeder je ausgelöst?
-  Kann er überhaupt auslösen? Doppelt er einen anderen? Ist seine Meldung
-  umsetzbar? Und in welcher Reihenfolge melden sie sich — die brauchbarste
-  Meldung muss zuerst kommen."
+  Ein wirkungsloser Mechanismus lässt die Regel abgesichert erscheinen; einer, der bei
+  jedem Schritt blockiert, erzieht zum Überlesen.
+  → *Prompt:* „Etabliere einen Mechanismus, der die Schutzmechanismen selbst mitprüft:
+  Hat jeder je ausgelöst? Kann er überhaupt? Doppelt er einen anderen? Ist seine Meldung
+  umsetzbar — und meldet sich die brauchbarste zuerst?"
 
 - **Der rote Test klagt den Falschen an.** Ein grüner Test kann täuschen — ein roter
   auch, und der ist gefährlicher, weil er zum schnellen Eingriff verleitet. Prüfungen
@@ -286,53 +283,47 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   auch dann fehl, wenn ihr Messwert in die *unerwartete* Richtung ausschlägt — nicht
   nur, wenn er die Grenze überschreitet."
 
-- **Derselbe Fakt steht an fünf Stellen — und veraltet an vier.** Zählwerte,
-  Vorgabewerte, Tastenbelegungen, Aufzählungen: Wer baut, aktualisiert die Stelle, an
-  der er gerade schreibt; die übrigen Kopien rotten unbemerkt. Doku-Audits *ohne*
-  Code-Abgleich machen es schlimmer.
+- **Derselbe Fakt steht an fünf Stellen — und veraltet an vier.** Wer baut, aktualisiert
+  die Stelle, an der er gerade schreibt; die übrigen Kopien rotten unbemerkt.
   → *Prompt:* „Etabliere einen Mechanismus, der jedem Fakt genau **einen** verbindlichen
-  Ort zuweist; alle anderen Stellen verweisen darauf, statt ihn zu wiederholen. Wo sich
-  eine Wiederholung nicht vermeiden lässt, prüft ein Test sie gegen den Code, dem der
-  Fakt gehört — Doku wird immer gegen den **Code** geprüft, nie gegen die Nachbarprosa."
+  Ort zuweist; alle anderen verweisen darauf. Wo sich eine Wiederholung nicht vermeiden
+  lässt, prüft ein Test sie gegen den **Code**, dem der Fakt gehört, nie gegen die
+  Nachbarprosa."
 
-- **„Aufgeräumt" ohne Beweisliste.** Nach einem Zwischenfall räumt man dort auf, wo
-  man den Schaden vermutet, und übersieht den Rest — den dann jemand anders findet.
+- **„Aufgeräumt" ohne Beweisliste.** Man räumt dort auf, wo man den Schaden vermutet,
+  und übersieht den Rest — den dann jemand anders findet.
   → *Prompt:* „Etabliere einen Mechanismus, der nach jedem Zwischenfall eine
-  **Beweisliste** erzwingt, deren Punkte einzeln zu belegen sind: Liegt alles am
-  Zielort? Gibt es Reste (kaputte Kodierung, Waisen-Dateien, Tests ohne echte Prüfung)?
-  Passen Dokumente und Code zusammen? Läuft am Ende alles grün?"
+  **Beweisliste** erzwingt: Liegt alles am Zielort? Gibt es Reste (Waisen-Dateien, Tests
+  ohne echte Prüfung)? Passen Dokumente und Code zusammen? Läuft alles grün?"
 
-- **Der Autor sieht seine eigene Annahme nicht.** Wer entwirft und baut, prüft am Ende
-  gegen dieselbe Vorstellung, aus der der Fehler stammt. Ein einzelnes Modell hat blinde
-  Flecken — besonders bei Dingen, die *immer* funktionieren müssen.
+- **Der Autor sieht seine eigene Annahme nicht.** Wer entwirft und baut, prüft gegen
+  dieselbe Vorstellung, aus der der Fehler stammt — besonders teuer bei Dingen, die
+  *immer* funktionieren müssen.
   → *Prompt:* „Etabliere einen Mechanismus, der vor dem Bau **Schwierigkeit ×
   Kritikalität** einschätzt und bei Kritischem **ein anderes Modell** erst den Plan und
   danach das fertige Ergebnis gegenprüfen lässt — gegen die echten Daten, nicht gegen
   die Beschreibung, und bevor zusammengeführt wird." *(Kosten ≈ 2x)*
 
-- **Die teuerste Prüfung großflächig verlangt.** Bildbegutachtung, ein zweiter
-  Lauf auf einer anderen Plattform, ein zweites Modell: Solche Kontrollen kosten
-  ein Vielfaches der übrigen. Wird eine davon pauschal für ganze Verzeichnisse
-  gefordert, zahlst du sie auch für Änderungen, bei denen sie nichts beweisen kann.
+- **Die teuerste Prüfung großflächig verlangt.** Bildbegutachtung, ein Lauf auf einer
+  zweiten Plattform, ein zweites Modell kosten ein Vielfaches. Pauschal für ganze
+  Verzeichnisse gefordert, zahlst du sie auch, wo sie nichts beweisen kann.
   → *Prompt:* „Verlange die teuerste Prüfung nur für Änderungen, die dort wirklich
-  abweichen können. Nimm dabei nur aus, was **beweisbar** nichts beitragen kann —
-  nicht, was plausibel nichts beiträgt —, und schreib die Grenze samt Begründung
-  in den prüfenden Code, nicht in eine Regel daneben."
+  abweichen können. Nimm nur aus, was **beweisbar** nichts beiträgt, und schreib die
+  Grenze samt Begründung in den prüfenden Code, nicht in eine Regel daneben."
 
 - **Was bei jedem Start mitgelesen wird, wächst — und du bezahlst es jedes Mal.**
   Jede einzelne Ergänzung am Regeldokument ist berechtigt; und in der Aufgabenliste
   bleibt Erledigtes stehen, bis der größte Teil der Datei Geschichte ist.
-  → *Prompt:* „Gib jedem Dokument, das bei jedem Start oder Vorgang gelesen wird, eine
-  **gemessene Obergrenze** mit genau zwei Auswegen: Detail auslagern, oder die Grenze
-  anheben und die Begründung danebenschreiben. Ausgelagert wird **verschoben, nicht
-  umformuliert**, und jeder Leser der alten Stelle wird nachgezogen — der gefährlichste
-  ist der, der nicht scheitert, sondern nur nichts mehr findet. In der Aufgabenliste
-  steht nur Offenes, Erledigtes wandert wortgleich ins Archiv; prüfe dabei, welcher
-  Leser welche Hälfte braucht."
+  → *Prompt:* „Gib jedem Dokument, das bei jedem Start gelesen wird, eine **gemessene
+  Obergrenze** mit zwei Auswegen: Detail auslagern, oder die Grenze anheben und die
+  Begründung danebenschreiben. Ausgelagert wird **verschoben, nicht umformuliert**, und
+  jeder Leser der alten Stelle wird nachgezogen — der gefährlichste ist der, der nicht
+  scheitert, sondern nur nichts mehr findet. In der Aufgabenliste steht nur Offenes,
+  Erledigtes wandert wortgleich ins Archiv."
 
 - **Im Präsens behauptet, nie nachgesehen.** „Das Feld wird bereits gesetzt" — im Code
-  steht es nicht. Eine Lücke im Auftrag führt zur Rückfrage; eine falsche
-  Tatsachenbehauptung führt zu einer Lieferung, die nichts tut und dabei grün ist.
+  steht es nicht. Eine falsche Tatsachenbehauptung liefert etwas, das nichts tut und
+  dabei grün ist.
   → *Prompt:* „Was du im **Präsens** behauptest, sieh vorher nach. Was erst gebaut
   werden muss, schreib in die Zukunftsform. Und prüfe jede Zusicherung, die ein
   Dokument über den Code macht, gegen den Code — oder kennzeichne sie als Absicht."
@@ -346,9 +337,19 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 - **Das Prüfgerät schaut durch ein zu schmales Fenster.** Es sieht nur die letzten *n*
   Einträge an oder misst erst *nach* dem Vorgang — und meldet „nichts gefunden".
   → *Prompt:* „Leite das Fenster jeder Messung aus dem **Gegenstand** ab: eine Frage über
-  einen Zeitraum wird nach Zeit gestellt, nie nach Anzahl; eine über einen Lauf
-  **während** des Laufs. Irrt eine Heuristik zur Entwarnung hin, braucht sie einen
-  zweiten Beleg."
+  einen Zeitraum nach Zeit, nie nach Anzahl; eine über einen Lauf **während** des Laufs.
+  Irrt eine Heuristik zur Entwarnung hin, braucht sie einen zweiten Beleg."
+
+- **Grün über einer geschrumpften Menge.** Tausende Tests bestanden — aber ein Teil der
+  Testdateien lud gar nicht und fiel aus der Bilanz. Nicht geladen ist nicht rot, sondern
+  abwesend: Der Bericht liest sich *grüner* als ein Fehlschlag.
+  → *Prompt:* „Melde die **Zahl der ausgeführten Testdateien** mit und vergleiche sie mit
+  dem letzten grünen Lauf. Ein Rückgang ist ein Rot."
+
+- **Die Prüfung steht hinter der Auslieferung.** Der Wächter prüft, was schon beim
+  Empfänger liegt — repariert wird danach.
+  → *Prompt:* „Setze jede Formprüfung **vor** den Schritt nach außen, so dass sie die
+  Auslieferung verhindern kann; nur Inhaltliches darf danach laufen."
 
 ---
 
@@ -397,4 +398,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 Wenn du diese eine Nachricht an den Anfang stellst, hast du 80 % der Lehren dieses
 Projekts eingebaut, bevor die erste Zeile Code entsteht.
 
-<!-- GUIDE-FINGERPRINT: 29f1a1831b260ca9608158885158639c127dfe7f0857ada831af9a35a183b293 -->
+<!-- GUIDE-FINGERPRINT: a610e584441a1d0cac696bcb92e1f5427baa636728d85f381cf9567dc4ef3224 -->
