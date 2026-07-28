@@ -84,6 +84,14 @@ export const REAP_MUTEX_STALE_MS = 60 * 1000
 /** Start times within this tolerance count as the same process (pid reuse
  *  detection). */
 export const PID_START_TOLERANCE_MS = 2000
+/** One tick of the HoA-Batch-Autostart scheduled task. */
+export const LAUNCHER_TICK_MS = 15 * 60 * 1000
+/** How many launcher ticks of COMPLETE silence — no tool call from the owner AND
+ *  no declared work advancing — before the owner counts as stalled (point 402
+ *  (d)). Two, deliberately expressed as the silence it spans rather than as a
+ *  persisted counter, so a lost `autostart-state.json` cannot reset it. */
+export const WORK_STALL_TICKS = 2
+export const WORK_STALL_MS = WORK_STALL_TICKS * LAUNCHER_TICK_MS
 
 /**
  * EVERY state file this module writes, derived from ONE lock path. PURE.
@@ -171,7 +179,21 @@ const readJson = (p) => {
  *   bootTime — epoch ms this machine booted (claude never survives a reboot)
  *   probe — { exists: boolean, startedAt: number|null } for lock.pid
  *           (pass null when no pid is recorded)
+ *   work  — what the owner DECLARED it is waiting on, already assessed:
+ *           { declared, advancing, summary } from `assessOwnerWork`
+ *           (scripts/batch-in-flight-core.mjs). Optional — a caller that does not
+ *           pass it gets exactly the pre-402 behaviour.
  * Returns { alive, wedged, reason }.
+ *
+ * PROGRESS, NOT AGE (point 402, 28.07.2026). Age was the only thing this function
+ * could measure, and any single number is wrong in both directions: long enough
+ * not to shoot a healthy delegated agent is long enough for a hung session to sit
+ * undetected. The question that separates the two is whether the declared work is
+ * still ADVANCING, which this repository already knows how to answer. So an owner
+ * whose heartbeat is silent is NOT wedged while its agent still commits, and one
+ * whose declared work has gone quiet for `WORK_STALL_MS` is wedged long before
+ * the four-hour valve would have noticed. What no evidence may ever do is revive
+ * a DEAD process: the pid checks come first and are untouched.
  *
  * HANDOVER (point 388): a lock the owner itself marked handed-over at a VALID
  * point boundary reads NOT alive, even while its process still runs. That is the
@@ -187,7 +209,8 @@ const readJson = (p) => {
  *   - while the pid is still alive the successor waits HANDOVER_GRACE_MS, so a
  *     session mid-shutdown is never raced.
  */
-export function assessOwner(lock, { now, bootTime, probe }) {
+export function assessOwner(lock, { now, bootTime, probe, work = null, stallMs = WORK_STALL_MS }) {
+  const advancing = work?.advancing === true
   if (!lock || typeof lock.claimedAt !== 'number') {
     return { alive: false, wedged: false, reason: 'no-lock' }
   }
@@ -211,11 +234,13 @@ export function assessOwner(lock, { now, bootTime, probe }) {
   const kind = lock.kind === 'pending-spawn' ? 'pending-spawn' : 'session'
   const pid = typeof lock.pid === 'number' && lock.pid > 0 ? lock.pid : null
   if (pid === null) {
-    // Legacy lock — age is all we have.
+    // Legacy lock — age is all we have, unless the owner's declared work says
+    // otherwise (point 402): a running agent proves a running session.
     const stale = kind === 'pending-spawn' ? PENDING_STALE_MS : LEGACY_STALE_MS
-    return age > stale
-      ? { alive: false, wedged: false, reason: 'legacy-stale' }
-      : { alive: true, wedged: false, reason: 'legacy-fresh' }
+    if (age <= stale) return { alive: true, wedged: false, reason: 'legacy-fresh' }
+    return advancing
+      ? { alive: true, wedged: false, reason: 'work-advancing' }
+      : { alive: false, wedged: false, reason: 'legacy-stale' }
   }
   if (!probe || probe.exists !== true) {
     // The owning process no longer exists → provably dead (past the grace).
@@ -236,6 +261,17 @@ export function assessOwner(lock, { now, bootTime, probe }) {
   // old the heartbeat — a long tool call starves the heartbeat but not the
   // process. This is the exact fix for the 24.07 incident (heartbeat 24 min
   // stale, session mid-turn, launcher double-spawned).
+  //
+  // Point 402 refines only the WEDGE half of that verdict, never the alive half:
+  if (advancing) return { alive: true, wedged: false, reason: 'work-advancing' }
+  if (work?.declared === true && age > stallMs) {
+    // Nothing has moved for two launcher ticks: not the owner's heartbeat, not
+    // one piece of the work it declared. A healthy agent — however slow —
+    // advances something, so this needs the work to be genuinely frozen. Still
+    // ALIVE (the process exists; the launcher signals and may only reap a spawn
+    // of its own making), but wedged NOW rather than in four hours.
+    return { alive: true, wedged: true, reason: 'work-stalled' }
+  }
   return { alive: true, wedged: age > WEDGED_MS, reason: 'pid-alive' }
 }
 
@@ -315,6 +351,38 @@ export function sweepableTmpFiles({ entries, lockName, now, probe, staleMs = REA
 export function spawnDecision(assessment) {
   if (!assessment.alive) return 'spawn'
   return assessment.wedged ? 'skip-wedged' : 'skip-alive'
+}
+
+/**
+ * WHAT THE LAUNCHER MAY DO WITH A WEDGED OWNER (point 402 (d)). PURE.
+ *
+ * Two kinds of wedge reach here and they earn different consequences:
+ *   - `work-stalled` — the owner has been silent for two launcher ticks AND the
+ *     work it declared has stopped moving. That is a positive finding, not a
+ *     guess from a clock, so it is worth an urgent signal AND a takeover.
+ *   - the four-hour `pid-alive` valve — age alone, which can still be a very long
+ *     legitimate run. It keeps its pre-402 consequence exactly: reap only the
+ *     launcher's own headless spawn, and let the next tick take over.
+ *
+ * The one rule that binds both: the launcher only ever kills a process it spawned
+ * itself. An interactive window is never killed — the guards make a rogue one
+ * stand down and the user is told instead.
+ *
+ * Returns { stalled, own, notify, kill, takeover }.
+ */
+export function wedgeAction({ assessment, lock, lastSpawnPid } = {}) {
+  const stalled = assessment?.reason === 'work-stalled'
+  const own = Boolean(lock?.pid) && lock.pid === lastSpawnPid
+  return {
+    stalled,
+    own,
+    notify: stalled ? 'urgent' : null,
+    kill: own,
+    // Taking the lock beside a process that is still running is the incident this
+    // module exists to prevent, so a takeover needs BOTH a positive stall finding
+    // and a process the launcher may reap — and, at the call site, a confirmed exit.
+    takeover: stalled && own,
+  }
 }
 
 /**

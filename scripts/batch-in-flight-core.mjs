@@ -201,6 +201,85 @@ export function assessInFlight({
   return out(true, 'live', { ageMs, summary, items })
 }
 
+/**
+ * Details that mean A PROBE COULD NOT ANSWER, as opposed to answering "gone".
+ * A declaration nobody can check is not proof of anything — it is treated as no
+ * evidence at all (point 402), never as a reason to keep an owner alive.
+ */
+export const UNANSWERABLE_DETAILS = new Set([
+  'unknown-kind',
+  'not-a-pid',
+  'no-ref',
+  'no-path',
+  'no-start-time',
+  'start-time-unverifiable',
+])
+
+/**
+ * IS THE LOCK OWNER'S DECLARED WORK STILL ADVANCING? PURE.
+ *
+ * The LAUNCHER's question, and it is not the guard's. `assessInFlight` asks "may
+ * THIS session end its turn", so it demands that ALL evidence still holds and
+ * that the declaration has not aged out. The launcher asks the narrower one that
+ * decides whether a silent owner is working or wedged (point 402 (c)): is ANY of
+ * the declared work still moving? A session with three agents out and two of them
+ * finished is plainly alive, and shooting it would be the exact failure this
+ * whole point exists to end.
+ *
+ * Same probes, same `checkEvidence`, same ownership rules — nothing about
+ * liveness is re-invented here.
+ *
+ * Inputs:
+ *   declaration — the parsed `.claude/batch-in-flight.json`, or null
+ *   lock        — the parsed batch lock, whose owner the declaration must belong to
+ *   now, maxAgeMs, and the four probes of `checkEvidence`
+ *
+ * Returns { declared, advancing, reason, summary, items }:
+ *   advancing — something the declaration names moved inside its freshness window.
+ *               Judged on the EVIDENCE alone, so it holds however old the
+ *               declaration is: an agent that is still committing is still
+ *               building, whatever the paperwork's timestamp says.
+ *   declared  — there is a CURRENT declaration, so its silence means something.
+ *               Goes false once the declaration ages past `maxAgeMs`, and that is
+ *               deliberate: a stale declaration says nothing about what the
+ *               session is doing NOW (it may well be inside one long verification
+ *               run), so it must not be allowed to tighten the wedge bound.
+ */
+export function assessOwnerWork({ declaration, lock, now, maxAgeMs = IN_FLIGHT_MAX_AGE_MS, ...probes } = {}) {
+  const out = (o) => ({ declared: false, advancing: false, reason: 'no-declaration', summary: '', items: [], ...o })
+  if (!declaration || typeof declaration !== 'object' || typeof declaration.at !== 'number') return out({})
+  if (!lock || typeof lock.sessionId !== 'string') return out({ reason: 'no-lock' })
+
+  const owner = resolveOwnership({
+    lock: declaration,
+    sessionId: lock.sessionId,
+    ancestor: typeof lock.pid === 'number' && lock.pid > 0 ? { pid: lock.pid, startedAt: lock.pidStartedAt ?? null } : null,
+  })
+  if (!owner.mine) return out({ reason: `not-owners:${owner.via}` })
+
+  const ageMs = now - declaration.at
+  // A declaration from the future is a clock this cannot reason about → the same
+  // as an aged-out one: no bearing on the present.
+  const current = ageMs >= 0 && ageMs <= maxAgeMs
+
+  const evidence = Array.isArray(declaration.evidence) ? declaration.evidence : []
+  if (evidence.length === 0) return out({ declared: current, reason: 'no-evidence' })
+
+  const items = evidence.map((e) => checkEvidence(e, { now, ...probes }))
+  const summary = items.map((i) => `${i.describe} — ${i.detail}`).join('; ')
+  const answerable = items.filter((i) => !UNANSWERABLE_DETAILS.has(i.detail))
+  if (answerable.length === 0) return out({ declared: current, reason: 'unanswerable', summary, items })
+
+  const advancing = answerable.some((i) => i.ok)
+  return out({
+    declared: current,
+    advancing,
+    reason: advancing ? 'advancing' : current ? 'no-progress' : 'expired',
+    summary,
+    items,
+  })
+}
+
 /** The one line the guard puts in the boundary log and in its allow message. */
 export function describeInFlight(assessment, declaration) {
   const what = declaration?.waitingOn ? String(declaration.waitingOn) : 'in-flight work'

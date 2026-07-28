@@ -42,11 +42,16 @@ import {
   wedgeNotifyDecision,
   wedgeOwnerKey,
   wedgeStage,
+  wedgeAction,
   PENDING_STALE_MS,
   WEDGE_NOTIFY_MS,
+  WORK_STALL_MS,
 } from './batch-singleton.mjs'
 import { readClaim, maxAgeMs as claimMaxAgeMs } from './batch-claim.mjs'
 import { assessClaim } from './batch-claim-core.mjs'
+import { readDeclaration, refTipAt, worktreeActiveAt, mtimeOf } from './batch-in-flight.mjs'
+import { assessOwnerWork, describeInFlight } from './batch-in-flight-core.mjs'
+import { buildSpawnArgs, buildSpawnOptions } from './batch-autostart-core.mjs'
 
 // IMPORT-PROOF (27.07.2026). Everything below runs at MODULE LOAD, so merely
 // importing this file — a syntax check, a test, a tooling scan — SPAWNS a
@@ -78,6 +83,17 @@ const writeJsonAtomic = (p, obj) => {
 }
 const head = () => { try { return execSync('git rev-parse HEAD', { cwd: REPO, encoding: 'utf8' }).trim() } catch { return '' } }
 const pidAlive = (pid) => { try { process.kill(pid, 0); return true } catch (e) { return e && e.code === 'EPERM' } }
+// Synchronous, because this launcher is a straight-line script: a reaped process
+// takes a moment to disappear, and a takeover may only proceed once it HAS.
+const sleepSync = (ms) => { try { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms) } catch { /* ignore */ } }
+const waitForExit = (pid, budgetMs) => {
+  const until = Date.now() + budgetMs
+  while (Date.now() < until) {
+    if (!pidAlive(pid)) return true
+    sleepSync(200)
+  }
+  return !pidAlive(pid)
+}
 const openPointCount = () => {
   let n = 0
   let sawCheckbox = false
@@ -127,9 +143,16 @@ const state = readJson(C('autostart-state.json')) ?? { failCount: 0, lastHead: '
 const curHead = head()
 
 // --- Owner liveness (the hard-singleton assessment) ---------------------------
+// PROGRESS, NOT AGE (point 402): the owner's declared work is an INPUT to the
+// verdict. A session waiting on a delegated agent starves its heartbeat for as
+// long as the agent takes, and the launcher used to have nothing but the clock to
+// judge that with. Same probes and the same pure functions the Stop guard uses —
+// nothing about liveness is re-invented here.
 const lock = readOwnerLock()
 const probe = lock && lock.pid ? probePid(lock.pid) : null
-const assessment = assessOwner(lock, { now, bootTime: bootTimeMs(), probe })
+const declaration = lock ? readDeclaration() : null
+const work = assessOwnerWork({ declaration, lock, now, probePid, refTipAt, worktreeActiveAt, mtimeOf })
+const assessment = assessOwner(lock, { now, bootTime: bootTimeMs(), probe, work })
 
 // --- Verify the previous spawn ------------------------------------------------
 if (state.lastSpawnAt > 0) {
@@ -180,7 +203,11 @@ if (
 // nobody. It still may not act on the age: a long verify run legitimately starves
 // the heartbeat, so the age alone may neither spawn a successor NOR kill the
 // owner. What it can do is SAY so, once per silence.
-if (assessment.alive) {
+// A session whose declared work is visibly ADVANCING is not silent in the sense
+// this alarm was written for (point 402): it is waiting on an agent that is still
+// committing, and reporting that as a stall would train the user to ignore the
+// channel. The stall verdict below is what covers the case where it stops moving.
+if (assessment.alive && !work.advancing) {
   const ageMs = now - lock.claimedAt
   const thresholdMin = Number(process.env.HOA_WEDGE_NOTIFY_MIN)
   const notifyMs = Number.isFinite(thresholdMin) && thresholdMin > 0 ? thresholdMin * 60000 : WEDGE_NOTIFY_MS
@@ -213,27 +240,54 @@ if (state.failCount >= 3) {
 // --- Liveness verdict ----------------------------------------------------------
 const verdict = lock ? spawnDecision(assessment) : 'spawn'
 if (verdict === 'skip-alive') {
-  log(`skip: owner alive (${assessment.reason}; heartbeat ${Math.round((now - lock.claimedAt) / 60000)} min old, pid ${lock.pid ?? 'unknown'})`)
+  const why = assessment.reason === 'work-advancing' ? `; work advancing — ${work.summary}` : ''
+  log(`skip: owner alive (${assessment.reason}; heartbeat ${Math.round((now - lock.claimedAt) / 60000)} min old, pid ${lock.pid ?? 'unknown'}${why})`)
   writeJsonAtomic(C('autostart-state.json'), state)
   process.exit(0)
 }
+let takeoverAfterKill = false
 if (verdict === 'skip-wedged') {
-  log(`WEDGED owner: pid ${lock.pid} alive but heartbeat ${Math.round((now - lock.claimedAt) / 60000)} min old`)
-  // The new consequence of point 388 (c) is the NOTIFICATION above, and it never
-  // kills: at 90 minutes a silent owner may well be inside a long verification.
-  // This valve is the pre-existing one and is left standing (four-eyes review,
-  // finding 5): it fires only on the launcher's OWN headless spawn, only past
-  // WEDGED_MS = four hours, and never on an interactive window. No tool call runs
-  // four hours, and an unattended `claude -p` that hangs has nobody to read the
-  // notification — removing it would trade one silent night for another.
-  if (lock.pid && lock.pid === state.lastPid) {
-    try { process.kill(lock.pid) } catch { /* gone */ }
-    log(`killed wedged own spawn pid ${lock.pid} — next tick may take over`)
+  const act = wedgeAction({ assessment, lock, lastSpawnPid: state.lastPid })
+  if (act.stalled) {
+    // NOT a clock reading (point 402 (d)): the owner has made no tool call for
+    // two launcher ticks AND every piece of work it declared has stopped moving.
+    const what = declaration ? describeInFlight(work, declaration) : 'nothing declared'
+    log(`STALLED owner: pid ${lock.pid} alive, heartbeat ${Math.round((now - lock.claimedAt) / 60000)} min old, work frozen — ${what}`)
+    await notify(
+      'Batch work STALLED',
+      `The owning session (pid ${lock.pid ?? 'unknown'}) has made no tool call for ${Math.round(WORK_STALL_MS / 60000)}+ minutes ` +
+        `and the work it declared has stopped advancing: ${what}. ` +
+        (act.own ? 'It was spawned by the launcher, so it is being reaped and taken over.' : 'It is not the launcher\'s own spawn, so nothing is being killed — please look.'),
+      'urgent',
+    )
+  } else {
+    log(`WEDGED owner: pid ${lock.pid} alive but heartbeat ${Math.round((now - lock.claimedAt) / 60000)} min old`)
   }
-  writeJsonAtomic(C('autostart-state.json'), state)
-  process.exit(0)
+  // The consequence of point 388 (c) is the NOTIFICATION above, and it never
+  // kills: at 90 minutes a silent owner may well be inside a long verification.
+  // The reaping valve fires only on the launcher's OWN headless spawn and never
+  // on an interactive window — an unattended `claude -p` that hangs has nobody to
+  // read the notification, while a user's window has.
+  if (act.kill) {
+    try { process.kill(lock.pid) } catch { /* gone */ }
+    // Taking the lock beside a process that is still running IS the e9407cae
+    // incident, so the takeover waits for a CONFIRMED exit and otherwise leaves
+    // the job to the next tick.
+    takeoverAfterKill = act.takeover && waitForExit(lock.pid, 3000)
+    log(
+      takeoverAfterKill
+        ? `killed stalled own spawn pid ${lock.pid} — taking over in this tick`
+        : `killed ${act.stalled ? 'stalled' : 'wedged'} own spawn pid ${lock.pid} — next tick may take over`,
+    )
+  }
+  if (!takeoverAfterKill) {
+    writeJsonAtomic(C('autostart-state.json'), state)
+    process.exit(0)
+  }
 }
-if (lock) {
+if (takeoverAfterKill) {
+  log(`owner reaped for a frozen wait (${assessment.reason}) — taking over`)
+} else if (lock) {
   // "handed-over" is not death: the owner finished a point and passed the batch
   // on (point 388). Logged distinctly so the end-to-end chain can be READ out of
   // this file rather than inferred.
@@ -296,47 +350,19 @@ try {
   if (changed) { const t = `${cfgPath}.tmp`; writeFileSync(t, JSON.stringify(cfg, null, 2)); renameSync(t, cfgPath); log('ensured repo trust in ~/.claude.json') }
 } catch (e) { log(`warn: could not ensure trust (${e && e.message})`) }
 
-const prompt =
-  'Autonome Batch-Wiederaufnahme (vom OS-Scheduler gestartet, weil keine Claude-Session aktiv war). ' +
-  'Setze den "Heart of Africa"-Batch fort. Lies ZUERST die Handoff-Memory resume-184-qa-framework. ' +
-  'Pruefe als erstes den ausgecheckten Git-Branch und ob ein Merge halb fertig ist. Arbeite die offenen ' +
-  'TASKS-Punkte in Reihenfolge ab — Feature-Branch-Workflow (CLAUDE.md §6): jeder Punkt auf seinem ' +
-  'EIGENEN feat/<punkt>-<slug>-Branch von main, atomare Commits, den BRANCH nach jedem Commit pushen, ' +
-  'Merge nach main NUR wenn der Punkt fertig und verifiziert ist (Tests gruen; Render-/GUI-Aenderungen ' +
-  'auf BEIDEN Backends am Bild geprueft); TASKS.md nur auf main abhaken (beim Merge); ' +
-  'Querschnitts-Aenderungen (Guards, Docs, Dashboard, Prozessdateien) direkt auf main. Dashboard-Guard + ' +
-  'prep-guard gruen halten, Vorarbeit waehrend jeder Validierung. PUNKT-GRENZE (27.07.2026): der Kontext ' +
-  'ist der groesste Kostenfaktor des Batches — wenn der gemergte und abgehakte Punkt fertig ist UND kein ' +
-  'delegierter Agent mehr laeuft (Pool erst leerlaufen lassen), fuehre `node scripts/batch-boundary.mjs ' +
-  '<punkt>` aus und BEENDE die Session, statt den naechsten Punkt in denselben Kontext zu ziehen; der ' +
-  'OS-Task startet die naechste Session. Halte sonst NICHT still an. Wenn ein git push ' +
-  'scheitert, schreibe .claude/push-failed und benachrichtige via scripts/notify.mjs. WICHTIG: Wenn der ' +
-  'SessionStart-Hook meldet, dass eine ANDERE Session den Batch-Lock haelt (STAND DOWN), dann arbeite ' +
-  'NICHT am Batch und beende dich sofort. Wenn alles erledigt ist: Closing fahren.'
-
 // Author the run: verify-able spawn (log to file, record pid+head), atomic markers.
 writeJsonAtomic(C('autostart-last.json'), { at: now, head: curHead })
 log(`RESUMING: launching ${exe} -p (batch has ${open} open point(s), failCount=${state.failCount})`)
 let child
 try {
   const out = openSync(join(REPO, '.claude', 'autostart-run.log'), 'a')
-  // --dangerously-skip-permissions: the resurrected session is HEADLESS (-p) and
-  // unattended, so it can neither show a permission prompt nor have one answered.
-  // A bare "Bash" allow does NOT blanket-approve novel command shapes in this
-  // harness (each new one still prompts — the endlessly-growing Bash(...) list in
-  // settings.local.json is the proof), and defaultMode "dontAsk" is the settings
-  // ceiling. For an autonomous batch on the user's own single-user machine the
-  // launch flag is the only thing that guarantees a prompt never blocks the run.
-  // Model per the 25.07.2026 policy: Opus 5 is the worker at any difficulty, and
-  // the fallback CHAIN is Opus 5 -> Fable 5 -> Opus 4.8. The CLI takes a single
-  // --fallback-model, so Fable is wired as that first fallback; should Fable be
-  // unavailable too, the session comes up on the user's configured default and
-  // the model-guard Stop hook still enforces the allowlist from inside (Opus 4.8
-  // passes it, anything outside the three does not). Fable is otherwise used ONLY
-  // for four-eyes review, never because a task looks hard.
-  child = spawn(exe, ['-p', prompt, '--model', 'claude-opus-5[1m]', '--fallback-model', 'claude-fable-5', '--dangerously-skip-permissions'], {
-    cwd: REPO, detached: true, stdio: ['ignore', out, out], windowsHide: true,
-  })
+  // Everything about the launch — argv, the model chain, the environment — is
+  // built purely in scripts/batch-autostart-core.mjs, because THIS file cannot be
+  // imported by a test without spawning a session. The environment is the part
+  // that matters most: it carries CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0, without
+  // which the runtime terminates the session ten minutes into every delegated
+  // build (point 402).
+  child = spawn(exe, buildSpawnArgs(), buildSpawnOptions({ cwd: REPO, stdio: ['ignore', out, out] }))
   child.unref()
 } catch (e) {
   release(launcherSid)
