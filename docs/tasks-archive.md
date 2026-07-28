@@ -11456,3 +11456,124 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   plateau exactly ONE label element names the pyramids (currently two), named from the
   first frame without any approach, with a screenshot; the existing Giza suites
   (src/scenes/place/gizaSite.test.ts, settlementEntry, landmarks) stay green.
+
+- [x] 388. A PERMITTED BOUNDARY IS NOT A TAKEN ONE — THE NIGHT THE BATCH STOOD STILL
+  (28.07.2026, measured). Point 373 made the batch session allowed to END at a closed
+  point so the launcher can bring up a fresh one. On the first night it was live, the
+  batch idled from 01:15 to 06:44 — five and a half hours — and the logs say exactly why:
+  · the session had merged and ticked four points and no agent was in flight, so
+    `batch-progress-guard` PERMITTED the stop, as designed;
+  · nothing then TOOK the boundary: `scripts/batch-boundary.mjs` was never run, so no
+    marker was written (`--status` afterwards: `"marker": null, "reason": "no-marker"`);
+  · the session therefore just sat there, ALIVE and holding `.claude/batch-lock.json`;
+  · the launcher did the right thing every 15 minutes — `skip: owner alive` — and from
+    03:21 named the state precisely: `WEDGED owner: pid alive but heartbeat 245 min old`.
+  It diagnosed the condition twenty-one times and never acted on it, because acting is
+  not in its remit.
+  THE DEFECT IS THE DECOUPLING: permission to stop and the ACT of ending the session are
+  two different things, and only the first was built. A session that stops while holding
+  the lock is worse than one that never stops at all — it blocks its own successor.
+  BUILD THE OTHER HALF, and keep the singleton intact (a second live session is the
+  incident class this whole apparatus exists to prevent):
+  (a) THE BOUNDARY IS TAKEN, NOT OFFERED. When `batch-progress-guard` finds the boundary
+  conditions met, it does not simply allow the stop: it requires the marker to exist
+  (writing it is a single command the guard's own message names), and it says plainly
+  that the batch will now hand over. A permitted stop WITHOUT a marker BLOCKS, with the
+  command to take the boundary — the opposite of today's silence.
+  (b) A HANDOVER RELEASES THE LOCK. Taking the boundary releases the batch lock (or
+  marks it handed-over) so the launcher's next tick spawns the successor instead of
+  reading a live owner. The release happens only for a VALID boundary — a crash, a
+  wedge or an ordinary turn end must still leave the lock held, exactly as now.
+  (c) THE WEDGE DETECTION EARNS A CONSEQUENCE. `batch-autostart` already recognises
+  "alive but heartbeat N minutes old" and only logs it. Beyond a calibratable age it
+  must NOTIFY (`scripts/notify.mjs`, the ntfy topic) so a silent night is reported
+  rather than discovered the next morning. It must NOT kill the owner: a long verify run
+  legitimately starves the heartbeat, which is why the age alone may not spawn.
+  FIRST LIVE FINDING, 28.07.2026 10:44 — the run has already paid for itself before it
+  finished: `.claude/boundary.log` carries a line `FAIL-OPEN: the guard errored and
+  allowed the stop (EPERM: operation not permitted, rename batch-lock.json.tmp-9904 ->
+  batch-lock.json)`. The atomic lock write can fail on
+  Windows — an antivirus or indexer holding the target for a moment is the usual cause —
+  and the guard then fails open, which is right for a guard but means the HANDOVER was
+  silently not written. A handover that reports success while the lock keeps its old
+  content is the night's failure in a new costume. Make the marking of the lock
+  RETRY briefly on EPERM/EBUSY, and where it still fails, say so in the same breath as
+  the allow: the stop may proceed, but the session must be told the handover did NOT
+  happen, so it does not stop believing the batch was passed on.
+  SECOND LIVE FINDING, 28.07.2026 11:00 — the boundary is WITHDRAWN by the very work the
+  other guards demand. Taking it writes a marker; any further work withdraws it again
+  ("the session is working again; the lock stays held"), which is right in itself. But the
+  Stop chain routinely sends a session back to work AFTER the boundary is taken — a
+  missing timestamp, an unreviewed mechanism commit, a dashboard whose HEAD moved — and
+  each of those rounds silently un-takes the handover. Three rounds happened on the first
+  live run, and every one ended with the guard reporting the batch as standing still. A
+  boundary that only survives a turn with nothing left to do is not a mechanism, because
+  the Stop chain's whole purpose is to find something left to do. FIX: the withdrawal must
+  distinguish work that CONTINUES the batch from work a Stop guard DEMANDED — the latter
+  is part of ending, not of carrying on. Simplest honest shape: the marker survives edits
+  confined to the closing set (the board, the review ledger, the work order's own point)
+  and is withdrawn by anything else. Whatever the shape, the acceptance is the same as
+  below: one observed handover, not a green unit test.
+  THIRD LIVE FINDING, 28.07.2026 11:20 — the UNIT SUITE writes into the REAL handover log.
+  `.claude/boundary.log` carries lines "WITHDRAWN point 388 by s1", and `s1` is the test
+  session id from `scripts/batch-singleton-core.test.mjs`. So a test run — which the
+  pre-push gate performs on every push — reaches into the live batch state and can
+  withdraw a boundary a real session has taken. The cores must be given their paths by
+  their caller (a temp dir in the test), and no test may fall back to the repo's
+  `.claude/`; a pure test asserting that the default paths are NOT touched when a base dir
+  is passed keeps it that way.
+  THE WEDGE ITSELF, 28.07.2026 11:40 — finding 1 is not a fluke, it is the failure. The
+  boundary stop runs its course three times over and dies in the same place each time
+  (07:03:01Z, 08:59:13Z, 09:35:31Z): the guard REACHES its boundary branch, CONSUMES the
+  marker, and then the lock write throws `EPERM … rename batch-lock.json.tmp-<pid> ->
+  batch-lock.json`. The throw escapes the branch, the fail-open wrapper catches it, logs
+  FAIL-OPEN and allows the stop. Marker gone, no HANDOVER line, no handed-over flag — and
+  the next turn the guard demands the boundary again, which is the loop this point was
+  opened on. THREE OF THREE is not an antivirus fluke; find the concurrent writer (the
+  PostToolUse heartbeat and the Stop guard reach for the same file at the same moment) and
+  fix the write: retry with backoff, an exclusive-create lock or an in-place write, as the
+  cause dictates. Two properties matter more than the mechanism chosen. The marker must
+  NOT be consumed unless the handover actually succeeded — order it the other way round or
+  restore it on failure. And `markHandover` must never take the whole guard down with it:
+  a failure is reported IN the allow, "the stop may proceed, but the handover did NOT
+  happen", so a session never stops believing it passed the batch on.
+  IDENTITY, a hardening and NOT the fix (the same day's mis-diagnosis, corrected here
+  rather than told as a story). Ownership hangs on the session id, and a context
+  compaction mints a new one — so the reasoning that identity belongs on something stable
+  stands, and the lock already records `pid` and `pidStartedAt`. But the marker WAS
+  consumed at every attempt, which proves ownership resolved as ours, so this was never
+  what wedged the batch. Do it if it is cheap and safe, pinned by a pure test (same pid +
+  pidStartedAt but a different session id resolves as `mine`, a different pid does not, a
+  stale `pidStartedAt` from a reused pid does not either) — and never let it widen
+  ownership so far that a genuinely second window passes as ours, which is the one thing
+  the singleton exists to prevent.
+  FIFTH LIVE FINDING, 28.07.2026 11:55 — the guard cannot see work that is IN FLIGHT, so
+  it cannot tell waiting from idling. Its own text names polling as the sanctioned way to
+  wait ("WAIT by POLLING within this turn"), but nothing a polling session does satisfies
+  it: with three delegated agents building and a browser suite running, every attempt to
+  end the turn was blocked with "DO NOT STOP THE BATCH — continue the NEXT queue item now",
+  eight times in a row. The queue item cannot be continued — the pool is at its cap and the
+  next item needs the machine the suite is using — and the turn cannot end, so the session
+  writes reply after reply that never reaches the user. The batch is not idle; the guard
+  merely has no way to know. FIX: give the session a way to DECLARE what it is waiting on,
+  the way `prep-guard --prepped` already works — a marker naming the in-flight work
+  (agent branches, a running suite) and the time it was set. The guard then allows the stop
+  while that work is provably still running and blocks again the moment it is not, so an
+  abandoned wait still cannot become an idle night. Do not simply weaken the block: the
+  five-and-a-half-hour standstill is what it exists for.
+  TEST THE WHOLE CHAIN, NOT THE PARTS (user 28.07.2026). Every part worked last night
+  and the batch still stood still, so a green unit layer proves nothing here. The
+  acceptance is ONE observed handover end to end: a point closed, the boundary taken,
+  the lock released, the launcher's next tick spawning a successor, and that successor's
+  first turn picking up the next point — read out of `.claude/autostart.log` and the new
+  session's own commits, never inferred. Run it in this repository at a real point
+  boundary and record the log lines with their times. If the chain breaks anywhere, that
+  break IS the finding and the point stays open.
+  VERIFIABLE: pure Vitest — a met boundary without a marker blocks and names the
+  command; with a marker it allows and the handover is recorded; a crash-shaped stop
+  does not release the lock; the wedge notification fires once past the age and not
+  again for the same owner. Live: one real boundary in this repository, with
+  `.claude/autostart.log` showing the spawn and the successor's first turn picking up
+  the next point — the acceptance point 373 could not yet show.
+  DOCS in the same commit: CLAUDE.md §6's context-boundary bullet (it currently
+  describes the half that exists) and `docs/batch-autonomy.md`.
