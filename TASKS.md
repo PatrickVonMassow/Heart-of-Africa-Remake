@@ -3427,6 +3427,81 @@ read that as "the criterion and its evidence section".
   DOCS in the same commit: `docs/batch-autonomy.md`, where the point boundary describes
   when it falls due.
 
+- [ ] 400. THE BOARD IS CURRENT, OR THE USER IS TOLD IT IS NOT (28.07.2026, user
+  mandate: "das muss endlich zuverlässig funktionieren", designed with a four-eyes
+  review by Fable 5 whose verdict is in `.claude/mechanism-reviews.jsonl` against
+  commit dc51774). Three cards were missing from the published board for up to
+  25 minutes while the user was reading it. The first delta — a publish is only
+  believed when the Artifact tool says it happened — IS BUILT (dc51774,
+  `scripts/publish-outcome-core.mjs`). This point is the rest, and it must be
+  built in the order below because each delta makes the next one honest.
+  THE MEASUREMENT THAT DEFINES THE PROBLEM: the headless successor session
+  (`claude -p`, spawned by `scripts/batch-autostart.mjs`) HAS NO ARTIFACT TOOL.
+  On 28.07. at 15:38 it edited the board and recorded
+  `publishDeferred: "headless successor session — no Artifact tool available
+  here"`. That is the flagship mode — user away, batch resurrected by the
+  scheduler — and in it the board CANNOT be updated at all. No hook topology
+  fixes this; only delta D does, and delta D needs the user's decision.
+  DELTA A — THE DUE-MARK, ON THE HOOK THAT ALREADY RUNS. Do NOT add a
+  PostToolUse matcher: `.claude/settings.json` is a protected path an unattended
+  session cannot edit, and an `Edit|Write` matcher would miss TASKS.md changes
+  made through Bash (a merge, the archive move). Instead `lock-heartbeat-hook.mjs`
+  (matcher `""`, already on every call) hashes the open-point set after each call
+  and, on a change, sets `publishDue` in `dashboard-state.json`. Persisted state,
+  so a session that dies between the change and the publish hands the mark to its
+  successor.
+  DELTA B — THE DENY, WITH THE CARVE-OUTS THAT KEEP IT UNBLOCKABLE. `publishDue`
+  is enforced in `board-first-guard`'s existing evaluate, which already fails open
+  on unwritable state and fires at most once per turn. It must exempt its own
+  remedy path (the regeneration script, `dashboard-publish.mjs`, the Artifact
+  call, `board.mjs attest`) or it deadlocks the only way out, and it must escalate
+  to a hard deny ONLY when the Artifact tool exists in the session — a headless
+  session can never satisfy it and would spin.
+  DELTA C — DERIVE THE QUEUE, DO NOT MAINTAIN IT. The footer is ALREADY derived
+  (`refreshFooter` + `parseTasks` in `dashboard-publish.mjs`); it went stale on
+  28.07. only because the board HTML was hand-edited past that pipeline. Extend
+  the same pattern to the queue section: prose and section membership live in a
+  data source keyed by point number, the queue HTML and the footer are built from
+  it plus TASKS.md, and `board.mjs` commands edit the DATA, never the HTML. Two
+  writers on one HTML is the trap to avoid: a generator that re-adds a card for a
+  point already promoted to the now-section trips the double-listing invariant
+  (4b) in `dashboard-guard-core.mjs`. A point with no prose yet gets a stub card
+  rather than no card — and because `auditDashboard` demands a `~<n> h` estimate
+  and a non-empty body, the audit must accept an explicit unestimated-stub meta,
+  or the stub blocks `--synced` and creates the block loop this design exists to
+  prevent. Decide that in the spec, not in the debugger.
+  DELTA D — THE WATCHDOG, WHICH IS THE ONLY LAYER THAT SURVIVES A WEDGED SESSION.
+  `scripts/batch-autostart.mjs` already ticks every 15 minutes and already has
+  `notify`. It gains a board-currency check: `publishDue`, `publishDeferred` or
+  `publishFailed` outstanding beyond one tick sends the ntfy alert, naming how
+  many changes are pending and since when. It verifies the RECORD, not the page:
+  a claude.ai artifact is private and there is no non-interactive way for a Node
+  script to read it (the reviewer confirmed the roster offers no egress the page
+  could use either). An occasional in-session WebFetch spot-check of the artifact
+  is a nice-to-have, not a layer — WebFetch caches, so it can flap.
+  WHAT THIS GUARANTEES, STATED HONESTLY (and it is NOT 100 %, because every Stop
+  guard stays fail-open by CLAUDE.md §7.2 decree): interactively, the board
+  reflects every work-order change before the session's next state-changing call,
+  and a publish is verified as accepted rather than merely attempted. Headless,
+  the artifact cannot be updated at all — the user is alerted within one watchdog
+  tick that the board is behind, and by how much. Wedged session: alert only.
+  Residual risk: the watchdog disabled AND a session wedged at the same time.
+  OPEN FOR THE USER (do not decide this alone): closing the unattended window
+  instead of merely alerting requires a different transport — e.g. publishing the
+  board to the GH-Pages deploy this repo already runs, which a script CAN write
+  and plain HTTPS CAN read end-to-end. That trades the artifact's privacy for
+  headless publishability, and it touches a user-mandated structure
+  (`batch-dashboard-artifact`: never restructure without an explicit go).
+  VERIFIABLE: pure Vitest per delta — the open-set hash marking `publishDue` only
+  on a real change; the deny exempting each remedy call and standing down without
+  an Artifact tool; the generator refusing to double-list a promoted point and
+  emitting a stub the audit accepts; the watchdog's alert decision over
+  outstanding/settled state with an injected clock. Live: a work-order change
+  followed by an attempted unrelated tool call is denied until published; and one
+  headless tick with a deferred publish produces exactly one ntfy alert.
+  DOCS in the same commit: `docs/batch-autonomy.md` (what the board guarantees in
+  each mode) and CLAUDE.md §7.2, where the Stop-chain list names the new deny.
+
 ## Closing (only after all points)
 
 New points are appended BEFORE this section — it stays last in the file.
