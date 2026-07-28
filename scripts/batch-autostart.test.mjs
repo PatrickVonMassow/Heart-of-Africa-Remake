@@ -46,18 +46,29 @@ describe('the launcher uses the pure spawn builders', () => {
   })
 
   it('CALLS them at the one spawn site — a re-inlined call would drop the env fix', () => {
-    // Every statement that actually launches a process: `spawn(<ident>, …`.
-    const spawnSites = codeLines.filter((l) => /(?<![\w.])spawn\(\s*[A-Za-z_$][\w$]*\s*,/.test(l))
-    expect(spawnSites, 'the launcher must have exactly one spawn( site').toHaveLength(1)
+    // Every statement that launches an executable BY PATH: an optional member
+    // prefix, one of the launching functions, then an identifier argument. The
+    // first version of this counted bare `spawn(` only, so `cp.spawn(…)` or
+    // `spawnSync(…)` would have escaped the exactly-one pin entirely (second
+    // four-eyes review, finding D). `spawn(s)` in a log line is not a call site,
+    // hence the identifier-and-comma shape; `execSync('git …')` passes a string
+    // literal, so the legitimate git calls are not caught either.
+    const LAUNCHES = /(?:^|[^\w.])(?:[A-Za-z_$][\w$]*\.)?(?:spawnSync|spawn|execFileSync|execFile|fork)\s*\(\s*[A-Za-z_$][\w$]*\s*,/
+    const spawnSites = codeLines.filter((l) => LAUNCHES.test(l))
+    expect(spawnSites, 'the launcher must have exactly one process-launching site').toHaveLength(1)
     expect(spawnSites[0]).toMatch(/buildSpawnArgs\(/)
     expect(spawnSites[0]).toMatch(/buildSpawnOptions\(/)
   })
 
-  it('never names the runtime ceiling variable in CODE — the core owns that policy', () => {
+  it('never builds a spawn environment in CODE — the core owns that policy', () => {
     // A literal assignment here would sit outside every test in
     // batch-autostart-core.test.mjs, including the one that stops an inherited
-    // value from re-arming the kill.
+    // value from re-arming the kill. Forbidding the two variable NAMES is not
+    // enough (finding D): assembling an `env:` at all is how the builder's
+    // environment gets bypassed, whatever the keys are called.
     expect(code).not.toMatch(/CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS/)
+    expect(code).not.toMatch(/HOA_BG_WAIT_CEILING_MS/)
+    expect(code, 'the spawn environment is assembled in the core, never here').not.toMatch(/\benv\s*:/)
   })
 
   it('records every spawn in the ledger and reaps from it (finding 1.4)', () => {
