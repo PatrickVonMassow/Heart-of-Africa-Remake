@@ -21,12 +21,24 @@
 //      assumed). Unknown counts as NOT armed: erring toward "keep working" can
 //      cost context, erring toward "stop" can cost the whole batch.
 //
-// Deliberately NOT part of the boundary: releasing the batch lock. A session that
-// frees the lock while its own process is still winding down invites the launcher
-// to spawn a successor next to it — the double-session class this project already
-// paid for once. The lock is left to expire the honest way (the successor's
-// `assessOwner` sees the dead pid), which costs a few minutes and guarantees the
-// old session is gone.
+// POINT 388 (28.07.2026) corrects one assumption of the paragraph this replaces.
+// The boundary used to end at "the stop is permitted": the lock was left to
+// expire the honest way, on the reasoning that the old process dies within
+// minutes. It does not. On the first live night a session ended its TURN and kept
+// its PROCESS — an interactive window fires no SessionEnd, so nothing released
+// the lock — and the launcher correctly refused to spawn a successor beside a
+// live owner, 21 ticks in a row, for five and a half hours.
+//
+// So the boundary is now TAKEN rather than offered, in three parts:
+//   - `boundaryDueFrom` below: a point closed IN THIS SESSION with no marker
+//     recorded makes the guard BLOCK and name the command, instead of falling
+//     through to a message where the boundary is one option among many.
+//   - the Stop hook marks the lock HANDED OVER (scripts/batch-singleton.mjs
+//     `markHandover`) at the moment it allows the stop, and only there. The
+//     singleton stays intact: the handover is not an age heuristic but the
+//     owner's own statement, it survives only while no further tool call bumps
+//     the heartbeat past it, and a live pid still gets a grace window.
+//   - the launcher REPORTS a silent owner instead of only logging it.
 
 /** How long a recorded boundary marker stays usable. Long enough for the merge,
  *  the tick, the push and the closing report of a point; short enough that a
@@ -106,6 +118,52 @@ export function assessBoundary({ marker, sid, now, closure, freshMs = BOUNDARY_F
   if (closure === 'open') return { valid: false, point, reason: 'point-still-open' }
   if (closure !== 'closed') return { valid: false, point, reason: 'point-not-verifiable' }
   return { valid: true, point, reason: 'boundary' }
+}
+
+/** How long after a tick the boundary counts as DUE. Wide enough to cover a
+ *  merge, a push and a closing report; a session still working an hour and a
+ *  half later has plainly moved on and gets the ordinary message again. */
+export const BOUNDARY_DUE_MS = 90 * 60 * 1000
+
+/**
+ * Point numbers a diff actually CLOSED — added `- [x] N.` lines, minus the ones
+ * the same diff also removed. The subtraction is what tells a tick from
+ * housekeeping: moving an already-ticked point from TASKS.md into the archive
+ * adds the line in one file and removes it from the other, and would otherwise
+ * read as a point just closed (four-eyes review, finding 7).
+ */
+export function tickedPointsInDiff(diffText) {
+  const added = []
+  const removed = new Set()
+  for (const line of String(diffText ?? '').split('\n')) {
+    const a = line.match(/^\+- \[x\] (\d+)\./)
+    if (a) added.push(Number(a[1]))
+    const r = line.match(/^-- \[x\] (\d+)\./)
+    if (r) removed.add(Number(r[1]))
+  }
+  return added.filter((n) => !removed.has(n))
+}
+
+/**
+ * Is a boundary DUE — a point closed with no marker recorded? Inputs are plain
+ * data:
+ *   tick       — { point, at } from the newest work-order commit, or null
+ *   ownerSince — when THIS session acquired the batch lock (acquiredAt)
+ *   now, dueMs
+ * Returns the point number, or null.
+ *
+ * `tick.at >= ownerSince` is the load-bearing condition. Without it a freshly
+ * spawned successor would read its PREDECESSOR's tick, take a boundary for a
+ * point it never closed and end after doing nothing — session ping-pong instead
+ * of work. A session can only be sent home for a point it closed itself.
+ */
+export function boundaryDueFrom({ tick, ownerSince, now, dueMs = BOUNDARY_DUE_MS }) {
+  if (!tick || !Number.isInteger(tick.point) || tick.point <= 0) return null
+  if (typeof tick.at !== 'number') return null
+  if (!(now - tick.at < dueMs)) return null
+  if (typeof ownerSince !== 'number') return null // unknown ownership start → never nag
+  if (tick.at < ownerSince) return null
+  return tick.point
 }
 
 /**

@@ -31,7 +31,7 @@ import {
   mergeState,
   sha256File,
 } from './dashboard-state.mjs'
-import { heldByOtherLiveOwner } from './batch-singleton.mjs'
+import { heldByOtherLiveOwner, withdrawHandover } from './batch-singleton.mjs'
 import { evaluate } from './board-first-core.mjs'
 
 const PAUSE = resolve(REPO_ROOT, '.claude', 'batch-paused')
@@ -82,6 +82,21 @@ try {
     process.exit(0)
   }
   if (!payload) process.exit(0)
+  // PIGGY-BACKED, and deliberately: WITHDRAW a batch handover before the tool
+  // runs (point 388). If this session marked the lock handed-over at a boundary
+  // and is nevertheless about to act — a later Stop hook blocked the turn end,
+  // or a delegated agent woke it — then it is still working and the successor
+  // must not be spawned beside it. The PostToolUse heartbeat withdraws the
+  // handover too, but only AFTER the call returns, and the first call after such
+  // a block can be a 40-minute verification (four-eyes review, finding 1). This
+  // hook lives here rather than in one of its own because .claude/settings.json
+  // is a protected path an unattended session cannot extend, and this matcher
+  // already covers every state-changing tool. Never blocks, never throws.
+  try {
+    withdrawHandover(payload.session_id || '')
+  } catch {
+    /* best effort — a lock we cannot write is not this gate's problem */
+  }
   if (existsSync(PAUSE)) process.exit(0)
   if (heldByOtherLiveOwner(payload.session_id || '')) process.exit(0)
 

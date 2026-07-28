@@ -26,6 +26,7 @@
 // still sees a fresh lock as "held". Pure decision logic is dependency-injected
 // and Vitest-covered in scripts/batch-singleton-core.test.mjs.
 import {
+  appendFileSync,
   readFileSync,
   writeFileSync,
   existsSync,
@@ -59,6 +60,20 @@ export const WEDGED_MS = 4 * 60 * 60 * 1000
 /** A pending-spawn lock (launcher claimed, claude -p still booting) older than
  *  this with a dead child pid is reapable. */
 export const PENDING_STALE_MS = 10 * 60 * 1000
+/** After a HANDOVER (point 388) whose owning process is still ALIVE, the lock
+ *  stays "alive" this long before the successor may take it. A headless `claude
+ *  -p` — the batch's normal mode — exits at the boundary and is taken over at
+ *  once by the dead-pid path, so this window only ever costs an interactive
+ *  window something. It is one full launcher tick wide on purpose (four-eyes
+ *  review, finding 1): the handover is withdrawn by the session's next tool
+ *  call, and a session that neither ends nor calls a tool for a quarter of an
+ *  hour does not exist. */
+export const HANDOVER_GRACE_MS = 15 * 60 * 1000
+/** An ALIVE owner silent for longer than this is reported out of band (point
+ *  388 (c)). Calibratable — the longest legitimate silence in this repository is
+ *  the LARGE browser regression at roughly 30-40 minutes, so the default leaves
+ *  better than 2x headroom. Override with HOA_WEDGE_NOTIFY_MIN (minutes). */
+export const WEDGE_NOTIFY_MS = 90 * 60 * 1000
 /** Tool activity younger than this counts a session as "live" for the
  *  parallel-session detector. */
 export const PARALLEL_FRESH_MS = 10 * 60 * 1000
@@ -101,10 +116,31 @@ const writeJsonAtomic = (p, obj) => {
  *   probe — { exists: boolean, startedAt: number|null } for lock.pid
  *           (pass null when no pid is recorded)
  * Returns { alive, wedged, reason }.
+ *
+ * HANDOVER (point 388): a lock the owner itself marked handed-over at a VALID
+ * point boundary reads NOT alive, even while its process still runs. That is the
+ * one place where a live pid does not mean a live owner — and it is not a
+ * heuristic like the age window that caused the e9407cae incident, but the
+ * owner's own statement, written only after the Stop hook confirmed a fresh
+ * session-bound marker, a verifiably closed point and an armed launcher. Two
+ * conditions keep it honest:
+ *   - `claimedAt <= handedOverAt`: the PostToolUse heartbeat stamps claimedAt on
+ *     EVERY tool call, so a session that did NOT actually stop (a later Stop hook
+ *     in the chain blocked the turn end) withdraws its own handover at its next
+ *     tool call. No mutation, just a comparison.
+ *   - while the pid is still alive the successor waits HANDOVER_GRACE_MS, so a
+ *     session mid-shutdown is never raced.
  */
 export function assessOwner(lock, { now, bootTime, probe }) {
   if (!lock || typeof lock.claimedAt !== 'number') {
     return { alive: false, wedged: false, reason: 'no-lock' }
+  }
+  if (lock.handedOver === true && typeof lock.handedOverAt === 'number' && lock.claimedAt <= lock.handedOverAt) {
+    const pidGone = probe ? probe.exists !== true : false
+    if (pidGone || now - lock.handedOverAt >= HANDOVER_GRACE_MS) {
+      return { alive: false, wedged: false, reason: 'handed-over' }
+    }
+    return { alive: true, wedged: false, reason: 'handover-grace' }
   }
   const age = now - lock.claimedAt
   // Fresh heartbeat proves life — REBOOT IS NOT SUFFICIENT to declare death
@@ -157,6 +193,47 @@ export function spawnDecision(assessment) {
 }
 
 /**
+ * How far a silence has gone: null (still normal), 'silent' past the notify
+ * threshold, 'wedged' past the hours-long one. TWO stages on purpose — the
+ * incident was "nobody looked", so a silence that deepens escalates instead of
+ * being reported once and then forgotten (four-eyes review, finding 5).
+ */
+export function wedgeStage(ageMs, { notifyMs = WEDGE_NOTIFY_MS, wedgedMs = WEDGED_MS } = {}) {
+  if (typeof ageMs !== 'number') return null
+  if (ageMs >= wedgedMs) return 'wedged'
+  if (ageMs >= notifyMs) return 'silent'
+  return null
+}
+
+/**
+ * The identity of ONE silence at ONE stage: owner + pid + the heartbeat it fell
+ * silent at + the stage. Keying the notification on this reports every genuine
+ * stall exactly once per stage — the key holds still across the launcher's
+ * 15-minute ticks (claimedAt does not move while nobody works), deepens into a
+ * second report when the silence crosses into 'wedged', and a later stall of the
+ * same session gets a new key again.
+ */
+export function wedgeOwnerKey(lock, stage = '') {
+  if (!lock || !lock.sessionId || typeof lock.claimedAt !== 'number') return ''
+  return `${lock.sessionId}#${lock.pid ?? 'nopid'}#${lock.claimedAt}${stage ? `#${stage}` : ''}`
+}
+
+/**
+ * Should the launcher REPORT a silent owner (point 388 (c))? The launcher may
+ * neither spawn against a live pid nor kill it — a long verify run legitimately
+ * starves the heartbeat — but a night in which nothing happens must not be
+ * discovered the next morning. Pure; the caller supplies the stage, the key and
+ * the last key it notified for.
+ */
+export function wedgeNotifyDecision({ alive, stage, ownerKey, lastNotifiedKey }) {
+  if (!alive) return { notify: false, reason: 'owner-not-alive' }
+  if (!stage) return { notify: false, reason: 'below-threshold' }
+  if (!ownerKey) return { notify: false, reason: 'no-owner' }
+  if (lastNotifiedKey && lastNotifiedKey === ownerKey) return { notify: false, reason: 'already-notified' }
+  return { notify: true, reason: stage === 'wedged' ? 'wedged-owner' : 'silent-owner' }
+}
+
+/**
  * Parallel-session classifier. A parallel session is a sid that
  *   - started as a TOP-LEVEL session (recorded by the SessionStart hook —
  *     subagents/worktree agents never fire SessionStart, so they can never be
@@ -187,6 +264,9 @@ export function classifyParallel({ sessionsSeen, activity, ownerSid, now }) {
  *                        stop — the OS task brings up a fresh session
  *   'block-launcher'   — a boundary was claimed but the launcher is not armed, so
  *                        nothing would restart the batch: keep working
+ *   'block-take-boundary' — owner, a point closed IN THIS SESSION and no marker:
+ *                        the boundary is DUE and must be TAKEN, not offered
+ *                        (point 388) — block, naming the one command
  *   'block-continue'   — owner + open points → keep working
  *   'block-format'     — TASKS.md unparseable → warn, never read as complete
  *
@@ -203,6 +283,7 @@ export function progressGuardDecision({
   unhandledAlert,
   boundary = null, // { valid, point, reason } | null
   launcher = 'unknown', // 'armed' | 'disabled' | 'unknown'
+  boundaryDue = null, // point number closed in THIS session without a marker | null
 }) {
   if (paused) return 'allow'
   if (formatSuspect) return 'block-format'
@@ -219,6 +300,11 @@ export function progressGuardDecision({
   // batch", so it blocks instead. An INVALID claim falls through to the ordinary
   // block: the work order, not the marker, decides whether a point is closed.
   if (boundary && boundary.valid) return launcher === 'armed' ? 'allow-boundary' : 'block-launcher'
+  // A DUE boundary without a marker (point 388): the permission of point 373 was
+  // never taken up, and the session simply sat there holding the lock. Both
+  // verdicts block, so a false positive costs a wrong message and nothing more —
+  // but a true one now names the single command that hands the batch over.
+  if (Number.isInteger(boundaryDue) && boundaryDue > 0) return 'block-take-boundary'
   return 'block-continue'
 }
 
@@ -472,7 +558,16 @@ export function heartbeat(sessionId, opts = {}) {
   const lock = readOwnerLock(lockPath)
   if (!lock || lock.sessionId !== sessionId) return false
   const now = opts.now ?? Date.now()
+  // A heartbeat is proof the session is WORKING, so it withdraws a handover
+  // outright rather than only outdating it. The comparison in assessOwner would
+  // do the same, but an explicit delete also survives a clock stepped backwards
+  // (four-eyes review, finding 1) and leaves an honest lock file behind.
   const next = { ...lock, v: 2, claimedAt: now }
+  if (next.handedOver !== undefined || next.handedOverAt !== undefined) {
+    delete next.handedOver
+    delete next.handedOverAt
+    delete next.handoverPoint
+  }
   // Backfill the pid identity ONCE for a lock claimed before pids were
   // recorded — and never retry a failed walk on the hot per-tool-call path.
   if (next.pid == null && !next.pidBackfillFailed && opts.skipBackfill !== true) {
@@ -539,6 +634,72 @@ export function release(sessionId, lockPath = LOCK_PATH) {
     return true
   }
   return false
+}
+
+/**
+ * HAND THE BATCH OVER (point 388). Marks the lock "the owner is finished" so the
+ * launcher's next tick spawns the successor instead of reading a live owner — the
+ * decoupling that cost five and a half idle hours on the night of 28.07.2026,
+ * when a session ended its TURN at a permitted boundary but kept its PROCESS (and
+ * therefore the lock) alive.
+ *
+ * It is deliberately NOT a release: the lock keeps naming this session and pid, so
+ * the state stays inspectable and `heartbeat()` still belongs to this session
+ * alone. `claimedAt` is NOT bumped — the comparison in assessOwner is what lets a
+ * session that keeps working withdraw its own handover.
+ *
+ * Owner-guarded and no-op otherwise, and it must only ever be called where a
+ * VALID boundary has been established (scripts/batch-progress-guard.mjs).
+ */
+export function markHandover(sessionId, opts = {}) {
+  const lockPath = opts.lockPath ?? LOCK_PATH
+  const lock = readOwnerLock(lockPath)
+  if (!lock || lock.sessionId !== sessionId) return false
+  const now = opts.now ?? Date.now()
+  writeJsonAtomic(lockPath, {
+    ...lock,
+    handedOver: true,
+    handedOverAt: now,
+    handoverPoint: opts.point ?? null,
+  })
+  return true
+}
+
+/**
+ * WITHDRAW a handover — the session is demonstrably still working after all.
+ * Owner-guarded, so it is a no-op once a successor has claimed the lock (by then
+ * the old session is stood down by ownership anyway).
+ *
+ * This exists because the Stop chain does not end at batch-progress-guard:
+ * sixteen guards run after it and several can block, and the session's first act
+ * after such a block may be a single 40-minute tool call, during which no
+ * heartbeat lands (four-eyes review, finding 1). Calling this from a PreToolUse
+ * hook closes that window BEFORE the long call starts.
+ */
+export function withdrawHandover(sessionId, opts = {}) {
+  const lockPath = opts.lockPath ?? LOCK_PATH
+  const lock = readOwnerLock(lockPath)
+  if (!lock || lock.sessionId !== sessionId || lock.handedOver !== true) return false
+  const next = { ...lock, claimedAt: opts.now ?? Date.now() }
+  delete next.handedOver
+  delete next.handedOverAt
+  delete next.handoverPoint
+  writeJsonAtomic(lockPath, next)
+  // Recorded beside the handover it cancels: without this line, a launcher tick
+  // that finds a live owner past the grace cannot be told apart from one whose
+  // handover was legitimately taken back, and the acceptance evidence would be
+  // ambiguous exactly where it matters (four-eyes review).
+  try {
+    const log = opts.logPath ?? repoPath('.claude/boundary.log')
+    appendFileSync(
+      log,
+      `[${new Date().toISOString()}] WITHDRAWN point ${lock.handoverPoint ?? '?'} by ${sessionId} — ` +
+        'the session is working again; the lock stays held.\n',
+    )
+  } catch {
+    /* best effort — the withdrawal itself has already landed */
+  }
+  return true
 }
 
 /**
