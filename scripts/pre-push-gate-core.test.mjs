@@ -643,13 +643,21 @@ describe('the baseline state — the gate own memory of the last green run', () 
 
   it('leaves an auditable trace ONLY where the escape hatch was used', () => {
     expect(withTestFileBaseline({}, { files: 153, tests: 4214, onDisk: 153 }).unit).not.toHaveProperty(
-      'acknowledgedDropFrom',
+      'acknowledgedDrop',
     )
     const waved = withTestFileBaseline({}, { files: 119, tests: 3546, onDisk: 153, acknowledgedDropFrom: 153 })
-    expect(waved.unit.acknowledgedDropFrom).toBe(153)
+    expect(waved.unit.acknowledgedDrop).toMatchObject({ from: 153, onDisk: 153 })
     expect(waved.unit.onDisk).toBe(153)
     // It round-trips, so the trace survives the next read of the file.
-    expect(parseGateState(JSON.stringify(waved)).unit.acknowledgedDropFrom).toBe(153)
+    expect(parseGateState(JSON.stringify(waved)).unit.acknowledgedDrop.from).toBe(153)
+  })
+
+  it('records the trace even where there was NO baseline to drop from', () => {
+    // The fresh-checkout case: `from` is legitimately null, and dropping the
+    // whole trace on it would lose exactly the wave-through worth auditing.
+    const waved = withTestFileBaseline({}, { files: 53, tests: 1476, onDisk: 153, acknowledgedDropFrom: null })
+    expect(waved.unit.acknowledgedDrop).toMatchObject({ from: null, onDisk: 153 })
+    expect(waved.unit.acknowledgedDrop.at).toBe(waved.unit.at)
   })
 
   it('refuses a nonsense count rather than recording it as a baseline', () => {

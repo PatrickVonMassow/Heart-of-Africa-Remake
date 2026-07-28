@@ -323,8 +323,9 @@ moment this number matters is the moment that directory is the broken thing.
 
 A block is therefore **not** cleared by re-running: it is cleared by repairing the
 tree, or by pushing once with `HOA_ACCEPT_TEST_FILE_DROP=1`, the deliberate,
-named second escape hatch — recorded in the state file as `acknowledgedDropFrom`
-so a waved-through drop stays auditable rather than looking like an ordinary
+named second escape hatch — recorded in the state file as an `acknowledgedDrop`
+block (`from`, `onDisk`, `at`, and `from: null` where there was no baseline at
+all) so a waved-through drop stays auditable rather than looking like an ordinary
 green. The state file is written through `scripts/atomic-write.mjs`, so a torn
 write cannot garble the JSON into "no baseline at all".
 

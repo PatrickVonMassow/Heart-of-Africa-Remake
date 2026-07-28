@@ -310,6 +310,8 @@ try {
           onDisk: fileCount.onDisk,
           // An acknowledged drop is RECORDED as such: the escape hatch leaves a
           // trace in the state file rather than only in one console scrollback.
+          // `null` is a legitimate "from" here — a fresh checkout has no
+          // baseline, and that is the case whose trace matters most.
           ...(fileCount.status === 'acknowledged' ? { acknowledgedDropFrom: fileCount.baseline } : {}),
         }),
       )

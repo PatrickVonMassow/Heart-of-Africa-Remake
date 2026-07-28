@@ -512,6 +512,7 @@ export function testFileBaseline(state) {
 /** The state to write back, keeping whatever else the file already carried. */
 export function withTestFileBaseline(state, { files, tests, at, onDisk, acknowledgedDropFrom } = {}) {
   const base = state && typeof state === 'object' && !Array.isArray(state) ? state : {}
+  const when = at ?? new Date().toISOString()
   return {
     ...base,
     unit: {
@@ -520,10 +521,15 @@ export function withTestFileBaseline(state, { files, tests, at, onDisk, acknowle
       // Recorded for the reader, never read back as the floor: the floor is
       // always counted fresh, because the tree is what may have changed.
       onDisk: countOrNull(onDisk),
-      at: at ?? new Date().toISOString(),
+      at: when,
       // Present ONLY where the escape hatch was used, so an acknowledged drop
       // leaves an auditable trace instead of looking like an ordinary green.
-      ...(countOrNull(acknowledgedDropFrom) === null ? {} : { acknowledgedDropFrom }),
+      // Written whenever the hatch fired — including from NO baseline at all,
+      // which is exactly the fresh-checkout case, and the one whose trace would
+      // otherwise be the easiest to lose.
+      ...(acknowledgedDropFrom === undefined
+        ? {}
+        : { acknowledgedDrop: { from: countOrNull(acknowledgedDropFrom), onDisk: countOrNull(onDisk), at: when } }),
     },
   }
 }
