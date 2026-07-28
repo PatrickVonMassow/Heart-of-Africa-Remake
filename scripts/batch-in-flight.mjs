@@ -19,13 +19,21 @@
 // the session cannot do while it waits — and it stops the moment the evidence
 // stops checking out, or the declaration ages out.
 import { readFileSync, rmSync, statSync } from 'node:fs'
+import { join, resolve } from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { REPO_ROOT } from './repo-paths.mjs'
 import { writeJsonAtomic } from './atomic-write.mjs'
-import { readOwnerLock, cheapProbePid, ourClaudeProcess, statePathsFor, LOCK_PATH } from './batch-singleton.mjs'
+import {
+  readOwnerLock,
+  probePid,
+  ourClaudeProcess,
+  statePathsFor,
+  LOCK_PATH,
+  IN_FLIGHT_PATH,
+} from './batch-singleton.mjs'
 import { assessInFlight, describeInFlight, IN_FLIGHT_MAX_AGE_MS } from './batch-in-flight-core.mjs'
 
-export const IN_FLIGHT_PATH = statePathsFor(LOCK_PATH).inFlightPath
+export { IN_FLIGHT_PATH }
 
 /** The calibratable maximum age, HOA_IN_FLIGHT_MAX_MIN in minutes. Reading it
  *  here (not in the core) keeps the decision function pure and testable. */
@@ -58,31 +66,66 @@ export function clearDeclaration(path = IN_FLIGHT_PATH) {
 
 // --- The probes ----------------------------------------------------------------
 
-/** Does this git ref exist? Any git failure answers NO — evidence that cannot be
- *  established never counts as established. execFile, never a shell (a `^` in a
- *  revision is eaten by cmd.exe). */
-export function refExists(ref, { cwd = REPO_ROOT } = {}) {
+/**
+ * WHEN did this branch last receive a commit? Epoch ms, or null when the ref does
+ * not resolve. Existence was not enough (four-eyes review): ~94 `feat/*` and
+ * `worktree-agent-*` branches live in this repository, so "the branch is there"
+ * is true of work that finished days ago. Any git failure answers null — evidence
+ * that cannot be established never counts as established. execFile, never a shell
+ * (a `^` in a revision is eaten by cmd.exe).
+ */
+export function refTipAt(ref, { cwd = REPO_ROOT } = {}) {
   const name = String(ref ?? '').trim()
-  if (!name || /[\s~^:?*[\]\\]/.test(name)) return false
+  if (!name || /[\s~^:?*[\]\\]/.test(name)) return null
   try {
-    execFileSync('git', ['rev-parse', '--verify', '--quiet', `${name}^{commit}`], {
+    const out = execFileSync('git', ['log', '-1', '--format=%ct', `${name}^{commit}`], {
       cwd,
       encoding: 'utf8',
       timeout: 8000,
       stdio: ['ignore', 'pipe', 'ignore'],
-    })
-    return true
+    }).trim()
+    const secs = Number(out)
+    return Number.isFinite(secs) && secs > 0 ? secs * 1000 : null
   } catch {
-    return false
+    return null
   }
 }
 
-export function dirExists(path) {
-  try {
-    return statSync(String(path)).isDirectory()
-  } catch {
-    return false
+/**
+ * WHEN did git last do something in this worktree? Epoch ms, or null when the
+ * path is not a checkout (or is gone). A worktree's `.git` is a FILE pointing at
+ * `…/.git/worktrees/<name>`; that directory carries the index, HEAD and
+ * COMMIT_EDITMSG a working agent rewrites on every commit, and the directory's
+ * own mtime moves with each of those renames. The newest of them is the answer —
+ * the same "is anything still happening" question the log kind asks.
+ */
+export function worktreeActiveAt(path) {
+  const stamp = (p) => {
+    try {
+      return statSync(p).mtimeMs
+    } catch {
+      return null
+    }
   }
+  const root = String(path ?? '').trim()
+  if (!root) return null
+  let gitdir = null
+  const dot = join(root, '.git')
+  try {
+    const st = statSync(dot)
+    if (st.isDirectory()) gitdir = dot
+    else {
+      const m = readFileSync(dot, 'utf8').match(/^gitdir:\s*(.+)$/m)
+      gitdir = m ? resolve(root, m[1].trim()) : null
+    }
+  } catch {
+    return null // no checkout there any more
+  }
+  if (!gitdir) return null
+  const stamps = [gitdir, join(gitdir, 'index'), join(gitdir, 'HEAD'), join(gitdir, 'COMMIT_EDITMSG')]
+    .map(stamp)
+    .filter((v) => typeof v === 'number')
+  return stamps.length ? Math.max(...stamps) : null
 }
 
 export function mtimeOf(path) {
@@ -93,7 +136,10 @@ export function mtimeOf(path) {
   }
 }
 
-const probes = { probePid: cheapProbePid, refExists, dirExists, mtimeOf }
+// The FULL probe, not the cheap one: `cheapProbePid` answers existence only (and
+// true on EPERM), so a reused pid would keep a declaration alive on a stranger's
+// process. The start time is what makes a pid an identity.
+const probes = { probePid, refTipAt, worktreeActiveAt, mtimeOf }
 
 /**
  * Everything the Stop hook needs, gathered. Returns the core's assessment plus
@@ -150,7 +196,20 @@ if (isMain) {
       const flag = argv[i]
       const value = argv[i + 1]
       if (value === undefined) fail(`${flag} needs a value.\n${usage}`)
-      if (flag === '--pid') evidence.push({ kind: 'pid', pid: Number(value) })
+      if (flag === '--pid') {
+        // The start time is recorded WITH the pid, so a later probe can tell the
+        // same process from a stranger that inherited the number.
+        const pid = Number(value)
+        const probe = Number.isInteger(pid) && pid > 0 ? probePid(pid) : { exists: false, startedAt: null }
+        if (probe.exists === true && typeof probe.startedAt !== 'number') {
+          fail(
+            `the start time of pid ${pid} could not be established, so a reused pid could later pass as this ` +
+              'process. Declare something else instead (--log <the file the run writes to> is the closest ' +
+              'equivalent). Nothing recorded.',
+          )
+        }
+        evidence.push({ kind: 'pid', pid, startedAt: probe.startedAt })
+      }
       else if (flag === '--branch') evidence.push({ kind: 'branch', ref: value })
       else if (flag === '--worktree') evidence.push({ kind: 'worktree', path: value })
       else if (flag === '--log') evidence.push({ kind: 'log', path: value })
@@ -159,8 +218,9 @@ if (isMain) {
     if (evidence.length === 0) {
       fail(
         'no EVIDENCE given. A declaration is only honoured while a probe can confirm the work is still ' +
-          'running, so it must name at least one of: --pid <background process>, --branch <agent branch>, ' +
-          `--worktree <agent worktree>, --log <file the run is writing to>.\n${usage}`,
+          'RUNNING — not merely that it once existed — so it must name at least one of: --pid <background ' +
+          'process, alive and the same process>, --branch <agent branch, committed to recently>, --worktree ' +
+          `<agent worktree, git-active recently>, --log <file the run is still writing to>.\n${usage}`,
       )
     }
     const lock = readOwnerLock()
@@ -195,8 +255,9 @@ if (isMain) {
     const mins = Math.round(maxAgeMs() / 60000)
     console.log(
       `waiting on ${waitingOn} — recorded: ${check.summary}. The turn may now end while this holds. It ` +
-        `expires in ${mins} min and stops holding the MOMENT any of it stops checking out (a finished agent, ` +
-        'a dead process, a silent log), so re-declare after every change and clear it with --clear when the ' +
+        `expires in ${mins} min and stops holding the MOMENT any of it stops checking out (a dead or replaced ` +
+        'process, a branch or worktree that has gone quiet, a silent log — none of them may merely EXIST, all ' +
+        'must still be moving), so re-declare after every change and clear it with --clear when the ' +
         'wait is over. The batch lock stays HELD: no successor is spawned, this session is still the batch.',
     )
   } else {

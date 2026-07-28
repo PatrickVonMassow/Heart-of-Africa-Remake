@@ -18,10 +18,13 @@
 // hours on the night of 28.07.2026, and an abandoned wait must not become an idle
 // night. Three properties keep the two apart:
 //
-//   1. EVIDENCE, NOT ASSERTION. A declaration names things a probe can answer:
-//      a background pid that must still be alive, a branch that must exist, a
-//      worktree directory that must exist, a log file that must have been written
-//      to recently. Nothing here takes the session's word for anything.
+//   1. EVIDENCE, NOT ASSERTION — and RECENCY, never mere existence. A declaration
+//      names things a probe can answer, and each answer must be FRESH: a pid whose
+//      process is alive AND started when the declaration says (a reused pid is a
+//      stranger), a branch whose tip commit is recent, a worktree where git work
+//      recently happened, a log still being written to. Existence alone was the
+//      one real hole the four-eyes review found — ~94 stale branches in this
+//      repository would each have passed forever.
 //   2. ALL of it must check out, not some. When one of three agents finishes, the
 //      declaration stops holding and the guard blocks again — which is right: the
 //      finished agent's work is now the session's next action (merge it), and
@@ -34,7 +37,7 @@
 //
 // Where the two verdicts are close, this file chooses the BLOCK: a wrong block
 // costs one command, a wrong allow cost five and a half hours.
-import { resolveOwnership } from './batch-singleton.mjs'
+import { resolveOwnership, PID_START_TOLERANCE_MS } from './batch-singleton.mjs'
 
 /** How old a declaration may be before the guard stops honouring it. Wide enough
  *  for a LARGE browser regression or a delegated agent building a point (both run
@@ -47,44 +50,94 @@ export const IN_FLIGHT_MAX_AGE_MS = 45 * 60 * 1000
  *  is not something to keep waiting on without saying so again. */
 export const LOG_FRESH_MS = 15 * 60 * 1000
 
+/**
+ * The same question for a BRANCH and a WORKTREE: how recently work must have
+ * landed in it. EXISTENCE IS NOT EVIDENCE (four-eyes review, 28.07.2026) — this
+ * repository carries ~94 `feat/*` and `worktree-agent-*` branches, many of them
+ * days old, so a declaration naming any of them would have passed the up-front
+ * check AND every re-proving, held its full 45 minutes and been renewable with
+ * one command. That was the single "yes" to "can this switch the block off", and
+ * it sat on the COMMON path: the guard's block message steers sessions to exactly
+ * these two kinds. So they are judged the way the log kind already was — by
+ * recency. A delegated agent commits per step, so a quarter of an hour without a
+ * commit or a git operation in its tree means it is finished, stuck or gone;
+ * whichever it is, the session's next action is to look, not to keep waiting.
+ */
+export const WORK_FRESH_MS = 15 * 60 * 1000
+
 /** The evidence kinds a probe can actually answer. An unknown kind is never
  *  "assume fine": it fails, and the declaration with it. */
 export const EVIDENCE_KINDS = ['pid', 'branch', 'worktree', 'log']
 
+/** Minutes, for the human-readable detail strings. */
+const minutes = (ms) => Math.round(ms / 60000)
+
 /**
  * ONE piece of evidence, checked. PURE — every probe is injected:
- *   probePid  — (pid) => { exists: boolean }        (scripts/batch-singleton.mjs)
- *   refExists — (ref) => boolean                    (git show-ref)
- *   dirExists — (path) => boolean
- *   mtimeOf   — (path) => number|null               (epoch ms, null when absent)
+ *   probePid         — (pid) => { exists: boolean, startedAt: number|null }
+ *   refTipAt         — (ref) => number|null  epoch ms of the branch tip commit
+ *   worktreeActiveAt — (path) => number|null epoch ms of the last git activity
+ *   mtimeOf          — (path) => number|null epoch ms, null when absent
+ *
+ * EVERY kind is now judged on RECENCY, not on existence — a pid by the identity
+ * of the process behind it, the other three by when something last happened.
  *
  * Returns { ok, kind, describe, detail } — `describe` is what the guard's allow
  * message says out loud, so a later reader of the transcript can see what the
  * turn ended on.
  */
-export function checkEvidence(item, { now, probePid, refExists, dirExists, mtimeOf, logFreshMs = LOG_FRESH_MS } = {}) {
+export function checkEvidence(
+  item,
+  {
+    now,
+    probePid,
+    refTipAt,
+    worktreeActiveAt,
+    mtimeOf,
+    logFreshMs = LOG_FRESH_MS,
+    workFreshMs = WORK_FRESH_MS,
+    tolerance = PID_START_TOLERANCE_MS,
+  } = {},
+) {
   const kind = String(item?.kind ?? '')
   const label = typeof item?.label === 'string' && item.label.trim() ? ` (${item.label.trim()})` : ''
   const no = (describe, detail) => ({ ok: false, kind, describe, detail })
   const yes = (describe, detail) => ({ ok: true, kind, describe, detail })
+  const window = (fallback) => (Number.isFinite(item?.freshMs) && item.freshMs > 0 ? item.freshMs : fallback)
 
   if (kind === 'pid') {
     const pid = Number(item.pid)
     if (!Number.isInteger(pid) || pid <= 0) return no(`pid ${item.pid}${label}`, 'not-a-pid')
-    const alive = !!probePid && probePid(pid).exists === true
-    return alive ? yes(`pid ${pid}${label}`, 'alive') : no(`pid ${pid}${label}`, 'process-gone')
+    const probe = probePid ? probePid(pid) : null
+    if (!probe || probe.exists !== true) return no(`pid ${pid}${label}`, 'process-gone')
+    // IDENTITY, not just existence (four-eyes review): a pid is reused within
+    // hours on a busy machine, and an exists-only probe would keep a declaration
+    // alive on a stranger's process. Recorded at declaration time and compared
+    // the way `resolveOwnership` compares the lock's.
+    if (typeof item.startedAt !== 'number') return no(`pid ${pid}${label}`, 'no-start-time')
+    if (typeof probe.startedAt !== 'number') return no(`pid ${pid}${label}`, 'start-time-unverifiable')
+    if (Math.abs(probe.startedAt - item.startedAt) > tolerance) return no(`pid ${pid}${label}`, 'pid-reused')
+    return yes(`pid ${pid}${label}`, 'alive')
   }
   if (kind === 'branch') {
     const ref = String(item.ref ?? '').trim()
     if (!ref) return no(`branch ?${label}`, 'no-ref')
-    const there = !!refExists && refExists(ref) === true
-    return there ? yes(`branch ${ref}${label}`, 'exists') : no(`branch ${ref}${label}`, 'branch-gone')
+    const tip = refTipAt ? refTipAt(ref) : null
+    if (typeof tip !== 'number') return no(`branch ${ref}${label}`, 'branch-gone')
+    const idle = now - tip
+    return idle <= window(workFreshMs)
+      ? yes(`branch ${ref}${label}`, `tip ${minutes(idle)} min old`)
+      : no(`branch ${ref}${label}`, `no commit for ${minutes(idle)} min`)
   }
   if (kind === 'worktree') {
     const path = String(item.path ?? '').trim()
     if (!path) return no(`worktree ?${label}`, 'no-path')
-    const there = !!dirExists && dirExists(path) === true
-    return there ? yes(`worktree ${path}${label}`, 'exists') : no(`worktree ${path}${label}`, 'worktree-gone')
+    const active = worktreeActiveAt ? worktreeActiveAt(path) : null
+    if (typeof active !== 'number') return no(`worktree ${path}${label}`, 'worktree-gone')
+    const idle = now - active
+    return idle <= window(workFreshMs)
+      ? yes(`worktree ${path}${label}`, `active ${minutes(idle)} min ago`)
+      : no(`worktree ${path}${label}`, `quiet for ${minutes(idle)} min`)
   }
   if (kind === 'log') {
     const path = String(item.path ?? '').trim()
@@ -92,10 +145,9 @@ export function checkEvidence(item, { now, probePid, refExists, dirExists, mtime
     const mtime = mtimeOf ? mtimeOf(path) : null
     if (typeof mtime !== 'number') return no(`log ${path}${label}`, 'log-missing')
     const idle = now - mtime
-    const fresh = Number.isFinite(item.freshMs) && item.freshMs > 0 ? item.freshMs : logFreshMs
-    return idle <= fresh
+    return idle <= window(logFreshMs)
       ? yes(`log ${path}${label}`, `written ${Math.round(idle / 1000)}s ago`)
-      : no(`log ${path}${label}`, `silent for ${Math.round(idle / 60000)} min`)
+      : no(`log ${path}${label}`, `silent for ${minutes(idle)} min`)
   }
   return no(`${kind || 'unnamed'}${label}`, 'unknown-kind')
 }

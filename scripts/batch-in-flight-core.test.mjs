@@ -2,8 +2,11 @@
 // pinned. The mechanism has exactly one job — tell WAITING apart from IDLING —
 // and exactly one way to fail: letting an idle session through. Every case below
 // is therefore written from the failure side first:
-//   · a declaration only holds while a PROBE still confirms the work (dead pid,
-//     vanished branch, silent log, unknown evidence kind → block);
+//   · a declaration only holds while a PROBE still confirms the work is MOVING —
+//     EXISTENCE IS NOT EVIDENCE (four-eyes review): a dead or REUSED pid, a
+//     branch with no recent commit, a quiet worktree, a silent log and an unknown
+//     kind all block. ~94 `feat/*` branches live in this repository, many days
+//     old, so "the branch is there" would have been a permanent yes;
 //   · it holds only for its OWN session, by the lock's own identity rules;
 //   · it EXPIRES, and past that nothing it says matters;
 //   · with none declared, the guard behaves exactly as it did before;
@@ -16,25 +19,35 @@ import { REPO_ROOT } from './repo-paths.mjs'
 import {
   IN_FLIGHT_MAX_AGE_MS,
   LOG_FRESH_MS,
+  WORK_FRESH_MS,
   assessInFlight,
   checkEvidence,
   describeInFlight,
 } from './batch-in-flight-core.mjs'
-import { progressGuardDecision, statePathsFor, LOCK_PATH, IN_FLIGHT_PATH } from './batch-singleton.mjs'
+import {
+  progressGuardDecision,
+  statePathsFor,
+  probePid,
+  LOCK_PATH,
+  IN_FLIGHT_PATH,
+  PID_START_TOLERANCE_MS,
+} from './batch-singleton.mjs'
 import { gatherInFlight, maxAgeMs, readDeclaration, writeDeclaration, clearDeclaration } from './batch-in-flight.mjs'
 
 const NOW = 1_785_100_000_000
 const SID = 'session-owner'
 const PID = 4242
 const PID_STARTED = NOW - 3_600_000
+const RUN_PID = 9001
+const RUN_STARTED = NOW - 600_000
 
-const alive = () => ({ exists: true, startedAt: null })
+const alive = () => ({ exists: true, startedAt: RUN_STARTED })
 const dead = () => ({ exists: false, startedAt: null })
 
 const probes = (over = {}) => ({
   probePid: () => alive(),
-  refExists: () => true,
-  dirExists: () => true,
+  refTipAt: () => NOW - 60_000,
+  worktreeActiveAt: () => NOW - 60_000,
   mtimeOf: () => NOW - 1000,
   ...over,
 })
@@ -48,7 +61,7 @@ const declaration = (over = {}) => ({
   waitingOn: 'three delegated agents and the browser suite',
   evidence: [
     { kind: 'branch', ref: 'feat/389-a', label: 'agent 389' },
-    { kind: 'pid', pid: 9001, label: 'test:large' },
+    { kind: 'pid', pid: RUN_PID, startedAt: RUN_STARTED, label: 'test:large' },
   ],
   ...over,
 })
@@ -58,19 +71,42 @@ const assess = (over = {}, probeOver = {}) =>
 
 // ---------------------------------------------------------------------------
 describe('checkEvidence — every kind is answered by a probe, never by the claim', () => {
+  const pidItem = (over = {}) => ({ kind: 'pid', pid: 77, startedAt: RUN_STARTED, ...over })
+
   it('a pid counts only while the process is really alive', () => {
-    expect(checkEvidence({ kind: 'pid', pid: 77 }, { now: NOW, probePid: () => alive() }).ok).toBe(true)
-    expect(checkEvidence({ kind: 'pid', pid: 77 }, { now: NOW, probePid: () => dead() })).toMatchObject({
+    expect(checkEvidence(pidItem(), { now: NOW, probePid: () => alive() }).ok).toBe(true)
+    expect(checkEvidence(pidItem(), { now: NOW, probePid: () => dead() })).toMatchObject({
       ok: false,
       detail: 'process-gone',
     })
+  })
+
+  it('a REUSED pid does not count — the start time is what makes it an identity', () => {
+    const reused = () => ({ exists: true, startedAt: RUN_STARTED + PID_START_TOLERANCE_MS + 1 })
+    expect(checkEvidence(pidItem(), { now: NOW, probePid: reused })).toMatchObject({
+      ok: false,
+      detail: 'pid-reused',
+    })
+    // …while a jitter inside the tolerance is still the same process.
+    const jittered = () => ({ exists: true, startedAt: RUN_STARTED + PID_START_TOLERANCE_MS - 1 })
+    expect(checkEvidence(pidItem(), { now: NOW, probePid: jittered }).ok).toBe(true)
+  })
+
+  it('a pid with no recorded or no probeable start time never counts', () => {
+    expect(checkEvidence(pidItem({ startedAt: undefined }), { now: NOW, probePid: () => alive() })).toMatchObject({
+      ok: false,
+      detail: 'no-start-time',
+    })
+    expect(
+      checkEvidence(pidItem(), { now: NOW, probePid: () => ({ exists: true, startedAt: null }) }),
+    ).toMatchObject({ ok: false, detail: 'start-time-unverifiable' })
   })
 
   it('rejects a pid that is not one, without asking the probe', () => {
     for (const pid of [0, -1, 'x', undefined, null]) {
       expect(
         checkEvidence(
-          { kind: 'pid', pid },
+          { kind: 'pid', pid, startedAt: RUN_STARTED },
           {
             now: NOW,
             probePid: () => {
@@ -82,21 +118,42 @@ describe('checkEvidence — every kind is answered by a probe, never by the clai
     }
   })
 
-  it('a branch counts only while the ref resolves', () => {
-    expect(checkEvidence({ kind: 'branch', ref: 'feat/1-x' }, { now: NOW, refExists: () => true }).ok).toBe(true)
-    expect(checkEvidence({ kind: 'branch', ref: 'feat/1-x' }, { now: NOW, refExists: () => false })).toMatchObject({
+  it('a branch counts only while its TIP is recent — an old branch that merely exists does not', () => {
+    const branch = { kind: 'branch', ref: 'feat/1-x' }
+    expect(checkEvidence(branch, { now: NOW, refTipAt: () => NOW - 60_000 }).ok).toBe(true)
+    // THE HOLE THE REVIEW FOUND: ~94 branches exist in this repository, many of
+    // them days old. Existing is not running.
+    expect(
+      checkEvidence(branch, { now: NOW, refTipAt: () => NOW - 3 * 24 * 3600 * 1000 }),
+    ).toMatchObject({ ok: false, detail: expect.stringContaining('no commit for') })
+    expect(checkEvidence(branch, { now: NOW, refTipAt: () => NOW - WORK_FRESH_MS - 1 }).ok).toBe(false)
+    expect(checkEvidence(branch, { now: NOW, refTipAt: () => NOW - WORK_FRESH_MS }).ok).toBe(true)
+    expect(checkEvidence(branch, { now: NOW, refTipAt: () => null })).toMatchObject({
       ok: false,
       detail: 'branch-gone',
     })
-    expect(checkEvidence({ kind: 'branch', ref: '  ' }, { now: NOW, refExists: () => true }).ok).toBe(false)
+    expect(checkEvidence({ kind: 'branch', ref: '  ' }, { now: NOW, refTipAt: () => NOW }).ok).toBe(false)
   })
 
-  it('a worktree counts only while the directory is there', () => {
-    expect(checkEvidence({ kind: 'worktree', path: '/tmp/w' }, { now: NOW, dirExists: () => true }).ok).toBe(true)
-    expect(checkEvidence({ kind: 'worktree', path: '/tmp/w' }, { now: NOW, dirExists: () => false })).toMatchObject({
+  it('a worktree counts only while git ACTIVITY in it is recent, not while the directory sits there', () => {
+    const wt = { kind: 'worktree', path: '/tmp/w' }
+    expect(checkEvidence(wt, { now: NOW, worktreeActiveAt: () => NOW - 60_000 }).ok).toBe(true)
+    expect(checkEvidence(wt, { now: NOW, worktreeActiveAt: () => NOW - WORK_FRESH_MS - 1 })).toMatchObject({
+      ok: false,
+      detail: expect.stringContaining('quiet for'),
+    })
+    expect(checkEvidence(wt, { now: NOW, worktreeActiveAt: () => null })).toMatchObject({
       ok: false,
       detail: 'worktree-gone',
     })
+  })
+
+  it('lets a per-item window tighten the branch/worktree default too', () => {
+    const recent = NOW - 10 * 60 * 1000
+    expect(checkEvidence({ kind: 'branch', ref: 'r' }, { now: NOW, refTipAt: () => recent }).ok).toBe(true)
+    expect(
+      checkEvidence({ kind: 'branch', ref: 'r', freshMs: 60_000 }, { now: NOW, refTipAt: () => recent }).ok,
+    ).toBe(false)
   })
 
   it('a log counts only while it is still being WRITTEN to', () => {
@@ -157,25 +214,49 @@ describe('assessInFlight — a fresh declaration with live evidence, and every w
   })
 
   it('BLOCKS when a declared branch is gone', () => {
-    expect(assess({}, { refExists: () => false })).toMatchObject({ live: false, reason: 'evidence-gone' })
+    expect(assess({}, { refTipAt: () => null })).toMatchObject({ live: false, reason: 'evidence-gone' })
+  })
+
+  it('BLOCKS on a branch that still EXISTS but has not been committed to — the review’s one real hole', () => {
+    const a = assess({}, { refTipAt: () => NOW - 2 * 24 * 3600 * 1000 })
+    expect(a).toMatchObject({ live: false, reason: 'evidence-gone' })
+    expect(a.summary).toContain('no commit for')
+  })
+
+  it('BLOCKS on a worktree directory that still EXISTS but has gone quiet', () => {
+    const a = assessInFlight({
+      declaration: declaration({ evidence: [{ kind: 'worktree', path: '/w/agent-1' }] }),
+      sid: SID,
+      now: NOW,
+      ...probes({ worktreeActiveAt: () => NOW - WORK_FRESH_MS - 1 }),
+    })
+    expect(a).toMatchObject({ live: false, reason: 'evidence-gone' })
+    expect(a.summary).toContain('quiet for')
+  })
+
+  it('BLOCKS when the declared pid was REUSED by a different process', () => {
+    const a = assess({}, { probePid: () => ({ exists: true, startedAt: RUN_STARTED + 60_000 }) })
+    expect(a).toMatchObject({ live: false, reason: 'evidence-gone' })
+    expect(a.summary).toContain('pid-reused')
   })
 
   it('BLOCKS when ONE of several declared items has finished — all of it must hold', () => {
     const three = declaration({
       evidence: [
-        { kind: 'branch', ref: 'feat/389-a' },
-        { kind: 'branch', ref: 'feat/390-b' },
-        { kind: 'branch', ref: 'feat/391-c' },
+        { kind: 'branch', ref: 'feat/389-a', label: 'agent 389-a' },
+        { kind: 'branch', ref: 'feat/390-b', label: 'agent 390-b' },
+        { kind: 'branch', ref: 'feat/391-c', label: 'agent 391-c' },
       ],
     })
     const a = assessInFlight({
       declaration: three,
       sid: SID,
       now: NOW,
-      ...probes({ refExists: (r) => r !== 'feat/390-b' }),
+      // Agent 390 committed last an hour ago: it is done, stuck or gone.
+      ...probes({ refTipAt: (r) => (r === 'feat/390-b' ? NOW - 3600_000 : NOW - 60_000) }),
     })
     expect(a).toMatchObject({ live: false, reason: 'evidence-gone' })
-    expect(a.summary).toContain('feat/390-b — branch-gone')
+    expect(a.summary).toContain('feat/390-b (agent 390-b) — no commit for 60 min')
   })
 
   it('BLOCKS a declaration with no evidence at all — and one that is not a declaration', () => {
@@ -304,7 +385,13 @@ describe('the declaration file is derived from the caller’s lock path', () => 
     const path = statePathsFor(lockPath).inFlightPath
     const repoBefore = existsSync(IN_FLIGHT_PATH) ? readFileSync(IN_FLIGHT_PATH, 'utf8') : null
     try {
-      const d = declaration({ at: Date.now(), evidence: [{ kind: 'pid', pid: process.pid, label: 'this test' }] })
+      // A REAL probe of this very process, start time included — the round trip
+      // therefore exercises the identity check as well as the paths.
+      const self = probePid(process.pid)
+      const d = declaration({
+        at: Date.now(),
+        evidence: [{ kind: 'pid', pid: process.pid, startedAt: self.startedAt, label: 'this test' }],
+      })
       writeDeclaration(d, path)
       expect(readDeclaration(path)).toMatchObject({ sessionId: SID })
       // The real gather, real probe: this process is alive, so the wait holds.
