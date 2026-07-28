@@ -22,6 +22,7 @@ import { basename, join, resolve } from 'node:path'
 import { REPO_ROOT } from './repo-paths.mjs'
 import {
   CLAIM_MAX_AGE_MS,
+  GIT_STATE_UNVERIFIABLE,
   assessClaim,
   claimWriteDecision,
   describeClaim,
@@ -37,7 +38,15 @@ import {
   CLAIM_PATH,
   PID_START_TOLERANCE_MS,
 } from './batch-singleton.mjs'
-import { clearClaim, gatherClaim, markClaimReleased, maxAgeMs, readClaim, writeClaim } from './batch-claim.mjs'
+import {
+  clearClaim,
+  gatherClaim,
+  gitOperationInProgress,
+  markClaimReleased,
+  maxAgeMs,
+  readClaim,
+  writeClaim,
+} from './batch-claim.mjs'
 
 const NOW = 1_785_200_000_000
 const OWNER = 'session-night'
@@ -173,6 +182,39 @@ describe('releaseDecision — the owner releases only at a CLEAN moment', () => 
         reason: `git-${op}`,
       })
     }
+  })
+
+  // The probe has THREE answers, and the third one is why this case exists: a git
+  // call that timed out under load says nothing about the checkout. Collapsing it
+  // into "clean" released the batch mid-merge on exactly the busy machine that
+  // produced the timeout.
+  it('does NOT release when the git state could not be read at all', () => {
+    expect(releaseDecision({ assessment: honoured, gitOperation: GIT_STATE_UNVERIFIABLE })).toEqual({
+      verdict: 'wait',
+      reason: 'git-state-unverifiable',
+    })
+    // …and it is distinguishable from a named operation, not folded into `git-…`.
+    expect(releaseDecision({ assessment: honoured, gitOperation: 'merge' }).reason).toBe('git-merge')
+    // The timid direction cannot strand anything: without an honoured claim there
+    // is nothing to hold on to in the first place.
+    expect(
+      releaseDecision({ assessment: { honour: false, reason: 'expired' }, gitOperation: GIT_STATE_UNVERIFIABLE }),
+    ).toEqual({ verdict: 'none', reason: 'expired' })
+  })
+
+  it('the live probe answers the unverifiable sentinel rather than "clean" when git cannot run', () => {
+    // A directory that is not a repository at all makes every probe fail — the
+    // same shape a timeout produces, and the one that used to read as all-clear.
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-claim-nogit-'))
+    try {
+      expect(gitOperationInProgress({ cwd: join(dir, 'does-not-exist') })).toBe(GIT_STATE_UNVERIFIABLE)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+    // And a REAL checkout is readable — whatever it happens to be doing, the probe
+    // reaches a verdict rather than the sentinel. (Not pinned to null: a suite run
+    // during a conflicted merge would then fail for being correct.)
+    expect(gitOperationInProgress({ cwd: REPO_ROOT })).not.toBe(GIT_STATE_UNVERIFIABLE)
   })
 
   it('reads only an exact true as "in flight" — a truthy stray must not hold the batch forever', () => {

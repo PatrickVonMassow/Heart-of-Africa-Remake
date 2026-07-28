@@ -42,6 +42,7 @@ import {
   describeClaim,
   releaseDecision,
   CLAIM_MAX_AGE_MS,
+  GIT_STATE_UNVERIFIABLE,
 } from './batch-claim-core.mjs'
 
 export { CLAIM_PATH }
@@ -77,8 +78,15 @@ export function clearClaim(path = CLAIM_PATH) {
 
 /**
  * A git operation that must NOT be cut in half: a merge, a cherry-pick, a rebase
- * or a conflicted index. Returns its name, or null. Any git failure answers null
- * — this is one input to a guard, never a reason to fail one.
+ * or a conflicted index. Returns its name, `null` when the checkout is clean, or
+ * `GIT_STATE_UNVERIFIABLE` when the probe could not find out — this is one input
+ * to a guard, never a reason to fail one, so it still never throws.
+ *
+ * THE THIRD ANSWER IS THE POINT. It used to fail to `null`, which
+ * `releaseDecision` reads as "nothing half-done" — so a probe that timed out
+ * under load (8 s, on the machine that is busy enough to time out) released the
+ * batch MID-MERGE, the one outcome this family exists to prevent. "I could not
+ * look" is now its own verdict and waits, bounded by the claim's own expiry.
  *
  * `--git-path` rather than a hard-coded `.git/…`, so it is right inside a
  * worktree too (where `.git` is a file pointing elsewhere).
@@ -101,7 +109,7 @@ export function gitOperationInProgress({ cwd = REPO_ROOT } = {}) {
     if (git(['ls-files', '--unmerged']).length > 0) return 'unresolved-conflict'
     return null
   } catch {
-    return null
+    return GIT_STATE_UNVERIFIABLE
   }
 }
 
@@ -293,7 +301,12 @@ if (isMain) {
       `${ownerAlive.reason}). It sees this claim at its next turn end and releases the lock at the first CLEAN ` +
       'moment — never mid-merge, never with a delegated agent still building or a verification running, so ' +
       'nothing it is doing gets cut in half.' +
-      (check.verdict === 'wait' ? ` (A ${check.reason.replace(/^git-/, '')} is in progress in this checkout right now.)` : '') +
+      (check.verdict === 'wait'
+        ? check.reason === 'git-state-unverifiable'
+          ? ' (The git state of this checkout could not be read just now, so the owner waits rather than risk ' +
+            'releasing mid-merge.)'
+          : ` (A ${check.reason.replace(/^git-/, '')} is in progress in this checkout right now.)`
+        : '') +
       ` Re-run \`node scripts/batch-claim.mjs --session ${sid}\` to take the batch once it is free — the same ` +
       `command claims and takes. The claim expires in ${mins} min, and it is ignored outright if this window ` +
       'closes, so it can never strand the batch.',

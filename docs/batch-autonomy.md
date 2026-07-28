@@ -408,7 +408,12 @@ session — the failure the whole singleton exists to prevent.
    evidence is the existing one (`assessInFlight().live`) and the git state is
    probed (`MERGE_HEAD`, `CHERRY_PICK_HEAD`, `REVERT_HEAD`, `REBASE_HEAD`, an
    unmerged index). Anything unclean makes the claim WAIT — it stays pending and
-   every block message names it — and it is honoured at the next turn end.
+   every block message names it — and it is honoured at the next turn end. The
+   git probe has a THIRD answer besides "clean" and a named operation:
+   `GIT_STATE_UNVERIFIABLE`, when it could not find out (a timeout under load, a
+   git that would not run). It waits too — "I could not look" read as "all clear"
+   is exactly the release-mid-merge this bound exists to prevent, and the timid
+   direction costs at most one more turn because the claim expires on its own.
 
 Two consequences that are easy to miss and were both built:
 

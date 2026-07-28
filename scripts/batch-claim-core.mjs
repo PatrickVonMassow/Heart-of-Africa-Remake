@@ -50,6 +50,16 @@ import { resolveOwnership, PID_START_TOLERANCE_MS } from './batch-singleton.mjs'
  *  (scripts/batch-claim.mjs). */
 export const CLAIM_MAX_AGE_MS = 30 * 60 * 1000
 
+/** What the git probe answers when it could not find OUT (a timeout under load, a
+ *  git that would not run) — as opposed to `null`, which means it looked and found
+ *  nothing half-done. The two must not collapse into one value: "I could not look"
+ *  read as "all clear" releases the batch mid-merge, and that is the one outcome
+ *  this whole family exists to prevent. `releaseDecision` maps it to `wait`, and
+ *  the bound that keeps a too-timid verdict from stranding anything is the claim's
+ *  own expiry. Lives here, not in the IO half, so the pure decision function owns
+ *  the value it interprets. */
+export const GIT_STATE_UNVERIFIABLE = 'unverifiable'
+
 /**
  * JUDGE A CLAIM. PURE — the pid probe is injected.
  *
@@ -137,6 +147,12 @@ export function assessClaim({
  * (`assessInFlight().live`) — this file does not invent a second way to ask
  * whether work is still running.
  *
+ * An UNVERIFIABLE git state waits too. A probe that timed out under load says
+ * nothing about the checkout, and reading it as "nothing half-done" is precisely
+ * the release-mid-merge this file's closing rule forbids. The cost of the timid
+ * direction is bounded: the claim keeps standing until the next turn end, and it
+ * expires on its own, so nothing is stranded.
+ *
  * Returns { verdict: 'none' | 'wait' | 'release', reason }.
  */
 export function releaseDecision({ assessment, inFlightLive = false, gitOperation = null } = {}) {
@@ -145,6 +161,7 @@ export function releaseDecision({ assessment, inFlightLive = false, gitOperation
   }
   if (inFlightLive === true) return { verdict: 'wait', reason: 'work-in-flight' }
   const op = typeof gitOperation === 'string' && gitOperation.trim() ? gitOperation.trim() : null
+  if (op === GIT_STATE_UNVERIFIABLE) return { verdict: 'wait', reason: 'git-state-unverifiable' }
   if (op) return { verdict: 'wait', reason: `git-${op}` }
   return { verdict: 'release', reason: 'clean' }
 }
