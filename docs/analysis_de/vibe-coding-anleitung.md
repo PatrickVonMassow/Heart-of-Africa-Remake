@@ -197,15 +197,13 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   Performance und Kosten werden nur **gemessen** kommuniziert — Performance auf der
   **Ziel-Hardware**, nicht auf der Build-Maschine."
 
-- **Das Kontingent ist die Grenze, nicht die Zeit.** Der Verbrauch hängt nicht an den
-  Stunden, sondern an der Größe jedes Kontexts: lange Sitzungen, die jede Aufgabe im
-  selben Fenster mitschleppen, und Helfer, die ihren Auftrag in großen Dokumenten erst
-  *suchen* müssen.
-  → *Prompt:* „Lies die Verbrauchsanzeige und nenne mir die **gemessenen** Treiber. Schicke
-  jedem Helfer seinen Auftrag als fertigen Kurzbrief mit, statt ihn in den Projektdokumenten
-  suchen zu lassen, und fang für jede neue Aufgabe einen **frischen Kontext** an."
-  *(Ein billigeres Modell für ‚einfache' Aufgaben ist der falsche Hebel: Die Nacharbeit an
-  einer schwachen Lieferung kostet mehr als die Ersparnis.)*
+- **Das Kontingent ist die Grenze, nicht die Zeit.** Der Verbrauch hängt an der Größe
+  jedes Kontexts, nicht an den Stunden: lange Sitzungen, die alles mitschleppen, und
+  Helfer, die ihren Auftrag erst in großen Dokumenten *suchen* müssen.
+  → *Prompt:* „Nenne mir die **gemessenen** Treiber. Schicke jedem Helfer seinen Auftrag
+  als fertigen Kurzbrief mit, und fang für jede Aufgabe einen **frischen Kontext** an."
+  *(Ein billigeres Modell für ‚einfache' Aufgaben ist der falsche Hebel: die Nacharbeit
+  kostet mehr als die Ersparnis.)*
 
 - **Der Assistent bleibt still stehen / schläft ein.** Bei langen, autonomen Läufen endet
   der Fortschritt unbemerkt.
@@ -302,8 +300,7 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Etabliere einen Mechanismus, der nach jedem Zwischenfall eine
   **Beweisliste** erzwingt, deren Punkte einzeln zu belegen sind: Liegt alles am
   Zielort? Gibt es Reste (kaputte Kodierung, Waisen-Dateien, Tests ohne echte Prüfung)?
-  Ist jedes zuletzt gebaute Feature samt Tests plausibel? Passen Dokumente und Code noch
-  zusammen? Läuft am Ende alles grün?"
+  Passen Dokumente und Code zusammen? Läuft am Ende alles grün?"
 
 - **Der Autor sieht seine eigene Annahme nicht.** Wer entwirft und baut, prüft am Ende
   gegen dieselbe Vorstellung, aus der der Fehler stammt. Ein einzelnes Modell hat blinde
@@ -341,32 +338,18 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   wissen will, was zu tun ist, liest die offene; wer erkennen muss, dass etwas
   **abgeschlossen** ist, braucht beide."
 
-- **Im Präsens behauptet, nie nachgesehen.** In deiner Anweisung steht „das Feld wird
-  bereits gesetzt", weil du es dir so vorstellst — im Code steht es nicht. Eine Lücke
-  im Auftrag führt zur Rückfrage; eine falsche Tatsachenbehauptung führt zu einer
-  Lieferung, die genau das tut, was dasteht: nichts — und dabei grün ist.
-  → *Prompt:* „Was du in einem Auftrag im **Präsens** behauptest, sieh vorher nach. Was
-  erst gebaut werden muss, schreib in die Zukunftsform oder ausdrücklich unter ‚das
-  existiert noch nicht'. Und prüfe jede Zusicherung, die ein Dokument über den Code
-  macht, gegen den Code — oder kennzeichne sie als Absicht."
+- **Im Präsens behauptet, nie nachgesehen.** „Das Feld wird bereits gesetzt" — im Code
+  steht es nicht. Eine Lücke im Auftrag führt zur Rückfrage; eine falsche
+  Tatsachenbehauptung führt zu einer Lieferung, die nichts tut und dabei grün ist.
+  → *Prompt:* „Was du im **Präsens** behauptest, sieh vorher nach. Was erst gebaut
+  werden muss, schreib in die Zukunftsform. Und prüfe jede Zusicherung, die ein
+  Dokument über den Code macht, gegen den Code — oder kennzeichne sie als Absicht."
 
-- **Der Wächter, der beim Scheitern durchwinkt — und die Handlung, die er dabei
-  verschluckt.** Ein guter Wächter lässt bei einem eigenen Fehler durch, sonst sperrt
-  er dich aus. Das ist richtig, solange er nur *prüft*. Sobald er auch etwas **tut**,
-  wird dieselbe Höflichkeit gefährlich: Die Handlung scheitert, der Fehler wird
-  aufgefangen, alles sieht nach Erfolg aus — und der halb veränderte Zustand bleibt
-  liegen. Bei mir hat genau das eine Sitzungsübergabe fünfeinhalb Stunden lahmgelegt.
-  → *Prompt:* „Wo ein Wächter nicht nur prüft, sondern etwas ausführt: Melde ein
-  Scheitern im selben Atemzug wie die Freigabe, und verbrauche den Zustand, der die
-  Handlung erlaubt hat, erst **nachdem** sie gelungen ist."
-
-- **Jedes Teil grün, die Kette trotzdem tot.** Du hast Tests für jeden Baustein, und
-  sie leuchten alle. Trotzdem passiert am Ende nichts, weil zwischen zwei Bausteinen
-  niemand nachgesehen hat. Eine Kette wird durch **einen echten Durchlauf** geprüft,
-  nicht durch die Summe ihrer Teile.
-  → *Prompt:* „Für alles, was aus mehreren Schritten besteht: Spiel es **einmal
-  vollständig durch** und lies das Ergebnis aus den Protokollen, nicht aus den Tests.
-  Bricht die Kette irgendwo, ist genau dieser Bruch das Ergebnis."
+- **Jedes Teil grün, die Kette trotzdem tot.** Alle Bausteine sind getestet, am Ende
+  passiert trotzdem nichts — zwischen zweien hat niemand nachgesehen.
+  → *Prompt:* „Was aus mehreren Schritten besteht, spiel **einmal vollständig durch**
+  und lies das Ergebnis aus den Protokollen, nicht aus den Tests. Wo eine Prüfung auch
+  etwas ausführt, melde ein Scheitern im selben Atemzug wie die Freigabe."
 
 ---
 
