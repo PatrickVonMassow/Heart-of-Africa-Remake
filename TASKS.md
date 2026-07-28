@@ -2833,6 +2833,50 @@ read that as "the criterion and its evidence section".
   DOCS: design.md §19.8 + §21.2 already state it; balance comments and the
   acceptance-evidence line under §12.
 
+- [ ] 395. THE BATCH RUNS THROUGH THE NIGHT IN THE WINDOW THAT IS ALREADY OPEN (user
+  decision 28.07.2026, and it REVERSES the delivery of points 373/388 rather than
+  extending it). The user's requirement, stated plainly: "Ich möchte nicht dabei sein und
+  mit der Sache nichts zu tun haben … Wenn du die Nacht durcharbeitest, möchte ich morgens
+  im noch geöffneten Chatfenster die aktuellen Meldungen erscheinen sehen." Both existing
+  answers fail it — `/clear` needs the user to act, and the point boundary hands over to a
+  NEW session whose messages appear in a NEW window while the open one goes silent.
+  TARGET: while a session owns the batch lock, it KEEPS working point after point in the
+  same window. `batch-progress-guard` no longer demands a boundary at a closed point; it
+  demands the NEXT point, exactly as it did before the boundary existed. The
+  boundary/handover machinery is NOT deleted — it stays as the recovery path for the case
+  it was really built for: no live owner at all (a crashed or closed session), where the
+  launcher must bring the batch back up. `scripts/batch-boundary.mjs` therefore keeps
+  working when invoked, and the launcher keeps its "spawn only when nobody owns the lock"
+  rule; what goes is the RULE that a session must end at a point boundary.
+  THE COST THE USER ACCEPTED, and it must not be hidden: the boundary existed because the
+  context is the batch's dominant cost — measured, 84 % of the spend sat above 150k
+  context and 68 % in sessions over eight hours. A session that runs all night will
+  compact repeatedly instead. The three levers that remain are the ones to lean on, and
+  the point is not done until each is verified still in force: EVERY point is delegated to
+  a worktree agent (the main session merges and verifies, §6), every agent gets a BRIEF
+  rather than a document (point 365), and the main session reads via commands whose output
+  is small, never whole files. Report the night's context profile the next morning so the
+  new cost is measured, not assumed.
+  WHAT A LONG SESSION NOW EXPOSES: a context compaction mints a NEW session id while the
+  lock keeps the old one. Point 388 hardened ownership to resolve by PROCESS
+  (`resolveOwnership` in `scripts/batch-singleton.mjs`), which is exactly what carries a
+  compacting session — verify it end to end here rather than trusting it: force a
+  compaction, then confirm the guards still recognise the session as the owner and the
+  lock is re-stamped with the new id.
+  ALSO: the heartbeat must keep the lock fresh across a night of long agent runs, so the
+  launcher never mistakes a working owner for a dead one and spawns a second window beside
+  it — the incident of 24.07.2026. Check the heartbeat interval against the longest
+  realistic agent run and say what margin remains.
+  VERIFIABLE: pure Vitest on the guard decision — a closed point with an open queue
+  demands the next point and does NOT demand a boundary; an explicitly invoked boundary
+  still records and hands over; and with no live owner the launcher path is unchanged.
+  Live: one night's run in a single window, reported the next morning with the number of
+  points closed, the compactions survived, and the context profile.
+  DOCS in the same commit: CLAUDE.md §6's "context boundary at a point boundary" paragraph
+  is rewritten to state THIS as the rule and the boundary as the recovery path — the
+  document must not keep telling a session to end at a point. `docs/batch-autonomy.md`
+  likewise. Both sit at measured ceilings; the rewrite should SHRINK them, since one rule
+  replaces two.
 - [ ] 373. THE SESSION BOUNDARY BECOMES AUTONOMOUS (user 27.07.2026: "implement it the
   way you recommend", against the plan to run the batch 24/7). Measured: 80 % of the
   token spend sits above 150k context, because one session carries point after point.
