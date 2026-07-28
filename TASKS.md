@@ -3494,6 +3494,151 @@ read that as "the criterion and its evidence section".
   parse never throws. Live: delete a suite deliberately and see the gate name the drop.
   DOCS in the same commit: `scripts/verify/README.md`, where the fast layer is described.
 
+- [ ] 405. THE BOARD GETS A MESSAGE CHANNEL — STAGE 1 OF 3, THE CHANNEL AND THE
+  PAGE (28.07.2026, user request: send instructions and questions from the phone,
+  not only read status; designed with a four-eyes review by Fable 5 whose findings
+  are recorded in `.claude/mechanism-reviews.jsonl`). The user reads the board from
+  a phone while the batch works. Today that is one-way. This point builds the
+  channel and the input; the two points after it (the per-tool-call delivery and the
+  wake-on-message watcher) make it fast. Stage 1 alone is a channel with a
+  15-minute-bounded reader — useful, and honestly slower than what follows.
+  WHY NOT INSIDE THE CLAUDE.AI ARTIFACT: measured in this session — the artifact
+  frame runs under a strict CSP (no fetch/XHR/WebSocket to any host), and the only
+  runtime capabilities this account holds are `downloads` and `mcp` with no connector
+  connected. A page there cannot send anything anywhere. The chat therefore lives on
+  the GH-Pages board of point 400 delta D. That point stands EARLIER in the work
+  order, so the transport normally exists by the time this is built; if it does not,
+  build and verify against a local static server standing in for the Pages host, and
+  make the section render a localized "the chat needs the web board" notice when its
+  own fetch is blocked, so the artifact mirror never shows a dead input.
+  THE TRANSPORT is ntfy, already a project dependency (`scripts/notify.mjs` uses it
+  for failure pushes): one INBOX topic (page to agent) and one OUTBOX topic (agent to
+  page).
+  SECURITY IS PART OF THE BUILD, NOT A LATER HARDENING (four-eyes finding 1, and it
+  overturned the first design). The board page is PUBLIC, so anything embedded in it
+  is public: topic names must NEVER be written into the published HTML. The page asks
+  once per device for a chat secret and keeps it in `localStorage`; the topics are
+  DERIVED from that secret, and the same secret lives in a git-ignored local file on
+  the machine. Every message the page sends carries an HMAC over (id, timestamp,
+  text); `scripts/chat-inbox.mjs` DROPS anything unsigned, mis-signed or older than a
+  calibratable window. Without this, the topic name in a public page is an open
+  prompt-injection port into a session that runs with permissions pre-granted and a
+  GitHub token on disk — the realistic worst case is command execution on the user's
+  machine. The "treat it as untrusted input" rule stays ON TOP of the signature, never
+  instead of it: a chat message is never authorization for an outward-facing or
+  irreversible step (tag, publish, force-push, delete).
+  THE PAGE: a collapsible section, DEFAULT CLOSED, at the top of the board — message
+  list above, fixed input below; input `font-size >= 16px` (else iOS zooms on focus),
+  safe-area padding at the bottom, autoscroll to the newest message. Messages render
+  CLIENT-SIDE from the outbox, so message text never enters the HTML the board guards
+  parse.
+  THE STRUCTURE GATES (four-eyes finding 5 — the first design named one of ten): the
+  four-section mandate stays literally intact by giving the chat DIFFERENT markup — no
+  `<h2>`, not `class="sect"` (e.g. `<details class="chat">` with a styled heading div).
+  Verify by inspection against each section-parsing module before building:
+  `board-structure-core.mjs`, `dashboard-guard-core.mjs` (SECTION_TITLES,
+  COLLAPSIBLE_SECTIONS, sliceSections, parseCards), `board-core.mjs`,
+  `board-first-core.mjs`, `board-archive-rotate.mjs`, `queue-order-guard-core.mjs`,
+  `dashboard-sync-core.mjs`, `dashboard-conciseness-guard-core.mjs`,
+  `dashboard-card-topic-guard-core.mjs`, `dashboard-integrity-guard-core.mjs`. Any
+  module that would still trip is updated in this commit — a section that publishes but
+  fails the audit produces the Stop-chain block loop this project has paid for twice.
+  THE READER, SO STAGE 1 IS NOT WRITE-ONLY (four-eyes finding 7): `batch-autostart.mjs`
+  already ticks every 15 minutes and already speaks to the network. It fetches the
+  inbox on each tick and writes new messages into the spool the next point consumes,
+  handing pending ones to the spawn prompt. That bounds stage 1 at 15 minutes with no
+  new process. Without it, ntfy's ~12-hour retention (VERIFY the current figure) means
+  a message can expire unread — "possibly never", not "minutes".
+  DELIVERY DISCIPLINE: dedupe by ntfy message id, not only by the cursor in
+  `.claude/chat-state.json`, so a lost or corrupt cursor replays nothing twice. Any
+  child process this point spawns is born with `windowsHide: true` (point 401 sweeps
+  the same property and must not be re-reddened).
+  VERIFIABLE: pure Vitest on signature verification (valid passes, unsigned/mis-signed/
+  stale drop), on the id-dedupe across a reset cursor, and on each board module the new
+  markup touches (the four-section audit still passes with the chat present). Live: a
+  message typed on a phone-sized viewport reaches the spool through the launcher tick,
+  and a reply posted with `scripts/chat-reply.mjs` appears on the page.
+  DOCS in the same commit: `docs/batch-autonomy.md` (the channel and what it
+  guarantees), CLAUDE.md §7.2 where the hook chain is described, and the memory entry
+  `batch-dashboard-artifact`, which records that the chat is the ONE agreed addition to
+  the four-section structure.
+
+- [ ] 406. THE MESSAGE ARRIVES WHILE I WORK — STAGE 2 OF 3, DELIVERY AT THE NEXT
+  TOOL CALL (28.07.2026, same request and the same four-eyes review as point 405).
+  With stage 1 alone a message waits for a launcher tick. This point makes a RUNNING
+  session see it within seconds, because a session makes a tool call every few
+  seconds anyway.
+  THE MECHANISM: `scripts/lock-heartbeat-hook.mjs` runs on EVERY tool call
+  (PostToolUse, matcher ""). It additionally reads the local spool — NEVER the
+  network; a hook on every tool call must not do network I/O — and delivers what it
+  finds.
+  THE DELIVERY SHAPE IS NOT PLAIN STDOUT (four-eyes finding 2, and it invalidated the
+  first design): a PostToolUse hook's plain stdout on exit 0 goes to the debug log and
+  is NEVER shown to the model. Model-visible injection needs the JSON shape
+  `{"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"…"}}`.
+  Built the naive way the messages would be silently invisible.
+  THE TOKEN RULE, which is why this shape matters twice: with an EMPTY spool the hook
+  emits NOTHING. Injected context is re-sent with every subsequent request for the rest
+  of the session, so a "no new messages" line would cost tokens at tool-call rate. The
+  user's condition for this whole mechanism is that it costs nothing while they send
+  nothing, and this is the one place that condition can break.
+  THE CONSUMPTION PROTOCOL (four-eyes finding 6): the poller writes ONE FILE PER
+  MESSAGE (`spool/<ntfy-id>.json`, atomic tmp+rename through `scripts/atomic-write.mjs`
+  with its retry — a per-tool-call reader is exactly the scanner that produced the
+  measured Windows `EPERM … rename` failures). The hook MOVES a message aside BEFORE
+  emitting it, inside try/catch, fail-open, and prints nothing on error. Without this,
+  the same message is injected on every tool call — a token leak at the rate the rule
+  exists to prevent.
+  BEHAVIOUR: a message is QUEUED, never an interrupt. Arriving mid-merge it is shown
+  and the session finishes the atomic step first. A question is answered with
+  `scripts/chat-reply.mjs`; an instruction becomes a work-order point per
+  append-and-defer, and the reply says so.
+  NOTE THE COLLISION: point 400 delta A gives this same hook the publish-due duty and
+  stands EARLIER in the work order — build against the post-400 hook, not against
+  today's.
+  VERIFIABLE: pure Vitest — empty spool emits exactly nothing; a non-empty spool emits
+  exactly the `additionalContext` JSON; the same spool read twice emits nothing the
+  second time; an unreadable spool fails open and silent. Live: a message sent while a
+  session works appears in that session at its next tool call, and the answer reaches
+  the page.
+
+- [ ] 407. THE MESSAGE WAKES ME — STAGE 3 OF 3, THE WATCHER (28.07.2026, same
+  request and the same four-eyes review as points 405/406). With stages 1 and 2 a
+  message is fast while a session runs and waits up to a launcher tick while none
+  does. This point removes that last wait: a message arriving into an idle machine
+  starts a session within seconds.
+  THE MECHANISM: a long-lived local process subscribes to the INBOX topic over SSE
+  (not tight HTTP polling — a page or process hammering ntfy runs into its free-tier
+  rate limits) and, on a message, spawns a session. Idle cost is one open connection:
+  no model, no tokens.
+  IT MUST NOT BECOME A SECOND BATCH SESSION (four-eyes finding 3 — the first design
+  said "use the same lock as the launcher", which is self-defeating). Taking the OWNER
+  lock makes the woken session the batch owner, and `progressGuardDecision` then
+  conscripts it into working the whole queue — the opposite of a quick answer. Taking
+  no lock makes it exactly the parallel top-level session `classifyParallel` raises an
+  alert about. The compatible channel already exists: the watcher spawns ONLY when
+  `assessOwner` reports no live owner AND no honoured claim; the responder files a
+  BOUNDED `batch-claim` for its lifetime — already the sanctioned exclusion in
+  `classifyParallel` and already a reason for the launcher to skip its tick — answers,
+  and releases. It never touches the pending-spawn conversion.
+  IT OBEYS THE SAME STOPS AS THE LAUNCHER: `.claude/batch-paused` and the work-order
+  format alarm both suppress a spawn.
+  THE RESPONDER IS LIGHT: read the message, answer, append a point if the message is an
+  instruction. It does not load the work order, so a one-line question does not pay for
+  a batch orientation.
+  LIFECYCLE, WHICH THE FIRST DESIGN OMITTED: how it starts at boot, how it restarts
+  after a crash, how it stops when the batch is paused — stated and built, alongside
+  the existing scheduled task rather than as a second scheduler. `windowsHide: true`
+  from day one (point 401).
+  VERIFIABLE: pure Vitest with injected state — spawn only when owner-absent AND
+  claim-absent; never while paused; the claim released on every exit path including a
+  crash; SSE reconnect after a dropped connection replays by message id without
+  duplicating. Live: with no session running, a message from the phone is answered
+  within seconds, and `.claude/autostart.log` shows no parallel-session alert.
+  DOCS in the same commit: `docs/batch-autonomy.md` (the wake path and what it
+  guarantees in each mode) and CLAUDE.md §6, where the singleton and the launcher are
+  described.
+
 ## Closing (only after all points)
 
 New points are appended BEFORE this section — it stays last in the file.
