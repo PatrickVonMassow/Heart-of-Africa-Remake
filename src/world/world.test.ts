@@ -10,6 +10,7 @@ import { cellAt, coastDistance, riverDistance, CELL_LAKE, CELL_OCEAN, CELL_LAND 
 import { lakeContains } from './hydro'
 import { landFractionAt } from './geodata'
 import { LAKES } from './data/lakes'
+import { mapPointGlyphHiddenByLandmark } from '../systems/economy'
 import { LAND_POLYGONS } from './data/coastline'
 import { MOUNTAINS, WATERFALLS, ELEPHANT_GRAVEYARD, CULTURAL_LANDMARKS, NATURAL_SITES } from './data/landmarks'
 import { GIZA_PLATEAU } from './data/gizaPlateau'
@@ -518,5 +519,20 @@ describe('world data invariants (design.md §4)', () => {
     const peopleIds = villages.map((v) => v.peopleId)
     expect(peopleIds.length).toBe(22)
     expect(new Set(peopleIds).size).toBe(22)
+  })
+})
+
+describe('one site, one shape (point 338)', () => {
+  it('hides the schematic marker where a landmark draws the real masses', () => {
+    // Giza is the one site declared twice; its map point must not add a
+    // stand-in glyph inside the pyramid field it shares a coordinate with.
+    expect(mapPointGlyphHiddenByLandmark('giza')).toBe(true)
+  })
+
+  it('keeps the marker for every place that is not also a landmark', () => {
+    for (const place of PLACES) {
+      if (place.id === 'giza') continue
+      expect(mapPointGlyphHiddenByLandmark(place.id)).toBe(false)
+    }
   })
 })

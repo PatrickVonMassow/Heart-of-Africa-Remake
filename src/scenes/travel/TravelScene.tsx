@@ -39,6 +39,7 @@ import {
   worldToLatLon,
   type PlaceDef,
 } from '../../world/geo'
+import { mapPointGlyphHiddenByLandmark } from '../../systems/economy'
 import { enterHintName, settlementEnterCandidate, settlementToEnter } from './settlementEntry'
 import { sampleTerrain, type TerrainType } from '../../world/terrain'
 import { REFINE_RING_MAX, chunkNeedsRefine, refinedSegments, setTerrainRefine } from './terrainLod'
@@ -1779,7 +1780,13 @@ function PlaceMarker({ place }: { place: PlaceDef }) {
   const y = useMemo(() => Math.max(0.2, sampleTerrain(place.lat, place.lon, seed).height), [place, seed])
   return (
     <group position={[p.x, y, p.z]} name={`place-marker-${place.id}`}>
-      {place.kind === 'port' ? <PortMarker /> : place.kind === 'monument' ? <MonumentMarker /> : <VillageMarker />}
+      {mapPointGlyphHiddenByLandmark(place.id) ? null : place.kind === 'port' ? (
+        <PortMarker />
+      ) : place.kind === 'monument' ? (
+        <MonumentMarker />
+      ) : (
+        <VillageMarker />
+      )}
       {!enterHintShown && (
         <Html center position={[0, 2.9, 0]} distanceFactor={60}>
           <div className={`map-label${discovered ? '' : ' undiscovered'}`}>

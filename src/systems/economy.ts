@@ -154,6 +154,20 @@ export const KNOWN_FROM_START_LANDMARKS: readonly string[] = LANDMARK_POINTS.fil
   KNOWN_FROM_START_PLACES.includes(lm.id),
 ).map((lm) => lm.id)
 
+/**
+ * One site, one SHAPE — the twin of `landmarkLabelHiddenByMapPoint` (point 338).
+ * The label rule gives the name to the map point, because that is what the
+ * player can act on; the shape rule goes the other way, because the landmark
+ * draws the site's real masses while the map point only carries a schematic
+ * marker. Once both records share one coordinate the little marker sits
+ * concentric INSIDE those masses, and at Giza its smallest pale cone pushed out
+ * through a pyramid's face in the bird's-eye frame. Keyed on shared identity
+ * like its twin, never on distance.
+ */
+export function mapPointGlyphHiddenByLandmark(placeId: string): boolean {
+  return LANDMARK_POINTS.some((lm) => lm.id === placeId)
+}
+
 // Dev hook for the headless verification (CLAUDE.md §7.2).
 if (import.meta.env.DEV && typeof window !== 'undefined') {
   ;(window as unknown as Record<string, unknown>).__economy = {
