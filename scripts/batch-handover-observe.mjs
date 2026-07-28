@@ -14,7 +14,7 @@
 import { readFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { repoPath } from './repo-paths.mjs'
-import { readOwnerLock } from './batch-singleton.mjs'
+import { readOwnerLock, HANDOVER_GRACE_MS } from './batch-singleton.mjs'
 import { lastWorkOrderTick } from './batch-boundary.mjs'
 import { assessChain, parseHandoverLog, parseLauncherLog } from './batch-handover-observe-core.mjs'
 
@@ -51,7 +51,14 @@ const handovers = parseHandoverLog(read(repoPath('.claude/boundary.log')))
 const launcher = parseLauncherLog(read(repoPath('.claude/autostart.log')))
 const lock = readOwnerLock()
 const since = handovers.length ? handovers[handovers.length - 1].at : (tick?.at ?? Date.now() - 86400_000)
-const result = assessChain({ tick, handovers, launcher, lock, commits: commitsSince(since) })
+const result = assessChain({
+  tick,
+  handovers,
+  launcher,
+  lock,
+  commits: commitsSince(since),
+  graceMs: HANDOVER_GRACE_MS, // the real constant, never a copy that can drift
+})
 
 if (process.argv.includes('--json')) {
   console.log(JSON.stringify({ tick, lock, ...result }, null, 2))

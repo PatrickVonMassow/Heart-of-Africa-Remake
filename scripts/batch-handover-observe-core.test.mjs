@@ -6,7 +6,14 @@
 // reads a complete chain as complete, and above all that it recognises each
 // broken link for what it is, including the exact shape of that night's failure.
 import { describe, it, expect } from 'vitest'
-import { assessChain, parseHandoverLog, parseLauncherLog } from './batch-handover-observe-core.mjs'
+import {
+  OBSERVE_GRACE_MS,
+  TAKEOVER_GRACE_MS,
+  assessChain,
+  parseHandoverLog,
+  parseLauncherLog,
+} from './batch-handover-observe-core.mjs'
+import { HANDOVER_GRACE_MS } from './batch-singleton.mjs'
 
 const T = (iso) => Date.parse(iso)
 const TICK_AT = T('2026-07-29T10:00:00.000Z')
@@ -20,7 +27,11 @@ const HANDOVER_AT = T('2026-07-29T10:05:00.000Z')
 const launcherLog = (...lines) => parseLauncherLog(lines.join('\n'))
 const ACCEPT = '[2026-07-29T10:18:00.000Z] HANDOVER accepted: session-old handed the batch over at point 388 — spawning the successor'
 const SPAWN = '[2026-07-29T10:18:02.000Z] launched pid 5150 under pending-spawn lock launcher-xyz'
-const SKIP = '[2026-07-29T10:18:00.000Z] skip: owner alive (pid-alive; heartbeat 20 min old, pid 18492)'
+const FREE = '[2026-07-29T10:18:00.000Z] no owner lock — taking over'
+// Inside the grace the launcher waits ON PURPOSE — a healthy chain, not a failure.
+const GRACE_SKIP = '[2026-07-29T10:12:00.000Z] skip: owner alive (handover-grace; heartbeat 7 min old, pid 18492)'
+// Past the grace, still reading a live owner: THE failure of 28.07.2026.
+const SKIP = '[2026-07-29T10:35:00.000Z] skip: owner alive (pid-alive; heartbeat 30 min old, pid 18492)'
 
 const successorLock = { sessionId: 'session-new', kind: 'session', pid: 5150, claimedAt: T('2026-07-29T10:19:00.000Z') }
 const oldLock = { sessionId: 'session-old', kind: 'session', pid: 18492, claimedAt: HANDOVER_AT - 60_000 }
@@ -50,10 +61,29 @@ describe('parsers — the log lines each link is proved by', () => {
   })
 
   it('classifies the launcher lines that matter', () => {
-    const l = launcherLog(ACCEPT, SPAWN, SKIP, '[2026-07-29T10:33:00.000Z] SILENT owner: s (pid 1) has not moved in 95 min — notifying')
-    expect(l.map((x) => x.kind)).toEqual(['handover-accepted', 'spawned', 'skip-alive', 'silent-notified'])
+    const l = launcherLog(ACCEPT, SPAWN, SKIP, FREE, '[2026-07-29T10:33:00.000Z] SILENT owner: s (pid 1) has not moved in 95 min — notifying')
+    expect(l.map((x) => x.kind)).toEqual([
+      'handover-accepted',
+      'spawned',
+      'skip-alive',
+      'took-free-lock',
+      'silent-notified',
+    ])
     expect(l[0].point).toBe(388)
     expect(l[1].pid).toBe(5150)
+  })
+
+  it('tells the deliberate handover-grace wait apart from a skip that means failure', () => {
+    const l = launcherLog(GRACE_SKIP, SKIP)
+    expect(l.map((x) => x.kind)).toEqual(['skip-grace', 'skip-alive'])
+    expect(l[0].reason).toBe('handover-grace')
+  })
+})
+
+// ---------------------------------------------------------------------------
+describe('the observer measures the mechanism, not a copy of it', () => {
+  it('its grace matches HANDOVER_GRACE_MS', () => {
+    expect(OBSERVE_GRACE_MS).toBe(HANDOVER_GRACE_MS)
   })
 })
 
@@ -68,13 +98,38 @@ describe('assessChain — one observed handover, end to end', () => {
     expect(linkOf(r, 'work').evidence).toContain('Give the walkers a way out')
   })
 
-  it('THE NIGHT OF 28.07.2026: a taken boundary that the launcher still skips is BROKEN, not pending', () => {
+  it('THE NIGHT OF 28.07.2026: a taken boundary the launcher still skips PAST THE GRACE is BROKEN', () => {
     const r = chain({ launcher: launcherLog(SKIP), lock: oldLock, commits: [] })
     const spawn = linkOf(r, 'spawn')
     expect(spawn.status).toBe('broken')
     expect(spawn.evidence).toContain('skip: owner alive')
     expect(spawn.broken).toMatch(/live owner/)
     expect(r.ok).toBe(false)
+  })
+
+  it('but the launcher WAITING OUT the grace is a healthy chain on schedule, never a break', () => {
+    const r = chain({
+      launcher: launcherLog(GRACE_SKIP),
+      lock: oldLock,
+      commits: [],
+      now: HANDOVER_AT + 8 * 60_000,
+    })
+    expect(linkOf(r, 'spawn').status).toBe('pending')
+    expect(linkOf(r, 'spawn').evidence).toMatch(/waiting out the handover grace/)
+  })
+
+  it('an ordinary skip INSIDE the grace window is not evidence either', () => {
+    const early = '[2026-07-29T10:14:00.000Z] skip: owner alive (pid-alive; heartbeat 9 min old, pid 18492)'
+    const r = chain({ launcher: launcherLog(early), lock: oldLock, commits: [], now: HANDOVER_AT + 10 * 60_000 })
+    expect(linkOf(r, 'spawn').status).toBe('pending')
+  })
+
+  it('THE HEADLESS PATH: a `claude -p` that exited leaves no lock to accept, and the spawn alone proves the link', () => {
+    // SessionEnd released the lock, so the launcher logs no acceptance at all.
+    const r = chain({ launcher: launcherLog(FREE, SPAWN) })
+    expect(linkOf(r, 'spawn').status).toBe('pass')
+    expect(linkOf(r, 'spawn').evidence).toContain('launched pid 5150')
+    expect(r.ok).toBe(true)
   })
 
   it('a boundary that was never taken is the OTHER half of that night, and names the guard that must block it', () => {
@@ -96,6 +151,21 @@ describe('assessChain — one observed handover, end to end', () => {
     expect(linkOf(r, 'spawn').status).toBe('pass')
     expect(linkOf(r, 'takeover').status).toBe('broken')
     expect(linkOf(r, 'takeover').broken).toMatch(/pending-spawn/)
+  })
+
+  it('the LAUNCHER\'s own pending-spawn lock is not a takeover — that is where conversion can still fail', () => {
+    const pending = { sessionId: 'launcher-xyz', kind: 'pending-spawn', spawnedPid: 5150, claimedAt: T('2026-07-29T10:18:02.000Z') }
+    const soon = chain({ lock: pending, commits: [], now: T('2026-07-29T10:19:00.000Z') })
+    expect(linkOf(soon, 'takeover').status).toBe('pending')
+    // …and once the successor has had its time, it is a genuine break.
+    const late = chain({ lock: pending, commits: [], now: T('2026-07-29T10:18:02.000Z') + TAKEOVER_GRACE_MS + 1000 })
+    expect(linkOf(late, 'takeover').status).toBe('broken')
+  })
+
+  it('the seconds while the child boots are pending, not broken', () => {
+    const r = chain({ lock: oldLock, commits: [], now: T('2026-07-29T10:18:30.000Z') })
+    expect(linkOf(r, 'takeover').status).toBe('pending')
+    expect(linkOf(r, 'takeover').evidence).toMatch(/still coming up/)
   })
 
   it('a successor that owns the lock but commits nothing is still incomplete', () => {

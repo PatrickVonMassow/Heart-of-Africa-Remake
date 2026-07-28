@@ -192,30 +192,44 @@ export function spawnDecision(assessment) {
 }
 
 /**
- * The identity of ONE silence: owner + pid + the heartbeat it fell silent at.
- * Keying the wedge notification on this reports every genuine stall exactly
- * once — the same stall keeps its key across the launcher's 15-minute ticks
- * (claimedAt does not move while nobody works), while a later stall of the same
- * session gets a new key and is reported again.
+ * How far a silence has gone: null (still normal), 'silent' past the notify
+ * threshold, 'wedged' past the hours-long one. TWO stages on purpose — the
+ * incident was "nobody looked", so a silence that deepens escalates instead of
+ * being reported once and then forgotten (four-eyes review, finding 5).
  */
-export function wedgeOwnerKey(lock) {
+export function wedgeStage(ageMs, { notifyMs = WEDGE_NOTIFY_MS, wedgedMs = WEDGED_MS } = {}) {
+  if (typeof ageMs !== 'number') return null
+  if (ageMs >= wedgedMs) return 'wedged'
+  if (ageMs >= notifyMs) return 'silent'
+  return null
+}
+
+/**
+ * The identity of ONE silence at ONE stage: owner + pid + the heartbeat it fell
+ * silent at + the stage. Keying the notification on this reports every genuine
+ * stall exactly once per stage — the key holds still across the launcher's
+ * 15-minute ticks (claimedAt does not move while nobody works), deepens into a
+ * second report when the silence crosses into 'wedged', and a later stall of the
+ * same session gets a new key again.
+ */
+export function wedgeOwnerKey(lock, stage = '') {
   if (!lock || !lock.sessionId || typeof lock.claimedAt !== 'number') return ''
-  return `${lock.sessionId}#${lock.pid ?? 'nopid'}#${lock.claimedAt}`
+  return `${lock.sessionId}#${lock.pid ?? 'nopid'}#${lock.claimedAt}${stage ? `#${stage}` : ''}`
 }
 
 /**
  * Should the launcher REPORT a silent owner (point 388 (c))? The launcher may
  * neither spawn against a live pid nor kill it — a long verify run legitimately
  * starves the heartbeat — but a night in which nothing happens must not be
- * discovered the next morning. Pure; the caller supplies the age, the threshold
- * and the last key it notified for.
+ * discovered the next morning. Pure; the caller supplies the stage, the key and
+ * the last key it notified for.
  */
-export function wedgeNotifyDecision({ alive, ageMs, thresholdMs = WEDGE_NOTIFY_MS, ownerKey, lastNotifiedKey }) {
+export function wedgeNotifyDecision({ alive, stage, ownerKey, lastNotifiedKey }) {
   if (!alive) return { notify: false, reason: 'owner-not-alive' }
+  if (!stage) return { notify: false, reason: 'below-threshold' }
   if (!ownerKey) return { notify: false, reason: 'no-owner' }
-  if (!(typeof ageMs === 'number' && ageMs >= thresholdMs)) return { notify: false, reason: 'below-threshold' }
   if (lastNotifiedKey && lastNotifiedKey === ownerKey) return { notify: false, reason: 'already-notified' }
-  return { notify: true, reason: 'silent-owner' }
+  return { notify: true, reason: stage === 'wedged' ? 'wedged-owner' : 'silent-owner' }
 }
 
 /**

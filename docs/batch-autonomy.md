@@ -170,22 +170,27 @@ Three changes, and none of them loosens the singleton:
      reached only after a fresh session-bound marker, a point the work order
      confirms closed and an armed launcher. A crash, a wedge or an ordinary turn
      end never reaches it.
-   - It is **withdrawn the moment the session acts again**: `heartbeat()` deletes
-     the fields on every tool call, and a PreToolUse withdrawal (piggy-backed on
-     `board-first-guard`, whose matcher already covers every state-changing tool)
-     clears it BEFORE a long call starts. That matters because sixteen Stop hooks
-     run after `batch-progress-guard` and several can block — the session's first
-     act after such a block may be one 40-minute verification, during which no
-     heartbeat would land (four-eyes review, finding 1).
+   - It is **withdrawn the moment the session shows life again**: `heartbeat()`
+     deletes the fields on every tool call, a PreToolUse withdrawal (piggy-backed
+     on `board-first-guard`, whose matcher already covers every state-changing
+     tool) clears it BEFORE a long call starts, and the UserPromptSubmit hook
+     clears it on the user's first word — earlier than any tool call, and it
+     arrives even in a turn that never makes one. That matters because sixteen
+     Stop hooks run after `batch-progress-guard` and several can block: the
+     session's first act after such a block may be one 40-minute verification,
+     during which no heartbeat would land (four-eyes review, findings 1 and 4).
    - While the process is still alive the successor waits `HANDOVER_GRACE_MS`
      (15 minutes, one full launcher tick). A headless `claude -p` exits and is
      taken over at once by the ordinary dead-pid path, so the grace only ever
      costs an interactive window something.
-3. **A silent owner is reported.** Past a calibratable age (`WEDGE_NOTIFY_MS`,
-   90 minutes, `HOA_WEDGE_NOTIFY_MIN` to tune) the launcher sends one ntfy
-   notification per silence — keyed on session + pid + the heartbeat it fell
-   silent at, so the same stall is not repeated tick after tick while a second,
-   later stall still is. It neither spawns nor kills on age: a long verify run
+3. **A silent owner is reported, and a deepening silence escalates.** Past a
+   calibratable age (`WEDGE_NOTIFY_MS`, 90 minutes, `HOA_WEDGE_NOTIFY_MIN` to
+   tune) the launcher sends one `high` ntfy notification, and one `urgent` one
+   again when the same silence crosses `WEDGED_MS` — keyed on session + pid + the
+   heartbeat it fell silent at + the stage, so the same stall is not repeated
+   tick after tick, while a deeper or a later one is. One report and then
+   permanent silence would repeat the incident's own shape, which was that nobody
+   looked. It neither spawns nor kills on age: a long verify run
    legitimately starves the heartbeat. The pre-existing four-hour valve that
    kills the launcher's OWN headless spawn is left standing (four-eyes review,
    finding 5) — it can never catch a verify run, and an unattended `claude -p`
@@ -215,9 +220,12 @@ complete / 1 pending / 2 broken:
 | --- | --- | --- |
 | `close` | the newest work-order commit on `main` adds `- [x] N.` without removing it elsewhere (an archive move cancels out) | only `- [ ] N.` lines, or a pure archive move |
 | `take` | `.claude/boundary.log`: `HANDOVER point N by <sid>` | no such line — the session stopped without taking the boundary, the failure of 28.07.2026; the guard must have blocked with "TAKE THE POINT BOUNDARY" |
-| `spawn` | `.claude/autostart.log`: `HANDOVER accepted: <sid> handed the batch over at point N — spawning the successor`, then `launched pid <pid>` | `skip: owner alive` AFTER the handover line — the handover never reached the lock, or a later tool call withdrew it |
-| `takeover` | `.claude/batch-lock.json` names a different session with a heartbeat after the handover | the lock still names the old session — the spawned session never converted the pending-spawn lock |
-| `work` | a commit on `main` after the spawn, in the successor's own hand: the next point's branch or its first atomic commit | nothing committed — the successor stood down (lock) or `batch-resume-hook` never oriented it |
+| `spawn` | `.claude/autostart.log`: `launched pid <pid>` after the handover — preceded by `HANDOVER accepted: …` when the process still lived, or by `no owner lock — taking over` on the headless path, where a `claude -p` has already exited and SessionEnd freed the lock | `skip: owner alive` more than one grace window (15 min) after the handover — the handover never reached the lock, or a later tool call withdrew it. A `handover-grace` skip is the mechanism waiting on purpose and never counts |
+| `takeover` | `.claude/batch-lock.json` names a DIFFERENT session, kind `session`, with a heartbeat after the handover | still the old session, or still the launcher's own `pending-spawn` lock, ten minutes after the spawn — the successor never converted it |
+| `work` | a commit on `main` after the spawn: the next point's branch or its first atomic commit | nothing committed — the successor stood down (lock) or `batch-resume-hook` never oriented it |
+
+`work` is the one link a machine cannot close: no commit names the session that
+wrote it, so the observer prints the commit and the reader confirms the hand.
 
 The run itself belongs to the MAIN session in the main tree: it needs the live
 batch lock, and no worktree agent may take or release it. The natural occasion is

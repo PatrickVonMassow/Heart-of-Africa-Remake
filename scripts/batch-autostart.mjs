@@ -41,6 +41,7 @@ import {
   raiseParallelAlert,
   wedgeNotifyDecision,
   wedgeOwnerKey,
+  wedgeStage,
   PENDING_STALE_MS,
   WEDGE_NOTIFY_MS,
 } from './batch-singleton.mjs'
@@ -162,24 +163,19 @@ if (
 if (assessment.alive) {
   const ageMs = now - lock.claimedAt
   const thresholdMin = Number(process.env.HOA_WEDGE_NOTIFY_MIN)
-  const thresholdMs = Number.isFinite(thresholdMin) && thresholdMin > 0 ? thresholdMin * 60000 : WEDGE_NOTIFY_MS
-  const ownerKey = wedgeOwnerKey(lock)
-  const w = wedgeNotifyDecision({
-    alive: true,
-    ageMs,
-    thresholdMs,
-    ownerKey,
-    lastNotifiedKey: state.wedgeNotifiedKey,
-  })
+  const notifyMs = Number.isFinite(thresholdMin) && thresholdMin > 0 ? thresholdMin * 60000 : WEDGE_NOTIFY_MS
+  const stage = wedgeStage(ageMs, { notifyMs })
+  const ownerKey = wedgeOwnerKey(lock, stage ?? '')
+  const w = wedgeNotifyDecision({ alive: true, stage, ownerKey, lastNotifiedKey: state.wedgeNotifiedKey })
   if (w.notify) {
     const mins = Math.round(ageMs / 60000)
-    log(`SILENT owner: ${lock.sessionId} (pid ${lock.pid ?? 'unknown'}) has not moved in ${mins} min — notifying`)
+    log(`SILENT owner: ${lock.sessionId} (pid ${lock.pid ?? 'unknown'}) has not moved in ${mins} min — notifying (${stage})`)
     await notify(
-      'Batch session SILENT',
+      stage === 'wedged' ? 'Batch session WEDGED' : 'Batch session SILENT',
       `The owning session (pid ${lock.pid ?? 'unknown'}) has made no tool call in ${mins} minutes but its process ` +
-        'is alive, so the launcher may not take over. Either it is inside a very long run, or it stopped while ' +
-        'holding the batch lock — the batch is making no progress until someone looks.',
-      'high',
+        'is alive, so the launcher may neither take over nor kill it. Either it is inside a very long run, or it ' +
+        'stopped while holding the batch lock — the batch is making no progress until someone looks.',
+      stage === 'wedged' ? 'urgent' : 'high',
     )
     state.wedgeNotifiedKey = ownerKey
   }
@@ -226,6 +222,11 @@ if (lock) {
       ? `HANDOVER accepted: ${lock.sessionId} handed the batch over${lock.handoverPoint ? ` at point ${lock.handoverPoint}` : ''} — spawning the successor`
       : `owner provably dead (${assessment.reason}) — taking over`,
   )
+} else {
+  // The headless path leaves no lock at all: a `claude -p` that ends at a
+  // boundary exits, and SessionEnd releases the lock before this tick runs. Said
+  // distinctly so the handover chain can be read from this file either way.
+  log('no owner lock — taking over')
 }
 
 // Debounce: a spawn less than 10 min ago is still coming up.

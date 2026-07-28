@@ -117,9 +117,30 @@ export function lastWorkOrderTick({ cwd = repoPath('.'), refs = ['main'] } = {})
   return null
 }
 
-/** Is point N closed, per the split work order? */
-export function closureOf(point) {
-  return pointClosure(point, readTasksOpen(TASKS_PATH), readText(ARCHIVE_PATH))
+/**
+ * Is point N closed, per the split work order? The WORKING TREE is asked first,
+ * and `main` second — a feature-branch checkout carries the work order as it was
+ * when the branch was cut, so a point ticked on main after that reads "still
+ * OPEN" there. Without the fallback the guard (which reads main) would demand a
+ * boundary the CLI (which read the checkout) refuses: a contradiction that loops
+ * (four-eyes review, finding 6). Ticks are main-only, so main is the authority.
+ */
+export function closureOf(point, { cwd = repoPath('.') } = {}) {
+  const local = pointClosure(point, readTasksOpen(TASKS_PATH), readText(ARCHIVE_PATH))
+  if (local === 'closed') return local
+  try {
+    const show = (path) =>
+      execFileSync('git', ['show', `main:${path}`], {
+        cwd,
+        encoding: 'utf8',
+        timeout: 8000,
+        stdio: ['ignore', 'pipe', 'ignore'],
+      })
+    const onMain = pointClosure(point, show('TASKS.md'), show('docs/tasks-archive.md'))
+    return onMain === 'closed' ? 'closed' : local
+  } catch {
+    return local // no main ref / not a repo — the checkout is all there is
+  }
 }
 
 /**
@@ -135,8 +156,9 @@ export function gatherBoundary(sid, { now = Date.now(), path = BOUNDARY_PATH } =
   // turn end of the owning session, and a PowerShell round-trip per turn for a
   // question nobody asked would be pure waste.
   let launcher = boundary.valid ? probeLauncherState() : 'unknown'
-  // Is one DUE (point 388)? Only asked when none was taken — that is the whole
-  // failure case. Two cheap git calls, and only for the owning session.
+  // Is one DUE (point 388)? Asked at every turn end that has no valid marker —
+  // that is the whole failure case — at the cost of two short git calls, and
+  // only ever for the owning session (the guard gathers nothing for the others).
   let due = null
   if (!boundary.valid) {
     const lock = readOwnerLock()

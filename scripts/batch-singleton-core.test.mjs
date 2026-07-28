@@ -29,6 +29,7 @@ import {
   withdrawHandover,
   wedgeNotifyDecision,
   wedgeOwnerKey,
+  wedgeStage,
   DEAD_CONFIRM_MS,
   LEGACY_STALE_MS,
   WEDGED_MS,
@@ -188,40 +189,61 @@ describe('assessOwner (liveness = heartbeat AND real pid, never age alone)', () 
 })
 
 // ---------------------------------------------------------------------------
-describe('wedgeNotifyDecision (point 388 (c): diagnose AND report, once per silence)', () => {
-  const key = 'owner-1#4242#1000'
+describe('wedgeNotifyDecision (point 388 (c): diagnose AND report, once per silence and stage)', () => {
+  const lock = { sessionId: 'owner-1', pid: 4242, claimedAt: 1000 }
+  const at = (ageMs) => {
+    const stage = wedgeStage(ageMs)
+    return { stage, ownerKey: wedgeOwnerKey(lock, stage ?? '') }
+  }
 
   it('reports an alive owner past the threshold', () => {
-    expect(wedgeNotifyDecision({ alive: true, ageMs: WEDGE_NOTIFY_MS, ownerKey: key }).notify).toBe(true)
+    expect(wedgeNotifyDecision({ alive: true, ...at(WEDGE_NOTIFY_MS) }).notify).toBe(true)
   })
 
   it('stays quiet below the threshold — a long verify run is not a wedge', () => {
-    const d = wedgeNotifyDecision({ alive: true, ageMs: 40 * 60_000, ownerKey: key })
+    const d = wedgeNotifyDecision({ alive: true, ...at(40 * 60_000) })
     expect(d.notify).toBe(false)
     expect(d.reason).toBe('below-threshold')
   })
 
   it('does not repeat itself for the same silence, tick after tick', () => {
-    const d = wedgeNotifyDecision({ alive: true, ageMs: 5 * 3600_000, ownerKey: key, lastNotifiedKey: key })
+    const now = at(2 * 3600_000)
+    const d = wedgeNotifyDecision({ alive: true, ...now, lastNotifiedKey: now.ownerKey })
     expect(d.notify).toBe(false)
     expect(d.reason).toBe('already-notified')
   })
 
-  it('but reports a SECOND stall of the same session — the key carries the heartbeat it fell silent at', () => {
-    const first = wedgeOwnerKey({ sessionId: 'owner-1', pid: 4242, claimedAt: 1000 })
-    const second = wedgeOwnerKey({ sessionId: 'owner-1', pid: 4242, claimedAt: 9_000_000 })
+  it('ESCALATES when the same silence deepens into a wedge — the incident was "nobody looked"', () => {
+    const silent = at(2 * 3600_000)
+    const wedged = at(WEDGED_MS + 60_000)
+    expect(silent.stage).toBe('silent')
+    expect(wedged.stage).toBe('wedged')
+    const d = wedgeNotifyDecision({ alive: true, ...wedged, lastNotifiedKey: silent.ownerKey })
+    expect(d.notify).toBe(true)
+    expect(d.reason).toBe('wedged-owner')
+    // …and then falls silent again for that stage.
+    expect(wedgeNotifyDecision({ alive: true, ...wedged, lastNotifiedKey: wedged.ownerKey }).notify).toBe(false)
+  })
+
+  it('reports a SECOND stall of the same session — the key carries the heartbeat it fell silent at', () => {
+    const first = wedgeOwnerKey(lock, 'silent')
+    const second = wedgeOwnerKey({ ...lock, claimedAt: 9_000_000 }, 'silent')
     expect(first).not.toBe(second)
-    expect(wedgeNotifyDecision({ alive: true, ageMs: 5 * 3600_000, ownerKey: second, lastNotifiedKey: first }).notify).toBe(true)
+    expect(
+      wedgeNotifyDecision({ alive: true, stage: 'silent', ownerKey: second, lastNotifiedKey: first }).notify,
+    ).toBe(true)
   })
 
   it('says nothing about a dead owner (the launcher simply takes over) or a nameless lock', () => {
-    expect(wedgeNotifyDecision({ alive: false, ageMs: 9 * 3600_000, ownerKey: key }).notify).toBe(false)
-    expect(wedgeNotifyDecision({ alive: true, ageMs: 9 * 3600_000, ownerKey: '' }).notify).toBe(false)
+    expect(wedgeNotifyDecision({ alive: false, ...at(9 * 3600_000) }).notify).toBe(false)
+    expect(wedgeNotifyDecision({ alive: true, stage: 'wedged', ownerKey: '' }).notify).toBe(false)
     expect(wedgeOwnerKey(null)).toBe('')
+    expect(wedgeStage('a while')).toBe(null)
   })
 
   it('the calibratable threshold clears the longest legitimate silence (a LARGE regression, ~40 min)', () => {
     expect(WEDGE_NOTIFY_MS).toBeGreaterThan(60 * 60 * 1000)
+    expect(WEDGE_NOTIFY_MS).toBeLessThan(WEDGED_MS)
   })
 })
 
