@@ -2998,6 +2998,16 @@ read that as "the criterion and its evidence section".
   must NOTIFY (`scripts/notify.mjs`, the ntfy topic) so a silent night is reported
   rather than discovered the next morning. It must NOT kill the owner: a long verify run
   legitimately starves the heartbeat, which is why the age alone may not spawn.
+  FIRST LIVE FINDING, 28.07.2026 10:44 — the run has already paid for itself before it
+  finished:  carries a line
+  . The atomic lock write can fail on
+  Windows — an antivirus or indexer holding the target for a moment is the usual cause —
+  and the guard then fails open, which is right for a guard but means the HANDOVER was
+  silently not written. A handover that reports success while the lock keeps its old
+  content is the night's failure in a new costume. Make the marking of the lock
+  RETRY briefly on EPERM/EBUSY, and where it still fails, say so in the same breath as
+  the allow: the stop may proceed, but the session must be told the handover did NOT
+  happen, so it does not stop believing the batch was passed on.
   TEST THE WHOLE CHAIN, NOT THE PARTS (user 28.07.2026). Every part worked last night
   and the batch still stood still, so a green unit layer proves nothing here. The
   acceptance is ONE observed handover end to end: a point closed, the boundary taken,
