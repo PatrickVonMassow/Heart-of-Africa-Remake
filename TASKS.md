@@ -3038,6 +3038,47 @@ read that as "the criterion and its evidence section".
   reason recorded in the commit.
   DOCS in the same commit: `scripts/verify/README.md` where the suite is described.
 
+- [ ] 388. A PERMITTED BOUNDARY IS NOT A TAKEN ONE — THE NIGHT THE BATCH STOOD STILL
+  (28.07.2026, measured). Point 373 made the batch session allowed to END at a closed
+  point so the launcher can bring up a fresh one. On the first night it was live, the
+  batch idled from 01:15 to 06:44 — five and a half hours — and the logs say exactly why:
+  · the session had merged and ticked four points and no agent was in flight, so
+    `batch-progress-guard` PERMITTED the stop, as designed;
+  · nothing then TOOK the boundary: `scripts/batch-boundary.mjs` was never run, so no
+    marker was written (`--status` afterwards: `"marker": null, "reason": "no-marker"`);
+  · the session therefore just sat there, ALIVE and holding `.claude/batch-lock.json`;
+  · the launcher did the right thing every 15 minutes — `skip: owner alive` — and from
+    03:21 named the state precisely: `WEDGED owner: pid alive but heartbeat 245 min old`.
+  It diagnosed the condition twenty-one times and never acted on it, because acting is
+  not in its remit.
+  THE DEFECT IS THE DECOUPLING: permission to stop and the ACT of ending the session are
+  two different things, and only the first was built. A session that stops while holding
+  the lock is worse than one that never stops at all — it blocks its own successor.
+  BUILD THE OTHER HALF, and keep the singleton intact (a second live session is the
+  incident class this whole apparatus exists to prevent):
+  (a) THE BOUNDARY IS TAKEN, NOT OFFERED. When `batch-progress-guard` finds the boundary
+  conditions met, it does not simply allow the stop: it requires the marker to exist
+  (writing it is a single command the guard's own message names), and it says plainly
+  that the batch will now hand over. A permitted stop WITHOUT a marker BLOCKS, with the
+  command to take the boundary — the opposite of today's silence.
+  (b) A HANDOVER RELEASES THE LOCK. Taking the boundary releases the batch lock (or
+  marks it handed-over) so the launcher's next tick spawns the successor instead of
+  reading a live owner. The release happens only for a VALID boundary — a crash, a
+  wedge or an ordinary turn end must still leave the lock held, exactly as now.
+  (c) THE WEDGE DETECTION EARNS A CONSEQUENCE. `batch-autostart` already recognises
+  "alive but heartbeat N minutes old" and only logs it. Beyond a calibratable age it
+  must NOTIFY (`scripts/notify.mjs`, the ntfy topic) so a silent night is reported
+  rather than discovered the next morning. It must NOT kill the owner: a long verify run
+  legitimately starves the heartbeat, which is why the age alone may not spawn.
+  VERIFIABLE: pure Vitest — a met boundary without a marker blocks and names the
+  command; with a marker it allows and the handover is recorded; a crash-shaped stop
+  does not release the lock; the wedge notification fires once past the age and not
+  again for the same owner. Live: one real boundary in this repository, with
+  `.claude/autostart.log` showing the spawn and the successor's first turn picking up
+  the next point — the acceptance point 373 could not yet show.
+  DOCS in the same commit: CLAUDE.md §6's context-boundary bullet (it currently
+  describes the half that exists) and `docs/batch-autonomy.md`.
+
 ## Closing (only after all points)
 
 New points are appended BEFORE this section — it stays last in the file.
