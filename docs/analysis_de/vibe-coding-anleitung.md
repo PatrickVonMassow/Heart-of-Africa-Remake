@@ -233,12 +233,12 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   **mehrere Eingabeformen** testet und bei einem gescheiterten Parse **sichtbar**
   scheitert, statt still einen plausiblen Ersatzwert einzusetzen."
 
-- **Was solo grün ist, kippt unter Last.** Zeitgrenzen, die auf einer ruhigen Maschine
-  großzügig wirken, reißen, sobald mehrere Läufe parallel arbeiten — und der rote Lauf
-  sieht dann aus wie ein Produktfehler.
+- **Was solo grün ist, kippt unter Last.** Zeitgrenzen reißen, sobald mehrere Läufe
+  parallel arbeiten — und eine Wiederholung entlastet nicht: Blieb die Last, misst sie
+  zweimal denselben Zustand und nennt das Beweis.
   → *Prompt:* „Etabliere einen Mechanismus, der Last erkennt und Zeitgrenzen daran
   anpasst, statt sie fest zu verdrahten. Einen roten Lauf bewerte ich erst auf einer
-  ruhigen Maschine — vorher wird kein Code geändert."
+  ruhigen Maschine; eine Wiederholung zählt nur, wenn die Last dazwischen weg war."
 
 - **Doku und Code driften auseinander.** Das ‚Was' im Design-Doc passt nicht mehr zum
   ‚Wie' im Code.
@@ -398,4 +398,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 Wenn du diese eine Nachricht an den Anfang stellst, hast du 80 % der Lehren dieses
 Projekts eingebaut, bevor die erste Zeile Code entsteht.
 
-<!-- GUIDE-FINGERPRINT: a610e584441a1d0cac696bcb92e1f5427baa636728d85f381cf9567dc4ef3224 -->
+<!-- GUIDE-FINGERPRINT: 9863f678211c358ab38c71a482da43a60d08121de9d38fa1cd95c4fa0c11e71e -->
