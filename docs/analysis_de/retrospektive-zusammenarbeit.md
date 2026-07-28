@@ -358,6 +358,17 @@ Die Antwort ist ein Paar: eine Messung **vor** dem Lauf, die die Maschine beurte
 
 **Lehren:** Vor der Interpretation eines Messergebnisses gehört die Frage, ob die Bedingungen es überhaupt zu einem Beweis machen — und diese Frage gehört an die Maschine, nicht ans Gedächtnis. Und: Ein Prüfstand, der eine Aussage über die Art seines Roten trifft, muss sie begründen können; „zweimal gescheitert, also echt" war eine Behauptung ohne Beleg.
 
+### 3.42 Erlaubt ist nicht genommen
+
+In der Nacht auf den 28.07.2026 stand der Batch fünfeinhalb Stunden still, und das Protokoll erzählt die Geschichte lückenlos. Um 01:15 waren vier Punkte gemergt und abgehakt, kein Agent lief mehr — die Bedingung, unter der die tags zuvor gebaute Sitzungsgrenze das Ende freigibt. Der Wächter **erlaubte** den Halt. Genommen hat die Grenze niemand: Der Befehl, der die Übergabe einträgt, lief nie, es entstand kein Marker.
+
+Damit saß die Sitzung da — lebendig, mit der Sperre in der Hand. Der Starter prüfte alle 15 Minuten und entschied jedes Mal **richtig**, keinen Nachfolger zu starten, denn es lebte ein Eigentümer. Ab 03:21 benannte er den Zustand sogar exakt („wedged owner: pid alive but heartbeat 245 min old") — einundzwanzig Mal, ohne zu handeln, weil Handeln nicht in seinem Auftrag stand.
+
+Kein einzelnes Teil hat versagt. Der Wächter tat, was er sollte; der Starter tat, was er sollte; die Diagnose war korrekt und pünktlich. Gefehlt hat die **Verbindung**: Die Erlaubnis zu stoppen und der Akt des Beendens sind zwei verschiedene Dinge, und gebaut war nur das erste. Schlimmer noch: Eine Sitzung, die mit der Sperre in der Hand stehenbleibt, ist schädlicher als eine, die nie stehenbleibt — sie blockiert ihren eigenen Nachfolger. Der Singleton, der eine Doppel-Sitzung verhindert, verhindert dann auch die Ablösung.
+
+**Lehren:** Ein Mechanismus, der eine Handlung *erlaubt*, ist unfertig, solange nichts sie auch **auslöst** — eine Freigabe ohne Vollzug ist eine Regel, kein Mechanismus, also §3.40 in anderer Gestalt. Und eine Diagnose ohne Konsequenz ist Protokollprosa: Wer einen Zustand einundzwanzig Mal richtig benennt und nichts tut, hat ihn nicht erkannt, sondern nur beschrieben.
+
+
 ---
 
 ## 4. Die Guards als Immunsystem
@@ -447,7 +458,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Montag, 27.07.2026, 22:08 · Quellen-Fingerprint: `6a33a8d80dda…`
+Zuletzt aktualisiert: Dienstag, 28.07.2026, 06:51 · Quellen-Fingerprint: `f1ee3eb83a5a…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -519,8 +530,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | CORRECTED 19.07.2026 — WebGPU IS testable headless/autonomously via system Chrome (channel:'chrome') + --headless=new; the 'untestable' belief held only for Playwright's BUNDLED Chromium | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 64 Feedback-/Projekt-Memories · 35 Guard-/Hook-Skripte · 3 Revert-/Reapply-Commits · 15 Prozess-/Meta-TASKS-Punkte (davon 8 offen).
+Erfasste Quellen: 64 Feedback-/Projekt-Memories · 35 Guard-/Hook-Skripte · 3 Revert-/Reapply-Commits · 16 Prozess-/Meta-TASKS-Punkte (davon 9 offen).
 
-<!-- RETRO-FINGERPRINT: 6a33a8d80dda49b0c01bec1e5f1d9a986f35a907e282c540b677ce02ffc2cd5c -->
-<!-- RETRO-LAST-REFRESHED: 2026-07-27T20:08:40.689Z -->
+<!-- RETRO-FINGERPRINT: f1ee3eb83a5a73eb68dc1458352ad063b7d5039c7018fc205fe4f11637545d9a -->
+<!-- RETRO-LAST-REFRESHED: 2026-07-28T04:51:24.938Z -->
 <!-- AUTO-GENERATED:END -->
