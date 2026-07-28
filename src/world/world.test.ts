@@ -12,6 +12,7 @@ import { landFractionAt } from './geodata'
 import { LAKES } from './data/lakes'
 import { LAND_POLYGONS } from './data/coastline'
 import { MOUNTAINS, WATERFALLS, ELEPHANT_GRAVEYARD, CULTURAL_LANDMARKS, NATURAL_SITES } from './data/landmarks'
+import { GIZA_PLATEAU } from './data/gizaPlateau'
 import { setupGeodata } from '../test/geodata'
 import { densifyRiver } from '../scenes/travel/waterSurface'
 import { balance } from '../config/balance'
@@ -100,6 +101,22 @@ describe('built cultural landmarks stand clear of river channels (design.md §4.
     // of it, so the two anchors sit ~1.1 deg apart across the channel. The
     // place-scene skyline mounts Giza regardless of this world distance.
     expect(Math.hypot(giza.lat - cairo.lat, giza.lon - cairo.lon)).toBeLessThan(1.15)
+  })
+
+  // ONE SITE, ONE POSITION (point 338): the plateau is declared twice — as the
+  // §4.4 cultural landmark and as the enterable monument map point of point 273
+  // — and the two hand-placed coordinates had drifted ~0.3° apart, so the
+  // bird's-eye view drew Giza twice, in two places. Both now derive from the
+  // shared data/gizaPlateau constant.
+  it('the Giza landmark and the Giza map point are the SAME coordinate', () => {
+    const landmark = CULTURAL_LANDMARKS.find((c) => c.id === 'giza')
+    expect(landmark).toBeDefined()
+    if (!landmark) return
+    const mapPoint = placeById('giza')
+    expect(mapPoint.lat).toBe(landmark.lat)
+    expect(mapPoint.lon).toBe(landmark.lon)
+    expect(landmark.lat).toBe(GIZA_PLATEAU.lat)
+    expect(landmark.lon).toBe(GIZA_PLATEAU.lon)
   })
 
   it('the Meroë pyramid field stands wholly on the Nile east bank, not in the river', () => {

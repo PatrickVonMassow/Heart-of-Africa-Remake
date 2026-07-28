@@ -6,6 +6,7 @@
 // procedural per run (design.md §18).
 
 import { RIVERS_DATA, type RiverDef } from './data/rivers'
+import { GIZA_PLATEAU } from './data/gizaPlateau'
 import { riverDistanceExact } from './hydro'
 import { RIVER_WIDTH_DEG } from './riverWidth'
 
@@ -259,12 +260,15 @@ const CLEARED_PORTS: PlaceDef[] = PORTS.map((p) => ({
 
 // Enterable monument sites (design.md §4.4, point 273): world-famous landmarks
 // the traveller walks around in first person like a settlement, but with no
-// trade, elder or hints — a walkable monument space. Giza sits a short way
-// south-west of Cairo: the map scale (10 units/°) cannot resolve the real 13 km
-// between them, so the plateau is placed clear of the city's enter radius — the
-// same symbolic compaction the point-82 Giza skyline uses.
+// trade, elder or hints — a walkable monument space. Giza sits west of Cairo
+// across the Nile: the map scale (10 units/°) cannot resolve the real 13 km
+// between them, so the plateau stands clear of the city's enter radius — the
+// same symbolic compaction the point-82 Giza skyline uses. Its coordinate is
+// the SHARED ./data/gizaPlateau constant, which the cultural landmark of §4.4
+// reads too: one real site, one position (the two used to drift ~0.3° apart
+// and the bird's-eye view drew the plateau twice).
 const MONUMENT_SITES: PlaceDef[] = [
-  { id: 'giza', kind: 'monument', lat: 29.75, lon: 30.85, region: 'north' },
+  { id: 'giza', kind: 'monument', lat: GIZA_PLATEAU.lat, lon: GIZA_PLATEAU.lon, region: 'north' },
 ]
 const MONUMENTS: PlaceDef[] = MONUMENT_SITES.map((m) => ({
   ...m,
