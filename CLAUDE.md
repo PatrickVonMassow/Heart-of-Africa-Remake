@@ -284,6 +284,12 @@ old→new coverage map live in `scripts/verify/README.md`.
   `HoA-Batch-Autostart`, then marks the lock HANDED OVER so the launcher spawns
   the successor — five hours were lost to a session that stopped holding it.
   Attended, ask for `/clear`. The "cheaper model" idea stays REJECTED.
+  THE WAY BACK (user 28.07.2026): a window the user returns to runs `node
+  scripts/batch-claim.mjs --session <id>` (the stand-down message prints it with
+  the id filled in); the owner sees the claim at its next hook, finishes — never
+  mid-merge, never with an agent or a verification running — releases, and the
+  same command then takes the batch. A claim expires, a dead claimant's is
+  ignored, and exactly one session ever wins.
 - **Model policy (user decision 25.07.2026, points 309 + the role revision).**
   ONLY three models may author work on this project, each with its own role:
   **Opus 5** is the WORKER at any difficulty; **Fable 5** is used ONLY for the

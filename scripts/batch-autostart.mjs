@@ -45,6 +45,8 @@ import {
   PENDING_STALE_MS,
   WEDGE_NOTIFY_MS,
 } from './batch-singleton.mjs'
+import { readClaim, maxAgeMs as claimMaxAgeMs } from './batch-claim.mjs'
+import { assessClaim } from './batch-claim-core.mjs'
 
 // IMPORT-PROOF (27.07.2026). Everything below runs at MODULE LOAD, so merely
 // importing this file — a syntax check, a test, a tooling scan — SPAWNS a
@@ -102,6 +104,24 @@ let open
 try { open = openPointCount() } catch { log('skip: cannot read TASKS.md'); process.exit(0) }
 if (open === -1) { log('ALERT: TASKS.md format unrecognized — not spawning'); await notify('TASKS.md format', 'The batch parser found checkboxes but no points — halting resurrection to be safe.', 'high'); process.exit(0) }
 if (open === 0) { log('skip: batch complete (0 open points)'); process.exit(0) }
+
+// --- THE USER TOOK THE BATCH BACK (point 395) ---------------------------------
+// A live, unexpired claim RESERVES the batch for the window the user is sitting
+// at. Spawning a headless successor into that reservation would take it straight
+// back off them — the owner releases at its next clean turn end, and this tick
+// could easily fall in between. Same bounds as everywhere else: the claim expires
+// and a claim from a closed window is ignored, so this can never strand the batch.
+{
+  const claim = readClaim()
+  const reserved = claim ? assessClaim({ claim, now, maxAgeMs: claimMaxAgeMs(), probePid }) : { honour: false }
+  if (reserved.honour) {
+    log(
+      `skip: session ${reserved.claimantSid} has CLAIMED the batch ${Math.round(reserved.ageMs / 60000)} min ago — ` +
+        'the user is working in that window',
+    )
+    process.exit(0)
+  }
+}
 
 const state = readJson(C('autostart-state.json')) ?? { failCount: 0, lastHead: '', lastSpawnAt: 0, lastPid: 0, lastTickAt: 0 }
 const curHead = head()
