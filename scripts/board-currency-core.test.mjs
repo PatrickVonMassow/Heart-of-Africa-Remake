@@ -1,0 +1,228 @@
+import { describe, it, expect } from 'vitest'
+import {
+  BOARD_CONTENT_URL,
+  BOARD_PAGE_URL,
+  BOARD_REF,
+  LIVE_GRACE_MS,
+  WATCHDOG_TICK_MS,
+  isPublishDue,
+  liveBoardVerdict,
+  normaliseOpenSet,
+  openSetFingerprint,
+  publishCapability,
+  publishDuePatch,
+  readFingerprint,
+  stampFingerprint,
+  watchdogDecision,
+} from './board-currency-core.mjs'
+
+const board = (extra = '') => `﻿<title>HoA Batch-Dashboard</title>\n<style>x</style>\n${extra}<main><h1>Board</h1></main>`
+
+describe('the open-point fingerprint', () => {
+  it('is order-independent and duplicate-proof', () => {
+    expect(openSetFingerprint([3, 1, 2])).toBe(openSetFingerprint([1, 2, 3, 3]))
+  })
+
+  it('changes when a point is added, removed or ticked', () => {
+    const base = openSetFingerprint([1, 2, 3])
+    expect(openSetFingerprint([1, 2, 3, 4])).not.toBe(base)
+    expect(openSetFingerprint([1, 2])).not.toBe(base)
+  })
+
+  it('normalises away everything that is not a point number', () => {
+    expect(normaliseOpenSet([5, '4', null, undefined, -1, 0, 2.5, NaN, 4])).toEqual([4, 5])
+    expect(normaliseOpenSet('nonsense')).toEqual([])
+    expect(openSetFingerprint(null)).toBe(openSetFingerprint([]))
+  })
+
+  it('is a short, stable, prefixed digest', () => {
+    expect(openSetFingerprint([400])).toMatch(/^sha256:[0-9a-f]{16}$/)
+    expect(openSetFingerprint([400])).toBe(openSetFingerprint([400]))
+  })
+})
+
+describe('stamping the fingerprint into a board document', () => {
+  it('writes the meta after the title and reads it back', () => {
+    const stamped = stampFingerprint(board(), 'sha256:abc')
+    expect(readFingerprint(stamped)).toBe('sha256:abc')
+    expect(stamped.indexOf('<meta name="hoa-board-open"')).toBeGreaterThan(stamped.indexOf('</title>'))
+    expect(stamped).toContain('<main>')
+  })
+
+  it('is idempotent and replaces an older stamp rather than stacking metas', () => {
+    const once = stampFingerprint(board(), 'sha256:one')
+    expect(stampFingerprint(once, 'sha256:one')).toBe(once)
+    const twice = stampFingerprint(once, 'sha256:two')
+    expect(readFingerprint(twice)).toBe('sha256:two')
+    expect(twice.match(/hoa-board-open/g)).toHaveLength(1)
+  })
+
+  it('still stamps a document without a title, and reads nothing from junk', () => {
+    expect(readFingerprint(stampFingerprint('<main>x</main>', 'sha256:z'))).toBe('sha256:z')
+    expect(readFingerprint('<main>x</main>')).toBeNull()
+    expect(readFingerprint(null)).toBeNull()
+  })
+})
+
+describe('delta A — the due mark is set only on a real change', () => {
+  const fp = openSetFingerprint([1, 2])
+
+  it('writes nothing when the open set is unchanged', () => {
+    expect(publishDuePatch({ state: { openFingerprint: fp }, fingerprint: fp })).toBeNull()
+  })
+
+  it('records the FIRST observation without demanding a publish', () => {
+    const patch = publishDuePatch({ state: {}, fingerprint: fp, at: 10 })
+    expect(patch).toEqual({ openFingerprint: fp, openFingerprintAt: 10 })
+    expect(patch.publishDue).toBeUndefined()
+  })
+
+  it('marks a publish due when the set actually changed', () => {
+    const next = openSetFingerprint([1, 2, 3])
+    const patch = publishDuePatch({ state: { openFingerprint: fp }, fingerprint: next, at: 99 })
+    expect(patch.openFingerprint).toBe(next)
+    expect(patch.publishDue).toEqual({ at: 99, fingerprint: next, previous: fp })
+  })
+
+  it('does not demand a publish for a set the live board already shows', () => {
+    const next = openSetFingerprint([1, 2, 3])
+    const patch = publishDuePatch({
+      state: { openFingerprint: fp, publishedFingerprint: next },
+      fingerprint: next,
+    })
+    expect(patch.publishDue).toBeUndefined()
+  })
+
+  it('CLEARS a standing due mark once the live board caught up', () => {
+    const patch = publishDuePatch({
+      state: { openFingerprint: fp, publishedFingerprint: fp, publishDue: { at: 1, fingerprint: fp } },
+      fingerprint: fp,
+    })
+    expect(patch).toEqual({ publishDue: undefined })
+  })
+
+  it('never throws on partial or hostile input', () => {
+    expect(publishDuePatch()).toBeNull()
+    expect(publishDuePatch({ fingerprint: '' })).toBeNull()
+    expect(publishDuePatch({ state: 'nonsense', fingerprint: fp })).toEqual(
+      expect.objectContaining({ openFingerprint: fp }),
+    )
+    expect(isPublishDue(null)).toBe(false)
+    expect(isPublishDue({ publishDue: { at: 1 } })).toBe(true)
+    expect(isPublishDue({ publishDue: 'yes' })).toBe(false)
+  })
+})
+
+describe('delta B — who is allowed to be denied', () => {
+  it('the pages transport makes every session capable, headless included', () => {
+    expect(publishCapability({ transport: 'pages', state: null })).toEqual({ canPublish: true, how: 'pages' })
+  })
+
+  it('an Artifact call seen in THIS session counts', () => {
+    const state = { artifactToolSeen: { sessionId: 's1', at: 1 } }
+    expect(publishCapability({ state, sessionId: 's1' }).canPublish).toBe(true)
+    expect(publishCapability({ state, sessionId: 's2' }).canPublish).toBe(false)
+  })
+
+  it('a session with neither transport nor Artifact tool is NOT capable', () => {
+    expect(publishCapability({ state: {}, sessionId: 's1' })).toEqual({ canPublish: false, how: null })
+    expect(publishCapability()).toEqual({ canPublish: false, how: null })
+  })
+})
+
+describe('delta D/E — judging the LIVE page', () => {
+  const expected = 'sha256:aaaa'
+  const live = (fp) => stampFingerprint(board(), fp)
+
+  it('calls a matching page current', () => {
+    expect(liveBoardVerdict({ liveHtml: live(expected), expected }).verdict).toBe('current')
+  })
+
+  it('tolerates the deploy/CDN latency instead of flapping', () => {
+    const v = liveBoardVerdict({ liveHtml: live('sha256:old'), expected, publishedAt: 1000, now: 1000 + 60_000 })
+    expect(v.verdict).toBe('settling')
+  })
+
+  it('calls a page behind once the grace has passed', () => {
+    const v = liveBoardVerdict({
+      liveHtml: live('sha256:old'),
+      expected,
+      publishedAt: 1000,
+      now: 1000 + LIVE_GRACE_MS + 1,
+    })
+    expect(v.verdict).toBe('behind')
+    expect(v.live).toBe('sha256:old')
+  })
+
+  it('treats a page that was never published as behind, not as settling', () => {
+    expect(liveBoardVerdict({ liveHtml: live('sha256:old'), expected, publishedAt: 0 }).verdict).toBe('behind')
+  })
+
+  it('NEVER claims current when the page cannot be read', () => {
+    expect(liveBoardVerdict({ fetchError: new Error('ENOTFOUND'), expected }).verdict).toBe('unreachable')
+    expect(liveBoardVerdict({ liveHtml: '', expected }).verdict).toBe('unreachable')
+    expect(liveBoardVerdict({ liveHtml: board(), expected }).verdict).toBe('unreachable')
+    expect(liveBoardVerdict({ liveHtml: null, expected }).verdict).toBe('unreachable')
+  })
+
+  it('says so honestly when there is nothing to compare against', () => {
+    expect(liveBoardVerdict({ liveHtml: live(expected), expected: null }).verdict).toBe('unknown')
+  })
+})
+
+describe('delta E — the watchdog alert decision', () => {
+  const now = 10_000_000
+
+  it('stays silent on a current board', () => {
+    expect(watchdogDecision({ verdict: 'current', state: {}, now }).notify).toBe(false)
+  })
+
+  it('alerts on a board that is behind, and names the page', () => {
+    const d = watchdogDecision({ verdict: 'behind', live: 'sha256:old', expected: 'sha256:new', state: {}, now })
+    expect(d.notify).toBe(true)
+    expect(d.message).toContain(BOARD_PAGE_URL)
+    expect(d.priority).toBe('high')
+  })
+
+  it('alerts on an unreachable board', () => {
+    const d = watchdogDecision({ verdict: 'unreachable', reason: 'HTTP 404', state: {}, now })
+    expect(d.notify).toBe(true)
+    expect(d.title).toBe('Board unreachable')
+    expect(d.message).toContain('HTTP 404')
+  })
+
+  it('repeats itself at most once per fault', () => {
+    const args = { verdict: 'behind', live: 'a', expected: 'b', state: {}, now }
+    const first = watchdogDecision(args)
+    expect(watchdogDecision({ ...args, lastKey: first.key }).notify).toBe(false)
+  })
+
+  it('alerts on a publishDue that survived a whole tick, and not before', () => {
+    const state = { publishDue: { at: now - WATCHDOG_TICK_MS + 1000 } }
+    expect(watchdogDecision({ verdict: 'current', state, now }).notify).toBe(false)
+    const late = { publishDue: { at: now - WATCHDOG_TICK_MS - 1000 } }
+    expect(watchdogDecision({ verdict: 'current', state: late, now }).notify).toBe(true)
+  })
+
+  it('escalates a publish that failed and was never retried', () => {
+    const state = { publishFailed: { at: now - WATCHDOG_TICK_MS * 2 } }
+    const d = watchdogDecision({ verdict: 'current', state, now })
+    expect(d.notify).toBe(true)
+    expect(d.priority).toBe('urgent')
+  })
+
+  it('never throws on junk', () => {
+    expect(watchdogDecision().notify).toBe(false)
+    expect(watchdogDecision({ state: 'nope', verdict: 'weird' }).notify).toBe(false)
+  })
+})
+
+describe('the transport constants are the ones the docs name', () => {
+  it('points at a branch of this repository, never at main', () => {
+    expect(BOARD_REF).toBe('refs/heads/board')
+    expect(BOARD_CONTENT_URL).toBe(
+      'https://raw.githubusercontent.com/PatrickVonMassow/Heart-of-Africa-Remake/board/board.html',
+    )
+    expect(BOARD_PAGE_URL).toBe('https://patrickvonmassow.github.io/Heart-of-Africa-Remake/board/')
+  })
+})
