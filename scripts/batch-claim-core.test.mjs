@@ -372,6 +372,25 @@ describe('the claim file is derived from the caller’s lock path', () => {
     expect(repoAfter).toBe(repoBefore)
   })
 
+  // Not cosmetic. batch-doctor repairs a suspect tree with `git stash push -u`,
+  // which sweeps up UNTRACKED files — so a claim the repository does not ignore is
+  // silently stashed away mid-handover, exactly at the moment the user is trying
+  // to take the batch back. Every sibling state file is ignored; this one must be
+  // too, with the same `.tmp-*` pattern the atomic write leaves behind.
+  it('is ignored by the repository like every sibling state file', () => {
+    const ignore = readFileSync(resolve(REPO_ROOT, '.gitignore'), 'utf8').split(/\r?\n/).map((l) => l.trim())
+    for (const entry of [
+      '.claude/batch-claim.json',
+      '.claude/batch-claim.json.tmp-*',
+      // the siblings, so a rewrite of the block cannot quietly drop the family
+      '.claude/batch-lock.json',
+      '.claude/batch-boundary.json',
+      '.claude/batch-in-flight.json',
+    ]) {
+      expect(ignore, `${entry} must be in .gitignore`).toContain(entry)
+    }
+  })
+
   it('takes the maximum age from the environment when one is set', () => {
     expect(maxAgeMs({})).toBe(CLAIM_MAX_AGE_MS)
     expect(maxAgeMs({ HOA_CLAIM_MAX_MIN: '10' })).toBe(10 * 60 * 1000)
