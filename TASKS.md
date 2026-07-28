@@ -3234,47 +3234,6 @@ read that as "the criterion and its evidence section".
   trailer must NAME the model and that the hook enforces it) and §7.2 (the Stop-chain list
   gains the unidentified/forbidden split).
 
-- [ ] 398. THE FAST GATE CANNOT BE RUN WHILE THE AGENT POOL WORKS (28.07.2026, measured
-  twice within ten minutes on `main`). `npm run test:unit` is the gate every push and
-  several Stop guards lean on, and with delegated agents building it goes red — 2 failures
-  in the first run, 5 in the second, and EVERY one of them the same line: `Test timed out
-  in 5000ms`. Not one was an assertion. Run alone on the same commit, the same files pass:
-  `src/render/water.test.ts` in 1.55 s and the `crocodileIdleYaw` case in
-  `src/scenes/travel/wildlifeBehavior.test.ts` in 2.27 s. The others that tipped —
-  `scripts/pre-push-gate-core.test.mjs` (the load-probe contract) and
-  `scripts/render-verify-guard.test.mjs` (a real git probe) — have the same shape: honest
-  work against an external process or a heavy constructor.
-  THE CAUSE IS THE MARGIN, not the tests. Vitest's default `testTimeout` is 5000 ms
-  (`vitest.config.ts` sets none) and the slowest cases sit at 1.5–2.3 s of it. Any load at
-  all — three worktree agents building, which is this project's DESIGNED steady state —
-  doubles them past the bar. The consequence is not a flaky number on a report:
-  `pre-push-gate` blocks the push, and its retry does not save it, because the load probe
-  is asked AFTER the step and by then the machine reads quiet again ("pre-push gate:
-  machine quiet (red reading, 2.8s)"). So `main` cannot be pushed while the pool it is
-  meant to feed is working.
-  THE FIX: give the unit layer a timeout that is load-proof rather than tight. These are
-  deterministic pure-logic and jsdom tests — a case that passes in 2 s and one that hangs
-  are orders of magnitude apart, so a generous `testTimeout` (start at 20 s, set once in
-  `vitest.config.ts` with the reason written beside it) costs nothing on a green run and
-  still catches a real hang. A single case that needs longer gets its own explicit
-  timeout rather than raising the floor a second time.
-  DO NOT paper over the slow cases: keep them measurable. The suite must still REPORT its
-  slowest cases (vitest's slow-test threshold), so a test quietly growing from 2 s to 15 s
-  stays visible instead of hiding inside the larger budget — the change is meant to stop
-  the timeouts under load, not to stop noticing cost.
-  ALSO FIX THE PROBE'S TIMING, since it is the same defect one layer up: `pre-push-gate`
-  must judge the load DURING the step it is judging (sample while it runs, or record the
-  probe's verdict at the start and the end and take the worse), never only afterwards — a
-  reading taken once the load has gone is what turned a load-flake into a hard block here.
-  VERIFIABLE: `npm run test:unit` green while three worktree agents build — measured, with
-  the load probe's own verdict quoted for that run — a deliberately hanging case still
-  failing rather than stalling the suite, a pure test pinning the configured timeout, and
-  a pure test of the gate's load judgement over a run that was loaded at the start and
-  quiet at the end (it must read as loaded). Live: one real `git push` of `main` passing
-  the gate under that same load.
-  DOCS in the same commit: `scripts/verify/README.md`, where the test architecture
-  describes the fast layer, gains the timeout and its reason.
-
 - [ ] 399. THE GUARD STOPS DEMANDING THE BOUNDARY AS SOON AS THE QUEUE GROWS
   (28.07.2026, found while fixing the handover observer, and it is the same blind spot
   one layer up — where it costs more). `boundaryDueFrom` in `gatherBoundary`
@@ -3392,6 +3351,47 @@ read that as "the criterion and its evidence section".
   each mode, and the new transport), CLAUDE.md §7.2, where the Stop-chain list
   names the new deny, and the memory entry `batch-dashboard-artifact`, which keeps
   its binding four-section structure and states the transport this point settles.
+
+- [ ] 401. THE CONSOLE WINDOWS THAT STEAL THE USER'S FOCUS (28.07.2026, user
+  report: "es poppen immer wieder Konsolenfenster auf, die mir den Fokus
+  stehlen"). It is NOT unavoidable, and there are exactly two causes, both
+  measured.
+  CAUSE 1 — EVERY GUARD'S GIT CALL. On Windows a child console process gets a
+  NEW console window unless `CREATE_NO_WINDOW` is set, which in Node is
+  `windowsHide: true`. Of the script files that run `execSync`/`spawnSync`/
+  `execFileSync`/`spawn`, only 7 set it; 23 do not — among them EVERY member of
+  the Stop chain that shells out to git: `dashboard-guard`, `model-guard`,
+  `ci-status-guard`, `commit-scope-guard`, `mechanism-review-guard`,
+  `render-verify-guard`, `dashboard-integrity-guard`, `dashboard-sync`,
+  `batch-singleton`, `batch-boundary`, `batch-in-flight`, `batch-resume-hook`,
+  `board.mjs`, `closing-guard`, `audit-check`, plus the verify runners. The Stop
+  chain runs at EVERY turn end and each guard makes several git calls, so a turn
+  ends in dozens of window flashes.
+  FIX: add `windowsHide: true` to every child-process call under `scripts/`.
+  Mechanical and behaviour-neutral — it suppresses a window, not output. Give it
+  a guard of its own so it cannot rot back: a pure test that greps the script
+  tree and FAILS on a child-process call without the flag (the same shape as the
+  quality-preset completeness gate), so a newly added exec is caught at once.
+  CAUSE 2 — THE SCHEDULED TASK ITSELF. `HoA-Batch-Autostart` runs
+  `C:\Program Files\nodejs\node.exe` directly with LogonType `Interactive`, so
+  Task Scheduler opens a visible console for it every 15 minutes — ~96 windows a
+  day on its own. The session it spawns does NOT need that console: the spawn
+  already passes `detached: true`, `stdio` to a log file and `windowsHide: true`
+  (`scripts/batch-autostart.mjs`), so nothing is lost by hiding the launcher.
+  FIX: the task action stops being a bare `node.exe`. Either point it at a
+  hidden-launch wrapper, or set the task to run without a visible window. This
+  touches the USER'S machine, not the repository — it is ATTENDED work and needs
+  the user's go for the specific change, and the task's re-enabled state
+  (user 27.07.2026) must survive it.
+  SEQUENCING: cause 1 touches files point 400 is rewriting (`dashboard-*`,
+  `board*`, `batch-*`). Do it AFTER 400 has landed, or the merge fights itself.
+  VERIFIABLE: the pure grep gate above, red before the change and green after;
+  `npm run test:unit` and `npm run lint` unchanged; and one live check the user
+  can judge — a full turn end with the Stop chain running produces no window.
+  For cause 2, one scheduler tick with no console appearing, with the batch still
+  resuming as before (`.claude/autostart.log` shows the tick).
+  DOCS in the same commit: `docs/batch-autonomy.md`, where the launcher is
+  described, gains the hidden-window requirement.
 
 ## Closing (only after all points)
 

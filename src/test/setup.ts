@@ -5,7 +5,11 @@ import { afterEach } from 'vitest'
 import { cleanup } from '@testing-library/react'
 
 // jsdom implements neither of these; HUD components call them harmlessly.
-if (!Element.prototype.scrollIntoView) {
+// Guarded on the DOM itself: a file may opt into the `node` environment (the
+// config-pinning test does, because importing a vite config drags esbuild in
+// and esbuild rejects jsdom's TextEncoder), and there these shims have nothing
+// to attach to.
+if (typeof Element !== 'undefined' && !Element.prototype.scrollIntoView) {
   Element.prototype.scrollIntoView = () => {}
 }
 
