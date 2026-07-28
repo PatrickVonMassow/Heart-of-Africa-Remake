@@ -1,9 +1,9 @@
 <img width="1168" height="784" alt="Copver photo" src="https://github.com/user-attachments/assets/07cc05d9-7a8d-427c-88a7-adbd0ea372cf" />
 
+# The Heart of Africa — Modern Remake
+
 PoC playable directly in the browser at:  
 <https://patrickvonmassow.github.io/Heart-of-Africa-Remake/poc/>
-
-# The Heart of Africa — Modern Remake
 
 A non-commercial single-player 3D remake of the 1985 exploration classic *The Heart of Africa*
 — Ozark Softscape's follow-up to *The Seven Cities of Gold* (1984) — built as a
