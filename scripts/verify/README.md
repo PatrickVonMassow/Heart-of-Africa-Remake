@@ -235,7 +235,12 @@ commit) to catch a spike that cannot hide inside a half-second run. `build` and
 2.6 s is noise. A green push pays for no probe at all on the light gate, and one
 on the full gate; the re-run itself is timed and printed, so its cost is measured
 rather than assumed. An unreadable probe reports `unknown`, which buys a re-run —
-never quiet, never a certified red.
+never quiet, never a certified red. A level the wrapper does not recognise is said
+out LOUD and treated the same way: a silently drifted `--json` contract would turn
+"a quiet red blocks immediately" into "every red buys a retry" on every machine
+with nothing red to notice it, so the shape is pinned by a test that runs the CLI
+with `VERIFY_LOAD_FORCE=busy` (asynchronously — a `spawnSync` inside a vitest
+worker starves its own `onTaskUpdate` RPC and reddens the whole run).
 
 ## Triaging a RED run (point 294)
 

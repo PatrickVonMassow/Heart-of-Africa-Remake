@@ -3,12 +3,15 @@
 // user and a later fix does not unsend that mail.
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
+import { execFile } from 'node:child_process'
 import { resolve } from 'node:path'
 import { REPO_ROOT } from './repo-paths.mjs'
+import { LEVEL } from './verify/machine-load-core.mjs'
 import {
   FULL_GATE,
   GATE_COMMANDS,
   LIGHT_GATE,
+  LOAD_LEVELS,
   PROTECTED_REF,
   UNAVAILABLE,
   decide,
@@ -320,13 +323,21 @@ describe('a red under load is not evidence — the gate re-runs it once (point 3
     expect(decide(results).blocked).toBe(true)
   })
 
-  it('keeps failing soft when the RE-RUN cannot run at all', () => {
+  it('keeps failing soft when the RE-RUN cannot run at all, and does not call that a pass', () => {
+    const notices = []
     const results = runGate(['audit', 'unit'], (step, _cmd, { attempt }) =>
-      step === 'audit' ? (attempt === 1 ? false : UNAVAILABLE) : true, { readLoad: () => ({ level: 'loaded' }) })
+      step === 'audit' ? (attempt === 1 ? false : UNAVAILABLE) : true, {
+      readLoad: () => ({ level: 'loaded' }),
+      onNotice: (l) => notices.push(l),
+    })
     const v = decide(results)
     expect(v.blocked).toBe(false)
     expect(v.unavailable).toEqual(['audit'])
     expect(v.retried).toEqual(['audit'])
+    // It neither passed nor was re-measured — saying "passed on the re-run" here
+    // would assert something untrue (four-eyes finding).
+    expect(notices[1]).toMatch(/the re-run of audit could not RUN — it was neither confirmed nor cleared/)
+    expect(notices[1]).not.toMatch(/passed/)
   })
 })
 
@@ -362,13 +373,16 @@ describe('the load reading is taken where a storm can hide (point 389)', () => {
   it('does not let a lull AFTER the storm certify a red', () => {
     // The probe is a snapshot: a red produced while a neighbour built can be
     // followed a second later by a quiet reading. The worse of the two decides.
-    const log = []
+    const notices = []
     const readings = [{ level: 'loaded', reasons: ['a competing vitest run'] }, { level: 'quiet' }]
-    const results = runGate(['unit'], (step, _cmd, { attempt }) => attempt !== 1, {
+    const results = runGate(['unit'], (_step, _cmd, { attempt }) => attempt !== 1, {
       readLoad: () => readings.shift(),
+      onNotice: (l) => notices.push(l),
     })
-    expect(log).toBeTruthy()
     expect(decide(results)).toMatchObject({ blocked: false, retried: ['unit'] })
+    // Both readings were spent, and the retry named the LOADED one.
+    expect(readings).toEqual([])
+    expect(notices[0]).toMatch(/a competing vitest run/)
   })
 
   it('picks the least quiet reading, and normalises whatever shape it gets', () => {
@@ -394,6 +408,50 @@ describe('the load reading is taken where a storm can hide (point 389)', () => {
     expect(blocked).toMatch(/unit failed TWICE — the load was not the cause/)
     // A step re-run GREEN, with a later step red, must not be reported as twice-failed.
     expect(formatVerdict({ blocked: true, failed: ['unit'], retried: ['lint'] }, { reason: 'x' })).not.toMatch(/TWICE/)
+  })
+
+  it('never THROWS while formatting a block — the wrapper fails open on a throw', () => {
+    // A formatting error would turn a blocked push into an allowed one, which is
+    // the one direction this gate must never move.
+    expect(() => formatVerdict({ blocked: true, failed: ['unit'], retried: null, unavailable: null })).not.toThrow()
+    expect(() => formatVerdict({ blocked: true })).not.toThrow()
+    expect(() => formatVerdict()).not.toThrow()
+    expect(formatVerdict({ blocked: true, failed: ['unit'], retried: null })).toMatch(/PUSH BLOCKED/)
+  })
+})
+
+// The wrapper reads the machine through another script's --json output, and a
+// silently drifted shape would degrade EVERY reading to `unknown` — which turns
+// "a quiet red blocks immediately" into "every red buys a retry", on every
+// machine, with nothing red to notice it (four-eyes finding).
+describe('the load probe contract the wrapper depends on', () => {
+  // ASYNC on purpose: a spawnSync here blocks the vitest worker thread, and a
+  // blocked worker misses its own `onTaskUpdate` RPC — measured, it turned the
+  // whole unit run red (all 4037 tests passing, "Errors 1 error", exit 1) while
+  // the identical run without this file exited 0.
+  it('answers with a top-level level from the known set, and its reasons', async () => {
+    const { code, stdout } = await new Promise((done) => {
+      execFile(
+        process.execPath,
+        [resolve(REPO_ROOT, 'scripts/verify/machine-load.mjs'), '--json'],
+        // Forced, so this pins the SHAPE in a fixed moment rather than measuring
+        // the machine — the documented wiring self-test of point 296.
+        { cwd: REPO_ROOT, encoding: 'utf8', env: { ...process.env, VERIFY_LOAD_FORCE: 'busy' }, timeout: 30000 },
+        // A NON-ZERO exit is expected here: the probe exits 2 on a machine that
+        // is not quiet. The wrapper reads its stdout, not its status, and this
+        // test pins exactly that.
+        (err, out) => done({ code: err?.code ?? 0, stdout: out }),
+      )
+    })
+    expect(code).toBe(2)
+    const parsed = JSON.parse(stdout)
+    expect(LOAD_LEVELS).toContain(parsed.level)
+    expect(parsed.level).toBe('busy')
+    expect(Array.isArray(parsed.reasons)).toBe(true)
+  })
+
+  it('knows exactly the four levels machine-load-core classifies into', () => {
+    expect([...LOAD_LEVELS].sort()).toEqual([...Object.values(LEVEL)].sort())
   })
 })
 

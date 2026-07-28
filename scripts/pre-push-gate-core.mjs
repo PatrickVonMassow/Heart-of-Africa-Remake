@@ -139,6 +139,15 @@ export function shouldRetryAfterRed(level) {
 const LOAD_SEVERITY = { quiet: 0, unknown: 1, busy: 2, loaded: 3 }
 
 /**
+ * The levels the probe may report. The wrapper checks its answer against this
+ * list and says so LOUDLY when it does not match (four-eyes finding): a silently
+ * unrecognised level degrades to `unknown`, and a permanent `unknown` would turn
+ * "a quiet red blocks immediately" into "every red buys a retry" on every machine
+ * without anyone noticing the contract had drifted.
+ */
+export const LOAD_LEVELS = Object.keys(LOAD_SEVERITY)
+
+/**
  * The less quiet of two readings — the answer to "the storm was over by the time
  * we looked".
  *
@@ -181,8 +190,15 @@ export function retryNotice(step, { level, why } = {}) {
   )
 }
 
-/** The line that closes a retry, so its OUTCOME is as visible as its start. */
-export function retryOutcomeNotice(step, ok) {
+/**
+ * The line that closes a retry, so its OUTCOME is as visible as its start.
+ *
+ * Three outcomes, not two: a re-run that could not RUN neither passed nor was
+ * re-measured, and saying "passed" there would assert something untrue in the
+ * one place a reader looks for the truth (four-eyes finding).
+ */
+export function retryOutcomeNotice(step, ok, { unavailable = false } = {}) {
+  if (unavailable) return `pre-push gate: the re-run of ${step} could not RUN — it was neither confirmed nor cleared.`
   return ok
     ? `pre-push gate: ${step} passed on the re-run — the first red was the machine, not the code.`
     : `pre-push gate: ${step} failed AGAIN — this red is evidence, and it blocks.`
@@ -243,7 +259,7 @@ export function runGate(steps, run, { readLoad, onNotice } = {}) {
     say(retryNotice(step, load))
     const second = run(step, GATE_COMMANDS[step], { attempt: 2 })
     if (second === UNAVAILABLE) {
-      say(retryOutcomeNotice(step, true))
+      say(retryOutcomeNotice(step, true, { unavailable: true }))
       results.push({ step, ok: true, unavailable: true, retried: true, loadLevel: load.level })
       continue
     }
@@ -265,20 +281,26 @@ export function decide(results) {
 }
 
 /** The message the developer sees — it must say what to run, not only what broke. */
-export function formatVerdict({ blocked, failed, unavailable = [], retried = [] }, { reason } = {}) {
-  const note = unavailable.length ? ` — ${unavailable.join(', ')} could not run and was NOT checked` : ''
+export function formatVerdict({ blocked, failed, unavailable = [], retried = [] } = {}, { reason } = {}) {
+  // Every list is taken defensively: this runs inside the wrapper's try, and the
+  // wrapper fails OPEN on a throw — a formatting error here would turn a BLOCKED
+  // push into an allowed one, which is the one direction the gate must never move.
+  const red = Array.isArray(failed) ? failed : []
+  const gaps = Array.isArray(unavailable) ? unavailable : []
+  const redone = Array.isArray(retried) ? retried : []
+  const note = gaps.length ? ` — ${gaps.join(', ')} could not run and was NOT checked` : ''
   // A retry stays in the verdict, not only in the scrollback: a green that only
   // came on a second run is a green with a question attached to it.
-  const redo = retried.length ? ` — ${retried.join(', ')} was re-run once after a red taken under load` : ''
+  const redo = redone.length ? ` — ${redone.join(', ')} was re-run once after a red taken under load` : ''
   if (!blocked) return `pre-push gate: green (${reason ?? 'gate passed'})${note}${redo}`
   // The bypass is documented in the hook's own comment and NOT advertised here:
   // most pushes in this repository are made by autonomous agents, and a failure
   // message that names its escape hatch invites the escape.
-  const twice = (failed ?? []).filter((f) => retried.includes(f))
+  const twice = red.filter((f) => redone.includes(f))
   return [
-    `PUSH BLOCKED — the fast gate is red: ${failed.join(', ')}`,
+    `PUSH BLOCKED — the fast gate is red: ${red.join(', ')}`,
     ...(twice.length ? [`${twice.join(', ')} failed TWICE — the load was not the cause.`] : []),
     'CI would fail on this state and mail the failure. Fix it, then push again.',
-    `  ${failed.map((f) => (GATE_COMMANDS[f] ?? []).join(' ')).join('\n  ')}`,
+    `  ${red.map((f) => (GATE_COMMANDS[f] ?? []).join(' ')).join('\n  ')}`,
   ].join('\n')
 }

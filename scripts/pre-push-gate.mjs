@@ -29,6 +29,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { REPO_ROOT } from './repo-paths.mjs'
 import {
+  LOAD_LEVELS,
   PROTECTED_REF,
   UNAVAILABLE,
   decide,
@@ -77,9 +78,22 @@ function readLoadLevel({ when } = {}) {
     })
     const parsed = JSON.parse(res.stdout ?? '')
     const seconds = ((Date.now() - started) / 1000).toFixed(1)
+    // The JSON shape is a CONTRACT, and a drifted one must be loud (four-eyes
+    // finding): silently degrading every reading to `unknown` would quietly turn
+    // "a quiet red blocks immediately" into "every red buys a retry", everywhere.
+    if (!LOAD_LEVELS.includes(parsed?.level)) {
+      console.log(
+        `pre-push gate: the load probe answered "${parsed?.level}", which is not one of ${LOAD_LEVELS.join('/')}` +
+          ' — its --json contract has drifted; treating the machine as unmeasured.',
+      )
+      return { level: 'unknown', reasons: ['the load probe reported an unknown level'] }
+    }
     console.log(`pre-push gate: machine ${parsed.level} (${when} reading, ${seconds}s)`)
     return { level: parsed.level, reasons: parsed.reasons }
   } catch {
+    // Said out loud, not swallowed: "the machine could not be read" is itself a
+    // fact about this verdict, and it is what buys the re-run.
+    console.log(`pre-push gate: the load probe could not be read (${when} reading) — treating the machine as unmeasured`)
     return { level: 'unknown', reasons: ['the load probe could not be read'] }
   }
 }
