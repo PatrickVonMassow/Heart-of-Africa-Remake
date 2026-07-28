@@ -64,7 +64,7 @@ export const DOC_BUDGETS = [
     // omit: the case behind it (two runs photographing different places, both
     // green) is invisible to every existing check, so a session that did not
     // read the rule would file the wrong picture as evidence again.
-    // RAISED by the 16 measured words that turn §7.1 pt 4's flora-only collider
+    // RAISED by the 19 measured words that turn §7.1 pt 4's flora-only collider
     // rule into the rule for EVERY bird's-eye collider (point 378): a collider
     // is derived from the placement the renderer DRAWS, never from the
     // behaviour position beside it. Not a longer telling of the point-129
@@ -73,7 +73,7 @@ export const DOC_BUDGETS = [
     // off their drawn bodies, so the traveller walked through the animal he saw
     // and was blocked on empty ground. A rule stated for one subsystem is not a
     // rule; the words buy its generality.
-    maxWords: 9949,
+    maxWords: 9952,
     why: 'loaded at every session start — the most expensive document in the project',
   },
   {
