@@ -21,6 +21,7 @@
 import { readFileSync } from 'node:fs'
 import { basename } from 'node:path'
 import { heartbeat, noteActivity } from './batch-singleton.mjs'
+import { handoverSurvivesCall } from './batch-boundary-core.mjs'
 import {
   STATE_PATH,
   ACTIVITY_PATH,
@@ -38,9 +39,22 @@ try {
 }
 const sid = data.session_id || ''
 
-// (1) owner-only lock heartbeat — never claims for a non-owner
+// (1) owner-only lock heartbeat — never claims for a non-owner.
+// A heartbeat normally WITHDRAWS a taken boundary (working is proof the session
+// is not finished), but not when the call was part of ENDING the batch — the
+// board, the review ledger, the work order's own entry (point 388, live finding
+// 2). Same verdict as the PreToolUse gate, from the same pure function, so the
+// two can never disagree about one call.
 try {
-  if (sid) heartbeat(sid)
+  if (sid) {
+    const input = data.tool_input ?? data.toolInput ?? {}
+    const keep = handoverSurvivesCall({
+      toolName: data.tool_name ?? data.toolName,
+      filePath: input.file_path ?? input.notebook_path,
+      command: input.command,
+    })
+    heartbeat(sid, { preserveHandover: keep.survives })
+  }
 } catch {
   /* no lock dir / unreadable — nothing to do */
 }

@@ -7,11 +7,29 @@
 // guard must never make the repository unpushable. A real red, however, fails
 // CLOSED — that is the whole point. `git push --no-verify` remains the explicit,
 // visible exception.
+//
+// A RED UNDER LOAD IS NOT EVIDENCE (point 389, the rule of point 296 applied
+// here at last). The gate used to measure the machine as much as the code: on
+// 28.07.2026 `npm run test:unit` passed standing alone, three times, while the
+// same command inside this gate reported red and refused the push, because two
+// delegated agents were working and the CPU sat at 45 %. So on a red the gate
+// asks `scripts/verify/machine-load.mjs`, and if the machine is not quiet it
+// re-runs THAT step ONCE and uses the second result. The bar itself is
+// unchanged: a red on a quiet machine blocks immediately, a step that fails
+// twice blocks whatever the machine says, and nothing is skipped, warned-about
+// instead of blocked, or bypassed. The only question the retry answers is
+// whether the first red was evidence.
+//
+// Every retry PRINTS what is being re-run and why — a silent retry would hide a
+// real intermittent defect, which is exactly what the house rule about visible
+// retries exists to prevent — and the wrapper times the second attempt, so the
+// cost of the retry is measured rather than assumed.
 import { execFileSync, spawnSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { REPO_ROOT } from './repo-paths.mjs'
 import {
+  LOAD_LEVELS,
   PROTECTED_REF,
   UNAVAILABLE,
   decide,
@@ -40,6 +58,43 @@ function changedFiles({ localSha, remoteSha }) {
       .filter(Boolean)
   } catch {
     return []
+  }
+}
+
+/**
+ * The machine's load level, read through the same probe every browser suite uses
+ * (`scripts/verify/machine-load.mjs --json`). A subprocess rather than an import
+ * on purpose: the probe is async and this wrapper is a straight-line script, and
+ * the probe already owns the fail-open behaviour.
+ *
+ * FAIL-OPEN, but never towards "quiet": an unreadable probe returns `unknown`,
+ * which buys one re-run rather than certifying a red.
+ */
+function readLoadLevel({ when } = {}) {
+  const started = Date.now()
+  try {
+    const res = spawnSync(process.execPath, [resolve(REPO_ROOT, 'scripts/verify/machine-load.mjs'), '--json'], {
+      cwd: REPO_ROOT, encoding: 'utf8', timeout: 30000, maxBuffer: 8 * 1024 * 1024, windowsHide: true,
+    })
+    const parsed = JSON.parse(res.stdout ?? '')
+    const seconds = ((Date.now() - started) / 1000).toFixed(1)
+    // The JSON shape is a CONTRACT, and a drifted one must be loud (four-eyes
+    // finding): silently degrading every reading to `unknown` would quietly turn
+    // "a quiet red blocks immediately" into "every red buys a retry", everywhere.
+    if (!LOAD_LEVELS.includes(parsed?.level)) {
+      console.log(
+        `pre-push gate: the load probe answered "${parsed?.level}", which is not one of ${LOAD_LEVELS.join('/')}` +
+          ' — its --json contract has drifted; treating the machine as unmeasured.',
+      )
+      return { level: 'unknown', reasons: ['the load probe reported an unknown level'] }
+    }
+    console.log(`pre-push gate: machine ${parsed.level} (${when} reading, ${seconds}s)`)
+    return { level: parsed.level, reasons: parsed.reasons }
+  } catch {
+    // Said out loud, not swallowed: "the machine could not be read" is itself a
+    // fact about this verdict, and it is what buys the re-run.
+    console.log(`pre-push gate: the load probe could not be read (${when} reading) — treating the machine as unmeasured`)
+    return { level: 'unknown', reasons: ['the load probe could not be read'] }
   }
 }
 
@@ -106,13 +161,20 @@ try {
   if (warning) console.log(warning)
 
   console.log(`pre-push gate: ${plan.steps.join(' → ')} (${plan.reason})`)
-  const results = runGate(plan.steps, (step, [cmd, ...args]) => {
-    const run = spawnSync(cmd, args, { cwd: REPO_ROOT, stdio: 'inherit', shell: process.platform === 'win32' })
-    // audit-check exits 3 when the audit could not RUN (offline, registry
-    // down). That is an environment fact, not a finding: fail soft, say so.
-    if (step === 'audit' && run.status === 3) return UNAVAILABLE
-    return run.status === 0
-  })
+  const results = runGate(
+    plan.steps,
+    (step, [cmd, ...args], { attempt = 1 } = {}) => {
+      const started = Date.now()
+      const run = spawnSync(cmd, args, { cwd: REPO_ROOT, stdio: 'inherit', shell: process.platform === 'win32' })
+      // What the retry COSTS, measured rather than estimated (point 389).
+      if (attempt > 1) console.log(`pre-push gate: the re-run of ${step} took ${((Date.now() - started) / 1000).toFixed(1)}s`)
+      // audit-check exits 3 when the audit could not RUN (offline, registry
+      // down). That is an environment fact, not a finding: fail soft, say so.
+      if (step === 'audit' && run.status === 3) return UNAVAILABLE
+      return run.status === 0
+    },
+    { readLoad: readLoadLevel, onNotice: (line) => console.log(line) },
+  )
 
   const verdict = decide(results)
   console.log(formatVerdict(verdict, plan))

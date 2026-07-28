@@ -11339,3 +11339,71 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   assumed radius.
   DOCS in the same commit: CLAUDE.md §7.1 pt 4 (the collider-derived-from-the-drawing
   rule, already stated for flora, extended to animals) and its evidence section.
+- [x] 340. THE LOCK HEARTBEAT MUST NOT LOSE ITS WRITE TO A TRANSIENT RENAME FAILURE
+  (user 25.07.2026). EVIDENCE: fourteen orphaned `.claude/batch-lock.json.tmp-<pid>`
+  files accreted between 19:36 and 20:52 on 25.07.2026 — one per failed write, each
+  holding the same session's lock snapshot. `writeJsonAtomic`
+  (scripts/batch-singleton.mjs:88) writes `${p}.tmp-${process.pid}` and then
+  `renameSync`s it over the lock; on Windows that rename fails with a sharing violation
+  whenever another reader (the resume hook, a second session, a virus scanner) holds the
+  lock file open at that instant. Against a per-tool-call heartbeat that was roughly
+  every fifth write.
+  WHY IT MATTERS MORE THAN THE LITTER: `heartbeat()` (line 455) neither retries nor
+  catches, so a failed rename leaves `claimedAt` at its OLD value while reporting
+  nothing. Liveness is decided on exactly that timestamp (`assessOwner`,
+  `DEAD_CONFIRM_MS`), so a run of failures ages a LIVE session's heartbeat toward the
+  "provably dead" verdict — and a takeover on a false-dead reading is precisely the
+  24.07.2026 parallel-session incident. The pid probe is the second gate that held here;
+  that is not a reason to let the first one rot silently.
+  TARGET, TWO PARTS. (a) RETRY: the rename is attempted a bounded number of times with a
+  short backoff, because the collision is transient by nature; if every attempt fails the
+  tmp file is removed and the error PROPAGATES — a heartbeat that did not land must never
+  read as one that did, so no silent swallow. (b) SWEEP: acquiring the lock removes
+  orphaned `<lockPath>.tmp-*` files, but ONLY where the owning pid is provably dead AND
+  the file has settled (the `REAP_MUTEX_STALE_MS` age gate is the natural one) — a live
+  process mid-write must never have its tmp taken from under it.
+  Both decisions are PURE and dependency-injected (rename/remove/sleep for the retry; the
+  sweep predicate over directory entries plus a pid probe), matching the rest of this
+  module, so the failure paths are tested without provoking a real sharing violation.
+  KEEP INTACT: the write stays ATOMIC — tmp plus rename, never an in-place truncate, so a
+  concurrent reader can never see half a lock; the pid-backed liveness gates,
+  `DEAD_CONFIRM_MS`/`WEDGED_MS` and the reap mutex are untouched; `heartbeat()` keeps its
+  one-shot pid backfill and the `skipBackfill` fast path.
+  DOCS in the same commit: `docs/batch-singleton-analysis.md` records this write-failure
+  mode and its fix in its failure-path table — the analysis is the place where the
+  singleton's known ways of failing are enumerated.
+  VERIFIABLE: pure (`scripts/batch-singleton-core.test.mjs`) — a rename that fails twice
+  and then succeeds leaves the lock written and NO tmp behind; a rename that fails every
+  attempt throws and STILL leaves no tmp; the retry gives up after its bounded attempts
+  (no unbounded loop); the sweep predicate takes an orphan whose pid is dead, spares one
+  whose pid is alive, and spares a just-written tmp that has not settled; and an
+  end-to-end `acquire` against a directory seeded with both kinds removes exactly the
+  dead one. The five hard-singleton scenarios already pinned in that file stay green.
+- [x] 389. THE PUSH GATE BLOCKS A GOOD PUSH UNDER LOAD (28.07.2026, measured three times
+  in a row). `npm run test:unit` passes standing alone — 4003 tests green, twice — while
+  the same command inside `scripts/pre-push-gate.mjs` reports red and refuses the push,
+  on a machine the probe calls "UNDER LOAD, CPU 45 % across 16 cores" because two
+  delegated agents are working. The gate is measuring the machine, not the code.
+  THE ASYMMETRY IS ALREADY DECIDED, it is simply not applied here: point 296 established
+  that load produces false REDS and never false greens, and every browser suite already
+  labels a red taken under load as not-evidence. The push gate predates that rule and
+  consults nothing.
+  FIX IT THE WAY THE SUITES DO, and keep it visible: on a red, ask
+  `scripts/verify/machine-load.mjs`; if the machine is not quiet, RE-RUN the failing step
+  ONCE and use the second result. A step that fails twice blocks as it does today. Every
+  retry prints a line naming what was re-run and why — a silent retry would hide a real
+  intermittent defect, which is the failure the house rule about visible retries exists
+  for. A red on a QUIET machine still blocks immediately, with no retry.
+  DO NOT WEAKEN THE GATE: no skipping, no "warn instead of block", no bypass. The
+  question is only whether the FIRST red was evidence, and the answer comes from a second
+  run, not from a lowered bar.
+  MEASURE THE COST: record how long the re-run adds in the loaded case and how often it
+  fires over a working day. If the retry turns out to fire on most pushes, the finding is
+  that the pool is too large for the machine, not that the gate is wrong.
+  VERIFIABLE: pure Vitest on the decision — a red plus a quiet machine blocks without a
+  retry; a red plus a loaded machine retries once and passes on a green second run; two
+  reds block whatever the machine says; the retry line is emitted in exactly the retry
+  case. Plus one live push on a loaded machine that succeeds through the retry, with the
+  printed line recorded.
+  DOCS in the same commit: `scripts/verify/README.md` beside the quiet-machine section,
+  and the comment block at the head of `scripts/pre-push-gate.mjs`.

@@ -302,22 +302,39 @@ describe('GATHER-STEP REUSE (the drift guard)', () => {
     expect(modelMain).not.toMatch(/\bbaselineMs\(/)
   })
 
-  it('holds each gather step to the applicable/inputs contract on the REAL repo', () => {
-    for (const guard of GUARDS) {
-      const gathered = guard.gather({ sessionId: 'preflight-test' })
-      expect(gathered, guard.id).toBeTruthy()
-      if (gathered.applicable === false) expect(typeof gathered.why, guard.id).toBe('string')
-      else expect(typeof gathered.inputs, guard.id).toBe('object')
-    }
-  })
+  // The two REAL-REPO checks below walk real git history, and one of them —
+  // mechanism-review-guard — costs a `git show` per commit between its review
+  // baseline and HEAD. On a branch carrying several unreviewed mechanism commits
+  // that is seconds rather than milliseconds (measured 1.8 s → 4.8 s on a
+  // three-commit guard branch), so the default 5 s budget makes these tests fail
+  // for the state of the checkout rather than for a defect. The generous timeout
+  // is the fail-soft; what they assert is unchanged.
+  const REAL_REPO_TIMEOUT_MS = 30_000
 
-  it('runs against the real repo without an error status', () => {
-    // A wrapper that throws on import or on gathering would show up here — and
-    // an `error` row is exactly the false-confidence case this must not have.
-    const results = runPreflight(GUARDS, { sessionId: 'preflight-test' })
-    expect(results.filter((r) => r.status === STATUS.error)).toEqual([])
-    expect(results.map((r) => r.id)).toEqual(GUARDS.map((g) => g.id))
-  })
+  it(
+    'holds each gather step to the applicable/inputs contract on the REAL repo',
+    () => {
+      for (const guard of GUARDS) {
+        const gathered = guard.gather({ sessionId: 'preflight-test' })
+        expect(gathered, guard.id).toBeTruthy()
+        if (gathered.applicable === false) expect(typeof gathered.why, guard.id).toBe('string')
+        else expect(typeof gathered.inputs, guard.id).toBe('object')
+      }
+    },
+    REAL_REPO_TIMEOUT_MS,
+  )
+
+  it(
+    'runs against the real repo without an error status',
+    () => {
+      // A wrapper that throws on import or on gathering would show up here — and
+      // an `error` row is exactly the false-confidence case this must not have.
+      const results = runPreflight(GUARDS, { sessionId: 'preflight-test' })
+      expect(results.filter((r) => r.status === STATUS.error)).toEqual([])
+      expect(results.map((r) => r.id)).toEqual(GUARDS.map((g) => g.id))
+    },
+    REAL_REPO_TIMEOUT_MS,
+  )
 })
 
 describe('isMainModule', () => {

@@ -3,12 +3,15 @@
 // user and a later fix does not unsend that mail.
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
+import { execFile } from 'node:child_process'
 import { resolve } from 'node:path'
 import { REPO_ROOT } from './repo-paths.mjs'
+import { LEVEL } from './verify/machine-load-core.mjs'
 import {
   FULL_GATE,
   GATE_COMMANDS,
   LIGHT_GATE,
+  LOAD_LEVELS,
   PROTECTED_REF,
   UNAVAILABLE,
   decide,
@@ -16,8 +19,12 @@ import {
   gatePlan,
   gatePlanForPush,
   isProseOnlyPath,
+  needsOpeningLoadReading,
+  normaliseLoad,
   parsePushInput,
   runGate,
+  shouldRetryAfterRed,
+  worseLoad,
 } from './pre-push-gate-core.mjs'
 
 describe('parsePushInput', () => {
@@ -127,11 +134,13 @@ describe('gatePlanForPush', () => {
 describe('decide', () => {
   it('blocks on any red and names every failed step', () => {
     const v = decide([{ step: 'build', ok: true }, { step: 'lint', ok: false }])
-    expect(v).toEqual({ blocked: true, failed: ['lint'], unavailable: [] })
+    expect(v).toEqual({ blocked: true, failed: ['lint'], unavailable: [], retried: [] })
   })
 
   it('passes an all-green run', () => {
-    expect(decide(FULL_GATE.map((step) => ({ step, ok: true })))).toEqual({ blocked: false, failed: [], unavailable: [] })
+    expect(decide(FULL_GATE.map((step) => ({ step, ok: true })))).toEqual({
+      blocked: false, failed: [], unavailable: [], retried: [],
+    })
   })
 
   it('does not block on an empty or malformed result list — the wrapper fails open', () => {
@@ -166,7 +175,7 @@ describe('runGate — a synthetic failing state stops the push', () => {
       return step !== 'lint'
     })
     expect(ran).toEqual(['build', 'lint'])
-    expect(decide(results)).toEqual({ blocked: true, failed: ['lint'], unavailable: [] })
+    expect(decide(results)).toEqual({ blocked: true, failed: ['lint'], unavailable: [], retried: [] })
   })
 
   it('runs every step when they all pass', () => {
@@ -210,6 +219,239 @@ describe('runGate — a synthetic failing state stops the push', () => {
       return true
     })
     expect(seen).toEqual([['audit', GATE_COMMANDS.audit]])
+  })
+})
+
+// The failure this repository actually had a second time (point 389): the gate
+// measured the MACHINE. `npm run test:unit` passed standing alone, three times,
+// while the same command inside the gate went red under two working agents. The
+// asymmetry of point 296 decides it — load produces false REDS, never false
+// greens — so a red under load buys ONE re-run, and nothing else moves.
+describe('a red under load is not evidence — the gate re-runs it once (point 389)', () => {
+  /** A runner scripted per step: an array of outcomes, one per attempt. */
+  const scripted = (script, log = []) => (step, _cmd, opts = {}) => {
+    log.push({ step, attempt: opts.attempt })
+    const outcomes = script[step] ?? [true]
+    return outcomes[Math.min((opts.attempt ?? 1) - 1, outcomes.length - 1)]
+  }
+
+  it('blocks a red taken on a QUIET machine immediately, with no retry', () => {
+    const log = []
+    const notices = []
+    const results = runGate(['lint'], scripted({ lint: [false, true] }, log), {
+      readLoad: () => ({ level: 'quiet', reasons: ['CPU 2 %, no competing run'] }),
+      onNotice: (l) => notices.push(l),
+    })
+    // The second outcome in the script is green — and must never be reached.
+    expect(log).toEqual([{ step: 'lint', attempt: 1 }])
+    expect(decide(results).blocked).toBe(true)
+    expect(notices).toEqual([])
+  })
+
+  it('re-runs the failing step ONCE on a loaded machine and uses the second result', () => {
+    const log = []
+    const notices = []
+    const results = runGate(['lint', 'audit'], scripted({ lint: [false, true] }, log), {
+      readLoad: () => ({ level: 'loaded', reasons: ['CPU 45 % across 16 cores'] }),
+      onNotice: (l) => notices.push(l),
+    })
+    expect(log).toEqual([
+      { step: 'lint', attempt: 1 },
+      { step: 'lint', attempt: 2 },
+      { step: 'audit', attempt: 1 },
+    ])
+    const v = decide(results)
+    expect(v.blocked).toBe(false)
+    expect(v.retried).toEqual(['lint'])
+    // Visible, always: a silent retry would hide a real intermittent defect.
+    expect(notices[0]).toMatch(/RETRY — lint was red on a machine that is loaded/)
+    expect(notices[0]).toMatch(/CPU 45 %/)
+    expect(notices[0]).toMatch(/A second red blocks the push/)
+    expect(notices[1]).toMatch(/lint passed on the re-run/)
+    expect(notices).toHaveLength(2)
+  })
+
+  it('blocks a step that fails TWICE, whatever the machine says', () => {
+    for (const level of ['quiet', 'busy', 'loaded', 'unknown']) {
+      const log = []
+      const results = runGate(['lint'], scripted({ lint: [false, false] }, log), { readLoad: () => ({ level }) })
+      const v = decide(results)
+      expect(v.blocked, `a double red must block on a ${level} machine`).toBe(true)
+      expect(v.failed).toEqual(['lint'])
+      // One retry, never two.
+      expect(log.length).toBe(level === 'quiet' ? 1 : 2)
+    }
+  })
+
+  it('emits the retry line in EXACTLY the retry case', () => {
+    const green = []
+    runGate(FULL_GATE, () => true, { readLoad: () => ({ level: 'loaded' }), onNotice: (l) => green.push(l) })
+    expect(green).toEqual([])
+
+    const quietRed = []
+    runGate(['lint'], () => false, { readLoad: () => ({ level: 'quiet' }), onNotice: (l) => quietRed.push(l) })
+    expect(quietRed).toEqual([])
+
+    const loadedRed = []
+    runGate(['lint'], () => false, { readLoad: () => ({ level: 'busy' }), onNotice: (l) => loadedRed.push(l) })
+    expect(loadedRed[0]).toMatch(/RETRY/)
+    expect(loadedRed[1]).toMatch(/failed AGAIN — this red is evidence/)
+  })
+
+  it('retries where the quiet could not be verified — unmeasured is not quiet', () => {
+    expect(shouldRetryAfterRed('quiet')).toBe(false)
+    for (const level of ['busy', 'loaded', 'unknown', undefined, null, '']) {
+      expect(shouldRetryAfterRed(level), `${level} is not quiet`).toBe(true)
+    }
+  })
+
+  it('treats a load probe that THROWS as unmeasured, not as quiet', () => {
+    const log = []
+    const results = runGate(['lint'], scripted({ lint: [false, true] }, log), {
+      readLoad: () => {
+        throw new Error('powershell died')
+      },
+    })
+    expect(log).toHaveLength(2)
+    expect(decide(results).blocked).toBe(false)
+  })
+
+  it('behaves exactly as before when no load reader is injected', () => {
+    const log = []
+    const results = runGate(['lint'], scripted({ lint: [false, true] }, log))
+    expect(log).toEqual([{ step: 'lint', attempt: 1 }])
+    expect(decide(results).blocked).toBe(true)
+  })
+
+  it('keeps failing soft when the RE-RUN cannot run at all, and does not call that a pass', () => {
+    const notices = []
+    const results = runGate(['audit', 'unit'], (step, _cmd, { attempt }) =>
+      step === 'audit' ? (attempt === 1 ? false : UNAVAILABLE) : true, {
+      readLoad: () => ({ level: 'loaded' }),
+      onNotice: (l) => notices.push(l),
+    })
+    const v = decide(results)
+    expect(v.blocked).toBe(false)
+    expect(v.unavailable).toEqual(['audit'])
+    expect(v.retried).toEqual(['audit'])
+    // It neither passed nor was re-measured — saying "passed on the re-run" here
+    // would assert something untrue (four-eyes finding).
+    expect(notices[1]).toMatch(/the re-run of audit could not RUN — it was neither confirmed nor cleared/)
+    expect(notices[1]).not.toMatch(/passed/)
+  })
+})
+
+describe('the load reading is taken where a storm can hide (point 389)', () => {
+  it('takes an opening reading only for the minute-long steps', () => {
+    // Measured 28.07.2026: the probe costs 2.6 s, lint 0.5 s and audit 1.6 s. A
+    // pre-reading would more than double a feature-branch push for a spike that
+    // cannot hide inside a half-second run.
+    expect(needsOpeningLoadReading(LIGHT_GATE)).toBe(false)
+    expect(needsOpeningLoadReading(FULL_GATE)).toBe(true)
+    expect(needsOpeningLoadReading(['unit'])).toBe(true)
+    expect(needsOpeningLoadReading([])).toBe(false)
+    expect(needsOpeningLoadReading(null)).toBe(false)
+  })
+
+  it('asks the probe once at the start and once per red on the full gate', () => {
+    const asked = []
+    runGate(FULL_GATE, (step) => step !== 'unit', {
+      readLoad: (q) => {
+        asked.push(q)
+        return { level: 'quiet' }
+      },
+    })
+    expect(asked).toEqual([{ when: 'start', step: null }, { when: 'red', step: 'unit' }])
+  })
+
+  it('never spends a probe on a green light-gate push', () => {
+    const asked = []
+    runGate(LIGHT_GATE, () => true, { readLoad: (q) => asked.push(q) })
+    expect(asked).toEqual([])
+  })
+
+  it('does not let a lull AFTER the storm certify a red', () => {
+    // The probe is a snapshot: a red produced while a neighbour built can be
+    // followed a second later by a quiet reading. The worse of the two decides.
+    const notices = []
+    const readings = [{ level: 'loaded', reasons: ['a competing vitest run'] }, { level: 'quiet' }]
+    const results = runGate(['unit'], (_step, _cmd, { attempt }) => attempt !== 1, {
+      readLoad: () => readings.shift(),
+      onNotice: (l) => notices.push(l),
+    })
+    expect(decide(results)).toMatchObject({ blocked: false, retried: ['unit'] })
+    // Both readings were spent, and the retry named the LOADED one.
+    expect(readings).toEqual([])
+    expect(notices[0]).toMatch(/a competing vitest run/)
+  })
+
+  it('picks the least quiet reading, and normalises whatever shape it gets', () => {
+    expect(worseLoad({ level: 'quiet' }, { level: 'busy' }).level).toBe('busy')
+    expect(worseLoad({ level: 'loaded' }, { level: 'quiet' }).level).toBe('loaded')
+    expect(worseLoad({ level: 'quiet' }, { level: 'unknown' }).level).toBe('unknown')
+    expect(worseLoad(null, 'busy').level).toBe('busy')
+    expect(worseLoad('quiet', null).level).toBe('quiet')
+    expect(worseLoad(null, null)).toBe(null)
+    expect(normaliseLoad(undefined).level).toBe('unknown')
+    expect(normaliseLoad('quiet')).toEqual({ level: 'quiet', why: '' })
+    expect(normaliseLoad({ level: 'busy', reasons: ['a', 'b'] }).why).toBe('a; b')
+    // Normalising an already normalised reading keeps its reason — worseLoad
+    // does exactly that on its way to the retry line.
+    expect(worseLoad({ level: 'quiet' }, normaliseLoad({ level: 'busy', reasons: ['CPU 45 %'] })).why).toBe('CPU 45 %')
+  })
+
+  it('says in the verdict that a green only came on a re-run', () => {
+    expect(formatVerdict({ blocked: false, failed: [], retried: ['unit'] }, { reason: 'x' })).toMatch(
+      /unit was re-run once after a red taken under load/,
+    )
+    const blocked = formatVerdict({ blocked: true, failed: ['unit'], retried: ['unit'] }, { reason: 'x' })
+    expect(blocked).toMatch(/unit failed TWICE — the load was not the cause/)
+    // A step re-run GREEN, with a later step red, must not be reported as twice-failed.
+    expect(formatVerdict({ blocked: true, failed: ['unit'], retried: ['lint'] }, { reason: 'x' })).not.toMatch(/TWICE/)
+  })
+
+  it('never THROWS while formatting a block — the wrapper fails open on a throw', () => {
+    // A formatting error would turn a blocked push into an allowed one, which is
+    // the one direction this gate must never move.
+    expect(() => formatVerdict({ blocked: true, failed: ['unit'], retried: null, unavailable: null })).not.toThrow()
+    expect(() => formatVerdict({ blocked: true })).not.toThrow()
+    expect(() => formatVerdict()).not.toThrow()
+    expect(formatVerdict({ blocked: true, failed: ['unit'], retried: null })).toMatch(/PUSH BLOCKED/)
+  })
+})
+
+// The wrapper reads the machine through another script's --json output, and a
+// silently drifted shape would degrade EVERY reading to `unknown` — which turns
+// "a quiet red blocks immediately" into "every red buys a retry", on every
+// machine, with nothing red to notice it (four-eyes finding).
+describe('the load probe contract the wrapper depends on', () => {
+  // ASYNC on purpose: a spawnSync here blocks the vitest worker thread, and a
+  // blocked worker misses its own `onTaskUpdate` RPC — measured, it turned the
+  // whole unit run red (all 4037 tests passing, "Errors 1 error", exit 1) while
+  // the identical run without this file exited 0.
+  it('answers with a top-level level from the known set, and its reasons', async () => {
+    const { code, stdout } = await new Promise((done) => {
+      execFile(
+        process.execPath,
+        [resolve(REPO_ROOT, 'scripts/verify/machine-load.mjs'), '--json'],
+        // Forced, so this pins the SHAPE in a fixed moment rather than measuring
+        // the machine — the documented wiring self-test of point 296.
+        { cwd: REPO_ROOT, encoding: 'utf8', env: { ...process.env, VERIFY_LOAD_FORCE: 'busy' }, timeout: 30000 },
+        // A NON-ZERO exit is expected here: the probe exits 2 on a machine that
+        // is not quiet. The wrapper reads its stdout, not its status, and this
+        // test pins exactly that.
+        (err, out) => done({ code: err?.code ?? 0, stdout: out }),
+      )
+    })
+    expect(code).toBe(2)
+    const parsed = JSON.parse(stdout)
+    expect(LOAD_LEVELS).toContain(parsed.level)
+    expect(parsed.level).toBe('busy')
+    expect(Array.isArray(parsed.reasons)).toBe(true)
+  })
+
+  it('knows exactly the four levels machine-load-core classifies into', () => {
+    expect([...LOAD_LEVELS].sort()).toEqual([...Object.values(LEVEL)].sort())
   })
 })
 

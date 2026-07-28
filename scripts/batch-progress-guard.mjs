@@ -35,19 +35,21 @@ import { appendFileSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import {
   acquire,
-  heartbeat,
   detectParallel,
   markHandover,
   raiseParallelAlert,
   readUnhandledAlert,
   progressGuardDecision,
+  BOUNDARY_LOG_PATH,
 } from './batch-singleton.mjs'
-import { gatherBoundary, clearBoundary } from './batch-boundary.mjs'
+import { gatherBoundary } from './batch-boundary.mjs'
 import { LAUNCHER_TASK_NAME } from './batch-boundary-core.mjs'
 import { isPaused } from './batch-lock.mjs'
 
 const TASKS = fileURLToPath(new URL('../TASKS.md', import.meta.url))
-const BOUNDARY_LOG = fileURLToPath(new URL('../.claude/boundary.log', import.meta.url))
+// One source of truth with the withdrawal that cancels these lines (finding 3):
+// both sit beside the lock, so a redirected lock redirects the log with it.
+const BOUNDARY_LOG = BOUNDARY_LOG_PATH
 
 /** Leave a trace of every handover — the acceptance evidence for point 388, and
  *  the line that tells a later reader why the launcher took over a live pid. */
@@ -69,6 +71,23 @@ try {
 const block = (reason) => {
   process.stdout.write(JSON.stringify({ decision: 'block', reason }))
   process.exit(0)
+}
+
+/** ALLOW, but say something. A hook payload without a `decision` lets the stop
+ *  through; `systemMessage` surfaces the line to the session and the user. Used
+ *  where the stop is legitimate but something the session believes is NOT true —
+ *  a handover that did not reach the lock, or a guard that failed open. */
+const warn = (message) => {
+  try {
+    process.stdout.write(JSON.stringify({ systemMessage: message }))
+  } catch {
+    /* best effort */
+  }
+  try {
+    process.stderr.write(`[batch-progress-guard] ${message}\n`)
+  } catch {
+    /* best effort */
+  }
 }
 
 try {
@@ -101,11 +120,17 @@ try {
       raiseParallelAlert({ detectedBy: 'batch-progress-guard', ownerSid: sid, parallel })
     }
     unhandledAlert = readUnhandledAlert()
-    try {
-      heartbeat(sid)
-    } catch {
-      /* best effort */
-    }
+    // NO extra heartbeat here. `acquire` above already refreshed the lock (it
+    // heartbeats on 'mine' and writes a fresh lock on 'acquired'), so this call
+    // only ever rewrote the same small file a second time within milliseconds —
+    // and the THIRD rewrite of the turn, markHandover, was the one that failed
+    // with EPERM three times on 28.07.2026 while a scanner still held the file
+    // the previous rename had just replaced. Writing the lock less is one of the
+    // TWO defences; the other is the bounded retry in scripts/atomic-write.mjs.
+    // There is deliberately no third: the write stays atomic — temp plus rename,
+    // never an in-place truncate — so a concurrent reader can never see half a
+    // lock (point 340). Where every attempt still fails, markHandover reports it
+    // and the allow below says so.
   }
 
   // Boundary claim (point 373) — only ever gathered for the owning session, and
@@ -132,21 +157,41 @@ try {
   })
 
   if (decision === 'allow-boundary') {
-    // Consume the marker: it authorised THIS stop, not the next one.
-    clearBoundary()
-    // AND HAND THE BATCH OVER (point 388). Waiting for the old process to die
-    // was the flaw: an interactive window fires no SessionEnd, so the lock could
+    // HAND THE BATCH OVER (point 388). Waiting for the old process to die was
+    // the flaw: an interactive window fires no SessionEnd, so the lock could
     // outlive the work by hours. The handover is not a release — the lock keeps
-    // naming this session, a later tool call of ours withdraws it again by
-    // stamping the heartbeat past it, and a still-live pid buys the successor's
-    // spawn a grace window. The singleton therefore still admits exactly one
-    // working session.
+    // naming this session, work that CONTINUES the batch withdraws it again, and
+    // a still-live pid buys the successor's spawn a grace window. The singleton
+    // therefore still admits exactly one working session.
+    //
+    // THE WRITE COMES FIRST, AND THE MARKER IS NOT CONSUMED (live findings 1+2,
+    // 28.07.2026). It used to run the other way round: clearBoundary(), then a
+    // markHandover that threw EPERM straight into the fail-open catch. The stop
+    // proceeded with the marker gone, no handover on the lock and nothing saying
+    // so — and the next turn demanded the boundary again, a loop. The marker now
+    // survives its own use: it is withdrawn by work that continues the batch,
+    // never by being spent, so a Stop guard that sends the session back for a
+    // timestamp or a review record does not un-take the boundary.
     const point = bound.boundary?.point ?? null
     const handed = markHandover(sid, { point })
-    record(
-      handed
-        ? `HANDOVER point ${point ?? '?'} by ${sid} — lock marked handed-over; the launcher may spawn the successor.`
-        : `boundary stop by ${sid} for point ${point ?? '?'} but the lock was not ours to hand over.`,
+    if (handed.handed) {
+      record(
+        `HANDOVER point ${point ?? '?'} by ${sid} — lock marked handed-over; the launcher may spawn the ` +
+          `successor.${handed.attempts > 1 ? ` (the write needed ${handed.attempts} attempts)` : ''}`,
+      )
+      process.exit(0)
+    }
+    // The stop may proceed — a guard never traps a session — but it must NEVER
+    // proceed silently, or the session stops believing it passed the batch on.
+    const why = handed.reason === 'write-failed' ? String(handed.error?.message ?? handed.error) : handed.reason
+    record(`HANDOVER FAILED point ${point ?? '?'} by ${sid} — ${why}; the lock is unchanged and still held.`)
+    warn(
+      `THE HANDOVER DID NOT HAPPEN. The boundary for point ${point ?? '?'} is valid and this stop is allowed, ` +
+        `but the batch lock could NOT be marked handed-over (${why}), so the launcher will keep seeing a live ` +
+        `owner and will NOT spawn a successor. Do not stop believing the batch was passed on: retry with ` +
+        `\`node scripts/batch-boundary.mjs ${point ?? '<point>'}\` and end the turn again, or release the lock ` +
+        `by hand (\`node scripts/batch-singleton.mjs release\`) once this session is really finished. The ` +
+        `boundary marker was deliberately left in place, so a retry needs no new one.`,
     )
     process.exit(0)
   }
@@ -222,7 +267,15 @@ try {
 } catch (e) {
   // Never hard-block on a guard error — but never allow a stop SILENTLY either:
   // this path is indistinguishable from "the batch may end", and a night was
-  // lost to a stop nobody could account for afterwards.
-  record(`FAIL-OPEN: the guard errored and allowed the stop (${(e && e.message) || e}).`)
+  // lost to a stop nobody could account for afterwards. Since 28.07.2026 it is
+  // said OUT LOUD as well as logged: five of these lines were written before
+  // anyone noticed, and each one was a handover that never happened.
+  const why = (e && e.message) || e
+  record(`FAIL-OPEN: the guard errored and allowed the stop (${why}).`)
+  warn(
+    `THE BATCH GUARD FAILED OPEN and allowed this stop without deciding anything (${why}). If you were at a ` +
+      `point boundary, the handover did NOT happen — check \`node scripts/batch-boundary.mjs --status\` and ` +
+      `\`node scripts/batch-handover-observe.mjs\` before assuming the batch was passed on.`,
+  )
   process.exit(0)
 }

@@ -10,10 +10,12 @@
 //       cause: a stale heartbeat with a LIVE pid (mid-long-tool-call) is ALIVE;
 //   (5) a non-owner session at the batch-progress-guard → stands down.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdtempSync, rmSync, writeFileSync, existsSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync, existsSync, readFileSync, readdirSync, renameSync, utimesSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { basename, join, resolve } from 'node:path'
 import { execFile } from 'node:child_process'
+import { REPO_ROOT } from './repo-paths.mjs'
+import { WRITE_RETRY_DELAYS_MS } from './atomic-write.mjs'
 import {
   assessOwner,
   spawnDecision,
@@ -27,9 +29,23 @@ import {
   convertPendingSpawn,
   markHandover,
   withdrawHandover,
+  touchHandover,
+  clearOwnBoundary,
   wedgeNotifyDecision,
   wedgeOwnerKey,
   wedgeStage,
+  sweepableTmpFiles,
+  resolveOwnership,
+  ourClaudeProcess,
+  statePathsFor,
+  LOCK_PATH,
+  BOUNDARY_LOG_PATH,
+  BOUNDARY_MARKER_PATH,
+  SESSIONS_SEEN_PATH,
+  SESSION_ACTIVITY_PATH,
+  PARALLEL_ALERT_PATH,
+  DOCTOR_STATE_PATH,
+  ANCESTOR_CACHE_PATH,
   DEAD_CONFIRM_MS,
   LEGACY_STALE_MS,
   WEDGED_MS,
@@ -42,6 +58,44 @@ const NOW = 1_784_900_000_000
 const BOOT = NOW - 12 * 3600 * 1000 // machine booted 12 h ago
 const aliveProbe = { exists: true, startedAt: null }
 const deadProbe = { exists: false, startedAt: null }
+
+// ---------------------------------------------------------------------------
+// FINDING 3 (28.07.2026): the unit suite was writing "WITHDRAWN point 388 by s1"
+// into the REAL .claude/boundary.log — `s1` is this file's test session id. The
+// pre-push gate runs this suite on every push, so a test run could withdraw a
+// boundary a live session had taken. Every state file must therefore be derived
+// from the caller's lock path, so redirecting the lock redirects all of them.
+describe('statePathsFor — a redirected lock never reaches the repo .claude/', () => {
+  const inside = (p) => !resolve(p).startsWith(resolve(REPO_ROOT))
+
+  it('derives EVERY state file from the given lock path, all outside the repo', () => {
+    const base = join(tmpdir(), 'hoa-paths-test')
+    const p = statePathsFor(join(base, 'batch-lock.json'))
+    expect(Object.keys(p).length).toBeGreaterThanOrEqual(8)
+    for (const [key, value] of Object.entries(p)) {
+      expect([key, resolve(value)]).toEqual([key, resolve(base, basename(value))])
+      expect(inside(value)).toBe(true) // NOT under the repository
+    }
+  })
+
+  it('none of the redirected paths equals a repo default', () => {
+    const defaults = [
+      LOCK_PATH,
+      BOUNDARY_LOG_PATH,
+      BOUNDARY_MARKER_PATH,
+      SESSIONS_SEEN_PATH,
+      SESSION_ACTIVITY_PATH,
+      PARALLEL_ALERT_PATH,
+      DOCTOR_STATE_PATH,
+      ANCESTOR_CACHE_PATH,
+    ]
+    const redirected = Object.values(statePathsFor(join(tmpdir(), 'hoa-paths-test', 'batch-lock.json')))
+    for (const d of defaults) expect(redirected).not.toContain(d)
+    // …and the repo defaults are themselves one consistent family, so a new
+    // state file added to statePathsFor gets its default for free.
+    expect(Object.values(statePathsFor(LOCK_PATH))).toEqual(expect.arrayContaining(defaults))
+  })
+})
 
 // ---------------------------------------------------------------------------
 describe('assessOwner (liveness = heartbeat AND real pid, never age alone)', () => {
@@ -189,6 +243,63 @@ describe('assessOwner (liveness = heartbeat AND real pid, never age alone)', () 
 })
 
 // ---------------------------------------------------------------------------
+// A context compaction mints a NEW session id while the lock keeps the old one.
+// The PROCESS is the stable identity — a compaction happens inside one
+// claude.exe — so ownership may resolve on it. What it may NEVER do is widen
+// into "any live process owns it": a genuinely second window has its own claude
+// process, and detecting it is what the singleton is for.
+describe('resolveOwnership — identity on the process, never on liveness alone', () => {
+  const lock = (over = {}) => ({ sessionId: 'old-id', claimedAt: NOW, pid: 4242, pidStartedAt: NOW - 3600_000, ...over })
+  const ours = { pid: 4242, startedAt: NOW - 3600_000 }
+
+  it('the SAME pid and start time under a NEW session id is ours, and asks to be restamped', () => {
+    const r = resolveOwnership({ lock: lock(), sessionId: 'new-id', ancestor: ours })
+    expect(r).toEqual({ mine: true, via: 'process', restamp: true })
+  })
+
+  it('a DIFFERENT pid is NOT ours — that is a second window, and it must stay visible', () => {
+    const r = resolveOwnership({ lock: lock(), sessionId: 'new-id', ancestor: { pid: 9999, startedAt: NOW - 3600_000 } })
+    expect(r.mine).toBe(false)
+    expect(r.via).toBe('other-process')
+  })
+
+  it('a STALE pidStartedAt (the pid was reused) is NOT ours', () => {
+    const r = resolveOwnership({ lock: lock(), sessionId: 'new-id', ancestor: { pid: 4242, startedAt: NOW - 5000 } })
+    expect(r.mine).toBe(false)
+    expect(r.via).toBe('pid-reused')
+  })
+
+  it('the matching id still decides first, and costs no walk', () => {
+    expect(resolveOwnership({ lock: lock(), sessionId: 'old-id', ancestor: null })).toEqual({
+      mine: true,
+      via: 'session-id',
+      restamp: false,
+    })
+  })
+
+  it('where the platform cannot tell us, the answer is NO — the id decides exactly as before', () => {
+    expect(resolveOwnership({ lock: lock(), sessionId: 'new-id', ancestor: null }).via).toBe('process-unknown')
+    expect(resolveOwnership({ lock: lock({ pid: null }), sessionId: 'new-id', ancestor: ours }).via).toBe(
+      'lock-without-pid',
+    )
+    expect(resolveOwnership({ lock: lock({ pidStartedAt: null }), sessionId: 'new-id', ancestor: ours }).via).toBe(
+      'start-time-unknown',
+    )
+    expect(resolveOwnership({ lock: lock(), sessionId: 'new-id', ancestor: { pid: 4242, startedAt: null } }).via).toBe(
+      'start-time-unknown',
+    )
+    expect(resolveOwnership({ lock: lock(), sessionId: '', ancestor: ours }).mine).toBe(false)
+    expect(resolveOwnership({ lock: null, sessionId: 'new-id', ancestor: ours }).mine).toBe(false)
+  })
+
+  it("a launcher's pending-spawn lock is never claimed this way", () => {
+    expect(resolveOwnership({ lock: lock({ kind: 'pending-spawn' }), sessionId: 'new-id', ancestor: ours }).via).toBe(
+      'pending-spawn',
+    )
+  })
+})
+
+// ---------------------------------------------------------------------------
 describe('wedgeNotifyDecision (point 388 (c): diagnose AND report, once per silence and stage)', () => {
   const lock = { sessionId: 'owner-1', pid: 4242, claimedAt: 1000 }
   const at = (ageMs) => {
@@ -285,8 +396,13 @@ describe('acquire (atomic test-and-set on the real filesystem)', () => {
     pidStartedAt: NOW,
     bootTime: 0,
     probePidFn: () => aliveProbe,
+    // No REAL ancestor walk unless a test is about ancestry: it is a PowerShell
+    // round trip, and an un-injected one costs ~0.7 s per temp directory.
+    findAncestorFn: () => null,
     ...over,
   })
+  /** heldByOtherLiveOwner with the ancestor walk stubbed out (see above). */
+  const heldByOther = (sid, over = {}) => heldByOtherLiveOwner(sid, { lockPath, findAncestorFn: () => null, ...over })
 
   it('free lock → acquired, and the lock names the session + pid', () => {
     expect(acquire('s1', opts())).toBe('acquired')
@@ -355,15 +471,46 @@ describe('acquire (atomic test-and-set on the real filesystem)', () => {
   it('markHandover: only the owner may hand over, and it does not touch the heartbeat', () => {
     acquire('s1', opts())
     const before = readOwnerLock(lockPath).claimedAt
-    expect(markHandover('s2', { lockPath })).toBe(false)
+    expect(markHandover('s2', { lockPath })).toMatchObject({ handed: false, reason: 'not-owner' })
     expect(readOwnerLock(lockPath).handedOver).toBeUndefined()
-    expect(markHandover('s1', { lockPath, point: 388, now: before + 1000 })).toBe(true)
+    expect(markHandover('s1', { lockPath, point: 388, now: before + 1000 })).toMatchObject({
+      handed: true,
+      reason: 'ok',
+    })
     const lock = readOwnerLock(lockPath)
     expect(lock.handedOver).toBe(true)
     expect(lock.handedOverAt).toBe(before + 1000)
     expect(lock.handoverPoint).toBe(388)
     expect(lock.claimedAt).toBe(before) // the heartbeat is NOT bumped
     expect(lock.sessionId).toBe('s1') // and it is not a release
+  })
+
+  // --- FINDING 1 (28.07.2026): the lock write that kept failing ---------------
+  // `EPERM: operation not permitted, rename batch-lock.json.tmp-9904 ->
+  // batch-lock.json` — three times at a boundary stop. It threw out of
+  // markHandover into the guard's fail-open catch, the marker had already been
+  // consumed and the batch was never passed on. markHandover must REPORT.
+  const eperm = () => {
+    throw Object.assign(new Error('EPERM: operation not permitted, rename'), { code: 'EPERM' })
+  }
+  const noWait = { delays: [1, 1], sleep: () => {}, write: () => {}, remove: () => {} }
+
+  it('a persistent EPERM on the rename is REPORTED, never thrown', () => {
+    acquire('s1', opts())
+    const res = markHandover('s1', { lockPath, point: 388, ...noWait, rename: eperm })
+    expect(res.handed).toBe(false)
+    expect(res.reason).toBe('write-failed')
+    expect(String(res.error?.code)).toBe('EPERM')
+    expect(readOwnerLock(lockPath).handedOver).toBeUndefined() // and the lock is untouched
+  })
+
+  it('markHandover is the ONE place the propagating write is turned into data', () => {
+    // Everywhere else the error must escape (point 340): a heartbeat that did not
+    // land may never read as one that did. Here the caller has to allow the stop
+    // AND tell the session the truth about it, so the throw is caught once.
+    acquire('s1', opts())
+    expect(() => heartbeat('s1', { lockPath, skipBackfill: true, ...noWait, rename: eperm })).toThrow(/EPERM/)
+    expect(markHandover('s1', { lockPath, point: 388, ...noWait, rename: eperm }).handed).toBe(false)
   })
 
   it('a heartbeat WITHDRAWS the handover — working is proof the session is not finished', () => {
@@ -386,6 +533,89 @@ describe('acquire (atomic test-and-set on the real filesystem)', () => {
     expect(withdrawHandover('s1', { lockPath })).toBe(false) // nothing left to withdraw
   })
 
+  // --- FINDING 2: what a taken boundary survives ------------------------------
+  it('closing work CARRIES the handover forward instead of withdrawing it', () => {
+    acquire('s1', opts())
+    const at = Date.now()
+    markHandover('s1', { lockPath, point: 388, now: at })
+    // The PostToolUse heartbeat after a dashboard republish: the session is
+    // finishing, not carrying on. `claimedAt <= handedOverAt` must still hold.
+    expect(heartbeat('s1', { lockPath, now: at + 5000, skipBackfill: true, preserveHandover: true })).toBe(true)
+    const lock = readOwnerLock(lockPath)
+    expect(lock.handedOver).toBe(true)
+    expect(lock.handedOverAt).toBe(at + 5000)
+    expect(lock.claimedAt).toBeLessThanOrEqual(lock.handedOverAt)
+    expect(assessOwner(lock, { now: at + 6000, bootTime: BOOT, probe: deadProbe }).reason).toBe('handed-over')
+  })
+
+  it('…and ordinary work still withdraws it — the safety invariant is untouched', () => {
+    acquire('s1', opts())
+    markHandover('s1', { lockPath, point: 388 })
+    heartbeat('s1', { lockPath, now: Date.now() + 5000, skipBackfill: true, preserveHandover: false })
+    expect(readOwnerLock(lockPath).handedOver).toBeUndefined()
+  })
+
+  it('touchHandover keeps the grace rolling through a long closing call, but throttles the write', () => {
+    acquire('s1', opts())
+    const at = Date.now()
+    markHandover('s1', { lockPath, point: 388, now: at })
+    expect(touchHandover('s1', { lockPath, now: at + 1000 })).toBe(false) // too soon to bother
+    expect(touchHandover('s1', { lockPath, now: at + 90_000 })).toBe(true)
+    expect(readOwnerLock(lockPath).handedOverAt).toBe(at + 90_000)
+    expect(touchHandover('s2', { lockPath, now: at + 200_000 })).toBe(false) // not the owner
+  })
+
+  it('touchHandover invents nothing: with no handover there is nothing to carry', () => {
+    acquire('s1', opts())
+    expect(touchHandover('s1', { lockPath })).toBe(false)
+    expect(readOwnerLock(lockPath).handedOver).toBeUndefined()
+  })
+
+  it('the withdrawal takes the MARKER with it — that is what ends a boundary now', () => {
+    const markerPath = join(dir, 'batch-boundary.json')
+    acquire('s1', opts())
+    markHandover('s1', { lockPath, point: 388 })
+    writeFileSync(markerPath, JSON.stringify({ v: 1, sessionId: 's1', point: 388, at: Date.now() }))
+    expect(withdrawHandover('s1', { lockPath })).toBe(true)
+    expect(existsSync(markerPath)).toBe(false)
+    // A marker recorded and then followed by real work goes too, handover or not.
+    writeFileSync(markerPath, JSON.stringify({ v: 1, sessionId: 's1', point: 388, at: Date.now() }))
+    expect(withdrawHandover('s1', { lockPath })).toBe(false) // no flag left to withdraw
+    expect(existsSync(markerPath)).toBe(false) // …and the marker is gone all the same
+  })
+
+  it('clearOwnBoundary retires only THIS session\'s marker at SessionEnd', () => {
+    const markerPath = join(dir, 'batch-boundary.json')
+    writeFileSync(markerPath, JSON.stringify({ v: 1, sessionId: 's1', point: 388, at: Date.now() }))
+    expect(clearOwnBoundary('s2', { boundaryPath: markerPath })).toBe(false)
+    expect(existsSync(markerPath)).toBe(true)
+    expect(clearOwnBoundary('s1', { boundaryPath: markerPath })).toBe(true)
+    expect(existsSync(markerPath)).toBe(false)
+    expect(clearOwnBoundary('s1', { boundaryPath: markerPath })).toBe(false) // nothing there
+  })
+
+  it('a STRANGER can neither withdraw the handover nor delete the marker', () => {
+    const markerPath = join(dir, 'batch-boundary.json')
+    acquire('s1', opts())
+    markHandover('s1', { lockPath, point: 388 })
+    writeFileSync(markerPath, JSON.stringify({ v: 1, sessionId: 's1', point: 388, at: Date.now() }))
+    expect(withdrawHandover('s2', { lockPath })).toBe(false)
+    expect(existsSync(markerPath)).toBe(true)
+    expect(readOwnerLock(lockPath).handedOver).toBe(true)
+  })
+
+  it('FINDING 3: the withdrawal is logged BESIDE the redirected lock, never in the repo', () => {
+    acquire('s1', opts())
+    markHandover('s1', { lockPath, point: 388 })
+    expect(withdrawHandover('s1', { lockPath })).toBe(true)
+    const log = join(dir, 'boundary.log')
+    expect(existsSync(log)).toBe(true)
+    expect(readFileSync(log, 'utf8')).toMatch(/WITHDRAWN point 388 by s1/)
+    // The line the live batch found in ITS log: it must be impossible for this
+    // suite to produce it there.
+    expect(resolve(log)).not.toBe(resolve(BOUNDARY_LOG_PATH))
+  })
+
   it('after the successor claims, the old session can neither heartbeat nor withdraw', () => {
     acquire('s1', opts())
     markHandover('s1', { lockPath, point: 388 })
@@ -398,16 +628,209 @@ describe('acquire (atomic test-and-set on the real filesystem)', () => {
     expect(acquire('s1', opts({ probePidFn: () => aliveProbe }))).toBe('held') // → stand-down
   })
 
-  it('heldByOtherLiveOwner: true for a foreign live lock, false for mine/free/dead', () => {
-    expect(heldByOtherLiveOwner('sX', { lockPath })).toBe(false) // free
+  it('a compacted session keeps its lock and RESTAMPS it, so the next check is cheap', () => {
+    acquire('before-compaction', opts())
+    const before = readOwnerLock(lockPath)
+    const sameProcess = () => ({ pid: before.pid, startedAt: before.pidStartedAt })
+    // Every ownership-gated guard would stand down on the new id alone.
+    expect(heldByOther('after-compaction', { processIdentity: false })).toBe(true)
+    // With the process as identity it is ours, and the lock says so afterwards.
+    expect(
+      heldByOther('after-compaction', {
+        findAncestorFn: sameProcess,
+        ancestorCachePath: join(dir, 'session-process.json'),
+      }),
+    ).toBe(false)
+    const lock = readOwnerLock(lockPath)
+    expect(lock.sessionId).toBe('after-compaction')
+    expect(lock.sessionIdBefore).toBe('before-compaction')
+    expect(lock.claimedAt).toBe(before.claimedAt) // the restamp is not work
+    expect(acquire('after-compaction', opts())).toBe('mine') // …and the id path suffices now
+  })
+
+  it('a SECOND WINDOW is still a second window — its own claude process gives it away', () => {
     acquire('s1', opts())
-    expect(heldByOtherLiveOwner('s1', { lockPath, probePidFn: () => aliveProbe })).toBe(false) // mine
-    expect(heldByOtherLiveOwner('s2', { lockPath, probePidFn: () => aliveProbe })).toBe(true) // foreign + live
+    const otherProcess = () => ({ pid: process.pid + 1, startedAt: NOW })
+    expect(
+      heldByOther('intruder', {
+        findAncestorFn: otherProcess,
+        probePidFn: () => aliveProbe,
+        ancestorCachePath: join(dir, 'session-process.json'),
+      }),
+    ).toBe(true)
+    expect(readOwnerLock(lockPath).sessionId).toBe('s1') // untouched
+    expect(acquire('intruder', opts({ findAncestorFn: otherProcess }))).toBe('held')
+  })
+
+  it('a CLAIMED pid buys no ownership — only an established ancestry does', () => {
+    // opts.pid is the identity a caller wants RECORDED. Reading it as proof of
+    // ancestry would let any second session name itself the owner: both sessions
+    // here pass the same pid, and the second must still be held off.
+    acquire('s1', opts())
+    expect(acquire('s2', opts())).toBe('held')
+    expect(readOwnerLock(lockPath).sessionId).toBe('s1')
+  })
+
+  it('ourClaudeProcess memoises the walk, and re-validates a cached pid', () => {
+    const ancestorCachePath = join(dir, 'session-process.json')
+    let walks = 0
+    const walk = () => {
+      walks++
+      return { pid: process.pid, startedAt: NOW }
+    }
+    expect(ourClaudeProcess('sid', { ancestorCachePath, findAncestorFn: walk })).toMatchObject({ pid: process.pid })
+    expect(ourClaudeProcess('sid', { ancestorCachePath, findAncestorFn: walk })).toMatchObject({ pid: process.pid })
+    expect(walks).toBe(1)
+    // A cached pid that is no longer alive is not trusted — walk again.
+    ourClaudeProcess('sid', { ancestorCachePath, findAncestorFn: walk, probePidFn: () => deadProbe })
+    expect(walks).toBe(2)
+    // A failed walk is remembered too, so it is not retried on every call…
+    let failed = 0
+    const fail = () => {
+      failed++
+      return null
+    }
+    expect(ourClaudeProcess('sid2', { ancestorCachePath, findAncestorFn: fail })).toBe(null)
+    expect(ourClaudeProcess('sid2', { ancestorCachePath, findAncestorFn: fail })).toBe(null)
+    expect(failed).toBe(1)
+    // …but not forever.
+    expect(ourClaudeProcess('sid2', { ancestorCachePath, findAncestorFn: fail, retryMs: 0 })).toBe(null)
+    expect(failed).toBe(2)
+  })
+
+  it('heldByOtherLiveOwner: true for a foreign live lock, false for mine/free/dead', () => {
+    expect(heldByOther('sX')).toBe(false) // free
+    acquire('s1', opts())
+    expect(heldByOther('s1', { probePidFn: () => aliveProbe })).toBe(false) // mine
+    expect(heldByOther('s2', { probePidFn: () => aliveProbe })).toBe(true) // foreign + live
     writeFileSync(
       lockPath,
       JSON.stringify({ sessionId: 'dead', claimedAt: Date.now() - 30 * 60_000, pid: 999999 }),
     )
-    expect(heldByOtherLiveOwner('s2', { lockPath, probePidFn: () => deadProbe })).toBe(false) // foreign but dead
+    expect(heldByOther('s2', { probePidFn: () => deadProbe })).toBe(false) // foreign but dead
+  })
+})
+
+// ---------------------------------------------------------------------------
+// POINT 340: the lock heartbeat must not lose its write to a transient rename
+// failure. EVIDENCE: fourteen orphaned `.claude/batch-lock.json.tmp-<pid>` files
+// accreted between 19:36 and 20:52 on 25.07.2026, one per failed write, while
+// `claimedAt` stayed at its OLD value and reported nothing — and liveness is
+// decided on exactly that timestamp.
+describe('the lock write: retried, atomic, propagating, and swept up after (point 340)', () => {
+  let dir, lockPath
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'hoa-lockwrite-'))
+    lockPath = join(dir, 'batch-lock.json')
+  })
+  afterEach(() => rmSync(dir, { recursive: true, force: true }))
+
+  const tmpLeftovers = () => readdirSync(dir).filter((f) => f.includes('.tmp-'))
+  const flakyRename = (failures) => {
+    let calls = 0
+    return {
+      calls: () => calls,
+      rename: (from, to) => {
+        calls++
+        if (calls <= failures) throw Object.assign(new Error('EPERM: sharing violation'), { code: 'EPERM' })
+        renameSync(from, to)
+      },
+    }
+  }
+
+  it('a rename that fails twice and then succeeds still writes the lock, and leaves NO tmp behind', () => {
+    acquire('s1', { lockPath, pid: 1, pidStartedAt: NOW, bootTime: 0, probePidFn: () => aliveProbe })
+    const flaky = flakyRename(2)
+    const at = Date.now() + 5000
+    expect(heartbeat('s1', { lockPath, now: at, skipBackfill: true, sleep: () => {}, rename: flaky.rename })).toBe(true)
+    expect(readOwnerLock(lockPath).claimedAt).toBe(at)
+    expect(flaky.calls()).toBe(3)
+    expect(tmpLeftovers()).toEqual([])
+  })
+
+  it('a rename that fails EVERY attempt throws and STILL leaves no tmp behind', () => {
+    acquire('s1', { lockPath, pid: 1, pidStartedAt: NOW, bootTime: 0, probePidFn: () => aliveProbe })
+    const before = readOwnerLock(lockPath).claimedAt
+    const flaky = flakyRename(99)
+    expect(() =>
+      heartbeat('s1', { lockPath, now: before + 5000, skipBackfill: true, sleep: () => {}, rename: flaky.rename }),
+    ).toThrow(/EPERM/)
+    expect(readOwnerLock(lockPath).claimedAt).toBe(before) // the old value, honestly unchanged
+    expect(tmpLeftovers()).toEqual([])
+  })
+
+  it('the retry is BOUNDED — no unbounded loop against a permanently held file', () => {
+    acquire('s1', { lockPath, pid: 1, pidStartedAt: NOW, bootTime: 0, probePidFn: () => aliveProbe })
+    const flaky = flakyRename(99)
+    expect(() => heartbeat('s1', { lockPath, skipBackfill: true, sleep: () => {}, rename: flaky.rename })).toThrow()
+    expect(flaky.calls()).toBe(WRITE_RETRY_DELAYS_MS.length + 1)
+  })
+
+  it('the write stays ATOMIC: a reader never sees a half-written lock', () => {
+    // The content only ever appears via a rename of a fully written temp file —
+    // no in-place truncate, which is what would let a concurrent reader catch it.
+    acquire('s1', { lockPath, pid: 1, pidStartedAt: NOW, bootTime: 0, probePidFn: () => aliveProbe })
+    const seen = []
+    heartbeat('s1', {
+      lockPath,
+      skipBackfill: true,
+      sleep: () => {},
+      rename: (from, to) => {
+        seen.push(JSON.parse(readFileSync(from, 'utf8')).sessionId) // complete before the swap
+        renameSync(from, to)
+      },
+    })
+    expect(seen).toEqual(['s1'])
+  })
+
+  // --- (b) the sweep ---------------------------------------------------------
+  describe('sweepableTmpFiles — only a dead pid AND a settled file', () => {
+    const NOW_T = 1_785_100_000_000
+    const dead = (pid) => ({ exists: pid !== 7777 })
+    const call = (entries) =>
+      sweepableTmpFiles({ entries, lockName: 'batch-lock.json', now: NOW_T, probe: dead, staleMs: 60_000 })
+
+    it('takes an orphan whose pid is dead and which has settled', () => {
+      expect(call([{ name: 'batch-lock.json.tmp-7777', mtimeMs: NOW_T - 600_000 }])).toEqual([
+        'batch-lock.json.tmp-7777',
+      ])
+    })
+
+    it('spares one whose pid is ALIVE — a process mid-write keeps its tmp', () => {
+      expect(call([{ name: 'batch-lock.json.tmp-4242', mtimeMs: NOW_T - 600_000 }])).toEqual([])
+    })
+
+    it('spares a JUST-WRITTEN tmp even from a dead pid — it may still be in flight', () => {
+      expect(call([{ name: 'batch-lock.json.tmp-7777', mtimeMs: NOW_T - 1000 }])).toEqual([])
+    })
+
+    it('recognises both name shapes and touches nothing else in the directory', () => {
+      const entries = [
+        { name: 'batch-lock.json.tmp-7777', mtimeMs: NOW_T - 600_000 },
+        { name: 'batch-lock.json.tmp-7777-3', mtimeMs: NOW_T - 600_000 }, // per-attempt name
+        { name: 'batch-lock.json', mtimeMs: NOW_T - 600_000 },
+        { name: 'boundary.log', mtimeMs: NOW_T - 600_000 },
+        { name: 'other-lock.json.tmp-7777', mtimeMs: NOW_T - 600_000 },
+        { name: 'batch-lock.json.tmp-notapid', mtimeMs: NOW_T - 600_000 },
+      ]
+      expect(call(entries)).toEqual(['batch-lock.json.tmp-7777', 'batch-lock.json.tmp-7777-3'])
+    })
+  })
+
+  it('acquire sweeps exactly the dead orphan out of a seeded directory', () => {
+    const old = Date.now() - 10 * 60_000
+    writeFileSync(join(dir, 'batch-lock.json.tmp-7777'), '{}') // dead writer
+    writeFileSync(join(dir, 'batch-lock.json.tmp-4242'), '{}') // live writer
+    utimesSync(join(dir, 'batch-lock.json.tmp-7777'), old / 1000, old / 1000)
+    utimesSync(join(dir, 'batch-lock.json.tmp-4242'), old / 1000, old / 1000)
+    acquire('s1', {
+      lockPath,
+      pid: 1,
+      pidStartedAt: NOW,
+      bootTime: 0,
+      probePidFn: (pid) => ({ exists: pid !== 7777, startedAt: null }),
+    })
+    expect(readdirSync(dir).sort()).toEqual(['batch-lock.json', 'batch-lock.json.tmp-4242'])
   })
 })
 

@@ -10,9 +10,10 @@
 // Recording is DELIBERATE and verified up front: the command refuses unless the
 // point is really closed in the work order and the launcher is really armed, so
 // the session learns at the boundary rather than at a blocked turn end.
-import { readFileSync, writeFileSync, renameSync, rmSync } from 'node:fs'
+import { readFileSync, rmSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { repoPath } from './repo-paths.mjs'
+import { writeJsonAtomic } from './atomic-write.mjs'
 import { readTasksOpen, TASKS_PATH, ARCHIVE_PATH } from './tasks-source.mjs'
 import { readOwnerLock } from './batch-singleton.mjs'
 import {
@@ -44,10 +45,10 @@ export function readBoundary(path = BOUNDARY_PATH) {
   }
 }
 
+/** Retries a Windows EPERM/EBUSY like every other state write here — the marker
+ *  is what authorises the stop, and a lost one costs the batch a whole session. */
 export function writeBoundary(marker, path = BOUNDARY_PATH) {
-  const tmp = `${path}.tmp-${process.pid}`
-  writeFileSync(tmp, JSON.stringify(marker, null, 2))
-  renameSync(tmp, path)
+  writeJsonAtomic(path, marker)
 }
 
 export function clearBoundary(path = BOUNDARY_PATH) {

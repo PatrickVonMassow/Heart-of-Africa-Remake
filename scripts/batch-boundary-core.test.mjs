@@ -16,6 +16,9 @@ import {
   classifyLauncherState,
   pointClosure,
   tickedPointsInDiff,
+  handoverSurvivesCall,
+  isClosingSetPath,
+  isClosingSetCommand,
 } from './batch-boundary-core.mjs'
 import { progressGuardDecision } from './batch-singleton.mjs'
 
@@ -232,6 +235,91 @@ describe('progressGuardDecision at a point boundary (the point-373 witnesses)', 
     for (const bad of [null, 0, -3, '387', 1.5]) {
       expect(progressGuardDecision({ ...base, boundaryDue: bad })).toBe('block-continue')
     }
+  })
+})
+
+// ---------------------------------------------------------------------------
+// LIVE FINDING 2 (28.07.2026): the boundary was withdrawn by the very work the
+// Stop chain demanded. `.claude/boundary.log` shows it to the second —
+// `HANDOVER point 378` at 08:56:12, `WITHDRAWN point 378` at 08:56:16 — and
+// three such rounds happened on the first live run. A boundary that only
+// survives a turn with nothing left to do is not a mechanism, because finding
+// something left to do is the Stop chain's whole purpose.
+describe('handoverSurvivesCall — closing work keeps the boundary, anything else ends it', () => {
+  const call = (over) => handoverSurvivesCall({ toolName: 'Bash', ...over })
+
+  it('keeps it for the board, the review ledger and the work order itself', () => {
+    for (const f of [
+      'C:\\repo\\.claude\\batch-dashboard.html',
+      '/tmp/scratch/hoa-batch-dashboard.html',
+      '.claude/dashboard-state.json',
+      '.claude/mechanism-reviews.jsonl',
+      'TASKS.md',
+      'docs/tasks-archive.md',
+    ]) {
+      expect(handoverSurvivesCall({ toolName: 'Edit', filePath: f })).toMatchObject({ survives: true })
+    }
+  })
+
+  it('keeps it for the commands the Stop guards demand', () => {
+    for (const c of [
+      'node scripts/dashboard-publish.mjs',
+      'node scripts/focus.mjs confirm',
+      'node scripts/mechanism-review.mjs --record --verdict ok',
+      'node scripts/batch-boundary.mjs 388',
+      'cd /repo && node scripts/board.mjs move 388 done',
+      'node "C:/repo/scripts/retro-refresh.mjs"',
+    ]) {
+      expect(call({ command: c })).toMatchObject({ survives: true })
+    }
+  })
+
+  it('ENDS it for ordinary work — the batch is being carried on', () => {
+    for (const c of ['npm test', 'git commit -m x', 'node scripts/point-brief.mjs 389', 'npm run build']) {
+      expect(call({ command: c }).survives).toBe(false)
+    }
+    expect(handoverSurvivesCall({ toolName: 'Write', filePath: 'src/world/world.ts' }).survives).toBe(false)
+  })
+
+  it('ONE non-closing segment ends it, however much closing work rides along', () => {
+    expect(call({ command: 'node scripts/dashboard-publish.mjs && git push' }).survives).toBe(false)
+    expect(call({ command: 'npm test; node scripts/focus.mjs confirm' }).survives).toBe(false)
+  })
+
+  it('a single & is a separator too — it hid real work behind a closing head', () => {
+    // Four-eyes review (Fable 5): with `&&` and `;` as the only separators this
+    // parsed as ONE segment, matched the closing head and KEPT the handover
+    // through `npm test` — a successor could then spawn beside a working session.
+    expect(call({ command: 'node scripts/board.mjs & npm test' }).survives).toBe(false)
+    expect(call({ command: 'npm test & node scripts/board.mjs' }).survives).toBe(false)
+    // …and a genuine chain of closing commands still survives it.
+    expect(call({ command: 'node scripts/focus.mjs confirm & node scripts/dashboard-publish.mjs' }).survives).toBe(true)
+  })
+
+  it('a segment that can run or write something unseen is not closing', () => {
+    for (const c of [
+      'node scripts/board.mjs $(rm -rf src)',
+      'node scripts/dashboard-publish.mjs `npm test`',
+      'node scripts/board.mjs > src/world.ts',
+      'node scripts/focus.mjs confirm < payload.txt',
+    ]) {
+      expect(call({ command: c }).survives).toBe(false)
+    }
+  })
+
+  it('is CONSERVATIVE where it cannot tell: unknown tool, no target, empty command', () => {
+    expect(handoverSurvivesCall({}).survives).toBe(false)
+    expect(handoverSurvivesCall({ toolName: 'Agent' }).survives).toBe(false)
+    expect(handoverSurvivesCall({ toolName: 'Bash', command: '   ' }).survives).toBe(false)
+    expect(call({ command: 'node' }).survives).toBe(false)
+    expect(handoverSurvivesCall({ toolName: 'Edit', filePath: '.claude/settings.json' }).survives).toBe(false)
+  })
+
+  it('a lookalike path outside the closing set does not pass', () => {
+    expect(isClosingSetPath('docs/tasks-archive.md.bak')).toBe(false)
+    expect(isClosingSetPath('my-tasks.md')).toBe(false)
+    expect(isClosingSetPath('')).toBe(false)
+    expect(isClosingSetCommand('node scripts/focus-something-else.mjs')).toBe(false)
   })
 })
 

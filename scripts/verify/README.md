@@ -205,6 +205,43 @@ This is the half that acts BEFORE a run; the section below is the half that read
 a red AFTER it, and they share their vocabulary (`load signature`, "judge a red
 only on a quiet machine") because they describe one phenomenon from two ends.
 
+### The PUSH GATE asks the same question (point 389)
+
+The pre-push gate predates this rule and used to consult nothing, so it measured
+the machine as much as the code: on 28.07.2026 `npm run test:unit` passed standing
+alone, three times, while the same command inside `pre-push-gate.mjs` went red and
+refused the push, on a machine the probe called "UNDER LOAD, CPU 45 % across 16
+cores" because two delegated agents were working.
+
+It now applies the asymmetry the suites apply. On a RED it reads the level through
+this probe; if the machine is not quiet it re-runs THAT step ONCE and uses the
+second result. Nothing else moves — a red on a quiet machine still blocks
+immediately, a step that fails twice blocks whatever the machine says, and there
+is no skip, no warn-instead-of-block and no bypass. Every retry PRINTS what is
+being re-run and why, and the verdict line carries it too (`unit was re-run once
+after a red taken under load` / `unit failed TWICE — the load was not the cause`),
+because a silent retry would hide a real intermittent defect. The decision is pure
+in `pre-push-gate-core.mjs` and pinned in `pre-push-gate-core.test.mjs`.
+
+**Where the reading is taken, and what it costs.** The probe is a SNAPSHOT, and a
+red produced while a neighbour was building can be followed a second later by a
+quiet reading. So on the FULL gate a reading is also taken BEFORE the first step
+and the WORSE of the two decides (`worseLoad`) — a machine seen busy at either end
+was not quiet while the step ran. On the LIGHT gate it is not: measured
+28.07.2026, the probe costs 2.6 s while `lint` runs in 0.5 s and `audit` in 1.6 s,
+so a pre-reading would more than double a feature-branch push (agents push per
+commit) to catch a spike that cannot hide inside a half-second run. `build` and
+`unit` are the minute-long steps a whole storm fits inside, and there the same
+2.6 s is noise. A green push pays for no probe at all on the light gate, and one
+on the full gate; the re-run itself is timed and printed, so its cost is measured
+rather than assumed. An unreadable probe reports `unknown`, which buys a re-run —
+never quiet, never a certified red. A level the wrapper does not recognise is said
+out LOUD and treated the same way: a silently drifted `--json` contract would turn
+"a quiet red blocks immediately" into "every red buys a retry" on every machine
+with nothing red to notice it, so the shape is pinned by a test that runs the CLI
+with `VERIFY_LOAD_FORCE=busy` (asynchronously — a `spawnSync` inside a vitest
+worker starves its own `onTaskUpdate` RPC and reddens the whole run).
+
 ## Triaging a RED run (point 294)
 
 A red is now read, not asserted. Two signals, both decided in the pure module
