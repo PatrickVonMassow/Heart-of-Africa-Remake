@@ -229,6 +229,77 @@ And for the first time `acquire()` reaps a lock whose owner can still write: a
 delayed `heartbeat()` rename can clobber a freshly created pending-spawn lock, a
 millisecond-wide race that both traced interleavings self-heal (finding 3).
 
+### Waiting is not idling — declaring work that is in flight (fifth live finding)
+
+The guard can see the work order, the lock and the launcher. It could not see work
+the session had **handed out**. On 28.07.2026, with three delegated agents
+building and a browser suite occupying the machine, every attempt to end the turn
+was met with *"DO NOT STOP THE BATCH — continue the NEXT queue item now"*, eight
+times in a row. The queue item could not be continued (the pool was at its cap and
+the next item needed the machine the suite was using) and the turn could not end,
+so the session wrote eight replies that reached nobody. Its own text names polling
+as the sanctioned way to wait, but nothing a polling session does satisfies it.
+
+So the session may now **declare** what it is waiting on, in the shape
+`prep-guard --prepped` already uses:
+
+```
+node scripts/batch-in-flight.mjs --waiting-on "<what>" \
+     [--pid <alive, and the same process>] [--branch <committed to recently>] \
+     [--worktree <git-active recently>] [--log <still being written to>]
+node scripts/batch-in-flight.mjs --status    # what the Stop hook would decide
+node scripts/batch-in-flight.mjs --clear     # the wait is over
+```
+
+`batch-progress-guard` then returns `allow-in-flight` instead of
+`block-continue`/`block-take-boundary`, and **says in the allow what it is waiting
+on** (and in `.claude/boundary.log` as a `WAIT` line), so a later reader of the
+transcript can see why the turn ended. It does not touch the lock: a waiting
+session is still the working session, the launcher keeps seeing a live owner and
+no successor is spawned beside it.
+
+It is deliberately not a way off the block — the five-and-a-half-hour standstill
+is what that block exists for. Four properties keep an abandoned wait from
+becoming an idle night:
+
+| property | how |
+| --- | --- |
+| **Evidence, not assertion — and RECENCY, never existence** | Every item is answered by a probe, and every answer must be FRESH. A `pid` must be alive AND have started when the declaration says (`probePid`, compared with `PID_START_TOLERANCE_MS` the way `resolveOwnership` compares the lock's — a reused pid is a stranger). A `branch` counts only while its tip commit is younger than `WORK_FRESH_MS` (15 min); a `worktree` only while git activity in it is (its gitdir's index/HEAD/COMMIT_EDITMSG and the directory's own mtime); a `log` only while it is younger than `LOG_FRESH_MS` (15 min). Windows are overridable per item at the format level (`freshMs`; the CLI has no flag for it). An unknown kind never passes. Declaring is verified up front, so a typo fails at the command, not at a turn end |
+| **All of it, not some** | One finished agent ends the declaration. That is the point: the finished agent's work is now the session's next action, and re-declaring the rest is one command |
+| **It expires** | `IN_FLIGHT_MAX_AGE_MS` (45 min, `HOA_IN_FLIGHT_MAX_MIN` to tune). Past it the guard blocks exactly as before, whatever the declaration says and however live its evidence looks |
+| **Ownership, by the lock's own rules** | Honoured only for the session that holds the batch lock **and** wrote the declaration — resolved by `resolveOwnership`, the same function the lock uses, so a context compaction that mints a new session id keeps it while a genuinely second window fails it. No second notion of liveness was invented for this |
+
+What it never overrides: a parallel-session alert (remediation cannot wait on an
+agent), an unarmed launcher, or a boundary already taken. A due boundary it does
+pass — ending mid-flight would throw the agents' work away — and the allow says so,
+naming the point still to be taken once the wait is over.
+
+**Why recency and not existence** (four-eyes review, 28.07.2026 — the one real
+"yes" to *can this switch the block off*): this repository carries ~94 `feat/*`
+and `worktree-agent-*` branches, many days old, and the guard's block message
+steers sessions to exactly the `--branch`/`--worktree` kinds. On bare existence,
+naming any of them would have passed the up-front check and every re-proving, held
+the full 45 minutes and been renewable with one command — the weak kinds were the
+common path, not a corner case. Judged on recency, a quarter of an hour without a
+commit or a git operation means the agent is finished, stuck or gone, and in all
+three cases the session's next action is to look rather than to keep waiting.
+
+**The residual, stated rather than left in nobody's head.** Expiry is measured
+from the declaration's timestamp and only ever evaluated when the Stop hook next
+runs, so the 45 minutes bound how long a declaration is HONOURED, not how long a
+session may idle: a session that stops on `allow-in-flight` and is never
+re-invoked sits on the lock exactly as the night of 28.07.2026 did. An honest wait
+is re-invoked by the harness when its work lands, so with recency-based evidence
+this is narrow — but it is not zero, and the mechanism that would close it
+(detecting the wedge from outside) is a separate one with its own risk, not built
+here. Today's backstop is the launcher's wedge notification (`WEDGE_NOTIFY_MS`).
+
+Decision logic: `scripts/batch-in-flight-core.mjs` (pure, dependency-injected,
+Vitest-covered in `scripts/batch-in-flight-core.test.mjs`). IO and probes:
+`scripts/batch-in-flight.mjs`. The marker is `.claude/batch-in-flight.json`,
+derived from the caller's lock path via `statePathsFor`, so a redirected lock
+redirects it too (finding 3).
+
 ### Observing one handover end to end
 
 Every part of this worked on the night it failed, so the acceptance is not a green

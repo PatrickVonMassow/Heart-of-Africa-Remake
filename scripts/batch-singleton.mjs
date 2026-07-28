@@ -103,6 +103,7 @@ export function statePathsFor(lockPath) {
     lockPath,
     boundaryLogPath: join(dir, 'boundary.log'),
     boundaryPath: join(dir, 'batch-boundary.json'),
+    inFlightPath: join(dir, 'batch-in-flight.json'),
     sessionsSeenPath: join(dir, 'sessions-seen.json'),
     activityPath: join(dir, 'session-activity.json'),
     alertPath: join(dir, 'parallel-alert.json'),
@@ -119,6 +120,7 @@ export const PARALLEL_ALERT_PATH = DEFAULT_PATHS.alertPath
 export const DOCTOR_STATE_PATH = DEFAULT_PATHS.doctorStatePath
 export const BOUNDARY_LOG_PATH = DEFAULT_PATHS.boundaryLogPath
 export const BOUNDARY_MARKER_PATH = DEFAULT_PATHS.boundaryPath
+export const IN_FLIGHT_PATH = DEFAULT_PATHS.inFlightPath
 export const ANCESTOR_CACHE_PATH = DEFAULT_PATHS.ancestorCachePath
 
 // --- Small IO helpers ----------------------------------------------------------
@@ -388,12 +390,17 @@ export function classifyParallel({ sessionsSeen, activity, ownerSid, now }) {
  *   'block-take-boundary' — owner, a point closed IN THIS SESSION and no marker:
  *                        the boundary is DUE and must be TAKEN, not offered
  *                        (point 388) — block, naming the one command
+ *   'allow-in-flight'  — owner WAITING on work it has declared and that is
+ *                        provably still running (point 388, fifth live finding):
+ *                        the turn may end, the lock stays held, nothing is handed
+ *                        over. The session is waiting, not idling
  *   'block-continue'   — owner + open points → keep working
  *   'block-format'     — TASKS.md unparseable → warn, never read as complete
  *
  * `boundary`/`launcher` come from scripts/batch-boundary-core.mjs
- * (`assessBoundary`, `classifyLauncherState`); omitting them keeps the old
- * behaviour exactly, which is what every non-boundary turn end wants.
+ * (`assessBoundary`, `classifyLauncherState`); `inFlight` from
+ * scripts/batch-in-flight-core.mjs (`assessInFlight`). Omitting any of them keeps
+ * the old behaviour exactly, which is what every ordinary turn end wants.
  */
 export function progressGuardDecision({
   sid,
@@ -405,6 +412,7 @@ export function progressGuardDecision({
   boundary = null, // { valid, point, reason } | null
   launcher = 'unknown', // 'armed' | 'disabled' | 'unknown'
   boundaryDue = null, // point number closed in THIS session without a marker | null
+  inFlight = false, // declared work PROVEN still running (assessInFlight().live)
 }) {
   if (paused) return 'allow'
   if (formatSuspect) return 'block-format'
@@ -425,6 +433,19 @@ export function progressGuardDecision({
   // never taken up, and the session simply sat there holding the lock. Both
   // verdicts block, so a false positive costs a wrong message and nothing more —
   // but a true one now names the single command that hands the batch over.
+  // WAITING IS NOT IDLING (fifth live finding). The two blocks below both tell
+  // the session to do something it may be unable to do — continue the next queue
+  // item while the agent pool is at its cap, or take a boundary while delegated
+  // agents are still building (ending would throw their work away). A DECLARED
+  // wait whose evidence a probe still confirms therefore passes both, and only
+  // those two: a parallel-session alert still blocks (remediation cannot wait),
+  // an unarmed launcher still blocks, and a VALID boundary still hands over —
+  // there the session already decided it is finished.
+  //
+  // The declaration cannot become a way to switch the block off: it is bounded by
+  // its own expiry and by evidence that has to keep checking out (assessInFlight),
+  // and the lock stays HELD, so no successor is spawned beside a waiting session.
+  if (inFlight === true) return 'allow-in-flight'
   if (Number.isInteger(boundaryDue) && boundaryDue > 0) return 'block-take-boundary'
   return 'block-continue'
 }
