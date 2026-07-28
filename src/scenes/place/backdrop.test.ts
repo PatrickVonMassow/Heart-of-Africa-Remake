@@ -14,18 +14,27 @@ import {
   backdropTaper,
   discHorizonY,
   panoramaStandY,
+  groundDiscSegments,
   BACKDROP_DISC_OVERLAP,
+  BACKDROP_INNER_OFFSET,
   BACKDROP_MAX_SLOPE,
   BACKDROP_OUTER,
   BACKDROP_RINGS,
   BACKDROP_SEGS,
+  GROUND_DISC_OVERHANG,
 } from './backdrop'
 import { createBackdropMaterial } from './backdropMaterial'
+import { GIZA_SITE_RADIUS } from './gizaSite'
+import { PLACE_RADIUS } from './layout'
 import { PLACES, placeById } from '../../world/geo'
 import { sampleTerrain } from '../../world/terrain'
 import { setupGeodata } from '../../test/geodata'
 
 const SEED = 42
+
+/** The widest disc the game mounts: the open-plain Giza site (point 390). The
+ *  point-381 seam rules are swept at it like every other radius. */
+const GIZA_DISC_EDGE = GIZA_SITE_RADIUS + GROUND_DISC_OVERHANG
 
 beforeAll(async () => {
   await setupGeodata()
@@ -164,7 +173,7 @@ describe('backdrop heightfield (design.md §2.5)', () => {
       ['mountain range', (r: number) => Math.max(-20, r * 0.5 - 60)],
     ] as const
     const openings: string[] = []
-    for (const discRadius of [28, 40, 48, 60, 74, 96]) {
+    for (const discRadius of [28, 40, 48, 60, 74, 96, GIZA_DISC_EDGE]) {
       const r0 = discRadius - BACKDROP_DISC_OVERLAP
       const discEdge = discRadius
       for (const eye of [1.2, 1.5, 1.9]) {
@@ -187,7 +196,7 @@ describe('backdrop heightfield (design.md §2.5)', () => {
     // the first row that emerges past its edge must not stand proud of the
     // plane the player walks on — a lit top with an unlit face is what an open
     // rim looks like from inside.
-    for (const discRadius of [28, 42, 62, 74]) {
+    for (const discRadius of [28, 42, 62, 74, GIZA_DISC_EDGE]) {
       const r0 = discRadius - BACKDROP_DISC_OVERLAP
       for (const relief of [-30, -5, 0, 3, 40]) {
         // Hidden under the disc: strictly below its plane all the way to the edge.
@@ -203,7 +212,7 @@ describe('backdrop heightfield (design.md §2.5)', () => {
   })
 
   it('pins a mesh ring on the ground-disc edge so the join is not interpolated (point 381)', () => {
-    for (const r0 of [40, 54, 72]) {
+    for (const r0 of [40, 54, 72, GIZA_DISC_EDGE - BACKDROP_DISC_OVERLAP]) {
       const edge = r0 + BACKDROP_DISC_OVERLAP
       expect(backdropRingRadius(0, r0)).toBe(r0)
       expect(backdropRingRadius(1, r0)).toBe(edge)
@@ -236,8 +245,9 @@ describe('backdrop heightfield (design.md §2.5)', () => {
     // centre and in 3–241/320 from the far rim at EVERY one of them.
     const EYE = 1.5
     for (const place of PLACES) {
-      const radius = place.kind === 'port' ? 30 + (place.size ?? 1) * 6 : place.kind === 'monument' ? 60 : 28
-      const r0 = radius + 12
+      const radius =
+        place.kind === 'port' ? 30 + (place.size ?? 1) * 6 : place.kind === 'monument' ? GIZA_SITE_RADIUS : PLACE_RADIUS
+      const r0 = radius + BACKDROP_INNER_OFFSET
       const discEdge = r0 + BACKDROP_DISC_OVERLAP
       const centerH = sampleTerrain(place.lat, place.lon, SEED).height
       let open = 0
@@ -259,6 +269,21 @@ describe('backdrop heightfield (design.md §2.5)', () => {
       }
       expect({ place: place.id, open }).toEqual({ place: place.id, open: 0 })
     }
+  })
+
+  it('keeps the ground line curved however wide the disc gets (point 390)', () => {
+    // The disc's chord must not grow with the disc: the widened Giza plate puts
+    // the player 14 m from an edge that a fixed 192-gon would have coarsened
+    // from 2.4 m to 3.7 m chords — the straight ground line of point 381.
+    const chord = (edge: number) => (2 * Math.PI * edge) / groundDiscSegments(edge)
+    const reference = chord(74)
+    for (const edge of [42, 60, 74, 96, GIZA_DISC_EDGE, 300]) {
+      expect(chord(edge)).toBeLessThanOrEqual(reference + 1e-9)
+    }
+    // Small discs keep the historic count exactly — nothing else changes shape.
+    expect(groundDiscSegments(42)).toBe(192)
+    expect(groundDiscSegments(74)).toBe(192)
+    expect(groundDiscSegments(GIZA_DISC_EDGE)).toBeGreaterThan(192)
   })
 
   it('holds the raised sampling resolution (no stepped ridge silhouette)', () => {

@@ -40,11 +40,15 @@ import { placeById, type RegionId } from '../../world/geo'
 import { sampleTerrain } from '../../world/terrain'
 import {
   BACKDROP_HEIGHT,
+  BACKDROP_INNER_OFFSET,
   BACKDROP_RINGS,
   BACKDROP_SCALE,
   BACKDROP_SEGS,
+  GROUND_DISC_OVERHANG,
+  PANORAMA_RADIUS,
   backdropRingRadius,
   backdropSurfaceY,
+  groundDiscSegments,
   panoramaStandY,
 } from './backdrop'
 import { createBackdropMaterial } from './backdropMaterial'
@@ -71,7 +75,7 @@ import {
 import { REGION_PLACE_STYLES, type RegionPlaceStyle } from './regionStyles'
 import { PlaceLife } from './PlaceLife'
 import { resolveMove } from './collision'
-import { buildLayout, isOnLane, nearestActionable, PLACE_RADIUS, type Interactive, type PathDef, type DwellingDef, type FenceDef } from './layout'
+import { buildLayout, isOnLane, nearestActionable, PLACE_RADIUS, SPAWN_INSET, type Interactive, type PathDef, type DwellingDef, type FenceDef } from './layout'
 import { getPanoramaCapture } from '../travel/panoramaCapture'
 import {
   silhouetteScale,
@@ -95,10 +99,6 @@ import { getStrings, useStrings } from '../../i18n'
 
 const PLAYER_RADIUS = 0.35 // collision radius of player and inhabitants
 const EYE_HEIGHT = 1.5 // first-person camera height in meters
-/** Radial segments of the walkable ground disc: enough that its ground line
- *  reads as a curve, not as the straight chords of point 381 (at the largest
- *  disc, Giza's 74 m, a chord is 2.4 m and its inset 0.01 m). */
-const GROUND_DISC_SEGS = 192
 
 /** Sun direction shared by the sky dome disc and the shadow light. */
 const SUN_DIR: [number, number, number] = [0.52, 0.68, 0.34]
@@ -1470,9 +1470,9 @@ function TableMountainSkyline({ placeId }: { placeId: string }) {
  * dressing appear where they actually lie, direction-true. Fades into the
  * sky at its top and into the backdrop ground at its bottom; without a
  * capture (snapshot load, ferry arrival) the geometry backdrop alone stands.
+ * Its radius lives in ./backdrop — the walkable disc is sized against it
+ * (point 390), so the two must read from one constant.
  */
-const PANORAMA_RADIUS = 200
-
 function TravelPanorama({ placeId }: { placeId: string }) {
   const seed = useGame((s) => s.seed)
   const capture = useFreshPanoramaCapture(placeId, seed)
@@ -1924,7 +1924,7 @@ export function PlaceScene() {
 
   // Reset position when the place changes (just inside the southern edge).
   useEffect(() => {
-    player.current = { x: 0, z: (layout?.radius ?? PLACE_RADIUS) - 10, yaw: 0 }
+    player.current = { x: 0, z: layout?.spawnZ ?? PLACE_RADIUS - SPAWN_INSET, yaw: 0 }
     walk.current = { velF: 0, velS: 0, phase: 0, roll: 0 }
     // Seed the shared position for the town-plan map marker (point 89).
     placePlayerPosition.x = player.current.x
@@ -2324,19 +2324,20 @@ export function PlaceScene() {
       />
 
       {/* Real-surroundings panorama behind the settlement (design.md §2) */}
-      <LandscapeBackdrop lat={place.lat} lon={place.lon} seed={seed} innerRadius={layout.radius + 12} />
+      <LandscapeBackdrop lat={place.lat} lon={place.lon} seed={seed} innerRadius={layout.radius + BACKDROP_INNER_OFFSET} />
       <TravelPanorama placeId={place.id} />
       <TableMountainSkyline placeId={place.id} />
       <GizaSkyline placeId={place.id} />
-      <PanoramaWildlife region={place.region} placeId={place.id} seed={seed} innerRadius={layout.radius + 12} lat={place.lat} lon={place.lon} skyHorizon={sky.horizon} />
+      <PanoramaWildlife region={place.region} placeId={place.id} seed={seed} innerRadius={layout.radius + BACKDROP_INNER_OFFSET} lat={place.lat} lon={place.lon} skyHorizon={sky.horizon} />
 
-      {/* Ground disc with procedural mottling. GROUND_DISC_SEGS, not 48: a
+      {/* Ground disc with procedural mottling. Many segments, not 48: a
           48-gon around a 74 m plateau puts 9.7 m straight chords on the ground
           line, and from a few metres away that reads as the hard straight edge
           of point 381 — while its 0.16 m inset also uncovered the backdrop's
-          tucked rim ramp as a scalloped hairline. */}
+          tucked rim ramp as a scalloped hairline. The count follows the disc's
+          own edge (point 390 widened Giza's), so the chord never grows. */}
       <mesh name="ground-disc" rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow material={mats.ground}>
-        <circleGeometry args={[layout.radius + 14, GROUND_DISC_SEGS]} />
+        <circleGeometry args={[layout.radius + GROUND_DISC_OVERHANG, groundDiscSegments(layout.radius + GROUND_DISC_OVERHANG)]} />
       </mesh>
 
       {layout.interactives.map((it, i) => {
