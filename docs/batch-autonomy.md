@@ -423,11 +423,18 @@ Two consequences that are easy to miss and were both built:
   excludes the honoured claimant from `detectParallel`. A session that announced
   itself through the sanctioned channel is not the covert second driver the
   detector was written for; an unannounced one is still flagged exactly as before.
-- **A live claim RESERVES the batch.** `batch-autostart` skips its tick and
-  `batch-resume-hook` does not acquire while one is pending, so the launcher
-  cannot spawn a headless successor into the gap between the release and the
-  claimant's next check and take the batch straight back off the user. Both stand
-  downs are bounded by the same expiry, so a claim can never strand the batch.
+- **A live claim RESERVES the batch.** Once the owner lets go, the lock lies FREE
+  until the claiming window runs its next command, and ANY window that reaches an
+  acquire in that gap would take it. So all three doors ask
+  `reservationDecision` first: `batch-autostart` skips its tick,
+  `batch-resume-hook` does not acquire, and the owner's own Stop guard
+  (`batch-progress-guard`) does not re-acquire. Without that third one a stood-down
+  window would take the freed lock at its next turn end, see the claim, judge the
+  moment clean and release again — repeated "handed back" messages and RELEASED
+  spam in `boundary.log`. The claimant's OWN claim reserves nothing against itself
+  (`assessClaim` answers `mine`, never `honour`), so the window the batch is
+  waiting for still acquires; and all three stand-downs are bounded by the same
+  expiry, so a claim can never strand the batch.
 
 Where two verdicts are close the mechanism chooses NOT to release: the owner
 keeping the batch for one more turn is a nuisance, a merge cut in half is a repair

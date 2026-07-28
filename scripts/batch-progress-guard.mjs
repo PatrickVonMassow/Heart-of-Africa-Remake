@@ -65,8 +65,8 @@ import { gatherBoundary } from './batch-boundary.mjs'
 import { LAUNCHER_TASK_NAME } from './batch-boundary-core.mjs'
 import { gatherInFlight } from './batch-in-flight.mjs'
 import { describeInFlight } from './batch-in-flight-core.mjs'
-import { gatherClaim, gitOperationInProgress, markClaimReleased } from './batch-claim.mjs'
-import { describeClaim, releaseDecision } from './batch-claim-core.mjs'
+import { clearClaim, gatherClaim, gitOperationInProgress, markClaimReleased } from './batch-claim.mjs'
+import { describeClaim, releaseDecision, reservationDecision } from './batch-claim-core.mjs'
 import { isPaused } from './batch-lock.mjs'
 
 const TASKS = fileURLToPath(new URL('../TASKS.md', import.meta.url))
@@ -130,9 +130,27 @@ try {
 
   // Ownership through the atomic acquire ONLY (it refuses while a live other
   // owner exists, resolves races to one winner, and refreshes when it is ours).
+  //
+  // A RESERVATION COMES FIRST (point 395), the same one the launcher and the
+  // resume hook honour. With the lock FREE, an honoured claim belongs to the
+  // window the user is sitting at, and a THIRD window must not acquire into that
+  // gap: it would take the lock the owner has just released, see the claim, judge
+  // the moment clean and release again — churn, a repeated "handed back" message
+  // and RELEASED spam in the boundary log. The claimant's own claim never reserves
+  // against itself (assessClaim answers `mine`, not `honour`), so the window the
+  // batch is waiting for still acquires here. Only asked when there is no lock to
+  // acquire against, and free when no claim file exists.
   let ownership = 'none'
   if (sid && !paused && open.length > 0) {
-    ownership = acquire(sid) // 'acquired' | 'mine' | 'held' | 'lost-race'
+    let reserved = false
+    if (!readOwnerLock()) {
+      try {
+        reserved = !reservationDecision({ assessment: gatherClaim(sid) }).acquire
+      } catch {
+        /* an unreadable claim reserves nothing */
+      }
+    }
+    if (!reserved) ownership = acquire(sid) // 'acquired' | 'mine' | 'held' | 'lost-race'
   }
 
   // A pending CLAIM (point 395) — gathered before the parallel detector, because
@@ -142,10 +160,15 @@ try {
   // announced itself through the sanctioned channel is not the covert second
   // driver the detector was written for. Cheap: with no claim file on disk this
   // returns before any probe runs.
-  let claimInfo = { claim: null, honour: false, reason: 'not-gathered', claimantSid: null }
+  let claimInfo = { claim: null, honour: false, reason: 'not-gathered', claimantSid: null, mine: false }
   if (ownership === 'mine' || ownership === 'acquired') {
     try {
       claimInfo = gatherClaim(sid, { ownerLock: readOwnerLock() })
+      // The claim has done its job the moment its OWN window owns the batch — the
+      // same line the resume hook runs at its acquire. Left lying about, it would
+      // keep the launcher standing down for the rest of its expiry while the
+      // window it was written for is already working.
+      if (claimInfo.mine) clearClaim()
     } catch {
       /* an unreadable claim is simply no claim → nothing changes */
     }

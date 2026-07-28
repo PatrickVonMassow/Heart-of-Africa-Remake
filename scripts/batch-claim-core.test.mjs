@@ -27,6 +27,7 @@ import {
   claimWriteDecision,
   describeClaim,
   releaseDecision,
+  reservationDecision,
 } from './batch-claim-core.mjs'
 import {
   acquire,
@@ -232,6 +233,84 @@ describe('releaseDecision — the owner releases only at a CLEAN moment', () => 
       reason: 'expired',
     })
   })
+})
+
+// ---------------------------------------------------------------------------
+// The counterpart to the release, and the reason it does not turn into churn.
+// Once the owner lets go, the lock lies FREE until the claiming window runs its
+// next command — and any other window that reaches an acquire in that gap takes
+// it, sees the claim that freed it, judges the moment clean and releases again:
+// repeated "handed back" messages and RELEASED spam in the boundary log. Every
+// site that acquires asks this first.
+describe('reservationDecision — a free lock still belongs to the window that claimed it', () => {
+  const honoured = { honour: true, mine: false, reason: 'honour', claimantSid: CLAIMANT, ageMs: 60_000 }
+
+  it('reserves the free lock against a THIRD window while a claim is honoured', () => {
+    expect(reservationDecision({ assessment: honoured })).toEqual({
+      acquire: false,
+      reason: 'reserved',
+      claimantSid: CLAIMANT,
+    })
+  })
+
+  it('lets the CLAIMANT ITSELF acquire — freeing the lock for it is the whole point', () => {
+    // assessClaim answers `mine` (never `honour`) for one's own claim, so the
+    // window the batch is waiting for passes the very gate that holds others off.
+    const own = assessClaim({
+      claim: claimOf(),
+      sid: CLAIMANT,
+      ancestor: { pid: CLAIMANT_PID, startedAt: CLAIMANT_STARTED },
+      now: NOW,
+      probePid: aliveClaimant,
+    })
+    expect(own).toMatchObject({ honour: false, mine: true })
+    expect(reservationDecision({ assessment: own })).toMatchObject({ acquire: true, reason: 'own-claim' })
+  })
+
+  it('reserves NOTHING without a claim, or on one that no longer holds', () => {
+    expect(reservationDecision({})).toMatchObject({ acquire: true, reason: 'no-claim' })
+    expect(reservationDecision({ assessment: null }).acquire).toBe(true)
+    for (const reason of ['expired', 'claimant-dead', 'claimant-pid-reused', 'malformed', 'clock-skew']) {
+      expect(reservationDecision({ assessment: { honour: false, reason } })).toMatchObject({ acquire: true, reason })
+    }
+  })
+
+  it('never reads a stray value as a reservation', () => {
+    for (const v of ['yes', 1, {}, []]) {
+      expect(reservationDecision({ assessment: { honour: v } }).acquire).toBe(true)
+    }
+  })
+
+  it('the three doors ask ONE question: the guard, the resume hook and the launcher', () => {
+    // The gate the wrappers run, spelled out on the real assessment they compute —
+    // an honoured foreign claim closes every door, the claimant's own closes none.
+    const foreign = gatherAssessment(OWNER)
+    const own = gatherAssessment(CLAIMANT)
+    expect(reservationDecision({ assessment: foreign }).acquire).toBe(false)
+    expect(foreign.honour).toBe(true) // what batch-autostart reads at its spawn gate
+    expect(reservationDecision({ assessment: own }).acquire).toBe(true)
+    expect(own.honour).toBe(false)
+  })
+
+  /** What the wrappers gather: a live claim on disk, judged by the asking session,
+   *  through the real path (temp lock dir, real pid, real probe). The asking
+   *  session's own process identity is injected rather than walked — the walk is a
+   *  PowerShell round trip and the claimant here is this very process. */
+  function gatherAssessment(askingSid) {
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-claim-reserve-'))
+    const lockPath = join(dir, 'batch-lock.json')
+    try {
+      const self = probePid(process.pid)
+      writeClaim(
+        { v: 1, sessionId: CLAIMANT, pid: process.pid, pidStartedAt: self.startedAt, at: Date.now() },
+        statePathsFor(lockPath).claimPath,
+      )
+      const ancestor = askingSid === CLAIMANT ? { pid: process.pid, startedAt: self.startedAt } : { pid: -1, startedAt: 0 }
+      return gatherClaim(askingSid, { lockPath, ownerLock: null, ancestor })
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  }
 })
 
 // ---------------------------------------------------------------------------

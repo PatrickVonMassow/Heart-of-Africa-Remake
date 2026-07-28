@@ -167,6 +167,31 @@ export function releaseDecision({ assessment, inFlightLive = false, gitOperation
 }
 
 /**
+ * MAY THIS SESSION TAKE THE FREE LOCK, OR IS IT RESERVED? PURE.
+ *
+ * The counterpart to `releaseDecision`, and the reason the release does not turn
+ * into churn. Once the owner has let go, the lock lies free for as long as it
+ * takes the claiming window to run its next command — and ANY other window that
+ * reaches an acquire in that gap takes it: the launcher's spawn, a stood-down
+ * third window's turn end. It would then see the very claim that freed the lock,
+ * judge the moment clean, release again, and say "handed back" once more. Every
+ * site that acquires therefore asks this first.
+ *
+ * `honour` is exactly the reservation: `assessClaim` answers `mine` (never
+ * `honour`) for the claimant's OWN claim, so the window the batch is waiting for
+ * still acquires — which is the whole point of freeing it.
+ *
+ * Returns { acquire, reason, claimantSid }.
+ */
+export function reservationDecision({ assessment } = {}) {
+  const a = assessment ?? null
+  if (a && a.honour === true) {
+    return { acquire: false, reason: 'reserved', claimantSid: a.claimantSid ?? null }
+  }
+  return { acquire: true, reason: a?.mine === true ? 'own-claim' : (a?.reason ?? 'no-claim'), claimantSid: a?.claimantSid ?? null }
+}
+
+/**
  * MAY THIS SESSION RECORD A CLAIM? PURE.
  *
  * 'refresh' — the pending claim is already ours (re-stating the wait is free)

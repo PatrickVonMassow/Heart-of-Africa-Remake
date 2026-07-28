@@ -29,7 +29,7 @@ import {
   probePid,
 } from './batch-singleton.mjs'
 import { readClaim, clearClaim, maxAgeMs } from './batch-claim.mjs'
-import { assessClaim } from './batch-claim-core.mjs'
+import { assessClaim, reservationDecision } from './batch-claim-core.mjs'
 import { isPaused, pauseReason } from './batch-lock.mjs'
 
 const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url))
@@ -195,7 +195,9 @@ try {
       const auth = autostartAuthorization(now)
       let ownership = 'none'
       const lock = readOwnerLock()
-      if (!reservation.honour) {
+      // The same predicate the owner's Stop guard applies before ITS acquire, so
+      // the rule lives in one place and cannot drift between the two doors.
+      if (reservationDecision({ assessment: reservation }).acquire) {
         if (lock && lock.kind === 'pending-spawn') {
           if (convertPendingSpawn(sessionId, { authorized: !!auth })) ownership = 'acquired-spawn'
         }
