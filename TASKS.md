@@ -3460,11 +3460,12 @@ read that as "the criterion and its evidence section".
   frame runs under a strict CSP (no fetch/XHR/WebSocket to any host), and the only
   runtime capabilities this account holds are `downloads` and `mcp` with no connector
   connected. A page there cannot send anything anywhere. The chat therefore lives on
-  the GH-Pages board of point 400 delta D. That point stands EARLIER in the work
-  order, so the transport normally exists by the time this is built; if it does not,
-  build and verify against a local static server standing in for the Pages host, and
-  make the section render a localized "the chat needs the web board" notice when its
-  own fetch is blocked, so the artifact mirror never shows a dead input.
+  the GH-Pages board of point 400 delta D, and this point is queued DIRECTLY BEHIND
+  400 for exactly that reason (user 28.07.2026) — the transport exists before the
+  chat is built, so the live acceptance test runs against the real page. While the
+  claude.ai artifact is still mirrored alongside it, the section renders a localized
+  "the chat needs the web board" notice when its own fetch is blocked there, so the
+  mirror never shows a dead input.
   THE TRANSPORT is ntfy, already a project dependency (`scripts/notify.mjs` uses it
   for failure pushes): one INBOX topic (page to agent) and one OUTBOX topic (agent to
   page).
