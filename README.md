@@ -1,4 +1,4 @@
-<img width="1168" height="784" alt="Copver photo" src="https://github.com/user-attachments/assets/07cc05d9-7a8d-427c-88a7-adbd0ea372cf" />
+<img width="1168" height="784" alt="The Heart of Africa — Modern Remake" src="https://github.com/user-attachments/assets/07cc05d9-7a8d-427c-88a7-adbd0ea372cf" />
 
 # The Heart of Africa — Modern Remake
 
