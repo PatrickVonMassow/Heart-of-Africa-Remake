@@ -3682,6 +3682,33 @@ read that as "the criterion and its evidence section".
   DOCS in the same commit: the memory entry `batch-dashboard-artifact` gains the one
   sentence naming the stdin path as the way to write a card.
 
+- [ ] 411. THE BOARD'S PROMISED END TIME IS ALWAYS FOUND STALE BY THE READER, NEVER
+  BY ME (29.07.2026, user reported it for the third time in one night: "Die
+  End-Uhrzeiten sind mal wieder total veraltet"). The `~HH:MM` on a current-work card
+  is a promise to someone reading from a phone. `dashboard-guard-core.mjs` already has
+  `now-eta-past`, which blocks a turn end once the estimate has PASSED (plus a 5-minute
+  grace). That is one tick too late by construction: the card is already wrong when the
+  guard speaks, and between two turn ends — which can be half an hour apart while a
+  delegated agent builds — the reader sees a promise that expired long ago. Measured
+  tonight: 300 stood at `~00:45` and 402 at `~00:17` while the clock read 01:52.
+  THE FIX, and it is a shift of one comparison: the guard fires when the estimate has
+  less than a calibratable margin LEFT (default 15 minutes, the launcher's own tick
+  width), not after it has passed. The remedy text stays the same — give it a realistic
+  new time or move the card — so the session is nudged while the board is still honest.
+  The existing past-due case remains, one severity louder.
+  AND THE SECOND HALF, which is the actual cause: the estimates were optimistic every
+  single time. The remedy line therefore states the rule the estimate must follow — the
+  time by which the work will be VISIBLY done including its verification, not the time
+  the current step might end — and a card whose estimate is moved more than twice in one
+  session gets the observation printed with it, because a third revision is a signal that
+  the estimate method is wrong rather than the number.
+  VERIFIABLE: pure Vitest — an estimate 20 minutes out passes, one 10 minutes out is
+  flagged, one that has passed is flagged more loudly, a card opened before midnight and
+  estimating into the next day is never mistaken for past-due (the existing wrap case),
+  a missing estimate keeps its current behaviour, and a garbled meta never throws.
+  DOCS in the same commit: the memory entry `batch-dashboard-artifact`, which states what
+  the board's four sections promise.
+
 ## Closing (only after all points)
 
 New points are appended BEFORE this section — it stays last in the file.
