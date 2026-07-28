@@ -85,8 +85,8 @@ describe('the criterion, and its teeth', () => {
   const floorOfCleanWater = waterFloor(0, 19873) // the measured croc-free reading
 
   it('passes the striking body measured in the game', () => {
-    // 0.303-0.316 over twelve staged repeats on a quiet machine, WebGL 2 and
-    // WebGPU alike — the extremes of that spread and one from the middle.
+    // 0.303-0.316 over fifteen frames on a quiet machine, WebGL 2 and WebGPU
+    // alike — the extremes of that spread and one from the middle.
     for (const share of [0.30307, 0.31143, 0.31586]) {
       expect(readsAsAnimal({ share }, floorOfCleanWater)).toBe(true)
     }

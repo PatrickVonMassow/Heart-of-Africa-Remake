@@ -8,9 +8,9 @@
 // answer that with an absolute channel delta between two rect MEANS, compared
 // against a hand-set 45 — and so decided on the second decimal of a colour
 // average. It read 44.2 and 44.6 in one evening on a quiet machine (the same
-// check twice: the candidate-real signature, not the load one), and 37.5-43.7
-// across twelve staged repeats measured for this point on both backends — red on
-// every one of them. The picture was never in
+// check twice: the candidate-real signature, not the load one), and 37.5-45.7
+// across the fifteen frames measured for this point on both backends — landing
+// on the passing side of its own 45 exactly once. The picture was never in
 // doubt; the measure was. A mean over the rect DILUTES the body with the water
 // beside it, and how much it dilutes moves with the projection, so the number
 // carries the zoom and the camera as much as the crocodile.
@@ -43,8 +43,8 @@ export const ANIMAL_SIGMAS = 6
  *  that looks like one. */
 export const MIN_ORDINARY_FRACTION = 0.6
 /** The risen body must repaint at least this share of its own footprint.
- *  Measured 0.303-0.316 over twelve staged repeats on both backends, so a 3x
- *  margin — and it is a GEOMETRIC share of the rect, not a colour value. */
+ *  Measured 0.303-0.316 over fifteen frames on both backends, so a 3x margin —
+ *  and it is a GEOMETRIC share of the rect, not a colour value. */
 export const STRIKE_MIN_SHARE = 0.1
 /** …and must beat the water's own floor in the same rect this many times over.
  *  The clause that bites when the water itself is busy: a foaming or

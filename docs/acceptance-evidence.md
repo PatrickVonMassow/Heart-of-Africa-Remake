@@ -586,12 +586,14 @@ Verifiable (`scripts/verify/settings.mjs`,
   rect whose colour sits further from that frame's OWN water colour
   than a fixed multiple of the water's OWN spread — so the verdict
   survives any change of brightness, exposure, backend or zoom. Measured
-  over twelve staged repeats on a quiet machine (eight on WebGL 2, four
-  on WebGPU, agreeing to within the run-to-run noise): striking body
-  0.303-0.316 against its 0.10 bar, hidden body 0-0.00046 against 0.02,
-  eye knobs 0.108-0.119 against 0.02, the water floor 0-0.00257. The old
-  absolute delta over the same twelve read 37.5-43.7 against its bar of
-  45 — red on every one, on both backends.
+  over twelve repeats of the staging on a quiet machine (eight on
+  WebGL 2, four on WebGPU, agreeing to within the run-to-run noise) plus
+  three full suite runs: striking body 0.303-0.316 against its 0.10 bar,
+  hidden body 0-0.00046 against 0.02, eye knobs 0.108-0.119 against
+  0.02, the water floor 0-0.00257. The old absolute delta over the same
+  fifteen frames read 37.5-45.7 against its bar of 45 and landed on the
+  passing side exactly once — the same undisputed picture, the verdict
+  decided by which side of a hand-set number an average fell on.
   The criterion is fed the HIDDEN frame as
   well and asserted to say no, so the teeth are proven per run and not
   merely claimed; the rule is pure-tested in `animalShare.test.mjs`. It
