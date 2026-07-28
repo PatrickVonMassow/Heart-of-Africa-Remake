@@ -3396,6 +3396,37 @@ read that as "the criterion and its evidence section".
   DOCS in the same commit: `scripts/verify/README.md`, where the test architecture
   describes the fast layer, gains the timeout and its reason.
 
+- [ ] 399. THE GUARD STOPS DEMANDING THE BOUNDARY AS SOON AS THE QUEUE GROWS
+  (28.07.2026, found while fixing the handover observer, and it is the same blind spot
+  one layer up — where it costs more). `boundaryDueFrom` in `gatherBoundary`
+  (`scripts/batch-boundary.mjs`) asks `lastWorkOrderTick()` when a boundary became due,
+  and that function scans only the newest FIVE work-order commits for a tick. A batch
+  turn routinely appends points: on 28.07.2026 eight append-only commits landed after the
+  tick of point 338, and the tick fell out of the window. On the OBSERVER that made a
+  completed handover unreadable, and it was fixed there. On the GUARD it does worse:
+  `boundaryDueFrom` returns null, so within the 90-minute `BOUNDARY_DUE_MS` window in
+  which `batch-progress-guard` should be demanding the point boundary, it demands
+  nothing — and a session that is not told to hand over keeps the lock and carries the
+  next point in the same context, which is exactly the cost point 373 exists to avoid.
+  THE FIX: give the guard's due-check an anchor that cannot fall out of a window. The
+  question it needs answered is "was a point ticked within `BOUNDARY_DUE_MS`", so it must
+  look back by TIME, not by a commit count — `git log --since` over the two work-order
+  paths, taking the newest commit whose diff actually ticks a point (`tickedPointsInDiff`
+  keeps the rule that an archive move is not a tick). The count-limited
+  `lastWorkOrderTick` may keep its shape for any caller that wants "the most recent
+  closure, cheaply", but the guard must not be that caller.
+  MIND THE COST: this runs in a Stop hook on every turn end, so the probe must stay
+  bounded — one `git log` over two paths, limited by the same window the answer is
+  scoped to, and no `git show` per commit beyond the candidates inside it.
+  VERIFIABLE: pure Vitest with an injected git — a tick inside the window followed by
+  twenty append-only work-order commits still reports the boundary as due; a tick older
+  than the window reports nothing due; an archive-move-only commit is not a tick; and an
+  unreadable git answers "not due" rather than throwing (the guard fails open). Plus one
+  live check in this repository: after a point is ticked and several points appended,
+  `node scripts/batch-boundary.mjs --status` names the due boundary instead of `null`.
+  DOCS in the same commit: `docs/batch-autonomy.md`, where the point boundary describes
+  when it falls due.
+
 ## Closing (only after all points)
 
 New points are appended BEFORE this section — it stays last in the file.
