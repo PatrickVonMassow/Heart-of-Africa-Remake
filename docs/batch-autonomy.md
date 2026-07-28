@@ -129,22 +129,102 @@ How it works:
    both block and the message names the fix
    (`Enable-ScheduledTask -TaskName 'HoA-Batch-Autostart'`, elevated, by the user).
 
-Two decisions worth keeping in view:
-
-- **The session does NOT release the batch lock, and does NOT spawn its own
-  successor.** Either would put a fresh session next to a still-winding-down one —
-  the double-session class of the e9407cae incident. The successor takes over the
-  honest way: the old process dies, its pid reads dead past the `DEAD_CONFIRM_MS`
-  grace, and the next launcher tick spawns. The price is a few idle minutes per
-  point; the alternative is a class of failure this project has already paid for.
-- **Unknown counts as unarmed.** Erring toward "keep working" costs context; erring
-  toward "stop" can cost the whole batch. The asymmetry decides it.
+One decision worth keeping in view: **unknown counts as unarmed.** Erring toward
+"keep working" costs context; erring toward "stop" can cost the whole batch. The
+asymmetry decides it.
 
 Pure logic and its witnesses: `scripts/batch-boundary-core.mjs` +
 `scripts/batch-boundary-core.test.mjs` (launcher-state classification, point
 closure against the split work order, marker assessment, and the three verdicts
 the point names: closed point + armed launcher → allow, work still open → block,
 unarmed launcher → block).
+
+## Taking the boundary — the other half (28.07.2026, point 388)
+
+The design above ended at "the stop is permitted", on the reasoning that the old
+process dies within minutes and the successor takes over the honest way. On the
+first night it was live, that assumption cost five and a half hours: the session
+ended its TURN and kept its PROCESS — an interactive window fires no `SessionEnd`,
+so `lock-release-hook` never ran — and the launcher, correctly, refused to spawn
+beside a live owner. It logged `skip: owner alive` every fifteen minutes, then
+`WEDGED owner: pid alive but heartbeat 245 min old`, twenty-one diagnoses without
+a consequence. **Permission to stop and the act of handing over are two different
+things, and only the first was built.**
+
+Three changes, and none of them loosens the singleton:
+
+1. **The boundary is TAKEN, not offered.** When a point was closed IN THIS
+   SESSION and no marker is recorded, `batch-progress-guard` blocks with its own
+   verdict (`block-take-boundary`) naming the single command, instead of burying
+   it in the general "do not stop" wall. It only ever fires for a tick this
+   session made (`tick.at >= lock.acquiredAt`) — otherwise a fresh successor
+   would be sent home for its predecessor's point and the batch would ping-pong
+   instead of work — and only while the launcher really is armed, so the guard
+   can never demand a boundary the CLI would refuse.
+2. **A handover releases the batch — as an annotation, not a release.** At the
+   moment the guard ALLOWS the stop, and only there, it marks the lock
+   `handedOver` (`markHandover`). `assessOwner` then reads that lock as free, and
+   the launcher's next tick spawns the successor even though the pid still lives.
+   The three properties that keep the singleton intact:
+   - It is written in exactly ONE place, the `allow-boundary` branch, which is
+     reached only after a fresh session-bound marker, a point the work order
+     confirms closed and an armed launcher. A crash, a wedge or an ordinary turn
+     end never reaches it.
+   - It is **withdrawn the moment the session acts again**: `heartbeat()` deletes
+     the fields on every tool call, and a PreToolUse withdrawal (piggy-backed on
+     `board-first-guard`, whose matcher already covers every state-changing tool)
+     clears it BEFORE a long call starts. That matters because sixteen Stop hooks
+     run after `batch-progress-guard` and several can block — the session's first
+     act after such a block may be one 40-minute verification, during which no
+     heartbeat would land (four-eyes review, finding 1).
+   - While the process is still alive the successor waits `HANDOVER_GRACE_MS`
+     (15 minutes, one full launcher tick). A headless `claude -p` exits and is
+     taken over at once by the ordinary dead-pid path, so the grace only ever
+     costs an interactive window something.
+3. **A silent owner is reported.** Past a calibratable age (`WEDGE_NOTIFY_MS`,
+   90 minutes, `HOA_WEDGE_NOTIFY_MIN` to tune) the launcher sends one ntfy
+   notification per silence — keyed on session + pid + the heartbeat it fell
+   silent at, so the same stall is not repeated tick after tick while a second,
+   later stall still is. It neither spawns nor kills on age: a long verify run
+   legitimately starves the heartbeat. The pre-existing four-hour valve that
+   kills the launcher's OWN headless spawn is left standing (four-eyes review,
+   finding 5) — it can never catch a verify run, and an unattended `claude -p`
+   that hangs has nobody to read a notification.
+
+**Known residuals, named rather than hidden.** A delegated agent still in flight
+at a handover can wake the old session after the successor has spawned; its tool
+calls withdraw the handover only while it still owns the lock, so the containment
+past that point is the parallel-session detector and `batch-doctor`, as for any
+rogue window (four-eyes finding 2 — the drain rule stays a rule, not a gate).
+During the handover window `heldByOtherLiveOwner` reads false, so a third session
+may be conscripted into the batch; that has always been true of a dead lock, and
+it is new only in that the previous owner's process may still exist (finding 8).
+And for the first time `acquire()` reaps a lock whose owner can still write: a
+delayed `heartbeat()` rename can clobber a freshly created pending-spawn lock, a
+millisecond-wide race that both traced interleavings self-heal (finding 3).
+
+### Observing one handover end to end
+
+Every part of this worked on the night it failed, so the acceptance is not a green
+test suite but ONE observed handover. `node scripts/batch-handover-observe.mjs`
+(read-only — it writes nothing, touches no lock, starts no session, and is safe
+from a worktree) prints the five links with the evidence for each, and exits 0
+complete / 1 pending / 2 broken:
+
+| link | proved by | a broken link looks like |
+| --- | --- | --- |
+| `close` | the newest work-order commit on `main` adds `- [x] N.` without removing it elsewhere (an archive move cancels out) | only `- [ ] N.` lines, or a pure archive move |
+| `take` | `.claude/boundary.log`: `HANDOVER point N by <sid>` | no such line — the session stopped without taking the boundary, the failure of 28.07.2026; the guard must have blocked with "TAKE THE POINT BOUNDARY" |
+| `spawn` | `.claude/autostart.log`: `HANDOVER accepted: <sid> handed the batch over at point N — spawning the successor`, then `launched pid <pid>` | `skip: owner alive` AFTER the handover line — the handover never reached the lock, or a later tool call withdrew it |
+| `takeover` | `.claude/batch-lock.json` names a different session with a heartbeat after the handover | the lock still names the old session — the spawned session never converted the pending-spawn lock |
+| `work` | a commit on `main` after the spawn, in the successor's own hand: the next point's branch or its first atomic commit | nothing committed — the successor stood down (lock) or `batch-resume-hook` never oriented it |
+
+The run itself belongs to the MAIN session in the main tree: it needs the live
+batch lock, and no worktree agent may take or release it. The natural occasion is
+the next point that closes — merge, tick, run `node scripts/batch-boundary.mjs
+<point>`, stop, and read the observer afterwards. Nothing about the design forces
+the batch to be stopped for the observation; the chain is exactly the ordinary
+path through a point boundary.
 
 ## The two true residuals (NOT in the agent's control)
 
