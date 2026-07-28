@@ -3031,23 +3031,31 @@ read that as "the criterion and its evidence section".
   their caller (a temp dir in the test), and no test may fall back to the repo's
   `.claude/`; a pure test asserting that the default paths are NOT touched when a base dir
   is passed keeps it that way.
-  FOURTH LIVE FINDING, 28.07.2026 11:20 — THE DECISIVE ONE. A context compaction mints a
-  NEW session id, and the lock keeps the OLD one. Every ownership-gated guard then resolves
-  the session as foreign and STANDS DOWN — silently, because standing down is the correct
-  behaviour for a second window. `batch-progress-guard` is one of them, so at the 11:02
-  stop it never reached its boundary branch: the marker was not consumed, no HANDOVER line
-  was written, the lock kept no handed-over flag, and the launcher's 11:06 tick skipped
-  with "owner alive (pid-alive)" exactly as designed. The evidence is the state itself —
-  the marker for 378 still lies unconsumed while `--status` says a boundary stop would be
-  allowed. A batch that compacts its context can therefore NEVER hand over, which is a
-  standing wedge and not a rare one: this session compacted once and was mute afterwards.
-  FIX: the lock's identity must survive the id change. The lock already records `pid` and
-  `pidStartedAt` — the PROCESS is the stable identity, the session id is not — so
-  ownership resolves as ours when the recorded process is the one we run under, whatever
-  the session id says, and the lock is re-stamped with the new id when it does. Where the
-  process cannot be established, fall back to the id as today. A pure test pins it: same
-  pid + pidStartedAt but a different session id resolves as `mine`, a different pid does
-  not, and a stale `pidStartedAt` (pid reused) does not either.
+  THE WEDGE ITSELF, 28.07.2026 11:40 — finding 1 is not a fluke, it is the failure. The
+  boundary stop runs its course three times over and dies in the same place each time
+  (07:03:01Z, 08:59:13Z, 09:35:31Z): the guard REACHES its boundary branch, CONSUMES the
+  marker, and then the lock write throws `EPERM … rename batch-lock.json.tmp-<pid> ->
+  batch-lock.json`. The throw escapes the branch, the fail-open wrapper catches it, logs
+  FAIL-OPEN and allows the stop. Marker gone, no HANDOVER line, no handed-over flag — and
+  the next turn the guard demands the boundary again, which is the loop this point was
+  opened on. THREE OF THREE is not an antivirus fluke; find the concurrent writer (the
+  PostToolUse heartbeat and the Stop guard reach for the same file at the same moment) and
+  fix the write: retry with backoff, an exclusive-create lock or an in-place write, as the
+  cause dictates. Two properties matter more than the mechanism chosen. The marker must
+  NOT be consumed unless the handover actually succeeded — order it the other way round or
+  restore it on failure. And `markHandover` must never take the whole guard down with it:
+  a failure is reported IN the allow, "the stop may proceed, but the handover did NOT
+  happen", so a session never stops believing it passed the batch on.
+  IDENTITY, a hardening and NOT the fix (the same day's mis-diagnosis, corrected here
+  rather than told as a story). Ownership hangs on the session id, and a context
+  compaction mints a new one — so the reasoning that identity belongs on something stable
+  stands, and the lock already records `pid` and `pidStartedAt`. But the marker WAS
+  consumed at every attempt, which proves ownership resolved as ours, so this was never
+  what wedged the batch. Do it if it is cheap and safe, pinned by a pure test (same pid +
+  pidStartedAt but a different session id resolves as `mine`, a different pid does not, a
+  stale `pidStartedAt` from a reused pid does not either) — and never let it widen
+  ownership so far that a genuinely second window passes as ours, which is the one thing
+  the singleton exists to prevent.
   TEST THE WHOLE CHAIN, NOT THE PARTS (user 28.07.2026). Every part worked last night
   and the batch still stood still, so a green unit layer proves nothing here. The
   acceptance is ONE observed handover end to end: a point closed, the boundary taken,
