@@ -37,13 +37,53 @@
 //
 // Where the two verdicts are close, this file chooses the BLOCK: a wrong block
 // costs one command, a wrong allow cost five and a half hours.
-import { resolveOwnership, PID_START_TOLERANCE_MS } from './batch-singleton.mjs'
+import { resolveOwnership, PID_START_TOLERANCE_MS, WEDGED_MS } from './batch-singleton.mjs'
 
 /** How old a declaration may be before the guard stops honouring it. Wide enough
  *  for a LARGE browser regression or a delegated agent building a point (both run
  *  well past half an hour), short enough that a forgotten declaration cannot
  *  cover a night. Calibratable via HOA_IN_FLIGHT_MAX_MIN (scripts/batch-in-flight.mjs). */
 export const IN_FLIGHT_MAX_AGE_MS = 45 * 60 * 1000
+
+/**
+ * THE WINDOW THE LAUNCHER MUST ASK WITH — and the reason the guard's own is wrong
+ * for it (second four-eyes review, 28.07.2026, finding A).
+ *
+ * `work-stalled` was UNREACHABLE in production. Three constants made it so, and
+ * each was defensible alone:
+ *   - `assessOwnerWork` marks a declaration `declared: false` once it is older
+ *     than `IN_FLIGHT_MAX_AGE_MS` (45 min);
+ *   - `assessOwner` licenses the stall verdict only past `WORK_STALL_MS` (90 min)
+ *     of heartbeat silence;
+ *   - and only while the declaration is the owner's LAST WORD, i.e.
+ *     `claimedAt <= declaredAt + WORK_DECLARATION_TOLERANCE_MS`.
+ * The declare CLI is itself a tool call, so its own PostToolUse heartbeat lands
+ * seconds after `declaration.at` — which means in the honest stall shape the
+ * heartbeat age and the declaration age are the SAME number. It cannot be above
+ * 90 and below 45 at once, so the verdict never fired: the reviewer drove the real
+ * pipeline minute by minute over five hours after a total freeze and got the old
+ * four-hour valve every time.
+ *
+ * The launcher's question is not the guard's. The guard asks "may a turn end ride
+ * on this declaration?", where an aged one must stop counting. The launcher asks
+ * "is this declaration the owner's LAST WORD?" — and for that, age is not the
+ * disqualifier: `lastWord` already excludes every session that worked after
+ * declaring, which is the only way an old declaration becomes misleading (the
+ * replayed near-kill — declare, agent finishes, merge, start a LARGE regression —
+ * leaves a heartbeat twelve minutes newer than the declaration and fails it).
+ *
+ * WHY NOT JUST `WORK_STALL_MS + WORK_DECLARATION_TOLERANCE_MS`, the minimum that
+ * makes the window non-empty: because non-empty is not the same as REACHABLE. In
+ * the honest stall shape the heartbeat age and the declaration age are the same
+ * number, so that value opens a band barely two minutes wide — and the launcher
+ * only looks once per `LAUNCHER_TICK_MS` (15 min). Roughly seven ticks in eight
+ * would step straight over it and fall through to the four-hour valve, which is
+ * the very outcome finding A reported. The band must therefore be at least a
+ * couple of ticks wide, and `WEDGED_MS` is where it naturally ends: past the old
+ * valve a silent owner reads wedged anyway, so the declaration has nothing left to
+ * add. `assessOwnerWork`'s own tests pin the width against the tick.
+ */
+export const LAUNCHER_WORK_MAX_AGE_MS = WEDGED_MS
 
 /** How recently a declared LOG file must have been written to count as proof that
  *  the run behind it is alive. A suite that has not appended a line in this long
@@ -324,13 +364,19 @@ export const UNANSWERABLE_DETAILS = new Set([
  *                deliberate: a stale declaration says nothing about what the
  *                session is doing NOW (it may well be inside one long verification
  *                run), so it must not be allowed to tighten the wedge bound.
+ *                `maxAgeMs` defaults to `LAUNCHER_WORK_MAX_AGE_MS`, NOT to the
+ *                guard's `IN_FLIGHT_MAX_AGE_MS`: with the guard's 45 minutes here
+ *                the stall verdict this feeds is arithmetically unreachable (see
+ *                that constant). The staleness that actually matters — a session
+ *                that went on working after declaring — is caught by `lastWord`
+ *                in `assessOwner`, not by this clock.
  *   declaredAt — WHEN it was declared, passed through so `assessOwner` can ask the
  *                second question the four-eyes review found missing (finding 1.1):
  *                is this declaration still the owner's LAST WORD, or did the
  *                session go on working after writing it? A heartbeat newer than
  *                `declaredAt` answers that without any new notion of liveness.
  */
-export function assessOwnerWork({ declaration, lock, now, maxAgeMs = IN_FLIGHT_MAX_AGE_MS, ...probes } = {}) {
+export function assessOwnerWork({ declaration, lock, now, maxAgeMs = LAUNCHER_WORK_MAX_AGE_MS, ...probes } = {}) {
   const out = (o) => ({
     declared: false,
     advancing: false,

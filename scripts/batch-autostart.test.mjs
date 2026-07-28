@@ -64,4 +64,17 @@ describe('the launcher uses the pure spawn builders', () => {
     expect(source).toMatch(/spawns:\s*recordSpawn\(/)
     expect(source).toMatch(/reapableSpawns\(/)
   })
+
+  // THE LAUNCHER ASKS ITS OWN QUESTION (second four-eyes review, finding A).
+  // `assessOwnerWork` defaults to the launcher's window, but the launcher names it
+  // anyway — and this pins that it does, because the window is the one input that
+  // silently turned `work-stalled` into dead code. The behaviour itself is proved
+  // on the real pipeline in scripts/batch-in-flight-core.test.mjs; this is only the
+  // witness that the uncallable file still asks the right question.
+  it('assesses the owner’s work with the LAUNCHER’s window, not the Stop guard’s', () => {
+    expect(code).toMatch(/maxAgeMs:\s*LAUNCHER_WORK_MAX_AGE_MS/)
+    expect(code, 'the guard’s 45-minute window makes the stall verdict unreachable').not.toMatch(
+      /maxAgeMs:\s*IN_FLIGHT_MAX_AGE_MS/,
+    )
+  })
 })

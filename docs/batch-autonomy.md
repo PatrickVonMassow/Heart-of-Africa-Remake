@@ -378,11 +378,32 @@ kill. Six ticks follows the same better-than-2x headroom rule.
 
 Three deliberate narrownesses, so none reads as an oversight.
 
-- **Only a CURRENT declaration may tighten the bound**: past
-  `IN_FLIGHT_MAX_AGE_MS` a declaration still proves progress but no longer
-  licenses the stall verdict, because a stale one says nothing about what the
-  session is doing now — it may well be inside one 40-minute verification run,
-  and the pre-402 four-hour valve covers that case exactly as before.
+- **Only a CURRENT declaration may tighten the bound** — but "current" is measured
+  with the LAUNCHER's window, `LAUNCHER_WORK_MAX_AGE_MS` (= `WEDGED_MS`, four
+  hours), never with the Stop guard's `IN_FLIGHT_MAX_AGE_MS`. Past it a
+  declaration still proves progress but no longer licenses the stall verdict, and
+  the pre-402 four-hour valve covers the rest exactly as before.
+  **This is where the feature was dead code** (second four-eyes review,
+  28.07.2026, finding A). The launcher first asked with the guard's 45 minutes,
+  and the three constants are then mutually exclusive: the declaration had to be
+  older than the 90-minute stall bound and younger than 45 minutes at the same
+  moment, and `lastWord` pins the two ages to the SAME number because the declare
+  command's own PostToolUse heartbeat lands seconds after `declaration.at`. Driven
+  minute by minute over five hours after a total freeze, `work-stalled` never
+  fired once; every tick fell through to the four-hour valve. The two questions
+  are genuinely different — the guard asks "may a turn end ride on this?", where
+  an aged declaration must stop counting, while the launcher asks "is this the
+  owner's LAST WORD?", where age is not the disqualifier — and widening the
+  launcher's window reopens no idle-night hole, because `lastWord` already
+  excludes every session that worked after declaring. The window is `WEDGED_MS`
+  rather than the bare minimum that makes it non-empty (`WORK_STALL_MS +
+  WORK_DECLARATION_TOLERANCE_MS`) because non-empty is not reachable: that value
+  opens a band two minutes wide, and the launcher looks once per
+  `LAUNCHER_TICK_MS`, so seven schedules in eight would step straight over it.
+  `scripts/batch-in-flight-core.test.mjs` drives the real
+  `assessOwnerWork` → `assessOwner` pipeline across five hours and asserts that
+  every phase of the 15-minute schedule sees the stall — hand-crafted `work`
+  objects, which is what the original tests used, cannot witness this.
 - **The declaration must be the owner's LAST WORD** (four-eyes review, finding
   1.1). `assessOwner` licenses `work-stalled` only while
   `claimedAt <= declaredAt + WORK_DECLARATION_TOLERANCE_MS` — the same comparison

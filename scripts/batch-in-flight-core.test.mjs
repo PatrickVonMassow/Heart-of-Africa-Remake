@@ -18,6 +18,7 @@ import { basename, join, resolve } from 'node:path'
 import { REPO_ROOT } from './repo-paths.mjs'
 import {
   IN_FLIGHT_MAX_AGE_MS,
+  LAUNCHER_WORK_MAX_AGE_MS,
   LOG_FRESH_MS,
   WORK_FRESH_MS,
   assessInFlight,
@@ -27,12 +28,17 @@ import {
   selfReferentialEvidence,
 } from './batch-in-flight-core.mjs'
 import {
+  assessOwner,
   progressGuardDecision,
+  spawnDecision,
   statePathsFor,
   probePid,
   LOCK_PATH,
   IN_FLIGHT_PATH,
+  LAUNCHER_TICK_MS,
   PID_START_TOLERANCE_MS,
+  WEDGED_MS,
+  WORK_STALL_MS,
 } from './batch-singleton.mjs'
 import { gatherInFlight, maxAgeMs, readDeclaration, writeDeclaration, clearDeclaration } from './batch-in-flight.mjs'
 
@@ -492,7 +498,7 @@ describe('assessOwnerWork — is the OWNER’s declared work still advancing?', 
     // paperwork's timestamp says), while only a CURRENT declaration may tighten
     // the wedge bound — a stale one says nothing about what the session is doing
     // now, and it may well be inside one long verification run.
-    const old = { at: NOW - IN_FLIGHT_MAX_AGE_MS - 60_000 }
+    const old = { at: NOW - LAUNCHER_WORK_MAX_AGE_MS - 60_000 }
     expect(work(old)).toMatchObject({ advancing: true, declared: false })
     expect(work(old, { probePid: () => dead(), refTipAt: () => null })).toMatchObject({
       advancing: false,
@@ -516,6 +522,148 @@ describe('assessOwnerWork — is the OWNER’s declared work still advancing?', 
     // Nothing to time-stamp → null, never a fabricated moment.
     expect(assessOwnerWork({ declaration: null, lock: lock(), now: NOW }).declaredAt).toBe(null)
     expect(assessOwnerWork({ declaration: declaration(), lock: null, now: NOW }).declaredAt).toBe(null)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// THE STALL VERDICT MUST BE REACHABLE — AND REACHABLE BY A LAUNCHER THAT ONLY
+// LOOKS EVERY FIFTEEN MINUTES (second four-eyes review, 28.07.2026, finding A).
+//
+// `work-stalled` was DEAD CODE in production, and every unit test above it was
+// green, because those tests hand a `work` object straight to `assessOwner` —
+// `{ declared: true, declaredAt: heartbeat - 1000 }` at an age of 91 minutes,
+// which is a shape `assessOwnerWork` cannot produce. Three constants made it
+// impossible: a declaration stopped counting as `declared` at 45 minutes, the
+// stall bound needed 90 minutes of heartbeat silence, and `lastWord` demanded the
+// heartbeat land within two minutes of the declaration — which pins the two ages
+// to the SAME number. It cannot be above 90 and below 45 at once.
+//
+// So this block refuses hand-crafted `work` objects entirely. It builds ONE frozen
+// declaration, ONE lock whose heartbeat is the declare command's own PostToolUse,
+// and drives the REAL pipeline — `assessOwnerWork` → `assessOwner` — minute by
+// minute across five hours, exactly as the launcher does on each tick.
+describe('assessOwnerWork → assessOwner: a totally frozen session really is read as stalled', () => {
+  const T0 = NOW - 6 * 60 * 60 * 1000 // the moment everything stopped
+  const OWNER_PID = 7777
+  const OWNER_STARTED = T0 - 30 * 60_000
+  const BOOT = T0 - 24 * 60 * 60 * 1000
+
+  // The declare CLI is itself a tool call, so its PostToolUse heartbeat lands
+  // seconds after `declaration.at` and nothing follows it. THIS is what a real
+  // stall looks like — and it is the shape the old tests could not express.
+  const DECLARED_AT = T0
+  const CLAIMED_AT = DECLARED_AT + 5000
+
+  const lock = (over = {}) => ({
+    sessionId: SID,
+    claimedAt: CLAIMED_AT,
+    pid: OWNER_PID,
+    pidStartedAt: OWNER_STARTED,
+    ...over,
+  })
+  const ownerProbe = { exists: true, startedAt: OWNER_STARTED }
+  const frozen = {
+    v: 1,
+    sessionId: SID,
+    pid: OWNER_PID,
+    pidStartedAt: OWNER_STARTED,
+    at: DECLARED_AT,
+    waitingOn: 'the delegated agent for point 402',
+    evidence: [
+      { kind: 'branch', ref: 'feat/402-progress-not-age', label: 'the agent' },
+      { kind: 'worktree', path: 'C:/repo/.claude/worktrees/agent-402', label: 'the agent' },
+    ],
+  }
+  // Everything the declaration names went quiet three minutes BEFORE the freeze
+  // and never moves again. The owner's own process stays alive throughout — that
+  // is the whole difficulty: a wedged session looks exactly like a working one.
+  const dead = {
+    probePid: () => ({ exists: true, startedAt: OWNER_STARTED }),
+    refTipAt: () => T0 - 3 * 60_000,
+    worktreeActiveAt: () => T0 - 3 * 60_000,
+    mtimeOf: () => T0 - 3 * 60_000,
+  }
+
+  /** One launcher tick, driven end to end. No `work` object is ever written here. */
+  const tick = (minute, { lockOver = {}, probes = dead, ...over } = {}) => {
+    const now = T0 + minute * 60_000
+    const l = lock(lockOver)
+    const work = assessOwnerWork({ declaration: frozen, lock: l, now, ...probes, ...over })
+    return { work, verdict: assessOwner(l, { now, bootTime: BOOT, probe: ownerProbe, work }) }
+  }
+  /** Every minute of the first five hours at which the launcher would say "stalled". */
+  const stalledMinutes = (opts = {}) => {
+    const out = []
+    for (let m = 0; m <= 300; m++) if (tick(m, opts).verdict.reason === 'work-stalled') out.push(m)
+    return out
+  }
+
+  it('IS REACHABLE AT ALL — the freeze is caught, and near the stall bound, not hours later', () => {
+    const hits = stalledMinutes()
+    expect(hits.length, 'work-stalled never fires on the real pipeline — the feature is dead code').toBeGreaterThan(0)
+    // First fire at the stall bound (the heartbeat trails the declaration by 5 s,
+    // so it crosses one minute later), and long before the four-hour valve.
+    expect(hits[0]).toBe(Math.round(WORK_STALL_MS / 60_000) + 1)
+    expect(hits[0] * 60_000).toBeLessThan(WEDGED_MS)
+    const t = tick(hits[0])
+    expect(t.verdict).toMatchObject({ alive: true, wedged: true, reason: 'work-stalled' })
+    expect(spawnDecision(t.verdict)).toBe('skip-wedged')
+    // The launcher can say WHAT froze, not merely that something did.
+    expect(t.work.summary).toMatch(/feat\/402-progress-not-age/)
+    expect(t.work).toMatchObject({ declared: true, advancing: false, declaredAt: DECLARED_AT })
+  })
+
+  it('…AND REACHABLE ON A 15-MINUTE TICK: no phase of the schedule can step over the band', () => {
+    // Non-empty is not the same as reachable. `WORK_STALL_MS +
+    // WORK_DECLARATION_TOLERANCE_MS` — the minimum that makes the window exist —
+    // opens a band barely two minutes wide, and the launcher looks once per
+    // LAUNCHER_TICK_MS: seven schedules in eight would miss it and fall through to
+    // the four-hour valve, which IS the reported bug. So every possible phase of
+    // the tick schedule must hit the band.
+    const hits = new Set(stalledMinutes())
+    const tickMin = Math.round(LAUNCHER_TICK_MS / 60_000)
+    for (let phase = 0; phase < tickMin; phase++) {
+      const seen = []
+      for (let m = phase; m <= 300; m += tickMin) if (hits.has(m)) seen.push(m)
+      expect(seen.length, `a launcher ticking at phase ${phase} min never sees the stall`).toBeGreaterThan(0)
+    }
+    // Stated as the invariant, so a future narrowing of the window fails here too.
+    expect(LAUNCHER_WORK_MAX_AGE_MS - WORK_STALL_MS).toBeGreaterThanOrEqual(2 * LAUNCHER_TICK_MS)
+  })
+
+  it('THE REGRESSION WITNESS: asked with the GUARD’s window, the same freeze is never stalled', () => {
+    // This is the bug, reproduced. `IN_FLIGHT_MAX_AGE_MS` is the right answer to
+    // the guard's question ("may a turn end ride on this?") and the wrong one to
+    // the launcher's, and asking it here silently disabled the feature.
+    expect(stalledMinutes({ maxAgeMs: IN_FLIGHT_MAX_AGE_MS })).toEqual([])
+    expect(LAUNCHER_WORK_MAX_AGE_MS).toBeGreaterThan(IN_FLIGHT_MAX_AGE_MS)
+  })
+
+  it('a healthy wait is still never accused, however long the agent takes', () => {
+    // Same aging paperwork, but the agent keeps committing: its branch tip is
+    // always a minute old, so not one of the five hours' ticks accuses it.
+    const reasons = new Set()
+    for (let m = 0; m <= 300; m++) {
+      const now = T0 + m * 60_000
+      reasons.add(tick(m, { probes: { ...dead, refTipAt: () => now - 60_000 } }).verdict.reason)
+    }
+    expect(reasons).toEqual(new Set(['fresh-heartbeat', 'work-advancing']))
+  })
+
+  it('and a heartbeat that POSTDATES the declaration still disarms the verdict entirely', () => {
+    // The replayed near-kill: declare, agent finishes, merge, start a LARGE
+    // regression without clearing the declaration. `lastWord` — not the age cap —
+    // is what protects that session, which is why widening the age cap is safe.
+    expect(stalledMinutes({ lockOver: { claimedAt: DECLARED_AT + 12 * 60_000 } })).toEqual([])
+  })
+
+  it('and no evidence may revive a DEAD process, whatever the paperwork says', () => {
+    const now = T0 + 120 * 60_000
+    const l = lock()
+    const work = assessOwnerWork({ declaration: frozen, lock: l, now, ...dead, refTipAt: () => now - 60_000 })
+    expect(work.advancing).toBe(true)
+    const v = assessOwner(l, { now, bootTime: BOOT, probe: { exists: false, startedAt: null }, work })
+    expect(v).toMatchObject({ alive: false, reason: 'pid-dead' })
   })
 })
 

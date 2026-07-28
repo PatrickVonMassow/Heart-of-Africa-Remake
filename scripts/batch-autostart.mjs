@@ -51,7 +51,7 @@ import {
 import { readClaim, maxAgeMs as claimMaxAgeMs } from './batch-claim.mjs'
 import { assessClaim } from './batch-claim-core.mjs'
 import { readDeclaration, refTipAt, worktreeActiveAt, mtimeOf } from './batch-in-flight.mjs'
-import { assessOwnerWork, describeInFlight } from './batch-in-flight-core.mjs'
+import { assessOwnerWork, describeInFlight, LAUNCHER_WORK_MAX_AGE_MS } from './batch-in-flight-core.mjs'
 import { buildSpawnArgs, buildSpawnOptions, recordSpawn, reapableSpawns, pruneSpawns } from './batch-autostart-core.mjs'
 
 // IMPORT-PROOF (27.07.2026). Everything below runs at MODULE LOAD, so merely
@@ -153,7 +153,22 @@ const curHead = head()
 const lock = readOwnerLock()
 const probe = lock && lock.pid ? probePid(lock.pid) : null
 const declaration = lock ? readDeclaration() : null
-const work = assessOwnerWork({ declaration, lock, now, probePid, refTipAt, worktreeActiveAt, mtimeOf })
+// The WINDOW is the launcher's own (`LAUNCHER_WORK_MAX_AGE_MS`), never the Stop
+// guard's 45 minutes: asking with the guard's window made `work-stalled`
+// arithmetically UNREACHABLE, because a declaration had to be older than the
+// 90-minute stall bound and younger than 45 minutes at the same moment. The
+// question here is "is this the owner's LAST WORD", not "may a turn end ride on
+// it", and `lastWord` already excludes every session that worked after declaring.
+const work = assessOwnerWork({
+  declaration,
+  lock,
+  now,
+  maxAgeMs: LAUNCHER_WORK_MAX_AGE_MS,
+  probePid,
+  refTipAt,
+  worktreeActiveAt,
+  mtimeOf,
+})
 const assessment = assessOwner(lock, { now, bootTime: bootTimeMs(), probe, work })
 
 // --- Verify the previous spawn ------------------------------------------------
