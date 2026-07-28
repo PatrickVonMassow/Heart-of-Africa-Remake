@@ -11267,3 +11267,31 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   CONCLUSION: the mechanism holds; what it still under-serves is measurable state (budget
   headroom, where a companion document sits) rather than prose. Those are cheap to add
   and are the next improvement to the generator, not a reason to widen the brief.
+
+- [x] 382. THE CROCODILE'S EYE-KNOB CHECK SITS ON ITS OWN THRESHOLD (27.07.2026, found
+  while triaging point 369). The `enrichments` check "a lurking crocodile shows its eye
+  knobs while its body reads as WATER, and a strike does not" (point 274) failed TWICE
+  with the SAME check in one evening — the candidate-real signature, not the load one —
+  at `strikeDiff` 44.2 and 44.6 against a threshold of `> 45`. A check that decides on
+  the second decimal of a colour difference is not measuring the property it claims:
+  the question is whether the lunging body reads as an ANIMAL rather than as water, and
+  that answer must not flip because a frame landed a shade differently.
+  DECIDE WHAT THE CHECK IS REALLY ASKING, then re-express it: measure the separation
+  between the hidden and the striking body against the WATER around them (a ratio or a
+  standard-deviation distance, which is scale-free), rather than an absolute channel
+  delta compared with a hand-set number. Whatever replaces it must still FAIL a body
+  that stays water-coloured through the strike — verify that by feeding it the hidden
+  frame and demanding a red.
+  DO NOT SIMPLY RAISE OR LOWER THE NUMBER. Moving the threshold to make today's run
+  green is the failure mode this project has paid for: the next frame lands on the new
+  edge and the same evening repeats.
+  MEASURE THE SPREAD FIRST: run the check's own staging several times and record the
+  distribution of the value it reads. A threshold is only defensible against a measured
+  spread; if the spread turns out to be wide because the STAGING varies, the staging is
+  what needs pinning (the point-369 triage found exactly that class — a third animal
+  wandering into a staged drama).
+  VERIFIABLE: the reworked check green over repeated runs on a QUIET machine (the
+  point-296 probe confirms the machine before the figure is believed), red on the
+  hidden-body frame, and the measured spread recorded beside the new criterion.
+  DOCS in the same commit: the check's own comment block in `scripts/verify/
+  enrichments.mjs` and, if the criterion changes what §19.16 promises, design.md.
