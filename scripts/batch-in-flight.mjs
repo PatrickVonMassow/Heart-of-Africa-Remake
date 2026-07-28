@@ -141,9 +141,48 @@ export function mtimeOf(path) {
   }
 }
 
+/**
+ * THE FULL SYMBOLIC NAME GIT GIVES THIS REF — `refs/heads/main` for `main` and
+ * for `heads/main`, `HEAD` for `@`, `refs/remotes/origin/main` for `origin/main`.
+ * Null when git cannot resolve it (an unknown ref, a revision expression like
+ * `main@{0}` that has no symbolic name, or no git at all).
+ *
+ * The refusal list can only compare NAMES, and a name has more spellings than any
+ * string rule can enumerate: the second four-eyes review (28.07.2026, finding B)
+ * declared `--branch @` and `--branch heads/main` live and both sailed past it,
+ * then probed eternally fresh. Git is the only authority on what a ref names, so
+ * the declared ref is resolved through it and the RESOLVED name is what gets
+ * refused and stored. An unresolvable ref falls back to what was typed, where the
+ * string rules in `normRef` still apply and the up-front evidence check then fails
+ * it as a branch that does not exist.
+ */
+export function resolveRefName(ref, { cwd = REPO_ROOT } = {}) {
+  const name = String(ref ?? '').trim()
+  // Never hand git something it would read as an option (`--help` opens a pager).
+  if (!name || name.startsWith('-') || /[\s~^:?*[\]\\]/.test(name)) return null
+  try {
+    const out = execFileSync('git', ['rev-parse', '--symbolic-full-name', name], {
+      cwd,
+      encoding: 'utf8',
+      timeout: 8000,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim()
+    return out || null
+  } catch {
+    return null
+  }
+}
+
 /** The branch this checkout has checked out, or null when it cannot be read (a
  *  detached HEAD, or no git at all). Only used to REFUSE naming it as evidence,
  *  so an unreadable answer refuses nothing extra. */
+/** An absolute path for what was typed. An empty value stays empty, so it keeps
+ *  failing as "no path" instead of quietly becoming the working directory. */
+export function absPath(value) {
+  const raw = String(value ?? '').trim()
+  return raw ? resolve(raw) : raw
+}
+
 export function currentBranchOf({ cwd = REPO_ROOT } = {}) {
   try {
     const out = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {
@@ -232,9 +271,20 @@ if (isMain) {
         }
         evidence.push({ kind: 'pid', pid, startedAt: probe.startedAt })
       }
-      else if (flag === '--branch') evidence.push({ kind: 'branch', ref: value })
-      else if (flag === '--worktree') evidence.push({ kind: 'worktree', path: value })
-      else if (flag === '--log') evidence.push({ kind: 'log', path: value })
+      // WHAT IS STORED IS WHAT THE LAUNCHER WILL PROBE (second four-eyes review,
+      // 28.07.2026, finding B). Both of the following used to be recorded raw:
+      //   - a REF, so `@`, `heads/main` and `main@{0}` — every one of them a
+      //     spelling of something eternally fresh — walked past the refusal below
+      //     and then answered "still moving" forever. Git resolves it, git's
+      //     answer is what gets refused, and git's answer is what gets stored.
+      //   - a PATH, which `normPath` only cleans up and never RESOLVES, so
+      //     `--worktree .` from the repo root, `<root>/.` and `<root>/../hoa` all
+      //     named the checkout itself without being recognised as it. And a
+      //     relative path is meaningless to the launcher anyway: it probes from
+      //     its own cwd, not from the one the declaration was written in.
+      else if (flag === '--branch') evidence.push({ kind: 'branch', ref: resolveRefName(value) ?? value })
+      else if (flag === '--worktree') evidence.push({ kind: 'worktree', path: absPath(value) })
+      else if (flag === '--log') evidence.push({ kind: 'log', path: absPath(value) })
       else fail(`unknown option "${flag}".\n${usage}`)
     }
     // Evidence that cannot go quiet is refused HERE (four-eyes review

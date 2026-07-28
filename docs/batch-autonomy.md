@@ -428,6 +428,21 @@ on work that is not the work being waited for). Such a declaration would have he
 indefinitely AND suppressed the silent-owner notification — leaving the session
 LESS observed than declaring nothing at all. `selfReferentialEvidence` refuses all
 three at declaration time, where the mistake is one command away from being fixed.
+
+**And the refusal now sees what was MEANT, not what was typed** (second four-eyes
+review, 28.07.2026, finding B). It can only compare names, and the CLI used to
+hand it the raw argument: `--worktree .` from the repo root, `<root>/.` and
+`<root>/../hoa` all named the checkout itself, while `--branch @` (git's own alias
+for HEAD), `--branch heads/main` and `--branch main@{0}` all named things that move
+on their own. All of them were driven live and all of them slipped through, then
+probed eternally fresh. Two changes close the family rather than the six examples:
+the CLI RESOLVES every `--worktree`/`--log` to an absolute path (`absPath`) and
+every `--branch` through `git rev-parse --symbolic-full-name` (`resolveRefName`),
+and STORES the resolved form — which it should do regardless, because the launcher
+probes from its own working directory, not from the one the declaration was
+written in. `normRef` keeps a string belt for what git will not resolve (`heads/…`
+and a `…@{0}` revision expression have no symbolic name), and `@` joins `main` and
+`HEAD` on the always-refused list.
 And past the hours-long `WEDGED_MS` threshold the launcher notifies REGARDLESS of
 whether work is advancing (`silenceStage`), naming the evidence in the message —
 notify only, never a kill.

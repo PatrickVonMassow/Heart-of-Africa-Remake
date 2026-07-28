@@ -13,6 +13,7 @@
 //   · and nothing here may touch the repository's .claude/ (finding 3).
 import { describe, it, expect } from 'vitest'
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { basename, join, resolve } from 'node:path'
 import { REPO_ROOT } from './repo-paths.mjs'
@@ -40,7 +41,15 @@ import {
   WEDGED_MS,
   WORK_STALL_MS,
 } from './batch-singleton.mjs'
-import { gatherInFlight, maxAgeMs, readDeclaration, writeDeclaration, clearDeclaration } from './batch-in-flight.mjs'
+import {
+  absPath,
+  gatherInFlight,
+  maxAgeMs,
+  readDeclaration,
+  resolveRefName,
+  writeDeclaration,
+  clearDeclaration,
+} from './batch-in-flight.mjs'
 
 const NOW = 1_785_100_000_000
 const SID = 'session-owner'
@@ -701,6 +710,38 @@ describe('selfReferentialEvidence (what may never be declared)', () => {
     }
   })
 
+  it('…and every OTHER spelling of the same two refs (second review, finding B)', () => {
+    // All four were declared LIVE by the reviewer, all four slipped through, and
+    // all four then probed eternally fresh. `@` is git's own alias for HEAD;
+    // `heads/…` is the half-qualified form the `refs/` strip never reached; and
+    // `…@{0}` is a revision expression that git will not even give a symbolic
+    // name to, so no resolver can catch it and this string rule must.
+    for (const ref of ['@', 'heads/main', 'main@{0}', 'refs/heads/main@{1}', 'MAIN', 'origin/MAIN']) {
+      expect(
+        selfReferentialEvidence({ evidence: [{ kind: 'branch', ref }], repoRoot: ROOT }),
+        ref,
+      ).toHaveLength(1)
+    }
+    // The own-branch rule normalises the same way, whichever side is spelled long.
+    expect(
+      selfReferentialEvidence({
+        evidence: [{ kind: 'branch', ref: 'heads/feat/402-x' }],
+        repoRoot: ROOT,
+        currentBranch: 'feat/402-x',
+      }),
+    ).toHaveLength(1)
+  })
+
+  it('…but a real agent branch that merely BEGINS with those letters is untouched', () => {
+    // The strips are anchored, so nothing legitimate is swallowed by them.
+    for (const ref of ['feat/main-menu', 'heads-up/402', 'origin-mirror/feat/x', 'mainline/402']) {
+      expect(
+        selfReferentialEvidence({ evidence: [{ kind: 'branch', ref }], repoRoot: ROOT, currentBranch: 'main' }),
+        ref,
+      ).toEqual([])
+    }
+  })
+
   it('refuses the declaring checkout’s OWN current branch', () => {
     const found = selfReferentialEvidence({
       evidence: [{ kind: 'branch', ref: 'feat/402-progress-not-age' }],
@@ -733,5 +774,78 @@ describe('selfReferentialEvidence (what may never be declared)', () => {
     expect(selfReferentialEvidence()).toEqual([])
     expect(selfReferentialEvidence({ evidence: null })).toEqual([])
     expect(selfReferentialEvidence({ evidence: [{ kind: 'branch', ref: '' }], repoRoot: ROOT })).toEqual([])
+  })
+})
+
+// ---------------------------------------------------------------------------
+// WHAT IS STORED IS WHAT THE LAUNCHER WILL PROBE (second four-eyes review,
+// 28.07.2026, finding B). The refusal above can only compare NAMES, and the CLI
+// used to hand it whatever was typed: a raw path that `normPath` cleans up but
+// never RESOLVES, and a raw ref whose spelling only git can settle. The reviewer
+// drove `--worktree .` from the repo root, `<root>/.`, `<root>/../hoa`,
+// `--branch @` and `--branch heads/main` live — all five slipped past the refusal
+// and then probed eternally fresh, which is worse than declaring nothing at all
+// (a declaration also suppresses the launcher's silent-owner report).
+describe('the CLI records RESOLVED evidence, not what was typed', () => {
+  it('absPath resolves a relative path against the cwd — the launcher probes from elsewhere', () => {
+    expect(absPath('.')).toBe(resolve('.'))
+    expect(absPath('./scripts/..')).toBe(resolve('.'))
+    expect(absPath('../hoa/..')).toBe(resolve('..'))
+    const abs = resolve('scripts')
+    expect(absPath(abs)).toBe(abs)
+    // An empty value stays empty, so it keeps failing as "no path" rather than
+    // quietly becoming the working directory.
+    expect(absPath('')).toBe('')
+    expect(absPath(undefined)).toBe('')
+  })
+
+  it('…so every spelling of the repo root IS recognised as the repo root', () => {
+    const root = resolve(REPO_ROOT)
+    for (const typed of [root, `${root}/.`, `${root}/../${basename(root)}`, `${root}/scripts/..`]) {
+      const found = selfReferentialEvidence({
+        evidence: [{ kind: 'worktree', path: absPath(typed) }],
+        repoRoot: REPO_ROOT,
+      })
+      expect(found, typed).toHaveLength(1)
+    }
+  })
+
+  it('resolveRefName asks GIT what a ref names, so an alias cannot hide behind a spelling', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-ref-'))
+    const git = (...args) =>
+      execFileSync('git', args, { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
+    try {
+      git('init', '-b', 'main')
+      git('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '--allow-empty', '-m', 'x')
+      const at = (ref) => resolveRefName(ref, { cwd: dir })
+      // The two live bypasses, resolved to names the refusal already knows.
+      expect(at('@')).toBe(at('HEAD'))
+      expect(at('heads/main')).toBe('refs/heads/main')
+      expect(at('main')).toBe('refs/heads/main')
+      // …and refused once resolved, which is what the CLI now stores.
+      for (const typed of ['@', 'heads/main', 'main']) {
+        expect(
+          selfReferentialEvidence({ evidence: [{ kind: 'branch', ref: at(typed) ?? typed }], repoRoot: REPO_ROOT }),
+          typed,
+        ).toHaveLength(1)
+      }
+      // Unresolvable input answers null rather than guessing — the caller then
+      // keeps what was typed, where the string rules in normRef still apply and
+      // the up-front evidence check fails it as a branch that is not there.
+      expect(at('no-such-ref')).toBe(null)
+      expect(at('main@{0}')).toBe(null) // a revision expression has no symbolic name
+      expect(at('')).toBe(null)
+      // Never hand git something it reads as an option (`--help` opens a pager).
+      expect(at('--help')).toBe(null)
+      expect(at('-v')).toBe(null)
+      // A real agent branch resolves and is NOT refused.
+      git('branch', 'feat/403-x')
+      expect(at('feat/403-x')).toBe('refs/heads/feat/403-x')
+      expect(
+        selfReferentialEvidence({ evidence: [{ kind: 'branch', ref: at('feat/403-x') }], repoRoot: REPO_ROOT }),
+      ).toEqual([])
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 })

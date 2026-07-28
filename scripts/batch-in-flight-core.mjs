@@ -111,9 +111,10 @@ export const EVIDENCE_KINDS = ['pid', 'branch', 'worktree', 'log']
 
 /** Branch refs that can never be evidence of a DELEGATED agent's progress,
  *  whatever the declaring session names them (four-eyes review 28.07.2026,
- *  finding 1.2). `main` moves on everyone else's merges, and `HEAD` is the
- *  declaring checkout itself. */
-const ALWAYS_REFUSED_REFS = new Set(['main', 'head'])
+ *  finding 1.2). `main` moves on everyone else's merges, and `HEAD` — for which
+ *  `@` is git's own alias (second review, finding B; it walked straight past the
+ *  refusal) — is the declaring checkout itself. */
+const ALWAYS_REFUSED_REFS = new Set(['main', 'head', '@'])
 
 /** Compare a filesystem path the way both Windows and git will: separators
  *  normalised, trailing separators dropped, case folded. */
@@ -124,11 +125,22 @@ const normPath = (p) =>
     .replace(/\/+$/, '')
     .toLowerCase()
 
-/** `refs/heads/x`, `origin/x` and `x` all name the same thing for this purpose. */
+/**
+ * `refs/heads/x`, `heads/x`, `origin/x`, `x` and `x@{0}` all name the same thing
+ * for this purpose. The last three spellings are not pedantry: `heads/main` and
+ * `main@{0}` both resolve to main and both walked past the refusal until the
+ * second four-eyes review drove them live (finding B). This is the BELT — the CLI
+ * additionally resolves every declared ref through `git rev-parse
+ * --symbolic-full-name` and refuses on the resolved name, which catches the
+ * spellings no string rule can enumerate; this rule is what still holds when git
+ * cannot resolve the ref at all.
+ */
 const normRef = (r) =>
   String(r ?? '')
     .trim()
+    .replace(/@\{[^}]*\}$/, '')
     .replace(/^refs\/(heads|remotes)\//, '')
+    .replace(/^heads\//, '')
     .replace(/^origin\//, '')
     .toLowerCase()
 
