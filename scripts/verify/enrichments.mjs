@@ -13,6 +13,7 @@
 // hit-tests), a real WheelEvent zoom, the screenshots and the console-error
 // gate. Dev server only (dev hooks).
 import { launchVerifyBrowser, assertBackend } from './_browser.mjs'
+import { animalShare, readsAsAnimal, waterFloor } from './animalShare.mjs'
 import { frameShutter, captureFrame } from './frameSubject.mjs'
 import { fileURLToPath } from 'node:url'
 import sharp from 'sharp'
@@ -4423,6 +4424,19 @@ await shot('128-elephant-mourning', { world: { lat: -4.9, lon: 36.6 }, label: 't
 // untouched throughout. Screenshots 129 (hidden) / 130 (lunge).
 await page.evaluate(() => {
   window.__game.getState().debugJumpTo(-17.9, 25.9) // the Zambezi reach
+  // PIN THE STAGING AT THE JUMP (point 382). The traveller lands ON the river and
+  // the current sweeps him ~2 units/s downstream while the herds restock and the
+  // camera settles — a wall-clock-dependent stretch. His drifted position is what
+  // the point-274 water-cell search below starts from, so the staged cell (and
+  // with it the sampled rects) landed somewhere different on every run: measured,
+  // one run put the eye rect half over the waterfall's foam and another put the
+  // body rect under the "Unknown waterfall" map label, which is not water at all.
+  // Freezing the drift HERE — rather than inside the staging, after the settle —
+  // makes the traveller's spot, the chosen cell and the rects identical run to
+  // run (verified: cell (265,179) and body rect (1145,304,167,118) in three
+  // separate browser sessions). Restored in the cleanup below.
+  window.__stagedCrocPrevDrift = window.__balance.currentDrift
+  window.__balance.currentDrift = 0
   window.__ui.getState().setWheelZoomEnabled(true)
   window.__ui.getState().setTravelZoom(2)
   window.__wildlife.restock()
@@ -4484,6 +4498,34 @@ check(
 // The teeth: a control forces the SAME croc to STRIKE (fully out) and asserts the
 // BODY rect then reads CLEARLY different from water — so hidden = eyes present AND
 // body==water, visible = body!=water, and an empty frame = eyes absent -> FAIL.
+//
+// HOW "different from water" IS MEASURED (point 382). Every leg above is read
+// through ONE scale-free statistic, `animalShare` (defined at its use below):
+// the share of a rect whose colour sits further from that frame's OWN water
+// colour than a fixed multiple of the water's OWN spread. Nothing is compared
+// against a hand-set colour number, and nothing depends on brightness, exposure,
+// backend or projection — the water in the picture is the yardstick.
+// It replaced three absolute deltas whose worst, `strikeDiff > 45`, decided the
+// verdict on the second decimal of a mean and went red on an undisputed picture
+// (44.2 and 44.6 in one evening, and 37.5-42.9 across the eight staged repeats
+// measured for point 382): a mean over the rect dilutes the body with the water
+// beside it, and the dilution moves with the projection.
+// THE MEASURED SPREAD the new bars stand on — twelve repeats of this staging on
+// a quiet machine (eight on WebGL 2, four on WebGPU) plus the three full suite
+// runs that closed point 382, the two backends agreeing to within the
+// run-to-run noise, which is the property a scale-free measure is chosen for:
+//   share, striking body   0.303 - 0.316   bar >= 0.10   (a 3x margin)
+//   share, hidden body     0     - 0.00046 bar <= 0.02   (a 43x margin)
+//   share, croc-free body  0     - 0.00257               (the water floor)
+//   share, eye rect hidden 0.108 - 0.119   bar >= 0.02   (a 5x margin)
+//   share, eye rect free   0                             (the water floor)
+// The old absolute delta over the SAME fifteen frames: 37.5 - 45.7 against its
+// bar of 45 — it landed on the passing side exactly once. That is the flake seen
+// from the other end: the same undisputed picture, a verdict decided by which
+// side of 45 a colour average happened to fall on.
+// and the criterion is written ONCE so it can be FED THE HIDDEN FRAME and shown
+// to say no — `hiddenWouldReadAsAnimal` must be false, asserted, so a body that
+// stayed water-coloured through the strike still turns this check red.
 // Staging discipline (the fix of this check's own false-fail): the ambush
 // trigger is FROZEN while the croc is sampled (balance.crocodile.strikeRadius
 // = 0 — debug-editable; the point-247 bank drinkers stand within the default
@@ -4502,6 +4544,15 @@ check(
 // reach ~1.35 + margin) holds through every sample, and `playerClear`
 // (player-croc distance > 4 at the hidden sample) is asserted and logged so a
 // pass PROVES the body rect held pure water-over-the-submerged-croc.
+// That freeze happens AT THE JUMP now (point 382), not here. Frozen only once
+// the camera had settled, it left the traveller a wall-clock-dependent stretch
+// of drifting first — and the cell search starts from where he ended up, so the
+// staged cell and the sampled rects landed somewhere different on every run.
+// Measured on unpinned runs: one put the eye rect over the falls' foam (its
+// reference read 2548 of 2613 pixels as crocodile), another put the body rect
+// under the "Unknown waterfall" map label, which is no more water than the HUD
+// is. Frozen at the jump, three separate browser sessions staged the identical
+// cell (265, 179) and the identical body rect (1145, 304, 167x118).
 // Sampled at an ACHIEVABLE gameplay zoom (point 172 —
 // the non-debug wheel range is 0.125–0.5): the closest candidate at which both
 // rects project fully on screen, preferring 0.25 where the two ~0.06-unit
@@ -4539,13 +4590,10 @@ const crocStage = await page.evaluate(() => {
   }
   if (!water) return { staged: false }
   // Freeze the ambush while the croc is sampled (restored in the cleanup).
+  // The river's downstream drift is already frozen — at the JUMP, so the cell
+  // this search picks is the same one every run (point 382).
   window.__stagedCrocPrevStrike = window.__balance.crocodile.strikeRadius
   window.__balance.crocodile.strikeRadius = 0
-  // Freeze the river's downstream drift so the canoeing player (and the
-  // camera that follows him) stands STILL through every sample — the swept
-  // canoe used to drift into the body rect and false-fail the hidden read.
-  window.__stagedCrocPrevDrift = window.__balance.currentDrift
-  window.__balance.currentDrift = 0
   window.__stagedCrocBackup = { crocodile: herds.crocodile.splice(0), flamingo: herds.flamingo.splice(0) }
   // Anchor at the visibly DRAWN sheet (point 274): sheetAt, never the canoe
   // float height surfaceAt — its local-bed floor can stand ~0.22 proud of the
@@ -4642,32 +4690,43 @@ if (
     return { mean: [r / n, g / n, b / n], data, n, ch }
   }
   const l1 = (a, c) => Math.abs(a[0] - c[0]) + Math.abs(a[1] - c[1]) + Math.abs(a[2] - c[2])
-  // Pixels of a clip that read as CROC rather than water: colour more than T
-  // (L1) from the local water mean, EXCLUDING bright specular/foam (which also
-  // differs from the mean but is water, not croc) — so an animated river's
-  // wave crests never masquerade as an eye knob and inflate the reference
-  // floor. Returned as an ABSOLUTE count: the two eye-knob caps are a small
-  // patch whose FRACTION of the rect shrinks with the projection, but a real
-  // croc yields a two-digit pixel count while an empty frame stays at the
-  // water-noise floor near 0.
-  const crocPx = (s, water, T) => {
-    let c = 0
-    for (let i = 0; i < s.n; i++) {
-      const r = s.data[i * s.ch], g = s.data[i * s.ch + 1], b = s.data[i * s.ch + 2]
-      const foam = Math.min(r, g, b) > 200
-      if (!foam && Math.abs(r - water[0]) + Math.abs(g - water[1]) + Math.abs(b - water[2]) > T) c++
-    }
-    return c
-  }
-  const EYE_T = 22 // an eye-knob pixel must differ from water by at least this (L1)
+  // --- THE MEASURE (point 382) -------------------------------------------------
+  // `animalShare` (./animalShare.mjs — pure, and unit-pinned in
+  // animalShare.test.mjs, including the teeth) answers the question this check is
+  // really asking — does what lies in this rect read as an ANIMAL rather than as
+  // the water around it? — as a share of the rect, measured against the water's
+  // OWN colour spread IN THE SAME FRAME:
+  //   median colour of the rect  = the water (the water is the majority of every
+  //                                rect here, so the median IS a water pixel)
+  //   d_i                        = each pixel's L1 distance from that median
+  //   spread                     = the median of the d_i — the water's own scale
+  //   share                      = #{ d_i > ANIMAL_SIGMAS · spread } / kept
+  // It is SCALE-FREE by construction: multiply every colour distance in the rect
+  // by any λ (a brighter sky, a darker backend, a cloud passing, a different
+  // exposure) and both d_i and `spread` scale with it, so the share does not
+  // move. It is also free of the projection: it is a fraction of the rect, not a
+  // pixel count. Nothing here is compared against a hand-set colour number — the
+  // only absolute is the 1-unit floor under `spread`, which is one 8-bit step,
+  // i.e. the smallest colour difference that exists at all.
+  // This REPLACES an absolute channel delta (`l1(strikeMean, waterMean) > 45`)
+  // that decided the verdict on the second decimal of a mean: it read 44.2 and
+  // 44.6 against its own 45 in one evening, and 37.5-42.9 across eight staged
+  // repeats measured for point 382 — the check was red on a picture nobody
+  // disputes, because a mean over the rect DILUTES the body with the water
+  // beside it and the dilution moves with the projection.
+  // Bright specular/foam is water, not animal, and is dropped BEFORE anything is
+  // measured (the point-274 exclusion, now applied to the reference colour too:
+  // the old code excluded foam from the count but left it in the mean, so a rect
+  // with foam in it reported nearly every water pixel as crocodile — measured
+  // 2548 of 2613 on an unpinned staging).
   // (a) WATER REFERENCE — both rects with NO crocodile over them.
   await page.evaluate(() => window.__pollSim(1.5, () => false))
   const refClips = await crocClips(false)
   const bodyRef = await sample(refClips.bodyClip)
   const eyeRef = await sample(refClips.eyeClip)
   const waterMean = bodyRef.mean
-  const eyeWater = eyeRef.mean
-  const eyePxRef = crocPx(eyeRef, eyeWater, EYE_T) // water-noise floor (≈0)
+  const bodyRefShare = animalShare(bodyRef) // water-only floor (measured 0)
+  const eyeRefShare = animalShare(eyeRef)   // water-only floor (measured 0)
   // (b) HIDDEN croc on that cell — body vanishes into the water, eye knobs show.
   await page.evaluate(() => {
     const p = window.__stagedCrocPos
@@ -4695,9 +4754,19 @@ if (
   await page.evaluate(() => window.__pollSim(2, () => false))
   const strikeClips = await crocClips(true)
   const bodyStrike = await sample(strikeClips.bodyClip)
-  const bodyDiff = l1(bodyHidden.mean, waterMean)   // hidden body vs water (want small)
-  const strikeDiff = l1(bodyStrike.mean, waterMean) // strike body vs water (want large)
-  const eyePxHidden = crocPx(eyeHidden, eyeWater, EYE_T) // eye knobs present (want ≫ floor)
+  const bodyHiddenShare = animalShare(bodyHidden)
+  const bodyStrikeShare = animalShare(bodyStrike)
+  const eyeHiddenShare = animalShare(eyeHidden)
+  // --- THE CRITERION (point 382), written ONCE so the same function can be fed
+  // the HIDDEN frame and demanded to say no. Both clauses are dimensionless:
+  //   * a GEOMETRIC floor — the risen body must repaint at least a tenth of its
+  //     own footprint (measured 0.305-0.314 over eight staged repeats, so a 3x
+  //     margin, against a share of the rect rather than a colour value); and
+  //   * a SEPARATION against the water's own floor: whatever share the same rect
+  //     shows with NO crocodile over it, the strike must beat many times over.
+  //     It is the clause that bites when the water itself is busy — a foaming or
+  //     shadow-crossed rect raises the floor, and the bar rises with it.
+  const floor = waterFloor(bodyRefShare.share, bodyRef.n)
   crocHiddenResult = {
     staged: true, zoom: crocView.zoom,
     croc: hiddenClips.croc, bodyClip: hiddenClips.bodyClip, eyeClip: hiddenClips.eyeClip,
@@ -4709,30 +4778,50 @@ if (
     // sampled pixels were water over the submerged croc, never the boat.
     player: hiddenClips.player,
     playerClear: hiddenClips.player.dist > 4,
+    // The scale-free readings the verdict rests on.
+    bodyRefShare: +(bodyRefShare.share ?? -1).toFixed(5),
+    bodyHiddenShare: +(bodyHiddenShare.share ?? -1).toFixed(5),
+    bodyStrikeShare: +(bodyStrikeShare.share ?? -1).toFixed(5),
+    eyeRefShare: +(eyeRefShare.share ?? -1).toFixed(5),
+    eyeHiddenShare: +(eyeHiddenShare.share ?? -1).toFixed(5),
+    waterFloor: +floor.toFixed(6),
+    spreads: { bodyRef: bodyRefShare.spread, bodyHidden: bodyHiddenShare.spread, bodyStrike: bodyStrikeShare.spread, eyeRef: eyeRefShare.spread, eyeHidden: eyeHiddenShare.spread },
+    strikeReadsAsAnimal: readsAsAnimal(bodyStrikeShare, floor),
+    // THE TEETH, proven rather than argued (point 382): the SAME criterion, fed
+    // the HIDDEN frame — a body that stayed water-coloured through the strike —
+    // must say NO. If this ever comes out true the criterion has stopped
+    // discriminating and the check fails, however green its other legs are.
+    hiddenWouldReadAsAnimal: readsAsAnimal(bodyHiddenShare, floor),
+    // Diagnostics only — the absolute means the old criterion decided on, kept
+    // because a failure log is easier to read with them present.
     waterMean: waterMean.map((v) => +v.toFixed(1)),
     bodyHidden: bodyHidden.mean.map((v) => +v.toFixed(1)), bodyStrike: bodyStrike.mean.map((v) => +v.toFixed(1)),
-    bodyDiff: +bodyDiff.toFixed(1), strikeDiff: +strikeDiff.toFixed(1),
-    eyePxRef, eyePxHidden, eyeN: eyeHidden.n,
+    bodyDiff: +l1(bodyHidden.mean, waterMean).toFixed(1), strikeDiff: +l1(bodyStrike.mean, waterMean).toFixed(1),
+    eyeN: eyeHidden.n,
   }
 }
-// Restore the natural herds and the ambush radius whenever the staging spliced
-// them — even when the rect guard above bailed — so the following staged drama
-// starts clean and with its lunge trigger live.
-if (crocStage.staged) {
-  await page.evaluate(() => {
-    const herds = window.__wildlife.herdsRef.current
+// Restore the natural herds, the ambush radius and the frozen river drift — even
+// when the staging or the rect guard above bailed, so the following staged drama
+// starts clean and with its lunge trigger live. The drift is restored
+// UNCONDITIONALLY (point 382): it is frozen at the jump now, before the cell
+// search can decide whether anything was staged at all.
+await page.evaluate(() => {
+  const herds = window.__wildlife.herdsRef.current
+  const bk = window.__stagedCrocBackup
+  if (bk) {
+    // Only a staging that SPLICED the herds may put them back — an unstaged run
+    // must keep the natural crocodiles it never touched.
     herds.crocodile.splice(0)
-    const bk = window.__stagedCrocBackup || { crocodile: [], flamingo: [] }
     herds.crocodile.push(...bk.crocodile)
     herds.flamingo.push(...bk.flamingo)
-    if (window.__stagedCrocPrevStrike !== undefined) window.__balance.crocodile.strikeRadius = window.__stagedCrocPrevStrike
-    if (window.__stagedCrocPrevDrift !== undefined) window.__balance.currentDrift = window.__stagedCrocPrevDrift
-    delete window.__stagedCrocBackup
-    delete window.__stagedCrocPos
-    delete window.__stagedCrocPrevStrike
-    delete window.__stagedCrocPrevDrift
-  })
-}
+  }
+  if (window.__stagedCrocPrevStrike !== undefined) window.__balance.crocodile.strikeRadius = window.__stagedCrocPrevStrike
+  if (window.__stagedCrocPrevDrift !== undefined) window.__balance.currentDrift = window.__stagedCrocPrevDrift
+  delete window.__stagedCrocBackup
+  delete window.__stagedCrocPos
+  delete window.__stagedCrocPrevStrike
+  delete window.__stagedCrocPrevDrift
+})
 check(
   "a lurking crocodile shows its eye knobs while its body reads as WATER, and a strike does not (point 274)",
   crocHiddenResult.staged &&
@@ -4741,15 +4830,22 @@ check(
     // and the drift-frozen player's canoe stood provably clear of the body rect
     crocHiddenResult.playerClear === true &&
     // (1) eye knobs present — the croc is there, not an empty frame (a false
-    // pass): an absolute two-digit-ish pixel patch, clearly above the water-
-    // noise floor of the same rect sampled croc-free
-    crocHiddenResult.eyePxHidden >= 6 &&
-    crocHiddenResult.eyePxHidden > crocHiddenResult.eyePxRef * 3 + 4 &&
-    // (2) the submerged body is indistinguishable from the water
-    crocHiddenResult.bodyDiff < 22 &&
-    // teeth: the risen strike body is a clear dark silhouette the test tells apart
-    crocHiddenResult.strikeDiff > 45 &&
-    crocHiddenResult.strikeDiff > crocHiddenResult.bodyDiff * 2.5,
+    // pass): a readable share of the eye rect stands outside that frame's own
+    // water population, many times whatever the same rect shows croc-free
+    // (measured 0.108-0.119 against a floor of 0 over eight staged repeats)
+    crocHiddenResult.eyeRefShare >= 0 && // -1 = the rect was not water enough to measure
+    crocHiddenResult.eyeHiddenShare >= 0.02 &&
+    crocHiddenResult.eyeHiddenShare >= 8 * Math.max(crocHiddenResult.eyeRefShare, 1 / crocHiddenResult.eyeN) &&
+    // (2) the submerged body is indistinguishable from the water: essentially
+    // NOTHING in its footprint stands outside the water population
+    // (measured 0-0.00046)
+    crocHiddenResult.bodyHiddenShare >= 0 && crocHiddenResult.bodyHiddenShare <= 0.02 &&
+    // (3) teeth: the risen strike body reads as an ANIMAL by the scale-free
+    // criterion (measured 0.305-0.314 against its 0.10 bar) …
+    crocHiddenResult.strikeReadsAsAnimal === true &&
+    // … and that same criterion, fed the HIDDEN frame, still says no — proof it
+    // discriminates rather than merely passing today's picture
+    crocHiddenResult.hiddenWouldReadAsAnimal === false,
   JSON.stringify(crocHiddenResult),
 )
 await page.evaluate(() => {
