@@ -350,6 +350,24 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   existiert noch nicht'. Und prüfe jede Zusicherung, die ein Dokument über den Code
   macht, gegen den Code — oder kennzeichne sie als Absicht."
 
+- **Der Wächter, der beim Scheitern durchwinkt — und die Handlung, die er dabei
+  verschluckt.** Ein guter Wächter lässt bei einem eigenen Fehler durch, sonst sperrt
+  er dich aus. Das ist richtig, solange er nur *prüft*. Sobald er auch etwas **tut**,
+  wird dieselbe Höflichkeit gefährlich: Die Handlung scheitert, der Fehler wird
+  aufgefangen, alles sieht nach Erfolg aus — und der halb veränderte Zustand bleibt
+  liegen. Bei mir hat genau das eine Sitzungsübergabe fünfeinhalb Stunden lahmgelegt.
+  → *Prompt:* „Wo ein Wächter nicht nur prüft, sondern etwas ausführt: Melde ein
+  Scheitern im selben Atemzug wie die Freigabe, und verbrauche den Zustand, der die
+  Handlung erlaubt hat, erst **nachdem** sie gelungen ist."
+
+- **Jedes Teil grün, die Kette trotzdem tot.** Du hast Tests für jeden Baustein, und
+  sie leuchten alle. Trotzdem passiert am Ende nichts, weil zwischen zwei Bausteinen
+  niemand nachgesehen hat. Eine Kette wird durch **einen echten Durchlauf** geprüft,
+  nicht durch die Summe ihrer Teile.
+  → *Prompt:* „Für alles, was aus mehreren Schritten besteht: Spiel es **einmal
+  vollständig durch** und lies das Ergebnis aus den Protokollen, nicht aus den Tests.
+  Bricht die Kette irgendwo, ist genau dieser Bruch das Ergebnis."
+
 ---
 
 ## Drei Meta-Regeln, die alles zusammenhalten
@@ -397,4 +415,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 Wenn du diese eine Nachricht an den Anfang stellst, hast du 80 % der Lehren dieses
 Projekts eingebaut, bevor die erste Zeile Code entsteht.
 
-<!-- GUIDE-FINGERPRINT: f1ee3eb83a5a73eb68dc1458352ad063b7d5039c7018fc205fe4f11637545d9a -->
+<!-- GUIDE-FINGERPRINT: 76463706f4e963820efdb6cc542d44309ef8baf6994419a852a27bf9c306c467 -->
