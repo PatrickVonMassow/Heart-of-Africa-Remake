@@ -37,6 +37,7 @@ scripts/.tile-cache
 .claude/dashboard-state.json
 .claude/current-focus.json
 .claude/focus-check-pending.json
+.claude/session-process.json
 .claude/tool-activity.json
 .claude/wait-prep.json
 .claude/render-verify-state.json
