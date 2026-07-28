@@ -3643,6 +3643,39 @@ read that as "the criterion and its evidence section".
   DOCS in the same commit: CLAUDE.md §6 as above, and `scripts/verify/README.md` where
   the hooks are described.
 
+- [ ] 409. A MERGED BRANCH MUST NOT SURVIVE ITS MERGE (28.07.2026, user reported 36
+  branches on GitHub and asked for a mechanism). Measured at that moment: 31 of the 36
+  remote branches were already fully contained in `main`, 72 of 77 local branches were,
+  and 36 of 48 worktrees sat on such a branch — some of them 450 commits behind. None
+  of it was risky (every commit lives in `main`), and all of it was noise: it hid the
+  four branches that were genuinely open, it made `git branch` useless as an overview,
+  and the stale worktrees cost disk and confused every search. The debris was cleared by
+  hand on 28.07.2026; this point makes the cleanup automatic, because CLAUDE.md §6
+  already says the branch workflow ends at the merge and the deletion was simply
+  forgotten thirty-one times. A rule that is remembered is a rule that rots.
+  THE MECHANISM, in the shape this project uses: a Stop hook
+  (`scripts/branch-hygiene-guard.mjs`, decision core pure and Vitest-covered, FAIL-OPEN
+  like every guard here) BLOCKS the turn end while a branch that is FULLY CONTAINED in
+  `origin/main` still exists — as a local branch, as a remote branch, or as a worktree —
+  and names the exact commands that remove each one. It must be cheap: `git branch
+  --merged origin/main` and `git worktree list` are local, no network.
+  THE CARVE-OUTS, or it fires on healthy work: `main` itself; a branch a LIVE session
+  has declared in flight (`.claude/batch-in-flight.json`); the verify-baseline
+  checkouts under `local/`, which are caches keyed by sha and not branches at all; and a
+  branch merged less than a calibratable grace ago (default 10 minutes), so the merging
+  session is never blocked by the branch it is still finishing with.
+  MERGE-TIME DELETION IS THE PRIMARY PATH, the guard is the backstop: the merge step in
+  CLAUDE.md §6 gains "delete the branch — local, remote and its worktree — as part of
+  the merge, before the tick", so the guard normally has nothing to find. A backstop
+  that fires routinely has become the process, which is how this debt accumulated.
+  VERIFIABLE: pure Vitest on the decision — a merged local branch blocks, a merged
+  remote branch blocks, a merged worktree blocks, an UNMERGED branch never blocks, a
+  branch inside the grace never blocks, an in-flight branch never blocks, `main` never
+  blocks, and an unreadable git state allows the stop (fail-open). Live: merge a point
+  and see the turn end refused until the branch is gone.
+  DOCS in the same commit: CLAUDE.md §6 (the merge step) and §7.2, where the Stop chain
+  lists its guards.
+
 ## Closing (only after all points)
 
 New points are appended BEFORE this section — it stays last in the file.
