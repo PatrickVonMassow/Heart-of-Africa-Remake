@@ -26,7 +26,15 @@ import {
   type DebugEventFailure,
   type WildlifeDramaKind,
 } from '../../systems/debugEvents'
-import { setAnimalCollider } from './wildlifeCollision'
+import { setAnimalCollider, collidableAnimalsNear } from './wildlifeCollision'
+import {
+  recordDrawnBody,
+  drawnCollisionCircle,
+  BODY_RADIUS,
+  SPECIES,
+  type DrawnBody,
+  type Species,
+} from './animalBodies'
 import { isOnScreen } from './frameVisibility'
 import { latLonToWorld, regionAt, PLACES, UNITS_PER_DEGREE, worldToLatLon } from '../../world/geo'
 import { RIVER_WIDTH_DEG, sampleTerrain } from '../../world/terrain'
@@ -165,11 +173,6 @@ const CHUNK_SIZE = 24
 // existing scavenger/cull/render machinery works a dead hyena exactly like a
 // dead zebra. Live predators never spawn here — spawnChunk picks species
 // explicitly, and the one live hunter stays the scripted <LionHunt>.
-type Species = 'elephant' | 'giraffe' | 'zebra' | 'wildebeest' | 'antelope' | 'warthog' | 'flamingo' | 'crocodile' | 'plover' | PredatorKind
-const SPECIES: Species[] = [
-  'elephant', 'giraffe', 'zebra', 'wildebeest', 'antelope', 'warthog', 'flamingo', 'crocodile', 'plover',
-  'lion', 'cheetah', 'leopard', 'hyena',
-]
 const MAX_INSTANCES: Record<Species, number> = {
   elephant: 60,
   giraffe: 60,
@@ -337,6 +340,12 @@ interface Animal {
    *  judges animals the ground sweep has seen — a staged injection with a
    *  hard-coded y is corrected on its first sweep visit, not flagged. */
   grounded?: boolean
+  /** The transform the render loop last composed for this animal (point 378):
+   *  written from the instance matrix itself, read by the collider so the
+   *  circle sits where the body is DRAWN. Never read back by the simulation —
+   *  the render offsets must not accumulate into the behaviour position (the
+   *  point-383 write-back lesson). */
+  drawn?: DrawnBody
   /** Consecutive anchoring-assert visits this animal has been buried/floating
    *  (point 200): the tripwire fires only at 2+, tolerating a 1-frame transient. */
   floatStrike?: number
@@ -515,6 +524,11 @@ const mournOrphan = (young: Animal | null | undefined, body: { x: number; z: num
  *  calf to hunt (both live in this module). Set each frame by <Herds>, cleared on
  *  unmount. */
 let ACTIVE_HERDS: Record<Species, Animal[]> | null = null
+
+/** Frame stamp of the herd draw pass the collider must match (point 378): only
+ *  an animal DRAWN in that pass carries a collision circle, so a body the frame
+ *  never rendered (capped out, streamed away) leaves no phantom collider. */
+let ACTIVE_DRAW_FRAME = 0
 
 /** Base render scale per prey species (warthog small, wildebeest sturdy). The
  *  giraffe geometry is already giraffe-sized (~3.6 units tall, fauna.ts), so
@@ -815,28 +829,6 @@ const VULTURE_FLY_SPEED = 16
 const FALLS_DRIFT_BOOST = 4
 const FALLS_DRIFT_RADIUS_DEG = 0.5
 
-/** Body radius per species (world units, at scale 1): animals spawn with — and
- *  keep — at least the sum of two bodies' radii between their centres, so they
- *  neither spawn inside one another nor walk through each other (design.md
- *  §19). The elephant×smaller-prey pair is exempt at runtime: trampling is a
- *  designed interaction (the herd walks OVER a too-slow animal). */
-const BODY_RADIUS: Record<Species, number> = {
-  elephant: 1.3,
-  giraffe: 0.9,
-  zebra: 0.7,
-  wildebeest: 0.75,
-  antelope: 0.6,
-  warthog: 0.45,
-  flamingo: 0.25,
-  crocodile: 0.55,
-  plover: 0.12,
-  // Predator entries complete the record (point 146); their list members are
-  // always dead, and every proximity pass skips carcasses.
-  lion: 0.8,
-  cheetah: 0.55,
-  leopard: 0.55,
-  hyena: 0.6,
-}
 /** Grid cell size for the runtime separation pass (≥ 2·max body radius). */
 const SEPARATION_CELL = 4
 // Body separation acts as a bounded force (units/s), not a per-frame teleport:
@@ -849,6 +841,16 @@ const SEPARATION_MAX_SPEED = 2.2
  * through them. Reads the streamed herds shared each frame via ACTIVE_HERDS;
  * carcasses are passable. The Wildlife component registers this with
  * `setAnimalCollider` so the movement loop can call it (see wildlifeCollision).
+ *
+ * The circle comes from the transform the RENDERER composed for that instance
+ * (point 378), never from the behaviour position: the drawn body carries the
+ * render offsets — the idle shuffle (up to ~1.1 units, more than a grazer's
+ * whole body), the drink/bathe slide to the bank (measured up to 8.9 units),
+ * the caught struggle, the crocodile's ambush placement — and a collider built
+ * from `a.x`/`a.z` therefore sat BESIDE the animal: the traveller walked
+ * through the drawn body and was blocked on empty ground next to it (the user's
+ * report). An animal the last pass did not draw contributes nothing, so an
+ * unrendered body leaves no phantom collider either (the point-129 rule).
  */
 function nearAnimalObstacles(px: number, pz: number, radius: number): Array<[number, number, number]> {
   const herds = ACTIVE_HERDS
@@ -857,9 +859,10 @@ function nearAnimalObstacles(px: number, pz: number, radius: number): Array<[num
   for (const sp of SPECIES) {
     const br = BODY_RADIUS[sp]
     for (const a of herds[sp]) {
-      if (a.dead) continue
-      const r = br * a.scale
-      if (Math.abs(a.x - px) < radius + r && Math.abs(a.z - pz) < radius + r) out.push([a.x, a.z, r])
+      const circle = drawnCollisionCircle(a, br, ACTIVE_DRAW_FRAME)
+      if (circle === null) continue
+      const [cx, cz, r] = circle
+      if (Math.abs(cx - px) < radius + r && Math.abs(cz - pz) < radius + r) out.push(circle)
     }
   }
   return out
@@ -1768,7 +1771,11 @@ function Herds() {
       herdState.current.clear()
       for (const f of scavengers.current) f.target = null
     }
-    w.__wildlife = { herdsRef, stains, spawnedChunks, scavenger, restock, calfMeshRefs, herdState, fire: FIRE_STATE, lion: LION_STATE, igniteFire: igniteFireAt, simTime: () => simTimeRef.current, frames: () => frameCountRef.current }
+    // meshRefs + colliders (point 378): the verification reads the ADULT instance
+    // matrices themselves and the circles the movement loop really collides
+    // against, so the two can be checked against each other.
+    w.__wildlife = { herdsRef, stains, spawnedChunks, scavenger, restock, meshRefs, calfMeshRefs, herdState,
+      colliders: (x: number, z: number, r: number) => collidableAnimalsNear(x, z, r), fire: FIRE_STATE, lion: LION_STATE, igniteFire: igniteFireAt, simTime: () => simTimeRef.current, frames: () => frameCountRef.current }
     return () => {
       delete w.__wildlife
     }
@@ -3862,6 +3869,10 @@ function Herds() {
       }
     }
 
+    // Frame stamp of THIS draw pass (point 378): every instance written below
+    // carries it, and the collider accepts only circles stamped with it.
+    const drawFrame = frameCountRef.current
+    ACTIVE_DRAW_FRAME = drawFrame
     for (const sp of SPECIES) {
       const mesh = meshRefs.current[sp]
       if (!mesh) continue
@@ -3877,6 +3888,8 @@ function Herds() {
       let sIdx = 0
       let crocStrikeThis = false
       const write = (a: Animal) => {
+        // Point 378: the collider's single source is the matrix written here.
+        recordDrawnBody(a, mtx.elements, drawFrame)
         if (a.young && calfMesh) {
           if (cIdx < MAX_CALF_INSTANCES) calfMesh.setMatrixAt(cIdx++, mtx)
         } else if (crocStrikeThis) {
