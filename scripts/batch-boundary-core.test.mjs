@@ -286,6 +286,27 @@ describe('handoverSurvivesCall — closing work keeps the boundary, anything els
     expect(call({ command: 'npm test; node scripts/focus.mjs confirm' }).survives).toBe(false)
   })
 
+  it('a single & is a separator too — it hid real work behind a closing head', () => {
+    // Four-eyes review (Fable 5): with `&&` and `;` as the only separators this
+    // parsed as ONE segment, matched the closing head and KEPT the handover
+    // through `npm test` — a successor could then spawn beside a working session.
+    expect(call({ command: 'node scripts/board.mjs & npm test' }).survives).toBe(false)
+    expect(call({ command: 'npm test & node scripts/board.mjs' }).survives).toBe(false)
+    // …and a genuine chain of closing commands still survives it.
+    expect(call({ command: 'node scripts/focus.mjs confirm & node scripts/dashboard-publish.mjs' }).survives).toBe(true)
+  })
+
+  it('a segment that can run or write something unseen is not closing', () => {
+    for (const c of [
+      'node scripts/board.mjs $(rm -rf src)',
+      'node scripts/dashboard-publish.mjs `npm test`',
+      'node scripts/board.mjs > src/world.ts',
+      'node scripts/focus.mjs confirm < payload.txt',
+    ]) {
+      expect(call({ command: c }).survives).toBe(false)
+    }
+  })
+
   it('is CONSERVATIVE where it cannot tell: unknown tool, no target, empty command', () => {
     expect(handoverSurvivesCall({}).survives).toBe(false)
     expect(handoverSurvivesCall({ toolName: 'Agent' }).survives).toBe(false)

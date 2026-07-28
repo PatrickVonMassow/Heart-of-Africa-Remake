@@ -227,15 +227,30 @@ export function isClosingSetPath(p) {
  * A shell command counts only when EVERY one of its segments is a closing-set
  * script (bare navigation is neutral). One `git commit` or one `npm test` in the
  * chain is the session carrying on, whatever else rides along with it.
+ *
+ * The SEPARATOR set is the load-bearing part, and it errs toward splitting. A
+ * single `&` was missing from it (four-eyes review, Fable 5): `node
+ * scripts/board.mjs & npm test` then parsed as ONE segment whose head matched a
+ * closing script, so the handover survived real work — the dangerous direction,
+ * because a kept handover plus a long enough silence lets a successor spawn
+ * beside a working session.
+ *
+ * A segment must also be nothing but the invocation: any command substitution
+ * (`$(…)`, backticks) or redirection (`>`, `<`) makes it non-closing, whatever
+ * its head reads as. Those run or write something this function cannot see, and
+ * the head is no longer evidence of what the segment does.
  */
+const OPAQUE_SEGMENT_RE = /\$\(|`|>|</
+
 export function isClosingSetCommand(command) {
   if (typeof command !== 'string' || !command.trim()) return false
   const segments = command
-    .split(/&&|\|\||[;|\n\r]+/)
+    .split(/&&|\|\||[;|&\n\r]+/)
     .map((s) => s.trim())
     .filter(Boolean)
   let sawClosing = false
   for (const seg of segments) {
+    if (OPAQUE_SEGMENT_RE.test(seg)) return false
     if (/^(?:cd|set-location|pushd|popd)\b/i.test(seg)) continue
     const head = seg.match(/^(?:node|npx\s+node)\s+(?:"[^"]*"|'[^']*'|\S+)/i)
     if (!head || !CLOSING_SCRIPT_RE.test(head[0])) return false
