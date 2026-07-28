@@ -766,7 +766,7 @@ for (const [placeId, shot] of [
   check('the Giza field (with the Sphinx) is mounted at travel scale', !!giza?.ids?.includes('giza'), JSON.stringify(giza))
   // Giza's own position (the marker jumped to in the block below), not the
   // standpoint: the frame claims the field, so the field must be in the picture.
-  await frame('103-giza-sphinx-travel', { world: { lat: 29.7726, lon: 30.7554 }, label: 'the Giza field with the Sphinx' })
+  await frame('103-giza-sphinx-travel', { world: { lat: 29.98, lon: 30.59 }, label: 'the Giza field with the Sphinx' })
   await page.evaluate(() => window.__ui.getState().setTravelZoom(0.5))
 }
 
@@ -783,7 +783,7 @@ for (const [placeId, shot] of [
   await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 45000 })
   // Giza's river-cleared position (src/world/geo.ts). Jumping onto the marker
   // arms the enter hint; a Space press then confirms entry (design.md §2.3).
-  await page.evaluate(() => window.__game.getState().debugJumpTo(29.7726, 30.7554))
+  await page.evaluate(() => window.__game.getState().debugJumpTo(29.98, 30.59))
   await page.waitForFunction(() => window.__ui.getState().enterPlaceId === 'giza', null, { timeout: 15000 })
   const gizaPrompt = await page.evaluate(() => window.__ui.getState().prompt ?? '')
   check('the enter hint arms and names Giza (discovered, localized)', /Giza|Gizeh/.test(gizaPrompt), gizaPrompt)
@@ -793,7 +793,7 @@ for (const [placeId, shot] of [
   // the horizon check below vacuous.
   await page.waitForFunction(() => window.__placePanorama?.placeId === 'giza', null, { timeout: 60000 }).catch(() => {})
   // Re-set the live position right before the press (Space re-derives from it).
-  await page.evaluate(() => window.__game.getState().debugJumpTo(29.7726, 30.7554))
+  await page.evaluate(() => window.__game.getState().debugJumpTo(29.98, 30.59))
   await page.keyboard.press('Space')
   await page.waitForFunction(
     () => window.__game.getState().placeId === 'giza' && !!window.__placeLayout && !!window.__placeMonuments,
