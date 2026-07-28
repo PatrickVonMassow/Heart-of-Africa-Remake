@@ -34,6 +34,7 @@ export const BACKENDS = ['webgpu', 'webgl']
  */
 export const NON_RENDER_VERIFY = new Set([
   '_server.mjs', // vite start/stop plumbing shared by the runner and the classifier
+  'animalShare.mjs', // the animal-vs-water decision layer; enrichments.mjs feeds it pixels
   'baseline-classify-core.mjs',
   'baseline-classify.mjs',
   'docs.mjs',

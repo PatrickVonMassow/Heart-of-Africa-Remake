@@ -114,6 +114,32 @@ being neutral: F8 starts the in-game render benchmark (point 277), which swept
 ten graphics configs inside the measurement. A verification's filler inputs need
 re-checking whenever the game binds a new key.
 
+`scripts/verify/animalShare.mjs` is the fourth: the decision layer of the
+lurking-crocodile check in `enrichments.mjs` (design.md §19.16), pinned by
+`animalShare.test.mjs`. Its lesson (point 382) is about what a pixel check is
+allowed to compare against: **judge a picture by something IN the picture, never
+by a hand-set number.** The check asked whether a lunging crocodile reads as an
+ANIMAL rather than as water, and answered it with an absolute channel delta
+between two rect means against a threshold of 45 — so it decided on the second
+decimal of a colour average, read 44.2 and 44.6 in one evening on a quiet
+machine, and 37.5-42.9 across eight staged repeats. The picture was never in
+doubt; a mean over the rect dilutes the body with the water beside it, and the
+dilution moves with the projection. The replacement measures the share of a rect
+whose colour sits further from that frame's OWN water colour than a fixed
+multiple of the water's OWN spread: scale every colour distance by any factor
+and the share does not move, so brightness, exposure, backend and zoom cannot
+flip the verdict. The criterion is written once and the check FEEDS IT THE
+HIDDEN FRAME, asserting it still says no — a threshold that only ever sees
+today's good picture has no proven teeth.
+
+Its second lesson is about staging. Half the spread was not the measure at all:
+the traveller drifts downstream for a wall-clock-dependent stretch after the
+jump, and the staging's water-cell search starts from wherever he ended up, so
+one run sampled the falls' foam as its water reference and another the "Unknown
+waterfall" map label as its water. **A check that stages a scene must pin what
+the scene depends on before anything can move it** — the drift freeze moved to
+the jump, and three separate sessions then staged the identical cell and rect.
+
 ## Is the machine QUIET? — before the run (point 296)
 
 A timing verdict taken under load is not evidence. On 27.07.2026 that cost three

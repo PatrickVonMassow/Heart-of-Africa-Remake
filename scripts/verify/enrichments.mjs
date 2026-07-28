@@ -13,6 +13,7 @@
 // hit-tests), a real WheelEvent zoom, the screenshots and the console-error
 // gate. Dev server only (dev hooks).
 import { launchVerifyBrowser, assertBackend } from './_browser.mjs'
+import { animalShare, readsAsAnimal, waterFloor } from './animalShare.mjs'
 import { frameShutter, captureFrame } from './frameSubject.mjs'
 import { fileURLToPath } from 'node:url'
 import sharp from 'sharp'
@@ -4683,12 +4684,12 @@ if (
     return { mean: [r / n, g / n, b / n], data, n, ch }
   }
   const l1 = (a, c) => Math.abs(a[0] - c[0]) + Math.abs(a[1] - c[1]) + Math.abs(a[2] - c[2])
-  const medianOf = (arr) => { const s = Float64Array.from(arr).sort(); return s[s.length >> 1] }
   // --- THE MEASURE (point 382) -------------------------------------------------
-  // `animalShare` answers the question this check is really asking — does what
-  // lies in this rect read as an ANIMAL rather than as the water around it? — as
-  // a share of the rect, measured against the water's OWN colour spread IN THE
-  // SAME FRAME:
+  // `animalShare` (./animalShare.mjs — pure, and unit-pinned in
+  // animalShare.test.mjs, including the teeth) answers the question this check is
+  // really asking — does what lies in this rect read as an ANIMAL rather than as
+  // the water around it? — as a share of the rect, measured against the water's
+  // OWN colour spread IN THE SAME FRAME:
   //   median colour of the rect  = the water (the water is the majority of every
   //                                rect here, so the median IS a water pixel)
   //   d_i                        = each pixel's L1 distance from that median
@@ -4712,28 +4713,6 @@ if (
   // the old code excluded foam from the count but left it in the mean, so a rect
   // with foam in it reported nearly every water pixel as crocodile — measured
   // 2548 of 2613 on an unpinned staging).
-  const ANIMAL_SIGMAS = 6
-  const animalShare = (s) => {
-    const R = [], G = [], B = []
-    for (let i = 0; i < s.n; i++) {
-      const r = s.data[i * s.ch], g = s.data[i * s.ch + 1], b = s.data[i * s.ch + 2]
-      if (Math.min(r, g, b) > 200) continue // specular/foam — water, not animal
-      R.push(r); G.push(g); B.push(b)
-    }
-    const kept = R.length
-    // Below a clear majority of ordinary pixels the median is no longer the
-    // water and the measure has no meaning — say so instead of reporting a
-    // number that looks like one.
-    if (kept < s.n * 0.6) return { share: null, kept, n: s.n }
-    const med = [medianOf(R), medianOf(G), medianOf(B)]
-    const d = new Float64Array(kept)
-    for (let i = 0; i < kept; i++) d[i] = Math.abs(R[i] - med[0]) + Math.abs(G[i] - med[1]) + Math.abs(B[i] - med[2])
-    const spread = Math.max(medianOf(d), 1)
-    const T = ANIMAL_SIGMAS * spread
-    let c = 0
-    for (let i = 0; i < kept; i++) if (d[i] > T) c++
-    return { share: c / kept, spread, kept, n: s.n, med: med.map((v) => +v.toFixed(1)) }
-  }
   // (a) WATER REFERENCE — both rects with NO crocodile over them.
   await page.evaluate(() => window.__pollSim(1.5, () => false))
   const refClips = await crocClips(false)
@@ -4781,10 +4760,7 @@ if (
   //     shows with NO crocodile over it, the strike must beat many times over.
   //     It is the clause that bites when the water itself is busy — a foaming or
   //     shadow-crossed rect raises the floor, and the bar rises with it.
-  const STRIKE_MIN_SHARE = 0.1
-  const SEPARATION = 8
-  const waterFloor = Math.max(bodyRefShare.share ?? 1, 1 / bodyRef.n)
-  const readsAsAnimal = (a) => a.share !== null && a.share >= STRIKE_MIN_SHARE && a.share >= SEPARATION * waterFloor
+  const floor = waterFloor(bodyRefShare.share, bodyRef.n)
   crocHiddenResult = {
     staged: true, zoom: crocView.zoom,
     croc: hiddenClips.croc, bodyClip: hiddenClips.bodyClip, eyeClip: hiddenClips.eyeClip,
@@ -4802,14 +4778,14 @@ if (
     bodyStrikeShare: +(bodyStrikeShare.share ?? -1).toFixed(5),
     eyeRefShare: +(eyeRefShare.share ?? -1).toFixed(5),
     eyeHiddenShare: +(eyeHiddenShare.share ?? -1).toFixed(5),
-    waterFloor: +waterFloor.toFixed(6),
+    waterFloor: +floor.toFixed(6),
     spreads: { bodyRef: bodyRefShare.spread, bodyHidden: bodyHiddenShare.spread, bodyStrike: bodyStrikeShare.spread, eyeRef: eyeRefShare.spread, eyeHidden: eyeHiddenShare.spread },
-    strikeReadsAsAnimal: readsAsAnimal(bodyStrikeShare),
+    strikeReadsAsAnimal: readsAsAnimal(bodyStrikeShare, floor),
     // THE TEETH, proven rather than argued (point 382): the SAME criterion, fed
     // the HIDDEN frame — a body that stayed water-coloured through the strike —
     // must say NO. If this ever comes out true the criterion has stopped
     // discriminating and the check fails, however green its other legs are.
-    hiddenWouldReadAsAnimal: readsAsAnimal(bodyHiddenShare),
+    hiddenWouldReadAsAnimal: readsAsAnimal(bodyHiddenShare, floor),
     // Diagnostics only — the absolute means the old criterion decided on, kept
     // because a failure log is easier to read with them present.
     waterMean: waterMean.map((v) => +v.toFixed(1)),
