@@ -13,7 +13,7 @@ import {
   parseHandoverLog,
   parseLauncherLog,
 } from './batch-handover-observe-core.mjs'
-import { HANDOVER_GRACE_MS } from './batch-singleton.mjs'
+import { HANDOVER_GRACE_MS, PENDING_STALE_MS } from './batch-singleton.mjs'
 
 const T = (iso) => Date.parse(iso)
 const TICK_AT = T('2026-07-29T10:00:00.000Z')
@@ -85,6 +85,10 @@ describe('the observer measures the mechanism, not a copy of it', () => {
   it('its grace matches HANDOVER_GRACE_MS', () => {
     expect(OBSERVE_GRACE_MS).toBe(HANDOVER_GRACE_MS)
   })
+
+  it('and the window it allows a booting successor matches the launcher\'s own PENDING_STALE_MS', () => {
+    expect(TAKEOVER_GRACE_MS).toBe(PENDING_STALE_MS)
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -122,6 +126,23 @@ describe('assessChain — one observed handover, end to end', () => {
     const early = '[2026-07-29T10:14:00.000Z] skip: owner alive (pid-alive; heartbeat 9 min old, pid 18492)'
     const r = chain({ launcher: launcherLog(early), lock: oldLock, commits: [], now: HANDOVER_AT + 10 * 60_000 })
     expect(linkOf(r, 'spawn').status).toBe('pending')
+  })
+
+  it('a spawn reached by the OLD route — the lock EXPIRING — is not the handover working', () => {
+    const dead = '[2026-07-29T10:18:00.000Z] owner provably dead (pid-dead) — taking over'
+    const r = chain({ launcher: launcherLog(dead, SPAWN) })
+    expect(linkOf(r, 'spawn').status).toBe('broken')
+    expect(linkOf(r, 'spawn').broken).toMatch(/it EXPIRED/)
+  })
+
+  it('a launcher log with no takeover line at all still passes on the spawn (older builds)', () => {
+    expect(linkOf(chain({ launcher: launcherLog(SPAWN) }), 'spawn').status).toBe('pass')
+  })
+
+  it('a skip line without its parenthesised reason is still counted as evidence', () => {
+    const bare = '[2026-07-29T10:35:00.000Z] skip: owner alive'
+    expect(parseLauncherLog(bare)[0].kind).toBe('skip-alive')
+    expect(linkOf(chain({ launcher: launcherLog(bare), lock: oldLock, commits: [] }), 'spawn').status).toBe('broken')
   })
 
   it('THE HEADLESS PATH: a `claude -p` that exited leaves no lock to accept, and the spawn alone proves the link', () => {

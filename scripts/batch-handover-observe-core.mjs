@@ -60,7 +60,12 @@ export function parseLauncherLog(text) {
     let reason = null
     const acc = body.match(/^HANDOVER accepted: \S+ handed the batch over(?: at point (\d+))?/)
     const spawn = body.match(/^launched pid (\d+)/)
-    const skip = body.match(/^skip: owner alive \(([^;)]+)/)
+    // The reason is parenthesised in every line this launcher writes, but a
+    // parser that silently drops a line whose format drifted would quietly
+    // shrink the evidence set — so a bare "skip: owner alive" still classifies.
+    const skip = /^skip: owner alive/.test(body)
+      ? (body.match(/^skip: owner alive \(([^;)]+)/) ?? ['', ''])
+      : null
     if (acc) {
       kind = 'handover-accepted'
       point = acc[1] ? Number(acc[1]) : null
@@ -70,8 +75,8 @@ export function parseLauncherLog(text) {
     } else if (skip) {
       // `handover-grace` is the launcher waiting out a live process on purpose —
       // a healthy chain on schedule, never evidence of a failure.
-      kind = skip[1].trim() === 'handover-grace' ? 'skip-grace' : 'skip-alive'
-      reason = skip[1].trim()
+      reason = (skip[1] ?? '').trim()
+      kind = reason === 'handover-grace' ? 'skip-grace' : 'skip-alive'
     } else if (/^WEDGED owner/.test(body)) kind = 'skip-wedged'
     else if (/^SILENT owner/.test(body)) kind = 'silent-notified'
     else if (/^no owner lock — taking over/.test(body)) kind = 'took-free-lock'
@@ -148,6 +153,14 @@ export function assessChain({
   const after = launcher.filter((l) => l.at >= handover.at)
   const accepted = after.find((l) => l.kind === 'handover-accepted') ?? null
   const spawned = after.find((l) => l.kind === 'spawned' && (!accepted || l.at >= accepted.at)) ?? null
+  // Which takeover led to that spawn? A spawn preceded by `owner provably dead`
+  // means the batch continued, but by the OLD route — the lock outlived the work
+  // and expired. For acceptance evidence that is not the handover's doing, so it
+  // is named rather than counted as proof.
+  const viaHandover = after.find(
+    (l) => (l.kind === 'handover-accepted' || l.kind === 'took-free-lock') && (!spawned || l.at <= spawned.at),
+  )
+  const viaDeath = after.find((l) => l.kind === 'took-dead-lock' && (!spawned || l.at <= spawned.at))
   // A skip is only evidence of failure once the grace it is entitled to has run
   // out — and `handover-grace` is never evidence at all: that IS the mechanism
   // waiting, on schedule.
@@ -155,13 +168,25 @@ export function assessChain({
     after.find(
       (l) => (l.kind === 'skip-alive' || l.kind === 'skip-wedged') && l.at >= handover.at + graceMs,
     ) ?? null
-  if (spawned) {
+  if (spawned && !viaHandover && viaDeath) {
+    links.push(
+      link(
+        'spawn',
+        'the launcher takes the batch over and spawns',
+        'broken',
+        `${viaDeath.line}\n          ${spawned.line}`,
+        'the batch continued, but by the OLD route: the lock was not handed over, it EXPIRED. ' +
+          'The handover never reached the lock file, or a later tool call withdrew it',
+      ),
+    )
+    return { ok: false, links }
+  } else if (spawned) {
     links.push(
       link(
         'spawn',
         'the launcher takes the batch over and spawns',
         'pass',
-        accepted ? `${accepted.line}\n          ${spawned.line}` : spawned.line,
+        viaHandover ? `${viaHandover.line}\n          ${spawned.line}` : spawned.line,
         '',
       ),
     )

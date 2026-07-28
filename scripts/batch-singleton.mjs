@@ -26,6 +26,7 @@
 // still sees a fresh lock as "held". Pure decision logic is dependency-injected
 // and Vitest-covered in scripts/batch-singleton-core.test.mjs.
 import {
+  appendFileSync,
   readFileSync,
   writeFileSync,
   existsSync,
@@ -684,6 +685,20 @@ export function withdrawHandover(sessionId, opts = {}) {
   delete next.handedOverAt
   delete next.handoverPoint
   writeJsonAtomic(lockPath, next)
+  // Recorded beside the handover it cancels: without this line, a launcher tick
+  // that finds a live owner past the grace cannot be told apart from one whose
+  // handover was legitimately taken back, and the acceptance evidence would be
+  // ambiguous exactly where it matters (four-eyes review).
+  try {
+    const log = opts.logPath ?? repoPath('.claude/boundary.log')
+    appendFileSync(
+      log,
+      `[${new Date().toISOString()}] WITHDRAWN point ${lock.handoverPoint ?? '?'} by ${sessionId} — ` +
+        'the session is working again; the lock stays held.\n',
+    )
+  } catch {
+    /* best effort — the withdrawal itself has already landed */
+  }
   return true
 }
 
