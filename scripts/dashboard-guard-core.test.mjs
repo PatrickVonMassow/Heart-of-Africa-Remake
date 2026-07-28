@@ -20,6 +20,7 @@ import {
   auditDashboard,
   evaluate,
   ERLEDIGT_ON_BOARD,
+  ETA_GRACE_MIN,
 } from './dashboard-guard-core.mjs'
 
 /** Minimal dashboard HTML in the real board's markup (incl. an Erledigt section
@@ -855,5 +856,54 @@ describe('the board keeps its shape (point 371)', () => {
       '<h2>Warteschlange</h2>',
     )
     expect(codes(flat)).toContain('section-not-collapsible')
+  })
+})
+
+// The expected end of a current-work card is a promise to a reader who checks
+// the board from a phone (user 28.07.2026). A "~HH:MM" that has passed reads as
+// a stalled batch while the work is running, so it BLOCKS rather than reminds —
+// the 388 card had stood two hours past its estimate.
+describe('a current-work estimate stays ahead of the clock (user 28.07.2026)', () => {
+  const board = (meta) =>
+    `<main><h1>B</h1>` +
+    `<details class="sect"><summary><h2>Woran ich gerade arbeite</h2></summary>\n` +
+    `<details class="now"><summary><span class="t">388 — T</span><span class="right">` +
+    `<span class="meta">${meta}</span></span></summary><div class="body"><p>Stand 14:12 — läuft</p></div></details>\n` +
+    `</details>` +
+    `<details class="sect"><summary><h2>Von dir zu klären</h2></summary>\n</details>` +
+    `<details class="sect"><summary><h2>Warteschlange</h2></summary>\n</details>` +
+    `<details class="sect"><summary><h2>Erledigt</h2></summary>\n` +
+    `<p class="archive-link">im <a href="https://example.invalid/a">Archiv</a>.</p></details>` +
+    `<footer>Stand: 28.07.2026 · 1 offene Punkte</footer></main>`
+  const codes = (meta, nowMinutes) =>
+    auditDashboard(board(meta), { open: [1], done: [], nowMinutes }).map((x) => x.code)
+
+  it('passes while the estimate is still ahead', () => {
+    expect(codes('10:44 · ~15:15', 13 * 60)).not.toContain('now-eta-past')
+  })
+
+  it('blocks once the estimate has passed, naming the card', () => {
+    const v = auditDashboard(board('10:44 · ~11:15'), { open: [1], done: [], nowMinutes: 13 * 60 })
+    const hit = v.find((x) => x.code === 'now-eta-past')
+    expect(hit).toBeDefined()
+    expect(hit.msg).toContain('388')
+  })
+
+  it('grants a few minutes of grace so a republish on the minute cannot flap', () => {
+    expect(codes('10:44 · ~13:00', 13 * 60 + ETA_GRACE_MIN)).not.toContain('now-eta-past')
+    expect(codes('10:44 · ~13:00', 13 * 60 + ETA_GRACE_MIN + 1)).toContain('now-eta-past')
+  })
+
+  it('reads an estimate earlier than its own start as the next day, not as overdue', () => {
+    expect(codes('23:40 · ~00:30', 23 * 60 + 50)).not.toContain('now-eta-past')
+  })
+
+  it('stays silent when no clock is handed in — the rule is pure, never guessed', () => {
+    expect(codes('10:44 · ~11:15', null)).not.toContain('now-eta-past')
+    expect(codes('10:44 · ~11:15', undefined)).not.toContain('now-eta-past')
+  })
+
+  it('ignores a card that states no expected end at all', () => {
+    expect(codes('10:44', 13 * 60)).not.toContain('now-eta-past')
   })
 })

@@ -61,6 +61,27 @@ import { isMainModule } from './is-main.mjs'
 const TASKS = resolve(REPO_ROOT, 'TASKS.md')
 const PAUSE = resolve(REPO_ROOT, '.claude', 'batch-paused')
 
+/**
+ * Minutes since midnight in Europe/Berlin — the clock the board is written
+ * against, so a card's expected end is judged in the reader's timezone rather
+ * than the machine's. Returns null when the locale data is unavailable, and the
+ * pure check then simply does not run.
+ */
+function berlinMinutes() {
+  try {
+    const s = new Intl.DateTimeFormat('de-DE', {
+      timeZone: 'Europe/Berlin',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).format(new Date())
+    const m = /(\d{1,2}):(\d{2})/.exec(s)
+    return m ? Number(m[1]) * 60 + Number(m[2]) : null
+  } catch {
+    return null
+  }
+}
+
 function head() {
   try {
     return execSync('git rev-parse HEAD', { cwd: REPO_ROOT, encoding: 'utf8' }).trim()
@@ -154,7 +175,12 @@ if (RUN_AS_SCRIPT && process.argv[2] === '--synced') {
   // not be attested — nothing is written, the violations are the work list.
   const { open, done } = parseTasks(readTasksAll(TASKS))
   const priorState = readJson(STATE_PATH) ?? {}
-  const violations = auditDashboard(readFileSync(p, 'utf8'), { open, done, doneSeen: priorState.doneSeen ?? null })
+  const violations = auditDashboard(readFileSync(p, 'utf8'), {
+    open,
+    done,
+    doneSeen: priorState.doneSeen ?? null,
+    nowMinutes: berlinMinutes(),
+  })
   const waived = priorState.auditWaived && priorState.auditWaived.repoHash === sha256File(p)
   if (violations.length && !waived) {
     console.error(`dashboard-guard --synced REFUSED — ${violations.length} consistency violation(s):`)

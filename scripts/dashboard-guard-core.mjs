@@ -264,11 +264,17 @@ export function parseCards(sectionHtml) {
  * wrapper seeds it on the first clean pass, so pre-guard history is
  * grandfathered exactly once.
  */
+/**
+ * Grace on the expected-end rule: a card is overdue only this many minutes
+ * PAST its own estimate, so a board republished on the minute cannot flap.
+ */
+export const ETA_GRACE_MIN = 5
+
 export function auditDashboard(html, input = {}) {
   const v = []
   if (typeof html !== 'string' || !html) return v
   // Totality: every list comes from JSON/parsers and may be anything.
-  const { doneSeen = null } = input ?? {}
+  const { doneSeen = null, nowMinutes = null } = input ?? {}
   const open = Array.isArray(input?.open) ? input.open : []
   const done = Array.isArray(input?.done) ? input.done : []
   const { order, sections } = sliceSections(html)
@@ -371,6 +377,35 @@ export function auditDashboard(html, input = {}) {
   // NOW META — the now-card names its start time.
   if (nowCards.length && nowCards.some((c) => !c.meta || !/\d{1,2}:\d{2}/.test(c.meta))) {
     v.push({ code: 'now-meta', msg: 'a now-card meta lacks a HH:MM time' })
+  }
+
+  // THE EXPECTED END STAYS AHEAD OF THE CLOCK (user 28.07.2026). The "~HH:MM"
+  // in a current-work header is a promise to a reader who checks the board from
+  // a phone; once it has passed, it is worse than no estimate, because the card
+  // then reads as stalled while the work is running. Enforced rather than
+  // reminded: the 388 card stood two hours past its estimate. `nowMinutes` is
+  // injected (minutes since midnight, Europe/Berlin) so the rule is pure; a
+  // caller that passes nothing skips it.
+  if (Number.isFinite(nowMinutes)) {
+    const overdue = []
+    for (const c of nowCards) {
+      const end = /~\s*(\d{1,2}):(\d{2})/.exec(c.meta ?? '')
+      if (!end) continue
+      const start = /(\d{1,2}):(\d{2})/.exec(c.meta ?? '')
+      let eta = Number(end[1]) * 60 + Number(end[2])
+      // A card opened before midnight may legitimately estimate into the next
+      // day; an end earlier than its own start is that case, not a past one.
+      if (start && eta < Number(start[1]) * 60 + Number(start[2])) eta += 1440
+      if (eta + ETA_GRACE_MIN < nowMinutes) overdue.push(...(c.points.length ? c.points : ['?']))
+    }
+    if (overdue.length) {
+      v.push({
+        code: 'now-eta-past',
+        msg:
+          `current-work card(s) ${overdue.join(', ')} promise an end time that has passed — give each a ` +
+          'realistic new "~HH:MM" (or move the card to Erledigt if it is done), republish, re-run --synced',
+      })
+    }
   }
 
   // NEWLY TICKED points need an Erledigt card, with a time meta (only vs the
