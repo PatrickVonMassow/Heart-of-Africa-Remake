@@ -122,7 +122,8 @@ by a hand-set number.** The check asked whether a lunging crocodile reads as an
 ANIMAL rather than as water, and answered it with an absolute channel delta
 between two rect means against a threshold of 45 — so it decided on the second
 decimal of a colour average, read 44.2 and 44.6 in one evening on a quiet
-machine, and 37.5-42.9 across eight staged repeats. The picture was never in
+machine, and 37.5-43.7 across twelve staged repeats on both backends. The
+picture was never in
 doubt; a mean over the rect dilutes the body with the water beside it, and the
 dilution moves with the projection. The replacement measures the share of a rect
 whose colour sits further from that frame's OWN water colour than a fixed

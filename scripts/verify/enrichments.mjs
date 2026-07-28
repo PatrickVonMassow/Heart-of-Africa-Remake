@@ -4510,13 +4510,16 @@ check(
 // (44.2 and 44.6 in one evening, and 37.5-42.9 across the eight staged repeats
 // measured for point 382): a mean over the rect dilutes the body with the water
 // beside it, and the dilution moves with the projection.
-// THE MEASURED SPREAD the new bars stand on — eight staged repeats, quiet
-// machine, WebGL 2, and a further four on WebGPU:
-//   share, striking body   0.305 - 0.314   bar >= 0.10   (a 3x margin)
+// THE MEASURED SPREAD the new bars stand on — twelve staged repeats on a quiet
+// machine, eight on WebGL 2 and four on WebGPU, the two backends agreeing to
+// within the run-to-run noise (which is the point of a scale-free measure):
+//   share, striking body   0.303 - 0.316   bar >= 0.10   (a 3x margin)
 //   share, hidden body     0     - 0.00046 bar <= 0.02   (a 43x margin)
-//   share, croc-free body  0                             (the water floor)
+//   share, croc-free body  0     - 0.00257               (the water floor)
 //   share, eye rect hidden 0.108 - 0.119   bar >= 0.02   (a 5x margin)
 //   share, eye rect free   0                             (the water floor)
+// The old absolute delta over the SAME twelve: 37.5 - 43.7 against its bar of
+// 45, i.e. red on every one of them, on both backends.
 // and the criterion is written ONCE so it can be FED THE HIDDEN FRAME and shown
 // to say no — `hiddenWouldReadAsAnimal` must be false, asserted, so a body that
 // stayed water-coloured through the strike still turns this check red.
