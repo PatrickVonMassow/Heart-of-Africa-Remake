@@ -11407,3 +11407,52 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   printed line recorded.
   DOCS in the same commit: `scripts/verify/README.md` beside the quiet-machine section,
   and the comment block at the head of `scripts/pre-push-gate.mjs`.
+- [x] 338. GIZA IS LABELLED TWICE IN THE BIRD'S-EYE VIEW, FROM TWO DEFINITIONS OF THE
+  SAME SITE (user 25.07.2026, screenshot: the italic cultural-landmark label »Pyramids
+  of Giza« and the map-point label »The Pyramids of Giza« overlap each other west of
+  Cairo). ROOT CAUSE — the plateau is declared twice, in two systems that each render
+  their own floating label, and at DIFFERENT coordinates:
+  src/world/data/landmarks.ts:123 `{ id: 'giza', lon: 30.59, lat: 29.98, kind:
+  'giza-pyramids' }` (one of the eight §4.4 cultural landmarks: first-sighting journal
+  entry, discovery bounty, italic landmark label) and src/world/geo.ts:267
+  `{ id: 'giza', kind: 'monument', lat: 29.75, lon: 30.85, region: 'north' }` (the
+  point-273 ENTERABLE monument site: map point, known from start, SPACE to enter,
+  `.map-label`). Both are legitimate FEATURES — the site must stay enterable AND must
+  keep earning its sighting entry — so this is not "delete one".
+  FIX BOTH HALVES: (1) ONE POSITION. The two records place the same real plateau ~0.3°
+  apart. Derive both from a single coordinate constant so they cannot drift again; the
+  §17.2 known-from-start rule, the Giza-vs-Cairo enter-disc separation
+  (src/scenes/travel/settlementEntry.test.ts) and Cairo's western skyline (point 82)
+  must all still hold at the unified position. (2) ONE LABEL. Where a map point and a
+  cultural landmark denote the same site, only ONE floating label renders — the map
+  point's, since it is the one the player can act on (it names the enterable place and
+  obeys the §17.2 discovery gate). Suppress the landmark's own label by that identity,
+  NOT by a distance heuristic: a proximity rule would silently hide a genuinely
+  neighbouring landmark, and the two records already share the id `giza`.
+  (3) KNOWN FROM THE START, BOTH HALVES (user 25.07.2026: "die Pyramiden bei Kairo
+  sollen außerdem von Anfang an als entdeckt gelten"). Today the two halves disagree:
+  `visitedPlaces` is seeded from KNOWN_FROM_START_PLACES (src/world/geo.ts:290 — every
+  port plus every monument), so the MAP POINT is known; `landmarksSeen` starts EMPTY
+  (src/state/store.ts:436), so the CULTURAL LANDMARK is not. Seed the Giza landmark as
+  seen at game start, and migrate a legacy save the way point 288 migrated the
+  known-from-start places. Everyone in 1890 knew the pyramids stood there; only their
+  surroundings were to be explored.
+  FOLLOWS FROM THAT, and is intended: Giza pays NO discovery bounty for itself (§10 /
+  point 288 — a known-from-start place never does), and because the first-sighting
+  journal entry is gated on `landmarksSeen` (store.ts:788), that vignette does NOT fire
+  for Giza. Its text stays in both language files, unused for now, rather than being
+  deleted — the §4.4 flavour set stays complete.
+  KEEP INTACT: the §4.4 count of eight built cultural landmarks and Giza's membership
+  in it; the other seven landmarks stay discovery-gated with their sighting entries and
+  bounties untouched.
+  VERIFIABLE: pure — the two records resolve to the SAME coordinate, and a sweep
+  asserts no OTHER cultural landmark shares an id with a map point (so the rule is
+  general, not a Giza special case); pure — the label-suppression predicate hides the
+  landmark label exactly when a map point shares its id and never otherwise; pure
+  (`src/state/store.economy.test.ts` / `store.saveload.test.ts`) — a fresh game has
+  Giza in `landmarksSeen`, sighting it credits no bounty and writes no journal entry,
+  a legacy save without it migrates to include it, and an ordinary landmark still
+  discovers, journals and bounties; `scripts/verify/enrichments.mjs` — at the Giza
+  plateau exactly ONE label element names the pyramids (currently two), named from the
+  first frame without any approach, with a screenshot; the existing Giza suites
+  (src/scenes/place/gizaSite.test.ts, settlementEntry, landmarks) stay green.
