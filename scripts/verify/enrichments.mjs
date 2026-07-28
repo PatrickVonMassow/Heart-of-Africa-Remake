@@ -2230,11 +2230,19 @@ const treeHit = await page.evaluate(async () => {
   if (!tree) return { found: false }
   // Park due west of it, then drive east into the trunk.
   window.__game.getState().debugJumpTo(-(tree.z) / U, (tree.x - 3) / U)
-  // Clear other animals off the spot so only the tree can block.
-  const h0 = window.__wildlife.herdsRef.current
-  if (h0) for (const sp of Object.keys(h0)) for (const a of h0[sp]) {
-    if (!a.dead && Math.hypot(a.x - tree.x, a.z - tree.z) < 8) a.z += 25
+  // Clear other animals off the spot so only the tree can block — CONTINUOUSLY,
+  // not once (point 378): the herds stream and wander for the whole test, and
+  // since the collider now sits on the DRAWN body, a grazer that walks in — or
+  // is merely rendered a body-width off its behaviour spot — is a legitimate
+  // blocker that has nothing to do with the tree this check is about.
+  const clearAnimals = () => {
+    const h0 = window.__wildlife?.herdsRef?.current
+    if (!h0) return
+    for (const sp of Object.keys(h0)) for (const a of h0[sp]) {
+      if (!a.dead && Math.hypot(a.x - tree.x, a.z - tree.z) < 12) a.z += 25
+    }
   }
+  clearAnimals()
   const out = { found: true, r: tree.r, minDist: Infinity, reached: false, north: 0, south: 0, west: 0 }
   window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyD' }))
   // Sim-budget the approach (point 177): a wall-clock drive under load rests the
@@ -2242,6 +2250,7 @@ const treeHit = await page.evaluate(async () => {
   // northward drive below reads blocked — a deterministic sim-time approach fixes
   // the resting position.
   await window.__pollSim(6, () => {
+    clearAnimals()
     const p = window.__game.getState().pos
     const d = Math.hypot(p.x - tree.x, p.z - tree.z)
     out.minDist = Math.min(out.minDist, d)
@@ -2255,6 +2264,7 @@ const treeHit = await page.evaluate(async () => {
     window.dispatchEvent(new KeyboardEvent('keydown', { code }))
     let moved = 0
     await window.__pollSim(8, () => {
+      clearAnimals()
       const p = window.__game.getState().pos
       moved = sign * (axis === 'x' ? p.x - start.x : p.z - start.z)
       return moved > dist
