@@ -135,7 +135,9 @@ Ein Kantenenergie-Check des Bodens fiel, nachdem SSAO per Nutzerentscheid im Sta
 
 Ein zweites Modell kam anfangs nur bei Audits und bei Festgefahrenheit. Der Nutzer verallgemeinerte das: vor dem Bau **Schwierigkeit × Kritikalität** einschätzen und bei hoher Einstufung — besonders bei Mechanismen, die immer funktionieren müssen — Plan *und* Ergebnis vom anderen Modell prüfen lassen.
 
-**Lehre:** Modell-Diversität ist kein Audit-Sonderfall, sondern eine **Funktion der Kritikalität** — und hält, wie alles hier, nur als Mechanismus.
+Die Gegenrichtung wurde später genauso wichtig: Eine Gegenprüfung kostet ungefähr so viel wie die Arbeit selbst und verdoppelt die Wartezeit — über jede Kleinigkeit gestülpt, wird sie zur Formalie, die niemand mehr ernst nimmt. Die Grenze zieht nicht die Schwierigkeit, sondern die **Sichtbarkeit des Fehlers**: Was den Ablauf steuert oder Arbeit vernichten kann (Wächter, Sperren, Nebenläufigkeit, Speichern/Laden, Migrationen, Veröffentlichungen), wird immer gegengeprüft; was ein schneller Test sofort zeigt (Texte, Balancewerte, Kulissen, Umbenennungen), nie. Der Nutzen ist an der richtigen Stelle real: An einem Abend mit drei Gegenprüfungen fand das zweite Modell jedes Mal etwas Substanzielles — einen Zustandspfad, der beim Aufräumen mitgelöscht worden wäre, eine Prüfung, die im Fehlerfall die riskante statt der vorsichtigen Antwort gab, und einen kaputten Abhängigkeitsbaum, den der Testlauf als „grün" gemeldet hatte (3.46). Keiner dieser Funde war eine Geschmacksfrage.
+
+**Lehre:** Modell-Diversität ist kein Audit-Sonderfall, sondern eine **Funktion der Kritikalität** — und hält, wie alles hier, nur als Mechanismus. Ihre Obergrenze ist dieselbe Funktion von unten: Wo der Fehler sofort auffällt, sind zweite Augen verschwendete Zeit.
 
 ### 3.14 Fast-Gate ≠ Release-Gate
 
