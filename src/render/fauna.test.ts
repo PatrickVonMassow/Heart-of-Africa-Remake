@@ -830,6 +830,62 @@ describe('animal gait (design.md §19, points 228/255/300 — planted feet, no s
     expect(gaitPhase(dist, GOAT.cadence)).toBeCloseTo(dist * GOAT.cadence, 9)
   })
 
+  it('the live probe’s heading-frame slip is nil at the derived cadence and ~1 at a wrong one (point 300)', () => {
+    // The settlement walkers wander a curving path, so their bodies TURN while
+    // they walk. A trot plants a DIAGONAL pair — the two stance feet sit
+    // symmetrically about the body centre — so no rigid rotation can hold both
+    // still; only full foot-IK could, and this point leaves that out of scope.
+    // The live probe (scripts/verify/polish.mjs) therefore measures the tracked
+    // foot's travel with the rigid yaw change removed. This replays that exact
+    // formula and proves it is still FALSIFIABLE: the correct cadence gives ~0,
+    // the over-driven cadence the point was raised about gives ~1.
+    const leg = buildGoatParts().legs[0]
+    const worstSlipOnCurve = (cadence: number) => {
+      const R = 1.5 // turning inside a couple of body lengths, as the goats do
+      const step = 0.02 // world units of path per sample
+      const toWorld = (lx: number, lz: number, yaw: number) => ({
+        x: lx * Math.cos(yaw) + lz * Math.sin(yaw),
+        z: -lx * Math.sin(yaw) + lz * Math.cos(yaw),
+      })
+      const at = (k: number) => {
+        const ang = (k * step) / R
+        return { x: Math.cos(ang) * R, z: Math.sin(ang) * R }
+      }
+      let worst = 0
+      let yawPrev = 0
+      const samples: Array<{ x: number; z: number; yaw: number; fz: number }> = []
+      for (let k = 0; k <= 24; k++) {
+        const p = at(k)
+        const q = at(k - 1)
+        // Exactly as the walker does it: face the chord just travelled.
+        const yaw = faceVelocity(p.x - q.x, p.z - q.z, yawPrev)
+        yawPrev = yaw
+        const phase = gaitPhase(k * step, cadence)
+        // Stay inside one stance of the tracked leg, where the foot is planted.
+        if (!isStance(phase + leg.phaseOffset)) break
+        samples.push({ ...p, yaw, fz: leg.hip[2] + footForwardOffset(phase, leg.phaseOffset, GOAT.legLength) })
+      }
+      expect(samples.length).toBeGreaterThan(4) // the walk really happened
+      for (let k = 1; k < samples.length; k++) {
+        const p0 = samples[k - 1]
+        const p1 = samples[k]
+        const body = Math.hypot(p1.x - p0.x, p1.z - p0.z)
+        // The foot's sweep through the body frame, carried back to world in the
+        // heading held at the interval's start, plus the body's own travel.
+        const s = toWorld(0, p1.fz - p0.fz, p0.yaw)
+        worst = Math.max(worst, Math.hypot(p1.x - p0.x + s.x, p1.z - p0.z + s.z) / body)
+      }
+      return worst
+    }
+    // The rig's own cadence: the foot holds its ground spot — well inside the
+    // live gate of 0.25, the residual being only the chord/tangent error of a
+    // walker that re-faces once per sampled step.
+    expect(worstSlipOnCurve(GOAT.cadence)).toBeLessThan(0.1)
+    // Twice the cadence — the legs cycling faster than the ground passes, which
+    // IS the reported skate — drags the foot at about the body's own speed.
+    expect(worstSlipOnCurve(2 * GOAT.cadence)).toBeGreaterThan(0.5)
+  })
+
   it('every leg is at neutral at rest (phase 0), and the diagonal pairs hand the ground over cleanly', () => {
     // At a standing phase (0) each leg — offset 0 or π — reads neutral: one pair
     // stands mid-stance, the other hangs mid-swing, and neither is angled. No

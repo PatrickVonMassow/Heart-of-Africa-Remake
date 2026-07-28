@@ -269,7 +269,10 @@ function Goats({ seed, count, pen, colliders }: { seed: number; count: number; p
       if (import.meta.env.DEV) {
         // The live no-skate probe (point 300) tracks one foot through its stance:
         // its world spot must hold while the body advances. Reported straight
-        // from the rendered leg group, so the probe reads what is DRAWN.
+        // from the rendered leg group, so the probe reads what is DRAWN. `yaw`
+        // rides along because a goat on this wandering path also TURNS, and the
+        // probe measures the foot's travel in the walker's own heading frame —
+        // the rigid pivot of a turning body is not the gait's doing.
         const lg = legRefs.current[i]?.[0]
         if (lg) {
           const foot = footProbe.set(0, -rig.legLength, 0)
@@ -283,6 +286,7 @@ function Goats({ seed, count, pen, colliders }: { seed: number; count: number; p
             dist: s.dist,
             phase,
             stride: rig.stride,
+            yaw: s.yaw,
             stance: isStance(phase + parts.legs[0].phaseOffset),
             foot: { x: foot.x, y: foot.y, z: foot.z },
           }
