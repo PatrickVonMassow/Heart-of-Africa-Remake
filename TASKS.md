@@ -3411,33 +3411,59 @@ read that as "the criterion and its evidence section".
   deaths": three takeovers without a handover in `.claude/autostart.log`
   (`no owner lock — taking over`), each one a session that had just been shot.
   It also explains the `failCount` bumps (`previous spawn did NOT take over`).
-  THE FIX: `scripts/batch-autostart.mjs` passes the ceiling in the spawn's `env`
-  (it currently passes no `env` at all, so the child inherits a launcher
-  environment that never sets it). Do NOT use `0`/infinite: a genuinely wedged
-  agent would then hold a session open forever, and the launcher's liveness
-  watchdog — the thing that rescues a stuck batch — only fires on a dead or
-  stale-heartbeat owner. Set a GENEROUS FINITE ceiling instead (start at 60
-  minutes, calibratable in one named constant with the reason beside it), which is
-  longer than any agent this project has run and still bounded.
-  VERIFY THE VARIABLE FIRST: the runtime's own message documents `=0`; that a
-  finite millisecond value is honoured is an ASSUMPTION until measured. Prove it
-  with a spawn that outlives 600 s and dies at the configured bound instead —
-  if only `0` works, take `0` and compensate by making the in-flight declaration
-  expire (`scripts/batch-in-flight-core.mjs` already probes agent liveness), so a
-  wedged agent still releases the batch.
+  NO FIXED TIME LIMIT (user 28.07.2026, and the objection is correct): any single
+  number is wrong in both directions — long enough not to shoot a healthy agent is
+  long enough for a hung one to sit undetected, and short enough to notice a hang
+  is short enough to shoot a healthy build. The trade-off only exists because the
+  ceiling measures ELAPSED TIME. The question that actually separates the two
+  cases is whether the delegated work is still ADVANCING, and this repository
+  already knows how to answer it: `scripts/batch-in-flight-core.mjs` probes a pid
+  that is alive AND started when the declaration says, a branch whose tip commit
+  is recent, a worktree where git work recently happened, a log still being
+  written to. That machinery is pure and injected — it is built and tested. The
+  launcher does NOT consult it: `assessOwner` in `scripts/batch-singleton.mjs`
+  looks only at the lock's handover flag, heartbeat age and pid, and
+  `batch-autostart.mjs` never mentions the declaration at all.
+  THE FIX, in four parts:
+  (a) THE RUNTIME CEILING GOES TO INFINITE. `scripts/batch-autostart.mjs` passes
+  `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0` in the spawn's `env` (it currently
+  passes no `env` at all). This is deliberate: the runtime cannot know anything
+  about the work, so it must not hold the policy. `0` is the value the runtime's
+  own message documents, so it needs no proving.
+  (b) THE WAIT BECOMES VISIBLE. A session waiting on an agent must POLL rather
+  than sit silent — which the batch-progress guard already demands. Every poll is
+  a tool call, every tool call refreshes the heartbeat, so a healthy waiting
+  session never looks dead. A SILENT wait is what made a working session
+  indistinguishable from a corpse.
+  (c) THE LAUNCHER JUDGES PROGRESS, NOT AGE. `assessOwner` gains the declared
+  work as an input: an owner with a stale heartbeat is NOT dead while its declared
+  agent shows fresh evidence (branch tip moved, worktree touched, log grew inside
+  the window). Same probes, same pure functions as (the already-tested)
+  `batch-in-flight-core.mjs` — wire them, do not reimplement them.
+  (d) THE ONLY BOUND LEFT IS ON STALL, NOT ON DURATION. When nothing has advanced
+  for N launcher ticks (start at 2 = ~30 min of complete silence), the owner counts
+  as wedged: ntfy alert naming what stalled, then take over. A healthy agent —
+  however slow — advances something, so a false kill needs the work to be
+  genuinely frozen. Some bound must remain (nothing can decide halting), but it
+  now measures the right thing.
   WHAT THIS IS NOT: not a reason to stop delegating, and not a reason to end the
   turn while an agent builds. The in-flight declaration of point 388 is the
   correct behaviour and stays; it was being punished by a runtime limit, not by a
   design error.
-  VERIFIABLE: a pure test that the spawn options carry the ceiling in `env` with
-  the intended value (the spawn arguments are assembled in one place — extract
-  them into a pure builder if they are not yet). Live: one delegated agent that
-  runs longer than 600 s while its parent session waits, and the parent is STILL
-  ALIVE afterwards and merges the branch itself — the exact sequence that failed
-  four times today. Plus `.claude/autostart-run.log` free of the termination line
-  for that run.
+  VERIFIABLE: pure Vitest on `assessOwner` with injected probes — a stale
+  heartbeat plus a branch tip that moved inside the window reads ALIVE; the same
+  stale heartbeat with every probe silent reads WEDGED; a dead pid stays dead
+  whatever the evidence says; and a declaration naming work that no probe can
+  answer is treated as no evidence rather than as proof. Plus a pure test that the
+  spawn options carry the ceiling in `env` (extract the spawn arguments into a
+  pure builder if they are not one already). Live, and this is the acceptance
+  test: one delegated agent that runs longer than 600 s while its parent session
+  waits, and the parent is STILL ALIVE afterwards and merges the branch itself —
+  the exact sequence that failed four times today — with
+  `.claude/autostart-run.log` free of the termination line for that run.
   DOCS in the same commit: `docs/batch-autonomy.md`, where the resurrection and
-  the waiting rules are described, states the ceiling and why it is finite.
+  the waiting rules are described, states that liveness is judged by progress and
+  what counts as evidence.
 
 ## Closing (only after all points)
 
