@@ -3070,6 +3070,14 @@ read that as "the criterion and its evidence section".
   must NOTIFY (`scripts/notify.mjs`, the ntfy topic) so a silent night is reported
   rather than discovered the next morning. It must NOT kill the owner: a long verify run
   legitimately starves the heartbeat, which is why the age alone may not spawn.
+  TEST THE WHOLE CHAIN, NOT THE PARTS (user 28.07.2026). Every part worked last night
+  and the batch still stood still, so a green unit layer proves nothing here. The
+  acceptance is ONE observed handover end to end: a point closed, the boundary taken,
+  the lock released, the launcher's next tick spawning a successor, and that successor's
+  first turn picking up the next point — read out of `.claude/autostart.log` and the new
+  session's own commits, never inferred. Run it in this repository at a real point
+  boundary and record the log lines with their times. If the chain breaks anywhere, that
+  break IS the finding and the point stays open.
   VERIFIABLE: pure Vitest — a met boundary without a marker blocks and names the
   command; with a marker it allows and the handover is recorded; a crash-shaped stop
   does not release the lock; the wedge notification fires once past the age and not
