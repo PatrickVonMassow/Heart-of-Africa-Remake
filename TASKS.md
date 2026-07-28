@@ -3393,6 +3393,52 @@ read that as "the criterion and its evidence section".
   DOCS in the same commit: `docs/batch-autonomy.md`, where the launcher is
   described, gains the hidden-window requirement.
 
+- [ ] 402. THE HEADLESS SESSION IS KILLED FOR DOING EXACTLY WHAT IT IS TOLD TO DO
+  (28.07.2026, four deaths measured in one afternoon, user asked for the cause to
+  be found). The batch sessions were not crashing. `.claude/autostart-run.log`
+  carries the executioner's own words, four times:
+  `Background tasks still running after 600s; terminating. Set
+  CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 to wait indefinitely.`
+  A print-mode session (`claude -p`, which is how `scripts/batch-autostart.mjs`
+  spawns every resurrected worker) waits at most 600 SECONDS for its background
+  tasks after its turn ends, then the runtime TERMINATES the process.
+  WHY THIS HITS THIS PROJECT EVERY TIME: the batch's designed steady state is
+  "delegate the point to a worktree-isolated agent and wait for it" (CLAUDE.md §6,
+  maximal delegation). A delegated agent routinely runs longer than ten minutes —
+  the point 398 agent took 12.7 minutes, the point 400 agent longer. So the
+  session is killed WHILE ITS AGENT IS STILL BUILDING, every single time the agent
+  is slower than the ceiling. That is the whole of today's "frequent session
+  deaths": three takeovers without a handover in `.claude/autostart.log`
+  (`no owner lock — taking over`), each one a session that had just been shot.
+  It also explains the `failCount` bumps (`previous spawn did NOT take over`).
+  THE FIX: `scripts/batch-autostart.mjs` passes the ceiling in the spawn's `env`
+  (it currently passes no `env` at all, so the child inherits a launcher
+  environment that never sets it). Do NOT use `0`/infinite: a genuinely wedged
+  agent would then hold a session open forever, and the launcher's liveness
+  watchdog — the thing that rescues a stuck batch — only fires on a dead or
+  stale-heartbeat owner. Set a GENEROUS FINITE ceiling instead (start at 60
+  minutes, calibratable in one named constant with the reason beside it), which is
+  longer than any agent this project has run and still bounded.
+  VERIFY THE VARIABLE FIRST: the runtime's own message documents `=0`; that a
+  finite millisecond value is honoured is an ASSUMPTION until measured. Prove it
+  with a spawn that outlives 600 s and dies at the configured bound instead —
+  if only `0` works, take `0` and compensate by making the in-flight declaration
+  expire (`scripts/batch-in-flight-core.mjs` already probes agent liveness), so a
+  wedged agent still releases the batch.
+  WHAT THIS IS NOT: not a reason to stop delegating, and not a reason to end the
+  turn while an agent builds. The in-flight declaration of point 388 is the
+  correct behaviour and stays; it was being punished by a runtime limit, not by a
+  design error.
+  VERIFIABLE: a pure test that the spawn options carry the ceiling in `env` with
+  the intended value (the spawn arguments are assembled in one place — extract
+  them into a pure builder if they are not yet). Live: one delegated agent that
+  runs longer than 600 s while its parent session waits, and the parent is STILL
+  ALIVE afterwards and merges the branch itself — the exact sequence that failed
+  four times today. Plus `.claude/autostart-run.log` free of the termination line
+  for that run.
+  DOCS in the same commit: `docs/batch-autonomy.md`, where the resurrection and
+  the waiting rules are described, states the ceiling and why it is finite.
+
 ## Closing (only after all points)
 
 New points are appended BEFORE this section — it stays last in the file.
