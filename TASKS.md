@@ -3676,6 +3676,34 @@ read that as "the criterion and its evidence section".
   DOCS in the same commit: CLAUDE.md §6 (the merge step) and §7.2, where the Stop chain
   lists its guards.
 
+- [ ] 410. THE BOARD LOSES ITS UMLAUTS ON THE WAY IN (28.07.2026, user spotted
+  "faellt weg" and "kuenftig" on a current-work card). The board is German prose the
+  user reads on a phone; transliterated umlauts read as broken. The cause is the path
+  the text takes: `scripts/board.mjs` receives a card's text as a COMMAND-LINE
+  ARGUMENT, and German text passed through the shell on Windows arrives mangled — so
+  every session has been transliterating by hand to stay safe, which is the defect
+  rather than the workaround. Cards written straight into the HTML carry proper
+  umlauts; cards written through `board.mjs` do not. Both kinds sit on the board today
+  (the ones written on 28.07. were corrected by hand).
+  THE FIX: `board.mjs` takes the text on STDIN (`--text-stdin`, and the argument form
+  keeps working for ASCII), reading it as UTF-8 explicitly, so the shell never sees
+  the prose. Everything it writes stays UTF-8 end to end — the HTML file is written
+  with an explicit encoding, never the platform default.
+  ENFORCE IT: `dashboard-guard-core.mjs` gains one check over the board's text —
+  a card body containing a transliterated umlaut in a German word (`ae`/`ue`/`oe`
+  inside a word the surrounding text shows to be German, e.g. `Pruefung`, `faellt`,
+  `kuenftig`, `ueber`, `Flaeche`) FAILS the audit, naming the card. A word list is
+  enough; this is a spelling smell, not a linguistics problem, and a false positive is
+  cheap to whitelist. Without the check the workaround simply returns the next time a
+  session finds the argument path convenient.
+  VERIFIABLE: pure Vitest — text with real umlauts survives the stdin path byte for
+  byte; a transliterated body fails the audit naming the card; a legitimate word that
+  merely contains those letters (`Quelle`, `Steuer`, `Aequator`) does not fire; an
+  unreadable board never throws. Live: write a card with umlauts through the new path
+  and read them back from the published page.
+  DOCS in the same commit: the memory entry `batch-dashboard-artifact` gains the one
+  sentence naming the stdin path as the way to write a card.
+
 ## Closing (only after all points)
 
 New points are appended BEFORE this section — it stays last in the file.
