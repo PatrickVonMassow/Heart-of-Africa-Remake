@@ -3355,6 +3355,47 @@ read that as "the criterion and its evidence section".
   trailer must NAME the model and that the hook enforces it) and §7.2 (the Stop-chain list
   gains the unidentified/forbidden split).
 
+- [ ] 398. THE FAST GATE CANNOT BE RUN WHILE THE AGENT POOL WORKS (28.07.2026, measured
+  twice within ten minutes on `main`). `npm run test:unit` is the gate every push and
+  several Stop guards lean on, and with delegated agents building it goes red — 2 failures
+  in the first run, 5 in the second, and EVERY one of them the same line: `Test timed out
+  in 5000ms`. Not one was an assertion. Run alone on the same commit, the same files pass:
+  `src/render/water.test.ts` in 1.55 s and the `crocodileIdleYaw` case in
+  `src/scenes/travel/wildlifeBehavior.test.ts` in 2.27 s. The others that tipped —
+  `scripts/pre-push-gate-core.test.mjs` (the load-probe contract) and
+  `scripts/render-verify-guard.test.mjs` (a real git probe) — have the same shape: honest
+  work against an external process or a heavy constructor.
+  THE CAUSE IS THE MARGIN, not the tests. Vitest's default `testTimeout` is 5000 ms
+  (`vitest.config.ts` sets none) and the slowest cases sit at 1.5–2.3 s of it. Any load at
+  all — three worktree agents building, which is this project's DESIGNED steady state —
+  doubles them past the bar. The consequence is not a flaky number on a report:
+  `pre-push-gate` blocks the push, and its retry does not save it, because the load probe
+  is asked AFTER the step and by then the machine reads quiet again ("pre-push gate:
+  machine quiet (red reading, 2.8s)"). So `main` cannot be pushed while the pool it is
+  meant to feed is working.
+  THE FIX: give the unit layer a timeout that is load-proof rather than tight. These are
+  deterministic pure-logic and jsdom tests — a case that passes in 2 s and one that hangs
+  are orders of magnitude apart, so a generous `testTimeout` (start at 20 s, set once in
+  `vitest.config.ts` with the reason written beside it) costs nothing on a green run and
+  still catches a real hang. A single case that needs longer gets its own explicit
+  timeout rather than raising the floor a second time.
+  DO NOT paper over the slow cases: keep them measurable. The suite must still REPORT its
+  slowest cases (vitest's slow-test threshold), so a test quietly growing from 2 s to 15 s
+  stays visible instead of hiding inside the larger budget — the change is meant to stop
+  the timeouts under load, not to stop noticing cost.
+  ALSO FIX THE PROBE'S TIMING, since it is the same defect one layer up: `pre-push-gate`
+  must judge the load DURING the step it is judging (sample while it runs, or record the
+  probe's verdict at the start and the end and take the worse), never only afterwards — a
+  reading taken once the load has gone is what turned a load-flake into a hard block here.
+  VERIFIABLE: `npm run test:unit` green while three worktree agents build — measured, with
+  the load probe's own verdict quoted for that run — a deliberately hanging case still
+  failing rather than stalling the suite, a pure test pinning the configured timeout, and
+  a pure test of the gate's load judgement over a run that was loaded at the start and
+  quiet at the end (it must read as loaded). Live: one real `git push` of `main` passing
+  the gate under that same load.
+  DOCS in the same commit: `scripts/verify/README.md`, where the test architecture
+  describes the fast layer, gains the timeout and its reason.
+
 ## Closing (only after all points)
 
 New points are appended BEFORE this section — it stays last in the file.
