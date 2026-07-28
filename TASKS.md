@@ -3447,28 +3447,6 @@ read that as "the criterion and its evidence section".
   measured budget, so pay for the sentence by shortening there) and
   `docs/batch-autonomy.md` where the Stop chain is described.
 
-- [ ] 404. A PASSING COUNT OVER A SET THAT SILENTLY SHRANK (28.07.2026, measured:
-  one run reported 3546 passing tests while 34 test FILES had failed to load; the run an
-  hour earlier had 4214 tests over 153 files). A damaged dependency tree — a platform
-  package missing its entry file — made whole suites unloadable, and an unloadable suite
-  does not fail: it vanishes from the totals. The report therefore read GREENER than a red
-  run. Nothing in the chain compares the number of EXECUTED files with the last known
-  state, so every gate waved it through; it was noticed only because a review agent could
-  not start the tests either and said so.
-  THE FIX: `scripts/pre-push-gate.mjs` already parses the unit run. Record the test-FILE
-  count beside the result, keep the last green count in the state the gate already writes,
-  and treat a DROP as a red — a shrinking evidence base is exactly as serious as a
-  failure. Report both numbers in the gate's own line ("153 files / 4214 tests"), so the
-  shrink is visible even where it does not yet block.
-  DO NOT compare against a hard-coded number: it would rot with every added suite. The
-  baseline is the last green run's own count, and a deliberate reduction (a suite genuinely
-  deleted) is accepted by re-running once the drop is understood.
-  VERIFIABLE: pure Vitest on the comparison — a higher count passes and advances the
-  baseline, an equal count passes, a lower count is red with BOTH numbers named, a missing
-  baseline passes and records rather than blocking (fail-open on first use), and a garbled
-  parse never throws. Live: delete a suite deliberately and see the gate name the drop.
-  DOCS in the same commit: `scripts/verify/README.md`, where the fast layer is described.
-
 - [ ] 405. THE BOARD GETS A MESSAGE CHANNEL — STAGE 1 OF 3, THE CHANNEL AND THE
   PAGE (28.07.2026, user request: send instructions and questions from the phone,
   not only read status; designed with a four-eyes review by Fable 5 whose findings
