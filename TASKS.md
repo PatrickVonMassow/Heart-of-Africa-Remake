@@ -3276,6 +3276,40 @@ read that as "the criterion and its evidence section".
   DOCS in the same commit: CLAUDE.md §6's context-boundary bullet (it currently
   describes the half that exists) and `docs/batch-autonomy.md`.
 
+- [ ] 396. A HANDOVER IS UN-TAKEN BY THE TOOL CALL THAT CAME BEFORE IT (28.07.2026,
+  measured in `.claude/boundary.log`, found while closing point 388). Two of the ten
+  boundary attempts that morning were cancelled 117 ms and 154 ms after they were
+  written: `HANDOVER point 338` at 11:42:00.469Z, `WITHDRAWN point 338` at 11:42:00.586Z,
+  and the same shape at 11:52:08.478Z/11:52:08.632Z. A withdrawal means "the session is
+  working again", and no session works again within 117 ms — a continuation needs a model
+  round trip and cannot be that fast.
+  THE MECHANISM: `batch-progress-guard` writes the handover in the Stop chain, while the
+  PostToolUse `lock-heartbeat-hook` of the turn's LAST tool call is still in flight (the
+  same file contention that produced that morning's EPERM retries delays it). That
+  heartbeat then calls `heartbeat(sid)` without `preserveHandover`, and `clearOwnBoundary`
+  both strips the handover flag AND deletes the boundary marker. The session had done
+  nothing wrong — it had stopped. The next turn is told to take the boundary again, which
+  is precisely the loop point 388 was opened on; it cost that run roughly an hour and ten
+  launcher ticks before a round happened to survive.
+  THE FIX: a withdrawal may only ever be caused by work that happened AFTER the handover
+  was written. Where the hook payload carries the tool call's own timestamp, compare it
+  with `handedOverAt` and ignore a call that predates the handover. Where it does not, a
+  calibratable settle window (start at ~1 s) does the same job: a handover younger than
+  the window is never withdrawn. The marker file must survive the same test as the flag —
+  deleting it is what forces the re-take.
+  DO NOT widen this into "ignore withdrawals": a session that genuinely carries on working
+  must still withdraw its boundary, or the five-and-a-half-hour standstill of 28.07.2026
+  comes back. The rule stays "work after the handover withdraws it", only measured
+  honestly.
+  VERIFIABLE: pure Vitest on `clearOwnBoundary`/`heartbeat` with injected clocks — a
+  heartbeat dated BEFORE `handedOverAt` (or inside the settle window) leaves both the flag
+  and the marker file untouched; one dated after withdraws exactly as today, marker
+  included; the closing-set rule of point 388 is unchanged by either; and a session that
+  does not own the lock still cannot withdraw anything. Live: the next real boundary shows
+  a single `HANDOVER` line with no `WITHDRAWN` behind it in `.claude/boundary.log`.
+  DOCS in the same commit: `docs/batch-autonomy.md`, in the section on what a taken
+  boundary survives.
+
 ## Closing (only after all points)
 
 New points are appended BEFORE this section — it stays last in the file.
