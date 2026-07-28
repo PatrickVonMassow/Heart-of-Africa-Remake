@@ -35,6 +35,8 @@ import {
   wedgeOwnerKey,
   wedgeStage,
   sweepableTmpFiles,
+  resolveOwnership,
+  ourClaudeProcess,
   statePathsFor,
   LOCK_PATH,
   BOUNDARY_LOG_PATH,
@@ -241,6 +243,63 @@ describe('assessOwner (liveness = heartbeat AND real pid, never age alone)', () 
 })
 
 // ---------------------------------------------------------------------------
+// A context compaction mints a NEW session id while the lock keeps the old one.
+// The PROCESS is the stable identity — a compaction happens inside one
+// claude.exe — so ownership may resolve on it. What it may NEVER do is widen
+// into "any live process owns it": a genuinely second window has its own claude
+// process, and detecting it is what the singleton is for.
+describe('resolveOwnership — identity on the process, never on liveness alone', () => {
+  const lock = (over = {}) => ({ sessionId: 'old-id', claimedAt: NOW, pid: 4242, pidStartedAt: NOW - 3600_000, ...over })
+  const ours = { pid: 4242, startedAt: NOW - 3600_000 }
+
+  it('the SAME pid and start time under a NEW session id is ours, and asks to be restamped', () => {
+    const r = resolveOwnership({ lock: lock(), sessionId: 'new-id', ancestor: ours })
+    expect(r).toEqual({ mine: true, via: 'process', restamp: true })
+  })
+
+  it('a DIFFERENT pid is NOT ours — that is a second window, and it must stay visible', () => {
+    const r = resolveOwnership({ lock: lock(), sessionId: 'new-id', ancestor: { pid: 9999, startedAt: NOW - 3600_000 } })
+    expect(r.mine).toBe(false)
+    expect(r.via).toBe('other-process')
+  })
+
+  it('a STALE pidStartedAt (the pid was reused) is NOT ours', () => {
+    const r = resolveOwnership({ lock: lock(), sessionId: 'new-id', ancestor: { pid: 4242, startedAt: NOW - 5000 } })
+    expect(r.mine).toBe(false)
+    expect(r.via).toBe('pid-reused')
+  })
+
+  it('the matching id still decides first, and costs no walk', () => {
+    expect(resolveOwnership({ lock: lock(), sessionId: 'old-id', ancestor: null })).toEqual({
+      mine: true,
+      via: 'session-id',
+      restamp: false,
+    })
+  })
+
+  it('where the platform cannot tell us, the answer is NO — the id decides exactly as before', () => {
+    expect(resolveOwnership({ lock: lock(), sessionId: 'new-id', ancestor: null }).via).toBe('process-unknown')
+    expect(resolveOwnership({ lock: lock({ pid: null }), sessionId: 'new-id', ancestor: ours }).via).toBe(
+      'lock-without-pid',
+    )
+    expect(resolveOwnership({ lock: lock({ pidStartedAt: null }), sessionId: 'new-id', ancestor: ours }).via).toBe(
+      'start-time-unknown',
+    )
+    expect(resolveOwnership({ lock: lock(), sessionId: 'new-id', ancestor: { pid: 4242, startedAt: null } }).via).toBe(
+      'start-time-unknown',
+    )
+    expect(resolveOwnership({ lock: lock(), sessionId: '', ancestor: ours }).mine).toBe(false)
+    expect(resolveOwnership({ lock: null, sessionId: 'new-id', ancestor: ours }).mine).toBe(false)
+  })
+
+  it("a launcher's pending-spawn lock is never claimed this way", () => {
+    expect(resolveOwnership({ lock: lock({ kind: 'pending-spawn' }), sessionId: 'new-id', ancestor: ours }).via).toBe(
+      'pending-spawn',
+    )
+  })
+})
+
+// ---------------------------------------------------------------------------
 describe('wedgeNotifyDecision (point 388 (c): diagnose AND report, once per silence and stage)', () => {
   const lock = { sessionId: 'owner-1', pid: 4242, claimedAt: 1000 }
   const at = (ageMs) => {
@@ -337,8 +396,13 @@ describe('acquire (atomic test-and-set on the real filesystem)', () => {
     pidStartedAt: NOW,
     bootTime: 0,
     probePidFn: () => aliveProbe,
+    // No REAL ancestor walk unless a test is about ancestry: it is a PowerShell
+    // round trip, and an un-injected one costs ~0.7 s per temp directory.
+    findAncestorFn: () => null,
     ...over,
   })
+  /** heldByOtherLiveOwner with the ancestor walk stubbed out (see above). */
+  const heldByOther = (sid, over = {}) => heldByOtherLiveOwner(sid, { lockPath, findAncestorFn: () => null, ...over })
 
   it('free lock → acquired, and the lock names the session + pid', () => {
     expect(acquire('s1', opts())).toBe('acquired')
@@ -570,16 +634,86 @@ describe('acquire (atomic test-and-set on the real filesystem)', () => {
     expect(acquire('s1', opts({ probePidFn: () => aliveProbe }))).toBe('held') // → stand-down
   })
 
-  it('heldByOtherLiveOwner: true for a foreign live lock, false for mine/free/dead', () => {
-    expect(heldByOtherLiveOwner('sX', { lockPath })).toBe(false) // free
+  it('a compacted session keeps its lock and RESTAMPS it, so the next check is cheap', () => {
+    acquire('before-compaction', opts())
+    const before = readOwnerLock(lockPath)
+    const sameProcess = () => ({ pid: before.pid, startedAt: before.pidStartedAt })
+    // Every ownership-gated guard would stand down on the new id alone.
+    expect(heldByOther('after-compaction', { processIdentity: false })).toBe(true)
+    // With the process as identity it is ours, and the lock says so afterwards.
+    expect(
+      heldByOther('after-compaction', {
+        findAncestorFn: sameProcess,
+        ancestorCachePath: join(dir, 'session-process.json'),
+      }),
+    ).toBe(false)
+    const lock = readOwnerLock(lockPath)
+    expect(lock.sessionId).toBe('after-compaction')
+    expect(lock.sessionIdBefore).toBe('before-compaction')
+    expect(lock.claimedAt).toBe(before.claimedAt) // the restamp is not work
+    expect(acquire('after-compaction', opts())).toBe('mine') // …and the id path suffices now
+  })
+
+  it('a SECOND WINDOW is still a second window — its own claude process gives it away', () => {
     acquire('s1', opts())
-    expect(heldByOtherLiveOwner('s1', { lockPath, probePidFn: () => aliveProbe })).toBe(false) // mine
-    expect(heldByOtherLiveOwner('s2', { lockPath, probePidFn: () => aliveProbe })).toBe(true) // foreign + live
+    const otherProcess = () => ({ pid: process.pid + 1, startedAt: NOW })
+    expect(
+      heldByOther('intruder', {
+        findAncestorFn: otherProcess,
+        probePidFn: () => aliveProbe,
+        ancestorCachePath: join(dir, 'session-process.json'),
+      }),
+    ).toBe(true)
+    expect(readOwnerLock(lockPath).sessionId).toBe('s1') // untouched
+    expect(acquire('intruder', opts({ findAncestorFn: otherProcess }))).toBe('held')
+  })
+
+  it('a CLAIMED pid buys no ownership — only an established ancestry does', () => {
+    // opts.pid is the identity a caller wants RECORDED. Reading it as proof of
+    // ancestry would let any second session name itself the owner: both sessions
+    // here pass the same pid, and the second must still be held off.
+    acquire('s1', opts())
+    expect(acquire('s2', opts())).toBe('held')
+    expect(readOwnerLock(lockPath).sessionId).toBe('s1')
+  })
+
+  it('ourClaudeProcess memoises the walk, and re-validates a cached pid', () => {
+    const ancestorCachePath = join(dir, 'session-process.json')
+    let walks = 0
+    const walk = () => {
+      walks++
+      return { pid: process.pid, startedAt: NOW }
+    }
+    expect(ourClaudeProcess('sid', { ancestorCachePath, findAncestorFn: walk })).toMatchObject({ pid: process.pid })
+    expect(ourClaudeProcess('sid', { ancestorCachePath, findAncestorFn: walk })).toMatchObject({ pid: process.pid })
+    expect(walks).toBe(1)
+    // A cached pid that is no longer alive is not trusted — walk again.
+    ourClaudeProcess('sid', { ancestorCachePath, findAncestorFn: walk, probePidFn: () => deadProbe })
+    expect(walks).toBe(2)
+    // A failed walk is remembered too, so it is not retried on every call…
+    let failed = 0
+    const fail = () => {
+      failed++
+      return null
+    }
+    expect(ourClaudeProcess('sid2', { ancestorCachePath, findAncestorFn: fail })).toBe(null)
+    expect(ourClaudeProcess('sid2', { ancestorCachePath, findAncestorFn: fail })).toBe(null)
+    expect(failed).toBe(1)
+    // …but not forever.
+    expect(ourClaudeProcess('sid2', { ancestorCachePath, findAncestorFn: fail, retryMs: 0 })).toBe(null)
+    expect(failed).toBe(2)
+  })
+
+  it('heldByOtherLiveOwner: true for a foreign live lock, false for mine/free/dead', () => {
+    expect(heldByOther('sX')).toBe(false) // free
+    acquire('s1', opts())
+    expect(heldByOther('s1', { probePidFn: () => aliveProbe })).toBe(false) // mine
+    expect(heldByOther('s2', { probePidFn: () => aliveProbe })).toBe(true) // foreign + live
     writeFileSync(
       lockPath,
       JSON.stringify({ sessionId: 'dead', claimedAt: Date.now() - 30 * 60_000, pid: 999999 }),
     )
-    expect(heldByOtherLiveOwner('s2', { lockPath, probePidFn: () => deadProbe })).toBe(false) // foreign but dead
+    expect(heldByOther('s2', { probePidFn: () => deadProbe })).toBe(false) // foreign but dead
   })
 })
 

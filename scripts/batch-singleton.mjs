@@ -236,6 +236,44 @@ export function assessOwner(lock, { now, bootTime, probe }) {
 }
 
 /**
+ * DOES THIS LOCK BELONG TO THE PROCESS WE RUN UNDER? PURE.
+ *
+ * The session id is not a stable identity: a context compaction mints a new one
+ * while the lock keeps the old, and every ownership-gated guard would then read
+ * the owner as foreign and stand down. The PROCESS is stable — a compaction
+ * happens inside one `claude.exe` — and the lock already records `pid` and
+ * `pidStartedAt`, so it can answer the question the id cannot.
+ *
+ * This must NEVER widen into "any live process owns it": a genuinely second
+ * window is exactly what the singleton exists to detect, and it has its own
+ * claude process. So ownership by process requires the recorded pid to be OUR
+ * OWN ancestor AND its start time to match — a reused pid is a different
+ * process. Where the platform cannot tell us (no ancestor resolvable, no start
+ * time recorded), the answer is NO and the session id decides exactly as before.
+ * Being wrong toward "not mine" costs a stand-down; being wrong the other way
+ * costs the incident this module was written for.
+ *
+ * Returns { mine, via, restamp }.
+ */
+export function resolveOwnership({ lock, sessionId, ancestor, tolerance = PID_START_TOLERANCE_MS }) {
+  const no = (via) => ({ mine: false, via, restamp: false })
+  if (!lock || typeof lock.sessionId !== 'string') return no('no-lock')
+  if (sessionId && lock.sessionId === sessionId) return { mine: true, via: 'session-id', restamp: false }
+  if (!sessionId) return no('no-session-id')
+  // A launcher's pending-spawn lock names a process that is not this session's
+  // to claim; convertPendingSpawn is the only door into it.
+  if (lock.kind === 'pending-spawn') return no('pending-spawn')
+  if (typeof lock.pid !== 'number' || lock.pid <= 0) return no('lock-without-pid')
+  if (!ancestor || typeof ancestor.pid !== 'number' || ancestor.pid <= 0) return no('process-unknown')
+  if (ancestor.pid !== lock.pid) return no('other-process')
+  if (typeof lock.pidStartedAt !== 'number' || typeof ancestor.startedAt !== 'number') {
+    return no('start-time-unknown')
+  }
+  if (Math.abs(ancestor.startedAt - lock.pidStartedAt) > tolerance) return no('pid-reused')
+  return { mine: true, via: 'process', restamp: true }
+}
+
+/**
  * WHICH ORPHANED TMP FILES MAY BE SWEPT (point 340 (b)). PURE.
  *
  * Fourteen `.claude/batch-lock.json.tmp-<pid>` files accreted between 19:36 and
@@ -636,7 +674,10 @@ export function acquire(sessionId, opts = {}) {
   }
 
   const lock = readOwnerLock(lockPath)
-  if (lock && lock.sessionId === sessionId) {
+  // Ours by id, or ours by PROCESS under a session id a compaction renamed. The
+  // restamp inside ownsLock puts the current id back on the lock, so this is the
+  // one place that pays for the ancestor walk.
+  if (lock && ownsLock(sessionId, { ...opts, lockPath, lock, now }).mine) {
     heartbeat(sessionId, { lockPath, now })
     return 'mine'
   }
@@ -737,6 +778,92 @@ export function updateOwnLock(sessionId, patch, lockPath = LOCK_PATH) {
   return true
 }
 
+/** A failed ancestor walk is remembered this long before it is retried — the
+ *  walk costs a PowerShell round trip and a session's ancestry does not change,
+ *  so asking once per session id is the whole budget. */
+export const ANCESTOR_RETRY_MS = 10 * 60 * 1000
+
+/**
+ * The claude process THIS session runs under, memoised per session id. The walk
+ * itself is one PowerShell round trip; without the memo it would sit in front of
+ * every guard call of every non-owner session, which is most tool calls in the
+ * repository. A cached pid is re-validated by a cheap liveness probe, so a stale
+ * entry can never answer for a process that is gone.
+ */
+export function ourClaudeProcess(sessionId, opts = {}) {
+  if (!sessionId) return null
+  const path = opts.ancestorCachePath ?? statePathsFor(opts.lockPath ?? LOCK_PATH).ancestorCachePath
+  const now = opts.now ?? Date.now()
+  let cache = null
+  try {
+    cache = readJson(path) ?? {}
+    const hit = cache[sessionId]
+    if (hit && typeof hit.at === 'number') {
+      if (hit.pid == null) {
+        if (now - hit.at < (opts.retryMs ?? ANCESTOR_RETRY_MS)) return null
+      } else if ((opts.probePidFn ?? cheapProbePid)(hit.pid).exists) {
+        return { pid: hit.pid, startedAt: typeof hit.startedAt === 'number' ? hit.startedAt : null }
+      }
+    }
+  } catch {
+    cache = null // unreadable cache → walk, but do not try to write it back
+  }
+  const anc = (opts.findAncestorFn ?? findClaudeAncestor)()
+  if (cache) {
+    try {
+      const next = { ...cache, [sessionId]: { pid: anc?.pid ?? null, startedAt: anc?.startedAt ?? null, at: now } }
+      for (const [k, v] of Object.entries(next)) if (now - (v?.at ?? 0) > 24 * 3600 * 1000) delete next[k]
+      writeJsonAtomic(path, next)
+    } catch {
+      /* best effort — the answer above is what matters */
+    }
+  }
+  return anc
+}
+
+/**
+ * Ownership, by session id first and by PROCESS second. Returns
+ * `{ mine, via, lock }`. On a process match the lock is RE-STAMPED with the
+ * current session id, so every later check is the cheap string compare again and
+ * the state file stops lying about who holds it.
+ *
+ * `processIdentity: false` keeps the old id-only behaviour for a caller that
+ * wants it; `restamp: false` asks the same question without writing.
+ */
+export function ownsLock(sessionId, opts = {}) {
+  const lockPath = opts.lockPath ?? LOCK_PATH
+  const lock = opts.lock !== undefined ? opts.lock : readOwnerLock(lockPath)
+  if (!lock) return { mine: false, via: 'no-lock', lock: null }
+  if (sessionId && lock.sessionId === sessionId) return { mine: true, via: 'session-id', lock }
+  if (opts.processIdentity === false || !sessionId) return { mine: false, via: 'session-id-mismatch', lock }
+  // Cheap necessary conditions BEFORE the expensive walk: a lock with no pid, or
+  // one whose pid is not even alive, cannot name the process we are running in.
+  if (typeof lock.pid !== 'number' || lock.pid <= 0) return { mine: false, via: 'lock-without-pid', lock }
+  if ((opts.probePidFn ?? cheapProbePid)(lock.pid).exists !== true) {
+    return { mine: false, via: 'lock-pid-dead', lock }
+  }
+  // Deliberately NOT `opts.pid`: that is the identity a caller wants RECORDED,
+  // not one it has verified it runs under, and trusting it would let any caller
+  // name itself the owner. Ancestry is established or it is not.
+  const ancestor = opts.ancestor !== undefined ? opts.ancestor : ourClaudeProcess(sessionId, opts)
+  const verdict = resolveOwnership({ lock, sessionId, ancestor })
+  if (verdict.mine && verdict.restamp && opts.restamp !== false) {
+    try {
+      // Only the id moves. claimedAt is NOT bumped (that would count as work and
+      // silently withdraw a handover) and no other field is touched.
+      writeJsonAtomic(lockPath, {
+        ...lock,
+        sessionId,
+        sessionIdBefore: lock.sessionId,
+        sessionIdRestampedAt: opts.now ?? Date.now(),
+      })
+    } catch {
+      /* the verdict stands; the next call simply pays for the walk again */
+    }
+  }
+  return { mine: verdict.mine, via: verdict.via, lock }
+}
+
 export function isOwner(sessionId, lockPath = LOCK_PATH) {
   if (!sessionId) return false
   const lock = readOwnerLock(lockPath)
@@ -754,7 +881,9 @@ export function heldByOtherLiveOwner(sessionId, opts = {}) {
     const lockPath = opts.lockPath ?? LOCK_PATH
     const lock = readOwnerLock(lockPath)
     if (!lock) return false
-    if (sessionId && lock.sessionId === sessionId) return false
+    // Ours by id, or ours by process (the compaction case) — a session must not
+    // stand down against its own lock just because its id was renamed under it.
+    if (ownsLock(sessionId, { ...opts, lockPath, lock }).mine) return false
     const probe = lock.pid ? (opts.probePidFn ?? cheapProbePid)(lock.pid) : null
     const a = assessOwner(lock, {
       now: opts.now ?? Date.now(),
