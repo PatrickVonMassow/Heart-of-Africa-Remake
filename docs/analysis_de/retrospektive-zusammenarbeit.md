@@ -369,6 +369,18 @@ Kein einzelnes Teil hat versagt. Der Wächter tat, was er sollte; der Starter ta
 **Lehren:** Ein Mechanismus, der eine Handlung *erlaubt*, ist unfertig, solange nichts sie auch **auslöst** — eine Freigabe ohne Vollzug ist eine Regel, kein Mechanismus, also §3.40 in anderer Gestalt. Und eine Diagnose ohne Konsequenz ist Protokollprosa: Wer einen Zustand einundzwanzig Mal richtig benennt und nichts tut, hat ihn nicht erkannt, sondern nur beschrieben.
 
 
+### 3.43 Ein Mechanismus, den ein Namenswechsel abschaltet
+
+Am 28.07.2026 wurde die tags zuvor gebaute Sitzungsgrenze zum ersten Mal live durchgespielt — auf ausdrückliche Anweisung des Nutzers, „teste den ganzen Prozess". Die Unit-Ebene war grün, jedes Teil einzeln geprüft. Der Durchlauf förderte vier Fehler zutage, von denen keiner auf der Unit-Ebene sichtbar war, und der schwerste hat eine Form, die es zu merken lohnt.
+
+Die Sperre, die verhindert, dass zwei Sitzungen gleichzeitig am Projekt arbeiten, hängt an der **Sitzungs-ID**. Jeder Wächter fragt zuerst: gehört diese Sperre mir? Lautet die Antwort nein, tritt er still zurück — genau richtig, denn ein zweites Fenster darf die Arbeit des ersten nicht kommentieren. Nur vergibt eine Kontext-Kompaktierung eine **neue** Sitzungs-ID, während die Sperre die alte behält. Von diesem Moment an hält sich die arbeitende Sitzung selbst für fremd. Alle besitzgebundenen Wächter treten zurück, darunter der, der die Übergabe an die Nachfolge-Sitzung einträgt. Der Marker blieb liegen, die Übergabe wurde nie geschrieben, der Starter übersprang korrekt jeden Takt — und der Batch stand.
+
+Das Tückische ist die **Lautlosigkeit**. Ein Wächter, der abstürzt, hinterlässt eine Spur; einer, der zurücktritt, hinterlässt keine, denn Zurücktreten ist sein normales Verhalten. Die Diagnose ließ sich nur am Zustand selbst führen: der Marker war unverbraucht, obwohl der Statusbefehl „ein Grenz-Halt wäre ERLAUBT" meldete. Alle Teile sagten ja, und trotzdem geschah nichts.
+
+Zwei kleinere Funde derselben Nacht gehören zum selben Muster. Die Testsuite schrieb mit einer Test-Sitzungs-ID in das *echte* Übergabe-Protokoll — ein Unit-Lauf konnte also eine real genommene Grenze widerrufen, und das Push-Gate führt bei jedem Push einen aus. Und die Stop-Kette schickte die Sitzung nach dem Nehmen der Grenze regelmäßig zurück an die Arbeit (fehlender Zeitstempel, ungeprüfter Mechanismus-Commit, verschobener HEAD), was die Grenze jedes Mal still widerrief.
+
+**Lehren:** Ein Mechanismus, dessen Zuständigkeit an einem **veränderlichen Namen** hängt, schaltet sich ab, sobald der Name wechselt — und zwar geräuschlos, weil Nichtzuständigkeit ein gültiger Zustand ist. Identität gehört an etwas Stabiles gebunden (hier: den Prozess, der ohnehin schon in der Sperre steht), oder der Namenswechsel muss die Bindung aktiv nachziehen. Zweitens: Tests dürfen den Produktivzustand nicht anfassen — ein Testlauf, der Live-Zustand verändern kann, ist kein Test mehr, sondern ein Eingriff. Und drittens, wieder §3.40 in neuer Gestalt: eine Kette wird durch **einen Durchlauf** geprüft, nicht durch die Summe grüner Teile.
+
 ---
 
 ## 4. Die Guards als Immunsystem
@@ -535,15 +547,3 @@ Erfasste Quellen: 64 Feedback-/Projekt-Memories · 35 Guard-/Hook-Skripte · 3 R
 <!-- RETRO-FINGERPRINT: f1ee3eb83a5a73eb68dc1458352ad063b7d5039c7018fc205fe4f11637545d9a -->
 <!-- RETRO-LAST-REFRESHED: 2026-07-28T04:51:24.938Z -->
 <!-- AUTO-GENERATED:END -->
-
-### 3.43 Ein Mechanismus, den ein Namenswechsel abschaltet
-
-Am 28.07.2026 wurde die tags zuvor gebaute Sitzungsgrenze zum ersten Mal live durchgespielt — auf ausdrückliche Anweisung des Nutzers, „teste den ganzen Prozess". Die Unit-Ebene war grün, jedes Teil einzeln geprüft. Der Durchlauf förderte vier Fehler zutage, von denen keiner auf der Unit-Ebene sichtbar war, und der schwerste hat eine Form, die es zu merken lohnt.
-
-Die Sperre, die verhindert, dass zwei Sitzungen gleichzeitig am Projekt arbeiten, hängt an der **Sitzungs-ID**. Jeder Wächter fragt zuerst: gehört diese Sperre mir? Lautet die Antwort nein, tritt er still zurück — genau richtig, denn ein zweites Fenster darf die Arbeit des ersten nicht kommentieren. Nur vergibt eine Kontext-Kompaktierung eine **neue** Sitzungs-ID, während die Sperre die alte behält. Von diesem Moment an hält sich die arbeitende Sitzung selbst für fremd. Alle besitzgebundenen Wächter treten zurück, darunter der, der die Übergabe an die Nachfolge-Sitzung einträgt. Der Marker blieb liegen, die Übergabe wurde nie geschrieben, der Starter übersprang korrekt jeden Takt — und der Batch stand.
-
-Das Tückische ist die **Lautlosigkeit**. Ein Wächter, der abstürzt, hinterlässt eine Spur; einer, der zurücktritt, hinterlässt keine, denn Zurücktreten ist sein normales Verhalten. Die Diagnose ließ sich nur am Zustand selbst führen: der Marker war unverbraucht, obwohl der Statusbefehl „ein Grenz-Halt wäre ERLAUBT" meldete. Alle Teile sagten ja, und trotzdem geschah nichts.
-
-Zwei kleinere Funde derselben Nacht gehören zum selben Muster. Die Testsuite schrieb mit einer Test-Sitzungs-ID in das *echte* Übergabe-Protokoll — ein Unit-Lauf konnte also eine real genommene Grenze widerrufen, und das Push-Gate führt bei jedem Push einen aus. Und die Stop-Kette schickte die Sitzung nach dem Nehmen der Grenze regelmäßig zurück an die Arbeit (fehlender Zeitstempel, ungeprüfter Mechanismus-Commit, verschobener HEAD), was die Grenze jedes Mal still widerrief.
-
-**Lehren:** Ein Mechanismus, dessen Zuständigkeit an einem **veränderlichen Namen** hängt, schaltet sich ab, sobald der Name wechselt — und zwar geräuschlos, weil Nichtzuständigkeit ein gültiger Zustand ist. Identität gehört an etwas Stabiles gebunden (hier: den Prozess, der ohnehin schon in der Sperre steht), oder der Namenswechsel muss die Bindung aktiv nachziehen. Zweitens: Tests dürfen den Produktivzustand nicht anfassen — ein Testlauf, der Live-Zustand verändern kann, ist kein Test mehr, sondern ein Eingriff. Und drittens, wieder §3.40 in neuer Gestalt: eine Kette wird durch **einen Durchlauf** geprüft, nicht durch die Summe grüner Teile.
