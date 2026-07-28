@@ -11295,3 +11295,47 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   hidden-body frame, and the measured spread recorded beside the new criterion.
   DOCS in the same commit: the check's own comment block in `scripts/verify/
   enrichments.mjs` and, if the criterion changes what §19.16 promises, design.md.
+
+- [x] 378. THE ANIMAL'S COLLISION SITS BESIDE THE ANIMAL (user 27.07.2026, reported on
+  the deployed build with a screenshot: in the bird's-eye view the traveller walks
+  STRAIGHT THROUGH the drawn body, and is blocked on empty ground NEXT TO it). The
+  §7.1 pt 4 rule is that the bird's-eye traveller collides with animals; today he
+  collides with something that is not where the animal is drawn, which is worse than
+  no collision at all — the picture and the feel contradict each other, and the player
+  cannot learn a rule from it.
+  THE FIX IS THE POINT-129 PRINCIPLE, APPLIED TO ANIMALS: a collider is DERIVED from
+  the SAME transform the renderer draws, never from a parallel quantity that is
+  merely expected to match. `nearAnimalObstacles` in `src/scenes/travel/Wildlife.tsx`
+  builds its circles from `a.x`/`a.z` and `BODY_RADIUS[species] * a.scale`; the
+  rendered body is placed by the instanced draw for that species. FIND where the two
+  diverge and make the collider read the drawn placement — do not "correct" it by an
+  offset constant, which would drift again the next time the rendering moves.
+  THE REPORT CARRIES ITS OWN REPRODUCTION, so start there rather than hunting for a
+  case: `local/reports/378-animal-collider-report.json` is the state dump taken at the
+  moment of the report (git-ignored, outside the repo's tracked content). World seed
+  3241103702, traveller at x 330.707 / z −233.274 in the north region, 29.01.1890,
+  travel speed 5.6, detail level medium — the same seed and spot re-streams the same
+  herd, so the offending animal can be walked into again instead of being waited for.
+  A related in-game assert fired during an unrelated verification run the same
+  evening and points at the same seam: `animal-buried — wildebeest bodyY=1.13
+  ground=1.92`, i.e. a body DRAWN below the ground it stands on. Check whether one
+  cause explains both before treating them as two.
+  MEASURE THE DIVERGENCE FIRST, so the fix is aimed rather than guessed: for a
+  standing and a moving animal of several species, log the drawn world position of the
+  instance and the circle the collider reports, and record the delta. A per-species
+  constant offset, a lag of one frame, a herd-anchor instead of the individual, and a
+  facing-dependent body offset all produce the reported symptom and are told apart by
+  that measurement.
+  WATCH FOR THE NEIGHBOURING CASE: whatever the cause, check the SAME question for the
+  crocodile in water and for a juvenile beside its parent — both draw with their own
+  placement rules, and a fix that only lines up the plain grazers would leave the
+  reported class half open.
+  VERIFIABLE: pure Vitest — for a sampled set of species and states, the collider
+  circle's centre equals the position the renderer places that instance at, within a
+  tight tolerance, and the radius scales with the drawn body; a moving animal keeps
+  that identity across frames (the lag case). Plus one Playwright check in the
+  bird's-eye view that walks the traveller INTO the drawn body (blocked) and past its
+  flank (free), judged by PROJECTING the animal to the frame per §7.2, never by an
+  assumed radius.
+  DOCS in the same commit: CLAUDE.md §7.1 pt 4 (the collider-derived-from-the-drawing
+  rule, already stated for flora, extended to animals) and its evidence section.
