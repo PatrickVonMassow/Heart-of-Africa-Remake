@@ -1011,7 +1011,7 @@ After completion and after every major system:
   `dashboard-integrity-guard` (the progress board is published, concise,
   one-topic-per-card and consistent with the real state), `prep-guard` (no
   idle wait while a background validation runs), `batch-progress-guard` (no
-  idle stop bar a verified point boundary), `render-verify-guard` (no
+  idle stop without a boundary or wait), `render-verify-guard` (no
   render-set change — scene/shader/HUD, `src/world/` geometry, the browser
   suites — finished without the picture check; both backends where they can
   differ, one where they cannot), `mechanism-review-guard` (no new or changed
