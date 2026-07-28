@@ -1,4 +1,7 @@
-<img width="1168" height="784" alt="Grok 2" src="https://github.com/user-attachments/assets/07cc05d9-7a8d-427c-88a7-adbd0ea372cf" />
+<img width="1168" height="784" alt="Copver photo" src="https://github.com/user-attachments/assets/07cc05d9-7a8d-427c-88a7-adbd0ea372cf" />
+
+PoC playable directly in the browser at:  
+<https://patrickvonmassow.github.io/Heart-of-Africa-Remake/poc/>
 
 # The Heart of Africa — Modern Remake
 
@@ -18,9 +21,6 @@ This repository contains the proof of concept: the core gameplay loop end to
 end, not the complete game. `design.md` is the authoritative design document;
 `CLAUDE.md` defines the POC scope, acceptance criteria and build rules.
 
-PoC playable directly in the browser at:  
-<https://patrickvonmassow.github.io/Heart-of-Africa-Remake/poc/>
-
 ## Gameplay
 
 - **Two perspectives.** A 3D bird's-eye view for the journey across the
@@ -38,7 +38,7 @@ PoC playable directly in the browser at:
   pay regional prices for treasure finds (continent-wide arbitrage), travel
   agencies sell ferry passages, and discovery bounties arrive at the next port
   as telegraphic transfers.
-- **Standing with the natives.** A rejected gift means hostility and expulsion;
+- **Standing with the local peoples.** A rejected gift means hostility and expulsion;
   repeatedly satisfying a chief earns "Honored Friend" — rescue from attacks,
   near-death aid and free village supplies — while a rifle-backed robbery pays
   richly but antagonizes the region for good. Village caches and free camps
