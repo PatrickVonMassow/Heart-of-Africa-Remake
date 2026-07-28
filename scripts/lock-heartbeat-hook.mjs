@@ -18,10 +18,14 @@
 // (4) Detect a dashboard publish: when the Artifact tool is called on the
 //     dashboard file, record the published content's sha256 in
 //     dashboard-state.json ("published" vs "merely edited", invariant 9).
+//     The tool's RESPONSE decides whether it counts — a failed publish records
+//     publishFailed and no hash, so the board can never be believed live on the
+//     strength of an attempt alone (point 399).
 import { readFileSync } from 'node:fs'
 import { basename } from 'node:path'
 import { heartbeat, noteActivity } from './batch-singleton.mjs'
 import { handoverSurvivesCall } from './batch-boundary-core.mjs'
+import { classifyPublishResponse, publishStatePatch } from './publish-outcome-core.mjs'
 import {
   STATE_PATH,
   ACTIVITY_PATH,
@@ -84,16 +88,15 @@ try {
     if (state.dashboardPath) dashboardNames.add(basename(state.dashboardPath))
     if (state.scratchpadPath) dashboardNames.add(basename(state.scratchpadPath))
     if (dashboardNames.has(basename(file))) {
-      const hash = sha256File(file)
-      if (hash) {
-        mergeState({
-          publishedHash: hash,
-          publishedAt: Date.now(),
-          publishedPath: file,
-          publishedBy: 'hook',
-          publishDeferred: undefined,
-        })
-      }
+      // The RESPONSE decides, not the call: a refused or conflicted publish used
+      // to be recorded as a live board (point 399, four-eyes finding 28.07.2026).
+      const outcome = classifyPublishResponse(data.tool_response ?? data.toolResponse)
+      const patch = publishStatePatch(outcome, {
+        hash: sha256File(file),
+        path: file,
+        at: Date.now(),
+      })
+      if (patch) mergeState(patch)
     }
   }
 } catch {

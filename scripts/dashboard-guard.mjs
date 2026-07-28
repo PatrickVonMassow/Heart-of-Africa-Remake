@@ -194,6 +194,31 @@ if (RUN_AS_SCRIPT && process.argv[2] === '--synced') {
     process.exit(1)
   }
 
+  // THEN: was this exact board actually PUBLISHED? (point 399, four-eyes
+  // finding 28.07.2026.) attest used to register a board the Artifact tool had
+  // never accepted — the file was consistent, so it printed "registered" over a
+  // phone still showing the previous board. The publish record is only evidence
+  // if it names THIS content; a deferred publish (headless session, no Artifact
+  // tool) is the documented exception and passes with a loud line instead.
+  const fileHash = sha256File(p)
+  if (priorState.publishFailed) {
+    console.error('dashboard-guard --synced REFUSED — the last publish attempt FAILED:')
+    console.error(`  ${priorState.publishFailed.reason} (${priorState.publishFailed.path})`)
+    console.error('Publish the scratchpad file via the Artifact tool again, then re-run --synced.')
+    process.exit(1)
+  }
+  if (priorState.publishDeferred) {
+    const why = priorState.publishDeferred.reason ?? priorState.publishDeferred
+    console.warn(`dashboard-guard --synced: publish DEFERRED — ${why}`)
+    console.warn('  the board file is current, the LIVE page is not. The watchdog reports this.')
+  } else if (fileHash && priorState.publishedHash !== fileHash) {
+    console.error('dashboard-guard --synced REFUSED — this board was never published:')
+    console.error(`  file ${String(fileHash).slice(0, 12)}… vs last published ${String(priorState.publishedHash ?? 'none').slice(0, 12)}…`)
+    console.error('Publish the scratchpad file via the Artifact tool, then re-run --synced.')
+    console.error('Headless session without the Artifact tool: node scripts/dashboard-publish.mjs --defer "<reason>".')
+    process.exit(1)
+  }
+
   // Advance the doneSeen baseline — but a WAIVED pass must not absorb an
   // erledigt-missing finding forever: it only advances over points that
   // actually have a card (plus everything already seen). A clean pass has no
