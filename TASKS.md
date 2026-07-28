@@ -2974,6 +2974,12 @@ read that as "the criterion and its evidence section".
   · fire shadows ON — per-stone lit-minus-shadow `[1.6, -1.3, 0]`. Not a criterion sitting
     on its edge: one stone shows a shadow, the next shows the OPPOSITE sign, the third
     nothing at all. Judge the product here before touching the number.
+  AND THE BASELINE LANE AGREES, same session: the second run reported 55 pass / 8 fail,
+  and its own classifier separated them without help — "the SAME check failed twice … a
+  candidate REAL failure; the other 4 rotated between the runs and read as load". The four
+  that failed twice are the four above. So the list is not stale: it is today's list, and
+  the four extra reds of the second run (the dome graying, the fire glow under overcast,
+  the settlement rain, the ground tint) are the load signature, not new defects.
   MEASURE BEFORE JUDGING A THRESHOLD: run the staging several times on a quiet machine
   (`node scripts/verify/machine-load.mjs` confirms) and record the spread beside the
   criterion, exactly as point 382 requires for the crocodile's eyes.
