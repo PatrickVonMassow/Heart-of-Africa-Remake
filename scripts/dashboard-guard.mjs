@@ -194,8 +194,8 @@ if (RUN_AS_SCRIPT && process.argv[2] === '--synced') {
     process.exit(1)
   }
 
-  // THEN: was this exact board actually PUBLISHED? (point 399, four-eyes
-  // finding 28.07.2026.) attest used to register a board the Artifact tool had
+  // THEN: was this exact board actually PUBLISHED? (four-eyes finding
+  // 28.07.2026.) attest used to register a board the Artifact tool had
   // never accepted — the file was consistent, so it printed "registered" over a
   // phone still showing the previous board. The publish record is only evidence
   // if it names THIS content; a deferred publish (headless session, no Artifact
