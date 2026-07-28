@@ -31,7 +31,8 @@ import {
   mergeState,
   sha256File,
 } from './dashboard-state.mjs'
-import { heldByOtherLiveOwner, withdrawHandover } from './batch-singleton.mjs'
+import { heldByOtherLiveOwner, withdrawHandover, touchHandover } from './batch-singleton.mjs'
+import { handoverSurvivesCall } from './batch-boundary-core.mjs'
 import { evaluate } from './board-first-core.mjs'
 
 const PAUSE = resolve(REPO_ROOT, '.claude', 'batch-paused')
@@ -92,8 +93,23 @@ try {
   // hook lives here rather than in one of its own because .claude/settings.json
   // is a protected path an unattended session cannot extend, and this matcher
   // already covers every state-changing tool. Never blocks, never throws.
+  //
+  // …but NOT for work the Stop chain itself demanded (live finding 2,
+  // 28.07.2026). Publishing the board, recording a mechanism review or touching
+  // the work order's own entry is part of ENDING, not of carrying on, and
+  // withdrawing on those rounds un-took every handover the guard had just
+  // written. The closing set is deliberately narrow and everything outside it
+  // withdraws — a wrongly withdrawn boundary costs one command, a wrongly kept
+  // one lets a successor spawn beside a working session.
   try {
-    withdrawHandover(payload.session_id || '')
+    const call = payload.tool_input ?? {}
+    const keep = handoverSurvivesCall({
+      toolName: payload.tool_name,
+      filePath: call.file_path ?? call.notebook_path,
+      command: call.command,
+    })
+    if (keep.survives) touchHandover(payload.session_id || '')
+    else withdrawHandover(payload.session_id || '')
   } catch {
     /* best effort — a lock we cannot write is not this gate's problem */
   }

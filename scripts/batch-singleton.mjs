@@ -28,20 +28,21 @@
 import {
   appendFileSync,
   readFileSync,
-  writeFileSync,
   existsSync,
-  renameSync,
   openSync,
   closeSync,
   writeSync,
   rmSync,
   mkdirSync,
   rmdirSync,
+  readdirSync,
   statSync,
 } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import os from 'node:os'
+import { dirname, join } from 'node:path'
 import { repoPath } from './repo-paths.mjs'
+import { writeJsonAtomic, tryWriteJsonAtomic } from './atomic-write.mjs'
 
 // --- Constants (exported for tests and callers) -------------------------------
 
@@ -84,11 +85,41 @@ export const REAP_MUTEX_STALE_MS = 60 * 1000
  *  detection). */
 export const PID_START_TOLERANCE_MS = 2000
 
+/**
+ * EVERY state file this module writes, derived from ONE lock path. PURE.
+ *
+ * A caller that redirects the lock — a test into a temp directory, a sandbox —
+ * redirects the whole family with it, and can therefore never reach into the
+ * repository's live `.claude/`. That is not a nicety: on 28.07.2026 the unit
+ * suite was found writing `WITHDRAWN point 388 by s1` into the REAL
+ * `.claude/boundary.log`, because `withdrawHandover` defaulted its log path to
+ * the repo while the test had redirected only the lock. The pre-push gate runs
+ * that suite on every push, so a test run could withdraw a boundary a live
+ * session had taken.
+ */
+export function statePathsFor(lockPath) {
+  const dir = dirname(lockPath)
+  return {
+    lockPath,
+    boundaryLogPath: join(dir, 'boundary.log'),
+    boundaryPath: join(dir, 'batch-boundary.json'),
+    sessionsSeenPath: join(dir, 'sessions-seen.json'),
+    activityPath: join(dir, 'session-activity.json'),
+    alertPath: join(dir, 'parallel-alert.json'),
+    doctorStatePath: join(dir, 'doctor-state.json'),
+    ancestorCachePath: join(dir, 'session-process.json'),
+  }
+}
+
 export const LOCK_PATH = repoPath('.claude/batch-lock.json')
-export const SESSIONS_SEEN_PATH = repoPath('.claude/sessions-seen.json')
-export const SESSION_ACTIVITY_PATH = repoPath('.claude/session-activity.json')
-export const PARALLEL_ALERT_PATH = repoPath('.claude/parallel-alert.json')
-export const DOCTOR_STATE_PATH = repoPath('.claude/doctor-state.json')
+const DEFAULT_PATHS = statePathsFor(LOCK_PATH)
+export const SESSIONS_SEEN_PATH = DEFAULT_PATHS.sessionsSeenPath
+export const SESSION_ACTIVITY_PATH = DEFAULT_PATHS.activityPath
+export const PARALLEL_ALERT_PATH = DEFAULT_PATHS.alertPath
+export const DOCTOR_STATE_PATH = DEFAULT_PATHS.doctorStatePath
+export const BOUNDARY_LOG_PATH = DEFAULT_PATHS.boundaryLogPath
+export const BOUNDARY_MARKER_PATH = DEFAULT_PATHS.boundaryPath
+export const ANCESTOR_CACHE_PATH = DEFAULT_PATHS.ancestorCachePath
 
 // --- Small IO helpers ----------------------------------------------------------
 
@@ -99,11 +130,32 @@ const readJson = (p) => {
     return null
   }
 }
-const writeJsonAtomic = (p, obj) => {
-  const tmp = `${p}.tmp-${process.pid}`
-  writeFileSync(tmp, JSON.stringify(obj, null, 2))
-  renameSync(tmp, p)
-}
+// The atomic write RETRIES a Windows EPERM/EBUSY (scripts/atomic-write.mjs).
+//
+// THE MEASURED FAILURE (28.07.2026, five times in .claude/boundary.log, three of
+// them at a boundary stop): `EPERM: operation not permitted, rename
+// batch-lock.json.tmp-9904 -> batch-lock.json`. The rename that makes a lock
+// update atomic is NOT atomic against another process holding the TARGET — and
+// something reliably does, because the Stop chain rewrote this one small file
+// three times within milliseconds (acquire's heartbeat, the guard's explicit
+// heartbeat, then markHandover) and a real-time scanner opens each freshly
+// renamed file to inspect it. The third write is the one that failed, and it was
+// the handover.
+//
+// Two defences, and NOT a third: write the lock LESS (the redundant heartbeat is
+// gone) and RETRY over the scanner's window. The write stays ATOMIC — tmp plus
+// rename, never an in-place truncate — so a concurrent reader can never see half
+// a lock (point 340). Where every attempt fails the tmp is removed and the error
+// PROPAGATES: a heartbeat that did not land must never read as one that did,
+// because `assessOwner` decides liveness on exactly that timestamp, and a run of
+// silently swallowed failures would age a LIVE session toward "provably dead".
+// The one caller that must not be taken down by the throw — the boundary branch
+// of the Stop guard — converts it to data in `markHandover` instead.
+//
+// The litter of that failure mode is swept up too: fourteen orphaned
+// `.claude/batch-lock.json.tmp-<pid>` files accreted in 76 minutes on
+// 25.07.2026, one per failed write. `sweepableTmpFiles` below decides which may
+// go — only those whose owning pid is provably dead and which have settled.
 
 // --- Pure decision logic (dependency-injected, Vitest-covered) -----------------
 
@@ -181,6 +233,75 @@ export function assessOwner(lock, { now, bootTime, probe }) {
   // process. This is the exact fix for the 24.07 incident (heartbeat 24 min
   // stale, session mid-turn, launcher double-spawned).
   return { alive: true, wedged: age > WEDGED_MS, reason: 'pid-alive' }
+}
+
+/**
+ * DOES THIS LOCK BELONG TO THE PROCESS WE RUN UNDER? PURE.
+ *
+ * The session id is not a stable identity: a context compaction mints a new one
+ * while the lock keeps the old, and every ownership-gated guard would then read
+ * the owner as foreign and stand down. The PROCESS is stable — a compaction
+ * happens inside one `claude.exe` — and the lock already records `pid` and
+ * `pidStartedAt`, so it can answer the question the id cannot.
+ *
+ * This must NEVER widen into "any live process owns it": a genuinely second
+ * window is exactly what the singleton exists to detect, and it has its own
+ * claude process. So ownership by process requires the recorded pid to be OUR
+ * OWN ancestor AND its start time to match — a reused pid is a different
+ * process. Where the platform cannot tell us (no ancestor resolvable, no start
+ * time recorded), the answer is NO and the session id decides exactly as before.
+ * Being wrong toward "not mine" costs a stand-down; being wrong the other way
+ * costs the incident this module was written for.
+ *
+ * Returns { mine, via, restamp }.
+ */
+export function resolveOwnership({ lock, sessionId, ancestor, tolerance = PID_START_TOLERANCE_MS }) {
+  const no = (via) => ({ mine: false, via, restamp: false })
+  if (!lock || typeof lock.sessionId !== 'string') return no('no-lock')
+  if (sessionId && lock.sessionId === sessionId) return { mine: true, via: 'session-id', restamp: false }
+  if (!sessionId) return no('no-session-id')
+  // A launcher's pending-spawn lock names a process that is not this session's
+  // to claim; convertPendingSpawn is the only door into it.
+  if (lock.kind === 'pending-spawn') return no('pending-spawn')
+  if (typeof lock.pid !== 'number' || lock.pid <= 0) return no('lock-without-pid')
+  if (!ancestor || typeof ancestor.pid !== 'number' || ancestor.pid <= 0) return no('process-unknown')
+  if (ancestor.pid !== lock.pid) return no('other-process')
+  if (typeof lock.pidStartedAt !== 'number' || typeof ancestor.startedAt !== 'number') {
+    return no('start-time-unknown')
+  }
+  if (Math.abs(ancestor.startedAt - lock.pidStartedAt) > tolerance) return no('pid-reused')
+  return { mine: true, via: 'process', restamp: true }
+}
+
+/**
+ * WHICH ORPHANED TMP FILES MAY BE SWEPT (point 340 (b)). PURE.
+ *
+ * Fourteen `.claude/batch-lock.json.tmp-<pid>` files accreted between 19:36 and
+ * 20:52 on 25.07.2026 — one per rename that lost to a sharing violation. The
+ * litter is harmless in itself; sweeping it wrongly is not, so two conditions
+ * must BOTH hold: the pid encoded in the name is provably dead, and the file has
+ * settled (the reap-mutex age gate). A live process mid-write must never have its
+ * tmp taken from under it.
+ *
+ * Inputs are plain data:
+ *   entries  — [{ name, mtimeMs }] of the lock's directory
+ *   lockName — basename of the lock file
+ *   now, staleMs
+ *   probe    — (pid) => { exists }
+ */
+export function sweepableTmpFiles({ entries, lockName, now, probe, staleMs = REAP_MUTEX_STALE_MS }) {
+  // Both shapes the writer has produced: `<lock>.tmp-<pid>` and, since the retry
+  // gives every attempt its own name, `<lock>.tmp-<pid>-<attempt>`.
+  const re = new RegExp(`^${String(lockName).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\.tmp-(\\d+)(?:-\\d+)?$`)
+  const out = []
+  for (const entry of entries ?? []) {
+    const m = String(entry?.name ?? '').match(re)
+    if (!m) continue
+    if (!(typeof entry.mtimeMs === 'number' && now - entry.mtimeMs > staleMs)) continue
+    if (probe(Number(m[1]))?.exists === true) continue
+    out.push(entry.name)
+  }
+  return out
 }
 
 /**
@@ -428,6 +549,49 @@ function tryExclusiveCreate(lockPath, payload) {
   }
 }
 
+/**
+ * Remove the tmp files a failed rename left behind (point 340 (b)). Best effort
+ * and never throws: it is housekeeping, and the acquire it rides along with must
+ * not fail over litter. Returns the names removed.
+ */
+export function sweepOrphanTmp(lockPath, opts = {}) {
+  try {
+    const dir = dirname(lockPath)
+    const lockName = lockPath.slice(dir.length + 1)
+    const entries = (opts.readDir ?? defaultReadDir)(dir)
+    const doomed = sweepableTmpFiles({
+      entries,
+      lockName,
+      now: opts.now ?? Date.now(),
+      probe: opts.probePidFn ?? cheapProbePid,
+      staleMs: opts.staleMs ?? REAP_MUTEX_STALE_MS,
+    })
+    const removed = []
+    for (const name of doomed) {
+      try {
+        ;(opts.remove ?? rmSync)(join(dir, name), { force: true })
+        removed.push(name)
+      } catch {
+        /* someone else got there first, or it is held — try again next time */
+      }
+    }
+    return removed
+  } catch {
+    return []
+  }
+}
+
+const defaultReadDir = (dir) =>
+  readdirSync(dir).map((name) => {
+    let mtimeMs = 0
+    try {
+      mtimeMs = statSync(join(dir, name)).mtimeMs
+    } catch {
+      mtimeMs = Date.now() // vanished mid-scan → treat as fresh, i.e. spare it
+    }
+    return { name, mtimeMs }
+  })
+
 function enterReapMutex(mutexPath) {
   try {
     mkdirSync(mutexPath)
@@ -498,13 +662,22 @@ export function acquire(sessionId, opts = {}) {
     }
   }
 
+  // Sweep the litter of past failed writes (point 340 (b)) — only tmp files
+  // whose owning pid is provably dead and which have settled. Best effort, and
+  // deliberately here: acquisition is the one moment that is already doing lock
+  // housekeeping, and it is not on the per-tool-call hot path.
+  if (opts.sweep !== false) sweepOrphanTmp(lockPath, opts)
+
   // Fast path: no lock → exclusive create (test-and-set; one winner).
   if (!existsSync(lockPath)) {
     if (tryExclusiveCreate(lockPath, identity())) return 'acquired'
   }
 
   const lock = readOwnerLock(lockPath)
-  if (lock && lock.sessionId === sessionId) {
+  // Ours by id, or ours by PROCESS under a session id a compaction renamed. The
+  // restamp inside ownsLock puts the current id back on the lock, so this is the
+  // one place that pays for the ancestor walk.
+  if (lock && ownsLock(sessionId, { ...opts, lockPath, lock, now }).mine) {
     heartbeat(sessionId, { lockPath, now })
     return 'mine'
   }
@@ -562,11 +735,24 @@ export function heartbeat(sessionId, opts = {}) {
   // outright rather than only outdating it. The comparison in assessOwner would
   // do the same, but an explicit delete also survives a clock stepped backwards
   // (four-eyes review, finding 1) and leaves an honest lock file behind.
+  //
+  // …UNLESS the work was part of ENDING (live finding 2, 28.07.2026): the Stop
+  // chain routinely sends a session back for a timestamp, a review record or a
+  // dashboard republish AFTER the boundary was taken, and each of those rounds
+  // silently un-took the handover — `HANDOVER point 378` at 08:56:12, `WITHDRAWN
+  // point 378` at 08:56:16. The caller decides (handoverSurvivesCall in
+  // batch-boundary-core.mjs); here the handover is carried forward by moving
+  // handedOverAt WITH claimedAt, so `claimedAt <= handedOverAt` still holds and
+  // nothing else in assessOwner needs to know about the exception.
   const next = { ...lock, v: 2, claimedAt: now }
   if (next.handedOver !== undefined || next.handedOverAt !== undefined) {
-    delete next.handedOver
-    delete next.handedOverAt
-    delete next.handoverPoint
+    if (opts.preserveHandover === true && next.handedOver === true) {
+      next.handedOverAt = now
+    } else {
+      delete next.handedOver
+      delete next.handedOverAt
+      delete next.handoverPoint
+    }
   }
   // Backfill the pid identity ONCE for a lock claimed before pids were
   // recorded — and never retry a failed walk on the hot per-tool-call path.
@@ -579,7 +765,7 @@ export function heartbeat(sessionId, opts = {}) {
       next.pidBackfillFailed = true
     }
   }
-  writeJsonAtomic(lockPath, next)
+  writeJsonAtomic(lockPath, next, opts)
   return true
 }
 
@@ -590,6 +776,92 @@ export function updateOwnLock(sessionId, patch, lockPath = LOCK_PATH) {
   if (!lock || lock.sessionId !== sessionId) return false
   writeJsonAtomic(lockPath, { ...lock, ...patch, sessionId, claimedAt: Date.now() })
   return true
+}
+
+/** A failed ancestor walk is remembered this long before it is retried — the
+ *  walk costs a PowerShell round trip and a session's ancestry does not change,
+ *  so asking once per session id is the whole budget. */
+export const ANCESTOR_RETRY_MS = 10 * 60 * 1000
+
+/**
+ * The claude process THIS session runs under, memoised per session id. The walk
+ * itself is one PowerShell round trip; without the memo it would sit in front of
+ * every guard call of every non-owner session, which is most tool calls in the
+ * repository. A cached pid is re-validated by a cheap liveness probe, so a stale
+ * entry can never answer for a process that is gone.
+ */
+export function ourClaudeProcess(sessionId, opts = {}) {
+  if (!sessionId) return null
+  const path = opts.ancestorCachePath ?? statePathsFor(opts.lockPath ?? LOCK_PATH).ancestorCachePath
+  const now = opts.now ?? Date.now()
+  let cache = null
+  try {
+    cache = readJson(path) ?? {}
+    const hit = cache[sessionId]
+    if (hit && typeof hit.at === 'number') {
+      if (hit.pid == null) {
+        if (now - hit.at < (opts.retryMs ?? ANCESTOR_RETRY_MS)) return null
+      } else if ((opts.probePidFn ?? cheapProbePid)(hit.pid).exists) {
+        return { pid: hit.pid, startedAt: typeof hit.startedAt === 'number' ? hit.startedAt : null }
+      }
+    }
+  } catch {
+    cache = null // unreadable cache → walk, but do not try to write it back
+  }
+  const anc = (opts.findAncestorFn ?? findClaudeAncestor)()
+  if (cache) {
+    try {
+      const next = { ...cache, [sessionId]: { pid: anc?.pid ?? null, startedAt: anc?.startedAt ?? null, at: now } }
+      for (const [k, v] of Object.entries(next)) if (now - (v?.at ?? 0) > 24 * 3600 * 1000) delete next[k]
+      writeJsonAtomic(path, next)
+    } catch {
+      /* best effort — the answer above is what matters */
+    }
+  }
+  return anc
+}
+
+/**
+ * Ownership, by session id first and by PROCESS second. Returns
+ * `{ mine, via, lock }`. On a process match the lock is RE-STAMPED with the
+ * current session id, so every later check is the cheap string compare again and
+ * the state file stops lying about who holds it.
+ *
+ * `processIdentity: false` keeps the old id-only behaviour for a caller that
+ * wants it; `restamp: false` asks the same question without writing.
+ */
+export function ownsLock(sessionId, opts = {}) {
+  const lockPath = opts.lockPath ?? LOCK_PATH
+  const lock = opts.lock !== undefined ? opts.lock : readOwnerLock(lockPath)
+  if (!lock) return { mine: false, via: 'no-lock', lock: null }
+  if (sessionId && lock.sessionId === sessionId) return { mine: true, via: 'session-id', lock }
+  if (opts.processIdentity === false || !sessionId) return { mine: false, via: 'session-id-mismatch', lock }
+  // Cheap necessary conditions BEFORE the expensive walk: a lock with no pid, or
+  // one whose pid is not even alive, cannot name the process we are running in.
+  if (typeof lock.pid !== 'number' || lock.pid <= 0) return { mine: false, via: 'lock-without-pid', lock }
+  if ((opts.probePidFn ?? cheapProbePid)(lock.pid).exists !== true) {
+    return { mine: false, via: 'lock-pid-dead', lock }
+  }
+  // Deliberately NOT `opts.pid`: that is the identity a caller wants RECORDED,
+  // not one it has verified it runs under, and trusting it would let any caller
+  // name itself the owner. Ancestry is established or it is not.
+  const ancestor = opts.ancestor !== undefined ? opts.ancestor : ourClaudeProcess(sessionId, opts)
+  const verdict = resolveOwnership({ lock, sessionId, ancestor })
+  if (verdict.mine && verdict.restamp && opts.restamp !== false) {
+    try {
+      // Only the id moves. claimedAt is NOT bumped (that would count as work and
+      // silently withdraw a handover) and no other field is touched.
+      writeJsonAtomic(lockPath, {
+        ...lock,
+        sessionId,
+        sessionIdBefore: lock.sessionId,
+        sessionIdRestampedAt: opts.now ?? Date.now(),
+      })
+    } catch {
+      /* the verdict stands; the next call simply pays for the walk again */
+    }
+  }
+  return { mine: verdict.mine, via: verdict.via, lock }
 }
 
 export function isOwner(sessionId, lockPath = LOCK_PATH) {
@@ -609,7 +881,9 @@ export function heldByOtherLiveOwner(sessionId, opts = {}) {
     const lockPath = opts.lockPath ?? LOCK_PATH
     const lock = readOwnerLock(lockPath)
     if (!lock) return false
-    if (sessionId && lock.sessionId === sessionId) return false
+    // Ours by id, or ours by process (the compaction case) — a session must not
+    // stand down against its own lock just because its id was renamed under it.
+    if (ownsLock(sessionId, { ...opts, lockPath, lock }).mine) return false
     const probe = lock.pid ? (opts.probePidFn ?? cheapProbePid)(lock.pid) : null
     const a = assessOwner(lock, {
       now: opts.now ?? Date.now(),
@@ -650,19 +924,33 @@ export function release(sessionId, lockPath = LOCK_PATH) {
  *
  * Owner-guarded and no-op otherwise, and it must only ever be called where a
  * VALID boundary has been established (scripts/batch-progress-guard.mjs).
+ *
+ * It REPORTS rather than throws — `{ handed, reason, attempts, error }` — and
+ * that is the whole point of the shape (live finding 1, 28.07.2026). It used to
+ * throw an EPERM straight through the guard into its fail-open catch, so the stop
+ * proceeded, the marker had already been consumed and nothing recorded that the
+ * batch had NOT been passed on. This is the ONE place where the propagating write
+ * of point 340 is converted to data, because its single caller must allow the
+ * stop while telling the session the truth about it.
  */
 export function markHandover(sessionId, opts = {}) {
   const lockPath = opts.lockPath ?? LOCK_PATH
   const lock = readOwnerLock(lockPath)
-  if (!lock || lock.sessionId !== sessionId) return false
+  if (!lock || lock.sessionId !== sessionId) {
+    return { handed: false, reason: lock ? 'not-owner' : 'no-lock', attempts: 0, error: null }
+  }
   const now = opts.now ?? Date.now()
-  writeJsonAtomic(lockPath, {
-    ...lock,
-    handedOver: true,
-    handedOverAt: now,
-    handoverPoint: opts.point ?? null,
-  })
-  return true
+  const res = tryWriteJsonAtomic(
+    lockPath,
+    { ...lock, handedOver: true, handedOverAt: now, handoverPoint: opts.point ?? null },
+    opts,
+  )
+  return {
+    handed: res.ok,
+    reason: res.ok ? 'ok' : 'write-failed',
+    attempts: res.attempts,
+    error: res.error,
+  }
 }
 
 /**
@@ -679,18 +967,32 @@ export function markHandover(sessionId, opts = {}) {
 export function withdrawHandover(sessionId, opts = {}) {
   const lockPath = opts.lockPath ?? LOCK_PATH
   const lock = readOwnerLock(lockPath)
-  if (!lock || lock.sessionId !== sessionId || lock.handedOver !== true) return false
+  if (!lock || lock.sessionId !== sessionId) return false
+  // THE MARKER GOES WITH THE FLAG (live finding 2). The marker used to be
+  // consumed by the stop it authorised, so a Stop guard that sent the session
+  // back to work left it with no marker and the next turn was met with "TAKE THE
+  // POINT BOUNDARY" again — a loop. It now survives its own use, which makes
+  // THIS the one place a boundary ends: real work withdraws it, closing work
+  // does not. Removed even when no handover flag is set, so a marker recorded
+  // and then followed by real work is withdrawn just the same.
+  try {
+    ;(opts.remove ?? rmSync)(opts.boundaryPath ?? statePathsFor(lockPath).boundaryPath, { force: true })
+  } catch {
+    /* best effort — a marker we cannot delete is caught by its own freshness */
+  }
+  if (lock.handedOver !== true) return false
   const next = { ...lock, claimedAt: opts.now ?? Date.now() }
   delete next.handedOver
   delete next.handedOverAt
   delete next.handoverPoint
-  writeJsonAtomic(lockPath, next)
+  writeJsonAtomic(lockPath, next, opts)
   // Recorded beside the handover it cancels: without this line, a launcher tick
   // that finds a live owner past the grace cannot be told apart from one whose
   // handover was legitimately taken back, and the acceptance evidence would be
-  // ambiguous exactly where it matters (four-eyes review).
+  // ambiguous exactly where it matters (four-eyes review). The log is a SIBLING
+  // of the lock, never the repo default, so a redirected lock redirects it too.
   try {
-    const log = opts.logPath ?? repoPath('.claude/boundary.log')
+    const log = opts.logPath ?? statePathsFor(lockPath).boundaryLogPath
     appendFileSync(
       log,
       `[${new Date().toISOString()}] WITHDRAWN point ${lock.handoverPoint ?? '?'} by ${sessionId} — ` +
@@ -699,6 +1001,51 @@ export function withdrawHandover(sessionId, opts = {}) {
   } catch {
     /* best effort — the withdrawal itself has already landed */
   }
+  return true
+}
+
+/**
+ * Drop a boundary marker THIS session left behind (SessionEnd). Now that the
+ * marker survives the stop it authorised, the session's own end is what retires
+ * it — otherwise a successor would meet a foreign marker and be told a boundary
+ * was "claimed but REFUSED" for a point it had nothing to do with.
+ */
+export function clearOwnBoundary(sessionId, opts = {}) {
+  try {
+    const path = opts.boundaryPath ?? statePathsFor(opts.lockPath ?? LOCK_PATH).boundaryPath
+    const marker = readJson(path)
+    if (!marker || !sessionId || marker.sessionId !== sessionId) return false
+    ;(opts.remove ?? rmSync)(path, { force: true })
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** How stale a handover may get before a closing-set tool call refreshes it.
+ *  Throttles the write: the boundary's grace is a quarter of an hour wide, so
+ *  moving the stamp once a minute is ample, and every avoided write is one fewer
+ *  chance for the rename to lose (points 340/388). */
+export const HANDOVER_TOUCH_MS = 60 * 1000
+
+/**
+ * CARRY a handover forward across work that is part of ENDING the batch (live
+ * finding 2). Owner-guarded, a no-op unless the lock really is handed over, and
+ * throttled — it only rewrites the lock when the stamp has gone stale.
+ *
+ * It exists for the window `heartbeat` cannot cover: a PreToolUse hook runs
+ * BEFORE the call, and a closing-set call could otherwise sit through the whole
+ * grace with an ageing stamp before its PostToolUse heartbeat refreshes it.
+ */
+export function touchHandover(sessionId, opts = {}) {
+  const lockPath = opts.lockPath ?? LOCK_PATH
+  const lock = readOwnerLock(lockPath)
+  if (!lock || lock.sessionId !== sessionId || lock.handedOver !== true) return false
+  const now = opts.now ?? Date.now()
+  if (typeof lock.handedOverAt === 'number' && now - lock.handedOverAt < (opts.touchMs ?? HANDOVER_TOUCH_MS)) {
+    return false
+  }
+  writeJsonAtomic(lockPath, { ...lock, handedOverAt: now }, opts)
   return true
 }
 

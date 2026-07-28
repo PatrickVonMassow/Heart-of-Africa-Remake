@@ -5,7 +5,7 @@
 // parallel-session activity map so a cleanly ended session can never be
 // flagged as a live parallel session. Never errors.
 import { readFileSync } from 'node:fs'
-import { release, clearActivity } from './batch-singleton.mjs'
+import { release, clearActivity, clearOwnBoundary } from './batch-singleton.mjs'
 
 let sid = ''
 try {
@@ -17,6 +17,10 @@ try {
   if (sid) {
     release(sid) // no-op unless this session owns the lock
     clearActivity(sid)
+    // The boundary marker now survives the stop it authorised (point 388, live
+    // finding 2), so the session's own end is what retires it — a successor must
+    // never meet a marker naming a point it did not close.
+    clearOwnBoundary(sid)
   }
 } catch {
   /* nothing to release */
