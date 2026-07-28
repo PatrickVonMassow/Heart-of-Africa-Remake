@@ -254,6 +254,27 @@ names does not expire.
 `work` is the one link a machine cannot close: no commit names the session that
 wrote it, so the observer prints the commit and the reader confirms the hand.
 
+#### The observed run — 28.07.2026, all five links
+
+The acceptance of point 388, read out of the logs rather than inferred. Point 338
+was merged and ticked at 11:12:27Z (`23000d7`); the session then took the boundary
+and ended:
+
+| link | evidence, with its time |
+| --- | --- |
+| `close` | point 338 closed in the work order, ticked 11:12:27Z (`23000d7`) |
+| `take` | `boundary.log` 12:34:39.809Z — `HANDOVER point 338 by b1498420-…` |
+| `spawn` | `autostart.log` 12:51:15.440Z — `HANDOVER accepted: … spawning the successor`, then `launched pid 32680` |
+| `takeover` | `batch-lock.json` held by `5be59bde-…`, kind `session`, pid 32680 |
+| `work` | `652a8ba` — the successor's first commit, confirmed by hand |
+
+Two costs the run made visible, both by design rather than defects. The launcher
+spent one full `HANDOVER_GRACE_MS` (15 min, 12:34 → 12:51) because the handing-over
+process was an interactive window that stays alive; a headless `claude -p` exits
+and is taken over at the next tick. And the boundary was taken and withdrawn ten
+times between 11:27Z and 12:34Z before one held — eight of those withdrawals were
+the session legitimately working on, two were the race recorded as point 396.
+
 The run itself belongs to the MAIN session in the main tree: it needs the live
 batch lock, and no worktree agent may take or release it. The natural occasion is
 the next point that closes — merge, tick, run `node scripts/batch-boundary.mjs
