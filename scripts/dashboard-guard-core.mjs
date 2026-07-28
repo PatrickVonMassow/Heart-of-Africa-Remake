@@ -488,6 +488,7 @@ export function evaluate(input) {
     now = Date.now(),
     freshMs = FOCUS_FRESH_MS,
     nowCardHash = null,
+    nowMinutes = null,
   } = input ?? {}
 
   // Batch paused or complete: no dashboard duty in flight.
@@ -665,7 +666,7 @@ export function evaluate(input) {
   // (8b) FULL-CONSISTENCY AUDIT (point 313) — evaluated BEFORE the publish
   // check (fix first, publish once). A logged waiver covers exactly ONE file
   // hash: any further edit re-arms the audit.
-  const violations = auditDashboard(html, { open, done, doneSeen: marker.doneSeen })
+  const violations = auditDashboard(html, { open, done, doneSeen: marker.doneSeen, nowMinutes })
   if (violations.length) {
     const waived = marker.auditWaived && repoHash && marker.auditWaived.repoHash === repoHash
     if (!waived) {

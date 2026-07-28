@@ -907,3 +907,16 @@ describe('a current-work estimate stays ahead of the clock (user 28.07.2026)', (
     expect(codes('10:44', 13 * 60)).not.toContain('now-eta-past')
   })
 })
+
+// The rule has to bite in the STOP chain, not only at a manual --synced: a card
+// whose status text is refreshed and whose HEAD has not moved satisfies every
+// other invariant while its header ages. Found by the four-eyes review.
+describe('the expected-end rule reaches the turn end', () => {
+  it('blocks the stop when a current-work estimate has passed', () => {
+    const stale = boardHtml().replace(/class="meta">[^<]*</, 'class="meta">10:44 · ~11:15<')
+    const withClock = evaluate(green({ html: stale, nowMinutes: 13 * 60 }))
+    expect(JSON.stringify(withClock)).toContain('now-eta-past')
+    // Without a clock the rule stays silent — it is never guessed.
+    expect(JSON.stringify(evaluate(green({ html: stale })))).not.toContain('now-eta-past')
+  })
+})
