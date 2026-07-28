@@ -2,7 +2,7 @@
 
 # The Heart of Africa — Modern Remake
 
-A single-player 3D remake of the 1985 exploration classic *The Heart of Africa*
+A non-commercial single-player 3D remake of the 1985 exploration classic *The Heart of Africa*
 — Ozark Softscape's follow-up to *The Seven Cities of Gold* (1984) — built as a
 web application. You start in Cairo in 1890 with $250 and a journal,
 and travel across a geographically authentic Africa in search of a lost tomb —
