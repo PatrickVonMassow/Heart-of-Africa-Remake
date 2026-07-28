@@ -2135,16 +2135,23 @@ const drawnCollision = await page.evaluate(async () => {
     const t0 = Date.now()
     let min = Infinity
     let minBody = Infinity
+    let onScreenAtMin = false
     while (window.__simTime() - s0 < 3 && Date.now() - t0 < 60000) {
       repin()
       const p = window.__game.getState().pos
       const g = targetOf()
-      min = Math.min(min, Math.hypot(p.x - g.x, p.z - g.z))
+      const d = Math.hypot(p.x - g.x, p.z - g.z)
+      if (d < min) {
+        min = d
+        // §7.2: judge "was it in the picture" by PROJECTING the subject through
+        // the live camera, at the moment it mattered — the closest approach.
+        onScreenAtMin = window.__camera.onScreen(g.x, g.z)
+      }
       if (zebra.drawn) minBody = Math.min(minBody, Math.hypot(zebra.drawn.x - g.x, zebra.drawn.z - g.z))
       await sleep(20)
     }
     window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyD' }))
-    return { min, minBody }
+    return { min, minBody, onScreenAtMin }
   }
   // 1. Straight at the DRAWN body: the traveller must be stopped by it.
   const into = await drive(zebra.drawn.x - 5, () => zebra.drawn)
@@ -2155,7 +2162,7 @@ const drawnCollision = await page.evaluate(async () => {
   const bodyKeptOffFlank = past.minBody // the body never came near the flank line
   const drawnEnd = zebra.drawn ? { x: zebra.drawn.x, z: zebra.drawn.z } : null
   const offsetEnd = drawnEnd ? Math.hypot(drawnEnd.x - S.x, drawnEnd.z - S.z) : 0
-  const onScreen = drawnEnd ? window.__camera.onScreen(drawnEnd.x, drawnEnd.z) : false
+  const onScreen = into.onScreenAtMin // in the picture at the moment it blocked
   herds.zebra = herds.zebra.filter((a) => a !== zebra)
   return { offset, offsetEnd, radius, intoBody, pastFlank, bodyKeptOffFlank, onScreen,
     circleAtDrawn: circleAtDrawn.length, circleAtSpot: circleAtSpot.length, drawnEnd, spot: S }
