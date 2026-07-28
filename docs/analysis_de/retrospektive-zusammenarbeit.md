@@ -37,6 +37,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 25.07. | Stille Modell-Degradation + Aufräum-Pass; Regel-Audit über den ganzen Bestand; Guard-Gesundheit |
 | 26.07. | Kosten-vs-Rate-Korrektur bei der Parallelität; Commit-Umfangs-Wächter |
 | 27.07. | Gemessene Verbrauchstreiber → Kurzbrief je Auftrag statt Dokumentensuche; Board-Gate **vor** der Arbeit; Vorprüfung der Wächter |
+| 28.07. | Fünfeinhalb Stunden Stillstand → die Grenze wird **genommen**, nicht nur erlaubt; erste vollständig beobachtete Übergabe; drei Messfenster schmaler als das Gemessene (§3.44) |
 
 Muster: Ab dem 22.07. explodiert die Commit-Rate (Delegation) — und genau dann häufen sich die Infrastruktur-Vorfälle. **Skalierung der Autonomie erzeugt eine eigene Problemklasse, die die Feature-Arbeit zeitweise überholt.**
 
@@ -385,6 +386,18 @@ Eine eigene Lehre steckt in der Diagnose selbst: Die erste, in die Retrospektive
 
 **Lehren:** Fail-open darf eine *Prüfung* umschließen, nie unbemerkt eine *Handlung* — wo ein Wächter etwas ausführt, muss das Scheitern im selben Atemzug gemeldet werden wie die Freigabe, und der Zustand, der die Handlung autorisiert, wird erst nach ihrem Gelingen verbraucht. Zweitens: Tests dürfen den Produktivzustand nicht anfassen; ein Testlauf, der Live-Zustand ändern kann, ist kein Test mehr, sondern ein Eingriff. Drittens, wieder §3.40 in neuer Gestalt: eine Kette prüft man durch **einen Durchlauf**, nicht durch die Summe grüner Teile. Und viertens: eine Diagnose ist eine Hypothese, bis ein Zustandsdetail sie trägt — wer sie vorher weiterreicht, lässt andere auf ihr bauen.
 
+### 3.44 Das Messfenster war schmaler als das Gemessene — dreimal an einem Tag
+
+Am 28.07.2026 fand die Übergabe endlich statt, und zwar vollständig: Punkt 338 gemergt und abgehakt, die Grenze um 14:34 genommen, der Starter nahm sie um 14:51 an, startete die Nachfolgesitzung, und deren erster Zug schrieb Commits. Fünf von fünf Gliedern, aus den Protokollen gelesen. Der Punkt hätte damit geschlossen sein können — nur meldete das Werkzeug, das genau diesen Nachweis führen soll, „keine Übergabe gefunden".
+
+Der Grund: Es suchte den abgehakten Punkt in den letzten **fünf** Änderungen der Arbeitsordnung. Seit dem Abhaken waren acht dazugekommen, alle bloße Anhänge neuer Punkte — also genau das, was ein Batch-Zug ohnehin tut. Der Nachweis war nicht verlorengegangen; er war aus dem Fenster gerutscht, durch das das Instrument schaute.
+
+Derselbe Schnitt sitzt an zwei weiteren Stellen, und die eine ist teurer als der Beobachter. Der Wächter fragt dieselbe Funktion, *wann* eine Sitzungsgrenze fällig wurde: Rutscht der Abschluss aus dem Fünf-Commit-Fenster, fordert er die Grenze in dem Zeitraum, in dem er sie fordern müsste, gar nicht mehr — die Sitzung bleibt sitzen und schleppt den nächsten Punkt im selben Kontext weiter, also genau die Kosten, gegen die die Grenze eingeführt wurde. Und das Push-Tor fragt seine Lastmessung **nach** dem Testlauf: Eine fünf Minuten lange Suite läuft unter Volllast rot, danach ist die Maschine wieder ruhig, und das Tor beurteilt ein rotes Ergebnis als „auf ruhiger Maschine gemessen, also echt" und blockiert.
+
+Alle drei Instrumente sind einzeln vernünftig gebaut, alle drei sind pur getestet, und alle drei antworten falsch in dieselbe Richtung: **zur Beruhigung hin**. „Nichts gefunden", „nichts fällig", „Maschine ruhig" — kein Alarm, kein Widerspruch, nichts, was auffiele. Ein Instrument, das zur Beunruhigung hin irrt, wird nach zwei Fehlalarmen korrigiert; eines, das zur Beruhigung hin irrt, wird geglaubt.
+
+**Lehren:** Das Fenster einer Messung muss aus dem **Gegenstand** abgeleitet sein, nicht aus der Bequemlichkeit der Abfrage — die Frage „wurde in den letzten 90 Minuten ein Punkt geschlossen?" ist eine Zeitfrage und darf nicht als Anzahlfrage gestellt werden, und „war die Maschine während des Laufs belastet?" ist eine Frage über den Lauf, nicht über den Moment danach. Zweitens: Bei jeder Heuristik ist zu benennen, in welche Richtung sie irrt; irrt sie zur Beruhigung, braucht sie einen zweiten, unabhängigen Beleg. Drittens, als Gegenprobe zu §3.40 und §3.43: Der eine echte Durchlauf hat hier nicht nur die Kette bewiesen, sondern auch das Prüfgerät blamiert — wer die Kette nie durchspielt, hält beides für in Ordnung.
+
 ---
 
 ## 4. Die Guards als Immunsystem
@@ -474,7 +487,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Dienstag, 28.07.2026, 14:32 · Quellen-Fingerprint: `7888bb7ea8b0…`
+Zuletzt aktualisiert: Dienstag, 28.07.2026, 15:55 · Quellen-Fingerprint: `ead732b8b073…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -518,6 +531,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Per-point QA runs scoped (Vitest always, browser suites by diff mapping, flake-retry single suites) — WATCHDOG duty to report any bug that slips through | 3 | mittel | — (Regel/Memory) | ◐ Regel |
 | Edits to .claude/settings.json and .git/hooks ALWAYS trigger a permission prompt (harness safety layer, allowlist cannot override); never schedule such work for unattended night batches | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | hoa uses a feature-branch workflow — each TASKS point on feat/<point>-<slug>, push the branch after every commit, merge to main only when done+verified; cross-cutting changes go straight to main | 2 | mittel | commit-scope-guard.mjs, push-arrival-guard.mjs | ✔ Mechanismus |
+| Direct pushes to main are approved despite GitHub's branch protection — never ask about switching to pull requests again | 1 | niedrig | push-arrival-guard.mjs | ✔ Mechanismus |
 | Order the TASKS/queue so known-bug fixes + user-requested extensions come BEFORE the big bug-FINDING / QA-framework tickets | 1 | niedrig | queue-order-guard.mjs | ✔ Mechanismus |
 | Before the 224 demo checkpoint queue ONLY bugfixes + almost-done points; new features go to v0.3 (after 224) | 2 | mittel | queue-order-guard.mjs | ✔ Mechanismus |
 | Console warning \"THREE.Clock deprecated, use THREE.Timer\" comes from R3F v9 internals — fix by updating @react-three/fiber once it migrates to Timer | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -546,8 +560,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | CORRECTED 19.07.2026 — WebGPU IS testable headless/autonomously via system Chrome (channel:'chrome') + --headless=new; the 'untestable' belief held only for Playwright's BUNDLED Chromium | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 64 Feedback-/Projekt-Memories · 35 Guard-/Hook-Skripte · 3 Revert-/Reapply-Commits · 17 Prozess-/Meta-TASKS-Punkte (davon 9 offen).
+Erfasste Quellen: 65 Feedback-/Projekt-Memories · 35 Guard-/Hook-Skripte · 3 Revert-/Reapply-Commits · 18 Prozess-/Meta-TASKS-Punkte (davon 10 offen).
 
-<!-- RETRO-FINGERPRINT: 7888bb7ea8b03da9e8b5f47fc3a63416a97950e6fd044854d215fd68d684e303 -->
-<!-- RETRO-LAST-REFRESHED: 2026-07-28T12:32:49.283Z -->
+<!-- RETRO-FINGERPRINT: ead732b8b073f800b198a6aa29c24aa5c5a13b9de9b54b97532f17683054476c -->
+<!-- RETRO-LAST-REFRESHED: 2026-07-28T13:55:31.220Z -->
 <!-- AUTO-GENERATED:END -->
