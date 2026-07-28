@@ -77,4 +77,40 @@ describe('the launcher uses the pure spawn builders', () => {
       /maxAgeMs:\s*IN_FLIGHT_MAX_AGE_MS/,
     )
   })
+
+  // THE LEAK SWEEP RUNS BEFORE EVERY "DO NOT SPAWN" GUARD (second four-eyes
+  // review, finding C). Order is the whole behaviour here, and order is only
+  // visible in the source — the file cannot be imported. The sweep sat BELOW the
+  // guards, and the one it sat below most often is `open === 0`: the final session
+  // of a completed batch is exactly the one whose dev server outlives it, so from
+  // the next tick onward the launcher exited at "batch complete" and never looked
+  // at the ledger again. The leak the ledger was built for was the one it missed.
+  it('sweeps the spawn ledger BEFORE any guard may exit the tick', () => {
+    const lineOf = (re, what) => {
+      const i = codeLines.findIndex((l) => re.test(l))
+      expect(i, `no line matching ${what}`).toBeGreaterThanOrEqual(0)
+      return i
+    }
+    const sweep = lineOf(/reapableSpawns\(/, 'the ledger sweep')
+    for (const [re, what] of [
+      [/batch-paused/, 'the user-paused guard'],
+      [/openPointCount\(\)/, 'the work-order read'],
+      [/open === 0/, 'the batch-complete guard'],
+      [/reserved\.honour/, 'the honoured user claim'],
+    ]) {
+      expect(sweep, `the sweep must run before ${what}`).toBeLessThan(lineOf(re, what))
+    }
+  })
+
+  it('…and every one of those exits persists the state the sweep just changed', () => {
+    // A pruned ledger that is never written back is a sweep that half happened.
+    const first = codeLines.findIndex((l) => /reapableSpawns\(/.test(l))
+    const claimEnd = codeLines.findIndex((l) => /reserved\.honour/.test(l))
+    const early = codeLines.slice(first, claimEnd + 12)
+    expect(early.some((l) => /\bbail\(/.test(l)), 'the early guards must exit through bail()').toBe(true)
+    for (const l of early) {
+      expect(l, 'an early exit that skips the state write').not.toMatch(/process\.exit\(/)
+    }
+    expect(code).toMatch(/const bail =[^\n]*writeJsonAtomic\(C\('autostart-state\.json'\), state\)/)
+  })
 })

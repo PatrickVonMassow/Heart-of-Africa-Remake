@@ -115,12 +115,53 @@ const openPointCount = () => {
   return n
 }
 
+const state = readJson(C('autostart-state.json')) ?? { failCount: 0, lastHead: '', lastSpawnAt: 0, lastPid: 0, lastTickAt: 0, spawns: [] }
+state.spawns = Array.isArray(state.spawns) ? state.spawns : []
+const lock = readOwnerLock()
+const probe = lock && lock.pid ? probePid(lock.pid) : null
+/** Every exit persists the state, so a sweep that ran is never forgotten. */
+const bail = (code = 0) => { writeJsonAtomic(C('autostart-state.json'), state); process.exit(code) }
+
+// --- LEAKED SPAWNS: reap what the removed runtime ceiling used to reap --------
+// `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0` means a `claude -p` waits forever for
+// a background task — including one that never exits, which a left-running dev
+// server routinely is. The 600-second ceiling used to end exactly those, and
+// `state.lastPid` alone cannot track them because a handover overwrites it. A
+// leaked session holds ports, and that breaks the next session's verify suites.
+// Narrow by construction (see reapableSpawns): our own spawn by pid AND start
+// time, past its boot window, not the lock owner, and superseded.
+//
+// IT RUNS BEFORE EVERY "DO NOT SPAWN" GUARD (second four-eyes review 28.07.2026,
+// finding C). It used to sit below them, and the guard it sat below most often is
+// `open === 0`: the FINAL session of a completed batch is precisely the one whose
+// dev server outlives it, and from the next tick onward the launcher exited at
+// "batch complete" before ever looking at the ledger. The same held for a paused
+// batch, an unreadable work order and an honoured user claim. A reason not to
+// SPAWN is not a reason to leave a leaked process holding ports; the sweep needs
+// only the state, the lock and a pid probe, all cheap.
+{
+  const leaked = reapableSpawns({ spawns: state.spawns, now, lock, probePid, isOwnSpawn })
+  for (const s of leaked) {
+    try { process.kill(s.pid) } catch { /* gone */ }
+    log(`REAPED leaked spawn pid ${s.pid} (spawned ${Math.round(s.ageMs / 60000)} min ago, not the batch owner)`)
+  }
+  if (leaked.length > 0) {
+    await notify(
+      'Leaked worker reaped',
+      `The launcher reaped ${leaked.length} of its own earlier headless spawn(s) (pid ${leaked.map((s) => s.pid).join(', ')}) ` +
+        'that were still running without owning the batch — a background task the session was waiting on never exited.',
+      'low',
+    )
+  }
+  state.spawns = pruneSpawns({ spawns: state.spawns, probePid })
+}
+
 // --- Guards: never resurrect when it would be wrong ---------------------------
-if (existsSync(C('batch-paused'))) { log('skip: batch is user-paused'); process.exit(0) }
+if (existsSync(C('batch-paused'))) { log('skip: batch is user-paused'); bail() }
 let open
-try { open = openPointCount() } catch { log('skip: cannot read TASKS.md'); process.exit(0) }
-if (open === -1) { log('ALERT: TASKS.md format unrecognized — not spawning'); await notify('TASKS.md format', 'The batch parser found checkboxes but no points — halting resurrection to be safe.', 'high'); process.exit(0) }
-if (open === 0) { log('skip: batch complete (0 open points)'); process.exit(0) }
+try { open = openPointCount() } catch { log('skip: cannot read TASKS.md'); bail() }
+if (open === -1) { log('ALERT: TASKS.md format unrecognized — not spawning'); await notify('TASKS.md format', 'The batch parser found checkboxes but no points — halting resurrection to be safe.', 'high'); bail() }
+if (open === 0) { log('skip: batch complete (0 open points)'); bail() }
 
 // --- THE USER TOOK THE BATCH BACK (point 395) ---------------------------------
 // A live, unexpired claim RESERVES the batch for the window the user is sitting
@@ -136,12 +177,10 @@ if (open === 0) { log('skip: batch complete (0 open points)'); process.exit(0) }
       `skip: session ${reserved.claimantSid} has CLAIMED the batch ${Math.round(reserved.ageMs / 60000)} min ago — ` +
         'the user is working in that window',
     )
-    process.exit(0)
+    bail()
   }
 }
 
-const state = readJson(C('autostart-state.json')) ?? { failCount: 0, lastHead: '', lastSpawnAt: 0, lastPid: 0, lastTickAt: 0, spawns: [] }
-state.spawns = Array.isArray(state.spawns) ? state.spawns : []
 const curHead = head()
 
 // --- Owner liveness (the hard-singleton assessment) ---------------------------
@@ -149,9 +188,8 @@ const curHead = head()
 // verdict. A session waiting on a delegated agent starves its heartbeat for as
 // long as the agent takes, and the launcher used to have nothing but the clock to
 // judge that with. Same probes and the same pure functions the Stop guard uses —
-// nothing about liveness is re-invented here.
-const lock = readOwnerLock()
-const probe = lock && lock.pid ? probePid(lock.pid) : null
+// nothing about liveness is re-invented here. (`lock` and `probe` were read
+// further up — the leak sweep needs them before any guard may exit.)
 const declaration = lock ? readDeclaration() : null
 // The WINDOW is the launcher's own (`LAUNCHER_WORK_MAX_AGE_MS`), never the Stop
 // guard's 45 minutes: asking with the guard's window made `work-stalled`
@@ -216,31 +254,6 @@ if (
   try { process.kill(state.lastPid) } catch { /* gone */ }
   log(`REMEDIATED: killed own rogue spawn pid ${state.lastPid} (alive but not the lock owner)`)
   await notify('Rogue spawn killed', `The launcher killed its own previous spawn (pid ${state.lastPid}) — it was alive but not the batch owner.`, 'high')
-}
-
-// --- LEAKED SPAWNS: reap what the removed runtime ceiling used to reap --------
-// `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0` means a `claude -p` waits forever for
-// a background task — including one that never exits, which a left-running dev
-// server routinely is. The 600-second ceiling used to end exactly those, and
-// `state.lastPid` alone cannot track them because a handover overwrites it. A
-// leaked session holds ports, and that breaks the next session's verify suites.
-// Narrow by construction (see reapableSpawns): our own spawn by pid AND start
-// time, past its boot window, not the lock owner, and superseded.
-{
-  const leaked = reapableSpawns({ spawns: state.spawns, now, lock, probePid, isOwnSpawn })
-  for (const s of leaked) {
-    try { process.kill(s.pid) } catch { /* gone */ }
-    log(`REAPED leaked spawn pid ${s.pid} (spawned ${Math.round(s.ageMs / 60000)} min ago, not the batch owner)`)
-  }
-  if (leaked.length > 0) {
-    await notify(
-      'Leaked worker reaped',
-      `The launcher reaped ${leaked.length} of its own earlier headless spawn(s) (pid ${leaked.map((s) => s.pid).join(', ')}) ` +
-        'that were still running without owning the batch — a background task the session was waiting on never exited.',
-      'low',
-    )
-  }
-  state.spawns = pruneSpawns({ spawns: state.spawns, probePid })
 }
 
 // --- SILENT OWNER: diagnose AND report (point 388 (c)) ------------------------

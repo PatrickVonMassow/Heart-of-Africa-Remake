@@ -485,6 +485,17 @@ child, and SUPERSEDED — either another session holds the lock now, or a later
 spawn exists. That last clause is what keeps a lock file which merely went missing
 from turning a healthy worker into a target.
 
+The sweep runs **before every guard that ends the tick** — the user pause, an
+unreadable work order, `open === 0` and an honoured user claim (second four-eyes
+review, 28.07.2026, finding C). It sat below them at first, and the guard it sat
+below most often is `open === 0`: the FINAL session of a completed batch is
+exactly the one whose dev server outlives it, and from the next tick onward the
+launcher exited at "batch complete" before ever reading the ledger. The leak the
+ledger was built for was the one leak it never reaped. A reason not to SPAWN is
+not a reason to leave a process holding ports, and the sweep needs only the state,
+the lock and a pid probe. Those early exits therefore write the state back
+(`bail`), so a pruned ledger is never lost.
+
 ### Observing one handover end to end
 
 Every part of this worked on the night it failed, so the acceptance is not a green
