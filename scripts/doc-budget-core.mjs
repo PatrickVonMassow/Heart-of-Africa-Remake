@@ -30,7 +30,7 @@
 export const DOC_BUDGETS = [
   {
     path: 'CLAUDE.md',
-    maxLines: 1100,
+    maxLines: 1106,
     // RAISED by the 50 measured words of the §7.2 rule that screenshot diffing
     // is not available as a shortcut (point 361). That is the mechanism working
     // as designed rather than a concession: the words buy a NEW standing rule
@@ -73,7 +73,17 @@ export const DOC_BUDGETS = [
     // off their drawn bodies, so the traveller walked through the animal he saw
     // and was blocked on empty ground. A rule stated for one subsystem is not a
     // rule; the words buy its generality.
-    maxWords: 9952,
+    // RAISED by the 71 measured words (6 lines) of the §6 WAY BACK (point 395):
+    // the user claims the batch into the window they are sitting at, the owner
+    // releases at a clean moment, and the same command then takes it. Not a
+    // longer telling of the boundary paragraph it stands under — that paragraph
+    // is the way OUT (the session ends, the launcher brings up a fresh one) and
+    // says nothing about a way IN. The words buy the one command a returning
+    // session must run and the bounds that keep it from being abused. Omitting
+    // them would leave the stand-down message naming a mechanism this file never
+    // mentions, and a session that had not read it would go on killing the other
+    // window's lock by hand — exactly the move the mechanism replaces.
+    maxWords: 10023,
     why: 'loaded at every session start — the most expensive document in the project',
   },
   {

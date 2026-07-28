@@ -2833,38 +2833,6 @@ read that as "the criterion and its evidence section".
   DOCS: design.md §19.8 + §21.2 already state it; balance comments and the
   acceptance-evidence line under §12.
 
-- [ ] 395. THE USER TAKES THE BATCH BACK INTO THE WINDOW THEY ARE SITTING AT (user
-  decision 28.07.2026). The night belongs to fresh sessions — that is where the context
-  saving comes from, and it stays. What is missing is the way back: the user returns to a
-  window that has been silent for hours, types `/clear`, says "I am back", and expects to
-  work HERE. Today that window would resolve as a non-owner and correctly stand down
-  (`stand-down` in `scripts/batch-singleton.mjs`), while the night session keeps the lock.
-  TARGET: a CLAIM and a clean release. The returning window records a claim on the batch;
-  the live owner sees it at its next hook, FINISHES what it is doing — a merge, a running
-  agent, a verification must never be cut in half — and then releases the lock, saying so
-  in its own transcript. The claiming window acquires at its next check and reports that it
-  now owns the batch. If no session holds the lock at all, the claim is satisfied
-  immediately.
-  BOUND IT SO IT CANNOT BE ABUSED, and each bound is measurable rather than a matter of
-  taste: a claim EXPIRES (a stale claim file must never hand the batch to a window that was
-  closed hours ago); a claim is only honoured for a session that is actually alive; and two
-  claims cannot both win — the singleton's whole purpose is that exactly one session drives.
-  Reuse `assessOwner`/`resolveOwnership` and the heartbeat rather than building a second
-  notion of liveness beside them.
-  THE COMMANDS: one to claim (`scripts/batch-claim.mjs` or the same shape as
-  `batch-boundary.mjs`), one to see the state (`--status`, read-only, naming who holds the
-  lock, whether a claim is pending and how old it is). The returning session runs the claim
-  itself after `/clear`; the user says nothing but "I am back".
-  VERIFIABLE: pure Vitest on the decision — a fresh claim by a live session makes the
-  current owner release at its next check; the owner does NOT release while it reports work
-  in flight; an expired claim is ignored; a claim by a dead session is ignored; two
-  competing claims resolve to exactly one owner; and with no owner the claim is satisfied
-  at once. Plus one live run: the batch claimed back into a window while a night session
-  holds it, both transcripts showing the handover from their side.
-  DOCS in the same commit: CLAUDE.md §6 gains one sentence on the way back (the boundary
-  paragraph already carries the way out), and `docs/batch-autonomy.md` the mechanics. Both
-  sit at measured ceilings, so the words are paid for by a measured raise with its
-  justification or by shortening elsewhere.
 - [ ] 373. THE SESSION BOUNDARY BECOMES AUTONOMOUS (user 27.07.2026: "implement it the
   way you recommend", against the plan to run the batch 24/7). Measured: 80 % of the
   token spend sits above 150k context, because one session carries point after point.
@@ -3503,6 +3471,28 @@ read that as "the criterion and its evidence section".
   DOCS in the same commit: CLAUDE.md §7.2 (the rule from (a); it sits near its
   measured budget, so pay for the sentence by shortening there) and
   `docs/batch-autonomy.md` where the Stop chain is described.
+
+- [ ] 404. A PASSING COUNT OVER A SET THAT SILENTLY SHRANK (28.07.2026, measured:
+  one run reported 3546 passing tests while 34 test FILES had failed to load; the run an
+  hour earlier had 4214 tests over 153 files). A damaged dependency tree — a platform
+  package missing its entry file — made whole suites unloadable, and an unloadable suite
+  does not fail: it vanishes from the totals. The report therefore read GREENER than a red
+  run. Nothing in the chain compares the number of EXECUTED files with the last known
+  state, so every gate waved it through; it was noticed only because a review agent could
+  not start the tests either and said so.
+  THE FIX: `scripts/pre-push-gate.mjs` already parses the unit run. Record the test-FILE
+  count beside the result, keep the last green count in the state the gate already writes,
+  and treat a DROP as a red — a shrinking evidence base is exactly as serious as a
+  failure. Report both numbers in the gate's own line ("153 files / 4214 tests"), so the
+  shrink is visible even where it does not yet block.
+  DO NOT compare against a hard-coded number: it would rot with every added suite. The
+  baseline is the last green run's own count, and a deliberate reduction (a suite genuinely
+  deleted) is accepted by re-running once the drop is understood.
+  VERIFIABLE: pure Vitest on the comparison — a higher count passes and advances the
+  baseline, an equal count passes, a lower count is red with BOTH numbers named, a missing
+  baseline passes and records rather than blocking (fail-open on first use), and a garbled
+  parse never throws. Live: delete a suite deliberately and see the gate name the drop.
+  DOCS in the same commit: `scripts/verify/README.md`, where the fast layer is described.
 
 ## Closing (only after all points)
 

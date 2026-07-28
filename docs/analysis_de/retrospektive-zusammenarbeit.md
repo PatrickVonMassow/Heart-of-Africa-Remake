@@ -38,6 +38,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 26.07. | Kosten-vs-Rate-Korrektur bei der Parallelität; Commit-Umfangs-Wächter |
 | 27.07. | Gemessene Verbrauchstreiber → Kurzbrief je Auftrag statt Dokumentensuche; Board-Gate **vor** der Arbeit; Vorprüfung der Wächter |
 | 28.07. | Fünfeinhalb Stunden Stillstand → die Grenze wird **genommen**, nicht nur erlaubt; erste vollständig beobachtete Übergabe; drei Messfenster schmaler als das Gemessene (§3.44) |
+| 28.07. | Board dreimal am selben Handgriff zerbrochen → Strukturprüfung **vor** die Veröffentlichung (§3.45); 3546 grüne Tests über einer stillschweigend geschrumpften Menge (§3.46) |
 
 Muster: Ab dem 22.07. explodiert die Commit-Rate (Delegation) — und genau dann häufen sich die Infrastruktur-Vorfälle. **Skalierung der Autonomie erzeugt eine eigene Problemklasse, die die Feature-Arbeit zeitweise überholt.**
 
@@ -134,7 +135,9 @@ Ein Kantenenergie-Check des Bodens fiel, nachdem SSAO per Nutzerentscheid im Sta
 
 Ein zweites Modell kam anfangs nur bei Audits und bei Festgefahrenheit. Der Nutzer verallgemeinerte das: vor dem Bau **Schwierigkeit × Kritikalität** einschätzen und bei hoher Einstufung — besonders bei Mechanismen, die immer funktionieren müssen — Plan *und* Ergebnis vom anderen Modell prüfen lassen.
 
-**Lehre:** Modell-Diversität ist kein Audit-Sonderfall, sondern eine **Funktion der Kritikalität** — und hält, wie alles hier, nur als Mechanismus.
+Die Gegenrichtung wurde später genauso wichtig: Eine Gegenprüfung kostet ungefähr so viel wie die Arbeit selbst und verdoppelt die Wartezeit — über jede Kleinigkeit gestülpt, wird sie zur Formalie, die niemand mehr ernst nimmt. Die Grenze zieht nicht die Schwierigkeit, sondern die **Sichtbarkeit des Fehlers**: Was den Ablauf steuert oder Arbeit vernichten kann (Wächter, Sperren, Nebenläufigkeit, Speichern/Laden, Migrationen, Veröffentlichungen), wird immer gegengeprüft; was ein schneller Test sofort zeigt (Texte, Balancewerte, Kulissen, Umbenennungen), nie. Der Nutzen ist an der richtigen Stelle real: An einem Abend mit drei Gegenprüfungen fand das zweite Modell jedes Mal etwas Substanzielles — einen Zustandspfad, der beim Aufräumen mitgelöscht worden wäre, eine Prüfung, die im Fehlerfall die riskante statt der vorsichtigen Antwort gab, und einen kaputten Abhängigkeitsbaum, den der Testlauf als „grün" gemeldet hatte (3.46). Keiner dieser Funde war eine Geschmacksfrage.
+
+**Lehre:** Modell-Diversität ist kein Audit-Sonderfall, sondern eine **Funktion der Kritikalität** — und hält, wie alles hier, nur als Mechanismus. Ihre Obergrenze ist dieselbe Funktion von unten: Wo der Fehler sofort auffällt, sind zweite Augen verschwendete Zeit.
 
 ### 3.14 Fast-Gate ≠ Release-Gate
 
@@ -398,6 +401,28 @@ Alle drei Instrumente sind einzeln vernünftig gebaut, alle drei sind pur getest
 
 **Lehren:** Das Fenster einer Messung muss aus dem **Gegenstand** abgeleitet sein, nicht aus der Bequemlichkeit der Abfrage — die Frage „wurde in den letzten 90 Minuten ein Punkt geschlossen?" ist eine Zeitfrage und darf nicht als Anzahlfrage gestellt werden, und „war die Maschine während des Laufs belastet?" ist eine Frage über den Lauf, nicht über den Moment danach. Zweitens: Bei jeder Heuristik ist zu benennen, in welche Richtung sie irrt; irrt sie zur Beruhigung, braucht sie einen zweiten, unabhängigen Beleg. Drittens, als Gegenprobe zu §3.40 und §3.43: Der eine echte Durchlauf hat hier nicht nur die Kette bewiesen, sondern auch das Prüfgerät blamiert — wer die Kette nie durchspielt, hält beides für in Ordnung.
 
+### 3.45 Die Prüfung stand hinter der Auslieferung — und derselbe Griff brach dreimal
+
+Am Abend des 28.07.2026 zerbrach das Board dreimal an derselben Technik: Um Karten umzusortieren, wurde der Abschnitt über den **Fließtext** gesucht („von der Überschrift bis zum nächsten `<h2>`"), herausgeschnitten und wieder zusammengesetzt. Jedes Mal wanderte dabei ein schließendes Tag, und der Browser hängte die folgenden Karten in den falschen Container. Beim dritten Mal sah der Nutzer das Ergebnis auf seinem Bildschirm und fragte, warum das Design geändert worden sei.
+
+Zwei Befunde stecken darin, und der zweite ist der wichtigere.
+
+Der erste ist die Wiederholung. Nach dem ersten Bruch wurde repariert und weitergemacht — mit derselben Technik. Nach dem zweiten wieder. Eine Fehlerklasse, die sich beim ersten Auftreten als Ungeschick liest, ist beim dritten ein Befund über das Werkzeug: Eine HTML-Datei, die mit Textersetzungen gepflegt wird, geht kaputt, und zwar nicht gelegentlich, sondern verlässlich. Das Vorsatz-Gegenmittel („ich mache das nicht mehr") ist wertlos, wie der Nutzer sofort feststellte: Es überlebt die nächste Kontextkompression nicht.
+
+Der zweite Befund ist die Reihenfolge. Die bestehenden Wächter haben **jeden** der drei Brüche gefunden — die Abschnittsprüfung, die Karten-Vollständigkeit, die Struktur der Überschriften. Nur laufen sie bei `--synced`, also **nach** dem Veröffentlichen. Die Kette lautete: Datei ändern → veröffentlichen → prüfen → reparieren. Der Leser sah dazwischen den kaputten Stand. Die Prüfung war nicht zu schwach, sie stand an der falschen Stelle — dieselbe Form wie §3.40, nur eine Ebene konkreter: dort kam die Prüfung zu spät für die Entscheidung, hier für die Auslieferung.
+
+Das Gegenmittel ist entsprechend keine Regel, sondern eine Verschiebung: Die Strukturprüfung sitzt jetzt **vor** der Kopie, die das Veröffentlichen aufgreift (`scripts/board-structure-core.mjs`, aufgerufen in `dashboard-publish.mjs`). Ein zerbrochenes Board ist damit nicht mehr veröffentlichbar — unabhängig davon, wer es zerbrochen hat und ob sich jemand an die verbotene Technik erinnert. Die drei realen Bruchformen sind als Testfälle festgeschrieben, und die Gegenprobe wurde geführt: Der künstlich wiederhergestellte Bruch wird abgewiesen, das intakte Board geht durch.
+
+**Lehren:** Erstens, eine Fehlerklasse, die sich zum dritten Mal zeigt, ist keine Unachtsamkeit mehr — sie ist eine Aussage über das benutzte Werkzeug, und die Antwort darauf ist, das Werkzeug unmöglich zu machen, nicht sich vorzunehmen, es zu meiden. Zweitens: Bei jeder Prüfung ist zu fragen, **welches Ereignis** sie verhindern soll, und sie gehört unmittelbar davor — eine Prüfung hinter der Auslieferung ist eine Fehlermeldung, keine Absicherung.
+
+### 3.46 Dreitausend bestandene Tests, und die Hälfte lief nie
+
+Am selben Abend beschädigte eine Neuinstallation der Abhängigkeiten den Baum: Einem Plattform-Paket fehlte seine Einstiegsdatei. Der darauf folgende Testlauf meldete **3546 bestandene Tests** — eine große, beruhigende Zahl. Tatsächlich hatten 34 Testdateien gar nicht erst geladen; sie tauchten in der bestandenen Zahl nicht auf, weil sie nie zu Tests wurden. Die Vergleichszahl aus dem Lauf eine Stunde zuvor lautete 4214.
+
+Der Fehler ist derselbe wie in §3.41, aber in seiner tückischsten Form: Nicht ein Ergebnis war kein Beweis, sondern die **Menge**, über die das Ergebnis sprach, war stillschweigend geschrumpft. Ein rotes Testergebnis wird untersucht; ein grünes über einer kleineren Grundgesamtheit wird abgehakt. Bemerkt wurde es hier nicht durch Aufmerksamkeit, sondern weil ein zweites Modell in seiner Prüfung dieselben Tests nicht starten konnte und das **meldete**, statt es als Umgebungsproblem abzutun.
+
+**Lehren:** Eine bestandene Zahl ist nur zusammen mit der Zahl der ausgeführten Dateien eine Aussage — beide gehören in jede Meldung, und ein Rückgang der Dateizahl ist so ernst zu nehmen wie ein Fehlschlag. Und: Wer einen Nebenbefund meldet, den er nicht erklären kann („die Tests starten bei mir nicht"), leistet mehr als der, der ihn wegsortiert.
+
 ---
 
 ## 4. Die Guards als Immunsystem
@@ -487,7 +512,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Dienstag, 28.07.2026, 16:16 · Quellen-Fingerprint: `29f1a1831b26…`
+Zuletzt aktualisiert: Dienstag, 28.07.2026, 20:42 · Quellen-Fingerprint: `a610e584441a…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -561,8 +586,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | CORRECTED 19.07.2026 — WebGPU IS testable headless/autonomously via system Chrome (channel:'chrome') + --headless=new; the 'untestable' belief held only for Playwright's BUNDLED Chromium | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 66 Feedback-/Projekt-Memories · 35 Guard-/Hook-Skripte · 3 Revert-/Reapply-Commits · 18 Prozess-/Meta-TASKS-Punkte (davon 9 offen).
+Erfasste Quellen: 66 Feedback-/Projekt-Memories · 35 Guard-/Hook-Skripte · 3 Revert-/Reapply-Commits · 18 Prozess-/Meta-TASKS-Punkte (davon 8 offen).
 
-<!-- RETRO-FINGERPRINT: 29f1a1831b260ca9608158885158639c127dfe7f0857ada831af9a35a183b293 -->
-<!-- RETRO-LAST-REFRESHED: 2026-07-28T14:16:54.142Z -->
+<!-- RETRO-FINGERPRINT: a610e584441a1d0cac696bcb92e1f5427baa636728d85f381cf9567dc4ef3224 -->
+<!-- RETRO-LAST-REFRESHED: 2026-07-28T18:42:05.589Z -->
 <!-- AUTO-GENERATED:END -->
