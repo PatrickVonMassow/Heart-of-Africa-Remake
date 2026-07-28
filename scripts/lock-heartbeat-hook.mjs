@@ -33,8 +33,7 @@ import { basename } from 'node:path'
 import { heartbeat, noteActivity } from './batch-singleton.mjs'
 import { handoverSurvivesCall } from './batch-boundary-core.mjs'
 import { classifyPublishResponse, publishStatePatch } from './publish-outcome-core.mjs'
-import { openSetFingerprint, publishDuePatch } from './board-currency-core.mjs'
-import { parseTasks } from './dashboard-guard-core.mjs'
+import { openFingerprintOfTasks, publishDuePatch } from './board-currency-core.mjs'
 import { repoPath } from './repo-paths.mjs'
 import {
   STATE_PATH,
@@ -127,8 +126,8 @@ try {
   const mtime = statSync(tasksPath).mtimeMs
   const state = readJson(STATE_PATH) ?? {}
   if (state.tasksSeenMtime !== mtime) {
-    const { open } = parseTasks(readFileSync(tasksPath, 'utf8'))
-    const patch = publishDuePatch({ state, fingerprint: openSetFingerprint(open), at: Date.now() })
+    const fingerprint = openFingerprintOfTasks(readFileSync(tasksPath, 'utf8'))
+    const patch = publishDuePatch({ state, fingerprint, at: Date.now() })
     mergeState({ ...(patch ?? {}), tasksSeenMtime: mtime })
   }
 } catch {

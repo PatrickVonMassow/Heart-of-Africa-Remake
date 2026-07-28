@@ -54,6 +54,7 @@ import {
 /** Hash of the now-card BODIES — the text the reader sees (invariant 8c). */
 const nowHash = (html) => createHash('sha256').update(nowCardText(html)).digest('hex')
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
+import { openFingerprintOfTasks, syncedPublishPatch } from './board-currency-core.mjs'
 import { specSnapshots } from './dashboard-integrity-guard-core.mjs'
 import { readTasksAll } from './tasks-source.mjs'
 import { isMainModule } from './is-main.mjs'
@@ -232,12 +233,27 @@ if (RUN_AS_SCRIPT && process.argv[2] === '--synced') {
     violations.length && prevSeen
       ? [...new Set([...prevSeen, ...done.filter((n) => carded.has(n))])]
       : done
+  // THE PUBLISH-DUE MARK IS CLEARED HERE, and only by a REAL publish (point
+  // 400, delta B) — the decision is pure (syncedPublishPatch), the fingerprint
+  // comes from the SAME single source the due mark is written from, so a
+  // publish can never re-arm the mark it just cleared.
+  let publishPatch = {}
+  try {
+    publishPatch = syncedPublishPatch({
+      state: priorState,
+      fileHash,
+      fingerprint: openFingerprintOfTasks(readFileSync(TASKS, 'utf8')),
+    })
+  } catch {
+    /* an unreadable work order must not fail an otherwise clean attestation */
+  }
   mergeState({
     dashboardPath: p,
     head: head(),
     syncedAt: Date.now(),
     doneSeen,
     auditWaived: undefined,
+    ...publishPatch,
     // The now-card text as reviewed; (8c) blocks when work happens and this
     // never changes — a stale card cannot pass by confirming the focus alone.
     nowCardHash: nowHash(readFileSync(p, 'utf8')),

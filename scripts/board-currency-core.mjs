@@ -22,6 +22,7 @@
 //      is behind, which is the only layer that still speaks when the session
 //      itself is wedged.
 import { createHash } from 'node:crypto'
+import { parseTasks } from './dashboard-guard-core.mjs'
 
 // ── The transport (delta D) ────────────────────────────────────────────────
 // The board lives on its OWN branch of this repository, never on `main`: a
@@ -85,6 +86,17 @@ export function openSetFingerprint(open) {
   return `sha256:${createHash('sha256').update(canonical).digest('hex').slice(0, 16)}`
 }
 
+/**
+ * THE fingerprint, derived from ONE source. The due mark (delta A) and the
+ * record a publish leaves behind (delta B) MUST read the same text: derive one
+ * from TASKS.md and the other from TASKS.md plus the archive and a publish would
+ * re-arm the very mark it just cleared — the block loop this whole design exists
+ * to prevent. Every caller goes through here rather than parsing for itself.
+ */
+export function openFingerprintOfTasks(tasksText) {
+  return openSetFingerprint(parseTasks(String(tasksText ?? '')).open)
+}
+
 /** Write (or replace) the fingerprint meta in a board document. Idempotent. */
 export function stampFingerprint(html, fingerprint) {
   const doc = typeof html === 'string' ? html : ''
@@ -135,7 +147,25 @@ export function publishDuePatch({ state, fingerprint, at = Date.now() } = {}) {
 /** Is a publish outstanding? (Reads the persisted mark, tolerating junk.) */
 export function isPublishDue(state) {
   const due = state && typeof state === 'object' ? state.publishDue : null
-  return !!(due && typeof due === 'object')
+  return !!(due && typeof due === 'object' && !Array.isArray(due))
+}
+
+/**
+ * What an attestation (`dashboard-guard --synced`) writes about the publish
+ * state — the ONLY place the due mark is cleared.
+ *
+ * A publish counts only when the attested bytes ARE the bytes that went live. A
+ * DEFERRED publish leaves the live board behind, so the mark must survive it,
+ * and that surviving mark is precisely what the watchdog (delta E) reports. The
+ * fingerprint recorded beside it is what the live page is then expected to
+ * carry.
+ */
+export function syncedPublishPatch({ state, fileHash, fingerprint, at = Date.now() } = {}) {
+  const s = state && typeof state === 'object' ? state : {}
+  if (s.publishDeferred) return {}
+  if (!fileHash || s.publishedHash !== fileHash) return {}
+  const fp = typeof fingerprint === 'string' && fingerprint ? fingerprint : null
+  return { publishDue: undefined, ...(fp ? { publishedFingerprint: fp, publishedFingerprintAt: at } : {}) }
 }
 
 /**

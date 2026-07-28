@@ -1032,7 +1032,9 @@ After completion and after every major system:
   `board-first-guard`, which fires BEFORE the work rather than at the turn end
   (the Stop chain leaves the board free to lag the whole hour the user is
   reading it): the FIRST state-changing call of a turn is denied while no
-  `focus set|confirm` postdates the turn stamp or the board is unpublished —
+  `focus set|confirm` postdates the turn stamp, or the board is unpublished, or
+  the OPEN-POINT SET changed without a publish since (`publishDue`, and only
+  where this session can publish at all — a session that cannot would spin) —
   never a read, its own remedy commands or an edit of the board file, and at
   most ONCE per turn.
   Every one is fail-OPEN — an internal error allows the stop, so

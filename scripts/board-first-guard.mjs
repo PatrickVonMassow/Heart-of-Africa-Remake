@@ -33,9 +33,18 @@ import {
 } from './dashboard-state.mjs'
 import { heldByOtherLiveOwner, withdrawHandover, touchHandover } from './batch-singleton.mjs'
 import { handoverSurvivesCall } from './batch-boundary-core.mjs'
+import { publishCapability } from './board-currency-core.mjs'
 import { evaluate } from './board-first-core.mjs'
 
 const PAUSE = resolve(REPO_ROOT, '.claude', 'batch-paused')
+
+/**
+ * The transport this session may publish through (point 400, delta B/D). Until
+ * the delta-D pages transport exists, only a session that has demonstrably used
+ * the Artifact tool can publish — so only such a session may be denied for an
+ * unpublished board.
+ */
+const TRANSPORT = null
 
 /** State + focus + the registered board's current hash and paths. */
 function gather() {
@@ -56,6 +65,7 @@ if (process.argv.includes('--status')) {
     focus,
     repoHash,
     boardPaths,
+    canPublish: publishCapability({ state, transport: TRANSPORT }).canPublish,
   })
   const turn = Number(state && state.turnStartedAt)
   const armed = Number.isFinite(turn) && turn > 0
@@ -126,6 +136,7 @@ try {
     focus,
     repoHash,
     boardPaths,
+    canPublish: publishCapability({ state, sessionId: payload.session_id || '', transport: TRANSPORT }).canPublish,
   })
   if (decision.block) {
     // Record that the gate fired, so it denies AT MOST ONCE per turn — a session

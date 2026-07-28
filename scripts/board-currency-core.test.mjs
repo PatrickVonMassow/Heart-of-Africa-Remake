@@ -8,11 +8,13 @@ import {
   isPublishDue,
   liveBoardVerdict,
   normaliseOpenSet,
+  openFingerprintOfTasks,
   openSetFingerprint,
   publishCapability,
   publishDuePatch,
   readFingerprint,
   stampFingerprint,
+  syncedPublishPatch,
   watchdogDecision,
 } from './board-currency-core.mjs'
 
@@ -110,6 +112,53 @@ describe('delta A — the due mark is set only on a real change', () => {
     expect(isPublishDue(null)).toBe(false)
     expect(isPublishDue({ publishDue: { at: 1 } })).toBe(true)
     expect(isPublishDue({ publishDue: 'yes' })).toBe(false)
+    expect(isPublishDue({ publishDue: [] })).toBe(false)
+  })
+})
+
+describe('delta B — one fingerprint source, one place that clears the mark', () => {
+  const TASKS = [
+    '## Checklist',
+    '- [ ] 400. the board is current',
+    '- [x] 399. an older point',
+    '- [ ] 401. DEFERRED — waiting on the user',
+    'not a checkbox line at all',
+  ].join('\n')
+
+  it('derives the fingerprint from the work order exactly as the audit parses it', () => {
+    // Open = 400 only: the tick is done, the DEFERRED line is not counted.
+    expect(openFingerprintOfTasks(TASKS)).toBe(openSetFingerprint([400]))
+    expect(openFingerprintOfTasks(null)).toBe(openSetFingerprint([]))
+  })
+
+  it('the mark the heartbeat sets is exactly the one an attestation clears', () => {
+    // The regression this guards: two derivations of "the open set" would let a
+    // publish clear a mark that the next tool call immediately re-armed.
+    const fingerprint = openFingerprintOfTasks(TASKS)
+    const armed = publishDuePatch({ state: { openFingerprint: openSetFingerprint([1]) }, fingerprint, at: 5 })
+    expect(armed.publishDue).toEqual({ at: 5, fingerprint, previous: openSetFingerprint([1]) })
+    const state = { ...armed, publishedHash: 'h1' }
+    const cleared = syncedPublishPatch({ state, fileHash: 'h1', fingerprint, at: 9 })
+    expect(cleared).toEqual({ publishDue: undefined, publishedFingerprint: fingerprint, publishedFingerprintAt: 9 })
+    // …and with the mark cleared and the live fingerprint recorded, the next
+    // observation of the SAME set demands nothing again.
+    expect(publishDuePatch({ state: { ...state, ...cleared }, fingerprint })).toBeNull()
+  })
+
+  it('a DEFERRED publish leaves the mark standing — the live board is still behind', () => {
+    const state = { publishedHash: 'h1', publishDeferred: { repoHash: 'h1', reason: 'headless' } }
+    expect(syncedPublishPatch({ state, fileHash: 'h1', fingerprint: 'sha256:x' })).toEqual({})
+  })
+
+  it('attesting bytes that were never published clears nothing', () => {
+    expect(syncedPublishPatch({ state: { publishedHash: 'other' }, fileHash: 'h1', fingerprint: 'sha256:x' })).toEqual({})
+    expect(syncedPublishPatch({ state: { publishedHash: 'h1' }, fileHash: null, fingerprint: 'sha256:x' })).toEqual({})
+  })
+
+  it('clears the mark even when no fingerprint could be computed, and never throws', () => {
+    expect(syncedPublishPatch({ state: { publishedHash: 'h1' }, fileHash: 'h1' })).toEqual({ publishDue: undefined })
+    expect(syncedPublishPatch()).toEqual({})
+    expect(syncedPublishPatch({ state: 'nonsense', fileHash: 'h1' })).toEqual({})
   })
 })
 

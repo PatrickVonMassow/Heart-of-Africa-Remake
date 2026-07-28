@@ -30,7 +30,15 @@
 export const DOC_BUDGETS = [
   {
     path: 'CLAUDE.md',
-    maxLines: 1100,
+    // RAISED by the 26 measured words (2 lines) of board-first-guard's THIRD
+    // condition in §7.2 (point 400): the gate also denies while the OPEN-POINT
+    // SET has changed without a publish since — and only where the session can
+    // publish at all. A new deny in the chain this section exists to enumerate;
+    // a reader who does not know it reads the block as a guard bug and goes
+    // looking for the wrong fix. The capability half is not a flourish either:
+    // it is the reason a headless session is not trapped, and leaving it out
+    // invites exactly the "then just remove the check" repair.
+    maxLines: 1101,
     // RAISED by the 50 measured words of the §7.2 rule that screenshot diffing
     // is not available as a shortcut (point 361). That is the mechanism working
     // as designed rather than a concession: the words buy a NEW standing rule
@@ -73,7 +81,7 @@ export const DOC_BUDGETS = [
     // off their drawn bodies, so the traveller walked through the animal he saw
     // and was blocked on empty ground. A rule stated for one subsystem is not a
     // rule; the words buy its generality.
-    maxWords: 9952,
+    maxWords: 9978,
     why: 'loaded at every session start — the most expensive document in the project',
   },
   {
