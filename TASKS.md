@@ -3310,6 +3310,51 @@ read that as "the criterion and its evidence section".
   DOCS in the same commit: `docs/batch-autonomy.md`, in the section on what a taken
   boundary survives.
 
+- [ ] 397. AN UNNAMED AUTHOR IS NOT A FORBIDDEN ONE — THE TRAILER THAT COST A ROUND
+  (28.07.2026, observed live). Commit 652a8ba carried `Co-Authored-By: Claude
+  <noreply@anthropic.com>` — the trailer with no model name. `isPolicyBreach` in
+  `scripts/model-guard-core.mjs` tests `ALLOWED = /\b(opus|fable)\b/i` against the
+  trailer, so a trailer naming NOTHING fails exactly as a trailer naming Haiku does, and
+  the Stop hook demanded the full breach ritual: pause the batch, stop, wait for the user.
+  It was Opus 5 — every session live in that window shows `claude-opus-5` and nothing
+  else. The alarm cost a full round and a user interruption, and it will recur, because
+  nothing stops the next agent from stamping the same bare trailer.
+  THE POINT IS NOT TO SOFTEN THE GUARD. A bare trailer is not proof of compliance either,
+  and the 24.07.2026 incident — a session degraded to Haiku merging three defective
+  deliveries in 14 minutes — is what the guard exists for. What is wrong is that the guard
+  collapses two different states into one verdict.
+  THE FIX, both halves in one point:
+  (a) CLASSIFY THREE WAYS, not two. `model-guard-core.mjs` gains `classifyTrailer` →
+  `'allowed' | 'unidentified' | 'forbidden'`: a Claude trailer matching `ALLOWED` is
+  allowed, one naming a model outside it is forbidden, one carrying NO model name at all
+  is unidentified. `findForbiddenCommits` keeps returning only the forbidden ones; a new
+  `findUnidentifiedCommits` returns the rest. The Stop hook stops HARD on a forbidden hit
+  exactly as today (pause file, no batch work), and on an unidentified hit it blocks with a
+  DIFFERENT, resolvable message: name the commit, and instruct the session to resolve it
+  from the local transcripts before anything else — `~/.claude/projects/<repo-slug>/
+  *.jsonl` carries the true `message.model` per turn, so a commit's authoring model is
+  READABLE, not a matter of assumption. Resolves to an allowed model → advance the
+  baseline past it and carry on, no user interruption. Resolves to a forbidden one, or the
+  transcripts do not cover it → the forbidden path, unchanged.
+  (b) CATCH IT AT THE SOURCE. A versioned `commit-msg` hook in `scripts/git-hooks/`
+  (wired by `npm install` like `commit-scope-guard` and `pre-push-gate`) REJECTS a commit
+  whose `Co-Authored-By: Claude …` trailer carries no model name, naming the three allowed
+  spellings in its message. An unnamed trailer then cannot reach history at all, and (a)
+  stays the net under the commits already in it.
+  MECHANISM REVIEW REQUIRED: both halves change a guard and add a git hook, so
+  `scripts/mechanism-review.mjs --record` with the OTHER model's verdict is part of the
+  point (CLAUDE.md §7.2), and the hook file needs the user attended — `.git/hooks` and
+  versioned hook paths always prompt.
+  VERIFIABLE: pure Vitest on `model-guard-core.mjs` — `classifyTrailer` over the three
+  shapes incl. the real `Claude <noreply@anthropic.com>` string, a multi-trailer commit
+  (one named + one bare) classified by its worst trailer, `findForbiddenCommits` NOT
+  returning an unidentified commit, and a non-Claude co-author (a human) ignored by both.
+  A hook test drives the `commit-msg` script over a rejected and an accepted message.
+  Live: a commit attempted with the bare trailer is refused by the hook.
+  DOCS in the same commit: CLAUDE.md §6 (the model-policy paragraph states that the
+  trailer must NAME the model and that the hook enforces it) and §7.2 (the Stop-chain list
+  gains the unidentified/forbidden split).
+
 ## Closing (only after all points)
 
 New points are appended BEFORE this section — it stays last in the file.
