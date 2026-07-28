@@ -23,5 +23,26 @@ export default defineConfig({
     // components are imported, so no canvas/WebGL is needed.
     css: false,
     restoreMocks: true,
+    // A LOAD-PROOF timeout, not a tight one (point 398). Vitest's default is
+    // 5000 ms and the slowest honest cases here sit at 1.5-2.3 s of it — a real
+    // git probe, a heavy constructor, a child process. This project's DESIGNED
+    // steady state is three worktree agents building, and that load alone
+    // doubled them past the bar: on 28.07.2026 `npm run test:unit` went red
+    // twice within ten minutes on `main`, 2 then 5 failures, every single one
+    // `Test timed out in 5000ms` and not one an assertion. The gate that reads
+    // it then blocked the push. These are deterministic pure-logic and jsdom
+    // tests: a case that passes in 2 s and one that HANGS are orders of
+    // magnitude apart, so a generous ceiling costs nothing on a green run and
+    // still fails a real hang. A single case that legitimately needs longer
+    // gets its own explicit timeout — this floor is not raised a second time.
+    testTimeout: 20_000,
+    // Same bar for the same reason: leaving hooks at their 10 s default would
+    // only move the load flake one line over, into a beforeAll.
+    hookTimeout: 20_000,
+    // The larger budget must not become a place for cost to HIDE. Every case
+    // slower than a second is printed with its duration, so a test quietly
+    // growing from 2 s to 15 s stays visible instead of passing silently
+    // inside the ceiling — the change stops the timeouts, not the noticing.
+    slowTestThreshold: 1000,
   },
 })

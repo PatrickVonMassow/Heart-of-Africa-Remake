@@ -30,6 +30,33 @@ npm test -- flow      # just the named browser suite(s) (dev server managed for 
 lint → **vitest (fail-fast)** → the Playwright browser suites against the dev
 server → the production-preview smoke test.
 
+### The fast layer's timeout is load-proof, not tight (point 398)
+
+`vitest.config.ts` sets `testTimeout: 20_000` (and the same for `hookTimeout`).
+Vitest's default is 5000 ms, and that bar could not survive this project's own
+steady state: on 28.07.2026 `npm run test:unit` went red on `main` twice within
+ten minutes while delegated agents were building — 2 failures, then 5 — and
+every single one was `Test timed out in 5000ms`, not one an assertion. Run
+alone on the same commit the same files passed (`src/render/water.test.ts` in
+1.55 s, the `crocodileIdleYaw` case in 2.27 s). The cause was the MARGIN: the
+slowest honest cases here do real work — a git probe, a heavy constructor, a
+child process — at 1.5–2.3 s of a 5 s budget, so any load at all doubles them
+past it. The consequence was not a cosmetic red: `pre-push-gate` blocked the
+push, and its retry did not save it, because the load reading was taken after
+the step, when the machine already read quiet again (that half is fixed too —
+see the push-gate section below, where the opening reading and `worseLoad`
+live). These are deterministic pure-logic and jsdom tests: a case that passes in
+2 s and one that HANGS are orders of magnitude apart, so the generous ceiling
+costs nothing on a green run and still fails a real hang.
+
+It is not a licence to get slow. `slowTestThreshold` is pinned at 1000 ms, so
+every case over a second is still printed with its duration and a test growing
+from 2 s to 15 s stays visible instead of hiding inside the larger budget. A
+single case that legitimately needs longer gets **its own** explicit timeout
+(third argument to `it`) — the floor is not raised a second time. All three
+values, and a deliberately hanging case that must still be failed rather than
+stall the suite, are pinned by `src/test/vitestConfig.test.ts`.
+
 ### Regression tiers (point 173)
 
 The browser suites split into two selectable tiers, so a change can be gated at
