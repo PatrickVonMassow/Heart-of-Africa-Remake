@@ -24,6 +24,7 @@ import {
   assessOwnerWork,
   checkEvidence,
   describeInFlight,
+  selfReferentialEvidence,
 } from './batch-in-flight-core.mjs'
 import {
   progressGuardDecision,
@@ -502,5 +503,87 @@ describe('assessOwnerWork — is the OWNER’s declared work still advancing?', 
 
   it('a declaration from the FUTURE is a clock this cannot reason about → not current', () => {
     expect(work({ at: NOW + 60_000 })).toMatchObject({ declared: false })
+  })
+
+  it('the declaration TIMESTAMP is passed through, so the launcher can ask whose last word it was', () => {
+    // `assessOwner` needs it for the second question (four-eyes finding 1.1): a
+    // heartbeat NEWER than the declaration proves the session went on working
+    // after declaring, which makes the declaration leftover paperwork.
+    const at = NOW - 7 * 60_000
+    expect(work({ at })).toMatchObject({ declaredAt: at })
+    expect(work({ at, evidence: [] })).toMatchObject({ declaredAt: at, reason: 'no-evidence' })
+    expect(work({ at, evidence: [{ kind: 'vibes' }] })).toMatchObject({ declaredAt: at, reason: 'unanswerable' })
+    // Nothing to time-stamp → null, never a fabricated moment.
+    expect(assessOwnerWork({ declaration: null, lock: lock(), now: NOW }).declaredAt).toBe(null)
+    expect(assessOwnerWork({ declaration: declaration(), lock: null, now: NOW }).declaredAt).toBe(null)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// EVIDENCE THAT CANNOT GO QUIET (four-eyes review 28.07.2026, finding 1.2).
+// Recency made existence-only evidence honest, but nothing restricted WHAT may
+// be named — and a declaration naming something eternally fresh suppressed BOTH
+// the wedge verdict and the silent-owner notification, leaving the session less
+// observed than declaring nothing at all.
+describe('selfReferentialEvidence (what may never be declared)', () => {
+  const ROOT = 'C:/Users/x/repo'
+
+  it('refuses the repo root as a worktree — the session’s own git commands keep it fresh', () => {
+    const found = selfReferentialEvidence({
+      evidence: [{ kind: 'worktree', path: ROOT }],
+      repoRoot: ROOT,
+      currentBranch: 'main',
+    })
+    expect(found).toHaveLength(1)
+    expect(found[0]).toMatchObject({ kind: 'worktree' })
+    expect(found[0].why).toMatch(/this checkout itself/)
+  })
+
+  it('…however it is spelled: separators, trailing slash and case all normalise', () => {
+    for (const path of ['C:\\Users\\x\\repo', 'C:/Users/x/repo/', 'c:/users/X/REPO']) {
+      expect(selfReferentialEvidence({ evidence: [{ kind: 'worktree', path }], repoRoot: ROOT })).toHaveLength(1)
+    }
+  })
+
+  it('refuses main (and HEAD, and origin/main) as a branch ref', () => {
+    for (const ref of ['main', 'origin/main', 'refs/heads/main', 'HEAD']) {
+      const found = selfReferentialEvidence({ evidence: [{ kind: 'branch', ref }], repoRoot: ROOT })
+      expect(found, ref).toHaveLength(1)
+      expect(found[0].why).toMatch(/every merge/)
+    }
+  })
+
+  it('refuses the declaring checkout’s OWN current branch', () => {
+    const found = selfReferentialEvidence({
+      evidence: [{ kind: 'branch', ref: 'feat/402-progress-not-age' }],
+      repoRoot: ROOT,
+      currentBranch: 'feat/402-progress-not-age',
+    })
+    expect(found).toHaveLength(1)
+    expect(found[0].why).toMatch(/own current branch/)
+  })
+
+  it('ALLOWS what a delegated agent actually touches — the common, correct declaration', () => {
+    expect(
+      selfReferentialEvidence({
+        evidence: [
+          { kind: 'branch', ref: 'feat/403-something' },
+          { kind: 'worktree', path: `${ROOT}/.claude/worktrees/agent-1` },
+          { kind: 'pid', pid: 900 },
+          { kind: 'log', path: `${ROOT}/.claude/run.log` },
+        ],
+        repoRoot: ROOT,
+        currentBranch: 'main',
+      }),
+    ).toEqual([])
+  })
+
+  it('an unknown current branch refuses nothing extra, and bad input refuses nothing at all', () => {
+    expect(
+      selfReferentialEvidence({ evidence: [{ kind: 'branch', ref: 'feat/x' }], repoRoot: ROOT, currentBranch: null }),
+    ).toEqual([])
+    expect(selfReferentialEvidence()).toEqual([])
+    expect(selfReferentialEvidence({ evidence: null })).toEqual([])
+    expect(selfReferentialEvidence({ evidence: [{ kind: 'branch', ref: '' }], repoRoot: ROOT })).toEqual([])
   })
 })

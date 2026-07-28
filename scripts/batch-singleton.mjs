@@ -88,10 +88,31 @@ export const PID_START_TOLERANCE_MS = 2000
 export const LAUNCHER_TICK_MS = 15 * 60 * 1000
 /** How many launcher ticks of COMPLETE silence — no tool call from the owner AND
  *  no declared work advancing — before the owner counts as stalled (point 402
- *  (d)). Two, deliberately expressed as the silence it spans rather than as a
- *  persisted counter, so a lost `autostart-state.json` cannot reset it. */
-export const WORK_STALL_TICKS = 2
+ *  (d)). Expressed as the silence it spans rather than as a persisted counter, so
+ *  a lost `autostart-state.json` cannot reset it.
+ *
+ *  SIX, not the two this was first written with (four-eyes review, 28.07.2026).
+ *  The heartbeat is a PostToolUse hook, so ONE long tool call starves it, and the
+ *  longest LEGITIMATE silence in this repository is the LARGE browser regression
+ *  at roughly 30-40 minutes — the number `WEDGE_NOTIFY_MS` two entries up is
+ *  calibrated against. A 30-minute stall bound therefore sat BELOW the silence
+ *  this repository documents as normal, and the verdict it fed can end in a kill.
+ *  Six ticks = 90 minutes follows the same better-than-2x headroom rule. */
+export const WORK_STALL_TICKS = 6
 export const WORK_STALL_MS = WORK_STALL_TICKS * LAUNCHER_TICK_MS
+/** How much later than a declaration its own heartbeat may land and still leave
+ *  the declaration the owner's LAST WORD (point 402, four-eyes finding 1.1). The
+ *  declare command is itself a tool call, so its PostToolUse heartbeat lands
+ *  seconds after `declaration.at`; anything appreciably later proves the session
+ *  went on WORKING after declaring, which makes the declaration leftover
+ *  paperwork rather than a description of the present. */
+export const WORK_DECLARATION_TOLERANCE_MS = 2 * 60 * 1000
+/** How closely a live process's start time must match the moment the launcher
+ *  recorded spawning it before it counts as THAT spawn (point 402, four-eyes
+ *  finding 1.3). Windows recycles pids aggressively, and `lastPid` persists
+ *  indefinitely: pid equality alone would let a days-old, long-exited spawn number
+ *  be inherited by an INTERACTIVE window that the launcher would then kill. */
+export const SPAWN_IDENTITY_TOLERANCE_MS = 60 * 1000
 
 /**
  * EVERY state file this module writes, derived from ONE lock path. PURE.
@@ -180,7 +201,7 @@ const readJson = (p) => {
  *   probe — { exists: boolean, startedAt: number|null } for lock.pid
  *           (pass null when no pid is recorded)
  *   work  — what the owner DECLARED it is waiting on, already assessed:
- *           { declared, advancing, summary } from `assessOwnerWork`
+ *           { declared, advancing, declaredAt, summary } from `assessOwnerWork`
  *           (scripts/batch-in-flight-core.mjs). Optional — a caller that does not
  *           pass it gets exactly the pre-402 behaviour.
  * Returns { alive, wedged, reason }.
@@ -194,6 +215,16 @@ const readJson = (p) => {
  * whose declared work has gone quiet for `WORK_STALL_MS` is wedged long before
  * the four-hour valve would have noticed. What no evidence may ever do is revive
  * a DEAD process: the pid checks come first and are untouched.
+ *
+ * THE DECLARATION MUST BE THE OWNER'S LAST WORD (four-eyes review, finding 1.1)
+ * before it may tighten anything. `claimedAt <= declaredAt + tolerance` is the
+ * SAME comparison the handover below rests on, for the same reason: the PostToolUse
+ * heartbeat stamps `claimedAt` on every tool call, so a heartbeat NEWER than the
+ * declaration is proof the session went on working after declaring. The replayed
+ * failure: a session declares a wait, the agent finishes, the session merges and
+ * starts a LARGE regression WITHOUT clearing the declaration, and 31 minutes of
+ * legitimate silence later the launcher reads a frozen declaration and reaps it
+ * mid-run. Such leftover paperwork now licenses at most the old four-hour valve.
  *
  * HANDOVER (point 388): a lock the owner itself marked handed-over at a VALID
  * point boundary reads NOT alive, even while its process still runs. That is the
@@ -209,8 +240,17 @@ const readJson = (p) => {
  *   - while the pid is still alive the successor waits HANDOVER_GRACE_MS, so a
  *     session mid-shutdown is never raced.
  */
-export function assessOwner(lock, { now, bootTime, probe, work = null, stallMs = WORK_STALL_MS }) {
+export function assessOwner(
+  lock,
+  { now, bootTime, probe, work = null, stallMs = WORK_STALL_MS, declarationToleranceMs = WORK_DECLARATION_TOLERANCE_MS },
+) {
   const advancing = work?.advancing === true
+  // Is the declaration still the owner's last word? A heartbeat that postdates it
+  // by more than the tolerance says no, and only a "yes" may tighten the bound.
+  const lastWord =
+    typeof work?.declaredAt === 'number' &&
+    typeof lock?.claimedAt === 'number' &&
+    lock.claimedAt <= work.declaredAt + declarationToleranceMs
   if (!lock || typeof lock.claimedAt !== 'number') {
     return { alive: false, wedged: false, reason: 'no-lock' }
   }
@@ -264,12 +304,13 @@ export function assessOwner(lock, { now, bootTime, probe, work = null, stallMs =
   //
   // Point 402 refines only the WEDGE half of that verdict, never the alive half:
   if (advancing) return { alive: true, wedged: false, reason: 'work-advancing' }
-  if (work?.declared === true && age > stallMs) {
-    // Nothing has moved for two launcher ticks: not the owner's heartbeat, not
-    // one piece of the work it declared. A healthy agent — however slow —
-    // advances something, so this needs the work to be genuinely frozen. Still
-    // ALIVE (the process exists; the launcher signals and may only reap a spawn
-    // of its own making), but wedged NOW rather than in four hours.
+  if (work?.declared === true && lastWord && age > stallMs) {
+    // Nothing has moved for six launcher ticks: not the owner's heartbeat, not
+    // one piece of the work it declared, and the declaration is the last thing
+    // the owner did. A healthy agent — however slow — advances something, so this
+    // needs the work to be genuinely frozen. Still ALIVE (the process exists; the
+    // launcher signals and may only reap a spawn of its own making), but wedged
+    // NOW rather than in four hours.
     return { alive: true, wedged: true, reason: 'work-stalled' }
   }
   return { alive: true, wedged: age > WEDGED_MS, reason: 'pid-alive' }
@@ -354,10 +395,65 @@ export function spawnDecision(assessment) {
 }
 
 /**
+ * IS THIS LIVE PROCESS THE SPAWN THE LAUNCHER RECORDED? PURE.
+ *
+ * A PID IS NOT AN IDENTITY (four-eyes review 28.07.2026, finding 1.3). The
+ * launcher's `state.lastPid` persists indefinitely and carries no start time, and
+ * Windows recycles pids aggressively: a days-old spawn exits, an INTERACTIVE
+ * window later inherits that number and takes the batch lock, and every "we may
+ * reap our own spawn" path would then kill the user's own window — the one thing
+ * this module exists to make impossible. So the pid must be matched by the pid AND
+ * by the process start time against the moment the spawn was recorded, exactly the
+ * way `assessOwner` already matches `lock.pidStartedAt`.
+ *
+ * Inputs: the live process's { exists, startedAt } probe, the pid on the lock (or
+ * whichever pid is being considered), and the launcher's recorded lastSpawnPid /
+ * lastSpawnAt. A start time that cannot be established answers NO — an
+ * unverifiable identity is never a licence to kill.
+ */
+export function isOwnSpawn({
+  pid,
+  probe,
+  lastSpawnPid,
+  lastSpawnAt,
+  toleranceMs = SPAWN_IDENTITY_TOLERANCE_MS,
+} = {}) {
+  if (!(typeof pid === 'number' && pid > 0)) return false
+  if (!(typeof lastSpawnPid === 'number' && lastSpawnPid > 0)) return false
+  if (pid !== lastSpawnPid) return false
+  if (!(typeof lastSpawnAt === 'number' && lastSpawnAt > 0)) return false
+  if (!probe || probe.exists !== true) return false
+  if (typeof probe.startedAt !== 'number') return false
+  return Math.abs(probe.startedAt - lastSpawnAt) <= toleranceMs
+}
+
+/**
+ * WHICH SILENCE IS WORTH REPORTING, given what the owner declared. PURE.
+ *
+ * `wedgeStage` reads the clock alone; this is the launcher's policy on top of it.
+ * A session whose declared work is visibly ADVANCING is not silent in the sense
+ * the 'silent' alarm was written for — it is waiting on an agent that is still
+ * committing, and reporting that would train the user to ignore the channel. So
+ * the first stage is suppressed while work advances.
+ *
+ * The hours-long 'wedged' stage is NOT (four-eyes review 28.07.2026, finding
+ * 1.2). Nothing restricts WHAT may be declared as evidence, and some things are
+ * eternally fresh by nature; such a declaration used to suppress the wedge verdict
+ * AND this notification at once, leaving the owner less observed than before the
+ * declaration existed. Past `WEDGED_MS` the user is told regardless — notify only,
+ * never a kill.
+ */
+export function silenceStage({ ageMs, advancing = false, notifyMs = WEDGE_NOTIFY_MS, wedgedMs = WEDGED_MS } = {}) {
+  const stage = wedgeStage(ageMs, { notifyMs, wedgedMs })
+  if (stage === 'wedged') return stage
+  return advancing ? null : stage
+}
+
+/**
  * WHAT THE LAUNCHER MAY DO WITH A WEDGED OWNER (point 402 (d)). PURE.
  *
  * Two kinds of wedge reach here and they earn different consequences:
- *   - `work-stalled` — the owner has been silent for two launcher ticks AND the
+ *   - `work-stalled` — the owner has been silent for six launcher ticks AND the
  *     work it declared has stopped moving. That is a positive finding, not a
  *     guess from a clock, so it is worth an urgent signal AND a takeover.
  *   - the four-hour `pid-alive` valve — age alone, which can still be a very long
@@ -365,14 +461,15 @@ export function spawnDecision(assessment) {
  *     launcher's own headless spawn, and let the next tick take over.
  *
  * The one rule that binds both: the launcher only ever kills a process it spawned
- * itself. An interactive window is never killed — the guards make a rogue one
- * stand down and the user is told instead.
+ * itself — judged by `isOwnSpawn`, i.e. pid AND start time, never the pid alone.
+ * An interactive window is never killed — the guards make a rogue one stand down
+ * and the user is told instead.
  *
  * Returns { stalled, own, notify, kill, takeover }.
  */
-export function wedgeAction({ assessment, lock, lastSpawnPid } = {}) {
+export function wedgeAction({ assessment, lock, lastSpawnPid, lastSpawnAt, probe } = {}) {
   const stalled = assessment?.reason === 'work-stalled'
-  const own = Boolean(lock?.pid) && lock.pid === lastSpawnPid
+  const own = isOwnSpawn({ pid: lock?.pid, probe, lastSpawnPid, lastSpawnAt })
   return {
     stalled,
     own,

@@ -69,6 +69,86 @@ export const WORK_FRESH_MS = 15 * 60 * 1000
  *  "assume fine": it fails, and the declaration with it. */
 export const EVIDENCE_KINDS = ['pid', 'branch', 'worktree', 'log']
 
+/** Branch refs that can never be evidence of a DELEGATED agent's progress,
+ *  whatever the declaring session names them (four-eyes review 28.07.2026,
+ *  finding 1.2). `main` moves on everyone else's merges, and `HEAD` is the
+ *  declaring checkout itself. */
+const ALWAYS_REFUSED_REFS = new Set(['main', 'head'])
+
+/** Compare a filesystem path the way both Windows and git will: separators
+ *  normalised, trailing separators dropped, case folded. */
+const normPath = (p) =>
+  String(p ?? '')
+    .trim()
+    .replace(/\\/g, '/')
+    .replace(/\/+$/, '')
+    .toLowerCase()
+
+/** `refs/heads/x`, `origin/x` and `x` all name the same thing for this purpose. */
+const normRef = (r) =>
+  String(r ?? '')
+    .trim()
+    .replace(/^refs\/(heads|remotes)\//, '')
+    .replace(/^origin\//, '')
+    .toLowerCase()
+
+/**
+ * EVIDENCE THAT PROVES NOTHING BECAUSE IT CANNOT GO QUIET. PURE.
+ *
+ * Recency made existence-only evidence honest (point 388's own four-eyes round),
+ * but nothing restricted WHAT may be named — and some things are eternally fresh
+ * by construction (four-eyes review 28.07.2026, finding 1.2):
+ *   - the REPO ROOT as a `--worktree`: every `git status` the declaring session
+ *     runs touches its index, so it is git-active at all times, by the session's
+ *     own hand;
+ *   - `main`, or the declaring checkout's OWN current branch, as a `--branch`:
+ *     the first moves on everyone else's merges, the second on the session's own
+ *     commits.
+ * Either one would hold a declaration open indefinitely — and because the
+ * declaration also suppressed the silent-owner notification, naming one left the
+ * session LESS observed than declaring nothing at all. They are refused at
+ * declaration time, where the mistake is one command away from being fixed,
+ * rather than silently honoured for hours.
+ *
+ * Inputs are plain data: the evidence array, the resolved repo root and the
+ * declaring checkout's current branch (null when it cannot be determined — an
+ * unknown branch refuses nothing extra, it just cannot add the second rule).
+ * Returns [{ kind, value, why }], empty when everything may be declared.
+ */
+export function selfReferentialEvidence({ evidence, repoRoot, currentBranch = null } = {}) {
+  const root = normPath(repoRoot)
+  const own = normRef(currentBranch)
+  const out = []
+  for (const item of Array.isArray(evidence) ? evidence : []) {
+    if (item?.kind === 'worktree') {
+      if (root && normPath(item.path) === root) {
+        out.push({
+          kind: 'worktree',
+          value: String(item.path),
+          why: 'that is this checkout itself — every git command the session runs keeps it fresh forever',
+        })
+      }
+    } else if (item?.kind === 'branch') {
+      const ref = normRef(item.ref)
+      if (!ref) continue
+      if (ALWAYS_REFUSED_REFS.has(ref)) {
+        out.push({
+          kind: 'branch',
+          value: String(item.ref),
+          why: 'main (and HEAD) move on every merge in the repository, not on the work being waited for',
+        })
+      } else if (own && ref === own) {
+        out.push({
+          kind: 'branch',
+          value: String(item.ref),
+          why: `that is this checkout's own current branch (${currentBranch}) — the session's own commits keep it fresh`,
+        })
+      }
+    }
+  }
+  return out
+}
+
 /** Minutes, for the human-readable detail strings. */
 const minutes = (ms) => Math.round(ms / 60000)
 
@@ -234,19 +314,32 @@ export const UNANSWERABLE_DETAILS = new Set([
  *   lock        — the parsed batch lock, whose owner the declaration must belong to
  *   now, maxAgeMs, and the four probes of `checkEvidence`
  *
- * Returns { declared, advancing, reason, summary, items }:
- *   advancing — something the declaration names moved inside its freshness window.
- *               Judged on the EVIDENCE alone, so it holds however old the
- *               declaration is: an agent that is still committing is still
- *               building, whatever the paperwork's timestamp says.
- *   declared  — there is a CURRENT declaration, so its silence means something.
- *               Goes false once the declaration ages past `maxAgeMs`, and that is
- *               deliberate: a stale declaration says nothing about what the
- *               session is doing NOW (it may well be inside one long verification
- *               run), so it must not be allowed to tighten the wedge bound.
+ * Returns { declared, advancing, declaredAt, reason, summary, items }:
+ *   advancing  — something the declaration names moved inside its freshness window.
+ *                Judged on the EVIDENCE alone, so it holds however old the
+ *                declaration is: an agent that is still committing is still
+ *                building, whatever the paperwork's timestamp says.
+ *   declared   — there is a CURRENT declaration, so its silence means something.
+ *                Goes false once the declaration ages past `maxAgeMs`, and that is
+ *                deliberate: a stale declaration says nothing about what the
+ *                session is doing NOW (it may well be inside one long verification
+ *                run), so it must not be allowed to tighten the wedge bound.
+ *   declaredAt — WHEN it was declared, passed through so `assessOwner` can ask the
+ *                second question the four-eyes review found missing (finding 1.1):
+ *                is this declaration still the owner's LAST WORD, or did the
+ *                session go on working after writing it? A heartbeat newer than
+ *                `declaredAt` answers that without any new notion of liveness.
  */
 export function assessOwnerWork({ declaration, lock, now, maxAgeMs = IN_FLIGHT_MAX_AGE_MS, ...probes } = {}) {
-  const out = (o) => ({ declared: false, advancing: false, reason: 'no-declaration', summary: '', items: [], ...o })
+  const out = (o) => ({
+    declared: false,
+    advancing: false,
+    declaredAt: null,
+    reason: 'no-declaration',
+    summary: '',
+    items: [],
+    ...o,
+  })
   if (!declaration || typeof declaration !== 'object' || typeof declaration.at !== 'number') return out({})
   if (!lock || typeof lock.sessionId !== 'string') return out({ reason: 'no-lock' })
 
@@ -257,22 +350,24 @@ export function assessOwnerWork({ declaration, lock, now, maxAgeMs = IN_FLIGHT_M
   })
   if (!owner.mine) return out({ reason: `not-owners:${owner.via}` })
 
-  const ageMs = now - declaration.at
+  const declaredAt = declaration.at
+  const ageMs = now - declaredAt
   // A declaration from the future is a clock this cannot reason about → the same
   // as an aged-out one: no bearing on the present.
   const current = ageMs >= 0 && ageMs <= maxAgeMs
 
   const evidence = Array.isArray(declaration.evidence) ? declaration.evidence : []
-  if (evidence.length === 0) return out({ declared: current, reason: 'no-evidence' })
+  if (evidence.length === 0) return out({ declared: current, declaredAt, reason: 'no-evidence' })
 
   const items = evidence.map((e) => checkEvidence(e, { now, ...probes }))
   const summary = items.map((i) => `${i.describe} — ${i.detail}`).join('; ')
   const answerable = items.filter((i) => !UNANSWERABLE_DETAILS.has(i.detail))
-  if (answerable.length === 0) return out({ declared: current, reason: 'unanswerable', summary, items })
+  if (answerable.length === 0) return out({ declared: current, declaredAt, reason: 'unanswerable', summary, items })
 
   const advancing = answerable.some((i) => i.ok)
   return out({
     declared: current,
+    declaredAt,
     advancing,
     reason: advancing ? 'advancing' : current ? 'no-progress' : 'expired',
     summary,
