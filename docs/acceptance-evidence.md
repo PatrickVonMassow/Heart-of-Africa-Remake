@@ -581,6 +581,18 @@ Verifiable (`scripts/verify/settings.mjs`,
   `scripts/verify/enrichments.mjs`: hidden -> lunge -> catch, the
   three family endings, the vanish -> deadline release, and lion-hunt
   independence, with screenshots 129/130.
+  WHAT "HIDDEN" AND "STRIKING" MEAN AS A MEASUREMENT (point 382): both
+  are read through `scripts/verify/animalShare.mjs` — the share of a
+  rect whose colour sits further from that frame's OWN water colour
+  than a fixed multiple of the water's OWN spread — so the verdict
+  survives any change of brightness, exposure, backend or zoom. Measured
+  over eight staged repeats: striking body 0.305-0.314 against its 0.10
+  bar, hidden body 0-0.00046 against 0.02, eye knobs 0.108-0.119 against
+  0.02, each water floor 0. The criterion is fed the HIDDEN frame as
+  well and asserted to say no, so the teeth are proven per run and not
+  merely claimed; the rule is pure-tested in `animalShare.test.mjs`. It
+  replaced an absolute channel delta against a hand-set 45 that read
+  44.2 and 44.6 in one evening on a picture nobody disputed.
   THE KILL GOES INTO THE WATER (point 383, user-reported from the
   deployed build): the seizure hands over to a DRAG leg — the
   crocodile hauls its catch back to the water it lunged from
