@@ -694,11 +694,24 @@ export function heartbeat(sessionId, opts = {}) {
   // outright rather than only outdating it. The comparison in assessOwner would
   // do the same, but an explicit delete also survives a clock stepped backwards
   // (four-eyes review, finding 1) and leaves an honest lock file behind.
+  //
+  // …UNLESS the work was part of ENDING (live finding 2, 28.07.2026): the Stop
+  // chain routinely sends a session back for a timestamp, a review record or a
+  // dashboard republish AFTER the boundary was taken, and each of those rounds
+  // silently un-took the handover — `HANDOVER point 378` at 08:56:12, `WITHDRAWN
+  // point 378` at 08:56:16. The caller decides (handoverSurvivesCall in
+  // batch-boundary-core.mjs); here the handover is carried forward by moving
+  // handedOverAt WITH claimedAt, so `claimedAt <= handedOverAt` still holds and
+  // nothing else in assessOwner needs to know about the exception.
   const next = { ...lock, v: 2, claimedAt: now }
   if (next.handedOver !== undefined || next.handedOverAt !== undefined) {
-    delete next.handedOver
-    delete next.handedOverAt
-    delete next.handoverPoint
+    if (opts.preserveHandover === true && next.handedOver === true) {
+      next.handedOverAt = now
+    } else {
+      delete next.handedOver
+      delete next.handedOverAt
+      delete next.handoverPoint
+    }
   }
   // Backfill the pid identity ONCE for a lock claimed before pids were
   // recorded — and never retry a failed walk on the hot per-tool-call path.
@@ -825,7 +838,20 @@ export function markHandover(sessionId, opts = {}) {
 export function withdrawHandover(sessionId, opts = {}) {
   const lockPath = opts.lockPath ?? LOCK_PATH
   const lock = readOwnerLock(lockPath)
-  if (!lock || lock.sessionId !== sessionId || lock.handedOver !== true) return false
+  if (!lock || lock.sessionId !== sessionId) return false
+  // THE MARKER GOES WITH THE FLAG (live finding 2). The marker used to be
+  // consumed by the stop it authorised, so a Stop guard that sent the session
+  // back to work left it with no marker and the next turn was met with "TAKE THE
+  // POINT BOUNDARY" again — a loop. It now survives its own use, which makes
+  // THIS the one place a boundary ends: real work withdraws it, closing work
+  // does not. Removed even when no handover flag is set, so a marker recorded
+  // and then followed by real work is withdrawn just the same.
+  try {
+    ;(opts.remove ?? rmSync)(opts.boundaryPath ?? statePathsFor(lockPath).boundaryPath, { force: true })
+  } catch {
+    /* best effort — a marker we cannot delete is caught by its own freshness */
+  }
+  if (lock.handedOver !== true) return false
   const next = { ...lock, claimedAt: opts.now ?? Date.now() }
   delete next.handedOver
   delete next.handedOverAt
@@ -846,6 +872,51 @@ export function withdrawHandover(sessionId, opts = {}) {
   } catch {
     /* best effort — the withdrawal itself has already landed */
   }
+  return true
+}
+
+/**
+ * Drop a boundary marker THIS session left behind (SessionEnd). Now that the
+ * marker survives the stop it authorised, the session's own end is what retires
+ * it — otherwise a successor would meet a foreign marker and be told a boundary
+ * was "claimed but REFUSED" for a point it had nothing to do with.
+ */
+export function clearOwnBoundary(sessionId, opts = {}) {
+  try {
+    const path = opts.boundaryPath ?? statePathsFor(opts.lockPath ?? LOCK_PATH).boundaryPath
+    const marker = readJson(path)
+    if (!marker || !sessionId || marker.sessionId !== sessionId) return false
+    ;(opts.remove ?? rmSync)(path, { force: true })
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** How stale a handover may get before a closing-set tool call refreshes it.
+ *  Throttles the write: the boundary's grace is a quarter of an hour wide, so
+ *  moving the stamp once a minute is ample, and every avoided write is one fewer
+ *  chance for the rename to lose (points 340/388). */
+export const HANDOVER_TOUCH_MS = 60 * 1000
+
+/**
+ * CARRY a handover forward across work that is part of ENDING the batch (live
+ * finding 2). Owner-guarded, a no-op unless the lock really is handed over, and
+ * throttled — it only rewrites the lock when the stamp has gone stale.
+ *
+ * It exists for the window `heartbeat` cannot cover: a PreToolUse hook runs
+ * BEFORE the call, and a closing-set call could otherwise sit through the whole
+ * grace with an ageing stamp before its PostToolUse heartbeat refreshes it.
+ */
+export function touchHandover(sessionId, opts = {}) {
+  const lockPath = opts.lockPath ?? LOCK_PATH
+  const lock = readOwnerLock(lockPath)
+  if (!lock || lock.sessionId !== sessionId || lock.handedOver !== true) return false
+  const now = opts.now ?? Date.now()
+  if (typeof lock.handedOverAt === 'number' && now - lock.handedOverAt < (opts.touchMs ?? HANDOVER_TOUCH_MS)) {
+    return false
+  }
+  writeJsonAtomic(lockPath, { ...lock, handedOverAt: now }, opts)
   return true
 }
 

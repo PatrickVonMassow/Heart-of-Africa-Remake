@@ -29,6 +29,8 @@ import {
   convertPendingSpawn,
   markHandover,
   withdrawHandover,
+  touchHandover,
+  clearOwnBoundary,
   wedgeNotifyDecision,
   wedgeOwnerKey,
   wedgeStage,
@@ -471,6 +473,77 @@ describe('acquire (atomic test-and-set on the real filesystem)', () => {
     expect(withdrawHandover('s1', { lockPath })).toBe(true)
     expect(readOwnerLock(lockPath).handedOver).toBeUndefined()
     expect(withdrawHandover('s1', { lockPath })).toBe(false) // nothing left to withdraw
+  })
+
+  // --- FINDING 2: what a taken boundary survives ------------------------------
+  it('closing work CARRIES the handover forward instead of withdrawing it', () => {
+    acquire('s1', opts())
+    const at = Date.now()
+    markHandover('s1', { lockPath, point: 388, now: at })
+    // The PostToolUse heartbeat after a dashboard republish: the session is
+    // finishing, not carrying on. `claimedAt <= handedOverAt` must still hold.
+    expect(heartbeat('s1', { lockPath, now: at + 5000, skipBackfill: true, preserveHandover: true })).toBe(true)
+    const lock = readOwnerLock(lockPath)
+    expect(lock.handedOver).toBe(true)
+    expect(lock.handedOverAt).toBe(at + 5000)
+    expect(lock.claimedAt).toBeLessThanOrEqual(lock.handedOverAt)
+    expect(assessOwner(lock, { now: at + 6000, bootTime: BOOT, probe: deadProbe }).reason).toBe('handed-over')
+  })
+
+  it('…and ordinary work still withdraws it — the safety invariant is untouched', () => {
+    acquire('s1', opts())
+    markHandover('s1', { lockPath, point: 388 })
+    heartbeat('s1', { lockPath, now: Date.now() + 5000, skipBackfill: true, preserveHandover: false })
+    expect(readOwnerLock(lockPath).handedOver).toBeUndefined()
+  })
+
+  it('touchHandover keeps the grace rolling through a long closing call, but throttles the write', () => {
+    acquire('s1', opts())
+    const at = Date.now()
+    markHandover('s1', { lockPath, point: 388, now: at })
+    expect(touchHandover('s1', { lockPath, now: at + 1000 })).toBe(false) // too soon to bother
+    expect(touchHandover('s1', { lockPath, now: at + 90_000 })).toBe(true)
+    expect(readOwnerLock(lockPath).handedOverAt).toBe(at + 90_000)
+    expect(touchHandover('s2', { lockPath, now: at + 200_000 })).toBe(false) // not the owner
+  })
+
+  it('touchHandover invents nothing: with no handover there is nothing to carry', () => {
+    acquire('s1', opts())
+    expect(touchHandover('s1', { lockPath })).toBe(false)
+    expect(readOwnerLock(lockPath).handedOver).toBeUndefined()
+  })
+
+  it('the withdrawal takes the MARKER with it — that is what ends a boundary now', () => {
+    const markerPath = join(dir, 'batch-boundary.json')
+    acquire('s1', opts())
+    markHandover('s1', { lockPath, point: 388 })
+    writeFileSync(markerPath, JSON.stringify({ v: 1, sessionId: 's1', point: 388, at: Date.now() }))
+    expect(withdrawHandover('s1', { lockPath })).toBe(true)
+    expect(existsSync(markerPath)).toBe(false)
+    // A marker recorded and then followed by real work goes too, handover or not.
+    writeFileSync(markerPath, JSON.stringify({ v: 1, sessionId: 's1', point: 388, at: Date.now() }))
+    expect(withdrawHandover('s1', { lockPath })).toBe(false) // no flag left to withdraw
+    expect(existsSync(markerPath)).toBe(false) // …and the marker is gone all the same
+  })
+
+  it('clearOwnBoundary retires only THIS session\'s marker at SessionEnd', () => {
+    const markerPath = join(dir, 'batch-boundary.json')
+    writeFileSync(markerPath, JSON.stringify({ v: 1, sessionId: 's1', point: 388, at: Date.now() }))
+    expect(clearOwnBoundary('s2', { boundaryPath: markerPath })).toBe(false)
+    expect(existsSync(markerPath)).toBe(true)
+    expect(clearOwnBoundary('s1', { boundaryPath: markerPath })).toBe(true)
+    expect(existsSync(markerPath)).toBe(false)
+    expect(clearOwnBoundary('s1', { boundaryPath: markerPath })).toBe(false) // nothing there
+  })
+
+  it('a STRANGER can neither withdraw the handover nor delete the marker', () => {
+    const markerPath = join(dir, 'batch-boundary.json')
+    acquire('s1', opts())
+    markHandover('s1', { lockPath, point: 388 })
+    writeFileSync(markerPath, JSON.stringify({ v: 1, sessionId: 's1', point: 388, at: Date.now() }))
+    expect(withdrawHandover('s2', { lockPath })).toBe(false)
+    expect(existsSync(markerPath)).toBe(true)
+    expect(readOwnerLock(lockPath).handedOver).toBe(true)
   })
 
   it('FINDING 3: the withdrawal is logged BESIDE the redirected lock, never in the repo', () => {

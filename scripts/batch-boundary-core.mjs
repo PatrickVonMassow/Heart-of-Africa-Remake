@@ -166,6 +166,104 @@ export function boundaryDueFrom({ tick, ownerSince, now, dueMs = BOUNDARY_DUE_MS
   return tick.point
 }
 
+// --- What ends a boundary, and what does not (live finding 2, 28.07.2026) -----
+//
+// Taking the boundary writes a marker and marks the lock handed over; any
+// further work withdraws it again, which is right in itself. But the Stop chain
+// ROUTINELY sends a session back to work AFTER the boundary is taken — a missing
+// timestamp, an unreviewed mechanism commit, a dashboard whose HEAD moved — and
+// each of those rounds silently un-took the handover. The log shows it to the
+// second: `HANDOVER point 378` at 08:56:12, `WITHDRAWN point 378` at 08:56:16.
+// A boundary that only survives a turn with nothing left to do is not a
+// mechanism, because finding something left to do is the Stop chain's purpose.
+//
+// So the withdrawal distinguishes work that CONTINUES the batch from work a Stop
+// guard DEMANDED: the marker survives edits confined to the CLOSING SET — the
+// board, the review ledger, the work order's own entry and the boundary's own
+// bookkeeping — and anything else withdraws it. Deliberately conservative: an
+// unrecognised tool, an unparseable command and a call with no target all
+// withdraw. A wrongly withdrawn boundary costs one command to re-take; a wrongly
+// KEPT one lets a successor spawn beside a working session, which is the
+// incident class this whole apparatus exists to prevent.
+
+/** Files whose modification is part of ENDING the batch, by basename. */
+export const CLOSING_SET_FILES = new Set([
+  'batch-dashboard.html',
+  'hoa-batch-dashboard.html',
+  '.batch-dashboard.html',
+  'dashboard-state.json',
+  'focus-check-pending.json',
+  'mechanism-reviews.jsonl',
+  'batch-boundary.json',
+  'batch-lock.json',
+  'boundary.log',
+  'tasks.md',
+  'tasks-archive.md',
+])
+
+/** Scripts that exist to SATISFY a Stop guard or to run the handover itself. */
+export const CLOSING_SET_SCRIPTS = [
+  'dashboard-publish',
+  'dashboard-sync',
+  'focus',
+  'board',
+  'mechanism-review',
+  'retro-refresh',
+  'batch-boundary',
+  'batch-handover-observe',
+  'batch-singleton',
+  'guard-preflight',
+]
+
+const CLOSING_SCRIPT_RE = new RegExp(`scripts[\\\\/](?:${CLOSING_SET_SCRIPTS.join('|')})\\.mjs`, 'i')
+
+export function isClosingSetPath(p) {
+  if (typeof p !== 'string' || !p.trim()) return false
+  const parts = p.replace(/\\/g, '/').toLowerCase().split('/')
+  return CLOSING_SET_FILES.has(parts[parts.length - 1])
+}
+
+/**
+ * A shell command counts only when EVERY one of its segments is a closing-set
+ * script (bare navigation is neutral). One `git commit` or one `npm test` in the
+ * chain is the session carrying on, whatever else rides along with it.
+ */
+export function isClosingSetCommand(command) {
+  if (typeof command !== 'string' || !command.trim()) return false
+  const segments = command
+    .split(/&&|\|\||[;|\n\r]+/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+  let sawClosing = false
+  for (const seg of segments) {
+    if (/^(?:cd|set-location|pushd|popd)\b/i.test(seg)) continue
+    const head = seg.match(/^(?:node|npx\s+node)\s+(?:"[^"]*"|'[^']*'|\S+)/i)
+    if (!head || !CLOSING_SCRIPT_RE.test(head[0])) return false
+    sawClosing = true
+  }
+  return sawClosing
+}
+
+/**
+ * Does a taken boundary SURVIVE this tool call? Pure; the caller supplies the
+ * PreToolUse/PostToolUse payload's tool name and target.
+ * Returns { survives, reason }.
+ */
+export function handoverSurvivesCall({ toolName, filePath, command } = {}) {
+  if (!String(toolName ?? '').trim()) return { survives: false, reason: 'unknown-tool' }
+  if (typeof command === 'string' && command.trim()) {
+    return isClosingSetCommand(command)
+      ? { survives: true, reason: 'closing-command' }
+      : { survives: false, reason: 'other-command' }
+  }
+  if (typeof filePath === 'string' && filePath.trim()) {
+    return isClosingSetPath(filePath)
+      ? { survives: true, reason: 'closing-file' }
+      : { survives: false, reason: 'other-file' }
+  }
+  return { survives: false, reason: 'no-target' }
+}
+
 /**
  * Should the recorded boundary be honoured, and if not, why? Returns
  *   'allow-boundary'  — end the session here; the launcher brings up the next one
