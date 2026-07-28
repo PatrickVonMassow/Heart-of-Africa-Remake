@@ -9,16 +9,12 @@ A single-player 3D remake of the 1985 exploration classic *The Heart of
 Africa* — Ozark Softscape's follow-up to *The Seven Cities of Gold* (1984) —
 built as a web application. You start in Cairo in 1890 with $250 and a journal,
 and travel across a geographically authentic Africa in search of a lost tomb:
-trading in port cities, offering culturally appropriate gifts to village chiefs,
-and decoding direction hints given in the regions' own language system.
+trading in port cities and decoding direction hints given in the regions' own language system.
 
 If you remember *The Seven Cities of Gold*, you know the DNA: the same design
 team, and the same loop of walking into an unmapped continent, watching the map
 fill itself in behind you, and getting along — or not — with the peoples who
 already live there. Where that game had the Americas, this one has Africa.
-
-This repository contains the **proof of concept**: the core gameplay loop end to
-end, not the complete game.
 
 ## Gameplay
 
@@ -46,14 +42,13 @@ end, not the complete game.
   researched seasonal calendar — the Sahel's humid-period rains, the
   harmattan's dust pall, the October Nile flood and the Okavango's inverted
   July flood, snow only on the peaks that really carried it — and the
-  inhabitants answer it as the period sources describe: exactly six peoples
+  inhabitants answer it as the period sources describe: six peoples
   put on a documented seasonal garment (rank-gated where the record says so),
   while for the rest the season shows in the fire, the market and who is
   away with the herds.
 - **Journal.** A chronicle that grows automatically with events and stores
   decoded hints, language-neutrally, re-rendered in the selected language.
-  Entries are written into the book stroke by stroke by an animated hand that
-  shows the writer's wounds. Every English entry can be read aloud in-browser
+  Every English entry can be read aloud in-browser
   via the Kokoro TTS model, with emotional voice markup shaping the delivery.
 - **Saving and controls.** Automatic checkpoints on every port visit with a
   tabular load overview.
@@ -152,11 +147,7 @@ scope, acceptance criteria and build rules.
 
 ## Status
 
-All 32 acceptance criteria of `CLAUDE.md` §7.1 are implemented; screenshot
-evidence lives in `verification/`. Known simplifications (e.g. no true water
-refraction, English-only journal read-aloud; screen-space reflections were
-integrated, found visually irrelevant for this game's camera and removed again)
-are recorded as open items in the code (`// OPEN:`) and in `TASKS.md`.
+This repository contains the **proof of concept**: the core gameplay loop is not fully developed.
 
 The full headless regression runs with `npm test` — a fast Vitest (jsdom) layer
 plus 15 Playwright browser suites; the test strategy and coverage map live in
@@ -179,7 +170,7 @@ concept, the design and the original score belongs to the people above.
 
 ### This remake
 
-Built by **Patrick von Massow**. Source code, assets and text in this
+Designed by **Patrick von Massow**. Source code, assets and text in this
 repository are original work unless noted otherwise.
 
 ### Data and libraries
