@@ -819,12 +819,13 @@ for (const [placeId, shot] of [
     site.colliders >= 4 && site.interactives === 0,
     JSON.stringify({ colliders: site.colliders, interactives: site.interactives }),
   )
-  // Stand back near the southern spawn, look north over the cluster, and shoot.
+  // Stand at the arrival standpoint, look north over the cluster, and shoot.
+  // The APPROACH distance, not the radius (point 390 widened the disc for the
+  // desert; the view of the pyramid row must not widen with it).
   await page.evaluate(() => {
     const p = window.__placePlayer
-    const r = window.__placeLayout?.radius ?? 60
     p.x = 0
-    p.z = r - 12
+    p.z = window.__placeLayout?.spawnZ ?? 50
     p.yaw = 0 // yaw 0 faces −Z (north), toward the pyramids
   })
   await page.waitForTimeout(1000)
@@ -1033,6 +1034,85 @@ for (const [placeId, shot] of [
       await page.waitForTimeout(600)
       shot++
       await frame(`141-giza-horizon-${shot}`, { place: 'giza', label: 'the Giza horizon from the site rim' })
+    }
+
+    // Point 390: the walkable sand must reach to where the PICTURE stops
+    // offering ground. The desert around the plateau runs unbroken to the
+    // horizon, so the old 60 m disc ended the world ~18 m past the outermost
+    // mass — the player met an invisible wall (or was thrown back to the
+    // bird's-eye view) while standing on the same sand that kept going.
+    //
+    // The exact radius is pinned in the Vitest layer (it is DERIVED from the
+    // §2.5 band); here only the live shape is asserted, plus the picture from
+    // the two standpoints the point asks for.
+    {
+      // Settle on the app's OWN clock (rendered frames), never a wall-clock
+      // sleep: the camera follows the teleport on the next frame and the
+      // temporal resolve needs a few more.
+      const settleFrames = (n) =>
+        page.evaluate(
+          (k) =>
+            new Promise((res) => {
+              let i = 0
+              const tick = () => (++i >= k ? res(true) : requestAnimationFrame(tick))
+              requestAnimationFrame(tick)
+            }),
+          n,
+        )
+      const geo = await page.evaluate(() => ({
+        radius: window.__placeLayout?.radius ?? 0,
+        spawnZ: window.__placeLayout?.spawnZ ?? 0,
+      }))
+      check(
+        'the Giza disc carries the open-plain radius and its own arrival distance (point 390)',
+        geo.radius > 90 && geo.spawnZ > 0 && geo.spawnZ < geo.radius - 20,
+        JSON.stringify(geo),
+      )
+      // At the walkable LIMIT the frame must still draw ground running outward:
+      // disc first, then the geometry backdrop — never the band or nothing.
+      // This is the standpoint the old disc turned into a wall in open sand.
+      await page.evaluate((r) => {
+        const p = window.__placePlayer
+        p.x = 0
+        p.z = r - 2
+        p.yaw = Math.PI // yaw π faces +Z (south), straight out of the site
+        p.pitch = 0
+      }, geo.radius)
+      await settleFrames(4)
+      const edgeGround = await page.evaluate(() => {
+        const cam = window.__placeCamera
+        const seq = []
+        for (let i = 0; i <= 60; i++) {
+          const t = ((-6 + i * 0.1) * Math.PI) / 180
+          const L = 3500
+          const h = window.__placeRayHit(
+            cam.position.x,
+            cam.position.y + Math.sin(t) * L,
+            cam.position.z + Math.cos(t) * L,
+          )
+          const name = h.hitDistance == null ? 'nothing' : h.hitName
+          if (seq[seq.length - 1] !== name) seq.push(name)
+        }
+        return seq
+      })
+      const discAt = edgeGround.indexOf('ground-disc')
+      check(
+        'from the walkable edge the ground runs on to the backdrop (point 390)',
+        discAt >= 0 && edgeGround[discAt + 1] === 'landscape-backdrop',
+        JSON.stringify(edgeGround),
+      )
+      await settleFrames(30)
+      await frame('390-giza-sand-edge', { place: 'giza', label: 'the open sand seen from the walkable edge' })
+      // And from the centre, looking out over the sand the player may now cross.
+      await page.evaluate(() => {
+        const p = window.__placePlayer
+        p.x = 0
+        p.z = 0
+        p.yaw = Math.PI
+        p.pitch = 0
+      })
+      await settleFrames(30)
+      await frame('390-giza-sand-centre', { place: 'giza', label: 'the open sand seen from the site centre' })
     }
   }
   await page.evaluate(() => window.__game.getState().leavePlace())
