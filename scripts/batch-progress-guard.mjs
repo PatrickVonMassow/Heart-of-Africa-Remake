@@ -58,14 +58,13 @@ import {
   readUnhandledAlert,
   progressGuardDecision,
   readOwnerLock,
-  release,
   BOUNDARY_LOG_PATH,
 } from './batch-singleton.mjs'
 import { gatherBoundary } from './batch-boundary.mjs'
 import { LAUNCHER_TASK_NAME } from './batch-boundary-core.mjs'
 import { gatherInFlight } from './batch-in-flight.mjs'
 import { describeInFlight } from './batch-in-flight-core.mjs'
-import { clearClaim, gatherClaim, gitOperationInProgress, markClaimReleased } from './batch-claim.mjs'
+import { clearClaim, gatherClaim, gitOperationInProgress, handBackToClaimant } from './batch-claim.mjs'
 import { describeClaim, releaseDecision, reservationDecision } from './batch-claim-core.mjs'
 import { isPaused } from './batch-lock.mjs'
 
@@ -259,18 +258,17 @@ try {
     // The claim is stamped rather than deleted, so `--status` in the other window
     // can say the batch is waiting for it, and the launcher keeps standing down
     // until it is taken or the claim expires.
+    // Release, then stamp the claim ONLY if the release actually happened — the
+    // stamp says "the batch is waiting for you", so it is never written on the
+    // word of a session that freed nothing. Both lines live in handBackToClaimant
+    // so the pairing is testable.
     const who = describeClaim(claimInfo)
-    let released = false
-    try {
-      released = release(sid)
-      markClaimReleased(claimInfo.claim, { by: sid })
-    } catch {
-      released = false
-    }
+    const { released } = handBackToClaimant(sid, claimInfo.claim)
     record(
       released
         ? `RELEASED to ${claimInfo.claimantSid} by ${sid} — the batch was claimed back into the user's window.`
-        : `RELEASE FAILED for ${claimInfo.claimantSid} by ${sid} — the lock is unchanged and still held.`,
+        : `RELEASE SKIPPED for ${claimInfo.claimantSid} by ${sid} — the lock does not name this session (already ` +
+            `released, taken over, or gone), so nothing was released here.`,
     )
     warn(
       released
@@ -278,9 +276,11 @@ try {
             `merge half-done), so the batch lock was RELEASED. You are no longer the batch worker: do not start ` +
             `another point, do not merge to main, do not edit TASKS.md or the dashboard. The claiming window ` +
             `takes it with \`node scripts/batch-claim.mjs --session <its id>\`. This turn may end.`
-        : `THE RELEASE DID NOT HAPPEN. ${who} claimed the batch and this stop is allowed, but the lock could ` +
-            `NOT be released, so that window will keep waiting. Release it by hand: ` +
-            `\`node scripts/batch-singleton.mjs release\`.`,
+        : `NOTHING WAS RELEASED HERE. ${who} claimed the batch and this stop is allowed, but the lock does not ` +
+            `name this session — it was already released, has been taken over, or is gone — so there was ` +
+            `nothing for this session to hand back. Either way you are NOT the batch worker: do not start ` +
+            `another point. Check with \`node scripts/batch-claim.mjs --status\`; if a stale lock is still ` +
+            `there, release it by hand (\`node scripts/batch-singleton.mjs release\`).`,
     )
     process.exit(0)
   }

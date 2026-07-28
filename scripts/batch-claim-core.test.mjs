@@ -43,6 +43,7 @@ import {
   clearClaim,
   gatherClaim,
   gitOperationInProgress,
+  handBackToClaimant,
   markClaimReleased,
   maxAgeMs,
   readClaim,
@@ -449,6 +450,63 @@ describe('classifyParallel — an announced claimant is not a rogue second sessi
     // …and an empty or junk exclusion changes nothing.
     expect(classifyParallel({ ...inputs, exclude: [] }).map((p) => p.sid)).toEqual([CLAIMANT])
     expect(classifyParallel({ ...inputs, exclude: ['', null] }).map((p) => p.sid)).toEqual([CLAIMANT])
+  })
+})
+
+// ---------------------------------------------------------------------------
+// The stamp on a claim says "the batch was freed for you, come and take it". A
+// session that did not free anything must not say it: `release` answers false
+// whenever the lock does not name the caller — already released, taken over, or
+// gone — and the stamp used to be written regardless.
+describe('handBackToClaimant — the claim is stamped only where a release really happened', () => {
+  const withState = (fn) => {
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-claim-handback-'))
+    const lockPath = join(dir, 'batch-lock.json')
+    const claimPath = statePathsFor(lockPath).claimPath
+    try {
+      writeClaim(claimOf(), claimPath)
+      return fn({ lockPath, claimPath })
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  }
+
+  it('releases the lock it owns and stamps the claim', () => {
+    withState(({ lockPath, claimPath }) => {
+      expect(acquire(OWNER, { lockPath, pid: process.pid, pidStartedAt: NOW, sweep: false })).toBe('acquired')
+      expect(handBackToClaimant(OWNER, readClaim(claimPath), { lockPath, now: 555 })).toEqual({
+        released: true,
+        stamped: true,
+      })
+      expect(existsSync(lockPath)).toBe(false)
+      expect(readClaim(claimPath)).toMatchObject({ releasedAt: 555, releasedBy: OWNER })
+    })
+  })
+
+  it('stamps NOTHING when the lock names somebody else — no release, no promise', () => {
+    withState(({ lockPath, claimPath }) => {
+      acquire('some-other-session', { lockPath, pid: process.pid, pidStartedAt: NOW, sweep: false })
+      expect(handBackToClaimant(OWNER, readClaim(claimPath), { lockPath, now: 555 })).toEqual({
+        released: false,
+        stamped: false,
+      })
+      // The other session's lock is untouched, and the claim still reads as
+      // PENDING rather than as one that is waiting to be picked up.
+      expect(JSON.parse(readFileSync(lockPath, 'utf8')).sessionId).toBe('some-other-session')
+      expect(readClaim(claimPath).releasedAt).toBe(undefined)
+      expect(describeClaim(asOwner(readClaim(claimPath)))).not.toContain('already released')
+    })
+  })
+
+  it('stamps NOTHING when there is no lock left to release', () => {
+    withState(({ lockPath, claimPath }) => {
+      expect(existsSync(lockPath)).toBe(false)
+      expect(handBackToClaimant(OWNER, readClaim(claimPath), { lockPath })).toEqual({
+        released: false,
+        stamped: false,
+      })
+      expect(readClaim(claimPath).releasedAt).toBe(undefined)
+    })
   })
 })
 

@@ -30,6 +30,7 @@ import {
   ourClaudeProcess,
   probePid,
   readOwnerLock,
+  release,
   statePathsFor,
   assessOwner,
   bootTimeMs,
@@ -161,6 +162,32 @@ export function markClaimReleased(claim, { path = CLAIM_PATH, now = Date.now(), 
   } catch {
     return false
   }
+}
+
+/**
+ * HAND THE BATCH BACK to the claiming window: release the lock, and stamp the
+ * claim ONLY if that release actually happened.
+ *
+ * The order matters and so does the gate. `release` answers false when the lock
+ * does not name this session — already released, taken over, or gone — and a
+ * stamp written anyway tells the claiming window "the batch was freed for you"
+ * on the word of a session that freed nothing. The two lines live together here
+ * rather than in the Stop guard so the pairing is testable at all.
+ *
+ * Returns { released, stamped }; never throws — this runs inside a guard.
+ */
+export function handBackToClaimant(
+  sid,
+  claim,
+  { lockPath = LOCK_PATH, path = statePathsFor(lockPath).claimPath, now = Date.now() } = {},
+) {
+  let released = false
+  try {
+    released = release(sid, lockPath) === true
+  } catch {
+    released = false
+  }
+  return { released, stamped: released ? markClaimReleased(claim, { path, now, by: sid }) : false }
 }
 
 // --- CLI -----------------------------------------------------------------------
