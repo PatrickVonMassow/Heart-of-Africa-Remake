@@ -34,6 +34,7 @@ import {
   wedgeNotifyDecision,
   wedgeOwnerKey,
   wedgeStage,
+  wedgeAction,
   sweepableTmpFiles,
   resolveOwnership,
   ourClaudeProcess,
@@ -53,6 +54,9 @@ import {
   PARALLEL_FRESH_MS,
   HANDOVER_GRACE_MS,
   WEDGE_NOTIFY_MS,
+  LAUNCHER_TICK_MS,
+  WORK_STALL_TICKS,
+  WORK_STALL_MS,
 } from './batch-singleton.mjs'
 
 const NOW = 1_784_900_000_000
@@ -231,6 +235,101 @@ describe('assessOwner (liveness = heartbeat AND real pid, never age alone)', () 
     }
   })
 
+  // --- PROGRESS, NOT AGE (point 402) ----------------------------------------
+  // Four sessions were killed in one afternoon for doing exactly what they were
+  // told to do: delegate a point and wait for it. The runtime shot them at ten
+  // minutes; the launcher could not tell the corpse from the worker either, since
+  // age was the only thing it measured. These pin the input that replaced the
+  // clock — what the owner DECLARED it is waiting on, already probed.
+  const advancing = { declared: true, advancing: true, summary: 'branch feat/402-x — tip 3 min old' }
+  const frozen = { declared: true, advancing: false, summary: 'branch feat/402-x — no commit for 41 min' }
+  const stale = NOW - WORK_STALL_MS - 60_000
+
+  it('a stale heartbeat whose declared agent still COMMITS reads alive, never wedged', () => {
+    const a = assessOwner(lock({ claimedAt: stale }), { now: NOW, bootTime: BOOT, probe: aliveProbe, work: advancing })
+    expect(a).toMatchObject({ alive: true, wedged: false, reason: 'work-advancing' })
+    expect(spawnDecision(a)).toBe('skip-alive')
+  })
+
+  it('…however long it takes: even past the four-hour valve, moving work is alive', () => {
+    const a = assessOwner(lock({ claimedAt: NOW - WEDGED_MS - 60_000 }), {
+      now: NOW,
+      bootTime: BOOT,
+      probe: aliveProbe,
+      work: advancing,
+    })
+    expect(a).toMatchObject({ alive: true, wedged: false, reason: 'work-advancing' })
+  })
+
+  it('THE ONLY BOUND LEFT: the same silence with every probe quiet is WEDGED after two launcher ticks', () => {
+    const a = assessOwner(lock({ claimedAt: stale }), { now: NOW, bootTime: BOOT, probe: aliveProbe, work: frozen })
+    expect(a).toMatchObject({ alive: true, wedged: true, reason: 'work-stalled' })
+    expect(spawnDecision(a)).toBe('skip-wedged')
+    expect(WORK_STALL_MS).toBe(WORK_STALL_TICKS * LAUNCHER_TICK_MS)
+    expect(WORK_STALL_MS).toBeLessThan(WEDGED_MS) // it notices hours earlier than the old valve
+  })
+
+  it('inside the stall window nothing is accused — the pre-402 verdict stands', () => {
+    const a = assessOwner(lock({ claimedAt: NOW - WORK_STALL_MS + 60_000 }), {
+      now: NOW,
+      bootTime: BOOT,
+      probe: aliveProbe,
+      work: frozen,
+    })
+    expect(a).toMatchObject({ alive: true, wedged: false, reason: 'pid-alive' })
+  })
+
+  it('A DEAD PID STAYS DEAD whatever the evidence says', () => {
+    const a = assessOwner(lock({ claimedAt: stale }), { now: NOW, bootTime: BOOT, probe: deadProbe, work: advancing })
+    expect(a).toMatchObject({ alive: false, reason: 'pid-dead' })
+    // …and so does a REUSED one, and a heartbeat from before the boot.
+    const reused = assessOwner(lock({ claimedAt: stale }), {
+      now: NOW,
+      bootTime: BOOT,
+      probe: { exists: true, startedAt: NOW - 10_000 },
+      work: advancing,
+    })
+    expect(reused).toMatchObject({ alive: false, reason: 'pid-reused' })
+    const preboot = assessOwner(lock({ claimedAt: BOOT - 60_000 }), {
+      now: NOW,
+      bootTime: BOOT,
+      probe: aliveProbe,
+      work: advancing,
+    })
+    expect(preboot).toMatchObject({ alive: false, reason: 'heartbeat-predates-boot' })
+  })
+
+  it('a declaration no probe can answer is no evidence — it neither saves nor is required to', () => {
+    // `assessOwnerWork` reports that shape as declared-but-not-advancing, which is
+    // exactly a stall: unanswerable is treated as no evidence, never as proof.
+    const unanswerable = { declared: true, advancing: false, summary: 'vibes (the agent is surely fine) — unknown-kind' }
+    expect(assessOwner(lock({ claimedAt: stale }), { now: NOW, bootTime: BOOT, probe: aliveProbe, work: unanswerable }))
+      .toMatchObject({ wedged: true, reason: 'work-stalled' })
+  })
+
+  it('NO declaration → the pre-402 behaviour exactly (a long verify run is not a stall)', () => {
+    const none = { declared: false, advancing: false, summary: '' }
+    for (const work of [null, undefined, none]) {
+      const a = assessOwner(lock({ claimedAt: stale }), { now: NOW, bootTime: BOOT, probe: aliveProbe, work })
+      expect(a).toMatchObject({ alive: true, wedged: false, reason: 'pid-alive' })
+    }
+  })
+
+  it('a stale declaration proves progress but cannot tighten the bound (declared false, advancing true)', () => {
+    const agedButMoving = { declared: false, advancing: true, summary: 'branch feat/402-x — tip 2 min old' }
+    expect(assessOwner(lock({ claimedAt: stale }), { now: NOW, bootTime: BOOT, probe: aliveProbe, work: agedButMoving }))
+      .toMatchObject({ alive: true, wedged: false, reason: 'work-advancing' })
+  })
+
+  it('a LEGACY lock (no pid) is likewise kept alive by moving work', () => {
+    const legacy = { sessionId: 's', claimedAt: NOW - LEGACY_STALE_MS - 60_000 }
+    expect(assessOwner(legacy, { now: NOW, bootTime: BOOT, probe: null }).reason).toBe('legacy-stale')
+    expect(assessOwner(legacy, { now: NOW, bootTime: BOOT, probe: null, work: advancing })).toMatchObject({
+      alive: true,
+      reason: 'work-advancing',
+    })
+  })
+
   it('a CRASH and a WEDGE still hold the lock — only a taken boundary hands it over', () => {
     const crashed = assessOwner(lock({ claimedAt: NOW - 30 * 60_000 }), { now: NOW, bootTime: BOOT, probe: aliveProbe })
     expect(crashed.alive).toBe(true)
@@ -380,6 +479,57 @@ describe('spawnDecision (scenario 2 + 4: the launcher path)', () => {
   it('post-reboot, owner never came back (pre-boot heartbeat, dead pid) → spawn', () => {
     const a = assessOwner({ sessionId: 'gone', claimedAt: NOW - 60 * 60_000, pid: 4242, pidStartedAt: null }, { now: NOW, bootTime: NOW - 30 * 60_000, probe: deadProbe })
     expect(spawnDecision(a)).toBe('spawn')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// WHAT A WEDGE EARNS (point 402 (d)). Two kinds reach the launcher and they are
+// not the same finding: a `work-stalled` verdict is positive evidence that
+// nothing is moving, while the four-hour valve is still only a clock reading. The
+// rule that binds both is older than either: the launcher only ever kills a
+// process it spawned itself.
+describe('wedgeAction (the launcher’s consequence for a wedged owner)', () => {
+  const stalled = { alive: true, wedged: true, reason: 'work-stalled' }
+  const aged = { alive: true, wedged: true, reason: 'pid-alive' }
+
+  it('a stall in the launcher’s OWN spawn → urgent signal, reap, take over', () => {
+    expect(wedgeAction({ assessment: stalled, lock: { pid: 900 }, lastSpawnPid: 900 })).toMatchObject({
+      stalled: true,
+      own: true,
+      notify: 'urgent',
+      kill: true,
+      takeover: true,
+    })
+  })
+
+  it('a stall in an INTERACTIVE window → signal only; nothing is ever killed there', () => {
+    expect(wedgeAction({ assessment: stalled, lock: { pid: 901 }, lastSpawnPid: 900 })).toMatchObject({
+      stalled: true,
+      own: false,
+      notify: 'urgent',
+      kill: false,
+      takeover: false,
+    })
+  })
+
+  it('the four-hour valve keeps its pre-402 consequence: reap our own, never take over in the same tick', () => {
+    expect(wedgeAction({ assessment: aged, lock: { pid: 900 }, lastSpawnPid: 900 })).toMatchObject({
+      stalled: false,
+      notify: null,
+      kill: true,
+      takeover: false,
+    })
+    expect(wedgeAction({ assessment: aged, lock: { pid: 901 }, lastSpawnPid: 900 })).toMatchObject({
+      kill: false,
+      takeover: false,
+    })
+  })
+
+  it('a lock without a pid, or no previous spawn, is never ours to reap', () => {
+    expect(wedgeAction({ assessment: stalled, lock: {}, lastSpawnPid: 0 }).kill).toBe(false)
+    expect(wedgeAction({ assessment: stalled, lock: { pid: 0 }, lastSpawnPid: 0 }).kill).toBe(false)
+    expect(wedgeAction({ assessment: stalled, lock: { pid: 900 }, lastSpawnPid: undefined }).kill).toBe(false)
+    expect(wedgeAction({}).kill).toBe(false)
   })
 })
 

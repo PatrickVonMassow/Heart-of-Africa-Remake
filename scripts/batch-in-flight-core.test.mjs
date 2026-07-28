@@ -21,6 +21,7 @@ import {
   LOG_FRESH_MS,
   WORK_FRESH_MS,
   assessInFlight,
+  assessOwnerWork,
   checkEvidence,
   describeInFlight,
 } from './batch-in-flight-core.mjs'
@@ -411,5 +412,95 @@ describe('the declaration file is derived from the caller’s lock path', () => 
     expect(maxAgeMs({ HOA_IN_FLIGHT_MAX_MIN: '20' })).toBe(20 * 60 * 1000)
     expect(maxAgeMs({ HOA_IN_FLIGHT_MAX_MIN: 'nonsense' })).toBe(IN_FLIGHT_MAX_AGE_MS)
     expect(maxAgeMs({ HOA_IN_FLIGHT_MAX_MIN: '-5' })).toBe(IN_FLIGHT_MAX_AGE_MS)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// THE LAUNCHER'S QUESTION, WHICH IS NOT THE GUARD'S (point 402, 28.07.2026).
+//
+// `assessInFlight` decides whether a session may end its turn, so it demands that
+// ALL the declared work still holds. The launcher decides whether a silent owner
+// is working or wedged, and for that the right question is whether ANY of it is
+// still moving: a session with three agents out and two of them finished is
+// plainly alive, and shooting it is what killed four sessions in one afternoon.
+describe('assessOwnerWork — is the OWNER’s declared work still advancing?', () => {
+  const lock = (over = {}) => ({ sessionId: SID, claimedAt: NOW - 40 * 60_000, pid: PID, pidStartedAt: PID_STARTED, ...over })
+  const work = (declOver = {}, probeOver = {}, over = {}) =>
+    assessOwnerWork({ declaration: declaration(declOver), lock: lock(), now: NOW, ...probes(probeOver), ...over })
+
+  it('a branch tip that moved inside the window is PROGRESS', () => {
+    expect(work()).toMatchObject({ declared: true, advancing: true, reason: 'advancing' })
+  })
+
+  it('ONE live piece is enough — a finished agent beside a running one is not a stall', () => {
+    // The pid has exited (that agent is done); the branch still commits.
+    expect(work({}, { probePid: () => dead() })).toMatchObject({ advancing: true })
+    // …whereas the guard, asking its own stricter question, blocks on exactly this.
+    expect(assess({}, { probePid: () => dead() })).toMatchObject({ live: false, reason: 'evidence-gone' })
+  })
+
+  it('every probe silent → NOT advancing, and the summary names what went quiet', () => {
+    const a = work({}, { probePid: () => dead(), refTipAt: () => NOW - 60 * 60_000 })
+    expect(a).toMatchObject({ declared: true, advancing: false, reason: 'no-progress' })
+    expect(a.summary).toMatch(/no commit for 60 min/)
+    expect(a.summary).toMatch(/process-gone/)
+  })
+
+  it('work that NO PROBE CAN ANSWER is treated as no evidence, never as proof', () => {
+    const a = work({ evidence: [{ kind: 'vibes', label: 'the agent is surely fine' }] })
+    expect(a).toMatchObject({ advancing: false, reason: 'unanswerable' })
+    // …and an unanswerable item neither blocks nor carries an answerable one: the
+    // decision is made on what CAN be checked.
+    const mixed = work({ evidence: [{ kind: 'vibes' }, { kind: 'branch', ref: 'feat/389-a' }] })
+    expect(mixed).toMatchObject({ advancing: true, reason: 'advancing' })
+  })
+
+  it('an empty or malformed declaration says nothing', () => {
+    expect(work({ evidence: [] })).toMatchObject({ advancing: false, reason: 'no-evidence' })
+    expect(assessOwnerWork({ declaration: null, lock: lock(), now: NOW })).toMatchObject({ reason: 'no-declaration' })
+    expect(assessOwnerWork({ declaration: { sessionId: SID }, lock: lock(), now: NOW })).toMatchObject({
+      reason: 'no-declaration',
+    })
+    expect(assessOwnerWork({ declaration: declaration(), lock: null, now: NOW })).toMatchObject({ reason: 'no-lock' })
+  })
+
+  it('only the LOCK OWNER’s declaration counts — a stranger’s proves nothing', () => {
+    const a = assessOwnerWork({
+      declaration: declaration({ sessionId: 'someone-else', pid: 5, pidStartedAt: 1 }),
+      lock: lock(),
+      now: NOW,
+      ...probes(),
+    })
+    expect(a.advancing).toBe(false)
+    expect(a.reason).toMatch(/^not-owners:/)
+  })
+
+  it('…but a session id renamed by a COMPACTION still owns it, resolved on the process', () => {
+    const a = assessOwnerWork({
+      declaration: declaration({ sessionId: 'pre-compaction' }),
+      lock: lock({ sessionId: 'post-compaction' }),
+      now: NOW,
+      ...probes(),
+    })
+    expect(a).toMatchObject({ advancing: true, declared: true })
+  })
+
+  it('AN AGED DECLARATION STILL PROVES PROGRESS, but no longer licenses a stall verdict', () => {
+    // The asymmetry is the whole design: evidence recency decides "is it moving"
+    // (an agent that is still committing is still building, whatever the
+    // paperwork's timestamp says), while only a CURRENT declaration may tighten
+    // the wedge bound — a stale one says nothing about what the session is doing
+    // now, and it may well be inside one long verification run.
+    const old = { at: NOW - IN_FLIGHT_MAX_AGE_MS - 60_000 }
+    expect(work(old)).toMatchObject({ advancing: true, declared: false })
+    expect(work(old, { probePid: () => dead(), refTipAt: () => null })).toMatchObject({
+      advancing: false,
+      declared: false,
+      reason: 'expired',
+    })
+  })
+
+  it('a declaration from the FUTURE is a clock this cannot reason about → not current', () => {
+    expect(work({ at: NOW + 60_000 })).toMatchObject({ declared: false })
   })
 })
