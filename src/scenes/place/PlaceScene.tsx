@@ -68,12 +68,15 @@ import {
   buildElephantParts,
   buildGiraffeParts,
   buildZebraParts,
+  footBodyOffset,
+  footHeight,
   gaitBodyLift,
   gaitPhase,
   gaitRig,
   groundPitch,
   isStance,
   legSwingAngle,
+  seatFootOnGround,
   type GoatLeg,
 } from '../../render/fauna'
 import { REGION_PLACE_STYLES, type RegionPlaceStyle } from './regionStyles'
@@ -1338,9 +1341,10 @@ function PanoramaWildlife({
       // higher of this spot's relief and the ground line over the town's disc
       // edge, seen from the live camera — never the hard EYE_HEIGHT horizon at
       // infinity, which left them hanging over the captured band's content.
-      // Point 300: sampled under the animal's OWN front and back feet rather
-      // than once under its centre, so a body on a dune pitches with the slope
-      // instead of holding a level plane with one foot pair in the air.
+      // Point 300: sampled under the animal's OWN front and back hips rather
+      // than once under its centre, so a body on a dune lies along the slope
+      // instead of holding a level plane. That fit is the body's POSE; what
+      // actually plants the feet is the per-foot seating in the leg loop below.
       const half = (it.rig.wheelbase * it.scale) / 2
       const fx = Math.sin(yaw) * half
       const fz = Math.cos(yaw) * half
@@ -1381,7 +1385,8 @@ function PanoramaWildlife({
         // it is, while a wall-clock bob would advance them all alike regardless
         // of speed. `drop`/`pitch`/`frontY`/`backY` carry the point-300 footing:
         // how far the body dipped onto its stance leg and how it lies on the
-        // slope under its own wheelbase.
+        // slope under its own wheelbase — and `stretch` (below) the reach the
+        // tracked leg needed on top of that fit to stand on its own ground.
         info[i] = { y, visibleY: groundY, apparentDeg: it.apparentDeg, hazeLum: it.hazeLum, azimuth, visible: !hidden, x, z, yaw, radius: it.radius, worldHeight: it.worldHeight, gait: phase, gaitSpeed: Math.abs(it.radius * it.drift) / (it.scale > 0 ? it.scale : 1), cadence: it.rig.cadence, stride: it.rig.stride * it.scale, drop: -lift, pitch, frontY, backY, stance: isStance(phase + it.parts.legs[0].phaseOffset) }
       }
       g.position.set(x, y, z)
@@ -1392,12 +1397,34 @@ function PanoramaWildlife({
       g.rotation.order = 'YXZ'
       g.rotation.y = yaw
       g.rotation.x = pitch
-      // The stride itself: diagonal legs swing in antiphase about their hips.
+      // The stride itself: diagonal legs swing in antiphase about their hips —
+      // and each foot is then seated on the ground drawn under ITS OWN spot
+      // (point 300). The body pitch above is a two-sample fit over the
+      // wheelbase, but the compressed backdrop relief is not locally linear and
+      // a foot's ground spot lies up to half a stride outside that span, so the
+      // fit alone left feet hanging (measured: 23 % of stance frames over the
+      // 5 %-of-body-height gate). One terrain sample per foot — the same query
+      // the backdrop mesh itself is built from — pins each planted foot to its
+      // ground and lets each swinging one ride its own clearance above it.
       const legs = legRefs.current[i]
       if (legs) {
         for (let li = 0; li < it.parts.legs.length; li++) {
           const lg = legs[li]
-          if (lg) lg.rotation.x = legSwingAngle(phase, it.parts.legs[li].phaseOffset)
+          if (!lg) continue
+          const leg = it.parts.legs[li]
+          const swing = legSwingAngle(phase, leg.phaseOffset)
+          const off = footBodyOffset(leg.hip, swing, it.rig.legLength, yaw, pitch, it.scale)
+          // Where this foot BELONGS: on its own ground, plus the clearance the
+          // gait gives it (exactly zero through stance, so a planted foot
+          // touches), and re-aimed rather than merely lowered so its ground spot
+          // does not move — a foot dragged fore/aft would be skating again.
+          const standY =
+            panoramaStandY(x + off[0], z + off[2], lat, lon, seed, centerH, innerRadius, camX, camZ, EYE_HEIGHT) -
+            pw.sinkEpsilon
+          const targetY = standY + footHeight(phase, leg.phaseOffset, it.rig.legLength) * it.scale
+          const seat = seatFootOnGround(swing, it.rig.legLength, targetY - (y + off[1]), pitch, it.scale)
+          lg.rotation.x = seat.angle
+          lg.scale.y = seat.stretch
         }
         if (import.meta.env.DEV) {
           // The live no-skate probe (point 300) reads leg 0's foot straight out
@@ -1406,10 +1433,14 @@ function PanoramaWildlife({
           const w = window as unknown as Record<string, unknown>
           const info = (w.__placePanoramaWildlifeInfo ?? {}) as Record<string, Record<string, unknown>>
           if (lg && info[i]) {
+            // Read through the leg group's OWN matrix, so the seating (its
+            // angle and its telescoping reach, `scale.y`) is included exactly as
+            // the renderer applies it.
             const foot = footProbe.set(0, -it.rig.legLength, 0)
             lg.updateWorldMatrix(true, false)
             lg.localToWorld(foot)
             info[i].foot = { x: foot.x, y: foot.y, z: foot.z }
+            info[i].stretch = lg.scale.y
             // How far the foot sits off the ground DRAWN under it — the
             // point-300 slope gate: a planted foot on a dune must touch, not
             // hover over, the incline it stands on.

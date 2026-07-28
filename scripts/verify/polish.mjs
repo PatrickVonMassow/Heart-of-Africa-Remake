@@ -454,8 +454,9 @@ const stepUntil = async (ready, arg = null, capFrames = 240) => {
   }, 'settlement walker (goat)')
 }
 // Point 300, slope footing: a silhouette on a dune must lie ON the incline —
-// its body pitched over its own wheelbase — so the planted foot touches the
-// ground drawn under it instead of hovering above it. Measured as the vertical
+// its body pitched over its own wheelbase, and each foot then seated on the
+// ground under ITS OWN spot — so the planted foot touches the ground drawn
+// under it instead of hovering above it. Measured as the vertical
 // gap between the tracked foot and that ground, in units of the animal's own
 // height, and specifically on the silhouettes standing on a genuinely SLOPED
 // spot (front and back footing differ).
@@ -474,6 +475,7 @@ const stepUntil = async (ready, arg = null, capFrames = 240) => {
           h: w.worldHeight,
           slope: Math.abs((w.frontY ?? 0) - (w.backY ?? 0)),
           pitch: w.pitch,
+          stretch: w.stretch,
         })),
     )
   let feet = await readFeet()
@@ -488,7 +490,7 @@ const stepUntil = async (ready, arg = null, capFrames = 240) => {
     feet.length >= 1
       ? `foot gap / body height [${rel.map((r) => r.toFixed(3)).join(', ')}], slope over the wheelbase [${feet
           .map((f) => f.slope.toFixed(2))
-          .join(', ')}]`
+          .join(', ')}], leg reach [${feet.map((f) => (f.stretch ?? 1).toFixed(2)).join(', ')}]`
       : 'MEASURED NOTHING — no visible silhouette had its tracked leg in stance within the frame cap',
   )
   check(

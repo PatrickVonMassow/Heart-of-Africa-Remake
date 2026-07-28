@@ -244,6 +244,85 @@ export function groundPitch(frontY: number, backY: number, wheelbase: number, ma
 }
 
 /**
+ * World-space offset from a body's origin (its ground point) to one leg's FOOT,
+ * for a body at the given yaw/pitch/uniform scale (point 300).
+ *
+ * The leg hangs from `hip` and swings about it by `swingAngle`, so in the body's
+ * own frame the foot sits at hip + (0, −L·cos θ, −L·sin θ); the body's YXZ
+ * rotation (yaw, then the ground pitch) and its scale carry that to world. This
+ * is the spot the ground under a foot must be sampled at — the renderer would
+ * otherwise have to compose a matrix per leg just to ask where its foot is.
+ */
+export function footBodyOffset(
+  hip: readonly [number, number, number],
+  swingAngle: number,
+  legLength: number,
+  yaw: number,
+  pitch: number,
+  scale: number,
+): [number, number, number] {
+  const lx = hip[0]
+  const ly = hip[1] - legLength * Math.cos(swingAngle)
+  const lz = hip[2] - legLength * Math.sin(swingAngle)
+  const cp = Math.cos(pitch)
+  const sp = Math.sin(pitch)
+  const py = ly * cp - lz * sp
+  const pz = ly * sp + lz * cp
+  const cy = Math.cos(yaw)
+  const sy = Math.sin(yaw)
+  return [scale * (lx * cy + pz * sy), scale * py, scale * (-lx * sy + pz * cy)]
+}
+
+/** A leg re-aimed and re-reached to put its foot on a given spot. */
+export interface LegSeating {
+  /** Hip angle (rad about the body's local x) to draw the leg at. */
+  angle: number
+  /** Factor on the leg's own length — the telescoping reach to the ground. */
+  stretch: number
+}
+
+/**
+ * Seat one foot on the ground drawn under IT (point 300): re-aim and re-reach
+ * the leg so the foot rises by `worldRise` world units WITHOUT moving off its
+ * ground spot.
+ *
+ * Pitching the body to the slope under its wheelbase (`groundPitch`) is only a
+ * two-sample fit, and the compressed panorama backdrop is not locally linear —
+ * measured live, 23 % of stance frames still hung a foot more than 5 % of the
+ * body's height off the ground, worst case 25 %, because the tracked foot's own
+ * ground spot lies up to half a stride outside the span those two samples cover.
+ * A rigid leg cannot fix that: lengthening it alone would drag the foot fore/aft
+ * (it swings on an arc) and reintroduce the skating this point removed. So the
+ * correction is solved as the leg VECTOR — the foot displaced purely vertically
+ * in world, the hip angle and the leg's reach read back off the result. The
+ * foot's ground spot is therefore untouched by construction, and the body keeps
+ * the pitch and the stance dip as its visual fit.
+ *
+ * Deliberately unbounded: a cap would be a hovering foot again, which is the
+ * one thing this must not produce. Where the miniature relief is steep the leg
+ * reaches further, which at horizon distance is a sub-pixel difference — a foot
+ * off the ground is not.
+ */
+export function seatFootOnGround(
+  swingAngle: number,
+  legLength: number,
+  worldRise: number,
+  bodyPitch: number,
+  bodyScale: number,
+): LegSeating {
+  if (!(legLength > 0)) return { angle: swingAngle, stretch: 1 }
+  const s = bodyScale > 0 ? bodyScale : 1
+  // A world-vertical step expressed in the body's own (yaw-then-pitch) frame:
+  // yaw leaves y alone, so only the pitch tilts it — and it enters the leg's
+  // unscaled local units, hence ÷ scale.
+  const dy = (worldRise * Math.cos(bodyPitch)) / s
+  const dz = (-worldRise * Math.sin(bodyPitch)) / s
+  const vy = -legLength * Math.cos(swingAngle) + dy
+  const vz = -legLength * Math.sin(swingAngle) + dz
+  return { angle: Math.atan2(-vz, -vy), stretch: Math.hypot(vy, vz) / legLength }
+}
+
+/**
  * Facing yaw (rad) that tracks the velocity direction (point 228): an animal
  * turns to face where it MOVES, so it can never glide backward. Below the
  * epsilon speed the previous facing is held (no spin when standing still). Uses

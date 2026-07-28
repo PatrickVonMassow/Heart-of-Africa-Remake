@@ -22,6 +22,7 @@ import {
   buildGiraffeParts,
   buildElephantParts,
   faceVelocity,
+  footBodyOffset,
   footForwardOffset,
   footHeight,
   gaitBodyLift,
@@ -32,6 +33,7 @@ import {
   groundPitch,
   isStance,
   legSwingAngle,
+  seatFootOnGround,
   strideLength,
   GAIT_DUTY,
   GAIT_MAX_PITCH,
@@ -970,6 +972,88 @@ describe('animal gait (design.md §19, points 228/255/300 — planted feet, no s
     }
     // A degenerate wheelbase is inert rather than NaN.
     expect(groundPitch(3.5, 3, 0)).toBe(0)
+  })
+
+  it('seating a foot moves it straight DOWN the world, never off its ground spot (point 300)', () => {
+    const rig = GOAT
+    const hip: [number, number, number] = [0.18, rig.legLength, 0.9]
+    for (const [yaw, pitch, scale] of [
+      [0, 0, 1],
+      [0.9, 0.2, 2.6],
+      [-2.4, -0.28, 3.4],
+    ]) {
+      for (const swing of [-0.4, -0.12, 0, 0.12, 0.4]) {
+        // No correction asked for: the leg is left exactly as the gait drew it.
+        const idle = seatFootOnGround(swing, rig.legLength, 0, pitch, scale)
+        expect(idle.angle).toBeCloseTo(swing, 12)
+        expect(idle.stretch).toBeCloseTo(1, 12)
+
+        const before = footBodyOffset(hip, swing, rig.legLength, yaw, pitch, scale)
+        for (const rise of [-0.9, -0.2, 0.05, 0.7]) {
+          const seat = seatFootOnGround(swing, rig.legLength, rise, pitch, scale)
+          const after = footBodyOffset(hip, seat.angle, rig.legLength * seat.stretch, yaw, pitch, scale)
+          // The whole point: the foot rises by exactly the asked amount and its
+          // GROUND SPOT does not budge — a foot dragged fore/aft would skate.
+          expect(after[0]).toBeCloseTo(before[0], 12)
+          expect(after[2]).toBeCloseTo(before[2], 12)
+          expect(after[1]).toBeCloseTo(before[1] + rise, 12)
+          expect(seat.stretch).toBeGreaterThan(0)
+        }
+      }
+    }
+    // A degenerate leg is inert rather than NaN.
+    expect(seatFootOnGround(0.2, 0, 1, 0, 1)).toEqual({ angle: 0.2, stretch: 1 })
+  })
+
+  it('every planted foot lands on NON-LINEAR ground, which a body pitch alone cannot do (point 300)', () => {
+    // The panorama backdrop compresses a landscape, so the relief under one
+    // silhouette is not a plane: the body's two-sample pitch fit leaves a foot
+    // hanging (measured live: 23 % of stance frames over 5 % of the body height,
+    // worst 25 %). Model exactly that here — a dune-like ground, the body fitted
+    // from the two hip-span samples, then each foot seated on ITS OWN ground.
+    const parts = buildZebraParts()
+    const rig = gaitRig(parts.legs)
+    const scale = 3
+    parts.body.computeBoundingBox()
+    // The silhouette's rendered height, read the way the scene reads it.
+    const bodyHeight = (parts.body.boundingBox?.max.y ?? 2) * scale
+    // A ridge whose curvature is well inside what the live backdrop shows.
+    const ground = (x: number, z: number) => 0.9 * Math.sin(0.5 * x) + 0.6 * Math.cos(0.37 * z)
+    let worstFit = 0
+    let worstSeated = 0
+    for (let k = 0; k <= 120; k++) {
+      const phase = (k / 120) * 4 * Math.PI
+      const yaw = 0.7 + k * 0.013
+      const bx = 6 + k * 0.05
+      const bz = -4 + k * 0.037
+      // The body's own fit: pitch over the wheelbase, anchored at the mean of
+      // the two hip-span ground samples, dipped onto the stance leg.
+      const half = (rig.wheelbase * scale) / 2
+      const frontY = ground(bx + Math.sin(yaw) * half, bz + Math.cos(yaw) * half)
+      const backY = ground(bx - Math.sin(yaw) * half, bz - Math.cos(yaw) * half)
+      const pitch = groundPitch(frontY, backY, rig.wheelbase * scale)
+      const by = (frontY + backY) / 2 + gaitBodyLift(phase, rig.legLength) * scale
+      for (const leg of parts.legs) {
+        const swing = legSwingAngle(phase, leg.phaseOffset)
+        const off = footBodyOffset(leg.hip, swing, rig.legLength, yaw, pitch, scale)
+        const standY = ground(bx + off[0], bz + off[2])
+        const clearance = footHeight(phase, leg.phaseOffset, rig.legLength) * scale
+        // Without seating: how far off the drawn ground the fit leaves the foot.
+        if (clearance < 1e-12) worstFit = Math.max(worstFit, Math.abs(by + off[1] - standY))
+        const seat = seatFootOnGround(swing, rig.legLength, standY + clearance - (by + off[1]), pitch, scale)
+        const seated = footBodyOffset(leg.hip, seat.angle, rig.legLength * seat.stretch, yaw, pitch, scale)
+        // Seated: the foot stands on the ground under its OWN spot — exactly
+        // while planted, its own clearance above it while swinging.
+        expect(bx + seated[0]).toBeCloseTo(bx + off[0], 12)
+        expect(bz + seated[2]).toBeCloseTo(bz + off[2], 12)
+        expect(by + seated[1]).toBeCloseTo(ground(bx + seated[0], bz + seated[2]) + clearance, 12)
+        if (clearance < 1e-12) worstSeated = Math.max(worstSeated, Math.abs(by + seated[1] - standY))
+        expect(seat.stretch).toBeGreaterThan(0)
+      }
+    }
+    // The defect this replaces is real on this ground, and the seating removes it.
+    expect(worstFit).toBeGreaterThan(0.05 * bodyHeight)
+    expect(worstSeated).toBeLessThan(1e-12)
   })
 
   it("the walker's facing tracks its velocity — it never glides backward", () => {
