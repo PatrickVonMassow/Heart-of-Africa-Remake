@@ -98,13 +98,18 @@ export function lastWorkOrderTick({ cwd = repoPath('.'), refs = ['main'] } = {})
   const paths = ['--', 'TASKS.md', 'docs/tasks-archive.md']
   for (const ref of refs) {
     try {
-      const head = git(['log', '-1', '--format=%H %ct', ref, ...paths])
-      const m = head.match(/^([0-9a-f]{7,40}) (\d+)$/)
-      if (!m) continue
-      const diff = git(['show', '--format=', '--unified=0', m[1], ...paths])
-      const points = tickedPointsInDiff(diff)
-      if (points.length === 0) return null
-      return { point: points[points.length - 1], at: Number(m[2]) * 1000 }
+      // The newest few work-order commits, not just the last: appending a new
+      // point after ticking one would otherwise mask the tick.
+      const log = git(['log', '-5', '--format=%H %ct', ref, ...paths])
+      for (const row of log.split('\n')) {
+        const m = row.trim().match(/^([0-9a-f]{7,40}) (\d+)$/)
+        if (!m) continue
+        const points = tickedPointsInDiff(git(['show', '--format=', '--unified=0', m[1], ...paths]))
+        if (points.length > 0) {
+          return { point: points[points.length - 1], at: Number(m[2]) * 1000, sha: m[1] }
+        }
+      }
+      return null
     } catch {
       /* no such ref / not a repo — try the next */
     }
