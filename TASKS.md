@@ -1383,6 +1383,45 @@ read that as "the criterion and its evidence section".
   the model.
   DOCS in the same commit: `docs/acceptance-evidence.md` §15/§25 gain the chain, and
   `docs/graphics-detail-levels.md` the new per-level entries.
+- [ ] 391. THE GIZA MONUMENTS STAND AT A MONUMENTAL SCALE IN THE FIRST-PERSON VIEW (user
+  28.07.2026). Standing on the plateau, the pyramids and the Sphinx must read as GIANTS —
+  markedly larger than today, so that a person at their foot is a speck against them. The
+  stated reason is a planned later feature and belongs in the record: the user intends a
+  secret entrance, found by deciphering hints from inhabitants, that leads into a further
+  first-person scene INSIDE the monument, where more clues to the treasure wait. Entering
+  is only plausible if the outside is big enough to hold an inside. THAT FEATURE IS NOT
+  BUILT HERE — this point delivers the scale it needs, nothing more; no entrance, no
+  interior scene, no hint chain.
+  WHAT TO CHANGE: the site-scale geometry in `src/scenes/place/gizaSite.ts` (the pyramid
+  cones and the Sphinx). Take the REAL proportions as the yardstick — the Great Pyramid
+  stood ~146 m tall on a ~230 m base, the Sphinx ~20 m tall and ~73 m long — and state in
+  the commit what fraction of real scale the site now uses and why. The eye height is
+  1.5 m (§20), so the numbers decide the feeling: from the base, the apex must be far
+  above the top of the frame at the default field of view.
+  WHAT IT COLLIDES WITH, and none of it may be broken quietly:
+  · the WALKABLE RADIUS (point 390) — bigger monuments need more ground to be seen from,
+    and both points touch the same site. Work them on ONE branch, 390 first: the radius is
+    measured against what the picture offers, and the picture changes here.
+  · the SPHINX MODEL (point 315) — same file, same monument. Whichever lands second
+    rebases on the first; do not build the new Sphinx twice at two sizes.
+  · the COLLIDERS must follow the drawn masses, not the old ones (point 378's rule: the
+    collider is derived from the placement the renderer draws).
+  · the BACKDROP and panorama (points 181/381) — a taller monument may now rise past the
+    ground line the silhouettes stand on; the seam checks in
+    `src/scenes/place/backdrop.test.ts` must still hold.
+  · the BIRD'S-EYE landmark and the Cairo SKYLINE (point 82) are a DIFFERENT scale and are
+    NOT enlarged by this point — check that they are unchanged, and say so.
+  VERIFIABLE: pure Vitest on the site geometry — the pyramid height and base, and the
+  Sphinx length, sit at the stated fraction of the real proportions, and the collider set
+  matches the drawn masses. Live on BOTH backends: a first-person frame from the base of
+  the great pyramid looking up (the apex out of frame is the point), one from the site
+  centre showing all three, and one at the Sphinx — judged by the picture, plus the
+  measured frame cost at LOW and MEDIUM.
+  DOCS in the same commit: design.md §4.4 states the monumental first-person scale and
+  names the planned interior as an OPEN idea, not a promise. design.md sits at its
+  measured ceiling, so the sentence is paid for by a measured raise with its justification
+  in `scripts/doc-budget-core.mjs`, or by shortening elsewhere — the guard decides, not a
+  round number.
 - [ ] 316. SWIMMER TRAPPED IN A RIVER-MOUTH NOTCH (user 25.07.2026, screenshot at the
   Nile delta mouth ~31.4N/30.4E: swimming without a canoe, the downstream current
   outruns the swim speed so he cannot go back upstream, and the ocean boundary
