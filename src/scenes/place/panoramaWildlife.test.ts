@@ -13,11 +13,13 @@ import {
   panoramaDriftVelocity,
   panoramaDriftYaw,
   panoramaGaitDistance,
-  panoramaGaitBob,
   panoramaGaitNod,
-  PANORAMA_GAIT_BOB,
 } from './panoramaWildlife'
-import { gaitPhase } from '../../render/fauna'
+import { buildElephantParts, GAIT_SWING, gaitBodyLift, gaitPhase, gaitRig } from '../../render/fauna'
+
+/** The cadence a panorama silhouette really walks on: read off its own rig, as
+ *  PlaceScene does (point 300) — never the one shared constant it used to be. */
+const RIG = gaitRig(buildElephantParts().legs)
 
 describe('silhouetteScale', () => {
   it('shrinks an oversized scale so the subtended angle stays within the cap', () => {
@@ -104,7 +106,8 @@ describe('panoramaDriftDistance (point 255 — walking silhouettes, not gliding)
 
 describe('panorama silhouette gait pose (point 255 — walking, not sliding)', () => {
   /** Exactly what PlaceScene feeds the pose: the ring arc walked → gait phase. */
-  const phaseAt = (radius: number, drift: number, t: number) => gaitPhase(panoramaDriftDistance(radius, drift, t))
+  const phaseAt = (radius: number, drift: number, t: number) =>
+    gaitPhase(panoramaDriftDistance(radius, drift, t), RIG.cadence)
 
   it('advances the stride with the distance covered, and holds it at zero displacement', () => {
     // A drifting silhouette walks: the phase grows as it covers arc.
@@ -115,7 +118,7 @@ describe('panorama silhouette gait pose (point 255 — walking, not sliding)', (
     // A silhouette that covers no ground never moves a muscle, however long
     // the clock runs — the whole point of a distance-driven gait.
     expect(phaseAt(120, 0, 900)).toBe(0)
-    expect(panoramaGaitBob(phaseAt(120, 0, 900), 5)).toBe(0)
+    expect(gaitBodyLift(phaseAt(120, 0, 900), RIG.legLength)).toBe(0)
     expect(panoramaGaitNod(phaseAt(120, 0, 900))).toBe(0)
   })
 
@@ -125,21 +128,26 @@ describe('panorama silhouette gait pose (point 255 — walking, not sliding)', (
     expect(phaseAt(160, 0.006, 3)).toBeGreaterThan(phaseAt(100, 0.006, 3))
   })
 
-  it('bobs twice per stride, scaled to the body, and never sinks the animal', () => {
-    const h = 5
-    // |sin| — two rises per 2π cycle (one per footfall), never negative, so the
-    // bob only ever lifts the body off the ground line it stands on.
-    expect(panoramaGaitBob(0, h)).toBe(0)
-    expect(panoramaGaitBob(Math.PI, h)).toBeCloseTo(0, 12)
-    expect(panoramaGaitBob(Math.PI / 2, h)).toBeCloseTo(h * PANORAMA_GAIT_BOB, 12)
-    expect(panoramaGaitBob((3 * Math.PI) / 2, h)).toBeCloseTo(h * PANORAMA_GAIT_BOB, 12)
-    for (let i = 0; i <= 40; i++) {
-      const b = panoramaGaitBob((i / 40) * 6 * Math.PI, h)
-      expect(b).toBeGreaterThanOrEqual(0)
-      expect(b).toBeLessThanOrEqual(h * PANORAMA_GAIT_BOB + 1e-12)
+  it('dips onto the planted leg twice per stride and never rises off the ground line (point 300)', () => {
+    // The cosmetic |sin| bob is gone: the vertical stride motion is now the
+    // GEOMETRIC dip onto whichever leg is planted, which is what puts the
+    // standing foot on the ground. It is never positive — the body only ever
+    // settles onto its leg, never floats above the line it stands on.
+    const L = RIG.legLength
+    const deepest = L * (Math.cos(GAIT_SWING) - 1)
+    // Two troughs per cycle — one per footfall, at the handovers where both
+    // pairs stand at full reach — and full height twice, at each mid-stance.
+    expect(gaitBodyLift(0, L)).toBeCloseTo(0, 12)
+    expect(gaitBodyLift(Math.PI, L)).toBeCloseTo(0, 12)
+    expect(gaitBodyLift(Math.PI / 2, L)).toBeCloseTo(deepest, 12)
+    expect(gaitBodyLift((3 * Math.PI) / 2, L)).toBeCloseTo(deepest, 12)
+    for (let i = 0; i <= 400; i++) {
+      const b = gaitBodyLift((i / 400) * 6 * Math.PI, L)
+      expect(b).toBeLessThanOrEqual(1e-12) // only ever settles, never floats
+      expect(b).toBeGreaterThanOrEqual(deepest - 1e-12)
     }
-    // A taller animal bobs proportionally more, so the cue reads the same.
-    expect(panoramaGaitBob(Math.PI / 2, 10)).toBeCloseTo(2 * panoramaGaitBob(Math.PI / 2, 5), 12)
+    // A longer leg dips proportionally more — the motion scales with the animal.
+    expect(gaitBodyLift(Math.PI / 2, 2 * L)).toBeCloseTo(2 * gaitBodyLift(Math.PI / 2, L), 12)
   })
 
   it('nods gently fore and aft — a rock, never a seesaw', () => {
@@ -192,7 +200,7 @@ describe('panorama silhouette faces its motion (point 286 — forward-only, neve
 
 describe('panorama silhouette gait rate (point 286 — consistent with rendered travel, no flail)', () => {
   const phaseAt = (radius: number, drift: number, scale: number, t: number) =>
-    gaitPhase(panoramaGaitDistance(radius, drift, scale, t))
+    gaitPhase(panoramaGaitDistance(radius, drift, scale, t), RIG.cadence)
 
   it("drives the stride by the arc in the silhouette's own rendered frame (÷ scale)", () => {
     // Same world arc, larger enlargement → the legs step SLOWER (the flail fix):

@@ -68,7 +68,11 @@ import {
   buildElephantParts,
   buildGiraffeParts,
   buildZebraParts,
+  gaitBodyLift,
   gaitPhase,
+  gaitRig,
+  groundPitch,
+  isStance,
   legSwingAngle,
   type GoatLeg,
 } from '../../render/fauna'
@@ -84,7 +88,6 @@ import {
   luminance,
   panoramaDriftYaw,
   panoramaGaitDistance,
-  panoramaGaitBob,
   panoramaGaitNod,
   excludedAzimuthSpan,
   isAzimuthExcluded,
@@ -1240,6 +1243,10 @@ function PanoramaWildlife({
   // into one is hidden so it never crosses the monument (point 102, part a).
   const exclusionSpans = useMemo(() => skylineExclusionSpans(placeId), [placeId])
   // World height of each mesh, for the apparent-size clamp (point 94).
+  // Each species' gait read off its OWN legs (point 300): a long-legged giraffe
+  // takes long, slow strides, a zebra shorter, quicker ones — the single shared
+  // cadence over-drove every one of them and they skated along the horizon.
+  const rigs = useMemo(() => builds.map((p) => gaitRig(p.legs)), [builds])
   const geoHeights = useMemo(
     () => builds.map((p) => {
       p.body.computeBoundingBox()
@@ -1279,6 +1286,7 @@ function PanoramaWildlife({
         scale,
         drift: (rand() < 0.5 ? -1 : 1) * (0.004 + rand() * 0.006),
         parts: builds[gi],
+        rig: rigs[gi],
         material: new THREE.MeshStandardMaterial({ color: new THREE.Color(rgb[0], rgb[1], rgb[2]), roughness: 1 }),
         worldHeight: geoHeights[gi] * scale,
         apparentDeg: apparentAngleDeg(geoHeights[gi] * scale, radius),
@@ -1286,7 +1294,7 @@ function PanoramaWildlife({
         phase: rand() * Math.PI * 2,
       }
     })
-  }, [placeId, seed, innerRadius, builds, geoHeights, baseRgb, skyRgb, pw])
+  }, [placeId, seed, innerRadius, builds, rigs, geoHeights, baseRgb, skyRgb, pw])
   useEffect(
     () => () => items.forEach((it) => it.material.dispose()),
     [items],
@@ -1294,6 +1302,8 @@ function PanoramaWildlife({
   const refs = useRef<Array<THREE.Group | null>>([])
   // Per-silhouette leg-pivot groups, so the stride swings them about the hips.
   const legRefs = useRef<Array<Array<THREE.Group | null>>>([])
+  // Scratch vector for the DEV foot probe — never allocated per frame.
+  const footProbe = useMemo(() => new THREE.Vector3(), [])
 
   useEffect(() => {
     if (!import.meta.env.DEV) return
@@ -1321,13 +1331,26 @@ function PanoramaWildlife({
       g.visible = !hidden
       const x = Math.cos(a) * it.radius
       const z = Math.sin(a) * it.radius
+      // Point 286: face where it MOVES along the ring tangent (derived from the
+      // velocity), so a silhouette can never walk backward — the former
+      // `−a + (drift>0 ? π : 0)` was exactly π off and moonwalked every one.
+      const yaw = panoramaDriftYaw(a, it.drift)
       // Point 181: the feet go on the ground the frame DRAWS under them — the
       // higher of this spot's relief and the ground line over the town's disc
       // edge, seen from the live camera — never the hard EYE_HEIGHT horizon at
       // infinity, which left them hanging over the captured band's content.
-      const groundY =
-        panoramaStandY(x, z, lat, lon, seed, centerH, innerRadius, camera.position.x, camera.position.z, EYE_HEIGHT) -
-        pw.sinkEpsilon
+      // Point 300: sampled under the animal's OWN front and back feet rather
+      // than once under its centre, so a body on a dune pitches with the slope
+      // instead of holding a level plane with one foot pair in the air.
+      const half = (it.rig.wheelbase * it.scale) / 2
+      const fx = Math.sin(yaw) * half
+      const fz = Math.cos(yaw) * half
+      const camX = camera.position.x
+      const camZ = camera.position.z
+      const frontY = panoramaStandY(x + fx, z + fz, lat, lon, seed, centerH, innerRadius, camX, camZ, EYE_HEIGHT)
+      const backY = panoramaStandY(x - fx, z - fz, lat, lon, seed, centerH, innerRadius, camX, camZ, EYE_HEIGHT)
+      const groundY = (frontY + backY) / 2 - pw.sinkEpsilon
+      const pitch = groundPitch(frontY, backY, it.rig.wheelbase * it.scale)
       // Point 255 (3): the silhouettes used to GLIDE — their only motion was a
       // wall-clock bob. The stride rides the ground they cover along the ring,
       // through the same distance-driven gait phase the settlement goats walk
@@ -1337,12 +1360,13 @@ function PanoramaWildlife({
       // apparent horizon motion is a fraction of a degree per second — so the
       // arc is expressed in the silhouette's OWN rendered frame (÷ scale), which
       // makes the leg cadence consistent with the rendered body's slow crawl.
-      const phase = gaitPhase(panoramaGaitDistance(it.radius, it.drift, it.scale, t)) + it.phase
-      const y = groundY + panoramaGaitBob(phase, it.worldHeight)
-      // Point 286: face where it MOVES along the ring tangent (derived from the
-      // velocity), so a silhouette can never walk backward — the former
-      // `−a + (drift>0 ? π : 0)` was exactly π off and moonwalked every one.
-      const yaw = panoramaDriftYaw(a, it.drift)
+      // Point 300: at this species' OWN cadence, so one stride carries the body
+      // exactly as far as the planted foot sweeps — no skating — and the body
+      // dips onto the stance leg (the walk's real rise and fall, in the
+      // silhouette's frame, hence × scale) instead of the old cosmetic bob.
+      const phase = gaitPhase(panoramaGaitDistance(it.radius, it.drift, it.scale, t), it.rig.cadence) + it.phase
+      const lift = gaitBodyLift(phase, it.rig.legLength) * it.scale
+      const y = groundY + lift
       if (import.meta.env.DEV) {
         const w = window as unknown as Record<string, unknown>
         const info = (w.__placePanoramaWildlifeInfo ?? (w.__placePanoramaWildlifeInfo = {})) as Record<string, unknown>
@@ -1351,24 +1375,41 @@ function PanoramaWildlife({
         // point-102 skyline-exclusion gate; x/z/height for the point-181 gate,
         // which ray-probes the surface drawn behind the feet. `yaw` + x/z prove
         // the point-286 forward-only walk (displacement projects positively onto
-        // the facing). `gait`/`gaitSpeed` prove the point-255/286 stride live:
-        // the phase advances in step with the SCALE-NORMALISED ground each
-        // silhouette covers, so the ratio is the same constant for all of them —
-        // a wall-clock bob would advance them all equally regardless of speed.
-        info[i] = { y, visibleY: groundY, apparentDeg: it.apparentDeg, hazeLum: it.hazeLum, azimuth, visible: !hidden, x, z, yaw, radius: it.radius, worldHeight: it.worldHeight, gait: phase, gaitSpeed: Math.abs(it.radius * it.drift) / (it.scale > 0 ? it.scale : 1) }
+        // the facing). `gait`/`gaitSpeed`/`cadence` prove the point-255/286/300
+        // stride live: the phase advances in step with the SCALE-NORMALISED
+        // ground each silhouette covers, at its OWN leg's cadence — so
+        // phase ÷ (speed × cadence) is 1 for every one of them, whatever species
+        // it is, while a wall-clock bob would advance them all alike regardless
+        // of speed. `drop`/`pitch`/`frontY`/`backY` carry the point-300 footing:
+        // how far the body dipped onto its stance leg and how it lies on the
+        // slope under its own wheelbase.
+        info[i] = { y, visibleY: groundY, apparentDeg: it.apparentDeg, hazeLum: it.hazeLum, azimuth, visible: !hidden, x, z, yaw, radius: it.radius, worldHeight: it.worldHeight, gait: phase, gaitSpeed: Math.abs(it.radius * it.drift) / (it.scale > 0 ? it.scale : 1), cadence: it.rig.cadence, drop: -lift, pitch, frontY, backY, stance: isStance(phase + it.parts.legs[0].phaseOffset) }
       }
       g.position.set(x, y, z)
       // Nod fore/aft in the body's own frame (YXZ: yaw first, so x is the
-      // walking pitch).
+      // walking pitch) — over the ground slope the body lies on (point 300).
       g.rotation.order = 'YXZ'
       g.rotation.y = yaw
-      g.rotation.x = panoramaGaitNod(phase)
+      g.rotation.x = pitch + panoramaGaitNod(phase)
       // The stride itself: diagonal legs swing in antiphase about their hips.
       const legs = legRefs.current[i]
       if (legs) {
         for (let li = 0; li < it.parts.legs.length; li++) {
           const lg = legs[li]
           if (lg) lg.rotation.x = legSwingAngle(phase, it.parts.legs[li].phaseOffset)
+        }
+        if (import.meta.env.DEV) {
+          // The live no-skate probe (point 300) reads leg 0's foot straight out
+          // of the rendered leg group, so it tracks what is DRAWN.
+          const lg = legs[0]
+          const w = window as unknown as Record<string, unknown>
+          const info = (w.__placePanoramaWildlifeInfo ?? {}) as Record<string, Record<string, unknown>>
+          if (lg && info[i]) {
+            const foot = footProbe.set(0, -it.rig.legLength, 0)
+            lg.updateWorldMatrix(true, false)
+            lg.localToWorld(foot)
+            info[i].foot = { x: foot.x, y: foot.y, z: foot.z }
+          }
         }
       }
     })

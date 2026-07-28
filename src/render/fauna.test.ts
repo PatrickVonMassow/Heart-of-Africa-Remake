@@ -22,9 +22,20 @@ import {
   buildGiraffeParts,
   buildElephantParts,
   faceVelocity,
+  footForwardOffset,
+  footHeight,
+  gaitBodyLift,
+  gaitCadence,
+  gaitFootFraction,
   gaitPhase,
+  gaitRig,
+  groundPitch,
+  isStance,
   legSwingAngle,
-  GAIT_CADENCE,
+  strideLength,
+  GAIT_DUTY,
+  GAIT_SWING,
+  GAIT_SWING_MAX,
   buildHyena,
   buildLeopard,
   buildLion,
@@ -694,35 +705,92 @@ describe('crocodile submersion fade (design.md §19.16, points 246/274)', () => 
   })
 })
 
-describe('animal gait (design.md §19, point 228 — no foot-slide, no backward glide)', () => {
+describe('animal gait (design.md §19, points 228/255/300 — planted feet, no skating, no backward glide)', () => {
+  // Every rig walks on the cadence read off its OWN legs (point 300).
+  const GOAT = gaitRig(buildGoatParts().legs)
+  const ZEBRA = gaitRig(buildZebraParts().legs)
+  const ELEPHANT = gaitRig(buildElephantParts().legs)
+  const GIRAFFE = gaitRig(buildGiraffeParts().legs)
+
   it('the leg-swing phase is a pure function of DISTANCE travelled, not time', () => {
     // Zero distance → zero phase: a standing animal's legs never move.
-    expect(gaitPhase(0)).toBe(0)
+    expect(gaitPhase(0, GOAT.cadence)).toBe(0)
     // The phase scales with the distance covered (stride matches speed): walking
     // twice as far advances the cycle twice as much.
-    expect(gaitPhase(2)).toBeCloseTo(2 * gaitPhase(1), 12)
-    expect(gaitPhase(1)).toBeCloseTo(GAIT_CADENCE, 12)
+    expect(gaitPhase(2, GOAT.cadence)).toBeCloseTo(2 * gaitPhase(1, GOAT.cadence), 12)
+    expect(gaitPhase(1, GOAT.cadence)).toBeCloseTo(GOAT.cadence, 12)
     // Strictly monotone in distance.
     let prev = -1
     for (let d = 0; d <= 5; d += 0.25) {
-      const p = gaitPhase(d)
+      const p = gaitPhase(d, GOAT.cadence)
       expect(p).toBeGreaterThanOrEqual(prev)
       prev = p
     }
   })
 
-  it('the gait cadence reads as a real walk — ~1.5-2 strides per metre, not the old shuffle (point 255)', () => {
-    // A full swing cycle is 2π rad, so the cadence is strides-per-world-unit ×
-    // 2π. The complaint was that the legs shuffled far too slowly for the speed;
-    // the cadence must land in a plausible walking band (~1.2-2.5 strides/m),
-    // clearly above the old 3.4 rad/unit (0.54 strides/m — under one per metre).
-    const stridesPerUnit = GAIT_CADENCE / (2 * Math.PI)
-    expect(stridesPerUnit).toBeGreaterThanOrEqual(1.2)
-    expect(stridesPerUnit).toBeLessThanOrEqual(2.5)
-    expect(stridesPerUnit).toBeGreaterThan(0.54) // strictly faster than the old shuffle
-    // One metre walked completes well over a full stride cycle.
-    expect(gaitPhase(1)).toBeGreaterThan(2 * Math.PI)
-    expect(gaitPhase(1) / (2 * Math.PI)).toBeCloseTo(stridesPerUnit, 12)
+  it('THE stance foot stays PLANTED on its ground spot while the body walks over it (point 300)', () => {
+    // The point-300 report: the legs cycle faster than the ground passes, so the
+    // animals skate. The invariant that forbids it — walk the body forward at the
+    // rig's own cadence and track a foot's WORLD position: through the whole
+    // stance it must not move at all.
+    for (const rig of [GOAT, ZEBRA, ELEPHANT, GIRAFFE]) {
+      // Start at mid-stance (phase 0) and walk through the rest of the stance.
+      const spot = (d: number) => d + footForwardOffset(gaitPhase(d, rig.cadence), 0, rig.legLength)
+      const start = spot(0)
+      const stanceDistance = (Math.PI / 2 / rig.cadence) * 0.999 // to just before lift-off
+      let moved = 0
+      for (let k = 0; k <= 60; k++) {
+        const d = (k / 60) * stanceDistance
+        expect(isStance(gaitPhase(d, rig.cadence))).toBe(true)
+        moved = Math.max(moved, Math.abs(spot(d) - start))
+      }
+      // The body genuinely advanced meanwhile — this is not a stalled animal.
+      expect(stanceDistance).toBeGreaterThan(0.05 * rig.legLength)
+      expect(moved).toBeLessThan(1e-9)
+    }
+  })
+
+  it('one stride carries the body exactly the foot’s stance ground-travel (no skate, no mince)', () => {
+    for (const rig of [GOAT, ZEBRA, ELEPHANT, GIRAFFE]) {
+      // The foot's own ground travel through one stance: from touchdown to
+      // lift-off, measured on the rendered hip angle.
+      const touchdown = footForwardOffset(-Math.PI / 2, 0, rig.legLength)
+      const liftoff = footForwardOffset(Math.PI / 2, 0, rig.legLength)
+      const footTravel = touchdown - liftoff
+      // Stance is GAIT_DUTY of the cycle, so the whole cycle covers that much
+      // ground divided by the duty factor — and that is the stride.
+      expect(rig.stride).toBeCloseTo(footTravel / GAIT_DUTY, 9)
+      expect(strideLength(rig.legLength)).toBeCloseTo(rig.stride, 12)
+      // …and the cadence is exactly one cycle per stride.
+      expect(gaitPhase(rig.stride, rig.cadence)).toBeCloseTo(2 * Math.PI, 9)
+    }
+  })
+
+  it('derives the cadence from the leg — a long leg strides long and slow, a short one short and quick', () => {
+    // The bug: ONE shared cadence for every species. An elephant then cycled its
+    // legs at a goat's rate over ground its stride crosses in a fraction of the
+    // steps — the "reads as gliding/skating" report.
+    expect(ELEPHANT.legLength).toBeGreaterThan(GOAT.legLength)
+    expect(ELEPHANT.stride).toBeGreaterThan(GOAT.stride)
+    expect(ELEPHANT.cadence).toBeLessThan(GOAT.cadence)
+    expect(GIRAFFE.cadence).toBeLessThan(ZEBRA.cadence)
+    // Walking the SAME ground, the long-legged animal takes fewer steps.
+    expect(gaitPhase(10, ELEPHANT.cadence)).toBeLessThan(gaitPhase(10, GOAT.cadence))
+    // Every rig lands in a plausible walking band (0.3–2.5 strides per unit) —
+    // the old shared 11.0 rad/unit put the elephant at 1.75, 4.4× too quick.
+    for (const rig of [GOAT, ZEBRA, ELEPHANT, GIRAFFE]) {
+      const stridesPerUnit = rig.cadence / (2 * Math.PI)
+      expect(stridesPerUnit).toBeGreaterThan(0.3)
+      expect(stridesPerUnit).toBeLessThan(2.5)
+      expect(rig.cadence).toBeCloseTo(gaitCadence(rig.legLength), 12)
+    }
+    // The rig reads its measurements off the built legs, not off a table.
+    expect(GOAT.wheelbase).toBeGreaterThan(0)
+    expect(ELEPHANT.wheelbase).toBeGreaterThan(GOAT.wheelbase)
+    // A rig with no legs is inert rather than a division blow-up.
+    const empty = gaitRig([])
+    expect(empty.cadence).toBe(0)
+    expect(empty.wheelbase).toBe(0)
   })
 
   it('advances the gait over a CURVED path — any displacement, not only a straight heading (point 255)', () => {
@@ -757,21 +825,87 @@ describe('animal gait (design.md §19, point 228 — no foot-slide, no backward 
     expect(dist).toBeGreaterThan(net) // the arc is longer than its chord
     // The phase rides the full curved path length, not the net displacement —
     // so it advances over a turn instead of freezing.
-    expect(gaitPhase(dist)).toBeGreaterThan(gaitPhase(net))
-    expect(gaitPhase(dist)).toBeCloseTo(dist * GAIT_CADENCE, 9)
+    expect(gaitPhase(dist, GOAT.cadence)).toBeGreaterThan(gaitPhase(net, GOAT.cadence))
+    expect(gaitPhase(dist, GOAT.cadence)).toBeCloseTo(dist * GOAT.cadence, 9)
   })
 
-  it('every leg is at neutral at rest (phase 0), and diagonal legs trot in antiphase', () => {
-    // At a standing phase (0) each leg — offset 0 or π — reads sin 0 = sin π = 0:
-    // no twitch while the animal holds still.
+  it('every leg is at neutral at rest (phase 0), and the diagonal pairs hand the ground over cleanly', () => {
+    // At a standing phase (0) each leg — offset 0 or π — reads neutral: one pair
+    // stands mid-stance, the other hangs mid-swing, and neither is angled. No
+    // twitch while the animal holds still.
     expect(legSwingAngle(0, 0)).toBeCloseTo(0, 12)
     expect(legSwingAngle(0, Math.PI)).toBeCloseTo(0, 12)
-    // The two diagonal beats are opposite as the phase advances (a trot).
-    for (let ph = 0.1; ph < Math.PI; ph += 0.3) {
-      expect(legSwingAngle(ph, 0)).toBeCloseTo(-legSwingAngle(ph, Math.PI), 12)
+    // A trot: at EVERY phase exactly one diagonal pair carries the ground, so
+    // the animal is never on all fours and never on none.
+    for (let ph = 0.05; ph < 4 * Math.PI; ph += 0.11) {
+      expect(isStance(ph) === isStance(ph + Math.PI)).toBe(false)
     }
-    // The swing stays bounded (never flails past the amplitude).
-    for (let ph = 0; ph < 20; ph += 0.37) expect(Math.abs(legSwingAngle(ph, 0))).toBeLessThanOrEqual(0.5 + 1e-9)
+    // The swing stays bounded (never flails past the reach-out overshoot).
+    for (let ph = 0; ph < 20; ph += 0.37) {
+      expect(Math.abs(legSwingAngle(ph, 0))).toBeLessThanOrEqual(GAIT_SWING_MAX + 1e-9)
+    }
+    expect(GAIT_SWING_MAX).toBeGreaterThan(GAIT_SWING) // the reach-out is real…
+    expect(GAIT_SWING_MAX).toBeLessThan(GAIT_SWING * 1.15) // …but small
+    // The cycle repeats every 2π and the foot fraction spans the full reach.
+    for (let ph = -3; ph < 3; ph += 0.29) {
+      expect(gaitFootFraction(ph + 2 * Math.PI)).toBeCloseTo(gaitFootFraction(ph), 9)
+    }
+    expect(gaitFootFraction(-Math.PI / 2)).toBeCloseTo(1, 9) // touchdown, fully forward
+    expect(gaitFootFraction(Math.PI / 2)).toBeCloseTo(-1, 9) // lift-off, fully back
+  })
+
+  it('the planted foot touches the ground and the swinging one never sinks through it (point 300)', () => {
+    // The body dips onto the stance leg, which is what puts the standing foot ON
+    // the ground rather than hovering it (a rigid leg swung by θ reaches only
+    // legLength·cos θ down). The other foot must clear that ground, never dig in.
+    for (const rig of [GOAT, ELEPHANT]) {
+      for (let k = 0; k <= 240; k++) {
+        const ph = (k / 240) * 4 * Math.PI
+        const stanceOffset = isStance(ph) ? 0 : Math.PI
+        const swingOffset = stanceOffset === 0 ? Math.PI : 0
+        expect(footHeight(ph, stanceOffset, rig.legLength)).toBeCloseTo(0, 12)
+        const swing = footHeight(ph, swingOffset, rig.legLength)
+        expect(swing).toBeGreaterThan(-1e-12)
+        expect(swing).toBeLessThan(0.2 * rig.legLength) // a step, not a high kick
+      }
+      // The dip itself is a walk's rise and fall, not a squat.
+      expect(Math.abs(gaitBodyLift(Math.PI / 2, rig.legLength))).toBeLessThan(0.15 * rig.legLength)
+      expect(gaitBodyLift(0, rig.legLength)).toBeCloseTo(0, 12)
+    }
+  })
+
+  it('lays the body on the slope it stands on, so no foot floats on a dune (point 300)', () => {
+    // Flat ground: no pitch. Uphill (front ground higher): the nose lifts, which
+    // is a NEGATIVE rotation about +x in this rig (rotation about +x carries +z
+    // down). Downhill: the mirror image.
+    expect(groundPitch(3, 3, 2)).toBe(0)
+    expect(groundPitch(4, 3, 2)).toBeLessThan(0) // uphill → nose up
+    expect(groundPitch(3, 4, 2)).toBeGreaterThan(0) // downhill → nose down
+    expect(groundPitch(4, 3, 2)).toBeCloseTo(-groundPitch(3, 4, 2), 12)
+    // The angle IS the incline: a 1-in-2 rise reads as atan(0.5).
+    expect(groundPitch(3, 4, 2)).toBeCloseTo(Math.atan(0.5), 12)
+    // Pitched by that angle over a body anchored at the MEAN of the two heights,
+    // both foot pairs land ON the slope instead of one hanging in the air. The
+    // pitched foot sits at a foreshortened reach (half·cos pitch), so it is
+    // checked against the ground plane AT ITS OWN spot — the way the picture
+    // shows it — not against the sample point it was derived from.
+    for (const [front, back] of [
+      [4, 3],
+      [3, 4],
+      [10.5, 10.1],
+      [2, 2],
+    ]) {
+      const wheelbase = 2
+      const pitch = groundPitch(front, back, wheelbase)
+      const anchor = (front + back) / 2
+      const half = wheelbase / 2
+      const groundAt = (u: number) => anchor + (u * (front - back)) / wheelbase // the slope plane
+      // Rotation about +x: a foot at local +z·half lands at (half·cos, −half·sin).
+      expect(anchor - half * Math.sin(pitch)).toBeCloseTo(groundAt(half * Math.cos(pitch)), 12)
+      expect(anchor + half * Math.sin(pitch)).toBeCloseTo(groundAt(-half * Math.cos(pitch)), 12)
+    }
+    // A degenerate wheelbase is inert rather than NaN.
+    expect(groundPitch(4, 3, 0)).toBe(0)
   })
 
   it("the walker's facing tracks its velocity — it never glides backward", () => {
