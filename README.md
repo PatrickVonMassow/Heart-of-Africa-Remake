@@ -1,14 +1,24 @@
-<img width="1168" height="784" alt="Copver photo" src="https://github.com/user-attachments/assets/07cc05d9-7a8d-427c-88a7-adbd0ea372cf" />
+<p align="center">
+  <img src="docs/images/cover.jpg" alt="The Heart of Africa — Modern Remake" width="820">
+</p>
 
-# The Heart of Africa — Modern Remake
+<h1 align="center">The Heart of Africa — Modern Remake</h1>
 
-PoC playable directly in the browser at:  
-<https://patrickvonmassow.github.io/Heart-of-Africa-Remake/poc/>
+<p align="center">
+  <strong><a href="https://patrickvonmassow.github.io/Heart-of-Africa-Remake/poc/">▶ Play the proof of concept in your browser</a></strong><br>
+  <sub>No install, no account. Desktop browser with WebGPU or WebGL 2.</sub>
+</p>
 
-A non-commercial single-player 3D remake of the 1985 exploration classic *The Heart of Africa*
-— Ozark Softscape's follow-up to *The Seven Cities of Gold* (1984) — built as a
-web application. You start in Cairo in 1890 with $250 and a journal,
-and travel across a geographically authentic Africa in search of a lost tomb —
+<p align="center">
+  <em>A non-commercial fan tribute to the 1985 Ozark Softscape / Electronic Arts classic.</em>
+</p>
+
+---
+
+A single-player 3D remake of the 1985 exploration classic *The Heart of
+Africa* — Ozark Softscape's follow-up to *The Seven Cities of Gold* (1984) —
+built as a web application. You start in Cairo in 1890 with $250 and a journal,
+and travel across a geographically authentic Africa in search of a lost tomb:
 trading in port cities, offering culturally appropriate gifts to village chiefs,
 and decoding direction hints given in the regions' own language system.
 
@@ -17,9 +27,17 @@ team, and the same loop of walking into an unmapped continent, watching the map
 fill itself in behind you, and getting along — or not — with the peoples who
 already live there. Where that game had the Americas, this one has Africa.
 
-This repository contains the proof of concept: the core gameplay loop end to
-end, not the complete game. `design.md` is the authoritative design document;
-`CLAUDE.md` defines the POC scope, acceptance criteria and build rules.
+This repository contains the **proof of concept**: the core gameplay loop end to
+end, not the complete game.
+
+## Screenshots
+
+| | |
+|---|---|
+| ![Travelling across the continent](docs/images/screenshot-travel.jpg) | ![Inside a settlement](docs/images/screenshot-settlement.jpg) |
+| *Bird's-eye view: real elevation data, seasonal climate, ambient wildlife* | *First-person view: procedurally built, inhabited settlements* |
+| ![The journal](docs/images/screenshot-journal.jpg) | ![Trading in a port city](docs/images/screenshot-port.jpg) |
+| *The journal, written stroke by stroke by an animated hand* | *Port cities: equipment, provisions, gifts and treasure prices* |
 
 ## Gameplay
 
@@ -38,11 +56,11 @@ end, not the complete game. `design.md` is the authoritative design document;
   pay regional prices for treasure finds (continent-wide arbitrage), travel
   agencies sell ferry passages, and discovery bounties arrive at the next port
   as telegraphic transfers.
-- **Standing with the local peoples.** A rejected gift means hostility and expulsion;
-  repeatedly satisfying a chief earns "Honored Friend" — rescue from attacks,
-  near-death aid and free village supplies — while a rifle-backed robbery pays
-  richly but antagonizes the region for good. Village caches and free camps
-  relieve the limited inventory.
+- **Standing with the peoples you meet.** A rejected gift means hostility and
+  expulsion; repeatedly satisfying a chief earns "Honored Friend" — rescue from
+  attacks, near-death aid and free village supplies — while a rifle-backed
+  robbery pays richly but antagonizes the region for good. Village caches and
+  free camps relieve the limited inventory.
 - **Language and direction system.** Hints are given in the regional
   Nivera/koko/Katula system and must be decoded into bearings and positions.
 - **Survival.** Provisions, a canteen with a draining water level, and a health
@@ -74,6 +92,13 @@ end, not the complete game. `design.md` is the authoritative design document;
 - **The goal.** A procedurally placed tomb triangulated from regional hints;
   digging at the right spot with the shovel wins the game.
 
+### Audio
+
+Deliberately still open. The 1985 original's score is not used here in any
+form, and no placeholder music has been dropped in either — the sound design
+deserves to be decided rather than defaulted into. Ideas and collaborators
+welcome; see [Contact](#contact).
+
 ## Tech stack
 
 - [Vite](https://vitejs.dev/) + React 19 + TypeScript
@@ -95,14 +120,14 @@ foam.
 
 Requires Node.js ≥ 20.
 
-```sh
+```
 npm install
 npm run dev        # dev server at http://localhost:5173
 ```
 
 Other scripts:
 
-```sh
+```
 npm run build      # type-check + production build (must pass clean)
 npm run preview    # serve the production build locally
 npm run lint       # oxlint (zero errors/warnings required)
@@ -122,7 +147,7 @@ The terrain uses real elevation data. The runtime assets in `public/geodata/`
 are generated reproducibly (no npm dependencies) by the scripts in
 [`scripts/`](scripts/README.md):
 
-```sh
+```
 node scripts/build-geodata.mjs              # DEM from public Terrarium tiles
 node scripts/generate-terrain-textures.mjs  # tileable terrain textures (bird's-eye)
 node scripts/generate-surface-textures.mjs  # tileable settlement surfaces (first-person)
@@ -154,18 +179,77 @@ src/
 └── world/           geography, geodata sampling, hydrology, terrain model
 ```
 
-## Status
+`design.md` is the authoritative design document; `CLAUDE.md` defines the POC
+scope, acceptance criteria and build rules.
 
-The autonomous build batch reports its live progress — what it is working on,
-what needs a decision, the queue and what is done — on the
-[batch dashboard](https://claude.ai/code/artifact/fe669d50-9b71-43a3-bf82-2fce7abe774b).
+## Status
 
 All 32 acceptance criteria of `CLAUDE.md` §7.1 are implemented; screenshot
 evidence lives in `verification/`. Known simplifications (e.g. no true water
 refraction, English-only journal read-aloud; screen-space reflections were
-integrated, found visually irrelevant for this game's camera and removed
-again) are recorded as open items in the code (`// OPEN:`) and in
-`TASKS.md`. The full headless regression runs with
-`npm test` — a fast Vitest (jsdom) layer plus 15 Playwright browser suites;
-the test strategy and coverage map live in
+integrated, found visually irrelevant for this game's camera and removed again)
+are recorded as open items in the code (`// OPEN:`) and in `TASKS.md`.
+
+The full headless regression runs with `npm test` — a fast Vitest (jsdom) layer
+plus 15 Playwright browser suites; the test strategy and coverage map live in
 [`scripts/verify/README.md`](scripts/verify/README.md).
+
+## Credits
+
+### The original game
+
+*The Heart of Africa* (1985) was created by **Ozark Softscape** and published
+by **Electronic Arts**. It was the follow-up to *The Seven Cities of Gold*
+(1984).
+
+- **Dan Bunten** (later Dani Bunten Berry) — design and programming
+- **David Warhol** — music and sound effects
+- **Electronic Arts** — publisher
+
+This remake exists because that game was worth remembering. All credit for the
+concept, the design and the original score belongs to the people above.
+
+### This remake
+
+Built by **Patrick von Massow**. Source code, assets and text in this
+repository are original work unless noted otherwise.
+
+### Data and libraries
+
+- Elevation data derived from public **Terrarium** terrain tiles
+- Hydrology and place-name research from public-domain and openly licensed
+  period sources
+- See [Tech stack](#tech-stack) for the open-source libraries this project
+  depends on; each remains under its own license
+
+## Legal
+
+This is a **non-commercial fan project**, made as a tribute. It is not
+affiliated with, endorsed by, or connected to Electronic Arts Inc., Ozark
+Softscape, or any rights holder of the original game.
+
+- No code, graphics, audio, text or other assets from the 1985 original are
+  used, extracted or redistributed here. Everything in this repository was
+  built from scratch.
+- *The Heart of Africa*, *The Seven Cities of Gold* and all related names and
+  marks are the property of their respective owners. They are used here only to
+  identify the work this project pays tribute to — nominative use, no claim of
+  ownership implied.
+- Nothing here is sold, monetised, or offered in exchange for payment,
+  donations or advertising revenue, and there is no intention to do so.
+- Depictions of 1890s Africa, its peoples and the colonial-era framing of the
+  original are treated as historical subject matter, researched from period and
+  scholarly sources. Where the original's assumptions have not aged well, this
+  project tries to do better rather than reproduce them.
+
+If you hold rights to the original work and object to anything in this
+repository, open an issue or contact the author and it will be addressed
+promptly.
+
+Own code released under the [MIT License](LICENSE).
+
+## Contact
+
+Questions, corrections, period sources, or an interest in the audio side:
+open an [issue](https://github.com/PatrickVonMassow/Heart-of-Africa-Remake/issues)
+or get in touch directly.
