@@ -853,10 +853,12 @@ Verifiable: the sweep, the derivation, its maximality, the preserved
 arrival distance and the desert left past the monuments are pure-tested in
 `src/scenes/place/gizaSite.test.ts`; the point-381 seam rules are swept at
 the new disc radius and the chord bound pinned in
-`src/scenes/place/backdrop.test.ts`; and the picture — from the site centre
-looking outward and from the walkable edge, ground running to where the
-backdrop takes over — is gated in `scripts/verify/polish.mjs`
-(screenshots 390-giza-sand-centre / 390-giza-sand-edge, both backends).
+`src/scenes/place/backdrop.test.ts`; and the picture — from beside the
+monument row looking outward and from the walkable edge, ground running to
+where the backdrop takes over — is gated in `scripts/verify/polish.mjs`
+(screenshots 390-giza-sand-open / 390-giza-sand-edge, both backends). The
+outward standpoint is deliberately NOT the geometric centre: Khafre stands
+on (0, 0), so a camera there is inside the pyramid.
 The §19.10
 campfire can CAST SHADOWS (point 289, level-driven per point 276 part B):
 the fire light renders a cube shadow map (remounted on the variant, also

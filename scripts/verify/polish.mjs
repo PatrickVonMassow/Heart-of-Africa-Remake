@@ -1103,16 +1103,20 @@ for (const [placeId, shot] of [
       )
       await settleFrames(30)
       await frame('390-giza-sand-edge', { place: 'giza', label: 'the open sand seen from the walkable edge' })
-      // And from the centre, looking out over the sand the player may now cross.
+      // And from the monument row itself, looking out over the sand the player
+      // may now cross. NOT from (0, 0): Khafre stands there (gizaSite.ts), so a
+      // camera at the site's geometric centre sits INSIDE the pyramid and the
+      // frame came out as a dark slit — a picture that did not show what its
+      // name claimed. The standpoint is the open sand just south of the row.
       await page.evaluate(() => {
         const p = window.__placePlayer
         p.x = 0
-        p.z = 0
+        p.z = 30
         p.yaw = Math.PI
         p.pitch = 0
       })
       await settleFrames(30)
-      await frame('390-giza-sand-centre', { place: 'giza', label: 'the open sand seen from the site centre' })
+      await frame('390-giza-sand-open', { place: 'giza', label: 'the open sand seen from beside the monument row' })
     }
   }
   await page.evaluate(() => window.__game.getState().leavePlace())
