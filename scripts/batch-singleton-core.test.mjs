@@ -10,10 +10,11 @@
 //       cause: a stale heartbeat with a LIVE pid (mid-long-tool-call) is ALIVE;
 //   (5) a non-owner session at the batch-progress-guard → stands down.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdtempSync, rmSync, writeFileSync, existsSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync, existsSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { basename, join, resolve } from 'node:path'
 import { execFile } from 'node:child_process'
+import { REPO_ROOT } from './repo-paths.mjs'
 import {
   assessOwner,
   spawnDecision,
@@ -30,6 +31,15 @@ import {
   wedgeNotifyDecision,
   wedgeOwnerKey,
   wedgeStage,
+  statePathsFor,
+  LOCK_PATH,
+  BOUNDARY_LOG_PATH,
+  BOUNDARY_MARKER_PATH,
+  SESSIONS_SEEN_PATH,
+  SESSION_ACTIVITY_PATH,
+  PARALLEL_ALERT_PATH,
+  DOCTOR_STATE_PATH,
+  ANCESTOR_CACHE_PATH,
   DEAD_CONFIRM_MS,
   LEGACY_STALE_MS,
   WEDGED_MS,
@@ -42,6 +52,44 @@ const NOW = 1_784_900_000_000
 const BOOT = NOW - 12 * 3600 * 1000 // machine booted 12 h ago
 const aliveProbe = { exists: true, startedAt: null }
 const deadProbe = { exists: false, startedAt: null }
+
+// ---------------------------------------------------------------------------
+// FINDING 3 (28.07.2026): the unit suite was writing "WITHDRAWN point 388 by s1"
+// into the REAL .claude/boundary.log — `s1` is this file's test session id. The
+// pre-push gate runs this suite on every push, so a test run could withdraw a
+// boundary a live session had taken. Every state file must therefore be derived
+// from the caller's lock path, so redirecting the lock redirects all of them.
+describe('statePathsFor — a redirected lock never reaches the repo .claude/', () => {
+  const inside = (p) => !resolve(p).startsWith(resolve(REPO_ROOT))
+
+  it('derives EVERY state file from the given lock path, all outside the repo', () => {
+    const base = join(tmpdir(), 'hoa-paths-test')
+    const p = statePathsFor(join(base, 'batch-lock.json'))
+    expect(Object.keys(p).length).toBeGreaterThanOrEqual(8)
+    for (const [key, value] of Object.entries(p)) {
+      expect([key, resolve(value)]).toEqual([key, resolve(base, basename(value))])
+      expect(inside(value)).toBe(true) // NOT under the repository
+    }
+  })
+
+  it('none of the redirected paths equals a repo default', () => {
+    const defaults = [
+      LOCK_PATH,
+      BOUNDARY_LOG_PATH,
+      BOUNDARY_MARKER_PATH,
+      SESSIONS_SEEN_PATH,
+      SESSION_ACTIVITY_PATH,
+      PARALLEL_ALERT_PATH,
+      DOCTOR_STATE_PATH,
+      ANCESTOR_CACHE_PATH,
+    ]
+    const redirected = Object.values(statePathsFor(join(tmpdir(), 'hoa-paths-test', 'batch-lock.json')))
+    for (const d of defaults) expect(redirected).not.toContain(d)
+    // …and the repo defaults are themselves one consistent family, so a new
+    // state file added to statePathsFor gets its default for free.
+    expect(Object.values(statePathsFor(LOCK_PATH))).toEqual(expect.arrayContaining(defaults))
+  })
+})
 
 // ---------------------------------------------------------------------------
 describe('assessOwner (liveness = heartbeat AND real pid, never age alone)', () => {
@@ -384,6 +432,18 @@ describe('acquire (atomic test-and-set on the real filesystem)', () => {
     expect(withdrawHandover('s1', { lockPath })).toBe(true)
     expect(readOwnerLock(lockPath).handedOver).toBeUndefined()
     expect(withdrawHandover('s1', { lockPath })).toBe(false) // nothing left to withdraw
+  })
+
+  it('FINDING 3: the withdrawal is logged BESIDE the redirected lock, never in the repo', () => {
+    acquire('s1', opts())
+    markHandover('s1', { lockPath, point: 388 })
+    expect(withdrawHandover('s1', { lockPath })).toBe(true)
+    const log = join(dir, 'boundary.log')
+    expect(existsSync(log)).toBe(true)
+    expect(readFileSync(log, 'utf8')).toMatch(/WITHDRAWN point 388 by s1/)
+    // The line the live batch found in ITS log: it must be impossible for this
+    // suite to produce it there.
+    expect(resolve(log)).not.toBe(resolve(BOUNDARY_LOG_PATH))
   })
 
   it('after the successor claims, the old session can neither heartbeat nor withdraw', () => {

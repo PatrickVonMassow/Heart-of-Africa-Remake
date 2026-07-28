@@ -41,13 +41,16 @@ import {
   raiseParallelAlert,
   readUnhandledAlert,
   progressGuardDecision,
+  BOUNDARY_LOG_PATH,
 } from './batch-singleton.mjs'
 import { gatherBoundary, clearBoundary } from './batch-boundary.mjs'
 import { LAUNCHER_TASK_NAME } from './batch-boundary-core.mjs'
 import { isPaused } from './batch-lock.mjs'
 
 const TASKS = fileURLToPath(new URL('../TASKS.md', import.meta.url))
-const BOUNDARY_LOG = fileURLToPath(new URL('../.claude/boundary.log', import.meta.url))
+// One source of truth with the withdrawal that cancels these lines (finding 3):
+// both sit beside the lock, so a redirected lock redirects the log with it.
+const BOUNDARY_LOG = BOUNDARY_LOG_PATH
 
 /** Leave a trace of every handover — the acceptance evidence for point 388, and
  *  the line that tells a later reader why the launcher took over a live pid. */

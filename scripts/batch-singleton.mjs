@@ -41,6 +41,7 @@ import {
 } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import os from 'node:os'
+import { dirname, join } from 'node:path'
 import { repoPath } from './repo-paths.mjs'
 
 // --- Constants (exported for tests and callers) -------------------------------
@@ -84,11 +85,41 @@ export const REAP_MUTEX_STALE_MS = 60 * 1000
  *  detection). */
 export const PID_START_TOLERANCE_MS = 2000
 
+/**
+ * EVERY state file this module writes, derived from ONE lock path. PURE.
+ *
+ * A caller that redirects the lock — a test into a temp directory, a sandbox —
+ * redirects the whole family with it, and can therefore never reach into the
+ * repository's live `.claude/`. That is not a nicety: on 28.07.2026 the unit
+ * suite was found writing `WITHDRAWN point 388 by s1` into the REAL
+ * `.claude/boundary.log`, because `withdrawHandover` defaulted its log path to
+ * the repo while the test had redirected only the lock. The pre-push gate runs
+ * that suite on every push, so a test run could withdraw a boundary a live
+ * session had taken.
+ */
+export function statePathsFor(lockPath) {
+  const dir = dirname(lockPath)
+  return {
+    lockPath,
+    boundaryLogPath: join(dir, 'boundary.log'),
+    boundaryPath: join(dir, 'batch-boundary.json'),
+    sessionsSeenPath: join(dir, 'sessions-seen.json'),
+    activityPath: join(dir, 'session-activity.json'),
+    alertPath: join(dir, 'parallel-alert.json'),
+    doctorStatePath: join(dir, 'doctor-state.json'),
+    ancestorCachePath: join(dir, 'session-process.json'),
+  }
+}
+
 export const LOCK_PATH = repoPath('.claude/batch-lock.json')
-export const SESSIONS_SEEN_PATH = repoPath('.claude/sessions-seen.json')
-export const SESSION_ACTIVITY_PATH = repoPath('.claude/session-activity.json')
-export const PARALLEL_ALERT_PATH = repoPath('.claude/parallel-alert.json')
-export const DOCTOR_STATE_PATH = repoPath('.claude/doctor-state.json')
+const DEFAULT_PATHS = statePathsFor(LOCK_PATH)
+export const SESSIONS_SEEN_PATH = DEFAULT_PATHS.sessionsSeenPath
+export const SESSION_ACTIVITY_PATH = DEFAULT_PATHS.activityPath
+export const PARALLEL_ALERT_PATH = DEFAULT_PATHS.alertPath
+export const DOCTOR_STATE_PATH = DEFAULT_PATHS.doctorStatePath
+export const BOUNDARY_LOG_PATH = DEFAULT_PATHS.boundaryLogPath
+export const BOUNDARY_MARKER_PATH = DEFAULT_PATHS.boundaryPath
+export const ANCESTOR_CACHE_PATH = DEFAULT_PATHS.ancestorCachePath
 
 // --- Small IO helpers ----------------------------------------------------------
 
@@ -688,9 +719,10 @@ export function withdrawHandover(sessionId, opts = {}) {
   // Recorded beside the handover it cancels: without this line, a launcher tick
   // that finds a live owner past the grace cannot be told apart from one whose
   // handover was legitimately taken back, and the acceptance evidence would be
-  // ambiguous exactly where it matters (four-eyes review).
+  // ambiguous exactly where it matters (four-eyes review). The log is a SIBLING
+  // of the lock, never the repo default, so a redirected lock redirects it too.
   try {
-    const log = opts.logPath ?? repoPath('.claude/boundary.log')
+    const log = opts.logPath ?? statePathsFor(lockPath).boundaryLogPath
     appendFileSync(
       log,
       `[${new Date().toISOString()}] WITHDRAWN point ${lock.handoverPoint ?? '?'} by ${sessionId} — ` +
