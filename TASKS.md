@@ -3056,6 +3056,20 @@ read that as "the criterion and its evidence section".
   stale `pidStartedAt` from a reused pid does not either) — and never let it widen
   ownership so far that a genuinely second window passes as ours, which is the one thing
   the singleton exists to prevent.
+  FIFTH LIVE FINDING, 28.07.2026 11:55 — the guard cannot see work that is IN FLIGHT, so
+  it cannot tell waiting from idling. Its own text names polling as the sanctioned way to
+  wait ("WAIT by POLLING within this turn"), but nothing a polling session does satisfies
+  it: with three delegated agents building and a browser suite running, every attempt to
+  end the turn was blocked with "DO NOT STOP THE BATCH — continue the NEXT queue item now",
+  eight times in a row. The queue item cannot be continued — the pool is at its cap and the
+  next item needs the machine the suite is using — and the turn cannot end, so the session
+  writes reply after reply that never reaches the user. The batch is not idle; the guard
+  merely has no way to know. FIX: give the session a way to DECLARE what it is waiting on,
+  the way `prep-guard --prepped` already works — a marker naming the in-flight work
+  (agent branches, a running suite) and the time it was set. The guard then allows the stop
+  while that work is provably still running and blocks again the moment it is not, so an
+  abandoned wait still cannot become an idle night. Do not simply weaken the block: the
+  five-and-a-half-hour standstill is what it exists for.
   TEST THE WHOLE CHAIN, NOT THE PARTS (user 28.07.2026). Every part worked last night
   and the batch still stood still, so a green unit layer proves nothing here. The
   acceptance is ONE observed handover end to end: a point closed, the boundary taken,
