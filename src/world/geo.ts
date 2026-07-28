@@ -283,6 +283,19 @@ export function placeById(id: string): PlaceDef {
   return p
 }
 
+/**
+ * One site, one label (design.md §4.4/§17.2): where a map point and a landmark
+ * denote the SAME site, only the map point's name renders — it is the one the
+ * player can act on (it names the enterable place and obeys the §17.2 discovery
+ * gate). The rule keys on shared IDENTITY, never on proximity: a distance
+ * heuristic would silently swallow a genuinely neighbouring landmark, while two
+ * records of one site already share their id (Giza is the only such pair today,
+ * and a sweep in world.test.ts holds that true).
+ */
+export function landmarkLabelHiddenByMapPoint(landmarkId: string): boolean {
+  return PLACES.some((p) => p.id === landmarkId)
+}
+
 // Settlements an ~1890 explorer already knew and could name from the outset
 // (design.md §3.2/§17.2): the ten port cities. They start DISCOVERED — their
 // map labels show their names from the start (never a placeholder, §17.2) and returning to

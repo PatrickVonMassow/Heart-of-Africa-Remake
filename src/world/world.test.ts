@@ -4,7 +4,7 @@
 // proof.
 import * as THREE from 'three'
 import { describe, it, expect, beforeAll } from 'vitest'
-import { PLACES, RIVERS, regionAt, VILLAGE_HEARTLANDS, VILLAGE_RIVER_CLEARANCE_DEG, PORT_RIVER_CLEARANCE_DEG, placeById } from './geo'
+import { PLACES, RIVERS, regionAt, VILLAGE_HEARTLANDS, VILLAGE_RIVER_CLEARANCE_DEG, PORT_RIVER_CLEARANCE_DEG, placeById, landmarkLabelHiddenByMapPoint } from './geo'
 import { sampleTerrain, isBlocked, RIVER_WIDTH_DEG } from './terrain'
 import { cellAt, coastDistance, riverDistance, CELL_LAKE, CELL_OCEAN, CELL_LAND } from './geoIndex'
 import { lakeContains } from './hydro'
@@ -137,6 +137,38 @@ describe('built cultural landmarks stand clear of river channels (design.md §4.
     // Shifted east onto the desert bank, a bounded nudge off the real anchor.
     expect(meroe.lon).toBeGreaterThan(33.75) // east of the raw Nile-side anchor
     expect(Math.hypot(meroe.lat - 16.94, meroe.lon - 33.75)).toBeLessThan(1.4)
+  })
+})
+
+// ONE SITE, ONE LABEL (point 338): where a map point and a landmark denote the
+// same site, only the map point's name renders — it names the enterable place
+// and obeys the §17.2 discovery gate. The predicate keys on shared IDENTITY, so
+// a genuinely neighbouring landmark is never silently swallowed the way a
+// proximity rule would swallow it.
+describe('one site, one label (design.md §4.4/§17.2)', () => {
+  it('hides a landmark label exactly when a map point shares its id', () => {
+    expect(landmarkLabelHiddenByMapPoint('giza')).toBe(true)
+    for (const p of PLACES) expect(landmarkLabelHiddenByMapPoint(p.id)).toBe(true)
+    // Never otherwise — not for a landmark standing right beside a map point.
+    for (const c of CULTURAL_LANDMARKS) {
+      if (PLACES.some((p) => p.id === c.id)) continue
+      expect(landmarkLabelHiddenByMapPoint(c.id), c.id).toBe(false)
+    }
+    for (const id of [...MOUNTAINS, ...WATERFALLS, ...NATURAL_SITES].map((l) => l.id)) {
+      expect(landmarkLabelHiddenByMapPoint(id), id).toBe(false)
+    }
+    expect(landmarkLabelHiddenByMapPoint(ELEPHANT_GRAVEYARD.id)).toBe(false)
+    expect(landmarkLabelHiddenByMapPoint('no-such-id')).toBe(false)
+  })
+
+  it('keeps the rule general: Giza is the ONLY landmark that is also a map point', () => {
+    const shared = [...CULTURAL_LANDMARKS, ...NATURAL_SITES, ...MOUNTAINS, ...WATERFALLS]
+      .map((l) => l.id)
+      .filter((id) => PLACES.some((p) => p.id === id))
+    expect(shared).toEqual(['giza'])
+    // The suppressed landmark keeps its membership in the §4.4 built eight.
+    expect(CULTURAL_LANDMARKS).toHaveLength(8)
+    expect(CULTURAL_LANDMARKS.map((c) => c.id)).toContain('giza')
   })
 })
 

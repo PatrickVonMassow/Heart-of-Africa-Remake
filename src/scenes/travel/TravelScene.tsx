@@ -31,7 +31,14 @@ import {
   effectiveFloraCastShadow,
 } from '../../state/ui'
 import { balance, START_YEAR } from '../../config/balance'
-import { PLACES, latLonToWorld, placeById, worldToLatLon, type PlaceDef } from '../../world/geo'
+import {
+  PLACES,
+  landmarkLabelHiddenByMapPoint,
+  latLonToWorld,
+  placeById,
+  worldToLatLon,
+  type PlaceDef,
+} from '../../world/geo'
 import { enterHintName, settlementEnterCandidate, settlementToEnter } from './settlementEntry'
 import { sampleTerrain, type TerrainType } from '../../world/terrain'
 import { REFINE_RING_MAX, chunkNeedsRefine, refinedSegments, setTerrainRefine } from './terrainLod'
@@ -1850,7 +1857,12 @@ function LandmarkLabels() {
       y: Math.max(0.5, sampleTerrain(n.lat, n.lon, seed).height) + 1.0,
       water: n.kind === 'delta' || n.kind === 'wetland',
     }))
-    return [...lakes, ...mountains, ...falls, graveyard, ...cultural, ...natural]
+    // One site, one label (point 338): where a map point denotes the same site
+    // as a landmark, the map point's label is the one that renders — it names
+    // the place the player can enter. Keyed on shared identity, not distance.
+    return [...lakes, ...mountains, ...falls, graveyard, ...cultural, ...natural].filter(
+      (it) => !landmarkLabelHiddenByMapPoint(it.key),
+    )
   }, [seed, t])
   return (
     <>
