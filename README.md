@@ -2,9 +2,6 @@
 
 # The Heart of Africa — Modern Remake
 
-PoC playable directly in the browser at:  
-<https://patrickvonmassow.github.io/Heart-of-Africa-Remake/poc/>
-
 A single-player 3D remake of the 1985 exploration classic *The Heart of
 Africa* — Ozark Softscape's follow-up to *The Seven Cities of Gold* (1984) —
 built as a web application. You start in Cairo in 1890 with $250 and a journal,
@@ -15,6 +12,9 @@ If you remember *The Seven Cities of Gold*, you know the DNA: the same design
 team, and the same loop of walking into an unmapped continent, watching the map
 fill itself in behind you, and getting along — or not — with the peoples who
 already live there. Where that game had the Americas, this one has Africa.
+
+PoC playable directly in the browser at:  
+<https://patrickvonmassow.github.io/Heart-of-Africa-Remake/poc/>
 
 ## Screenshots
 
