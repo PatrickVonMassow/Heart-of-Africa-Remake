@@ -291,22 +291,58 @@ CHECKOUT: each worktree has its own dependency tree). Both numbers appear in the
 gate's own line — `unit ran 153 files / 4214 tests` — so the size of the evidence
 base is visible on a green push too, not only when it blocks.
 
-| This run vs. the last green one | Verdict |
+#### The discriminator is on DISK, not in the memory
+
+The first version of this gate blocked **once** and recorded the lower count as
+it blocked, telling the pusher to run it again. That waves through exactly the
+failure it exists to catch: a damaged tree drops 153 files to 119, push #1
+blocks and records 119, push #2 — the tree *still* damaged, 34 suites still
+invisible — passes, because 119 === 119. Nothing distinguished "understood and
+deliberate" from "retried without fixing", and in this repository most pushes
+come from autonomous agents whose natural reaction to a red gate is `npm ci` and
+another push (four-eyes finding, verified at the extreme: a shrink to zero
+recorded a baseline of zero, and the next zero-file run passed).
+
+So the executed count is compared with the **checkout** first. A suite genuinely
+DELETED leaves the tree; a suite that could not LOAD is still lying in it. The
+gate walks the roots of vitest's own include globs (`src/`, `scripts/` — mirrored
+in `TEST_FILE_PATTERNS` and pinned identical to `vitest.config.ts` by a test) and
+counts the files present; `node_modules` is never descended, because the one
+moment this number matters is the moment that directory is the broken thing.
+
+| This run | Verdict |
 |---|---|
-| more files | passes, baseline advances |
+| more files than the last green run | passes, baseline advances |
 | the same | passes |
-| FEWER files | **blocks**, naming both counts — and records the drop |
-| no baseline recorded | passes and records; a first run never blocks |
+| fewer files, and **just as many on disk** | passes — the suites are gone from the tree; the baseline follows the deletion down, no second push needed |
+| **files on disk that did NOT run** | **blocks**, naming the difference — regardless of the baseline, and records nothing |
+| fewer files, tree **not countable** | **blocks** — it is unknown whether they were deleted or failed to load; records nothing |
+| no baseline recorded | passes and records — *unless* files on disk did not run, which is how a fresh clone off an already-damaged tree is stopped from recording a poisoned-low first baseline |
 | summary unreadable | passes, compares nothing, records nothing |
 | the unit step itself was red | already blocked; its count is not taken as a baseline |
 
-A shrink blocks **once**. The drop is recorded as it blocks, so a deliberate
-reduction (a suite genuinely deleted) is accepted by pushing again once the drop
-is understood — a permanent wall would make the repository unpushable over a
-legitimate change, while the incident's actual gap was that nothing said anything
-at all. The comparison, the parse (colour escapes and all) and the state shape are
-pure in `pre-push-gate-core.mjs` and pinned in `pre-push-gate-core.test.mjs`; a
-garbled summary yields nulls and never throws.
+A block is therefore **not** cleared by re-running: it is cleared by repairing the
+tree, or by pushing once with `HOA_ACCEPT_TEST_FILE_DROP=1`, the deliberate,
+named second escape hatch — recorded in the state file as `acknowledgedDropFrom`
+so a waved-through drop stays auditable rather than looking like an ordinary
+green. The state file is written through `scripts/atomic-write.mjs`, so a torn
+write cannot garble the JSON into "no baseline at all".
+
+The comparison, the glob translation, the parse (colour escapes and all) and the
+state shape are pure in `pre-push-gate-core.mjs` and pinned in
+`pre-push-gate-core.test.mjs`, which also greps the wrapper to prove it actually
+asks the question; a garbled summary yields nulls and never throws.
+
+#### When a green run exits non-zero
+
+The parse is also what lets the gate recognise a runner that **died** rather than
+a test that failed: a complete summary naming no failure, beside a non-zero exit.
+Measured three times on 28.07.2026 — every test passing, exit 1, on a
+`[vitest-worker]: Timeout calling "onTaskUpdate"` under constant load from
+parallel agents. It still blocks (a run that could not finish proved nothing),
+but the verdict now names what was *observed* instead of asserting a cause. The
+old line "failed TWICE — the load was not the cause" was simply false: the load
+never went away between the two runs.
 
 ## Triaging a RED run (point 294)
 
