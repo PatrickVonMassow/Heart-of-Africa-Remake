@@ -423,6 +423,30 @@ Der Fehler ist derselbe wie in §3.41, aber in seiner tückischsten Form: Nicht 
 
 **Lehren:** Eine bestandene Zahl ist nur zusammen mit der Zahl der ausgeführten Dateien eine Aussage — beide gehören in jede Meldung, und ein Rückgang der Dateizahl ist so ernst zu nehmen wie ein Fehlschlag. Und: Wer einen Nebenbefund meldet, den er nicht erklären kann („die Tests starten bei mir nicht"), leistet mehr als der, der ihn wegsortiert.
 
+### 3.47 Die Prüfung, die auf der schnellen Maschine scheitert
+
+Eine Live-Prüfung des Tierschritts meldete „0 Standphasen, schlimmster Wert Unendlich" — und zwar reproduzierbar auf der **ruhigen** Maschine, während sie unter Last grün wurde. Das ist die Umkehrung dessen, was dieses Projekt gelernt hatte (§3.8: ein Rot unter Last ist meist die Last), und deshalb war die erste Deutung falsch. Die Ursache: Die Prüfung verlangte je Messfenster eine feste Mindeststrecke von 0,01 Welteinheiten. Eine Ziege legt in drei Bildern einer schnellen Aufzeichnung 0,008 zurück — jedes der 52 Fenster wurde verworfen. Auf der langsamen Maschine dauern dieselben drei Bilder länger, die Strecke reicht, die Prüfung besteht.
+
+Der Schwesterbefund desselben Abends hat dieselbe Wurzel mit umgekehrtem Vorzeichen: Eine Nachbarprüfung wartete eine feste Wanduhrzeit von 1,2 Sekunden zwischen zwei Aufnahmen und las bei einem Renderer-Stocker zweimal dieselbe Pose — exakt 0,000 Bewegung für alle fünf Silhouetten. Beide Prüfungen unterstellen eine feste Beziehung zwischen Wanduhr und Bildfolge, die es nicht gibt.
+
+**Lehren:** Eine Messschwelle gehört in die Einheit des Gemessenen — Schrittlängen, nicht Meter; gerenderte Bilder, nicht Sekunden. Und eine Prüfung, die **nichts** gemessen hat, muss das laut sagen: Sie meldete „Unendlich", was wie ein katastrophaler Messwert aussieht statt wie eine leere Menge, und hätte in anderer Form auch vakuum-grün werden können. Die Regel aus §3.41 gilt auch für die eigene Messung: Ein Ergebnis ohne Grundgesamtheit ist kein Ergebnis.
+
+### 3.48 Zweimal rot heißt nur dann „nicht die Last", wenn die Last dazwischen weg war
+
+Das Push-Tor wiederholt einen roten Schnelltest einmal und schreibt beim zweiten Rot: *„failed TWICE — the load was not the cause."* In derselben Nacht scheiterte ein Push dreimal an einem Vitest-internen RPC-Zeitüberlauf, während **alle 4219 Tests bestanden** — die Maschine war durchgehend von drei parallelen Zuarbeitern ausgelastet. Der Beweis kam später am selben Abend: Auf der leeren Maschine lief derselbe Push auf Anhieb grün durch.
+
+Die Wiederholung prüft nur dann etwas, wenn sich zwischen den beiden Läufen etwas ändert. Unter konstanter Last misst sie zweimal denselben Zustand und nennt das Ergebnis Beweis.
+
+**Lehre:** Eine Wiederholung ist erst dann ein Ausschlussverfahren, wenn die vermutete Ursache dazwischen **entfernt** wurde. Ein Tor, das Last als Ursache ausschließen will, muss die Last messen (das tut dieses beim Start bereits) und sie in sein Urteil einrechnen — oder ehrlich sagen, was es gesehen hat: alle Tests bestanden, der Prozess endete trotzdem mit einem Fehler.
+
+### 3.49 Aufräumen, das durch eine Verknüpfung hindurchlöscht
+
+Sechsunddreißig verwaiste Arbeitsbäume wurden entfernt — eine reine Hygienemaßnahme, deren Zweck es war, vier wirklich offene Zweige wieder sichtbar zu machen. Dabei verschwand `node_modules` im Hauptbaum vollständig: Die Arbeitsbäume enthielten Verknüpfungen dorthin, und das rekursive Löschen folgte ihnen. Der nächste Build meldete „tsc ist nicht erkannt".
+
+Zwei Dinge haben den Schaden begrenzt. Erstens war er vollständig reparierbar, weil die Sperrdatei im Repository liegt — eine Neuinstallation stellte alles her. Zweitens fiel er **sofort** auf, weil das Push-Tor unmittelbar danach rot schlug; ohne dieses Tor wäre ein kaputter Zustand in den Hauptzweig gegangen. Sehr wahrscheinlich ist das auch die bis dahin ungeklärte Ursache des Vorfalls aus §3.46.
+
+**Lehre:** Eine Löschoperation muss wissen, ob sie einer Verknüpfung folgt. Und: Aufräumarbeit ist kein risikoarmer Nebenschauplatz — sie fasst per Definition Dinge an, die niemand mehr beobachtet.
+
 ---
 
 ## 4. Die Guards als Immunsystem
@@ -512,7 +536,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Dienstag, 28.07.2026, 20:42 · Quellen-Fingerprint: `a610e584441a…`
+Zuletzt aktualisiert: Mittwoch, 29.07.2026, 01:17 · Quellen-Fingerprint: `9863f678211c…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -586,8 +610,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | CORRECTED 19.07.2026 — WebGPU IS testable headless/autonomously via system Chrome (channel:'chrome') + --headless=new; the 'untestable' belief held only for Playwright's BUNDLED Chromium | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 66 Feedback-/Projekt-Memories · 35 Guard-/Hook-Skripte · 3 Revert-/Reapply-Commits · 18 Prozess-/Meta-TASKS-Punkte (davon 8 offen).
+Erfasste Quellen: 66 Feedback-/Projekt-Memories · 35 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 18 Prozess-/Meta-TASKS-Punkte (davon 8 offen).
 
-<!-- RETRO-FINGERPRINT: a610e584441a1d0cac696bcb92e1f5427baa636728d85f381cf9567dc4ef3224 -->
-<!-- RETRO-LAST-REFRESHED: 2026-07-28T18:42:05.589Z -->
+<!-- RETRO-FINGERPRINT: 9863f678211c358ab38c71a482da43a60d08121de9d38fa1cd95c4fa0c11e71e -->
+<!-- RETRO-LAST-REFRESHED: 2026-07-28T23:17:22.332Z -->
 <!-- AUTO-GENERATED:END -->
