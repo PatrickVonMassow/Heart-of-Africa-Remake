@@ -28,7 +28,6 @@
 import {
   appendFileSync,
   readFileSync,
-  writeFileSync,
   existsSync,
   openSync,
   closeSync,
@@ -36,6 +35,7 @@ import {
   rmSync,
   mkdirSync,
   rmdirSync,
+  readdirSync,
   statSync,
 } from 'node:fs'
 import { execFileSync } from 'node:child_process'
@@ -142,29 +142,20 @@ const readJson = (p) => {
 // renamed file to inspect it. The third write is the one that failed, and it was
 // the handover.
 //
-// Three defences, in order: write the lock LESS (the redundant heartbeat is
-// gone), RETRY over the scanner's window, and — only when even that fails —
-// write in place. In-place is not atomic, but every reader of this lock already
-// survives an unreadable one (readOwnerLock answers null, and acquire treats a
-// fresh unreadable lock as HELD), whereas a lost handover wedges the batch.
-
-/**
- * Write the owner lock, reporting rather than throwing:
- *   { ok, attempts, fallback, error }
- * `fallback: true` means the atomic path never succeeded and the content was
- * written in place — worth naming in a log line, because it is the one write
- * that a concurrent reader could catch half-finished.
- */
-function writeLockSafely(lockPath, obj, opts = {}) {
-  const res = tryWriteJsonAtomic(lockPath, obj, opts)
-  if (res.ok) return { ok: true, attempts: res.attempts, fallback: false, error: null }
-  try {
-    ;(opts.writeInPlace ?? writeFileSync)(lockPath, JSON.stringify(obj, null, 2))
-    return { ok: true, attempts: res.attempts + 1, fallback: true, error: res.error }
-  } catch (e) {
-    return { ok: false, attempts: res.attempts + 1, fallback: true, error: e ?? res.error }
-  }
-}
+// Two defences, and NOT a third: write the lock LESS (the redundant heartbeat is
+// gone) and RETRY over the scanner's window. The write stays ATOMIC — tmp plus
+// rename, never an in-place truncate — so a concurrent reader can never see half
+// a lock (point 340). Where every attempt fails the tmp is removed and the error
+// PROPAGATES: a heartbeat that did not land must never read as one that did,
+// because `assessOwner` decides liveness on exactly that timestamp, and a run of
+// silently swallowed failures would age a LIVE session toward "provably dead".
+// The one caller that must not be taken down by the throw — the boundary branch
+// of the Stop guard — converts it to data in `markHandover` instead.
+//
+// The litter of that failure mode is swept up too: fourteen orphaned
+// `.claude/batch-lock.json.tmp-<pid>` files accreted in 76 minutes on
+// 25.07.2026, one per failed write. `sweepableTmpFiles` below decides which may
+// go — only those whose owning pid is provably dead and which have settled.
 
 // --- Pure decision logic (dependency-injected, Vitest-covered) -----------------
 
@@ -242,6 +233,37 @@ export function assessOwner(lock, { now, bootTime, probe }) {
   // process. This is the exact fix for the 24.07 incident (heartbeat 24 min
   // stale, session mid-turn, launcher double-spawned).
   return { alive: true, wedged: age > WEDGED_MS, reason: 'pid-alive' }
+}
+
+/**
+ * WHICH ORPHANED TMP FILES MAY BE SWEPT (point 340 (b)). PURE.
+ *
+ * Fourteen `.claude/batch-lock.json.tmp-<pid>` files accreted between 19:36 and
+ * 20:52 on 25.07.2026 — one per rename that lost to a sharing violation. The
+ * litter is harmless in itself; sweeping it wrongly is not, so two conditions
+ * must BOTH hold: the pid encoded in the name is provably dead, and the file has
+ * settled (the reap-mutex age gate). A live process mid-write must never have its
+ * tmp taken from under it.
+ *
+ * Inputs are plain data:
+ *   entries  — [{ name, mtimeMs }] of the lock's directory
+ *   lockName — basename of the lock file
+ *   now, staleMs
+ *   probe    — (pid) => { exists }
+ */
+export function sweepableTmpFiles({ entries, lockName, now, probe, staleMs = REAP_MUTEX_STALE_MS }) {
+  // Both shapes the writer has produced: `<lock>.tmp-<pid>` and, since the retry
+  // gives every attempt its own name, `<lock>.tmp-<pid>-<attempt>`.
+  const re = new RegExp(`^${String(lockName).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\.tmp-(\\d+)(?:-\\d+)?$`)
+  const out = []
+  for (const entry of entries ?? []) {
+    const m = String(entry?.name ?? '').match(re)
+    if (!m) continue
+    if (!(typeof entry.mtimeMs === 'number' && now - entry.mtimeMs > staleMs)) continue
+    if (probe(Number(m[1]))?.exists === true) continue
+    out.push(entry.name)
+  }
+  return out
 }
 
 /**
@@ -489,6 +511,49 @@ function tryExclusiveCreate(lockPath, payload) {
   }
 }
 
+/**
+ * Remove the tmp files a failed rename left behind (point 340 (b)). Best effort
+ * and never throws: it is housekeeping, and the acquire it rides along with must
+ * not fail over litter. Returns the names removed.
+ */
+export function sweepOrphanTmp(lockPath, opts = {}) {
+  try {
+    const dir = dirname(lockPath)
+    const lockName = lockPath.slice(dir.length + 1)
+    const entries = (opts.readDir ?? defaultReadDir)(dir)
+    const doomed = sweepableTmpFiles({
+      entries,
+      lockName,
+      now: opts.now ?? Date.now(),
+      probe: opts.probePidFn ?? cheapProbePid,
+      staleMs: opts.staleMs ?? REAP_MUTEX_STALE_MS,
+    })
+    const removed = []
+    for (const name of doomed) {
+      try {
+        ;(opts.remove ?? rmSync)(join(dir, name), { force: true })
+        removed.push(name)
+      } catch {
+        /* someone else got there first, or it is held — try again next time */
+      }
+    }
+    return removed
+  } catch {
+    return []
+  }
+}
+
+const defaultReadDir = (dir) =>
+  readdirSync(dir).map((name) => {
+    let mtimeMs = 0
+    try {
+      mtimeMs = statSync(join(dir, name)).mtimeMs
+    } catch {
+      mtimeMs = Date.now() // vanished mid-scan → treat as fresh, i.e. spare it
+    }
+    return { name, mtimeMs }
+  })
+
 function enterReapMutex(mutexPath) {
   try {
     mkdirSync(mutexPath)
@@ -558,6 +623,12 @@ export function acquire(sessionId, opts = {}) {
       ...(opts.extra ?? {}),
     }
   }
+
+  // Sweep the litter of past failed writes (point 340 (b)) — only tmp files
+  // whose owning pid is provably dead and which have settled. Best effort, and
+  // deliberately here: acquisition is the one moment that is already doing lock
+  // housekeeping, and it is not on the per-tool-call hot path.
+  if (opts.sweep !== false) sweepOrphanTmp(lockPath, opts)
 
   // Fast path: no lock → exclusive create (test-and-set; one winner).
   if (!existsSync(lockPath)) {
@@ -640,7 +711,8 @@ export function heartbeat(sessionId, opts = {}) {
       next.pidBackfillFailed = true
     }
   }
-  return writeLockSafely(lockPath, next, opts).ok
+  writeJsonAtomic(lockPath, next, opts)
+  return true
 }
 
 /** Owner-guarded lock update (e.g. the launcher rebinding its pending-spawn
@@ -648,7 +720,8 @@ export function heartbeat(sessionId, opts = {}) {
 export function updateOwnLock(sessionId, patch, lockPath = LOCK_PATH) {
   const lock = readOwnerLock(lockPath)
   if (!lock || lock.sessionId !== sessionId) return false
-  return writeLockSafely(lockPath, { ...lock, ...patch, sessionId, claimedAt: Date.now() }).ok
+  writeJsonAtomic(lockPath, { ...lock, ...patch, sessionId, claimedAt: Date.now() })
+  return true
 }
 
 export function isOwner(sessionId, lockPath = LOCK_PATH) {
@@ -710,30 +783,30 @@ export function release(sessionId, lockPath = LOCK_PATH) {
  * Owner-guarded and no-op otherwise, and it must only ever be called where a
  * VALID boundary has been established (scripts/batch-progress-guard.mjs).
  *
- * It REPORTS rather than throws — `{ handed, reason, attempts, fallback, error }`
- * — and that is the whole point of the shape (live finding 1, 28.07.2026). It
- * used to throw an EPERM straight through the guard into its fail-open catch, so
- * the stop proceeded, the marker had already been consumed and nothing recorded
- * that the batch had NOT been passed on. A caller must be able to say "the stop
- * may proceed, but the handover did not happen".
+ * It REPORTS rather than throws — `{ handed, reason, attempts, error }` — and
+ * that is the whole point of the shape (live finding 1, 28.07.2026). It used to
+ * throw an EPERM straight through the guard into its fail-open catch, so the stop
+ * proceeded, the marker had already been consumed and nothing recorded that the
+ * batch had NOT been passed on. This is the ONE place where the propagating write
+ * of point 340 is converted to data, because its single caller must allow the
+ * stop while telling the session the truth about it.
  */
 export function markHandover(sessionId, opts = {}) {
   const lockPath = opts.lockPath ?? LOCK_PATH
   const lock = readOwnerLock(lockPath)
   if (!lock || lock.sessionId !== sessionId) {
-    return { handed: false, reason: lock ? 'not-owner' : 'no-lock', attempts: 0, fallback: false, error: null }
+    return { handed: false, reason: lock ? 'not-owner' : 'no-lock', attempts: 0, error: null }
   }
   const now = opts.now ?? Date.now()
-  const res = writeLockSafely(
+  const res = tryWriteJsonAtomic(
     lockPath,
     { ...lock, handedOver: true, handedOverAt: now, handoverPoint: opts.point ?? null },
     opts,
   )
   return {
     handed: res.ok,
-    reason: res.ok ? (res.fallback ? 'written-in-place' : 'ok') : 'write-failed',
+    reason: res.ok ? 'ok' : 'write-failed',
     attempts: res.attempts,
-    fallback: res.fallback,
     error: res.error,
   }
 }
@@ -757,7 +830,7 @@ export function withdrawHandover(sessionId, opts = {}) {
   delete next.handedOver
   delete next.handedOverAt
   delete next.handoverPoint
-  if (!writeLockSafely(lockPath, next, opts).ok) return false
+  writeJsonAtomic(lockPath, next, opts)
   // Recorded beside the handover it cancels: without this line, a launcher tick
   // that finds a live owner past the grace cannot be told apart from one whose
   // handover was legitimately taken back, and the acceptance evidence would be
@@ -797,7 +870,7 @@ export function convertPendingSpawn(sessionId, opts = {}) {
   try {
     const recheck = readOwnerLock(lockPath)
     if (!recheck || recheck.kind !== 'pending-spawn' || recheck.spawnedPid !== lock.spawnedPid) return false
-    return writeLockSafely(lockPath, {
+    writeJsonAtomic(lockPath, {
       v: 2,
       sessionId,
       kind: 'session',
@@ -806,7 +879,8 @@ export function convertPendingSpawn(sessionId, opts = {}) {
       acquiredAt: now,
       pid: anc ? anc.pid : (recheck.spawnedPid ?? null),
       pidStartedAt: anc ? anc.startedAt : null,
-    }).ok
+    })
+    return true
   } finally {
     exitReapMutex(mutexPath)
   }

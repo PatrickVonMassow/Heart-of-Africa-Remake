@@ -173,7 +173,7 @@ try {
     if (handed.handed) {
       record(
         `HANDOVER point ${point ?? '?'} by ${sid} — lock marked handed-over; the launcher may spawn the ` +
-          `successor.${handed.fallback ? ' (written in place after the atomic rename kept failing)' : ''}`,
+          `successor.${handed.attempts > 1 ? ` (the write needed ${handed.attempts} attempts)` : ''}`,
       )
       process.exit(0)
     }

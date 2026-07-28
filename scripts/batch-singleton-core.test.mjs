@@ -10,11 +10,12 @@
 //       cause: a stale heartbeat with a LIVE pid (mid-long-tool-call) is ALIVE;
 //   (5) a non-owner session at the batch-progress-guard → stands down.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdtempSync, rmSync, writeFileSync, existsSync, readFileSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync, existsSync, readFileSync, readdirSync, renameSync, utimesSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { basename, join, resolve } from 'node:path'
 import { execFile } from 'node:child_process'
 import { REPO_ROOT } from './repo-paths.mjs'
+import { WRITE_RETRY_DELAYS_MS } from './atomic-write.mjs'
 import {
   assessOwner,
   spawnDecision,
@@ -31,6 +32,7 @@ import {
   wedgeNotifyDecision,
   wedgeOwnerKey,
   wedgeStage,
+  sweepableTmpFiles,
   statePathsFor,
   LOCK_PATH,
   BOUNDARY_LOG_PATH,
@@ -442,21 +444,13 @@ describe('acquire (atomic test-and-set on the real filesystem)', () => {
     expect(readOwnerLock(lockPath).handedOver).toBeUndefined() // and the lock is untouched
   })
 
-  it('when even the retry fails, the handover is written IN PLACE rather than lost', () => {
+  it('markHandover is the ONE place the propagating write is turned into data', () => {
+    // Everywhere else the error must escape (point 340): a heartbeat that did not
+    // land may never read as one that did. Here the caller has to allow the stop
+    // AND tell the session the truth about it, so the throw is caught once.
     acquire('s1', opts())
-    let written = null
-    const res = markHandover('s1', {
-      lockPath,
-      point: 388,
-      ...noWait,
-      rename: eperm,
-      writeInPlace: (p, text) => {
-        written = { p, obj: JSON.parse(text) }
-      },
-    })
-    expect(res).toMatchObject({ handed: true, reason: 'written-in-place', fallback: true })
-    expect(written.p).toBe(lockPath)
-    expect(written.obj).toMatchObject({ sessionId: 's1', handedOver: true, handoverPoint: 388 })
+    expect(() => heartbeat('s1', { lockPath, skipBackfill: true, ...noWait, rename: eperm })).toThrow(/EPERM/)
+    expect(markHandover('s1', { lockPath, point: 388, ...noWait, rename: eperm }).handed).toBe(false)
   })
 
   it('a heartbeat WITHDRAWS the handover — working is proof the session is not finished', () => {
@@ -513,6 +507,129 @@ describe('acquire (atomic test-and-set on the real filesystem)', () => {
       JSON.stringify({ sessionId: 'dead', claimedAt: Date.now() - 30 * 60_000, pid: 999999 }),
     )
     expect(heldByOtherLiveOwner('s2', { lockPath, probePidFn: () => deadProbe })).toBe(false) // foreign but dead
+  })
+})
+
+// ---------------------------------------------------------------------------
+// POINT 340: the lock heartbeat must not lose its write to a transient rename
+// failure. EVIDENCE: fourteen orphaned `.claude/batch-lock.json.tmp-<pid>` files
+// accreted between 19:36 and 20:52 on 25.07.2026, one per failed write, while
+// `claimedAt` stayed at its OLD value and reported nothing — and liveness is
+// decided on exactly that timestamp.
+describe('the lock write: retried, atomic, propagating, and swept up after (point 340)', () => {
+  let dir, lockPath
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'hoa-lockwrite-'))
+    lockPath = join(dir, 'batch-lock.json')
+  })
+  afterEach(() => rmSync(dir, { recursive: true, force: true }))
+
+  const tmpLeftovers = () => readdirSync(dir).filter((f) => f.includes('.tmp-'))
+  const flakyRename = (failures) => {
+    let calls = 0
+    return {
+      calls: () => calls,
+      rename: (from, to) => {
+        calls++
+        if (calls <= failures) throw Object.assign(new Error('EPERM: sharing violation'), { code: 'EPERM' })
+        renameSync(from, to)
+      },
+    }
+  }
+
+  it('a rename that fails twice and then succeeds still writes the lock, and leaves NO tmp behind', () => {
+    acquire('s1', { lockPath, pid: 1, pidStartedAt: NOW, bootTime: 0, probePidFn: () => aliveProbe })
+    const flaky = flakyRename(2)
+    const at = Date.now() + 5000
+    expect(heartbeat('s1', { lockPath, now: at, skipBackfill: true, sleep: () => {}, rename: flaky.rename })).toBe(true)
+    expect(readOwnerLock(lockPath).claimedAt).toBe(at)
+    expect(flaky.calls()).toBe(3)
+    expect(tmpLeftovers()).toEqual([])
+  })
+
+  it('a rename that fails EVERY attempt throws and STILL leaves no tmp behind', () => {
+    acquire('s1', { lockPath, pid: 1, pidStartedAt: NOW, bootTime: 0, probePidFn: () => aliveProbe })
+    const before = readOwnerLock(lockPath).claimedAt
+    const flaky = flakyRename(99)
+    expect(() =>
+      heartbeat('s1', { lockPath, now: before + 5000, skipBackfill: true, sleep: () => {}, rename: flaky.rename }),
+    ).toThrow(/EPERM/)
+    expect(readOwnerLock(lockPath).claimedAt).toBe(before) // the old value, honestly unchanged
+    expect(tmpLeftovers()).toEqual([])
+  })
+
+  it('the retry is BOUNDED — no unbounded loop against a permanently held file', () => {
+    acquire('s1', { lockPath, pid: 1, pidStartedAt: NOW, bootTime: 0, probePidFn: () => aliveProbe })
+    const flaky = flakyRename(99)
+    expect(() => heartbeat('s1', { lockPath, skipBackfill: true, sleep: () => {}, rename: flaky.rename })).toThrow()
+    expect(flaky.calls()).toBe(WRITE_RETRY_DELAYS_MS.length + 1)
+  })
+
+  it('the write stays ATOMIC: a reader never sees a half-written lock', () => {
+    // The content only ever appears via a rename of a fully written temp file —
+    // no in-place truncate, which is what would let a concurrent reader catch it.
+    acquire('s1', { lockPath, pid: 1, pidStartedAt: NOW, bootTime: 0, probePidFn: () => aliveProbe })
+    const seen = []
+    heartbeat('s1', {
+      lockPath,
+      skipBackfill: true,
+      sleep: () => {},
+      rename: (from, to) => {
+        seen.push(JSON.parse(readFileSync(from, 'utf8')).sessionId) // complete before the swap
+        renameSync(from, to)
+      },
+    })
+    expect(seen).toEqual(['s1'])
+  })
+
+  // --- (b) the sweep ---------------------------------------------------------
+  describe('sweepableTmpFiles — only a dead pid AND a settled file', () => {
+    const NOW_T = 1_785_100_000_000
+    const dead = (pid) => ({ exists: pid !== 7777 })
+    const call = (entries) =>
+      sweepableTmpFiles({ entries, lockName: 'batch-lock.json', now: NOW_T, probe: dead, staleMs: 60_000 })
+
+    it('takes an orphan whose pid is dead and which has settled', () => {
+      expect(call([{ name: 'batch-lock.json.tmp-7777', mtimeMs: NOW_T - 600_000 }])).toEqual([
+        'batch-lock.json.tmp-7777',
+      ])
+    })
+
+    it('spares one whose pid is ALIVE — a process mid-write keeps its tmp', () => {
+      expect(call([{ name: 'batch-lock.json.tmp-4242', mtimeMs: NOW_T - 600_000 }])).toEqual([])
+    })
+
+    it('spares a JUST-WRITTEN tmp even from a dead pid — it may still be in flight', () => {
+      expect(call([{ name: 'batch-lock.json.tmp-7777', mtimeMs: NOW_T - 1000 }])).toEqual([])
+    })
+
+    it('recognises both name shapes and touches nothing else in the directory', () => {
+      const entries = [
+        { name: 'batch-lock.json.tmp-7777', mtimeMs: NOW_T - 600_000 },
+        { name: 'batch-lock.json.tmp-7777-3', mtimeMs: NOW_T - 600_000 }, // per-attempt name
+        { name: 'batch-lock.json', mtimeMs: NOW_T - 600_000 },
+        { name: 'boundary.log', mtimeMs: NOW_T - 600_000 },
+        { name: 'other-lock.json.tmp-7777', mtimeMs: NOW_T - 600_000 },
+        { name: 'batch-lock.json.tmp-notapid', mtimeMs: NOW_T - 600_000 },
+      ]
+      expect(call(entries)).toEqual(['batch-lock.json.tmp-7777', 'batch-lock.json.tmp-7777-3'])
+    })
+  })
+
+  it('acquire sweeps exactly the dead orphan out of a seeded directory', () => {
+    const old = Date.now() - 10 * 60_000
+    writeFileSync(join(dir, 'batch-lock.json.tmp-7777'), '{}') // dead writer
+    writeFileSync(join(dir, 'batch-lock.json.tmp-4242'), '{}') // live writer
+    utimesSync(join(dir, 'batch-lock.json.tmp-7777'), old / 1000, old / 1000)
+    utimesSync(join(dir, 'batch-lock.json.tmp-4242'), old / 1000, old / 1000)
+    acquire('s1', {
+      lockPath,
+      pid: 1,
+      pidStartedAt: NOW,
+      bootTime: 0,
+      probePidFn: (pid) => ({ exists: pid !== 7777, startedAt: null }),
+    })
+    expect(readdirSync(dir).sort()).toEqual(['batch-lock.json', 'batch-lock.json.tmp-4242'])
   })
 })
 
