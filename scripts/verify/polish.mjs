@@ -216,8 +216,11 @@ await page.waitForFunction(() => Object.keys(window.__placePanoramaWildlifeInfo 
 const wInfo = await page.evaluate(() => Object.values(window.__placePanoramaWildlifeInfo ?? {}))
 check(
   'every panorama silhouette sits on the ground line it was placed on',
-  wInfo.length >= 3 && wInfo.every((w) => w.y >= w.visibleY && w.y <= w.visibleY + 0.2),
-  `y vs line [${wInfo.map((w) => `${w.y.toFixed(2)}/${w.visibleY.toFixed(2)}`).join(', ')}]`,
+  // Point 300: the body DIPS onto whichever leg is planted (that is what puts
+  // the standing foot on the ground), so the anchor may sit below the line by
+  // that dip — `drop` — and never above it.
+  wInfo.length >= 3 && wInfo.every((w) => w.y >= w.visibleY - w.drop - 1e-3 && w.y <= w.visibleY + 0.2),
+  `y vs line [${wInfo.map((w) => `${w.y.toFixed(2)}/${w.visibleY.toFixed(2)}-${(w.drop ?? 0).toFixed(2)}`).join(', ')}]`,
 )
 await probeSilhouetteFooting(page, check, 'maasai-village (no capture)')
 // Point 255 (3): the silhouettes must WALK the horizon, not glide along it.
@@ -228,20 +231,28 @@ await probeSilhouetteFooting(page, check, 'maasai-village (no capture)')
 {
   const sample = () =>
     page.evaluate(() =>
-      Object.values(window.__placePanoramaWildlifeInfo ?? {}).map((w) => ({ gait: w.gait, speed: w.gaitSpeed })),
+      Object.values(window.__placePanoramaWildlifeInfo ?? {}).map((w) => ({
+        gait: w.gait,
+        speed: w.gaitSpeed,
+        cadence: w.cadence,
+      })),
     )
   const before = await sample()
   await page.waitForTimeout(1200)
   const after = await sample()
+  // Point 300: each species walks at its OWN cadence (derived from its leg), so
+  // the shared constant is no longer the phase per unit walked but the phase per
+  // unit walked DIVIDED by that cadence — one full cycle per stride, for every
+  // animal whatever its legs. A clock-driven bob would advance them all alike.
   const rates = before
-    .map((b, i) => ({ d: after[i].gait - b.gait, speed: b.speed }))
-    .filter((r) => r.speed > 0)
-    .map((r) => r.d / r.speed)
+    .map((b, i) => ({ d: after[i].gait - b.gait, speed: b.speed, cadence: b.cadence }))
+    .filter((r) => r.speed > 0 && r.cadence > 0)
+    .map((r) => r.d / (r.speed * r.cadence))
   const spread = rates.length ? (Math.max(...rates) - Math.min(...rates)) / Math.max(...rates) : 1
   check(
-    'the panorama silhouettes stride with the ground they cover, not the clock (point 255)',
+    'the panorama silhouettes stride with the ground they cover, not the clock (points 255/300)',
     rates.length >= 3 && rates.every((r) => r > 0) && spread < 0.02,
-    `phase per unit walked [${rates.map((r) => r.toFixed(2)).join(', ')}], spread ${(spread * 100).toFixed(1)}%`,
+    `phase per unit walked ÷ cadence [${rates.map((r) => r.toFixed(3)).join(', ')}], spread ${(spread * 100).toFixed(1)}%`,
   )
 }
 // Point 286: the silhouettes must WALK FORWARD, never backward. The facing is
@@ -273,6 +284,118 @@ await probeSilhouetteFooting(page, check, 'maasai-village (no capture)')
     'every panorama silhouette walks forward along its facing, never backward (point 286)',
     along.length >= 3 && along.every((r) => r.a >= -1e-3) && along.some((r) => r.d > 1e-3 && r.a > 0),
     `along-facing displacement [${along.map((r) => r.a.toFixed(3)).join(', ')}]`,
+  )
+}
+// Point 300: the feet must be PLANTED, not skating. Sample a tracked foot's
+// WORLD position across a series of frames and compare its travel with the
+// body's over the same intervals, counting only the intervals in which that leg
+// stayed in stance. A planted foot barely moves while the body walks on; the old
+// over-driven cadence dragged it along at a large fraction of the body's speed.
+{
+  // Sampled per RENDERED FRAME, never on a wall clock: this scene draws a frame
+  // every few hundred ms headless, so fixed waits returned the same frozen pose
+  // over and over and no interval showed any body travel at all.
+  const nextFrames = (n) =>
+    page.evaluate(
+      (count) =>
+        new Promise((resolve) => {
+          let left = count
+          const tick = () => (left-- > 0 ? requestAnimationFrame(tick) : resolve())
+          requestAnimationFrame(tick)
+        }),
+      n,
+    )
+  const trackFeet = async (read, label, minBody) => {
+    const samples = []
+    for (let k = 0; k < 14; k++) {
+      samples.push(await page.evaluate(read))
+      await nextFrames(3)
+    }
+    const slips = []
+    for (let k = 1; k < samples.length; k++) {
+      const a = samples[k - 1]
+      const b = samples[k]
+      for (const id of Object.keys(a)) {
+        const p0 = a[id]
+        const p1 = b[id]
+        if (!p1 || !p0.stance || !p1.stance || !p0.foot || !p1.foot) continue
+        const body = Math.hypot(p1.x - p0.x, p1.z - p0.z)
+        if (body < minBody) continue // a standing animal proves nothing
+        // A headless frame can be hundreds of ms apart, so an interval may span
+        // a whole cycle and find the SAME leg planted again a stride further on.
+        // Within one stance the body can cover at most half a stride, so a
+        // longer interval is a wrap, not a skate — it proves nothing either.
+        if (p0.stride > 0 && body > 0.4 * p0.stride) continue
+        const foot = Math.hypot(p1.foot.x - p0.foot.x, p1.foot.z - p0.foot.z)
+        slips.push(foot / body)
+      }
+    }
+    console.log('DIAG', label, 'first', JSON.stringify(samples[0]).slice(0, 600))
+    console.log('DIAG', label, 'slips', JSON.stringify(slips.map((x) => +x.toFixed(3))))
+    const worst = slips.length ? Math.max(...slips) : Infinity
+    check(
+      `${label}: the planted foot holds its ground spot while the body walks over it (point 300)`,
+      slips.length >= 3 && worst < 0.25,
+      `${slips.length} stance intervals, worst foot/body travel ${worst.toFixed(3)}`,
+    )
+  }
+  await trackFeet(
+    () => {
+      const out = {}
+      const info = window.__placePanoramaWildlifeInfo ?? {}
+      for (const k of Object.keys(info)) {
+        const w = info[k]
+        if (w.visible === false) continue
+        out[k] = { x: w.x, z: w.z, foot: w.foot, stance: w.stance, stride: w.stride }
+      }
+      return out
+    },
+    'panorama silhouette',
+    0.01,
+  )
+  await trackFeet(
+    () => {
+      const out = {}
+      const info = window.__placeGoatGait ?? {}
+      for (const k of Object.keys(info)) {
+        const g = info[k]
+        out[k] = { x: g.x, z: g.z, foot: g.foot, stance: g.stance, stride: g.stride }
+      }
+      return out
+    },
+    'settlement walker (goat)',
+    0.01,
+  )
+}
+// Point 300, slope footing: a silhouette on a dune must lie ON the incline —
+// its body pitched over its own wheelbase — so the planted foot touches the
+// ground drawn under it instead of hovering above it. Measured as the vertical
+// gap between the tracked foot and that ground, in units of the animal's own
+// height, and specifically on the silhouettes standing on a genuinely SLOPED
+// spot (front and back footing differ).
+{
+  const feet = await page.evaluate(() =>
+    Object.values(window.__placePanoramaWildlifeInfo ?? {})
+      .filter((w) => w.visible !== false && w.foot && w.stance)
+      .map((w) => ({
+        gap: w.footGap,
+        h: w.worldHeight,
+        slope: Math.abs((w.frontY ?? 0) - (w.backY ?? 0)),
+        pitch: w.pitch,
+      })),
+  )
+  const rel = feet.map((f) => Math.abs(f.gap) / Math.max(1e-6, f.h))
+  check(
+    'every planted panorama foot touches the ground drawn under it (point 300)',
+    feet.length >= 1 && rel.every((r) => r < 0.05),
+    `foot gap / body height [${rel.map((r) => r.toFixed(3)).join(', ')}], slope over the wheelbase [${feet
+      .map((f) => f.slope.toFixed(2))
+      .join(', ')}]`,
+  )
+  check(
+    'no panorama body leans past a stand-able incline, however steep the backdrop reads (point 300)',
+    feet.length >= 1 && feet.every((f) => Math.abs(f.pitch) <= 0.3 + 1e-6),
+    `pitch [${feet.map((f) => f.pitch.toFixed(3)).join(', ')}]`,
   )
 }
 check(

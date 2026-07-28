@@ -282,6 +282,7 @@ function Goats({ seed, count, pen, colliders }: { seed: number; count: number; p
             z: pz,
             dist: s.dist,
             phase,
+            stride: rig.stride,
             stance: isStance(phase + parts.legs[0].phaseOffset),
             foot: { x: foot.x, y: foot.y, z: foot.z },
           }

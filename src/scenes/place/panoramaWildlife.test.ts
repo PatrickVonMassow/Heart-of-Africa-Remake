@@ -13,9 +13,8 @@ import {
   panoramaDriftVelocity,
   panoramaDriftYaw,
   panoramaGaitDistance,
-  panoramaGaitNod,
 } from './panoramaWildlife'
-import { buildElephantParts, GAIT_SWING, gaitBodyLift, gaitPhase, gaitRig } from '../../render/fauna'
+import { buildElephantParts, GAIT_MAX_PITCH, GAIT_SWING, gaitBodyLift, gaitPhase, gaitRig, groundPitch } from '../../render/fauna'
 
 /** The cadence a panorama silhouette really walks on: read off its own rig, as
  *  PlaceScene does (point 300) — never the one shared constant it used to be. */
@@ -119,7 +118,6 @@ describe('panorama silhouette gait pose (point 255 — walking, not sliding)', (
     // the clock runs — the whole point of a distance-driven gait.
     expect(phaseAt(120, 0, 900)).toBe(0)
     expect(gaitBodyLift(phaseAt(120, 0, 900), RIG.legLength)).toBe(0)
-    expect(panoramaGaitNod(phaseAt(120, 0, 900))).toBe(0)
   })
 
   it('steps faster for a faster drift, at the same instant', () => {
@@ -150,12 +148,18 @@ describe('panorama silhouette gait pose (point 255 — walking, not sliding)', (
     expect(gaitBodyLift(Math.PI / 2, 2 * L)).toBeCloseTo(2 * gaitBodyLift(Math.PI / 2, L), 12)
   })
 
-  it('nods gently fore and aft — a rock, never a seesaw', () => {
-    expect(panoramaGaitNod(0)).toBe(0)
-    let maxNod = 0
-    for (let i = 0; i <= 60; i++) maxNod = Math.max(maxNod, Math.abs(panoramaGaitNod((i / 60) * 4 * Math.PI)))
-    expect(maxNod).toBeGreaterThan(0)
-    expect(maxNod).toBeLessThan(0.09) // ≈5°, invisible as a tilt but alive
+  it('holds its body to the ground slope and never leans past what an animal could stand on (point 300)', () => {
+    // The backdrop COMPRESSES a landscape into a few dozen world units, so the
+    // relief under a silhouette's own wheelbase can read as a cliff: measured
+    // live, one spot gave a 5.5-unit rise over a 5-unit wheelbase, which
+    // unclamped tipped the body 61° nose-down. A walkable incline passes through
+    // untouched; an impossible one is capped.
+    const wheelbase = RIG.wheelbase * 3 // the silhouette's enlarged frame
+    expect(Math.abs(groundPitch(1, 0.4, wheelbase))).toBeLessThan(GAIT_MAX_PITCH) // a real slope: untouched
+    expect(groundPitch(1, 0.4, wheelbase)).toBeCloseTo(Math.atan2(-0.6, wheelbase), 12)
+    expect(groundPitch(13.6, 8.1, wheelbase)).toBe(-GAIT_MAX_PITCH) // the measured cliff: capped
+    expect(groundPitch(8.1, 13.6, wheelbase)).toBe(GAIT_MAX_PITCH)
+    expect(GAIT_MAX_PITCH).toBeLessThan(0.4) // ≈17°, a lean, never a dive
   })
 })
 

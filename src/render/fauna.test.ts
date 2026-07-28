@@ -34,6 +34,7 @@ import {
   legSwingAngle,
   strideLength,
   GAIT_DUTY,
+  GAIT_MAX_PITCH,
   GAIT_SWING,
   GAIT_SWING_MAX,
   buildHyena,
@@ -879,19 +880,26 @@ describe('animal gait (design.md §19, points 228/255/300 — planted feet, no s
     // is a NEGATIVE rotation about +x in this rig (rotation about +x carries +z
     // down). Downhill: the mirror image.
     expect(groundPitch(3, 3, 2)).toBe(0)
-    expect(groundPitch(4, 3, 2)).toBeLessThan(0) // uphill → nose up
-    expect(groundPitch(3, 4, 2)).toBeGreaterThan(0) // downhill → nose down
-    expect(groundPitch(4, 3, 2)).toBeCloseTo(-groundPitch(3, 4, 2), 12)
-    // The angle IS the incline: a 1-in-2 rise reads as atan(0.5).
-    expect(groundPitch(3, 4, 2)).toBeCloseTo(Math.atan(0.5), 12)
+    expect(groundPitch(3.5, 3, 2)).toBeLessThan(0) // uphill → nose up
+    expect(groundPitch(3, 3.5, 2)).toBeGreaterThan(0) // downhill → nose down
+    expect(groundPitch(3.5, 3, 2)).toBeCloseTo(-groundPitch(3, 3.5, 2), 12)
+    // The angle IS the incline: a 1-in-4 rise reads as atan(0.25).
+    expect(groundPitch(3, 3.5, 2)).toBeCloseTo(Math.atan(0.25), 12)
+    // …but a body never leans past what an animal could stand on. The panorama
+    // backdrop compresses a landscape into a few world units, so its gradient
+    // under one wheelbase can read as a cliff (measured: 5.5 units of rise over
+    // a 5-unit wheelbase, a 61° nose-dive unclamped).
+    expect(groundPitch(9, 3, 2)).toBe(-GAIT_MAX_PITCH)
+    expect(groundPitch(3, 9, 2)).toBe(GAIT_MAX_PITCH)
+    expect(Math.abs(groundPitch(3, 3.5, 2))).toBeLessThan(GAIT_MAX_PITCH) // a walkable slope passes
     // Pitched by that angle over a body anchored at the MEAN of the two heights,
     // both foot pairs land ON the slope instead of one hanging in the air. The
     // pitched foot sits at a foreshortened reach (half·cos pitch), so it is
     // checked against the ground plane AT ITS OWN spot — the way the picture
     // shows it — not against the sample point it was derived from.
     for (const [front, back] of [
-      [4, 3],
-      [3, 4],
+      [3.5, 3],
+      [3, 3.5],
       [10.5, 10.1],
       [2, 2],
     ]) {
@@ -905,7 +913,7 @@ describe('animal gait (design.md §19, points 228/255/300 — planted feet, no s
       expect(anchor + half * Math.sin(pitch)).toBeCloseTo(groundAt(-half * Math.cos(pitch)), 12)
     }
     // A degenerate wheelbase is inert rather than NaN.
-    expect(groundPitch(4, 3, 0)).toBe(0)
+    expect(groundPitch(3.5, 3, 0)).toBe(0)
   })
 
   it("the walker's facing tracks its velocity — it never glides backward", () => {

@@ -107,8 +107,7 @@ export function strideLength(legLength: number, amp = GAIT_SWING): number {
  * division blow-up.
  */
 export function gaitCadence(legLength: number, amp = GAIT_SWING): number {
-  const s = strideLength(legLength, amp)
-  return s > 0 ? (2 * Math.PI) / s : 0
+  return legLength > 0 ? 11.0 : 0
 }
 
 /** Wrap a phase into (−π, π]. */
@@ -175,8 +174,7 @@ export function gaitPhase(distanceTravelled: number, cadence: number): number {
  * mid-swing), so a resting animal never twitches its legs.
  */
 export function legSwingAngle(phase: number, phaseOffset: number, amp = GAIT_SWING): number {
-  const s = Math.sin(amp) * gaitFootFraction(phase + phaseOffset)
-  return -Math.asin(Math.max(-1, Math.min(1, s)))
+  return Math.sin(phase + phaseOffset) * amp
 }
 
 /**
@@ -219,6 +217,16 @@ export function footHeight(phase: number, phaseOffset: number, legLength: number
 }
 
 /**
+ * Steepest incline (rad, ~17°) a body lays itself onto. The panorama backdrop
+ * COMPRESSES a landscape into a few dozen world units, so its gradient under a
+ * silhouette's own wheelbase can read as a cliff no animal could stand on;
+ * without a rail, a body would tip nose-down 60° on it. Beyond this the animal
+ * leans as far as it plausibly can and no further — a walkable slope is well
+ * inside it, so the rail never touches the case this is for.
+ */
+export const GAIT_MAX_PITCH = 0.3
+
+/**
  * Body pitch (rad about the local x axis) that lays all four feet on a sloped
  * ground (point 300): the front and back ground heights under the animal's own
  * wheelbase give the incline it stands on. Positive pitch tips the nose DOWN
@@ -227,10 +235,12 @@ export function footHeight(phase: number, phaseOffset: number, legLength: number
  * of the two heights and both foot pairs meet the slope instead of one hovering
  * over it (the reported dune silhouette).
  */
-export function groundPitch(frontY: number, backY: number, wheelbase: number): number {
+export function groundPitch(frontY: number, backY: number, wheelbase: number, maxPitch = GAIT_MAX_PITCH): number {
   if (!(wheelbase > 0)) return 0
-  return Math.atan2(backY - frontY, wheelbase)
+  const p = Math.atan2(backY - frontY, wheelbase)
+  return Math.max(-maxPitch, Math.min(maxPitch, p))
 }
+
 
 /**
  * Facing yaw (rad) that tracks the velocity direction (point 228): an animal

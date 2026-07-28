@@ -88,7 +88,6 @@ import {
   luminance,
   panoramaDriftYaw,
   panoramaGaitDistance,
-  panoramaGaitNod,
   excludedAzimuthSpan,
   isAzimuthExcluded,
   type AzimuthSpan,
@@ -1383,14 +1382,16 @@ function PanoramaWildlife({
         // of speed. `drop`/`pitch`/`frontY`/`backY` carry the point-300 footing:
         // how far the body dipped onto its stance leg and how it lies on the
         // slope under its own wheelbase.
-        info[i] = { y, visibleY: groundY, apparentDeg: it.apparentDeg, hazeLum: it.hazeLum, azimuth, visible: !hidden, x, z, yaw, radius: it.radius, worldHeight: it.worldHeight, gait: phase, gaitSpeed: Math.abs(it.radius * it.drift) / (it.scale > 0 ? it.scale : 1), cadence: it.rig.cadence, drop: -lift, pitch, frontY, backY, stance: isStance(phase + it.parts.legs[0].phaseOffset) }
+        info[i] = { y, visibleY: groundY, apparentDeg: it.apparentDeg, hazeLum: it.hazeLum, azimuth, visible: !hidden, x, z, yaw, radius: it.radius, worldHeight: it.worldHeight, gait: phase, gaitSpeed: Math.abs(it.radius * it.drift) / (it.scale > 0 ? it.scale : 1), cadence: it.rig.cadence, stride: it.rig.stride * it.scale, drop: -lift, pitch, frontY, backY, stance: isStance(phase + it.parts.legs[0].phaseOffset) }
       }
       g.position.set(x, y, z)
-      // Nod fore/aft in the body's own frame (YXZ: yaw first, so x is the
-      // walking pitch) — over the ground slope the body lies on (point 300).
+      // Lie on the ground slope in the body's own frame (YXZ: yaw first, so x
+      // is the walking pitch). Point 300: this is the ONLY pitch now — the old
+      // cosmetic fore/aft nod rocked the body about its feet and so lifted the
+      // planted one off the ground.
       g.rotation.order = 'YXZ'
       g.rotation.y = yaw
-      g.rotation.x = pitch + panoramaGaitNod(phase)
+      g.rotation.x = pitch
       // The stride itself: diagonal legs swing in antiphase about their hips.
       const legs = legRefs.current[i]
       if (legs) {
@@ -1409,6 +1410,13 @@ function PanoramaWildlife({
             lg.updateWorldMatrix(true, false)
             lg.localToWorld(foot)
             info[i].foot = { x: foot.x, y: foot.y, z: foot.z }
+            // How far the foot sits off the ground DRAWN under it — the
+            // point-300 slope gate: a planted foot on a dune must touch, not
+            // hover over, the incline it stands on.
+            info[i].footGap =
+              foot.y -
+              (panoramaStandY(foot.x, foot.z, lat, lon, seed, centerH, innerRadius, camX, camZ, EYE_HEIGHT) -
+                pw.sinkEpsilon)
           }
         }
       }
