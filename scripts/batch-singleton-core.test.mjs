@@ -497,13 +497,7 @@ describe('acquire (atomic test-and-set on the real filesystem)', () => {
 
   it('a persistent EPERM on the rename is REPORTED, never thrown', () => {
     acquire('s1', opts())
-    const res = markHandover('s1', {
-      lockPath,
-      point: 388,
-      ...noWait,
-      rename: eperm,
-      writeInPlace: eperm,
-    })
+    const res = markHandover('s1', { lockPath, point: 388, ...noWait, rename: eperm })
     expect(res.handed).toBe(false)
     expect(res.reason).toBe('write-failed')
     expect(String(res.error?.code)).toBe('EPERM')

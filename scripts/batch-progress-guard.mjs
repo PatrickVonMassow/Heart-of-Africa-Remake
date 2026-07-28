@@ -125,8 +125,12 @@ try {
     // only ever rewrote the same small file a second time within milliseconds —
     // and the THIRD rewrite of the turn, markHandover, was the one that failed
     // with EPERM three times on 28.07.2026 while a scanner still held the file
-    // the previous rename had just replaced. Writing the lock less is the first
-    // of the three defences; the retry and the in-place fallback are the others.
+    // the previous rename had just replaced. Writing the lock less is one of the
+    // TWO defences; the other is the bounded retry in scripts/atomic-write.mjs.
+    // There is deliberately no third: the write stays atomic — temp plus rename,
+    // never an in-place truncate — so a concurrent reader can never see half a
+    // lock (point 340). Where every attempt still fails, markHandover reports it
+    // and the allow below says so.
   }
 
   // Boundary claim (point 373) — only ever gathered for the owning session, and
