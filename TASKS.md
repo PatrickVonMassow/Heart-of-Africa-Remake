@@ -3023,6 +3023,31 @@ read that as "the criterion and its evidence section".
   confined to the closing set (the board, the review ledger, the work order's own point)
   and is withdrawn by anything else. Whatever the shape, the acceptance is the same as
   below: one observed handover, not a green unit test.
+  THIRD LIVE FINDING, 28.07.2026 11:20 — the UNIT SUITE writes into the REAL handover log.
+  `.claude/boundary.log` carries lines "WITHDRAWN point 388 by s1", and `s1` is the test
+  session id from `scripts/batch-singleton-core.test.mjs`. So a test run — which the
+  pre-push gate performs on every push — reaches into the live batch state and can
+  withdraw a boundary a real session has taken. The cores must be given their paths by
+  their caller (a temp dir in the test), and no test may fall back to the repo's
+  `.claude/`; a pure test asserting that the default paths are NOT touched when a base dir
+  is passed keeps it that way.
+  FOURTH LIVE FINDING, 28.07.2026 11:20 — THE DECISIVE ONE. A context compaction mints a
+  NEW session id, and the lock keeps the OLD one. Every ownership-gated guard then resolves
+  the session as foreign and STANDS DOWN — silently, because standing down is the correct
+  behaviour for a second window. `batch-progress-guard` is one of them, so at the 11:02
+  stop it never reached its boundary branch: the marker was not consumed, no HANDOVER line
+  was written, the lock kept no handed-over flag, and the launcher's 11:06 tick skipped
+  with "owner alive (pid-alive)" exactly as designed. The evidence is the state itself —
+  the marker for 378 still lies unconsumed while `--status` says a boundary stop would be
+  allowed. A batch that compacts its context can therefore NEVER hand over, which is a
+  standing wedge and not a rare one: this session compacted once and was mute afterwards.
+  FIX: the lock's identity must survive the id change. The lock already records `pid` and
+  `pidStartedAt` — the PROCESS is the stable identity, the session id is not — so
+  ownership resolves as ours when the recorded process is the one we run under, whatever
+  the session id says, and the lock is re-stamped with the new id when it does. Where the
+  process cannot be established, fall back to the id as today. A pure test pins it: same
+  pid + pidStartedAt but a different session id resolves as `mine`, a different pid does
+  not, and a stale `pidStartedAt` (pid reused) does not either.
   TEST THE WHOLE CHAIN, NOT THE PARTS (user 28.07.2026). Every part worked last night
   and the batch still stood still, so a green unit layer proves nothing here. The
   acceptance is ONE observed handover end to end: a point closed, the boundary taken,
