@@ -3470,37 +3470,49 @@ read that as "the criterion and its evidence section".
   and a non-empty body, the audit must accept an explicit unestimated-stub meta,
   or the stub blocks `--synced` and creates the block loop this design exists to
   prevent. Decide that in the spec, not in the debugger.
-  DELTA D — THE WATCHDOG, WHICH IS THE ONLY LAYER THAT SURVIVES A WEDGED SESSION.
+  DELTA D — THE TRANSPORT, WHICH IS WHAT ACTUALLY CLOSES THE WINDOW (user
+  decision 28.07.2026: "das Board ist schon lange nicht mehr privat — das ist
+  okay"). The board moves to the GH-Pages deploy this repository already runs. A
+  script CAN write there (commit + push, which a headless session has) and plain
+  HTTPS CAN read it back (no auth, no tool binding) — so for the first time the
+  unattended session can publish AND the check can verify the LIVE page rather
+  than the record of an attempt. The claude.ai artifact stays mirrored until the
+  user has moved their bookmark, then it is retired; the four-section structure
+  is untouched (memory `batch-dashboard-artifact` covers the STRUCTURE, and the
+  user's go covers only the transport).
+  Sub-decisions to settle IN the implementation, not afterwards: where on the
+  Pages site the board lives and what its URL is; that a board publish must not
+  spam the history (batch the commits, or give the board its own deploy path so
+  a board change is not a source change); and the deploy latency (~1–2 min) as
+  the new floor of "current", which the verification must tolerate rather than
+  flap on.
+  DELTA E — THE WATCHDOG AS THE BACKSTOP, NOT THE MECHANISM.
   `scripts/batch-autostart.mjs` already ticks every 15 minutes and already has
-  `notify`. It gains a board-currency check: `publishDue`, `publishDeferred` or
-  `publishFailed` outstanding beyond one tick sends the ntfy alert, naming how
-  many changes are pending and since when. It verifies the RECORD, not the page:
-  a claude.ai artifact is private and there is no non-interactive way for a Node
-  script to read it (the reviewer confirmed the roster offers no egress the page
-  could use either). An occasional in-session WebFetch spot-check of the artifact
-  is a nice-to-have, not a layer — WebFetch caches, so it can flap.
-  WHAT THIS GUARANTEES, STATED HONESTLY (and it is NOT 100 %, because every Stop
-  guard stays fail-open by CLAUDE.md §7.2 decree): interactively, the board
-  reflects every work-order change before the session's next state-changing call,
-  and a publish is verified as accepted rather than merely attempted. Headless,
-  the artifact cannot be updated at all — the user is alerted within one watchdog
-  tick that the board is behind, and by how much. Wedged session: alert only.
+  `notify`. It fetches the live board over HTTPS, compares the embedded
+  open-point fingerprint with TASKS.md, and sends the ntfy alert when the page
+  is behind — plus when `publishDue`/`publishFailed` are outstanding beyond one
+  tick. This is the only layer that still speaks when the session itself is
+  wedged, which is precisely when the user is away.
+  WHAT THIS GUARANTEES, STATED HONESTLY (and it is still not literally 100 %,
+  because every Stop guard stays fail-open by CLAUDE.md §7.2 decree): every
+  session — attended or headless — can publish, so a work-order change reaches
+  the live page before the session's next state-changing call, plus the deploy
+  latency; the publish is verified against the PAGE, not against a record of an
+  attempt; and if any of that fails, the watchdog names it within one tick.
   Residual risk: the watchdog disabled AND a session wedged at the same time.
-  OPEN FOR THE USER (do not decide this alone): closing the unattended window
-  instead of merely alerting requires a different transport — e.g. publishing the
-  board to the GH-Pages deploy this repo already runs, which a script CAN write
-  and plain HTTPS CAN read end-to-end. That trades the artifact's privacy for
-  headless publishability, and it touches a user-mandated structure
-  (`batch-dashboard-artifact`: never restructure without an explicit go).
   VERIFIABLE: pure Vitest per delta — the open-set hash marking `publishDue` only
-  on a real change; the deny exempting each remedy call and standing down without
-  an Artifact tool; the generator refusing to double-list a promoted point and
-  emitting a stub the audit accepts; the watchdog's alert decision over
-  outstanding/settled state with an injected clock. Live: a work-order change
-  followed by an attempted unrelated tool call is denied until published; and one
-  headless tick with a deferred publish produces exactly one ntfy alert.
+  on a real change; the deny exempting each remedy call; the generator refusing to
+  double-list a promoted point and emitting a stub the audit accepts; the
+  fingerprint comparison over a page that is current, one deploy behind, and
+  unreachable (unreachable must alert, never claim current); the watchdog's alert
+  decision with an injected clock. Live, and this is the acceptance test the whole
+  point exists for: a HEADLESS session (`claude -p`, no Artifact tool) changes the
+  work order and the live board shows it — verified by fetching the URL, not by
+  reading a state file.
   DOCS in the same commit: `docs/batch-autonomy.md` (what the board guarantees in
-  each mode) and CLAUDE.md §7.2, where the Stop-chain list names the new deny.
+  each mode, and the new transport), CLAUDE.md §7.2, where the Stop-chain list
+  names the new deny, and the memory entry `batch-dashboard-artifact`, whose
+  transport half is superseded by this point while its structure half stands.
 
 ## Closing (only after all points)
 
