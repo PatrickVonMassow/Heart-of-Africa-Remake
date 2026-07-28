@@ -104,6 +104,7 @@ export function statePathsFor(lockPath) {
     boundaryLogPath: join(dir, 'boundary.log'),
     boundaryPath: join(dir, 'batch-boundary.json'),
     inFlightPath: join(dir, 'batch-in-flight.json'),
+    claimPath: join(dir, 'batch-claim.json'),
     sessionsSeenPath: join(dir, 'sessions-seen.json'),
     activityPath: join(dir, 'session-activity.json'),
     alertPath: join(dir, 'parallel-alert.json'),
@@ -121,6 +122,7 @@ export const DOCTOR_STATE_PATH = DEFAULT_PATHS.doctorStatePath
 export const BOUNDARY_LOG_PATH = DEFAULT_PATHS.boundaryLogPath
 export const BOUNDARY_MARKER_PATH = DEFAULT_PATHS.boundaryPath
 export const IN_FLIGHT_PATH = DEFAULT_PATHS.inFlightPath
+export const CLAIM_PATH = DEFAULT_PATHS.claimPath
 export const ANCESTOR_CACHE_PATH = DEFAULT_PATHS.ancestorCachePath
 
 // --- Small IO helpers ----------------------------------------------------------
@@ -365,11 +367,21 @@ export function wedgeNotifyDecision({ alive, stage, ownerKey, lastNotifiedKey })
  *   - has tool activity fresher than PARALLEL_FRESH_MS.
  * Inputs are plain maps: sessionsSeen { sid: firstSeenAt },
  * activity { sid: lastToolAt }.
+ *
+ * `exclude` names sessions that are second by DESIGN rather than by accident —
+ * today exactly one: the window that has CLAIMED the batch through the sanctioned
+ * channel (point 395). It is a live top-level session with fresh tool activity, so
+ * it matches this classifier exactly, and flagging it would raise a
+ * parallel-session alert that blocks the owner's turn end — and the block demands
+ * the doctor, which is the one thing the handover then never gets past. A session
+ * that announced itself in the open is not the covert second driver this detector
+ * was written for.
  */
-export function classifyParallel({ sessionsSeen, activity, ownerSid, now }) {
+export function classifyParallel({ sessionsSeen, activity, ownerSid, now, exclude = [] }) {
   const out = []
+  const skip = new Set((exclude ?? []).filter(Boolean))
   for (const [sid, lastToolAt] of Object.entries(activity ?? {})) {
-    if (!sid || sid === ownerSid) continue
+    if (!sid || sid === ownerSid || skip.has(sid)) continue
     if (!(sessionsSeen && Object.prototype.hasOwnProperty.call(sessionsSeen, sid))) continue
     if (typeof lastToolAt !== 'number' || now - lastToolAt > PARALLEL_FRESH_MS) continue
     out.push({ sid, lastToolAt })
@@ -390,6 +402,9 @@ export function classifyParallel({ sessionsSeen, activity, ownerSid, now }) {
  *   'block-take-boundary' — owner, a point closed IN THIS SESSION and no marker:
  *                        the boundary is DUE and must be TAKEN, not offered
  *                        (point 388) — block, naming the one command
+ *   'allow-release'    — owner with an honoured CLAIM at a CLEAN moment (point
+ *                        395): the user took the batch back into the window they
+ *                        are sitting at. Release the lock and end here
  *   'allow-in-flight'  — owner WAITING on work it has declared and that is
  *                        provably still running (point 388, fifth live finding):
  *                        the turn may end, the lock stays held, nothing is handed
@@ -413,6 +428,7 @@ export function progressGuardDecision({
   launcher = 'unknown', // 'armed' | 'disabled' | 'unknown'
   boundaryDue = null, // point number closed in THIS session without a marker | null
   inFlight = false, // declared work PROVEN still running (assessInFlight().live)
+  claim = 'none', // 'none' | 'wait' | 'release' from batch-claim-core's releaseDecision
 }) {
   if (paused) return 'allow'
   if (formatSuspect) return 'block-format'
@@ -424,6 +440,13 @@ export function progressGuardDecision({
   if (!sid) return 'stand-down'
   if (ownership !== 'mine' && ownership !== 'acquired') return 'stand-down'
   if (unhandledAlert) return 'block-remediate'
+  // THE USER TOOK THE BATCH BACK (point 395). Ahead of the boundary on purpose:
+  // where both apply the session is finished either way, and handing the batch to
+  // the window the user is sitting at beats handing it to the launcher. The
+  // 'wait' verdict deliberately falls through to the ordinary decisions — a
+  // release is only ever offered at a moment `releaseDecision` has judged CLEAN,
+  // so a merge, a building agent or a running verification is never cut in half.
+  if (claim === 'release') return 'allow-release'
   // The point boundary (point 373). A valid boundary is only ever honoured with
   // an armed launcher — an unarmed one would turn "end the session" into "end the
   // batch", so it blocks instead. An INVALID claim falls through to the ordinary
@@ -1151,13 +1174,14 @@ export function clearActivity(sid, opts = {}) {
   }
 }
 
-/** Live parallel sessions right now (excluding `ownerSid`). */
+/** Live parallel sessions right now (excluding `ownerSid` and `opts.exclude`). */
 export function detectParallel(ownerSid, opts = {}) {
   return classifyParallel({
     sessionsSeen: readJson(opts.sessionsPath ?? SESSIONS_SEEN_PATH) ?? {},
     activity: readJson(opts.activityPath ?? SESSION_ACTIVITY_PATH) ?? {},
     ownerSid,
     now: opts.now ?? Date.now(),
+    exclude: opts.exclude ?? [],
   })
 }
 

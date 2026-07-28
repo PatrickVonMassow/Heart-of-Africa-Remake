@@ -38,6 +38,14 @@
 // allowed while a probe still confirms that work is running. It is not a way off
 // the block: the declaration expires, its evidence is re-proved every turn end,
 // and the lock stays HELD, so nothing is handed over to anyone.
+// THE USER TAKES THE BATCH BACK (28.07.2026, point 395): the night belongs to
+// fresh sessions, but the way BACK was missing. A window the user returns to
+// records a CLAIM (scripts/batch-claim.mjs); this guard is where the owner SEES
+// it, and — at the first CLEAN turn end, never mid-merge and never with a
+// delegated agent or a verification still running — RELEASES the lock and says so
+// in its own transcript. It is the boundary's sibling: there the batch goes to
+// the launcher, here it goes to the window the user is sitting at, which is why
+// the claim is honoured ahead of a valid boundary.
 // Format-safe: a TASKS.md whose checkboxes no longer parse blocks with a warning
 // instead of silently reading "complete". Fail-open on any error.
 import { appendFileSync, readFileSync } from 'node:fs'
@@ -49,12 +57,15 @@ import {
   raiseParallelAlert,
   readUnhandledAlert,
   progressGuardDecision,
+  readOwnerLock,
   BOUNDARY_LOG_PATH,
 } from './batch-singleton.mjs'
 import { gatherBoundary } from './batch-boundary.mjs'
 import { LAUNCHER_TASK_NAME } from './batch-boundary-core.mjs'
 import { gatherInFlight } from './batch-in-flight.mjs'
 import { describeInFlight } from './batch-in-flight-core.mjs'
+import { clearClaim, gatherClaim, gitOperationInProgress, handBackToClaimant } from './batch-claim.mjs'
+import { describeClaim, releaseDecision, reservationDecision } from './batch-claim-core.mjs'
 import { isPaused } from './batch-lock.mjs'
 
 const TASKS = fileURLToPath(new URL('../TASKS.md', import.meta.url))
@@ -118,15 +129,56 @@ try {
 
   // Ownership through the atomic acquire ONLY (it refuses while a live other
   // owner exists, resolves races to one winner, and refreshes when it is ours).
+  //
+  // A RESERVATION COMES FIRST (point 395), the same one the launcher and the
+  // resume hook honour. With the lock FREE, an honoured claim belongs to the
+  // window the user is sitting at, and a THIRD window must not acquire into that
+  // gap: it would take the lock the owner has just released, see the claim, judge
+  // the moment clean and release again — churn, a repeated "handed back" message
+  // and RELEASED spam in the boundary log. The claimant's own claim never reserves
+  // against itself (assessClaim answers `mine`, not `honour`), so the window the
+  // batch is waiting for still acquires here. Only asked when there is no lock to
+  // acquire against, and free when no claim file exists.
   let ownership = 'none'
   if (sid && !paused && open.length > 0) {
-    ownership = acquire(sid) // 'acquired' | 'mine' | 'held' | 'lost-race'
+    let reserved = false
+    if (!readOwnerLock()) {
+      try {
+        reserved = !reservationDecision({ assessment: gatherClaim(sid) }).acquire
+      } catch {
+        /* an unreadable claim reserves nothing */
+      }
+    }
+    if (!reserved) ownership = acquire(sid) // 'acquired' | 'mine' | 'held' | 'lost-race'
+  }
+
+  // A pending CLAIM (point 395) — gathered before the parallel detector, because
+  // the claiming window IS a second live top-level session and would otherwise be
+  // flagged as a rogue one. That block demands the doctor before any further batch
+  // work, which is the one thing a handover never gets past; and a session that
+  // announced itself through the sanctioned channel is not the covert second
+  // driver the detector was written for. Cheap: with no claim file on disk this
+  // returns before any probe runs.
+  let claimInfo = { claim: null, honour: false, reason: 'not-gathered', claimantSid: null, mine: false }
+  if (ownership === 'mine' || ownership === 'acquired') {
+    try {
+      claimInfo = gatherClaim(sid, { ownerLock: readOwnerLock() })
+      // The claim has done its job the moment its OWN window owns the batch — the
+      // same line the resume hook runs at its acquire. Left lying about, it would
+      // keep the launcher standing down for the rest of its expiry while the
+      // window it was written for is already working.
+      if (claimInfo.mine) clearClaim()
+    } catch {
+      /* an unreadable claim is simply no claim → nothing changes */
+    }
   }
 
   // Active detector (owner only): a second live top-level session?
   let unhandledAlert = null
   if (ownership === 'mine' || ownership === 'acquired') {
-    const parallel = detectParallel(sid)
+    const parallel = detectParallel(sid, {
+      exclude: claimInfo.honour && claimInfo.claimantSid ? [claimInfo.claimantSid] : [],
+    })
     if (parallel.length > 0) {
       raiseParallelAlert({ detectedBy: 'batch-progress-guard', ownerSid: sid, parallel })
     }
@@ -167,6 +219,24 @@ try {
     }
   }
 
+  // IS THIS A CLEAN MOMENT TO HAND THE BATCH BACK? Only asked when a claim is
+  // actually honoured, so the git probe costs an ordinary turn end nothing. A
+  // merge, a building agent and a running verification all make it 'wait' — the
+  // claim then simply stays pending and is honoured at the next turn end.
+  let claimVerdict = { verdict: 'none', reason: claimInfo.reason }
+  if (claimInfo.honour) {
+    try {
+      claimVerdict = releaseDecision({
+        assessment: claimInfo,
+        inFlightLive: inFlight.live === true,
+        gitOperation: gitOperationInProgress(),
+      })
+    } catch {
+      /* cannot judge cleanliness → do NOT release (the safe direction) */
+      claimVerdict = { verdict: 'wait', reason: 'cleanliness-unverifiable' }
+    }
+  }
+
   const decision = progressGuardDecision({
     sid,
     paused,
@@ -178,7 +248,51 @@ try {
     launcher: bound.launcher,
     boundaryDue: bound.due,
     inFlight: inFlight.live === true,
+    claim: claimVerdict.verdict,
   })
+
+  if (decision === 'allow-release') {
+    // HAND THE BATCH BACK. A real release, not a handover: the user is not the
+    // launcher, and leaving a lock behind that names a session which is done would
+    // only make the claiming window wait for a grace window it should not have to.
+    // The claim is stamped rather than deleted, so `--status` in the other window
+    // can say the batch is waiting for it, and the launcher keeps standing down
+    // until it is taken or the claim expires.
+    // Release, then stamp the claim ONLY if the release actually happened — the
+    // stamp says "the batch is waiting for you", so it is never written on the
+    // word of a session that freed nothing. Both lines live in handBackToClaimant
+    // so the pairing is testable.
+    const who = describeClaim(claimInfo)
+    const { released } = handBackToClaimant(sid, claimInfo.claim)
+    record(
+      released
+        ? `RELEASED to ${claimInfo.claimantSid} by ${sid} — the batch was claimed back into the user's window.`
+        : `RELEASE SKIPPED for ${claimInfo.claimantSid} by ${sid} — the lock does not name this session (already ` +
+            `released, taken over, or gone), so nothing was released here.`,
+    )
+    warn(
+      released
+        ? `YOU HAVE HANDED THE BATCH BACK. ${who} claimed it, this is a clean moment (nothing in flight, no ` +
+            `merge half-done), so the batch lock was RELEASED. You are no longer the batch worker: do not start ` +
+            `another point, do not merge to main, do not edit TASKS.md or the dashboard. The claiming window ` +
+            `takes it with \`node scripts/batch-claim.mjs --session <its id>\`. This turn may end.`
+        : `NOTHING WAS RELEASED HERE. ${who} claimed the batch and this stop is allowed, but the lock does not ` +
+            `name this session — it was already released, has been taken over, or is gone — so there was ` +
+            `nothing for this session to hand back. Either way you are NOT the batch worker: do not start ` +
+            `another point. Check with \`node scripts/batch-claim.mjs --status\`; if a stale lock is still ` +
+            `there, release it by hand (\`node scripts/batch-singleton.mjs release\`).`,
+    )
+    process.exit(0)
+  }
+
+  // Said at every turn end that does NOT release, so the owner knows somebody is
+  // waiting and why it is still holding on.
+  const claimNote =
+    claimVerdict.verdict === 'wait'
+      ? ` A CLAIM IS PENDING (${describeClaim(claimInfo)}): the user wants the batch back in their own window, ` +
+        `and it is released at the first CLEAN turn end — this one is not clean (${claimVerdict.reason}). ` +
+        `Finish what is in flight; do not start anything new.`
+      : ''
 
   if (decision === 'allow-in-flight') {
     // The stop is allowed because the session is WAITING, and it says on what —
@@ -192,7 +306,8 @@ try {
         `of that evidence stops checking out, and it expires on its own — so when the work lands, ACT on it ` +
         `(merge the agent, read the suite result), then either re-declare what is still running ` +
         `(\`node scripts/batch-in-flight.mjs --waiting-on …\`) or clear it (\`--clear\`).` +
-        (bound.due ? ` Note: the boundary for point ${bound.due} is still DUE — take it once the wait is over.` : ''),
+        (bound.due ? ` Note: the boundary for point ${bound.due} is still DUE — take it once the wait is over.` : '') +
+        claimNote,
     )
     process.exit(0)
   }
@@ -249,7 +364,8 @@ try {
         `CONTINUE it in this turn — poll, never idle — and take the boundary when it is done. If you cannot ` +
         `poll it inside this turn, DECLARE the wait instead: \`node scripts/batch-in-flight.mjs --waiting-on ` +
         `"<what>" --branch <agent branch> --pid <background run> --log <its log>\`. The stop is then allowed ` +
-        `while a probe still finds that work running — and blocked again the moment it does not.`,
+        `while a probe still finds that work running — and blocked again the moment it does not.` +
+        claimNote,
     )
   }
 
@@ -311,7 +427,8 @@ try {
       `stop. The OS launcher starts a fresh session and batch-resume-hook re-orients it from TASKS.md. ` +
       `Let a running agent pool DRAIN first — ending mid-flight throws its work away. If you are blocked on a ` +
       `user decision for EVERY open item, that is also a legitimate pause: create .claude/batch-paused with ` +
-      `a reason and add a "Von dir zu klären" dashboard card. Otherwise pick a DIFFERENT open item.`,
+      `a reason and add a "Von dir zu klären" dashboard card. Otherwise pick a DIFFERENT open item.` +
+      claimNote,
   )
 } catch (e) {
   // Never hard-block on a guard error — but never allow a stop SILENTLY either:

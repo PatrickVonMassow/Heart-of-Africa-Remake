@@ -353,6 +353,102 @@ the next point that closes — merge, tick, run `node scripts/batch-boundary.mjs
 the batch to be stopped for the observation; the chain is exactly the ordinary
 path through a point boundary.
 
+## The way back — claiming the batch into the window you are sitting at (28.07.2026, point 395)
+
+Everything above is a way OUT: a session ends and something else picks the batch
+up. There was no way IN. The user returns to a window that has been silent for
+hours, types `/clear`, says "I am back" — and that window resolves as a non-owner
+and correctly STANDS DOWN, while the night session keeps the lock and keeps
+working. The only move left was to kill the other session's lock by hand
+(`batch-singleton.mjs release`), which races whatever it was doing.
+
+So the returning window records a CLAIM, and the owner hands the batch back.
+
+```
+node scripts/batch-claim.mjs --session <id>   claim it — or take it, if it is free
+node scripts/batch-claim.mjs --status         who holds it, what is pending, how old
+node scripts/batch-claim.mjs --withdraw --session <id>    never mind
+```
+
+The user says nothing but "I am back"; the session runs the command itself. The
+session id is the one thing a CLI cannot look up — it gets no hook payload — so
+`batch-resume-hook` PRINTS the whole command with the id already in it at the
+moment it stands the session down. That message is what the returning user reads.
+
+The chain, and where each link lives:
+
+| step | who | what happens |
+| --- | --- | --- |
+| claim | the returning window | `acquire` first: with no live owner the claim is satisfied AT ONCE and the command reports the batch is yours. Otherwise `.claude/batch-claim.json` records `{ sessionId, pid, pidStartedAt, at }` |
+| see | the owner's Stop hook | `batch-progress-guard` gathers the claim before the parallel detector and asks `releaseDecision` whether this is a clean moment |
+| release | the owner's Stop hook | at a clean moment: `handBackToClaimant` — a real release, not a handover — and ONLY where the release really happened is the claim stamped `releasedAt`; `.claude/boundary.log` gets `RELEASED to <sid> by <sid>`, and the session is told out loud that it is no longer the batch worker. Where the lock did not name this session there is nothing to release, and nothing is stamped: the stamp is a promise to the claiming window and a session that freed nothing must not make it |
+| take | the returning window | the SAME command again: `acquire` succeeds and clears the claim. (Its next `SessionStart` does the same thing by itself.) |
+
+**A claim is a REQUEST, never a transfer.** Nothing in it writes the lock:
+ownership is still gained only through the atomic `acquire` in
+`batch-singleton.mjs`, whose test-and-set is what makes two racing windows resolve
+to exactly one owner. A claim can therefore never produce a second driving
+session — the failure the whole singleton exists to prevent.
+
+**Four bounds, each measurable rather than a matter of taste.**
+
+1. **It EXPIRES** (`CLAIM_MAX_AGE_MS`, 30 min, `HOA_CLAIM_MAX_MIN`). A claim file
+   left by a window that was closed hours ago must never hand the batch to nobody.
+2. **The claimant must be ALIVE, by IDENTITY.** The recorded pid must exist AND
+   have started when the claim says — a reused pid is a stranger. Same rule
+   `checkEvidence` applies to a declared background run; `resolveOwnership`
+   answers "is this claim mine", so there is no second notion of liveness beside
+   the lock's. That is also what stops a compaction-renamed owner from releasing
+   the batch to itself: the owner asks with its own lock's process identity, so
+   its own claim reads as its own.
+3. **ONE claim at a time.** `claimWriteDecision` refuses a second claim while a
+   first is live, so two windows are never both told the batch is coming to them.
+4. **The owner releases only at a CLEAN moment.** Never mid-merge, never with a
+   delegated agent still building or a verification running. The in-flight
+   evidence is the existing one (`assessInFlight().live`) and the git state is
+   probed (`MERGE_HEAD`, `CHERRY_PICK_HEAD`, `REVERT_HEAD`, `REBASE_HEAD`, an
+   unmerged index). Anything unclean makes the claim WAIT — it stays pending and
+   every block message names it — and it is honoured at the next turn end. The
+   git probe has a THIRD answer besides "clean" and a named operation:
+   `GIT_STATE_UNVERIFIABLE`, when it could not find out (a timeout under load, a
+   git that would not run). It waits too — "I could not look" read as "all clear"
+   is exactly the release-mid-merge this bound exists to prevent, and the timid
+   direction costs at most one more turn because the claim expires on its own.
+
+Two consequences that are easy to miss and were both built:
+
+- **The claimant is a second live top-level session by DESIGN.** It would trip the
+  parallel-session detector, and that block demands the doctor before any further
+  batch work — the one thing a handover never gets past. So the owner's guard
+  excludes the honoured claimant from `detectParallel`. A session that announced
+  itself through the sanctioned channel is not the covert second driver the
+  detector was written for; an unannounced one is still flagged exactly as before.
+- **A live claim RESERVES the batch.** Once the owner lets go, the lock lies FREE
+  until the claiming window runs its next command, and ANY window that reaches an
+  acquire in that gap would take it. So all three doors ask
+  `reservationDecision` first: `batch-autostart` skips its tick,
+  `batch-resume-hook` does not acquire, and the owner's own Stop guard
+  (`batch-progress-guard`) does not re-acquire. Without that third one a stood-down
+  window would take the freed lock at its next turn end, see the claim, judge the
+  moment clean and release again — repeated "handed back" messages and RELEASED
+  spam in `boundary.log`. The claimant's OWN claim reserves nothing against itself
+  (`assessClaim` answers `mine`, never `honour`), so the window the batch is
+  waiting for still acquires; and all three stand-downs are bounded by the same
+  expiry, so a claim can never strand the batch.
+
+Where two verdicts are close the mechanism chooses NOT to release: the owner
+keeping the batch for one more turn is a nuisance, a merge cut in half is a repair
+job.
+
+Decision logic: `scripts/batch-claim-core.mjs` (pure, dependency-injected,
+Vitest-covered in `scripts/batch-claim-core.test.mjs`). IO, probes and the CLI:
+`scripts/batch-claim.mjs`. The claim file is derived from the caller's lock path
+via `statePathsFor`, so a redirected lock redirects it too (finding 3).
+
+The one residual is the same one the in-flight declaration has: the guard only
+runs at a TURN END. A session that has stopped and is never re-invoked never sees
+the claim — its lock then ages out the honest way, and the claim expires with it.
+
 ## The two true residuals (NOT in the agent's control)
 
 1. **Auth needs a logged-in profile.** `claude` needs the user's interactive,

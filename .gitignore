@@ -60,6 +60,8 @@ scripts/.tile-cache
 .claude/batch-boundary.json.tmp-*
 .claude/batch-in-flight.json
 .claude/batch-in-flight.json.tmp-*
+.claude/batch-claim.json
+.claude/batch-claim.json.tmp-*
 # Per-branch baseline of the mechanism four-eyes gate — local bookkeeping. The
 # ledger it is judged against (.claude/mechanism-reviews.jsonl) IS tracked: a
 # review happens on a branch and the gate bites in the session that merges it.

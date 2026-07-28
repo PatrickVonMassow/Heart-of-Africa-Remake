@@ -20,7 +20,16 @@ import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { isAbsolute, join } from 'node:path'
 import { randomUUID } from 'node:crypto'
-import { acquire, convertPendingSpawn, readOwnerLock, noteTopLevelSession } from './batch-singleton.mjs'
+import {
+  acquire,
+  convertPendingSpawn,
+  readOwnerLock,
+  noteTopLevelSession,
+  findClaudeAncestor,
+  probePid,
+} from './batch-singleton.mjs'
+import { readClaim, clearClaim, maxAgeMs } from './batch-claim.mjs'
+import { assessClaim, reservationDecision } from './batch-claim-core.mjs'
 import { isPaused, pauseReason } from './batch-lock.mjs'
 
 const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url))
@@ -162,19 +171,44 @@ try {
           'or delete .claude/batch-paused) before resuming.',
       )
     } else {
+      // A RESERVATION (point 395): the user claimed the batch back into the window
+      // they are sitting at. A freshly started session — most of all one the OS
+      // launcher spawned — must NOT take the lock the owner is about to release
+      // for that window, or the claim would hand the batch straight back to a
+      // headless successor. Only a live, unexpired claim by a session that is not
+      // THIS one reserves; the walk that establishes our own identity is paid for
+      // only when a claim file actually exists.
+      const claim = readClaim()
+      const reservation = claim
+        ? assessClaim({
+            claim,
+            sid: sessionId,
+            ancestor: findClaudeAncestor(),
+            now,
+            maxAgeMs: maxAgeMs(),
+            probePid,
+          })
+        : { honour: false, mine: false, claimantSid: null }
+
       // Ownership: pending-spawn conversion first (launcher-spawned session),
       // then the ordinary atomic acquire. NO path overrides a live lock.
       const auth = autostartAuthorization(now)
       let ownership = 'none'
       const lock = readOwnerLock()
-      if (lock && lock.kind === 'pending-spawn') {
-        if (convertPendingSpawn(sessionId, { authorized: !!auth })) ownership = 'acquired-spawn'
-      }
-      if (ownership === 'none') {
-        const r = acquire(sessionId)
-        if (r === 'acquired' || r === 'mine') ownership = r
+      // The same predicate the owner's Stop guard applies before ITS acquire, so
+      // the rule lives in one place and cannot drift between the two doors.
+      if (reservationDecision({ assessment: reservation }).acquire) {
+        if (lock && lock.kind === 'pending-spawn') {
+          if (convertPendingSpawn(sessionId, { authorized: !!auth })) ownership = 'acquired-spawn'
+        }
+        if (ownership === 'none') {
+          const r = acquire(sessionId)
+          if (r === 'acquired' || r === 'mine') ownership = r
+        }
       }
       if (auth) clearAuthorized()
+      // The claim has done its job the moment its own window owns the batch.
+      if (reservation.mine && (ownership === 'acquired' || ownership === 'mine')) clearClaim()
 
       if (ownership === 'acquired-spawn') {
         console.log(
@@ -192,14 +226,24 @@ try {
       } else {
         const cur = readOwnerLock()
         const ageMin = cur ? Math.round((now - cur.claimedAt) / 60000) : 0
+        // THE WAY BACK (point 395). The stand-down is right, but for years it was
+        // also a dead end: the user returns to this window, says "I am back", and
+        // there was nothing to do but kill the other session's lock by hand. The
+        // command below is printed WITH this session's id already in it, because a
+        // CLI gets no hook payload and this is the one place the id is known.
         console.log(
           `${header} But another session OWNS the batch lock (session ${cur ? cur.sessionId : 'unknown'}, ` +
             `pid ${cur && cur.pid ? cur.pid : 'unknown'}, heartbeat ${ageMin} min ago, .claude/batch-lock.json) ` +
             'and its liveness check passed. STAND DOWN: this session is NOT the batch worker. Do NOT ' +
             'run batch actions, do NOT merge to main, do NOT edit TASKS.md or the dashboard. Answer the ' +
-            'user normally. If the user confirms this is the sole session, run ' +
-            '`node scripts/batch-singleton.mjs status` to inspect and `node scripts/batch-singleton.mjs release` ' +
-            'to free the lock, then restart the session.',
+            'user normally. THE WAY BACK: if the user says they are back and want the batch worked HERE, run ' +
+            `\`node scripts/batch-claim.mjs --session ${sessionId}\` — that claims the batch, the owning session ` +
+            'releases it at its next CLEAN turn end (never mid-merge, never with a delegated agent or a ' +
+            'verification still running), and re-running the SAME command takes it. Nothing else is needed from ' +
+            'the user. To inspect first: `node scripts/batch-claim.mjs --status`.' +
+            (reservation.honour
+              ? ` NOTE: session ${reservation.claimantSid} has already claimed the batch — do not claim over it.`
+              : ''),
         )
       }
     }
