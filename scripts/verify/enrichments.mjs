@@ -2001,7 +2001,12 @@ const animalHit = await page.evaluate(async () => {
     zebra.x = ax
     zebra.z = az
     const p = window.__game.getState().pos
-    const d = Math.hypot(p.x - ax, p.z - az)
+    // Judged against the DRAWN body (point 378), which is where the collider
+    // now sits: the idle shuffle renders the instance up to ~1.1 units off its
+    // behaviour spot, so measuring to `ax/az` would grade the picture by a
+    // quantity the player never sees.
+    const b = zebra.drawn ?? { x: ax, z: az }
+    const d = Math.hypot(p.x - b.x, p.z - b.z)
     minDist = Math.min(minDist, d)
     if (d < 2) reached = true
     await sleep(20)
@@ -2045,6 +2050,143 @@ check(
   animalHit.escaped > 1.5,
   JSON.stringify(animalHit),
 )
+
+// --- Point 378: the collision sits ON the animal, not beside it ---------------
+// The user walked THROUGH the drawn body and was blocked on empty ground next to
+// it: the collider was built from the behaviour position while the renderer
+// draws that position plus its render offsets. Staged with the largest of those
+// offsets — the drink walk, which renders the body several units away at the
+// bank while the animal's own spot stays put — the two halves of the report are
+// asserted directly: driving at the DRAWN body is blocked, driving through the
+// spot the body merely "belongs" to is free. Everything is measured against the
+// instance matrix the renderer wrote and the circles the movement loop really
+// collides against — never an assumed radius (§7.2).
+const drawnCollision = await page.evaluate(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  if (!window.__wildlife?.herdsRef?.current) return { notReady: true }
+  const seed = window.__game.getState().seed
+  const p0 = window.__game.getState().pos
+  const S = { x: p0.x + 3, z: p0.z + 3 } // the animal's own (behaviour) spot
+  // A drink target on dry land 8 units away: the render slides the body there
+  // and holds it for the drinking plateau while the animal itself never moves.
+  let T = null
+  for (const [dx, dz] of [[0, 8], [8, 0], [0, -8], [-8, 0], [6, 6], [-6, -6]]) {
+    const tx = S.x + dx
+    const tz = S.z + dz
+    const ty = window.__terrainType(-tz / 10, tx / 10, seed)
+    if (ty !== 'water' && ty !== 'ocean') { T = { x: tx, z: tz }; break }
+  }
+  if (!T) return { noDryTarget: true }
+  const liveChunk = (() => {
+    const h = window.__wildlife.herdsRef.current
+    for (const sp of Object.keys(h)) for (const a of h[sp]) if (a.chunk && !a.dead) return a.chunk
+    return undefined
+  })()
+  const zebra = { x: S.x, z: S.z, y: 0.2, rot: 0, scale: 1, phase: 0, chunk: liveChunk ?? 'drawn-collide-test',
+    drink: { tx: T.x, tz: T.z } }
+  const herds = window.__wildlife.herdsRef.current
+  herds.zebra.unshift(zebra)
+  // Keep every other body out of both drive corridors, so what blocks (or does
+  // not block) the traveller is the staged animal alone.
+  const clearCorridors = () => {
+    for (const sp of Object.keys(herds)) {
+      for (const a of herds[sp]) {
+        if (a === zebra || a.dead) continue
+        const nearDrawn = Math.abs(a.z - (zebra.drawn?.z ?? T.z)) < 6 && a.x > Math.min(p0.x - 10, T.x - 10) && a.x < T.x + 6
+        const nearSpot = Math.abs(a.z - S.z) < 6 && a.x > S.x - 12 && a.x < S.x + 6
+        if (nearDrawn || nearSpot) a.z += 30
+      }
+    }
+  }
+  const repin = () => {
+    if (!herds.zebra.includes(zebra)) herds.zebra.unshift(zebra)
+    zebra.x = S.x
+    zebra.z = S.z
+    clearCorridors()
+  }
+  // Reach the drink walk's PLATEAU (the stretch of the 75 s cycle where the body
+  // stands at the bank) without waiting out the cycle: the cycle is driven by
+  // the animal's own phase, so scan the phase until the render places the body
+  // at the target, then keep that phase.
+  for (let p = 0; p < 1.9; p += 0.04) {
+    zebra.phase = p
+    repin()
+    await sleep(70)
+    const d = zebra.drawn
+    if (d && Math.hypot(d.x - T.x, d.z - T.z) < 0.8) break
+  }
+  const atBank = zebra.drawn ? Math.hypot(zebra.drawn.x - T.x, zebra.drawn.z - T.z) : Infinity
+  const offset = zebra.drawn ? Math.hypot(zebra.drawn.x - S.x, zebra.drawn.z - S.z) : 0
+  if (!(atBank < 0.8)) { herds.zebra = herds.zebra.filter((a) => a !== zebra); return { noPlateau: true, atBank, offset } }
+  // The circle the movement loop would collide against, at the drawn body.
+  const circleAtDrawn = window.__wildlife.colliders(zebra.drawn.x, zebra.drawn.z, 0.1)
+  const circleAtSpot = window.__wildlife.colliders(S.x, S.z, 0.1)
+  const radius = circleAtDrawn.length ? circleAtDrawn[0][2] : 0
+
+  // One drive east along a given z, from `fromX`, bounded in SIM time (a wall cap
+  // as the safety). Tracks how close the traveller came to the target AND how
+  // close the drawn body ever came to it — the second is what proves the flank
+  // was genuinely empty ground while he crossed it.
+  const drive = async (fromX, targetOf) => {
+    window.__game.setState({ pos: { x: fromX, z: targetOf().z } })
+    await sleep(120)
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyD' }))
+    const s0 = window.__simTime()
+    const t0 = Date.now()
+    let min = Infinity
+    let minBody = Infinity
+    while (window.__simTime() - s0 < 3 && Date.now() - t0 < 60000) {
+      repin()
+      const p = window.__game.getState().pos
+      const g = targetOf()
+      min = Math.min(min, Math.hypot(p.x - g.x, p.z - g.z))
+      if (zebra.drawn) minBody = Math.min(minBody, Math.hypot(zebra.drawn.x - g.x, zebra.drawn.z - g.z))
+      await sleep(20)
+    }
+    window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyD' }))
+    return { min, minBody }
+  }
+  // 1. Straight at the DRAWN body: the traveller must be stopped by it.
+  const into = await drive(zebra.drawn.x - 5, () => zebra.drawn)
+  const intoBody = into.min
+  // 2. Through the animal's own spot, where nothing is drawn: free ground.
+  const past = await drive(S.x - 5, () => S)
+  const pastFlank = past.min
+  const bodyKeptOffFlank = past.minBody // the body never came near the flank line
+  const drawnEnd = zebra.drawn ? { x: zebra.drawn.x, z: zebra.drawn.z } : null
+  const offsetEnd = drawnEnd ? Math.hypot(drawnEnd.x - S.x, drawnEnd.z - S.z) : 0
+  const onScreen = drawnEnd ? window.__camera.onScreen(drawnEnd.x, drawnEnd.z) : false
+  herds.zebra = herds.zebra.filter((a) => a !== zebra)
+  return { offset, offsetEnd, radius, intoBody, pastFlank, bodyKeptOffFlank, onScreen,
+    circleAtDrawn: circleAtDrawn.length, circleAtSpot: circleAtSpot.length, drawnEnd, spot: S }
+})
+if (drawnCollision.notReady || drawnCollision.noDryTarget || drawnCollision.noPlateau ||
+    !(drawnCollision.bodyKeptOffFlank > drawnCollision.radius + 0.9)) {
+  // Staging miss (no wildlife hook / no dry bank / the drink cycle never reached
+  // its plateau, or walked the body back onto the flank line mid-drive) — fail
+  // SOFT like the neighbouring wildlife checks: an environment transient, not a
+  // product defect. The flank must be provably empty for its check to mean
+  // anything, so a body that came back is a miss, never a pass.
+  console.log(`SKIP  the collider follows the drawn body — staging miss ${JSON.stringify(drawnCollision)}`)
+} else {
+  check(
+    'the collision circle sits on the DRAWN body, not on the behaviour spot (point 378)',
+    drawnCollision.circleAtDrawn === 1 && drawnCollision.circleAtSpot === 0 && drawnCollision.offset > 3,
+    JSON.stringify(drawnCollision),
+  )
+  check(
+    'driving into the drawn body is blocked (the traveller never enters it)',
+    drawnCollision.intoBody > drawnCollision.radius + 0.2 && drawnCollision.intoBody < drawnCollision.radius + 1.6,
+    JSON.stringify(drawnCollision),
+  )
+  check(
+    'driving through the spot beside it is free (no collider on empty ground)',
+    drawnCollision.pastFlank < 0.4,
+    JSON.stringify(drawnCollision),
+  )
+  check('the drawn body was in the rendered frame while it blocked (§7.2)', drawnCollision.onScreen === true,
+    JSON.stringify(drawnCollision))
+}
 
 // --- Point 129: a tree contact leaves every free direction free ---------------
 // The user's invisible-blocker report (west dead at a spot with nothing

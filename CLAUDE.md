@@ -414,10 +414,11 @@ changes with it in the same commit.
    the canoe ride/drag depiction (§6.1/§7), and the bird's-eye collision
    with trees and animals (§11/§19 — a fast step is caught at the near
    edge with no tunnelling; small dressing and carcasses stay passable —
-   only the large solid dressing collides, and its collider is DERIVED
-   from the same `placedFloraAt` placement the renderer draws, so an
-   unrendered/suppressed plant can never leave a phantom collider,
-   point 129).
+   only the large solid dressing collides. EVERY collider here is DERIVED
+   from the placement the renderer DRAWS — the plant's `placedFloraAt`, the
+   animal's own instance matrix, never its behaviour spot, which the render
+   offsets leave a body-width or more away — so nothing unrendered leaves a
+   phantom collider, points 129/378).
    Evidence: docs/acceptance-evidence.md §4.
 
 5. **Port city.** At least Cairo as the enterable starting port with trade

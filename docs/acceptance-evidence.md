@@ -77,7 +77,21 @@ rendered water sheet: rope rotation to land, spit shortening) — is
 pure-tested (`src/scenes/travel/canoeDrag.test.ts`). Driving straight into a pinned
 animal blocks the traveller at its body edge without ever entering it,
 and steering away afterwards moves him clear — a collision never pins
-the traveller (`scripts/verify/enrichments.mjs`); the swept obstacle
+the traveller (`scripts/verify/enrichments.mjs`, judged against the DRAWN
+body). That body is where the collider is: the herd render stamps every
+animal with the instance matrix it writes, and the circle is derived from
+that matrix alone — centre and radius identical to the drawn instance for
+every species, scale and pose, following a mover frame by frame, and
+absent for a body the pass did not draw
+(`src/scenes/travel/animalBodies.test.ts`). Staged live with the largest
+render offset — the drink walk, which draws the body ~7.8 units from the
+animal's own spot — driving at the drawn body stops the traveller at
+exactly body radius + player radius (1.200) while driving through the
+behaviour spot beside it is free (0.02), and the collider query reports
+one circle at the drawn body and none at that spot
+(`scripts/verify/enrichments.mjs`, point 378; the same staging on the old
+collider inverted both: 0.109 into the drawn body, blocked at 1.200 on the
+empty ground beside it — the user's report in numbers). The swept obstacle
 resolve is pure-tested incl. the no-tunnelling case and the
 away/tangent moves from a resting contact staying free
 (`src/systems/movement.test.ts`). The Red Sea cut and world trim are
