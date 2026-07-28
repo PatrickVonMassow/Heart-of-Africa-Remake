@@ -3009,6 +3009,20 @@ read that as "the criterion and its evidence section".
   RETRY briefly on EPERM/EBUSY, and where it still fails, say so in the same breath as
   the allow: the stop may proceed, but the session must be told the handover did NOT
   happen, so it does not stop believing the batch was passed on.
+  SECOND LIVE FINDING, 28.07.2026 11:00 — the boundary is WITHDRAWN by the very work the
+  other guards demand. Taking it writes a marker; any further work withdraws it again
+  ("the session is working again; the lock stays held"), which is right in itself. But the
+  Stop chain routinely sends a session back to work AFTER the boundary is taken — a
+  missing timestamp, an unreviewed mechanism commit, a dashboard whose HEAD moved — and
+  each of those rounds silently un-takes the handover. Three rounds happened on the first
+  live run, and every one ended with the guard reporting the batch as standing still. A
+  boundary that only survives a turn with nothing left to do is not a mechanism, because
+  the Stop chain's whole purpose is to find something left to do. FIX: the withdrawal must
+  distinguish work that CONTINUES the batch from work a Stop guard DEMANDED — the latter
+  is part of ending, not of carrying on. Simplest honest shape: the marker survives edits
+  confined to the closing set (the board, the review ledger, the work order's own point)
+  and is withdrawn by anything else. Whatever the shape, the acceptance is the same as
+  below: one observed handover, not a green unit test.
   TEST THE WHOLE CHAIN, NOT THE PARTS (user 28.07.2026). Every part worked last night
   and the batch still stood still, so a green unit layer proves nothing here. The
   acceptance is ONE observed handover end to end: a point closed, the boundary taken,
