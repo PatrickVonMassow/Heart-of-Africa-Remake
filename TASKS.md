@@ -1393,8 +1393,11 @@ read that as "the criterion and its evidence section".
   TARGET: mouse movement pitches the view as well as turning it, at the same
   `balance.mouseSensitivity` (§20), CLAMPED just short of straight up and straight down so
   the world can never roll over — the clamp is a calibratable balance value, debug-editable
-  like its siblings (§21.2). Inverted look is NOT part of this point; do not add an option
-  nobody asked for.
+  like its siblings (§21.2). The vertical axis is INVERTED (user 28.07.2026): pushing the
+  mouse FORWARD looks DOWN, pulling it back looks UP — the flight-stick convention, and
+  the default. A debug-menu checkbox "Invert mouse look" (localized in both languages,
+  §21.3) toggles it, CHECKED by default, so the store field defaults to inverted rather
+  than defaulting off and being flipped somewhere else. Horizontal look is unaffected.
   THE GAMEPAD FOLLOWS (§17.5): the right stick already turns the first-person view, so its
   VERTICAL axis pitches it, through the same path — the §17.5 rule that the pad drives
   synthetic key events and never a second input path stays untouched, and the
