@@ -3068,35 +3068,6 @@ read that as "the criterion and its evidence section".
   DOCS in the same commit: CLAUDE.md §6's context-boundary bullet (it currently
   describes the half that exists) and `docs/batch-autonomy.md`.
 
-- [ ] 389. THE PUSH GATE BLOCKS A GOOD PUSH UNDER LOAD (28.07.2026, measured three times
-  in a row). `npm run test:unit` passes standing alone — 4003 tests green, twice — while
-  the same command inside `scripts/pre-push-gate.mjs` reports red and refuses the push,
-  on a machine the probe calls "UNDER LOAD, CPU 45 % across 16 cores" because two
-  delegated agents are working. The gate is measuring the machine, not the code.
-  THE ASYMMETRY IS ALREADY DECIDED, it is simply not applied here: point 296 established
-  that load produces false REDS and never false greens, and every browser suite already
-  labels a red taken under load as not-evidence. The push gate predates that rule and
-  consults nothing.
-  FIX IT THE WAY THE SUITES DO, and keep it visible: on a red, ask
-  `scripts/verify/machine-load.mjs`; if the machine is not quiet, RE-RUN the failing step
-  ONCE and use the second result. A step that fails twice blocks as it does today. Every
-  retry prints a line naming what was re-run and why — a silent retry would hide a real
-  intermittent defect, which is the failure the house rule about visible retries exists
-  for. A red on a QUIET machine still blocks immediately, with no retry.
-  DO NOT WEAKEN THE GATE: no skipping, no "warn instead of block", no bypass. The
-  question is only whether the FIRST red was evidence, and the answer comes from a second
-  run, not from a lowered bar.
-  MEASURE THE COST: record how long the re-run adds in the loaded case and how often it
-  fires over a working day. If the retry turns out to fire on most pushes, the finding is
-  that the pool is too large for the machine, not that the gate is wrong.
-  VERIFIABLE: pure Vitest on the decision — a red plus a quiet machine blocks without a
-  retry; a red plus a loaded machine retries once and passes on a green second run; two
-  reds block whatever the machine says; the retry line is emitted in exactly the retry
-  case. Plus one live push on a loaded machine that succeeds through the retry, with the
-  printed line recorded.
-  DOCS in the same commit: `scripts/verify/README.md` beside the quiet-machine section,
-  and the comment block at the head of `scripts/pre-push-gate.mjs`.
-
 ## Closing (only after all points)
 
 New points are appended BEFORE this section — it stays last in the file.
