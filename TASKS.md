@@ -2958,6 +2958,22 @@ read that as "the criterion and its evidence section".
   promised, or the THRESHOLD decides on noise — and fix accordingly. Loosening an
   assertion to reach green is refused; a check that waits for unbuilt work is marked as
   waiting, with the point number it waits for, so the suite can exit 0 honestly.
+  FIRST MEASUREMENT, 28.07.2026 11:52, quiet machine (CPU 13 %, GPU 0 %), WebGL 2:
+  `polish` reports 59 pass, 4 fail, 0 console errors, and the four are exactly the four
+  named above. Their figures change what each of them is:
+  · the rains dim the settlement sun and sky light — dry `{sun 2.4, hemi 0.8}` against wet
+    `{sun 1.993, hemi 0.664}`. The dimming EXISTS and is 17 %; the check is not asserting
+    an unbuilt state after all, its BAR is above what today delivers. Decide the bar
+    against what §19.9/§385 actually promise, and record the promise beside it.
+  · the leave capture bakes the surrounding terrain into the band — "bottom-quarter opaque
+    0.000", i.e. NOTHING opaque at the bottom of the band. That is a staging or capture
+    failure, not a bad threshold: the check has nothing to measure.
+  · the band is compass-true — "west 0px, east 0px". BOTH probes read zero, so the check
+    cannot decide east from west; it is not reporting a mirrored band, it is reporting a
+    blank one. Same family as the one above and probably the same cause.
+  · fire shadows ON — per-stone lit-minus-shadow `[1.6, -1.3, 0]`. Not a criterion sitting
+    on its edge: one stone shows a shadow, the next shows the OPPOSITE sign, the third
+    nothing at all. Judge the product here before touching the number.
   MEASURE BEFORE JUDGING A THRESHOLD: run the staging several times on a quiet machine
   (`node scripts/verify/machine-load.mjs` confirms) and record the spread beside the
   criterion, exactly as point 382 requires for the crocodile's eyes.
