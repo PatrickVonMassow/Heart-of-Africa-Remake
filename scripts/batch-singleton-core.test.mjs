@@ -403,15 +403,60 @@ describe('acquire (atomic test-and-set on the real filesystem)', () => {
   it('markHandover: only the owner may hand over, and it does not touch the heartbeat', () => {
     acquire('s1', opts())
     const before = readOwnerLock(lockPath).claimedAt
-    expect(markHandover('s2', { lockPath })).toBe(false)
+    expect(markHandover('s2', { lockPath })).toMatchObject({ handed: false, reason: 'not-owner' })
     expect(readOwnerLock(lockPath).handedOver).toBeUndefined()
-    expect(markHandover('s1', { lockPath, point: 388, now: before + 1000 })).toBe(true)
+    expect(markHandover('s1', { lockPath, point: 388, now: before + 1000 })).toMatchObject({
+      handed: true,
+      reason: 'ok',
+    })
     const lock = readOwnerLock(lockPath)
     expect(lock.handedOver).toBe(true)
     expect(lock.handedOverAt).toBe(before + 1000)
     expect(lock.handoverPoint).toBe(388)
     expect(lock.claimedAt).toBe(before) // the heartbeat is NOT bumped
     expect(lock.sessionId).toBe('s1') // and it is not a release
+  })
+
+  // --- FINDING 1 (28.07.2026): the lock write that kept failing ---------------
+  // `EPERM: operation not permitted, rename batch-lock.json.tmp-9904 ->
+  // batch-lock.json` — three times at a boundary stop. It threw out of
+  // markHandover into the guard's fail-open catch, the marker had already been
+  // consumed and the batch was never passed on. markHandover must REPORT.
+  const eperm = () => {
+    throw Object.assign(new Error('EPERM: operation not permitted, rename'), { code: 'EPERM' })
+  }
+  const noWait = { delays: [1, 1], sleep: () => {}, write: () => {}, remove: () => {} }
+
+  it('a persistent EPERM on the rename is REPORTED, never thrown', () => {
+    acquire('s1', opts())
+    const res = markHandover('s1', {
+      lockPath,
+      point: 388,
+      ...noWait,
+      rename: eperm,
+      writeInPlace: eperm,
+    })
+    expect(res.handed).toBe(false)
+    expect(res.reason).toBe('write-failed')
+    expect(String(res.error?.code)).toBe('EPERM')
+    expect(readOwnerLock(lockPath).handedOver).toBeUndefined() // and the lock is untouched
+  })
+
+  it('when even the retry fails, the handover is written IN PLACE rather than lost', () => {
+    acquire('s1', opts())
+    let written = null
+    const res = markHandover('s1', {
+      lockPath,
+      point: 388,
+      ...noWait,
+      rename: eperm,
+      writeInPlace: (p, text) => {
+        written = { p, obj: JSON.parse(text) }
+      },
+    })
+    expect(res).toMatchObject({ handed: true, reason: 'written-in-place', fallback: true })
+    expect(written.p).toBe(lockPath)
+    expect(written.obj).toMatchObject({ sessionId: 's1', handedOver: true, handoverPoint: 388 })
   })
 
   it('a heartbeat WITHDRAWS the handover — working is proof the session is not finished', () => {

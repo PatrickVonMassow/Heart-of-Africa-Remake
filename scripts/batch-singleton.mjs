@@ -30,7 +30,6 @@ import {
   readFileSync,
   writeFileSync,
   existsSync,
-  renameSync,
   openSync,
   closeSync,
   writeSync,
@@ -43,6 +42,7 @@ import { execFileSync } from 'node:child_process'
 import os from 'node:os'
 import { dirname, join } from 'node:path'
 import { repoPath } from './repo-paths.mjs'
+import { writeJsonAtomic, tryWriteJsonAtomic } from './atomic-write.mjs'
 
 // --- Constants (exported for tests and callers) -------------------------------
 
@@ -130,10 +130,40 @@ const readJson = (p) => {
     return null
   }
 }
-const writeJsonAtomic = (p, obj) => {
-  const tmp = `${p}.tmp-${process.pid}`
-  writeFileSync(tmp, JSON.stringify(obj, null, 2))
-  renameSync(tmp, p)
+// The atomic write RETRIES a Windows EPERM/EBUSY (scripts/atomic-write.mjs).
+//
+// THE MEASURED FAILURE (28.07.2026, five times in .claude/boundary.log, three of
+// them at a boundary stop): `EPERM: operation not permitted, rename
+// batch-lock.json.tmp-9904 -> batch-lock.json`. The rename that makes a lock
+// update atomic is NOT atomic against another process holding the TARGET — and
+// something reliably does, because the Stop chain rewrote this one small file
+// three times within milliseconds (acquire's heartbeat, the guard's explicit
+// heartbeat, then markHandover) and a real-time scanner opens each freshly
+// renamed file to inspect it. The third write is the one that failed, and it was
+// the handover.
+//
+// Three defences, in order: write the lock LESS (the redundant heartbeat is
+// gone), RETRY over the scanner's window, and — only when even that fails —
+// write in place. In-place is not atomic, but every reader of this lock already
+// survives an unreadable one (readOwnerLock answers null, and acquire treats a
+// fresh unreadable lock as HELD), whereas a lost handover wedges the batch.
+
+/**
+ * Write the owner lock, reporting rather than throwing:
+ *   { ok, attempts, fallback, error }
+ * `fallback: true` means the atomic path never succeeded and the content was
+ * written in place — worth naming in a log line, because it is the one write
+ * that a concurrent reader could catch half-finished.
+ */
+function writeLockSafely(lockPath, obj, opts = {}) {
+  const res = tryWriteJsonAtomic(lockPath, obj, opts)
+  if (res.ok) return { ok: true, attempts: res.attempts, fallback: false, error: null }
+  try {
+    ;(opts.writeInPlace ?? writeFileSync)(lockPath, JSON.stringify(obj, null, 2))
+    return { ok: true, attempts: res.attempts + 1, fallback: true, error: res.error }
+  } catch (e) {
+    return { ok: false, attempts: res.attempts + 1, fallback: true, error: e ?? res.error }
+  }
 }
 
 // --- Pure decision logic (dependency-injected, Vitest-covered) -----------------
@@ -610,8 +640,7 @@ export function heartbeat(sessionId, opts = {}) {
       next.pidBackfillFailed = true
     }
   }
-  writeJsonAtomic(lockPath, next)
-  return true
+  return writeLockSafely(lockPath, next, opts).ok
 }
 
 /** Owner-guarded lock update (e.g. the launcher rebinding its pending-spawn
@@ -619,8 +648,7 @@ export function heartbeat(sessionId, opts = {}) {
 export function updateOwnLock(sessionId, patch, lockPath = LOCK_PATH) {
   const lock = readOwnerLock(lockPath)
   if (!lock || lock.sessionId !== sessionId) return false
-  writeJsonAtomic(lockPath, { ...lock, ...patch, sessionId, claimedAt: Date.now() })
-  return true
+  return writeLockSafely(lockPath, { ...lock, ...patch, sessionId, claimedAt: Date.now() }).ok
 }
 
 export function isOwner(sessionId, lockPath = LOCK_PATH) {
@@ -681,19 +709,33 @@ export function release(sessionId, lockPath = LOCK_PATH) {
  *
  * Owner-guarded and no-op otherwise, and it must only ever be called where a
  * VALID boundary has been established (scripts/batch-progress-guard.mjs).
+ *
+ * It REPORTS rather than throws — `{ handed, reason, attempts, fallback, error }`
+ * — and that is the whole point of the shape (live finding 1, 28.07.2026). It
+ * used to throw an EPERM straight through the guard into its fail-open catch, so
+ * the stop proceeded, the marker had already been consumed and nothing recorded
+ * that the batch had NOT been passed on. A caller must be able to say "the stop
+ * may proceed, but the handover did not happen".
  */
 export function markHandover(sessionId, opts = {}) {
   const lockPath = opts.lockPath ?? LOCK_PATH
   const lock = readOwnerLock(lockPath)
-  if (!lock || lock.sessionId !== sessionId) return false
+  if (!lock || lock.sessionId !== sessionId) {
+    return { handed: false, reason: lock ? 'not-owner' : 'no-lock', attempts: 0, fallback: false, error: null }
+  }
   const now = opts.now ?? Date.now()
-  writeJsonAtomic(lockPath, {
-    ...lock,
-    handedOver: true,
-    handedOverAt: now,
-    handoverPoint: opts.point ?? null,
-  })
-  return true
+  const res = writeLockSafely(
+    lockPath,
+    { ...lock, handedOver: true, handedOverAt: now, handoverPoint: opts.point ?? null },
+    opts,
+  )
+  return {
+    handed: res.ok,
+    reason: res.ok ? (res.fallback ? 'written-in-place' : 'ok') : 'write-failed',
+    attempts: res.attempts,
+    fallback: res.fallback,
+    error: res.error,
+  }
 }
 
 /**
@@ -715,7 +757,7 @@ export function withdrawHandover(sessionId, opts = {}) {
   delete next.handedOver
   delete next.handedOverAt
   delete next.handoverPoint
-  writeJsonAtomic(lockPath, next)
+  if (!writeLockSafely(lockPath, next, opts).ok) return false
   // Recorded beside the handover it cancels: without this line, a launcher tick
   // that finds a live owner past the grace cannot be told apart from one whose
   // handover was legitimately taken back, and the acceptance evidence would be
@@ -755,7 +797,7 @@ export function convertPendingSpawn(sessionId, opts = {}) {
   try {
     const recheck = readOwnerLock(lockPath)
     if (!recheck || recheck.kind !== 'pending-spawn' || recheck.spawnedPid !== lock.spawnedPid) return false
-    writeJsonAtomic(lockPath, {
+    return writeLockSafely(lockPath, {
       v: 2,
       sessionId,
       kind: 'session',
@@ -764,8 +806,7 @@ export function convertPendingSpawn(sessionId, opts = {}) {
       acquiredAt: now,
       pid: anc ? anc.pid : (recheck.spawnedPid ?? null),
       pidStartedAt: anc ? anc.startedAt : null,
-    })
-    return true
+    }).ok
   } finally {
     exitReapMutex(mutexPath)
   }
