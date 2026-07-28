@@ -2999,8 +2999,9 @@ read that as "the criterion and its evidence section".
   rather than discovered the next morning. It must NOT kill the owner: a long verify run
   legitimately starves the heartbeat, which is why the age alone may not spawn.
   FIRST LIVE FINDING, 28.07.2026 10:44 — the run has already paid for itself before it
-  finished:  carries a line
-  . The atomic lock write can fail on
+  finished: `.claude/boundary.log` carries a line `FAIL-OPEN: the guard errored and
+  allowed the stop (EPERM: operation not permitted, rename batch-lock.json.tmp-9904 ->
+  batch-lock.json)`. The atomic lock write can fail on
   Windows — an antivirus or indexer holding the target for a moment is the usual cause —
   and the guard then fails open, which is right for a guard but means the HANDOVER was
   silently not written. A handover that reports success while the lock keeps its old
