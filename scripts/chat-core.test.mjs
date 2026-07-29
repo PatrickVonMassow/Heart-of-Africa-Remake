@@ -17,6 +17,7 @@ import {
   publishUrl,
   sanitizeText,
   signMessage,
+  TEST_VECTOR,
   sinceParam,
   verifyMessage,
 } from './chat-core.mjs'
@@ -25,21 +26,8 @@ const SECRET = 'hoa-test-secret'
 const OTHER = 'not-the-secret'
 const NOW = 1_700_000_000_000
 
-/**
- * THE SHARED TEST VECTOR. The browser half of this protocol is a literal inside
- * public/board/index.html — a deployed page cannot import a Node module — so the
- * two implementations can only be held together by fixed expected values. These
- * are frozen: a change to a derivation string, the topic length or the canonical
- * form breaks them, which is the point. scripts/chat-viewer.test.mjs runs the
- * page's own code against the SAME vector.
- */
-export const VECTOR = {
-  secret: SECRET,
-  inbox: 'hoa-38fdec7f90f796a6bb17f532fd061ced',
-  outbox: 'hoa-dafacbb4e108a19c0c3f6850f845ce63',
-  message: { id: 'abc', ts: 1_700_000_000_000, text: 'hallo' },
-  sig: '79feb5a148880c950c9285a713199811d5611579b94dba6d1665ade82af1fbeb',
-}
+/** The frozen cross-implementation vector, shared with the page (chat-core). */
+const VECTOR = TEST_VECTOR
 
 /** One ntfy poll frame carrying a signed envelope. `id` is the TRANSPORT id,
  *  `msgId` the envelope's own — they are different identities on purpose. */

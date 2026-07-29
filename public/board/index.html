@@ -19,6 +19,37 @@
   The fetch is cache-busted; where the CDN wins anyway, the reader simply sees a
   board a few minutes old, and the launcher watchdog is the layer that notices a
   page that is genuinely behind.
+
+  THE CHAT LIVES HERE, IN THE VIEWER, AND IS INJECTED AT RUNTIME.
+  The board is read from a phone; the chat is the way back. Three consequences
+  shape how it is built:
+
+  (1) document.write REPLACES this document. Markup written statically into the
+      body below would be wiped the moment the board content lands. The JS realm
+      SURVIVES document.open/write/close on a same-origin document, though — the
+      window and this running promise chain persist — so the chat is BUILT IN
+      DOM afterwards and inserted into the new body. It is injected on the
+      success path AND on the failure path: a board that cannot be read is
+      exactly when the reader most wants to write.
+
+  (2) Nothing of the chat ever enters the board CONTENT. Every board guard
+      (board-structure-core, dashboard-guard-core, board-core, board-first-core,
+      board-archive-rotate, queue-order-guard-core, dashboard-sync-core,
+      dashboard-conciseness-guard-core, dashboard-card-topic-guard-core,
+      dashboard-integrity-guard-core) parses the board fragment; not one of them
+      reads this viewer. The four-section mandate is therefore untouched by
+      construction rather than by careful markup. For the same reason the chat
+      is NOT a <details>: the board fragment's own localStorage script remembers
+      which cards the reader opened, and an extra <details> in the document
+      could shift what it counts. The collapsible here is a button plus a hidden
+      panel, default CLOSED.
+
+  (3) The page is PUBLIC. No topic name is written into this file. The reader
+      enters a shared secret once, it stays in localStorage, and the topics are
+      DERIVED from it with WebCrypto — byte-identically to scripts/chat-core.mjs,
+      which scripts/chat-viewer.test.mjs proves by running the block below in
+      Node against the same test vector. Every message is HMAC-signed, and an
+      unverified one is never shown.
 -->
 <html lang="de">
   <head>
@@ -49,6 +80,357 @@
     <script>
       const SOURCE =
         'https://raw.githubusercontent.com/PatrickVonMassow/Heart-of-Africa-Remake/board/board.html'
+
+      /* HOA-CHAT-CRYPTO-BEGIN
+         The browser half of the chat protocol. A deployed page cannot import a
+         Node module, so this is a deliberate second implementation of
+         scripts/chat-core.mjs — held to it by scripts/chat-viewer.test.mjs,
+         which extracts exactly this block, runs it in Node and compares topics
+         and signatures against the shared test vector. Edit both or neither. */
+      const CHAT_PROTOCOL = 'hoa-chat-1'
+      const CHAT_TOPIC_PREFIX = 'hoa'
+      const chatEnc = new TextEncoder()
+      const chatHex = (buf) =>
+        Array.from(new Uint8Array(buf))
+          .map((b) => b.toString(16).padStart(2, '0'))
+          .join('')
+      async function chatSha256Hex(text) {
+        return chatHex(await crypto.subtle.digest('SHA-256', chatEnc.encode(text)))
+      }
+      async function chatTopics(secret) {
+        const s = String(secret || '').trim()
+        if (!s) throw new Error('chat secret is empty')
+        const inbox = await chatSha256Hex(CHAT_PROTOCOL + '|topic|inbox|' + s)
+        const outbox = await chatSha256Hex(CHAT_PROTOCOL + '|topic|outbox|' + s)
+        return {
+          inbox: CHAT_TOPIC_PREFIX + '-' + inbox.slice(0, 32),
+          outbox: CHAT_TOPIC_PREFIX + '-' + outbox.slice(0, 32),
+        }
+      }
+      function chatCanonical(m) {
+        return [
+          CHAT_PROTOCOL,
+          JSON.stringify(String(m.id)),
+          JSON.stringify(String(m.ts)),
+          JSON.stringify(String(m.text)),
+        ].join('\n')
+      }
+      async function chatSign(secret, m) {
+        const key = await crypto.subtle.importKey(
+          'raw',
+          chatEnc.encode(String(secret)),
+          { name: 'HMAC', hash: 'SHA-256' },
+          false,
+          ['sign'],
+        )
+        return chatHex(await crypto.subtle.sign('HMAC', key, chatEnc.encode(chatCanonical(m))))
+      }
+      async function chatVerify(secret, m, sig) {
+        if (typeof sig !== 'string' || !/^[0-9a-f]{64}$/.test(sig)) return false
+        try {
+          const mine = await chatSign(secret, m)
+          if (mine.length !== sig.length) return false
+          let diff = 0
+          for (let i = 0; i < mine.length; i++) diff |= mine.charCodeAt(i) ^ sig.charCodeAt(i)
+          return diff === 0
+        } catch (e) {
+          return false
+        }
+      }
+      /* HOA-CHAT-CRYPTO-END */
+
+      const CHAT_SECRET_KEY = 'hoa-chat-secret'
+      const CHAT_POLL_MS = 10000
+      const CHAT_WINDOW = '12h' // ntfy caches for 12 h; asking for more is pointless
+      const CHAT_MAX_LEN = 2000
+      const CHAT_TEXT = {
+        title: 'Nachricht an den Agenten',
+        hint: 'Wird beim nächsten Launcher-Tick gelesen (spätestens nach 15 Minuten).',
+        pair: 'Einmalig koppeln: Chat-Geheimnis eingeben (im Terminal: node scripts/chat-secret.mjs).',
+        pairButton: 'Koppeln',
+        secretPlaceholder: 'Chat-Geheimnis',
+        placeholder: 'Nachricht …',
+        send: 'Senden',
+        empty: 'Noch keine Nachrichten.',
+        you: 'Du',
+        agent: 'Agent',
+        sending: 'wird gesendet …',
+        sendFailed: 'konnte nicht gesendet werden — bitte nochmal.',
+        blocked:
+          'Der Chat braucht die Web-Board-Seite: hier darf die Seite keine Verbindung aufbauen. ' +
+          'Öffne das Board unter seiner GitHub-Pages-Adresse, dort funktioniert er.',
+        insecure: 'Der Chat braucht eine HTTPS-Seite (WebCrypto ist hier nicht verfügbar).',
+        forget: 'Kopplung lösen',
+      }
+
+      const chatState = { secret: null, topics: null, seen: new Set(), timer: null, open: false }
+
+      const chatEl = (tag, props, ...kids) => {
+        const el = document.createElement(tag)
+        Object.assign(el, props || {})
+        for (const k of kids) if (k) el.append(k)
+        return el
+      }
+
+      function chatStyles() {
+        if (document.getElementById('hoa-chat-style')) return
+        const s = document.createElement('style')
+        s.id = 'hoa-chat-style'
+        s.textContent = [
+          '#hoa-chat{max-width:680px;margin:0 auto 18px;font-family:ui-sans-serif,system-ui,sans-serif;}',
+          '#hoa-chat .chat-toggle{width:100%;text-align:left;font:inherit;font-weight:600;',
+          'padding:10px 12px;border:1px solid rgba(128,110,70,.45);border-radius:8px;',
+          'background:rgba(128,110,70,.12);color:inherit;cursor:pointer;}',
+          '#hoa-chat .chat-panel{border:1px solid rgba(128,110,70,.45);border-top:none;',
+          'border-radius:0 0 8px 8px;padding:10px 12px;}',
+          '#hoa-chat .chat-list{max-height:45vh;overflow-y:auto;overflow-wrap:anywhere;}',
+          '#hoa-chat .msg{margin:0 0 8px;font-size:0.95rem;}',
+          '#hoa-chat .msg .who{font-weight:600;margin-right:6px;}',
+          '#hoa-chat .msg .when{opacity:.6;font-size:.8em;margin-left:6px;}',
+          '#hoa-chat .chat-note{font-size:.85rem;opacity:.75;margin:6px 0;}',
+          '#hoa-chat form{display:flex;gap:8px;position:sticky;bottom:0;',
+          'padding-bottom:calc(6px + env(safe-area-inset-bottom));}',
+          '#hoa-chat input{flex:1;min-width:0;font-size:16px;padding:10px;border-radius:8px;',
+          'border:1px solid rgba(128,110,70,.5);background:transparent;color:inherit;}',
+          '#hoa-chat button.send{font-size:16px;padding:10px 14px;border-radius:8px;cursor:pointer;',
+          'border:1px solid rgba(128,110,70,.5);background:rgba(128,110,70,.2);color:inherit;}',
+          '#hoa-chat .chat-forget{font-size:.8rem;background:none;border:none;padding:0;',
+          'color:inherit;opacity:.6;text-decoration:underline;cursor:pointer;}',
+        ].join('')
+        document.head.append(s)
+      }
+
+      function chatRenderMessage(list, m) {
+        const p = chatEl('p', { className: 'msg ' + (m.side === 'agent' ? 'agent' : 'you') })
+        p.append(
+          chatEl('span', {
+            className: 'who',
+            textContent: (m.side === 'agent' ? CHAT_TEXT.agent : CHAT_TEXT.you) + ':',
+          }),
+        )
+        // textContent, never innerHTML: a message stays untrusted input even
+        // after it verifies — the signature says WHO wrote it, not WHAT.
+        p.append(document.createTextNode(m.text))
+        const when = new Date(m.ts)
+        p.append(
+          chatEl('span', {
+            className: 'when',
+            textContent: isNaN(when.getTime())
+              ? ''
+              : when.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }),
+          }),
+        )
+        list.append(p)
+        list.scrollTop = list.scrollHeight // autoscroll to the newest
+      }
+
+      function chatNote(text) {
+        const n = document.getElementById('hoa-chat-note')
+        if (n) n.textContent = text || ''
+      }
+
+      async function chatPollTopic(topic, side) {
+        const url = 'https://ntfy.sh/' + encodeURIComponent(topic) + '/json?poll=1&since=' + CHAT_WINDOW
+        const res = await fetch(url, { cache: 'no-store' })
+        if (!res.ok) throw new Error('HTTP ' + res.status)
+        const body = await res.text()
+        const out = []
+        for (const line of body.split('\n')) {
+          if (!line.trim()) continue
+          let ev = null
+          try {
+            ev = JSON.parse(line)
+          } catch (e) {
+            continue
+          }
+          if (!ev || ev.event !== 'message') continue
+          let env = null
+          try {
+            env = JSON.parse(ev.message)
+          } catch (e) {
+            continue
+          }
+          if (!env || env.v !== CHAT_PROTOCOL || typeof env.id !== 'string') continue
+          if (chatState.seen.has(env.id)) continue
+          const ok = await chatVerify(chatState.secret, { id: env.id, ts: env.ts, text: env.text }, env.sig)
+          if (!ok) continue // unverified is never shown
+          chatState.seen.add(env.id)
+          out.push({ id: env.id, ts: Number(env.ts), text: String(env.text), side: side })
+        }
+        return out
+      }
+
+      async function chatPoll() {
+        const list = document.getElementById('hoa-chat-list')
+        if (!list || !chatState.topics) return
+        const fresh = [
+          ...(await chatPollTopic(chatState.topics.inbox, 'you')),
+          ...(await chatPollTopic(chatState.topics.outbox, 'agent')),
+        ].sort((a, b) => a.ts - b.ts)
+        if (fresh.length) {
+          const placeholder = list.querySelector('.chat-empty')
+          if (placeholder) placeholder.remove()
+        }
+        for (const m of fresh) chatRenderMessage(list, m)
+      }
+
+      async function chatSend(text) {
+        const id = crypto.randomUUID
+          ? crypto.randomUUID()
+          : String(Date.now()) + '-' + Math.random().toString(16).slice(2)
+        const body = { v: CHAT_PROTOCOL, id: id, ts: Date.now(), text: String(text).slice(0, CHAT_MAX_LEN) }
+        body.sig = await chatSign(chatState.secret, body)
+        const res = await fetch('https://ntfy.sh/' + encodeURIComponent(chatState.topics.inbox), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Priority: 'min' },
+          body: JSON.stringify(body),
+        })
+        if (!res.ok) throw new Error('HTTP ' + res.status)
+        return body
+      }
+
+      // Only while the panel is OPEN: a closed chat makes no request at all.
+      function chatStartPolling() {
+        if (chatState.timer) return
+        chatState.timer = setInterval(() => {
+          chatPoll().catch(() => chatNote(CHAT_TEXT.blocked))
+        }, CHAT_POLL_MS)
+      }
+      function chatStopPolling() {
+        if (chatState.timer) clearInterval(chatState.timer)
+        chatState.timer = null
+      }
+
+      async function chatConnect(panel) {
+        panel.textContent = ''
+        const list = chatEl('div', { className: 'chat-list', id: 'hoa-chat-list' })
+        list.append(chatEl('p', { className: 'msg chat-empty', textContent: CHAT_TEXT.empty }))
+        const note = chatEl('div', { className: 'chat-note', id: 'hoa-chat-note', textContent: CHAT_TEXT.hint })
+        const input = chatEl('input', {
+          type: 'text',
+          placeholder: CHAT_TEXT.placeholder,
+          maxLength: CHAT_MAX_LEN,
+          id: 'hoa-chat-input',
+        })
+        // Disabled until the topics are derived and the first poll came back:
+        // a send before that would post nowhere and read as a lost message.
+        const send = chatEl('button', { type: 'submit', className: 'send', textContent: CHAT_TEXT.send, disabled: true })
+        const form = chatEl('form', { id: 'hoa-chat-form' }, input, send)
+        const forget = chatEl('button', { type: 'button', className: 'chat-forget', textContent: CHAT_TEXT.forget })
+        forget.addEventListener('click', () => {
+          try {
+            localStorage.removeItem(CHAT_SECRET_KEY)
+          } catch (e) {
+            /* private mode */
+          }
+          chatStopPolling()
+          chatState.secret = null
+          chatState.topics = null
+          chatState.seen = new Set()
+          chatPair(panel)
+        })
+        panel.append(list, note, form, forget)
+
+        form.addEventListener('submit', async (ev) => {
+          ev.preventDefault()
+          const text = input.value.trim()
+          if (!text || !chatState.topics) return // Enter must not outrun the connect either
+          input.value = ''
+          chatNote(CHAT_TEXT.sending)
+          try {
+            const sent = await chatSend(text)
+            chatState.seen.add(sent.id)
+            const placeholder = list.querySelector('.chat-empty')
+            if (placeholder) placeholder.remove()
+            chatRenderMessage(list, { id: sent.id, ts: sent.ts, text: sent.text, side: 'you' })
+            chatNote(CHAT_TEXT.hint)
+          } catch (e) {
+            input.value = text
+            chatNote(CHAT_TEXT.sendFailed)
+          }
+        })
+
+        try {
+          chatState.topics = await chatTopics(chatState.secret)
+          await chatPoll()
+          chatStartPolling()
+          send.disabled = false
+        } catch (e) {
+          // The claude.ai artifact mirror runs under a CSP that forbids fetch.
+          // Say so and point at the page that works, rather than leave a dead
+          // input the reader types into for nothing.
+          chatNote(CHAT_TEXT.blocked)
+          input.disabled = true
+          send.disabled = true
+        }
+      }
+
+      function chatPair(panel) {
+        panel.textContent = ''
+        const note = chatEl('div', { className: 'chat-note', textContent: CHAT_TEXT.pair })
+        const input = chatEl('input', {
+          type: 'password',
+          placeholder: CHAT_TEXT.secretPlaceholder,
+          id: 'hoa-chat-secret-input',
+          autocomplete: 'off',
+        })
+        const go = chatEl('button', { type: 'submit', className: 'send', textContent: CHAT_TEXT.pairButton })
+        const form = chatEl('form', {}, input, go)
+        form.addEventListener('submit', (ev) => {
+          ev.preventDefault()
+          const secret = input.value.trim()
+          if (!secret) return
+          try {
+            localStorage.setItem(CHAT_SECRET_KEY, secret)
+          } catch (e) {
+            /* private mode: this session only */
+          }
+          chatState.secret = secret
+          chatConnect(panel)
+        })
+        panel.append(note, form)
+      }
+
+      function chatTogglePanel(panel, toggle) {
+        chatState.open = !chatState.open
+        panel.hidden = !chatState.open
+        toggle.setAttribute('aria-expanded', String(chatState.open))
+        if (!chatState.open) return chatStopPolling()
+        if (panel.dataset.built === '1') return chatStartPolling()
+        panel.dataset.built = '1'
+        if (!(window.crypto && crypto.subtle)) {
+          panel.append(chatEl('div', { className: 'chat-note', textContent: CHAT_TEXT.insecure }))
+          return
+        }
+        let stored = null
+        try {
+          stored = localStorage.getItem(CHAT_SECRET_KEY)
+        } catch (e) {
+          stored = null
+        }
+        chatState.secret = stored && stored.trim() ? stored.trim() : null
+        if (chatState.secret) chatConnect(panel)
+        else chatPair(panel)
+      }
+
+      /**
+       * Build the chat and put it at the top of whatever document is live now.
+       * IDEMPOTENT — it runs after the board render, on the failure path and
+       * again on load, and must add exactly one section however often it runs.
+       */
+      function injectChat() {
+        if (!document.body || document.getElementById('hoa-chat')) return
+        chatStyles()
+        const host = chatEl('section', { id: 'hoa-chat' })
+        const toggle = chatEl('button', { type: 'button', className: 'chat-toggle', textContent: CHAT_TEXT.title })
+        toggle.setAttribute('aria-expanded', 'false')
+        const panel = chatEl('div', { className: 'chat-panel', hidden: true }) // DEFAULT CLOSED
+        toggle.addEventListener('click', () => chatTogglePanel(panel, toggle))
+        host.append(toggle, panel)
+        document.body.insertBefore(host, document.body.firstChild)
+      }
+      window.injectChat = injectChat // the jsdom test drives the real function
+
       // Keep the failure honest and self-explaining: a blank page would read as
       // "no work", which is the exact misreading this whole mechanism exists to
       // prevent. Say that the board could not be READ, and where it lives.
@@ -59,6 +441,7 @@
           'Inhalt gerade nicht lesen kann (' +
           String(why).replace(/[<&]/g, (c) => (c === '<' ? '&lt;' : '&amp;')) +
           ').</p><p>Quelle direkt: <a href="' + SOURCE + '"><code>' + SOURCE + '</code></a></p>'
+        injectChat()
       }
       fetch(SOURCE + '?t=' + Date.now(), { cache: 'no-store' })
         .then((res) => (res.ok ? res.text() : Promise.reject(new Error('HTTP ' + res.status))))
@@ -67,6 +450,11 @@
           document.open()
           document.write(html)
           document.close()
+          // The document was REPLACED; this realm survived it. Rebuild the chat
+          // into the NEW body — and once more on load, in case a late script in
+          // the fragment is still parsing. injectChat is idempotent.
+          injectChat()
+          window.addEventListener('load', injectChat)
         })
         .catch((e) => failed((e && e.message) || 'unbekannter Fehler'))
     </script>

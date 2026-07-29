@@ -278,6 +278,22 @@ export function sinceParam(state = {}, { maxAgeMs = DEFAULT_MAX_AGE_MS } = {}) {
   return `${Math.max(1, Math.round(maxAgeMs / 1000))}s`
 }
 
+/**
+ * THE SHARED TEST VECTOR — the only thing holding the two implementations of
+ * this protocol together. The browser half is a literal inside
+ * public/board/index.html (a deployed page cannot import this module), so both
+ * scripts/chat-core.test.mjs and scripts/chat-viewer.test.mjs assert against
+ * these fixed values. A change to a derivation string, the topic length or the
+ * canonical form breaks them on BOTH sides at once, which is the point.
+ */
+export const TEST_VECTOR = Object.freeze({
+  secret: 'hoa-test-secret',
+  inbox: 'hoa-38fdec7f90f796a6bb17f532fd061ced',
+  outbox: 'hoa-dafacbb4e108a19c0c3f6850f845ce63',
+  message: Object.freeze({ id: 'abc', ts: 1700000000000, text: 'hallo' }),
+  sig: '79feb5a148880c950c9285a713199811d5611579b94dba6d1665ade82af1fbeb',
+})
+
 /** The poll URL for a topic. Kept here so both CLIs build it identically. */
 export const pollUrl = (topic, since) =>
   `https://ntfy.sh/${encodeURIComponent(topic)}/json?poll=1&since=${encodeURIComponent(since)}`
