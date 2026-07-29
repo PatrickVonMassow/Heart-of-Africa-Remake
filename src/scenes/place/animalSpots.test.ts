@@ -5,11 +5,14 @@
 
 import { describe, expect, it } from 'vitest'
 import {
+  ANIMAL_BODY_RADIUS,
   ANIMAL_RADIUS,
+  ANIMAL_TURN_RATE,
   animalAnchors,
   animalBodies,
   animalScene,
   stepAnimal,
+  turnToward,
 } from './animalSpots'
 import { boxCollider, spawnPointFree, standingClear, type Collider } from './collision'
 import { buildLayout } from './layout'
@@ -66,7 +69,7 @@ describe('stepAnimal (point 413 — the herd is an obstacle to itself)', () => {
     stepAnimal(scene, bodies, 0, 0, 0, 0, 0)
     stepAnimal(scene, bodies, 1, 0, 0, 0, 0)
     const apart = Math.hypot(bodies[0].x - bodies[1].x, bodies[0].z - bodies[1].z)
-    expect(apart).toBeGreaterThanOrEqual(2 * ANIMAL_RADIUS - 1e-6)
+    expect(apart).toBeGreaterThanOrEqual(ANIMAL_RADIUS + ANIMAL_BODY_RADIUS - 1e-6)
   })
 
   it('keeps a whole herd apart when every member wants the same spot', () => {
@@ -82,7 +85,7 @@ describe('stepAnimal (point 413 — the herd is an obstacle to itself)', () => {
     for (let i = 0; i < bodies.length; i++) {
       for (let j = i + 1; j < bodies.length; j++) {
         const d = Math.hypot(bodies[i].x - bodies[j].x, bodies[i].z - bodies[j].z)
-        expect(d, `${i}/${j}`).toBeGreaterThan(2 * ANIMAL_RADIUS - 0.01)
+        expect(d, `${i}/${j}`).toBeGreaterThan(ANIMAL_RADIUS + ANIMAL_BODY_RADIUS - 0.01)
       }
     }
   })
@@ -146,5 +149,41 @@ describe('an animal at a real village fence (point 413)', () => {
         expect(side, `${id}: ${f.kind} panel ${i} crossed (side ${side.toFixed(2)})`).toBeGreaterThan(0)
       }
     }
+  })
+})
+
+describe('turnToward (point 413 — a goat pivots fast, not instantly)', () => {
+  const step = ANIMAL_TURN_RATE / 60 // one frame at 60 fps
+
+  it('snaps to the target when it is already within one step', () => {
+    expect(turnToward(0, step * 0.5, step)).toBeCloseTo(step * 0.5, 12)
+    expect(turnToward(1.2, 1.2, step)).toBe(1.2)
+  })
+
+  it('never turns further than the step allows', () => {
+    expect(turnToward(0, Math.PI, step)).toBeCloseTo(step, 12)
+    expect(turnToward(0, -Math.PI / 2, step)).toBeCloseTo(-step, 12)
+  })
+
+  it('takes the SHORT way round the wrap', () => {
+    // From just under +pi to just over -pi is a 0.1 rad turn, not a full circle.
+    const from = Math.PI - 0.05
+    const to = -Math.PI + 0.05
+    const wrapped = (a: number) => Math.atan2(Math.sin(a), Math.cos(a))
+    // Within one step it lands on the target...
+    expect(wrapped(turnToward(from, to, 1) - to)).toBeCloseTo(0, 12)
+    // ...and a smaller step moves 0.05 the SHORT way, not 6.23 the long way.
+    expect(wrapped(turnToward(from, to, 0.05) - from)).toBeCloseTo(0.05, 12)
+  })
+
+  it('needs many frames for a reversal — the abrupt flip the report saw', () => {
+    let yaw = 0
+    let frames = 0
+    while (Math.abs(Math.atan2(Math.sin(Math.PI - yaw), Math.cos(Math.PI - yaw))) > 1e-6 && frames < 1000) {
+      yaw = turnToward(yaw, Math.PI, step)
+      frames++
+    }
+    expect(frames).toBeGreaterThan(30) // half a second or more, never one frame
+    expect(frames).toBeLessThan(120)
   })
 })

@@ -12,9 +12,17 @@
 import { nudgeToFree, resolveMove, WALKER_RADIUS, type Collider } from './collision'
 import { mulberry32 } from '../../world/noise'
 
-/** An animal's own body as an obstacle for the others. The same radius it
- *  moves with, so two of them settle exactly one body width apart. */
+/** The radius an animal MOVES with — the settlement's shared mover footprint. */
 export const ANIMAL_RADIUS = WALKER_RADIUS
+
+/**
+ * The radius an animal presents to the OTHERS. Deliberately smaller than the
+ * mover radius: a goat is ~0.4 wide, so 0.18 + 0.3 = 0.48 m between centres
+ * already keeps two bodies clear of each other, while the full 0.6 had the herd
+ * shouldering one another all day — every jostle is motion the legs then have to
+ * account for, and a grazing pen is not a scrum. Calibratable.
+ */
+export const ANIMAL_BODY_RADIUS = 0.18
 
 /** A grazing spot: the point the animal wanders around, and the wobble that
  *  carries it (phase so the herd does not move as one, amplitude by setting —
@@ -79,7 +87,7 @@ export function animalAnchors(
 /** One body per anchor, seeded at the anchor so the first frame already
  *  resolves against real positions rather than the origin. */
 export function animalBodies(anchors: readonly AnimalAnchor[]): AnimalBody[] {
-  return anchors.map((a) => ({ x: a.x, z: a.z, r: ANIMAL_RADIUS }))
+  return anchors.map((a) => ({ x: a.x, z: a.z, r: ANIMAL_BODY_RADIUS }))
 }
 
 /** The settlement's colliders with every animal body appended. The bodies keep
@@ -91,6 +99,20 @@ export function animalScene(colliders: readonly Collider[], bodies: readonly Ani
 /** Stand-in for the mover's own body while IT resolves: a collider infinitely
  *  far away pushes nobody, so one scene array serves the whole herd. */
 const NO_COLLIDER: Collider = { x: Infinity, z: Infinity, r: 0 }
+
+/** How fast an animal may swing its body round (rad/s). A goat pivots quickly
+ *  but not instantly, and the facing used to be SNAPPED to the raw per-frame
+ *  velocity: meeting a fence or another goat reversed that velocity, and the
+ *  body flipped 180 degrees between two frames — the "changes direction
+ *  abruptly" half of the point-413 report. Calibratable. */
+export const ANIMAL_TURN_RATE = 4
+
+/** Turn `from` toward `to` by at most `maxStep` radians, the short way round. */
+export function turnToward(from: number, to: number, maxStep: number): number {
+  const delta = Math.atan2(Math.sin(to - from), Math.cos(to - from))
+  if (Math.abs(delta) <= maxStep) return to
+  return from + Math.sign(delta) * maxStep
+}
 
 /**
  * Move animal `index` from `from` toward its wobble target, against the

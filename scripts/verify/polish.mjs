@@ -520,14 +520,14 @@ const stepUntil = async (ready, arg = null, capFrames = 240) => {
   )
   check(
     'no settlement animal stands inside another one (point 413)',
-    pairs.length >= 10 && closest > 0.5,
+    pairs.length >= 10 && closest > 0.45,
     pairs.length >= 10
       ? `${pairs.length} samples, closest pair ${closest.toFixed(2)} m`
       : `MEASURED NOTHING — only ${pairs.length} samples carried two animals`,
   )
   // The picture behind the numbers. The probe borrows the camera and hands the
   // pose back exactly as it found it (the lesson of point 375).
-  const saved = await page.evaluate(() => {
+  const aimed = await page.evaluate(() => {
     const p = window.__placePlayer
     const herd = Object.values(window.__placeGoatGait ?? {})
     if (!p || herd.length === 0) return null
@@ -538,18 +538,23 @@ const stepUntil = async (ready, arg = null, capFrames = 240) => {
     p.x = cx - ((cx - p.x) / d) * 7
     p.z = cz - ((cz - p.z) / d) * 7
     p.yaw = Math.atan2(-(cx - p.x), -(cz - p.z))
-    return pose
+    return { pose, cx, cz }
   })
-  if (saved) {
+  if (aimed) {
     await nextFrames(2)
-    await frame('143-village-goat-separation', { place: 'maasai-village', label: 'the goats, each on its own ground' })
+    // The subject is the HERD, so the shutter projects it (point 375): a frame
+    // named after the goats must have the goats in it.
+    await frame('143-village-goat-separation', {
+      local: { x: aimed.cx, y: 0.5, z: aimed.cz },
+      label: 'the goats, each on its own ground',
+    })
     await page.evaluate((pose) => {
       const p = window.__placePlayer
       if (!p) return
       p.x = pose.x
       p.z = pose.z
       p.yaw = pose.yaw
-    }, saved)
+    }, aimed.pose)
   }
 }
 // Point 300, slope footing: a silhouette on a dune must lie ON the incline —

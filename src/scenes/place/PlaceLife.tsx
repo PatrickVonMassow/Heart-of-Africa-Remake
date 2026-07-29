@@ -29,7 +29,7 @@ import { useGame } from '../../state/store'
 import { START_YEAR, balance } from '../../config/balance'
 import type { RegionPlaceStyle } from './regionStyles'
 import { resolveMove, tryNudgeToFree, WALKER_RADIUS, type Collider } from './collision'
-import { animalAnchors, animalBodies, animalScene, stepAnimal } from './animalSpots'
+import { animalAnchors, animalBodies, animalScene, stepAnimal, turnToward, ANIMAL_TURN_RATE } from './animalSpots'
 import { PORT_TALKERS, VILLAGE_SPOTS } from './lifeSpots'
 
 /** Collision radius of inhabitants (matches the player's). */
@@ -234,8 +234,9 @@ function Goats({ seed, count, pen, colliders }: { seed: number; count: number; p
   if (gait.current.length !== anchors.length) {
     gait.current = anchors.map((a) => ({ x: a.x, z: a.z, dist: 0, yaw: 0 }))
   }
-  useFrame(({ clock }) => {
+  useFrame(({ clock }, rawDt) => {
     const t = clock.elapsedTime
+    const dt = Math.min(rawDt, 0.1)
     // Publish every animal's last position into the scene before anyone moves,
     // so each of them resolves against where the others actually stand.
     for (let i = 0; i < bodies.length; i++) {
@@ -264,8 +265,13 @@ function Goats({ seed, count, pen, colliders }: { seed: number; count: number; p
       )
       const vx = px - s.x
       const vz = pz - s.z
+      // The body swings round toward its travel direction at a bounded rate
+      // (point 413). Snapping straight to the raw per-frame velocity made an
+      // animal that met a fence — or, now, another animal — flip 180 degrees
+      // between two frames, which is the "changes direction abruptly" half of
+      // the report; a goat pivots fast, but not instantly.
+      s.yaw = turnToward(s.yaw, faceVelocity(vx, vz, s.yaw), ANIMAL_TURN_RATE * dt)
       s.dist += Math.hypot(vx, vz)
-      s.yaw = faceVelocity(vx, vz, s.yaw)
       s.x = px
       s.z = pz
       // Swing the legs on the distance-driven phase at this rig's own cadence,
