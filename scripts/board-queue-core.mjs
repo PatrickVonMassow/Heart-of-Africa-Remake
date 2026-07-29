@@ -32,20 +32,16 @@
 // block `--synced` and create the very block loop this design exists to
 // prevent.
 
-import { parseTasks, QUEUE_STUB_META } from './dashboard-guard-core.mjs'
+import { parseTasks, QUEUE_STUB_BODY, QUEUE_STUB_META } from './dashboard-guard-core.mjs'
 import { FINDER_POINTS, RELEASE_TAG_POINT } from './queue-order-guard-core.mjs'
 
 // The stub meta is DEFINED beside the audit rule that exempts it and re-exported
 // here: two copies of that string would be a block loop waiting to happen.
-export { QUEUE_STUB_META }
+export { QUEUE_STUB_BODY, QUEUE_STUB_META }
 
 /** Where the queue's prose and order live (git-ignored, like the board itself). */
 export const QUEUE_DATA_PATH = '.claude/board-queue.json'
 
-/** The body a point gets while nobody has written one. */
-export const QUEUE_STUB_BODY =
-  'Noch keine Beschreibung auf dem Board — der Punkt steht im Arbeitsauftrag. ' +
-  'Text setzen: node scripts/board.mjs queue <N> "<Text>".'
 
 /** Minimal HTML escaping for text that goes into a card. */
 export function esc(text) {

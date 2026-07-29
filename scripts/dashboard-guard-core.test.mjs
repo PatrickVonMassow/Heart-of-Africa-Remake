@@ -21,6 +21,8 @@ import {
   evaluate,
   ERLEDIGT_ON_BOARD,
   ETA_GRACE_MIN,
+  QUEUE_STUB_BODY,
+  QUEUE_STUB_META,
 } from './dashboard-guard-core.mjs'
 
 import { boardHtml, green } from './dashboard-guard-fixtures.mjs'
@@ -831,5 +833,62 @@ describe('the expected-end rule reaches the turn end', () => {
     expect(JSON.stringify(withClock)).toContain('now-eta-past')
     // Without a clock the rule stays silent — it is never guessed.
     expect(JSON.stringify(evaluate(green({ html: stale })))).not.toContain('now-eta-past')
+  })
+})
+
+describe('a queue of placeholders is a regression, not a valid board (point 419 d)', () => {
+  // The failure this counts: when the queue became a projection, the prose was
+  // never migrated — 79 of 81 cards carried the stub body and every existing
+  // rule passed, because the stub is exempt by name and coverage only asks that
+  // a point appear somewhere. Formally perfect, materially empty.
+  const stubCard = (n) =>
+    `<details><summary><span class="num">${n}</span><span class="t">Task ${n}</span>` +
+    `<span class="right"><span class="meta">${QUEUE_STUB_META}</span></span></summary>` +
+    `<div class="body"><p>${QUEUE_STUB_BODY}</p></div></details>`
+  const realCard = (n) =>
+    `<details><summary><span class="num">${n}</span><span class="t">Task ${n}</span>` +
+    `<span class="right"><span class="meta">~2 h</span></span></summary>` +
+    `<div class="body"><p>Echte Beschreibung für ${n}.</p></div></details>`
+
+  const boardWith = (cards) =>
+    boardHtml().replace(
+      /(<summary><h2>Warteschlange<\/h2><\/summary>\n)[\s\S]*?(\n<\/details>)/,
+      `$1${cards.join('\n')}$2`,
+    )
+  const codesFor = (cards, open) =>
+    auditDashboard(boardWith(cards), { open, done: [] }).map((x) => x.code)
+
+  it('flags a queue that is mostly placeholder', () => {
+    const cards = [1, 2, 3, 4, 5, 6, 7, 8].map(stubCard)
+    expect(codesFor(cards, [210, 1, 2, 3, 4, 5, 6, 7, 8])).toContain('queue-stubbed')
+  })
+
+  it('accepts a handful of fresh points among written ones', () => {
+    const cards = [realCard(1), realCard(2), realCard(3), realCard(4), realCard(5), realCard(6), stubCard(7)]
+    expect(codesFor(cards, [210, 1, 2, 3, 4, 5, 6, 7])).not.toContain('queue-stubbed')
+  })
+
+  it('flags a RUN of placeholders even when the share is under the ceiling', () => {
+    // 4 of 20 is 20 %, under the share ceiling — but a reader meets them in a row.
+    const cards = [
+      ...[1, 2, 3, 4].map(stubCard),
+      ...Array.from({ length: 16 }, (_, i) => realCard(i + 5)),
+    ]
+    const open = [210, ...Array.from({ length: 20 }, (_, i) => i + 1)]
+    expect(codesFor(cards, open)).toContain('queue-stubbed')
+  })
+
+  it('says nothing about an empty queue', () => {
+    expect(codesFor([], [210])).not.toContain('queue-stubbed')
+  })
+
+  it('recognises the exact body the generator emits, not a lookalike', () => {
+    const lookalike = [1, 2, 3, 4, 5, 6, 7, 8].map(
+      (n) =>
+        `<details><summary><span class="num">${n}</span><span class="t">Task ${n}</span>` +
+        `<span class="right"><span class="meta">~1 h</span></span></summary>` +
+        `<div class="body"><p>Noch offen, aber hier steht echter Text über den Punkt.</p></div></details>`,
+    )
+    expect(codesFor(lookalike, [210, 1, 2, 3, 4, 5, 6, 7, 8])).not.toContain('queue-stubbed')
   })
 })

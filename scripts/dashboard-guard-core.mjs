@@ -149,6 +149,21 @@ export const ERLEDIGT_ON_BOARD = 20
  *  board-queue-core re-exports it rather than keeping a second copy. */
 export const QUEUE_STUB_META = 'Schätzung offen'
 
+/** The body that same generated card carries while nobody has written prose for
+ *  the point. Defined here for the same reason as the meta above: the rule that
+ *  COUNTS these cards must recognise the exact string the generator emits. */
+export const QUEUE_STUB_BODY =
+  'Noch keine Beschreibung auf dem Board — der Punkt steht im Arbeitsauftrag. ' +
+  'Text setzen: node scripts/board.mjs queue <N> "<Text>".'
+
+/** How much of the queue may be placeholder before it counts as a regression.
+ *  A quarter is generous for a normal day — a handful of freshly appended points
+ *  with no prose yet — and far below the 97 % the board actually reached. */
+export const STUB_SHARE_CEILING = 0.25
+/** …and how many may stand in a ROW. A run is what a reader hits: three stubs
+ *  in sequence already reads as an empty board however good the rest is. */
+export const STUB_RUN_CEILING = 3
+
 // cp1252: byte → displayed char (the 0x80-0x9F block; every other byte shows
 // its own code point). The detector uses it REVERSED.
 const CP1252_HIGH = {
@@ -386,6 +401,35 @@ export function auditDashboard(html, input = {}) {
       code: 'queue-meta',
       msg: `${badQueue.length} Warteschlange card(s) lack a "~<n> h" duration meta (point(s) ${badQueue.flatMap((c) => c.points).join(', ') || '<none parseable>'})`,
     })
+  }
+
+  // A BOARD OF PLACEHOLDERS BREAKS NO OTHER RULE (point 419 d). When the queue
+  // became a projection, the hand-written prose was never migrated into the data
+  // file: 79 of 81 cards carried the stub body and not one an estimate — and
+  // every check passed, because `queue-meta` exempts the stub by name and the
+  // coverage rule only asks that each open point appear SOMEWHERE. The board was
+  // formally perfect and materially empty, for hours, until the reader said so.
+  // Counted rather than remembered: a share ceiling for the whole queue, and a
+  // run ceiling because a reader meets consecutive cards, not an average.
+  if (queueCards.length) {
+    const isStub = (c) => (c.body ?? '').trim().startsWith(QUEUE_STUB_BODY.slice(0, 40))
+    const stubs = queueCards.filter(isStub)
+    let run = 0
+    let longestRun = 0
+    for (const c of queueCards) {
+      run = isStub(c) ? run + 1 : 0
+      if (run > longestRun) longestRun = run
+    }
+    const share = stubs.length / queueCards.length
+    if (share > STUB_SHARE_CEILING || longestRun > STUB_RUN_CEILING) {
+      v.push({
+        code: 'queue-stubbed',
+        msg:
+          `${stubs.length} of ${queueCards.length} Warteschlange card(s) still carry the placeholder body ` +
+          `(${Math.round(share * 100)} %, longest run ${longestRun}) — the queue reads as empty to whoever ` +
+          'opens it. Write the prose: node scripts/board-queue.mjs set <N> "<Text>"',
+      })
+    }
   }
 
   // NOW META — the now-card names its start time.
