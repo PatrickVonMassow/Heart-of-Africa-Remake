@@ -27,9 +27,10 @@
 // twice, because the ledger travels with the spool (see `seededLedger`). The
 // ledger counts CONSUMED messages too: a message the session has already read is
 // exactly the one a re-poll must not hand over a second time.
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { repoPath } from './repo-paths.mjs'
+import { writeJsonAtomic } from './atomic-write.mjs'
 import { SECRET_FAULT, readSecretStatus } from './chat-secret.mjs'
 import { DEFAULT_MAX_AGE_MS, deriveTopics, ingest, parseNtfyPoll, pollUrl, seenKeys, sinceParam } from './chat-core.mjs'
 import { postOutbox } from './chat-reply.mjs'
@@ -232,7 +233,11 @@ async function tick() {
   pruneConsumed()
   mkdirSync(dirname(STATE_PATH), { recursive: true })
   const persisted = stateAfterSpool({ next, previousCursor: seeded.cursor, failed })
-  writeFileSync(STATE_PATH, `${JSON.stringify({ ...persisted, updatedAt: Date.now() }, null, 2)}\n`, 'utf8')
+  // ATOMIC, because this file now carries the REPLAY LEDGER. A torn write makes
+  // `readJson` answer null, and with it go the envelope ids that refuse a replay
+  // inside the window — the very hole the ledger was rebuilt to close. Same
+  // tmp+rename with the retry ladder the spool and the reply receipt use.
+  writeJsonAtomic(STATE_PATH, { ...persisted, updatedAt: Date.now() })
 
   // THE SENDER LEARNS THAT THEIR MESSAGE DID NOT LAND. The page renders a sent
   // message like any other, so a drop the user could act on has to travel back
