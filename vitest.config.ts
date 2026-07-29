@@ -44,5 +44,18 @@ export default defineConfig({
     // growing from 2 s to 15 s stays visible instead of passing silently
     // inside the ceiling — the change stops the timeouts, not the noticing.
     slowTestThreshold: 1000,
+    // A CAP ON THE POOL, for the same reason the timeouts above are generous
+    // (29.07.2026). Vitest fans out to one fork per core minus one by default —
+    // 15 jsdom processes on this machine — and at that width the MAIN thread no
+    // longer answers its own workers: every run ended in `[vitest-worker]:
+    // Timeout calling "onTaskUpdate"`, an unhandled error that exits 1 while
+    // all 4799 tests PASS. The pre-push gate reads that exit code, so a green
+    // regression could not be pushed at all. Measured on a quiet machine, twice
+    // each: at the default width the run reports ~573 s of environment setup
+    // and dies on the RPC; at 4 workers it reports ~178 s and exits 0 — with
+    // the SAME ~91 s wall clock, because the extra forks were queueing, not
+    // running. The cap therefore costs no time and buys back the gate. Raise it
+    // only against a measurement showing the wall clock actually falls.
+    maxWorkers: 4,
   },
 })
