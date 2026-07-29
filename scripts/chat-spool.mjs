@@ -220,18 +220,29 @@ export function readLegacyJsonl(path = LEGACY_SPOOL_PATH) {
  * The old file is then RENAMED aside (`.migrated-<ts>`), never deleted, and
  * every step is idempotent: a message whose file already exists is skipped, so a
  * migration interrupted halfway simply finishes on the next tick.
+ *
+ * THE ARCHIVE RENAME IS GATED ON EVERY LINE BEING SAFE. A line whose write
+ * FAILED still exists only in the old file, while its ids are already in the
+ * stage-1 ledger (`.claude/chat-state.json`) — so renaming the file away would
+ * take that message out of the only place it exists AND out of delivery, exactly
+ * the silent loss this whole migration is meant to avoid. The old file therefore
+ * stays where it is until a later tick gets every line onto the disk; `lost`
+ * counts what did not make it, and `skipped` stays what it was: lines already on
+ * the spool.
  */
 export function migrateLegacySpool({ legacyPath = LEGACY_SPOOL_PATH, dir = SPOOL_DIR, now = Date.now() } = {}) {
-  if (!existsSync(legacyPath)) return { migrated: 0, skipped: 0, archived: false }
+  if (!existsSync(legacyPath)) return { migrated: 0, skipped: 0, lost: 0, archived: false }
   let migrated = 0
   let skipped = 0
+  let lost = 0
   for (const message of readLegacyJsonl(legacyPath)) {
     const r = spoolMessage(message, dir)
     if (r.ok) migrated++
-    else skipped++
+    else if (r.reason === 'already-spooled') skipped++
+    else lost++
   }
-  const archived = renameWithRetry(legacyPath, `${legacyPath}.migrated-${now}`).ok
-  return { migrated, skipped, archived }
+  const archived = lost === 0 && renameWithRetry(legacyPath, `${legacyPath}.migrated-${now}`).ok
+  return { migrated, skipped, lost, archived }
 }
 
 /** Drop consumed messages that no transport can replay any more. Bounds the

@@ -244,9 +244,36 @@ describe('THE MIGRATION off the stage-1 .jsonl', () => {
     expect(readFileSync(`${legacyPath}.migrated-${NOW}`, 'utf8')).toContain('erste')
   })
 
+  it('KEEPS the old file when a line could not be written — it is the only copy left', () => {
+    const base = tmp()
+    const legacyPath = join(base, 'chat-spool.jsonl')
+    // A FILE where the spool directory belongs: every write into it fails, the
+    // way a permission or a disk fault would.
+    const dir = join(base, 'chat-spool')
+    writeFileSync(dir, 'not a directory')
+    legacyLines(legacyPath, [msg({ text: 'darf nicht verloren gehen' })])
+    const r = migrateLegacySpool({ legacyPath, dir, now: NOW })
+    expect(r).toMatchObject({ migrated: 0, lost: 1, archived: false })
+    expect(existsSync(legacyPath)).toBe(true)
+    expect(existsSync(`${legacyPath}.migrated-${NOW}`)).toBe(false)
+    expect(readFileSync(legacyPath, 'utf8')).toContain('darf nicht verloren gehen')
+  })
+
+  it('archives once a later run has every line on the disk', () => {
+    const base = tmp()
+    const legacyPath = join(base, 'chat-spool.jsonl')
+    const dir = join(base, 'chat-spool')
+    writeFileSync(dir, 'not a directory')
+    legacyLines(legacyPath, [msg()])
+    expect(migrateLegacySpool({ legacyPath, dir, now: NOW }).archived).toBe(false)
+    rmSync(dir, { force: true })
+    expect(migrateLegacySpool({ legacyPath, dir, now: NOW + 1 })).toMatchObject({ migrated: 1, lost: 0, archived: true })
+    expect(readPending(dir).map((m) => m.text)).toEqual(['hallo'])
+  })
+
   it('is a no-op when there is no stage-1 spool', () => {
     const base = tmp()
-    expect(migrateLegacySpool({ legacyPath: join(base, 'none.jsonl'), dir: join(base, 'spool') })).toMatchObject({ migrated: 0, archived: false })
+    expect(migrateLegacySpool({ legacyPath: join(base, 'none.jsonl'), dir: join(base, 'spool') })).toMatchObject({ migrated: 0, lost: 0, archived: false })
   })
 
   it('runs twice without delivering anything twice', () => {
