@@ -22,7 +22,7 @@
 //     guards make it stand down — but the user is notified urgently.
 // Disable: Disable-ScheduledTask -TaskName HoA-Batch-Autostart
 import { readFileSync, writeFileSync, existsSync, readdirSync, renameSync, openSync } from 'node:fs'
-import { spawn, execSync } from 'node:child_process'
+import { spawn, execSync, execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
@@ -53,15 +53,7 @@ import { assessClaim } from './batch-claim-core.mjs'
 import { readDeclaration, refTipAt, worktreeActiveAt, mtimeOf } from './batch-in-flight.mjs'
 import { assessOwnerWork, describeInFlight, LAUNCHER_WORK_MAX_AGE_MS } from './batch-in-flight-core.mjs'
 import { buildSpawnArgs, buildSpawnOptions, recordSpawn, reapableSpawns, pruneSpawns } from './batch-autostart-core.mjs'
-import {
-  BOARD_CONTENT_URL,
-  BOARD_PAGE_URL,
-  LIVE_GRACE_MS,
-  liveBoardVerdict,
-  liveCheckUrl,
-  openFingerprintOfTasks,
-  watchdogDecision,
-} from './board-currency-core.mjs'
+import { BOARD_PAGE_URL } from './board-currency-core.mjs'
 
 // IMPORT-PROOF (27.07.2026). Everything below runs at MODULE LOAD, so merely
 // importing this file — a syntax check, a test, a tooling scan — SPAWNS a
@@ -185,38 +177,28 @@ if (existsSync(C('batch-paused'))) { log('skip: batch is user-paused'); bail() }
 // It runs BEFORE every "do not spawn" reason below (except the user's pause):
 // "no successor is needed" is not "the board is fine", and a batch that is
 // complete or wedged is exactly when a stale board goes unnoticed longest.
-// Wrapped whole, and fail-open like every guard here — the launcher's job is
-// resurrection, and a board check must never be able to stop it.
+//
+// IT RUNS AS ITS OWN PROCESS (scripts/board-watchdog.mjs), and that is not
+// tidiness. On this platform a `process.exit()` after any `fetch` tears undici's
+// socket down mid-close and ABORTS the process — measured: exit 127 with
+// `Assertion failed: !(handle->flags & UV_HANDLE_CLOSING)`. This launcher exits
+// that way at fifteen points, so it must not hold a fetch at all. The child is
+// also containment nothing else matches: it cannot take the resurrection with it.
+// Bounded by a timeout and wrapped fail-open on top, because the launcher's job
+// is bringing the batch back and a board check may never be a reason it does not.
 try {
-  let liveHtml = null
-  let fetchError = null
-  try {
-    // TIMED OUT deliberately: undici would let a hung socket hold this tick for
-    // minutes, and the launcher's real job is resurrecting a dead batch. A board
-    // check may cost seconds, never a resurrection.
-    const res = await fetch(liveCheckUrl(BOARD_CONTENT_URL, now), { cache: 'no-store', signal: AbortSignal.timeout(15000) })
-    if (!res.ok) fetchError = `HTTP ${res.status} ${res.statusText}`
-    else liveHtml = await res.text()
-  } catch (e) { fetchError = (e && e.message) || 'fetch failed' }
-
-  const dash = readJson(C('dashboard-state.json')) ?? {}
-  let expected = null
-  try { expected = openFingerprintOfTasks(readFileSync(join(REPO, 'TASKS.md'), 'utf8')) } catch { /* unknown → no alarm */ }
-  const v = liveBoardVerdict({
-    liveHtml,
-    fetchError,
-    expected,
-    publishedAt: Number(dash.pagesPublishedAt) || 0,
-    now,
-    graceMs: LIVE_GRACE_MS,
+  const out = execFileSync(process.execPath, [R('board-watchdog.mjs'), '--last-key', state.boardWatchKey ?? ''], {
+    cwd: REPO,
+    encoding: 'utf8',
+    timeout: 60000,
+    stdio: ['ignore', 'pipe', 'pipe'],
   })
-  const d = watchdogDecision({ ...v, state: dash, now, lastKey: state.boardWatchKey })
-  if (v.verdict !== 'current') log(`board: ${v.verdict}${v.reason ? ` — ${v.reason}` : ''} (${BOARD_PAGE_URL})`)
-  if (d.notify) {
-    log(`BOARD ALERT: ${d.message}`)
-    await notify(d.title, d.message, d.priority)
-    state.boardWatchKey = d.key
-  } else if (d.key === null) {
+  const r = JSON.parse(out.trim().split('\n').filter(Boolean).pop())
+  if (r.verdict !== 'current') log(`board: ${r.verdict}${r.reason ? ` — ${r.reason}` : ''} (${BOARD_PAGE_URL})`)
+  if (r.notified) {
+    log(`BOARD ALERT: ${r.message}`)
+    state.boardWatchKey = r.key
+  } else if (r.key === null) {
     // NOTHING to report — not merely "already reported". A recovered board
     // forgets the key so the NEXT fault is announced again instead of being
     // swallowed as a repeat of the one that is over; a fault still standing

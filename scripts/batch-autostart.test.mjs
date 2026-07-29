@@ -145,24 +145,26 @@ describe('the launcher runs the board watchdog', () => {
     return i
   }
 
-  it('imports the pure verdict and alert decisions rather than re-deriving them', () => {
-    const imports = source.match(/import\s*\{[^}]*\}\s*from\s*'\.\/board-currency-core\.mjs'/)
-    expect(imports, 'no import from ./board-currency-core.mjs').not.toBeNull()
-    expect(imports[0]).toMatch(/\bliveBoardVerdict\b/)
-    expect(imports[0]).toMatch(/\bwatchdogDecision\b/)
+  it('holds NO fetch of its own — a fetch here would abort its own exit', () => {
+    // Measured: on this platform a `process.exit()` after any fetch tears
+    // undici's socket down mid-close and aborts the process (exit 127,
+    // `UV_HANDLE_CLOSING`). This launcher exits that way at fifteen points, so
+    // the check runs as a child. A future edit inlining it would look harmless
+    // and break every tick.
+    expect(code).not.toMatch(/\bfetch\(/)
   })
 
-  it('fetches the LIVE page — the point of delta E is not reading a state file', () => {
-    expect(code).toMatch(/fetch\(liveCheckUrl\(BOARD_CONTENT_URL/)
-    expect(code).toMatch(/liveBoardVerdict\(\{/)
-    expect(code).toMatch(/watchdogDecision\(\{/)
-    expect(code).toMatch(/await notify\(d\.title, d\.message, d\.priority\)/)
+  it('delegates the check to the watchdog child and reads its verdict back', () => {
+    expect(code).toMatch(/board-watchdog\.mjs/)
+    expect(code).toMatch(/state\.boardWatchKey = r\.key/)
+    // A hung child may not hold the tick either.
+    expect(code).toMatch(/timeout: \d+/)
   })
 
   it('runs BEFORE every reason not to spawn except the user pause', () => {
     // "No successor is needed" is not "the board is fine". A complete, claimed
     // or wedged batch is exactly when a stale board goes unnoticed longest.
-    const watch = lineOf(/liveBoardVerdict\(\{/, 'the board verdict')
+    const watch = lineOf(/board-watchdog\.mjs/, 'the board watchdog call')
     expect(lineOf(/batch-paused/, 'the user pause')).toBeLessThan(watch)
     for (const [re, what] of [
       [/openPointCount\(\)/, 'the work-order read'],
@@ -176,9 +178,33 @@ describe('the launcher runs the board watchdog', () => {
   it('cannot stop the launcher: the block is wrapped and fails open', () => {
     // A board check that could throw would take the RESURRECTION down with it —
     // the launcher's job is bringing the batch back, and this is a backstop.
-    const watch = lineOf(/liveBoardVerdict\(\{/, 'the board verdict')
+    const watch = lineOf(/board-watchdog\.mjs/, 'the board watchdog call')
     const opener = [...codeLines.slice(0, watch)].reverse().find((l) => /^(try \{|\} catch)/.test(l))
     expect(opener, 'the watchdog is not inside a try block').toMatch(/^try \{/)
     expect(code).toMatch(/board watchdog skipped/)
+  })
+})
+
+// The child the launcher delegates to. It is importable (no side effects at
+// load beyond its own run), but it fetches, so it is read rather than run.
+describe('the board watchdog child', () => {
+  const source = readFileSync(resolve(process.cwd(), 'scripts', 'board-watchdog.mjs'), 'utf8')
+  const code = source.split('\n').filter((l) => !l.trimStart().startsWith('//')).join('\n')
+
+  it('reads the LIVE page — the point of delta E is not reading a state file', () => {
+    expect(code).toMatch(/fetch\(liveCheckUrl\(BOARD_CONTENT_URL/)
+    expect(code).toMatch(/liveBoardVerdict\(\{/)
+    expect(code).toMatch(/watchdogDecision\(\{/)
+    expect(code).toMatch(/await notify\(d\.title, d\.message, d\.priority\)/)
+  })
+
+  it('bounds the fetch and clears its timer', () => {
+    expect(code).toMatch(/AbortController/)
+    expect(code).toMatch(/clearTimeout\(timer\)/)
+  })
+
+  it('always answers, never throws out — its caller parses one json line', () => {
+    expect(code).toMatch(/catch \(e\) \{\s*say\(\{ verdict: 'error'/)
+    expect(code).not.toMatch(/process\.exit\(/)
   })
 })

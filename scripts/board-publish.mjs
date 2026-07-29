@@ -67,6 +67,26 @@ const sha256 = (text) => createHash('sha256').update(Buffer.from(text)).digest('
 /** No fetch in this repository waits for ever; a hung socket must not hang a CLI. */
 const FETCH_TIMEOUT_MS = 15000
 
+/**
+ * A timed fetch whose timer is CLEARED again.
+ *
+ * `AbortSignal.timeout` leaves a libuv handle alive that a following
+ * `process.exit` tears down mid-close: on Windows that aborts the process with
+ * `Assertion failed: !(handle->flags & UV_HANDLE_CLOSING)` and exit code 127 —
+ * observed on the very first `--check`, where it turned an honest "the board is
+ * unreachable" (exit 1) into a crash. An explicit controller with a cleared
+ * timeout leaves nothing behind.
+ */
+async function fetchWithTimeout(url, ms = FETCH_TIMEOUT_MS) {
+  const ac = new AbortController()
+  const timer = setTimeout(() => ac.abort(new Error(`timed out after ${ms} ms`)), ms)
+  try {
+    return await fetch(url, { cache: 'no-store', signal: ac.signal })
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 const args = process.argv.slice(2)
 const git = (a, opts = {}) => execFileSync('git', a, { cwd: REPO_ROOT, encoding: 'utf8', ...opts }).trim()
 
@@ -100,12 +120,11 @@ if (args.includes('--check')) {
   let liveHtml = null
   let fetchError = null
   try {
-    const res = await fetch(liveCheckUrl(BOARD_CONTENT_URL), {
-      cache: 'no-store',
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-    })
+    const res = await fetchWithTimeout(liveCheckUrl(BOARD_CONTENT_URL))
+    // The body is consumed either way, so no socket is left half-read.
+    const body = await res.text()
     if (!res.ok) fetchError = `HTTP ${res.status} ${res.statusText}`
-    else liveHtml = await res.text()
+    else liveHtml = body
   } catch (e) {
     fetchError = (e && e.message) || 'fetch failed'
   }
@@ -119,15 +138,27 @@ if (args.includes('--check')) {
   // 'settling' and 'unknown' are not faults: the first is the deploy/CDN floor
   // this check exists to tolerate, the second says honestly that there was
   // nothing to compare against.
-  process.exit(v.verdict === 'behind' || v.verdict === 'unreachable' ? 1 : 0)
-}
-
-if (args.length > 0) {
-  console.error('usage: node scripts/board-publish.mjs [--check | --url]')
-  process.exit(1)
+  //
+  // exitCode, NOT process.exit: exiting here would tear down undici's keep-alive
+  // socket mid-close, and on Windows that aborts the process with
+  // `Assertion failed: !(handle->flags & UV_HANDLE_CLOSING)` and code 127 — the
+  // very first `--check` did exactly that, turning an honest "the board is
+  // unreachable" (exit 1) into a crash a caller cannot read. The sockets are
+  // unref'd, so the process ends by itself once the loop drains.
+  process.exitCode = v.verdict === 'behind' || v.verdict === 'unreachable' ? 1 : 0
+} else {
+  if (args.length > 0) {
+    console.error('usage: node scripts/board-publish.mjs [--check | --url]')
+    process.exit(1)
+  }
+  publish()
 }
 
 // ---- publish --------------------------------------------------------------
+// A function, not top-level code, so `--check` above can end the run by setting
+// an exit CODE rather than calling process.exit — see the note there. Nothing in
+// here awaits, so hoisting it costs the straight-line reading nothing.
+function publish() {
 if (!existsSync(boardFile)) {
   console.error(`board-publish: repo board not found: ${boardFile}`)
   process.exit(1)
@@ -156,10 +187,15 @@ try {
   console.error(`board-publish: footer not refreshed (${e.message})`)
 }
 
+// ONE read of the board from here on: the gates below, the bytes that go out and
+// the hash that is recorded must all be the SAME bytes, or a gate passes on one
+// version while another is published.
+const repoBytes = readFileSync(boardFile, 'utf8')
+
 // STRUCTURE BEFORE PUBLISH: a malformed board must not be publishable at all.
 // The gate sits before the bytes leave, exactly as in dashboard-publish.mjs —
 // a board broken by an edit reached the reader three times in one evening.
-const broken = structureViolations(readFileSync(boardFile, 'utf8'))
+const broken = structureViolations(repoBytes)
 if (broken.length) {
   console.error(`board-publish REFUSED — the board is structurally broken (${broken.length}):`)
   for (const v of broken) console.error(`  [${v.code}] ${v.msg}`)
@@ -178,7 +214,6 @@ if (!fingerprint) fail('the work order could not be read, so the page would carr
 // publishable either, the same reasoning the structure gate above rests on. No
 // deadlock: editing the board is never blocked by any gate, and the deny that
 // asks for a publish fires at most once per turn.
-const repoBytes = readFileSync(boardFile, 'utf8')
 let openPoints = []
 try { openPoints = parseTasks(readFileSync(tasksPath, 'utf8')).open } catch { /* judged unreadable above */ }
 const uncovered = boardMissingPoints(repoBytes, openPoints)
@@ -186,7 +221,13 @@ if (uncovered.length) {
   console.error(`board-publish REFUSED — the board does not show open point(s) ${uncovered.join(', ')}.`)
   console.error('Publishing it would stamp a fingerprint claiming it does, and the watchdog would')
   console.error('then report the board as current while the reader is missing work.')
-  console.error('Give each of them a card (node scripts/board.mjs queue <N> "<text>"), then publish.')
+  // NAME A REMEDY THAT WORKS (four-eyes NEW-1). `board.mjs queue <N>` MOVES a
+  // current-work card back to the queue and throws when there is none — and the
+  // case that lands here is exactly a freshly appended point with no card
+  // anywhere. The generator is what serves it.
+  console.error('Give each of them a card: node scripts/board-queue.mjs   (rebuilds the queue')
+  console.error('from the work order; a point with no prose yet gets a stub, which is enough to')
+  console.error('publish). Write the prose with: node scripts/board-queue.mjs set <N> "<text>".')
   process.exit(1)
 }
 
@@ -236,3 +277,4 @@ mergeState(pagesPublishPatch({ fileHash: sha256(repoBytes), fingerprint }))
 console.log(`board PUBLISHED (${fingerprint}) — commit ${commit.slice(0, 12)} on ${BOARD_REF}`)
 console.log(`  live in seconds, cached up to ${Math.round(LIVE_GRACE_MS / 60000)} min: ${BOARD_PAGE_URL}`)
 console.log('  verify against the PAGE: node scripts/board-publish.mjs --check')
+}
