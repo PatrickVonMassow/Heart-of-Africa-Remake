@@ -1041,17 +1041,17 @@ After completion and after every major system:
   a mechanism decision: `docs/analysis_de/lesson-mechanisms.md`), followed
   by `dashboard-sync`. Separately, PreToolUse hooks run `closing-guard` (§9),
   which denies a version tag until every closing step is recorded, and
-  `board-first-guard`, which fires BEFORE the work rather than at the turn end
-  (the Stop chain lets the board lag the whole hour the user is reading it): a
-  turn's FIRST state-changing call is denied while no `focus set|confirm`
-  postdates the turn stamp, the board is unpublished, or the OPEN-POINT SET
-  changed without a publish since (`publishDue`) — never a read, its own
-  remedy commands or a board-file edit, and at most ONCE per turn. It binds
-  EVERY session (point 400): `scripts/board-publish.mjs` pushes the board to its
-  live page from a SCRIPT, which the headless successor — no Artifact tool, so
-  formerly unable to publish at all — has. The check then reads that PAGE, and
-  `batch-autostart.mjs` alerts when it is behind, which is the one layer still
-  speaking while a session is wedged.
+  `board-first-guard`, which fires BEFORE the work rather than at the turn end (the
+  Stop chain lets the board lag an hour): a turn's FIRST state-changing call is
+  denied while no `focus set|confirm` postdates the turn stamp, the board is
+  unpublished, or the OPEN-POINT SET changed without a publish since (`publishDue`)
+  — never a read, its remedy commands or a board-file edit, and at most ONCE per
+  turn. It binds EVERY session (point 400): `scripts/board-publish.mjs` publishes
+  from a SCRIPT, so the headless successor can too; the check reads that PAGE, and
+  `batch-autostart.mjs` alerts when it is behind — the one layer still speaking
+  while a session is wedged. It runs BACK too (`scripts/chat-core.mjs`,
+  `docs/batch-autonomy.md`): the launcher polls the chat each tick and hands what
+  VERIFIES on as untrusted input, never as authorization.
   Every one is fail-OPEN (an internal error allows the stop, so a guard bug
   cannot trap the session) with a pure, Vitest-covered decision core.
 - **Ask the guards BEFORE the action, and answer LAST (points 365/403).** Before

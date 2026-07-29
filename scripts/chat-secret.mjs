@@ -11,7 +11,7 @@
 // file, and never written into the published HTML. The derived TOPIC NAMES are
 // just as sensitive — knowing one is enough to read or post — which is why they
 // are printed only on request and only to this terminal.
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { randomBytes } from 'node:crypto'
 import { dirname } from 'node:path'
 import { repoPath } from './repo-paths.mjs'

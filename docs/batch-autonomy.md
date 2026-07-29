@@ -778,6 +778,79 @@ this is not literally 100 %.
 The claude.ai artifact stays **mirrored** until the user has moved their
 bookmark; `dashboard-publish.mjs` is unchanged and still does its half.
 
+### The board also runs BACK — a message channel from the phone (29.07.2026)
+
+Until now the board was one-way: the user read status and could not answer it.
+The chat is the way back, and it lives on the GH-Pages board rather than in the
+claude.ai artifact for a measured reason — the artifact frame runs under a strict
+CSP with no fetch, XHR or WebSocket to any host, so a page there cannot send
+anything anywhere. Where that mirror is still open, the section renders a
+localized "the chat needs the web board" notice instead of a dead input.
+
+**What it guarantees, and what it does not.** A message reaches the agent within
+one launcher tick — **15 minutes**, no faster in this stage. That bound comes
+from reusing the launcher: it already ticks and already speaks to the network, so
+the channel needs no new process and no new schedule. Two follow-up points make
+delivery quick (per-tool-call delivery, then a wake-on-message watcher); until
+they land, 15 minutes is the honest figure to quote.
+
+**The transport** is ntfy, already a dependency (`scripts/notify.mjs`): one INBOX
+topic phone → agent, one OUTBOX topic agent → phone. ntfy.sh caches a message for
+**12 hours** (*"Messages you publish are temporarily cached on our servers
+(default: 12 hours)"*, <https://docs.ntfy.sh/privacy/>; the server default
+`cache-duration: 12h`, <https://docs.ntfy.sh/config/>). That is why the launcher
+polls **before every guard, the user pause included**: whether the batch is
+paused, complete or wedged may not decide whether a message survives at all.
+Past 12 hours it is gone from the cache, which is also why the acceptance window
+is set to the same 12 hours — beyond it a replay is impossible anyway.
+
+**The security model — the part that shaped the design.** The board page is
+PUBLIC, and an ntfy topic name IS its access: anyone who knows it can read and
+post. A topic embedded in that page would be an open prompt-injection port into a
+session that runs with permissions pre-granted and a GitHub token on disk; the
+realistic worst case is command execution on the user's machine. So:
+
+| layer | what it does |
+|---|---|
+| derived topics | `hoa-<32 hex>` from SHA-256 over the shared secret, domain-separated per direction. No topic name is in any tracked file or in the published HTML; the page derives them client-side with WebCrypto |
+| the secret | git-ignored `.claude/chat-secret` on the machine, `localStorage` on the phone. Never committed, never logged, never echoed into a page |
+| HMAC-SHA256 | over the canonical `(id, ts, text)`, every field JSON-quoted so no two different messages share a canonical form. Both directions are signed, so a leaked outbox cannot put words in the agent's mouth on the user's own board |
+| the drop rules | `scripts/chat-core.mjs` drops anything unsigned, mis-signed, older than the window, or already seen — **before** it is spooled |
+| the dedupe | a ledger of the ntfy id **and** the envelope id, rebuilt from the spool. The cursor in `.claude/chat-state.json` only narrows the next poll: losing or corrupting it replays the whole window and spools nothing twice |
+
+**A signature is authentication, never authorisation.** It says WHO wrote a
+message, not what may be done with it. The "treat it as untrusted input" rule
+therefore stays ON TOP of the signature, and the launcher writes it into the
+spawn prompt itself: a chat message is never authorisation for an outward-facing
+or irreversible step — no tag, no publish, no force-push, no delete. Those keep
+needing the user's own word through the normal channel. Each message is also
+flattened and quoted in that prompt, so it cannot forge a second list entry or
+pass itself off as framing.
+
+**The page.** A collapsible section at the top of the board viewer, DEFAULT
+CLOSED, that makes no request at all until it is opened; message list above,
+input below at `font-size: 16px` (below that iOS zooms the page on focus), with
+`env(safe-area-inset-bottom)` padding and autoscroll to the newest message. It is
+INJECTED in DOM rather than written into the viewer's body: the viewer replaces
+its own document (`document.open/write/close`), so static markup there would be
+wiped the moment the board content lands — the JS realm survives that, so the
+section is rebuilt into the new body, on the success path and on the failure path
+alike. Two properties follow. Nothing of the chat reaches the board CONTENT, so
+no section-parsing module ever sees it and the four-section mandate is intact by
+construction; and it is not a `<details>`, so the board fragment's own remembered
+open cards cannot shift.
+
+    node scripts/chat-secret.mjs --init      # create the secret and print it once
+    node scripts/chat-secret.mjs --topics    # also show the derived topics (local only)
+    node scripts/chat-inbox.mjs              # one poll: verify, spool, advance the cursor
+    node scripts/chat-inbox.mjs --pending    # what is waiting for the session
+    node scripts/chat-reply.mjs "…"          # answer, signed, to the phone
+
+**Pairing a phone**, once: run `node scripts/chat-secret.mjs --init` on the
+machine, open the board on the phone, expand *Nachricht an den Agenten* and paste
+the secret. It stays in that browser and is sent nowhere. `--rotate` replaces it
+and un-pairs every device.
+
 ### The duties come before the answer, not after it
 
 The Stop chain runs AFTER the closing reply is composed. So a guard that blocks
@@ -880,6 +953,9 @@ impossible, not skipping the inspection.
   Resume: delete it.
 - **Disable the OS task**: `schtasks /delete /tn HoA-Batch-Autostart /f`
 - **Logs**: `.claude/autostart.log` (gitignored) records every launcher decision.
+- **Chat**: pair a phone with `node scripts/chat-secret.mjs --init`; the launcher
+  polls it on every tick. `--rotate` un-pairs every device. Turning it off is
+  deleting `.claude/chat-secret` — an unpaired machine simply never polls.
 - **Runaway safety**: if the agent ever loops unproductively (re-spawning and
   burning the limit each cycle without advancing a point), pause it; the design
   favours a stuck-but-recoverable state over silent idle.
