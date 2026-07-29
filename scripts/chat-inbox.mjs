@@ -161,7 +161,10 @@ async function tick() {
     // one whose content must not reach a log the agent reads.
     dropped: dropped.map((d) => d.reason),
     pending: spool.length + accepted.length,
-    messages: accepted,
+    // The WHOLE spool, not only what this tick added: the launcher decides for
+    // itself which of them a spawn still needs to hear about, and the spool
+    // stays untouched for the consumer that acknowledges it.
+    messages: [...spool, ...accepted],
   })
   process.exit(0)
 }
