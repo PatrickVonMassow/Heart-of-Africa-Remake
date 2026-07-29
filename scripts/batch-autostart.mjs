@@ -57,12 +57,16 @@ import {
   buildSpawnArgs,
   buildSpawnOptions,
   chatPromptSuffix,
+  claudeExeBase,
+  findClaudeExe,
   nextChatHandedAt,
   pendingSinceHandover,
   recordSpawn,
   reapableSpawns,
   pruneSpawns,
 } from './batch-autostart-core.mjs'
+import { WATCHER_PID_FILE, watcherSupervision } from './chat-watcher-core.mjs'
+import { openPointStatus } from './tasks-source.mjs'
 import { BOARD_PAGE_URL } from './board-currency-core.mjs'
 
 // IMPORT-PROOF (27.07.2026). Everything below runs at MODULE LOAD, so merely
@@ -106,24 +110,18 @@ const waitForExit = (pid, budgetMs) => {
   }
   return !pidAlive(pid)
 }
+// Open points, or -1 for the FORMAT ALARM (checkboxes but no parseable point).
+// The rule itself lives in scripts/tasks-source.mjs, because the message watcher
+// asks the same question — a second copy of it would drift silently, and both
+// callers only ever see its verdict. The read stays here: a missing TASKS.md must
+// still throw, so the tick bails on it rather than reading it as "nothing to do".
 const openPointCount = () => {
-  let n = 0
-  let sawCheckbox = false
-  for (const l of readFileSync(join(REPO, 'TASKS.md'), 'utf8').split('\n')) {
-    if (/^- \[/.test(l)) sawCheckbox = true
-    const m = l.match(/^- \[ \] (\d+)\./)
-    if (m && !/\bDEFERRED\b/.test(l)) n++
-  }
-  // Format sanity: checkboxes exist but none parse → treat as unknown, NOT as
-  // "complete" (never silently stop with work left on a reformat). The escape
-  // hatch reads the ARCHIVE (docs/tasks-archive.md), because since the split of
-  // 26.07.2026 a ticked point leaves TASKS.md at once: looking for `- [x]` here
-  // could never succeed again, so every all-DEFERRED file would raise a false
-  // format alarm (four-eyes review).
   const archive = join(REPO, 'docs', 'tasks-archive.md')
-  const ticksExist = existsSync(archive) && /- \[x\] \d+\./.test(readFileSync(archive, 'utf8'))
-  if (n === 0 && sawCheckbox && !ticksExist) return -1
-  return n
+  const { open, alarm } = openPointStatus({
+    tasksText: readFileSync(join(REPO, 'TASKS.md'), 'utf8'),
+    archiveText: existsSync(archive) ? readFileSync(archive, 'utf8') : '',
+  })
+  return alarm ? -1 : open
 }
 
 const state = readJson(C('autostart-state.json')) ?? { failCount: 0, lastHead: '', lastSpawnAt: 0, lastPid: 0, lastTickAt: 0, spawns: [] }
@@ -201,6 +199,44 @@ try {
   pendingChat = Array.isArray(r.messages) ? r.messages : []
 } catch (e) {
   log(`chat inbox skipped (${(e && e.message) || e})`)
+}
+
+// --- THE MESSAGE WATCHER: this tick is its supervisor (point 407) --------------
+// Stage 3 of the chat channel is a long-lived process subscribed to the inbox
+// topic, so a message arriving into an IDLE machine wakes a light responder
+// within seconds instead of at the next tick of this launcher.
+//
+// IT GETS NO SCHEDULED TASK OF ITS OWN. `HoA-Batch-Autostart` already runs every
+// few minutes, at boot included, and is the one thing here that runs when
+// nothing else does — so start-at-boot, restart-after-crash and stop-on-pause
+// are three readings of the SAME line rather than three mechanisms. The decision
+// is pure (`watcherSupervision`); liveness is by pid AND start time, so a
+// recycled pid is never mistaken for the watcher and never killed as one.
+//
+// IT RUNS BEFORE THE PAUSE GUARD because the pause is half its job: the guard
+// below exits the tick, and the watcher would then keep answering messages on a
+// batch the user has stopped.
+try {
+  const rec = readJson(C(WATCHER_PID_FILE))
+  const sup = watcherSupervision({ paused: existsSync(C('batch-paused')), record: rec, probe: probePid })
+  if (sup.action === 'stop') {
+    try { process.kill(sup.pid) } catch { /* already gone */ }
+    log(`chat watcher: stopped pid ${sup.pid} (${sup.reason})`)
+  } else if (sup.action === 'start') {
+    const out = openSync(C('chat-watcher.log'), 'a')
+    const child = spawn(process.execPath, [R('chat-watcher.mjs')], {
+      cwd: REPO,
+      detached: true,
+      stdio: ['ignore', out, out],
+      // point 401 — a console window popping up while the user works elsewhere
+      // steals their focus, and this process starts unattended by definition.
+      windowsHide: true,
+    })
+    child.unref()
+    log(`chat watcher: started pid ${child.pid} (${sup.reason})`)
+  }
+} catch (e) {
+  log(`chat watcher supervision skipped (${(e && e.message) || e})`)
 }
 
 // --- Guards: never resurrect when it would be wrong ---------------------------
@@ -491,15 +527,9 @@ if (acq !== 'acquired') {
 }
 
 // --- Find the newest bundled claude.exe ---------------------------------------
-function findClaude() {
-  const base = join(process.env.LOCALAPPDATA ?? '', 'Packages', 'Claude_pzs8sxrjxfjjc', 'LocalCache', 'Roaming', 'Claude', 'claude-code')
-  try {
-    const v = readdirSync(base).filter((d) => existsSync(join(base, d, 'claude.exe')))
-    v.sort((a, b) => b.localeCompare(a, undefined, { numeric: true }))
-    return v.length ? join(base, v[0], 'claude.exe') : null
-  } catch { return null }
-}
-const exe = findClaude()
+// The lookup itself lives in batch-autostart-core.mjs, because the message
+// watcher spawns the same executable and a second copy of this path would drift.
+const exe = findClaudeExe({ base: claudeExeBase(), readdir: readdirSync, exists: existsSync, join })
 if (!exe) {
   release(launcherSid)
   log('FAIL: no bundled claude.exe found')

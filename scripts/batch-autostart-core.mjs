@@ -270,3 +270,30 @@ export function pruneSpawns({ spawns, probePid } = {}) {
     (s) => s && typeof s.pid === 'number' && typeof s.at === 'number' && probePid(s.pid)?.exists === true,
   )
 }
+
+// --- WHERE THE BUNDLED claude.exe LIVES ---------------------------------------
+//
+// Two spawners need it now — the launcher and the message watcher
+// (scripts/chat-watcher.mjs) — so the lookup lives here rather than twice. The
+// filesystem calls are INJECTED, which is what keeps this file testable without
+// a Windows install: the defaults are the real ones.
+
+/** The versioned install directory of the bundled CLI. */
+export function claudeExeBase(env = process.env) {
+  return `${env.LOCALAPPDATA ?? ''}/Packages/Claude_pzs8sxrjxfjjc/LocalCache/Roaming/Claude/claude-code`
+}
+
+/**
+ * The NEWEST bundled claude.exe, or null. `readdir`/`exists`/`join` are injected
+ * so the version sort can be proven without an install. The sort is numeric and
+ * descending, so `1.10.0` beats `1.9.0`.
+ */
+export function findClaudeExe({ base, readdir, exists, join } = {}) {
+  try {
+    const dirs = readdir(base).filter((d) => exists(join(base, d, 'claude.exe')))
+    dirs.sort((a, b) => b.localeCompare(a, undefined, { numeric: true }))
+    return dirs.length ? join(base, dirs[0], 'claude.exe') : null
+  } catch {
+    return null
+  }
+}

@@ -379,5 +379,23 @@ export const TEST_VECTOR = Object.freeze({
 export const pollUrl = (topic, since) =>
   `https://ntfy.sh/${encodeURIComponent(topic)}/json?poll=1&since=${encodeURIComponent(since)}`
 
+/**
+ * The STREAMING URL for a topic — the same `/json` endpoint without `poll=1`,
+ * which keeps one connection open and pushes each message as a line as it
+ * arrives (https://docs.ntfy.sh/subscribe/api/). scripts/chat-watcher.mjs
+ * subscribes through it so an idle machine answers within seconds instead of at
+ * the next launcher tick.
+ *
+ * IT IS THIS AND NOT `/sse` ON PURPOSE. Both are one long-lived connection, so
+ * both avoid the rate limits a tight poll runs into; the difference is the frame.
+ * `/sse` wraps the same object in `data: ` lines, i.e. a SECOND parser beside
+ * `parseNtfyLine` and a second place for a protocol change to be missed. The
+ * JSON stream is byte-for-byte what `parseNtfyPoll` already reads, so the
+ * verification path of a streamed message and of a polled one is literally the
+ * same code.
+ */
+export const streamUrl = (topic, since) =>
+  `https://ntfy.sh/${encodeURIComponent(topic)}/json?since=${encodeURIComponent(since)}`
+
 /** The publish URL for a topic. */
 export const publishUrl = (topic) => `https://ntfy.sh/${encodeURIComponent(topic)}`
