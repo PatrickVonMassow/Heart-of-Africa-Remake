@@ -12155,3 +12155,24 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   where every direction is genuinely blocked. That change alone would let the
   reported situation resolve even before the geometry work of layer (1) lands —
   worth doing first and verifying separately.
+
+- [x] 420. THE GERMAN TEXTS USE A DASH GERMAN TYPOGRAPHY DOES NOT HAVE (29.07.2026,
+  user asked whether the spaced em dash in the documents is a typographic error). For
+  ENGLISH it is not: a SPACED em dash is AP style, the repository holds it consistently
+  (README: 16 spaced, 0 unspaced, 0 en dashes), and changing it would be taste, not a
+  correction — English prose stays as it is, in every document.
+  GERMAN is the real finding. The Duden Gedankenstrich is the EN dash with spaces; the em
+  dash does not occur in German typesetting at all. `src/i18n/de.ts` uses it 139 times —
+  86 as a plain spaced dash, 46 before a `[pause]` marker, 6 before a closing voice tag,
+  1 before a comma — and every one of them is a Gedankenstrich, so every one is wrong.
+  These are the only ones a PLAYER reads.
+  FIX: replace every em dash with an en dash in `src/i18n/de.ts` and nowhere else. The
+  voice markup is stripped for display, so a dash before a marker is the same case as any
+  other. `en.ts` is NOT touched — English keeps its spaced em dash. The German analysis
+  documents under `docs/analysis_de/` carry the same error 424 times; they are prose for
+  the team, not for the player, and are explicitly OUT of scope here (user decision).
+  VERIFIABLE: pure Vitest in `src/i18n/` — no em dash occurs in the German language file,
+  the en-dash count matches what was replaced, and the existing parity and completeness
+  tests still hold (the replacement must not touch a key, only a value). Read one changed
+  entry through the voice-markup stripper to confirm the display string reads correctly.
+
