@@ -3765,6 +3765,37 @@ read that as "the criterion and its evidence section".
   notify produces no second notice and no contradictory pair, (B) both conditions in one
   tick produce both log statements.
 
+- [ ] 431. THE DOCTOR'S GATE ACCUSES THE CODE OF WHAT THE LOAD DID (29.07.2026, THREE
+  times in one afternoon). Every turn in which a second session touched the repo, the
+  Stop hook demanded `batch-doctor.mjs --gate` before any further work. Each run declared
+  the repo CONSISTENT and then reported `npm run test:unit FAILED — the concurrent writes
+  (or the current head) broke it; fix before continuing the batch`. Each time the same
+  suite, run standalone on the SAME commit minutes later, was fully green (170–172 files,
+  4853–4903 tests). The gate had been competing with a delegated agent's build for the
+  machine — the exact class the flake policy and retrospective §3.22/§3.48 describe, and
+  the exact accusation they forbid: the message names the CODE as the suspect and orders
+  the batch stopped.
+  THE FIX IS NOT TO WEAKEN THE GATE. The doctor already has the instrument: the verify
+  runner performs a quiet-machine check (point 296) and prints "the machine is quiet — a
+  verdict from this run is evidence" or the opposite. The doctor must use that same check:
+  under a busy machine — or with a live agent worktree — a red gate is reported as
+  INCONCLUSIVE (load), naming what was running, and the doctor asks for a repeat once the
+  pool is idle instead of ordering a stop. Only a red on a quiet machine keeps today's
+  wording. A red on a quiet machine must also stay ORDERED before the noisy one in the
+  log, so a reader sees which verdict is evidence.
+  SECOND HALF, cheaper and independent: the hook fires the gate EVERY turn while the other
+  session merely exists, and the gate costs ~3 minutes of unit tests each time. Once a
+  doctor run has reported CONSISTENT for a given (HEAD, parallel-session) pair, the demand
+  is satisfied until one of the two changes — the state is what is being judged, not the
+  turn.
+  VERIFIABLE: Vitest over the doctor's decision core — a red gate plus a busy machine
+  yields the inconclusive verdict and no stop order; a red gate plus a quiet machine yields
+  today's verdict; a repeated call with an unchanged (HEAD, parallel set) is reported as
+  already satisfied. Plus one case that the quiet-machine reading actually reaches the
+  verdict rather than only the log.
+  DOCS in the same commit: `docs/batch-autonomy.md` under the doctor, and the ledger row
+  for retrospective §3.22.
+
 ## Closing (only after all points)
 
 New points are appended BEFORE this section — it stays last in the file.
