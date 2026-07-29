@@ -231,7 +231,10 @@ If you hold rights to the original work and object to anything in this
 repository, open an issue or contact the author and it will be addressed
 promptly.
 
-Own code released under the [MIT License](LICENSE).
+Own code released under the [MIT License](LICENSE). Note that this covers only
+the original work in this repository — it conveys no rights to the 1985 game.
+Anyone looking to commercialise a derivative would need to clear that with the
+rights holders of the original.
 
 ## Contact
 
