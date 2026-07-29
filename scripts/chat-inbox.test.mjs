@@ -5,22 +5,12 @@
 // dedupe ledger is rebuilt FROM THE SPOOL, so deleting or corrupting
 // .claude/chat-state.json re-reads the whole retention window and still spools
 // nothing twice. A cursor is a shortcut, never the guarantee.
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
-import { readSpool, seededLedger } from './chat-inbox.mjs'
+//
+// The spool's own file layout — one file per message, the claim, the migration
+// off the stage-1 .jsonl — is proved in scripts/chat-spool.test.mjs.
+import { describe, expect, it } from 'vitest'
+import { seededLedger } from './chat-inbox.mjs'
 import { TEST_VECTOR, ingest, makeEnvelope } from './chat-core.mjs'
-
-const dirs = []
-const tmp = () => {
-  const d = mkdtempSync(join(tmpdir(), 'hoa-chat-'))
-  dirs.push(d)
-  return d
-}
-afterEach(() => {
-  for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true })
-})
 
 const NOW = 1_700_000_000_000
 const secret = TEST_VECTOR.secret
@@ -31,24 +21,6 @@ const frame = async ({ ntfyId, msgId, text, ts = NOW, direction = 'inbox' }) => 
   event: 'message',
   topic: 't',
   message: JSON.stringify(await makeEnvelope({ secret, direction, id: msgId, ts, text })),
-})
-
-describe('the spool file', () => {
-  it('reads back what was written, oldest first', () => {
-    const p = join(tmp(), 'spool.jsonl')
-    writeFileSync(p, `${JSON.stringify({ id: 'a', text: 'one' })}\n${JSON.stringify({ id: 'b', text: 'two' })}\n`)
-    expect(readSpool(p).map((m) => m.text)).toEqual(['one', 'two'])
-  })
-
-  it('skips a torn line instead of losing the file', () => {
-    const p = join(tmp(), 'spool.jsonl')
-    writeFileSync(p, `${JSON.stringify({ id: 'a', text: 'one' })}\n{"id":"b",\n${JSON.stringify({ id: 'c', text: 'three' })}\n`)
-    expect(readSpool(p).map((m) => m.text)).toEqual(['one', 'three'])
-  })
-
-  it('is empty, not an error, when there is no file at all', () => {
-    expect(readSpool(join(tmp(), 'nothing.jsonl'))).toEqual([])
-  })
 })
 
 describe('the ledger is seeded from the spool, not only from the cursor file', () => {

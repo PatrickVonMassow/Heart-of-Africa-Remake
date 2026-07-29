@@ -42,7 +42,12 @@ scripts/.tile-cache
 # so it is never committed — and neither is a topic name derived from it.
 .claude/chat-secret
 .claude/chat-state.json
+# The stage-1 spool, its archived remains, and the spool DIRECTORY that replaced
+# it (one file per message plus the consumed archive the replay ledger reads).
+# All of it is the user's own words — never repository content.
 .claude/chat-spool.jsonl
+.claude/chat-spool.jsonl.migrated-*
+.claude/chat-spool/
 .claude/dashboard-state.json
 .claude/current-focus.json
 .claude/focus-check-pending.json

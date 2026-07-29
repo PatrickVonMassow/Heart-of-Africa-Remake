@@ -2,12 +2,15 @@
 //
 //   node scripts/chat-inbox.mjs            # poll, spool, print one json line
 //   node scripts/chat-inbox.mjs --pending  # print the spool without polling
-//   node scripts/chat-inbox.mjs --ack <n>  # drop the oldest n spooled messages
+//   node scripts/chat-inbox.mjs --ack <n>  # consume the oldest n spooled messages
 //
 // It fetches the INBOX topic over ntfy's JSON poll endpoint, drops everything
 // unsigned / mis-signed / stale / already seen (scripts/chat-core.mjs decides,
-// purely), appends what survives to .claude/chat-spool.jsonl and advances the
-// cursor in .claude/chat-state.json.
+// purely), writes what survives into the spool DIRECTORY .claude/chat-spool/ —
+// one file per message, atomically (scripts/chat-spool.mjs explains why it is a
+// directory and not the stage-1 .jsonl) — and advances the cursor in
+// .claude/chat-state.json. A stage-1 .jsonl left on disk is migrated into that
+// directory on the first tick and archived, never dropped.
 //
 // FAIL-SOFT, ALWAYS EXIT 0. Its caller is scripts/batch-autostart.mjs, whose job
 // is resurrecting a dead batch: a chat poll may never be the reason that fails.
@@ -21,15 +24,17 @@
 // THE CURSOR IS NOT THE DEDUPE. It only narrows the next poll; the ledger of
 // seen ids in the state file is what guarantees once-only delivery. Delete the
 // state file and the whole retention window is re-read — and nothing is spooled
-// twice, because the ledger travels with the spool (see `seededLedger`).
-import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+// twice, because the ledger travels with the spool (see `seededLedger`). The
+// ledger counts CONSUMED messages too: a message the session has already read is
+// exactly the one a re-poll must not hand over a second time.
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { repoPath } from './repo-paths.mjs'
 import { readSecret } from './chat-secret.mjs'
 import { DEFAULT_MAX_AGE_MS, deriveTopics, ingest, parseNtfyPoll, pollUrl, seenKeys, sinceParam } from './chat-core.mjs'
+import { claimOldest, knownMessages, migrateLegacySpool, pruneConsumed, readPending, spoolMessage } from './chat-spool.mjs'
 
 export const STATE_PATH = repoPath('.claude', 'chat-state.json')
-export const SPOOL_PATH = repoPath('.claude', 'chat-spool.jsonl')
 
 const FETCH_TIMEOUT_MS = 15000
 
@@ -43,31 +48,12 @@ const readJson = (p) => {
   }
 }
 
-/** Every spooled message, oldest first. TOTAL — a torn line is skipped. */
-export function readSpool(path = SPOOL_PATH) {
-  try {
-    return readFileSync(path, 'utf8')
-      .split('\n')
-      .filter((l) => l.trim() !== '')
-      .map((l) => {
-        try {
-          return JSON.parse(l)
-        } catch {
-          return null
-        }
-      })
-      .filter(Boolean)
-  } catch {
-    return []
-  }
-}
-
 /**
  * THE LEDGER A LOST STATE FILE CANNOT LOSE. The spool is the record of what was
- * already delivered, so the seen-ids are rebuilt from it and unioned with
- * whatever the state file still has. That is what makes a reset cursor harmless:
- * the poll re-reads the window, and every message already on the spool is
- * dropped as a duplicate rather than delivered a second time.
+ * already accepted — waiting AND consumed — so the seen-ids are rebuilt from it
+ * and unioned with whatever the state file still has. That is what makes a reset
+ * cursor harmless: the poll re-reads the window, and every message already on
+ * the spool is dropped as a duplicate rather than delivered a second time.
  */
 export function seededLedger(state, spool) {
   const fromState = Array.isArray(state?.seen) ? state.seen : []
@@ -94,17 +80,22 @@ const args = process.argv.slice(2)
 const isCli = Boolean(process.argv[1] && process.argv[1].replace(/\\/g, '/').endsWith('scripts/chat-inbox.mjs'))
 
 async function tick() {
+  // The migration runs before ANY read of the spool, on every path: a stage-1
+  // .jsonl must never be half-visible to one command and invisible to the next.
+  migrateLegacySpool()
+
   if (args.includes('--pending')) {
-    const pending = readSpool()
+    const pending = readPending()
     say({ ok: true, pending: pending.length, messages: pending })
     process.exit(0)
   }
 
   if (args.includes('--ack')) {
+    // One atomic rename per message — no read-slice-rewrite of a shared file, so
+    // an ack concurrent with a poll's append can lose nothing.
     const n = Number(args[args.indexOf('--ack') + 1])
-    const rest = readSpool().slice(Number.isFinite(n) && n > 0 ? Math.floor(n) : 0)
-    writeFileSync(SPOOL_PATH, rest.map((m) => JSON.stringify(m)).join('\n') + (rest.length ? '\n' : ''), 'utf8')
-    say({ ok: true, pending: rest.length })
+    const taken = claimOldest(n)
+    say({ ok: true, acked: taken.length, pending: readPending().length })
     process.exit(0)
   }
 
@@ -112,15 +103,18 @@ async function tick() {
   if (!secret) {
     // Not configured is not an error: the channel is opt-in, and the launcher
     // ticks on every machine whether or not the user has paired a phone.
-    say({ ok: true, configured: false, accepted: 0, pending: readSpool().length })
+    say({ ok: true, configured: false, accepted: 0, pending: readPending().length })
     process.exit(0)
   }
 
   const maxAgeMs = Number(process.env.HOA_CHAT_MAX_AGE_MS) > 0 ? Number(process.env.HOA_CHAT_MAX_AGE_MS) : DEFAULT_MAX_AGE_MS
   const { inbox } = await deriveTopics(secret)
   const state = readJson(STATE_PATH) ?? {}
-  const spool = readSpool()
-  const seeded = { cursor: state.cursor, seen: seededLedger(state, spool) }
+  const spool = readPending()
+  // Consumed messages seed the ledger as much as waiting ones do — see
+  // seededLedger. `spool` alone would let a message the session has already read
+  // back in for as long as ntfy still caches it.
+  const seeded = { cursor: state.cursor, seen: seededLedger(state, knownMessages()) }
 
   let body = null
   let fetchError = null
@@ -151,13 +145,17 @@ async function tick() {
     state: seeded,
   })
 
-  if (accepted.length > 0) {
-    mkdirSync(dirname(SPOOL_PATH), { recursive: true })
-    appendFileSync(SPOOL_PATH, `${accepted.map((m) => JSON.stringify(m)).join('\n')}\n`, 'utf8')
-  }
+  for (const message of accepted) spoolMessage(message)
+  // Bound the consumed archive without ever shortening the ledger inside the
+  // window in which the transport could still replay a message.
+  pruneConsumed()
   mkdirSync(dirname(STATE_PATH), { recursive: true })
   writeFileSync(STATE_PATH, `${JSON.stringify({ ...next, updatedAt: Date.now() }, null, 2)}\n`, 'utf8')
 
+  // Re-read rather than concatenate: between the poll and here the running
+  // session's per-tool-call delivery may have consumed part of the spool, and a
+  // message it has already shown must not ride into a spawn prompt as well.
+  const pending = readPending()
   say({
     ok: true,
     configured: true,
@@ -165,11 +163,10 @@ async function tick() {
     // The reasons, never the rejected text: a mis-signed message is exactly the
     // one whose content must not reach a log the agent reads.
     dropped: dropped.map((d) => d.reason),
-    pending: spool.length + accepted.length,
-    // The WHOLE spool, not only what this tick added: the launcher decides for
-    // itself which of them a spawn still needs to hear about, and the spool
-    // stays untouched for the consumer that acknowledges it.
-    messages: [...spool, ...accepted],
+    pending: pending.length,
+    // The WHOLE waiting spool, not only what this tick added: the launcher
+    // decides for itself which of them a spawn still needs to hear about.
+    messages: pending,
   })
   process.exit(0)
 }
