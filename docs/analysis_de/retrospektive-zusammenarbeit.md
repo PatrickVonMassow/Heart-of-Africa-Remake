@@ -447,6 +447,10 @@ Zwei Dinge haben den Schaden begrenzt. Erstens war er vollständig reparierbar, 
 
 **Lehre:** Eine Löschoperation muss wissen, ob sie einer Verknüpfung folgt. Und: Aufräumarbeit ist kein risikoarmer Nebenschauplatz — sie fasst per Definition Dinge an, die niemand mehr beobachtet.
 
+**Nachtrag 29.07.2026 — derselbe Schaden zweimal an einem Nachmittag.** Nach dem Ende zweier delegierter Agenten wurde je ein Arbeitsbaum entfernt — einmal mit dem regulären Kommando, einmal mit einem rekursiven Löschen, nachdem jenes fehlschlug —, und beide Male kam das `node_modules` des Hauptbaums mit. Beide Male meldete der nächste Build „tsc ist nicht erkannt", beide Male war die Reparatur eine Neuinstallation, beide Male hielt das Push-Tor den kaputten Stand zurück.
+
+Bemerkenswert ist nicht der Schaden, sondern die Wiederholung: Die Lehre stand seit dem ersten Vorfall geschrieben, wortgleich, in genau diesem Abschnitt — und hat nichts verhindert, weil zwei verschiedene Agenten zwei verschiedene Kommandos benutzten und keines von beiden etwas von der Verknüpfung wusste. Eine Lehre, die nur an der Stelle steht, an der sie entstand, erreicht den nicht, der sie das nächste Mal braucht. Erfasst als Arbeitsauftrag mit einer prüfbaren Bedingung — das Entfernen darf das Verknüpfungsziel nicht anfassen — und mit dem Aufräumen an EINER Stelle statt in jedem Agenten-Auftrag.
+
 ### 3.50 Der Zustand, den nur die Lücke zwischen zwei Schritten erzeugt
 
 Einen Punkt abzuschließen sind zwei Schreibvorgänge am Board: die fertige Karte ins Archiv, die nächste hochziehen. Zwischen ihnen ist die Sektion „Woran ich gerade arbeite" leer. In dieser Nacht hat der Nutzer diesen Zustand **zweimal innerhalb einer Stunde** erwischt — beide Male, bevor irgendein Wächter etwas sagte, und beide Male mit derselben Frage: „Du arbeitest gerade an nichts?"
@@ -628,7 +632,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Mittwoch, 29.07.2026, 17:47 · Quellen-Fingerprint: `1489eddd66bf…`
+Zuletzt aktualisiert: Mittwoch, 29.07.2026, 18:23 · Quellen-Fingerprint: `faa0aced8fe5…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -646,6 +650,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Take the session boundary as the LAST action and with bare commands — a pipe makes the call count as work and silently deletes the marker | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Delegate via `node scripts/point-brief.mjs <N>` — the AGENT generates its own brief; board changes go through `scripts/board.mjs`; expect 529 agent deaths and commit-per-step | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | F6 bug-report zips the user hands over are saved into the repo's git-ignored local/ folder — search there first, not only Downloads | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
+| A newly found problem goes into an EXISTING bundle point first; a new standalone point is the exception, and may instead re-cut the bundles | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Jede Chat-Antwort mit einem Zeitstempel nach deutscher Zeit (Europe/Berlin, DST-korrekt) beginnen | 11 | hoch | timestamp-guard.mjs | ✔ Mechanismus |
 | CLAUDE.md §7.1 references design.md instead of retelling it; future doc edits must preserve the verifiable conditions, script mappings, numbering and checked numbers | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Autonomously insert a full CLOSING cycle (regression + dead-code/stale-doc cleanup + .md audit) when warranted — after extensive rework or many small completed tasks — without waiting for the user to ask | 1 | niedrig | closing-guard.mjs | ✔ Mechanismus |
@@ -706,8 +711,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | CORRECTED 19.07.2026 — WebGPU IS testable headless/autonomously via system Chrome (channel:'chrome') + --headless=new; the 'untestable' belief held only for Playwright's BUNDLED Chromium | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 70 Feedback-/Projekt-Memories · 36 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 18 Prozess-/Meta-TASKS-Punkte (davon 8 offen).
+Erfasste Quellen: 71 Feedback-/Projekt-Memories · 36 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 18 Prozess-/Meta-TASKS-Punkte (davon 8 offen).
 
-<!-- RETRO-FINGERPRINT: 1489eddd66bf973e53f870d4b720e3942870dae3a1a372108df394cf13ddc49f -->
-<!-- RETRO-LAST-REFRESHED: 2026-07-29T15:47:41.548Z -->
+<!-- RETRO-FINGERPRINT: faa0aced8fe5db95315963f8e285948fdc474a8a3dc69a34c6a492315e3eab91 -->
+<!-- RETRO-LAST-REFRESHED: 2026-07-29T16:23:43.470Z -->
 <!-- AUTO-GENERATED:END -->
