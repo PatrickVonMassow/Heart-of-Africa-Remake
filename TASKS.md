@@ -59,6 +59,14 @@ AND its evidence section in the same commit; a point that only adds a test touch
 evidence section alone. Older specs below still say "CLAUDE.md §7.1" for both halves —
 read that as "the criterion and its evidence section".
 
+## Work packages (bundles)
+
+Open points are worked in BUNDLES: one branch, one verification, one regression
+round, a commit per member point. The table — which point sits in which bundle,
+what stays unbundled and in what order they are worked — is `docs/work-packages.md`.
+Every open point below appears there exactly once; a new point joins a bundle when
+it is appended.
+
 ## Checklist
 
 - [ ] 174. Tag the demo build `v0.3` and publish it at
@@ -3751,6 +3759,21 @@ read that as "the criterion and its evidence section".
   attended-only.
   DOCS in the same commit: CLAUDE.md §7.2 (the Stop chain lists its guards) and
   `docs/batch-autonomy.md` under the session lifecycle.
+  STATE 29.07.2026: BUILT, REVIEWED AND MERGED, but deliberately DORMANT — the Stop-hook
+  line lives in `.claude/settings.json`, which always raises a permission prompt, and the
+  build ran unattended. The dormancy is recorded with its one reason in
+  `guard-health-core.mjs`; remove that entry in the same commit that adds the hook line.
+  The second model's corpus review (2709 real turns, verdict merge-with-fixes, recorded in
+  `.claude/mechanism-reviews.jsonl`) is folded in: shell calls now count as investigation
+  only when every segment merely looks, recording is judged per anchored segment, and the
+  turn boundary is stamped per session so a stood-down session no longer measures against
+  the owner's clock.
+  REMAINS FOR THE WIRING COMMIT, all named by that review: fixtures cut from the real
+  transcript corpus (the calibration claim in the core comment must be backed by the cases
+  it cites); an entry in `scripts/guard-preflight.mjs` so `--for answer` knows the guard;
+  the two doc updates above; and a decision, written down, on the Agent trigger — 96 of the
+  corpus's 235 agent-spawning turns carried no record, so the delegation pattern pays a
+  `--none` per turn unless the trigger is softened.
 
 ## Closing (only after all points)
 
