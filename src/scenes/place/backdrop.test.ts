@@ -22,7 +22,11 @@ import {
   BACKDROP_RINGS,
   BACKDROP_SEGS,
   GROUND_DISC_OVERHANG,
+  PANORAMA_RADIUS,
 } from './backdrop'
+import { bandHeightAt } from '../travel/panoramaMath'
+import { balance } from '../../config/balance'
+import { pitchLimit } from '../../systems/lookPitch'
 import { createBackdropMaterial } from './backdropMaterial'
 import { GIZA_SITE_RADIUS } from './gizaSite'
 import { PLACE_RADIUS } from './layout'
@@ -404,5 +408,189 @@ describe('panorama-wildlife standing height (design.md §2.5, point 181)', () =>
       checked++
     }
     expect(checked).toBeGreaterThan(0)
+  })
+})
+
+// --- Vertical look (design.md §17.5, point 392) -------------------------------
+// The seam rules above are swept over disc radii, eye heights and reliefs at a
+// camera that only ever looked at the horizon. With a pitching camera the same
+// surfaces are asked a new question: what does the frame draw ALONG the view
+// ray? Looking down it must be the walkable ground (no hole between one's feet
+// and the horizon); looking up it must be the band and then sky, never a wall
+// of backdrop terrain arcing over the camera.
+
+const PITCH_EYE = 1.5
+/** Height of the §2.5 panorama band cylinder, centred on the eye height. */
+const BAND_H = bandHeightAt(PANORAMA_RADIUS)
+
+/**
+ * The first thing the frame draws along the view ray: the walkable ground disc,
+ * the geometry backdrop past its edge, or the panorama band at the horizon.
+ * `null` means the ray reached the band without meeting any of them — a hole,
+ * or (above the band) the sky.
+ */
+function firstSurfaceHit(
+  camX: number,
+  camZ: number,
+  ux: number,
+  uz: number,
+  pitch: number,
+  discEdge: number,
+  surfaceAt: (x: number, z: number, r: number) => number,
+): { surface: 'disc' | 'backdrop' | 'band' | null; distance: number } {
+  const slope = Math.tan(pitch)
+  for (let d = 0.25; d <= PANORAMA_RADIUS * 2; d += 0.5) {
+    const x = camX + ux * d
+    const z = camZ + uz * d
+    const r = Math.hypot(x, z)
+    const y = PITCH_EYE + d * slope
+    if (r >= PANORAMA_RADIUS) {
+      // The band draws the real captured horizon over its own height.
+      return { surface: Math.abs(y - PITCH_EYE) <= BAND_H / 2 ? 'band' : null, distance: d }
+    }
+    if (r <= discEdge) {
+      if (y <= 0) return { surface: 'disc', distance: d }
+    } else if (y <= surfaceAt(x, z, r)) {
+      return { surface: 'backdrop', distance: d }
+    }
+  }
+  return { surface: null, distance: Infinity }
+}
+
+describe('vertical look over the settlement horizon (design.md §17.5, point 392)', () => {
+  const LIMIT = pitchLimit(balance.lookPitchLimitDeg)
+  /** Fractions of the down-clamp swept: from a hair below the horizon (where
+   *  the far horizon still answers) down to the clamp itself. */
+  const DOWN_FRACTIONS = [0.002, 0.01, 0.05, ...Array.from({ length: 24 }, (_, i) => (i + 1) / 24)]
+  const RELIEFS = [
+    ['flat desert', () => 0],
+    ['sunken plain (the reported Giza case)', () => -8],
+    ['deep sea', () => -40],
+    ['plateau over a valley', (r: number) => (r < 120 ? -12 : 4)],
+    ['mountain range', (r: number) => Math.max(-20, r * 0.5 - 60)],
+  ] as const
+
+  /** The backdrop surface for a synthetic radial relief profile. */
+  const syntheticSurface =
+    (r0: number, relief: (r: number) => number) => (_x: number, _z: number, r: number) =>
+      backdropSurfaceY(r, r0, relief(r))
+
+  it('draws a surface under EVERY downward ray — no hole between the feet and the horizon', () => {
+    const holes: string[] = []
+    const seen = new Set<string>()
+    for (const discEdge of [28, 48, 74, GIZA_DISC_EDGE]) {
+      const r0 = discEdge - BACKDROP_DISC_OVERLAP
+      for (const [label, relief] of RELIEFS) {
+        const surfaceAt = syntheticSurface(r0, relief)
+        // Standpoints from the centre out to the last step the player may take.
+        for (const camDist of [0, discEdge * 0.5, discEdge - GROUND_DISC_OVERHANG]) {
+          for (let ai = 0; ai < 8; ai++) {
+            const a = (ai / 8) * Math.PI * 2
+            const ux = Math.cos(a)
+            const uz = Math.sin(a)
+            for (const frac of DOWN_FRACTIONS) {
+              // The whole reachable downward range, from a hair below the
+              // horizon to the clamp — the player can hold any of them.
+              const pitch = -frac * LIMIT
+              const hit = firstSurfaceHit(camDist, 0, ux, uz, pitch, discEdge, surfaceAt)
+              if (!hit.surface) {
+                holes.push(
+                  `${label} disc=${discEdge} cam=${camDist.toFixed(0)} az=${ai} pitch=${((pitch * 180) / Math.PI).toFixed(1)}`,
+                )
+              } else seen.add(hit.surface)
+            }
+          }
+        }
+      }
+    }
+    expect(holes).toEqual([])
+    // Not vacuous: the sweep really crosses the seam — the plate near the feet,
+    // the backdrop past its edge and the band at the horizon all answer rays.
+    expect([...seen].sort()).toEqual(['backdrop', 'band', 'disc'])
+  })
+
+  it('shows the walkable ground itself as soon as the look drops past the disc edge', () => {
+    // The seam question in the pitch's own terms: a ray steeper than the
+    // grazing line over the disc edge must land ON the plate — inside its own
+    // edge, at a distance the player reads as ground at his feet. A hole there
+    // is exactly what point 381 reported, seen by looking down instead of out.
+    for (const discEdge of [28, 48, 74, GIZA_DISC_EDGE]) {
+      const r0 = discEdge - BACKDROP_DISC_OVERLAP
+      for (const [, relief] of RELIEFS) {
+        const surfaceAt = syntheticSurface(r0, relief)
+        for (const camDist of [0, discEdge * 0.6]) {
+          const toEdge = discEdge - camDist // straight out from the centre
+          const grazing = -Math.atan(PITCH_EYE / toEdge)
+          for (const pitch of [grazing * 1.02, grazing * 1.5, grazing * 4, -LIMIT]) {
+            const hit = firstSurfaceHit(camDist, 0, 1, 0, pitch, discEdge, surfaceAt)
+            // The plate, or the backdrop's flush first row right past its edge
+            // (the two meet AT the edge since point 381) — never the far
+            // horizon and never nothing.
+            const near = hit.surface === 'disc' || hit.surface === 'backdrop'
+            expect({ discEdge, camDist, near }).toEqual({ discEdge, camDist, near: true })
+            expect(hit.distance).toBeLessThanOrEqual(toEdge + 1)
+          }
+        }
+      }
+    }
+  })
+
+  it('meets the band and then sky looking UP — never a backdrop wall over the camera', () => {
+    // The backdrop is capped at BACKDROP_MAX_SLOPE of its own distance, so it
+    // stays a distant range. Measured from every reachable standpoint: the
+    // highest elevation at which any backdrop surface is seen must stay far
+    // below the up clamp, or a pitched-up camera would look into terrain.
+    let highestBackdropDeg = -90
+    for (const discEdge of [28, 48, 74, GIZA_DISC_EDGE]) {
+      const r0 = discEdge - BACKDROP_DISC_OVERLAP
+      for (const [, relief] of RELIEFS) {
+        const surfaceAt = syntheticSurface(r0, relief)
+        for (const camDist of [0, discEdge - GROUND_DISC_OVERHANG]) {
+          for (const ux of [1, -1]) {
+            for (let pi = 0; pi <= 24; pi++) {
+              const pitch = (pi / 24) * LIMIT
+              const hit = firstSurfaceHit(camDist, 0, ux, 0, pitch, discEdge, surfaceAt)
+              if (hit.surface === 'backdrop') highestBackdropDeg = Math.max(highestBackdropDeg, (pitch * 180) / Math.PI)
+              // Below the band's own top the picture is never empty: band,
+              // backdrop or ground — a gap there would read as a torn horizon.
+              // The band's rim elevation from the FAR side of the ring — the
+              // conservative bound, since the ray may cross either side.
+              const bandTop = Math.atan(BAND_H / 2 / (PANORAMA_RADIUS + camDist))
+              if (pitch < bandTop * 0.9) expect(hit.surface).not.toBeNull()
+            }
+          }
+        }
+      }
+    }
+    // A mountain range may stand at the horizon, but never overhead: the cap is
+    // atan(BACKDROP_MAX_SLOPE), and the up clamp is far above it.
+    expect(highestBackdropDeg).toBeLessThan((Math.atan(BACKDROP_MAX_SLOPE) * 180) / Math.PI + 1)
+    expect(highestBackdropDeg).toBeLessThan((LIMIT * 180) / Math.PI - 45)
+  })
+
+  it('draws ground under the downward look at every real place on the map', () => {
+    // The same question against the REAL terrain, all round every enterable
+    // place — the pitched counterpart of the point-381 sweep above.
+    for (const place of PLACES) {
+      const radius =
+        place.kind === 'port' ? 30 + (place.size ?? 1) * 6 : place.kind === 'monument' ? GIZA_SITE_RADIUS : PLACE_RADIUS
+      const r0 = radius + BACKDROP_INNER_OFFSET
+      const discEdge = r0 + BACKDROP_DISC_OVERLAP
+      const centerH = sampleTerrain(place.lat, place.lon, SEED).height
+      const surfaceAt = (x: number, z: number) => backdropHeightAt(x, z, place.lat, place.lon, SEED, centerH, r0)
+      let holes = 0
+      for (let ai = 0; ai < 8; ai++) {
+        const a = (ai / 8) * Math.PI * 2
+        const ux = Math.cos(a)
+        const uz = Math.sin(a)
+        for (const camDist of [0, radius - 2]) {
+          for (const frac of [0.05, 0.2, 0.5, 1]) {
+            const hit = firstSurfaceHit(camDist * ux, camDist * uz, ux, uz, -frac * LIMIT, discEdge, surfaceAt)
+            if (!hit.surface) holes++
+          }
+        }
+      }
+      expect({ place: place.id, holes }).toEqual({ place: place.id, holes: 0 })
+    }
   })
 })
