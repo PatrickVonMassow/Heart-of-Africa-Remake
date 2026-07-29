@@ -505,6 +505,32 @@ Der gemeinsame Nenner ist nicht Nachlässigkeit, sondern die Bauform: Alle vier 
 
 **Lehre:** Vor einem Wechsel des Auslieferungswegs gehört aufgezählt, was der alte Weg zusichert — und jede dieser Zusagen braucht zuerst einen Test am AUSGELIEFERTEN Ergebnis. Eigenschaften ohne Test sind nicht zugesichert, sondern geliehen. Und Logik, die außerhalb der Versionsverwaltung liegt, ist von jeder Prüfung ausgenommen, die das Projekt sonst für selbstverständlich hält.
 
+### 3.56 Die Marke, die ein Seitenstrich zurücknahm
+
+Die Sitzungsgrenze wurde ordnungsgemäß genommen: `batch-boundary.mjs 419` meldete „boundary recorded", der Punkt war abgehakt, der Starter scharf. Zwei Aufrufe später verlangte der Wächter dieselbe Grenze erneut — die Marke war weg, ohne dass irgendetwas es gesagt hätte.
+
+Die Ursache liegt in einer an sich richtigen Regel: Eine genommene Grenze wird von jeder Arbeit ZURÜCKGEZOGEN, die den Batch fortsetzt, denn wer weiterarbeitet, ist nicht fertig. Ausgenommen ist eine kleine Menge von Abschluss-Skripten. Die Prüfung dafür zerlegt die Kommandozeile an ihren Trennern und verlangt, dass JEDES Segment ein Abschluss-Skript ist — richtig gegen `board.mjs & npm test`, aber eben auch gegen `node scripts/focus.mjs set … | tail -2`. Ein `tail` ist kein Abschluss-Skript, also galt der ganze Aufruf als Fortsetzung der Arbeit. Ein Seitenstrich, der nur die Ausgabe kürzt, nahm die Grenze zurück.
+
+Zwei Dinge machten es teuer. Erstens war die Rücknahme **stumm**: kein Protokolleintrag, keine Meldung, und die nächste Guard-Meldung liest sich, als habe man die Grenze nie genommen. Zweitens ist der Zug, in dem das passiert, genau der Zug, in dem man Ausgaben kürzt — am Ende, beim Aufräumen, wo man nur noch schnell nachsehen will, ob alles sitzt.
+
+**Lehre:** Wo ein Mechanismus einen Zustand aufgrund von BEOBACHTETEM VERHALTEN zurücknimmt, muss die Beobachtung zwischen „Arbeit" und „Hinsehen" unterscheiden — ein Pager ändert nichts an der Welt. Und eine automatische Rücknahme, die niemand mitbekommt, ist von einem Fehler nicht unterscheidbar: Sie gehört protokolliert, mit dem Aufruf, der sie ausgelöst hat.
+
+### 3.57 Die Anleitung an den Nutzer ist die schlechteste aller Antworten
+
+Eine Sicherheitsschranke verweigerte mir zwei Dateizugriffe: das Vorrücken der Modell-Marke und das Löschen der Pausendatei. Ich habe daraufhin dem Nutzer eine saubere, nummerierte Handanleitung geschrieben — welche Datei, welche Zeile, welcher Wert. Seine Antwort war deutlich: „Wenn ich von Hand Schritte durchführen muss, durch die du mich lenkst, ist das ja noch schlimmer, als wenn ich Rückfragen bekomme, die ich nur abnicken muss. Eigentlich will ich weder noch."
+
+Der zweite Zugriff wäre gar nicht nötig gewesen. Das Projekt besitzt für genau diesen Zweck eine eigene Funktion — `clearPaused()` in `scripts/batch-lock.mjs`, seit Monaten da, im Kopf derselben Datei dokumentiert. Ich hatte sie nicht gesucht, weil die Verweigerung wie eine Frage nach BERECHTIGUNG aussah und nicht wie eine Frage nach dem WEG. Dieselbe Verwechslung eine Stunde vorher: Statt selbst zu ermitteln, welches Modell fünf Commits geschrieben hatte, hatte ich den Nutzer gefragt — obwohl die Mitschriften jeder Sitzung und jedes Agenten das Modell je Anfrage festhalten und die Antwort in zwei Minuten belegbar war.
+
+**Lehre:** Eine blockierte Aktion ist zuerst ein Hinweis auf den falschen WEG, nicht auf eine fehlende Erlaubnis. Bevor irgendetwas an den Nutzer geht, wird das Repository nach dem vorgesehenen Kommando durchsucht und die Frage selbst beantwortet, soweit die Fakten im Haus liegen. Existiert kein Weg, ist das eine fehlende Mechanik — also ein Arbeitsauftrag, keine Hausaufgabe für den Nutzer. An den Nutzer geht nur, was wirklich SEINE Entscheidung ist.
+
+### 3.58 Ein Agent in Arbeit, zwei Plätze leer
+
+Der Pool darf drei Agenten parallel fahren. Die Sitzung beauftragte einen Punkt, meldete ordnungsgemäß Wartearbeit an — und wartete dann anderthalb Stunden auf diesen einen Agenten, während die Warteschlange voll unabhängiger Punkte stand. Der Nutzer sah es an der Tafel, bevor irgendein Mechanismus es sah: „Nur ein Punkt in Arbeit? Ist aktuell keine Parallelisierung sinnvoll?"
+
+Alle Regeln dazu waren erfüllt. Die Warteanmeldung ist gebaut und erzwungen, der Leerlauf-Wächter greift, die Obergrenze steht in der Delegationsregel. Nur ist die Obergrenze eben eine OBERGRENZE — und niemand prüft die Untergrenze. Eine Sitzung, die einen Agenten beauftragt und sich schlafen legt, verletzt keine einzige Regel, verschenkt aber zwei Drittel des Durchsatzes, und zwar unsichtbar: Von außen sieht Warten wie Arbeiten aus.
+
+**Lehre:** Wo eine Ressource eine Obergrenze hat, braucht sie auch eine Untergrenze, sobald Arbeit ansteht. Die Wartemeldung ist der richtige Ort dafür: Wer sich wartend erklärt, erklärt zugleich, warum die freien Plätze frei sind — und das ist eine Angabe, die eine Maschine prüfen kann, weil sie die Zahl der laufenden Agenten und die Länge der Warteschlange beide kennt.
+
 ---
 
 ## 4. Die Guards als Immunsystem

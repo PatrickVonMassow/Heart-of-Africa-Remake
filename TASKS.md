@@ -3702,6 +3702,65 @@ read that as "the criterion and its evidence section".
   its author model — it gains the fact that the trailer is ENFORCED at commit time) and the
   memory entry `serving-model-watch`.
 
+- [ ] 426. A PAGER TAKES THE SESSION BOUNDARY BACK, AND NOTHING SAYS SO (29.07.2026,
+  measured live; retrospective 3.56). A taken boundary is withdrawn by any tool call that
+  reads as CONTINUING the batch — correct, and judged by `handoverSurvivesCall` →
+  `isClosingSetCommand` (`scripts/batch-boundary-core.mjs`). That judgement splits the
+  command line at its separators and demands EVERY segment be a closing-set script, which
+  is right against `node scripts/board.mjs & npm test` and wrong against
+  `node scripts/focus.mjs set … | tail -2`: `tail` is not a closing script, so a pager that
+  only shortens the OUTPUT counted as fresh work and silently deleted the marker. Cost: the
+  command reported "boundary recorded", the next Stop hook demanded the boundary again, and
+  no record anywhere named the cause.
+  FIX, two halves, both in the existing mechanism — no new guard:
+  (a) TOLERATE THE PAGER: a trailing segment that is a pure output pager (`head`, `tail`,
+  `more`, `cat` with no redirection) does not make a closing-set line ordinary. The rule
+  stays strict everywhere else — the opaque-segment ban (`$(…)`, backticks, `>`, `<`) is
+  untouched, a pager may only TRAIL a closing line, and a pager alone is not a closing
+  line. Anything else, including a pager in the middle, keeps counting as work: the
+  dangerous direction is a KEPT handover beside real work, so the widening must be the
+  narrowest one that covers "I am only looking at the output".
+  (b) SAY IT: every withdrawal of a taken boundary is appended to `.claude/boundary.log`
+  (where boundary events already live) with the session, the point and the TRIGGERING call,
+  so the next turn can see why the marker went instead of rediscovering it. The log write
+  is best-effort and may never break a tool call.
+  VERIFIABLE: pure Vitest over `batch-boundary-core` — `node scripts/focus.mjs set 1 x |
+  tail -2` and `… | head -5` survive; `node scripts/board.mjs attest && npm test`,
+  `npm test | tail -2`, `node scripts/focus.mjs show | grep x | node other.mjs` and a bare
+  `tail -2` do NOT; the existing separator and opaque-segment cases stay green unchanged.
+  Plus a hook-level case asserting the withdrawal log line carries the triggering command.
+  DOCS in the same commit: `docs/batch-autonomy.md` (the boundary section states the
+  fragility and the bare-command rule — it is rewritten to state what the code now does)
+  and the ledger row 3.56 in `docs/analysis_de/lesson-mechanisms.md`.
+  MECHANISM REVIEW required (it changes a gate): `scripts/mechanism-review.mjs --record`.
+
+- [ ] 427. THE POOL RUNS AT ITS CAP, OR SAYS WHY NOT (29.07.2026, user asked it plainly
+  while one agent built and two slots stood empty: "Nur ein Punkt in Arbeit? Ist aktuell
+  keine Parallelisierung sinnvoll?"; retrospective 3.58). Delegation allows THREE concurrent
+  agents. A session that commissions one point and then declares a wait breaks no rule —
+  the wait declaration is built and enforced, the idle guard is satisfied, the cap is an
+  upper bound and nothing checks the lower one. Measured today: one agent, two free slots,
+  ninety minutes, a queue full of independent points.
+  FIX, in the mechanism that already judges the wait — no new guard:
+  `scripts/batch-in-flight.mjs` counts the agents it can actually see (the declared
+  evidence: worktrees and branches) and reads the open work order. When slots are free AND
+  the queue holds a point that does not overlap the running one, the declaration must carry
+  a REASON for the idle slots (`--slots-free "<why>"`); `batch-progress-guard` allows the
+  waiting stop only with that reason present, and its remedy line names the two honest
+  answers: commission another point, or state what makes the queue's next points unsuitable
+  right now (file overlap with the running branch, a closing freeze, a user pause).
+  It must not become a nag: a queue whose remaining points all overlap the running work,
+  a paused batch and a closing freeze are recognised and need no reason at all.
+  VERIFIABLE: pure Vitest over the in-flight core — one agent + free slots + an independent
+  open point demands the reason; the same state WITH the reason passes; three agents pass
+  with no reason; a queue whose open points all touch the running branch's files passes;
+  a paused batch and a recorded closing freeze pass. Plus a guard-level case that the
+  remedy text names both answers.
+  DOCS in the same commit: `docs/batch-autonomy.md` (the wait declaration gains the
+  slot-reason), CLAUDE.md §6 (the delegation rule states the cap is also a TARGET while
+  independent work is queued) and the ledger row 3.58.
+  MECHANISM REVIEW required (it changes a gate): `scripts/mechanism-review.mjs --record`.
+
 ## Closing (only after all points)
 
 New points are appended BEFORE this section — it stays last in the file.

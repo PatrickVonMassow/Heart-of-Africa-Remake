@@ -146,6 +146,20 @@ One decision worth keeping in view: **unknown counts as unarmed.** Erring toward
 "keep working" costs context; erring toward "stop" can cost the whole batch. The
 asymmetry decides it.
 
+**A TAKEN BOUNDARY IS FRAGILE — TAKE IT LAST (29.07.2026, measured).** The marker
+is WITHDRAWN by any tool call that reads as continuing the batch, which is correct
+(working is proof the session is not finished) and is judged by
+`handoverSurvivesCall` → `isClosingSetCommand`. That judgement splits the command
+line at its separators and demands that EVERY segment be a closing-set script — so
+`node scripts/focus.mjs set … | tail -2` counts as ordinary work, because `tail` is
+not one, and the boundary silently disappears. It cost a full extra turn: the
+command reported "boundary recorded", the next Stop hook demanded the boundary
+again, and nothing anywhere said why. Until point 426 makes a trailing pager
+harmless and logs every withdrawal with its trigger, two rules hold: run
+`batch-boundary.mjs` as the LAST action of the turn, and issue it — and the board
+and focus commands around it — as BARE commands with no pipe, no redirection and
+no `&&` chain.
+
 Pure logic and its witnesses: `scripts/batch-boundary-core.mjs` +
 `scripts/batch-boundary-core.test.mjs` (launcher-state classification, point
 closure against the split work order, marker assessment, and the three verdicts
