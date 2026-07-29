@@ -9,7 +9,7 @@
 // The spool's own file layout — one file per message, the claim, the migration
 // off the stage-1 .jsonl — is proved in scripts/chat-spool.test.mjs.
 import { describe, expect, it } from 'vitest'
-import { seededLedger } from './chat-inbox.mjs'
+import { seededLedger, stateAfterSpool } from './chat-inbox.mjs'
 import { TEST_VECTOR, ingest, makeEnvelope } from './chat-core.mjs'
 
 const NOW = 1_700_000_000_000
@@ -21,6 +21,44 @@ const frame = async ({ ntfyId, msgId, text, ts = NOW, direction = 'inbox' }) => 
   event: 'message',
   topic: 't',
   message: JSON.stringify(await makeEnvelope({ secret, direction, id: msgId, ts, text })),
+})
+
+describe('A MESSAGE WHOSE SPOOL WRITE FAILED IS NOT RECORDED AS SEEN', () => {
+  const next = { cursor: 5000, seen: ['n:n1', 'm:m1', 'n:n2', 'm:m2'] }
+
+  it('keeps the whole ledger and the new cursor when everything reached the disk', () => {
+    expect(stateAfterSpool({ next, previousCursor: 4000, failed: [] })).toEqual({ cursor: 5000, seen: next.seen })
+  })
+
+  it('strikes the failed message from the ledger, so the next poll re-accepts it', () => {
+    const r = stateAfterSpool({ next, previousCursor: 4000, failed: [{ id: 'm2', ntfyId: 'n2' }] })
+    expect(r.seen).toEqual(['n:n1', 'm:m1'])
+    expect(r.seen).not.toContain('n:n2')
+    expect(r.seen).not.toContain('m:m2')
+  })
+
+  it('leaves the CURSOR where it was, or the re-poll would not even see the event', () => {
+    expect(stateAfterSpool({ next, previousCursor: 4000, failed: [{ id: 'm2', ntfyId: 'n2' }] }).cursor).toBe(4000)
+    // No previous cursor at all: the next poll re-reads the whole window, which
+    // is the conservative direction — the ledger stops anything spooling twice.
+    expect(stateAfterSpool({ next, previousCursor: undefined, failed: [{ id: 'm2' }] }).cursor).toBeUndefined()
+  })
+
+  it('keeps the messages that DID reach the disk in the ledger', () => {
+    const r = stateAfterSpool({ next, previousCursor: 4000, failed: [{ id: 'm2', ntfyId: 'n2' }] })
+    expect(r.seen).toContain('n:n1')
+    expect(r.seen).toContain('m:m1')
+  })
+
+  it('strikes a message that carried no ntfy id by its envelope id alone', () => {
+    const r = stateAfterSpool({ next: { cursor: 9, seen: ['m:m7'] }, previousCursor: 3, failed: [{ id: 'm7', ntfyId: null }] })
+    expect(r).toEqual({ cursor: 3, seen: [] })
+  })
+
+  it('survives junk instead of throwing on the state write path', () => {
+    expect(() => stateAfterSpool({ next: null, previousCursor: NaN, failed: [null] })).not.toThrow()
+    expect(stateAfterSpool({ next: undefined, previousCursor: 1, failed: [] })).toEqual({ cursor: undefined, seen: [] })
+  })
 })
 
 describe('the ledger is seeded from the spool, not only from the cursor file', () => {

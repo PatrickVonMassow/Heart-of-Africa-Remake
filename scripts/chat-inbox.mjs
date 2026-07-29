@@ -61,6 +61,33 @@ export function seededLedger(state, spool) {
   return [...new Set([...fromSpool, ...fromState])]
 }
 
+/**
+ * THE STATE A FAILED SPOOL WRITE MUST LEAVE BEHIND. PURE.
+ *
+ * `ingest` records every ACCEPTED message in the ledger, on the assumption that
+ * accepting it also puts it on disk. When the write then fails, the obvious code
+ * writes that ledger anyway — and the message exists nowhere: the next poll drops
+ * it as already-seen and the user's words are gone silently. Stage 1 could not
+ * reach this state, because `appendFileSync` threw BEFORE the state write and the
+ * cursor simply never advanced.
+ *
+ * So a tick that could not write everything does not advance PAST it: the failed
+ * message's ids are struck from the ledger AND the cursor is left where it was,
+ * because the cursor is what decides whether the next poll still sees the event
+ * at all (a one-second overlap would not reach a message a minute older than the
+ * newest one). Everything that DID reach the disk stays in the ledger, so nothing
+ * is spooled twice.
+ */
+export function stateAfterSpool({ next, previousCursor, failed = [] }) {
+  const seen = Array.isArray(next?.seen) ? next.seen : []
+  if (failed.length === 0) return { cursor: next?.cursor, seen }
+  const lost = new Set(failed.flatMap((m) => seenKeys({ ntfyId: m?.ntfyId, envelopeId: m?.id })))
+  return {
+    cursor: Number.isFinite(previousCursor) ? Number(previousCursor) : undefined,
+    seen: seen.filter((k) => !lost.has(k)),
+  }
+}
+
 /** A timed fetch whose timer is CLEARED again — an `AbortSignal.timeout` leaves
  *  a libuv handle that a following exit tears down mid-close on Windows. */
 async function fetchWithTimeout(url, ms = FETCH_TIMEOUT_MS) {
@@ -73,8 +100,8 @@ async function fetchWithTimeout(url, ms = FETCH_TIMEOUT_MS) {
   }
 }
 
-// The CLI half is GATED: scripts/chat-inbox.test.mjs imports `readSpool` and
-// `seededLedger`, and an unguarded top-level body would poll the network on
+// The CLI half is GATED: scripts/chat-inbox.test.mjs imports `seededLedger` and
+// `stateAfterSpool`, and an unguarded top-level body would poll the network on
 // every test run.
 const args = process.argv.slice(2)
 const isCli = Boolean(process.argv[1] && process.argv[1].replace(/\\/g, '/').endsWith('scripts/chat-inbox.mjs'))
@@ -145,21 +172,39 @@ async function tick() {
     state: seeded,
   })
 
-  for (const message of accepted) spoolMessage(message)
+  // A write that failed is NOT a message that was received: it must stay out of
+  // the ledger, or it is lost for good (see stateAfterSpool). `already-spooled`
+  // is a success — the file is on disk, this poll merely re-read the event.
+  const failed = []
+  const failures = []
+  for (const message of accepted) {
+    const r = spoolMessage(message)
+    if (!r.ok && r.reason !== 'already-spooled') {
+      failed.push(message)
+      failures.push(r.reason)
+    }
+  }
   // Bound the consumed archive without ever shortening the ledger inside the
   // window in which the transport could still replay a message.
   pruneConsumed()
   mkdirSync(dirname(STATE_PATH), { recursive: true })
-  writeFileSync(STATE_PATH, `${JSON.stringify({ ...next, updatedAt: Date.now() }, null, 2)}\n`, 'utf8')
+  const persisted = stateAfterSpool({ next, previousCursor: seeded.cursor, failed })
+  writeFileSync(STATE_PATH, `${JSON.stringify({ ...persisted, updatedAt: Date.now() }, null, 2)}\n`, 'utf8')
 
   // Re-read rather than concatenate: between the poll and here the running
   // session's per-tool-call delivery may have consumed part of the spool, and a
   // message it has already shown must not ride into a spawn prompt as well.
   const pending = readPending()
   say({
-    ok: true,
+    // A failed write is reported LOUDLY (the launcher logs `reason`): the message
+    // is still on the transport and will be re-accepted next tick, but a spool
+    // this machine cannot write is a fault the log must name.
+    ok: failed.length === 0,
+    ...(failed.length > 0
+      ? { reason: `spool write failed for ${failed.length} message(s): ${[...new Set(failures)].join('; ')}` }
+      : {}),
     configured: true,
-    accepted: accepted.length,
+    accepted: accepted.length - failed.length,
     // The reasons, never the rejected text: a mis-signed message is exactly the
     // one whose content must not reach a log the agent reads.
     dropped: dropped.map((d) => d.reason),
