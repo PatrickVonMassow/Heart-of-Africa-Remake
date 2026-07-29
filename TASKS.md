@@ -3706,6 +3706,52 @@ read that as "the criterion and its evidence section".
   DOCS in the same commit: `docs/batch-autonomy.md` under the doctor, and the ledger row
   for retrospective §3.22.
 
+- [ ] 432. A FINDING SURVIVES ONLY AS LONG AS THE SESSION THAT MADE IT (29.07.2026, user:
+  "Etabliere einen Mechanismus, der Befunde allgemein sichert"). THE EVIDENCE: in one
+  evening this session found three defects — the project hooks that cannot fire outside the
+  repo root, the bundling scheme covering only 53 of 91 open points, and point 409 repeating
+  within 24 hours — and all three lived in the chat alone until the user asked TWICE whether
+  they were being kept. The cause is structural, not sloppiness: a session that does not own
+  the batch lock cannot write `TASKS.md` at all, so in the state where findings are MOST
+  likely (a second window, standing down) there is no durable path that anything checks. The
+  existing answer was a hand-written memory note, which is how `pending-queue-work-29-07.md`
+  came to exist — a carrier nothing drains.
+  THE RECORDING COMMAND, `scripts/finding.mjs`, deliberately cheap:
+  `--record "<title>" --detail "<…>" [--target <point|bundle>]` appends to a carrier the
+  MEMORY dir owns (plus its `MEMORY.md` pointer), stamped with session id and time — memory,
+  not the repo, because that is writable in stand-down and stand-down is the case that
+  loses findings. `--none "<reason>"` records the turn as deliberately empty, so the honest
+  "nothing to record" is never more expensive than silence. `--drain` lists what still sits
+  in the carrier.
+  THE GUARD, `scripts/findings-guard.mjs` with a pure `findings-core.mjs`, Vitest-covered
+  and FAIL-OPEN, wired as a Stop hook, blocks on either condition:
+  (1) THE TURN INVESTIGATED AND RECORDED NOTHING. Investigation is COUNTED, never inferred
+  semantically: a calibratable threshold of read/search calls (Read, Grep, Glob, read-only
+  Bash) or any spawned Agent inside the current turn, read from the session transcript. A
+  durable record is any of — a commit, an edit to `TASKS.md`, a write under the memory dir,
+  a `finding.mjs --record`, or a `--none`. The turn stamp comes from the SAME source
+  `board-first-guard` already uses; a second clock is not to be invented.
+  (2) THE SESSION OWNS THE BATCH AND THE CARRIER IS NOT EMPTY. Every recorded finding must
+  reach `TASKS.md` — as a bundle member per the bundle-first rule — and then leave the
+  carrier. Memory is transport, never the resting place.
+  THRESHOLD DISCIPLINE: a guard that fires on an ordinary conversational turn trains the
+  reader to skip it, which is the argument `guard-health-core.mjs` already makes. Calibrate
+  against the real corpus: seed the fixtures from this session's transcript, where three
+  turns SHOULD fire and the answer-only turns must not.
+  VERIFIABLE: pure Vitest on the decision — an investigating turn with no record blocks; the
+  same turn with a `--record` passes; with a `--none` passes; a commit or a `TASKS.md` edit
+  counts as the record; an answer-only turn never blocks; a non-owning session is never
+  judged on condition 2; an owning session with a non-empty carrier blocks; an unreadable
+  transcript or carrier ALLOWS the stop (fail-open). Plus a case per accepted record kind,
+  so a future refactor cannot silently drop one.
+  WIRED ABSOLUTELY: the hook command uses the project-dir anchor, never a cwd-relative path
+  — the first finding above is precisely that a relatively wired guard is silently absent in
+  the sessions where this one is needed most.
+  MECHANISM REVIEW REQUIRED (CLAUDE.md §7.2), and the `.claude/settings.json` wiring is
+  attended-only.
+  DOCS in the same commit: CLAUDE.md §7.2 (the Stop chain lists its guards) and
+  `docs/batch-autonomy.md` under the session lifecycle.
+
 ## Closing (only after all points)
 
 New points are appended BEFORE this section — it stays last in the file.
