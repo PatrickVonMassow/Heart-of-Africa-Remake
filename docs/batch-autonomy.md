@@ -842,6 +842,24 @@ needing the user's own word through the normal channel. Each message is also
 flattened and quoted in that prompt, so it cannot forge a second list entry or
 pass itself off as framing.
 
+**KNOWN BOUNDARY: the secret shares an origin with the game.** `localStorage` is
+scoped to an ORIGIN, and `patrickvonmassow.github.io` is one origin for every
+page this project publishes — the board at `/board/`, the deployed game at `/`,
+`/poc/` and every frozen `/vX.Y/`. Any script running on any of them can read the
+chat secret. So an XSS in the game, or a supply-chain compromise anywhere in its
+dependency tree, opened in the same phone browser, hands over the channel: with
+the secret an attacker derives both topics, reads everything and writes messages
+that verify. The signature cannot help — at that point the attacker legitimately
+holds the key.
+
+This is not fixable cheaply on GitHub Pages: a separate origin means a separate
+host (a `*.github.io` user page is one origin per account, and a custom domain
+or a different host is a bigger change than this channel is worth today). It is
+recorded rather than left unstated, and it bounds what the channel may ever be
+trusted with — which is the same bound the paragraph above sets for a different
+reason. Rotating is cheap if it is ever suspected:
+`node scripts/chat-secret.mjs --rotate`.
+
 **The page.** A collapsible section at the top of the board viewer, DEFAULT
 CLOSED, that makes no request at all until it is opened; message list above,
 input below at `font-size: 16px` (below that iOS zooms the page on focus), with
