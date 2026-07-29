@@ -15,13 +15,43 @@
 // cluster of small, steep ~70° cones — the slope ratio here is far flatter than
 // MEROE_PYRAMIDS' (~2.6·base) so the two can never be mistaken.
 
+import { balance } from '../../config/balance'
+import { openPlainWalkRadius } from './backdrop'
 import { boxCollider, nudgeToFree, WALKER_RADIUS, type Collider } from './collision'
 import type { PlaceLayout } from './layout'
 
-/** Walkable radius of the Giza site (m); leaving it exits to the bird's-eye
- *  view. Large so the pyramids read as giants and the traveller can walk all
- *  the way around the cluster. */
-export const GIZA_SITE_RADIUS = 60
+/**
+ * Walkable radius of the Giza site (m); leaving it exits to the bird's-eye
+ * view. MEASURED, not guessed (point 390): the plateau's surroundings are an
+ * open plain that the picture runs unbroken to the horizon, so the walkable
+ * ground has to reach as far as the scene affords — the former 60 put the edge
+ * ~27 m past the outermost pyramid, in the middle of flat empty sand.
+ *
+ * The measurement (recorded in `gizaSite.test.ts`, swept over 720 azimuths at
+ * eye height against the real geodata):
+ *  - The drawn backdrop ground reads as flat open sand out to the backdrop's
+ *    own outer edge (340) over the whole western and southern half; the median
+ *    azimuth breaks only at 191.
+ *  - The one seed-independent break is the Nile's water band at 76, in the
+ *    eastern arc (~340°→95°). The geometry backdrop is the FALLBACK horizon;
+ *    on a normal entry the captured §2.5 band carries the Nile.
+ *  - The backdrop's relief is no usable target: it is a compressed miniature
+ *    anchored to the disc edge, so it begins immediately past the plate at any
+ *    radius.
+ * The binding limit is therefore the §2.5 panorama band, and the radius is
+ * derived from it (`openPlainWalkRadius`) rather than written as a round guess.
+ */
+export const GIZA_SITE_RADIUS = openPlainWalkRadius(
+  // Read at module load, i.e. the SHIPPED ring defaults: a debug-time change to
+  // the silhouette ring must not resize the walkable site under the player.
+  balance.panoramaWildlife.ringInner + balance.panoramaWildlife.ringSpread,
+)
+
+/** Distance south of the centre at which the traveller arrives (design.md §2.3
+ *  spawns him just inside the southern edge facing north). Held at its own
+ *  value rather than `radius − 10`: the disc grew to give the desert its room,
+ *  and the approach view of the pyramid row must not grow with it. */
+export const GIZA_SPAWN_Z = 50
 
 /** Giza slope ratio: apex height over the cone circumradius. The shallow
  *  Old-Kingdom profile shared with buildGizaPyramids (0.64·2 ≈ 1.28) — clearly
@@ -146,6 +176,7 @@ export function buildGizaLayout(_seed: number): PlaceLayout {
   const errands = GIZA_AMBIENT.map((a) => nudgeToFree(colliders, a.x, a.z, WALKER_RADIUS))
   return {
     radius: GIZA_SITE_RADIUS,
+    spawnZ: GIZA_SPAWN_Z,
     interactives: [],
     dwellings: [],
     fences: [],

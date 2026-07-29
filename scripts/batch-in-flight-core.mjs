@@ -37,13 +37,53 @@
 //
 // Where the two verdicts are close, this file chooses the BLOCK: a wrong block
 // costs one command, a wrong allow cost five and a half hours.
-import { resolveOwnership, PID_START_TOLERANCE_MS } from './batch-singleton.mjs'
+import { resolveOwnership, PID_START_TOLERANCE_MS, WEDGED_MS } from './batch-singleton.mjs'
 
 /** How old a declaration may be before the guard stops honouring it. Wide enough
  *  for a LARGE browser regression or a delegated agent building a point (both run
  *  well past half an hour), short enough that a forgotten declaration cannot
  *  cover a night. Calibratable via HOA_IN_FLIGHT_MAX_MIN (scripts/batch-in-flight.mjs). */
 export const IN_FLIGHT_MAX_AGE_MS = 45 * 60 * 1000
+
+/**
+ * THE WINDOW THE LAUNCHER MUST ASK WITH — and the reason the guard's own is wrong
+ * for it (second four-eyes review, 28.07.2026, finding A).
+ *
+ * `work-stalled` was UNREACHABLE in production. Three constants made it so, and
+ * each was defensible alone:
+ *   - `assessOwnerWork` marks a declaration `declared: false` once it is older
+ *     than `IN_FLIGHT_MAX_AGE_MS` (45 min);
+ *   - `assessOwner` licenses the stall verdict only past `WORK_STALL_MS` (90 min)
+ *     of heartbeat silence;
+ *   - and only while the declaration is the owner's LAST WORD, i.e.
+ *     `claimedAt <= declaredAt + WORK_DECLARATION_TOLERANCE_MS`.
+ * The declare CLI is itself a tool call, so its own PostToolUse heartbeat lands
+ * seconds after `declaration.at` — which means in the honest stall shape the
+ * heartbeat age and the declaration age are the SAME number. It cannot be above
+ * 90 and below 45 at once, so the verdict never fired: the reviewer drove the real
+ * pipeline minute by minute over five hours after a total freeze and got the old
+ * four-hour valve every time.
+ *
+ * The launcher's question is not the guard's. The guard asks "may a turn end ride
+ * on this declaration?", where an aged one must stop counting. The launcher asks
+ * "is this declaration the owner's LAST WORD?" — and for that, age is not the
+ * disqualifier: `lastWord` already excludes every session that worked after
+ * declaring, which is the only way an old declaration becomes misleading (the
+ * replayed near-kill — declare, agent finishes, merge, start a LARGE regression —
+ * leaves a heartbeat twelve minutes newer than the declaration and fails it).
+ *
+ * WHY NOT JUST `WORK_STALL_MS + WORK_DECLARATION_TOLERANCE_MS`, the minimum that
+ * makes the window non-empty: because non-empty is not the same as REACHABLE. In
+ * the honest stall shape the heartbeat age and the declaration age are the same
+ * number, so that value opens a band barely two minutes wide — and the launcher
+ * only looks once per `LAUNCHER_TICK_MS` (15 min). Roughly seven ticks in eight
+ * would step straight over it and fall through to the four-hour valve, which is
+ * the very outcome finding A reported. The band must therefore be at least a
+ * couple of ticks wide, and `WEDGED_MS` is where it naturally ends: past the old
+ * valve a silent owner reads wedged anyway, so the declaration has nothing left to
+ * add. `assessOwnerWork`'s own tests pin the width against the tick.
+ */
+export const LAUNCHER_WORK_MAX_AGE_MS = WEDGED_MS
 
 /** How recently a declared LOG file must have been written to count as proof that
  *  the run behind it is alive. A suite that has not appended a line in this long
@@ -68,6 +108,98 @@ export const WORK_FRESH_MS = 15 * 60 * 1000
 /** The evidence kinds a probe can actually answer. An unknown kind is never
  *  "assume fine": it fails, and the declaration with it. */
 export const EVIDENCE_KINDS = ['pid', 'branch', 'worktree', 'log']
+
+/** Branch refs that can never be evidence of a DELEGATED agent's progress,
+ *  whatever the declaring session names them (four-eyes review 28.07.2026,
+ *  finding 1.2). `main` moves on everyone else's merges, and `HEAD` — for which
+ *  `@` is git's own alias (second review, finding B; it walked straight past the
+ *  refusal) — is the declaring checkout itself. */
+const ALWAYS_REFUSED_REFS = new Set(['main', 'head', '@'])
+
+/** Compare a filesystem path the way both Windows and git will: separators
+ *  normalised, trailing separators dropped, case folded. */
+const normPath = (p) =>
+  String(p ?? '')
+    .trim()
+    .replace(/\\/g, '/')
+    .replace(/\/+$/, '')
+    .toLowerCase()
+
+/**
+ * `refs/heads/x`, `heads/x`, `origin/x`, `x` and `x@{0}` all name the same thing
+ * for this purpose. The last three spellings are not pedantry: `heads/main` and
+ * `main@{0}` both resolve to main and both walked past the refusal until the
+ * second four-eyes review drove them live (finding B). This is the BELT — the CLI
+ * additionally resolves every declared ref through `git rev-parse
+ * --symbolic-full-name` and refuses on the resolved name, which catches the
+ * spellings no string rule can enumerate; this rule is what still holds when git
+ * cannot resolve the ref at all.
+ */
+const normRef = (r) =>
+  String(r ?? '')
+    .trim()
+    .replace(/@\{[^}]*\}$/, '')
+    .replace(/^refs\/(heads|remotes)\//, '')
+    .replace(/^heads\//, '')
+    .replace(/^origin\//, '')
+    .toLowerCase()
+
+/**
+ * EVIDENCE THAT PROVES NOTHING BECAUSE IT CANNOT GO QUIET. PURE.
+ *
+ * Recency made existence-only evidence honest (point 388's own four-eyes round),
+ * but nothing restricted WHAT may be named — and some things are eternally fresh
+ * by construction (four-eyes review 28.07.2026, finding 1.2):
+ *   - the REPO ROOT as a `--worktree`: every `git status` the declaring session
+ *     runs touches its index, so it is git-active at all times, by the session's
+ *     own hand;
+ *   - `main`, or the declaring checkout's OWN current branch, as a `--branch`:
+ *     the first moves on everyone else's merges, the second on the session's own
+ *     commits.
+ * Either one would hold a declaration open indefinitely — and because the
+ * declaration also suppressed the silent-owner notification, naming one left the
+ * session LESS observed than declaring nothing at all. They are refused at
+ * declaration time, where the mistake is one command away from being fixed,
+ * rather than silently honoured for hours.
+ *
+ * Inputs are plain data: the evidence array, the resolved repo root and the
+ * declaring checkout's current branch (null when it cannot be determined — an
+ * unknown branch refuses nothing extra, it just cannot add the second rule).
+ * Returns [{ kind, value, why }], empty when everything may be declared.
+ */
+export function selfReferentialEvidence({ evidence, repoRoot, currentBranch = null } = {}) {
+  const root = normPath(repoRoot)
+  const own = normRef(currentBranch)
+  const out = []
+  for (const item of Array.isArray(evidence) ? evidence : []) {
+    if (item?.kind === 'worktree') {
+      if (root && normPath(item.path) === root) {
+        out.push({
+          kind: 'worktree',
+          value: String(item.path),
+          why: 'that is this checkout itself — every git command the session runs keeps it fresh forever',
+        })
+      }
+    } else if (item?.kind === 'branch') {
+      const ref = normRef(item.ref)
+      if (!ref) continue
+      if (ALWAYS_REFUSED_REFS.has(ref)) {
+        out.push({
+          kind: 'branch',
+          value: String(item.ref),
+          why: 'main (and HEAD) move on every merge in the repository, not on the work being waited for',
+        })
+      } else if (own && ref === own) {
+        out.push({
+          kind: 'branch',
+          value: String(item.ref),
+          why: `that is this checkout's own current branch (${currentBranch}) — the session's own commits keep it fresh`,
+        })
+      }
+    }
+  }
+  return out
+}
 
 /** Minutes, for the human-readable detail strings. */
 const minutes = (ms) => Math.round(ms / 60000)
@@ -199,6 +331,106 @@ export function assessInFlight({
   const summary = items.map((i) => `${i.describe} — ${i.detail}`).join('; ')
   if (dead.length > 0) return out(false, 'evidence-gone', { ageMs, summary, items })
   return out(true, 'live', { ageMs, summary, items })
+}
+
+/**
+ * Details that mean A PROBE COULD NOT ANSWER, as opposed to answering "gone".
+ * A declaration nobody can check is not proof of anything — it is treated as no
+ * evidence at all (point 402), never as a reason to keep an owner alive.
+ */
+export const UNANSWERABLE_DETAILS = new Set([
+  'unknown-kind',
+  'not-a-pid',
+  'no-ref',
+  'no-path',
+  'no-start-time',
+  'start-time-unverifiable',
+])
+
+/**
+ * IS THE LOCK OWNER'S DECLARED WORK STILL ADVANCING? PURE.
+ *
+ * The LAUNCHER's question, and it is not the guard's. `assessInFlight` asks "may
+ * THIS session end its turn", so it demands that ALL evidence still holds and
+ * that the declaration has not aged out. The launcher asks the narrower one that
+ * decides whether a silent owner is working or wedged (point 402 (c)): is ANY of
+ * the declared work still moving? A session with three agents out and two of them
+ * finished is plainly alive, and shooting it would be the exact failure this
+ * whole point exists to end.
+ *
+ * Same probes, same `checkEvidence`, same ownership rules — nothing about
+ * liveness is re-invented here.
+ *
+ * Inputs:
+ *   declaration — the parsed `.claude/batch-in-flight.json`, or null
+ *   lock        — the parsed batch lock, whose owner the declaration must belong to
+ *   now, maxAgeMs, and the four probes of `checkEvidence`
+ *
+ * Returns { declared, advancing, declaredAt, reason, summary, items }:
+ *   advancing  — something the declaration names moved inside its freshness window.
+ *                Judged on the EVIDENCE alone, so it holds however old the
+ *                declaration is: an agent that is still committing is still
+ *                building, whatever the paperwork's timestamp says.
+ *   declared   — there is a CURRENT declaration, so its silence means something.
+ *                Goes false once the declaration ages past `maxAgeMs`, and that is
+ *                deliberate: a stale declaration says nothing about what the
+ *                session is doing NOW (it may well be inside one long verification
+ *                run), so it must not be allowed to tighten the wedge bound.
+ *                `maxAgeMs` defaults to `LAUNCHER_WORK_MAX_AGE_MS`, NOT to the
+ *                guard's `IN_FLIGHT_MAX_AGE_MS`: with the guard's 45 minutes here
+ *                the stall verdict this feeds is arithmetically unreachable (see
+ *                that constant). The staleness that actually matters — a session
+ *                that went on working after declaring — is caught by `lastWord`
+ *                in `assessOwner`, not by this clock.
+ *   declaredAt — WHEN it was declared, passed through so `assessOwner` can ask the
+ *                second question the four-eyes review found missing (finding 1.1):
+ *                is this declaration still the owner's LAST WORD, or did the
+ *                session go on working after writing it? A heartbeat newer than
+ *                `declaredAt` answers that without any new notion of liveness.
+ */
+export function assessOwnerWork({ declaration, lock, now, maxAgeMs = LAUNCHER_WORK_MAX_AGE_MS, ...probes } = {}) {
+  const out = (o) => ({
+    declared: false,
+    advancing: false,
+    declaredAt: null,
+    reason: 'no-declaration',
+    summary: '',
+    items: [],
+    ...o,
+  })
+  if (!declaration || typeof declaration !== 'object' || typeof declaration.at !== 'number') return out({})
+  if (!lock || typeof lock.sessionId !== 'string') return out({ reason: 'no-lock' })
+
+  const owner = resolveOwnership({
+    lock: declaration,
+    sessionId: lock.sessionId,
+    ancestor: typeof lock.pid === 'number' && lock.pid > 0 ? { pid: lock.pid, startedAt: lock.pidStartedAt ?? null } : null,
+  })
+  if (!owner.mine) return out({ reason: `not-owners:${owner.via}` })
+
+  const declaredAt = declaration.at
+  const ageMs = now - declaredAt
+  // A declaration from the future is a clock this cannot reason about → the same
+  // as an aged-out one: no bearing on the present.
+  const current = ageMs >= 0 && ageMs <= maxAgeMs
+
+  const evidence = Array.isArray(declaration.evidence) ? declaration.evidence : []
+  if (evidence.length === 0) return out({ declared: current, declaredAt, reason: 'no-evidence' })
+
+  const items = evidence.map((e) => checkEvidence(e, { now, ...probes }))
+  const summary = items.map((i) => `${i.describe} — ${i.detail}`).join('; ')
+  const answerable = items.filter((i) => !UNANSWERABLE_DETAILS.has(i.detail))
+  if (answerable.length === 0) return out({ declared: current, declaredAt, reason: 'unanswerable', summary, items })
+
+  const advancing = answerable.some((i) => i.ok)
+  return out({
+    declared: current,
+    declaredAt,
+    advancing,
+    reason: advancing ? 'advancing' : current ? 'no-progress' : 'expired',
+    summary,
+    items,
+  })
 }
 
 /** The one line the guard puts in the boundary log and in its allow message. */

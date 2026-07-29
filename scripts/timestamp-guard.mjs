@@ -20,6 +20,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { berlinStamp, evaluate, extractLastAssistantText } from './timestamp-guard-core.mjs'
+import { shortAckDemand } from './closing-reply-core.mjs'
 
 // Overridable for the test harness so tests never touch the live state file.
 const STATE_PATH =
@@ -72,8 +73,7 @@ function blockUnverifiable(sessionId, detail) {
       decision: 'block',
       reason:
         `Chat-timestamp rule: the guard could not read the transcript to verify ` +
-        `your reply (${detail}). Do not end the turn silently — write your closing ` +
-        `reply to the user, beginning with exactly this line: ${expected}`,
+        `your reply (${detail}). Do not end the turn silently. ${shortAckDemand(expected)}`,
     }) + '\n',
   )
 }
@@ -126,9 +126,8 @@ try {
       JSON.stringify({
         decision: 'block',
         reason:
-          'Chat-timestamp rule: the timestamp guard failed internally. Begin your ' +
-          'closing reply with the current bold Berlin timestamp ' +
-          '(**Wochentag, TT.MM.JJJJ, HH:MM**).',
+          'Chat-timestamp rule: the timestamp guard failed internally. ' +
+          shortAckDemand('the current bold Berlin timestamp (**Wochentag, TT.MM.JJJJ, HH:MM**).'),
       }) + '\n',
     )
   }

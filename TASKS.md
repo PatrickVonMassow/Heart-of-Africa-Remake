@@ -1100,36 +1100,6 @@ read that as "the criterion and its evidence section".
   or `enrichments.mjs`) that the traveller is stopped at a settlement edge and cannot cross it,
   yet still enters with Space. No new player-visible text (reuses the existing prompt).
 
-- [ ] 300. ANIMAL GAIT REALISM — leg cadence must match forward speed, no foot-skating (user
-  24.07.2026; for later/v0.3). The animals' leg-swing speed looks too fast for their forward
-  movement — they read as GLIDING/skating over the ground rather than walking on their feet.
-  ESPECIALLY the panorama skyline silhouettes (points 255/286) but ALSO the walkers inside
-  settlements. FIX: either model the gait physically correctly (the stance foot stays PLANTED on
-  the ground while the body moves forward over it; the leg cadence is derived from ground
-  distance covered, so one full stride = a fixed forward distance = the foot's planted-to-lift
-  ground travel), OR — if a full physical foot-IK is too compute-heavy in-game — tune the
-  gait-phase-per-distance (stride length) so the feet do not skate. The panorama gait is already
-  distance-driven (point 255: gaitPhase from the drifted arc); investigate why it STILL reads too
-  fast — likely the stride length (forward distance per full cycle) is too short, so legs cycle
-  faster than the ground passes. VERIFY (the user's method — concrete + testable): a SERIES OF
-  SCREENSHOTS across an interval — when a leg that has just swung forward moves BACK (stance
-  phase), its FOOT must stay at the SAME ground position while the animal advances (the plant foot
-  is fixed to the ground, the body translates over it; no sliding). Add a PURE test that the
-  stride length equals the foot's stance ground-travel (feet planted, not skating), and a LIVE
-  screenshot-series check (a skyline silhouette AND a settlement walker) that a tracked foot's
-  screen position stays ~fixed through its stance phase while the body moves forward.
-  SLOPE FOOTING (user 24.07.2026, second facet of the same "feet on the ground" system): when an
-  animal walks UP or DOWN a slope, its front (uphill) or back (downhill) feet FLOAT in the air —
-  the body/legs do not conform to the incline (screenshot: a skyline silhouette on a dune with a
-  foot hovering above the terrain). FIX: sample the terrain height under EACH foot (or pitch the
-  body to the local ground slope) so ALL feet contact the sloped ground, not just the ones on the
-  body's reference plane. VERIFY (screenshot): on an up-slope AND a down-slope, no foot hovers
-  above the terrain — every planted foot touches the ground it stands on (panorama silhouette on a
-  dune AND a settlement walker on sloped ground). ANCHORS: the
-  panorama gait (`src/scenes/place/panoramaWildlife.ts` — gaitPhase / legSwingAngle /
-  panoramaGaitDistance, points 255/286), the settlement-walker gait, `src/render/fauna.ts` (the
-  leg pivots). No player-visible text.
-
 - [ ] 303. CODE REVIEW OF ALL CHANGES SINCE v0.1 — validate every test is still VALID (user
   24.07.2026). QUEUE POSITION: the NEXT task after 224. Stale tests keep surfacing only as
   incidental findings (today alone: a strict type-check, heavy fuzz timeouts, and checks that
@@ -1940,12 +1910,29 @@ read that as "the criterion and its evidence section".
   June winter). One hour later breaks it — at 17:00 the Cape sun in June is BELOW the
   horizon, and a fixed hour must never put the sun under the horizon anywhere in the
   world window (lat -37..38, all 365 days).
+  ONE DEFINITION, READ BY BOTH SCENES. The two constants above are not merely stale,
+  they DISAGREE (~45° against ~48°) — the same sun stands at two heights depending on
+  which view holds the camera. The derivation therefore lands in ONE place that travel
+  and settlement both read; neither scene keeps a sun of its own, or they drift apart
+  again the first time one of them is touched.
   EVERYTHING THE SUN FEEDS MUST FOLLOW IT, or the picture contradicts itself: the
   directional light AND its shadow camera in both scenes, the sky dome's disc and halo
   (`src/render/sky.tsx`, whose `sunDirection` must keep agreeing with the light — its
   own comment says so), and the baked environment light
   (`createEnvironmentTexture`/`IBL_SUN` in `src/render/Effects.tsx`), re-derived when
   the date or the position changes and NEVER per frame.
+  THE SETTLEMENT IS THE STRICTER OF THE TWO (user 28.07.2026). Point 344's eye
+  adaptation and sun glare build DIRECTLY on this angle, and at eye height a wrong sun
+  is not a subtlety — it decides whether the traveller is dazzled turning west, and
+  where every wall's shadow falls in a lane he walks through. The settlement sun is
+  therefore derived from the SETTLEMENT's own latitude and the current date, never from
+  a scene default, and the acceptance below judges it at eye height.
+  AND THE JOURNEY MUST SHOW IT (user 28.07.2026). The bird's-eye view is where the
+  change becomes legible: walking the continent from the Mediterranean to the Cape at
+  one date, the shadows must visibly turn and lengthen as the latitude runs out — and
+  the same place in June and in December must not look alike. A sun that is merely
+  CORRECT per frame but whose change no traveller notices misses the point of this
+  ticket; the live acceptance therefore measures a TRAVERSE, not only a single spot.
   THE SKY PRESETS ARE THE REAL WORK, not the arithmetic. They are authored for a high
   sun; a low sun under an unchanged noon-blue dome reads as a bug — the same failure
   the overcast handling already guards against (a dimmed sun under a bright blue sky,
@@ -1964,11 +1951,15 @@ read that as "the criterion and its evidence section".
   hemispheres invert across the year, and a SWEEP over the full world bounds × all 365
   days asserts the sun never falls to or below the horizon at the default hour (the
   17:00 counter-case is pinned as the witness that the bound is real); the azimuth is
-  westerly in the afternoon for both hemispheres. Live (`scripts/verify/
-  enrichments.mjs` + `polish.mjs`, BOTH backends, screenshots): the same place rendered
-  in June and in December differs measurably in pixels and in shadow direction; a
-  settlement's shadows agree with its sky-dome sun disc rather than pointing elsewhere;
-  no console errors.
+  westerly in the afternoon for both hemispheres; and a NORTH-SOUTH SWEEP at one date
+  returns a monotonically changing elevation, so the traverse below has something to
+  show. Live (`scripts/verify/enrichments.mjs` + `polish.mjs`, BOTH backends,
+  screenshots): the same place rendered in June and in December differs measurably in
+  pixels and in shadow direction; a TRAVERSE of at least three widely separated
+  latitudes at one date yields shadows whose measured direction and length differ
+  between the stops — the check the user's "you should notice it while walking" asks
+  for; inside a settlement, at EYE HEIGHT, the shadows agree with the sky-dome sun disc
+  rather than pointing elsewhere; no console errors.
   DOCS: design.md §2.7 already states it; CLAUDE.md §7.1 point 14 gains the built
   behaviour when this lands.
 
@@ -2671,52 +2662,6 @@ read that as "the criterion and its evidence section".
   targets are still reached afterwards; no walker is left standing past its window.
   DOCS: design.md §19.10 beside the existing village vignettes.
 
-- [ ] 390. THE SAND AROUND THE PYRAMIDS IS NOT WALKABLE (user 28.07.2026, screenshot from
-  the deployed build inside the Giza monument site: standing beside a pyramid, the desert
-  reaches unbroken to the horizon and the traveller cannot go out into it — "man sollte
-  über den Sand laufen können"). CAUSE: the site is a walkable DISC. `GIZA_SITE_RADIUS`
-  (`src/scenes/place/gizaSite.ts`) is 60 m, and `PlaceScene` leaves the place the moment
-  `hypot(p.x, p.z)` exceeds `layout.radius` — position-based by design (design.md §2.3,
-  no exit key). At Giza that edge falls in the MIDDLE of a flat, empty, visibly continuous
-  plain, so the picture promises ground the rules do not grant: the player either meets an
-  invisible boundary or is thrown back to the bird's-eye view while still standing on the
-  same sand.
-  THE RULE TO HOLD, stated for every place and not only for Giza: the walkable ground must
-  reach to where the PICTURE stops offering ground. Where the surroundings are a built or
-  broken edge (a village's fence line, a port's quay, a slope) the disc may end there,
-  because the eye reads a boundary. Where the surroundings are an open plain that continues
-  unbroken — the desert sites are that case — the disc must extend far enough that a player
-  walking outward meets the transition as a DISTANCE, not as a wall a few strides from the
-  monument.
-  DO IT IN THIS ORDER. (1) MEASURE, do not guess: from the site centre, at the in-game eye
-  height, find the distance at which the drawn ground stops being flat open sand — the
-  backdrop ring and the §2.5 panorama band are the reference (`panoramaStandY` /
-  `discHorizonY` in `src/scenes/place/backdrop.ts`), and point 381 already pins that the
-  backdrop meets the disc edge with no seam. Record the number. (2) RAISE the desert
-  monument radius to that measured distance rather than to a round guess, and check what it
-  costs: the disc carries ground detail, flora scatter and the walker errand grid, so
-  report the frame time at the new radius on BOTH backends (the F8 benchmark does not route
-  through settlements — measure with the FPS counter at the site, at LOW and at MEDIUM). If
-  the cost is real, cap the radius at what the measurement affords and SAY SO with the
-  number, rather than quietly leaving the wall closer than the picture promises. (3) The
-  EXIT must stay findable: a player who walks outward has to reach the bird's-eye view
-  without a hunt, so keep the position-based rule and, if the radius grows large, decide
-  whether the §17.4 hint layer should name the direction. Do NOT add an exit key — the
-  movement-based switch is design.md §2.3 and is not up for revision here.
-  BEWARE THE COUPLED RULES, each already enforced elsewhere: the backdrop must still meet
-  the ground with no hole and no unlit face at the new radius (point 381 —
-  `src/scenes/place/backdrop.test.ts` sweeps a set of disc radii, add the new one), the
-  panorama silhouettes stand on the higher of backdrop relief and the visible ground line
-  (point 181) and must not end up inside the walkable area, and the settlement-entry disc
-  separation between Giza and Cairo (`src/scenes/travel/settlementEntry.test.ts`) is a
-  BIRD'S-EYE distance untouched by the site radius — do not "fix" it.
-  VERIFIABLE: pure Vitest — the desert monument radius equals the measured open-plain
-  distance (one constant, derived rather than written twice), and the backdrop sweep covers
-  it. Plus the picture on BOTH backends: a frame from the site centre looking outward and
-  one taken at the new edge, showing that the ground the player stands on runs to where the
-  backdrop takes over.
-  DOCS in the same commit: the `GIZA_SITE_RADIUS` comment states its measured basis, and
-  `docs/acceptance-evidence.md` §15 gains the chain.
 - [ ] 362. THE CROSSING TURNED BACK — the crocodile takes a calf mid-channel
   (user 26.07.2026; design.md §19.8 states the target). Two systems exist and have
   never met: the purposeful water crossing (`crossingTarget`/`shouldStartCrossing`
@@ -2833,38 +2778,6 @@ read that as "the criterion and its evidence section".
   DOCS: design.md §19.8 + §21.2 already state it; balance comments and the
   acceptance-evidence line under §12.
 
-- [ ] 395. THE USER TAKES THE BATCH BACK INTO THE WINDOW THEY ARE SITTING AT (user
-  decision 28.07.2026). The night belongs to fresh sessions — that is where the context
-  saving comes from, and it stays. What is missing is the way back: the user returns to a
-  window that has been silent for hours, types `/clear`, says "I am back", and expects to
-  work HERE. Today that window would resolve as a non-owner and correctly stand down
-  (`stand-down` in `scripts/batch-singleton.mjs`), while the night session keeps the lock.
-  TARGET: a CLAIM and a clean release. The returning window records a claim on the batch;
-  the live owner sees it at its next hook, FINISHES what it is doing — a merge, a running
-  agent, a verification must never be cut in half — and then releases the lock, saying so
-  in its own transcript. The claiming window acquires at its next check and reports that it
-  now owns the batch. If no session holds the lock at all, the claim is satisfied
-  immediately.
-  BOUND IT SO IT CANNOT BE ABUSED, and each bound is measurable rather than a matter of
-  taste: a claim EXPIRES (a stale claim file must never hand the batch to a window that was
-  closed hours ago); a claim is only honoured for a session that is actually alive; and two
-  claims cannot both win — the singleton's whole purpose is that exactly one session drives.
-  Reuse `assessOwner`/`resolveOwnership` and the heartbeat rather than building a second
-  notion of liveness beside them.
-  THE COMMANDS: one to claim (`scripts/batch-claim.mjs` or the same shape as
-  `batch-boundary.mjs`), one to see the state (`--status`, read-only, naming who holds the
-  lock, whether a claim is pending and how old it is). The returning session runs the claim
-  itself after `/clear`; the user says nothing but "I am back".
-  VERIFIABLE: pure Vitest on the decision — a fresh claim by a live session makes the
-  current owner release at its next check; the owner does NOT release while it reports work
-  in flight; an expired claim is ignored; a claim by a dead session is ignored; two
-  competing claims resolve to exactly one owner; and with no owner the claim is satisfied
-  at once. Plus one live run: the batch claimed back into a window while a night session
-  holds it, both transcripts showing the handover from their side.
-  DOCS in the same commit: CLAUDE.md §6 gains one sentence on the way back (the boundary
-  paragraph already carries the way out), and `docs/batch-autonomy.md` the mechanics. Both
-  sit at measured ceilings, so the words are paid for by a measured raise with its
-  justification or by shortening elsewhere.
 - [ ] 373. THE SESSION BOUNDARY BECOMES AUTONOMOUS (user 27.07.2026: "implement it the
   way you recommend", against the plan to run the batch 24/7). Measured: 80 % of the
   token spend sits above 150k context, because one session carries point after point.
@@ -3392,6 +3305,445 @@ read that as "the criterion and its evidence section".
   resuming as before (`.claude/autostart.log` shows the tick).
   DOCS in the same commit: `docs/batch-autonomy.md`, where the launcher is
   described, gains the hidden-window requirement.
+
+- [ ] 405. THE BOARD GETS A MESSAGE CHANNEL — STAGE 1 OF 3, THE CHANNEL AND THE
+  PAGE (28.07.2026, user request: send instructions and questions from the phone,
+  not only read status; designed with a four-eyes review by Fable 5 whose findings
+  are recorded in `.claude/mechanism-reviews.jsonl`). The user reads the board from
+  a phone while the batch works. Today that is one-way. This point builds the
+  channel and the input; the two points after it (the per-tool-call delivery and the
+  wake-on-message watcher) make it fast. Stage 1 alone is a channel with a
+  15-minute-bounded reader — useful, and honestly slower than what follows.
+  WHY NOT INSIDE THE CLAUDE.AI ARTIFACT: measured in this session — the artifact
+  frame runs under a strict CSP (no fetch/XHR/WebSocket to any host), and the only
+  runtime capabilities this account holds are `downloads` and `mcp` with no connector
+  connected. A page there cannot send anything anywhere. The chat therefore lives on
+  the GH-Pages board of point 400 delta D, and this point is queued DIRECTLY BEHIND
+  400 for exactly that reason (user 28.07.2026) — the transport exists before the
+  chat is built, so the live acceptance test runs against the real page. While the
+  claude.ai artifact is still mirrored alongside it, the section renders a localized
+  "the chat needs the web board" notice when its own fetch is blocked there, so the
+  mirror never shows a dead input.
+  THE TRANSPORT is ntfy, already a project dependency (`scripts/notify.mjs` uses it
+  for failure pushes): one INBOX topic (page to agent) and one OUTBOX topic (agent to
+  page).
+  SECURITY IS PART OF THE BUILD, NOT A LATER HARDENING (four-eyes finding 1, and it
+  overturned the first design). The board page is PUBLIC, so anything embedded in it
+  is public: topic names must NEVER be written into the published HTML. The page asks
+  once per device for a chat secret and keeps it in `localStorage`; the topics are
+  DERIVED from that secret, and the same secret lives in a git-ignored local file on
+  the machine. Every message the page sends carries an HMAC over (id, timestamp,
+  text); `scripts/chat-inbox.mjs` DROPS anything unsigned, mis-signed or older than a
+  calibratable window. Without this, the topic name in a public page is an open
+  prompt-injection port into a session that runs with permissions pre-granted and a
+  GitHub token on disk — the realistic worst case is command execution on the user's
+  machine. The "treat it as untrusted input" rule stays ON TOP of the signature, never
+  instead of it: a chat message is never authorization for an outward-facing or
+  irreversible step (tag, publish, force-push, delete).
+  THE PAGE: a collapsible section, DEFAULT CLOSED, at the top of the board — message
+  list above, fixed input below; input `font-size >= 16px` (else iOS zooms on focus),
+  safe-area padding at the bottom, autoscroll to the newest message. Messages render
+  CLIENT-SIDE from the outbox, so message text never enters the HTML the board guards
+  parse.
+  THE STRUCTURE GATES (four-eyes finding 5 — the first design named one of ten): the
+  four-section mandate stays literally intact by giving the chat DIFFERENT markup — no
+  `<h2>`, not `class="sect"` (e.g. `<details class="chat">` with a styled heading div).
+  Verify by inspection against each section-parsing module before building:
+  `board-structure-core.mjs`, `dashboard-guard-core.mjs` (SECTION_TITLES,
+  COLLAPSIBLE_SECTIONS, sliceSections, parseCards), `board-core.mjs`,
+  `board-first-core.mjs`, `board-archive-rotate.mjs`, `queue-order-guard-core.mjs`,
+  `dashboard-sync-core.mjs`, `dashboard-conciseness-guard-core.mjs`,
+  `dashboard-card-topic-guard-core.mjs`, `dashboard-integrity-guard-core.mjs`. Any
+  module that would still trip is updated in this commit — a section that publishes but
+  fails the audit produces the Stop-chain block loop this project has paid for twice.
+  THE READER, SO STAGE 1 IS NOT WRITE-ONLY (four-eyes finding 7): `batch-autostart.mjs`
+  already ticks every 15 minutes and already speaks to the network. It fetches the
+  inbox on each tick and writes new messages into the spool the next point consumes,
+  handing pending ones to the spawn prompt. That bounds stage 1 at 15 minutes with no
+  new process. Without it, ntfy's ~12-hour retention (VERIFY the current figure) means
+  a message can expire unread — "possibly never", not "minutes".
+  DELIVERY DISCIPLINE: dedupe by ntfy message id, not only by the cursor in
+  `.claude/chat-state.json`, so a lost or corrupt cursor replays nothing twice. Any
+  child process this point spawns is born with `windowsHide: true` (point 401 sweeps
+  the same property and must not be re-reddened).
+  VERIFIABLE: pure Vitest on signature verification (valid passes, unsigned/mis-signed/
+  stale drop), on the id-dedupe across a reset cursor, and on each board module the new
+  markup touches (the four-section audit still passes with the chat present). Live: a
+  message typed on a phone-sized viewport reaches the spool through the launcher tick,
+  and a reply posted with `scripts/chat-reply.mjs` appears on the page.
+  DOCS in the same commit: `docs/batch-autonomy.md` (the channel and what it
+  guarantees), CLAUDE.md §7.2 where the hook chain is described, and the memory entry
+  `batch-dashboard-artifact`, which records that the chat is the ONE agreed addition to
+  the four-section structure.
+
+- [ ] 406. THE MESSAGE ARRIVES WHILE I WORK — STAGE 2 OF 3, DELIVERY AT THE NEXT
+  TOOL CALL (28.07.2026, same request and the same four-eyes review as point 405).
+  With stage 1 alone a message waits for a launcher tick. This point makes a RUNNING
+  session see it within seconds, because a session makes a tool call every few
+  seconds anyway.
+  THE MECHANISM: `scripts/lock-heartbeat-hook.mjs` runs on EVERY tool call
+  (PostToolUse, matcher ""). It additionally reads the local spool — NEVER the
+  network; a hook on every tool call must not do network I/O — and delivers what it
+  finds.
+  THE DELIVERY SHAPE IS NOT PLAIN STDOUT (four-eyes finding 2, and it invalidated the
+  first design): a PostToolUse hook's plain stdout on exit 0 goes to the debug log and
+  is NEVER shown to the model. Model-visible injection needs the JSON shape
+  `{"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"…"}}`.
+  Built the naive way the messages would be silently invisible.
+  THE TOKEN RULE, which is why this shape matters twice: with an EMPTY spool the hook
+  emits NOTHING. Injected context is re-sent with every subsequent request for the rest
+  of the session, so a "no new messages" line would cost tokens at tool-call rate. The
+  user's condition for this whole mechanism is that it costs nothing while they send
+  nothing, and this is the one place that condition can break.
+  THE CONSUMPTION PROTOCOL (four-eyes finding 6): the poller writes ONE FILE PER
+  MESSAGE (`spool/<ntfy-id>.json`, atomic tmp+rename through `scripts/atomic-write.mjs`
+  with its retry — a per-tool-call reader is exactly the scanner that produced the
+  measured Windows `EPERM … rename` failures). The hook MOVES a message aside BEFORE
+  emitting it, inside try/catch, fail-open, and prints nothing on error. Without this,
+  the same message is injected on every tool call — a token leak at the rate the rule
+  exists to prevent.
+  BEHAVIOUR: a message is QUEUED, never an interrupt. Arriving mid-merge it is shown
+  and the session finishes the atomic step first. A question is answered with
+  `scripts/chat-reply.mjs`; an instruction becomes a work-order point per
+  append-and-defer, and the reply says so.
+  NOTE THE COLLISION: point 400 delta A gives this same hook the publish-due duty and
+  stands EARLIER in the work order — build against the post-400 hook, not against
+  today's.
+  VERIFIABLE: pure Vitest — empty spool emits exactly nothing; a non-empty spool emits
+  exactly the `additionalContext` JSON; the same spool read twice emits nothing the
+  second time; an unreadable spool fails open and silent. Live: a message sent while a
+  session works appears in that session at its next tool call, and the answer reaches
+  the page.
+
+- [ ] 407. THE MESSAGE WAKES ME — STAGE 3 OF 3, THE WATCHER (28.07.2026, same
+  request and the same four-eyes review as points 405/406). With stages 1 and 2 a
+  message is fast while a session runs and waits up to a launcher tick while none
+  does. This point removes that last wait: a message arriving into an idle machine
+  starts a session within seconds.
+  THE MECHANISM: a long-lived local process subscribes to the INBOX topic over SSE
+  (not tight HTTP polling — a page or process hammering ntfy runs into its free-tier
+  rate limits) and, on a message, spawns a session. Idle cost is one open connection:
+  no model, no tokens.
+  IT MUST NOT BECOME A SECOND BATCH SESSION (four-eyes finding 3 — the first design
+  said "use the same lock as the launcher", which is self-defeating). Taking the OWNER
+  lock makes the woken session the batch owner, and `progressGuardDecision` then
+  conscripts it into working the whole queue — the opposite of a quick answer. Taking
+  no lock makes it exactly the parallel top-level session `classifyParallel` raises an
+  alert about. The compatible channel already exists: the watcher spawns ONLY when
+  `assessOwner` reports no live owner AND no honoured claim; the responder files a
+  BOUNDED `batch-claim` for its lifetime — already the sanctioned exclusion in
+  `classifyParallel` and already a reason for the launcher to skip its tick — answers,
+  and releases. It never touches the pending-spawn conversion.
+  IT OBEYS THE SAME STOPS AS THE LAUNCHER: `.claude/batch-paused` and the work-order
+  format alarm both suppress a spawn.
+  THE RESPONDER IS LIGHT: read the message, answer, append a point if the message is an
+  instruction. It does not load the work order, so a one-line question does not pay for
+  a batch orientation.
+  LIFECYCLE, WHICH THE FIRST DESIGN OMITTED: how it starts at boot, how it restarts
+  after a crash, how it stops when the batch is paused — stated and built, alongside
+  the existing scheduled task rather than as a second scheduler. `windowsHide: true`
+  from day one (point 401).
+  VERIFIABLE: pure Vitest with injected state — spawn only when owner-absent AND
+  claim-absent; never while paused; the claim released on every exit path including a
+  crash; SSE reconnect after a dropped connection replays by message id without
+  duplicating. Live: with no session running, a message from the phone is answered
+  within seconds, and `.claude/autostart.log` shows no parallel-session alert.
+  DOCS in the same commit: `docs/batch-autonomy.md` (the wake path and what it
+  guarantees in each mode) and CLAUDE.md §6, where the singleton and the launcher are
+  described.
+
+- [ ] 409. A MERGED BRANCH MUST NOT SURVIVE ITS MERGE (28.07.2026, user reported 36
+  branches on GitHub and asked for a mechanism). Measured at that moment: 31 of the 36
+  remote branches were already fully contained in `main`, 72 of 77 local branches were,
+  and 36 of 48 worktrees sat on such a branch — some of them 450 commits behind. None
+  of it was risky (every commit lives in `main`), and all of it was noise: it hid the
+  four branches that were genuinely open, it made `git branch` useless as an overview,
+  and the stale worktrees cost disk and confused every search. The debris was cleared by
+  hand on 28.07.2026; this point makes the cleanup automatic, because CLAUDE.md §6
+  already says the branch workflow ends at the merge and the deletion was simply
+  forgotten thirty-one times. A rule that is remembered is a rule that rots.
+  THE MECHANISM, in the shape this project uses: a Stop hook
+  (`scripts/branch-hygiene-guard.mjs`, decision core pure and Vitest-covered, FAIL-OPEN
+  like every guard here) BLOCKS the turn end while a branch that is FULLY CONTAINED in
+  `origin/main` still exists — as a local branch, as a remote branch, or as a worktree —
+  and names the exact commands that remove each one. It must be cheap: `git branch
+  --merged origin/main` and `git worktree list` are local, no network.
+  THE CARVE-OUTS, or it fires on healthy work: `main` itself; a branch a LIVE session
+  has declared in flight (`.claude/batch-in-flight.json`); the verify-baseline
+  checkouts under `local/`, which are caches keyed by sha and not branches at all; and a
+  branch merged less than a calibratable grace ago (default 10 minutes), so the merging
+  session is never blocked by the branch it is still finishing with.
+  MERGE-TIME DELETION IS THE PRIMARY PATH, the guard is the backstop: the merge step in
+  CLAUDE.md §6 gains "delete the branch — local, remote and its worktree — as part of
+  the merge, before the tick", so the guard normally has nothing to find. A backstop
+  that fires routinely has become the process, which is how this debt accumulated.
+  VERIFIABLE: pure Vitest on the decision — a merged local branch blocks, a merged
+  remote branch blocks, a merged worktree blocks, an UNMERGED branch never blocks, a
+  branch inside the grace never blocks, an in-flight branch never blocks, `main` never
+  blocks, and an unreadable git state allows the stop (fail-open). Live: merge a point
+  and see the turn end refused until the branch is gone.
+  DOCS in the same commit: CLAUDE.md §6 (the merge step) and §7.2, where the Stop chain
+  lists its guards.
+
+- [ ] 410. THE BOARD LOSES ITS UMLAUTS ON THE WAY IN (28.07.2026, user spotted
+  "faellt weg" and "kuenftig" on a current-work card). The board is German prose the
+  user reads on a phone; transliterated umlauts read as broken. The cause is the path
+  the text takes: `scripts/board.mjs` receives a card's text as a COMMAND-LINE
+  ARGUMENT, and German text passed through the shell on Windows arrives mangled — so
+  every session has been transliterating by hand to stay safe, which is the defect
+  rather than the workaround. Cards written straight into the HTML carry proper
+  umlauts; cards written through `board.mjs` do not. Both kinds sit on the board today
+  (the ones written on 28.07. were corrected by hand).
+  THE FIX: `board.mjs` takes the text on STDIN (`--text-stdin`, and the argument form
+  keeps working for ASCII), reading it as UTF-8 explicitly, so the shell never sees
+  the prose. Everything it writes stays UTF-8 end to end — the HTML file is written
+  with an explicit encoding, never the platform default.
+  ENFORCE IT: `dashboard-guard-core.mjs` gains one check over the board's text —
+  a card body containing a transliterated umlaut in a German word (`ae`/`ue`/`oe`
+  inside a word the surrounding text shows to be German, e.g. `Pruefung`, `faellt`,
+  `kuenftig`, `ueber`, `Flaeche`) FAILS the audit, naming the card. A word list is
+  enough; this is a spelling smell, not a linguistics problem, and a false positive is
+  cheap to whitelist. Without the check the workaround simply returns the next time a
+  session finds the argument path convenient.
+  VERIFIABLE: pure Vitest — text with real umlauts survives the stdin path byte for
+  byte; a transliterated body fails the audit naming the card; a legitimate word that
+  merely contains those letters (`Quelle`, `Steuer`, `Aequator`) does not fire; an
+  unreadable board never throws. Live: write a card with umlauts through the new path
+  and read them back from the published page.
+  DOCS in the same commit: the memory entry `batch-dashboard-artifact` gains the one
+  sentence naming the stdin path as the way to write a card.
+
+- [ ] 411. THE BOARD'S PROMISED END TIME IS ALWAYS FOUND STALE BY THE READER, NEVER
+  BY ME (29.07.2026, user reported it for the third time in one night: "Die
+  End-Uhrzeiten sind mal wieder total veraltet"). The `~HH:MM` on a current-work card
+  is a promise to someone reading from a phone. `dashboard-guard-core.mjs` already has
+  `now-eta-past`, which blocks a turn end once the estimate has PASSED (plus a 5-minute
+  grace). That is one tick too late by construction: the card is already wrong when the
+  guard speaks, and between two turn ends — which can be half an hour apart while a
+  delegated agent builds — the reader sees a promise that expired long ago. Measured
+  tonight: 300 stood at `~00:45` and 402 at `~00:17` while the clock read 01:52.
+  THE FIX, and it is a shift of one comparison: the guard fires when the estimate has
+  less than a calibratable margin LEFT (default 15 minutes, the launcher's own tick
+  width), not after it has passed. The remedy text stays the same — give it a realistic
+  new time or move the card — so the session is nudged while the board is still honest.
+  The existing past-due case remains, one severity louder.
+  AND THE SECOND HALF, which is the actual cause: the estimates were optimistic every
+  single time. The remedy line therefore states the rule the estimate must follow — the
+  time by which the work will be VISIBLY done including its verification, not the time
+  the current step might end — and a card whose estimate is moved more than twice in one
+  session gets the observation printed with it, because a third revision is a signal that
+  the estimate method is wrong rather than the number.
+  VERIFIABLE: pure Vitest — an estimate 20 minutes out passes, one 10 minutes out is
+  flagged, one that has passed is flagged more loudly, a card opened before midnight and
+  estimating into the next day is never mistaken for past-due (the existing wrap case),
+  a missing estimate keeps its current behaviour, and a garbled meta never throws.
+  DOCS in the same commit: the memory entry `batch-dashboard-artifact`, which states what
+  the board's four sections promise.
+
+- [ ] 412. THE FOOTING CHECK PASSES BECAUSE IT NEVER STOOD ON A SLOPE (29.07.2026,
+  reported by the agent that built the fix, against its own green result — the kind of
+  finding that only comes from someone looking at what their PASS actually measured).
+  Point 300 now seats every planted panorama foot on the ground drawn under it, and the
+  live check `every planted panorama foot touches the ground drawn under it` went from
+  23 % of stance frames over the gate to a clean PASS on both backends. But the same
+  PASS line reports `slope over the wheelbase [0.00, 0.00, 0.00, 0.00]`, `pitch
+  [0.000 ×4]` and `leg reach [1.00 ×4]`: at the place the check runs (maasai-village)
+  the silhouettes stand on the flat disc-horizon line, so the seating it is meant to
+  prove was a NO-OP in the measured frame. The non-linear-relief case is carried today
+  by a pure test alone. The live green is therefore true but weak — it says the code
+  does not break flat ground, not that it fixes sloped ground.
+  THIS IS THE SAME CLASS AS §3.47 of the retrospective, one step further on: there a
+  check measured NOTHING and said `Infinity`; here a check measures only the trivial
+  case and says PASS. Both are a verdict without its population.
+  THE FIX, which the point's own VERIFY wording already asks for: make it a SERIES.
+  Sample many frames across the walk, count how many samples stood on genuinely sloped
+  ground (a calibratable minimum slope over the wheelbase), and FAIL when that count is
+  zero — a check that never met its own subject must not report success. Choose the
+  sampling place so slope actually occurs: either drive the probe to a settlement whose
+  backdrop relief rises, or state in the check why the chosen place is the right one.
+  Report the distribution (how many samples, how many sloped, worst gap among the sloped
+  ones) so the next reader can judge the evidence rather than trust the word PASS.
+  VERIFIABLE: pure Vitest on the decision — zero sloped samples fails naming the count,
+  a mixed series judges only the sloped ones, an all-flat series is never silently
+  accepted; plus the existing non-linear-ground unit test stays. Live: the check reports
+  a non-zero sloped-sample count on both backends.
+  DOCS in the same commit: `scripts/verify/README.md`, where the polish suite's checks
+  are described.
+
+- [ ] 413. AN ANIMAL WALKS STRAIGHT THROUGH THE FENCE (29.07.2026, user bug report
+  `hoa-state-2026-07-29-2757182050`, seen TWICE in one visit: production 41d8caf,
+  WebGPU, hausa-village in the west, high quality, standing at 85.46 / -120.25). The
+  compound fence is drawn as a continuous woven wall; a goat crossed it as if it were
+  not there.
+  DIAGNOSED, not guessed — two causes stack, and both must be fixed:
+  (a) THE COLLIDER IS A ROW OF DOTS WHERE THE PICTURE DRAWS A WALL. `layout.ts` pushes
+  one CIRCLE PER POST (`for (const f of fences) … colliders.push({x, z, r})`, r = 0.42
+  woven / 0.5 stone / 0.6 thorn) while `fenceRing` spaces posts by `step` (0.85–1.0)
+  along the arc. Between two post circles the blocked band is barely as wide as the gap
+  and it PINCHES at the midpoint, so even a correct sweep would squeeze through where
+  the drawn panel is solid. The collider must follow the SEGMENT between neighbouring
+  posts (a capsule/oriented box per panel), derived from the same posts the renderer
+  draws — never a second, hand-kept list, per the point-129/378 rule that every collider
+  comes from what is actually drawn.
+  (b) THE SETTLEMENT COLLISION CANNOT CATCH A FAST STEP. `resolveMove`
+  (`src/scenes/place/collision.ts`) is a POSITION test: it takes the desired point and
+  pushes it out of whatever it overlaps. A step longer than the collider band lands on
+  the far side overlapping nothing, so nothing pushes back — textbook tunnelling. The
+  bird's-eye path already solves this (§7.1 pt. 4: "a fast step is caught at the near
+  edge with no tunnelling"); the settlement path never got it. Give `resolveMove` the
+  PREVIOUS position and test the SEGMENT from it to the desired point, stopping at the
+  near edge of the first collider crossed, then resolve the slide as today. Every caller
+  in `PlaceLife.tsx` (kids, goats, walkers) and the player already knows its previous
+  position.
+  WHY IT SHOWED ON A GOAT FIRST: goats drift by a wobble (`a.x + wob * a.amp`) that can
+  jump further in one frame than a villager's walk, so they meet the tunnelling case
+  soonest — but the defect is in the shared routine, not in the goats.
+  THE USER'S SECOND OBSERVATION IS THE OTHER HALF OF THE SAME CAUSE and pins it: at the
+  fence the animal either passes through OR "changes direction abruptly". The abrupt
+  turn is the push-out's own signature — the goat's next position lands inside ONE post
+  circle and is shoved out along that circle's radius, i.e. sideways, with no relation
+  to the wall it was walking into. A panel collider plus a swept test replaces both
+  symptoms with the one correct behaviour: stop at the wall and slide along it. Both
+  symptoms must be gone, not only the clipping — a fix that merely stops the tunnelling
+  and keeps the sideways jerk has fixed half the report.
+  (c) THE ANIMALS DO NOT SEE EACH OTHER, AND THEIR HOME SPOT IS NEVER CHECKED. Second
+  report the same night (`(1).zip`, tuareg-village, north, 57.42 / -232.22, medium):
+  "wildes Durcheinanderclippen" — the picture shows several goats standing INSIDE one
+  another and inside a tent, among rocks. Two causes, both in `Goats` in `PlaceLife.tsx`:
+  no animal is part of the collider set, so `resolveMove` can never separate two goats;
+  and a goat's anchor is drawn as a bare radius around the centre (`r = 9 + rand() * 12`)
+  with NO validation against the colliders — an anchor may sit inside a tent or a rock,
+  and the ±1.5 wobble then drives the animal in and out of it forever. Point 155 already
+  did exactly this validation for walker errand targets; the goats never got it. Fix
+  both: validate an animal's anchor the way point 155 validates a target (clear standing
+  circle, nudged to the nearest free spot otherwise), and give the animals mutual
+  separation — the cheapest correct form is to add each animal as a small dynamic
+  collider for the others' resolve step, so one routine keeps doing the work.
+  VERIFIABLE: pure Vitest — a segment crossing a fence panel between two posts is
+  stopped at the panel (today it passes through); a step of 10× the collider width is
+  stopped at the near edge; sliding along a wall still works; an inhabitant standing
+  inside an overlap is still pushed out (the current behaviour must not regress); a
+  sweep over every fence in every generated village asserts no gap wider than the
+  smallest inhabitant radius between neighbouring panel colliders; every generated
+  animal anchor stands on free ground in every village of every region; and two animals
+  released onto the same spot end up apart. Live (`scripts/verify/polish.mjs`, BOTH
+  backends): a goat driven at the fence for a long run never ends up on the far side,
+  and a photographed herd shows no body inside another body.
+  DOCS in the same commit: CLAUDE.md §7.1 point 16, where settlement collision is
+  described, gains the swept rule.
+
+- [ ] 414. THE BIRD'S-EYE ANIMALS GET THE WALK THE SETTLEMENT ONES HAVE (29.07.2026,
+  user asked after seeing the settlement gait: "could this walk be carried over to the
+  bird's-eye view?"). Yes — and the hard part is already built and tested. `src/render/
+  fauna.ts` carries the whole derivation as pure functions: `footReach`, `strideLength`,
+  `gaitCadence`, `isStance`, `gaitFootFraction`, `gaitPhase`, `legSwingAngle`,
+  `gaitBodyLift`, `groundPitch`, `footBodyOffset`, `seatFootOnGround`. The settlement
+  walkers, the panorama silhouettes and the goats all read it. `src/scenes/travel/
+  Wildlife.tsx` reads NONE of it — measured: no reference to any of those names. Its
+  animals carry only a grazing-shuffle phase, so a walking herd slides.
+  WHAT IS ACTUALLY MISSING is not the maths but the BODY: the travel animals are drawn
+  from `animalBodies.ts` without pivoted legs, and they are INSTANCED (19 instanced
+  meshes in `Wildlife.tsx`) because a bird's-eye frame holds far more animals than a
+  settlement. So this point is a rendering-cost question wearing an animation costume,
+  and it must be answered in that order:
+  1. Give the travel bodies pivoted legs from the SAME part description the settlement
+     bodies use, so one definition drives both and they cannot drift apart (the §300
+     lesson, and the reason the panorama and the village already agree).
+  2. Drive them from the SAME distance-driven phase — the animal's own travelled arc,
+     never a wall clock — so a faster animal steps faster and a standing one stands
+     still, exactly as the settlement does today.
+  3. MEASURE before deciding the scope: extra per-leg instance matrices at herd scale
+     are the cost, and this project has the instrument for it (F8, the in-game
+     benchmark, on the user's own hardware — the headless machine's numbers are not the
+     player's). If the full articulation is too dear at distance, degrade by DISTANCE
+     rather than by dropping the feature: articulated near the traveller, the cheaper
+     body-lift-only cue further out, nothing at the horizon — and say where each band
+     begins.
+  4. SORT IT INTO THE THREE QUALITY LEVELS (`QUALITY_PRESETS`, the §21 convention): the
+     completeness gate fails a new optical feature that lacks low/medium/high entries,
+     and `docs/graphics-detail-levels.md` is updated in the same commit.
+     THE LEVEL IS THE PRIMARY AXIS, decided by the user 29.07.2026: HIGH always carries
+     the walk, LOW never does, and MEDIUM is decided BY THE MEASUREMENT of step 3 — it
+     gets the walk if the F8 numbers on the user's own hardware show it comfortably
+     inside the frame budget, and stays without it if they do not. Do not guess that
+     value: run the benchmark, put the two rows (medium with and without) in the point's
+     record, and let them decide. The distance banding of step 3 is then a refinement
+     INSIDE a level that carries the feature, not a substitute for the level split.
+  NOT IN SCOPE: foot-on-ground seating for bird's-eye animals. The settlement needed it
+  because a silhouette stands on compressed backdrop relief; at travel distance the
+  terrain under a walking animal is near-flat per stride, and seating every foot of a
+  herd is exactly the cost this point is trying to contain. Revisit only if the picture
+  shows floating feet.
+  VERIFIABLE: pure Vitest — a travel animal's stride advances with the distance it
+  covered (not with elapsed time), a standing animal's phase does not move, and the
+  cadence differs between a long-legged and a short-legged species; plus the
+  `QUALITY_PRESETS` completeness test and the doc-sync test. Live (`scripts/verify/`,
+  BOTH backends): a herd photographed twice a stride apart shows moved legs, and the F8
+  report's per-system triangle/draw-call rows are attached to the point so the cost is
+  on the record.
+  DOCS in the same commit: design.md §19 where the wildlife is described, and
+  `docs/graphics-detail-levels.md`.
+
+- [ ] 415. THE TUAREG TENT READS AS A HEAP OF SAND (29.07.2026, user in the Tuareg
+  village, North: "what are these cones supposed to be? Sand piles? They look more like
+  mini tents"). They ARE tents — `Tent` in `PlaceScene.tsx` is a single
+  `coneGeometry(r·1.25, h)` in the cloth material, a 0.45-unit pole and a small dark
+  entrance flap. Standing on pale sand in the pale cloth colour, a smooth tall cone
+  reads as a dune, and the flap is far too small to say otherwise. The user's reaction
+  is the correct one: nothing in the shape says "someone lives here".
+  THE REAL FORM IS ALMOST THE OPPOSITE, and it is what makes it readable: a Tuareg tent
+  (ehen) of that period is LOW and WIDE, not tall and pointed — mats or hides stretched
+  over an arched wooden frame, dark against the sand, with the long side open toward the
+  lee and the frame's poles and guy lines visible. Height well under a standing person,
+  width several times the height. RESEARCH IT FIRST against `docs/peoples-1890.md`
+  (Tuareg material is in §2.4 and §7.2) and record what the sources support before
+  modelling; where the evidence is thin, say so in the point rather than inventing
+  detail — the accuracy principle of this project applies to dwellings as much as to
+  clothing, and the guide's own rule is that a real system is never faked.
+  WHAT TO BUILD: replace the cone for the NORTH dwelling kind with the arched form —
+  a low curved shell, dark mat/hide colouring against the light ground, an open side,
+  and the frame legible at eye height (design.md §2.6 asks for structure and weathering
+  at eye height, which a smooth cone cannot carry). Keep it cheap: this is a village
+  dressing element and appears many times.
+  CHECK THE OTHER PEOPLES' TENTS at the same time: the `tent` kind is also used to dress
+  the market in other regions. Those are trade awnings, not dwellings, and must not
+  inherit the desert form — say which shape each use gets.
+  VERIFIABLE: pure Vitest on the geometry description (the north dwelling is wider than
+  it is tall, and the market awning is not the same part), plus the existing layout
+  tests. Live (`scripts/verify/polish.mjs`, BOTH backends, screenshot): the Tuareg
+  village photographed at eye height — the tents must be distinguishable from the ground
+  by colour as well as by shape, which is exactly what fails today.
+  DOCS in the same commit: `docs/peoples-1890.md` §8 (the research-to-game table) gains
+  the dwelling row for the Tuareg, per the standing rule that the implementation
+  sections move with the rendering.
+
+- [ ] 416. AN ARCHIVED CARD LEAVES THE BOARD EMPTY, AND A GREEN PUSH TURNS RED
+  (29.07.2026, hit TWICE within one hour and BOTH times reported by the user before any
+  guard spoke: "you are not working on anything?" and "again no card in progress").
+  Closing a point is two board edits — archive the finished card, promote the next one —
+  and between them the "Woran ich gerade arbeite" section is EMPTY. That is not only a
+  bad look on the phone: `scripts/board-core.test.mjs` asserts "the live board must
+  carry current work for this sweep to mean anything", so the empty window turns the
+  whole unit layer red, and the pre-push gate then blocks a merge that is otherwise
+  perfectly green. Measured tonight: a 155-file run reporting one failed file, the merge
+  of a finished point blocked, and the red read at first glance like the load flake this
+  night was already full of.
+  THE FIX: make the archive and the next promotion ONE board edit. `board.mjs done <n>`
+  gains the successor — `board.mjs done <n> --next <m> "<status>"` — writing both cards
+  in a single write, so the file is never observed without current work. Where a session
+  genuinely has nothing to promote (the queue is empty, or it is about to take a session
+  boundary), it must say so ON the board rather than leave a hole: a single card naming
+  what is happening instead. That case is rare and belongs in the same command
+  (`--none "<reason>"`), so the empty state cannot be reached by forgetting.
+  THE TEST STAYS AS IT IS: it is right that an empty current-work section is a defect —
+  do not weaken it to tolerate the hole. It fired correctly both times; what was missing
+  was a way to close a point without creating the hole in the first place.
+  VERIFIABLE: pure Vitest — `done --next` produces a board that never lacks a now-card
+  (assert on the intermediate string, not only the result); `--none` writes the naming
+  card; `done` without either is REFUSED when it would empty the section, naming the two
+  ways out; and the existing board audits still pass on the produced board.
+  DOCS in the same commit: the memory entry `batch-dashboard-artifact`, which states how
+  a card moves.
 
 ## Closing (only after all points)
 

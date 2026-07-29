@@ -181,7 +181,14 @@ old→new coverage map live in `scripts/verify/README.md`.
   developed on its OWN feature branch (`feat/<point>-<slug>`), branched from
   `main`. Commit atomically AND immediately push the BRANCH after every commit
   (durability — nothing stays only local, nothing is lost if a session dies;
-  a failed push is reported, never skipped silently). Merge to `main` ONLY when
+  a failed push is reported, never skipped silently). A RESCUE commit — work
+  committed because a session or agent was killed mid-build — carries
+  `[skip ci]` in its SUBJECT plus a `Rescue: <what was interrupted>` trailer
+  (user 28.07.2026): it is no claim of completeness, and a red CI run on such a
+  branch state MAILS the repository owner. Durability is untouched — the commit
+  still exists and still pushes; only the run is skipped, and the NEXT commit,
+  the one that finishes the work, runs CI normally. The `commit-msg` hook
+  refuses each half without the other. Merge to `main` ONLY when
   the point is COMPLETE and verified — tests green on both layers AND, for a
   render/GUI change, the rendered picture checked: on BOTH backends where the
   change can render differently on each, and on ONE where it cannot — a DOM-only
@@ -284,6 +291,12 @@ old→new coverage map live in `scripts/verify/README.md`.
   `HoA-Batch-Autostart`, then marks the lock HANDED OVER so the launcher spawns
   the successor — five hours were lost to a session that stopped holding it.
   Attended, ask for `/clear`. The "cheaper model" idea stays REJECTED.
+  THE WAY BACK (user 28.07.2026): a window the user returns to runs `node
+  scripts/batch-claim.mjs --session <id>` (the stand-down message prints it with
+  the id filled in); the owner sees the claim at its next hook, finishes — never
+  mid-merge, never with an agent or a verification running — releases, and the
+  same command then takes the batch. A claim expires, a dead claimant's is
+  ignored, and exactly one session ever wins.
 - **Model policy (user decision 25.07.2026, points 309 + the role revision).**
   ONLY three models may author work on this project, each with its own role:
   **Opus 5** is the WORKER at any difficulty; **Fable 5** is used ONLY for the
@@ -997,15 +1010,14 @@ After completion and after every major system:
     prod preview), then the render suites on WebGPU. A pinned `VERIFY_GL`, the
     SMALL tier and a bare suite filter stay single-backend. `touch` and `voice`
     are the documented WebGL2-only skip (headless WebGPU drives neither the CDP
-    touch events nor the TTS speak state; both were verified on WebGL 2).
+    touch events nor the TTS speak state; both were verified there).
   - The suite→tier→backend map is the pure module `scripts/verify/tiers.mjs`,
     pinned by `scripts/verify/tiers.test.mjs` in the Vitest layer; change it
     there and in `scripts/verify/README.md` together.
 - **The Stop chain gates the turn end, not only the test run.** Beyond the
-  suites, a chain of Stop hooks (the authoritative list is
-  `.claude/settings.json`) BLOCKS finishing a turn while the working
-  state contradicts a standing rule — the "enforce, don't remind" model, each
-  adopted after a reminder failed. Currently: `model-guard`
+  suites, Stop hooks (authoritative list: `.claude/settings.json`) BLOCK a turn
+  end while the working state contradicts a standing rule — "enforce, don't
+  remind", each adopted after a reminder failed. Currently: `model-guard`
   (no commit authored outside the §6 model allowlist), `dashboard-guard`,
   `dashboard-conciseness-guard`, `dashboard-card-topic-guard` and
   `dashboard-integrity-guard` (the progress board is published, concise,
@@ -1013,41 +1025,43 @@ After completion and after every major system:
   idle wait while a background validation runs), `batch-progress-guard` (no
   idle stop without a boundary or wait), `render-verify-guard` (no
   render-set change — scene/shader/HUD, `src/world/` geometry, the browser
-  suites — finished without the picture check; both backends where they can
-  differ, one where they cannot), `mechanism-review-guard` (no new or changed
+  suites — finished without the picture check, on both backends where they can
+  differ), `mechanism-review-guard` (no new or changed
   guard, gate or git hook without a recorded review by the OTHER model —
   `scripts/mechanism-review.mjs --record`), `queue-order-guard`, `tasks-spec-guard` and `tasks-archive-guard`
   (the queue order, the final-state-only spec rule, and the open/archived split
-  of the work order), `doc-budget-guard` (the constantly-read documents stay
-  within measured ceilings — this file, design.md, and the work order's
-  preamble; budgets and both honest exits in
-  `scripts/doc-budget-core.mjs`), `commit-scope-guard` and `pre-push-gate`
+  of the work order), `doc-budget-guard` (this file, design.md and the work
+  order's preamble stay within measured ceilings; budgets and both honest exits
+  in `scripts/doc-budget-core.mjs`), `commit-scope-guard` and `pre-push-gate`
   (versioned `scripts/git-hooks/`, wired by `npm install`: no stray file rides
-  along, no push lands a state CI would reject), `ci-status-guard` (a
+  along, no rescue commit mails the user, no push lands a state CI would
+  reject), `ci-status-guard` (a
   red CI is noticed), `timestamp-guard` (the chat timestamp) and
-  `retro-currency-guard` (the retrospective stays current, each lesson in it
-  carrying a mechanism decision: `docs/analysis_de/lesson-mechanisms.md`), followed
+  `retro-currency-guard` (the retrospective stays current, each lesson carrying
+  a mechanism decision: `docs/analysis_de/lesson-mechanisms.md`), followed
   by `dashboard-sync`. Separately, PreToolUse hooks run `closing-guard` (§9),
   which denies a version tag until every closing step is recorded, and
   `board-first-guard`, which fires BEFORE the work rather than at the turn end
-  (the Stop chain leaves the board free to lag the whole hour the user is
-  reading it): the FIRST state-changing call of a turn is denied while no
-  `focus set|confirm` postdates the turn stamp, or the board is unpublished, or
-  the OPEN-POINT SET changed without a publish since (`publishDue`, and only
-  where this session can publish at all — a session that cannot would spin) —
-  never a read, its own remedy commands or an edit of the board file, and at
-  most ONCE per turn.
-  Every one is fail-OPEN — an internal error allows the stop, so
-  a guard bug can never trap the session — and each decision core is pure and
-  Vitest-covered.
-- **Ask the guards BEFORE the action, not at the turn end (point 365).** Before an action a guard governs, `node scripts/guard-preflight.mjs --for <action>
-  --session <id>` reports read-only whether one would block — advisory, the guard
-  itself stays the authority. A blocked turn produces nothing, and one such loop
-  has already cost ~30 turns; asking first is a cheap process run.
+  (the Stop chain lets the board lag the whole hour the user is reading it): a
+  turn's FIRST state-changing call is denied while no `focus set|confirm`
+  postdates the turn stamp, the board is unpublished, or the OPEN-POINT SET
+  changed without a publish since (`publishDue`, and only where this session can
+  publish at all — one that cannot would spin) — never a read, its own
+  remedy commands or a board-file edit, and at most ONCE per turn.
+  Every one is fail-OPEN (an internal error allows the stop, so a guard bug
+  cannot trap the session) with a pure, Vitest-covered decision core.
+- **Ask the guards BEFORE the action, and answer LAST (points 365/403).** Before
+  an action a guard governs, `node scripts/guard-preflight.mjs --for <action>
+  --session <id>` reports read-only whether one would block — advisory; the guard
+  stays authoritative, a blocked turn produces nothing, one loop cost ~30 turns.
+  The turn's END is such an action (`--for answer`): routine duties (focus
+  confirm, board publish/attest, the boundary) FIRST, the closing reply LAST,
+  once the chain would pass. Blocked anyway, the next message names in one
+  sentence what was fixed; re-answering is how the user got the same text twice.
 - **Screenshot diffing is NOT available as a shortcut (point 361).** Every
-  pixel-metric way to cheapen this check was replayed against the bugs the
-  picture caught and REJECTED: two runs of one suite on identical code move
-  11–98 % of a frame, the smallest real defect moved 0.75 %. No golden-image
+  pixel-metric shortcut was replayed against the bugs the picture caught and
+  REJECTED: two runs of one suite on identical code move 11–98 % of a frame,
+  the smallest real defect 0.75 %. No golden-image
   gate until `node scripts/picture-stability.mjs <suite>` reports STABLE;
   verdicts in `docs/picture-check-levers.md`.
 - Fix deviations, do not paper over them. An unfulfilled criterion is

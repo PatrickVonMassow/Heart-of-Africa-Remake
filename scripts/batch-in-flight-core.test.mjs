@@ -13,26 +13,43 @@
 //   · and nothing here may touch the repository's .claude/ (finding 3).
 import { describe, it, expect } from 'vitest'
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { basename, join, resolve } from 'node:path'
 import { REPO_ROOT } from './repo-paths.mjs'
 import {
   IN_FLIGHT_MAX_AGE_MS,
+  LAUNCHER_WORK_MAX_AGE_MS,
   LOG_FRESH_MS,
   WORK_FRESH_MS,
   assessInFlight,
+  assessOwnerWork,
   checkEvidence,
   describeInFlight,
+  selfReferentialEvidence,
 } from './batch-in-flight-core.mjs'
 import {
+  assessOwner,
   progressGuardDecision,
+  spawnDecision,
   statePathsFor,
   probePid,
   LOCK_PATH,
   IN_FLIGHT_PATH,
+  LAUNCHER_TICK_MS,
   PID_START_TOLERANCE_MS,
+  WEDGED_MS,
+  WORK_STALL_MS,
 } from './batch-singleton.mjs'
-import { gatherInFlight, maxAgeMs, readDeclaration, writeDeclaration, clearDeclaration } from './batch-in-flight.mjs'
+import {
+  absPath,
+  gatherInFlight,
+  maxAgeMs,
+  readDeclaration,
+  resolveRefName,
+  writeDeclaration,
+  clearDeclaration,
+} from './batch-in-flight.mjs'
 
 const NOW = 1_785_100_000_000
 const SID = 'session-owner'
@@ -411,5 +428,424 @@ describe('the declaration file is derived from the caller’s lock path', () => 
     expect(maxAgeMs({ HOA_IN_FLIGHT_MAX_MIN: '20' })).toBe(20 * 60 * 1000)
     expect(maxAgeMs({ HOA_IN_FLIGHT_MAX_MIN: 'nonsense' })).toBe(IN_FLIGHT_MAX_AGE_MS)
     expect(maxAgeMs({ HOA_IN_FLIGHT_MAX_MIN: '-5' })).toBe(IN_FLIGHT_MAX_AGE_MS)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// THE LAUNCHER'S QUESTION, WHICH IS NOT THE GUARD'S (point 402, 28.07.2026).
+//
+// `assessInFlight` decides whether a session may end its turn, so it demands that
+// ALL the declared work still holds. The launcher decides whether a silent owner
+// is working or wedged, and for that the right question is whether ANY of it is
+// still moving: a session with three agents out and two of them finished is
+// plainly alive, and shooting it is what killed four sessions in one afternoon.
+describe('assessOwnerWork — is the OWNER’s declared work still advancing?', () => {
+  const lock = (over = {}) => ({ sessionId: SID, claimedAt: NOW - 40 * 60_000, pid: PID, pidStartedAt: PID_STARTED, ...over })
+  const work = (declOver = {}, probeOver = {}, over = {}) =>
+    assessOwnerWork({ declaration: declaration(declOver), lock: lock(), now: NOW, ...probes(probeOver), ...over })
+
+  it('a branch tip that moved inside the window is PROGRESS', () => {
+    expect(work()).toMatchObject({ declared: true, advancing: true, reason: 'advancing' })
+  })
+
+  it('ONE live piece is enough — a finished agent beside a running one is not a stall', () => {
+    // The pid has exited (that agent is done); the branch still commits.
+    expect(work({}, { probePid: () => dead() })).toMatchObject({ advancing: true })
+    // …whereas the guard, asking its own stricter question, blocks on exactly this.
+    expect(assess({}, { probePid: () => dead() })).toMatchObject({ live: false, reason: 'evidence-gone' })
+  })
+
+  it('every probe silent → NOT advancing, and the summary names what went quiet', () => {
+    const a = work({}, { probePid: () => dead(), refTipAt: () => NOW - 60 * 60_000 })
+    expect(a).toMatchObject({ declared: true, advancing: false, reason: 'no-progress' })
+    expect(a.summary).toMatch(/no commit for 60 min/)
+    expect(a.summary).toMatch(/process-gone/)
+  })
+
+  it('work that NO PROBE CAN ANSWER is treated as no evidence, never as proof', () => {
+    const a = work({ evidence: [{ kind: 'vibes', label: 'the agent is surely fine' }] })
+    expect(a).toMatchObject({ advancing: false, reason: 'unanswerable' })
+    // …and an unanswerable item neither blocks nor carries an answerable one: the
+    // decision is made on what CAN be checked.
+    const mixed = work({ evidence: [{ kind: 'vibes' }, { kind: 'branch', ref: 'feat/389-a' }] })
+    expect(mixed).toMatchObject({ advancing: true, reason: 'advancing' })
+  })
+
+  it('an empty or malformed declaration says nothing', () => {
+    expect(work({ evidence: [] })).toMatchObject({ advancing: false, reason: 'no-evidence' })
+    expect(assessOwnerWork({ declaration: null, lock: lock(), now: NOW })).toMatchObject({ reason: 'no-declaration' })
+    expect(assessOwnerWork({ declaration: { sessionId: SID }, lock: lock(), now: NOW })).toMatchObject({
+      reason: 'no-declaration',
+    })
+    expect(assessOwnerWork({ declaration: declaration(), lock: null, now: NOW })).toMatchObject({ reason: 'no-lock' })
+  })
+
+  it('only the LOCK OWNER’s declaration counts — a stranger’s proves nothing', () => {
+    const a = assessOwnerWork({
+      declaration: declaration({ sessionId: 'someone-else', pid: 5, pidStartedAt: 1 }),
+      lock: lock(),
+      now: NOW,
+      ...probes(),
+    })
+    expect(a.advancing).toBe(false)
+    expect(a.reason).toMatch(/^not-owners:/)
+  })
+
+  it('…but a session id renamed by a COMPACTION still owns it, resolved on the process', () => {
+    const a = assessOwnerWork({
+      declaration: declaration({ sessionId: 'pre-compaction' }),
+      lock: lock({ sessionId: 'post-compaction' }),
+      now: NOW,
+      ...probes(),
+    })
+    expect(a).toMatchObject({ advancing: true, declared: true })
+  })
+
+  it('AN AGED DECLARATION STILL PROVES PROGRESS, but no longer licenses a stall verdict', () => {
+    // The asymmetry is the whole design: evidence recency decides "is it moving"
+    // (an agent that is still committing is still building, whatever the
+    // paperwork's timestamp says), while only a CURRENT declaration may tighten
+    // the wedge bound — a stale one says nothing about what the session is doing
+    // now, and it may well be inside one long verification run.
+    const old = { at: NOW - LAUNCHER_WORK_MAX_AGE_MS - 60_000 }
+    expect(work(old)).toMatchObject({ advancing: true, declared: false })
+    expect(work(old, { probePid: () => dead(), refTipAt: () => null })).toMatchObject({
+      advancing: false,
+      declared: false,
+      reason: 'expired',
+    })
+  })
+
+  it('a declaration from the FUTURE is a clock this cannot reason about → not current', () => {
+    expect(work({ at: NOW + 60_000 })).toMatchObject({ declared: false })
+  })
+
+  it('the declaration TIMESTAMP is passed through, so the launcher can ask whose last word it was', () => {
+    // `assessOwner` needs it for the second question (four-eyes finding 1.1): a
+    // heartbeat NEWER than the declaration proves the session went on working
+    // after declaring, which makes the declaration leftover paperwork.
+    const at = NOW - 7 * 60_000
+    expect(work({ at })).toMatchObject({ declaredAt: at })
+    expect(work({ at, evidence: [] })).toMatchObject({ declaredAt: at, reason: 'no-evidence' })
+    expect(work({ at, evidence: [{ kind: 'vibes' }] })).toMatchObject({ declaredAt: at, reason: 'unanswerable' })
+    // Nothing to time-stamp → null, never a fabricated moment.
+    expect(assessOwnerWork({ declaration: null, lock: lock(), now: NOW }).declaredAt).toBe(null)
+    expect(assessOwnerWork({ declaration: declaration(), lock: null, now: NOW }).declaredAt).toBe(null)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// THE STALL VERDICT MUST BE REACHABLE — AND REACHABLE BY A LAUNCHER THAT ONLY
+// LOOKS EVERY FIFTEEN MINUTES (second four-eyes review, 28.07.2026, finding A).
+//
+// `work-stalled` was DEAD CODE in production, and every unit test above it was
+// green, because those tests hand a `work` object straight to `assessOwner` —
+// `{ declared: true, declaredAt: heartbeat - 1000 }` at an age of 91 minutes,
+// which is a shape `assessOwnerWork` cannot produce. Three constants made it
+// impossible: a declaration stopped counting as `declared` at 45 minutes, the
+// stall bound needed 90 minutes of heartbeat silence, and `lastWord` demanded the
+// heartbeat land within two minutes of the declaration — which pins the two ages
+// to the SAME number. It cannot be above 90 and below 45 at once.
+//
+// So this block refuses hand-crafted `work` objects entirely. It builds ONE frozen
+// declaration, ONE lock whose heartbeat is the declare command's own PostToolUse,
+// and drives the REAL pipeline — `assessOwnerWork` → `assessOwner` — minute by
+// minute across five hours, exactly as the launcher does on each tick.
+describe('assessOwnerWork → assessOwner: a totally frozen session really is read as stalled', () => {
+  const T0 = NOW - 6 * 60 * 60 * 1000 // the moment everything stopped
+  const OWNER_PID = 7777
+  const OWNER_STARTED = T0 - 30 * 60_000
+  const BOOT = T0 - 24 * 60 * 60 * 1000
+
+  // The declare CLI is itself a tool call, so its PostToolUse heartbeat lands
+  // seconds after `declaration.at` and nothing follows it. THIS is what a real
+  // stall looks like — and it is the shape the old tests could not express.
+  const DECLARED_AT = T0
+  const CLAIMED_AT = DECLARED_AT + 5000
+
+  const lock = (over = {}) => ({
+    sessionId: SID,
+    claimedAt: CLAIMED_AT,
+    pid: OWNER_PID,
+    pidStartedAt: OWNER_STARTED,
+    ...over,
+  })
+  const ownerProbe = { exists: true, startedAt: OWNER_STARTED }
+  const frozen = {
+    v: 1,
+    sessionId: SID,
+    pid: OWNER_PID,
+    pidStartedAt: OWNER_STARTED,
+    at: DECLARED_AT,
+    waitingOn: 'the delegated agent for point 402',
+    evidence: [
+      { kind: 'branch', ref: 'feat/402-progress-not-age', label: 'the agent' },
+      { kind: 'worktree', path: 'C:/repo/.claude/worktrees/agent-402', label: 'the agent' },
+    ],
+  }
+  // Everything the declaration names went quiet three minutes BEFORE the freeze
+  // and never moves again. The owner's own process stays alive throughout — that
+  // is the whole difficulty: a wedged session looks exactly like a working one.
+  const dead = {
+    probePid: () => ({ exists: true, startedAt: OWNER_STARTED }),
+    refTipAt: () => T0 - 3 * 60_000,
+    worktreeActiveAt: () => T0 - 3 * 60_000,
+    mtimeOf: () => T0 - 3 * 60_000,
+  }
+
+  /** One launcher tick, driven end to end. No `work` object is ever written here. */
+  const tick = (minute, { lockOver = {}, probes = dead, ...over } = {}) => {
+    const now = T0 + minute * 60_000
+    const l = lock(lockOver)
+    const work = assessOwnerWork({ declaration: frozen, lock: l, now, ...probes, ...over })
+    return { work, verdict: assessOwner(l, { now, bootTime: BOOT, probe: ownerProbe, work }) }
+  }
+  /** Every minute of the first five hours at which the launcher would say "stalled". */
+  const stalledMinutes = (opts = {}) => {
+    const out = []
+    for (let m = 0; m <= 300; m++) if (tick(m, opts).verdict.reason === 'work-stalled') out.push(m)
+    return out
+  }
+
+  it('IS REACHABLE AT ALL — the freeze is caught, and near the stall bound, not hours later', () => {
+    const hits = stalledMinutes()
+    expect(hits.length, 'work-stalled never fires on the real pipeline — the feature is dead code').toBeGreaterThan(0)
+    // First fire at the stall bound (the heartbeat trails the declaration by 5 s,
+    // so it crosses one minute later), and long before the four-hour valve.
+    expect(hits[0]).toBe(Math.round(WORK_STALL_MS / 60_000) + 1)
+    expect(hits[0] * 60_000).toBeLessThan(WEDGED_MS)
+    const t = tick(hits[0])
+    expect(t.verdict).toMatchObject({ alive: true, wedged: true, reason: 'work-stalled' })
+    expect(spawnDecision(t.verdict)).toBe('skip-wedged')
+    // The launcher can say WHAT froze, not merely that something did.
+    expect(t.work.summary).toMatch(/feat\/402-progress-not-age/)
+    expect(t.work).toMatchObject({ declared: true, advancing: false, declaredAt: DECLARED_AT })
+  })
+
+  it('…AND REACHABLE ON A 15-MINUTE TICK: no phase of the schedule can step over the band', () => {
+    // Non-empty is not the same as reachable. `WORK_STALL_MS +
+    // WORK_DECLARATION_TOLERANCE_MS` — the minimum that makes the window exist —
+    // opens a band barely two minutes wide, and the launcher looks once per
+    // LAUNCHER_TICK_MS: seven schedules in eight would miss it and fall through to
+    // the four-hour valve, which IS the reported bug. So every possible phase of
+    // the tick schedule must hit the band.
+    const hits = new Set(stalledMinutes())
+    const tickMin = Math.round(LAUNCHER_TICK_MS / 60_000)
+    for (let phase = 0; phase < tickMin; phase++) {
+      const seen = []
+      for (let m = phase; m <= 300; m += tickMin) if (hits.has(m)) seen.push(m)
+      expect(seen.length, `a launcher ticking at phase ${phase} min never sees the stall`).toBeGreaterThan(0)
+    }
+    // Stated as the invariant, so a future narrowing of the window fails here too.
+    expect(LAUNCHER_WORK_MAX_AGE_MS - WORK_STALL_MS).toBeGreaterThanOrEqual(2 * LAUNCHER_TICK_MS)
+  })
+
+  it('THE REGRESSION WITNESS: asked with the GUARD’s window, the same freeze is never stalled', () => {
+    // This is the bug, reproduced. `IN_FLIGHT_MAX_AGE_MS` is the right answer to
+    // the guard's question ("may a turn end ride on this?") and the wrong one to
+    // the launcher's, and asking it here silently disabled the feature.
+    expect(stalledMinutes({ maxAgeMs: IN_FLIGHT_MAX_AGE_MS })).toEqual([])
+    expect(LAUNCHER_WORK_MAX_AGE_MS).toBeGreaterThan(IN_FLIGHT_MAX_AGE_MS)
+  })
+
+  it('a healthy wait is still never accused, however long the agent takes', () => {
+    // Same aging paperwork, but the agent keeps committing: its branch tip is
+    // always a minute old, so not one of the five hours' ticks accuses it.
+    const reasons = new Set()
+    for (let m = 0; m <= 300; m++) {
+      const now = T0 + m * 60_000
+      reasons.add(tick(m, { probes: { ...dead, refTipAt: () => now - 60_000 } }).verdict.reason)
+    }
+    expect(reasons).toEqual(new Set(['fresh-heartbeat', 'work-advancing']))
+  })
+
+  it('and a heartbeat that POSTDATES the declaration still disarms the verdict entirely', () => {
+    // The replayed near-kill: declare, agent finishes, merge, start a LARGE
+    // regression without clearing the declaration. `lastWord` — not the age cap —
+    // is what protects that session, which is why widening the age cap is safe.
+    expect(stalledMinutes({ lockOver: { claimedAt: DECLARED_AT + 12 * 60_000 } })).toEqual([])
+  })
+
+  it('and no evidence may revive a DEAD process, whatever the paperwork says', () => {
+    const now = T0 + 120 * 60_000
+    const l = lock()
+    const work = assessOwnerWork({ declaration: frozen, lock: l, now, ...dead, refTipAt: () => now - 60_000 })
+    expect(work.advancing).toBe(true)
+    const v = assessOwner(l, { now, bootTime: BOOT, probe: { exists: false, startedAt: null }, work })
+    expect(v).toMatchObject({ alive: false, reason: 'pid-dead' })
+  })
+})
+
+// ---------------------------------------------------------------------------
+// EVIDENCE THAT CANNOT GO QUIET (four-eyes review 28.07.2026, finding 1.2).
+// Recency made existence-only evidence honest, but nothing restricted WHAT may
+// be named — and a declaration naming something eternally fresh suppressed BOTH
+// the wedge verdict and the silent-owner notification, leaving the session less
+// observed than declaring nothing at all.
+describe('selfReferentialEvidence (what may never be declared)', () => {
+  const ROOT = 'C:/Users/x/repo'
+
+  it('refuses the repo root as a worktree — the session’s own git commands keep it fresh', () => {
+    const found = selfReferentialEvidence({
+      evidence: [{ kind: 'worktree', path: ROOT }],
+      repoRoot: ROOT,
+      currentBranch: 'main',
+    })
+    expect(found).toHaveLength(1)
+    expect(found[0]).toMatchObject({ kind: 'worktree' })
+    expect(found[0].why).toMatch(/this checkout itself/)
+  })
+
+  it('…however it is spelled: separators, trailing slash and case all normalise', () => {
+    for (const path of ['C:\\Users\\x\\repo', 'C:/Users/x/repo/', 'c:/users/X/REPO']) {
+      expect(selfReferentialEvidence({ evidence: [{ kind: 'worktree', path }], repoRoot: ROOT })).toHaveLength(1)
+    }
+  })
+
+  it('refuses main (and HEAD, and origin/main) as a branch ref', () => {
+    for (const ref of ['main', 'origin/main', 'refs/heads/main', 'HEAD']) {
+      const found = selfReferentialEvidence({ evidence: [{ kind: 'branch', ref }], repoRoot: ROOT })
+      expect(found, ref).toHaveLength(1)
+      expect(found[0].why).toMatch(/every merge/)
+    }
+  })
+
+  it('…and every OTHER spelling of the same two refs (second review, finding B)', () => {
+    // All four were declared LIVE by the reviewer, all four slipped through, and
+    // all four then probed eternally fresh. `@` is git's own alias for HEAD;
+    // `heads/…` is the half-qualified form the `refs/` strip never reached; and
+    // `…@{0}` is a revision expression that git will not even give a symbolic
+    // name to, so no resolver can catch it and this string rule must.
+    for (const ref of ['@', 'heads/main', 'main@{0}', 'refs/heads/main@{1}', 'MAIN', 'origin/MAIN']) {
+      expect(
+        selfReferentialEvidence({ evidence: [{ kind: 'branch', ref }], repoRoot: ROOT }),
+        ref,
+      ).toHaveLength(1)
+    }
+    // The own-branch rule normalises the same way, whichever side is spelled long.
+    expect(
+      selfReferentialEvidence({
+        evidence: [{ kind: 'branch', ref: 'heads/feat/402-x' }],
+        repoRoot: ROOT,
+        currentBranch: 'feat/402-x',
+      }),
+    ).toHaveLength(1)
+  })
+
+  it('…but a real agent branch that merely BEGINS with those letters is untouched', () => {
+    // The strips are anchored, so nothing legitimate is swallowed by them.
+    for (const ref of ['feat/main-menu', 'heads-up/402', 'origin-mirror/feat/x', 'mainline/402']) {
+      expect(
+        selfReferentialEvidence({ evidence: [{ kind: 'branch', ref }], repoRoot: ROOT, currentBranch: 'main' }),
+        ref,
+      ).toEqual([])
+    }
+  })
+
+  it('refuses the declaring checkout’s OWN current branch', () => {
+    const found = selfReferentialEvidence({
+      evidence: [{ kind: 'branch', ref: 'feat/402-progress-not-age' }],
+      repoRoot: ROOT,
+      currentBranch: 'feat/402-progress-not-age',
+    })
+    expect(found).toHaveLength(1)
+    expect(found[0].why).toMatch(/own current branch/)
+  })
+
+  it('ALLOWS what a delegated agent actually touches — the common, correct declaration', () => {
+    expect(
+      selfReferentialEvidence({
+        evidence: [
+          { kind: 'branch', ref: 'feat/403-something' },
+          { kind: 'worktree', path: `${ROOT}/.claude/worktrees/agent-1` },
+          { kind: 'pid', pid: 900 },
+          { kind: 'log', path: `${ROOT}/.claude/run.log` },
+        ],
+        repoRoot: ROOT,
+        currentBranch: 'main',
+      }),
+    ).toEqual([])
+  })
+
+  it('an unknown current branch refuses nothing extra, and bad input refuses nothing at all', () => {
+    expect(
+      selfReferentialEvidence({ evidence: [{ kind: 'branch', ref: 'feat/x' }], repoRoot: ROOT, currentBranch: null }),
+    ).toEqual([])
+    expect(selfReferentialEvidence()).toEqual([])
+    expect(selfReferentialEvidence({ evidence: null })).toEqual([])
+    expect(selfReferentialEvidence({ evidence: [{ kind: 'branch', ref: '' }], repoRoot: ROOT })).toEqual([])
+  })
+})
+
+// ---------------------------------------------------------------------------
+// WHAT IS STORED IS WHAT THE LAUNCHER WILL PROBE (second four-eyes review,
+// 28.07.2026, finding B). The refusal above can only compare NAMES, and the CLI
+// used to hand it whatever was typed: a raw path that `normPath` cleans up but
+// never RESOLVES, and a raw ref whose spelling only git can settle. The reviewer
+// drove `--worktree .` from the repo root, `<root>/.`, `<root>/../hoa`,
+// `--branch @` and `--branch heads/main` live — all five slipped past the refusal
+// and then probed eternally fresh, which is worse than declaring nothing at all
+// (a declaration also suppresses the launcher's silent-owner report).
+describe('the CLI records RESOLVED evidence, not what was typed', () => {
+  it('absPath resolves a relative path against the cwd — the launcher probes from elsewhere', () => {
+    expect(absPath('.')).toBe(resolve('.'))
+    expect(absPath('./scripts/..')).toBe(resolve('.'))
+    expect(absPath('../hoa/..')).toBe(resolve('..'))
+    const abs = resolve('scripts')
+    expect(absPath(abs)).toBe(abs)
+    // An empty value stays empty, so it keeps failing as "no path" rather than
+    // quietly becoming the working directory.
+    expect(absPath('')).toBe('')
+    expect(absPath(undefined)).toBe('')
+  })
+
+  it('…so every spelling of the repo root IS recognised as the repo root', () => {
+    const root = resolve(REPO_ROOT)
+    for (const typed of [root, `${root}/.`, `${root}/../${basename(root)}`, `${root}/scripts/..`]) {
+      const found = selfReferentialEvidence({
+        evidence: [{ kind: 'worktree', path: absPath(typed) }],
+        repoRoot: REPO_ROOT,
+      })
+      expect(found, typed).toHaveLength(1)
+    }
+  })
+
+  it('resolveRefName asks GIT what a ref names, so an alias cannot hide behind a spelling', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-ref-'))
+    const git = (...args) =>
+      execFileSync('git', args, { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
+    try {
+      git('init', '-b', 'main')
+      git('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '--allow-empty', '-m', 'x')
+      const at = (ref) => resolveRefName(ref, { cwd: dir })
+      // The two live bypasses, resolved to names the refusal already knows.
+      expect(at('@')).toBe(at('HEAD'))
+      expect(at('heads/main')).toBe('refs/heads/main')
+      expect(at('main')).toBe('refs/heads/main')
+      // …and refused once resolved, which is what the CLI now stores.
+      for (const typed of ['@', 'heads/main', 'main']) {
+        expect(
+          selfReferentialEvidence({ evidence: [{ kind: 'branch', ref: at(typed) ?? typed }], repoRoot: REPO_ROOT }),
+          typed,
+        ).toHaveLength(1)
+      }
+      // Unresolvable input answers null rather than guessing — the caller then
+      // keeps what was typed, where the string rules in normRef still apply and
+      // the up-front evidence check fails it as a branch that is not there.
+      expect(at('no-such-ref')).toBe(null)
+      expect(at('main@{0}')).toBe(null) // a revision expression has no symbolic name
+      expect(at('')).toBe(null)
+      // Never hand git something it reads as an option (`--help` opens a pager).
+      expect(at('--help')).toBe(null)
+      expect(at('-v')).toBe(null)
+      // A real agent branch resolves and is NOT refused.
+      git('branch', 'feat/403-x')
+      expect(at('feat/403-x')).toBe('refs/heads/feat/403-x')
+      expect(
+        selfReferentialEvidence({ evidence: [{ kind: 'branch', ref: at('feat/403-x') }], repoRoot: REPO_ROOT }),
+      ).toEqual([])
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 })

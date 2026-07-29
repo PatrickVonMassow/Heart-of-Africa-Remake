@@ -269,6 +269,122 @@ with nothing red to notice it, so the shape is pinned by a test that runs the CL
 with `VERIFY_LOAD_FORCE=busy` (asynchronously — a `spawnSync` inside a vitest
 worker starves its own `onTaskUpdate` RPC and reddens the whole run).
 
+### The gate also counts HOW MUCH ran (point 404)
+
+A red run is not the only broken run. On 28.07.2026 one unit run reported **3546
+passing tests while 34 test FILES had failed to load**; the run an hour earlier
+had **4214 tests over 153 files**. A damaged dependency tree — a platform package
+missing its entry file — makes whole suites unloadable, and an unloadable suite
+does not fail: it VANISHES from the totals, so the report reads *greener* than a
+red run. The same night the tree was destroyed outright (`node_modules` in the
+main tree went empty when stale worktrees were removed, and the build failed with
+"tsc is not recognized") — the same failure class, one step louder. Nothing in the
+chain compared the number of EXECUTED files with the last known state, so every
+gate waved it through; it was noticed only because a review agent could not start
+the tests either and said so.
+
+So the gate now captures the unit step's output as well as printing it, reads its
+`Test Files` / `Tests` summary, and compares the file count with the **last green
+run's own count** — never a hard-coded number, which would rot with every added
+suite. The baseline lives in `.claude/pre-push-gate-state.json` (git-ignored, per
+CHECKOUT: each worktree has its own dependency tree). Both numbers appear in the
+gate's own line — `unit ran 153 files / 4214 tests` — so the size of the evidence
+base is visible on a green push too, not only when it blocks.
+
+#### The discriminator is on DISK, not in the memory
+
+The first version of this gate blocked **once** and recorded the lower count as
+it blocked, telling the pusher to run it again. That waves through exactly the
+failure it exists to catch: a damaged tree drops 153 files to 119, push #1
+blocks and records 119, push #2 — the tree *still* damaged, 34 suites still
+invisible — passes, because 119 === 119. Nothing distinguished "understood and
+deliberate" from "retried without fixing", and in this repository most pushes
+come from autonomous agents whose natural reaction to a red gate is `npm ci` and
+another push (four-eyes finding, verified at the extreme: a shrink to zero
+recorded a baseline of zero, and the next zero-file run passed).
+
+So the executed count is compared with the **checkout** first. A suite genuinely
+DELETED leaves the tree; a suite that could not LOAD is still lying in it. The
+gate walks the roots of vitest's own include globs (`src/`, `scripts/` — mirrored
+in `TEST_FILE_PATTERNS` and pinned identical to `vitest.config.ts` by a test) and
+counts the files present; `node_modules` is never descended, because the one
+moment this number matters is the moment that directory is the broken thing.
+
+| This run | Verdict |
+|---|---|
+| more files than the last green run | passes, baseline advances |
+| the same | passes |
+| fewer files, and **just as many on disk** | passes — the suites are gone from the tree; the baseline follows the deletion down, no second push needed |
+| **files on disk that did NOT run** | **blocks**, naming the difference — regardless of the baseline, and records nothing |
+| fewer files, tree **not countable** | **blocks** — it is unknown whether they were deleted or failed to load; records nothing |
+| no baseline recorded | passes and records — *unless* files on disk did not run, which is how a fresh clone off an already-damaged tree is stopped from recording a poisoned-low first baseline |
+| summary unreadable | passes, compares nothing, records nothing |
+| the unit step itself was red | already blocked; its count is not taken as a baseline |
+
+A block is therefore **not** cleared by re-running: it is cleared by repairing the
+tree, or by pushing once with `HOA_ACCEPT_TEST_FILE_DROP=1`, the deliberate,
+named second escape hatch — recorded in the state file as an `acknowledgedDrop`
+block (`from`, `onDisk`, `at`, and `from: null` where there was no baseline at
+all) so a waved-through drop stays auditable rather than looking like an ordinary
+green. The state file is written through `scripts/atomic-write.mjs`, so a torn
+write cannot garble the JSON into "no baseline at all".
+
+The comparison, the glob translation, the parse (colour escapes and all) and the
+state shape are pure in `pre-push-gate-core.mjs` and pinned in
+`pre-push-gate-core.test.mjs`, which also greps the wrapper to prove it actually
+asks the question; a garbled summary yields nulls and never throws.
+
+#### When a green run exits non-zero
+
+The parse is also what lets the gate recognise a runner that **died** rather than
+a test that failed: a complete summary naming no failure, beside a non-zero exit.
+Measured three times on 28.07.2026 — every test passing, exit 1, on a
+`[vitest-worker]: Timeout calling "onTaskUpdate"` under constant load from
+parallel agents. It still blocks (a run that could not finish proved nothing),
+but the verdict now names what was *observed* instead of asserting a cause. The
+old line "failed TWICE — the load was not the cause" was simply false: the load
+never went away between the two runs.
+
+### The COMMIT-MSG hook: a rescue must not mail the user (point 408)
+
+The third versioned hook (`scripts/git-hooks/commit-msg`, wired by the same
+`npm install` as the other two) runs `commit-scope-guard.mjs --message` — the
+message half of the guard whose file half runs at `pre-commit`. It exists
+because of one night on `feat/300-gait-matches-speed`: a delegated agent was
+killed mid-build, its uncommitted work was committed and pushed at once
+(durability first — nothing may stay only local), CI ran on that half-finished
+state, went red, and mailed the repository owner. The follow-up commit was
+green and `main` was never red; the whole cost was one failure mail for a state
+nobody claimed was finished.
+
+The fix is a commit-message convention, not a workflow change. A RESCUE commit
+carries `[skip ci]` in its **subject**, which GitHub Actions honours for push
+events, and a `Rescue: <what was interrupted>` trailer:
+
+```
+Keep the interrupted gait work [skip ci]
+
+Rescue: agent killed mid-build; the next commit finishes and runs CI.
+```
+
+**Both halves or neither** — that is the whole design. A rescue trailer without
+the marker still mails the user, so it is refused naming the marker; a bare
+`[skip ci]` silently skips a real gate, so it is refused naming the trailer —
+and with it every other spelling GitHub honours, anywhere in the message:
+`[ci skip]`, `[no ci]`, `[skip actions]`, `[actions skip]`, and the unbracketed
+`skip-checks: true` trailer that reads like nothing at all. Only the SUBJECT
+marker satisfies the rescue half, because that is the placement the convention
+states and the one a log line shows. An ordinary message is untouched, and a garbled or
+unreadable one blocks nothing: the decision is `evaluateCommitMessage` in
+`commit-scope-guard-core.mjs`, pure, fail-open and pinned in
+`commit-scope-guard-core.test.mjs`, which also drives the guard over a rejected
+and an accepted message so the wiring is proven by running it.
+
+Durability is untouched: the commit still exists, still pushes, still survives
+the session. Only the run is skipped — and the NEXT commit on that branch, the
+one that finishes the work, carries neither marker nor trailer and runs CI
+normally.
+
 ## Triaging a RED run (point 294)
 
 A red is now read, not asserted. Two signals, both decided in the pure module

@@ -38,6 +38,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 26.07. | Kosten-vs-Rate-Korrektur bei der Parallelität; Commit-Umfangs-Wächter |
 | 27.07. | Gemessene Verbrauchstreiber → Kurzbrief je Auftrag statt Dokumentensuche; Board-Gate **vor** der Arbeit; Vorprüfung der Wächter |
 | 28.07. | Fünfeinhalb Stunden Stillstand → die Grenze wird **genommen**, nicht nur erlaubt; erste vollständig beobachtete Übergabe; drei Messfenster schmaler als das Gemessene (§3.44) |
+| 28.07. | Board dreimal am selben Handgriff zerbrochen → Strukturprüfung **vor** die Veröffentlichung (§3.45); 3546 grüne Tests über einer stillschweigend geschrumpften Menge (§3.46) |
 
 Muster: Ab dem 22.07. explodiert die Commit-Rate (Delegation) — und genau dann häufen sich die Infrastruktur-Vorfälle. **Skalierung der Autonomie erzeugt eine eigene Problemklasse, die die Feature-Arbeit zeitweise überholt.**
 
@@ -134,7 +135,9 @@ Ein Kantenenergie-Check des Bodens fiel, nachdem SSAO per Nutzerentscheid im Sta
 
 Ein zweites Modell kam anfangs nur bei Audits und bei Festgefahrenheit. Der Nutzer verallgemeinerte das: vor dem Bau **Schwierigkeit × Kritikalität** einschätzen und bei hoher Einstufung — besonders bei Mechanismen, die immer funktionieren müssen — Plan *und* Ergebnis vom anderen Modell prüfen lassen.
 
-**Lehre:** Modell-Diversität ist kein Audit-Sonderfall, sondern eine **Funktion der Kritikalität** — und hält, wie alles hier, nur als Mechanismus.
+Die Gegenrichtung wurde später genauso wichtig: Eine Gegenprüfung kostet ungefähr so viel wie die Arbeit selbst und verdoppelt die Wartezeit — über jede Kleinigkeit gestülpt, wird sie zur Formalie, die niemand mehr ernst nimmt. Die Grenze zieht nicht die Schwierigkeit, sondern die **Sichtbarkeit des Fehlers**: Was den Ablauf steuert oder Arbeit vernichten kann (Wächter, Sperren, Nebenläufigkeit, Speichern/Laden, Migrationen, Veröffentlichungen), wird immer gegengeprüft; was ein schneller Test sofort zeigt (Texte, Balancewerte, Kulissen, Umbenennungen), nie. Der Nutzen ist an der richtigen Stelle real: An einem Abend mit drei Gegenprüfungen fand das zweite Modell jedes Mal etwas Substanzielles — einen Zustandspfad, der beim Aufräumen mitgelöscht worden wäre, eine Prüfung, die im Fehlerfall die riskante statt der vorsichtigen Antwort gab, und einen kaputten Abhängigkeitsbaum, den der Testlauf als „grün" gemeldet hatte (3.46). Keiner dieser Funde war eine Geschmacksfrage.
+
+**Lehre:** Modell-Diversität ist kein Audit-Sonderfall, sondern eine **Funktion der Kritikalität** — und hält, wie alles hier, nur als Mechanismus. Ihre Obergrenze ist dieselbe Funktion von unten: Wo der Fehler sofort auffällt, sind zweite Augen verschwendete Zeit.
 
 ### 3.14 Fast-Gate ≠ Release-Gate
 
@@ -398,6 +401,70 @@ Alle drei Instrumente sind einzeln vernünftig gebaut, alle drei sind pur getest
 
 **Lehren:** Das Fenster einer Messung muss aus dem **Gegenstand** abgeleitet sein, nicht aus der Bequemlichkeit der Abfrage — die Frage „wurde in den letzten 90 Minuten ein Punkt geschlossen?" ist eine Zeitfrage und darf nicht als Anzahlfrage gestellt werden, und „war die Maschine während des Laufs belastet?" ist eine Frage über den Lauf, nicht über den Moment danach. Zweitens: Bei jeder Heuristik ist zu benennen, in welche Richtung sie irrt; irrt sie zur Beruhigung, braucht sie einen zweiten, unabhängigen Beleg. Drittens, als Gegenprobe zu §3.40 und §3.43: Der eine echte Durchlauf hat hier nicht nur die Kette bewiesen, sondern auch das Prüfgerät blamiert — wer die Kette nie durchspielt, hält beides für in Ordnung.
 
+### 3.45 Die Prüfung stand hinter der Auslieferung — und derselbe Griff brach dreimal
+
+Am Abend des 28.07.2026 zerbrach das Board dreimal an derselben Technik: Um Karten umzusortieren, wurde der Abschnitt über den **Fließtext** gesucht („von der Überschrift bis zum nächsten `<h2>`"), herausgeschnitten und wieder zusammengesetzt. Jedes Mal wanderte dabei ein schließendes Tag, und der Browser hängte die folgenden Karten in den falschen Container. Beim dritten Mal sah der Nutzer das Ergebnis auf seinem Bildschirm und fragte, warum das Design geändert worden sei.
+
+Zwei Befunde stecken darin, und der zweite ist der wichtigere.
+
+Der erste ist die Wiederholung. Nach dem ersten Bruch wurde repariert und weitergemacht — mit derselben Technik. Nach dem zweiten wieder. Eine Fehlerklasse, die sich beim ersten Auftreten als Ungeschick liest, ist beim dritten ein Befund über das Werkzeug: Eine HTML-Datei, die mit Textersetzungen gepflegt wird, geht kaputt, und zwar nicht gelegentlich, sondern verlässlich. Das Vorsatz-Gegenmittel („ich mache das nicht mehr") ist wertlos, wie der Nutzer sofort feststellte: Es überlebt die nächste Kontextkompression nicht.
+
+Der zweite Befund ist die Reihenfolge. Die bestehenden Wächter haben **jeden** der drei Brüche gefunden — die Abschnittsprüfung, die Karten-Vollständigkeit, die Struktur der Überschriften. Nur laufen sie bei `--synced`, also **nach** dem Veröffentlichen. Die Kette lautete: Datei ändern → veröffentlichen → prüfen → reparieren. Der Leser sah dazwischen den kaputten Stand. Die Prüfung war nicht zu schwach, sie stand an der falschen Stelle — dieselbe Form wie §3.40, nur eine Ebene konkreter: dort kam die Prüfung zu spät für die Entscheidung, hier für die Auslieferung.
+
+Das Gegenmittel ist entsprechend keine Regel, sondern eine Verschiebung: Die Strukturprüfung sitzt jetzt **vor** der Kopie, die das Veröffentlichen aufgreift (`scripts/board-structure-core.mjs`, aufgerufen in `dashboard-publish.mjs`). Ein zerbrochenes Board ist damit nicht mehr veröffentlichbar — unabhängig davon, wer es zerbrochen hat und ob sich jemand an die verbotene Technik erinnert. Die drei realen Bruchformen sind als Testfälle festgeschrieben, und die Gegenprobe wurde geführt: Der künstlich wiederhergestellte Bruch wird abgewiesen, das intakte Board geht durch.
+
+**Lehren:** Erstens, eine Fehlerklasse, die sich zum dritten Mal zeigt, ist keine Unachtsamkeit mehr — sie ist eine Aussage über das benutzte Werkzeug, und die Antwort darauf ist, das Werkzeug unmöglich zu machen, nicht sich vorzunehmen, es zu meiden. Zweitens: Bei jeder Prüfung ist zu fragen, **welches Ereignis** sie verhindern soll, und sie gehört unmittelbar davor — eine Prüfung hinter der Auslieferung ist eine Fehlermeldung, keine Absicherung.
+
+### 3.46 Dreitausend bestandene Tests, und die Hälfte lief nie
+
+Am selben Abend beschädigte eine Neuinstallation der Abhängigkeiten den Baum: Einem Plattform-Paket fehlte seine Einstiegsdatei. Der darauf folgende Testlauf meldete **3546 bestandene Tests** — eine große, beruhigende Zahl. Tatsächlich hatten 34 Testdateien gar nicht erst geladen; sie tauchten in der bestandenen Zahl nicht auf, weil sie nie zu Tests wurden. Die Vergleichszahl aus dem Lauf eine Stunde zuvor lautete 4214.
+
+Der Fehler ist derselbe wie in §3.41, aber in seiner tückischsten Form: Nicht ein Ergebnis war kein Beweis, sondern die **Menge**, über die das Ergebnis sprach, war stillschweigend geschrumpft. Ein rotes Testergebnis wird untersucht; ein grünes über einer kleineren Grundgesamtheit wird abgehakt. Bemerkt wurde es hier nicht durch Aufmerksamkeit, sondern weil ein zweites Modell in seiner Prüfung dieselben Tests nicht starten konnte und das **meldete**, statt es als Umgebungsproblem abzutun.
+
+**Lehren:** Eine bestandene Zahl ist nur zusammen mit der Zahl der ausgeführten Dateien eine Aussage — beide gehören in jede Meldung, und ein Rückgang der Dateizahl ist so ernst zu nehmen wie ein Fehlschlag. Und: Wer einen Nebenbefund meldet, den er nicht erklären kann („die Tests starten bei mir nicht"), leistet mehr als der, der ihn wegsortiert.
+
+### 3.47 Die Prüfung, die auf der schnellen Maschine scheitert
+
+Eine Live-Prüfung des Tierschritts meldete „0 Standphasen, schlimmster Wert Unendlich" — und zwar reproduzierbar auf der **ruhigen** Maschine, während sie unter Last grün wurde. Das ist die Umkehrung dessen, was dieses Projekt gelernt hatte (§3.8: ein Rot unter Last ist meist die Last), und deshalb war die erste Deutung falsch. Die Ursache: Die Prüfung verlangte je Messfenster eine feste Mindeststrecke von 0,01 Welteinheiten. Eine Ziege legt in drei Bildern einer schnellen Aufzeichnung 0,008 zurück — jedes der 52 Fenster wurde verworfen. Auf der langsamen Maschine dauern dieselben drei Bilder länger, die Strecke reicht, die Prüfung besteht.
+
+Der Schwesterbefund desselben Abends hat dieselbe Wurzel mit umgekehrtem Vorzeichen: Eine Nachbarprüfung wartete eine feste Wanduhrzeit von 1,2 Sekunden zwischen zwei Aufnahmen und las bei einem Renderer-Stocker zweimal dieselbe Pose — exakt 0,000 Bewegung für alle fünf Silhouetten. Beide Prüfungen unterstellen eine feste Beziehung zwischen Wanduhr und Bildfolge, die es nicht gibt.
+
+**Lehren:** Eine Messschwelle gehört in die Einheit des Gemessenen — Schrittlängen, nicht Meter; gerenderte Bilder, nicht Sekunden. Und eine Prüfung, die **nichts** gemessen hat, muss das laut sagen: Sie meldete „Unendlich", was wie ein katastrophaler Messwert aussieht statt wie eine leere Menge, und hätte in anderer Form auch vakuum-grün werden können. Die Regel aus §3.41 gilt auch für die eigene Messung: Ein Ergebnis ohne Grundgesamtheit ist kein Ergebnis.
+
+### 3.48 Zweimal rot heißt nur dann „nicht die Last", wenn die Last dazwischen weg war
+
+Das Push-Tor wiederholt einen roten Schnelltest einmal und schreibt beim zweiten Rot: *„failed TWICE — the load was not the cause."* In derselben Nacht scheiterte ein Push dreimal an einem Vitest-internen RPC-Zeitüberlauf, während **alle 4219 Tests bestanden** — die Maschine war durchgehend von drei parallelen Zuarbeitern ausgelastet. Der Beweis kam später am selben Abend: Auf der leeren Maschine lief derselbe Push auf Anhieb grün durch.
+
+Die Wiederholung prüft nur dann etwas, wenn sich zwischen den beiden Läufen etwas ändert. Unter konstanter Last misst sie zweimal denselben Zustand und nennt das Ergebnis Beweis.
+
+**Lehre:** Eine Wiederholung ist erst dann ein Ausschlussverfahren, wenn die vermutete Ursache dazwischen **entfernt** wurde. Ein Tor, das Last als Ursache ausschließen will, muss die Last messen (das tut dieses beim Start bereits) und sie in sein Urteil einrechnen — oder ehrlich sagen, was es gesehen hat: alle Tests bestanden, der Prozess endete trotzdem mit einem Fehler.
+
+### 3.49 Aufräumen, das durch eine Verknüpfung hindurchlöscht
+
+Sechsunddreißig verwaiste Arbeitsbäume wurden entfernt — eine reine Hygienemaßnahme, deren Zweck es war, vier wirklich offene Zweige wieder sichtbar zu machen. Dabei verschwand `node_modules` im Hauptbaum vollständig: Die Arbeitsbäume enthielten Verknüpfungen dorthin, und das rekursive Löschen folgte ihnen. Der nächste Build meldete „tsc ist nicht erkannt".
+
+Zwei Dinge haben den Schaden begrenzt. Erstens war er vollständig reparierbar, weil die Sperrdatei im Repository liegt — eine Neuinstallation stellte alles her. Zweitens fiel er **sofort** auf, weil das Push-Tor unmittelbar danach rot schlug; ohne dieses Tor wäre ein kaputter Zustand in den Hauptzweig gegangen. Sehr wahrscheinlich ist das auch die bis dahin ungeklärte Ursache des Vorfalls aus §3.46.
+
+**Lehre:** Eine Löschoperation muss wissen, ob sie einer Verknüpfung folgt. Und: Aufräumarbeit ist kein risikoarmer Nebenschauplatz — sie fasst per Definition Dinge an, die niemand mehr beobachtet.
+
+### 3.50 Der Zustand, den nur die Lücke zwischen zwei Schritten erzeugt
+
+Einen Punkt abzuschließen sind zwei Schreibvorgänge am Board: die fertige Karte ins Archiv, die nächste hochziehen. Zwischen ihnen ist die Sektion „Woran ich gerade arbeite" leer. In dieser Nacht hat der Nutzer diesen Zustand **zweimal innerhalb einer Stunde** erwischt — beide Male, bevor irgendein Wächter etwas sagte, und beide Male mit derselben Frage: „Du arbeitest gerade an nichts?"
+
+Der Schaden blieb nicht bei der Optik. Ein Test prüft, dass die lebende Tafel laufende Arbeit trägt; die Lücke färbte den gesamten Unit-Lauf rot, und das Push-Tor blockierte daraufhin den Merge eines fertigen, sonst grünen Punktes. Beim ersten Mal war die Fehldeutung schon vorbereitet: Die Nacht war voller lastbedingter Rot-Läufe, und dieses Rot sah genauso aus.
+
+Bemerkenswert ist, wer es zuerst gesehen hat: der Zuarbeiter, der an einem ganz anderen Punkt arbeitete, hat die Lücke in seinem Abschlussbericht als eigenen Arbeitsauftrag vorgeschlagen — eine Stunde, bevor sie ein zweites Mal zuschlug.
+
+**Lehren:** Ein Zustand, der nur *zwischen* zwei Schritten existiert, wird von keinem Wächter am Zugende gesehen — er gehört deshalb nicht abgesichert, sondern **unmöglich gemacht**, indem die beiden Schritte ein Schreibvorgang werden. Und: Ein Rot in einer Nacht voller Flimmern ist genau dann gefährlich, wenn es echt ist.
+
+### 3.51 Die Ebene darunter wird erst sichtbar, wenn die darüber gut wird
+
+Nach dem neuen Gang der Tiere meldete der Nutzer binnen einer halben Stunde zwei Kollisionsfehler: ein Tier läuft durch den Zaun, mehrere stehen ineinander. Die naheliegende Vermutung — die neue Animation habe sie verursacht — war falsch, und das ließ sich am Repository belegen: Die Zaun-Kollider, die Kollisionsauflösung und die Bewegungszeile der Tiere sind auf dem Stand VOR dem Gang-Merge zeichenweise identisch; die Auflösung war zuletzt acht Tage zuvor angefasst worden.
+
+Die Fehler waren also alt. Neu war nur, dass man sie sieht: Solange die Tiere über den Boden glitten und mit den Beinen zappelten, fiel ein Durchdringen nicht auf, weil ohnehin nichts glaubwürdig aussah. Sobald sie sichtbar auf ihren Füßen gehen, liest man ein Tier im Zaun sofort als falsch.
+
+**Lehre:** Eine Qualitätsstufe nach oben deckt die nächste Schwäche darunter auf — das ist der Normalfall, kein Rückschritt. Wer nach einer sichtbaren Verbesserung plötzlich mehr Fehlerberichte bekommt, misst nicht Verschlechterung, sondern die neue Auflösung des Blicks. Und die Zuordnung „neu gebaut, also neu kaputt" gehört jedes Mal am Verlauf geprüft, bevor man sie glaubt.
+
 ---
 
 ## 4. Die Guards als Immunsystem
@@ -487,7 +554,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Dienstag, 28.07.2026, 16:16 · Quellen-Fingerprint: `29f1a1831b26…`
+Zuletzt aktualisiert: Mittwoch, 29.07.2026, 03:36 · Quellen-Fingerprint: `1fd02526ae73…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -498,19 +565,19 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | User's rulings on the point-205 plausibility audit (what to fix vs. accept, 21.07.2026) | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | For code audits/reviews, mix in a DIFFERENT model than the one that wrote the code — different blind spots find more bugs | 1 | niedrig | model-guard.mjs | ✔ Mechanismus |
 | The hardened batch-autonomy system — never idle-stop, resurrect after crash/reboot, signal on failure, never block on the user | 1 | niedrig | batch-autostart.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs | ✔ Mechanismus |
-| The private claude.ai batch dashboard — its BINDING four-section structure (never change without explicit user go) and update discipline | 7 | hoch | batch-autostart.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs, dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
+| The private claude.ai batch dashboard — its BINDING four-section structure (never change without explicit user go) and update discipline | 7 | hoch | batch-autostart.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs, dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
 | RETIRED 27.07.2026 — this was a 16.07. work-in-progress handoff, not a rule; what survives is the research foundation, the accuracy principle and the §13-placeholder carve-out | 3 | mittel | batch-autostart.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs | ✔ Mechanismus |
-| The batch dashboard may leave the private claude.ai artifact for a publicly readable transport — privacy is no longer a constraint | 1 | niedrig | board-first-guard.mjs, dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
+| The batch dashboard may leave the private claude.ai artifact for a publicly readable transport — privacy is no longer a constraint | 1 | niedrig | board-first-guard.mjs, dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
 | Delegate via `node scripts/point-brief.mjs <N>` — the AGENT generates its own brief; board changes go through `scripts/board.mjs`; expect 529 agent deaths and commit-per-step | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Jede Chat-Antwort mit einem Zeitstempel nach deutscher Zeit (Europe/Berlin, DST-korrekt) beginnen | 11 | hoch | timestamp-guard.mjs | ✔ Mechanismus |
 | CLAUDE.md §7.1 references design.md instead of retelling it; future doc edits must preserve the verifiable conditions, script mappings, numbering and checked numbers | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Autonomously insert a full CLOSING cycle (regression + dead-code/stale-doc cleanup + .md audit) when warranted — after extensive rework or many small completed tasks — without waiting for the user to ask | 1 | niedrig | closing-guard.mjs | ✔ Mechanismus |
 | hoa commit messages must not reference the TASKS point (\"Point N\") | 1 | niedrig | commit-scope-guard.mjs | ✔ Mechanismus |
-| The batch dashboard's Warteschlange must ALWAYS list every open TASKS point — no open point may be missing | 1 | niedrig | dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs, queue-order-guard.mjs | ✔ Mechanismus |
-| Every dashboard card's body must speak STRICTLY about its own point — never report on or reference another TASKS point inside a card | 1 | niedrig | batch-singleton.mjs, dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
-| hoa dashboard \"Woran ich gerade arbeite\" holds ONE CARD PER parallel point being actively worked (not a single card); cards move from Warteschlange into it (possibly several at once); a point is NEVER in both sections at once | 1 | niedrig | dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
-| Never put a hardcoded `open` attribute on a dashboard `<details>` card — default all closed; localStorage persistence keeps user-opened cards open across refresh | 1 | niedrig | batch-autostart.mjs, dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
-| The batch dashboard \"Von dir zu klären\" section holds ONLY genuine user decisions — no done items, no announcements for in-progress work | 1 | niedrig | dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
+| The batch dashboard's Warteschlange must ALWAYS list every open TASKS point — no open point may be missing | 1 | niedrig | dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs, queue-order-guard.mjs | ✔ Mechanismus |
+| Every dashboard card's body must speak STRICTLY about its own point — never report on or reference another TASKS point inside a card | 1 | niedrig | batch-singleton.mjs, dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
+| hoa dashboard \"Woran ich gerade arbeite\" holds ONE CARD PER parallel point being actively worked (not a single card); cards move from Warteschlange into it (possibly several at once); a point is NEVER in both sections at once | 1 | niedrig | dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
+| Never put a hardcoded `open` attribute on a dashboard `<details>` card — default all closed; localStorage persistence keeps user-opened cards open across refresh | 1 | niedrig | batch-autostart.mjs, dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
+| The batch dashboard \"Von dir zu klären\" section holds ONLY genuine user decisions — no done items, no announcements for in-progress work | 1 | niedrig | dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
 | RETIRED 25.07.2026 — the blanket authorization to spin up Fable for hard analyses is withdrawn; Opus 5 does that work, Fable only reviews or stands in as fallback | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Work at High effort by default; the user reserves Extra high for research and design decisions, not implementation | 3 | mittel | — (Regel/Memory) | ◐ Regel |
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -561,8 +628,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | CORRECTED 19.07.2026 — WebGPU IS testable headless/autonomously via system Chrome (channel:'chrome') + --headless=new; the 'untestable' belief held only for Playwright's BUNDLED Chromium | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 66 Feedback-/Projekt-Memories · 35 Guard-/Hook-Skripte · 3 Revert-/Reapply-Commits · 18 Prozess-/Meta-TASKS-Punkte (davon 9 offen).
+Erfasste Quellen: 66 Feedback-/Projekt-Memories · 36 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 18 Prozess-/Meta-TASKS-Punkte (davon 8 offen).
 
-<!-- RETRO-FINGERPRINT: 29f1a1831b260ca9608158885158639c127dfe7f0857ada831af9a35a183b293 -->
-<!-- RETRO-LAST-REFRESHED: 2026-07-28T14:16:54.142Z -->
+<!-- RETRO-FINGERPRINT: 1fd02526ae737ed1d713302b579cb4a49a7722163a65aff0da111cb48de414fb -->
+<!-- RETRO-LAST-REFRESHED: 2026-07-29T01:36:23.608Z -->
 <!-- AUTO-GENERATED:END -->

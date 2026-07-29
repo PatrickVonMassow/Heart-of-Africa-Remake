@@ -11617,3 +11617,273 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   the gate under that same load.
   DOCS in the same commit: `scripts/verify/README.md`, where the test architecture
   describes the fast layer, gains the timeout and its reason.
+- [x] 395. THE USER TAKES THE BATCH BACK INTO THE WINDOW THEY ARE SITTING AT (user
+  decision 28.07.2026). The night belongs to fresh sessions — that is where the context
+  saving comes from, and it stays. What is missing is the way back: the user returns to a
+  window that has been silent for hours, types `/clear`, says "I am back", and expects to
+  work HERE. Today that window would resolve as a non-owner and correctly stand down
+  (`stand-down` in `scripts/batch-singleton.mjs`), while the night session keeps the lock.
+  TARGET: a CLAIM and a clean release. The returning window records a claim on the batch;
+  the live owner sees it at its next hook, FINISHES what it is doing — a merge, a running
+  agent, a verification must never be cut in half — and then releases the lock, saying so
+  in its own transcript. The claiming window acquires at its next check and reports that it
+  now owns the batch. If no session holds the lock at all, the claim is satisfied
+  immediately.
+  BOUND IT SO IT CANNOT BE ABUSED, and each bound is measurable rather than a matter of
+  taste: a claim EXPIRES (a stale claim file must never hand the batch to a window that was
+  closed hours ago); a claim is only honoured for a session that is actually alive; and two
+  claims cannot both win — the singleton's whole purpose is that exactly one session drives.
+  Reuse `assessOwner`/`resolveOwnership` and the heartbeat rather than building a second
+  notion of liveness beside them.
+  THE COMMANDS: one to claim (`scripts/batch-claim.mjs` or the same shape as
+  `batch-boundary.mjs`), one to see the state (`--status`, read-only, naming who holds the
+  lock, whether a claim is pending and how old it is). The returning session runs the claim
+  itself after `/clear`; the user says nothing but "I am back".
+  VERIFIABLE: pure Vitest on the decision — a fresh claim by a live session makes the
+  current owner release at its next check; the owner does NOT release while it reports work
+  in flight; an expired claim is ignored; a claim by a dead session is ignored; two
+  competing claims resolve to exactly one owner; and with no owner the claim is satisfied
+  at once. Plus one live run: the batch claimed back into a window while a night session
+  holds it, both transcripts showing the handover from their side.
+  DOCS in the same commit: CLAUDE.md §6 gains one sentence on the way back (the boundary
+  paragraph already carries the way out), and `docs/batch-autonomy.md` the mechanics. Both
+  sit at measured ceilings, so the words are paid for by a measured raise with its
+  justification or by shortening elsewhere.
+
+- [x] 390. THE SAND AROUND THE PYRAMIDS IS NOT WALKABLE (user 28.07.2026, screenshot from
+  the deployed build inside the Giza monument site: standing beside a pyramid, the desert
+  reaches unbroken to the horizon and the traveller cannot go out into it — "man sollte
+  über den Sand laufen können"). CAUSE: the site is a walkable DISC. `GIZA_SITE_RADIUS`
+  (`src/scenes/place/gizaSite.ts`) is 60 m, and `PlaceScene` leaves the place the moment
+  `hypot(p.x, p.z)` exceeds `layout.radius` — position-based by design (design.md §2.3,
+  no exit key). At Giza that edge falls in the MIDDLE of a flat, empty, visibly continuous
+  plain, so the picture promises ground the rules do not grant: the player either meets an
+  invisible boundary or is thrown back to the bird's-eye view while still standing on the
+  same sand.
+  THE RULE TO HOLD, stated for every place and not only for Giza: the walkable ground must
+  reach to where the PICTURE stops offering ground. Where the surroundings are a built or
+  broken edge (a village's fence line, a port's quay, a slope) the disc may end there,
+  because the eye reads a boundary. Where the surroundings are an open plain that continues
+  unbroken — the desert sites are that case — the disc must extend far enough that a player
+  walking outward meets the transition as a DISTANCE, not as a wall a few strides from the
+  monument.
+  DO IT IN THIS ORDER. (1) MEASURE, do not guess: from the site centre, at the in-game eye
+  height, find the distance at which the drawn ground stops being flat open sand — the
+  backdrop ring and the §2.5 panorama band are the reference (`panoramaStandY` /
+  `discHorizonY` in `src/scenes/place/backdrop.ts`), and point 381 already pins that the
+  backdrop meets the disc edge with no seam. Record the number. (2) RAISE the desert
+  monument radius to that measured distance rather than to a round guess, and check what it
+  costs: the disc carries ground detail, flora scatter and the walker errand grid, so
+  report the frame time at the new radius on BOTH backends (the F8 benchmark does not route
+  through settlements — measure with the FPS counter at the site, at LOW and at MEDIUM). If
+  the cost is real, cap the radius at what the measurement affords and SAY SO with the
+  number, rather than quietly leaving the wall closer than the picture promises. (3) The
+  EXIT must stay findable: a player who walks outward has to reach the bird's-eye view
+  without a hunt, so keep the position-based rule and, if the radius grows large, decide
+  whether the §17.4 hint layer should name the direction. Do NOT add an exit key — the
+  movement-based switch is design.md §2.3 and is not up for revision here.
+  BEWARE THE COUPLED RULES, each already enforced elsewhere: the backdrop must still meet
+  the ground with no hole and no unlit face at the new radius (point 381 —
+  `src/scenes/place/backdrop.test.ts` sweeps a set of disc radii, add the new one), the
+  panorama silhouettes stand on the higher of backdrop relief and the visible ground line
+  (point 181) and must not end up inside the walkable area, and the settlement-entry disc
+  separation between Giza and Cairo (`src/scenes/travel/settlementEntry.test.ts`) is a
+  BIRD'S-EYE distance untouched by the site radius — do not "fix" it.
+  VERIFIABLE: pure Vitest — the desert monument radius equals the measured open-plain
+  distance (one constant, derived rather than written twice), and the backdrop sweep covers
+  it. Plus the picture on BOTH backends: a frame from the site centre looking outward and
+  one taken at the new edge, showing that the ground the player stands on runs to where the
+  backdrop takes over.
+  DOCS in the same commit: the `GIZA_SITE_RADIUS` comment states its measured basis, and
+  `docs/acceptance-evidence.md` §15 gains the chain.
+
+- [x] 404. A PASSING COUNT OVER A SET THAT SILENTLY SHRANK (28.07.2026, measured:
+  one run reported 3546 passing tests while 34 test FILES had failed to load; the run an
+  hour earlier had 4214 tests over 153 files). A damaged dependency tree — a platform
+  package missing its entry file — made whole suites unloadable, and an unloadable suite
+  does not fail: it vanishes from the totals. The report therefore read GREENER than a red
+  run. Nothing in the chain compares the number of EXECUTED files with the last known
+  state, so every gate waved it through; it was noticed only because a review agent could
+  not start the tests either and said so.
+  THE FIX: `scripts/pre-push-gate.mjs` already parses the unit run. Record the test-FILE
+  count beside the result, keep the last green count in the state the gate already writes,
+  and treat a DROP as a red — a shrinking evidence base is exactly as serious as a
+  failure. Report both numbers in the gate's own line ("153 files / 4214 tests"), so the
+  shrink is visible even where it does not yet block.
+  DO NOT compare against a hard-coded number: it would rot with every added suite. The
+  baseline is the last green run's own count, and a deliberate reduction (a suite genuinely
+  deleted) is accepted by re-running once the drop is understood.
+  VERIFIABLE: pure Vitest on the comparison — a higher count passes and advances the
+  baseline, an equal count passes, a lower count is red with BOTH numbers named, a missing
+  baseline passes and records rather than blocking (fail-open on first use), and a garbled
+  parse never throws. Live: delete a suite deliberately and see the gate name the drop.
+  DOCS in the same commit: `scripts/verify/README.md`, where the fast layer is described.
+
+- [x] 402. THE HEADLESS SESSION IS KILLED FOR DOING EXACTLY WHAT IT IS TOLD TO DO
+  (28.07.2026, four deaths measured in one afternoon, user asked for the cause to
+  be found). The batch sessions were not crashing. `.claude/autostart-run.log`
+  carries the executioner's own words, four times:
+  `Background tasks still running after 600s; terminating. Set
+  CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 to wait indefinitely.`
+  A print-mode session (`claude -p`, which is how `scripts/batch-autostart.mjs`
+  spawns every resurrected worker) waits at most 600 SECONDS for its background
+  tasks after its turn ends, then the runtime TERMINATES the process.
+  WHY THIS HITS THIS PROJECT EVERY TIME: the batch's designed steady state is
+  "delegate the point to a worktree-isolated agent and wait for it" (CLAUDE.md §6,
+  maximal delegation). A delegated agent routinely runs longer than ten minutes —
+  the point 398 agent took 12.7 minutes, the point 400 agent longer. So the
+  session is killed WHILE ITS AGENT IS STILL BUILDING, every single time the agent
+  is slower than the ceiling. That is the whole of today's "frequent session
+  deaths": three takeovers without a handover in `.claude/autostart.log`
+  (`no owner lock — taking over`), each one a session that had just been shot.
+  It also explains the `failCount` bumps (`previous spawn did NOT take over`).
+  NO FIXED TIME LIMIT (user 28.07.2026, and the objection is correct): any single
+  number is wrong in both directions — long enough not to shoot a healthy agent is
+  long enough for a hung one to sit undetected, and short enough to notice a hang
+  is short enough to shoot a healthy build. The trade-off only exists because the
+  ceiling measures ELAPSED TIME. The question that actually separates the two
+  cases is whether the delegated work is still ADVANCING, and this repository
+  already knows how to answer it: `scripts/batch-in-flight-core.mjs` probes a pid
+  that is alive AND started when the declaration says, a branch whose tip commit
+  is recent, a worktree where git work recently happened, a log still being
+  written to. That machinery is pure and injected — it is built and tested. The
+  launcher does NOT consult it: `assessOwner` in `scripts/batch-singleton.mjs`
+  looks only at the lock's handover flag, heartbeat age and pid, and
+  `batch-autostart.mjs` never mentions the declaration at all.
+  THE FIX, in four parts:
+  (a) THE RUNTIME CEILING GOES TO INFINITE. `scripts/batch-autostart.mjs` passes
+  `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0` in the spawn's `env` (it currently
+  passes no `env` at all). This is deliberate: the runtime cannot know anything
+  about the work, so it must not hold the policy. `0` is the value the runtime's
+  own message documents, so it needs no proving.
+  (b) THE WAIT BECOMES VISIBLE. A session waiting on an agent must POLL rather
+  than sit silent — which the batch-progress guard already demands. Every poll is
+  a tool call, every tool call refreshes the heartbeat, so a healthy waiting
+  session never looks dead. A SILENT wait is what made a working session
+  indistinguishable from a corpse.
+  (c) THE LAUNCHER JUDGES PROGRESS, NOT AGE. `assessOwner` gains the declared
+  work as an input: an owner with a stale heartbeat is NOT dead while its declared
+  agent shows fresh evidence (branch tip moved, worktree touched, log grew inside
+  the window). Same probes, same pure functions as (the already-tested)
+  `batch-in-flight-core.mjs` — wire them, do not reimplement them.
+  (d) THE ONLY BOUND LEFT IS ON STALL, NOT ON DURATION. When nothing has advanced
+  for N launcher ticks (start at 2 = ~30 min of complete silence), the owner counts
+  as wedged: ntfy alert naming what stalled, then take over. A healthy agent —
+  however slow — advances something, so a false kill needs the work to be
+  genuinely frozen. Some bound must remain (nothing can decide halting), but it
+  now measures the right thing.
+  WHAT THIS IS NOT: not a reason to stop delegating, and not a reason to end the
+  turn while an agent builds. The in-flight declaration of point 388 is the
+  correct behaviour and stays; it was being punished by a runtime limit, not by a
+  design error.
+  VERIFIABLE: pure Vitest on `assessOwner` with injected probes — a stale
+  heartbeat plus a branch tip that moved inside the window reads ALIVE; the same
+  stale heartbeat with every probe silent reads WEDGED; a dead pid stays dead
+  whatever the evidence says; and a declaration naming work that no probe can
+  answer is treated as no evidence rather than as proof. Plus a pure test that the
+  spawn options carry the ceiling in `env` (extract the spawn arguments into a
+  pure builder if they are not one already). Live, and this is the acceptance
+  test: one delegated agent that runs longer than 600 s while its parent session
+  waits, and the parent is STILL ALIVE afterwards and merges the branch itself —
+  the exact sequence that failed four times today — with
+  `.claude/autostart-run.log` free of the termination line for that run.
+  DOCS in the same commit: `docs/batch-autonomy.md`, where the resurrection and
+  the waiting rules are described, states that liveness is judged by progress and
+  what counts as evidence.
+
+- [x] 300. ANIMAL GAIT REALISM — leg cadence must match forward speed, no foot-skating (user
+  24.07.2026; for later/v0.3). The animals' leg-swing speed looks too fast for their forward
+  movement — they read as GLIDING/skating over the ground rather than walking on their feet.
+  ESPECIALLY the panorama skyline silhouettes (points 255/286) but ALSO the walkers inside
+  settlements. FIX: either model the gait physically correctly (the stance foot stays PLANTED on
+  the ground while the body moves forward over it; the leg cadence is derived from ground
+  distance covered, so one full stride = a fixed forward distance = the foot's planted-to-lift
+  ground travel), OR — if a full physical foot-IK is too compute-heavy in-game — tune the
+  gait-phase-per-distance (stride length) so the feet do not skate. The panorama gait is already
+  distance-driven (point 255: gaitPhase from the drifted arc); investigate why it STILL reads too
+  fast — likely the stride length (forward distance per full cycle) is too short, so legs cycle
+  faster than the ground passes. VERIFY (the user's method — concrete + testable): a SERIES OF
+  SCREENSHOTS across an interval — when a leg that has just swung forward moves BACK (stance
+  phase), its FOOT must stay at the SAME ground position while the animal advances (the plant foot
+  is fixed to the ground, the body translates over it; no sliding). Add a PURE test that the
+  stride length equals the foot's stance ground-travel (feet planted, not skating), and a LIVE
+  screenshot-series check (a skyline silhouette AND a settlement walker) that a tracked foot's
+  screen position stays ~fixed through its stance phase while the body moves forward.
+  SLOPE FOOTING (user 24.07.2026, second facet of the same "feet on the ground" system): when an
+  animal walks UP or DOWN a slope, its front (uphill) or back (downhill) feet FLOAT in the air —
+  the body/legs do not conform to the incline (screenshot: a skyline silhouette on a dune with a
+  foot hovering above the terrain). FIX: sample the terrain height under EACH foot (or pitch the
+  body to the local ground slope) so ALL feet contact the sloped ground, not just the ones on the
+  body's reference plane. VERIFY (screenshot): on an up-slope AND a down-slope, no foot hovers
+  above the terrain — every planted foot touches the ground it stands on (panorama silhouette on a
+  dune AND a settlement walker on sloped ground). ANCHORS: the
+  panorama gait (`src/scenes/place/panoramaWildlife.ts` — gaitPhase / legSwingAngle /
+  panoramaGaitDistance, points 255/286), the settlement-walker gait, `src/render/fauna.ts` (the
+  leg pivots). No player-visible text.
+
+- [x] 403. THE USER GETS THE SAME MESSAGE TWICE (user 28.07.2026, reported
+  repeatedly before and now with a verbatim example: the 19:18 and 19:19 replies
+  are the same text). It is not a display bug and not randomness — it is the Stop
+  chain's shape.
+  THE MECHANISM: a reply to the user is written, THEN the Stop chain runs. A guard
+  blocks, the session performs the demanded action, and the turn must end with a
+  reply again — so a second, near-identical message is delivered. Three cases in
+  one afternoon: `timestamp-guard` twice (15:38→15:34, 17:12→17:05, where its own
+  message literally says "write your closing reply again"), and `dashboard-guard`'s
+  focus reconcile once — the user's quoted example. The focus reconcile arms on
+  EVERY user prompt, so this is not a rare corner: any turn where the user writes
+  and the session has not yet confirmed the focus ends in a doubled message.
+  THE FIX HAS TWO HALVES, and the first is the one that matters:
+  (a) SATISFY THE STOP CHAIN BEFORE COMPOSING THE CLOSING REPLY, not after. The
+  preflight already exists (`scripts/guard-preflight.mjs`, CLAUDE.md §7.2) and is
+  read-only; the routine turn-end actions (focus confirm, board publish/attest,
+  the boundary) belong BEFORE the last message, not behind it. CLAUDE.md §7.2
+  gains this as a rule in the Stop-chain paragraph: the closing reply is the LAST
+  thing written, after the chain would pass.
+  (b) A BLOCKED TURN IS ACKNOWLEDGED, NOT REPEATED. When a guard blocks anyway,
+  the new closing message states what was fixed in one or two sentences and does
+  NOT restate the previous answer. `timestamp-guard`'s wording actively causes the
+  bug by demanding the reply "again"; it must instead ask for a SHORT closing line
+  carrying the correct stamp. Same for every other guard whose message asks for a
+  re-written reply — audit all of them in `.claude/settings.json`'s Stop chain and
+  reword.
+  DO NOT "FIX" THIS BY WEAKENING THE GUARDS. Each of them exists because a
+  reminder failed; the defect is the ORDER of composing and checking, plus the
+  wording that asks for a repetition.
+  VERIFIABLE: a pure test per reworded guard that its block message asks for a
+  short acknowledgement and never for the reply "again" (assert on the message
+  text — that is what the model acts on); a pure test that `guard-preflight`
+  reports the focus-reconcile requirement while it is unmet and stays silent once
+  confirmed. Live: three consecutive turns in which the user writes, each ending
+  in exactly ONE message.
+  DOCS in the same commit: CLAUDE.md §7.2 (the rule from (a); it sits near its
+  measured budget, so pay for the sentence by shortening there) and
+  `docs/batch-autonomy.md` where the Stop chain is described.
+
+- [x] 408. A RESCUE COMMIT MUST NOT MAIL THE USER (28.07.2026, user reported the
+  inbox spam and it was earned). When a delegated agent is killed mid-build, its
+  uncommitted work is committed and pushed at once — durability first, nothing may
+  stay only local. But the branch push starts CI, CI fails on the half-finished
+  state, and GitHub mails the repository owner. That happened tonight on
+  `feat/300-gait-matches-speed`: the rescue push went red, the follow-up commit went
+  green, and in between the user got the failure mail for a state nobody claimed was
+  finished. `main` was green throughout — the noise is entirely branch-side.
+  THE FIX IS A COMMIT-MESSAGE CONVENTION, NOT A WORKFLOW CHANGE: a rescue commit
+  carries `[skip ci]` in its SUBJECT, which GitHub Actions honours for push events.
+  Durability is unaffected — the commit still exists, still pushes, still survives the
+  session — only the run (and therefore the mail) is skipped for a state that is
+  explicitly not a claim of completeness. The NEXT commit on that branch, the one
+  that finishes the work, runs CI normally.
+  WHERE IT BELONGS: CLAUDE.md §6, in the feature-branch rules beside "push after every
+  commit" — the same paragraph that demands the rescue must state its one condition.
+  ENFORCE IT, DO NOT REMEMBER IT: `scripts/git-hooks/commit-scope-guard` already
+  inspects commits. It gains one check — a commit whose message declares a rescue
+  (a `Rescue:` trailer, machine-readable) MUST carry `[skip ci]`, and one that carries
+  `[skip ci]` MUST declare why. Neither half alone is honest: an unmarked rescue mails
+  the user, and a bare `[skip ci]` on ordinary work silently skips a real gate.
+  VERIFIABLE: pure Vitest on the decision — a rescue-trailered message without
+  `[skip ci]` is rejected naming the fix, one with it passes, a `[skip ci]` without the
+  trailer is rejected, an ordinary message is untouched, and a garbled message never
+  throws (fail-open, like every guard here).
+  DOCS in the same commit: CLAUDE.md §6 as above, and `scripts/verify/README.md` where
+  the hooks are described.

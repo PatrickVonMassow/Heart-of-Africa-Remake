@@ -38,7 +38,7 @@ export const DOC_BUDGETS = [
     // looking for the wrong fix. The capability half is not a flourish either:
     // it is the reason a headless session is not trapped, and leaving it out
     // invites exactly the "then just remove the check" repair.
-    maxLines: 1101,
+    maxLines: 1115,
     // RAISED by the 50 measured words of the §7.2 rule that screenshot diffing
     // is not available as a shortcut (point 361). That is the mechanism working
     // as designed rather than a concession: the words buy a NEW standing rule
@@ -81,7 +81,28 @@ export const DOC_BUDGETS = [
     // off their drawn bodies, so the traveller walked through the animal he saw
     // and was blocked on empty ground. A rule stated for one subsystem is not a
     // rule; the words buy its generality.
-    maxWords: 9978,
+    // RAISED by the 71 measured words (6 lines) of the §6 WAY BACK (point 395):
+    // the user claims the batch into the window they are sitting at, the owner
+    // releases at a clean moment, and the same command then takes it. Not a
+    // longer telling of the boundary paragraph it stands under — that paragraph
+    // is the way OUT (the session ends, the launcher brings up a fresh one) and
+    // says nothing about a way IN. The words buy the one command a returning
+    // session must run and the bounds that keep it from being abused. Omitting
+    // them would leave the stand-down message naming a mechanism this file never
+    // mentions, and a session that had not read it would go on killing the other
+    // window's lock by hand — exactly the move the mechanism replaces.
+    // RAISED by the 93 measured words (7 lines) of the §6 RESCUE-commit rule
+    // (point 408): work committed because a session or agent was killed
+    // mid-build carries `[skip ci]` and a `Rescue:` trailer, so a red run on a
+    // state nobody claimed was finished cannot mail the repository owner. A NEW
+    // condition on the rule it stands beside — "push after every commit" made
+    // the mails inevitable and said nothing about them — not a longer telling
+    // of it. It is cheap to hold and expensive to omit: the convention is
+    // useless unread, since a session that does not know the trailer exists
+    // will simply write an ordinary message and mail the user again, and the
+    // hook that enforces it would then refuse a commit whose fix is stated
+    // nowhere in this file.
+    maxWords: 10142,
     why: 'loaded at every session start — the most expensive document in the project',
   },
   {

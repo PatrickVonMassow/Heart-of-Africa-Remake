@@ -24,19 +24,40 @@
 // real intermittent defect, which is exactly what the house rule about visible
 // retries exists to prevent — and the wrapper times the second attempt, so the
 // cost of the retry is measured rather than assumed.
+// A PASSING COUNT OVER A SET THAT SILENTLY SHRANK (point 404). The unit step's
+// output is CAPTURED as well as printed, so the gate can read how many test
+// FILES actually ran and compare that with the last green run's own count. A
+// suite that cannot load does not fail — it vanishes from the totals — so a
+// damaged dependency tree reports greener than a red run unless someone counts.
+//
+// And the count is compared with the TREE, not only with the memory: a suite
+// genuinely deleted leaves the checkout, an unloadable one is still lying in it.
+// That is what tells "understood and deliberate" from "re-ran without fixing" —
+// the first version blocked once and recorded the lower number as it blocked, so
+// a second push with the tree still damaged sailed through (four-eyes finding).
 import { execFileSync, spawnSync } from 'node:child_process'
-import { existsSync, readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
+import { join, resolve } from 'node:path'
 import { REPO_ROOT } from './repo-paths.mjs'
+import { tryWriteJsonAtomic } from './atomic-write.mjs'
 import {
+  DROP_ACK_ENV,
+  GATE_STATE_FILE,
   LOAD_LEVELS,
   PROTECTED_REF,
   UNAVAILABLE,
+  countTestFilesOnDisk,
   decide,
+  evaluateTestFileCount,
   formatVerdict,
   gatePlanForPush,
+  parseGateState,
+  parseUnitTotals,
   parsePushInput,
   runGate,
+  testFileBaseline,
+  testFileRoots,
+  withTestFileBaseline,
 } from './pre-push-gate-core.mjs'
 
 const git = (args) => execFileSync('git', args, { cwd: REPO_ROOT, encoding: 'utf8' })
@@ -95,6 +116,75 @@ function readLoadLevel({ when } = {}) {
     // fact about this verdict, and it is what buys the re-run.
     console.log(`pre-push gate: the load probe could not be read (${when} reading) — treating the machine as unmeasured`)
     return { level: 'unknown', reasons: ['the load probe could not be read'] }
+  }
+}
+
+/**
+ * The gate's own memory of the last green unit run (point 404). Git-ignored and
+ * per checkout, because each checkout has its own dependency tree and its own
+ * branch — a baseline shared across them would compare two different worlds.
+ *
+ * FAIL-OPEN on every I/O error: a missing, unreadable or garbled state file
+ * yields "no baseline", which records and passes rather than blocking.
+ */
+const gateStatePath = () => resolve(REPO_ROOT, GATE_STATE_FILE)
+
+function readGateState() {
+  try {
+    return parseGateState(readFileSync(gateStatePath(), 'utf8'))
+  } catch {
+    return {}
+  }
+}
+
+function writeGateState(state) {
+  // ATOMIC, with the documented Windows retry (scripts/atomic-write.mjs): a torn
+  // write garbles the JSON, `parseGateState` then reads it as "no baseline", and
+  // the gate silently forgets the number it exists to remember. An antivirus
+  // scanner holding the file for a few milliseconds is enough — this repository
+  // has already had that EPERM once, on the batch lock.
+  const { ok, error } = tryWriteJsonAtomic(gateStatePath(), state)
+  // Said out loud rather than swallowed: a baseline that cannot be written is
+  // a gate that will never notice the next shrink either.
+  if (!ok) console.log(`pre-push gate: the test-count baseline could not be written (${error?.message})`)
+}
+
+/**
+ * How many test files this CHECKOUT actually holds (point 404, four-eyes fix).
+ *
+ * The discriminator between the two shrinks: a suite genuinely DELETED leaves
+ * the tree, an unloadable one is still lying in it. Counted from the filesystem
+ * rather than from `git ls-files`, so a suite deleted in the working tree but
+ * not yet committed counts as gone and a brand-new untracked suite counts as
+ * present — both are what the runner would actually see.
+ *
+ * Only the pattern roots are walked, never the whole repository: the one moment
+ * this number matters is the moment `node_modules` is the broken thing.
+ *
+ * FAIL-OPEN into `null`, which means "the tree could not be counted" — and the
+ * core treats that as unverifiable, so it blocks a drop rather than waving it
+ * through. Fail-open on the reading, fail-closed on the verdict.
+ */
+function countTestFilesInCheckout() {
+  const walk = (dir, prefix, out) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      if (entry.name === 'node_modules' || entry.name === '.git') continue
+      const rel = prefix ? `${prefix}/${entry.name}` : entry.name
+      if (entry.isDirectory()) walk(join(dir, entry.name), rel, out)
+      else if (entry.isFile()) out.push(rel)
+    }
+  }
+  try {
+    const found = []
+    for (const root of testFileRoots()) {
+      const dir = resolve(REPO_ROOT, root)
+      if (!existsSync(dir)) continue
+      walk(dir, root === '.' ? '' : root, found)
+    }
+    return countTestFilesOnDisk(found)
+  } catch (e) {
+    console.log(`pre-push gate: the checkout's test files could not be counted (${e.message}) — a drop cannot be verified`)
+    return null
   }
 }
 
@@ -161,11 +251,30 @@ try {
   if (warning) console.log(warning)
 
   console.log(`pre-push gate: ${plan.steps.join(' → ')} (${plan.reason})`)
+  // The LAST unit attempt's output — a re-run replaces it, because the second
+  // run is the one the verdict is taken from. The streams are kept APART: the
+  // summary is read from stdout first, so a stray count on stderr arriving after
+  // it can never win the last-occurrence rule (four-eyes finding).
+  let unitOutput = { stdout: '', stderr: '' }
   const results = runGate(
     plan.steps,
     (step, [cmd, ...args], { attempt = 1 } = {}) => {
       const started = Date.now()
-      const run = spawnSync(cmd, args, { cwd: REPO_ROOT, stdio: 'inherit', shell: process.platform === 'win32' })
+      // Only the unit step is captured, and it is echoed straight afterwards, so
+      // nothing is lost from the scrollback. The cost is that its output arrives
+      // in one block instead of streaming — paid for the one step whose totals
+      // have to be counted (point 404).
+      const capture = step === 'unit'
+      const run = spawnSync(cmd, args, {
+        cwd: REPO_ROOT,
+        stdio: capture ? ['inherit', 'pipe', 'pipe'] : 'inherit',
+        ...(capture ? { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 } : {}),
+        shell: process.platform === 'win32',
+      })
+      if (capture) {
+        unitOutput = { stdout: run.stdout ?? '', stderr: run.stderr ?? '' }
+        process.stdout.write(`${unitOutput.stdout}${unitOutput.stderr}`)
+      }
       // What the retry COSTS, measured rather than estimated (point 389).
       if (attempt > 1) console.log(`pre-push gate: the re-run of ${step} took ${((Date.now() - started) / 1000).toFixed(1)}s`)
       // audit-check exits 3 when the audit could not RUN (offline, registry
@@ -176,7 +285,40 @@ try {
     { readLoad: readLoadLevel, onNotice: (line) => console.log(line) },
   )
 
-  const verdict = decide(results)
+  // How large the evidence base actually was — against the CHECKOUT first and
+  // the last green run's own count second (point 404). Only taken where the unit
+  // step ran at all: the light gate has no unit step, and a build that failed
+  // first never reaches one.
+  let fileCount = null
+  const unitResult = results.find((r) => r?.step === 'unit')
+  if (unitResult) {
+    const state = readGateState()
+    const totals = parseUnitTotals(unitOutput)
+    const acknowledged = /^(1|true|yes)$/i.test(String(process.env[DROP_ACK_ENV] ?? ''))
+    fileCount = evaluateTestFileCount({
+      totals,
+      baseline: testFileBaseline(state),
+      unitOk: unitResult.ok === true,
+      onDisk: countTestFilesInCheckout(),
+      acknowledged,
+    })
+    if (fileCount.nextBaseline !== null && fileCount.nextBaseline !== fileCount.baseline) {
+      writeGateState(
+        withTestFileBaseline(state, {
+          files: fileCount.nextBaseline,
+          tests: fileCount.tests,
+          onDisk: fileCount.onDisk,
+          // An acknowledged drop is RECORDED as such: the escape hatch leaves a
+          // trace in the state file rather than only in one console scrollback.
+          // `null` is a legitimate "from" here — a fresh checkout has no
+          // baseline, and that is the case whose trace matters most.
+          ...(fileCount.status === 'acknowledged' ? { acknowledgedDropFrom: fileCount.baseline } : {}),
+        }),
+      )
+    }
+  }
+
+  const verdict = decide(results, fileCount)
   console.log(formatVerdict(verdict, plan))
   process.exit(verdict.blocked ? 1 : 0)
 } catch (e) {

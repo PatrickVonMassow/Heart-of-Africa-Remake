@@ -40,11 +40,15 @@ import { placeById, type RegionId } from '../../world/geo'
 import { sampleTerrain } from '../../world/terrain'
 import {
   BACKDROP_HEIGHT,
+  BACKDROP_INNER_OFFSET,
   BACKDROP_RINGS,
   BACKDROP_SCALE,
   BACKDROP_SEGS,
+  GROUND_DISC_OVERHANG,
+  PANORAMA_RADIUS,
   backdropRingRadius,
   backdropSurfaceY,
+  groundDiscSegments,
   panoramaStandY,
 } from './backdrop'
 import { createBackdropMaterial } from './backdropMaterial'
@@ -64,14 +68,21 @@ import {
   buildElephantParts,
   buildGiraffeParts,
   buildZebraParts,
+  footBodyOffset,
+  footHeight,
+  gaitBodyLift,
   gaitPhase,
+  gaitRig,
+  groundPitch,
+  isStance,
   legSwingAngle,
+  seatFootOnGround,
   type GoatLeg,
 } from '../../render/fauna'
 import { REGION_PLACE_STYLES, type RegionPlaceStyle } from './regionStyles'
 import { PlaceLife } from './PlaceLife'
 import { resolveMove } from './collision'
-import { buildLayout, isOnLane, nearestActionable, PLACE_RADIUS, type Interactive, type PathDef, type DwellingDef, type FenceDef } from './layout'
+import { buildLayout, isOnLane, nearestActionable, PLACE_RADIUS, SPAWN_INSET, type Interactive, type PathDef, type DwellingDef, type FenceDef } from './layout'
 import { getPanoramaCapture } from '../travel/panoramaCapture'
 import {
   silhouetteScale,
@@ -80,8 +91,6 @@ import {
   luminance,
   panoramaDriftYaw,
   panoramaGaitDistance,
-  panoramaGaitBob,
-  panoramaGaitNod,
   excludedAzimuthSpan,
   isAzimuthExcluded,
   type AzimuthSpan,
@@ -95,10 +104,6 @@ import { getStrings, useStrings } from '../../i18n'
 
 const PLAYER_RADIUS = 0.35 // collision radius of player and inhabitants
 const EYE_HEIGHT = 1.5 // first-person camera height in meters
-/** Radial segments of the walkable ground disc: enough that its ground line
- *  reads as a curve, not as the straight chords of point 381 (at the largest
- *  disc, Giza's 74 m, a chord is 2.4 m and its inset 0.01 m). */
-const GROUND_DISC_SEGS = 192
 
 /** Sun direction shared by the sky dome disc and the shadow light. */
 const SUN_DIR: [number, number, number] = [0.52, 0.68, 0.34]
@@ -1240,6 +1245,10 @@ function PanoramaWildlife({
   // into one is hidden so it never crosses the monument (point 102, part a).
   const exclusionSpans = useMemo(() => skylineExclusionSpans(placeId), [placeId])
   // World height of each mesh, for the apparent-size clamp (point 94).
+  // Each species' gait read off its OWN legs (point 300): a long-legged giraffe
+  // takes long, slow strides, a zebra shorter, quicker ones — the single shared
+  // cadence over-drove every one of them and they skated along the horizon.
+  const rigs = useMemo(() => builds.map((p) => gaitRig(p.legs)), [builds])
   const geoHeights = useMemo(
     () => builds.map((p) => {
       p.body.computeBoundingBox()
@@ -1279,6 +1288,7 @@ function PanoramaWildlife({
         scale,
         drift: (rand() < 0.5 ? -1 : 1) * (0.004 + rand() * 0.006),
         parts: builds[gi],
+        rig: rigs[gi],
         material: new THREE.MeshStandardMaterial({ color: new THREE.Color(rgb[0], rgb[1], rgb[2]), roughness: 1 }),
         worldHeight: geoHeights[gi] * scale,
         apparentDeg: apparentAngleDeg(geoHeights[gi] * scale, radius),
@@ -1286,7 +1296,7 @@ function PanoramaWildlife({
         phase: rand() * Math.PI * 2,
       }
     })
-  }, [placeId, seed, innerRadius, builds, geoHeights, baseRgb, skyRgb, pw])
+  }, [placeId, seed, innerRadius, builds, rigs, geoHeights, baseRgb, skyRgb, pw])
   useEffect(
     () => () => items.forEach((it) => it.material.dispose()),
     [items],
@@ -1294,6 +1304,8 @@ function PanoramaWildlife({
   const refs = useRef<Array<THREE.Group | null>>([])
   // Per-silhouette leg-pivot groups, so the stride swings them about the hips.
   const legRefs = useRef<Array<Array<THREE.Group | null>>>([])
+  // Scratch vector for the DEV foot probe — never allocated per frame.
+  const footProbe = useMemo(() => new THREE.Vector3(), [])
 
   useEffect(() => {
     if (!import.meta.env.DEV) return
@@ -1321,13 +1333,27 @@ function PanoramaWildlife({
       g.visible = !hidden
       const x = Math.cos(a) * it.radius
       const z = Math.sin(a) * it.radius
+      // Point 286: face where it MOVES along the ring tangent (derived from the
+      // velocity), so a silhouette can never walk backward — the former
+      // `−a + (drift>0 ? π : 0)` was exactly π off and moonwalked every one.
+      const yaw = panoramaDriftYaw(a, it.drift)
       // Point 181: the feet go on the ground the frame DRAWS under them — the
       // higher of this spot's relief and the ground line over the town's disc
       // edge, seen from the live camera — never the hard EYE_HEIGHT horizon at
       // infinity, which left them hanging over the captured band's content.
-      const groundY =
-        panoramaStandY(x, z, lat, lon, seed, centerH, innerRadius, camera.position.x, camera.position.z, EYE_HEIGHT) -
-        pw.sinkEpsilon
+      // Point 300: sampled under the animal's OWN front and back hips rather
+      // than once under its centre, so a body on a dune lies along the slope
+      // instead of holding a level plane. That fit is the body's POSE; what
+      // actually plants the feet is the per-foot seating in the leg loop below.
+      const half = (it.rig.wheelbase * it.scale) / 2
+      const fx = Math.sin(yaw) * half
+      const fz = Math.cos(yaw) * half
+      const camX = camera.position.x
+      const camZ = camera.position.z
+      const frontY = panoramaStandY(x + fx, z + fz, lat, lon, seed, centerH, innerRadius, camX, camZ, EYE_HEIGHT)
+      const backY = panoramaStandY(x - fx, z - fz, lat, lon, seed, centerH, innerRadius, camX, camZ, EYE_HEIGHT)
+      const groundY = (frontY + backY) / 2 - pw.sinkEpsilon
+      const pitch = groundPitch(frontY, backY, it.rig.wheelbase * it.scale)
       // Point 255 (3): the silhouettes used to GLIDE — their only motion was a
       // wall-clock bob. The stride rides the ground they cover along the ring,
       // through the same distance-driven gait phase the settlement goats walk
@@ -1337,12 +1363,13 @@ function PanoramaWildlife({
       // apparent horizon motion is a fraction of a degree per second — so the
       // arc is expressed in the silhouette's OWN rendered frame (÷ scale), which
       // makes the leg cadence consistent with the rendered body's slow crawl.
-      const phase = gaitPhase(panoramaGaitDistance(it.radius, it.drift, it.scale, t)) + it.phase
-      const y = groundY + panoramaGaitBob(phase, it.worldHeight)
-      // Point 286: face where it MOVES along the ring tangent (derived from the
-      // velocity), so a silhouette can never walk backward — the former
-      // `−a + (drift>0 ? π : 0)` was exactly π off and moonwalked every one.
-      const yaw = panoramaDriftYaw(a, it.drift)
+      // Point 300: at this species' OWN cadence, so one stride carries the body
+      // exactly as far as the planted foot sweeps — no skating — and the body
+      // dips onto the stance leg (the walk's real rise and fall, in the
+      // silhouette's frame, hence × scale) instead of the old cosmetic bob.
+      const phase = gaitPhase(panoramaGaitDistance(it.radius, it.drift, it.scale, t), it.rig.cadence) + it.phase
+      const lift = gaitBodyLift(phase, it.rig.legLength) * it.scale
+      const y = groundY + lift
       if (import.meta.env.DEV) {
         const w = window as unknown as Record<string, unknown>
         const info = (w.__placePanoramaWildlifeInfo ?? (w.__placePanoramaWildlifeInfo = {})) as Record<string, unknown>
@@ -1351,24 +1378,77 @@ function PanoramaWildlife({
         // point-102 skyline-exclusion gate; x/z/height for the point-181 gate,
         // which ray-probes the surface drawn behind the feet. `yaw` + x/z prove
         // the point-286 forward-only walk (displacement projects positively onto
-        // the facing). `gait`/`gaitSpeed` prove the point-255/286 stride live:
-        // the phase advances in step with the SCALE-NORMALISED ground each
-        // silhouette covers, so the ratio is the same constant for all of them —
-        // a wall-clock bob would advance them all equally regardless of speed.
-        info[i] = { y, visibleY: groundY, apparentDeg: it.apparentDeg, hazeLum: it.hazeLum, azimuth, visible: !hidden, x, z, yaw, radius: it.radius, worldHeight: it.worldHeight, gait: phase, gaitSpeed: Math.abs(it.radius * it.drift) / (it.scale > 0 ? it.scale : 1) }
+        // the facing). `gait`/`gaitSpeed`/`cadence` prove the point-255/286/300
+        // stride live: the phase advances in step with the SCALE-NORMALISED
+        // ground each silhouette covers, at its OWN leg's cadence — so
+        // phase ÷ (speed × cadence) is 1 for every one of them, whatever species
+        // it is, while a wall-clock bob would advance them all alike regardless
+        // of speed. `drop`/`pitch`/`frontY`/`backY` carry the point-300 footing:
+        // how far the body dipped onto its stance leg and how it lies on the
+        // slope under its own wheelbase — and `stretch` (below) the reach the
+        // tracked leg needed on top of that fit to stand on its own ground.
+        info[i] = { y, visibleY: groundY, apparentDeg: it.apparentDeg, hazeLum: it.hazeLum, azimuth, visible: !hidden, x, z, yaw, radius: it.radius, worldHeight: it.worldHeight, gait: phase, gaitSpeed: Math.abs(it.radius * it.drift) / (it.scale > 0 ? it.scale : 1), cadence: it.rig.cadence, stride: it.rig.stride * it.scale, drop: -lift, pitch, frontY, backY, stance: isStance(phase + it.parts.legs[0].phaseOffset) }
       }
       g.position.set(x, y, z)
-      // Nod fore/aft in the body's own frame (YXZ: yaw first, so x is the
-      // walking pitch).
+      // Lie on the ground slope in the body's own frame (YXZ: yaw first, so x
+      // is the walking pitch). Point 300: this is the ONLY pitch now — the old
+      // cosmetic fore/aft nod rocked the body about its feet and so lifted the
+      // planted one off the ground.
       g.rotation.order = 'YXZ'
       g.rotation.y = yaw
-      g.rotation.x = panoramaGaitNod(phase)
-      // The stride itself: diagonal legs swing in antiphase about their hips.
+      g.rotation.x = pitch
+      // The stride itself: diagonal legs swing in antiphase about their hips —
+      // and each foot is then seated on the ground drawn under ITS OWN spot
+      // (point 300). The body pitch above is a two-sample fit over the
+      // wheelbase, but the compressed backdrop relief is not locally linear and
+      // a foot's ground spot lies up to half a stride outside that span, so the
+      // fit alone left feet hanging (measured: 23 % of stance frames over the
+      // 5 %-of-body-height gate). One terrain sample per foot — the same query
+      // the backdrop mesh itself is built from — pins each planted foot to its
+      // ground and lets each swinging one ride its own clearance above it.
       const legs = legRefs.current[i]
       if (legs) {
         for (let li = 0; li < it.parts.legs.length; li++) {
           const lg = legs[li]
-          if (lg) lg.rotation.x = legSwingAngle(phase, it.parts.legs[li].phaseOffset)
+          if (!lg) continue
+          const leg = it.parts.legs[li]
+          const swing = legSwingAngle(phase, leg.phaseOffset)
+          const off = footBodyOffset(leg.hip, swing, it.rig.legLength, yaw, pitch, it.scale)
+          // Where this foot BELONGS: on its own ground, plus the clearance the
+          // gait gives it (exactly zero through stance, so a planted foot
+          // touches), and re-aimed rather than merely lowered so its ground spot
+          // does not move — a foot dragged fore/aft would be skating again.
+          const standY =
+            panoramaStandY(x + off[0], z + off[2], lat, lon, seed, centerH, innerRadius, camX, camZ, EYE_HEIGHT) -
+            pw.sinkEpsilon
+          const targetY = standY + footHeight(phase, leg.phaseOffset, it.rig.legLength) * it.scale
+          const seat = seatFootOnGround(swing, it.rig.legLength, targetY - (y + off[1]), pitch, it.scale)
+          lg.rotation.x = seat.angle
+          lg.scale.y = seat.stretch
+        }
+        if (import.meta.env.DEV) {
+          // The live no-skate probe (point 300) reads leg 0's foot straight out
+          // of the rendered leg group, so it tracks what is DRAWN.
+          const lg = legs[0]
+          const w = window as unknown as Record<string, unknown>
+          const info = (w.__placePanoramaWildlifeInfo ?? {}) as Record<string, Record<string, unknown>>
+          if (lg && info[i]) {
+            // Read through the leg group's OWN matrix, so the seating (its
+            // angle and its telescoping reach, `scale.y`) is included exactly as
+            // the renderer applies it.
+            const foot = footProbe.set(0, -it.rig.legLength, 0)
+            lg.updateWorldMatrix(true, false)
+            lg.localToWorld(foot)
+            info[i].foot = { x: foot.x, y: foot.y, z: foot.z }
+            info[i].stretch = lg.scale.y
+            // How far the foot sits off the ground DRAWN under it — the
+            // point-300 slope gate: a planted foot on a dune must touch, not
+            // hover over, the incline it stands on.
+            info[i].footGap =
+              foot.y -
+              (panoramaStandY(foot.x, foot.z, lat, lon, seed, centerH, innerRadius, camX, camZ, EYE_HEIGHT) -
+                pw.sinkEpsilon)
+          }
         }
       }
     })
@@ -1470,9 +1550,9 @@ function TableMountainSkyline({ placeId }: { placeId: string }) {
  * dressing appear where they actually lie, direction-true. Fades into the
  * sky at its top and into the backdrop ground at its bottom; without a
  * capture (snapshot load, ferry arrival) the geometry backdrop alone stands.
+ * Its radius lives in ./backdrop — the walkable disc is sized against it
+ * (point 390), so the two must read from one constant.
  */
-const PANORAMA_RADIUS = 200
-
 function TravelPanorama({ placeId }: { placeId: string }) {
   const seed = useGame((s) => s.seed)
   const capture = useFreshPanoramaCapture(placeId, seed)
@@ -1924,7 +2004,7 @@ export function PlaceScene() {
 
   // Reset position when the place changes (just inside the southern edge).
   useEffect(() => {
-    player.current = { x: 0, z: (layout?.radius ?? PLACE_RADIUS) - 10, yaw: 0 }
+    player.current = { x: 0, z: layout?.spawnZ ?? PLACE_RADIUS - SPAWN_INSET, yaw: 0 }
     walk.current = { velF: 0, velS: 0, phase: 0, roll: 0 }
     // Seed the shared position for the town-plan map marker (point 89).
     placePlayerPosition.x = player.current.x
@@ -2324,19 +2404,20 @@ export function PlaceScene() {
       />
 
       {/* Real-surroundings panorama behind the settlement (design.md §2) */}
-      <LandscapeBackdrop lat={place.lat} lon={place.lon} seed={seed} innerRadius={layout.radius + 12} />
+      <LandscapeBackdrop lat={place.lat} lon={place.lon} seed={seed} innerRadius={layout.radius + BACKDROP_INNER_OFFSET} />
       <TravelPanorama placeId={place.id} />
       <TableMountainSkyline placeId={place.id} />
       <GizaSkyline placeId={place.id} />
-      <PanoramaWildlife region={place.region} placeId={place.id} seed={seed} innerRadius={layout.radius + 12} lat={place.lat} lon={place.lon} skyHorizon={sky.horizon} />
+      <PanoramaWildlife region={place.region} placeId={place.id} seed={seed} innerRadius={layout.radius + BACKDROP_INNER_OFFSET} lat={place.lat} lon={place.lon} skyHorizon={sky.horizon} />
 
-      {/* Ground disc with procedural mottling. GROUND_DISC_SEGS, not 48: a
+      {/* Ground disc with procedural mottling. Many segments, not 48: a
           48-gon around a 74 m plateau puts 9.7 m straight chords on the ground
           line, and from a few metres away that reads as the hard straight edge
           of point 381 — while its 0.16 m inset also uncovered the backdrop's
-          tucked rim ramp as a scalloped hairline. */}
+          tucked rim ramp as a scalloped hairline. The count follows the disc's
+          own edge (point 390 widened Giza's), so the chord never grows. */}
       <mesh name="ground-disc" rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow material={mats.ground}>
-        <circleGeometry args={[layout.radius + 14, GROUND_DISC_SEGS]} />
+        <circleGeometry args={[layout.radius + GROUND_DISC_OVERHANG, groundDiscSegments(layout.radius + GROUND_DISC_OVERHANG)]} />
       </mesh>
 
       {layout.interactives.map((it, i) => {

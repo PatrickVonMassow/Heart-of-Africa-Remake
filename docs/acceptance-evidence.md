@@ -829,7 +829,37 @@ enter-with-SPACE, the three pyramids + buried Sphinx rendering, the
 collidable-and-no-trade/elder site and the warm desert-sand ground
 gated in `scripts/verify/polish.mjs` (screenshot 139);
 the same period casing cap and half-buried Sphinx carry into Cairo's
-western skyline (point 82). The §19.10
+western skyline (point 82).
+The walkable ground of an OPEN-PLAIN place reaches to where the picture
+stops offering ground (point 390): at Giza the desert runs unbroken to the
+horizon, so a 60 m disc ended the world ~18 m past the outermost mass, in
+flat empty sand. MEASURED against the drawn surroundings — 720 azimuths at
+eye height on the real geodata — the backdrop ground stays open land out to
+its own outer edge (340) over the western and southern half, breaks at 191
+on the median azimuth, and has exactly ONE seed-independent near break: the
+Nile's water band at 76, in the eastern arc. The backdrop's relief is no
+target, being a compressed miniature anchored to the disc edge, so it begins
+immediately past the plate at ANY radius. The binding limit is therefore the
+§2.5 panorama band: the disc takes the LARGEST radius that still leaves the
+outermost drifting silhouette in front of it (`openPlainWalkRadius` in
+`src/scenes/place/backdrop.ts`, derived from `PANORAMA_RADIUS` — 98 m, with
+~56 m of open desert past the monuments), the arrival distance keeps its own
+value (`spawnZ`) so the approach view of the pyramid row does not widen with
+the disc, and the ground disc's segment count follows its edge so the chord
+never grows into the straight ground line of point 381. The site carries no
+flora, no lanes and nine fixed ambient anchors, and its tuft scatter is
+count-fixed, so nothing on the disc scales with the radius.
+Verifiable: the sweep, the derivation, its maximality, the preserved
+arrival distance and the desert left past the monuments are pure-tested in
+`src/scenes/place/gizaSite.test.ts`; the point-381 seam rules are swept at
+the new disc radius and the chord bound pinned in
+`src/scenes/place/backdrop.test.ts`; and the picture — from beside the
+monument row looking outward and from the walkable edge, ground running to
+where the backdrop takes over — is gated in `scripts/verify/polish.mjs`
+(screenshots 390-giza-sand-open / 390-giza-sand-edge, both backends). The
+outward standpoint is deliberately NOT the geometric centre: Khafre stands
+on (0, 0), so a camera there is inside the pyramid.
+The §19.10
 campfire can CAST SHADOWS (point 289, level-driven per point 276 part B):
 the fire light renders a cube shadow map (remounted on the variant, also
 behind the global shadow switch), with an invisible player-body proxy so
