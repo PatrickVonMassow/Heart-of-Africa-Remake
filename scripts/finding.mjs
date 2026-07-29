@@ -68,8 +68,11 @@ function ensureIndexed() {
   }
 }
 
+/** Who recorded this. The session id is NOT in the shell environment, so a
+ *  bare call would stamp every entry "unknown" — the caller passes --session,
+ *  and the env vars stay as a fallback for a harness that does export one. */
 function sessionTag() {
-  const raw = process.env.CLAUDE_SESSION_ID || process.env.HOA_SESSION_ID || ''
+  const raw = flag('--session') || process.env.CLAUDE_SESSION_ID || process.env.HOA_SESSION_ID || ''
   return raw ? raw.slice(0, 8) : 'unknown'
 }
 
