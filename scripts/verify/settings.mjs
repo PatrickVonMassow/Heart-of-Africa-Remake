@@ -208,6 +208,18 @@ check(
 const SENS = await page.evaluate(() => window.__balance.mouseSensitivity)
 const PITCH_LIMIT = await page.evaluate(() => (window.__balance.lookPitchLimitDeg * Math.PI) / 180)
 
+/** Wait until the scene's own frame loop has carried the look onto the camera —
+ *  the application's clock, never the wall clock. */
+const lookSettled = () =>
+  page.waitForFunction(
+    () =>
+      window.__placeCamera &&
+      window.__placePlayer &&
+      Math.abs(window.__placeCamera.rotation.x - window.__placePlayer.pitch) < 1e-9,
+    null,
+    { timeout: 15000 },
+  )
+
 async function resetLook() {
   await page.evaluate(() => {
     window.__ui.getState().setDialog(null)
@@ -218,21 +230,21 @@ async function resetLook() {
     p.yaw = 0
     p.pitch = 0
   })
-  await page.waitForTimeout(60)
+  await lookSettled()
 }
 
-/** Dispatch `times` mouse moves of (dx, dy) px and read the resulting look. */
+/** Dispatch `times` mouse moves of (dx, dy) px and read the resulting look. The
+ *  handler applies them synchronously, so the state is readable at once. */
 async function mouseLook(dx, dy, times = 1) {
-  await page.evaluate(
+  return await page.evaluate(
     ({ dx, dy, times }) => {
       for (let i = 0; i < times; i++) {
         window.dispatchEvent(new MouseEvent('mousemove', { movementX: dx, movementY: dy, bubbles: true }))
       }
+      return { yaw: window.__placePlayer.yaw, pitch: window.__placePlayer.pitch }
     },
     { dx, dy, times },
   )
-  await page.waitForTimeout(40)
-  return await page.evaluate(() => ({ yaw: window.__placePlayer.yaw, pitch: window.__placePlayer.pitch }))
 }
 
 await resetLook()
@@ -269,6 +281,7 @@ check(
 
 // The camera itself carries the pitch (YXZ), and the bob stays a position
 // offset: the eye height is unchanged by looking around.
+await lookSettled()
 const camAtClamp = await page.evaluate(() => ({
   x: window.__placeCamera.rotation.x,
   order: window.__placeCamera.rotation.order,
@@ -304,28 +317,34 @@ const tallest = await page.evaluate(() => {
   return best
 })
 if (tallest) {
-  // Stand just clear of the building and look up at its roof line.
+  // Stand just clear of the building, on its INWARD side: the layout is seeded
+  // per run, so a tall house near the rim would otherwise put the standpoint
+  // outside the walkable radius — which leaves the settlement (design.md §2.3)
+  // and photographs the travel scene instead.
   const stand = await page.evaluate(
-    ({ b, delta }) => {
+    ({ b }) => {
       const len = Math.hypot(b.x, b.z) || 1
       const gap = b.r + 4
       const p = window.__placePlayer
-      p.x = b.x + (b.x / len) * gap
-      p.z = b.z + (b.z / len) * gap
+      p.x = b.x - (b.x / len) * gap
+      p.z = b.z - (b.z / len) * gap
       p.yaw = Math.atan2(-(b.x - p.x), -(b.z - p.z))
       p.pitch = 0
-      return { x: p.x, z: p.z, delta }
+      return { x: p.x, z: p.z, radius: window.__placeLayout.radius }
     },
-    { b: tallest, delta: 0 },
+    { b: tallest },
   )
-  await page.waitForTimeout(120)
   // Drive the pitch live rather than assigning it: same path as the player's.
   await mouseLook(0, Math.round(0.75 / SENS))
   await shot('143-look-up-rooftop', {
     local: { x: tallest.x, y: tallest.top, z: tallest.z },
     label: 'the roof line overhead with the view pitched up',
   })
-  check('the up-pitched frame stands where it should', Number.isFinite(stand.x), `at ${stand.x.toFixed(1)}/${stand.z.toFixed(1)}`)
+  check(
+    'the up-pitched frame stands inside the settlement',
+    Math.hypot(stand.x, stand.z) < stand.radius,
+    `at ${stand.x.toFixed(1)}/${stand.z.toFixed(1)} of radius ${stand.radius}`,
+  )
 }
 
 // Looking down at one's own feet: the ground the player stands on.
@@ -354,7 +373,6 @@ const edge = await page.evaluate(() => {
   p.pitch = 0
   return r
 })
-await page.waitForTimeout(120)
 // A 20° downward look holds BOTH the disc edge a few metres ahead and the
 // ground beyond it inside the frame's 25° half-FOV.
 await mouseLook(0, -Math.round(0.35 / SENS))
