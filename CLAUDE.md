@@ -263,9 +263,9 @@ old→new coverage map live in `scripts/verify/README.md`.
   at it. Each open TASKS point is implemented by a WORKTREE-ISOLATED subagent on
   its own `feat/<point>-<slug>` branch (gates green, branch pushed, NOT merged by
   the agent — the main session merges); a POOL of such agents runs in PARALLEL on
-  NON-OVERLAPPING files. Infra, guard, doc and dashboard work too. What stays at
-  the main session: the picture-verification on BOTH backends, the serial
-  merge → fast-gate → tick → deploy → cleanup, and the Artifact publish
+  NON-OVERLAPPING files. Infra, guard, doc and dashboard-restructure work too.
+  What stays at the main session: the picture-verification on BOTH backends, the
+  serial merge → fast-gate → tick → deploy → cleanup, and the Artifact publish
   (URL-bound).
 - **Delegation brief instead of a reading assignment (point 365).** A delegated
   agent receives its point as a BRIEF: `node scripts/point-brief.mjs <N>` prints

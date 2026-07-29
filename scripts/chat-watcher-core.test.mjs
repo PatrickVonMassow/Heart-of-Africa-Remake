@@ -17,6 +17,7 @@ import {
 } from './chat-watcher-core.mjs'
 import { assessClaim } from './batch-claim-core.mjs'
 import { assessEvent, makeEnvelope } from './chat-core.mjs'
+import { claudeExeBase, findClaudeExe } from './batch-autostart-core.mjs'
 import { openPointStatus } from './tasks-source.mjs'
 
 const ok = { accepted: true, paused: false, formatAlarm: false, ownerAlive: false, responderLive: false, claimHonoured: false }
@@ -386,6 +387,45 @@ describe('ackPlan — consumed only against EVIDENCE that the responder answered
     expect(ackPlan({ handed, pending })).toEqual([])
     expect(ackPlan({ handed, pending, spawnedAt })).toEqual([])
     expect(ackPlan({ handed, pending, actedAt: 5 })).toEqual([])
+  })
+})
+
+describe('findClaudeExe — the version sort, proven without an install', () => {
+  const join = (...p) => p.join('/')
+  const tree = (dirs, withExe = dirs) => ({
+    base: 'base',
+    readdir: () => dirs,
+    exists: (p) => withExe.some((d) => p === `base/${d}/claude.exe`),
+    join,
+  })
+
+  it('picks the NEWEST version numerically — 1.10.0 beats 1.9.0', () => {
+    expect(findClaudeExe(tree(['1.9.0', '1.10.0', '1.2.0']))).toBe('base/1.10.0/claude.exe')
+  })
+
+  it('ignores a version directory that holds no claude.exe', () => {
+    expect(findClaudeExe(tree(['1.11.0', '1.9.0'], ['1.9.0']))).toBe('base/1.9.0/claude.exe')
+  })
+
+  it('returns null when nothing qualifies, and never throws on an unreadable base', () => {
+    expect(findClaudeExe(tree(['1.0.0'], []))).toBe(null)
+    expect(
+      findClaudeExe({
+        base: 'nope',
+        readdir: () => {
+          throw new Error('ENOENT')
+        },
+        exists: () => true,
+        join,
+      }),
+    ).toBe(null)
+    expect(findClaudeExe()).toBe(null)
+  })
+
+  it('builds its base under LOCALAPPDATA', () => {
+    expect(claudeExeBase({ LOCALAPPDATA: 'C:/x' })).toBe(
+      'C:/x/Packages/Claude_pzs8sxrjxfjjc/LocalCache/Roaming/Claude/claude-code',
+    )
   })
 })
 
