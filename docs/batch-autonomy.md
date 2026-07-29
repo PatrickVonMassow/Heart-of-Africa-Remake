@@ -42,6 +42,14 @@ outside the agent's control.
    rather than run — the whole file executes at module load, so a bare `import()`
    of it (a syntax check, a tooling scan) used to be indistinguishable from
    running it, and once launched a session inside a git worktree.
+5. **Message watcher `scripts/chat-watcher.mjs`** (29.07.2026). A long-lived local
+   process subscribed to the chat INBOX topic, so a message arriving into an idle
+   machine wakes a light responder within seconds instead of waiting for (4). It
+   is NOT a second driver: it spawns only with no live owner and no honoured
+   claim, files a bounded `batch-claim` for the responder's lifetime, and obeys
+   the same pause and format-alarm stops as (4). It gets no scheduler of its own —
+   (4) is its supervisor and starts, restarts and stops it. See "The board also
+   runs BACK" below.
 
 ## Failure-mode table
 
@@ -62,6 +70,7 @@ outside the agent's control.
 | 13 | Session ENDS at a point boundary (27.07.2026, deliberate — the context is the batch's dominant cost) | (4) the launcher spawns the successor once the old pid is provably dead; `batch-progress-guard` allows the stop only against a verified-closed point AND an armed task | a few idle minutes per point, traded for a fresh context |
 | 14 | The scheduled task is DISABLED while the boundary is in use | the guard reads the task's REAL state each time and blocks the stop when it is not armed (`unknown` counts as unarmed), so the session keeps working instead of stranding the batch | the user must re-arm it (`Enable-ScheduledTask`, elevated) |
 | 15 | **The RUNTIME kills the session for waiting on a delegated agent** (28.07.2026, four deaths in one afternoon) | the spawn carries `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0`, so a `claude -p` waits indefinitely for its background tasks instead of terminating at 600 s; what bounds a wait instead is PROGRESS — see the section below | none for a healthy wait; a genuinely frozen one is reported and taken over after six launcher ticks (90 min), and only while the declaration is the owner's last word |
+| 16 | The user writes from the phone and NOTHING is running (29.07.2026) | (5) the watcher wakes a light responder within seconds under a bounded claim; if the watcher is itself down, (4) still delivers the message into the next spawn prompt | ≤ 15 min in the watcher-down case — the pre-watcher bound, never worse |
 
 ## The hard singleton (24.07.2026 — replaces the advisory lock)
 
@@ -787,14 +796,102 @@ CSP with no fetch, XHR or WebSocket to any host, so a page there cannot send
 anything anywhere. Where that mirror is still open, the section renders a
 localized "the chat needs the web board" notice instead of a dead input.
 
-**What it guarantees, and what it does not.** A message reaches a RUNNING session
-within **seconds** — at its next tool call — and a session that must be spawned
-first within one launcher tick, **15 minutes**. Both bounds come from reusing
-something that already runs: the launcher ticks and already speaks to the
-network, and the PostToolUse hook `scripts/lock-heartbeat-hook.mjs` already runs
-on every single tool call. Neither needs a new process or a new schedule. One
-follow-up remains — a wake-on-message watcher, so a message also *starts* a
-stopped session instead of waiting for the next tick.
+**What it guarantees, in each mode.** A message reaches a RUNNING session within
+**seconds** — at its next tool call — and it reaches an IDLE machine within
+**seconds** too, because the watcher below wakes a responder for it. The
+launcher's 15-minute tick is now only the BACKSTOP: it is what still delivers if
+the watcher is down, and it is what brings the watcher back. The first two bounds
+come from reusing something that already runs (the launcher ticks and already
+speaks to the network; the PostToolUse hook `scripts/lock-heartbeat-hook.mjs`
+already runs on every tool call); the third costs one open connection.
+
+| the machine is… | who delivers | bound |
+|---|---|---|
+| running a batch session | the PostToolUse hook, from the local spool | seconds |
+| idle, watcher up | the watcher wakes a light responder | seconds |
+| idle, watcher down | the next launcher tick spawns a session with the message in its prompt | ≤ 15 min |
+| paused by the user | nobody — the message is spooled and waits for the go | until resumed |
+
+**The watcher: a message wakes the machine** (`scripts/chat-watcher.mjs`, the
+decisions pure in `scripts/chat-watcher-core.mjs`). A long-lived local process
+subscribes to the INBOX topic over ntfy's streaming `/json` endpoint — one open
+connection, no model, no tokens while nothing happens. It is a subscription and
+not a poll for two reasons: a process polling every few seconds walks into ntfy's
+free-tier rate limit, and a poll cannot be faster than its interval. `/sse` was
+available and refused: both are one connection, but the JSON stream is
+byte-for-byte what `parseNtfyLine` already reads, so a streamed message and a
+polled one go through literally the same verification.
+
+**It must not become a second batch session, and that shaped everything.** The
+first design said "use the same lock as the launcher", which is self-defeating in
+both directions: taking the OWNER lock makes the woken session the batch owner,
+and `progressGuardDecision` then conscripts it into working the whole queue — the
+opposite of a quick answer; taking NO lock makes it exactly the parallel
+top-level session `classifyParallel` raises an alert about, and that alert blocks
+the real owner's turn end. The compatible channel already existed: the watcher
+spawns ONLY when `assessOwner` reports no live owner AND no honoured claim, and
+for the responder's lifetime it files a BOUNDED `batch-claim` — already a reason
+for the launcher to stand down, already the one exclusion `classifyParallel`
+knows. It never touches the pending-spawn conversion.
+
+**The claim names the WATCHER's own process, and that is the load-bearing
+detail.** `assessClaim` honours a claim only while the recorded pid exists and
+started when the claim says it did, so a watcher that is SIGKILLed, or a machine
+that reboots, releases the claim by ceasing to exist — there is no exit path on
+which a dead watcher leaves the batch reserved, and the 30-minute expiry is only
+the second bound. Naming the RESPONDER's pid instead reads better and is wrong:
+the responder's own SessionStart hook would resolve that claim as ITS OWN
+(`resolveOwnership` matches by process) and would then acquire the owner lock —
+precisely the outcome the paragraph above forbids. As it stands the responder is
+stood down by the ordinary hook, which is exactly right: it answers the user and
+touches nothing else.
+
+**The same stops as the launcher.** `.claude/batch-paused` and the work-order
+format alarm both suppress a wake (the alarm rule itself is single-sourced in
+`scripts/tasks-source.mjs`, so the launcher and the watcher cannot drift). A
+live owner suppresses it too — stage 2 is already delivering to that session.
+
+**The responder is LIGHT.** Its prompt forbids the work order: read the message,
+answer with `scripts/chat-reply.mjs`, append a point if the message is an
+instruction, then exit. A one-line question does not pay for a batch
+orientation. It is bounded at ten minutes, after which it is killed and the
+reservation released, and the messages it was handed are marked consumed only
+after a CLEAN exit — a crashed responder leaves them for the next session, the
+same at-least-once discipline the launcher follows.
+
+**Lifecycle: no second scheduled task.** `HoA-Batch-Autostart` already runs every
+few minutes, at boot included, and is the one thing here that runs when nothing
+else does — so it is the supervisor. Each tick asks `watcherSupervision` whether
+the watcher is alive (by pid AND start time, so a recycled pid is never mistaken
+for it) and starts one if it is not, kills it while the batch is paused, and
+leaves a healthy one alone. Start-at-boot, restart-after-crash and stop-on-pause
+are then three readings of one line. A responder orphaned by a crashed watcher is
+ADOPTED by its successor rather than duplicated. Everything the watcher spawns
+carries `windowsHide: true` (point 401 — a console window popping up steals the
+user's focus, and this process wakes while the user is elsewhere), and the
+watcher REFUSES to run from a git worktree, where its claim and pidfile would
+land in a checkout nothing reads.
+
+**A reconnect replays and decides nothing twice.** A dropped stream is resumed
+from its own cursor with one second of overlap, and ntfy replays what it still
+holds; the ledger of seen ntfy AND envelope ids — seeded at start from the spool,
+consumed messages included — drops every one of them as `duplicate`. A COLD start
+replays only the last 15 minutes rather than the full 12-hour retention: anything
+older has already been through a launcher poll, so missing it costs exactly the
+pre-watcher behaviour, while replaying half a day would wake a responder for
+every instruction in it.
+
+    node scripts/chat-watcher.mjs --dry-run  # subscribe, DECIDE, spawn nothing
+    node scripts/chat-watcher.mjs --status   # is one running, and what does it hold
+    node scripts/chat-watcher.mjs --stop     # stop it (the next tick starts it again)
+
+`--dry-run` is how the subscription gets PROVEN. The live path can only be
+observed on a machine with no session running, which is the machine nobody is
+sitting at — so the dry run opens the real subscription, verifies each arriving
+envelope through the same `chat-core` path, prints one
+`{event, decision, reason}` line per event and spawns, claims and spools nothing.
+From a session that is holding the batch lock it reports `skip / owner-live`, and
+that line arriving within seconds of a phone message is the proof.
 
 **Per-tool-call delivery, and the two rules that shape it.** The hook reads the
 LOCAL spool only — a hook on every tool call must never do network I/O — and

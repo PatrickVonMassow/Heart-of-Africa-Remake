@@ -258,15 +258,13 @@ old→new coverage map live in `scripts/verify/README.md`.
     (If a change genuinely needs the user's eyes BEFORE it is safe to land, that
     is the rare exception: set up a branch-preview deploy rather than merge
     unverified.)
-- **Maximal delegation (user decision 22.07.2026, permanent process).** The
-  main session delegates the MAXIMUM to subagents so as little as possible
-  bottlenecks at it. Each open TASKS point is implemented by a
-  WORKTREE-ISOLATED subagent on its own `feat/<point>-<slug>` branch
-  (gates green, branch pushed, NOT merged by the agent — the main session
-  merges); a POOL of such agents runs in PARALLEL on NON-OVERLAPPING files.
-  Infra, guard, doc and dashboard-restructure work is delegated the same
-  way. What stays at the main session — the deliberate, minimal bottleneck:
-  the picture-verification on BOTH backends, the serial
+- **Maximal delegation (user decision 22.07.2026, permanent process).** The main
+  session delegates the MAXIMUM to subagents so as little as possible bottlenecks
+  at it. Each open TASKS point is implemented by a WORKTREE-ISOLATED subagent on
+  its own `feat/<point>-<slug>` branch (gates green, branch pushed, NOT merged by
+  the agent — the main session merges); a POOL of such agents runs in PARALLEL on
+  NON-OVERLAPPING files. Infra, guard, doc and dashboard work too. What stays at
+  the main session: the picture-verification on BOTH backends, the serial
   merge → fast-gate → tick → deploy → cleanup, and the Artifact publish
   (URL-bound).
 - **Delegation brief instead of a reading assignment (point 365).** A delegated
@@ -275,13 +273,12 @@ old→new coverage map live in `scripts/verify/README.md`.
   cross-referenced point, and a REFERENCE MAP naming where every `§` resolved.
   Measured, that is ~1.8k tokens median against ~108k for reading TASKS.md and
   design.md whole — and it does not grow with the queue, because the parsing
-  happens in a subprocess rather than in a context. The prompt carries the brief
-  and forbids wholesale reads; a NAMED section may be read on demand, and an
-  insufficient brief is ESCALATED, not guessed around. The brief FAILS LOUDLY on
-  a reference that resolves nowhere, and where one section number exists in two
-  documents it prints BOTH — no resolver can decide that, so the reader is told
-  instead of being handed a plausible wrong answer. Every brief carries the
-  revision it was cut from; regenerate rather than reuse an old one.
+  happens in a subprocess. The prompt carries the brief and forbids wholesale
+  reads; a NAMED section may be read on demand, and an insufficient brief is
+  ESCALATED, not guessed around. The brief FAILS LOUDLY on a reference that
+  resolves nowhere, and where one section number exists in two documents it
+  prints BOTH — no resolver can decide that, so the reader is told. Every brief
+  carries the revision it was cut from; regenerate rather than reuse an old one.
 - **Context boundary at a point boundary (users 27./28.07.2026).** 87–94 % of
   the spend sat above 150k context — one session carried point after
   point. A batch session ENDS at its boundary, and the boundary is
@@ -291,12 +288,15 @@ old→new coverage map live in `scripts/verify/README.md`.
   `HoA-Batch-Autostart`, then marks the lock HANDED OVER so the launcher spawns
   the successor — five hours were lost to a session that stopped holding it.
   Attended, ask for `/clear`. The "cheaper model" idea stays REJECTED.
-  THE WAY BACK (user 28.07.2026): a window the user returns to runs `node
-  scripts/batch-claim.mjs --session <id>` (the stand-down message prints it with
-  the id filled in); the owner sees the claim at its next hook, finishes — never
-  mid-merge, never with an agent or a verification running — releases, and the
-  same command then takes the batch. A claim expires, a dead claimant's is
-  ignored, and exactly one session ever wins.
+  THE WAY BACK (28.07.2026): a returning window runs `node
+  scripts/batch-claim.mjs --session <id>` (the stand-down prints it filled in);
+  the owner sees it at its next hook, finishes — never mid-merge, never with an
+  agent or a verification running — releases, and the same command takes it. A
+  claim expires, a dead claimant's is ignored, one session ever wins.
+  A MESSAGE WAKES IT TOO (29.07.2026): `scripts/chat-watcher.mjs` subscribes to
+  the chat inbox and spawns a light responder — only with no live owner and no
+  honoured claim, under a bounded claim and the launcher's own stops; the
+  launcher tick supervises it.
 - **Model policy (user decision 25.07.2026, points 309 + the role revision).**
   ONLY three models may author work on this project, each with its own role:
   **Opus 5** is the WORKER at any difficulty; **Fable 5** is used ONLY for the
@@ -338,7 +338,7 @@ old→new coverage map live in `scripts/verify/README.md`.
 - **Let a subprocess answer, never the context (point 365, generalised).** A question
   about the repository is answered by a command whose OUTPUT is small — a count, a
   section, a brief — never by lifting a whole file into a context. The brief is this
-  rule applied to work orders; it holds for every other document too.
+  rule applied to work orders.
 - Keep comments brief and factual. Mark placeholder values as such.
 - After each major system, run the self-verification (§7.2) and record the
   result.
