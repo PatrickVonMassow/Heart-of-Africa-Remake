@@ -179,17 +179,17 @@ export const de: Strings = {
     mapToggle: 'Karte (M)',
     useTooltip: 'Anklicken, um es hier einzusetzen',
     passiveTooltip: 'Wirkt automatisch, solange du es dabei hast',
-    canteenTooltip: 'Füllstand der Feldflasche — füllt sich an Süßwasser wieder',
+    canteenTooltip: 'Füllstand der Feldflasche – füllt sich an Süßwasser wieder',
     presentTooltip: 'Einem Dorf zeigen (löst eine Reaktion aus)',
-    webglFallback: 'Grafik-Hinweis: WebGPU ist nicht verfügbar — das Spiel läuft im WebGL-2-Kompatibilitätsmodus.',
+    webglFallback: 'Grafik-Hinweis: WebGPU ist nicht verfügbar – das Spiel läuft im WebGL-2-Kompatibilitätsmodus.',
     webglFallbackDismiss: 'Verstanden',
     fps: (fps) => `${fps} FPS`,
     healthBar: 'Gesundheit',
     movementPenalty: {
-      jungle: 'Der dichte Dschungel bremst — mit einer Machete im Gepäck geht es schneller voran.',
-      water: 'Schwimmen ist langsam und gefährlich — mit einem Kanu käme ich schneller und sicherer übers Wasser.',
-      mountain: 'Der steile Fels bremst den Aufstieg — mit einem Seil geht es sicherer und schneller.',
-      canoeOnLand: 'Das Kanu ist an Land totes Gewicht und bremst mich — für lange Landwege lasse ich es besser im Lager.',
+      jungle: 'Der dichte Dschungel bremst – mit einer Machete im Gepäck geht es schneller voran.',
+      water: 'Schwimmen ist langsam und gefährlich – mit einem Kanu käme ich schneller und sicherer übers Wasser.',
+      mountain: 'Der steile Fels bremst den Aufstieg – mit einem Seil geht es sicherer und schneller.',
+      canoeOnLand: 'Das Kanu ist an Land totes Gewicht und bremst mich – für lange Landwege lasse ich es besser im Lager.',
     },
     touch: {
       moveStick: 'Bewegen (ziehen zum Gehen)',
@@ -198,9 +198,9 @@ export const de: Strings = {
   },
 
   prompts: {
-    interact: (label) => `Space — ${label}`,
-    openCamp: 'C — Lager öffnen',
-    enterPlace: (name) => `Space — ${name} betreten`,
+    interact: (label) => `Space – ${label}`,
+    openCamp: 'C – Lager öffnen',
+    enterPlace: (name) => `Space – ${name} betreten`,
   },
 
   labels: {
@@ -245,20 +245,20 @@ export const de: Strings = {
     copied: 'Spielzustand in die Zwischenablage kopiert.',
     close: 'Schließen (F6)',
     descriptionLabel: 'Was ist schiefgelaufen?',
-    descriptionPlaceholder: 'Beschreibe, was du gesehen hast — was du gerade getan hast und was falsch aussah.',
+    descriptionPlaceholder: 'Beschreibe, was du gesehen hast – was du gerade getan hast und was falsch aussah.',
     contents: 'Das Archiv enthält das Bild, den vollständigen Spielzustand und deine Beschreibung. Du kannst es ungeöffnet weitergeben.',
     saved: 'Fehlerbericht gespeichert.',
     report: {
-      heading: 'The Heart of Africa — Fehlerbericht',
+      heading: 'The Heart of Africa – Fehlerbericht',
       description: 'Was schiefgelaufen ist',
       noDescription: '(keine Beschreibung angegeben)',
       environment: 'Umgebung',
       reproduction: 'Reproduktion',
       files: 'Dateien in diesem Archiv',
-      pictureNote: 'die 3-D-Szene, aus dem Canvas zurückgelesen. Sie enthält WEDER die Anzeigeleiste NOCH eine schwebende Beschriftung — die sind HTML und kommen nie ins Bild.',
-      pictureMissing: '(kein Bildschirmfoto: die Aufnahme ist fehlgeschlagen — Zustand und Beschriftungsliste sind trotzdem vollständig.)',
+      pictureNote: 'die 3-D-Szene, aus dem Canvas zurückgelesen. Sie enthält WEDER die Anzeigeleiste NOCH eine schwebende Beschriftung – die sind HTML und kommen nie ins Bild.',
+      pictureMissing: '(kein Bildschirmfoto: die Aufnahme ist fehlgeschlagen – Zustand und Beschriftungsliste sind trotzdem vollständig.)',
       stateNote: 'der vollständige Spielzustand, die Balance-Werte und der UI-Zustand als JSON.',
-      overlayNote: 'jede in diesem Moment sichtbare Beschriftung und jedes Anzeigeelement, mit Text und Bildschirmrechteck — hier stehen die Anzeigeleiste und die Kartenbeschriftungen.',
+      overlayNote: 'jede in diesem Moment sichtbare Beschriftung und jedes Anzeigeelement, mit Text und Bildschirmrechteck – hier stehen die Anzeigeleiste und die Kartenbeschriftungen.',
       duplicateNote: 'Beschriftungen mit gleichem Text an überlappenden Stellen',
     },
   },
@@ -276,11 +276,11 @@ export const de: Strings = {
     remaining: (time) => `Noch etwa ${time}`,
     abortHint: 'Esc bricht den Benchmark ab und stellt alle Einstellungen wieder her.',
     doneTitle: 'Benchmark abgeschlossen',
-    abortedNote: 'Der Lauf wurde abgebrochen — der Bericht enthält nur die fertigen Einstellungen.',
+    abortedNote: 'Der Lauf wurde abgebrochen – der Bericht enthält nur die fertigen Einstellungen.',
     headline: {
       gpu: 'Maßgeblich ist die GPU-Spalte: echte GPU-Zeiten vom Grafiktreiber, unabhängig von der Bildwiederholrate.',
       cpu: (reason) =>
-        `Keine GPU-Zeiten verfügbar (${reason}), und die Bildzeiten sind durch die Bildwiederholrate gedeckelt. Nur die CPU-Spalte ist aussagekräftig — die Kosten der Grafikkarte selbst misst dieser Lauf nicht.`,
+        `Keine GPU-Zeiten verfügbar (${reason}), und die Bildzeiten sind durch die Bildwiederholrate gedeckelt. Nur die CPU-Spalte ist aussagekräftig – die Kosten der Grafikkarte selbst misst dieser Lauf nicht.`,
       wall: 'Maßgeblich ist die Bildzeit-Spalte: sie ist hier nicht durch die Bildwiederholrate gedeckelt und misst das ganze Bild.',
     },
     download: 'Bericht herunterladen',
@@ -290,53 +290,53 @@ export const de: Strings = {
     unavailable: 'Der Benchmark braucht die laufende 3D-Ansicht.',
     failed: (message) => `Benchmark abgebrochen: ${message}`,
     lowProfile: {
-      title: 'Kostenrangliste auf Niedrig — wo als Nächstes kürzen:',
+      title: 'Kostenrangliste auf Niedrig – wo als Nächstes kürzen:',
       dominatedBy: (list) => `Auf der niedrigen Grafikstufe dominiert das Bild: ${list}.`,
     },
   },
 
   toasts: {
-    oceanBlocked: 'Der Ozean ist unpassierbar — ich kann den Kontinent nicht verlassen.',
-    mountainNoRopeWarn: 'Ohne Seil wird der Aufstieg gefährlich — ein Fehltritt, und ich stürze. Langsam und vorsichtig!',
-    penaltyJungle: 'Der Dschungel bremst mich — eine Machete im Gepäck bahnte den Weg.',
-    penaltyWater: 'Kein Kanu — ich muss hinüberschwimmen, langsam und durchnässt.',
-    penaltyCanoeLand: 'Das Kanu bremst mich an Land — für Landwege besser im Lager lassen.',
+    oceanBlocked: 'Der Ozean ist unpassierbar – ich kann den Kontinent nicht verlassen.',
+    mountainNoRopeWarn: 'Ohne Seil wird der Aufstieg gefährlich – ein Fehltritt, und ich stürze. Langsam und vorsichtig!',
+    penaltyJungle: 'Der Dschungel bremst mich – eine Machete im Gepäck bahnte den Weg.',
+    penaltyWater: 'Kein Kanu – ich muss hinüberschwimmen, langsam und durchnässt.',
+    penaltyCanoeLand: 'Das Kanu bremst mich an Land – für Landwege besser im Lager lassen.',
     valuableAlreadyShown: 'Dieses Dorf hat den Schatz bereits gesehen.',
     boughtFood: 'Eine Woche Proviant gekauft.',
     bought: (name) => `${name} gekauft.`,
     notEnoughMoney: 'Nicht genug Geld.',
     digNoShovel: 'Ohne Schaufel in der Hand kann ich nicht graben.',
     villagerNod: 'Der Alte nickt mir freundlich zu.',
-    journalDndOn: 'Tagebuch-Unterbrechungen aus — Einträge erscheinen still.',
-    journalDndOff: 'Tagebuch-Unterbrechungen an — neue Einträge öffnen das Tagebuch.',
+    journalDndOn: 'Tagebuch-Unterbrechungen aus – Einträge erscheinen still.',
+    journalDndOff: 'Tagebuch-Unterbrechungen an – neue Einträge öffnen das Tagebuch.',
     graphicsLevel: {
-      low: 'Grafik: Niedrig — sparsamste Effekte für die höchste Bildrate.',
-      medium: 'Grafik: Mittel — die ausgewogene Voreinstellung.',
-      high: 'Grafik: Hoch — die reichsten Effekte.',
+      low: 'Grafik: Niedrig – sparsamste Effekte für die höchste Bildrate.',
+      medium: 'Grafik: Mittel – die ausgewogene Voreinstellung.',
+      high: 'Grafik: Hoch – die reichsten Effekte.',
     },
-    debugLoadout: 'Debug: Volle Ausstattung — alles im Gepäck, Geld und Proviant randvoll, kerngesund.',
+    debugLoadout: 'Debug: Volle Ausstattung – alles im Gepäck, Geld und Proviant randvoll, kerngesund.',
     debugCanoeOn: 'Debug: Kanu ins Gepäck genommen.',
     debugCanoeOff: 'Debug: Kanu abgelegt.',
     noMedicine: 'Ich habe keine Medizin mehr.',
-    medicineNotNeeded: 'Weder Fieber noch Wunden — ich hebe die Medizin auf.',
-    inventoryFull: 'Mein Gepäck ist voll — mehr kann ich nicht tragen.',
+    medicineNotNeeded: 'Weder Fieber noch Wunden – ich hebe die Medizin auf.',
+    inventoryFull: 'Mein Gepäck ist voll – mehr kann ich nicht tragen.',
     discovered: (name) => `Entdeckt: ${name}. Die Geographische Gesellschaft wird diesen Bericht bezahlen.`,
     sold: (name, amount) => `${name} für ${amount} $ verkauft.`,
     soldForGifts: (name, count) => `${name} für ${count} ${count === 1 ? 'Gabe' : 'Gaben'} verkauft.`,
-    notEnoughGifts: 'Nicht genug Gaben — hier zählt kein Geld.',
-    bazaarRejected: (name) => `Der Händler winkt ab — mit ${name} wird hier nicht gehandelt.`,
+    notEnoughGifts: 'Nicht genug Gaben – hier zählt kein Geld.',
+    bazaarRejected: (name) => `Der Händler winkt ab – mit ${name} wird hier nicht gehandelt.`,
     graveyardEmpty: 'Die gebleichten Knochen geben kein Elfenbein mehr her.',
     chiefHostile: 'Das Dorf hat meinen Fehltritt nicht vergessen. Das Oberhaupt empfängt mich nicht.',
-    regionShunned: 'Die Kunde von meinem Raub hat sich verbreitet — keine Hütte dieser Region öffnet sich mir mehr.',
-    campPitched: 'Lager aufgeschlagen — ein X auf meiner Karte markiert die Stelle.',
+    regionShunned: 'Die Kunde von meinem Raub hat sich verbreitet – keine Hütte dieser Region öffnet sich mir mehr.',
+    campPitched: 'Lager aufgeschlagen – ein X auf meiner Karte markiert die Stelle.',
     campNeedsFriend: 'Nur ein Ehrenfreund dieser Region darf seine Habe im Dorf zurücklassen.',
-    positionReport: (coords, region) => `Nach meiner Rechnung: ${coords} — Region ${region}.`,
+    positionReport: (coords, region) => `Nach meiner Rechnung: ${coords} – Region ${region}.`,
     orientationGained: 'Zum Dank für die Gabe zeigt man mir die wichtigen Gebäude.',
   },
 
   dialogs: {
-    tradeGreeting: '„Willkommen, Reisender! Sieh dich um — beste Ware, ehrliche Preise."',
-    tradeGreetingVillage: '„Sei gegrüßt, Fremder. Bei uns zählt kein Geld — biete Gaben, so handeln wir."',
+    tradeGreeting: '„Willkommen, Reisender! Sieh dich um – beste Ware, ehrliche Preise."',
+    tradeGreetingVillage: '„Sei gegrüßt, Fremder. Bei uns zählt kein Geld – biete Gaben, so handeln wir."',
     cash: 'Geld',
     giftsHeld: 'Gaben',
     priceGifts: (n) => `${n} ${n === 1 ? 'Gabe' : 'Gaben'}`,
@@ -357,24 +357,24 @@ export const de: Strings = {
     endAudience: 'Audienz beenden (Esc)',
     rob: 'Gewehr ziehen und rauben',
     robConfirm:
-      'Dieses Dorf mit vorgehaltenem Gewehr ausrauben? Das verfeindet die ganze Region für immer — keine Audienzen, Hinweise oder Hilfe mehr, und ein etwaiger Status als "Geehrter Freund" ist unwiederbringlich verloren.',
+      'Dieses Dorf mit vorgehaltenem Gewehr ausrauben? Das verfeindet die ganze Region für immer – keine Audienzen, Hinweise oder Hilfe mehr, und ein etwaiger Status als "Geehrter Freund" ist unwiederbringlich verloren.',
     robConfirmYes: 'Ja, ausrauben',
     robCancel: 'Nein, ablassen',
     robOrphansGoal:
-      'Achtung: Nur diese Region kann dir noch eine Richtung zum Grab lehren, die du noch nicht kennst. Raubst du sie aus, ist dieses Wissen für immer verloren — das Grab könnte unauffindbar werden.',
-    bazaarGreeting: '„Schätze, Effendi! Zeig her, was die Wildnis hergab — oder nimm selbst ein Stück mit heim."',
+      'Achtung: Nur diese Region kann dir noch eine Richtung zum Grab lehren, die du noch nicht kennst. Raubst du sie aus, ist dieses Wissen für immer verloren – das Grab könnte unauffindbar werden.',
+    bazaarGreeting: '„Schätze, Effendi! Zeig her, was die Wildnis hergab – oder nimm selbst ein Stück mit heim."',
     bazaarSell: 'Einen Fund anbieten:',
     bazaarBuy: 'Zum Verkauf:',
     offer: 'Anbieten',
     bid: (name, amount) => `Der Händler bietet ${amount} $ für ${name}.`,
     accept: 'Annehmen',
     decline: 'Ablehnen',
-    agencyGreeting: '„Passagen in jeden Hafen des Kontinents — schnelle Schiffe, ehrliche Preise."',
+    agencyGreeting: '„Passagen in jeden Hafen des Kontinents – schnelle Schiffe, ehrliche Preise."',
     passage: (dest, days) => `Passage nach ${dest} (~${days} Tage)`,
     book: 'Buchen',
     campTitle: 'Lager',
     villageCampTitle: 'Dorflager',
-    campHint: 'Was hier bleibt, macht das Gepäck leichter — doch ein unbewachtes Lager kann geplündert werden.',
+    campHint: 'Was hier bleibt, macht das Gepäck leichter – doch ein unbewachtes Lager kann geplündert werden.',
     villageCampHint: 'Die Dorfbewohner hüten diese Habe wie ihre eigene. Was hier lagert, geht nie verloren.',
     campPack: 'In meinem Gepäck:',
     campContents: 'Hier gelagert:',
@@ -388,14 +388,14 @@ export const de: Strings = {
     victoryText: (days) =>
       `Du hast das Grab des großen Königs gefunden und geborgen. Nach ${days} Tagen Reise durch Wüste und Wildnis ist die Expedition vollendet. Dein Name wird in einem Atemzug mit den großen Entdeckern genannt werden.`,
     remainsReport: (cause, days) =>
-      `Eine Karawane hat die Überreste des Forschers gefunden — ein grausiger Anblick. Alles deutet darauf hin, dass ${cause}. Das Tagebuch, ${days} Tage voller Hoffnungen und Strapazen, endet hier.`,
+      `Eine Karawane hat die Überreste des Forschers gefunden – ein grausiger Anblick. Alles deutet darauf hin, dass ${cause}. Das Tagebuch, ${days} Tage voller Hoffnungen und Strapazen, endet hier.`,
     deathCauses: {
       starvation: 'der Hunger ihn zermürbte, bis er nicht mehr weiterkonnte',
       fever: 'das Fieber ihn fern jeder Hilfe verzehrte',
       dehydration: 'er unter der Wüstensonne verdurstete',
       sunblind: 'er sonnenblind im Kreis irrte, bis die Wüste ihn nahm',
       wounds: 'er seinen Wunden erlag',
-      eaten: 'wilde Tiere ihn überwältigten — es blieb wenig zu begraben',
+      eaten: 'wilde Tiere ihn überwältigten – es blieb wenig zu begraben',
     },
     deadlineExpired: (days) =>
       `Die Geduld der Geldgeber ist erschöpft: Nach ${days} Tagen ohne das Grab wird die Expedition zurückgerufen. Das Herz von Afrika behält sein Geheimnis.`,
@@ -500,12 +500,12 @@ export const de: Strings = {
       mountainFall: 'Sturz beim Klettern',
     },
     stageFailures: {
-      noScene: 'Nur unterwegs auf Reisen — hier gibt es keine Tierwelt.',
-      noSavanna: 'Keine Savanne in der Nähe — begib dich ins offene Grasland.',
-      noWater: 'Kein Wasser in der Nähe — geh näher an einen Fluss oder See.',
-      noPrey: 'Kein geeignetes Tier in der Nähe — reise weiter, bis Wild in Sicht ist.',
-      noCalf: 'Kein Jungtier in der Nähe — reise weiter, bis eine Herde mit Nachwuchs in Sicht ist.',
-      noCub: 'Kein Löwenjunges in der Nähe — Löwinnen ziehen ihre Jungen in der Savanne auf.',
+      noScene: 'Nur unterwegs auf Reisen – hier gibt es keine Tierwelt.',
+      noSavanna: 'Keine Savanne in der Nähe – begib dich ins offene Grasland.',
+      noWater: 'Kein Wasser in der Nähe – geh näher an einen Fluss oder See.',
+      noPrey: 'Kein geeignetes Tier in der Nähe – reise weiter, bis Wild in Sicht ist.',
+      noCalf: 'Kein Jungtier in der Nähe – reise weiter, bis eine Herde mit Nachwuchs in Sicht ist.',
+      noCub: 'Kein Löwenjunges in der Nähe – Löwinnen ziehen ihre Jungen in der Savanne auf.',
       noElephant: 'Keine Elefantenherde in der Nähe.',
     },
     showHidden: 'Versteckte Objekte anzeigen',
@@ -629,69 +629,69 @@ export const de: Strings = {
       campLooted: 'Das geplünderte Lager',
     },
     start:
-      'Kairo, im Januar 1890. [excited]Heute beginnt meine Expedition.[/excited] Mit 250 Dollar in der Tasche, einem Bündel Tauschgaben und mehr Hoffnung als Verstand will ich das Herz von Afrika finden — [awe]das sagenumwobene Grab des großen Königs.[/awe] [breath][somber]Möge das Glück mit mir sein.[/somber]',
+      'Kairo, im Januar 1890. [excited]Heute beginnt meine Expedition.[/excited] Mit 250 Dollar in der Tasche, einem Bündel Tauschgaben und mehr Hoffnung als Verstand will ich das Herz von Afrika finden – [awe]das sagenumwobene Grab des großen Königs.[/awe] [breath][somber]Möge das Glück mit mir sein.[/somber]',
     regionEntry: (p: TextParams) => {
       const texts: Record<string, string> = {
         north:
           '[awe]Die Wüste![pause] Ein Meer aus Sand und Licht, so weit das Auge reicht.[/awe] Die Hitze flimmert über den Dünen, und doch spüre ich eine seltsame Erhabenheit. [pause]Man sagt, die Völker des Nordens lesen die Richtung im Ursprung des Windes. [somber]Ich muss ihre Worte erst verstehen lernen.[/somber]',
         west:
-          'Endlose Savanne, [awe]golden im Abendlicht.[/awe] Schirmakazien stehen wie Wächter in der Weite, und in der Ferne wandern Herden. [excited]Der Westen empfängt mich mit einem Gefühl von Freiheit[/excited] — und der Ahnung, dass hier andere Worte für die Himmelsrichtungen gelten.',
+          'Endlose Savanne, [awe]golden im Abendlicht.[/awe] Schirmakazien stehen wie Wächter in der Weite, und in der Ferne wandern Herden. [excited]Der Westen empfängt mich mit einem Gefühl von Freiheit[/excited] – und der Ahnung, dass hier andere Worte für die Himmelsrichtungen gelten.',
         central:
           '[fear]Der Dschungel hat mich verschluckt.[/fear] Grünes Dämmerlicht, das Kreischen der Vögel, feuchte Luft, die sich wie ein nasses Tuch auf die Brust legt. [weary]Ohne Machete komme ich hier kaum einen Schritt voran.[/weary] [breath][somber]Alles ist Leben,[pause] und alles ist Gefahr.[/somber]',
         east:
-          'Berge und Seen, so klar, dass sich der Himmel darin spiegelt. [awe]Im Osten ragen schneebedeckte Gipfel über die Wolken —[pause] welch ein Anblick mitten in Afrika![/awe] Die Völker hier messen die Welt an Orten, die sie [emph]„Odabi"[/emph] nennen.',
+          'Berge und Seen, so klar, dass sich der Himmel darin spiegelt. [awe]Im Osten ragen schneebedeckte Gipfel über die Wolken –[pause] welch ein Anblick mitten in Afrika![/awe] Die Völker hier messen die Welt an Orten, die sie [emph]„Odabi"[/emph] nennen.',
         south:
           'Das Hochplateau des Südens. [pause]Kühle, klare Luft nach all der Hitze, weites Grasland unter einem gewaltigen Himmel. Die Menschen hier, so heißt es, sprechen von Jahreszeiten, wenn sie Richtungen meinen. [pause][awe]Was für ein wunderliches Land.[/awe]',
       }
       return texts[p.region as string]
     },
     portArrival: (p: TextParams) =>
-      `Ich habe ${PLACES[p.place as string]} erreicht. [excited]Der Lärm des Hafens, die Rufe der Händler, der Geruch von Salz und Gewürzen[/excited] — hier kann ich Vorräte auffrischen und Kräfte sammeln. [pause]Meine Aufzeichnungen habe ich in Sicherheit gebracht. [mute](Checkpoint gespeichert)[/mute]`,
+      `Ich habe ${PLACES[p.place as string]} erreicht. [excited]Der Lärm des Hafens, die Rufe der Händler, der Geruch von Salz und Gewürzen[/excited] – hier kann ich Vorräte auffrischen und Kräfte sammeln. [pause]Meine Aufzeichnungen habe ich in Sicherheit gebracht. [mute](Checkpoint gespeichert)[/mute]`,
     villageFirstVisit: (p: TextParams) => {
       const name = PLACES[p.place as string]
-      // Jedes Dorf liest sich wie es selbst um 1890 (design.md §16) — und die
+      // Jedes Dorf liest sich wie es selbst um 1890 (design.md §16) – und die
       // Rinderpest-Jahre sind datumsabhängig (Punkt 133): die Phase des
       // Besuchsdatums wählt bei Maasai und Sidama die Vignette. Der deutsche
       // Getroffen-Text trägt Baumanns wörtliche Sätze (Baumann 1894, S. 31-32).
       const phase = (p.phase as string) ?? 'clean'
       const texts: Record<string, string> = {
-        tuareg: `Ich habe das ${name} erreicht — ein Lager der blau verschleierten Reiter der Wüste. [awe]Flache Zelte aus Häuten, Kamele im Sand gelagert, und Männer, deren Gesichter in Indigotuch gehüllt sind —[pause] bei den Tuareg verschleiern sich die Männer, nicht die Frauen.[/awe] Ihre Salzkarawanen durchqueren die Leere wochenlang. [somber]Der Häuptling empfängt Fremde im großen Zelt.[/somber]`,
+        tuareg: `Ich habe das ${name} erreicht – ein Lager der blau verschleierten Reiter der Wüste. [awe]Flache Zelte aus Häuten, Kamele im Sand gelagert, und Männer, deren Gesichter in Indigotuch gehüllt sind –[pause] bei den Tuareg verschleiern sich die Männer, nicht die Frauen.[/awe] Ihre Salzkarawanen durchqueren die Leere wochenlang. [somber]Der Häuptling empfängt Fremde im großen Zelt.[/somber]`,
         berbers: `Ich habe das ${name} erreicht, hoch am Atlas. [awe]Flachdächer aus Stein und Lehm staffeln sich den Hang hinauf,[pause] Walnusshaine säumen den Bach,[/awe] und an den Webstühlen entstehen Teppiche, bunter als alles, was ich heimtragen könnte. Das Haus des Ältesten thront über den Terrassen.`,
-        nubians: `Ich habe das ${name} am großen Strom erreicht. [awe]Die Häuser tragen kühne Muster um die Türen,[pause] Dattelpalmen neigen sich über das Ufer, und das Wasserrad knarrt, während es den Nil auf die schmalen Terrassen hebt.[/awe] [somber]Doch dies ist jetzt eine Grenze: Soldaten bewachen die Flussstraße nach Süden, und die Männer sprechen leise vom Reich des Khalifa dahinter,[pause] und vom Hungerjahr, das vor Kurzem die Herden leerte.[/somber] [somber]Man sagt, die Pyramiden alter Könige stünden nicht weit von hier —[pause] dieses Land ist älter als all das.[/somber]`,
-        bambara: `Ich habe das ${name} erreicht. [awe]Speicher aus gestampftem Lehm stehen auf Stelzen wie große versiegelte Krüge,[pause] Hirsefelder laufen bis zum Horizont,[/awe] und über den Türen sind Antilopenfiguren geschnitzt — der Geist, so erzählt man mir, der die Menschen das Ackern lehrte. Der Hof des Häuptlings liegt im Herzen des Dorfes.`,
+        nubians: `Ich habe das ${name} am großen Strom erreicht. [awe]Die Häuser tragen kühne Muster um die Türen,[pause] Dattelpalmen neigen sich über das Ufer, und das Wasserrad knarrt, während es den Nil auf die schmalen Terrassen hebt.[/awe] [somber]Doch dies ist jetzt eine Grenze: Soldaten bewachen die Flussstraße nach Süden, und die Männer sprechen leise vom Reich des Khalifa dahinter,[pause] und vom Hungerjahr, das vor Kurzem die Herden leerte.[/somber] [somber]Man sagt, die Pyramiden alter Könige stünden nicht weit von hier –[pause] dieses Land ist älter als all das.[/somber]`,
+        bambara: `Ich habe das ${name} erreicht. [awe]Speicher aus gestampftem Lehm stehen auf Stelzen wie große versiegelte Krüge,[pause] Hirsefelder laufen bis zum Horizont,[/awe] und über den Türen sind Antilopenfiguren geschnitzt – der Geist, so erzählt man mir, der die Menschen das Ackern lehrte. Der Hof des Häuptlings liegt im Herzen des Dorfes.`,
         hausa: `Ich habe das ${name} erreicht, eine ummauerte Stadt des Sahel. [excited]Am Tor dampfen Färbergruben voll Indigo, Lederarbeiter schneiden und punzen ihre berühmten roten Häute,[pause] und Reiter in gesteppten Panzern klappern durch einen Markt, der die Vögel übertönt.[/excited]`,
-        mandinka: `Ich habe das ${name} erreicht. [awe]Aus dem Schatten klingt die Kora — einundzwanzig Saiten über einem Kürbis —[pause] und ein Griot singt die Ahnenreihe der Könige ganz aus dem Gedächtnis.[/awe] Kolanüsse gehen zum Gruß von Hand zu Hand; auch mir wurde eine gereicht, und ich nahm sie dankbar.`,
+        mandinka: `Ich habe das ${name} erreicht. [awe]Aus dem Schatten klingt die Kora – einundzwanzig Saiten über einem Kürbis –[pause] und ein Griot singt die Ahnenreihe der Könige ganz aus dem Gedächtnis.[/awe] Kolanüsse gehen zum Gruß von Hand zu Hand; auch mir wurde eine gereicht, und ich nahm sie dankbar.`,
         fang: `Ich habe das ${name} erreicht, eine dem Wald abgerungene Lichtung. [awe]Langhäuser mit Wänden aus Rindenbahnen stehen in geordneten Reihen,[pause] und die Schnitzer formen Figuren aus dunklem Holz, deren ruhiger Blick, so heißt es, die Reliquien der Ahnen bewacht.[/awe] [somber]Neben den Türen hängen Armbrüste bereit.[/somber]`,
         mongo: `Ich habe das ${name} erreicht, tief im Flusswald. [awe]Zwischen den Hütten trocknet Tuch aus Raffiapalme,[pause] Fischwehre aus geflochtenem Rohr spannen sich über den Bach,[/awe] und Pflanzgärten voller Kochbananen sind dem Dschungelrand abgetrotzt. Die Ältesten versammeln sich am Feuer des Häuptlings.`,
-        mbuti: `Ich habe das ${name} erreicht, ein Lager des Waldvolkes. [awe]Kuppelhütten aus gebogenen Ruten und breiten Blättern,[pause] Jagdnetze zwischen den Bäumen, und überall der Geruch von Holzrauch und wildem Honig.[/awe] [somber]Sie lesen diesen Wald, wie ich meine Karten lese —[pause] und weit besser.[/somber]`,
-        banda: `Ich habe das ${name} erreicht. [awe]Von den Öfen klingt das Hämmern — die Schmiede gewinnen hier feines Eisen aus dem Erz ihrer Hügel —[pause] und beim Versammlungshaus stehen Schlitztrommeln, höher als ein Mann, deren Stimmen meilenweit über den Busch sprechen.[/awe]`,
+        mbuti: `Ich habe das ${name} erreicht, ein Lager des Waldvolkes. [awe]Kuppelhütten aus gebogenen Ruten und breiten Blättern,[pause] Jagdnetze zwischen den Bäumen, und überall der Geruch von Holzrauch und wildem Honig.[/awe] [somber]Sie lesen diesen Wald, wie ich meine Karten lese –[pause] und weit besser.[/somber]`,
+        banda: `Ich habe das ${name} erreicht. [awe]Von den Öfen klingt das Hämmern – die Schmiede gewinnen hier feines Eisen aus dem Erz ihrer Hügel –[pause] und beim Versammlungshaus stehen Schlitztrommeln, höher als ein Mann, deren Stimmen meilenweit über den Busch sprechen.[/awe]`,
         bambundu: `Ich habe das ${name} erreicht, versammelt unter einem mächtigen Baobab. [awe]Alte Handelspfade führen von hier hinab zur Küste,[/awe] [somber]und die Alten erzählen noch von der Kriegerkönigin, die den Portugiesen ein ganzes Leben lang trotzte.[/somber] Der Häuptling hält Rat im Schatten des großen Baumes.`,
         lunda: `Ich habe das ${name} erreicht. [awe]Höfische Sitte regiert hier:[pause] jeder Gruß hat seine Form, jeder Rang seinen Platz auf der Matte.[/awe] Mit Ehrfurcht sprechen sie vom Mwata Yamvo, dessen Hof weit im Osten liegt, [pause]und Kreuze aus Kupfer gehen auf dem Markt als Geld um.`,
         maasai:
           phase === 'struck'
-            ? `Ich habe das ${name} der Ebenen erreicht — [somber]und es ist ein Ort des Jammers. Die Rinderpest ist durch die Kraale gegangen wie ein Feuer; hinter dem Dornenzaun stehen die Hütten um einen leeren Platz.[/somber] [fear]Ein abgemagertes, halb blödsinniges Massai-Weib wankte mit stierem Blick durch das Lager, die Ueberreste der Trägermahlzeiten sammelnd —[pause] die erste jener schrecklichen Hungergestalten, die wir nun täglich im Massailande sehen sollten, und die, vom Honig der Waldbienen und von wilden Früchten lebend, einem sichern Tode entgegen gehen.[/fear] [somber]Und doch hält ein Kern des Dorfes aus: die Ältesten sitzen am Feuer, und die jungen Männer wachen mit ruhigen Speeren über das, was blieb.[/somber]`
+            ? `Ich habe das ${name} der Ebenen erreicht – [somber]und es ist ein Ort des Jammers. Die Rinderpest ist durch die Kraale gegangen wie ein Feuer; hinter dem Dornenzaun stehen die Hütten um einen leeren Platz.[/somber] [fear]Ein abgemagertes, halb blödsinniges Massai-Weib wankte mit stierem Blick durch das Lager, die Ueberreste der Trägermahlzeiten sammelnd –[pause] die erste jener schrecklichen Hungergestalten, die wir nun täglich im Massailande sehen sollten, und die, vom Honig der Waldbienen und von wilden Früchten lebend, einem sichern Tode entgegen gehen.[/fear] [somber]Und doch hält ein Kern des Dorfes aus: die Ältesten sitzen am Feuer, und die jungen Männer wachen mit ruhigen Speeren über das, was blieb.[/somber]`
             : phase === 'aftermath'
-              ? `Ich habe das ${name} der Ebenen erreicht. [somber]Die großen Kraale stehen leer; die Seuchenjahre haben die Herden genommen, und mit ihnen das Geflecht aus Viehleihe und Verwandtschaft, das dieses Volk zusammenhielt.[/somber] [somber]Manche sind zu den Ackerbauern der Berge gegangen; die geblieben sind, reiten verzweifeltere Raubzüge als je zuvor, erzählt man sich am Feuer.[/somber] [awe]Aber der Ring der Hütten steht, und in der Dämmerung springen die jungen Männer noch immer ihren Tanz — gerade wie Pfeile.[/awe]`
-              : `Ich habe das ${name} der Ebenen erreicht. [awe]Hütten aus Geäst und Erde stehen im Ring hinter dem Dornenzaun, und in seiner Mitte das Vieh — Reichtum, Nahrung und Stolz in einem.[/awe] [somber]Doch die Kraale sind weiter, als die Herden sie füllen: die Lungenseuche der letzten Jahre hat tief in den Bestand geschnitten, erzählen die Alten.[/somber] [somber]Die Krieger halten Wache, die langen Speere ruhig, ein Schaffell über der Schulter und von Kopf bis Fuß mit Fett und rotem Ocker eingerieben;[pause] in der Dämmerung sah ich die jungen Männer springen, gerade wie Pfeile, in ihrem Tanz.[/somber]`,
+              ? `Ich habe das ${name} der Ebenen erreicht. [somber]Die großen Kraale stehen leer; die Seuchenjahre haben die Herden genommen, und mit ihnen das Geflecht aus Viehleihe und Verwandtschaft, das dieses Volk zusammenhielt.[/somber] [somber]Manche sind zu den Ackerbauern der Berge gegangen; die geblieben sind, reiten verzweifeltere Raubzüge als je zuvor, erzählt man sich am Feuer.[/somber] [awe]Aber der Ring der Hütten steht, und in der Dämmerung springen die jungen Männer noch immer ihren Tanz – gerade wie Pfeile.[/awe]`
+              : `Ich habe das ${name} der Ebenen erreicht. [awe]Hütten aus Geäst und Erde stehen im Ring hinter dem Dornenzaun, und in seiner Mitte das Vieh – Reichtum, Nahrung und Stolz in einem.[/awe] [somber]Doch die Kraale sind weiter, als die Herden sie füllen: die Lungenseuche der letzten Jahre hat tief in den Bestand geschnitten, erzählen die Alten.[/somber] [somber]Die Krieger halten Wache, die langen Speere ruhig, ein Schaffell über der Schulter und von Kopf bis Fuß mit Fett und rotem Ocker eingerieben;[pause] in der Dämmerung sah ich die jungen Männer springen, gerade wie Pfeile, in ihrem Tanz.[/somber]`,
         swahili: `Ich habe das ${name} am Meer erreicht. [awe]Häuser aus Korallenstein säumen enge Gassen, ihre großen Türen mit Ranken und Schriftzeichen beschnitzt,[pause] und Dhaus liegen mit gerefften Lateinersegeln am Strand.[/awe] [excited]Die Passatwinde haben diese Küste zu einer Kreuzung von einem Dutzend Sprachen gemacht.[/excited]`,
         somali: `Ich habe das ${name} erreicht. [awe]Tragbare Häuser aus gebogenen Ästen und geflochtenen Matten stehen bereit, mit den Herden zu ziehen,[pause] Kamele ohne Zahl knien an den Brunnen,[/awe] und die Luft trägt Weihrauch aus den Hügeln. [somber]Ihre Dichter, so sagt man mir, tragen ganze Kriege und Verträge allein im Vers.[/somber]`,
         sidama:
           phase === 'aftermath'
-            ? `Ich habe das ${name} im Hochland erreicht. [somber]Die bösen Tage liegen hinter diesem Land — Jahre, in denen Seuche und Heuschrecken das Hochland leerten —[pause] und ihre Spuren stehen noch an den leeren Viehgattern.[/somber] [awe]Doch die Ensete-Haine haben die Dörfer durchgetragen, und zwischen ihnen rösten sie wieder die roten Beeren zu jenem Trank, der Tote wecken könnte.[/awe] [excited]Ich trank drei Tassen.[/excited]`
-            : `Ich habe das ${name} im Hochland erreicht — [somber]mitten in dem, was sie die bösen Tage nennen: Seuche über den Rindern, Heuschrecken über den Feldern, Hunger über dem ganzen Hochland.[/somber] [awe]Dass hier überhaupt Leben bleibt, danken sie den Hainen der Ensete — der falschen Banane, deren Mark sie stampfen und vergraben, ein Vorrat gegen genau solche Jahre.[/awe] [somber]Von den Rindern aber steht kaum eines mehr; die Höfe tauschen Saatgut gegen Salz.[/somber]`,
-        baganda: `Ich habe das ${name} erreicht. [awe]Bananenhaine stehen in geordneten Reihen, Rindenbasttuch trocknet auf Rahmen, glatt wie feines Papier,[pause] und schilfumzäunte Gehöfte säumen eine gefegte Straße —[/awe] [somber]das Reich des Kabaka wahrt seine Ordnung selbst so fern von seinem Hügel.[/somber]`,
-        wayeyi: `Ich habe das ${name} zwischen den Schilfkanälen erreicht. [awe]Die Wayeyi lesen dieses Wasser wie ein Buch — sie staken ihre Mokoro-Einbäume durch Passagen, die ich nicht einmal sehe,[pause] Reusen dort gesetzt, wo die Strömung sich zu laufen erinnert.[/awe] [excited]Das Seltsamste: die Flut kommt in der Trockenzeit, sagen sie mir — der Fluss trinkt von Regen, der fern und vor Monaten fiel.[/excited] Die Hütte des Ältesten steht auf dem ersten trockenen Grund.`,
-        bemba: `Ich habe das ${name} erreicht. [awe]Ihre Felder gewinnen sie mit Feuer: Äste werden geschlagen und verbrannt, die Hirse in die warme Asche gesät —[pause] der Wald gibt eine Ernte, dann ruht er.[/awe] [somber]Der Name des Chitimukulu, ihres großen Häuptlings im Osten, wird hier mit gesenktem Kopf gesprochen.[/somber]`,
+            ? `Ich habe das ${name} im Hochland erreicht. [somber]Die bösen Tage liegen hinter diesem Land – Jahre, in denen Seuche und Heuschrecken das Hochland leerten –[pause] und ihre Spuren stehen noch an den leeren Viehgattern.[/somber] [awe]Doch die Ensete-Haine haben die Dörfer durchgetragen, und zwischen ihnen rösten sie wieder die roten Beeren zu jenem Trank, der Tote wecken könnte.[/awe] [excited]Ich trank drei Tassen.[/excited]`
+            : `Ich habe das ${name} im Hochland erreicht – [somber]mitten in dem, was sie die bösen Tage nennen: Seuche über den Rindern, Heuschrecken über den Feldern, Hunger über dem ganzen Hochland.[/somber] [awe]Dass hier überhaupt Leben bleibt, danken sie den Hainen der Ensete – der falschen Banane, deren Mark sie stampfen und vergraben, ein Vorrat gegen genau solche Jahre.[/awe] [somber]Von den Rindern aber steht kaum eines mehr; die Höfe tauschen Saatgut gegen Salz.[/somber]`,
+        baganda: `Ich habe das ${name} erreicht. [awe]Bananenhaine stehen in geordneten Reihen, Rindenbasttuch trocknet auf Rahmen, glatt wie feines Papier,[pause] und schilfumzäunte Gehöfte säumen eine gefegte Straße –[/awe] [somber]das Reich des Kabaka wahrt seine Ordnung selbst so fern von seinem Hügel.[/somber]`,
+        wayeyi: `Ich habe das ${name} zwischen den Schilfkanälen erreicht. [awe]Die Wayeyi lesen dieses Wasser wie ein Buch – sie staken ihre Mokoro-Einbäume durch Passagen, die ich nicht einmal sehe,[pause] Reusen dort gesetzt, wo die Strömung sich zu laufen erinnert.[/awe] [excited]Das Seltsamste: die Flut kommt in der Trockenzeit, sagen sie mir – der Fluss trinkt von Regen, der fern und vor Monaten fiel.[/excited] Die Hütte des Ältesten steht auf dem ersten trockenen Grund.`,
+        bemba: `Ich habe das ${name} erreicht. [awe]Ihre Felder gewinnen sie mit Feuer: Äste werden geschlagen und verbrannt, die Hirse in die warme Asche gesät –[pause] der Wald gibt eine Ernte, dann ruht er.[/awe] [somber]Der Name des Chitimukulu, ihres großen Häuptlings im Osten, wird hier mit gesenktem Kopf gesprochen.[/somber]`,
         pedi: `Ich habe das ${name} erreicht. [awe]Runde Strohhütten stehen um den Viehkraal, Kornkörbe reiten auf Pfählen außer Reichweite der Mäuse,[pause] und in der Dämmerung pfeifen die Hirtenjungen ihr Vieh durch den Staub nach Hause.[/awe] Die Hütte des Häuptlings ist die größte im Ring.`,
         zulu: `Ich habe das ${name} erreicht. [awe]Bienenkorbhütten aus geflochtenem Gras stehen im vollkommenen Ring um den Viehkraal,[pause] Lederschilde lehnen gestapelt am Tor.[/awe] [somber]Die Disziplin der alten Regimenter lebt fort in der Haltung der jungen Männer.[/somber]`,
-        san: `Ich habe das ${name} am Rand der Wüste erreicht. [awe]Schutzdächer aus gebogenem Gras, schlanke Bögen mit vergifteten Pfeilen, und Wasser, in Straußeneierschalen gegen die Dürre vergraben.[/awe] [somber]Auf den Felsen nahebei sind Elenantilopen und Jäger gemalt.[pause] Ich hatte diese Menschen für eine Welt für sich gehalten — doch sie sprechen von den Viehleuten im Osten wie von Nachbarn,[pause] und von Schulden und Gefälligkeiten zwischen ihnen, die weiter zurückreichen, als ich folgen konnte.[/somber]`,
+        san: `Ich habe das ${name} am Rand der Wüste erreicht. [awe]Schutzdächer aus gebogenem Gras, schlanke Bögen mit vergifteten Pfeilen, und Wasser, in Straußeneierschalen gegen die Dürre vergraben.[/awe] [somber]Auf den Felsen nahebei sind Elenantilopen und Jäger gemalt.[pause] Ich hatte diese Menschen für eine Welt für sich gehalten – doch sie sprechen von den Viehleuten im Osten wie von Nachbarn,[pause] und von Schulden und Gefälligkeiten zwischen ihnen, die weiter zurückreichen, als ich folgen konnte.[/somber]`,
       }
       return (
         texts[p.people as string] ??
         `Ich habe das ${name} erreicht. Einfache Hütten aus Lehm und Schilf drängen sich am Wasser, und Kinder laufen mir entgegen, [pause]voller Neugier. Der Häuptling residiert in der großen Hütte in der Dorfmitte. [somber]Wenn ich sein Wohlwollen gewinne,[pause] zeigt er mir vielleicht den Weg.[/somber]`
       )
     },
-    // Return vignette (point 170): the situation CHANGED since the last visit —
+    // Return vignette (point 170): the situation CHANGED since the last visit –
     // describe only the change, in a shocked register. Keyed on people +
     // fromPhase_toPhase; only the rinderpest peoples ever reach it.
     villageReturn: (p: TextParams) => {
@@ -699,11 +699,11 @@ export const de: Strings = {
       const texts: Record<string, Record<string, string>> = {
         maasai: {
           preDamaged_struck: `[fear]Ich kam zurück und fand die Kraale leer.[/fear] Wo im vergangenen Jahr noch Rinder standen, [somber]wenige zwar, aber lebendig,[/somber] ist nur gestampfte Erde geblieben. [pause] Eine ausgezehrte Frau las Schoten vom Boden auf und sah durch mich hindurch; man sagt mir, sie lebe von wildem Honig und gehe dem sicheren Tod entgegen. [breath] Nur am Feuer der Alten und an den Speeren der jungen Männer hält sich ein Rest der alten Ordnung.`,
-          struck_aftermath: `[somber]Der Hunger, den ich hier mitansah, ist weitergezogen — und hat das halbe Volk mit sich genommen.[/somber] Die großen Kraale stehen offen und still; mit den Herden zerriss das Geflecht aus Viehleihe und Verwandtschaft, das diese Menschen zusammenhielt. [pause] Manche sind zu den Ackerbauern in die Berge gegangen, die Gebliebenen reiten verzweifeltere Raubzüge als je zuvor. [breath] Und doch steht der Ring der Hütten, [emph]und die jungen Männer springen noch ihren Tanz.[/emph]`,
-          preDamaged_aftermath: `[fear]Ich kam zurück und erkannte den Ort kaum wieder.[/fear] In den Jahren meiner Abwesenheit ist die Seuche durch die Kraale gegangen [somber]wie ein Feuer[/somber]: Die Rinder, die ich damals noch sah, sind bis auf das letzte Stück dahin, und mit ihnen das Geflecht aus Viehleihe und Verwandtschaft. [pause] Manche sind fort zu den Hackbauern der Berge; die Gebliebenen reiten verzweifelte Raubzüge. [breath] Nur der Ring der Hütten steht noch, [weary]und abends springen die jungen Männer ihren Tanz — schmaler geworden, aber ungebrochen.[/weary]`,
+          struck_aftermath: `[somber]Der Hunger, den ich hier mitansah, ist weitergezogen – und hat das halbe Volk mit sich genommen.[/somber] Die großen Kraale stehen offen und still; mit den Herden zerriss das Geflecht aus Viehleihe und Verwandtschaft, das diese Menschen zusammenhielt. [pause] Manche sind zu den Ackerbauern in die Berge gegangen, die Gebliebenen reiten verzweifeltere Raubzüge als je zuvor. [breath] Und doch steht der Ring der Hütten, [emph]und die jungen Männer springen noch ihren Tanz.[/emph]`,
+          preDamaged_aftermath: `[fear]Ich kam zurück und erkannte den Ort kaum wieder.[/fear] In den Jahren meiner Abwesenheit ist die Seuche durch die Kraale gegangen [somber]wie ein Feuer[/somber]: Die Rinder, die ich damals noch sah, sind bis auf das letzte Stück dahin, und mit ihnen das Geflecht aus Viehleihe und Verwandtschaft. [pause] Manche sind fort zu den Hackbauern der Berge; die Gebliebenen reiten verzweifelte Raubzüge. [breath] Nur der Ring der Hütten steht noch, [weary]und abends springen die jungen Männer ihren Tanz – schmaler geworden, aber ungebrochen.[/weary]`,
         },
         sidama: {
-          struck_aftermath: `[breath] Ich kam zurück und wagte kaum zu hoffen — [somber]doch die Bösen Tage liegen hinter ihnen.[/somber] Die Viehpferche stehen noch immer fast leer, stumme Zeugen dessen, was ich hier mitangesehen habe; aber die Ensete-Haine haben sie durch den Hunger getragen. [pause] Heute rösten sie wieder die roten Kaffeebeeren, [emph]einen Trank, der Tote wecken könnte,[/emph] und reichten mir davon wie in besseren Zeiten.`,
+          struck_aftermath: `[breath] Ich kam zurück und wagte kaum zu hoffen – [somber]doch die Bösen Tage liegen hinter ihnen.[/somber] Die Viehpferche stehen noch immer fast leer, stumme Zeugen dessen, was ich hier mitangesehen habe; aber die Ensete-Haine haben sie durch den Hunger getragen. [pause] Heute rösten sie wieder die roten Kaffeebeeren, [emph]einen Trank, der Tote wecken könnte,[/emph] und reichten mir davon wie in besseren Zeiten.`,
         },
       }
       return (
@@ -712,23 +712,23 @@ export const de: Strings = {
       )
     },
     giftRevered: (p: TextParams) =>
-      `Ich überreichte dem Oberhaupt der ${PEOPLES[p.people as string]} meine Gabe. [excited]Seine Augen leuchteten auf —[pause] ich habe getroffen, was sein Volk verehrt![/excited] Er neigte das Haupt und hieß mich willkommen. [pause][excited]Das Wohlwollen wächst.[/excited]`,
+      `Ich überreichte dem Oberhaupt der ${PEOPLES[p.people as string]} meine Gabe. [excited]Seine Augen leuchteten auf –[pause] ich habe getroffen, was sein Volk verehrt![/excited] Er neigte das Haupt und hieß mich willkommen. [pause][excited]Das Wohlwollen wächst.[/excited]`,
     giftNeutral:
-      'Das Oberhaupt nahm meine Gabe mit höflichem Nicken entgegen. [somber]Kein Leuchten in den Augen —[pause] es war wohl nicht das, was sein Volk verehrt.[/somber] [pause]Aber ein Anfang ist gemacht.',
+      'Das Oberhaupt nahm meine Gabe mit höflichem Nicken entgegen. [somber]Kein Leuchten in den Augen –[pause] es war wohl nicht das, was sein Volk verehrt.[/somber] [pause]Aber ein Anfang ist gemacht.',
     giftRejected: (p: TextParams) =>
       `[fear]Ein schwerer Fehler![/fear] Kaum sah das Oberhaupt der ${PEOPLES[p.people as string]} meine Gabe, verfinsterte sich seine Miene. [somber]Was ich anbot, gilt seinem Volk als Unglücksbringer.[pause] Man führte mich wortlos hinaus.[/somber] [breath][weary]Ich muss dieses Misstrauen erst wieder abtragen.[/weary]`,
     languageLesson: (p: TextParams) => {
       const texts: Record<string, string> = {
         north:
-          'Ein alter Mann am Feuer sprach lange mit mir, mit Händen und Worten. Er nannte die Winde: [emph]„Nivera"[/emph], wo der kalte Nachtwind geboren wird — gen Mitternacht —, „Chamsina" für den heißen Atem des Mittags, „Levantra" für den Morgen, „Gharbia" für den Abend. [breath][excited]Ich begreife:[pause] Der Norden liest seine Richtungen am Ursprung des Windes, und [emph]„Nivera" bedeutet Norden![/emph][/excited]',
+          'Ein alter Mann am Feuer sprach lange mit mir, mit Händen und Worten. Er nannte die Winde: [emph]„Nivera"[/emph], wo der kalte Nachtwind geboren wird – gen Mitternacht –, „Chamsina" für den heißen Atem des Mittags, „Levantra" für den Morgen, „Gharbia" für den Abend. [breath][excited]Ich begreife:[pause] Der Norden liest seine Richtungen am Ursprung des Windes, und [emph]„Nivera" bedeutet Norden![/emph][/excited]',
         west:
           'Ein Ältester zog vier Striche in den Staub und sprach bedächtig: [emph]„koko"[/emph] gen Mitternacht, [emph]„Katula"[/emph] gen Sonnenaufgang, „Phuthswama" gen Mittag, „Mimbumi" gen Sonnenuntergang. [breath][excited]Die Worte des Westens gehören nun mir:[pause] koko ist Norden, Katula ist Osten![/excited]',
         central:
-          'Am Feuer wies ein Alter immer wieder auf den großen Fluss, den sein Volk [emph]„Utomba"[/emph] nennt — den Mongdamara. Alles liegt „wa-Utomba" oder „ka-Utomba": fort vom Fluss oder zu ihm hin, „lem-Utomba" zur Sonnenaufgangsseite, „mos-Utomba" zum Sonnenuntergang. [breath][excited]Der Wald misst die Welt an seinem Fluss![/excited]',
+          'Am Feuer wies ein Alter immer wieder auf den großen Fluss, den sein Volk [emph]„Utomba"[/emph] nennt – den Mongdamara. Alles liegt „wa-Utomba" oder „ka-Utomba": fort vom Fluss oder zu ihm hin, „lem-Utomba" zur Sonnenaufgangsseite, „mos-Utomba" zum Sonnenuntergang. [breath][excited]Der Wald misst die Welt an seinem Fluss![/excited]',
         east:
-          'Ein alter Hirte hob den Stab zum leuchtenden Berg, den sein Volk [emph]„Odabi"[/emph] nennt — den Unumpara. Von ihm gehen die Richtungen aus: [emph]„Relolo"[/emph] jenseits von ihm gen Mitternacht, „Dethamee" gen Mittag, „Salewa" gen Sonnenaufgang, „Munjori" gen Sonnenuntergang. [breath][excited]Der Osten misst die Welt am heiligen Berg![/excited]',
+          'Ein alter Hirte hob den Stab zum leuchtenden Berg, den sein Volk [emph]„Odabi"[/emph] nennt – den Unumpara. Von ihm gehen die Richtungen aus: [emph]„Relolo"[/emph] jenseits von ihm gen Mitternacht, „Dethamee" gen Mittag, „Salewa" gen Sonnenaufgang, „Munjori" gen Sonnenuntergang. [breath][excited]Der Osten misst die Welt am heiligen Berg![/excited]',
         south:
-          'Eine alte Frau lachte über meinen Kompass und deutete in den Himmel: Ihr Volk nennt die Richtungen nach den Jahreszeiten — [emph]gen Sommer[/emph] heißt gen Mitternacht, gen Winter gen Mittag, Frühling ist der Sonnenaufgang, Herbst der Sonnenuntergang. [breath][excited]Was für eine wunderliche, schöne Art, die Welt zu tragen![/excited]',
+          'Eine alte Frau lachte über meinen Kompass und deutete in den Himmel: Ihr Volk nennt die Richtungen nach den Jahreszeiten – [emph]gen Sommer[/emph] heißt gen Mitternacht, gen Winter gen Mittag, Frühling ist der Sonnenaufgang, Herbst der Sonnenuntergang. [breath][excited]Was für eine wunderliche, schöne Art, die Welt zu tragen![/excited]',
       }
       return texts[p.region as string]
     },
@@ -742,15 +742,15 @@ export const de: Strings = {
           `Wo die Breite ${dec(p.lat as number)} Grad gen [emph]${w.north}[/emph] zählt, dort ruht er unter dem Sand."[/whisper] ` +
           `[breath][somber]${w.north} …[pause] ich muss lernen, was dieses Wort bedeutet;[/somber] [excited]dann weist mir diese Zahl den Weg.[/excited]`,
         east:
-          'Das Oberhaupt wies mit dem Stab weit über die Ebene: [whisper]„Jenseits der großen Wüste, dorthin, wo Unumpara sich verbirgt — ' +
+          'Das Oberhaupt wies mit dem Stab weit über die Ebene: [whisper]„Jenseits der großen Wüste, dorthin, wo Unumpara sich verbirgt – ' +
           `wo die Länge ${dec(p.lon as number)} Grad gen [emph]${w.east}[/emph] zählt, schläft der alte König."[/whisper] ` +
           `[breath][somber]${w.east} …[pause] wieder ein Wort, das ich entschlüsseln muss.[/somber]`,
         west:
           `Das Oberhaupt sprach von einem Land weit gen [emph]${w.north}[/emph], jenseits des großen Sandes, wo kein Gras mehr wächst: [whisper]„Dort, so heißt es, wurde einst ein König in die Erde gelegt."[/whisper] [somber]Wenn ${w.north} eine Richtung ist, engt das meine Suche ein.[/somber]`,
         central:
-          `Das Oberhaupt murmelte: [whisper]„Geh [emph]${w.north}[/emph], fort vom ${GLOSSARY.congo}, bis die Bäume enden und der Sand beginnt — unter solchem Sand schlafen die alten Könige."[/whisper] [somber]Die Worte des Waldes verhüllen mir noch die Richtung.[/somber]`,
+          `Das Oberhaupt murmelte: [whisper]„Geh [emph]${w.north}[/emph], fort vom ${GLOSSARY.congo}, bis die Bäume enden und der Sand beginnt – unter solchem Sand schlafen die alten Könige."[/whisper] [somber]Die Worte des Waldes verhüllen mir noch die Richtung.[/somber]`,
         south:
-          `Das Oberhaupt blickte lange zum Horizont: [whisper]„Viele Monde gen [emph]${seasonNorth}[/emph], weiter als ${GLOSSARY.zambezi}, weiter als der große Wald — wo das Land nur noch Sand ist, liegt der große König."[/whisper] [somber]Gen ${seasonNorth} … eine Jahreszeit als Wegweiser?[/somber]`,
+          `Das Oberhaupt blickte lange zum Horizont: [whisper]„Viele Monde gen [emph]${seasonNorth}[/emph], weiter als ${GLOSSARY.zambezi}, weiter als der große Wald – wo das Land nur noch Sand ist, liegt der große König."[/whisper] [somber]Gen ${seasonNorth} … eine Jahreszeit als Wegweiser?[/somber]`,
       }
       return texts[regionId]
     },
@@ -759,19 +759,19 @@ export const de: Strings = {
       const texts: Record<string, string> = {
         north: `[excited]Entschlüsselt![/excited] Die Worte des Oberhaupts bedeuten: [emph]Das Grab liegt auf Breite ${dec(p.lat as number)} Grad Nord.[/emph] [somber]Nun fehlt mir noch seine Länge.[/somber]`,
         east: `[excited]Entschlüsselt![/excited] „Salewa" ist der Sonnenaufgang: [emph]Das Grab liegt auf Länge ${dec(p.lon as number)} Grad Ost.[/emph] [somber]Zusammen mit der Breite ist der Ort bestimmt.[/somber]`,
-        west: '[excited]Nun verstehe ich das Oberhaupt des Westens:[/excited] Das Grab liegt [emph]im Norden, jenseits des Wüstenrands[/emph] — ein Land ohne Gras.',
+        west: '[excited]Nun verstehe ich das Oberhaupt des Westens:[/excited] Das Grab liegt [emph]im Norden, jenseits des Wüstenrands[/emph] – ein Land ohne Gras.',
         central: '[excited]Die Worte des Waldes öffnen sich:[/excited] Das Grab liegt [emph]im Norden, fort vom Kongo, wo der Sand beginnt[/emph].',
-        south: '[excited]Die Jahreszeiten sprechen:[/excited] „Gen Sommer" heißt [emph]weit nach Norden[/emph] — jenseits des Sambesi, jenseits der Wälder, im großen Sand.',
+        south: '[excited]Die Jahreszeiten sprechen:[/excited] „Gen Sommer" heißt [emph]weit nach Norden[/emph] – jenseits des Sambesi, jenseits der Wälder, im großen Sand.',
       }
       return texts[regionId]
     },
     unspecific: (p: TextParams) =>
-      `Das Oberhaupt nickte ernst, ruderte mit den Händen und sagte immer wieder nur [emph]„${p.word}"[/emph]. [somber]Was immer es weiß — es kann oder will es nicht in Worten sagen, die ich fasse.[/somber] [pause]Doch es wies beharrlich zu den Dörfern der [emph]${PEOPLES[p.people as string]}[/emph] — [excited]sie sollen mehr wissen.[/excited]`,
+      `Das Oberhaupt nickte ernst, ruderte mit den Händen und sagte immer wieder nur [emph]„${p.word}"[/emph]. [somber]Was immer es weiß – es kann oder will es nicht in Worten sagen, die ich fasse.[/somber] [pause]Doch es wies beharrlich zu den Dörfern der [emph]${PEOPLES[p.people as string]}[/emph] – [excited]sie sollen mehr wissen.[/excited]`,
     giftLore: (p: TextParams) =>
       `Der Alte sprach von den Schätzen seines Landes: Was sein Volk über alles verehrt, ist [emph]${de.gifts[p.gift as keyof typeof de.gifts]}[/emph]. [pause]Ein damit geehrtes Oberhaupt öffnet sein Herz.`,
     digNothing: '[weary]Ich grub an dieser Stelle, doch der Sand gab nichts preis als Steine und alte Wurzeln.[/weary]',
     victory: (p: TextParams) =>
-      `${de.formatDate(p.day as number, 1890)}. [excited]Meine Schaufel stieß auf Stein —[pause] behauenen Stein![/excited] [breath]Mit zitternden Händen legte ich die Grabkammer frei. [awe]Gold glänzt im Licht der Fackel, und auf dem Sarkophag ruht die Maske des großen Königs.[/awe] [breath][awe]Ich habe es gefunden.[pause] Das Herz von Afrika.[/awe] [pause][somber]Die Reise war jeden Schritt wert.[/somber]`,
+      `${de.formatDate(p.day as number, 1890)}. [excited]Meine Schaufel stieß auf Stein –[pause] behauenen Stein![/excited] [breath]Mit zitternden Händen legte ich die Grabkammer frei. [awe]Gold glänzt im Licht der Fackel, und auf dem Sarkophag ruht die Maske des großen Königs.[/awe] [breath][awe]Ich habe es gefunden.[pause] Das Herz von Afrika.[/awe] [pause][somber]Die Reise war jeden Schritt wert.[/somber]`,
     foodLow:
       '[somber]Mein Proviant geht zur Neige.[/somber] Ich muss bald eine Stadt oder ein Dorf erreichen, [pause]sonst wird der Hunger mein ständiger Begleiter.',
     foodOut:
@@ -783,9 +783,9 @@ export const de: Strings = {
     sunblindOver:
       '[somber]Das weiße Gleißen ist aus meinen Augen gewichen.[/somber] [excited]Ich kann wieder klar sehen![/excited]',
     woundHealed:
-      '[somber]Heute wechselte ich den Verband und fand die Wunde endlich geschlossen.[/somber] [excited]Mein Körper hat sich selbst geheilt —[pause] ich bin wieder ganz.[/excited]',
+      '[somber]Heute wechselte ich den Verband und fand die Wunde endlich geschlossen.[/somber] [excited]Mein Körper hat sich selbst geheilt –[pause] ich bin wieder ganz.[/excited]',
     woundEased:
-      '[somber]Die tiefe Wunde schließt sich.[/somber] [weary]Noch zieht sie bei jedem Schritt, doch das Schlimmste ist vorüber —[pause] mit Ruhe und Proviant heilt sie von allein.[/weary]',
+      '[somber]Die tiefe Wunde schließt sich.[/somber] [weary]Noch zieht sie bei jedem Schritt, doch das Schlimmste ist vorüber –[pause] mit Ruhe und Proviant heilt sie von allein.[/weary]',
     medicineUsed:
       'Ich habe die Medizin genommen. [pause][somber]Das Fieber bricht, die Wunden schließen sich;[/somber] [excited]bald bin ich wieder der Alte.[/excited]',
     healthPoor:
@@ -798,7 +798,7 @@ export const de: Strings = {
         leopard: `[fear]Aus dem Nichts war ${animal} über mir![/fear]`,
         hyena: `[fear]Mit schnappenden Kiefern kam ${animal} näher![/fear]`,
         snake: `[fear]Beinahe wäre ich auf ${animal} getreten![/fear]`,
-        crocodile: `[fear]Das Wasser brach auf —[pause] ${animal}![/fear]`,
+        crocodile: `[fear]Das Wasser brach auf –[pause] ${animal}![/fear]`,
       }
       const results: Record<string, string> = {
         escaped: ' [excited]Ich bin entkommen.[/excited]',
@@ -810,7 +810,7 @@ export const de: Strings = {
     },
     robbery: (p: TextParams) =>
       p.result === 'deterred'
-        ? '[fear]Räuber verstellten mir den Weg —[/fear] [excited]doch ein Blick auf das Gewehr, und sie verschwanden im Busch.[/excited]'
+        ? '[fear]Räuber verstellten mir den Weg –[/fear] [excited]doch ein Blick auf das Gewehr, und sie verschwanden im Busch.[/excited]'
         : `[fear]Räuber fielen über mich her![/fear] [somber]Sie nahmen ${p.money} Dollar, ehe ich fliehen konnte.[/somber]`,
     feverOn:
       '[weary]Ein Fieber brennt in mir.[pause] Das Land schwankt vor meinen Augen, und die Beine gehen, wohin sie wollen.[/weary] [fear]Ich muss Medizin finden, sonst wird dieses Sumpfland mein Grab.[/fear]',
@@ -819,53 +819,53 @@ export const de: Strings = {
     sandstorm:
       '[fear]Ein Sandsturm verschluckte den Horizont![/fear] [weary]Stundenlang kauerte ich hinter meinem Gepäck, während die Welt zu heulendem Staub wurde.[/weary] Kostbare Zeit ist verloren.',
     sweptAway:
-      '[fear]Die Strömung packte mich und riss mich über die Fälle![/fear] [weary]Zerschlagen und blutend zog ich mich ans Ufer —[pause] die Hälfte meiner Habe gehört nun dem Fluss.[/weary]',
+      '[fear]Die Strömung packte mich und riss mich über die Fälle![/fear] [weary]Zerschlagen und blutend zog ich mich ans Ufer –[pause] die Hälfte meiner Habe gehört nun dem Fluss.[/weary]',
     landmarkDiscovered: (p: TextParams) => {
       const name = de.landmarks[p.landmark as keyof typeof de.landmarks]
       const flavors: Record<string, string> = {
-        mountain: `[awe]Da erhob er sich endlich vor mir —[pause] ${name}, seine Flanken gewaltig gegen den Himmel.[/awe] [excited]Ich habe ihn mit eigenen Augen gesehen, und mein Tagebuch soll es bezeugen.[/excited]`,
-        falls: `[awe]Ein fernes Donnern rollte über das Land, lange bevor ich es sah:[pause] ${name}![/awe] [excited]Der Fluss stürzt sich in weißen Wänden in die Tiefe —[pause] ein Anblick, den ich nie vergessen werde.[/excited]`,
-        lake: `[awe]Ein großes Wasser öffnete sich vor mir —[pause] ${name}, bis zum Horizont gedehnt wie ein Meer.[/awe] [somber]Ich habe sein Ufer auf meiner Karte vermerkt.[/somber]`,
-        grave: `[whisper]Ich gehe zwischen gebleichten Knochen und mächtigen Stoßzähnen —[pause] der Friedhof der Elefanten.[/whisper] [awe]Die alten Geschichten haben also die Wahrheit gesagt.[/awe]`,
-        'giza-pyramids': `[awe]Da standen sie jenseits des Stroms, als der Morgendunst sich hob —[pause] die drei großen Pyramiden von ${name}, und davor kauerte der löwenleibige Wächter.[/awe] [excited]Von afrikanischen Händen errichtet, viertausend Jahre vor jedem europäischen Reich —[pause] das älteste aller Weltwunder, und es steht in Afrika.[/excited]`,
-        pyramids: `[awe]Steile Pyramiden drängen sich am Ostufer des Nils —[pause] ${name}, die Königsstadt von Kusch.[/awe] [excited]Ein Reich, das diese Gräber errichtete und in eigener Schrift schrieb —[pause] ein afrikanisches Reich aus eigenem Recht, kein Schatten Ägyptens.[/excited]`,
-        'stone-city': `[awe]Fugenlose Mauern aus behauenem Granit schwingen über den Hügel, überragt von einem großen Kegelturm —[pause] ${name}.[/awe] [somber]Afrikanische Hände errichteten diese Hauptstadt, was die Siedler daheim auch behaupten mögen.[/somber]`,
-        'rock-churches': `[awe]In den lebenden Fels hinabgehauene Kirchen, Kreuz um Kreuz in den Stein gesenkt —[pause] ${name}.[/awe] [excited]Das Werk eines christlichen äthiopischen Königreichs,[pause] und noch heute knien Gläubige darin.[/excited]`,
-        'coastal-ruins': `[somber]Mauern aus Korallenstein und geborstene Bögen stehen über der Flutlinie —[pause] ${name}.[/somber] [awe]Eine Suaheli-Stadt, die eigene Münzen prägte und über den ganzen Indischen Ozean handelte, lange vor jedem europäischen Segel.[/awe]`,
-        stelae: `[awe]Granitnadeln, höher als jeder Mast, ragen aus dem Gras, ein gestürzter Riese darunter —[pause] die Stelen von ${name}.[/awe] [excited]Das Reich von Aksum hat sie gehauen, eigene Münzen geprägt und über das Rote Meer gehandelt —[pause] eine afrikanische Macht ersten Ranges.[/excited]`,
-        castles: `[awe]Steinerne Burgen mit Zinnen und Rundtürmen stehen auf dem Hochland —[pause] ${name}, Sitz der Kaiser Äthiopiens.[/awe] [somber]Afrikanische Baumeister haben jede dieser Mauern errichtet, allen kolonialen Berichten zum Trotz.[/somber]`,
-        'cliff-dwellings': `[awe]Wohnungen, terrassiert in die steile Felswand, Speicher an Simsen hoch über der Ebene —[pause] ${name}.[/awe] [excited]Die Dogon lesen dieses Land senkrecht und bauen ihre Häuser über den älteren Kammern der Tellem.[/excited]`,
-        crater: `[awe]Der Kraterrand fiel unter mir in eine gewaltige grüne Schüssel ab —[pause] ${name}, eine ummauerte Welt voller Wild.[/awe] [somber]Sein Ring steht gegen die Ebene wie ein Wall, den die Erde selbst aufgeworfen hat.[/somber]`,
-        volcano: `[fear]Der Boden bebte unter den Füßen,[pause] und über mir rauchte der steile Kegel —[/fear] [awe]${name}, der Berg, den die Massai den Berg Gottes nennen.[/awe] [whisper]Ich bin nicht lange an seinen Hängen geblieben.[/whisper]`,
-        delta: `[awe]Ein Fluss, der nie das Meer findet —[pause] ${name}, der sich in den Sand verströmt.[/awe] [excited]Sein Wasser flicht sich in ein Labyrinth aus Kanälen und Schilfinseln, so weit das Auge reicht.[/excited]`,
-        wetland: `[somber]Der Nil verschwindet hier einfach —[pause] verschluckt vom ${name}, einem endlosen Papyrussumpf.[/somber] [weary]Tagelang verliert sich die Fahrrinne im treibenden Schilf;[pause] kein Ufer, keine Landmarke, nur Grün.[/weary]`,
+        mountain: `[awe]Da erhob er sich endlich vor mir –[pause] ${name}, seine Flanken gewaltig gegen den Himmel.[/awe] [excited]Ich habe ihn mit eigenen Augen gesehen, und mein Tagebuch soll es bezeugen.[/excited]`,
+        falls: `[awe]Ein fernes Donnern rollte über das Land, lange bevor ich es sah:[pause] ${name}![/awe] [excited]Der Fluss stürzt sich in weißen Wänden in die Tiefe –[pause] ein Anblick, den ich nie vergessen werde.[/excited]`,
+        lake: `[awe]Ein großes Wasser öffnete sich vor mir –[pause] ${name}, bis zum Horizont gedehnt wie ein Meer.[/awe] [somber]Ich habe sein Ufer auf meiner Karte vermerkt.[/somber]`,
+        grave: `[whisper]Ich gehe zwischen gebleichten Knochen und mächtigen Stoßzähnen –[pause] der Friedhof der Elefanten.[/whisper] [awe]Die alten Geschichten haben also die Wahrheit gesagt.[/awe]`,
+        'giza-pyramids': `[awe]Da standen sie jenseits des Stroms, als der Morgendunst sich hob –[pause] die drei großen Pyramiden von ${name}, und davor kauerte der löwenleibige Wächter.[/awe] [excited]Von afrikanischen Händen errichtet, viertausend Jahre vor jedem europäischen Reich –[pause] das älteste aller Weltwunder, und es steht in Afrika.[/excited]`,
+        pyramids: `[awe]Steile Pyramiden drängen sich am Ostufer des Nils –[pause] ${name}, die Königsstadt von Kusch.[/awe] [excited]Ein Reich, das diese Gräber errichtete und in eigener Schrift schrieb –[pause] ein afrikanisches Reich aus eigenem Recht, kein Schatten Ägyptens.[/excited]`,
+        'stone-city': `[awe]Fugenlose Mauern aus behauenem Granit schwingen über den Hügel, überragt von einem großen Kegelturm –[pause] ${name}.[/awe] [somber]Afrikanische Hände errichteten diese Hauptstadt, was die Siedler daheim auch behaupten mögen.[/somber]`,
+        'rock-churches': `[awe]In den lebenden Fels hinabgehauene Kirchen, Kreuz um Kreuz in den Stein gesenkt –[pause] ${name}.[/awe] [excited]Das Werk eines christlichen äthiopischen Königreichs,[pause] und noch heute knien Gläubige darin.[/excited]`,
+        'coastal-ruins': `[somber]Mauern aus Korallenstein und geborstene Bögen stehen über der Flutlinie –[pause] ${name}.[/somber] [awe]Eine Suaheli-Stadt, die eigene Münzen prägte und über den ganzen Indischen Ozean handelte, lange vor jedem europäischen Segel.[/awe]`,
+        stelae: `[awe]Granitnadeln, höher als jeder Mast, ragen aus dem Gras, ein gestürzter Riese darunter –[pause] die Stelen von ${name}.[/awe] [excited]Das Reich von Aksum hat sie gehauen, eigene Münzen geprägt und über das Rote Meer gehandelt –[pause] eine afrikanische Macht ersten Ranges.[/excited]`,
+        castles: `[awe]Steinerne Burgen mit Zinnen und Rundtürmen stehen auf dem Hochland –[pause] ${name}, Sitz der Kaiser Äthiopiens.[/awe] [somber]Afrikanische Baumeister haben jede dieser Mauern errichtet, allen kolonialen Berichten zum Trotz.[/somber]`,
+        'cliff-dwellings': `[awe]Wohnungen, terrassiert in die steile Felswand, Speicher an Simsen hoch über der Ebene –[pause] ${name}.[/awe] [excited]Die Dogon lesen dieses Land senkrecht und bauen ihre Häuser über den älteren Kammern der Tellem.[/excited]`,
+        crater: `[awe]Der Kraterrand fiel unter mir in eine gewaltige grüne Schüssel ab –[pause] ${name}, eine ummauerte Welt voller Wild.[/awe] [somber]Sein Ring steht gegen die Ebene wie ein Wall, den die Erde selbst aufgeworfen hat.[/somber]`,
+        volcano: `[fear]Der Boden bebte unter den Füßen,[pause] und über mir rauchte der steile Kegel –[/fear] [awe]${name}, der Berg, den die Massai den Berg Gottes nennen.[/awe] [whisper]Ich bin nicht lange an seinen Hängen geblieben.[/whisper]`,
+        delta: `[awe]Ein Fluss, der nie das Meer findet –[pause] ${name}, der sich in den Sand verströmt.[/awe] [excited]Sein Wasser flicht sich in ein Labyrinth aus Kanälen und Schilfinseln, so weit das Auge reicht.[/excited]`,
+        wetland: `[somber]Der Nil verschwindet hier einfach –[pause] verschluckt vom ${name}, einem endlosen Papyrussumpf.[/somber] [weary]Tagelang verliert sich die Fahrrinne im treibenden Schilf;[pause] kein Ufer, keine Landmarke, nur Grün.[/weary]`,
       }
       return flavors[p.kind as string] ?? flavors.mountain
     },
     mountainNoRope:
-      '[weary]Kein Seil in der Hand, und doch führt kein Weg um dieses Gebirge herum.[/weary] [fear]Ich klettere langsam, Griff um Griff —[pause] ein Fehltritt hier, und der Fels wird mich nicht halten.[/fear]',
+      '[weary]Kein Seil in der Hand, und doch führt kein Weg um dieses Gebirge herum.[/weary] [fear]Ich klettere langsam, Griff um Griff –[pause] ein Fehltritt hier, und der Fels wird mich nicht halten.[/fear]',
     penaltyJungle:
-      '[weary]Der Dschungel schließt sich um mich, dicht von Ranken und Dornen.[/weary] [emph]Ohne Machete[/emph] muss ich jeden Schritt erzwingen —[pause] eine Klinge in der Hand bahnte den Weg.',
+      '[weary]Der Dschungel schließt sich um mich, dicht von Ranken und Dornen.[/weary] [emph]Ohne Machete[/emph] muss ich jeden Schritt erzwingen –[pause] eine Klinge in der Hand bahnte den Weg.',
     penaltyWater:
       '[weary]Das Wasser versperrt mir den Weg, und ich habe kein Kanu.[/weary] Ich wate und schwimme hinüber, langsam und durchnässt;[pause] [emph]ein Kanu[/emph] trüge mich mühelos und sicher darüber.',
     penaltyCanoeLand:
-      '[weary]Das Kanu auf meinem Rücken ist an Land eine schwere Last.[/weary] Es bremst jeden Schritt —[pause] [emph]für lange Wege über Land[/emph] lasse ich es besser in einem Lager zurück.',
+      '[weary]Das Kanu auf meinem Rücken ist an Land eine schwere Last.[/weary] Es bremst jeden Schritt –[pause] [emph]für lange Wege über Land[/emph] lasse ich es besser in einem Lager zurück.',
     dangerUnarmed:
-      '[somber]Ich brach in die Wildnis auf,[pause] und mir wurde bewusst, dass ich unbewaffnet bin.[/somber] [fear]Löwen, Leoparden und Schlangen lauern in diesem Land.[/fear] [emph]Ein Gewehr im Gepäck[/emph] ist der beste Schutz —[pause] besser noch als eine Machete.',
+      '[somber]Ich brach in die Wildnis auf,[pause] und mir wurde bewusst, dass ich unbewaffnet bin.[/somber] [fear]Löwen, Leoparden und Schlangen lauern in diesem Land.[/fear] [emph]Ein Gewehr im Gepäck[/emph] ist der beste Schutz –[pause] besser noch als eine Machete.',
     dangerDesert:
-      '[weary]Die Wüste glüht ohne Gnade.[/weary] [fear]Ohne Wasser drohen Verdursten und die Sonnenblindheit, die tödlich enden kann.[/fear] [emph]Eine gefüllte Trinkflasche[/emph] hält den Durst fern —[pause] doch gegen die Blindheit hilft nur, die Wüste zu verlassen.',
+      '[weary]Die Wüste glüht ohne Gnade.[/weary] [fear]Ohne Wasser drohen Verdursten und die Sonnenblindheit, die tödlich enden kann.[/fear] [emph]Eine gefüllte Trinkflasche[/emph] hält den Durst fern –[pause] doch gegen die Blindheit hilft nur, die Wüste zu verlassen.',
     dangerWater:
       '[fear]Im Wasser lauern Krokodile.[/fear] [weary]Ohne Kanu bin ich ihnen ausgeliefert, und mein Gewehr wird nass und nutzlos.[/weary] [emph]Ein Kanu[/emph] trägt mich sicher hinüber und hält die Waffe trocken;[pause] sonst hilft nur die Machete.',
     dangerWaterCanoe:
-      '[fear]Im Wasser lauern Krokodile —[pause] ihre Augen stehen über der Oberfläche.[/fear] [somber]Gut, dass das Kanu mich trägt:[/somber] [emph]außerhalb ihrer Reichweite,[/emph] und das Gewehr bleibt an Bord trocken.',
+      '[fear]Im Wasser lauern Krokodile –[pause] ihre Augen stehen über der Oberfläche.[/fear] [somber]Gut, dass das Kanu mich trägt:[/somber] [emph]außerhalb ihrer Reichweite,[/emph] und das Gewehr bleibt an Bord trocken.',
     dangerWetland:
-      '[somber]Feuchter Dunst hängt über dem Dickicht.[/somber] [fear]Hier brütet das Fieber, das den Verstand trübt und die Kräfte zehrt.[/fear] [emph]Medizin im Gepäck[/emph] heilt es —[pause] ich sollte stets welche bei mir tragen.',
+      '[somber]Feuchter Dunst hängt über dem Dickicht.[/somber] [fear]Hier brütet das Fieber, das den Verstand trübt und die Kräfte zehrt.[/fear] [emph]Medizin im Gepäck[/emph] heilt es –[pause] ich sollte stets welche bei mir tragen.',
     mountainFall:
-      '[fear]Der Fels brach unter meinem Fuß, und ich stürzte![/fear] [weary]Zerschunden und benommen kam ich weiter unten zum Liegen —[pause] ohne Seil wäre dieser Aufstieg beinahe mein Ende gewesen.[/weary]',
+      '[fear]Der Fels brach unter meinem Fuß, und ich stürzte![/fear] [weary]Zerschunden und benommen kam ich weiter unten zum Liegen –[pause] ohne Seil wäre dieser Aufstieg beinahe mein Ende gewesen.[/weary]',
     mountainFallItem:
-      '[fear]Der Fels brach unter meinem Fuß, und ich stürzte![/fear] [weary]Zerschunden schleppte ich mich weiter —[pause] und beim Sturz riss sich ein Stück meiner Ausrüstung los und verschwand in der Tiefe.[/weary]',
+      '[fear]Der Fels brach unter meinem Fuß, und ich stürzte![/fear] [weary]Zerschunden schleppte ich mich weiter –[pause] und beim Sturz riss sich ein Stück meiner Ausrüstung los und verschwand in der Tiefe.[/weary]',
     findRemains: (p: TextParams) =>
-      `[somber]Ich stieß auf die Überreste eines Reisenden, der nicht weiterkam.[pause] Eine düstere Mahnung dieses Landes.[/somber] Zwischen den Knochen lag eine Börse mit ${p.money} Dollar — [whisper]mögen sie einem besseren Schicksal dienen.[/whisper]`,
+      `[somber]Ich stieß auf die Überreste eines Reisenden, der nicht weiterkam.[pause] Eine düstere Mahnung dieses Landes.[/somber] Zwischen den Knochen lag eine Börse mit ${p.money} Dollar – [whisper]mögen sie einem besseren Schicksal dienen.[/whisper]`,
     deadline1:
       '[somber]Ein Brief der Geldgeber hat mich erreicht.[pause] Ihre Geduld wird dünn: Mehr als die Hälfte der gewährten Zeit ist verstrichen, und ich habe kein Grab vorzuweisen.[/somber] [emph]Ich muss vorankommen.[/emph]',
     deadline2:
@@ -873,17 +873,17 @@ export const de: Strings = {
     successor:
       '[somber]Ich übernehme dieses Tagebuch aus den Händen meines Vorgängers, der alles dafür gab.[pause] Seine Aufzeichnungen sollen mich leiten.[/somber] [emph]Die Suche geht weiter, wo er sie ließ.[/emph]',
     treasureFound: (p: TextParams) =>
-      `[excited]Meine Schaufel stieß auf etwas Hartes![/excited] [breath]Aus der Erde hob ich ein Versteck voll [emph]${de.treasures[p.treasure as keyof typeof de.treasures]}[/emph] — vor langer Zeit vergraben und von allen vergessen außer vom Sand. [awe]Das Glück lächelt dem geduldigen Gräber.[/awe]`,
+      `[excited]Meine Schaufel stieß auf etwas Hartes![/excited] [breath]Aus der Erde hob ich ein Versteck voll [emph]${de.treasures[p.treasure as keyof typeof de.treasures]}[/emph] – vor langer Zeit vergraben und von allen vergessen außer vom Sand. [awe]Das Glück lächelt dem geduldigen Gräber.[/awe]`,
     ivoryFound: (p: TextParams) =>
-      `[awe]Der Elefantenfriedhof.[pause] Gebleichte Knochen ragen um mich auf wie die Rippen gestrandeter Schiffe.[/awe] [somber]Mit stiller Ehrfurcht löste ich ${p.count === 1 ? 'einen mächtigen Stoßzahn' : `${p.count} mächtige Stoßzähne`} aus dem Boden —[pause] Elfenbein von einer Reinheit, wie ich sie nie gesehen habe.[/somber]`,
+      `[awe]Der Elefantenfriedhof.[pause] Gebleichte Knochen ragen um mich auf wie die Rippen gestrandeter Schiffe.[/awe] [somber]Mit stiller Ehrfurcht löste ich ${p.count === 1 ? 'einen mächtigen Stoßzahn' : `${p.count} mächtige Stoßzähne`} aus dem Boden –[pause] Elfenbein von einer Reinheit, wie ich sie nie gesehen habe.[/somber]`,
     bounty: (p: TextParams) => {
       const names = [namesFromCsv(p.villages, PLACES), namesFromCsv(p.landmarks, LANDMARKS)].filter(Boolean).join(', ')
-      return `[excited]Die Geographische Gesellschaft hat meine Berichte gewürdigt![/excited] Für ${p.count} ${Number(p.count) === 1 ? 'dokumentierte Entdeckung' : 'dokumentierte Entdeckungen'} — [emph]${names}[/emph] — ließ man mir vorab Nachricht zukommen: eine [emph]telegrafische Überweisung[/emph] über [emph]${p.amount} Dollar[/emph] erwartete mich im Hafen. [pause]Das Entdecken, so zeigt sich, bezahlt seinen eigenen Proviant.`
+      return `[excited]Die Geographische Gesellschaft hat meine Berichte gewürdigt![/excited] Für ${p.count} ${Number(p.count) === 1 ? 'dokumentierte Entdeckung' : 'dokumentierte Entdeckungen'} – [emph]${names}[/emph] – ließ man mir vorab Nachricht zukommen: eine [emph]telegrafische Überweisung[/emph] über [emph]${p.amount} Dollar[/emph] erwartete mich im Hafen. [pause]Das Entdecken, so zeigt sich, bezahlt seinen eigenen Proviant.`
     },
     ferry: (p: TextParams) =>
-      `Ich habe eine Passage von ${PLACES[p.from as string]} nach ${PLACES[p.to as string]} gebucht. [pause]${p.days} Tage auf See — [somber]die Küste zog vorbei wie ein langsames Panorama,[/somber] [excited]und ich kam ausgeruht an, ausnahmsweise mit trockenen Stiefeln.[/excited]`,
+      `Ich habe eine Passage von ${PLACES[p.from as string]} nach ${PLACES[p.to as string]} gebucht. [pause]${p.days} Tage auf See – [somber]die Küste zog vorbei wie ein langsames Panorama,[/somber] [excited]und ich kam ausgeruht an, ausnahmsweise mit trockenen Stiefeln.[/excited]`,
     valuableRevered: (p: TextParams) =>
-      `Kaum betrat ich das Dorf, richteten sich alle Blicke auf [emph]${de.treasures[p.treasure as keyof typeof de.treasures]}[/emph] in meiner Hand. [excited]Ehrfürchtiges Raunen folgte mir durch die Gassen —[pause] die ${PEOPLES[p.people as string]} verehren, was ich trage.[/excited]`,
+      `Kaum betrat ich das Dorf, richteten sich alle Blicke auf [emph]${de.treasures[p.treasure as keyof typeof de.treasures]}[/emph] in meiner Hand. [excited]Ehrfürchtiges Raunen folgte mir durch die Gassen –[pause] die ${PEOPLES[p.people as string]} verehren, was ich trage.[/excited]`,
     valuableRejected: (p: TextParams) =>
       `[fear]Ein Fehler, es offen zu tragen![/fear] Die ${PEOPLES[p.people as string]} wichen vor [emph]${de.treasures[p.treasure as keyof typeof de.treasures]}[/emph] in meiner Hand zurück wie vor einem bösen Omen. [somber]Türen schlossen sich;[pause] Mütter zogen ihre Kinder ins Haus.[/somber]`,
     friendPledge: (p: TextParams) =>
@@ -894,14 +894,14 @@ export const de: Strings = {
       return `[fear]Ich wurde von ${animal} angegriffen![/fear] [excited]Eine Gruppe der ${PEOPLES[p.people as string]} eilte mir sofort zu Hilfe und vertrieb das Tier.[/excited]${hurt} [pause][somber]Ich verdanke diesen Menschen mein Leben.[/somber]`
     },
     friendRescueRobbers: (p: TextParams) =>
-      `[fear]Räuber verstellten mir den Weg —[/fear] [excited]doch Männer der ${PEOPLES[p.people as string]} traten mit erhobenen Speeren aus dem Busch, und die Banditen stoben auseinander wie aufgescheuchte Vögel.[/excited] [somber]Das Gelöbnis des Oberhaupts wiegt mehr als jedes Gewehr.[/somber]`,
+      `[fear]Räuber verstellten mir den Weg –[/fear] [excited]doch Männer der ${PEOPLES[p.people as string]} traten mit erhobenen Speeren aus dem Busch, und die Banditen stoben auseinander wie aufgescheuchte Vögel.[/excited] [somber]Das Gelöbnis des Oberhaupts wiegt mehr als jedes Gewehr.[/somber]`,
     friendAid: (p: TextParams) =>
-      `[weary]Ich konnte nicht mehr weiter;[pause] das Land verschwamm vor meinen Augen.[/weary] [somber]Dann hoben mich Hände auf —[/somber] [excited]Leute der ${PEOPLES[p.people as string]} hatten mich gefunden.[/excited] Sie brachten Wasser, Nahrung und bittere Medizin und blieben, bis meine Kräfte zurückkehrten. [pause][awe]Ich lebe, weil ich ihr Freund bin.[/awe]`,
+      `[weary]Ich konnte nicht mehr weiter;[pause] das Land verschwamm vor meinen Augen.[/weary] [somber]Dann hoben mich Hände auf –[/somber] [excited]Leute der ${PEOPLES[p.people as string]} hatten mich gefunden.[/excited] Sie brachten Wasser, Nahrung und bittere Medizin und blieben, bis meine Kräfte zurückkehrten. [pause][awe]Ich lebe, weil ich ihr Freund bin.[/awe]`,
     friendSupplies: (p: TextParams) =>
       `Im Dorf der ${PEOPLES[p.people as string]} empfing man mich wie Familie: [excited]Man füllte mein Gepäck mit Proviant und drückte mir Medizin in die Hände,[/excited] von Bezahlung wollte niemand hören. [pause][somber]Die Freundschaft dieser Region ist mein sicherster Besitz.[/somber]`,
     robberyCommitted: (p: TextParams) =>
       `[somber]Ich habe etwas getan, das sich nicht ungeschehen machen lässt.[/somber] [fear]Mit erhobenem Gewehr räumte ich die Hütte der ${PEOPLES[p.people as string]} aus und floh aus dem Dorf.[/fear] [breath][weary]Die Beute: ${p.money} Dollar, ${p.gifts} Handelswaren und ${p.food} Tage Proviant.[pause] Hinter mir: Schreie, und eine Stille, die schlimmer war als die Schreie.[pause] Keine Hütte dieser Region wird sich mir je wieder öffnen.[/weary]`,
     campLooted:
-      '[somber]Ich fand mein Lager verwüstet vor —[pause] die Stangen umgerissen, der Boden von fremden Füßen zerwühlt.[/somber] [weary]Alles, was ich zurückgelassen hatte, ist fort.[/weary] [fear]Nichts ist sicher in dieser Wildnis, was nicht getragen oder bewacht wird.[/fear]',
+      '[somber]Ich fand mein Lager verwüstet vor –[pause] die Stangen umgerissen, der Boden von fremden Füßen zerwühlt.[/somber] [weary]Alles, was ich zurückgelassen hatte, ist fort.[/weary] [fear]Nichts ist sicher in dieser Wildnis, was nicht getragen oder bewacht wird.[/fear]',
   },
 }
