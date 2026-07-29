@@ -421,7 +421,14 @@ export function auditDashboard(html, input = {}) {
       if (run > longestRun) longestRun = run
     }
     const share = stubs.length / queueCards.length
-    if (share > STUB_SHARE_CEILING || longestRun > STUB_RUN_CEILING) {
+    // AN ABSOLUTE FLOOR UNDER THE RATIO (second model's review of this rule).
+    // A pure share fires on a SINGLE fresh point once the queue is short — 1 of
+    // 3 is 33 % — and would then block every turn end over the first appended
+    // point, in fully normal operation. Today's ~80 cards hide that; a shrinking
+    // queue is certain. So a handful is always tolerable whatever the length,
+    // and 79 of 81 is still caught on the first evaluation.
+    const tooMany = stubs.length > Math.max(STUB_RUN_CEILING, Math.ceil(queueCards.length * STUB_SHARE_CEILING))
+    if (tooMany || longestRun > STUB_RUN_CEILING) {
       v.push({
         code: 'queue-stubbed',
         msg:
