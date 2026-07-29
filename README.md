@@ -186,7 +186,8 @@ plus 15 Playwright browser suites; the test strategy and coverage map live in
 by **Electronic Arts**. It was the follow-up to *The Seven Cities of Gold*
 (1984).
 
-- **Dan Bunten** (later Dani Bunten Berry) — design and programming
+- **Dani Bunten Berry** (credited on the 1985 release as Dan Bunten) — design
+  and programming
 - **David Warhol** — music and sound effects
 - **Electronic Arts** — publisher
 
@@ -236,4 +237,4 @@ Own code released under the [MIT License](LICENSE).
 
 Questions, corrections, period sources, or an interest in the audio side:
 open an [issue](https://github.com/PatrickVonMassow/Heart-of-Africa-Remake/issues)
-or get in touch directly.
+or write to <patrick.von.massow@gmail.com>.
