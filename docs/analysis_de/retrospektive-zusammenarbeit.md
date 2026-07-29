@@ -531,6 +531,14 @@ Alle Regeln dazu waren erfüllt. Die Warteanmeldung ist gebaut und erzwungen, de
 
 **Lehre:** Wo eine Ressource eine Obergrenze hat, braucht sie auch eine Untergrenze, sobald Arbeit ansteht. Die Wartemeldung ist der richtige Ort dafür: Wer sich wartend erklärt, erklärt zugleich, warum die freien Plätze frei sind — und das ist eine Angabe, die eine Maschine prüfen kann, weil sie die Zahl der laufenden Agenten und die Länge der Warteschlange beide kennt.
 
+### 3.59 Der Nachweis reichte nur so weit wie die damalige Freiheit
+
+Mit dem senkrechten Blick bekam die Ego-Sicht eine neue Bewegungsachse — und im ersten Bild, das über die Kante des begehbaren Bodens nach unten sieht, steht eine gerade Helligkeitskante quer durchs Bild: begehbarer Boden und Hintergrundlandschaft werden verschieden beleuchtet. Der Fehler ist nicht neu. Das zugehörige Kriterium fordert seit Längerem, dass dort „keine Kante, keine unbeleuchtete Fläche und kein Loch" ist, und es galt als erfüllt — geprüft wurde es am Augenhöhen-Horizont, wo genau diese Naht auf der Fluchtlinie liegt und niemand sie sehen kann. Die alte Prüfung war nicht falsch; sie deckte nur den Ausschnitt ab, den das Spiel damals überhaupt zeigen konnte.
+
+Das ist eine eigene Klasse, weil kein Test dabei rot wird und keine Regel verletzt ist: Eine neue Freiheitsachse für den Spieler vergrößert rückwirkend die Fläche JEDES Kriteriums, das innerhalb der alten Freiheit nachgewiesen wurde — und der Nachweis altert dabei still. Bemerkenswert ist, dass der Fund aus der Bildprüfung kam, nicht aus der Suite: Die Suite prüfte, was sie schon immer prüfte, und war grün.
+
+**Lehre:** Wer eine Bewegungs-, Blick- oder Zoomachse hinzufügt, prüft nicht nur das neue Feature, sondern fragt: welche bestehenden Zusagen wurden bisher nur deshalb eingehalten, weil man nicht hinsehen konnte? Diese Kriterien brauchen ihren Nachweis am neuen Rand des Erreichbaren — sonst wandert die Lücke unbemerkt aus dem Unsichtbaren ins Sichtbare, und zwar zum Nutzer.
+
 ---
 
 ## 4. Die Guards als Immunsystem
@@ -620,7 +628,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Mittwoch, 29.07.2026, 14:03 · Quellen-Fingerprint: `af41ca5d0974…`
+Zuletzt aktualisiert: Mittwoch, 29.07.2026, 17:47 · Quellen-Fingerprint: `1489eddd66bf…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -633,8 +641,11 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | The hardened batch-autonomy system — never idle-stop, resurrect after crash/reboot, signal on failure, never block on the user | 1 | niedrig | batch-autostart.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs | ✔ Mechanismus |
 | The batch dashboard — its live GH-Pages transport, its BINDING four-section structure (never change without explicit user go) and update discipline | 9 | hoch | batch-autostart.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs, dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
 | RETIRED 27.07.2026 — this was a 16.07. work-in-progress handoff, not a rule; what survives is the research foundation, the accuracy principle and the §13-placeholder carve-out | 3 | mittel | batch-autostart.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs | ✔ Mechanismus |
+| A blocked tool call means the wrong path, not a missing permission — search the repo for its own command; never hand the user manual steps | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | The batch dashboard may leave the private claude.ai artifact for a publicly readable transport — privacy is no longer a constraint | 1 | niedrig | board-first-guard.mjs, dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
+| Take the session boundary as the LAST action and with bare commands — a pipe makes the call count as work and silently deletes the marker | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Delegate via `node scripts/point-brief.mjs <N>` — the AGENT generates its own brief; board changes go through `scripts/board.mjs`; expect 529 agent deaths and commit-per-step | 2 | mittel | — (Regel/Memory) | ◐ Regel |
+| F6 bug-report zips the user hands over are saved into the repo's git-ignored local/ folder — search there first, not only Downloads | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Jede Chat-Antwort mit einem Zeitstempel nach deutscher Zeit (Europe/Berlin, DST-korrekt) beginnen | 11 | hoch | timestamp-guard.mjs | ✔ Mechanismus |
 | CLAUDE.md §7.1 references design.md instead of retelling it; future doc edits must preserve the verifiable conditions, script mappings, numbering and checked numbers | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Autonomously insert a full CLOSING cycle (regression + dead-code/stale-doc cleanup + .md audit) when warranted — after extensive rework or many small completed tasks — without waiting for the user to ask | 1 | niedrig | closing-guard.mjs | ✔ Mechanismus |
@@ -672,7 +683,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Console warning \"THREE.Clock deprecated, use THREE.Timer\" comes from R3F v9 internals — fix by updating @react-three/fiber once it migrates to Timer | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Choose the browser-regression tier per task at my discretion (Vitest-only / Vitest+small / Vitest+large); the closing cycle ALWAYS runs Vitest+large | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | RETIRED 27.07.2026 — a 23.07. session handoff whose branches all merged; what survives is the file-collision map habit and the closing-freeze housekeeping | 3 | mittel | batch-resume-hook.mjs | ✔ Mechanismus |
-| 24.07.2026 evening chaos — serving model silently degraded to Haiku 4.5; verify the serving model before batch work, Haiku-class must pause instead of working | 2 | mittel | model-guard.mjs | ✔ Mechanismus |
+| 24.07.2026 evening chaos — serving model silently degraded to Haiku 4.5; verify the serving model before batch work, Haiku-class must pause instead of working | 3 | mittel | model-guard.mjs | ✔ Mechanismus |
 | Every new optical/graphics feature must be sorted into the low/medium/high detail presets, enforced by a pure completeness test — a new quality key with no preset entries fails the gate | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Never access paths outside the project directory unless strictly necessary (e.g. the global ~/.claude rules); keep local non-versioned artefacts in a git-ignored local/ folder inside the repo | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | RETIRED 25.07.2026 — a stuck Opus no longer hands the task to Fable; re-attack with Opus or let Fable REVIEW the stuck attempt (Fable is review + fallback only) | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -695,8 +706,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | CORRECTED 19.07.2026 — WebGPU IS testable headless/autonomously via system Chrome (channel:'chrome') + --headless=new; the 'untestable' belief held only for Playwright's BUNDLED Chromium | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 67 Feedback-/Projekt-Memories · 36 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 18 Prozess-/Meta-TASKS-Punkte (davon 8 offen).
+Erfasste Quellen: 70 Feedback-/Projekt-Memories · 36 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 18 Prozess-/Meta-TASKS-Punkte (davon 8 offen).
 
-<!-- RETRO-FINGERPRINT: af41ca5d09744d37bbacee08dbbae22c2da103b37539b69f863cf8120b333ca8 -->
-<!-- RETRO-LAST-REFRESHED: 2026-07-29T12:03:21.316Z -->
+<!-- RETRO-FINGERPRINT: 1489eddd66bf973e53f870d4b720e3942870dae3a1a372108df394cf13ddc49f -->
+<!-- RETRO-LAST-REFRESHED: 2026-07-29T15:47:41.548Z -->
 <!-- AUTO-GENERATED:END -->
