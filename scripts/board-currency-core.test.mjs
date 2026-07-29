@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import {
+  ARCHIVE_CONTENT_URL,
   BOARD_CONTENT_URL,
   BOARD_PAGE_URL,
   BOARD_REF,
@@ -7,9 +10,12 @@ import {
   WATCHDOG_TICK_MS,
   isPublishDue,
   liveBoardVerdict,
+  liveCheckUrl,
   normaliseOpenSet,
   openFingerprintOfTasks,
   openSetFingerprint,
+  pagesFailurePatch,
+  pagesPublishPatch,
   publishCapability,
   publishDuePatch,
   readFingerprint,
@@ -273,5 +279,72 @@ describe('the transport constants are the ones the docs name', () => {
       'https://raw.githubusercontent.com/PatrickVonMassow/Heart-of-Africa-Remake/board/board.html',
     )
     expect(BOARD_PAGE_URL).toBe('https://patrickvonmassow.github.io/Heart-of-Africa-Remake/board/')
+  })
+})
+
+describe('delta D — what a pages publish records', () => {
+  it('clears the due mark, the deferral and the last failure in one patch', () => {
+    const p = pagesPublishPatch({ fileHash: 'h1', fingerprint: 'sha256:aa', at: 7 })
+    expect(p.publishDue).toBeUndefined()
+    expect(p.publishDeferred).toBeUndefined()
+    expect(p.publishFailed).toBeUndefined()
+    expect(p.pagesPublishedHash).toBe('h1')
+    expect(p.pagesPublishedAt).toBe(7)
+    expect(p.publishedFingerprint).toBe('sha256:aa')
+    // Every one of those keys must be PRESENT, or mergeState (which deletes on
+    // an explicit undefined) would leave the mark it was meant to clear.
+    for (const k of ['publishDue', 'publishDeferred', 'publishFailed']) {
+      expect(Object.prototype.hasOwnProperty.call(p, k)).toBe(true)
+    }
+  })
+
+  it('never claims an ARTIFACT publish that did not happen', () => {
+    // The Artifact mirror is attested by `publishedHash`. A pages publish that
+    // wrote that key would make the mirror look current while it is not — the
+    // exact dishonesty this point exists to end.
+    expect(pagesPublishPatch({ fileHash: 'h1', fingerprint: 'sha256:aa' }).publishedHash).toBeUndefined()
+  })
+
+  it('records a failure with its reason and leaves the due mark standing', () => {
+    const p = pagesFailurePatch({ reason: 'push rejected', at: 11 })
+    expect(p.publishFailed).toEqual({ at: 11, reason: 'push rejected' })
+    expect(Object.prototype.hasOwnProperty.call(p, 'publishDue')).toBe(false)
+  })
+
+  it('survives junk on both patches', () => {
+    expect(() => pagesPublishPatch()).not.toThrow()
+    expect(() => pagesPublishPatch({ fileHash: 5, fingerprint: {} })).not.toThrow()
+    expect(pagesPublishPatch({}).publishedFingerprint).toBeUndefined()
+    expect(pagesFailurePatch().publishFailed.reason).toBe('unknown')
+  })
+
+  it('busts the CDN cache with a fresh query on every check', () => {
+    expect(liveCheckUrl(BOARD_CONTENT_URL, 1234)).toBe(`${BOARD_CONTENT_URL}?t=1234`)
+    expect(liveCheckUrl('https://x/y?a=1', 9)).toBe('https://x/y?a=1&t=9')
+    expect(liveCheckUrl(BOARD_CONTENT_URL, 1)).not.toBe(liveCheckUrl(BOARD_CONTENT_URL, 2))
+  })
+})
+
+describe('delta D — the viewer pages fetch the branch this module names', () => {
+  // The URL exists twice by necessity: once here, once as a literal inside the
+  // deployed viewer, which cannot import a Node module. A drift between them
+  // would leave the reader on a page that quietly shows nothing, so it is
+  // pinned rather than trusted.
+  const read = (...p) => readFileSync(resolve(process.cwd(), 'public', 'board', ...p), 'utf8')
+
+  it('the board viewer reads BOARD_CONTENT_URL', () => {
+    expect(read('index.html')).toContain(BOARD_CONTENT_URL)
+  })
+
+  it('the archive viewer reads ARCHIVE_CONTENT_URL', () => {
+    expect(read('archive', 'index.html')).toContain(ARCHIVE_CONTENT_URL)
+  })
+
+  it('both cache-bust, and neither renders an empty body as a board', () => {
+    for (const html of [read('index.html'), read('archive', 'index.html')]) {
+      expect(html).toMatch(/\?t=' \+ Date\.now\(\)/)
+      expect(html).toMatch(/cache: 'no-store'/)
+      expect(html).toMatch(/if \(!html\.trim\(\)\)/)
+    }
   })
 })

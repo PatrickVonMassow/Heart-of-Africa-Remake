@@ -169,6 +169,55 @@ export function syncedPublishPatch({ state, fileHash, fingerprint, at = Date.now
 }
 
 /**
+ * What a SUCCESSFUL pages publish (delta D) writes.
+ *
+ * The transport is the second way to be published, beside the Artifact mirror,
+ * so it records its own hash rather than overwriting `publishedHash` — an
+ * Artifact publish is a different event and attesting one that never happened
+ * would be the exact dishonesty delta D was built to end. `publishDeferred` is
+ * dropped because there is nothing left to defer, and `publishFailed` because a
+ * publish that succeeded supersedes the one that did not.
+ *
+ * `fingerprint` is what the live page will carry, and it is what the watchdog
+ * and `--check` compare the fetched page against.
+ */
+export function pagesPublishPatch({ fileHash, fingerprint, at = Date.now() } = {}) {
+  const fp = typeof fingerprint === 'string' && fingerprint ? fingerprint : null
+  return {
+    pagesPublishedHash: typeof fileHash === 'string' && fileHash ? fileHash : undefined,
+    pagesPublishedAt: at,
+    publishDue: undefined,
+    publishDeferred: undefined,
+    publishFailed: undefined,
+    ...(fp ? { publishedFingerprint: fp, publishedFingerprintAt: at } : {}),
+  }
+}
+
+/**
+ * What a FAILED pages publish writes. The failure is persisted rather than
+ * merely printed: the watchdog (delta E) reports a `publishFailed` that survived
+ * a tick, and that is the layer that still speaks when the session is wedged.
+ * The due mark is deliberately left standing — nothing went live.
+ */
+export function pagesFailurePatch({ reason, at = Date.now() } = {}) {
+  return { publishFailed: { at, reason: String(reason ?? 'unknown') } }
+}
+
+/**
+ * The URL the checker fetches: the content URL with a cache-buster.
+ *
+ * raw.githubusercontent answers with `cache-control: max-age=300`, so a plain
+ * re-fetch can be served a five-minute-old body from the CDN. A unique query
+ * usually misses that cache and gets the fresh object; where it does not,
+ * `LIVE_GRACE_MS` is the floor that keeps the check from flapping. Both, not
+ * either — the query is the fast path, the grace is the guarantee.
+ */
+export function liveCheckUrl(url = BOARD_CONTENT_URL, now = Date.now()) {
+  const base = String(url ?? '')
+  return `${base}${base.includes('?') ? '&' : '?'}t=${Math.floor(Number(now) || 0)}`
+}
+
+/**
  * CAN this session publish at all? The deny of delta B may only escalate where
  * the answer is yes — a session that cannot publish would spin against a gate it
  * has no way to satisfy, and a blocked turn produces nothing (CLAUDE.md §7.2).
