@@ -1469,41 +1469,6 @@ read that as "the criterion and its evidence section".
   `docs/acceptance-evidence.md` §8 gains the chain. design.md sits at its measured ceiling,
   so the words are paid for by a measured raise with its justification or by shortening
   elsewhere.
-- [ ] 316. SWIMMER TRAPPED IN A RIVER-MOUTH NOTCH (user 25.07.2026, screenshot at the
-  Nile delta mouth ~31.4N/30.4E: swimming without a canoe, the downstream current
-  outruns the swim speed so he cannot go back upstream, and the ocean boundary
-  blocks WITHOUT letting him slide sideways along it — a softlock in the notch
-  between river mouth and coast; user's proposed solution: there must BE no such
-  notch, and every other river-to-ocean transition needs the same check). Fix BOTH
-  layers: (1) GEOMETRY per the user's proposal — at every sea mouth the
-  coast/mouth-bridge junction must not form a concave water pocket that the current
-  pushes into; adjust the mouth-junction shaping (§11.3 point 211) so the water
-  edge meets the coast without a trap notch, and SWEEP all sea-mouth rivers
-  programmatically for such pockets (a pure test walking each mouth's water cells:
-  from every swimmable cell there exists an exit path on which the current does not
-  exceed swim speed); (2) MOVEMENT GUARANTEES as the backstop — the ocean boundary
-  resolves swimming movement by SLIDING tangentially (like settlement collision)
-  instead of a hard stop, and the passive downstream drift never pushes INTO a
-  blocked boundary (drift clamped by the same resolve). The §11.3 continuity,
-  mouth-bridge and never-buried invariants and the ocean-impassable rule stay
-  intact (no new way to leave the continent). VERIFIABLE: the all-mouths
-  escapability sweep (pure); a staged swim in the reported notch drifts, slides
-  along the coast and gets out alive (enrichments, both backends); the §11.2/redSea
-  suite stays green.
-  ANCHORS (read-only prep 25.07, main session — layer (2) is confirmed): in
-  src/state/store.ts the bird's-eye move resolves a blocked step as a HARD STOP —
-  it samples the target cell, and `if (isBlocked(...)) { set({toast: oceanBlocked});
-  return }`, with no tangential retry. Settlement collision has had sliding for a
-  long time; the overland move never got it, so a traveller pressed against the
-  ocean boundary by the current has no lateral escape at all — exactly the
-  reported softlock. The drift itself already refuses to push INTO blocked ocean
-  (the same `isBlocked` guard in the drift step), so the drift is not the trap; the
-  missing slide is. FIX SHAPE for layer (2): on a blocked step, retry along the
-  boundary tangent (project the intended step onto the free direction, the way the
-  settlement resolve does) before giving up, and keep the toast only for the case
-  where every direction is genuinely blocked. That change alone would let the
-  reported situation resolve even before the geometry work of layer (1) lands —
-  worth doing first and verifying separately.
 
 - [ ] 319. CROCODILE KILL AFTERMATH: PREY DISSOLVES WITHOUT SINK OR VISIBLE SCAVENGER
   (user 25.07.2026: a crocodile seized an animal, the crocodile disappeared at some
@@ -3548,6 +3513,47 @@ read that as "the criterion and its evidence section".
   than the window may be evicted.
   DOCS in the same commit: `docs/batch-autonomy.md`, where the channel's guarantees
   are stated — the drop notice is one of them, and the replay bound is the other.
+
+- [ ] 418. A STAGED DROWNING STAYS RED AND THE BASELINE LANE DIES BEFORE IT CAN SAY WHY
+  (29.07.2026, found while clearing point 316 on a QUIET machine — `machine-load` reported
+  CPU 1 %, GPU 0 %, no competing run, so these verdicts are evidence, not load).
+  TWO DEFECTS, and the second is why the first is still open:
+  (a) THE CHECK. `enrichments` reports "in the forced rains a calf in a strong current
+  drowns — dead, never rescued (point 122)" as FAILED in FIVE consecutive runs — three on WebGL 2,
+  two on WebGPU — every time with `{"staged":true,"tries":1,"drowned":false,"rescued":true,"out":true,
+  "lionFed":false}` — the staging works, the calf enters the water, and it comes OUT alive
+  where design.md §19.8 says a swollen current must not let the self-rescue fire. It is not
+  the point-141 Atlas red already listed in point 387, and not the point-382 eye knob.
+  It is NOT the point-316 mouth slack either, and that is measured rather than assumed: the
+  flow field the staging picks its spot from is bit-identical with and without the slack
+  across the whole search window (lat 29..27, lon 30.4..31.8, probed cell by cell —
+  0.419/0.419, 0.996/0.996, 0.902/0.902 …), because the ramp covers the last 0.6 deg of the
+  course while the window sits 2.4 deg or more upstream. So the cause is either a red that
+  main already carries or a rotating staging flake of the fragile family of point 336.
+  DECIDE WHICH, then fix accordingly: the PRODUCT (the swollen current no longer holds the
+  calf under), the CHECK (it asserts something the staging cannot deliver), or the STAGING
+  (it drifts out of the state it means to create) — per point 387's rule, loosening the
+  assertion to reach green is refused.
+  (b) THE LANE THAT SHOULD HAVE ANSWERED (a). `node scripts/verify/baseline-classify.mjs
+  enrichments` ran the baseline (merge-base 25e0f0f, i.e. main itself) TWICE, and both
+  baseline runs ended after 55 of the suite's 243 checks — exit 1 with ZERO failing checks,
+  which is a run that DIED, not a run that failed. The classifier then labelled all three
+  current reds INCONCLUSIVE ("the check did not run on the baseline"). A lane that dies at a
+  quarter of the suite is worse than no lane: it costs the full runtime and answers nothing,
+  and the classification it refuses is exactly the judgement every branch needs before it
+  merges. FIX: find why the suite aborts in the reused baseline worktree under
+  `local/verify-baseline/` (its stderr is the first evidence and is currently thrown away),
+  KEEP that output, and make the abort LOUD — a baseline run that ends with fewer checks
+  than the current run must be reported as DIED with its last check named, never folded into
+  the same "did not run on the baseline" as a genuinely newer check.
+  VERIFIABLE: `scripts/verify/baseline-classify-core.mjs` gains a pure case for the
+  died-early verdict (fewer baseline checks than current + zero failures => DIED, distinct
+  from INCONCLUSIVE-because-newer), covered in the Vitest layer; a live
+  `baseline-classify.mjs enrichments` run completes the baseline passes over the whole suite
+  and returns a REAL/PRE-EXISTING verdict for the point-122 drowning check; the resolution
+  of (a) is recorded in its commit with the reason chosen.
+  DOCS in the same commit: `scripts/verify/README.md` (the baseline lane's failure modes)
+  and point 387's list, if (a) turns out to be a red main already carries.
 
 ## Closing (only after all points)
 

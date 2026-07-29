@@ -12119,3 +12119,39 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   DOCS in the same commit: `docs/batch-autonomy.md` (the wake path and what it
   guarantees in each mode) and CLAUDE.md §6, where the singleton and the launcher are
   described.
+
+- [x] 316. SWIMMER TRAPPED IN A RIVER-MOUTH NOTCH (user 25.07.2026, screenshot at the
+  Nile delta mouth ~31.4N/30.4E: swimming without a canoe, the downstream current
+  outruns the swim speed so he cannot go back upstream, and the ocean boundary
+  blocks WITHOUT letting him slide sideways along it — a softlock in the notch
+  between river mouth and coast; user's proposed solution: there must BE no such
+  notch, and every other river-to-ocean transition needs the same check). Fix BOTH
+  layers: (1) GEOMETRY per the user's proposal — at every sea mouth the
+  coast/mouth-bridge junction must not form a concave water pocket that the current
+  pushes into; adjust the mouth-junction shaping (§11.3 point 211) so the water
+  edge meets the coast without a trap notch, and SWEEP all sea-mouth rivers
+  programmatically for such pockets (a pure test walking each mouth's water cells:
+  from every swimmable cell there exists an exit path on which the current does not
+  exceed swim speed); (2) MOVEMENT GUARANTEES as the backstop — the ocean boundary
+  resolves swimming movement by SLIDING tangentially (like settlement collision)
+  instead of a hard stop, and the passive downstream drift never pushes INTO a
+  blocked boundary (drift clamped by the same resolve). The §11.3 continuity,
+  mouth-bridge and never-buried invariants and the ocean-impassable rule stay
+  intact (no new way to leave the continent). VERIFIABLE: the all-mouths
+  escapability sweep (pure); a staged swim in the reported notch drifts, slides
+  along the coast and gets out alive (enrichments, both backends); the §11.2/redSea
+  suite stays green.
+  ANCHORS (read-only prep 25.07, main session — layer (2) is confirmed): in
+  src/state/store.ts the bird's-eye move resolves a blocked step as a HARD STOP —
+  it samples the target cell, and `if (isBlocked(...)) { set({toast: oceanBlocked});
+  return }`, with no tangential retry. Settlement collision has had sliding for a
+  long time; the overland move never got it, so a traveller pressed against the
+  ocean boundary by the current has no lateral escape at all — exactly the
+  reported softlock. The drift itself already refuses to push INTO blocked ocean
+  (the same `isBlocked` guard in the drift step), so the drift is not the trap; the
+  missing slide is. FIX SHAPE for layer (2): on a blocked step, retry along the
+  boundary tangent (project the intended step onto the free direction, the way the
+  settlement resolve does) before giving up, and keep the toast only for the case
+  where every direction is genuinely blocked. That change alone would let the
+  reported situation resolve even before the geometry work of layer (1) lands —
+  worth doing first and verifying separately.
