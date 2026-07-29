@@ -28,7 +28,13 @@ export const ENFORCER_RE = /^(?!.*-core\.)([a-z0-9-]+-(?:guard|gate|hook))\.mjs$
  * so "park it quietly" is not available as an escape.
  */
 export const INTENTIONALLY_DORMANT = {
-  // (none at present)
+  // Point 432, 29.07.2026. The guard is finished and Vitest-covered, but
+  // wiring it means editing .claude/settings.json, which ALWAYS raises a
+  // permission prompt — attended work by definition, and it was built during
+  // an unattended night. Dormant on purpose and for exactly one reason: the
+  // hook line is missing. Remove this entry in the same commit that adds it.
+  'findings-guard.mjs':
+    'built and tested; the Stop-hook wiring in .claude/settings.json needs the user attended (protected path)',
 }
 
 /**

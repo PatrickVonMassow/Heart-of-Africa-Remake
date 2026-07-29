@@ -549,6 +549,16 @@ Das ist eine eigene Klasse, weil kein Test dabei rot wird und keine Regel verlet
 
 ---
 
+### 3.60 Der Befund, der nur so lange lebte wie das Fenster
+
+An einem Abend fielen drei echte Defekte an: die Projekt-Hooks, die außerhalb der Repo-Wurzel still gar nicht feuern; ein Bündelschema, das 53 von 91 offenen Punkten abdeckte, ohne dass irgendwo stand, dass es unvollständig ist; und ein Punkt, dessen Aufräum-Schuld sich binnen 24 Stunden neu gebildet hatte. Alle drei standen nur im Gespräch. Sie sind heute festgehalten, aber nicht, weil ein Mechanismus sie eingefangen hätte — sondern weil der Nutzer zweimal nachfragte, ob sie überhaupt gesichert werden.
+
+Die Klasse ist nicht Schludrigkeit, sondern Bauart. Wer einen Befund macht, ist oft genau die Sitzung, die ihn nicht aufschreiben darf: Das Arbeitsverzeichnis gehört einer anderen, das Stand-down verbietet den Schreibzugriff auf die Arbeitsordnung, und damit hat der wahrscheinlichste Fundort keinen dauerhaften Ausgang. Was blieb, war eine handgeschriebene Memory-Notiz — ein Träger, den nichts leert und dessen Vollständigkeit niemand prüft. Erschwerend: ein Befund sieht im Moment seiner Entstehung nie dringend aus. Er ist eine Randbeobachtung neben der eigentlichen Aufgabe, und genau deshalb überlebt er die Aufgabe nicht.
+
+**Lehre:** Dauerhaftigkeit muss dort möglich sein, wo der Fund entsteht, nicht dort, wo die Arbeitsordnung liegt. Ein Ausgang, der nur der schreibberechtigten Sitzung offensteht, ist für die Hälfte aller Funde kein Ausgang. Und ein Träger ohne Leerungspflicht wird zum Lager: Wer ihn füllen darf, muss verpflichtet sein, ihn zu leeren, sobald er wieder schreiben darf — sonst verschiebt der Mechanismus den Verlust nur von der Sitzung auf die Datei.
+
+---
+
 ## 4. Die Guards als Immunsystem
 
 Jedes Guard-Skript ist die geronnene Lösung eines real aufgetretenen, wiederholten Problems.
@@ -636,7 +646,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Mittwoch, 29.07.2026, 20:24 · Quellen-Fingerprint: `863359521e2d…`
+Zuletzt aktualisiert: Mittwoch, 29.07.2026, 20:48 · Quellen-Fingerprint: `aa2fbe1a0684…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -649,7 +659,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | The hardened batch-autonomy system — never idle-stop, resurrect after crash/reboot, signal on failure, never block on the user | 1 | niedrig | batch-autostart.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs | ✔ Mechanismus |
 | The batch dashboard — its live GH-Pages transport, its BINDING four-section structure (never change without explicit user go) and update discipline | 9 | hoch | batch-autostart.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs, dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
 | RETIRED 27.07.2026 — this was a 16.07. work-in-progress handoff, not a rule; what survives is the research foundation, the accuracy principle and the §13-placeholder carve-out | 3 | mittel | batch-autostart.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs | ✔ Mechanismus |
-| A blocked tool call means the wrong path, not a missing permission — search the repo for its own command; never hand the user manual steps | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
+| A blocked tool call means the wrong path, not a missing permission — search the repo for its own command; never hand the user manual steps | 1 | niedrig | findings-guard.mjs | ✔ Mechanismus |
 | The batch dashboard may leave the private claude.ai artifact for a publicly readable transport — privacy is no longer a constraint | 1 | niedrig | board-first-guard.mjs, dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
 | Take the session boundary as the LAST action and with bare commands — a pipe makes the call count as work and silently deletes the marker | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Delegate via `node scripts/point-brief.mjs <N>` — the AGENT generates its own brief; board changes go through `scripts/board.mjs`; expect 529 agent deaths and commit-per-step | 2 | mittel | — (Regel/Memory) | ◐ Regel |
@@ -718,8 +728,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | CORRECTED 19.07.2026 — WebGPU IS testable headless/autonomously via system Chrome (channel:'chrome') + --headless=new; the 'untestable' belief held only for Playwright's BUNDLED Chromium | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 74 Feedback-/Projekt-Memories · 36 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 18 Prozess-/Meta-TASKS-Punkte (davon 8 offen).
+Erfasste Quellen: 74 Feedback-/Projekt-Memories · 37 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 18 Prozess-/Meta-TASKS-Punkte (davon 8 offen).
 
-<!-- RETRO-FINGERPRINT: 863359521e2d79be0abd632c960a6c9fdc290a86d41a2779407339552cf6cc27 -->
-<!-- RETRO-LAST-REFRESHED: 2026-07-29T18:24:03.631Z -->
+<!-- RETRO-FINGERPRINT: aa2fbe1a0684d898ff22defde0793ff455c9788ef306cb385f982273d4fe97d4 -->
+<!-- RETRO-LAST-REFRESHED: 2026-07-29T18:48:54.669Z -->
 <!-- AUTO-GENERATED:END -->
