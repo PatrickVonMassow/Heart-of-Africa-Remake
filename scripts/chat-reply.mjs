@@ -62,7 +62,17 @@ async function readStdin() {
   return Buffer.concat(chunks).toString('utf8')
 }
 
-export async function sendReply({ secret, text, id = randomUUID(), ts = Date.now(), fetchImpl = fetch }) {
+/**
+ * PUT ONE SIGNED ENVELOPE ON THE OUTBOX — and write NO receipt.
+ *
+ * Not everything the machine posts to the phone is an ANSWER. The launcher's
+ * inbox tick posts drop notices through here (chat-core's `dropNoticeDecision`),
+ * and a receipt for one of those would be a lie the watcher acts on: it would
+ * read "a reply went out after the spawn" and mark the user's message consumed
+ * with nobody having answered it — the silent loss `ackPlan` exists to prevent.
+ * So the receipt belongs to `sendReply` alone.
+ */
+export async function postOutbox({ secret, text, id = randomUUID(), ts = Date.now(), fetchImpl = fetch }) {
   const { outbox } = await deriveTopics(secret)
   // Signed FOR the outbox: the direction is inside the signed string, so this
   // envelope cannot be copied onto the inbox and read there as the user's own
@@ -80,13 +90,19 @@ export async function sendReply({ secret, text, id = randomUUID(), ts = Date.now
       body: JSON.stringify(envelope),
       signal: ac.signal,
     })
-    // The receipt is the watcher's evidence that an answer went out, so it is
-    // written ONLY for a send the transport accepted.
-    if (res.ok) recordReplyReceipt({ id: envelope.id })
     return { ok: res.ok, status: res.status, id: envelope.id }
   } finally {
     clearTimeout(timer)
   }
+}
+
+/** An AGENT'S ANSWER on its way to the phone: the same post, plus the receipt
+ *  that proves a session acted. Written ONLY for a send the transport accepted.
+ *  `receiptPath` exists so a test can prove that without writing into `.claude/`. */
+export async function sendReply({ receiptPath = RECEIPT_PATH, ...args }) {
+  const r = await postOutbox(args)
+  if (r.ok) recordReplyReceipt({ id: r.id, path: receiptPath })
+  return r
 }
 
 if (process.argv[1] && process.argv[1].replace(/\\/g, '/').endsWith('scripts/chat-reply.mjs')) {

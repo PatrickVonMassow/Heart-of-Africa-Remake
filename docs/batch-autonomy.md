@@ -1012,6 +1012,73 @@ paused, complete or wedged may not decide whether a message survives at all.
 Past 12 hours it is gone from the cache, which is also why the acceptance window
 is set to the same 12 hours — beyond it a replay is impossible anyway.
 
+**A DROPPED message does not look delivered** (`dropNoticeDecision` /
+`dropNoticeText` in `scripts/chat-core.mjs`). The page renders a sent message like
+any other — display never asks whether the machine accepted it — so a message
+dropped because the phone's clock runs further ahead than the five-minute skew
+left the user looking at a delivered-looking message the agent never received.
+That is the failure this channel exists to prevent, mirrored. The launcher's tick
+now posts a signed notice to the OUTBOX naming the reason, and the page shows it
+as an agent message.
+
+**What earns a notice is narrower than "a drop", and every exclusion is
+load-bearing.** Only a VERIFIED envelope earns one: a failed signature gets no
+answer at all, because replying would turn the outbox into an ORACLE for someone
+probing the inbox topic. A `duplicate` earns none — the original was accepted and
+delivered, so the words did land, and a notice would additionally hand a captured
+envelope an amplifier. And of the two halves of `stale`, only `ahead` (the clock
+running fast) qualifies; `expired` (older than the window) does NOT, because it is
+indistinguishable from a message that was accepted long ago and has since aged out
+of the envelope ledger — a four-eyes review proved a replay of a DELIVERED
+instruction landing exactly there, which would have told the user that something
+the machine had already carried out never arrived. The information to tell the two
+apart is genuinely gone, so the notice is narrowed rather than guessed at, and
+nothing is lost in practice: the acceptance window matches ntfy's cache, so an
+`expired` message is one the transport has dropped as well. `ahead` is safe by
+construction — acceptance requires `age >= -skew`, and at every earlier moment
+such an envelope's age was more negative still, so no past poll can have taken it.
+
+The notice **never quotes the message**: the two topics are derived separately so
+that knowing one reveals nothing about the other, and the signed timestamp
+identifies the message on its own. One notice per envelope id (kept in its own
+age-bounded ledger) and at most `MAX_DROP_NOTICES` per poll, so a broken clock
+cannot become an outbox flood. It is posted with `postOutbox`, never `sendReply`:
+a notice is not an ANSWER, and a reply receipt written for one would make the
+watcher mark the user's message consumed with nobody having answered it.
+
+**The replay bound is a WINDOW, not a count** (`envelopeRetentionMs` /
+`pruneIdLedger` in `scripts/chat-core.mjs`). Both id kinds used to share one
+500-entry array that dropped events pushed into as well — so a few hundred junk
+posts to a known inbox topic evicted the accepted envelope ids, and a captured
+envelope could then be replayed under a fresh transport id and be accepted a
+second time. The spool-seeded ledger softened that but did not close it: its
+bound is the consumed-file retention, not the acceptance window. The two are now
+separate. Transport ids stay cheap and count-capped; an accepted ENVELOPE id is
+kept for `maxAgeMs` plus the clock skew — exactly as long as `assessEvent` could
+still accept it — and dropped events never reach that ledger at all, so the flood
+path cannot touch it. Past the window the id is forgotten and the message it
+named is refused anyway, as `stale`. The launcher's poll and the watcher's
+subscription both hold the pair, and a message whose spool write FAILED is struck
+from both, or it would be lost for good.
+
+**An UNPAIRED machine and a BROKEN one are told apart** (`classifySecret` /
+`readSecretStatus` in `scripts/chat-secret.mjs`). The channel is opt-in, so a
+machine with no `.claude/chat-secret` stays silent — that is correct. But every
+other way that read can fail (a permission error, a directory in its place, a
+file that exists and holds nothing) takes the whole channel down: the topics
+cannot be derived, so every message the user sends is dropped before it is even
+parsed. Both states used to answer `null` and neither was reported. The reader
+now returns `absent` or `unreadable`; the inbox tick answers `ok: false` plus a
+machine-readable `fault` for the second, and the launcher logs it every tick and
+pushes it to the signal topic at most every six hours (`standingAlertDue` — it is
+a standing condition, not an event, and an unattended machine must not notify a
+phone all night). That push is the one chat fault that leaves the machine out of
+band, because the chat itself can no longer carry it. The watcher refuses to run
+on it — and because it exits BEFORE writing its pidfile, the supervisor would
+otherwise start a fresh doomed process at every tick, so the launcher does not
+start one at all while the fault stands. A watcher already running is left alone:
+it read the secret at its own start.
+
 **The security model — the part that shaped the design.** The board page is
 PUBLIC, and an ntfy topic name IS its access: anyone who knows it can read and
 post. A topic embedded in that page would be an open prompt-injection port into a
@@ -1023,8 +1090,8 @@ realistic worst case is command execution on the user's machine. So:
 | derived topics | `hoa-<32 hex>` from SHA-256 over the shared secret, domain-separated per direction. No topic name is in any tracked file or in the published HTML; the page derives them client-side with WebCrypto |
 | the secret | git-ignored `.claude/chat-secret` on the machine, `localStorage` on the phone. Never committed, never logged, never echoed into a page |
 | HMAC-SHA256 | over the canonical `(direction, id, ts, text)`, every field JSON-quoted so no two different messages share a canonical form. Both directions are signed — and the DIRECTION is inside the signed string, see below |
-| the drop rules | `scripts/chat-core.mjs` drops anything unsigned, mis-signed, older than the window, or already seen — **before** it is spooled |
-| the dedupe | a ledger of the ntfy id **and** the envelope id, rebuilt from the spool — the consumed messages included, since one already read is exactly the one a re-poll must not hand over again. The cursor in `.claude/chat-state.json` only narrows the next poll: losing or corrupting it replays the whole window and spools nothing twice |
+| the drop rules | `scripts/chat-core.mjs` drops anything unsigned, mis-signed, older than the window, or already seen — **before** it is spooled. A drop of a VERIFIED envelope is reported back to the sender (see below); a failed signature never is |
+| the dedupe | TWO ledgers: the ntfy ids rotate under a count cap, the accepted ENVELOPE ids are kept for the whole acceptance window (see below). Both are rebuilt from the spool — the consumed messages included, since one already read is exactly the one a re-poll must not hand over again. The cursor in `.claude/chat-state.json` only narrows the next poll: losing or corrupting it replays the whole window and spools nothing twice |
 
 **The direction is part of the signature, and that was a correction.** The first
 cut signed only `(id, ts, text)` under one key for both topics — so an

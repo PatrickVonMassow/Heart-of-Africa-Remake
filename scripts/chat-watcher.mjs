@@ -32,13 +32,16 @@ import { randomUUID } from 'node:crypto'
 import { join } from 'node:path'
 import { REPO_ROOT, repoPath } from './repo-paths.mjs'
 import { writeJsonAtomic } from './atomic-write.mjs'
-import { readSecret } from './chat-secret.mjs'
+import { readSecretStatus } from './chat-secret.mjs'
 import {
   DEFAULT_MAX_AGE_MS,
   SEEN_MAX,
   assessEvent,
   deriveTopics,
+  envelopeKeys,
+  envelopeRetentionMs,
   parseNtfyLine,
+  pruneIdLedger,
   seenKeys,
   sinceParam,
   streamUrl,
@@ -183,7 +186,13 @@ const state = {
    *  to count as ITS answer rather than an earlier session's. */
   spawnedAt: null,
   cursor: 0,
+  /** Transport ids, count-capped and disposable. */
   seen: [],
+  /** Accepted ENVELOPE ids under their own age-bounded retention — a stream of
+   *  junk lines may evict a transport id, never one of these (see
+   *  `envelopeRetentionMs`), so a captured envelope cannot be replayed into a
+   *  second responder by flooding the topic first. */
+  envelopes: [],
 }
 
 /** Clear the claim, but only ever OUR OWN (a user's claim must survive us). */
@@ -402,15 +411,18 @@ async function handleLine(secret, maxAgeMs, line) {
   if (event.event === 'message' && Number.isFinite(event.time)) {
     state.cursor = Math.max(state.cursor, Number(event.time))
   }
+  const now = Date.now()
   const verdict = await assessEvent({
     event,
     secret,
     // The topic this line came FROM, and therefore the direction the signature
     // must have been made for. Never read a direction off the wire.
     direction: 'inbox',
-    now: Date.now(),
+    now,
     maxAgeMs,
-    seen: state.seen,
+    // Both ledgers: the count-capped transport ids and every envelope id still
+    // inside the window in which the transport could replay it.
+    seen: [...state.seen, ...envelopeKeys(state.envelopes)],
   })
   // `keepalive` and `open` frames arrive every few seconds; reporting them would
   // drown the dry run's output in noise and say nothing.
@@ -423,10 +435,14 @@ async function handleLine(secret, maxAgeMs, line) {
   // one re-read from the cache is not re-reported either.
   if (verdict.accept) {
     state.seen.push(...seenKeys({ ntfyId: verdict.message.ntfyId, envelopeId: verdict.message.id }))
+    state.envelopes.push({ id: verdict.message.id, at: verdict.message.ts })
   } else if (verdict.ntfyId) {
+    // Transport id only. This is the path a flood comes down, and it may not
+    // reach the envelope ledger.
     state.seen.push(`n:${verdict.ntfyId}`)
   }
   if (state.seen.length > SEEN_MAX) state.seen = state.seen.slice(-SEEN_MAX)
+  state.envelopes = pruneIdLedger(state.envelopes, { now, retentionMs: envelopeRetentionMs(maxAgeMs) })
 
   const gathered = gatherState(state.sessionId, state.child !== null)
   const decision = wakeDecision({
@@ -460,11 +476,18 @@ async function run() {
     )
     process.exit(1)
   }
-  const secret = readSecret()
-  if (!secret) {
+  const status = readSecretStatus()
+  if (status.state === 'absent') {
     say({ ok: true, configured: false, reason: 'no chat secret — run: node scripts/chat-secret.mjs --init' })
     process.exit(0)
   }
+  if (status.state !== 'ok') {
+    // A secret that EXISTS and cannot be read is a fault, not an unpaired
+    // machine — it is said loudly rather than mistaken for "nothing to watch".
+    say({ ok: false, configured: true, reason: `chat secret unreadable (${status.reason})` })
+    process.exit(1)
+  }
+  const secret = status.secret
   const maxAge = Number(process.env.HOA_CHAT_MAX_AGE_MS) > 0 ? Number(process.env.HOA_CHAT_MAX_AGE_MS) : DEFAULT_MAX_AGE_MS
   state.identity = ownIdentity()
   installShutdownHandlers()
@@ -472,7 +495,12 @@ async function run() {
   // The ledger the spool already holds: what is waiting AND what was consumed.
   // It is what makes a watcher restart free — a message on the spool is a
   // message some session will be handed, so re-reading it must wake nobody.
-  state.seen = knownMessages().flatMap((m) => seenKeys({ ntfyId: m.ntfyId, envelopeId: m.id }))
+  const known = knownMessages()
+  state.seen = known.flatMap((m) => seenKeys({ ntfyId: m.ntfyId, envelopeId: m.id }))
+  state.envelopes = pruneIdLedger(
+    known.map((m) => ({ id: m.id, at: m.ts })),
+    { now: Date.now(), retentionMs: envelopeRetentionMs(maxAge) },
+  )
 
   if (!dryRun) {
     // A responder orphaned by a crashed predecessor is ADOPTED rather than

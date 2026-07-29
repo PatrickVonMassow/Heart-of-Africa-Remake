@@ -60,12 +60,14 @@ import {
   claudeExeBase,
   findClaudeExe,
   nextChatHandedAt,
+  standingAlertDue,
   pendingSinceHandover,
   recordSpawn,
   reapableSpawns,
   pruneSpawns,
 } from './batch-autostart-core.mjs'
 import { WATCHER_PID_FILE, watcherSupervision } from './chat-watcher-core.mjs'
+import { SECRET_FAULT } from './chat-secret.mjs'
 import { openPointStatus } from './tasks-source.mjs'
 import { BOARD_PAGE_URL } from './board-currency-core.mjs'
 
@@ -182,6 +184,9 @@ const bail = (code = 0) => { writeJsonAtomic(C('autostart-state.json'), state); 
 // window may steal the user's focus), and wrapped fail-open: a chat poll may
 // never be a reason the resurrection does not happen.
 let pendingChat = []
+/** Set by the tick below: the secret file exists and cannot be read, so nothing
+ *  in this channel can work until a human fixes it (see the watcher block). */
+let chatSecretBroken = false
 try {
   const out = execFileSync(process.execPath, [R('chat-inbox.mjs')], {
     cwd: REPO,
@@ -191,10 +196,30 @@ try {
     stdio: ['ignore', 'pipe', 'pipe'],
   })
   const r = JSON.parse(out.trim().split('\n').filter(Boolean).pop())
+  // A secret file that EXISTS and cannot be read takes the whole channel down
+  // silently — every message the user sends is dropped before it is parsed, and
+  // the channel itself can no longer say so. It is therefore the one chat fault
+  // that leaves the log and reaches the user out of band. But it is a STANDING
+  // condition, not an event: it is true at every tick until the file is fixed,
+  // so the PUSH is throttled (`standingAlertDue`) while the log line below still
+  // goes out every tick. The stamp is cleared as soon as the fault is gone, so a
+  // recurrence after a repair is reported at once.
+  chatSecretBroken = r.fault === SECRET_FAULT
+  if (!chatSecretBroken) state.chatSecretAlertAt = 0
+  else if (standingAlertDue({ lastAt: state.chatSecretAlertAt, now })) {
+    state.chatSecretAlertAt = now
+    await notify('Chat secret unreadable', `The board chat is DOWN: ${r.reason}. Messages from the phone are dropped until it is fixed.`, 'default')
+  }
   if (r.ok === false) log(`chat inbox: ${r.reason}`)
   else if (r.configured === false) { /* channel not paired on this machine — silent */ }
   else if (r.accepted > 0 || (r.dropped ?? []).length > 0) {
-    log(`chat inbox: ${r.accepted} new, ${r.pending} pending${r.dropped?.length ? ` (dropped: ${r.dropped.join(', ')})` : ''}`)
+    // The drop-notice counts are only worth a word when they DISAGREE: planned
+    // but not sent means the transport refused the notice, and the user is then
+    // still looking at a message that never landed with nothing to say so.
+    const notices = r.noticesPlanned > 0 && r.notices !== r.noticesPlanned
+      ? `, DROP NOTICE NOT SENT: ${r.noticesPlanned - r.notices} of ${r.noticesPlanned}`
+      : ''
+    log(`chat inbox: ${r.accepted} new, ${r.pending} pending${r.dropped?.length ? ` (dropped: ${r.dropped.join(', ')})` : ''}${notices}`)
   }
   pendingChat = Array.isArray(r.messages) ? r.messages : []
 } catch (e) {
@@ -219,7 +244,15 @@ try {
 try {
   const rec = readJson(C(WATCHER_PID_FILE))
   const sup = watcherSupervision({ paused: existsSync(C('batch-paused')), record: rec, probe: probePid })
-  if (sup.action === 'stop') {
+  // A WATCHER CANNOT RUN WITHOUT A READABLE SECRET, and one started anyway exits
+  // before it writes its pidfile — so the supervision would read "not running"
+  // and start another doomed process at every tick, for ever, with nothing
+  // reaching a human. The fault is already reported above; here it simply means
+  // do not start. A watcher that is ALREADY alive is left alone: it read the
+  // secret at ITS start and its subscription is unaffected by the file breaking.
+  if (sup.action === 'start' && chatSecretBroken) {
+    log('chat watcher: not started (the chat secret is unreadable)')
+  } else if (sup.action === 'stop') {
     try { process.kill(sup.pid) } catch { /* already gone */ }
     log(`chat watcher: stopped pid ${sup.pid} (${sup.reason})`)
   } else if (sup.action === 'start') {

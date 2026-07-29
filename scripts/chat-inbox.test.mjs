@@ -9,7 +9,10 @@
 // The spool's own file layout — one file per message, the claim, the migration
 // off the stage-1 .jsonl — is proved in scripts/chat-spool.test.mjs.
 import { describe, expect, it } from 'vitest'
-import { seededLedger, stateAfterSpool } from './chat-inbox.mjs'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+import { secretGateReport, seededLedger, stateAfterSpool } from './chat-inbox.mjs'
+import { SECRET_FAULT } from './chat-secret.mjs'
 import { TEST_VECTOR, ingest, makeEnvelope } from './chat-core.mjs'
 
 const NOW = 1_700_000_000_000
@@ -23,11 +26,57 @@ const frame = async ({ ntfyId, msgId, text, ts = NOW, direction = 'inbox' }) => 
   message: JSON.stringify(await makeEnvelope({ secret, direction, id: msgId, ts, text })),
 })
 
-describe('A MESSAGE WHOSE SPOOL WRITE FAILED IS NOT RECORDED AS SEEN', () => {
-  const next = { cursor: 5000, seen: ['n:n1', 'm:m1', 'n:n2', 'm:m2'] }
+describe('AN UNREADABLE SECRET REPORTS; AN ABSENT ONE STAYS SILENT', () => {
+  it('says nothing loud on a machine that never paired a phone', () => {
+    const r = secretGateReport({ status: { state: 'absent', secret: null, reason: null }, pending: 2 })
+    expect(r).toEqual({ ok: true, configured: false, accepted: 0, pending: 2 })
+    expect(r.fault).toBeUndefined()
+  })
 
-  it('keeps the whole ledger and the new cursor when everything reached the disk', () => {
-    expect(stateAfterSpool({ next, previousCursor: 4000, failed: [] })).toEqual({ cursor: 5000, seen: next.seen })
+  it('reports a fault the launcher can recognise by a FIELD, not by wording', () => {
+    const r = secretGateReport({ status: { state: 'unreadable', secret: null, reason: 'EACCES: denied' }, pending: 0 })
+    expect(r.ok).toBe(false)
+    expect(r.fault).toBe(SECRET_FAULT)
+    expect(r.reason).toContain('EACCES')
+    expect(r.configured).toBe(true)
+  })
+
+  it('lets a paired machine carry on', () => {
+    expect(secretGateReport({ status: { state: 'ok', secret: 's', reason: null } })).toBeNull()
+  })
+
+  it('treats a junk status as the fault rather than as "carry on"', () => {
+    for (const status of [null, undefined, {}, { state: 'nonsense' }]) {
+      expect(secretGateReport({ status })?.fault).toBe(SECRET_FAULT)
+    }
+  })
+
+  it('is the SAME field the launcher tests — the two may not drift apart', () => {
+    const launcher = readFileSync(resolve(process.cwd(), 'scripts/batch-autostart.mjs'), 'utf8')
+    expect(launcher).toContain('r.fault === SECRET_FAULT')
+    expect(launcher).toContain("from './chat-secret.mjs'")
+  })
+})
+
+describe('A MESSAGE WHOSE SPOOL WRITE FAILED IS NOT RECORDED AS SEEN', () => {
+  const next = {
+    cursor: 5000,
+    seen: ['n:n1', 'm:m1', 'n:n2', 'm:m2'],
+    envelopes: [{ id: 'm1', at: NOW }, { id: 'm2', at: NOW }],
+  }
+
+  it('keeps both ledgers and the new cursor when everything reached the disk', () => {
+    expect(stateAfterSpool({ next, previousCursor: 4000, failed: [] })).toEqual({
+      cursor: 5000,
+      seen: next.seen,
+      envelopes: next.envelopes,
+      notified: [],
+    })
+  })
+
+  it('strikes the failed message from the AGE-BOUNDED ledger too, or it is lost for good', () => {
+    const r = stateAfterSpool({ next, previousCursor: 4000, failed: [{ id: 'm2', ntfyId: 'n2' }] })
+    expect(r.envelopes).toEqual([{ id: 'm1', at: NOW }])
   })
 
   it('strikes the failed message from the ledger, so the next poll re-accepts it', () => {
@@ -51,13 +100,19 @@ describe('A MESSAGE WHOSE SPOOL WRITE FAILED IS NOT RECORDED AS SEEN', () => {
   })
 
   it('strikes a message that carried no ntfy id by its envelope id alone', () => {
-    const r = stateAfterSpool({ next: { cursor: 9, seen: ['m:m7'] }, previousCursor: 3, failed: [{ id: 'm7', ntfyId: null }] })
-    expect(r).toEqual({ cursor: 3, seen: [] })
+    const state = { cursor: 9, seen: ['m:m7'], envelopes: [{ id: 'm7', at: NOW }] }
+    const r = stateAfterSpool({ next: state, previousCursor: 3, failed: [{ id: 'm7', ntfyId: null }] })
+    expect(r).toEqual({ cursor: 3, seen: [], envelopes: [], notified: [] })
   })
 
   it('survives junk instead of throwing on the state write path', () => {
     expect(() => stateAfterSpool({ next: null, previousCursor: NaN, failed: [null] })).not.toThrow()
-    expect(stateAfterSpool({ next: undefined, previousCursor: 1, failed: [] })).toEqual({ cursor: undefined, seen: [] })
+    expect(stateAfterSpool({ next: undefined, previousCursor: 1, failed: [] })).toEqual({
+      cursor: undefined,
+      seen: [],
+      envelopes: [],
+      notified: [],
+    })
   })
 })
 
