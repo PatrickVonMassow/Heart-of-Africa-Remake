@@ -3716,6 +3716,55 @@ read that as "the criterion and its evidence section".
   DOCS in the same commit: the evidence section `docs/acceptance-evidence.md` §31 records
   the pitched-view check beside the existing eye-level one.
 
+- [ ] 429. AN AGENT'S CLEANUP DELETES THE MAIN TREE'S DEPENDENCIES (29.07.2026, TWICE in
+  one afternoon, both times through a worktree removal). A delegated agent finished, its
+  temporary worktree was removed — once with `git worktree remove --force`, once with an
+  `rm -rf` after that failed — and `node_modules` in the MAIN tree came away with it: the
+  next `npm run build` reported "'tsc' is not recognized", the push gate went red on a
+  state that was otherwise fine, and the repair each time was a full `npm install`. The
+  worktrees carry a junction/link to the main tree's `node_modules`, and a recursive
+  delete follows it. This is the incident of retrospective §3.49 repeating twice after it
+  was written down — which is exactly the evidence that a written lesson without a
+  mechanism does not hold.
+  WHAT MUST NOT BE "FIXED" BY BANNING WORKTREES: parallel agents NEED worktree isolation
+  (CLAUDE.md §6). The removal is the defect, not the isolation.
+  TARGET: removing an agent worktree can never reach outside that worktree. Establish
+  which of the two is true before choosing the fix — (i) the worktree's `node_modules` is
+  a link and the delete follows it, or (ii) the removal runs from a path that resolves
+  into the main tree. For (i) the fix is that the link is REPLACED by a real per-worktree
+  install or is removed before the tree is, for (ii) it is that the removal never runs
+  with a relative path. Whichever it is, the cleanup belongs in ONE place — a single
+  script the main session calls — not in each agent's own prompt, because the two damaged
+  runs used two different commands.
+  VERIFIABLE: a Vitest case over the cleanup helper that builds a throwaway worktree with
+  a link standing in for the dependency directory, removes it, and asserts the LINK TARGET
+  still exists — the assertion the two incidents would have failed. Plus a guard-level
+  case that the helper refuses a path that is not inside the worktree root.
+  BONUS, cheap and independent: `npm run build` failing with "'tsc' is not recognized"
+  should say WHAT that means (dependencies missing or damaged → run `npm install`), since
+  both incidents cost minutes of diagnosis for a one-command repair.
+  DOCS in the same commit: `docs/batch-autonomy.md` under the agent lifecycle, and the
+  ledger row for retrospective §3.49 gains its mechanism instead of its current
+  "deliberately none".
+
+- [ ] 430. TWO NARROW RESIDUALS IN THE CHAT DROP NOTICE (29.07.2026, named by the
+  four-eyes review of point 417 as non-blocking follow-ups; the review's verdict was
+  MERGE and the point is closed — these are what it deliberately left standing).
+  (A) A message dropped as CLOCK-AHEAD is notified at once, but it could still be accepted
+  minutes later once the machine's clock catches up — if its transport id were evicted
+  from the count-capped `seen` ledger by a flood in between. The user would be told "not
+  arrived" for a message that then arrives. It needs a flood AND tight timing, which is
+  why it is a follow-up and not a defect: the fix is to remember a NOTIFIED envelope id
+  and refuse to notify twice, or to suppress the notice for the skew band the clock can
+  still close.
+  (B) A tick where the spool write failed AND a drop notice went unsent logs only the
+  spool failure: the notice clause sits in the `else if` branch of the launcher's chat
+  log. Both facts should reach the log, since the whole point of the counts is that a
+  refused notice is not silent.
+  VERIFIABLE: one Vitest case per residual against the pure cores — (A) accept-after-
+  notify produces no second notice and no contradictory pair, (B) both conditions in one
+  tick produce both log statements.
+
 ## Closing (only after all points)
 
 New points are appended BEFORE this section — it stays last in the file.
