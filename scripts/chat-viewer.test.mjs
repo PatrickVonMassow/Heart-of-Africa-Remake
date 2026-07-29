@@ -109,16 +109,20 @@ describe('the page is public — nothing secret is written into it', () => {
 })
 
 describe('the chat survives the document the board writes over it', () => {
-  it('is present, at the TOP, AFTER the board content has rendered', async () => {
+  it('sits directly under the board heading, AFTER the board content has rendered', async () => {
     const dom = await loadViewer({ fetchImpl: async () => okResponse(board) })
     const doc = dom.window.document
     // The board really did replace the document…
     expect(doc.body.textContent).toContain('Woran ich gerade arbeite')
     expect(dom.window.__boardScriptRan).toBe(true)
-    // …and the chat is there anyway, as the first thing on the page.
+    // …and the chat is there anyway — under the heading that says what this page
+    // is, never above it (user 29.07.2026), and above the first section.
     const chat = doc.getElementById('hoa-chat')
     expect(chat).toBeTruthy()
-    expect(doc.body.firstElementChild).toBe(chat)
+    const heading = doc.querySelector('main h1 + .sub') ?? doc.querySelector('main h1')
+    expect(heading.nextElementSibling).toBe(chat)
+    expect(chat.previousElementSibling).toBe(heading)
+    expect(doc.body.firstElementChild).not.toBe(chat)
     dom.window.close()
   })
 

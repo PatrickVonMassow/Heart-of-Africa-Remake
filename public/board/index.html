@@ -445,7 +445,14 @@
         const panel = chatEl('div', { className: 'chat-panel', hidden: true }) // DEFAULT CLOSED
         toggle.addEventListener('click', () => chatTogglePanel(panel, toggle))
         host.append(toggle, panel)
-        document.body.insertBefore(host, document.body.firstChild)
+        // UNDER the board's own heading, not above it (user 29.07.2026): the page
+        // should still announce what it is before it offers a way to write. The
+        // heading block is the <h1> and its subtitle inside <main>; the chat goes
+        // directly after them. With no board rendered — the failure path — there is
+        // no heading to sit under, so it leads the page as before.
+        const sub = document.querySelector('main h1 + .sub') ?? document.querySelector('main h1')
+        if (sub && sub.parentNode) sub.parentNode.insertBefore(host, sub.nextSibling)
+        else document.body.insertBefore(host, document.body.firstChild)
       }
       window.injectChat = injectChat // the jsdom test drives the real function
 
