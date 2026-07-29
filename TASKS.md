@@ -3555,6 +3555,58 @@ read that as "the criterion and its evidence section".
   DOCS in the same commit: `scripts/verify/README.md` (the baseline lane's failure modes)
   and point 387's list, if (a) turns out to be a red main already carries.
 
+- [ ] 419. THE BOARD'S MOVE TO ITS OWN PAGE COST FOUR THINGS, ALL SILENTLY
+  (29.07.2026, user reported three of the four in one morning while the batch ran).
+  Point 400 moved the board from an artifact — where the FRAGMENT was the whole
+  document — to a GitHub-Pages shell that fetches the fragment and `document.write`s
+  it. Four properties of the old arrangement were lost in that move, none of them
+  covered by a test or a guard, so all four went unnoticed until a reader hit them:
+  (a) THE QUEUE LOST ITS PROSE, ITS ESTIMATES AND THE USER'S ORDER. The queue became a
+  projection over `TASKS.md` + `.claude/board-queue.json`, but the existing hand-kept
+  content was never migrated into the data file. Measured on the live page: 79 of 81
+  cards carried the stub body, 0 of 81 an estimate, and every title was the raw English
+  work-order headline (`parseTaskTitles`), cut mid-sentence at 90 characters. Worst is the
+  ORDER: `queueOrder` keeps only points listed in `order` and appends the rest ASCENDING
+  by number, so the user's prioritisation — the one datum on the board that exists
+  nowhere else — was replaced by the numbering the code itself calls "not it". Point 392
+  had been placed 2nd and stood 60th. FIX: restore titles, estimates, bodies and order
+  into `.claude/board-queue.json` from the recovered 05:10 artifact snapshot (80 of 81
+  cards; write fresh prose for the rest), WITHOUT overwriting a body a later session
+  already set. A card's prose is written for the reader, not the builder: no branch names
+  (`feat/336-croc-staging`), no file paths.
+  (b) THE PAGE NEVER REFRESHES ITSELF. The fragment's own 30-second refresher does
+  `fetch(location.href)` and swaps `<main>`. After `document.write` the location is the
+  SHELL's, and the shell has no `<main>` — so `fresh` is null, the swap is skipped and the
+  poll does nothing, for ever. The built-in fallback cannot save it either: it triggers on
+  a FAILED fetch, and fetching the shell succeeds. The reader sees whatever was loaded when
+  the page was opened; a phone left open shows hours-old work. FIX: fetch the CONTENT url
+  the shell already knows, and treat a missing `<main>` as a reason to reload rather than
+  as nothing to do.
+  (c) THE BOARD HAS NO VIEWPORT AND IS UNREADABLE ON A PHONE. The shell sets
+  `<meta name="viewport" content="width=device-width, initial-scale=1">`; `document.write`
+  discards it with the old document, and the fragment carries none of its own (0 occurrences).
+  Chrome falls back to its 980-px default viewport and scales the page down — roughly a
+  factor 2.4 on a 1080-px phone, which is what the user photographed. FIX: the FRAGMENT
+  carries its own viewport meta, so the property survives every transport (shell, artifact
+  mirror, the raw file opened directly).
+  (d) A BOARD FULL OF STUBS BREAKS NO RULE. Every existing check was satisfied while the
+  queue was 97 % placeholder: `queue-meta` accepts the named stub meta by design, and the
+  coverage rule only asks that each open point appear SOMEWHERE. The board was formally
+  perfect and materially empty. FIX: `dashboard-guard-core` gains a violation for a queue
+  whose stub share exceeds a calibratable ceiling (default: more than a quarter of the
+  cards, and never more than three consecutive), so a mass regression of the prose reports
+  itself instead of waiting for the reader.
+  VERIFIABLE: pure Vitest throughout — (a) a fixture data file with titles/estimates/order
+  renders cards that carry them, and a merge over an existing body keeps that body;
+  (b) the refresher, extracted and run in jsdom against a shell without `<main>`, reloads
+  instead of silently doing nothing, and against the content url swaps; (c) a shape test
+  asserts the published fragment contains a viewport meta — the same test that would have
+  caught this; (d) a queue over the ceiling is flagged, one under it is not, and the
+  existing stub-meta exemption is untouched. Plus a live check on the phone-width viewport
+  after publish.
+  DOCS in the same commit: `docs/batch-autonomy.md` (the board's transport and what each
+  half owns) and the memory entry `batch-dashboard-artifact`.
+
 ## Closing (only after all points)
 
 New points are appended BEFORE this section — it stays last in the file.
