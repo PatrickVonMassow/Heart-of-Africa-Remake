@@ -33,6 +33,8 @@ import {
   chatPromptSuffix,
   nextChatHandedAt,
   pendingSinceHandover,
+  STANDING_ALERT_INTERVAL_MS,
+  standingAlertDue,
 } from './batch-autostart-core.mjs'
 import { isOwnSpawn } from './batch-singleton.mjs'
 
@@ -343,5 +345,53 @@ describe('pendingSinceHandover / nextChatHandedAt', () => {
     expect(nextChatHandedAt({ spawned: true, previous: 900, now: NaN })).toBe(900)
     expect(nextChatHandedAt({ spawned: true, previous: 900, now: undefined })).toBe(900)
     expect(nextChatHandedAt({ spawned: false, previous: 'junk', now: 2000 })).toBe(0)
+  })
+})
+
+// A STANDING CONDITION IS NOT AN EVENT (four-eyes follow-up F3, 29.07.2026).
+//
+// An unreadable chat secret is true at EVERY tick until somebody fixes the file,
+// and the tick runs every few minutes — pushed unconditionally it wakes an
+// unattended phone all night. The log line stays per tick; the push is throttled
+// by this, and the stamp is cleared when the condition goes away so a recurrence
+// after a repair is reported at once.
+describe('standingAlertDue — the push for a standing fault', () => {
+  const NOW = 1_700_000_000_000
+
+  it('pushes the FIRST time the condition is seen', () => {
+    expect(standingAlertDue({ lastAt: null, now: NOW })).toBe(true)
+    expect(standingAlertDue({ lastAt: undefined, now: NOW })).toBe(true)
+    // 0 is the CLEARED stamp: the condition went away and came back.
+    expect(standingAlertDue({ lastAt: 0, now: NOW })).toBe(true)
+  })
+
+  it('stays silent for a whole tick-storm inside the interval', () => {
+    for (const minutes of [1, 5, 15, 60, 180, 359]) {
+      expect(standingAlertDue({ lastAt: NOW, now: NOW + minutes * 60_000 })).toBe(false)
+    }
+  })
+
+  it('pushes again once the interval has passed', () => {
+    expect(standingAlertDue({ lastAt: NOW, now: NOW + STANDING_ALERT_INTERVAL_MS })).toBe(true)
+    expect(standingAlertDue({ lastAt: NOW, now: NOW + STANDING_ALERT_INTERVAL_MS + 1 })).toBe(true)
+    expect(standingAlertDue({ lastAt: NOW, now: NOW + STANDING_ALERT_INTERVAL_MS - 1 })).toBe(false)
+  })
+
+  it('is measured in HOURS, not minutes — an unattended night must stay quiet', () => {
+    expect(STANDING_ALERT_INTERVAL_MS).toBeGreaterThanOrEqual(4 * 60 * 60 * 1000)
+  })
+
+  it('does not silence itself when the clock moved BACKWARD (a bad RTC after a reboot)', () => {
+    expect(standingAlertDue({ lastAt: NOW, now: NOW - 60_000 })).toBe(true)
+  })
+
+  it('never pushes blind without a usable clock, and survives junk', () => {
+    expect(standingAlertDue({ lastAt: NOW, now: NaN })).toBe(false)
+    expect(standingAlertDue({ lastAt: NOW, now: 'later' })).toBe(false)
+    expect(standingAlertDue({ lastAt: 'never', now: NOW })).toBe(true)
+    expect(() => standingAlertDue()).not.toThrow()
+    // A junk interval falls back to the default rather than to "always push".
+    expect(standingAlertDue({ lastAt: NOW, now: NOW + 60_000, intervalMs: 'soon' })).toBe(false)
+    expect(standingAlertDue({ lastAt: NOW, now: NOW + 60_000, intervalMs: 0 })).toBe(false)
   })
 })

@@ -19,6 +19,11 @@ export interface BalanceConfig {
   walkerUnstuckSeconds: number
   /** Mouse-look sensitivity in the first-person view, radians per pixel. */
   mouseSensitivity: number
+  /** Vertical first-person look clamp in DEGREES from the horizon (design.md
+   *  §17.5, point 392): how far up and down the view may pitch. Calibratable,
+   *  but structurally capped just short of vertical (`PITCH_LIMIT_CEILING_DEG`
+   *  in src/systems/lookPitch.ts) so the world can never roll over. */
+  lookPitchLimitDeg: number
   /** Single ambience volume: the noise beds (wind/surf/murmur), their gust/swell
    *  modulation and the proximity animal calls are all scaled by it (1 = full). */
   ambienceVolume: number
@@ -506,6 +511,7 @@ export const balance: BalanceConfig = {
   placeStrafeFactor: 0.8,
   walkerUnstuckSeconds: 4, // an inhabitant wedged this long is teleport-nudged free (point 155)
   mouseSensitivity: 0.0011,
+  lookPitchLimitDeg: 85, // just short of vertical (point 392); the view never rolls over
   ambienceVolume: 0.1,
   footstepVolume: 2, // footsteps twice as loud as the rest (user request)
   ambientVolume: 0.5, // every other ambient sound half as loud (user request)

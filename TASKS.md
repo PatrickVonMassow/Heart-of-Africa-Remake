@@ -2779,49 +2779,6 @@ read that as "the criterion and its evidence section".
   against today's 1.25 %/h. The point counts as delivered when the rate is measured, not
   when the mechanism runs.
 
-- [ ] 392. LOOKING UP AND DOWN IN THE FIRST-PERSON VIEW (user 28.07.2026, raised as the
-  answer to a problem point 391 would otherwise create: once the monuments tower, a
-  yaw-only camera shows the Sphinx's paws and the bottom courses of a pyramid and nothing
-  above them). VERIFIED IN THE CODE, not assumed: the first-person look reads
-  `e.movementX` only (`src/scenes/place/PlaceScene.tsx`, the pointer-lock `onMove`), so
-  there is no vertical look at all today — the gap is real and is not Giza-specific. It is
-  a PREREQUISITE for 391: build it first, or the enlarged monuments cannot be seen.
-  TARGET: mouse movement pitches the view as well as turning it, at the same
-  `balance.mouseSensitivity` (§20), CLAMPED just short of straight up and straight down so
-  the world can never roll over — the clamp is a calibratable balance value, debug-editable
-  like its siblings (§21.2). The vertical axis is INVERTED (user 28.07.2026): pushing the
-  mouse FORWARD looks DOWN, pulling it back looks UP — the flight-stick convention, and
-  the default. A debug-menu checkbox "Invert mouse look" (localized in both languages,
-  §21.3) toggles it, CHECKED by default, so the store field defaults to inverted rather
-  than defaulting off and being flipped somewhere else. Horizontal look is unaffected.
-  THE GAMEPAD FOLLOWS (§17.5): the right stick already turns the first-person view, so its
-  VERTICAL axis pitches it, through the same path — the §17.5 rule that the pad drives
-  synthetic key events and never a second input path stays untouched, and the
-  deliberate-input engagement guard against idle axis drift applies to the new axis too.
-  WHAT THE PITCH EXPOSES, and each of these is already pinned somewhere:
-  · the BACKDROP and the panorama band (points 181/381) are built around a horizon at eye
-    level; a camera looking UP must still meet sky and not the ring's upper rim, and one
-    looking DOWN must meet the walkable ground with no hole and no unlit face at the disc
-    edge. Extend the sweep in `src/scenes/place/backdrop.test.ts` over the pitch range
-    rather than only over disc radii.
-  · the CAMERA NEAR PLANE must keep buildings solid from every pitch (§7.1 pt 16: pressing
-    against a wall may never show its inside), including looking up at a wall from close.
-  · the WALKING BOB and the eye height (1.5 m, §20) compose with the pitch; the bob is a
-    camera offset and must not fight the new rotation — pin the composition order.
-  · the DOOR/use prompt, the SPACE entry and the leave rule are position-based (§2.3) and
-    must stay so: pitch changes what is seen, never what is reachable.
-  · the in-scene floating labels and the HUD (§17.4) stay legible and correctly ordered at
-    any pitch.
-  VERIFIABLE: pure Vitest on the look state — the pitch accumulates at the stated
-  sensitivity, clamps at both ends and cannot be pushed past them by any input sequence,
-  the gamepad axis feeds the same state, and the bob composes with it in a fixed order.
-  Live on BOTH backends: a first-person frame looking UP at a pyramid apex, one looking
-  DOWN at the ground at one's feet, and one at the disc edge looking down over it — judged
-  by the picture. `scripts/verify/settings.mjs` gains the live pitch drive.
-  DOCS in the same commit: design.md §17.5 states the vertical look and the clamp;
-  CLAUDE.md §7.1 pt 20's control calibration gains it. Both documents sit at measured
-  ceilings, so the words are paid for by a measured raise with its justification, or by
-  shortening elsewhere.
 - [ ] 379. ABU SIMBEL BECOMES A WALKABLE SITE (user 27.07.2026; a FEATURE, and the user's
   own instruction is that the open DEFECTS come first — it waits behind them). The world carries
   eight built cultural landmarks (Meroë, Giza, Great Zimbabwe, Lalibela, Kilwa, Aksum,
@@ -3477,42 +3434,6 @@ read that as "the criterion and its evidence section".
   DOCS in the same commit: the memory entry `batch-dashboard-artifact`, which states how
   a card moves.
 
-- [ ] 417. A DROPPED CHAT MESSAGE LOOKS DELIVERED, AND THE LEDGER CAN BE FLOODED
-  (29.07.2026, the two follow-up findings of the Fable-5 four-eyes review of the
-  message channel; the review's blocking findings were fixed in that point, these
-  two were deliberately deferred to their own commit).
-  A. THE SENDER IS TOLD NOTHING WHEN A MESSAGE IS DROPPED. `scripts/chat-inbox.mjs`
-  drops a message that is stale (a phone clock more than the skew ahead of the
-  machine is enough) or that arrives while the secret file cannot be read, and the
-  only trace is a line in `.claude/autostart.log`. The page meanwhile renders the
-  sent message like any other — display never asks whether it was accepted — so the
-  user sees a delivered-looking message the agent never received. That is the one
-  failure shape this whole channel exists to prevent, mirrored: a board that lies by
-  omission. FIX, both halves: (i) `readSecret` must distinguish an ABSENT secret file
-  (the channel is simply not configured — silence is correct) from an UNREADABLE one
-  (a permission error, a truncated file — a fault that must be reported), and the
-  launcher reports the second; (ii) when a message verifies as genuinely addressed to
-  this channel but is dropped anyway, the launcher posts a signed drop-notice to the
-  OUTBOX naming the reason, so the page shows the user that their message did not
-  land and why. A message that fails the signature check gets NO notice — answering
-  those would turn the outbox into an oracle for an attacker probing the topic.
-  B. THE LEDGER CAN BE EVICTED UNDER FLOOD. `chat-core.mjs` caps the seen-ledger at
-  `SEEN_MAX` entries and pushes DROPPED transport ids into it too, so 500-odd junk
-  posts to a known inbox topic evict the accepted envelope ids from the state file.
-  The spool-seeded ledger softens this but does not close it: the seed is bounded by
-  the consumed-file retention (`scripts/chat-spool.mjs`), so a replay stays possible
-  for any message the transport still holds once that retention has passed it by.
-  FIX: keep the accepted ENVELOPE ids (`m:`) under their own retention rule — bounded
-  by the acceptance window rather than by a shared entry count — so eviction can never
-  outrun the window in which a replay is possible, and let the cheap transport ids
-  (`n:`) rotate as they do now.
-  VERIFIABLE: pure Vitest — an unreadable secret reports while an absent one stays
-  silent; a stale drop produces exactly one outbox notice and a bad-signature drop
-  produces none; and an envelope id inside the acceptance window survives a flood of
-  `SEEN_MAX`+ dropped transport ids and is still refused on replay, while one older
-  than the window may be evicted.
-  DOCS in the same commit: `docs/batch-autonomy.md`, where the channel's guarantees
-  are stated — the drop notice is one of them, and the replay bound is the other.
 
 - [ ] 418. A STAGED DROWNING STAYS RED AND THE BASELINE LANE DIES BEFORE IT CAN SAY WHY
   (29.07.2026, found while clearing point 316 on a QUIET machine — `machine-load` reported
@@ -3760,6 +3681,120 @@ read that as "the criterion and its evidence section".
   slot-reason), CLAUDE.md §6 (the delegation rule states the cap is also a TARGET while
   independent work is queued) and the ledger row 3.58.
   MECHANISM REVIEW required (it changes a gate): `scripts/mechanism-review.mjs --record`.
+
+- [ ] 428. THE WALKABLE GROUND MEETS THE PANORAMA AT A VISIBLE STEP (29.07.2026, found by
+  the picture check of the vertical look, on BOTH backends). Standing at the settlement's
+  walkable edge and looking DOWN over it — a view the game only gained with the vertical
+  look — the walkable disc and the backdrop relief behind it read as TWO surfaces, not one
+  ground: a straight horizontal brightness step runs across the whole frame where they
+  meet, the backdrop side markedly darker, and the seam itself is faintly stepped in
+  short straight segments rather than following the terrain. Evidence:
+  `verification/145-look-down-disc-edge.png`, recorded on WebGL 2 and on WebGPU (the step
+  is on both, the shading difference is larger on WebGPU).
+  WHAT IS ALREADY TRUE AND MUST STAY: point 381 closed the HOLE at that edge — outside the
+  disc the backdrop never sinks below the ground plane and a ring is pinned on the disc
+  edge — and CLAUDE.md §7.1 pt 31 states the ground meets the panorama "with no edge, no
+  unlit face and no hole". That criterion was verified from an eye-level horizon, where
+  the seam sits at the vanishing line and cannot be seen; the pitch put it in frame. So
+  this is not a regression of 381 but the rest of its own criterion, and 381's geometry
+  fix is not to be undone.
+  TARGET: from any position and any pitch the walkable ground and the backdrop read as ONE
+  continuous ground — no tonal step at the seam beyond what the terrain itself explains,
+  and no straight-segment rim. Find WHICH of the two the step belongs to before changing
+  either: compare the two surfaces' shading inputs (do both take the same sun direction,
+  the same IBL/ambient term, the same tone mapping stage, and does the backdrop get the
+  biome splat the disc gets, or a flat fallback colour?), and check whether the point-381
+  ring is drawn in its own tone rather than the disc's. A material/lighting mismatch is
+  the likely cause; a geometry gap is not — the picture shows contact, not a crack.
+  VERIFIABLE: Vitest in `src/scenes/place/backdrop.test.ts` — the disc and the backdrop
+  resolve the same lighting inputs at coincident points on the seam, so a future change
+  that gives one of them its own term FAILS. Live in `scripts/verify/polish.mjs`: from the
+  disc edge looking down, scan a vertical pixel column across the seam IN THE ONE FRAME
+  and assert the luminance step at the contact stays under a calibratable threshold — a
+  within-frame measure, never a cross-run image diff (point 361 forbids the latter). Both
+  backends, judged by the picture: the same frame must show one ground.
+  DOCS in the same commit: the evidence section `docs/acceptance-evidence.md` §31 records
+  the pitched-view check beside the existing eye-level one.
+
+- [ ] 429. AN AGENT'S CLEANUP DELETES THE MAIN TREE'S DEPENDENCIES (29.07.2026, TWICE in
+  one afternoon, both times through a worktree removal). A delegated agent finished, its
+  temporary worktree was removed — once with `git worktree remove --force`, once with an
+  `rm -rf` after that failed — and `node_modules` in the MAIN tree came away with it: the
+  next `npm run build` reported "'tsc' is not recognized", the push gate went red on a
+  state that was otherwise fine, and the repair each time was a full `npm install`. The
+  worktrees carry a junction/link to the main tree's `node_modules`, and a recursive
+  delete follows it. This is the incident of retrospective §3.49 repeating twice after it
+  was written down — which is exactly the evidence that a written lesson without a
+  mechanism does not hold.
+  WHAT MUST NOT BE "FIXED" BY BANNING WORKTREES: parallel agents NEED worktree isolation
+  (CLAUDE.md §6). The removal is the defect, not the isolation.
+  TARGET: removing an agent worktree can never reach outside that worktree. Establish
+  which of the two is true before choosing the fix — (i) the worktree's `node_modules` is
+  a link and the delete follows it, or (ii) the removal runs from a path that resolves
+  into the main tree. For (i) the fix is that the link is REPLACED by a real per-worktree
+  install or is removed before the tree is, for (ii) it is that the removal never runs
+  with a relative path. Whichever it is, the cleanup belongs in ONE place — a single
+  script the main session calls — not in each agent's own prompt, because the two damaged
+  runs used two different commands.
+  VERIFIABLE: a Vitest case over the cleanup helper that builds a throwaway worktree with
+  a link standing in for the dependency directory, removes it, and asserts the LINK TARGET
+  still exists — the assertion the two incidents would have failed. Plus a guard-level
+  case that the helper refuses a path that is not inside the worktree root.
+  BONUS, cheap and independent: `npm run build` failing with "'tsc' is not recognized"
+  should say WHAT that means (dependencies missing or damaged → run `npm install`), since
+  both incidents cost minutes of diagnosis for a one-command repair.
+  DOCS in the same commit: `docs/batch-autonomy.md` under the agent lifecycle, and the
+  ledger row for retrospective §3.49 gains its mechanism instead of its current
+  "deliberately none".
+
+- [ ] 430. TWO NARROW RESIDUALS IN THE CHAT DROP NOTICE (29.07.2026, named by the
+  four-eyes review of point 417 as non-blocking follow-ups; the review's verdict was
+  MERGE and the point is closed — these are what it deliberately left standing).
+  (A) A message dropped as CLOCK-AHEAD is notified at once, but it could still be accepted
+  minutes later once the machine's clock catches up — if its transport id were evicted
+  from the count-capped `seen` ledger by a flood in between. The user would be told "not
+  arrived" for a message that then arrives. It needs a flood AND tight timing, which is
+  why it is a follow-up and not a defect: the fix is to remember a NOTIFIED envelope id
+  and refuse to notify twice, or to suppress the notice for the skew band the clock can
+  still close.
+  (B) A tick where the spool write failed AND a drop notice went unsent logs only the
+  spool failure: the notice clause sits in the `else if` branch of the launcher's chat
+  log. Both facts should reach the log, since the whole point of the counts is that a
+  refused notice is not silent.
+  VERIFIABLE: one Vitest case per residual against the pure cores — (A) accept-after-
+  notify produces no second notice and no contradictory pair, (B) both conditions in one
+  tick produce both log statements.
+
+- [ ] 431. THE DOCTOR'S GATE ACCUSES THE CODE OF WHAT THE LOAD DID (29.07.2026, THREE
+  times in one afternoon). Every turn in which a second session touched the repo, the
+  Stop hook demanded `batch-doctor.mjs --gate` before any further work. Each run declared
+  the repo CONSISTENT and then reported `npm run test:unit FAILED — the concurrent writes
+  (or the current head) broke it; fix before continuing the batch`. Each time the same
+  suite, run standalone on the SAME commit minutes later, was fully green (170–172 files,
+  4853–4903 tests). The gate had been competing with a delegated agent's build for the
+  machine — the exact class the flake policy and retrospective §3.22/§3.48 describe, and
+  the exact accusation they forbid: the message names the CODE as the suspect and orders
+  the batch stopped.
+  THE FIX IS NOT TO WEAKEN THE GATE. The doctor already has the instrument: the verify
+  runner performs a quiet-machine check (point 296) and prints "the machine is quiet — a
+  verdict from this run is evidence" or the opposite. The doctor must use that same check:
+  under a busy machine — or with a live agent worktree — a red gate is reported as
+  INCONCLUSIVE (load), naming what was running, and the doctor asks for a repeat once the
+  pool is idle instead of ordering a stop. Only a red on a quiet machine keeps today's
+  wording. A red on a quiet machine must also stay ORDERED before the noisy one in the
+  log, so a reader sees which verdict is evidence.
+  SECOND HALF, cheaper and independent: the hook fires the gate EVERY turn while the other
+  session merely exists, and the gate costs ~3 minutes of unit tests each time. Once a
+  doctor run has reported CONSISTENT for a given (HEAD, parallel-session) pair, the demand
+  is satisfied until one of the two changes — the state is what is being judged, not the
+  turn.
+  VERIFIABLE: Vitest over the doctor's decision core — a red gate plus a busy machine
+  yields the inconclusive verdict and no stop order; a red gate plus a quiet machine yields
+  today's verdict; a repeated call with an unchanged (HEAD, parallel set) is reported as
+  already satisfied. Plus one case that the quiet-machine reading actually reaches the
+  verdict rather than only the log.
+  DOCS in the same commit: `docs/batch-autonomy.md` under the doctor, and the ledger row
+  for retrospective §3.22.
 
 ## Closing (only after all points)
 

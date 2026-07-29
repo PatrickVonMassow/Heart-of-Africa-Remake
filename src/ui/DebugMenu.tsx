@@ -130,6 +130,7 @@ export function DebugMenu() {
   const detailLevel = useUi((s) => s.detailLevel)
   const groundDebugFlat = useUi((s) => s.groundDebugFlat)
   const seasonCollapseEnabled = useUi((s) => s.seasonCollapseEnabled)
+  const invertLook = useUi((s) => s.invertLook)
   const wheelZoomEnabled = useUi((s) => s.wheelZoomEnabled)
   const webglFallback = useUi((s) => s.webglFallback)
   const journalDnd = useUi((s) => s.journalDnd)
@@ -239,6 +240,18 @@ export function DebugMenu() {
         onChange={(v) => { balance.startup.pictureFreezeBudgetMs = Math.max(100, v); bump() }} />
       <NumberField label={t.debug.mouseSensitivity} value={balance.mouseSensitivity} step={0.0002}
         onChange={(v) => set('mouseSensitivity', Math.max(0, v))} />
+      {/* Vertical look (design.md §17.5/§21.2, point 392): the clamp in degrees
+          from the horizon, and the inversion — checked by default. */}
+      <NumberField label={t.debug.lookPitchLimit} value={balance.lookPitchLimitDeg} step={5}
+        onChange={(v) => set('lookPitchLimitDeg', Math.max(0, v))} />
+      <label>
+        <span>{t.debug.invertLook}</span>
+        <input
+          type="checkbox"
+          checked={invertLook}
+          onChange={(e) => useUi.getState().setInvertLook(e.target.checked)}
+        />
+      </label>
       <NumberField label={t.debug.ambienceVolume} value={balance.ambienceVolume} step={0.05}
         onChange={(v) => {
           set('ambienceVolume', Math.max(0, v))

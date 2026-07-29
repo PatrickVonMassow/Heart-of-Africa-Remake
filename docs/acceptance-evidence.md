@@ -960,7 +960,28 @@ Verifiable, by suite:
   inertia, step-phase/footstep crossings, the speed-scaled bob and the
   strafe-roll sign/clamp — is pure-tested in
   `src/systems/walkFeel.test.ts`; the bob is camera-only and never
-  moves the logical position (interaction/door/leave-radius).
+  moves the logical position (interaction/door/leave-radius). The
+  VERTICAL look (point 392, `design.md` §17.5) is driven live in the
+  same suite: real mousemove events carrying movementY through the
+  production pointer-lock handler show the inverted default (mouse
+  forward looks down), the gain against `balance.mouseSensitivity`,
+  both clamp ends holding under a hostile repeat, the yaw untouched,
+  the pitch arriving as the camera's YXZ X rotation with the 1.5 m
+  eye height unchanged, and the inversion switched off through the
+  store field the debug checkbox writes. Frames 143 (a roof line
+  overhead), 144 (the ground at the traveller's feet) and 145 (the
+  ground past the walkable disc edge, seen over it) each declare the
+  world point they must show. The pure rules — accumulation, the
+  clamp under any input sequence, the structural cap short of
+  vertical, the gamepad axis reaching the same state, and the fixed
+  order the bob (a position offset) composes with the pitch (a
+  rotation) — are in `src/systems/lookPitch.test.ts`, the balance
+  default in `src/config/balance.test.ts`, the store default and its
+  toggle in `src/state/ui.test.ts`, the localized debug-menu clamp
+  field and the checked-by-default "Invert mouse look" box in both
+  languages in `src/ui/DebugMenu.test.tsx`, and the horizon seen over
+  the whole pitch range — ground under every downward ray, band and
+  then sky above — in `src/scenes/place/backdrop.test.ts`.
 - `scripts/verify/enrichments.mjs`: the zoom gate, at the zoom cap
   the built and visible far sheet, a fog far plane beyond 2000 and
   haze opacity ~0 with a screenshot (87), during a zoomed walk the

@@ -447,6 +447,10 @@ Zwei Dinge haben den Schaden begrenzt. Erstens war er vollständig reparierbar, 
 
 **Lehre:** Eine Löschoperation muss wissen, ob sie einer Verknüpfung folgt. Und: Aufräumarbeit ist kein risikoarmer Nebenschauplatz — sie fasst per Definition Dinge an, die niemand mehr beobachtet.
 
+**Nachtrag 29.07.2026 — derselbe Schaden zweimal an einem Nachmittag.** Nach dem Ende zweier delegierter Agenten wurde je ein Arbeitsbaum entfernt — einmal mit dem regulären Kommando, einmal mit einem rekursiven Löschen, nachdem jenes fehlschlug —, und beide Male kam das `node_modules` des Hauptbaums mit. Beide Male meldete der nächste Build „tsc ist nicht erkannt", beide Male war die Reparatur eine Neuinstallation, beide Male hielt das Push-Tor den kaputten Stand zurück.
+
+Bemerkenswert ist nicht der Schaden, sondern die Wiederholung: Die Lehre stand seit dem ersten Vorfall geschrieben, wortgleich, in genau diesem Abschnitt — und hat nichts verhindert, weil zwei verschiedene Agenten zwei verschiedene Kommandos benutzten und keines von beiden etwas von der Verknüpfung wusste. Eine Lehre, die nur an der Stelle steht, an der sie entstand, erreicht den nicht, der sie das nächste Mal braucht. Erfasst als Arbeitsauftrag mit einer prüfbaren Bedingung — das Entfernen darf das Verknüpfungsziel nicht anfassen — und mit dem Aufräumen an EINER Stelle statt in jedem Agenten-Auftrag.
+
 ### 3.50 Der Zustand, den nur die Lücke zwischen zwei Schritten erzeugt
 
 Einen Punkt abzuschließen sind zwei Schreibvorgänge am Board: die fertige Karte ins Archiv, die nächste hochziehen. Zwischen ihnen ist die Sektion „Woran ich gerade arbeite" leer. In dieser Nacht hat der Nutzer diesen Zustand **zweimal innerhalb einer Stunde** erwischt — beide Male, bevor irgendein Wächter etwas sagte, und beide Male mit derselben Frage: „Du arbeitest gerade an nichts?"
@@ -530,6 +534,14 @@ Der Pool darf drei Agenten parallel fahren. Die Sitzung beauftragte einen Punkt,
 Alle Regeln dazu waren erfüllt. Die Warteanmeldung ist gebaut und erzwungen, der Leerlauf-Wächter greift, die Obergrenze steht in der Delegationsregel. Nur ist die Obergrenze eben eine OBERGRENZE — und niemand prüft die Untergrenze. Eine Sitzung, die einen Agenten beauftragt und sich schlafen legt, verletzt keine einzige Regel, verschenkt aber zwei Drittel des Durchsatzes, und zwar unsichtbar: Von außen sieht Warten wie Arbeiten aus.
 
 **Lehre:** Wo eine Ressource eine Obergrenze hat, braucht sie auch eine Untergrenze, sobald Arbeit ansteht. Die Wartemeldung ist der richtige Ort dafür: Wer sich wartend erklärt, erklärt zugleich, warum die freien Plätze frei sind — und das ist eine Angabe, die eine Maschine prüfen kann, weil sie die Zahl der laufenden Agenten und die Länge der Warteschlange beide kennt.
+
+### 3.59 Der Nachweis reichte nur so weit wie die damalige Freiheit
+
+Mit dem senkrechten Blick bekam die Ego-Sicht eine neue Bewegungsachse — und im ersten Bild, das über die Kante des begehbaren Bodens nach unten sieht, steht eine gerade Helligkeitskante quer durchs Bild: begehbarer Boden und Hintergrundlandschaft werden verschieden beleuchtet. Der Fehler ist nicht neu. Das zugehörige Kriterium fordert seit Längerem, dass dort „keine Kante, keine unbeleuchtete Fläche und kein Loch" ist, und es galt als erfüllt — geprüft wurde es am Augenhöhen-Horizont, wo genau diese Naht auf der Fluchtlinie liegt und niemand sie sehen kann. Die alte Prüfung war nicht falsch; sie deckte nur den Ausschnitt ab, den das Spiel damals überhaupt zeigen konnte.
+
+Das ist eine eigene Klasse, weil kein Test dabei rot wird und keine Regel verletzt ist: Eine neue Freiheitsachse für den Spieler vergrößert rückwirkend die Fläche JEDES Kriteriums, das innerhalb der alten Freiheit nachgewiesen wurde — und der Nachweis altert dabei still. Bemerkenswert ist, dass der Fund aus der Bildprüfung kam, nicht aus der Suite: Die Suite prüfte, was sie schon immer prüfte, und war grün.
+
+**Lehre:** Wer eine Bewegungs-, Blick- oder Zoomachse hinzufügt, prüft nicht nur das neue Feature, sondern fragt: welche bestehenden Zusagen wurden bisher nur deshalb eingehalten, weil man nicht hinsehen konnte? Diese Kriterien brauchen ihren Nachweis am neuen Rand des Erreichbaren — sonst wandert die Lücke unbemerkt aus dem Unsichtbaren ins Sichtbare, und zwar zum Nutzer.
 
 ---
 
@@ -620,7 +632,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Mittwoch, 29.07.2026, 14:03 · Quellen-Fingerprint: `af41ca5d0974…`
+Zuletzt aktualisiert: Mittwoch, 29.07.2026, 18:23 · Quellen-Fingerprint: `faa0aced8fe5…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -633,8 +645,12 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | The hardened batch-autonomy system — never idle-stop, resurrect after crash/reboot, signal on failure, never block on the user | 1 | niedrig | batch-autostart.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs | ✔ Mechanismus |
 | The batch dashboard — its live GH-Pages transport, its BINDING four-section structure (never change without explicit user go) and update discipline | 9 | hoch | batch-autostart.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs, dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
 | RETIRED 27.07.2026 — this was a 16.07. work-in-progress handoff, not a rule; what survives is the research foundation, the accuracy principle and the §13-placeholder carve-out | 3 | mittel | batch-autostart.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs | ✔ Mechanismus |
+| A blocked tool call means the wrong path, not a missing permission — search the repo for its own command; never hand the user manual steps | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | The batch dashboard may leave the private claude.ai artifact for a publicly readable transport — privacy is no longer a constraint | 1 | niedrig | board-first-guard.mjs, dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
+| Take the session boundary as the LAST action and with bare commands — a pipe makes the call count as work and silently deletes the marker | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Delegate via `node scripts/point-brief.mjs <N>` — the AGENT generates its own brief; board changes go through `scripts/board.mjs`; expect 529 agent deaths and commit-per-step | 2 | mittel | — (Regel/Memory) | ◐ Regel |
+| F6 bug-report zips the user hands over are saved into the repo's git-ignored local/ folder — search there first, not only Downloads | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
+| A newly found problem goes into an EXISTING bundle point first; a new standalone point is the exception, and may instead re-cut the bundles | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Jede Chat-Antwort mit einem Zeitstempel nach deutscher Zeit (Europe/Berlin, DST-korrekt) beginnen | 11 | hoch | timestamp-guard.mjs | ✔ Mechanismus |
 | CLAUDE.md §7.1 references design.md instead of retelling it; future doc edits must preserve the verifiable conditions, script mappings, numbering and checked numbers | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Autonomously insert a full CLOSING cycle (regression + dead-code/stale-doc cleanup + .md audit) when warranted — after extensive rework or many small completed tasks — without waiting for the user to ask | 1 | niedrig | closing-guard.mjs | ✔ Mechanismus |
@@ -672,7 +688,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Console warning \"THREE.Clock deprecated, use THREE.Timer\" comes from R3F v9 internals — fix by updating @react-three/fiber once it migrates to Timer | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Choose the browser-regression tier per task at my discretion (Vitest-only / Vitest+small / Vitest+large); the closing cycle ALWAYS runs Vitest+large | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | RETIRED 27.07.2026 — a 23.07. session handoff whose branches all merged; what survives is the file-collision map habit and the closing-freeze housekeeping | 3 | mittel | batch-resume-hook.mjs | ✔ Mechanismus |
-| 24.07.2026 evening chaos — serving model silently degraded to Haiku 4.5; verify the serving model before batch work, Haiku-class must pause instead of working | 2 | mittel | model-guard.mjs | ✔ Mechanismus |
+| 24.07.2026 evening chaos — serving model silently degraded to Haiku 4.5; verify the serving model before batch work, Haiku-class must pause instead of working | 3 | mittel | model-guard.mjs | ✔ Mechanismus |
 | Every new optical/graphics feature must be sorted into the low/medium/high detail presets, enforced by a pure completeness test — a new quality key with no preset entries fails the gate | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Never access paths outside the project directory unless strictly necessary (e.g. the global ~/.claude rules); keep local non-versioned artefacts in a git-ignored local/ folder inside the repo | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | RETIRED 25.07.2026 — a stuck Opus no longer hands the task to Fable; re-attack with Opus or let Fable REVIEW the stuck attempt (Fable is review + fallback only) | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -695,8 +711,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | CORRECTED 19.07.2026 — WebGPU IS testable headless/autonomously via system Chrome (channel:'chrome') + --headless=new; the 'untestable' belief held only for Playwright's BUNDLED Chromium | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 67 Feedback-/Projekt-Memories · 36 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 18 Prozess-/Meta-TASKS-Punkte (davon 8 offen).
+Erfasste Quellen: 71 Feedback-/Projekt-Memories · 36 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 18 Prozess-/Meta-TASKS-Punkte (davon 8 offen).
 
-<!-- RETRO-FINGERPRINT: af41ca5d09744d37bbacee08dbbae22c2da103b37539b69f863cf8120b333ca8 -->
-<!-- RETRO-LAST-REFRESHED: 2026-07-29T12:03:21.316Z -->
+<!-- RETRO-FINGERPRINT: faa0aced8fe5db95315963f8e285948fdc474a8a3dc69a34c6a492315e3eab91 -->
+<!-- RETRO-LAST-REFRESHED: 2026-07-29T16:23:43.470Z -->
 <!-- AUTO-GENERATED:END -->

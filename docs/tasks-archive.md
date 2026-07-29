@@ -12228,3 +12228,83 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   DOCS in the same commit: `docs/batch-autonomy.md` (the board's transport and what each
   half owns) and the memory entry `batch-dashboard-artifact`.
 
+- [x] 392. LOOKING UP AND DOWN IN THE FIRST-PERSON VIEW (user 28.07.2026, raised as the
+  answer to a problem point 391 would otherwise create: once the monuments tower, a
+  yaw-only camera shows the Sphinx's paws and the bottom courses of a pyramid and nothing
+  above them). VERIFIED IN THE CODE, not assumed: the first-person look reads
+  `e.movementX` only (`src/scenes/place/PlaceScene.tsx`, the pointer-lock `onMove`), so
+  there is no vertical look at all today — the gap is real and is not Giza-specific. It is
+  a PREREQUISITE for 391: build it first, or the enlarged monuments cannot be seen.
+  TARGET: mouse movement pitches the view as well as turning it, at the same
+  `balance.mouseSensitivity` (§20), CLAMPED just short of straight up and straight down so
+  the world can never roll over — the clamp is a calibratable balance value, debug-editable
+  like its siblings (§21.2). The vertical axis is INVERTED (user 28.07.2026): pushing the
+  mouse FORWARD looks DOWN, pulling it back looks UP — the flight-stick convention, and
+  the default. A debug-menu checkbox "Invert mouse look" (localized in both languages,
+  §21.3) toggles it, CHECKED by default, so the store field defaults to inverted rather
+  than defaulting off and being flipped somewhere else. Horizontal look is unaffected.
+  THE GAMEPAD FOLLOWS (§17.5): the right stick already turns the first-person view, so its
+  VERTICAL axis pitches it, through the same path — the §17.5 rule that the pad drives
+  synthetic key events and never a second input path stays untouched, and the
+  deliberate-input engagement guard against idle axis drift applies to the new axis too.
+  WHAT THE PITCH EXPOSES, and each of these is already pinned somewhere:
+  · the BACKDROP and the panorama band (points 181/381) are built around a horizon at eye
+    level; a camera looking UP must still meet sky and not the ring's upper rim, and one
+    looking DOWN must meet the walkable ground with no hole and no unlit face at the disc
+    edge. Extend the sweep in `src/scenes/place/backdrop.test.ts` over the pitch range
+    rather than only over disc radii.
+  · the CAMERA NEAR PLANE must keep buildings solid from every pitch (§7.1 pt 16: pressing
+    against a wall may never show its inside), including looking up at a wall from close.
+  · the WALKING BOB and the eye height (1.5 m, §20) compose with the pitch; the bob is a
+    camera offset and must not fight the new rotation — pin the composition order.
+  · the DOOR/use prompt, the SPACE entry and the leave rule are position-based (§2.3) and
+    must stay so: pitch changes what is seen, never what is reachable.
+  · the in-scene floating labels and the HUD (§17.4) stay legible and correctly ordered at
+    any pitch.
+  VERIFIABLE: pure Vitest on the look state — the pitch accumulates at the stated
+  sensitivity, clamps at both ends and cannot be pushed past them by any input sequence,
+  the gamepad axis feeds the same state, and the bob composes with it in a fixed order.
+  Live on BOTH backends: a first-person frame looking UP at a pyramid apex, one looking
+  DOWN at the ground at one's feet, and one at the disc edge looking down over it — judged
+  by the picture. `scripts/verify/settings.mjs` gains the live pitch drive.
+  DOCS in the same commit: design.md §17.5 states the vertical look and the clamp;
+  CLAUDE.md §7.1 pt 20's control calibration gains it. Both documents sit at measured
+  ceilings, so the words are paid for by a measured raise with its justification, or by
+  shortening elsewhere.
+
+- [x] 417. A DROPPED CHAT MESSAGE LOOKS DELIVERED, AND THE LEDGER CAN BE FLOODED
+  (29.07.2026, the two follow-up findings of the Fable-5 four-eyes review of the
+  message channel; the review's blocking findings were fixed in that point, these
+  two were deliberately deferred to their own commit).
+  A. THE SENDER IS TOLD NOTHING WHEN A MESSAGE IS DROPPED. `scripts/chat-inbox.mjs`
+  drops a message that is stale (a phone clock more than the skew ahead of the
+  machine is enough) or that arrives while the secret file cannot be read, and the
+  only trace is a line in `.claude/autostart.log`. The page meanwhile renders the
+  sent message like any other — display never asks whether it was accepted — so the
+  user sees a delivered-looking message the agent never received. That is the one
+  failure shape this whole channel exists to prevent, mirrored: a board that lies by
+  omission. FIX, both halves: (i) `readSecret` must distinguish an ABSENT secret file
+  (the channel is simply not configured — silence is correct) from an UNREADABLE one
+  (a permission error, a truncated file — a fault that must be reported), and the
+  launcher reports the second; (ii) when a message verifies as genuinely addressed to
+  this channel but is dropped anyway, the launcher posts a signed drop-notice to the
+  OUTBOX naming the reason, so the page shows the user that their message did not
+  land and why. A message that fails the signature check gets NO notice — answering
+  those would turn the outbox into an oracle for an attacker probing the topic.
+  B. THE LEDGER CAN BE EVICTED UNDER FLOOD. `chat-core.mjs` caps the seen-ledger at
+  `SEEN_MAX` entries and pushes DROPPED transport ids into it too, so 500-odd junk
+  posts to a known inbox topic evict the accepted envelope ids from the state file.
+  The spool-seeded ledger softens this but does not close it: the seed is bounded by
+  the consumed-file retention (`scripts/chat-spool.mjs`), so a replay stays possible
+  for any message the transport still holds once that retention has passed it by.
+  FIX: keep the accepted ENVELOPE ids (`m:`) under their own retention rule — bounded
+  by the acceptance window rather than by a shared entry count — so eviction can never
+  outrun the window in which a replay is possible, and let the cheap transport ids
+  (`n:`) rotate as they do now.
+  VERIFIABLE: pure Vitest — an unreadable secret reports while an absent one stays
+  silent; a stale drop produces exactly one outbox notice and a bad-signature drop
+  produces none; and an envelope id inside the acceptance window survives a flood of
+  `SEEN_MAX`+ dropped transport ids and is still refused on replay, while one older
+  than the window may be evicted.
+  DOCS in the same commit: `docs/batch-autonomy.md`, where the channel's guarantees
+  are stated — the drop notice is one of them, and the replay bound is the other.
