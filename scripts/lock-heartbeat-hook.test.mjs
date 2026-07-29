@@ -1,19 +1,22 @@
-// THE HOOK ITSELF, SPAWNED (point 400 delta A; point 406).
+// The DUE MARK, proven by running the hook (point 400, delta A).
 //
-// Both duties proved here ride on the PostToolUse hook that already runs on
-// every tool call, so a pure test of the decision is not enough: what must hold
-// is that the SPAWNED hook writes the due mark — and, for the chat delivery,
-// that it writes the injection JSON when a message waits and NOTHING WHATSOEVER
-// when none does. That token rule is only enforceable at this level, where
-// stdout is a real byte count rather than a return value.
+// The mark rides on the PostToolUse hook that already runs on every call, so a
+// pure test of the decision is not enough: what must hold is that the spawned
+// hook actually writes it. Each case runs `node scripts/lock-heartbeat-hook.mjs`
+// the way the harness does — the hook payload on stdin — against an ISOLATED
+// temp repo (a copy of scripts/ plus a file skeleton), so REPO_ROOT is the temp
+// dir and this suite can never touch the real state file.
 //
-// Each case runs `node scripts/lock-heartbeat-hook.mjs` the way the harness does
-// — the hook payload on stdin — against an ISOLATED temp repo (a copy of
-// scripts/ plus a file skeleton), so REPO_ROOT is the temp dir and this suite
-// can never touch the real state file.
+// The SAME hook's other spawned duty — the chat delivery of point 406, whose
+// token rule is likewise only provable on a real stdout — lives in
+// scripts/chat-delivery-hook.test.mjs. It is a separate file because every case
+// here blocks its worker inside a `spawnSync`: fifteen of them in one file
+// starved the Vitest pool into a "Timeout calling onTaskUpdate", a green run
+// with a red exit code. Add spawned cases sparingly, and to one file or the
+// other rather than piling them up in one.
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { spawnSync } from 'node:child_process'
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 import { openSetFingerprint } from './board-currency-core.mjs'
@@ -112,126 +115,5 @@ describe('lock-heartbeat-hook — the board-publish due mark', () => {
     const r = runHook({ tool_name: 'Read', tool_input: { file_path: 'x.ts' } })
     expect(r.status).toBe(0)
     writeTasks([10, 30])
-  })
-})
-
-// --- THE CHAT DELIVERY (point 406) -------------------------------------------
-//
-// THE TOKEN RULE IS THE ACCEPTANCE-CRITICAL ONE, and only a spawned hook can
-// prove it: injected context is re-sent with every later request, so an empty
-// spool must produce zero bytes on stdout — not an empty JSON object, not a
-// newline. `toBe('')` is the assertion the rule reduces to.
-describe('lock-heartbeat-hook — the user message at the next tool call', () => {
-  const LOCK = () => resolve(repo, '.claude', 'batch-lock.json')
-  const SPOOL = () => resolve(repo, '.claude', 'chat-spool')
-  const CONSUMED = () => resolve(SPOOL(), 'consumed')
-  const call = { tool_name: 'Read', tool_input: { file_path: 'x.ts' } }
-
-  const own = (sessionId = 'due-mark-session') =>
-    writeFileSync(
-      LOCK(),
-      // pid is set so the heartbeat never walks for an ancestor: this suite must
-      // not spawn a PowerShell round trip, and the walk is irrelevant here.
-      JSON.stringify({ v: 2, sessionId, pid: process.pid, pidStartedAt: Date.now(), claimedAt: Date.now() }, null, 2),
-    )
-
-  const spool = (message) => {
-    mkdirSync(SPOOL(), { recursive: true })
-    writeFileSync(resolve(SPOOL(), `${message.ntfyId}.json`), JSON.stringify(message))
-  }
-
-  const message = (over = {}) => ({
-    id: 'm1',
-    ntfyId: 'n1',
-    ts: 1_700_000_000_000,
-    receivedAt: 1_700_000_000_000,
-    text: 'bitte v0.3 vorbereiten',
-    ...over,
-  })
-
-  const pendingFiles = () => {
-    try {
-      return readdirSync(SPOOL()).filter((f) => f.endsWith('.json'))
-    } catch {
-      return []
-    }
-  }
-
-  afterAll(() => {
-    rmSync(LOCK(), { force: true })
-    rmSync(SPOOL(), { recursive: true, force: true })
-  })
-
-  it('writes NOTHING AT ALL when there is no spool — the token rule', () => {
-    own()
-    rmSync(SPOOL(), { recursive: true, force: true })
-    const r = runHook(call)
-    expect(r.status).toBe(0)
-    expect(r.stdout).toBe('')
-  })
-
-  it('writes NOTHING AT ALL when the spool is there but empty', () => {
-    own()
-    mkdirSync(SPOOL(), { recursive: true })
-    const r = runHook(call)
-    expect(r.status).toBe(0)
-    expect(r.stdout).toBe('')
-  })
-
-  it('delivers a waiting message as the additionalContext JSON, and consumes it', () => {
-    own()
-    spool(message())
-    const r = runHook(call)
-    expect(r.status).toBe(0)
-    const parsed = JSON.parse(r.stdout)
-    expect(parsed).toEqual({
-      hookSpecificOutput: {
-        hookEventName: 'PostToolUse',
-        additionalContext: expect.stringContaining('bitte v0.3 vorbereiten'),
-      },
-    })
-    expect(pendingFiles()).toEqual([])
-    expect(existsSync(resolve(CONSUMED(), 'n1.json'))).toBe(true)
-  })
-
-  it('says nothing at the NEXT call — the same message is never injected twice', () => {
-    own()
-    const r = runHook(call)
-    expect(r.stdout).toBe('')
-  })
-
-  it('stands down for a session that does not own the batch, and consumes nothing', () => {
-    own('somebody-else')
-    spool(message({ id: 'm2', ntfyId: 'n2', text: 'nicht fuer diese Sitzung' }))
-    const r = runHook(call)
-    expect(r.status).toBe(0)
-    expect(r.stdout).toBe('')
-    expect(pendingFiles()).toEqual(['n2.json'])
-  })
-
-  it('stands down while the batch is paused, and consumes nothing', () => {
-    own()
-    const paused = resolve(repo, '.claude', 'batch-paused')
-    writeFileSync(paused, '')
-    const r = runHook(call)
-    expect(r.stdout).toBe('')
-    expect(pendingFiles()).toEqual(['n2.json'])
-    rmSync(paused, { force: true })
-  })
-
-  it('delivers that same message once the pause is lifted', () => {
-    own()
-    const r = runHook(call)
-    expect(JSON.parse(r.stdout).hookSpecificOutput.additionalContext).toContain('nicht fuer diese Sitzung')
-    expect(pendingFiles()).toEqual([])
-  })
-
-  it('never fails a tool call over a corrupt spool, and stays silent', () => {
-    own()
-    mkdirSync(SPOOL(), { recursive: true })
-    writeFileSync(resolve(SPOOL(), 'n3.json'), 'not json at all')
-    const r = runHook(call)
-    expect(r.status).toBe(0)
-    expect(r.stdout).toBe('')
   })
 })
