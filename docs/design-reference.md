@@ -159,6 +159,7 @@ are adjustable at runtime). The complete set, grouped as the menu presents it:
 - Walking speed of the player character outside settlements (travel across the continent; the default overland pace is calibrated on the calm side).
 - The strafe/backward factor (§2.2): the fraction of the forward speed at which the character sidesteps or walks backward, so a diagonal is never faster than straight ahead.
 - Mouse-look sensitivity in the first-person view.
+- The vertical look clamp in degrees from the horizon (§17.5): how far up and down the first-person view may pitch. It is calibratable, but structurally capped just short of vertical, so no value entered here can turn the world over.
 - The inhabitant unstuck window (§2.6): the seconds a settlement walker may stay physically pinned before it is nudged to free ground.
 
 **Loading** (§2.7)
