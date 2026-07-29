@@ -582,7 +582,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Mittwoch, 29.07.2026, 07:26 · Quellen-Fingerprint: `2eef73ff6b2e…`
+Zuletzt aktualisiert: Mittwoch, 29.07.2026, 13:20 · Quellen-Fingerprint: `258d697aa5aa…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -624,6 +624,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | RETIRED 27.07.2026 — merged into parallel-session-root-cause, which holds the confirmed cause and the one detection recipe; the advisory-lock analysis here was superseded by the hard singleton | 3 | mittel | batch-autostart.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs | ✔ Mechanismus |
 | Parallel batch sessions are spawned by the HoA-Batch-Autostart scheduled task after a reboot; the advisory lock never stopped it — a hard singleton is being built | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | RETIRED 27.07.2026 — merged into parallel-session-root-cause; what survives is that the lock file alone is never proof of exclusivity, and the four signals that actually detect a second writer | 2 | mittel | — (Regel/Memory) | ◐ Regel |
+| Always take the point boundary autonomously at a closed point — never ask the user whether to hand over or /clear | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Per-point QA runs scoped (Vitest always, browser suites by diff mapping, flake-retry single suites) — WATCHDOG duty to report any bug that slips through | 3 | mittel | — (Regel/Memory) | ◐ Regel |
 | Edits to .claude/settings.json and .git/hooks ALWAYS trigger a permission prompt (harness safety layer, allowlist cannot override); never schedule such work for unattended night batches | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | hoa uses a feature-branch workflow — each TASKS point on feat/<point>-<slug>, push the branch after every commit, merge to main only when done+verified; cross-cutting changes go straight to main | 2 | mittel | commit-scope-guard.mjs, push-arrival-guard.mjs | ✔ Mechanismus |
@@ -656,8 +657,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | CORRECTED 19.07.2026 — WebGPU IS testable headless/autonomously via system Chrome (channel:'chrome') + --headless=new; the 'untestable' belief held only for Playwright's BUNDLED Chromium | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 66 Feedback-/Projekt-Memories · 36 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 18 Prozess-/Meta-TASKS-Punkte (davon 8 offen).
+Erfasste Quellen: 67 Feedback-/Projekt-Memories · 36 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 18 Prozess-/Meta-TASKS-Punkte (davon 8 offen).
 
-<!-- RETRO-FINGERPRINT: 2eef73ff6b2ef6af6920824cbf8718772c1cc46ee97b7e01da243f3e195c5d46 -->
-<!-- RETRO-LAST-REFRESHED: 2026-07-29T05:26:38.121Z -->
+<!-- RETRO-FINGERPRINT: 258d697aa5aadae61f899941613f635f017c56955d87b877debc365725033296 -->
+<!-- RETRO-LAST-REFRESHED: 2026-07-29T11:20:11.398Z -->
 <!-- AUTO-GENERATED:END -->
