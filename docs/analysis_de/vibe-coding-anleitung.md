@@ -158,12 +158,11 @@ umgangen wird. Bewährt haben sich **abgestufte Umfänge**:
 
 Zwei Mechanismen, die das Netz ehrlich halten:
 
-> *Prompt:* „Etabliere einen Mechanismus, der eine Wiederholung **sichtbar** macht:
-> Ein flakender Browser-Test darf einmal automatisch wiederholt werden, muss dann
-> aber eine ‚auf Wiederholung bestanden — untersuchen'-Zeile hinterlassen, und der
-> Release-Lauf muss strikt ohne Wiederholung grün sein. Etabliere außerdem einen
-> Mechanismus, der feste Wartezeiten in Tests aufspürt — gewartet wird auf eine
-> Bedingung oder die App-Uhr, nie auf die Wanduhr."
+> *Prompt:* „Etabliere einen Mechanismus, der eine Wiederholung **sichtbar** macht: Ein
+> flakender Browser-Test darf einmal wiederholt werden, muss dann aber eine ‚auf
+> Wiederholung bestanden — untersuchen'-Zeile hinterlassen, und der Release-Lauf muss
+> strikt ohne Wiederholung grün sein. Und einen, der feste Wartezeiten aufspürt —
+> gewartet wird auf eine Bedingung oder die App-Uhr, nie auf die Wanduhr."
 
 ---
 
@@ -267,9 +266,8 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   Hat jeder je ausgelöst? Kann er überhaupt? Doppelt er einen anderen? Ist seine Meldung
   umsetzbar — und meldet sich die brauchbarste zuerst?"
 
-- **Der rote Test klagt den Falschen an.** Ein roter Test täuscht gefährlicher als ein grüner,
-  weil er zum schnellen Eingriff verleitet: Prüfungen veralten von selbst, wenn sich ihre
-  Umgebung ändert, und klagen dann gesunden Code an.
+- **Der rote Test klagt den Falschen an.** Er täuscht gefährlicher als ein grüner, weil er
+  zum schnellen Eingriff verleitet: Prüfungen veralten von selbst und klagen gesunden Code an.
   → *Prompt:* „Etabliere einen Mechanismus, der vor einer Code-Änderung auf einen roten Test
   hin ein **Experiment** verlangt: Belastet der Befund das Produkt oder die Messung? Gemessen
   wird nur an einem eingeschwungenen Zustand, und eine Prüfung schlägt auch dann fehl, wenn
@@ -288,9 +286,8 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   **Beweisliste** erzwingt: Liegt alles am Zielort? Gibt es Reste (Waisen-Dateien, Tests
   ohne echte Prüfung)? Passen Dokumente und Code zusammen? Läuft alles grün?"
 
-- **Der Autor sieht seine eigene Annahme nicht.** Wer entwirft und baut, prüft gegen
-  dieselbe Vorstellung, aus der der Fehler stammt — besonders teuer bei Dingen, die
-  *immer* funktionieren müssen.
+- **Der Autor sieht seine eigene Annahme nicht.** Wer entwirft und baut, prüft gegen dieselbe
+  Vorstellung, aus der der Fehler stammt — besonders teuer bei Dingen, die *immer* laufen müssen.
   → *Prompt:* „Etabliere einen Mechanismus, der vor dem Bau **Schwierigkeit ×
   Kritikalität** einschätzt und bei Kritischem **ein anderes Modell** erst den Plan und
   danach das fertige Ergebnis gegenprüfen lässt — gegen die echten Daten, nicht gegen
@@ -303,14 +300,13 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   abweichen können. Nimm nur aus, was **beweisbar** nichts beiträgt, und schreib die
   Grenze samt Begründung in den prüfenden Code, nicht in eine Regel daneben."
 
-- **Was bei jedem Start mitgelesen wird, wächst — und du bezahlst es jedes Mal.**
-  Jede einzelne Ergänzung am Regeldokument ist berechtigt; und in der Aufgabenliste
-  bleibt Erledigtes stehen, bis der größte Teil der Datei Geschichte ist.
+- **Was bei jedem Start mitgelesen wird, wächst — und du bezahlst es jedes Mal.** Jede
+  einzelne Ergänzung ist berechtigt; irgendwann ist der größte Teil der Datei Geschichte.
   → *Prompt:* „Gib jedem Dokument, das bei jedem Start gelesen wird, eine **gemessene
   Obergrenze** mit zwei Auswegen: Detail auslagern, oder die Grenze anheben und begründen.
   Ausgelagert wird **verschoben, nicht umformuliert**, und jeder Leser der alten Stelle wird
-  nachgezogen — der gefährlichste findet nur nichts mehr, statt zu scheitern. In der
-  Aufgabenliste steht nur Offenes, Erledigtes wandert wortgleich ins Archiv."
+  nachgezogen. In der Aufgabenliste steht nur Offenes, Erledigtes wandert wortgleich ins
+  Archiv."
 
 - **Im Präsens behauptet, nie nachgesehen.** „Das Feld wird bereits gesetzt" — im Code
   steht es nicht. Eine falsche Tatsachenbehauptung liefert etwas, das nichts tut und
@@ -346,6 +342,13 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   dieselbe Regel getrennt — eines schreibt, eines prüft; das blockiert *alle* Arbeit.
   → *Prompt:* „Wo ein Teil schreibt, was ein anderes prüft, **importiere** den geprüften
   Wert. Wird etwas ohne Code-Änderung rot, frag: welcher **Zustand** hat sich geändert?"
+
+- **Der Befund stirbt mit dem Gespräch.** Ein echter Fehler fällt nebenbei auf und bleibt im
+  Chat — die Aufgabenliste ist gerade gesperrt.
+  → *Prompt:* „Etabliere einen Mechanismus, der Befunde sichert: ein billiges Kommando, das
+  auch bei gesperrter Aufgabenliste schreibt, ein ebenso billiges ‚nichts gefunden', und eine
+  Prüfung, die einen Zug **nicht enden lässt**, der untersucht und nichts hinterlassen hat —
+  samt Leerungspflicht, sobald wieder geschrieben werden darf."
 
 ---
 
@@ -394,4 +397,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 Wenn du diese eine Nachricht an den Anfang stellst, hast du 80 % der Lehren dieses
 Projekts eingebaut, bevor die erste Zeile Code entsteht.
 
-<!-- GUIDE-FINGERPRINT: 863359521e2d79be0abd632c960a6c9fdc290a86d41a2779407339552cf6cc27 -->
+<!-- GUIDE-FINGERPRINT: a3227dd27acfceed91e4fccae7d77e6f1f5675ebfe4323365e074b4fae3dd84d -->
