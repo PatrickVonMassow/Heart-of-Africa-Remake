@@ -125,3 +125,60 @@ describe('the launcher uses the pure spawn builders', () => {
     expect(code).toMatch(/const bail =[^\n]*writeJsonAtomic\(C\('autostart-state\.json'\), state\)/)
   })
 })
+
+// ---------------------------------------------------------------------------
+// THE BOARD WATCHDOG IS WIRED (point 400, delta E).
+//
+// Every rule the watchdog applies is pure and pinned in board-currency-core.test
+// (behind / settling / unreachable / the alert key). What no unit test can see is
+// whether the launcher CALLS them — the file cannot be imported, by design. So
+// the same source-reading witness the spawn builders get is used here: the delta
+// is worthless if a future edit drops the block, and every other test would stay
+// green while it did.
+describe('the launcher runs the board watchdog', () => {
+  const source = readFileSync(resolve(process.cwd(), 'scripts', 'batch-autostart.mjs'), 'utf8')
+  const codeLines = source.split('\n').filter((l) => !l.trimStart().startsWith('//'))
+  const code = codeLines.join('\n')
+  const lineOf = (re, what) => {
+    const i = codeLines.findIndex((l) => re.test(l))
+    expect(i, `no line matching ${what}`).toBeGreaterThanOrEqual(0)
+    return i
+  }
+
+  it('imports the pure verdict and alert decisions rather than re-deriving them', () => {
+    const imports = source.match(/import\s*\{[^}]*\}\s*from\s*'\.\/board-currency-core\.mjs'/)
+    expect(imports, 'no import from ./board-currency-core.mjs').not.toBeNull()
+    expect(imports[0]).toMatch(/\bliveBoardVerdict\b/)
+    expect(imports[0]).toMatch(/\bwatchdogDecision\b/)
+  })
+
+  it('fetches the LIVE page — the point of delta E is not reading a state file', () => {
+    expect(code).toMatch(/fetch\(liveCheckUrl\(BOARD_CONTENT_URL/)
+    expect(code).toMatch(/liveBoardVerdict\(\{/)
+    expect(code).toMatch(/watchdogDecision\(\{/)
+    expect(code).toMatch(/await notify\(d\.title, d\.message, d\.priority\)/)
+  })
+
+  it('runs BEFORE every reason not to spawn except the user pause', () => {
+    // "No successor is needed" is not "the board is fine". A complete, claimed
+    // or wedged batch is exactly when a stale board goes unnoticed longest.
+    const watch = lineOf(/liveBoardVerdict\(\{/, 'the board verdict')
+    expect(lineOf(/batch-paused/, 'the user pause')).toBeLessThan(watch)
+    for (const [re, what] of [
+      [/openPointCount\(\)/, 'the work-order read'],
+      [/open === 0/, 'the batch-complete guard'],
+      [/reserved\.honour/, 'the honoured user claim'],
+    ]) {
+      expect(watch, `the watchdog must run before ${what}`).toBeLessThan(lineOf(re, what))
+    }
+  })
+
+  it('cannot stop the launcher: the block is wrapped and fails open', () => {
+    // A board check that could throw would take the RESURRECTION down with it —
+    // the launcher's job is bringing the batch back, and this is a backstop.
+    const watch = lineOf(/liveBoardVerdict\(\{/, 'the board verdict')
+    const opener = [...codeLines.slice(0, watch)].reverse().find((l) => /^(try \{|\} catch)/.test(l))
+    expect(opener, 'the watchdog is not inside a try block').toMatch(/^try \{/)
+    expect(code).toMatch(/board watchdog skipped/)
+  })
+})
