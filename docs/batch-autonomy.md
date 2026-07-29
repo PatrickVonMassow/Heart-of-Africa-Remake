@@ -31,7 +31,10 @@ outside the agent's control.
    heartbeat AND a real OS pid check — a live claude process blocks takeover no
    matter how stale the heartbeat (a long tool call starves the heartbeat, not the
    process), and a reboot alone is never death while a fresh post-boot heartbeat
-   exists. The spawn itself goes through the SAME atomic acquire (a
+   exists. Since 28.07.2026 the owner's DECLARED WORK is a third input: a silent
+   session whose delegated agent is still committing reads alive, and only a stall
+   — nothing moving for six ticks, with the declaration still the owner's last
+   word — reads wedged (see "Liveness is judged by PROGRESS" below). The spawn itself goes through the SAME atomic acquire (a
    `pending-spawn` lock is won BEFORE spawning; losing the race means no spawn).
    Guards: skips while paused, while the batch is complete, and while the owner is
    alive; a debounce marker avoids double-spawns; it finds the newest bundled
@@ -58,6 +61,7 @@ outside the agent's control.
 | 12 | Scheduled task deleted (by the user or a cleanup tool) | — | not recoverable by the agent; re-create with the command below |
 | 13 | Session ENDS at a point boundary (27.07.2026, deliberate — the context is the batch's dominant cost) | (4) the launcher spawns the successor once the old pid is provably dead; `batch-progress-guard` allows the stop only against a verified-closed point AND an armed task | a few idle minutes per point, traded for a fresh context |
 | 14 | The scheduled task is DISABLED while the boundary is in use | the guard reads the task's REAL state each time and blocks the stop when it is not armed (`unknown` counts as unarmed), so the session keeps working instead of stranding the batch | the user must re-arm it (`Enable-ScheduledTask`, elevated) |
+| 15 | **The RUNTIME kills the session for waiting on a delegated agent** (28.07.2026, four deaths in one afternoon) | the spawn carries `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0`, so a `claude -p` waits indefinitely for its background tasks instead of terminating at 600 s; what bounds a wait instead is PROGRESS — see the section below | none for a healthy wait; a genuinely frozen one is reported and taken over after six launcher ticks (90 min), and only while the declaration is the owner's last word |
 
 ## The hard singleton (24.07.2026 — replaces the advisory lock)
 
@@ -284,21 +288,213 @@ common path, not a corner case. Judged on recency, a quarter of an hour without 
 commit or a git operation means the agent is finished, stuck or gone, and in all
 three cases the session's next action is to look rather than to keep waiting.
 
-**The residual, stated rather than left in nobody's head.** Expiry is measured
-from the declaration's timestamp and only ever evaluated when the Stop hook next
-runs, so the 45 minutes bound how long a declaration is HONOURED, not how long a
-session may idle: a session that stops on `allow-in-flight` and is never
-re-invoked sits on the lock exactly as the night of 28.07.2026 did. An honest wait
-is re-invoked by the harness when its work lands, so with recency-based evidence
-this is narrow — but it is not zero, and the mechanism that would close it
-(detecting the wedge from outside) is a separate one with its own risk, not built
-here. Today's backstop is the launcher's wedge notification (`WEDGE_NOTIFY_MS`).
+**The residual this used to leave open — now closed from the outside.** Expiry is
+measured from the declaration's timestamp and only ever evaluated when the Stop
+hook next runs, so the 45 minutes bound how long a declaration is HONOURED, not
+how long a session may idle: a session that stops on `allow-in-flight` and is
+never re-invoked would sit on the lock exactly as the night of 28.07.2026 did.
+Detecting that from OUTSIDE the session was named here as a separate mechanism
+with its own risk; it is the one point 402 built, below.
 
 Decision logic: `scripts/batch-in-flight-core.mjs` (pure, dependency-injected,
 Vitest-covered in `scripts/batch-in-flight-core.test.mjs`). IO and probes:
 `scripts/batch-in-flight.mjs`. The marker is `.claude/batch-in-flight.json`,
 derived from the caller's lock path via `statePathsFor`, so a redirected lock
 redirects it too (finding 3).
+
+### Liveness is judged by PROGRESS, not by age (28.07.2026, point 402)
+
+The batch sessions of that afternoon were not crashing. `.claude/autostart-run.log`
+carries the executioner's own words, four times:
+
+```
+Background tasks still running after 600s; terminating.
+Set CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 to wait indefinitely.
+```
+
+A print-mode session (`claude -p`, which is how every resurrected worker is
+spawned) waits at most ten minutes for its background tasks after its turn ends,
+and the runtime then TERMINATES the process. The batch's designed steady state is
+"delegate the point to a worktree-isolated agent and wait for it" (CLAUDE.md §6),
+and a delegated agent routinely runs longer than that — the point 398 agent took
+12.7 minutes. So the session was killed WHILE ITS AGENT WAS STILL BUILDING, every
+time the agent was slower than the ceiling. That is the whole of that day's
+"frequent session deaths": three takeovers without a handover in
+`.claude/autostart.log` (`no owner lock — taking over`), each one a session that
+had just been shot, and the `failCount` bumps that followed.
+
+**No fixed time limit.** Any single number is wrong in both directions: long
+enough not to shoot a healthy agent is long enough for a hung one to sit
+undetected, and short enough to notice a hang is short enough to shoot a healthy
+build. The trade-off exists only because the ceiling measures ELAPSED TIME. The
+question that separates the two cases is whether the work is still ADVANCING, and
+the probes that answer it were already built and tested for the in-flight
+declaration above.
+
+1. **The runtime ceiling goes to infinite.** The spawn now carries an environment
+   (it carried none at all), with `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0` — the
+   value the runtime's own message documents. Deliberate: the runtime knows
+   nothing about the work, so it must not hold the policy. The launcher-scoped
+   `HOA_BG_WAIT_CEILING_MS` can put a ceiling back; an inherited value of the
+   runtime's own variable cannot, so a stray environment can never silently re-arm
+   the kill. Built purely in `scripts/batch-autostart-core.mjs` because the
+   launcher itself may never be imported, and pinned in
+   `scripts/batch-autostart-core.test.mjs`.
+2. **The wait is visible.** A session waiting on an agent POLLS within the turn
+   rather than sitting silent — which `batch-progress-guard` already demands, and
+   which the resume prompt now says in as many words. Every poll is a tool call
+   and every tool call refreshes the heartbeat, so a healthy waiting session never
+   looks dead. A SILENT wait is what made a working session indistinguishable from
+   a corpse.
+3. **The launcher judges progress.** `assessOwner` takes the owner's declared work
+   as an input (`assessOwnerWork` in `scripts/batch-in-flight-core.mjs`, wired in
+   `scripts/batch-autostart.mjs`): an owner with a silent heartbeat reads
+   `work-advancing` — alive, never wedged — while a branch tip, a worktree, a log
+   or a pid it declared still shows movement inside its freshness window. Same
+   probes, same `checkEvidence`, no second notion of liveness. Two asymmetries
+   make it honest: the launcher asks whether ANY declared work is moving (the
+   guard asks whether ALL of it is, because a finished agent is the session's next
+   action — but one finished agent among three is no reason to shoot the session),
+   and evidence recency alone decides "is it moving", so an aged declaration still
+   proves progress. A DEAD pid stays dead whatever the evidence says: the process
+   checks come first and are untouched.
+4. **The only bound left is on stall, not on duration.** When nothing has advanced
+   for `WORK_STALL_TICKS` launcher ticks (6 = 90 minutes of complete silence:
+   no tool call from the owner AND no declared work moving), `assessOwner` returns
+   `work-stalled`. The launcher then sends an urgent ntfy naming what stalled and,
+   if the frozen owner is a headless spawn of its OWN making, reaps it and takes
+   over in the same tick — after CONFIRMING the exit, because taking the lock
+   beside a running process is the e9407cae incident. An interactive window is
+   never killed; the user is told instead. A healthy agent, however slow, advances
+   something, so a false kill needs the work to be genuinely frozen. Some bound
+   must remain (nothing can decide halting), but it now measures the right thing.
+
+**Why 90 minutes and not 30** (four-eyes review, finding 1.1). The heartbeat is a
+PostToolUse hook, so ONE long tool call starves it, and the longest LEGITIMATE
+silence in this repository is a LARGE browser regression at roughly 30-40 minutes
+— which is what `WEDGE_NOTIFY_MS` is calibrated against. A 30-minute stall bound
+therefore sat BELOW the documented normal silence, and this verdict can end in a
+kill. Six ticks follows the same better-than-2x headroom rule.
+
+Three deliberate narrownesses, so none reads as an oversight.
+
+- **Only a CURRENT declaration may tighten the bound** — but "current" is measured
+  with the LAUNCHER's window, `LAUNCHER_WORK_MAX_AGE_MS` (= `WEDGED_MS`, four
+  hours), never with the Stop guard's `IN_FLIGHT_MAX_AGE_MS`. Past it a
+  declaration still proves progress but no longer licenses the stall verdict, and
+  the pre-402 four-hour valve covers the rest exactly as before.
+  **This is where the feature was dead code** (second four-eyes review,
+  28.07.2026, finding A). The launcher first asked with the guard's 45 minutes,
+  and the three constants are then mutually exclusive: the declaration had to be
+  older than the 90-minute stall bound and younger than 45 minutes at the same
+  moment, and `lastWord` pins the two ages to the SAME number because the declare
+  command's own PostToolUse heartbeat lands seconds after `declaration.at`. Driven
+  minute by minute over five hours after a total freeze, `work-stalled` never
+  fired once; every tick fell through to the four-hour valve. The two questions
+  are genuinely different — the guard asks "may a turn end ride on this?", where
+  an aged declaration must stop counting, while the launcher asks "is this the
+  owner's LAST WORD?", where age is not the disqualifier — and widening the
+  launcher's window reopens no idle-night hole, because `lastWord` already
+  excludes every session that worked after declaring. The window is `WEDGED_MS`
+  rather than the bare minimum that makes it non-empty (`WORK_STALL_MS +
+  WORK_DECLARATION_TOLERANCE_MS`) because non-empty is not reachable: that value
+  opens a band two minutes wide, and the launcher looks once per
+  `LAUNCHER_TICK_MS`, so seven schedules in eight would step straight over it.
+  `scripts/batch-in-flight-core.test.mjs` drives the real
+  `assessOwnerWork` → `assessOwner` pipeline across five hours and asserts that
+  every phase of the 15-minute schedule sees the stall — hand-crafted `work`
+  objects, which is what the original tests used, cannot witness this.
+- **The declaration must be the owner's LAST WORD** (four-eyes review, finding
+  1.1). `assessOwner` licenses `work-stalled` only while
+  `claimedAt <= declaredAt + WORK_DECLARATION_TOLERANCE_MS` — the same comparison
+  the handover rests on, for the same reason: the PostToolUse heartbeat stamps
+  `claimedAt` on every tool call, so a heartbeat NEWER than the declaration proves
+  the session went on working after declaring. Nothing forces a session to clear a
+  declaration when its agent finishes, and the replayed failure was exactly that:
+  declare, agent finishes, merge, start `npm run test:large`, and 31 minutes of
+  perfectly legitimate silence later a still-current declaration with quiet
+  evidence would have been read as a stall and reaped MID-REGRESSION. Such
+  leftover paperwork now licenses at most the old four-hour valve.
+- **A declaration no probe can answer is treated as no evidence rather than as
+  proof**, so an unanswerable kind can neither keep a corpse alive nor be gamed
+  into one.
+
+**What may be declared is restricted too** (four-eyes review, finding 1.2).
+Recency made existence-only evidence honest, but nothing restricted WHAT could be
+named, and some things are eternally fresh by construction: the REPO ROOT as a
+`--worktree` (every `git status` the declaring session runs touches its index),
+or `main` / the declaring checkout's OWN current branch as a `--branch` (both move
+on work that is not the work being waited for). Such a declaration would have held
+indefinitely AND suppressed the silent-owner notification — leaving the session
+LESS observed than declaring nothing at all. `selfReferentialEvidence` refuses all
+three at declaration time, where the mistake is one command away from being fixed.
+
+**And the refusal now sees what was MEANT, not what was typed** (second four-eyes
+review, 28.07.2026, finding B). It can only compare names, and the CLI used to
+hand it the raw argument: `--worktree .` from the repo root, `<root>/.` and
+`<root>/../hoa` all named the checkout itself, while `--branch @` (git's own alias
+for HEAD), `--branch heads/main` and `--branch main@{0}` all named things that move
+on their own. All of them were driven live and all of them slipped through, then
+probed eternally fresh. Two changes close the family rather than the six examples:
+the CLI RESOLVES every `--worktree`/`--log` to an absolute path (`absPath`) and
+every `--branch` through `git rev-parse --symbolic-full-name` (`resolveRefName`),
+and STORES the resolved form — which it should do regardless, because the launcher
+probes from its own working directory, not from the one the declaration was
+written in. `normRef` keeps a string belt for what git will not resolve (`heads/…`
+and a `…@{0}` revision expression have no symbolic name), and `@` joins `main` and
+`HEAD` on the always-refused list.
+And past the hours-long `WEDGED_MS` threshold the launcher notifies REGARDLESS of
+whether work is advancing (`silenceStage`), naming the evidence in the message —
+notify only, never a kill.
+
+Pinned in `scripts/batch-singleton-core.test.mjs` (a silent heartbeat with a
+moving branch reads ALIVE, the same silence with every probe quiet reads WEDGED,
+a heartbeat NEWER than the declaration never reaches a kill, a dead or reused pid
+stays dead whatever the evidence says, an unanswerable declaration is no evidence,
+and with NO declaration the pre-402 verdict is unchanged — plus `isOwnSpawn`,
+`silenceStage` and `wedgeAction`, which pin that only a spawn of the launcher's own
+making, matched by pid AND start time, is ever killed) and in
+`scripts/batch-in-flight-core.test.mjs` (`assessOwnerWork`,
+`selfReferentialEvidence`).
+
+### The two costs of switching the ceiling off, and what pays them
+
+Neither is a corner case; both were named by the four-eyes review and both are
+handled in `scripts/batch-autostart-core.mjs`.
+
+**A pid is not an identity** (finding 1.3). Every "the launcher may reap a spawn of
+its own making" path used to compare `lock.pid === state.lastPid`. `state.lastPid`
+persists indefinitely and carries no start time, and Windows recycles pids
+aggressively — so a days-old spawn exits, an INTERACTIVE window later inherits that
+number and takes the batch lock, and the launcher would have killed the user's own
+window. `isOwnSpawn` now demands the pid AND a process start time matching
+`state.lastSpawnAt` within `SPAWN_IDENTITY_TOLERANCE_MS`; an unverifiable start
+time answers no. Both call sites use it: the wedge reaping and the older
+rogue-spawn remediation.
+
+**Waiting forever leaks processes** (finding 1.4). The 600-second ceiling used to
+end a `claude -p` whose turn had finished but whose background task never exits —
+a dev server left running is routine here. After a handover the launcher
+overwrites `state.lastPid`, so nothing tracked those any more, and a leaked
+session holds the ports the next session's verify suites need. The launcher
+therefore keeps a short LEDGER (`state.spawns`, `recordSpawn`, capped at
+`SPAWN_LEDGER_MAX`) of what it spawned and when, and each tick reaps
+(`reapableSpawns`) any entry that is alive under the SAME identity, past its
+`SPAWN_REAP_MIN_AGE_MS` boot window, not the lock owner nor a pending-spawn's
+child, and SUPERSEDED — either another session holds the lock now, or a later
+spawn exists. That last clause is what keeps a lock file which merely went missing
+from turning a healthy worker into a target.
+
+The sweep runs **before every guard that ends the tick** — the user pause, an
+unreadable work order, `open === 0` and an honoured user claim (second four-eyes
+review, 28.07.2026, finding C). It sat below them at first, and the guard it sat
+below most often is `open === 0`: the FINAL session of a completed batch is
+exactly the one whose dev server outlives it, and from the next tick onward the
+launcher exited at "batch complete" before ever reading the ledger. The leak the
+ledger was built for was the one leak it never reaped. A reason not to SPAWN is
+not a reason to leave a process holding ports, and the sweep needs only the state,
+the lock and a pid probe. Those early exits therefore write the state back
+(`bail`), so a pruned ledger is never lost.
 
 ### Observing one handover end to end
 
