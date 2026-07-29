@@ -3658,6 +3658,45 @@ read that as "the criterion and its evidence section".
   DOCS in the same commit: the memory entry `batch-dashboard-artifact`, which states how
   a card moves.
 
+- [ ] 417. A DROPPED CHAT MESSAGE LOOKS DELIVERED, AND THE LEDGER CAN BE FLOODED
+  (29.07.2026, the two follow-up findings of the Fable-5 four-eyes review of the
+  message channel; the review's blocking findings were fixed in that point, these
+  two were deliberately deferred to their own commit).
+  A. THE SENDER IS TOLD NOTHING WHEN A MESSAGE IS DROPPED. `scripts/chat-inbox.mjs`
+  drops a message that is stale (a phone clock more than the skew ahead of the
+  machine is enough) or that arrives while the secret file cannot be read, and the
+  only trace is a line in `.claude/autostart.log`. The page meanwhile renders the
+  sent message like any other — display never asks whether it was accepted — so the
+  user sees a delivered-looking message the agent never received. That is the one
+  failure shape this whole channel exists to prevent, mirrored: a board that lies by
+  omission. FIX, both halves: (i) `readSecret` must distinguish an ABSENT secret file
+  (the channel is simply not configured — silence is correct) from an UNREADABLE one
+  (a permission error, a truncated file — a fault that must be reported), and the
+  launcher reports the second; (ii) when a message verifies as genuinely addressed to
+  this channel but is dropped anyway, the launcher posts a signed drop-notice to the
+  OUTBOX naming the reason, so the page shows the user that their message did not
+  land and why. A message that fails the signature check gets NO notice — answering
+  those would turn the outbox into an oracle for an attacker probing the topic.
+  B. THE LEDGER CAN BE EVICTED UNDER FLOOD. `chat-core.mjs` caps the seen-ledger at
+  `SEEN_MAX` entries and pushes DROPPED transport ids into it too, so 500-odd junk
+  posts to a known inbox topic evict the accepted envelope ids from the state file.
+  Today the spool-seeded ledger covers the gap; the moment the stage-2 consumer acks
+  the spool away, a within-retention replay of a real message becomes possible again.
+  FIX: keep the accepted ENVELOPE ids (`m:`) under their own retention rule — bounded
+  by the acceptance window rather than by a shared entry count — so eviction can never
+  outrun the window in which a replay is possible, and let the cheap transport ids
+  (`n:`) rotate as they do now. Additionally, the `--ack` path reads, slices and
+  writes the spool unlocked, which races a concurrent tick's append; make that one
+  atomic replace (`scripts/atomic-write.mjs`).
+  VERIFIABLE: pure Vitest — an unreadable secret reports while an absent one stays
+  silent; a stale drop produces exactly one outbox notice and a bad-signature drop
+  produces none; an envelope id inside the acceptance window survives a flood of
+  `SEEN_MAX`+ dropped transport ids and is still refused on replay, while one older
+  than the window may be evicted; and an `--ack` concurrent with an append loses no
+  message.
+  DOCS in the same commit: `docs/batch-autonomy.md`, where the channel's guarantees
+  are stated — the drop notice is one of them, and the replay bound is the other.
+
 ## Closing (only after all points)
 
 New points are appended BEFORE this section — it stays last in the file.
