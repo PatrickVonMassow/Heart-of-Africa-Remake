@@ -159,6 +159,33 @@ export function nextChatHandedAt({ spawned, previous = 0, now }) {
 }
 
 /**
+ * A STANDING CONDITION IS NOT AN EVENT (four-eyes review, follow-up F3). PURE.
+ *
+ * Most of what this launcher pushes out of band happens ONCE — a spawn failed, a
+ * rogue process was killed — so the tick reports it and the moment is over. A
+ * broken chat secret is the other kind: it is TRUE at every tick until somebody
+ * fixes the file, and pushed unconditionally it wakes an unattended phone every
+ * few minutes all night. The LOG line still goes on every tick; the push is
+ * throttled to this interval.
+ *
+ * `lastAt` is the moment of the last push for THIS condition, cleared to 0 when
+ * the condition goes away, so a recurrence after a repair is reported at once.
+ * A clock that moved BACKWARD (a reboot with a bad RTC) makes it due rather than
+ * silencing it until the interval has passed twice.
+ */
+export const STANDING_ALERT_INTERVAL_MS = 6 * 60 * 60 * 1000
+
+export function standingAlertDue({ lastAt = null, now = Date.now(), intervalMs = STANDING_ALERT_INTERVAL_MS } = {}) {
+  const last = typeof lastAt === 'number' && Number.isFinite(lastAt) ? lastAt : NaN
+  const at = typeof now === 'number' && Number.isFinite(now) ? now : NaN
+  if (!Number.isFinite(at)) return false // no usable clock: do not push blind
+  if (!Number.isFinite(last)) return true // never pushed for this condition
+  if (at < last) return true
+  const gap = Number.isFinite(intervalMs) && intervalMs > 0 ? intervalMs : STANDING_ALERT_INTERVAL_MS
+  return at - last >= gap
+}
+
+/**
  * The argv the launcher hands to claude.exe. PURE.
  *
  * --dangerously-skip-permissions: the resurrected session is HEADLESS (-p) and

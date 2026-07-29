@@ -60,6 +60,7 @@ import {
   claudeExeBase,
   findClaudeExe,
   nextChatHandedAt,
+  standingAlertDue,
   pendingSinceHandover,
   recordSpawn,
   reapableSpawns,
@@ -192,17 +193,20 @@ try {
     stdio: ['ignore', 'pipe', 'pipe'],
   })
   const r = JSON.parse(out.trim().split('\n').filter(Boolean).pop())
-  if (r.ok === false) {
-    log(`chat inbox: ${r.reason}`)
-    // A secret file that EXISTS and cannot be read takes the whole channel down
-    // silently — every message the user sends is dropped before it is parsed,
-    // and the channel itself can no longer say so. It is therefore the one chat
-    // fault that leaves the log and reaches the user out of band. A poll that
-    // merely failed on the network is not: it retries at the next tick.
-    if (r.fault === SECRET_FAULT) {
-      await notify('Chat secret unreadable', `The board chat is DOWN: ${r.reason}. Messages from the phone are dropped until it is fixed.`, 'default')
-    }
+  // A secret file that EXISTS and cannot be read takes the whole channel down
+  // silently — every message the user sends is dropped before it is parsed, and
+  // the channel itself can no longer say so. It is therefore the one chat fault
+  // that leaves the log and reaches the user out of band. But it is a STANDING
+  // condition, not an event: it is true at every tick until the file is fixed,
+  // so the PUSH is throttled (`standingAlertDue`) while the log line below still
+  // goes out every tick. The stamp is cleared as soon as the fault is gone, so a
+  // recurrence after a repair is reported at once.
+  if (r.fault !== SECRET_FAULT) state.chatSecretAlertAt = 0
+  else if (standingAlertDue({ lastAt: state.chatSecretAlertAt, now })) {
+    state.chatSecretAlertAt = now
+    await notify('Chat secret unreadable', `The board chat is DOWN: ${r.reason}. Messages from the phone are dropped until it is fixed.`, 'default')
   }
+  if (r.ok === false) log(`chat inbox: ${r.reason}`)
   else if (r.configured === false) { /* channel not paired on this machine — silent */ }
   else if (r.accepted > 0 || (r.dropped ?? []).length > 0) {
     log(`chat inbox: ${r.accepted} new, ${r.pending} pending${r.dropped?.length ? ` (dropped: ${r.dropped.join(', ')})` : ''}`)
