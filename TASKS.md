@@ -3718,6 +3718,40 @@ read that as "the criterion and its evidence section".
   independent work is queued) and the ledger row 3.58.
   MECHANISM REVIEW required (it changes a gate): `scripts/mechanism-review.mjs --record`.
 
+- [ ] 428. THE WALKABLE GROUND MEETS THE PANORAMA AT A VISIBLE STEP (29.07.2026, found by
+  the picture check of the vertical look, on BOTH backends). Standing at the settlement's
+  walkable edge and looking DOWN over it — a view the game only gained with the vertical
+  look — the walkable disc and the backdrop relief behind it read as TWO surfaces, not one
+  ground: a straight horizontal brightness step runs across the whole frame where they
+  meet, the backdrop side markedly darker, and the seam itself is faintly stepped in
+  short straight segments rather than following the terrain. Evidence:
+  `verification/145-look-down-disc-edge.png`, recorded on WebGL 2 and on WebGPU (the step
+  is on both, the shading difference is larger on WebGPU).
+  WHAT IS ALREADY TRUE AND MUST STAY: point 381 closed the HOLE at that edge — outside the
+  disc the backdrop never sinks below the ground plane and a ring is pinned on the disc
+  edge — and CLAUDE.md §7.1 pt 31 states the ground meets the panorama "with no edge, no
+  unlit face and no hole". That criterion was verified from an eye-level horizon, where
+  the seam sits at the vanishing line and cannot be seen; the pitch put it in frame. So
+  this is not a regression of 381 but the rest of its own criterion, and 381's geometry
+  fix is not to be undone.
+  TARGET: from any position and any pitch the walkable ground and the backdrop read as ONE
+  continuous ground — no tonal step at the seam beyond what the terrain itself explains,
+  and no straight-segment rim. Find WHICH of the two the step belongs to before changing
+  either: compare the two surfaces' shading inputs (do both take the same sun direction,
+  the same IBL/ambient term, the same tone mapping stage, and does the backdrop get the
+  biome splat the disc gets, or a flat fallback colour?), and check whether the point-381
+  ring is drawn in its own tone rather than the disc's. A material/lighting mismatch is
+  the likely cause; a geometry gap is not — the picture shows contact, not a crack.
+  VERIFIABLE: Vitest in `src/scenes/place/backdrop.test.ts` — the disc and the backdrop
+  resolve the same lighting inputs at coincident points on the seam, so a future change
+  that gives one of them its own term FAILS. Live in `scripts/verify/polish.mjs`: from the
+  disc edge looking down, scan a vertical pixel column across the seam IN THE ONE FRAME
+  and assert the luminance step at the contact stays under a calibratable threshold — a
+  within-frame measure, never a cross-run image diff (point 361 forbids the latter). Both
+  backends, judged by the picture: the same frame must show one ground.
+  DOCS in the same commit: the evidence section `docs/acceptance-evidence.md` §31 records
+  the pitched-view check beside the existing eye-level one.
+
 ## Closing (only after all points)
 
 New points are appended BEFORE this section — it stays last in the file.
