@@ -31,6 +31,7 @@ withWorld()
 // defaults so each test restores them (deterministic, no cross-test bleed).
 const DEFAULTS = {
   mouseSensitivity: balance.mouseSensitivity,
+  lookPitchLimitDeg: balance.lookPitchLimitDeg,
   ambienceVolume: balance.ambienceVolume,
   footstepVolume: balance.footstepVolume,
   ambientVolume: balance.ambientVolume,
@@ -100,6 +101,7 @@ beforeEach(() => {
 
 afterEach(() => {
   balance.mouseSensitivity = DEFAULTS.mouseSensitivity
+  balance.lookPitchLimitDeg = DEFAULTS.lookPitchLimitDeg
   balance.ambienceVolume = DEFAULTS.ambienceVolume
   balance.footstepVolume = DEFAULTS.footstepVolume
   balance.ambientVolume = DEFAULTS.ambientVolume
@@ -138,6 +140,7 @@ afterEach(() => {
   useUi.getState().setGroundDebugFlat(false)
   useUi.getState().setSeasonCollapseEnabled(true)
   useUi.getState().setWheelZoomEnabled(false)
+  useUi.getState().setInvertLook(true)
   useUi.getState().setJournalDnd(false)
   if (useUi.getState().debugOpen) useUi.getState().toggleDebug()
 })
@@ -147,6 +150,8 @@ describe('DebugMenu localization (settings.mjs de/en label checks)', () => {
     render(<DebugMenu />)
     expect(screen.getByText(en.debug.title)).toBeInTheDocument()
     expect(screen.getByText(en.debug.mouseSensitivity)).toBeInTheDocument()
+    expect(screen.getByText(en.debug.lookPitchLimit)).toBeInTheDocument()
+    expect(screen.getByText(en.debug.invertLook)).toBeInTheDocument()
     expect(screen.getByText(en.debug.ambienceVolume)).toBeInTheDocument()
     expect(screen.getByText(en.debug.travelSpeed)).toBeInTheDocument()
   })
@@ -155,6 +160,8 @@ describe('DebugMenu localization (settings.mjs de/en label checks)', () => {
     useLocale.getState().setLang('de')
     render(<DebugMenu />)
     expect(screen.getByText(de.debug.mouseSensitivity)).toBeInTheDocument()
+    expect(screen.getByText(de.debug.lookPitchLimit)).toBeInTheDocument()
+    expect(screen.getByText(de.debug.invertLook)).toBeInTheDocument()
     expect(screen.getByText(de.debug.ambienceVolume)).toBeInTheDocument()
     // The English labels are gone once German is active.
     expect(screen.queryByText(en.debug.mouseSensitivity)).not.toBeInTheDocument()
@@ -189,6 +196,8 @@ describe('DebugMenu language selector (i18n.mjs)', () => {
 describe('DebugMenu editable fields write through to balance (settings.mjs fillField)', () => {
   const editable: Array<{ label: string; read: () => number; value: number }> = [
     { label: en.debug.mouseSensitivity, read: () => balance.mouseSensitivity, value: 0.002 },
+    // The vertical look clamp (point 392), calibratable like its siblings.
+    { label: en.debug.lookPitchLimit, read: () => balance.lookPitchLimitDeg, value: 70 },
     { label: en.debug.ambienceVolume, read: () => balance.ambienceVolume, value: 0.5 },
     { label: en.debug.footstepVolume, read: () => balance.footstepVolume, value: 3 },
     { label: en.debug.ambientVolume, read: () => balance.ambientVolume, value: 0.3 },
@@ -305,6 +314,19 @@ describe('DebugMenu remaining boolean toggles write through (design.md §21, poi
     expect(dnd.checked).toBe(false)
     fireEvent.click(dnd)
     expect(useUi.getState().journalDnd).toBe(true)
+  })
+
+  it('the inverted vertical look ships CHECKED and toggles both ways (point 392)', () => {
+    render(<DebugMenu />)
+    const invert = screen.getByText(en.debug.invertLook).closest('label')?.querySelector('input') as HTMLInputElement
+    // Checked by DEFAULT: the store field itself is inverted, the checkbox only
+    // reports it — nothing flips the sense somewhere else.
+    expect(invert.checked).toBe(true)
+    expect(useUi.getState().invertLook).toBe(true)
+    fireEvent.click(invert)
+    expect(useUi.getState().invertLook).toBe(false)
+    fireEvent.click(invert)
+    expect(useUi.getState().invertLook).toBe(true)
   })
 
   it('the graphics-level picker writes through to the store (design.md §21, point 276)', () => {
