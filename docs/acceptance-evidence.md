@@ -1210,6 +1210,23 @@ scale-normalised gait distance pure-tested in
 the viewer nears, relief-following on a dune, and both old failure modes
 swept round Cairo).
 
+The slope-footing half of that gate is a SERIES, and it runs where the slope is
+(point 412). It used to read one instant at the Maasai village and PASS while
+reporting `slope over the wheelbase [0.00 x4]` and `pitch [0.000 x4]` — the
+silhouettes there stand on the flat disc-horizon line, so the seating under test
+never ran in the measured frame: a verdict without its population. It now
+samples ~30 frames, counts the samples that stood on genuinely sloped ground and
+judges only those, FAILING when that count is zero and naming the count. The
+place is measured rather than assumed — `pedi-village` puts every stance sample
+on a slope, `sidama-village` and `capetown` a smaller share, `maasai-village`
+and `berber-village` 0.000 across 150 samples — and the PASS line names which
+place supplied the population. The decision itself is the pure module
+`scripts/verify/footingSeries.mjs`, pinned by
+`scripts/verify/footingSeries.test.mjs`: an empty series, an all-flat series and
+a too-thin sloped population each fail with their own reason, a mixed series is
+judged on its sloped samples alone, and a sloped foot hanging off its ground
+fails.
+
 The seam that footing worked around is CLOSED (point 381). What tore it: the
 backdrop's relief floor was a flat −6 while `backdropTaper` reaches 1 within
 ~40 % of the inner radius, so a surround sampling lower than the place centre

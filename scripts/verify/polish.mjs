@@ -2,6 +2,7 @@
 // a gift and distant panorama wildlife, design.md §17/§2). Dev server only.
 import { launchVerifyBrowser, waitForStable, assertBackend } from './_browser.mjs'
 import { frameShutter } from './frameSubject.mjs'
+import { judgeFootingSeries, judgePitchSeries, MIN_SLOPED_SAMPLES } from './footingSeries.mjs'
 import { fileURLToPath } from 'node:url'
 import sharp from 'sharp'
 
@@ -564,12 +565,20 @@ const stepUntil = async (ready, arg = null, capFrames = 240) => {
 // gap between the tracked foot and that ground, in units of the animal's own
 // height, and specifically on the silhouettes standing on a genuinely SLOPED
 // spot (front and back footing differ).
+// It is measured as a SERIES, and where the slope actually is (point 412). The
+// old check read ONE instant at maasai-village and passed while reporting
+// `slope over the wheelbase [0.00 x4]` and `pitch [0.000 x4]`: the silhouettes
+// there stand on the flat disc-horizon line, so the seating under test was a
+// NO-OP in the measured frame — a verdict without its population, the same
+// class as retrospective §3.47 one step on. Now many frames are sampled, the
+// samples that stood on genuinely sloped ground are COUNTED, and a count of
+// zero FAILS. `judgeFootingSeries` holds that decision and is pure-tested in
+// scripts/verify/footingSeries.test.mjs.
 {
   // The TRACKED leg is only planted for half of each cycle, and a single sampled
-  // instant can catch every silhouette mid-swing — which left both checks below
-  // measuring the empty set. Step frames until at least one really stands on it,
-  // reading the feet in the SAME evaluate as the test so the pose cannot change
-  // between deciding and measuring.
+  // instant can catch every silhouette mid-swing. Reading the feet in the SAME
+  // evaluate as the test keeps the pose from changing between deciding and
+  // measuring.
   const readFeet = () =>
     page.evaluate(() =>
       Object.values(window.__placePanoramaWildlifeInfo ?? {})
@@ -582,26 +591,57 @@ const stepUntil = async (ready, arg = null, capFrames = 240) => {
           stretch: w.stretch,
         })),
     )
-  let feet = await readFeet()
-  for (let f = 0; f < 240 && feet.length === 0; f++) {
-    await nextFrames(1)
-    feet = await readFeet()
+  const sampleSeries = async (frames) => {
+    const out = []
+    for (let f = 0; f < frames; f++) {
+      out.push(...(await readFeet()))
+      await nextFrames(2)
+    }
+    return out
   }
-  const rel = feet.map((f) => Math.abs(f.gap) / Math.max(1e-6, f.h))
+  const goTo = async (id) => {
+    await page.evaluate((want) => {
+      const g = window.__game.getState()
+      if (g.placeId) g.leavePlace()
+      g.enterPlace(want)
+    }, id)
+    await page
+      .waitForFunction((want) => window.__game.getState().placeId === want && !!window.__placeLayout, id, { timeout: 40000 })
+      .catch(() => {})
+    await page.waitForFunction(() => Object.keys(window.__placePanoramaWildlifeInfo ?? {}).length >= 3, null, { timeout: 25000 }).catch(() => {})
+  }
+  // Settlements whose backdrop relief RISES, measured: pedi-village puts every
+  // stance sample on a slope (Drakensberg foothills), sidama-village and
+  // capetown a smaller share. maasai-village, where this check used to run, and
+  // berber-village both measure 0.000 across 150 samples — the flat disc line.
+  // The first place that supplies a population is used; falling through them all
+  // is itself a failure, never a quiet pass.
+  const SLOPED_PLACES = ['pedi-village', 'sidama-village', 'capetown']
+  let series = []
+  let where = null
+  for (const id of SLOPED_PLACES) {
+    await goTo(id)
+    series = await sampleSeries(30)
+    where = id
+    if (judgeFootingSeries(series).sloped >= MIN_SLOPED_SAMPLES) break
+  }
+  // The place goes in the DETAIL, never in the check NAME: the flake and
+  // baseline classifiers match checks by name, and a name that moved with the
+  // sampling place would read as a different check every run.
+  const footing = judgeFootingSeries(series)
   check(
-    'every planted panorama foot touches the ground drawn under it (point 300)',
-    feet.length >= 1 && rel.every((r) => r < 0.05),
-    feet.length >= 1
-      ? `foot gap / body height [${rel.map((r) => r.toFixed(3)).join(', ')}], slope over the wheelbase [${feet
-          .map((f) => f.slope.toFixed(2))
-          .join(', ')}], leg reach [${feet.map((f) => (f.stretch ?? 1).toFixed(2)).join(', ')}]`
-      : 'MEASURED NOTHING — no visible silhouette had its tracked leg in stance within the frame cap',
+    'every planted panorama foot touches the ground drawn under it, on SLOPED ground (points 300/412)',
+    footing.ok,
+    `at ${where} — ${footing.detail}`,
   )
+  const leaning = judgePitchSeries(series)
   check(
-    'no panorama body leans past a stand-able incline, however steep the backdrop reads (point 300)',
-    feet.length >= 1 && feet.every((f) => Math.abs(f.pitch) <= 0.3 + 1e-6),
-    feet.length >= 1 ? `pitch [${feet.map((f) => f.pitch.toFixed(3)).join(', ')}]` : 'MEASURED NOTHING — no silhouette in stance',
+    'no panorama body leans past a stand-able incline, however steep the backdrop reads (points 300/412)',
+    leaning.ok,
+    `at ${where} — ${leaning.detail}`,
   )
+  // Hand the scene back to the settlement the rest of this suite expects.
+  await goTo('maasai-village')
 }
 check(
   'every panorama silhouette reads small (bounded subtended angle, point 94)',

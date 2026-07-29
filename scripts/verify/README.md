@@ -494,6 +494,32 @@ ported asserts now live in Vitest:
 | `voice.mjs` | movement-while-journal-open (scene), TTS read-aloud (assets from the local `.cache/tts/` record-and-replay cache — first run records from the CDNs, later runs are strictly offline; delete the dir to re-prime), the cold-load main-thread liveness gate (see `liveness.mjs`), screenshots | `src/journal/voiceMarkup.test.ts`, `src/i18n/i18n.test.ts`, `src/ui/JournalPanel.test.tsx`, `scripts/verify/liveness.test.mjs` |
 | `touch.mjs` | touch/tablet layer (`hasTouch` context, real CDP touch): guard mounts the overlay on first touch + mobile quality preset, virtual-stick walk, right-half look drag, tappable prompt, two-finger pinch zoom | `src/systems/touchInput.test.ts`, `src/state/ui.test.ts`, `src/ui/Hud.test.tsx` (touch absence/presence), `src/ui/DebugMenu.test.tsx` (SSAO/shadow checkboxes) |
 
+### `polish.mjs`: the checks that need a POPULATION, not an instant
+
+Two of its checks measure something that only happens SOMETIMES, so each is a
+SERIES over the walk rather than one sampled frame, and each fails loudly when
+its own subject never occurred:
+
+- **Slope footing (points 300/412).** "Every planted panorama foot touches the
+  ground drawn under it" used to run at `maasai-village` and read ONE instant.
+  It passed — while reporting `slope over the wheelbase [0.00, 0.00, 0.00,
+  0.00]` and `pitch [0.000 x4]`: the silhouettes there stand on the flat
+  disc-horizon line, so the seating the check exists to prove was a NO-OP in the
+  measured frame. It now samples ~30 frames, COUNTS the samples that stood on
+  genuinely sloped ground (rise over the animal's own wheelbase ≥
+  `MIN_WHEELBASE_SLOPE`), judges only those, and FAILS when that count is zero.
+  The decision is the pure module `footingSeries.mjs`, pinned by
+  `footingSeries.test.mjs` in the Vitest layer. The place is chosen because the
+  slope is measurably there, not assumed: `pedi-village` puts every stance
+  sample on a slope, `sidama-village` and `capetown` a smaller share, while
+  `maasai-village` and `berber-village` measure 0.000 across 150 samples. The
+  check walks that list and names in its verdict which place supplied the
+  population; running out of places is a failure, never a quiet pass.
+- **Settlement animals (point 413).** No goat may stand inside a fence, hut or
+  prop, and none inside another goat — sampled over 20 reads of the herd, with
+  the deepest penetration and the closest pair reported, plus the frame
+  `143-village-goat-separation`.
+
 Kept largely intact (already browser-only): `flow.mjs` (the one E2E core loop +
 buy-price layout geometry), `collision.mjs`, `gamepad.mjs`, `polish.mjs`,
 `handwriting.mjs` (the writing animation is timing/DOM-sensitive and stays
