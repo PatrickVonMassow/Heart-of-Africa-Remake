@@ -18,9 +18,12 @@
 //   --defer "<reason>"    logged escape valve for sessions that genuinely lack
 //                         the Artifact tool (headless resume); covers the
 //                         CURRENT content only — any further edit re-blocks.
-import { copyFileSync, existsSync } from 'node:fs'
+import { copyFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { REPO_ROOT, STATE_PATH, readJson, mergeState, sha256File } from './dashboard-state.mjs'
+import { refreshFooter } from './board-core.mjs'
+import { structureViolations } from './board-structure-core.mjs'
+import { parseTasks } from './dashboard-guard-core.mjs'
 
 const state = readJson(STATE_PATH) ?? {}
 const repoFile = resolve(REPO_ROOT, state.dashboardPath ?? '.batch-dashboard.html')
@@ -69,6 +72,38 @@ if (!target) {
     'dashboard-publish: no scratchpad target known — pass --to <path> (the session scratchpad file ' +
       'hoa-batch-dashboard.html).',
   )
+  process.exit(1)
+}
+
+// The footer's date and open-point count are derived, not typed: every tick
+// otherwise left a stale figure that the audit refused two steps later, after
+// the Artifact call. Same parse as the audit, so the two cannot disagree.
+try {
+  const html = readFileSync(repoFile, 'utf8')
+  const { open } = parseTasks(readFileSync(resolve(REPO_ROOT, 'TASKS.md'), 'utf8'))
+  const refreshed = refreshFooter(html, { openCount: open.length })
+  if (refreshed !== html) {
+    writeFileSync(repoFile, refreshed)
+    console.log(`footer refreshed: ${open.length} open point(s)`)
+  }
+} catch (e) {
+  // A publish must never be blocked by the footer; the audit still catches a
+  // stale one, and saying why beats failing silently.
+  console.error(`dashboard-publish: footer not refreshed (${e.message})`)
+}
+
+// STRUCTURE BEFORE PUBLISH (28.07.2026): the consistency audit runs at
+// --synced, which is AFTER the Artifact call, so a board broken by an edit
+// reached the reader and was repaired afterwards — three times in one evening.
+// A malformed board must not be publishable at all, so the gate sits here,
+// before the copy the Artifact tool picks up. Structure only; the audit keeps
+// owning content and freshness.
+const broken = structureViolations(readFileSync(repoFile, 'utf8'))
+if (broken.length) {
+  console.error(`dashboard-publish REFUSED — the board is structurally broken (${broken.length}):`)
+  for (const v of broken) console.error(`  [${v.code}] ${v.msg}`)
+  console.error('Repair the markup first. Do NOT reorder cards with text replacement —')
+  console.error('use scripts/board.mjs, which edits whole cards and cannot move a closing tag.')
   process.exit(1)
 }
 

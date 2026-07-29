@@ -1,6 +1,7 @@
 // Headless verification for CLAUDE.md §7.1.31 (settlement orientation after
 // a gift and distant panorama wildlife, design.md §17/§2). Dev server only.
 import { launchVerifyBrowser, waitForStable, assertBackend } from './_browser.mjs'
+import { frameShutter } from './frameSubject.mjs'
 import { fileURLToPath } from 'node:url'
 import sharp from 'sharp'
 
@@ -27,6 +28,16 @@ const check = (name, ok, detail) => {
 const probeSilhouetteFooting = async (page, check, label) => {
   const count = await page.evaluate(() => Object.keys(window.__placePanoramaWildlifeInfo ?? {}).length)
   const rows = []
+  // The probe BORROWS the camera — it walks the player onto every silhouette's
+  // bearing — so it hands the pose back exactly as it found it. It used to reset
+  // only x/z and leave the yaw on the last silhouette, and every frame taken
+  // afterwards inherited that arbitrary aim: `93-orientation-highlight` was then
+  // photographed from a camera facing a panorama animal, and whether a building
+  // marker happened to be in the picture was luck (point 375 caught it).
+  const pose = await page.evaluate(() => {
+    const p = window.__placePlayer
+    return p ? { x: p.x, z: p.z, yaw: p.yaw, pitch: p.pitch } : null
+  })
   for (let i = 0; i < count; i++) {
     const stood = await page.evaluate((idx) => {
       const it = (window.__placePanoramaWildlifeInfo ?? {})[idx]
@@ -54,11 +65,19 @@ const probeSilhouetteFooting = async (page, check, label) => {
     }, i)
     if (row) rows.push(row)
   }
-  await page.evaluate(() => {
+  await page.evaluate((saved) => {
     const p = window.__placePlayer
-    p.x = 0
-    p.z = 0
-  })
+    if (!p || !saved) return
+    p.x = saved.x
+    p.z = saved.z
+    p.yaw = saved.yaw
+    // `pitch` is not part of the place camera's pose (PlaceScene builds the
+    // rotation from yaw alone) and the live object does not carry it — the
+    // probe adds it. Hand the object back as it was found rather than leaving
+    // a stray field behind.
+    if (saved.pitch === undefined) delete p.pitch
+    else p.pitch = saved.pitch
+  }, pose)
   check(
     `${label}: every panorama silhouette's feet meet drawn ground (point 181)`,
     rows.length >= 2 && rows.every((r) => r.ratio <= 1.05),
@@ -68,6 +87,10 @@ const probeSilhouetteFooting = async (page, check, label) => {
 
 const browser = await launchVerifyBrowser()
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
+// Point 375: every frame below states the subject it must show — the settlement
+// it stands in, the building it is aimed at, the overlay it documents — and the
+// shutter proves that subject is in the picture before the file is written.
+const frame = frameShutter(page, OUT)
 const errors = []
 page.on('console', (m) => {
   if (m.type() === 'error') errors.push(m.text())
@@ -124,9 +147,7 @@ await page.evaluate(() => {
     p.pitch = 0.02
   })
   await page.waitForTimeout(700)
-  const skyBuf = await page.screenshot()
-  await sharp(skyBuf).toFile(`${OUT}100-cairo-giza-skyline.png`)
-  console.log('shot 100-cairo-giza-skyline.png')
+  const skyBuf = await frame('100-cairo-giza-skyline', { place: 'cairo', label: 'the Giza skyline over Cairo' })
 
   // Point 273: Menkaure's red-granite base casing read as a floating RED ERROR
   // BAND at this distant skyline scale, so it was removed (kept only at the
@@ -171,8 +192,7 @@ await page.evaluate(() => {
     gizaExcl.skyline === 'giza-pyramids' && gizaExcl.spanCount >= 1 && gizaExcl.sils >= 3 && gizaExcl.violating === 0,
     JSON.stringify(gizaExcl),
   )
-  await page.screenshot({ path: `${OUT}105-cairo-panorama-giza-clear.png` })
-  console.log('shot 105-cairo-panorama-giza-clear.png')
+  await frame('105-cairo-panorama-giza-clear', { place: 'cairo', label: 'the Cairo panorama with the Giza skyline' })
 }
 
 // --- Panorama wildlife (design.md §2) ---------------------------------------------
@@ -196,10 +216,40 @@ await page.waitForFunction(() => Object.keys(window.__placePanoramaWildlifeInfo 
 const wInfo = await page.evaluate(() => Object.values(window.__placePanoramaWildlifeInfo ?? {}))
 check(
   'every panorama silhouette sits on the ground line it was placed on',
-  wInfo.length >= 3 && wInfo.every((w) => w.y >= w.visibleY && w.y <= w.visibleY + 0.2),
-  `y vs line [${wInfo.map((w) => `${w.y.toFixed(2)}/${w.visibleY.toFixed(2)}`).join(', ')}]`,
+  // Point 300: the body DIPS onto whichever leg is planted (that is what puts
+  // the standing foot on the ground), so the anchor may sit below the line by
+  // that dip — `drop` — and never above it.
+  wInfo.length >= 3 && wInfo.every((w) => w.y >= w.visibleY - w.drop - 1e-3 && w.y <= w.visibleY + 0.2),
+  `y vs line [${wInfo.map((w) => `${w.y.toFixed(2)}/${w.visibleY.toFixed(2)}-${(w.drop ?? 0).toFixed(2)}`).join(', ')}]`,
 )
 await probeSilhouetteFooting(page, check, 'maasai-village (no capture)')
+// Advance the scene by RENDERED frames. The headless frame time here swings
+// between ~20 ms and well over a second, so every motion measurement below
+// counts frames DRAWN rather than milliseconds elapsed: a fixed wall wait that
+// happens to span a stall reads the same pose twice and reports the whole
+// panorama as motionless, and one that spans a fast stretch moves a walker too
+// little to measure. Both were seen turning green checks red on this suite.
+const nextFrames = (n) =>
+  page.evaluate(
+    (count) =>
+      new Promise((resolve) => {
+        let left = count
+        const tick = () => (left-- > 0 ? requestAnimationFrame(tick) : resolve())
+        requestAnimationFrame(tick)
+      }),
+    n,
+  )
+/** Step frames until the page arrow `ready(arg)` reads true, capped. Returns
+ *  whether it ever did — the caller ASSERTS on that, so a scene that never gets
+ *  there fails loudly instead of quietly measuring nothing. */
+const stepUntil = async (ready, arg = null, capFrames = 240) => {
+  if (await page.evaluate(ready, arg)) return true
+  for (let f = 0; f < capFrames; f++) {
+    await nextFrames(1)
+    if (await page.evaluate(ready, arg)) return true
+  }
+  return false
+}
 // Point 255 (3): the silhouettes must WALK the horizon, not glide along it.
 // Their stride phase rides the ground they cover on the ring, so over the same
 // interval each one's phase advance divided by its (scale-normalised, point 286)
@@ -208,20 +258,36 @@ await probeSilhouetteFooting(page, check, 'maasai-village (no capture)')
 {
   const sample = () =>
     page.evaluate(() =>
-      Object.values(window.__placePanoramaWildlifeInfo ?? {}).map((w) => ({ gait: w.gait, speed: w.gaitSpeed })),
+      Object.values(window.__placePanoramaWildlifeInfo ?? {}).map((w) => ({
+        gait: w.gait,
+        speed: w.gaitSpeed,
+        cadence: w.cadence,
+      })),
     )
   const before = await sample()
-  await page.waitForTimeout(1200)
+  // Wait for the STRIDE to actually advance rather than for a wall clock: on a
+  // stalled headless frame a fixed 1200 ms wait read the identical phase twice
+  // and reported every rate as 0.000 with a NaN spread.
+  const walked = await stepUntil((b) => {
+    const now = Object.values(window.__placePanoramaWildlifeInfo ?? {})
+    return now.some((w, i) => Math.abs(w.gait - b[i]?.gait) > 0.2)
+  }, before)
   const after = await sample()
+  // Point 300: each species walks at its OWN cadence (derived from its leg), so
+  // the shared constant is no longer the phase per unit walked but the phase per
+  // unit walked DIVIDED by that cadence — one full cycle per stride, for every
+  // animal whatever its legs. A clock-driven bob would advance them all alike.
   const rates = before
-    .map((b, i) => ({ d: after[i].gait - b.gait, speed: b.speed }))
-    .filter((r) => r.speed > 0)
-    .map((r) => r.d / r.speed)
+    .map((b, i) => ({ d: after[i].gait - b.gait, speed: b.speed, cadence: b.cadence }))
+    .filter((r) => r.speed > 0 && r.cadence > 0)
+    .map((r) => r.d / (r.speed * r.cadence))
   const spread = rates.length ? (Math.max(...rates) - Math.min(...rates)) / Math.max(...rates) : 1
   check(
-    'the panorama silhouettes stride with the ground they cover, not the clock (point 255)',
-    rates.length >= 3 && rates.every((r) => r > 0) && spread < 0.02,
-    `phase per unit walked [${rates.map((r) => r.toFixed(2)).join(', ')}], spread ${(spread * 100).toFixed(1)}%`,
+    'the panorama silhouettes stride with the ground they cover, not the clock (points 255/300)',
+    walked && rates.length >= 3 && rates.every((r) => r > 0) && spread < 0.02,
+    walked
+      ? `phase per unit walked ÷ cadence [${rates.map((r) => r.toFixed(3)).join(', ')}], spread ${(spread * 100).toFixed(1)}%`
+      : 'MEASURED NOTHING — no silhouette advanced its stride within the frame cap',
   )
 }
 // Point 286: the silhouettes must WALK FORWARD, never backward. The facing is
@@ -229,6 +295,14 @@ await probeSilhouetteFooting(page, check, 'maasai-village (no capture)')
 // an interval must project POSITIVELY onto its facing (forward = (sin yaw,
 // cos yaw)), and a moving one must actually advance. The reverted bug set the
 // yaw exactly π off the tangent, so every silhouette moonwalked.
+//
+// Stepped by RENDERED FRAMES, never by a wall clock: this scene occasionally
+// stalls for over a second headless, and a fixed 1200 ms wait that spans such a
+// stall reads the SAME pose twice and reports every silhouette as motionless —
+// the check then fails on "no one advanced" while the walk itself is fine (seen
+// once, passing on the very next run). Waiting for the drift to actually happen
+// removes the false red without touching what is asserted: a silhouette that
+// still refuses to advance within the cap fails exactly as before.
 {
   const snap = () =>
     page.evaluate(() => {
@@ -238,7 +312,11 @@ await probeSilhouetteFooting(page, check, 'maasai-village (no capture)')
       return out
     })
   const b0 = await snap()
-  await page.waitForTimeout(1200)
+  for (let f = 0; f < 240; f++) {
+    await nextFrames(1)
+    const now = await snap()
+    if (Object.keys(b0).some((k) => now[k] && Math.hypot(now[k].x - b0[k].x, now[k].z - b0[k].z) > 0.05)) break
+  }
   const b1 = await snap()
   const along = []
   for (const k of Object.keys(b0)) {
@@ -253,6 +331,172 @@ await probeSilhouetteFooting(page, check, 'maasai-village (no capture)')
     'every panorama silhouette walks forward along its facing, never backward (point 286)',
     along.length >= 3 && along.every((r) => r.a >= -1e-3) && along.some((r) => r.d > 1e-3 && r.a > 0),
     `along-facing displacement [${along.map((r) => r.a.toFixed(3)).join(', ')}]`,
+  )
+}
+// Point 300: the feet must be PLANTED, not skating. Sample a tracked foot's
+// WORLD position across a series of frames and compare its travel with the
+// body's over the same intervals, counting only the intervals in which that leg
+// stayed in stance. A planted foot barely moves while the body walks on; the old
+// over-driven cadence dragged it along at a large fraction of the body's speed.
+{
+  /**
+   * Step the scene until SOME tracked animal has covered `want` of its own
+   * stride, so the interval is sized in the animal's units and not in frames.
+   *
+   * A FIXED frame count cannot do this: a pen goat walks ~0.12 world units a
+   * second and its stride is 0.82, so three frames of a fast headless run move
+   * it 0.008 — under any usable floor, which is exactly why this check first
+   * measured NOTHING and reported a vacuous "0 stance intervals". The same three
+   * frames on a stalled run cover a whole cycle. Sizing the step by the stride
+   * makes the measurement independent of the frame rate.
+   */
+  const stepUntilWalked = async (read, want, capFrames = 150) => {
+    const from = await page.evaluate(read)
+    for (let f = 0; f < capFrames; f++) {
+      await nextFrames(1)
+      const now = await page.evaluate(read)
+      let far = 0
+      for (const id of Object.keys(from)) {
+        const p0 = from[id]
+        const p1 = now[id]
+        if (!p1 || !(p0.stride > 0)) continue
+        far = Math.max(far, Math.hypot(p1.x - p0.x, p1.z - p0.z) / p0.stride)
+      }
+      if (far >= want) return
+    }
+  }
+  const trackFeet = async (read, label) => {
+    const samples = []
+    for (let k = 0; k < 14; k++) {
+      samples.push(await page.evaluate(read))
+      // 5 % of a stride per interval: far above any measurement floor, far below
+      // the half-stride a stance lasts.
+      await stepUntilWalked(read, 0.05)
+    }
+    const slips = []
+    let turned = 0
+    for (let k = 1; k < samples.length; k++) {
+      const a = samples[k - 1]
+      const b = samples[k]
+      for (const id of Object.keys(a)) {
+        const p0 = a[id]
+        const p1 = b[id]
+        if (!p1 || !p0.stance || !p1.stance || !p0.foot || !p1.foot) continue
+        const body = Math.hypot(p1.x - p0.x, p1.z - p0.z)
+        // A standing animal proves nothing. The floor is a fraction of the
+        // animal's OWN stride, not a world constant — a goat and an elephant do
+        // not walk in the same units.
+        if (!(p0.stride > 0) || body < 0.02 * p0.stride) continue
+        // Within one stance the body covers at most half a stride, so a longer
+        // interval found the SAME leg planted again a cycle on: a wrap, not a
+        // skate — it proves nothing either.
+        if (body > 0.4 * p0.stride) continue
+        // The foot's travel is measured in the walker's own HEADING frame: the
+        // promise under test is that one stride carries the body exactly as far
+        // as the stance foot sweeps back through it, which is a statement about
+        // the walking direction. A body that also TURNS swings its rigid legs
+        // about its centre, and because a trot plants a DIAGONAL pair — the two
+        // stance feet sit symmetrically about that centre — no rigid rotation
+        // can hold both; only full foot-IK could, which this point explicitly
+        // leaves out of scope. So the pivot is measured and REPORTED (`turn`
+        // below) but not charged to the cadence, which is what the fix controls
+        // and what a wrong cadence would blow up here on any path, straight or
+        // curved.
+        // Forward is (sin yaw, cos yaw) throughout this codebase, so local→world
+        // is (lx·cos + lz·sin, −lx·sin + lz·cos) and world→local its transpose.
+        const toLocal = (dx, dz, yaw) => ({
+          x: dx * Math.cos(yaw) - dz * Math.sin(yaw),
+          z: dx * Math.sin(yaw) + dz * Math.cos(yaw),
+        })
+        const y0 = p0.yaw ?? 0
+        const y1 = p1.yaw ?? 0
+        const f0 = toLocal(p0.foot.x - p0.x, p0.foot.z - p0.z, y0)
+        const f1 = toLocal(p1.foot.x - p1.x, p1.foot.z - p1.z, y1)
+        // The foot's world displacement with the rigid yaw change removed: the
+        // body's own travel plus the foot's sweep through the body frame, the
+        // latter carried back to world in the heading held at interval start.
+        const lx = f1.x - f0.x
+        const lz = f1.z - f0.z
+        const sx = lx * Math.cos(y0) + lz * Math.sin(y0)
+        const sz = -lx * Math.sin(y0) + lz * Math.cos(y0)
+        slips.push(Math.hypot(p1.x - p0.x + sx, p1.z - p0.z + sz) / body)
+        turned = Math.max(turned, Math.abs(Math.atan2(Math.sin((p1.yaw ?? 0) - (p0.yaw ?? 0)), Math.cos((p1.yaw ?? 0) - (p0.yaw ?? 0)))))
+      }
+    }
+    // A check that measured nothing must never be able to pass, and must say so
+    // rather than print the empty set's Infinity as if it were a huge slip.
+    check(
+      `${label}: the planted foot holds its ground spot while the body walks over it (point 300)`,
+      slips.length >= 3 && Math.max(...slips) < 0.25,
+      slips.length >= 3
+        ? `${slips.length} stance intervals, worst foot/body travel ${Math.max(...slips).toFixed(3)}, turn up to ${turned.toFixed(3)} rad`
+        : `MEASURED NOTHING — only ${slips.length} usable stance intervals (needs 3): no tracked walker was both in stance and moving`,
+    )
+  }
+  await trackFeet(() => {
+    const out = {}
+    const info = window.__placePanoramaWildlifeInfo ?? {}
+    for (const k of Object.keys(info)) {
+      const w = info[k]
+      if (w.visible === false) continue
+      out[k] = { x: w.x, z: w.z, yaw: w.yaw, foot: w.foot, stance: w.stance, stride: w.stride }
+    }
+    return out
+  }, 'panorama silhouette')
+  await trackFeet(() => {
+    const out = {}
+    const info = window.__placeGoatGait ?? {}
+    for (const k of Object.keys(info)) {
+      const g = info[k]
+      out[k] = { x: g.x, z: g.z, yaw: g.yaw, foot: g.foot, stance: g.stance, stride: g.stride }
+    }
+    return out
+  }, 'settlement walker (goat)')
+}
+// Point 300, slope footing: a silhouette on a dune must lie ON the incline —
+// its body pitched over its own wheelbase, and each foot then seated on the
+// ground under ITS OWN spot — so the planted foot touches the ground drawn
+// under it instead of hovering above it. Measured as the vertical
+// gap between the tracked foot and that ground, in units of the animal's own
+// height, and specifically on the silhouettes standing on a genuinely SLOPED
+// spot (front and back footing differ).
+{
+  // The TRACKED leg is only planted for half of each cycle, and a single sampled
+  // instant can catch every silhouette mid-swing — which left both checks below
+  // measuring the empty set. Step frames until at least one really stands on it,
+  // reading the feet in the SAME evaluate as the test so the pose cannot change
+  // between deciding and measuring.
+  const readFeet = () =>
+    page.evaluate(() =>
+      Object.values(window.__placePanoramaWildlifeInfo ?? {})
+        .filter((w) => w.visible !== false && w.foot && w.stance)
+        .map((w) => ({
+          gap: w.footGap,
+          h: w.worldHeight,
+          slope: Math.abs((w.frontY ?? 0) - (w.backY ?? 0)),
+          pitch: w.pitch,
+          stretch: w.stretch,
+        })),
+    )
+  let feet = await readFeet()
+  for (let f = 0; f < 240 && feet.length === 0; f++) {
+    await nextFrames(1)
+    feet = await readFeet()
+  }
+  const rel = feet.map((f) => Math.abs(f.gap) / Math.max(1e-6, f.h))
+  check(
+    'every planted panorama foot touches the ground drawn under it (point 300)',
+    feet.length >= 1 && rel.every((r) => r < 0.05),
+    feet.length >= 1
+      ? `foot gap / body height [${rel.map((r) => r.toFixed(3)).join(', ')}], slope over the wheelbase [${feet
+          .map((f) => f.slope.toFixed(2))
+          .join(', ')}], leg reach [${feet.map((f) => (f.stretch ?? 1).toFixed(2)).join(', ')}]`
+      : 'MEASURED NOTHING — no visible silhouette had its tracked leg in stance within the frame cap',
+  )
+  check(
+    'no panorama body leans past a stand-able incline, however steep the backdrop reads (point 300)',
+    feet.length >= 1 && feet.every((f) => Math.abs(f.pitch) <= 0.3 + 1e-6),
+    feet.length >= 1 ? `pitch [${feet.map((f) => f.pitch.toFixed(3)).join(', ')}]` : 'MEASURED NOTHING — no silhouette in stance',
   )
 }
 check(
@@ -276,8 +520,7 @@ const plan = await page.evaluate(() => {
   const labels = [...document.querySelectorAll('.plan-building-label')].map((n) => n.textContent)
   return { present: !!el, labels, canvas: !!document.querySelector('.map-overlay canvas') }
 })
-await page.screenshot({ path: `${OUT}98-place-plan.png` })
-console.log('shot 98-place-plan.png')
+await frame('98-place-plan', { element: '.map-place-plan', label: 'the town plan' })
 check('inside a settlement the map shows the town plan', plan.present && !plan.canvas, JSON.stringify({ canvas: plan.canvas }))
 check('the plan names the functional buildings', plan.labels.length >= 2, `labels [${plan.labels.join(', ')}]`)
 await page.evaluate(() => window.__ui.getState().toggleMap())
@@ -297,9 +540,32 @@ const after = await page.evaluate(() => document.querySelectorAll('.building-hig
 check('the gift unlocks the building markers', after >= 1, `${after} markers`)
 check('the orientation announces itself', !!toast && toast.length > 0, `"${toast}"`)
 await page.evaluate(() => window.__game.getState().setJournalOpen(false))
+// AIM the camera at a marked building before photographing its marker. The
+// frame used to be shot from wherever the previous check had left the camera,
+// so whether a marker was in the picture at all was chance — the shutter
+// (point 375) refused the frame and that is how the missing aim was found.
+// The chief's hut is the marker the shutter judges (it is the first
+// `.building-highlight` in DOM order, the layout's first non-villager
+// interactive), so stand back from it on its own bearing and face it.
+const marked = await page.evaluate(() => {
+  const it = (window.__placeLayout?.interactives ?? []).find((i) => i.type !== 'villager')
+  if (!it) return null
+  const p = window.__placePlayer
+  const [mx, mz] = it.pos
+  const d = Math.hypot(mx, mz) || 1
+  // Stand 14 m from the hut on the line toward the settlement centre — the open
+  // ground every layout keeps clear — and far enough back that the marker at
+  // ~5.6 m sits well inside the vertical field of view (the place camera builds
+  // its rotation from yaw alone, so there is no pitch to tilt up with).
+  p.x = mx - (mx / d) * 14
+  p.z = mz - (mz / d) * 14
+  // Place-camera yaw 0 looks toward -Z, so aim with the +PI complement.
+  p.yaw = Math.atan2(mx - p.x, mz - p.z) + Math.PI
+  return { type: it.type, x: mx, z: mz }
+})
+check('the settlement offers a marked building to photograph', !!marked, JSON.stringify(marked))
 await page.waitForTimeout(400)
-await page.screenshot({ path: `${OUT}93-orientation-highlight.png` })
-console.log('shot 93-orientation-highlight.png')
+await frame('93-orientation-highlight', { element: '.building-highlight', label: `the marker over the ${marked?.type ?? 'important'} building` })
 
 // Persistence: leaving and re-entering keeps the orientation.
 await page.evaluate(() => {
@@ -349,8 +615,7 @@ await page.evaluate(() => {
   p.yaw = 0
 })
 await page.waitForTimeout(600)
-await page.screenshot({ path: `${OUT}96-capetown-table-mountain.png` })
-console.log('shot 96-capetown-table-mountain.png')
+await frame('96-capetown-table-mountain', { place: 'capetown', label: 'Cape Town under Table Mountain' })
 
 // Timbuktu: the Djinguereber mosque stands inside the town fabric, with a
 // collider (an oriented box like every rectangular building).
@@ -385,8 +650,7 @@ if (mosque) {
     p.yaw = Math.atan2(m.x - p.x, m.z - p.z) + Math.PI
   }, mosque)
   await page.waitForTimeout(600)
-  await page.screenshot({ path: `${OUT}97-timbuktu-djinguereber.png` })
-  console.log('shot 97-timbuktu-djinguereber.png')
+  await frame('97-timbuktu-djinguereber', { local: { x: mosque.x, z: mosque.z, y: 4 }, label: 'the Djinguereber mosque' })
 }
 
 // --- The season inside a settlement (design.md §19.13, point 120g) ------------
@@ -407,14 +671,12 @@ if (mosque) {
   // Poll until the dome-gray lerp settles (point 200), not a fixed wall wait.
   await waitForStable(page, () => window.__placeSeason().sun, { settleMs: 200, timeout: 6000 })
   const dry = await read()
-  await page.screenshot({ path: `${OUT}110-village-season-dry.png` })
-  console.log('shot 110-village-season-dry.png')
+  await frame('110-village-season-dry', { place: 'maasai-village', label: 'the settlement in the dry season' })
 
   await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(1))
   await waitForStable(page, () => window.__placeSeason().sun, { settleMs: 200, timeout: 6000 })
   const wet = await read()
-  await page.screenshot({ path: `${OUT}111-village-season-wet.png` })
-  console.log('shot 111-village-season-wet.png')
+  await frame('111-village-season-wet', { place: 'maasai-village', label: 'the settlement in the wet season' })
 
   check(
     'the dry-season settlement stands under the clear preset sky',
@@ -450,8 +712,7 @@ if (mosque) {
     wet.tint > 0.75 && dry.tint < 0.25,
     `tint wet ${wet.tint.toFixed(2)} -> dry ${dry.tint.toFixed(2)}`,
   )
-  await page.screenshot({ path: `${OUT}114-village-rain.png` })
-  console.log('shot 114-village-rain.png')
+  await frame('114-village-rain', { place: 'maasai-village', label: 'the rain inside the settlement' })
   // Leave no forced weather behind for the checks below.
   await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(null))
 
@@ -591,8 +852,7 @@ if (mosque) {
   )
   await page.evaluate(() => { const p = window.__placePlayer; p.x = 0; p.z = 0; p.yaw = 0; p.pitch = 0.02 })
   await page.waitForTimeout(700)
-  await page.screenshot({ path: `${OUT}99-travel-panorama.png` })
-  console.log('shot 99-travel-panorama.png')
+  await frame('99-travel-panorama', { place: 'nubian-village', label: 'the surroundings panorama' })
 
   // Magenta-pillar orientation proof: the probe stood due west of the
   // capture point, so its colour must show looking WEST and not EAST.
@@ -654,9 +914,9 @@ if (mosque) {
   await page.waitForFunction(() => Object.keys(window.__placePanoramaWildlifeInfo ?? {}).length >= 3, null, { timeout: 15000 }).catch(() => {})
   await probeSilhouetteFooting(page, check, 'cairo (capture active, Giza skyline)')
   // Human-viewable evidence: aim at a silhouette and shoot it against the band.
-  await page.evaluate(() => {
+  const aimedAt = await page.evaluate(() => {
     const it = Object.values(window.__placePanoramaWildlifeInfo ?? {}).filter((w) => w.visible)[0]
-    if (!it) return
+    if (!it) return null
     const p = window.__placePlayer
     const r = (window.__placeLayout?.radius ?? 40) * 0.9
     const d = Math.hypot(it.x, it.z) || 1
@@ -664,10 +924,15 @@ if (mosque) {
     p.z = (it.z / d) * r
     p.pitch = 0
     p.yaw = Math.atan2(-(it.x - p.x), -(it.z - p.z))
+    return { x: it.x, z: it.z, y: it.y }
   })
   await page.waitForTimeout(800)
-  await page.screenshot({ path: `${OUT}136-cairo-silhouette-footing.png` })
-  console.log('shot 136-cairo-silhouette-footing.png')
+  // The silhouette itself is the subject — it stands far past the walkable disc,
+  // so its own reported height is what has to be projected, not the ground.
+  await frame(
+    '136-cairo-silhouette-footing',
+    aimedAt ? { local: aimedAt, label: 'the panorama silhouette on its ground line' } : { place: 'cairo', label: 'the Cairo panorama (no silhouette to aim at)' },
+  )
   await page.evaluate(() => {
     const p = window.__placePlayer
     p.x = 0
@@ -699,8 +964,7 @@ for (const [placeId, shot] of [
     paths: window.__placeLayout.paths.length,
     dwellings: window.__placeLayout.dwellings.length,
   }))
-  await page.screenshot({ path: `${OUT}${shot}` })
-  console.log(`shot ${shot}`)
+  await frame(shot.replace(/\.png$/, ''), { element: '.map-place-plan', label: `the ${placeId} town plan` })
   check(`${placeId}: the town plan draws the plan fabric`, fabric.plan && fabric.dwellings >= 6, JSON.stringify(fabric))
   await page.evaluate(() => window.__ui.getState().toggleMap())
   await page.waitForTimeout(200)
@@ -724,8 +988,9 @@ for (const [placeId, shot] of [
   await page.waitForTimeout(2500) // travel scene settles, landmark chunk streams in
   const giza = await page.evaluate(() => window.__culturalLandmarks)
   check('the Giza field (with the Sphinx) is mounted at travel scale', !!giza?.ids?.includes('giza'), JSON.stringify(giza))
-  await page.screenshot({ path: `${OUT}103-giza-sphinx-travel.png` })
-  console.log('shot 103-giza-sphinx-travel.png')
+  // Giza's own position (the marker jumped to in the block below), not the
+  // standpoint: the frame claims the field, so the field must be in the picture.
+  await frame('103-giza-sphinx-travel', { world: { lat: 29.98, lon: 30.59 }, label: 'the Giza field with the Sphinx' })
   await page.evaluate(() => window.__ui.getState().setTravelZoom(0.5))
 }
 
@@ -742,7 +1007,7 @@ for (const [placeId, shot] of [
   await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 45000 })
   // Giza's river-cleared position (src/world/geo.ts). Jumping onto the marker
   // arms the enter hint; a Space press then confirms entry (design.md §2.3).
-  await page.evaluate(() => window.__game.getState().debugJumpTo(29.7726, 30.7554))
+  await page.evaluate(() => window.__game.getState().debugJumpTo(29.98, 30.59))
   await page.waitForFunction(() => window.__ui.getState().enterPlaceId === 'giza', null, { timeout: 15000 })
   const gizaPrompt = await page.evaluate(() => window.__ui.getState().prompt ?? '')
   check('the enter hint arms and names Giza (discovered, localized)', /Giza|Gizeh/.test(gizaPrompt), gizaPrompt)
@@ -752,7 +1017,7 @@ for (const [placeId, shot] of [
   // the horizon check below vacuous.
   await page.waitForFunction(() => window.__placePanorama?.placeId === 'giza', null, { timeout: 60000 }).catch(() => {})
   // Re-set the live position right before the press (Space re-derives from it).
-  await page.evaluate(() => window.__game.getState().debugJumpTo(29.7726, 30.7554))
+  await page.evaluate(() => window.__game.getState().debugJumpTo(29.98, 30.59))
   await page.keyboard.press('Space')
   await page.waitForFunction(
     () => window.__game.getState().placeId === 'giza' && !!window.__placeLayout && !!window.__placeMonuments,
@@ -778,18 +1043,17 @@ for (const [placeId, shot] of [
     site.colliders >= 4 && site.interactives === 0,
     JSON.stringify({ colliders: site.colliders, interactives: site.interactives }),
   )
-  // Stand back near the southern spawn, look north over the cluster, and shoot.
+  // Stand at the arrival standpoint, look north over the cluster, and shoot.
+  // The APPROACH distance, not the radius (point 390 widened the disc for the
+  // desert; the view of the pyramid row must not widen with it).
   await page.evaluate(() => {
     const p = window.__placePlayer
-    const r = window.__placeLayout?.radius ?? 60
     p.x = 0
-    p.z = r - 12
+    p.z = window.__placeLayout?.spawnZ ?? 50
     p.yaw = 0 // yaw 0 faces −Z (north), toward the pyramids
   })
   await page.waitForTimeout(1000)
-  const siteBuf = await page.screenshot()
-  await sharp(siteBuf).toFile(`${OUT}139-giza-walkable-site.png`)
-  console.log('shot 139-giza-walkable-site.png')
+  const siteBuf = await frame('139-giza-walkable-site', { place: 'giza', label: 'the walkable Giza plateau' })
 
   // Point 273: the plateau must read as warm DESERT SAND, not a pale, cool,
   // wavy parchment. Sample the near foreground (the bottom-centre strip, always
@@ -906,6 +1170,73 @@ for (const [placeId, shot] of [
       bandGaps === null ? 'no capture to read' : `${bandGaps.splitColumns}/${bandGaps.width} columns split, worst gap ${bandGaps.worstGapRows} rows`,
     )
 
+    // Point 381: the seam between the walkable ground and the §2.5 panorama
+    // must be CLOSED. The reported picture had the plateau end in a hard
+    // straight edge and give way to the captured band's low rows and the sky
+    // behind them — because the geometry backdrop sank up to 6 units below the
+    // ground plane just past the disc rim and never rose back into the eye's
+    // grazing line inside its own reach.
+    //
+    // Read the rendered scene, not the formula: from each standpoint sweep the
+    // elevation upward through the horizon and record which surface the frame
+    // draws. A closed horizon reads ground-disc → landscape-backdrop → band/sky.
+    // A torn one steps straight from the disc to the band or to nothing, which
+    // is what this asserts against. Standpoints include the rim, where the
+    // grazing line is shallowest and the tear was worst.
+    {
+      const siteR = await page.evaluate(() => window.__placeLayout?.radius ?? 60)
+      const seamBad = []
+      let seamProbed = 0
+      for (const stand of [
+        [0, 0],
+        [0, siteR * 0.8],
+        [siteR * 0.8, 0],
+      ]) {
+        await page.evaluate(([x, z]) => {
+          const p = window.__placePlayer
+          p.x = x
+          p.z = z
+          p.pitch = 0
+        }, stand)
+        // Let the camera follow the teleport: the ray probe casts from IT.
+        await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))))
+        const res = await page.evaluate(() => {
+          const cam = window.__placeCamera
+          const bad = []
+          let probed = 0
+          for (let ai = 0; ai < 24; ai++) {
+            const yaw = (ai / 24) * Math.PI * 2
+            const seq = []
+            for (let i = 0; i <= 60; i++) {
+              const t = ((-6 + i * 0.1) * Math.PI) / 180
+              const dx = -Math.sin(yaw) * Math.cos(t)
+              const dz = -Math.cos(yaw) * Math.cos(t)
+              const dy = Math.sin(t)
+              const L = 3500
+              const h = window.__placeRayHit(cam.position.x + dx * L, cam.position.y + dy * L, cam.position.z + dz * L)
+              const name = h.hitDistance == null ? 'nothing' : h.hitName
+              if (seq[seq.length - 1] !== name) seq.push(name)
+            }
+            probed++
+            const disc = seq.indexOf('ground-disc')
+            if (disc < 0) continue // a building or monument fills this bearing
+            const next = seq[disc + 1]
+            if (next === 'panorama-band' || next === 'nothing' || next === undefined) {
+              bad.push({ yawDeg: Math.round((yaw * 180) / Math.PI), seq })
+            }
+          }
+          return { probed, bad }
+        })
+        seamProbed += res.probed
+        for (const b of res.bad) seamBad.push({ stand, ...b })
+      }
+      check(
+        'the walkable ground meets the panorama with no torn horizon (point 381)',
+        seamProbed > 0 && seamBad.length === 0,
+        `${seamProbed} bearings probed, ${seamBad.length} torn${seamBad.length ? ' — ' + JSON.stringify(seamBad.slice(0, 3)) : ''}`,
+      )
+    }
+
     // Human-viewable evidence from two standpoints on the site.
     const radius = await page.evaluate(() => window.__placeLayout?.radius ?? 60)
     const posts = [
@@ -926,8 +1257,90 @@ for (const [placeId, shot] of [
       )
       await page.waitForTimeout(600)
       shot++
-      await page.screenshot({ path: `${OUT}141-giza-horizon-${shot}.png` })
-      console.log(`shot 141-giza-horizon-${shot}.png`)
+      await frame(`141-giza-horizon-${shot}`, { place: 'giza', label: 'the Giza horizon from the site rim' })
+    }
+
+    // Point 390: the walkable sand must reach to where the PICTURE stops
+    // offering ground. The desert around the plateau runs unbroken to the
+    // horizon, so the old 60 m disc ended the world ~18 m past the outermost
+    // mass — the player met an invisible wall (or was thrown back to the
+    // bird's-eye view) while standing on the same sand that kept going.
+    //
+    // The exact radius is pinned in the Vitest layer (it is DERIVED from the
+    // §2.5 band); here only the live shape is asserted, plus the picture from
+    // the two standpoints the point asks for.
+    {
+      // Settle on the app's OWN clock (rendered frames), never a wall-clock
+      // sleep: the camera follows the teleport on the next frame and the
+      // temporal resolve needs a few more.
+      const settleFrames = (n) =>
+        page.evaluate(
+          (k) =>
+            new Promise((res) => {
+              let i = 0
+              const tick = () => (++i >= k ? res(true) : requestAnimationFrame(tick))
+              requestAnimationFrame(tick)
+            }),
+          n,
+        )
+      const geo = await page.evaluate(() => ({
+        radius: window.__placeLayout?.radius ?? 0,
+        spawnZ: window.__placeLayout?.spawnZ ?? 0,
+      }))
+      check(
+        'the Giza disc carries the open-plain radius and its own arrival distance (point 390)',
+        geo.radius > 90 && geo.spawnZ > 0 && geo.spawnZ < geo.radius - 20,
+        JSON.stringify(geo),
+      )
+      // At the walkable LIMIT the frame must still draw ground running outward:
+      // disc first, then the geometry backdrop — never the band or nothing.
+      // This is the standpoint the old disc turned into a wall in open sand.
+      await page.evaluate((r) => {
+        const p = window.__placePlayer
+        p.x = 0
+        p.z = r - 2
+        p.yaw = Math.PI // yaw π faces +Z (south), straight out of the site
+        p.pitch = 0
+      }, geo.radius)
+      await settleFrames(4)
+      const edgeGround = await page.evaluate(() => {
+        const cam = window.__placeCamera
+        const seq = []
+        for (let i = 0; i <= 60; i++) {
+          const t = ((-6 + i * 0.1) * Math.PI) / 180
+          const L = 3500
+          const h = window.__placeRayHit(
+            cam.position.x,
+            cam.position.y + Math.sin(t) * L,
+            cam.position.z + Math.cos(t) * L,
+          )
+          const name = h.hitDistance == null ? 'nothing' : h.hitName
+          if (seq[seq.length - 1] !== name) seq.push(name)
+        }
+        return seq
+      })
+      const discAt = edgeGround.indexOf('ground-disc')
+      check(
+        'from the walkable edge the ground runs on to the backdrop (point 390)',
+        discAt >= 0 && edgeGround[discAt + 1] === 'landscape-backdrop',
+        JSON.stringify(edgeGround),
+      )
+      await settleFrames(30)
+      await frame('390-giza-sand-edge', { place: 'giza', label: 'the open sand seen from the walkable edge' })
+      // And from the monument row itself, looking out over the sand the player
+      // may now cross. NOT from (0, 0): Khafre stands there (gizaSite.ts), so a
+      // camera at the site's geometric centre sits INSIDE the pyramid and the
+      // frame came out as a dark slit — a picture that did not show what its
+      // name claimed. The standpoint is the open sand just south of the row.
+      await page.evaluate(() => {
+        const p = window.__placePlayer
+        p.x = 0
+        p.z = 30
+        p.yaw = Math.PI
+        p.pitch = 0
+      })
+      await settleFrames(30)
+      await frame('390-giza-sand-open', { place: 'giza', label: 'the open sand seen from beside the monument row' })
     }
   }
   await page.evaluate(() => window.__game.getState().leavePlace())
@@ -964,15 +1377,13 @@ for (const [placeId, shot] of [
   // month, against the fifteen that never dress. The pure mapping is covered in
   // src/systems/dress.test.ts; this is the live half.
   const somaliKarif = await dressAt('somali-village', 8) // August — the karif on the Haud
-  await page.screenshot({ path: `${OUT}113-somali-karif-tobe.png` })
-  console.log('shot 113-somali-karif-tobe.png')
+  await frame('113-somali-karif-tobe', { place: 'somali-village', label: 'the Somali karif dress' })
   const somaliJilal = await dressAt('somali-village', 2) // February — jilal, dry and HOT
   const hausaHarmattan = await dressAt('hausa-village', 1) // January — the harmattan
   const hausaWet = await dressAt('hausa-village', 8) // August — the rains
 
   const zuluWinter = await dressAt('zulu-village', 7) // July — austral winter
-  await page.screenshot({ path: `${OUT}112-zulu-winter-cloaks.png` })
-  console.log('shot 112-zulu-winter-cloaks.png')
+  await frame('112-zulu-winter-cloaks', { place: 'zulu-village', label: 'the Zulu winter cloaks' })
   const zuluSummer = await dressAt('zulu-village', 1) // January — austral summer
   const maasaiWinter = await dressAt('maasai-village', 7) // the equator has no winter
   const sanWinter = await dressAt('san-village', 7) // Passarge's -5C Kalahari mornings
@@ -1088,8 +1499,7 @@ for (const [placeId, shot] of [
     return { sheltered: s.fireSheltered, rain: s.rain, rainFactor: s.fireRainFactor }
   }
   const bembaFire = await fireInRain('bemba-village') // a cook-shelter people
-  await page.screenshot({ path: `${OUT}135-fire-cook-shelter-rain.png` })
-  console.log('shot 135-fire-cook-shelter-rain.png')
+  await frame('135-fire-cook-shelter-rain', { place: 'bemba-village', label: 'the cook shelter over the fire' })
   const maasaiFire = await fireInRain('maasai-village') // a dome-dweller, no canopy
   await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(null))
   check(
@@ -1187,8 +1597,7 @@ for (const [placeId, shot] of [
   await page.evaluate(() => window.__ui.getState().setFireShadowsEnabled(true))
   await page.waitForTimeout(1500) // cube map + TRAA settle
   const contrastOn = await fireContrasts()
-  await page.screenshot({ path: `${OUT}138-fire-shadows-on.png` })
-  console.log('shot 138-fire-shadows-on.png')
+  await frame('138-fire-shadows-on', { local: { x: -3.5, z: 2.5, y: 0.5 }, label: 'the fire pit and its stone ring' })
   await page.evaluate(() => {
     window.__ui.getState().setFireShadowsEnabled(false)
     window.__ui.getState().setSeasonWetnessOverride(null)

@@ -7,6 +7,7 @@
 // screenshots (54-58) that are the §7.2 acceptance evidence, plus the
 // console-error gate. Dev server only (dev hooks).
 import { launchVerifyBrowser, assertBackend } from './_browser.mjs'
+import { frameShutter } from './frameSubject.mjs'
 import { fileURLToPath } from 'node:url'
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:5173/'
@@ -14,6 +15,10 @@ const OUT = fileURLToPath(new URL('../../verification/', import.meta.url))
 
 const browser = await launchVerifyBrowser()
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
+// Every frame here documents a piece of LOCALIZED UI, so the shutter (point
+// 375) proves that piece is actually on screen before the file is written — a
+// dialog that never opened would otherwise be filed as evidence that it did.
+const shot = frameShutter(page, OUT)
 const errors = []
 page.on('console', (m) => {
   if (m.type() === 'error') errors.push(m.text())
@@ -29,14 +34,12 @@ await assertBackend(page) // point 204: fail loud if the requested backend silen
 await page.waitForTimeout(5000)
 
 // --- English is the default: capture the status bar + journal ----------------
-await page.screenshot({ path: `${OUT}54-i18n-english-default.png` })
-console.log('shot 54-i18n-english-default.png')
+await shot('54-i18n-english-default', { element: '.status-bar', label: 'the English status bar' })
 
 // --- Switch to German at runtime ---------------------------------------------
 await page.evaluate(() => window.__setLang('de'))
 await page.waitForTimeout(800)
-await page.screenshot({ path: `${OUT}55-i18n-german-journal.png` })
-console.log('shot 55-i18n-german-journal.png')
+await shot('55-i18n-german-journal', { element: '.journal', label: 'the German journal' })
 
 // --- German trade dialog -------------------------------------------------------
 await page.evaluate(() => window.__game.getState().setJournalOpen(false))
@@ -53,24 +56,21 @@ await page.waitForFunction(() => !!document.querySelector('.prompt'), null, { ti
 await page.keyboard.press('Space')
 await page.waitForFunction(() => !!document.querySelector('.dialog'), null, { timeout: 8000 })
 await page.waitForTimeout(300)
-await page.screenshot({ path: `${OUT}56-i18n-german-trade.png` })
-console.log('shot 56-i18n-german-trade.png')
+await shot('56-i18n-german-trade', { element: '.dialog', label: 'the German trade dialog' })
 await page.keyboard.press('Escape')
 await page.waitForTimeout(300)
 
 // --- German map overlay --------------------------------------------------------
 await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyM' })))
 await page.waitForTimeout(800)
-await page.screenshot({ path: `${OUT}57-i18n-german-map.png` })
-console.log('shot 57-i18n-german-map.png')
+await shot('57-i18n-german-map', { element: '.map-overlay', label: 'the German map overlay' })
 await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyM' })))
 await page.waitForTimeout(300)
 
 // --- Debug menu language selector + switch back to English --------------------
 await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'F1' })))
 await page.waitForTimeout(600)
-await page.screenshot({ path: `${OUT}58-i18n-debug-language.png` })
-console.log('shot 58-i18n-debug-language.png')
+await shot('58-i18n-debug-language', { element: '.debug-menu', label: 'the debug menu language selector' })
 // Click the "English" button to switch back (drives the live UI control).
 await page.evaluate(() => {
   const btn = [...document.querySelectorAll('.debug-menu button')].find((b) => b.textContent === 'English')

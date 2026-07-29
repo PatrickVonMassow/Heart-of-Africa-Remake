@@ -6,6 +6,7 @@
 // surface and never penetrates. Reachability of paths/accesses is verified
 // geometrically. Dev server only (dev hooks).
 import { launchVerifyBrowser, assertBackend } from './_browser.mjs'
+import { frameShutter } from './frameSubject.mjs'
 import { fileURLToPath } from 'node:url'
 
 // A fixed dev seed makes the procedural settlement layout deterministic so the
@@ -253,18 +254,21 @@ await accessPointsFree('Port')
 await dwellingDoorsReachable('Port')
 
 // Ram screenshot: teleport in front of the biggest wall and nudge into it.
-await page.evaluate(() => {
+const shot = frameShutter(page, OUT)
+const rammedWall = await page.evaluate(() => {
   const c = [...window.__placeColliders].sort((a, b) => window.__colliderSize(b) - window.__colliderSize(a))[0]
   const p = window.__placePlayer
   const len = Math.hypot(c.x, c.z) || 1
   p.x = c.x - (c.x / len) * (window.__colliderSize(c) + 2)
   p.z = c.z - (c.z / len) * (window.__colliderSize(c) + 2)
   p.yaw = Math.atan2(-(c.x - p.x), -(c.z - p.z))
+  return { x: c.x, z: c.z }
 })
 await pushFrames(16)
 check('Port: no penetration at the wall', (await clearance()) >= -0.03, `clearance ${(await clearance()).toFixed(3)}`)
-await page.screenshot({ path: `${OUT}52-collision-port-wall.png` })
-console.log('shot 52-collision-port-wall.png')
+// Point 375: the wall the player is pressed against must be the thing in the
+// picture — projected through the place camera, not assumed from the teleport.
+await shot('52-collision-port-wall', { local: { x: rammedWall.x, z: rammedWall.z }, label: 'the rammed wall' })
 
 // Corner clipping (§7.1.16): drop the player exactly onto each corner of the
 // biggest box building; the resolver must eject it with positive clearance —
@@ -329,8 +333,7 @@ check('Village: chief hut opens with Space at its door', audienceOpened)
 await page.evaluate(() => window.__ui?.getState?.().setDialog(null))
 await page.waitForTimeout(200)
 await dwellingDoorsReachable('Village')
-await page.screenshot({ path: `${OUT}53-collision-village-chief-hut.png` })
-console.log('shot 53-collision-village-chief-hut.png')
+await shot('53-collision-village-chief-hut', { place: 'maasai-village', label: "the chief's hut and its door" })
 await page.keyboard.press('Escape')
 await page.evaluate(() => { const p = window.__placePlayer; p.x = 0; p.z = 0 })
 await page.waitForFunction(() => !document.querySelector('.dialog'), null, { timeout: 8000 }).catch(() => {})

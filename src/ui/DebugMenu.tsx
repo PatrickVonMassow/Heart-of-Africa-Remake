@@ -235,6 +235,8 @@ export function DebugMenu() {
         onChange={(v) => set('placeStrafeFactor', Math.max(0, v))} />
       <NumberField label={t.debug.walkerUnstuck} value={balance.walkerUnstuckSeconds} step={1}
         onChange={(v) => set('walkerUnstuckSeconds', Math.max(0.5, v))} />
+      <NumberField label={t.debug.startupFreezeBudget} value={balance.startup.pictureFreezeBudgetMs} step={250}
+        onChange={(v) => { balance.startup.pictureFreezeBudgetMs = Math.max(100, v); bump() }} />
       <NumberField label={t.debug.mouseSensitivity} value={balance.mouseSensitivity} step={0.0002}
         onChange={(v) => set('mouseSensitivity', Math.max(0, v))} />
       <NumberField label={t.debug.ambienceVolume} value={balance.ambienceVolume} step={0.05}
@@ -312,12 +314,20 @@ export function DebugMenu() {
         onChange={(v) => { balance.family.adoptionRadius = Math.max(0, v); bump() }} />
       <NumberField label={t.debug.calfEscapeSeconds} value={balance.family.escapeSeconds} step={0.5}
         onChange={(v) => { balance.family.escapeSeconds = Math.max(0, v); bump() }} />
+      <NumberField label={t.debug.calfReunionSeconds} value={balance.family.reunionSeconds} step={1}
+        onChange={(v) => { balance.family.reunionSeconds = Math.max(0, v); bump() }} />
+      <NumberField label={t.debug.calfMourningSeconds} value={balance.family.mourningSeconds} step={1}
+        onChange={(v) => { balance.family.mourningSeconds = Math.max(0, v); bump() }} />
       <NumberField label={t.debug.crocStrikeRadius} value={balance.crocodile.strikeRadius} step={0.5}
         onChange={(v) => { balance.crocodile.strikeRadius = Math.max(0.5, v); bump() }} />
       <NumberField label={t.debug.crocAmbushBankBand} value={balance.crocodile.ambushBankBand} step={0.5}
         onChange={(v) => { balance.crocodile.ambushBankBand = Math.max(0, v); bump() }} />
       <NumberField label={t.debug.crocMouthOffset} value={balance.crocodile.mouthOffsetLocal} step={0.05}
         onChange={(v) => { balance.crocodile.mouthOffsetLocal = Math.max(0, v); bump() }} />
+      <NumberField label={t.debug.crocDragSpeed} value={balance.crocodile.dragSpeed} step={0.5}
+        onChange={(v) => { balance.crocodile.dragSpeed = Math.max(0.5, v); bump() }} />
+      <NumberField label={t.debug.crocDragSeconds} value={balance.crocodile.dragSeconds} step={0.5}
+        onChange={(v) => { balance.crocodile.dragSeconds = Math.max(0.5, v); bump() }} />
       <NumberField label={t.debug.crocGripSeconds} value={balance.crocodile.gripSeconds} step={0.5}
         onChange={(v) => { balance.crocodile.gripSeconds = Math.max(0.5, v); bump() }} />
       <NumberField label={t.debug.crocDriveOffRest} value={balance.crocodile.driveOffRestSeconds} step={1}

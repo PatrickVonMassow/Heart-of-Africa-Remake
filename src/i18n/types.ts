@@ -12,6 +12,18 @@ import type { SketchId } from '../journal/sketches'
 /** Params for journal text templates (values are ids or numbers). */
 export type TextParams = Record<string, string | number>
 
+/** Map-point kinds an undiscovered label can name (point 318). */
+export type UnknownPlaceKind =
+  | 'port'
+  | 'monument'
+  | 'village'
+  | 'mountain'
+  | 'waterfall'
+  | 'lake'
+  | 'cultural'
+  | 'natural'
+  | 'site'
+
 export interface Strings {
   /** BCP-47-ish tag, e.g. "de", "en". */
   lang: string
@@ -34,6 +46,14 @@ export interface Strings {
   places: Record<string, string>
   peoples: Record<string, string>
   landmarks: Record<string, string>
+  /**
+   * Placeholders for a map point that is still UNDISCOVERED (design.md §17.2).
+   * Kind-aware instead of a bare "?" (point 318): the traveller can tell a
+   * village from a mountain without being told which one it is. `site` is the
+   * deliberately NEUTRAL term for a point whose kind would itself be a spoiler
+   * — the elephant graveyard names no elephants before it is found.
+   */
+  unknownPlaces: Record<UnknownPlaceKind, string>
   equipment: Record<EquipmentId, string>
   gifts: Record<Material, string>
   /** Treasure finds/valuables (design.md §8). */
@@ -136,16 +156,40 @@ export interface Strings {
     back: string
   }
 
-  /** F6 state-dump popup (design.md §21.1): the full game state for bug reports. */
+  /** F6 bug report (design.md §21.1): picture, state and description in one zip. */
   stateDump: {
     title: string
     /** Save the JSON as a .json file. */
     download: string
+    /** Save picture + state + description as one .zip (the primary action). */
+    downloadReport: string
     /** Copy the JSON to the clipboard. */
     copy: string
     /** Toast confirming the JSON went to the clipboard. */
     copied: string
     close: string
+    /** Label above the free-text field for what went wrong. */
+    descriptionLabel: string
+    /** Placeholder inside that field. */
+    descriptionPlaceholder: string
+    /** One line under the field naming what the archive will contain. */
+    contents: string
+    /** Toast after the archive was handed to the browser. */
+    saved: string
+    /** Section headings and notes of the description file inside the archive. */
+    report: {
+      heading: string
+      description: string
+      noDescription: string
+      environment: string
+      reproduction: string
+      files: string
+      pictureNote: string
+      pictureMissing: string
+      stateNote: string
+      overlayNote: string
+      duplicateNote: string
+    }
   }
 
   /** In-game render benchmark (design.md §21.1, F8). */
@@ -329,6 +373,7 @@ export interface Strings {
     walkSpeed: string
     strafeFactor: string
     walkerUnstuck: string
+    startupFreezeBudget: string
     mouseSensitivity: string
     ambienceVolume: string
     footstepVolume: string
@@ -363,7 +408,11 @@ export interface Strings {
     juvenileDrinkCrocBias: string
     calfAdoptionRadius: string
     calfEscapeSeconds: string
+    calfReunionSeconds: string
+    calfMourningSeconds: string
     benchmarkStart: string
+    crocDragSpeed: string
+    crocDragSeconds: string
     crocGripSeconds: string
     crocDriveOffRest: string
     huntLeaveOvertime: string

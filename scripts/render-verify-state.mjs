@@ -12,13 +12,11 @@
 // suite, exit code and the screenshots the run actually wrote — never a parsed
 // self-report. Writes are atomic (tmp + rename, via dashboard-state.mjs)
 // because a suite's exit handler can race the Stop-hook in the same moment.
-import { fileURLToPath } from 'node:url'
 import { readJson, writeJsonAtomic, REPO_ROOT } from './dashboard-state.mjs'
+import { repoPath } from './repo-paths.mjs'
 
 export { REPO_ROOT }
-export const RENDER_STATE_PATH = fileURLToPath(
-  new URL('../.claude/render-verify-state.json', import.meta.url),
-)
+export const RENDER_STATE_PATH = repoPath('.claude/render-verify-state.json')
 
 /** Keep only the most recent run records (a bounded evidence window). */
 export const MAX_RUNS = 40

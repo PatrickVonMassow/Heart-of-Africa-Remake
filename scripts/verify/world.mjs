@@ -4,8 +4,9 @@
 // needs a real browser: console-error-free rendering and screenshots of the
 // bird's-eye view at characteristic locations. Dev server only.
 import { launchVerifyBrowser, assertBackend } from './_browser.mjs'
+import { frameShutter } from './frameSubject.mjs'
 import { fileURLToPath } from 'node:url'
-import { mkdirSync } from 'node:fs'
+import { mkdirSync, existsSync, rmSync } from 'node:fs'
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:5173/'
 const OUT = fileURLToPath(new URL('../../verification/', import.meta.url))
@@ -45,20 +46,51 @@ await page.evaluate(() => {
 })
 await page.waitForTimeout(2000)
 
+// Each frame NAMES a place, so the shutter (point 375) proves that place is in
+// the rendered picture before the file is written — projected through the live
+// camera, never assumed from the jump having been requested. This suite is the
+// case that motivated the rule: two runs on identical code photographed
+// different places under `12-worldmodel-lake-victoria`, and both exited 0.
+const shot = frameShutter(page, OUT)
+
+// FRAME_SUBJECT_SELFTEST=1 proves the shutter still bites, the way
+// VOICE_STALL_SELFTEST / STARTUP_STALL_SELFTEST do for their gates: stand in
+// Cairo, claim Lake Victoria, and require the capture to be REFUSED and no file
+// to be written. Without this the mechanism could rot into an always-green
+// check and nobody would learn of it from a passing run.
+if (process.env.FRAME_SUBJECT_SELFTEST) {
+  const probeShot = frameShutter(page, OUT, { timeout: 3000 })
+  const misaimed = `${OUT}999-frame-subject-selftest.png`
+  rmSync(misaimed, { force: true })
+  await jump(30.0, 31.3) // the traveller stands at the Nile delta …
+  let refusal = null
+  try {
+    // … while the frame claims a lake 3600 km away.
+    await probeShot('999-frame-subject-selftest', { world: { lat: -0.8, lon: 33.0 }, label: 'Lake Victoria' })
+  } catch (e) {
+    refusal = String(e.message ?? e)
+  }
+  const written = existsSync(misaimed)
+  const ok = !!refusal && !written
+  console.log(ok ? 'PASS  the shutter refuses a mis-aimed frame' : 'FAIL  the shutter refuses a mis-aimed frame')
+  console.log(`      refusal: ${refusal ?? 'NONE — the frame was accepted'}; file written: ${written}`)
+  await browser.close()
+  process.exit(ok ? 0 : 1)
+}
+
 const shots = [
-  [30.0, 31.3, '10-worldmodel-nile-delta-cairo'],
-  [15.6, 32.6, '11-worldmodel-khartoum-confluence'],
-  [-0.8, 33.0, '12-worldmodel-lake-victoria'],
-  [-3.05, 37.3, '13-worldmodel-kilimanjaro'],
-  [-5.9, 12.8, '14-worldmodel-congo-mouth-boma'],
-  [-17.9, 25.9, '15-worldmodel-victoria-falls'],
-  [-33.9, 18.6, '16-worldmodel-cape-town'],
-  [13.2, 14.2, '17-worldmodel-lake-chad'],
+  [30.0, 31.3, '10-worldmodel-nile-delta-cairo', 'the Nile delta at Cairo'],
+  [15.6, 32.6, '11-worldmodel-khartoum-confluence', 'the Nile confluence at Khartoum'],
+  [-0.8, 33.0, '12-worldmodel-lake-victoria', 'Lake Victoria'],
+  [-3.05, 37.3, '13-worldmodel-kilimanjaro', 'Kilimanjaro'],
+  [-5.9, 12.8, '14-worldmodel-congo-mouth-boma', 'the Congo mouth at Boma'],
+  [-17.9, 25.9, '15-worldmodel-victoria-falls', 'Victoria Falls'],
+  [-33.9, 18.6, '16-worldmodel-cape-town', 'Cape Town'],
+  [13.2, 14.2, '17-worldmodel-lake-chad', 'Lake Chad'],
 ]
-for (const [lat, lon, name] of shots) {
+for (const [lat, lon, name, label] of shots) {
   await jump(lat, lon)
-  await page.screenshot({ path: `${OUT}${name}.png` })
-  console.log('shot', name)
+  await shot(name, { world: { lat, lon }, label })
 }
 
 console.log('console errors:', errors.length ? errors : 'none')

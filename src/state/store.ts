@@ -16,6 +16,7 @@ import { REGION_PREDATORS } from '../scenes/travel/wildlifeBehavior'
 import { movementPenalty, slideAlongBlocked } from '../systems/movement'
 import { currentDriftDegPerSecond, waterTravelCost } from '../systems/current'
 import {
+  KNOWN_FROM_START_LANDMARKS,
   LANDMARK_POINTS, TREASURE_IDS, ferryCost, ferryDays, generateTreasureSites, treasureBid, treasureBuyPrice,
   type TreasureId, type TreasureSite,
 } from '../systems/economy'
@@ -434,7 +435,10 @@ function startState(seed: number) {
     graveyardIvoryLeft: balance.economy.graveyardIvory,
     bazaarQuotes: {},
     pendingBounties: [] as Array<{ kind: 'village' | 'landmark'; id: string }>,
-    landmarksSeen: [] as string[],
+    // The pyramids of Giza were known to every ~1890 explorer (design.md §17.2,
+    // point 338): the known-from-start landmarks start SEEN, so they earn no
+    // discovery bounty and write no first-sighting entry.
+    landmarksSeen: [...KNOWN_FROM_START_LANDMARKS] as string[],
     valuableShown: {} as Record<string, boolean>,
     orientationGiven: {} as Record<string, boolean>,
     journal: [
@@ -1966,7 +1970,7 @@ export const useGame = create<GameState>()((set, get) => ({
         explored: snap.explored ?? {},
         // The ten ports are known from the start (point 288): a legacy save from
         // before this rule migrates by marking them discovered, so their labels
-        // never regress to "?" on load.
+        // never regress to a kind placeholder on load.
         visitedPlaces: Array.from(new Set([...KNOWN_FROM_START_PLACES, ...(snap.visitedPlaces ?? [])])),
         villagePhases: snap.villagePhases ?? {}, // legacy saves lack it (point 170)
         health: snap.health ?? balance.health.max,
@@ -1988,7 +1992,10 @@ export const useGame = create<GameState>()((set, get) => ({
         treasureSites: snap.treasureSites ?? generateTreasureSites(snap.seed ?? 0),
         graveyardIvoryLeft: snap.graveyardIvoryLeft ?? balance.economy.graveyardIvory,
         pendingBounties: snap.pendingBounties ?? [],
-        landmarksSeen: snap.landmarksSeen ?? [],
+        // The Giza plateau is known from the start (point 338) — a legacy save
+        // from before that rule migrates by marking it seen, exactly as the
+        // known-from-start PLACES migrate above.
+        landmarksSeen: Array.from(new Set([...KNOWN_FROM_START_LANDMARKS, ...(snap.landmarksSeen ?? [])])),
         valuableShown: snap.valuableShown ?? {},
         orientationGiven: snap.orientationGiven ?? {},
         honoredFriend: snap.honoredFriend ?? {},

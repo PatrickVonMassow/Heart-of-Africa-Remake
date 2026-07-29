@@ -1,26 +1,38 @@
 {
-  "commit": "e10f3dcd68e9832017582805514b53c00926878e",
+  "commit": "41d8cafd39bab4766f0989b679915ada459ccaaf",
   "steps": {
+    "large-regression": {
+      "evidence": "NICHT DURCHGEFUEHRT — vom Nutzer am 29.07.2026 fuer diesen poc-Tag ausdruecklich erlassen ('ausnahmsweise mal ohne die Closing-Schritte'). Belegt ist nur das schnelle Tor auf 41d8caf: 154 Testdateien / 4360 Tests, Build und Linter sauber; die drei heute Nacht gemergten Punkte (300/402/404) wurden je einzeln geprueft."
+    },
     "lint-audit": {
-      "evidence": "npm run lint: 0 errors/0 warnings, npm audit: OK (1 known-accepted CVE)"
+      "evidence": "NICHT DURCHGEFUEHRT — vom Nutzer am 29.07.2026 fuer diesen poc-Tag ausdruecklich erlassen ('ausnahmsweise mal ohne die Closing-Schritte'). Belegt ist nur das schnelle Tor auf 41d8caf: 154 Testdateien / 4360 Tests, Build und Linter sauber; die drei heute Nacht gemergten Punkte (300/402/404) wurden je einzeln geprueft."
     },
     "dead-code": {
-      "evidence": "Cleanup-Branch: existsSync removed (commit 62c5018), ~70 knip false-positives verified as intentional exports/module-internal usage"
+      "evidence": "NICHT DURCHGEFUEHRT — vom Nutzer am 29.07.2026 fuer diesen poc-Tag ausdruecklich erlassen ('ausnahmsweise mal ohne die Closing-Schritte'). Belegt ist nur das schnelle Tor auf 41d8caf: 154 Testdateien / 4360 Tests, Build und Linter sauber; die drei heute Nacht gemergten Punkte (300/402/404) wurden je einzeln geprueft."
     },
     "stale-doc": {
-      "evidence": "Cleanup-Branch: F9 (not F7), deadline suspended, save-load suspended, SSR removed all verified in design.md/CLAUDE.md (commit f6d09ad)"
+      "evidence": "NICHT DURCHGEFUEHRT — vom Nutzer am 29.07.2026 fuer diesen poc-Tag ausdruecklich erlassen ('ausnahmsweise mal ohne die Closing-Schritte'). Belegt ist nur das schnelle Tor auf 41d8caf: 154 Testdateien / 4360 Tests, Build und Linter sauber; die drei heute Nacht gemergten Punkte (300/402/404) wurden je einzeln geprueft."
     },
     "stale-comment": {
-      "evidence": "Spot-check: no misleading comments found in src/scripts. Comment discipline high (commit a8ba44024c86f491e audit)"
+      "evidence": "NICHT DURCHGEFUEHRT — vom Nutzer am 29.07.2026 fuer diesen poc-Tag ausdruecklich erlassen ('ausnahmsweise mal ohne die Closing-Schritte'). Belegt ist nur das schnelle Tor auf 41d8caf: 154 Testdateien / 4360 Tests, Build und Linter sauber; die drei heute Nacht gemergten Punkte (300/402/404) wurden je einzeln geprueft."
     },
     "md-audit": {
-      "evidence": "Cleanup-Branch: 4 .md cruft fixes (suite counts 13→16, SSR removal, section numbers preserved, commits f6d09ad + db6814c)"
+      "evidence": "NICHT DURCHGEFUEHRT — vom Nutzer am 29.07.2026 fuer diesen poc-Tag ausdruecklich erlassen ('ausnahmsweise mal ohne die Closing-Schritte'). Belegt ist nur das schnelle Tor auf 41d8caf: 154 Testdateien / 4360 Tests, Build und Linter sauber; die drei heute Nacht gemergten Punkte (300/402/404) wurden je einzeln geprueft."
+    },
+    "impl-sections": {
+      "evidence": "NICHT DURCHGEFUEHRT — vom Nutzer am 29.07.2026 fuer diesen poc-Tag ausdruecklich erlassen ('ausnahmsweise mal ohne die Closing-Schritte'). Belegt ist nur das schnelle Tor auf 41d8caf: 154 Testdateien / 4360 Tests, Build und Linter sauber; die drei heute Nacht gemergten Punkte (300/402/404) wurden je einzeln geprueft."
+    },
+    "graphics-detail-doc": {
+      "evidence": "NICHT DURCHGEFUEHRT — vom Nutzer am 29.07.2026 fuer diesen poc-Tag ausdruecklich erlassen ('ausnahmsweise mal ohne die Closing-Schritte'). Belegt ist nur das schnelle Tor auf 41d8caf: 154 Testdateien / 4360 Tests, Build und Linter sauber; die drei heute Nacht gemergten Punkte (300/402/404) wurden je einzeln geprueft."
     },
     "acceptance-criteria": {
-      "evidence": "Point 306: closing-guard built + wired, 30 Vitest cases all pass, 5 critical gaps fixed (Opus agent), Fable 100%-verification found 12 FN (5 critical fixed, 7 medium/low for future hardening)"
+      "evidence": "NICHT DURCHGEFUEHRT — vom Nutzer am 29.07.2026 fuer diesen poc-Tag ausdruecklich erlassen ('ausnahmsweise mal ohne die Closing-Schritte'). Belegt ist nur das schnelle Tor auf 41d8caf: 154 Testdateien / 4360 Tests, Build und Linter sauber; die drei heute Nacht gemergten Punkte (300/402/404) wurden je einzeln geprueft."
     },
     "open-items": {
-      "evidence": "Fable review: FN-6 to FN-12 (medium/low severity) documented as future hardening; v10.0, gh-release-via-refspec, bash-c, heredoc-indirection, boundary-commit-tagging. Not critical for this release."
+      "evidence": "NICHT DURCHGEFUEHRT — vom Nutzer am 29.07.2026 fuer diesen poc-Tag ausdruecklich erlassen ('ausnahmsweise mal ohne die Closing-Schritte'). Belegt ist nur das schnelle Tor auf 41d8caf: 154 Testdateien / 4360 Tests, Build und Linter sauber; die drei heute Nacht gemergten Punkte (300/402/404) wurden je einzeln geprueft."
+    },
+    "simplifications": {
+      "evidence": "NICHT DURCHGEFUEHRT — vom Nutzer am 29.07.2026 fuer diesen poc-Tag ausdruecklich erlassen ('ausnahmsweise mal ohne die Closing-Schritte'). Belegt ist nur das schnelle Tor auf 41d8caf: 154 Testdateien / 4360 Tests, Build und Linter sauber; die drei heute Nacht gemergten Punkte (300/402/404) wurden je einzeln geprueft."
     }
   }
 }

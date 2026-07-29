@@ -53,42 +53,273 @@ export function createFaunaMaterial(): THREE.MeshStandardMaterial {
 }
 
 /**
- * Walk-cycle gait (design.md §19, points 228/255 — the animal foot-slide fix). A
- * walking animal must swing its legs, and the swing must ride the DISTANCE it
- * covers rather than wall-clock time, so the stride matches the speed and is
- * exactly zero at rest (no glide with still legs). rad of swing-cycle per world
- * unit walked.
+ * Walk-cycle gait (design.md §19, points 228/255/300 — the animal foot-slide
+ * fix). A walking animal must swing its legs, the swing must ride the DISTANCE
+ * it covers rather than wall-clock time (so the stride matches the speed and is
+ * exactly zero at rest), and — point 300 — the foot it stands on must stay
+ * PLANTED on the ground while the body travels over it. A phase that merely
+ * rides distance is not enough: if the cadence does not match the leg's own
+ * reach, the legs cycle faster than the ground passes and the animal skates.
  *
- * Calibrated as strides-per-metre (point 255): a full swing cycle is 2π rad, so
- * the cadence yields GAIT_CADENCE / 2π strides per world unit. At 11.0 that is
- * ~1.75 strides/m — a plausible walking cadence that reads as striding on the
- * FEET. The old 3.4 (0.54 strides/m — under one stride per metre) read as a slow
- * shuffle, the strongest of the point-255 complaints: it also made the SLOW
- * (near-turn) segments of the drift look frozen, so the legs seemed to move only
- * on the straight stretches even though the phase already rode raw distance.
+ * The model is the peg-leg walk of a rigid limb pivoting at the hip:
+ *
+ *   reach A   = legLength · sin(amp)      fore/aft ground reach of one foot
+ *   stance    = half the cycle (the trot's duty factor, diagonal pairs at π)
+ *   stride S  = 2A / duty = 4A            forward distance per full cycle
+ *   cadence   = 2π / S                    rad of phase per world unit walked
+ *
+ * so the body advances exactly as much as the stance foot sweeps backward
+ * through the body frame, and the two cancel: the foot does not move. The
+ * cadence is therefore DERIVED per species from its own leg length (`gaitRig`),
+ * never a shared guess — the old single 11.0 rad/unit over-drove every long
+ * leg (an elephant's stride is ~4.4× a goat's, so it cycled ~4.4× too fast:
+ * the point-300 report).
  */
-export const GAIT_CADENCE = 11.0
+
 /** Amplitude (rad) a leg swings fore/aft about its hip. */
 export const GAIT_SWING = 0.5
+
+/**
+ * Fraction of one cycle a leg spends PLANTED (stance). The rig trots — diagonal
+ * pairs sit π apart — so each leg carries the ground for exactly half the cycle
+ * and the pairs hand over without a gap. The phase profile below is built for
+ * this duty factor; changing it means rebuilding `gaitFootFraction` too.
+ */
+export const GAIT_DUTY = 0.5
+
+/** Fore/aft ground reach of one foot from its hip's plumb line (world units). */
+export function footReach(legLength: number, amp = GAIT_SWING): number {
+  return legLength * Math.sin(amp)
+}
+
+/**
+ * Forward distance covered by one full gait cycle that keeps the stance foot
+ * planted: the foot sweeps 2·reach through the body frame during its stance,
+ * which is `GAIT_DUTY` of the cycle.
+ */
+export function strideLength(legLength: number, amp = GAIT_SWING): number {
+  return (2 * footReach(legLength, amp)) / GAIT_DUTY
+}
+
+/**
+ * rad of gait phase per world unit walked, derived from the leg the animal
+ * actually walks on (point 300). Zero-length legs yield 0 rather than a
+ * division blow-up.
+ */
+export function gaitCadence(legLength: number, amp = GAIT_SWING): number {
+  const s = strideLength(legLength, amp)
+  return s > 0 ? (2 * Math.PI) / s : 0
+}
+
+/** Wrap a phase into (−π, π]. */
+function wrapPhase(phase: number): number {
+  return Math.atan2(Math.sin(phase), Math.cos(phase))
+}
+
+/** True while the leg at this phase carries the ground (stance, foot planted). */
+export function isStance(phase: number): boolean {
+  return Math.abs(wrapPhase(phase)) <= Math.PI / 2
+}
+
+/**
+ * Fore/aft foot offset at a gait phase as a fraction of the foot's reach: +1 at
+ * touchdown (fully forward), −1 at lift-off (fully back), the leg vertical at 0.
+ *
+ * Stance — the half-cycle centred on phase 0 — is LINEAR in the phase, and the
+ * phase is linear in the distance walked, so the foot travels backward through
+ * the body frame at exactly the speed the body travels forward: it stands still
+ * on the ground. (The old pure sine had zero AVERAGE slip at best and skated
+ * through the whole stance; it also never matched the stride to the leg.)
+ *
+ * Swing is a cubic Hermite back from −1 to +1 whose end slopes match the
+ * stance's, so the foot's motion is smooth across touchdown and lift-off with no
+ * velocity snap. It overshoots the reach by ~9 % at each end — the natural
+ * reach-out before touchdown and flick-back at lift-off — which is why the swing
+ * angle is bounded by `GAIT_SWING_MAX`, not by `amp` itself.
+ */
+export function gaitFootFraction(phase: number): number {
+  const p = wrapPhase(phase)
+  const half = Math.PI / 2
+  if (Math.abs(p) <= half) return (-2 * p) / Math.PI // stance: planted, linear
+  const t = (p > half ? p - half : p + 3 * half) / Math.PI // swing: 0 → 1
+  return -8 * t * t * t + 12 * t * t - 2 * t - 1
+}
+
+/** Peak |fraction| the swing return reaches (the Hermite's overshoot), read off
+ *  the profile itself at the stationary point of its derivative
+ *  (−24τ² + 24τ − 2 = 0) rather than restated as a magic number. */
+export const GAIT_FRACTION_MAX = Math.abs(
+  gaitFootFraction(Math.PI / 2 + ((24 - Math.sqrt(24 * 24 - 4 * 24 * 2)) / (2 * 24)) * Math.PI),
+)
+
+/** Widest hip angle (rad) the cycle reaches, overshoot included. */
+export const GAIT_SWING_MAX = Math.asin(Math.min(1, Math.sin(GAIT_SWING) * GAIT_FRACTION_MAX))
 
 /**
  * Leg-swing phase from the distance travelled (point 228): a pure function of
  * DISTANCE, never of time — a stopped animal's legs are still, a faster one
  * strides faster. The caller accumulates the ground distance and reads the
- * phase back each frame.
+ * phase back each frame. The cadence is the species' own (`gaitRig`), so the
+ * stride length matches the leg that walks it (point 300).
  */
-export function gaitPhase(distanceTravelled: number, cadence = GAIT_CADENCE): number {
+export function gaitPhase(distanceTravelled: number, cadence: number): number {
   return distanceTravelled * cadence
 }
 
 /**
- * Fore/aft swing angle (rad) of one leg at a gait phase (point 228). Diagonal
- * legs carry a phaseOffset of π (a trot). At phase 0 — a standing animal —
- * every leg is at neutral (sin 0 = sin π = 0), so a resting animal never
- * twitches its legs.
+ * Hip rotation (rad about the body's local x) of one leg at a gait phase.
+ * Diagonal legs carry a phaseOffset of π (a trot). Positive rotation swings the
+ * foot BACKWARD (the leg hangs down −y, so +x rotation carries it to −z), hence
+ * the sign: a forward foot fraction is a negative hip angle. At phase 0 — a
+ * standing animal — every leg is at neutral (fraction 0 at mid-stance and at
+ * mid-swing), so a resting animal never twitches its legs.
  */
 export function legSwingAngle(phase: number, phaseOffset: number, amp = GAIT_SWING): number {
-  return Math.sin(phase + phaseOffset) * amp
+  const s = Math.sin(amp) * gaitFootFraction(phase + phaseOffset)
+  return -Math.asin(Math.max(-1, Math.min(1, s)))
+}
+
+/**
+ * Fore/aft offset (world units, +forward) of one foot from its hip's plumb line
+ * at a gait phase — the quantity that must stay pinned to the ground through
+ * stance. Derived from the rendered hip angle, so a test of this IS a test of
+ * what the renderer draws.
+ */
+export function footForwardOffset(
+  phase: number,
+  phaseOffset: number,
+  legLength: number,
+  amp = GAIT_SWING,
+): number {
+  return -legLength * Math.sin(legSwingAngle(phase, phaseOffset, amp))
+}
+
+/**
+ * Vertical body offset (≤ 0) that puts the STANCE foot on the ground (point
+ * 300). A rigid leg swung by θ reaches only legLength·cos θ down, so a body held
+ * at the full leg height would hover its planted foot — the "foot floats above
+ * the terrain" half of the report on flat ground. Dropping the body by the
+ * shortfall of whichever diagonal pair is currently in stance plants it, and
+ * gives the walk its natural rise and fall for free (two per cycle, one per
+ * footfall, exactly zero at rest). The SWING foot rides just clear of the ground
+ * throughout and never sinks below it.
+ */
+export function gaitBodyLift(phase: number, legLength: number, amp = GAIT_SWING): number {
+  const stanceOffset = isStance(phase) ? 0 : Math.PI
+  return legLength * (Math.cos(legSwingAngle(phase, stanceOffset, amp)) - 1)
+}
+
+/**
+ * Height (world units, ≥ 0) of one foot above the ground the body stands on, at
+ * a gait phase — 0 exactly while that leg is planted.
+ */
+export function footHeight(phase: number, phaseOffset: number, legLength: number, amp = GAIT_SWING): number {
+  const drop = legLength * Math.cos(legSwingAngle(phase, phaseOffset, amp))
+  return legLength - drop + gaitBodyLift(phase, legLength, amp)
+}
+
+/**
+ * Steepest incline (rad, ~17°) a body lays itself onto. The panorama backdrop
+ * COMPRESSES a landscape into a few dozen world units, so its gradient under a
+ * silhouette's own wheelbase can read as a cliff no animal could stand on;
+ * without a rail, a body would tip nose-down 60° on it. Beyond this the animal
+ * leans as far as it plausibly can and no further — a walkable slope is well
+ * inside it, so the rail never touches the case this is for.
+ */
+export const GAIT_MAX_PITCH = 0.3
+
+/**
+ * Body pitch (rad about the local x axis) that lays all four feet on a sloped
+ * ground (point 300): the front and back ground heights under the animal's own
+ * wheelbase give the incline it stands on. Positive pitch tips the nose DOWN
+ * (rotation about +x carries +z to −y), so walking UPHILL — front ground higher
+ * than back — returns a negative angle. Pair it with a body anchored at the MEAN
+ * of the two heights and both foot pairs meet the slope instead of one hovering
+ * over it (the reported dune silhouette).
+ */
+export function groundPitch(frontY: number, backY: number, wheelbase: number, maxPitch = GAIT_MAX_PITCH): number {
+  if (!(wheelbase > 0)) return 0
+  const p = Math.atan2(backY - frontY, wheelbase)
+  return Math.max(-maxPitch, Math.min(maxPitch, p))
+}
+
+/**
+ * World-space offset from a body's origin (its ground point) to one leg's FOOT,
+ * for a body at the given yaw/pitch/uniform scale (point 300).
+ *
+ * The leg hangs from `hip` and swings about it by `swingAngle`, so in the body's
+ * own frame the foot sits at hip + (0, −L·cos θ, −L·sin θ); the body's YXZ
+ * rotation (yaw, then the ground pitch) and its scale carry that to world. This
+ * is the spot the ground under a foot must be sampled at — the renderer would
+ * otherwise have to compose a matrix per leg just to ask where its foot is.
+ */
+export function footBodyOffset(
+  hip: readonly [number, number, number],
+  swingAngle: number,
+  legLength: number,
+  yaw: number,
+  pitch: number,
+  scale: number,
+): [number, number, number] {
+  const lx = hip[0]
+  const ly = hip[1] - legLength * Math.cos(swingAngle)
+  const lz = hip[2] - legLength * Math.sin(swingAngle)
+  const cp = Math.cos(pitch)
+  const sp = Math.sin(pitch)
+  const py = ly * cp - lz * sp
+  const pz = ly * sp + lz * cp
+  const cy = Math.cos(yaw)
+  const sy = Math.sin(yaw)
+  return [scale * (lx * cy + pz * sy), scale * py, scale * (-lx * sy + pz * cy)]
+}
+
+/** A leg re-aimed and re-reached to put its foot on a given spot. */
+export interface LegSeating {
+  /** Hip angle (rad about the body's local x) to draw the leg at. */
+  angle: number
+  /** Factor on the leg's own length — the telescoping reach to the ground. */
+  stretch: number
+}
+
+/**
+ * Seat one foot on the ground drawn under IT (point 300): re-aim and re-reach
+ * the leg so the foot rises by `worldRise` world units WITHOUT moving off its
+ * ground spot.
+ *
+ * Pitching the body to the slope under its wheelbase (`groundPitch`) is only a
+ * two-sample fit, and the compressed panorama backdrop is not locally linear —
+ * measured live, 23 % of stance frames still hung a foot more than 5 % of the
+ * body's height off the ground, worst case 25 %, because the tracked foot's own
+ * ground spot lies up to half a stride outside the span those two samples cover.
+ * A rigid leg cannot fix that: lengthening it alone would drag the foot fore/aft
+ * (it swings on an arc) and reintroduce the skating this point removed. So the
+ * correction is solved as the leg VECTOR — the foot displaced purely vertically
+ * in world, the hip angle and the leg's reach read back off the result. The
+ * foot's ground spot is therefore untouched by construction, and the body keeps
+ * the pitch and the stance dip as its visual fit.
+ *
+ * Deliberately unbounded: a cap would be a hovering foot again, which is the
+ * one thing this must not produce. Where the miniature relief is steep the leg
+ * reaches further, which at horizon distance is a sub-pixel difference — a foot
+ * off the ground is not.
+ */
+export function seatFootOnGround(
+  swingAngle: number,
+  legLength: number,
+  worldRise: number,
+  bodyPitch: number,
+  bodyScale: number,
+): LegSeating {
+  if (!(legLength > 0)) return { angle: swingAngle, stretch: 1 }
+  const s = bodyScale > 0 ? bodyScale : 1
+  // A world-vertical step expressed in the body's own (yaw-then-pitch) frame:
+  // yaw leaves y alone, so only the pitch tilts it — and it enters the leg's
+  // unscaled local units, hence ÷ scale.
+  const dy = (worldRise * Math.cos(bodyPitch)) / s
+  const dz = (-worldRise * Math.sin(bodyPitch)) / s
+  const vy = -legLength * Math.cos(swingAngle) + dy
+  const vz = -legLength * Math.sin(swingAngle) + dz
+  return { angle: Math.atan2(-vz, -vy), stretch: Math.hypot(vy, vz) / legLength }
 }
 
 /**
@@ -1015,6 +1246,38 @@ export interface GoatLeg {
   geo: THREE.BufferGeometry
   hip: [number, number, number]
   phaseOffset: number
+}
+
+/** The gait constants a built rig walks on — all read off its OWN legs. */
+export interface GaitRig {
+  /** Hip height above the foot: the leg the animal actually stands on. */
+  legLength: number
+  /** Fore/aft distance between the front and back hips. */
+  wheelbase: number
+  /** rad of gait phase per world unit walked. */
+  cadence: number
+  /** Forward distance of one full cycle. */
+  stride: number
+}
+
+/**
+ * Read a species' gait off the legs that were built for it (point 300): the
+ * cadence must follow the leg length, so a long-legged animal takes long, slow
+ * strides and a short-legged one short, quick ones — and neither skates. The
+ * wheelbase is what the body pitches over on a slope. Measured from the built
+ * geometry, so a species whose proportions change re-derives automatically.
+ */
+export function gaitRig(legs: readonly GoatLeg[], amp = GAIT_SWING): GaitRig {
+  let legLength = 0
+  let minZ = Infinity
+  let maxZ = -Infinity
+  for (const l of legs) {
+    legLength = Math.max(legLength, l.hip[1])
+    minZ = Math.min(minZ, l.hip[2])
+    maxZ = Math.max(maxZ, l.hip[2])
+  }
+  const wheelbase = legs.length ? Math.max(0, maxZ - minZ) : 0
+  return { legLength, wheelbase, cadence: gaitCadence(legLength, amp), stride: strideLength(legLength, amp) }
 }
 
 /**

@@ -140,12 +140,25 @@ export function parsePointBlocks(text) {
 /** Whitespace-collapsed lowercase form, so wrapped phrases match across lines. */
 const normalize = (text) => text.replace(/\s+/g, ' ').toLowerCase()
 
-/** First matching trail marker in a block's text, or null. */
+/**
+ * First matching trail marker in a block's text, or null.
+ *
+ * The match needs a WORD BOUNDARY at the phrase's start: a plain substring test
+ * read "is unchanged from" as the revision trail "changed from" and blocked a
+ * point whose prose was innocent (27.07.2026). A guard that cries wolf on
+ * ordinary English teaches people to route around it.
+ */
 export function findTrailMarker(text) {
   if (typeof text !== 'string') return null
   const haystack = normalize(text)
   for (const phrase of TRAIL_MARKERS) {
-    if (haystack.includes(phrase)) return phrase
+    let from = 0
+    for (;;) {
+      const at = haystack.indexOf(phrase, from)
+      if (at < 0) break
+      if (at === 0 || !/[a-z0-9']/.test(haystack[at - 1])) return phrase
+      from = at + 1
+    }
   }
   return null
 }

@@ -28,6 +28,7 @@ import {
   evaluate,
 } from './dashboard-sync-core.mjs'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
+import { readTasksAll } from './tasks-source.mjs'
 
 const R = (p) => fileURLToPath(new URL(p, import.meta.url))
 const REPO_ROOT = R('..')
@@ -53,7 +54,7 @@ function currentState() {
   const agentBranches = worktrees.filter((b) => b !== 'main' && b !== headBranch)
   let tasksText = null
   try {
-    tasksText = readFileSync(TASKS, 'utf8')
+    tasksText = readTasksAll(TASKS)
   } catch {
     // unreadable → tasksReadable false below
   }

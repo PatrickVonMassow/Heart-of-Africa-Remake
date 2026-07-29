@@ -11,6 +11,14 @@
 // HH:MM — so the guard's expectation and the injected value can never
 // disagree. Everything here is pure and Vitest-covered
 // (timestamp-guard.test.mjs); the wrapper only gathers stdin/transcript/state.
+//
+// WHAT A BLOCK ASKS FOR (point 403): the guard runs AFTER the reply is composed,
+// so its message decides what gets written next. Until 28.07.2026 it asked for
+// the closing reply to be produced a second time — and it was obeyed, which is
+// how the user received the identical text at 19:18 and 19:19. The demand is
+// unchanged (a closing message, led by the exact stamp handed over); only the
+// deliverable is now named honestly, through the shared `shortAckDemand()`.
+import { shortAckDemand } from './closing-reply-core.mjs'
 
 const BERLIN = { timeZone: 'Europe/Berlin' }
 
@@ -104,18 +112,14 @@ export function evaluate({ lastText, now = new Date() }) {
   if (typeof lastText !== 'string' || lastText.trim() === '') {
     return {
       decision: 'block',
-      reason:
-        `${rule} No assistant reply text was found to verify. Write your closing ` +
-        `reply to the user now, beginning with exactly this line: ${expected}`,
+      reason: `${rule} No assistant reply text was found to verify. ${shortAckDemand(expected)}`,
     }
   }
   const match = TIMESTAMP_RE.exec(lastText.trimStart())
   if (!match) {
     return {
       decision: 'block',
-      reason:
-        `${rule} Your last reply does NOT begin with it. Write your closing reply ` +
-        `again, beginning with exactly this line (copy it verbatim): ${expected}`,
+      reason: `${rule} Your last reply does NOT begin with it. ${shortAckDemand(expected)}`,
     }
   }
   if (!acceptedStamps(now).has(match[1])) {
@@ -123,8 +127,7 @@ export function evaluate({ lastText, now = new Date() }) {
       decision: 'block',
       reason:
         `${rule} Your last reply begins with "**${match[1]}**", which is not the ` +
-        `current Berlin time (stale or wrong). Write your closing reply again, ` +
-        `beginning with exactly this line (copy it verbatim): ${expected}`,
+        `current Berlin time (stale or wrong). ${shortAckDemand(expected)}`,
     }
   }
   return null

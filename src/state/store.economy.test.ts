@@ -12,7 +12,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { balance } from '../config/balance'
 import { g, freshGame, withWorld, jumpTo, useGame, TEST_SEED } from '../test/store'
 import { totalGifts, VILLAGE_TRADE_GOODS, usedInventory } from './store'
-import { generateTreasureSites } from '../systems/economy'
+import { KNOWN_FROM_START_LANDMARKS, LANDMARK_POINTS, generateTreasureSites } from '../systems/economy'
 import { KNOWN_FROM_START_PLACES, PLACES } from '../world/geo'
 import { useUi } from './ui'
 import { getStrings } from '../i18n'
@@ -208,6 +208,40 @@ describe('discovery bounties (design.md §10)', () => {
     g().enterPlace('maasai-village')
     expect(g().visitedPlaces).toContain('maasai-village')
     expect(g().pendingBounties.some((b) => b.kind === 'village' && b.id === 'maasai-village')).toBe(true)
+  })
+
+  // Point 338: the two halves of the Giza plateau — the enterable monument map
+  // point and the §4.4 cultural landmark — used to disagree, the map point
+  // known from the start and the landmark not. Both are known now: everyone in
+  // 1890 knew the pyramids stood there, only their surroundings were to be
+  // explored. So Giza pays no bounty for itself and writes no first-sighting
+  // entry, while an ordinary landmark still does all three.
+  it('starts with the known-from-start landmarks sighted — Giza, and only Giza', () => {
+    expect(KNOWN_FROM_START_LANDMARKS).toEqual(['giza'])
+    expect(g().landmarksSeen).toEqual(['giza'])
+    expect(g().pendingBounties.length).toBe(0)
+  })
+
+  it('credits no bounty and writes no sighting entry when Giza is reached', () => {
+    const giza = LANDMARK_POINTS.find((l) => l.id === 'giza')!
+    const moneyPre = g().money
+    jumpTo(giza.lat, giza.lon)
+    for (let i = 0; i < 3; i++) g().moveTravel(0, -1, 0.1)
+    expect(g().pendingBounties.some((b) => b.id === 'giza')).toBe(false)
+    expect(journalKeys()).not.toContain('journal.landmarkDiscovered')
+    g().enterPlace('cairo')
+    expect(g().money).toBe(moneyPre)
+    expect(journalKeys()).not.toContain('journal.bounty')
+  })
+
+  it('still sights, journals and bounties an ordinary cultural landmark', () => {
+    const meroe = LANDMARK_POINTS.find((l) => l.id === 'meroe')!
+    expect(g().landmarksSeen).not.toContain('meroe')
+    jumpTo(meroe.lat, meroe.lon)
+    for (let i = 0; i < 3; i++) g().moveTravel(0, -1, 0.1)
+    expect(g().landmarksSeen).toContain('meroe')
+    expect(g().pendingBounties.some((b) => b.kind === 'landmark' && b.id === 'meroe')).toBe(true)
+    expect(journalKeys()).toContain('journal.landmarkDiscovered')
   })
 })
 

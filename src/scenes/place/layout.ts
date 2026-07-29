@@ -15,6 +15,9 @@ import type { BuildingType } from '../../state/ui'
 
 export const PLACE_RADIUS = 28 // walkable radius in meters; leaving it exits the place
 
+/** How far inside the southern edge a settlement drops the arriving traveller. */
+export const SPAWN_INSET = 10
+
 export interface Interactive {
   type: BuildingType | 'villager'
   pos: [number, number]
@@ -56,6 +59,11 @@ export interface FenceDef {
 export interface PlaceLayout {
   /** Walkable radius; leaving it exits the place (larger for big cities). */
   radius: number
+  /** Distance south of the centre at which the traveller arrives, facing north
+   *  (design.md §2.3). Normally just inside the walkable edge; an open-plain
+   *  monument site keeps its own approach distance, so a disc widened for the
+   *  desert does not push the arrival away from the monuments (point 390). */
+  spawnZ: number
   interactives: Interactive[]
   dwellings: DwellingDef[]
   fences: FenceDef[]
@@ -815,5 +823,5 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     errands[i] = nudgeToFree(colliders, errands[i][0], errands[i][1], WALKER_RADIUS)
   }
 
-  return { radius, interactives, dwellings, fences, paths, flora, rocks, pen, errands, colliders }
+  return { radius, spawnZ: radius - SPAWN_INSET, interactives, dwellings, fences, paths, flora, rocks, pen, errands, colliders }
 }

@@ -54,10 +54,34 @@ import {
 /** Hash of the now-card BODIES — the text the reader sees (invariant 8c). */
 const nowHash = (html) => createHash('sha256').update(nowCardText(html)).digest('hex')
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
+import { openFingerprintOfTasks, syncedPublishPatch } from './board-currency-core.mjs'
 import { specSnapshots } from './dashboard-integrity-guard-core.mjs'
+import { readTasksAll } from './tasks-source.mjs'
+import { isMainModule } from './is-main.mjs'
 
 const TASKS = resolve(REPO_ROOT, 'TASKS.md')
 const PAUSE = resolve(REPO_ROOT, '.claude', 'batch-paused')
+
+/**
+ * Minutes since midnight in Europe/Berlin — the clock the board is written
+ * against, so a card's expected end is judged in the reader's timezone rather
+ * than the machine's. Returns null when the locale data is unavailable, and the
+ * pure check then simply does not run.
+ */
+function berlinMinutes() {
+  try {
+    const s = new Intl.DateTimeFormat('de-DE', {
+      timeZone: 'Europe/Berlin',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).format(new Date())
+    const m = /(\d{1,2}):(\d{2})/.exec(s)
+    return m ? Number(m[1]) * 60 + Number(m[2]) : null
+  } catch {
+    return null
+  }
+}
 
 function head() {
   try {
@@ -67,10 +91,67 @@ function head() {
   }
 }
 
+/**
+ * Everything evaluate() needs, gathered from disk and git — exported so the
+ * preflight (point 365 D) can ask "would the dashboard guard block?" from the
+ * SAME inputs the Stop hook uses. This gathering is where a reimplementation
+ * would drift and report a false "clean", so there is exactly one of it.
+ */
+export function gatherDashboardInputs({ sessionId = '' } = {}) {
+  // Hard singleton: a session that does not own the live batch lock has no
+  // dashboard duty — it must stand down entirely, not be pushed to publish.
+  if (heldByOtherLiveOwner(sessionId)) {
+    return { applicable: false, why: 'another live session owns the batch lock', cause: 'not-lock-owner' }
+  }
+
+  const marker = readJson(STATE_PATH)
+  const dashboardFile = marker && marker.dashboardPath ? resolve(REPO_ROOT, marker.dashboardPath) : null
+  const markerFileExists = !!(dashboardFile && existsSync(dashboardFile))
+  const html = markerFileExists ? readFileSync(dashboardFile, 'utf8') : null
+
+  // Only THIS session's tool activity drives the focus-freshness invariant —
+  // a parallel chat window's calls must not nag the batch session (and vice versa).
+  const activity = readJson(ACTIVITY_PATH)
+  const lastToolAt =
+    activity && (!activity.sessionId || !sessionId || activity.sessionId === sessionId)
+      ? Number(activity.lastToolAt ?? 0)
+      : 0
+
+  return {
+    applicable: true,
+    inputs: {
+      paused: existsSync(PAUSE),
+      ...parseTasks(readTasksAll(TASKS)),
+      marker,
+      markerFileExists,
+      head: head(),
+      html,
+      repoHash: markerFileExists ? sha256File(dashboardFile) : null,
+      focus: readJson(FOCUS_PATH),
+      pending: readJson(PENDING_PATH),
+      sessionId,
+      lastToolAt,
+      nowCardHash: html ? nowHash(html) : null,
+      now: Date.now(),
+      // The board's own clock, for the expected-end rule. Gathered HERE and not
+      // only at --synced: the Stop chain is where the rule has to bite, because
+      // a card whose status text is refreshed and whose HEAD has not moved
+      // satisfies every other invariant while its header ages (Fable 5, four-eyes).
+      nowMinutes: berlinMinutes(),
+      // Calibratable without a code change: minutes in dashboard-state.json.
+      freshMs: marker && marker.focusFreshMinutes ? Number(marker.focusFreshMinutes) * 60000 : undefined,
+    },
+  }
+}
+
+// Everything below is the CLI/hook behaviour and must not run on import (the
+// preflight imports this file for gatherDashboardInputs).
+const RUN_AS_SCRIPT = isMainModule(import.meta.url)
+
 // --waive-audit "<reason>": emergency bypass for the consistency audit, bound
 // to exactly the CURRENT registered file's hash (point 313 escape hatch — the
 // only alternative used to be pausing the whole batch).
-if (process.argv[2] === '--waive-audit') {
+if (RUN_AS_SCRIPT && process.argv[2] === '--waive-audit') {
   const reason = process.argv[3]
   const marker = readJson(STATE_PATH)
   // Falls back to the default board path so the hatch also works BEFORE the
@@ -89,7 +170,7 @@ if (process.argv[2] === '--waive-audit') {
 }
 
 // --synced <path>: record that the dashboard at <path> was reviewed at this HEAD.
-if (process.argv[2] === '--synced') {
+if (RUN_AS_SCRIPT && process.argv[2] === '--synced') {
   const p = process.argv[3]
   if (!p || !existsSync(p)) {
     console.error(`dashboard-guard --synced: file not found: ${p}`)
@@ -98,14 +179,53 @@ if (process.argv[2] === '--synced') {
 
   // VALIDATE FIRST (point 313): a board that fails the consistency audit can
   // not be attested — nothing is written, the violations are the work list.
-  const { open, done } = parseTasks(readFileSync(TASKS, 'utf8'))
+  const { open, done } = parseTasks(readTasksAll(TASKS))
   const priorState = readJson(STATE_PATH) ?? {}
-  const violations = auditDashboard(readFileSync(p, 'utf8'), { open, done, doneSeen: priorState.doneSeen ?? null })
+  const violations = auditDashboard(readFileSync(p, 'utf8'), {
+    open,
+    done,
+    doneSeen: priorState.doneSeen ?? null,
+    nowMinutes: berlinMinutes(),
+  })
   const waived = priorState.auditWaived && priorState.auditWaived.repoHash === sha256File(p)
   if (violations.length && !waived) {
     console.error(`dashboard-guard --synced REFUSED — ${violations.length} consistency violation(s):`)
     for (const x of violations) console.error(`  [${x.code}] ${x.msg}`)
     console.error('Fix the board, republish, then re-run --synced. Emergency only: --waive-audit "<reason>".')
+    process.exit(1)
+  }
+
+  // THEN: was this exact board actually PUBLISHED? (four-eyes finding
+  // 28.07.2026.) attest used to register a board the Artifact tool had
+  // never accepted — the file was consistent, so it printed "registered" over a
+  // phone still showing the previous board. The publish record is only evidence
+  // if it names THIS content; a deferred publish (headless session, no Artifact
+  // tool) is the documented exception and passes with a loud line instead.
+  const fileHash = sha256File(p)
+  // EITHER transport counts (point 400, delta D): the pages push and the
+  // Artifact call publish the same bytes, and the pages push is the one every
+  // session can run. Reading only the Artifact record here would refuse to
+  // attest a board that IS live and offer `--defer` as the way out — a false
+  // deferral over a published board.
+  const livePublished = !!fileHash && (priorState.publishedHash === fileHash || priorState.pagesPublishedHash === fileHash)
+  if (priorState.publishFailed && !livePublished) {
+    console.error('dashboard-guard --synced REFUSED — the last publish attempt FAILED:')
+    console.error(`  ${priorState.publishFailed.reason}${priorState.publishFailed.path ? ` (${priorState.publishFailed.path})` : ''}`)
+    console.error('Publish again — node scripts/board-publish.mjs (or the Artifact tool) — then re-run --synced.')
+    process.exit(1)
+  }
+  if (priorState.publishDeferred) {
+    const why = priorState.publishDeferred.reason ?? priorState.publishDeferred
+    console.warn(`dashboard-guard --synced: publish DEFERRED — ${why}`)
+    console.warn('  the board file is current, the LIVE page is not. The watchdog reports this.')
+  } else if (fileHash && !livePublished) {
+    console.error('dashboard-guard --synced REFUSED — this board was never published:')
+    console.error(
+      `  file ${String(fileHash).slice(0, 12)}… vs last published ${String(priorState.pagesPublishedHash ?? priorState.publishedHash ?? 'none').slice(0, 12)}…`,
+    )
+    console.error('Publish it: node scripts/board-publish.mjs — then re-run --synced.')
+    console.error('(The claude.ai mirror is the second path: dashboard-publish.mjs + the Artifact tool.)')
+    console.error('Neither reachable at all — e.g. offline: node scripts/dashboard-publish.mjs --defer "<reason>".')
     process.exit(1)
   }
 
@@ -122,12 +242,31 @@ if (process.argv[2] === '--synced') {
     violations.length && prevSeen
       ? [...new Set([...prevSeen, ...done.filter((n) => carded.has(n))])]
       : done
+  // THE PUBLISH-DUE MARK IS CLEARED HERE, and only by a REAL publish (point
+  // 400, delta B) — the decision is pure (syncedPublishPatch), the fingerprint
+  // comes from the SAME single source the due mark is written from, so a
+  // publish can never re-arm the mark it just cleared.
+  let publishPatch = {}
+  try {
+    publishPatch = syncedPublishPatch({
+      state: priorState,
+      fileHash,
+      fingerprint: openFingerprintOfTasks(readFileSync(TASKS, 'utf8')),
+    })
+  } catch {
+    /* an unreadable work order must not fail an otherwise clean attestation */
+  }
   mergeState({
     dashboardPath: p,
     head: head(),
     syncedAt: Date.now(),
     doneSeen,
     auditWaived: undefined,
+    // A failure record that the live bytes have overtaken is spent: leaving it
+    // would wedge every later attestation AND keep the launcher watchdog
+    // reporting a publish that has since happened.
+    ...(livePublished ? { publishFailed: undefined } : {}),
+    ...publishPatch,
     // The now-card text as reviewed; (8c) blocks when work happens and this
     // never changes — a stale card cannot pass by confirming the focus alone.
     nowCardHash: nowHash(readFileSync(p, 'utf8')),
@@ -139,7 +278,7 @@ if (process.argv[2] === '--synced') {
   // later spec change with an unchanged card then flags at turn end until the
   // next reviewed --synced refreshes these snapshots.
   try {
-    const snaps = specSnapshots(readFileSync(TASKS, 'utf8'), readFileSync(p, 'utf8'))
+    const snaps = specSnapshots(readTasksAll(TASKS), readFileSync(p, 'utf8'))
     mergeState({ integritySnapshots: snaps })
     console.log(`integrity snapshots recorded for ${Object.keys(snaps).length} queue card(s)`)
   } catch (e) {
@@ -170,51 +309,23 @@ if (process.argv[2] === '--synced') {
 }
 
 // Stop-hook mode.
-try {
-  let sessionId = ''
+if (RUN_AS_SCRIPT) {
   try {
-    sessionId = JSON.parse(readFileSync(0, 'utf8')).session_id || ''
-  } catch {
-    // no/non-JSON stdin (manual run) — invariant 7 then binds regardless of session
+    let sessionId = ''
+    try {
+      sessionId = JSON.parse(readFileSync(0, 'utf8')).session_id || ''
+    } catch {
+      // no/non-JSON stdin (manual run) — invariant 7 then binds regardless of session
+    }
+
+    const gathered = gatherDashboardInputs({ sessionId })
+    if (!gathered.applicable) process.exit(0)
+
+    const result = evaluate(gathered.inputs)
+    if (result.decision === 'block') process.stdout.write(JSON.stringify(result))
+    process.exit(0)
+  } catch (e) {
+    console.error(`dashboard-guard error (allowing stop): ${e && e.message}`)
+    process.exit(0)
   }
-
-  // Hard singleton: a session that does not own the live batch lock has no
-  // dashboard duty — it must stand down entirely, not be pushed to publish.
-  if (heldByOtherLiveOwner(sessionId)) process.exit(0)
-
-  const marker = readJson(STATE_PATH)
-  const dashboardFile = marker && marker.dashboardPath ? resolve(REPO_ROOT, marker.dashboardPath) : null
-  const markerFileExists = !!(dashboardFile && existsSync(dashboardFile))
-  const html = markerFileExists ? readFileSync(dashboardFile, 'utf8') : null
-
-  // Only THIS session's tool activity drives the focus-freshness invariant —
-  // a parallel chat window's calls must not nag the batch session (and vice versa).
-  const activity = readJson(ACTIVITY_PATH)
-  const lastToolAt =
-    activity && (!activity.sessionId || !sessionId || activity.sessionId === sessionId)
-      ? Number(activity.lastToolAt ?? 0)
-      : 0
-
-  const result = evaluate({
-    paused: existsSync(PAUSE),
-    ...parseTasks(readFileSync(TASKS, 'utf8')),
-    marker,
-    markerFileExists,
-    head: head(),
-    html,
-    repoHash: markerFileExists ? sha256File(dashboardFile) : null,
-    focus: readJson(FOCUS_PATH),
-    pending: readJson(PENDING_PATH),
-    sessionId,
-    lastToolAt,
-    nowCardHash: html ? nowHash(html) : null,
-    now: Date.now(),
-    // Calibratable without a code change: minutes in dashboard-state.json.
-    freshMs: marker && marker.focusFreshMinutes ? Number(marker.focusFreshMinutes) * 60000 : undefined,
-  })
-  if (result.decision === 'block') process.stdout.write(JSON.stringify(result))
-  process.exit(0)
-} catch (e) {
-  console.error(`dashboard-guard error (allowing stop): ${e && e.message}`)
-  process.exit(0)
 }

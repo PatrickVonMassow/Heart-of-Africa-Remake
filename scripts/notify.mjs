@@ -9,11 +9,11 @@
 //    or: import { notify } from './notify.mjs'; await notify(title, message)
 // Silent no-op if disabled (delete .claude/ntfy-topic to turn off).
 import { readFileSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
+import { repoPath } from './repo-paths.mjs'
 
 // The topic is a shared secret in the URL — anyone who knows it can read/post.
 // Kept in a gitignored file so it is easy to rotate and never committed.
-const TOPIC_FILE = fileURLToPath(new URL('../.claude/ntfy-topic', import.meta.url))
+const TOPIC_FILE = repoPath('.claude/ntfy-topic')
 
 export function ntfyTopic() {
   try {

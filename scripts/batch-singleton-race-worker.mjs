@@ -17,6 +17,10 @@ const result = acquire(sessionId, {
   pid: process.pid,
   pidStartedAt: Date.now(),
   bootTime: 0, // never triggers the predates-boot clause in the race tests
+  // The race is about the ATOMIC acquire, not about process ancestry, and the
+  // ancestor walk is a PowerShell round trip per worker. Ownership by process
+  // (point 388) has its own witnesses.
+  processIdentity: false,
   probePidFn: (pid) => (dead !== null && pid === dead ? { exists: false, startedAt: null } : { exists: true, startedAt: null }),
 })
 console.log(result)

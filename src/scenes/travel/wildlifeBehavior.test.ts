@@ -63,6 +63,9 @@ import {
   crocodileAmbushResting,
   crocodileWaterlinePrey,
   crocodileMouthAnchor,
+  crocodileHaulStep,
+  crocodileFeedPairValid,
+  CROCODILE_BODY_LENGTH_LOCAL,
   crocodileFeedPose,
   CROCODILE_FEED_THRASH_AMP,
   CROCODILE_FEED_GULP_PITCH,
@@ -99,6 +102,13 @@ import {
   adoptionHeld,
   inEscapeRun,
   tickEscapeRun,
+  severFamilyLinks,
+  tickFamilySeparation,
+  orphanMourns,
+  tickMourning,
+  isMourning,
+  calfMayPlay,
+  juvenileAnchor,
   isPredatorSpecies,
   type AdoptionAdult,
   PREDATOR_PREY,
@@ -909,6 +919,179 @@ describe('crocodile feed depiction (design.md §19.16, point 268)', () => {
     expect(p0.rollYaw).toBeCloseTo(0, 6)
     expect(p0.pitch).toBeCloseTo(0, 6)
     expect(p0.bobY).toBeCloseTo(0, 6)
+  })
+})
+
+// THE KILL GOES INTO THE WATER (design.md §19.16, point 383). Reported from the
+// deployed build: the crocodile stood WHOLLY on the sandy bank feeding, while the
+// carcass lay at the waterline with its head under — the exact inverse of the
+// ambusher that takes its catch back into the river. Nothing tied the two to each
+// other or to the shoreline: the seizure left both where the strike happened and
+// the grip then pulled the CROCODILE to its victim on the bank.
+describe('crocodile drag-into-water and feeding hold (design.md §19.16, point 383)', () => {
+  const SCALE = 0.55
+  const MOUTH = 1.15
+  const DRAG = 5
+  const DT = 1 / 60
+  /** A straight bank: water at x < edge, land beyond — the channel to the -x side. */
+  const bankAt = (edge: number) => (x: number) => x < edge
+  /** A river BAND of the given half-width about x = 0 (the calibratable width
+   *  factor widens exactly this): water inside, land on both banks. */
+  const bandOf = (halfWidth: number) => (x: number) => Math.abs(x) < halfWidth
+
+  /** Run the haul from a seizure until it settles; returns the final pair. */
+  const haulToRest = (
+    croc: { x: number; z: number; rot: number },
+    home: { x: number; z: number },
+    isWater: (x: number, z: number) => boolean,
+    maxSteps = 900,
+  ) => {
+    let c = { ...croc }
+    let victim: [number, number] = [c.x, c.z]
+    let steps = 0
+    let dragging = true
+    while (dragging && steps < maxSteps) {
+      const hold = crocodileHaulStep(c.x, c.z, c.rot, SCALE, home.x, home.z, MOUTH, DRAG, DT, isWater)
+      // Never a teleport: one step covers at most the drag speed's own distance.
+      expect(Math.hypot(hold.x - c.x, hold.z - c.z)).toBeLessThanOrEqual(DRAG * DT + 1e-9)
+      c = { x: hold.x, z: hold.z, rot: hold.rot }
+      victim = [hold.victimX, hold.victimZ]
+      dragging = hold.dragging
+      steps++
+    }
+    return { croc: c, victim, steps, dragging }
+  }
+
+  it('THE REPORTED ARRANGEMENT IS ILLEGAL: crocodile on the sand, carcass in the water', () => {
+    const isWater = (x: number) => bankAt(0)(x)
+    // The screenshot: the croc wholly on land (x > 0), the carcass at the
+    // waterline (x < 0). Both halves wrong, and in opposite directions.
+    expect(crocodileFeedPairValid(1.4, 0, -0.2, 0, SCALE, isWater)).toBe(false)
+    // The inverse arrangement is just as illegal — a carcass left on the bank.
+    expect(crocodileFeedPairValid(-0.6, 0, 0.4, 0, SCALE, isWater)).toBe(false)
+    // Far apart on the same water is no feeding pair either.
+    expect(crocodileFeedPairValid(-1, 0, -1, 9, SCALE, isWater)).toBe(false)
+    // What §19.16 asks for: both in the channel, the catch beside the croc.
+    expect(crocodileFeedPairValid(-1, 0, -1 + MOUTH * SCALE, 0, SCALE, isWater)).toBe(true)
+  })
+
+  it('the PRE-FIX placement fails the rule for every bank strike (the regression case)', () => {
+    // What the code did until point 383: the victim stayed at the strike point
+    // on the bank and the crocodile was pulled to it (0.6 back along its facing).
+    // Both end up on land — the feed on the beach the user photographed.
+    for (let inland = 0.1; inland <= 4; inland += 0.3) {
+      const isWater = bankAt(0)
+      const vx = inland // the bank visitor, on land
+      const preFixCrocX = vx - 0.6 // pulled to the victim, facing +x
+      expect(
+        crocodileFeedPairValid(preFixCrocX, 0, vx, 0, SCALE, (x) => isWater(x)),
+      ).toBe(false)
+    }
+  })
+
+  it('hauls every bank strike back into the water — pair on water, catch at the jaws', () => {
+    for (const edge of [0, 1.5]) { // a plain bank, and the widened river band
+      const isWater = (x: number) => bankAt(edge)(x)
+      for (let inland = 0.1; inland <= 4.001; inland += 0.3) {
+        for (const zOff of [-3, 0, 4]) {
+          const home = { x: edge - 1.2, z: zOff } // the water it lunged from
+          // Where the burst left it: just short of the victim, facing the bank.
+          const vx = edge + inland
+          const rot = Math.atan2(vx - home.x, 0)
+          const croc = { x: vx - 0.85, z: zOff, rot }
+          const out = haulToRest(croc, home, (x) => isWater(x))
+          expect(out.dragging).toBe(false)
+          expect(
+            crocodileFeedPairValid(out.croc.x, out.croc.z, out.victim[0], out.victim[1], SCALE, (x) => isWater(x)),
+          ).toBe(true)
+          // The catch lies AT the jaws (point 268), not on the croc's back.
+          const sep = Math.hypot(out.victim[0] - out.croc.x, out.victim[1] - out.croc.z)
+          expect(sep).toBeCloseTo(MOUTH * SCALE, 6)
+          // And it got there in a haul, not a hop: bounded by the drag deadline.
+          expect(out.steps * DT).toBeLessThan(balance.crocodile.dragSeconds)
+        }
+      }
+    }
+  })
+
+  it('holds the settled pair still — the feed does not wander back out of the water', () => {
+    const isWater = bankAt(0)
+    let c = { x: -1.5, z: 3, rot: Math.PI } // in the channel, facing -x (deeper)
+    const home = { x: -1.5, z: 3 }
+    for (let i = 0; i < 300; i++) {
+      const hold = crocodileHaulStep(c.x, c.z, c.rot, SCALE, home.x, home.z, MOUTH, DRAG, DT, (x) => isWater(x))
+      expect(hold.dragging).toBe(false)
+      expect(hold.x).toBe(c.x)
+      expect(hold.z).toBe(c.z)
+      expect(crocodileFeedPairValid(hold.x, hold.z, hold.victimX, hold.victimZ, SCALE, (x) => isWater(x))).toBe(true)
+      c = { x: hold.x, z: hold.z, rot: hold.rot }
+    }
+  })
+
+  it('resumes the haul when the water moves out from under a feeding pair', () => {
+    // The river width is a calibratable, debug-editable value: a narrowed band
+    // can leave a settled feed on dry land. The hold is re-run every frame, so
+    // the crocodile simply hauls its catch back in rather than eating on sand.
+    const wide = bandOf(3)
+    const narrow = bandOf(1)
+    const home = { x: 0, z: 0 }
+    const settled = crocodileHaulStep(2.4, 0, Math.PI, SCALE, home.x, home.z, MOUTH, DRAG, DT, wide)
+    expect(settled.dragging).toBe(false)
+    const out = haulToRest({ x: settled.x, z: settled.z, rot: settled.rot }, home, narrow)
+    expect(out.dragging).toBe(false)
+    expect(crocodileFeedPairValid(out.croc.x, out.croc.z, out.victim[0], out.victim[1], SCALE, narrow)).toBe(true)
+  })
+
+  it('turns its head onto the water instead of hauling forever in a narrow channel', () => {
+    // A channel barely wider than the crocodile itself: the home water is
+    // reached but the jaws still point at the bank. It turns the head rather
+    // than dragging out the other side — and the haul always terminates.
+    const narrow = bandOf(0.7)
+    const home = { x: 0, z: 0 }
+    const out = haulToRest({ x: 0.4, z: 0, rot: Math.PI / 2 }, home, narrow) // facing +x, at the bank
+    expect(out.dragging).toBe(false)
+    expect(narrow(out.croc.x)).toBe(true)
+    expect(narrow(out.victim[0])).toBe(true)
+    expect(crocodileFeedPairValid(out.croc.x, out.croc.z, out.victim[0], out.victim[1], SCALE, narrow)).toBe(true)
+  })
+
+  it('terminates even where no heading can put the jaws on water', () => {
+    // Degenerate: a puddle smaller than the crocodile's own reach. Nothing can
+    // satisfy the rule, so the haul settles instead of running forever (I4).
+    const puddle = (x: number, z: number) => Math.hypot(x, z) < 0.3
+    const out = haulToRest({ x: 0.05, z: 0, rot: 0 }, { x: 0, z: 0 }, puddle)
+    expect(out.dragging).toBe(false)
+    expect(out.steps).toBeLessThan(200)
+    // And it SAYS so, so the in-game invariant stands down instead of accusing
+    // the placement of a bug the world cannot let it fix.
+    const last = crocodileHaulStep(out.croc.x, out.croc.z, out.croc.rot, SCALE, 0, 0, MOUTH, DRAG, DT, puddle)
+    expect(last.stranded).toBe(true)
+    // A home spot that is no longer water at all strands it too, rather than
+    // hauling forever at a target that cannot help.
+    const dry = crocodileHaulStep(0, 0, 0, SCALE, 0, 0, MOUTH, DRAG, DT, () => false)
+    expect(dry.stranded).toBe(true)
+    expect(dry.dragging).toBe(false)
+    // An ordinary settled feed is never flagged stranded.
+    expect(crocodileHaulStep(-2, 0, Math.PI, SCALE, -2, 0, MOUTH, DRAG, DT, bankAt(0)).stranded).toBe(false)
+  })
+
+  it('a body length is the yardstick — the jaws reach is well inside it', () => {
+    expect(MOUTH).toBeLessThan(CROCODILE_BODY_LENGTH_LOCAL)
+    const isWater = () => true
+    // Just inside its own body length passes, just outside fails.
+    const L = CROCODILE_BODY_LENGTH_LOCAL * SCALE
+    expect(crocodileFeedPairValid(0, 0, L - 0.01, 0, SCALE, isWater)).toBe(true)
+    expect(crocodileFeedPairValid(0, 0, L + 0.01, 0, SCALE, isWater)).toBe(false)
+    // It scales with the animal: a bigger crocodile holds a catch further out.
+    expect(crocodileFeedPairValid(0, 0, L + 0.01, 0, SCALE * 2, isWater)).toBe(true)
+  })
+
+  it('the drag speed and its deadline are calibratable balance values', () => {
+    expect(balance.crocodile.dragSpeed).toBeGreaterThan(0)
+    // A haul of the whole ambush band must fit inside the deadline with margin.
+    expect(balance.crocodile.ambushBankBand / balance.crocodile.dragSpeed).toBeLessThan(
+      balance.crocodile.dragSeconds,
+    )
   })
 })
 
@@ -3419,5 +3602,497 @@ describe('the freed calf runs its escape before it is adopted (design.md §19.8,
     // The calf is freed at the END of its ~5 s struggle, and the flight then has
     // to carry it clear of the kill — so the window is sized well above it.
     expect(balance.family.escapeSeconds).toBeGreaterThan(5)
+  })
+})
+
+describe("a juvenile's bond to its parent RESOLVES, never hangs (design.md §19.8, point 341)", () => {
+  // The regression: the streaming cull removes an animal by distance from the
+  // player, and it cleared NEITHER `parent` nor `child`. A player who drove a
+  // calf far enough left its parent behind, and because the follow branch only
+  // tests `!parent.dead` — a culled parent is not dead — the calf walked to a
+  // frozen phantom position and nursed at nothing, while the §19.8 orphan
+  // adoption (which waits for a DEAD parent) never fired. Two rules end it: the
+  // cull severs the pair, and a separation window resolves everything else.
+  interface Beast extends AdoptionAdult {
+    x: number
+    z: number
+    species: string
+    young?: boolean
+    dead?: boolean
+    caught?: number
+    escape?: number
+    chunk?: string
+    parent?: Beast
+    child?: Beast
+    separated?: number
+  }
+  const CHUNK = 100
+  const FOLLOW = 8.1 // balance.family.followRadius' shape
+  const WINDOW = 45 // balance.family.reunionSeconds' shape; the value stays calibratable
+  const RADIUS = 20 // balance.family.adoptionRadius
+
+  const pair = (parentX = 0, calfX = 1) => {
+    const parent: Beast = { species: 'zebra', x: parentX, z: 0, chunk: '0,0' }
+    const calf: Beast = { species: 'zebra', x: calfX, z: 0, young: true, chunk: '0,0', parent }
+    parent.child = calf
+    return { parent, calf }
+  }
+
+  /** The live streaming cull (Wildlife.tsx): keep by distance/frame, and sever
+   *  the family links of everything it drops. No live chunks and no frustum keep,
+   *  so distance alone decides — as it does when the player drives away. */
+  const cullFrame = (herd: Beast[], playerX: number, despawnR: number): Beast[] =>
+    herd.filter((a) => {
+      const v = keepStreamedAnimal(a, () => false, CHUNK, playerX, 0, despawnR, () => false)
+      if (!v.keep) severFamilyLinks(a)
+      return v.keep
+    })
+
+  /** The live family pass (Wildlife.tsx): tick the separation of every juvenile
+   *  with a living parent, resolve the bond at the window, then run the ordinary
+   *  point-262 adoption over every parentless young. */
+  const familyFrame = (herd: Beast[], dt: number, window = WINDOW) => {
+    for (const a of herd) {
+      if (a.dead || a.young !== true) continue
+      let released: Beast | null = null
+      if (a.parent && !a.parent.dead) {
+        const sep = tickFamilySeparation(
+          a.separated,
+          Math.hypot(a.parent.x - a.x, a.parent.z - a.z),
+          FOLLOW,
+          dt,
+          window,
+          adoptionHeld(a),
+        )
+        a.separated = sep.separated
+        if (!sep.resolve) continue
+        released = a.parent
+        severFamilyLinks(a)
+      } else {
+        a.separated = undefined
+      }
+      const adopter = findAdopter(a, herd, RADIUS, { exclude: released })
+      if (adopter) {
+        a.parent = adopter
+        adopter.child = a
+      }
+    }
+  }
+
+  it('severFamilyLinks clears BOTH directions', () => {
+    const { parent, calf } = pair()
+    severFamilyLinks(calf)
+    expect(calf.parent).toBeUndefined()
+    expect(parent.child).toBeUndefined()
+    // …and from the parent's side just the same.
+    const b = pair()
+    severFamilyLinks(b.parent)
+    expect(b.parent.child).toBeUndefined()
+    expect(b.calf.parent).toBeUndefined()
+  })
+
+  it('severFamilyLinks leaves a FOREIGN back-reference alone', () => {
+    // A calf already re-parented elsewhere: cutting its former parent must not
+    // clear the link it now holds to its new one.
+    const { parent, calf } = pair()
+    const newParent: Beast = { species: 'zebra', x: 30, z: 0 }
+    calf.parent = newParent
+    newParent.child = calf
+    severFamilyLinks(parent) // parent.child still points at the calf
+    expect(parent.child).toBeUndefined()
+    expect(calf.parent).toBe(newParent) // not cut
+    expect(newParent.child).toBe(calf)
+    expect(severFamilyLinks({})).toBeUndefined() // an unlinked animal is a no-op
+  })
+
+  it('the CULL clears the pair: a survivor never references a removed animal', () => {
+    const { parent, calf } = pair(0, 1)
+    // The player drives off: the parent is now beyond the despawn ring, the calf
+    // (which the player followed) is not.
+    parent.x = 500
+    const left = cullFrame([parent, calf], 1, 110)
+    expect(left).toEqual([calf]) // the parent was streamed out
+    expect(calf.parent).toBeUndefined() // …and left NO phantom behind
+  })
+
+  it('a calf whose parent is culled is adopted in the very same frame', () => {
+    const { parent, calf } = pair(0, 1)
+    const herdMate: Beast = { species: 'zebra', x: 5, z: 0, chunk: '0,0' }
+    parent.x = 500 // out of the ring
+    const left = cullFrame([parent, calf, herdMate], 1, 110)
+    familyFrame(left, 1 / 60)
+    expect(calf.parent).toBe(herdMate)
+    expect(herdMate.child).toBe(calf)
+    expect(calf.separated).toBeUndefined() // in reach of its new parent
+  })
+
+  it('a culled CALF leaves its parent shielding nothing', () => {
+    const { parent, calf } = pair(0, 1)
+    calf.x = 500
+    const left = cullFrame([parent, calf], 1, 110)
+    expect(left).toEqual([parent])
+    expect(parent.child).toBeUndefined()
+  })
+
+  it('the separation clock runs ONLY while the calf is out of reach', () => {
+    // Inside the follow radius nothing accumulates, however long it stands there.
+    let s: number | undefined
+    for (let i = 0; i < 1000; i++) {
+      const r = tickFamilySeparation(s, FOLLOW, FOLLOW, 1 / 60, WINDOW)
+      s = r.separated
+      expect(r.resolve).toBe(false)
+      expect(s).toBeUndefined()
+    }
+    // Out of reach it accumulates…
+    s = tickFamilySeparation(undefined, FOLLOW + 0.01, FOLLOW, 2, WINDOW).separated
+    expect(s).toBeCloseTo(2, 10)
+    s = tickFamilySeparation(s, 40, FOLLOW, 3, WINDOW).separated
+    expect(s).toBeCloseTo(5, 10)
+    // …and coming back inside RESETS it (a gambol at the leash edge, a short
+    // flight): the next excursion starts from zero, so it can never add up.
+    const back = tickFamilySeparation(s, FOLLOW - 0.5, FOLLOW, 1 / 60, WINDOW)
+    expect(back.resolve).toBe(false)
+    expect(back.separated).toBeUndefined()
+  })
+
+  it('the window boundary is exact: a tick landing on it resolves, a sliver short does not', () => {
+    const short = tickFamilySeparation(WINDOW - 1, 40, FOLLOW, 0.999, WINDOW)
+    expect(short.resolve).toBe(false)
+    expect(short.separated).toBeCloseTo(WINDOW - 0.001, 10)
+    const exact = tickFamilySeparation(WINDOW - 1, 40, FOLLOW, 1, WINDOW)
+    expect(exact.resolve).toBe(true)
+    expect(exact.separated).toBeUndefined() // the clock is cleared with the bond
+    const over = tickFamilySeparation(WINDOW - 1, 40, FOLLOW, 5, WINDOW)
+    expect(over.resolve).toBe(true) // an overshooting frame resolves too
+  })
+
+  it('a running §19.8 ending FREEZES the clock — that drama resolves first', () => {
+    // Caught by a predator, or escaping after the parent's sacrifice: the pair
+    // belongs to that ending, whose own deadline is hard (point 311).
+    const held = tickFamilySeparation(WINDOW - 0.5, 40, FOLLOW, 5, WINDOW, true)
+    expect(held.resolve).toBe(false)
+    expect(held.separated).toBeCloseTo(WINDOW - 0.5, 10) // frozen, not reset
+    // The moment the ending lifts, the window resolves as usual.
+    expect(tickFamilySeparation(WINDOW - 0.5, 40, FOLLOW, 5, WINDOW, false).resolve).toBe(true)
+  })
+
+  it('a window of zero switches the separation OFF (a debug edit must not sever every bond)', () => {
+    const off = tickFamilySeparation(3, 40, FOLLOW, 1, 0)
+    expect(off.resolve).toBe(false)
+    expect(off.separated).toBeUndefined()
+    expect(tickFamilySeparation(3, 40, FOLLOW, 1, -5).resolve).toBe(false)
+  })
+
+  it('the separation ALWAYS resolves — invariant I4 — from any window and frame time', () => {
+    for (const w of [0.5, 5, 45, 120]) {
+      for (const dt of [1 / 240, 1 / 60, 0.25, 1, 3]) {
+        let s: number | undefined
+        let resolved = false
+        const frames = Math.ceil(w / dt) + 1
+        for (let i = 0; i < frames && !resolved; i++) {
+          const r = tickFamilySeparation(s, 999, FOLLOW, dt, w)
+          s = r.separated
+          resolved = r.resolve
+        }
+        expect(resolved).toBe(true)
+      }
+    }
+  })
+
+  it('an out-of-reach calf keeps its parent until the window is out, then is adopted', () => {
+    const { parent, calf } = pair(0, 0)
+    calf.x = 15 // out of reach (> FOLLOW), but well inside the adoption radius
+    const herdMate: Beast = { species: 'zebra', x: 18, z: 0 }
+    const herd = [parent, calf, herdMate]
+    for (let t = 0; t < WINDOW - 1; t += 0.5) {
+      familyFrame(herd, 0.5)
+      expect(calf.parent).toBe(parent) // the bond holds while the window runs
+    }
+    while (calf.parent === parent) familyFrame(herd, 0.5)
+    expect(calf.parent).toBe(herdMate) // resolved → a LIVING parent nearby
+    expect(herdMate.child).toBe(calf)
+    expect(parent.child).toBeUndefined() // the old bond is cut on both sides
+  })
+
+  it('the released parent is not handed the same calf straight back', () => {
+    // It is the nearest eligible adult the instant its link is cleared, so
+    // without the exclusion the resolve would be a no-op and the walk toward a
+    // parent it cannot reach would simply start over.
+    const { parent, calf } = pair(0, 0)
+    calf.x = 15
+    const herd = [parent, calf]
+    while (calf.parent === parent) familyFrame(herd, 0.5)
+    expect(calf.parent).toBeUndefined() // roams on as an ordinary juvenile
+    expect(parent.child).toBeUndefined()
+    // From the NEXT frame on it is an ordinary candidate again, so a pair that
+    // merely drifted apart re-forms — with a fresh window, not a stale clock.
+    familyFrame(herd, 0.5)
+    expect(calf.parent).toBe(parent)
+    expect(parent.child).toBe(calf)
+    expect(calf.separated).toBeUndefined()
+  })
+
+  it('with no eligible adult the resolved calf ends PARENTLESS, never bonded to a ghost', () => {
+    const { parent, calf } = pair(0, 0)
+    calf.x = 40 // far out of reach; nothing else of its kind anywhere near
+    const predator: Beast = { species: 'lion', x: 41, z: 0 } // never an adopter
+    const otherKind: Beast = { species: 'wildebeest', x: 41, z: 1 }
+    const herd = [parent, calf, predator, otherKind]
+    for (let t = 0; t <= WINDOW + 5; t += 0.5) familyFrame(herd, 0.5)
+    expect(calf.parent).toBeUndefined()
+    expect(calf.separated).toBeUndefined() // no clock left running either
+    expect(parent.child).toBeUndefined()
+  })
+
+  it('a healthy pair at play never trips the window', () => {
+    // The scene's play cycle: a bout of balance.family.gambolBoutSeconds out at
+    // the gambol range, then the follow leg back inside the leash. The calf drops
+    // into reach once per cycle, which resets the clock — so the window never
+    // fires however long the pair grazes together.
+    const { parent, calf } = pair(0, 0)
+    const herd = [parent, calf]
+    const dt = 1 / 30
+    for (let cycle = 0; cycle < 20; cycle++) {
+      for (let t = 0; t < balance.family.gambolBoutSeconds; t += dt) {
+        calf.x = balance.family.gambolRange // out at the leash edge
+        familyFrame(herd, dt)
+      }
+      for (let t = 0; t < 12; t += dt) {
+        calf.x = 1 // followed back in and nursing (the idle gap)
+        familyFrame(herd, dt)
+      }
+      expect(calf.parent).toBe(parent)
+    }
+  })
+
+  it('the shipped window outlasts a whole play cycle', () => {
+    // GAMBOL_IDLE_SECONDS is 12 s in the scene, so one cycle is bout + 12 s; the
+    // window must sit clear above it or ordinary play would end healthy bonds.
+    expect(balance.family.reunionSeconds).toBeGreaterThan(balance.family.gambolBoutSeconds + 12)
+    expect(balance.family.reunionSeconds).toBeGreaterThan(balance.family.escapeSeconds)
+  })
+})
+
+describe('the orphan mourns before it plays again (design.md §19.8, point 369)', () => {
+  interface Beast {
+    species: string
+    x: number
+    z: number
+    young?: boolean
+    dead?: boolean
+    caught?: number
+    escape?: number
+    parent?: Beast
+    child?: Beast
+    separated?: number
+    mourn?: number
+    mournAt?: { x: number; z: number }
+  }
+  const FOLLOW = 8.1 // balance.family.followRadius' shape
+  const WINDOW = 45 // balance.family.reunionSeconds' shape
+  const RADIUS = 20 // balance.family.adoptionRadius
+  const MOURN = 30 // balance.family.mourningSeconds' shape; the value stays calibratable
+
+  const pair = (parentX = 0, calfX = 1) => {
+    const parent: Beast = { species: 'zebra', x: parentX, z: 0 }
+    const calf: Beast = { species: 'zebra', x: calfX, z: 0, young: true, parent }
+    parent.child = calf
+    return { parent, calf }
+  }
+
+  /** The live family pass (Wildlife.tsx) with the mourning window in it: tick
+   *  the countdown for every animal (a hard deadline that always resolves), open
+   *  it on a parent that DIED — severing the bond, so nothing survives holding a
+   *  body that is gone (point 341) — then run the ordinary point-262 adoption. */
+  const familyFrame = (herd: Beast[], dt: number, mourning = MOURN) => {
+    for (const a of herd) {
+      if (a.mourn !== undefined) {
+        a.mourn = tickMourning(a.mourn, dt)
+        if (a.mourn === undefined) a.mournAt = undefined // the watch is over — play again
+      }
+      if (a.escape !== undefined) a.escape = tickEscapeRun(a.escape, dt)
+      if (a.dead || a.young !== true) continue
+      let released: Beast | null = null
+      if (a.parent && !a.parent.dead) {
+        const sep = tickFamilySeparation(
+          a.separated,
+          Math.hypot(a.parent.x - a.x, a.parent.z - a.z),
+          FOLLOW,
+          dt,
+          WINDOW,
+          adoptionHeld(a),
+        )
+        a.separated = sep.separated
+        if (!sep.resolve) continue
+        released = a.parent
+        severFamilyLinks(a) // an administrative ending: nothing to grieve
+      } else {
+        a.separated = undefined
+        if (orphanMourns(a.parent)) {
+          const body = a.parent as Beast
+          a.mourn = mourning
+          a.mournAt = { x: body.x, z: body.z }
+          severFamilyLinks(a)
+        }
+      }
+      const adopter = findAdopter(a, herd, RADIUS, { exclude: released })
+      if (adopter) {
+        a.parent = adopter
+        adopter.child = a
+      }
+    }
+  }
+
+  it('THE TRIGGER IS DEATH: only a parent that died opens the window', () => {
+    expect(orphanMourns({ dead: true })).toBe(true)
+    expect(orphanMourns({})).toBe(false) // alive and well
+    expect(orphanMourns({ dead: false })).toBe(false)
+    expect(orphanMourns(undefined)).toBe(false) // the bond was already cut
+    expect(orphanMourns(null)).toBe(false)
+  })
+
+  it('a parent that dies leaves its calf mourning AT THE SPOT it fell', () => {
+    const { parent, calf } = pair(4, 5)
+    const herd = [parent, calf]
+    familyFrame(herd, 1 / 60)
+    expect(calf.mourn).toBeUndefined() // nothing has happened yet
+    parent.dead = true
+    familyFrame(herd, 1 / 60)
+    expect(calf.mourn).toBeCloseTo(MOURN, 5) // armed this frame — the tick starts next
+    expect(calf.mournAt).toEqual({ x: 4, z: 0 })
+    expect(calf.parent).toBeUndefined() // no calf holds a body that is gone
+    // The anchor is a POINT: moving or removing the carcass cannot drag the watch.
+    parent.x = 999
+    expect(juvenileAnchor(calf)).toEqual({ x: 4, z: 0 })
+  })
+
+  it('a bond ended by SEPARATION is never mourned — the calf saw nothing happen', () => {
+    const { parent, calf } = pair(0, 0)
+    calf.x = 15 // out of reach of a LIVING parent: the point-341 resolve
+    const herd = [parent, calf]
+    while (calf.parent === parent) familyFrame(herd, 0.5)
+    expect(calf.mourn).toBeUndefined()
+    expect(calf.mournAt).toBeUndefined()
+    expect(calfMayPlay(true, calf)).toBe(true) // it plays on, as it should
+  })
+
+  it('a parent STREAMED OUT is never mourned either (point 341 cuts the bond, nobody died)', () => {
+    const { parent, calf } = pair(0, 1)
+    severFamilyLinks(parent) // the cull's spelling: removed, not dead
+    const herd = [calf]
+    familyFrame(herd, 1 / 60)
+    expect(calf.mourn).toBeUndefined()
+  })
+
+  it('the play selector is FALSE for the whole window and TRUE after it', () => {
+    const { parent, calf } = pair(0, 1)
+    const herd = [parent, calf]
+    parent.dead = true
+    familyFrame(herd, 1 / 60)
+    const dt = 1 / 60
+    for (let elapsed = 0; elapsed < MOURN - dt; elapsed += dt) {
+      expect(isMourning(calf)).toBe(true)
+      expect(calfMayPlay(true, calf)).toBe(false) // grief silences the gambol
+      familyFrame(herd, dt)
+    }
+    // …and the EXIT path: the window runs out and the calf plays again.
+    while (calf.mourn !== undefined) familyFrame(herd, dt)
+    expect(isMourning(calf)).toBe(false)
+    expect(calfMayPlay(true, calf)).toBe(true)
+    expect(calf.mournAt).toBeUndefined() // the watch is packed away with it
+  })
+
+  it('ADOPTION runs on its own clock: it changes WHO the calf follows, not its demeanour', () => {
+    const { parent, calf } = pair(0, 1)
+    const adopter: Beast = { species: 'zebra', x: 3, z: 0 }
+    const herd = [parent, calf, adopter]
+    parent.dead = true
+    familyFrame(herd, 1 / 60)
+    expect(calf.parent).toBe(adopter) // taken in at once (point 262)
+    expect(adopter.child).toBe(calf)
+    expect(isMourning(calf)).toBe(true) // …and STILL mourning: the two never cancel
+    // It follows its new parent, subdued — the anchor is the living adult again,
+    // while the play gate stays shut for the rest of the window.
+    expect(juvenileAnchor(calf)).toBe(adopter)
+    expect(calfMayPlay(true, calf)).toBe(false)
+    for (let t = 0; t < MOURN + 5; t += 0.5) familyFrame(herd, 0.5)
+    expect(isMourning(calf)).toBe(false)
+    expect(calf.parent).toBe(adopter) // and the adoption outlives the grief
+    expect(calfMayPlay(true, calf)).toBe(true)
+  })
+
+  it('a SECOND bereavement mourns again (the adoptive parent is grieved like the first)', () => {
+    const { parent, calf } = pair(0, 1)
+    const adopter: Beast = { species: 'zebra', x: 3, z: 0 }
+    const herd = [parent, calf, adopter]
+    parent.dead = true
+    familyFrame(herd, 0.5) // the first bereavement: mourned and adopted
+    while (calf.mourn !== undefined) familyFrame(herd, 0.5)
+    expect(calf.parent).toBe(adopter)
+    adopter.dead = true
+    familyFrame(herd, 0.5)
+    expect(isMourning(calf)).toBe(true)
+    expect(calf.mournAt).toEqual({ x: 3, z: 0 })
+  })
+
+  it('FEAR STILL WINS: a mourning calf inside the shy ring flees the traveller', () => {
+    // The mourning window deliberately does NOT enter the drama state fed to the
+    // arbitration (point 252), so every danger response outranks it — a grieving
+    // calf must never stand still for a predator.
+    const calf: Beast = { species: 'zebra', x: 0, z: 0, young: true, mourn: MOURN, mournAt: { x: 0, z: 0 } }
+    expect(isMourning(calf)).toBe(true)
+    const pick = resolveFleeTarget(
+      0,
+      0,
+      {
+        species: 'zebra',
+        isJuvenile: true,
+        preyWeapon: balance.parentDefense.preyWeapon,
+        drama: {}, // what dramaStateOf builds for a merely mourning calf
+        drinking: false,
+        stagedBankVictim: false,
+      },
+      [],
+      [[0, -4]],
+      3.2,
+      6,
+    )
+    expect(pick).not.toBeNull()
+    expect(pick!.source).toBe('player')
+    // And the seized/hunted states still own their frame, mourning or not.
+    expect(adoptionHeld({ caught: 3 })).toBe(true)
+  })
+
+  it('the window ALWAYS resolves — invariant I4 — from any length and frame time', () => {
+    for (const w of [0.5, 5, 30, 120]) {
+      for (const dt of [1 / 240, 1 / 60, 0.25, 1, 7]) {
+        let m: number | undefined = w
+        let frames = 0
+        while (m !== undefined && frames < Math.ceil(w / dt) + 2) {
+          m = tickMourning(m, dt)
+          frames++
+        }
+        expect(m).toBeUndefined()
+      }
+    }
+    // Exact boundary: a tick of exactly the remaining time ENDS the window.
+    expect(tickMourning(2, 2)).toBeUndefined()
+    expect(tickMourning(2, 1.999)).toBeCloseTo(0.001, 6)
+    expect(tickMourning(undefined, 1)).toBeUndefined()
+  })
+
+  it('the anchor falls back to the herd once the watch is over', () => {
+    expect(juvenileAnchor({})).toBeNull() // an ordinary parentless juvenile roams
+    expect(juvenileAnchor({ parent: { x: 2, z: 3 }, mourn: 5, mournAt: { x: 9, z: 9 } })).toEqual({ x: 2, z: 3 })
+    expect(juvenileAnchor({ parent: { x: 2, z: 3, dead: true }, mourn: 5, mournAt: { x: 9, z: 9 } }))
+      .toEqual({ x: 9, z: 9 }) // a dead parent is no anchor — the spot it fell is
+    expect(juvenileAnchor({ parent: { x: 2, z: 3, dead: true } })).toBeNull()
+  })
+
+  it('the shipped window outlasts a whole play cycle', () => {
+    // GAMBOL_IDLE_SECONDS is 12 s in the scene, so one cycle is bout + 12 s: the
+    // window must sit above it or the calf would gambol straight through its
+    // grief and the picture would say nothing had happened.
+    expect(balance.family.mourningSeconds).toBeGreaterThan(balance.family.gambolBoutSeconds + 12)
   })
 })

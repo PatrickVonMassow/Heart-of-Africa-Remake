@@ -35,6 +35,7 @@ const DEFAULTS = {
   footstepVolume: balance.footstepVolume,
   ambientVolume: balance.ambientVolume,
   walkerUnstuckSeconds: balance.walkerUnstuckSeconds,
+  startupFreezeBudgetMs: balance.startup.pictureFreezeBudgetMs,
   birdsongVolume: balance.birdsongVolume,
   surfNearRadius: balance.surf.nearRadius,
   surfCutoff: balance.surf.cutoff,
@@ -52,6 +53,7 @@ const DEFAULTS = {
   juvenileDrinkCrocBias: balance.family.juvenileDrinkCrocBias,
   calfAdoptionRadius: balance.family.adoptionRadius,
   calfEscapeSeconds: balance.family.escapeSeconds,
+  calfReunionSeconds: balance.family.reunionSeconds,
   crocStrikeRadius: balance.crocodile.strikeRadius,
   crocAmbushBankBand: balance.crocodile.ambushBankBand,
   crocMouthOffset: balance.crocodile.mouthOffsetLocal,
@@ -102,6 +104,7 @@ afterEach(() => {
   balance.footstepVolume = DEFAULTS.footstepVolume
   balance.ambientVolume = DEFAULTS.ambientVolume
   balance.walkerUnstuckSeconds = DEFAULTS.walkerUnstuckSeconds
+  balance.startup.pictureFreezeBudgetMs = DEFAULTS.startupFreezeBudgetMs
   balance.birdsongVolume = DEFAULTS.birdsongVolume
   balance.surf.nearRadius = DEFAULTS.surfNearRadius
   balance.surf.cutoff = DEFAULTS.surfCutoff
@@ -119,6 +122,7 @@ afterEach(() => {
   balance.family.juvenileDrinkCrocBias = DEFAULTS.juvenileDrinkCrocBias
   balance.family.adoptionRadius = DEFAULTS.calfAdoptionRadius
   balance.family.escapeSeconds = DEFAULTS.calfEscapeSeconds
+  balance.family.reunionSeconds = DEFAULTS.calfReunionSeconds
   balance.crocodile.strikeRadius = DEFAULTS.crocStrikeRadius
   balance.crocodile.ambushBankBand = DEFAULTS.crocAmbushBankBand
   balance.crocodile.mouthOffsetLocal = DEFAULTS.crocMouthOffset
@@ -190,6 +194,8 @@ describe('DebugMenu editable fields write through to balance (settings.mjs fillF
     { label: en.debug.ambientVolume, read: () => balance.ambientVolume, value: 0.3 },
     // The inhabitant unstuck window (point 155).
     { label: en.debug.walkerUnstuck, read: () => balance.walkerUnstuckSeconds, value: 8 },
+    // The loading picture's freeze budget the startup gate binds (point 337).
+    { label: en.debug.startupFreezeBudget, read: () => balance.startup.pictureFreezeBudgetMs, value: 6000 },
     // Per-source birdsong volume and the coastal surf fade bounds (point 153).
     { label: en.debug.birdsongVolume, read: () => balance.birdsongVolume, value: 0.5 },
     { label: en.debug.surfNearRadius, read: () => balance.surf.nearRadius, value: 0.8 },
@@ -218,6 +224,8 @@ describe('DebugMenu editable fields write through to balance (settings.mjs fillF
     { label: en.debug.calfAdoptionRadius, read: () => balance.family.adoptionRadius, value: 25 },
     // The freed calf's escape run before it may be adopted (design.md §19.8/§21.2, point 311).
     { label: en.debug.calfEscapeSeconds, read: () => balance.family.escapeSeconds, value: 9 },
+    // The separation window after which a juvenile's bond resolves (design.md §19.8/§21.2, point 341).
+    { label: en.debug.calfReunionSeconds, read: () => balance.family.reunionSeconds, value: 60 },
     // The crocodile's bank strike radius (design.md §19.16, point 130).
     { label: en.debug.crocStrikeRadius, read: () => balance.crocodile.strikeRadius, value: 8 },
     // The broadened waterline ambush band and the mouth anchor (points 275/268).

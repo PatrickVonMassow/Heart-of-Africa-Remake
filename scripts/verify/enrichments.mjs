@@ -13,6 +13,8 @@
 // hit-tests), a real WheelEvent zoom, the screenshots and the console-error
 // gate. Dev server only (dev hooks).
 import { launchVerifyBrowser, assertBackend } from './_browser.mjs'
+import { animalShare, readsAsAnimal, waterFloor } from './animalShare.mjs'
+import { frameShutter, captureFrame } from './frameSubject.mjs'
 import { fileURLToPath } from 'node:url'
 import sharp from 'sharp'
 
@@ -73,6 +75,11 @@ const waitForFamily = (timeout = 30000) =>
 
 const browser = await launchVerifyBrowser()
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
+// Point 375: every frame written below declares what it must show — the place
+// it is named after, the settlement, the staged animal, the overlay — and the
+// shutter projects that subject through the live camera before the file is
+// written. A frame that deliberately photographs a general view says so.
+const shot = frameShutter(page, OUT)
 const errors = []
 page.on('console', (m) => {
   if (m.type() === 'error') errors.push(m.text())
@@ -246,8 +253,7 @@ const village = await page.evaluate(() => ({
 }))
 check('Village: inhabitants with daily routines present', village.walkers >= 3, `${village.walkers} walkers`)
 check('Village: landscape backdrop mesh present', village.backdrop > 1000, `${village.backdrop} vertices`)
-await page.screenshot({ path: `${OUT}77-enrich-village-life.png` })
-console.log('shot 77-enrich-village-life.png')
+await shot('77-enrich-village-life', { place: 'maasai-village', label: 'the inhabited village' })
 
 // Point 14: the backdrop of a mountainous settlement (Berber Village, at the
 // Atlas) must read as a distant range on the horizon, not loom over the camera
@@ -264,29 +270,36 @@ check(
   berber.maxElevationDeg < 25,
   `max elevation ${berber.maxElevationDeg?.toFixed(1)}°`,
 )
-await page.screenshot({ path: `${OUT}86-berber-backdrop.png` })
-console.log('shot 86-berber-backdrop.png')
+await shot('86-berber-backdrop', { place: 'berber-village', label: 'the Atlas backdrop over the Berber village' })
 
 // === Travel view =============================================================
 await page.evaluate(() => window.__game.getState().leavePlace())
 await page.waitForTimeout(1500)
 await page.evaluate(() => window.__game.getState().setJournalOpen(false))
 
-// --- Point 12: map points show "?" until discovered --------------------------
-// Every place/landmark label is rendered; an undiscovered one shows a muted "?",
+// --- Point 12: map points name their KIND until discovered -------------------
+// Every place/landmark label is rendered; an undiscovered one shows a muted,
+// kind-aware placeholder (point 318 — "Unbekanntes Dorf", "Unbekannter Berg"),
 // a visited place (Cairo) shows its real name, and sighting a landmark reveals it.
-const labelsBefore = await page.evaluate(() => {
+const labelsBefore = await page.evaluate(async () => {
+  // Language-agnostic on purpose: this suite runs in ENGLISH, flow.mjs in German,
+  // so the placeholder is matched against the language FILES rather than one
+  // hard-coded wording (point 318 — a German-only regex failed here first).
+  const [{ en }, { de }] = await Promise.all([import('/src/i18n/en.ts'), import('/src/i18n/de.ts')])
+  const placeholders = new Set([...Object.values(en.unknownPlaces), ...Object.values(de.unknownPlaces)])
   const labels = [...document.querySelectorAll('.map-label')]
   return {
-    undiscovered: labels.filter((l) => l.classList.contains('undiscovered') && l.textContent.trim() === '?').length,
+    undiscovered: labels.filter((l) => l.classList.contains('undiscovered') && placeholders.has(l.textContent.trim())).length,
+    bareQuestionMarks: labels.filter((l) => l.textContent.trim() === '?').length,
     cairoNamed: labels.some((l) => !l.classList.contains('undiscovered') && /Kair|Cairo/.test(l.textContent)),
     kiliHidden: !labels.some((l) => /Kilim/.test(l.textContent)),
     seen: window.__game.getState().landmarksSeen.includes('kilimanjaro'),
   }
 })
-check('undiscovered map points show a "?" label', labelsBefore.undiscovered > 0, JSON.stringify(labelsBefore))
+check('undiscovered map points name their kind', labelsBefore.undiscovered > 0, JSON.stringify(labelsBefore))
+check('no map label is a bare "?" any more (point 318)', labelsBefore.bareQuestionMarks === 0, JSON.stringify(labelsBefore))
 check('a visited place (Cairo) shows its real name', labelsBefore.cairoNamed, JSON.stringify(labelsBefore))
-check('an unsighted landmark (Kilimanjaro) is hidden behind "?"', labelsBefore.kiliHidden && !labelsBefore.seen, JSON.stringify(labelsBefore))
+check('an unsighted landmark (Kilimanjaro) is hidden behind its kind label', labelsBefore.kiliHidden && !labelsBefore.seen, JSON.stringify(labelsBefore))
 await page.evaluate(() =>
   window.__game.setState({ landmarksSeen: [...window.__game.getState().landmarksSeen, 'kilimanjaro'] }),
 )
@@ -349,8 +362,7 @@ const meroeRevealed = await page.evaluate(() =>
   [...document.querySelectorAll('.map-label')].some((l) => /Mero/.test(l.textContent)),
 )
 check('the Meroë pyramids reveal their name once sighted', meroeRevealed, '')
-await page.screenshot({ path: `${OUT}91-cultural-landmark-meroe.png` })
-console.log('shot 91-cultural-landmark-meroe.png')
+await shot('91-cultural-landmark-meroe', { world: { lat: 16.94, lon: 33.75 }, label: 'the Meroe pyramids' })
 
 // Stage-2 evidence: one new cultural site (Aksum stelae) and one natural site
 // (Ngorongoro crater) with their labels revealed.
@@ -363,8 +375,7 @@ const aksumRevealed = await page.evaluate(() =>
   [...document.querySelectorAll('.map-label')].some((l) => /Aksum/.test(l.textContent)),
 )
 check('the Aksum stelae reveal their name once sighted', aksumRevealed, '')
-await page.screenshot({ path: `${OUT}94-cultural-landmark-aksum.png` })
-console.log('shot 94-cultural-landmark-aksum.png')
+await shot('94-cultural-landmark-aksum', { world: { lat: 14.13, lon: 38.72 }, label: 'the Aksum stelae' })
 await page.evaluate(() => window.__game.getState().debugJumpTo(-3.16, 35.58)) // Ngorongoro
 await page.evaluate(() =>
   window.__game.setState({ landmarksSeen: [...window.__game.getState().landmarksSeen, 'ngorongoro'] }),
@@ -374,8 +385,7 @@ const ngoroRevealed = await page.evaluate(() =>
   [...document.querySelectorAll('.map-label')].some((l) => /Ngorongoro/.test(l.textContent)),
 )
 check('the Ngorongoro crater reveals its name once sighted', ngoroRevealed, '')
-await page.screenshot({ path: `${OUT}95-natural-site-ngorongoro.png` })
-console.log('shot 95-natural-site-ngorongoro.png')
+await shot('95-natural-site-ngorongoro', { world: { lat: -3.16, lon: 35.58 }, label: 'the Ngorongoro crater' })
 
 // --- Exploration map: parchment look + fog of war (§7.1.3, design.md §19) -----
 // Explore a swath of the north, open the map and confirm the explored area is a
@@ -402,8 +412,7 @@ check(
   mapPix !== null && mapPix.explored > mapPix.fogged + 25,
   JSON.stringify(mapPix),
 )
-await page.locator('.map-overlay').screenshot({ path: `${OUT}92-map-fog-of-war.png` })
-console.log('shot 92-map-fog-of-war.png')
+await shot('92-map-fog-of-war', { element: '.map-overlay', locator: '.map-overlay', label: 'the exploration map under its fog' })
 
 // Point 89: the opened map sits BOTTOM-LEFT, clear of the inventory bar and the
 // bottom-right camp/map/journal buttons, and shows a "you are here" marker.
@@ -523,8 +532,7 @@ for (const [name, lat, lon] of [
 ]) {
   await page.evaluate(([a, o]) => window.__game.getState().debugJumpTo(a, o), [lat, lon])
   await page.waitForTimeout(1500) // let the chunks and water surfaces stream in
-  await page.screenshot({ path: `${OUT}${name}.png` })
-  console.log(`shot ${name}.png`)
+  await shot(name, { world: { lat, lon }, label: name })
 }
 
 // --- Region border labels (§7.1.3) -------------------------------------------
@@ -589,8 +597,7 @@ if (jungleSpot) {
       barBottom: Math.round(br.bottom),
     }
   })
-  await page.screenshot({ path: `${OUT}84-movement-penalty.png` })
-  console.log('shot 84-movement-penalty.png')
+  await shot('84-movement-penalty', { element: '.movement-penalty', label: 'the movement-penalty hint' })
   check('Movement penalty hint sits centred inside the status bar', hint.centred === true, `centreOff ${hint.centreOff}, hintTop ${hint.hintTop} vs barBottom ${hint.barBottom}`)
 } else {
   check('Movement penalty hint: a jungle tile was found', false, 'no jungle tile located')
@@ -665,8 +672,7 @@ if (waterSpot && landSpot) {
   // shot catches a mid-transition view instead of the close-up.
   await page.evaluate(() => window.__ui.getState().setTravelZoom(0.3))
   await page.waitForTimeout(1800)
-  await page.screenshot({ path: `${OUT}88-canoe-ride.png` })
-  console.log('shot 88-canoe-ride.png')
+  await shot('88-canoe-ride', { world: { lat: waterSpot.lat, lon: waterSpot.lon }, label: 'the canoe ride on the water', settle: false })
 
   // On land with the canoe still in the pack: it is dragged behind, not ridden.
   await page.evaluate((s) => window.__game.getState().debugJumpTo(s.lat, s.lon), landSpot)
@@ -688,8 +694,7 @@ if (waterSpot && landSpot) {
       Math.abs(drag.drag.roll) <= 0.36,
     JSON.stringify(drag?.drag),
   )
-  await page.screenshot({ path: `${OUT}89-canoe-carry.png` })
-  console.log('shot 89-canoe-carry.png')
+  await shot('89-canoe-carry', { world: { lat: landSpot.lat, lon: landSpot.lon }, label: 'the dragged canoe on land', settle: false })
   await page.evaluate(() => window.__ui.getState().setTravelZoom(1))
 
   // Stow the canoe (remove it): neither ridden nor dragged.
@@ -732,7 +737,12 @@ if (waterSpot && landSpot) {
       Math.abs(swimGap - 0.35) < 0.12, // immersion, within the swim bob
     JSON.stringify({ spot: swim.spot, swimming: swim.player?.swimming, swimGap, surfOverBed: swim.found ? swim.player.surfaceY - swim.player.refY : null }),
   )
-  await page.screenshot({ path: `${OUT}125-swim-lake-edward.png` })
+  await shot(
+    '125-swim-lake-edward',
+    swim.found
+      ? { world: { lat: swim.spot[0], lon: swim.spot[1] }, label: 'the swimmer on Lake Edward', settle: false }
+      : { general: 'Lake Edward was not found in the data, so there is no spot to aim at' },
+  )
   // State hygiene: the swim check leaves the player mid-Lake-Edward; jump
   // back to the Cairo reach so the downstream checks (vicinity seeding,
   // scripted hunts) run over their usual streamed chunks.
@@ -781,8 +791,10 @@ if (waterSpot && landSpot) {
   await page.waitForTimeout(500)
   const hurt = await page.evaluate(() => window.__player)
   check('Injured figure: a severe wound shows on the explorer', hurt?.wounds === 2, JSON.stringify(hurt))
-  await page.screenshot({ path: `${OUT}90-wounded-explorer.png` })
-  console.log('shot 90-wounded-explorer.png')
+  // The traveller himself is the subject: read where he stands and require the
+  // camera to hold him (point 375), rather than trusting the earlier jump.
+  const hurtAt = await page.evaluate(() => window.__game.getState().pos)
+  await shot('90-wounded-explorer', { world: { x: hurtAt.x, z: hurtAt.z }, label: 'the wounded explorer', settle: false })
   await page.evaluate(() => {
     const g = window.__game.getState()
     window.__game.setState({ afflictions: { ...g.afflictions, wounds: 0 } })
@@ -869,10 +881,12 @@ check(
   JSON.stringify(notch),
 )
 // The picture for the record: the swimmer in the mouth notch he used to be
-// stuck in, before he works his way out.
-await page.waitForTimeout(500)
-await page.screenshot({ path: `${OUT}142-river-mouth-swim.png` })
-console.log('shot 142-river-mouth-swim.png')
+// stuck in, before he works his way out. The shutter settles the camera on the
+// spot he drifted to and refuses the frame if he is not in it (point 375).
+await shot('142-river-mouth-swim', {
+  world: { lat: notch.landed?.[0] ?? notch.tip?.[0] ?? 31.4, lon: notch.landed?.[1] ?? notch.tip?.[1] ?? 30.4 },
+  label: 'the swimmer in the Nile mouth notch',
+})
 const escape = await page.evaluate(async () => {
   const terrain = await import('/src/world/terrain.ts')
   const st = () => window.__game.getState()
@@ -899,9 +913,13 @@ check(
   escape.alive && !escape.endBlocked && escape.movedDeg > 0.25 && escape.southedDeg > 0.1,
   JSON.stringify(escape),
 )
-// State hygiene: back to the Cairo reach the later checks stream over.
+// State hygiene: back to the Cairo reach the later checks stream over. Wait on
+// the traveller actually standing there, not on the wall clock.
 await page.evaluate(() => window.__game.getState().debugJumpTo(29.5, 31.4))
-await page.waitForTimeout(500)
+await page.waitForFunction(() => {
+  const p = window.__game.getState().pos
+  return Math.abs(-p.z / 10 - 29.5) < 0.05 && Math.abs(p.x / 10 - 31.4) < 0.05
+})
 
 // --- Point 5: the journal panel stops above the camp/journal buttons ----------
 // The open journal must not reach the bottom and cover the camp/journal toggle
@@ -1181,8 +1199,12 @@ const stainPixels = await (async () => {
     y: Math.min(VH - 300, Math.max(0, Math.round(box.y + box.height / 2 - 150))),
     width: 420, height: 300,
   }
-  await page.screenshot({ path: `${OUT}137-blood-ground-tint.png`, clip: shot })
-  console.log('shot 137-blood-ground-tint.png')
+  await captureFrame(page, OUT, '137-blood-ground-tint', {
+    world: { x: spot.x, z: spot.z },
+    label: 'the blood stain soaked into the ground',
+    settle: false,
+    clip: shot,
+  })
   await page.evaluate((prev) => window.__ui.getState().setSeasonWetnessOverride(prev.wet), prevState)
   // A pixel counts as soaked when the blood REDDENED it — the signature of the
   // tint and of nothing else on this ground (a strayed animal or its shadow
@@ -1887,6 +1909,90 @@ check('the adoption re-establishes the parent↔child link so a §19.8 drama can
 check('with no adult in range the orphan simply stays parentless (point 262)',
   adoption.stayedOrphan, JSON.stringify(adoption))
 
+// Point 341: a juvenile's bond RESOLVES, never hangs. The streaming cull removes
+// an animal by distance from the player, and a culled parent is NOT dead — so a
+// calf used to keep it, walk to its frozen phantom position and nurse at nothing
+// while the point-262 adoption (which waits for a dead parent) never fired. Two
+// staged cases: the parent is driven out of the despawn ring (the cull must clear
+// both link directions, and the calf ends with a LIVING herd-mate — or nothing at
+// all where none is eligible), and a calf left out of reach of a living parent
+// past balance.family.reunionSeconds has its bond released to the same adoption.
+const bond = await page.evaluate(async () => {
+  const STAGE = [-2.5, 34.0] // Serengeti savanna
+  const AWAY = [5.0, 20.0] // far off in another region: the staged pair is left behind
+  const jump = (ll) => window.__game.getState().debugJumpTo(ll[0], ll[1])
+  jump(STAGE)
+  await window.__sleepSim(0.5)
+  const herds = window.__wildlife.herdsRef.current
+  const clear = () => { for (const sp of Object.keys(herds)) herds[sp].length = 0 }
+  const at = () => window.__game.getState().pos
+  const mk = (p, dx, dz, over = {}) => ({ x: p.x + dx, z: p.z + dz, y: 0.2, rot: 0, scale: 1, phase: 0, ...over })
+  const live = (a) => !!a && a.dead !== true && a.young !== true && herds.zebra.includes(a)
+
+  // --- The cull takes the parent: the calf keeps no phantom ---
+  // Driving AWAY is what removes it, exactly as in the report — the despawn ring
+  // is a distance from the player, and the on-screen backstop only holds an
+  // animal inside the rendered frame. `chunk` is what makes the cull judge it at
+  // all (an injected, untagged animal is always kept), so the staged calf and its
+  // herd-mate survive the drive while the tagged parent is streamed out.
+  clear()
+  const p0 = at()
+  const parent = mk(p0, 0, 0, { chunk: '999999,999999' })
+  const calf = mk(p0, 1, 0, { young: true, scale: 0.55, parent })
+  parent.child = calf
+  const adopter = mk(p0, 3, 0) // a childless zebra adult beside the calf
+  herds.zebra.unshift(parent, calf, adopter)
+  await window.__sleepSim(0.3)
+  jump(AWAY)
+  await window.__pollSim(6, () => !herds.zebra.includes(parent) && !!calf.parent && calf.parent !== parent)
+  const culled = !herds.zebra.includes(parent)
+  const noPhantom = culled && calf.parent !== parent && parent.child !== calf
+  const reAdopted = culled && calf.parent !== parent && live(calf.parent) && calf.parent.child === calf
+
+  // --- No eligible adult: the calf roams on parentless, never bonded to a ghost ---
+  const prevR = window.__balance.family.adoptionRadius
+  window.__balance.family.adoptionRadius = 0.001 // nothing is in reach, not even a streamed-in herd-mate
+  clear()
+  jump(STAGE)
+  await window.__sleepSim(0.3)
+  const p1 = at()
+  const lone = mk(p1, 0, 0, { chunk: '999999,999999' })
+  const stray = mk(p1, 1, 0, { young: true, scale: 0.55, parent: lone })
+  lone.child = stray
+  herds.zebra.unshift(lone, stray)
+  await window.__sleepSim(0.3)
+  jump(AWAY)
+  await window.__pollSim(6, () => !herds.zebra.includes(lone) && !stray.parent)
+  const freeRoamer = !herds.zebra.includes(lone) && !stray.parent && lone.child !== stray
+  window.__balance.family.adoptionRadius = prevR
+
+  // --- The separation window: a living parent it cannot reach ---
+  const prevW = window.__balance.family.reunionSeconds
+  window.__balance.family.reunionSeconds = 1 // debug-editable; shortened so the check stays quick
+  clear()
+  jump(STAGE)
+  await window.__sleepSim(0.3)
+  const p2 = at()
+  const distant = mk(p2, 0, 0) // alive and well, but far outside the follow radius
+  const left = mk(p2, 40, 0, { young: true, scale: 0.55, parent: distant })
+  distant.child = left
+  herds.zebra.unshift(distant, left, mk(p2, 38, 0)) // an eligible adult beside the stray calf
+  await window.__pollSim(8, () => !!left.parent && left.parent !== distant)
+  const separated = live(left.parent) && left.parent.child === left && distant.child !== left
+  window.__balance.family.reunionSeconds = prevW
+  clear()
+
+  return { culled, noPhantom, reAdopted, freeRoamer, separated }
+})
+check('the streaming cull clears the family link on both sides (point 341)',
+  bond.culled && bond.noPhantom, JSON.stringify(bond))
+check('a calf whose parent was culled is adopted by a living herd-mate (point 341)',
+  bond.reAdopted, JSON.stringify(bond))
+check('with no eligible adult that calf roams on parentless, never bonded to a ghost (point 341)',
+  bond.freeRoamer, JSON.stringify(bond))
+check('a calf out of reach past the reunion window is handed to the adoption (point 341)',
+  bond.separated, JSON.stringify(bond))
+
 // --- Scavenging of a non-lion carcass (point 5) ------------------------------
 // A carcass that was not eaten by the lion (e.g. trampled) draws a vulture that
 // flies in, lands and consumes it, dissolving it as a lion kill does.
@@ -2010,7 +2116,12 @@ const animalHit = await page.evaluate(async () => {
     zebra.x = ax
     zebra.z = az
     const p = window.__game.getState().pos
-    const d = Math.hypot(p.x - ax, p.z - az)
+    // Judged against the DRAWN body (point 378), which is where the collider
+    // now sits: the idle shuffle renders the instance up to ~1.1 units off its
+    // behaviour spot, so measuring to `ax/az` would grade the picture by a
+    // quantity the player never sees.
+    const b = zebra.drawn ?? { x: ax, z: az }
+    const d = Math.hypot(p.x - b.x, p.z - b.z)
     minDist = Math.min(minDist, d)
     if (d < 2) reached = true
     await sleep(20)
@@ -2055,6 +2166,150 @@ check(
   JSON.stringify(animalHit),
 )
 
+// --- Point 378: the collision sits ON the animal, not beside it ---------------
+// The user walked THROUGH the drawn body and was blocked on empty ground next to
+// it: the collider was built from the behaviour position while the renderer
+// draws that position plus its render offsets. Staged with the largest of those
+// offsets — the drink walk, which renders the body several units away at the
+// bank while the animal's own spot stays put — the two halves of the report are
+// asserted directly: driving at the DRAWN body is blocked, driving through the
+// spot the body merely "belongs" to is free. Everything is measured against the
+// instance matrix the renderer wrote and the circles the movement loop really
+// collides against — never an assumed radius (§7.2).
+const drawnCollision = await page.evaluate(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  if (!window.__wildlife?.herdsRef?.current) return { notReady: true }
+  const seed = window.__game.getState().seed
+  const p0 = window.__game.getState().pos
+  const S = { x: p0.x + 3, z: p0.z + 3 } // the animal's own (behaviour) spot
+  // A drink target on dry land 8 units away: the render slides the body there
+  // and holds it for the drinking plateau while the animal itself never moves.
+  let T = null
+  for (const [dx, dz] of [[0, 8], [8, 0], [0, -8], [-8, 0], [6, 6], [-6, -6]]) {
+    const tx = S.x + dx
+    const tz = S.z + dz
+    const ty = window.__terrainType(-tz / 10, tx / 10, seed)
+    if (ty !== 'water' && ty !== 'ocean') { T = { x: tx, z: tz }; break }
+  }
+  if (!T) return { noDryTarget: true }
+  const liveChunk = (() => {
+    const h = window.__wildlife.herdsRef.current
+    for (const sp of Object.keys(h)) for (const a of h[sp]) if (a.chunk && !a.dead) return a.chunk
+    return undefined
+  })()
+  const zebra = { x: S.x, z: S.z, y: 0.2, rot: 0, scale: 1, phase: 0, chunk: liveChunk ?? 'drawn-collide-test',
+    drink: { tx: T.x, tz: T.z } }
+  const herds = window.__wildlife.herdsRef.current
+  herds.zebra.unshift(zebra)
+  // Keep every other body out of both drive corridors, so what blocks (or does
+  // not block) the traveller is the staged animal alone.
+  const clearCorridors = () => {
+    for (const sp of Object.keys(herds)) {
+      for (const a of herds[sp]) {
+        if (a === zebra || a.dead) continue
+        const nearDrawn = Math.abs(a.z - (zebra.drawn?.z ?? T.z)) < 6 && a.x > Math.min(p0.x - 10, T.x - 10) && a.x < T.x + 6
+        const nearSpot = Math.abs(a.z - S.z) < 6 && a.x > S.x - 12 && a.x < S.x + 6
+        if (nearDrawn || nearSpot) a.z += 30
+      }
+    }
+  }
+  const repin = () => {
+    if (!herds.zebra.includes(zebra)) herds.zebra.unshift(zebra)
+    zebra.x = S.x
+    zebra.z = S.z
+    clearCorridors()
+  }
+  // Reach the drink walk's PLATEAU (the stretch of the 75 s cycle where the body
+  // stands at the bank) without waiting out the cycle: the cycle is driven by
+  // the animal's own phase, so scan the phase until the render places the body
+  // at the target, then keep that phase.
+  for (let p = 0; p < 1.9; p += 0.04) {
+    zebra.phase = p
+    repin()
+    await sleep(70)
+    const d = zebra.drawn
+    if (d && Math.hypot(d.x - T.x, d.z - T.z) < 0.8) break
+  }
+  const atBank = zebra.drawn ? Math.hypot(zebra.drawn.x - T.x, zebra.drawn.z - T.z) : Infinity
+  const offset = zebra.drawn ? Math.hypot(zebra.drawn.x - S.x, zebra.drawn.z - S.z) : 0
+  if (!(atBank < 0.8)) { herds.zebra = herds.zebra.filter((a) => a !== zebra); return { noPlateau: true, atBank, offset } }
+  // The circle the movement loop would collide against, at the drawn body.
+  const circleAtDrawn = window.__wildlife.colliders(zebra.drawn.x, zebra.drawn.z, 0.1)
+  const circleAtSpot = window.__wildlife.colliders(S.x, S.z, 0.1)
+  const radius = circleAtDrawn.length ? circleAtDrawn[0][2] : 0
+
+  // One drive east along a given z, from `fromX`, bounded in SIM time (a wall cap
+  // as the safety). Tracks how close the traveller came to the target AND how
+  // close the drawn body ever came to it — the second is what proves the flank
+  // was genuinely empty ground while he crossed it.
+  const drive = async (fromX, targetOf) => {
+    window.__game.setState({ pos: { x: fromX, z: targetOf().z } })
+    await sleep(120)
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyD' }))
+    const s0 = window.__simTime()
+    const t0 = Date.now()
+    let min = Infinity
+    let minBody = Infinity
+    let onScreenAtMin = false
+    while (window.__simTime() - s0 < 3 && Date.now() - t0 < 60000) {
+      repin()
+      const p = window.__game.getState().pos
+      const g = targetOf()
+      const d = Math.hypot(p.x - g.x, p.z - g.z)
+      if (d < min) {
+        min = d
+        // §7.2: judge "was it in the picture" by PROJECTING the subject through
+        // the live camera, at the moment it mattered — the closest approach.
+        onScreenAtMin = window.__camera.onScreen(g.x, g.z)
+      }
+      if (zebra.drawn) minBody = Math.min(minBody, Math.hypot(zebra.drawn.x - g.x, zebra.drawn.z - g.z))
+      await sleep(20)
+    }
+    window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyD' }))
+    return { min, minBody, onScreenAtMin }
+  }
+  // 1. Straight at the DRAWN body: the traveller must be stopped by it.
+  const into = await drive(zebra.drawn.x - 5, () => zebra.drawn)
+  const intoBody = into.min
+  // 2. Through the animal's own spot, where nothing is drawn: free ground.
+  const past = await drive(S.x - 5, () => S)
+  const pastFlank = past.min
+  const bodyKeptOffFlank = past.minBody // the body never came near the flank line
+  const drawnEnd = zebra.drawn ? { x: zebra.drawn.x, z: zebra.drawn.z } : null
+  const offsetEnd = drawnEnd ? Math.hypot(drawnEnd.x - S.x, drawnEnd.z - S.z) : 0
+  const onScreen = into.onScreenAtMin // in the picture at the moment it blocked
+  herds.zebra = herds.zebra.filter((a) => a !== zebra)
+  return { offset, offsetEnd, radius, intoBody, pastFlank, bodyKeptOffFlank, onScreen,
+    circleAtDrawn: circleAtDrawn.length, circleAtSpot: circleAtSpot.length, drawnEnd, spot: S }
+})
+if (drawnCollision.notReady || drawnCollision.noDryTarget || drawnCollision.noPlateau ||
+    !(drawnCollision.bodyKeptOffFlank > drawnCollision.radius + 0.9)) {
+  // Staging miss (no wildlife hook / no dry bank / the drink cycle never reached
+  // its plateau, or walked the body back onto the flank line mid-drive) — fail
+  // SOFT like the neighbouring wildlife checks: an environment transient, not a
+  // product defect. The flank must be provably empty for its check to mean
+  // anything, so a body that came back is a miss, never a pass.
+  console.log(`SKIP  the collider follows the drawn body — staging miss ${JSON.stringify(drawnCollision)}`)
+} else {
+  check(
+    'the collision circle sits on the DRAWN body, not on the behaviour spot (point 378)',
+    drawnCollision.circleAtDrawn === 1 && drawnCollision.circleAtSpot === 0 && drawnCollision.offset > 3,
+    JSON.stringify(drawnCollision),
+  )
+  check(
+    'driving into the drawn body is blocked (the traveller never enters it)',
+    drawnCollision.intoBody > drawnCollision.radius + 0.2 && drawnCollision.intoBody < drawnCollision.radius + 1.6,
+    JSON.stringify(drawnCollision),
+  )
+  check(
+    'driving through the spot beside it is free (no collider on empty ground)',
+    drawnCollision.pastFlank < 0.4,
+    JSON.stringify(drawnCollision),
+  )
+  check('the drawn body was in the rendered frame while it blocked (§7.2)', drawnCollision.onScreen === true,
+    JSON.stringify(drawnCollision))
+}
+
 // --- Point 129: a tree contact leaves every free direction free ---------------
 // The user's invisible-blocker report (west dead at a spot with nothing
 // visible west) could not be reproduced; hypotheses (a) two-circle resting
@@ -2090,11 +2345,19 @@ const treeHit = await page.evaluate(async () => {
   if (!tree) return { found: false }
   // Park due west of it, then drive east into the trunk.
   window.__game.getState().debugJumpTo(-(tree.z) / U, (tree.x - 3) / U)
-  // Clear other animals off the spot so only the tree can block.
-  const h0 = window.__wildlife.herdsRef.current
-  if (h0) for (const sp of Object.keys(h0)) for (const a of h0[sp]) {
-    if (!a.dead && Math.hypot(a.x - tree.x, a.z - tree.z) < 8) a.z += 25
+  // Clear other animals off the spot so only the tree can block — CONTINUOUSLY,
+  // not once (point 378): the herds stream and wander for the whole test, and
+  // since the collider now sits on the DRAWN body, a grazer that walks in — or
+  // is merely rendered a body-width off its behaviour spot — is a legitimate
+  // blocker that has nothing to do with the tree this check is about.
+  const clearAnimals = () => {
+    const h0 = window.__wildlife?.herdsRef?.current
+    if (!h0) return
+    for (const sp of Object.keys(h0)) for (const a of h0[sp]) {
+      if (!a.dead && Math.hypot(a.x - tree.x, a.z - tree.z) < 12) a.z += 25
+    }
   }
+  clearAnimals()
   const out = { found: true, r: tree.r, minDist: Infinity, reached: false, north: 0, south: 0, west: 0 }
   window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyD' }))
   // Sim-budget the approach (point 177): a wall-clock drive under load rests the
@@ -2102,6 +2365,7 @@ const treeHit = await page.evaluate(async () => {
   // northward drive below reads blocked — a deterministic sim-time approach fixes
   // the resting position.
   await window.__pollSim(6, () => {
+    clearAnimals()
     const p = window.__game.getState().pos
     const d = Math.hypot(p.x - tree.x, p.z - tree.z)
     out.minDist = Math.min(out.minDist, d)
@@ -2115,6 +2379,7 @@ const treeHit = await page.evaluate(async () => {
     window.dispatchEvent(new KeyboardEvent('keydown', { code }))
     let moved = 0
     await window.__pollSim(8, () => {
+      clearAnimals()
       const p = window.__game.getState().pos
       moved = sign * (axis === 'x' ? p.x - start.x : p.z - start.z)
       return moved > dist
@@ -2356,7 +2621,7 @@ check(
   grassFire.trapped && grassFire.calfDead && grassFire.parentDead && grassFire.resolved,
   JSON.stringify(grassFire),
 )
-await page.screenshot({ path: `${OUT}131-burning-grass.png` })
+await shot('131-burning-grass', { world: { lat: 13.5, lon: 5.0 }, label: 'the Sahel fire line', settle: false })
 
 // --- Point 145b: the broken-wing lure -----------------------------------------
 // A plover nest planted beside the traveller: standing close starts the act
@@ -2413,7 +2678,7 @@ check(
   brokenWing.lured && brokenWing.maxFromNest > 5 && brokenWing.tookOff && brokenWing.resolved && brokenWing.homeAgain,
   JSON.stringify(brokenWing),
 )
-await page.screenshot({ path: `${OUT}132-broken-wing.png` })
+await shot('132-broken-wing', { world: { lat: -2.5, lon: 34.0 }, label: 'the plover feigning the broken wing', settle: false })
 
 // --- Carcasses do not accumulate off-screen (freeze fix) ---------------------
 // A single scavenger cannot keep up with every kill, so carcasses left far off
@@ -2914,6 +3179,123 @@ const guard = await page.evaluate(async () => {
   return { found: true, before: +before.toFixed(2), after: +after.toFixed(2) }
 })
 check('a parent moves to guard its calf from a predator', guard.found && guard.after < guard.before - 0.05, JSON.stringify(guard))
+
+// --- Point 369: an orphaned juvenile mourns before it plays again ------------
+// A calf whose parent has just DIED used to go straight back to gambolling, and
+// the picture said nothing had happened. Three staged scenes, all on the
+// synthetic family (point 135) so nothing depends on the natural spawn pool:
+// the bereaved calf keeps to the body and does not hop for a whole play cycle;
+// the window survives an adoption and then RELEASES it back into play; and a
+// predator staged mid-window still makes it run — fear outranks grief.
+const mourn369 = await page.evaluate(async () => {
+  const B = window.__balance
+  const L = window.__lionHunt.state
+  const prevWindow = B.family.mourningSeconds
+  const prevRadius = B.family.adoptionRadius
+  const at = () => window.__game.getState().pos
+  // The play cycle the demeanour must visibly SKIP: one bout plus the fixed
+  // 12 s idle gap (GAMBOL_IDLE_SECONDS in the scene).
+  const CYCLE = B.family.gambolBoutSeconds + 12
+
+  // --- 1) The bereaved calf keeps to the body and does not play -------------
+  L.mode = 'idle'; L.timer = 999 // no stray hunt while the demeanour is watched
+  B.family.adoptionRadius = 0.001 // nobody takes it in: it keeps to the body itself
+  B.family.mourningSeconds = CYCLE * 3 // debug-editable; long enough to watch a whole cycle
+  const p0 = at()
+  // Staged well outside PLAYER_SHY_RADIUS (6): a calf inside it bolts from the
+  // traveller — correctly — and would never reach the demeanour at all.
+  const fam = window.__makeTestFamily(p0.x + 26, p0.z + 6)
+  const { parent, calf } = fam
+  await window.__sleepSim(0.4)
+  const bodyX = parent.x, bodyZ = parent.z
+  parent.dead = true // THE TRIGGER IS DEATH: the calf watches its parent fall
+  await window.__pollSim(4, () => calf.mourn !== undefined)
+  const armed = calf.mourn > 0 && !!calf.mournAt
+  const anchored = armed && Math.hypot(calf.mournAt.x - bodyX, calf.mournAt.z - bodyZ) < 0.01
+  const cutLoose = calf.parent === undefined // holds no body that is gone (point 341)
+  let hopped = false
+  await window.__pollSim(CYCLE + 4, () => {
+    if (calf.hop !== undefined) hopped = true
+    return hopped
+  })
+  const subdued = !hopped && calf.mourn !== undefined
+  // …and it kept to the body rather than roaming off with the herd.
+  const besideBody = Math.hypot(calf.x - bodyX, calf.z - bodyZ) < 12
+  fam.dispose()
+
+  // --- 2) Adoption runs on its own clock, and the window RELEASES the calf --
+  B.family.adoptionRadius = prevRadius
+  const p1 = at()
+  const fam2 = window.__makeTestFamily(p1.x + 26, p1.z - 8)
+  const calf2 = fam2.calf
+  const adopter = { x: fam2.parent.x + 3, z: fam2.parent.z, y: 0.2, rot: 0, scale: 1, phase: 0.11, chunk: fam2.parent.chunk }
+  window.__wildlife.herdsRef.current.zebra.push(adopter)
+  await window.__sleepSim(0.4)
+  fam2.parent.dead = true
+  await window.__pollSim(4, () => calf2.mourn !== undefined && !!calf2.parent)
+  const adoptedWhileMourning = !!calf2.parent && calf2.parent !== fam2.parent && calf2.mourn > 0
+  let hopped2 = false
+  await window.__pollSim(CYCLE + 4, () => {
+    if (calf2.hop !== undefined) hopped2 = true
+    return hopped2
+  })
+  const followsSubdued = !hopped2 && !!calf2.parent
+  // The EXIT path: run the window out and the calf plays again.
+  calf2.mourn = 0.05
+  await window.__pollSim(CYCLE + 8, () => calf2.hop !== undefined)
+  const playsAgain = calf2.mourn === undefined && calf2.mournAt === undefined && calf2.hop !== undefined
+  fam2.dispose()
+  window.__wildlife.herdsRef.current.zebra = window.__wildlife.herdsRef.current.zebra.filter((a) => a !== adopter)
+
+  // --- 3) FEAR STILL WINS: a predator staged mid-window makes it run --------
+  B.family.adoptionRadius = 0.001 // keep it at the body, so only fear can move it off
+  const p2 = at()
+  const fam3 = window.__makeTestFamily(p2.x + 26, p2.z + 20)
+  const calf3 = fam3.calf
+  await window.__sleepSim(0.4)
+  fam3.parent.dead = true
+  await window.__pollSim(4, () => calf3.mourn !== undefined)
+  const mourningWhenHunted = calf3.mourn !== undefined
+  const lx = calf3.x + 5, lz = calf3.z // pinned well beyond CALF_CATCH_DIST: it flees, it is not seized
+  const distToPredator = () => Math.hypot(calf3.x - lx, calf3.z - lz)
+  const fleeBefore = distToPredator()
+  // Re-pin the hunt EVERY frame (the guard check's discipline): a victimless or
+  // stale chase aborts on its own, and the flight branch would then skip.
+  await new Promise((resolve) => {
+    const s0 = window.__wildlife.simTime()
+    const t0 = Date.now()
+    const tick = () => {
+      L.mode = 'chase'; L.lx = lx; L.lz = lz; L.px = calf3.x; L.pz = calf3.z; L.victim = calf3
+      if (window.__wildlife.simTime() - s0 < 5 && Date.now() - t0 < 60000) requestAnimationFrame(tick)
+      else resolve()
+    }
+    requestAnimationFrame(tick)
+  })
+  const fleeAfter = distToPredator()
+  const stillMourningWhileFleeing = calf3.mourn !== undefined // the clock never paused
+  L.mode = 'idle'; L.timer = 60; L.victim = null
+  fam3.dispose()
+
+  B.family.mourningSeconds = prevWindow
+  B.family.adoptionRadius = prevRadius
+  return {
+    armed, anchored, cutLoose, subdued, besideBody,
+    adoptedWhileMourning, followsSubdued, playsAgain,
+    mourningWhenHunted, stillMourningWhileFleeing,
+    fleeBefore: +fleeBefore.toFixed(2), fleeAfter: +fleeAfter.toFixed(2),
+  }
+})
+check('a parent that dies leaves its calf mourning at the spot it fell (point 369)',
+  mourn369.armed && mourn369.anchored && mourn369.cutLoose, JSON.stringify(mourn369))
+check('the bereaved calf stays subdued beside the body instead of hopping (point 369)',
+  mourn369.subdued && mourn369.besideBody, JSON.stringify(mourn369))
+check('adoption changes WHO it follows, not its demeanour — it follows subdued (point 369)',
+  mourn369.adoptedWhileMourning && mourn369.followsSubdued, JSON.stringify(mourn369))
+check('the window always releases the calf back into play (point 369)',
+  mourn369.playsAgain, JSON.stringify(mourn369))
+check('a predator staged during the window still makes the calf RUN (point 369)',
+  mourn369.mourningWhenHunted && mourn369.stillMourningWhileFleeing &&
+    mourn369.fleeAfter > mourn369.fleeBefore + 0.5, JSON.stringify(mourn369))
 
 // --- Lion hunt: varied chase directions and a weaving prey (point 7) ---------
 // The lion now approaches from a random direction (chase no longer always runs
@@ -4084,8 +4466,9 @@ await page.evaluate(() => {
 // Let the hyena close and the lioness take up the shield, but capture before
 // the drive-off scatters them.
 await page.waitForTimeout(1600)
-await page.screenshot({ path: `${OUT}133-lioness-defends-cub.png` })
-console.log('shot 133-lioness-defends-cub.png')
+// The scene is staged AT the traveller, so his own spot is what must be framed.
+const cubSceneAt = await page.evaluate(() => window.__game.getState().pos)
+await shot('133-lioness-defends-cub', { world: { x: cubSceneAt.x, z: cubSceneAt.z }, label: 'the lioness shielding her cub', settle: false })
 await page.evaluate(() => {
   const herds = window.__wildlife.herdsRef.current
   herds.lion = herds.lion.filter((a) => !a.__cubShot && !a.__cubTest)
@@ -4302,7 +4685,7 @@ check(
   mourn.found && mourn.closed !== null && mourn.closed < 10 && mourn.held !== null && mourn.held < 3 && mourn.released,
   JSON.stringify(mourn),
 )
-await page.screenshot({ path: `${OUT}128-elephant-mourning.png` })
+await shot('128-elephant-mourning', { world: { lat: -4.9, lon: 36.6 }, label: 'the elephant graveyard', settle: false })
 
 // --- Point 130: the crocodile ambush ------------------------------------------
 // (1) Natural placement: after a restock at a water-rich reach, crocodiles
@@ -4314,6 +4697,19 @@ await page.screenshot({ path: `${OUT}128-elephant-mourning.png` })
 // untouched throughout. Screenshots 129 (hidden) / 130 (lunge).
 await page.evaluate(() => {
   window.__game.getState().debugJumpTo(-17.9, 25.9) // the Zambezi reach
+  // PIN THE STAGING AT THE JUMP (point 382). The traveller lands ON the river and
+  // the current sweeps him ~2 units/s downstream while the herds restock and the
+  // camera settles — a wall-clock-dependent stretch. His drifted position is what
+  // the point-274 water-cell search below starts from, so the staged cell (and
+  // with it the sampled rects) landed somewhere different on every run: measured,
+  // one run put the eye rect half over the waterfall's foam and another put the
+  // body rect under the "Unknown waterfall" map label, which is not water at all.
+  // Freezing the drift HERE — rather than inside the staging, after the settle —
+  // makes the traveller's spot, the chosen cell and the rects identical run to
+  // run (verified: cell (265,179) and body rect (1145,304,167,118) in three
+  // separate browser sessions). Restored in the cleanup below.
+  window.__stagedCrocPrevDrift = window.__balance.currentDrift
+  window.__balance.currentDrift = 0
   window.__ui.getState().setWheelZoomEnabled(true)
   window.__ui.getState().setTravelZoom(2)
   window.__wildlife.restock()
@@ -4375,6 +4771,34 @@ check(
 // The teeth: a control forces the SAME croc to STRIKE (fully out) and asserts the
 // BODY rect then reads CLEARLY different from water — so hidden = eyes present AND
 // body==water, visible = body!=water, and an empty frame = eyes absent -> FAIL.
+//
+// HOW "different from water" IS MEASURED (point 382). Every leg above is read
+// through ONE scale-free statistic, `animalShare` (defined at its use below):
+// the share of a rect whose colour sits further from that frame's OWN water
+// colour than a fixed multiple of the water's OWN spread. Nothing is compared
+// against a hand-set colour number, and nothing depends on brightness, exposure,
+// backend or projection — the water in the picture is the yardstick.
+// It replaced three absolute deltas whose worst, `strikeDiff > 45`, decided the
+// verdict on the second decimal of a mean and went red on an undisputed picture
+// (44.2 and 44.6 in one evening, and 37.5-42.9 across the eight staged repeats
+// measured for point 382): a mean over the rect dilutes the body with the water
+// beside it, and the dilution moves with the projection.
+// THE MEASURED SPREAD the new bars stand on — twelve repeats of this staging on
+// a quiet machine (eight on WebGL 2, four on WebGPU) plus the three full suite
+// runs that closed point 382, the two backends agreeing to within the
+// run-to-run noise, which is the property a scale-free measure is chosen for:
+//   share, striking body   0.303 - 0.316   bar >= 0.10   (a 3x margin)
+//   share, hidden body     0     - 0.00046 bar <= 0.02   (a 43x margin)
+//   share, croc-free body  0     - 0.00257               (the water floor)
+//   share, eye rect hidden 0.108 - 0.119   bar >= 0.02   (a 5x margin)
+//   share, eye rect free   0                             (the water floor)
+// The old absolute delta over the SAME fifteen frames: 37.5 - 45.7 against its
+// bar of 45 — it landed on the passing side exactly once. That is the flake seen
+// from the other end: the same undisputed picture, a verdict decided by which
+// side of 45 a colour average happened to fall on.
+// and the criterion is written ONCE so it can be FED THE HIDDEN FRAME and shown
+// to say no — `hiddenWouldReadAsAnimal` must be false, asserted, so a body that
+// stayed water-coloured through the strike still turns this check red.
 // Staging discipline (the fix of this check's own false-fail): the ambush
 // trigger is FROZEN while the croc is sampled (balance.crocodile.strikeRadius
 // = 0 — debug-editable; the point-247 bank drinkers stand within the default
@@ -4393,6 +4817,15 @@ check(
 // reach ~1.35 + margin) holds through every sample, and `playerClear`
 // (player-croc distance > 4 at the hidden sample) is asserted and logged so a
 // pass PROVES the body rect held pure water-over-the-submerged-croc.
+// That freeze happens AT THE JUMP now (point 382), not here. Frozen only once
+// the camera had settled, it left the traveller a wall-clock-dependent stretch
+// of drifting first — and the cell search starts from where he ended up, so the
+// staged cell and the sampled rects landed somewhere different on every run.
+// Measured on unpinned runs: one put the eye rect over the falls' foam (its
+// reference read 2548 of 2613 pixels as crocodile), another put the body rect
+// under the "Unknown waterfall" map label, which is no more water than the HUD
+// is. Frozen at the jump, three separate browser sessions staged the identical
+// cell (265, 179) and the identical body rect (1145, 304, 167x118).
 // Sampled at an ACHIEVABLE gameplay zoom (point 172 —
 // the non-debug wheel range is 0.125–0.5): the closest candidate at which both
 // rects project fully on screen, preferring 0.25 where the two ~0.06-unit
@@ -4430,13 +4863,10 @@ const crocStage = await page.evaluate(() => {
   }
   if (!water) return { staged: false }
   // Freeze the ambush while the croc is sampled (restored in the cleanup).
+  // The river's downstream drift is already frozen — at the JUMP, so the cell
+  // this search picks is the same one every run (point 382).
   window.__stagedCrocPrevStrike = window.__balance.crocodile.strikeRadius
   window.__balance.crocodile.strikeRadius = 0
-  // Freeze the river's downstream drift so the canoeing player (and the
-  // camera that follows him) stands STILL through every sample — the swept
-  // canoe used to drift into the body rect and false-fail the hidden read.
-  window.__stagedCrocPrevDrift = window.__balance.currentDrift
-  window.__balance.currentDrift = 0
   window.__stagedCrocBackup = { crocodile: herds.crocodile.splice(0), flamingo: herds.flamingo.splice(0) }
   // Anchor at the visibly DRAWN sheet (point 274): sheetAt, never the canoe
   // float height surfaceAt — its local-bed floor can stand ~0.22 proud of the
@@ -4533,32 +4963,43 @@ if (
     return { mean: [r / n, g / n, b / n], data, n, ch }
   }
   const l1 = (a, c) => Math.abs(a[0] - c[0]) + Math.abs(a[1] - c[1]) + Math.abs(a[2] - c[2])
-  // Pixels of a clip that read as CROC rather than water: colour more than T
-  // (L1) from the local water mean, EXCLUDING bright specular/foam (which also
-  // differs from the mean but is water, not croc) — so an animated river's
-  // wave crests never masquerade as an eye knob and inflate the reference
-  // floor. Returned as an ABSOLUTE count: the two eye-knob caps are a small
-  // patch whose FRACTION of the rect shrinks with the projection, but a real
-  // croc yields a two-digit pixel count while an empty frame stays at the
-  // water-noise floor near 0.
-  const crocPx = (s, water, T) => {
-    let c = 0
-    for (let i = 0; i < s.n; i++) {
-      const r = s.data[i * s.ch], g = s.data[i * s.ch + 1], b = s.data[i * s.ch + 2]
-      const foam = Math.min(r, g, b) > 200
-      if (!foam && Math.abs(r - water[0]) + Math.abs(g - water[1]) + Math.abs(b - water[2]) > T) c++
-    }
-    return c
-  }
-  const EYE_T = 22 // an eye-knob pixel must differ from water by at least this (L1)
+  // --- THE MEASURE (point 382) -------------------------------------------------
+  // `animalShare` (./animalShare.mjs — pure, and unit-pinned in
+  // animalShare.test.mjs, including the teeth) answers the question this check is
+  // really asking — does what lies in this rect read as an ANIMAL rather than as
+  // the water around it? — as a share of the rect, measured against the water's
+  // OWN colour spread IN THE SAME FRAME:
+  //   median colour of the rect  = the water (the water is the majority of every
+  //                                rect here, so the median IS a water pixel)
+  //   d_i                        = each pixel's L1 distance from that median
+  //   spread                     = the median of the d_i — the water's own scale
+  //   share                      = #{ d_i > ANIMAL_SIGMAS · spread } / kept
+  // It is SCALE-FREE by construction: multiply every colour distance in the rect
+  // by any λ (a brighter sky, a darker backend, a cloud passing, a different
+  // exposure) and both d_i and `spread` scale with it, so the share does not
+  // move. It is also free of the projection: it is a fraction of the rect, not a
+  // pixel count. Nothing here is compared against a hand-set colour number — the
+  // only absolute is the 1-unit floor under `spread`, which is one 8-bit step,
+  // i.e. the smallest colour difference that exists at all.
+  // This REPLACES an absolute channel delta (`l1(strikeMean, waterMean) > 45`)
+  // that decided the verdict on the second decimal of a mean: it read 44.2 and
+  // 44.6 against its own 45 in one evening, and 37.5-42.9 across eight staged
+  // repeats measured for point 382 — the check was red on a picture nobody
+  // disputes, because a mean over the rect DILUTES the body with the water
+  // beside it and the dilution moves with the projection.
+  // Bright specular/foam is water, not animal, and is dropped BEFORE anything is
+  // measured (the point-274 exclusion, now applied to the reference colour too:
+  // the old code excluded foam from the count but left it in the mean, so a rect
+  // with foam in it reported nearly every water pixel as crocodile — measured
+  // 2548 of 2613 on an unpinned staging).
   // (a) WATER REFERENCE — both rects with NO crocodile over them.
   await page.evaluate(() => window.__pollSim(1.5, () => false))
   const refClips = await crocClips(false)
   const bodyRef = await sample(refClips.bodyClip)
   const eyeRef = await sample(refClips.eyeClip)
   const waterMean = bodyRef.mean
-  const eyeWater = eyeRef.mean
-  const eyePxRef = crocPx(eyeRef, eyeWater, EYE_T) // water-noise floor (≈0)
+  const bodyRefShare = animalShare(bodyRef) // water-only floor (measured 0)
+  const eyeRefShare = animalShare(eyeRef)   // water-only floor (measured 0)
   // (b) HIDDEN croc on that cell — body vanishes into the water, eye knobs show.
   await page.evaluate(() => {
     const p = window.__stagedCrocPos
@@ -4568,7 +5009,13 @@ if (
   const hiddenClips = await crocClips(true) // re-derived from the LIVE croc
   const bodyHidden = await sample(hiddenClips.bodyClip)
   const eyeHidden = await sample(hiddenClips.eyeClip)
-  await page.screenshot({ path: `${OUT}129-crocodile-hidden.png` })
+  const stagedCroc = await page.evaluate(() => (window.__stagedCrocPos ? { x: window.__stagedCrocPos.x, z: window.__stagedCrocPos.z } : null))
+  await shot(
+    '129-crocodile-hidden',
+    stagedCroc
+      ? { world: stagedCroc, label: 'the hidden crocodile', settle: false }
+      : { general: 'no crocodile was staged, so the water cell itself is all this frame can show' },
+  )
   // (c) STRIKING control — the SAME croc forced fully out. A gripped lunge holds
   // it in place (the AI settles it at its own spot with the victim 0.6 ahead) and
   // reads as striking (fully out, opaque); a live `caught` keeps
@@ -4580,9 +5027,19 @@ if (
   await page.evaluate(() => window.__pollSim(2, () => false))
   const strikeClips = await crocClips(true)
   const bodyStrike = await sample(strikeClips.bodyClip)
-  const bodyDiff = l1(bodyHidden.mean, waterMean)   // hidden body vs water (want small)
-  const strikeDiff = l1(bodyStrike.mean, waterMean) // strike body vs water (want large)
-  const eyePxHidden = crocPx(eyeHidden, eyeWater, EYE_T) // eye knobs present (want ≫ floor)
+  const bodyHiddenShare = animalShare(bodyHidden)
+  const bodyStrikeShare = animalShare(bodyStrike)
+  const eyeHiddenShare = animalShare(eyeHidden)
+  // --- THE CRITERION (point 382), written ONCE so the same function can be fed
+  // the HIDDEN frame and demanded to say no. Both clauses are dimensionless:
+  //   * a GEOMETRIC floor — the risen body must repaint at least a tenth of its
+  //     own footprint (measured 0.305-0.314 over eight staged repeats, so a 3x
+  //     margin, against a share of the rect rather than a colour value); and
+  //   * a SEPARATION against the water's own floor: whatever share the same rect
+  //     shows with NO crocodile over it, the strike must beat many times over.
+  //     It is the clause that bites when the water itself is busy — a foaming or
+  //     shadow-crossed rect raises the floor, and the bar rises with it.
+  const floor = waterFloor(bodyRefShare.share, bodyRef.n)
   crocHiddenResult = {
     staged: true, zoom: crocView.zoom,
     croc: hiddenClips.croc, bodyClip: hiddenClips.bodyClip, eyeClip: hiddenClips.eyeClip,
@@ -4594,30 +5051,50 @@ if (
     // sampled pixels were water over the submerged croc, never the boat.
     player: hiddenClips.player,
     playerClear: hiddenClips.player.dist > 4,
+    // The scale-free readings the verdict rests on.
+    bodyRefShare: +(bodyRefShare.share ?? -1).toFixed(5),
+    bodyHiddenShare: +(bodyHiddenShare.share ?? -1).toFixed(5),
+    bodyStrikeShare: +(bodyStrikeShare.share ?? -1).toFixed(5),
+    eyeRefShare: +(eyeRefShare.share ?? -1).toFixed(5),
+    eyeHiddenShare: +(eyeHiddenShare.share ?? -1).toFixed(5),
+    waterFloor: +floor.toFixed(6),
+    spreads: { bodyRef: bodyRefShare.spread, bodyHidden: bodyHiddenShare.spread, bodyStrike: bodyStrikeShare.spread, eyeRef: eyeRefShare.spread, eyeHidden: eyeHiddenShare.spread },
+    strikeReadsAsAnimal: readsAsAnimal(bodyStrikeShare, floor),
+    // THE TEETH, proven rather than argued (point 382): the SAME criterion, fed
+    // the HIDDEN frame — a body that stayed water-coloured through the strike —
+    // must say NO. If this ever comes out true the criterion has stopped
+    // discriminating and the check fails, however green its other legs are.
+    hiddenWouldReadAsAnimal: readsAsAnimal(bodyHiddenShare, floor),
+    // Diagnostics only — the absolute means the old criterion decided on, kept
+    // because a failure log is easier to read with them present.
     waterMean: waterMean.map((v) => +v.toFixed(1)),
     bodyHidden: bodyHidden.mean.map((v) => +v.toFixed(1)), bodyStrike: bodyStrike.mean.map((v) => +v.toFixed(1)),
-    bodyDiff: +bodyDiff.toFixed(1), strikeDiff: +strikeDiff.toFixed(1),
-    eyePxRef, eyePxHidden, eyeN: eyeHidden.n,
+    bodyDiff: +l1(bodyHidden.mean, waterMean).toFixed(1), strikeDiff: +l1(bodyStrike.mean, waterMean).toFixed(1),
+    eyeN: eyeHidden.n,
   }
 }
-// Restore the natural herds and the ambush radius whenever the staging spliced
-// them — even when the rect guard above bailed — so the following staged drama
-// starts clean and with its lunge trigger live.
-if (crocStage.staged) {
-  await page.evaluate(() => {
-    const herds = window.__wildlife.herdsRef.current
+// Restore the natural herds, the ambush radius and the frozen river drift — even
+// when the staging or the rect guard above bailed, so the following staged drama
+// starts clean and with its lunge trigger live. The drift is restored
+// UNCONDITIONALLY (point 382): it is frozen at the jump now, before the cell
+// search can decide whether anything was staged at all.
+await page.evaluate(() => {
+  const herds = window.__wildlife.herdsRef.current
+  const bk = window.__stagedCrocBackup
+  if (bk) {
+    // Only a staging that SPLICED the herds may put them back — an unstaged run
+    // must keep the natural crocodiles it never touched.
     herds.crocodile.splice(0)
-    const bk = window.__stagedCrocBackup || { crocodile: [], flamingo: [] }
     herds.crocodile.push(...bk.crocodile)
     herds.flamingo.push(...bk.flamingo)
-    if (window.__stagedCrocPrevStrike !== undefined) window.__balance.crocodile.strikeRadius = window.__stagedCrocPrevStrike
-    if (window.__stagedCrocPrevDrift !== undefined) window.__balance.currentDrift = window.__stagedCrocPrevDrift
-    delete window.__stagedCrocBackup
-    delete window.__stagedCrocPos
-    delete window.__stagedCrocPrevStrike
-    delete window.__stagedCrocPrevDrift
-  })
-}
+  }
+  if (window.__stagedCrocPrevStrike !== undefined) window.__balance.crocodile.strikeRadius = window.__stagedCrocPrevStrike
+  if (window.__stagedCrocPrevDrift !== undefined) window.__balance.currentDrift = window.__stagedCrocPrevDrift
+  delete window.__stagedCrocBackup
+  delete window.__stagedCrocPos
+  delete window.__stagedCrocPrevStrike
+  delete window.__stagedCrocPrevDrift
+})
 check(
   "a lurking crocodile shows its eye knobs while its body reads as WATER, and a strike does not (point 274)",
   crocHiddenResult.staged &&
@@ -4626,15 +5103,22 @@ check(
     // and the drift-frozen player's canoe stood provably clear of the body rect
     crocHiddenResult.playerClear === true &&
     // (1) eye knobs present — the croc is there, not an empty frame (a false
-    // pass): an absolute two-digit-ish pixel patch, clearly above the water-
-    // noise floor of the same rect sampled croc-free
-    crocHiddenResult.eyePxHidden >= 6 &&
-    crocHiddenResult.eyePxHidden > crocHiddenResult.eyePxRef * 3 + 4 &&
-    // (2) the submerged body is indistinguishable from the water
-    crocHiddenResult.bodyDiff < 22 &&
-    // teeth: the risen strike body is a clear dark silhouette the test tells apart
-    crocHiddenResult.strikeDiff > 45 &&
-    crocHiddenResult.strikeDiff > crocHiddenResult.bodyDiff * 2.5,
+    // pass): a readable share of the eye rect stands outside that frame's own
+    // water population, many times whatever the same rect shows croc-free
+    // (measured 0.108-0.119 against a floor of 0 over eight staged repeats)
+    crocHiddenResult.eyeRefShare >= 0 && // -1 = the rect was not water enough to measure
+    crocHiddenResult.eyeHiddenShare >= 0.02 &&
+    crocHiddenResult.eyeHiddenShare >= 8 * Math.max(crocHiddenResult.eyeRefShare, 1 / crocHiddenResult.eyeN) &&
+    // (2) the submerged body is indistinguishable from the water: essentially
+    // NOTHING in its footprint stands outside the water population
+    // (measured 0-0.00046)
+    crocHiddenResult.bodyHiddenShare >= 0 && crocHiddenResult.bodyHiddenShare <= 0.02 &&
+    // (3) teeth: the risen strike body reads as an ANIMAL by the scale-free
+    // criterion (measured 0.305-0.314 against its 0.10 bar) …
+    crocHiddenResult.strikeReadsAsAnimal === true &&
+    // … and that same criterion, fed the HIDDEN frame, still says no — proof it
+    // discriminates rather than merely passing today's picture
+    crocHiddenResult.hiddenWouldReadAsAnimal === false,
   JSON.stringify(crocHiddenResult),
 )
 await page.evaluate(() => {
@@ -4698,6 +5182,19 @@ const crocDrama = async (mode, attempt = 0) =>
     herds.zebra.push(calf)
     const pf = window.__balance.parentDefense.predatorFlight
     const prevPf = pf.crocodile
+    // NO THIRD PARENT (27.07.2026). The staged calf stands at the bank ALONE for
+    // up to 30 sim seconds while the drink phase is swept — and a parentless
+    // juvenile is exactly what the point-262 adoption looks for: any childless
+    // zebra adult that has roamed within balance.family.adoptionRadius (20) takes
+    // it in, and THAT adult then charges the crocodile when the grip lands. Its
+    // sacrifice frees the calf, so the lunge case read calf ALIVE, staged parent
+    // alive, crocodile retreated — the drive-off picture, from an animal the
+    // staging never placed. The scenario pins WHICH parent resolves it (the one
+    // it parks and links), so it must pin that there is only one: no adoption for
+    // the length of the drama. Same class as the 25.07. lunge-distance and
+    // outcome pins — the staging is made deterministic, no assertion is relaxed.
+    const prevAdoption = window.__balance.family.adoptionRadius
+    window.__balance.family.adoptionRadius = 0.001
     if (MODE.kind === 'rescue') pf.crocodile = 100 // force the drive-off band
     if (MODE.kind === 'sacrifice' || MODE.kind === 'toolate') pf.crocodile = 0 // force taken
     // Park the scripted lion hunt for the staged scenario (point 194): the two
@@ -4709,7 +5206,7 @@ const crocDrama = async (mode, attempt = 0) =>
     lion.timer = 9999
     lion.victim = null
     lion.victimHunt = false
-    const out = { staged: true, lunged: false, noTeleport: true, gripped: false, calfAlive: null, parentAlive: null, crocRetreated: false, lionTouched: false }
+    const out = { staged: true, lunged: false, noTeleport: true, gripped: false, calfAlive: null, parentAlive: null, crocRetreated: false, lionTouched: false, foreignParent: false }
     // Sweep the drink phase so the bank window comes around quickly, watching
     // the croc for motion and teleports until it grips.
     let lastX = croc.x
@@ -4737,6 +5234,11 @@ const crocDrama = async (mode, attempt = 0) =>
       lastX = croc.x; lastZ = croc.z; lastSimT = nowSim
       if (calf.caught !== undefined && calf.caughtBy === 'crocodile') {
         out.gripped = true
+        // Did the adoption pin hold? Any OTHER animal holding this calf as its
+        // child would charge the crocodile itself and resolve the drama the
+        // staging means to resolve — reported, so a future occurrence names its
+        // cause instead of leaving an inexplicable "the calf survived the grip".
+        out.foreignParent = herds.zebra.some((z) => z !== parent && z.child === calf)
         // Now the parent enters the drama: linked and pushed only here, so
         // the pre-grip stand was never disturbed by the follow drive.
         parent.child = calf
@@ -4822,6 +5324,7 @@ const crocDrama = async (mode, attempt = 0) =>
         out.lionTouched = lion.victim === calf || lion.victim === parent
         window.__balance.parentDefense.forceOutcome = undefined
         pf.crocodile = prevPf
+        window.__balance.family.adoptionRadius = prevAdoption
         herds.zebra = herds.zebra.filter((a) => a !== parent && a !== calf)
         herds.crocodile = naturals
         out.calfAt = { x: +calf.x.toFixed(1), z: +calf.z.toFixed(1), bankX: +bankX.toFixed(1), bankZ: +bankZ.toFixed(1) }
@@ -4849,6 +5352,7 @@ const crocDrama = async (mode, attempt = 0) =>
     out.lionTouched = lion.victim === calf || lion.victim === parent
     window.__balance.parentDefense.forceOutcome = undefined // clear the forced rescue outcome
     pf.crocodile = prevPf
+    window.__balance.family.adoptionRadius = prevAdoption // the herds adopt again
     herds.zebra = herds.zebra.filter((a) => a !== parent && a !== calf)
     herds.crocodile = naturals // the staged croc retires, the naturals return
     out.calfAt = { x: +calf.x.toFixed(1), z: +calf.z.toFixed(1), bankX: +bankX.toFixed(1), bankZ: +bankZ.toFixed(1) }
@@ -4856,7 +5360,12 @@ const crocDrama = async (mode, attempt = 0) =>
   }, { kind: mode, attempt })
 
 const crocLunge = await crocDrama('lunge')
-await page.screenshot({ path: `${OUT}130-crocodile-lunge.png` })
+await shot(
+  '130-crocodile-lunge',
+  crocLunge?.calfAt
+    ? { world: { x: crocLunge.calfAt.x, z: crocLunge.calfAt.z }, label: 'the lunging crocodile at the bank', settle: false }
+    : { general: 'the lunge staging reported no position, so the bank scene as a whole is the subject' },
+)
 check(
   'the hidden crocodile lunges visibly (no teleport) and grips the bank drinker (point 130)',
   crocLunge.staged && crocLunge.lunged && crocLunge.noTeleport && crocLunge.gripped && !crocLunge.calfAlive && !crocLunge.lionTouched,
@@ -5031,11 +5540,16 @@ const crocJaws = await page.evaluate(async () => {
       gripped = true
       const r = victim.jawAnchor // dev hook: the last RENDERED jaws position
       if (r) {
-        // Project onto the croc heading (rot 0 -> +z is "ahead").
+        // Project onto the croc's LIVE heading — point 383 lets a gripping croc
+        // turn (it hauls its catch back into the water, and may turn its head onto
+        // the water in a narrow channel), so the staged rot 0 is no longer the
+        // heading it still has when the jaws are read back.
         const dx = r[0] - croc.x
         const dz = r[1] - croc.z
-        aheadSum += dz // ahead component (sin0,cos0 => (0,1))
-        lateralSum += Math.abs(dx)
+        const fx = Math.sin(croc.rot)
+        const fz = Math.cos(croc.rot)
+        aheadSum += dx * fx + dz * fz // ahead component along the facing
+        lateralSum += Math.abs(dx * fz - dz * fx)
         n++
       }
     }
@@ -5054,6 +5568,112 @@ check(
     crocJaws.ahead !== null && crocJaws.ahead > 0.4,
   JSON.stringify(crocJaws),
 )
+// --- Point 383: the kill is EATEN IN THE WATER, never on the bank ------------
+// Reported from the deployed build: the crocodile stood wholly on the sand
+// feeding while the carcass lay at the waterline. Staged like crocDrama (the
+// natural crocs stand down, the lion is parked, the prey is a lone ADULT so no
+// family drama or adoption can claim it), then the terrain under BOTH bodies is
+// read back across the whole feed — struggle, kill and sink.
+await page.evaluate(async () => {
+  const herds = window.__wildlife.herdsRef.current
+  const seed = window.__game.getState().seed
+  const U = 10
+  const p0 = window.__game.getState().pos
+  const terrainAt = (x, z) => window.__terrainType(-z / U, x / U, seed)
+  let water = null
+  let bank = null
+  outer: for (let r = 4; r <= 40 && !water; r += 3) {
+    for (let k = 0; k < 16; k++) {
+      const ang = (k / 16) * Math.PI * 2
+      const x = p0.x + Math.cos(ang) * r
+      const z = p0.z + Math.sin(ang) * r
+      if (terrainAt(x, z) !== 'water') continue
+      for (let n = 0; n < 8; n++) {
+        const na = (n / 8) * Math.PI * 2
+        const nx = x + Math.cos(na) * 1.8
+        const nz = z + Math.sin(na) * 1.8
+        const nt = terrainAt(nx, nz)
+        if (nt !== 'water' && nt !== 'ocean') { water = { x, z }; bank = { x: nx, z: nz }; break outer }
+      }
+    }
+  }
+  if (!water || !bank) return { staged: false, noWater: true }
+  const naturals = herds.crocodile.splice(0)
+  const stageWs = window.__rivers?.sheetAt(-water.z / U, water.x / U) ?? window.__rivers?.surfaceAt(-water.z / U, water.x / U)
+  const croc = { x: water.x, z: water.z, y: stageWs ?? 0.4, rot: 0, scale: 1, phase: 0.1, chunk: undefined }
+  herds.crocodile.push(croc)
+  // An ADULT victim: no parent, no calf — nothing else can enter this drama.
+  const prey = { x: bank.x, z: bank.z, y: 0.2, rot: 0, scale: 1, phase: 0, chunk: undefined }
+  prey.drink = { tx: bank.x, tz: bank.z }
+  herds.zebra.push(prey)
+  const lion = window.__lionHunt.state
+  lion.mode = 'idle'; lion.timer = 9999; lion.victim = null; lion.victimHunt = false
+  const out = { staged: true, seized: false, feeding: false, samples: 0, onLand: 0, tooFar: 0, sawSink: false }
+  await window.__pollSim(30, () => {
+    prey.phase = (prey.phase + 0.1) % 75
+    if (!prey.drink) prey.drink = { tx: bank.x, tz: bank.z }
+    if (prey.caught === undefined && Math.hypot(prey.x - bank.x, prey.z - bank.z) > 3) { prey.x = bank.x; prey.z = bank.z }
+    if (prey.caught !== undefined && prey.caughtBy === 'crocodile') { out.seized = true; return true }
+    return false
+  })
+  if (out.seized) {
+    // The haul is a moment of the seizure; the feed holds once it is done.
+    await window.__pollSim(window.__balance.crocodile.dragSeconds + 4, () => croc.lunge?.gripped === true)
+    out.feeding = croc.lunge?.gripped === true
+  }
+  // Hand the stage to the frame capture below — the PICTURE has to be taken
+  // mid-feed, so the sampling continues in a second call after the screenshot.
+  window.__crocFeedStage = { croc, prey, naturals, out, terrainAt }
+  return out
+})
+// The subject is the staged pair itself: the shutter projects the crocodile's
+// own position, so a frame taken while the camera sits elsewhere is refused
+// rather than filed as evidence (point 375).
+const crocFeedAt = await page.evaluate(() => {
+  const c = window.__crocFeedStage?.croc
+  return c ? { x: c.x, z: c.z } : null
+})
+await shot('383-crocodile-feeds-in-water', {
+  world: crocFeedAt ?? { x: 0, z: 0 },
+  label: 'the crocodile feeding in the water with its catch',
+})
+const crocFeedsInWater = await page.evaluate(async () => {
+  const st = window.__crocFeedStage
+  if (!st) return { staged: false, noStage: true }
+  const { croc, prey, naturals, out, terrainAt } = st
+  const herds = window.__wildlife.herdsRef.current
+  if (out.seized) {
+    await window.__pollSim(20, () => {
+      // Sample the whole feed: struggle, kill and the sink under it. It ends
+      // when the body is gone and the crocodile lets go (retreat) — from there
+      // the two are no longer a pair and nothing is being held.
+      if (croc.lunge === undefined || croc.lunge.retreat === true || prey.gone === true) return true
+      out.samples++
+      if (terrainAt(croc.x, croc.z) !== 'water') out.onLand++
+      if (terrainAt(prey.x, prey.z) !== 'water') out.onLand++
+      // 3.7 = CROCODILE_BODY_LENGTH_LOCAL (wildlifeBehavior.ts): the catch lies
+      // beside the crocodile, never adrift somewhere else in the river.
+      if (Math.hypot(prey.x - croc.x, prey.z - croc.z) > 3.7 * croc.scale) out.tooFar++
+      if (prey.dead) out.sawSink = true
+      return false
+    })
+  }
+  out.crocAt = { x: +croc.x.toFixed(1), z: +croc.z.toFixed(1), t: terrainAt(croc.x, croc.z) }
+  out.preyAt = { x: +prey.x.toFixed(1), z: +prey.z.toFixed(1), t: terrainAt(prey.x, prey.z) }
+  croc.lunge = undefined
+  herds.zebra = herds.zebra.filter((a) => a !== prey)
+  herds.crocodile = naturals
+  window.__crocFeedStage = undefined
+  return out
+})
+check(
+  'the crocodile eats its catch IN the water: both bodies on water cells, the carcass beside it, through the whole feed (point 383)',
+  crocFeedsInWater.staged && crocFeedsInWater.seized && crocFeedsInWater.feeding &&
+    crocFeedsInWater.samples > 10 && crocFeedsInWater.onLand === 0 && crocFeedsInWater.tooFar === 0 &&
+    crocFeedsInWater.sawSink,
+  JSON.stringify(crocFeedsInWater),
+)
+
 await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(null))
 await page.waitForTimeout(300)
 
@@ -6187,12 +6807,12 @@ check(
 // July gradient (123: the Gezira between the Nile arms; 124: the Nile at 18N).
 await page.evaluate(() => window.__game.getState().debugJumpTo(13.4, 31.8))
 await page.waitForTimeout(1500)
-await page.screenshot({ path: `${OUT}123-season-field-gezira-june.png` })
+await shot('123-season-field-gezira-june', { world: { lat: 13.4, lon: 31.8 }, label: 'the Gezira fields in June' })
 await page.evaluate(() => window.__game.getState().debugJumpToMonth(7))
 await page.waitForTimeout(3000)
 await page.evaluate(() => window.__game.getState().debugJumpTo(18.1, 33.9))
 await page.waitForTimeout(1500)
-await page.screenshot({ path: `${OUT}124-season-field-nile-july.png` })
+await shot('124-season-field-nile-july', { world: { lat: 18.1, lon: 33.9 }, label: 'the Nile fields in July' })
 // Restore the calendar for the downstream checks (state hygiene: the later
 // sections set their own months/overrides but must not START skewed).
 await page.evaluate(() => window.__game.getState().debugJumpToMonth(1))
@@ -6323,9 +6943,9 @@ const settleScalar = async (read, rel = 0.003) => {
     }))
   }
   const apr = await surfAt(4)
-  await page.screenshot({ path: `${OUT}117-nile-low-april.png` })
+  await shot('117-nile-low-april', { world: { lat: 24.09, lon: 32.9 }, label: 'the Aswan reach at low water' })
   const oct = await surfAt(10)
-  await page.screenshot({ path: `${OUT}118-nile-flood-october.png` })
+  await shot('118-nile-flood-october', { world: { lat: 24.09, lon: 32.9 }, label: 'the Aswan reach at the flood crest' })
   console.log('shot 117-nile-low-april.png, 118-nile-flood-october.png')
   check(
     'the Nile crests in October and sits low in April (point 138, remote-fed)',
@@ -6360,9 +6980,9 @@ const settleScalar = async (read, rel = 0.003) => {
     }))
   }
   const jan = await deltaAt(1) // Botswana's own rains — and LOW water
-  await page.screenshot({ path: `${OUT}119-okavango-low-january.png` })
+  await shot('119-okavango-low-january', { world: { lat: -19.2, lon: 22.9 }, label: 'the Okavango delta at low water' })
   const jul = await deltaAt(7) // the local dry season — and the FLOOD
-  await page.screenshot({ path: `${OUT}120-okavango-flood-july.png` })
+  await shot('120-okavango-flood-july', { world: { lat: -19.2, lon: 22.9 }, label: 'the Okavango delta in flood' })
   console.log('shot 119-okavango-low-january.png, 120-okavango-flood-july.png')
   check(
     'the Okavango delta is FULLER in the local dry season than in the local rains (point 139)',
@@ -6389,7 +7009,7 @@ const settleScalar = async (read, rel = 0.003) => {
     }))
   }
   const jan = await at(1)
-  await page.screenshot({ path: `${OUT}121-harmattan-pall-january.png` })
+  await shot('121-harmattan-pall-january', { world: { lat: 12.5, lon: 8.0 }, label: 'the Sahel under the harmattan pall' })
   console.log('shot 121-harmattan-pall-january.png')
   const aug = await at(8)
   check(
@@ -6459,7 +7079,10 @@ const settleScalar = async (read, rel = 0.003) => {
     return { ready: true, mode, first, second }
   })
   await page.evaluate(() => window.__climate?.forceStrike?.(1)) // a fresh bolt for the screenshot
-  await page.screenshot({ path: `${OUT}134-thunderstorm.png` })
+  await shot('134-thunderstorm', {
+    general: 'the storm sky and its forced bolt fill the whole frame - there is no ground subject to aim at',
+    scene: 'travel',
+  })
   console.log('shot 134-thunderstorm.png')
   check(
     'a lightning strike flashes and fires thunder delayed 1-4 s (point 166)',
@@ -6531,7 +7154,7 @@ const settleScalar = async (read, rel = 0.003) => {
     return white / px
   }
   const feb = await whiteFrac(2)
-  await page.screenshot({ path: `${OUT}122-atlas-snow-february.png` })
+  await shot('122-atlas-snow-february', { world: { lat: 31.06, lon: -7.91 }, label: 'Toubkal under February snow' })
   console.log('shot 122-atlas-snow-february.png')
   const jul = await whiteFrac(7)
   check(
@@ -6576,9 +7199,9 @@ const gx = (c) => c[1] - (c[0] + c[2]) / 2
 // dry-season gathering (the very features of 120e/135c) parked a herd in it,
 // drowning the ground's green-excess signal in animal and water pixels.
 const savDry = await groundRGB(-20.0, 27.8, 7) // Matabele plateau, July — bone dry
-await page.screenshot({ path: `${OUT}115-savanna-dry.png` })
+await shot('115-savanna-dry', { world: { lat: -20.0, lon: 27.8 }, label: 'the Matabele plateau in July' })
 const savWet = await groundRGB(-20.0, 27.8, 1) // January — the summer rains
-await page.screenshot({ path: `${OUT}116-savanna-wet.png` })
+await shot('116-savanna-wet', { world: { lat: -20.0, lon: 27.8 }, label: 'the Matabele plateau in January' })
 console.log('shot 115-savanna-dry.png, 116-savanna-wet.png')
 const congoDry = await groundRGB(1.5, 24.5, 8) // basin, its driest month
 const congoWet = await groundRGB(1.5, 24.5, 5) // and its wettest — the swing is small
@@ -6741,8 +7364,10 @@ check('zoomed out, the water plane scale uniform tracks the mesh scale (no sea/l
 check('zoomed out, the chunk-bound dressing hides (no dressed chunk rectangle)',
   zoomedWalk.vegVisible === false, JSON.stringify(zoomedWalk))
 await page.waitForTimeout(1200)
-await page.screenshot({ path: `${OUT}87-continent-zoom.png` })
-console.log('shot 87-continent-zoom.png')
+await shot('87-continent-zoom', {
+  general: 'the whole continent at the unlocked wide zoom is the subject - no single place is claimed',
+  scene: 'travel',
+})
 const zoomBack = await page.evaluate(async () => {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
   window.__ui.getState().setTravelZoom(1)
@@ -6923,8 +7548,7 @@ check('elephant graveyard has strewn ivory tusks', !!graveyard && graveyard.tusk
 check('elephant graveyard has scattered bones', !!graveyard && graveyard.bones >= 8, graveyard ? `${graveyard.bones} bones` : 'no dev hook')
 await page.evaluate(() => window.__game.getState().debugJumpTo(-4.9, 36.6)) // onto the graveyard
 await page.waitForTimeout(2600)
-await page.screenshot({ path: `${OUT}85-elephant-graveyard.png` })
-console.log('shot 85-elephant-graveyard.png')
+await shot('85-elephant-graveyard', { world: { lat: -4.9, lon: 36.6 }, label: 'the elephant graveyard' })
 
 // --- Modal dialogs render above the in-scene labels (user request) -----------
 // In a settlement the buildings carry floating map-labels (drei <Html>); an
@@ -7085,8 +7709,7 @@ check(
   borderLum !== null && borderLum > 45 && borderLum < 245,
   `mean luminance ${borderLum === null ? 'n/a' : borderLum.toFixed(1)} at ${JSON.stringify(probe)}`,
 )
-await page.screenshot({ path: `${OUT}104-region-border-river.png` })
-console.log('shot 104-region-border-river.png')
+await shot('104-region-border-river', { world: { lat: 2.28, lon: 31.68 }, label: 'the region border where it meets the river', settle: false })
 
 // --- Point 258: the debug menu's event-trigger dropdown ----------------------
 // The §19.8/§19.16 dramas are rare by design, so the debug menu stages the

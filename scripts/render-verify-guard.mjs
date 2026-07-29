@@ -31,9 +31,31 @@ import {
 } from './render-verify-state.mjs'
 import { isRenderPath, evaluate, BACKENDS, coveringRun, baselineFor } from './render-verify-core.mjs'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
+import { isMainModule } from './is-main.mjs'
 
 function git(cmd) {
   return execSync(cmd, { cwd: REPO_ROOT, encoding: 'utf8' }).trim()
+}
+
+/**
+ * True when `sha` names no reachable commit — the one condition under which a
+ * failed baseline diff may advance the gate. A git failure here answers "cannot
+ * tell", which counts as PRESENT: the gate then stays where it is rather than
+ * clearing itself on a question it could not answer.
+ */
+export function commitMissing(sha) {
+  try {
+    // The revision MUST stay quoted: execSync goes through cmd.exe on Windows,
+    // where `^` is the escape character — unquoted, git received `<sha>{commit}`
+    // and answered "Not a valid object name" for a commit that exists, so this
+    // function called every baseline gone and the narrowing protected nothing.
+    git(`git cat-file -e "${sha}^{commit}"`)
+    return false
+  } catch (e) {
+    return /Not a valid object name|could not be found|bad file|unknown revision/i.test(
+      String(e.stderr ?? e.message ?? e),
+    )
+  }
 }
 
 /** Current branch name ('HEAD' when detached) — the per-branch baseline key. */
@@ -118,7 +140,91 @@ function advanceBaseline(state, branch, head, extra = {}) {
   })
 }
 
-const arg = process.argv[2]
+/**
+ * The ONE gather failure that may clear a pending gate: the recorded baseline no
+ * longer diffs against HEAD (rebased away, gc'd, or a baseline from an unrelated
+ * history). Blocking forever on a window that cannot be diffed would trap the
+ * session, so that case re-baselines — fail-open ONCE, logged.
+ *
+ * It is a distinct type because every OTHER failure in the gathering must NOT
+ * write state. A transient `git` failure (index.lock contention is real on this
+ * machine) or a throwing ownership probe would otherwise permanently clear a
+ * pending, unverified render gate — fail-open-once turned into fail-open-forever,
+ * and a NON-owner session could overwrite the owner's baseline. Those allow the
+ * stop with the state untouched, so the gate is still there on the next turn.
+ */
+export class BaselineDiffError extends Error {
+  constructor(baseline, cause) {
+    super(`diff vs ${String(baseline).slice(0, 7)} failed (${(cause && cause.message) || cause})`)
+    this.name = 'BaselineDiffError'
+    this.baseline = baseline
+    this.cause = cause
+  }
+}
+
+/**
+ * Everything evaluate() needs — HEAD, the per-branch baseline, the pending render
+ * paths and their latest change time — exported so the preflight (point 365 D)
+ * judges the gate from the SAME gathering the Stop hook uses; a second copy of
+ * this git work would drift and report a false "clean". Read-only: the baseline
+ * bootstrap and its advancement stay in the main path.
+ *
+ * `deps` overrides the I/O sources one by one; the H4 tests use it to make each
+ * source throw and pin which error re-baselines and which merely allows.
+ */
+export function gatherRenderVerifyInputs({ sessionId = '', deps = {} } = {}) {
+  const {
+    heldByOther = heldByOtherLiveOwner,
+    revParseHead = () => git('git rev-parse HEAD'),
+    branchOf = currentBranch,
+    readState = readRenderState,
+    diffRenderPaths = changedRenderPaths,
+    changeTimeOf = latestChangeAt,
+    baselineGone = commitMissing,
+  } = deps
+  // Hard singleton: a session that does not own the live batch lock stands down.
+  if (heldByOther(sessionId)) {
+    return { applicable: false, why: 'another live session owns the batch lock', cause: 'not-lock-owner' }
+  }
+  const head = revParseHead()
+  const branch = branchOf()
+  const state = readState() ?? {}
+  const cleared = baselineFor(state, branch)
+  if (!cleared) {
+    return { applicable: false, why: 'no verified baseline yet — the gate bootstraps at this HEAD', head, branch, state }
+  }
+  let paths
+  let base
+  try {
+    ;({ paths, base } = diffRenderPaths(cleared, head))
+  } catch (e) {
+    // Typed on purpose: ONLY a baseline that is genuinely GONE may advance the
+    // gate. The diff step can also fail transiently — a spawn error while the
+    // machine is loaded, which is a documented reality here — and re-baselining
+    // on that would clear an unverified render change for good. So confirm the
+    // commit is really unreachable first; every other failure falls through to
+    // the fail-open path, which allows the stop and writes NO state.
+    if (baselineGone(cleared)) throw new BaselineDiffError(cleared, e)
+    throw e
+  }
+  return {
+    applicable: true,
+    head,
+    branch,
+    state,
+    cleared,
+    inputs: {
+      head,
+      clearedHead: cleared,
+      changedRenderPaths: paths,
+      latestChangeAt: paths.length ? changeTimeOf(paths, head, base) : 0,
+      runs: state.runs,
+      deferral: state.deferral,
+    },
+  }
+}
+
+const arg = isMainModule(import.meta.url) ? process.argv[2] : '__imported__'
 
 // --defer "<reason>": the LOUD escape valve for the honest case where one
 // backend genuinely cannot be judged headless. Covers the CURRENT head only —
@@ -210,66 +316,63 @@ if (arg === 'status') {
 }
 
 // Stop-hook mode.
-try {
-  let sessionId = ''
+if (isMainModule(import.meta.url)) {
   try {
-    sessionId = JSON.parse(readFileSync(0, 'utf8')).session_id || ''
-  } catch {
-    /* no/non-JSON stdin (manual run) — the gate is global truth, not session-local */
-  }
-
-  // Hard singleton: a session that does not own the live batch lock stands
-  // down — it neither advances the baseline nor gets blocked into batch work.
-  if (heldByOtherLiveOwner(sessionId)) process.exit(0)
-
-  const head = git('git rev-parse HEAD')
-  const branch = currentBranch()
-  const state = readRenderState() ?? {}
-  const cleared = baselineFor(state, branch)
-
-  // Bootstrap: first ever evaluation baselines at the current HEAD (the gate
-  // audits work from now on, not history).
-  if (!cleared) {
-    advanceBaseline(state, branch, head, { clearedAt: Date.now(), clearedBy: sessionId || 'bootstrap' })
-    process.exit(0)
-  }
-
-  let changed
-  let base
-  try {
-    ;({ paths: changed, base } = changedRenderPaths(cleared, head))
-  } catch (e) {
-    // The baseline commit no longer resolves (rebase/gc): re-baseline rather
-    // than block forever on an undiffable window — fail-open, logged.
-    console.error(`render-verify-guard: diff vs ${String(cleared).slice(0, 7)} failed (${e && e.message}) — re-baselining`)
-    advanceBaseline(state, branch, head, { clearedAt: Date.now(), clearedBy: 'rebaseline' })
-    process.exit(0)
-  }
-
-  const result = evaluate({
-    head,
-    clearedHead: cleared,
-    changedRenderPaths: changed,
-    latestChangeAt: changed.length ? latestChangeAt(changed, head, base) : 0,
-    runs: state.runs,
-    deferral: state.deferral,
-  })
-
-  if (result.decision === 'block') {
-    process.stdout.write(JSON.stringify({ decision: 'block', reason: result.reason }))
-    process.exit(0)
-  }
-  if (result.clear && head !== cleared) {
-    const extra = { clearedAt: Date.now(), clearedBy: sessionId || 'stop-hook' }
-    if (result.deferred) {
-      // Consume the deferral but keep it visible (status shows lastDeferral).
-      extra.lastDeferral = state.deferral
-      extra.deferral = undefined
+    let sessionId = ''
+    try {
+      sessionId = JSON.parse(readFileSync(0, 'utf8')).session_id || ''
+    } catch {
+      /* no/non-JSON stdin (manual run) — the gate is global truth, not session-local */
     }
-    advanceBaseline(state, branch, head, extra)
+
+    let gathered
+    try {
+      gathered = gatherRenderVerifyInputs({ sessionId })
+    } catch (e) {
+      // ONLY an undiffable baseline re-baselines (see BaselineDiffError). Any
+      // other gather failure — a transient git error, a throwing ownership probe
+      // — falls through to the outer catch, which allows the stop and leaves the
+      // state ALONE, so a pending gate survives to the next turn.
+      if (!(e instanceof BaselineDiffError)) throw e
+      console.error(`render-verify-guard: ${e.message} — re-baselining`)
+      advanceBaseline(readRenderState() ?? {}, currentBranch(), git('git rev-parse HEAD'), {
+        clearedAt: Date.now(),
+        clearedBy: 'rebaseline',
+      })
+      process.exit(0)
+    }
+
+    // A non-owner session stands down; a gate without a baseline bootstraps at
+    // the current HEAD (it audits work from now on, not history).
+    if (!gathered.applicable) {
+      if (gathered.head) {
+        advanceBaseline(gathered.state, gathered.branch, gathered.head, {
+          clearedAt: Date.now(),
+          clearedBy: sessionId || 'bootstrap',
+        })
+      }
+      process.exit(0)
+    }
+
+    const { head, branch, state, cleared } = gathered
+    const result = evaluate(gathered.inputs)
+
+    if (result.decision === 'block') {
+      process.stdout.write(JSON.stringify({ decision: 'block', reason: result.reason }))
+      process.exit(0)
+    }
+    if (result.clear && head !== cleared) {
+      const extra = { clearedAt: Date.now(), clearedBy: sessionId || 'stop-hook' }
+      if (result.deferred) {
+        // Consume the deferral but keep it visible (status shows lastDeferral).
+        extra.lastDeferral = state.deferral
+        extra.deferral = undefined
+      }
+      advanceBaseline(state, branch, head, extra)
+    }
+    process.exit(0)
+  } catch (e) {
+    console.error(`render-verify-guard error (allowing stop): ${e && e.message}`)
+    process.exit(0)
   }
-  process.exit(0)
-} catch (e) {
-  console.error(`render-verify-guard error (allowing stop): ${e && e.message}`)
-  process.exit(0)
 }

@@ -20,7 +20,17 @@ import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { isAbsolute, join } from 'node:path'
 import { randomUUID } from 'node:crypto'
-import { acquire, convertPendingSpawn, readOwnerLock, noteTopLevelSession } from './batch-singleton.mjs'
+import {
+  acquire,
+  convertPendingSpawn,
+  readOwnerLock,
+  noteTopLevelSession,
+  findClaudeAncestor,
+  probePid,
+} from './batch-singleton.mjs'
+import { readClaim, clearClaim, maxAgeMs } from './batch-claim.mjs'
+import { assessClaim, reservationDecision } from './batch-claim-core.mjs'
+import { standDownMessage } from './batch-resume-hook-core.mjs'
 import { isPaused, pauseReason } from './batch-lock.mjs'
 
 const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url))
@@ -108,12 +118,22 @@ const RESUME_BODY =
   'fast-gate -> tick -> deploy -> cleanup, and the Artifact publish. Every defect the user ' +
   'reports on the deployed build during the batch is APPENDED as its own implementation-ready ' +
   'TASKS point (append-and-defer) on main and delegated in turn — never fixed ad hoc or ' +
-  'dropped; keep the agent pool MODERATE (about 2-3 concurrent), reduce parallelism if the ' +
-  'report volume threatens context (user grant 22.07.2026), and delegate tightly-coupled ' +
+  'dropped; the agent pool is capped at AT MOST 3 concurrent agents (user 26.07.2026 — ' +
+  'parallel strands multiply the RATE of consumption and the throughput together, not ' +
+  'the cost per finished point; the real surcharge is rework where two strands touch the ' +
+  'same code); throttle DOWN further if the report volume ' +
+  'threatens context (user grant 22.07.2026), never up, and delegate tightly-coupled ' +
   'same-file points TOGETHER on ONE branch sequentially so shared files never collide. ' +
   'CLOSING FREEZE (user decision 22.07.2026): during a closing run the code is FROZEN — ' +
   'no parallel agent work lands/merges while the closing runs; merge or park in-flight ' +
   'branches first, resume the pool only after. ' +
+  'POINT BOUNDARY (user 27.07.2026): the context is the batch\'s dominant cost, so a session ' +
+  'carries ONE stretch of work, not point after point. Once the merged-and-ticked point is done ' +
+  'AND no delegated agent is still in flight (let the pool drain — ending mid-flight throws its ' +
+  'work away), run `node scripts/batch-boundary.mjs <point>` and END THE SESSION instead of ' +
+  'starting the next point here. The OS task HoA-Batch-Autostart brings up a fresh session and ' +
+  'this hook re-orients it; batch-progress-guard permits that stop only against a verifiably ' +
+  'closed point and an armed launcher, and blocks every other end as before. ' +
   'First check git status AND the checked-out branch above for work already underway, and ' +
   'do not double-start regressions. This session now holds the batch lock ' +
   '(.claude/batch-lock.json); the PostToolUse heartbeat keeps it fresh while you work.'
@@ -152,19 +172,48 @@ try {
           'or delete .claude/batch-paused) before resuming.',
       )
     } else {
+      // A RESERVATION (point 395): the user claimed the batch back into the window
+      // they are sitting at. A freshly started session — most of all one the OS
+      // launcher spawned — must NOT take the lock the owner is about to release
+      // for that window, or the claim would hand the batch straight back to a
+      // headless successor. Only a live, unexpired claim by a session that is not
+      // THIS one reserves; the walk that establishes our own identity is paid for
+      // only when a claim file actually exists.
+      const claim = readClaim()
+      // Resolved ONCE and reused: the stand-down below needs the same identity
+      // to tell "I am the responder the watcher woke" from "some responder is
+      // running", and the ancestor walk is the expensive half of this branch.
+      const ancestor = claim ? findClaudeAncestor() : null
+      const reservation = claim
+        ? assessClaim({
+            claim,
+            sid: sessionId,
+            ancestor,
+            now,
+            maxAgeMs: maxAgeMs(),
+            probePid,
+          })
+        : { honour: false, mine: false, claimantSid: null }
+
       // Ownership: pending-spawn conversion first (launcher-spawned session),
       // then the ordinary atomic acquire. NO path overrides a live lock.
       const auth = autostartAuthorization(now)
       let ownership = 'none'
       const lock = readOwnerLock()
-      if (lock && lock.kind === 'pending-spawn') {
-        if (convertPendingSpawn(sessionId, { authorized: !!auth })) ownership = 'acquired-spawn'
-      }
-      if (ownership === 'none') {
-        const r = acquire(sessionId)
-        if (r === 'acquired' || r === 'mine') ownership = r
+      // The same predicate the owner's Stop guard applies before ITS acquire, so
+      // the rule lives in one place and cannot drift between the two doors.
+      if (reservationDecision({ assessment: reservation }).acquire) {
+        if (lock && lock.kind === 'pending-spawn') {
+          if (convertPendingSpawn(sessionId, { authorized: !!auth })) ownership = 'acquired-spawn'
+        }
+        if (ownership === 'none') {
+          const r = acquire(sessionId)
+          if (r === 'acquired' || r === 'mine') ownership = r
+        }
       }
       if (auth) clearAuthorized()
+      // The claim has done its job the moment its own window owns the batch.
+      if (reservation.mine && (ownership === 'acquired' || ownership === 'mine')) clearClaim()
 
       if (ownership === 'acquired-spawn') {
         console.log(
@@ -180,17 +229,21 @@ try {
             `"continue". ${RESUME_BODY}`,
         )
       } else {
-        const cur = readOwnerLock()
-        const ageMin = cur ? Math.round((now - cur.claimedAt) / 60000) : 0
-        console.log(
-          `${header} But another session OWNS the batch lock (session ${cur ? cur.sessionId : 'unknown'}, ` +
-            `pid ${cur && cur.pid ? cur.pid : 'unknown'}, heartbeat ${ageMin} min ago, .claude/batch-lock.json) ` +
-            'and its liveness check passed. STAND DOWN: this session is NOT the batch worker. Do NOT ' +
-            'run batch actions, do NOT merge to main, do NOT edit TASKS.md or the dashboard. Answer the ' +
-            'user normally. If the user confirms this is the sole session, run ' +
-            '`node scripts/batch-singleton.mjs status` to inspect and `node scripts/batch-singleton.mjs release` ' +
-            'to free the lock, then restart the session.',
-        )
+        // THE STAND-DOWN NAMES ITS SITUATION FIRST (four-eyes review 29.07.2026).
+        // Four situations reach this branch and they need different words — most
+        // of all the MESSAGE RESPONDER, which the single old text forbade the one
+        // thing it was woken to do (append the user's instruction as a point), so
+        // an instruction from the phone was read, obeyed into silence and lost.
+        // The decision and every word of it are pure in batch-resume-hook-core.mjs.
+        const stand = standDownMessage({
+          sessionId,
+          lock: readOwnerLock(),
+          claim,
+          claimHonoured: reservation.honour === true,
+          ancestorPid: ancestor?.pid ?? null,
+          now,
+        })
+        console.log(`${header} ${stand.text}`)
       }
     }
   }

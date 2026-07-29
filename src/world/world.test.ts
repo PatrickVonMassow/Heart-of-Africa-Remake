@@ -4,14 +4,16 @@
 // proof.
 import * as THREE from 'three'
 import { describe, it, expect, beforeAll } from 'vitest'
-import { PLACES, RIVERS, regionAt, VILLAGE_HEARTLANDS, VILLAGE_RIVER_CLEARANCE_DEG, PORT_RIVER_CLEARANCE_DEG, placeById } from './geo'
+import { PLACES, RIVERS, regionAt, VILLAGE_HEARTLANDS, VILLAGE_RIVER_CLEARANCE_DEG, PORT_RIVER_CLEARANCE_DEG, placeById, landmarkLabelHiddenByMapPoint } from './geo'
 import { sampleTerrain, isBlocked, RIVER_WIDTH_DEG } from './terrain'
 import { cellAt, coastDistance, riverDistance, CELL_LAKE, CELL_OCEAN, CELL_LAND } from './geoIndex'
 import { lakeContains } from './hydro'
 import { landFractionAt } from './geodata'
 import { LAKES } from './data/lakes'
+import { mapPointGlyphHiddenByLandmark } from '../systems/economy'
 import { LAND_POLYGONS } from './data/coastline'
 import { MOUNTAINS, WATERFALLS, ELEPHANT_GRAVEYARD, CULTURAL_LANDMARKS, NATURAL_SITES } from './data/landmarks'
+import { GIZA_PLATEAU } from './data/gizaPlateau'
 import { setupGeodata } from '../test/geodata'
 import { densifyRiver } from '../scenes/travel/waterSurface'
 import { balance } from '../config/balance'
@@ -102,6 +104,22 @@ describe('built cultural landmarks stand clear of river channels (design.md §4.
     expect(Math.hypot(giza.lat - cairo.lat, giza.lon - cairo.lon)).toBeLessThan(1.15)
   })
 
+  // ONE SITE, ONE POSITION (point 338): the plateau is declared twice — as the
+  // §4.4 cultural landmark and as the enterable monument map point of point 273
+  // — and the two hand-placed coordinates had drifted ~0.3° apart, so the
+  // bird's-eye view drew Giza twice, in two places. Both now derive from the
+  // shared data/gizaPlateau constant.
+  it('the Giza landmark and the Giza map point are the SAME coordinate', () => {
+    const landmark = CULTURAL_LANDMARKS.find((c) => c.id === 'giza')
+    expect(landmark).toBeDefined()
+    if (!landmark) return
+    const mapPoint = placeById('giza')
+    expect(mapPoint.lat).toBe(landmark.lat)
+    expect(mapPoint.lon).toBe(landmark.lon)
+    expect(landmark.lat).toBe(GIZA_PLATEAU.lat)
+    expect(landmark.lon).toBe(GIZA_PLATEAU.lon)
+  })
+
   it('the Meroë pyramid field stands wholly on the Nile east bank, not in the river', () => {
     const meroe = CULTURAL_LANDMARKS.find((c) => c.id === 'meroe')
     expect(meroe).toBeDefined()
@@ -120,6 +138,38 @@ describe('built cultural landmarks stand clear of river channels (design.md §4.
     // Shifted east onto the desert bank, a bounded nudge off the real anchor.
     expect(meroe.lon).toBeGreaterThan(33.75) // east of the raw Nile-side anchor
     expect(Math.hypot(meroe.lat - 16.94, meroe.lon - 33.75)).toBeLessThan(1.4)
+  })
+})
+
+// ONE SITE, ONE LABEL (point 338): where a map point and a landmark denote the
+// same site, only the map point's name renders — it names the enterable place
+// and obeys the §17.2 discovery gate. The predicate keys on shared IDENTITY, so
+// a genuinely neighbouring landmark is never silently swallowed the way a
+// proximity rule would swallow it.
+describe('one site, one label (design.md §4.4/§17.2)', () => {
+  it('hides a landmark label exactly when a map point shares its id', () => {
+    expect(landmarkLabelHiddenByMapPoint('giza')).toBe(true)
+    for (const p of PLACES) expect(landmarkLabelHiddenByMapPoint(p.id)).toBe(true)
+    // Never otherwise — not for a landmark standing right beside a map point.
+    for (const c of CULTURAL_LANDMARKS) {
+      if (PLACES.some((p) => p.id === c.id)) continue
+      expect(landmarkLabelHiddenByMapPoint(c.id), c.id).toBe(false)
+    }
+    for (const id of [...MOUNTAINS, ...WATERFALLS, ...NATURAL_SITES].map((l) => l.id)) {
+      expect(landmarkLabelHiddenByMapPoint(id), id).toBe(false)
+    }
+    expect(landmarkLabelHiddenByMapPoint(ELEPHANT_GRAVEYARD.id)).toBe(false)
+    expect(landmarkLabelHiddenByMapPoint('no-such-id')).toBe(false)
+  })
+
+  it('keeps the rule general: Giza is the ONLY landmark that is also a map point', () => {
+    const shared = [...CULTURAL_LANDMARKS, ...NATURAL_SITES, ...MOUNTAINS, ...WATERFALLS]
+      .map((l) => l.id)
+      .filter((id) => PLACES.some((p) => p.id === id))
+    expect(shared).toEqual(['giza'])
+    // The suppressed landmark keeps its membership in the §4.4 built eight.
+    expect(CULTURAL_LANDMARKS).toHaveLength(8)
+    expect(CULTURAL_LANDMARKS.map((c) => c.id)).toContain('giza')
   })
 })
 
@@ -469,5 +519,20 @@ describe('world data invariants (design.md §4)', () => {
     const peopleIds = villages.map((v) => v.peopleId)
     expect(peopleIds.length).toBe(22)
     expect(new Set(peopleIds).size).toBe(22)
+  })
+})
+
+describe('one site, one shape (point 338)', () => {
+  it('hides the schematic marker where a landmark draws the real masses', () => {
+    // Giza is the one site declared twice; its map point must not add a
+    // stand-in glyph inside the pyramid field it shares a coordinate with.
+    expect(mapPointGlyphHiddenByLandmark('giza')).toBe(true)
+  })
+
+  it('keeps the marker for every place that is not also a landmark', () => {
+    for (const place of PLACES) {
+      if (place.id === 'giza') continue
+      expect(mapPointGlyphHiddenByLandmark(place.id)).toBe(false)
+    }
   })
 })

@@ -8,6 +8,7 @@
 //
 // Env: BASE_URL (dev/preview server), SWEEP_OUT (folder), VERIFY_GL (webgl|webgpu).
 import { launchVerifyBrowser, assertBackend } from './_browser.mjs'
+import { frameShutter } from './frameSubject.mjs'
 import fs from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
@@ -52,6 +53,7 @@ await page.evaluate(() => {
 })
 await page.waitForTimeout(2000)
 
+const shot = frameShutter(page, OUT)
 for (const [name, lat, lon, month] of SPOTS) {
   await page.evaluate(
     ([la, lo, mo]) => {
@@ -71,9 +73,15 @@ for (const [name, lat, lon, month] of SPOTS) {
     await page.waitForTimeout(1800) // wall-clock cadence — a capture, not an assertion
     // Keep the journal from covering the scene — region-discovery entries reopen it.
     await page.evaluate(() => window.__game.getState().setJournalOpen(false))
-    const file = `${OUT}${name}-f${f}.png`
-    await page.screenshot({ path: file })
-    console.log(`SHOT ${name} f${f}`)
+    // The first frame of each filmstrip claims the named spot and is checked
+    // against the live camera; the later ones deliberately drive AWAY from it,
+    // which is what the strip is for — declared rather than inferred (pt. 375).
+    await shot(
+      `${name}-f${f}`,
+      f === 0
+        ? { world: { lat, lon }, label: name, settle: false }
+        : { general: `frame ${f} of the ${name} filmstrip — the traveller is deliberately driving away from the spot` },
+    )
   }
   await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyW', key: 'w' })))
   if (month != null) await page.evaluate(() => window.__ui.getState().setDebugMonth && window.__ui.getState().setDebugMonth(null))

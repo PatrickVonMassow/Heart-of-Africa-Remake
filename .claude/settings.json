@@ -59,11 +59,23 @@
           },
           {
             "type": "command",
+            "command": "node scripts/mechanism-review-guard.mjs"
+          },
+          {
+            "type": "command",
             "command": "node scripts/queue-order-guard.mjs"
           },
           {
             "type": "command",
             "command": "node scripts/tasks-spec-guard.mjs"
+          },
+          {
+            "type": "command",
+            "command": "node scripts/tasks-archive-guard.mjs"
+          },
+          {
+            "type": "command",
+            "command": "node scripts/doc-budget-guard.mjs"
           },
           {
             "type": "command",
@@ -95,12 +107,29 @@
           },
           {
             "type": "command",
+            "command": "node scripts/rule-review-guard.mjs"
+          },
+          {
+            "type": "command",
+            "command": "node scripts/guard-health-guard.mjs"
+          },
+          {
+            "type": "command",
             "command": "node scripts/dashboard-sync.mjs"
           }
         ]
       }
     ],
     "PreToolUse": [
+      {
+        "matcher": "Edit|Write|NotebookEdit|Agent|Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/board-first-guard.mjs"
+          }
+        ]
+      },
       {
         "matcher": "Agent",
         "hooks": [

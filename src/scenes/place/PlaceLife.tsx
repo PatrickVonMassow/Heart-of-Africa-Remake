@@ -10,7 +10,16 @@ import { createContext, useContext, useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three/webgpu'
 import { mulberry32 } from '../../world/noise'
-import { buildGoatParts, createFaunaMaterial, faceVelocity, gaitPhase, legSwingAngle } from '../../render/fauna'
+import {
+  buildGoatParts,
+  createFaunaMaterial,
+  faceVelocity,
+  gaitBodyLift,
+  gaitPhase,
+  gaitRig,
+  isStance,
+  legSwingAngle,
+} from '../../render/fauna'
 import { TESSELLATION } from '../../render/figures'
 import { cloakForCloth, wearsByRank } from '../../systems/dress'
 import { useColdCloaks, type ColdDress } from './useColdCloaks'
@@ -193,12 +202,18 @@ function Kids({ x, z, cloth, colliders }: { x: number; z: number; cloth: string[
 }
 
 /** Goats drifting around, grazing — inside the pen when one exists. Each goat
- *  walks with a real gait (design.md §19, point 228): its legs swing about their
- *  hips on a phase driven by the DISTANCE it covers (still legs at rest, longer
- *  strides when it moves faster), and its body FACES its velocity so it can
- *  never glide backward. */
+ *  walks with a real gait (design.md §19, points 228/300): its legs swing about
+ *  their hips on a phase driven by the DISTANCE it covers, at the cadence its own
+ *  leg length dictates, so the planted foot stays put on the ground while the
+ *  body travels over it (no skating, still legs at rest); the body dips with each
+ *  footfall so the standing foot really touches, and it FACES its velocity so it
+ *  can never glide backward. The settlement ground is one flat disc at y = 0, so
+ *  no slope pitch is needed here — the panorama silhouettes, which walk real
+ *  relief, carry that half. */
 function Goats({ seed, count, pen, colliders }: { seed: number; count: number; pen: PenDef | null; colliders: Collider[] }) {
   const parts = useMemo(() => buildGoatParts(), [])
+  // The gait read off this rig's own legs (point 300): stride length, cadence.
+  const rig = useMemo(() => gaitRig(parts.legs), [parts])
   // The shared smooth-shaded fauna material (point 214) — the goats stand at
   // first-person range, where flat shading would read as hard panels.
   const material = useMemo(() => createFaunaMaterial(), [])
@@ -219,6 +234,8 @@ function Goats({ seed, count, pen, colliders }: { seed: number; count: number; p
   // distance, held facing) so the swing rides distance and the body faces travel.
   const legRefs = useRef<Array<Array<THREE.Group | null>>>([])
   const gait = useRef<Array<{ x: number; z: number; dist: number; yaw: number }>>([])
+  // Scratch vector for the DEV foot probe below — never allocated per frame.
+  const footProbe = useMemo(() => new THREE.Vector3(), [])
   if (gait.current.length !== anchors.length) {
     gait.current = anchors.map((a) => ({ x: a.x, z: a.z, dist: 0, yaw: 0 }))
   }
@@ -236,10 +253,12 @@ function Goats({ seed, count, pen, colliders }: { seed: number; count: number; p
       s.yaw = faceVelocity(vx, vz, s.yaw)
       s.x = px
       s.z = pz
-      g.position.set(px, 0, pz)
+      // Swing the legs on the distance-driven phase at this rig's own cadence,
+      // and drop the body onto the stance leg (point 300): the planted foot then
+      // holds its ground spot while the goat walks over it, instead of skating.
+      const phase = gaitPhase(s.dist, rig.cadence)
+      g.position.set(px, gaitBodyLift(phase, rig.legLength), pz)
       g.rotation.y = s.yaw
-      // Swing the legs on the distance-driven phase (still at rest, no slide).
-      const phase = gaitPhase(s.dist)
       const legs = legRefs.current[i]
       if (legs) {
         for (let li = 0; li < parts.legs.length; li++) {
@@ -247,8 +266,40 @@ function Goats({ seed, count, pen, colliders }: { seed: number; count: number; p
           if (lg) lg.rotation.x = legSwingAngle(phase, parts.legs[li].phaseOffset)
         }
       }
+      if (import.meta.env.DEV) {
+        // The live no-skate probe (point 300) tracks one foot through its stance:
+        // its world spot must hold while the body advances. Reported straight
+        // from the rendered leg group, so the probe reads what is DRAWN. `yaw`
+        // rides along because a goat on this wandering path also TURNS, and the
+        // probe measures the foot's travel in the walker's own heading frame —
+        // the rigid pivot of a turning body is not the gait's doing.
+        const lg = legRefs.current[i]?.[0]
+        if (lg) {
+          const foot = footProbe.set(0, -rig.legLength, 0)
+          lg.updateWorldMatrix(true, false)
+          lg.localToWorld(foot)
+          const w = window as unknown as Record<string, unknown>
+          const info = (w.__placeGoatGait ?? (w.__placeGoatGait = {})) as Record<string, unknown>
+          info[i] = {
+            x: px,
+            z: pz,
+            dist: s.dist,
+            phase,
+            stride: rig.stride,
+            yaw: s.yaw,
+            stance: isStance(phase + parts.legs[0].phaseOffset),
+            foot: { x: foot.x, y: foot.y, z: foot.z },
+          }
+        }
+      }
     })
   })
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    return () => {
+      delete (window as unknown as Record<string, unknown>).__placeGoatGait
+    }
+  }, [])
   return (
     <>
       {anchors.map((_, i) => (

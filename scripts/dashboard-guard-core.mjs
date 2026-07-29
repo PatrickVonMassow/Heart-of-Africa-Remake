@@ -125,6 +125,30 @@ export function parseKlaerungPoints(html) {
 /** The four binding sections, in the user's mandated order (18.07.2026). */
 export const SECTION_TITLES = ['Woran ich gerade arbeite', 'Von dir zu klären', 'Warteschlange', 'Erledigt']
 
+/** Sections whose whole body collapses behind their heading (user 26.07.2026).
+ *  Erledigt is the archive: it dwarfs the board and is the least-read part, so
+ *  its heading is the toggle and it starts CLOSED like every card. */
+/** Every section folds behind its own heading (user 27.07.2026); only Erledigt
+ *  starts closed, and the `open` ban plus the board's script handle that. */
+export const COLLAPSIBLE_SECTIONS = [
+  'Woran ich gerade arbeite',
+  'Von dir zu klären',
+  'Warteschlange',
+  'Erledigt',
+]
+
+/** The board keeps only the newest finished cards; the rest live on their own
+ *  published page (user 27.07.2026). Measured reason: at 214 cards the archive
+ *  was three quarters of the file, so every review of the board grew with every
+ *  closed point. */
+export const ERLEDIGT_ON_BOARD = 20
+
+/** The meta a generated queue card carries while nobody has estimated the point
+ *  (point 400, delta C). It lives HERE, beside the rule that exempts it, so the
+ *  generator and the audit can never disagree about the exact wording — and
+ *  board-queue-core re-exports it rather than keeping a second copy. */
+export const QUEUE_STUB_META = 'Schätzung offen'
+
 // cp1252: byte → displayed char (the 0x80-0x9F block; every other byte shows
 // its own code point). The detector uses it REVERSED.
 const CP1252_HIGH = {
@@ -214,6 +238,13 @@ export function parseCards(sectionHtml) {
       .map(Number)
   for (const part of sectionHtml.split(/<details/).slice(1)) {
     const summary = (part.match(/<summary>([\s\S]*?)<\/summary>/) ?? [])[1] ?? ''
+    // A collapsible SECTION wrapper is not a card: its summary holds the <h2>
+    // heading. Without this it would enter the PRECEDING section's card list as
+    // a card with no point, no body and no duration meta — the slice ends AT
+    // the <h2>, so the wrapper's opening tag falls just before the boundary and
+    // its summary is cut open mid-tag. Hence both tests: an intact wrapper is
+    // recognised by the heading, a cut one by the missing `</summary>`.
+    if (/<h2[\s>]/.test(summary) || !part.includes('</summary>')) continue
     const meta = (summary.match(/class="meta">([^<]*)</) ?? [])[1] ?? null
     // The body slice must survive a container child, so take everything after
     // the body div's opening tag (the card ends at the next <details anyway).
@@ -239,11 +270,17 @@ export function parseCards(sectionHtml) {
  * wrapper seeds it on the first clean pass, so pre-guard history is
  * grandfathered exactly once.
  */
+/**
+ * Grace on the expected-end rule: a card is overdue only this many minutes
+ * PAST its own estimate, so a board republished on the minute cannot flap.
+ */
+export const ETA_GRACE_MIN = 5
+
 export function auditDashboard(html, input = {}) {
   const v = []
   if (typeof html !== 'string' || !html) return v
   // Totality: every list comes from JSON/parsers and may be anything.
-  const { doneSeen = null } = input ?? {}
+  const { doneSeen = null, nowMinutes = null } = input ?? {}
   const open = Array.isArray(input?.open) ? input.open : []
   const done = Array.isArray(input?.done) ? input.done : []
   const { order, sections } = sliceSections(html)
@@ -266,10 +303,54 @@ export function auditDashboard(html, input = {}) {
     })
   }
 
+  // COLLAPSIBLE SECTION — user 26.07.2026: Erledigt collapses behind its own
+  // heading and starts closed. The `open` ban above already covers "closed", so
+  // this rule only pins that the wrapper still EXISTS: a republish that dropped
+  // it would silently unfold the longest part of the board again.
+  for (const title of COLLAPSIBLE_SECTIONS) {
+    const wrapped = new RegExp(`<details\\b[^>]*>\\s*<summary>\\s*<h2>${title}</h2>\\s*</summary>`).test(html)
+    if (!wrapped && html.includes(`<h2>${title}</h2>`)) {
+      v.push({
+        code: 'section-not-collapsible',
+        msg: `the "${title}" heading is not wrapped in <details><summary><h2>…</h2></summary> — that section collapses behind its heading (user 26.07.2026)`,
+      })
+    }
+  }
+
+  // THE ARCHIVE STAYS OUT (user 27.07.2026): the board carries the newest
+  // finished cards and links the rest. Both halves are checked — a board that
+  // kept everything, and one that dropped the link and orphaned the archive.
+  const erledigtSection = sections[SECTION_TITLES[3]] ?? ''
+  const doneOnBoard = parseCards(erledigtSection).length
+  if (doneOnBoard > ERLEDIGT_ON_BOARD) {
+    v.push({
+      code: 'erledigt-overflow',
+      msg: `the Erledigt section holds ${doneOnBoard} cards — the board keeps ${ERLEDIGT_ON_BOARD}, the older ones move to the archive page`,
+    })
+  }
+  if (doneOnBoard > 0 && !/<a\s[^>]*href="https?:\/\/[^"]+"[^>]*>/.test(erledigtSection)) {
+    v.push({
+      code: 'archive-link-missing',
+      msg: 'the Erledigt section links no archive page — the moved cards would be unreachable',
+    })
+  }
+
   const nowCards = parseCards(sections[SECTION_TITLES[0]] ?? '')
   const vdzkCards = parseCards(sections[SECTION_TITLES[1]] ?? '')
   const queueCards = parseCards(sections[SECTION_TITLES[2]] ?? '')
   const erledigtCards = parseCards(sections[SECTION_TITLES[3]] ?? '')
+
+  // THE STATUS CARRIES ITS DATE (user 27.07.2026): a current-work card says WHEN
+  // its status was written, so a reader can tell a fresh assessment from one
+  // that has stood for hours. The collapsed header keeps only start/expected
+  // end; it is the status TEXT that ages, so the stamp belongs in the body.
+  const undated = nowCards.filter((c) => !/\b\d{1,2}[:.]\d{2}\b/.test(c.body ?? '')).length
+  if (undated) {
+    v.push({
+      code: 'now-card-undated',
+      msg: `${undated} current-work card(s) carry no status time in the body — a status without its time cannot be judged for freshness`,
+    })
+  }
 
   // EMPTY BODY — a card must explain itself when expanded.
   const empty = [nowCards, vdzkCards, queueCards, erledigtCards].flat().filter((c) => !c.body).length
@@ -290,8 +371,16 @@ export function auditDashboard(html, input = {}) {
     }
   }
 
-  // QUEUE META — every Warteschlange card names its estimated duration.
-  const badQueue = queueCards.filter((c) => !c.meta || !/~\s*\d+([.,]\d+)?\s*h/.test(c.meta))
+  // QUEUE META — every Warteschlange card names its estimated duration, or says
+  // in so many words that it has none yet (point 400, delta C). The generator
+  // emits a card for every open point, and a point nobody has estimated must
+  // still be VISIBLE: dropping it is the staleness this whole point exists to
+  // end, and blocking on it would deadlock `--synced` against a card only the
+  // generator can produce. The exemption is a NAMED value, not a shape, so an
+  // estimate that merely failed to parse is still a violation.
+  const badQueue = queueCards.filter(
+    (c) => !c.meta || (c.meta.trim() !== QUEUE_STUB_META && !/~\s*\d+([.,]\d+)?\s*h/.test(c.meta)),
+  )
   if (badQueue.length) {
     v.push({
       code: 'queue-meta',
@@ -302,6 +391,35 @@ export function auditDashboard(html, input = {}) {
   // NOW META — the now-card names its start time.
   if (nowCards.length && nowCards.some((c) => !c.meta || !/\d{1,2}:\d{2}/.test(c.meta))) {
     v.push({ code: 'now-meta', msg: 'a now-card meta lacks a HH:MM time' })
+  }
+
+  // THE EXPECTED END STAYS AHEAD OF THE CLOCK (user 28.07.2026). The "~HH:MM"
+  // in a current-work header is a promise to a reader who checks the board from
+  // a phone; once it has passed, it is worse than no estimate, because the card
+  // then reads as stalled while the work is running. Enforced rather than
+  // reminded: the 388 card stood two hours past its estimate. `nowMinutes` is
+  // injected (minutes since midnight, Europe/Berlin) so the rule is pure; a
+  // caller that passes nothing skips it.
+  if (Number.isFinite(nowMinutes)) {
+    const overdue = []
+    for (const c of nowCards) {
+      const end = /~\s*(\d{1,2}):(\d{2})/.exec(c.meta ?? '')
+      if (!end) continue
+      const start = /(\d{1,2}):(\d{2})/.exec(c.meta ?? '')
+      let eta = Number(end[1]) * 60 + Number(end[2])
+      // A card opened before midnight may legitimately estimate into the next
+      // day; an end earlier than its own start is that case, not a past one.
+      if (start && eta < Number(start[1]) * 60 + Number(start[2])) eta += 1440
+      if (eta + ETA_GRACE_MIN < nowMinutes) overdue.push(...(c.points.length ? c.points : ['?']))
+    }
+    if (overdue.length) {
+      v.push({
+        code: 'now-eta-past',
+        msg:
+          `current-work card(s) ${overdue.join(', ')} promise an end time that has passed — give each a ` +
+          'realistic new "~HH:MM" (or move the card to Erledigt if it is done), republish, re-run --synced',
+      })
+    }
   }
 
   // NEWLY TICKED points need an Erledigt card, with a time meta (only vs the
@@ -384,6 +502,7 @@ export function evaluate(input) {
     now = Date.now(),
     freshMs = FOCUS_FRESH_MS,
     nowCardHash = null,
+    nowMinutes = null,
   } = input ?? {}
 
   // Batch paused or complete: no dashboard duty in flight.
@@ -561,7 +680,7 @@ export function evaluate(input) {
   // (8b) FULL-CONSISTENCY AUDIT (point 313) — evaluated BEFORE the publish
   // check (fix first, publish once). A logged waiver covers exactly ONE file
   // hash: any further edit re-arms the audit.
-  const violations = auditDashboard(html, { open, done, doneSeen: marker.doneSeen })
+  const violations = auditDashboard(html, { open, done, doneSeen: marker.doneSeen, nowMinutes })
   if (violations.length) {
     const waived = marker.auditWaived && repoHash && marker.auditWaived.repoHash === repoHash
     if (!waived) {
@@ -583,18 +702,23 @@ export function evaluate(input) {
   // (fail-open; invariant 1 already covers a missing file).
   if (repoHash) {
     const deferred = marker.publishDeferred
+    // EITHER transport counts (point 400, delta D): the pages push is a real
+    // publish of the same bytes, and it is the one every session can run.
     const covered =
       (marker.publishedHash && marker.publishedHash === repoHash) ||
+      (marker.pagesPublishedHash && marker.pagesPublishedHash === repoHash) ||
       (deferred && deferred.repoHash === repoHash)
     if (!covered) {
       return block(
         'DASHBOARD EDITED BUT NOT REPUBLISHED: the repo dashboard file does not match the content ' +
-          'last published via the Artifact tool' +
-          (marker.publishedHash ? '' : ' (no publish recorded yet)') +
-          '. Publishing is part of EVERY dashboard update: run node scripts/dashboard-publish.mjs, ' +
-          'publish the synced scratchpad file with the Artifact tool (same artifact url), then re-run ' +
-          '--synced. ONLY if the Artifact tool is genuinely unavailable in this session (headless run): ' +
-          'node scripts/dashboard-publish.mjs --defer "<reason>" — and republish at the first chance.',
+          'last published to the live page or via the Artifact tool' +
+          (marker.publishedHash || marker.pagesPublishedHash ? '' : ' (no publish recorded yet)') +
+          '. Publishing is part of EVERY dashboard update: run node scripts/board-publish.mjs, which ' +
+          'pushes the board to the live page and works in every session. The claude.ai mirror is still ' +
+          'kept alongside it: node scripts/dashboard-publish.mjs, publish the synced scratchpad file ' +
+          'with the Artifact tool (same artifact url), then re-run --synced. ONLY if NEITHER is ' +
+          'reachable (offline): node scripts/dashboard-publish.mjs --defer "<reason>" — and publish at ' +
+          'the first chance.',
       )
     }
   }

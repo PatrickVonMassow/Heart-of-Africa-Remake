@@ -10,7 +10,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useGame, exploreCellKey, EXPLORE_CELL_DEG } from '../state/store'
 import { useUi } from '../state/ui'
-import { PLACES, REGION_BORDERS, regionAt, worldToLatLon } from '../world/geo'
+import { PLACES, REGION_BORDERS, landmarkLabelHiddenByMapPoint, regionAt, worldToLatLon } from '../world/geo'
 import { useStrings } from '../i18n'
 import { LAND_POLYGONS } from '../world/data/coastline'
 import { RIVERS_DATA } from '../world/data/rivers'
@@ -401,6 +401,9 @@ export function MapOverlay() {
     }
     for (const c of CULTURAL_LANDMARKS) {
       if (!landmarksSeen.includes(c.id)) continue
+      // One site, one label (point 338): a landmark that IS a map point is
+      // drawn once, below, with its place symbol and name.
+      if (landmarkLabelHiddenByMapPoint(c.id)) continue
       const [x, y] = project(c.lon, c.lat)
       ctx.fillStyle = INK
       ctx.globalAlpha = 0.9

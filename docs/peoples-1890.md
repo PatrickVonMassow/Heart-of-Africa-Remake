@@ -2373,6 +2373,9 @@ This record moved to design.md §19.15 on the user's decision (17.07.2026):
 it documents the game design, not the research, so design.md is its home.
 The live dress table (six peoples, drivers, gates, sources) and its notes
 are kept current there; this document remains the underlying research.
+Since 27.07.2026 (point 367) the record itself sits one document further out,
+in `docs/design-reference.md` §19.15 — same number, same text, still design
+rather than research; design.md §19.15 is the pointer to it.
 
 ---
 

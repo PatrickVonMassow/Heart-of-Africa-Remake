@@ -20,6 +20,7 @@ import { resolve } from 'node:path'
 import { REPO_ROOT, STATE_PATH, FOCUS_PATH, readJson } from './dashboard-state.mjs'
 import { evaluate, RECENT_COMMIT_COUNT } from './dashboard-integrity-guard-core.mjs'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
+import { readTasksAll } from './tasks-source.mjs'
 
 const TASKS = resolve(REPO_ROOT, 'TASKS.md')
 const DASHBOARD = resolve(REPO_ROOT, '.batch-dashboard.html')
@@ -82,7 +83,7 @@ try {
 
   const result = evaluate({
     dashboardHtml: readFileSync(DASHBOARD, 'utf8'),
-    tasksMd: readFileSync(TASKS, 'utf8'),
+    tasksMd: readTasksAll(TASKS),
     focusPoint: focus && Number.isInteger(focus.point) ? focus.point : null,
     commitSubjects,
     touchedFiles: touchedFiles(),
