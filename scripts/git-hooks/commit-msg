@@ -1,0 +1,16 @@
+#!/bin/sh
+# Versioned git hook (core.hooksPath = scripts/git-hooks, wired by npm install),
+# so the rule lives in the repository and is reviewable, rather than in an
+# unversioned .git/hooks.
+#
+# Asks the commit-scope guard about the MESSAGE: a rescue commit must carry
+# [skip ci] (else its red CI run mails the repository owner for a state nobody
+# claimed was finished), and a commit that skips CI must say why.
+#
+# The message is only readable here — git writes it after the pre-commit hook.
+#
+# Worktrees share one .git/config, so this hook also runs in a worktree whose
+# branch predates the guard. Skip silently there rather than block a commit over
+# a script that branch cannot have.
+[ -f scripts/commit-scope-guard.mjs ] || exit 0
+exec node scripts/commit-scope-guard.mjs --message "$1"

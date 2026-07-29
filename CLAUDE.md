@@ -181,7 +181,14 @@ old→new coverage map live in `scripts/verify/README.md`.
   developed on its OWN feature branch (`feat/<point>-<slug>`), branched from
   `main`. Commit atomically AND immediately push the BRANCH after every commit
   (durability — nothing stays only local, nothing is lost if a session dies;
-  a failed push is reported, never skipped silently). Merge to `main` ONLY when
+  a failed push is reported, never skipped silently). A RESCUE commit — work
+  committed because a session or agent was killed mid-build — carries
+  `[skip ci]` in its SUBJECT plus a `Rescue: <what was interrupted>` trailer
+  (user 28.07.2026): it is no claim of completeness, and a red CI run on such a
+  branch state MAILS the repository owner. Durability is untouched — the commit
+  still exists and still pushes; only the run is skipped, and the NEXT commit,
+  the one that finishes the work, runs CI normally. The `commit-msg` hook
+  refuses each half without the other. Merge to `main` ONLY when
   the point is COMPLETE and verified — tests green on both layers AND, for a
   render/GUI change, the rendered picture checked: on BOTH backends where the
   change can render differently on each, and on ONE where it cannot — a DOM-only
@@ -1027,7 +1034,8 @@ After completion and after every major system:
   order's preamble stay within measured ceilings; budgets and both honest exits
   in `scripts/doc-budget-core.mjs`), `commit-scope-guard` and `pre-push-gate`
   (versioned `scripts/git-hooks/`, wired by `npm install`: no stray file rides
-  along, no push lands a state CI would reject), `ci-status-guard` (a
+  along, no rescue commit mails the user, no push lands a state CI would
+  reject), `ci-status-guard` (a
   red CI is noticed), `timestamp-guard` (the chat timestamp) and
   `retro-currency-guard` (the retrospective stays current, each lesson carrying
   a mechanism decision: `docs/analysis_de/lesson-mechanisms.md`), followed

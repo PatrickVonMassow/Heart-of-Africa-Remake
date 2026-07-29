@@ -30,7 +30,7 @@
 export const DOC_BUDGETS = [
   {
     path: 'CLAUDE.md',
-    maxLines: 1106,
+    maxLines: 1113,
     // RAISED by the 50 measured words of the §7.2 rule that screenshot diffing
     // is not available as a shortcut (point 361). That is the mechanism working
     // as designed rather than a concession: the words buy a NEW standing rule
@@ -83,7 +83,18 @@ export const DOC_BUDGETS = [
     // them would leave the stand-down message naming a mechanism this file never
     // mentions, and a session that had not read it would go on killing the other
     // window's lock by hand — exactly the move the mechanism replaces.
-    maxWords: 10023,
+    // RAISED by the 93 measured words (7 lines) of the §6 RESCUE-commit rule
+    // (point 408): work committed because a session or agent was killed
+    // mid-build carries `[skip ci]` and a `Rescue:` trailer, so a red run on a
+    // state nobody claimed was finished cannot mail the repository owner. A NEW
+    // condition on the rule it stands beside — "push after every commit" made
+    // the mails inevitable and said nothing about them — not a longer telling
+    // of it. It is cheap to hold and expensive to omit: the convention is
+    // useless unread, since a session that does not know the trailer exists
+    // will simply write an ordinary message and mail the user again, and the
+    // hook that enforces it would then refuse a commit whose fix is stated
+    // nowhere in this file.
+    maxWords: 10116,
     why: 'loaded at every session start — the most expensive document in the project',
   },
   {

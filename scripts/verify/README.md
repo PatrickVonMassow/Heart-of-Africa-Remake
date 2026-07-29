@@ -345,6 +345,43 @@ but the verdict now names what was *observed* instead of asserting a cause. The
 old line "failed TWICE — the load was not the cause" was simply false: the load
 never went away between the two runs.
 
+### The COMMIT-MSG hook: a rescue must not mail the user (point 408)
+
+The third versioned hook (`scripts/git-hooks/commit-msg`, wired by the same
+`npm install` as the other two) runs `commit-scope-guard.mjs --message` — the
+message half of the guard whose file half runs at `pre-commit`. It exists
+because of one night on `feat/300-gait-matches-speed`: a delegated agent was
+killed mid-build, its uncommitted work was committed and pushed at once
+(durability first — nothing may stay only local), CI ran on that half-finished
+state, went red, and mailed the repository owner. The follow-up commit was
+green and `main` was never red; the whole cost was one failure mail for a state
+nobody claimed was finished.
+
+The fix is a commit-message convention, not a workflow change. A RESCUE commit
+carries `[skip ci]` in its **subject**, which GitHub Actions honours for push
+events, and a `Rescue: <what was interrupted>` trailer:
+
+```
+Keep the interrupted gait work [skip ci]
+
+Rescue: agent killed mid-build; the next commit finishes and runs CI.
+```
+
+**Both halves or neither** — that is the whole design. A rescue trailer without
+the marker still mails the user, so it is refused naming the marker; a bare
+`[skip ci]` (in any spelling GitHub honours — `[ci skip]`, `[no ci]`,
+`[skip actions]`, `[actions skip]`) silently skips a real gate, so it is refused
+naming the trailer. An ordinary message is untouched, and a garbled or
+unreadable one blocks nothing: the decision is `evaluateCommitMessage` in
+`commit-scope-guard-core.mjs`, pure, fail-open and pinned in
+`commit-scope-guard-core.test.mjs`, which also drives the guard over a rejected
+and an accepted message so the wiring is proven by running it.
+
+Durability is untouched: the commit still exists, still pushes, still survives
+the session. Only the run is skipped — and the NEXT commit on that branch, the
+one that finishes the work, carries neither marker nor trailer and runs CI
+normally.
+
 ## Triaging a RED run (point 294)
 
 A red is now read, not asserted. Two signals, both decided in the pure module

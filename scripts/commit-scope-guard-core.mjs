@@ -103,6 +103,113 @@ export function evaluateStagedFiles(entries) {
   return { block: findings.length > 0, findings }
 }
 
+// ---------------------------------------------------------------------------
+// THE MESSAGE CHECK (user 28.07.2026): a rescue commit must not mail the user.
+//
+// WHY IT EXISTS: when a delegated agent is killed mid-build its uncommitted
+// work is committed and pushed AT ONCE — durability first, nothing may stay
+// only local. But the branch push starts CI, CI fails on the half-finished
+// state, and GitHub mails the repository owner. That happened on
+// `feat/300-gait-matches-speed`: the rescue push went red, the follow-up commit
+// went green, and in between the user got a failure mail for a state nobody
+// claimed was finished. `main` was green throughout — the noise is entirely
+// branch-side.
+//
+// The fix is a commit-message convention, not a workflow change: a rescue
+// commit carries `[skip ci]` in its SUBJECT, which GitHub Actions honours for
+// push events. The commit still exists, still pushes, still survives the
+// session — only the run (and the mail) is skipped for a state that is
+// explicitly not a claim of completeness.
+//
+// BOTH HALVES OR NEITHER. An unmarked rescue mails the user; a bare `[skip ci]`
+// on ordinary work silently skips a real gate. So the trailer demands the
+// marker and the marker demands the trailer.
+
+/** The machine-readable declaration: a `Rescue:` trailer with a reason after
+ *  it. A bare `Rescue:` says nothing, so it does not count as a declaration. */
+export const RESCUE_TRAILER_RE = /^[ \t]*Rescue:[ \t]*\S/m
+
+/** Every spelling GitHub Actions honours to skip a push run. All of them skip
+ *  the gate, so all of them must be declared. */
+export const SKIP_CI_MARKERS = ['[skip ci]', '[ci skip]', '[no ci]', '[skip actions]', '[actions skip]']
+
+const hasSkipMarker = (text) => {
+  const lower = String(text ?? '').toLowerCase()
+  return SKIP_CI_MARKERS.some((m) => lower.includes(m))
+}
+
+/** Drop git's comment lines, so a hint in the commit template — or a quoted
+ *  `# Rescue: …` — is never read as the author's own declaration. */
+const messageLines = (message) =>
+  String(message ?? '')
+    .split(/\r?\n/)
+    .filter((line) => !line.startsWith('#'))
+
+/**
+ * Decide whether a commit MESSAGE may be committed.
+ *
+ * Returns { block, findings: [{ rule, detail }] } and NEVER throws — a garbled
+ * or missing message yields no findings, like every other guard here.
+ */
+export function evaluateCommitMessage(message) {
+  const findings = []
+  try {
+    const lines = messageLines(message)
+    const subject = (lines[0] ?? '').trim()
+    const body = lines.join('\n')
+    const declaresRescue = RESCUE_TRAILER_RE.test(body)
+    // The rescue half is satisfied only by a marker in the SUBJECT — that is
+    // the placement the convention states and the one GitHub honours everywhere.
+    const subjectSkips = hasSkipMarker(subject)
+    // The declaration half fires on a marker ANYWHERE: wherever it sits, it can
+    // silently skip the run, so wherever it sits it must be accounted for.
+    const anySkips = hasSkipMarker(body)
+
+    if (declaresRescue && !subjectSkips) {
+      findings.push({
+        rule: 'rescue-without-skip-ci',
+        detail:
+          'this commit declares a rescue but its subject carries no "[skip ci]" — ' +
+          'append "[skip ci]" to the SUBJECT line',
+      })
+    } else if (anySkips && !declaresRescue) {
+      findings.push({
+        rule: 'skip-ci-without-reason',
+        detail:
+          'this commit skips CI but says nothing about why — add a "Rescue: <what was ' +
+          'interrupted>" trailer, or drop the skip marker so the gate runs',
+      })
+    }
+  } catch {
+    /* fail-open: a guard that throws must never make the tree uncommittable */
+  }
+  return { block: findings.length > 0, findings }
+}
+
+/** Human-readable refusal for a message finding, naming the fix. */
+export function formatMessageVerdict(verdict) {
+  if (!verdict?.block) return ''
+  const lines = ['commit-scope-guard: refusing this commit message.', '']
+  for (const f of verdict.findings) lines.push(`  ${f.rule}: ${f.detail}`)
+  lines.push(
+    '',
+    'A RESCUE commit — work committed because a session or agent was killed ' +
+      'mid-build —',
+    'is not a claim of completeness, so it must not start CI: a red run on a ' +
+      'half-finished',
+    'state mails the repository owner. It looks like this:',
+    '',
+    '    Keep the interrupted gait work [skip ci]',
+    '',
+    '    Rescue: agent killed mid-build; the next commit finishes and runs CI.',
+    '',
+    'The NEXT commit on the branch — the one that finishes the work — carries ' +
+      'neither',
+    'the trailer nor the marker, and runs CI normally.',
+  )
+  return lines.join('\n')
+}
+
 /** Human-readable refusal, naming every offender and the deliberate way out. */
 export function formatVerdict(verdict) {
   if (!verdict?.block) return ''
