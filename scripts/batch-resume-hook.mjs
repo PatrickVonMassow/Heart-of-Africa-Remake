@@ -30,6 +30,7 @@ import {
 } from './batch-singleton.mjs'
 import { readClaim, clearClaim, maxAgeMs } from './batch-claim.mjs'
 import { assessClaim, reservationDecision } from './batch-claim-core.mjs'
+import { standDownMessage } from './batch-resume-hook-core.mjs'
 import { isPaused, pauseReason } from './batch-lock.mjs'
 
 const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url))
@@ -179,11 +180,15 @@ try {
       // THIS one reserves; the walk that establishes our own identity is paid for
       // only when a claim file actually exists.
       const claim = readClaim()
+      // Resolved ONCE and reused: the stand-down below needs the same identity
+      // to tell "I am the responder the watcher woke" from "some responder is
+      // running", and the ancestor walk is the expensive half of this branch.
+      const ancestor = claim ? findClaudeAncestor() : null
       const reservation = claim
         ? assessClaim({
             claim,
             sid: sessionId,
-            ancestor: findClaudeAncestor(),
+            ancestor,
             now,
             maxAgeMs: maxAgeMs(),
             probePid,
@@ -224,27 +229,21 @@ try {
             `"continue". ${RESUME_BODY}`,
         )
       } else {
-        const cur = readOwnerLock()
-        const ageMin = cur ? Math.round((now - cur.claimedAt) / 60000) : 0
-        // THE WAY BACK (point 395). The stand-down is right, but for years it was
-        // also a dead end: the user returns to this window, says "I am back", and
-        // there was nothing to do but kill the other session's lock by hand. The
-        // command below is printed WITH this session's id already in it, because a
-        // CLI gets no hook payload and this is the one place the id is known.
-        console.log(
-          `${header} But another session OWNS the batch lock (session ${cur ? cur.sessionId : 'unknown'}, ` +
-            `pid ${cur && cur.pid ? cur.pid : 'unknown'}, heartbeat ${ageMin} min ago, .claude/batch-lock.json) ` +
-            'and its liveness check passed. STAND DOWN: this session is NOT the batch worker. Do NOT ' +
-            'run batch actions, do NOT merge to main, do NOT edit TASKS.md or the dashboard. Answer the ' +
-            'user normally. THE WAY BACK: if the user says they are back and want the batch worked HERE, run ' +
-            `\`node scripts/batch-claim.mjs --session ${sessionId}\` — that claims the batch, the owning session ` +
-            'releases it at its next CLEAN turn end (never mid-merge, never with a delegated agent or a ' +
-            'verification still running), and re-running the SAME command takes it. Nothing else is needed from ' +
-            'the user. To inspect first: `node scripts/batch-claim.mjs --status`.' +
-            (reservation.honour
-              ? ` NOTE: session ${reservation.claimantSid} has already claimed the batch — do not claim over it.`
-              : ''),
-        )
+        // THE STAND-DOWN NAMES ITS SITUATION FIRST (four-eyes review 29.07.2026).
+        // Four situations reach this branch and they need different words — most
+        // of all the MESSAGE RESPONDER, which the single old text forbade the one
+        // thing it was woken to do (append the user's instruction as a point), so
+        // an instruction from the phone was read, obeyed into silence and lost.
+        // The decision and every word of it are pure in batch-resume-hook-core.mjs.
+        const stand = standDownMessage({
+          sessionId,
+          lock: readOwnerLock(),
+          claim,
+          claimHonoured: reservation.honour === true,
+          ancestorPid: ancestor?.pid ?? null,
+          now,
+        })
+        console.log(`${header} ${stand.text}`)
       }
     }
   }
