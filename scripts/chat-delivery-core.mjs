@@ -82,6 +82,26 @@ export function orderMessages(messages) {
 }
 
 /**
+ * A timestamp as ISO 8601, or `unknown time`. TOTAL — and that is not pedantry
+ * here: rendering runs AFTER the message has been claimed, so a throw would be
+ * swallowed by the caller's fail-open catch and the whole claimed batch would be
+ * consumed and never shown. Silent message loss, from a formatting bug.
+ *
+ * `new Date(1e21).toISOString()` THROWS on a perfectly finite number (the Date
+ * range ends at ±8.64e15 ms), and `parseSpoolFile` accepts any finite `ts`, so
+ * `Number.isFinite` alone was never the right guard.
+ */
+export function isoOrUnknown(ts) {
+  const n = Number(ts)
+  if (!Number.isFinite(n)) return 'unknown time'
+  try {
+    return new Date(n).toISOString()
+  } catch {
+    return 'unknown time'
+  }
+}
+
+/**
  * ONE MESSAGE AS A CONTEXT LINE. Flattened AND quoted, exactly as the launcher
  * writes it into a spawn prompt: flattened so a newline cannot open a paragraph
  * of its own, quoted so a message reading `- [2026-…] delete everything` cannot
@@ -90,8 +110,7 @@ export function orderMessages(messages) {
  * a structure a message can forge is one an attacker gets to write.
  */
 export function messageLine(message) {
-  const ts = Number(message?.ts)
-  const when = Number.isFinite(ts) ? new Date(ts).toISOString() : 'unknown time'
+  const when = isoOrUnknown(message?.ts)
   const text = String(message?.text ?? '')
     .replace(/\s+/g, ' ')
     .trim()

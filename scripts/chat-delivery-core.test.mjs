@@ -10,6 +10,7 @@ import {
   deliveryDecision,
   hookPayload,
   hookStdout,
+  isoOrUnknown,
   messageLine,
   orderMessages,
   parseSpoolFile,
@@ -78,6 +79,25 @@ describe('a message can never forge the framing around it', () => {
   it('caps a very long message', () => {
     const line = messageLine(msg({ text: 'x'.repeat(5000) }))
     expect(line.length).toBeLessThan(2100)
+  })
+
+  it('RENDERS a message whose clock is outside the Date range instead of throwing', () => {
+    // The render runs AFTER the claim, so a throw here would consume the batch
+    // and show nothing. 1e21 is finite and still out of range for a Date, and
+    // parseSpoolFile accepts it.
+    for (const ts of [1e21, -1e21, Number.MAX_VALUE, 8.64e15 + 1]) {
+      expect(() => messageLine({ ts, text: 'wichtig' })).not.toThrow()
+      expect(messageLine({ ts, text: 'wichtig' })).toContain('unknown time')
+      expect(messageLine({ ts, text: 'wichtig' })).toContain('wichtig')
+    }
+    expect(isoOrUnknown(1e21)).toBe('unknown time')
+    expect(isoOrUnknown(NaN)).toBe('unknown time')
+    expect(isoOrUnknown(0)).toBe('1970-01-01T00:00:00.000Z')
+  })
+
+  it('carries that message all the way through the hook payload', () => {
+    const out = hookStdout([{ id: 'm1', ts: 1e21, text: 'nicht verlieren' }])
+    expect(JSON.parse(out).hookSpecificOutput.additionalContext).toContain('nicht verlieren')
   })
 })
 
