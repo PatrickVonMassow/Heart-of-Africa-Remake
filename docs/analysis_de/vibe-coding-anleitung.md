@@ -398,4 +398,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 Wenn du diese eine Nachricht an den Anfang stellst, hast du 80 % der Lehren dieses
 Projekts eingebaut, bevor die erste Zeile Code entsteht.
 
-<!-- GUIDE-FINGERPRINT: 2eef73ff6b2ef6af6920824cbf8718772c1cc46ee97b7e01da243f3e195c5d46 -->
+<!-- GUIDE-FINGERPRINT: af41ca5d09744d37bbacee08dbbae22c2da103b37539b69f863cf8120b333ca8 -->
