@@ -195,7 +195,11 @@ old→new coverage map live in `scripts/verify/README.md`.
   `isBackendSensitivePath` in `scripts/render-verify-core.mjs`, and the guard
   demands accordingly). On merge,
   resolve any conflict CAREFULLY so nothing breaks, and RE-TEST (re-run the
-  relevant regression) whenever a conflict touched real code. `main` therefore
+  relevant regression) whenever a conflict touched real code. THE MERGE ENDS THE
+  BRANCH: delete it — local, remote AND its worktree, via
+  `node scripts/worktree-cleanup.mjs <path>` — before the tick, or the debris of
+  28.07.2026 returns (31 of 36 remote branches already contained in `main`).
+  `branch-hygiene-guard` is only the backstop. `main` therefore
   always reflects finished, verified work — it is the deployed branch (the
   GH-Pages root builds from `main`; the `/poc/` deploy builds from the immutable
   `poc` TAG, not from main). CROSS-CUTTING changes that
@@ -1047,7 +1051,10 @@ After completion and after every major system:
   (versioned `scripts/git-hooks/`, wired by `npm install`: no stray file rides
   along, no rescue commit mails the user, no push lands a state CI would
   reject), `ci-status-guard` (a
-  red CI is noticed), `timestamp-guard` (the chat timestamp) and
+  red CI is noticed), `branch-hygiene-guard` (no branch, remote branch or
+  worktree already contained in `origin/main` survives its merge — carve-outs:
+  in-flight, live worktrees, the `local/` baseline caches and a 10-minute
+  grace), `timestamp-guard` (the chat timestamp) and
   `retro-currency-guard` (the retrospective stays current, each lesson carrying
   a mechanism decision: `docs/analysis_de/lesson-mechanisms.md`), followed
   by `dashboard-sync`. Separately, PreToolUse hooks run `closing-guard` (§9),
