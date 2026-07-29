@@ -3745,6 +3745,34 @@ read that as "the criterion and its evidence section".
   the dwelling row for the Tuareg, per the standing rule that the implementation
   sections move with the rendering.
 
+- [ ] 416. AN ARCHIVED CARD LEAVES THE BOARD EMPTY, AND A GREEN PUSH TURNS RED
+  (29.07.2026, hit TWICE within one hour and BOTH times reported by the user before any
+  guard spoke: "you are not working on anything?" and "again no card in progress").
+  Closing a point is two board edits — archive the finished card, promote the next one —
+  and between them the "Woran ich gerade arbeite" section is EMPTY. That is not only a
+  bad look on the phone: `scripts/board-core.test.mjs` asserts "the live board must
+  carry current work for this sweep to mean anything", so the empty window turns the
+  whole unit layer red, and the pre-push gate then blocks a merge that is otherwise
+  perfectly green. Measured tonight: a 155-file run reporting one failed file, the merge
+  of a finished point blocked, and the red read at first glance like the load flake this
+  night was already full of.
+  THE FIX: make the archive and the next promotion ONE board edit. `board.mjs done <n>`
+  gains the successor — `board.mjs done <n> --next <m> "<status>"` — writing both cards
+  in a single write, so the file is never observed without current work. Where a session
+  genuinely has nothing to promote (the queue is empty, or it is about to take a session
+  boundary), it must say so ON the board rather than leave a hole: a single card naming
+  what is happening instead. That case is rare and belongs in the same command
+  (`--none "<reason>"`), so the empty state cannot be reached by forgetting.
+  THE TEST STAYS AS IT IS: it is right that an empty current-work section is a defect —
+  do not weaken it to tolerate the hole. It fired correctly both times; what was missing
+  was a way to close a point without creating the hole in the first place.
+  VERIFIABLE: pure Vitest — `done --next` produces a board that never lacks a now-card
+  (assert on the intermediate string, not only the result); `--none` writes the naming
+  card; `done` without either is REFUSED when it would empty the section, naming the two
+  ways out; and the existing board audits still pass on the produced board.
+  DOCS in the same commit: the memory entry `batch-dashboard-artifact`, which states how
+  a card moves.
+
 ## Closing (only after all points)
 
 New points are appended BEFORE this section — it stays last in the file.
