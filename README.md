@@ -21,21 +21,21 @@ PoC playable directly in the browser at:
 <table>
   <tr valign="top">
     <td width="50%">
-      <img src="https://github.com/user-attachments/assets/ded4dedd-3b13-46e3-b09a-983bbe3178fa" alt="Inside a village" width="100%"><br>
+      <a href="https://github.com/user-attachments/assets/ded4dedd-3b13-46e3-b09a-983bbe3178fa"><img src="https://github.com/user-attachments/assets/ded4dedd-3b13-46e3-b09a-983bbe3178fa" alt="Inside a village" width="100%"></a><br>
       <strong>Village.</strong> Procedurally varied dwellings, inhabitants going about their routines.
     </td>
     <td width="50%">
-      <img src="https://github.com/user-attachments/assets/1cff2bc4-3579-499f-b6e8-9a2e4b4f4038" alt="Inside a port city" width="100%"><br>
+      <a href="https://github.com/user-attachments/assets/1cff2bc4-3579-499f-b6e8-9a2e4b4f4038"><img src="https://github.com/user-attachments/assets/1cff2bc4-3579-499f-b6e8-9a2e4b4f4038" alt="Inside a port city" width="100%"></a><br>
       <strong>Port city.</strong> Trade, equipment, gifts and treasure prices.
     </td>
   </tr>
   <tr valign="top">
     <td>
-      <img src="https://github.com/user-attachments/assets/4f2b165f-9cfb-4de6-8517-bc1ce19af9de" alt="Coastal dunes seen from the travel view" width="100%"><br>
+      <a href="https://github.com/user-attachments/assets/4f2b165f-9cfb-4de6-8517-bc1ce19af9de"><img src="https://github.com/user-attachments/assets/4f2b165f-9cfb-4de6-8517-bc1ce19af9de" alt="Coastal dunes seen from the travel view" width="100%"></a><br>
       <strong>Coastal dunes.</strong> Real elevation data, cascaded shadows, wildlife herds on the move.
     </td>
     <td>
-      <img src="https://github.com/user-attachments/assets/7a936324-3c3e-47d0-bd7b-4be9e55d9742" alt="Savanna seen from the travel view" width="100%"><br>
+      <a href="https://github.com/user-attachments/assets/7a936324-3c3e-47d0-bd7b-4be9e55d9742"><img src="https://github.com/user-attachments/assets/7a936324-3c3e-47d0-bd7b-4be9e55d9742" alt="Savanna seen from the travel view" width="100%"></a><br>
       <strong>Savanna.</strong> Biome-based terrain texturing and ambient wildlife.
     </td>
   </tr>
