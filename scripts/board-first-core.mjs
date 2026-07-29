@@ -159,11 +159,18 @@ export function classifyTool({ toolName, command, filePath, boardPaths = [] } = 
  * Is the board's published copy identical to the repo file? Mirrors invariant 9
  * of dashboard-guard-core, including the logged `--defer` valve. An unknown repo
  * hash means "cannot tell" → treated as published (fail-open).
+ *
+ * EITHER transport counts (point 400, delta D). The pages publish is a real
+ * publish — the user reads that page — and once `canPublish` answers yes for
+ * every session, a gate that still recognised only the Artifact record would
+ * deny a headless session over a remedy it has no tool to run. That is the spin
+ * this design forbids, not a stricter gate.
  */
 export function isPublished(state, repoHash) {
   if (!repoHash) return true
   const s = state && typeof state === 'object' ? state : {}
   if (s.publishedHash && s.publishedHash === repoHash) return true
+  if (s.pagesPublishedHash && s.pagesPublishedHash === repoHash) return true
   const d = s.publishDeferred
   return !!(d && d.repoHash === repoHash)
 }
@@ -254,7 +261,9 @@ export function evaluate({
         '\nDo this now, then repeat the call:\n' +
         '  1. Update the "Woran ich gerade arbeite" card so it names what you are about to do.\n' +
         '  2. node scripts/focus.mjs set <N> "<what>"   (or `confirm` when the card is already right)\n' +
-        '  3. node scripts/dashboard-publish.mjs  → publish the scratchpad file via the Artifact tool\n' +
+        '  3. node scripts/board-publish.mjs   → pushes the board to the live page; works in EVERY\n' +
+        '     session, headless included. (The claude.ai mirror is still kept while the user moves\n' +
+        '     their bookmark: node scripts/dashboard-publish.mjs → Artifact → --synced.)\n' +
         '  4. node scripts/dashboard-guard.mjs --synced <board path>\n' +
         'Reads, those four commands and an edit of the board file are never blocked, and this gate ' +
         'fires at most ONCE per turn — the next call goes through either way.\n' +

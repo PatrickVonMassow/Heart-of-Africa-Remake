@@ -253,6 +253,14 @@ describe('isPublished', () => {
     expect(isPublished({ publishDeferred: { repoHash: 'h1' } }, 'h1')).toBe(true)
     expect(isPublished({ publishDeferred: { repoHash: 'h0' } }, 'h1')).toBe(false)
   })
+  it('counts the PAGES publish, which is the one every session can run', () => {
+    // Once canPublish answers yes for every session (delta D), a gate that
+    // recognised only the Artifact record would deny a headless session over a
+    // remedy it has no tool to run — the spin this design forbids.
+    expect(isPublished({ pagesPublishedHash: 'h1' }, 'h1')).toBe(true)
+    expect(isPublished({ pagesPublishedHash: 'h0' }, 'h1')).toBe(false)
+    expect(isPublished({ publishedHash: 'h0', pagesPublishedHash: 'h1' }, 'h1')).toBe(true)
+  })
   it('cannot tell without a repo hash, and says so by allowing', () => {
     expect(isPublished({}, null)).toBe(true)
     expect(isPublished(null, null)).toBe(true)

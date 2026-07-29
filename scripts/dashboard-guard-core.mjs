@@ -688,18 +688,21 @@ export function evaluate(input) {
   // (fail-open; invariant 1 already covers a missing file).
   if (repoHash) {
     const deferred = marker.publishDeferred
+    // EITHER transport counts (point 400, delta D): the pages push is a real
+    // publish of the same bytes, and it is the one every session can run.
     const covered =
       (marker.publishedHash && marker.publishedHash === repoHash) ||
+      (marker.pagesPublishedHash && marker.pagesPublishedHash === repoHash) ||
       (deferred && deferred.repoHash === repoHash)
     if (!covered) {
       return block(
         'DASHBOARD EDITED BUT NOT REPUBLISHED: the repo dashboard file does not match the content ' +
-          'last published via the Artifact tool' +
-          (marker.publishedHash ? '' : ' (no publish recorded yet)') +
-          '. Publishing is part of EVERY dashboard update: run node scripts/dashboard-publish.mjs, ' +
-          'publish the synced scratchpad file with the Artifact tool (same artifact url), then re-run ' +
-          '--synced. ONLY if the Artifact tool is genuinely unavailable in this session (headless run): ' +
-          'node scripts/dashboard-publish.mjs --defer "<reason>" — and republish at the first chance.',
+          'last published to the live page or via the Artifact tool' +
+          (marker.publishedHash || marker.pagesPublishedHash ? '' : ' (no publish recorded yet)') +
+          '. Publishing is part of EVERY dashboard update: run node scripts/board-publish.mjs, which ' +
+          'pushes the board to the live page and works in every session. The claude.ai mirror is still ' +
+          'kept alongside it: node scripts/dashboard-publish.mjs, publish the synced scratchpad file ' +
+          'with the Artifact tool (same artifact url), then re-run --synced.',
       )
     }
   }

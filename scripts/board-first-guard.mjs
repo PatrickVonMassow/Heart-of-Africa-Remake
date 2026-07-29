@@ -39,12 +39,13 @@ import { evaluate } from './board-first-core.mjs'
 const PAUSE = resolve(REPO_ROOT, '.claude', 'batch-paused')
 
 /**
- * The transport this session may publish through (point 400, delta B/D). Until
- * the delta-D pages transport exists, only a session that has demonstrably used
- * the Artifact tool can publish — so only such a session may be denied for an
- * unpublished board.
+ * The transport this session may publish through (point 400, delta B/D). The
+ * pages transport is a SCRIPT, not a tool binding, so it is available to every
+ * session — headless successors included, which is the mode the whole point was
+ * written for. The deny may therefore escalate everywhere: there is no longer a
+ * session that could be blocked without a remedy it can run.
  */
-const TRANSPORT = null
+const TRANSPORT = 'pages'
 
 /** State + focus + the registered board's current hash and paths. */
 function gather() {
