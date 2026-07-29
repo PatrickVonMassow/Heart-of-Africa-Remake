@@ -28,9 +28,17 @@
 //     `Edit|Write` matcher would miss every TASKS.md change made through Bash
 //     (a merge, the archive move). The mark is PERSISTED, so a session that dies
 //     between the change and the publish hands it to its successor.
-import { readFileSync, statSync } from 'node:fs'
+// (6) THE USER'S MESSAGE, DELIVERED WHILE THE SESSION WORKS (point 406): read
+//     the LOCAL chat spool — never the network, a hook on every tool call must
+//     not do network I/O — and inject what it finds as `additionalContext`. This
+//     is the only duty here that WRITES to stdout, and it writes exactly nothing
+//     while the spool is empty: injected context is re-sent with every later
+//     request, so even a "no new messages" line would cost tokens at tool-call
+//     rate. Owner-only and silent under a user pause, like every guard here.
+import { existsSync, readFileSync, statSync } from 'node:fs'
 import { basename } from 'node:path'
 import { heartbeat, noteActivity } from './batch-singleton.mjs'
+import { deliverPendingMessages } from './chat-spool.mjs'
 import { handoverSurvivesCall } from './batch-boundary-core.mjs'
 import { classifyPublishResponse, publishStatePatch } from './publish-outcome-core.mjs'
 import { openFingerprintOfTasks, publishDuePatch } from './board-currency-core.mjs'
@@ -58,6 +66,10 @@ const sid = data.session_id || ''
 // board, the review ledger, the work order's own entry (point 388, live finding
 // 2). Same verdict as the PreToolUse gate, from the same pure function, so the
 // two can never disagree about one call.
+// Its verdict doubles as the ownership signal duty (6) stands down on: it is
+// true exactly for the session named in the batch lock, and it is already paid
+// for here — no second lock read on the hot path.
+let ownsBatch = false
 try {
   if (sid) {
     const input = data.tool_input ?? data.toolInput ?? {}
@@ -66,7 +78,7 @@ try {
       filePath: input.file_path ?? input.notebook_path,
       command: input.command,
     })
-    heartbeat(sid, { preserveHandover: keep.survives })
+    ownsBatch = heartbeat(sid, { preserveHandover: keep.survives }) === true
   }
 } catch {
   /* no lock dir / unreadable — nothing to do */
@@ -132,5 +144,19 @@ try {
   }
 } catch {
   /* no TASKS.md / unwritable state — the watchdog is the backstop */
+}
+
+// (6) the user's message — the ONLY duty that speaks. `deliverPendingMessages`
+// claims each message before it renders it and returns '' for every reason not
+// to speak (not the owner, batch paused, empty spool, any error at all), and ''
+// is written as nothing whatsoever.
+try {
+  const out = deliverPendingMessages({
+    ownsBatch,
+    paused: existsSync(repoPath('.claude', 'batch-paused')),
+  })
+  if (out) process.stdout.write(out)
+} catch {
+  /* the channel may never break a tool call */
 }
 process.exit(0)

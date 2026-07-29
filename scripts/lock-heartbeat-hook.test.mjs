@@ -6,6 +6,14 @@
 // the way the harness does — the hook payload on stdin — against an ISOLATED
 // temp repo (a copy of scripts/ plus a file skeleton), so REPO_ROOT is the temp
 // dir and this suite can never touch the real state file.
+//
+// The SAME hook's other spawned duty — the chat delivery of point 406, whose
+// token rule is likewise only provable on a real stdout — lives in
+// scripts/chat-delivery-hook.test.mjs. It is a separate file because every case
+// here blocks its worker inside a `spawnSync`: fifteen of them in one file
+// starved the Vitest pool into a "Timeout calling onTaskUpdate", a green run
+// with a red exit code. Add spawned cases sparingly, and to one file or the
+// other rather than piling them up in one.
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { spawnSync } from 'node:child_process'
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'

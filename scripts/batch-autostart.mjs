@@ -535,6 +535,15 @@ try {
   // Only what arrived SINCE the last spawn. The stamp is NOT advanced here: it
   // moves below, after a spawn that actually happened and read at that moment —
   // `now` is the top of the tick, from before the chat poll even ran.
+  //
+  // DELIVERY HERE IS AT-LEAST-ONCE, DELIBERATELY. These messages ride into the
+  // prompt WITHOUT being claimed off the spool, so the session this launcher
+  // spawns will read the same words a second time when its per-tool-call hook
+  // claims them at its first tool call. Claiming them here instead would make
+  // delivery at-most-once: a spawn that dies before its first tool call — or one
+  // whose prompt never reaches a model — would take the user's message with it.
+  // Seeing an instruction twice costs a few tokens; losing it costs the user
+  // their message, so the duplicate is the side to err on.
   const fresh = pendingSinceHandover(pendingChat, state.chatHandedAt)
   const suffix = chatPromptSuffix(fresh)
   if (suffix) log(`carrying ${fresh.length} chat message(s) into the spawn prompt`)

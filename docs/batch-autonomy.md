@@ -787,12 +787,59 @@ CSP with no fetch, XHR or WebSocket to any host, so a page there cannot send
 anything anywhere. Where that mirror is still open, the section renders a
 localized "the chat needs the web board" notice instead of a dead input.
 
-**What it guarantees, and what it does not.** A message reaches the agent within
-one launcher tick — **15 minutes**, no faster in this stage. That bound comes
-from reusing the launcher: it already ticks and already speaks to the network, so
-the channel needs no new process and no new schedule. Two follow-up points make
-delivery quick (per-tool-call delivery, then a wake-on-message watcher); until
-they land, 15 minutes is the honest figure to quote.
+**What it guarantees, and what it does not.** A message reaches a RUNNING session
+within **seconds** — at its next tool call — and a session that must be spawned
+first within one launcher tick, **15 minutes**. Both bounds come from reusing
+something that already runs: the launcher ticks and already speaks to the
+network, and the PostToolUse hook `scripts/lock-heartbeat-hook.mjs` already runs
+on every single tool call. Neither needs a new process or a new schedule. One
+follow-up remains — a wake-on-message watcher, so a message also *starts* a
+stopped session instead of waiting for the next tick.
+
+**Per-tool-call delivery, and the two rules that shape it.** The hook reads the
+LOCAL spool only — a hook on every tool call must never do network I/O — and
+injects what it finds as
+`{"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"…"}}`.
+That shape is not decoration: a hook's plain stdout on exit 0 goes to the debug
+log and is **never** shown to the model, so built the obvious way every message
+would be silently invisible. And with an empty spool the hook emits **nothing at
+all**, not even a "no new messages" line: injected context is re-sent with every
+later request for the rest of the session, so one idle line would cost tokens at
+tool-call rate, and the user's condition for the whole mechanism is that it costs
+nothing while they send nothing. Like every guard here it stands down for a
+session that does not own the batch lock and for a paused batch, and it is
+fail-open and silent on every error — the channel may never break a tool call.
+
+**A message is QUEUED, never an interrupt.** The injected block says so: arriving
+mid-merge it is read and the session finishes the atomic step first. A question
+is answered with `scripts/chat-reply.mjs`; an instruction becomes a work-order
+point per append-and-defer, and the reply says so.
+
+**Delivery is AT-LEAST-ONCE where the two paths meet, and that is a choice.** A
+message still waiting when the launcher spawns a session rides into the spawn
+PROMPT *without* being claimed off the spool, so that session reads the same
+words again when its hook claims them at its first tool call. Claiming at the
+handover instead would make delivery at-most-once: a spawn that dies before its
+first tool call — or whose prompt never reaches a model — would take the user's
+message with it. Seeing an instruction twice costs a few tokens; losing it costs
+the user their message, so the duplicate is the side to err on. Within one
+running session delivery is exactly-once, because the claim precedes the
+injection.
+
+**The spool is a directory, one file per message** (`.claude/chat-spool/`,
+`scripts/chat-spool.mjs`). The poller creates each file atomically (tmp+rename
+with the retry ladder of `scripts/atomic-write.mjs`); the consumer RENAMES it
+into `consumed/` **before** it emits it. Both halves matter. Consuming first is
+what stops the same message being injected on every following tool call — the
+token leak the rule above exists to prevent — and a rename is an operation
+exactly one caller can win, so two readers can never deliver one message twice.
+Removing a line from a shared `.jsonl` instead would race the poller's append,
+and is not atomic on this platform anyway (the measured `EPERM … rename` of a
+scanner holding a file open; a per-tool-call reader is precisely that load). A
+consumed file is kept rather than deleted: the replay ledger is seeded from the
+spool, so a message that vanished without trace could be accepted again for as
+long as ntfy still caches it. A stage-1 `.jsonl` left on disk is migrated into
+the directory on the first tick and archived as `.migrated-<ts>` — never dropped.
 
 **The transport** is ntfy, already a dependency (`scripts/notify.mjs`): one INBOX
 topic phone → agent, one OUTBOX topic agent → phone. ntfy.sh caches a message for
@@ -816,7 +863,7 @@ realistic worst case is command execution on the user's machine. So:
 | the secret | git-ignored `.claude/chat-secret` on the machine, `localStorage` on the phone. Never committed, never logged, never echoed into a page |
 | HMAC-SHA256 | over the canonical `(direction, id, ts, text)`, every field JSON-quoted so no two different messages share a canonical form. Both directions are signed — and the DIRECTION is inside the signed string, see below |
 | the drop rules | `scripts/chat-core.mjs` drops anything unsigned, mis-signed, older than the window, or already seen — **before** it is spooled |
-| the dedupe | a ledger of the ntfy id **and** the envelope id, rebuilt from the spool. The cursor in `.claude/chat-state.json` only narrows the next poll: losing or corrupting it replays the whole window and spools nothing twice |
+| the dedupe | a ledger of the ntfy id **and** the envelope id, rebuilt from the spool — the consumed messages included, since one already read is exactly the one a re-poll must not hand over again. The cursor in `.claude/chat-state.json` only narrows the next poll: losing or corrupting it replays the whole window and spools nothing twice |
 
 **The direction is part of the signature, and that was a correction.** The first
 cut signed only `(id, ts, text)` under one key for both topics — so an
@@ -877,6 +924,7 @@ open cards cannot shift.
     node scripts/chat-secret.mjs --topics    # also show the derived topics (local only)
     node scripts/chat-inbox.mjs              # one poll: verify, spool, advance the cursor
     node scripts/chat-inbox.mjs --pending    # what is waiting for the session
+    node scripts/chat-inbox.mjs --ack 1      # consume the oldest waiting message by hand
     node scripts/chat-reply.mjs "…"          # answer, signed, to the phone
 
 **Pairing a phone**, once: run `node scripts/chat-secret.mjs --init` on the
