@@ -32,18 +32,15 @@
 // block `--synced` and create the very block loop this design exists to
 // prevent.
 
-import { parseTasks } from './dashboard-guard-core.mjs'
+import { parseTasks, QUEUE_STUB_META } from './dashboard-guard-core.mjs'
 import { FINDER_POINTS, RELEASE_TAG_POINT } from './queue-order-guard-core.mjs'
+
+// The stub meta is DEFINED beside the audit rule that exempts it and re-exported
+// here: two copies of that string would be a block loop waiting to happen.
+export { QUEUE_STUB_META }
 
 /** Where the queue's prose and order live (git-ignored, like the board itself). */
 export const QUEUE_DATA_PATH = '.claude/board-queue.json'
-
-/**
- * The meta an unestimated stub card carries. It is a NAMED value rather than a
- * shape, so the audit can accept exactly this and nothing else: an estimate
- * that merely FAILED to parse must still be a violation.
- */
-export const QUEUE_STUB_META = 'Schätzung offen'
 
 /** The body a point gets while nobody has written one. */
 export const QUEUE_STUB_BODY =
