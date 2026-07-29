@@ -3306,45 +3306,6 @@ read that as "the criterion and its evidence section".
   DOCS in the same commit: `docs/batch-autonomy.md`, where the launcher is
   described, gains the hidden-window requirement.
 
-- [ ] 403. THE USER GETS THE SAME MESSAGE TWICE (user 28.07.2026, reported
-  repeatedly before and now with a verbatim example: the 19:18 and 19:19 replies
-  are the same text). It is not a display bug and not randomness — it is the Stop
-  chain's shape.
-  THE MECHANISM: a reply to the user is written, THEN the Stop chain runs. A guard
-  blocks, the session performs the demanded action, and the turn must end with a
-  reply again — so a second, near-identical message is delivered. Three cases in
-  one afternoon: `timestamp-guard` twice (15:38→15:34, 17:12→17:05, where its own
-  message literally says "write your closing reply again"), and `dashboard-guard`'s
-  focus reconcile once — the user's quoted example. The focus reconcile arms on
-  EVERY user prompt, so this is not a rare corner: any turn where the user writes
-  and the session has not yet confirmed the focus ends in a doubled message.
-  THE FIX HAS TWO HALVES, and the first is the one that matters:
-  (a) SATISFY THE STOP CHAIN BEFORE COMPOSING THE CLOSING REPLY, not after. The
-  preflight already exists (`scripts/guard-preflight.mjs`, CLAUDE.md §7.2) and is
-  read-only; the routine turn-end actions (focus confirm, board publish/attest,
-  the boundary) belong BEFORE the last message, not behind it. CLAUDE.md §7.2
-  gains this as a rule in the Stop-chain paragraph: the closing reply is the LAST
-  thing written, after the chain would pass.
-  (b) A BLOCKED TURN IS ACKNOWLEDGED, NOT REPEATED. When a guard blocks anyway,
-  the new closing message states what was fixed in one or two sentences and does
-  NOT restate the previous answer. `timestamp-guard`'s wording actively causes the
-  bug by demanding the reply "again"; it must instead ask for a SHORT closing line
-  carrying the correct stamp. Same for every other guard whose message asks for a
-  re-written reply — audit all of them in `.claude/settings.json`'s Stop chain and
-  reword.
-  DO NOT "FIX" THIS BY WEAKENING THE GUARDS. Each of them exists because a
-  reminder failed; the defect is the ORDER of composing and checking, plus the
-  wording that asks for a repetition.
-  VERIFIABLE: a pure test per reworded guard that its block message asks for a
-  short acknowledgement and never for the reply "again" (assert on the message
-  text — that is what the model acts on); a pure test that `guard-preflight`
-  reports the focus-reconcile requirement while it is unmet and stays silent once
-  confirmed. Live: three consecutive turns in which the user writes, each ending
-  in exactly ONE message.
-  DOCS in the same commit: CLAUDE.md §7.2 (the rule from (a); it sits near its
-  measured budget, so pay for the sentence by shortening there) and
-  `docs/batch-autonomy.md` where the Stop chain is described.
-
 - [ ] 405. THE BOARD GETS A MESSAGE CHANNEL — STAGE 1 OF 3, THE CHANNEL AND THE
   PAGE (28.07.2026, user request: send instructions and questions from the phone,
   not only read status; designed with a four-eyes review by Fable 5 whose findings

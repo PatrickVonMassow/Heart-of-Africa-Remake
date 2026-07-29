@@ -1,8 +1,38 @@
 {
-  "commit": "15ac051a1b6b32cc62747b645f4b07da64ef4eb4",
+  "commit": "41d8cafd39bab4766f0989b679915ada459ccaaf",
   "steps": {
+    "large-regression": {
+      "evidence": "NICHT DURCHGEFUEHRT — vom Nutzer am 29.07.2026 fuer diesen poc-Tag ausdruecklich erlassen ('ausnahmsweise mal ohne die Closing-Schritte'). Belegt ist nur das schnelle Tor auf 41d8caf: 154 Testdateien / 4360 Tests, Build und Linter sauber; die drei heute Nacht gemergten Punkte (300/402/404) wurden je einzeln geprueft."
+    },
+    "lint-audit": {
+      "evidence": "NICHT DURCHGEFUEHRT — vom Nutzer am 29.07.2026 fuer diesen poc-Tag ausdruecklich erlassen ('ausnahmsweise mal ohne die Closing-Schritte'). Belegt ist nur das schnelle Tor auf 41d8caf: 154 Testdateien / 4360 Tests, Build und Linter sauber; die drei heute Nacht gemergten Punkte (300/402/404) wurden je einzeln geprueft."
+    },
     "dead-code": {
-      "evidence": "knip run at this HEAD. Its 67 unused-FILES are all Stop/PreToolUse hook and CLI scripts invoked through .claude/settings.json or by hand, which knip cannot see — verified as intentional (same finding as the previous closing). Of the 77 unused EXPORTS, sampled and checked by grep across the whole repo: GAIT_SWING, buildQuadrupedParts, seasonalSnow, KHUFU_STANDING and MOUTH_BRIDGE are all genuinely used (module-internal defaults or cross-module imports; MOUTH_BRIDGE is additionally cited by name in CLAUDE.md §7.1 pt 21). Exactly ONE true dead symbol was found and REMOVED: distToLanes in src/scenes/place/lanePlan.ts, whose only occurrence in any .ts/.tsx/.mjs/.md file was its own definition. Build green, place-scene suite 769 tests green, lint clean after the removal."
+      "evidence": "NICHT DURCHGEFUEHRT — vom Nutzer am 29.07.2026 fuer diesen poc-Tag ausdruecklich erlassen ('ausnahmsweise mal ohne die Closing-Schritte'). Belegt ist nur das schnelle Tor auf 41d8caf: 154 Testdateien / 4360 Tests, Build und Linter sauber; die drei heute Nacht gemergten Punkte (300/402/404) wurden je einzeln geprueft."
+    },
+    "stale-doc": {
+      "evidence": "NICHT DURCHGEFUEHRT — vom Nutzer am 29.07.2026 fuer diesen poc-Tag ausdruecklich erlassen ('ausnahmsweise mal ohne die Closing-Schritte'). Belegt ist nur das schnelle Tor auf 41d8caf: 154 Testdateien / 4360 Tests, Build und Linter sauber; die drei heute Nacht gemergten Punkte (300/402/404) wurden je einzeln geprueft."
+    },
+    "stale-comment": {
+      "evidence": "NICHT DURCHGEFUEHRT — vom Nutzer am 29.07.2026 fuer diesen poc-Tag ausdruecklich erlassen ('ausnahmsweise mal ohne die Closing-Schritte'). Belegt ist nur das schnelle Tor auf 41d8caf: 154 Testdateien / 4360 Tests, Build und Linter sauber; die drei heute Nacht gemergten Punkte (300/402/404) wurden je einzeln geprueft."
+    },
+    "md-audit": {
+      "evidence": "NICHT DURCHGEFUEHRT — vom Nutzer am 29.07.2026 fuer diesen poc-Tag ausdruecklich erlassen ('ausnahmsweise mal ohne die Closing-Schritte'). Belegt ist nur das schnelle Tor auf 41d8caf: 154 Testdateien / 4360 Tests, Build und Linter sauber; die drei heute Nacht gemergten Punkte (300/402/404) wurden je einzeln geprueft."
+    },
+    "impl-sections": {
+      "evidence": "NICHT DURCHGEFUEHRT — vom Nutzer am 29.07.2026 fuer diesen poc-Tag ausdruecklich erlassen ('ausnahmsweise mal ohne die Closing-Schritte'). Belegt ist nur das schnelle Tor auf 41d8caf: 154 Testdateien / 4360 Tests, Build und Linter sauber; die drei heute Nacht gemergten Punkte (300/402/404) wurden je einzeln geprueft."
+    },
+    "graphics-detail-doc": {
+      "evidence": "NICHT DURCHGEFUEHRT — vom Nutzer am 29.07.2026 fuer diesen poc-Tag ausdruecklich erlassen ('ausnahmsweise mal ohne die Closing-Schritte'). Belegt ist nur das schnelle Tor auf 41d8caf: 154 Testdateien / 4360 Tests, Build und Linter sauber; die drei heute Nacht gemergten Punkte (300/402/404) wurden je einzeln geprueft."
+    },
+    "acceptance-criteria": {
+      "evidence": "NICHT DURCHGEFUEHRT — vom Nutzer am 29.07.2026 fuer diesen poc-Tag ausdruecklich erlassen ('ausnahmsweise mal ohne die Closing-Schritte'). Belegt ist nur das schnelle Tor auf 41d8caf: 154 Testdateien / 4360 Tests, Build und Linter sauber; die drei heute Nacht gemergten Punkte (300/402/404) wurden je einzeln geprueft."
+    },
+    "open-items": {
+      "evidence": "NICHT DURCHGEFUEHRT — vom Nutzer am 29.07.2026 fuer diesen poc-Tag ausdruecklich erlassen ('ausnahmsweise mal ohne die Closing-Schritte'). Belegt ist nur das schnelle Tor auf 41d8caf: 154 Testdateien / 4360 Tests, Build und Linter sauber; die drei heute Nacht gemergten Punkte (300/402/404) wurden je einzeln geprueft."
+    },
+    "simplifications": {
+      "evidence": "NICHT DURCHGEFUEHRT — vom Nutzer am 29.07.2026 fuer diesen poc-Tag ausdruecklich erlassen ('ausnahmsweise mal ohne die Closing-Schritte'). Belegt ist nur das schnelle Tor auf 41d8caf: 154 Testdateien / 4360 Tests, Build und Linter sauber; die drei heute Nacht gemergten Punkte (300/402/404) wurden je einzeln geprueft."
     }
   }
 }
