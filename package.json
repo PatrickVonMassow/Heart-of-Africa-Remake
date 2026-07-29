@@ -6,7 +6,7 @@
   "scripts": {
     "prepare": "node scripts/enable-hooks.mjs",
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "node scripts/deps-preflight.mjs && tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
     "test:unit": "vitest run",

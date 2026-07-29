@@ -244,6 +244,33 @@ retires it is the withdrawal, or the session's own `SessionEnd`
 (`clearOwnBoundary`) — a successor must never meet a marker naming a point it
 did not close.
 
+### The end of an agent's life: ONE cleanup command
+
+A finished agent's worktree is removed with **`node scripts/worktree-cleanup.mjs
+<path>`** — never with a bare `git worktree remove`, never with `rm -rf`. Both of
+those delete the MAIN tree's `node_modules`, because an agent worktree carries a
+JUNCTION to it and the recursive delete follows the link. That happened twice in
+one afternoon on 29.07.2026 (two agents, two different removal commands), and
+each time the repair was a full `npm install` after `npm run build` reported
+`'tsc' is not recognized` and the push gate went red on a state that was fine.
+Measured on a throwaway repository the same day: `git worktree remove --force`
+with the junction in place destroys the link target; with the junction detached
+first it does not.
+
+The script does exactly that, in that order — detach every link inside the tree
+(the link goes, its target does not), then hand the removal to git, then prune.
+It REFUSES the main checkout, anything git does not know as a worktree, and any
+path that is not strictly inside the tree being removed. Why one script rather
+than a rule in each agent's prompt: the two damaged runs used two different
+commands, and a rule that must be re-obeyed per prompt is the rule that already
+failed twice. The regression is `scripts/worktree-cleanup-core.test.mjs`,
+including a NEGATIVE CONTROL that reproduces the damage with the bare git command
+— without it the positive case would pass with the fix removed.
+
+Should the dependencies go missing anyway, `npm run build` now says so itself
+(`scripts/deps-preflight.mjs`): the cause, `npm install` as the repair, and this
+script as the prevention.
+
 **Known residuals, named rather than hidden.** A delegated agent still in flight
 at a handover can wake the old session after the successor has spawned; its tool
 calls withdraw the handover only while it still owns the lock, so the containment
