@@ -12,6 +12,7 @@ import {
   claimIsOurs,
   reconnectDelayMs,
   responderClaim,
+  stampOf,
   wakeDecision,
   watcherSupervision,
 } from './chat-watcher-core.mjs'
@@ -273,6 +274,52 @@ describe('watcherSupervision — the launcher tick is the whole lifecycle', () =
       }),
     ).toEqual({ action: 'stop', reason: 'paused', pid: 900 })
     expect(watcherSupervision({ paused: true, record: null, probe: probeOf({}) }).action).toBe('none')
+  })
+
+  // THE SAME COERCION, ONE LEVEL DEEPER (four-eyes confirmation pass,
+  // 29.07.2026). `Number(null)` is 0 and 0 IS finite, so a pidfile without a
+  // start time used to SKIP the leniency this branch exists for, compare a live
+  // watcher against the epoch, read it as dead — and start a SECOND watcher.
+  // Two idle watchers wake two responders for one message. Latent rather than
+  // live (today's writer always records a number), and literally the shape that
+  // bit ackPlan.
+  it('a record with NO start time reads ALIVE — it is never restarted beside itself', () => {
+    const probe = probeOf({ 900: { exists: true, startedAt: now - 10_000 } })
+    for (const missing of [null, undefined, '', 'unknown', NaN]) {
+      expect(
+        watcherSupervision({ record: { pid: 900, pidStartedAt: missing }, probe }),
+        `pidStartedAt=${String(missing)}`,
+      ).toEqual({ action: 'none', reason: 'alive', pid: 900 })
+    }
+  })
+
+  it('such a watcher is STOPPED on a pause rather than duplicated', () => {
+    const probe = probeOf({ 900: { exists: true, startedAt: now - 10_000 } })
+    expect(watcherSupervision({ paused: true, record: { pid: 900, pidStartedAt: null }, probe }).action).toBe('stop')
+  })
+
+  it('but the leniency never extends to a pid the probe says is GONE', () => {
+    expect(watcherSupervision({ record: { pid: 900, pidStartedAt: null }, probe: probeOf({}) }).action).toBe('start')
+  })
+})
+
+describe('stampOf — the one place a missing value stops becoming zero', () => {
+  it('passes a real number through', () => {
+    expect(stampOf(0)).toBe(0)
+    expect(stampOf(1_700_000_000_000)).toBe(1_700_000_000_000)
+    expect(stampOf(-5)).toBe(-5)
+  })
+
+  it('turns every non-number into NaN, so Number.isFinite downstream means what it says', () => {
+    for (const v of [null, undefined, '', '0', '17', [], {}, NaN, Infinity, -Infinity, true, false]) {
+      expect(Number.isFinite(stampOf(v)), `stampOf(${JSON.stringify(v)})`).toBe(false)
+    }
+  })
+
+  it('specifically does NOT do what Number() does to null', () => {
+    expect(Number(null)).toBe(0)
+    expect(Number.isFinite(Number(null))).toBe(true)
+    expect(Number.isFinite(stampOf(null))).toBe(false)
   })
 })
 

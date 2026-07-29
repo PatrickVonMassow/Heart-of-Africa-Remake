@@ -84,6 +84,26 @@ export const VERIFICATION_REASONS = Object.freeze([
 ])
 
 /**
+ * A TIMESTAMP, OR NaN — never a silent zero. PURE.
+ *
+ * `Number(null)` is `0`, and `0` is FINITE, so every `Number.isFinite(Number(x))`
+ * guard in this file read a MISSING value as "the epoch" and carried on
+ * comparing against it. That is not a hypothetical: it shipped twice in one
+ * afternoon. In `ackPlan` it made "never spawned, never answered" compare EQUAL
+ * and consume every message unanswered; in `watcherSupervision` it made a
+ * pidfile without a start time skip the leniency it was written for, compare a
+ * live watcher's start time against zero, read it as dead and start a SECOND
+ * watcher — and two idle watchers wake two responders for one message.
+ *
+ * So there is now one helper and both sites use it: a value that is not a real
+ * number is NaN, and every `Number.isFinite` test downstream then means what it
+ * says.
+ */
+export function stampOf(value) {
+  return typeof value === 'number' && Number.isFinite(value) ? value : NaN
+}
+
+/**
  * SHOULD THIS MESSAGE WAKE A RESPONDER? PURE — every input is injected state, so
  * the whole gate is testable without a network, a process or a clock.
  *
@@ -230,7 +250,12 @@ export function watcherSupervision({ paused = false, record = null, probe = null
   if (Number.isInteger(pid) && pid > 0 && typeof probe === 'function') {
     const p = probe(pid)
     if (p && p.exists === true) {
-      const recorded = Number(record?.pidStartedAt)
+      // `stampOf`, not `Number` — see its note. A pidfile with no start time is
+      // meant to fall through to the LENIENT branch (unknown identity, treat the
+      // live pid as ours); `Number(null)` is 0, which is finite, so the old form
+      // took the strict branch instead, compared against the epoch, read the
+      // live watcher as dead and would have started a SECOND one.
+      const recorded = stampOf(record?.pidStartedAt)
       alive =
         !Number.isFinite(recorded) ||
         typeof p.startedAt !== 'number' ||
@@ -349,12 +374,11 @@ export function buildResponderPrompt(messages) {
  * crashed has still answered, and asking the user twice is no improvement.
  */
 export function ackPlan({ handed = [], pending = [], spawnedAt = null, actedAt = null } = {}) {
-  // `Number(null)` is 0, and 0 >= 0 — so a plain `Number()` here would read
-  // "never spawned, never answered" as "answered at the moment of the spawn" and
-  // ack the lot. Its own test caught it; a MISSING value is not a timestamp.
-  const stamp = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : NaN)
-  const spawned = stamp(spawnedAt)
-  const acted = stamp(actedAt)
+  // `stampOf`, not `Number` — see its note. `Number(null)` is 0, and 0 >= 0, so
+  // a plain coercion here read "never spawned, never answered" as "answered at
+  // the moment of the spawn" and acked the lot.
+  const spawned = stampOf(spawnedAt)
+  const acted = stampOf(actedAt)
   if (!Number.isFinite(spawned) || !Number.isFinite(acted) || acted < spawned) return []
   const ids = new Set((Array.isArray(handed) ? handed : []).map((m) => m?.id).filter(Boolean))
   return (Array.isArray(pending) ? pending : []).filter((m) => m && ids.has(m.id) && typeof m.file === 'string')
