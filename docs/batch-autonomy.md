@@ -787,6 +787,23 @@ this is not literally 100 %.
 The claude.ai artifact stays **mirrored** until the user has moved their
 bookmark; `dashboard-publish.mjs` is unchanged and still does its half.
 
+**What each half owns (29.07.2026, point 419).** Splitting one document into a
+shell plus a fragment silently took four properties with it — the shell had them,
+the fragment did not, and nothing asked. Each is now owned by the FRAGMENT, which
+is the half that survives every transport (Pages shell, artifact mirror, the raw
+file opened straight from disk):
+
+| property | owner | what enforces it |
+|---|---|---|
+| the queue's titles, prose, estimates and **the user's order** | `.claude/board-queue.json`, projected over the work order by `board-queue.mjs` | the data file is the only home of the order; `queueOrder` appends anything unlisted by number, which is explicitly *not* the user's prioritisation |
+| the 30-second self-refresh | `board-refresher-core.mjs`, embedded verbatim | `structureViolations` refuses a board without it; jsdom runs it against both page shapes |
+| the phone viewport | a `<meta name="viewport">` in the fragment itself | `structureViolations` → `viewport-missing` |
+| prose instead of placeholders | the generator's stub is a stop-gap, not a resting state | `dashboard-guard-core` → `queue-stubbed` above a quarter of the cards or three in a row |
+
+The lesson under all four: the shell may only carry what a reader can lose
+without harm. A property the board NEEDS belongs in the fragment, because the
+fragment is what gets written into someone else's document.
+
 ### The board also runs BACK — a message channel from the phone (29.07.2026)
 
 Until now the board was one-way: the user read status and could not answer it.
