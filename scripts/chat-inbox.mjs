@@ -32,6 +32,7 @@ import { dirname } from 'node:path'
 import { repoPath } from './repo-paths.mjs'
 import { readSecretStatus } from './chat-secret.mjs'
 import { DEFAULT_MAX_AGE_MS, deriveTopics, ingest, parseNtfyPoll, pollUrl, seenKeys, sinceParam } from './chat-core.mjs'
+import { postOutbox } from './chat-reply.mjs'
 import { claimOldest, knownMessages, migrateLegacySpool, pruneConsumed, readPending, spoolMessage } from './chat-spool.mjs'
 
 export const STATE_PATH = repoPath('.claude', 'chat-state.json')
@@ -83,13 +84,17 @@ export function stateAfterSpool({ next, previousCursor, failed = [] }) {
   // The age-bounded envelope ledger travels with the state file; a flood may
   // evict a transport id, never one of these (see envelopeRetentionMs).
   const envelopes = Array.isArray(next?.envelopes) ? next.envelopes : []
-  if (failed.length === 0) return { cursor: next?.cursor, seen, envelopes }
+  // Who has already been told their message was dropped. Untouched by a spool
+  // failure — those are DROPS, not messages that were meant to reach the disk.
+  const notified = Array.isArray(next?.notified) ? next.notified : []
+  if (failed.length === 0) return { cursor: next?.cursor, seen, envelopes, notified }
   const lost = new Set(failed.flatMap((m) => seenKeys({ ntfyId: m?.ntfyId, envelopeId: m?.id })))
   const lostIds = new Set(failed.map((m) => m?.id).filter(Boolean))
   return {
     cursor: Number.isFinite(previousCursor) ? Number(previousCursor) : undefined,
     seen: seen.filter((k) => !lost.has(k)),
     envelopes: envelopes.filter((e) => !lostIds.has(e?.id)),
+    notified,
   }
 }
 
@@ -157,8 +162,9 @@ async function tick() {
   const seeded = {
     cursor: state.cursor,
     seen: seededLedger(state, knownMessages()),
-    // Carried through untouched: `ingest` prunes it by age and hands it back.
+    // Carried through untouched: `ingest` prunes them by age and hands them back.
     envelopes: Array.isArray(state.envelopes) ? state.envelopes : [],
+    notified: Array.isArray(state.notified) ? state.notified : [],
   }
 
   let body = null
@@ -177,7 +183,7 @@ async function tick() {
     process.exit(0)
   }
 
-  const { accepted, dropped, state: next } = await ingest({
+  const { accepted, dropped, notices, state: next } = await ingest({
     events: parseNtfyPoll(body),
     secret,
     // The topic this body came FROM, and therefore the direction the signature
@@ -209,6 +215,30 @@ async function tick() {
   const persisted = stateAfterSpool({ next, previousCursor: seeded.cursor, failed })
   writeFileSync(STATE_PATH, `${JSON.stringify({ ...persisted, updatedAt: Date.now() }, null, 2)}\n`, 'utf8')
 
+  // THE SENDER LEARNS THAT THEIR MESSAGE DID NOT LAND. The page renders a sent
+  // message like any other, so a drop the user could act on has to travel back
+  // as a signed OUTBOX notice — `dropNoticeDecision` has already decided which
+  // ones qualify (a verified envelope only, never a failed signature: the outbox
+  // must not answer an attacker probing the topic).
+  //
+  // Posted with `postOutbox`, never `sendReply`: a notice is not an ANSWER, and a
+  // reply receipt written here would make the watcher mark the user's message
+  // consumed with nobody having answered it.
+  //
+  // BEST EFFORT, AFTER the state write. A notice that cannot be posted costs one
+  // notice; it may never cost the poll, and the ledger that makes it
+  // at-most-once is already on disk.
+  let noticesSent = 0
+  for (const n of notices) {
+    if (!n.text) continue
+    try {
+      const r = await postOutbox({ secret, text: n.text })
+      if (r.ok) noticesSent++
+    } catch {
+      /* the transport is down for this post — the log line below says so */
+    }
+  }
+
   // Re-read rather than concatenate: between the poll and here the running
   // session's per-tool-call delivery may have consumed part of the spool, and a
   // message it has already shown must not ride into a spawn prompt as well.
@@ -226,6 +256,9 @@ async function tick() {
     // The reasons, never the rejected text: a mis-signed message is exactly the
     // one whose content must not reach a log the agent reads.
     dropped: dropped.map((d) => d.reason),
+    // How many drop notices went back to the phone, and how many were planned:
+    // a difference is a post the transport refused, and the launcher logs it.
+    ...(notices.length > 0 ? { notices: noticesSent, noticesPlanned: notices.length } : {}),
     pending: pending.length,
     // The WHOLE waiting spool, not only what this tick added: the launcher
     // decides for itself which of them a spawn still needs to hear about.

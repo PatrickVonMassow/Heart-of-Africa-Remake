@@ -10,8 +10,12 @@ import {
   assessEvent,
   canonicalMessage,
   constantTimeEqual,
+  MAX_DROP_NOTICES,
   deriveTopics,
+  dropNoticeDecision,
+  dropNoticeText,
   envelopeRetentionMs,
+  formatChatStamp,
   ingest,
   pruneIdLedger,
   makeEnvelope,
@@ -266,6 +270,112 @@ describe('delivery discipline — the ledger, not the cursor, is the dedupe', ()
       await expect(ingest({ events, secret: SECRET, now: NOW })).resolves.toBeTruthy()
     }
     await expect(ingest({ events: [], secret: SECRET, state: 'broken' })).resolves.toBeTruthy()
+  })
+})
+
+describe('A DROPPED MESSAGE DOES NOT LOOK DELIVERED — the drop notice', () => {
+  const STALE_TS = NOW - DEFAULT_MAX_AGE_MS - 60_000
+
+  it('produces EXACTLY ONE notice for a stale message, naming the reason in German', async () => {
+    const e = await event({ id: 'nfy1', msgId: 'spaet', ts: STALE_TS })
+    const r = await ingest({ events: [e], secret: SECRET, now: NOW })
+    expect(r.accepted).toEqual([])
+    expect(r.dropped.map((d) => d.reason)).toEqual(['stale'])
+    expect(r.notices).toHaveLength(1)
+    expect(r.notices[0].id).toBe('spaet')
+    expect(r.notices[0].text).toContain('Zustellung fehlgeschlagen')
+    expect(r.notices[0].text).toContain('Annahmefensters')
+    // Never the message's own words: the two topics are derived separately so
+    // that knowing one reveals nothing about the other.
+    expect(r.notices[0].text).not.toContain('hallo')
+  })
+
+  it('produces NO notice for a bad signature — the outbox is not an oracle', async () => {
+    const forged = await event({ id: 'nfyX', msgId: 'forged', ts: STALE_TS, secret: OTHER })
+    const r = await ingest({ events: [forged], secret: SECRET, now: NOW })
+    expect(r.dropped.map((d) => d.reason)).toEqual(['bad-signature'])
+    expect(r.notices).toEqual([])
+  })
+
+  it('produces no notice for an unsigned, malformed or control frame either', async () => {
+    const raw = (message) => ({ id: 'nfyZ', time: 1, event: 'message', topic: 't', message })
+    const events = [
+      raw(JSON.stringify({ v: PROTOCOL, id: 'x', ts: NOW, text: 'hi' })),
+      raw('not json at all'),
+      { event: 'keepalive' },
+    ]
+    const r = await ingest({ events, secret: SECRET, now: NOW })
+    expect(r.notices).toEqual([])
+  })
+
+  it('produces no notice for a DUPLICATE — the original DID land', async () => {
+    const e = await event({ id: 'nfy1', msgId: 'm1' })
+    const first = await ingest({ events: [e], secret: SECRET, now: NOW })
+    expect(first.accepted).toHaveLength(1)
+    const replay = { ...e, id: 'nfy2' }
+    const second = await ingest({ events: [replay], secret: SECRET, now: NOW, state: first.state })
+    expect(second.dropped[0].reason).toBe('duplicate')
+    expect(second.notices).toEqual([])
+  })
+
+  it('notices the same envelope only ONCE, however often it is re-posted', async () => {
+    const e = await event({ id: 'nfy1', msgId: 'spaet', ts: STALE_TS })
+    const first = await ingest({ events: [e], secret: SECRET, now: NOW })
+    expect(first.notices).toHaveLength(1)
+    expect(first.state.notified.map((n) => n.id)).toEqual(['spaet'])
+    // Re-posted under a transport id nothing has seen: still one notice in all.
+    const again = await ingest({ events: [{ ...e, id: 'nfy2' }], secret: SECRET, now: NOW + 1000, state: first.state })
+    expect(again.dropped[0].reason).toBe('stale')
+    expect(again.notices).toEqual([])
+  })
+
+  it('caps a BURST — a broken clock may not become an outbox flood', async () => {
+    const events = []
+    for (let i = 0; i < MAX_DROP_NOTICES + 4; i++) {
+      events.push(await event({ id: `nfy${i}`, msgId: `spaet${i}`, ts: STALE_TS }))
+    }
+    const r = await ingest({ events, secret: SECRET, now: NOW })
+    expect(r.dropped).toHaveLength(events.length)
+    expect(r.notices).toHaveLength(MAX_DROP_NOTICES)
+    // Only what was actually announced is recorded as announced.
+    expect(r.state.notified).toHaveLength(MAX_DROP_NOTICES)
+  })
+
+  it('gates each drop purely, with the deciding gate named', () => {
+    const verdict = { accept: false, reason: 'stale', verified: true, envelopeId: 'a', ts: NOW }
+    expect(dropNoticeDecision({ verdict })).toEqual({ notify: true, reason: 'stale' })
+    expect(dropNoticeDecision({ verdict: { ...verdict, verified: false } }).reason).toBe('unverified')
+    expect(dropNoticeDecision({ verdict: { ...verdict, reason: 'duplicate' } }).reason).toBe('not-notifiable')
+    expect(dropNoticeDecision({ verdict: { ...verdict, envelopeId: '' } }).reason).toBe('no-envelope-id')
+    expect(dropNoticeDecision({ verdict, notified: [{ id: 'a', at: NOW }] }).reason).toBe('already-notified')
+    expect(dropNoticeDecision({ verdict, sent: MAX_DROP_NOTICES }).reason).toBe('rate-limited')
+    expect(dropNoticeDecision({ verdict: { accept: true } }).reason).toBe('accepted')
+    for (const bad of [null, undefined, 42, 'nope']) {
+      expect(() => dropNoticeDecision({ verdict: bad })).not.toThrow()
+      expect(dropNoticeDecision({ verdict: bad }).notify).toBe(false)
+    }
+  })
+
+  it('writes a notice only for a reason it has words for', () => {
+    expect(dropNoticeText({ reason: 'stale', when: '12.11.23, 14:32' })).toContain('12.11.23, 14:32')
+    expect(dropNoticeText({ reason: 'stale' })).toContain('Zustellung fehlgeschlagen')
+    for (const reason of ['duplicate', 'bad-signature', 'unsigned', 'malformed', null, undefined]) {
+      expect(dropNoticeText({ reason })).toBeNull()
+    }
+    expect(dropNoticeText()).toBeNull()
+  })
+
+  it('formats a stamp a person can read, and refuses to invent one', () => {
+    expect(formatChatStamp(NOW)).toMatch(/\d/)
+    for (const bad of [null, undefined, NaN, 'soon', {}]) expect(formatChatStamp(bad)).toBeNull()
+  })
+
+  it('lets the NOTIFIED ledger go once the message could not be replayed anyway', async () => {
+    const e = await event({ id: 'nfy1', msgId: 'spaet', ts: STALE_TS })
+    const first = await ingest({ events: [e], secret: SECRET, now: NOW })
+    const later = NOW + DEFAULT_MAX_AGE_MS + CLOCK_SKEW_MS + 1000
+    const aged = await ingest({ events: [], secret: SECRET, now: later, state: first.state })
+    expect(aged.state.notified).toEqual([])
   })
 })
 

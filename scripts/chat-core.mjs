@@ -329,16 +329,109 @@ export async function assessEvent({
   const ok = await verifyMessage(secret, { direction, id, ts, text }, sig)
   if (!ok) return { accept: false, reason: 'bad-signature', ntfyId }
 
+  // From here the signature HELD for this direction, so the envelope is genuinely
+  // one of ours and a drop of it may be reported back to the sender. `verified`
+  // is what carries that fact out — nothing above this line ever sets it, which
+  // is what keeps the outbox from answering an attacker's probes (see
+  // `dropNoticeDecision`).
   const age = now - ts
-  if (age > maxAgeMs || age < -CLOCK_SKEW_MS) return { accept: false, reason: 'stale', ntfyId }
+  if (age > maxAgeMs || age < -CLOCK_SKEW_MS) {
+    return { accept: false, reason: 'stale', ntfyId, verified: true, envelopeId: id, ts }
+  }
 
-  if (ledger.has(`m:${id}`)) return { accept: false, reason: 'duplicate', ntfyId }
+  if (ledger.has(`m:${id}`)) return { accept: false, reason: 'duplicate', ntfyId, verified: true, envelopeId: id, ts }
 
   return {
     accept: true,
     reason: 'ok',
     message: { id, ts, text: sanitizeText(text), ntfyId, receivedAt: now },
   }
+}
+
+// --- THE DROP NOTICE: a message that did not land must not LOOK delivered -------
+//
+// The page renders a sent message like any other — display never asks whether the
+// machine accepted it. So a message dropped here (a phone clock further ahead
+// than the skew is enough) left the user with a delivered-looking message the
+// agent never received: the exact failure shape this channel exists to prevent,
+// mirrored. A drop that the SENDER can do something about therefore goes back to
+// the OUTBOX as a signed notice, and the page shows it beside the message.
+//
+// ONLY A VERIFIED ENVELOPE EVER EARNS ONE. A message that fails the signature
+// check gets nothing at all: answering those would make the outbox an ORACLE for
+// an attacker probing the inbox topic — post junk, watch the outbox, learn that
+// somebody is listening and how the machine judges it. `verified` is set only
+// after the HMAC held for the direction the event was read from.
+
+/**
+ * The drop reasons a notice is sent for.
+ *
+ * `stale` only, and the omissions are deliberate:
+ *   - `bad-signature` / `unsigned` / `malformed` — not our sender; see the oracle
+ *     note above.
+ *   - `duplicate` — the ORIGINAL was accepted and delivered, so the user's words
+ *     did land; a notice would say the opposite. It would also hand a captured
+ *     envelope an amplifier: replay it and the machine posts on demand.
+ */
+export const NOTIFIABLE_DROP_REASONS = Object.freeze(['stale'])
+
+/** At most this many notices per poll. A burst of stale messages is a broken
+ *  clock, not a conversation — one poll may not turn it into an outbox flood. */
+export const MAX_DROP_NOTICES = 3
+
+/**
+ * A timestamp as the board reader reads it. TOTAL — null for a junk value, an
+ * ISO string where the runtime has no usable ICU data.
+ */
+export function formatChatStamp(ts, { locale = 'de-DE', timeZone = 'Europe/Berlin' } = {}) {
+  // `typeof`, not `Number(…)`: `Number(null)` is 0, and 0 is finite, so a MISSING
+  // stamp would be formatted as 01.01.1970 and printed to the user as the time
+  // they sent their message (the `stampOf` lesson of chat-watcher-core.mjs).
+  const n = typeof ts === 'number' && Number.isFinite(ts) ? ts : NaN
+  if (!Number.isFinite(n)) return null
+  try {
+    return new Intl.DateTimeFormat(locale, { timeZone, dateStyle: 'short', timeStyle: 'short' }).format(new Date(n))
+  } catch {
+    return new Date(n).toISOString()
+  }
+}
+
+/**
+ * The notice the phone shows. GERMAN — it is read on the board, where everything
+ * around it is German. Null for a reason that earns no notice.
+ *
+ * IT NEVER ECHOES THE MESSAGE TEXT. The two topics are derived separately so
+ * that knowing one reveals nothing about the other; quoting inbox content into
+ * the outbox would hand exactly that away. The timestamp is enough to identify
+ * which message it was, and it comes out of the SIGNED envelope.
+ */
+export function dropNoticeText({ reason, when = null } = {}) {
+  if (reason !== 'stale') return null
+  const stamp = when ? ` von ${when}` : ''
+  return (
+    `Zustellung fehlgeschlagen: Deine Nachricht${stamp} ist NICHT angekommen — sie lag außerhalb des ` +
+    'Annahmefensters (zu alt, oder die Uhr des Geräts weicht zu weit ab). Bitte prüfe Datum und Uhrzeit ' +
+    'am Telefon und schicke sie noch einmal.'
+  )
+}
+
+/**
+ * DOES THIS DROP EARN A NOTICE? PURE.
+ *
+ * Returns { notify, reason } — the reason names the gate that decided, so the
+ * live path, a dry run and the tests all speak the same words.
+ */
+export function dropNoticeDecision({ verdict, notified = [], sent = 0, max = MAX_DROP_NOTICES } = {}) {
+  const no = (reason) => ({ notify: false, reason })
+  if (!verdict || verdict.accept === true) return no('accepted')
+  if (verdict.verified !== true) return no('unverified')
+  if (!NOTIFIABLE_DROP_REASONS.includes(verdict.reason)) return no('not-notifiable')
+  if (typeof verdict.envelopeId !== 'string' || verdict.envelopeId === '') return no('no-envelope-id')
+  // One notice per message, ever — a replay under fresh transport ids may not
+  // become a notice generator.
+  if ((Array.isArray(notified) ? notified : []).some((e) => e?.id === verdict.envelopeId)) return no('already-notified')
+  if (!(Number(sent) < Number(max))) return no('rate-limited')
+  return { notify: true, reason: verdict.reason }
 }
 
 /**
@@ -377,6 +470,11 @@ export async function ingest({
   const seen = Array.isArray(state.seen) ? [...state.seen] : []
   const retentionMs = envelopeRetentionMs(maxAgeMs)
   const envelopes = pruneIdLedger(state.envelopes, { now, retentionMs })
+  // Which dropped envelopes the sender has already been told about. Anchored on
+  // the moment of the NOTICE, not on the message's own stamp: a stale message is
+  // stale by definition, so its stamp would expire the entry at once and the
+  // next replay would earn a second notice.
+  const notified = pruneIdLedger(state.notified, { now, retentionMs })
   // What the verification actually reads: the transport ledger PLUS every
   // envelope id still inside its window, whether or not `seen` still holds it.
   const lookup = [...seen, ...envelopeKeys(envelopes)]
@@ -384,6 +482,8 @@ export async function ingest({
 
   const accepted = []
   const dropped = []
+  /** What the caller must POST to the outbox — see the drop-notice section. */
+  const notices = []
   for (const event of list) {
     if (event && event.event === 'message' && Number.isFinite(event.time)) {
       cursor = Math.max(cursor, Number(event.time))
@@ -408,13 +508,33 @@ export async function ingest({
         seen.push(`n:${verdict.ntfyId}`)
         lookup.push(`n:${verdict.ntfyId}`)
       }
+      // A drop the SENDER can act on goes back to them; everything else stays
+      // silent. The ledger entry is written whether or not the post later
+      // succeeds: the transport id is already remembered, so this message will
+      // never be judged again, and a notice is at-most-once by design.
+      const plan = dropNoticeDecision({ verdict, notified, sent: notices.length })
+      if (plan.notify) {
+        notices.push({
+          id: verdict.envelopeId,
+          reason: verdict.reason,
+          ts: verdict.ts ?? null,
+          text: dropNoticeText({ reason: verdict.reason, when: formatChatStamp(verdict.ts) }),
+        })
+        notified.push({ id: verdict.envelopeId, at: now })
+      }
     }
   }
 
   return {
     accepted,
     dropped,
-    state: { cursor, seen: seen.slice(-SEEN_MAX), envelopes: pruneIdLedger(envelopes, { now, retentionMs }) },
+    notices,
+    state: {
+      cursor,
+      seen: seen.slice(-SEEN_MAX),
+      envelopes: pruneIdLedger(envelopes, { now, retentionMs }),
+      notified: pruneIdLedger(notified, { now, retentionMs }),
+    },
   }
 }
 

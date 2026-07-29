@@ -1012,6 +1012,28 @@ paused, complete or wedged may not decide whether a message survives at all.
 Past 12 hours it is gone from the cache, which is also why the acceptance window
 is set to the same 12 hours — beyond it a replay is impossible anyway.
 
+**A DROPPED message does not look delivered** (`dropNoticeDecision` /
+`dropNoticeText` in `scripts/chat-core.mjs`). The page renders a sent message like
+any other — display never asks whether the machine accepted it — so a message
+dropped as `stale` (a phone clock further ahead than the five-minute skew is
+enough) left the user looking at a delivered-looking message the agent never
+received. That is the failure this channel exists to prevent, mirrored. The
+launcher's tick now posts a signed notice to the OUTBOX naming the reason, and the
+page shows it as an agent message.
+
+Three properties make it safe rather than merely helpful. **Only a VERIFIED
+envelope earns one**: a failed signature gets no answer at all, because replying
+would turn the outbox into an ORACLE for someone probing the inbox topic. **A
+duplicate earns none either** — the original was accepted and delivered, so the
+words did land, and a notice would additionally hand a captured envelope an
+amplifier. And the notice **never quotes the message**: the two topics are derived
+separately so that knowing one reveals nothing about the other, and the signed
+timestamp identifies the message on its own. One notice per envelope id (kept in
+the same age-bounded ledger) and at most `MAX_DROP_NOTICES` per poll, so a broken
+clock cannot become an outbox flood. It is posted with `postOutbox`, never
+`sendReply`: a notice is not an ANSWER, and a reply receipt written for one would
+make the watcher mark the user's message consumed with nobody having answered it.
+
 **The replay bound is a WINDOW, not a count** (`envelopeRetentionMs` /
 `pruneIdLedger` in `scripts/chat-core.mjs`). Both id kinds used to share one
 500-entry array that dropped events pushed into as well — so a few hundred junk
@@ -1051,7 +1073,7 @@ realistic worst case is command execution on the user's machine. So:
 | derived topics | `hoa-<32 hex>` from SHA-256 over the shared secret, domain-separated per direction. No topic name is in any tracked file or in the published HTML; the page derives them client-side with WebCrypto |
 | the secret | git-ignored `.claude/chat-secret` on the machine, `localStorage` on the phone. Never committed, never logged, never echoed into a page |
 | HMAC-SHA256 | over the canonical `(direction, id, ts, text)`, every field JSON-quoted so no two different messages share a canonical form. Both directions are signed — and the DIRECTION is inside the signed string, see below |
-| the drop rules | `scripts/chat-core.mjs` drops anything unsigned, mis-signed, older than the window, or already seen — **before** it is spooled |
+| the drop rules | `scripts/chat-core.mjs` drops anything unsigned, mis-signed, older than the window, or already seen — **before** it is spooled. A drop of a VERIFIED envelope is reported back to the sender (see below); a failed signature never is |
 | the dedupe | TWO ledgers: the ntfy ids rotate under a count cap, the accepted ENVELOPE ids are kept for the whole acceptance window (see below). Both are rebuilt from the spool — the consumed messages included, since one already read is exactly the one a re-poll must not hand over again. The cursor in `.claude/chat-state.json` only narrows the next poll: losing or corrupting it replays the whole window and spools nothing twice |
 
 **The direction is part of the signature, and that was a correction.** The first

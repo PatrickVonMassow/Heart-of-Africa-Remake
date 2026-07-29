@@ -35,6 +35,7 @@ describe('A MESSAGE WHOSE SPOOL WRITE FAILED IS NOT RECORDED AS SEEN', () => {
       cursor: 5000,
       seen: next.seen,
       envelopes: next.envelopes,
+      notified: [],
     })
   })
 
@@ -66,7 +67,7 @@ describe('A MESSAGE WHOSE SPOOL WRITE FAILED IS NOT RECORDED AS SEEN', () => {
   it('strikes a message that carried no ntfy id by its envelope id alone', () => {
     const state = { cursor: 9, seen: ['m:m7'], envelopes: [{ id: 'm7', at: NOW }] }
     const r = stateAfterSpool({ next: state, previousCursor: 3, failed: [{ id: 'm7', ntfyId: null }] })
-    expect(r).toEqual({ cursor: 3, seen: [], envelopes: [] })
+    expect(r).toEqual({ cursor: 3, seen: [], envelopes: [], notified: [] })
   })
 
   it('survives junk instead of throwing on the state write path', () => {
@@ -75,6 +76,7 @@ describe('A MESSAGE WHOSE SPOOL WRITE FAILED IS NOT RECORDED AS SEEN', () => {
       cursor: undefined,
       seen: [],
       envelopes: [],
+      notified: [],
     })
   })
 })
