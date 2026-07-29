@@ -392,6 +392,7 @@ export interface Strings {
     canoeSpeedup: string
     junglePenalty: string
     riverWidthFactor: string
+    riverMouthSlackDeg: string
     drownSeconds: string
     wetFlowFactor: string
     vigilPredatorDelay: string

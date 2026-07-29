@@ -432,6 +432,11 @@ changes with it in the same commit.
    animal's own instance matrix, never its behaviour spot, which the render
    offsets leave a body-width or more away — so nothing unrendered leaves a
    phantom collider, points 129/378).
+   A blocked boundary never PINS the traveller (§11.2, point 316): a
+   blocked step resolves by SLIDING along it (`slideAlongBlocked`, the
+   shape the settlement and tree/animal resolves already use), only a
+   fully closed direction fan reports the blocked notice, and the
+   passive current obeys the same resolve (pt. 21).
    Evidence: docs/acceptance-evidence.md §4.
 
 5. **Port city.** At least Cairo as the enterable starting port with trade
@@ -773,6 +778,14 @@ changes with it in the same commit.
     `currentWaterfallRadius`), covering real distance so it advances time
     and provisions (and ticks health/deadline) — never free movement.
     Being swept over falls is gameplay via pt. 23 (waterfall-sweep event).
+    The current may never HOLD the traveller (§11.2/§11.3, point 316): a
+    river reaches the sea as SLACK WATER — its push ramps to nothing over
+    the last `balance.river.mouthSlackDeg` of a sea-ending course, while a
+    course ending at a confluence keeps its pace — the drift resolves a
+    blocked boundary through the same slide the overland move uses, and
+    EVERY sea mouth is swept for a pocket the current could hold a swimmer
+    in. Ribbon, mouth bridge and the ocean's impassability are untouched:
+    no new way off the continent.
    Evidence: docs/acceptance-evidence.md §21.
 
 22. **Health and afflictions.** The health system of `design.md` §6 is

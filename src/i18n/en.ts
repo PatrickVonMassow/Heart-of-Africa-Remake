@@ -430,6 +430,7 @@ export const en: Strings = {
     canoeSpeedup: 'Canoe speed factor (water)',
     junglePenalty: 'Jungle penalty factor (no machete)',
     riverWidthFactor: 'River width factor (applies on reload)',
+    riverMouthSlackDeg: 'River mouth slack water in degrees (applies on reload)',
     drownSeconds: 'Drowning: seconds in a strong current',
     wetFlowFactor: 'Drowning: wet-season current factor',
     vigilPredatorDelay: 'Vigil: seconds until a predator is drawn',

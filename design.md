@@ -340,12 +340,15 @@ Two seas are never inland water regardless of the outline: everything northeast 
 
 Even inside the outline, swimmable sea reaches only a short band off the coast (a calibratable balance value, debug menu §21); further out the open ocean blocks — there is no swimming far out to sea.
 
+The boundary blocks, but it never pins: a step into impassable water SLIDES along the boundary — the move fans to either side and takes the first free heading at full length — exactly as movement slides along a building or a tree (§2.6/§11). Only a fully closed fan reports the blocked notice, and the passive current (§11.3) obeys the same resolve, so the water can never press the traveller against a coast he cannot then move along.
+
 ### 11.3 Water, current and waterfalls
 
 Current and gameplay:
 
 - Waters carry a current, which is especially strong in the immediate surroundings of waterfalls (§4.4).
 - Moving with the current is faster, against it slower; even an idle traveller on a river is carried downstream. The drift covers real distance and therefore consumes time and provisions like any water travel — the current never moves the traveller for free.
+- A river reaches the sea as SLACK WATER: over the last stretch before a sea mouth its current runs out — the channel fans over the delta, the bed gradient dies against sea level, the sea backs the water up — so the junction is never a one-way funnel. A river ending at a CONFLUENCE keeps its full pace. This is a gameplay guarantee as much as realism: inside water the impassable ocean fences the traveller in, so the current must never hold him faster than he can swim out of it, and every sea mouth is swept for such a pocket (the reported softlock at the Nile's Rosetta mouth).
 - There is a risk of being swept over the falls — with injuries and the loss of a large part of the inventory.
 - Water can also be crossed without a canoe, but slower, more exposed to the current, and at risk of a crocodile attack (injury or death). Out of the canoe the rifle gets wet and is useless — only a machete reduces the risk; in the canoe it stays dry and works as usual. Visually the swimmer floats ON the rendered water surface, chest-deep with a slow swim bob (point 152) — never walking the carved bed under the sheet, however deep it lies (Lake Edward's rift bed made the difference plain).
 

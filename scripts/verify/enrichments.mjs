@@ -807,6 +807,120 @@ if (waterSpot && landSpot) {
   check('Canoe: a water tile and a land tile were found', false, `water=${JSON.stringify(waterSpot)} land=${JSON.stringify(landSpot)}`)
 }
 
+// --- Point 316: the river mouth never holds the swimmer ----------------------
+// The reported softlock: swimming without a canoe in the Nile's Rosetta mouth
+// (~31.4N/30.4E), the downstream current outran the swim speed while the
+// impassable Mediterranean fenced the pocket in. Staged live at the notch: the
+// current drifts him, resolves ALONG the coast wherever it would push into the
+// blocked sea (never a hard stop, never a step into blocked water), and he
+// swims his way back up the river alive.
+const notch = await page.evaluate(async () => {
+  const terrain = await import('/src/world/terrain.ts')
+  const current = await import('/src/systems/current.ts')
+  const st = () => window.__game.getState()
+  // The swimmer's case: the canoe out of the pack, the rest of the kit untouched.
+  window.__game.setState({ equipment: { ...st().equipment, canoe: 0 } })
+  const seed = st().seed
+  const blockedAt = (lat, lon) => terrain.isBlocked(window.__terrainType(lat, lon, seed), lat, lon)
+  // The notch itself: the NORTHERNMOST mouth water cell, the tip the current
+  // used to pin him against.
+  let tip = null
+  for (let lat = 31.45; lat >= 31.15 && !tip; lat -= 0.01) {
+    for (let lon = 30.3; lon <= 30.75; lon += 0.01) {
+      if (window.__terrainType(lat, lon, seed) === 'water') { tip = [lat, lon]; break }
+    }
+  }
+  if (!tip) return { found: false }
+  // Set him down a quarter degree UPSTREAM of it, on the strongest flow line
+  // of the mouth reach — the current then carries him into the notch, which is
+  // exactly how the player got there.
+  let start = null
+  let bestDrift = -1
+  for (let lon = 30.3; lon <= 31.0; lon += 0.01) {
+    const lat = tip[0] - 0.25
+    if (window.__terrainType(lat, lon, seed) !== 'water') continue
+    const d = current.currentDriftDegPerSecond(lat, lon, false)
+    const m = Math.hypot(d.lat, d.lon)
+    if (m > bestDrift) { bestDrift = m; start = [lat, lon] }
+  }
+  if (!start) return { found: false, tip }
+  st().debugJumpTo(start[0], start[1])
+  const at = (p) => ({ lat: -p.z / 10, lon: p.x / 10 })
+  const out = { found: true, tip, start, bestDrift, drifted: 0, slid: 0, intoBlocked: 0 }
+  // 1) Let the current work: it must carry him, must never land him in blocked
+  //    water, and where its own target IS blocked it must run along the
+  //    boundary rather than freeze.
+  for (let i = 0; i < 150; i++) {
+    const before = { ...st().pos }
+    const ll = at(before)
+    const d = current.currentDriftDegPerSecond(ll.lat, ll.lon, false)
+    const raw = [ll.lat + d.lat * 0.1, ll.lon + d.lon * 0.1]
+    const rawBlocked = blockedAt(raw[0], raw[1])
+    st().driftCurrent(0.1)
+    const now = at(st().pos)
+    const moved = Math.hypot(st().pos.x - before.x, st().pos.z - before.z)
+    if (moved > 1e-6) {
+      out.drifted++
+      if (rawBlocked) out.slid++
+    }
+    if (blockedAt(now.lat, now.lon)) out.intoBlocked++
+  }
+  const landed = at(st().pos)
+  out.landed = [landed.lat, landed.lon]
+  out.tipDeg = Math.hypot(landed.lat - tip[0], landed.lon - tip[1])
+  return out
+})
+check(
+  'river mouth: the current carries the swimmer into the notch, never into blocked sea (point 316)',
+  notch.found && notch.drifted > 5 && notch.intoBlocked === 0 && notch.tipDeg < 0.1,
+  JSON.stringify(notch),
+)
+check(
+  'river mouth: a drift that would run into the coast slides along it instead (point 316)',
+  notch.found && notch.slid > 0,
+  JSON.stringify(notch),
+)
+// The picture for the record: the swimmer in the mouth notch he used to be
+// stuck in, before he works his way out. The shutter settles the camera on the
+// spot he drifted to and refuses the frame if he is not in it (point 375).
+await shot('142-river-mouth-swim', {
+  world: { lat: notch.landed?.[0] ?? notch.tip?.[0] ?? 31.4, lon: notch.landed?.[1] ?? notch.tip?.[1] ?? 30.4 },
+  label: 'the swimmer in the Nile mouth notch',
+})
+const escape = await page.evaluate(async () => {
+  const terrain = await import('/src/world/terrain.ts')
+  const st = () => window.__game.getState()
+  const seed = st().seed
+  const at = (p) => ({ lat: -p.z / 10, lon: p.x / 10 })
+  const from = at(st().pos)
+  // Swim for the open river (south-east, upstream) while the drift keeps
+  // running — the way the player works his way out.
+  for (let i = 0; i < 120; i++) {
+    st().moveTravel(1, 1, 0.05)
+    st().driftCurrent(0.05)
+  }
+  const end = at(st().pos)
+  return {
+    movedDeg: Math.hypot(end.lat - from.lat, end.lon - from.lon),
+    southedDeg: from.lat - end.lat,
+    alive: st().health > 0 && !st().defeat,
+    endBlocked: terrain.isBlocked(window.__terrainType(end.lat, end.lon, seed), end.lat, end.lon),
+    end: [end.lat, end.lon],
+  }
+})
+check(
+  'river mouth: the swimmer gets back up the river alive (point 316)',
+  escape.alive && !escape.endBlocked && escape.movedDeg > 0.25 && escape.southedDeg > 0.1,
+  JSON.stringify(escape),
+)
+// State hygiene: back to the Cairo reach the later checks stream over. Wait on
+// the traveller actually standing there, not on the wall clock.
+await page.evaluate(() => window.__game.getState().debugJumpTo(29.5, 31.4))
+await page.waitForFunction(() => {
+  const p = window.__game.getState().pos
+  return Math.abs(-p.z / 10 - 29.5) < 0.05 && Math.abs(p.x / 10 - 31.4) < 0.05
+})
+
 // --- Point 5: the journal panel stops above the camp/journal buttons ----------
 // The open journal must not reach the bottom and cover the camp/journal toggle
 // buttons; its bottom edge sits above their top edges with a small gap.

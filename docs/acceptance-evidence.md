@@ -53,7 +53,10 @@ cannot collide (`src/ui/mapLayout.test.ts`).
 ## 4. Movement and time.
 
 Verifiable: an automated move on enclosed sea advances the position; a
-move on open ocean is refused with the blocking notice; a move onto a
+move on open ocean (mid-Atlantic, every direction blocked) is refused
+with the blocking notice, while a step into the boundary from a coastal
+pocket slides along it instead of stopping dead
+(`src/systems/movement.test.ts`, `src/state/store.travel.test.ts`); a move onto a
 mountain without a rope advances (with the warning) while the rope
 makes it faster, and a forced fall wounds the traveler and can drop an
 item. The penalty mapping is pure-tested for each terrain (incl. the
@@ -996,7 +999,20 @@ wetness < 0.1; low in December as the local rains fall) and without
 leaking into normal rivers (the Zambezi keeps its January, the Nile its
 October); live, the delta's water fan reads visibly fuller in July than
 in January via `__naturalSites.deltaFlood`/`deltaWaterScale`
-(screenshots 119/120).
+(screenshots 119/120). The sea mouths hold no trap (point 316): EVERY
+river that empties into the sea is swept cell by cell — from every
+swimmable cell an exit path must exist on which the current never eats
+more than half the swim speed — with the pre-316 funnel restored as the
+sweep's own regression witness (it reproduces the reported Nile pocket),
+the mouth-vs-confluence split and the slack ramp pure-tested in
+`src/world/riverMouths.test.ts` and the sweep rule itself on hand-drawn
+water fields in `src/systems/swimEscape.test.ts`; drift and swim speed
+come from one shared formula (`src/systems/current.ts`), so the sweep
+measures the world the player swims in. A swimmer set into the Nile
+mouth notch works his way out in `src/state/store.travel.test.ts`, and
+live the staged swim there drifts, slides along the coast where the
+current would push into the blocked sea and gets back up the river alive
+(`scripts/verify/enrichments.mjs`, screenshot 142).
 
 ## 22. Health and afflictions.
 

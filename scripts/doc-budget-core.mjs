@@ -47,7 +47,12 @@ export const DOC_BUDGETS = [
     // session that did not know a script publishes would go on recording a
     // deferral and leaving the user's board an hour behind, which is the exact
     // failure this point was written for.
-    maxLines: 1119,
+    // RAISED by the 13 lines point 316 adds to §7.1 pts 4 and 21: the
+    // no-pinning guarantee at a blocked boundary and the slack water at a
+    // sea mouth. Both are new acceptance CONDITIONS with a new balance
+    // value; their evidence chains went to docs/acceptance-evidence.md,
+    // which is unbudgeted, so what is priced here is the rules alone.
+    maxLines: 1132,
     // RAISED by the 50 measured words of the §7.2 rule that screenshot diffing
     // is not available as a shortcut (point 361). That is the mechanism working
     // as designed rather than a concession: the words buy a NEW standing rule
@@ -111,7 +116,12 @@ export const DOC_BUDGETS = [
     // will simply write an ordinary message and mail the user again, and the
     // hook that enforces it would then refuse a commit whose fix is stated
     // nowhere in this file.
-    maxWords: 10184,
+    // RAISED by the 136 measured words of the same two point-316 conditions:
+    // a blocked step slides instead of pinning (pt. 4) and a sea mouth runs
+    // slack so the current can never hold a swimmer against the ocean
+    // (pt. 21). A criterion that no longer describes the game is the drift
+    // this budget is not meant to buy.
+    maxWords: 10317,
     why: 'loaded at every session start — the most expensive document in the project',
   },
   {
@@ -156,7 +166,15 @@ export const DOC_BUDGETS = [
     // before it plays again, and the trigger is DEATH rather than distance —
     // a genuinely new §19.8 decision, which is what this mechanism prices in.
     // The margin left over is unchanged, so the next sentence pays its own way.
-    maxWords: 27983,
+    // RAISED by the 189 measured words (3 lines) of the two water rules of
+    // point 316: §11.2 gains the guarantee that a blocked boundary SLIDES
+    // rather than pins, and §11.3 that a river reaches the sea as slack
+    // water. Both are genuinely new decisions — the old text said what
+    // blocks and how fast the current runs, never what happens when the two
+    // meet, and the answer is the difference between a swim and a softlock.
+    // The tunable-value entry behind the slack ramp went to
+    // docs/design-reference.md §21.2, which is unbudgeted.
+    maxWords: 28171,
     why: 'read on demand, but every point that cites a section pays for the bulk around it',
   },
 ]

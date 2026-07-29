@@ -41,6 +41,7 @@ const DEFAULTS = {
   surfCutoff: balance.surf.cutoff,
   canoeSpeedup: balance.canoeSpeedup,
   riverWidthFactor: balance.river.widthFactor,
+  riverMouthSlackDeg: balance.river.mouthSlackDeg,
   canteenCapacity: balance.health.canteenCapacity,
   vigilPredatorDelay: balance.vigil.predatorDelay,
   rescueBurst: balance.family.rescueBurst,
@@ -109,6 +110,7 @@ afterEach(() => {
   balance.surf.cutoff = DEFAULTS.surfCutoff
   balance.canoeSpeedup = DEFAULTS.canoeSpeedup
   balance.river.widthFactor = DEFAULTS.riverWidthFactor
+  balance.river.mouthSlackDeg = DEFAULTS.riverMouthSlackDeg
   balance.health.canteenCapacity = DEFAULTS.canteenCapacity
   balance.vigil.predatorDelay = DEFAULTS.vigilPredatorDelay
   balance.family.rescueBurst = DEFAULTS.rescueBurst
@@ -204,6 +206,7 @@ describe('DebugMenu editable fields write through to balance (settings.mjs fillF
     // Build-time geometry value (point 136): the edit persists in balance and
     // applies on the next reload — the write-through is what the menu owes.
     { label: en.debug.riverWidthFactor, read: () => balance.river.widthFactor, value: 2 },
+    { label: en.debug.riverMouthSlackDeg, read: () => balance.river.mouthSlackDeg, value: 0.9 },
     // The vigil's predator draw delay (design.md §19.8, point 121 (f)).
     { label: en.debug.vigilPredatorDelay, read: () => balance.vigil.predatorDelay, value: 20 },
     // The parental rescue burst (design.md §19.8, point 127).

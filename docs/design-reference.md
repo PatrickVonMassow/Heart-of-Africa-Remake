@@ -185,6 +185,7 @@ are adjustable at runtime). The complete set, grouped as the menu presents it:
 - Movement-factor tuning for the terrain relief items: the factor by which a canoe speeds up water travel, and the penalty factors by which the jungle without a machete and the mountains without a rope slow the traveller.
 - The swimmable coastal band width (§11.2): how far off the coast the sea can be swum before the open ocean blocks.
 - The river width factor (§11.3): rivers are drawn wider than scale for canoe playability, and carved bed, ribbon, water mask and every clearance derive from this one value. It is a BUILD-time value — the edit persists and takes effect on the next reload.
+- The river mouth's slack water (§11.3): how far up its course a river that empties into the sea runs out of current. Like the width factor it is a BUILD-time value — the flow field bakes the ramp per course segment, so the edit takes effect on the next reload.
 
 **Seasons and weather** (§19.13)
 
