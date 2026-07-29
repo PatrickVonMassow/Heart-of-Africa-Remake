@@ -658,11 +658,12 @@ the claim — its lock then ages out the honest way, and the claim expires with 
    GitHub) but does **not** open VS Code or a Claude chat, so the user sees no live
    output there after a reboot. VS Code is not in autostart, and even if it were,
    the extension does not auto-open a resuming chat — there is no CLI/API to trigger
-   it. The live dashboard artifact also likely does not update headlessly (publishing
-   needs the claude.ai connection a `-p` run may lack). So while the user is away the
-   batch progresses and is visible on **GitHub**; the live chat + dashboard resume
-   when the user reopens VS Code + a Claude chat (SessionStart then resumes visibly).
-   This is a hard limit of an interactive-extension chat, not a hole to patch.
+   it. So while the user is away the batch progresses and is visible on **GitHub**;
+   the live chat resumes when the user reopens VS Code + a Claude chat (SessionStart
+   then resumes visibly). This is a hard limit of an interactive-extension chat, not
+   a hole to patch. The BOARD is no longer part of this residual: since point 400 it
+   is published by a script, so a headless run updates it like any other session
+   (see *The board's transport* below). Only the chat is invisible.
 
 Mitigation, and why it is small in practice: the moment the user logs in, the task
 resurrects the batch (promptly, thanks to `StartWhenAvailable` + the boot-time
@@ -690,20 +691,69 @@ point in the queue, every open point visible, a DECLARED focus
 (`scripts/focus.mjs set <N> "<what>"`), now-card title == declared focus, an
 acknowledged pivot check after every user prompt (`focus.mjs confirm` — armed
 automatically by the UserPromptSubmit hook), a re-affirmation after ~30 min of
-tool work, and publish parity (repo file bytes == the content last handed to the
-Artifact tool, recorded automatically by the PostToolUse heartbeat — so
-"edited" can never masquerade as "live"; the two-file repo/scratchpad split is
-bridged by `scripts/dashboard-publish.mjs`).
+tool work, and publish parity (repo file bytes == the content last published, to
+the live page or via the Artifact tool — so "edited" can never masquerade as
+"live"; the two-file repo/scratchpad split is bridged by
+`scripts/dashboard-publish.mjs`).
 
 The standard cycle after any dashboard edit:
-`node scripts/dashboard-publish.mjs` → Artifact publish of the synced scratchpad
-file (same artifact url) → `node scripts/dashboard-guard.mjs --synced
-.batch-dashboard.html` (which doubles as the focus confirmation when card and
-focus agree). On every work switch: `node scripts/focus.mjs set <N> "<what>"`.
-Headless sessions without the Artifact tool record
-`dashboard-publish.mjs --defer "<reason>"` — a logged escape valve covering the
-current content only. What stays judgment: the machine verifies the card's
-POINT NUMBER, publish state and freshness, never the truth of the prose.
+`node scripts/board-publish.mjs` (the live page — works in every session) →
+`node scripts/dashboard-guard.mjs --synced .batch-dashboard.html` (which doubles
+as the focus confirmation when card and focus agree). While the claude.ai mirror
+is still kept, `node scripts/dashboard-publish.mjs` → Artifact publish of the
+synced scratchpad file (same artifact url) runs alongside it; either publish
+satisfies the parity invariant, and each records its own hash. On every work
+switch: `node scripts/focus.mjs set <N> "<what>"`. What stays judgment: the
+machine verifies the card's POINT NUMBER, publish state and freshness, never the
+truth of the prose.
+
+### The board's transport (28.07.2026, point 400)
+
+The board used to be publishable only through the Artifact tool, and the
+**headless successor session has none**. On 28.07. at 15:38 one edited the board
+and recorded `publishDeferred: "headless successor session — no Artifact tool
+available here"` — in the flagship mode (user away, batch resurrected by the
+scheduler) the board could not be updated AT ALL, and the user found a board
+standing still for over an hour before any guard did. A commit and a push are
+things that session has, so the board is published by a script.
+
+| | where | why there |
+|---|---|---|
+| content | orphan branch `board`, ONE commit, force-updated | not on `main`, so a publish is not a source change: no CI (which watches `main` and `feat/**`), no Pages deploy (which rebuilds the game **and every frozen version tag** — minutes of runner time for a status card). No parent, so the branch never grows |
+| reader's URL | `https://patrickvonmassow.github.io/Heart-of-Africa-Remake/board/` | `public/board/index.html`, a source file deployed once with the site by the workflow that already runs. It fetches the content branch at load, so the URL is stable while the content behind it moves without a deploy |
+| the check | `https://raw.githubusercontent.com/…/board/board.html` | plain HTTPS, no auth, no tool binding — the verification reads the PAGE, not a record of an attempt |
+
+The board carries its open-point set as a `hoa-board-open` meta, stamped on the
+way out (never into the repo file, whose bytes the Artifact mirror attests).
+That fingerprint is what a fetched page is compared against.
+
+**The floor of "current".** The push lands in seconds, but raw.githubusercontent
+answers with `cache-control: max-age=300`. Every check therefore cache-busts AND
+tolerates `LIVE_GRACE_MS` (6 min) of disagreement: a page that differs while the
+publish is still settling reports `settling`, not an alarm. Only a page still
+behind past the grace — or one that cannot be read at all — is a fault, and an
+unreadable page is **never** called current.
+
+    node scripts/board-publish.mjs           # push the board live
+    node scripts/board-publish.mjs --check   # fetch the live page and judge it
+    node scripts/board-publish.mjs --url     # print the URLs
+
+**What each layer buys, honestly.** The due mark (`lock-heartbeat-hook.mjs`)
+notices a changed open-point set after any tool call and persists `publishDue`,
+so a session that dies before publishing hands the mark to its successor. The
+deny (`board-first-guard`) refuses a turn's first state-changing call while that
+mark stands — everywhere now, because every session can run the remedy. The
+watchdog (`batch-autostart.mjs`, every 15 min) fetches the live page and sends
+the ntfy alert when it is behind or unreadable, or when a `publishDue` /
+`publishFailed` has survived a whole tick; each fault is keyed, so one standing
+problem is reported once rather than four times an hour. That last layer is the
+only one that still speaks when the session itself is wedged — which is exactly
+when the user is away. Residual: the watchdog disabled AND a session wedged at
+the same time. And every Stop guard stays fail-open by CLAUDE.md §7.2 decree, so
+this is not literally 100 %.
+
+The claude.ai artifact stays **mirrored** until the user has moved their
+bookmark; `dashboard-publish.mjs` is unchanged and still does its half.
 
 ### The duties come before the answer, not after it
 

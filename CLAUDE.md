@@ -1045,9 +1045,13 @@ After completion and after every major system:
   (the Stop chain lets the board lag the whole hour the user is reading it): a
   turn's FIRST state-changing call is denied while no `focus set|confirm`
   postdates the turn stamp, the board is unpublished, or the OPEN-POINT SET
-  changed without a publish since (`publishDue`, and only where this session can
-  publish at all — one that cannot would spin) — never a read, its own
-  remedy commands or a board-file edit, and at most ONCE per turn.
+  changed without a publish since (`publishDue`) — never a read, its own
+  remedy commands or a board-file edit, and at most ONCE per turn. It binds
+  EVERY session (point 400): `scripts/board-publish.mjs` pushes the board to its
+  live page from a SCRIPT, which the headless successor — no Artifact tool, so
+  formerly unable to publish at all — has. The check then reads that PAGE, and
+  `batch-autostart.mjs` alerts when it is behind, which is the one layer still
+  speaking while a session is wedged.
   Every one is fail-OPEN (an internal error allows the stop, so a guard bug
   cannot trap the session) with a pure, Vitest-covered decision core.
 - **Ask the guards BEFORE the action, and answer LAST (points 365/403).** Before
