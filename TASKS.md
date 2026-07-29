@@ -3219,43 +3219,6 @@ read that as "the criterion and its evidence section".
   DOCS in the same commit: `docs/batch-autonomy.md`, where the launcher is
   described, gains the hidden-window requirement.
 
-- [ ] 407. THE MESSAGE WAKES ME — STAGE 3 OF 3, THE WATCHER (28.07.2026, same
-  request and the same four-eyes review as points 405/406). With stages 1 and 2 a
-  message is fast while a session runs and waits up to a launcher tick while none
-  does. This point removes that last wait: a message arriving into an idle machine
-  starts a session within seconds.
-  THE MECHANISM: a long-lived local process subscribes to the INBOX topic over SSE
-  (not tight HTTP polling — a page or process hammering ntfy runs into its free-tier
-  rate limits) and, on a message, spawns a session. Idle cost is one open connection:
-  no model, no tokens.
-  IT MUST NOT BECOME A SECOND BATCH SESSION (four-eyes finding 3 — the first design
-  said "use the same lock as the launcher", which is self-defeating). Taking the OWNER
-  lock makes the woken session the batch owner, and `progressGuardDecision` then
-  conscripts it into working the whole queue — the opposite of a quick answer. Taking
-  no lock makes it exactly the parallel top-level session `classifyParallel` raises an
-  alert about. The compatible channel already exists: the watcher spawns ONLY when
-  `assessOwner` reports no live owner AND no honoured claim; the responder files a
-  BOUNDED `batch-claim` for its lifetime — already the sanctioned exclusion in
-  `classifyParallel` and already a reason for the launcher to skip its tick — answers,
-  and releases. It never touches the pending-spawn conversion.
-  IT OBEYS THE SAME STOPS AS THE LAUNCHER: `.claude/batch-paused` and the work-order
-  format alarm both suppress a spawn.
-  THE RESPONDER IS LIGHT: read the message, answer, append a point if the message is an
-  instruction. It does not load the work order, so a one-line question does not pay for
-  a batch orientation.
-  LIFECYCLE, WHICH THE FIRST DESIGN OMITTED: how it starts at boot, how it restarts
-  after a crash, how it stops when the batch is paused — stated and built, alongside
-  the existing scheduled task rather than as a second scheduler. `windowsHide: true`
-  from day one (point 401).
-  VERIFIABLE: pure Vitest with injected state — spawn only when owner-absent AND
-  claim-absent; never while paused; the claim released on every exit path including a
-  crash; SSE reconnect after a dropped connection replays by message id without
-  duplicating. Live: with no session running, a message from the phone is answered
-  within seconds, and `.claude/autostart.log` shows no parallel-session alert.
-  DOCS in the same commit: `docs/batch-autonomy.md` (the wake path and what it
-  guarantees in each mode) and CLAUDE.md §6, where the singleton and the launcher are
-  described.
-
 - [ ] 409. A MERGED BRANCH MUST NOT SURVIVE ITS MERGE (28.07.2026, user reported 36
   branches on GitHub and asked for a mechanism). Measured at that moment: 31 of the 36
   remote branches were already fully contained in `main`, 72 of 77 local branches were,
