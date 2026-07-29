@@ -334,9 +334,17 @@ export async function assessEvent({
   // is what carries that fact out — nothing above this line ever sets it, which
   // is what keeps the outbox from answering an attacker's probes (see
   // `dropNoticeDecision`).
+  // THE TWO HALVES OF `stale` ARE NOT THE SAME FACT (four-eyes review, blocking
+  // finding). `expired` (older than the window) is indistinguishable from a
+  // message that was ACCEPTED long ago and has since fallen out of the envelope
+  // ledger — a replay of a delivered instruction lands exactly here. `ahead`
+  // (further ahead than the skew) cannot: acceptance requires `age >= -skew`,
+  // and at every EARLIER moment this envelope's age was more negative still, so
+  // no past poll can ever have taken it. Only that half may be reported back.
   const age = now - ts
   if (age > maxAgeMs || age < -CLOCK_SKEW_MS) {
-    return { accept: false, reason: 'stale', ntfyId, verified: true, envelopeId: id, ts }
+    const staleKind = age < -CLOCK_SKEW_MS ? 'ahead' : 'expired'
+    return { accept: false, reason: 'stale', staleKind, ntfyId, verified: true, envelopeId: id, ts }
   }
 
   if (ledger.has(`m:${id}`)) return { accept: false, reason: 'duplicate', ntfyId, verified: true, envelopeId: id, ts }
@@ -354,8 +362,9 @@ export async function assessEvent({
 // machine accepted it. So a message dropped here (a phone clock further ahead
 // than the skew is enough) left the user with a delivered-looking message the
 // agent never received: the exact failure shape this channel exists to prevent,
-// mirrored. A drop that the SENDER can do something about therefore goes back to
-// the OUTBOX as a signed notice, and the page shows it beside the message.
+// mirrored. A drop that the SENDER can do something about — and that is provably
+// NOT a message delivered earlier — therefore goes back to the OUTBOX as a signed
+// notice, and the page shows it beside the message.
 //
 // ONLY A VERIFIED ENVELOPE EVER EARNS ONE. A message that fails the signature
 // check gets nothing at all: answering those would make the outbox an ORACLE for
@@ -364,16 +373,25 @@ export async function assessEvent({
 // after the HMAC held for the direction the event was read from.
 
 /**
- * The drop reasons a notice is sent for.
+ * The drops a notice is sent for: `stale` with `staleKind: 'ahead'`, and nothing
+ * else. Every omission is deliberate.
  *
- * `stale` only, and the omissions are deliberate:
  *   - `bad-signature` / `unsigned` / `malformed` — not our sender; see the oracle
  *     note above.
  *   - `duplicate` — the ORIGINAL was accepted and delivered, so the user's words
  *     did land; a notice would say the opposite. It would also hand a captured
  *     envelope an amplifier: replay it and the machine posts on demand.
+ *   - `stale` / `expired` — THE BLOCKING FINDING of the four-eyes review. Once an
+ *     accepted envelope id has aged out of the ledger, a replay of that very
+ *     message arrives as verified-and-expired and is indistinguishable from one
+ *     that never landed: the machine would tell the user an instruction it had
+ *     already CARRIED OUT never arrived, and ask them to send it again. The
+ *     information needed to tell the two apart is genuinely gone, so the notice
+ *     is narrowed to the half where the ambiguity cannot arise rather than
+ *     guessed at. Nothing is lost in practice — the acceptance window matches
+ *     ntfy's cache, so an `expired` message is one the transport has dropped too.
  */
-export const NOTIFIABLE_DROP_REASONS = Object.freeze(['stale'])
+export const NOTIFIABLE_DROP_REASONS = Object.freeze(['ahead'])
 
 /** At most this many notices per poll. A burst of stale messages is a broken
  *  clock, not a conversation — one poll may not turn it into an outbox flood. */
@@ -406,12 +424,12 @@ export function formatChatStamp(ts, { locale = 'de-DE', timeZone = 'Europe/Berli
  * which message it was, and it comes out of the SIGNED envelope.
  */
 export function dropNoticeText({ reason, when = null } = {}) {
-  if (reason !== 'stale') return null
+  if (reason !== 'ahead') return null
   const stamp = when ? ` von ${when}` : ''
   return (
-    `Zustellung fehlgeschlagen: Deine Nachricht${stamp} ist NICHT angekommen — sie lag außerhalb des ` +
-    'Annahmefensters (zu alt, oder die Uhr des Geräts weicht zu weit ab). Bitte prüfe Datum und Uhrzeit ' +
-    'am Telefon und schicke sie noch einmal.'
+    `Zustellung fehlgeschlagen: Deine Nachricht${stamp} ist NICHT angekommen — die Uhr deines Geräts ` +
+    'geht deutlich vor, und damit lag sie außerhalb des Annahmefensters. Bitte stelle Datum und Uhrzeit ' +
+    'richtig (am besten automatisch) und schicke sie noch einmal.'
   )
 }
 
@@ -425,13 +443,17 @@ export function dropNoticeDecision({ verdict, notified = [], sent = 0, max = MAX
   const no = (reason) => ({ notify: false, reason })
   if (!verdict || verdict.accept === true) return no('accepted')
   if (verdict.verified !== true) return no('unverified')
-  if (!NOTIFIABLE_DROP_REASONS.includes(verdict.reason)) return no('not-notifiable')
+  // The NOTIFIABLE name is the stale KIND where there is one — `stale` alone is
+  // never notifiable, so a verdict without the kind falls through here rather
+  // than being read as the safe half.
+  const kind = verdict.reason === 'stale' ? verdict.staleKind : verdict.reason
+  if (!NOTIFIABLE_DROP_REASONS.includes(kind)) return no('not-notifiable')
   if (typeof verdict.envelopeId !== 'string' || verdict.envelopeId === '') return no('no-envelope-id')
   // One notice per message, ever — a replay under fresh transport ids may not
   // become a notice generator.
   if ((Array.isArray(notified) ? notified : []).some((e) => e?.id === verdict.envelopeId)) return no('already-notified')
   if (!(Number(sent) < Number(max))) return no('rate-limited')
-  return { notify: true, reason: verdict.reason }
+  return { notify: true, reason: kind }
 }
 
 /**
@@ -516,9 +538,9 @@ export async function ingest({
       if (plan.notify) {
         notices.push({
           id: verdict.envelopeId,
-          reason: verdict.reason,
+          reason: plan.reason,
           ts: verdict.ts ?? null,
-          text: dropNoticeText({ reason: verdict.reason, when: formatChatStamp(verdict.ts) }),
+          text: dropNoticeText({ reason: plan.reason, when: formatChatStamp(verdict.ts) }),
         })
         notified.push({ id: verdict.envelopeId, at: now })
       }

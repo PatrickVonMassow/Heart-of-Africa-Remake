@@ -274,26 +274,53 @@ describe('delivery discipline — the ledger, not the cursor, is the dedupe', ()
 })
 
 describe('A DROPPED MESSAGE DOES NOT LOOK DELIVERED — the drop notice', () => {
-  const STALE_TS = NOW - DEFAULT_MAX_AGE_MS - 60_000
+  /** The only notifiable drop: a clock running further AHEAD than the skew. Such
+   *  a message can never have been accepted at any earlier moment, because its
+   *  age was more negative then — so "it was delivered long ago" is impossible. */
+  const AHEAD_TS = NOW + CLOCK_SKEW_MS + 60_000
+  /** The other half of `stale`: too OLD. Never notified — see the tests below. */
+  const EXPIRED_TS = NOW - DEFAULT_MAX_AGE_MS - 60_000
 
-  it('produces EXACTLY ONE notice for a stale message, naming the reason in German', async () => {
-    const e = await event({ id: 'nfy1', msgId: 'spaet', ts: STALE_TS })
+  it('produces EXACTLY ONE notice for a clock-ahead message, naming the reason in German', async () => {
+    const e = await event({ id: 'nfy1', msgId: 'vorgestellt', ts: AHEAD_TS })
     const r = await ingest({ events: [e], secret: SECRET, now: NOW })
     expect(r.accepted).toEqual([])
     expect(r.dropped.map((d) => d.reason)).toEqual(['stale'])
     expect(r.notices).toHaveLength(1)
-    expect(r.notices[0].id).toBe('spaet')
+    expect(r.notices[0].id).toBe('vorgestellt')
     expect(r.notices[0].text).toContain('Zustellung fehlgeschlagen')
-    expect(r.notices[0].text).toContain('Annahmefensters')
+    expect(r.notices[0].text).toContain('Uhr')
     // Never the message's own words: the two topics are derived separately so
     // that knowing one reveals nothing about the other.
     expect(r.notices[0].text).not.toContain('hallo')
   })
 
   it('produces NO notice for a bad signature — the outbox is not an oracle', async () => {
-    const forged = await event({ id: 'nfyX', msgId: 'forged', ts: STALE_TS, secret: OTHER })
+    const forged = await event({ id: 'nfyX', msgId: 'forged', ts: AHEAD_TS, secret: OTHER })
     const r = await ingest({ events: [forged], secret: SECRET, now: NOW })
     expect(r.dropped.map((d) => d.reason)).toEqual(['bad-signature'])
+    expect(r.notices).toEqual([])
+  })
+
+  it('NEVER tells the user a DELIVERED message did not arrive (four-eyes finding F1)', async () => {
+    // A message is accepted and acted on; its envelope id then expires from the
+    // ledger; a replay of the very same envelope arrives past the window. It is
+    // `stale` and verified, and its id was never notified — so the naive gate
+    // would tell the user that an instruction which already ran never arrived.
+    const e = await event({ id: 'nfy1', msgId: 'geliefert', text: 'v0.3 taggen' })
+    const first = await ingest({ events: [e], secret: SECRET, now: NOW })
+    expect(first.accepted).toHaveLength(1)
+    const later = NOW + DEFAULT_MAX_AGE_MS + CLOCK_SKEW_MS + 60_000
+    const replay = await ingest({ events: [{ ...e, id: 'nfy2' }], secret: SECRET, now: later, state: first.state })
+    expect(replay.accepted).toEqual([])
+    expect(replay.dropped[0].reason).toBe('stale')
+    expect(replay.notices).toEqual([])
+  })
+
+  it('says nothing for an EXPIRED message at all — delivered or not is no longer knowable', async () => {
+    const old = await event({ id: 'nfy1', msgId: 'alt', ts: EXPIRED_TS })
+    const r = await ingest({ events: [old], secret: SECRET, now: NOW })
+    expect(r.dropped[0].reason).toBe('stale')
     expect(r.notices).toEqual([])
   })
 
@@ -319,10 +346,10 @@ describe('A DROPPED MESSAGE DOES NOT LOOK DELIVERED — the drop notice', () => 
   })
 
   it('notices the same envelope only ONCE, however often it is re-posted', async () => {
-    const e = await event({ id: 'nfy1', msgId: 'spaet', ts: STALE_TS })
+    const e = await event({ id: 'nfy1', msgId: 'vorgestellt', ts: AHEAD_TS })
     const first = await ingest({ events: [e], secret: SECRET, now: NOW })
     expect(first.notices).toHaveLength(1)
-    expect(first.state.notified.map((n) => n.id)).toEqual(['spaet'])
+    expect(first.state.notified.map((n) => n.id)).toEqual(['vorgestellt'])
     // Re-posted under a transport id nothing has seen: still one notice in all.
     const again = await ingest({ events: [{ ...e, id: 'nfy2' }], secret: SECRET, now: NOW + 1000, state: first.state })
     expect(again.dropped[0].reason).toBe('stale')
@@ -332,7 +359,7 @@ describe('A DROPPED MESSAGE DOES NOT LOOK DELIVERED — the drop notice', () => 
   it('caps a BURST — a broken clock may not become an outbox flood', async () => {
     const events = []
     for (let i = 0; i < MAX_DROP_NOTICES + 4; i++) {
-      events.push(await event({ id: `nfy${i}`, msgId: `spaet${i}`, ts: STALE_TS }))
+      events.push(await event({ id: `nfy${i}`, msgId: `vor${i}`, ts: AHEAD_TS }))
     }
     const r = await ingest({ events, secret: SECRET, now: NOW })
     expect(r.dropped).toHaveLength(events.length)
@@ -342,10 +369,14 @@ describe('A DROPPED MESSAGE DOES NOT LOOK DELIVERED — the drop notice', () => 
   })
 
   it('gates each drop purely, with the deciding gate named', () => {
-    const verdict = { accept: false, reason: 'stale', verified: true, envelopeId: 'a', ts: NOW }
-    expect(dropNoticeDecision({ verdict })).toEqual({ notify: true, reason: 'stale' })
+    const verdict = { accept: false, reason: 'stale', staleKind: 'ahead', verified: true, envelopeId: 'a', ts: NOW }
+    expect(dropNoticeDecision({ verdict })).toEqual({ notify: true, reason: 'ahead' })
     expect(dropNoticeDecision({ verdict: { ...verdict, verified: false } }).reason).toBe('unverified')
     expect(dropNoticeDecision({ verdict: { ...verdict, reason: 'duplicate' } }).reason).toBe('not-notifiable')
+    // The EXPIRED half of `stale` is the one that cannot be told apart from a
+    // message delivered long ago — it is refused by the same gate.
+    expect(dropNoticeDecision({ verdict: { ...verdict, staleKind: 'expired' } }).reason).toBe('not-notifiable')
+    expect(dropNoticeDecision({ verdict: { ...verdict, staleKind: undefined } }).reason).toBe('not-notifiable')
     expect(dropNoticeDecision({ verdict: { ...verdict, envelopeId: '' } }).reason).toBe('no-envelope-id')
     expect(dropNoticeDecision({ verdict, notified: [{ id: 'a', at: NOW }] }).reason).toBe('already-notified')
     expect(dropNoticeDecision({ verdict, sent: MAX_DROP_NOTICES }).reason).toBe('rate-limited')
@@ -357,9 +388,9 @@ describe('A DROPPED MESSAGE DOES NOT LOOK DELIVERED — the drop notice', () => 
   })
 
   it('writes a notice only for a reason it has words for', () => {
-    expect(dropNoticeText({ reason: 'stale', when: '12.11.23, 14:32' })).toContain('12.11.23, 14:32')
-    expect(dropNoticeText({ reason: 'stale' })).toContain('Zustellung fehlgeschlagen')
-    for (const reason of ['duplicate', 'bad-signature', 'unsigned', 'malformed', null, undefined]) {
+    expect(dropNoticeText({ reason: 'ahead', when: '12.11.23, 14:32' })).toContain('12.11.23, 14:32')
+    expect(dropNoticeText({ reason: 'ahead' })).toContain('Zustellung fehlgeschlagen')
+    for (const reason of ['stale', 'expired', 'duplicate', 'bad-signature', 'unsigned', 'malformed', null, undefined]) {
       expect(dropNoticeText({ reason })).toBeNull()
     }
     expect(dropNoticeText()).toBeNull()
@@ -371,7 +402,7 @@ describe('A DROPPED MESSAGE DOES NOT LOOK DELIVERED — the drop notice', () => 
   })
 
   it('lets the NOTIFIED ledger go once the message could not be replayed anyway', async () => {
-    const e = await event({ id: 'nfy1', msgId: 'spaet', ts: STALE_TS })
+    const e = await event({ id: 'nfy1', msgId: 'vorgestellt', ts: AHEAD_TS })
     const first = await ingest({ events: [e], secret: SECRET, now: NOW })
     const later = NOW + DEFAULT_MAX_AGE_MS + CLOCK_SKEW_MS + 1000
     const aged = await ingest({ events: [], secret: SECRET, now: later, state: first.state })

@@ -1015,24 +1015,36 @@ is set to the same 12 hours — beyond it a replay is impossible anyway.
 **A DROPPED message does not look delivered** (`dropNoticeDecision` /
 `dropNoticeText` in `scripts/chat-core.mjs`). The page renders a sent message like
 any other — display never asks whether the machine accepted it — so a message
-dropped as `stale` (a phone clock further ahead than the five-minute skew is
-enough) left the user looking at a delivered-looking message the agent never
-received. That is the failure this channel exists to prevent, mirrored. The
-launcher's tick now posts a signed notice to the OUTBOX naming the reason, and the
-page shows it as an agent message.
+dropped because the phone's clock runs further ahead than the five-minute skew
+left the user looking at a delivered-looking message the agent never received.
+That is the failure this channel exists to prevent, mirrored. The launcher's tick
+now posts a signed notice to the OUTBOX naming the reason, and the page shows it
+as an agent message.
 
-Three properties make it safe rather than merely helpful. **Only a VERIFIED
-envelope earns one**: a failed signature gets no answer at all, because replying
-would turn the outbox into an ORACLE for someone probing the inbox topic. **A
-duplicate earns none either** — the original was accepted and delivered, so the
-words did land, and a notice would additionally hand a captured envelope an
-amplifier. And the notice **never quotes the message**: the two topics are derived
-separately so that knowing one reveals nothing about the other, and the signed
-timestamp identifies the message on its own. One notice per envelope id (kept in
-the same age-bounded ledger) and at most `MAX_DROP_NOTICES` per poll, so a broken
-clock cannot become an outbox flood. It is posted with `postOutbox`, never
-`sendReply`: a notice is not an ANSWER, and a reply receipt written for one would
-make the watcher mark the user's message consumed with nobody having answered it.
+**What earns a notice is narrower than "a drop", and every exclusion is
+load-bearing.** Only a VERIFIED envelope earns one: a failed signature gets no
+answer at all, because replying would turn the outbox into an ORACLE for someone
+probing the inbox topic. A `duplicate` earns none — the original was accepted and
+delivered, so the words did land, and a notice would additionally hand a captured
+envelope an amplifier. And of the two halves of `stale`, only `ahead` (the clock
+running fast) qualifies; `expired` (older than the window) does NOT, because it is
+indistinguishable from a message that was accepted long ago and has since aged out
+of the envelope ledger — a four-eyes review proved a replay of a DELIVERED
+instruction landing exactly there, which would have told the user that something
+the machine had already carried out never arrived. The information to tell the two
+apart is genuinely gone, so the notice is narrowed rather than guessed at, and
+nothing is lost in practice: the acceptance window matches ntfy's cache, so an
+`expired` message is one the transport has dropped as well. `ahead` is safe by
+construction — acceptance requires `age >= -skew`, and at every earlier moment
+such an envelope's age was more negative still, so no past poll can have taken it.
+
+The notice **never quotes the message**: the two topics are derived separately so
+that knowing one reveals nothing about the other, and the signed timestamp
+identifies the message on its own. One notice per envelope id (kept in its own
+age-bounded ledger) and at most `MAX_DROP_NOTICES` per poll, so a broken clock
+cannot become an outbox flood. It is posted with `postOutbox`, never `sendReply`:
+a notice is not an ANSWER, and a reply receipt written for one would make the
+watcher mark the user's message consumed with nobody having answered it.
 
 **The replay bound is a WINDOW, not a count** (`envelopeRetentionMs` /
 `pruneIdLedger` in `scripts/chat-core.mjs`). Both id kinds used to share one
