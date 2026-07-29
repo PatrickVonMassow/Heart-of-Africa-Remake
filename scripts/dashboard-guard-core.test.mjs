@@ -15,6 +15,7 @@ import {
   parseKlaerungPoints,
   nowCardText,
   looksDoubleEncoded,
+  findTransliterations,
   sliceSections,
   parseCards,
   auditDashboard,
@@ -932,5 +933,69 @@ describe('the placeholder rule has a floor, and reads the card the generator rea
     expect(rendered[0]).toContain('&lt;N&gt;')
     const open = [210, ...Array.from({ length: 10 }, (_, i) => i + 1)]
     expect(codesFor(rendered, open)).toContain('queue-stubbed')
+  })
+})
+
+// Point 410 — the board is German prose the user reads on a phone, and
+// "faellt weg" / "kuenftig" read to him as broken text. The stdin path removes
+// the REASON to transliterate; this rule removes the habit, which would
+// otherwise return the next time the argument path looks convenient.
+describe('a transliterated umlaut on a card is a defect (point 410)', () => {
+  const board = ({ title = '410 — Die Tafel', body = 'Stand 14:12 — läuft' } = {}) =>
+    `<main><h1>B</h1>` +
+    `<details class="sect"><summary><h2>Woran ich gerade arbeite</h2></summary>\n` +
+    `<details class="now"><summary><span class="t">${title}</span><span class="right">` +
+    `<span class="meta">10:44 · ~15:15</span></span></summary><div class="body"><p>${body}</p></div></details>\n` +
+    `</details>` +
+    `<details class="sect"><summary><h2>Von dir zu klären</h2></summary>\n</details>` +
+    `<details class="sect"><summary><h2>Warteschlange</h2></summary>\n</details>` +
+    `<details class="sect"><summary><h2>Erledigt</h2></summary>\n` +
+    `<p class="archive-link">im <a href="https://example.invalid/a">Archiv</a>.</p></details></main>`
+  const audit = (opts) => auditDashboard(board(opts), { open: [410], done: [] })
+  const codes = (opts) => audit(opts).map((x) => x.code)
+
+  it('accepts real umlauts', () => {
+    expect(
+      codes({ body: 'Stand 14:12 — die Prüfung läuft, künftig fällt der Umweg über die Shell weg.' }),
+    ).not.toContain('transliterated-umlaut')
+  })
+
+  it('flags a transliterated body and NAMES the card', () => {
+    const hit = audit({ body: 'Stand 14:12 — der Umweg faellt kuenftig weg.' }).find(
+      (x) => x.code === 'transliterated-umlaut',
+    )
+    expect(hit).toBeDefined()
+    expect(hit.msg).toContain('410 — Die Tafel')
+    expect(hit.msg).toContain('faellt')
+    expect(hit.msg).toContain('--text-stdin')
+  })
+
+  it('flags a transliterated TITLE too, not only the body', () => {
+    expect(codes({ title: '410 — Pruefung der Tafel' })).toContain('transliterated-umlaut')
+  })
+
+  it('leaves legitimate words that merely carry those letters alone', () => {
+    expect(
+      codes({ body: 'Stand 14:12 — Quelle, Steuer, Aequator, Feuer, Museum, neue Route, Duell.' }),
+    ).not.toContain('transliterated-umlaut')
+  })
+
+  it('never throws on an unreadable board', () => {
+    expect(findTransliterations(null)).toEqual([])
+    expect(findTransliterations(undefined)).toEqual([])
+    expect(() => auditDashboard(null, { open: [1], done: [] })).not.toThrow()
+  })
+
+  it('catches the words the user reported, and the compounds around them', () => {
+    expect(findTransliterations('faellt weg')).toContain('faellt')
+    expect(findTransliterations('kuenftig')).toContain('kuenftig')
+    expect(findTransliterations('Ueberpruefung')).toContain('ueberpruefung')
+    expect(findTransliterations('ausgefuehrt')).toContain('ausgefuehrt')
+    expect(findTransliterations('groesser')).toContain('groesser')
+  })
+
+  it('reaches the turn end through the audit invariant', () => {
+    const broken = boardHtml().replace('Kurzstand.', 'Kurzstand, faellt kuenftig weg.')
+    expect(JSON.stringify(evaluate(green({ html: broken })))).toContain('transliterated-umlaut')
   })
 })

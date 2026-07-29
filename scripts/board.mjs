@@ -13,6 +13,16 @@
 //   node scripts/board.mjs focus  <point> "<note>"    # declare focus + stamp
 //   node scripts/board.mjs attest                     # rotate, publish, audit, confirm
 //
+// GERMAN TEXT GOES IN ON STDIN (point 410). Wherever a "<text>" stands above,
+// `--text-stdin` may take its place and the text is read from stdin as UTF-8:
+//
+//   node scripts/board.mjs status 410 --text-stdin <<'EOF'
+//   Stand 12:40: Die Umlaute überleben den Weg aufs Board jetzt.
+//   EOF
+//
+// The argument form still works and is fine for ASCII; a Windows shell mangles
+// umlauts on the way, which is why every session used to transliterate by hand.
+//
 // The Artifact publish is tool-bound and cannot be scripted, so the loop is
 // exactly: (1) an editing command, (2) the Artifact call, (3) `attest`.
 import { readFileSync, writeFileSync } from 'node:fs'
@@ -20,9 +30,11 @@ import { execFileSync } from 'node:child_process'
 import { resolve } from 'node:path'
 import { REPO_ROOT } from './repo-paths.mjs'
 import {
+  TEXT_STDIN_FLAG,
   berlinStamp,
   promoteToNow,
   removeVdzk,
+  resolveCardText,
   setCardStatus,
   toDone,
   toNow,
@@ -32,10 +44,27 @@ import {
 const BOARD = resolve(REPO_ROOT, '.batch-dashboard.html')
 const run = (args) => execFileSync(process.execPath, args, { cwd: REPO_ROOT, encoding: 'utf8' })
 
+// STDIN IS READ ONCE, AND ONLY WHEN ASKED FOR (point 410): reading fd 0
+// unconditionally would block every call that has no pipe attached. Explicit
+// UTF-8 — the whole reason this path exists is that the bytes must not be
+// reinterpreted by anything between the author and the board file.
+const stdinText = process.argv.includes(TEXT_STDIN_FLAG)
+  ? (() => {
+      try {
+        return readFileSync(0, 'utf8')
+      } catch (e) {
+        throw new Error(`${TEXT_STDIN_FLAG} could not read stdin (${e.code ?? e.message}) — pipe the text in`)
+      }
+    })()
+  : ''
+
 
 /** Apply a pure card edit, rotate the archive overflow, publish, and say what is left by hand. */
 function edit(fn, done) {
-  writeFileSync(BOARD, fn(readFileSync(BOARD, 'utf8')))
+  // Both ends of the round trip name their encoding (point 410). The write used
+  // to take the platform default, which is the other half of the way a German
+  // card could reach the file as something the reader sees as damage.
+  writeFileSync(BOARD, fn(readFileSync(BOARD, 'utf8')), { encoding: 'utf8' })
   console.log(done)
   console.log(run(['scripts/board-archive-rotate.mjs']).trim().split('\n')[0])
   // THE LIVE PAGE IS PUBLISHED HERE (point 400, delta D — four-eyes finding 2).
@@ -68,46 +97,48 @@ function edit(fn, done) {
 }
 
 const [cmd, ...rest] = process.argv.slice(2)
+/** The command's text, from the argv or — with `--text-stdin` — from stdin. */
+const textOf = (words) => resolveCardText(words, stdinText)
 try {
   if (cmd === 'status') {
     const [point, ...words] = rest
-    if (!point || words.length === 0) throw new Error('usage: board.mjs status <point> "<text>"')
+    if (!point || words.length === 0) throw new Error('usage: board.mjs status <point> "<text>"|--text-stdin')
     const at = berlinStamp()
-    edit((html) => setCardStatus(html, point, words.join(' '), at), `status of ${point} restated (Stand ${at})`)
+    edit((html) => setCardStatus(html, point, textOf(words), at), `status of ${point} restated (Stand ${at})`)
   } else if (cmd === 'now') {
     const [point, ...words] = rest
-    if (!point || words.length === 0) throw new Error('usage: board.mjs now <point> "<status>"')
+    if (!point || words.length === 0) throw new Error('usage: board.mjs now <point> "<status>"|--text-stdin')
     const at = berlinStamp()
     edit(
-      (html) => toNow(html, point, words.join(' '), { stamp: at }),
+      (html) => toNow(html, point, textOf(words), { stamp: at }),
       `${point} is current work since ${at} (title and estimate taken from its queue card)`,
     )
   } else if (cmd === 'queue') {
     const [point, ...words] = rest
-    if (!point) throw new Error('usage: board.mjs queue <point> ["<text>"]')
-    edit((html) => toQueue(html, point, { text: words.join(' ') }), `${point} returned to the queue`)
+    if (!point) throw new Error('usage: board.mjs queue <point> ["<text>"|--text-stdin]')
+    edit((html) => toQueue(html, point, { text: textOf(words) }), `${point} returned to the queue`)
   } else if (cmd === 'done') {
     const [point, ...words] = rest
-    if (!point) throw new Error('usage: board.mjs done <point> ["<text>"]')
+    if (!point) throw new Error('usage: board.mjs done <point> ["<text>"|--text-stdin]')
     const at = berlinStamp()
-    edit((html) => toDone(html, point, { text: words.join(' '), end: at }), `${point} archived as done at ${at}`)
+    edit((html) => toDone(html, point, { text: textOf(words), end: at }), `${point} archived as done at ${at}`)
   } else if (cmd === 'vdzk-remove') {
-    const fragment = rest.join(' ')
-    if (!fragment) throw new Error('usage: board.mjs vdzk-remove "<title>"')
+    const fragment = textOf(rest)
+    if (!fragment) throw new Error('usage: board.mjs vdzk-remove "<title>"|--text-stdin')
     edit((html) => removeVdzk(html, fragment), `open question removed: ${fragment}`)
   } else if (cmd === 'promote') {
     const [point, times, title, ...words] = rest
     if (!point || !times || !title || words.length === 0) {
-      throw new Error('usage: board.mjs promote <point> "<times>" "<title>" "<status>"')
+      throw new Error('usage: board.mjs promote <point> "<times>" "<title>" "<status>"|--text-stdin')
     }
     edit(
-      (html) => promoteToNow(html, point, { title, times, status: words.join(' ') }),
+      (html) => promoteToNow(html, point, { title, times, status: textOf(words) }),
       `${point} promoted to current work`,
     )
   } else if (cmd === 'focus') {
     const [point, ...words] = rest
-    if (!point) throw new Error('usage: board.mjs focus <point> "<note>"')
-    console.log(run(['scripts/focus.mjs', 'set', point, words.join(' ')]).trim())
+    if (!point) throw new Error('usage: board.mjs focus <point> "<note>"|--text-stdin')
+    console.log(run(['scripts/focus.mjs', 'set', point, textOf(words)]).trim())
   } else if (cmd === 'attest') {
     // Rotation first: a tick that pushed the Erledigt section past its cap would
     // otherwise fail the audit two steps later, after the Artifact call.
@@ -117,7 +148,8 @@ try {
   } else {
     console.error(
       'usage: board.mjs now|status|queue|done <point> "<text>" | vdzk-remove "<title>" | ' +
-        'promote <point> "<times>" "<title>" "<status>" | focus <point> "<note>" | attest',
+        'promote <point> "<times>" "<title>" "<status>" | focus <point> "<note>" | attest\n' +
+        `Any "<text>" may be replaced by ${TEXT_STDIN_FLAG} and piped in — use that for German prose.`,
     )
     process.exitCode = 2
   }

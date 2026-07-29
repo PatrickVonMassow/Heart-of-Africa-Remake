@@ -8,6 +8,38 @@
 // imports nothing, so the direction cannot become a cycle.
 import { QUEUE_STUB_META } from './dashboard-guard-core.mjs'
 
+/** The flag that takes a card's text from STDIN instead of the argv (point 410). */
+export const TEXT_STDIN_FLAG = '--text-stdin'
+
+/**
+ * A card's text — from the argv words, or, when `--text-stdin` stands among
+ * them, from what the wrapper read on stdin as UTF-8.
+ *
+ * WHY THE SECOND PATH EXISTS: German prose handed to this script as a
+ * command-line ARGUMENT arrives mangled on Windows, so every session had taken
+ * to transliterating its umlauts by hand ("faellt weg", "kuenftig") — and the
+ * board is German prose the user reads on a phone, where that reads as broken.
+ * The transliteration was the workaround, not the defect; the defect is the
+ * shell in the path. On stdin the shell never sees the text.
+ *
+ * The argument form keeps working (ASCII is safe and it is the shorter call),
+ * but the two may not be mixed: a caller that passes both meant one of them,
+ * and silently picking would drop the other.
+ */
+export function resolveCardText(words, stdinText) {
+  const list = (Array.isArray(words) ? words : []).map((w) => String(w))
+  const rest = list.filter((w) => w !== TEXT_STDIN_FLAG)
+  if (rest.length === list.length) return rest.join(' ')
+  if (rest.length) {
+    throw new Error(`board: ${TEXT_STDIN_FLAG} takes the WHOLE text — drop the argument text ("${rest.join(' ')}")`)
+  }
+  // Normalise the line ending a Windows pipe adds and the trailing newline every
+  // heredoc carries; the text itself is passed through untouched.
+  const text = (typeof stdinText === 'string' ? stdinText : '').replace(/\r\n/g, '\n').trim()
+  if (!text) throw new Error(`board: ${TEXT_STDIN_FLAG} was given but nothing arrived on stdin`)
+  return text
+}
+
 /** Berlin wall clock — the stamp every status carries (point 371). */
 export function berlinStamp(now = new Date()) {
   return new Intl.DateTimeFormat('de-DE', {

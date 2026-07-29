@@ -217,6 +217,49 @@ export function looksDoubleEncoded(text) {
   return [...new Set(found)]
 }
 
+// ═══ Point 410 — the board must not lose its umlauts ═══
+// The user reads the board as German prose on a phone, and "faellt weg" /
+// "kuenftig" read as broken. The cause was the path the text took: `board.mjs`
+// took a card's text as a command-line ARGUMENT, a Windows shell mangled the
+// umlauts, and every session learned to transliterate by hand to stay safe. The
+// stdin path (board-core `resolveCardText`) removes the reason; this rule
+// removes the habit, because a workaround returns the moment the old path looks
+// convenient again.
+//
+// A WORD LIST, deliberately: this is a spelling smell, not a linguistics
+// problem. STEMS are matched anywhere in a word so compounds and inflections
+// come along ("Ueberpruefung", "ausgefuehrt"), and every stem is long enough
+// that legitimate text cannot contain it — the digraphs themselves are useless
+// as a signal, since "Quelle", "Steuer" and "Aequator" all carry one. A false
+// positive costs one word in this list; a false negative costs the reader.
+export const TRANSLITERATION_STEMS = [
+  // ae
+  'faell', 'flaech', 'waehr', 'naechst', 'spaet', 'aender', 'erklaer', 'haett', 'waere', 'taeglich',
+  'zusaetzlich', 'saemtlich', 'erwaehn', 'waehl', 'naeh', 'staerk', 'laeng', 'gemaess', 'raeum',
+  'traeg', 'itaet', 'aehnlich', 'maessig', 'zaehl', 'erhaelt', 'behaelt',
+  // ue
+  'ueber', 'kuenft', 'zurueck', 'fuer', 'fuehr', 'fuehl', 'muess', 'stueck', 'gruen', 'wuerde',
+  'wuensch', 'pruef', 'frueh', 'natuerlich', 'duerf', 'gueltig', 'schluessel', 'unterstuetz',
+  'buend', 'kuerz', 'muend',
+  // oe
+  'oeffn', 'moeglich', 'koenn', 'hoech', 'groess', 'schoen', 'gehoer', 'erhoeh', 'noetig',
+  'stoer', 'boes', 'oefter', 'loesch', 'loesung', 'zerstoer',
+]
+
+/**
+ * Every transliterated German word in `text`, lower-cased and de-duplicated.
+ * Total: a non-string yields none, so an unreadable board never throws.
+ */
+export function findTransliterations(text) {
+  const s = typeof text === 'string' ? text : ''
+  const hits = new Set()
+  for (const word of s.match(/[A-Za-zÄÖÜäöüß]+/g) ?? []) {
+    const lower = word.toLowerCase()
+    if (TRANSLITERATION_STEMS.some((stem) => lower.includes(stem))) hits.add(lower)
+  }
+  return [...hits]
+}
+
 /** Slice the board into its <h2>-anchored sections: titles in document order
  *  plus each section's html (the last runs to EOF, footer included). */
 export function sliceSections(html) {
@@ -273,7 +316,10 @@ export function parseCards(sectionHtml) {
     // never a plain hyphen, which would read "2026-07-25 —" as point 2026.
     const t = (summary.match(/class="t">\s*([\d+·/ ]*\d)\s*[—–:]/) ?? [])[1]
     if (t) for (const n of numbers(t)) points.add(n)
-    cards.push({ meta, body, points: [...points] })
+    // The full title comes along so a violation can NAME the card it means; a
+    // point number alone is no help on a card that has none.
+    const title = ((summary.match(/class="t">([^<]*)</) ?? [])[1] ?? '').trim()
+    cards.push({ meta, body, title, points: [...points] })
   }
   return cards
 }
@@ -506,6 +552,26 @@ export function auditDashboard(html, input = {}) {
         `double-encoded sequence(s) found: ${moji.slice(0, 6).join(' ')}${moji.length > 6 ? ` … (+${moji.length - 6})` : ''} — repair the encoding. ` +
         'If a card DELIBERATELY quotes mojibake (a card about this very bug class), rephrase it ' +
         'without the literal sequence — quoting damaged bytes on the board is itself damage.',
+    })
+  }
+
+  // THE UMLAUTS SURVIVE THE WAY IN (point 410). Checked over the CARDS, not the
+  // raw file: the viewer's script, a URL or a CSS class is none of the reader's
+  // business, and only prose can be transliterated.
+  const transliterated = []
+  for (const c of [nowCards, vdzkCards, queueCards, erledigtCards].flat()) {
+    const hits = [...findTransliterations(c.title), ...findTransliterations(c.body)]
+    if (hits.length) {
+      transliterated.push(`"${c.title || c.points.join(', ') || '<untitled>'}" (${[...new Set(hits)].slice(0, 4).join(', ')})`)
+    }
+  }
+  if (transliterated.length) {
+    v.push({
+      code: 'transliterated-umlaut',
+      msg:
+        `card(s) ${transliterated.slice(0, 4).join('; ')} spell German words with ae/ue/oe instead of ` +
+        'ä/ö/ü — the reader sees that as broken text. Write the real umlauts and pass the text on ' +
+        'stdin, where no shell can mangle it: node scripts/board.mjs status <N> --text-stdin',
     })
   }
 

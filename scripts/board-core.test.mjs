@@ -13,9 +13,11 @@ import {
   QUEUE_STUB_META,
 } from './dashboard-guard-core.mjs'
 import {
+  TEXT_STDIN_FLAG,
   addHours,
   berlinStamp,
   estimateHours,
+  resolveCardText,
   hoursLabel,
   nowCard,
   promoteToNow,
@@ -127,6 +129,31 @@ const nowEntry = (n, title, times, status = 'läuft') =>
 const vdzkEntry = (title) =>
   `<details>\n  <summary><span class="t">${title}</span></summary>\n` +
   `  <div class="body">\n    <p>Die Frage.</p>\n  </div>\n</details>\n`
+
+// Point 410: the shell is what broke the umlauts, so the text must be able to
+// skip it. These cases pin the seam between the argv and the stdin path.
+describe('resolveCardText — the way German prose gets in', () => {
+  it('carries a stdin text through byte for byte, umlauts and all', () => {
+    const text = 'Stand 12:40: Die Prüfung läuft, künftig fällt der Umweg über die Shell weg — größer als 90 %.'
+    expect(resolveCardText([TEXT_STDIN_FLAG], `${text}\n`)).toBe(text)
+    // A Windows pipe's CRLF is the only thing normalised.
+    expect(resolveCardText([TEXT_STDIN_FLAG], `${text}\r\n`)).toBe(text)
+  })
+
+  it('keeps the argument form for ASCII', () => {
+    expect(resolveCardText(['Tests', 'green,', 'merging'], '')).toBe('Tests green, merging')
+    expect(resolveCardText([], '')).toBe('')
+  })
+
+  it('refuses to guess when both forms are given', () => {
+    expect(() => resolveCardText([TEXT_STDIN_FLAG, 'auch', 'Text'], 'Der Text.')).toThrow(/WHOLE text/)
+  })
+
+  it('refuses an empty stdin rather than writing an empty card', () => {
+    expect(() => resolveCardText([TEXT_STDIN_FLAG], '   \n')).toThrow(/nothing arrived on stdin/)
+    expect(() => resolveCardText([TEXT_STDIN_FLAG], undefined)).toThrow(/nothing arrived on stdin/)
+  })
+})
 
 describe('the stamp arithmetic behind the headers', () => {
   it('reads an estimate out of the queue header, decimal comma and tag included', () => {
