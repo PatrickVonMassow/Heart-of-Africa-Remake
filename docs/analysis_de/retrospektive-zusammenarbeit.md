@@ -473,6 +473,16 @@ Ein neuer Riegel im Board-Werkzeug verweigert eine Veröffentlichung, wenn ein o
 
 **Lehre:** Ein Durchsetzer ist erst dann fertig, wenn sein genannter Ausweg **ausgeführt** worden ist, nicht wenn er plausibel klingt. Das gehört in die Prüfung jedes neuen Riegels: den Weg, den die Fehlermeldung vorschlägt, einmal wirklich gehen — im auslösenden Zustand, nicht im gesunden.
 
+### 3.53 Der Schreiber und der Prüfer kannten dieselbe Regel verschieden
+
+Am 29.07.2026 blockierte das Push-Tor einen fertigen, geprüften Punkt: Der Schnelltest war rot. Nicht am gelieferten Code — an einem Board-Zug, den dieselbe Sitzung Minuten zuvor mit dem dafür vorgesehenen Werkzeug ausgeführt hatte. Eine Karte ohne Zeitschätzung war in die Warteschlange zurückgewandert, und der schreibende Baustein ließ die Schätzung in diesem Fall einfach **weg**. Der prüfende Baustein akzeptiert eine fehlende Schätzung aber nur, wenn sie mit seinem eigenen Namen ausgesprochen wird („Schätzung offen"); Schweigen zählt als Verstoß. Beide Seiten hielten sich für regelkonform, weil jede die Regel für sich buchstabierte.
+
+Bemerkenswert ist der Weg des Schadens: kein Bildfehler, keine falsche Ausgabe — ein legaler Zug erzeugte ein Artefakt, das die Prüfschicht ablehnt, und damit stand die gesamte Unit-Ebene rot und **jeder** Push blockiert, für jede Arbeit, bis jemand die Ursache sucht. Ein Durchsetzungsapparat kann sich auf diesem Weg selbst lahmlegen, ohne dass am Produkt irgendetwas kaputt wäre.
+
+Die Reparatur war nicht, den Fall zu umgehen — eine Schätzung von Hand nachzutragen hätte den Lauf ebenso grün gemacht und den Fehler stehen gelassen —, sondern die zweite Buchstabierung zu **entfernen**: Der Schreiber importiert jetzt den Namen, den der Prüfer für „noch keine Schätzung" führt, statt ihn ein zweites Mal zu formulieren. Damit kann die Regel nicht mehr an zwei Stellen auseinanderlaufen; dieselbe Bewegung wie in §3.21, nur zwischen zwei Programmteilen statt zwischen zwei Dokumenten.
+
+**Lehren:** Wo ein Modul schreibt, was ein anderes prüft, gehört der geprüfte Wert **importiert**, nicht wiederholt — eine zweite Formulierung derselben Regel ist eine Sollbruchstelle mit Verzögerungszündung. Und: Wenn ein grüner Bereich rot wird, ohne dass jemand ihn angefasst hat, ist die erste Frage nicht „welcher Test ist kaputt", sondern „welcher Zustand hat sich unter dem Test verändert" — hier war es eine Datei, die gar nicht im Testverzeichnis liegt.
+
 ---
 
 ## 4. Die Guards als Immunsystem
@@ -562,7 +572,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Mittwoch, 29.07.2026, 04:50 · Quellen-Fingerprint: `946ff3c53440…`
+Zuletzt aktualisiert: Mittwoch, 29.07.2026, 06:49 · Quellen-Fingerprint: `966d82ae8cc6…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -638,6 +648,6 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 66 Feedback-/Projekt-Memories · 36 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 18 Prozess-/Meta-TASKS-Punkte (davon 8 offen).
 
-<!-- RETRO-FINGERPRINT: 946ff3c534400dfb43f5402444b6e976e100343b7657a093bf10749125e18e77 -->
-<!-- RETRO-LAST-REFRESHED: 2026-07-29T02:50:26.065Z -->
+<!-- RETRO-FINGERPRINT: 966d82ae8cc6eec9c7cc5ef11d9232ed65e20dbceaeeb7e7cb9ccc276b517951 -->
+<!-- RETRO-LAST-REFRESHED: 2026-07-29T04:49:14.867Z -->
 <!-- AUTO-GENERATED:END -->
