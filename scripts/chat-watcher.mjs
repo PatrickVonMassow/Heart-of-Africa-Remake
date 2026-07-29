@@ -44,6 +44,7 @@ import {
   streamUrl,
 } from './chat-core.mjs'
 import { knownMessages, claimMessage, readPending, spoolMessage } from './chat-spool.mjs'
+import { readReplyReceipt } from './chat-reply.mjs'
 import { assessOwner, bootTimeMs, probePid, readOwnerLock } from './batch-singleton.mjs'
 import { clearClaim, maxAgeMs as claimMaxAgeMs, readClaim, writeClaim } from './batch-claim.mjs'
 import { assessClaim } from './batch-claim-core.mjs'
@@ -197,10 +198,21 @@ function releaseClaim(why) {
   }
 }
 
-/** Mark the messages a CLEAN responder answered as consumed, so the next batch
- *  session is not handed — and does not answer — them a second time. */
-function ackHanded(exitCode) {
-  const plan = ackPlan({ exitCode, handed: state.handed, pending: readPending() })
+/**
+ * Mark the handed messages consumed — ONLY against EVIDENCE that this responder
+ * actually answered: a reply the transport accepted, recorded after the spawn by
+ * `recordReplyReceipt` in scripts/chat-reply.mjs. The exit code proves nothing —
+ * a responder that stands down and ends its turn exits 0 as well, and acking on
+ * that took the user's instruction off the spool with nobody having answered it.
+ */
+function ackHanded() {
+  const receipt = readReplyReceipt()
+  const plan = ackPlan({
+    handed: state.handed,
+    pending: readPending(),
+    spawnedAt: state.spawnedAt,
+    actedAt: receipt?.at ?? null,
+  })
   let acked = 0
   for (const m of plan) if (claimMessage(m.file)) acked++
   return acked
@@ -210,9 +222,14 @@ function onResponderExit(code) {
   if (state.childTimer) clearTimeout(state.childTimer)
   state.childTimer = null
   state.child = null
-  const acked = ackHanded(code)
-  log({ event: 'responder-exit', code, acked })
+  const handed = state.handed.length
+  const acked = ackHanded()
+  // A responder that sent NO reply leaves its messages PENDING, on purpose — and
+  // says so here, because that is the one shape in which a message could
+  // otherwise pass unnoticed. The next session is handed it.
+  log({ event: 'responder-exit', code, handed, acked, stillPending: handed - acked })
   state.handed = []
+  state.spawnedAt = null
   releaseClaim('responder-exit')
 }
 

@@ -16,8 +16,7 @@ import {
   watcherSupervision,
 } from './chat-watcher-core.mjs'
 import { assessClaim } from './batch-claim-core.mjs'
-import { assessEvent } from './chat-core.mjs'
-import { makeEnvelope } from './chat-core.mjs'
+import { assessEvent, makeEnvelope } from './chat-core.mjs'
 import { openPointStatus } from './tasks-source.mjs'
 
 const ok = { accepted: true, paused: false, formatAlarm: false, ownerAlive: false, responderLive: false, claimHonoured: false }
@@ -343,30 +342,50 @@ describe('the responder prompt', () => {
   })
 })
 
-describe('ackPlan — a CLEAN responder consumes exactly what it was handed', () => {
+describe('ackPlan — consumed only against EVIDENCE that the responder answered', () => {
   const handed = [{ id: 'a' }, { id: 'b' }]
   const pending = [
     { id: 'a', file: 'a.json' },
     { id: 'b', file: 'b.json' },
     { id: 'c', file: 'c.json' },
   ]
+  const spawnedAt = 1_000_000
 
-  it('claims the handed messages after exit code 0', () => {
-    expect(ackPlan({ exitCode: 0, handed, pending }).map((m) => m.file)).toEqual(['a.json', 'b.json'])
+  it('claims the handed messages once a reply was SENT after the spawn', () => {
+    expect(ackPlan({ handed, pending, spawnedAt, actedAt: spawnedAt + 5000 }).map((m) => m.file)).toEqual([
+      'a.json',
+      'b.json',
+    ])
   })
 
-  it('claims NOTHING after a crash — the message stays for the next session', () => {
-    expect(ackPlan({ exitCode: 1, handed, pending })).toEqual([])
-    expect(ackPlan({ exitCode: null, handed, pending })).toEqual([])
+  // THE DEFECT THIS REPLACES (four-eyes review 29.07.2026, finding 1b). The
+  // responder lands in the SessionStart stand-down; a session that reads it,
+  // does nothing and ends its turn cleanly exits 0. Acking on the exit code
+  // ALONE therefore deleted the user's INSTRUCTION from the spool with nobody
+  // having answered it — it then reached no session at all.
+  it('claims NOTHING when no reply was sent, however cleanly the responder exited', () => {
+    expect(ackPlan({ handed, pending, spawnedAt, actedAt: null })).toEqual([])
+  })
+
+  it('claims NOTHING on a receipt that PREDATES the spawn — that was an earlier session answering', () => {
+    expect(ackPlan({ handed, pending, spawnedAt, actedAt: spawnedAt - 1 })).toEqual([])
+  })
+
+  it('does not require a clean exit: a responder that answered and then crashed HAS answered', () => {
+    // No exit code enters the decision at all — asking the user the same thing
+    // twice is no improvement over acking a demonstrably answered message.
+    expect(ackPlan({ handed, pending, spawnedAt, actedAt: spawnedAt + 1, exitCode: 1 }).length).toBe(2)
   })
 
   it('never claims a message that arrived while the responder ran', () => {
-    expect(ackPlan({ exitCode: 0, handed, pending }).some((m) => m.id === 'c')).toBe(false)
+    expect(ackPlan({ handed, pending, spawnedAt, actedAt: spawnedAt + 1 }).some((m) => m.id === 'c')).toBe(false)
   })
 
-  it('is total', () => {
+  it('is total, and every missing input means NOT acked', () => {
     expect(ackPlan()).toEqual([])
-    expect(ackPlan({ exitCode: 0 })).toEqual([])
+    expect(ackPlan({ handed, pending })).toEqual([])
+    expect(ackPlan({ handed, pending, spawnedAt })).toEqual([])
+    expect(ackPlan({ handed, pending, actedAt: 5 })).toEqual([])
   })
 })
 

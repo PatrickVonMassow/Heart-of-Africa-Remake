@@ -265,8 +265,10 @@ export const RESPONDER_PROMPT_HEAD =
   'Batch. Du haeltst den Batch-Lock NICHT und darfst ihn NICHT nehmen; der SessionStart-Hook wird dich ' +
   'zurecht abweisen (STAND DOWN) - das ist richtig so, arbeite trotzdem diese eine Aufgabe ab. ' +
   'LIES NICHT die Arbeitsliste (TASKS.md), nicht design.md und nicht das Archiv: eine kurze Frage soll keine ' +
-  'Batch-Orientierung bezahlen. DEINE AUFGABE: (1) beantworte die Nachricht knapp und auf Deutsch mit ' +
-  '`node scripts/chat-reply.mjs "..."`; brauchst du dafuer eine Tatsache aus dem Repo, hole sie mit EINEM ' +
+  'Batch-Orientierung bezahlen. DEINE AUFGABE: (1) beantworte die Nachricht IMMER mit ' +
+  '`node scripts/chat-reply.mjs "..."`, knapp und auf Deutsch - auch wenn du nur bestaetigst. Diese ' +
+  'Antwort ist zugleich der BELEG, dass die Nachricht bearbeitet wurde; ohne sie bleibt sie in der ' +
+  'Warteschlange und die naechste Sitzung bekommt sie erneut. Brauchst du eine Tatsache aus dem Repo, hole sie mit EINEM ' +
   'gezielten Befehl, dessen AUSGABE klein ist. (2) Ist die Nachricht eine ANWEISUNG statt einer Frage, dann ' +
   'haenge sie als neuen, implementierungsreifen Punkt ans ENDE von TASKS.md auf main an (append-and-defer, ' +
   'ein atomarer Commit, danach pushen) und sage in der Antwort, unter welcher Nummer sie steht. ' +
@@ -307,17 +309,38 @@ export function buildResponderPrompt(messages) {
  *
  * Delivery into the prompt is AT-LEAST-ONCE by the same reasoning the launcher
  * records: the messages are NOT claimed off the spool before the spawn, so a
- * responder that dies before it reads them leaves them for the next session.
- * They are claimed only after a CLEAN exit — and only the ones this responder
- * was actually handed, never whatever else arrived meanwhile.
+ * responder that never reads them leaves them for the next session. Only the
+ * ones this responder was actually HANDED are ever candidates, never whatever
+ * else arrived meanwhile.
  *
- * Without this the duplicate would not be a risk but a certainty: the responder
- * does not own the batch, so the per-tool-call delivery of stage 2 never claims
- * for it, and the next batch session would be handed — and would answer — every
- * message a responder had already answered.
+ * Without an ack at all the duplicate would not be a risk but a certainty: the
+ * responder does not own the batch, so stage 2's per-tool-call delivery never
+ * claims for it, and the next batch session would be handed — and would answer
+ * — every message a responder had already answered.
+ *
+ * THE ACK ASKS FOR EVIDENCE, NOT FOR AN EXIT CODE (four-eyes review 29.07.2026,
+ * finding 1b — the worst defect of the first cut). `exitCode === 0` is evidence
+ * of nothing: a responder that reads its prompt, stands down and ends its turn
+ * cleanly exits 0, and acking on that took the user's INSTRUCTION off the spool
+ * with nobody having answered it. It then reached no session at all — a silent
+ * loss, worse than the fifteen-minute wait the watcher exists to remove.
+ *
+ * `actedAt` is the moment a reply was actually SENT: `recordReplyReceipt` in
+ * scripts/chat-reply.mjs writes it only after the transport ACCEPTED the post.
+ * It must postdate the spawn, or it is some earlier session's answer. NOT
+ * ACKING is the safe direction throughout — the message stays pending and the
+ * next session is handed it, which costs a duplicate at worst. The exit code is
+ * deliberately NOT a condition either way: a responder that answered and then
+ * crashed has still answered, and asking the user twice is no improvement.
  */
-export function ackPlan({ exitCode, handed = [], pending = [] } = {}) {
-  if (exitCode !== 0) return []
+export function ackPlan({ handed = [], pending = [], spawnedAt = null, actedAt = null } = {}) {
+  // `Number(null)` is 0, and 0 >= 0 — so a plain `Number()` here would read
+  // "never spawned, never answered" as "answered at the moment of the spawn" and
+  // ack the lot. Its own test caught it; a MISSING value is not a timestamp.
+  const stamp = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : NaN)
+  const spawned = stamp(spawnedAt)
+  const acted = stamp(actedAt)
+  if (!Number.isFinite(spawned) || !Number.isFinite(acted) || acted < spawned) return []
   const ids = new Set((Array.isArray(handed) ? handed : []).map((m) => m?.id).filter(Boolean))
   return (Array.isArray(pending) ? pending : []).filter((m) => m && ids.has(m.id) && typeof m.file === 'string')
 }
