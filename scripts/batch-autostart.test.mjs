@@ -207,4 +207,27 @@ describe('the board watchdog child', () => {
     expect(code).toMatch(/catch \(e\) \{\s*say\(\{ verdict: 'error'/)
     expect(code).not.toMatch(/process\.exit\(/)
   })
+
+  it('reports what notify() DID, not what was decided', () => {
+    // notify() returns false on a missing topic or a failed POST and never
+    // throws. Reporting the intention would let the launcher key a fault whose
+    // alert never left the machine — and a keyed fault is never announced
+    // again, so one transient POST failure would silence it for good.
+    expect(code).toMatch(/const sent = d\.notify && !quiet \? await notify\(/)
+    expect(code).toMatch(/notified: !!sent/)
+  })
+})
+
+// The launcher only remembers a fault as reported when it really was reported.
+describe('the launcher keys a board fault only on a real notification', () => {
+  const code = readFileSync(resolve(process.cwd(), 'scripts', 'batch-autostart.mjs'), 'utf8')
+    .split('\n')
+    .filter((l) => !l.trimStart().startsWith('//'))
+    .join('\n')
+
+  it('stores the key under r.notified, and forgets it only when nothing is wrong', () => {
+    expect(code).toMatch(/if \(r\.notified\) \{/)
+    expect(code).toMatch(/state\.boardWatchKey = r\.key/)
+    expect(code).toMatch(/else if \(r\.key === null\)/)
+  })
 })

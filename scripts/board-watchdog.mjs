@@ -80,14 +80,19 @@ try {
     graceMs: LIVE_GRACE_MS,
   })
   const d = watchdogDecision({ ...v, state, now, lastKey })
-  if (d.notify && !quiet) await notify(d.title, d.message, d.priority)
+  // `notified` is what notify() ACTUALLY did, not what was decided (four-eyes
+  // NEW-4). It returns false on a missing topic or a failed POST and never
+  // throws, so reporting the intention would let the caller key a fault whose
+  // one alert never left the machine — and a keyed fault is never announced
+  // again. A transient POST failure would silence a standing problem for good.
+  const sent = d.notify && !quiet ? await notify(d.title, d.message, d.priority) : false
 
   say({
     verdict: v.verdict,
     reason: v.reason,
     live: v.live,
     expected: v.expected,
-    notified: !!(d.notify && !quiet),
+    notified: !!sent,
     title: d.title,
     message: d.message,
     // null when there is NOTHING to report — the caller forgets its key then, so

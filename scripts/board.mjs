@@ -50,15 +50,20 @@ function edit(fn, done) {
   // the loop AND reduce the publisher's whole remedy text to `e.message`. The
   // refusal is the most useful thing it ever prints, so it is printed, and the
   // mirror still runs: the board file is already written either way.
+  let published = true
   try {
     console.log(run(['scripts/board-publish.mjs']).trim().split('\n')[0])
   } catch (e) {
+    published = false
     console.error(String(e.stderr || '').trimEnd() || `board-publish failed: ${e.message}`)
     console.error('The LIVE page was NOT updated — fix the above, then: node scripts/board-publish.mjs')
     process.exitCode = 1
   }
   console.log(run(['scripts/dashboard-publish.mjs']).trim().split('\n').pop())
-  console.log('The live page is updated. Mirror it while the artifact still exists:')
+  // The success line is GATED (four-eyes NEW-3): printed unconditionally it sat
+  // two lines under "The LIVE page was NOT updated", so a session skimming the
+  // tail read success in exactly the failure case this reporting exists for.
+  if (published) console.log('The live page is updated. Mirror it while the artifact still exists:')
   console.log('NEXT: publish the scratchpad file via the Artifact tool, then: node scripts/board.mjs attest')
 }
 
