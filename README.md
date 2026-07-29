@@ -228,7 +228,7 @@ Softscape, or any rights holder of the original game.
   project tries to do better rather than reproduce them.
 
 If you hold rights to the original work and object to anything in this
-repository, open an issue or contact the author and it will be addressed
+repository, open an issue or contact me and it will be addressed
 promptly.
 
 Own code released under the [MIT License](LICENSE). Note that this covers only
