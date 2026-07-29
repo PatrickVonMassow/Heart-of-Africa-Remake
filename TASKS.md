@@ -3637,6 +3637,53 @@ read that as "the criterion and its evidence section".
   DOCS in the same commit: `scripts/verify/README.md`, where the polish suite's checks
   are described.
 
+- [ ] 413. AN ANIMAL WALKS STRAIGHT THROUGH THE FENCE (29.07.2026, user bug report
+  `hoa-state-2026-07-29-2757182050`, seen TWICE in one visit: production 41d8caf,
+  WebGPU, hausa-village in the west, high quality, standing at 85.46 / -120.25). The
+  compound fence is drawn as a continuous woven wall; a goat crossed it as if it were
+  not there.
+  DIAGNOSED, not guessed — two causes stack, and both must be fixed:
+  (a) THE COLLIDER IS A ROW OF DOTS WHERE THE PICTURE DRAWS A WALL. `layout.ts` pushes
+  one CIRCLE PER POST (`for (const f of fences) … colliders.push({x, z, r})`, r = 0.42
+  woven / 0.5 stone / 0.6 thorn) while `fenceRing` spaces posts by `step` (0.85–1.0)
+  along the arc. Between two post circles the blocked band is barely as wide as the gap
+  and it PINCHES at the midpoint, so even a correct sweep would squeeze through where
+  the drawn panel is solid. The collider must follow the SEGMENT between neighbouring
+  posts (a capsule/oriented box per panel), derived from the same posts the renderer
+  draws — never a second, hand-kept list, per the point-129/378 rule that every collider
+  comes from what is actually drawn.
+  (b) THE SETTLEMENT COLLISION CANNOT CATCH A FAST STEP. `resolveMove`
+  (`src/scenes/place/collision.ts`) is a POSITION test: it takes the desired point and
+  pushes it out of whatever it overlaps. A step longer than the collider band lands on
+  the far side overlapping nothing, so nothing pushes back — textbook tunnelling. The
+  bird's-eye path already solves this (§7.1 pt. 4: "a fast step is caught at the near
+  edge with no tunnelling"); the settlement path never got it. Give `resolveMove` the
+  PREVIOUS position and test the SEGMENT from it to the desired point, stopping at the
+  near edge of the first collider crossed, then resolve the slide as today. Every caller
+  in `PlaceLife.tsx` (kids, goats, walkers) and the player already knows its previous
+  position.
+  WHY IT SHOWED ON A GOAT FIRST: goats drift by a wobble (`a.x + wob * a.amp`) that can
+  jump further in one frame than a villager's walk, so they meet the tunnelling case
+  soonest — but the defect is in the shared routine, not in the goats.
+  THE USER'S SECOND OBSERVATION IS THE OTHER HALF OF THE SAME CAUSE and pins it: at the
+  fence the animal either passes through OR "changes direction abruptly". The abrupt
+  turn is the push-out's own signature — the goat's next position lands inside ONE post
+  circle and is shoved out along that circle's radius, i.e. sideways, with no relation
+  to the wall it was walking into. A panel collider plus a swept test replaces both
+  symptoms with the one correct behaviour: stop at the wall and slide along it. Both
+  symptoms must be gone, not only the clipping — a fix that merely stops the tunnelling
+  and keeps the sideways jerk has fixed half the report.
+  VERIFIABLE: pure Vitest — a segment crossing a fence panel between two posts is
+  stopped at the panel (today it passes through); a step of 10× the collider width is
+  stopped at the near edge; sliding along a wall still works; an inhabitant standing
+  inside an overlap is still pushed out (the current behaviour must not regress); and a
+  sweep over every fence in every generated village asserts no gap wider than the
+  smallest inhabitant radius between neighbouring panel colliders. Live
+  (`scripts/verify/polish.mjs`, BOTH backends): a goat driven at the fence for a long
+  run never ends up on the far side.
+  DOCS in the same commit: CLAUDE.md §7.1 point 16, where settlement collision is
+  described, gains the swept rule.
+
 ## Closing (only after all points)
 
 New points are appended BEFORE this section — it stays last in the file.
