@@ -122,6 +122,43 @@ export function chatPromptSuffix(messages) {
 }
 
 /**
+ * WHICH PENDING MESSAGES A SPAWN STILL NEEDS TO HEAR. PURE.
+ *
+ * The spool is NOT consumed here — the per-tool-call delivery owns that — so
+ * without this filter every successor would be handed the same messages again.
+ * `receivedAt` (when the poll accepted it) is the clock, falling back to the
+ * sender's `ts` for a spool line written before that field existed.
+ */
+export function pendingSinceHandover(pending, handedAt) {
+  const since = Number.isFinite(handedAt) ? Number(handedAt) : 0
+  return (Array.isArray(pending) ? pending : []).filter((m) => {
+    const at = Number(m?.receivedAt ?? m?.ts)
+    return Number.isFinite(at) && at > since
+  })
+}
+
+/**
+ * THE HANDOVER STAMP, AND WHEN IT MAY MOVE. PURE (four-eyes review, 29.07.2026).
+ *
+ * Two bugs sat in the obvious version — `state.chatHandedAt = now` written
+ * before `spawn()`, with `now` taken at the TOP of the tick:
+ *   (a) the chat poll happens a hundred lines AFTER that `now`, so a message
+ *       accepted DURING the spawning tick had `receivedAt > chatHandedAt` and
+ *       rode along AGAIN at the next spawn — two successive sessions told the
+ *       same instruction, exactly what the filter above exists to prevent;
+ *   (b) if `spawn()` threw, the stamp had already advanced and those messages
+ *       reached no prompt at all — and in stage 1 nothing else consumes the
+ *       spool, so they were simply lost.
+ * The stamp therefore moves only for a spawn that HAPPENED, and is read at that
+ * moment rather than inherited from the top of the tick.
+ */
+export function nextChatHandedAt({ spawned, previous = 0, now }) {
+  const before = Number.isFinite(previous) ? Number(previous) : 0
+  if (!spawned) return before
+  return Number.isFinite(now) ? Number(now) : before
+}
+
+/**
  * The argv the launcher hands to claude.exe. PURE.
  *
  * --dangerously-skip-permissions: the resurrected session is HEADLESS (-p) and

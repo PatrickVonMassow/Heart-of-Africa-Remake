@@ -57,6 +57,8 @@ import {
   buildSpawnArgs,
   buildSpawnOptions,
   chatPromptSuffix,
+  nextChatHandedAt,
+  pendingSinceHandover,
   recordSpawn,
   reapableSpawns,
   pruneSpawns,
@@ -530,13 +532,12 @@ try {
   // that matters most: it carries CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0, without
   // which the runtime terminates the session ten minutes into every delegated
   // build (point 402).
-  // Only what arrived SINCE the last spawn: the spool is not consumed here (the
-  // per-tool-call delivery owns that), so without this filter every successor
-  // would be handed the same messages again.
-  const fresh = pendingChat.filter((m) => Number(m?.receivedAt ?? m?.ts) > Number(state.chatHandedAt ?? 0))
+  // Only what arrived SINCE the last spawn. The stamp is NOT advanced here: it
+  // moves below, after a spawn that actually happened and read at that moment —
+  // `now` is the top of the tick, from before the chat poll even ran.
+  const fresh = pendingSinceHandover(pendingChat, state.chatHandedAt)
   const suffix = chatPromptSuffix(fresh)
   if (suffix) log(`carrying ${fresh.length} chat message(s) into the spawn prompt`)
-  state.chatHandedAt = now
   child = spawn(exe, buildSpawnArgs({ prompt: RESUME_PROMPT + suffix }), buildSpawnOptions({ cwd: REPO, stdio: ['ignore', out, out] }))
   child.unref()
 } catch (e) {
@@ -559,6 +560,11 @@ writeJsonAtomic(C('autostart-state.json'), {
   // The ledger, so a handover overwriting lastPid can no longer lose track of a
   // process that is still running (four-eyes finding 1.4).
   spawns: recordSpawn(state.spawns, { pid: child.pid, at: now }),
+  // ONLY NOW, and with a fresh clock. A spawn that threw exits above without
+  // ever reaching this line, so its messages stay pending; and `now` is the top
+  // of the tick, from BEFORE the chat poll, so using it here would re-deliver
+  // everything that arrived during this very tick (four-eyes review, 29.07.2026).
+  chatHandedAt: nextChatHandedAt({ spawned: true, previous: state.chatHandedAt, now: Date.now() }),
 })
 log(`launched pid ${child.pid} under pending-spawn lock ${launcherSid}`)
 await notify('Resurrected', `No live session — launched a headless worker to continue the batch (${open} open, failCount ${state.failCount}). Progress on GitHub.`, 'low')
