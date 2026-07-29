@@ -7,10 +7,10 @@
 // the watcher a message had been answered when nobody had answered it, and the
 // message would be marked consumed and lost (see `ackPlan`).
 import { afterEach, describe, expect, it } from 'vitest'
-import { existsSync, mkdtempSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { postOutbox, readReplyReceipt, sendReply } from './chat-reply.mjs'
+import { join, resolve } from 'node:path'
+import { RECEIPT_PATH, postOutbox, readReplyReceipt, sendReply } from './chat-reply.mjs'
 import { TEST_VECTOR, parseEnvelope, verifyMessage } from './chat-core.mjs'
 
 const secret = TEST_VECTOR.secret
@@ -54,12 +54,29 @@ describe('postOutbox — a signed envelope for the phone', () => {
     await expect(verifyMessage(secret, { direction: 'inbox', id, ts, text }, sig)).resolves.toBe(false)
   })
 
-  it('writes NO receipt — it is not evidence that anybody answered', async () => {
-    const path = join(tmp(), 'receipt.json')
+  it('writes NO receipt — asserted against the path that could ACTUALLY be written', async () => {
+    // A temp path would be a TAUTOLOGY (four-eyes finding F2): `postOutbox` has
+    // no receipt parameter, so a temp file was never a candidate, and the case
+    // would still pass if a refactor made it write the REAL receipt. The real
+    // one is therefore what is watched — snapshotted before and after, and left
+    // exactly as it was found, present or absent.
+    const existedBefore = existsSync(RECEIPT_PATH)
+    const before = readReplyReceipt(RECEIPT_PATH)
     const { fetchImpl } = recorder()
-    await postOutbox({ secret, text: 'Zustellung fehlgeschlagen: …', id: 'n1', ts: NOW, fetchImpl })
-    expect(existsSync(path)).toBe(false)
-    expect(readReplyReceipt(path)).toBeNull()
+    await postOutbox({ secret, text: 'Zustellung fehlgeschlagen: …', id: 'drop-notice-1', ts: NOW, fetchImpl })
+    expect(existsSync(RECEIPT_PATH)).toBe(existedBefore)
+    expect(readReplyReceipt(RECEIPT_PATH)).toEqual(before)
+    // And whatever this machine happens to hold, it is not what was just posted.
+    expect(readReplyReceipt(RECEIPT_PATH)?.id ?? null).not.toBe('drop-notice-1')
+  })
+
+  it('is the call the INBOX TICK makes — the notice never travels through sendReply', () => {
+    const inbox = readFileSync(resolve(process.cwd(), 'scripts/chat-inbox.mjs'), 'utf8')
+    expect(inbox).toMatch(/import \{ postOutbox \} from '\.\/chat-reply\.mjs'/)
+    expect(inbox).toMatch(/\bpostOutbox\(/)
+    // Prose may NAME it (the comment explains why it is not used); code may not
+    // CALL it.
+    expect(inbox).not.toMatch(/\bsendReply\s*\(/)
   })
 
   it('reports a refused post rather than throwing', async () => {
