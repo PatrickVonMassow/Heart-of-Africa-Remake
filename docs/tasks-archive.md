@@ -12308,3 +12308,95 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   than the window may be evicted.
   DOCS in the same commit: `docs/batch-autonomy.md`, where the channel's guarantees
   are stated — the drop notice is one of them, and the replay bound is the other.
+
+- [x] 413. AN ANIMAL WALKS STRAIGHT THROUGH THE FENCE (29.07.2026, user bug report
+  `hoa-state-2026-07-29-2757182050`, seen TWICE in one visit: production 41d8caf,
+  WebGPU, hausa-village in the west, high quality, standing at 85.46 / -120.25). The
+  compound fence is drawn as a continuous woven wall; a goat crossed it as if it were
+  not there.
+  DIAGNOSED, not guessed — two causes stack, and both must be fixed:
+  (a) THE COLLIDER IS A ROW OF DOTS WHERE THE PICTURE DRAWS A WALL. `layout.ts` pushes
+  one CIRCLE PER POST (`for (const f of fences) … colliders.push({x, z, r})`, r = 0.42
+  woven / 0.5 stone / 0.6 thorn) while `fenceRing` spaces posts by `step` (0.85–1.0)
+  along the arc. Between two post circles the blocked band is barely as wide as the gap
+  and it PINCHES at the midpoint, so even a correct sweep would squeeze through where
+  the drawn panel is solid. The collider must follow the SEGMENT between neighbouring
+  posts (a capsule/oriented box per panel), derived from the same posts the renderer
+  draws — never a second, hand-kept list, per the point-129/378 rule that every collider
+  comes from what is actually drawn.
+  (b) THE SETTLEMENT COLLISION CANNOT CATCH A FAST STEP. `resolveMove`
+  (`src/scenes/place/collision.ts`) is a POSITION test: it takes the desired point and
+  pushes it out of whatever it overlaps. A step longer than the collider band lands on
+  the far side overlapping nothing, so nothing pushes back — textbook tunnelling. The
+  bird's-eye path already solves this (§7.1 pt. 4: "a fast step is caught at the near
+  edge with no tunnelling"); the settlement path never got it. Give `resolveMove` the
+  PREVIOUS position and test the SEGMENT from it to the desired point, stopping at the
+  near edge of the first collider crossed, then resolve the slide as today. Every caller
+  in `PlaceLife.tsx` (kids, goats, walkers) and the player already knows its previous
+  position.
+  WHY IT SHOWED ON A GOAT FIRST: goats drift by a wobble (`a.x + wob * a.amp`) that can
+  jump further in one frame than a villager's walk, so they meet the tunnelling case
+  soonest — but the defect is in the shared routine, not in the goats.
+  THE USER'S SECOND OBSERVATION IS THE OTHER HALF OF THE SAME CAUSE and pins it: at the
+  fence the animal either passes through OR "changes direction abruptly". The abrupt
+  turn is the push-out's own signature — the goat's next position lands inside ONE post
+  circle and is shoved out along that circle's radius, i.e. sideways, with no relation
+  to the wall it was walking into. A panel collider plus a swept test replaces both
+  symptoms with the one correct behaviour: stop at the wall and slide along it. Both
+  symptoms must be gone, not only the clipping — a fix that merely stops the tunnelling
+  and keeps the sideways jerk has fixed half the report.
+  (c) THE ANIMALS DO NOT SEE EACH OTHER, AND THEIR HOME SPOT IS NEVER CHECKED. Second
+  report the same night (`(1).zip`, tuareg-village, north, 57.42 / -232.22, medium):
+  "wildes Durcheinanderclippen" — the picture shows several goats standing INSIDE one
+  another and inside a tent, among rocks. Two causes, both in `Goats` in `PlaceLife.tsx`:
+  no animal is part of the collider set, so `resolveMove` can never separate two goats;
+  and a goat's anchor is drawn as a bare radius around the centre (`r = 9 + rand() * 12`)
+  with NO validation against the colliders — an anchor may sit inside a tent or a rock,
+  and the ±1.5 wobble then drives the animal in and out of it forever. Point 155 already
+  did exactly this validation for walker errand targets; the goats never got it. Fix
+  both: validate an animal's anchor the way point 155 validates a target (clear standing
+  circle, nudged to the nearest free spot otherwise), and give the animals mutual
+  separation — the cheapest correct form is to add each animal as a small dynamic
+  collider for the others' resolve step, so one routine keeps doing the work.
+  VERIFIABLE: pure Vitest — a segment crossing a fence panel between two posts is
+  stopped at the panel (today it passes through); a step of 10× the collider width is
+  stopped at the near edge; sliding along a wall still works; an inhabitant standing
+  inside an overlap is still pushed out (the current behaviour must not regress); a
+  sweep over every fence in every generated village asserts no gap wider than the
+  smallest inhabitant radius between neighbouring panel colliders; every generated
+  animal anchor stands on free ground in every village of every region; and two animals
+  released onto the same spot end up apart. Live (`scripts/verify/polish.mjs`, BOTH
+  backends): a goat driven at the fence for a long run never ends up on the far side,
+  and a photographed herd shows no body inside another body.
+  DOCS in the same commit: CLAUDE.md §7.1 point 16, where settlement collision is
+  described, gains the swept rule.
+
+- [x] 412. THE FOOTING CHECK PASSES BECAUSE IT NEVER STOOD ON A SLOPE (29.07.2026,
+  reported by the agent that built the fix, against its own green result — the kind of
+  finding that only comes from someone looking at what their PASS actually measured).
+  Point 300 now seats every planted panorama foot on the ground drawn under it, and the
+  live check `every planted panorama foot touches the ground drawn under it` went from
+  23 % of stance frames over the gate to a clean PASS on both backends. But the same
+  PASS line reports `slope over the wheelbase [0.00, 0.00, 0.00, 0.00]`, `pitch
+  [0.000 ×4]` and `leg reach [1.00 ×4]`: at the place the check runs (maasai-village)
+  the silhouettes stand on the flat disc-horizon line, so the seating it is meant to
+  prove was a NO-OP in the measured frame. The non-linear-relief case is carried today
+  by a pure test alone. The live green is therefore true but weak — it says the code
+  does not break flat ground, not that it fixes sloped ground.
+  THIS IS THE SAME CLASS AS §3.47 of the retrospective, one step further on: there a
+  check measured NOTHING and said `Infinity`; here a check measures only the trivial
+  case and says PASS. Both are a verdict without its population.
+  THE FIX, which the point's own VERIFY wording already asks for: make it a SERIES.
+  Sample many frames across the walk, count how many samples stood on genuinely sloped
+  ground (a calibratable minimum slope over the wheelbase), and FAIL when that count is
+  zero — a check that never met its own subject must not report success. Choose the
+  sampling place so slope actually occurs: either drive the probe to a settlement whose
+  backdrop relief rises, or state in the check why the chosen place is the right one.
+  Report the distribution (how many samples, how many sloped, worst gap among the sloped
+  ones) so the next reader can judge the evidence rather than trust the word PASS.
+  VERIFIABLE: pure Vitest on the decision — zero sloped samples fails naming the count,
+  a mixed series judges only the sloped ones, an all-flat series is never silently
+  accepted; plus the existing non-linear-ground unit test stays. Live: the check reports
+  a non-zero sloped-sample count on both backends.
+  DOCS in the same commit: `scripts/verify/README.md`, where the polish suite's checks
+  are described.
