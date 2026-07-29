@@ -9,7 +9,10 @@ const nowCard = (n) =>
 const queueCard = (n) =>
   `<details>\n  <summary><span class="num">${n}</span><span class="t">Titel</span></summary>\n  <div class="body"><p>Text</p></div>\n</details>`
 
+const VIEWPORT = '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
+
 const board = ({ now = [400], queue = [401] } = {}) =>
+  VIEWPORT +
   '<div class="wrap">\n' +
   sect(REQUIRED_SECTIONS[0], now.map(nowCard).join('\n')) +
   '\n' +
@@ -104,5 +107,27 @@ describe('totality — a checker that blocks a publish may never throw', () => {
   it('markupOnly is total', () => {
     expect(markupOnly(null)).toBe('')
     expect(markupOnly('<style>x</style>abc')).toBe('abc')
+  })
+})
+
+describe('the board carries its own viewport', () => {
+  // The property it used to INHERIT: as an artifact the fragment was the whole
+  // document and the host set the meta. Under the Pages shell, document.write
+  // discards the shell's along with the old document — and the board rendered at
+  // Chrome's 980-px desktop default, unreadable on the phone it is read on.
+  it('flags a board without one', () => {
+    const naked = board().replace(/<meta name="viewport"[^>]*>\n/, '')
+    expect(codes(naked)).toContain('viewport-missing')
+  })
+
+  it('accepts the intact board, and does not care how the meta is quoted', () => {
+    expect(codes(board())).not.toContain('viewport-missing')
+    const unquoted = board().replace(/name="viewport"/, 'name=viewport')
+    expect(codes(unquoted)).not.toContain('viewport-missing')
+  })
+
+  it('is not satisfied by the word appearing in a card', () => {
+    const decoy = board().replace(/<meta name="viewport"[^>]*>\n/, '<p>viewport</p>\n')
+    expect(codes(decoy)).toContain('viewport-missing')
   })
 })
