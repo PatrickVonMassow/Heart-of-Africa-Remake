@@ -21,31 +21,99 @@
 // Side-effect free; the wrapper (findings-guard.mjs) reads the tree and is
 // fail-open, so a bug in here can never trap a session.
 
-/** Investigative calls needed before a recordless turn is judged. Calibrated
- *  against the 29.07. transcript: the analysis turns ran 6+ read/search calls,
- *  the answer-only turns stayed at 0-2. A guard that fires on an ordinary
- *  conversational turn trains the reader to skip it — the argument
- *  guard-health-core.mjs makes about enforcers in general. */
+/** Investigative calls needed before a recordless turn is judged.
+ *
+ *  Calibrated against the whole transcript corpus (2709 turns, 43 sessions,
+ *  measured by the second model on 29.07.2026), NOT against an impression:
+ *  counting every shell call as investigation blocked 10.6 % of all turns and
+ *  73 % of those blocks were build/verify turns, not analysis. With shell
+ *  calls classified read-only-or-not (below) the rate lands near 5 % — about
+ *  one turn in twenty, and the samples there are genuinely analysis. A guard
+ *  that fires on an ordinary turn trains the reader to skip it, which is the
+ *  argument guard-health-core.mjs makes about enforcers in general. */
 export const DEFAULT_THRESHOLD = 6
 
 /** Tools whose every use is investigation. */
 const READ_TOOLS = new Set(['Read', 'Grep', 'Glob', 'NotebookRead', 'WebFetch', 'WebSearch'])
-/** Tools that run a shell — investigation unless the command IS a record. */
+/** Tools that run a shell — investigation only when the command merely LOOKS. */
 const SHELL_TOOLS = new Set(['Bash', 'PowerShell'])
 /** Tools that write files — a record only for the paths below. */
 const WRITE_TOOLS = new Set(['Edit', 'Write', 'NotebookEdit'])
 
+/**
+ * Split a shell command into its segments.
+ *
+ * Everything below is judged PER SEGMENT and anchored at its start, because a
+ * whole-string match is both forgeable and maskable: `rg "git commit" src/`
+ * would otherwise count as a commit (a search laundering itself into a
+ * record), and `git commit --dry-run; git commit -m real` would lose the real
+ * commit to the dry run beside it. Quoting is not parsed — a separator inside
+ * a quoted string splits too, which can only ever split one segment into two
+ * and never invents a match at a segment head.
+ */
+function segments(command) {
+  return String(command ?? '')
+    .split(/(?:\|\||&&|[;|\n])/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+}
+
+/** `git` option run: flags, flags with a detached value (`-C <path>`), and
+ *  `key=value` config pairs — but never a bare subcommand, so `git log --grep
+ *  commit` stays a search. */
+const GIT_OPTS = '(?:-[Cc]\\s+\\S+\\s+|-\\S+\\s+|\\S+=\\S+\\s+)*'
+const GIT_DURABLE = new RegExp(`^git\\s+${GIT_OPTS}(?:commit|merge|cherry-pick|revert)\\b`)
+
+/** Shell heads that only ever look at something. */
+const READ_ONLY_HEADS = new Set([
+  'ls', 'cat', 'head', 'tail', 'wc', 'grep', 'rg', 'find', 'sed', 'awk', 'echo', 'pwd',
+  'which', 'type', 'stat', 'diff', 'sort', 'uniq', 'tree', 'file', 'basename', 'dirname',
+  'printf', 'date', 'env', 'test', 'true', 'false',
+])
+/** `git` subcommands that only read. */
+const READ_ONLY_GIT = new Set([
+  'status', 'log', 'diff', 'show', 'branch', 'rev-parse', 'for-each-ref', 'ls-files',
+  'describe', 'blame', 'shortlog', 'worktree', 'remote', 'tag', 'stash',
+])
+
+/** Does this ONE segment merely look at the tree? */
+function segmentIsReadOnly(segment) {
+  const words = segment.split(/\s+/).filter(Boolean)
+  const head = (words[0] ?? '').replace(/^.*[\\/]/, '')
+  if (READ_ONLY_HEADS.has(head)) return true
+  if (head === 'git') {
+    const sub = words.slice(1).find((w) => !w.startsWith('-') && !w.includes('='))
+    // A bare `git tag`/`git stash` lists; with more words they act.
+    if (sub === 'tag' || sub === 'stash' || sub === 'worktree' || sub === 'remote') {
+      return words.length <= 2
+    }
+    return READ_ONLY_GIT.has(sub)
+  }
+  // The project's own probes are how analysis actually happens here.
+  if (head === 'node') return /\s(?:-e|--status|--drain|--check|--dry-run)\b/.test(segment)
+  return false
+}
+
 /** A shell command that itself constitutes a durable record. */
 function shellRecordKind(command) {
-  const c = String(command ?? '')
-  // `git commit` — the project's own durable unit. `--dry-run` is not one.
-  // The option run between `git` and `commit` admits flags AND their values
-  // (`git -c user.name=x commit`), but not a bare subcommand, so `git log
-  // --grep commit` stays what it is: a search.
-  if (/\bgit\s+(?:-\S+\s+|\S+=\S+\s+)*commit\b/.test(c) && !/--dry-run\b/.test(c)) return 'commit'
-  if (/\bfinding\.mjs\b[^|;&]*--record\b/.test(c)) return 'finding-record'
-  if (/\bfinding\.mjs\b[^|;&]*--none\b/.test(c)) return 'finding-none'
+  for (const segment of segments(command)) {
+    if (GIT_DURABLE.test(segment) && !/--dry-run\b/.test(segment)) return 'commit'
+    if (/^(?:\S*node\s+)?\S*finding\.mjs\b/.test(segment)) {
+      if (/\s--record\b/.test(segment)) return 'finding-record'
+      if (/\s--none\b/.test(segment)) return 'finding-none'
+      // Retiring an entry is the second half of the same duty, so a turn that
+      // only drains the carrier is a recording turn too.
+      if (/\s--drained\b/.test(segment)) return 'finding-drained'
+    }
+  }
   return null
+}
+
+/** Does this whole shell call merely look? One acting segment is enough to
+ *  make the call something other than investigation. */
+function shellIsReadOnly(command) {
+  const parts = segments(command)
+  return parts.length > 0 && parts.every(segmentIsReadOnly)
 }
 
 /** A written path that constitutes a durable record. */
@@ -68,7 +136,11 @@ export function classifyCall({ name, command, filePath } = {}) {
   if (READ_TOOLS.has(tool)) return { kind: 'investigate' }
   if (SHELL_TOOLS.has(tool)) {
     const record = shellRecordKind(command)
-    return record ? { kind: 'record', record } : { kind: 'investigate' }
+    if (record) return { kind: 'record', record }
+    // A shell call that ACTS (builds, tests, publishes, installs) is work, not
+    // investigation — counting it was what made this guard fire on 10.6 % of
+    // all turns, three quarters of them build/verify turns.
+    return shellIsReadOnly(command) ? { kind: 'investigate' } : { kind: 'ignore' }
   }
   if (WRITE_TOOLS.has(tool)) {
     const record = writeRecordKind(filePath)
@@ -223,19 +295,41 @@ export function carrierEntry({ at, session, title, detail }) {
   return [head, ...body].join('\n')
 }
 
-/** Mark the first pending entry whose title matches as drained. Returns the
- *  new text, or null when nothing matched — the caller reports that rather
- *  than silently succeeding. */
+/**
+ * Retire the pending entry whose title matches.
+ *
+ * Returns { text, title } on exactly one match, { ambiguous: [titles] } on
+ * several, and null on none. Reporting the MATCHED title back — rather than
+ * the search string — is what keeps the caller from confirming a retirement
+ * it did not perform; refusing an ambiguous match is what keeps it from
+ * retiring the wrong finding while saying the right one.
+ */
 export function markDrained(text, title) {
   const needle = String(title ?? '').trim().toLowerCase()
   if (!needle) return null
   const lines = String(text ?? '').split(/\r?\n/)
+  const hits = []
   for (let i = 0; i < lines.length; i++) {
     const m = /^- \[ \] (\S+) · (\S+) · (.*)$/.exec(lines[i])
     if (!m) continue
     if (!m[3].toLowerCase().includes(needle)) continue
-    lines[i] = lines[i].replace('- [ ] ', '- [x] ')
-    return lines.join('\n')
+    hits.push({ index: i, title: m[3] })
   }
-  return null
+  if (hits.length === 0) return null
+  if (hits.length > 1) return { ambiguous: hits.map((h) => h.title) }
+  lines[hits[0].index] = lines[hits[0].index].replace('- [ ] ', '- [x] ')
+  return { text: lines.join('\n'), title: hits[0].title }
+}
+
+/** Lines that look like an entry but do not parse — a hand edit that broke the
+ *  head would otherwise vanish from BOTH the listing and the pending count,
+ *  silently under-reporting what still waits. */
+export function malformedEntries(text = '') {
+  const bad = []
+  for (const line of String(text ?? '').split(/\r?\n/)) {
+    if (!/^- \[[ x]\] /.test(line)) continue
+    if (/^- \[[ x]\] (\S+) · (\S+) · (.*)$/.test(line)) continue
+    bad.push(line.trim())
+  }
+  return bad
 }

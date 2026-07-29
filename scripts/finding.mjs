@@ -12,7 +12,7 @@
 //   node scripts/finding.mjs --drained "<title substring>" mark one as landed
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
-import { carrierEntry, markDrained, parseCarrier } from './findings-core.mjs'
+import { carrierEntry, malformedEntries, markDrained, parseCarrier } from './findings-core.mjs'
 import { carrierPath, memoryIndexPath } from './findings-paths.mjs'
 
 const argv = process.argv.slice(2)
@@ -110,11 +110,19 @@ if (has('--none')) {
 if (has('--drained')) {
   const title = flag('--drained')
   if (!title) fail('--drained needs the title (or part of it) of the entry that landed')
-  const text = readCarrier()
-  const next = markDrained(text, title)
-  if (next === null) fail(`no pending entry matches "${title}" — check: node scripts/finding.mjs --drain`)
-  writeFileSync(CARRIER, next, 'utf8')
-  console.log(`marked as landed: ${title} (${parseCarrier(next).pending.length} still waiting)`)
+  const result = markDrained(readCarrier(), title)
+  if (result === null) fail(`no pending entry matches "${title}" — check: node scripts/finding.mjs --drain`)
+  if (result.ambiguous) {
+    fail(
+      `"${title}" matches ${result.ambiguous.length} pending entries — retiring one of them blindly would ` +
+        `silence the wrong finding. Name it more precisely:\n` +
+        result.ambiguous.map((t) => `  · ${t}`).join('\n'),
+    )
+  }
+  writeFileSync(CARRIER, result.text, 'utf8')
+  // Echo the MATCHED title, never the search string: the difference is the
+  // only way the caller can tell which entry actually went.
+  console.log(`marked as landed: ${result.title} (${parseCarrier(result.text).pending.length} still waiting)`)
   process.exit(0)
 }
 
@@ -125,6 +133,12 @@ if (!existsSync(CARRIER)) {
 } else {
   console.log(`${pending.length} waiting, ${drained} landed — ${CARRIER}`)
   for (const entry of pending) console.log(`  · ${entry.at.slice(0, 16).replace('T', ' ')} [${entry.session}] ${entry.title}`)
+  const broken = malformedEntries(readCarrier())
+  if (broken.length) {
+    console.log('')
+    console.log(`WARNUNG: ${broken.length} Zeile(n) sehen aus wie Einträge, parsen aber nicht — sie zählen nirgends mit:`)
+    for (const line of broken) console.log(`  ? ${line.slice(0, 100)}`)
+  }
 }
 if (!has('--drain')) {
   console.log('')

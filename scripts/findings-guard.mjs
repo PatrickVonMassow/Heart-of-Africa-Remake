@@ -24,23 +24,36 @@ function readJson(path) {
 
 function gather(input) {
   const state = readJson(STATE_PATH)
-  const turnStartedAt = Number(state && state.turnStartedAt)
   const argSession = (() => {
     const i = process.argv.indexOf('--session')
     return i >= 0 ? process.argv[i + 1] : null
   })()
   const sessionId = (input && (input.session_id || input.sessionId)) || argSession
   const transcriptPath = input && (input.transcript_path || input.transcriptPath)
+  // THIS session's own turn boundary. The shared `turnStartedAt` is written by
+  // the batch owner alone, so a session standing down — the very one this
+  // guard exists for — would otherwise measure its turn against a stranger's
+  // clock: too young and it counts nothing, too old and it counts several of
+  // its own past turns. Falling back to the shared field keeps an owner that
+  // predates the per-session stamp working.
+  const bySession = (state && state.turnStartedAtBySession) || {}
+  const own = sessionId ? Number(bySession[sessionId]) : NaN
+  const turnStartedAt = Number.isFinite(own) && own > 0 ? own : Number(state && state.turnStartedAt)
   return { turnStartedAt, sessionId, transcriptPath }
 }
 
 function main() {
+  // --status must NOT read stdin first: on an interactive console that blocks
+  // on the TTY forever, which is why board-first-guard orders it this way too.
+  const status = process.argv.includes('--status')
   let input = {}
-  try {
-    const raw = readFileSync(0, 'utf8')
-    if (raw.trim()) input = JSON.parse(raw)
-  } catch {
-    /* no stdin — the --status path below still works */
+  if (!status) {
+    try {
+      const raw = readFileSync(0, 'utf8')
+      if (raw.trim()) input = JSON.parse(raw)
+    } catch {
+      /* no stdin — fail open, judge what can be judged without it */
+    }
   }
 
   const { turnStartedAt, sessionId, transcriptPath } = gather(input)
@@ -68,7 +81,7 @@ function main() {
 
   const verdict = auditFindings({ tally, ownsBatch: owner, carrierPending: carrier.pending.length })
 
-  if (process.argv.includes('--status')) {
+  if (status) {
     console.log(`turn calls     : ${tally.investigative} investigative, ${tally.agents} agent(s)`)
     console.log(`turn records   : ${tally.records.length ? tally.records.join(', ') : '<none>'}`)
     console.log(

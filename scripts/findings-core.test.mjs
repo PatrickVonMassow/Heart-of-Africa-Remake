@@ -5,6 +5,7 @@ import {
   carrierEntry,
   classifyCall,
   formatFindings,
+  malformedEntries,
   markDrained,
   parseCarrier,
   tallyTurn,
@@ -25,8 +26,31 @@ describe('classifyCall separates looking from recording', () => {
     expect(classifyCall({ name: 'Agent' })).toEqual({ kind: 'investigate', agent: true })
   })
 
-  it('reads a shell call as investigation by default', () => {
-    expect(classifyCall({ name: 'Bash', command: 'git status --short' }).kind).toBe('investigate')
+  it('reads a LOOKING shell call as investigation', () => {
+    for (const command of [
+      'git status --short',
+      'git log -3 --format=%s',
+      'ls -1 scripts',
+      'grep -n "foo" TASKS.md | head -5',
+      'node scripts/guard-health-guard.mjs --status',
+      'node -e "console.log(1)"',
+    ]) {
+      expect(classifyCall({ name: 'Bash', command }).kind, command).toBe('investigate')
+    }
+  })
+
+  it('does NOT read an ACTING shell call as investigation — that was the false-positive engine', () => {
+    // Measured over 2709 real turns: counting these blocked 10.6 % of all
+    // turns, three quarters of them build/verify turns rather than analysis.
+    for (const command of [
+      'npm run build',
+      'npm run test:unit',
+      'node scripts/board-publish.mjs',
+      'npx vitest run scripts/findings-core.test.mjs',
+      'git status && npm run lint',
+    ]) {
+      expect(classifyCall({ name: 'Bash', command }).kind, command).toBe('ignore')
+    }
   })
 
   it('recognises a commit as a record', () => {
@@ -38,7 +62,41 @@ describe('classifyCall separates looking from recording', () => {
   })
 
   it('does NOT accept a dry-run commit as a record', () => {
-    expect(classifyCall({ name: 'Bash', command: 'git commit --dry-run' }).kind).toBe('investigate')
+    expect(classifyCall({ name: 'Bash', command: 'git commit --dry-run' }).kind).not.toBe('record')
+  })
+
+  it('cannot be talked into a record by a mention of one — the self-laundering path', () => {
+    for (const command of [
+      'rg "git commit" scripts/',
+      'echo how to git commit > notes.txt',
+      'git stash push -m "before git commit fix"',
+      'grep -n "git commit" docs/*.md',
+    ]) {
+      expect(classifyCall({ name: 'Bash', command }).kind, command).not.toBe('record')
+    }
+  })
+
+  it('finds the real commit beside a dry run instead of losing it', () => {
+    expect(classifyCall({ name: 'Bash', command: 'git add -A; git commit --dry-run; git commit -m real' }).record).toBe(
+      'commit',
+    )
+  })
+
+  it('accepts the git forms that really do land work', () => {
+    for (const command of [
+      'cd x && git commit -m "y"',
+      'git -C ../wt commit -m "y"',
+      'git merge --no-ff feat/x',
+      'git cherry-pick abc123',
+    ]) {
+      expect(classifyCall({ name: 'Bash', command }).record, command).toBe('commit')
+    }
+  })
+
+  it('counts retiring a carrier entry as recording too', () => {
+    expect(classifyCall({ name: 'Bash', command: 'node scripts/finding.mjs --drained "x"' }).record).toBe(
+      'finding-drained',
+    )
   })
 
   it('recognises both finding.mjs forms', () => {
@@ -151,15 +209,37 @@ describe('the carrier round-trips', () => {
     expect(parseCarrier('Eine Zeile Fließtext.\n- ein Aufzählungspunkt\n').pending).toEqual([])
   })
 
-  it('marks a matching entry drained by a substring of its title', () => {
-    const next = markDrained(entry, 'hooks feuern')
-    expect(parseCarrier(next).pending).toEqual([])
-    expect(parseCarrier(next).drained).toBe(1)
+  it('marks a matching entry drained and reports WHICH one it hit', () => {
+    const hit = markDrained(entry, 'hooks feuern')
+    expect(hit.title).toBe('Die Hooks feuern außerhalb der Wurzel nicht')
+    expect(parseCarrier(hit.text).pending).toEqual([])
+    expect(parseCarrier(hit.text).drained).toBe(1)
   })
 
   it('returns null when nothing matched, so the caller can report it', () => {
     expect(markDrained(entry, 'gibt es nicht')).toBeNull()
     expect(markDrained(entry, '')).toBeNull()
+  })
+
+  it('refuses an ambiguous match rather than silencing the wrong finding', () => {
+    const two = [
+      carrierEntry({ at: '2026-07-29T18:00:00.000Z', session: 's', title: 'Hooks feuern nicht · Variante A' }),
+      carrierEntry({ at: '2026-07-29T18:01:00.000Z', session: 's', title: 'Hooks feuern nicht' }),
+    ].join('\n')
+    const verdict = markDrained(two, 'Hooks feuern')
+    expect(verdict.ambiguous).toHaveLength(2)
+    expect(verdict.text).toBeUndefined()
+    expect(parseCarrier(two).pending).toHaveLength(2)
+  })
+
+  it('surfaces a hand-broken entry instead of dropping it from every count', () => {
+    const broken = '- [ ] kaputt ohne Trennzeichen\n' + entry
+    expect(malformedEntries(broken)).toEqual(['- [ ] kaputt ohne Trennzeichen'])
+    expect(parseCarrier(broken).pending).toHaveLength(1)
+  })
+
+  it('sees nothing wrong with a well-formed carrier', () => {
+    expect(malformedEntries(entry)).toEqual([])
   })
 })
 

@@ -10,7 +10,7 @@
 // re-declares its focus (scripts/focus.mjs) — enforcement, not a reminder.
 import fs from 'node:fs'
 import path from 'node:path'
-import { PENDING_PATH, writeJsonAtomic, mergeState } from './dashboard-state.mjs'
+import { PENDING_PATH, STATE_PATH, readJson, writeJsonAtomic, mergeState } from './dashboard-state.mjs'
 import { heldByOtherLiveOwner, withdrawHandover } from './batch-singleton.mjs'
 
 // Hard singleton (24.07.2026): a session that does not own the live batch lock
@@ -51,6 +51,14 @@ try {
     // inactive, so this hook is what arms it.
     mergeState({ turnStartedAt: Date.now() })
   }
+  // The SAME boundary, but keyed per session and stamped in EVERY state —
+  // stand-down included. `turnStartedAt` above is shared by all sessions and
+  // written only by the owner, which is correct for the board-first gate (it
+  // judges the owner alone) and wrong for any check that must bind a session
+  // standing down: that session would measure its turn against a stranger's
+  // clock. Its own key cannot be read by mistake, and board-first keeps
+  // reading the field it always read.
+  mergeState({ turnStartedAtBySession: { ...((readJson(STATE_PATH) ?? {}).turnStartedAtBySession ?? {}), [sid]: Date.now() } })
   // Keep the current session's scratchpad target on record so a plain
   // `node scripts/dashboard-publish.mjs` works even without the env variable.
   if (process.env.CLAUDE_SCRATCHPAD_DIR) {
