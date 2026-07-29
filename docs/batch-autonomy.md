@@ -705,6 +705,32 @@ Headless sessions without the Artifact tool record
 current content only. What stays judgment: the machine verifies the card's
 POINT NUMBER, publish state and freshness, never the truth of the prose.
 
+### The duties come before the answer, not after it
+
+The Stop chain runs AFTER the closing reply is composed. So a guard that blocks
+does not merely cost a turn — it forces a SECOND message, and the user reads the
+same answer twice. Reported repeatedly and finally with a verbatim example: the
+19:18 and 19:19 replies were the same text (`timestamp-guard` twice that
+afternoon, the dashboard's focus reconcile once). The reconcile arms on EVERY
+user prompt, so any turn where the user writes and the focus has not yet been
+confirmed ends that way. It is the chain's SHAPE, not randomness.
+
+Two rules follow, and neither of them loosens a guard:
+
+1. **Satisfy the chain before composing the reply.** The routine turn-end duties
+   — `focus.mjs confirm`, the publish/`--synced` cycle above, the boundary — are
+   done FIRST; `node scripts/guard-preflight.mjs --for answer --session <id>`
+   reports read-only what would still block. The closing reply is the LAST thing
+   written (CLAUDE.md §7.2).
+2. **A blocked turn is acknowledged, not repeated.** When a guard blocks anyway,
+   the next message states in a sentence or two what was fixed and does not give
+   the previous answer over again. The guards say so themselves now: every one
+   of them asks for a SHORT closing acknowledgement led by the exact line it
+   hands over — `shortAckDemand()` in `scripts/closing-reply-core.mjs` is that
+   single wording, and `findRepeatDemands()` is the ratchet, a pure test that
+   reads the live Stop chain out of `.claude/settings.json` and fails on any
+   guard whose message asks for the answer a second time.
+
 ## Render-verify (both backends — enforced, not reminded)
 
 Every GUI/rendering/shader fix must be verified on BOTH renderer backends —
