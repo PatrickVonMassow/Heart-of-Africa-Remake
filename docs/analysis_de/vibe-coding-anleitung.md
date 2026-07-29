@@ -169,25 +169,13 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 ## Die häufigsten Fallstricke → und was hilft
 
-- **Grüner Test, falsches Bild.** Der gefährlichste Fehler: Der Test ist grün, aber das
-  Ergebnis ist trotzdem falsch (er prüfte einen Hilfswert, einen unerreichbaren
-  Debug-Zustand, einen geratenen Näherungswert).
+- **Grüner Test, falsches Bild.** Der Test ist grün, das Ergebnis trotzdem falsch — er prüfte
+  einen Hilfswert, einen unerreichbaren Debug-Zustand, einen geratenen Näherungswert.
   → *Prompt:* „Etabliere einen Mechanismus, der eine sichtbare Änderung erst als fertig
-  gelten lässt, wenn sie am **echten gerenderten Bild** unter einer Bedingung geprüft
-  wurde, die ein Nutzer wirklich erreicht — nicht an einem Hilfswert und nicht in einem
-  Debug-Zustand." *(Kosten ≈ 1,5x — Bilder sind teuer.)* *(Der letzte Schritt bleibt menschlich:
-  Sieh dir den Screenshot an und frag dich, ob das für einen Menschen richtig aussieht.)*
-
-- **Der alte Nachweis deckt den neuen Blickwinkel nicht mehr.** Gibst du dem Nutzer eine
-  neue Freiheit — nach oben schauen zu können, weiter herauszuzoomen, einen bisher
-  verschlossenen Ort zu betreten —, dann vergrößert das rückwirkend die Fläche **jeder**
-  Zusage, die vorher nur innerhalb der alten Freiheit geprüft wurde. Rot wird dabei nichts:
-  Die Prüfung schaut weiter dorthin, wo sie immer hinschaute.
-  → *Prompt:* „Wenn eine Änderung eine neue Blick-, Bewegungs- oder Zoomachse hinzufügt,
-  liste zuerst auf, welche bestehenden Zusagen dadurch an einem **neuen Rand** prüfbar
-  werden, und weise sie dort nach — nicht nur das neue Feature selbst." *(Bei mir lag so
-  eine Naht zwischen begehbarem Boden und Landschaft lange im toten Winkel: Auf Augenhöhe
-  liegt sie auf der Fluchtlinie, mit dem neuen Blick nach unten war sie sofort da.)*
+  gelten lässt, wenn sie am **echten gerenderten Bild** unter einer Bedingung geprüft wurde,
+  die ein Nutzer wirklich erreicht — und der bei einer **neuen** Blick-, Bewegungs- oder
+  Zoomachse zuerst auflistet, welche alten Zusagen dadurch an einem neuen Rand prüfbar
+  werden." *(Kosten ≈ 1,5x.)* *(Zuletzt: Sieht das für einen Menschen richtig aus?)*
 
 - **Neue Features zerbrechen alte.** Eine Änderung repariert X und bricht das unbeobachtete Y.
   → *Prompt:* „Etabliere einen Mechanismus, der jede Mechanik auch im
@@ -209,10 +197,9 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 - **Das Kontingent ist die Grenze, nicht die Zeit.** Der Verbrauch hängt an der Größe
   jedes Kontexts, nicht an den Stunden: lange Sitzungen, die alles mitschleppen, und
   Helfer, die ihren Auftrag erst in großen Dokumenten *suchen* müssen.
-  → *Prompt:* „Nenne mir die **gemessenen** Treiber. Schicke jedem Helfer seinen Auftrag
-  als fertigen Kurzbrief mit, und fang für jede Aufgabe einen **frischen Kontext** an."
-  *(Ein billigeres Modell für ‚einfache' Aufgaben ist der falsche Hebel: die Nacharbeit
-  kostet mehr als die Ersparnis.)*
+  → *Prompt:* „Nenne mir die **gemessenen** Treiber. Schicke jedem Helfer seinen Auftrag als
+  fertigen Kurzbrief mit, und fang für jede Aufgabe einen **frischen Kontext** an."
+  *(Ein billigeres Modell für ‚einfache' Aufgaben ist der falsche Hebel — die Nacharbeit kostet mehr.)*
 
 - **Der Assistent bleibt still stehen.** Bei langen, autonomen Läufen endet der
   Fortschritt unbemerkt.
@@ -266,12 +253,12 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   Erfolgsmeldung — er muss zeigen, dass mein Stand wirklich angekommen ist."
 
 - **Deine Regelsammlung verrottet — nur merkt es niemand.** Regeln wachsen an: Widersprüche
-  (auch innerhalb *einer* Datei), Doppelungen, und Regeln, die eine nie gebaute
-  Absicherung behaupten.
+  (auch innerhalb *einer* Datei), Doppelungen, und Regeln, die eine nie gebaute Absicherung
+  behaupten.
   → *Prompt:* „Etabliere einen Mechanismus, der den ganzen Regelbestand periodisch zur
-  Durchsicht zwingt — auf Aktualität, Dopplung, Widerspruch und **Wirkungslosigkeit**.
-  Jede Regel wird gegen den Code geprüft, nicht gegen die Nachbarregel; zuerst die
-  Texte, die am häufigsten eingeblendet werden." *(Kosten: einmalig hoch)*
+  Durchsicht zwingt — auf Aktualität, Dopplung, Widerspruch und **Wirkungslosigkeit**. Jede
+  Regel wird gegen den Code geprüft, nicht gegen die Nachbarregel; zuerst die am häufigsten
+  eingeblendeten Texte." *(Kosten: einmalig hoch)*
 
 - **Ein Wächter, der nie auslöst, ist so kaputt wie einer, der immer auslöst.**
   Ein wirkungsloser Mechanismus lässt die Regel abgesichert erscheinen; einer, der bei
@@ -280,14 +267,13 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   Hat jeder je ausgelöst? Kann er überhaupt? Doppelt er einen anderen? Ist seine Meldung
   umsetzbar — und meldet sich die brauchbarste zuerst?"
 
-- **Der rote Test klagt den Falschen an.** Ein grüner Test kann täuschen — ein roter
-  auch, und der ist gefährlicher, weil er zum schnellen Eingriff verleitet. Prüfungen
-  veralten von selbst, wenn sich ihre Umgebung ändert, und klagen dann gesunden Code an.
-  → *Prompt:* „Etabliere einen Mechanismus, der vor einer Code-Änderung auf einen roten
-  Test hin ein **Experiment** verlangt: Belastet der Befund das Produkt oder die
-  Messung? Gemessen wird nur an einem eingeschwungenen Zustand, und eine Prüfung schlägt
-  auch dann fehl, wenn ihr Messwert in die *unerwartete* Richtung ausschlägt — nicht
-  nur, wenn er die Grenze überschreitet."
+- **Der rote Test klagt den Falschen an.** Ein roter Test täuscht gefährlicher als ein grüner,
+  weil er zum schnellen Eingriff verleitet: Prüfungen veralten von selbst, wenn sich ihre
+  Umgebung ändert, und klagen dann gesunden Code an.
+  → *Prompt:* „Etabliere einen Mechanismus, der vor einer Code-Änderung auf einen roten Test
+  hin ein **Experiment** verlangt: Belastet der Befund das Produkt oder die Messung? Gemessen
+  wird nur an einem eingeschwungenen Zustand, und eine Prüfung schlägt auch dann fehl, wenn
+  ihr Messwert in die *unerwartete* Richtung ausschlägt — nicht nur über der Grenze."
 
 - **Derselbe Fakt steht an fünf Stellen — und veraltet an vier.** Wer baut, aktualisiert
   die Stelle, an der er gerade schreibt; die übrigen Kopien rotten unbemerkt.
@@ -321,11 +307,10 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   Jede einzelne Ergänzung am Regeldokument ist berechtigt; und in der Aufgabenliste
   bleibt Erledigtes stehen, bis der größte Teil der Datei Geschichte ist.
   → *Prompt:* „Gib jedem Dokument, das bei jedem Start gelesen wird, eine **gemessene
-  Obergrenze** mit zwei Auswegen: Detail auslagern, oder die Grenze anheben und die
-  Begründung danebenschreiben. Ausgelagert wird **verschoben, nicht umformuliert**, und
-  jeder Leser der alten Stelle wird nachgezogen — der gefährlichste ist der, der nicht
-  scheitert, sondern nur nichts mehr findet. In der Aufgabenliste steht nur Offenes,
-  Erledigtes wandert wortgleich ins Archiv."
+  Obergrenze** mit zwei Auswegen: Detail auslagern, oder die Grenze anheben und begründen.
+  Ausgelagert wird **verschoben, nicht umformuliert**, und jeder Leser der alten Stelle wird
+  nachgezogen — der gefährlichste findet nur nichts mehr, statt zu scheitern. In der
+  Aufgabenliste steht nur Offenes, Erledigtes wandert wortgleich ins Archiv."
 
 - **Im Präsens behauptet, nie nachgesehen.** „Das Feld wird bereits gesetzt" — im Code
   steht es nicht. Eine falsche Tatsachenbehauptung liefert etwas, das nichts tut und
