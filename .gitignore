@@ -48,6 +48,16 @@ scripts/.tile-cache
 .claude/chat-spool.jsonl
 .claude/chat-spool.jsonl.migrated-*
 .claude/chat-spool/
+# The message watcher's own runtime state (point 407). Both belong here for the
+# same reason .claude/batch-claim.json does — batch-doctor's stash sweeps what
+# git does not know about, and each of these has a failure mode when it goes:
+# the PIDFILE deleted makes the next launcher tick start a SECOND watcher beside
+# the live one, and the RECEIPT deleted makes an answered message read as
+# unanswered, so the next session answers the user all over again.
+.claude/chat-watcher.json
+.claude/chat-watcher.json.tmp-*
+.claude/chat-reply-receipt.json
+.claude/chat-reply-receipt.json.tmp-*
 .claude/dashboard-state.json
 .claude/current-focus.json
 .claude/focus-check-pending.json
