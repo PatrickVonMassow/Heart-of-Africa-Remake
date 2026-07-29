@@ -815,6 +815,17 @@ mid-merge it is read and the session finishes the atomic step first. A question
 is answered with `scripts/chat-reply.mjs`; an instruction becomes a work-order
 point per append-and-defer, and the reply says so.
 
+**Delivery is AT-LEAST-ONCE where the two paths meet, and that is a choice.** A
+message still waiting when the launcher spawns a session rides into the spawn
+PROMPT *without* being claimed off the spool, so that session reads the same
+words again when its hook claims them at its first tool call. Claiming at the
+handover instead would make delivery at-most-once: a spawn that dies before its
+first tool call — or whose prompt never reaches a model — would take the user's
+message with it. Seeing an instruction twice costs a few tokens; losing it costs
+the user their message, so the duplicate is the side to err on. Within one
+running session delivery is exactly-once, because the claim precedes the
+injection.
+
 **The spool is a directory, one file per message** (`.claude/chat-spool/`,
 `scripts/chat-spool.mjs`). The poller creates each file atomically (tmp+rename
 with the retry ladder of `scripts/atomic-write.mjs`); the consumer RENAMES it
