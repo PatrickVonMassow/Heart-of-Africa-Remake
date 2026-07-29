@@ -129,14 +129,22 @@ export function evaluateStagedFiles(entries) {
  *  it. A bare `Rescue:` says nothing, so it does not count as a declaration. */
 export const RESCUE_TRAILER_RE = /^[ \t]*Rescue:[ \t]*\S/m
 
-/** Every spelling GitHub Actions honours to skip a push run. All of them skip
- *  the gate, so all of them must be declared. */
+/** The bracketed spellings GitHub Actions honours to skip a push run. All of
+ *  them skip the gate, so all of them must be declared. */
 export const SKIP_CI_MARKERS = ['[skip ci]', '[ci skip]', '[no ci]', '[skip actions]', '[actions skip]']
+
+/** GitHub honours one more spelling that is not bracketed and only works as a
+ *  trailer: `skip-checks: true`. It skips just as silently, so it counts for
+ *  the declaration half — but not for the rescue half, where the convention
+ *  asks for a marker in the SUBJECT, which a trailer can never be. */
+export const SKIP_CHECKS_TRAILER_RE = /^[ \t]*skip-checks:[ \t]*true[ \t]*$/im
 
 const hasSkipMarker = (text) => {
   const lower = String(text ?? '').toLowerCase()
   return SKIP_CI_MARKERS.some((m) => lower.includes(m))
 }
+
+const skipsAnyHow = (text) => hasSkipMarker(text) || SKIP_CHECKS_TRAILER_RE.test(String(text ?? ''))
 
 /** Drop git's comment lines, so a hint in the commit template — or a quoted
  *  `# Rescue: …` — is never read as the author's own declaration. */
@@ -161,9 +169,10 @@ export function evaluateCommitMessage(message) {
     // The rescue half is satisfied only by a marker in the SUBJECT — that is
     // the placement the convention states and the one GitHub honours everywhere.
     const subjectSkips = hasSkipMarker(subject)
-    // The declaration half fires on a marker ANYWHERE: wherever it sits, it can
-    // silently skip the run, so wherever it sits it must be accounted for.
-    const anySkips = hasSkipMarker(body)
+    // The declaration half fires on a marker ANYWHERE, in every spelling:
+    // wherever it sits, it silently skips the run, so wherever it sits it must
+    // be accounted for.
+    const anySkips = skipsAnyHow(body)
 
     if (declaresRescue && !subjectSkips) {
       findings.push({

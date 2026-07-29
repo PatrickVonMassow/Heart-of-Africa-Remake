@@ -369,9 +369,12 @@ Rescue: agent killed mid-build; the next commit finishes and runs CI.
 
 **Both halves or neither** — that is the whole design. A rescue trailer without
 the marker still mails the user, so it is refused naming the marker; a bare
-`[skip ci]` (in any spelling GitHub honours — `[ci skip]`, `[no ci]`,
-`[skip actions]`, `[actions skip]`) silently skips a real gate, so it is refused
-naming the trailer. An ordinary message is untouched, and a garbled or
+`[skip ci]` silently skips a real gate, so it is refused naming the trailer —
+and with it every other spelling GitHub honours, anywhere in the message:
+`[ci skip]`, `[no ci]`, `[skip actions]`, `[actions skip]`, and the unbracketed
+`skip-checks: true` trailer that reads like nothing at all. Only the SUBJECT
+marker satisfies the rescue half, because that is the placement the convention
+states and the one a log line shows. An ordinary message is untouched, and a garbled or
 unreadable one blocks nothing: the decision is `evaluateCommitMessage` in
 `commit-scope-guard-core.mjs`, pure, fail-open and pinned in
 `commit-scope-guard-core.test.mjs`, which also drives the guard over a rejected

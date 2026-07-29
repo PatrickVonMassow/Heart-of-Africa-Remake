@@ -160,6 +160,19 @@ describe('evaluateCommitMessage', () => {
     }
   })
 
+  it('rejects the unbracketed trailer GitHub also honours', () => {
+    // `skip-checks: true` is not a marker anyone reads as one, which is exactly
+    // why it must be caught: it skips the gate as silently as the rest.
+    expect(evaluateCommitMessage('Tidy the walker nudge\n\nskip-checks: true\n').block).toBe(true)
+    expect(evaluateCommitMessage('Tidy the walker nudge\n\nskip-checks:true\n').block).toBe(true)
+    expect(evaluateCommitMessage('Tidy the walker nudge\n\nSkip-Checks: TRUE\n').block).toBe(true)
+    // Not a trailer, so not a skip: the words may appear in ordinary prose.
+    expect(evaluateCommitMessage('Tidy the walker nudge\n\nwe skip-checks: true here\n').block).toBe(
+      false,
+    )
+    expect(evaluateCommitMessage('Tidy the walker nudge\n\nskip-checks: false\n').block).toBe(false)
+  })
+
   it('is case-insensitive about the marker', () => {
     expect(evaluateCommitMessage('Tidy the walker nudge [SKIP CI]').block).toBe(true)
     expect(evaluateCommitMessage(`Keep it [Skip CI]\n\n${RESCUE_BODY}`).block).toBe(false)
@@ -182,6 +195,13 @@ describe('evaluateCommitMessage', () => {
     )
   })
 
+  it('reads a CRLF message like any other', () => {
+    expect(evaluateCommitMessage('Keep it\r\n\r\nRescue: killed mid-build\r\n').block).toBe(true)
+    expect(evaluateCommitMessage('Keep it [skip ci]\r\n\r\nRescue: killed mid-build\r\n').block).toBe(
+      false,
+    )
+  })
+
   it('ignores git comment lines, so the template never speaks for the author', () => {
     const v = evaluateCommitMessage(
       'Tidy the walker nudge\n\n# Rescue: a hint from the commit template\n' +
@@ -191,7 +211,9 @@ describe('evaluateCommitMessage', () => {
   })
 
   it('never throws on a garbled or missing message (fail-open)', () => {
-    for (const bad of [undefined, null, '', 42, {}, [], ' �']) {
+    // The garble is spelled with escapes on purpose: a literal NUL byte in this
+    // file makes git and grep treat the whole suite as binary.
+    for (const bad of [undefined, null, '', 42, {}, [], '\u0000\uFFFD']) {
       expect(() => evaluateCommitMessage(bad)).not.toThrow()
       expect(evaluateCommitMessage(bad).block).toBe(false)
     }
