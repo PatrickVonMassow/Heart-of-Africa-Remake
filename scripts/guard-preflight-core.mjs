@@ -38,6 +38,11 @@ export const CAUSE = { notLockOwner: 'not-lock-owner' }
  */
 export const ACTIONS = {
   'turn-end': null, // null = all registered guards
+  // The closing reply is the LAST thing written (point 403): a guard that
+  // blocks after it was composed forces a second message, and the user reads
+  // the same answer twice. `--for answer` is therefore the whole chain under
+  // the name of the moment it is asked at — before composing, not after.
+  answer: null,
   merge: [
     'model-guard',
     'render-verify-guard',

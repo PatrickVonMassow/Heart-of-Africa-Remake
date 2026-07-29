@@ -33,6 +33,7 @@ import { evaluate as queueOrderEvaluate } from './queue-order-guard-core.mjs'
 import { evaluate as dashboardEvaluate } from './dashboard-guard-core.mjs'
 import { evaluate as renderVerifyEvaluate } from './render-verify-core.mjs'
 import { findForbiddenCommits } from './model-guard-core.mjs'
+import { green } from './dashboard-guard-fixtures.mjs'
 
 /** A guard whose gathering and decision are visible to the test. */
 const fakeGuard = (id, gathered, verdict, calls = []) => ({
@@ -162,6 +163,14 @@ describe('selectGuards', () => {
     for (const [action, ids] of Object.entries(ACTIONS)) {
       for (const id of ids ?? []) expect(registered, `${action} names ${id}`).toContain(id)
     }
+  })
+
+  it('knows "answer" — the moment BEFORE the closing reply — as the whole chain', () => {
+    // The doubled-message bug (point 403) is a turn that composed its reply and
+    // then had to write a second one. Asking here costs a process run; being
+    // told afterwards costs the user a duplicate.
+    expect(isKnownAction('answer')).toBe(true)
+    expect(selectGuards(guards, 'answer')).toHaveLength(3)
   })
 })
 
@@ -358,5 +367,56 @@ describe('isMainModule', () => {
   it('does not throw on a non-file module url (the Vitest case)', () => {
     expect(() => isMainModule('/not/a/url', 'C:/repo/scripts/x.mjs')).not.toThrow()
     expect(isMainModule('/not/a/url', 'C:/repo/scripts/x.mjs')).toBe(false)
+  })
+})
+
+describe('the focus reconcile, asked BEFORE the closing reply', () => {
+  // The user's own example of the doubled message: a prompt arrives, the reply
+  // is composed, dashboard-guard demands the pivot reconcile, the demand is met
+  // and the turn has to end with a SECOND message. The reconcile arms on EVERY
+  // user prompt, so this is the common case and not a corner — which makes the
+  // preflight's ability to name it BEFORE the reply is written load-bearing.
+  //
+  // Wired the way the real tool is: the registered dashboard-guard entry's OWN
+  // decide step, never a local copy of the verdict logic.
+  const dashboardGuard = GUARDS.find((g) => g.id === 'dashboard-guard')
+  const preflightFor = (inputs) =>
+    runPreflight([
+      {
+        id: dashboardGuard.id,
+        gather: () => ({ applicable: true, inputs }),
+        decide: dashboardGuard.decide,
+      },
+    ])
+
+  it('reports the reconcile as a would-block while the pivot check is unmet', () => {
+    const [result] = preflightFor(green({ pending: { sessionId: 'sess-a', at: 1500 } }))
+    expect(result.status).toBe(STATUS.block)
+    expect(result.reason).toMatch(/FOCUS RECONCILE REQUIRED/)
+    expect(result.reason).toMatch(/focus\.mjs confirm/)
+  })
+
+  it('names it in the report, with the remedy readable rather than summarised away', () => {
+    const report = formatPreflightReport(
+      preflightFor(green({ pending: { sessionId: 'sess-a', at: 1500 } })),
+      { action: 'answer' },
+    )
+    expect(report).toMatch(/would a guard block "answer" right now\?/)
+    expect(report).toMatch(/1 guard\(s\) WOULD BLOCK: dashboard-guard/)
+    expect(report).toMatch(/focus\.mjs confirm/)
+  })
+
+  it('goes silent once the focus was confirmed (the marker cleared)', () => {
+    const [result] = preflightFor(green({ pending: null }))
+    expect(result.status).toBe(STATUS.clean)
+    expect(result.reason).toBe('')
+    expect(formatPreflightReport([result], { action: 'answer' })).toMatch(
+      /No registered guard would block right now\./,
+    )
+  })
+
+  it("does not report ANOTHER session's pivot check as this session's duty", () => {
+    const [result] = preflightFor(green({ pending: { sessionId: 'sess-b', at: 1500 } }))
+    expect(result.status).toBe(STATUS.clean)
   })
 })

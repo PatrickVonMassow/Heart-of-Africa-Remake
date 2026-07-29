@@ -2,6 +2,7 @@
 // turn's end (point 365 D, user 26.07.2026).
 //
 //   node scripts/guard-preflight.mjs                 # the whole Stop chain
+//   node scripts/guard-preflight.mjs --for answer    # …before composing the closing reply
 //   node scripts/guard-preflight.mjs --for merge     # merge / tick / commit / tag
 //   node scripts/guard-preflight.mjs --session <id>  # whose session is asking
 //   node scripts/guard-preflight.mjs --json          # machine-readable
