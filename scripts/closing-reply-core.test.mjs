@@ -17,6 +17,7 @@ import {
   SHORT_ACK_DEMAND,
   findRepeatDemands,
   hookScripts,
+  logicalLines,
   shortAckDemand,
   stripComments,
 } from './closing-reply-core.mjs'
@@ -78,6 +79,29 @@ describe('findRepeatDemands', () => {
     const source = '// it used to say: write your closing reply again\nconst ok = true\n'
     expect(findRepeatDemands(source)).toEqual([])
     expect(stripComments(source)).not.toMatch(/again/)
+  })
+
+  it('reads ACROSS a concatenation seam — the shape the real offender had', () => {
+    // Verbatim from timestamp-guard-core.mjs before this change: no single
+    // physical line contains "reply again", and a per-line scan reported the
+    // file clean (four-eyes review, Fable 5). A formatter wrapping a long
+    // message re-creates this for free, so it must be caught by construction.
+    const source =
+      '      reason:\n' +
+      '        `${rule} Your last reply does NOT begin with it. Write your closing reply ` +\n' +
+      '        `again, beginning with exactly this line (copy it verbatim): ${expected}`,\n'
+    const [hit] = findRepeatDemands(source)
+    expect(hit, 'a demand split over two literals must still be found').toBeTruthy()
+    expect(hit.id).toBe('reply-again')
+    expect(hit.line, 'reported at the line the message starts on').toBe(2)
+  })
+
+  it('rejoins only real seams, and leaves ordinary neighbouring lines apart', () => {
+    expect(logicalLines("const a = 'x' +\n  'y'\n").map((l) => l.text)).toEqual(["const a = 'xy'", ''])
+    // No trailing `+`: two separate lines, so no phantom sentence is invented.
+    const lines = logicalLines("const a = 'write your'\nconst b = 'reply again'\n")
+    expect(lines.map((l) => l.line)).toEqual([1, 2, 3])
+    expect(findRepeatDemands("const a = 'the reply'\nconst b = 'again later'\n")).toEqual([])
   })
 
   it('strips block comments too, and keeps the code around them', () => {

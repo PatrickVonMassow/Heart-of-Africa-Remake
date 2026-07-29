@@ -74,18 +74,52 @@ export function stripComments(source) {
     .replace(/(^|\n)\s*\/\/[^\n]*/g, '$1')
 }
 
+const SEAM_END = /(['"`])\s*\+\s*$/
+const SEAM_START = /^\s*(['"`])/
+
+/**
+ * `source` as `[{ line, text }]`, with a message SPLIT across concatenated
+ * string literals rejoined into the sentence the model actually reads.
+ *
+ * This is what a naive per-line scan misses, and it is not hypothetical: the
+ * offender this module exists for was written exactly so —
+ *
+ *     `${rule} Your last reply does NOT begin with it. Write your closing reply ` +
+ *     `again, beginning with exactly this line: ${expected}`
+ *
+ * — where no single physical line contains "reply again". A formatter wrapping a
+ * long message re-creates that shape for free, so the ratchet has to read across
+ * the seam (four-eyes review, Fable 5, 29.07.2026). `line` stays the number of
+ * the FIRST physical line, which is where the message begins.
+ */
+export function logicalLines(source) {
+  const raw = stripComments(source).replace(/\r\n/g, '\n').split('\n')
+  const out = []
+  let i = 0
+  while (i < raw.length) {
+    const start = i + 1
+    let text = raw[i]
+    i += 1
+    while (SEAM_END.test(text) && i < raw.length && SEAM_START.test(raw[i])) {
+      text = text.replace(SEAM_END, '') + raw[i].replace(SEAM_START, '')
+      i += 1
+    }
+    out.push({ line: start, text })
+  }
+  return out
+}
+
 /**
  * Every repeat-the-answer instruction left in `source`, as
  * `[{ id, line, text }]` — empty when the source is clean.
  */
 export function findRepeatDemands(source) {
   const findings = []
-  const lines = stripComments(source).replace(/\r\n/g, '\n').split('\n')
-  lines.forEach((line, i) => {
+  for (const { line, text } of logicalLines(source)) {
     for (const { id, re } of REPEAT_DEMAND_PATTERNS) {
-      if (re.test(line)) findings.push({ id, line: i + 1, text: line.trim() })
+      if (re.test(text)) findings.push({ id, line, text: text.trim() })
     }
-  })
+  }
   return findings
 }
 
