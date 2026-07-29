@@ -52,7 +52,17 @@ import { readClaim, maxAgeMs as claimMaxAgeMs } from './batch-claim.mjs'
 import { assessClaim } from './batch-claim-core.mjs'
 import { readDeclaration, refTipAt, worktreeActiveAt, mtimeOf } from './batch-in-flight.mjs'
 import { assessOwnerWork, describeInFlight, LAUNCHER_WORK_MAX_AGE_MS } from './batch-in-flight-core.mjs'
-import { buildSpawnArgs, buildSpawnOptions, recordSpawn, reapableSpawns, pruneSpawns } from './batch-autostart-core.mjs'
+import {
+  RESUME_PROMPT,
+  buildSpawnArgs,
+  buildSpawnOptions,
+  chatPromptSuffix,
+  nextChatHandedAt,
+  pendingSinceHandover,
+  recordSpawn,
+  reapableSpawns,
+  pruneSpawns,
+} from './batch-autostart-core.mjs'
 import { BOARD_PAGE_URL } from './board-currency-core.mjs'
 
 // IMPORT-PROOF (27.07.2026). Everything below runs at MODULE LOAD, so merely
@@ -155,6 +165,42 @@ const bail = (code = 0) => { writeJsonAtomic(C('autostart-state.json'), state); 
     )
   }
   state.spawns = pruneSpawns({ spawns: state.spawns, probePid })
+}
+
+// --- THE CHAT INBOX: the user's way back ---------------------------------------
+// The board is READ from a phone; this is the tick that reads the reply channel.
+// It polls the inbox topic, drops everything unsigned/mis-signed/stale/seen and
+// spools what survives; the pending ones are handed to the session spawned
+// below. That bounds delivery at one launcher tick without a new process.
+//
+// IT RUNS BEFORE EVERY GUARD, THE PAUSE INCLUDED. ntfy keeps a message for
+// twelve hours, so whether the batch is paused, complete or wedged may not
+// decide whether the user's words survive at all — spooling is cheap and the
+// spool is read whenever work resumes.
+//
+// AS ITS OWN PROCESS, like the board watchdog and for the same measured reason:
+// a `process.exit()` after any fetch tears undici's socket down mid-close and
+// ABORTS this process (exit 127). Bounded, windowsHide (point 401 — no console
+// window may steal the user's focus), and wrapped fail-open: a chat poll may
+// never be a reason the resurrection does not happen.
+let pendingChat = []
+try {
+  const out = execFileSync(process.execPath, [R('chat-inbox.mjs')], {
+    cwd: REPO,
+    encoding: 'utf8',
+    timeout: 45000,
+    windowsHide: true,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  })
+  const r = JSON.parse(out.trim().split('\n').filter(Boolean).pop())
+  if (r.ok === false) log(`chat inbox: ${r.reason}`)
+  else if (r.configured === false) { /* channel not paired on this machine — silent */ }
+  else if (r.accepted > 0 || (r.dropped ?? []).length > 0) {
+    log(`chat inbox: ${r.accepted} new, ${r.pending} pending${r.dropped?.length ? ` (dropped: ${r.dropped.join(', ')})` : ''}`)
+  }
+  pendingChat = Array.isArray(r.messages) ? r.messages : []
+} catch (e) {
+  log(`chat inbox skipped (${(e && e.message) || e})`)
 }
 
 // --- Guards: never resurrect when it would be wrong ---------------------------
@@ -486,7 +532,13 @@ try {
   // that matters most: it carries CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0, without
   // which the runtime terminates the session ten minutes into every delegated
   // build (point 402).
-  child = spawn(exe, buildSpawnArgs(), buildSpawnOptions({ cwd: REPO, stdio: ['ignore', out, out] }))
+  // Only what arrived SINCE the last spawn. The stamp is NOT advanced here: it
+  // moves below, after a spawn that actually happened and read at that moment —
+  // `now` is the top of the tick, from before the chat poll even ran.
+  const fresh = pendingSinceHandover(pendingChat, state.chatHandedAt)
+  const suffix = chatPromptSuffix(fresh)
+  if (suffix) log(`carrying ${fresh.length} chat message(s) into the spawn prompt`)
+  child = spawn(exe, buildSpawnArgs({ prompt: RESUME_PROMPT + suffix }), buildSpawnOptions({ cwd: REPO, stdio: ['ignore', out, out] }))
   child.unref()
 } catch (e) {
   release(launcherSid)
@@ -508,6 +560,11 @@ writeJsonAtomic(C('autostart-state.json'), {
   // The ledger, so a handover overwriting lastPid can no longer lose track of a
   // process that is still running (four-eyes finding 1.4).
   spawns: recordSpawn(state.spawns, { pid: child.pid, at: now }),
+  // ONLY NOW, and with a fresh clock. A spawn that threw exits above without
+  // ever reaching this line, so its messages stay pending; and `now` is the top
+  // of the tick, from BEFORE the chat poll, so using it here would re-deliver
+  // everything that arrived during this very tick (four-eyes review, 29.07.2026).
+  chatHandedAt: nextChatHandedAt({ spawned: true, previous: state.chatHandedAt, now: Date.now() }),
 })
 log(`launched pid ${child.pid} under pending-spawn lock ${launcherSid}`)
 await notify('Resurrected', `No live session — launched a headless worker to continue the batch (${open} open, failCount ${state.failCount}). Progress on GitHub.`, 'low')
