@@ -141,6 +141,11 @@ async function tick() {
   const { accepted, dropped, state: next } = await ingest({
     events: parseNtfyPoll(body),
     secret,
+    // The topic this body came FROM, and therefore the direction the signature
+    // must have been made for. An agent-signed OUTBOX envelope copied verbatim
+    // onto the inbox drops here as `bad-signature` — see DIRECTIONS in
+    // chat-core.mjs. Never read a direction off the wire.
+    direction: 'inbox',
     now: Date.now(),
     maxAgeMs,
     state: seeded,

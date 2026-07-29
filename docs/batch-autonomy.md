@@ -814,9 +814,24 @@ realistic worst case is command execution on the user's machine. So:
 |---|---|
 | derived topics | `hoa-<32 hex>` from SHA-256 over the shared secret, domain-separated per direction. No topic name is in any tracked file or in the published HTML; the page derives them client-side with WebCrypto |
 | the secret | git-ignored `.claude/chat-secret` on the machine, `localStorage` on the phone. Never committed, never logged, never echoed into a page |
-| HMAC-SHA256 | over the canonical `(id, ts, text)`, every field JSON-quoted so no two different messages share a canonical form. Both directions are signed, so a leaked outbox cannot put words in the agent's mouth on the user's own board |
+| HMAC-SHA256 | over the canonical `(direction, id, ts, text)`, every field JSON-quoted so no two different messages share a canonical form. Both directions are signed — and the DIRECTION is inside the signed string, see below |
 | the drop rules | `scripts/chat-core.mjs` drops anything unsigned, mis-signed, older than the window, or already seen — **before** it is spooled |
 | the dedupe | a ledger of the ntfy id **and** the envelope id, rebuilt from the spool. The cursor in `.claude/chat-state.json` only narrows the next poll: losing or corrupting it replays the whole window and spools nothing twice |
+
+**The direction is part of the signature, and that was a correction.** The first
+cut signed only `(id, ts, text)` under one key for both topics — so an
+agent-signed OUTBOX envelope could be copied verbatim and POSTed to the INBOX:
+same key, same canonical form, a transport id the inbox ledger had never seen. It
+verified, was spooled, and reached the spawn prompt **as the user's words**. That
+needs no secret at all: the ntfy.sh operator sees both topics and every plaintext
+envelope, and so does a TLS-inspecting proxy on the phone's network, because the
+page polls both. A four-eyes review caught it before the first device was paired.
+The direction is now signed and deliberately **not** carried on the wire — the
+verifier supplies it from the topic it actually polled, so a replay is judged
+against the channel it arrived on rather than a label the attacker copied along
+with everything else. What the signature therefore guarantees is what it always
+claimed to: a message read on the inbox was written by whoever holds the secret,
+*for the inbox*.
 
 **A signature is authentication, never authorisation.** It says WHO wrote a
 message, not what may be done with it. The "treat it as untrusted input" rule

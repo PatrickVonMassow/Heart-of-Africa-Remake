@@ -26,7 +26,10 @@ async function readStdin() {
 
 export async function sendReply({ secret, text, id = randomUUID(), ts = Date.now(), fetchImpl = fetch }) {
   const { outbox } = await deriveTopics(secret)
-  const envelope = await makeEnvelope({ secret, text, id, ts })
+  // Signed FOR the outbox: the direction is inside the signed string, so this
+  // envelope cannot be copied onto the inbox and read there as the user's own
+  // words (see DIRECTIONS in chat-core.mjs).
+  const envelope = await makeEnvelope({ secret, direction: 'outbox', text, id, ts })
   const ac = new AbortController()
   const timer = setTimeout(() => ac.abort(new Error('chat reply timed out')), FETCH_TIMEOUT_MS)
   try {

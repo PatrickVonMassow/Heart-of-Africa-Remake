@@ -107,9 +107,17 @@
           outbox: CHAT_TOPIC_PREFIX + '-' + outbox.slice(0, 32),
         }
       }
+      // `direction` ('inbox' | 'outbox') is SIGNED but never put on the wire:
+      // the verifier takes it from the topic it POLLED, so an envelope copied
+      // from one topic onto the other stops verifying. Without it, an
+      // agent-signed outbox message could be replayed into the inbox and be
+      // read there as the user's own words.
+      const CHAT_DIRECTIONS = ['inbox', 'outbox']
       function chatCanonical(m) {
+        if (CHAT_DIRECTIONS.indexOf(m.direction) < 0) throw new Error('unknown chat direction')
         return [
           CHAT_PROTOCOL,
+          JSON.stringify(m.direction),
           JSON.stringify(String(m.id)),
           JSON.stringify(String(m.ts)),
           JSON.stringify(String(m.text)),
@@ -229,7 +237,9 @@
         if (n) n.textContent = text || ''
       }
 
-      async function chatPollTopic(topic, side) {
+      // `direction` is the topic being polled; `side` is only who to draw it as.
+      async function chatPollTopic(topic, direction) {
+        const side = direction === 'outbox' ? 'agent' : 'you'
         const url = 'https://ntfy.sh/' + encodeURIComponent(topic) + '/json?poll=1&since=' + CHAT_WINDOW
         const res = await fetch(url, { cache: 'no-store' })
         if (!res.ok) throw new Error('HTTP ' + res.status)
@@ -252,7 +262,13 @@
           }
           if (!env || env.v !== CHAT_PROTOCOL || typeof env.id !== 'string') continue
           if (chatState.seen.has(env.id)) continue
-          const ok = await chatVerify(chatState.secret, { id: env.id, ts: env.ts, text: env.text }, env.sig)
+          // Verified against the direction of the topic it was READ from, so an
+          // envelope copied between the two topics is not shown on either.
+          const ok = await chatVerify(
+            chatState.secret,
+            { direction: direction, id: env.id, ts: env.ts, text: env.text },
+            env.sig,
+          )
           if (!ok) continue // unverified is never shown
           chatState.seen.add(env.id)
           out.push({ id: env.id, ts: Number(env.ts), text: String(env.text), side: side })
@@ -264,8 +280,8 @@
         const list = document.getElementById('hoa-chat-list')
         if (!list || !chatState.topics) return
         const fresh = [
-          ...(await chatPollTopic(chatState.topics.inbox, 'you')),
-          ...(await chatPollTopic(chatState.topics.outbox, 'agent')),
+          ...(await chatPollTopic(chatState.topics.inbox, 'inbox')),
+          ...(await chatPollTopic(chatState.topics.outbox, 'outbox')),
         ].sort((a, b) => a.ts - b.ts)
         if (fresh.length) {
           const placeholder = list.querySelector('.chat-empty')
@@ -279,7 +295,9 @@
           ? crypto.randomUUID()
           : String(Date.now()) + '-' + Math.random().toString(16).slice(2)
         const body = { v: CHAT_PROTOCOL, id: id, ts: Date.now(), text: String(text).slice(0, CHAT_MAX_LEN) }
-        body.sig = await chatSign(chatState.secret, body)
+        // Signed FOR the inbox, the topic it is about to be posted to. The
+        // direction never enters `body` — it is context, not payload.
+        body.sig = await chatSign(chatState.secret, { direction: 'inbox', id: body.id, ts: body.ts, text: body.text })
         const res = await fetch('https://ntfy.sh/' + encodeURIComponent(chatState.topics.inbox), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Priority: 'min' },

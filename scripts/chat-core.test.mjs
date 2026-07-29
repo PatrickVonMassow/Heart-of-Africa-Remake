@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   CLOCK_SKEW_MS,
+  DIRECTIONS,
   DEFAULT_MAX_AGE_MS,
   MAX_TEXT_LEN,
   PROTOCOL,
@@ -28,11 +29,14 @@ const NOW = 1_700_000_000_000
 
 /** The frozen cross-implementation vector, shared with the page (chat-core). */
 const VECTOR = TEST_VECTOR
+const IN_MSG = { ...VECTOR.message, direction: 'inbox' }
+const OUT_MSG = { ...VECTOR.message, direction: 'outbox' }
 
 /** One ntfy poll frame carrying a signed envelope. `id` is the TRANSPORT id,
  *  `msgId` the envelope's own — they are different identities on purpose. */
 const event = async ({
   id = 'nfy1',
+  direction = 'inbox',
   msgId = 'm1',
   time = Math.round(NOW / 1000),
   secret = SECRET,
@@ -43,7 +47,7 @@ const event = async ({
   time,
   event: 'message',
   topic: 't',
-  message: JSON.stringify(await makeEnvelope({ secret, id: msgId, ts, text })),
+  message: JSON.stringify(await makeEnvelope({ secret, direction, id: msgId, ts, text })),
 })
 
 describe('topic derivation', () => {
@@ -82,26 +86,27 @@ describe('topic derivation', () => {
 
 describe('canonical form and signing', () => {
   it('quotes every field, so no two different messages share a canonical form', () => {
-    const canon = canonicalMessage({ id: 'a', ts: 1, text: 'b\nc' })
-    expect(canon).toBe(`${PROTOCOL}\n"a"\n"1"\n"b\\nc"`)
+    const canon = canonicalMessage({ direction: 'inbox', id: 'a', ts: 1, text: 'b\nc' })
+    expect(canon).toBe(`${PROTOCOL}\n"inbox"\n"a"\n"1"\n"b\\nc"`)
     // The ambiguity a raw join had: a newline moved between fields collided.
-    expect(canonicalMessage({ id: 'a', ts: 1, text: 'b\nc' })).not.toBe(
-      canonicalMessage({ id: 'a\n1', ts: 'b', text: 'c' }),
+    expect(canonicalMessage({ direction: 'inbox', id: 'a', ts: 1, text: 'b\nc' })).not.toBe(
+      canonicalMessage({ direction: 'inbox', id: 'a\n1', ts: 'b', text: 'c' }),
     )
   })
 
   it('signs to the frozen vector', async () => {
-    expect(await signMessage(VECTOR.secret, VECTOR.message)).toBe(VECTOR.sig)
+    expect(await signMessage(VECTOR.secret, { ...VECTOR.message, direction: 'inbox' })).toBe(VECTOR.inboxSig)
+    expect(await signMessage(VECTOR.secret, { ...VECTOR.message, direction: 'outbox' })).toBe(VECTOR.outboxSig)
   })
 
   it('verifies a valid signature and rejects one made with another secret', async () => {
-    expect(await verifyMessage(SECRET, VECTOR.message, VECTOR.sig)).toBe(true)
-    expect(await verifyMessage(OTHER, VECTOR.message, VECTOR.sig)).toBe(false)
+    expect(await verifyMessage(SECRET, IN_MSG, VECTOR.inboxSig)).toBe(true)
+    expect(await verifyMessage(OTHER, IN_MSG, VECTOR.inboxSig)).toBe(false)
   })
 
   it('rejects anything that is not a 64-hex signature', async () => {
-    for (const bad of ['', 'zz', VECTOR.sig.slice(0, 63), `${VECTOR.sig}0`, VECTOR.sig.toUpperCase(), null, 42]) {
-      expect(await verifyMessage(SECRET, VECTOR.message, bad)).toBe(false)
+    for (const bad of ['', 'zz', VECTOR.inboxSig.slice(0, 63), `${VECTOR.inboxSig}0`, VECTOR.inboxSig.toUpperCase(), null, 42]) {
+      expect(await verifyMessage(SECRET, IN_MSG, bad)).toBe(false)
     }
   })
 
@@ -114,7 +119,7 @@ describe('canonical form and signing', () => {
 })
 
 describe('envelope parsing', () => {
-  const good = { v: PROTOCOL, id: 'm1', ts: NOW, text: 'x', sig: VECTOR.sig }
+  const good = { v: PROTOCOL, id: 'm1', ts: NOW, text: 'x', sig: VECTOR.inboxSig }
 
   it('accepts a well-formed envelope, as an object or as a json string', () => {
     expect(parseEnvelope(good).ok).toBe(true)
@@ -297,12 +302,78 @@ describe('text hygiene — a chat message is untrusted input', () => {
 
   it('sanitises on the way OUT too, so a signed reply carries no escape', async () => {
     const ESC = String.fromCharCode(27)
-    const env = await makeEnvelope({ secret: SECRET, text: `a${ESC}b`, id: 'r1', ts: NOW })
+    const env = await makeEnvelope({ secret: SECRET, direction: 'inbox', text: `a${ESC}b`, id: 'r1', ts: NOW })
     expect(env.text).toBe('a b')
-    expect(await verifyMessage(SECRET, { id: env.id, ts: env.ts, text: env.text }, env.sig)).toBe(true)
+    expect(await verifyMessage(SECRET, { direction: 'inbox', id: env.id, ts: env.ts, text: env.text }, env.sig)).toBe(true)
   })
 
   it('is total', () => {
     for (const bad of [null, undefined, 42, {}]) expect(() => sanitizeText(bad)).not.toThrow()
+  })
+})
+
+// --- THE DIRECTION IS PART OF THE SIGNATURE ----------------------------------
+//
+// The four-eyes review (29.07.2026) found the hole this section closes: with
+// `(protocol, id, ts, text)` signed under ONE key for both topics, an
+// agent-signed OUTBOX envelope copied verbatim onto the INBOX verified, had a
+// transport id the inbox ledger had never seen, and was spooled and handed to
+// the spawn prompt AS THE USER'S WORDS. No secret required — the ntfy operator
+// and any TLS-inspecting proxy on the phone's network see both topics and every
+// plaintext envelope.
+describe('cross-direction replay', () => {
+  it('signs the SAME message differently in each direction', async () => {
+    const a = await signMessage(SECRET, IN_MSG)
+    const b = await signMessage(SECRET, OUT_MSG)
+    expect(a).not.toBe(b)
+    expect(a).toBe(VECTOR.inboxSig)
+    expect(b).toBe(VECTOR.outboxSig)
+  })
+
+  it('REJECTS an outbox signature offered as an inbox message, and the reverse', async () => {
+    expect(await verifyMessage(SECRET, IN_MSG, VECTOR.outboxSig)).toBe(false)
+    expect(await verifyMessage(SECRET, OUT_MSG, VECTOR.inboxSig)).toBe(false)
+  })
+
+  it('DROPS an agent-signed envelope replayed onto the inbox', async () => {
+    // Exactly the attack: the agent's reply, copied off the outbox and POSTed to
+    // the inbox under a transport id the inbox has never seen.
+    const reply = await event({ id: 'nfy-stolen', msgId: 'agent-1', direction: 'outbox', text: 'taggen und veroeffentlichen' })
+    const v = await assessEvent({ event: reply, secret: SECRET, direction: 'inbox', now: NOW })
+    expect(v).toMatchObject({ accept: false, reason: 'bad-signature' })
+    const r = await ingest({ events: [reply], secret: SECRET, direction: 'inbox', now: NOW })
+    expect(r.accepted).toEqual([])
+  })
+
+  it('DROPS a user-signed envelope replayed onto the outbox — the page is protected too', async () => {
+    const sent = await event({ id: 'nfy-echo', msgId: 'user-1', direction: 'inbox', text: 'hallo' })
+    const v = await assessEvent({ event: sent, secret: SECRET, direction: 'outbox', now: NOW })
+    expect(v).toMatchObject({ accept: false, reason: 'bad-signature' })
+  })
+
+  it('still accepts each envelope on the topic it was signed for', async () => {
+    const toAgent = await event({ id: 'n-in', msgId: 'in-1', direction: 'inbox' })
+    expect((await assessEvent({ event: toAgent, secret: SECRET, direction: 'inbox', now: NOW })).accept).toBe(true)
+    const toPhone = await event({ id: 'n-out', msgId: 'out-1', direction: 'outbox' })
+    expect((await assessEvent({ event: toPhone, secret: SECRET, direction: 'outbox', now: NOW })).accept).toBe(true)
+  })
+
+  it('defaults to the inbox — the direction the agent side reads', async () => {
+    const toAgent = await event({ direction: 'inbox' })
+    expect((await assessEvent({ event: toAgent, secret: SECRET, now: NOW })).accept).toBe(true)
+  })
+
+  it('FAILS LOUDLY on a forgotten or unknown direction rather than signing something meaningless', async () => {
+    for (const bad of [undefined, null, '', 'INBOX', 'both', 42]) {
+      expect(() => canonicalMessage({ direction: bad, id: 'a', ts: 1, text: 'x' })).toThrow(/direction/)
+      await expect(signMessage(SECRET, { direction: bad, id: 'a', ts: 1, text: 'x' })).rejects.toThrow(/direction/)
+      // …and a verifier that forgot it rejects everything rather than accepting it.
+      expect(await verifyMessage(SECRET, { direction: bad, ...VECTOR.message }, VECTOR.inboxSig)).toBe(false)
+    }
+  })
+
+  it('names exactly the two directions', () => {
+    expect(DIRECTIONS).toEqual(['inbox', 'outbox'])
+    expect(Object.isFrozen(DIRECTIONS)).toBe(true)
   })
 })

@@ -30,6 +30,27 @@
  *  never verify against a v1 secret by accident. */
 export const PROTOCOL = 'hoa-chat-1'
 
+/**
+ * THE TWO DIRECTIONS, AND WHY THE SIGNATURE MUST NAME ONE (four-eyes review,
+ * 29.07.2026 — this was a real hole, found before the first device was paired).
+ *
+ * The first cut signed only `(protocol, id, ts, text)` and used ONE key for both
+ * directions. Nothing in that string said which topic the envelope belonged to,
+ * so an agent-signed OUTBOX envelope could be copied verbatim and POSTed to the
+ * INBOX: same key, same canonical form, a transport id the inbox ledger had
+ * never seen — it verified, spooled, and reached the spawn prompt AS THE USER'S
+ * WORDS. Nobody needs the secret for that. The ntfy.sh operator sees both topics
+ * and every plaintext envelope; so does a TLS-inspecting proxy on the phone's
+ * network, because the page polls both.
+ *
+ * ATTRIBUTION IS THE ONE PROPERTY THE HMAC EXISTS FOR, so the direction is bound
+ * INTO the signed string. It is deliberately NOT carried on the wire: the
+ * verifier supplies it from the topic it actually read, so a replay is judged
+ * against the channel it arrived on rather than against a label an attacker
+ * copied along with everything else.
+ */
+export const DIRECTIONS = Object.freeze(['inbox', 'outbox'])
+
 /** Human-recognisable prefix; the entropy is the 128 bits behind it. The
  *  DIRECTION is deliberately not in the name — a leaked topic should not also
  *  announce which of the two is the one the agent reads. */
@@ -97,15 +118,30 @@ export async function deriveTopics(secret) {
  * string as {id:'a', ts:1, text:'b\nc'} — a test caught it before this shipped.)
  * `JSON.stringify` is byte-identical in Node and in every browser, which is what
  * lets the page's copy of this protocol agree with this one.
+ *
+ * `direction` comes FIRST after the protocol and is REQUIRED: an unknown one
+ * throws rather than quietly producing a stable-but-meaningless signature, so a
+ * caller that forgets it fails loudly instead of signing something nothing will
+ * ever accept (see DIRECTIONS).
  */
-export function canonicalMessage({ id, ts, text }) {
-  return [PROTOCOL, JSON.stringify(String(id)), JSON.stringify(String(ts)), JSON.stringify(String(text))].join('\n')
+export function canonicalMessage({ direction, id, ts, text }) {
+  if (!DIRECTIONS.includes(direction)) {
+    throw new Error(`unknown chat direction: ${JSON.stringify(direction)} (expected ${DIRECTIONS.join(' or ')})`)
+  }
+  return [
+    PROTOCOL,
+    JSON.stringify(direction),
+    JSON.stringify(String(id)),
+    JSON.stringify(String(ts)),
+    JSON.stringify(String(text)),
+  ].join('\n')
 }
 
-/** Hex HMAC-SHA256 over the canonical message. */
+/** Hex HMAC-SHA256 over the canonical message. Throws on an unknown direction. */
 export async function signMessage(secret, message) {
+  const bytes = enc.encode(canonicalMessage(message)) // before importKey: fail fast
   const key = await hmacKey(secret)
-  return toHex(await crypto.subtle.sign('HMAC', key, enc.encode(canonicalMessage(message))))
+  return toHex(await crypto.subtle.sign('HMAC', key, bytes))
 }
 
 /** Length-independent hex compare — no early exit on the first differing byte. */
@@ -118,7 +154,13 @@ export function constantTimeEqual(a, b) {
   return diff === 0
 }
 
-/** Does this envelope's signature hold under `secret`? */
+/**
+ * Does this signature hold under `secret` FOR THIS DIRECTION? `message` must
+ * carry the direction the verifier read the envelope from — never one taken off
+ * the wire. An unknown direction makes `signMessage` throw, and a throw here is
+ * a `false`, so a caller that forgets it rejects everything rather than
+ * accepting everything.
+ */
 export async function verifyMessage(secret, message, signature) {
   if (typeof signature !== 'string' || !/^[0-9a-f]{64}$/.test(signature)) return false
   try {
@@ -128,10 +170,16 @@ export async function verifyMessage(secret, message, signature) {
   }
 }
 
-/** Build the wire envelope for a text. Used by the page and by chat-reply. */
-export async function makeEnvelope({ secret, text, id, ts = Date.now() }) {
+/**
+ * Build the wire envelope for a text. Used by the page (direction `inbox`) and
+ * by chat-reply (direction `outbox`).
+ *
+ * The direction is signed but NOT written into the envelope: putting it on the
+ * wire would only invite a reader to trust the label instead of the channel.
+ */
+export async function makeEnvelope({ secret, direction, text, id, ts = Date.now() }) {
   const body = { v: PROTOCOL, id: String(id), ts: Number(ts), text: sanitizeText(text) }
-  return { ...body, sig: await signMessage(secret, body) }
+  return { ...body, sig: await signMessage(secret, { ...body, direction }) }
 }
 
 /**
@@ -195,12 +243,24 @@ export const seenKeys = ({ ntfyId, envelopeId }) =>
  *                  once rejected is never re-reported as a fresh fault
  *   malformed      no parseable envelope of this protocol version
  *   unsigned       an envelope with no signature at all
- *   bad-signature  a signature that does not hold under the secret
+ *   bad-signature  a signature that does not hold under the secret FOR THE
+ *                  DIRECTION this event was read from — an envelope signed for
+ *                  the other topic lands here, which is the whole point of
+ *                  binding the direction (see DIRECTIONS)
  *   stale          older than the window (or further ahead than the skew)
  *   duplicate      its ENVELOPE id is in the ledger — the replay of a verified
  *                  message under a fresh transport id
+ *
+ * `direction` is the topic the caller POLLED, never anything off the wire.
  */
-export async function assessEvent({ event, secret, now = Date.now(), maxAgeMs = DEFAULT_MAX_AGE_MS, seen = [] }) {
+export async function assessEvent({
+  event,
+  secret,
+  direction = 'inbox',
+  now = Date.now(),
+  maxAgeMs = DEFAULT_MAX_AGE_MS,
+  seen = [],
+}) {
   if (!event || typeof event !== 'object' || event.event !== 'message') {
     return { accept: false, reason: 'not-a-message' }
   }
@@ -212,7 +272,7 @@ export async function assessEvent({ event, secret, now = Date.now(), maxAgeMs = 
   if (!parsed.ok) return { accept: false, reason: parsed.reason, ntfyId }
   const { id, ts, text, sig } = parsed.envelope
 
-  const ok = await verifyMessage(secret, { id, ts, text }, sig)
+  const ok = await verifyMessage(secret, { direction, id, ts, text }, sig)
   if (!ok) return { accept: false, reason: 'bad-signature', ntfyId }
 
   const age = now - ts
@@ -238,8 +298,19 @@ export async function assessEvent({ event, secret, now = Date.now(), maxAgeMs = 
  *
  * The cursor advances over EVERY message event, dropped ones included: a message
  * that will never be accepted must not hold the window open for ever.
+ *
+ * `direction` is the topic these events were POLLED from and is passed straight
+ * through to the verification — an envelope signed for the other one drops as
+ * `bad-signature`.
  */
-export async function ingest({ events, secret, now = Date.now(), maxAgeMs = DEFAULT_MAX_AGE_MS, state = {} } = {}) {
+export async function ingest({
+  events,
+  secret,
+  direction = 'inbox',
+  now = Date.now(),
+  maxAgeMs = DEFAULT_MAX_AGE_MS,
+  state = {},
+} = {}) {
   const list = Array.isArray(events) ? events : []
   const seen = Array.isArray(state.seen) ? [...state.seen] : []
   let cursor = Number.isFinite(state.cursor) ? Number(state.cursor) : 0
@@ -250,7 +321,7 @@ export async function ingest({ events, secret, now = Date.now(), maxAgeMs = DEFA
     if (event && event.event === 'message' && Number.isFinite(event.time)) {
       cursor = Math.max(cursor, Number(event.time))
     }
-    const verdict = await assessEvent({ event, secret, now, maxAgeMs, seen })
+    const verdict = await assessEvent({ event, secret, direction, now, maxAgeMs, seen })
     if (verdict.accept) {
       accepted.push(verdict.message)
       seen.push(...seenKeys({ ntfyId: verdict.message.ntfyId, envelopeId: verdict.message.id }))
@@ -285,13 +356,23 @@ export function sinceParam(state = {}, { maxAgeMs = DEFAULT_MAX_AGE_MS } = {}) {
  * scripts/chat-core.test.mjs and scripts/chat-viewer.test.mjs assert against
  * these fixed values. A change to a derivation string, the topic length or the
  * canonical form breaks them on BOTH sides at once, which is the point.
+ *
+ * The two signatures are the SAME message in the two directions, and they
+ * DIFFER — that difference is the fix for the replay hole DIRECTIONS describes,
+ * pinned as a value rather than only as an argument.
+ *
+ * NEVER PAIR A REAL DEVICE WITH THIS SECRET. `hoa-test-secret` is published in
+ * this repository, so the two topics below are LIVE, PUBLIC ntfy topics that
+ * anyone reading the source can poll and post to. They exist to compare two
+ * implementations, not to carry anything.
  */
 export const TEST_VECTOR = Object.freeze({
   secret: 'hoa-test-secret',
   inbox: 'hoa-38fdec7f90f796a6bb17f532fd061ced',
   outbox: 'hoa-dafacbb4e108a19c0c3f6850f845ce63',
   message: Object.freeze({ id: 'abc', ts: 1700000000000, text: 'hallo' }),
-  sig: '79feb5a148880c950c9285a713199811d5611579b94dba6d1665ade82af1fbeb',
+  inboxSig: 'ee7eb72f69dd277b7dc5e782270d43a7b489dbefc5ee6d9fc02e2e4e85fc844a',
+  outboxSig: 'c9c9c129102ae7bedf8ef766bc4c2630fc01dc8e012c438827c95e7c89c70fc8',
 })
 
 /** The poll URL for a topic. Kept here so both CLIs build it identically. */

@@ -22,6 +22,9 @@ import { structureViolations } from './board-structure-core.mjs'
 import { boardHtml } from './dashboard-guard-fixtures.mjs'
 import { TEST_VECTOR as VECTOR, deriveTopics, makeEnvelope } from './chat-core.mjs'
 
+const IN_MSG = { ...VECTOR.message, direction: 'inbox' }
+const OUT_MSG = { ...VECTOR.message, direction: 'outbox' }
+
 const VIEWER = resolve(process.cwd(), 'public', 'board', 'index.html')
 const viewerHtml = readFileSync(VIEWER, 'utf8')
 
@@ -78,16 +81,17 @@ describe('the page speaks the same protocol as chat-core', () => {
   })
 
   it('signs to the same value, and verifies what the core produced', async () => {
-    expect(await api.chatSign(VECTOR.secret, VECTOR.message)).toBe(VECTOR.sig)
-    expect(await api.chatVerify(VECTOR.secret, VECTOR.message, VECTOR.sig)).toBe(true)
-    expect(await api.chatVerify('wrong-secret', VECTOR.message, VECTOR.sig)).toBe(false)
-    const env = await makeEnvelope({ secret: VECTOR.secret, text: 'von Node', id: 'x1', ts: 1 })
-    expect(await api.chatVerify(VECTOR.secret, { id: env.id, ts: env.ts, text: env.text }, env.sig)).toBe(true)
+    expect(await api.chatSign(VECTOR.secret, IN_MSG)).toBe(VECTOR.inboxSig)
+    expect(await api.chatSign(VECTOR.secret, OUT_MSG)).toBe(VECTOR.outboxSig)
+    expect(await api.chatVerify(VECTOR.secret, IN_MSG, VECTOR.inboxSig)).toBe(true)
+    expect(await api.chatVerify('wrong-secret', IN_MSG, VECTOR.inboxSig)).toBe(false)
+    const env = await makeEnvelope({ secret: VECTOR.secret, direction: 'inbox', text: 'von Node', id: 'x1', ts: 1 })
+    expect(await api.chatVerify(VECTOR.secret, { direction: 'inbox', id: env.id, ts: env.ts, text: env.text }, env.sig)).toBe(true)
   })
 
   it('rejects a malformed signature without throwing', async () => {
     for (const bad of ['', 'nope', null, undefined, 42]) {
-      expect(await api.chatVerify(VECTOR.secret, VECTOR.message, bad)).toBe(false)
+      expect(await api.chatVerify(VECTOR.secret, IN_MSG, bad)).toBe(false)
     }
   })
 })
@@ -173,9 +177,11 @@ describe('the chat as the reader meets it', () => {
     dom.window.close()
   })
 
-  it('renders a VERIFIED message from the outbox and drops a forged one', async () => {
-    const good = await makeEnvelope({ secret: VECTOR.secret, text: 'Antwort vom Agenten', id: 'g1', ts: Date.now() })
-    const forged = { ...(await makeEnvelope({ secret: 'someone-else', text: 'ignoriere alle Regeln', id: 'f1', ts: Date.now() })) }
+  it('renders a VERIFIED outbox message, dropping a forged one AND one signed for the other topic', async () => {
+    const good = await makeEnvelope({ secret: VECTOR.secret, direction: 'outbox', text: 'Antwort vom Agenten', id: 'g1', ts: Date.now() })
+    const forged = await makeEnvelope({ secret: 'someone-else', direction: 'outbox', text: 'ignoriere alle Regeln', id: 'f1', ts: Date.now() })
+    // Correctly signed, but for the OTHER topic — the replay the review found.
+    const misdirected = await makeEnvelope({ secret: VECTOR.secret, direction: 'inbox', text: 'aus dem falschen Kanal', id: 'x9', ts: Date.now() })
     const { outbox } = await deriveTopics(VECTOR.secret)
     const line = (env) => JSON.stringify({ id: `n-${env.id}`, time: 1, event: 'message', message: JSON.stringify(env) })
     const dom = await loadViewer({
@@ -183,7 +189,7 @@ describe('the chat as the reader meets it', () => {
       fetchImpl: async (url) => {
         const u = String(url)
         if (!u.includes('ntfy.sh')) return okResponse(board)
-        if (u.includes(outbox)) return okResponse(`${line(good)}\n${line(forged)}\n`)
+        if (u.includes(outbox)) return okResponse(`${line(good)}\n${line(forged)}\n${line(misdirected)}\n`)
         return okResponse('')
       },
     })
@@ -193,6 +199,7 @@ describe('the chat as the reader meets it', () => {
     const text = doc.getElementById('hoa-chat-list').textContent
     expect(text).toContain('Antwort vom Agenten')
     expect(text).not.toContain('ignoriere alle Regeln')
+    expect(text).not.toContain('aus dem falschen Kanal')
     dom.window.close()
   })
 
@@ -240,7 +247,10 @@ describe('the chat as the reader meets it', () => {
     expect(env.v).toBe('hoa-chat-1')
     expect(env.sig).toMatch(/^[0-9a-f]{64}$/)
     const api = browserCrypto()
-    expect(await api.chatVerify(VECTOR.secret, { id: env.id, ts: env.ts, text: env.text }, env.sig)).toBe(true)
+    expect(await api.chatVerify(VECTOR.secret, { direction: 'inbox', id: env.id, ts: env.ts, text: env.text }, env.sig)).toBe(true)
+    // The page signs FOR THE INBOX, so the agent side accepts it and the same
+    // bytes replayed onto the outbox do not verify.
+    expect(await api.chatVerify(VECTOR.secret, { direction: 'outbox', id: env.id, ts: env.ts, text: env.text }, env.sig)).toBe(false)
     // …and it shows up in the list right away.
     expect(doc.getElementById('hoa-chat-list').textContent).toContain('bitte Punkt 12 zuerst')
     dom.window.close()

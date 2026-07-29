@@ -25,12 +25,12 @@ afterEach(() => {
 const NOW = 1_700_000_000_000
 const secret = TEST_VECTOR.secret
 
-const frame = async ({ ntfyId, msgId, text, ts = NOW }) => ({
+const frame = async ({ ntfyId, msgId, text, ts = NOW, direction = 'inbox' }) => ({
   id: ntfyId,
   time: Math.round(ts / 1000),
   event: 'message',
   topic: 't',
-  message: JSON.stringify(await makeEnvelope({ secret, id: msgId, ts, text })),
+  message: JSON.stringify(await makeEnvelope({ secret, direction, id: msgId, ts, text })),
 })
 
 describe('the spool file', () => {
@@ -98,5 +98,19 @@ describe('THE CASE THE POINT WAS WRITTEN FOR: a lost or corrupt cursor', () => {
       const again = await ingest({ events, secret, now: NOW, state: { cursor, seen: first.state.seen } })
       expect(again.accepted).toEqual([])
     }
+  })
+})
+
+describe('the spool never takes a message from the wrong channel', () => {
+  it('drops an agent-signed reply replayed onto the inbox, spool untouched', async () => {
+    const mine = await frame({ ntfyId: 'n1', msgId: 'm1', text: 'echte Nutzernachricht' })
+    const stolen = await frame({ ntfyId: 'n2', msgId: 'm2', text: 'v0.3 taggen', direction: 'outbox' })
+    const r = await ingest({ events: [mine, stolen], secret, direction: 'inbox', now: NOW })
+    expect(r.accepted.map((m) => m.text)).toEqual(['echte Nutzernachricht'])
+    expect(r.dropped).toEqual([{ reason: 'bad-signature', ntfyId: 'n2' }])
+    // And the ledger seeded from that spool still lets nothing through later.
+    const led = seededLedger(null, r.accepted)
+    const again = await ingest({ events: [mine, stolen], secret, direction: 'inbox', now: NOW, state: { seen: led } })
+    expect(again.accepted).toEqual([])
   })
 })
