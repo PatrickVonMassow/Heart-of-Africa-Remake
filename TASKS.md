@@ -1100,36 +1100,6 @@ read that as "the criterion and its evidence section".
   or `enrichments.mjs`) that the traveller is stopped at a settlement edge and cannot cross it,
   yet still enters with Space. No new player-visible text (reuses the existing prompt).
 
-- [ ] 300. ANIMAL GAIT REALISM — leg cadence must match forward speed, no foot-skating (user
-  24.07.2026; for later/v0.3). The animals' leg-swing speed looks too fast for their forward
-  movement — they read as GLIDING/skating over the ground rather than walking on their feet.
-  ESPECIALLY the panorama skyline silhouettes (points 255/286) but ALSO the walkers inside
-  settlements. FIX: either model the gait physically correctly (the stance foot stays PLANTED on
-  the ground while the body moves forward over it; the leg cadence is derived from ground
-  distance covered, so one full stride = a fixed forward distance = the foot's planted-to-lift
-  ground travel), OR — if a full physical foot-IK is too compute-heavy in-game — tune the
-  gait-phase-per-distance (stride length) so the feet do not skate. The panorama gait is already
-  distance-driven (point 255: gaitPhase from the drifted arc); investigate why it STILL reads too
-  fast — likely the stride length (forward distance per full cycle) is too short, so legs cycle
-  faster than the ground passes. VERIFY (the user's method — concrete + testable): a SERIES OF
-  SCREENSHOTS across an interval — when a leg that has just swung forward moves BACK (stance
-  phase), its FOOT must stay at the SAME ground position while the animal advances (the plant foot
-  is fixed to the ground, the body translates over it; no sliding). Add a PURE test that the
-  stride length equals the foot's stance ground-travel (feet planted, not skating), and a LIVE
-  screenshot-series check (a skyline silhouette AND a settlement walker) that a tracked foot's
-  screen position stays ~fixed through its stance phase while the body moves forward.
-  SLOPE FOOTING (user 24.07.2026, second facet of the same "feet on the ground" system): when an
-  animal walks UP or DOWN a slope, its front (uphill) or back (downhill) feet FLOAT in the air —
-  the body/legs do not conform to the incline (screenshot: a skyline silhouette on a dune with a
-  foot hovering above the terrain). FIX: sample the terrain height under EACH foot (or pitch the
-  body to the local ground slope) so ALL feet contact the sloped ground, not just the ones on the
-  body's reference plane. VERIFY (screenshot): on an up-slope AND a down-slope, no foot hovers
-  above the terrain — every planted foot touches the ground it stands on (panorama silhouette on a
-  dune AND a settlement walker on sloped ground). ANCHORS: the
-  panorama gait (`src/scenes/place/panoramaWildlife.ts` — gaitPhase / legSwingAngle /
-  panoramaGaitDistance, points 255/286), the settlement-walker gait, `src/render/fauna.ts` (the
-  leg pivots). No player-visible text.
-
 - [ ] 303. CODE REVIEW OF ALL CHANGES SINCE v0.1 — validate every test is still VALID (user
   24.07.2026). QUEUE POSITION: the NEXT task after 224. Stale tests keep surfacing only as
   incidental findings (today alone: a strict type-check, heavy fuzz timeouts, and checks that
