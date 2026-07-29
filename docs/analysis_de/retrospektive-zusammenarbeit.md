@@ -493,6 +493,18 @@ Die Reparatur folgt derselben Linie: Die Trailer-Form gehört nicht in jeden Pro
 
 **Lehre:** Wenn ein Guard ein Artefakt liest, ist die eigentliche Frage, **wer dieses Artefakt schreibt**. Steht dazwischen ein Text, den niemand prüft, ist die Durchsetzung nur so belastbar wie die Sorgfalt in diesem Text — und ein Guard, dessen häufigster Treffer ein Eigentor ist, verliert genau die Autorität, für die er gebaut wurde.
 
+### 3.55 Was beim Umzug still zurückbleibt
+
+Punkt 400 verlegte die Fortschrittstafel von einem claude.ai-Artefakt, wo das HTML-Fragment das ganze Dokument WAR, auf eine GitHub-Pages-Hülle, die das Fragment lädt und per `document.write` einsetzt. Der Umzug hatte einen guten Grund — die headless gestartete Nachfolgesitzung besitzt kein Artifact-Werkzeug und konnte gar nicht veröffentlichen. Er kostete vier Eigenschaften auf einmal, und keine davon meldete sich:
+
+Der Selbst-Auffrischer holte weiterhin `location.href` — unter der Hülle also die Hülle, die kein `<main>` besitzt; der Tausch unterblieb, alle 30 Sekunden, für immer. Sein eingebauter Notausgang griff nicht, weil er einen FEHLGESCHLAGENEN Abruf braucht und die Hülle sauber 200 liefert. Das Viewport-Meta der Hülle wurde mit dem alten Dokument verworfen, und die Seite fiel auf Chromes 980-Pixel-Ersatzbreite zurück: auf dem Telefon, dem einzigen Gerät, auf dem sie gelesen wird, um den Faktor 2,4 zu klein. Die Warteschlange wurde zugleich von einem gepflegten Dokument zu einer Projektion — nur wanderte der vorhandene Bestand nie in die Datenquelle: 79 von 81 Karten standen auf Platzhaltertext, keine trug eine Schätzung, und die vom Nutzer gesetzte REIHENFOLGE, das einzige Datum der Tafel, das nirgendwo sonst existiert, war durch die Nummernfolge ersetzt.
+
+Formal war dabei nichts kaputt. Jede Karte stand auf der Tafel, jeder Wächter war grün, die Seite lud. Gemerkt hat es der Leser — nach Stunden, in vier getrennten Meldungen.
+
+Der gemeinsame Nenner ist nicht Nachlässigkeit, sondern die Bauform: Alle vier Eigenschaften waren **geerbt**, nicht zugesichert. Sie galten, solange die Umgebung sie mitbrachte, und niemand hatte je aufgeschrieben, dass sie gelten sollen. Ein Umzug tauscht die Umgebung — und was nur geerbt war, fällt lautlos weg. Verschärfend kam hinzu, dass der Auffrischer in einer nicht versionierten Datei lebte: kein Test, keine Gegenprüfung und kein zweites Modell konnten ihn je sehen.
+
+**Lehre:** Vor einem Wechsel des Auslieferungswegs gehört aufgezählt, was der alte Weg zusichert — und jede dieser Zusagen braucht zuerst einen Test am AUSGELIEFERTEN Ergebnis. Eigenschaften ohne Test sind nicht zugesichert, sondern geliehen. Und Logik, die außerhalb der Versionsverwaltung liegt, ist von jeder Prüfung ausgenommen, die das Projekt sonst für selbstverständlich hält.
+
 ---
 
 ## 4. Die Guards als Immunsystem
@@ -582,7 +594,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Mittwoch, 29.07.2026, 13:20 · Quellen-Fingerprint: `258d697aa5aa…`
+Zuletzt aktualisiert: Mittwoch, 29.07.2026, 14:03 · Quellen-Fingerprint: `af41ca5d0974…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -593,7 +605,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | User's rulings on the point-205 plausibility audit (what to fix vs. accept, 21.07.2026) | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | For code audits/reviews, mix in a DIFFERENT model than the one that wrote the code — different blind spots find more bugs | 1 | niedrig | model-guard.mjs | ✔ Mechanismus |
 | The hardened batch-autonomy system — never idle-stop, resurrect after crash/reboot, signal on failure, never block on the user | 1 | niedrig | batch-autostart.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs | ✔ Mechanismus |
-| The batch dashboard — its live GH-Pages transport, its BINDING four-section structure (never change without explicit user go) and update discipline | 8 | hoch | batch-autostart.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs, dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
+| The batch dashboard — its live GH-Pages transport, its BINDING four-section structure (never change without explicit user go) and update discipline | 9 | hoch | batch-autostart.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs, dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
 | RETIRED 27.07.2026 — this was a 16.07. work-in-progress handoff, not a rule; what survives is the research foundation, the accuracy principle and the §13-placeholder carve-out | 3 | mittel | batch-autostart.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs | ✔ Mechanismus |
 | The batch dashboard may leave the private claude.ai artifact for a publicly readable transport — privacy is no longer a constraint | 1 | niedrig | board-first-guard.mjs, dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
 | Delegate via `node scripts/point-brief.mjs <N>` — the AGENT generates its own brief; board changes go through `scripts/board.mjs`; expect 529 agent deaths and commit-per-step | 2 | mittel | — (Regel/Memory) | ◐ Regel |
@@ -659,6 +671,6 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 67 Feedback-/Projekt-Memories · 36 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 18 Prozess-/Meta-TASKS-Punkte (davon 8 offen).
 
-<!-- RETRO-FINGERPRINT: 258d697aa5aadae61f899941613f635f017c56955d87b877debc365725033296 -->
-<!-- RETRO-LAST-REFRESHED: 2026-07-29T11:20:11.398Z -->
+<!-- RETRO-FINGERPRINT: af41ca5d09744d37bbacee08dbbae22c2da103b37539b69f863cf8120b333ca8 -->
+<!-- RETRO-LAST-REFRESHED: 2026-07-29T12:03:21.316Z -->
 <!-- AUTO-GENERATED:END -->
