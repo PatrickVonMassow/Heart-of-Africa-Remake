@@ -831,8 +831,21 @@ top-level session `classifyParallel` raises an alert about, and that alert block
 the real owner's turn end. The compatible channel already existed: the watcher
 spawns ONLY when `assessOwner` reports no live owner AND no honoured claim, and
 for the responder's lifetime it files a BOUNDED `batch-claim` — already a reason
-for the launcher to stand down, already the one exclusion `classifyParallel`
-knows. It never touches the pending-spawn conversion.
+for the launcher to stand down at its tick. It never touches the pending-spawn
+conversion.
+
+**What the claim does NOT buy, said plainly.** `classifyParallel`'s `exclude`
+list keys on a SESSION ID, and the claim's is synthetic
+(`chat-responder-<uuid>`) — it can never equal the responder's real session id,
+which nothing knows before that session starts. The responder is therefore **not
+excluded** from the parallel-session detector. In the ordinary run that costs
+nothing: the launcher bails at the honoured claim *before* it detects, and the
+wake gate refuses to spawn beside a live owner at all. It bites only in the
+narrow window where the watcher dies while its responder is still answering —
+the claim stops being honoured, a tick may spawn a real owner, and that owner's
+guard *will* raise a parallel alert naming the responder. Bounded (ten minutes)
+and visible (the alert is the point), but real, and stated rather than promised
+away.
 
 **The claim names the WATCHER's own process, and that is the load-bearing
 detail.** `assessClaim` honours a claim only while the recorded pid exists and
@@ -842,9 +855,30 @@ which a dead watcher leaves the batch reserved, and the 30-minute expiry is only
 the second bound. Naming the RESPONDER's pid instead reads better and is wrong:
 the responder's own SessionStart hook would resolve that claim as ITS OWN
 (`resolveOwnership` matches by process) and would then acquire the owner lock —
-precisely the outcome the paragraph above forbids. As it stands the responder is
-stood down by the ordinary hook, which is exactly right: it answers the user and
-touches nothing else.
+precisely the outcome the paragraph above forbids.
+
+**The responder is stood down — and told what it MAY do.** That branch of
+`scripts/batch-resume-hook.mjs` had one message, written when the only way to
+reach it was "another window holds the lock": *do NOT edit TASKS.md*. For the
+responder that forbade the one duty it was woken for — appending an instruction
+as a work-order point — so an instruction from the phone would be read, obeyed
+into silence and lost. The branch now NAMES its situation first
+(`scripts/batch-resume-hook-core.mjs`, `standDownKind`): the responder is told it
+may answer and may append a point, and may not merge, work the queue or take the
+lock; a bystander beside a responder is told that too; and the "no lock on disk"
+case no longer asserts that another session owns a lock that does not exist.
+
+**A message is marked consumed only against EVIDENCE that it was answered.** The
+responder does not own the batch, so stage 2's per-tool-call delivery never
+claims for it — without an ack every message a responder answered would be
+handed to the next batch session and answered again. But the ack may *not* key
+on the exit code: a responder that stands down and ends its turn cleanly exits 0
+too, so acking on that would take the user's instruction off the spool with
+nobody having answered it — a silent loss, worse than the wait this removes. The
+evidence is a reply the transport ACCEPTED (`recordReplyReceipt` in
+`scripts/chat-reply.mjs`, written after `res.ok`), and it must postdate the
+spawn. No receipt, no ack: the message stays pending and the next session gets
+it, which costs a duplicate at worst.
 
 **The same stops as the launcher.** `.claude/batch-paused` and the work-order
 format alarm both suppress a wake (the alarm rule itself is single-sourced in
@@ -854,10 +888,9 @@ live owner suppresses it too — stage 2 is already delivering to that session.
 **The responder is LIGHT.** Its prompt forbids the work order: read the message,
 answer with `scripts/chat-reply.mjs`, append a point if the message is an
 instruction, then exit. A one-line question does not pay for a batch
-orientation. It is bounded at ten minutes, after which it is killed and the
-reservation released, and the messages it was handed are marked consumed only
-after a CLEAN exit — a crashed responder leaves them for the next session, the
-same at-least-once discipline the launcher follows.
+orientation. Its reply is obligatory — it is also the receipt (see below) — and
+it is bounded at ten minutes, after which it is killed and the reservation
+released.
 
 **Lifecycle: no second scheduled task.** `HoA-Batch-Autostart` already runs every
 few minutes, at boot included, and is the one thing here that runs when nothing

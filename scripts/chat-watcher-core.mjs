@@ -21,8 +21,23 @@
 //     owner's turn end.
 // The compatible channel already exists: the BOUNDED claim of point 395. The
 // watcher files one for the responder's lifetime — a sanctioned reason for the
-// launcher to stand down, and the one exclusion `classifyParallel` already
-// knows — and it is released on every exit path.
+// launcher to stand down at its tick — and it is released on every exit path.
+//
+// WHAT THE CLAIM DOES **NOT** BUY, stated because the first draft of this file
+// promised it (four-eyes review 29.07.2026, finding 3). `classifyParallel`'s
+// `exclude` list keys on a SESSION ID, and the claim's is synthetic
+// (`chat-responder-<uuid>`) — it can never equal the responder's real claude
+// session id, which nothing knows before that session starts. So the responder
+// is NOT excluded from the parallel-session detector. In the ordinary run that
+// costs nothing, because the launcher bails at the honoured claim BEFORE it
+// detects, and the wake gate refuses to spawn beside a live owner in the first
+// place. It bites only in the narrow window where the watcher dies while its
+// responder is still answering: the claim stops being honoured, a launcher tick
+// may then spawn a real owner, and that owner's guard WILL raise a
+// parallel-session alert naming the responder. Bounded (the responder is capped
+// at ten minutes) and visible (the alert is the point), but real — and the honest
+// statement of it is worth more than a comment claiming an exclusion that the
+// code cannot deliver.
 //
 // THE CLAIM NAMES THE WATCHER'S OWN PROCESS, and that is the deliberate part.
 // `assessClaim` honours a claim only while the recorded pid exists AND started
