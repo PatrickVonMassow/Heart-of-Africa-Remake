@@ -3711,6 +3711,16 @@ it is appended.
   today's verdict; a repeated call with an unchanged (HEAD, parallel set) is reported as
   already satisfied. Plus one case that the quiet-machine reading actually reaches the
   verdict rather than only the log.
+  THIRD HALF, found 29.07.2026 while the gate kept firing: THE ALERT NAMES THE SESSION
+  THAT IS READING IT. Twice in one evening the Stop hook reported "PARALLEL SESSION
+  DETECTED (10a2d2e0…)" — and that id was the id of the very session it was warning, the
+  one holding the lock. So the whole ritual above (a three-minute gate, a doctor run, a
+  re-check of board and work order) was ordered because a session had seen ITSELF in the
+  activity record. The detector must exclude the reading session's own id before it counts
+  a second writer, and the message must name the OTHER session it found; an alert that
+  cannot say who else was there is not evidence of anyone else being there. Verifiable in
+  the same pure test set: an activity record holding only the reader's own id yields NO
+  alert, one holding a stranger's yields one and names it.
   DOCS in the same commit: `docs/batch-autonomy.md` under the doctor, and the ledger row
   for retrospective §3.22.
 
