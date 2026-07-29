@@ -3613,6 +3613,95 @@ read that as "the criterion and its evidence section".
   NOTE: the guide currency was attested on 29.07. against the sources of that day; the
   review found this gap and could not close it, which is what this point exists for.
 
+- [ ] 423. THE BOARD'S OWN REFRESH DELETES THE MESSAGE CHANNEL (29.07.2026, user
+  reported it from the phone: "Wechsle ich auf dem Handy zurück zur Browser-App sehe ich
+  die Agenten-Sektion erst nach einem Refresh — vorher fehlt sie. Noch schlimmer: Das
+  passiert auch beim automatischen Refresh."). The chat section is built by the viewer
+  and inserted UNDER the board's heading — which puts it INSIDE `<main>`
+  (`public/board/index.html`, `injectChat`: `document.querySelector('main h1 + .sub')`,
+  then `insertBefore`). The fragment's 30-second refresher REPLACES `<main>` wholesale,
+  and `injectChat` runs only once per document load, so every successful refresh removes
+  the chat and nothing puts it back. On a phone it reads as "the section is gone": returning
+  to the browser makes the page visible, the refresher fires at once, and the chat vanishes
+  in the same moment the reader looks at it; only a full reload — a new document — brings it
+  back. Before the heading move it sat at body level and survived the swap, so this is a
+  regression of that change, not of the transport.
+  FIX: the swap and the injection must be tied together — after `<main>` is replaced the
+  viewer re-runs `injectChat` (which is already idempotent). The refresher is versioned
+  source (`scripts/board-refresher-core.mjs`) and the injection lives in the viewer, so the
+  seam is a documented signal, not a shared variable: the refresher dispatches an event on
+  `window` after a successful swap, and the viewer listens and re-injects. Nothing about
+  the chat may enter the board CONTENT — that rule is unchanged and is why re-injection,
+  not markup, is the fix. Keep the reader's typed-but-unsent text and the open/closed state
+  across a re-injection, or the channel loses words on a 30-second timer.
+  VERIFIABLE: pure Vitest in jsdom — (a) a document with the chat injected, put through one
+  successful swap, still carries exactly one `#hoa-chat` afterwards (this is the case that
+  fails today); (b) an unsent draft and the panel's open state survive that swap; (c) the
+  idempotence holds — two swaps in a row never yield two sections; (d) the existing
+  `scripts/chat-viewer.test.mjs` cases stay green.
+  DOCS in the same commit: `docs/batch-autonomy.md` (the board's transport section — the
+  chat is injected, so every content swap must re-inject it) and the memory entry
+  `batch-dashboard-artifact`, whose chat paragraph states where the section lives.
+
+- [ ] 424. A MESSAGE WAITS AS LONG AS THE OWNER WAITS (29.07.2026, user: "habe ich dort um
+  15:31 etwas geschrieben (also vor deutlich mehr als 15 min) und es gab keine Reaktion").
+  Measured on the live state: the message reached the spool at 15:31 and was still PENDING
+  at 16:05. The watcher did its job — it logged `decision: skip, reason: owner-live` and
+  left the message to the running session, which is correct, because a live owner has the
+  context. The delivery, though, only happens in the PostToolUse heartbeat, i.e. AT THE
+  OWNER'S NEXT TOOL CALL. That session had declared a wait (`batch-in-flight`, "Agent baut
+  Punkt 392") and was doing exactly what a waiting session should do: nothing. Its agent
+  worked in a WORKTREE, whose own `.claude/chat-spool` is empty, so the agent's calls could
+  not deliver it either. The guarantee "within seconds, at the next tool call" therefore
+  silently degrades to "whenever the owner happens to act again" — and the mode where the
+  user most needs the channel (long delegated build, user on the phone) is precisely the
+  mode where the owner is idle longest.
+  FIX: give the deferral a DEADLINE. A message that stays pending past a calibratable
+  window (default 3 minutes) is no longer covered by "the owner will get it": the watcher
+  stops skipping and spawns the responder as it would with no live owner, under the same
+  bounded claim it already uses. A declared WAIT is the trigger to look at, not the mere
+  existence of a live session — a session that is genuinely working produces tool calls and
+  will collect the message on its own within seconds.
+  VERIFIABLE: pure Vitest over `chat-watcher-core` — a pending message younger than the
+  window with a live owner still skips (unchanged behaviour); the same message past the
+  window is taken; a message the owner consumed in between is not taken twice; the claim
+  and its expiry are unchanged. Plus a `chat-spool` case pinning that the pending age is
+  read from the spooled `receivedAt`, so a restarted watcher cannot reset the clock.
+  DOCS in the same commit: `docs/batch-autonomy.md` (the message-channel section states
+  what each mode guarantees — the "seconds while a session runs" line gains the deadline
+  that makes it true).
+
+- [ ] 425. A DELEGATED AGENT'S COMMIT NAMES NO MODEL, SO THE TRIPWIRE FIRES ON CLEAN WORK
+  (29.07.2026, hit live: five commits on the point-392 branch carried
+  `Co-Authored-By: Claude <noreply@anthropic.com>` — no model at all — and `model-guard`
+  blocked the turn end as a policy breach). The guard is right to block: the allowlist is
+  checked against the trailer, and a trailer that names nothing cannot show that an allowed
+  model wrote the code. It is exactly what a silent degradation looks like from the outside,
+  which is the failure the guard exists for (24.07.2026). But the commits were clean — the
+  session transcript and the subagent transcript both record `claude-opus-5` — so the batch
+  was paused over a MISSING WORD, and clearing it needed a research pass no unattended
+  session would have done.
+  FIX, both halves:
+  (a) PREVENT: the versioned `commit-msg` hook (`scripts/git-hooks/`) REFUSES a commit whose
+  Claude co-author trailer does not name a model from the allowlist. The remedy line prints
+  the exact trailer to use. A subagent then cannot create the ambiguous commit in the first
+  place, in the main tree or in a worktree.
+  (b) RESOLVE: `model-guard`'s block text distinguishes a NAMED forbidden model from an
+  UNNAMED one and, for the unnamed case, names where the answer actually lives — the
+  session transcript `~/.claude/projects/<project>/<session>.jsonl` and, for delegated work,
+  `…/<session>/subagents/agent-*.jsonl`, whose `message.model` fields record the serving
+  model per request. The pause stays mandatory; what changes is that the way out is stated
+  instead of rediscovered.
+  VERIFIABLE: pure Vitest — `commit-msg` core accepts each allowed spelling (Opus 5,
+  Opus 4.8, Fable 5, with and without the `(1M context)` suffix), rejects a bare
+  `Claude <noreply@anthropic.com>`, rejects a named forbidden model, and ignores a purely
+  human co-author; `model-guard-core` classifies named-forbidden vs unnamed and the hook
+  test asserts the transcript path appears in the unnamed remedy. Plus the mechanism review
+  by the other model, since both halves are gates.
+  DOCS in the same commit: CLAUDE.md §6 (the model policy already says every commit records
+  its author model — it gains the fact that the trailer is ENFORCED at commit time) and the
+  memory entry `serving-model-watch`.
+
 ## Closing (only after all points)
 
 New points are appended BEFORE this section — it stays last in the file.
