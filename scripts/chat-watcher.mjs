@@ -178,6 +178,9 @@ const state = {
   child: null,
   childTimer: null,
   handed: [],
+  /** When the live responder was spawned — the floor a reply receipt must beat
+   *  to count as ITS answer rather than an earlier session's. */
+  spawnedAt: null,
   cursor: 0,
   seen: [],
 }
@@ -235,18 +238,14 @@ function spawnResponder(messages) {
   }
   state.child = child
   state.handed = messages
-  // THE CLAIM IS WRITTEN AFTER THE SPAWN because it records the responder's pid,
-  // and BEFORE anything awaits, so the window in which a launcher tick could see
-  // an unreserved batch beside a live responder is a few milliseconds wide.
-  writeClaim(
-    responderClaim({
-      sessionId: state.sessionId,
-      watcherPid: state.identity.pid,
-      watcherStartedAt: state.identity.pidStartedAt,
-      responderPid: child.pid,
-      now: Date.now(),
-    }),
-  )
+  state.spawnedAt = Date.now()
+
+  // THE HANDLERS AND THE TIMEOUT GO ON BEFORE THE CLAIM WRITE (four-eyes review
+  // 29.07.2026, finding 2). They used to be attached AFTER it, so a `writeClaim`
+  // throw left a LIVE responder with no claim, no exit handler and no timeout —
+  // and `state.child` set for ever, which made the watcher refuse every further
+  // wake until it was restarted. Attached first, every one of those paths is
+  // covered whatever the claim write does.
   child.on('exit', (code) => onResponderExit(code))
   child.on('error', () => onResponderExit(1))
   // A responder is LIGHT. Past the ceiling it is killed and the reservation
@@ -259,6 +258,34 @@ function spawnResponder(messages) {
       /* already gone */
     }
   }, RESPONDER_MAX_MS)
+
+  // The claim records the responder's pid, so it can only be written now — but
+  // nothing AWAITS in between, so the window in which a launcher tick could see
+  // an unreserved batch beside a live responder is a few milliseconds wide.
+  try {
+    writeClaim(
+      responderClaim({
+        sessionId: state.sessionId,
+        watcherPid: state.identity.pid,
+        watcherStartedAt: state.identity.pidStartedAt,
+        responderPid: child.pid,
+        now: Date.now(),
+      }),
+    )
+  } catch (e) {
+    // NO CLAIM, NO RESPONDER. An unreserved responder is exactly the parallel
+    // top-level session this design exists to avoid, so it is killed rather than
+    // left running. The exit handler above then clears the state and the
+    // message stays pending — for the next wake, or for the next launcher tick.
+    log({ event: 'claim-write-failed', reason: (e && e.message) || String(e), pid: child.pid })
+    releaseClaim('claim-write-failed')
+    try {
+      process.kill(child.pid)
+    } catch {
+      /* already gone */
+    }
+    return false
+  }
   log({ event: 'responder-spawned', pid: child.pid, messages: messages.length })
   return true
 }
