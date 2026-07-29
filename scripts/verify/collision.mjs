@@ -21,7 +21,9 @@ const check = (name, ok, detail) => {
 
 const browser = await launchVerifyBrowser()
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
-// Shared helpers for both collider shapes (circle and oriented box).
+// Shared helpers for all three collider shapes: circle, oriented box and the
+// fence panel's capsule around a segment (point 413). A shape this helper does
+// not know reads every point as NaN-blocked, so it must track collision.ts.
 await page.addInitScript(() => {
   window.__clearanceTo = (c, x, z) => {
     if (c.kind === 'box') {
@@ -35,6 +37,13 @@ await page.addInitScript(() => {
       const qz = Math.max(-c.hz, Math.min(c.hz, lz))
       if (qx === lx && qz === lz) return -Math.min(c.hx - Math.abs(lx), c.hz - Math.abs(lz))
       return Math.hypot(lx - qx, lz - qz)
+    }
+    if (c.kind === 'segment') {
+      const ex = c.x2 - c.x1
+      const ez = c.z2 - c.z1
+      const l2 = ex * ex + ez * ez
+      const t = l2 < 1e-12 ? 0 : Math.max(0, Math.min(1, ((x - c.x1) * ex + (z - c.z1) * ez) / l2))
+      return Math.hypot(x - (c.x1 + ex * t), z - (c.z1 + ez * t)) - c.r
     }
     return Math.hypot(x - c.x, z - c.z) - c.r
   }
@@ -109,11 +118,15 @@ async function ejectTest(sceneLabel, pick) {
     const idx = eval(pickSrc)(cs)
     const c = cs[idx]
     if (!c) return null
+    // A fence panel has no centre field — its middle is the segment's midpoint
+    // (point 413); every other shape carries its own.
+    const cx = c.kind === 'segment' ? (c.x1 + c.x2) / 2 : c.x
+    const cz = c.kind === 'segment' ? (c.z1 + c.z2) / 2 : c.z
     const p = window.__placePlayer
-    p.x = c.x
-    p.z = c.z
+    p.x = cx
+    p.z = cz
     p.yaw = 0
-    return { cx: c.x, cz: c.z, cr: window.__colliderSize(c) }
+    return { cx, cz, cr: window.__colliderSize(c) }
   }, pick)
   if (!info) {
     check(`${sceneLabel}: eject target found`, false, `pick matched nothing: ${pick}`)
@@ -242,7 +255,9 @@ async function accessPointsFree(sceneLabel) {
 // === Port (Cairo) ============================================================
 // Eject from: biggest building (box collider), and a mid-size circle collider.
 await ejectTest('Port', '(cs)=>cs.reduce((b,c,i,a)=>window.__colliderSize(c)>window.__colliderSize(a[b])?i:b,0)')
-await ejectTest('Port', '(cs)=>cs.reduce((b,c,i,a)=>(c.kind!=="box"&&(b<0||c.r>a[b].r))?i:b,-1)') // biggest circle prop
+// Biggest circle prop. A fence panel has an `r` too but no centre to eject
+// from, so segments are skipped here (point 413).
+await ejectTest('Port', '(cs)=>cs.reduce((b,c,i,a)=>(c.kind!=="box"&&c.kind!=="segment"&&(b<0||c.r>a[b].r))?i:b,-1)')
 const funcTypes = await page.evaluate(() =>
   window.__placeLayout.interactives.filter((b) => b.type !== 'villager').map((b) => b.type),
 )
@@ -303,8 +318,11 @@ await page.evaluate(() => window.__game.getState().setJournalOpen(false))
 await page.waitForTimeout(400)
 
 await ejectTest('Village', '(cs)=>cs.reduce((b,c,i,a)=>window.__colliderSize(c)>window.__colliderSize(a[b])?i:b,0)') // chief hut
-await ejectTest('Village', '(cs)=>cs.reduce((b,c,i,a)=>(c.kind!=="box"&&c.r>=1.5&&c.r<=2.2&&(b<0||c.r<a[b].r))?i:b,-1)') // dwelling hut
-await ejectTest('Village', '(cs)=>cs.reduce((b,c,i,a)=>(c.kind!=="box"&&c.r<=0.65&&(b<0))?i:b,-1)') // thorn fence post
+await ejectTest('Village', '(cs)=>cs.reduce((b,c,i,a)=>(c.kind!=="box"&&c.kind!=="segment"&&c.r>=1.5&&c.r<=2.2&&(b<0||c.r<a[b].r))?i:b,-1)') // dwelling hut
+// The fence is now a run of panels, not a chain of posts (point 413): eject
+// from the MIDDLE of a panel, where the old post-circle chain had its thinnest,
+// most sideways-pushing spot.
+await ejectTest('Village', '(cs)=>cs.reduce((b,c,i)=>(c.kind==="segment"&&b<0)?i:b,-1)') // fence panel
 
 // Chief hut operable despite collision: standing at its door and pressing the
 // Space use key opens the audience dialog (design.md §2.3).

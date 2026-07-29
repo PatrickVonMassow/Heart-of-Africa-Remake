@@ -554,21 +554,20 @@ changes with it in the same commit.
    Evidence: docs/acceptance-evidence.md §15.
 
 16. **Collision inside settlements.** The collision rules of `design.md`
-    §2.6 are implemented (impenetrable buildings and solid objects,
-    sliding movement, inhabitants never permanently stuck, reachable
-    accesses and exits, inhabitants entering dwellings through their door
-    while the player cannot, and every door oriented onto reachable free
-    ground). Rectangular buildings collide as oriented boxes (exact
-    corners, no gaps), and the clearance keeps the camera's near plane out
-    of every wall — pressing against a building must never show its
-    inside. No inhabitant spawns or walks into a pocket it cannot leave
-    (point 155): every walker errand target is validated to have a clear
-    standing circle AND an open escape direction against the FULL collider
-    set (stall boards, rocks and props included, not only buildings) and
-    nudged to the nearest free spot otherwise, and a walker physically
-    pinned past a calibratable window (`balance.walkerUnstuckSeconds`,
-    debug-editable) is teleport-nudged to free ground — inhabitants only, a
-    small invisible correction, never the player.
+    §2.6 hold, incl. inhabitants using dwelling doors the player cannot
+    and every door onto reachable free ground. Rectangular buildings
+    collide as oriented boxes (exact corners, no gaps) and the clearance
+    keeps the camera's near plane out of every wall — pressing against one
+    must never show its inside. A move is SWEPT from the previous position
+    (point 413): it stops at the first collider's near edge and slides,
+    never landing beyond it; a fence collides as the panel run the picture
+    draws (a capsule per panel, not a circle per post); each animal
+    collides with the others. No inhabitant is ever stuck
+    (point 155): every walker errand target and animal grazing anchor has
+    a clear standing circle AND an escape direction against the FULL
+    collider set, else nudged to the nearest free spot; a walker pinned
+    past `balance.walkerUnstuckSeconds` (debug-editable) is teleport-nudged
+    free — inhabitants only, never the player.
    Evidence: docs/acceptance-evidence.md §16.
 
 17. **Localization.** The game is fully playable in English as well as

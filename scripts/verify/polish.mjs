@@ -2,6 +2,7 @@
 // a gift and distant panorama wildlife, design.md §17/§2). Dev server only.
 import { launchVerifyBrowser, waitForStable, assertBackend } from './_browser.mjs'
 import { frameShutter } from './frameSubject.mjs'
+import { judgeFootingSeries, judgePitchSeries, MIN_SLOPED_SAMPLES } from './footingSeries.mjs'
 import { fileURLToPath } from 'node:url'
 import sharp from 'sharp'
 
@@ -457,6 +458,110 @@ const stepUntil = async (ready, arg = null, capFrames = 240) => {
     return out
   }, 'settlement walker (goat)')
 }
+// Point 413: the settlement animals must stay OUT of the settlement's solids and
+// out of one another. The report was a goat crossing a compound fence and, the
+// same night, "wildes Durcheinanderclippen" — goats standing inside one another
+// and inside a tent. Sampled as a SERIES over the walk, never one instant: a
+// wandering animal meets a wall only now and then, and a single frame that
+// happened to catch it in open ground would prove nothing.
+{
+  const readOverlap = () =>
+    page.evaluate(() => {
+      const cs = window.__placeLayout?.colliders ?? []
+      const info = window.__placeGoatGait ?? {}
+      const ids = Object.keys(info)
+      const R = 0.3 // WALKER_RADIUS — the radius the animals move with
+      const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v)
+      // How deep a mover at (x,z) sits inside this collider; ≤ 0 is clear.
+      const depth = (c, x, z) => {
+        if (c.kind === 'box') {
+          const sin = Math.sin(c.rot)
+          const cos = Math.cos(c.rot)
+          const dx = x - c.x
+          const dz = z - c.z
+          const lx = cos * dx - sin * dz
+          const lz = sin * dx + cos * dz
+          return R - Math.hypot(lx - clamp(lx, -c.hx, c.hx), lz - clamp(lz, -c.hz, c.hz))
+        }
+        if (c.kind === 'segment') {
+          const ex = c.x2 - c.x1
+          const ez = c.z2 - c.z1
+          const l2 = ex * ex + ez * ez
+          const t = l2 < 1e-12 ? 0 : clamp(((x - c.x1) * ex + (z - c.z1) * ez) / l2, 0, 1)
+          return c.r + R - Math.hypot(x - (c.x1 + ex * t), z - (c.z1 + ez * t))
+        }
+        return c.r + R - Math.hypot(x - c.x, z - c.z)
+      }
+      let solid = -Infinity
+      let pair = Infinity
+      for (const id of ids) {
+        const g = info[id]
+        for (const c of cs) solid = Math.max(solid, depth(c, g.x, g.z))
+      }
+      for (let i = 0; i < ids.length; i++) {
+        for (let j = i + 1; j < ids.length; j++) {
+          const a = info[ids[i]]
+          const b = info[ids[j]]
+          pair = Math.min(pair, Math.hypot(a.x - b.x, a.z - b.z))
+        }
+      }
+      return { animals: ids.length, solid, pair }
+    })
+  const series = []
+  for (let k = 0; k < 20; k++) {
+    series.push(await readOverlap())
+    await nextFrames(3)
+  }
+  const solids = series.filter((s) => s.animals >= 1)
+  const pairs = series.filter((s) => s.animals >= 2)
+  const deepest = solids.length > 0 ? Math.max(...solids.map((s) => s.solid)) : 0
+  const closest = pairs.length > 0 ? Math.min(...pairs.map((s) => s.pair)) : 0
+  check(
+    'no settlement animal stands inside a fence, hut or prop (point 413)',
+    solids.length >= 10 && deepest < 0.02,
+    solids.length >= 10
+      ? `${solids.length} samples, deepest penetration ${deepest.toFixed(3)} m`
+      : `MEASURED NOTHING — only ${solids.length} samples carried an animal`,
+  )
+  check(
+    'no settlement animal stands inside another one (point 413)',
+    pairs.length >= 10 && closest > 0.45,
+    pairs.length >= 10
+      ? `${pairs.length} samples, closest pair ${closest.toFixed(2)} m`
+      : `MEASURED NOTHING — only ${pairs.length} samples carried two animals`,
+  )
+  // The picture behind the numbers. The probe borrows the camera and hands the
+  // pose back exactly as it found it (the lesson of point 375).
+  const aimed = await page.evaluate(() => {
+    const p = window.__placePlayer
+    const herd = Object.values(window.__placeGoatGait ?? {})
+    if (!p || herd.length === 0) return null
+    const pose = { x: p.x, z: p.z, yaw: p.yaw }
+    const cx = herd.reduce((s, g) => s + g.x, 0) / herd.length
+    const cz = herd.reduce((s, g) => s + g.z, 0) / herd.length
+    const d = Math.hypot(cx - p.x, cz - p.z) || 1
+    p.x = cx - ((cx - p.x) / d) * 7
+    p.z = cz - ((cz - p.z) / d) * 7
+    p.yaw = Math.atan2(-(cx - p.x), -(cz - p.z))
+    return { pose, cx, cz }
+  })
+  if (aimed) {
+    await nextFrames(2)
+    // The subject is the HERD, so the shutter projects it (point 375): a frame
+    // named after the goats must have the goats in it.
+    await frame('143-village-goat-separation', {
+      local: { x: aimed.cx, y: 0.5, z: aimed.cz },
+      label: 'the goats, each on its own ground',
+    })
+    await page.evaluate((pose) => {
+      const p = window.__placePlayer
+      if (!p) return
+      p.x = pose.x
+      p.z = pose.z
+      p.yaw = pose.yaw
+    }, aimed.pose)
+  }
+}
 // Point 300, slope footing: a silhouette on a dune must lie ON the incline —
 // its body pitched over its own wheelbase, and each foot then seated on the
 // ground under ITS OWN spot — so the planted foot touches the ground drawn
@@ -464,12 +569,20 @@ const stepUntil = async (ready, arg = null, capFrames = 240) => {
 // gap between the tracked foot and that ground, in units of the animal's own
 // height, and specifically on the silhouettes standing on a genuinely SLOPED
 // spot (front and back footing differ).
+// It is measured as a SERIES, and where the slope actually is (point 412). The
+// old check read ONE instant at maasai-village and passed while reporting
+// `slope over the wheelbase [0.00 x4]` and `pitch [0.000 x4]`: the silhouettes
+// there stand on the flat disc-horizon line, so the seating under test was a
+// NO-OP in the measured frame — a verdict without its population, the same
+// class as retrospective §3.47 one step on. Now many frames are sampled, the
+// samples that stood on genuinely sloped ground are COUNTED, and a count of
+// zero FAILS. `judgeFootingSeries` holds that decision and is pure-tested in
+// scripts/verify/footingSeries.test.mjs.
 {
   // The TRACKED leg is only planted for half of each cycle, and a single sampled
-  // instant can catch every silhouette mid-swing — which left both checks below
-  // measuring the empty set. Step frames until at least one really stands on it,
-  // reading the feet in the SAME evaluate as the test so the pose cannot change
-  // between deciding and measuring.
+  // instant can catch every silhouette mid-swing. Reading the feet in the SAME
+  // evaluate as the test keeps the pose from changing between deciding and
+  // measuring.
   const readFeet = () =>
     page.evaluate(() =>
       Object.values(window.__placePanoramaWildlifeInfo ?? {})
@@ -482,26 +595,57 @@ const stepUntil = async (ready, arg = null, capFrames = 240) => {
           stretch: w.stretch,
         })),
     )
-  let feet = await readFeet()
-  for (let f = 0; f < 240 && feet.length === 0; f++) {
-    await nextFrames(1)
-    feet = await readFeet()
+  const sampleSeries = async (frames) => {
+    const out = []
+    for (let f = 0; f < frames; f++) {
+      out.push(...(await readFeet()))
+      await nextFrames(2)
+    }
+    return out
   }
-  const rel = feet.map((f) => Math.abs(f.gap) / Math.max(1e-6, f.h))
+  const goTo = async (id) => {
+    await page.evaluate((want) => {
+      const g = window.__game.getState()
+      if (g.placeId) g.leavePlace()
+      g.enterPlace(want)
+    }, id)
+    await page
+      .waitForFunction((want) => window.__game.getState().placeId === want && !!window.__placeLayout, id, { timeout: 40000 })
+      .catch(() => {})
+    await page.waitForFunction(() => Object.keys(window.__placePanoramaWildlifeInfo ?? {}).length >= 3, null, { timeout: 25000 }).catch(() => {})
+  }
+  // Settlements whose backdrop relief RISES, measured: pedi-village puts every
+  // stance sample on a slope (Drakensberg foothills), sidama-village and
+  // capetown a smaller share. maasai-village, where this check used to run, and
+  // berber-village both measure 0.000 across 150 samples — the flat disc line.
+  // The first place that supplies a population is used; falling through them all
+  // is itself a failure, never a quiet pass.
+  const SLOPED_PLACES = ['pedi-village', 'sidama-village', 'capetown']
+  let series = []
+  let where = null
+  for (const id of SLOPED_PLACES) {
+    await goTo(id)
+    series = await sampleSeries(30)
+    where = id
+    if (judgeFootingSeries(series).sloped >= MIN_SLOPED_SAMPLES) break
+  }
+  // The place goes in the DETAIL, never in the check NAME: the flake and
+  // baseline classifiers match checks by name, and a name that moved with the
+  // sampling place would read as a different check every run.
+  const footing = judgeFootingSeries(series)
   check(
-    'every planted panorama foot touches the ground drawn under it (point 300)',
-    feet.length >= 1 && rel.every((r) => r < 0.05),
-    feet.length >= 1
-      ? `foot gap / body height [${rel.map((r) => r.toFixed(3)).join(', ')}], slope over the wheelbase [${feet
-          .map((f) => f.slope.toFixed(2))
-          .join(', ')}], leg reach [${feet.map((f) => (f.stretch ?? 1).toFixed(2)).join(', ')}]`
-      : 'MEASURED NOTHING — no visible silhouette had its tracked leg in stance within the frame cap',
+    'every planted panorama foot touches the ground drawn under it, on SLOPED ground (points 300/412)',
+    footing.ok,
+    `at ${where} — ${footing.detail}`,
   )
+  const leaning = judgePitchSeries(series)
   check(
-    'no panorama body leans past a stand-able incline, however steep the backdrop reads (point 300)',
-    feet.length >= 1 && feet.every((f) => Math.abs(f.pitch) <= 0.3 + 1e-6),
-    feet.length >= 1 ? `pitch [${feet.map((f) => f.pitch.toFixed(3)).join(', ')}]` : 'MEASURED NOTHING — no silhouette in stance',
+    'no panorama body leans past a stand-able incline, however steep the backdrop reads (points 300/412)',
+    leaning.ok,
+    `at ${where} — ${leaning.detail}`,
   )
+  // Hand the scene back to the settlement the rest of this suite expects.
+  await goTo('maasai-village')
 }
 check(
   'every panorama silhouette reads small (bounded subtended angle, point 94)',

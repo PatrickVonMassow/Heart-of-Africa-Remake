@@ -29,6 +29,7 @@ import { useGame } from '../../state/store'
 import { START_YEAR, balance } from '../../config/balance'
 import type { RegionPlaceStyle } from './regionStyles'
 import { resolveMove, tryNudgeToFree, WALKER_RADIUS, type Collider } from './collision'
+import { animalAnchors, animalBodies, animalScene, stepAnimal, turnToward, ANIMAL_TURN_RATE } from './animalSpots'
 import { PORT_TALKERS, VILLAGE_SPOTS } from './lifeSpots'
 
 /** Collision radius of inhabitants (matches the player's). */
@@ -176,7 +177,7 @@ function Kids({ x, z, cloth, colliders }: { x: number; z: number; cloth: string[
         pos.current[i] = p
       }
       const k = Math.min(1, dt * 3.5)
-      const [px, pz] = resolveMove(colliders, p.x + (tx - p.x) * k, p.z + (tz - p.z) * k, NPC_RADIUS)
+      const [px, pz] = resolveMove(colliders, p.x + (tx - p.x) * k, p.z + (tz - p.z) * k, NPC_RADIUS, [p.x, p.z])
       const dx = px - p.x
       const dz = pz - p.z
       p.x = px
@@ -217,18 +218,12 @@ function Goats({ seed, count, pen, colliders }: { seed: number; count: number; p
   // The shared smooth-shaded fauna material (point 214) — the goats stand at
   // first-person range, where flat shading would read as hard panels.
   const material = useMemo(() => createFaunaMaterial(), [])
-  const anchors = useMemo(() => {
-    const rand = mulberry32((seed + 31337) >>> 0)
-    return Array.from({ length: count }, () => {
-      const a = rand() * Math.PI * 2
-      if (pen) {
-        const r = rand() * (pen.r - 1.6)
-        return { x: pen.x + Math.cos(a) * r, z: pen.z + Math.sin(a) * r, phase: rand() * Math.PI * 2, amp: 0.6 }
-      }
-      const r = 9 + rand() * 12
-      return { x: Math.cos(a) * r, z: Math.sin(a) * r, phase: rand() * Math.PI * 2, amp: 1.5 }
-    })
-  }, [seed, count, pen])
+  // Grazing spots validated against the collider set, and one body per animal so
+  // the herd is an obstacle to itself (point 413) — both in `animalSpots`, where
+  // the fast test layer can pin them.
+  const anchors = useMemo(() => animalAnchors(seed, count, pen, colliders), [seed, count, pen, colliders])
+  const bodies = useMemo(() => animalBodies(anchors), [anchors])
+  const scene = useMemo(() => animalScene(colliders, bodies), [colliders, bodies])
   const refs = useRef<Array<THREE.Group | null>>([])
   // Per-goat leg-pivot groups (four each) and gait state (last position, walked
   // distance, held facing) so the swing rides distance and the body faces travel.
@@ -239,18 +234,44 @@ function Goats({ seed, count, pen, colliders }: { seed: number; count: number; p
   if (gait.current.length !== anchors.length) {
     gait.current = anchors.map((a) => ({ x: a.x, z: a.z, dist: 0, yaw: 0 }))
   }
-  useFrame(({ clock }) => {
+  useFrame(({ clock }, rawDt) => {
     const t = clock.elapsedTime
+    const dt = Math.min(rawDt, 0.1)
+    // Publish every animal's last position into the scene before anyone moves,
+    // so each of them resolves against where the others actually stand.
+    for (let i = 0; i < bodies.length; i++) {
+      const s = gait.current[i]
+      if (!s) continue
+      bodies[i].x = s.x
+      bodies[i].z = s.z
+    }
     refs.current.forEach((g, i) => {
       const a = anchors[i]
       const s = gait.current[i]
       if (!g || !a || !s) return
       const wob = Math.sin(t * 0.2 + a.phase)
-      const [px, pz] = resolveMove(colliders, a.x + wob * a.amp, a.z + Math.cos(t * 0.17 + a.phase) * a.amp, NPC_RADIUS)
+      // Swept from the position this animal actually holds (point 413): the old
+      // position-only test resolved the raw wobble point, so the moment that
+      // point crossed the ridge between two post circles the goat was pushed
+      // out on the FAR side of the fence.
+      const [px, pz] = stepAnimal(
+        scene,
+        bodies,
+        i,
+        a.x + wob * a.amp,
+        a.z + Math.cos(t * 0.17 + a.phase) * a.amp,
+        s.x,
+        s.z,
+      )
       const vx = px - s.x
       const vz = pz - s.z
+      // The body swings round toward its travel direction at a bounded rate
+      // (point 413). Snapping straight to the raw per-frame velocity made an
+      // animal that met a fence — or, now, another animal — flip 180 degrees
+      // between two frames, which is the "changes direction abruptly" half of
+      // the report; a goat pivots fast, but not instantly.
+      s.yaw = turnToward(s.yaw, faceVelocity(vx, vz, s.yaw), ANIMAL_TURN_RATE * dt)
       s.dist += Math.hypot(vx, vz)
-      s.yaw = faceVelocity(vx, vz, s.yaw)
       s.x = px
       s.z = pz
       // Swing the legs on the distance-driven phase at this rig's own cadence,
@@ -361,6 +382,8 @@ function Porters({
     })
   }, [seed, stops, count])
   const refs = useRef<Array<THREE.Group | null>>([])
+  // Where each porter actually stands, so its move can be swept from there.
+  const pos = useRef<Array<{ x: number; z: number } | null>>([])
   useFrame(({ clock }) => {
     const t = clock.elapsedTime
     refs.current.forEach((g, i) => {
@@ -371,7 +394,10 @@ function Porters({
       const x = r.ax + (r.bx - r.ax) * u
       const z = r.az + (r.bz - r.az) * u
       const dir = Math.cos(t * r.speed + r.phase) >= 0 ? 1 : -1
-      const [px, pz] = resolveMove(colliders, x, z, NPC_RADIUS)
+      const p = (pos.current[i] ??= { x, z })
+      const [px, pz] = resolveMove(colliders, x, z, NPC_RADIUS, [p.x, p.z])
+      p.x = px
+      p.z = pz
       g.position.set(px, Math.abs(Math.sin(t * 5 + r.phase)) * 0.05, pz)
       g.rotation.y = Math.atan2((r.bx - r.ax) * dir, (r.bz - r.az) * dir)
     })
@@ -636,7 +662,7 @@ function TaskWalker({
       s.z += (dz / d) * step
       s.yaw = Math.atan2(dx, dz)
     } else {
-      const [nx, nz] = resolveMove(colliders, s.x + (dx / d) * step, s.z + (dz / d) * step, NPC_RADIUS)
+      const [nx, nz] = resolveMove(colliders, s.x + (dx / d) * step, s.z + (dz / d) * step, NPC_RADIUS, [s.x, s.z])
       if (Math.hypot(nx - s.x, nz - s.z) < step * 0.25) s.seg++ // blocked: skip ahead
       s.x = nx
       s.z = nz
@@ -826,7 +852,7 @@ function Walkers({
       } else {
         // Solid objects block inhabitants too; slide along and skip the
         // waypoint if blocked for too long (design.md §2 collision).
-        const [nx, nz] = resolveMove(colliders, s.x + (dx / d) * step, s.z + (dz / d) * step, NPC_RADIUS)
+        const [nx, nz] = resolveMove(colliders, s.x + (dx / d) * step, s.z + (dz / d) * step, NPC_RADIUS, [s.x, s.z])
         const moved = Math.hypot(nx - s.x, nz - s.z)
         s.x = nx
         s.z = nz

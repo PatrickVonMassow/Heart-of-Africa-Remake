@@ -39,6 +39,7 @@ export const NON_RENDER_VERIFY = new Set([
   'baseline-classify.mjs',
   'docs.mjs',
   'fixedWaits.mjs',
+  'footingSeries.mjs', // the slope-footing verdict; polish.mjs hands it the samples
   'frameSubject-core.mjs',
   'frameSubject.mjs', // the frame shutter's decision layer; the suites hand it their page
   'liveness.mjs', // main-thread liveness ATTRIBUTION; the suites do the driving

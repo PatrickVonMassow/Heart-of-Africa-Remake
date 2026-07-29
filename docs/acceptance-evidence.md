@@ -893,6 +893,24 @@ sweep spawn-free across seeds (`src/scenes/place/layout.test.ts`); live,
 no walker stays pinned past the window (`scripts/verify/collision.mjs`);
 the application runs without console errors (`scripts/verify/collision.mjs`).
 
+The swept move and the fence panels (point 413) are pinned in the fast layer.
+`src/scenes/place/collision.test.ts` holds the segment collider (the whole run
+between two posts blocks; the push-out follows the WALL normal rather than a
+post radius, which is where the reported "abrupt turn" came from) and the swept
+`resolveMove` (a step across a panel stops at the near edge — the un-swept call,
+kept for spawns and teleports, lands on the far side; ten collider widths still
+stop at the near edge; sliding survives; an overlapping mover is still pushed
+out; a gate stays passable; an over-long move is truncated, never tunnelled).
+`src/scenes/place/layout.test.ts` sweeps every place and seed: neighbouring
+panel colliders leave no opening as wide as an inhabitant, every gate stays
+walkable, and every animal grazing anchor is spawn-free in every village.
+`src/scenes/place/animalSpots.test.ts` pins the anchor validation, the herd's
+mutual separation (two animals released onto one spot end apart) and the
+reported case itself — an animal driven at a real village fence for 60 frames
+never ends up on the far side; the pre-fix code ends 1.5 m inside in hausa-,
+maasai- and tuareg-village, which is what makes that test a witness rather than
+a restatement. Live: the goats in `scripts/verify/polish.mjs`.
+
 ## 17. Localization.
 
 Verifiable: screenshots of the status bar, journal, a trade
@@ -1212,6 +1230,23 @@ scale-normalised gait distance pure-tested in
 `src/scenes/place/backdrop.test.ts` (the sight-line geometry, the drop as
 the viewer nears, relief-following on a dune, and both old failure modes
 swept round Cairo).
+
+The slope-footing half of that gate is a SERIES, and it runs where the slope is
+(point 412). It used to read one instant at the Maasai village and PASS while
+reporting `slope over the wheelbase [0.00 x4]` and `pitch [0.000 x4]` — the
+silhouettes there stand on the flat disc-horizon line, so the seating under test
+never ran in the measured frame: a verdict without its population. It now
+samples ~30 frames, counts the samples that stood on genuinely sloped ground and
+judges only those, FAILING when that count is zero and naming the count. The
+place is measured rather than assumed — `pedi-village` puts every stance sample
+on a slope, `sidama-village` and `capetown` a smaller share, `maasai-village`
+and `berber-village` 0.000 across 150 samples — and the PASS line names which
+place supplied the population. The decision itself is the pure module
+`scripts/verify/footingSeries.mjs`, pinned by
+`scripts/verify/footingSeries.test.mjs`: an empty series, an all-flat series and
+a too-thin sloped population each fail with their own reason, a mixed series is
+judged on its sloped samples alone, and a sloped foot hanging off its ground
+fails.
 
 The seam that footing worked around is CLOSED (point 381). What tore it: the
 backdrop's relief floor was a flat −6 while `backdropTaper` reaches 1 within
