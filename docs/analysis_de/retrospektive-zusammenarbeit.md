@@ -483,6 +483,16 @@ Die Reparatur war nicht, den Fall zu umgehen — eine Schätzung von Hand nachzu
 
 **Lehren:** Wo ein Modul schreibt, was ein anderes prüft, gehört der geprüfte Wert **importiert**, nicht wiederholt — eine zweite Formulierung derselben Regel ist eine Sollbruchstelle mit Verzögerungszündung. Und: Wenn ein grüner Bereich rot wird, ohne dass jemand ihn angefasst hat, ist die erste Frage nicht „welcher Test ist kaputt", sondern „welcher Zustand hat sich unter dem Test verändert" — hier war es eine Datei, die gar nicht im Testverzeichnis liegt.
 
+### 3.54 Der Beweis, den eine ungeprüfte Anweisung schreibt
+
+Am 29.07.2026 meldete der `model-guard` einen Verstoß gegen die Modell-Politik: zwei frische Commits trugen einen Co-Author-Trailer außerhalb der Erlaubnisliste, die geforderte Reaktion ist das Anhalten des Batches. Tatsächlich war das ausführende Modell zugelassen. Falsch war der **Trailer** — und zwar, weil die delegierende Sitzung ihn im Auftragstext selbst diktiert hatte, in der generischen Form ohne Modellnamen. Der Guard prüft auf den Namen; ein ungenannter Autor ist ihm damit ein verbotener.
+
+Der Punkt ist nicht der Tippfehler, sondern die Bauform: Ein Durchsetzer prüft hier ein **Artefakt, das eine Anweisung erzeugt, die er nie sieht**. Zwischen der Regel und ihrem Beweis liegt ein frei formulierter Prompt, und dort kann die Regel unbemerkt anders buchstabiert werden — dieselbe Bewegung wie §3.53, nur dass die zweite Buchstabierung diesmal nicht in einem Modul steht, sondern in natürlicher Sprache. Ein falscher Alarm ist dabei nicht harmlos: Er ist von einer echten Degradation (§3.17) nicht zu unterscheiden, und genau das kostet die Zeit — die Sitzung muss erst beweisen, dass sie kein Problem ist.
+
+Die Reparatur folgt derselben Linie: Die Trailer-Form gehört nicht in jeden Prompt neu geschrieben, sondern aus einer Quelle bezogen — und der Guard soll den ungenannten Autor als *unbekannt* behandeln statt als *verboten* (Arbeitsauftrag Punkt 397, aus demselben Befund entstanden). Bis dahin trägt die Delegations-Regel die Form ausdrücklich.
+
+**Lehre:** Wenn ein Guard ein Artefakt liest, ist die eigentliche Frage, **wer dieses Artefakt schreibt**. Steht dazwischen ein Text, den niemand prüft, ist die Durchsetzung nur so belastbar wie die Sorgfalt in diesem Text — und ein Guard, dessen häufigster Treffer ein Eigentor ist, verliert genau die Autorität, für die er gebaut wurde.
+
 ---
 
 ## 4. Die Guards als Immunsystem
@@ -572,7 +582,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Mittwoch, 29.07.2026, 06:49 · Quellen-Fingerprint: `966d82ae8cc6…`
+Zuletzt aktualisiert: Mittwoch, 29.07.2026, 07:26 · Quellen-Fingerprint: `2eef73ff6b2e…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -586,7 +596,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | The batch dashboard — its live GH-Pages transport, its BINDING four-section structure (never change without explicit user go) and update discipline | 8 | hoch | batch-autostart.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs, dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
 | RETIRED 27.07.2026 — this was a 16.07. work-in-progress handoff, not a rule; what survives is the research foundation, the accuracy principle and the §13-placeholder carve-out | 3 | mittel | batch-autostart.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs | ✔ Mechanismus |
 | The batch dashboard may leave the private claude.ai artifact for a publicly readable transport — privacy is no longer a constraint | 1 | niedrig | board-first-guard.mjs, dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
-| Delegate via `node scripts/point-brief.mjs <N>` — the AGENT generates its own brief; board changes go through `scripts/board.mjs`; expect 529 agent deaths and commit-per-step | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
+| Delegate via `node scripts/point-brief.mjs <N>` — the AGENT generates its own brief; board changes go through `scripts/board.mjs`; expect 529 agent deaths and commit-per-step | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Jede Chat-Antwort mit einem Zeitstempel nach deutscher Zeit (Europe/Berlin, DST-korrekt) beginnen | 11 | hoch | timestamp-guard.mjs | ✔ Mechanismus |
 | CLAUDE.md §7.1 references design.md instead of retelling it; future doc edits must preserve the verifiable conditions, script mappings, numbering and checked numbers | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Autonomously insert a full CLOSING cycle (regression + dead-code/stale-doc cleanup + .md audit) when warranted — after extensive rework or many small completed tasks — without waiting for the user to ask | 1 | niedrig | closing-guard.mjs | ✔ Mechanismus |
@@ -648,6 +658,6 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 66 Feedback-/Projekt-Memories · 36 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 18 Prozess-/Meta-TASKS-Punkte (davon 8 offen).
 
-<!-- RETRO-FINGERPRINT: 966d82ae8cc6eec9c7cc5ef11d9232ed65e20dbceaeeb7e7cb9ccc276b517951 -->
-<!-- RETRO-LAST-REFRESHED: 2026-07-29T04:49:14.867Z -->
+<!-- RETRO-FINGERPRINT: 2eef73ff6b2ef6af6920824cbf8718772c1cc46ee97b7e01da243f3e195c5d46 -->
+<!-- RETRO-LAST-REFRESHED: 2026-07-29T05:26:38.121Z -->
 <!-- AUTO-GENERATED:END -->
