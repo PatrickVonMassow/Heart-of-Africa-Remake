@@ -3673,14 +3673,29 @@ read that as "the criterion and its evidence section".
   symptoms with the one correct behaviour: stop at the wall and slide along it. Both
   symptoms must be gone, not only the clipping — a fix that merely stops the tunnelling
   and keeps the sideways jerk has fixed half the report.
+  (c) THE ANIMALS DO NOT SEE EACH OTHER, AND THEIR HOME SPOT IS NEVER CHECKED. Second
+  report the same night (`(1).zip`, tuareg-village, north, 57.42 / -232.22, medium):
+  "wildes Durcheinanderclippen" — the picture shows several goats standing INSIDE one
+  another and inside a tent, among rocks. Two causes, both in `Goats` in `PlaceLife.tsx`:
+  no animal is part of the collider set, so `resolveMove` can never separate two goats;
+  and a goat's anchor is drawn as a bare radius around the centre (`r = 9 + rand() * 12`)
+  with NO validation against the colliders — an anchor may sit inside a tent or a rock,
+  and the ±1.5 wobble then drives the animal in and out of it forever. Point 155 already
+  did exactly this validation for walker errand targets; the goats never got it. Fix
+  both: validate an animal's anchor the way point 155 validates a target (clear standing
+  circle, nudged to the nearest free spot otherwise), and give the animals mutual
+  separation — the cheapest correct form is to add each animal as a small dynamic
+  collider for the others' resolve step, so one routine keeps doing the work.
   VERIFIABLE: pure Vitest — a segment crossing a fence panel between two posts is
   stopped at the panel (today it passes through); a step of 10× the collider width is
   stopped at the near edge; sliding along a wall still works; an inhabitant standing
-  inside an overlap is still pushed out (the current behaviour must not regress); and a
+  inside an overlap is still pushed out (the current behaviour must not regress); a
   sweep over every fence in every generated village asserts no gap wider than the
-  smallest inhabitant radius between neighbouring panel colliders. Live
-  (`scripts/verify/polish.mjs`, BOTH backends): a goat driven at the fence for a long
-  run never ends up on the far side.
+  smallest inhabitant radius between neighbouring panel colliders; every generated
+  animal anchor stands on free ground in every village of every region; and two animals
+  released onto the same spot end up apart. Live (`scripts/verify/polish.mjs`, BOTH
+  backends): a goat driven at the fence for a long run never ends up on the far side,
+  and a photographed herd shows no body inside another body.
   DOCS in the same commit: CLAUDE.md §7.1 point 16, where settlement collision is
   described, gains the swept rule.
 
@@ -3735,6 +3750,39 @@ read that as "the criterion and its evidence section".
   on the record.
   DOCS in the same commit: design.md §19 where the wildlife is described, and
   `docs/graphics-detail-levels.md`.
+
+- [ ] 415. THE TUAREG TENT READS AS A HEAP OF SAND (29.07.2026, user in the Tuareg
+  village, North: "what are these cones supposed to be? Sand piles? They look more like
+  mini tents"). They ARE tents — `Tent` in `PlaceScene.tsx` is a single
+  `coneGeometry(r·1.25, h)` in the cloth material, a 0.45-unit pole and a small dark
+  entrance flap. Standing on pale sand in the pale cloth colour, a smooth tall cone
+  reads as a dune, and the flap is far too small to say otherwise. The user's reaction
+  is the correct one: nothing in the shape says "someone lives here".
+  THE REAL FORM IS ALMOST THE OPPOSITE, and it is what makes it readable: a Tuareg tent
+  (ehen) of that period is LOW and WIDE, not tall and pointed — mats or hides stretched
+  over an arched wooden frame, dark against the sand, with the long side open toward the
+  lee and the frame's poles and guy lines visible. Height well under a standing person,
+  width several times the height. RESEARCH IT FIRST against `docs/peoples-1890.md`
+  (Tuareg material is in §2.4 and §7.2) and record what the sources support before
+  modelling; where the evidence is thin, say so in the point rather than inventing
+  detail — the accuracy principle of this project applies to dwellings as much as to
+  clothing, and the guide's own rule is that a real system is never faked.
+  WHAT TO BUILD: replace the cone for the NORTH dwelling kind with the arched form —
+  a low curved shell, dark mat/hide colouring against the light ground, an open side,
+  and the frame legible at eye height (design.md §2.6 asks for structure and weathering
+  at eye height, which a smooth cone cannot carry). Keep it cheap: this is a village
+  dressing element and appears many times.
+  CHECK THE OTHER PEOPLES' TENTS at the same time: the `tent` kind is also used to dress
+  the market in other regions. Those are trade awnings, not dwellings, and must not
+  inherit the desert form — say which shape each use gets.
+  VERIFIABLE: pure Vitest on the geometry description (the north dwelling is wider than
+  it is tall, and the market awning is not the same part), plus the existing layout
+  tests. Live (`scripts/verify/polish.mjs`, BOTH backends, screenshot): the Tuareg
+  village photographed at eye height — the tents must be distinguishable from the ground
+  by colour as well as by shape, which is exactly what fails today.
+  DOCS in the same commit: `docs/peoples-1890.md` §8 (the research-to-game table) gains
+  the dwelling row for the Tuareg, per the standing rule that the implementation
+  sections move with the rendering.
 
 ## Closing (only after all points)
 
