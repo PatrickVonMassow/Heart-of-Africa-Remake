@@ -32,20 +32,16 @@
 // block `--synced` and create the very block loop this design exists to
 // prevent.
 
-import { parseTasks, QUEUE_STUB_META } from './dashboard-guard-core.mjs'
+import { parseTasks, QUEUE_STUB_BODY, QUEUE_STUB_META } from './dashboard-guard-core.mjs'
 import { FINDER_POINTS, RELEASE_TAG_POINT } from './queue-order-guard-core.mjs'
 
 // The stub meta is DEFINED beside the audit rule that exempts it and re-exported
 // here: two copies of that string would be a block loop waiting to happen.
-export { QUEUE_STUB_META }
+export { QUEUE_STUB_BODY, QUEUE_STUB_META }
 
 /** Where the queue's prose and order live (git-ignored, like the board itself). */
 export const QUEUE_DATA_PATH = '.claude/board-queue.json'
 
-/** The body a point gets while nobody has written one. */
-export const QUEUE_STUB_BODY =
-  'Noch keine Beschreibung auf dem Board — der Punkt steht im Arbeitsauftrag. ' +
-  'Text setzen: node scripts/board.mjs queue <N> "<Text>".'
 
 /** Minimal HTML escaping for text that goes into a card. */
 export function esc(text) {
@@ -80,6 +76,22 @@ export function parseTaskTitles(text, { maxLength = 90 } = {}) {
 }
 
 /**
+ * A card body as the list of paragraphs it renders to. Accepts a single string
+ * (one paragraph) or an array of them, and drops anything empty.
+ *
+ * The array form exists because the derived queue could only ever emit ONE <p>,
+ * while the hand-kept board it replaced carried two or three per card — and the
+ * conciseness guard flags exactly the long unbroken paragraph that collapsing
+ * them produces. A body restored from the old board would have tripped the guard
+ * it was restored to satisfy.
+ */
+export function paragraphs(value) {
+  const one = (v) => (typeof v === 'string' && v.trim() ? v.trim() : null)
+  const list = (Array.isArray(value) ? value : [value]).map(one).filter(Boolean)
+  return list.length ? list : null
+}
+
+/**
  * Bring a stored data file into a shape the renderer can trust. Everything is
  * optional and everything hostile is dropped: this file is hand-editable and a
  * torn or half-typed one must degrade to stubs, never throw inside a hook.
@@ -97,7 +109,7 @@ export function normaliseQueueData(raw) {
     const n = Number(key)
     if (!Number.isInteger(n) || n <= 0 || !value || typeof value !== 'object') continue
     const str = (v) => (typeof v === 'string' && v.trim() ? v.trim() : null)
-    points[n] = { title: str(value.title), body: str(value.body), estimate: str(value.estimate) }
+    points[n] = { title: str(value.title), body: paragraphs(value.body), estimate: str(value.estimate) }
   }
   return { order, points }
 }
@@ -147,7 +159,7 @@ export function queueEntries({ open = [], data = null, exclude = [], titles = {}
     out.push({
       point,
       title: entry.title || titles[point] || `Punkt ${point}`,
-      body: entry.body || QUEUE_STUB_BODY,
+      body: entry.body ?? [QUEUE_STUB_BODY],
       meta: entry.estimate || QUEUE_STUB_META,
       stub,
     })
@@ -160,7 +172,9 @@ export function renderQueueCard({ point, title, body, meta }) {
   return (
     `<details>\n  <summary><span class="num">${Number(point)}</span><span class="t">${esc(title)}</span>` +
     `<span class="right"><span class="meta">${esc(meta)}</span></span></summary>\n` +
-    `  <div class="body">\n    <p>${esc(body)}</p>\n  </div>\n</details>\n`
+    `  <div class="body">\n${(paragraphs(body) ?? [QUEUE_STUB_BODY])
+      .map((p) => `    <p>${esc(p)}</p>\n`)
+      .join('')}  </div>\n</details>\n`
   )
 }
 

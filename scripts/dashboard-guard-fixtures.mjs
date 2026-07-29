@@ -58,7 +58,8 @@ export function boardHtml({
   // Every section folds behind its heading and the Erledigt section links its
   // archive page (point 371) — the fixture has to be a VALID board, or the
   // pre-existing invariant tests would read violations that are the fixture's.
-  return `<main><h1>Dashboard</h1>
+  return `<meta name="viewport" content="width=device-width, initial-scale=1">
+<main><h1>Dashboard</h1>
 <details class="sect"><summary><h2>Woran ich gerade arbeite</h2></summary>
 ${now}
 </details>

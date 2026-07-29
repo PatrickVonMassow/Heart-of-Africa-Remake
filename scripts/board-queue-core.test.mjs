@@ -15,6 +15,7 @@ import {
   importQueueFromHtml,
   normaliseQueueData,
   openPointsOf,
+  paragraphs,
   parseTaskTitles,
   queueEntries,
   queueOrder,
@@ -44,7 +45,7 @@ describe('normaliseQueueData — a hand-editable file must degrade, never throw'
   it('drops everything hostile and keeps the order unique', () => {
     const d = normaliseQueueData({ order: [3, '3', 0, -1, 'x', 2], points: { 5: { body: ' b ' }, 0: { body: 'n' }, z: {} } })
     expect(d.order).toEqual([3, 2])
-    expect(d.points).toEqual({ 5: { title: null, body: 'b', estimate: null } })
+    expect(d.points).toEqual({ 5: { title: null, body: ['b'], estimate: null } })
   })
   it('survives junk of every shape', () => {
     for (const raw of [null, undefined, 'x', 42, [], { points: 'no' }, { order: 'no' }]) {
@@ -76,7 +77,7 @@ describe('queueOrder — judgment first, work order second, finders last', () =>
 describe('queueEntries — every open point gets a card, and never two', () => {
   it('emits a STUB rather than nothing for a point with no prose', () => {
     const [e] = queueEntries({ open: [412], titles: { 412: 'Der Titel' } })
-    expect(e).toMatchObject({ point: 412, title: 'Der Titel', body: QUEUE_STUB_BODY, meta: QUEUE_STUB_META, stub: true })
+    expect(e).toMatchObject({ point: 412, title: 'Der Titel', body: [QUEUE_STUB_BODY], meta: QUEUE_STUB_META, stub: true })
   })
   it('falls back to the bare number when even the work order names nothing', () => {
     expect(queueEntries({ open: [412] })[0].title).toBe('Punkt 412')
@@ -85,7 +86,7 @@ describe('queueEntries — every open point gets a card, and never two', () => {
     const data = { points: { 412: { title: 'Board-Titel', body: 'Der Text.', estimate: '~3 h' } } }
     expect(queueEntries({ open: [412], data, titles: { 412: 'TASKS-Titel' } })[0]).toMatchObject({
       title: 'Board-Titel',
-      body: 'Der Text.',
+      body: ['Der Text.'],
       meta: '~3 h',
       stub: false,
     })
@@ -144,6 +145,40 @@ describe('renderQueueCard — the markup the guard parsers read, and no injectio
     expect(html).toContain('&lt;script&gt;')
     expect(html).toContain('a &amp; b')
     expect(html).toMatch(/<span class="num">7<\/span>/)
+  })
+
+  // The hand-kept board carried two or three paragraphs per card; the projection
+  // that replaced it could emit only one, which turns a restored body into the
+  // long unbroken paragraph the conciseness guard rejects.
+  it('renders one <p> per paragraph, and still accepts a bare string', () => {
+    const many = renderQueueCard({ point: 9, title: 'Neun', body: ['Erster.', 'Zweiter.'], meta: '~1 h' })
+    expect(many.match(/<p>/g)).toHaveLength(2)
+    expect(many).toContain('<p>Erster.</p>')
+    expect(many).toContain('<p>Zweiter.</p>')
+
+    const one = renderQueueCard({ point: 9, title: 'Neun', body: 'Nur einer.', meta: '~1 h' })
+    expect(one.match(/<p>/g)).toHaveLength(1)
+  })
+
+  it('drops empty paragraphs rather than rendering a blank one', () => {
+    const html = renderQueueCard({ point: 9, title: 'Neun', body: ['Da.', '   ', ''], meta: '~1 h' })
+    expect(html.match(/<p>/g)).toHaveLength(1)
+  })
+})
+
+describe('paragraphs — a body is a list, however it was written', () => {
+  it('normalises both shapes and refuses nothing else', () => {
+    expect(paragraphs('Eins.')).toEqual(['Eins.'])
+    expect(paragraphs(['Eins.', 'Zwei.'])).toEqual(['Eins.', 'Zwei.'])
+    expect(paragraphs('  ')).toBeNull()
+    expect(paragraphs([])).toBeNull()
+    expect(paragraphs(null)).toBeNull()
+    expect(paragraphs(42)).toBeNull()
+  })
+
+  it('survives a stored array in normaliseQueueData', () => {
+    const { points } = normaliseQueueData({ points: { 5: { body: ['A.', 'B.'] } } })
+    expect(points[5].body).toEqual(['A.', 'B.'])
   })
 })
 

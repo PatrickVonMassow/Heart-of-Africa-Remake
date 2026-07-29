@@ -21,9 +21,12 @@ import {
   evaluate,
   ERLEDIGT_ON_BOARD,
   ETA_GRACE_MIN,
+  QUEUE_STUB_BODY,
+  QUEUE_STUB_META,
 } from './dashboard-guard-core.mjs'
 
 import { boardHtml, green } from './dashboard-guard-fixtures.mjs'
+import { renderQueueCard } from './board-queue-core.mjs'
 
 
 describe('parseTasks', () => {
@@ -831,5 +834,103 @@ describe('the expected-end rule reaches the turn end', () => {
     expect(JSON.stringify(withClock)).toContain('now-eta-past')
     // Without a clock the rule stays silent — it is never guessed.
     expect(JSON.stringify(evaluate(green({ html: stale })))).not.toContain('now-eta-past')
+  })
+})
+
+describe('a queue of placeholders is a regression, not a valid board (point 419 d)', () => {
+  // The failure this counts: when the queue became a projection, the prose was
+  // never migrated — 79 of 81 cards carried the stub body and every existing
+  // rule passed, because the stub is exempt by name and coverage only asks that
+  // a point appear somewhere. Formally perfect, materially empty.
+  const stubCard = (n) =>
+    `<details><summary><span class="num">${n}</span><span class="t">Task ${n}</span>` +
+    `<span class="right"><span class="meta">${QUEUE_STUB_META}</span></span></summary>` +
+    `<div class="body"><p>${QUEUE_STUB_BODY}</p></div></details>`
+  const realCard = (n) =>
+    `<details><summary><span class="num">${n}</span><span class="t">Task ${n}</span>` +
+    `<span class="right"><span class="meta">~2 h</span></span></summary>` +
+    `<div class="body"><p>Echte Beschreibung für ${n}.</p></div></details>`
+
+  const boardWith = (cards) =>
+    boardHtml().replace(
+      /(<summary><h2>Warteschlange<\/h2><\/summary>\n)[\s\S]*?(\n<\/details>)/,
+      `$1${cards.join('\n')}$2`,
+    )
+  const codesFor = (cards, open) =>
+    auditDashboard(boardWith(cards), { open, done: [] }).map((x) => x.code)
+
+  it('flags a queue that is mostly placeholder', () => {
+    const cards = [1, 2, 3, 4, 5, 6, 7, 8].map(stubCard)
+    expect(codesFor(cards, [210, 1, 2, 3, 4, 5, 6, 7, 8])).toContain('queue-stubbed')
+  })
+
+  it('accepts a handful of fresh points among written ones', () => {
+    const cards = [realCard(1), realCard(2), realCard(3), realCard(4), realCard(5), realCard(6), stubCard(7)]
+    expect(codesFor(cards, [210, 1, 2, 3, 4, 5, 6, 7])).not.toContain('queue-stubbed')
+  })
+
+  it('flags a RUN of placeholders even when the share is under the ceiling', () => {
+    // 4 of 20 is 20 %, under the share ceiling — but a reader meets them in a row.
+    const cards = [
+      ...[1, 2, 3, 4].map(stubCard),
+      ...Array.from({ length: 16 }, (_, i) => realCard(i + 5)),
+    ]
+    const open = [210, ...Array.from({ length: 20 }, (_, i) => i + 1)]
+    expect(codesFor(cards, open)).toContain('queue-stubbed')
+  })
+
+  it('says nothing about an empty queue', () => {
+    expect(codesFor([], [210])).not.toContain('queue-stubbed')
+  })
+
+  it('recognises the exact body the generator emits, not a lookalike', () => {
+    const lookalike = [1, 2, 3, 4, 5, 6, 7, 8].map(
+      (n) =>
+        `<details><summary><span class="num">${n}</span><span class="t">Task ${n}</span>` +
+        `<span class="right"><span class="meta">~1 h</span></span></summary>` +
+        `<div class="body"><p>Noch offen, aber hier steht echter Text über den Punkt.</p></div></details>`,
+    )
+    expect(codesFor(lookalike, [210, 1, 2, 3, 4, 5, 6, 7, 8])).not.toContain('queue-stubbed')
+  })
+})
+
+describe('the placeholder rule has a floor, and reads the card the generator really writes', () => {
+  // Both findings of the second model's review of that rule.
+  const boardWith = (cards) =>
+    boardHtml().replace(
+      /(<summary><h2>Warteschlange<\/h2><\/summary>\n)[\s\S]*?(\n<\/details>)/,
+      `$1${cards.join('\n')}$2`,
+    )
+  const codesFor = (cards, open) =>
+    auditDashboard(boardWith(cards), { open, done: [] }).map((x) => x.code)
+  const stubCard = (n) => renderQueueCard({ point: n, title: `Task ${n}`, body: null, meta: QUEUE_STUB_META })
+  const realCard = (n) =>
+    renderQueueCard({ point: n, title: `Task ${n}`, body: `Echte Beschreibung für ${n}.`, meta: '~2 h' })
+
+  it('tolerates a single fresh point on a SHORT queue, where the bare ratio would not', () => {
+    // 1 of 3 is 33 %, over the share ceiling — and must not block a turn end.
+    expect(codesFor([stubCard(1), realCard(2), realCard(3)], [210, 1, 2, 3])).not.toContain('queue-stubbed')
+  })
+
+  it('still tolerates three, and flags the fourth on a short queue', () => {
+    const three = [stubCard(1), stubCard(2), realCard(3), stubCard(4), realCard(5)]
+    expect(codesFor(three, [210, 1, 2, 3, 4, 5])).not.toContain('queue-stubbed')
+    const four = [stubCard(1), stubCard(2), realCard(3), stubCard(4), realCard(5), stubCard(6)]
+    expect(codesFor(four, [210, 1, 2, 3, 4, 5, 6])).toContain('queue-stubbed')
+  })
+
+  it('catches the all-placeholder queue the rule was written for', () => {
+    const cards = Array.from({ length: 20 }, (_, i) => stubCard(i + 1))
+    const open = [210, ...Array.from({ length: 20 }, (_, i) => i + 1)]
+    expect(codesFor(cards, open)).toContain('queue-stubbed')
+  })
+
+  // The stub body goes through esc() on the way out and parseCards on the way
+  // back; building the fixture from the raw constant would not exercise that.
+  it('recognises a stub rendered through the real generator, entities and all', () => {
+    const rendered = Array.from({ length: 10 }, (_, i) => stubCard(i + 1))
+    expect(rendered[0]).toContain('&lt;N&gt;')
+    const open = [210, ...Array.from({ length: 10 }, (_, i) => i + 1)]
+    expect(codesFor(rendered, open)).toContain('queue-stubbed')
   })
 })

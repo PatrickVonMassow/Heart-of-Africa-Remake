@@ -110,5 +110,19 @@ export function structureViolations(html) {
     }
   }
 
+  // (5) The board carries its own viewport. It used to inherit one: as an
+  // artifact the fragment WAS the document, and the host set it. The Pages shell
+  // sets one too — and then `document.write` replaces the whole document with
+  // this fragment and the meta goes with the old one. Chrome falls back to its
+  // 980-px desktop viewport and scales the page down by roughly 2.4 on a phone,
+  // which is how the board became unreadable on the device it is read on.
+  // Carrying it here makes the property survive every transport.
+  if (!/<meta\s[^>]*name=["']?viewport["']?[^>]*>/i.test(m)) {
+    out.push({
+      code: 'viewport-missing',
+      msg: 'the board carries no <meta name="viewport"> — on a phone it renders at the 980-px desktop default',
+    })
+  }
+
   return out
 }
