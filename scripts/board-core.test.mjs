@@ -13,10 +13,14 @@ import {
   QUEUE_STUB_META,
 } from './dashboard-guard-core.mjs'
 import {
+  NO_CURRENT_WORK_TITLE,
   TEXT_STDIN_FLAG,
   addHours,
   berlinStamp,
+  closeCard,
   estimateHours,
+  hasCurrentWork,
+  parseDoneArgs,
   resolveCardText,
   hoursLabel,
   nowCard,
@@ -275,6 +279,105 @@ describe('toDone — current work into the archive', () => {
       `<span class="right"><span class="meta">10:07 · ~14:30</span></span></summary>\n` +
       `  <div class="body">\n  </div>\n</details>\n` })
     expect(() => toDone(bare, 365, { end: '16:45' })).toThrow(/empty body/)
+  })
+})
+
+// Point 416: the user reported an empty current-work section TWICE in one hour,
+// and the same window turned the unit layer red and blocked a green merge.
+// Archiving and the successor therefore land in ONE document.
+describe('closeCard — archiving a point never empties the board', () => {
+  const archiveLink = '<p class="archive-link">Ältere im <a href="https://example.invalid/archiv">Archiv</a>.</p>\n'
+  const board = () =>
+    fullBoard({
+      now: nowEntry(300, 'Der abgeschlossene Punkt', '10:07 · ~14:30'),
+      queue: queueEntry(416, 'Die leere Tafel', '~2 h'),
+      done: archiveLink,
+    })
+
+  it('pins the hole the two-step move opened — the intermediate document HAS no current work', () => {
+    const intermediate = toDone(board(), 300, { text: 'Fertig.', end: '16:45' })
+    expect(hasCurrentWork(intermediate)).toBe(false)
+    expect(hasCurrentWork(board())).toBe(true)
+  })
+
+  it('archives and promotes the successor in one document, with no empty state in between', () => {
+    const out = closeCard(board(), 300, { text: 'Fertig.', end: '16:45', next: 416, nextStatus: 'Angefangen.' })
+    expect(hasCurrentWork(out)).toBe(true)
+    expect(out).toContain('<span class="t">416 — Die leere Tafel</span>')
+    expect(out).toContain('<span class="meta">10:07 · 16:45</span>') // the archived card
+    expect(out).not.toContain('class="num">416') // …and the queue card is gone
+  })
+
+  it('names the gap with --none when there is genuinely nothing to promote', () => {
+    const out = closeCard(board(), 300, { end: '16:45', text: 'Fertig.', none: 'Sitzungsgrenze, der Nachfolger übernimmt.' })
+    expect(hasCurrentWork(out)).toBe(true)
+    expect(out).toContain(NO_CURRENT_WORK_TITLE)
+    expect(out).toContain('Sitzungsgrenze, der Nachfolger übernimmt.')
+  })
+
+  it('REFUSES a bare close that would empty the section, naming both ways out', () => {
+    expect(() => closeCard(board(), 300, { text: 'Fertig.', end: '16:45' })).toThrow(/--next <m>[\s\S]*--none/)
+  })
+
+  it('allows a bare close while another card keeps the section populated', () => {
+    const parallel = fullBoard({
+      now: nowEntry(300, 'Fertig', '10:07 · ~14:30') + nowEntry(301, 'Läuft weiter', '11:00 · ~15:00'),
+      queue: queueEntry(416, 'Die leere Tafel', '~2 h'),
+    })
+    const out = closeCard(parallel, 300, { text: 'Fertig.', end: '16:45' })
+    expect(hasCurrentWork(out)).toBe(true)
+    expect(out).toContain('301 — Läuft weiter')
+  })
+
+  it('refuses the contradictory pair and an unstated successor status', () => {
+    expect(() => closeCard(board(), 300, { end: '16:45', next: 416, nextStatus: 'x', none: 'y' })).toThrow(/never both/)
+    expect(() => closeCard(board(), 300, { text: 'F.', end: '16:45', next: 416, nextStatus: '  ' })).toThrow(/status text/)
+    // A blank reason is not a way out either — it would name nothing.
+    expect(() => closeCard(board(), 300, { text: 'F.', end: '16:45', none: '   ' })).toThrow(/needs a reason/)
+  })
+
+  it('leaves the produced board free of new audit violations', () => {
+    const before = new Set(auditDashboard(board(), { open: [416], done: [300] }).map((v) => v.code))
+    for (const out of [
+      closeCard(board(), 300, { text: 'Fertig.', end: '16:45', next: 416, nextStatus: 'Angefangen.' }),
+      closeCard(board(), 300, { text: 'Fertig.', end: '16:45', none: 'Warteschlange leer.' }),
+    ]) {
+      const added = auditDashboard(out, { open: [416], done: [300] })
+        .map((v) => v.code)
+        .filter((c) => !before.has(c))
+      expect(added).toEqual([])
+    }
+  })
+})
+
+describe('parseDoneArgs — the flags behind one closing call', () => {
+  it('splits text, successor and its status', () => {
+    expect(parseDoneArgs(['300', 'Fertig', 'und', 'gemerged', '--next', '416', 'Angefangen.'])).toEqual({
+      point: '300',
+      words: ['Fertig', 'und', 'gemerged'],
+      next: '416',
+      nextWords: ['Angefangen.'],
+      noneWords: [],
+      hasNone: false,
+    })
+  })
+
+  it('reads --none as its own bucket, and remembers a bare one', () => {
+    const out = parseDoneArgs(['300', '--none', 'Warteschlange', 'leer.'])
+    expect(out.next).toBeNull()
+    expect(out.noneWords).toEqual(['Warteschlange', 'leer.'])
+    expect(out.hasNone).toBe(true)
+    expect(parseDoneArgs(['300', '--none'])).toMatchObject({ hasNone: true, noneWords: [] })
+  })
+
+  it('insists that --next names a point number', () => {
+    expect(() => parseDoneArgs(['300', '--next', 'Angefangen.'])).toThrow(/POINT NUMBER/)
+    expect(() => parseDoneArgs(['300', '--next'])).toThrow(/needs a point number/)
+  })
+
+  it('never throws on nothing at all', () => {
+    expect(parseDoneArgs(undefined).point).toBeUndefined()
+    expect(parseDoneArgs([]).words).toEqual([])
   })
 })
 

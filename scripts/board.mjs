@@ -8,7 +8,9 @@
 //   node scripts/board.mjs now    <point> "<status>"  # queue → current work
 //   node scripts/board.mjs status <point> "<text>"    # restate a now-card's status
 //   node scripts/board.mjs queue  <point> ["<text>"]  # current work → back to queue
-//   node scripts/board.mjs done   <point> ["<text>"]  # current work → Erledigt
+//   node scripts/board.mjs done   <point> ["<text>"] --next <m> "<status>"
+//                                                     # archive + promote in ONE write
+//   node scripts/board.mjs done   <point> --none "<reason>"   # …or name the gap
 //   node scripts/board.mjs vdzk-remove "<title>"      # drop an answered question
 //   node scripts/board.mjs focus  <point> "<note>"    # declare focus + stamp
 //   node scripts/board.mjs attest                     # rotate, publish, audit, confirm
@@ -32,11 +34,12 @@ import { REPO_ROOT } from './repo-paths.mjs'
 import {
   TEXT_STDIN_FLAG,
   berlinStamp,
+  closeCard,
+  parseDoneArgs,
   promoteToNow,
   removeVdzk,
   resolveCardText,
   setCardStatus,
-  toDone,
   toNow,
   toQueue,
 } from './board-core.mjs'
@@ -118,10 +121,28 @@ try {
     if (!point) throw new Error('usage: board.mjs queue <point> ["<text>"|--text-stdin]')
     edit((html) => toQueue(html, point, { text: textOf(words) }), `${point} returned to the queue`)
   } else if (cmd === 'done') {
-    const [point, ...words] = rest
-    if (!point) throw new Error('usage: board.mjs done <point> ["<text>"|--text-stdin]')
+    // ONE edit, one write (point 416): archiving and the successor go into the
+    // same document, so the board is never observed without current work.
+    const { point, words, next, nextWords, noneWords, hasNone } = parseDoneArgs(rest)
+    if (!point) throw new Error('usage: board.mjs done <point> ["<text>"] [--next <m> "<status>" | --none "<reason>"]')
     const at = berlinStamp()
-    edit((html) => toDone(html, point, { text: textOf(words), end: at }), `${point} archived as done at ${at}`)
+    edit(
+      (html) =>
+        closeCard(html, point, {
+          text: textOf(words),
+          end: at,
+          next,
+          nextStatus: next == null ? '' : textOf(nextWords),
+          // A bare `--none` must reach the "needs a reason" refusal, not the
+          // one for a forgotten successor: the caller DID choose this way out.
+          none: hasNone ? textOf(noneWords) || ' ' : '',
+        }),
+      next != null
+        ? `${point} archived as done at ${at}; ${next} is current work in the same edit`
+        : hasNone
+          ? `${point} archived as done at ${at}; the board now names why nothing is running`
+          : `${point} archived as done at ${at}`,
+    )
   } else if (cmd === 'vdzk-remove') {
     const fragment = textOf(rest)
     if (!fragment) throw new Error('usage: board.mjs vdzk-remove "<title>"|--text-stdin')
@@ -147,7 +168,8 @@ try {
     console.log(run(['scripts/prep-guard.mjs', '--prepped']).trim())
   } else {
     console.error(
-      'usage: board.mjs now|status|queue|done <point> "<text>" | vdzk-remove "<title>" | ' +
+      'usage: board.mjs now|status|queue <point> "<text>" | ' +
+        'done <point> ["<text>"] [--next <m> "<status>" | --none "<reason>"] | vdzk-remove "<title>" | ' +
         'promote <point> "<times>" "<title>" "<status>" | focus <point> "<note>" | attest\n' +
         `Any "<text>" may be replaced by ${TEXT_STDIN_FLAG} and piped in — use that for German prose.`,
     )
