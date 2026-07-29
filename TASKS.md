@@ -3714,6 +3714,13 @@ read that as "the criterion and its evidence section".
   4. SORT IT INTO THE THREE QUALITY LEVELS (`QUALITY_PRESETS`, the §21 convention): the
      completeness gate fails a new optical feature that lacks low/medium/high entries,
      and `docs/graphics-detail-levels.md` is updated in the same commit.
+     THE LEVEL IS THE PRIMARY AXIS, decided by the user 29.07.2026: HIGH always carries
+     the walk, LOW never does, and MEDIUM is decided BY THE MEASUREMENT of step 3 — it
+     gets the walk if the F8 numbers on the user's own hardware show it comfortably
+     inside the frame budget, and stays without it if they do not. Do not guess that
+     value: run the benchmark, put the two rows (medium with and without) in the point's
+     record, and let them decide. The distance banding of step 3 is then a refinement
+     INSIDE a level that carries the feature, not a substitute for the level split.
   NOT IN SCOPE: foot-on-ground seating for bird's-eye animals. The settlement needed it
   because a silhouette stands on compressed backdrop relief; at travel distance the
   terrain under a walking animal is near-flat per stride, and seating every foot of a
