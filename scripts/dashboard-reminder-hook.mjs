@@ -125,7 +125,7 @@ console.log(
   'Mobil-Hochformat muss gut aussehen. Empfiehlst du dringend eine ' +
   'Strukturänderung, schreibe sie als Karte in »Von dir zu klären«. ' +
   'Bei JEDER Änderung: die GANZE Datei lesen, jede Sektion gegen den Ist-Zustand ' +
-  'prüfen (topaktuell, konsistent, redundanzfrei), dann per Artifact republishen.' +
+  'prüfen (topaktuell, konsistent, redundanzfrei), dann `node scripts/board-publish.mjs`.' +
   mtimeNote,
 )
 
@@ -133,8 +133,8 @@ console.log(
   '[focus-guard] Diese Nutzer-Nachricht hat den Fokus-Abgleich SCHARFGESCHALTET: bevor dieser ' +
   'Zug enden kann, musst du prüfen, ob die »Woran ich gerade arbeite«-Karte noch das nennt, was ' +
   'du WIRKLICH tust — dann `node scripts/focus.mjs confirm` (unverändert) oder `node scripts/' +
-  'focus.mjs set <N> "<was>"` + Karte aktualisieren + `node scripts/dashboard-publish.mjs` + ' +
-  'Artifact-Republish + `--synced` (geändert). Der Stop-Guard blockiert sonst das Zug-Ende.',
+  'focus.mjs set <N> "<was>"` + Karte aktualisieren + `node scripts/board-publish.mjs` + ' +
+  '`--synced` (geändert). Der Stop-Guard blockiert sonst das Zug-Ende.',
 )
 }
 

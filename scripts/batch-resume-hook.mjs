@@ -115,7 +115,7 @@ const RESUME_BODY =
   'OPUS 5, per the model policy stated below; Fable only reviews or stands in ' +
   '(each point on its own branch, gates green, pushed, not merged by the agent); the main ' +
   'session keeps only the picture-verification on both backends, the serial merge -> ' +
-  'fast-gate -> tick -> deploy -> cleanup, and the Artifact publish. Every defect the user ' +
+  'fast-gate -> tick -> deploy -> cleanup, and the board publish. Every defect the user ' +
   'reports on the deployed build during the batch is APPENDED as its own implementation-ready ' +
   'TASKS point (append-and-defer) on main and delegated in turn — never fixed ad hoc or ' +
   'dropped; the agent pool is capped at AT MOST 3 concurrent agents (user 26.07.2026 — ' +
