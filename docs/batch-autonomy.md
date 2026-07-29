@@ -737,6 +737,8 @@ unreadable page is **never** called current.
     node scripts/board-publish.mjs           # push the board live
     node scripts/board-publish.mjs --check   # fetch the live page and judge it
     node scripts/board-publish.mjs --url     # print the URLs
+    node scripts/board-queue.mjs             # rebuild the queue from the work order
+    node scripts/board-queue.mjs set <N> "…" # write one queue card's prose
 
 `scripts/board.mjs` runs the publish itself, so the one-command board loop keeps
 the live page current without a second step. **The stamp may not lie:** the
@@ -744,7 +746,20 @@ publisher REFUSES a board that does not show every open point — the fingerprin
 asserts that it does, and a board going live stamped current while a card is
 missing is exactly the 28.07. failure, only now with two green checks over it.
 That is invariant (4) of the Stop audit applied earlier, like the structure gate
-beside it; editing the board is never blocked, so there is no way to get stuck.
+beside it. The way out is the GENERATOR, not a hand edit: `board-queue.mjs`
+rebuilds the Warteschlange as a projection of TASKS.md over the prose in
+`.claude/board-queue.json`, giving a point nobody has written up yet a stub card
+(and the audit accepts that stub's `Schätzung offen` by name, so it cannot
+deadlock). `board.mjs queue` is a different command — it MOVES a current-work
+card back — and it throws on a point that has no card at all, which is precisely
+the case the refusal catches.
+
+The watchdog runs as its own process (`scripts/board-watchdog.mjs`), called by
+the launcher. That is not tidiness: on this platform a `process.exit()` after any
+`fetch` tears undici's socket down mid-close and ABORTS the process
+(`UV_HANDLE_CLOSING`, exit 127 — measured). The launcher exits that way at
+fifteen points, so it holds no fetch at all, and the child cannot take a
+resurrection down with it.
 
 **What each layer buys, honestly.** The due mark (`lock-heartbeat-hook.mjs`)
 notices a changed open-point set after any tool call and persists `publishDue`,
