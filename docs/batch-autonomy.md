@@ -1068,11 +1068,16 @@ other way that read can fail (a permission error, a directory in its place, a
 file that exists and holds nothing) takes the whole channel down: the topics
 cannot be derived, so every message the user sends is dropped before it is even
 parsed. Both states used to answer `null` and neither was reported. The reader
-now returns `absent` or `unreadable`; the inbox tick answers `ok: false` for the
-second, and the launcher both logs it and sends it to the signal topic — the one
-chat fault that must leave the machine out of band, because the chat itself can
-no longer carry it. The watcher exits loudly on it rather than reporting "not
-configured".
+now returns `absent` or `unreadable`; the inbox tick answers `ok: false` plus a
+machine-readable `fault` for the second, and the launcher logs it every tick and
+pushes it to the signal topic at most every six hours (`standingAlertDue` — it is
+a standing condition, not an event, and an unattended machine must not notify a
+phone all night). That push is the one chat fault that leaves the machine out of
+band, because the chat itself can no longer carry it. The watcher refuses to run
+on it — and because it exits BEFORE writing its pidfile, the supervisor would
+otherwise start a fresh doomed process at every tick, so the launcher does not
+start one at all while the fault stands. A watcher already running is left alone:
+it read the secret at its own start.
 
 **The security model — the part that shaped the design.** The board page is
 PUBLIC, and an ntfy topic name IS its access: anyone who knows it can read and
