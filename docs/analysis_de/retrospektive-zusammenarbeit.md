@@ -465,6 +465,14 @@ Die Fehler waren also alt. Neu war nur, dass man sie sieht: Solange die Tiere ü
 
 **Lehre:** Eine Qualitätsstufe nach oben deckt die nächste Schwäche darunter auf — das ist der Normalfall, kein Rückschritt. Wer nach einer sichtbaren Verbesserung plötzlich mehr Fehlerberichte bekommt, misst nicht Verschlechterung, sondern die neue Auflösung des Blicks. Und die Zuordnung „neu gebaut, also neu kaputt" gehört jedes Mal am Verlauf geprüft, bevor man sie glaubt.
 
+### 3.52 Der Ausweg, den die Verweigerung nennt, gibt es nicht
+
+Ein neuer Riegel im Board-Werkzeug verweigert eine Veröffentlichung, wenn ein offener Punkt auf dem Board keine Karte hat, und nennt dazu — wie es die Hausregel verlangt — den Befehl, der das behebt. Die Gegenprüfung fand: Genau dieser Befehl wirft in genau diesem Fall eine Ausnahme. Er verschiebt eine bestehende Karte in die Warteschlange und setzt deshalb voraus, dass es eine gibt; der auslösende Fall ist aber der frisch angehängte Punkt, der noch nirgends eine Karte hat. Der eigentlich gemeinte Weg war ein Generator, dessen Kommandozeilen-Werkzeug noch gar nicht existierte, obwohl die Ausweg-Liste des Riegels es bereits führte.
+
+Übrig geblieben wäre die Handbearbeitung der Board-Datei — dieselbe Handbearbeitung, an der das Board am Vortag dreimal zerbrochen ist (§3.45).
+
+**Lehre:** Ein Durchsetzer ist erst dann fertig, wenn sein genannter Ausweg **ausgeführt** worden ist, nicht wenn er plausibel klingt. Das gehört in die Prüfung jedes neuen Riegels: den Weg, den die Fehlermeldung vorschlägt, einmal wirklich gehen — im auslösenden Zustand, nicht im gesunden.
+
 ---
 
 ## 4. Die Guards als Immunsystem
@@ -554,7 +562,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Mittwoch, 29.07.2026, 03:36 · Quellen-Fingerprint: `1fd02526ae73…`
+Zuletzt aktualisiert: Mittwoch, 29.07.2026, 04:50 · Quellen-Fingerprint: `946ff3c53440…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -565,7 +573,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | User's rulings on the point-205 plausibility audit (what to fix vs. accept, 21.07.2026) | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | For code audits/reviews, mix in a DIFFERENT model than the one that wrote the code — different blind spots find more bugs | 1 | niedrig | model-guard.mjs | ✔ Mechanismus |
 | The hardened batch-autonomy system — never idle-stop, resurrect after crash/reboot, signal on failure, never block on the user | 1 | niedrig | batch-autostart.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs | ✔ Mechanismus |
-| The private claude.ai batch dashboard — its BINDING four-section structure (never change without explicit user go) and update discipline | 7 | hoch | batch-autostart.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs, dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
+| The batch dashboard — its live GH-Pages transport, its BINDING four-section structure (never change without explicit user go) and update discipline | 8 | hoch | batch-autostart.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs, dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
 | RETIRED 27.07.2026 — this was a 16.07. work-in-progress handoff, not a rule; what survives is the research foundation, the accuracy principle and the §13-placeholder carve-out | 3 | mittel | batch-autostart.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs | ✔ Mechanismus |
 | The batch dashboard may leave the private claude.ai artifact for a publicly readable transport — privacy is no longer a constraint | 1 | niedrig | board-first-guard.mjs, dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
 | Delegate via `node scripts/point-brief.mjs <N>` — the AGENT generates its own brief; board changes go through `scripts/board.mjs`; expect 529 agent deaths and commit-per-step | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -630,6 +638,6 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 66 Feedback-/Projekt-Memories · 36 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 18 Prozess-/Meta-TASKS-Punkte (davon 8 offen).
 
-<!-- RETRO-FINGERPRINT: 1fd02526ae737ed1d713302b579cb4a49a7722163a65aff0da111cb48de414fb -->
-<!-- RETRO-LAST-REFRESHED: 2026-07-29T01:36:23.608Z -->
+<!-- RETRO-FINGERPRINT: 946ff3c534400dfb43f5402444b6e976e100343b7657a093bf10749125e18e77 -->
+<!-- RETRO-LAST-REFRESHED: 2026-07-29T02:50:26.065Z -->
 <!-- AUTO-GENERATED:END -->
