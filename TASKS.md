@@ -3640,6 +3640,31 @@ read that as "the criterion and its evidence section".
   `dashboard-vdzk-only-decisions`, which states what that section holds — it gains the
   converse rule, that every decision MUST be there.
 
+- [ ] 422. THE BEGINNER GUIDE IS FULL, AND TODAY'S LESSON HAS NOWHERE TO GO
+  (29.07.2026, found while doing the guide review the currency guard demands).
+  `docs/analysis_de/vibe-coding-anleitung.md` sits at EXACTLY its budget — 401 lines of
+  401, 3398 words of 3398 (`scripts/guide-brevity-core.mjs`). The gate is right to hold
+  it there: a beginner guide that grows without bound stops being read. But it means the
+  guide can no longer absorb a new lesson at all, and the currency guard will keep asking
+  for one — two mechanisms pulling opposite ways, with no path through.
+  THE LESSON THAT HAS NOWHERE TO GO, and it is the day's biggest: changing WHERE or HOW
+  something is delivered does not carry the old path's guarantees along, and what no test
+  pins falls away SILENTLY — the page still loads, the tests stay green, only a promise no
+  longer holds. Point 419 measured four such losses from one move. Its special case: logic
+  living in a file version control does not track, which no test and no second model can
+  see.
+  DECIDE AND DO, in this order: (1) read the guide whole and judge which existing entry is
+  now the WEAKEST — the budget is a forcing function, so a new lesson earns its place by
+  displacing one, not by widening the frame; (2) if genuinely nothing is weaker, raise both
+  budgets deliberately in `guide-brevity-core.mjs` with the justification in the same
+  commit, the way the doc-budget ceilings are raised; (3) either way the new pitfall goes
+  in with its prompt, in the guide's established form.
+  VERIFIABLE: `scripts/guide-brevity-core.test.mjs` stays green (the real guide inside its
+  budget), the guide contains the new pitfall, and `node scripts/retro-refresh.mjs
+  --guide-reviewed` is re-attested afterwards.
+  NOTE: the guide currency was attested on 29.07. against the sources of that day; the
+  review found this gap and could not close it, which is what this point exists for.
+
 ## Closing (only after all points)
 
 New points are appended BEFORE this section — it stays last in the file.
