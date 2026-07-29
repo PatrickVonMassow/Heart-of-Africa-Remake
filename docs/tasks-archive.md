@@ -12044,3 +12044,42 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   guarantees), CLAUDE.md §7.2 where the hook chain is described, and the memory entry
   `batch-dashboard-artifact`, which records that the chat is the ONE agreed addition to
   the four-section structure.
+- [x] 406. THE MESSAGE ARRIVES WHILE I WORK — STAGE 2 OF 3, DELIVERY AT THE NEXT
+  TOOL CALL (28.07.2026, same request and the same four-eyes review as point 405).
+  With stage 1 alone a message waits for a launcher tick. This point makes a RUNNING
+  session see it within seconds, because a session makes a tool call every few
+  seconds anyway.
+  THE MECHANISM: `scripts/lock-heartbeat-hook.mjs` runs on EVERY tool call
+  (PostToolUse, matcher ""). It additionally reads the local spool — NEVER the
+  network; a hook on every tool call must not do network I/O — and delivers what it
+  finds.
+  THE DELIVERY SHAPE IS NOT PLAIN STDOUT (four-eyes finding 2, and it invalidated the
+  first design): a PostToolUse hook's plain stdout on exit 0 goes to the debug log and
+  is NEVER shown to the model. Model-visible injection needs the JSON shape
+  `{"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"…"}}`.
+  Built the naive way the messages would be silently invisible.
+  THE TOKEN RULE, which is why this shape matters twice: with an EMPTY spool the hook
+  emits NOTHING. Injected context is re-sent with every subsequent request for the rest
+  of the session, so a "no new messages" line would cost tokens at tool-call rate. The
+  user's condition for this whole mechanism is that it costs nothing while they send
+  nothing, and this is the one place that condition can break.
+  THE CONSUMPTION PROTOCOL (four-eyes finding 6): the poller writes ONE FILE PER
+  MESSAGE (`spool/<ntfy-id>.json`, atomic tmp+rename through `scripts/atomic-write.mjs`
+  with its retry — a per-tool-call reader is exactly the scanner that produced the
+  measured Windows `EPERM … rename` failures). The hook MOVES a message aside BEFORE
+  emitting it, inside try/catch, fail-open, and prints nothing on error. Without this,
+  the same message is injected on every tool call — a token leak at the rate the rule
+  exists to prevent.
+  BEHAVIOUR: a message is QUEUED, never an interrupt. Arriving mid-merge it is shown
+  and the session finishes the atomic step first. A question is answered with
+  `scripts/chat-reply.mjs`; an instruction becomes a work-order point per
+  append-and-defer, and the reply says so.
+  NOTE THE COLLISION: point 400 delta A gives this same hook the publish-due duty and
+  stands EARLIER in the work order — build against the post-400 hook, not against
+  today's.
+  VERIFIABLE: pure Vitest — empty spool emits exactly nothing; a non-empty spool emits
+  exactly the `additionalContext` JSON; the same spool read twice emits nothing the
+  second time; an unreadable spool fails open and silent. Live: a message sent while a
+  session works appears in that session at its next tool call, and the answer reaches
+  the page.
+
