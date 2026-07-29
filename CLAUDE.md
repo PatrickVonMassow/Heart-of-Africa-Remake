@@ -90,10 +90,8 @@ so that one stall happens up front rather than at the first narration. The
 WASM fallback never touches the GPU process and keeps the game rendering
 through its cold load; the headless verification forces WASM (no WebGPU
 adapter) via the `window.__ttsForceWasm` dev hook, and `scripts/verify/
-voice.mjs` gates that fallback path's liveness with an rAF probe. (History:
-point 100 had made the engine WASM-only to avoid the WebGPU cold-load
-freeze; point 117 reversed that on the user's decision — the smooth WebGPU
-voice is worth the one-time, front-loaded stall.) The model weights are
+voice.mjs` gates that fallback path's liveness with an rAF probe. (Point
+100's WASM-only engine was reversed by 117 — do not revert it.) The model weights are
 streamed from the Hugging Face CDN on first use and cached by the browser;
 they are not part of the repository or the bundle. The TTS stack (worker
 included) is loaded lazily and must never enter the eagerly loaded startup
@@ -335,10 +333,11 @@ old→new coverage map live in `scripts/verify/README.md`.
   `src/journal/ttsWorker.ts`) turns it into
   prosody. This rule applies to German too, even while no German TTS voice
   exists yet.
-- **Let a subprocess answer, never the context (point 365, generalised).** A question
+- **Answer from the repository, never from the user (points 365/3.57).** A question
   about the repository is answered by a command whose OUTPUT is small — a count, a
-  section, a brief — never by lifting a whole file into a context. The brief is this
-  rule applied to work orders.
+  section, a brief — never by lifting a whole file into a context. A BLOCKED action
+  means the wrong path, not a missing permission: find the project's own command
+  before routing the user through steps he must perform by hand.
 - Keep comments brief and factual. Mark placeholder values as such.
 - After each major system, run the self-verification (§7.2) and record the
   result.
