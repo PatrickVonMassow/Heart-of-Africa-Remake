@@ -1,0 +1,53 @@
+<!doctype html>
+<!--
+  The board's ARCHIVE page (point 400, delta D) — same transport, same trick as
+  ../index.html: source deployed once, content fetched from the orphan `board`
+  branch, which scripts/board-publish.mjs replaces on every publish.
+-->
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>HoA Batch-Dashboard — Archiv</title>
+    <style>
+      body {
+        background: #f0e8d2;
+        color: #3a2e1c;
+        font-family: ui-sans-serif, system-ui, 'Segoe UI', sans-serif;
+        line-height: 1.5;
+        margin: 0;
+        padding: 24px 16px;
+      }
+      @media (prefers-color-scheme: dark) {
+        body { background: #221c10; color: #e9dfc2; }
+      }
+      .note { max-width: 680px; margin: 0 auto; font-size: 0.95rem; }
+      .note code { font-family: ui-monospace, Consolas, monospace; overflow-wrap: anywhere; }
+      a { color: #41628a; }
+      @media (prefers-color-scheme: dark) { a { color: #7fa3cf; } }
+    </style>
+  </head>
+  <body>
+    <div class="note" id="status">Archiv wird geladen …</div>
+    <script>
+      const SOURCE =
+        'https://raw.githubusercontent.com/PatrickVonMassow/Heart-of-Africa-Remake/board/archive.html'
+      const failed = (why) => {
+        document.getElementById('status').innerHTML =
+          '<p><strong>Das Archiv konnte nicht geladen werden</strong> (' +
+          String(why).replace(/[<&]/g, (c) => (c === '<' ? '&lt;' : '&amp;')) +
+          ').</p><p>Quelle direkt: <a href="' + SOURCE + '"><code>' + SOURCE + '</code></a></p>'
+      }
+      fetch(SOURCE + '?t=' + Date.now(), { cache: 'no-store' })
+        .then((res) => (res.ok ? res.text() : Promise.reject(new Error('HTTP ' + res.status))))
+        .then((html) => {
+          if (!html.trim()) return failed('leere Antwort')
+          document.open()
+          document.write(html)
+          document.close()
+        })
+        .catch((e) => failed((e && e.message) || 'unbekannter Fehler'))
+    </script>
+  </body>
+</html>

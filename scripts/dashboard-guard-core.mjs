@@ -143,6 +143,12 @@ export const COLLAPSIBLE_SECTIONS = [
  *  closed point. */
 export const ERLEDIGT_ON_BOARD = 20
 
+/** The meta a generated queue card carries while nobody has estimated the point
+ *  (point 400, delta C). It lives HERE, beside the rule that exempts it, so the
+ *  generator and the audit can never disagree about the exact wording — and
+ *  board-queue-core re-exports it rather than keeping a second copy. */
+export const QUEUE_STUB_META = 'Schätzung offen'
+
 // cp1252: byte → displayed char (the 0x80-0x9F block; every other byte shows
 // its own code point). The detector uses it REVERSED.
 const CP1252_HIGH = {
@@ -365,8 +371,16 @@ export function auditDashboard(html, input = {}) {
     }
   }
 
-  // QUEUE META — every Warteschlange card names its estimated duration.
-  const badQueue = queueCards.filter((c) => !c.meta || !/~\s*\d+([.,]\d+)?\s*h/.test(c.meta))
+  // QUEUE META — every Warteschlange card names its estimated duration, or says
+  // in so many words that it has none yet (point 400, delta C). The generator
+  // emits a card for every open point, and a point nobody has estimated must
+  // still be VISIBLE: dropping it is the staleness this whole point exists to
+  // end, and blocking on it would deadlock `--synced` against a card only the
+  // generator can produce. The exemption is a NAMED value, not a shape, so an
+  // estimate that merely failed to parse is still a violation.
+  const badQueue = queueCards.filter(
+    (c) => !c.meta || (c.meta.trim() !== QUEUE_STUB_META && !/~\s*\d+([.,]\d+)?\s*h/.test(c.meta)),
+  )
   if (badQueue.length) {
     v.push({
       code: 'queue-meta',
@@ -688,18 +702,23 @@ export function evaluate(input) {
   // (fail-open; invariant 1 already covers a missing file).
   if (repoHash) {
     const deferred = marker.publishDeferred
+    // EITHER transport counts (point 400, delta D): the pages push is a real
+    // publish of the same bytes, and it is the one every session can run.
     const covered =
       (marker.publishedHash && marker.publishedHash === repoHash) ||
+      (marker.pagesPublishedHash && marker.pagesPublishedHash === repoHash) ||
       (deferred && deferred.repoHash === repoHash)
     if (!covered) {
       return block(
         'DASHBOARD EDITED BUT NOT REPUBLISHED: the repo dashboard file does not match the content ' +
-          'last published via the Artifact tool' +
-          (marker.publishedHash ? '' : ' (no publish recorded yet)') +
-          '. Publishing is part of EVERY dashboard update: run node scripts/dashboard-publish.mjs, ' +
-          'publish the synced scratchpad file with the Artifact tool (same artifact url), then re-run ' +
-          '--synced. ONLY if the Artifact tool is genuinely unavailable in this session (headless run): ' +
-          'node scripts/dashboard-publish.mjs --defer "<reason>" — and republish at the first chance.',
+          'last published to the live page or via the Artifact tool' +
+          (marker.publishedHash || marker.pagesPublishedHash ? '' : ' (no publish recorded yet)') +
+          '. Publishing is part of EVERY dashboard update: run node scripts/board-publish.mjs, which ' +
+          'pushes the board to the live page and works in every session. The claude.ai mirror is still ' +
+          'kept alongside it: node scripts/dashboard-publish.mjs, publish the synced scratchpad file ' +
+          'with the Artifact tool (same artifact url), then re-run --synced. ONLY if NEITHER is ' +
+          'reachable (offline): node scripts/dashboard-publish.mjs --defer "<reason>" — and publish at ' +
+          'the first chance.',
       )
     }
   }

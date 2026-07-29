@@ -1,0 +1,74 @@
+<!doctype html>
+<!--
+  THE BOARD'S STABLE URL (point 400, delta D).
+
+  This page is SOURCE: it is committed once and deployed with the site by the
+  workflow that already runs. The board CONTENT is not here — it lives on the
+  orphan `board` branch of this repository and is fetched at load. That split is
+  the whole trick: the reader keeps one URL while the content behind it is
+  replaced every few minutes by `node scripts/board-publish.mjs`, without a
+  source commit, without CI, and without a Pages deploy (which would rebuild the
+  game and every frozen version tag for a status card).
+
+  Rendering: the board is a full HTML fragment with its own styles and its own
+  little localStorage script that remembers which cards the reader opened. An
+  innerHTML assignment would drop that script, and an <iframe> cannot show it
+  either — raw.githubusercontent serves .html as text/plain with nosniff. So the
+  fetched document is written into a fresh document, which runs it as authored.
+
+  The fetch is cache-busted; where the CDN wins anyway, the reader simply sees a
+  board a few minutes old, and the launcher watchdog is the layer that notices a
+  page that is genuinely behind.
+-->
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>HoA Batch-Dashboard</title>
+    <style>
+      body {
+        background: #f0e8d2;
+        color: #3a2e1c;
+        font-family: ui-sans-serif, system-ui, 'Segoe UI', sans-serif;
+        line-height: 1.5;
+        margin: 0;
+        padding: 24px 16px;
+      }
+      @media (prefers-color-scheme: dark) {
+        body { background: #221c10; color: #e9dfc2; }
+      }
+      .note { max-width: 680px; margin: 0 auto; font-size: 0.95rem; }
+      .note code { font-family: ui-monospace, Consolas, monospace; overflow-wrap: anywhere; }
+      a { color: #41628a; }
+      @media (prefers-color-scheme: dark) { a { color: #7fa3cf; } }
+    </style>
+  </head>
+  <body>
+    <div class="note" id="status">Board wird geladen …</div>
+    <script>
+      const SOURCE =
+        'https://raw.githubusercontent.com/PatrickVonMassow/Heart-of-Africa-Remake/board/board.html'
+      // Keep the failure honest and self-explaining: a blank page would read as
+      // "no work", which is the exact misreading this whole mechanism exists to
+      // prevent. Say that the board could not be READ, and where it lives.
+      const failed = (why) => {
+        document.getElementById('status').innerHTML =
+          '<p><strong>Das Board konnte nicht geladen werden.</strong></p>' +
+          '<p>Das heißt <em>nicht</em>, dass keine Arbeit läuft — nur, dass diese Seite den ' +
+          'Inhalt gerade nicht lesen kann (' +
+          String(why).replace(/[<&]/g, (c) => (c === '<' ? '&lt;' : '&amp;')) +
+          ').</p><p>Quelle direkt: <a href="' + SOURCE + '"><code>' + SOURCE + '</code></a></p>'
+      }
+      fetch(SOURCE + '?t=' + Date.now(), { cache: 'no-store' })
+        .then((res) => (res.ok ? res.text() : Promise.reject(new Error('HTTP ' + res.status))))
+        .then((html) => {
+          if (!html.trim()) return failed('leere Antwort')
+          document.open()
+          document.write(html)
+          document.close()
+        })
+        .catch((e) => failed((e && e.message) || 'unbekannter Fehler'))
+    </script>
+  </body>
+</html>

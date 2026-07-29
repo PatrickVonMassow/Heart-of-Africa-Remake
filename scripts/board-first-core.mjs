@@ -29,6 +29,20 @@
 //     session that ignores it can still work; the Stop chain still catches the
 //     end state,
 //   - and is fail-OPEN in the wrapper: any internal error allows the call.
+//
+// THE THIRD CONDITION (point 400, delta B): a publish is DUE. The open-point set
+// changed since the board was last published, so the reader is looking at a
+// board that is missing work — the 25-minute window of 28.07.2026. The mark is
+// written by the PostToolUse heartbeat (delta A) and read here.
+//
+// It may only ESCALATE to a deny where a publish is actually POSSIBLE. The
+// headless successor session has no Artifact tool; denying it a publish it
+// cannot perform would spin it against a gate it can never satisfy, and a
+// blocked turn produces nothing. `publishCapability` (board-currency-core) is
+// that question, and until the delta-D transport exists it answers yes only for
+// a session that has demonstrably used the Artifact tool itself.
+
+import { isPublishDue } from './board-currency-core.mjs'
 
 /** Tools that change state by their nature — no command inspection needed. */
 export const MUTATING_TOOLS = new Set(['Edit', 'Write', 'NotebookEdit', 'Agent'])
@@ -49,6 +63,13 @@ export const ESCAPE_SCRIPTS = [
   'board-archive-rotate.mjs',
   'board-first-guard.mjs',
   'guard-preflight.mjs',
+  // The one-command board loop, the generator that rebuilds the queue from the
+  // work order, and the transport that publishes it. All three are remedies for
+  // the publish-due deny below; a gate that blocks its own way out is worse than
+  // the staleness it fixes.
+  'board.mjs',
+  'board-queue.mjs',
+  'board-publish.mjs',
 ]
 
 /** Board files an Edit/Write may always touch (suffix match on the path). */
@@ -138,11 +159,18 @@ export function classifyTool({ toolName, command, filePath, boardPaths = [] } = 
  * Is the board's published copy identical to the repo file? Mirrors invariant 9
  * of dashboard-guard-core, including the logged `--defer` valve. An unknown repo
  * hash means "cannot tell" → treated as published (fail-open).
+ *
+ * EITHER transport counts (point 400, delta D). The pages publish is a real
+ * publish — the user reads that page — and once `canPublish` answers yes for
+ * every session, a gate that still recognised only the Artifact record would
+ * deny a headless session over a remedy it has no tool to run. That is the spin
+ * this design forbids, not a stricter gate.
  */
 export function isPublished(state, repoHash) {
   if (!repoHash) return true
   const s = state && typeof state === 'object' ? state : {}
   if (s.publishedHash && s.publishedHash === repoHash) return true
+  if (s.pagesPublishedHash && s.pagesPublishedHash === repoHash) return true
   const d = s.publishDeferred
   return !!(d && d.repoHash === repoHash)
 }
@@ -164,11 +192,22 @@ export function focusStampedAt(focus) {
  *   focus                         .claude/current-focus.json (may be null)
  *   repoHash                      sha256 of the registered board file (or null)
  *   boardPaths                    extra board paths an edit may always target
+ *   canPublish                    may THIS session publish at all? (delta B —
+ *                                 false disables the publish-due deny entirely)
  *
  * Returns { block, reason }. Never throws on partial input — the wrapper's
  * fail-open must not depend on luck.
  */
-export function evaluate({ toolName, command, filePath, state, focus, repoHash = null, boardPaths = [] } = {}) {
+export function evaluate({
+  toolName,
+  command,
+  filePath,
+  state,
+  focus,
+  repoHash = null,
+  boardPaths = [],
+  canPublish = false,
+} = {}) {
   try {
     const s = state && typeof state === 'object' ? state : null
     // No turn stamp → the UserPromptSubmit hook has not run (a manual invocation,
@@ -188,7 +227,10 @@ export function evaluate({ toolName, command, filePath, state, focus, repoHash =
     const stampedAt = focusStampedAt(focus)
     const focusFresh = stampedAt >= turnStartedAt
     const published = isPublished(s, repoHash)
-    if (focusFresh && published) return { block: false, reason: '' }
+    // The publish-due mark only bites where a publish is possible (see the head
+    // of this file); everywhere else it is carried by the watchdog instead.
+    const dueUnpublished = canPublish === true && isPublishDue(s)
+    if (focusFresh && published && !dueUnpublished) return { block: false, reason: '' }
 
     const missing = []
     if (!focusFresh) {
@@ -199,6 +241,14 @@ export function evaluate({ toolName, command, filePath, state, focus, repoHash =
     }
     if (!published) {
       missing.push('  - the board file differs from what was last PUBLISHED (the phone still shows the old board)')
+    }
+    if (dueUnpublished) {
+      const due = s.publishDue
+      missing.push(
+        '  - the OPEN-POINT SET changed and the board has not been published since' +
+          (due && due.at ? ` (marked ${new Date(due.at).toISOString()})` : '') +
+          ' — the reader is looking at a board that is missing work',
+      )
     }
 
     return {
@@ -211,7 +261,9 @@ export function evaluate({ toolName, command, filePath, state, focus, repoHash =
         '\nDo this now, then repeat the call:\n' +
         '  1. Update the "Woran ich gerade arbeite" card so it names what you are about to do.\n' +
         '  2. node scripts/focus.mjs set <N> "<what>"   (or `confirm` when the card is already right)\n' +
-        '  3. node scripts/dashboard-publish.mjs  → publish the scratchpad file via the Artifact tool\n' +
+        '  3. node scripts/board-publish.mjs   → pushes the board to the live page; works in EVERY\n' +
+        '     session, headless included. (The claude.ai mirror is still kept while the user moves\n' +
+        '     their bookmark: node scripts/dashboard-publish.mjs → Artifact → --synced.)\n' +
         '  4. node scripts/dashboard-guard.mjs --synced <board path>\n' +
         'Reads, those four commands and an edit of the board file are never blocked, and this gate ' +
         'fires at most ONCE per turn — the next call goes through either way.\n' +

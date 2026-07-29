@@ -21,11 +21,20 @@
 //     The tool's RESPONSE decides whether it counts — a failed publish records
 //     publishFailed and no hash, so the board can never be believed live on the
 //     strength of an attempt alone (four-eyes finding 28.07.2026).
-import { readFileSync } from 'node:fs'
+// (5) THE BOARD-PUBLISH DUE MARK (point 400, delta A): hash the open-point set
+//     after each call and, on a CHANGE, set `publishDue`. It lives HERE rather
+//     than in a PostToolUse matcher of its own because .claude/settings.json is
+//     a protected path an unattended session cannot edit — and because an
+//     `Edit|Write` matcher would miss every TASKS.md change made through Bash
+//     (a merge, the archive move). The mark is PERSISTED, so a session that dies
+//     between the change and the publish hands it to its successor.
+import { readFileSync, statSync } from 'node:fs'
 import { basename } from 'node:path'
 import { heartbeat, noteActivity } from './batch-singleton.mjs'
 import { handoverSurvivesCall } from './batch-boundary-core.mjs'
 import { classifyPublishResponse, publishStatePatch } from './publish-outcome-core.mjs'
+import { openFingerprintOfTasks, publishDuePatch } from './board-currency-core.mjs'
+import { repoPath } from './repo-paths.mjs'
 import {
   STATE_PATH,
   ACTIVITY_PATH,
@@ -82,6 +91,12 @@ try {
   const name = data.tool_name ?? data.toolName ?? ''
   const input = data.tool_input ?? data.toolInput ?? {}
   const file = typeof input.file_path === 'string' ? input.file_path : ''
+  // The mere EXISTENCE of the Artifact tool in this session is a fact the
+  // board-first gate needs (delta B): it may only escalate to a hard deny where
+  // a publish is actually possible. Recorded on any Artifact call, whatever it
+  // targeted — a headless session never records one and is therefore never
+  // denied for a transport it does not have.
+  if (name === 'Artifact' && sid) mergeState({ artifactToolSeen: { sessionId: sid, at: Date.now() } })
   if (name === 'Artifact' && file && input.action !== 'list') {
     const state = readJson(STATE_PATH) ?? {}
     const dashboardNames = new Set(['hoa-batch-dashboard.html', '.batch-dashboard.html'])
@@ -101,5 +116,21 @@ try {
   }
 } catch {
   /* never fail a tool call over the bookkeeping */
+}
+
+// (5) board-publish due mark — the open-point set changed, so the board owes the
+// reader an update. Gated on TASKS.md's mtime so the common case (nothing
+// changed) costs one stat rather than a parse on every single tool call.
+try {
+  const tasksPath = repoPath('TASKS.md')
+  const mtime = statSync(tasksPath).mtimeMs
+  const state = readJson(STATE_PATH) ?? {}
+  if (state.tasksSeenMtime !== mtime) {
+    const fingerprint = openFingerprintOfTasks(readFileSync(tasksPath, 'utf8'))
+    const patch = publishDuePatch({ state, fingerprint, at: Date.now() })
+    mergeState({ ...(patch ?? {}), tasksSeenMtime: mtime })
+  }
+} catch {
+  /* no TASKS.md / unwritable state — the watchdog is the backstop */
 }
 process.exit(0)

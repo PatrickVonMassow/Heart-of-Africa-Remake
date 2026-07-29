@@ -356,6 +356,12 @@ describe('evaluate — publish parity (edited must not masquerade as live)', () 
   it('allows when repo and published hashes match', () => {
     expect(evaluate(green()).decision).toBe('allow')
   })
+  it('accepts the PAGES publish as a publish — it is the one a headless session can run', () => {
+    const marker = { dashboardPath: '.batch-dashboard.html', head: 'abc1234', pagesPublishedHash: 'hash-1' }
+    expect(evaluate(green({ marker })).decision).toBe('allow')
+    // …but only for exactly those bytes: an older pages push covers nothing.
+    expect(evaluate(green({ marker: { ...marker, pagesPublishedHash: 'hash-0' } })).decision).toBe('block')
+  })
   it('honors an explicit deferral for the CURRENT content only', () => {
     const marker = {
       dashboardPath: '.batch-dashboard.html',

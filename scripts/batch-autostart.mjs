@@ -22,7 +22,7 @@
 //     guards make it stand down — but the user is notified urgently.
 // Disable: Disable-ScheduledTask -TaskName HoA-Batch-Autostart
 import { readFileSync, writeFileSync, existsSync, readdirSync, renameSync, openSync } from 'node:fs'
-import { spawn, execSync } from 'node:child_process'
+import { spawn, execSync, execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
@@ -53,6 +53,7 @@ import { assessClaim } from './batch-claim-core.mjs'
 import { readDeclaration, refTipAt, worktreeActiveAt, mtimeOf } from './batch-in-flight.mjs'
 import { assessOwnerWork, describeInFlight, LAUNCHER_WORK_MAX_AGE_MS } from './batch-in-flight-core.mjs'
 import { buildSpawnArgs, buildSpawnOptions, recordSpawn, reapableSpawns, pruneSpawns } from './batch-autostart-core.mjs'
+import { BOARD_PAGE_URL } from './board-currency-core.mjs'
 
 // IMPORT-PROOF (27.07.2026). Everything below runs at MODULE LOAD, so merely
 // importing this file — a syntax check, a test, a tooling scan — SPAWNS a
@@ -158,6 +159,56 @@ const bail = (code = 0) => { writeJsonAtomic(C('autostart-state.json'), state); 
 
 // --- Guards: never resurrect when it would be wrong ---------------------------
 if (existsSync(C('batch-paused'))) { log('skip: batch is user-paused'); bail() }
+
+// --- BOARD WATCHDOG (point 400, delta E) --------------------------------------
+// The BACKSTOP, not the mechanism. Delta D lets every session publish and delta B
+// makes it publish before it works, but both live inside a session — and the
+// failure this point was written for is precisely a session that has stopped
+// running hooks while the user, away from the desk, reads a board that stands
+// still. This tick is the only layer that still speaks then.
+//
+// It reads the LIVE PAGE, not a state file: the whole design turns on the check
+// asking the URL rather than a record of an attempt. `liveBoardVerdict` tolerates
+// the CDN floor (a page that differs while the publish is still settling is not
+// an alarm) and refuses to call an unreadable page current. `watchdogDecision`
+// keys each alert so one standing fault is reported once rather than every
+// quarter of an hour.
+//
+// It runs BEFORE every "do not spawn" reason below (except the user's pause):
+// "no successor is needed" is not "the board is fine", and a batch that is
+// complete or wedged is exactly when a stale board goes unnoticed longest.
+//
+// IT RUNS AS ITS OWN PROCESS (scripts/board-watchdog.mjs), and that is not
+// tidiness. On this platform a `process.exit()` after any `fetch` tears undici's
+// socket down mid-close and ABORTS the process — measured: exit 127 with
+// `Assertion failed: !(handle->flags & UV_HANDLE_CLOSING)`. This launcher exits
+// that way at fifteen points, so it must not hold a fetch at all. The child is
+// also containment nothing else matches: it cannot take the resurrection with it.
+// Bounded by a timeout and wrapped fail-open on top, because the launcher's job
+// is bringing the batch back and a board check may never be a reason it does not.
+try {
+  const out = execFileSync(process.execPath, [R('board-watchdog.mjs'), '--last-key', state.boardWatchKey ?? ''], {
+    cwd: REPO,
+    encoding: 'utf8',
+    timeout: 60000,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  })
+  const r = JSON.parse(out.trim().split('\n').filter(Boolean).pop())
+  if (r.verdict !== 'current') log(`board: ${r.verdict}${r.reason ? ` — ${r.reason}` : ''} (${BOARD_PAGE_URL})`)
+  if (r.notified) {
+    log(`BOARD ALERT: ${r.message}`)
+    state.boardWatchKey = r.key
+  } else if (r.key === null) {
+    // NOTHING to report — not merely "already reported". A recovered board
+    // forgets the key so the NEXT fault is announced again instead of being
+    // swallowed as a repeat of the one that is over; a fault still standing
+    // keeps its key and stays quiet.
+    state.boardWatchKey = null
+  }
+} catch (e) {
+  log(`board watchdog skipped (${(e && e.message) || e})`)
+}
+
 let open
 try { open = openPointCount() } catch { log('skip: cannot read TASKS.md'); bail() }
 if (open === -1) { log('ALERT: TASKS.md format unrecognized — not spawning'); await notify('TASKS.md format', 'The batch parser found checkboxes but no points — halting resurrection to be safe.', 'high'); bail() }

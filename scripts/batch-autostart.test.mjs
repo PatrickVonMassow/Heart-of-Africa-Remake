@@ -125,3 +125,109 @@ describe('the launcher uses the pure spawn builders', () => {
     expect(code).toMatch(/const bail =[^\n]*writeJsonAtomic\(C\('autostart-state\.json'\), state\)/)
   })
 })
+
+// ---------------------------------------------------------------------------
+// THE BOARD WATCHDOG IS WIRED (point 400, delta E).
+//
+// Every rule the watchdog applies is pure and pinned in board-currency-core.test
+// (behind / settling / unreachable / the alert key). What no unit test can see is
+// whether the launcher CALLS them — the file cannot be imported, by design. So
+// the same source-reading witness the spawn builders get is used here: the delta
+// is worthless if a future edit drops the block, and every other test would stay
+// green while it did.
+describe('the launcher runs the board watchdog', () => {
+  const source = readFileSync(resolve(process.cwd(), 'scripts', 'batch-autostart.mjs'), 'utf8')
+  const codeLines = source.split('\n').filter((l) => !l.trimStart().startsWith('//'))
+  const code = codeLines.join('\n')
+  const lineOf = (re, what) => {
+    const i = codeLines.findIndex((l) => re.test(l))
+    expect(i, `no line matching ${what}`).toBeGreaterThanOrEqual(0)
+    return i
+  }
+
+  it('holds NO fetch of its own — a fetch here would abort its own exit', () => {
+    // Measured: on this platform a `process.exit()` after any fetch tears
+    // undici's socket down mid-close and aborts the process (exit 127,
+    // `UV_HANDLE_CLOSING`). This launcher exits that way at fifteen points, so
+    // the check runs as a child. A future edit inlining it would look harmless
+    // and break every tick.
+    expect(code).not.toMatch(/\bfetch\(/)
+  })
+
+  it('delegates the check to the watchdog child and reads its verdict back', () => {
+    expect(code).toMatch(/board-watchdog\.mjs/)
+    expect(code).toMatch(/state\.boardWatchKey = r\.key/)
+    // A hung child may not hold the tick either.
+    expect(code).toMatch(/timeout: \d+/)
+  })
+
+  it('runs BEFORE every reason not to spawn except the user pause', () => {
+    // "No successor is needed" is not "the board is fine". A complete, claimed
+    // or wedged batch is exactly when a stale board goes unnoticed longest.
+    const watch = lineOf(/board-watchdog\.mjs/, 'the board watchdog call')
+    expect(lineOf(/batch-paused/, 'the user pause')).toBeLessThan(watch)
+    for (const [re, what] of [
+      [/openPointCount\(\)/, 'the work-order read'],
+      [/open === 0/, 'the batch-complete guard'],
+      [/reserved\.honour/, 'the honoured user claim'],
+    ]) {
+      expect(watch, `the watchdog must run before ${what}`).toBeLessThan(lineOf(re, what))
+    }
+  })
+
+  it('cannot stop the launcher: the block is wrapped and fails open', () => {
+    // A board check that could throw would take the RESURRECTION down with it —
+    // the launcher's job is bringing the batch back, and this is a backstop.
+    const watch = lineOf(/board-watchdog\.mjs/, 'the board watchdog call')
+    const opener = [...codeLines.slice(0, watch)].reverse().find((l) => /^(try \{|\} catch)/.test(l))
+    expect(opener, 'the watchdog is not inside a try block').toMatch(/^try \{/)
+    expect(code).toMatch(/board watchdog skipped/)
+  })
+})
+
+// The child the launcher delegates to. It is importable (no side effects at
+// load beyond its own run), but it fetches, so it is read rather than run.
+describe('the board watchdog child', () => {
+  const source = readFileSync(resolve(process.cwd(), 'scripts', 'board-watchdog.mjs'), 'utf8')
+  const code = source.split('\n').filter((l) => !l.trimStart().startsWith('//')).join('\n')
+
+  it('reads the LIVE page — the point of delta E is not reading a state file', () => {
+    expect(code).toMatch(/fetch\(liveCheckUrl\(BOARD_CONTENT_URL/)
+    expect(code).toMatch(/liveBoardVerdict\(\{/)
+    expect(code).toMatch(/watchdogDecision\(\{/)
+    expect(code).toMatch(/await notify\(d\.title, d\.message, d\.priority\)/)
+  })
+
+  it('bounds the fetch and clears its timer', () => {
+    expect(code).toMatch(/AbortController/)
+    expect(code).toMatch(/clearTimeout\(timer\)/)
+  })
+
+  it('always answers, never throws out — its caller parses one json line', () => {
+    expect(code).toMatch(/catch \(e\) \{\s*say\(\{ verdict: 'error'/)
+    expect(code).not.toMatch(/process\.exit\(/)
+  })
+
+  it('reports what notify() DID, not what was decided', () => {
+    // notify() returns false on a missing topic or a failed POST and never
+    // throws. Reporting the intention would let the launcher key a fault whose
+    // alert never left the machine — and a keyed fault is never announced
+    // again, so one transient POST failure would silence it for good.
+    expect(code).toMatch(/const sent = d\.notify && !quiet \? await notify\(/)
+    expect(code).toMatch(/notified: !!sent/)
+  })
+})
+
+// The launcher only remembers a fault as reported when it really was reported.
+describe('the launcher keys a board fault only on a real notification', () => {
+  const code = readFileSync(resolve(process.cwd(), 'scripts', 'batch-autostart.mjs'), 'utf8')
+    .split('\n')
+    .filter((l) => !l.trimStart().startsWith('//'))
+    .join('\n')
+
+  it('stores the key under r.notified, and forgets it only when nothing is wrong', () => {
+    expect(code).toMatch(/if \(r\.notified\) \{/)
+    expect(code).toMatch(/state\.boardWatchKey = r\.key/)
+    expect(code).toMatch(/else if \(r\.key === null\)/)
+  })
+})

@@ -44,8 +44,86 @@ describe('constants', () => {
   })
 
   it('lists every remedy script the gate must never block', () => {
-    for (const s of ['focus.mjs', 'dashboard-publish.mjs', 'dashboard-guard.mjs'])
+    for (const s of [
+      'focus.mjs',
+      'dashboard-publish.mjs',
+      'dashboard-guard.mjs',
+      'board.mjs',
+      'board-queue.mjs',
+      'board-publish.mjs',
+    ])
       expect(ESCAPE_SCRIPTS).toContain(s)
+  })
+})
+
+describe('delta B — the publish-due deny', () => {
+  /** Board published and focus fresh: the gate would allow but for the due mark. */
+  const cleanCall = (over = {}) => ({
+    toolName: 'Write',
+    filePath: 'src/example.ts',
+    state: armedState(),
+    focus: focusAt(AFTER),
+    repoHash: 'h1',
+    ...over,
+  })
+  const due = (extra = {}) => armedState({ publishDue: { at: BEFORE, fingerprint: 'sha256:new' }, ...extra })
+
+  it('allows an otherwise clean call while nothing is due', () => {
+    expect(evaluate(cleanCall({ canPublish: true })).block).toBe(false)
+  })
+
+  it('DENIES a mutating call while a publish is due and this session CAN publish', () => {
+    const d = evaluate(cleanCall({ state: due(), canPublish: true }))
+    expect(d.block).toBe(true)
+    expect(d.reason).toContain('OPEN-POINT SET changed')
+    expect(d.reason).toContain('dashboard-publish.mjs')
+  })
+
+  it('does NOT deny a session that cannot publish — it would spin against a gate it cannot satisfy', () => {
+    expect(evaluate(cleanCall({ state: due(), canPublish: false })).block).toBe(false)
+    expect(evaluate(cleanCall({ state: due() })).block).toBe(false) // default: not capable
+    expect(evaluate(cleanCall({ state: due(), canPublish: 'yes' })).block).toBe(false) // only true counts
+  })
+
+  it('never blocks the remedy path, however overdue the publish', () => {
+    const remedies = [
+      'node scripts/dashboard-publish.mjs',
+      'node scripts/board.mjs attest',
+      'node scripts/board.mjs now 400 "läuft"',
+      'node scripts/board-queue.mjs',
+      'node scripts/board-publish.mjs',
+      'node scripts/dashboard-guard.mjs --synced .batch-dashboard.html',
+      'node scripts/focus.mjs confirm',
+    ]
+    for (const command of remedies) {
+      expect(
+        evaluate(cleanCall({ state: due(), canPublish: true, toolName: 'Bash', command, filePath: undefined })).block,
+      ).toBe(false)
+    }
+    expect(
+      evaluate(cleanCall({ state: due(), canPublish: true, toolName: 'Edit', filePath: '.batch-dashboard.html' }))
+        .block,
+    ).toBe(false)
+    expect(evaluate(cleanCall({ state: due(), canPublish: true, toolName: 'Read', filePath: 'src/x.ts' })).block).toBe(
+      false,
+    )
+  })
+
+  it('stands down after firing once, like every other condition', () => {
+    const state = due({ boardFirstFiredAt: TURN + 1 })
+    expect(evaluate(cleanCall({ state, canPublish: true })).block).toBe(false)
+  })
+
+  it('ignores a junk due mark rather than denying on it', () => {
+    for (const publishDue of ['yes', 0, [], null])
+      expect(evaluate(cleanCall({ state: armedState({ publishDue }), canPublish: true })).block).toBe(false)
+  })
+
+  it('names the due mark BESIDE the older conditions when several are unmet', () => {
+    const d = evaluate(cleanCall({ state: due(), focus: focusAt(BEFORE), repoHash: 'h2', canPublish: true }))
+    expect(d.reason).toContain('no `focus set|confirm`')
+    expect(d.reason).toContain('differs from what was last PUBLISHED')
+    expect(d.reason).toContain('OPEN-POINT SET changed')
   })
 })
 
@@ -174,6 +252,14 @@ describe('isPublished', () => {
   it('honours the logged --defer valve for exactly that content', () => {
     expect(isPublished({ publishDeferred: { repoHash: 'h1' } }, 'h1')).toBe(true)
     expect(isPublished({ publishDeferred: { repoHash: 'h0' } }, 'h1')).toBe(false)
+  })
+  it('counts the PAGES publish, which is the one every session can run', () => {
+    // Once canPublish answers yes for every session (delta D), a gate that
+    // recognised only the Artifact record would deny a headless session over a
+    // remedy it has no tool to run — the spin this design forbids.
+    expect(isPublished({ pagesPublishedHash: 'h1' }, 'h1')).toBe(true)
+    expect(isPublished({ pagesPublishedHash: 'h0' }, 'h1')).toBe(false)
+    expect(isPublished({ publishedHash: 'h0', pagesPublishedHash: 'h1' }, 'h1')).toBe(true)
   })
   it('cannot tell without a repo hash, and says so by allowing', () => {
     expect(isPublished({}, null)).toBe(true)

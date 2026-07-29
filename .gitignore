@@ -34,6 +34,9 @@ scripts/.tile-cache
 .claude/batch-paused
 .batch-dashboard.html
 .batch-dashboard-archive.html
+# The derived queue's prose and order (point 400, delta C) — session state that
+# belongs beside the board it renders, not in the source history.
+.claude/board-queue.json
 .claude/dashboard-state.json
 .claude/current-focus.json
 .claude/focus-check-pending.json

@@ -38,7 +38,32 @@ function edit(fn, done) {
   writeFileSync(BOARD, fn(readFileSync(BOARD, 'utf8')))
   console.log(done)
   console.log(run(['scripts/board-archive-rotate.mjs']).trim().split('\n')[0])
+  // THE LIVE PAGE IS PUBLISHED HERE (point 400, delta D — four-eyes finding 2).
+  // This is the one-command board loop, so a loop that only synced the
+  // scratchpad left the LIVE page behind on every edit while the Artifact half
+  // cleared the due mark — the launcher would then alert about a board the
+  // session had updated exactly as documented, which trains the reader to
+  // ignore the one channel that speaks when a session is wedged.
+  //
+  // A REFUSAL MUST BE READABLE (four-eyes NEW-2). The child's stdio is piped, so
+  // a non-zero exit throws — and an uncaught throw here would abort the rest of
+  // the loop AND reduce the publisher's whole remedy text to `e.message`. The
+  // refusal is the most useful thing it ever prints, so it is printed, and the
+  // mirror still runs: the board file is already written either way.
+  let published = true
+  try {
+    console.log(run(['scripts/board-publish.mjs']).trim().split('\n')[0])
+  } catch (e) {
+    published = false
+    console.error(String(e.stderr || '').trimEnd() || `board-publish failed: ${e.message}`)
+    console.error('The LIVE page was NOT updated — fix the above, then: node scripts/board-publish.mjs')
+    process.exitCode = 1
+  }
   console.log(run(['scripts/dashboard-publish.mjs']).trim().split('\n').pop())
+  // The success line is GATED (four-eyes NEW-3): printed unconditionally it sat
+  // two lines under "The LIVE page was NOT updated", so a session skimming the
+  // tail read success in exactly the failure case this reporting exists for.
+  if (published) console.log('The live page is updated. Mirror it while the artifact still exists:')
   console.log('NEXT: publish the scratchpad file via the Artifact tool, then: node scripts/board.mjs attest')
 }
 

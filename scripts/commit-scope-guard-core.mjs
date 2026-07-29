@@ -30,6 +30,10 @@ export const ALLOWED_ROOT_FILES = [
   '.gitignore',
   '.oxlintrc.json',
   'CLAUDE.md',
+  // The repository's licence, added on main through the GitHub web UI — which
+  // never runs this hook, so the guard first met the file when a branch merged
+  // main and refused a merge that authored nothing.
+  'LICENSE',
   'README.md',
   'TASKS.md',
   'design.md',
