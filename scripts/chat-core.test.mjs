@@ -3,6 +3,7 @@ import {
   CLOCK_SKEW_MS,
   DIRECTIONS,
   DEFAULT_MAX_AGE_MS,
+  ID_LEDGER_MAX,
   MAX_TEXT_LEN,
   PROTOCOL,
   SEEN_MAX,
@@ -10,7 +11,9 @@ import {
   canonicalMessage,
   constantTimeEqual,
   deriveTopics,
+  envelopeRetentionMs,
   ingest,
+  pruneIdLedger,
   makeEnvelope,
   parseEnvelope,
   parseNtfyPoll,
@@ -263,6 +266,91 @@ describe('delivery discipline — the ledger, not the cursor, is the dedupe', ()
       await expect(ingest({ events, secret: SECRET, now: NOW })).resolves.toBeTruthy()
     }
     await expect(ingest({ events: [], secret: SECRET, state: 'broken' })).resolves.toBeTruthy()
+  })
+})
+
+describe('THE LEDGER CANNOT BE FLOODED OUT — envelope ids are bounded by the window', () => {
+  /** A junk post to a known topic: it never verifies, but it costs a ledger
+   *  entry. The cheap way to try to evict something that matters. */
+  const junk = async (n) => ({ id: `junk-${n}`, time: Math.round(NOW / 1000), event: 'message', topic: 't', message: JSON.stringify({ v: PROTOCOL, id: `j${n}`, ts: NOW, text: 'x', sig: 'f'.repeat(64) }) })
+
+  it('refuses a REPLAY after a flood of SEEN_MAX+ dropped transport ids', async () => {
+    const real = await event({ id: 'nfy1', msgId: 'mine' })
+    const first = await ingest({ events: [real], secret: SECRET, now: NOW })
+    expect(first.accepted).toHaveLength(1)
+
+    const flood = []
+    for (let i = 0; i < SEEN_MAX + 50; i++) flood.push(await junk(i))
+    const flooded = await ingest({ events: flood, secret: SECRET, now: NOW, state: first.state })
+    expect(flooded.accepted).toHaveLength(0)
+    // The transport ledger HAS been evicted — that is expected and cheap …
+    expect(flooded.state.seen).not.toContain('m:mine')
+    // … but the envelope ledger still holds the accepted id inside its window.
+    expect(flooded.state.envelopes.map((e) => e.id)).toContain('mine')
+
+    // The replay: same envelope, a transport id nothing has seen.
+    const replay = { ...real, id: 'nfy-replay' }
+    const after = await ingest({ events: [replay], secret: SECRET, now: NOW, state: flooded.state })
+    expect(after.accepted).toHaveLength(0)
+    expect(after.dropped[0].reason).toBe('duplicate')
+  })
+
+  it('lets an envelope id go once it is PAST the window — it can only be stale by then', async () => {
+    const real = await event({ id: 'nfy1', msgId: 'mine' })
+    const first = await ingest({ events: [real], secret: SECRET, now: NOW })
+    const later = NOW + DEFAULT_MAX_AGE_MS + CLOCK_SKEW_MS + 1000
+    const aged = await ingest({ events: [], secret: SECRET, now: later, state: first.state })
+    expect(aged.state.envelopes).toHaveLength(0)
+    // And the message it forgot is refused anyway — by age, not by memory.
+    const replay = { ...real, id: 'nfy-replay' }
+    const after = await ingest({ events: [replay], secret: SECRET, now: later, state: aged.state })
+    expect(after.accepted).toHaveLength(0)
+    expect(after.dropped[0].reason).toBe('stale')
+  })
+
+  it('keeps DROPPED events out of the envelope ledger entirely', async () => {
+    const bad = await event({ id: 'nfyX', msgId: 'forged', secret: OTHER })
+    const r = await ingest({ events: [bad], secret: SECRET, now: NOW })
+    expect(r.state.envelopes).toEqual([])
+    expect(r.state.seen).toContain('n:nfyX')
+  })
+
+  it('follows a shortened acceptance window', () => {
+    expect(envelopeRetentionMs(60_000)).toBe(60_000 + CLOCK_SKEW_MS)
+    expect(envelopeRetentionMs()).toBe(DEFAULT_MAX_AGE_MS + CLOCK_SKEW_MS)
+    for (const bad of [0, -1, NaN, 'nope', null]) expect(envelopeRetentionMs(bad)).toBe(DEFAULT_MAX_AGE_MS + CLOCK_SKEW_MS)
+  })
+})
+
+describe('pruneIdLedger — bounded by age, not by count', () => {
+  it('drops what is past the retention and keeps what is inside it', () => {
+    const entries = [{ id: 'old', at: NOW - 5000 }, { id: 'new', at: NOW - 100 }]
+    expect(pruneIdLedger(entries, { now: NOW, retentionMs: 1000 }).map((e) => e.id)).toEqual(['new'])
+  })
+
+  it('keeps an entry whose stamp runs AHEAD of now — a fast phone clock is not a reason to forget', () => {
+    expect(pruneIdLedger([{ id: 'ahead', at: NOW + 60_000 }], { now: NOW, retentionMs: 1000 })).toHaveLength(1)
+  })
+
+  it('keeps one entry per id, the newest stamp winning, oldest first', () => {
+    const r = pruneIdLedger([{ id: 'a', at: 3 }, { id: 'b', at: 1 }, { id: 'a', at: 5 }], { now: 5, retentionMs: 100 })
+    expect(r).toEqual([{ id: 'b', at: 1 }, { id: 'a', at: 5 }])
+  })
+
+  it('applies the disk ceiling by dropping what is nearest to expiring', () => {
+    const entries = []
+    for (let i = 0; i < 12; i++) entries.push({ id: `e${i}`, at: NOW - (12 - i) })
+    const r = pruneIdLedger(entries, { now: NOW, retentionMs: 1000, cap: 5 })
+    expect(r).toHaveLength(5)
+    expect(r.map((e) => e.id)).toEqual(['e7', 'e8', 'e9', 'e10', 'e11'])
+    expect(ID_LEDGER_MAX).toBeGreaterThan(SEEN_MAX)
+  })
+
+  it('is TOTAL — junk entries are skipped, never thrown on', () => {
+    for (const bad of [null, undefined, 'nope', 42, [null, 5, {}, { id: 7, at: 1 }, { id: 'x' }, { id: 'y', at: 'soon' }]]) {
+      expect(() => pruneIdLedger(bad, { now: NOW, retentionMs: 1000 })).not.toThrow()
+      expect(pruneIdLedger(bad, { now: NOW, retentionMs: 1000 })).toEqual([])
+    }
   })
 })
 

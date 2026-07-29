@@ -1012,6 +1012,21 @@ paused, complete or wedged may not decide whether a message survives at all.
 Past 12 hours it is gone from the cache, which is also why the acceptance window
 is set to the same 12 hours — beyond it a replay is impossible anyway.
 
+**The replay bound is a WINDOW, not a count** (`envelopeRetentionMs` /
+`pruneIdLedger` in `scripts/chat-core.mjs`). Both id kinds used to share one
+500-entry array that dropped events pushed into as well — so a few hundred junk
+posts to a known inbox topic evicted the accepted envelope ids, and a captured
+envelope could then be replayed under a fresh transport id and be accepted a
+second time. The spool-seeded ledger softened that but did not close it: its
+bound is the consumed-file retention, not the acceptance window. The two are now
+separate. Transport ids stay cheap and count-capped; an accepted ENVELOPE id is
+kept for `maxAgeMs` plus the clock skew — exactly as long as `assessEvent` could
+still accept it — and dropped events never reach that ledger at all, so the flood
+path cannot touch it. Past the window the id is forgotten and the message it
+named is refused anyway, as `stale`. The launcher's poll and the watcher's
+subscription both hold the pair, and a message whose spool write FAILED is struck
+from both, or it would be lost for good.
+
 **An UNPAIRED machine and a BROKEN one are told apart** (`classifySecret` /
 `readSecretStatus` in `scripts/chat-secret.mjs`). The channel is opt-in, so a
 machine with no `.claude/chat-secret` stays silent — that is correct. But every
@@ -1037,7 +1052,7 @@ realistic worst case is command execution on the user's machine. So:
 | the secret | git-ignored `.claude/chat-secret` on the machine, `localStorage` on the phone. Never committed, never logged, never echoed into a page |
 | HMAC-SHA256 | over the canonical `(direction, id, ts, text)`, every field JSON-quoted so no two different messages share a canonical form. Both directions are signed — and the DIRECTION is inside the signed string, see below |
 | the drop rules | `scripts/chat-core.mjs` drops anything unsigned, mis-signed, older than the window, or already seen — **before** it is spooled |
-| the dedupe | a ledger of the ntfy id **and** the envelope id, rebuilt from the spool — the consumed messages included, since one already read is exactly the one a re-poll must not hand over again. The cursor in `.claude/chat-state.json` only narrows the next poll: losing or corrupting it replays the whole window and spools nothing twice |
+| the dedupe | TWO ledgers: the ntfy ids rotate under a count cap, the accepted ENVELOPE ids are kept for the whole acceptance window (see below). Both are rebuilt from the spool — the consumed messages included, since one already read is exactly the one a re-poll must not hand over again. The cursor in `.claude/chat-state.json` only narrows the next poll: losing or corrupting it replays the whole window and spools nothing twice |
 
 **The direction is part of the signature, and that was a correction.** The first
 cut signed only `(id, ts, text)` under one key for both topics — so an

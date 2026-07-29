@@ -24,10 +24,23 @@ const frame = async ({ ntfyId, msgId, text, ts = NOW, direction = 'inbox' }) => 
 })
 
 describe('A MESSAGE WHOSE SPOOL WRITE FAILED IS NOT RECORDED AS SEEN', () => {
-  const next = { cursor: 5000, seen: ['n:n1', 'm:m1', 'n:n2', 'm:m2'] }
+  const next = {
+    cursor: 5000,
+    seen: ['n:n1', 'm:m1', 'n:n2', 'm:m2'],
+    envelopes: [{ id: 'm1', at: NOW }, { id: 'm2', at: NOW }],
+  }
 
-  it('keeps the whole ledger and the new cursor when everything reached the disk', () => {
-    expect(stateAfterSpool({ next, previousCursor: 4000, failed: [] })).toEqual({ cursor: 5000, seen: next.seen })
+  it('keeps both ledgers and the new cursor when everything reached the disk', () => {
+    expect(stateAfterSpool({ next, previousCursor: 4000, failed: [] })).toEqual({
+      cursor: 5000,
+      seen: next.seen,
+      envelopes: next.envelopes,
+    })
+  })
+
+  it('strikes the failed message from the AGE-BOUNDED ledger too, or it is lost for good', () => {
+    const r = stateAfterSpool({ next, previousCursor: 4000, failed: [{ id: 'm2', ntfyId: 'n2' }] })
+    expect(r.envelopes).toEqual([{ id: 'm1', at: NOW }])
   })
 
   it('strikes the failed message from the ledger, so the next poll re-accepts it', () => {
@@ -51,13 +64,18 @@ describe('A MESSAGE WHOSE SPOOL WRITE FAILED IS NOT RECORDED AS SEEN', () => {
   })
 
   it('strikes a message that carried no ntfy id by its envelope id alone', () => {
-    const r = stateAfterSpool({ next: { cursor: 9, seen: ['m:m7'] }, previousCursor: 3, failed: [{ id: 'm7', ntfyId: null }] })
-    expect(r).toEqual({ cursor: 3, seen: [] })
+    const state = { cursor: 9, seen: ['m:m7'], envelopes: [{ id: 'm7', at: NOW }] }
+    const r = stateAfterSpool({ next: state, previousCursor: 3, failed: [{ id: 'm7', ntfyId: null }] })
+    expect(r).toEqual({ cursor: 3, seen: [], envelopes: [] })
   })
 
   it('survives junk instead of throwing on the state write path', () => {
     expect(() => stateAfterSpool({ next: null, previousCursor: NaN, failed: [null] })).not.toThrow()
-    expect(stateAfterSpool({ next: undefined, previousCursor: 1, failed: [] })).toEqual({ cursor: undefined, seen: [] })
+    expect(stateAfterSpool({ next: undefined, previousCursor: 1, failed: [] })).toEqual({
+      cursor: undefined,
+      seen: [],
+      envelopes: [],
+    })
   })
 })
 

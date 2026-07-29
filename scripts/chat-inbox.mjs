@@ -72,7 +72,7 @@ export function seededLedger(state, spool) {
  * cursor simply never advanced.
  *
  * So a tick that could not write everything does not advance PAST it: the failed
- * message's ids are struck from the ledger AND the cursor is left where it was,
+ * message's ids are struck from BOTH ledgers AND the cursor is left where it was,
  * because the cursor is what decides whether the next poll still sees the event
  * at all (a one-second overlap would not reach a message a minute older than the
  * newest one). Everything that DID reach the disk stays in the ledger, so nothing
@@ -80,11 +80,16 @@ export function seededLedger(state, spool) {
  */
 export function stateAfterSpool({ next, previousCursor, failed = [] }) {
   const seen = Array.isArray(next?.seen) ? next.seen : []
-  if (failed.length === 0) return { cursor: next?.cursor, seen }
+  // The age-bounded envelope ledger travels with the state file; a flood may
+  // evict a transport id, never one of these (see envelopeRetentionMs).
+  const envelopes = Array.isArray(next?.envelopes) ? next.envelopes : []
+  if (failed.length === 0) return { cursor: next?.cursor, seen, envelopes }
   const lost = new Set(failed.flatMap((m) => seenKeys({ ntfyId: m?.ntfyId, envelopeId: m?.id })))
+  const lostIds = new Set(failed.map((m) => m?.id).filter(Boolean))
   return {
     cursor: Number.isFinite(previousCursor) ? Number(previousCursor) : undefined,
     seen: seen.filter((k) => !lost.has(k)),
+    envelopes: envelopes.filter((e) => !lostIds.has(e?.id)),
   }
 }
 
@@ -149,7 +154,12 @@ async function tick() {
   // Consumed messages seed the ledger as much as waiting ones do — see
   // seededLedger. `spool` alone would let a message the session has already read
   // back in for as long as ntfy still caches it.
-  const seeded = { cursor: state.cursor, seen: seededLedger(state, knownMessages()) }
+  const seeded = {
+    cursor: state.cursor,
+    seen: seededLedger(state, knownMessages()),
+    // Carried through untouched: `ingest` prunes it by age and hands it back.
+    envelopes: Array.isArray(state.envelopes) ? state.envelopes : [],
+  }
 
   let body = null
   let fetchError = null

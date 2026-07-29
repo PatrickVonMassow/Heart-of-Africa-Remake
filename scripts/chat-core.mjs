@@ -70,9 +70,63 @@ export const CLOCK_SKEW_MS = 5 * 60 * 1000
 /** Longer than a phone user types, short enough that a flood cannot fill a disk. */
 export const MAX_TEXT_LEN = 2000
 
-/** How many ids the replay ledger remembers. Two per message (the ntfy id and
- *  the envelope id), so this is ~250 messages — far past a 12-hour window. */
+/** How many ids the TRANSPORT ledger remembers. These are cheap and disposable:
+ *  an ntfy id says only "this exact post was looked at once", so losing the
+ *  oldest ones costs at most one re-verification. The ENVELOPE ids do NOT live
+ *  under this cap — see `pruneIdLedger`. */
 export const SEEN_MAX = 500
+
+/**
+ * THE ENVELOPE LEDGER IS BOUNDED BY THE ACCEPTANCE WINDOW, NOT BY A COUNT.
+ *
+ * Both id kinds used to share one `SEEN_MAX`-capped array, and dropped events
+ * were pushed into it too — so ~500 junk posts to a known inbox topic EVICTED
+ * the accepted envelope ids, and a captured envelope could then be replayed
+ * under a fresh transport id and be accepted a second time. A count can always
+ * be outrun; the window in which a replay is possible cannot, because an
+ * envelope older than it is refused as `stale` whatever the ledger says.
+ *
+ * So an accepted envelope id is kept for exactly that window — `maxAgeMs` plus
+ * the clock skew, past which `assessEvent` can never accept it again — and the
+ * transport ids go on rotating as before.
+ */
+export function envelopeRetentionMs(maxAgeMs = DEFAULT_MAX_AGE_MS) {
+  const ms = Number(maxAgeMs)
+  return (Number.isFinite(ms) && ms > 0 ? ms : DEFAULT_MAX_AGE_MS) + CLOCK_SKEW_MS
+}
+
+/**
+ * A DISK BOUND, NOT A REPLAY BOUND. Only the holder of the secret can produce
+ * envelopes that are accepted at all, so this ceiling cannot be reached by an
+ * attacker — it exists so a state file cannot grow without limit under a fault
+ * nobody foresaw. It is far above what a person types in twelve hours, and what
+ * it drops first is the entry nearest to expiring anyway.
+ */
+export const ID_LEDGER_MAX = 5000
+
+/**
+ * PRUNE AN ID LEDGER BY AGE. PURE and TOTAL — junk entries are skipped.
+ *
+ * `entries` are `{ id, at }`, oldest first on the way out, one entry per id
+ * (the newest `at` wins). An entry whose `at` lies AHEAD of `now` is kept: a
+ * phone clock running a little fast is not a reason to forget a message.
+ */
+export function pruneIdLedger(entries, { now = Date.now(), retentionMs = DEFAULT_MAX_AGE_MS, cap = ID_LEDGER_MAX } = {}) {
+  const byId = new Map()
+  for (const e of Array.isArray(entries) ? entries : []) {
+    if (!e || typeof e !== 'object') continue
+    const id = typeof e.id === 'string' && e.id !== '' ? e.id : null
+    const at = Number(e.at)
+    if (!id || !Number.isFinite(at) || now - at > retentionMs) continue
+    const prev = byId.get(id)
+    if (!prev || at > prev.at) byId.set(id, { id, at })
+  }
+  const list = [...byId.values()].sort((a, b) => a.at - b.at)
+  return list.length > cap ? list.slice(-cap) : list
+}
+
+/** The ledger keys an envelope-id list contributes to a verification lookup. */
+export const envelopeKeys = (entries) => (Array.isArray(entries) ? entries : []).map((e) => `m:${e?.id}`)
 
 const enc = new TextEncoder()
 
@@ -302,6 +356,14 @@ export async function assessEvent({
  * `direction` is the topic these events were POLLED from and is passed straight
  * through to the verification — an envelope signed for the other one drops as
  * `bad-signature`.
+ *
+ * THE STATE HAS TWO LEDGERS, and that is the fix for the flood (see
+ * `envelopeRetentionMs`). `seen` stays what it was — the count-capped list of
+ * transport ids, which dropped events still push into — while `envelopes` holds
+ * every ACCEPTED envelope id under its own age-bounded retention, so no volume
+ * of junk can evict one inside the window in which it could still be replayed.
+ * Accepted envelope ids go into BOTH: the duplicate storage costs nothing and
+ * keeps a reader of an older state file working unchanged.
  */
 export async function ingest({
   events,
@@ -313,6 +375,11 @@ export async function ingest({
 } = {}) {
   const list = Array.isArray(events) ? events : []
   const seen = Array.isArray(state.seen) ? [...state.seen] : []
+  const retentionMs = envelopeRetentionMs(maxAgeMs)
+  const envelopes = pruneIdLedger(state.envelopes, { now, retentionMs })
+  // What the verification actually reads: the transport ledger PLUS every
+  // envelope id still inside its window, whether or not `seen` still holds it.
+  const lookup = [...seen, ...envelopeKeys(envelopes)]
   let cursor = Number.isFinite(state.cursor) ? Number(state.cursor) : 0
 
   const accepted = []
@@ -321,19 +388,34 @@ export async function ingest({
     if (event && event.event === 'message' && Number.isFinite(event.time)) {
       cursor = Math.max(cursor, Number(event.time))
     }
-    const verdict = await assessEvent({ event, secret, direction, now, maxAgeMs, seen })
+    const verdict = await assessEvent({ event, secret, direction, now, maxAgeMs, seen: lookup })
     if (verdict.accept) {
       accepted.push(verdict.message)
-      seen.push(...seenKeys({ ntfyId: verdict.message.ntfyId, envelopeId: verdict.message.id }))
+      const keys = seenKeys({ ntfyId: verdict.message.ntfyId, envelopeId: verdict.message.id })
+      seen.push(...keys)
+      lookup.push(...keys)
+      // The envelope's OWN timestamp is the anchor: it is what decides how much
+      // longer the message could be accepted, so it is what decides how much
+      // longer it must be refused.
+      envelopes.push({ id: verdict.message.id, at: verdict.message.ts })
     } else if (verdict.reason !== 'not-a-message') {
       dropped.push({ reason: verdict.reason, ntfyId: verdict.ntfyId ?? null })
       // A message that failed to verify is remembered too, so a mis-signed
       // message re-read from the cache is not re-reported every quarter hour.
-      if (verdict.ntfyId) seen.push(`n:${verdict.ntfyId}`)
+      // Transport ids only — this is exactly the path a flood comes down, and
+      // it may not reach the envelope ledger.
+      if (verdict.ntfyId) {
+        seen.push(`n:${verdict.ntfyId}`)
+        lookup.push(`n:${verdict.ntfyId}`)
+      }
     }
   }
 
-  return { accepted, dropped, state: { cursor, seen: seen.slice(-SEEN_MAX) } }
+  return {
+    accepted,
+    dropped,
+    state: { cursor, seen: seen.slice(-SEEN_MAX), envelopes: pruneIdLedger(envelopes, { now, retentionMs }) },
+  }
 }
 
 /**
