@@ -37,9 +37,10 @@
 // is what the watchdog in scripts/batch-autostart.mjs reports when the session
 // itself is wedged and no Stop hook will ever run again.
 import { execFileSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { REPO_ROOT, STATE_PATH, readJson, mergeState, sha256File } from './dashboard-state.mjs'
+import { REPO_ROOT, STATE_PATH, readJson, mergeState } from './dashboard-state.mjs'
 import { refreshFooter } from './board-core.mjs'
 import { structureViolations } from './board-structure-core.mjs'
 import { parseTasks } from './dashboard-guard-core.mjs'
@@ -51,6 +52,7 @@ import {
   BOARD_PAGE_URL,
   BOARD_REF,
   LIVE_GRACE_MS,
+  boardMissingPoints,
   liveBoardVerdict,
   liveCheckUrl,
   openFingerprintOfTasks,
@@ -58,6 +60,12 @@ import {
   pagesPublishPatch,
   stampFingerprint,
 } from './board-currency-core.mjs'
+
+/** SHA-256 of the exact bytes published — the same digest dashboard-state uses. */
+const sha256 = (text) => createHash('sha256').update(Buffer.from(text)).digest('hex')
+
+/** No fetch in this repository waits for ever; a hung socket must not hang a CLI. */
+const FETCH_TIMEOUT_MS = 15000
 
 const args = process.argv.slice(2)
 const git = (a, opts = {}) => execFileSync('git', a, { cwd: REPO_ROOT, encoding: 'utf8', ...opts }).trim()
@@ -92,7 +100,10 @@ if (args.includes('--check')) {
   let liveHtml = null
   let fetchError = null
   try {
-    const res = await fetch(liveCheckUrl(BOARD_CONTENT_URL), { cache: 'no-store' })
+    const res = await fetch(liveCheckUrl(BOARD_CONTENT_URL), {
+      cache: 'no-store',
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    })
     if (!res.ok) fetchError = `HTTP ${res.status} ${res.statusText}`
     else liveHtml = await res.text()
   } catch (e) {
@@ -159,10 +170,30 @@ if (broken.length) {
 const fingerprint = expectedFingerprint()
 if (!fingerprint) fail('the work order could not be read, so the page would carry no fingerprint')
 
+// THE STAMP MUST NOT LIE. The fingerprint says "this board shows these points",
+// so a board that is MISSING one may not carry it: it would go live stamped
+// current and both `--check` and the watchdog would then be green over exactly
+// the missing-card staleness of 28.07.2026. This is invariant (4) of the Stop
+// audit, applied EARLIER — a board that could never be attested must not be
+// publishable either, the same reasoning the structure gate above rests on. No
+// deadlock: editing the board is never blocked by any gate, and the deny that
+// asks for a publish fires at most once per turn.
+const repoBytes = readFileSync(boardFile, 'utf8')
+let openPoints = []
+try { openPoints = parseTasks(readFileSync(tasksPath, 'utf8')).open } catch { /* judged unreadable above */ }
+const uncovered = boardMissingPoints(repoBytes, openPoints)
+if (uncovered.length) {
+  console.error(`board-publish REFUSED — the board does not show open point(s) ${uncovered.join(', ')}.`)
+  console.error('Publishing it would stamp a fingerprint claiming it does, and the watchdog would')
+  console.error('then report the board as current while the reader is missing work.')
+  console.error('Give each of them a card (node scripts/board.mjs queue <N> "<text>"), then publish.')
+  process.exit(1)
+}
+
 // The fingerprint is stamped on the way OUT, never into the repo file: the repo
 // bytes are what the Artifact mirror attests, and moving them under that record
 // would make the mirror look stale on every publish.
-const published = stampFingerprint(readFileSync(boardFile, 'utf8'), fingerprint)
+const published = stampFingerprint(repoBytes, fingerprint)
 const archive = existsSync(archiveFile) ? readFileSync(archiveFile, 'utf8') : null
 
 // A tree built with plumbing: no checkout, no index, no branch switch. The
@@ -198,7 +229,10 @@ try {
   fail(`the push to ${BOARD_REF} was rejected: ${(e && (e.stderr || e.message)) || e}`)
 }
 
-mergeState(pagesPublishPatch({ fileHash: sha256File(boardFile), fingerprint }))
+// Hash the bytes that were actually published, not a fourth read of the file:
+// an edit landing during the push would otherwise be attested as live while the
+// OLD bytes went out (four-eyes finding 5).
+mergeState(pagesPublishPatch({ fileHash: sha256(repoBytes), fingerprint }))
 console.log(`board PUBLISHED (${fingerprint}) — commit ${commit.slice(0, 12)} on ${BOARD_REF}`)
 console.log(`  live in seconds, cached up to ${Math.round(LIVE_GRACE_MS / 60000)} min: ${BOARD_PAGE_URL}`)
 console.log('  verify against the PAGE: node scripts/board-publish.mjs --check')

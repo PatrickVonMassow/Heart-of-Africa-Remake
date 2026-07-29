@@ -191,7 +191,10 @@ try {
   let liveHtml = null
   let fetchError = null
   try {
-    const res = await fetch(liveCheckUrl(BOARD_CONTENT_URL, now), { cache: 'no-store' })
+    // TIMED OUT deliberately: undici would let a hung socket hold this tick for
+    // minutes, and the launcher's real job is resurrecting a dead batch. A board
+    // check may cost seconds, never a resurrection.
+    const res = await fetch(liveCheckUrl(BOARD_CONTENT_URL, now), { cache: 'no-store', signal: AbortSignal.timeout(15000) })
     if (!res.ok) fetchError = `HTTP ${res.status} ${res.statusText}`
     else liveHtml = await res.text()
   } catch (e) { fetchError = (e && e.message) || 'fetch failed' }

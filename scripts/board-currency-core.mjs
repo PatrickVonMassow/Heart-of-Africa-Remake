@@ -22,7 +22,12 @@
 //      is behind, which is the only layer that still speaks when the session
 //      itself is wedged.
 import { createHash } from 'node:crypto'
-import { parseTasks } from './dashboard-guard-core.mjs'
+import {
+  parseKlaerungPoints,
+  parseNowCardPoints,
+  parseQueuePoints,
+  parseTasks,
+} from './dashboard-guard-core.mjs'
 
 // ── The transport (delta D) ────────────────────────────────────────────────
 // The board lives on its OWN branch of this repository, never on `main`: a
@@ -163,9 +168,37 @@ export function isPublishDue(state) {
 export function syncedPublishPatch({ state, fileHash, fingerprint, at = Date.now() } = {}) {
   const s = state && typeof state === 'object' ? state : {}
   if (s.publishDeferred) return {}
-  if (!fileHash || s.publishedHash !== fileHash) return {}
+  // EITHER transport is a publish (delta D, four-eyes finding 1). Reading only
+  // the Artifact record here would refuse to attest a board that IS live and
+  // steer the session to `--defer` — a false deferral, and one that then makes
+  // `isPublished` true for those bytes. That masking record is the dishonesty
+  // this whole point replaces; it must not be re-created by the attestation.
+  if (!fileHash || (s.publishedHash !== fileHash && s.pagesPublishedHash !== fileHash)) return {}
   const fp = typeof fingerprint === 'string' && fingerprint ? fingerprint : null
   return { publishDue: undefined, ...(fp ? { publishedFingerprint: fp, publishedFingerprintAt: at } : {}) }
+}
+
+/**
+ * Does the board SHOW every open point? (delta D, four-eyes finding 3.)
+ *
+ * The fingerprint stamped on a published board is computed from the work order,
+ * so it asserts "this board shows these points" — and nothing was checking that
+ * it does. A board missing a card would go live stamped current, and both the
+ * `--check` and the watchdog would then be green over precisely the
+ * missing-card staleness of 28.07.2026. So the publisher asks first.
+ *
+ * The rule is invariant (4) of the Stop audit, moved EARLIER: a board that could
+ * never be attested must not be publishable either. Returns the open points that
+ * appear in no section.
+ */
+export function boardMissingPoints(html, open) {
+  const doc = String(html ?? '')
+  const seen = new Set([
+    ...parseNowCardPoints(doc),
+    ...parseQueuePoints(doc),
+    ...parseKlaerungPoints(doc),
+  ])
+  return normaliseOpenSet(open).filter((n) => !seen.has(n))
 }
 
 /**
@@ -321,11 +354,10 @@ export function watchdogDecision({
   if (parts.length === 0) return { notify: false, key: null, title: '', message: '', priority: 'default' }
   const key = `${verdict}:${live ?? '-'}:${expected ?? '-'}:${Math.round((dueAt || 0) / 60000)}:${Math.round((failedAt || 0) / 60000)}`
   if (lastKey && lastKey === key) return { notify: false, key, title: '', message: '', priority }
-  return {
-    notify: true,
-    key,
-    title: verdict === 'unreachable' ? 'Board unreachable' : 'Board out of date',
-    message: `${parts.join(' ')} ${BOARD_PAGE_URL}`,
-    priority,
-  }
+  // The title names what was actually found. A due-or-failed publish reported
+  // over a page that IS current is not "out of date" — mislabelling it teaches
+  // the reader to distrust the one channel that speaks when a session is wedged.
+  const title =
+    verdict === 'unreachable' ? 'Board unreachable' : verdict === 'behind' ? 'Board out of date' : 'Board publish outstanding'
+  return { notify: true, key, title, message: `${parts.join(' ')} ${BOARD_PAGE_URL}`, priority }
 }

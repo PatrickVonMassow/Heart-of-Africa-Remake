@@ -4,6 +4,7 @@ import { resolve } from 'node:path'
 import {
   ARCHIVE_CONTENT_URL,
   BOARD_CONTENT_URL,
+  boardMissingPoints,
   BOARD_PAGE_URL,
   BOARD_REF,
   LIVE_GRACE_MS,
@@ -235,8 +236,16 @@ describe('delta E — the watchdog alert decision', () => {
   it('alerts on a board that is behind, and names the page', () => {
     const d = watchdogDecision({ verdict: 'behind', live: 'sha256:old', expected: 'sha256:new', state: {}, now })
     expect(d.notify).toBe(true)
+    expect(d.title).toBe('Board out of date')
     expect(d.message).toContain(BOARD_PAGE_URL)
     expect(d.priority).toBe('high')
+  })
+
+  it('does not call a CURRENT page out of date when the fault is an unrun publish', () => {
+    // A mislabelled alert teaches the reader to distrust the one channel that
+    // still speaks while a session is wedged.
+    const state = { publishDue: { at: now - WATCHDOG_TICK_MS * 2 } }
+    expect(watchdogDecision({ verdict: 'current', state, now }).title).toBe('Board publish outstanding')
   })
 
   it('alerts on an unreachable board', () => {
@@ -322,6 +331,56 @@ describe('delta D — what a pages publish records', () => {
     expect(liveCheckUrl(BOARD_CONTENT_URL, 1234)).toBe(`${BOARD_CONTENT_URL}?t=1234`)
     expect(liveCheckUrl('https://x/y?a=1', 9)).toBe('https://x/y?a=1&t=9')
     expect(liveCheckUrl(BOARD_CONTENT_URL, 1)).not.toBe(liveCheckUrl(BOARD_CONTENT_URL, 2))
+  })
+})
+
+describe('delta D — a publish is attested by EITHER transport', () => {
+  // Four-eyes finding 1: reading only the Artifact record here refused to
+  // attest a board that IS live and offered `--defer` as the way out — a false
+  // deferral, and one that then makes isPublished true for those bytes.
+  it('accepts the pages hash exactly as it accepts the Artifact hash', () => {
+    const fp = 'sha256:aa'
+    for (const state of [{ publishedHash: 'h1' }, { pagesPublishedHash: 'h1' }]) {
+      expect(syncedPublishPatch({ state, fileHash: 'h1', fingerprint: fp })).toMatchObject({
+        publishDue: undefined,
+        publishedFingerprint: fp,
+      })
+    }
+  })
+  it('still attests nothing for bytes NEITHER transport published', () => {
+    expect(syncedPublishPatch({ state: { pagesPublishedHash: 'h0' }, fileHash: 'h1', fingerprint: 'x' })).toEqual({})
+  })
+})
+
+describe('delta D — the stamp may not claim a board that is missing work', () => {
+  // Four-eyes finding 3: the fingerprint asserts "this board shows these
+  // points". Nothing was checking that it does, so a board missing a card would
+  // publish stamped current and BOTH the check and the watchdog would then be
+  // green over exactly the missing-card staleness this point exists to end.
+  // The queue numbers a card in its own `.num` span; a now-card and a "Von dir
+  // zu klären" card carry the number at the head of the TITLE instead — the
+  // three parsers this helper feeds all read the real board's shapes.
+  const card = (n) =>
+    `<details><summary><span class="num">${n}</span><span class="t">T</span></summary><div class="body"><p>b</p></div></details>`
+  const titled = (n) =>
+    `<details><summary><span class="t">${n} — T</span></summary><div class="body"><p>b</p></div></details>`
+  const doc = (queue = '', now = '', k = '') => `<title>B</title>
+<main>
+<details class="sect"><summary><h2>Woran ich gerade arbeite</h2></summary>${now}</details>
+<details class="sect"><summary><h2>Von dir zu klären</h2></summary>${k}</details>
+<details class="sect"><summary><h2>Warteschlange</h2></summary>${queue}</details>
+<details class="sect"><summary><h2>Erledigt</h2></summary></details>
+</main>`
+
+  it('names the open points no section shows', () => {
+    expect(boardMissingPoints(doc(card(1)), [1, 2, 3])).toEqual([2, 3])
+  })
+  it('counts a now-card and a "Von dir zu klären" card as showing the point', () => {
+    expect(boardMissingPoints(doc(card(1), titled(2), titled(3)), [1, 2, 3])).toEqual([])
+  })
+  it('is empty for an empty open set, and never throws on junk', () => {
+    expect(boardMissingPoints(doc(), [])).toEqual([])
+    for (const bad of [null, undefined, 42, {}]) expect(() => boardMissingPoints(bad, [1])).not.toThrow()
   })
 })
 

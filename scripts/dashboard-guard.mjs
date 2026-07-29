@@ -202,21 +202,30 @@ if (RUN_AS_SCRIPT && process.argv[2] === '--synced') {
   // if it names THIS content; a deferred publish (headless session, no Artifact
   // tool) is the documented exception and passes with a loud line instead.
   const fileHash = sha256File(p)
-  if (priorState.publishFailed) {
+  // EITHER transport counts (point 400, delta D): the pages push and the
+  // Artifact call publish the same bytes, and the pages push is the one every
+  // session can run. Reading only the Artifact record here would refuse to
+  // attest a board that IS live and offer `--defer` as the way out — a false
+  // deferral over a published board.
+  const livePublished = !!fileHash && (priorState.publishedHash === fileHash || priorState.pagesPublishedHash === fileHash)
+  if (priorState.publishFailed && !livePublished) {
     console.error('dashboard-guard --synced REFUSED — the last publish attempt FAILED:')
-    console.error(`  ${priorState.publishFailed.reason} (${priorState.publishFailed.path})`)
-    console.error('Publish the scratchpad file via the Artifact tool again, then re-run --synced.')
+    console.error(`  ${priorState.publishFailed.reason}${priorState.publishFailed.path ? ` (${priorState.publishFailed.path})` : ''}`)
+    console.error('Publish again — node scripts/board-publish.mjs (or the Artifact tool) — then re-run --synced.')
     process.exit(1)
   }
   if (priorState.publishDeferred) {
     const why = priorState.publishDeferred.reason ?? priorState.publishDeferred
     console.warn(`dashboard-guard --synced: publish DEFERRED — ${why}`)
     console.warn('  the board file is current, the LIVE page is not. The watchdog reports this.')
-  } else if (fileHash && priorState.publishedHash !== fileHash) {
+  } else if (fileHash && !livePublished) {
     console.error('dashboard-guard --synced REFUSED — this board was never published:')
-    console.error(`  file ${String(fileHash).slice(0, 12)}… vs last published ${String(priorState.publishedHash ?? 'none').slice(0, 12)}…`)
-    console.error('Publish the scratchpad file via the Artifact tool, then re-run --synced.')
-    console.error('Headless session without the Artifact tool: node scripts/dashboard-publish.mjs --defer "<reason>".')
+    console.error(
+      `  file ${String(fileHash).slice(0, 12)}… vs last published ${String(priorState.pagesPublishedHash ?? priorState.publishedHash ?? 'none').slice(0, 12)}…`,
+    )
+    console.error('Publish it: node scripts/board-publish.mjs — then re-run --synced.')
+    console.error('(The claude.ai mirror is the second path: dashboard-publish.mjs + the Artifact tool.)')
+    console.error('Neither reachable at all — e.g. offline: node scripts/dashboard-publish.mjs --defer "<reason>".')
     process.exit(1)
   }
 
@@ -253,6 +262,10 @@ if (RUN_AS_SCRIPT && process.argv[2] === '--synced') {
     syncedAt: Date.now(),
     doneSeen,
     auditWaived: undefined,
+    // A failure record that the live bytes have overtaken is spent: leaving it
+    // would wedge every later attestation AND keep the launcher watchdog
+    // reporting a publish that has since happened.
+    ...(livePublished ? { publishFailed: undefined } : {}),
     ...publishPatch,
     // The now-card text as reviewed; (8c) blocks when work happens and this
     // never changes — a stale card cannot pass by confirming the focus alone.

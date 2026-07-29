@@ -716,7 +716,9 @@ export function evaluate(input) {
           '. Publishing is part of EVERY dashboard update: run node scripts/board-publish.mjs, which ' +
           'pushes the board to the live page and works in every session. The claude.ai mirror is still ' +
           'kept alongside it: node scripts/dashboard-publish.mjs, publish the synced scratchpad file ' +
-          'with the Artifact tool (same artifact url), then re-run --synced.',
+          'with the Artifact tool (same artifact url), then re-run --synced. ONLY if NEITHER is ' +
+          'reachable (offline): node scripts/dashboard-publish.mjs --defer "<reason>" — and publish at ' +
+          'the first chance.',
       )
     }
   }

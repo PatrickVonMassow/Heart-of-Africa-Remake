@@ -738,6 +738,14 @@ unreadable page is **never** called current.
     node scripts/board-publish.mjs --check   # fetch the live page and judge it
     node scripts/board-publish.mjs --url     # print the URLs
 
+`scripts/board.mjs` runs the publish itself, so the one-command board loop keeps
+the live page current without a second step. **The stamp may not lie:** the
+publisher REFUSES a board that does not show every open point — the fingerprint
+asserts that it does, and a board going live stamped current while a card is
+missing is exactly the 28.07. failure, only now with two green checks over it.
+That is invariant (4) of the Stop audit applied earlier, like the structure gate
+beside it; editing the board is never blocked, so there is no way to get stuck.
+
 **What each layer buys, honestly.** The due mark (`lock-heartbeat-hook.mjs`)
 notices a changed open-point set after any tool call and persists `publishDue`,
 so a session that dies before publishing hands the mark to its successor. The
