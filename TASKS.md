@@ -3607,6 +3607,39 @@ read that as "the criterion and its evidence section".
   DOCS in the same commit: `docs/batch-autonomy.md` (the board's transport and what each
   half owns) and the memory entry `batch-dashboard-artifact`.
 
+- [ ] 421. A DECISION ASKED IN THE CHAT NEVER REACHES THE BOARD (29.07.2026, user:
+  "Du hast mir Handlungsaufforderungen im Chat vom Dashboard geschrieben. Die dürfen dort
+  höchstens zusätzlich stehen. In jedem Fall müssen sie als Karte in 'Von dir zu klären'
+  erscheinen." — and, decisively, "In den Chatbereich schaue ich nicht regelmäßig. Den
+  öffne ich nur, wenn ich dir etwas schreiben will."). THE CHAT IS AN INBOX, NOT A
+  NOTICE-BOARD: the user writes there, the user does not read there. A question put only
+  into a chat reply is therefore a question that was never asked — it waits in a channel
+  nobody watches while the board, which IS read, shows nothing pending. Observed today: a
+  typography decision was put to the user in chat with three options and no "Von dir zu
+  klären" card ever existed for it.
+  THE RULE: every request for a user DECISION exists as a card in "Von dir zu klären".
+  The chat may carry it as well — additionally, never instead. A card is removed when the
+  decision is answered (`board.mjs vdzk-remove`), which is the existing mechanism.
+  ENFORCE IT, do not remember it (the project has paid for reminders repeatedly). A Stop
+  hook `decision-card-guard` blocks the turn end when the turn's own reply to the user
+  ASKS for a decision while "Von dir zu klären" holds no card for it. Detecting a question
+  is the hard half and it must fail SAFE — a false block costs a turn, a false pass costs
+  a decision the user never sees, so the trigger is deliberately broad: a reply containing
+  a question mark addressed at the user, or one of the decision phrasings the project
+  actually uses ("sag mir", "welche Variante", "deine Entscheidung", "soll ich", "willst
+  du"), demands that the VDZK section have gained a card in this turn OR already carry one
+  whose title shares a content word with the question. The remedy line names the one
+  command that fixes it.
+  VERIFIABLE: pure Vitest over a `decision-card-guard-core.mjs` — a reply with a decision
+  question and no VDZK card blocks; the same reply with a matching card passes; a reply
+  with a rhetorical question inside a status sentence and an unrelated card blocks (fail
+  safe, and the test says so in its name); an answer containing no question passes; a
+  malformed board or a missing reply allows the stop (fail-open, like every guard here).
+  Plus the guard's own entry in the four-eyes ledger, since it is a mechanism.
+  DOCS in the same commit: CLAUDE.md §7.2 (the Stop-chain list) and the memory entry
+  `dashboard-vdzk-only-decisions`, which states what that section holds — it gains the
+  converse rule, that every decision MUST be there.
+
 ## Closing (only after all points)
 
 New points are appended BEFORE this section — it stays last in the file.

@@ -243,3 +243,46 @@ describe('undiscovered map points name their KIND, not a bare "?" (point 318)', 
     }
   })
 })
+
+describe('German typography: the Gedankenstrich is an en dash (point 420)', () => {
+  // Duden sets the German Gedankenstrich as an EN dash with spaces; the em dash
+  // does not occur in German typesetting at all. English keeps its spaced em
+  // dash (AP style, held consistently across the repository) — so this rule is
+  // asserted for the German file ONLY, and the English one is checked to still
+  // carry its own convention rather than being dragged along.
+  const source = (file: string) => readFileSync(resolve(__dirname, file), 'utf8')
+
+  it('the German language file contains no em dash', () => {
+    const text = source('de.ts')
+    const offenders = [...text.matchAll(/.{0,30}—.{0,30}/g)].map((m) => m[0])
+    expect(offenders, `em dash in de.ts: ${offenders.slice(0, 3).join(' | ')}`).toEqual([])
+  })
+
+  it('and does carry en dashes, so the replacement happened rather than the dashes vanishing', () => {
+    expect((source('de.ts').match(/–/g) ?? []).length).toBeGreaterThan(100)
+  })
+
+  it('leaves the English file on its own convention', () => {
+    expect((source('en.ts').match(/—/g) ?? []).length).toBeGreaterThan(0)
+  })
+
+  // The dash is often followed directly by a voice marker; display strips the
+  // markup, so what the player reads must still be a spaced Gedankenstrich.
+  it('reads as a spaced en dash once the voice markup is stripped', () => {
+    const leaves: string[] = []
+    const walk = (node: unknown) => {
+      if (typeof node === 'string') leaves.push(node)
+      else if (node && typeof node === 'object') Object.values(node).forEach(walk)
+    }
+    walk(de)
+    const withMarker = leaves.filter((v) => /–\[/.test(v))
+    // A sample of nothing would pass this test while proving nothing — the
+    // failure shape point 412 was written about. Say so out loud.
+    expect(withMarker.length, 'no German text puts a dash before a voice marker — nothing was checked').toBeGreaterThan(10)
+    for (const raw of withMarker) {
+      const shown = stripVoiceMarkup(raw)
+      expect(shown).not.toMatch(/—/)
+      expect(shown).toMatch(/\s–\s/)
+    }
+  })
+})
