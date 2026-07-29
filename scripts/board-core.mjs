@@ -1,6 +1,12 @@
 // Pure half of the board command (point 372): the card edit, so the markup the
 // board guard accepts is pinned by tests rather than by the shape of one
 // regex written once. The wrapper does the I/O.
+//
+// The one import is the auditor's OWN name for "no estimate yet": a card this
+// module writes must satisfy the audit that reads it, and spelling that value a
+// second time here is how the two would drift apart. dashboard-guard-core
+// imports nothing, so the direction cannot become a cycle.
+import { QUEUE_STUB_META } from './dashboard-guard-core.mjs'
 
 /** Berlin wall clock — the stamp every status carries (point 371). */
 export function berlinStamp(now = new Date()) {
@@ -173,6 +179,13 @@ export function toNow(html, point, status, { stamp = berlinStamp() } = {}) {
  * hand today, and that the board guard blocks the turn on when it is forgotten
  * (a point listed in both sections at once). The estimate is recovered from the
  * card's own start/end span unless the caller states a new one.
+ *
+ * A card that carries NO recoverable span falls back to the NAMED stub meta
+ * rather than to no meta at all: the audit accepts "no estimate yet" only when
+ * it is said in so many words, so an omitted meta is a `queue-meta` violation.
+ * That is reachable in one step — a point promoted straight from a stub queue
+ * card has a start time and no end, so `spanHours` is null on the way back —
+ * and it turned the whole unit layer red over a board move that looked routine.
  */
 export function toQueue(html, point, { text, estimate } = {}) {
   const card = nowCard(html, point)
@@ -180,11 +193,11 @@ export function toQueue(html, point, { text, estimate } = {}) {
   const body = text?.trim() || statusOf(card)
   if (!body) throw new Error('board: refusing to queue a card with an empty body')
   const hours = spanHours(metaOf(card))
-  const meta = estimate ?? (hours == null ? null : hoursLabel(hours))
+  const meta = estimate ?? (hours == null ? QUEUE_STUB_META : hoursLabel(hours))
   const title = titleOf(card).replace(new RegExp(`^${point}\\s*—\\s*`), '')
   const entry =
     `<details>\n  <summary><span class="num">${point}</span><span class="t">${title}</span>` +
-    (meta ? `<span class="right"><span class="meta">${meta}</span></span>` : '') +
+    `<span class="right"><span class="meta">${meta}</span></span>` +
     `</summary>\n  <div class="body">\n    <p>${body}</p>\n  </div>\n</details>\n`
   const out = html.replace(card, '')
   const { from } = sectionBounds(out, 'queue')

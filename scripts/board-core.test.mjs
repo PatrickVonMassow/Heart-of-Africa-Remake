@@ -5,7 +5,13 @@ import { describe, it, expect } from 'vitest'
 import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { REPO_ROOT } from './repo-paths.mjs'
-import { auditDashboard, parseNowCardPoints, parseQueuePoints, parseTasks } from './dashboard-guard-core.mjs'
+import {
+  auditDashboard,
+  parseNowCardPoints,
+  parseQueuePoints,
+  parseTasks,
+  QUEUE_STUB_META,
+} from './dashboard-guard-core.mjs'
 import {
   addHours,
   berlinStamp,
@@ -203,6 +209,16 @@ describe('toQueue — the move that had to be done by hand', () => {
 
   it('throws when the point is not in current work', () => {
     expect(() => toQueue(board(), 999)).toThrow(/no current-work card/)
+  })
+
+  // A point promoted straight from a STUB queue card has a start time and no
+  // end, so nothing can be recovered on the way back. Emitting no meta at all
+  // was a queue-meta violation, and the live-board sweep below turned the whole
+  // unit layer red on it — an omitted estimate must SAY it is missing.
+  it('falls back to the named stub estimate when the card has no span', () => {
+    const out = toQueue(fullBoard({ now: nowEntry(406, 'Die Zustellung', '06:47') }), 406)
+    expect(out).toContain(`<span class="meta">${QUEUE_STUB_META}</span>`)
+    expect(auditDashboard(out, { open: [], done: [] }).map((x) => x.code)).not.toContain('queue-meta')
   })
 })
 
