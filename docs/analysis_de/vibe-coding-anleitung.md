@@ -26,15 +26,13 @@ und nicht erst beim zweiten Schaden. Fast alles Folgende wendet das an.
 Die Prompts unten sind **Aufträge, einen Mechanismus zu bauen** — keine Merksätze.
 „Jedes neue Feature bekommt einen Test" ist eine *Regel*, die vergessen wird;
 „Etabliere einen Mechanismus, der das garantiert" ist ein *Auftrag*, an dessen Ende
-etwas steht, das die Regel erzwingt. Formuliere deine eigenen genauso.
+etwas steht, das die Regel erzwingt. Formuliere deine eigenen genauso. Wo ein
+Mechanismus prinzipiell **nicht** möglich ist (etwa „sieht das für einen Menschen
+richtig aus?"), steht das dabei — dann trägt nur die Aufmerksamkeit.
 
-Wo ein Mechanismus prinzipiell **nicht** möglich ist (etwa „sieht das für einen
-Menschen richtig aus?"), steht das dabei — dann trägt nur die Aufmerksamkeit.
-
-Manche Tipps kosten spürbar mehr Token. Die tragen eine grobe **Schätzung** wie
-*(Kosten ≈ 2x)* — gemeint ist der Mehrverbrauch für die betroffene Arbeit, nicht
-fürs ganze Projekt. Sie sind es meist wert; wenn dein Kontingent knapp wird, weißt
-du damit, wo du zuerst drehst.
+Manche Tipps kosten spürbar mehr Token und tragen eine grobe **Schätzung** wie
+*(Kosten ≈ 2x)* — der Mehrverbrauch für die betroffene Arbeit, nicht fürs ganze
+Projekt. Sie sind es meist wert; wird dein Kontingent knapp, weißt du, wo du drehst.
 
 ### Primäres und sekundäres Modell
 
@@ -56,13 +54,13 @@ Lege **zwei** Modelle fest und gib ihnen klare Rollen:
 
 Ein zweites Modell nützt nicht, weil es *besser* wäre, sondern weil es **andere
 blinde Flecken** hat — diesen Wert hebt nur eine Prüfung, keine Übergabe. Der Stopp
-bei einem fremden Modell ist wichtig: Ein unbemerkt schwächeres Modell liefert
+bei einem fremden Modell ist wichtig: Ein unbemerkt schwächeres liefert
 selbstbewusst Attrappen.
 
-Und die **Obergrenze**: Eine Gegenprüfung kostet etwa so viel wie die Arbeit. Die
-Grenze zieht die **Sichtbarkeit des Fehlers** — was den Ablauf steuert oder Arbeit
-vernichten kann (Wächter, Sperren, Speichern/Laden, Veröffentlichungen), wird immer
-gegengeprüft; was ein schneller Test sofort zeigt, nie.
+Die **Obergrenze**: Eine Gegenprüfung kostet etwa so viel wie die Arbeit; die Grenze
+zieht die **Sichtbarkeit des Fehlers**. Was den Ablauf steuert oder Arbeit vernichten
+kann (Wächter, Sperren, Speichern/Laden, Veröffentlichungen), wird immer gegengeprüft;
+was ein schneller Test sofort zeigt, nie.
 
 ---
 
@@ -111,22 +109,19 @@ gegengeprüft; was ein schneller Test sofort zeigt, nie.
    zweiten Schaden.
    > „Für **jede** Regel, die wirklich gelten soll, baue von Anfang an einen **Mechanismus**,
    > der ihre Verletzung unmöglich macht — einen Test, einen Git-Hook oder einen Stop-/
-   > PreToolUse-Hook, der abbricht bzw. die Aktion verweigert, wenn die Regel gebrochen würde.
-   > Der Aufwand soll zur Wichtigkeit passen (ein leichter Guard für eine leichte Regel),
-   > aber die Grundhaltung ist: **erzwingen statt erinnern**. Ein Vorsatz — auch ein
-   > ausführlich niedergeschriebener — reicht nicht."
+   > PreToolUse-Hook, der die Aktion verweigert, wenn die Regel gebrochen würde. Der Aufwand
+   > soll zur Wichtigkeit passen, aber die Grundhaltung ist: **erzwingen statt erinnern**.
+   > Ein Vorsatz — auch ein ausführlich niedergeschriebener — reicht nicht."
 
    Ein Mechanismus kann selbst falsch gebaut sein; Gegenprüfungen finden darin mehr
    Fehler als in gewöhnlichem Code:
    > „Etabliere einen Mechanismus, der beim Hinzufügen oder Ändern eines
    > Mechanismus **immer das Vier-Augen-Prinzip** erzwingt: Plan und Ergebnis
    > werden vom sekundären Modell gegengeprüft, bevor der neue Mechanismus scharf
-   > geschaltet wird — und das Ergebnis dieser Prüfung wird festgehalten."
+   > geschaltet wird — und ohne festgehaltenen Prüf-Eintrag (wer, mit welchem
+   > Ergebnis, welcher Stand) darf der Zug nicht enden."
 
-   Auch diese Regel braucht ihren eigenen Mechanismus, sonst fällt sie genau dann
-   aus, wenn es eng wird: Ohne festgehaltenen Prüf-Eintrag — wer geprüft hat, mit
-   welchem Ergebnis, welcher Stand — darf der Zug nicht enden. Ein „passt schon"
-   des Autors selbst zählt dabei nicht als Gegenprüfung.
+   Ein „passt schon" des Autors selbst zählt nicht als Gegenprüfung.
 
    *(Kosten ≈ 2x)*
 
@@ -351,6 +346,11 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Setze jede Formprüfung **vor** den Schritt nach außen, so dass sie die
   Auslieferung verhindern kann; nur Inhaltliches darf danach laufen."
 
+- **Plötzlich rot, obwohl niemand den Code angefasst hat.** Zwei Teile buchstabieren
+  dieselbe Regel getrennt — eines schreibt, eines prüft; das blockiert *alle* Arbeit.
+  → *Prompt:* „Wo ein Teil schreibt, was ein anderes prüft, **importiere** den geprüften
+  Wert. Wird etwas ohne Code-Änderung rot, frag: welcher **Zustand** hat sich geändert?"
+
 ---
 
 ## Drei Meta-Regeln, die alles zusammenhalten
@@ -398,4 +398,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 Wenn du diese eine Nachricht an den Anfang stellst, hast du 80 % der Lehren dieses
 Projekts eingebaut, bevor die erste Zeile Code entsteht.
 
-<!-- GUIDE-FINGERPRINT: 946ff3c534400dfb43f5402444b6e976e100343b7657a093bf10749125e18e77 -->
+<!-- GUIDE-FINGERPRINT: 966d82ae8cc6eec9c7cc5ef11d9232ed65e20dbceaeeb7e7cb9ccc276b517951 -->
