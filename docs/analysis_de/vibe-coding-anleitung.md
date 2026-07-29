@@ -178,6 +178,17 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   Debug-Zustand." *(Kosten ≈ 1,5x — Bilder sind teuer.)* *(Der letzte Schritt bleibt menschlich:
   Sieh dir den Screenshot an und frag dich, ob das für einen Menschen richtig aussieht.)*
 
+- **Der alte Nachweis deckt den neuen Blickwinkel nicht mehr.** Gibst du dem Nutzer eine
+  neue Freiheit — nach oben schauen zu können, weiter herauszuzoomen, einen bisher
+  verschlossenen Ort zu betreten —, dann vergrößert das rückwirkend die Fläche **jeder**
+  Zusage, die vorher nur innerhalb der alten Freiheit geprüft wurde. Rot wird dabei nichts:
+  Die Prüfung schaut weiter dorthin, wo sie immer hinschaute.
+  → *Prompt:* „Wenn eine Änderung eine neue Blick-, Bewegungs- oder Zoomachse hinzufügt,
+  liste zuerst auf, welche bestehenden Zusagen dadurch an einem **neuen Rand** prüfbar
+  werden, und weise sie dort nach — nicht nur das neue Feature selbst." *(Bei mir lag so
+  eine Naht zwischen begehbarem Boden und Landschaft lange im toten Winkel: Auf Augenhöhe
+  liegt sie auf der Fluchtlinie, mit dem neuen Blick nach unten war sie sofort da.)*
+
 - **Neue Features zerbrechen alte.** Eine Änderung repariert X und bricht das unbeobachtete Y.
   → *Prompt:* „Etabliere einen Mechanismus, der jede Mechanik auch im
   **Ausgangs-/Danach-Zustand** prüft und nach jedem Zusammenführen die schnelle
@@ -398,4 +409,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 Wenn du diese eine Nachricht an den Anfang stellst, hast du 80 % der Lehren dieses
 Projekts eingebaut, bevor die erste Zeile Code entsteht.
 
-<!-- GUIDE-FINGERPRINT: af41ca5d09744d37bbacee08dbbae22c2da103b37539b69f863cf8120b333ca8 -->
+<!-- GUIDE-FINGERPRINT: 1489eddd66bf973e53f870d4b720e3942870dae3a1a372108df394cf13ddc49f -->
