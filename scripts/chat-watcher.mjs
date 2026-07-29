@@ -32,7 +32,7 @@ import { randomUUID } from 'node:crypto'
 import { join } from 'node:path'
 import { REPO_ROOT, repoPath } from './repo-paths.mjs'
 import { writeJsonAtomic } from './atomic-write.mjs'
-import { readSecret } from './chat-secret.mjs'
+import { readSecretStatus } from './chat-secret.mjs'
 import {
   DEFAULT_MAX_AGE_MS,
   SEEN_MAX,
@@ -460,11 +460,18 @@ async function run() {
     )
     process.exit(1)
   }
-  const secret = readSecret()
-  if (!secret) {
+  const status = readSecretStatus()
+  if (status.state === 'absent') {
     say({ ok: true, configured: false, reason: 'no chat secret — run: node scripts/chat-secret.mjs --init' })
     process.exit(0)
   }
+  if (status.state !== 'ok') {
+    // A secret that EXISTS and cannot be read is a fault, not an unpaired
+    // machine — it is said loudly rather than mistaken for "nothing to watch".
+    say({ ok: false, configured: true, reason: `chat secret unreadable (${status.reason})` })
+    process.exit(1)
+  }
+  const secret = status.secret
   const maxAge = Number(process.env.HOA_CHAT_MAX_AGE_MS) > 0 ? Number(process.env.HOA_CHAT_MAX_AGE_MS) : DEFAULT_MAX_AGE_MS
   state.identity = ownIdentity()
   installShutdownHandlers()

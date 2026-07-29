@@ -30,7 +30,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { repoPath } from './repo-paths.mjs'
-import { readSecret } from './chat-secret.mjs'
+import { readSecretStatus } from './chat-secret.mjs'
 import { DEFAULT_MAX_AGE_MS, deriveTopics, ingest, parseNtfyPoll, pollUrl, seenKeys, sinceParam } from './chat-core.mjs'
 import { claimOldest, knownMessages, migrateLegacySpool, pruneConsumed, readPending, spoolMessage } from './chat-spool.mjs'
 
@@ -126,13 +126,21 @@ async function tick() {
     process.exit(0)
   }
 
-  const secret = readSecret()
-  if (!secret) {
+  const status = readSecretStatus()
+  if (status.state === 'absent') {
     // Not configured is not an error: the channel is opt-in, and the launcher
     // ticks on every machine whether or not the user has paired a phone.
     say({ ok: true, configured: false, accepted: 0, pending: readPending().length })
     process.exit(0)
   }
+  if (status.state !== 'ok') {
+    // A secret this machine cannot read is a FAULT, not an unpaired machine:
+    // the topics cannot be derived, so every message the user sends is dropped
+    // where nobody sees it. `ok: false` is what the launcher logs and reports.
+    say({ ok: false, reason: `chat secret unreadable (${status.reason})`, configured: true, accepted: 0, pending: readPending().length })
+    process.exit(0)
+  }
+  const secret = status.secret
 
   const maxAgeMs = Number(process.env.HOA_CHAT_MAX_AGE_MS) > 0 ? Number(process.env.HOA_CHAT_MAX_AGE_MS) : DEFAULT_MAX_AGE_MS
   const { inbox } = await deriveTopics(secret)

@@ -19,15 +19,50 @@ import { deriveTopics } from './chat-core.mjs'
 
 export const SECRET_PATH = repoPath('.claude', 'chat-secret')
 
-/** The secret, or null. Trimmed — a trailing newline from an editor is not part
- *  of it, and the browser side trims too, so both derive the same topics. */
-export function readSecret(path = SECRET_PATH) {
-  try {
-    const s = readFileSync(path, 'utf8').trim()
-    return s || null
-  } catch {
-    return null
+/**
+ * ABSENT IS NOT THE SAME AS UNREADABLE. PURE — the caller does the I/O and hands
+ * over what it got.
+ *
+ * The channel is opt-in: on a machine that never paired a phone there is simply
+ * no secret file, and silence is the correct behaviour. But every OTHER way the
+ * read can fail — a permission error, a directory where the file should be, a
+ * file that exists and holds nothing (an interrupted write, a truncation) — is a
+ * FAULT: the topics cannot be derived, so every message the user sends is dropped
+ * before it is even parsed, and the two states used to be indistinguishable
+ * because both answered `null`. That is a channel that fails silently in exactly
+ * the shape it exists to prevent, so the reader now says which of the two it is
+ * and the launcher reports the second.
+ *
+ * Returns { state: 'ok' | 'absent' | 'unreadable', secret, reason }.
+ */
+export function classifySecret({ error = null, raw = null } = {}) {
+  if (error) {
+    const code = error.code ?? null
+    if (code === 'ENOENT') return { state: 'absent', secret: null, reason: null }
+    return { state: 'unreadable', secret: null, reason: `${code ?? 'read failed'}: ${error.message ?? String(error)}` }
   }
+  const secret = String(raw ?? '').trim()
+  // An EXISTING but empty file is the truncated-write case, not an unpaired
+  // machine: `ensureSecret` never writes an empty secret, so nothing legitimate
+  // produces this state.
+  if (!secret) return { state: 'unreadable', secret: null, reason: 'the secret file is empty' }
+  return { state: 'ok', secret, reason: null }
+}
+
+/** `classifySecret` against the real file. TOTAL — never throws. */
+export function readSecretStatus(path = SECRET_PATH) {
+  try {
+    return classifySecret({ raw: readFileSync(path, 'utf8') })
+  } catch (e) {
+    return classifySecret({ error: e })
+  }
+}
+
+/** The secret, or null. Trimmed — a trailing newline from an editor is not part
+ *  of it, and the browser side trims too, so both derive the same topics.
+ *  Callers that must tell "not configured" from "broken" use `readSecretStatus`. */
+export function readSecret(path = SECRET_PATH) {
+  return readSecretStatus(path).secret
 }
 
 /** 160 bits, base32-ish and hyphenated: long enough to be unguessable, short

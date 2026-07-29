@@ -1012,6 +1012,19 @@ paused, complete or wedged may not decide whether a message survives at all.
 Past 12 hours it is gone from the cache, which is also why the acceptance window
 is set to the same 12 hours — beyond it a replay is impossible anyway.
 
+**An UNPAIRED machine and a BROKEN one are told apart** (`classifySecret` /
+`readSecretStatus` in `scripts/chat-secret.mjs`). The channel is opt-in, so a
+machine with no `.claude/chat-secret` stays silent — that is correct. But every
+other way that read can fail (a permission error, a directory in its place, a
+file that exists and holds nothing) takes the whole channel down: the topics
+cannot be derived, so every message the user sends is dropped before it is even
+parsed. Both states used to answer `null` and neither was reported. The reader
+now returns `absent` or `unreadable`; the inbox tick answers `ok: false` for the
+second, and the launcher both logs it and sends it to the signal topic — the one
+chat fault that must leave the machine out of band, because the chat itself can
+no longer carry it. The watcher exits loudly on it rather than reporting "not
+configured".
+
 **The security model — the part that shaped the design.** The board page is
 PUBLIC, and an ntfy topic name IS its access: anyone who knows it can read and
 post. A topic embedded in that page would be an open prompt-injection port into a
