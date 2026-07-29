@@ -30,7 +30,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { repoPath } from './repo-paths.mjs'
-import { readSecretStatus } from './chat-secret.mjs'
+import { SECRET_FAULT, readSecretStatus } from './chat-secret.mjs'
 import { DEFAULT_MAX_AGE_MS, deriveTopics, ingest, parseNtfyPoll, pollUrl, seenKeys, sinceParam } from './chat-core.mjs'
 import { postOutbox } from './chat-reply.mjs'
 import { claimOldest, knownMessages, migrateLegacySpool, pruneConsumed, readPending, spoolMessage } from './chat-spool.mjs'
@@ -98,6 +98,30 @@ export function stateAfterSpool({ next, previousCursor, failed = [] }) {
   }
 }
 
+/**
+ * WHAT THE TICK ANSWERS BEFORE IT EVER POLLS. PURE.
+ *
+ * `null` means "carry on"; anything else is the whole answer of this tick.
+ * The two failure states are deliberately different reports: an ABSENT secret is
+ * the opt-out and stays quiet (`ok: true, configured: false`), while an
+ * UNREADABLE one is a fault the launcher must repeat out of band — it carries
+ * `ok: false` AND the machine-readable `fault`, so the launcher recognises it by
+ * a field rather than by the wording of a sentence.
+ */
+export function secretGateReport({ status, pending = 0 } = {}) {
+  const state = status?.state
+  if (state === 'ok') return null
+  if (state === 'absent') return { ok: true, configured: false, accepted: 0, pending }
+  return {
+    ok: false,
+    fault: SECRET_FAULT,
+    reason: `chat secret unreadable (${status?.reason ?? 'unknown'})`,
+    configured: true,
+    accepted: 0,
+    pending,
+  }
+}
+
 /** A timed fetch whose timer is CLEARED again — an `AbortSignal.timeout` leaves
  *  a libuv handle that a following exit tears down mid-close on Windows. */
 async function fetchWithTimeout(url, ms = FETCH_TIMEOUT_MS) {
@@ -136,18 +160,13 @@ async function tick() {
     process.exit(0)
   }
 
+  // Not configured is not an error (the channel is opt-in and the launcher ticks
+  // on every machine); a secret that exists and cannot be READ is — see
+  // `secretGateReport`.
   const status = readSecretStatus()
-  if (status.state === 'absent') {
-    // Not configured is not an error: the channel is opt-in, and the launcher
-    // ticks on every machine whether or not the user has paired a phone.
-    say({ ok: true, configured: false, accepted: 0, pending: readPending().length })
-    process.exit(0)
-  }
-  if (status.state !== 'ok') {
-    // A secret this machine cannot read is a FAULT, not an unpaired machine:
-    // the topics cannot be derived, so every message the user sends is dropped
-    // where nobody sees it. `ok: false` is what the launcher logs and reports.
-    say({ ok: false, reason: `chat secret unreadable (${status.reason})`, configured: true, accepted: 0, pending: readPending().length })
+  const gate = secretGateReport({ status, pending: readPending().length })
+  if (gate) {
+    say(gate)
     process.exit(0)
   }
   const secret = status.secret

@@ -19,6 +19,13 @@ import { deriveTopics } from './chat-core.mjs'
 
 export const SECRET_PATH = repoPath('.claude', 'chat-secret')
 
+/** The machine-readable name of the one chat fault that must leave the machine
+ *  out of band. The inbox tick puts it in its `fault` field and the launcher
+ *  matches on THAT rather than on the wording of a reason string — a report the
+ *  user never gets because a sentence was rephrased is the failure this whole
+ *  point is about. */
+export const SECRET_FAULT = 'secret-unreadable'
+
 /**
  * ABSENT IS NOT THE SAME AS UNREADABLE. PURE — the caller does the I/O and hands
  * over what it got.

@@ -9,7 +9,10 @@
 // The spool's own file layout — one file per message, the claim, the migration
 // off the stage-1 .jsonl — is proved in scripts/chat-spool.test.mjs.
 import { describe, expect, it } from 'vitest'
-import { seededLedger, stateAfterSpool } from './chat-inbox.mjs'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+import { secretGateReport, seededLedger, stateAfterSpool } from './chat-inbox.mjs'
+import { SECRET_FAULT } from './chat-secret.mjs'
 import { TEST_VECTOR, ingest, makeEnvelope } from './chat-core.mjs'
 
 const NOW = 1_700_000_000_000
@@ -21,6 +24,38 @@ const frame = async ({ ntfyId, msgId, text, ts = NOW, direction = 'inbox' }) => 
   event: 'message',
   topic: 't',
   message: JSON.stringify(await makeEnvelope({ secret, direction, id: msgId, ts, text })),
+})
+
+describe('AN UNREADABLE SECRET REPORTS; AN ABSENT ONE STAYS SILENT', () => {
+  it('says nothing loud on a machine that never paired a phone', () => {
+    const r = secretGateReport({ status: { state: 'absent', secret: null, reason: null }, pending: 2 })
+    expect(r).toEqual({ ok: true, configured: false, accepted: 0, pending: 2 })
+    expect(r.fault).toBeUndefined()
+  })
+
+  it('reports a fault the launcher can recognise by a FIELD, not by wording', () => {
+    const r = secretGateReport({ status: { state: 'unreadable', secret: null, reason: 'EACCES: denied' }, pending: 0 })
+    expect(r.ok).toBe(false)
+    expect(r.fault).toBe(SECRET_FAULT)
+    expect(r.reason).toContain('EACCES')
+    expect(r.configured).toBe(true)
+  })
+
+  it('lets a paired machine carry on', () => {
+    expect(secretGateReport({ status: { state: 'ok', secret: 's', reason: null } })).toBeNull()
+  })
+
+  it('treats a junk status as the fault rather than as "carry on"', () => {
+    for (const status of [null, undefined, {}, { state: 'nonsense' }]) {
+      expect(secretGateReport({ status })?.fault).toBe(SECRET_FAULT)
+    }
+  })
+
+  it('is the SAME field the launcher tests — the two may not drift apart', () => {
+    const launcher = readFileSync(resolve(process.cwd(), 'scripts/batch-autostart.mjs'), 'utf8')
+    expect(launcher).toContain('r.fault === SECRET_FAULT')
+    expect(launcher).toContain("from './chat-secret.mjs'")
+  })
 })
 
 describe('A MESSAGE WHOSE SPOOL WRITE FAILED IS NOT RECORDED AS SEEN', () => {

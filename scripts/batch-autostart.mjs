@@ -66,6 +66,7 @@ import {
   pruneSpawns,
 } from './batch-autostart-core.mjs'
 import { WATCHER_PID_FILE, watcherSupervision } from './chat-watcher-core.mjs'
+import { SECRET_FAULT } from './chat-secret.mjs'
 import { openPointStatus } from './tasks-source.mjs'
 import { BOARD_PAGE_URL } from './board-currency-core.mjs'
 
@@ -198,7 +199,7 @@ try {
     // and the channel itself can no longer say so. It is therefore the one chat
     // fault that leaves the log and reaches the user out of band. A poll that
     // merely failed on the network is not: it retries at the next tick.
-    if (/secret unreadable/i.test(String(r.reason))) {
+    if (r.fault === SECRET_FAULT) {
       await notify('Chat secret unreadable', `The board chat is DOWN: ${r.reason}. Messages from the phone are dropped until it is fixed.`, 'default')
     }
   }
