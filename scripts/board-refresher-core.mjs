@@ -66,7 +66,13 @@ export function refresherScript(source = BOARD_CONTENT_URL) {
     '<script>',
     REFRESHER_SOURCE,
     '(function(){',
-    `  var refresh = createBoardRefresher({ document: document, window: window, fetch: fetch, source: ${JSON.stringify(source)}, onSwap: window.__hoaBoardRestore });`,
+    // onSwap is resolved at CALL time, not here: the swap replaces the cards, so
+    // whatever restores the reader's opened sections must run right after it. Read
+    // eagerly, this was `undefined` (the other block had not exported it yet) and
+    // every refresh silently collapsed the board the reader had opened.
+    '  var refresh = createBoardRefresher({ document: document, window: window, fetch: fetch,',
+    `    source: ${JSON.stringify(source)},`,
+    '    onSwap: function(){ if (typeof window.__hoaBoardRestore === "function") window.__hoaBoardRestore(); } });',
     '  setInterval(refresh, 30000);',
     "  document.addEventListener('visibilitychange', function(){ if (document.visibilityState === 'visible') refresh(); });",
     '})();',

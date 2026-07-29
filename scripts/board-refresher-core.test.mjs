@@ -112,3 +112,39 @@ describe('the embedded script', () => {
     expect(refresherScript()).not.toContain('location.href')
   })
 })
+
+describe('the swap must not collapse what the reader opened', () => {
+  // The regression this pins: onSwap was read EAGERLY at construction, when the
+  // other script block had not exported the restorer yet — so it was undefined,
+  // and every refresh replaced the cards with their default (closed) state.
+  it('calls the restorer that exists at SWAP time, not the one that existed at build time', async () => {
+    document.body.innerHTML = '<main><p>alt</p></main>'
+    const calls = []
+    const win = {
+      DOMParser,
+      scrollY: 0,
+      sessionStorage: { setItem() {} },
+      location: { reload() {} },
+    }
+    // Exactly the wiring the embedded script uses: resolved when the swap happens.
+    const env = {
+      document,
+      window: win,
+      fetch: () => Promise.resolve({ ok: true, status: 200, text: () => Promise.resolve('<html><body><main><p>neu</p></main></body></html>') }),
+      source: BOARD_CONTENT_URL,
+      onSwap: () => { if (typeof win.__hoaBoardRestore === 'function') win.__hoaBoardRestore() },
+    }
+    // eslint-disable-next-line no-new-func
+    const refresh = new Function(`${REFRESHER_SOURCE}; return createBoardRefresher;`)()(env)
+    // The restorer is exported only AFTER the refresher was built — the real order.
+    win.__hoaBoardRestore = () => calls.push('restored')
+    expect(await refresh()).toBe('swapped')
+    expect(calls).toEqual(['restored'])
+  })
+
+  it('the embedded script resolves the restorer lazily rather than capturing it', () => {
+    const script = refresherScript()
+    expect(script).toContain('typeof window.__hoaBoardRestore === "function"')
+    expect(script).not.toMatch(/onSwap:\s*window\.__hoaBoardRestore\s*[,}]/)
+  })
+})
