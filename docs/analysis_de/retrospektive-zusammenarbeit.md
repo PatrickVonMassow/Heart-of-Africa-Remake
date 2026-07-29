@@ -461,6 +461,10 @@ Bemerkenswert ist, wer es zuerst gesehen hat: der Zuarbeiter, der an einem ganz 
 
 **Lehren:** Ein Zustand, der nur *zwischen* zwei Schritten existiert, wird von keinem Wächter am Zugende gesehen — er gehört deshalb nicht abgesichert, sondern **unmöglich gemacht**, indem die beiden Schritte ein Schreibvorgang werden. Und: Ein Rot in einer Nacht voller Flimmern ist genau dann gefährlich, wenn es echt ist.
 
+**Nachtrag 29.07.2026 — die Absicherung gegen die Lücke verbietet den ehrlichen Nachbarfall.** Der Test, der seither verlangt, dass die Tafel laufende Arbeit trägt, liest die laufende Karte über ihre PUNKTNUMMER. Die Übergabe-Karte am Sitzungsende hat keine: Es wird gerade kein Punkt bearbeitet, es wird übergeben. Damit stand die Sitzung zwischen zwei Mechanismen — die Sitzungsgrenze verlangt die Übergabe-Karte, der Test verlangt die Nummer —, und ein fertiger, geprüfter Stand ließ sich nicht hochladen, bis die Karte die Nummer des Punktes trug, den die NÄCHSTE Sitzung aufnimmt. Allein herauszufinden, in welcher Form die Nummer gelesen wird, kostete drei Anläufe: Eine handgeschriebene Karte mit dem Nummern-Element der Warteschlange erkannte der Leser nicht, und eine Karte für einen Punkt, der noch in der Warteschlange stand, erzeugte prompt einen Doppel-Eintrags-Verstoß.
+
+**Lehre:** Wer einen Zustand verbietet, muss den legitimen Nachbarzustand ausdrücklich erlauben — sonst wandert der Stillstand nur von der Lücke zur Übergabe. Und ein Format, das ein Prüfer liest, gehört genau einmal geschrieben: Solche Karten erzeugt das Werkzeug, das beide Seiten kennt, nie die Hand.
+
 ### 3.51 Die Ebene darunter wird erst sichtbar, wenn die darüber gut wird
 
 Nach dem neuen Gang der Tiere meldete der Nutzer binnen einer halben Stunde zwei Kollisionsfehler: ein Tier läuft durch den Zaun, mehrere stehen ineinander. Die naheliegende Vermutung — die neue Animation habe sie verursacht — war falsch, und das ließ sich am Repository belegen: Die Zaun-Kollider, die Kollisionsauflösung und die Bewegungszeile der Tiere sind auf dem Stand VOR dem Gang-Merge zeichenweise identisch; die Auflösung war zuletzt acht Tage zuvor angefasst worden.
@@ -632,7 +636,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Mittwoch, 29.07.2026, 18:23 · Quellen-Fingerprint: `faa0aced8fe5…`
+Zuletzt aktualisiert: Mittwoch, 29.07.2026, 20:24 · Quellen-Fingerprint: `863359521e2d…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -675,9 +679,11 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | RETIRED 27.07.2026 — its model half (Fable at my discretion, Opus 4.8 as default) was withdrawn on 25.07.; what survives is never trading model or effort down on load-bearing work | 4 | hoch | model-guard.mjs | ✔ Mechanismus |
 | A user question is an INTERRUPT, not a new task — after answering, the last action of the turn must resume the batch; only an explicit stop or a genuine block on user input ends it | 3 | mittel | batch-autostart.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs | ✔ Mechanismus |
 | EVERY user change request is a TASKS.md point appended at the END, done only after the current work finishes — never interleaved or mass-committed | 5 | hoch | tasks-archive-guard.mjs, tasks-spec-guard.mjs | ✔ Mechanismus |
+| The batch-owning session is a headless successor the launcher spawned — the user cannot see, reach or close it; never ask them to | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | RETIRED 27.07.2026 — merged into parallel-session-root-cause, which holds the confirmed cause and the one detection recipe; the advisory-lock analysis here was superseded by the hard singleton | 3 | mittel | batch-autostart.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs | ✔ Mechanismus |
 | Parallel batch sessions are spawned by the HoA-Batch-Autostart scheduled task after a reboot; the advisory lock never stopped it — a hard singleton is being built | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | RETIRED 27.07.2026 — merged into parallel-session-root-cause; what survives is that the lock file alone is never proof of exclusivity, and the four signals that actually detect a second writer | 2 | mittel | — (Regel/Memory) | ◐ Regel |
+| Work agreed with the user on 29.07.2026 evening that is NOT yet in TASKS.md because the batch lock was held elsewhere — carry it into the work order at the first chance | 3 | mittel | queue-order-guard.mjs, worktree-reminder.mjs | ✔ Mechanismus |
 | Always take the point boundary autonomously at a closed point — never ask the user whether to hand over or /clear | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Per-point QA runs scoped (Vitest always, browser suites by diff mapping, flake-retry single suites) — WATCHDOG duty to report any bug that slips through | 3 | mittel | — (Regel/Memory) | ◐ Regel |
 | Edits to .claude/settings.json and .git/hooks ALWAYS trigger a permission prompt (harness safety layer, allowlist cannot override); never schedule such work for unattended night batches | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -690,6 +696,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | RETIRED 27.07.2026 — a 23.07. session handoff whose branches all merged; what survives is the file-collision map habit and the closing-freeze housekeeping | 3 | mittel | batch-resume-hook.mjs | ✔ Mechanismus |
 | 24.07.2026 evening chaos — serving model silently degraded to Haiku 4.5; verify the serving model before batch work, Haiku-class must pause instead of working | 3 | mittel | model-guard.mjs | ✔ Mechanismus |
 | Every new optical/graphics feature must be sorted into the low/medium/high detail presets, enforced by a pure completeness test — a new quality key with no preset entries fails the gate | 2 | mittel | — (Regel/Memory) | ◐ Regel |
+| Write about this project as a participant (\"wir/unser\"), never as an outside observer (\"euer Mechanismus\", \"die ihr abschaffen wollt\") | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Never access paths outside the project directory unless strictly necessary (e.g. the global ~/.claude rules); keep local non-versioned artefacts in a git-ignored local/ folder inside the repo | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | RETIRED 25.07.2026 — a stuck Opus no longer hands the task to Fable; re-attack with Opus or let Fable REVIEW the stuck attempt (Fable is review + fallback only) | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Release tags are re-pointed ONLY on the user's explicit request — never automatically after a fix; a cut vX.Y is frozen | 3 | mittel | — (Regel/Memory) | ◐ Regel |
@@ -711,8 +718,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | CORRECTED 19.07.2026 — WebGPU IS testable headless/autonomously via system Chrome (channel:'chrome') + --headless=new; the 'untestable' belief held only for Playwright's BUNDLED Chromium | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 71 Feedback-/Projekt-Memories · 36 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 18 Prozess-/Meta-TASKS-Punkte (davon 8 offen).
+Erfasste Quellen: 74 Feedback-/Projekt-Memories · 36 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 18 Prozess-/Meta-TASKS-Punkte (davon 8 offen).
 
-<!-- RETRO-FINGERPRINT: faa0aced8fe5db95315963f8e285948fdc474a8a3dc69a34c6a492315e3eab91 -->
-<!-- RETRO-LAST-REFRESHED: 2026-07-29T16:23:43.470Z -->
+<!-- RETRO-FINGERPRINT: 863359521e2d79be0abd632c960a6c9fdc290a86d41a2779407339552cf6cc27 -->
+<!-- RETRO-LAST-REFRESHED: 2026-07-29T18:24:03.631Z -->
 <!-- AUTO-GENERATED:END -->
