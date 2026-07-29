@@ -1,12 +1,17 @@
 {
-  "lastReviewedAt": 1785002538088,
-  "reviewedCount": 87,
-  "evidence": "Vollaudit 25.07.2026 ueber alle Memories und Waechter auf sechs Achsen: zehn Widersprueche, sechs Redundanz-Cluster, mehrere Regeln mit behaupteter, nie gebauter Durchsetzung. Behoben u.a.: Release-Verfahren auf eine Quelle reduziert, zwei Regeln zurueckgezogen, dashboard-reminder-hook von zwei zurueckgezogenen Regeln befreit, batch-resume-hook Selbstwiderspruch entfernt.",
+  "lastReviewedAt": 1785325749337,
+  "reviewedCount": 97,
+  "evidence": "Durchsicht in der vorgegebenen Reihenfolge, jede Regel gegen den CODE geprueft. (1) dashboard-reminder-hook: FUND - der bei jedem Prompt eingeblendete Text verlangte 'per Artifact republishen' und einen 'Artifact-Republish'; seit dem Board-Umzug ist das fuer headless Sitzungen unmoeglich (kein Artifact-Werkzeug) und zeigt auf einen Spiegel, den der Nutzer verlassen hat - beide Stellen auf board-publish.mjs umgestellt (583beef). (2) batch-resume-hook: dieselbe Drift, mit korrigiert. (3) Waechter-Meldungstexte: gegen ihre Kerne gelesen, keine weitere Artifact-Drift; die queue-stubbed-Meldung nennt den richtigen Befehl. (4) MEMORY.md + Memories: FUND - der Index beschrieb die Tafel weiter als 'private phone artifact', und batch-dashboard-artifact hielt den claude.ai-Spiegel als 'MIRRORED bis der Nutzer sein Lesezeichen umzieht' - der Umzug ist heute erfolgt und bestaetigt, also als RETIRED nachgezogen; der dort genannte Viewer-Pfad public/board/index.html gegen das Dateisystem geprueft und korrekt, dagegen nannte meine eigene 419-Spec faelschlich docs/board/index.html - korrigiert. (5) CLAUDE.md Paragrafen 2/4/6/7/9: NICHT geprueft, dafuer reichte der Kontext dieser Sitzung nicht - offen fuer die Nachfolgesitzung.",
   "history": [
     {
       "at": "2026-07-25T18:02:18.088Z",
       "entryCount": 87,
       "evidence": "Vollaudit 25.07.2026 ueber alle Memories und Waechter auf sechs Achsen: zehn Widersprueche, sechs Redundanz-Cluster, mehrere Regeln mit behaupteter, nie gebauter Durchsetzung. Behoben u.a.: Release-Verfahren auf eine Quelle reduziert, zwei Regeln zurueckgezogen, dashboard-reminder-hook von zwei zurueckgezogenen Regeln befreit, batch-resume-hook Selbstwiderspruch entfernt."
+    },
+    {
+      "at": "2026-07-29T11:49:09.337Z",
+      "entryCount": 97,
+      "evidence": "Durchsicht in der vorgegebenen Reihenfolge, jede Regel gegen den CODE geprueft. (1) dashboard-reminder-hook: FUND - der bei jedem Prompt eingeblendete Text verlangte 'per Artifact republishen' und einen 'Artifact-Republish'; seit dem Board-Umzug ist das fuer headless Sitzungen unmoeglich (kein Artifact-Werkzeug) und zeigt auf einen Spiegel, den der Nutzer verlassen hat - beide Stellen auf board-publish.mjs umgestellt (583beef). (2) batch-resume-hook: dieselbe Drift, mit korrigiert. (3) Waechter-Meldungstexte: gegen ihre Kerne gelesen, keine weitere Artifact-Drift; die queue-stubbed-Meldung nennt den richtigen Befehl. (4) MEMORY.md + Memories: FUND - der Index beschrieb die Tafel weiter als 'private phone artifact', und batch-dashboard-artifact hielt den claude.ai-Spiegel als 'MIRRORED bis der Nutzer sein Lesezeichen umzieht' - der Umzug ist heute erfolgt und bestaetigt, also als RETIRED nachgezogen; der dort genannte Viewer-Pfad public/board/index.html gegen das Dateisystem geprueft und korrekt, dagegen nannte meine eigene 419-Spec faelschlich docs/board/index.html - korrigiert. (5) CLAUDE.md Paragrafen 2/4/6/7/9: NICHT geprueft, dafuer reichte der Kontext dieser Sitzung nicht - offen fuer die Nachfolgesitzung."
     }
   ]
 }
