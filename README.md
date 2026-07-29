@@ -196,7 +196,7 @@ concept, the design and the original score belongs to the people above.
 
 ### This remake
 
-Designed by **Patrick von Massow**. Source code, assets and text in this
+Developed by **Patrick von Massow**. Source code, assets and text in this
 repository are original work unless noted otherwise.
 
 ### Data and libraries
