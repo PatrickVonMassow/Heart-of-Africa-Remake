@@ -100,6 +100,7 @@ import { bandHeightAt, panoramaBandShown } from '../travel/panoramaMath'
 import { placeWalkVelocity } from '../../systems/movement'
 import { emitFootstep } from '../../systems/ambience'
 import { easeSpeed, easeToward, advanceStepPhase, headBob, strafeRollTarget, idleSway } from '../../systems/walkFeel'
+import { PAD_LOOK_RATE, applyPitch, mousePitchDelta, padPitchDelta, placeCameraPose } from '../../systems/lookPitch'
 import { getStrings, useStrings } from '../../i18n'
 
 const PLAYER_RADIUS = 0.35 // collision radius of player and inhabitants
@@ -1968,8 +1969,9 @@ export function PlaceScene() {
     return m
   }, [])
 
-  // yaw 0 faces -Z (toward the place center from the southern spawn point).
-  const player = useRef({ x: 0, z: 18, yaw: 0 })
+  // yaw 0 faces -Z (toward the place center from the southern spawn point);
+  // pitch 0 is the horizon (design.md §17.5, point 392: + looks up).
+  const player = useRef({ x: 0, z: 18, yaw: 0, pitch: 0 })
   // Walk feel (design.md §2, point 97): body-relative eased velocity, the
   // step-phase accumulator and the smoothed camera roll — all camera/feel only.
   const walk = useRef({ velF: 0, velS: 0, phase: 0, roll: 0 })
@@ -2004,7 +2006,7 @@ export function PlaceScene() {
 
   // Reset position when the place changes (just inside the southern edge).
   useEffect(() => {
-    player.current = { x: 0, z: layout?.spawnZ ?? PLACE_RADIUS - SPAWN_INSET, yaw: 0 }
+    player.current = { x: 0, z: layout?.spawnZ ?? PLACE_RADIUS - SPAWN_INSET, yaw: 0, pitch: 0 }
     walk.current = { velF: 0, velS: 0, phase: 0, roll: 0 }
     // Seed the shared position for the town-plan map marker (point 89).
     placePlayerPosition.x = player.current.x
@@ -2110,6 +2112,15 @@ export function PlaceScene() {
       // drive and assert first-person yaw, without the OS cursor being grabbed.
       if (document.pointerLockElement === el || navigator.webdriver) {
         player.current.yaw -= e.movementX * balance.mouseSensitivity
+        // Vertical look (design.md §17.5, point 392) at the SAME sensitivity,
+        // inverted by default (mouse forward = look down) and clamped short of
+        // vertical. The inversion is read live so the debug checkbox takes
+        // effect without re-binding the listener.
+        player.current.pitch = applyPitch(
+          player.current.pitch,
+          mousePitchDelta(e.movementY, balance.mouseSensitivity, useUi.getState().invertLook),
+          balance.lookPitchLimitDeg,
+        )
       }
     }
     el.addEventListener('click', onClick)
@@ -2259,9 +2270,14 @@ export function PlaceScene() {
       // Q/E-free tank controls: WASD + arrows; ←/→ turn, A/D strafe.
       if (isKeyDown('ArrowLeft')) p.yaw += 2.2 * dt
       if (isKeyDown('ArrowRight')) p.yaw -= 2.2 * dt
-      // Gamepad right stick turns the view (design.md §17).
+      // Gamepad right stick turns the view (design.md §17). Its VERTICAL axis
+      // pitches it through the same clamped state as the mouse (point 392) —
+      // the engagement guard in gamepadLook keeps idle axis drift out of both.
       const look = gamepadLook()
-      if (look.x !== 0) p.yaw -= look.x * 2.4 * dt
+      if (look.x !== 0) p.yaw -= look.x * PAD_LOOK_RATE * dt
+      if (look.y !== 0) {
+        p.pitch = applyPitch(p.pitch, padPitchDelta(look.y, dt, useUi.getState().invertLook), balance.lookPitchLimitDeg)
+      }
       // Touch look-drag turns the view through the same sensitivity as the
       // mouse (design.md §17.5, point 84): the accumulated drag px maps 1:1 to
       // mouse px, so touch and pointer-lock look identical.
@@ -2340,12 +2356,12 @@ export function PlaceScene() {
     // A barely-visible idle sway keeps the camera alive at rest, fading out as
     // soon as the walk bob takes over.
     const idle = idleSway(clock.elapsedTime, wf.idleSwayAmp, wf.idleSwayRate) * (1 - Math.min(1, speedFrac * 3))
-    const sin = Math.sin(p.yaw)
-    const cos = Math.cos(p.yaw)
-    // Lateral bob/idle along the camera's right axis (cos, -sin).
-    const lateral = bob.dx + idle
-    camera.position.set(p.x + cos * lateral, EYE_HEIGHT + bob.dy, p.z - sin * lateral)
-    camera.rotation.set(0, p.yaw, w.roll, 'YXZ')
+    // One fixed composition order (point 392): the bob stays a POSITION offset
+    // on the yaw's right axis, the look a YXZ rotation — so pitching the view
+    // never swings the head and the horizon never tilts with it.
+    const pose = placeCameraPose(p.x, p.z, EYE_HEIGHT, p.yaw, p.pitch, w.roll, bob.dy, bob.dx + idle)
+    camera.position.set(pose.position[0], pose.position[1], pose.position[2])
+    camera.rotation.set(pose.rotation[0], pose.rotation[1], pose.rotation[2], 'YXZ')
     // Share the live LOGICAL position so the town-plan map marker can track it.
     placePlayerPosition.x = p.x
     placePlayerPosition.z = p.z

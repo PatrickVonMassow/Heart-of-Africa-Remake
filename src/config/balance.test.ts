@@ -13,6 +13,10 @@ describe('comfort & control defaults (user calibration)', () => {
     expect(balance.ambienceVolume).toBe(0.1)
     expect(balance.travelSpeed).toBe(5.6)
   })
+
+  it('the vertical look clamp stops short of vertical (design.md §17.5)', () => {
+    expect(balance.lookPitchLimitDeg).toBe(85)
+  })
 })
 
 describe('terrain relief factors (design.md §11)', () => {

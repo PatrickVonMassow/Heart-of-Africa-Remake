@@ -415,6 +415,8 @@ export const de: Strings = {
     walkerUnstuck: 'Bewohner-Entklemmung (s)',
     startupFreezeBudget: 'Ladebild-Stillstand-Budget (ms)',
     mouseSensitivity: 'Maus-Empfindlichkeit (Ego-Sicht)',
+    lookPitchLimit: 'Blickgrenze hoch/runter (°)',
+    invertLook: 'Mausblick invertieren',
     ambienceVolume: 'Ambiente-Lautstärke',
     footstepVolume: 'Schritt-Lautstärke',
     ambientVolume: 'Übrige Ambiente-Lautstärke',

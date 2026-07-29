@@ -71,10 +71,10 @@ const probeSilhouetteFooting = async (page, check, label) => {
     p.x = saved.x
     p.z = saved.z
     p.yaw = saved.yaw
-    // `pitch` is not part of the place camera's pose (PlaceScene builds the
-    // rotation from yaw alone) and the live object does not carry it — the
-    // probe adds it. Hand the object back as it was found rather than leaving
-    // a stray field behind.
+    // `pitch` is part of the pose since point 392 (the view looks up and down),
+    // so restoring it restores the aim the caller had — before that it was a
+    // stray field the probe itself added, and the undefined branch below is
+    // what handed the object back unchanged then.
     if (saved.pitch === undefined) delete p.pitch
     else p.pitch = saved.pitch
   }, pose)
@@ -144,7 +144,11 @@ await page.evaluate(() => {
     p.x = -(window.__placeLayout.radius - 8)
     p.z = 0
     p.yaw = Math.PI / 2
-    p.pitch = 0.02
+    // No tilt: this frame's composition was accepted at the horizon. (A pitch
+    // written here did nothing before point 392 gave the view a vertical axis;
+    // now it would aim the camera, so the stray value is gone rather than
+    // quietly re-framing an acceptance shot.)
+    p.pitch = 0
   })
   await page.waitForTimeout(700)
   const skyBuf = await frame('100-cairo-giza-skyline', { place: 'cairo', label: 'the Giza skyline over Cairo' })
@@ -645,7 +649,7 @@ if (mosque) {
     // enough that no neighbouring house can block the view.
     p.x = m.door[0] - (dx / dl) * 5
     p.z = m.door[1] - (dz / dl) * 5
-    p.pitch = 0.3 // tilt up so the minaret is in frame
+    p.pitch = 0 // level: the minaret is in frame from here (see the Cairo note)
     // Place-camera yaw 0 looks toward -Z, so aim with the +PI complement.
     p.yaw = Math.atan2(m.x - p.x, m.z - p.z) + Math.PI
   }, mosque)

@@ -375,6 +375,8 @@ export interface Strings {
     walkerUnstuck: string
     startupFreezeBudget: string
     mouseSensitivity: string
+    lookPitchLimit: string
+    invertLook: string
     ambienceVolume: string
     footstepVolume: string
     ambientVolume: string

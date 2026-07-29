@@ -610,23 +610,25 @@ changes with it in the same commit.
     mouse-look sensitivity defaults to 0.0011 rad/px, walk speed inside
     settlements to 10 m/s, strafing and walking backward to 80 % of the
     forward speed (a diagonal is never faster than straight; `design.md`
-    §2.2), the first-person eye height is 1.5 m, a single ambience volume
+    §2.2), the first-person eye height is 1.5 m, the view pitches with
+    mouse and right stick (inverted by default, clamped 85° short of
+    vertical by `balance.lookPitchLimitDeg`), a single ambience volume
     (default 0.1) scales the whole soundscape incl. the §19.1 proximity
-    calls (a nearby animal's own call rises and fades with distance); the
+    calls (a nearby animal's call rises and fades with distance); the
     ocean surf is COASTAL (point 153): its gain fades with the distance to
     the nearest coast — full within a calibratable near radius, exactly 0 at
     and beyond a calibratable cutoff (`balance.surf.nearRadius`/`cutoff`) —
-    so it is heard at the sea and in seaside ports but silent inland, and
-    per-source volume sliders sit over the master volume (at least
-    `balance.birdsongVolume` for the birdsong), all debug-editable; the
+    so it is heard at sea and in seaside ports but silent inland, and
+    per-source volume sliders sit over the master volume
+    (`balance.birdsongVolume` for the birdsong), all debug-editable; the
     overland travel speed defaults to 5.6 (calibrated calm), and the
     terrain relief items are tunable as factors (§11/§21.2). All of these
     are adjustable at runtime in the debug menu (§21) in both languages.
     The zoom behavior of §21.4 holds: the bird's-eye mouse-wheel zoom is
     always active (0.125x-16x) starting at the closer default 0.5. A debug
     checkbox gates zoom-out beyond that default (disabling clamps a wider
-    view back to it), and the unlocked range reaches a whole-continent
-    view per §21.4. The camera near plane snaps back to the first-person
+    view back), and the unlocked range reaches a whole-continent view.
+    The camera near plane snaps back to the first-person
     default the moment another scene takes the shared camera — entering a
     settlement straight out of the debug zoom must never clip hut walls.
     The debug menu offers the §21.3 dropdown selectors
@@ -638,31 +640,29 @@ changes with it in the same commit.
     do-not-disturb option (§16.2; also F2); the §21.1 shortcuts hold (F1
     menu, F2 do-not-disturb, F3 full loadout — all gear/treasures, 100000
     gifts/dollars/provisions, full health, full canteen, no afflictions,
-    capacity raised to fit, the extended zoom unlocked, and the travel
-    speed set to 25 for fast test traversal (point 154) — F4 canoe
+    capacity raised to fit, the extended zoom unlocked, and travel speed
+    25 for fast test traversal (point 154) — F4 canoe
     toggle — F6 the COMPLETE bug report in one keypress: a top-most modal
     with an autofocused description field and one download handing out
-    picture, state JSON (complete state incl. balance and UI), overlay
+    picture, state JSON (incl. balance and UI), overlay
     list and description as ONE zip named from the dump stem, the
     reproduction summary — seed, position, region, date, travel speed,
     graphics level — at the TOP of the JSON. The screenshot is read back
     INSIDE a rendered frame (no `preserveDrawingBuffer` — it would cost
-    every player frame time) and holds the scene ALONE; labels and HUD are
+    every player frame) and holds the scene ALONE; labels and HUD are
     DOM and ride along in the overlay list, which the description file
     states; F5 stays the browser's reload (it fires before
     preventDefault can stop it, hence F6; the lower F-key that Windows Chrome
-    binds to Caret-Browsing is likewise left to the browser) and F9 cycles the
-    GRAPHICS QUALITY LEVEL — low / medium / high (design.md §2.7/§21, point 276
-    part B),
-    default MEDIUM. Each press steps DOWN one level, wrapping the bottom to
+    binds to Caret-Browsing is left to the browser) and F9 cycles the
+    GRAPHICS QUALITY LEVEL — low / medium / high (design.md §2.7/§21,
+    point 276 part B), default MEDIUM. Each press steps DOWN one level, wrapping the bottom to
     the top: medium → low → high → medium. A `detailLevel` in `useUi` maps
     through the `QUALITY_PRESETS` registry (`src/config/quality.ts`) to a
     value for EVERY quality-relevant lever (dpr cap; SSAO/TRAA/bloom;
     sun-shadow on/off + map resolution 1024/2048/4096; campfire shadows +
     the 256²/512² soft variant; terrain refine; flora fog factor + cast
     shadow; haze/rain intensity; calm water; wildlife density); the render
-    consumers read the current
-    level through effective selectors (`effectiveSsao = QUALITY_PRESETS[
+    consumers read the current level through effective selectors (`effectiveSsao = QUALITY_PRESETS[
     detailLevel].ssao && ssaoEnabled`, etc.) that NEVER clobber the
     individual debug allow-flags — those still tune a feature within a level
     (unlike `activateTouch`, which keeps clobbering; the touch preset stays a
@@ -679,12 +679,12 @@ changes with it in the same commit.
     convention), and the per-level values are tabulated in
     `docs/graphics-detail-levels.md`, kept in sync with the registry by
     `src/config/qualityDoc.test.ts` (it fails if a preset value changes or a
-    key is added without updating the doc). The preset reads per level, the F9
+    key is added without the doc). The preset reads per level, the F9
     cycle order and the completeness gate are pure-tested in
     `src/state/ui.test.ts` + `src/config/quality.test.ts` (with `floraFogFar`
     in `src/scenes/travel/floraStreaming.test.ts`), the F9 cycle +
     preventDefault + non-clobber in `src/ui/Hud.test.tsx`; the debug menu's
-    graphics section is now a SINGLE localized detail-level dropdown — the
+    graphics section is a SINGLE localized detail-level dropdown — the
     per-setting graphics allow-flags (TRAA/SSAO/half/full/campfire shadows) are
     no longer exposed there but remain internal store fields for the touch
     preset and the F8 benchmark — asserted in `src/ui/DebugMenu.test.tsx`, and
@@ -723,7 +723,7 @@ changes with it in the same commit.
     free. Where timestamps are unavailable (WebGL 2, or an adapter
     without `timestamp-query`) the series is FLAGGED with its reason,
     never fabricated, and the report names which series is the
-    trustworthy one (`headline`, in the digest and in the result panel).
+    trustworthy one (`headline`, in the digest and the result panel).
     The sweep forces the HIGH level so every lever stays measurable; a
     FINAL profiling pass (point 293, `LOW_CONFIG_NAME`) then applies the
     actual LOW `QUALITY_PRESETS` values and reports, per route section at

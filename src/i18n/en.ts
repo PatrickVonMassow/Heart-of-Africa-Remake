@@ -414,6 +414,8 @@ export const en: Strings = {
     walkerUnstuck: 'Inhabitant unstuck (s)',
     startupFreezeBudget: 'Loading-picture freeze budget (ms)',
     mouseSensitivity: 'Mouse sensitivity (first-person)',
+    lookPitchLimit: 'Look up/down limit (°)',
+    invertLook: 'Invert mouse look',
     ambienceVolume: 'Ambience volume',
     footstepVolume: 'Footstep volume',
     ambientVolume: 'Other ambient volume',
