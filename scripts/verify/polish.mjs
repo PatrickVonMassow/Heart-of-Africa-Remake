@@ -453,6 +453,105 @@ const stepUntil = async (ready, arg = null, capFrames = 240) => {
     return out
   }, 'settlement walker (goat)')
 }
+// Point 413: the settlement animals must stay OUT of the settlement's solids and
+// out of one another. The report was a goat crossing a compound fence and, the
+// same night, "wildes Durcheinanderclippen" — goats standing inside one another
+// and inside a tent. Sampled as a SERIES over the walk, never one instant: a
+// wandering animal meets a wall only now and then, and a single frame that
+// happened to catch it in open ground would prove nothing.
+{
+  const readOverlap = () =>
+    page.evaluate(() => {
+      const cs = window.__placeLayout?.colliders ?? []
+      const info = window.__placeGoatGait ?? {}
+      const ids = Object.keys(info)
+      const R = 0.3 // WALKER_RADIUS — the radius the animals move with
+      const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v)
+      // How deep a mover at (x,z) sits inside this collider; ≤ 0 is clear.
+      const depth = (c, x, z) => {
+        if (c.kind === 'box') {
+          const sin = Math.sin(c.rot)
+          const cos = Math.cos(c.rot)
+          const dx = x - c.x
+          const dz = z - c.z
+          const lx = cos * dx - sin * dz
+          const lz = sin * dx + cos * dz
+          return R - Math.hypot(lx - clamp(lx, -c.hx, c.hx), lz - clamp(lz, -c.hz, c.hz))
+        }
+        if (c.kind === 'segment') {
+          const ex = c.x2 - c.x1
+          const ez = c.z2 - c.z1
+          const l2 = ex * ex + ez * ez
+          const t = l2 < 1e-12 ? 0 : clamp(((x - c.x1) * ex + (z - c.z1) * ez) / l2, 0, 1)
+          return c.r + R - Math.hypot(x - (c.x1 + ex * t), z - (c.z1 + ez * t))
+        }
+        return c.r + R - Math.hypot(x - c.x, z - c.z)
+      }
+      let solid = -Infinity
+      let pair = Infinity
+      for (const id of ids) {
+        const g = info[id]
+        for (const c of cs) solid = Math.max(solid, depth(c, g.x, g.z))
+      }
+      for (let i = 0; i < ids.length; i++) {
+        for (let j = i + 1; j < ids.length; j++) {
+          const a = info[ids[i]]
+          const b = info[ids[j]]
+          pair = Math.min(pair, Math.hypot(a.x - b.x, a.z - b.z))
+        }
+      }
+      return { animals: ids.length, solid, pair }
+    })
+  const series = []
+  for (let k = 0; k < 20; k++) {
+    series.push(await readOverlap())
+    await nextFrames(3)
+  }
+  const solids = series.filter((s) => s.animals >= 1)
+  const pairs = series.filter((s) => s.animals >= 2)
+  const deepest = solids.length > 0 ? Math.max(...solids.map((s) => s.solid)) : 0
+  const closest = pairs.length > 0 ? Math.min(...pairs.map((s) => s.pair)) : 0
+  check(
+    'no settlement animal stands inside a fence, hut or prop (point 413)',
+    solids.length >= 10 && deepest < 0.02,
+    solids.length >= 10
+      ? `${solids.length} samples, deepest penetration ${deepest.toFixed(3)} m`
+      : `MEASURED NOTHING — only ${solids.length} samples carried an animal`,
+  )
+  check(
+    'no settlement animal stands inside another one (point 413)',
+    pairs.length >= 10 && closest > 0.5,
+    pairs.length >= 10
+      ? `${pairs.length} samples, closest pair ${closest.toFixed(2)} m`
+      : `MEASURED NOTHING — only ${pairs.length} samples carried two animals`,
+  )
+  // The picture behind the numbers. The probe borrows the camera and hands the
+  // pose back exactly as it found it (the lesson of point 375).
+  const saved = await page.evaluate(() => {
+    const p = window.__placePlayer
+    const herd = Object.values(window.__placeGoatGait ?? {})
+    if (!p || herd.length === 0) return null
+    const pose = { x: p.x, z: p.z, yaw: p.yaw }
+    const cx = herd.reduce((s, g) => s + g.x, 0) / herd.length
+    const cz = herd.reduce((s, g) => s + g.z, 0) / herd.length
+    const d = Math.hypot(cx - p.x, cz - p.z) || 1
+    p.x = cx - ((cx - p.x) / d) * 7
+    p.z = cz - ((cz - p.z) / d) * 7
+    p.yaw = Math.atan2(-(cx - p.x), -(cz - p.z))
+    return pose
+  })
+  if (saved) {
+    await nextFrames(2)
+    await frame('143-village-goat-separation', { place: 'maasai-village', label: 'the goats, each on its own ground' })
+    await page.evaluate((pose) => {
+      const p = window.__placePlayer
+      if (!p) return
+      p.x = pose.x
+      p.z = pose.z
+      p.yaw = pose.yaw
+    }, saved)
+  }
+}
 // Point 300, slope footing: a silhouette on a dune must lie ON the incline —
 // its body pitched over its own wheelbase, and each foot then seated on the
 // ground under ITS OWN spot — so the planted foot touches the ground drawn

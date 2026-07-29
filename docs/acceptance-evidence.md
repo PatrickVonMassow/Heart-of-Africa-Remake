@@ -893,6 +893,24 @@ sweep spawn-free across seeds (`src/scenes/place/layout.test.ts`); live,
 no walker stays pinned past the window (`scripts/verify/collision.mjs`);
 the application runs without console errors (`scripts/verify/collision.mjs`).
 
+The swept move and the fence panels (point 413) are pinned in the fast layer.
+`src/scenes/place/collision.test.ts` holds the segment collider (the whole run
+between two posts blocks; the push-out follows the WALL normal rather than a
+post radius, which is where the reported "abrupt turn" came from) and the swept
+`resolveMove` (a step across a panel stops at the near edge — the un-swept call,
+kept for spawns and teleports, lands on the far side; ten collider widths still
+stop at the near edge; sliding survives; an overlapping mover is still pushed
+out; a gate stays passable; an over-long move is truncated, never tunnelled).
+`src/scenes/place/layout.test.ts` sweeps every place and seed: neighbouring
+panel colliders leave no opening as wide as an inhabitant, every gate stays
+walkable, and every animal grazing anchor is spawn-free in every village.
+`src/scenes/place/animalSpots.test.ts` pins the anchor validation, the herd's
+mutual separation (two animals released onto one spot end apart) and the
+reported case itself — an animal driven at a real village fence for 60 frames
+never ends up on the far side; the pre-fix code ends 1.5 m inside in hausa-,
+maasai- and tuareg-village, which is what makes that test a witness rather than
+a restatement. Live: the goats in `scripts/verify/polish.mjs`.
+
 ## 17. Localization.
 
 Verifiable: screenshots of the status bar, journal, a trade

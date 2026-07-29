@@ -5,8 +5,9 @@
 // building stands on a lane.
 
 import { describe, expect, it } from 'vitest'
-import { buildLayout, type PlaceLayout, type Interactive, type DwellingDef } from './layout'
-import { spawnPointFree, WALKER_RADIUS } from './collision'
+import { buildLayout, fenceColliders, type PlaceLayout, type Interactive, type DwellingDef } from './layout'
+import { spawnPointFree, standingClear, WALKER_RADIUS } from './collision'
+import { ANIMAL_RADIUS, animalAnchors } from './animalSpots'
 import { closestOnPolyline } from './lanePlan'
 import { PLACES } from '../../world/geo'
 import { VILLAGE_PLANS } from './regionStyles'
@@ -300,4 +301,107 @@ describe('inhabitant spawn/errand freedom (point 155)', () => {
       }
     },
   )
+})
+
+// The fence a goat walked through (point 413). The picture draws a continuous
+// woven/stone/thorn run between the posts; the collider was one circle per post,
+// so the blocked band pinched at every midpoint. Swept over every fence of every
+// settlement: along a drawn panel there is no opening an inhabitant fits
+// through, and the gates the renderer leaves open stay open.
+describe('fence colliders follow the drawn panels (point 413)', () => {
+  /** The ring's own post spacing; a wider neighbour distance spans a gate. */
+  const postSpacing = (posts: Array<[number, number]>) => {
+    let min = Infinity
+    for (let i = 0; i < posts.length; i++) {
+      const a = posts[i]
+      const b = posts[(i + 1) % posts.length]
+      const d = Math.hypot(b[0] - a[0], b[1] - a[1])
+      if (d > 1e-6 && d < min) min = d
+    }
+    return min
+  }
+
+  it.each(PLACES.map((p) => [p.id] as const))('%s: no gap between neighbouring panel colliders', (id) => {
+    for (const s of SEEDS) {
+      const layout = buildLayout(id, s)
+      for (const f of layout.fences) {
+        const run = fenceColliders(f)
+        const n = f.posts.length
+        const span = postSpacing(f.posts) * 1.5
+        for (let i = 0; i < n; i++) {
+          const a = f.posts[i]
+          const b = f.posts[(i + 1) % n]
+          const len = Math.hypot(b[0] - a[0], b[1] - a[1])
+          if (len > span) continue // a gate the renderer leaves open
+          // The colliders that can cover this span — its own and its two
+          // neighbours. Judged against the FENCE's own run only, so no passing
+          // hut can make a hole in the wall look closed.
+          const local = [run[(i + n - 1) % n], run[i], run[(i + 1) % n]]
+          const steps = 40
+          let open = 0
+          let worst = 0
+          for (let k = 0; k <= steps; k++) {
+            const u = k / steps
+            const px = a[0] + (b[0] - a[0]) * u
+            const pz = a[1] + (b[1] - a[1]) * u
+            // A point outside every panel shape: the wall is not there.
+            if (standingClear(local, px, pz, 0)) open++
+            else open = 0
+            worst = Math.max(worst, open * (len / steps))
+          }
+          expect(
+            worst,
+            `${id} seed ${s}: ${f.kind} fence opens ${worst.toFixed(2)} m between posts ${i} and ${(i + 1) % n}`,
+          ).toBeLessThan(WALKER_RADIUS)
+        }
+      }
+    }
+  })
+
+  it.each(PLACES.map((p) => [p.id] as const))('%s: every gate stays walkable', (id) => {
+    for (const s of SEEDS) {
+      const layout = buildLayout(id, s)
+      for (const f of layout.fences) {
+        const run = fenceColliders(f)
+        const span = postSpacing(f.posts) * 1.5
+        for (let i = 0; i < f.posts.length; i++) {
+          const a = f.posts[i]
+          const b = f.posts[(i + 1) % f.posts.length]
+          if (Math.hypot(b[0] - a[0], b[1] - a[1]) <= span) continue
+          const mx = (a[0] + b[0]) / 2
+          const mz = (a[1] + b[1]) / 2
+          expect(
+            standingClear(run, mx, mz, WALKER_RADIUS),
+            `${id} seed ${s}: ${f.kind} gate walled shut at (${mx.toFixed(2)}, ${mz.toFixed(2)})`,
+          ).toBe(true)
+        }
+      }
+    }
+  })
+})
+
+// The animals' grazing spots (point 413): a goat anchor was a bare radius around
+// the centre, validated against nothing — it could sit inside a tent or a rock,
+// and the wobble drove the animal in and out of it forever. Swept over every
+// settlement of every region, with the seed and count the scene really uses.
+describe('animal anchors stand on free ground (point 413)', () => {
+  const localSeed = (seed: number, placeId: string) => {
+    let hash = 0
+    for (const c of placeId) hash = (hash * 31 + c.charCodeAt(0)) | 0
+    return (seed ^ hash) >>> 0
+  }
+
+  it.each(VILLAGES.map((p) => [p.id] as const))('%s: every animal anchor is clear and can be left', (id) => {
+    for (const s of SEEDS) {
+      const layout = buildLayout(id, s)
+      const anchors = animalAnchors(localSeed(s, id), layout.pen ? 4 : 3, layout.pen, layout.colliders)
+      expect(anchors.length).toBeGreaterThan(0)
+      for (const a of anchors) {
+        expect(
+          spawnPointFree(layout.colliders, a.x, a.z, ANIMAL_RADIUS),
+          `${id} seed ${s}: animal anchor (${a.x.toFixed(2)}, ${a.z.toFixed(2)}) is wedged`,
+        ).toBe(true)
+      }
+    }
+  })
 })
