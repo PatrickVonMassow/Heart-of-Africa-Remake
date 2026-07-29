@@ -3607,6 +3607,36 @@ read that as "the criterion and its evidence section".
   DOCS in the same commit: the memory entry `batch-dashboard-artifact`, which states what
   the board's four sections promise.
 
+- [ ] 412. THE FOOTING CHECK PASSES BECAUSE IT NEVER STOOD ON A SLOPE (29.07.2026,
+  reported by the agent that built the fix, against its own green result — the kind of
+  finding that only comes from someone looking at what their PASS actually measured).
+  Point 300 now seats every planted panorama foot on the ground drawn under it, and the
+  live check `every planted panorama foot touches the ground drawn under it` went from
+  23 % of stance frames over the gate to a clean PASS on both backends. But the same
+  PASS line reports `slope over the wheelbase [0.00, 0.00, 0.00, 0.00]`, `pitch
+  [0.000 ×4]` and `leg reach [1.00 ×4]`: at the place the check runs (maasai-village)
+  the silhouettes stand on the flat disc-horizon line, so the seating it is meant to
+  prove was a NO-OP in the measured frame. The non-linear-relief case is carried today
+  by a pure test alone. The live green is therefore true but weak — it says the code
+  does not break flat ground, not that it fixes sloped ground.
+  THIS IS THE SAME CLASS AS §3.47 of the retrospective, one step further on: there a
+  check measured NOTHING and said `Infinity`; here a check measures only the trivial
+  case and says PASS. Both are a verdict without its population.
+  THE FIX, which the point's own VERIFY wording already asks for: make it a SERIES.
+  Sample many frames across the walk, count how many samples stood on genuinely sloped
+  ground (a calibratable minimum slope over the wheelbase), and FAIL when that count is
+  zero — a check that never met its own subject must not report success. Choose the
+  sampling place so slope actually occurs: either drive the probe to a settlement whose
+  backdrop relief rises, or state in the check why the chosen place is the right one.
+  Report the distribution (how many samples, how many sloped, worst gap among the sloped
+  ones) so the next reader can judge the evidence rather than trust the word PASS.
+  VERIFIABLE: pure Vitest on the decision — zero sloped samples fails naming the count,
+  a mixed series judges only the sloped ones, an all-flat series is never silently
+  accepted; plus the existing non-linear-ground unit test stays. Live: the check reports
+  a non-zero sloped-sample count on both backends.
+  DOCS in the same commit: `scripts/verify/README.md`, where the polish suite's checks
+  are described.
+
 ## Closing (only after all points)
 
 New points are appended BEFORE this section — it stays last in the file.
