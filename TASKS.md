@@ -3684,6 +3684,51 @@ read that as "the criterion and its evidence section".
   DOCS in the same commit: CLAUDE.md §7.1 point 16, where settlement collision is
   described, gains the swept rule.
 
+- [ ] 414. THE BIRD'S-EYE ANIMALS GET THE WALK THE SETTLEMENT ONES HAVE (29.07.2026,
+  user asked after seeing the settlement gait: "could this walk be carried over to the
+  bird's-eye view?"). Yes — and the hard part is already built and tested. `src/render/
+  fauna.ts` carries the whole derivation as pure functions: `footReach`, `strideLength`,
+  `gaitCadence`, `isStance`, `gaitFootFraction`, `gaitPhase`, `legSwingAngle`,
+  `gaitBodyLift`, `groundPitch`, `footBodyOffset`, `seatFootOnGround`. The settlement
+  walkers, the panorama silhouettes and the goats all read it. `src/scenes/travel/
+  Wildlife.tsx` reads NONE of it — measured: no reference to any of those names. Its
+  animals carry only a grazing-shuffle phase, so a walking herd slides.
+  WHAT IS ACTUALLY MISSING is not the maths but the BODY: the travel animals are drawn
+  from `animalBodies.ts` without pivoted legs, and they are INSTANCED (19 instanced
+  meshes in `Wildlife.tsx`) because a bird's-eye frame holds far more animals than a
+  settlement. So this point is a rendering-cost question wearing an animation costume,
+  and it must be answered in that order:
+  1. Give the travel bodies pivoted legs from the SAME part description the settlement
+     bodies use, so one definition drives both and they cannot drift apart (the §300
+     lesson, and the reason the panorama and the village already agree).
+  2. Drive them from the SAME distance-driven phase — the animal's own travelled arc,
+     never a wall clock — so a faster animal steps faster and a standing one stands
+     still, exactly as the settlement does today.
+  3. MEASURE before deciding the scope: extra per-leg instance matrices at herd scale
+     are the cost, and this project has the instrument for it (F8, the in-game
+     benchmark, on the user's own hardware — the headless machine's numbers are not the
+     player's). If the full articulation is too dear at distance, degrade by DISTANCE
+     rather than by dropping the feature: articulated near the traveller, the cheaper
+     body-lift-only cue further out, nothing at the horizon — and say where each band
+     begins.
+  4. SORT IT INTO THE THREE QUALITY LEVELS (`QUALITY_PRESETS`, the §21 convention): the
+     completeness gate fails a new optical feature that lacks low/medium/high entries,
+     and `docs/graphics-detail-levels.md` is updated in the same commit.
+  NOT IN SCOPE: foot-on-ground seating for bird's-eye animals. The settlement needed it
+  because a silhouette stands on compressed backdrop relief; at travel distance the
+  terrain under a walking animal is near-flat per stride, and seating every foot of a
+  herd is exactly the cost this point is trying to contain. Revisit only if the picture
+  shows floating feet.
+  VERIFIABLE: pure Vitest — a travel animal's stride advances with the distance it
+  covered (not with elapsed time), a standing animal's phase does not move, and the
+  cadence differs between a long-legged and a short-legged species; plus the
+  `QUALITY_PRESETS` completeness test and the doc-sync test. Live (`scripts/verify/`,
+  BOTH backends): a herd photographed twice a stride apart shows moved legs, and the F8
+  report's per-system triangle/draw-call rows are attached to the point so the cost is
+  on the record.
+  DOCS in the same commit: design.md §19 where the wildlife is described, and
+  `docs/graphics-detail-levels.md`.
+
 ## Closing (only after all points)
 
 New points are appended BEFORE this section — it stays last in the file.
