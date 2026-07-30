@@ -134,6 +134,162 @@ describe('board-first-guard (spawned)', () => {
     }
   })
 
+  // --- THE FENCE CHOKEPOINT (point 434) --------------------------------------
+  // Spawned, not mocked: this gate's whole promise is that a session which lost
+  // the batch cannot go on writing shared state, and a promise about the executed
+  // path has to be shown on the executed path.
+  const SID = 'board-first-test' // the session id callGuard sends
+  const fencePath = () => resolve(repo, '.claude', 'batch-fence.json')
+  /** `held` for our session, and the mark since moved to `current`. */
+  const seedFence = (held, current, holder = 'the-successor') =>
+    writeJson(fencePath(), {
+      v: 1,
+      fence: current,
+      holder,
+      at: Date.now(),
+      holders: [
+        { sessionId: SID, fence: held, at: Date.now() - 60_000 },
+        { sessionId: holder, fence: current, at: Date.now() },
+      ],
+    })
+  const denial = (r) => (r.decision ? r.decision.hookSpecificOutput.permissionDecisionReason : '')
+
+  it('§8 chokepoint: a STALE-fence session is refused a push, a tick, a board publish and a state merge', () => {
+    // THE NIGHT OF 29./30.07.2026, at the point where it does damage: the woken
+    // owner still pushes to main. Without this the fence would protect only the
+    // file that was already protected.
+    seedFence(7, 8)
+    try {
+      for (const call of [
+        ['Bash', { command: 'git push origin HEAD:main' }],
+        ['Bash', { command: 'git merge --no-ff feat/x' }],
+        ['Edit', { file_path: 'TASKS.md' }],
+        ['Edit', { file_path: 'docs/tasks-archive.md' }],
+        ['Bash', { command: 'node scripts/board-publish.mjs' }],
+        ['Bash', { command: 'node scripts/focus.mjs confirm' }],
+        ['Write', { file_path: '.claude/dashboard-state.json' }],
+      ]) {
+        const r = callGuard(call[0], call[1])
+        expect(r.status, r.stderr).toBe(0)
+        expect(denial(r), `${call[0]} ${JSON.stringify(call[1])} must be REFUSED`).toContain('FENCED OUT')
+      }
+    } finally {
+      rmSync(fencePath(), { force: true })
+    }
+  })
+
+  it('the refusal repeats — it is a correctness gate, not a once-per-turn nudge', () => {
+    // The board-first deny stands down after firing once, so a session that
+    // ignores it can still work. This one must NOT: repeating the push is exactly
+    // what the dispossessed owner would do.
+    seedFence(7, 8)
+    try {
+      expect(denial(callGuard('Bash', { command: 'git push' }))).toContain('FENCED OUT')
+      expect(denial(callGuard('Bash', { command: 'git push' }))).toContain('FENCED OUT')
+    } finally {
+      rmSync(fencePath(), { force: true })
+    }
+  })
+
+  it('§8 chokepoint: a CURRENT-fence session is refused none of them', () => {
+    writeJson(fencePath(), { v: 1, fence: 8, holder: SID, at: Date.now(), holders: [{ sessionId: SID, fence: 8, at: Date.now() }] })
+    try {
+      // Fresh focus so the board-first rule allows too — this asserts the FENCE.
+      const now = Date.now()
+      writeJson(statePath(), { turnStartedAt: now - 1000 })
+      writeJson(focusPath(), { point: 434, note: 'fresh', setAt: now, confirmedAt: now })
+      for (const call of [
+        ['Bash', { command: 'git push origin main' }],
+        ['Edit', { file_path: 'TASKS.md' }],
+        ['Bash', { command: 'node scripts/board-publish.mjs' }],
+      ]) {
+        const r = callGuard(call[0], call[1])
+        expect(r.stdout.trim(), `${call[0]} must be allowed`).toBe('')
+      }
+    } finally {
+      rmSync(fencePath(), { force: true })
+    }
+  })
+
+  it('a session that NEVER held a fence is never blocked, whatever the mark says', () => {
+    // The over-blocking direction is the expensive one: a block-loop cost this
+    // project ~30 turns once. An attended window has no grant on record.
+    writeJson(fencePath(), { v: 1, fence: 99, holder: 'someone-else', at: Date.now(), holders: [{ sessionId: 'someone-else', fence: 99, at: Date.now() }] })
+    try {
+      expect(denial(callGuard('Bash', { command: 'git push origin main' }))).not.toContain('FENCED OUT')
+    } finally {
+      rmSync(fencePath(), { force: true })
+    }
+  })
+
+  it('leaves a fenced-out session everything OUTSIDE the four families', () => {
+    seedFence(7, 8)
+    try {
+      for (const call of [
+        ['Bash', { command: 'git commit -m "still my work"' }],
+        ['Bash', { command: 'git status --short' }],
+        ['Read', { file_path: 'TASKS.md' }],
+        ['Edit', { file_path: 'src/world/world.ts' }],
+      ]) {
+        expect(denial(callGuard(call[0], call[1])), `${call[0]} must not be fenced`).not.toContain('FENCED OUT')
+      }
+    } finally {
+      rmSync(fencePath(), { force: true })
+    }
+  })
+
+  it('INDEPENDENCE + fail-open: a stale fence still refuses with NO lock and NO state; a torn one refuses nothing', () => {
+    // The fence file is the only input this gate needs — deliberately, because on
+    // the lost night every other local signal was missing or stale.
+    seedFence(7, 8)
+    rmSync(statePath(), { force: true })
+    rmSync(resolve(repo, '.claude', 'batch-lock.json'), { force: true })
+    try {
+      expect(denial(callGuard('Bash', { command: 'git push' }))).toContain('FENCED OUT')
+      writeFileSync(fencePath(), '{ torn')
+      const r = callGuard('Bash', { command: 'git push' })
+      expect(r.status, r.stderr).toBe(0)
+      expect(r.stdout.trim()).toBe('')
+    } finally {
+      rmSync(fencePath(), { force: true })
+    }
+  })
+
+  it('stands down for a PAUSED batch, fence or no fence', () => {
+    seedFence(7, 8)
+    const pause = resolve(repo, '.claude', 'batch-paused')
+    writeFileSync(pause, '')
+    try {
+      expect(callGuard('Bash', { command: 'git push origin main' }).stdout.trim()).toBe('')
+    } finally {
+      rmSync(pause, { force: true })
+      rmSync(fencePath(), { force: true })
+    }
+  })
+
+  it('RENEWS THE LEASE BEFORE THE CALL — for the owner, and never for a stranger', () => {
+    // The renewal must happen in PreToolUse: the PostToolUse heartbeat fires when
+    // a call RETURNS, so a lease renewed there would have to outlive the longest
+    // single call (this repo runs 40-minute suites).
+    const lockPath = resolve(repo, '.claude', 'batch-lock.json')
+    const claimedAt = Date.now() - 30 * 60_000
+    writeJson(lockPath, { v: 2, sessionId: SID, claimedAt, leaseUntil: Date.now() - 60_000, pid: process.pid })
+    try {
+      callGuard('Bash', { command: 'git status' })
+      const after = JSON.parse(readFileSync(lockPath, 'utf8'))
+      expect(after.leaseUntil).toBeGreaterThan(Date.now())
+      expect(after.claimedAt, 'a renewal must not stamp claimedAt — that withdraws a handover').toBe(claimedAt)
+
+      // A stranger's call renews nothing.
+      const strangerLock = { v: 2, sessionId: 'someone-else', claimedAt, leaseUntil: Date.now() - 60_000, pid: process.pid }
+      writeJson(lockPath, strangerLock)
+      callGuard('Bash', { command: 'git status' })
+      expect(JSON.parse(readFileSync(lockPath, 'utf8')).leaseUntil).toBe(strangerLock.leaseUntil)
+    } finally {
+      rmSync(lockPath, { force: true })
+    }
+  })
+
   it('--status reports the verdict without a tool call', () => {
     const r = spawnSync(process.execPath, [resolve(repo, 'scripts', 'board-first-guard.mjs'), '--status'], {
       windowsHide: true,
