@@ -214,6 +214,35 @@ One decision worth keeping in view: **unknown counts as unarmed.** Erring toward
 "keep working" costs context; erring toward "stop" can cost the whole batch. The
 asymmetry decides it.
 
+### What it actually bought — measured, 30.07.2026
+
+Point 373 is delivered by a MEASUREMENT, not by a mechanism ("the point counts as
+delivered when the rate is measured, not when the mechanism runs"), and the command
+that measures it is `node scripts/measure-context-cost.mjs` — so the figures below can
+be re-derived rather than believed. It reads the transcripts, splits them at the moment
+the boundary FIRST fired (`.claude/boundary.log`, 28.07.2026 08:56Z) and weights each
+turn's billed tokens into one comparable number (`COST_WEIGHTS`; a PROXY, stated as
+one, not a bill).
+
+| | turns | active h | weighted/h | spend from turns ≥ 150k context |
+| --- | --- | --- | --- | --- |
+| before | 27 560 | 343.5 | 4 942 044 | 97.3 % |
+| after | 4 379 | 34.9 | 4 388 146 | 89.0 % |
+
+Per session, the mechanism plainly works: the **median peak context fell from 650k to
+284k** and the p90 from 1000k to 590k, with the share of sessions that ever crossed
+150k down from 95.7 % to 77.8 %.
+
+**And it is not enough.** The spend per active hour fell by only 11 % (ratio 0.888),
+which carried through the point's own 1.25 %/h anchor is **1.11 %/h — still nearly
+double the ~0.6 %/h that fits.** The reason is visible in the same table: the cost is
+roughly linear in the live context, and a session that ends at 284k still spends 89 %
+of its tokens above the 150k mark. Halving the PEAK barely moves a bill dominated by
+everything below that peak. So the criterion as written — get under the ceiling — is
+**NOT met**, and the boundary at a *point* boundary is too coarse a lever to meet it on
+its own. Recorded here rather than smoothed over: a mechanism that runs is not a
+mechanism that delivered.
+
 **A TAKEN BOUNDARY IS WITHDRAWN BY WORK — AND A PAGER IS NOT WORK (point 426).** The
 marker is withdrawn by any tool call that reads as continuing the batch, which is
 correct (working is proof the session is not finished) and is judged by
