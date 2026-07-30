@@ -3339,36 +3339,6 @@ it is appended.
   DOCS in the same commit: the evidence section `docs/acceptance-evidence.md` §31 records
   the pitched-view check beside the existing eye-level one.
 
-- [ ] 430. TWO NARROW RESIDUALS IN THE CHAT DROP NOTICE (29.07.2026, named by the
-  four-eyes review of point 417 as non-blocking follow-ups; the review's verdict was
-  MERGE and the point is closed — these are what it deliberately left standing).
-  (A) A message dropped as CLOCK-AHEAD is notified at once, but it could still be accepted
-  minutes later once the machine's clock catches up — if its transport id were evicted
-  from the count-capped `seen` ledger by a flood in between. The user would be told "not
-  arrived" for a message that then arrives. It needs a flood AND tight timing, which is
-  why it is a follow-up and not a defect: the fix is to remember a NOTIFIED envelope id
-  and refuse to notify twice, or to suppress the notice for the skew band the clock can
-  still close.
-  (B) A tick where the spool write failed AND a drop notice went unsent logs only the
-  spool failure: the notice clause sits in the `else if` branch of the launcher's chat
-  log. Both facts should reach the log, since the whole point of the counts is that a
-  refused notice is not silent.
-  VERIFIABLE: one Vitest case per residual against the pure cores — (A) accept-after-
-  notify produces no second notice and no contradictory pair, (B) both conditions in one
-  tick produce both log statements.
-  STATE 30.07.2026: (A) is done and (B) is HALF armed, which is why this point stayed open
-  while the rest of its bundle landed. The pure line composition `chatInboxLogLines` lives in
-  `scripts/chat-core.mjs` and is tested, but its CALLER is the `if`/`else if` chain in
-  `scripts/batch-autostart.mjs` (around lines 213-223), a file the parallel bundle-I agent
-  held, so it was deliberately left alone. Replace that chain with a loop over
-  `chatInboxLogLines`, or a rejected delivery notice stays silent in the spool-failure case —
-  the exact fault (B) exists to report.
-  THIRD RESIDUAL, found in the same build and carried over unchanged from the older
-  arithmetic: `etaMinutes` reads an estimate that wrapped past midnight as "plenty of time
-  left" once it is after midnight. It is a false NEGATIVE, so the standing requirement —
-  never wrongly call an estimate overdue — still holds, which is why it did not block the
-  estimate point. Fix it here, with a case at the wrap.
-
 - [ ] 432. A FINDING SURVIVES ONLY AS LONG AS THE SESSION THAT MADE IT (29.07.2026, user:
   "Etabliere einen Mechanismus, der Befunde allgemein sichert"). THE EVIDENCE: in one
   evening this session found three defects — the project hooks that cannot fire outside the
