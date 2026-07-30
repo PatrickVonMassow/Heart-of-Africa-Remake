@@ -459,10 +459,18 @@ describe('removeVdzk — an answered question disappears', () => {
 const BOARD_PATH = resolve(REPO_ROOT, '.batch-dashboard.html')
 const hasBoard = existsSync(BOARD_PATH)
 
-describe.skipIf(!hasBoard)('every move keeps the real board auditable', () => {
-  // Read lazily: a skipped suite still RUNS its factory, so an eager read would
-  // throw at collection time on exactly the machine that has no board.
-  const html = hasBoard ? readFileSync(BOARD_PATH, 'utf8') : ''
+const boardHtml = hasBoard ? readFileSync(BOARD_PATH, 'utf8') : ''
+// A board whose now-section is DELIBERATELY empty is a sanctioned state, not a
+// defect: `board.mjs done <n> --none "<reason>"` closes the last point of a
+// session by putting an unnumbered gap card where the work would be. This sweep
+// needs a NUMBERED now-card to have anything to move around, so it skips that
+// state instead of reddening the suite — otherwise taking the documented path to
+// end a session blocks the push that same path exists to reach (measured
+// 30.07.2026, at the boundary of point 434).
+const nowSectionEmpty = hasBoard && [...parseNowCardPoints(boardHtml)].length === 0
+
+describe.skipIf(!hasBoard || nowSectionEmpty)('every move keeps the real board auditable', () => {
+  const html = boardHtml
   const audit = (doc) => new Set(auditDashboard(doc, { open: [], done: [] }).map((v) => v.code))
   const baseline = audit(html)
   const [aNowPoint] = [...parseNowCardPoints(html)]

@@ -3522,18 +3522,15 @@ it is appended.
   parsed headline, never a language heuristic); `setQueueEntry` writes a title without
   disturbing body or estimate; retitling a now-card leaves its times and body untouched; and a
   board written with CRLF is normalised so the archive rotation still finds its section.
-  IN THE SAME POINT, found the same morning and the same family — THE DOCUMENTED ESCAPE
-  HATCH REDDENS THE SUITE. `board.mjs done <n> --none "<reason>"` is the sanctioned way to
-  close the last point of a session: it puts a card naming the gap where the hole would be.
-  That card has no point NUMBER, and `scripts/board-core.test.mjs` sweeps the LIVE board and
-  asserts a numbered now-card exists ("the live board must carry current work for this sweep
-  to mean anything") — so taking the documented path turns the unit layer red and blocks the
-  push, which is how it was found. Decide it ONE way and make both sides say it: either the
-  gap card carries the point it followed (and the sweep accepts it), or the sweep skips a
-  board whose now-section is deliberately empty. The gap card is also the one place where a
-  text still reaches the board as a command-line ARGUMENT, so `--none` gains `--text-stdin`
-  like every other text (point 410's rule: a Windows shell mangles the umlauts, and the
-  audit then flags the card it just wrote).
+  IN THE SAME POINT, the gap card the session-closing path writes: `board.mjs done <n>
+  --none "<reason>"` is the one place where a text still reaches the board as a command-line
+  ARGUMENT, so `--none` gains `--text-stdin` like every other text (point 410's rule: a
+  Windows shell mangles the umlauts, and the audit then flags the card it just wrote — it did
+  so again on 30.07.2026 at the boundary of point 434, which is how this stayed on the list).
+  The sibling half of this — that the same gap card reddened `scripts/board-core.test.mjs`,
+  whose live-board sweep asserted a numbered now-card exists — is DECIDED AND BUILT: the sweep
+  skips a board whose now-section is deliberately empty, because a state the documented path
+  produces must not block the push that same path exists to reach.
   AND THE FLAG ITSELF REACHED THE BOARD AS PROSE (found 30.07.2026). `board-queue.mjs set`
   has NO `--text-stdin`, so a session that tried to pipe German prose into it stored the
   literal string `--text-stdin` as the card body — and six cards, three of them live in the
