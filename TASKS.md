@@ -3513,6 +3513,20 @@ it is appended.
   rule as (2) above — liveness is read from output — applied to the layer that spawns children
   rather than sessions, and it is the rule this point's own design document states while its
   author broke it.
+  (5b) AND THE PROBE MUST MEASURE THE AGENT'S WORK, NOT ITS GIT COMMANDS (found 30.07.2026 on
+  the delivered code, and it is the same mistake one layer further in). `worktreeActiveAt`
+  stats exactly four paths — the gitdir, `index`, `HEAD`, `COMMIT_EDITMSG` — so what it dates
+  is the last GIT operation, not the last edit. An agent that has been writing source files
+  for twenty minutes without running a git command reads as `quiet`; measured live, the same
+  worktree read "quiet for 21 min" to the declaration while the agent was mid-edit. The
+  contamination runs the other way too: a reader's own `git status` on that worktree can
+  refresh the index and reset the clock, so the observer's look becomes the evidence.
+  TARGET: the probe dates the newest mtime among the worktree's TRACKED WORKING FILES as well
+  as the git metadata (cheap: `git -C <wt> status --porcelain` names the changed paths, or the
+  newest mtime under the checkout excluding `node_modules`/`dist`), and the verdict says which
+  of the two it read. VERIFIABLE in the pure layer: a worktree whose git metadata is old but
+  whose working files are fresh reads `alive`; both old reads `quiet`; and the detail names the
+  evidence in each case.
   MUST NOT BE BUILT: a rescue that depends on the wedged session noticing; a second LOCAL
   watchdog; two spawners; a window that kills a running verification; a silent recovery;
   and no conclusion of death from silence alone where output can be measured.
