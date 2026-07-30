@@ -12,6 +12,16 @@
 //
 // ADVISORY BY DESIGN: state changes between the preflight and the action, so the
 // guard itself stays the authority. A clean preflight is a good sign, not a pass.
+//
+// ONE DENY THIS REPORT DOES NOT MODEL (point 434, 30.07.2026): the PreToolUse
+// FENCE chokepoint in `board-first-guard.mjs`. It refuses merge/push, the TASKS.md
+// tick and archive move, the board publish and `dashboard-state.json` to a session
+// whose batch fence has been superseded — one that lost the batch while it was
+// silent. This report can therefore read "clean" where that gate denies. It is not
+// wired in because the answer is not a guard verdict but an ownership FACT, and its
+// remedy is not "satisfy the gate" but `node scripts/batch-claim.mjs` or stop
+// driving the batch — which the deny text says in full. Wire it here if a session
+// is ever seen looping against it.
 
 /** Statuses a guard can have in the report. */
 export const STATUS = {

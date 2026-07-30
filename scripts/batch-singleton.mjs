@@ -2,12 +2,25 @@
 // two live sessions drove the batch and committed to main concurrently).
 // This module is the ONE authority on "who may drive the batch":
 //
-//   1. A single OWNER LOCK (.claude/batch-lock.json) with a liveness heartbeat
-//      (timestamp + session id + the owning claude process's OS PID + its start
-//      time). The pid makes liveness REAL: a session mid-40-minute tool call
-//      writes no heartbeat, but its process is provably alive — the old
-//      claimedAt-age-only check declared exactly such a session dead and
-//      double-spawned (the incident's root cause).
+//   1. A single OWNER LOCK (.claude/batch-lock.json) held as a LEASE: session id,
+//      the owning claude process's OS PID and start time, a heartbeat timestamp,
+//      and `leaseUntil` — the moment ownership ENDS unless it is renewed. The pid
+//      makes liveness REAL: a session mid-40-minute tool call writes no
+//      heartbeat, but its process is provably alive — the old claimedAt-age-only
+//      check declared exactly such a session dead and double-spawned (the
+//      incident's root cause). The LEASE answers the opposite question, the one
+//      the night of 29./30.07.2026 lost seven hours to: a process that is alive
+//      but no longer working keeps nothing. Renewal is PreToolUse and expiry is
+//      pure arithmetic — there is no probe, no verdict and no condition at the
+//      acquire door (docs/batch-resilience.md §3, layer 1;
+//      scripts/batch-lease-core.mjs).
+//   1a. A FENCE (.claude/batch-fence.json), monotonic and never deleted: every
+//      acquisition takes a number, so a session that was dispossessed can be told
+//      apart from the one that holds the batch now. It cannot live in the lock
+//      file — `acquire` deletes that — and it is enforced at ONE PreToolUse
+//      chokepoint (scripts/board-first-guard.mjs) for the four paths that have no
+//      guard of their own: the work-order tick, `git merge`/`push`, the board
+//      publish and `dashboard-state.json`.
 //   2. ATOMIC acquisition (test-and-set, never check-then-set): first claim via
 //      exclusive file create ('wx'); takeover of a dead lock via a reap MUTEX
 //      directory (mkdirSync is atomic) so two racing starters can never both
@@ -43,6 +56,15 @@ import os from 'node:os'
 import { dirname, join } from 'node:path'
 import { repoPath } from './repo-paths.mjs'
 import { writeJsonAtomic, tryWriteJsonAtomic } from './atomic-write.mjs'
+import {
+  LEASE_MS,
+  leaseExpired,
+  renewedLock,
+  renewalDecision,
+  nextFence,
+  grantedFenceState,
+  normaliseFence,
+} from './batch-lease-core.mjs'
 
 // --- Constants (exported for tests and callers) -------------------------------
 
@@ -55,30 +77,6 @@ export const DEAD_CONFIRM_MS = 5 * 60 * 1000
 export const LEGACY_STALE_MS = 45 * 60 * 1000
 /** One tick of the HoA-Batch-Autostart scheduled task. */
 export const LAUNCHER_TICK_MS = 15 * 60 * 1000
-/**
- * An alive-pid owner whose heartbeat is older than this is flagged "wedged"
- * (hung process). Past it the launcher may TAKE the batch lock and start a
- * successor (`wedgeTakeover`, point 433) — never a kill; the wedged process keeps
- * running and simply stops owning the batch, learning it at its next hook.
- *
- * FORTY-FIVE MINUTES, MEASURED (point 433 (b), 30.07.2026). It was FOUR HOURS,
- * and on the night of 30.07.2026 that read 221 minutes of a total standstill as
- * "owner alive" and then logged the same wedge finding eight times over two hours
- * without acting — longer than any unattended stretch in which a rescue is still
- * worth something. The new value is calibrated against the real thing that starves
- * the heartbeat (a single long tool call, since the heartbeat is a PostToolUse
- * hook), measured over this project's own 43 transcripts — 32 440 tool calls:
- *   p50 1 s · p99 8.9 min · p99.9 10.0 min · only 15 calls above 15 min.
- * Of the ten calls above 20 min, five were waits on the USER (AskUserQuestion, a
- * protected-path edit prompt) and three were declared background waits (a Monitor
- * poll loop, a dev server); the longest undeclared, unattended call was 27.8 min.
- * So 45 min is 4.5x the p99.9 and better than 1.6x the longest real one, while a
- * legitimately long run is protected by its own evidence rather than by the clock:
- * a declared, ADVANCING piece of work reads alive and never wedged at any age.
- * It also lands exactly on `LEGACY_STALE_MS`, so 45 minutes of silence now costs
- * the batch lock whether or not the lock records a pid.
- */
-export const WEDGED_MS = 45 * 60 * 1000
 /** A pending-spawn lock (launcher claimed, claude -p still booting) older than
  *  this with a dead child pid is reapable. */
 export const PENDING_STALE_MS = 10 * 60 * 1000
@@ -91,18 +89,6 @@ export const PENDING_STALE_MS = 10 * 60 * 1000
  *  call, and a session that neither ends nor calls a tool for a quarter of an
  *  hour does not exist. */
 export const HANDOVER_GRACE_MS = 15 * 60 * 1000
-/**
- * An ALIVE owner silent for longer than this is reported out of band (point
- * 388 (c)). Override with HOA_WEDGE_NOTIFY_MIN (minutes).
- *
- * DERIVED, so the ladder can never invert again (point 433): exactly one launcher
- * tick BELOW the wedge threshold, so the user hears about a deepening silence one
- * tick before the launcher acts on it. It used to be 90 min against a four-hour
- * wedge; with the wedge at 45 min a hard 90 would have sat ABOVE it and made the
- * first stage unreachable — `wedgeStage` returns 'wedged' as soon as both are
- * passed.
- */
-export const WEDGE_NOTIFY_MS = WEDGED_MS - LAUNCHER_TICK_MS
 /** Tool activity younger than this counts a session as "live" for the
  *  parallel-session detector. */
 export const PARALLEL_FRESH_MS = 10 * 60 * 1000
@@ -112,32 +98,6 @@ export const REAP_MUTEX_STALE_MS = 60 * 1000
 /** Start times within this tolerance count as the same process (pid reuse
  *  detection). */
 export const PID_START_TOLERANCE_MS = 2000
-/** How many launcher ticks of COMPLETE silence — no tool call from the owner AND
- *  no declared work advancing — before the owner counts as stalled (point 402
- *  (d)). Expressed as the silence it spans rather than as a persisted counter, so
- *  a lost `autostart-state.json` cannot reset it.
- *
- *  SIX, not the two this was first written with (four-eyes review, 28.07.2026).
- *  The heartbeat is a PostToolUse hook, so ONE long tool call starves it, and the
- *  longest LEGITIMATE silence in this repository is the LARGE browser regression
- *  at roughly 30-40 minutes — the number `WEDGE_NOTIFY_MS` two entries up is
- *  calibrated against. A 30-minute stall bound therefore sat BELOW the silence
- *  this repository documents as normal, and the verdict it fed can end in a kill.
- *  Six ticks = 90 minutes follows the same better-than-2x headroom rule.
- *
- *  IT NOW SITS ABOVE `WEDGED_MS`, and that is the intended order (point 433): the
- *  45-minute wedge licenses only a non-destructive TAKE of the lock — the process
- *  keeps running — while this bound licenses REAPING the launcher's own spawn. The
- *  ladder is monotone in severity, so the destructive verdict is the slower one. */
-export const WORK_STALL_TICKS = 6
-export const WORK_STALL_MS = WORK_STALL_TICKS * LAUNCHER_TICK_MS
-/** How much later than a declaration its own heartbeat may land and still leave
- *  the declaration the owner's LAST WORD (point 402, four-eyes finding 1.1). The
- *  declare command is itself a tool call, so its PostToolUse heartbeat lands
- *  seconds after `declaration.at`; anything appreciably later proves the session
- *  went on WORKING after declaring, which makes the declaration leftover
- *  paperwork rather than a description of the present. */
-export const WORK_DECLARATION_TOLERANCE_MS = 2 * 60 * 1000
 /** How closely a live process's start time must match the moment the launcher
  *  recorded spawning it before it counts as THAT spawn (point 402, four-eyes
  *  finding 1.3). Windows recycles pids aggressively, and `lastPid` persists
@@ -164,6 +124,7 @@ export function statePathsFor(lockPath) {
     boundaryLogPath: join(dir, 'boundary.log'),
     boundaryPath: join(dir, 'batch-boundary.json'),
     inFlightPath: join(dir, 'batch-in-flight.json'),
+    fencePath: join(dir, 'batch-fence.json'),
     claimPath: join(dir, 'batch-claim.json'),
     sessionsSeenPath: join(dir, 'sessions-seen.json'),
     activityPath: join(dir, 'session-activity.json'),
@@ -183,6 +144,10 @@ export const BOUNDARY_LOG_PATH = DEFAULT_PATHS.boundaryLogPath
 export const BOUNDARY_MARKER_PATH = DEFAULT_PATHS.boundaryPath
 export const IN_FLIGHT_PATH = DEFAULT_PATHS.inFlightPath
 export const CLAIM_PATH = DEFAULT_PATHS.claimPath
+/** The fence's own file. NEVER deleted — not by a release, not by a takeover, not
+ *  by the doctor. It is the only record that survives `acquire` unlinking the
+ *  lock, and losing it is what would let a dispossessed session's writes back in. */
+export const FENCE_PATH = DEFAULT_PATHS.fencePath
 export const ANCESTOR_CACHE_PATH = DEFAULT_PATHS.ancestorCachePath
 
 // --- Small IO helpers ----------------------------------------------------------
@@ -231,31 +196,24 @@ const readJson = (p) => {
  *   bootTime — epoch ms this machine booted (claude never survives a reboot)
  *   probe — { exists: boolean, startedAt: number|null } for lock.pid
  *           (pass null when no pid is recorded)
- *   work  — what the owner DECLARED it is waiting on, already assessed:
- *           { declared, advancing, declaredAt, summary } from `assessOwnerWork`
- *           (scripts/batch-in-flight-core.mjs). Optional — a caller that does not
- *           pass it gets exactly the pre-402 behaviour.
- * Returns { alive, wedged, reason }.
+ * Returns { alive, reason }.
  *
- * PROGRESS, NOT AGE (point 402, 28.07.2026). Age was the only thing this function
- * could measure, and any single number is wrong in both directions: long enough
- * not to shoot a healthy delegated agent is long enough for a hung session to sit
- * undetected. The question that separates the two is whether the declared work is
- * still ADVANCING, which this repository already knows how to answer. So an owner
- * whose heartbeat is silent is NOT wedged while its agent still commits, and one
- * whose declared work has gone quiet for `WORK_STALL_MS` is wedged long before
- * the four-hour valve would have noticed. What no evidence may ever do is revive
- * a DEAD process: the pid checks come first and are untouched.
+ * ONE VERDICT, NOT THREE (point 434, docs/batch-resilience.md §6). This function
+ * used to answer "is the owner alive" three ways at once: the pid probe, a
+ * declared-work stall bound (`WORK_STALL_*`) and a heartbeat-age valve
+ * (`WEDGED_MS`), each with its own threshold and its own review. All three tried
+ * to INFER from silence what only the owner can state, and on the night of
+ * 29./30.07.2026 all three read a seven-hour standstill as "owner alive". They
+ * are gone. What replaces them is the LEASE: the owner says how long it means to
+ * keep the batch by writing `leaseUntil` BEFORE each call, and this function only
+ * compares that number to the clock. No probing, no evidence, no judgement — a
+ * lease that ran out is over even if the process is still breathing (it keeps
+ * running; it merely stops owning the batch, and learns that at its next hook).
  *
- * THE DECLARATION MUST BE THE OWNER'S LAST WORD (four-eyes review, finding 1.1)
- * before it may tighten anything. `claimedAt <= declaredAt + tolerance` is the
- * SAME comparison the handover below rests on, for the same reason: the PostToolUse
- * heartbeat stamps `claimedAt` on every tool call, so a heartbeat NEWER than the
- * declaration is proof the session went on working after declaring. The replayed
- * failure: a session declares a wait, the agent finishes, the session merges and
- * starts a LARGE regression WITHOUT clearing the declaration, and 31 minutes of
- * legitimate silence later the launcher reads a frozen declaration and reaps it
- * mid-run. Such leftover paperwork now licenses at most the old four-hour valve.
+ * A LOCK WITHOUT `leaseUntil` IS NOT A SPECIAL CASE and needs no migration: it
+ * reads as an implicit lease of `claimedAt + LEASE_MS` (`leaseUntilOf`), which is
+ * the same shape the demolished age valve had. The live owner across this change
+ * keeps working and writes a real lease at its next tool call.
  *
  * HANDOVER (point 388): a lock the owner itself marked handed-over at a VALID
  * point boundary reads NOT alive, even while its process still runs. That is the
@@ -271,51 +229,44 @@ const readJson = (p) => {
  *   - while the pid is still alive the successor waits HANDOVER_GRACE_MS, so a
  *     session mid-shutdown is never raced.
  */
-export function assessOwner(
-  lock,
-  { now, bootTime, probe, work = null, stallMs = WORK_STALL_MS, declarationToleranceMs = WORK_DECLARATION_TOLERANCE_MS },
-) {
-  const advancing = work?.advancing === true
-  // Is the declaration still the owner's last word? A heartbeat that postdates it
-  // by more than the tolerance says no, and only a "yes" may tighten the bound.
-  const lastWord =
-    typeof work?.declaredAt === 'number' &&
-    typeof lock?.claimedAt === 'number' &&
-    lock.claimedAt <= work.declaredAt + declarationToleranceMs
+export function assessOwner(lock, { now, bootTime, probe, leaseMs = LEASE_MS } = {}) {
   if (!lock || typeof lock.claimedAt !== 'number') {
-    return { alive: false, wedged: false, reason: 'no-lock' }
+    return { alive: false, reason: 'no-lock' }
   }
   if (lock.handedOver === true && typeof lock.handedOverAt === 'number' && lock.claimedAt <= lock.handedOverAt) {
     const pidGone = probe ? probe.exists !== true : false
     if (pidGone || now - lock.handedOverAt >= HANDOVER_GRACE_MS) {
-      return { alive: false, wedged: false, reason: 'handed-over' }
+      return { alive: false, reason: 'handed-over' }
     }
-    return { alive: true, wedged: false, reason: 'handover-grace' }
+    return { alive: true, reason: 'handover-grace' }
   }
   const age = now - lock.claimedAt
   // Fresh heartbeat proves life — REBOOT IS NOT SUFFICIENT to declare death
   // when a fresh heartbeat exists (a re-claimed post-boot session writes one).
-  if (age < DEAD_CONFIRM_MS) return { alive: true, wedged: false, reason: 'fresh-heartbeat' }
+  if (age < DEAD_CONFIRM_MS) return { alive: true, reason: 'fresh-heartbeat' }
   // A heartbeat from BEFORE this boot cannot have a living writer: no claude
   // process survives a reboot. (A live re-claimed session would have written a
   // post-boot heartbeat, caught above.)
   if (typeof bootTime === 'number' && lock.claimedAt < bootTime) {
-    return { alive: false, wedged: false, reason: 'heartbeat-predates-boot' }
+    return { alive: false, reason: 'heartbeat-predates-boot' }
   }
+  // THE LEASE, and it outranks the pid: a live process whose lease ran out no
+  // longer owns the batch. This is the whole of point 434's layer 1 — nothing is
+  // inferred from the silence, the owner simply stopped saying it was still
+  // there. Nothing is killed here or anywhere else.
+  if (leaseExpired(lock, { now, leaseMs })) return { alive: false, reason: 'lease-expired' }
   const kind = lock.kind === 'pending-spawn' ? 'pending-spawn' : 'session'
   const pid = typeof lock.pid === 'number' && lock.pid > 0 ? lock.pid : null
   if (pid === null) {
-    // Legacy lock — age is all we have, unless the owner's declared work says
-    // otherwise (point 402): a running agent proves a running session.
+    // Legacy lock (claimed before pids were recorded) — the lease above is the
+    // only bound it has, and this shorter one applies to a launcher's pending
+    // spawn that never came up.
     const stale = kind === 'pending-spawn' ? PENDING_STALE_MS : LEGACY_STALE_MS
-    if (age <= stale) return { alive: true, wedged: false, reason: 'legacy-fresh' }
-    return advancing
-      ? { alive: true, wedged: false, reason: 'work-advancing' }
-      : { alive: false, wedged: false, reason: 'legacy-stale' }
+    return age <= stale ? { alive: true, reason: 'legacy-fresh' } : { alive: false, reason: 'legacy-stale' }
   }
   if (!probe || probe.exists !== true) {
     // The owning process no longer exists → provably dead (past the grace).
-    return { alive: false, wedged: false, reason: 'pid-dead' }
+    return { alive: false, reason: 'pid-dead' }
   }
   if (
     typeof lock.pidStartedAt === 'number' &&
@@ -323,29 +274,14 @@ export function assessOwner(
     Math.abs(probe.startedAt - lock.pidStartedAt) > PID_START_TOLERANCE_MS
   ) {
     // A pid exists but it is a DIFFERENT process (pid reuse) → owner dead.
-    return { alive: false, wedged: false, reason: 'pid-reused' }
+    return { alive: false, reason: 'pid-reused' }
   }
-  if (kind === 'pending-spawn' && age > PENDING_STALE_MS && probe.exists !== true) {
-    return { alive: false, wedged: false, reason: 'pending-dead' }
-  }
-  // Pid alive and (as far as verifiable) the same process: ALIVE, no matter how
+  // Pid alive, the same process, and the lease still runs: ALIVE, no matter how
   // old the heartbeat — a long tool call starves the heartbeat but not the
   // process. This is the exact fix for the 24.07 incident (heartbeat 24 min
-  // stale, session mid-turn, launcher double-spawned).
-  //
-  // Point 402 refines only the WEDGE half of that verdict, never the alive half:
-  if (advancing) return { alive: true, wedged: false, reason: 'work-advancing' }
-  if (work?.declared === true && lastWord && age > stallMs) {
-    // Nothing has moved for six launcher ticks: not the owner's heartbeat, not
-    // one piece of the work it declared, and the declaration is the last thing
-    // the owner did. A healthy agent — however slow — advances something, so this
-    // needs the work to be genuinely frozen. Still ALIVE (the process exists; the
-    // launcher signals and may only reap a spawn of its own making), and wedged
-    // with the STRONGER reason: `work-stalled` is the only verdict that licenses a
-    // reap, while the plain `pid-alive` wedge below licenses the lock take alone.
-    return { alive: true, wedged: true, reason: 'work-stalled' }
-  }
-  return { alive: true, wedged: age > WEDGED_MS, reason: 'pid-alive' }
+  // stale, session mid-turn, launcher double-spawned), and the lease above is
+  // what keeps it from meaning "alive forever".
+  return { alive: true, reason: 'pid-alive' }
 }
 
 /**
@@ -419,11 +355,17 @@ export function sweepableTmpFiles({ entries, lockName, now, probe, staleMs = REA
 
 /**
  * Launcher decision: may the autostart spawn a takeover session?
- * Returns 'spawn' | 'skip-alive' | 'skip-wedged'.
+ * Returns 'spawn' | 'skip-alive'.
+ *
+ * THE THIRD OUTCOME IS GONE (point 434). 'skip-wedged' named a session that was
+ * alive AND stuck, and everything downstream of it — `wedgeAction`,
+ * `wedgeTakeover`, `takeWedged`, the two-stage silence report — existed to decide
+ * what to do about a state the launcher could describe but not resolve. An
+ * expired lease is not a third state: it is simply not alive, and the ordinary
+ * takeover this function has always licensed handles it.
  */
 export function spawnDecision(assessment) {
-  if (!assessment.alive) return 'spawn'
-  return assessment.wedged ? 'skip-wedged' : 'skip-alive'
+  return assessment.alive ? 'skip-alive' : 'spawn'
 }
 
 /**
@@ -459,109 +401,6 @@ export function isOwnSpawn({
   return Math.abs(probe.startedAt - lastSpawnAt) <= toleranceMs
 }
 
-/**
- * WHICH SILENCE IS WORTH REPORTING, given what the owner declared. PURE.
- *
- * `wedgeStage` reads the clock alone; this is the launcher's policy on top of it.
- * A session whose declared work is visibly ADVANCING is not silent in the sense
- * the 'silent' alarm was written for — it is waiting on an agent that is still
- * committing, and reporting that would train the user to ignore the channel. So
- * the first stage is suppressed while work advances.
- *
- * The hours-long 'wedged' stage is NOT (four-eyes review 28.07.2026, finding
- * 1.2). Nothing restricts WHAT may be declared as evidence, and some things are
- * eternally fresh by nature; such a declaration used to suppress the wedge verdict
- * AND this notification at once, leaving the owner less observed than before the
- * declaration existed. Past `WEDGED_MS` the user is told regardless — notify only,
- * never a kill.
- */
-export function silenceStage({ ageMs, advancing = false, notifyMs = WEDGE_NOTIFY_MS, wedgedMs = WEDGED_MS } = {}) {
-  const stage = wedgeStage(ageMs, { notifyMs, wedgedMs })
-  if (stage === 'wedged') return stage
-  return advancing ? null : stage
-}
-
-/**
- * WHAT THE LAUNCHER MAY DO WITH A WEDGED OWNER (point 402 (d)). PURE.
- *
- * Two kinds of wedge reach here and they earn different consequences:
- *   - `work-stalled` — the owner has been silent for six launcher ticks AND the
- *     work it declared has stopped moving. That is a positive finding, not a
- *     guess from a clock, so it is worth an urgent signal AND a takeover.
- *   - the four-hour `pid-alive` valve — age alone, which can still be a very long
- *     legitimate run. It keeps its pre-402 consequence exactly: reap only the
- *     launcher's own headless spawn, and let the next tick take over.
- *
- * THE `isOwnSpawn` CONDITION IS GONE (point 433, second model's review of
- * docs/batch-resilience.md §3 layer 2). It was the reason the night of 30.07.2026
- * was lost: the owner had been started BY HAND, so `own` was false, and the whole
- * verdict fell through to a log line printed nine times. A wedged owner is taken
- * over whoever started it — the authority already existed, it was merely too narrow.
- * WHAT THE CONDITION IS STILL NEEDED FOR: killing. Dropping it from the TAKEOVER
- * was the fix; dropping it from the KILL as well would let the launcher end a
- * process it never started — including an attended window of the user's that
- * declared a wait and then went quiet. The second model's review of this very
- * commit found five places still promising the opposite, one of them a
- * notification that says "nothing is being killed" while killing. So the reap
- * stays where it was: the launcher's OWN headless spawn, and only on the stronger
- * `work-stalled` finding. A foreign wedged owner is DISPOSSESSED instead, which is
- * what the lost night actually needed — it was the non-stalled path.
- *
- * Returns { stalled, own, notify, kill, takeover }.
- */
-export function wedgeAction({ assessment, lock, lastSpawnPid, lastSpawnAt, probe } = {}) {
-  const stalled = assessment?.reason === 'work-stalled'
-  const own = isOwnSpawn({ pid: lock?.pid, probe, lastSpawnPid, lastSpawnAt })
-  const reapable = typeof lock?.pid === 'number' && lock.pid > 0
-  return {
-    stalled,
-    own,
-    notify: stalled ? 'urgent' : null,
-    // Only the POSITIVE stall finding ends a process, and only one this launcher
-    // started: an unknown identity is never a licence to kill.
-    kill: stalled && reapable && own,
-    // Taking the lock beside a process that is still running is the incident this
-    // module exists to prevent, so the call site still waits for a CONFIRMED exit
-    // before it takes over on the back of a kill.
-    takeover: stalled && reapable && own,
-  }
-}
-
-/**
- * MAY THE LAUNCHER TAKE THE BATCH FROM A WEDGED OWNER (point 433 (a))? PURE.
- *
- * A verdict without a consequence is a comment. On the night of 30.07.2026 the
- * launcher logged "WEDGED owner: pid alive but heartbeat 251 min old" and then the
- * same line at 266, 281, 296, 311, 326, 341, 356 and 371 minutes — eight findings
- * over two hours, no successor, no release, nothing. The place that can conclude
- * "wedged" must also be allowed to act.
- *
- * The action is deliberately the MILD one: take the lock and let the successor
- * start. The wedged process is NOT killed — it keeps running and merely stops
- * owning the batch, which it learns at its next hook when every ownership-gated
- * guard stands it down. Killing stays what it was: only the launcher's own spawn,
- * only on the stronger `work-stalled` finding (`wedgeAction`).
- *
- * WHAT MAY NEVER TRIGGER IT: an in-flight declaration merely growing old. A long
- * verification must not be shot in the back, so the take needs the POSITIVE
- * evidence of heartbeat silence past `WEDGED_MS` — an aged declaration on a
- * session whose heartbeat is fresh yields nothing, and a declaration whose work is
- * still ADVANCING keeps the owner alive-and-not-wedged at any age (`assessOwner`).
- *
- * Returns { take, reason }.
- */
-export function wedgeTakeover({ assessment, lock, work = null } = {}) {
-  if (!lock || typeof lock.sessionId !== 'string' || !lock.sessionId) {
-    return { take: false, reason: 'no-owner' }
-  }
-  // A dead owner is not this path's business — the ordinary spawn decision already
-  // frees that lock, and saying "take" here would only duplicate it.
-  if (assessment?.alive !== true) return { take: false, reason: 'not-alive' }
-  if (assessment?.wedged !== true) return { take: false, reason: 'below-threshold' }
-  if (work?.advancing === true) return { take: false, reason: 'work-advancing' }
-  return { take: true, reason: assessment.reason ?? 'wedged' }
-}
-
 /** After how many IDENTICAL consecutive verdicts the repetition itself is the
  *  signal (point 433 (c)). Two, i.e. the second identical tick — 30 minutes at the
  *  launcher's cadence — because eight identical lines is what the incident cost. */
@@ -575,6 +414,12 @@ export const VERDICT_REPEAT_ESCALATE_AT = 2
  * whether to escalate (exactly once, at the Nth identical reading) and whether the
  * plain line may still be logged.
  *
+ * IT SURVIVED THE DEMOLITION of the wedge ladder (point 434) because the failure it
+ * answers is not the wedge but the REPORT: a launcher that reads the same thing
+ * every tick and keeps saying it. Its input is now the ordinary liveness verdict —
+ * a takeover that does not take, tick after tick, is exactly what a person needs
+ * to hear about.
+ *
  * Returns { key, repeats, escalate, suppressLog }.
  */
 export function verdictRepeat({ key, lastKey, repeats = 0, escalateAt = VERDICT_REPEAT_ESCALATE_AT } = {}) {
@@ -586,45 +431,16 @@ export function verdictRepeat({ key, lastKey, repeats = 0, escalateAt = VERDICT_
 }
 
 /**
- * How far a silence has gone: null (still normal), 'silent' past the notify
- * threshold, 'wedged' past the hours-long one. TWO stages on purpose — the
- * incident was "nobody looked", so a silence that deepens escalates instead of
- * being reported once and then forgotten (four-eyes review, finding 5).
+ * The identity of ONE owner at ONE heartbeat: owner + pid + the moment it last
+ * moved. Keying a report on this states it exactly once per genuine episode — the
+ * key holds still across the launcher's 15-minute ticks (claimedAt does not move
+ * while nobody works), and a later episode of the same session gets a new key.
  */
-export function wedgeStage(ageMs, { notifyMs = WEDGE_NOTIFY_MS, wedgedMs = WEDGED_MS } = {}) {
-  if (typeof ageMs !== 'number') return null
-  if (ageMs >= wedgedMs) return 'wedged'
-  if (ageMs >= notifyMs) return 'silent'
-  return null
-}
-
-/**
- * The identity of ONE silence at ONE stage: owner + pid + the heartbeat it fell
- * silent at + the stage. Keying the notification on this reports every genuine
- * stall exactly once per stage — the key holds still across the launcher's
- * 15-minute ticks (claimedAt does not move while nobody works), deepens into a
- * second report when the silence crosses into 'wedged', and a later stall of the
- * same session gets a new key again.
- */
-export function wedgeOwnerKey(lock, stage = '') {
+export function ownerStateKey(lock, suffix = '') {
   if (!lock || !lock.sessionId || typeof lock.claimedAt !== 'number') return ''
-  return `${lock.sessionId}#${lock.pid ?? 'nopid'}#${lock.claimedAt}${stage ? `#${stage}` : ''}`
+  return `${lock.sessionId}#${lock.pid ?? 'nopid'}#${lock.claimedAt}${suffix ? `#${suffix}` : ''}`
 }
 
-/**
- * Should the launcher REPORT a silent owner (point 388 (c))? The launcher may
- * neither spawn against a live pid nor kill it — a long verify run legitimately
- * starves the heartbeat — but a night in which nothing happens must not be
- * discovered the next morning. Pure; the caller supplies the stage, the key and
- * the last key it notified for.
- */
-export function wedgeNotifyDecision({ alive, stage, ownerKey, lastNotifiedKey }) {
-  if (!alive) return { notify: false, reason: 'owner-not-alive' }
-  if (!stage) return { notify: false, reason: 'below-threshold' }
-  if (!ownerKey) return { notify: false, reason: 'no-owner' }
-  if (lastNotifiedKey && lastNotifiedKey === ownerKey) return { notify: false, reason: 'already-notified' }
-  return { notify: true, reason: stage === 'wedged' ? 'wedged-owner' : 'silent-owner' }
-}
 
 /**
  * Parallel-session classifier. A parallel session is a sid that
@@ -958,13 +774,19 @@ function exitReapMutex(mutexPath) {
  *   - 'lost-race' — a concurrent starter won. STAND DOWN.
  * Options: { kind, pid, pidStartedAt, now, deps } — deps override probes for tests.
  *
- * `takeWedged` (point 433) widens 'held' by exactly one case: an owner that is
- * alive but WEDGED may be dispossessed. Only the launcher passes it, and only after
- * `wedgeTakeover` said so. It changes nothing about the atomicity — the take runs
- * through the SAME reap mutex and re-verifies the wedge INSIDE it, so two launchers
- * can never both act and a lock that came back to life in the race window is left
- * alone. Nothing is killed; the dispossessed process keeps running and stands down
- * at its next hook.
+ * THERE IS NO `takeWedged` ANY MORE (point 434). A wedged owner used to be a case
+ * the caller had to ASK for, having first proved it with a second mechanism; an
+ * owner whose lease ran out is simply not alive, so the ordinary door lets the
+ * successor in. Everything about the atomicity is unchanged — the takeover runs
+ * through the SAME reap mutex and re-reads the lock INSIDE it, so two starters can
+ * never both win and a lock that came back to life in the race window (a renewal
+ * landed) keeps its owner. Nothing is killed here; the dispossessed process keeps
+ * running and stands down at its next hook.
+ *
+ * EVERY SUCCESSFUL ACQUISITION TAKES A FENCE NUMBER, granted under that same
+ * mutex where the takeover path holds it. The number goes into the never-deleted
+ * fence file AND onto the lock, which is what lets the mark be re-seeded upward
+ * if the fence file is ever lost.
  */
 export function acquire(sessionId, opts = {}) {
   if (!sessionId) return 'held'
@@ -976,7 +798,12 @@ export function acquire(sessionId, opts = {}) {
     probePid: opts.probePidFn ?? probePid,
     findAncestor: opts.findAncestorFn ?? findClaudeAncestor,
   }
-  const identity = () => {
+  const fencePath = opts.fencePath ?? statePathsFor(lockPath).fencePath
+  // The fence the OUTGOING lock carried, if any: the seed that keeps the mark from
+  // falling if the fence file was lost (see `nextFence`). Read before the create,
+  // because the create is what replaces the lock it comes from.
+  let priorFence = null
+  const identity = (fence) => {
     // Resolve the owning claude process once, at acquisition.
     const anc = opts.pid ? { pid: opts.pid, startedAt: opts.pidStartedAt ?? null } : deps.findAncestor()
     return {
@@ -986,10 +813,40 @@ export function acquire(sessionId, opts = {}) {
       startedAt: now,
       claimedAt: now, // legacy heartbeat field
       acquiredAt: now,
+      // The lease starts full: the acquiring session owns the batch for one whole
+      // window before it has to say anything, which is what a booting session
+      // needs before its first PreToolUse call.
+      leaseUntil: now + (opts.leaseMs ?? LEASE_MS),
+      fence,
       pid: anc ? anc.pid : null,
       pidStartedAt: anc ? anc.startedAt : null,
       ...(opts.extra ?? {}),
     }
+  }
+  /**
+   * Win the lock, THEN take the fence number. The order is the whole safety
+   * argument: two starters race here (a launcher and a session do so routinely),
+   * and a LOSER that had already granted itself a higher number would fence the
+   * true owner out of its own batch — the exact inversion this mechanism exists
+   * to prevent. So only the winner of the exclusive create ever grants, and it
+   * pays for a second write of the lock to stamp the number on it.
+   *
+   * A fence file that cannot be written does NOT cost the acquisition: the lock is
+   * the authority on ownership, the fence only on supersession, and a fence
+   * nobody could record simply blocks nobody (fail-open, as everywhere here).
+   */
+  const claim = () => {
+    if (!tryExclusiveCreate(lockPath, identity(null))) return false
+    try {
+      const fence = grantFence(sessionId, { fencePath, priorFence, now })
+      const fresh = readOwnerLock(lockPath)
+      if (fence !== null && fresh && fresh.sessionId === sessionId) {
+        writeJsonAtomic(lockPath, { ...fresh, fence }, opts)
+      }
+    } catch {
+      /* see above — an unrecordable fence never fails an acquisition */
+    }
+    return true
   }
 
   // Sweep the litter of past failed writes (point 340 (b)) — only tmp files
@@ -1000,10 +857,11 @@ export function acquire(sessionId, opts = {}) {
 
   // Fast path: no lock → exclusive create (test-and-set; one winner).
   if (!existsSync(lockPath)) {
-    if (tryExclusiveCreate(lockPath, identity())) return 'acquired'
+    if (claim()) return 'acquired'
   }
 
   const lock = readOwnerLock(lockPath)
+  if (lock && typeof lock.fence === 'number') priorFence = lock.fence
   // Ours by id, or ours by PROCESS under a session id a compaction renamed. The
   // restamp inside ownsLock puts the current id back on the lock, so this is the
   // one place that pays for the ancestor walk.
@@ -1013,8 +871,7 @@ export function acquire(sessionId, opts = {}) {
   }
   if (lock) {
     const probe = lock.pid ? deps.probePid(lock.pid) : null
-    const a = assessOwner(lock, { now, bootTime: deps.bootTime, probe })
-    if (a.alive && !(opts.takeWedged === true && a.wedged === true)) return 'held'
+    if (assessOwner(lock, { now, bootTime: deps.bootTime, probe, leaseMs: opts.leaseMs }).alive) return 'held'
   } else {
     // Unreadable/corrupt lock file: reap only if it has settled (not mid-write).
     try {
@@ -1022,17 +879,16 @@ export function acquire(sessionId, opts = {}) {
       if (now - st.mtimeMs < REAP_MUTEX_STALE_MS) return 'held'
     } catch {
       // vanished between the existsSync and here — retry the fast path once
-      if (tryExclusiveCreate(lockPath, identity())) return 'acquired'
+      if (claim()) return 'acquired'
       return 'lost-race'
     }
   }
 
-  // Dead owner → takeover under the reap mutex (atomic mkdir): only ONE
-  // process at a time may unlink+recreate, and it re-verifies deadness inside
-  // the mutex so it can never clobber a freshly re-claimed live lock. With
-  // `takeWedged` a WEDGED owner counts the same way — and is re-verified as wedged
-  // inside the mutex, so a lock whose owner wrote a heartbeat in the race window
-  // keeps it.
+  // Not alive (dead pid, predates the boot, or the LEASE ran out) → takeover under
+  // the reap mutex (atomic mkdir): only ONE process at a time may unlink+recreate,
+  // and it re-reads the lock inside the mutex so it can never clobber a lock that
+  // came back to life in the race window — a lease renewal that landed a moment
+  // ago reads alive here and keeps its owner.
   if (!enterReapMutex(mutexPath)) return 'held'
   try {
     const recheck = readOwnerLock(lockPath)
@@ -1042,23 +898,134 @@ export function acquire(sessionId, opts = {}) {
         return 'mine'
       }
       const probe = recheck.pid ? deps.probePid(recheck.pid) : null
-      const a = assessOwner(recheck, { now, bootTime: deps.bootTime, probe })
-      if (a.alive && !(opts.takeWedged === true && a.wedged === true)) return 'held'
+      if (assessOwner(recheck, { now, bootTime: deps.bootTime, probe, leaseMs: opts.leaseMs }).alive) return 'held'
+      if (typeof recheck.fence === 'number') priorFence = recheck.fence
     }
     try {
       rmSync(lockPath, { force: true })
     } catch {
       return 'lost-race'
     }
-    if (tryExclusiveCreate(lockPath, identity())) return 'acquired'
+    if (claim()) return 'acquired'
     return 'lost-race'
   } finally {
     exitReapMutex(mutexPath)
   }
 }
 
+// --- The fence -----------------------------------------------------------------
+
+/**
+ * Read the fence file. Never throws: a missing or torn file reads as "nothing
+ * known" (fence 0, no holders), which blocks nobody — the deliberate fail-open
+ * direction, because over-blocking a session costs a block-loop and under-blocking
+ * costs at worst a stale board.
+ */
+export function readFence(opts = {}) {
+  return normaliseFence(readJson(opts.fencePath ?? FENCE_PATH))
+}
+
+/**
+ * Grant the next fence number to `sessionId`. Returns the number, or null when it
+ * could not be recorded.
+ *
+ * Called ONLY from `acquire`/`convertPendingSpawn`, and there only by the winner
+ * of the exclusive create — which is what serialises it: at most one process at a
+ * time holds the lock this grant belongs to, and the takeover path additionally
+ * holds the reap mutex. Monotonic and max-wins (`nextFence`, `grantedFenceState`),
+ * seeded from the outgoing lock's own copy so that losing the file cannot walk the
+ * mark backwards.
+ *
+ * THE FILE IS NEVER DELETED — not by `release`, not by a takeover, not by the
+ * doctor. It is the one record that outlives `acquire` unlinking the lock.
+ */
+export function grantFence(sessionId, opts = {}) {
+  try {
+    const fencePath = opts.fencePath ?? FENCE_PATH
+    const now = opts.now ?? Date.now()
+    const state = normaliseFence(readJson(fencePath))
+    const fence = nextFence({ fenceState: state, priorFence: opts.priorFence })
+    writeJsonAtomic(fencePath, grantedFenceState({ fenceState: state, sessionId, fence, now }), opts)
+    return fence
+  } catch {
+    return null
+  }
+}
+
+// --- The lease -----------------------------------------------------------------
+
+/**
+ * RENEW THIS SESSION'S LEASE. Called from the PreToolUse chokepoint — BEFORE the
+ * call, never after it (docs/batch-resilience.md §3, layer 1): the PostToolUse
+ * heartbeat fires when a call RETURNS, so a lease renewed there would have to
+ * outlive the longest single call, and this repository legitimately runs 30-40
+ * minute suites. Renewing first is what keeps a running verification from ever
+ * being shot in the back.
+ *
+ * Owner-guarded exactly like `heartbeat`, refused under a stale fence, and rate-
+ * limited to one write per `LEASE_RENEW_INTERVAL_MS` — this file is on the
+ * per-tool-call path and has a measured history of losing renames when it is
+ * written too often (see the note above `readJson`).
+ *
+ * Returns { renewed, reason, leaseUntil }. Never throws.
+ */
+export function renewLease(sessionId, opts = {}) {
+  try {
+    const lockPath = opts.lockPath ?? LOCK_PATH
+    const now = opts.now ?? Date.now()
+    const lock = readOwnerLock(lockPath)
+    const decision = renewalDecision({
+      lock,
+      sessionId,
+      fenceState: readFence({ fencePath: opts.fencePath ?? statePathsFor(lockPath).fencePath }),
+      now,
+      leaseMs: opts.leaseMs,
+      renewIntervalMs: opts.renewIntervalMs,
+    })
+    if (!decision.renew) {
+      return { renewed: false, reason: decision.reason, leaseUntil: lock?.leaseUntil ?? null }
+    }
+    const next = renewedLock(lock, { now, leaseMs: opts.leaseMs })
+    writeJsonAtomic(lockPath, next, opts)
+    return { renewed: true, reason: 'renewed', leaseUntil: next.leaseUntil }
+  } catch {
+    // A lease we could not write is not this hook's problem to escalate: the
+    // owner keeps the lock until the window runs out, and the launcher's takeover
+    // is the backstop. Never throw on the per-call path.
+    return { renewed: false, reason: 'error', leaseUntil: null }
+  }
+}
+
+/**
+ * EXTEND the lease beyond the ordinary window, for work that is declared to take
+ * longer than one. This is the ONLY way a long wait may keep the batch: the reader
+ * side compares numbers and asks no questions, so work that needs more time says
+ * so IN ADVANCE by writing a later `leaseUntil` (docs/batch-resilience.md §3 —
+ * "declared work extends the lease by writing a longer leaseUntil when it is
+ * declared, and the acquirer only compares numbers").
+ *
+ * Owner-guarded, and it only ever moves the lease FORWARD.
+ */
+export function extendLease(sessionId, untilMs, opts = {}) {
+  try {
+    const lockPath = opts.lockPath ?? LOCK_PATH
+    const lock = readOwnerLock(lockPath)
+    if (!lock || lock.sessionId !== sessionId) return false
+    if (!(typeof untilMs === 'number' && Number.isFinite(untilMs))) return false
+    const current = typeof lock.leaseUntil === 'number' ? lock.leaseUntil : 0
+    if (untilMs <= current) return false
+    writeJsonAtomic(lockPath, { ...lock, leaseUntil: untilMs }, opts)
+    return true
+  } catch {
+    return false
+  }
+}
+
 /** Refresh the heartbeat — ONLY if this session owns the lock. Never claims.
- *  Backfills the pid identity once for a lock claimed before the pid existed. */
+ *  Backfills the pid identity once for a lock claimed before the pid existed.
+ *  It does NOT touch `leaseUntil`: renewal is PreToolUse by design, and a
+ *  PostToolUse renewal here would reintroduce exactly the window the lease was
+ *  built to remove. */
 export function heartbeat(sessionId, opts = {}) {
   const lockPath = opts.lockPath ?? LOCK_PATH
   const lock = readOwnerLock(lockPath)
@@ -1489,6 +1456,17 @@ export function convertPendingSpawn(sessionId, opts = {}) {
   try {
     const recheck = readOwnerLock(lockPath)
     if (!recheck || recheck.kind !== 'pending-spawn' || recheck.spawnedPid !== lock.spawnedPid) return false
+    // THE FENCE FOLLOWS THE BATCH, and a conversion is a real change of holder:
+    // the launcher won a pending lock, the spawned session now owns it, so the
+    // session takes the next number and becomes the recorded holder. The
+    // launcher's own grant is thereby superseded, which is simply true — and
+    // harmless, because everything it still does (release, updateOwnLock) is
+    // sessionId-guarded and touches none of the four fenced paths.
+    const fence = grantFence(sessionId, {
+      fencePath: opts.fencePath ?? statePathsFor(lockPath).fencePath,
+      priorFence: typeof recheck.fence === 'number' ? recheck.fence : null,
+      now,
+    })
     writeJsonAtomic(lockPath, {
       v: 2,
       sessionId,
@@ -1496,6 +1474,8 @@ export function convertPendingSpawn(sessionId, opts = {}) {
       startedAt: now,
       claimedAt: now,
       acquiredAt: now,
+      leaseUntil: now + (opts.leaseMs ?? LEASE_MS),
+      fence: fence ?? recheck.fence ?? null,
       pid: anc ? anc.pid : (recheck.spawnedPid ?? null),
       pidStartedAt: anc ? anc.startedAt : null,
     })

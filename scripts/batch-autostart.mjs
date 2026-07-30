@@ -39,16 +39,10 @@ import {
   spawnDecision,
   detectParallel,
   raiseParallelAlert,
-  wedgeNotifyDecision,
-  wedgeOwnerKey,
-  silenceStage,
-  wedgeAction,
-  wedgeTakeover,
+  ownerStateKey,
   verdictRepeat,
   isOwnSpawn,
   PENDING_STALE_MS,
-  WEDGE_NOTIFY_MS,
-  WORK_STALL_MS,
 } from './batch-singleton.mjs'
 import { readClaim, maxAgeMs as claimMaxAgeMs } from './batch-claim.mjs'
 import { assessClaim } from './batch-claim-core.mjs'
@@ -107,17 +101,8 @@ const writeJsonAtomic = (p, obj) => {
 }
 const head = () => { try { return execSync('git rev-parse HEAD', { windowsHide: true, cwd: REPO, encoding: 'utf8' }).trim() } catch { return '' } }
 const pidAlive = (pid) => { try { process.kill(pid, 0); return true } catch (e) { return e && e.code === 'EPERM' } }
-// Synchronous, because this launcher is a straight-line script: a reaped process
-// takes a moment to disappear, and a takeover may only proceed once it HAS.
-const sleepSync = (ms) => { try { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms) } catch { /* ignore */ } }
-const waitForExit = (pid, budgetMs) => {
-  const until = Date.now() + budgetMs
-  while (Date.now() < until) {
-    if (!pidAlive(pid)) return true
-    sleepSync(200)
-  }
-  return !pidAlive(pid)
-}
+// (`sleepSync`/`waitForExit` went with the kill-then-take valve, point 434: the
+// launcher no longer ends the owner's process, so nothing here waits for an exit.)
 // Open points, or -1 for the FORMAT ALARM (checkboxes but no parseable point).
 // The rule itself lives in scripts/tasks-source.mjs, because the message watcher
 // asks the same question — a second copy of it would drift silently, and both
@@ -351,19 +336,17 @@ if (open === 0) { log('skip: batch complete (0 open points)'); bail() }
 const curHead = head()
 
 // --- Owner liveness (the hard-singleton assessment) ---------------------------
-// PROGRESS, NOT AGE (point 402): the owner's declared work is an INPUT to the
-// verdict. A session waiting on a delegated agent starves its heartbeat for as
-// long as the agent takes, and the launcher used to have nothing but the clock to
-// judge that with. Same probes and the same pure functions the Stop guard uses —
-// nothing about liveness is re-invented here. (`lock` and `probe` were read
-// further up — the leak sweep needs them before any guard may exit.)
+// THE LEASE DECIDES (point 434, docs/batch-resilience.md §3 layer 1). The launcher
+// no longer judges wedgedness at all: it reads whether the owner's lease has run
+// out, which is arithmetic on two numbers, and everything else follows from the
+// ordinary "not alive" path this file has always had. The declaration below is
+// still read — but only to SAY what the owner was waiting on, never to decide.
+// (`lock` and `probe` were read further up — the leak sweep needs them before any
+// guard may exit.)
 const declaration = lock ? readDeclaration() : null
-// The WINDOW is the launcher's own (`LAUNCHER_WORK_MAX_AGE_MS`), never the Stop
-// guard's 45 minutes: asking with the guard's window made `work-stalled`
-// arithmetically UNREACHABLE, because a declaration had to be older than the
-// 90-minute stall bound and younger than 45 minutes at the same moment. The
-// question here is "is this the owner's LAST WORD", not "may a turn end ride on
-// it", and `lastWord` already excludes every session that worked after declaring.
+// Read for the REPORT, not for the verdict: when the batch is taken from an owner
+// whose lease ran out, the notification should name what that owner said it was
+// doing. `LAUNCHER_WORK_MAX_AGE_MS` is the launcher's own window on a declaration.
 const work = assessOwnerWork({
   declaration,
   lock,
@@ -374,7 +357,7 @@ const work = assessOwnerWork({
   worktreeActiveAt,
   mtimeOf,
 })
-const assessment = assessOwner(lock, { now, bootTime: bootTimeMs(), probe, work })
+const assessment = assessOwner(lock, { now, bootTime: bootTimeMs(), probe })
 
 // --- Verify the previous spawn ------------------------------------------------
 // LIVING IS NOT WORKING (point 433, §4 of docs/batch-resilience.md). This used to
@@ -439,48 +422,12 @@ if (
   await notify('Rogue spawn killed', `The launcher killed its own previous spawn (pid ${state.lastPid}) — it was alive but not the batch owner.`, 'high')
 }
 
-// --- SILENT OWNER: diagnose AND report (point 388 (c)) ------------------------
-// The launcher could already NAME this state — it logged "WEDGED owner: pid alive
-// but heartbeat N min old" twenty-one times on the night of 28.07.2026 and told
-// nobody. It still may not act on the age: a long verify run legitimately starves
-// the heartbeat, so the age alone may neither spawn a successor NOR kill the
-// owner. What it can do is SAY so, once per silence.
-// A session whose declared work is visibly ADVANCING is not silent in the sense
-// this alarm was written for (point 402): it is waiting on an agent that is still
-// committing, and reporting that as a stall would train the user to ignore the
-// channel. The stall verdict below is what covers the case where it stops moving.
-// PAST THE HOURS-LONG THRESHOLD IT IS REPORTED ANYWAY (four-eyes review, finding
-// 1.2): a declaration is evidence, not a permanent exemption from being looked
-// at, and an eternally-fresh piece of evidence must never be able to buy silence
-// from BOTH the wedge verdict and this notification at once. Notify only — this
-// path has never killed anything and still does not.
-if (assessment.alive) {
-  const ageMs = now - lock.claimedAt
-  const thresholdMin = Number(process.env.HOA_WEDGE_NOTIFY_MIN)
-  const notifyMs = Number.isFinite(thresholdMin) && thresholdMin > 0 ? thresholdMin * 60000 : WEDGE_NOTIFY_MS
-  const stage = silenceStage({ ageMs, advancing: work.advancing, notifyMs })
-  const ownerKey = wedgeOwnerKey(lock, stage ?? '')
-  const w = wedgeNotifyDecision({ alive: true, stage, ownerKey, lastNotifiedKey: state.wedgeNotifiedKey })
-  if (w.notify) {
-    const mins = Math.round(ageMs / 60000)
-    log(
-      `SILENT owner: ${lock.sessionId} (pid ${lock.pid ?? 'unknown'}) has not moved in ${mins} min — notifying (${stage}` +
-        `${work.advancing ? '; declared work still advancing' : ''})`,
-    )
-    await notify(
-      stage === 'wedged' ? 'Batch session WEDGED' : 'Batch session SILENT',
-      `The owning session (pid ${lock.pid ?? 'unknown'}) has made no tool call in ${mins} minutes but its process ` +
-        'is alive, so the launcher may neither take over nor kill it. Either it is inside a very long run, or it ' +
-        'stopped while holding the batch lock — the batch is making no progress until someone looks.' +
-        // Past the hours-long threshold the report goes out even with live
-        // evidence (finding 1.2), so it must SAY what that evidence is — an
-        // eternally-fresh declaration looks identical to a working one from here.
-        (work.advancing ? ` It still declares advancing work (${work.summary}) — check that this is real.` : ''),
-      stage === 'wedged' ? 'urgent' : 'high',
-    )
-    state.wedgeNotifiedKey = ownerKey
-  }
-}
+// THE SILENCE REPORT IS GONE (point 434). It existed because the launcher could
+// name a wedged owner and not act on it — "it may neither take over nor kill it"
+// was its own text — so the best it could do was tell a person, in two stages, and
+// hope. The lease removed the reason: an owner that stopped saying it was there
+// stops owning the batch, and what used to be a notification is now the takeover
+// below, which reports itself. One verdict, one consequence, one line.
 
 // --- Runaway / stuck watchdog: pause + signal ----------------------------------
 if (state.failCount >= 3) {
@@ -492,12 +439,17 @@ if (state.failCount >= 3) {
 }
 
 // --- Liveness verdict ----------------------------------------------------------
+// TWO OUTCOMES, NOT THREE (point 434). 'skip-wedged' and everything under it —
+// the stall verdict, the two-stage silence report, the wedge takeover, the
+// kill-then-take valve — are gone. An owner whose lease ran out is not a third
+// state to be adjudicated; it is simply not the owner, and the takeover below is
+// the one this file has always performed for a dead one.
 const verdict = lock ? spawnDecision(assessment) : 'spawn'
 if (verdict === 'skip-alive') {
-  const why = assessment.reason === 'work-advancing' ? `; work advancing — ${work.summary}` : ''
+  const why = work.advancing ? `; declared work advancing — ${work.summary}` : ''
   log(`skip: owner alive (${assessment.reason}; heartbeat ${Math.round((now - lock.claimedAt) / 60000)} min old, pid ${lock.pid ?? 'unknown'}${why})`)
   // A healthy tick ENDS the repetition count (four-eyes nit on point 433 (c)):
-  // without this a later, identically-worded wedge episode of the same owner would
+  // without this a later, identically-worded episode of the same owner would
   // escalate on its second tick instead of its own count, because the key never
   // stopped matching. The direction is harmless either way, but "escalates after N
   // repeats" should mean N repeats of THIS episode.
@@ -506,91 +458,52 @@ if (verdict === 'skip-alive') {
   writeJsonAtomic(C('autostart-state.json'), state)
   process.exit(0)
 }
-let takeoverAfterKill = false
-let takeWedgedLock = false
-if (verdict === 'skip-wedged') {
-  // `probe` is the lock owner's own { exists, startedAt } — the identity half of
-  // "is this really the process we spawned" (four-eyes finding 1.3).
-  const act = wedgeAction({ assessment, lock, lastSpawnPid: state.lastPid, lastSpawnAt: state.lastSpawnAt, probe })
-  // REPETITION IS THE SIGNAL (point 433 (c)). The identical wedge line went out
-  // eight times over two hours on 30.07.2026; what reads the same eight times is
-  // not truer the ninth, only dearer. The key is the silence's identity, so it
-  // holds still across ticks while nobody works.
+// A LEASE THAT RAN OUT IS REPORTED, ALWAYS (docs/batch-resilience.md §5: no silent
+// recovery). The take itself happens through the ordinary atomic acquire further
+// down; this says WHO lost the batch, for how long it had been quiet and what it
+// had declared, so the morning reader finds the reason rather than a gap.
+const dispossessed = !!lock && assessment.reason === 'lease-expired'
+if (dispossessed) {
+  const mins = Math.round((now - lock.claimedAt) / 60000)
+  const what = declaration ? describeInFlight(work, declaration) : 'nothing declared'
+  // REPETITION IS THE SIGNAL (point 433 (c)): if the same owner still reads
+  // lease-expired a tick later, the takeover did NOT resolve the standstill, and
+  // that — not the finding itself — is what a person needs to hear.
   const rep = verdictRepeat({
-    key: `${assessment.reason}#${wedgeOwnerKey(lock)}`,
+    key: `${assessment.reason}#${ownerStateKey(lock)}`,
     lastKey: state.wedgeVerdictKey,
     repeats: state.wedgeVerdictRepeats,
   })
   state.wedgeVerdictKey = rep.key
   state.wedgeVerdictRepeats = rep.repeats
-  if (act.stalled) {
-    // NOT a clock reading (point 402 (d)): the owner has made no tool call for
-    // two launcher ticks AND every piece of work it declared has stopped moving.
-    const what = declaration ? describeInFlight(work, declaration) : 'nothing declared'
-    log(`STALLED owner: pid ${lock.pid} alive, heartbeat ${Math.round((now - lock.claimedAt) / 60000)} min old, work frozen — ${what}`)
+  log(
+    `LEASE EXPIRED: ${lock.sessionId} (pid ${lock.pid ?? 'unknown'}) has not renewed for ${mins} min — taking the ` +
+      `batch. It keeps running and merely stops owning the batch; it was waiting on: ${what}`,
+  )
+  if (rep.escalate) {
+    log(`ESCALATING: the same expired lease has stood for ${rep.repeats} launcher ticks — the takeover is not resolving it`)
     await notify(
-      'Batch work STALLED',
-      `The owning session (pid ${lock.pid ?? 'unknown'}) has made no tool call for ${Math.round(WORK_STALL_MS / 60000)}+ minutes ` +
-        `and the work it declared has stopped advancing: ${what}. ` +
-        (act.own ? 'It was spawned by the launcher, so it is being reaped and taken over.' : 'It is not the launcher\'s own spawn, so nothing is being killed — please look.'),
+      'Batch takeover NOT resolving',
+      `The launcher has taken the batch from ${lock.sessionId} for the ${rep.repeats}. tick running — the lease keeps ` +
+        `expiring and the standstill persists (silent ${mins} min, declared: ${what}). Please look.`,
       'urgent',
     )
   } else if (!rep.suppressLog) {
-    log(`WEDGED owner: pid ${lock.pid} alive but heartbeat ${Math.round((now - lock.claimedAt) / 60000)} min old`)
-  } else {
-    log(`WEDGED owner: pid ${lock.pid} — same verdict for the ${rep.repeats}. tick; already escalated, not repeating it`)
-  }
-  // THE VERDICT MUST HAVE A CONSEQUENCE (point 433 (a)). A wedged owner loses the
-  // batch: the launcher takes the lock through the SAME atomic acquire (so two
-  // launchers can never both act) and spawns the successor. Nothing is killed here
-  // — the wedged process keeps running and learns at its next hook that it no
-  // longer owns the batch, which stands every ownership-gated guard down.
-  const takeover = wedgeTakeover({ assessment, lock, work })
-  takeWedgedLock = takeover.take
-  if (takeWedgedLock) {
-    log(
-      `TAKING the batch from the wedged owner ${lock.sessionId} (pid ${lock.pid ?? 'unknown'}, silent ` +
-        `${Math.round((now - lock.claimedAt) / 60000)} min, ${takeover.reason}) — it keeps running but no longer owns the batch`,
-    )
-  }
-  // Escalate on the REPETITION, not on every reading: once the same verdict has
-  // stood for `VERDICT_REPEAT_ESCALATE_AT` ticks the take has demonstrably not
-  // resolved it (a lost race, a lock that keeps coming back), and that is the
-  // finding worth a person's attention.
-  if (rep.escalate) {
-    log(`ESCALATING: the wedge verdict "${assessment.reason}" has now stood for ${rep.repeats} launcher ticks unresolved`)
     await notify(
-      'Batch wedge UNRESOLVED',
-      `The launcher has read the same verdict (${assessment.reason}) for ${rep.repeats} ticks — the owning session ` +
-        `(pid ${lock.pid ?? 'unknown'}) has been silent for ${Math.round((now - lock.claimedAt) / 60000)} minutes and ` +
-        `taking the batch from it has not resolved the standstill. Please look; the launcher will stop repeating this line.`,
-      'urgent',
+      'Batch lease expired',
+      `The owning session (pid ${lock.pid ?? 'unknown'}) made no tool call for ${mins} minutes, so its lease ran out ` +
+        `and the launcher is starting a successor. Nothing was killed — the old process keeps running and stands ` +
+        `down at its next hook. It had declared: ${what}.`,
+      'high',
     )
-  }
-  // The reaping valve fires only on the launcher's OWN headless spawn and never on
-  // an interactive window — an unattended `claude -p` that hangs has nobody to read
-  // the notification, while a user's window has.
-  if (act.kill) {
-    try { process.kill(lock.pid) } catch { /* gone */ }
-    // Taking the lock beside a process that is still running IS the e9407cae
-    // incident, so the takeover waits for a CONFIRMED exit and otherwise leaves
-    // the job to the next tick.
-    takeoverAfterKill = act.takeover && waitForExit(lock.pid, 3000)
-    log(
-      takeoverAfterKill
-        ? `killed stalled own spawn pid ${lock.pid} — taking over in this tick`
-        : `killed ${act.stalled ? 'stalled' : 'wedged'} own spawn pid ${lock.pid} — next tick may take over`,
-    )
-  }
-  if (!takeoverAfterKill && !takeWedgedLock) {
-    writeJsonAtomic(C('autostart-state.json'), state)
-    process.exit(0)
   }
 }
-if (takeoverAfterKill) {
-  log(`owner reaped for a frozen wait (${assessment.reason}) — taking over`)
-} else if (takeWedgedLock) {
-  log(`wedged owner dispossessed (${assessment.reason}) — taking over`)
+if (dispossessed) {
+  // Nothing is killed and nothing waits for an exit: the dispossessed process
+  // keeps running and learns at its next hook that it no longer owns the batch,
+  // which stands every ownership-gated guard down. The kill-then-take valve that
+  // used to sit here needed an identity check it could rarely satisfy, and on the
+  // lost night that check is exactly what stopped the rescue.
 } else if (lock) {
   // "handed-over" is not death: the owner finished a point and passed the batch
   // on (point 388). Logged distinctly so the end-to-end chain can be READ out of
@@ -675,12 +588,13 @@ const acq = acquire(launcherSid, {
   kind: 'pending-spawn',
   pid: process.pid,
   pidStartedAt: now - Math.round(process.uptime() * 1000),
-  // Point 433 (a): the ONE case in which a live lock may be dispossessed. The
-  // wedge is re-verified inside acquire's reap mutex, so an owner that wrote a
-  // heartbeat in the race window keeps its lock and this tick logs "held".
-  takeWedged: takeWedgedLock,
-  extra: takeWedgedLock
-    ? { takenFromWedged: { sessionId: lock.sessionId, pid: lock.pid ?? null, silentMs: now - lock.claimedAt } }
+  // No special permission is asked for any more (point 434): an expired lease
+  // reads as "not alive" inside acquire's reap mutex, exactly like a dead pid, so
+  // an owner that renewed in the race window keeps its lock and this tick logs
+  // "held". The take is recorded on the new lock so the morning reader can see
+  // whose batch this was.
+  extra: dispossessed
+    ? { takenFromExpiredLease: { sessionId: lock.sessionId, pid: lock.pid ?? null, silentMs: now - lock.claimedAt } }
     : undefined,
 })
 if (acq !== 'acquired') {

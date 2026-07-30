@@ -31,7 +31,8 @@ import {
   mergeState,
   sha256File,
 } from './dashboard-state.mjs'
-import { heldByOtherLiveOwner, withdrawHandover, touchHandover } from './batch-singleton.mjs'
+import { heldByOtherLiveOwner, withdrawHandover, touchHandover, renewLease, readFence } from './batch-singleton.mjs'
+import { fenceDecision } from './batch-lease-core.mjs'
 import { handoverSurvivesCall, describeWithdrawalTrigger, hookCallTimestamp } from './batch-boundary-core.mjs'
 import { publishCapability } from './board-currency-core.mjs'
 import { evaluate } from './board-first-core.mjs'
@@ -94,6 +95,26 @@ try {
     process.exit(0)
   }
   if (!payload) process.exit(0)
+  const input0 = payload.tool_input ?? {}
+  // PIGGY-BACKED FIRST, and it must be first: RENEW THE BATCH LEASE before the
+  // tool runs (point 434, docs/batch-resilience.md §3 layer 1). The lease is what
+  // makes ownership end by arithmetic, and it is renewed HERE — in PreToolUse —
+  // rather than in the PostToolUse heartbeat, because that one fires when a call
+  // RETURNS: a lease renewed there would have to outlive the longest single call,
+  // and this repository legitimately runs 30-40 minute suites. Renewing before the
+  // long call is exactly what keeps a running verification from being taken over
+  // mid-run (docs/batch-resilience.md §5: "no window that kills a running
+  // verification — that is what PreToolUse renewal is for").
+  //
+  // It rides in this hook for the same reason the handover withdrawal below does:
+  // .claude/settings.json is a protected path an unattended session cannot extend,
+  // and this matcher already covers every state-changing tool. Owner-guarded,
+  // rate-limited and never throwing — `renewLease` reports rather than raises.
+  try {
+    renewLease(payload.session_id || '')
+  } catch {
+    /* a lease we cannot write costs the owner its window at worst; never a call */
+  }
   // PIGGY-BACKED, and deliberately: WITHDRAW a batch handover before the tool
   // runs (point 388). If this session marked the lock handed-over at a boundary
   // and is nevertheless about to act — a later Stop hook blocked the turn end,
@@ -113,7 +134,7 @@ try {
   // withdraws — a wrongly withdrawn boundary costs one command, a wrongly kept
   // one lets a successor spawn beside a working session.
   try {
-    const call = payload.tool_input ?? {}
+    const call = input0
     const keep = handoverSurvivesCall({
       toolName: payload.tool_name,
       filePath: call.file_path ?? call.notebook_path,
@@ -137,9 +158,54 @@ try {
     /* best effort — a lock we cannot write is not this gate's problem */
   }
   if (existsSync(PAUSE)) process.exit(0)
+
+  // ---- THE FENCE CHOKEPOINT (point 434, docs/batch-resilience.md §3 layer 1) --
+  // It sits BEFORE the ownership stand-down below, and it has to: a session whose
+  // fence is stale is by definition NOT the owner, so the ordinary
+  // `heldByOtherLiveOwner` exit is exactly the door it would walk out of. The
+  // narrowing that keeps this safe is different and stricter — it fires only for a
+  // session that DEMONSTRABLY held a fence which has since been superseded. A
+  // window that never drove the batch has no grant on record and can never be
+  // blocked here, whatever it does.
+  //
+  // WHY ONE CHOKEPOINT AND NOT A CHECK PER PATH: the lock's own writers are
+  // already sessionId-guarded and need nothing. The four paths that have no guard
+  // at all — the work-order tick and archive move, `git merge`/`push`, the board
+  // publish and `dashboard-state.json` — cannot each check for themselves, and
+  // without this the fence would protect only the file that was already protected
+  // while the woken owner still pushed to main.
+  //
+  // It cannot trap a session: it refuses four families of call and nothing else,
+  // so reading, committing locally and finishing its own file work all continue —
+  // and every OTHER guard stands down for a non-owner anyway, so the Stop chain
+  // cannot demand of it the very publish this refuses.
+  try {
+    const fence = fenceDecision({
+      fenceState: readFence(),
+      sessionId: payload.session_id || '',
+      toolName: payload.tool_name,
+      command: input0.command,
+      filePath: input0.file_path ?? input0.notebook_path,
+    })
+    if (fence.block) {
+      process.stdout.write(
+        JSON.stringify({
+          hookSpecificOutput: {
+            hookEventName: 'PreToolUse',
+            permissionDecision: 'deny',
+            permissionDecisionReason: fence.reason,
+          },
+        }),
+      )
+      process.exit(0)
+    }
+  } catch {
+    /* fail-OPEN: a fence we cannot read must never cost anybody a tool call */
+  }
+
   if (heldByOtherLiveOwner(payload.session_id || '')) process.exit(0)
 
-  const input = payload.tool_input ?? {}
+  const input = input0
   const { state, focus, repoHash, boardPaths } = gather()
   const decision = evaluate({
     toolName: payload.tool_name,

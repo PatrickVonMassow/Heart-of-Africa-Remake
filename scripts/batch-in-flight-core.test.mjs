@@ -45,15 +45,13 @@ import {
 import {
   assessOwner,
   progressGuardDecision,
-  spawnDecision,
   statePathsFor,
   probePid,
   LOCK_PATH,
   IN_FLIGHT_PATH,
-  LAUNCHER_TICK_MS,
   PID_START_TOLERANCE_MS,
-  WORK_STALL_MS,
 } from './batch-singleton.mjs'
+import { LEASE_MS } from './batch-lease-core.mjs'
 import {
   absPath,
   gatherInFlight,
@@ -721,23 +719,24 @@ describe('assessOwnerWork — is the OWNER’s declared work still advancing?', 
 })
 
 // ---------------------------------------------------------------------------
-// THE STALL VERDICT MUST BE REACHABLE — AND REACHABLE BY A LAUNCHER THAT ONLY
-// LOOKS EVERY FIFTEEN MINUTES (second four-eyes review, 28.07.2026, finding A).
+// THE REAL PIPELINE, NOW THAT THE VERDICT IS A LEASE (point 434).
 //
-// `work-stalled` was DEAD CODE in production, and every unit test above it was
-// green, because those tests hand a `work` object straight to `assessOwner` —
-// `{ declared: true, declaredAt: heartbeat - 1000 }` at an age of 91 minutes,
-// which is a shape `assessOwnerWork` cannot produce. Three constants made it
-// impossible: a declaration stopped counting as `declared` at 45 minutes, the
-// stall bound needed 90 minutes of heartbeat silence, and `lastWord` demanded the
-// heartbeat land within two minutes of the declaration — which pins the two ages
-// to the SAME number. It cannot be above 90 and below 45 at once.
+// This block used to prove `work-stalled` was REACHABLE: it had been dead code in
+// production while every hand-crafted test above it stayed green, because those
+// tests fed `assessOwner` a `work` shape `assessOwnerWork` could never produce.
+// That verdict is gone, and with it `WORK_STALL_MS`, `WEDGED_MS` and the
+// `lastWord` tolerance the whole reachability argument turned on.
 //
-// So this block refuses hand-crafted `work` objects entirely. It builds ONE frozen
-// declaration, ONE lock whose heartbeat is the declare command's own PostToolUse,
-// and drives the REAL pipeline — `assessOwnerWork` → `assessOwner` — minute by
-// minute across five hours, exactly as the launcher does on each tick.
-describe('assessOwnerWork → assessOwner: a totally frozen session really is read as stalled', () => {
+// The block keeps its VALUE by keeping its METHOD: it refuses hand-crafted `work`
+// objects, builds ONE frozen declaration and ONE lock whose heartbeat is the
+// declare command's own PostToolUse, and drives the real pair minute by minute
+// across five hours, exactly as the launcher ticks. What it pins now is the
+// inversion point 434 made — the declaration still REPORTS what the owner waits
+// on, and decides nothing; the lease decides. Three cases here were left
+// asserting `reason === 'work-stalled'`, a string no implementation can emit any
+// more and therefore trivially true on any code at all; they are repurposed
+// rather than deleted, because a vacuous green is worse than no test.
+describe('assessOwnerWork → assessOwner: the declaration reports, the lease decides', () => {
   const T0 = NOW - 6 * 60 * 60 * 1000 // the moment everything stopped
   const OWNER_PID = 7777
   const OWNER_STARTED = T0 - 30 * 60_000
@@ -779,89 +778,69 @@ describe('assessOwnerWork → assessOwner: a totally frozen session really is re
     mtimeOf: () => T0 - 3 * 60_000,
   }
 
-  /** One launcher tick, driven end to end. No `work` object is ever written here. */
+  /** One launcher tick, driven end to end. No `work` object is ever hand-written,
+   *  and none is passed to `assessOwner` — it no longer takes one (point 434). */
   const tick = (minute, { lockOver = {}, probes = dead, ...over } = {}) => {
     const now = T0 + minute * 60_000
     const l = lock(lockOver)
     const work = assessOwnerWork({ declaration: frozen, lock: l, now, ...probes, ...over })
-    return { work, verdict: assessOwner(l, { now, bootTime: BOOT, probe: ownerProbe, work }) }
+    return { work, verdict: assessOwner(l, { now, bootTime: BOOT, probe: ownerProbe }) }
   }
-  /** Every minute of the first five hours at which the launcher would say "stalled". */
-  const stalledMinutes = (opts = {}) => {
+  /** Every minute of the first five hours at which the owner reads NOT ALIVE. */
+  const notAliveMinutes = (opts = {}) => {
     const out = []
-    for (let m = 0; m <= 300; m++) if (tick(m, opts).verdict.reason === 'work-stalled') out.push(m)
+    for (let m = 0; m <= 300; m++) if (tick(m, opts).verdict.alive === false) out.push(m)
     return out
   }
 
-  it('IS REACHABLE AT ALL — the freeze is caught, and near the stall bound, not hours later', () => {
-    const hits = stalledMinutes()
-    expect(hits.length, 'work-stalled never fires on the real pipeline — the feature is dead code').toBeGreaterThan(0)
-    // First fire at the stall bound (the heartbeat trails the declaration by 5 s,
-    // so it crosses one minute later), and long before the four-hour valve.
-    expect(hits[0]).toBe(Math.round(WORK_STALL_MS / 60_000) + 1)
-    // …and well inside the window the launcher honours the declaration for. It used
-    // to be compared against WEDGED_MS, which point 433 dropped to 45 minutes so an
-    // unattended night could be rescued; the window this must clear is the
-    // launcher's own, which was written out for exactly that reason.
-    expect(hits[0] * 60_000).toBeLessThan(LAUNCHER_WORK_MAX_AGE_MS)
-    const t = tick(hits[0])
-    expect(t.verdict).toMatchObject({ alive: true, wedged: true, reason: 'work-stalled' })
-    expect(spawnDecision(t.verdict)).toBe('skip-wedged')
-    // The launcher can say WHAT froze, not merely that something did.
-    expect(t.work.summary).toMatch(/feat\/402-progress-not-age/)
-    expect(t.work).toMatchObject({ declared: true, advancing: false, declaredAt: DECLARED_AT })
-  })
-
-  it('…AND REACHABLE ON A 15-MINUTE TICK: no phase of the schedule can step over the band', () => {
-    // Non-empty is not the same as reachable. `WORK_STALL_MS +
-    // WORK_DECLARATION_TOLERANCE_MS` — the minimum that makes the window exist —
-    // opens a band barely two minutes wide, and the launcher looks once per
-    // LAUNCHER_TICK_MS: seven schedules in eight would miss it and fall through to
-    // the four-hour valve, which IS the reported bug. So every possible phase of
-    // the tick schedule must hit the band.
-    const hits = new Set(stalledMinutes())
-    const tickMin = Math.round(LAUNCHER_TICK_MS / 60_000)
-    for (let phase = 0; phase < tickMin; phase++) {
-      const seen = []
-      for (let m = phase; m <= 300; m += tickMin) if (hits.has(m)) seen.push(m)
-      expect(seen.length, `a launcher ticking at phase ${phase} min never sees the stall`).toBeGreaterThan(0)
-    }
-    // Stated as the invariant, so a future narrowing of the window fails here too.
-    expect(LAUNCHER_WORK_MAX_AGE_MS - WORK_STALL_MS).toBeGreaterThanOrEqual(2 * LAUNCHER_TICK_MS)
-  })
-
-  it('THE REGRESSION WITNESS: asked with the GUARD’s window, the same freeze is never stalled', () => {
-    // This is the bug, reproduced. `IN_FLIGHT_MAX_AGE_MS` is the right answer to
-    // the guard's question ("may a turn end ride on this?") and the wrong one to
-    // the launcher's, and asking it here silently disabled the feature.
-    expect(stalledMinutes({ maxAgeMs: IN_FLIGHT_MAX_AGE_MS })).toEqual([])
+  it('THE WINDOW SURVIVES THE VERDICT: the launcher asks about a declaration with its OWN window', () => {
+    // What this case used to prove — that asking with the GUARD's window silently
+    // disabled the stall verdict — is unprovable now, because the verdict is gone;
+    // asserting "never stalled" would pass on any code. The SURVIVING property is
+    // the one `LAUNCHER_WORK_MAX_AGE_MS` still exists for: how long a declaration
+    // stays readable AS a declaration, which is what the launcher reports from.
+    const at = 60 // minutes after the freeze — inside the launcher's window, past the guard's
     expect(LAUNCHER_WORK_MAX_AGE_MS).toBeGreaterThan(IN_FLIGHT_MAX_AGE_MS)
+    expect(at * 60_000).toBeGreaterThan(IN_FLIGHT_MAX_AGE_MS)
+    expect(at * 60_000).toBeLessThan(LAUNCHER_WORK_MAX_AGE_MS)
+    expect(tick(at).work.declared, 'the launcher can still SAY what the owner waited on').toBe(true)
+    expect(tick(at, { maxAgeMs: IN_FLIGHT_MAX_AGE_MS }).work.declared).toBe(false)
   })
 
-  it('a healthy wait is still never accused, however long the agent takes', () => {
-    // Same aging paperwork, but the agent keeps committing: its branch tip is
-    // always a minute old, so not one of the five hours' ticks accuses it.
-    const reasons = new Set()
-    for (let m = 0; m <= 300; m++) {
-      const now = T0 + m * 60_000
-      reasons.add(tick(m, { probes: { ...dead, refTipAt: () => now - 60_000 } }).verdict.reason)
-    }
-    expect(reasons).toEqual(new Set(['fresh-heartbeat', 'work-advancing']))
+  it('AN ADVANCING DECLARATION NO LONGER HOLDS THE BATCH — the lease does', () => {
+    // The deliberate inversion. The agent keeps committing all five hours, so the
+    // declaration reads advancing at every tick; that used to make the owner
+    // immune at any age. Now it is evidence for the REPORT and nothing more, and
+    // an owner that never renewed loses the batch exactly on the lease.
+    const advancing = (m) => ({ ...dead, refTipAt: () => T0 + m * 60_000 - 60_000 })
+    const late = 300
+    expect(tick(late, { probes: advancing(late) }).work.advancing).toBe(true)
+    expect(tick(late, { probes: advancing(late) }).verdict).toMatchObject({ alive: false, reason: 'lease-expired' })
+    // …and the ONE sanctioned way to keep it: say so in advance, by writing a
+    // longer lease (`extendLease`). Then the same wait is untouched at any age.
+    const held = tick(late, { probes: advancing(late), lockOver: { leaseUntil: T0 + 360 * 60_000 } })
+    expect(held.verdict).toMatchObject({ alive: true, reason: 'pid-alive' })
   })
 
-  it('and a heartbeat that POSTDATES the declaration still disarms the verdict entirely', () => {
-    // The replayed near-kill: declare, agent finishes, merge, start a LARGE
-    // regression without clearing the declaration. `lastWord` — not the age cap —
-    // is what protects that session, which is why widening the age cap is safe.
-    expect(stalledMinutes({ lockOver: { claimedAt: DECLARED_AT + 12 * 60_000 } })).toEqual([])
+  it('THE FREEZE IS STILL CAUGHT, and by arithmetic rather than three agreeing constants', () => {
+    // What the demolished pipeline needed 91 minutes and three constants to
+    // conclude, the lease concludes on its own clock — and this pins WHEN, so a
+    // future widening of the window fails here rather than silently on a night.
+    const caught = notAliveMinutes()
+    expect(caught.length).toBeGreaterThan(0)
+    expect(caught[0] * 60_000).toBeGreaterThan(LEASE_MS - 2 * 60_000)
+    expect(caught[0] * 60_000).toBeLessThanOrEqual(LEASE_MS + 60_000)
+    expect(tick(caught[0]).verdict.reason).toBe('lease-expired')
   })
 
-  it('and no evidence may revive a DEAD process, whatever the paperwork says', () => {
+  it('and no lease may revive a DEAD process, whatever the paperwork says', () => {
     const now = T0 + 120 * 60_000
-    const l = lock()
+    // `leaseUntil` so the LEASE does not decide first (point 434): the assertion
+    // below is about the pid, and only the pid.
+    const l = lock({ leaseUntil: now + 60 * 60_000 })
     const work = assessOwnerWork({ declaration: frozen, lock: l, now, ...dead, refTipAt: () => now - 60_000 })
     expect(work.advancing).toBe(true)
-    const v = assessOwner(l, { now, bootTime: BOOT, probe: { exists: false, startedAt: null }, work })
+    const v = assessOwner(l, { now, bootTime: BOOT, probe: { exists: false, startedAt: null } })
     expect(v).toMatchObject({ alive: false, reason: 'pid-dead' })
   })
 })

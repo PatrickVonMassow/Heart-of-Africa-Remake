@@ -33,15 +33,14 @@ import {
   HANDOVER_SETTLE_MS,
   touchHandover,
   clearOwnBoundary,
-  wedgeNotifyDecision,
-  wedgeOwnerKey,
-  wedgeStage,
-  wedgeAction,
-  wedgeTakeover,
+  ownerStateKey,
   verdictRepeat,
   VERDICT_REPEAT_ESCALATE_AT,
   isOwnSpawn,
-  silenceStage,
+  renewLease,
+  extendLease,
+  readFence,
+  grantFence,
   sweepableTmpFiles,
   resolveOwnership,
   ourClaudeProcess,
@@ -57,17 +56,12 @@ import {
   ANCESTOR_CACHE_PATH,
   DEAD_CONFIRM_MS,
   LEGACY_STALE_MS,
-  WEDGED_MS,
   PARALLEL_FRESH_MS,
   HANDOVER_GRACE_MS,
-  WEDGE_NOTIFY_MS,
   LAUNCHER_TICK_MS,
-  WORK_STALL_TICKS,
-  WORK_STALL_MS,
-  WORK_DECLARATION_TOLERANCE_MS,
   SPAWN_IDENTITY_TOLERANCE_MS,
 } from './batch-singleton.mjs'
-import { LAUNCHER_WORK_MAX_AGE_MS } from './batch-in-flight-core.mjs'
+import { LEASE_MS, LEASE_RENEW_INTERVAL_MS } from './batch-lease-core.mjs'
 
 const NOW = 1_784_900_000_000
 const BOOT = NOW - 12 * 3600 * 1000 // machine booted 12 h ago
@@ -172,11 +166,57 @@ describe('assessOwner (liveness = heartbeat AND real pid, never age alone)', () 
     expect(assessOwner(stale, { now: NOW, bootTime: BOOT, probe: null }).alive).toBe(false)
   })
 
-  it('wedged: pid alive but heartbeat hours old → alive AND flagged (never silently replaced)', () => {
-    const a = assessOwner(lock({ claimedAt: NOW - WEDGED_MS - 60_000 }), { now: NOW, bootTime: BOOT, probe: aliveProbe })
-    expect(a.alive).toBe(true)
-    expect(a.wedged).toBe(true)
-    expect(spawnDecision(a)).toBe('skip-wedged')
+  it('THE LOST NIGHT (point 434): pid alive but the LEASE ran out → NOT alive, and the successor may start', () => {
+    // 29./30.07.2026: the owner fell silent at 21:50 and still held the batch at
+    // 04:19. Its process was alive the whole time, so every age-based verdict read
+    // "alive" and the one authority that could act was fenced off by a condition.
+    // The lease removes the condition: the owner stopped saying it was there.
+    const a = assessOwner(lock({ claimedAt: NOW - LEASE_MS - 60_000, leaseUntil: NOW - 60_000 }), {
+      now: NOW,
+      bootTime: BOOT,
+      probe: aliveProbe,
+    })
+    expect(a.alive).toBe(false)
+    expect(a.reason).toBe('lease-expired')
+    expect(spawnDecision(a)).toBe('spawn')
+  })
+
+  it('a RENEWED lease keeps the owner through a call far longer than the heartbeat cadence', () => {
+    // The inverse failure and the more expensive one: a LARGE regression running
+    // for 40 minutes inside ONE tool call writes no heartbeat, and must not be
+    // shot in the back (docs/batch-resilience.md §5).
+    const a = assessOwner(lock({ claimedAt: NOW - 40 * 60_000, leaseUntil: NOW + 20 * 60_000 }), {
+      now: NOW,
+      bootTime: BOOT,
+      probe: aliveProbe,
+    })
+    expect(a).toMatchObject({ alive: true, reason: 'pid-alive' })
+    expect(spawnDecision(a)).toBe('skip-alive')
+  })
+
+  it('NEEDS NO MIGRATION: a lock written before the lease existed carries an implicit one', () => {
+    // The session that merges this code holds exactly such a lock and must keep
+    // working; nothing may depend on a step somebody has to remember.
+    const legacyShape = lock({ claimedAt: NOW - LEASE_MS + 60_000 })
+    expect(assessOwner(legacyShape, { now: NOW, bootTime: BOOT, probe: aliveProbe })).toMatchObject({
+      alive: true,
+      reason: 'pid-alive',
+    })
+    const overdue = lock({ claimedAt: NOW - LEASE_MS - 60_000 })
+    expect(assessOwner(overdue, { now: NOW, bootTime: BOOT, probe: aliveProbe }).reason).toBe('lease-expired')
+  })
+
+  it('THE VERDICT IS SINGULAR NOW: no `wedged` flag, no third spawn outcome', () => {
+    // docs/batch-resilience.md §6 — three overlapping liveness verdicts must not
+    // coexist. `WORK_STALL_*`, the wedgeAction/isOwnSpawn takeover construction,
+    // the two-stage silence report and the WEDGED_MS valve are gone with this.
+    const expired = assessOwner(lock({ claimedAt: NOW - LEASE_MS - 60_000 }), {
+      now: NOW,
+      bootTime: BOOT,
+      probe: aliveProbe,
+    })
+    expect(expired.wedged).toBeUndefined()
+    expect(['spawn', 'skip-alive']).toContain(spawnDecision(expired))
   })
 
   it('no lock → dead (free to claim)', () => {
@@ -245,215 +285,47 @@ describe('assessOwner (liveness = heartbeat AND real pid, never age alone)', () 
     }
   })
 
-  // --- PROGRESS, NOT AGE (point 402) ----------------------------------------
-  // Four sessions were killed in one afternoon for doing exactly what they were
-  // told to do: delegate a point and wait for it. The runtime shot them at ten
-  // minutes; the launcher could not tell the corpse from the worker either, since
-  // age was the only thing it measured. These pin the input that replaced the
-  // clock — what the owner DECLARED it is waiting on, already probed.
-  const advancing = { declared: true, advancing: true, declaredAt: NOW - 60_000, summary: 'branch feat/402-x — tip 3 min old' }
-  const stale = NOW - WORK_STALL_MS - 60_000
-  // The honest stall shape: the declaration is the owner's LAST WORD, so its own
-  // PostToolUse heartbeat lands a second after it and nothing follows.
-  const frozenAfter = (heartbeat) => ({
-    declared: true,
-    advancing: false,
-    declaredAt: heartbeat - 1000,
-    summary: 'branch feat/402-x — no commit for 41 min',
-  })
-  const frozen = frozenAfter(stale)
+  // --- WHAT REPLACED "PROGRESS, NOT AGE" (point 434) -------------------------
+  // Point 402 taught this function to read the owner's DECLARED work, so a
+  // session waiting on a delegated agent would not be judged by a clock it could
+  // not feed. It worked, and it was still one inference too many: the declaration
+  // could be leftover paperwork, it needed a tolerance, a stall bound and a
+  // last-word test, and on the night of 29./30.07.2026 all of it agreed with the
+  // other two verdicts that a seven-hour standstill was a live owner.
+  // The lease says the same thing without inferring anything — a long wait keeps
+  // the batch by WRITING a longer leaseUntil (`extendLease`), which the reader
+  // only compares. These pin that the inference is gone and cannot come back.
 
-  it('a stale heartbeat whose declared agent still COMMITS reads alive, never wedged', () => {
-    const a = assessOwner(lock({ claimedAt: stale }), { now: NOW, bootTime: BOOT, probe: aliveProbe, work: advancing })
-    expect(a).toMatchObject({ alive: true, wedged: false, reason: 'work-advancing' })
-    expect(spawnDecision(a)).toBe('skip-alive')
-  })
-
-  it('…however long it takes: even past the four-hour valve, moving work is alive', () => {
-    const a = assessOwner(lock({ claimedAt: NOW - WEDGED_MS - 60_000 }), {
+  it('IGNORES a declaration entirely — no evidence may extend ownership any more', () => {
+    const eternallyFresh = { declared: true, advancing: true, declaredAt: NOW, summary: 'an agent, allegedly' }
+    const a = assessOwner(lock({ claimedAt: NOW - LEASE_MS - 60_000 }), {
       now: NOW,
       bootTime: BOOT,
       probe: aliveProbe,
-      work: advancing,
+      work: eternallyFresh,
     })
-    expect(a).toMatchObject({ alive: true, wedged: false, reason: 'work-advancing' })
+    expect(a).toMatchObject({ alive: false, reason: 'lease-expired' })
   })
 
-  it('THE ONLY BOUND LEFT: the same silence with every probe quiet is WEDGED after the stall window', () => {
-    const a = assessOwner(lock({ claimedAt: stale }), { now: NOW, bootTime: BOOT, probe: aliveProbe, work: frozen })
-    expect(a).toMatchObject({ alive: true, wedged: true, reason: 'work-stalled' })
-    expect(spawnDecision(a)).toBe('skip-wedged')
-    expect(WORK_STALL_MS).toBe(WORK_STALL_TICKS * LAUNCHER_TICK_MS)
-    // THE LADDER IS MONOTONE IN SEVERITY (point 433): the 45-minute wedge licenses
-    // only the non-destructive lock take, this bound licenses REAPING the
-    // launcher's own spawn — so the destructive verdict is deliberately the slower
-    // one. Before 433 the relation was the other way round, against a four-hour
-    // valve that never rescued anything.
-    expect(WEDGED_MS).toBeLessThan(WORK_STALL_MS)
-  })
-
-  it('THE STALL BOUND CLEARS THE LONGEST LEGITIMATE SILENCE (four-eyes finding 1.1 (ii))', () => {
-    // The heartbeat is PostToolUse, so ONE long tool call starves it. The verdict
-    // this bound feeds can end in a KILL, so it keeps the 2x headroom over the
-    // longest legitimate silence this repository documents (~40 min) — measured
-    // against the transcripts in point 433, the longest undeclared unattended tool
-    // call is 27.8 min and the p99.9 is 10 min, so the headroom is real.
-    expect(WORK_STALL_MS).toBeGreaterThanOrEqual(60 * 60_000)
-    expect(WORK_STALL_MS).toBeGreaterThanOrEqual(2 * 40 * 60_000)
-  })
-
-  it('inside the stall window the REASON stays pre-402 — a declaration never invents a stall', () => {
-    const heartbeat = NOW - WORK_STALL_MS + 60_000
-    const a = assessOwner(lock({ claimedAt: heartbeat }), {
-      now: NOW,
-      bootTime: BOOT,
-      probe: aliveProbe,
-      work: frozenAfter(heartbeat),
-    })
-    // `wedged` is true here since point 433 — 89 minutes is far past the 45-minute
-    // threshold — but the REASON is what this pins: `pid-alive`, not `work-stalled`,
-    // so the declaration bought the launcher no licence to reap.
-    expect(a).toMatchObject({ alive: true, wedged: true, reason: 'pid-alive' })
-    expect(wedgeAction({ assessment: a, lock: lock({ claimedAt: heartbeat }) }).kill).toBe(false)
-  })
-
-  it('BELOW the wedge threshold nothing is flagged at all — a 40-minute tool call is normal', () => {
-    const heartbeat = NOW - 40 * 60_000
-    const a = assessOwner(lock({ claimedAt: heartbeat }), {
-      now: NOW,
-      bootTime: BOOT,
-      probe: aliveProbe,
-      work: frozenAfter(heartbeat),
-    })
-    expect(a).toMatchObject({ alive: true, wedged: false, reason: 'pid-alive' })
-    expect(spawnDecision(a)).toBe('skip-alive')
-  })
-
-  // --- THE DECLARATION MUST BE THE OWNER'S LAST WORD (finding 1.1 (i)) -------
-  it('A HEARTBEAT NEWER THAN THE DECLARATION IS NOT A STALL — the replayed near-kill', () => {
-    // Reproduced end to end by the four-eyes review: a session declares a wait,
-    // the agent finishes, the session merges and starts `npm run test:large`
-    // WITHOUT clearing the declaration (nothing forces a clear), and the next
-    // launcher tick sees a stale heartbeat beside a still-current declaration
-    // whose evidence has gone quiet. Reading that as `work-stalled` reaps a
-    // session in the middle of a LARGE regression.
-    const declaredAt = NOW - 43 * 60_000 // still current: inside IN_FLIGHT_MAX_AGE_MS
-    const heartbeat = declaredAt + 12 * 60_000 // the merge, AFTER the declaration
-    const leftoverPaperwork = {
-      declared: true,
-      advancing: false,
-      declaredAt,
-      summary: 'branch feat/402-x — no commit for 43 min',
-    }
-    const a = assessOwner(lock({ claimedAt: heartbeat }), {
-      now: NOW, // 31 min of legitimate silence since the heartbeat
-      bootTime: BOOT,
-      probe: aliveProbe,
-      work: leftoverPaperwork,
-    })
-    expect(a).toMatchObject({ alive: true, wedged: false, reason: 'pid-alive' })
-    expect(spawnDecision(a)).toBe('skip-alive')
-    // …and the four-hour valve is all such leftover paperwork may ever license.
-    const muchLater = assessOwner(lock({ claimedAt: heartbeat }), {
-      now: heartbeat + WEDGED_MS + 60_000,
-      bootTime: BOOT,
-      probe: aliveProbe,
-      work: leftoverPaperwork,
-    })
-    expect(muchLater).toMatchObject({ alive: true, wedged: true, reason: 'pid-alive' })
-  })
-
-  it('the tolerance is exactly the declare command’s own heartbeat, not a window to work in', () => {
-    const at = (declaredAt) =>
-      assessOwner(lock({ claimedAt: stale }), {
-        now: NOW,
-        bootTime: BOOT,
-        probe: aliveProbe,
-        work: { declared: true, advancing: false, declaredAt, summary: 'quiet' },
-      })
-    // The heartbeat may lag the declaration by the whole tolerance and no more.
-    expect(at(stale - WORK_DECLARATION_TOLERANCE_MS).reason).toBe('work-stalled')
-    expect(at(stale - WORK_DECLARATION_TOLERANCE_MS - 1).reason).toBe('pid-alive')
-  })
-
-  it('a declaration with no timestamp can never license a stall', () => {
-    const a = assessOwner(lock({ claimedAt: stale }), {
-      now: NOW,
-      bootTime: BOOT,
-      probe: aliveProbe,
-      work: { declared: true, advancing: false, declaredAt: null, summary: 'quiet' },
-    })
-    // Past the 45-minute threshold this is wedged either way; what is pinned is the
-    // REASON — an undatable declaration never upgrades it to the reapable one.
-    expect(a).toMatchObject({ alive: true, wedged: true, reason: 'pid-alive' })
-  })
-
-  it('A DEAD PID STAYS DEAD whatever the evidence says', () => {
-    const a = assessOwner(lock({ claimedAt: stale }), { now: NOW, bootTime: BOOT, probe: deadProbe, work: advancing })
-    expect(a).toMatchObject({ alive: false, reason: 'pid-dead' })
-    // …and so does a REUSED one, and a heartbeat from before the boot.
-    const reused = assessOwner(lock({ claimedAt: stale }), {
-      now: NOW,
-      bootTime: BOOT,
-      probe: { exists: true, startedAt: NOW - 10_000 },
-      work: advancing,
-    })
-    expect(reused).toMatchObject({ alive: false, reason: 'pid-reused' })
-    const preboot = assessOwner(lock({ claimedAt: BOOT - 60_000 }), {
-      now: NOW,
-      bootTime: BOOT,
-      probe: aliveProbe,
-      work: advancing,
-    })
-    expect(preboot).toMatchObject({ alive: false, reason: 'heartbeat-predates-boot' })
-  })
-
-  it('a declaration no probe can answer is no evidence — it neither saves nor is required to', () => {
-    // `assessOwnerWork` reports that shape as declared-but-not-advancing, which is
-    // exactly a stall: unanswerable is treated as no evidence, never as proof.
-    const unanswerable = {
-      declared: true,
-      advancing: false,
-      declaredAt: stale - 1000,
-      summary: 'vibes (the agent is surely fine) — unknown-kind',
-    }
-    expect(assessOwner(lock({ claimedAt: stale }), { now: NOW, bootTime: BOOT, probe: aliveProbe, work: unanswerable }))
-      .toMatchObject({ wedged: true, reason: 'work-stalled' })
-  })
-
-  it('NO declaration → the plain clock verdict, never the reapable one', () => {
-    const none = { declared: false, advancing: false, summary: '' }
-    for (const work of [null, undefined, none]) {
-      const a = assessOwner(lock({ claimedAt: stale }), { now: NOW, bootTime: BOOT, probe: aliveProbe, work })
-      expect(a).toMatchObject({ alive: true, wedged: true, reason: 'pid-alive' })
-    }
-  })
-
-  it('a stale declaration proves progress but cannot tighten the bound (declared false, advancing true)', () => {
-    const agedButMoving = { declared: false, advancing: true, summary: 'branch feat/402-x — tip 2 min old' }
-    expect(assessOwner(lock({ claimedAt: stale }), { now: NOW, bootTime: BOOT, probe: aliveProbe, work: agedButMoving }))
-      .toMatchObject({ alive: true, wedged: false, reason: 'work-advancing' })
-  })
-
-  it('a LEGACY lock (no pid) is likewise kept alive by moving work', () => {
-    const legacy = { sessionId: 's', claimedAt: NOW - LEGACY_STALE_MS - 60_000 }
-    expect(assessOwner(legacy, { now: NOW, bootTime: BOOT, probe: null }).reason).toBe('legacy-stale')
-    expect(assessOwner(legacy, { now: NOW, bootTime: BOOT, probe: null, work: advancing })).toMatchObject({
+  it('a long wait keeps the batch the ONE sanctioned way: a longer lease', () => {
+    const declaredLong = lock({ claimedAt: NOW - LEASE_MS - 60_000, leaseUntil: NOW + 3 * 3600_000 })
+    expect(assessOwner(declaredLong, { now: NOW, bootTime: BOOT, probe: aliveProbe })).toMatchObject({
       alive: true,
-      reason: 'work-advancing',
+      reason: 'pid-alive',
     })
   })
 
-  it('a CRASH and a WEDGE still hold the lock — only a taken boundary hands it over', () => {
+  it('what no lease may ever do: revive a DEAD process', () => {
+    const immortalLease = lock({ claimedAt: NOW - 30 * 60_000, leaseUntil: NOW + 10 * 3600_000 })
+    expect(assessOwner(immortalLease, { now: NOW, bootTime: BOOT, probe: deadProbe }).reason).toBe('pid-dead')
+    const preBoot = lock({ claimedAt: BOOT - 60_000, leaseUntil: NOW + 10 * 3600_000 })
+    expect(assessOwner(preBoot, { now: NOW, bootTime: BOOT, probe: aliveProbe }).reason).toBe('heartbeat-predates-boot')
+  })
+
+  it('a CRASH still holds the lock until the lease runs out — only a taken boundary hands it over early', () => {
     const crashed = assessOwner(lock({ claimedAt: NOW - 30 * 60_000 }), { now: NOW, bootTime: BOOT, probe: aliveProbe })
     expect(crashed.alive).toBe(true)
-    const wedged = assessOwner(lock({ claimedAt: NOW - WEDGED_MS - 60_000 }), {
-      now: NOW,
-      bootTime: BOOT,
-      probe: aliveProbe,
-    })
-    expect(wedged.alive).toBe(true)
-    expect(spawnDecision(wedged)).toBe('skip-wedged')
+    expect(spawnDecision(crashed)).toBe('skip-alive')
   })
 })
 
@@ -515,73 +387,6 @@ describe('resolveOwnership — identity on the process, never on liveness alone'
 })
 
 // ---------------------------------------------------------------------------
-describe('wedgeNotifyDecision (point 388 (c): diagnose AND report, once per silence and stage)', () => {
-  const lock = { sessionId: 'owner-1', pid: 4242, claimedAt: 1000 }
-  const at = (ageMs) => {
-    const stage = wedgeStage(ageMs)
-    return { stage, ownerKey: wedgeOwnerKey(lock, stage ?? '') }
-  }
-
-  it('reports an alive owner past the threshold', () => {
-    expect(wedgeNotifyDecision({ alive: true, ...at(WEDGE_NOTIFY_MS) }).notify).toBe(true)
-  })
-
-  it('stays quiet below the threshold — an ordinary long tool call is not a wedge', () => {
-    const d = wedgeNotifyDecision({ alive: true, ...at(WEDGE_NOTIFY_MS - 60_000) })
-    expect(d.notify).toBe(false)
-    expect(d.reason).toBe('below-threshold')
-  })
-
-  it('does not repeat itself for the same silence, tick after tick', () => {
-    const now = at(WEDGE_NOTIFY_MS + 60_000)
-    const d = wedgeNotifyDecision({ alive: true, ...now, lastNotifiedKey: now.ownerKey })
-    expect(d.notify).toBe(false)
-    expect(d.reason).toBe('already-notified')
-  })
-
-  it('ESCALATES when the same silence deepens into a wedge — the incident was "nobody looked"', () => {
-    const silent = at(WEDGE_NOTIFY_MS + 60_000)
-    const wedged = at(WEDGED_MS + 60_000)
-    expect(silent.stage).toBe('silent')
-    expect(wedged.stage).toBe('wedged')
-    const d = wedgeNotifyDecision({ alive: true, ...wedged, lastNotifiedKey: silent.ownerKey })
-    expect(d.notify).toBe(true)
-    expect(d.reason).toBe('wedged-owner')
-    // …and then falls silent again for that stage.
-    expect(wedgeNotifyDecision({ alive: true, ...wedged, lastNotifiedKey: wedged.ownerKey }).notify).toBe(false)
-  })
-
-  it('reports a SECOND stall of the same session — the key carries the heartbeat it fell silent at', () => {
-    const first = wedgeOwnerKey(lock, 'silent')
-    const second = wedgeOwnerKey({ ...lock, claimedAt: 9_000_000 }, 'silent')
-    expect(first).not.toBe(second)
-    expect(
-      wedgeNotifyDecision({ alive: true, stage: 'silent', ownerKey: second, lastNotifiedKey: first }).notify,
-    ).toBe(true)
-  })
-
-  it('says nothing about a dead owner (the launcher simply takes over) or a nameless lock', () => {
-    expect(wedgeNotifyDecision({ alive: false, ...at(9 * 3600_000) }).notify).toBe(false)
-    expect(wedgeNotifyDecision({ alive: true, stage: 'wedged', ownerKey: '' }).notify).toBe(false)
-    expect(wedgeOwnerKey(null)).toBe('')
-    expect(wedgeStage('a while')).toBe(null)
-  })
-
-  it('the notify stage arrives exactly ONE launcher tick before the launcher acts (point 433)', () => {
-    // It used to demand two hours' headroom over the longest legitimate silence,
-    // against a four-hour wedge. With the wedge at 45 minutes a hard 90 would sit
-    // ABOVE it and the first stage would be unreachable, so the threshold is now
-    // DERIVED: one tick of warning, then the take. A legitimately long run is
-    // protected by its declaration (`silenceStage` suppresses this stage while work
-    // advances), not by a bigger number — and 30 min is still 3x the measured p99.9
-    // of a single tool call (10 min, point 433's transcript sweep).
-    expect(WEDGE_NOTIFY_MS).toBe(WEDGED_MS - LAUNCHER_TICK_MS)
-    expect(WEDGE_NOTIFY_MS).toBeLessThan(WEDGED_MS)
-    expect(WEDGE_NOTIFY_MS).toBeGreaterThanOrEqual(3 * 10 * 60_000)
-  })
-})
-
-// ---------------------------------------------------------------------------
 describe('spawnDecision (scenario 2 + 4: the launcher path)', () => {
   it('live owner, fresh heartbeat → skip (no spawn)', () => {
     const a = assessOwner({ sessionId: 's', claimedAt: NOW - 60_000, pid: 1, pidStartedAt: null }, { now: NOW, bootTime: BOOT, probe: aliveProbe })
@@ -604,156 +409,21 @@ describe('spawnDecision (scenario 2 + 4: the launcher path)', () => {
   })
 })
 
-// ---------------------------------------------------------------------------
-// WHAT A WEDGE EARNS (point 402 (d)). Two kinds reach the launcher and they are
-// not the same finding: a `work-stalled` verdict is positive evidence that
-// nothing is moving, while the silence valve — 45 minutes since point 433, four
-// hours before it — is still only a clock reading. The rule that binds both is
-// older than either: the launcher only ever kills a process it spawned itself.
-describe('wedgeAction (the launcher’s consequence for a wedged owner)', () => {
-  const stalled = { alive: true, wedged: true, reason: 'work-stalled' }
-  const aged = { alive: true, wedged: true, reason: 'pid-alive' }
-  const SPAWNED_AT = NOW - 3 * 60 * 60_000
-  // The identity of the process the launcher actually started: pid AND start time.
-  const ours = { assessment: stalled, lock: { pid: 900 }, lastSpawnPid: 900, lastSpawnAt: SPAWNED_AT, probe: { exists: true, startedAt: SPAWNED_AT + 400 } }
-
-  it('a stall in the launcher’s OWN spawn → urgent signal, reap, take over', () => {
-    expect(wedgeAction(ours)).toMatchObject({
-      stalled: true,
-      own: true,
-      notify: 'urgent',
-      kill: true,
-      takeover: true,
-    })
-  })
-
-  it('THE OWN-SPAWN CONDITION IS GONE FROM THE TAKEOVER — but never from the kill', () => {
-    // THE REASON THE NIGHT OF 30.07.2026 WAS LOST (point 433): the owner had been
-    // started by hand, so `own` was false and the whole verdict fell through to a log
-    // line the launcher printed nine times over two hours. Dispossession is therefore
-    // open to any wedged owner — see `wedgeTakeover`, which needs no `own` at all.
-    //
-    // ENDING A PROCESS is the other question, and the second model's review of this
-    // very commit caught the widening: `kill` had become `stalled && reapable`, which
-    // would end a process the launcher never started — an attended window of the
-    // user’s that declared a wait and then went quiet included. An unknown identity
-    // is never a licence to kill, so both reap fields keep the condition.
-    expect(wedgeAction({ ...ours, lock: { pid: 901 } })).toMatchObject({
-      stalled: true,
-      own: false,
-      notify: 'urgent',
-      kill: false,
-      takeover: false,
-    })
-    // A recycled pid or an unverifiable start time withholds the reap for the same
-    // reason: what cannot be identified cannot be ended.
-    expect(wedgeAction({ ...ours, probe: { exists: true, startedAt: NOW - 20 * 60_000 } })).toMatchObject({
-      own: false,
-      kill: false,
-      takeover: false,
-    })
-    expect(wedgeAction({ ...ours, probe: null }).kill).toBe(false)
-    expect(wedgeAction({ ...ours, lastSpawnAt: 0 }).kill).toBe(false)
-    // The launcher’s OWN stalled spawn is still reaped — that path is untouched.
-    expect(wedgeAction(ours)).toMatchObject({ own: true, kill: true, takeover: true })
-  })
-
-  it('THE CLOCK VERDICT ALONE NEVER KILLS — it may only dispossess', () => {
-    // The plain `pid-alive` wedge is a clock reading, and at 45 minutes a silent
-    // owner may still be inside something long. It loses the LOCK (`wedgeTakeover`)
-    // and keeps its process; only the positive `work-stalled` finding ends one.
-    expect(wedgeAction({ ...ours, assessment: aged })).toMatchObject({
-      stalled: false,
-      notify: null,
-      kill: false,
-      takeover: false,
-    })
-    expect(wedgeAction({ ...ours, assessment: aged, lock: { pid: 901 } })).toMatchObject({
-      kill: false,
-      takeover: false,
-    })
-  })
-
-  it('a lock without a pid is never reapable — there is nothing to reap', () => {
-    expect(wedgeAction({ ...ours, lock: {} }).kill).toBe(false)
-    expect(wedgeAction({ ...ours, lock: { pid: 0 }, lastSpawnPid: 0 }).kill).toBe(false)
-    expect(wedgeAction({}).kill).toBe(false)
-  })
-})
-
-// ---------------------------------------------------------------------------
-// A VERDICT WITHOUT A CONSEQUENCE IS A COMMENT (point 433)
-// ---------------------------------------------------------------------------
-describe('wedgeTakeover (the launcher may take the batch from a wedged owner)', () => {
-  const owner = { sessionId: '10a2d2e0', pid: 33572, claimedAt: NOW - 251 * 60_000 }
-  const wedgedByClock = { alive: true, wedged: true, reason: 'pid-alive' }
-
-  it('THE INCIDENT: a pid-alive owner silent past the threshold → TAKE, not a log line', () => {
-    const a = assessOwner(owner, { now: NOW, bootTime: BOOT, probe: aliveProbe })
-    expect(a).toMatchObject({ alive: true, wedged: true, reason: 'pid-alive' })
-    expect(spawnDecision(a)).toBe('skip-wedged')
-    expect(wedgeTakeover({ assessment: a, lock: owner })).toEqual({ take: true, reason: 'pid-alive' })
-  })
-
-  it('a hand-started owner is taken over exactly the same — whoever started it', () => {
-    // No `own` input reaches this decision at all, which is the point.
-    expect(wedgeTakeover({ assessment: wedgedByClock, lock: owner }).take).toBe(true)
-  })
-
-  it('a FRESH heartbeat still yields skip — nothing is taken from a working session', () => {
-    const fresh = assessOwner({ ...owner, claimedAt: NOW - 60_000 }, { now: NOW, bootTime: BOOT, probe: aliveProbe })
-    expect(spawnDecision(fresh)).toBe('skip-alive')
-    expect(wedgeTakeover({ assessment: fresh, lock: owner })).toEqual({ take: false, reason: 'below-threshold' })
-  })
-
-  it('a silence just under the threshold yields nothing either', () => {
-    const almost = assessOwner({ ...owner, claimedAt: NOW - (WEDGED_MS - 60_000) }, { now: NOW, bootTime: BOOT, probe: aliveProbe })
-    expect(almost.wedged).toBe(false)
-    expect(wedgeTakeover({ assessment: almost, lock: owner }).take).toBe(false)
-  })
-
-  it("a DEAD pid keeps today's path — the ordinary spawn decision frees that lock", () => {
-    const dead = assessOwner(owner, { now: NOW, bootTime: BOOT, probe: deadProbe })
-    expect(spawnDecision(dead)).toBe('spawn')
-    expect(wedgeTakeover({ assessment: dead, lock: owner })).toEqual({ take: false, reason: 'not-alive' })
-  })
-
-  it('ADVANCING declared work is never dispossessed, however long the silence', () => {
-    const advancing = { declared: true, advancing: true, declaredAt: NOW - 60_000, summary: 'branch feat/x — tip 3 min old' }
-    const a = assessOwner({ ...owner, claimedAt: NOW - 9 * 3600_000 }, { now: NOW, bootTime: BOOT, probe: aliveProbe, work: advancing })
-    expect(a).toMatchObject({ alive: true, wedged: false, reason: 'work-advancing' })
-    expect(wedgeTakeover({ assessment: a, lock: owner, work: advancing }).take).toBe(false)
-    // Belt and braces: even handed a wedged assessment, advancing work refuses.
-    expect(wedgeTakeover({ assessment: wedgedByClock, lock: owner, work: advancing })).toEqual({
-      take: false,
-      reason: 'work-advancing',
-    })
-  })
-
-  it("A DECLARATION'S EXPIRY ALONE NEVER TRIGGERS A TAKE — no long verification is shot in the back", () => {
-    // The launcher honours a declaration for four hours (LAUNCHER_WORK_MAX_AGE_MS),
-    // and that window is written out rather than borrowed from WEDGED_MS precisely
-    // so this can hold: an aged-out declaration flips `advancing` to false, and if
-    // that alone licensed a take, every long verification would lose the batch the
-    // moment its paperwork expired. The take needs the POSITIVE evidence of silence.
-    const expired = { declared: false, advancing: false, summary: '' }
-    const freshHeartbeat = assessOwner({ ...owner, claimedAt: NOW - 60_000 }, { now: NOW, bootTime: BOOT, probe: aliveProbe, work: expired })
-    expect(freshHeartbeat.wedged).toBe(false)
-    expect(wedgeTakeover({ assessment: freshHeartbeat, lock: owner, work: expired }).take).toBe(false)
-    // And the window itself must not have been coupled to the wedge threshold.
-    expect(LAUNCHER_WORK_MAX_AGE_MS).toBeGreaterThan(WEDGED_MS)
-    expect(LAUNCHER_WORK_MAX_AGE_MS).toBeGreaterThan(WORK_STALL_MS)
-  })
-
-  it('a nameless or missing lock is never taken', () => {
-    expect(wedgeTakeover({ assessment: wedgedByClock, lock: null }).take).toBe(false)
-    expect(wedgeTakeover({ assessment: wedgedByClock, lock: { pid: 1 } })).toEqual({ take: false, reason: 'no-owner' })
-    expect(wedgeTakeover({ assessment: wedgedByClock, lock: { sessionId: '' } }).take).toBe(false)
-    expect(wedgeTakeover()).toEqual({ take: false, reason: 'no-owner' })
-  })
-})
-
 describe('verdictRepeat (repetition is the signal, point 433 (c))', () => {
+  it('ownerStateKey identifies ONE owner at ONE heartbeat, and moves when it moves', () => {
+    // The key must hold still across the launcher's 15-minute ticks while nobody
+    // works — otherwise "the same verdict twice" can never be observed — and it
+    // must change as soon as the owner does something, so a later episode of the
+    // same session counts from its own start.
+    const lock = { sessionId: 's1', pid: 33572, claimedAt: 9 }
+    expect(ownerStateKey(lock)).toBe('s1#33572#9')
+    expect(ownerStateKey(lock)).toBe(ownerStateKey({ ...lock }))
+    expect(ownerStateKey({ ...lock, claimedAt: 10 })).not.toBe(ownerStateKey(lock))
+    expect(ownerStateKey(lock, 'expired')).toBe('s1#33572#9#expired')
+    expect(ownerStateKey({ ...lock, pid: undefined })).toBe('s1#nopid#9')
+    for (const bad of [null, {}, { sessionId: 's' }, { claimedAt: 1 }]) expect(ownerStateKey(bad)).toBe('')
+  })
+
   it('the first reading is logged and escalates nothing', () => {
     expect(verdictRepeat({ key: 'pid-alive#s1#33572#9', lastKey: '' })).toEqual({
       key: 'pid-alive#s1#33572#9',
@@ -828,22 +498,113 @@ describe('isOwnSpawn (a pid is not an identity)', () => {
 })
 
 // ---------------------------------------------------------------------------
-describe('silenceStage (a declaration is evidence, not an exemption)', () => {
-  it('suppresses the first stage while the declared work advances', () => {
-    expect(silenceStage({ ageMs: WEDGE_NOTIFY_MS + 60_000, advancing: true })).toBe(null)
-    expect(silenceStage({ ageMs: WEDGE_NOTIFY_MS + 60_000, advancing: false })).toBe('silent')
+// THE LEASE AND THE FENCE, ON THE REAL FILESYSTEM (point 434). The pure rules are
+// swept in batch-lease-core.test.mjs; what only real files can show is that the
+// renewal is owner-guarded and rate-limited, that the fence file is written where
+// the acquisition happens, and that it SURVIVES the lock being deleted.
+describe('renewLease / grantFence (the I/O half)', () => {
+  let dir, lockPath, fencePath
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), 'hoa-lease-'))
+    lockPath = join(dir, 'batch-lock.json')
+    fencePath = statePathsFor(lockPath).fencePath
+  })
+  afterEach(() => rmSync(dir, { recursive: true, force: true }))
+
+  const opts = (over = {}) => ({ lockPath, fencePath, pid: process.pid, pidStartedAt: NOW, bootTime: 0, probePidFn: () => aliveProbe, findAncestorFn: () => null, ...over })
+  const lockOf = () => JSON.parse(readFileSync(lockPath, 'utf8'))
+
+  it('the fence file lives beside the lock and is derived from it', () => {
+    expect(basename(fencePath)).toBe('batch-fence.json')
+    expect(statePathsFor(lockPath).fencePath).toBe(fencePath)
   })
 
-  it('REPORTS THE HOURS-LONG STAGE REGARDLESS (finding 1.2)', () => {
-    // Otherwise an eternally-fresh piece of evidence — the repo root as a
-    // worktree, `main` as a branch — silences BOTH the wedge verdict and this
-    // notification, leaving the owner less observed than with no declaration.
-    expect(silenceStage({ ageMs: WEDGED_MS + 60_000, advancing: true })).toBe('wedged')
-    expect(silenceStage({ ageMs: WEDGED_MS + 60_000, advancing: false })).toBe('wedged')
+  it('an acquisition takes a fence number, and the number is on BOTH the lock and the file', () => {
+    expect(acquire('s1', opts())).toBe('acquired')
+    expect(lockOf().fence).toBe(1)
+    const fence = readFence({ fencePath })
+    expect(fence).toMatchObject({ fence: 1, holder: 's1' })
+    expect(lockOf().leaseUntil).toBeGreaterThan(Date.now())
   })
 
-  it('below the notify threshold nothing is reported either way', () => {
-    for (const advancing of [true, false]) expect(silenceStage({ ageMs: 60_000, advancing })).toBe(null)
+  /** The lock of a session that fell silent: heartbeat AND lease both run out.
+   *  (A FRESH heartbeat with an expired lease is a contradictory state — the
+   *  PostToolUse stamp is younger than the PreToolUse renewal that precedes it —
+   *  and `assessOwner` deliberately keeps such an owner: never dispossess a
+   *  session that demonstrably just worked.) */
+  const goSilent = (over = {}) =>
+    writeFileSync(
+      lockPath,
+      JSON.stringify({ ...lockOf(), claimedAt: Date.now() - LEASE_MS - 60_000, leaseUntil: Date.now() - 60_000, ...over }),
+    )
+
+  it('THE FENCE FILE SURVIVES THE LOCK — that is why it is not IN the lock', () => {
+    acquire('s1', opts())
+    // A takeover deletes the lock file; the fence must not go with it.
+    goSilent()
+    expect(acquire('s2', opts())).toBe('acquired')
+    expect(existsSync(fencePath)).toBe(true)
+    const fence = readFence({ fencePath })
+    expect(fence.fence).toBe(2)
+    expect(fence.holder).toBe('s2')
+    expect(fence.holders.map((h) => h.sessionId).sort()).toEqual(['s1', 's2'])
+  })
+
+  it('a DELETED fence file is re-seeded from the outgoing lock, never from 1', () => {
+    acquire('s1', opts())
+    goSilent({ fence: 9 })
+    rmSync(fencePath, { force: true })
+    expect(acquire('s2', opts())).toBe('acquired')
+    expect(readFence({ fencePath }).fence).toBe(10)
+  })
+
+  it('renewLease writes only for the owner, and only once per interval', () => {
+    acquire('s1', opts())
+    const first = lockOf().leaseUntil
+    // Fresh lease → nothing to do (the lock is a hot-path file).
+    expect(renewLease('s1', { lockPath, fencePath }).reason).toBe('still-fresh')
+    expect(lockOf().leaseUntil).toBe(first)
+    // Past the interval → renewed, and the lease moves forward.
+    const later = Date.now() + LEASE_RENEW_INTERVAL_MS + 60_000
+    expect(renewLease('s1', { lockPath, fencePath, now: later }).renewed).toBe(true)
+    expect(lockOf().leaseUntil).toBe(later + LEASE_MS)
+    // A stranger renews nothing.
+    expect(renewLease('s2', { lockPath, fencePath, now: later + 60_000 }).reason).toBe('not-owner')
+  })
+
+  it('a renewal under a STALE fence is refused on the real files too', () => {
+    acquire('s1', opts())
+    // Somebody else took the batch: the mark moved past s1's grant.
+    grantFence('s2', { fencePath })
+    const later = Date.now() + LEASE_RENEW_INTERVAL_MS + 60_000
+    expect(renewLease('s1', { lockPath, fencePath, now: later }).reason).toBe('fence-stale')
+  })
+
+  it('renewLease never touches claimedAt — a taken handover survives it', () => {
+    acquire('s1', opts())
+    const at = Date.now()
+    writeFileSync(lockPath, JSON.stringify({ ...lockOf(), claimedAt: at, handedOver: true, handedOverAt: at }))
+    renewLease('s1', { lockPath, fencePath, now: at + LEASE_RENEW_INTERVAL_MS + 60_000 })
+    expect(lockOf().claimedAt).toBe(at)
+    expect(lockOf().handedOver).toBe(true)
+  })
+
+  it('extendLease is the ONE way a long wait keeps the batch, and only forwards', () => {
+    acquire('s1', opts())
+    const target = Date.now() + 3 * 3600_000
+    expect(extendLease('s1', target, { lockPath })).toBe(true)
+    expect(lockOf().leaseUntil).toBe(target)
+    expect(extendLease('s1', target - 60_000, { lockPath })).toBe(false) // never backwards
+    expect(extendLease('s2', target + 60_000, { lockPath })).toBe(false) // never a stranger
+  })
+
+  it('INDEPENDENCE + fail-open: no fence file, no lock, junk input — nothing throws, nothing blocks', () => {
+    expect(readFence({ fencePath })).toEqual({ fence: 0, holder: '', holders: [] })
+    expect(renewLease('s1', { lockPath, fencePath }).renewed).toBe(false)
+    expect(extendLease('s1', Date.now(), { lockPath })).toBe(false)
+    writeFileSync(fencePath, '{ torn')
+    expect(readFence({ fencePath })).toEqual({ fence: 0, holder: '', holders: [] })
+    expect(acquire('s1', opts())).toBe('acquired') // a torn fence never fails an acquisition
   })
 })
 
@@ -899,54 +660,76 @@ describe('acquire (atomic test-and-set on the real filesystem)', () => {
     expect(acquire('s2', opts())).toBe('held')
   })
 
-  // --- THE ONE CASE IN WHICH A LIVE LOCK MAY BE TAKEN (point 433) -------------
-  describe('takeWedged — the launcher dispossesses a wedged owner, atomically', () => {
-    /** A live pid whose heartbeat is `silentMs` old. */
-    const wedgedOwner = (silentMs) =>
-      writeFileSync(lockPath, JSON.stringify({ sessionId: 'wedged', claimedAt: Date.now() - silentMs, pid: 999999 }))
+  // --- A LIVE LOCK WHOSE LEASE RAN OUT (point 434) ---------------------------
+  // This used to need a `takeWedged` flag the caller had to ask for, having first
+  // proved wedgedness with a second mechanism. It needs nothing now: an expired
+  // lease reads as not-alive at the ordinary door, and the atomicity argument is
+  // unchanged — the recheck inside the reap mutex still decides.
+  describe('an expired lease is taken through the ordinary door', () => {
+    /** A live pid whose lease ran out `agoMs` ago. */
+    const expiredOwner = (agoMs) =>
+      writeFileSync(
+        lockPath,
+        JSON.stringify({
+          sessionId: 'stalled',
+          claimedAt: Date.now() - LEASE_MS - agoMs,
+          leaseUntil: Date.now() - agoMs,
+          pid: 999999,
+        }),
+      )
 
-    it('WITHOUT the flag a wedged owner keeps its lock — nothing changed by default', () => {
-      wedgedOwner(WEDGED_MS + 60_000)
-      expect(acquire('launcher', opts())).toBe('held')
-      expect(readOwnerLock(lockPath).sessionId).toBe('wedged')
-    })
-
-    it('WITH the flag the launcher takes it, and the new lock records why', () => {
-      wedgedOwner(WEDGED_MS + 60_000)
-      const res = acquire('launcher', opts({ takeWedged: true, extra: { takenFromWedged: { sessionId: 'wedged' } } }))
+    it('THE LOST NIGHT: a live-but-silent owner loses the batch, and the new lock records why', () => {
+      expiredOwner(60_000)
+      const res = acquire('launcher', opts({ extra: { takenFromExpiredLease: { sessionId: 'stalled' } } }))
       expect(res).toBe('acquired')
       const lock = readOwnerLock(lockPath)
       expect(lock.sessionId).toBe('launcher')
-      expect(lock.takenFromWedged).toEqual({ sessionId: 'wedged' })
+      expect(lock.takenFromExpiredLease).toEqual({ sessionId: 'stalled' })
     })
 
-    it('the flag does NOT widen anything else: a merely silent owner keeps its lock', () => {
-      wedgedOwner(WEDGED_MS - 60_000)
-      expect(acquire('launcher', opts({ takeWedged: true }))).toBe('held')
-      expect(readOwnerLock(lockPath).sessionId).toBe('wedged')
+    it('a lease still running keeps the owner — no flag, no exception, no widening', () => {
+      writeFileSync(
+        lockPath,
+        JSON.stringify({
+          sessionId: 'working',
+          claimedAt: Date.now() - 40 * 60_000,
+          leaseUntil: Date.now() + 15 * 60_000,
+          pid: 999999,
+        }),
+      )
+      expect(acquire('launcher', opts())).toBe('held')
+      expect(readOwnerLock(lockPath).sessionId).toBe('working')
     })
 
-    it('TWO LAUNCHERS CANNOT BOTH ACT — the second loses cleanly', () => {
-      wedgedOwner(WEDGED_MS + 60_000)
-      expect(acquire('launcher-a', opts({ takeWedged: true }))).toBe('acquired')
-      // The second arrives after the first took it: the new lock is FRESH, so it is
-      // not wedged and the flag buys nothing.
-      expect(acquire('launcher-b', opts({ takeWedged: true }))).toBe('held')
+    it('TWO STARTERS CANNOT BOTH ACT — the second loses cleanly', () => {
+      expiredOwner(60_000)
+      expect(acquire('launcher-a', opts())).toBe('acquired')
+      expect(acquire('launcher-b', opts())).toBe('held')
       expect(readOwnerLock(lockPath).sessionId).toBe('launcher-a')
     })
 
-    it('an owner that came back to life in the race window keeps its lock', () => {
-      wedgedOwner(WEDGED_MS + 60_000)
-      // The recheck INSIDE the reap mutex is what must see the fresh heartbeat, so
-      // the probe stays alive and only the lock file moves on.
+    it('an owner that RENEWED in the race window keeps its lock', () => {
+      expiredOwner(60_000)
+      // The recheck INSIDE the reap mutex is what must see the renewal, so the probe
+      // stays alive and only the lock file moves on.
       let calls = 0
       const probePidFn = () => {
         calls += 1
-        if (calls === 1) wedgedOwner(1000) // heartbeat written between the two reads
+        if (calls === 1) {
+          writeFileSync(
+            lockPath,
+            JSON.stringify({
+              sessionId: 'stalled',
+              claimedAt: Date.now() - 1000,
+              leaseUntil: Date.now() + LEASE_MS,
+              pid: 999999,
+            }),
+          )
+        }
         return aliveProbe
       }
-      expect(acquire('launcher', opts({ takeWedged: true, probePidFn }))).toBe('held')
-      expect(readOwnerLock(lockPath).sessionId).toBe('wedged')
+      expect(acquire('launcher', opts({ probePidFn }))).toBe('held')
+      expect(readOwnerLock(lockPath).sessionId).toBe('stalled')
     })
   })
 
@@ -1515,7 +1298,9 @@ describe('the lock write: retried, atomic, propagating, and swept up after (poin
       bootTime: 0,
       probePidFn: (pid) => ({ exists: pid !== 7777, startedAt: null }),
     })
-    expect(readdirSync(dir).sort()).toEqual(['batch-lock.json', 'batch-lock.json.tmp-4242'])
+    // `batch-fence.json` is written by the acquisition itself (point 434) and is
+    // NEVER swept: it is the one record that outlives the lock.
+    expect(readdirSync(dir).sort()).toEqual(['batch-fence.json', 'batch-lock.json', 'batch-lock.json.tmp-4242'])
   })
 })
 
@@ -1654,10 +1439,18 @@ describe('constants sanity', () => {
   it('the takeover grace is well above the heartbeat cadence and DEAD_CONFIRM < LEGACY_STALE', () => {
     expect(DEAD_CONFIRM_MS).toBeGreaterThanOrEqual(5 * 60 * 1000)
     expect(LEGACY_STALE_MS).toBeGreaterThan(DEAD_CONFIRM_MS)
-    // NOT strictly greater since point 433: the wedge threshold came down to the
-    // legacy-stale bound, so 45 minutes of silence now costs the batch lock whether
-    // or not the lock records a pid. Tighter than the legacy bound would be wrong —
-    // a pid is evidence of life a bare timestamp is not.
-    expect(WEDGED_MS).toBeGreaterThanOrEqual(LEGACY_STALE_MS)
+  })
+
+  it('THE LADDER IS MONOTONE (point 434): renew < lease < the external watcher', () => {
+    // Each rung must be able to act before the next one is reached, or a layer is
+    // decoration. The renewal interval bounds how stale a lease may be when a long
+    // call starts; the lease bounds how long a standstill can hold the batch; and
+    // the GitHub-Actions watchdog (STALL_MINUTES 120, off this machine) is the
+    // backstop, judging repository OUTPUT rather than a heartbeat — the signal the
+    // local layer read wrongly all night.
+    expect(LEASE_RENEW_INTERVAL_MS).toBeLessThan(LEASE_MS)
+    expect(LEASE_MS - LEASE_RENEW_INTERVAL_MS).toBeGreaterThan(40 * 60_000) // the LARGE regression
+    expect(LEASE_MS).toBeLessThan(120 * 60_000) // the external watcher's window
+    expect(LEASE_MS).toBeGreaterThan(LAUNCHER_TICK_MS) // a tick can never outrun the lease
   })
 })

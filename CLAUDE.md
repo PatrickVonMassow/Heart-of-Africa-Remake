@@ -289,16 +289,19 @@ old→new coverage map live in `scripts/verify/README.md`.
   without that marker, allows one only against the work order and an armed
   `HoA-Batch-Autostart`, then marks the lock HANDED OVER so the launcher spawns
   the successor — five hours were lost to a session that stopped holding it.
-  Attended, ask for `/clear`. The "cheaper model" idea stays REJECTED.
+  Attended, ask for `/clear`. OWNERSHIP IS A LEASE (30.07.2026): `leaseUntil` on
+  the lock, renewed BEFORE each call; an owner that stops renewing stops owning
+  the batch — arithmetic, nothing killed, and the three verdicts that read a
+  seven-hour standstill as alive are gone. A PreToolUse fence then refuses it
+  merge/push, the tick, the board publish and `dashboard-state.json`.
   THE WAY BACK (28.07.2026): a returning window runs `node
-  scripts/batch-claim.mjs --session <id>` (the stand-down prints it filled in);
-  the owner sees it at its next hook, finishes — never mid-merge, never with an
-  agent or a verification running — releases, and the same command takes it. A
-  claim expires, a dead claimant's is ignored, one session ever wins.
-  A MESSAGE WAKES IT TOO (29.07.2026): `scripts/chat-watcher.mjs` subscribes to
-  the chat inbox and spawns a light responder — only with no live owner and no
-  honoured claim, under a bounded claim and the launcher's own stops; the
-  launcher tick supervises it.
+  scripts/batch-claim.mjs --session <id>`; the owner sees it at its next hook,
+  finishes — never mid-merge, never with an agent or a verification running —
+  releases, and the same command takes it. A claim expires, a dead claimant's is
+  ignored, one session ever wins.
+  A MESSAGE WAKES IT TOO (29.07.2026): `scripts/chat-watcher.mjs` spawns a light
+  responder from the chat inbox — only with no live owner and no honoured claim,
+  under a bounded claim; the launcher tick supervises it.
 - **Model policy (user decision 25.07.2026, points 309 + the role revision).**
   ONLY three models may author work on this project, each with its own role:
   **Opus 5** is the WORKER at any difficulty; **Fable 5** is used ONLY for the

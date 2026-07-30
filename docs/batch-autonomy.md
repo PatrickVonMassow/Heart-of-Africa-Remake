@@ -359,50 +359,50 @@ Three changes, and none of them loosens the singleton:
      (15 minutes, one full launcher tick). A headless `claude -p` exits and is
      taken over at once by the ordinary dead-pid path, so the grace only ever
      costs an interactive window something.
-3. **A silent owner is reported, and a deepening silence escalates.** Past a
-   calibratable age (`WEDGE_NOTIFY_MS`, `HOA_WEDGE_NOTIFY_MIN` to tune) the
-   launcher sends one `high` ntfy notification, and one `urgent` one
-   again when the same silence crosses `WEDGED_MS` — keyed on session + pid + the
-   heartbeat it fell silent at + the stage, so the same stall is not repeated
-   tick after tick, while a deeper or a later one is. One report and then
-   permanent silence would repeat the incident's own shape, which was that nobody
-   looked.
-4. **AND THE VERDICT NOW HAS A CONSEQUENCE (point 433, 30.07.2026).** For one
-   night it did not, and the night was lost: at 21:50 both delegated agents died on
-   a server-side 500, the environment's permission classifier went down moments
-   later, and the owning session could not execute a single command. It had not
-   crashed — it stood. From 00:06 the launcher logged the identical line every
-   fifteen minutes — "WEDGED owner: pid alive but heartbeat 251 min old", then 266,
-   281, 296 … 371 — nine findings over two hours, no successor, no release, nothing.
-   A verdict without a consequence is a comment. Four changes, all in the launcher:
-   - **The threshold, measured.** `WEDGED_MS` was FOUR HOURS, longer than any
-     unattended stretch worth rescuing; it is now **45 minutes**, calibrated against
-     the only thing that legitimately starves the heartbeat — one long tool call,
-     since the heartbeat is a PostToolUse hook. Measured over this project's 43
-     transcripts (32 440 tool calls): p99 8.9 min, p99.9 10.0 min, fifteen calls
-     above 15 min; of the ten above 20 min, five were waits on the USER and three
-     were declared background waits, so the longest undeclared unattended call was
-     27.8 min. `WEDGE_NOTIFY_MS` is now DERIVED as one launcher tick below it, so
-     the ladder can never invert.
-   - **The launcher acts.** `wedgeTakeover` licenses taking the lock through the
-     SAME atomic acquire (`takeWedged`, re-verified inside the reap mutex, so two
-     launchers can never both act and an owner that came back to life in the race
-     window keeps its lock). Nothing is killed: the wedged process keeps running,
-     stops owning the batch, and learns it at its next hook when the guards stand it
-     down. The new lock records `takenFromWedged`, so the morning reader sees why.
-   - **The own-spawn condition is GONE.** `wedgeAction` could always kill and take
-     over — but only the launcher's OWN spawn, and that night's owner had been
-     started by hand, so the verdict fell through to a log line. A wedged owner is
-     now taken over whoever started it. The reap still needs the stronger
-     `work-stalled` finding; age alone may dispossess but never end a process.
-   - **Repetition is the signal.** `verdictRepeat` escalates once when the same
-     verdict has stood for two ticks and then stops printing it. What reads
-     identically nine times is not truer the tenth, only dearer.
-   What may NEVER trigger a take: an in-flight declaration merely growing old. A
-   declaration whose work still ADVANCES keeps the owner alive-and-not-wedged at any
-   age, and `LAUNCHER_WORK_MAX_AGE_MS` was written out as its own four-hour value
-   instead of borrowing `WEDGED_MS` precisely so the drop to 45 minutes could not
-   turn an expiry into a dispossession. A long verification is not shot in the back.
+3. **OWNERSHIP IS A LEASE, AND THAT IS THE WHOLE VERDICT (point 434, 30.07.2026).**
+   For one night it was not, and the night was lost: at 21:50 both delegated agents
+   died on a server-side 500, the environment's permission classifier went down
+   moments later, and the owning session could not execute a single command. It had
+   not crashed — it stood. The launcher ticked all night and concluded "owner
+   alive" every time, because THREE separate verdicts each inferred liveness from
+   silence and each was satisfied by a merely breathing process.
+   All three are gone (`docs/batch-resilience.md` §6). What decides now:
+   - **`leaseUntil` on the lock, renewed BEFORE each tool call** (PreToolUse, in
+     `board-first-guard.mjs`) — never after it, because the PostToolUse heartbeat
+     fires when a call RETURNS, so a lease renewed there would have to outlive the
+     longest single call. The window is 60 minutes and a renewal happens at most
+     every 5, giving a guaranteed 55 minutes of cover — above the LARGE regression
+     (30–40 min) and about twice the longest undeclared call measured over this
+     project's 43 transcripts / 32 440 tool calls (27.8 min; p99 8.9, p99.9 10.0).
+     A wait that needs longer says so IN ADVANCE by writing a longer lease
+     (`extendLease`); nothing is inferred from evidence any more.
+   - **Expiry is arithmetic.** `assessOwner` compares two numbers and answers
+     `lease-expired`; the ordinary takeover path — the one a dead owner has always
+     opened — does the rest. There is no flag to pass, no wedge to prove and no
+     own-spawn condition to satisfy. That condition is precisely what fell through
+     to a log line on the lost night, because the owner had been started by hand.
+   - **Nothing is killed.** The dispossessed process keeps running, stops owning
+     the batch, and learns it at its next hook when the guards stand it down. The
+     new lock records `takenFromExpiredLease`, and the launcher logs `LEASE
+     EXPIRED: …` naming who, how long they were silent and what they had declared
+     — there is no silent recovery. `verdictRepeat` still escalates once if the
+     same expiry stands for two ticks: a takeover that does not resolve the
+     standstill is the finding worth a person's attention.
+   - **A fence backs it** (`.claude/batch-fence.json`, monotonic, never deleted):
+     one PreToolUse chokepoint refuses a session whose fence has been superseded
+     the four paths that have no guard of their own — the TASKS.md tick and archive
+     move, `git merge`/`push`, the board publish and `dashboard-state.json`. Only a
+     session that demonstrably HELD a fence can be refused, so a window that never
+     drove the batch is never blocked, and a missing fence file blocks nobody.
+   A declaration no longer extends ownership at all: it is read for the REPORT, and
+   `LAUNCHER_WORK_MAX_AGE_MS` bounds how long it stays readable as one.
+4. **The threshold that preceded it (point 433, superseded).** Before the lease,
+   the launcher's own wedge verdict was brought down from four hours to 45 minutes
+   and given the power to act. That mechanism — `WEDGED_MS`, `WEDGE_NOTIFY_MS`,
+   `wedgeAction`, `wedgeTakeover`/`takeWedged`, the two-stage silence report — no
+   longer exists; the measurement behind it survives as the calibration of the
+   lease window above. Recorded because the log lines it wrote still sit in
+   `.claude/autostart.log`, and the handover observer still parses them.
 5. **A spawn into a broken environment is not a rescue (point 433, the hole the
    second model's review found — `docs/batch-resilience.md` §4).** Item 4 alone
    would turn a silent night into a loud one: the successor wedges the same way, and
@@ -667,66 +667,32 @@ declaration above.
    and evidence recency alone decides "is it moving", so an aged declaration still
    proves progress. A DEAD pid stays dead whatever the evidence says: the process
    checks come first and are untouched.
-4. **The only bound left is on stall, not on duration.** When nothing has advanced
-   for `WORK_STALL_TICKS` launcher ticks (6 = 90 minutes of complete silence:
-   no tool call from the owner AND no declared work moving), `assessOwner` returns
-   `work-stalled`. The launcher then sends an urgent ntfy naming what stalled and,
-   if the frozen owner is a headless spawn of its OWN making, reaps it and takes
-   over in the same tick — after CONFIRMING the exit, because taking the lock
-   beside a running process is the e9407cae incident. An interactive window is
-   never killed; the user is told instead. A healthy agent, however slow, advances
-   something, so a false kill needs the work to be genuinely frozen. Some bound
-   must remain (nothing can decide halting), but it now measures the right thing.
+4. **The bound is the LEASE, not a stall verdict (point 434, 30.07.2026).** This
+   item used to describe `WORK_STALL_TICKS` — six launcher ticks of complete
+   silence, after which `assessOwner` returned `work-stalled` and the launcher
+   could reap a headless spawn of its own making. That verdict is GONE, together
+   with `WEDGED_MS` and the two-stage silence report, because all three inferred
+   liveness from silence and all three read the standstill of 29./30.07.2026 as a
+   live owner. What bounds a standstill now is the owner's own `leaseUntil`: it is
+   renewed BEFORE each tool call and expires by arithmetic (item 3 above), so
+   nothing needs to decide whether a silence "means" anything. The launcher no
+   longer kills anything at all on this path — an expired lease costs the lock and
+   nothing else, and the process learns it at its next hook.
 
-**Why 90 minutes and not 30** (four-eyes review, finding 1.1). The heartbeat is a
-PostToolUse hook, so ONE long tool call starves it, and the longest LEGITIMATE
-silence in this repository is a LARGE browser regression at roughly 30-40 minutes
-— which is what `WEDGE_NOTIFY_MS` is calibrated against. A 30-minute stall bound
-therefore sat BELOW the documented normal silence, and this verdict can end in a
-kill. Six ticks follows the same better-than-2x headroom rule.
+Two deliberate narrownesses, so neither reads as an oversight.
 
-Three deliberate narrownesses, so none reads as an oversight.
-
-- **Only a CURRENT declaration may tighten the bound** — but "current" is measured
-  with the LAUNCHER's window, `LAUNCHER_WORK_MAX_AGE_MS` (four hours), never with
-  the Stop guard's `IN_FLIGHT_MAX_AGE_MS`. Past it a
-  declaration still proves progress but no longer licenses the stall verdict, and
-  the pre-402 four-hour valve covers the rest exactly as before.
-  **This is where the feature was dead code** (second four-eyes review,
-  28.07.2026, finding A). The launcher first asked with the guard's 45 minutes,
-  and the three constants are then mutually exclusive: the declaration had to be
-  older than the 90-minute stall bound and younger than 45 minutes at the same
-  moment, and `lastWord` pins the two ages to the SAME number because the declare
-  command's own PostToolUse heartbeat lands seconds after `declaration.at`. Driven
-  minute by minute over five hours after a total freeze, `work-stalled` never
-  fired once; every tick fell through to the four-hour valve. The two questions
-  are genuinely different — the guard asks "may a turn end ride on this?", where
-  an aged declaration must stop counting, while the launcher asks "is this the
-  owner's LAST WORD?", where age is not the disqualifier — and widening the
-  launcher's window reopens no idle-night hole, because `lastWord` already
-  excludes every session that worked after declaring. The window is four hours —
-  written out rather than borrowed from `WEDGED_MS`, which point 433 dropped to 45
-  minutes; borrowed, it would have collapsed with it and turned a declaration's
-  EXPIRY into a dispossession —
-  rather than the bare minimum that makes it non-empty (`WORK_STALL_MS +
-  WORK_DECLARATION_TOLERANCE_MS`) because non-empty is not reachable: that value
-  opens a band two minutes wide, and the launcher looks once per
-  `LAUNCHER_TICK_MS`, so seven schedules in eight would step straight over it.
-  `scripts/batch-in-flight-core.test.mjs` drives the real
-  `assessOwnerWork` → `assessOwner` pipeline across five hours and asserts that
-  every phase of the 15-minute schedule sees the stall — hand-crafted `work`
-  objects, which is what the original tests used, cannot witness this.
-- **The declaration must be the owner's LAST WORD** (four-eyes review, finding
-  1.1). `assessOwner` licenses `work-stalled` only while
-  `claimedAt <= declaredAt + WORK_DECLARATION_TOLERANCE_MS` — the same comparison
-  the handover rests on, for the same reason: the PostToolUse heartbeat stamps
-  `claimedAt` on every tool call, so a heartbeat NEWER than the declaration proves
-  the session went on working after declaring. Nothing forces a session to clear a
-  declaration when its agent finishes, and the replayed failure was exactly that:
-  declare, agent finishes, merge, start `npm run test:large`, and 31 minutes of
-  perfectly legitimate silence later a still-current declaration with quiet
-  evidence would have been read as a stall and reaped MID-REGRESSION. Such
-  leftover paperwork now licenses at most the old four-hour valve.
+- **The launcher reads a declaration with its OWN window**,
+  `LAUNCHER_WORK_MAX_AGE_MS` (four hours), never with the Stop guard's
+  `IN_FLIGHT_MAX_AGE_MS` (45 min). The two questions genuinely differ: the guard
+  asks "may a turn end ride on this?", where an aged declaration must stop
+  counting, while the launcher asks "what was this owner waiting on?" — a question
+  age does not disqualify. Since point 434 the answer feeds the REPORT and nothing
+  else, so the window bounds how long a declaration stays quotable, not what may be
+  done to the session holding it. (Historically this asymmetry was where the
+  demolished `work-stalled` verdict turned out to be dead code: asked with the
+  guard's 45 minutes, the constants it needed were mutually exclusive and it never
+  fired once across five simulated hours. The verdict is gone; the window keeps its
+  own written-out value so it can never collapse by borrowing another constant.)
 - **A declaration no probe can answer is treated as no evidence rather than as
   proof**, so an unanswerable kind can neither keep a corpse alive nor be gamed
   into one.
@@ -755,21 +721,22 @@ probes from its own working directory, not from the one the declaration was
 written in. `normRef` keeps a string belt for what git will not resolve (`heads/…`
 and a `…@{0}` revision expression have no symbolic name), and `@` joins `main` and
 `HEAD` on the always-refused list.
-And past the `WEDGED_MS` threshold the launcher notifies REGARDLESS of
-whether work is advancing (`silenceStage`), naming the evidence in the message —
-notify only, never a kill. The TAKE is the stricter of the two: `wedgeTakeover`
-refuses while work advances, so live evidence still protects the owner's lock even
-where it no longer buys it silence.
+Since point 434 no amount of live evidence protects a lock: the lease does that,
+and only by being renewed. Evidence that goes quiet is reported, evidence that
+keeps moving is reported too, and neither buys the owner a minute more of
+ownership than it asked for in advance.
 
-Pinned in `scripts/batch-singleton-core.test.mjs` (a silent heartbeat with a
-moving branch reads ALIVE, the same silence with every probe quiet reads WEDGED,
-a heartbeat NEWER than the declaration never reaches a kill, a dead or reused pid
-stays dead whatever the evidence says, an unanswerable declaration is no evidence,
-and with NO declaration the pre-402 verdict is unchanged — plus `isOwnSpawn`,
-`silenceStage` and `wedgeAction`, which pin that only a spawn of the launcher's own
-making, matched by pid AND start time, is ever killed) and in
+Pinned in `scripts/batch-singleton-core.test.mjs` (an expired lease is takeable
+and a running one is not, a fresh heartbeat with an implicit lease reads ALIVE, a
+dead or reused pid stays dead whatever the evidence says, the fence is granted on
+acquisition and survives the lock being deleted, and a renewal is owner-guarded,
+rate-limited and refused under a stale fence — plus `isOwnSpawn`, which pins that
+only a spawn of the launcher's own making, matched by pid AND start time, is ever
+killed), in `scripts/batch-lease-core.test.mjs` (the pure lease/fence/chokepoint
+rules, each case naming the failure of 29./30.07. it would have prevented) and in
 `scripts/batch-in-flight-core.test.mjs` (`assessOwnerWork`,
-`selfReferentialEvidence`).
+`selfReferentialEvidence`, and the real pipeline driven across five hours to show
+the declaration now reports while the lease decides).
 
 ### The two costs of switching the ceiling off, and what pays them
 
