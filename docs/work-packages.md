@@ -8,22 +8,27 @@ and nothing else, so the "saved round" it would buy is two minutes — and a who
 bundle on one branch lands every one of its features in a single merge, which is
 neither reviewable nor attributable when one of them is wrong.
 
-What the bundle still IS, and why the grouping earns its keep:
+**THE BUNDLE SAVES NEITHER TIME NOR TOKENS — say so, do not re-derive it.** The
+scheme was cut on 29.07.2026 with a saving as its stated purpose ("n points cost
+one verification round together and n apart"), and by 30.07.2026 the user had
+taken that claim apart, step by step, and it does not survive:
 
-- **The ORDER.** It is the priority ranking, nothing more. It was first written
-  here as "the same code stays fresh across the points instead of being
-  re-learned" — THAT IS FALSE and the user caught it (30.07.2026): every point
-  goes to a worktree-isolated subagent with a FRESH context and a brief, and the
-  main session hands over at each point boundary, so nothing is carried between
-  two points of a bundle. The freshness only becomes real when the SAME running
-  agent is handed the bundle's next point instead of a new one being spawned —
-  which is what happened with 439 → 452 that evening, and is why point 471 makes
-  it the rule rather than an accident. NARROWLY, though, on the user's objection
-  the same day: a carried context is also a diluted one, so the reuse holds only
-  where the next point touches files the agent already has open, the follow-up
-  arrives as a full brief that closes the previous point explicitly, no context
-  takes a third point, and the comparison against fresh-agent work decides
-  whether the rule survives.
+- The regression is SCOPED per change, so a scripts- or docs-only member's
+  "shared round" is a two-minute Vitest run.
+- Nothing is carried between two points of a bundle: each goes to a
+  worktree-isolated agent with a fresh context and a brief, and the main session
+  hands over at every point boundary. The "related code stays fresh" line that
+  stood here was simply wrong.
+- The one real carry — handing the next point to the agent that already has the
+  files open, as with 439 → 452 — is possible only on FILE OVERLAP, and it is
+  fenced in by point 471 (full brief closing the previous point, one commit per
+  point, no third point in one context, dropped if reused work draws more review
+  findings). What is left of the saving is small and deliberately capped.
+
+So the grouping is kept for what it actually does, and the savings argument is
+retired:
+
+- **The ORDER** is the priority ranking. Nothing more.
 - **The COLLISION MAP.** The split follows SHARED FILES, so it says which points
   must NOT run in parallel. Two points in the same bundle that touch the same
   module go on ONE branch — one commit each — because parallel agents would
@@ -32,11 +37,23 @@ What the bundle still IS, and why the grouping earns its keep:
 - **The BOARD.** The queue is grouped by bundle, which is what makes ~100 open
   points readable on a phone.
 
+The collision map is the only one of the three that is load-bearing, and it is a
+HAND-MAINTAINED APPROXIMATION of something measurable: which points touch the same
+files. Deriving it instead of curating it would make the grouping both cheaper and
+harder to get wrong — an open thread, not a decision taken.
+
 Where the heavy verification really is per-branch expensive — the render bundles,
 whose points need the browser suites on both backends — the saving is taken at the
-END instead: several finished per-point branches merge, and ONE regression runs
-over the merged result. Per-point branches and per-bundle regression rounds are
-not in conflict.
+END: several finished per-point branches merge, and ONE regression runs over the
+merged result. That saving is real and is the only sizeable one left, but it comes
+from BATCHING THE MERGE, not from the bundle — any set of finished branches can be
+merged together, related or not.
+
+AND UNTIL POINT 471 LANDS THE SCHEME COSTS TIME. The order walks the bundles
+strictly in sequence while a bundle's members are, by construction, the points that
+cannot run beside each other — so the leading bundle can feed one agent while two
+of three slots stand idle. That is not a small residual; it is the largest single
+effect the bundling currently has on wall-clock, and its sign is negative.
 
 Bundles A–J were agreed with the user on 29.07.2026. K, L and M were cut the same
 evening for the open points the original scheme never covered, under the user's
