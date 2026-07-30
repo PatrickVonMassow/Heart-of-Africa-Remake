@@ -2774,6 +2774,20 @@ it is appended.
   MEASURE THE RESULT: report the %/h rate for the first full day after the change
   against today's 1.25 %/h. The point counts as delivered when the rate is measured, not
   when the mechanism runs.
+  MEASURED 30.07.2026, AND THE CRITERION IS NOT MET — the honest outcome, reported rather
+  than rounded. Per session the boundary works: median peak context 650k → 284k, p90
+  1000k → 590k. Per ACTIVE HOUR the spend fell only 11 %, from 1.25 to 1.11 %/h against
+  the 0.6 %/h that fits. The reason is in the same figures: 89 % of the spend still comes
+  from turns above 150k, so halving the PEAK barely moves a bill dominated by everything
+  under it. Recomputable with `node scripts/measure-context-cost.mjs`.
+  WHAT FOLLOWS, and it is what keeps this point open: the point boundary is too COARSE a
+  lever. The next one has to cut inside a session rather than between sessions — the
+  candidates, to be measured before one is chosen, are (a) a boundary at a bundle MEMBER
+  rather than at the bundle, (b) delegating the reading-heavy part of a point so the
+  parent never carries the files at all (the brief mechanism already does this for specs;
+  the same is missing for source), and (c) an explicit context budget per point after
+  which the session hands over mid-point with a written handoff. Pick by measurement, not
+  by preference, and report the %/h again — the criterion stays the one above.
 
 - [ ] 379. ABU SIMBEL BECOMES A WALKABLE SITE (user 27.07.2026; a FEATURE, and the user's
   own instruction is that the open DEFECTS come first — it waits behind them). The world carries
