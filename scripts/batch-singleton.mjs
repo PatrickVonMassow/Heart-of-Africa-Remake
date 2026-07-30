@@ -497,9 +497,15 @@ export function silenceStage({ ageMs, advancing = false, notifyMs = WEDGE_NOTIFY
  * was lost: the owner had been started BY HAND, so `own` was false, and the whole
  * verdict fell through to a log line printed nine times. A wedged owner is taken
  * over whoever started it — the authority already existed, it was merely too narrow.
- * `own` is still REPORTED, because the message should say which kind of process is
- * being reaped, and the reap still needs the strong `work-stalled` finding: age
- * alone may take the lock (`wedgeTakeover`) but never end a process.
+ * WHAT THE CONDITION IS STILL NEEDED FOR: killing. Dropping it from the TAKEOVER
+ * was the fix; dropping it from the KILL as well would let the launcher end a
+ * process it never started — including an attended window of the user's that
+ * declared a wait and then went quiet. The second model's review of this very
+ * commit found five places still promising the opposite, one of them a
+ * notification that says "nothing is being killed" while killing. So the reap
+ * stays where it was: the launcher's OWN headless spawn, and only on the stronger
+ * `work-stalled` finding. A foreign wedged owner is DISPOSSESSED instead, which is
+ * what the lost night actually needed — it was the non-stalled path.
  *
  * Returns { stalled, own, notify, kill, takeover }.
  */
@@ -511,13 +517,13 @@ export function wedgeAction({ assessment, lock, lastSpawnPid, lastSpawnAt, probe
     stalled,
     own,
     notify: stalled ? 'urgent' : null,
-    // Only the POSITIVE stall finding ends a process — the plain clock verdict may
-    // dispossess but never kill.
-    kill: stalled && reapable,
+    // Only the POSITIVE stall finding ends a process, and only one this launcher
+    // started: an unknown identity is never a licence to kill.
+    kill: stalled && reapable && own,
     // Taking the lock beside a process that is still running is the incident this
     // module exists to prevent, so the call site still waits for a CONFIRMED exit
     // before it takes over on the back of a kill.
-    takeover: stalled && reapable,
+    takeover: stalled && reapable && own,
   }
 }
 

@@ -607,9 +607,9 @@ describe('spawnDecision (scenario 2 + 4: the launcher path)', () => {
 // ---------------------------------------------------------------------------
 // WHAT A WEDGE EARNS (point 402 (d)). Two kinds reach the launcher and they are
 // not the same finding: a `work-stalled` verdict is positive evidence that
-// nothing is moving, while the four-hour valve is still only a clock reading. The
-// rule that binds both is older than either: the launcher only ever kills a
-// process it spawned itself.
+// nothing is moving, while the silence valve — 45 minutes since point 433, four
+// hours before it — is still only a clock reading. The rule that binds both is
+// older than either: the launcher only ever kills a process it spawned itself.
 describe('wedgeAction (the launcher’s consequence for a wedged owner)', () => {
   const stalled = { alive: true, wedged: true, reason: 'work-stalled' }
   const aged = { alive: true, wedged: true, reason: 'pid-alive' }
@@ -627,27 +627,35 @@ describe('wedgeAction (the launcher’s consequence for a wedged owner)', () => 
     })
   })
 
-  it('THE OWN-SPAWN CONDITION IS GONE: a hand-started owner is reaped and taken over too', () => {
-    // THE REASON THE NIGHT OF 30.07.2026 WAS LOST (point 433). The owner had been
-    // started by hand, so `own` was false, and the whole verdict fell through to a
-    // log line the launcher printed nine times over two hours. The authority
-    // existed; it was merely too narrow.
+  it('THE OWN-SPAWN CONDITION IS GONE FROM THE TAKEOVER — but never from the kill', () => {
+    // THE REASON THE NIGHT OF 30.07.2026 WAS LOST (point 433): the owner had been
+    // started by hand, so `own` was false and the whole verdict fell through to a log
+    // line the launcher printed nine times over two hours. Dispossession is therefore
+    // open to any wedged owner — see `wedgeTakeover`, which needs no `own` at all.
+    //
+    // ENDING A PROCESS is the other question, and the second model's review of this
+    // very commit caught the widening: `kill` had become `stalled && reapable`, which
+    // would end a process the launcher never started — an attended window of the
+    // user’s that declared a wait and then went quiet included. An unknown identity
+    // is never a licence to kill, so both reap fields keep the condition.
     expect(wedgeAction({ ...ours, lock: { pid: 901 } })).toMatchObject({
       stalled: true,
       own: false,
       notify: 'urgent',
-      kill: true,
-      takeover: true,
+      kill: false,
+      takeover: false,
     })
-    // A recycled pid or an unverifiable start time no longer withholds the reap
-    // either — they only change what `own` REPORTS, i.e. how the message reads.
+    // A recycled pid or an unverifiable start time withholds the reap for the same
+    // reason: what cannot be identified cannot be ended.
     expect(wedgeAction({ ...ours, probe: { exists: true, startedAt: NOW - 20 * 60_000 } })).toMatchObject({
       own: false,
-      kill: true,
-      takeover: true,
+      kill: false,
+      takeover: false,
     })
-    expect(wedgeAction({ ...ours, probe: null }).kill).toBe(true)
-    expect(wedgeAction({ ...ours, lastSpawnAt: 0 }).kill).toBe(true)
+    expect(wedgeAction({ ...ours, probe: null }).kill).toBe(false)
+    expect(wedgeAction({ ...ours, lastSpawnAt: 0 }).kill).toBe(false)
+    // The launcher’s OWN stalled spawn is still reaped — that path is untouched.
+    expect(wedgeAction(ours)).toMatchObject({ own: true, kill: true, takeover: true })
   })
 
   it('THE CLOCK VERDICT ALONE NEVER KILLS — it may only dispossess', () => {

@@ -496,6 +496,13 @@ const verdict = lock ? spawnDecision(assessment) : 'spawn'
 if (verdict === 'skip-alive') {
   const why = assessment.reason === 'work-advancing' ? `; work advancing — ${work.summary}` : ''
   log(`skip: owner alive (${assessment.reason}; heartbeat ${Math.round((now - lock.claimedAt) / 60000)} min old, pid ${lock.pid ?? 'unknown'}${why})`)
+  // A healthy tick ENDS the repetition count (four-eyes nit on point 433 (c)):
+  // without this a later, identically-worded wedge episode of the same owner would
+  // escalate on its second tick instead of its own count, because the key never
+  // stopped matching. The direction is harmless either way, but "escalates after N
+  // repeats" should mean N repeats of THIS episode.
+  delete state.wedgeVerdictKey
+  delete state.wedgeVerdictRepeats
   writeJsonAtomic(C('autostart-state.json'), state)
   process.exit(0)
 }
