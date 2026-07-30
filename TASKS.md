@@ -3511,7 +3511,20 @@ it is appended.
   prevented, plus one INDEPENDENCE case per layer — it still acts while the other layers'
   inputs are missing or stale. The full list is `docs/batch-resilience.md` §8.
   MECHANISM REVIEW REQUIRED per layer (CLAUDE.md §7.2); the design itself is reviewed.
-  (6) THE BOUNDARY CARD MUST NAME WHERE THE BATCH ACTUALLY GOES (found 29.07.2026 20:06).
+  (6) THE DEADLINES OF THE HANDOVER ARE WRONG FROM BOTH SIDES, and they belong to this
+  point because they are the same clock family as the lease. A batch CLAIM expires after
+  30 minutes — shorter than the owner's own gap between clean turn ends — so a takeover
+  silently fails; and keeping it alive is itself a background refresher that DIES SILENTLY
+  (measured 29.07.2026 20:00 in session 10a2d2e0: a watcher hit a 60-minute timeout and the
+  claim would have lapsed at 20:29 unnoticed). The IN-FLIGHT declaration has the same shape:
+  it expires after 45 minutes and is never refreshed while the work runs, so at 19:51 it read
+  `live:false, expired` while its agent had been building for 63 minutes and was mid-merge —
+  the declared-work check was lying while only the heartbeat proved liveness. TARGET: the
+  handover must not hang on a deadline somebody has to keep feeding; judge it by OUTPUT the
+  way (2) and (5) do. In the same edit, `scripts/batch-resume-hook*.mjs` states the expiry it
+  currently hides — it prints "re-running the SAME command takes it" and never says the claim
+  ages out, so a returning session claims once, waits, and never learns why nothing happened.
+  (7) THE BOUNDARY CARD MUST NAME WHERE THE BATCH ACTUALLY GOES (found 29.07.2026 20:06).
   It says "Ich übergebe an eine frische Sitzung … Sie nimmt den nächsten Punkt der
   Warteschlange auf" even while a user window holds an HONOURED claim — and that is not what
   happens: `batch-autostart.mjs` reserves the batch for a live claim and SKIPS the spawn, so
@@ -3599,6 +3612,46 @@ it is appended.
   `.claude/settings.json` wiring is attended-only and must be ABSOLUTE, not cwd-relative.
   DOCS in the same commit: `docs/batch-autonomy.md` (the guard chain) and, for (B),
   `docs/work-packages.md` states that its membership is now checked rather than remembered.
+
+- [ ] 438. THE PROJECT HOOKS CANNOT FIRE OUTSIDE THE REPO ROOT (29.07.2026, measured in a
+  `/doctor` run and reviewed by the second model; bundle J). All 31 project hooks in
+  `.claude/settings.json` are wired RELATIVELY (`node scripts/x.mjs`), so a session whose cwd
+  is not the repo root loses the WHOLE guard chain to a non-blocking `Cannot find module` —
+  silently, because a non-blocking hook error produces no notice. MEASURED over 46 transcripts
+  (06.–29.07.): session 8210a7ce 99 failures against 11 successes, 830a6878 44/51, f8c46e2f
+  43/245, 68c8c394 12/81, plus two worktree sessions. The failing cwds are the memory
+  directory, `hoa/local`, `~/.claude`, a second checkout, and removed agent worktrees; most
+  frequent are lock-heartbeat 45×, prep-arm 28×, closing-guard 26×, board-first-guard 20×,
+  every Stop guard 4×. THE PROOF OF CAUSE: the two USER-scope hooks are wired ABSOLUTELY and
+  never failed. The four-eyes review confirmed the damage — a guard blocks via stdout JSON
+  with EXIT 0, so a crash (exit 1) is non-blocking and THE VETO IS LOST: a crashed
+  `closing-guard` would have let a version tag through.
+  THE ROLLOUT, in the shape that review left it, and in this order:
+  (a) PILOT ONE harmless high-frequency hook (`lock-heartbeat-hook`) on
+  `node "$CLAUDE_PROJECT_DIR/scripts/…"` and verify it in a NEW session from a non-root cwd
+  (settings need a session restart) — only then the other 30. Never all at once: a failed
+  expansion would disable all 31 silently.
+  (b) Keep a shell-agnostic fallback ready (a `node -e` bootstrap reading
+  `process.env.CLAUDE_PROJECT_DIR`). A hardcoded absolute path is the LAST resort only —
+  `.claude/settings.json` is committed and would then bind every checkout.
+  (c) The new check belongs in `guard-health-core.mjs`, which already audits "can it fire at
+  all", but it needs STRUCTURED input: `wiringText()` hands it settings plus active git hooks
+  as one blob, and `scripts/git-hooks/pre-push`+`commit-msg` are relative ON PURPOSE (git
+  guarantees the repo root), so a naive check would accuse them.
+  (d) The switch CHANGES WORKTREE SEMANTICS — a worktree agent would run the MAIN tree's
+  guards against main-tree state instead of its own toothless checkout copies. That is
+  better, but it is a deliberate decision and belongs in the commit message, not in a silent
+  side effect.
+  (e) The removed-worktree class is NOT fixed by this (a dead cwd kills the spawn itself) and
+  stays with the worktree-hygiene work.
+  VERIFIABLE: pure Vitest on the wiring audit — a relatively wired project hook is reported, a
+  `$CLAUDE_PROJECT_DIR`-anchored one is not, the two git hooks are never accused, and an
+  unreadable settings file allows (fail-open). Live: one new session started from a non-root
+  cwd shows the piloted hook firing where it previously failed.
+  ATTENDED ONLY: `.claude/settings.json` always raises a permission prompt. MECHANISM REVIEW
+  REQUIRED (CLAUDE.md §7.2).
+  DOCS in the same commit: `docs/batch-autonomy.md` where the guard chain is described, and
+  CLAUDE.md §7.2 only if the families it names change.
 
 ## Closing (only after all points)
 
