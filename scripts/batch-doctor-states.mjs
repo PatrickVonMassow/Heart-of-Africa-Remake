@@ -276,10 +276,17 @@ export const KILLABLE_STRAY_KINDS = new Set([STRAY_KIND.verifyRun, STRAY_KIND.br
  * was indistinguishable from a fortnight-old leftover. `ownerAlive` covers a run
  * the BATCH started, but not a run the user starts in a bare terminal with the
  * launcher armed, and not a delegated agent's in-flight gate outliving its dead
- * parent (`pid-dead` licenses `--repair`). Both were killed mid-run. Same window
- * as the pending lock: ten minutes of running is not a leftover yet.
+ * parent (`pid-dead` licenses `--repair`). Both were killed mid-run.
+ *
+ * THE WINDOW MUST EXCEED THE LONGEST HONEST RUN (four-eyes re-review). Ten
+ * minutes — the pending-lock window — was the wrong evidence class: that one
+ * bounds a spawn, which takes seconds, while a LARGE regression on this machine
+ * runs well past an hour. The gate would have protected such a run for its first
+ * ten minutes and killed it at the eleventh. Two hours is chosen against the
+ * asymmetry the whole rule rests on: a leftover browser lingering two hours costs
+ * some CPU, a killed live run costs the work.
  */
-export const STRAY_MIN_AGE_MS = 10 * 60 * 1000
+export const STRAY_MIN_AGE_MS = 2 * 60 * 60 * 1000
 
 /**
  * The leftovers of this checkout's aborted verification. `processes` is the

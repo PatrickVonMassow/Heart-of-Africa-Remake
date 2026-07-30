@@ -353,7 +353,16 @@ describe('(c) leftover processes of an aborted verification', () => {
       expect(find(marker(), { startTime: justStarted })).toEqual([])
     })
 
-    it('sweeps only once the run is past the pending-lock window, and reports its age', () => {
+    // The window is an ABSOLUTE claim, not a relative one: a LARGE regression on
+    // this machine runs well past an hour, so a test written only against the
+    // constant would follow it downwards and prove nothing. This one fails if the
+    // window is ever set below an honest run again (four-eyes re-review).
+    it('SPARES a ninety-minute regression — the window must exceed the longest honest run', () => {
+      const ninetyMinutes = () => NOW - 90 * 60 * 1000
+      expect(find(marker(), { startTime: ninetyMinutes })).toEqual([])
+    })
+
+    it('sweeps only once the run is past the window, and reports its age', () => {
       const m = marker()
       const atTheEdge = () => NOW - STRAY_MIN_AGE_MS + 1000
       expect(find(m, { startTime: atTheEdge })).toEqual([])
