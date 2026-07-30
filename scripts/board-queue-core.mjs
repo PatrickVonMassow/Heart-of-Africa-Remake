@@ -187,8 +187,17 @@ export function assertNotFlagValue(value, field) {
  * it was restored to satisfy.
  */
 export function paragraphs(value) {
+  // A BLANK LINE INSIDE A STRING SPLITS IT (point 469). Text arrives here from
+  // stdin as one string; taking it whole pressed every card into a single
+  // 70-word block, which is what the conciseness guard rejects and what the
+  // user reads as a wall. The author's own blank line is the paragraph break —
+  // no other separator is invented.
   const one = (v) => (typeof v === 'string' && v.trim() ? v.trim() : null)
-  const list = (Array.isArray(value) ? value : [value]).map(one).filter(Boolean)
+  const split = (v) => (typeof v === 'string' ? v.split(/\r?\n[ \t\r]*\n+/) : [v])
+  const list = (Array.isArray(value) ? value : [value])
+    .flatMap(split)
+    .map(one)
+    .filter(Boolean)
   return list.length ? list : null
 }
 

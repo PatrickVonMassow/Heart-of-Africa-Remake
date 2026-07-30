@@ -194,6 +194,18 @@ describe('paragraphs — a body is a list, however it was written', () => {
     expect(paragraphs(42)).toBeNull()
   })
 
+  it('splits a string on its BLANK LINES — stdin delivers one string (point 469)', () => {
+    expect(paragraphs('Eins.\n\nZwei.')).toEqual(['Eins.', 'Zwei.'])
+    // Windows line endings and an indented blank line separate just the same.
+    expect(paragraphs('Eins.\r\n\r\nZwei.')).toEqual(['Eins.', 'Zwei.'])
+    expect(paragraphs('Eins.\n \nZwei.')).toEqual(['Eins.', 'Zwei.'])
+    // A SINGLE newline is a wrapped line, not a new paragraph.
+    expect(paragraphs('Eins.\nnoch eins.')).toEqual(['Eins.\nnoch eins.'])
+    // Already-split bodies keep working, and a member may split further.
+    expect(paragraphs(['Eins.\n\nZwei.', 'Drei.'])).toEqual(['Eins.', 'Zwei.', 'Drei.'])
+    expect(paragraphs('\n\n')).toBeNull()
+  })
+
   it('survives a stored array in normaliseQueueData', () => {
     const { points } = normaliseQueueData({ points: { 5: { body: ['A.', 'B.'] } } })
     expect(points[5].body).toEqual(['A.', 'B.'])

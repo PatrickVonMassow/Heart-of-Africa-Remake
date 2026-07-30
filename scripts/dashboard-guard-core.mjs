@@ -327,7 +327,9 @@ export function parseCards(sectionHtml) {
     // The split above drops the tag name, so the attributes of THIS card are
     // whatever precedes its first `>` — never the nested cards', which sit past
     // the body's opening tag.
-    const isGroup = /^[^>]*class="[^"]*\bgroup\b/.test(part)
+    // The class list is matched as WHOLE TOKENS, so neither `class="my-group"`
+    // nor `data-class="group"` can buy the exemption.
+    const isGroup = /^[^>]*\sclass="(?:[^"]* )?group(?: [^"]*)?"/.test(part)
     cards.push({ meta, body, title, isGroup, points: [...points] })
   }
   return cards
