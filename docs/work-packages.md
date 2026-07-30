@@ -34,10 +34,13 @@ retired:
   module go on ONE branch — one commit each — because parallel agents would
   otherwise overwrite each other. That is the only case where a branch carries
   more than one point.
-- **The BOARD.** The queue is grouped by bundle, which is what makes ~100 open
-  points readable on a phone.
+- **NOT the board.** The queue was grouped by bundle on 30.07.2026 and the user had
+  it taken back out the same evening (point 472): a flat queue IS the working order,
+  read top to bottom, while a grouped one is not — the pool draws its three slots
+  from different groups. The grouping cost clarity instead of adding it. The bundle
+  is never rendered.
 
-The collision map is the only one of the three that is load-bearing, and it is a
+The collision map is the only one of the two that is load-bearing, and it is a
 HAND-MAINTAINED APPROXIMATION of something measurable: which points touch the same
 files. Deriving it instead of curating it would make the grouping both cheaper and
 harder to get wrong — an open thread, not a decision taken.
@@ -83,7 +86,7 @@ the one the user reads (memory `bundle-names`, retrospective §3.66).
 | **Monumente** | E | Monument sites | 315, 379, 391 |
 | **Tierverhalten** | F | Animal behaviour | 264, 265, 269, 312, 362, 363, 364, 414 |
 | **Kadaver & Geier** | G | Carrion, vultures, staging | 319, 322, 326, 327, 328, 336, 453 |
-| **Chat & Tafel** | H | Chat and board | 440, 451, 465, 467, 470 — the rest landed 30.07.2026 (308, 410, 411, 416, 421, 423, 424, 430, 435, 436, 441, 439, 452) |
+| **Chat & Tafel** | H | Chat and board | 440, 451, 465, 467, 470, 472 — the rest landed 30.07.2026 (308, 410, 411, 416, 421, 423, 424, 430, 435, 436, 441, 439, 452) |
 | **Session- & Repo-Hygiene** | I | Session, pool and repo hygiene | 373, 401, 434, 461, 462, 463, 471 — the rest landed 30.07.2026 (329, 396, 399, 409, 426, 427, 429, 431, 433, 458) |
 | **Modell & Wächter** | J | Model and guard chain | 297, 298, 306, 309, 331, 355, 397, 425, 432, 437, 438, 457, 468 |
 | **Testinfrastruktur** | K | Test and verification infrastructure | 295, 330, 387, 418, 455, 456, 460, 464, 466 |
