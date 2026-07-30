@@ -76,12 +76,10 @@ function balancedEnd(masked, openIdx) {
 /**
  * Every child-process call in one file. PURE.
  *
- * Returns [{ api, line, hasFlag, args }]. `hasFlag` is true when `windowsHide`
- * appears anywhere in the call's own argument span — deliberately generous, because
+ * Returns [{ api, line, hasFlag }]. `hasFlag` is true when `windowsHide` appears
+ * anywhere in the call's own argument span — deliberately generous, because
  * `{ ...opts, windowsHide: true }` and a helper spread are both legitimate and a
  * stricter reading would only invite the flag to be written somewhere unreadable.
- * `args` is that same masked span, so an exception can be written against WHAT the
- * call does instead of which line it sits on (see `ALLOW`).
  */
 export function findChildProcessCalls(text) {
   const src = String(text ?? '')
@@ -96,12 +94,14 @@ export function findChildProcessCalls(text) {
       const openIdx = m.index + api.length
       const end = balancedEnd(masked, openIdx)
       if (end < 0) continue
-      const args = masked.slice(openIdx, end)
       found.push({
         api,
         line: src.slice(0, m.index).split('\n').length,
-        hasFlag: /windowsHide/.test(args),
-        args,
+        hasFlag: /windowsHide/.test(masked.slice(openIdx, end)),
+        // The call's own argument text, so an exception can be scoped to WHAT the
+        // call does rather than to the line it happens to sit on — a line number
+        // survives no merge, and a stale exception is itself a failure here.
+        args: masked.slice(openIdx, end),
       })
     }
   }
@@ -113,44 +113,25 @@ export function findChildProcessCalls(text) {
  * the shape `scripts/audit-check.mjs`'s ALLOW map uses — an exception nobody can read
  * is how a gate becomes decoration.
  *
- * An exception is written against WHAT the call does (`optionsFrom`: it takes its
- * options from a named helper that sets the flag), never against WHICH LINE it sits
- * on. A `lines` pin is still honoured for a case that needs one, but it is not the
- * default any more, and the reason is measured: this map's first entry pinned line
- * 741, another commit landed in the same file the same hour, the call moved to 736,
- * and the gate went red on correct code while the real rule still held. A line
- * number describes where a call is; the exemption is about what it does.
- *
  * `awaiting` marks an exception that is expected to GO: the flag belongs there, and
  * the only reason it is not there yet is that another agent held the file when point
  * 401 was built. Removing the entry is what proves the debt was paid.
  */
 export const ALLOW = {
   'scripts/batch-autostart.mjs': {
-    optionsFrom: ['buildSpawnOptions'],
+    matching: 'buildSpawnOptions',
     why: 'the options come from buildSpawnOptions(), which sets windowsHide: true itself (scripts/batch-autostart-core.mjs)',
   },
+  // The nine `awaiting: bundle H` debts that used to sit here are PAID: the files
+  // those calls live in were free again, the flag is written out in each of them, and
+  // the entries are gone — which is precisely what this map demands as proof.
+  // scripts/chat-watcher.mjs is the one that did NOT become a literal flag: its
+  // responder spawn shares buildSpawnOptions() with the launcher, so it is covered the
+  // same way that call is, by what it does.
   'scripts/chat-watcher.mjs': {
-    optionsFrom: ['buildSpawnOptions'],
+    matching: 'buildSpawnOptions',
     why: 'the responder spawn shares buildSpawnOptions() with the launcher, which sets windowsHide: true itself',
   },
-}
-
-/**
- * Does this documented exception cover this call? PURE.
- *
- * Narrowing keys are ANDed, and an entry with none of them covers the whole file —
- * which is what an `awaiting` debt needs, since the agent holding the file may move
- * its calls around before the debt is paid.
- */
-export function allowCovers(allow, call) {
-  if (!allow || typeof allow !== 'object') return false
-  if (Array.isArray(allow.lines) && !allow.lines.includes(call?.line)) return false
-  if (Array.isArray(allow.optionsFrom)) {
-    const args = String(call?.args ?? '')
-    if (!allow.optionsFrom.some((name) => name && args.includes(`${name}(`))) return false
-  }
-  return true
 }
 
 /**
@@ -160,24 +141,35 @@ export function allowCovers(allow, call) {
  * Returns { ok, offenders, unusedAllow }. `unusedAllow` matters as much as the
  * offenders: an exception that no longer applies is a rule pretending to be needed,
  * and the `awaiting` entries in particular must disappear once the flag lands.
+ *
+ * The exception map is INJECTABLE (defaulting to `ALLOW`) so the rules governing it
+ * can be pinned without a live entry of each kind having to exist. That is not
+ * hypothetical tidiness: the unscoped-entry rule — an entry with no `matching` covers
+ * the whole file, which is what an `awaiting` debt needs while another agent holds it
+ * — was tested by reaching into `ALLOW` for a real debt, so PAYING the last debt
+ * turned the rule's own test red. A gate must not be harder to satisfy as it gets
+ * cleaner.
  */
-export function auditWindowHide(files = []) {
+export function auditWindowHide(files = [], { allow: allowMap = ALLOW } = {}) {
+  const map = allowMap && typeof allowMap === 'object' ? allowMap : {}
   const offenders = []
   const usedPaths = new Set()
   for (const f of Array.isArray(files) ? files : []) {
     const path = String(f?.path ?? '').replace(/\\/g, '/')
     if (!path) continue
-    const allow = ALLOW[path]
+    const allow = map[path]
     for (const call of findChildProcessCalls(f?.text ?? '')) {
       if (call.hasFlag) continue
-      if (allow && allowCovers(allow, call)) {
+      // An exception may be scoped by what the call CONTAINS (`matching`); without a
+      // scope it covers the whole file, which is what an `awaiting` debt needs.
+      if (allow && (!allow.matching || String(call.args ?? '').includes(allow.matching))) {
         usedPaths.add(path)
         continue
       }
-      offenders.push({ path, ...call })
+      offenders.push({ path, api: call.api, line: call.line, hasFlag: call.hasFlag })
     }
   }
-  const unusedAllow = Object.keys(ALLOW).filter((p) => !usedPaths.has(p))
+  const unusedAllow = Object.keys(map).filter((p) => !usedPaths.has(p))
   return { ok: offenders.length === 0 && unusedAllow.length === 0, offenders, unusedAllow }
 }
 

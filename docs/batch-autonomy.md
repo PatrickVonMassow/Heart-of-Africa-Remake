@@ -154,14 +154,17 @@ from advisory claim-and-check to a HARD mutual exclusion in
     documented exceptions, each with a written reason, and a stale entry is itself a
     failure: an `awaiting` entry is a debt, and deleting it is how the debt is proven
     paid. Verified as a negative control against the pre-401 tree: 70 offenders
-    before, none after. Both kinds of entry have since been settled: the nine files a
-    parallel agent held were fixed and their `awaiting` debts deleted, and the one
-    genuine exception is written against WHAT the call does (`optionsFrom:
-    ['buildSpawnOptions']` — the helper sets the flag itself) rather than which LINE it
-    sits on. That change has its own measured reason: the original entry pinned line
-    741, an unrelated commit in the same file moved the call to 736 within the hour,
-    and the gate went red on correct code while the real rule still held. A line
-    number says where a call is; the exemption is about what it does.
+    before, none after. Both kinds of entry are now settled: the nine files a parallel
+    agent held were fixed and their `awaiting` debts DELETED, and every remaining
+    exception is scoped by what the call CONTAINS (`matching: 'buildSpawnOptions'` —
+    that helper sets the flag itself) rather than by which LINE it sits on. The
+    rescoping has its own measured reason: the original entry pinned line 741, an
+    unrelated commit in the same file moved the call to 736 within the hour, and the
+    gate reported both an offender and a stale exception for a file nothing had
+    changed. A line number says where a call is; an exemption is about what it does.
+    The exception map is injectable so the rules ABOUT it are pinned independently of
+    which entries happen to exist — paying the last debt must not redden the test that
+    describes what a debt is.
   - **Cause 2, ATTENDED and still open:** the `HoA-Batch-Autostart` task runs
     `node.exe` directly with LogonType `Interactive`, so Task Scheduler opens a
     visible console every 15 minutes — ~96 windows a day on its own. The session it
