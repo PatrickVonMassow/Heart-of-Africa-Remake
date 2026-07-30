@@ -27,15 +27,20 @@ The build order is work-order point 434, except layer 2, which is point 433.
 | F | One notification went out at 00:06 and was never repeated or escalated | A single message to a sleeping user is indistinguishable from silence. |
 | G | The lock stayed held the whole time | It is a lock with an owner, not a lease with an expiry: releasing it requires somebody to decide, and the only candidates were the wedged session and a launcher whose authority did not reach it. |
 | H | At 02:21 the owner CAME BACK — "fresh-heartbeat, 0 min old" — and still produced nothing until 04:19 | The heartbeat proves the process lives, not that work advances. This is §2's documented hard case, live in the same night, and it is exactly what a heartbeat-renewed lease cannot see. |
-| I | The launcher log ENDS at 02:21; no further tick, not even the line a paused batch would write | The entire local watcher infrastructure can fall silent as a unit — standby, a disabled task, a dead launcher. Root cause still open, and it is the empirical reason layer 3 may not live on this machine. |
+| I | ~~The launcher log ENDS at 02:21~~ **— WITHDRAWN 30.07.2026, this failure did not happen** | The log ticks every 15 minutes through to 08:36. What ends at 02:21 is the `WEDGED owner` line, because the owner's heartbeat ticked once and the verdict flipped to `skip: owner alive (fresh-heartbeat)`. I is not a second failure; it is H seen from the launcher's side. |
 
 **The pattern behind A–I:** every layer could OBSERVE the stall and none could ACT
 on it — and where authority existed, a condition kept it from reaching. An
 observation that is written down feels like protection, which is what makes this
 the expensive kind of failure.
 
-**Still to root-cause before the build is frozen:** why H produced nothing after
-waking, and why the log stops at I.
+**Root-caused 30.07.2026.** H is explained as far as the artefacts reach: the
+heartbeat ticked sporadically through the dead stretch (0, 15, 30 and 1 minutes
+old at successive launcher ticks), so the session was completing SOME calls and
+producing nothing — precisely the case a heartbeat-renewed liveness test cannot
+see. I was a misreading of the log and is withdrawn above. Nothing further is
+recoverable from the artefacts, and the design already assumes this case, so the
+build may be frozen.
 
 ## 2. What the established practice does about it
 
@@ -62,8 +67,9 @@ and the monitor that died with it), and **federation against the single watcher*
 ## 3. The design
 
 Independence is the requirement, not thoroughness: this night failed with a
-launcher that was running perfectly, and failure I shows the whole local layer can
-go quiet together.
+launcher that was running perfectly — it ticked all night and drew the wrong
+conclusion from a heartbeat. That is the local layer's real weakness, and no
+second local layer fixes it.
 
 ### Layer 1 — the lock becomes a lease
 
@@ -124,10 +130,13 @@ what turns a quiet night into a loud one.
 
 ### Layer 3 + 4 — one external watcher, off this machine
 
-The first revision wanted a second local watcher. Failure I kills that: a twin on
-the same scheduled-task infrastructure, the same node binary, the same disk and the
-same power state dies of the same causes — and that task has already been found
-disabled once.
+The first revision wanted a second local watcher. Two things kill that. It would
+share the whole local fate — standby, a dead node, a disabled task, and that
+scheduled task HAS been found disabled once — and, more decisively, it would ask
+the same question off the same local evidence: this night's launcher was awake
+throughout and still concluded "owner alive" from a heartbeat. A twin on the same
+scheduled-task infrastructure, the same node binary, the same disk and the same
+power state would have concluded the same thing at the same moment.
 
 So the question "did the repository move?" leaves the machine. A **GitHub Actions
 cron** reads push age against the open-point count (both are in the repo) and posts
@@ -217,7 +226,8 @@ mechanism instead of a reader.
 
 - **No rescue that depends on the wedged session noticing.** It is definitionally
   the party that cannot.
-- **No second local watchdog.** Failure I is the counter-evidence.
+- **No second local watchdog.** It shares the local fate AND the local evidence;
+  this night's launcher was awake all night and still read a heartbeat as life.
 - **No two spawners.**
 - **No window that kills a running verification** — that is what PreToolUse renewal
   is for.
@@ -237,7 +247,8 @@ the next reader inherits three answers to one question.
 1. **Point 433 with §4 folded in** — the smallest delta on code that already works,
    and the threshold alone would have acted at 00:06 instead of never.
 2. **The external watcher (layers 3+4 merged)** — the only layer with no shared
-   local cause of death, and failure I is its justification.
+   local cause of death, and the only one that judges repository OUTPUT rather
+   than a heartbeat — which is what failure H defeated.
 3. **Layer 1** — the right core, and the largest, riskiest rebuild: fence
    persistence, a window calibrated from the transcript corpus, the chokepoint gate.
    It follows 433 with its own four-eyes review.

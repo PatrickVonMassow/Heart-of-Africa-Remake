@@ -3418,8 +3418,10 @@ it is appended.
   spawns — one spawner is enough, and the launcher owns the debounce state a second one could
   not see. It is also the dead man's switch: ntfy forwards messages and cannot notice an
   ABSENCE, so the party that expects a check-in has to be the one that computes progress.
-  Justified empirically by failure I: the launcher log ENDS at 02:21, so the whole local
-  watcher layer can fall silent as a unit.
+  Justified by failure H: the local layer ticked all night and read a heartbeat as life, so a
+  second layer asking the same question off the same local evidence buys nothing — the outside
+  one judges repository OUTPUT. (The first telling justified this with failure I, "the launcher
+  log ends at 02:21"; that reading was WRONG and is withdrawn — see the root-cause below.)
   (1) IS BUILT, 30.07.2026: `.github/workflows/batch-watchdog.yml`, every 30 min from
   GitHub, `STALL_MINUTES` 120, alert-only. It came out NARROWER than specified above — it
   does not release the lease, because releasing from outside would need repository write
@@ -3456,9 +3458,27 @@ it is appended.
   (4) DEMOLITION, in the same commit that makes the lease authoritative: `WORK_STALL_*`, the
   `wedgeAction`/`isOwnSpawn` construction, the silence staging and the four-hour `WEDGED_MS`
   valve go. Three overlapping liveness verdicts must not coexist.
-  STILL TO ROOT-CAUSE before the lease is frozen: why the owner produced nothing after waking
-  at 02:21 with a fresh heartbeat (failure H — heartbeat is not progress), and why the launcher
-  log stops at 02:21 (failure I).
+  ROOT-CAUSED 30.07.2026 from `.claude/autostart.log`, and one of the two records was WRONG.
+  FAILURE I DID NOT HAPPEN: the launcher log does not end at 02:21 — it ticks every 15 minutes
+  right through to 08:36. What ends at 02:21 is the `WEDGED owner` LINE, and it ends because the
+  owner's heartbeat ticked once; the verdict flips to `skip: owner alive (fresh-heartbeat)` and
+  stays there for the remaining two hours while nothing is produced. So H and I are ONE failure,
+  not two, and the local watcher layer never fell silent. The external watcher keeps its
+  justification — a machine that is off, asleep or has a disabled task takes the local layer with
+  it — but that justification is now a RISK, not an observed event, and §1/§3 of
+  `docs/batch-resilience.md` say so. FAILURE H is root-caused as far as the artefacts reach: the
+  heartbeat ticked sporadically through the dead stretch (0, 15, 30, 1 minutes old at successive
+  ticks), so the session was making SOME calls and producing nothing — exactly the case a
+  heartbeat-renewed liveness test cannot see, and the reason the outside layer judges repository
+  OUTPUT. No further cause is recoverable from the artefacts, and the design already assumes this
+  one; the lease may be frozen.
+  (8) THE PREFLIGHT REGISTERS AS A SESSION AND RAISES A FALSE ALARM (found 30.07.2026 while
+  root-causing the above). Point 433's environment preflight appears in the launcher log as
+  `PARALLEL SESSIONS DETECTED: owner=preflight-test plus <real session>` — four times that night
+  alone. The parallel-session detector is one of the few alerts that means "stop everything", so a
+  probe of our own must not be able to trip it: the preflight's session identity is excluded from
+  that detector (or it stops registering as a session at all), with a Vitest case pinning that a
+  preflight in flight yields no parallel-session verdict while two REAL sessions still do.
   (5) JUDGE A DELEGATED AGENT BY ITS OUTPUT, NOT BY ITS LOG — added 30.07.2026 after doing
   exactly the opposite. A bundle agent's transcript log had been silent for 59 minutes, the
   in-flight declaration reported "evidence-gone: silent for 59 min", and it was declared dead
