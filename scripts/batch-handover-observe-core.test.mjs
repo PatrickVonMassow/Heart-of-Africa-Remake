@@ -73,6 +73,16 @@ describe('parsers — the log lines each link is proved by', () => {
     expect(l[1].pid).toBe(5150)
   })
 
+  it('reads the LEASE EXPIRED takeover as the old-route takeover it is (point 434)', () => {
+    // The launcher stopped writing "owner provably dead" for this case when
+    // ownership became a lease. An observer that silently stops recognising the
+    // line it exists to find reports a healthy chain forever.
+    const l = launcherLog(
+      '[2026-07-29T10:40:00.000Z] LEASE EXPIRED: session-old (pid 5150) has not renewed for 63 min — taking the batch.',
+    )
+    expect(l.map((x) => x.kind)).toEqual(['took-dead-lock'])
+  })
+
   it('tells the deliberate handover-grace wait apart from a skip that means failure', () => {
     const l = launcherLog(GRACE_SKIP, SKIP)
     expect(l.map((x) => x.kind)).toEqual(['skip-grace', 'skip-alive'])

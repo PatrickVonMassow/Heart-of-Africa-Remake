@@ -80,6 +80,13 @@ export function parseLauncherLog(text) {
     } else if (/^WEDGED owner/.test(body)) kind = 'skip-wedged'
     else if (/^SILENT owner/.test(body)) kind = 'silent-notified'
     else if (/^no owner lock — taking over/.test(body)) kind = 'took-free-lock'
+    // The lease that ran out is the SAME finding as `owner provably dead` for this
+    // observer's purpose — the batch continued because the lock expired, not
+    // because it was handed over — and since point 434 it is the line the launcher
+    // actually writes. Without this the chain analysis below would stop seeing the
+    // broken-handover case entirely, which is the quiet kind of blindness this file
+    // exists to prevent. The two lines above stay: old logs still hold them.
+    else if (/^LEASE EXPIRED/.test(body)) kind = 'took-dead-lock'
     else if (/^owner provably dead/.test(body)) kind = 'took-dead-lock'
     else if (/^skip: a spawn /.test(body)) kind = 'skip-debounce'
     out.push({ at, kind, point, pid, reason, line: line.trim() })
