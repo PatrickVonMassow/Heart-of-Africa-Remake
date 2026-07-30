@@ -1,9 +1,9 @@
 # Vibe Coding — kurze Anleitung aus einem echten Projekt
 
-Für den Einstieg. Destilliert aus einem mehrwöchigen, weitgehend autonom gebauten
-Projekt. Keine Klick-für-Klick-Schritte, sondern **Prompts, die du Claude gibst**,
-und die Fallstricke, die dich sonst einholen. Bewusst kurz gehalten — die
-ausführlichen Erfahrungen dahinter stehen in `retrospektive-zusammenarbeit.md`.
+Für den Einstieg, destilliert aus einem mehrwöchigen, weitgehend autonom gebauten
+Projekt: keine Klick-für-Klick-Schritte, sondern **Prompts, die du Claude gibst**, und
+die Fallstricke dahinter. Ausführlich steht das alles in
+`retrospektive-zusammenarbeit.md`.
 
 ---
 
@@ -30,9 +30,8 @@ etwas steht, das die Regel erzwingt. Formuliere deine eigenen genauso. Wo ein
 Mechanismus prinzipiell **nicht** möglich ist (etwa „sieht das für einen Menschen
 richtig aus?"), steht das dabei — dann trägt nur die Aufmerksamkeit.
 
-Eine grobe **Schätzung** wie *(Kosten ≈ 2x)* meint den Mehrverbrauch der betroffenen
-Arbeit, nicht des Projekts — meist lohnt er sich, und bei knappem Kontingent weißt du,
-wo du drehst.
+Eine **Schätzung** wie *(Kosten ≈ 2x)* meint den Mehrverbrauch der betroffenen Arbeit,
+nicht des Projekts.
 
 ### Primäres und sekundäres Modell
 
@@ -53,9 +52,8 @@ Lege **zwei** Modelle fest und gib ihnen klare Rollen:
 > erkennt und die Arbeit stoppt, statt sie stillschweigend zu übernehmen."
 
 Ein zweites Modell nützt nicht, weil es *besser* wäre, sondern weil es **andere
-blinde Flecken** hat — diesen Wert hebt nur eine Prüfung, keine Übergabe. Der Stopp
-bei einem fremden Modell ist wichtig: Ein unbemerkt schwächeres liefert
-selbstbewusst Attrappen.
+blinde Flecken** hat — diesen Wert hebt nur eine Prüfung, keine Übergabe. Und ein
+unbemerkt schwächeres Modell liefert selbstbewusst Attrappen.
 
 Die **Obergrenze**: Eine Gegenprüfung kostet etwa so viel wie die Arbeit; die Grenze
 zieht die **Sichtbarkeit des Fehlers**. Was den Ablauf steuert oder Arbeit vernichten
@@ -347,18 +345,11 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   Abbrüchen zu **zufälligen** Zeitpunkten und frag danach nicht ‚läuft es weiter?', sondern
   ‚läuft es **dort** weiter, wo es sollte, und gilt Unfertiges als unfertig?'"
 
-- **Ein abgefangener Fehler, der einen Wert zurückgibt, ist eine Behauptung.** Die übliche
-  Absicherung — „wenn die Prüfung selbst kaputtgeht, tu lieber nichts" — schützt nur gegen
-  **fehlende** Daten. Verwandelt ein `catch` weiter innen den Fehlschlag schon in einen
-  plausiblen Wert (eine leere Liste, eine 0, ein `false`), sieht die Absicherung nie einen
-  Fehler, und die Aktion läuft mit einer Lüge weiter. Bei uns hätte das jeden lebenden
-  Arbeitsordner gelöscht: „git kann gerade nicht antworten" war zu „git kennt keinen
-  Arbeitsordner" geworden, also galt jeder als verwaist.
-  → *Prompt:* „Geh jedes `catch` durch, das einen Ersatzwert zurückgibt, und frag: Führt
-  dieser Wert zu **weniger** Aktion oder zu **mehr**? Nur weniger darf verschluckt werden;
-  alles andere wird nach oben durchgereicht, damit die äußere Absicherung überhaupt greifen
-  kann. Und lass eine zerstörende Aktion ihr Ziel **direkt vor der Ausführung** noch einmal
-  prüfen, nicht nur beim Einsammeln."
+- **„Im Zweifel nichts tun" schützt nur gegen fehlende Daten, nicht gegen falsche.** Wird ein
+  Fehlschlag weiter innen schon in einen Ersatzwert verwandelt, läuft die Aktion mit einer
+  Lüge weiter.
+  → *Prompt:* „Prüfe jedes `catch` mit Ersatzwert: Führt er zu **weniger** Aktion oder zu
+  **mehr**? Nur weniger darf verschluckt werden."
 
 ---
 
@@ -375,18 +366,17 @@ Zwei Mechanismen, die das Netz ehrlich halten:
    > *Prompt:* „Struktur von Dingen, die ich festgelegt habe, friert ein. Schlag
    > Änderungen vor, setz sie nicht ungefragt um."
 
-3. **Parallel arbeiten geht nur mit Isolierung.** Delegation vervielfacht — ohne
-   eigene Arbeitskopien vervielfacht sie das Chaos. Die Grenze setzt nicht dein
-   Kontingent, sondern der **Haupt-Agent**: bei ihm endet jeder Strang, und je mehr
-   Fremdstoff sein Kontext aufnimmt, desto schlechter urteilt er. Und verlass dich nie
-   auf die Anweisung „nur lesen" — was ein Helfer anfassen kann, fasst er irgendwann an.
+3. **Parallel arbeiten geht nur mit Isolierung.** Ohne eigene Arbeitskopien vervielfacht
+   Delegation das Chaos. Die Grenze setzt nicht dein Kontingent, sondern der
+   **Haupt-Agent**: bei ihm endet jeder Strang, und je mehr Fremdstoff sein Kontext
+   aufnimmt, desto schlechter urteilt er. Verlass dich nie auf „nur lesen" — was ein
+   Helfer anfassen kann, fasst er an.
    > *Prompt:* „Arbeite jede Aufgabe auf einem eigenen Feature-Branch mit eigener
    > Arbeitskopie und führe sie erst nach `main`, wenn sie fertig und verifiziert ist.
-   > Gib auch jedem nur lesenden Helfer eine eigene Arbeitskopie, statt es ihm bloß
-   > aufzutragen.
+   > Auch ein nur lesender Helfer bekommt eine eigene Arbeitskopie.
    > Teile parallele Aufgaben so auf, dass sie **nicht dieselben Dateien** anfassen, und
    > arbeite an höchstens **drei** gleichzeitig. Reduziere die Zahl, sobald das
-   > Zusammenführen Nacharbeit erzeugt oder du Bekanntes nachlesen musst."
+   > Zusammenführen Nacharbeit erzeugt."
 
    *(Aufschlag ≈ 10–25 % je zusätzlichem Strang, geschätzt — Nacharbeit + Aufsicht)*
 
