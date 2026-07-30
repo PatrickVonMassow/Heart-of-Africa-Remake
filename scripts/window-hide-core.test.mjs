@@ -134,7 +134,7 @@ describe('auditWindowHide — the verdict, and its exceptions', () => {
   })
 
   it('AN EXCEPTION THAT NO LONGER APPLIES IS ITSELF A FAILURE', () => {
-    // Otherwise the `awaiting: bundle H` debts would sit here forever, unpaid and
+    // Otherwise the `awaiting: Chat & Tafel` debts would sit here forever, unpaid and
     // unnoticed — which is the failure mode a written exception is supposed to fix.
     const v = auditWindowHide([{ path: 'scripts/x.mjs', text: 'execSync(c, { windowsHide: true })' }])
     expect(v.ok).toBe(false)

@@ -1300,6 +1300,19 @@ with literal newlines, so a board an editor once wrote back in Windows text mode
 made `board-archive-rotate.mjs` miss the Erledigt section entirely and `attest`
 crash on a board that looked perfect in the browser. Every writer normalises now.
 
+**The queue is grouped by bundle.** `docs/work-packages.md` is the single source:
+its table gives each bundle its German name and members, its "Order of work"
+gives the group order, and a bundle added there reaches the board with no code
+change. The queue renders one group card per bundle — name, member count and the
+sum of its estimates in the summary, the working order and the point cards in the
+body — with the unbundled points in their own group last. The letter is the
+table's internal id and never leaves the doc. Groups start COLLAPSED
+(`QUEUE_GROUP_DEFAULT_STATE`), which on a phone is about a dozen lines of
+overview instead of a hundred cards; they carry no `open` attribute, because the
+reader's own choice owns that, and a group is addressable by name through its
+`data-group` attribute for a restore script that wants to change the default. An
+unreadable doc costs the grouping and renders flat — never a missing card.
+
 **A fallback title is REPORTED, never silently taken.** `queueEntries` still
 falls back `authored → work-order headline → "Punkt N"` (a nameless card is
 worse), but the middle rung is the work order's own headline, which is English by

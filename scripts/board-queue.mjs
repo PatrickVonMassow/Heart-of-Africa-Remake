@@ -38,11 +38,13 @@ import {
   QUEUE_DATA_PATH,
   SET_STDIN_FLAG,
   TITLE_CMD,
+  WORK_PACKAGES_PATH,
   buildQueueSection,
   importQueueFromHtml,
   openPointsOf,
   parseSetArgs,
   parseTaskTitles,
+  parseWorkPackages,
   setQueueEntry,
   unestimatedPoints,
   untranslatedTitlePoints,
@@ -86,8 +88,18 @@ function inputs() {
   if (!existsSync(boardFile)) throw new Error(`board not found: ${boardFile}`)
   const html = readFileSync(boardFile, 'utf8')
   const tasks = readFileSync(tasksFile, 'utf8')
+  // THE BUNDLES COME FROM THEIR OWN DOC (point 452), so a bundle added there
+  // reaches the board with no code change. Unreadable → no grouping, never no
+  // board: the flat queue is the old picture, a missing card is the failure.
+  let packages = null
+  try {
+    packages = parseWorkPackages(readFileSync(resolve(REPO_ROOT, WORK_PACKAGES_PATH), 'utf8'))
+  } catch (e) {
+    console.error(`board-queue: the bundles could not be read, rendering flat (${e.message})`)
+  }
   return {
     html,
+    packages,
     open: openPointsOf(tasks),
     titles: parseTaskTitles(tasks),
     // Erledigt is NOT excluded: a point there is closed, so it is not open, and
@@ -121,10 +133,13 @@ try {
     writeData(data)
     console.log(`imported ${Object.keys(data.points).length} queue card(s) into ${QUEUE_DATA_PATH}`)
   } else if (cmd === '--check' || cmd === undefined) {
-    const { html, open, titles, exclude } = inputs()
-    const built = buildQueueSection(html, { open, data: readData(), exclude, titles })
+    const { html, open, titles, exclude, packages } = inputs()
+    const built = buildQueueSection(html, { open, data: readData(), exclude, titles, packages })
+    const groups = built.groups?.length ? ` in ${built.groups.length} Bündel(n)` : ''
     if (cmd === '--check') {
-      console.log(`${built.entries.length} queue card(s) would be rendered${built.html === html ? ' (no change)' : ''}`)
+      console.log(
+        `${built.entries.length} queue card(s)${groups} would be rendered${built.html === html ? ' (no change)' : ''}`,
+      )
       reportEntries(built.entries)
       process.exitCode = built.html === html ? 0 : 1
     } else {
@@ -133,7 +148,9 @@ try {
       // (point 439) so a hand edit's CRLF cannot outlive one rebuild.
       const out = normaliseLineEndings(built.html)
       if (out !== html) writeTextAtomic(boardFile, out)
-      console.log(`queue rebuilt from the work order: ${built.entries.length} card(s)${out === html ? ' (unchanged)' : ''}`)
+      console.log(
+        `queue rebuilt from the work order: ${built.entries.length} card(s)${groups}${out === html ? ' (unchanged)' : ''}`,
+      )
       reportEntries(built.entries)
       console.log('Publish it: node scripts/board-publish.mjs')
     }

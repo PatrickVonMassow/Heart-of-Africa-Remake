@@ -122,7 +122,7 @@ export const ALLOW = {
     matching: 'buildSpawnOptions',
     why: 'the options come from buildSpawnOptions(), which sets windowsHide: true itself (scripts/batch-autostart-core.mjs)',
   },
-  // The nine `awaiting: bundle H` debts that used to sit here are PAID: the files
+  // The nine `awaiting: Chat & Tafel` debts that used to sit here are PAID: the files
   // those calls live in were free again, the flag is written out in each of them, and
   // the entries are gone — which is precisely what this map demands as proof.
   // scripts/chat-watcher.mjs is the one that did NOT become a literal flag: its
