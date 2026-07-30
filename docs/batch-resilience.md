@@ -174,6 +174,67 @@ died on the same 500 and two retries each would have bought four more deaths.
 Never retry a child that already reported a step complete. And cap the tokens a
 single point may consume.
 
+**BUILT 30.07.2026** as a pure decision core plus one command, because the party
+that spawns children is the MAIN SESSION and no hook fires when a delegated agent
+dies. `scripts/child-retry-core.mjs` decides; `scripts/child-retry.mjs` does the
+I/O. **The main session runs it the moment a delegated agent dies, before it
+decides anything itself:**
+
+```
+node scripts/child-retry.mjs --point <n> --branch <ref> --death "<what the harness said>"
+     [--child <agent id>] [--brief-revision <sha>] [--reported-complete] [--tokens <n>]
+```
+
+It answers exactly one of four verdicts and never spawns anything:
+
+- **RETRY** — with the backoff to wait out (2 min, then 8 min) and a prompt hint
+  that says CONTINUE where the child had already committed and REPEAT where it
+  had not. Whether it committed is read from the BRANCH, never from a quiet log,
+  which is layer 5b's rule applied at the moment of the retry decision.
+- **NO-RETRY** — the default. A death outside the allowlist, a child that
+  reported a step complete, a changed branch or brief revision, the second retry
+  already spent, or the point's token budget gone.
+- **OUTAGE-PAUSE** — two distinct children dead of the same signature inside 15
+  minutes. It pauses the batch, writes a German reason into
+  `.claude/batch-paused`, files a board card and sends an urgent notification.
+  Nothing is retried.
+- **STAND-DOWN** — the batch is paused, or this session does not own the lock.
+  It records nothing in that case; a session that may not act leaves no
+  footprints either.
+
+The exit code is always 0 — the verdict is the output, not the status. An
+internal error degrades to "no automatic verdict, decide by hand": fail-open in
+the sense that it never traps the session, but deliberately NOT to "retry",
+because a retry taken on a decision the code could not make is the exact
+retry-into-an-outage this layer exists to prevent. Its runtime state (the outage
+window and the per-point retry/token budget) lives in `.claude/resilience/`;
+deleting it forgets the window, never work. `--status`, `--complete --point <n>`
+and `--forget --point <n>` read and adjust it by hand.
+
+**THE ESCALATION LADDER, the remainder of part (1), built with it** — the
+external watchdog of layers 3+4 alerts every 30 minutes and shares its ntfy topic
+with the CI-red alert, so a repeated identical alert must not repeat identically.
+`scripts/alert-escalation-core.mjs` (pure) and `scripts/alert-escalation.mjs`
+(I/O) sit in front of `scripts/notify.mjs`, so EVERY local alert climbs: sent at
+once, then not before 15, 30, 60 and 120 minutes, the ntfy priority rising with
+the rung — and the LAST RUNG PAUSES THE BATCH with a board card instead of
+buzzing a fifth time, which is the whole point: an alert can be slept through, a
+paused batch that explains itself cannot. Two alerts count as identical when
+their text matches with digit runs collapsed, so the watchdog's rising minute
+count is ONE climbing alert while CI-red keeps its own ladder on the shared
+topic. Six hours of silence resets a ladder. The ladder may only RAISE a
+caller's priority, never lower it.
+
+Two asymmetries there are deliberate. **Fail-open means DELIVER**: an unreadable
+ladder file, a clock that jumped backwards or a throw anywhere inside sends the
+message unthrottled, because a throttle that swallows an alert is worse than a
+duplicate buzz. And **the ladder does not stand down for a non-owner** — it
+governs a channel rather than a session's actions, and its principal caller, the
+OS launcher, owns no lock and never will; a lock-keyed stand-down would switch it
+off precisely in the unattended case it exists for. It does stand down for an
+already-paused batch (the pause is a state, not an action to repeat), and
+`HOA_ALERT_ESCALATION=off` disables it entirely.
+
 ## 4. The hole the review found: failure B is not healed, only made louder
 
 If the lease expires and a successor spawns **into the same broken environment**, it

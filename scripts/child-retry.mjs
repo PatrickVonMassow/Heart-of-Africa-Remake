@@ -278,9 +278,11 @@ async function main() {
       'Batch pausiert: Umgebungsausfall',
       `${reason} Bitte bestätigen, wann wieder gestartet werden soll — oder die Pause selbst aufheben.`,
     )
-    void notify('Batch pausiert — Umgebungsausfall', reason, 'urgent', { key: 'child-retry-outage' })
+    // AWAITED, not fired and forgotten: process.exit() below would kill the
+    // pending POST and the pause would happen with nobody told about it.
+    await notify('Batch pausiert — Umgebungsausfall', reason, 'urgent', { key: 'child-retry-outage' })
   } else if (decision.verdict === 'no-retry') {
-    void notify(
+    await notify(
       `Punkt ${point} gestoppt`,
       `Der Agent für Punkt ${point} ist gestorben und wird NICHT automatisch neu gestartet: ${decision.reason}`,
       'default',
