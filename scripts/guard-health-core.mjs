@@ -35,6 +35,13 @@ export const INTENTIONALLY_DORMANT = {
   // hook line is missing. Remove this entry in the same commit that adds it.
   'findings-guard.mjs':
     'built and tested; the Stop-hook wiring in .claude/settings.json needs the user attended (protected path)',
+  // Point 421, 29.07.2026 — the same one reason as above, not a second kind of
+  // exception: the guard, its pure core and its Vitest cases are finished, and
+  // the only thing missing is the Stop-hook line in .claude/settings.json, which
+  // always raises a permission prompt and so cannot be added unattended. Remove
+  // this entry in the same commit that adds the line.
+  'decision-card-guard.mjs':
+    'built and tested; the Stop-hook wiring in .claude/settings.json needs the user attended (protected path)',
 }
 
 /**

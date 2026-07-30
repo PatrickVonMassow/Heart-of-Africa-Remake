@@ -11,6 +11,7 @@
 //   node scripts/board.mjs done   <point> ["<text>"] --next <m> "<status>"
 //                                                     # archive + promote in ONE write
 //   node scripts/board.mjs done   <point> --none "<reason>"   # …or name the gap
+//   node scripts/board.mjs vdzk-add "<title>" "<question>"  # ask the user a decision
 //   node scripts/board.mjs vdzk-remove "<title>"      # drop an answered question
 //   node scripts/board.mjs focus  <point> "<note>"    # declare focus + stamp
 //   node scripts/board.mjs attest                     # rotate, publish, audit, confirm
@@ -33,6 +34,7 @@ import { resolve } from 'node:path'
 import { REPO_ROOT } from './repo-paths.mjs'
 import {
   TEXT_STDIN_FLAG,
+  addVdzk,
   berlinStamp,
   closeCard,
   parseDoneArgs,
@@ -143,6 +145,16 @@ try {
           ? `${point} archived as done at ${at}; the board now names why nothing is running`
           : `${point} archived as done at ${at}`,
     )
+  } else if (cmd === 'vdzk-add') {
+    // EVERY decision asked of the user belongs here (point 421): the chat is an
+    // inbox he writes into, not a board he reads. `decision-card-guard` blocks a
+    // turn whose reply asks for a decision with no card standing for it, and this
+    // is the command its remedy names.
+    const [title, ...words] = rest
+    if (!title || (words.length === 0 && !stdinText.trim())) {
+      throw new Error('usage: board.mjs vdzk-add "<title>" "<question>"|--text-stdin')
+    }
+    edit((html) => addVdzk(html, title, textOf(words)), `open question added: ${title}`)
   } else if (cmd === 'vdzk-remove') {
     const fragment = textOf(rest)
     if (!fragment) throw new Error('usage: board.mjs vdzk-remove "<title>"|--text-stdin')
@@ -169,7 +181,8 @@ try {
   } else {
     console.error(
       'usage: board.mjs now|status|queue <point> "<text>" | ' +
-        'done <point> ["<text>"] [--next <m> "<status>" | --none "<reason>"] | vdzk-remove "<title>" | ' +
+        'done <point> ["<text>"] [--next <m> "<status>" | --none "<reason>"] | ' +
+        'vdzk-add "<title>" "<question>" | vdzk-remove "<title>" | ' +
         'promote <point> "<times>" "<title>" "<status>" | focus <point> "<note>" | attest\n' +
         `Any "<text>" may be replaced by ${TEXT_STDIN_FLAG} and piped in — use that for German prose.`,
     )

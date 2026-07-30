@@ -363,6 +363,26 @@ export function parseDoneArgs(rest) {
 }
 
 /**
+ * Put a question to the user as a "Von dir zu klären" card, at the TOP of the
+ * section (point 421). Until now the board could only DROP such a card, so the
+ * one thing the rule demands — that every decision asked of the user stands
+ * there — had to be hand-edited into the HTML, and the guard's remedy could not
+ * name a command. The card carries a TITLE ONLY in its collapsed header, per the
+ * board's binding structure, and the body says what is to be decided.
+ */
+export function addVdzk(html, title, text) {
+  const head = String(title ?? '').trim()
+  const body = String(text ?? '').trim()
+  if (!head) throw new Error('board: vdzk-add needs a title — the collapsed card shows nothing else')
+  if (!body) throw new Error('board: vdzk-add needs the question itself as the card body')
+  const { from } = sectionBounds(html, 'vdzk')
+  const card =
+    `<details>\n  <summary><span class="t">${head}</span></summary>\n` +
+    `  <div class="body">\n    <p>${body}</p>\n  </div>\n</details>\n`
+  return `${html.slice(0, from)}\n${card}${html.slice(from).replace(/^\n/, '')}`
+}
+
+/**
  * Remove a "Von dir zu klären" card the user has answered, matched on a
  * fragment of its title. An ambiguous fragment throws with the candidates
  * rather than deleting the wrong question.

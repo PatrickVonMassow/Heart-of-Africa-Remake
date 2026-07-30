@@ -7,15 +7,18 @@ import { resolve } from 'node:path'
 import { REPO_ROOT } from './repo-paths.mjs'
 import {
   auditDashboard,
+  parseCards,
   parseNowCardPoints,
   parseQueuePoints,
   parseTasks,
+  sliceSections,
   QUEUE_STUB_META,
 } from './dashboard-guard-core.mjs'
 import {
   NO_CURRENT_WORK_TITLE,
   TEXT_STDIN_FLAG,
   addHours,
+  addVdzk,
   berlinStamp,
   closeCard,
   estimateHours,
@@ -378,6 +381,36 @@ describe('parseDoneArgs — the flags behind one closing call', () => {
   it('never throws on nothing at all', () => {
     expect(parseDoneArgs(undefined).point).toBeUndefined()
     expect(parseDoneArgs([]).words).toEqual([])
+  })
+})
+
+// Point 421: the board could only DROP an open question, so the rule that every
+// decision asked of the user STANDS there had to be hand-edited into the HTML —
+// and `decision-card-guard`'s remedy could not name a command.
+describe('addVdzk — a decision asked of the user gets a card', () => {
+  it('puts the card at the TOP of the section, with the title alone in the header', () => {
+    const out = addVdzk(fullBoard({ vdzk: vdzkEntry('Ältere Frage') }), 'Kartenschrift wählen', 'Enge, weite oder gemischte Variante?')
+    const { sections } = sliceSections(out)
+    const cards = parseCards(sections['Von dir zu klären'])
+    expect(cards.map((c) => c.title)).toEqual(['Kartenschrift wählen', 'Ältere Frage'])
+    expect(cards[0].body).toContain('Enge, weite oder gemischte Variante?')
+    // The card must be the shape the board's own audit reads — a collapsed
+    // <details> with no `open`, exactly like the ones already there.
+    expect(out).toMatch(/<details>\s*<summary><span class="t">Kartenschrift wählen<\/span><\/summary>/)
+    expect(out).not.toMatch(/<details open/)
+  })
+
+  it('refuses a card with no title or no question — an empty card asks nothing', () => {
+    const b = fullBoard({ vdzk: '' })
+    expect(() => addVdzk(b, '', 'Die Frage.')).toThrow(/needs a title/)
+    expect(() => addVdzk(b, 'Ein Titel', '   ')).toThrow(/needs the question itself/)
+  })
+
+  it('never touches another section', () => {
+    const out = addVdzk(fullBoard({ queue: queueEntry(372, 'Ein Befehl', '~2 h') }), 'Eine Frage', 'Wie weiter?')
+    const { sections } = sliceSections(out)
+    expect(parseCards(sections['Warteschlange']).map((c) => c.title)).toEqual(['Ein Befehl'])
+    expect(parseCards(sections['Von dir zu klären']).map((c) => c.title)).toEqual(['Eine Frage'])
   })
 })
 
