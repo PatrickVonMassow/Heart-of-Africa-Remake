@@ -3685,6 +3685,56 @@ it is appended.
   board written with CRLF is normalised so the archive rotation still finds its section.
   DOCS in the same commit: `docs/batch-autonomy.md` where the board commands are listed.
 
+- [ ] 440. WHAT ELSE IS BILLED ON EVERY TURN FOR NOTHING — A MEASURED INVENTORY (user
+  30.07.2026, reading point 436: "ob du noch mehr Altlasten hast, durch die du redundante
+  Dinge machst, die Token und Zeit verschwenden"; bundle H). 436 cut ONE injected text by
+  61 %; the question is what else repeats itself, and the answer must be MEASURED, not
+  guessed. ALREADY FOUND while answering, and the clearest instance of the same pattern: the
+  chat-timestamp rule is stated THREE times in EVERY prompt — the user-scope
+  `berlin-timestamp.cjs` hook (~180 chars), the `[timestamp] PFLICHT` block in
+  `dashboard-reminder-hook.mjs` (~1071 chars) and the `WICHTIGSTE REGEL` banner (~318 chars)
+  — while `timestamp-guard.mjs` ALREADY blocks the turn end on a reply that lacks it. Same
+  for the `[focus-guard]` block (~886 chars), whose duty `dashboard-guard-core` refuses to
+  let pass anyway. That is ~2.3k characters of enforced rule per prompt, on top of the 843
+  the reminder still costs.
+  THE INVENTORY, each item with its measured size and its verdict:
+  · every text injected per PROMPT (all UserPromptSubmit hooks, project and user scope);
+  · every text injected per SESSION (SessionStart, the resume hook, CLAUDE.md, the memory
+    index) — measured, not estimated;
+  · every text a guard prints when it BLOCKS, since a block is read in full;
+  · the Stop chain's 21 hooks and the PreToolUse/PostToolUse hooks as TIME: how many node
+    processes a turn end spawns and what they cost in wall-clock, which is the other half of
+    the user's question (point 401 measured 85 spawn sites without window suppression).
+  THE RULE TO APPLY, from 436: a statement that a gate already refuses to break is deleted
+  and replaced by a pointer; a statement no mechanism can check stays, in full. Where a rule
+  is enforced but its remedy is not discoverable, the REMEDY moves into the guard's block
+  text, where it is read exactly when needed, instead of into every prompt.
+  VERIFIABLE: the inventory lands as a table in `docs/batch-autonomy.md` with the measured
+  before/after per item, and each cut is pinned the way 436 pinned its own — a test naming
+  the enforced claims that may not reappear, and the unenforceable duties that may not
+  vanish. The total saving is stated as one number in the commit.
+
+- [ ] 441. THE BOARD REFRESH STEALS THE CHAT INPUT'S FOCUS AND THE SCROLL POSITION (user
+  30.07.2026, reported from the phone: "Ein Refresh vom Dashboard nimmt mir den Fokus vom
+  Chat-Eingabefeld und die Scrollposition weg"; bundle H). The viewer
+  (`public/board/index.html`) refetches the board every 30 s and replaces `<main>` WHOLESALE,
+  then re-injects the chat on the `hoa-board-swapped` event (point 423). The draft text
+  survives that swap, but the caret does not: mid-sentence the keyboard closes on a phone and
+  the page jumps back to where the document starts — which makes writing a message from the
+  phone, the whole reason the channel exists, a race against a 30-second timer.
+  TARGET, in this order: (1) do not swap at all when the fetched board is byte-identical to
+  the rendered one — the common case, and it removes most of the damage for free; (2) when it
+  DID change, preserve the reader's place across the swap: scroll offset, which `<details>`
+  are open (the localStorage script already knows), and the chat input's focus WITH its caret
+  position; (3) never swap while the chat input holds focus AND a non-empty draft — defer to
+  the next tick, so a message being typed is never interrupted, with a cap so a permanently
+  focused field cannot freeze the board forever.
+  VERIFIABLE: a Vitest/jsdom case per rule — an identical fetch performs no DOM replacement;
+  a changed fetch restores scroll, open cards and caret; a focused input with a draft defers
+  the swap and the deferral ends at the cap. The live check is by hand on the phone-sized
+  viewport: type into the chat, wait out two refresh ticks, and the caret and the scroll
+  position are still where they were.
+
 ## Closing (only after all points)
 
 New points are appended BEFORE this section — it stays last in the file.
