@@ -30,7 +30,9 @@ import {
   parseTaskTitles,
   queueEntries,
   queueOrder,
+  boardSafeTitle,
   renderQueueCard,
+  renderRequestsCard,
   setQueueEntry,
   unestimatedPoints,
   untranslatedTitlePoints,
@@ -515,5 +517,84 @@ describe('setQueueEntry — a title lands without disturbing anything else', () 
       body: ['Text.'],
       estimate: '~4 h',
     })
+  })
+})
+
+// --- the deposits of other windows, named under the queue (point 462) --------
+
+describe('the pending-request card', () => {
+  const req = (title, over = {}) => ({ at: '2026-07-30T20:11:00.000Z', title, route: 'tasks', ...over })
+
+  it('renders nothing at all while no request waits', () => {
+    expect(renderRequestsCard([])).toBe('')
+    expect(renderRequestsCard(undefined)).toBe('')
+    expect(renderRequestsCard([{ at: 'x' }])).toBe('')
+  })
+
+  it('names every waiting deposit, with its day', () => {
+    const html = renderRequestsCard([req('Sitzungsübergabe härten'), req('Kartenbeschriftung prüfen')])
+    expect(html).toContain('2 Anfragen warten')
+    expect(html).toContain('30.07. Sitzungsübergabe härten')
+    expect(html).toContain('30.07. Kartenbeschriftung prüfen')
+  })
+
+  it('says which one needs the user rather than the work order', () => {
+    expect(renderRequestsCard([req('Eine offene Frage', { route: 'vdzk' })])).toContain('braucht deine Entscheidung')
+  })
+
+  it('caps the list instead of growing the card without end', () => {
+    const html = renderRequestsCard(Array.from({ length: 8 }, (_, i) => req(`Anfrage ${i}`)))
+    expect(html).toContain('… und 3 weitere.')
+  })
+
+  it('carries no point number, so no parser reads it as a queued point', () => {
+    const html = renderRequestsCard([req('Eine Anfrage')])
+    expect(parseQueuePoints(`<h2>Warteschlange</h2>${html}`).size).toBe(0)
+    expect(importQueueFromHtml(board(html)).order).toEqual([])
+  })
+
+  it('neutralises a title that would trip the board guards on the OWNER’s turn', () => {
+    const t = boardSafeTitle('Punkt 462: scripts/finding.mjs und design.md §19.5 (462) c2950bc0')
+    expect(t).not.toMatch(/scripts\//)
+    expect(t).not.toMatch(/\.mjs|\.md/)
+    expect(t).not.toContain('§')
+    expect(t).not.toMatch(/\bPunkt 462\b/)
+    expect(t).not.toMatch(/\(462\)/)
+  })
+
+  it('truncates a long title rather than filling the card with one', () => {
+    const t = boardSafeTitle('Ein sehr langer Titel, der auf einem Telefon niemals in eine Zeile passen würde')
+    expect(t.length).toBeLessThanOrEqual(60)
+    expect(t.endsWith('…')).toBe(true)
+  })
+
+  it('leaves an ordinary German title alone', () => {
+    expect(boardSafeTitle('  Sitzungsübergabe   härten ')).toBe('Sitzungsübergabe härten')
+  })
+})
+
+describe('the request card inside a rebuilt queue', () => {
+  const withRequests = (requests) =>
+    buildQueueSection(board(''), { open: [439, 465], data: null, titles: {}, requests }).html
+
+  it('sits in the Warteschlange and leaves the point cards untouched', () => {
+    const html = withRequests([{ at: '2026-07-30T20:11:00.000Z', title: 'Sitzungsübergabe härten', route: 'tasks' }])
+    expect(html).toContain('Anfragen aus anderen Fenstern')
+    expect([...parseQueuePoints(html)].sort((a, b) => a - b)).toEqual([439, 465])
+  })
+
+  it('disappears again on the next rebuild once the deposit was queued', () => {
+    expect(withRequests([])).not.toContain('Anfragen aus anderen Fenstern')
+  })
+
+  it('breaks no audit, conciseness or topic rule', () => {
+    const html = withRequests([
+      { at: '2026-07-30T20:11:00.000Z', title: 'Punkt 465 in scripts/finding.mjs härten', route: 'vdzk' },
+      { at: '2026-07-31T06:00:00.000Z', title: 'Kartenbeschriftung prüfen', route: 'tasks' },
+    ])
+    const codes = auditDashboard(html, { open: [210, 439, 465], done: [], nowMinutes: 9 * 60 }).map((x) => x.code)
+    expect(codes.filter((c) => c !== 'queue-stubbed')).toEqual([])
+    expect(concisenessOffenders(html)).toEqual([])
+    expect(evaluateTopic({ dashboardHtml: html, tasksText: '- [ ] 439. X\n- [ ] 465. Y\n' }).block).toBe(false)
   })
 })

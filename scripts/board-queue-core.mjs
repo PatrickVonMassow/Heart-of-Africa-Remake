@@ -280,6 +280,77 @@ export function queueEntries({ open = [], data = null, exclude = [], titles = {}
   return out
 }
 
+// ---- the pending requests of other windows (point 462) ---------------------
+//
+// A window the user is talking to but which does not hold the batch deposits a
+// finished spec in the findings carrier. It cannot publish the board — the lease
+// fence refuses a non-owner exactly that — so the card is rendered HERE, by the
+// owner's queue rebuild, and the user sees his instruction arrived and where it
+// stands without asking.
+
+/** How many pending requests the card names before it says "and n more". */
+export const REQUEST_CARD_MAX = 5
+
+/** The card's title — no leading number, so no parser reads it as a point. */
+export const REQUEST_CARD_TITLE = 'Anfragen aus anderen Fenstern'
+
+/**
+ * A deposit's title, made safe for a board card.
+ *
+ * The title is written in another window, by another session, and lands on a
+ * card the OWNER then publishes — so a title carrying a file path, a `§` or a
+ * point reference would block the owner's turn end on the conciseness and
+ * card-topic guards, for text it never wrote. Neutralising it here keeps the
+ * meaning readable and the guards satisfied by construction.
+ */
+export function boardSafeTitle(title, { maxLength = 60 } = {}) {
+  let t = String(title ?? '').replace(/\s+/g, ' ').trim()
+  const stem = (path) => (path.split('/').pop() ?? path).replace(/\.[a-z]+$/i, '')
+  t = t
+    .replace(/\b(?:src|scripts|docs)\/[\w./-]+/g, (m) => stem(m))
+    .replace(/\b[\w-]+\.(?:mjs|cjs|ts|tsx|js|md)\b/g, (m) => stem(m))
+    .replace(/§\s*/g, 'Abschnitt ')
+    .replace(/\b[0-9a-f]{7,40}\b/g, (m) => (/\d/.test(m) ? 'Rev.' : m))
+    .replace(/\b(punkt|point)\s+(\d{1,3})\b/gi, '$1 Nr. $2')
+    .replace(/\((\d{2,3})\)/g, '[Nr. $1]')
+    .replace(/\s+/g, ' ')
+    .trim()
+  return t.length > maxLength ? `${t.slice(0, maxLength - 1).trimEnd()}…` : t
+}
+
+/**
+ * The card naming the pending requests, or '' when none wait (an empty card
+ * would be a permanent fixture saying nothing, and the audit refuses an empty
+ * body anyway). The meta is the named "no estimate yet" marker: a deposit that
+ * has not become a point cannot carry a duration, and the audit accepts that
+ * marker by name.
+ */
+export function renderRequestsCard(requests, { max = REQUEST_CARD_MAX } = {}) {
+  const list = (Array.isArray(requests) ? requests : []).filter((r) => r && r.title)
+  if (!list.length) return ''
+  const shown = list.slice(0, max)
+  const day = (at) => {
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(at ?? ''))
+    return m ? `${m[3]}.${m[2]}.` : ''
+  }
+  const body = [
+    list.length === 1
+      ? 'Eine Anfrage wartet darauf, in den Arbeitsauftrag übernommen zu werden.'
+      : `${list.length} Anfragen warten darauf, in den Arbeitsauftrag übernommen zu werden.`,
+    ...shown.map((r) => {
+      const when = day(r.at)
+      const mark = r.route === 'vdzk' ? ' — braucht deine Entscheidung' : ''
+      return `${when ? `${when} ` : ''}${boardSafeTitle(r.title)}${mark}`
+    }),
+  ]
+  if (list.length > shown.length) body.push(`… und ${list.length - shown.length} weitere.`)
+  return (
+    `<details>\n  <summary><span class="num">✳</span><span class="t">${esc(REQUEST_CARD_TITLE)}</span>` +
+    `<span class="right"><span class="meta">${esc(QUEUE_STUB_META)}</span></span></summary>\n` +
+    `  <div class="body">\n${body.map((p) => `    <p>${esc(p)}</p>\n`).join('')}  </div>\n</details>\n`
+  )
+}
+
 /** One card, in exactly the markup the board guard's parsers read. */
 export function renderQueueCard({ point, title, body, meta }) {
   return (
@@ -321,12 +392,18 @@ export function queueSectionBounds(html) {
  *
  * `exclude` must already hold every point the other sections claim — see the
  * two-writers note at the head of this file.
+ *
+ * `requests` are the deposits of other windows (point 462); they render as ONE
+ * card at the end of the section. Because the whole section is rewritten here,
+ * a request that has since been queued disappears from the board on the next
+ * rebuild without anything having to remember it.
  */
-export function buildQueueSection(html, { open = [], data = null, exclude = [], titles = {} } = {}) {
+export function buildQueueSection(html, { open = [], data = null, exclude = [], titles = {}, requests = [] } = {}) {
   const doc = String(html ?? '')
   const { from, end } = queueSectionBounds(doc)
   const entries = queueEntries({ open, data, exclude, titles })
-  return { html: `${doc.slice(0, from)}\n${renderQueueCards(entries)}${doc.slice(end)}`, entries }
+  const cards = `${renderQueueCards(entries)}${renderRequestsCard(requests)}`
+  return { html: `${doc.slice(0, from)}\n${cards}${doc.slice(end)}`, entries }
 }
 
 /**
