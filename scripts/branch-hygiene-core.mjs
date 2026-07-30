@@ -102,6 +102,7 @@ export function assessBranchHygiene({
   worktrees = [],
   inFlightBranches = [],
   inFlightPaths = [],
+  mainTip = null,
 } = {}) {
   // FAIL-OPEN, as a decision rather than as luck: a git state nobody could read
   // is not evidence of debris, and a guard that blocks on its own blindness
@@ -112,6 +113,18 @@ export function assessBranchHygiene({
   const heldPaths = new Set(inFlightPaths.map(normPath).filter(Boolean))
   const fresh = (tipAt) => typeof tipAt === 'number' && now - tipAt >= 0 && now - tipAt < graceMs
   const age = (tipAt) => (typeof tipAt === 'number' ? now - tipAt : null)
+
+  // A BRANCH STANDING EXACTLY ON MAIN IS NOT DEBRIS — it was just cut (four-eyes
+  // review of the arming, 30.07.2026). Containment says "merged" for a ref whose
+  // tip EQUALS main's tip, and the grace period cannot save it: the grace is
+  // measured on the TIP COMMIT's date, which for a branch with no commits of its
+  // own is main's own history — already spent the moment the branch is born. The
+  // guard would therefore demand the deletion of a feature branch, or the cleanup
+  // of a live agent's worktree, in exactly the window between cutting it and its
+  // first commit. The debris this guard was built for sat commits BEHIND main,
+  // never on its tip.
+  const tip = typeof mainTip === 'string' && mainTip.trim() ? mainTip.trim() : null
+  const onMainTip = (sha) => tip !== null && typeof sha === 'string' && sha.trim() === tip
 
   const findings = []
 
@@ -144,7 +157,7 @@ export function assessBranchHygiene({
     const branch = normBranch(wt?.branch)
     const merged = branch ? isMergedLocal(branch, localMerged) : wt?.mergedHead === true
     if (!merged) continue
-    if (fresh(wt?.tipAt)) continue
+    if (fresh(wt?.tipAt) || onMainTip(wt?.tipSha)) continue
     findings.push({
       kind: 'worktree',
       name: String(wt.path),
@@ -158,7 +171,7 @@ export function assessBranchHygiene({
     const name = normBranch(b?.name)
     if (!name || PROTECTED_REFS.has(name)) continue
     if (heldBranches.has(name) || protectedByWorktree.has(name)) continue
-    if (fresh(b?.tipAt)) continue
+    if (fresh(b?.tipAt) || onMainTip(b?.tipSha)) continue
     findings.push({
       kind: 'local',
       name: String(b.name),

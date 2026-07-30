@@ -37,16 +37,20 @@ function git(args) {
   })
 }
 
-/** Tip commit date per ref, epoch ms — one call for every branch there is. */
+/** Tip commit date AND sha per ref — one call for every branch there is. The sha
+ *  is what tells a freshly cut branch (its tip IS main's tip) from real debris. */
 function tipDates() {
   const out = new Map()
-  for (const line of git(['for-each-ref', '--format=%(refname:short)\t%(committerdate:unix)', 'refs/heads', 'refs/remotes']).split(
-    /\r?\n/,
-  )) {
-    const [name, unix] = line.split('\t')
+  for (const line of git([
+    'for-each-ref',
+    '--format=%(refname:short)\t%(committerdate:unix)\t%(objectname)',
+    'refs/heads',
+    'refs/remotes',
+  ]).split(/\r?\n/)) {
+    const [name, unix, sha] = line.split('\t')
     if (!name) continue
     const n = Number(unix)
-    if (Number.isFinite(n)) out.set(normBranch(name), n * 1000)
+    if (Number.isFinite(n)) out.set(normBranch(name), { at: n * 1000, sha: (sha ?? '').trim() })
   }
   return out
 }
@@ -91,17 +95,21 @@ export function gatherBranchHygiene({ sessionId = '', now = Date.now() } = {}) {
   let localMerged
   let remoteMerged
   let worktrees
+  let mainTip = null
   try {
     tips = tipDates()
-    const at = (name) => tips.get(normBranch(name)) ?? null
-    localMerged = mergedNames(['branch', '--merged', 'origin/main']).map((name) => ({ name, tipAt: at(name) }))
-    remoteMerged = mergedNames(['branch', '-r', '--merged', 'origin/main']).map((name) => ({ name, tipAt: at(name) }))
+    const at = (name) => tips.get(normBranch(name))?.at ?? null
+    const shaOf = (name) => tips.get(normBranch(name))?.sha ?? null
+    mainTip = shaOf('origin/main')
+    localMerged = mergedNames(['branch', '--merged', 'origin/main']).map((name) => ({ name, tipAt: at(name), tipSha: shaOf(name) }))
+    remoteMerged = mergedNames(['branch', '-r', '--merged', 'origin/main']).map((name) => ({ name, tipAt: at(name), tipSha: shaOf(name) }))
     // git's FIRST worktree is the main checkout. Deriving the root from it
     // rather than from this module's own path is what keeps the guard right
     // when it runs from an agent worktree — where REPO_ROOT is the worktree.
     worktrees = parseWorktrees(git(['worktree', 'list', '--porcelain'])).map((wt) => ({
       ...wt,
       tipAt: wt.branch ? at(wt.branch) : headDate(wt.head),
+      tipSha: wt.branch ? shaOf(wt.branch) : ((wt.head ?? '').trim() || null),
       // Only asked where there is no branch to judge: a DETACHED leftover was a
       // third of the debris, and containment is the only thing that identifies it.
       mergedHead: wt.branch ? false : isAncestorOfMain(wt.head),
@@ -126,6 +134,7 @@ export function gatherBranchHygiene({ sessionId = '', now = Date.now() } = {}) {
       worktrees,
       inFlightBranches: declared.branches,
       inFlightPaths: declared.paths,
+      mainTip,
     },
   }
 }
