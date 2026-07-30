@@ -2795,6 +2795,25 @@ it is appended.
   the same is missing for source), and (c) an explicit context budget per point after
   which the session hands over mid-point with a written handoff. Pick by measurement, not
   by preference, and report the %/h again — the criterion stays the one above.
+  (d) THE HARNESS PRIMITIVES, EVALUATED AGAINST OUR HAND-BUILT LAYER (user question
+  30.07.2026: is there not an established mechanism for token-frugal parallel batch work
+  rather than reinventing it?). Partly there is, and parts are already in use — worktree
+  agent isolation per `docs/batch-autonomy.md`; the cron/wakeup primitives were tried and
+  deliberately superseded by the OS autostart task (`docs/rule-corpus-audit.md` A31); one
+  Workflow run happened and was curtailed after the ~3M-token incident. NOT evaluated
+  since: the Workflow tool's BUDGET primitive — a hard output-token ceiling with a
+  remaining() query, precisely the control that was missing on 20.07. — together with its
+  run-resume, which replays the unchanged prefix of agent calls after a crash and is the
+  crash-resume we hand-built; background agents with a monitor instead of the hand-written
+  in-flight declaration and log polling; and REMOTE execution, the one layer that survives
+  a dead machine or a dead line — the residual the user accepted when declining a paid API
+  key for the vacation hardening — whose availability is gated and must be CHECKED, never
+  assumed. What no primitive replaces, and why our layer exists at all: the singleton
+  across OS-started sessions, the work-order and guard discipline, the board, the repo
+  doctor and the chat channel — those are policy, not orchestration.
+  VERIFIABLE for (d): one bounded written evaluation, layer by layer, naming per
+  hand-built piece whether a primitive replaces it, decided by the same %/h measurement
+  rather than by preference; a piece kept is kept with its reason recorded.
 
 - [ ] 379. ABU SIMBEL BECOMES A WALKABLE SITE (user 27.07.2026; a FEATURE, and the user's
   own instruction is that the open DEFECTS come first — it waits behind them). The world carries
@@ -3446,11 +3465,27 @@ it is appended.
   bundle passes; one in none blocks; one in the "not bundled" list passes; an unreadable
   work-packages file ALLOWS (fail-open); the bundle membership reconciles against the full
   open set, so a point that silently left a bundle is caught too.
-  Both stand down for a session that does not own the batch lock and for a paused batch,
+  (C) A POINT'S OWN ACCEPTANCE CRITERION IS ENFORCED BY NOTHING (30.07.2026). Points carry
+  their acceptance condition as PROSE — "counts as delivered when the rate is MEASURED, not
+  when the mechanism runs" is the clearest case, with `scripts/measure-context-cost.mjs`
+  sitting there unused by any gate — and nothing compares a tick against it: `closing-guard`
+  gates a VERSION TAG only, and no guard reads a point's own condition. So a point can be
+  ticked because it FEELS finished, the very class this project's core lesson forbids: a rule
+  that exists only as prose. A point may therefore carry a machine-readable PROOF line naming
+  the command whose run must be recorded, in the grammar `closing-guard --step --evidence`
+  already uses, and the tick path refuses `[ ]`→`[x]` for such a point without a recorded run
+  at the CURRENT HEAD. A point WITHOUT a proof line ticks as before — the line is opt-in, so
+  adding the gate never blocks the existing corpus.
+  All three stand down for a session that does not own the batch lock and for a paused batch,
   like every guard here. MECHANISM REVIEW REQUIRED (CLAUDE.md §7.2); the
   `.claude/settings.json` wiring is attended-only and must be ABSOLUTE, not cwd-relative.
-  DOCS in the same commit: `docs/batch-autonomy.md` (the guard chain) and, for (B),
-  `docs/work-packages.md` states that its membership is now checked rather than remembered.
+  DOCS in the same commit: `docs/batch-autonomy.md` (the guard chain), for (B)
+  `docs/work-packages.md` states that its membership is now checked rather than remembered,
+  and for (C) the work order's own preamble states the proof-line grammar.
+  VERIFIABLE for (C): pure Vitest — a point with a proof line and no recorded run BLOCKS the
+  tick; the same point with a run recorded at the current HEAD passes; a run recorded at an
+  OLDER head does not count; a point without a proof line is untouched; an unreadable ledger
+  ALLOWS (fail-open).
 
 - [ ] 438. THE PROJECT HOOKS CANNOT FIRE OUTSIDE THE REPO ROOT (29.07.2026, measured in a
   `/doctor` run and reviewed by the second model; bundle J). All 31 project hooks in
