@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { STAND_DOWN_KINDS, standDownKind, standDownMessage } from './batch-resume-hook-core.mjs'
 import { CLAIM_BY, responderClaim } from './chat-watcher-core.mjs'
+import { CLAIM_MAX_AGE_MS } from './batch-claim-core.mjs'
 
 const now = 1_700_000_000_000
 const watcherClaim = (responderPid) =>
@@ -172,6 +173,32 @@ describe('the other stand-downs stay honest', () => {
 
   it('is total — the empty call still produces a usable message', () => {
     expect(standDownMessage().text.length).toBeGreaterThan(50)
+  })
+
+  // POINT 434 (6): the way back USED to end at "re-running the SAME command
+  // takes it" and never said that a claim ages at all, so a returning session
+  // claimed once, waited, and never learned why nothing happened.
+  it('every way back STATES the clock instead of hiding it', () => {
+    for (const c of [{ lock: liveLock }, { lock: null }, { lock: null, claim: userClaim, claimHonoured: true }]) {
+      const { text } = standDownMessage({ sessionId: 's1', now, takeUpMs: 30 * 60 * 1000, ...c })
+      // …that it does NOT expire while an owner holds — the half that made the
+      // old 30-minute deadline wrong…
+      expect(text).toContain('while a live owner holds the lock the claim does NOT expire')
+      expect(text).toContain('as long as THIS window is open')
+      // …and that the free lock is only reserved for the take-up window.
+      expect(text).toContain('reserves the batch for 30 min')
+      expect(text).toContain('ordinary handover')
+    }
+  })
+
+  it('prints the calibrated take-up window rather than a hard-coded number', () => {
+    expect(standDownMessage({ sessionId: 's1', lock: liveLock, takeUpMs: 45 * 60 * 1000, now }).text).toContain(
+      'reserves the batch for 45 min',
+    )
+    // A nonsense window falls back to the default rather than to zero minutes.
+    expect(standDownMessage({ sessionId: 's1', lock: liveLock, takeUpMs: 'bald', now }).text).toContain(
+      `reserves the batch for ${CLAIM_MAX_AGE_MS / 60000} min`,
+    )
   })
 
   it('recognises the watcher marker by the shared constant, not a literal', () => {

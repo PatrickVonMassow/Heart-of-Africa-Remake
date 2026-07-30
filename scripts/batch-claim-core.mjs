@@ -21,9 +21,13 @@
 // whole apparatus exists to prevent (the e9407cae incident).
 //
 // FOUR BOUNDS, each measurable rather than a matter of taste:
-//   1. IT EXPIRES. A claim file left by a window that was closed hours ago must
-//      never hand the batch to nobody — past `CLAIM_MAX_AGE_MS` it is ignored,
-//      whatever it says.
+//   1. IT IS BOUNDED BY THE THING IT WAITS FOR, not by a clock somebody has to
+//      feed (point 434 (6), 30.07.2026 — see `assessClaim`). A claim file left by
+//      a window that was closed must never hand the batch to nobody, and the
+//      reader that answers that is the pid probe of bound 2, not the calendar.
+//      The wall clock survives only where there is nobody left to wait for: with
+//      the lock free and the claim untaken, `CLAIM_MAX_AGE_MS` is the TAKE-UP
+//      window after which the ordinary handover takes over again.
 //   2. THE CLAIMANT MUST BE ALIVE, and alive by IDENTITY: the recorded pid must
 //      exist AND have started when the claim says it did. A reused pid is a
 //      stranger. This is the same rule `checkEvidence` applies to a declared
@@ -43,12 +47,40 @@
 // repair job.
 import { resolveOwnership, PID_START_TOLERANCE_MS } from './batch-singleton.mjs'
 
-/** How long a claim stays honourable. Wide enough that a session inside a long
- *  tool call still reaches its next Stop hook and sees it; short enough that a
- *  window closed after claiming loses the batch back to the launcher within the
- *  half hour instead of stranding it. Calibratable via HOA_CLAIM_MAX_MIN
- *  (scripts/batch-claim.mjs). */
+/**
+ * THE TAKE-UP WINDOW: how long a claim stays honourable once there is nobody
+ * left to wait for — the lock free (or its owner gone) and the claim not yet
+ * taken. Past it the ordinary handover applies again, so a claim can never leave
+ * the batch ownerless.
+ *
+ * IT IS NO LONGER THE CLAIM'S LIFETIME (point 434 (6a), 30.07.2026). As a flat
+ * expiry it was shorter than the owner's own gap between clean turn ends: the
+ * owner is inside a 40-minute suite, the claim ages out unseen, the takeover
+ * silently fails, and keeping it alive needed a background refresher that itself
+ * died silently (measured 29.07.2026 20:00, session 10a2d2e0 — a watcher hit a
+ * 60-minute timeout and the claim would have lapsed at 20:29 with nobody the
+ * wiser). While a live owner still holds the lock the claim therefore does NOT
+ * age: it is honoured for as long as the window that wrote it is alive, which is
+ * a fact a probe reads rather than a deadline anybody feeds.
+ *
+ * Calibratable via HOA_CLAIM_MAX_MIN (scripts/batch-claim.mjs).
+ */
 export const CLAIM_MAX_AGE_MS = 30 * 60 * 1000
+
+/**
+ * A claim that carries its own ISSUER is a machine errand with a lifetime of its
+ * own, and it keeps the wall clock. PURE.
+ *
+ * The chat watcher's responder claim (`by: 'chat-watcher'`,
+ * scripts/chat-watcher-core.mjs) names the WATCHER's process, which lives for
+ * hours while the errand it stands for is capped at ten minutes — so its pid is
+ * not a bound on the wait and the clock is the only one it has. A window's own
+ * takeover claim names the window that will TAKE the batch, and that pid is the
+ * honest bound. The distinction is in the record, not in a caller's flag.
+ */
+export function claimIsBounded(claim) {
+  return typeof claim?.by === 'string' && claim.by.trim() !== ''
+}
 
 /** What the git probe answers when it could not find OUT (a timeout under load, a
  *  git that would not run) — as opposed to `null`, which means it looked and found
@@ -74,17 +106,37 @@ export const GIT_STATE_UNVERIFIABLE = 'unverifiable'
  *               session, so the owner's own claim would otherwise read as a
  *               stranger's and it would release the batch to itself.
  *   ownerSid  — who holds the lock right now, when known
+ *   ownerHolding — is a live owner still holding the lock, i.e. is there anybody
+ *               to WAIT for? While there is, the claim does not age (point 434
+ *               (6a)); once there is not, `maxAgeMs` is the take-up window. It
+ *               defaults to FALSE, so a caller that cannot answer gets the
+ *               bounded reading — the direction that can never strand the batch.
  *   now, maxAgeMs, probePid, tolerance
  *
  * Returns { honour, mine, reason, ageMs, claimantSid, releasedAt }. `honour` true
  * is the ONLY value that changes anybody's behaviour; every other path leaves the
  * batch exactly as it was.
+ *
+ * A RELEASED CLAIM IS NOT A CLAIM (point 434 (6c), measured 30.07.2026
+ * 10:10-10:16). A record with `releasedAt` AND `releasedBy` both set was still
+ * honoured: the owning session released to it, the claiming window never took
+ * it, and the batch then ran for an hour with NO lock at all while every guard
+ * and heartbeat behaved as though it were owned — and the boundary that followed
+ * released to the same dead claim a second time (`.claude/boundary.log`: two
+ * RELEASED lines, no HANDOVER). The stamp means the hand-over already happened,
+ * so the reader must treat it as ABSENT: nothing is released to it twice, it
+ * reserves nothing, and a new claim may be written straight over it. What the
+ * claimant loses is the reservation — the lock is FREE and its own re-run of
+ * `batch-claim.mjs --session <id>` still takes it — and what the batch gains is
+ * that a release with no live taker falls back to the ordinary handover instead
+ * of leaving the batch ownerless.
  */
 export function assessClaim({
   claim,
   sid = '',
   ancestor = null,
   ownerSid = '',
+  ownerHolding = false,
   now,
   maxAgeMs = CLAIM_MAX_AGE_MS,
   probePid = null,
@@ -111,19 +163,24 @@ export function assessClaim({
   // A claim from the future is a clock nobody here can reason about → ignore it.
   // Costs one re-claim; the other direction hands the batch over on a bad stamp.
   if (!(ageMs >= 0)) return out(false, 'clock-skew', { ...base, ageMs })
-  if (ageMs > maxAgeMs) return out(false, 'expired', { ...base, ageMs })
 
   // Ours? By the lock's own identity rules — session id first, the claude process
   // second — so a compaction that mints a new id never orphans a claim this very
-  // window wrote, while a genuinely second window still fails it.
+  // window wrote, while a genuinely second window still fails it. Asked BEFORE the
+  // released check so the claimant still recognises (and clears) its own record.
   if (resolveOwnership({ lock: claim, sessionId: sid, ancestor, tolerance }).mine) {
     return out(false, 'own-claim', { ...base, ageMs, mine: true })
   }
   if (ownerSid && claim.sessionId === ownerSid) return out(false, 'claimant-is-owner', { ...base, ageMs })
 
+  // ALREADY HANDED OVER → absent, for everybody but its own writer (see above).
+  if (base.releasedAt !== null || (typeof claim.releasedBy === 'string' && claim.releasedBy.trim() !== '')) {
+    return out(false, 'released', { ...base, ageMs })
+  }
+
   // LIVENESS BY IDENTITY, never by existence: a claim from a window that has been
   // closed must not move the batch, and a pid the OS handed to somebody else is
-  // not the claimant.
+  // not the claimant. THIS is the bound that replaced the flat expiry.
   const pid = Number(claim.pid)
   if (!Number.isInteger(pid) || pid <= 0) return out(false, 'claimant-unidentified', { ...base, ageMs })
   const probe = probePid ? probePid(pid) : null
@@ -134,6 +191,12 @@ export function assessClaim({
   }
   if (Math.abs(probe.startedAt - claim.pidStartedAt) > tolerance) {
     return out(false, 'claimant-pid-reused', { ...base, ageMs })
+  }
+
+  // THE CLOCK, where and only where nothing else bounds the wait: an errand claim
+  // that carries its own issuer, or a claim with no live owner left to wait for.
+  if ((claimIsBounded(claim) || ownerHolding !== true) && ageMs > maxAgeMs) {
+    return out(false, 'expired', { ...base, ageMs })
   }
   return out(true, 'honour', { ...base, ageMs })
 }
@@ -206,13 +269,14 @@ export function claimWriteDecision({
   existing,
   sid,
   ancestor = null,
+  ownerHolding = false,
   now,
   maxAgeMs = CLAIM_MAX_AGE_MS,
   probePid = null,
   tolerance = PID_START_TOLERANCE_MS,
 } = {}) {
   if (!sid) return { action: 'refuse', reason: 'no-session-id', claimantSid: null, ageMs: null }
-  const a = assessClaim({ claim: existing, sid, ancestor, now, maxAgeMs, probePid, tolerance })
+  const a = assessClaim({ claim: existing, sid, ancestor, ownerHolding, now, maxAgeMs, probePid, tolerance })
   if (a.mine) return { action: 'refresh', reason: 'own-claim', claimantSid: a.claimantSid, ageMs: a.ageMs }
   if (a.honour) {
     return { action: 'refuse', reason: 'claimed-by-other', claimantSid: a.claimantSid, ageMs: a.ageMs }
@@ -221,12 +285,15 @@ export function claimWriteDecision({
 }
 
 /** The one line the guard puts in the boundary log and in its message, and the
- *  CLI prints. */
+ *  CLI prints. A released record says so in words, because it was HONOURED twice
+ *  in a row on 30.07.2026 while every line about it looked ordinary. */
 export function describeClaim(assessment) {
   if (!assessment || !assessment.claimantSid) return 'no claim'
   const mins = Number.isFinite(assessment.ageMs) ? Math.round(assessment.ageMs / 60000) : null
   const age = mins === null ? '' : ` (claimed ${mins} min ago)`
   const released =
-    typeof assessment.releasedAt === 'number' ? ', already released for it' : ''
+    typeof assessment.releasedAt === 'number'
+      ? ', ALREADY released for it — the hand-over happened, this record is spent'
+      : ''
   return `session ${assessment.claimantSid}${age} — ${assessment.reason}${released}`
 }

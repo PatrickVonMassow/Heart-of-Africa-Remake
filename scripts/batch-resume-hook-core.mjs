@@ -23,6 +23,7 @@
 // So the branch now NAMES its situation first and speaks to it. The rule is
 // pure and tested here; the hook only gathers the state and prints the result.
 import { CLAIM_BY } from './chat-watcher-core.mjs'
+import { CLAIM_MAX_AGE_MS } from './batch-claim-core.mjs'
 
 export const STAND_DOWN_KINDS = Object.freeze({
   /** THIS session is the responder the watcher woke for a chat message. */
@@ -59,16 +60,31 @@ export function standDownKind({ lock = null, claim = null, claimHonoured = false
   return STAND_DOWN_KINDS.UNKNOWN
 }
 
-/** The one line every non-responder stand-down ends with: how the user takes
- *  the batch into THIS window. Printed with the session id already in it,
- *  because a CLI gets no hook payload and this is the one place it is known. */
-function wayBack(sessionId) {
+/**
+ * The one line every non-responder stand-down ends with: how the user takes the
+ * batch into THIS window. Printed with the session id already in it, because a
+ * CLI gets no hook payload and this is the one place it is known.
+ *
+ * IT NAMES THE CLOCK (point 434 (6), 30.07.2026). The old text said "re-running
+ * the SAME command takes it" and stopped there — it never mentioned that a claim
+ * ages at all, so a returning session claimed once, waited, and never learned why
+ * nothing happened. Both halves of the rule are now stated: while the owner still
+ * holds the lock the claim does not age (it lives as long as this window does),
+ * and once the lock is free it only reserves the batch for the take-up window,
+ * after which the ordinary handover takes over. `takeUpMin` is the take-up
+ * window in minutes, injected so this stays pure.
+ */
+function wayBack(sessionId, takeUpMin) {
   return (
     'THE WAY BACK: if the user says they are back and want the batch worked HERE, run ' +
     `\`node scripts/batch-claim.mjs --session ${sessionId}\` — that claims the batch, the owning session ` +
     'releases it at its next CLEAN turn end (never mid-merge, never with a delegated agent or a ' +
     'verification still running), and re-running the SAME command takes it. Nothing else is needed from ' +
-    'the user. To inspect first: `node scripts/batch-claim.mjs --status`.'
+    'the user. THE CLOCK, stated rather than hidden: while a live owner holds the lock the claim does NOT ' +
+    'expire — it holds for as long as THIS window is open and is ignored the moment it closes; but once the ' +
+    `lock is FREE the claim only reserves the batch for ${takeUpMin} min, and after that the ordinary handover ` +
+    'takes over so the batch is never left ownerless. So re-run the command promptly once the release is ' +
+    'reported. To inspect first: `node scripts/batch-claim.mjs --status`.'
   )
 }
 
@@ -90,10 +106,13 @@ export function standDownMessage({
   claim = null,
   claimHonoured = false,
   ancestorPid = null,
+  takeUpMs = CLAIM_MAX_AGE_MS,
   now = Date.now(),
 } = {}) {
   const kind = standDownKind({ lock, claim, claimHonoured, ancestorPid })
   const claimantSid = claim && typeof claim.sessionId === 'string' ? claim.sessionId : 'unknown'
+  const takeUpMin = Math.max(1, Math.round((Number.isFinite(takeUpMs) && takeUpMs > 0 ? takeUpMs : CLAIM_MAX_AGE_MS) / 60000))
+  const wayBackText = wayBack(sessionId, takeUpMin)
 
   if (kind === STAND_DOWN_KINDS.RESPONDER) {
     // The ONE stand-down that grants something. It is narrow on purpose: this
@@ -124,7 +143,7 @@ export function standDownMessage({
         `A message RESPONDER holds a bounded claim on the batch (claim ${claimantSid}, ` +
         'scripts/chat-watcher.mjs) while it answers one chat message, so the lock is reserved and this ' +
         `session cannot take it. ${NOT_THE_WORKER}The claim releases itself within minutes — it is bounded ` +
-        `by the responder's lifetime and expires on its own. ${wayBack(sessionId)}`,
+        `by the responder's lifetime and expires on its own. ${wayBackText}`,
     }
   }
 
@@ -134,7 +153,7 @@ export function standDownMessage({
       text:
         `NO session owns the batch lock right now, but session ${claimantSid} has CLAIMED it ` +
         '(.claude/batch-claim.json) and that claim is still live, so taking the lock here would pull the ' +
-        `batch out of the window it was reserved for. ${NOT_THE_WORKER}${wayBack(sessionId)} ` +
+        `batch out of the window it was reserved for. ${NOT_THE_WORKER}${wayBackText} ` +
         `NOTE: session ${claimantSid} has already claimed the batch — do not claim over it.`,
     }
   }
@@ -146,7 +165,7 @@ export function standDownMessage({
       text:
         'The atomic acquire of the batch lock did NOT succeed here and no owner lock is readable — either ' +
         'another session claimed it in the race window, or the lock file could not be read. ' +
-        `${NOT_THE_WORKER}${wayBack(sessionId)}`,
+        `${NOT_THE_WORKER}${wayBackText}`,
     }
   }
 
@@ -156,7 +175,7 @@ export function standDownMessage({
     text:
       `But another session OWNS the batch lock (session ${lock?.sessionId ?? 'unknown'}, ` +
       `pid ${lock && lock.pid ? lock.pid : 'unknown'}, heartbeat ${ageMin} min ago, .claude/batch-lock.json) ` +
-      `and its liveness check passed. ${NOT_THE_WORKER}${wayBack(sessionId)}` +
+      `and its liveness check passed. ${NOT_THE_WORKER}${wayBackText}` +
       (claimHonoured ? ` NOTE: session ${claimantSid} has already claimed the batch — do not claim over it.` : ''),
   }
 }

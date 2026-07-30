@@ -138,11 +138,17 @@ export function gatherClaim(
         ? { pid: lock.pid, startedAt: lock.pidStartedAt ?? null }
         : ourClaudeProcess(sid, { lockPath })
   }
+  const lock = ownerLock === undefined ? readOwnerLock(lockPath) : ownerLock
   const assessment = assessClaim({
     claim,
     sid,
     ancestor: identity,
-    ownerSid: (ownerLock === undefined ? readOwnerLock(lockPath) : ownerLock)?.sessionId ?? '',
+    ownerSid: lock?.sessionId ?? '',
+    // IS THERE ANYBODY TO WAIT FOR (point 434 (6a))? A lock held by someone other
+    // than the claimant is exactly that, and while it stands the claim does not
+    // age out under the owner's own long turns. With no lock the take-up window
+    // applies again, so an untaken claim can never leave the batch ownerless.
+    ownerHolding: !!lock?.sessionId && lock.sessionId !== claim.sessionId,
     now,
     maxAgeMs: maxAgeMs(env),
     probePid,
@@ -150,10 +156,12 @@ export function gatherClaim(
   return { claim, ...assessment }
 }
 
-/** Mark the claim RELEASED, so the claimant's `--status` can say the batch is
- *  waiting for it and the launcher keeps standing down until it is taken. Only
- *  ever called by the releasing owner; best effort — the release itself is what
- *  matters, and a claim we cannot stamp is still honoured on its own age. */
+/** Mark the claim RELEASED: the hand-over HAPPENED, and from that moment the
+ *  record is spent (point 434 (6c) — `assessClaim` reads it as absent). The lock
+ *  is free, so the claiming window takes it by re-running its own command, and
+ *  nothing releases to this record a second time or keeps standing down for it.
+ *  Only ever called by the releasing owner; best effort — the release itself is
+ *  what matters, and an unstamped claim still ends inside its take-up window. */
 export function markClaimReleased(claim, { path = CLAIM_PATH, now = Date.now(), by = '' } = {}) {
   try {
     if (!claim || typeof claim !== 'object') return false
@@ -223,9 +231,19 @@ if (isMain) {
     ? assessOwner(lock, { now, bootTime: bootTimeMs(), probe: lock.pid ? probePid(lock.pid) : null })
     : { alive: false, reason: 'no-lock' }
 
+  const ownerHolding = !!lock?.sessionId && ownerAlive.alive === true
+
   if (has('--status')) {
     const claim = readClaim()
-    const view = assessClaim({ claim, sid, ownerSid: lock?.sessionId ?? '', now, maxAgeMs: maxAgeMs(), probePid })
+    const view = assessClaim({
+      claim,
+      sid,
+      ownerSid: lock?.sessionId ?? '',
+      ownerHolding: ownerHolding && lock.sessionId !== claim?.sessionId,
+      now,
+      maxAgeMs: maxAgeMs(),
+      probePid,
+    })
     console.log(
       JSON.stringify(
         {
@@ -246,8 +264,17 @@ if (isMain) {
         `\nA claim is PENDING: ${describeClaim(view)}. ` +
           (lock && ownerAlive.alive
             ? `The owner (${lock.sessionId}) releases at its next CLEAN turn end — not mid-merge and not while a ` +
-              'delegated agent or a verification is still running.'
-            : 'No live owner holds the batch — re-run the claim with --session <id> and it is yours at once.'),
+              'delegated agent or a verification is still running. While it holds the lock this claim does NOT ' +
+              'age out; it ends when the claiming window closes.'
+            : 'No live owner holds the batch — re-run the claim with --session <id> and it is yours at once. ' +
+              `Do not wait: with the lock free the claim only reserves it for ${Math.round(maxAgeMs() / 60000)} ` +
+              'min, and then the ordinary handover takes over so the batch is never left ownerless.'),
+      )
+    } else if (view.reason === 'released') {
+      console.log(
+        `\nThe batch was ALREADY RELEASED for ${view.claimantSid} (this record is spent, point 434). The lock is ` +
+          'free: run `node scripts/batch-claim.mjs --session <id>` to take it. Nothing reserves it any more — ' +
+          'if the launcher got there first, claim again against the new owner.',
       )
     } else console.log(`\nThe recorded claim is NOT honoured (${view.reason}) — it changes nothing.`)
     process.exit(0)
@@ -300,7 +327,15 @@ if (isMain) {
     )
   }
   const existing = readClaim()
-  const write = claimWriteDecision({ existing, sid, ancestor, now, maxAgeMs: maxAgeMs(), probePid })
+  const write = claimWriteDecision({
+    existing,
+    sid,
+    ancestor,
+    ownerHolding: ownerHolding && lock.sessionId !== existing?.sessionId,
+    now,
+    maxAgeMs: maxAgeMs(),
+    probePid,
+  })
   if (write.action === 'refuse') {
     fail(
       `session ${write.claimantSid} claimed the batch ${Math.round((write.ageMs ?? 0) / 60000)} min ago and that ` +
@@ -335,7 +370,10 @@ if (isMain) {
           : ` (A ${check.reason.replace(/^git-/, '')} is in progress in this checkout right now.)`
         : '') +
       ` Re-run \`node scripts/batch-claim.mjs --session ${sid}\` to take the batch once it is free — the same ` +
-      `command claims and takes. The claim expires in ${mins} min, and it is ignored outright if this window ` +
-      'closes, so it can never strand the batch.',
+      'command claims and takes. WHILE THAT OWNER LIVES the claim does NOT age out (point 434): it holds for as ' +
+      'long as THIS window is open and is ignored outright the moment it closes, so a long verification in the ' +
+      'other session can no longer let the takeover lapse unnoticed. ONCE THE LOCK IS FREE the clock starts: the ' +
+      `claim then reserves the batch for ${mins} min, and after that the ordinary handover takes over rather ` +
+      'than leaving the batch ownerless — so re-run the command promptly once the release is reported.',
   )
 }

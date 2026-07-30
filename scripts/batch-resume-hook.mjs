@@ -185,11 +185,18 @@ try {
       // to tell "I am the responder the watcher woke" from "some responder is
       // running", and the ancestor walk is the expensive half of this branch.
       const ancestor = claim ? findClaudeAncestor() : null
+      // The lock is read BEFORE the claim is judged: whether a live owner still
+      // holds it decides whether the claim ages at all (point 434 (6a)) — with
+      // somebody to wait for it does not, with nobody it is bounded by the
+      // take-up window so an untaken claim can never leave the batch ownerless.
+      const lock = readOwnerLock()
       const reservation = claim
         ? assessClaim({
             claim,
             sid: sessionId,
             ancestor,
+            ownerSid: lock?.sessionId ?? '',
+            ownerHolding: !!lock?.sessionId && lock.sessionId !== claim.sessionId,
             now,
             maxAgeMs: maxAgeMs(),
             probePid,
@@ -200,7 +207,6 @@ try {
       // then the ordinary atomic acquire. NO path overrides a live lock.
       const auth = autostartAuthorization(now)
       let ownership = 'none'
-      const lock = readOwnerLock()
       // The same predicate the owner's Stop guard applies before ITS acquire, so
       // the rule lives in one place and cannot drift between the two doors.
       if (reservationDecision({ assessment: reservation }).acquire) {
@@ -241,6 +247,7 @@ try {
           claim,
           claimHonoured: reservation.honour === true,
           ancestorPid: ancestor?.pid ?? null,
+          takeUpMs: maxAgeMs(),
           now,
         })
         console.log(`${header} ${stand.text}`)
