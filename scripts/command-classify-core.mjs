@@ -109,19 +109,26 @@ export function lexCommand(command) {
     let text = ''
     let sub = ''
     let quoted = false
+    let quoteAt = -1 // where the first quoted part begins inside `text`
     let emittedRedirect = false
     while (i < n) {
       const c = src[i]
       if (c === "'" || c === '"') {
         const quote = c
+        if (quoteAt < 0) quoteAt = text.length
         quoted = true
         i++
         while (i < n && src[i] !== quote) {
-          // Only `\"` inside double quotes escapes; a lone `\` stays literal so
-          // Windows paths survive.
-          if (quote === '"' && src[i] === '\\' && src[i + 1] === '"') {
-            text += '"'
-            sub += '"'
+          // Inside double quotes `\"`, `\$`, \` and `\\` escape; a lone `\` stays
+          // literal so Windows paths survive. An ESCAPED `\$(` or \` is INERT in
+          // a real shell, so it must not read as a substitution here either —
+          // that would be this point's own defect ("quoted text denies a read")
+          // in a rarer shape. The escaped char lands in `text` but never in the
+          // expandable `sub`.
+          if (quote === '"' && src[i] === '\\' && /["$`\\]/.test(src[i + 1] ?? '')) {
+            const esc = src[i + 1]
+            text += esc
+            sub += esc === '$' || esc === '`' ? ' ' : esc
             i += 2
             continue
           }
@@ -148,7 +155,7 @@ export function lexCommand(command) {
       sub += c
       i++
     }
-    if (!emittedRedirect && (text || quoted)) tokens.push({ type: 'word', text, sub, quoted, start, end: i })
+    if (!emittedRedirect && (text || quoted)) tokens.push({ type: 'word', text, sub, quoted, quoteAt, start, end: i })
   }
   return tokens
 }
@@ -179,7 +186,7 @@ export function parseSegments(command) {
     if (!current) current = { start: t.start, end: t.end, words: [], redirects: [], raw: '' }
     current.end = t.end
     if (t.type === 'word') {
-      current.words.push({ text: t.text, sub: t.sub ?? '', quoted: t.quoted })
+      current.words.push({ text: t.text, sub: t.sub ?? '', quoted: t.quoted, quoteAt: t.quoteAt ?? -1 })
     } else {
       const next = tokens[k + 1]
       const target = next && next.type === 'word' ? next : null
@@ -204,8 +211,70 @@ export function shellSegments(command) {
 
 // ── 2. The rules ─────────────────────────────────────────────────────────────
 
-/** Prefixes that only wrap the real command; the head is what follows them. */
-const WRAPPERS = new Set(['sudo', 'env', 'command', 'nohup', 'time', 'nice', 'stdbuf', 'xargs', 'exec'])
+/**
+ * Prefixes that only WRAP the real command — the head is what follows them.
+ *
+ * Each names the flags that EAT THE NEXT WORD and how many positionals of its
+ * own stand before the program (`timeout 60 bash -c …`). Without that, a
+ * wrapper's own flag becomes the head and the real program is never seen:
+ * `sudo -u me git push` classified as the program `-u` (four-eyes review round
+ * 2, 31.07.2026 — a regression against the old whole-string regex, and the
+ * fence let the push through).
+ *
+ * An ATTACHED value (`-n1`, `-I{}`) needs no entry: it is one word, skipped as
+ * the flag it is. Only the detached form (`-n 1`, `-u me`) does.
+ */
+const WRAPPERS = new Map([
+  ['sudo', { valueFlags: ['-u', '-g', '-p', '-C', '-U', '-T', '-h', '-r', '-t', '--user', '--group', '--prompt', '--chdir', '--host'], positionals: 0 }],
+  ['env', { valueFlags: ['-u', '--unset', '-C', '--chdir', '-S', '--split-string'], positionals: 0 }],
+  ['nice', { valueFlags: ['-n', '--adjustment'], positionals: 0 }],
+  ['time', { valueFlags: ['-o', '-f', '--output', '--format'], positionals: 0 }],
+  ['timeout', { valueFlags: ['-s', '--signal', '-k', '--kill-after'], positionals: 1 }], // the duration
+  ['xargs', { valueFlags: ['-n', '-I', '-i', '-P', '-a', '-d', '-E', '-L', '-l', '-s', '--max-args', '--replace', '--max-procs', '--arg-file', '--delimiter', '--max-lines', '--max-chars'], positionals: 0 }],
+  ['stdbuf', { valueFlags: ['-i', '-o', '-e', '--input', '--output', '--error'], positionals: 0 }],
+  ['exec', { valueFlags: ['-a'], positionals: 0 }],
+  ['command', { valueFlags: [], positionals: 0 }],
+  ['nohup', { valueFlags: [], positionals: 0 }],
+])
+
+/**
+ * Split a segment into the PROGRAM and its own arguments, stepping over every
+ * wrapper with its flags, its flag values and its positionals. One function, so
+ * the head and the arguments can never disagree about where the command starts.
+ */
+function splitHeadAndArgs(seg) {
+  const words = seg && Array.isArray(seg.words) ? seg.words : []
+  let i = 0
+  for (;;) {
+    // `FOO=bar cmd` — an environment assignment is never the program.
+    while (i < words.length && !words[i].quoted && /^[A-Za-z_][A-Za-z0-9_]*=/.test(words[i].text)) i++
+    if (i >= words.length) return { head: '', args: [], headWord: null }
+    const base = baseOf(words[i].text)
+    const spec = WRAPPERS.get(base)
+    if (!spec) return { head: base, args: words.slice(i + 1), headWord: words[i] }
+    i++ // step over the wrapper itself
+    let taken = 0
+    while (i < words.length) {
+      const t = words[i].text
+      if (t.startsWith('-') && t !== '-' && t !== '--') {
+        // A detached value flag eats the next word; `--` ends the option list.
+        const eats = !t.includes('=') && spec.valueFlags.includes(t)
+        i += eats ? 2 : 1
+        continue
+      }
+      if (t === '--') {
+        i++
+        break
+      }
+      if (taken < spec.positionals) {
+        taken++
+        i++
+        continue
+      }
+      break
+    }
+  }
+}
 
 /** Heads that write by their nature, whatever their arguments. */
 const WRITING_HEADS = new Set([
@@ -224,7 +293,13 @@ const INTERPRETERS = new Set(['node', 'npx', 'bun', 'deno', 'tsx', 'ts-node', 's
 
 /** Shells that take the real command as a STRING argument (`sh -c "…"`). */
 const SHELL_HEADS = new Set(['sh', 'bash', 'zsh', 'pwsh', 'powershell', 'cmd'])
-const SHELL_COMMAND_FLAGS = /^(-c|-command|\/c|-file)$/i
+
+/**
+ * The flag after which the argument IS the command. A COMBINED short cluster
+ * counts (`-lc`, `-ec`, `-xec`): the shell reads it as `-l -c`, and matching
+ * only an exact `-c` let `bash -lc "git push"` past (four-eyes review round 2).
+ */
+const SHELL_COMMAND_FLAGS = /^(-[a-z]*c|--?command|\/c|--?file)$/i
 
 /** A word's program name: no path, no extension, lower-cased. */
 const baseOf = (text) =>
@@ -238,33 +313,13 @@ const baseOf = (text) =>
 /** The program a segment runs, lower-cased and stripped of path and extension. */
 export function commandHead(segment) {
   const seg = asSegments(segment)[0]
-  if (!seg || !seg.words || !seg.words.length) return ''
-  for (const w of seg.words) {
-    const t = w.text
-    if (!t) continue
-    if (!w.quoted && /^[A-Za-z_][A-Za-z0-9_]*=/.test(t)) continue // FOO=bar prefix
-    const base = baseOf(t)
-    if (WRAPPERS.has(base)) continue
-    return base
-  }
-  return ''
+  if (!seg) return ''
+  return splitHeadAndArgs(seg).head
 }
 
 /** The words after the head, in order — the head's own arguments. */
 function argsOf(seg) {
-  const words = seg.words
-  let started = false
-  const args = []
-  for (const w of words) {
-    if (!started) {
-      if (!w.quoted && /^[A-Za-z_][A-Za-z0-9_]*=/.test(w.text)) continue
-      if (WRAPPERS.has(baseOf(w.text))) continue
-      started = true
-      continue
-    }
-    args.push(w)
-  }
-  return args
+  return splitHeadAndArgs(seg).args
 }
 
 const hasFlag = (args, flags) => args.some((a) => flags.some((f) => a.text === f || a.text.startsWith(`${f}=`)))
@@ -290,8 +345,20 @@ export function nestedCommands(segment) {
   // command. Single quotes around it change nothing: they stop the OUTER shell
   // from expanding, the inner one still runs it.
   if (SHELL_HEADS.has(head)) {
-    const i = args.findIndex((a) => SHELL_COMMAND_FLAGS.test(a.text))
-    if (i >= 0 && args[i + 1]) out.push(args[i + 1].text)
+    for (let i = 0; i < args.length; i++) {
+      const a = args[i]
+      if (SHELL_COMMAND_FLAGS.test(a.text)) {
+        if (args[i + 1]) out.push(args[i + 1].text)
+        break
+      }
+      // ATTACHED payload: `bash -c"git push"` is ONE word — the flag up to the
+      // first quote, the command from it on.
+      const q = Number(a.quoteAt ?? -1)
+      if (q > 0 && SHELL_COMMAND_FLAGS.test(a.text.slice(0, q))) {
+        out.push(a.text.slice(q))
+        break
+      }
+    }
   }
   // `eval` is the same case without a flag.
   if (head === 'eval') out.push(args.map((a) => a.text).join(' '))
@@ -335,10 +402,16 @@ const MAX_NESTING = 6
  * command nested inside a wrapper. This is what the LEASE FENCE iterates, so a
  * `bash -c`, an `eval` or a `$( … )` cannot hide a guarded action from it.
  */
-export function expandSegments(command, { maxDepth = MAX_NESTING } = {}) {
+export function expandSegments(command, { maxDepth = MAX_NESTING, onTruncate } = {}) {
   const out = []
   const walk = (cmd, depth) => {
-    if (depth > maxDepth) return
+    if (depth > maxDepth) {
+      // The cap was HIT — the caller is told, because what it does about that
+      // differs: the idle claim shrugs (fail open), the fence refuses (a
+      // wrapper chain nobody can read is not a licence to move shared history).
+      if (typeof onTruncate === 'function') onTruncate()
+      return
+    }
     for (const seg of parseSegments(cmd)) {
       out.push(seg)
       for (const nested of nestedCommands(seg)) walk(nested, depth + 1)

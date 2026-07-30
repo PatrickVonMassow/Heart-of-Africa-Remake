@@ -273,11 +273,20 @@ describe('board-first-guard (spawned)', () => {
     // `eval` or a command substitution.
     seedFence(7, 8)
     try {
-      for (const command of ['bash -c "git push origin main"', 'eval "git push"', 'echo $(git push)']) {
+      for (const command of [
+        'bash -c "git push origin main"',
+        'eval "git push"',
+        'echo $(git push)',
+        // …and a wrapper's own FLAGS must not become the program either.
+        'sudo -u me git push',
+        'timeout 60 bash -lc "git push"',
+      ]) {
         expect(denial(callGuard('Bash', { command })), `${command} must be REFUSED`).toContain('FENCED OUT')
       }
       // …while a wrapped READ still goes through.
-      expect(denial(callGuard('Bash', { command: 'bash -c "git status --short"' }))).not.toContain('FENCED OUT')
+      for (const command of ['bash -c "git status --short"', 'sudo git log', 'timeout 5 bash -c "echo ok"']) {
+        expect(denial(callGuard('Bash', { command })), `${command} must be allowed`).not.toContain('FENCED OUT')
+      }
     } finally {
       rmSync(fencePath(), { force: true })
     }

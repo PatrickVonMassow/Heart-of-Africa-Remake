@@ -145,10 +145,13 @@ of them free choices:
   SHARED classifier (`command-classify-core.mjs`, point 473), per segment and on the
   command head: `git log --merges` is not a merge, and a guarded script NAMED inside
   a grep is not that script being run. What CARRIES a command is unwrapped first
-  (`expandSegments` — `bash -c "…"`, `eval`, `$( … )`, backticks): the old string
-  regexes saw through a wrapper by accident, and losing that would let a
-  dispossessed session push through any shell. At THIS gate the conservative
-  direction wins, unlike the fail-open idle claim.
+  (`expandSegments` — `bash -c "…"`, a combined `-lc`, `eval`, `$( … )`,
+  backticks), and a wrapper's own flags, flag VALUES and positionals are stepped
+  over (`sudo -u me git push`, `timeout 60 bash -c …`): the old string regexes
+  saw through all of that by accident, and losing it would let a dispossessed
+  session push through any shell. At THIS gate the conservative direction wins,
+  unlike the fail-open idle claim — past the unwrapping depth it REFUSES rather
+  than shrugs, because "we stopped reading" is no licence.
   Reads, local commits and its own file work continue,
   and every other guard still stands down for it, so the Stop chain cannot demand
   of it the publish this refuses.

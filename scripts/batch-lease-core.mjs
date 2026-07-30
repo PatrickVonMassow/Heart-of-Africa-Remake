@@ -318,7 +318,13 @@ export function fenceGuardedAction({ toolName, command, filePath } = {}) {
     }
   }
   if (tool !== 'Bash' && tool !== 'PowerShell') return null
-  for (const segment of expandSegments(command)) {
+  // FAIL CLOSED ON AN UNREADABLE NESTING (four-eyes review round 2): past the
+  // unwrapping depth the classifier stops looking, and "we stopped looking" is
+  // not a licence to move shared history. The idle-claim gate shrugs at the same
+  // input — it may under-block; this one may not.
+  let tooDeep = false
+  const segments = expandSegments(command, { onTruncate: () => (tooDeep = true) })
+  for (const segment of segments) {
     if (GIT_SHARED_HISTORY.has(gitSubcommand(segment))) {
       // A dispossessed session may still commit locally; what it may not do is
       // move shared history. `git push` is matched in every form rather than only
@@ -339,6 +345,9 @@ export function fenceGuardedAction({ toolName, command, filePath } = {}) {
     if (segmentMentionsFile(segment, TASKS_FILES) && isMutatingSegment(segment)) {
       return { kind: 'tasks', what: 'a write to the work order' }
     }
+  }
+  if (tooDeep) {
+    return { kind: 'nested', what: 'a command wrapped deeper than this gate can read' }
   }
   return null
 }

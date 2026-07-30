@@ -82,6 +82,23 @@ describe('commandHead', () => {
     expect(commandHead('VERIFY_GL=webgpu npm test')).toBe('npm')
     expect(commandHead('xargs rm')).toBe('rm')
   })
+
+  // A wrapper's OWN flags are not the program (four-eyes round 2): `sudo -u me
+  // git push` reported the head `-u`, and the fence let the push through.
+  it("steps over a wrapper's flags, its flag VALUES and its positionals", () => {
+    expect(commandHead('sudo -u me git push')).toBe('git')
+    expect(commandHead('env -i git push')).toBe('git')
+    expect(commandHead('env -u FOO git push')).toBe('git')
+    expect(commandHead('nice -n 5 git push')).toBe('git')
+    expect(commandHead('xargs -n1 git push')).toBe('git') // attached value
+    expect(commandHead('xargs -I{} bash -c "git push"')).toBe('bash')
+    expect(commandHead('time -p git push')).toBe('git')
+    expect(commandHead('timeout 60 npm run build')).toBe('npm') // its own positional
+    expect(commandHead('timeout -k 5 60 npm run build')).toBe('npm')
+    expect(commandHead('sudo -u me env -i nice -n 5 git push')).toBe('git') // stacked
+    expect(commandHead('env -- git push')).toBe('git')
+  })
+
   it('is empty for an empty command', () => {
     expect(commandHead('')).toBe('')
     expect(commandHead(null)).toBe('')
@@ -219,6 +236,22 @@ describe('file mutation and redirection', () => {
     expect(isMutatingSegment('bash -c "bash -c \'git commit -m x\'"')).toBe(true)
     // A wrapper cannot talk its way out with a --help that is not its own.
     expect(isMutatingSegment('bash --help -c "git push"')).toBe(true)
+    // A COMBINED short cluster is `-l -c`, and the payload may be attached.
+    expect(isMutatingSegment('bash -lc "git push"')).toBe(true)
+    expect(isMutatingSegment('bash -ec "npm run build"')).toBe(true)
+    expect(isMutatingSegment('bash -c"git push"')).toBe(true)
+    expect(isMutatingSegment('bash -lc "git status"')).toBe(false)
+    // …and a wrapper the classifier must step over first.
+    expect(isMutatingSegment('timeout 60 bash -c "git push"')).toBe(true)
+    expect(isMutatingSegment('timeout 5 bash -c "echo ok"')).toBe(false)
+    expect(isMutatingSegment('xargs -I{} bash -c "git push"')).toBe(true)
+  })
+
+  it('a wrapper around a write is a write, around a read a read', () => {
+    for (const c of ['sudo -u me git push', 'env -i git push', 'nice -n 5 git push', 'xargs -n1 rm', 'time -p git push'])
+      expect(isMutatingSegment(c), c).toBe(true)
+    for (const c of ['sudo git log', 'env -i git status', 'nice -n 5 git log', 'xargs -n1 grep foo', 'time -p git status'])
+      expect(isMutatingSegment(c), c).toBe(false)
   })
 
   it('carries the intent of `eval` and of a command substitution', () => {
@@ -234,6 +267,13 @@ describe('file mutation and redirection', () => {
     // SINGLE quotes make both inert — in a real shell too, so this is no hole.
     expect(isMutatingSegment("grep -c '$(git push)' notes.md")).toBe(false)
     expect(isMutatingSegment(`grep -c '${bt}git push${bt}' notes.md`)).toBe(false)
+    // …and so does a BACKSLASH ESCAPE inside double quotes (four-eyes round 2):
+    // `"\$("` is literal text, and denying that search would be this point's own
+    // defect in a rarer shape.
+    expect(isMutatingSegment('grep "\\$(git push)" file')).toBe(false)
+    expect(isMutatingSegment(`grep "\\${bt}git push\\${bt}" file`)).toBe(false)
+    // An UNescaped backtick inside double quotes IS live, and stays a write.
+    expect(isMutatingSegment(`grep "${bt}git push${bt}" file`)).toBe(true)
   })
 
   it('survives an unbalanced or absurdly deep wrapper without hanging', () => {
@@ -251,6 +291,22 @@ describe('file mutation and redirection', () => {
     expect(nestedCommands('echo $(git push)')).toEqual(['git push'])
     expect(nestedCommands('git status')).toEqual([])
     expect(nestedCommands(null)).toEqual([])
+    expect(nestedCommands('bash -lc "git push"')).toEqual(['git push'])
+    expect(nestedCommands('bash -c"git push"')).toEqual(['git push'])
+  })
+
+  it('reports when the unwrapping depth was HIT, so a caller can fail closed', () => {
+    const esc = (s) => s.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+    const nest = (n) => {
+      let cmd = 'git push'
+      for (let k = 0; k < n; k++) cmd = `bash -c "${esc(cmd)}"`
+      return cmd
+    }
+    let hit = false
+    expandSegments(nest(3), { onTruncate: () => (hit = true) })
+    expect(hit).toBe(false)
+    expandSegments(nest(9), { onTruncate: () => (hit = true) })
+    expect(hit).toBe(true)
   })
 
   it('sees the verb behind find -exec / -delete', () => {
