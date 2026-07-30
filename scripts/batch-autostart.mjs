@@ -65,6 +65,7 @@ import {
   judgePreviousSpawn,
   spawnBackoffMs,
 } from './batch-autostart-core.mjs'
+import { repoRepairAllowed, repoRepairDecision } from './batch-doctor-core.mjs'
 import { WATCHER_PID_FILE, watcherSupervision } from './chat-watcher-core.mjs'
 import { SECRET_FAULT } from './chat-secret.mjs'
 import { chatInboxLogLines } from './chat-core.mjs'
@@ -554,6 +555,64 @@ if (!preflight.ok) {
   )
   writeJsonAtomic(C('autostart-state.json'), state)
   process.exit(0)
+}
+
+// Point 442. The repo comes BEFORE the successor. A session that died mid-merge
+// leaves the tree torn, and until 30.07.2026 the next one was started into it and
+// had to notice by itself. The doctor already knew how to find and mend exactly
+// this; nobody called it on the way in. It runs without `--gate`, so this stays a
+// repo check of a second or two — the three-minute suite is a session's job, not a
+// launcher tick's.
+//
+// It may WRITE only where the previous owner is provably gone. An expired LEASE is
+// not that (four-eyes review): such a process is alive and merely silent, it stands
+// down at its next hook, and stashing the merge it is resolving would destroy real
+// work. There the check is read-only and the successor carries the mandate instead.
+//
+// And it never stops the spawn. A finding no repair clears is TRUE at every tick
+// until somebody acts; refusing here would have stood the batch still for a whole
+// unattended fortnight, so the successor starts and is TOLD. The alert is throttled
+// as the standing condition it is, and `failCount` stays untouched — a torn tree is
+// not a broken environment.
+const repaired = repoRepairAllowed(assessment.reason)
+const repo = runRepoDoctor(repaired)
+const repoVerdict = repoRepairDecision({ ...repo, repaired })
+log(`repo check before spawn: ${repoVerdict.reason}${repo.ran ? ` (batch-doctor exit ${repo.code}${repaired ? ', --repair' : ', read-only'})` : ''}`)
+if (repoVerdict.alert) {
+  const due = !repoVerdict.standing || standingAlertDue({ lastAt: state.repoAlertAt ?? null, now })
+  if (due) {
+    state.repoAlertAt = now
+    await notify('Repo not clean before spawn', repoVerdict.alert, 'default')
+  }
+} else {
+  delete state.repoAlertAt
+  // And the MARKER goes with the condition (four-eyes re-review, finding 1). A tick
+  // whose spawn failed leaves one behind; without this line only its 15-minute
+  // expiry keeps the next, CLEAN tick from handing a false "repo not clean" to a
+  // healthy successor — and that expiry equals the tick interval, i.e. about a
+  // minute of margin. One deletion closes the class instead of leaning on timing.
+  rmSync(C('repo-mandate.json'), { force: true })
+}
+if (repoVerdict.mandate) writeJsonAtomic(C('repo-mandate.json'), { at: now, code: repo.code ?? null, reason: repoVerdict.reason })
+
+/** Run the doctor and report how it went. `write` false keeps it to its read-only
+ *  levels. Never throws: an unrunnable doctor is reported as such and decided
+ *  fail-open above. */
+function runRepoDoctor(write) {
+  try {
+    execFileSync(process.execPath, [join(REPO, 'scripts', 'batch-doctor.mjs'), ...(write ? ['--repair'] : [])], {
+      cwd: REPO,
+      encoding: 'utf8',
+      timeout: 120000,
+      windowsHide: true,
+    })
+    return { ran: true, code: 0 }
+  } catch (e) {
+    // A non-zero exit lands here too — that is the doctor's verdict, not a failure
+    // to run it. Only a missing binary/file or the timeout means it never ran.
+    if (e && typeof e.status === 'number') return { ran: true, code: e.status }
+    return { ran: false, code: null, detail: (e && e.message) || String(e) }
+  }
 }
 
 /** The cheap, local checks that must hold before a successor is worth starting. An

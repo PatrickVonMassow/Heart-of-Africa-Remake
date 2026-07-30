@@ -9,10 +9,10 @@ ausführlichen Erfahrungen dahinter stehen in `retrospektive-zusammenarbeit.md`.
 
 ## Die eine Kernlehre
 
-**Zuverlässigkeit ist eine Infrastrukturfrage, keine Charakterfrage.** Nur „gemerkte"
-Probleme kamen wieder; sobald ein **Mechanismus** dastand (Check, Hook, Test),
-verschwanden sie. Fordere deshalb bei allem, was dir wichtig ist, im Prompt einen
-Mechanismus — nicht eine Regel:
+**Gute Vorsätze halten nicht — Prüfungen halten.** Jedes Problem, das nur
+„gemerkt" war, kam wieder; sobald etwas es maschinell verhinderte (ein Test, ein
+Hook, ein Check), war es weg. Verlange deshalb bei allem, was dir wichtig ist, im
+Prompt einen **Mechanismus** — keine Regel:
 
 > *Prompt-Zusatz:* „Sichere das mit einem Mechanismus zu, der die Verletzung
 > unmöglich macht, und zeig mir, wo er blockiert."
@@ -284,10 +284,11 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   sind Texte, die bei *jeder* Anfrage mitgehen — zumal wenn sie wiederholen, was eine Prüfung
   ohnehin erzwingt.
   → *Prompt:* „Gib jedem Dokument, das bei jedem Start gelesen wird, eine **gemessene
-  Obergrenze** mit zwei Auswegen: Detail auslagern, oder die Grenze anheben und begründen. Der
-  Commit, der eine Prüfung einführt, streicht den Text, den sie ersetzt; ausgelagert wird
-  **verschoben, nicht umformuliert**. In der Aufgabenliste steht nur Offenes, Erledigtes
-  wandert wortgleich ins Archiv."
+  Obergrenze**. Blockiert sie eine Ergänzung, ist die Reihenfolge: kürzen, **zusammenführen**
+  (zwei Einträge mit derselben Ursache lesen sich als einer meist besser), Detail auslagern —
+  die Grenze anheben ist das **letzte** Mittel und braucht eine Begründung. Ausgelagert wird
+  verschoben, nicht umformuliert; und der Commit, der eine Prüfung einführt, streicht den
+  Text, den sie ersetzt."
 
 - **Im Präsens behauptet, nie nachgesehen.** „Das Feld wird bereits gesetzt" — im Code
   steht es nicht. Eine falsche Tatsachenbehauptung liefert etwas, das nichts tut und
@@ -361,13 +362,11 @@ Zwei Mechanismen, die das Netz ehrlich halten:
    > *Prompt:* „Struktur von Dingen, die ich festgelegt habe, friert ein. Schlag
    > Änderungen vor, setz sie nicht ungefragt um."
 
-3. **Autonomie/Parallelität skaliert nur mit Infrastruktur.** Delegation vervielfacht
-   — aber erst mit Isolierung und Exklusivität, sonst vervielfacht sie das Chaos. Die
-   Grenze setzt nicht dein Kontingent, sondern der **Haupt-Agent**: Bei ihm endet jeder
-   Strang, und je mehr Fremdstoff sein Kontext aufnimmt, desto schlechter urteilt er.
-   Drei ist ein guter Start, kein Optimum — die Zahl korrigiert die Erfahrung. Und
-   verlass dich nie auf die Anweisung „nur lesen": Isolierung ist eine Eigenschaft der
-   **Umgebung**, nicht des Auftrags — was ein Helfer anfassen kann, fasst er irgendwann an.
+3. **Parallel arbeiten geht nur mit Isolierung.** Delegation vervielfacht — ohne
+   eigene Arbeitskopien vervielfacht sie das Chaos. Die Grenze setzt nicht dein
+   Kontingent, sondern der **Haupt-Agent**: bei ihm endet jeder Strang, und je mehr
+   Fremdstoff sein Kontext aufnimmt, desto schlechter urteilt er. Und verlass dich nie
+   auf die Anweisung „nur lesen" — was ein Helfer anfassen kann, fasst er irgendwann an.
    > *Prompt:* „Arbeite jede Aufgabe auf einem eigenen Feature-Branch mit eigener
    > Arbeitskopie und führe sie erst nach `main`, wenn sie fertig und verifiziert ist.
    > Gib auch jedem nur lesenden Helfer eine eigene Arbeitskopie, statt es ihm bloß
@@ -393,4 +392,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 Wenn du diese eine Nachricht an den Anfang stellst, hast du 80 % der Lehren dieses
 Projekts eingebaut, bevor die erste Zeile Code entsteht.
 
-<!-- GUIDE-FINGERPRINT: 0acd6d8eb654d3f89ebd0213858c6e60866180d4388487c34f2bb400bf343d5e -->
+<!-- GUIDE-FINGERPRINT: 4a7d876e4881dab3fcc849451da2a420552e939e0f1efa7f6fca3cfdeaa3d91a -->

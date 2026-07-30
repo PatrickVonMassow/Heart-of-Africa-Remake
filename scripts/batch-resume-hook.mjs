@@ -33,6 +33,7 @@ import {
 import { readClaim, clearClaim, maxAgeMs } from './batch-claim.mjs'
 import { assessClaim, ownerIsHolding, reservationDecision } from './batch-claim-core.mjs'
 import { standDownMessage } from './batch-resume-hook-core.mjs'
+import { resumeRepairMandate } from './batch-doctor-core.mjs'
 import { isPaused, pauseReason } from './batch-lock.mjs'
 
 const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url))
@@ -67,6 +68,60 @@ function gitStanding() {
     )
   } catch {
     return ''
+  }
+}
+
+/** True for the three ownership values that mean "this session works the batch". */
+function ownsBatch(ownership) {
+  return ownership === 'acquired-spawn' || ownership === 'acquired' || ownership === 'mine'
+}
+
+/** The doctor's verdict on the tree this session woke up in (point 442).
+ *
+ *  PREFER THE LAUNCHER'S OWN READING. When a successor was just spawned, the
+ *  launcher has already asked the doctor seconds ago and left the answer in
+ *  `repo-mandate.json`; reusing it makes the common case free. The marker is
+ *  one-shot and expires, so a stale one can never mandate anything.
+ *
+ *  Only without one does the hook ask itself, and then WITHOUT `--repair` and
+ *  without `--gate`. Note what that does and does not mean (four-eyes review,
+ *  finding 3): the doctor's AUTO level still runs, i.e. `git fetch origin main` and
+ *  a strictly-behind fast-forward. That is deliberate and harmless — it is the same
+ *  fast-forward a resuming session would do first anyway — but it is not "nothing",
+ *  and the fetch is why the timeout allows for a slow network.
+ *
+ *  Never throws: an unrunnable doctor reports itself and `resumeRepairMandate` stays
+ *  silent about it — the launcher's alert already carries that news, and a session
+ *  cannot mend a broken doctor. */
+const MANDATE_PATH = fileURLToPath(new URL('../.claude/repo-mandate.json', import.meta.url))
+const MANDATE_MAX_AGE_MS = 15 * 60 * 1000
+
+function readRepoVerdict(nowMs = Date.now()) {
+  try {
+    const raw = readFileSync(MANDATE_PATH, 'utf8')
+    // Deleted BEFORE it is parsed (four-eyes re-review, finding 2): a corrupt marker
+    // used to throw past the deletion and then be re-parsed at every session start
+    // forever. One-shot means one-shot, readable or not.
+    rmSync(MANDATE_PATH, { force: true })
+    const m = JSON.parse(raw)
+    if (m && Number.isFinite(m.at) && nowMs - m.at <= MANDATE_MAX_AGE_MS) {
+      return { ran: true, code: Number.isFinite(m.code) ? m.code : 1 }
+    }
+  } catch {
+    /* no marker, or unreadable — ask the doctor directly */
+  }
+  try {
+    execFileSync(process.execPath, [join(REPO_ROOT, 'scripts', 'batch-doctor.mjs')], {
+      windowsHide: true,
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+      timeout: 30000,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    })
+    return { ran: true, code: 0 }
+  } catch (e) {
+    if (e && typeof e.status === 'number') return { ran: true, code: e.status }
+    return { ran: false, code: null }
   }
 }
 
@@ -237,15 +292,22 @@ try {
       // The claim has done its job the moment its own window owns the batch.
       if (reservation.mine && (ownership === 'acquired' || ownership === 'mine')) clearClaim()
 
+      // Point 442, the other side of the seam: the launcher repairs before it
+      // spawns, and the session it spawned checks the same thing on arrival. Two
+      // independent looks at one naht, because the one that fails is never the one
+      // you expected — and only a session that OWNS the batch is told to repair,
+      // so a stood-down window never starts mending a tree it may not touch.
+      const mandate = ownsBatch(ownership) ? resumeRepairMandate(readRepoVerdict()) : null
+      const repoLine = mandate ? ` ${mandate}` : ''
       if (ownership === 'acquired-spawn') {
         console.log(
-          `${header} ${gitStanding()} Resumed by the OS autostart launcher (the previous owner was ` +
+          `${header} ${gitStanding()}${repoLine} Resumed by the OS autostart launcher (the previous owner was ` +
             `provably dead). ${RESUME_BODY} ` +
             'Do NOT idle-stop (the batch-progress-guard enforces this).',
         )
       } else if (ownership === 'acquired' || ownership === 'mine') {
         console.log(
-          `${header} ${gitStanding()} Standing user instruction: continue the batch autonomously, ` +
+          `${header} ${gitStanding()}${repoLine} Standing user instruction: continue the batch autonomously, ` +
             `point by point, then the Closing steps — without waiting for the user to say ` +
             `"continue". ${RESUME_BODY}`,
         )
