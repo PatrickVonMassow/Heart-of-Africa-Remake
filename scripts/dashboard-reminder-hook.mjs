@@ -11,6 +11,9 @@
 import fs from 'node:fs'
 import { PENDING_PATH, STATE_PATH, boardFilePath, readJson, writeJsonAtomic, mergeState } from './dashboard-state.mjs'
 import { heldByOtherLiveOwner, withdrawHandover } from './batch-singleton.mjs'
+// The injected board obligation, in a pure module so its size is measurable and
+// its content testable (point 436).
+import { boardReminderText } from './dashboard-reminder-core.mjs'
 
 // Hard singleton (24.07.2026): a session that does not own the live batch lock
 // has NO dashboard/focus duty — arming the pivot check or issuing the board
@@ -98,38 +101,7 @@ try {
 } catch {
   // best effort — the reminder itself is the payload
 }
-console.log(
-  '[dashboard-reminder] PFLICHT: Das Dashboard IMMER als erstes im Zug aktualisieren, ' +
-  'wenn sich der Batch-Zustand geändert hat. Die STRUKTUR ist vom Nutzer verbindlich ' +
-  'festgelegt (18.07.2026) und darf NIE ohne ausdrückliche Freigabe geändert werden — ' +
-  'keine neuen Sektionen, keine Features entfernen, keine Infos in fremde Sektionen. ' +
-  'Genau VIER Sektionen in dieser Reihenfolge, jeder Eintrag eine ein-/ausklappbare ' +
-  'Karte — ALLE eingeklappt, NIE ein `open`-Attribut (Nutzer-Mandat 23.07.2026; ' +
-  'das Skript im Board merkt sich, was der LESER geöffnet hat): ' +
-  '(1) »Woran ich gerade arbeite« — EINE KARTE JE PARALLEL BEARBEITETEM PUNKT ' +
-  '(Nutzer-Entscheidung 22.07.2026), eingeklappt Titel + Startzeit + ' +
-  'voraussichtliche Endzeit, ausgeklappt Status/Details; KEIN »gerade fertig«, ' +
-  '»als nächstes«, »diese Nacht fertig«. Die Karte muss IMMER zeigen, was du ' +
-  'GERADE tust — auch Wartezeit-Vorarbeit (welche Folge-Punkte du gerade ' +
-  'vorbereitest), nie so wirken, als würdest du nur warten/idlen. ' +
-  '(2) »Von dir zu klären« — Karten, eingeklappt nur Titel. ' +
-  '(3) »Warteschlange« in Arbeitsreihenfolge — eingeklappt Titel + rechts im Header ' +
-  'die geschätzte Task-Dauer (»~2 h«; das ~ genügt, kein »geschätzt« davor; nach ' +
-  'jedem Vorarbeit-Schritt an einem Task dessen Schätzung aktualisieren), ' +
-  'KEINE Hinweise wie »neu«/»hochgezogen«. ' +
-  '(4) »Erledigt« — eingeklappt Titel + Startzeit + Endzeit. Diese Sektion ist ' +
-  'ZUSÄTZLICH als GANZES einklappbar (Nutzer 26.07.2026): ihre Überschrift steckt in ' +
-  '<details class="sect"><summary><h2>Erledigt</h2></summary>…</details> und ist ' +
-  'standardmäßig ZU — sie ist das Archiv und der längste Teil des Boards. ' +
-  'Keine weiteren Sektionen (kein »Zeiten & Aufwand«, »Zuletzt passiert«, »gemeldete ' +
-  'Bugs«). Was schon im eingeklappten Header steht, NICHT zusätzlich in den ausgeklappten ' +
-  'Details wiederholen (z. B. Start/Endzeit der aktuellen-Arbeit-Karte nur im Header). ' +
-  'Mobil-Hochformat muss gut aussehen. Empfiehlst du dringend eine ' +
-  'Strukturänderung, schreibe sie als Karte in »Von dir zu klären«. ' +
-  'Bei JEDER Änderung: die GANZE Datei lesen, jede Sektion gegen den Ist-Zustand ' +
-  'prüfen (topaktuell, konsistent, redundanzfrei), dann `node scripts/board-publish.mjs`.' +
-  mtimeNote,
-)
+console.log(boardReminderText(mtimeNote))
 
 console.log(
   '[focus-guard] Diese Nutzer-Nachricht hat den Fokus-Abgleich SCHARFGESCHALTET: bevor dieser ' +

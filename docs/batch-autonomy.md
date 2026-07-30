@@ -1001,6 +1001,22 @@ resolved by `boardFilePath()` so nothing measures a stale copy. `scripts/board-r
 holds the three gates: no remedy names the retired path, only the canonical file
 is measured, and the reference count outside a labelled legacy note is zero.
 
+**The prompt-injected reminder states only what no gate can (point 436).** It is
+the most expensive text here — `scripts/dashboard-reminder-hook.mjs` puts it into
+EVERY user prompt — and most of it repeated rules the machine already refuses to
+break: the four sections, their order and the card wrappers (`structureViolations`,
+before any publish), the `open`-attribute ban (`auto-open`) and the queue card's
+header meta (`queue-meta`). Measured, dropping those took it from 2153 to 843
+characters (−61 %), 283 to 112 words, and 31 concatenated source lines to a
+single call. What is left is judgement no check can make —
+information in a foreign section, the phone-portrait look, and proposing a
+structure change as a card instead of making it — plus the commands, with the
+structure itself a POINTER to the memory. The text lives in the pure module
+`scripts/dashboard-reminder-core.mjs` under a measured character budget, and
+`dashboard-reminder-core.test.mjs` pins both directions: `ENFORCED_CLAIMS` may not
+reappear (and the case proves those gates really do fire), `UNENFORCEABLE_DUTIES`
+and `REMINDER_COMMANDS` may not disappear.
+
 ### The board's transport (28.07.2026, point 400)
 
 The board used to be publishable only through a tool the **headless successor
