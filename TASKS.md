@@ -1582,25 +1582,6 @@ it is appended.
   single-frame snap) while the point-128 "stands on its own ground" clearance still
   holds; screenshot of the flare; both backends.
 
-- [ ] 329. DECIDE THE FATE OF THE TWO SURVIVING STRAY BRANCHES (25.07.2026 branch
-  cleanup: 133 fully-merged branches and 26 orphaned worktrees were removed; two
-  carried unmerged work whose value had to be judged rather than deleted or blindly
-  merged).
-  (a) `feat/276-wildlife-lod` — VERDICT 25.07: RETIRED UNMERGED, idea salvaged into
-  point 310. Reason (user-reported, then measured): the branch stood 219 commits
-  behind main; its three files had moved on 16 (Wildlife.tsx), 9
-  (wildlifeBehavior.ts) and 1 (terrain.ts) commits since — merging a 539-line
-  rework across that gap would fight every wildlife fix of the last two days for a
-  lever that is easier to rebuild than to reconcile. The LEVER (throttling
-  off-screen animal behaviour updates) is now an explicit sub-task of point 310,
-  where it is implemented fresh against current code and priced on the S25 report.
-  (b) `feat/278-dressing-growth` (24.07, 275 lines: an ALTERNATIVE fix for the
-  wildlife duplication that main solved differently in d9ee271, plus enrichments
-  checks and pure tests) — STILL OPEN: diff its test coverage against what main has
-  and salvage any check main lacks; then drop the branch.
-  VERIFIABLE: a written verdict per branch (done for (a)), the branch deleted
-  locally AND on GitHub afterwards, and the regression green on whatever landed.
-
 - [ ] 330. FULL POST-DEGRADATION ASSURANCE PASS — nothing new starts until this is
   100 % green (user 25.07.2026, after three separate leftovers were found by chance:
   the board's broken umlauts, the board's inconsistency, and a whole night's work
@@ -3042,40 +3023,6 @@ it is appended.
   DOCS in the same commit: `scripts/verify/README.md` where the suite is described, and
   CLAUDE.md §7.2 where the Stop chain lists what `ci-status-guard` watches.
 
-- [ ] 396. A HANDOVER IS UN-TAKEN BY THE TOOL CALL THAT CAME BEFORE IT (28.07.2026,
-  measured in `.claude/boundary.log`, found while closing point 388). Two of the ten
-  boundary attempts that morning were cancelled 117 ms and 154 ms after they were
-  written: `HANDOVER point 338` at 11:42:00.469Z, `WITHDRAWN point 338` at 11:42:00.586Z,
-  and the same shape at 11:52:08.478Z/11:52:08.632Z. A withdrawal means "the session is
-  working again", and no session works again within 117 ms — a continuation needs a model
-  round trip and cannot be that fast.
-  THE MECHANISM: `batch-progress-guard` writes the handover in the Stop chain, while the
-  PostToolUse `lock-heartbeat-hook` of the turn's LAST tool call is still in flight (the
-  same file contention that produced that morning's EPERM retries delays it). That
-  heartbeat then calls `heartbeat(sid)` without `preserveHandover`, and `clearOwnBoundary`
-  both strips the handover flag AND deletes the boundary marker. The session had done
-  nothing wrong — it had stopped. The next turn is told to take the boundary again, which
-  is precisely the loop point 388 was opened on; it cost that run roughly an hour and ten
-  launcher ticks before a round happened to survive.
-  THE FIX: a withdrawal may only ever be caused by work that happened AFTER the handover
-  was written. Where the hook payload carries the tool call's own timestamp, compare it
-  with `handedOverAt` and ignore a call that predates the handover. Where it does not, a
-  calibratable settle window (start at ~1 s) does the same job: a handover younger than
-  the window is never withdrawn. The marker file must survive the same test as the flag —
-  deleting it is what forces the re-take.
-  DO NOT widen this into "ignore withdrawals": a session that genuinely carries on working
-  must still withdraw its boundary, or the five-and-a-half-hour standstill of 28.07.2026
-  comes back. The rule stays "work after the handover withdraws it", only measured
-  honestly.
-  VERIFIABLE: pure Vitest on `clearOwnBoundary`/`heartbeat` with injected clocks — a
-  heartbeat dated BEFORE `handedOverAt` (or inside the settle window) leaves both the flag
-  and the marker file untouched; one dated after withdraws exactly as today, marker
-  included; the closing-set rule of point 388 is unchanged by either; and a session that
-  does not own the lock still cannot withdraw anything. Live: the next real boundary shows
-  a single `HANDOVER` line with no `WITHDRAWN` behind it in `.claude/boundary.log`.
-  DOCS in the same commit: `docs/batch-autonomy.md`, in the section on what a taken
-  boundary survives.
-
 - [ ] 397. AN UNNAMED AUTHOR IS NOT A FORBIDDEN ONE — THE TRAILER THAT COST A ROUND
   (28.07.2026, observed live). Commit 652a8ba carried `Co-Authored-By: Claude
   <noreply@anthropic.com>` — the trailer with no model name. `isPolicyBreach` in
@@ -3121,37 +3068,6 @@ it is appended.
   trailer must NAME the model and that the hook enforces it) and §7.2 (the Stop-chain list
   gains the unidentified/forbidden split).
 
-- [ ] 399. THE GUARD STOPS DEMANDING THE BOUNDARY AS SOON AS THE QUEUE GROWS
-  (28.07.2026, found while fixing the handover observer, and it is the same blind spot
-  one layer up — where it costs more). `boundaryDueFrom` in `gatherBoundary`
-  (`scripts/batch-boundary.mjs`) asks `lastWorkOrderTick()` when a boundary became due,
-  and that function scans only the newest FIVE work-order commits for a tick. A batch
-  turn routinely appends points: on 28.07.2026 eight append-only commits landed after the
-  tick of point 338, and the tick fell out of the window. On the OBSERVER that made a
-  completed handover unreadable, and it was fixed there. On the GUARD it does worse:
-  `boundaryDueFrom` returns null, so within the 90-minute `BOUNDARY_DUE_MS` window in
-  which `batch-progress-guard` should be demanding the point boundary, it demands
-  nothing — and a session that is not told to hand over keeps the lock and carries the
-  next point in the same context, which is exactly the cost point 373 exists to avoid.
-  THE FIX: give the guard's due-check an anchor that cannot fall out of a window. The
-  question it needs answered is "was a point ticked within `BOUNDARY_DUE_MS`", so it must
-  look back by TIME, not by a commit count — `git log --since` over the two work-order
-  paths, taking the newest commit whose diff actually ticks a point (`tickedPointsInDiff`
-  keeps the rule that an archive move is not a tick). The count-limited
-  `lastWorkOrderTick` may keep its shape for any caller that wants "the most recent
-  closure, cheaply", but the guard must not be that caller.
-  MIND THE COST: this runs in a Stop hook on every turn end, so the probe must stay
-  bounded — one `git log` over two paths, limited by the same window the answer is
-  scoped to, and no `git show` per commit beyond the candidates inside it.
-  VERIFIABLE: pure Vitest with an injected git — a tick inside the window followed by
-  twenty append-only work-order commits still reports the boundary as due; a tick older
-  than the window reports nothing due; an archive-move-only commit is not a tick; and an
-  unreadable git answers "not due" rather than throwing (the guard fails open). Plus one
-  live check in this repository: after a point is ticked and several points appended,
-  `node scripts/batch-boundary.mjs --status` names the due boundary instead of `null`.
-  DOCS in the same commit: `docs/batch-autonomy.md`, where the point boundary describes
-  when it falls due.
-
 - [ ] 401. THE CONSOLE WINDOWS THAT STEAL THE USER'S FOCUS (28.07.2026, user
   report: "es poppen immer wieder Konsolenfenster auf, die mir den Fokus
   stehlen"). It is NOT unavoidable, and there are exactly two causes, both
@@ -3192,39 +3108,6 @@ it is appended.
   resuming as before (`.claude/autostart.log` shows the tick).
   DOCS in the same commit: `docs/batch-autonomy.md`, where the launcher is
   described, gains the hidden-window requirement.
-
-- [ ] 409. A MERGED BRANCH MUST NOT SURVIVE ITS MERGE (28.07.2026, user reported 36
-  branches on GitHub and asked for a mechanism). Measured at that moment: 31 of the 36
-  remote branches were already fully contained in `main`, 72 of 77 local branches were,
-  and 36 of 48 worktrees sat on such a branch — some of them 450 commits behind. None
-  of it was risky (every commit lives in `main`), and all of it was noise: it hid the
-  four branches that were genuinely open, it made `git branch` useless as an overview,
-  and the stale worktrees cost disk and confused every search. The debris was cleared by
-  hand on 28.07.2026; this point makes the cleanup automatic, because CLAUDE.md §6
-  already says the branch workflow ends at the merge and the deletion was simply
-  forgotten thirty-one times. A rule that is remembered is a rule that rots.
-  THE MECHANISM, in the shape this project uses: a Stop hook
-  (`scripts/branch-hygiene-guard.mjs`, decision core pure and Vitest-covered, FAIL-OPEN
-  like every guard here) BLOCKS the turn end while a branch that is FULLY CONTAINED in
-  `origin/main` still exists — as a local branch, as a remote branch, or as a worktree —
-  and names the exact commands that remove each one. It must be cheap: `git branch
-  --merged origin/main` and `git worktree list` are local, no network.
-  THE CARVE-OUTS, or it fires on healthy work: `main` itself; a branch a LIVE session
-  has declared in flight (`.claude/batch-in-flight.json`); the verify-baseline
-  checkouts under `local/`, which are caches keyed by sha and not branches at all; and a
-  branch merged less than a calibratable grace ago (default 10 minutes), so the merging
-  session is never blocked by the branch it is still finishing with.
-  MERGE-TIME DELETION IS THE PRIMARY PATH, the guard is the backstop: the merge step in
-  CLAUDE.md §6 gains "delete the branch — local, remote and its worktree — as part of
-  the merge, before the tick", so the guard normally has nothing to find. A backstop
-  that fires routinely has become the process, which is how this debt accumulated.
-  VERIFIABLE: pure Vitest on the decision — a merged local branch blocks, a merged
-  remote branch blocks, a merged worktree blocks, an UNMERGED branch never blocks, a
-  branch inside the grace never blocks, an in-flight branch never blocks, `main` never
-  blocks, and an unreadable git state allows the stop (fail-open). Live: merge a point
-  and see the turn end refused until the branch is gone.
-  DOCS in the same commit: CLAUDE.md §6 (the merge step) and §7.2, where the Stop chain
-  lists its guards.
 
 - [ ] 414. THE BIRD'S-EYE ANIMALS GET THE WALK THE SETTLEMENT ONES HAVE (29.07.2026,
   user asked after seeing the settlement gait: "could this walk be carried over to the
@@ -3408,65 +3291,6 @@ it is appended.
   its author model — it gains the fact that the trailer is ENFORCED at commit time) and the
   memory entry `serving-model-watch`.
 
-- [ ] 426. A PAGER TAKES THE SESSION BOUNDARY BACK, AND NOTHING SAYS SO (29.07.2026,
-  measured live; retrospective 3.56). A taken boundary is withdrawn by any tool call that
-  reads as CONTINUING the batch — correct, and judged by `handoverSurvivesCall` →
-  `isClosingSetCommand` (`scripts/batch-boundary-core.mjs`). That judgement splits the
-  command line at its separators and demands EVERY segment be a closing-set script, which
-  is right against `node scripts/board.mjs & npm test` and wrong against
-  `node scripts/focus.mjs set … | tail -2`: `tail` is not a closing script, so a pager that
-  only shortens the OUTPUT counted as fresh work and silently deleted the marker. Cost: the
-  command reported "boundary recorded", the next Stop hook demanded the boundary again, and
-  no record anywhere named the cause.
-  FIX, two halves, both in the existing mechanism — no new guard:
-  (a) TOLERATE THE PAGER: a trailing segment that is a pure output pager (`head`, `tail`,
-  `more`, `cat` with no redirection) does not make a closing-set line ordinary. The rule
-  stays strict everywhere else — the opaque-segment ban (`$(…)`, backticks, `>`, `<`) is
-  untouched, a pager may only TRAIL a closing line, and a pager alone is not a closing
-  line. Anything else, including a pager in the middle, keeps counting as work: the
-  dangerous direction is a KEPT handover beside real work, so the widening must be the
-  narrowest one that covers "I am only looking at the output".
-  (b) SAY IT: every withdrawal of a taken boundary is appended to `.claude/boundary.log`
-  (where boundary events already live) with the session, the point and the TRIGGERING call,
-  so the next turn can see why the marker went instead of rediscovering it. The log write
-  is best-effort and may never break a tool call.
-  VERIFIABLE: pure Vitest over `batch-boundary-core` — `node scripts/focus.mjs set 1 x |
-  tail -2` and `… | head -5` survive; `node scripts/board.mjs attest && npm test`,
-  `npm test | tail -2`, `node scripts/focus.mjs show | grep x | node other.mjs` and a bare
-  `tail -2` do NOT; the existing separator and opaque-segment cases stay green unchanged.
-  Plus a hook-level case asserting the withdrawal log line carries the triggering command.
-  DOCS in the same commit: `docs/batch-autonomy.md` (the boundary section states the
-  fragility and the bare-command rule — it is rewritten to state what the code now does)
-  and the ledger row 3.56 in `docs/analysis_de/lesson-mechanisms.md`.
-  MECHANISM REVIEW required (it changes a gate): `scripts/mechanism-review.mjs --record`.
-
-- [ ] 427. THE POOL RUNS AT ITS CAP, OR SAYS WHY NOT (29.07.2026, user asked it plainly
-  while one agent built and two slots stood empty: "Nur ein Punkt in Arbeit? Ist aktuell
-  keine Parallelisierung sinnvoll?"; retrospective 3.58). Delegation allows THREE concurrent
-  agents. A session that commissions one point and then declares a wait breaks no rule —
-  the wait declaration is built and enforced, the idle guard is satisfied, the cap is an
-  upper bound and nothing checks the lower one. Measured today: one agent, two free slots,
-  ninety minutes, a queue full of independent points.
-  FIX, in the mechanism that already judges the wait — no new guard:
-  `scripts/batch-in-flight.mjs` counts the agents it can actually see (the declared
-  evidence: worktrees and branches) and reads the open work order. When slots are free AND
-  the queue holds a point that does not overlap the running one, the declaration must carry
-  a REASON for the idle slots (`--slots-free "<why>"`); `batch-progress-guard` allows the
-  waiting stop only with that reason present, and its remedy line names the two honest
-  answers: commission another point, or state what makes the queue's next points unsuitable
-  right now (file overlap with the running branch, a closing freeze, a user pause).
-  It must not become a nag: a queue whose remaining points all overlap the running work,
-  a paused batch and a closing freeze are recognised and need no reason at all.
-  VERIFIABLE: pure Vitest over the in-flight core — one agent + free slots + an independent
-  open point demands the reason; the same state WITH the reason passes; three agents pass
-  with no reason; a queue whose open points all touch the running branch's files passes;
-  a paused batch and a recorded closing freeze pass. Plus a guard-level case that the
-  remedy text names both answers.
-  DOCS in the same commit: `docs/batch-autonomy.md` (the wait declaration gains the
-  slot-reason), CLAUDE.md §6 (the delegation rule states the cap is also a TARGET while
-  independent work is queued) and the ledger row 3.58.
-  MECHANISM REVIEW required (it changes a gate): `scripts/mechanism-review.mjs --record`.
-
 - [ ] 428. THE WALKABLE GROUND MEETS THE PANORAMA AT A VISIBLE STEP (29.07.2026, found by
   the picture check of the vertical look, on BOTH backends). Standing at the settlement's
   walkable edge and looking DOWN over it — a view the game only gained with the vertical
@@ -3501,37 +3325,6 @@ it is appended.
   DOCS in the same commit: the evidence section `docs/acceptance-evidence.md` §31 records
   the pitched-view check beside the existing eye-level one.
 
-- [ ] 429. AN AGENT'S CLEANUP DELETES THE MAIN TREE'S DEPENDENCIES (29.07.2026, TWICE in
-  one afternoon, both times through a worktree removal). A delegated agent finished, its
-  temporary worktree was removed — once with `git worktree remove --force`, once with an
-  `rm -rf` after that failed — and `node_modules` in the MAIN tree came away with it: the
-  next `npm run build` reported "'tsc' is not recognized", the push gate went red on a
-  state that was otherwise fine, and the repair each time was a full `npm install`. The
-  worktrees carry a junction/link to the main tree's `node_modules`, and a recursive
-  delete follows it. This is the incident of retrospective §3.49 repeating twice after it
-  was written down — which is exactly the evidence that a written lesson without a
-  mechanism does not hold.
-  WHAT MUST NOT BE "FIXED" BY BANNING WORKTREES: parallel agents NEED worktree isolation
-  (CLAUDE.md §6). The removal is the defect, not the isolation.
-  TARGET: removing an agent worktree can never reach outside that worktree. Establish
-  which of the two is true before choosing the fix — (i) the worktree's `node_modules` is
-  a link and the delete follows it, or (ii) the removal runs from a path that resolves
-  into the main tree. For (i) the fix is that the link is REPLACED by a real per-worktree
-  install or is removed before the tree is, for (ii) it is that the removal never runs
-  with a relative path. Whichever it is, the cleanup belongs in ONE place — a single
-  script the main session calls — not in each agent's own prompt, because the two damaged
-  runs used two different commands.
-  VERIFIABLE: a Vitest case over the cleanup helper that builds a throwaway worktree with
-  a link standing in for the dependency directory, removes it, and asserts the LINK TARGET
-  still exists — the assertion the two incidents would have failed. Plus a guard-level
-  case that the helper refuses a path that is not inside the worktree root.
-  BONUS, cheap and independent: `npm run build` failing with "'tsc' is not recognized"
-  should say WHAT that means (dependencies missing or damaged → run `npm install`), since
-  both incidents cost minutes of diagnosis for a one-command repair.
-  DOCS in the same commit: `docs/batch-autonomy.md` under the agent lifecycle, and the
-  ledger row for retrospective §3.49 gains its mechanism instead of its current
-  "deliberately none".
-
 - [ ] 430. TWO NARROW RESIDUALS IN THE CHAT DROP NOTICE (29.07.2026, named by the
   four-eyes review of point 417 as non-blocking follow-ups; the review's verdict was
   MERGE and the point is closed — these are what it deliberately left standing).
@@ -3561,47 +3354,6 @@ it is appended.
   left" once it is after midnight. It is a false NEGATIVE, so the standing requirement —
   never wrongly call an estimate overdue — still holds, which is why it did not block the
   estimate point. Fix it here, with a case at the wrap.
-
-- [ ] 431. THE DOCTOR'S GATE ACCUSES THE CODE OF WHAT THE LOAD DID (29.07.2026, THREE
-  times in one afternoon). Every turn in which a second session touched the repo, the
-  Stop hook demanded `batch-doctor.mjs --gate` before any further work. Each run declared
-  the repo CONSISTENT and then reported `npm run test:unit FAILED — the concurrent writes
-  (or the current head) broke it; fix before continuing the batch`. Each time the same
-  suite, run standalone on the SAME commit minutes later, was fully green (170–172 files,
-  4853–4903 tests). The gate had been competing with a delegated agent's build for the
-  machine — the exact class the flake policy and retrospective §3.22/§3.48 describe, and
-  the exact accusation they forbid: the message names the CODE as the suspect and orders
-  the batch stopped.
-  THE FIX IS NOT TO WEAKEN THE GATE. The doctor already has the instrument: the verify
-  runner performs a quiet-machine check (point 296) and prints "the machine is quiet — a
-  verdict from this run is evidence" or the opposite. The doctor must use that same check:
-  under a busy machine — or with a live agent worktree — a red gate is reported as
-  INCONCLUSIVE (load), naming what was running, and the doctor asks for a repeat once the
-  pool is idle instead of ordering a stop. Only a red on a quiet machine keeps today's
-  wording. A red on a quiet machine must also stay ORDERED before the noisy one in the
-  log, so a reader sees which verdict is evidence.
-  SECOND HALF, cheaper and independent: the hook fires the gate EVERY turn while the other
-  session merely exists, and the gate costs ~3 minutes of unit tests each time. Once a
-  doctor run has reported CONSISTENT for a given (HEAD, parallel-session) pair, the demand
-  is satisfied until one of the two changes — the state is what is being judged, not the
-  turn.
-  VERIFIABLE: Vitest over the doctor's decision core — a red gate plus a busy machine
-  yields the inconclusive verdict and no stop order; a red gate plus a quiet machine yields
-  today's verdict; a repeated call with an unchanged (HEAD, parallel set) is reported as
-  already satisfied. Plus one case that the quiet-machine reading actually reaches the
-  verdict rather than only the log.
-  THIRD HALF, found 29.07.2026 while the gate kept firing: THE ALERT NAMES THE SESSION
-  THAT IS READING IT. Twice in one evening the Stop hook reported "PARALLEL SESSION
-  DETECTED (10a2d2e0…)" — and that id was the id of the very session it was warning, the
-  one holding the lock. So the whole ritual above (a three-minute gate, a doctor run, a
-  re-check of board and work order) was ordered because a session had seen ITSELF in the
-  activity record. The detector must exclude the reading session's own id before it counts
-  a second writer, and the message must name the OTHER session it found; an alert that
-  cannot say who else was there is not evidence of anyone else being there. Verifiable in
-  the same pure test set: an activity record holding only the reader's own id yields NO
-  alert, one holding a stranger's yields one and names it.
-  DOCS in the same commit: `docs/batch-autonomy.md` under the doctor, and the ledger row
-  for retrospective §3.22.
 
 - [ ] 432. A FINDING SURVIVES ONLY AS LONG AS THE SESSION THAT MADE IT (29.07.2026, user:
   "Etabliere einen Mechanismus, der Befunde allgemein sichert"). THE EVIDENCE: in one
@@ -3663,60 +3415,6 @@ it is appended.
   the two doc updates above; and a decision, written down, on the Agent trigger — 96 of the
   corpus's 235 agent-spawning turns carried no record, so the delegation pattern pays a
   `--none` per turn unless the trigger is softened.
-
-- [ ] 433. THE LAUNCHER WATCHED THE BATCH STAND STILL FOR TWO HOURS AND ONLY WROTE IT DOWN
-  (30.07.2026, a whole unattended night lost; bundle I). At 21:50 both delegated agents died
-  on a server-side 500, and moments later the environment's permission classifier went down,
-  so the owning session could not execute a single command. It had not crashed — it stood.
-  Six hours later the state was byte-for-byte what it had been at 21:53.
-  THE DETECTOR WORKED AND CHANGED NOTHING. `.claude/autostart.log` carries, every fifteen
-  minutes from 00:06, the same line — "WEDGED owner: pid alive but heartbeat 251 min old",
-  then 266, 281, 296, 311, 326, 341, 356, 371. Eight findings over two hours, no successor
-  spawned, no lock released, no escalation past the single notification. Before that the same
-  launcher read 221 minutes of silence as "owner alive", because `WEDGED_MS` is FOUR HOURS —
-  longer than any night in which a rescue would still have been worth something.
-  TARGET, and it is an EXTENSION of `scripts/batch-autostart.mjs`, not a new guard: the
-  place that can conclude "wedged" must also be allowed to act — release the lock and let
-  the successor start — because a verdict without a consequence is a comment. Three parts:
-  (a) ACT: on a wedged owner whose pid is alive but silent, take the lock (the same
-  test-and-set the singleton already uses, so two launchers can never both act) and spawn
-  the successor; the wedged process keeps running but no longer holds the batch, and its
-  next hook tells it so.
-  (b) THRESHOLD: `WEDGED_MS` drops to a value that can still save an unattended stretch —
-  propose 45 min of total silence, calibrated against the real gap between two tool calls in
-  a working session (measure it from the transcripts, do not guess), with the value and its
-  measurement written beside it.
-  (c) REPETITION IS THE SIGNAL: the same verdict logged N times in a row escalates instead
-  of repeating — what reads identically eight times is not truer the ninth, only dearer.
-  DO NOT "FIX" THIS BY MAKING THE OWNER NOTICE. The wedged session is precisely the party
-  that cannot: it is waiting on a call that never returns, and its own in-flight declaration
-  expired during the night without anything following from that either. The rescue has to
-  come from outside.
-  VERIFIABLE: pure Vitest over the launcher's decision core — a pid-alive owner silent past
-  the threshold yields TAKE-AND-SPAWN rather than a log line; the same state twice yields an
-  escalation, not a second identical verdict; a fresh heartbeat still yields skip; a dead pid
-  keeps today's path; and the take is guarded by the atomic acquire so a racing launcher
-  loses cleanly. Plus one case pinning that the in-flight declaration's EXPIRY alone never
-  triggers a take — a long verification must not be shot in the back.
-  PRECISION, from the second model's review of the resilience design: the launcher is NOT
-  without authority — `wedgeAction` may kill and take over, but ONLY its own spawn
-  (`batch-singleton.mjs:470–483`). The night's owner was started by hand, so `isOwnSpawn`
-  was false and the verdict fell through to a log line. The fix is to drop that condition,
-  not to invent power that already exists. It was NINE such lines, not eight.
-  AND THE PART WITHOUT WHICH THIS POINT MAKES THINGS WORSE (same review): a successor
-  spawned into the SAME broken environment wedges identically, and the runaway brake never
-  catches it, because `failCount` rises only when the spawn's pid is GONE
-  (`batch-autostart.mjs:385`). A chain of alive-but-wedged successors would burn tokens all
-  night and look busy. Three parts, all in this point: (i) an environment PREFLIGHT before
-  the spawn — can a trivial tool call complete at all? a spawn into a refusing environment
-  is not a rescue; (ii) `failCount` counts the successor that LIVES but neither converts the
-  lock nor produces a first commit within a calibratable M minutes; (iii) the spawn backoff
-  ESCALATES instead of hammering at a fixed interval.
-  VERIFIABLE additionally: a refusing preflight blocks the spawn; a live successor without
-  lock conversion or first commit raises failCount; the backoff rises across repeats; and a
-  wedged owner that is NOT the launcher's own spawn is taken over.
-  DOCS in the same commit: `docs/batch-autonomy.md` under the launcher, and the ledger row
-  for retrospective §3.61.
 
 - [ ] 434. THE BATCH MUST NOT BE ABLE TO STAND STILL — THE LAYERS AROUND POINT 433
   (30.07.2026, user: preventing this reliably outranks batch progress; bundle I). The night of
