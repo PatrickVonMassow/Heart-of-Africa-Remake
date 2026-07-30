@@ -293,3 +293,28 @@ describe('the block message', () => {
     expect(text).toContain('finding.mjs')
   })
 })
+
+// --- A declared wait is the record of a turn that handed work OUT ----------------
+
+describe('classifyCall — the declared wait', () => {
+  it('counts a --waiting-on declaration as a durable record', () => {
+    const c = classifyCall({ name: 'Bash', command: 'node scripts/batch-in-flight.mjs --waiting-on "agent building X" --log C:/tmp/x.log' })
+    expect(c.kind).toBe('record')
+    expect(c.record).toBe('wait-declared')
+  })
+
+  it('so a spawn-only turn that declares its wait does not block', () => {
+    const tally = { investigative: 1, agents: 1, records: ['wait-declared'] }
+    expect(auditFindings({ tally }).ok).toBe(true)
+  })
+
+  it('but a spawn with NOTHING recorded still blocks — the point of the guard is untouched', () => {
+    const tally = { investigative: 1, agents: 1, records: [] }
+    expect(auditFindings({ tally }).ok).toBe(false)
+  })
+
+  it('a bare in-flight call without --waiting-on is not a record (a --clear leaves nothing behind)', () => {
+    const c = classifyCall({ name: 'Bash', command: 'node scripts/batch-in-flight.mjs --clear' })
+    expect(c.record).toBeUndefined()
+  })
+})

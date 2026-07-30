@@ -205,7 +205,9 @@ export function evaluate({ replyText = null, vdzkTitles = null, cardAddedThisTur
       'there ("Den öffne ich nur, wenn ich dir etwas schreiben will"). Your reply asks him for a ' +
       `decision (${ask.trigger}): ${JSON.stringify(asked)} — and "Von dir zu klären" holds ${held}, ` +
       'so nothing on the board says a decision is pending. The chat may carry the question as well, ' +
-      `never instead. Add the card, then answer again:\n  ${REMEDY}\n` +
+      `never instead. Add the card, then close the turn with a SHORT acknowledgement — one or ` +
+      `two sentences naming the card you added, never a second copy of what the user has ` +
+      `already read:\n  ${REMEDY}\n` +
       'Is it NOT a decision for the user (a rhetorical question, a question you answer yourself)? ' +
       'Then rewrite the sentence without the question — this guard errs toward blocking on purpose, ' +
       'because a missed decision costs the user hours and a false block costs one turn.',

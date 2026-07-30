@@ -2795,6 +2795,25 @@ it is appended.
   the same is missing for source), and (c) an explicit context budget per point after
   which the session hands over mid-point with a written handoff. Pick by measurement, not
   by preference, and report the %/h again — the criterion stays the one above.
+  (d) THE HARNESS PRIMITIVES, EVALUATED AGAINST OUR HAND-BUILT LAYER (user question
+  30.07.2026: is there not an established mechanism for token-frugal parallel batch work
+  rather than reinventing it?). Partly there is, and parts are already in use — worktree
+  agent isolation per `docs/batch-autonomy.md`; the OS autostart task is the launcher, held
+  against the cron/wakeup primitives on the reasons in `docs/rule-corpus-audit.md` A31; the
+  Workflow tool stands under the token ceiling of memory `workflows-token-budget`. NOT
+  evaluated: the Workflow tool's BUDGET primitive — a hard output-token ceiling with a
+  remaining() query, precisely the control that was missing on 20.07. — together with its
+  run-resume, which replays the unchanged prefix of agent calls after a crash and is the
+  crash-resume we hand-built; background agents with a monitor instead of the hand-written
+  in-flight declaration and log polling; and REMOTE execution, the one layer that survives
+  a dead machine or a dead line — the residual the user accepted when declining a paid API
+  key for the vacation hardening — whose availability is gated and must be CHECKED, never
+  assumed. What no primitive replaces, and why our layer exists at all: the singleton
+  across OS-started sessions, the work-order and guard discipline, the board, the repo
+  doctor and the chat channel — those are policy, not orchestration.
+  VERIFIABLE for (d): one bounded written evaluation, layer by layer, naming per
+  hand-built piece whether a primitive replaces it, decided by the same %/h measurement
+  rather than by preference; a piece kept is kept with its reason recorded.
 
 - [ ] 379. ABU SIMBEL BECOMES A WALKABLE SITE (user 27.07.2026; a FEATURE, and the user's
   own instruction is that the open DEFECTS come first — it waits behind them). The world carries
@@ -3446,11 +3465,61 @@ it is appended.
   bundle passes; one in none blocks; one in the "not bundled" list passes; an unreadable
   work-packages file ALLOWS (fail-open); the bundle membership reconciles against the full
   open set, so a point that silently left a bundle is caught too.
-  Both stand down for a session that does not own the batch lock and for a paused batch,
+  (C) A POINT'S OWN ACCEPTANCE CRITERION IS ENFORCED BY NOTHING (30.07.2026). Points carry
+  their acceptance condition as PROSE — "counts as delivered when the rate is MEASURED, not
+  when the mechanism runs" is the clearest case, with `scripts/measure-context-cost.mjs`
+  sitting there unused by any gate — and nothing compares a tick against it: `closing-guard`
+  gates a VERSION TAG only, and no guard reads a point's own condition. So a point can be
+  ticked because it FEELS finished, the very class this project's core lesson forbids: a rule
+  that exists only as prose. A point may therefore carry a machine-readable PROOF line naming
+  the command whose run must be recorded, in the grammar `closing-guard --step --evidence`
+  already uses, and the tick path refuses `[ ]`→`[x]` for such a point without a recorded run
+  at the CURRENT HEAD. A point WITHOUT a proof line ticks as before — the line is opt-in, so
+  adding the gate never blocks the existing corpus.
+  (D) A DORMANT RECORD THAT OUTLIVES ITS DORMANCY (four-eyes review 30.07.2026). The
+  guard-health audit reads a guard's dormant entry ONLY while that guard is unwired, so a
+  guard that is wired AND still carries a dormant entry produces no violation and the stale
+  record stands unnoticed — the map goes on claiming an enforcer is inert while it enforces.
+  The audit gains the inverse check: a WIRED enforcer with a dormant entry is a violation
+  naming both sides, so the entry must be removed in the same commit that adds the hook
+  line. The convention the arming commit states thereby becomes the mechanism it describes.
+  (E) THE PREFLIGHT MUST NAME WHAT IT CANNOT JUDGE (30.07.2026). `guard-preflight`'s registry
+  covers only the guards someone remembered to add, so a wired Stop hook outside it reports
+  nothing while it would block — and CLAUDE.md §7.2 tells the session to preflight and answer
+  LAST, so a false clean reproduces the answer-twice loop the preflight exists to prevent
+  (one such loop was measured at ~30 turns). Every wired Stop hook gets a gather/decide pair
+  in the registry — `findings-guard` and `decision-card-guard` need a small extraction, and
+  the branch sweep is registered already — AND the preflight PRINTS any wired-but-
+  unregistered Stop hook by name, so the next omission is visible instead of silent. Second,
+  smaller half: `decision-card-guard` swallows a card added before the session's FIRST Stop
+  evaluation into its baseline, so its own remedy can read as unperformed; the block reason
+  names the extracted topic words, so a matching title can actually be written.
+  (F) THE FENCE JUDGES THE COMMAND STRING, NOT THE ACTION (observed three times on
+  30.07.2026 while a fenced-out session worked). A read-only search was refused for merely
+  NAMING a script; a local commit was refused because its MESSAGE carried a forbidden verb,
+  and since the whole invocation is judged the commit went with it; recording the finding
+  about it was refused because its text named a script. A quoted argument or a here-document
+  body decides the verdict. It never lets a forbidden write through — it errs safe — but it
+  costs turns and teaches a session to avoid naming things in a search. The fence judges per
+  SEGMENT and by the command HEAD, the way the findings core already does, and quoted text
+  never decides.
+  All six stand down for a session that does not own the batch lock and for a paused batch,
   like every guard here. MECHANISM REVIEW REQUIRED (CLAUDE.md §7.2); the
   `.claude/settings.json` wiring is attended-only and must be ABSOLUTE, not cwd-relative.
-  DOCS in the same commit: `docs/batch-autonomy.md` (the guard chain) and, for (B),
-  `docs/work-packages.md` states that its membership is now checked rather than remembered.
+  DOCS in the same commit: `docs/batch-autonomy.md` (the guard chain), for (B)
+  `docs/work-packages.md` states that its membership is now checked rather than remembered,
+  and for (C) the work order's own preamble states the proof-line grammar.
+  VERIFIABLE for (C): pure Vitest — a point with a proof line and no recorded run BLOCKS the
+  tick; the same point with a run recorded at the current HEAD passes; a run recorded at an
+  OLDER head does not count; a point without a proof line is untouched; an unreadable ledger
+  ALLOWS (fail-open). For (D): a wired enforcer with a dormant entry BLOCKS and the message
+  names both the enforcer and its stale entry; a wired enforcer without one passes; an
+  unwired-and-recorded one keeps passing as today. For (E): the registry covers every wired
+  Stop hook (the same drift test that already pins the list), an unregistered one is NAMED in
+  the report rather than implied clean, and a non-applicable gather reads as "not judged",
+  never as clean. For (F): a table of real invocations from the transcript corpus — a search
+  naming a script ALLOWS, a commit whose message carries a forbidden verb ALLOWS, the
+  forbidden write itself still DENIES, and a chained invocation is judged segment by segment.
 
 - [ ] 438. THE PROJECT HOOKS CANNOT FIRE OUTSIDE THE REPO ROOT (29.07.2026, measured in a
   `/doctor` run and reviewed by the second model; bundle J). All 31 project hooks in

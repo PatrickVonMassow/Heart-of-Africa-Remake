@@ -230,3 +230,56 @@ describe('helpers', () => {
     expect(formatBranchHygiene([])).toBe('')
   })
 })
+
+// --- A freshly cut branch stands ON main's tip and is not debris ------------------
+
+describe('assessBranchHygiene — a branch on main\'s own tip', () => {
+  const TIP = 'a'.repeat(40)
+  const old = Date.now() - 6 * 60 * 60 * 1000
+
+  it('does not report a local branch whose tip IS main\'s tip, however old that commit is', () => {
+    const r = assessBranchHygiene({
+      readable: true,
+      repoRoot: '/repo',
+      localMerged: [{ name: 'feat/999-just-cut', tipAt: old, tipSha: TIP }],
+      mainTip: TIP,
+    })
+    expect(r.block).toBe(false)
+    expect(r.findings).toEqual([])
+  })
+
+  it('does not propose cleaning a worktree that sits on that same tip', () => {
+    const r = assessBranchHygiene({
+      readable: true,
+      repoRoot: '/repo',
+      localMerged: [{ name: 'feat/999-just-cut', tipAt: old, tipSha: TIP }],
+      worktrees: [
+        { path: '/repo', branch: 'main', tipAt: old, tipSha: TIP },
+        { path: '/repo/.claude/worktrees/agent-x', branch: 'feat/999-just-cut', tipAt: old, tipSha: TIP },
+      ],
+      mainTip: TIP,
+    })
+    expect(r.findings).toEqual([])
+  })
+
+  it('still reports REAL debris — a merged branch whose tip is behind main', () => {
+    const r = assessBranchHygiene({
+      readable: true,
+      repoRoot: '/repo',
+      localMerged: [{ name: 'feat/111-done', tipAt: old, tipSha: 'b'.repeat(40) }],
+      mainTip: TIP,
+    })
+    expect(r.block).toBe(true)
+    expect(r.findings.map((f) => f.name)).toEqual(['feat/111-done'])
+  })
+
+  it('without a known main tip it behaves exactly as before — the exemption cannot swallow the sweep', () => {
+    const r = assessBranchHygiene({
+      readable: true,
+      repoRoot: '/repo',
+      localMerged: [{ name: 'feat/111-done', tipAt: old, tipSha: TIP }],
+      mainTip: null,
+    })
+    expect(r.block).toBe(true)
+  })
+})
