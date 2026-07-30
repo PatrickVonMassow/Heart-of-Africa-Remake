@@ -4158,6 +4158,26 @@ it is appended.
   current acquisition, own live card kept) and the gate's refusal; a live handover leaves no
   stale card behind.
 
+- [ ] 466. THE DOC VERIFICATION CHECKS A SENTENCE THE README NO LONGER HAS (30.07.2026,
+  found by the agent that shrank the always-loaded instruction file; reproduced on unmodified
+  `main`, so it is PRE-EXISTING and was not caused by that work; bundle K).
+  `scripts/verify/docs.mjs` fails two checks — "README states an acceptance-criteria count"
+  and "README count matches CLAUDE.md §7.1" — because the README no longer carries the
+  "All N acceptance criteria" phrase the check greps for. A verification that is red for a
+  reason nobody is fixing trains everyone to ignore it, which is the failure mode that let a
+  red run sit unnoticed for three weeks before.
+  FINAL STATE: decide it in the commit and act, do not silence it — either the README carries
+  the count again (and the check keeps it honest), or the two checks go and their intent is
+  written into the commit message. Whichever way, `node scripts/verify/docs.mjs` exits 0 on a
+  clean `main`.
+  IN THE SAME POINT: `docs.mjs` gains the `Detail:` pointer check that mirrors its existing
+  `Evidence:` checks — every acceptance criterion whose detail was moved out must resolve to
+  a real section in `docs/acceptance-criteria-detail.md`, so the move can never rot the way an
+  unchecked pointer does. That is a gate change and therefore needs the other model's recorded
+  review before it lands (`mechanism-review-guard`).
+  VERIFIABLE: `docs.mjs` green on `main`; the pure layer covers the pointer check against a
+  present, a missing and a misspelled detail section.
+
 ## Closing (only after all points)
 
 New points are appended BEFORE this section — it stays last in the file.
