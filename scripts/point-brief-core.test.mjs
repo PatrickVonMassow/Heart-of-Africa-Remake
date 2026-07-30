@@ -608,6 +608,89 @@ describe('assembleBrief', () => {
   })
 })
 
+// ---------------------------------------------------------------------------
+// The return protocol (point 458): what the agent writes BACK is part of the
+// brief, because the report is the only thing that enters the main session.
+// ---------------------------------------------------------------------------
+describe('the WHAT YOU RETURN block', () => {
+  /** Every field the block must demand — the whole reason it exists. */
+  const REQUIRED = [
+    [/WORK-ORDER POINT NUMBER/, 'the point number'],
+    [/BRANCH NAME/, 'the branch'],
+    [/COMMIT SHAs, in the order/, 'the SHAs in order'],
+    [/npm run build/, 'the build gate'],
+    [/npm run lint/, 'the lint gate'],
+    [/npm run test:unit/, 'the unit gate'],
+    [/each browser suite BY NAME/, 'the browser suites'],
+    [/VERDICT/, 'a verdict per gate'],
+    [/CHANGED FILES as PATHS ONLY/, 'changed files as paths'],
+    [/OPEN ITEMS AND ESCALATIONS/, 'open items'],
+    [/did this BRIEF SUFFICE, and what was MISSING/, 'the point-365 question'],
+  ]
+
+  it('closes an assembled brief — and is the FINAL section, after the notes', () => {
+    const brief = assembleBrief({
+      point: { number: 400, done: false, body: 'x' },
+      notes: ['a note'],
+    })
+    expect(brief).toContain('--- WHAT YOU RETURN ---')
+    expect(brief.indexOf('--- WHAT YOU RETURN ---')).toBeGreaterThan(brief.indexOf('--- NOTES ---'))
+    // Nothing may follow it: a demand buried mid-document is read as background.
+    expect(brief.slice(brief.indexOf('--- WHAT YOU RETURN ---'))).not.toContain('\n--- ')
+  })
+
+  /**
+   * The BLOCK's own text, not the whole brief. Asserting against the brief would
+   * let a future HEADER line that happens to mention a gate command stand in for
+   * a dropped demand — the check must fail when the block loses one.
+   */
+  const blockOf = (point) => {
+    const brief = assembleBrief({ point })
+    const at = brief.indexOf('--- WHAT YOU RETURN ---')
+    expect(at, 'the brief has no return block at all').toBeGreaterThan(-1)
+    return brief.slice(at)
+  }
+
+  it('names EVERY field it demands back', () => {
+    const block = blockOf({ number: 400, done: false, body: 'x' })
+    for (const [re, what] of REQUIRED) expect(block, `demands ${what}`).toMatch(re)
+  })
+
+  it('names the point number it is the protocol for', () => {
+    expect(assembleBrief({ point: { number: 458, done: false, body: 'x' } })).toContain(
+      'WORK-ORDER POINT NUMBER (458)',
+    )
+  })
+
+  it('FORBIDS the prose the merge does not read, and says why', () => {
+    const block = blockOf({ number: 400, done: false, body: 'x' })
+    for (const banned of ['diffs', 'file contents', 'command logs', 'code blocks', 'restated spec text']) {
+      expect(block, `forbids ${banned}`).toContain(banned)
+    }
+    expect(block).toMatch(/merge reads git .*never reads your report/)
+  })
+
+  it('gives the length as GUIDANCE, never as a cap that could truncate an escalation', () => {
+    const block = blockOf({ number: 400, done: false, body: 'x' })
+    expect(block).toMatch(/under ~40 lines/)
+    expect(block).toMatch(/GUIDANCE, not a cap/)
+    expect(block).toMatch(/never truncate/)
+  })
+
+  it('survives a brief with no sections, no cross-references and no notes', () => {
+    const block = blockOf({ number: 401, done: false, body: 'x' })
+    for (const [re] of REQUIRED) expect(block).toMatch(re)
+  })
+
+  it('rides along on a real built brief — OPEN and ARCHIVED alike', () => {
+    for (const n of [400, 401, 288]) {
+      const { brief } = buildBrief({ ...args, number: n })
+      expect(brief, `point ${n}`).toContain('--- WHAT YOU RETURN ---')
+      expect(brief).toContain(`WORK-ORDER POINT NUMBER (${n})`)
+    }
+  })
+})
+
 describe('pointTitle', () => {
   it('shortens to one identifying line', () => {
     const long = { body: `${'word '.repeat(80)}end` }
@@ -832,6 +915,18 @@ describe('faithfulness over the WHOLE work order', () => {
     }
     expect([...hit].sort()).toContain('docs/peoples-1890.md')
     expect([...hit].sort()).toContain('docs/fauna-behaviour-1890.md')
+  })
+
+  it('closes EVERY brief with the return protocol (point 458)', () => {
+    const off = []
+    for (const { point, result } of built) {
+      const tail = result.brief.slice(result.brief.lastIndexOf('--- '))
+      if (!tail.startsWith('--- WHAT YOU RETURN ---')) off.push(`${point.number}: does not close with it`)
+      else if (!tail.includes(`WORK-ORDER POINT NUMBER (${point.number})`)) {
+        off.push(`${point.number}: the block names the wrong point`)
+      }
+    }
+    expect(off).toEqual([])
   })
 
   it('keeps EVERY brief — archived ones too — under the measured ceiling', () => {

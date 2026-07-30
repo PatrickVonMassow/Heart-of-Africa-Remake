@@ -530,6 +530,41 @@ const HEADER = [
 ]
 
 /**
+ * The brief's closing block: what the agent writes BACK (point 458).
+ *
+ * WHY IT IS PART OF THE BRIEF. Point 365 bounded the INPUT side of delegation —
+ * ~1.8k tokens of brief against ~108k of reading assignment — but nothing bounded
+ * the OUTPUT, and the agent's final text is the only thing that enters the main
+ * session's context. It is also the part the main session needs least in prose:
+ * the merge reads git for every fact it acts on (branch, SHAs, changed files),
+ * never the report. So the demand travels WITH the brief rather than with a
+ * prompt template a caller has to remember — a regenerated brief carries it.
+ *
+ * The length line is GUIDANCE, deliberately not a cap: a truncated escalation
+ * costs a rebuild, which is far dearer than a report ten lines too long.
+ */
+export function returnBlock(number) {
+  return [
+    '--- WHAT YOU RETURN ---',
+    "Your final message is the ONLY thing that reaches the main session, so it is a PROTOCOL,",
+    'not a narrative. Report exactly these, in this order:',
+    `- the WORK-ORDER POINT NUMBER (${number}) and the BRANCH NAME;`,
+    '- the COMMIT SHAs, in the order you made them;',
+    '- the GATES YOU ACTUALLY RAN — `npm run build`, `npm run lint`, `npm run test:unit`, and',
+    '  each browser suite BY NAME — each with its VERDICT. A gate you did not run is reported',
+    '  as not run, never as green;',
+    '- the CHANGED FILES as PATHS ONLY;',
+    '- OPEN ITEMS AND ESCALATIONS — anything left undone, guessed at, or blocked;',
+    '- the point-365 question answered: did this BRIEF SUFFICE, and what was MISSING?',
+    'Leave OUT: diffs, file contents, command logs, code blocks and restated spec text. The',
+    'merge reads git for branch, SHAs and changed files — it never reads your report, so prose',
+    'about them costs context and buys nothing.',
+    'Keep this under ~40 lines. That is GUIDANCE, not a cap: an escalation cut short costs more',
+    'than a long report, so never truncate what the next session needs to know.',
+  ]
+}
+
+/**
  * Fingerprint of the work order a brief was cut from — the first 12 hex of the
  * sha256 over the concatenated (normalised) TASKS.md + archive text.
  *
@@ -605,6 +640,10 @@ export function assembleBrief({ point, sections = [], referenced = [], notes = [
   if (notes.length) {
     out.push('--- NOTES ---', ...notes.map((n) => `- ${n}`), '')
   }
+  // ALWAYS last, and never conditional: the return protocol is owed for every
+  // brief — OPEN or archived, with sections or without — so no caller can end up
+  // with a brief that says nothing about what comes back.
+  out.push(...returnBlock(point.number))
   return out.join('\n')
 }
 
