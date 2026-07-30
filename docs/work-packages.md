@@ -18,7 +18,12 @@ What the bundle still IS, and why the grouping earns its keep:
   two points of a bundle. The freshness only becomes real when the SAME running
   agent is handed the bundle's next point instead of a new one being spawned —
   which is what happened with 439 → 452 that evening, and is why point 471 makes
-  it the rule rather than an accident.
+  it the rule rather than an accident. NARROWLY, though, on the user's objection
+  the same day: a carried context is also a diluted one, so the reuse holds only
+  where the next point touches files the agent already has open, the follow-up
+  arrives as a full brief that closes the previous point explicitly, no context
+  takes a third point, and the comparison against fresh-agent work decides
+  whether the rule survives.
 - **The COLLISION MAP.** The split follows SHARED FILES, so it says which points
   must NOT run in parallel. Two points in the same bundle that touch the same
   module go on ONE branch — one commit each — because parallel agents would

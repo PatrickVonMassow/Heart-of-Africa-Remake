@@ -4105,6 +4105,19 @@ also be taken as its own task now and then.
   bundle touches files an agent is ALREADY working in, it goes to THAT agent as a follow-up ticket
   rather than to a new one — it is the same decision the picker makes, so it lives in the same
   mechanism. A new agent is spawned only when no running one holds the files.
+  THE REUSE IS NARROW AND IT IS THE RISKY HALF (user 30.07.2026: "Das klingt riskant, weil sein
+  Kontext dann noch mit den Anforderungen des vorherigen Punktes verwaessert ist." — correct, and it
+  bounds the rule rather than cancelling it). CONDITIONS, all of them: reuse ONLY when the next point
+  touches files the running agent already holds — the case where a fresh agent would both re-read
+  them and collide on the branch; the follow-up arrives as a FULL brief, the same document a fresh
+  agent would get, opening with the explicit statement that the previous point's requirements are
+  CLOSED and bind nothing here; one commit per point, so the diff stays attributable; and the
+  four-eyes review reads the DIFF, never the agent's account of it. A third point in one context is
+  not taken — after two the agent is done and the next goes to a fresh one, because the token saving
+  shrinks with every reuse while the bleed risk does not.
+  AND IT IS WATCHED, not assumed: the reuse is recorded per point, and if a reused agent's work
+  draws more review findings than a fresh one's over the next ten points, the rule is dropped rather
+  than defended. That comparison is part of what the reporting command prints.
   MEASURED, not asserted: the point is delivered when a command reports, for the current work
   order, how many agents the top of the queue can actually feed, and that figure is 3 (or the
   reason it cannot be). `--slots-free` already demands a reason for an idle slot; this makes
