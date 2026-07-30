@@ -352,7 +352,8 @@ if (isMain) {
     fail(
       `session ${write.claimantSid} claimed the batch ${Math.round((write.ageMs ?? 0) / 60000)} min ago and that ` +
         'claim is still live, so this one would be a second window pulling the batch two ways. Exactly one ' +
-        'session drives. Wait for it to expire, or have that window run `--withdraw`. Nothing recorded.',
+        'session drives. Have that window run `--withdraw`, or close it — a live claimant\'s claim is bound ' +
+        'by its own process, not by a clock that runs out while it waits. Nothing recorded.',
     )
   }
   const claim = {

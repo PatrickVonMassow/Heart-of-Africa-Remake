@@ -292,15 +292,19 @@ try {
     // HAND THE BATCH BACK. A real release, not a handover: the user is not the
     // launcher, and leaving a lock behind that names a session which is done would
     // only make the claiming window wait for a grace window it should not have to.
-    // The claim is stamped rather than deleted, so `--status` in the other window
-    // can say the batch is waiting for it, and the launcher keeps standing down
-    // while the claimant is provably alive. With the lock free and the claim
-    // untaken, `CLAIM_MAX_AGE_MS` is the TAKE-UP window after which the ordinary
-    // handover resumes — it is not a clock the claimant has to keep feeding.
-    // Release, then stamp the claim ONLY if the release actually happened — the
-    // stamp says "the batch is waiting for you", so it is never written on the
-    // word of a session that freed nothing. Both lines live in handBackToClaimant
-    // so the pairing is testable.
+    // The claim is stamped rather than deleted, and the stamp SPENDS it: from that
+    // moment `assessClaim` reads the record as absent (point 434 (6c)), so nothing
+    // releases to it twice and nothing reserves the free lock for it any more. What
+    // the stamp buys is the other window's `--status`, which can then say the record
+    // is spent and that the lock is there to be taken — the claimant re-runs its own
+    // command, and if the launcher got there first it claims again against the new
+    // owner. Before the stamp the claim is bound by the claimant's own liveness
+    // rather than by a clock it has to keep feeding; `CLAIM_MAX_AGE_MS` only bounds
+    // how long a FREE lock waits for a claim nobody has taken.
+    // Release, then stamp ONLY if the release actually happened — the stamp asserts
+    // that the batch was handed over, so it is never written on the word of a session
+    // that freed nothing. Both lines live in handBackToClaimant so the pairing is
+    // testable.
     const who = describeClaim(claimInfo)
     const { released } = handBackToClaimant(sid, claimInfo.claim)
     record(

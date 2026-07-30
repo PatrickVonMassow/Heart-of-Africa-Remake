@@ -240,7 +240,7 @@ export function assessClaim({
  * nothing about the checkout, and reading it as "nothing half-done" is precisely
  * the release-mid-merge this file's closing rule forbids. The cost of the timid
  * direction is bounded: the claim keeps standing until the next turn end, and it
- * expires on its own, so nothing is stranded.
+ * ends with the claimant's own process, so nothing is stranded.
  *
  * Returns { verdict: 'none' | 'wait' | 'release', reason }.
  */

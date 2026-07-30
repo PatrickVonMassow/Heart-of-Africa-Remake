@@ -965,7 +965,8 @@ session — the failure the whole singleton exists to prevent.
    `GIT_STATE_UNVERIFIABLE`, when it could not find out (a timeout under load, a
    git that would not run). It waits too — "I could not look" read as "all clear"
    is exactly the release-mid-merge this bound exists to prevent, and the timid
-   direction costs at most one more turn because the claim expires on its own.
+   direction costs at most one more turn, because the claim stands only as long as
+   the claimant's own process does.
 
 Two consequences that are easy to miss and were both built:
 
