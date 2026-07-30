@@ -80,6 +80,7 @@ scripts/.tile-cache
 .claude/batch-lock.json.tmp-*
 .claude/batch-lock.json.reaping
 .claude/timestamp-guard-state.json
+.claude/decision-card-guard-state.json
 .claude/batch-boundary.json
 .claude/batch-boundary.json.tmp-*
 .claude/batch-in-flight.json

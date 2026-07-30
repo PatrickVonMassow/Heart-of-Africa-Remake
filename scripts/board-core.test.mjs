@@ -400,6 +400,16 @@ describe('addVdzk — a decision asked of the user gets a card', () => {
     expect(out).not.toMatch(/<details open/)
   })
 
+  it('escapes the markup characters, so a pasted placeholder cannot hide the card', () => {
+    // The guard's remedy hands out a literal "<Titel der Frage>", and an
+    // unescaped `<` produced a card whose title parses as empty — an invisible
+    // open question (four-eyes review 30.07.2026).
+    const out = addVdzk(fullBoard({}), '<Titel der Frage>', 'A & B <oder> C?')
+    const cards = parseCards(sliceSections(out).sections['Von dir zu klären'])
+    expect(cards[0].title).toBe('&lt;Titel der Frage&gt;')
+    expect(cards[0].body).toContain('&amp;')
+  })
+
   it('refuses a card with no title or no question — an empty card asks nothing', () => {
     const b = fullBoard({ vdzk: '' })
     expect(() => addVdzk(b, '', 'Die Frage.')).toThrow(/needs a title/)

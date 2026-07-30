@@ -96,6 +96,43 @@ describe('fail-open: what cannot be read is never a violation', () => {
   })
 })
 
+// The four-eyes review (Fable 5, 30.07.2026) found these by probing, and they are
+// the costly direction: each one PASSED a decision the user would never have seen.
+describe('the false passes the four-eyes review found', () => {
+  it('does not accept a card connected only by a project-generic word', () => {
+    const v = evaluate({
+      replyText: 'Soll ich die offenen Punkte vor dem Release mergen?',
+      vdzkTitles: ['Offene Punkte der Typografie'],
+    })
+    expect(v.block).toBe(true)
+  })
+
+  it('does not let the mandated timestamp header connect a question to any card', () => {
+    // "montag" and "2026" used to enter the first sentence's topic set, because
+    // the sentence split only fires after `.!?` and the header has neither.
+    const v = evaluate({
+      replyText: '**Montag, 29.07.2026, 14:02** Soll ich mergen?',
+      vdzkTitles: ['Montag-Termin für den 2026er Umzug'],
+    })
+    expect(v.block).toBe(true)
+    expect(contentWords('**Montag, 29.07.2026, 14:02** Text').has('2026')).toBe(false)
+  })
+
+  it('blocks an imperative decision that never asks a question', () => {
+    for (const reply of ['Bitte wähle die enge oder die weite Variante.', 'Sag bescheid, welche bleibt.']) {
+      expect(evaluate({ replyText: reply, vdzkTitles: [] }).block, reply).toBe(true)
+    }
+  })
+
+  it('still passes on a genuinely shared topic — one long word, or two short ones', () => {
+    expect(evaluate({ replyText: 'Welche Kartenschrift?', vdzkTitles: ['Kartenschrift entscheiden'] }).block).toBe(false)
+    // "enge" + "weite" — two short words that together name the same choice.
+    expect(
+      evaluate({ replyText: 'Enge oder weite Version?', vdzkTitles: ['Enge gegen weite Version'] }).block,
+    ).toBe(false)
+  })
+})
+
 describe('the parts', () => {
   it('detects every documented decision phrasing', () => {
     for (const p of DECISION_PHRASES) {

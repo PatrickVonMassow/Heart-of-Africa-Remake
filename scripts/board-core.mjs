@@ -371,8 +371,13 @@ export function parseDoneArgs(rest) {
  * board's binding structure, and the body says what is to be decided.
  */
 export function addVdzk(html, title, text) {
-  const head = String(title ?? '').trim()
-  const body = String(text ?? '').trim()
+  // ESCAPED, unlike the other card builders (four-eyes review 30.07.2026): the
+  // guard's remedy line hands out a literal `"<Titel der Frage>"` placeholder, so
+  // a paste of it is the LIKELY first call — and an unescaped `<` produces a card
+  // whose title parses as empty, i.e. an invisible open question.
+  const esc = (s) => String(s ?? '').trim().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  const head = esc(title)
+  const body = esc(text)
   if (!head) throw new Error('board: vdzk-add needs a title — the collapsed card shows nothing else')
   if (!body) throw new Error('board: vdzk-add needs the question itself as the card body')
   const { from } = sectionBounds(html, 'vdzk')

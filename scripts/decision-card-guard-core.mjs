@@ -48,6 +48,13 @@ export const DECISION_PHRASES = Object.freeze([
   'bitte entscheide',
   'deine wahl',
   'gib mir bescheid',
+  // Imperatives put a decision without ever asking a question (four-eyes review
+  // 30.07.2026, finding 3): "Bitte wähle die enge oder die weite Variante."
+  'wähle',
+  'waehle',
+  'welche option',
+  'welche der',
+  'sag bescheid',
 ])
 
 /**
@@ -71,6 +78,12 @@ export const STOPWORDS = Object.freeze(
     'wo', 'wollen', 'zum', 'zur', 'zwei', 'about', 'been', 'does', 'from', 'have', 'into', 'like',
     'need', 'should', 'that', 'the', 'their', 'them', 'then', 'there', 'this', 'want', 'what',
     'when', 'which', 'with', 'would', 'your',
+    // The project's OWN filler (four-eyes review 30.07.2026, finding 2): a reply
+    // and a card both speak of "Punkte", "Fragen" and "Entscheidungen", and a
+    // question connected to a card by one of those is connected by nothing. The
+    // weekday and the word "Stand" come out of the mandated timestamp header.
+    'punkt', 'punkte', 'frage', 'fragen', 'antwort', 'entscheidung', 'entscheidungen', 'stand',
+    'montag', 'dienstag', 'mittwoch', 'donnerstag', 'freitag', 'samstag', 'sonntag',
   ]),
 )
 
@@ -78,12 +91,21 @@ export const STOPWORDS = Object.freeze(
  *  function words dominate and every question would "match" every card. */
 export const MIN_WORD_LENGTH = 4
 
-/** Topic words of a text, lowercased: letters and digits only, stopwords out. */
+/** A single shared word only carries a match from this length on — a long German
+ *  compound ("Kartenschrift") identifies a topic, a short word does not. Below it
+ *  TWO shared words are required (four-eyes review 30.07.2026, finding 2). */
+export const STRONG_WORD_LENGTH = 8
+
+/** Topic words of a text, lowercased: letters only, stopwords and numbers out. */
 export function contentWords(text) {
   if (typeof text !== 'string') return new Set()
   const out = new Set()
   for (const raw of text.toLowerCase().split(/[^0-9a-zäöüß]+/)) {
     if (raw.length < MIN_WORD_LENGTH || STOPWORDS.has(raw)) continue
+    // A PURE NUMBER is never a topic. A point number, a year or a time shared
+    // between a reply and some card matched two unrelated things — and the
+    // mandated timestamp header puts a year into every single reply.
+    if (/^\d+$/.test(raw)) continue
     out.add(raw)
   }
   return out
@@ -99,7 +121,15 @@ export function contentWords(text) {
  */
 export function asksForDecision(text) {
   if (typeof text !== 'string' || text.trim() === '') return { asks: false, trigger: null, questions: [] }
-  const prose = text.replace(/```[\s\S]*?```/g, ' ').replace(/`[^`]*`/g, ' ')
+  const prose = text
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/`[^`]*`/g, ' ')
+    // A bare URL's query string is not a question to anybody.
+    .replace(/https?:\/\/\S+/g, ' ')
+    // The mandated Berlin timestamp header glues to the first sentence — the
+    // split only fires after `.!?` — so its weekday and date would enter that
+    // sentence's topic set (four-eyes review 30.07.2026, finding 2).
+    .replace(/^\s*\*\*[^*]*\*\*/, ' ')
   const sentences = prose
     .split(/(?<=[.!?])\s+|\n+/)
     .map((s) => s.trim())
@@ -122,13 +152,26 @@ export function asksForDecision(text) {
   return { asks: questions.length > 0, trigger, questions }
 }
 
-/** Does any VDZK card title share a topic word with the asking sentences? */
+/**
+ * Does any VDZK card title carry the same TOPIC as the asking sentences?
+ *
+ * ONE shared word was too little (four-eyes review 30.07.2026): "Soll ich die
+ * offenen Punkte vor dem Release mergen?" passed against a card called "Offene
+ * Punkte der Typografie" — connected by "punkte", which connects nothing. So a
+ * single word carries a match only from `STRONG_WORD_LENGTH` on (a distinctive
+ * German compound), and anything shorter needs a second shared word. Erring here
+ * costs a turn; erring the other way costs the decision.
+ */
 export function matchingCard(questions, vdzkTitles) {
   const asked = new Set()
   for (const q of Array.isArray(questions) ? questions : []) for (const w of contentWords(q)) asked.add(w)
   if (asked.size === 0) return null
   for (const title of Array.isArray(vdzkTitles) ? vdzkTitles : []) {
-    for (const w of contentWords(title)) if (asked.has(w)) return { title, word: w }
+    const shared = [...contentWords(title)].filter((w) => asked.has(w))
+    if (shared.length === 0) continue
+    const strong = shared.find((w) => w.length >= STRONG_WORD_LENGTH)
+    if (strong) return { title, word: strong }
+    if (shared.length >= 2) return { title, word: shared.sort((a, b) => b.length - a.length)[0] }
   }
   return null
 }
