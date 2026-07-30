@@ -226,12 +226,13 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   Zwischen-Zweig, und halte Messläufe von störenden Fenstern frei."
 
 - **„Erfolgreich" heißt nicht „angekommen".** Ein Befehl meldet Erfolg, das Gewollte ist
-  trotzdem nicht passiert — etwa ein Upload, der den falschen Zweig überträgt und zufrieden
-  „alles aktuell" meldet, während die Arbeit nur lokal liegt.
+  trotzdem nicht passiert — etwa ein Upload, der den falschen Zweig überträgt und „alles
+  aktuell" meldet.
   → *Prompt:* „Etabliere einen Mechanismus, der nach jeder Aktion mit Fernwirkung
   (Hochladen, Veröffentlichen, Ausliefern) den **Zielzustand** belegt statt der
-  Erfolgsmeldung. Und setze jede Formprüfung **vor** den Schritt nach außen, so dass sie die
-  Auslieferung verhindern kann; nur Inhaltliches darf danach laufen."
+  Erfolgsmeldung; eine Abfrage ohne Treffer ist ein Befund, keine Antwort. Setze jede
+  Formprüfung **vor** den Schritt nach außen, so dass sie die Auslieferung verhindern kann;
+  nur Inhaltliches darf danach laufen."
 
 - **Regeln und Wächter verrotten — nur merkt es niemand.** Regeln wachsen an: Widersprüche
   (auch innerhalb *einer* Datei), Doppelungen, Regeln, die eine nie gebaute Absicherung
@@ -395,4 +396,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 Wenn du diese eine Nachricht an den Anfang stellst, hast du 80 % der Lehren dieses
 Projekts eingebaut, bevor die erste Zeile Code entsteht.
 
-<!-- GUIDE-FINGERPRINT: 67aefb05fabafb49e8f4a604bd4fb472796f2842ab2f56bee7e106e37ecb470d -->
+<!-- GUIDE-FINGERPRINT: 475358834bb9add5399e0d7f4c83bd6bb9e6dea57a5f516b340981e3bf073416 -->
