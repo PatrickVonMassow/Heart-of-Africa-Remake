@@ -3669,11 +3669,20 @@ it is appended.
   one command that fixes it, which means `board-queue.mjs` also GETS that command: a
   `--title` flag, since today only the body can be set from the CLI and the title had to be
   hand-written into `.claude/board-queue.json`.
+  A NOW-CARD NEEDS THE SAME PATH, and this is not cosmetic: retitling one has no command at
+  all today, so fixing the three current-work cards on 30.07.2026 meant hand-editing the board
+  HTML — with the outcome the memory predicts. The editor wrote the file back in Windows text
+  mode, every `\n` became `\r\n`, later node writes left the file MIXED, and
+  `board-archive-rotate.mjs` then failed to find the Erledigt section at all: `attest` crashed
+  with a stack trace on a board that looked perfect in the browser. So `board.mjs` gets a
+  `title <point> "<text>"` command covering both sections, and the publish path normalises
+  line endings on write instead of trusting every writer.
   VERIFIABLE: pure Vitest — an entry with an authored title passes; one falling back to the
   work-order headline is reported with its point number; the `Punkt N` fallback is reported
   too; a German title that merely resembles the headline is NOT reported (compare against the
-  parsed headline, never a language heuristic); and `setQueueEntry` writes a title without
-  disturbing body or estimate.
+  parsed headline, never a language heuristic); `setQueueEntry` writes a title without
+  disturbing body or estimate; retitling a now-card leaves its times and body untouched; and a
+  board written with CRLF is normalised so the archive rotation still finds its section.
   DOCS in the same commit: `docs/batch-autonomy.md` where the board commands are listed.
 
 ## Closing (only after all points)
