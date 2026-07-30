@@ -653,6 +653,16 @@ Die Klasse ist dieselbe wie beim Herzschlag, der für Fortschritt gehalten wird,
 
 **Lehre:** Ein Handschlag, dessen zweite Hälfte bei der Gegenseite liegt, braucht ein Zeitfenster, in dem niemand anders zugreifen darf — und die Prüfung eines Wiederanlaufs endet nicht bei „läuft es weiter?", sondern bei „läuft es dort weiter, wo es laufen sollte?". Ein Ausfall trifft nie die bequeme Stelle; jede Aktion mit zwei Hälften ist an ihrer Naht zu prüfen.
 
+### 3.71 Das Verschlucken, gegen das kein Fail-Open hilft
+
+Am 30.07.2026 fand die Zweitmodell-Prüfung im neuen Reparatur-Doktor einen Fehler, der jeden lebenden Agenten-Nebenbaum samt unversionierter Arbeit gelöscht hätte. Der Weg dahin ist unscheinbar: Eine Hilfsfunktion fing das Scheitern von `git worktree list` ab und gab eine leere Liste zurück. Für den Aufrufer war das nicht „ich weiß es nicht", sondern „git kennt keinen Nebenbaum" — also ist jedes Verzeichnis dort verwaist.
+
+Der Punkt ist, dass die vorhandene Absicherung dagegen wirkungslos war. Jede Erhebung des Doktors steckt in einer Fail-Open-Hülle: Wirft sie, gilt der Zustand als *nicht beurteilt*. Genau das hätte hier gerettet — aber die Hülle sah nie einen Fehler, weil er drinnen schon in ein Ergebnis verwandelt worden war. **Fail-Open schützt gegen FEHLENDE Daten, nicht gegen FALSCHE.** Ein inneres `catch`, das einen Fehlschlag in einen plausiblen Wert übersetzt, hebt die äußere Absicherung auf, ohne sie anzufassen. Dieselbe Form saß ein zweites Mal in derselben Datei: Eine unlesbare Arbeitsliste zählte als fehlende und wäre ohne Sicherung aus dem letzten Stand überschrieben worden.
+
+Zum selben Tag gehört die Gegenprobe, wie lange so etwas unbemerkt liegen kann. Drei fertig gebaute, getestete Wächter waren unverdrahtet, weil ihre Hook-Zeile in einer Datei steht, die immer nachfragt — sauber als „schlafend" vermerkt. Beim Scharfschalten wurden zwei bis dahin nie ausgeführte Tests lebendig, und beide hatten recht. Ein als schlafend verbuchter Wächter ist kein halb wirksamer Wächter, sondern gar keiner, und das Protokoll darüber ist kein Ersatz für die Verdrahtung.
+
+**Lehre:** Ein `catch`, das einen Wert zurückgibt statt weiterzureichen, ist eine Entscheidung über die Wahrheit — und gehört nur dorthin, wo der Ersatzwert in die SICHERE Richtung zeigt. Bei jeder Erhebung ist zu fragen: Führt ihr Fehlschlag zu WENIGER Befunden oder zu MEHR? Nur die erste Richtung darf verschluckt werden.
+
 ---
 
 ## 4. Die Guards als Immunsystem
@@ -742,7 +752,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Donnerstag, 30.07.2026, 14:43 · Quellen-Fingerprint: `4a7d876e4881…`
+Zuletzt aktualisiert: Donnerstag, 30.07.2026, 16:54 · Quellen-Fingerprint: `f3f9a099dcd3…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -819,8 +829,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | CORRECTED 19.07.2026 — WebGPU IS testable headless/autonomously via system Chrome (channel:'chrome') + --headless=new; the 'untestable' belief held only for Playwright's BUNDLED Chromium | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 69 Feedback-/Projekt-Memories · 39 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 25 Prozess-/Meta-TASKS-Punkte (davon 11 offen).
+Erfasste Quellen: 69 Feedback-/Projekt-Memories · 39 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 14 Prozess-/Meta-TASKS-Punkte (davon 0 offen).
 
-<!-- RETRO-FINGERPRINT: 4a7d876e4881dab3fcc849451da2a420552e939e0f1efa7f6fca3cfdeaa3d91a -->
-<!-- RETRO-LAST-REFRESHED: 2026-07-30T12:43:33.778Z -->
+<!-- RETRO-FINGERPRINT: f3f9a099dcd31e1f9493d1e7eda3f03ceb9a2c5a213892d52694e4c89a1ed6d3 -->
+<!-- RETRO-LAST-REFRESHED: 2026-07-30T14:54:48.625Z -->
 <!-- AUTO-GENERATED:END -->
