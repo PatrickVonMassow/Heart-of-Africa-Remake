@@ -39,6 +39,12 @@
 //     owner's own statement, it survives only while no further tool call bumps
 //     the heartbeat past it, and a live pid still gets a grace window.
 //   - the launcher REPORTS a silent owner instead of only logging it.
+//
+// The one import is the board's command NAMES (board-remedy, a constants module
+// that imports nothing): this core prints the instruction a session follows
+// literally at a boundary, and a second spelling of those commands here is how
+// the printed path and the working path came apart in the first place.
+import { EDIT_CMD, NONE_CARD_CMD } from './board-remedy.mjs'
 
 /** How long a recorded boundary marker stays usable. Long enough for the merge,
  *  the tick, the push and the closing report of a point; short enough that a
@@ -398,6 +404,26 @@ export function boundaryDestination({ claimHonoured = false, claimantSid = null 
  * closed point's own story belongs in Erledigt anyway, which is where `done`
  * files it in the same edit; this card says only where the batch GOES.
  */
+/**
+ * THE COMMAND THAT PUTS THE BOUNDARY CARD UP. PURE.
+ *
+ * Two shapes, because the board can be in two states at a boundary, and printing
+ * the wrong one is what sent sessions to hand-edit the file (point 470):
+ *   - the closed point's card still stands → close it AND name the gap in one
+ *     edit, which is what `done --none` is for;
+ *   - it does not (already archived, or the tick came first) → `board.mjs none`,
+ *     which needs no point at all. Before it existed there was NO sanctioned way
+ *     to write this card, and a hand-edit APPENDS: three idle cards ended up
+ *     stacked on the user's phone.
+ * Both names come from `board-remedy`, so this instruction cannot drift from the
+ * commands that actually exist.
+ */
+export function boundaryCardCommand({ point, pointCardStanding = false } = {}) {
+  return pointCardStanding === true
+    ? `${EDIT_CMD} done ${point} --none --text-stdin`
+    : `${NONE_CARD_CMD} --text-stdin`
+}
+
 export function boundaryCardText({ destination, claimantSid = null } = {}) {
   const head = 'Der Punkt ist abgeschlossen.'
   if (destination === BOUNDARY_DESTINATIONS.CLAIMING_WINDOW && claimantSid) {

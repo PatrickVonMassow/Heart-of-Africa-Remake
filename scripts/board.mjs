@@ -12,6 +12,7 @@
 //   node scripts/board.mjs done   <point> ["<text>"] --next <m> "<status>"
 //                                                     # archive + promote in ONE write
 //   node scripts/board.mjs done   <point> --none "<reason>"   # …or name the gap
+//   node scripts/board.mjs none   "<reason>"           # the gap card, no point to close
 //   node scripts/board.mjs vdzk-add "<title>" "<question>"  # ask the user a decision
 //   node scripts/board.mjs vdzk-remove "<title>"      # drop an answered question
 //   node scripts/board.mjs focus  <point> "<note>"    # declare focus + stamp
@@ -56,6 +57,7 @@ import {
   resolveCardText,
   setCardStatus,
   setCardTitle,
+  toNoCurrentWork,
   toNow,
   toQueue,
 } from './board-core.mjs'
@@ -194,6 +196,25 @@ try {
           : `${point} archived as done at ${at}`,
     )
     if (noEstimate) console.error(noEstimate)
+  } else if (cmd === 'none') {
+    // THE GAP CARD WITHOUT A POINT TO CLOSE (point 470). `done <n> --none` needs
+    // a current-work card for the point it closes, so at a boundary — where the
+    // point is already ticked and its card already archived — there was NO
+    // sanctioned way to put this card up, and the session hand-edited the board
+    // file. Hand-edits append: three idle cards ended up stacked on the user's
+    // phone and one of those edits broke the section markup. The card is a STATE,
+    // so writing it replaces any that stands (see `toNoCurrentWork`).
+    //
+    // WRITING IT IS A CLAIM TO STOP: `board-first-guard` denies the next
+    // state-changing call while it stands.
+    const reason = textOf(rest)
+    if (!reason) throw new Error(`usage: board.mjs none "<reason>"|${TEXT_STDIN_FLAG}`)
+    const at = berlinStamp()
+    edit(
+      (html) => toNoCurrentWork(html, reason, { stamp: at }),
+      `the board now names why nothing is running (Stand ${at}) — this is a claim to STOP: the ` +
+        'board gate denies the next state-changing call while it stands.',
+    )
   } else if (cmd === 'vdzk-add') {
     // EVERY decision asked of the user belongs here (point 421): the chat is an
     // inbox he writes into, not a board he reads. `decision-card-guard` blocks a
@@ -231,6 +252,7 @@ try {
     console.error(
       'usage: board.mjs now|status|title|queue <point> "<text>" | ' +
         'done <point> ["<text>"] [--next <m> "<status>" | --none "<reason>"] | ' +
+        'none "<reason>" | ' +
         'vdzk-add "<title>" "<question>" | vdzk-remove "<title>" | ' +
         'promote <point> "<times>" "<title>" "<status>" | focus <point> "<note>" | attest\n' +
         `Any "<text>" may be replaced by ${TEXT_STDIN_FLAG} and piped in — use that for German prose.`,

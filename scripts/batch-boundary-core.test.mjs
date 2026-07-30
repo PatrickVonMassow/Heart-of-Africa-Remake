@@ -19,6 +19,7 @@ import {
   classifyLauncherState,
   pointClosure,
   tickedPointsInDiff,
+  boundaryCardCommand,
   handoverSurvivesCall,
   isClosingSetPath,
   isClosingSetCommand,
@@ -541,6 +542,25 @@ describe('the boundary card names where the batch actually goes', () => {
       expect(topicViolations(card, knownPoints(tasks))).toEqual([])
       expect(evaluateTopic({ dashboardHtml: card, tasksText: tasks }).block).toBe(false)
     }
+  })
+
+  // POINT 470: the printed instruction must be a command that WORKS. Printing
+  // `done <n> --none` for a point whose card was already archived left the
+  // session with no working command at all, so it hand-edited the board file —
+  // and a hand-edit appends, which is how three idle cards came to stand stacked.
+  it('names the command that fits the board it is printed for', () => {
+    expect(boundaryCardCommand({ point: 434, pointCardStanding: true })).toBe(
+      'node scripts/board.mjs done 434 --none --text-stdin',
+    )
+    expect(boundaryCardCommand({ point: 434, pointCardStanding: false })).toBe(
+      'node scripts/board.mjs none --text-stdin',
+    )
+    // The point-less form is the DEFAULT: it works in either board state, while
+    // `done` is the one that can fail.
+    expect(boundaryCardCommand({ point: 434 })).toBe('node scripts/board.mjs none --text-stdin')
+    expect(boundaryCardCommand()).toContain('board.mjs none')
+    // Only a real true counts — a truthy string must not select the fragile form.
+    expect(boundaryCardCommand({ point: 434, pointCardStanding: 'yes' })).toContain('board.mjs none --text-stdin')
   })
 
   it('INDEPENDENCE: the card is decided with no lock, no launcher probe and no work order', () => {

@@ -21,6 +21,21 @@ export const SYNCED_CMD = 'node scripts/dashboard-guard.mjs --synced'
 /** Edit a card without touching the markup (whole-card edits, no text replacement). */
 export const EDIT_CMD = 'node scripts/board.mjs'
 
+/** Put a card up for the work that is starting — the answer to a board-first deny. */
+export const NOW_CARD_CMD = `${EDIT_CMD} now`
+
+/**
+ * Write the "nothing is running" card WITHOUT a point to close (point 470).
+ *
+ * The boundary is exactly the moment when no point is open, and until this
+ * command existed the only writer was `board.mjs done <n> --none`, which needs a
+ * current-work card for the point it closes. So a session at a boundary
+ * hand-edited the board file — and a hand-edit appends, which is how three idle
+ * cards came to stand stacked on the user's phone. `batch-boundary.mjs` prints
+ * THIS constant, so its instruction cannot name a path that does not work.
+ */
+export const NONE_CARD_CMD = `${EDIT_CMD} none`
+
 /** The tail every board remedy ends with. */
 export const REPUBLISH = `republish (${PUBLISH_CMD}) and re-run ${SYNCED_CMD}`
 

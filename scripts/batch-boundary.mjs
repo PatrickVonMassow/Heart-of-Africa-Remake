@@ -22,6 +22,7 @@ import {
   BOUNDARY_DUE_MS,
   LAUNCHER_TASK_NAME,
   assessBoundary,
+  boundaryCardCommand,
   boundaryCardText,
   boundaryDestination,
   boundaryDueFrom,
@@ -29,6 +30,8 @@ import {
   pointClosure,
   tickedPointsInDiff,
 } from './batch-boundary-core.mjs'
+import { BOARD_FILE_DEFAULT } from './dashboard-state.mjs'
+import { nowCard } from './board-core.mjs'
 
 export const BOUNDARY_PATH = repoPath('.claude/batch-boundary.json')
 
@@ -256,6 +259,24 @@ export function gatherBoundary(sid, { now = Date.now(), path = BOUNDARY_PATH } =
  * An unreadable claim answers "fresh session": that is what happens with no
  * honoured claim, and it is the state the old text always assumed anyway.
  */
+/**
+ * Does the board still carry a current-work card for `point` (point 470)? That
+ * decides WHICH command puts the boundary card up, and the answer must be read
+ * rather than assumed: printing `done <n> --none` for a point whose card was
+ * already archived is what left sessions with no working command at all, so they
+ * hand-edited the board file and stacked three idle cards on it.
+ *
+ * Any read failure answers false — the pointless `--none` is the one that can
+ * fail; `board.mjs none` works in both states, so it is the safe default.
+ */
+export function pointCardStanding(point, { path = repoPath(BOARD_FILE_DEFAULT) } = {}) {
+  try {
+    return nowCard(readFileSync(path, 'utf8'), point) != null
+  } catch {
+    return false
+  }
+}
+
 export function boundaryHandover({ sid = readOwnerLock()?.sessionId ?? '' } = {}) {
   let claim = { honour: false, claimantSid: null }
   try {
@@ -337,8 +358,13 @@ if (isMain) {
         'verbatim rather than writing it again. It names NO point number on purpose: it goes into the ' +
         'unnumbered gap card, where the topic guard reads every point reference as a foreign one.\n\n' +
         `${handover.card}\n\n` +
-        `  node scripts/board.mjs done ${point} --none --text-stdin   (the German goes in on stdin — a ` +
-        'Windows shell mangles the umlauts on the argument path)',
+        // The command is CHOSEN from the board's real state (point 470), never
+        // assumed: an instruction that does not work is what sent sessions to
+        // hand-edit the board file, and a hand-edit appends.
+        `  ${boundaryCardCommand({ point, pointCardStanding: pointCardStanding(point) })}   (the German ` +
+        'goes in on stdin — a Windows shell mangles the umlauts on the argument path)\n\n' +
+        'The card is a CLAIM TO STOP: once it stands, the board gate denies the next state-changing ' +
+        'call. Publishing it, the focus stamp and this boundary command are never blocked.',
     )
   }
 }
