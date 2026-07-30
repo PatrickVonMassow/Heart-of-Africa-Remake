@@ -123,6 +123,7 @@ const txtText = txt ? new TextDecoder().decode(txt.data) : ''
 check('the description file carries what the user typed', txtText.includes(DESCRIPTION))
 check('the description file names the seed and the position', /seed: \d+/.test(txtText) && /position x\/z/.test(txtText), '')
 check('the description file names the backend', txtText.includes(VERIFY_GL === 'webgpu' ? 'webgpu' : 'webgl2'))
+check('the description file names the wildlife section', /"wildlife"/.test(txtText) && /flocks within \d+, cap \d+\)/.test(txtText), txtText.split('\n').find((l) => l.includes('"wildlife"')) ?? '')
 
 // --- The state JSON carries the reproduction fields at the top ---------------
 const stateMember = members.find((m) => m.name.endsWith('.json') && !m.name.endsWith('-overlay.json'))
@@ -149,6 +150,24 @@ if (state) {
       !!state.summary?.detailLevel,
     JSON.stringify(state.summary ?? {}).slice(0, 160),
   )
+  // The wildlife section (point 454). This report is taken INSIDE the start
+  // port, where no travel scene is mounted: the section must still be there,
+  // still name its bounds, and stand empty and INACTIVE — proof that the
+  // source is cleared with the scene rather than answering from a stale herd.
+  const w = state.wildlife
+  check('the state carries a wildlife section', !!w, Object.keys(state).join(', '))
+  if (w) {
+    check(
+      'the section names its radius and its cap',
+      typeof w.bounds?.radius === 'number' && typeof w.bounds?.capPerList === 'number' && !!w.bounds?.note,
+      JSON.stringify(w.bounds ?? {}),
+    )
+    check(
+      'inside a settlement it stands empty and inactive',
+      w.active === false && w.animals.length === 0 && w.carcasses.length === 0 && !w.error,
+      `mode ${state.summary?.mode}/${state.summary?.placeId}, active ${w.active}, err ${w.error ?? '-'}`,
+    )
+  }
 }
 
 // --- The overlay list carries the HUD the picture cannot show ----------------
@@ -196,6 +215,64 @@ const closed = await page.evaluate(() => ({
 }))
 check('Esc closes the report from inside the field', closed.gone, `active: ${closed.tag}`)
 check('Esc leaves focus on no control', !['BUTTON', 'INPUT', 'TEXTAREA', 'SELECT'].includes(closed.tag), closed.tag)
+
+// --- Out in the savanna the dump SEES the wildlife (point 454) ---------------
+// Only a live run proves that the travel scene really registers its read-only
+// source; the pure layer can prove the shaping alone. Read straight off the
+// modal's JSON — the archive path is already covered above.
+await page.evaluate(() => {
+  const g = window.__game.getState()
+  g.setJournalOpen(false)
+  g.leavePlace()
+})
+await page.waitForFunction(() => window.__rivers, null, { timeout: 60000 })
+await page.evaluate(() => window.__game.getState().debugJumpTo(-2.2, 34.8)) // Serengeti savanna
+await page.waitForTimeout(2500)
+await page.keyboard.press('F6')
+await page.waitForSelector('.state-dump-json', { timeout: 5000 })
+const travelDump = await page.evaluate(() => document.querySelector('.state-dump-json')?.textContent ?? '')
+let travelWildlife = null
+try {
+  travelWildlife = JSON.parse(travelDump).wildlife
+} catch (e) {
+  check('the travel dump parses as JSON', false, String(e))
+}
+if (travelWildlife) {
+  const w = travelWildlife
+  check('the travel scene registers its wildlife source', w.active === true && !w.error, `active ${w.active}, err ${w.error ?? '-'}`)
+  check(
+    'the counts add up and the cap holds',
+    w.counts.animalsListed + w.counts.animalsOmitted === w.counts.animalsInRadius &&
+      w.counts.carcassesListed + w.counts.carcassesOmitted === w.counts.carcassesInRadius &&
+      w.animals.length <= w.bounds.capPerList &&
+      w.carcasses.length <= w.bounds.capPerList,
+    JSON.stringify(w.counts),
+  )
+  check(
+    'the savanna herds reach the report',
+    w.counts.animalsInRadius > 0 && w.animals.length > 0,
+    `${w.counts.animalsInRadius} in radius, ${w.animals.length} listed`,
+  )
+  check(
+    'every listed animal carries species, position, distance and state',
+    w.animals.length > 0 &&
+      w.animals.every(
+        (a) => !!a.species && typeof a.x === 'number' && typeof a.z === 'number' && a.dist <= w.bounds.radius && !!a.state,
+      ),
+    `e.g. ${JSON.stringify(w.animals[0] ?? null).slice(0, 140)}`,
+  )
+  check(
+    'the list is ordered nearest first',
+    w.animals.every((a, i) => i === 0 || w.animals[i - 1].dist <= a.dist),
+    w.animals.slice(0, 6).map((a) => a.dist).join(', '),
+  )
+  check(
+    'every vulture flock names the carcass it owns, or none',
+    w.flocks.every((f) => f.carcass === null || (!!f.carcass.species && typeof f.carcass.x === 'number')),
+    `${w.flocks.length} flocks`,
+  )
+}
+await page.keyboard.press('Escape')
 
 check('no console errors', errors.length === 0, errors.slice(0, 3).join(' | '))
 
