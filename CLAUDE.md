@@ -204,9 +204,15 @@ old→new coverage map live in `scripts/verify/README.md`.
   GH-Pages root builds from `main`; the `/poc/` deploy builds from the immutable
   `poc` TAG, not from main). CROSS-CUTTING changes that
   are not a single feature — guards, docs, the progress dashboard, workflow/
-  process files — are committed directly to `main` (a feature branch for each
-  would be needless ceremony). Use worktree isolation for parallel file-mutating
-  agents so their branches never collide in one tree.
+  process files — are committed directly to `main` while they stay SMALL (a
+  feature branch for each would be needless ceremony). BEYOND a small commit —
+  a new mechanism, a multi-file guard rebuild — such a change is DELEGATED to a
+  worktree agent like any point (measured 30.07.2026: of the last 60 first-parent
+  commits on `main`, 42 were main-only bookkeeping and the 9 delegable ones were
+  all small). What genuinely stays here is the ARMING in `.claude/settings.json`
+  or the git hooks, which needs an attended session, and the bookkeeping. Use
+  worktree isolation for parallel file-mutating agents so their branches never
+  collide in one tree.
 - **Feature-branch process rules (bind the workflow; verified against the
   automation 22.07.2026).**
   - `TASKS.md` is **main-only**. Feature branches NEVER edit it. New points are
