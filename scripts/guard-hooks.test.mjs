@@ -709,7 +709,10 @@ describe('the CLI half of the tooling, spawned', () => {
     const r = node([resolve(repo, 'scripts', 'point-brief.mjs'), '3'])
     expect(r.status, r.stderr).toBe(0)
     expect((r.stdout.match(/a filler line of specification prose\./g) ?? []).length).toBe(1800)
-    expect(r.stdout).toMatch(/re-run: node scripts\/point-brief\.mjs 3\s*$/)
+    expect(r.stdout).toMatch(/re-run: node scripts\/point-brief\.mjs 3\b/)
+    // The last line of the brief is the return protocol's — anchoring on the END
+    // is what proves nothing was dropped off the tail of the pipe.
+    expect(r.stdout).toMatch(/never truncate what the next session needs to know\.\s*$/)
   })
 
   it('FAILS, rather than warns, when a brief outgrows its ceiling', () => {
