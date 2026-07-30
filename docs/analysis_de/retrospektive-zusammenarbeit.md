@@ -559,6 +559,18 @@ Die Klasse ist nicht Schludrigkeit, sondern Bauart. Wer einen Befund macht, ist 
 
 ---
 
+### 3.61 Zwei Stunden erkannt, zwei Stunden nur notiert
+
+Die Nacht zum 30.07.2026 sollte zwei Arbeitspakete abarbeiten. Um 21:50 starben beide delegierten Agenten an einem Serverfehler; kurz danach fiel der Berechtigungs-Klassifizierer der Umgebung aus, und die haltende Sitzung konnte keinen Befehl mehr ausführen. Sie war nicht abgestürzt — sie stand. Um 04:19 war der Stand derselbe wie um 21:53: sechs Stunden, null Fortschritt.
+
+Der Wächter dafür existiert und hat funktioniert. Das Launcher-Protokoll zeigt ab 00:06 alle fünfzehn Minuten dieselbe Zeile: „WEDGED owner: pid alive but heartbeat 251 min old", dann 266, 281, 296, 311, 326, 341, 356, 371. Acht Feststellungen über zwei Stunden — und keine einzige Handlung. Kein Nachfolger, keine Freigabe des Locks, keine Eskalation über die eine Benachrichtigung hinaus. Davor las derselbe Launcher 221 Minuten Stille als „owner alive", weil die Schwelle für „festgefahren" bei vier Stunden liegt: länger als jede Nacht, in der es sich lohnen würde, zu retten.
+
+Das ist keine fehlende Erkennung, sondern eine **Erkennung ohne Folge** — die teuerste Sorte, weil sie sich wie Absicherung anfühlt. Und es ist die Umkehrung von §3.43: dort verschluckte eine fail-open-Hülle den Fehler, hier wird er sauber gemeldet und niemand hört zu. Erschwerend kommt hinzu, dass die haltende Sitzung genau die Instanz ist, die den Ausfall nicht bemerken kann: Sie wartet auf einen Aufruf, der nie zurückkommt, und ihre eigene Wartemeldung lief in der Zwischenzeit ab, ohne dass daraus etwas folgte.
+
+**Lehre:** Ein Zustandsurteil braucht eine Handlung, sonst ist es ein Kommentar. Wo ein Wächter „festgefahren" feststellen kann, muss dieselbe Stelle auch entscheiden dürfen — Lock freigeben und Nachfolger starten —, und die Schwelle dafür gehört an die Länge der unbeaufsichtigten Strecke, nicht an eine runde Stundenzahl. Wiederholt sich dieselbe Feststellung mehrfach, ist die Wiederholung selbst das Signal: Was achtmal gleich lautet, wird beim neunten Mal nicht wahrer, sondern teurer.
+
+---
+
 ## 4. Die Guards als Immunsystem
 
 Jedes Guard-Skript ist die geronnene Lösung eines real aufgetretenen, wiederholten Problems.
@@ -646,7 +658,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Mittwoch, 29.07.2026, 21:10 · Quellen-Fingerprint: `a3227dd27acf…`
+Zuletzt aktualisiert: Donnerstag, 30.07.2026, 04:22 · Quellen-Fingerprint: `32d22d628041…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -730,6 +742,6 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 74 Feedback-/Projekt-Memories · 37 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 18 Prozess-/Meta-TASKS-Punkte (davon 8 offen).
 
-<!-- RETRO-FINGERPRINT: a3227dd27acfceed91e4fccae7d77e6f1f5675ebfe4323365e074b4fae3dd84d -->
-<!-- RETRO-LAST-REFRESHED: 2026-07-29T19:10:04.275Z -->
+<!-- RETRO-FINGERPRINT: 32d22d62804175c8ef78115b0e7e9e39528a0a6e18f187dd65e3ef985f780f40 -->
+<!-- RETRO-LAST-REFRESHED: 2026-07-30T02:22:31.817Z -->
 <!-- AUTO-GENERATED:END -->

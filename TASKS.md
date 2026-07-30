@@ -3785,6 +3785,43 @@ it is appended.
   corpus's 235 agent-spawning turns carried no record, so the delegation pattern pays a
   `--none` per turn unless the trigger is softened.
 
+- [ ] 433. THE LAUNCHER WATCHED THE BATCH STAND STILL FOR TWO HOURS AND ONLY WROTE IT DOWN
+  (30.07.2026, a whole unattended night lost; bundle I). At 21:50 both delegated agents died
+  on a server-side 500, and moments later the environment's permission classifier went down,
+  so the owning session could not execute a single command. It had not crashed — it stood.
+  Six hours later the state was byte-for-byte what it had been at 21:53.
+  THE DETECTOR WORKED AND CHANGED NOTHING. `.claude/autostart.log` carries, every fifteen
+  minutes from 00:06, the same line — "WEDGED owner: pid alive but heartbeat 251 min old",
+  then 266, 281, 296, 311, 326, 341, 356, 371. Eight findings over two hours, no successor
+  spawned, no lock released, no escalation past the single notification. Before that the same
+  launcher read 221 minutes of silence as "owner alive", because `WEDGED_MS` is FOUR HOURS —
+  longer than any night in which a rescue would still have been worth something.
+  TARGET, and it is an EXTENSION of `scripts/batch-autostart.mjs`, not a new guard: the
+  place that can conclude "wedged" must also be allowed to act — release the lock and let
+  the successor start — because a verdict without a consequence is a comment. Three parts:
+  (a) ACT: on a wedged owner whose pid is alive but silent, take the lock (the same
+  test-and-set the singleton already uses, so two launchers can never both act) and spawn
+  the successor; the wedged process keeps running but no longer holds the batch, and its
+  next hook tells it so.
+  (b) THRESHOLD: `WEDGED_MS` drops to a value that can still save an unattended stretch —
+  propose 45 min of total silence, calibrated against the real gap between two tool calls in
+  a working session (measure it from the transcripts, do not guess), with the value and its
+  measurement written beside it.
+  (c) REPETITION IS THE SIGNAL: the same verdict logged N times in a row escalates instead
+  of repeating — what reads identically eight times is not truer the ninth, only dearer.
+  DO NOT "FIX" THIS BY MAKING THE OWNER NOTICE. The wedged session is precisely the party
+  that cannot: it is waiting on a call that never returns, and its own in-flight declaration
+  expired during the night without anything following from that either. The rescue has to
+  come from outside.
+  VERIFIABLE: pure Vitest over the launcher's decision core — a pid-alive owner silent past
+  the threshold yields TAKE-AND-SPAWN rather than a log line; the same state twice yields an
+  escalation, not a second identical verdict; a fresh heartbeat still yields skip; a dead pid
+  keeps today's path; and the take is guarded by the atomic acquire so a racing launcher
+  loses cleanly. Plus one case pinning that the in-flight declaration's EXPIRY alone never
+  triggers a take — a long verification must not be shot in the back.
+  DOCS in the same commit: `docs/batch-autonomy.md` under the launcher, and the ledger row
+  for retrospective §3.61.
+
 ## Closing (only after all points)
 
 New points are appended BEFORE this section — it stays last in the file.
