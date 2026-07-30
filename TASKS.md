@@ -4086,25 +4086,10 @@ also be taken as its own task now and then.
   grouping) count as ONE slot. Where the top bundles are not file-disjoint from each other, the
   ranking itself is adjusted so that they are — the priority order decides WHICH bundles lead,
   the disjointness decides only their arrangement among near-equals.
-  ITS VISIBLE HALF (user 30.07.2026, on seeing the grouped board): "Wo kann ich ab jetzt sehen,
-  welcher Punkt als nächstes bearbeitet wird? Das ist nicht mehr ersichtlich, oder?" — correct, and
-  the grouping caused it: before, the next point was the first card in the queue; now it is behind a
-  collapsed bundle, and once the picker draws from several bundles it is not the first card of the
-  first group either. So the board NAMES what the picker answers: at the head of the Warteschlange,
-  above the group cards, the points that would be started next — one line, as many as the pool has
-  slots, each with its number and German title. It is DERIVED from the picker, never written by hand,
-  so it cannot drift from what actually happens.
-  AND THE ASSIGNMENT, not only the order (user 30.07.2026: "Das heißt der nächste Punkt eines
-  Bündels wird mit frischem Kontext bearbeitet? Wo ist dann die Ersparnis?"). The objection is
-  correct and it refutes what docs/work-packages.md claimed: every point goes to a
-  worktree-isolated subagent with a FRESH context and a brief, and the main session hands over at
-  each point boundary — so NOTHING is carried between two points of a bundle, and the "related
-  points stay fresh" benefit did not exist. It exists only if the SAME still-running agent is
-  handed the bundle's next point, as 439 → 452 was that evening: that agent already had the module
-  in context and skipped the reading entirely. FINAL STATE for this half: when the next point of a
-  bundle touches files an agent is ALREADY working in, it goes to THAT agent as a follow-up ticket
-  rather than to a new one — it is the same decision the picker makes, so it lives in the same
-  mechanism. A new agent is spawned only when no running one holds the files.
+  THE NEXT-UP LINE IS NOT PART OF THIS POINT ANY MORE. It was added here when the queue was
+  grouped and the next point had disappeared behind a collapsed bundle; the grouping was taken back
+  out the same evening (point 472), so the first card of the flat queue names it again and a
+  separate line would only be a second place for the same fact to go stale.
   THE REUSE IS NARROW AND IT IS THE RISKY HALF (user 30.07.2026: "Das klingt riskant, weil sein
   Kontext dann noch mit den Anforderungen des vorherigen Punktes verwaessert ist." — correct, and it
   bounds the rule rather than cancelling it). CONDITIONS, all of them: reuse ONLY when the next point
