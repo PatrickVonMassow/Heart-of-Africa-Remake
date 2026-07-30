@@ -893,6 +893,22 @@ describe('the estimate helpers, on their own (point 411)', () => {
     expect(etaMinutes(null)).toBeNull()
   })
 
+  it('reads an estimate against a clock that rolled past midnight', () => {
+    const at = (meta, nowMinutes) => etaStatus({ meta, nowMinutes })
+    // Before midnight the wrapped estimate is still honest.
+    expect(at('23:40 · ~00:30', 23 * 60 + 50)).toEqual({ minutesLeft: 40, state: 'ok' })
+    // After it, five minutes PAST 00:30 — not 1435 minutes short of it.
+    expect(at('23:40 · ~00:30', 35).minutesLeft).toBe(-5)
+    expect(at('23:40 · ~00:30', 30 + ETA_GRACE_MIN + 1).state).toBe('past')
+    // The same rollover for an estimate that never wrapped.
+    expect(at('23:00 · ~23:30', 10)).toEqual({ minutesLeft: -40, state: 'past' })
+    // A clock a minute behind the card's own stamp is skew, never a rollover.
+    expect(at('10:44 · ~13:10', 10 * 60 + 43).state).toBe('ok')
+    // A meta with no start stamp cannot be rolled, so it is never called overdue.
+    expect(etaMinutes('~13:00')).toEqual({ eta: 13 * 60, start: null })
+    expect(at('~13:00', 10).state).toBe('ok')
+  })
+
   it('classifies ok / soon / past around the margin and the grace', () => {
     const at = (meta, nowMinutes) => etaStatus({ meta, nowMinutes })
     expect(at('10:00 · ~13:00', 12 * 60).state).toBe('ok')
