@@ -66,6 +66,8 @@ export const WAKE_REASONS = Object.freeze({
   ALARM: 'alarm',
   /** A live batch session owns the lock; stage 2 delivers to it within seconds. */
   OWNER_LIVE: 'owner-live',
+  /** The owner is alive but the deferral ran out of time — see `DEFERRAL_MS`. */
+  DEFER_EXPIRED: 'defer-expired',
   /** A responder spawned by this watcher is still answering. */
   RESPONDER_LIVE: 'responder-live',
   /** Someone holds an honoured claim — the user's own window, or another watcher. */
@@ -114,7 +116,9 @@ export function stampOf(value) {
  *      stops, and they bind here identically — a machine the user has stopped
  *      must not be started by a message;
  *   3. a live owner needs no waking: stage 2 hands the message to it at its next
- *      tool call, seconds away;
+ *      tool call, seconds away — UNLESS that promise has already expired
+ *      (`deferralExpired`, point 424), because the delivery happens at the owner's
+ *      next TOOL CALL and a session that declared a wait makes none;
  *   4. a responder of our own is answering already;
  *   5. an honoured claim is somebody's reservation — the window the user is
  *      sitting at, or another watcher — and spawning into it is the parallel
@@ -130,6 +134,7 @@ export function wakeDecision({
   ownerAlive = false,
   responderLive = false,
   claimHonoured = false,
+  deferralExpired = false,
 } = {}) {
   const skip = (reason) => ({ decision: 'skip', reason })
   if (!accepted) {
@@ -137,10 +142,82 @@ export function wakeDecision({
   }
   if (paused) return skip(WAKE_REASONS.PAUSED)
   if (formatAlarm) return skip(WAKE_REASONS.ALARM)
-  if (ownerAlive) return skip(WAKE_REASONS.OWNER_LIVE)
+  if (ownerAlive && !deferralExpired) return skip(WAKE_REASONS.OWNER_LIVE)
   if (responderLive) return skip(WAKE_REASONS.RESPONDER_LIVE)
   if (claimHonoured) return skip(WAKE_REASONS.CLAIM_HELD)
-  return { decision: 'spawn', reason: WAKE_REASONS.IDLE }
+  // Only the owner gate is bypassed by an expired deferral; the pause, the format
+  // alarm, our own responder and a foreign claim bind exactly as before.
+  return { decision: 'spawn', reason: ownerAlive ? WAKE_REASONS.DEFER_EXPIRED : WAKE_REASONS.IDLE }
+}
+
+// --- The deferral has a DEADLINE (point 424) -----------------------------------
+//
+// WHAT WENT WRONG. A message reached the spool at 15:31 and was still pending at
+// 16:05. The watcher had logged `skip / owner-live`, which was correct by its own
+// rule — a live owner has the context and stage 2 hands it the message. But stage
+// 2 delivers in the PostToolUse heartbeat, i.e. at the owner's next TOOL CALL, and
+// that owner had declared a wait (`batch-in-flight`) and was doing what a waiting
+// session should do: nothing. Its agent worked in a WORKTREE, whose own spool is
+// empty, so the agent's calls could not deliver it either. "Within seconds" thus
+// degraded to "whenever the owner happens to act again", in exactly the mode where
+// the user needs the channel most: a long delegated build, the user on the phone.
+//
+// WHY AGE IS THE RIGHT TRIGGER. A session that is genuinely working produces tool
+// calls and collects the message within seconds, so its messages never GET old —
+// the deadline can only fire on a session that is idle or waiting, which is the
+// case the fix is for. No declaration has to be read, and nothing has to be
+// trusted about what the owner claims to be doing.
+
+/** How long a message may sit pending under "the live owner will get it" before
+ *  the watcher takes it anyway. Calibratable — `HOA_CHAT_DEFER_MS` in the
+ *  wrapper. Three minutes is short enough that a phone reader still reads it as
+ *  an answer, and long enough that an ordinarily busy owner always wins the race
+ *  (its heartbeat delivers within seconds). */
+export const DEFERRAL_MS = 3 * 60 * 1000
+
+/**
+ * HOW LONG HAS THIS MESSAGE BEEN WAITING? PURE. NaN when it cannot be told.
+ *
+ * The clock is the SPOOLED `receivedAt` — the moment the poll accepted the
+ * message — falling back to the sender's `ts`, which is what
+ * `pendingSinceHandover` and `orderMessages` already key on. Reading the file's
+ * mtime or the watcher's own uptime instead would let a restarted watcher reset
+ * the clock and defer the same message for another full window, forever.
+ */
+export function pendingAgeMs(message, now) {
+  // `stampOf` per candidate, never `Number(a ?? b)` — see the note on `stampOf`:
+  // `Number(null)` is 0, so a message with NEITHER stamp would read as sent at
+  // the epoch and be overdue by fifty-five years, which is the one direction this
+  // function must never fail in.
+  const received = stampOf(message?.receivedAt)
+  const at = Number.isFinite(received) ? received : stampOf(message?.ts)
+  const clock = stampOf(now)
+  if (!Number.isFinite(at) || !Number.isFinite(clock)) return NaN
+  return clock - at
+}
+
+/**
+ * WHICH PENDING MESSAGES HAVE OUTLIVED THE DEFERRAL? PURE.
+ *
+ * `wokenIds` are the messages this watcher already handed to a responder. They
+ * are excluded, so a responder that answered nothing leaves its messages pending
+ * (deliberately, see `ackPlan`) without the sweep waking a fresh responder for
+ * them every window — the user would be answered once and asked about it forever.
+ * A message the owner consumed in between is not in `pending` at all any more: the
+ * consume is a RENAME out of the pending directory.
+ *
+ * A message with no readable timestamp is NOT overdue: not waking is the safe
+ * direction here, because the owner path still holds for it.
+ */
+export function sweepPlan({ pending = [], now = null, windowMs = DEFERRAL_MS, wokenIds = [] } = {}) {
+  const limit = Number.isFinite(windowMs) && windowMs >= 0 ? windowMs : DEFERRAL_MS
+  const woken = new Set(Array.isArray(wokenIds) ? wokenIds.filter(Boolean) : [])
+  const overdue = (Array.isArray(pending) ? pending : []).filter((m) => {
+    if (!m || typeof m.id !== 'string' || m.id === '' || woken.has(m.id)) return false
+    const age = pendingAgeMs(m, now)
+    return Number.isFinite(age) && age >= limit
+  })
+  return { overdue, windowMs: limit }
 }
 
 // --- The claim the responder runs under ---------------------------------------

@@ -847,8 +847,23 @@ anything anywhere. Where that mirror is still open, the section renders a
 localized "the chat needs the web board" notice instead of a dead input.
 
 **What it guarantees, in each mode.** A message reaches a RUNNING session within
-**seconds** — at its next tool call — and it reaches an IDLE machine within
-**seconds** too, because the watcher below wakes a responder for it. The
+**seconds** — at its next tool call, *while it makes tool calls* — and it reaches
+an IDLE machine within **seconds** too, because the watcher below wakes a
+responder for it. The "at its next tool call" half is only a bound while the
+session is actually acting, and that had to be made true rather than assumed
+(point 424): a session that has DECLARED A WAIT makes no tool calls, and its
+delegated agent works in a worktree whose own spool is empty, so a message left to
+it waited 34 minutes under a correctly logged `skip / owner-live`. The deferral
+therefore has a DEADLINE. The watcher re-reads the pending spool on its own clock
+and anything older than `DEFERRAL_MS` (3 minutes, calibratable via
+`HOA_CHAT_DEFER_MS`) is decided again with the owner gate lifted — it wakes a
+responder as it would for an idle machine, under the same bounded claim. Age is
+the trigger and no declaration is read: a session that is genuinely working
+collects the message within seconds, so its messages never get old, and the
+deadline can only fire on one that is idle or waiting. The age is measured from
+the SPOOLED `receivedAt`, so a restarted watcher cannot reset the clock, and a
+message already handed to a responder is never handed again — one answer, not one
+per window. The
 launcher's 15-minute tick is now only the BACKSTOP: it is what still delivers if
 the watcher is down, and it is what brings the watcher back. The first two bounds
 come from reusing something that already runs (the launcher ticks and already
@@ -858,6 +873,7 @@ already runs on every tool call); the third costs one open connection.
 | the machine is… | who delivers | bound |
 |---|---|---|
 | running a batch session | the PostToolUse hook, from the local spool | seconds |
+| a session that owns the batch but WAITS (no tool calls) | nobody at first; past `DEFERRAL_MS` the watcher wakes a responder anyway | ≤ ~4 min |
 | idle, watcher up | the watcher wakes a light responder | seconds |
 | idle, watcher down | the next launcher tick spawns a session with the message in its prompt | ≤ 15 min |
 | paused by the user | nobody — the message is spooled and waits for the go | until resumed |

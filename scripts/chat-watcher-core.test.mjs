@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   CLAIM_BY,
   CLAIM_SESSION_PREFIX,
+  DEFERRAL_MS,
   RECONNECT_MAX_MS,
   VERIFICATION_REASONS,
   WAKE_REASONS,
@@ -10,9 +11,11 @@ import {
   adoptDecision,
   buildResponderPrompt,
   claimIsOurs,
+  pendingAgeMs,
   reconnectDelayMs,
   responderClaim,
   stampOf,
+  sweepPlan,
   wakeDecision,
   watcherSupervision,
 } from './chat-watcher-core.mjs'
@@ -83,6 +86,96 @@ describe('wakeDecision — a message wakes a responder only into a genuinely idl
   })
 })
 
+// Point 424 — measured on the live state: a message reached the spool at 15:31
+// and was still pending at 16:05 under a correctly logged `skip / owner-live`.
+// Stage 2 delivers at the owner's next TOOL CALL, and the owner had declared a
+// wait, so it made none. The deferral therefore has a deadline.
+describe('the deferral has a deadline — a live owner may not sit on a message for ever', () => {
+  const aged = (ms, over = {}) => ({ id: `m-${ms}`, ts: 1_700_000_000_000, receivedAt: 1_700_000_000_000, ...over })
+  const NOW = 1_700_000_000_000
+
+  it('still skips for a live owner while the message is YOUNG — unchanged behaviour', () => {
+    const plan = sweepPlan({ pending: [aged(0)], now: NOW + 60_000, windowMs: DEFERRAL_MS })
+    expect(plan.overdue).toEqual([])
+    expect(wakeDecision({ ...ok, ownerAlive: true, deferralExpired: false })).toEqual({
+      decision: 'skip',
+      reason: WAKE_REASONS.OWNER_LIVE,
+    })
+  })
+
+  it('takes the message once it has outlived the window, and says why', () => {
+    const plan = sweepPlan({ pending: [aged(0)], now: NOW + DEFERRAL_MS, windowMs: DEFERRAL_MS })
+    expect(plan.overdue).toHaveLength(1)
+    expect(wakeDecision({ ...ok, ownerAlive: true, deferralExpired: true })).toEqual({
+      decision: 'spawn',
+      reason: WAKE_REASONS.DEFER_EXPIRED,
+    })
+  })
+
+  it('reads the age from the SPOOLED receivedAt, so a restarted watcher cannot reset the clock', () => {
+    expect(pendingAgeMs({ receivedAt: NOW }, NOW + 5000)).toBe(5000)
+    // The sender's clock is the fallback, and only that.
+    expect(pendingAgeMs({ ts: NOW }, NOW + 5000)).toBe(5000)
+    // An unreadable stamp is NOT overdue: not waking is the safe direction, the
+    // owner path still holds for it.
+    for (const bad of [{}, { receivedAt: null, ts: null }, { receivedAt: 'gestern' }, null]) {
+      expect(Number.isNaN(pendingAgeMs(bad, NOW))).toBe(true)
+    }
+    expect(sweepPlan({ pending: [{ id: 'x' }], now: NOW, windowMs: 0 }).overdue).toEqual([])
+  })
+
+  it('does not take a message the owner consumed in between — it left the pending set', () => {
+    // Consuming is a RENAME out of the pending directory, so the sweep simply
+    // never sees it again.
+    expect(sweepPlan({ pending: [], now: NOW + DEFERRAL_MS, windowMs: DEFERRAL_MS }).overdue).toEqual([])
+  })
+
+  it('never wakes twice for the same message, however long it stays pending', () => {
+    const pending = [aged(0)]
+    const first = sweepPlan({ pending, now: NOW + DEFERRAL_MS, windowMs: DEFERRAL_MS })
+    expect(first.overdue.map((m) => m.id)).toEqual(['m-0'])
+    const again = sweepPlan({
+      pending,
+      now: NOW + 10 * DEFERRAL_MS,
+      windowMs: DEFERRAL_MS,
+      wokenIds: first.overdue.map((m) => m.id),
+    })
+    expect(again.overdue).toEqual([])
+  })
+
+  it('lifts ONLY the owner gate — the pause, the alarm, our responder and a foreign claim still bind', () => {
+    const expired = { ...ok, ownerAlive: true, deferralExpired: true }
+    expect(wakeDecision({ ...expired, paused: true }).reason).toBe(WAKE_REASONS.PAUSED)
+    expect(wakeDecision({ ...expired, formatAlarm: true }).reason).toBe(WAKE_REASONS.ALARM)
+    expect(wakeDecision({ ...expired, responderLive: true }).reason).toBe(WAKE_REASONS.RESPONDER_LIVE)
+    expect(wakeDecision({ ...expired, claimHonoured: true }).reason).toBe(WAKE_REASONS.CLAIM_HELD)
+    expect(wakeDecision({ ...expired, accepted: false, dropReason: 'bad-signature' }).reason).toBe('bad-signature')
+  })
+
+  it('spawns under the SAME bounded claim, with its expiry untouched', () => {
+    const now = Date.parse('2026-07-29T14:00:00Z')
+    const claim = responderClaim({
+      sessionId: `${CLAIM_SESSION_PREFIX}-x`,
+      watcherPid: process.pid,
+      watcherStartedAt: now - 1000,
+      responderPid: 4242,
+      now,
+    })
+    expect(claim.by).toBe(CLAIM_BY)
+    const probe = (pid) => (pid === process.pid ? { exists: true, startedAt: now - 1000 } : { exists: false })
+    expect(assessClaim({ claim, now: now + 60_000, maxAgeMs: 30 * 60 * 1000, probePid: probe }).honour).toBe(true)
+    expect(assessClaim({ claim, now: now + 31 * 60 * 1000, maxAgeMs: 30 * 60 * 1000, probePid: probe }).honour).toBe(
+      false,
+    )
+  })
+
+  it('is total, and a nonsense window falls back to the default rather than to zero', () => {
+    expect(sweepPlan()).toEqual({ overdue: [], windowMs: DEFERRAL_MS })
+    expect(sweepPlan({ pending: [aged(0)], now: NOW + 1000, windowMs: 'gleich' }).overdue).toEqual([])
+    expect(sweepPlan({ pending: null, now: NOW, wokenIds: null }).overdue).toEqual([])
+  })
+})
+
 describe('the dry run maps to exactly the same decisions', () => {
   // The dry run is not a second code path: it takes the SAME gathered state
   // through the SAME function and only withholds the action. So the mapping it
@@ -91,6 +184,7 @@ describe('the dry run maps to exactly the same decisions', () => {
   const cases = [
     [{ ...ok }, 'spawn', WAKE_REASONS.IDLE],
     [{ ...ok, ownerAlive: true }, 'skip', 'owner-live'],
+    [{ ...ok, ownerAlive: true, deferralExpired: true }, 'spawn', 'defer-expired'],
     [{ ...ok, claimHonoured: true }, 'skip', 'claim-held'],
     [{ ...ok, paused: true }, 'skip', 'paused'],
     [{ ...ok, formatAlarm: true }, 'skip', 'alarm'],
