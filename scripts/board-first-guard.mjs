@@ -31,7 +31,7 @@ import {
   mergeState,
   sha256File,
 } from './dashboard-state.mjs'
-import { heldByOtherLiveOwner, withdrawHandover, touchHandover } from './batch-singleton.mjs'
+import { heldByOtherLiveOwner, withdrawHandover, touchHandover, renewLease } from './batch-singleton.mjs'
 import { handoverSurvivesCall, describeWithdrawalTrigger, hookCallTimestamp } from './batch-boundary-core.mjs'
 import { publishCapability } from './board-currency-core.mjs'
 import { evaluate } from './board-first-core.mjs'
@@ -94,6 +94,25 @@ try {
     process.exit(0)
   }
   if (!payload) process.exit(0)
+  // PIGGY-BACKED FIRST, and it must be first: RENEW THE BATCH LEASE before the
+  // tool runs (point 434, docs/batch-resilience.md §3 layer 1). The lease is what
+  // makes ownership end by arithmetic, and it is renewed HERE — in PreToolUse —
+  // rather than in the PostToolUse heartbeat, because that one fires when a call
+  // RETURNS: a lease renewed there would have to outlive the longest single call,
+  // and this repository legitimately runs 30-40 minute suites. Renewing before the
+  // long call is exactly what keeps a running verification from being taken over
+  // mid-run (docs/batch-resilience.md §5: "no window that kills a running
+  // verification — that is what PreToolUse renewal is for").
+  //
+  // It rides in this hook for the same reason the handover withdrawal below does:
+  // .claude/settings.json is a protected path an unattended session cannot extend,
+  // and this matcher already covers every state-changing tool. Owner-guarded,
+  // rate-limited and never throwing — `renewLease` reports rather than raises.
+  try {
+    renewLease(payload.session_id || '')
+  } catch {
+    /* a lease we cannot write costs the owner its window at worst; never a call */
+  }
   // PIGGY-BACKED, and deliberately: WITHDRAW a batch handover before the tool
   // runs (point 388). If this session marked the lock handed-over at a boundary
   // and is nevertheless about to act — a later Stop hook blocked the turn end,

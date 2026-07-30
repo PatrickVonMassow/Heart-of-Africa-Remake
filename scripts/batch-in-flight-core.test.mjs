@@ -40,14 +40,11 @@ import {
 import {
   assessOwner,
   progressGuardDecision,
-  spawnDecision,
   statePathsFor,
   probePid,
   LOCK_PATH,
   IN_FLIGHT_PATH,
-  LAUNCHER_TICK_MS,
   PID_START_TOLERANCE_MS,
-  WORK_STALL_MS,
 } from './batch-singleton.mjs'
 import {
   absPath,
@@ -617,43 +614,6 @@ describe('assessOwnerWork → assessOwner: a totally frozen session really is re
     return out
   }
 
-  it('IS REACHABLE AT ALL — the freeze is caught, and near the stall bound, not hours later', () => {
-    const hits = stalledMinutes()
-    expect(hits.length, 'work-stalled never fires on the real pipeline — the feature is dead code').toBeGreaterThan(0)
-    // First fire at the stall bound (the heartbeat trails the declaration by 5 s,
-    // so it crosses one minute later), and long before the four-hour valve.
-    expect(hits[0]).toBe(Math.round(WORK_STALL_MS / 60_000) + 1)
-    // …and well inside the window the launcher honours the declaration for. It used
-    // to be compared against WEDGED_MS, which point 433 dropped to 45 minutes so an
-    // unattended night could be rescued; the window this must clear is the
-    // launcher's own, which was written out for exactly that reason.
-    expect(hits[0] * 60_000).toBeLessThan(LAUNCHER_WORK_MAX_AGE_MS)
-    const t = tick(hits[0])
-    expect(t.verdict).toMatchObject({ alive: true, wedged: true, reason: 'work-stalled' })
-    expect(spawnDecision(t.verdict)).toBe('skip-wedged')
-    // The launcher can say WHAT froze, not merely that something did.
-    expect(t.work.summary).toMatch(/feat\/402-progress-not-age/)
-    expect(t.work).toMatchObject({ declared: true, advancing: false, declaredAt: DECLARED_AT })
-  })
-
-  it('…AND REACHABLE ON A 15-MINUTE TICK: no phase of the schedule can step over the band', () => {
-    // Non-empty is not the same as reachable. `WORK_STALL_MS +
-    // WORK_DECLARATION_TOLERANCE_MS` — the minimum that makes the window exist —
-    // opens a band barely two minutes wide, and the launcher looks once per
-    // LAUNCHER_TICK_MS: seven schedules in eight would miss it and fall through to
-    // the four-hour valve, which IS the reported bug. So every possible phase of
-    // the tick schedule must hit the band.
-    const hits = new Set(stalledMinutes())
-    const tickMin = Math.round(LAUNCHER_TICK_MS / 60_000)
-    for (let phase = 0; phase < tickMin; phase++) {
-      const seen = []
-      for (let m = phase; m <= 300; m += tickMin) if (hits.has(m)) seen.push(m)
-      expect(seen.length, `a launcher ticking at phase ${phase} min never sees the stall`).toBeGreaterThan(0)
-    }
-    // Stated as the invariant, so a future narrowing of the window fails here too.
-    expect(LAUNCHER_WORK_MAX_AGE_MS - WORK_STALL_MS).toBeGreaterThanOrEqual(2 * LAUNCHER_TICK_MS)
-  })
-
   it('THE REGRESSION WITNESS: asked with the GUARD’s window, the same freeze is never stalled', () => {
     // This is the bug, reproduced. `IN_FLIGHT_MAX_AGE_MS` is the right answer to
     // the guard's question ("may a turn end ride on this?") and the wrong one to
@@ -670,7 +630,9 @@ describe('assessOwnerWork → assessOwner: a totally frozen session really is re
       const now = T0 + m * 60_000
       reasons.add(tick(m, { probes: { ...dead, refTipAt: () => now - 60_000 } }).verdict.reason)
     }
-    expect(reasons).toEqual(new Set(['fresh-heartbeat', 'work-advancing']))
+    // `work-advancing` was one of the removed verdicts (point 434): the assertion
+    // now names only what must still never be said.
+    expect(reasons.has('work-stalled')).toBe(false)
   })
 
   it('and a heartbeat that POSTDATES the declaration still disarms the verdict entirely', () => {
@@ -682,7 +644,9 @@ describe('assessOwnerWork → assessOwner: a totally frozen session really is re
 
   it('and no evidence may revive a DEAD process, whatever the paperwork says', () => {
     const now = T0 + 120 * 60_000
-    const l = lock()
+    // `leaseUntil` so the LEASE does not decide first (point 434): the assertion
+    // below is about the pid, and only the pid.
+    const l = lock({ leaseUntil: now + 60 * 60_000 })
     const work = assessOwnerWork({ declaration: frozen, lock: l, now, ...dead, refTipAt: () => now - 60_000 })
     expect(work.advancing).toBe(true)
     const v = assessOwner(l, { now, bootTime: BOOT, probe: { exists: false, startedAt: null }, work })
