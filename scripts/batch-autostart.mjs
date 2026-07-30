@@ -66,6 +66,7 @@ import {
   spawnBackoffMs,
 } from './batch-autostart-core.mjs'
 import { repoRepairAllowed, repoRepairDecision } from './batch-doctor-core.mjs'
+import { clearMandateMarker, writeMandateMarker } from './batch-doctor-states.mjs'
 import { WATCHER_PID_FILE, watcherSupervision } from './chat-watcher-core.mjs'
 import { SECRET_FAULT } from './chat-secret.mjs'
 import { chatInboxLogLines } from './chat-core.mjs'
@@ -574,7 +575,12 @@ if (!preflight.ok) {
 // unattended fortnight, so the successor starts and is TOLD. The alert is throttled
 // as the standing condition it is, and `failCount` stays untouched — a torn tree is
 // not a broken environment.
-const repaired = repoRepairAllowed(assessment.reason)
+// (g) THE LEASE NO LONGER SHADOWS A PROVABLY DEAD PID (point 443). `assessOwner`
+// tests the expired lease BEFORE it probes the pid, so an owner that is BOTH dead
+// and lease-expired — the machine slept, the launcher was off for an hour, the
+// likely shape of an unattended fortnight — read `lease-expired` and its tree went
+// unmended for nothing. `repoRepairAllowed` now consults the probe on that branch.
+const repaired = repoRepairAllowed(assessment.reason, { probe, lock })
 const repo = runRepoDoctor(repaired)
 const repoVerdict = repoRepairDecision({ ...repo, repaired })
 log(`repo check before spawn: ${repoVerdict.reason}${repo.ran ? ` (batch-doctor exit ${repo.code}${repaired ? ', --repair' : ', read-only'})` : ''}`)
@@ -591,9 +597,9 @@ if (repoVerdict.alert) {
   // expiry keeps the next, CLEAN tick from handing a false "repo not clean" to a
   // healthy successor — and that expiry equals the tick interval, i.e. about a
   // minute of margin. One deletion closes the class instead of leaning on timing.
-  rmSync(C('repo-mandate.json'), { force: true })
+  clearMandateMarker({ path: C('repo-mandate.json') })
 }
-if (repoVerdict.mandate) writeJsonAtomic(C('repo-mandate.json'), { at: now, code: repo.code ?? null, reason: repoVerdict.reason })
+if (repoVerdict.mandate) writeMandateMarker({ path: C('repo-mandate.json'), at: now, code: repo.code ?? null, reason: repoVerdict.reason })
 
 /** Run the doctor and report how it went. `write` false keeps it to its read-only
  *  levels. Never throws: an unrunnable doctor is reported as such and decided
@@ -670,7 +676,12 @@ if (!exe) {
   release(launcherSid)
   log('FAIL: no bundled claude.exe found')
   await notify('claude.exe missing', 'The autostart launcher could not find the bundled claude.exe — resurrection is down.', 'urgent')
-  process.exit(1)
+  // `bail`, not a bare exit (point 443 (h)). Everything this tick learned would
+  // otherwise be thrown away — including `state.repoAlertAt`, which was set MINUTES
+  // ago above. Losing it means the repo alert fires again at the very next tick,
+  // and it is a STANDING condition: an already-alarming mode would then push a
+  // second, unthrottled alarm every quarter of an hour for the whole absence.
+  bail(1)
 }
 
 // Self-heal trust so a headless -p honours the allow-list (idempotent).
@@ -719,7 +730,7 @@ try {
   release(launcherSid)
   log(`FAIL: could not spawn claude (${e && e.message})`)
   await notify('Spawn failed', `Could not launch claude.exe: ${e && e.message}`, 'urgent')
-  process.exit(1)
+  bail(1) // same reason as the missing-exe path above (point 443 (h))
 }
 // Rebind the pending lock to the child so the singleton's liveness follows the
 // spawned process, and the spawned session may convert it to itself (pid-bound).
