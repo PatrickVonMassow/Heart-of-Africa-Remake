@@ -3552,6 +3552,21 @@ it is appended.
   documented command can produce what the guard demands. VERIFIABLE in the pure layer: a
   two-paragraph text yields two `<p>` elements, a single-paragraph one yields exactly one, and
   no card text can reach the file with a bare blank line inside a tag.
+  AND THE ESTIMATE IS EXEMPTED INTO INVISIBILITY (user 30.07.2026: "Die aktuelle Karte hat
+  keine geschätzte Endzeit. Wird das nicht per Mechanismus zugesichert?"). Two halves, both the
+  silent-fallback shape this point is about. (1) `auditDashboard` DOES demand a `~<n> h`
+  estimate on every queue card — and accepts `QUEUE_STUB_META` ("Schätzung offen") by name, so
+  an unestimated card passes forever; sixteen appended points sat in that hole at once, and
+  nothing said so. The stub stays legitimate for a point nobody has looked at yet, but it is
+  REPORTED like the untranslated title, with its point numbers and the command that fixes it —
+  and no CLI could set an estimate at all (only the promote path), so `board-queue.mjs` gains
+  `--estimate` beside its `--title`. (2) The NOW-card renders only its start time: the estimate
+  sits in the queue entry and is not carried across, so a card in active work shows no expected
+  end. It must carry it, and a promoted card with no estimate is reported rather than rendered
+  bare. VERIFIABLE in the pure layer: a queue card with the stub marker is reported with its
+  number while still passing the audit; `--estimate` writes without disturbing title or body; a
+  promoted now-card renders its queue estimate beside the start time; a promotion without one
+  is reported.
   DOCS in the same commit: `docs/batch-autonomy.md` where the board commands are listed.
 
 - [ ] 440. WHAT ELSE IS BILLED ON EVERY TURN FOR NOTHING — A MEASURED INVENTORY (user
