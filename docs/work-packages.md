@@ -27,7 +27,7 @@ compared it against the work order. Hence the property to preserve:
 | F | Animal behaviour | 264, 265, 269, 312, 362, 363, 364, 414 |
 | G | Carrion, vultures, staging | 319, 322, 326, 327, 328, 336 |
 | H | Chat and board | 308, 410, 411, 416, 421, 423, 424, 430 |
-| I | Session, pool and repo hygiene | 329, 373, 396, 399, 401, 409, 426, 427, 429, 431 |
+| I | Session, pool and repo hygiene | 329, 373, 396, 399, 401, 409, 426, 427, 429, 431, 433 |
 | J | Model and guard chain | 297, 298, 306, 309, 331, 355, 397, 425, 432 |
 | K | Test and verification infrastructure | 200, 295, 330, 387, 418 |
 | L | Docs and knowledge transfer | 303, 333, 422 |
