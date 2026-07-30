@@ -27,28 +27,20 @@ export const ENFORCER_RE = /^(?!.*-core\.)([a-z0-9-]+-(?:guard|gate|hook))\.mjs$
  * An entry here is a DECISION on the record; an empty reason is not accepted,
  * so "park it quietly" is not available as an escape.
  */
-export const INTENTIONALLY_DORMANT = {
-  // Point 432, 29.07.2026. The guard is finished and Vitest-covered, but
-  // wiring it means editing .claude/settings.json, which ALWAYS raises a
-  // permission prompt — attended work by definition, and it was built during
-  // an unattended night. Dormant on purpose and for exactly one reason: the
-  // hook line is missing. Remove this entry in the same commit that adds it.
-  'findings-guard.mjs':
-    'built and tested; the Stop-hook wiring in .claude/settings.json needs the user attended (protected path)',
-  // Point 421, 29.07.2026 — the same one reason as above, not a second kind of
-  // exception: the guard, its pure core and its Vitest cases are finished, and
-  // the only thing missing is the Stop-hook line in .claude/settings.json, which
-  // always raises a permission prompt and so cannot be added unattended. Remove
-  // this entry in the same commit that adds the line.
-  'decision-card-guard.mjs':
-    'built and tested; the Stop-hook wiring in .claude/settings.json needs the user attended (protected path)',
-  // Point 409, 29.07.2026. Same one reason as above and no other: the decision
-  // core is pure and Vitest-covered and `--status` runs, but the Stop-hook line
-  // lives in .claude/settings.json, which always prompts. Remove this entry in
-  // the same commit that adds the hook.
-  'branch-hygiene-guard.mjs':
-    'built and tested; the Stop-hook wiring in .claude/settings.json needs the user attended (protected path)',
-}
+// EMPTY SINCE 30.07.2026, and the way it emptied is the point. All three entries
+// carried the SAME one reason — the Stop-hook line lives in
+// `.claude/settings.json`, a protected path that always raises a permission
+// prompt, so none of them could be wired by the unattended night that built them.
+// They sat dormant for a day: finished, tested, and enforcing nothing. What ended
+// it was a user question ("und das ist eine Garantie?"), not a mechanism, which is
+// the lesson to keep — a guard the corpus KNOWS is dormant is still a guard that
+// does not guard, and the record of the reason is not a substitute for the wiring.
+// The three were wired together the moment the user was attended.
+//
+// The map stays: an enforcer may be dormant on the record, never quietly. An entry
+// without a written reason is refused, so "park it" is not available as an escape,
+// and the entry must be removed in the same commit that adds the hook line.
+export const INTENTIONALLY_DORMANT = {}
 
 /**
  * Enforcers known to lack a tested decision core, recorded 25.07.2026. This is
