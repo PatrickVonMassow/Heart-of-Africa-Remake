@@ -3604,25 +3604,6 @@ it is appended.
   viewport: type into the chat, wait out two refresh ticks, and the caret and the scroll
   position are still where they were.
 
-- [ ] 442. THE DOCTOR RUNS BEFORE THE SUCCESSOR, NOT AFTER THE DAMAGE (user 30.07.2026: "Ein
-  Ausfall eines Elements kann zu jedem beliebigen Zeitpunkt passieren — auch mitten in einer
-  kritischen Aktion. Davon musst du dich immer selbstständig erholen können"; bundle
-  Urlaubsfestigkeit). `scripts/batch-doctor-core.mjs` already detects the right things — a
-  half-done merge (`MERGE_HEAD`), conflict markers, a dirty tree, divergence from
-  `origin/main`, a TASKS.md that no longer parses — and grades every remedy `auto` / `repair`
-  / `alert`. NOBODY CALLS IT BEFORE A SPAWN: `scripts/batch-autostart.mjs` mentions the doctor
-  only in a message to a stood-down session, so a successor is started INTO the torn tree and
-  has to notice by itself. That is judgment where a mechanism belongs.
-  (a) The launcher runs the doctor's `auto` + `repair` levels BEFORE every spawn and starts
-  only on a consistent verdict; an `alert` state is logged, alerted (`scripts/notify.mjs`) and
-  retried on the next tick rather than parked.
-  (b) The successor refuses to work while the verdict is not consistent — the same check from
-  the other side of the seam, in `scripts/batch-resume-hook.mjs`.
-  VERIFIABLE: a Vitest case per branch of the spawn decision (consistent → spawn; repairable →
-  repair then spawn; alert → no spawn, alert sent, next tick retries) plus a live drill that
-  leaves a `MERGE_HEAD` behind, runs one launcher tick, and asserts the tree is clean and the
-  successor ran.
-
 - [ ] 443. THE TORN STATES THE DOCTOR DOES NOT YET KNOW (30.07.2026, same user demand as 442;
   bundle Urlaubsfestigkeit). A kill during a critical action leaves more behind than a half
   merge. Extend the doctor's state model and its remedy plan by, each with its own detection
@@ -3635,6 +3616,18 @@ it is appended.
   from `HEAD` (it is versioned; `tasksParses` already detects the damage but nothing repairs
   it); (e) a stale pending-spawn lock; (f) a half-published board (the local file newer than
   the published page — `scripts/board-publish.mjs` re-runs).
+  (g) THE LEASE SHADOWS A PROVABLY DEAD PID (four-eyes re-review of the pre-spawn check,
+  30.07.2026). `assessOwner` checks the expired lease BEFORE the pid probe, so an owner that
+  is BOTH dead and lease-expired — the machine slept, the launcher was off for an hour, i.e.
+  the likely shape of an unattended fortnight — reads `lease-expired`, and the launcher
+  therefore declines to mend its tree even though the process is provably gone. The successor
+  still inherits the repair through the mandate, so this is the safe direction and never stops
+  the batch; the improvement is to let the lease-expired branch consult the pid probe and allow
+  the write once the process is gone.
+  (h) Persist the launcher state on the two `process.exit(1)` failure paths after the repo
+  alert was recorded (a missing claude.exe, a spawn that threw), so a repo alert cannot slip
+  past its own throttle in an already-alarming mode; and cover the mandate marker's one-shot,
+  expiry and false-mandate mechanics with tests — they live in untested wiring today.
   THE PRINCIPLE, to be written into `docs/batch-autonomy.md`: every critical action is a
   transaction with an idempotent cleanup step, and that step runs at every start BEFORE any
   work — never "the session remembers to".

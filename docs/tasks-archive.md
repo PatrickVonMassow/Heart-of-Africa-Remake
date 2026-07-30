@@ -13110,3 +13110,22 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   DOCS in the same commit: `docs/batch-autonomy.md` under the launcher and the session
   lifecycle, CLAUDE.md §6 where the singleton and the context boundary are described, and the
   ledger row for retrospective §3.61.
+
+- [x] 442. THE DOCTOR RUNS BEFORE THE SUCCESSOR, NOT AFTER THE DAMAGE (user 30.07.2026: "Ein
+  Ausfall eines Elements kann zu jedem beliebigen Zeitpunkt passieren — auch mitten in einer
+  kritischen Aktion. Davon musst du dich immer selbstständig erholen können"; bundle
+  Urlaubsfestigkeit). `scripts/batch-doctor-core.mjs` already detects the right things — a
+  half-done merge (`MERGE_HEAD`), conflict markers, a dirty tree, divergence from
+  `origin/main`, a TASKS.md that no longer parses — and grades every remedy `auto` / `repair`
+  / `alert`. NOBODY CALLS IT BEFORE A SPAWN: `scripts/batch-autostart.mjs` mentions the doctor
+  only in a message to a stood-down session, so a successor is started INTO the torn tree and
+  has to notice by itself. That is judgment where a mechanism belongs.
+  (a) The launcher runs the doctor's `auto` + `repair` levels BEFORE every spawn and starts
+  only on a consistent verdict; an `alert` state is logged, alerted (`scripts/notify.mjs`) and
+  retried on the next tick rather than parked.
+  (b) The successor refuses to work while the verdict is not consistent — the same check from
+  the other side of the seam, in `scripts/batch-resume-hook.mjs`.
+  VERIFIABLE: a Vitest case per branch of the spawn decision (consistent → spawn; repairable →
+  repair then spawn; alert → no spawn, alert sent, next tick retries) plus a live drill that
+  leaves a `MERGE_HEAD` behind, runs one launcher tick, and asserts the tree is clean and the
+  successor ran.
