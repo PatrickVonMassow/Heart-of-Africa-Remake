@@ -359,6 +359,36 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Jeder Rückfall auf einen Ersatzwert wird **gemeldet**, dort wo er greift, mit
   dem Befehl, der ihn behebt. Nach außen geht der **sprechende Name**, nie das Kürzel."
 
+- **Die Gegenprüfung wurde angestoßen, nie abgeschlossen.** Der Helfer startet das Review
+  im Hintergrund und ist fertig, bevor das Urteil zurückkommt — das Urteil landet bei
+  niemandem. Der Zweig sieht geprüft aus: Es *gab* ein Review, nur war keiner da, der die
+  Funde umsetzt. Ein aufgezeichnetes „nicht zusammenführen" wirkt dabei wie ein Haken.
+  → *Prompt:* „Wer eine Gegenprüfung beauftragt, bleibt dran, bis sie da ist. Und lass ein
+  Urteil das Tor nur öffnen, wenn es **zustimmt** — ein ‚nicht zusammenführen' oder ‚mit
+  Korrekturen' ist erst durch ein **späteres** Urteil über den **korrigierten** Stand
+  erledigt, nicht durch seine bloße Existenz."
+
+- **Der Test ist nur in seiner eigenen Arbeitskopie grün.** Arbeiten mehrere Helfer
+  parallel, bekommt jeder eine eigene Kopie des Projekts — und alles, was *nicht* im
+  Projekt liegt (lokale Dateien, Zugänge, Laufzeitzustand), fehlt dort. Ein Test, der
+  echte Pfade liest, misst dann seine Umgebung statt des Verhaltens und kippt genau beim
+  Zusammenführen.
+  → *Prompt:* „Jeder Test bekommt seine Pfade **eingespritzt**, statt sie sich selbst zu
+  suchen. Die Frage vor dem Abgeben lautet nicht ‚ist er grün?', sondern ‚wäre er auch im
+  **Hauptstand** grün, mit allem, was dort liegt und in einer Arbeitskopie fehlt?'"
+
+- **Der Ausfall kommt nie an der bequemen Stelle.** Strom, Netz, Dienst — irgendetwas
+  bricht, und zwar mitten in einer Aktion: mitten im Zusammenführen, mitten im Hochladen.
+  Am tückischsten sind Abläufe mit **zwei Hälften**, deren zweite bei der Gegenseite liegt:
+  Fällt sie zwischen beiden aus, meldet jede Seite für sich korrektes Verhalten, und das
+  Ganze ist trotzdem verloren.
+  → *Prompt:* „Behandle jede kritische Aktion als Vorgang mit einem **wiederholbaren
+  Aufräumschritt**, der bei *jedem* Start läuft, bevor gearbeitet wird — nicht als etwas,
+  woran die Sitzung sich erinnert. Prüfe die Erholung nicht mit einem Abbruch an bequemer
+  Stelle, sondern mit **Abbrüchen zu zufälligen Zeitpunkten** in jeder kritischen Aktion,
+  und frag danach nicht nur ‚läuft es weiter?', sondern ‚läuft es **dort** weiter, wo es
+  laufen sollte, und gilt die unfertige Arbeit korrekt als unfertig?'"
+
 ---
 
 ## Drei Meta-Regeln, die alles zusammenhalten
@@ -406,4 +436,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 Wenn du diese eine Nachricht an den Anfang stellst, hast du 80 % der Lehren dieses
 Projekts eingebaut, bevor die erste Zeile Code entsteht.
 
-<!-- GUIDE-FINGERPRINT: 596d0d540848453a4c05951f613de1869add4d8f43b432146be21bb47c835c7b -->
+<!-- GUIDE-FINGERPRINT: 0acd6d8eb654d3f89ebd0213858c6e60866180d4388487c34f2bb400bf343d5e -->
