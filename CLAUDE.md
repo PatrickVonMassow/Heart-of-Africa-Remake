@@ -1032,34 +1032,26 @@ After completion and after every major system:
 - **The Stop chain gates the turn end, not only the test run.** Beyond the
   suites, Stop hooks (authoritative list: `.claude/settings.json`) BLOCK a turn
   end while the working state contradicts a standing rule — "enforce, don't
-  remind", each adopted after a reminder failed. Currently: `model-guard`
-  (no commit authored outside the §6 model allowlist), `dashboard-guard`,
-  `dashboard-conciseness-guard`, `dashboard-card-topic-guard` and
-  `dashboard-integrity-guard` (the progress board is published, concise,
-  one-topic-per-card and consistent with the real state),
-  `decision-card-guard` (every decision asked of the user stands as a
-  board card), `prep-guard` (no
-  idle wait while a background validation runs), `batch-progress-guard` (no
-  idle stop without a boundary or wait), `render-verify-guard` (no
-  render-set change — scene/shader/HUD, `src/world/` geometry, the browser
-  suites — finished without the picture check, on both backends where they can
-  differ), `mechanism-review-guard` (no new or changed
-  guard, gate or hook without the OTHER model's recorded review —
-  `scripts/mechanism-review.mjs --record`), `queue-order-guard`, `tasks-spec-guard` and `tasks-archive-guard`
-  (the queue order, the final-state-only spec rule, and the open/archived split
-  of the work order), `doc-budget-guard` (this file, design.md and the work
-  order's preamble stay within measured ceilings; budgets in
-  `scripts/doc-budget-core.mjs`), `commit-scope-guard` and `pre-push-gate`
-  (versioned `scripts/git-hooks/`, wired by `npm install`: no stray file, no
-  rescue commit mails the user, no push CI would
-  reject), `ci-status-guard` (a
-  red CI is noticed), `branch-hygiene-guard` (no branch, remote branch or
-  worktree already contained in `origin/main` survives its merge — carve-outs:
-  in-flight, live worktrees, the `local/` baseline caches and a 10-minute
-  grace), `timestamp-guard` (the chat timestamp) and
-  `retro-currency-guard` (the retrospective stays current, each lesson carrying
-  a mechanism decision: `docs/analysis_de/lesson-mechanisms.md`), followed
-  by `dashboard-sync`. Separately, PreToolUse hooks run `closing-guard` (§9),
+  remind", each adopted after a reminder failed. **`.claude/settings.json` is the
+  only authoritative list; this paragraph names FAMILIES, because the enumeration
+  that stood here had drifted four wired guards behind it** (rule-corpus review
+  30.07.2026). The families: the BOARD (published, concise, one topic per card,
+  consistent with the real state, and every decision asked of the user standing
+  as a card); the BATCH (no idle wait or idle stop, the model allowlist of §6, a
+  red CI, a branch already contained in `main`, the retrospective's currency,
+  the chat timestamp); the WORK ORDER (queue order, final-state-only specs, the
+  open/archived split, and the measured doc ceilings in
+  `scripts/doc-budget-core.mjs`); and the PROOF (`render-verify-guard` for a
+  render-set change on both backends where they can differ, and
+  `mechanism-review-guard`, which lets no new or changed guard, gate or hook end
+  a turn without the OTHER model's recorded review —
+  `scripts/mechanism-review.mjs --record`). Two carry a caveat worth knowing
+  here: `ci-status-guard` sees only the session's OWN HEAD, which is how 26 red
+  runs on `main` stayed unseen for three weeks (point 387 widens it to every ref
+  the session pushed and raises the demand from noticing red to CONFIRMING
+  GREEN), and the versioned git hooks (`scripts/git-hooks/`, wired by `npm
+  install`) refuse a stray file, a rescue commit that would mail the user, and a
+  push CI would reject. Separately, PreToolUse hooks run `closing-guard` (§9),
   which denies a version tag until every closing step is recorded, and
   `board-first-guard`, which fires BEFORE the work rather than at the turn end (the
   Stop chain lets the board lag an hour): a turn's FIRST state-changing call is

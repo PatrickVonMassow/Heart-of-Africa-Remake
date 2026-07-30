@@ -220,8 +220,7 @@ try {
         console.log(
           `${header} ${gitStanding()} Resumed by the OS autostart launcher (the previous owner was ` +
             `provably dead). ${RESUME_BODY} ` +
-            'Read the handoff memory resume-184-qa-framework first. Do NOT idle-stop ' +
-            '(the batch-progress-guard enforces this).',
+            'Do NOT idle-stop (the batch-progress-guard enforces this).',
         )
       } else if (ownership === 'acquired' || ownership === 'mine') {
         console.log(
