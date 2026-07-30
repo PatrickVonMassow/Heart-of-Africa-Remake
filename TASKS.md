@@ -3970,6 +3970,12 @@ it is appended.
   the deliberately UNBUDGETED reference material (same class as `docs/acceptance-evidence.md`,
   which the budget module's own comment exempts because on-demand reference costs nothing per
   turn), and the what-is-budgeted comment names it there.
+  THE USER'S RULING (30.07.2026, answering the board card): "Ja, machen, aber auf
+  Spezifikations- und Implementierungsebene mit vier Augen prüfen und gründlich testen, bevor
+  es produktiv geht." The spec review by the other model happened before this point was
+  written; the IMPLEMENTATION is reviewed by the other model as well, and the full gates
+  (build, lint, `test:unit`, `npm audit`) plus a rebuilt brief for a point citing §7.1 no. 20
+  or no. 21 must be green BEFORE the merge to main.
   IN THE SAME POINT, one precision to §6 that the delegation count settled (four-eyes,
   30.07.2026: of the last 60 first-parent commits on `main`, 42 are main-only bookkeeping and
   only 9 were delegable, all small): a cross-cutting change BEYOND a small commit — a new
