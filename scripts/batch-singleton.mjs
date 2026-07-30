@@ -307,6 +307,16 @@ export function assessOwner(lock, { now, bootTime, probe, leaseMs = LEASE_MS } =
 export function resolveOwnership({ lock, sessionId, ancestor, tolerance = PID_START_TOLERANCE_MS }) {
   const no = (via) => ({ mine: false, via, restamp: false })
   if (!lock || typeof lock.sessionId !== 'string') return no('no-lock')
+  // A PROBE IS NEVER MINE (point 434 (8)). This is the door the false alarm came
+  // through: five registered gathers ask `heldByOtherLiveOwner('preflight-test')`,
+  // and when the BATCH OWNER runs the unit suite in its own tree, the Vitest
+  // process's claude ancestor IS the lock's pid — so ownership resolved `via:
+  // 'process'` and the restamp below rewrote the LIVE lock's sessionId to
+  // `preflight-test`. The launcher then read `owner=preflight-test` beside the
+  // real session and reported a parallel batch. Refused here, in the pure
+  // resolver, so every door that asks — ownsLock, heldByOtherLiveOwner, acquire —
+  // gets the same answer.
+  if (isProbeSessionId(sessionId)) return no('probe-id')
   if (sessionId && lock.sessionId === sessionId) return { mine: true, via: 'session-id', restamp: false }
   if (!sessionId) return no('no-session-id')
   // A launcher's pending-spawn lock names a process that is not this session's
@@ -445,18 +455,27 @@ export function ownerStateKey(lock, suffix = '') {
 /**
  * A SESSION ID THIS REPOSITORY'S OWN PROBES USE, never a real session. PURE.
  *
- * THE ALARM IT CAUSED (point 434 (8), root-caused 30.07.2026): the guard preflight's
- * real-repo test runs every guard's `gather()` under the synthetic id
- * `preflight-test`, and `gatherBatchProgressInputs` ACQUIRES the batch lock with the
- * id it is handed. So a Vitest run, with the lock free, made a probe the owner of the
- * batch — and the launcher then read `owner=preflight-test` and reported every REAL
- * session as a second driver: `PARALLEL SESSIONS DETECTED`, sixteen times across four
- * nights. That alert is one of the few that mean "stop everything", so a probe of our
- * own must not be able to raise it.
+ * THE ALARM IT CAUSED (point 434 (8), root-caused 30.07.2026 and CORRECTED by the
+ * four-eyes review): the guard preflight's real-repo test runs every registered
+ * guard's `gather()` under the synthetic id `preflight-test`, and five of those
+ * gathers ask `heldByOtherLiveOwner('preflight-test')`. When the session that OWNS
+ * the batch runs the unit suite in its own tree — the fast gate after every merge —
+ * the Vitest process's claude ancestor is exactly the lock's pid, so ownership
+ * resolved `via: 'process'` and `ownsLock` RESTAMPED the live lock's sessionId to
+ * `preflight-test`. The launcher then read `owner=preflight-test` beside the real
+ * session and logged `PARALLEL SESSIONS DETECTED`, sixteen times across four nights.
+ * That alert is one of the few that mean "stop everything", so a probe of our own
+ * must not be able to raise it.
+ *
+ * (The first reading of this — that `acquire` handed a probe the free lock from a
+ * guard's gather — was WRONG: `batch-progress-guard` is not a registered preflight
+ * guard and its `acquire` is on its own Stop path. The restamp above is the path
+ * that exists, and it needs no free lock, which fits the frequency far better.)
  *
  * A real session id is a UUID and can never carry this prefix, so the namespace is
- * reserved rather than shared. Two consequences, both here: `acquire` refuses a probe
- * the lock, and the classifier below is blind to one on either side.
+ * reserved rather than shared. Three consequences: `resolveOwnership` never answers
+ * "mine" for a probe (so nothing restamps a lock to one), `acquire` refuses it the
+ * lock outright, and the classifier below is blind to one on either side.
  */
 export const PROBE_SESSION_PREFIX = 'preflight-'
 

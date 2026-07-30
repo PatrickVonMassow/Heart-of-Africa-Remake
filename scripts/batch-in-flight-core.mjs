@@ -190,8 +190,14 @@ export function worktreeStamp(value) {
  * is `XY <path>`; a rename/copy record is followed by a SECOND chunk holding the
  * source path, which is skipped — it is the path the file no longer has.
  *
- * `limit` bounds the work: the stamp only needs the NEWEST file, and a checkout
- * with thousands of dirty paths must not turn a liveness probe into a tree walk.
+ * `limit` bounds the work: a checkout with thousands of dirty paths must not turn a
+ * liveness probe into a tree walk. `git status` sorts by PATH, not by mtime, so a
+ * checkout dirtier than the limit can miss the newest file — the caller then falls
+ * back to the git metadata, which can only UNDER-report freshness, never invent it.
+ *
+ * The path is taken verbatim: `-z` exists precisely so nothing is quoted or
+ * escaped, and trimming it would corrupt the (legal) path that begins or ends with
+ * a space (four-eyes review, finding 6).
  */
 export function porcelainPaths(out, { limit = 400 } = {}) {
   const chunks = String(out ?? '').split('\0')
@@ -200,7 +206,7 @@ export function porcelainPaths(out, { limit = 400 } = {}) {
     const chunk = chunks[i]
     if (!chunk || chunk.length < 4) continue
     const xy = chunk.slice(0, 2)
-    const path = chunk.slice(3).trim()
+    const path = chunk.slice(3)
     if (path) paths.push(path)
     if (xy.includes('R') || xy.includes('C')) i += 1 // the rename/copy source chunk
   }
@@ -329,7 +335,9 @@ const minutes = (ms) => Math.round(ms / 60000)
  * ONE piece of evidence, checked. PURE — every probe is injected:
  *   probePid         — (pid) => { exists: boolean, startedAt: number|null }
  *   refTipAt         — (ref) => number|null  epoch ms of the branch tip commit
- *   worktreeActiveAt — (path) => number|null epoch ms of the last git activity
+ *   worktreeActiveAt — (path) => { at, source }|number|null, when the worktree last
+ *                      MOVED and which of its two sources said so (see
+ *                      `combineWorktreeStamps`); a bare number keeps its old meaning
  *   mtimeOf          — (path) => number|null epoch ms, null when absent
  *
  * EVERY kind is now judged on RECENCY, not on existence — a pid by the identity
@@ -892,8 +900,10 @@ export function assessOwnerWork({ declaration, lock, now, maxAgeMs = LAUNCHER_WO
 
 /** How the reported evidence kind reads in a sentence. */
 const JUDGED_ON_WORDS = {
-  git: 'the work’s own git output',
-  process: 'a live process (no git output)',
+  // Not "git output" any more: the worktree half may be a written FILE (point
+  // 434 (5b)), and the per-item detail names which of the two it was.
+  git: 'the work’s own output — a commit or a written file',
+  process: 'a live process (nothing produced)',
   log: 'a log file only — the weakest evidence there is',
   none: 'nothing that still checks out',
 }

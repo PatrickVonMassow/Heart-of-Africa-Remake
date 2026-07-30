@@ -130,11 +130,23 @@ const stampOf = (p) => {
  *
  * `git status --porcelain -z` names exactly the paths that are dirty or new —
  * cheaper than walking a checkout, and it already respects `.gitignore`, so
- * `node_modules/` and `dist/` never enter. `--no-optional-locks` is what keeps
- * OUR OWN look from becoming the evidence: without it git may refresh (and
- * rewrite) the index, which is the contamination point 434 (5b) names. The caller
- * additionally stats the git metadata BEFORE calling this, so even a git that
- * ignored the flag could not backdate the other half.
+ * `node_modules/` and `dist/` never enter. Three flags carry weight:
+ *   · `--no-optional-locks` keeps OUR OWN look from becoming the evidence —
+ *     without it git may refresh (and rewrite) the index, which is the
+ *     contamination point 434 (5b) names. The caller additionally stats the git
+ *     metadata BEFORE calling this, so even a git that ignored the flag could not
+ *     backdate the other half.
+ *   · `--untracked-files=normal` is stated rather than assumed: a global or repo
+ *     `status.showUntrackedFiles=no` would otherwise hide exactly the case this
+ *     probe exists for — an agent writing NEW files it has not added yet
+ *     (four-eyes review, finding 5).
+ *   · `--ignore-submodules=all`, because a submodule's own dirtiness is not this
+ *     checkout's work and would cost a recursive status.
+ *
+ * `limit` bounds the stats, not the newest-wins comparison; `git status` sorts by
+ * PATH, so a checkout dirtier than the limit can miss the newest file and fall
+ * back to the git metadata. That is the safe direction (it can only under-report
+ * freshness), and an agent worktree does not reach it.
  *
  * Any failure answers null — evidence that cannot be established never counts as
  * established, the same rule `refTipAt` follows.
@@ -144,13 +156,26 @@ export function worktreeFilesActiveAt(root, { limit } = {}) {
   if (!dir) return null
   let out = ''
   try {
-    out = execFileSync('git', ['--no-optional-locks', '-C', dir, 'status', '--porcelain', '-z'], {
-      windowsHide: true,
-      encoding: 'utf8',
-      timeout: 15000,
-      maxBuffer: 8 * 1024 * 1024,
-      stdio: ['ignore', 'pipe', 'ignore'],
-    })
+    out = execFileSync(
+      'git',
+      [
+        '--no-optional-locks',
+        '-C',
+        dir,
+        'status',
+        '--porcelain',
+        '-z',
+        '--untracked-files=normal',
+        '--ignore-submodules=all',
+      ],
+      {
+        windowsHide: true,
+        encoding: 'utf8',
+        timeout: 15000,
+        maxBuffer: 8 * 1024 * 1024,
+        stdio: ['ignore', 'pipe', 'ignore'],
+      },
+    )
   } catch {
     return null
   }

@@ -311,19 +311,36 @@ describe('the worktree stamp reads BOTH sources and says which one answered', ()
     expect(porcelainPaths(rec('R  new.ts', 'old.ts', ' M kept.ts'))).toEqual(['new.ts', 'kept.ts'])
     expect(porcelainPaths(rec('C  copy.ts', 'orig.ts'))).toEqual(['copy.ts'])
     expect(porcelainPaths(rec(' M a', ' M b', ' M c'), { limit: 2 })).toEqual(['a', 'b'])
+    // `-z` is unquoted and unescaped, so a legal path with an edge space survives
+    // verbatim — trimming it would make its stat miss (four-eyes review, finding 6).
+    expect(porcelainPaths(rec('?? odd name .ts', '?? tab\tname.ts'))).toEqual(['odd name .ts', 'tab\tname.ts'])
     for (const junk of ['', null, undefined, '\0\0', 'XY']) expect(porcelainPaths(junk), String(junk)).toEqual([])
   })
 })
 
 // ---------------------------------------------------------------------------
 describe('worktreeActiveAt against a REAL checkout (its own temp repo, never this one)', () => {
+  // The repo is built with the AMBIENT config neutralised: a machine with a global
+  // `commit.gpgsign`, a global `core.hooksPath` or an `init.templateDir` carrying
+  // hooks would otherwise fail or HANG these commits (four-eyes review, finding 4).
+  // `status.showUntrackedFiles=no` is neutralised the same way — the probe states
+  // the flag itself, and this keeps the test honest about that.
+  const gitEnv = { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_SYSTEM: '/dev/null' }
   const git = (dir, ...args) =>
-    execFileSync('git', args, {
+    execFileSync('git', ['-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=', ...args], {
       windowsHide: true,
       cwd: dir,
+      env: gitEnv,
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'ignore'],
     }).trim()
+
+  const seedRepo = (dir) => {
+    git(dir, 'init', '-b', 'main')
+    writeFileSync(join(dir, 'a.txt'), 'first\n')
+    git(dir, 'add', 'a.txt')
+    git(dir, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-m', 'x')
+  }
 
   const backdate = (dir, ageMs) => {
     const when = new Date(Date.now() - ageMs)
@@ -339,10 +356,7 @@ describe('worktreeActiveAt against a REAL checkout (its own temp repo, never thi
   it('an agent EDITING with no git command reads alive, on the working files', () => {
     const dir = mkdtempSync(join(tmpdir(), 'hoa-wt-probe-'))
     try {
-      git(dir, 'init', '-b', 'main')
-      writeFileSync(join(dir, 'a.txt'), 'first\n')
-      git(dir, 'add', 'a.txt')
-      git(dir, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-m', 'x')
+      seedRepo(dir)
       // The git metadata is 30 minutes old; the agent has just written a file.
       backdate(dir, 30 * 60 * 1000)
       writeFileSync(join(dir, 'a.txt'), 'mid-edit\n')
@@ -358,13 +372,29 @@ describe('worktreeActiveAt against a REAL checkout (its own temp repo, never thi
     }
   })
 
+  it('a NEW, not-yet-added file counts too — that is the mid-edit case itself', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-wt-untracked-'))
+    try {
+      seedRepo(dir)
+      backdate(dir, 30 * 60 * 1000)
+      // An agent writing a brand-new source file has not run `git add` either. The
+      // probe states `--untracked-files=normal`, so an ambient
+      // `status.showUntrackedFiles=no` cannot blind it (four-eyes review, finding 5).
+      git(dir, 'config', 'status.showUntrackedFiles', 'no')
+      writeFileSync(join(dir, 'brand-new.ts'), 'export const x = 1\n')
+
+      const stamp = worktreeActiveAt(dir)
+      expect(stamp.source).toBe('working files')
+      expect(Date.now() - stamp.at).toBeLessThan(60_000)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
   it('a clean, long-idle checkout still reads quiet — on the git metadata', () => {
     const dir = mkdtempSync(join(tmpdir(), 'hoa-wt-idle-'))
     try {
-      git(dir, 'init', '-b', 'main')
-      writeFileSync(join(dir, 'a.txt'), 'first\n')
-      git(dir, 'add', 'a.txt')
-      git(dir, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-m', 'x')
+      seedRepo(dir)
       backdate(dir, 40 * 60 * 1000)
 
       const stamp = worktreeActiveAt(dir)
@@ -380,10 +410,7 @@ describe('worktreeActiveAt against a REAL checkout (its own temp repo, never thi
   it('LOOKING AT IT IS NOT EVIDENCE: the probe does not refresh the index it reads', () => {
     const dir = mkdtempSync(join(tmpdir(), 'hoa-wt-clean-'))
     try {
-      git(dir, 'init', '-b', 'main')
-      writeFileSync(join(dir, 'a.txt'), 'first\n')
-      git(dir, 'add', 'a.txt')
-      git(dir, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-m', 'x')
+      seedRepo(dir)
       backdate(dir, 30 * 60 * 1000)
       const before = statSync(join(dir, '.git', 'index')).mtimeMs
 
@@ -484,7 +511,7 @@ describe('assessInFlight — a fresh declaration with live evidence, and every w
     expect(a.ignored.join(' ')).toContain('silent for 59 min')
     // The verdict SAYS what it rests on — the mistake was invisible because
     // "evidence-gone" never named the source that had answered.
-    expect(describeInFlight(a, withLog)).toContain('judged on the work’s own git output')
+    expect(describeInFlight(a, withLog)).toContain('judged on the work’s own output — a commit or a written file')
     expect(describeInFlight(a, withLog)).toContain('NOT counted as dead')
   })
 
