@@ -3604,6 +3604,239 @@ it is appended.
   viewport: type into the chat, wait out two refresh ticks, and the caret and the scroll
   position are still where they were.
 
+- [ ] 442. THE DOCTOR RUNS BEFORE THE SUCCESSOR, NOT AFTER THE DAMAGE (user 30.07.2026: "Ein
+  Ausfall eines Elements kann zu jedem beliebigen Zeitpunkt passieren — auch mitten in einer
+  kritischen Aktion. Davon musst du dich immer selbstständig erholen können"; bundle
+  Urlaubsfestigkeit). `scripts/batch-doctor-core.mjs` already detects the right things — a
+  half-done merge (`MERGE_HEAD`), conflict markers, a dirty tree, divergence from
+  `origin/main`, a TASKS.md that no longer parses — and grades every remedy `auto` / `repair`
+  / `alert`. NOBODY CALLS IT BEFORE A SPAWN: `scripts/batch-autostart.mjs` mentions the doctor
+  only in a message to a stood-down session, so a successor is started INTO the torn tree and
+  has to notice by itself. That is judgment where a mechanism belongs.
+  (a) The launcher runs the doctor's `auto` + `repair` levels BEFORE every spawn and starts
+  only on a consistent verdict; an `alert` state is logged, alerted (`scripts/notify.mjs`) and
+  retried on the next tick rather than parked.
+  (b) The successor refuses to work while the verdict is not consistent — the same check from
+  the other side of the seam, in `scripts/batch-resume-hook.mjs`.
+  VERIFIABLE: a Vitest case per branch of the spawn decision (consistent → spawn; repairable →
+  repair then spawn; alert → no spawn, alert sent, next tick retries) plus a live drill that
+  leaves a `MERGE_HEAD` behind, runs one launcher tick, and asserts the tree is clean and the
+  successor ran.
+
+- [ ] 443. THE TORN STATES THE DOCTOR DOES NOT YET KNOW (30.07.2026, same user demand as 442;
+  bundle Urlaubsfestigkeit). A kill during a critical action leaves more behind than a half
+  merge. Extend the doctor's state model and its remedy plan by, each with its own detection
+  and its idempotent repair: (a) stale `.git/index.lock` and `.git/refs/**/*.lock` from a
+  killed commit or push; (b) half-registered worktrees (`git worktree prune`) AND worktree
+  DIRECTORIES on disk that git no longer knows — six were lying around on 30.07.2026, four of
+  them from the previous night; (c) orphaned browser/node processes of an aborted verification,
+  which otherwise eat CPU for the rest of the absence — matched by their command line, never
+  by name alone, and only when no live session owns them; (d) a truncated `TASKS.md` restored
+  from `HEAD` (it is versioned; `tasksParses` already detects the damage but nothing repairs
+  it); (e) a stale pending-spawn lock; (f) a half-published board (the local file newer than
+  the published page — `scripts/board-publish.mjs` re-runs).
+  THE PRINCIPLE, to be written into `docs/batch-autonomy.md`: every critical action is a
+  transaction with an idempotent cleanup step, and that step runs at every start BEFORE any
+  work — never "the session remembers to".
+  VERIFIABLE: one Vitest case per state on a temporary repo (detection AND repair), and the
+  drill of 449 leaves at least three of them behind at once.
+
+- [ ] 444. A QUOTA BLOCK IS A WAITING STATE, NOT A FAILURE (user decision 30.07.2026: no
+  pacing — "wenn du durch die Kontingent-Bremse blockiert wirst, musst du es immer wieder
+  probieren, um zu merken, wann du neues Budget hast und ab dann weiterarbeiten"; bundle
+  Urlaubsfestigkeit). Nothing in the launcher classifies a usage-limit abort today, so it
+  lands in the ordinary failure ladder — `failCount` grows, the backoff climbs to its
+  two-hour ceiling (`scripts/batch-autostart-core.mjs`), and days of an unattended fortnight
+  are lost to a wait that is not a fault. The limit abort is recognised by its own signature
+  and treated as its own state: NO `failCount`, NO `.claude/batch-paused`, and a probe in the
+  ordinary 15-minute tick — cheap, because a blocked start fails at once and consumes
+  practically nothing, so the reason for the backoff (burning tokens on a broken night) does
+  not apply. Every probe and the moment work resumed are logged, so the real reset rhythm
+  becomes measurable instead of assumed.
+  VERIFIABLE: Vitest on the pure decision — a limit signature yields `state: 'quota'`, leaves
+  the fail counter untouched, writes no pause file and schedules the next tick at the normal
+  interval; an ordinary failure still climbs the ladder. Plus a fake-signature drill through
+  one real tick.
+
+- [ ] 445. EVERY PARK CARRIES A RESTART CLOCK (30.07.2026, out of the fortnight-alone review;
+  bundle Urlaubsfestigkeit). `.claude/batch-paused` stops the batch until someone removes it
+  by hand. Unattended that means: a cause which would have cleared itself in twenty minutes —
+  a red CI run, a guard loop, a transient forbidden serving model — costs the rest of the
+  absence. Every pause therefore records its REASON and a RETRY-AFTER; the launcher retries
+  when the clock runs out and notes the attempt. Only genuinely unsafe states park without a
+  clock, and the list of those is written down and short (today: a serving model outside the
+  allowlist is the candidate — decide per cause, and where a retry is safe, let the fallback
+  chain of CLAUDE.md §6 run rather than parking at all).
+  VERIFIABLE: Vitest on the pause record (reason + retryAfter round-trip, an expired clock
+  yields "retry", a clockless park yields "hold") and a drill that parks with a 60-second
+  clock and asserts the next tick starts a session.
+
+- [ ] 446. THE PICK-UP WINDOW AFTER A RELEASE (30.07.2026, measured on the same day — the
+  retrospective's §3.70; bundle Urlaubsfestigkeit). The takeover handshake has two halves: a
+  window claims the batch, the owner releases at its next clean turn end, and the window
+  PICKS IT UP. On 30.07.2026 the release came at 10:16 into a session the Claude outage had
+  just killed; twenty minutes later the launcher took the free lock for itself — correct by
+  its rules and against the user's intent. Point 434 made the claim non-lapsing BEFORE the
+  release; afterwards it is spent and the first to grab wins. Fix: a pick-up window of two
+  ticks in which the launcher does NOT take a free lock for itself while the claimant's window
+  is alive, using the same liveness check 434 already has; once the window dies or the frist
+  expires, the ordinary handover proceeds, so the batch can never end up ownerless.
+  VERIFIABLE: Vitest on the takeover decision — released-for-X + X alive + within the window →
+  no spawn, and the log says why; X dead, or the window elapsed → spawn. Plus the reverse case
+  that an unclaimed free lock is still taken at once.
+
+- [ ] 447. THE BOOT PATH, AND A SECOND TASK THAT WATCHES THE FIRST (30.07.2026; bundle
+  Urlaubsfestigkeit). Measured state of `HoA-Batch-Autostart`: ONE time trigger every 15 min,
+  `StartWhenAvailable` on, no battery/idle limit, `MultipleInstances: IgnoreNew`, principal
+  `Interactive` — i.e. it runs only while the user is logged on. `AutoAdminLogon` IS set on
+  this machine, so a reboot logs itself back in, but the path is unproven: the machine has been
+  up since 24.07.2026 and an update restart can still stop at the lock screen. Deliver, as ONE
+  documented and idempotent script the user runs once from an ELEVATED shell (the agent has no
+  admin rights): (a) an at-logon trigger on the existing task, so the resume is instant instead
+  of within 15 minutes; (b) a SECOND scheduled task under its own name with an at-startup
+  trigger and an offset 15-minute repeat, which checks that the primary task exists, is enabled
+  and ran recently, and re-registers or starts it — and the primary checks the same for the
+  second, so neither is a single point of failure; (c) the pre-departure setting that keeps
+  Windows Update from restarting into a locked screen during the absence.
+  The script is idempotent (running it twice changes nothing) and prints what it changed.
+  VERIFIABLE: the readiness command of 448 reports both tasks with their triggers and last
+  result; the drill of 449 disables the primary task and asserts the second one revives it.
+
+- [ ] 448. ONE COMMAND THAT SAYS "READY FOR A FORTNIGHT ALONE" (30.07.2026; bundle
+  Urlaubsfestigkeit). Before an absence, nothing today reports whether the chain is intact —
+  and the failures that hurt most are the silent ones. `scripts/vacation-ready.mjs` answers it
+  in one read-only run, each line PASS/WARN/FAIL with the remedy: both scheduled tasks present,
+  enabled, last result 0; `AutoAdminLogon` set; free disk space above a threshold; the GitHub
+  PAT valid with its REMAINING LIFETIME (a token that expires mid-absence fails every push
+  from then on, silently — warn below 30 days); the Claude authentication present and not due
+  to expire; the guard chain answering (`guard-preflight` clean); the GitHub watchdog workflow
+  enabled and its last run green; no stale park file; the doctor's verdict consistent; no
+  worktree debris; and the date of the last chaos drill (449) with a warning when it predates
+  the last change to the resilience layers.
+  VERIFIABLE: Vitest on the pure verdict assembly (one case per line, PASS/WARN/FAIL and the
+  overall exit code — 0 only when nothing is FAIL) with every probe injected; one live run
+  against the real machine as the acceptance evidence.
+
+- [ ] 449. THE CHAOS DRILL — KILLS AT RANDOM MOMENTS (user 30.07.2026: "Beachte, dass ein
+  Ausfall eines Elements zu jedem beliebigen Zeitpunkt passieren kann - auch mitten in einer
+  kritischen Aktion von dir"; bundle Urlaubsfestigkeit). Everything in this bundle is a claim
+  until an outage has been survived under observation, and the lesson of 30.07.2026 is exactly
+  that a designed handover still failed in practice. `scripts/chaos-drill.mjs` kills the batch
+  owner at a RANDOM moment inside a chosen critical action — during a merge, during a push,
+  during a browser verification, during the tick in TASKS.md, during a board publish — and
+  then asserts, without human help: the tree returns to a consistent state, the launcher
+  starts a successor, the successor works, and the interrupted point is correctly still OPEN
+  (the transaction property: the tick on `main` is the commit point, so nothing half-done can
+  count as done). It runs each action several times with different timings, writes a report per
+  run to `local/`, and records the date the readiness check (448) reads.
+  VERIFIABLE: the drill itself is the verification — one green report per critical action, plus
+  Vitest for its pure parts (the kill-moment plan, the verdict assembly). A drill that cannot
+  produce a verdict FAILS rather than passing quietly.
+
+- [ ] 450. VACATION MODE: A USER-GATED POINT NEVER JAMS THE QUEUE (30.07.2026; bundle
+  Urlaubsfestigkeit). Two decisions have been waiting on the user since 29.07.2026 (the
+  communication-system cards). Over a fortnight alone, a point that cannot proceed without an
+  answer must not hold the queue: the work order marks such a point explicitly as
+  user-gated, the queue skips it after recording WHY, and the board card says it is waiting on
+  the user rather than on work. A skipped point is never silently dropped — it returns to the
+  head of the queue as soon as the answer arrives.
+  VERIFIABLE: Vitest — a user-gated point is not chosen while unanswered, the next independent
+  point is, the reason is logged, and an answered point is picked up first afterwards.
+
+- [ ] 451. THE REPLY THAT SENT ITS OWN FLAG (user 30.07.2026: "Was ist mit dem Chat los?" —
+  two agent messages on the board read literally `--text-stdin`; bundle Chat & Tafel).
+  `scripts/board.mjs` accepts `--text-stdin` for German prose; `scripts/chat-reply.mjs` does
+  NOT — it joins `process.argv.slice(2)` into the message, so the flag itself was published as
+  the answer, twice, and the user's real replies never arrived. Fix both halves: accept
+  `--text-stdin` with the same meaning as in `board.mjs`, and REFUSE any unknown `--flag`
+  loudly (exit 1, naming it) instead of sending it as text — a send that silently publishes an
+  option is worse than no send. Check the sibling writers for the same shape while there.
+  VERIFIABLE: Vitest on the argument parsing — `--text-stdin` reads stdin, an unknown flag
+  exits non-zero and posts nothing, a plain text argument still works, and a text that merely
+  BEGINS with a dash is still sendable (via stdin), so the guard cannot swallow legitimate
+  prose.
+
+- [ ] 452. THE BOARD DOES NOT KNOW ITS OWN BUNDLES (user 30.07.2026: "Auf dem Dashboard sehe
+  ich nur Einzelschritte - keine Bündel"; bundle Chat & Tafel). The work order has been worked
+  in bundles since 29.07.2026 and `docs/work-packages.md` holds all thirteen, but
+  `scripts/board-queue-core.mjs` never mentions a bundle: the queue renders point after point.
+  Group the queue by bundle in the bundle's own working order, each group headed by its GERMAN
+  NAME (never the letter — memory `bundle-names`, retrospective §3.66) with its member count
+  and the sum of its estimates; the unbundled points keep their own group with the reason from
+  the doc. `docs/work-packages.md` gains the name column (the letter stays as the table's
+  internal id), and the "bundle X" mentions inside existing point texts are rewritten to the
+  names in the same commit.
+  VERIFIABLE: Vitest on the queue assembly — every open point appears exactly once under its
+  bundle, a point in no bundle lands in the unbundled group rather than vanishing, the German
+  name is used, and the group order follows the doc. Plus one published board reviewed by eye.
+
+- [ ] 453. WHAT IS THE LION EATING? (user bug report 30.07.2026,
+  `local/WasFrisstDerLoewe.zip`, seed 1608676381, east region at the river, WebGPU/high:
+  "Er scheint zu fressen und die Geier kreisen, aber ich sehe keine Beute"; bundle Kadaver &
+  Geier). In the frame the lion stands head-down in its feeding pose, vulture shadows circle
+  over the ground — and there is no prey body anywhere. Two candidates, both consistent with
+  the code: (a) the carcass was consumed (`carcassSeconds` reached 0 and it was removed) while
+  the feeding pose and the vulture staging carry on — a state that does not clear when its
+  subject disappears; (b) what remains is the prey remnant of `Wildlife.tsx` (the scrap left at
+  the kill site), which renders as a small white sphere and reads to a human as nothing at all.
+  Find out which by reproducing from the seed, then fix so that the picture always answers the
+  question: while a predator feeds, something recognisable as prey lies under it; when the
+  carcass is gone, the pose and the vultures end with it.
+  VERIFIABLE: Vitest on the behaviour — a predator's feeding state cannot outlive its carcass,
+  and a remnant that keeps vultures on station is itself renderable; plus a browser frame from
+  that seed showing predator and prey together, on both backends.
+
+- [ ] 454. THE BUG REPORT IS BLIND TO THE WILDLIFE (30.07.2026, found while analysing 453;
+  bundle Testinfrastruktur). The F6 dump carries the complete game state, balance and UI — and
+  not one animal: no predators, no carcasses, no hunt targets, no vulture bindings, no herd
+  membership. For a wildlife report, the most valuable evidence is exactly what is missing, so
+  453 cannot be decided from its own report. Add a wildlife section to the dump: every animal
+  within a radius of the traveller with species, position, state and its target, every carcass
+  with its remaining seconds and who is feeding on it, and each vulture flock with the carcass
+  it owns. Bounded (a radius and a cap, both named in the file) so the dump stays small, and
+  deterministic like the rest of the serialiser.
+  VERIFIABLE: `src/state/stateDump.test.ts` gains the wildlife cases (a fed carcass, an owned
+  flock, the cap holding, determinism); the report zip's description names the new section.
+
+- [ ] 455. A RED THAT LOAD DID NOT EXPLAIN (30.07.2026, measured: `batch-doctor --gate` called
+  a real unit-test failure INCONCLUSIVE because of "1 live agent worktree", and that worktree
+  had last been written the previous evening; bundle Testinfrastruktur). The load excuse is
+  right in principle (retrospective §3.22/§3.48) and was wrong here: it downgraded a genuine
+  red — the retro ledger demanding entries for three lessons — to "repeat later", which
+  unattended means the batch runs on a red tree for hours. A worktree only counts as LIVE
+  evidence of load when something has recently been WRITTEN in it (the probe of point 434
+  already dates an agent by its edits — reuse it, do not build a second one), and the verdict
+  names its evidence: which worktree, how old its newest edit, what CPU was measured. A stale
+  worktree directory is debris (443) and never an excuse.
+  VERIFIABLE: Vitest on the pure verdict — a red beside a worktree whose newest edit is hours
+  old is BROKEN, not inconclusive; a red beside a worktree edited a minute ago stays
+  inconclusive; the reason string names the deciding measurement.
+
+- [ ] 456. THE TEST THAT IS ONLY GREEN IN THE SIDE TREE (retrospective §3.68, 30.07.2026;
+  bundle Testinfrastruktur). Two blockers of one day shared a cause: a test passed because a
+  git-ignored file is ABSENT in the agent's worktree while it exists in the main tree — it
+  measured its environment, not the behaviour, and would have gone red on the merge. Add a
+  pure hygiene gate in the Vitest layer, after the pattern of this project's completeness
+  gates (`src/config/quality.test.ts`): a test file must have its paths INJECTED and may not
+  read a real repository path — `.claude/`, a git-ignored path, an absolute path into the
+  checkout. Existing offenders are either fixed or listed in an explicit, justified allowlist,
+  so the gate starts green and cannot be "fixed" by growing that list silently.
+  VERIFIABLE: the gate's own tests (a compliant file passes, each forbidden shape fails, an
+  allowlisted file passes with its reason present); `npm run test:unit` stays green.
+
+- [ ] 457. A RECORDED "DO NOT MERGE" MUST NOT SATISFY THE GATE (retrospective §3.67,
+  30.07.2026 — three cases in one morning, one of which would have turned `main` red; bundle
+  Modell & Wächter). `scripts/mechanism-review-guard.mjs` asks WHETHER the other model's review
+  is recorded, not WHAT it says: an agent started its review in the background, finished before
+  the verdict returned, and the branch looked reviewed. Make polarity and order part of the
+  condition — a verdict of "do not merge" or "with corrections" no longer satisfies the gate;
+  only a LATER verdict on a LATER commit does. Second half in the delegation brief
+  (`scripts/point-brief.mjs`), at the line where the commit-per-step rule already lives:
+  whoever commissions a review stays in the turn until it is back.
+  VERIFIABLE: Vitest on the decision — a negative verdict blocks, a positive one on an OLDER
+  commit blocks, a positive one on the current commit passes; the brief's text is pinned by its
+  existing test.
+
 ## Closing (only after all points)
 
 New points are appended BEFORE this section — it stays last in the file.

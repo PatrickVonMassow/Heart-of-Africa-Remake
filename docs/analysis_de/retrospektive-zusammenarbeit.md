@@ -643,6 +643,16 @@ Die frisch gebaute Lebendigkeits-Prüfung sollte einen delegierten Agenten an se
 
 **Lehre:** „Am Ergebnis messen" ist erst dann umgesetzt, wenn das Gemessene wirklich das Ergebnis ist. Ein Stellvertreter, der leicht zu beschaffen ist — eine Metadatei, ein Verzeichnisdatum —, ist die wahrscheinlichste Stelle, an der die Regel formal erfüllt und faktisch verfehlt wird. Und eine Sonde, die der Beobachter durch bloßes Hinsehen verändert, misst ihn statt des Beobachteten.
 
+### 3.70 Die Übergabe, die ein totes Fenster nicht einlösen konnte
+
+Am 30.07.2026 fiel Claude für rund eine Stunde aus, mitten in einem Zug. Der Batch überlebte das mustergültig: Der Launcher stellte um 10:36 „no owner lock — taking over" fest, startete einen headless Nachfolger, und der lieferte in den folgenden zwei Stunden zwei Dutzend Commits. Die autonome Erholung funktionierte also genau wie entworfen.
+
+Was durchfiel, war die Übergabe an das Fenster des Nutzers. Sie ist ein Zwei-Schritt-Handschlag: Das Fenster beansprucht den Batch, der Eigentümer gibt ihn am nächsten sauberen Zugende frei, und das Fenster **holt ihn dann ab**. Die Freigabe kam um 10:16 — in eine Sitzung, die der Ausfall gerade getötet hatte. Ein Anspruch, der eingelöst werden MUSS, ist damit nur so verlässlich wie der Anspruchsteller im Moment der Freigabe, und dieser Moment ist genau der, den niemand wählt. Zwanzig Minuten später nahm der Launcher den freien Lock für sich, korrekt nach seinen Regeln und trotzdem gegen die Absicht des Nutzers.
+
+Die Klasse ist dieselbe wie beim Herzschlag, der für Fortschritt gehalten wird, nur an der Übergabe statt an der Lebendigkeit: Ein Mechanismus, der einen zweiten Schritt von der Gegenseite ERWARTET, hat für dessen Ausfall keinen Plan. Punkt 434 hatte die Schwesterlücke schon geschlossen — ein Anspruch verfällt nicht mehr, solange das Fenster lebt —, aber nur für die Zeit VOR der Freigabe; danach ist der Anspruch verbraucht und es gewinnt, wer zuerst greift.
+
+**Lehre:** Ein Handschlag, dessen zweite Hälfte bei der Gegenseite liegt, braucht ein Zeitfenster, in dem niemand anders zugreifen darf — und die Prüfung eines Wiederanlaufs endet nicht bei „läuft es weiter?", sondern bei „läuft es dort weiter, wo es laufen sollte?". Ein Ausfall trifft nie die bequeme Stelle; jede Aktion mit zwei Hälften ist an ihrer Naht zu prüfen.
+
 ---
 
 ## 4. Die Guards als Immunsystem
@@ -732,7 +742,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Donnerstag, 30.07.2026, 13:55 · Quellen-Fingerprint: `1f9587ac35ff…`
+Zuletzt aktualisiert: Donnerstag, 30.07.2026, 14:02 · Quellen-Fingerprint: `1f9587ac35ff…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -818,5 +828,5 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 Erfasste Quellen: 75 Feedback-/Projekt-Memories · 39 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 21 Prozess-/Meta-TASKS-Punkte (davon 7 offen).
 
 <!-- RETRO-FINGERPRINT: 1f9587ac35ff1230f4771a2eef4cce94bc47aad78dab6d5298d2cc5031d00f25 -->
-<!-- RETRO-LAST-REFRESHED: 2026-07-30T11:55:56.018Z -->
+<!-- RETRO-LAST-REFRESHED: 2026-07-30T12:02:50.738Z -->
 <!-- AUTO-GENERATED:END -->
