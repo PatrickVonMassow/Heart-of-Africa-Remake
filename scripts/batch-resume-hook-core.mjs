@@ -92,7 +92,7 @@ function wayBack(sessionId, takeUpMin) {
     `owner it is honoured for ${takeUpMin} min FROM WHEN IT WAS RECORDED, and after that the ordinary handover ` +
     'takes over so the batch is never left ownerless. Once the owner has RELEASED for it the claim can never be ' +
     'honoured a second time, but the freed lock stays RESERVED for this window while it is open — no launcher ' +
-    `tick and no other window takes it away — for up to ${takeUpMin} min from the release. Re-run the command ` +
+    `tick and no other session takes it at a turn end — for up to ${takeUpMin} min from the release. Re-run the command ` +
     'within that window; miss it and the ordinary handover applies, and you simply claim again against the new ' +
     'owner. To inspect: `node scripts/batch-claim.mjs --status`.'
   )

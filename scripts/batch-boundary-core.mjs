@@ -440,9 +440,10 @@ export function boundaryCardText({ destination, claimantSid = null } = {}) {
       `${head} Der Stapel geht NICHT an eine frische Sitzung: Fenster ${claimantSid} hat ihn beansprucht, der ` +
       'Launcher hält den Start deshalb zurück und reserviert den Stapel für dieses Fenster. Weitergearbeitet ' +
       `wird dort, sobald es den Anspruch einlöst (\`node scripts/batch-claim.mjs --session ${claimantSid}\`). ` +
-      'Die Reservierung bleibt auch nach der Freigabe bestehen, solange dieses Fenster offen ist — kein anderes ' +
-      'Fenster und kein Launcher-Lauf nimmt sie ihm weg. Wird sie innerhalb der Übernahmefrist nicht eingelöst ' +
-      'oder das Fenster geschlossen, greift die gewöhnliche Übergabe — der Stapel bleibt nie ohne Eigentümer. ' +
+      'Die Reservierung bleibt auch nach der Freigabe bestehen, solange dieses Fenster offen ist — kein ' +
+      'Launcher-Lauf und keine andere Sitzung nimmt sie ihm beim Rundenende weg. Wird sie innerhalb der ' +
+      'Übernahmefrist nicht eingelöst oder das Fenster geschlossen, greift die gewöhnliche Übergabe — der ' +
+      'Stapel bleibt nie ohne Eigentümer. ' +
       'Hier läuft nichts weiter.'
     )
   }

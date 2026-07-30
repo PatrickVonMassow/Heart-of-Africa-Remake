@@ -1095,7 +1095,11 @@ session — the failure the whole singleton exists to prevent.
    reserving. `assessClaim` answers `reserve` instead of plain absent, and
    `reservationDecision` refuses the acquire on it — for the launcher, the chat
    watcher, the resume hook, a third window's Stop guard and the releasing session
-   alike. THE BOUNDS are the ones already there, not a new clock: the claimant must
+   alike. What it does NOT refuse is a deliberate `batch-claim.mjs --session <id>`
+   from another window: that path acquires a free lock directly, as it always has,
+   and it is the manual override the mechanism is meant to keep. The reservation
+   holds off the automated acquirers, not a person at a keyboard, and the texts say
+   so rather than promising a protection that is not there. THE BOUNDS are the ones already there, not a new clock: the claimant must
    be PROVABLY alive by the pid + start-time identity probe (a closed window frees
    the lock instantly — the probe decides, never a deadline), the take-up window
    caps it counted FROM THE RELEASE (a window left open but never taking what it

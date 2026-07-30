@@ -290,11 +290,12 @@ if (isMain) {
       console.log(
         `\nThe batch was ALREADY RELEASED for ${view.claimantSid} (this record can never be honoured a second ` +
           'time, point 434) and the free lock is RESERVED for that window while its process lives (point 461): ' +
-          'no launcher tick, no chat responder and no other window may take it. Run `node scripts/batch-claim.mjs ' +
-          `--session ${view.claimantSid}` +
-          '` in THAT window to take it — from another window this reservation refuses. It is not open-ended: ' +
+          'no launcher tick, no chat responder and no other session takes it at a turn end. Run `node ' +
+          `scripts/batch-claim.mjs --session ${view.claimantSid}` +
+          '` in THAT window to take it. It is not open-ended: ' +
           `${Math.round(maxAgeMs() / 60000)} min after the release the ordinary handover applies again, and a ` +
-          'claimant that closes its window frees the lock at once.',
+          'claimant that closes its window frees the lock at once. A deliberate claim from a DIFFERENT window ' +
+          'still wins — the reservation holds off the automated acquirers, not a person at a keyboard.',
       )
     } else if (view.reason === 'released') {
       console.log(
