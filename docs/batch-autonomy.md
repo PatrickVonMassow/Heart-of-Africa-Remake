@@ -1099,7 +1099,10 @@ session — the failure the whole singleton exists to prevent.
    from another window: that path acquires a free lock directly, as it always has,
    and it is the manual override the mechanism is meant to keep. The reservation
    holds off the automated acquirers, not a person at a keyboard, and the texts say
-   so rather than promising a protection that is not there. THE BOUNDS are the ones already there, not a new clock: the claimant must
+   so rather than promising a protection that is not there; and the acquire that
+   overrides CLEARS the spent record, so it cannot go on reserving against the
+   launcher's crash recovery. THE BOUNDS are the ones already there, not a new
+   clock: the claimant must
    be PROVABLY alive by the pid + start-time identity probe (a closed window frees
    the lock instantly — the probe decides, never a deadline), the take-up window
    caps it counted FROM THE RELEASE (a window left open but never taking what it

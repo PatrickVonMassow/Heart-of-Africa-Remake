@@ -536,6 +536,11 @@ describe('reservationDecision — a free lock still belongs to the window that c
     const cli = readFileSync(resolve(REPO_ROOT, 'scripts', 'batch-claim.mjs'), 'utf8')
     expect(cli).toContain('A deliberate claim from a DIFFERENT window')
     expect(cli).toContain('holds off the automated acquirers, not a person at a keyboard')
+    // …and the override CLEARS the spent record. Left behind it would keep
+    // reserving against the launcher's spawn gate, which is asked before the
+    // owner-alive check — so a crash of the overriding session would wait out the
+    // take-up window instead of being recovered at once (four-eyes, round 2).
+    expect(cli).toMatch(/ours\.reserve === true \|\| ours\.reason === 'released'/)
   })
 
   /** What the wrappers gather: a live claim on disk, judged by the asking session,

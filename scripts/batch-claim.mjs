@@ -327,11 +327,21 @@ if (isMain) {
   // 1. IS IT FREE? With no live owner the claim is satisfied AT ONCE — there is
   //    nobody to wait for. `acquire` is the only door to ownership and its
   //    test-and-set is what makes two racing windows resolve to exactly one.
+  //    This is the ONE acquiring door that does not ask `reservationDecision`, on
+  //    purpose: it is a person taking the batch into the window they are sitting
+  //    at, the manual override the whole mechanism exists to serve. The reserved
+  //    claimant loses only the reservation — its way back is to claim again
+  //    against the new owner, which is what the `--status` text tells it.
   const acq = acquire(sid)
   if (acq === 'acquired' || acq === 'mine') {
     const pending = readClaim()
     const ours = assessClaim({ claim: pending, sid, ancestor: findClaudeAncestor(), now, maxAgeMs: maxAgeMs(), probePid })
-    if (ours.mine || !pending) clearClaim()
+    // A SPENT record goes with the acquire, whoever wrote it (four-eyes review,
+    // Fable 5, 30.07.2026). Left lying about after an override it would keep
+    // reserving against the launcher's spawn gate, which is asked BEFORE the
+    // owner-alive check — so if this new owner died, crash recovery would wait
+    // out the take-up window instead of spawning at once.
+    if (ours.mine || !pending || ours.reserve === true || ours.reason === 'released') clearClaim()
     console.log(
       `THE BATCH IS YOURS. This session (${sid}) now owns .claude/batch-lock.json${
         acq === 'mine' ? ' (it already did)' : ''
