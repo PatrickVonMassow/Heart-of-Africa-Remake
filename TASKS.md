@@ -3494,6 +3494,14 @@ it is appended.
   way (2) and (5) do. In the same edit, `scripts/batch-resume-hook*.mjs` states the expiry it
   currently hides — it prints "re-running the SAME command takes it" and never says the claim
   ages out, so a returning session claims once, waits, and never learns why nothing happened.
+  THIRD SIDE OF THE SAME CLOCK, measured 30.07.2026 10:10-10:16: a claim record that had
+  ALREADY been released (`releasedAt` and `releasedBy` both set in `.claude/batch-claim.json`)
+  was still honoured. The owning session released to it, the claiming window never took it,
+  and the batch then ran for an hour with NO lock at all while every guard and heartbeat
+  behaved as though it were owned; the boundary that followed released to the same dead claim
+  a second time (`.claude/boundary.log`, two RELEASED lines, no HANDOVER). A released claim is
+  not a claim — the reader must treat it as absent, and a release with no live taker must fall
+  back to the ordinary handover rather than leaving the batch ownerless.
   (7) THE BOUNDARY CARD MUST NAME WHERE THE BATCH ACTUALLY GOES (found 29.07.2026 20:06).
   It says "Ich übergebe an eine frische Sitzung … Sie nimmt den nächsten Punkt der
   Warteschlange auf" even while a user window holds an HONOURED claim — and that is not what
