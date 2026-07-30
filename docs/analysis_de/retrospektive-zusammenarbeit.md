@@ -593,6 +593,22 @@ Bemerkenswert ist der Diagnose-Irrweg dazwischen: Lokal lief ein anderer Test in
 
 **Lehre:** Ein Tor, das dieselbe Prüfung wie die Fernumgebung fährt, deckt alles ab **außer der Umgebung selbst** — Plattform, Uhr, Dateisystem. Deshalb reicht „rot bemerken" nicht: Was zählt, ist die Bestätigung, dass der gepushte Stand dort GRÜN wurde, wo er wirklich läuft. Und ein Test, dessen Gegenstand Betriebssystemverhalten ist, formuliert seine Behauptung pro Plattform — sonst bedeutet sie auf der Plattform, die sie ausführt, gar nichts.
 
+### 3.64 Die Erinnerung, die neben ihrem eigenen Tor stehen blieb
+
+Der Leitsatz dieses Projekts lautet: erzwingen statt erinnern. Am 30.07.2026 zeigte sich seine Rückseite. Der Text, den der `UserPromptSubmit`-Hook in **jede** Eingabe einspritzt, wiederholte auf 2153 Zeichen die Board-Struktur — vier Sektionen, ihre Reihenfolge, die Kartenform, das `open`-Verbot, die Kopfzeile der Warteschlange. Jede einzelne dieser Regeln weist der Publish-Gate seit Wochen von sich aus zurück. Die Erinnerung wurde also nicht abgelöst, als ihr Mechanismus kam; sie blieb daneben stehen und wurde von da an **doppelt** bezahlt — einmal in Rechenzeit beim Prüfen, einmal in Kontext bei jedem Zug. Nach dem Schnitt bleiben 843 Zeichen: genau das, was keine Maschine entscheiden kann (steht eine Information in der falschen Sektion, sieht die Tafel auf dem Handy gut aus, wird eine Strukturänderung vorgeschlagen statt gemacht) plus die Befehle.
+
+Beim Beantworten der Nachfrage des Nutzers — „hast du noch mehr solcher Altlasten?" — fiel sofort die nächste auf: Die Regel, dass jede Antwort mit dem Zeitstempel beginnt, steht **dreimal** in derselben Eingabe, obwohl `timestamp-guard` das Zugende ohnehin blockiert. Das ist kein Einzelfall, sondern eine Klasse, und sie entsteht zwangsläufig: Ein Mechanismus wird gebaut, weil die Erinnerung versagt hat — und niemand hat die Aufgabe, die Erinnerung danach zu löschen.
+
+**Lehre:** Der Commit, der ein Tor einführt, muss den Text streichen, den dieses Tor ersetzt — sonst wächst neben jedem Mechanismus sein eigener toter Zwilling. Und was ein Tor nicht prüfen kann, bleibt vollständig stehen: Eine Kürzung, die eine echte Pflicht mitnimmt, wäre teurer als die Wiederholung.
+
+### 3.65 Der Rückfall, der nichts sagt
+
+Der Nutzer fragte zum zweiten Mal, warum die Kartentitel seiner Tafel englisch und in Großbuchstaben stehen. Die Ursache ist eine Fallback-Kette von drei Gliedern: Fehlt einer Karte der geschriebene deutsche Titel, nimmt der Generator die Überschrift aus der Arbeitsliste — und die ist per Projektregel englisch und in Versalien. Acht von 77 Karten standen so, alle frisch angehängt.
+
+Der Fehler ist nicht der Rückfall selbst; ein namenloser Eintrag wäre schlimmer. Der Fehler ist, dass er **schweigt**. Ein stiller Ersatz sieht im Code aus wie Sorgfalt und im Ergebnis wie Nachlässigkeit, und weil niemand ihn meldet, wird er erst vom Leser entdeckt — hier zweimal vom selben Leser.
+
+**Lehre:** Jeder Rückfall auf einen Ersatzwert wird gemeldet, an der Stelle, an der er greift. Und die Zeile, die ihn meldet, nennt den Befehl, der ihn behebt — sonst wird er von Hand behoben, was hier prompt die Datei mit falschen Zeilenenden zurückschrieb und die Archiv-Rotation der Tafel zum Absturz brachte.
+
 ---
 
 ## 4. Die Guards als Immunsystem
@@ -682,7 +698,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Donnerstag, 30.07.2026, 07:50 · Quellen-Fingerprint: `7999810bcfcd…`
+Zuletzt aktualisiert: Donnerstag, 30.07.2026, 09:51 · Quellen-Fingerprint: `df5469935519…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -693,7 +709,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | User's rulings on the point-205 plausibility audit (what to fix vs. accept, 21.07.2026) | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | For code audits/reviews, mix in a DIFFERENT model than the one that wrote the code — different blind spots find more bugs | 1 | niedrig | model-guard.mjs | ✔ Mechanismus |
 | The hardened batch-autonomy system — never idle-stop, resurrect after crash/reboot, signal on failure, never block on the user | 1 | niedrig | batch-autostart.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs | ✔ Mechanismus |
-| The batch dashboard — its live GH-Pages transport, its BINDING four-section structure (never change without explicit user go) and update discipline | 9 | hoch | batch-autostart.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs, dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
+| The batch dashboard — its live GH-Pages transport, its BINDING four-section structure (never change without explicit user go) and update discipline | 11 | hoch | batch-autostart.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs, dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
 | RETIRED 27.07.2026 — this was a 16.07. work-in-progress handoff, not a rule; what survives is the research foundation, the accuracy principle and the §13-placeholder carve-out | 3 | mittel | batch-autostart.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs | ✔ Mechanismus |
 | A blocked tool call means the wrong path, not a missing permission — search the repo for its own command; never hand the user manual steps | 1 | niedrig | findings-guard.mjs | ✔ Mechanismus |
 | The batch dashboard may leave the private claude.ai artifact for a publicly readable transport — privacy is no longer a constraint | 1 | niedrig | board-first-guard.mjs, dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
@@ -729,7 +745,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | RETIRED 27.07.2026 — merged into parallel-session-root-cause, which holds the confirmed cause and the one detection recipe; the advisory-lock analysis here was superseded by the hard singleton | 3 | mittel | batch-autostart.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs | ✔ Mechanismus |
 | Parallel batch sessions are spawned by the HoA-Batch-Autostart scheduled task after a reboot; the advisory lock never stopped it — a hard singleton is being built | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | RETIRED 27.07.2026 — merged into parallel-session-root-cause; what survives is that the lock file alone is never proof of exclusivity, and the four signals that actually detect a second writer | 2 | mittel | — (Regel/Memory) | ◐ Regel |
-| Work agreed with the user on 29.07.2026 evening that is NOT yet in TASKS.md because the batch lock was held elsewhere — carry it into the work order at the first chance | 3 | mittel | queue-order-guard.mjs, worktree-reminder.mjs | ✔ Mechanismus |
+| DRAINED 30.07.2026 — the carrier's work is all in the work order now; what remains is the list of options a /doctor run REJECTED, so nobody re-analyses them | 2 | mittel | queue-order-guard.mjs, worktree-reminder.mjs | ✔ Mechanismus |
 | Always take the point boundary autonomously at a closed point — never ask the user whether to hand over or /clear | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Per-point QA runs scoped (Vitest always, browser suites by diff mapping, flake-retry single suites) — WATCHDOG duty to report any bug that slips through | 3 | mittel | — (Regel/Memory) | ◐ Regel |
 | Edits to .claude/settings.json and .git/hooks ALWAYS trigger a permission prompt (harness safety layer, allowlist cannot override); never schedule such work for unattended night batches | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -764,8 +780,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | CORRECTED 19.07.2026 — WebGPU IS testable headless/autonomously via system Chrome (channel:'chrome') + --headless=new; the 'untestable' belief held only for Playwright's BUNDLED Chromium | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 74 Feedback-/Projekt-Memories · 39 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 20 Prozess-/Meta-TASKS-Punkte (davon 7 offen).
+Erfasste Quellen: 74 Feedback-/Projekt-Memories · 39 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 21 Prozess-/Meta-TASKS-Punkte (davon 8 offen).
 
-<!-- RETRO-FINGERPRINT: 7999810bcfcdc5b36050964c73a630954b76a45afab6242ed7466690c3678aaa -->
-<!-- RETRO-LAST-REFRESHED: 2026-07-30T05:50:59.529Z -->
+<!-- RETRO-FINGERPRINT: df546993551988de3abe782ae2d10d0321a8326c06a90832d07834b095a3d9f0 -->
+<!-- RETRO-LAST-REFRESHED: 2026-07-30T07:51:29.547Z -->
 <!-- AUTO-GENERATED:END -->
