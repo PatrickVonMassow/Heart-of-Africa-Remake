@@ -101,6 +101,9 @@ scripts/.tile-cache
 # shared across them would compare two different worlds.
 .claude/pre-push-gate-state.json
 
+# Runtime state of the batch-resilience layers (child-retry, alert-escalation).
+.claude/resilience/
+
 # Local GitHub PAT (ci-status-guard.mjs probes this path) — never committed
 .secrets/
 
