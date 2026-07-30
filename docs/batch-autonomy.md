@@ -1215,6 +1215,11 @@ open questions.
   stays pending and says so.
 - **A malformed entry warns, never blocks** — a half-written deposit is still
   listed and named, because dropping it is the exact failure the carrier ends.
+- **A body line that is itself a field marker is escaped** with one leading
+  backslash in the file and restored on read. The specs most likely deposited
+  here are specs about this mechanism, and one containing a bare `#spec` line
+  would otherwise lose everything after it out of the field it must carry
+  verbatim.
 
 **The gate is the point boundary**, not every turn end: a mid-branch owner cannot
 write `TASKS.md` at all, so `findings-guard` fires the request rule only on the
