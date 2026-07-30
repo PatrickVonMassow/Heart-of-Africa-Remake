@@ -3914,18 +3914,6 @@ it is appended.
   and a remnant that keeps vultures on station is itself renderable; plus a browser frame from
   that seed showing predator and prey together, on both backends.
 
-- [ ] 454. THE BUG REPORT IS BLIND TO THE WILDLIFE (30.07.2026, found while analysing 453;
-  bundle Testinfrastruktur). The F6 dump carries the complete game state, balance and UI — and
-  not one animal: no predators, no carcasses, no hunt targets, no vulture bindings, no herd
-  membership. For a wildlife report, the most valuable evidence is exactly what is missing, so
-  453 cannot be decided from its own report. Add a wildlife section to the dump: every animal
-  within a radius of the traveller with species, position, state and its target, every carcass
-  with its remaining seconds and who is feeding on it, and each vulture flock with the carcass
-  it owns. Bounded (a radius and a cap, both named in the file) so the dump stays small, and
-  deterministic like the rest of the serialiser.
-  VERIFIABLE: `src/state/stateDump.test.ts` gains the wildlife cases (a fed carcass, an owned
-  flock, the cap holding, determinism); the report zip's description names the new section.
-
 - [ ] 455. A RED THAT LOAD DID NOT EXPLAIN (30.07.2026, measured: `batch-doctor --gate` called
   a real unit-test failure INCONCLUSIVE because of "1 live agent worktree", and that worktree
   had last been written the previous evening; bundle Testinfrastruktur). The load excuse is
