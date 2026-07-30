@@ -4140,6 +4140,24 @@ it is appended.
   refused for a different one, refused when absent, refused on an internal error), and a live
   push attempt on a deliberately red tree is refused.
 
+- [ ] 465. A NOW-CARD OUTLIVES THE SESSION THAT WROTE IT (user 30.07.2026, from the board
+  screenshot: "'Gerade keine laufende Arbeit' ist auch nicht wirklich wahr … beim nächsten
+  Mal wird es wieder so eine geben, oder?"; bundle H). After the forced handover the
+  stopped session's card "Gerade keine laufende Arbeit" (17:09) still stood in "Woran ich
+  gerade arbeite" BESIDE the new session's card, so the board claimed work and no work at
+  once. It was removed by hand — which is the defect: a now-card is written by a session and
+  cleared by NOBODY when that session dies or loses the batch.
+  FINAL STATE: a now-card carries the session that wrote it. At publish time a card counts as
+  ORPHANED when its session no longer holds the batch lock, or when its stamp predates the
+  current owner's `acquiredAt`; an orphaned card is REMOVED rather than left standing, and
+  the publish gate refuses a board that still shows one — the same shape as its existing
+  refusal of a board missing a card for an open point. The board must rather refuse itself
+  than show something false; that is the property this and point 439 (a card title falling
+  silently back to "Punkt N") have in common.
+  VERIFIABLE: the pure layer covers orphan detection (foreign session, stamp older than the
+  current acquisition, own live card kept) and the gate's refusal; a live handover leaves no
+  stale card behind.
+
 ## Closing (only after all points)
 
 New points are appended BEFORE this section — it stays last in the file.
