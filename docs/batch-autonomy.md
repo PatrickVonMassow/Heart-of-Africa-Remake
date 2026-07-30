@@ -58,7 +58,7 @@ outside the agent's control.
 | 1 | Live session ends a turn idle (silent stop) | (1) Stop-hook hard-block | none, once the hook is active (next session start) |
 | 2 | Live session, Stop-hook not yet active (added mid-session) | (2) heartbeat cron re-invokes on idle | none (in-session) |
 | 3 | Session crashes / is closed, PC stays on | (4) scheduler resurrects ≤15 min | none |
-| 4 | API/usage limit reached → session dies | (4) scheduler retries every 15 min; succeeds after the limit resets | slow during the limit window (unavoidable) |
+| 4 | API/usage limit reached → session dies | (4) the refusal is recognised by its own signature and treated as a WAITING state (point 444): no `failCount`, no pause file, and a probe in every ordinary 15-min tick — so work resumes within one tick of the reset instead of behind a backoff ladder that had climbed to two hours and a runaway brake that had paused the batch | the limit window itself (unavoidable); every probe and the moment work resumed are logged, so the reset rhythm is measured rather than assumed |
 | 5 | Normal reboot, user logs in | (4) task persists + `StartWhenAvailable` + boot-time check → resurrects promptly after login | none beyond the login itself |
 | 6 | **Forced Windows-Update reboot** | same as #5: the task survives the update; after the user logs back in it resurrects promptly (boot-time check makes the stale-but-recent lock read as dead) | **the user must log in** — see the one true residual below |
 | 7 | Power loss / hard crash | same as #5/#6 (boot-time check) | user login |
@@ -439,6 +439,47 @@ Three changes, and none of them loosens the singleton:
    - **The backoff escalates** (`spawnBackoffMs`): the ten-minute debounce doubles
      per recorded failure up to two hours, and falls back to the floor the moment a
      spawn makes progress.
+6. **A quota block is a WAITING state, not a failure (point 444, user 30.07.2026).**
+   Item 5's ladder assumes a failed spawn means something is broken. A usage limit
+   is the other case, and nothing here told them apart: the refusal landed in
+   `failCount`, the wait doubled toward its two-hour ceiling and after three of them
+   the runaway brake wrote `.claude/batch-paused` — a batch stopped for the night by
+   a condition that repairs itself on the hour. The user's rule rules out pacing:
+   *"wenn du durch die Kontingent-Bremse blockiert wirst, musst du es immer wieder
+   probieren, um zu merken, wann du neues Budget hast und ab dann weiterarbeiten"*.
+   - **Recognised by its own signature.** The launcher records the size of
+     `.claude/autostart-run.log` at each spawn (`state.runLogAt`), so the segment a
+     spawn wrote is exactly its own; `detectQuotaSignature` searches the last few
+     lines of it for the refusal wordings — the witness is `You've hit your session
+     limit · resets 4:20pm (Europe/Berlin)`, which that log carries three times over
+     from 22.07.2026. Deliberately narrow: a WARNING ("approaching your usage
+     limit") and a session's own prose about limits are not refusals.
+   - **Its own state** (`judgeSpawnOutcome`): `state: 'quota'` leaves `failCount`
+     untouched, so the runaway brake is never approached and no pause file is
+     written; `spawnBackoffMs({ quota: true })` short-circuits the ladder to its
+     floor, so the probe rides the ordinary 15-minute tick. That is affordable
+     because a blocked start fails at once and consumes practically nothing — the
+     reason for the backoff does not apply.
+   - **Measurable, not assumed.** Every probe and the moment work resumed go into
+     `.claude/autostart.log` (`QUOTA BLOCK: … probe N, blocked for M min` and
+     `QUOTA BLOCK OVER: work resumed after N probe(s) over M min`), so the real
+     reset rhythm can be read off. The per-spawn "Resurrected" push is suppressed
+     while a block stands (`announceSpawn`) — a standing condition must not buzz an
+     unattended phone every quarter of an hour — and returns with the first spawn
+     after it clears. An ordinary failure drops the record and climbs the ladder
+     exactly as before.
+   - **A stillborn spawn is not progress** (`spawnProgressed`, found while wiring
+     the above). The launcher's own `pending-spawn` lock is stamped milliseconds
+     AFTER `lastSpawnAt` and re-stamped when it binds the child, so "a lock claimed
+     after the spawn" was true of every tick — and a spawn that died before
+     converting it left it standing. Read as progress, that called a stillborn
+     spawn a success and no refusal would ever have reached the classification. An
+     unconverted pending lock now counts for nothing, which is the same fact
+     `lockConverted` already carries into `judgePreviousSpawn`.
+   - **Drill:** `node scripts/quota-drill.mjs` hands the real launcher
+     (`batch-autostart.mjs --quota-report <segment>`, which exits before a tick's
+     first side effect) a segment carrying the refusal line and asserts the
+     invariants, plus the unsignatured control that must still climb.
 
 ### What the first live run found (28.07.2026)
 
