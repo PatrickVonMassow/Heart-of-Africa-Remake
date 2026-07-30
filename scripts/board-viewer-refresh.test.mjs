@@ -236,6 +236,21 @@ describe('a board that DID change still lands', () => {
     dom.window.close()
   })
 
+  it('reopens the cards BEFORE it restores the offset — the order the offset means', async () => {
+    const { win, served, poll, scrolled, dom } = await loadBoard()
+    const order = []
+    // The board's own localStorage script exports this; the fixture has no such
+    // script, so it stands in for it and records when it ran.
+    win.__hoaBoardRestore = () => order.push('cards')
+    win.scrollTo = (x, y) => order.push('scroll:' + y)
+    Object.defineProperty(win, 'scrollY', { value: 90, configurable: true })
+    served.board = page('Neuer Stand um 03:10.')
+    expect(await poll()).toBe('swapped')
+    expect(order).toEqual(['cards', 'scroll:90'])
+    expect(scrolled).toEqual([]) // the replaced scrollTo is the one that ran
+    dom.window.close()
+  })
+
   it('does not swap twice for one change — the second poll is quiet again', async () => {
     const { served, poll, dom } = await loadBoard()
     served.board = page('Neuer Stand um 03:10.')
