@@ -1073,6 +1073,24 @@ nothing is lost in practice: the acceptance window matches ntfy's cache, so an
 construction — acceptance requires `age >= -skew`, and at every earlier moment
 such an envelope's age was more negative still, so no past poll can have taken it.
 
+**A NOTIFIED ENVELOPE IS NEVER ACCEPTED AFTERWARDS (point 430).** `ahead` is safe
+against a PAST acceptance, but not against a FUTURE one: the envelope's stamp is
+fixed while `now` advances, so waiting alone brings it inside the window, and a
+replay whose transport id a flood had evicted from the count-capped `seen` could be
+accepted minutes after the sender was told "NICHT angekommen". The notice is the
+half that cannot be taken back, so the notified ledger is read by the verification
+too — a notified envelope drops as `duplicate` for as long as it is remembered.
+That matches what the notice asks for (fix the clock and send AGAIN, which is a new
+envelope) and settles the second notice by construction, since a `duplicate` earns
+none. The same tick is covered as well, not only the next state read.
+
+**Both facts of one tick reach the log (point 430).** The launcher's chat log was an
+`if/else if` chain, which made a failed SPOOL WRITE and a refused DROP NOTICE
+mutually exclusive: the storage fault took the first branch and the notice clause
+never ran, so the one thing those counts exist to make loud went silent. The lines
+are composed by `chatInboxLogLines` in `scripts/chat-core.mjs` instead — a pure
+function returning both.
+
 The notice **never quotes the message**: the two topics are derived separately so
 that knowing one reveals nothing about the other, and the signed timestamp
 identifies the message on its own. One notice per envelope id (kept in its own
