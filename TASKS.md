@@ -3653,6 +3653,29 @@ it is appended.
   DOCS in the same commit: `docs/batch-autonomy.md` where the guard chain is described, and
   CLAUDE.md §7.2 only if the families it names change.
 
+- [ ] 439. AN UNTRANSLATED CARD TITLE FALLS BACK TO THE WORK ORDER, AND THE USER READS
+  ENGLISH SHOUTING (30.07.2026, the user asked for the SECOND time why the titles are English
+  and upper case; bundle H). CAUSE, measured: `queueEntries` in `scripts/board-queue-core.mjs`
+  titles a card `entry.title || titles[point] || "Punkt N"`, and the middle fallback is
+  `parseTaskTitles`, i.e. the work-order headline — English by rule (`tasks-md-english`) and
+  written in capitals. Every appended point therefore reaches the board in the one language
+  the board is not written in, and nothing says so: the fallback is silent, which is why it
+  came back. On 30.07.2026 eight of 77 cards stood that way, and a promoted card carries the
+  same title into "Woran ich gerade arbeite".
+  TARGET: the fallback stays (a nameless card is worse), but it can no longer pass unnoticed.
+  A card whose title is the raw work-order headline is REPORTED — by `board-queue.mjs` on
+  every rebuild, naming the points, and by the board's own publish check, so a session cannot
+  publish a board with an untranslated title without being told. The remedy line states the
+  one command that fixes it, which means `board-queue.mjs` also GETS that command: a
+  `--title` flag, since today only the body can be set from the CLI and the title had to be
+  hand-written into `.claude/board-queue.json`.
+  VERIFIABLE: pure Vitest — an entry with an authored title passes; one falling back to the
+  work-order headline is reported with its point number; the `Punkt N` fallback is reported
+  too; a German title that merely resembles the headline is NOT reported (compare against the
+  parsed headline, never a language heuristic); and `setQueueEntry` writes a title without
+  disturbing body or estimate.
+  DOCS in the same commit: `docs/batch-autonomy.md` where the board commands are listed.
+
 ## Closing (only after all points)
 
 New points are appended BEFORE this section — it stays last in the file.
