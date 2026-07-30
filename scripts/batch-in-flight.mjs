@@ -37,6 +37,8 @@ import {
   selfReferentialEvidence,
   slotReasonDecision,
   slotsRemedy,
+  statusVerdict,
+  closingFreezeActive,
   declaredAgentCount,
   openPointSpecs,
   IN_FLIGHT_MAX_AGE_MS,
@@ -213,10 +215,43 @@ const probes = { probePid, refTipAt, worktreeActiveAt, mtimeOf }
  * the declaration it judged. Cheap in the common case: with no marker on disk it
  * returns before any probe runs, so an ordinary turn end pays nothing for this.
  */
-/** The path whose existence records a CLOSING FREEZE (CLAUDE.md §9): while a closing
- *  run is under way no agent work may land, so empty pool slots are correct. */
+/** The path whose existence DECLARES a CLOSING FREEZE (CLAUDE.md §9) by hand: while a
+ *  closing run is under way no agent work may land, so empty pool slots are correct.
+ *  It is the override, not the primary signal — see `closingFreeze()`. */
 export const CLOSING_FREEZE_PATH = resolve(REPO_ROOT, '.claude', 'closing-freeze')
+/** Where `closing-guard` keeps its per-commit checklist. THIS is the signal a closing
+ *  is really running, because it is written as a side effect of doing the closing. */
+export const CLOSING_STATE_PATH = resolve(REPO_ROOT, '.claude', 'closing-state.json')
 const PAUSE_PATH = resolve(REPO_ROOT, '.claude', 'batch-paused')
+
+/**
+ * IS A CLOSING FREEZE UNDER WAY? The decision is pure (`closingFreezeActive`); this
+ * reads the two facts it needs. A hand-placed marker file counts, and so does a
+ * closing checklist recorded for the CURRENT HEAD — the latter is what makes the
+ * recognition reachable at all, since nothing in this repository ever writes the
+ * marker. Unreadable either way answers "no freeze", the direction that keeps the
+ * nudge alive rather than silencing it on a failed read.
+ */
+export function closingFreeze({ cwd = REPO_ROOT, statePath = CLOSING_STATE_PATH } = {}) {
+  let closingState = null
+  try {
+    closingState = JSON.parse(readFileSync(statePath, 'utf8'))
+  } catch {
+    /* no closing has ever been recorded here */
+  }
+  let head = ''
+  try {
+    head = execFileSync('git', ['rev-parse', 'HEAD'], {
+      cwd,
+      encoding: 'utf8',
+      timeout: 15000,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim()
+  } catch {
+    /* not a repo — then the state cannot be keyed to this HEAD either */
+  }
+  return closingFreezeActive({ marker: existsSync(CLOSING_FREEZE_PATH), closingState, head })
+}
 
 /** The branch checked out in a declared WORKTREE, or null.
  *
@@ -288,7 +323,7 @@ export function gatherSlots(declaration, { cwd = REPO_ROOT, tasksPath = TASKS_PA
       runningFiles: running,
       reason: declaration?.slotsFree ?? '',
       paused: existsSync(PAUSE_PATH),
-      closingFreeze: existsSync(CLOSING_FREEZE_PATH),
+      closingFreeze: closingFreeze({ cwd }).active,
       cap: POOL_CAP,
     })
   } catch {
@@ -341,9 +376,19 @@ if (isMain) {
   } else if (argv[0] === '--status' || argv.length === 0) {
     const g = gatherInFlight(sid)
     console.log(JSON.stringify({ ownerSessionId: sid || null, maxAgeMs: maxAgeMs(), ...g }, null, 2))
-    if (!g.declaration) console.log(`\nNothing declared.\n${usage}`)
-    else if (g.live) console.log(`\nA stop would be ALLOWED — waiting on ${describeInFlight(g, g.declaration)}`)
-    else console.log(`\nA stop would be BLOCKED (${g.reason}).`)
+    // The verdict is decided in the pure core, not by an `if` here: since point 427
+    // a declaration can be perfectly live and STILL block, and this command promises
+    // what the hook would decide.
+    const verdict = statusVerdict(g)
+    if (verdict.verdict === 'none') console.log(`\nNothing declared.\n${usage}`)
+    else if (verdict.verdict === 'allowed') {
+      console.log(`\nA stop would be ALLOWED — waiting on ${describeInFlight(g, g.declaration)}`)
+    } else if (verdict.why === 'slots-free') {
+      console.log(
+        `\nA stop would be BLOCKED. The wait itself checks out (${describeInFlight(g, g.declaration)}), but the ` +
+          `agent pool runs below its cap and nothing says why.\n\n${slotsRemedy({ slots: g.slots ?? {}, cap: POOL_CAP })}`,
+      )
+    } else console.log(`\nA stop would be BLOCKED (${verdict.why}).`)
   } else if (argv[0] === '--waiting-on') {
     const waitingOn = String(argv[1] ?? '').trim()
     if (!waitingOn) fail(`--waiting-on needs a description of the wait.\n${usage}`)
