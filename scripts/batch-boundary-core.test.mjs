@@ -8,8 +8,11 @@
 //     session but END the batch.
 import { describe, it, expect } from 'vitest'
 import {
+  BOUNDARY_DESTINATIONS,
   BOUNDARY_FRESH_MS,
   BOUNDARY_DUE_MS,
+  boundaryCardText,
+  boundaryDestination,
   assessBoundary,
   boundaryDueFrom,
   boundaryVerdict,
@@ -462,5 +465,60 @@ describe('boundaryDueFrom — only for a point THIS session closed, and only whi
     expect(boundaryDueFrom({ tick: { point: 0, at: NOW }, ownerSince, now: NOW })).toBe(null)
     expect(boundaryDueFrom({ tick: { point: 388, at: 'yesterday' }, ownerSince, now: NOW })).toBe(null)
     expect(boundaryDueFrom({ tick: { point: 388, at: NOW - 60_000 }, ownerSince: undefined, now: NOW })).toBe(null)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// POINT 434 (7), found 29.07.2026 20:06: the card said "Ich übergebe an eine
+// frische Sitzung … Sie nimmt den nächsten Punkt der Warteschlange auf" while a
+// user window held an HONOURED claim — and `batch-autostart.mjs` reserves the
+// batch for a live claim and SKIPS the spawn, so the batch went to that window.
+// The text told the user his takeover had been overtaken. One case per state.
+describe('the boundary card names where the batch actually goes', () => {
+  it('WITH an honoured claim: the claiming window, and the launcher skips the spawn', () => {
+    const where = boundaryDestination({ claimHonoured: true, claimantSid: 'session-window-1' })
+    expect(where).toEqual({ destination: BOUNDARY_DESTINATIONS.CLAIMING_WINDOW, claimantSid: 'session-window-1' })
+    const text = boundaryCardText({ point: 434, ...where })
+    expect(text).toContain('Punkt 434 ist abgeschlossen.')
+    expect(text).toContain('NICHT an eine frische Sitzung')
+    expect(text).toContain('Fenster session-window-1 hat ihn beansprucht')
+    expect(text).toContain('Launcher hält den Start deshalb zurück')
+    expect(text).toContain('--session session-window-1')
+    // The sentence the incident was made of must not appear in this state.
+    expect(text).not.toContain('nächsten Punkt der Warteschlange')
+  })
+
+  it('WITHOUT a claim: a fresh session, which takes the next queued point', () => {
+    const where = boundaryDestination({})
+    expect(where).toEqual({ destination: BOUNDARY_DESTINATIONS.FRESH_SESSION, claimantSid: null })
+    const text = boundaryCardText({ point: 434, ...where })
+    expect(text).toContain('Ich übergebe an eine frische Sitzung')
+    expect(text).toContain('nächsten Punkt der Warteschlange')
+    expect(text).toContain('Kein Fenster hat den Stapel beansprucht')
+  })
+
+  it('a claim that is merely RECORDED changes nothing — the card follows `honour`', () => {
+    // Expired, dead, or already released: the launcher spawns, so the card says
+    // so. It reads the same predicate the launcher bails on, never the file.
+    expect(boundaryDestination({ claimHonoured: false, claimantSid: 'session-window-1' }).destination).toBe(
+      BOUNDARY_DESTINATIONS.FRESH_SESSION,
+    )
+    expect(boundaryDestination({ claimHonoured: true, claimantSid: '  ' }).destination).toBe(
+      BOUNDARY_DESTINATIONS.FRESH_SESSION,
+    )
+  })
+
+  it('is total, and never prints a nonsense point number', () => {
+    expect(boundaryCardText({}).startsWith('Der Punkt ist abgeschlossen.')).toBe(true)
+    expect(boundaryCardText({ point: 'vier' }).startsWith('Der Punkt ist abgeschlossen.')).toBe(true)
+    expect(boundaryCardText({ point: 0 }).startsWith('Der Punkt ist abgeschlossen.')).toBe(true)
+  })
+
+  it('INDEPENDENCE: the card is decided with no lock, no launcher probe and no work order', () => {
+    // Nothing but the claim verdict reaches this decision, so a stale or missing
+    // input from any other layer cannot silence it or make it lie.
+    expect(boundaryCardText({ point: 1, ...boundaryDestination({ claimHonoured: true, claimantSid: 's' }) })).toContain(
+      'Fenster s hat ihn beansprucht',
+    )
   })
 })
