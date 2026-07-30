@@ -527,6 +527,11 @@ const HEADER = [
   '  (`scripts/doc-budget-core.mjs`), and CLAUDE.md sits near its limit. Measure before you',
   '  add a paragraph; raising a ceiling needs a written justification in the same commit.',
   '- Never `git checkout <file>` on a file holding uncommitted work — it discards it.',
+  '- Every commit records its AUTHORING MODEL in the co-author trailer. That trailer is the',
+  '  only machine-readable evidence `scripts/model-guard.mjs` has, so the bare',
+  '  `Co-Authored-By: Claude <noreply@anthropic.com>` names no model and trips the tripwire,',
+  '  which STOPS the batch. Write your own model:',
+  '  `Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>`.',
 ]
 
 /**
