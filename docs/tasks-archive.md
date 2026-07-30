@@ -12836,7 +12836,7 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   for retrospective §3.22.
 
 - [x] 433. THE LAUNCHER WATCHED THE BATCH STAND STILL FOR TWO HOURS AND ONLY WROTE IT DOWN
-  (30.07.2026, a whole unattended night lost; bundle I). At 21:50 both delegated agents died
+  (30.07.2026, a whole unattended night lost; bundle Session- & Repo-Hygiene). At 21:50 both delegated agents died
   on a server-side 500, and moments later the environment's permission classifier went down,
   so the owning session could not execute a single command. It had not crashed — it stood.
   Six hours later the state was byte-for-byte what it had been at 21:53.
@@ -12890,7 +12890,7 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   for retrospective §3.61.
 
 - [x] 435. THE REMEDY TEXTS SEND EVERY SESSION DOWN A RETIRED PATH (30.07.2026, rule-corpus
-  review of 107 entries; bundle H). The claude.ai artifact was retired on 29.07.2026 — the
+  review of 107 entries; bundle Chat & Tafel). The claude.ai artifact was retired on 29.07.2026 — the
   user moved their bookmark to the Pages URL — but **43 references across seven files still
   name it**, and they sit in the worst possible places: the remedy text of every board Stop
   guard (`dashboard-guard-core.mjs`, `dashboard-card-topic-guard-core.mjs`,
@@ -12916,7 +12916,7 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   contract, and `docs/batch-autonomy.md` where the transport is described.
 
 - [x] 436. THE MOST EXPENSIVE TEXT IN THE PROJECT REPEATS WHAT THE MACHINE ALREADY ENFORCES
-  (30.07.2026, rule-corpus review; bundle H). `dashboard-reminder-hook.mjs` injects ~30 lines
+  (30.07.2026, rule-corpus review; bundle Chat & Tafel). `dashboard-reminder-hook.mjs` injects ~30 lines
   of board-structure prose into EVERY user prompt — the single most expensive text here — and
   most of it is now enforced mechanically: the four sections, their order and the card shape
   are checked by `board-structure-core.mjs` BEFORE every publish, the `open`-attribute ban
@@ -12965,7 +12965,7 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   estimate point. Fix it here, with a case at the wrap.
 
 - [x] 434. THE BATCH MUST NOT BE ABLE TO STAND STILL — THE LAYERS AROUND POINT 433
-  (30.07.2026, user: preventing this reliably outranks batch progress; bundle I). The night of
+  (30.07.2026, user: preventing this reliably outranks batch progress; bundle Session- & Repo-Hygiene). The night of
   29./30.07. produced nothing: work stopped at 21:50 and the state at 04:19 was byte-for-byte
   the same. NINE part-failures chained (A-I), and the pattern behind all of them is that every
   layer could OBSERVE the stall while none could ACT — and where authority existed, a condition
@@ -13174,7 +13174,7 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   drill of 449 leaves at least three of them behind at once.
 
 - [x] 458. A DELEGATED AGENT'S RETURN IS A PROTOCOL, NOT A NARRATIVE (30.07.2026,
-  measured while assessing the delegation economics; bundle I). Point 365 bounded the INPUT
+  measured while assessing the delegation economics; bundle Session- & Repo-Hygiene). Point 365 bounded the INPUT
   side of delegation — a brief costs ~1.8k tokens against ~108k for reading the work order
   and design.md whole — but NOTHING bounds what the agent writes BACK, and its final text is
   the only thing that enters the main session's context. It is also the one part the main
@@ -13199,7 +13199,7 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
 
 
 - [x] 459. CLAUDE.MD PAYS ITS RENT ON EVERY TURN (user 30.07.2026, measured that day;
-  bundle L). CLAUDE.md is 72014 characters — about 18k tokens — and it is sent with EVERY
+  bundle Dokumentation). CLAUDE.md is 72014 characters — about 18k tokens — and it is sent with EVERY
   turn of EVERY session and inherited by every delegated subagent, three of which run in
   parallel. Unlike the accumulated conversation, which the point boundary resets, this load
   never resets. It is also at 100.0 % of its own word ceiling today (10419 words against
@@ -13243,7 +13243,7 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
 
 - [x] 441. THE BOARD REFRESH STEALS THE CHAT INPUT'S FOCUS AND THE SCROLL POSITION (user
   30.07.2026, reported from the phone: "Ein Refresh vom Dashboard nimmt mir den Fokus vom
-  Chat-Eingabefeld und die Scrollposition weg"; bundle H). The viewer
+  Chat-Eingabefeld und die Scrollposition weg"; bundle Chat & Tafel). The viewer
   (`public/board/index.html`) refetches the board every 30 s and replaces `<main>` WHOLESALE,
   then re-injects the chat on the `hoa-board-swapped` event (point 423). The draft text
   survives that swap, but the caret does not: mid-sentence the keyboard closes on a phone and

@@ -3451,7 +3451,7 @@ it is appended.
   corpus's 235 agent-spawning turns carried no record, so the delegation pattern pays a
   `--none` per turn unless the trigger is softened.
 
-- [ ] 437. THE TWO GUARD MECHANISMS THE WORK ORDER NEVER RECEIVED (30.07.2026; bundle J).
+- [ ] 437. THE TWO GUARD MECHANISMS THE WORK ORDER NEVER RECEIVED (30.07.2026; bundle Modell & Wächter).
   Both were agreed with the user on 29.07.2026 and both survived only in a memory carrier
   (`pending-queue-work-29-07.md`) because the batch lock was held elsewhere that evening —
   the exact failure point 432 exists to end. They are collected here so the carrier can be
@@ -3548,7 +3548,7 @@ it is appended.
   one stays exempt.
 
 - [ ] 438. THE PROJECT HOOKS CANNOT FIRE OUTSIDE THE REPO ROOT (29.07.2026, measured in a
-  `/doctor` run and reviewed by the second model; bundle J). All 31 project hooks in
+  `/doctor` run and reviewed by the second model; bundle Modell & Wächter). All 31 project hooks in
   `.claude/settings.json` are wired RELATIVELY (`node scripts/x.mjs`), so a session whose cwd
   is not the repo root loses the WHOLE guard chain to a non-blocking `Cannot find module` —
   silently, because a non-blocking hook error produces no notice. MEASURED over 46 transcripts
@@ -3589,7 +3589,7 @@ it is appended.
 
 - [ ] 439. AN UNTRANSLATED CARD TITLE FALLS BACK TO THE WORK ORDER, AND THE USER READS
   ENGLISH SHOUTING (30.07.2026, the user asked for the SECOND time why the titles are English
-  and upper case; bundle H). CAUSE, measured: `queueEntries` in `scripts/board-queue-core.mjs`
+  and upper case; bundle Chat & Tafel). CAUSE, measured: `queueEntries` in `scripts/board-queue-core.mjs`
   titles a card `entry.title || titles[point] || "Punkt N"`, and the middle fallback is
   `parseTaskTitles`, i.e. the work-order headline — English by rule (`tasks-md-english`) and
   written in capitals. Every appended point therefore reaches the board in the one language
@@ -3677,7 +3677,7 @@ it is appended.
 
 - [ ] 440. WHAT ELSE IS BILLED ON EVERY TURN FOR NOTHING — A MEASURED INVENTORY (user
   30.07.2026, reading point 436: "ob du noch mehr Altlasten hast, durch die du redundante
-  Dinge machst, die Token und Zeit verschwenden"; bundle H). 436 cut ONE injected text by
+  Dinge machst, die Token und Zeit verschwenden"; bundle Chat & Tafel). 436 cut ONE injected text by
   61 %; the question is what else repeats itself, and the answer must be MEASURED, not
   guessed. ALREADY FOUND while answering, and the clearest instance of the same pattern: the
   chat-timestamp rule is stated THREE times in EVERY prompt — the user-scope
@@ -3933,7 +3933,7 @@ it is appended.
   saving it was drafted for.
 
 - [ ] 461. A RELEASED CLAIM MUST HOLD THE DOOR WHILE ITS CLAIMANT LIVES (30.07.2026,
-  observed live; bundle I). `.claude/boundary.log` records `RELEASED to 103806e3… by
+  observed live; bundle Session- & Repo-Hygiene). `.claude/boundary.log` records `RELEASED to 103806e3… by
   3c5d6964…` at 17:10:22; the lock shows `acquiredAt` 17:11 — the RELEASING session took it
   back at its next turn end (`scripts/batch-progress-guard.mjs`), because a released claim is
   read as ABSENT (`assessClaim`, `scripts/batch-claim-core.mjs`) and reserves nothing. The
@@ -3969,7 +3969,7 @@ it is appended.
 
 - [ ] 462. A WINDOW THAT IS NOT THE MASTER MUST BE ABLE TO ENQUEUE WHAT THE USER SAYS (user
   30.07.2026: "Es ist problematisch, dass ich regelmäßig mit einer Sitzung rede, die nicht der
-  Master ist … Gibt es eine sichere Lösung?"; bundle I). For an hour this window held a
+  Master ist … Gibt es eine sichere Lösung?"; bundle Session- & Repo-Hygiene). For an hour this window held a
   pending claim while the user settled three decisions and had two documents evaluated.
   TASKS.md is main-only and batch-owned, so nothing could be enqueued; the specs lived in a
   scratchpad file OUTSIDE the repository and would have died with the window.
@@ -4011,7 +4011,7 @@ it is appended.
   lands.
 
 - [ ] 463. TWO LIVENESS READINGS THE FORCED HANDOVER PROVED WRONG (30.07.2026, both
-  observed while taking the batch back by force; bundle I).
+  observed while taking the batch back by force; bundle Session- & Repo-Hygiene).
   PART A — A KILLED OWNER READS AS ALIVE FOR FIVE MINUTES. `assessOwner`
   (`scripts/batch-singleton.mjs`) returns `fresh-heartbeat` for any heartbeat younger than
   `DEAD_CONFIRM_MS` WITHOUT probing the pid, so a stopped owner keeps the batch for up to
@@ -4034,7 +4034,7 @@ it is appended.
   a non-owner; the sweep is evidenced by the commit message naming every guard checked.
 
 - [ ] 464. A RED UNIT LAYER REACHED `main` THROUGH THE PRE-PUSH GATE (user 30.07.2026:
-  "Sorge dafür, dass das sicher nicht mehr passiert."; bundle K). CI run 30555562185 on
+  "Sorge dafür, dass das sicher nicht mehr passiert."; bundle Testinfrastruktur). CI run 30555562185 on
   `main`, commit `4d580957`, failed at step `npm run test:unit` — the guide-brevity audit,
   because that commit pushed `docs/analysis_de/vibe-coding-anleitung.md` over its budget. The
   commit four minutes later paid for it, so the red was brief, but it MAILED the repository
@@ -4059,7 +4059,7 @@ it is appended.
 
 - [ ] 465. A NOW-CARD OUTLIVES THE SESSION THAT WROTE IT (user 30.07.2026, from the board
   screenshot: "'Gerade keine laufende Arbeit' ist auch nicht wirklich wahr … beim nächsten
-  Mal wird es wieder so eine geben, oder?"; bundle H). After the forced handover the
+  Mal wird es wieder so eine geben, oder?"; bundle Chat & Tafel). After the forced handover the
   stopped session's card "Gerade keine laufende Arbeit" (17:09) still stood in "Woran ich
   gerade arbeite" BESIDE the new session's card, so the board claimed work and no work at
   once. It was removed by hand — which is the defect: a now-card is written by a session and
@@ -4077,7 +4077,7 @@ it is appended.
 
 - [ ] 466. THE DOC VERIFICATION CHECKS A SENTENCE THE README NO LONGER HAS (30.07.2026,
   found by the agent that shrank the always-loaded instruction file; reproduced on unmodified
-  `main`, so it is PRE-EXISTING and was not caused by that work; bundle K).
+  `main`, so it is PRE-EXISTING and was not caused by that work; bundle Testinfrastruktur).
   `scripts/verify/docs.mjs` fails two checks — "README states an acceptance-criteria count"
   and "README count matches CLAUDE.md §7.1" — because the README no longer carries the
   "All N acceptance criteria" phrase the check greps for. A verification that is red for a
@@ -4126,3 +4126,26 @@ also be taken as its own task now and then.
   `REFRESHER_SOURCE`, one asserting the structure check refuses a board carrying a foreign or
   absent script, and one covering the event dispatch. Plus one published board reviewed by
   eye — a swap must still re-inject the chat.
+
+- [ ] 468. THE SAME BLIND PARSE SITS IN TWO MORE READERS OF THE WORK ORDER (30.07.2026,
+  named by the agent that fixed the board's title parse; bundle Modell & Wächter). The defect
+  shape of point 439 — a `$`-anchored line pattern applied to `split('\n')` output, which
+  matches NOTHING when the file arrives with CRLF because `.` does not match `\r` and `$` does
+  not stand before it — was found in two further readers that were NOT in that point's file
+  scope: `parsePointSpecs` in `scripts/dashboard-integrity-guard-core.mjs` (its whole spec map
+  comes back empty, so every per-point check silently passes on nothing — observed live on
+  30.07.2026, when it reported 96 queue cards as "point does not exist") and
+  `processTaskPoints` in `scripts/retro-core.mjs`. Two more carry the same shape but are
+  LF-fed by construction today (`retro-core.mjs` around line 94,
+  `batch-handover-observe-core.mjs` around line 52) — a construction, not a guarantee.
+  The line endings on disk were normalised on 30.07.2026, so the symptom is gone; the READERS
+  are still one bad checkout away from it, and the class is retrospective §3.72: over a
+  known non-empty source, an empty parse is a FINDING, not an answer.
+  FINAL STATE: every reader of the work order tolerates both line-ending forms, and the two
+  guard-side readers REPORT an empty parse over a non-empty file instead of passing. A sweep
+  names every remaining instance of the shape in `scripts/` and either fixes it or records why
+  it cannot arrive with CRLF. Both files are guard cores, so the other model's recorded review
+  is required before the merge (`mechanism-review-guard`).
+  VERIFIABLE: one Vitest case per fixed reader whose fixture text carries CRLF explicitly (a
+  fixture written with `\n` passes before the fix and proves nothing), plus one asserting the
+  empty-parse report fires for a non-empty source.
