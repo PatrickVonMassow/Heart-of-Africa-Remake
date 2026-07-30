@@ -3513,7 +3513,7 @@ it is appended.
   no age, no liveness — while the expiry lives in a consumer it never calls, so a dead
   session's declaration shields its branch and worktree from the sweep for ever; the sweep
   applies the same expiry the progress guard applies.
-  All eight stand down for a session that does not own the batch lock and for a paused batch,
+  All six stand down for a session that does not own the batch lock and for a paused batch,
   like every guard here. MECHANISM REVIEW REQUIRED (CLAUDE.md §7.2); the
   `.claude/settings.json` wiring is attended-only and must be ABSOLUTE, not cwd-relative.
   DOCS in the same commit: `docs/batch-autonomy.md` (the guard chain), for (B)
