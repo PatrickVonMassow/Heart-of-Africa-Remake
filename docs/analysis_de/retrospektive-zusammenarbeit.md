@@ -609,6 +609,14 @@ Der Fehler ist nicht der Rückfall selbst; ein namenloser Eintrag wäre schlimme
 
 **Lehre:** Jeder Rückfall auf einen Ersatzwert wird gemeldet, an der Stelle, an der er greift. Und die Zeile, die ihn meldet, nennt den Befehl, der ihn behebt — sonst wird er von Hand behoben, was hier prompt die Datei mit falschen Zeilenenden zurückschrieb und die Archiv-Rotation der Tafel zum Absturz brachte.
 
+### 3.66 Die Kennung, die nur innen etwas bedeutet
+
+„Die Buchstaben sagen nichts aus" (Nutzer, 30.07.2026). Die Arbeitspakete dieses Projekts heißen seit ihrer Einführung A bis M, und genau so standen sie im Chat und auf der Tafel — „Bündel H ist abgeschlossen". Für die Maschine ist der Buchstabe eine perfekte Kennung: kurz, eindeutig, stabil. Für den Leser ist er eine Nachschlagepflicht — bevor er irgendetwas beurteilen kann, muss er erst herausfinden, was H überhaupt ist.
+
+Es ist dieselbe Klasse wie die Regel, einen gefundenen Fehler in sichtbaren Worten statt in Modul- und Seeder-Namen zu melden, nur eine Ebene höher: Diesmal war nicht der Befund, sondern die ORDNUNG der Arbeit in einer Sprache formuliert, die nur innen gilt. Und sie ist billig zu vermeiden — jedes Paket hat jetzt einen deutschen Namen („Chat & Tafel", „Kadaver & Geier"), der Buchstabe bleibt die interne Kennung der Tabelle.
+
+**Lehre:** Eine Kennung, die der Leser nachschlagen muss, ist im Gespräch mit ihm keine Kennung, sondern eine Hürde. Was nach außen geht, trägt den Namen; die Kurzform bleibt drinnen. Und wer ein neues Paket schneidet, vergibt den Namen im selben Moment — ein Buchstabe allein ist keine vollständige Definition.
+
 ---
 
 ## 4. Die Guards als Immunsystem
@@ -698,7 +706,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Donnerstag, 30.07.2026, 09:51 · Quellen-Fingerprint: `df5469935519…`
+Zuletzt aktualisiert: Donnerstag, 30.07.2026, 10:10 · Quellen-Fingerprint: `596d0d540848…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -717,6 +725,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Delegate via `node scripts/point-brief.mjs <N>` — the AGENT generates its own brief; board changes go through `scripts/board.mjs`; expect 529 agent deaths and commit-per-step | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | F6 bug-report zips the user hands over are saved into the repo's git-ignored local/ folder — search there first, not only Downloads | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | A newly found problem goes into an EXISTING bundle point first; a new standalone point is the exception, and may instead re-cut the bundles | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
+| Work packages are SPOKEN by name, never by letter — the user cannot read \"bundle H\"; the letter stays only as an internal ID | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Jede Chat-Antwort mit einem Zeitstempel nach deutscher Zeit (Europe/Berlin, DST-korrekt) beginnen | 11 | hoch | timestamp-guard.mjs | ✔ Mechanismus |
 | CLAUDE.md §7.1 references design.md instead of retelling it; future doc edits must preserve the verifiable conditions, script mappings, numbering and checked numbers | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Autonomously insert a full CLOSING cycle (regression + dead-code/stale-doc cleanup + .md audit) when warranted — after extensive rework or many small completed tasks — without waiting for the user to ask | 1 | niedrig | closing-guard.mjs | ✔ Mechanismus |
@@ -780,8 +789,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | CORRECTED 19.07.2026 — WebGPU IS testable headless/autonomously via system Chrome (channel:'chrome') + --headless=new; the 'untestable' belief held only for Playwright's BUNDLED Chromium | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 74 Feedback-/Projekt-Memories · 39 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 21 Prozess-/Meta-TASKS-Punkte (davon 8 offen).
+Erfasste Quellen: 75 Feedback-/Projekt-Memories · 39 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 21 Prozess-/Meta-TASKS-Punkte (davon 8 offen).
 
-<!-- RETRO-FINGERPRINT: df546993551988de3abe782ae2d10d0321a8326c06a90832d07834b095a3d9f0 -->
-<!-- RETRO-LAST-REFRESHED: 2026-07-30T07:51:29.547Z -->
+<!-- RETRO-FINGERPRINT: 596d0d540848453a4c05951f613de1869add4d8f43b432146be21bb47c835c7b -->
+<!-- RETRO-LAST-REFRESHED: 2026-07-30T08:10:56.337Z -->
 <!-- AUTO-GENERATED:END -->
