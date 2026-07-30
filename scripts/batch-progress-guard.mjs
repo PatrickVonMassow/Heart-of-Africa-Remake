@@ -298,9 +298,12 @@ try {
     // the stamp buys is the other window's `--status`, which can then say the record
     // is spent and that the lock is there to be taken — the claimant re-runs its own
     // command, and if the launcher got there first it claims again against the new
-    // owner. Before the stamp the claim is bound by the claimant's own liveness
-    // rather than by a clock it has to keep feeding; `CLAIM_MAX_AGE_MS` only bounds
-    // how long a FREE lock waits for a claim nobody has taken.
+    // owner. Before the stamp a WINDOW's takeover claim is bound by the claimant's
+    // own liveness rather than by a clock it has to keep feeding, and for it
+    // `CLAIM_MAX_AGE_MS` bounds only how long a FREE lock waits for a claim nobody
+    // has taken. An ERRAND claim carrying an issuer (`claimIsBounded`) is the
+    // exception and keeps the wall clock even under a live owner, because its pid
+    // names the watcher rather than the taker.
     // Release, then stamp ONLY if the release actually happened — the stamp asserts
     // that the batch was handed over, so it is never written on the word of a session
     // that freed nothing. Both lines live in handBackToClaimant so the pairing is

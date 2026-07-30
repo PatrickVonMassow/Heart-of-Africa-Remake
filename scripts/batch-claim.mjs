@@ -88,7 +88,8 @@ export function clearClaim(path = CLAIM_PATH) {
  * `releaseDecision` reads as "nothing half-done" — so a probe that timed out
  * under load (8 s, on the machine that is busy enough to time out) released the
  * batch MID-MERGE, the one outcome this family exists to prevent. "I could not
- * look" is now its own verdict and waits, bounded by the claim's own expiry.
+ * look" is now its own verdict and waits, bounded by how long the claimant itself
+ * lives (and by the wall clock only for an errand claim, `claimIsBounded`).
  *
  * `--git-path` rather than a hard-coded `.git/…`, so it is right inside a
  * worktree too (where `.git` is a file pointing elsewhere).

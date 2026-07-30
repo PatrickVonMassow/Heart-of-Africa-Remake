@@ -113,8 +113,9 @@ export function ownerIsHolding({ lock = null, claimantSid = '', alive = false } 
  *  nothing half-done. The two must not collapse into one value: "I could not look"
  *  read as "all clear" releases the batch mid-merge, and that is the one outcome
  *  this whole family exists to prevent. `releaseDecision` maps it to `wait`, and
- *  the bound that keeps a too-timid verdict from stranding anything is the claim's
- *  own expiry. Lives here, not in the IO half, so the pure decision function owns
+ *  the bound that keeps a too-timid verdict from stranding anything is the
+ *  claimant's own lifetime — the wall clock only for an errand claim carrying an
+ *  issuer (`claimIsBounded`). Lives here, not in the IO half, so the pure decision function owns
  *  the value it interprets. */
 export const GIT_STATE_UNVERIFIABLE = 'unverifiable'
 
