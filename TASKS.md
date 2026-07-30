@@ -3738,6 +3738,15 @@ it is appended.
   ABSENCE, so the party that expects a check-in has to be the one that computes progress.
   Justified empirically by failure I: the launcher log ENDS at 02:21, so the whole local
   watcher layer can fall silent as a unit.
+  (1) IS BUILT, 30.07.2026: `.github/workflows/batch-watchdog.yml`, every 30 min from
+  GitHub, `STALL_MINUTES` 120, alert-only. It came out NARROWER than specified above — it
+  does not release the lease, because releasing from outside would need repository write
+  access from a job that cannot see the fence, which is a second failure mode rather than a
+  second safeguard; the release stays in layer 2 where the atomic acquire lives. Documented
+  in `docs/batch-autonomy.md` and `docs/batch-resilience.md` §3. What REMAINS of this part:
+  nothing for the watcher itself, but its ntfy alert shares a channel with the CI-red alert,
+  so the ESCALATION LADDER (rising interval, and a paused batch with a board card as the
+  last rung) is still owed and belongs with part (3).
   (2) THE LEASE — the right core and the largest rebuild, so it follows 433 with its own
   four-eyes review. `leaseUntil` in the lock file, renewed in PRE-ToolUse rather than post:
   the existing heartbeat fires after a call returns, so a lease renewed by it would have to

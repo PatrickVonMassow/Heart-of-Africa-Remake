@@ -149,6 +149,16 @@ enough, and the launcher already owns the debounce state (`autostart-last.json`)
 a second spawner would not see — two spawners produce double boots that then have to
 be reaped as rogue.
 
+**BUILT 30.07.2026** as `.github/workflows/batch-watchdog.yml`, and narrower than
+this section first proposed: it ALERTS only, it does not release. Releasing from
+outside would mean write access to the repository state from a job that cannot see
+the fence, which is a second failure mode rather than a second safeguard — the
+release stays with layer 2, where the atomic acquire lives. Cadence 30 minutes,
+`STALL_MINUTES` 120, both in the workflow's `env`; it dates HEAD and counts the
+open points in `TASKS.md`. It also cannot go red, because the morning it was
+written the owner's inbox was flooded by 53 failed runs and a watchdog that fails
+would add to the noise it exists to cut through.
+
 ### Layer 5 — a child's transient death is retryable, an environment outage is not
 
 Transience is an **allowlist**: HTTP 5xx/429/529, ECONNRESET/ETIMEDOUT, the

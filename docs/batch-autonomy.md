@@ -552,6 +552,39 @@ Vitest-covered in `scripts/batch-in-flight-core.test.mjs`). IO and probes:
 derived from the caller's lock path via `statePathsFor`, so a redirected lock
 redirects it too (finding 3).
 
+### The watcher that does not live on this machine (30.07.2026, point 434)
+
+`.github/workflows/batch-watchdog.yml` asks, every thirty minutes and from
+GitHub, the only question that survives a dead machine: **did `main` move while
+work was open?** It dates HEAD, counts the open points in `TASKS.md` — the work
+order carries only open ones, so a plain count is the honest number — and pushes
+an ntfy alert when the tree has stood still past `STALL_MINUTES` (120) with points
+outstanding. Tunable in the workflow's `env`, and it runs on `workflow_dispatch`
+too, so it can be exercised on demand.
+
+WHY IT IS NOT A SECOND LOCAL WATCHDOG. On the night of 30.07.2026 the batch stood
+still for six hours. The launcher DID diagnose it — nine "WEDGED owner" lines over
+two hours — and could not act; then its log simply stops at 02:21. That stop is
+the evidence: standby, a disabled scheduled task or a dead launcher takes the
+whole local layer down as ONE unit, and a twin on the same task scheduler, the
+same node binary and the same disk would have gone with it. Independence, not
+thoroughness, is what this layer buys.
+
+WHAT IT DELIBERATELY DOES NOT DO. It never spawns and never writes to the
+repository. One spawner is enough — the launcher owns the debounce state
+(`autostart-last.json`) that a second one could not see, and two spawners produce
+double boots that then have to be reaped as rogue. A watchdog that mutates what it
+watches is a new failure mode, not a guard.
+
+AND IT CANNOT GO RED. The morning it was written, 53 of the last 100 CI runs had
+failed and the owner's inbox was flooded; a watchdog that fails would add to
+exactly the noise it exists to cut through. Every step ends successfully, the
+finding travels by push notification, and a missing `NTFY_TOPIC` secret is
+reported in the log rather than as a failure. Its honest limits: alert only, and
+GitHub's cron drifts — 15 to 60 minutes late is normal, which is acceptable for a
+night watchman and is why it is a backstop rather than the primary rescue (that is
+point 433, in the launcher).
+
 ### Liveness is judged by PROGRESS, not by age (28.07.2026, point 402)
 
 The batch sessions of that afternoon were not crashing. `.claude/autostart-run.log`
