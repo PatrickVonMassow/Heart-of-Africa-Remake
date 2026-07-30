@@ -112,6 +112,39 @@ renew the PARENT's lease. A wedged parent with one ticking background child
 therefore never expires — the inverse of this night, and the reason layer 3 judges
 repository output instead.
 
+**BUILT, 30.07.2026** — `scripts/batch-lease-core.mjs` (pure) plus its I/O in
+`batch-singleton.mjs` (`renewLease`, `extendLease`, `grantFence`, `readFence`) and
+the chokepoint in `board-first-guard.mjs`. Three decisions the build settled, none
+of them free choices:
+
+- **The window is 60 minutes, renewed at most every 5** — so the guaranteed
+  coverage is 55. It has to exceed the longest legitimate SINGLE call, because
+  renewal happens before the call: the LARGE regression at 30–40 minutes and the
+  longest measured undeclared call at 27.8. The demolished valve's 45 could not be
+  kept for exactly that reason. The ladder stays monotone: renew 5 < lease 60 <
+  the external watcher's 120, and a launcher tick is 15, so recovery lands within
+  75 minutes of a standstill instead of never. The rate limit is not a nicety —
+  writing this file twice per tool call is what produced five `EPERM … rename
+  batch-lock.json` failures on 28.07.2026.
+- **A lock without `leaseUntil` carries an implicit one** (`claimedAt + LEASE_MS`),
+  so nothing needs a migration step somebody has to remember: the live owner that
+  merges the change keeps working and writes a real lease at its next call.
+- **Staleness is read from the session's OWN grant**, never from "does not hold the
+  lock". A session is fenced out only when it demonstrably held a fence and the
+  mark has moved past it; one that never drove the batch has no grant on record and
+  can never be blocked. The chokepoint therefore runs BEFORE the ordinary
+  `heldByOtherLiveOwner` stand-down — a dispossessed session is not the owner, so
+  that exit is precisely the door it would leave by — and it refuses four families
+  of call and nothing else. Reads, local commits and its own file work continue,
+  and every other guard still stands down for it, so the Stop chain cannot demand
+  of it the publish this refuses.
+
+**Not built here, and deliberately:** nothing yet WRITES a longer lease when work
+is declared. `extendLease` is the sanctioned door and is tested; wiring it to the
+in-flight declaration belongs with part (6), which owns that file. Until then a
+declared wait is carried by the ordinary renewals of the session's own tool calls
+— which is what the blind spot above already describes.
+
 ### Layer 2 — the launcher may act (point 433)
 
 The narrow `isOwnSpawn` condition goes: a wedged owner is taken over whoever
@@ -231,6 +264,30 @@ its own thresholds. Layer 1 replaces: `WORK_STALL_*`, the `wedgeAction` /
 `isOwnSpawn` construction, the silence staging, and the four-hour `WEDGED_MS` valve.
 The build removes them in the same commit that makes the lease authoritative, or
 the next reader inherits three answers to one question.
+
+**DONE, 30.07.2026**, in the commit that made the lease authoritative. Gone:
+`WORK_STALL_TICKS` / `WORK_STALL_MS` / `WORK_DECLARATION_TOLERANCE_MS` and the
+`work-stalled` verdict; `wedgeAction`; `wedgeTakeover` and `acquire`'s `takeWedged`
+option; `silenceStage`, `wedgeStage`, `wedgeNotifyDecision` and the two-stage
+silent-owner report in the launcher; `WEDGED_MS`, `WEDGE_NOTIFY_MS` and the
+`wedged` flag on the assessment; `spawnDecision`'s third outcome `skip-wedged`; and
+with the kill-then-take valve, the launcher's `waitForExit`/`sleepSync`.
+`assessOwner` no longer takes a `work` argument at all — a declaration is a report
+now, never a claim on the batch.
+
+Two things survived, and the reasons are worth keeping:
+
+- **`isOwnSpawn`**, narrowed to what it was always for — the launcher may only KILL
+  a process it started itself. Point 433 removed that condition from the TAKEOVER
+  and kept it on the kill; the takeover is gone, the kill of a rogue own spawn is
+  not, and dropping the check with it would let the launcher end an attended window
+  of the user's. It is also what `reapableSpawns` uses to garbage-collect the
+  launcher's own spawn records, which is not a liveness verdict about the owner.
+- **`verdictRepeat`** (point 433 (c)), re-pointed at the lease verdict and renamed
+  at its key helper (`wedgeOwnerKey` → `ownerStateKey`). The failure it answers is
+  not the wedge but the REPORT — a launcher that reads the same thing every tick
+  and keeps saying it. A takeover that does not resolve the standstill, tick after
+  tick, is exactly what a person still needs to hear.
 
 ## 7. Order of the build
 

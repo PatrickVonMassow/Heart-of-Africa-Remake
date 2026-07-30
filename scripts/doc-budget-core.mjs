@@ -139,7 +139,18 @@ export const DOC_BUDGETS = [
     // rule nobody reads is a rule that rots. The guard entry is not optional
     // either: a session blocked by a guard this file does not list reads the
     // block as a bug and goes looking for the wrong fix.
-    maxWords: 10385,
+    // RAISED by the 34 measured words of point 434's lease in §6, and by that
+    // margin only: the passage was written 74 words long and cut twice against
+    // this ceiling, and the paragraph it joins gave back everything it could —
+    // the "cheaper model" line, which the model-policy bullet below it already
+    // says, and the claim command's parenthesis. What is left is a RULE a session
+    // cannot work without: ownership of the batch now ENDS by arithmetic at a
+    // moment both sides can compute, and a session that stopped renewing is
+    // refused merge/push, the tick, the board publish and dashboard-state. One
+    // that does not know this reads a fence denial as a broken guard and goes
+    // looking for the wrong fix — the failure the entry above this one prices.
+    // The LINE budget was not touched: the passage came out five lines under.
+    maxWords: 10419,
     why: 'loaded at every session start — the most expensive document in the project',
   },
   {
