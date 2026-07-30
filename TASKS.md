@@ -2814,6 +2814,19 @@ it is appended.
   VERIFIABLE for (d): one bounded written evaluation, layer by layer, naming per
   hand-built piece whether a primitive replaces it, decided by the same %/h measurement
   rather than by preference; a piece kept is kept with its reason recorded.
+  (e) THE BOUNDARY DOES NOT REACH INSIDE A HEAVY POINT (four-eyes review 30.07.2026, and the
+  one gap both models named). `batch-boundary.mjs` fires at POINT boundaries only; within a
+  single heavy point — long verification runs, a merge fought out over many turns — the
+  context grows unchecked, and that is the one case a mid-session compaction would address
+  and this project does not. The counter-measure is not a compaction: verification output is
+  written to DISK and only its tail is read, so a run that produces thousands of lines costs
+  the tail rather than the transcript. Rejected with it, and recorded so it is not proposed
+  again: "clear the context and re-read the work order" is a WORSENING here — `TASKS.md` is
+  310831 characters (~78k tokens) while `batch-resume-hook.mjs` re-orients a fresh session
+  for about 600.
+  VERIFIABLE for (e): a verify invocation writes its output to a file and the session reads a
+  bounded tail; measured on one long run, the tokens the transcript carries fall by an order
+  of magnitude, and the failure case still names its failing test.
 
 - [ ] 379. ABU SIMBEL BECOMES A WALKABLE SITE (user 27.07.2026; a FEATURE, and the user's
   own instruction is that the open DEFECTS come first — it waits behind them). The world carries
@@ -3686,10 +3699,24 @@ it is appended.
   and replaced by a pointer; a statement no mechanism can check stays, in full. Where a rule
   is enforced but its remedy is not discoverable, the REMEDY moves into the guard's block
   text, where it is read exactly when needed, instead of into every prompt.
+  MEASURED 30.07.2026, AND IT MOVES THE VERDICT: the fixed per-turn preamble, not
+  accumulation, is now the dominant token item — `CLAUDE.md` 72014 characters (~18k tokens),
+  `MEMORY.md` 12787 (~3.2k), the global `CLAUDE.md` 5093 (~1.3k), plus the hook texts above:
+  roughly 23k tokens of FIXED load per turn, which no point boundary resets. And every
+  delegated subagent INHERITS it, so the figure is multiplied by the pool width, not paid
+  once. Against that the Stop chain is free while it is green — a block is what costs.
+  TWO THREADS THE INVENTORY MUST CLOSE: (a) the delegation prompt does not fix the RETURN
+  shape, so an agent's report is as long as it chooses; it becomes a short protocol — point,
+  files touched, status, what is still open — mirroring what `point-brief.mjs` already did
+  for the inbound side (~1.8k tokens against ~108k). (b) `CLAUDE.md` is shortened by the
+  method that already worked once: the §7.1 evidence chains moved to
+  `docs/acceptance-evidence.md` and are loaded only when needed. That second one CHANGES THE
+  GOVERNING FILE, so it waits for the user's go (board card).
   VERIFIABLE: the inventory lands as a table in `docs/batch-autonomy.md` with the measured
   before/after per item, and each cut is pinned the way 436 pinned its own — a test naming
   the enforced claims that may not reappear, and the unenforceable duties that may not
-  vanish. The total saving is stated as one number in the commit.
+  vanish. The total saving is stated as one number in the commit, and the per-turn fixed load
+  is re-measured after the cuts so the claim is a measurement rather than an intention.
 
 - [ ] 441. THE BOARD REFRESH STEALS THE CHAT INPUT'S FOCUS AND THE SCROLL POSITION (user
   30.07.2026, reported from the phone: "Ein Refresh vom Dashboard nimmt mir den Fokus vom
