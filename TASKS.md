@@ -3295,6 +3295,13 @@ it is appended.
   `…/<session>/subagents/agent-*.jsonl`, whose `message.model` fields record the serving
   model per request. The pause stays mandatory; what changes is that the way out is stated
   instead of rediscovered.
+  THE REMEDY HAS A TRAP OF ITS OWN, measured 30.07.2026: rewriting the trailer with
+  `git filter-branch` leaves the old commits alive under `refs/original/…`, and the guard
+  reads `git log --all`, so it stays RED on a branch that is already fixed — invisibly, because
+  every worktree shares one `.git` and nobody looks there. The remedy line therefore states the
+  cleanup (`git update-ref -d refs/original/refs/heads/<branch>`) as part of the fix, and the
+  Vitest case pins that a rewritten branch with the backup ref still present is reported with
+  that ref NAMED, rather than as a second policy breach.
   VERIFIABLE: pure Vitest — `commit-msg` core accepts each allowed spelling (Opus 5,
   Opus 4.8, Fable 5, with and without the `(1M context)` suffix), rejects a bare
   `Claude <noreply@anthropic.com>`, rejects a named forbidden model, and ignores a purely
@@ -3418,8 +3425,10 @@ it is appended.
   spawns — one spawner is enough, and the launcher owns the debounce state a second one could
   not see. It is also the dead man's switch: ntfy forwards messages and cannot notice an
   ABSENCE, so the party that expects a check-in has to be the one that computes progress.
-  Justified empirically by failure I: the launcher log ENDS at 02:21, so the whole local
-  watcher layer can fall silent as a unit.
+  Justified by failure H: the local layer ticked all night and read a heartbeat as life, so a
+  second layer asking the same question off the same local evidence buys nothing — the outside
+  one judges repository OUTPUT. (The first telling justified this with failure I, "the launcher
+  log ends at 02:21"; that reading was WRONG and is withdrawn — see the root-cause below.)
   (1) IS BUILT, 30.07.2026: `.github/workflows/batch-watchdog.yml`, every 30 min from
   GitHub, `STALL_MINUTES` 120, alert-only. It came out NARROWER than specified above — it
   does not release the lease, because releasing from outside would need repository write
@@ -3456,9 +3465,27 @@ it is appended.
   (4) DEMOLITION, in the same commit that makes the lease authoritative: `WORK_STALL_*`, the
   `wedgeAction`/`isOwnSpawn` construction, the silence staging and the four-hour `WEDGED_MS`
   valve go. Three overlapping liveness verdicts must not coexist.
-  STILL TO ROOT-CAUSE before the lease is frozen: why the owner produced nothing after waking
-  at 02:21 with a fresh heartbeat (failure H — heartbeat is not progress), and why the launcher
-  log stops at 02:21 (failure I).
+  ROOT-CAUSED 30.07.2026 from `.claude/autostart.log`, and one of the two records was WRONG.
+  FAILURE I DID NOT HAPPEN: the launcher log does not end at 02:21 — it ticks every 15 minutes
+  right through to 08:36. What ends at 02:21 is the `WEDGED owner` LINE, and it ends because the
+  owner's heartbeat ticked once; the verdict flips to `skip: owner alive (fresh-heartbeat)` and
+  stays there for the remaining two hours while nothing is produced. So H and I are ONE failure,
+  not two, and the local watcher layer never fell silent. The external watcher keeps its
+  justification — a machine that is off, asleep or has a disabled task takes the local layer with
+  it — but that justification is now a RISK, not an observed event, and §1/§3 of
+  `docs/batch-resilience.md` say so. FAILURE H is root-caused as far as the artefacts reach: the
+  heartbeat ticked sporadically through the dead stretch (0, 15, 30, 1 minutes old at successive
+  ticks), so the session was making SOME calls and producing nothing — exactly the case a
+  heartbeat-renewed liveness test cannot see, and the reason the outside layer judges repository
+  OUTPUT. No further cause is recoverable from the artefacts, and the design already assumes this
+  one; the lease may be frozen.
+  (8) THE PREFLIGHT REGISTERS AS A SESSION AND RAISES A FALSE ALARM (found 30.07.2026 while
+  root-causing the above). Point 433's environment preflight appears in the launcher log as
+  `PARALLEL SESSIONS DETECTED: owner=preflight-test plus <real session>` — four times that night
+  alone. The parallel-session detector is one of the few alerts that means "stop everything", so a
+  probe of our own must not be able to trip it: the preflight's session identity is excluded from
+  that detector (or it stops registering as a session at all), with a Vitest case pinning that a
+  preflight in flight yields no parallel-session verdict while two REAL sessions still do.
   (5) JUDGE A DELEGATED AGENT BY ITS OUTPUT, NOT BY ITS LOG — added 30.07.2026 after doing
   exactly the opposite. A bundle agent's transcript log had been silent for 59 minutes, the
   in-flight declaration reported "evidence-gone: silent for 59 min", and it was declared dead
@@ -3628,6 +3655,27 @@ it is appended.
   text still reaches the board as a command-line ARGUMENT, so `--none` gains `--text-stdin`
   like every other text (point 410's rule: a Windows shell mangles the umlauts, and the
   audit then flags the card it just wrote).
+  AND THE FLAG ITSELF REACHED THE BOARD AS PROSE (found 30.07.2026). `board-queue.mjs set`
+  has NO `--text-stdin`, so a session that tried to pipe German prose into it stored the
+  literal string `--text-stdin` as the card body — and six cards, three of them live in the
+  queue, showed the user a command-line flag where their explanation belonged. Two of those
+  cards additionally carried umlauts mangled by the Windows shell (`W?chter`), because the
+  title could only be hand-written into `.claude/board-queue.json`. So: `board-queue.mjs set`
+  gains `--text-stdin` like every other text command, and no card-writing command may store a
+  value that begins with `--` as prose — it refuses and names the flag it expected. Vitest:
+  a body of `--text-stdin` is refused; a body legitimately beginning with a dash after a `--`
+  separator is accepted.
+  ALSO IN THIS POINT, the same family once more: THE SANCTIONED COMMAND CANNOT SATISFY THE
+  GUARD THAT JUDGES ITS OUTPUT. `board.mjs status` wraps whatever it is given into ONE `<p>`,
+  while `dashboard-conciseness-guard` blocks the turn end on "one long unbroken paragraph —
+  split into paragraphs". Blank lines in the piped text are carried through verbatim, so they
+  render as one run-on block and the guard is right to refuse it. The only way out is
+  hand-editing the board HTML — the very act this point already documents as damaging (measured
+  30.07.2026: three publish rounds, then a hand edit anyway). TARGET: a blank line in any card
+  text becomes a `<p>` boundary on write, for `status`, `queue` and `done` alike, so the
+  documented command can produce what the guard demands. VERIFIABLE in the pure layer: a
+  two-paragraph text yields two `<p>` elements, a single-paragraph one yields exactly one, and
+  no card text can reach the file with a bare blank line inside a tag.
   DOCS in the same commit: `docs/batch-autonomy.md` where the board commands are listed.
 
 - [ ] 440. WHAT ELSE IS BILLED ON EVERY TURN FOR NOTHING — A MEASURED INVENTORY (user
