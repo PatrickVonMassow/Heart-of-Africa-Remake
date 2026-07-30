@@ -49,6 +49,7 @@
 // Format-safe: a TASKS.md whose checkboxes no longer parse blocks with a warning
 // instead of silently reading "complete". Fail-open on any error.
 import { appendFileSync, readFileSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import {
   acquire,
@@ -59,7 +60,9 @@ import {
   progressGuardDecision,
   readOwnerLock,
   BOUNDARY_LOG_PATH,
+  DOCTOR_STATE_PATH,
 } from './batch-singleton.mjs'
+import { otherSessionsIn, gateDemandSatisfied } from './batch-doctor-core.mjs'
 import { gatherBoundary } from './batch-boundary.mjs'
 import { LAUNCHER_TASK_NAME } from './batch-boundary-core.mjs'
 import { gatherInFlight } from './batch-in-flight.mjs'
@@ -88,6 +91,27 @@ try {
   sid = JSON.parse(readFileSync(0, 'utf8')).session_id || ''
 } catch {
   /* no/!JSON stdin — sid stays empty → this session can never be conscripted */
+}
+
+/**
+ * Has a doctor run already cleared THIS state — this HEAD beside these sessions
+ * (point 431, second half)? The decision is pure (`gateDemandSatisfied`); this
+ * only reads the two facts, and any failure answers "not satisfied", which is
+ * the safe direction: the demand simply stays live.
+ */
+function gateAlreadySatisfied(otherSids) {
+  try {
+    const state = JSON.parse(readFileSync(DOCTOR_STATE_PATH, 'utf8'))
+    const head = execFileSync('git', ['rev-parse', 'HEAD'], {
+      cwd: fileURLToPath(new URL('..', import.meta.url)),
+      encoding: 'utf8',
+      windowsHide: true,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim()
+    return gateDemandSatisfied({ state, head, parallelSids: otherSids })
+  } catch {
+    return false
+  }
 }
 
 const block = (reason) => {
@@ -183,6 +207,18 @@ try {
       raiseParallelAlert({ detectedBy: 'batch-progress-guard', ownerSid: sid, parallel })
     }
     unhandledAlert = readUnhandledAlert()
+    // AN ALERT MUST NAME SOMEONE ELSE, AND A CLEARED STATE MUST STAY CLEARED
+    // (point 431). Twice on 29.07.2026 this block reported "PARALLEL SESSION
+    // DETECTED (10a2d2e0…)" — the id of the session it was warning — and then
+    // demanded a three-minute gate for it. And while another session merely
+    // existed the demand fired EVERY turn, though what is judged is the state:
+    // this HEAD beside these sessions.
+    if (unhandledAlert) {
+      const others = otherSessionsIn({ alert: unhandledAlert, readerSid: sid, ownerSid: sid })
+      if (others.length === 0) unhandledAlert = null
+      else if (gateAlreadySatisfied(others)) unhandledAlert = null
+      else unhandledAlert = { ...unhandledAlert, others }
+    }
     // NO extra heartbeat here. `acquire` above already refreshed the lock (it
     // heartbeats on 'mine' and writes a fresh lock on 'acquired'), so this call
     // only ever rewrote the same small file a second time within milliseconds —
@@ -389,7 +425,8 @@ try {
   }
 
   if (decision === 'block-remediate') {
-    const who = (unhandledAlert.parallel ?? []).map((p) => p.sid).join(', ') || 'unknown'
+    // The OTHER session, never the reader's own id (point 431, third half).
+    const who = (unhandledAlert.others ?? []).join(', ') || 'unknown'
     block(
       `PARALLEL SESSION DETECTED (${who}) — a second top-level session has run tools in this repo ` +
         `within the last minutes. You hold the batch lock; the other session's guards make it stand ` +

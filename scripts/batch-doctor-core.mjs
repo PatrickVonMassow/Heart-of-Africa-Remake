@@ -87,3 +87,151 @@ export function needsRepair(plan) {
 export function isConsistent(plan) {
   return plan.length === 0
 }
+
+// ---------------------------------------------------------------------------
+// THE GATE MUST NOT BLAME THE CODE FOR THE LOAD (point 431, 29.07.2026)
+// ---------------------------------------------------------------------------
+//
+// Three times in one afternoon the doctor declared the repo CONSISTENT and then
+// reported `npm run test:unit FAILED — the concurrent writes (or the current
+// head) broke it; fix before continuing the batch`. Each time the same suite,
+// run standalone on the SAME commit minutes later, was fully green (170–172
+// files, 4853–4903 tests). The gate had been competing with a delegated agent's
+// build for the machine — the exact class the flake policy and retrospective
+// §3.22/§3.48 describe, and the exact accusation they forbid: the message names
+// the CODE as the suspect and orders the batch stopped.
+//
+// The fix is NOT to weaken the gate. The instrument already exists — the verify
+// runner's quiet-machine check (point 296) — and the doctor now uses it. A red
+// on a QUIET machine keeps today's wording, word for word. A red on a busy one,
+// or with a live agent worktree, is INCONCLUSIVE: it names what was running and
+// asks for a repeat once the pool is idle.
+
+/** The commands `--gate` runs, in order. */
+export const GATE_COMMANDS = ['npm run test:unit', 'npm run build', 'npm run lint']
+
+/**
+ * Is a verdict from this reading EVIDENCE? PURE.
+ *
+ * Only a measured-quiet machine with no live agent worktree qualifies. An
+ * UNKNOWN reading is deliberately not evidence: the whole point of the quiet
+ * check is that an unmeasured machine was believed once already.
+ */
+export function isEvidenceGrade({ level, agentWorktrees = [] } = {}) {
+  return level === 'quiet' && (agentWorktrees?.length ?? 0) === 0
+}
+
+/** What was competing, in one clause — never a list of the user's windows. */
+export function describeLoad({ level, reasons = [], agentWorktrees = [] } = {}) {
+  const parts = []
+  if ((agentWorktrees?.length ?? 0) > 0) {
+    parts.push(`${agentWorktrees.length} live agent worktree(s): ${agentWorktrees.join(', ')}`)
+  }
+  const load = (reasons ?? []).filter(Boolean)
+  if (load.length) parts.push(load.join('; '))
+  if (!parts.length) parts.push(`the machine read as ${level ?? 'unknown'}`)
+  return parts.join(' — ')
+}
+
+/**
+ * THE GATE'S VERDICT. PURE.
+ *
+ * `results` is one entry per command actually run:
+ *   { cmd, failed, level, reasons, agentWorktrees }
+ * where `level`/`reasons`/`agentWorktrees` describe the machine DURING that
+ * command, so a run that went quiet halfway is judged per command rather than
+ * as a lump.
+ *
+ * Returns { broken, inconclusive, ordered, lines }:
+ *   broken       — at least one failure on a quiet machine. Today's wording, and
+ *                  today's stop order.
+ *   inconclusive — a failure that only load can explain. NOT a stop order.
+ *   ordered      — the failures, EVIDENCE FIRST. A reader must see which verdict
+ *                  is evidence before the one that is not; the noisy line first
+ *                  is how three afternoons were spent on the wrong suspect.
+ */
+export function judgeGateRun(results = []) {
+  const all = Array.isArray(results) ? results : []
+  const failures = all.filter((r) => r?.failed)
+  const graded = failures.map((r) => ({ ...r, evidence: isEvidenceGrade(r) }))
+  const ordered = [...graded].sort((a, b) => Number(b.evidence) - Number(a.evidence))
+  const broken = graded.some((r) => r.evidence)
+  const inconclusive = !broken && graded.length > 0
+
+  const lines = ordered.map((r) =>
+    r.evidence
+      ? `gate: ${r.cmd} FAILED — the concurrent writes (or the current head) broke it; fix before continuing the batch`
+      : `gate: ${r.cmd} FAILED but the verdict is INCONCLUSIVE (load) — ${describeLoad(r)}. ` +
+        'A red under load is not evidence of a broken tree (retrospective §3.22/§3.48). ' +
+        'Repeat the gate once the agent pool is idle; do NOT stop the batch on this.',
+  )
+  return { broken, inconclusive, ordered, lines }
+}
+
+/** The closing verdict line for a gate run that failed only under load. */
+export const INCONCLUSIVE_VERDICT =
+  'VERDICT: the repo state is consistent; the gate could not be judged (the machine was not quiet). ' +
+  'Repeat `node scripts/batch-doctor.mjs --gate` once the agent pool is idle. The batch continues.'
+
+// ---------------------------------------------------------------------------
+// THE DEMAND IS SATISFIED BY A STATE, NOT BY A TURN (point 431, second half)
+// ---------------------------------------------------------------------------
+//
+// The Stop hook fired the gate EVERY turn while the other session merely
+// existed, and the gate costs ~3 minutes of unit tests each time. What is being
+// judged is the STATE — this HEAD, beside these parallel sessions — so once a
+// run has reported it consistent, the demand holds until one of the two changes.
+
+/** The key a satisfaction is recorded under. PURE, and order-insensitive: the
+ *  same two sessions in a different order are the same situation. */
+export function gateKey({ head = '', parallelSids = [] } = {}) {
+  const sids = [...new Set((parallelSids ?? []).filter(Boolean).map(String))].sort()
+  return `${String(head ?? '').trim()}|${sids.join(',')}`
+}
+
+/**
+ * Has a doctor run already cleared THIS state? PURE.
+ *
+ * `state` is the persisted doctor state; `satisfiedGate` is the key it recorded.
+ * An empty head never satisfies anything — an unreadable git state must not be
+ * able to switch the demand off.
+ */
+export function gateDemandSatisfied({ state, head, parallelSids = [] } = {}) {
+  const key = gateKey({ head, parallelSids })
+  if (!String(head ?? '').trim()) return false
+  return typeof state?.satisfiedGate === 'string' && state.satisfiedGate === key
+}
+
+// ---------------------------------------------------------------------------
+// AN ALERT MUST NAME SOMEONE ELSE (point 431, third half)
+// ---------------------------------------------------------------------------
+//
+// Twice in one evening the Stop hook reported "PARALLEL SESSION DETECTED
+// (10a2d2e0…)" — and that id was the id of the very session it was warning, the
+// one holding the lock. The live detector already excludes the owner, but the
+// alert is a FILE: it is written by whoever notices (a launcher tick, another
+// window) and read back later, by which time the session it names may be the
+// reader. So the whole ritual — a three-minute gate, a doctor run, a re-check of
+// board and work order — was ordered because a session had seen ITSELF.
+//
+// An alert that cannot say who else was there is not evidence of anyone else
+// being there.
+
+/**
+ * The OTHER sessions an alert names. PURE. Returns [] when the alert names
+ * nobody but the reader (or the owner), which means there is nothing to act on.
+ */
+export function otherSessionsIn({ alert, readerSid = '', ownerSid = '' } = {}) {
+  const mine = new Set([readerSid, ownerSid].filter(Boolean).map(String))
+  const listed = Array.isArray(alert?.parallel) ? alert.parallel : []
+  const out = []
+  for (const entry of listed) {
+    const sid = typeof entry === 'string' ? entry : entry?.sid
+    if (!sid || mine.has(String(sid))) continue
+    if (!out.includes(String(sid))) out.push(String(sid))
+  }
+  return out
+}
+
+/** Is this alert evidence of a second writer? PURE. */
+export const alertNamesAnother = (args) => otherSessionsIn(args).length > 0
