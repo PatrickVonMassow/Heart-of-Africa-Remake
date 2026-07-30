@@ -19,6 +19,9 @@ import {
   handoverSurvivesCall,
   isClosingSetPath,
   isClosingSetCommand,
+  isOutputPagerSegment,
+  describeWithdrawalTrigger,
+  WITHDRAWAL_TRIGGER_MAX,
 } from './batch-boundary-core.mjs'
 import { progressGuardDecision } from './batch-singleton.mjs'
 
@@ -320,6 +323,77 @@ describe('handoverSurvivesCall — closing work keeps the boundary, anything els
     expect(isClosingSetPath('my-tasks.md')).toBe(false)
     expect(isClosingSetPath('')).toBe(false)
     expect(isClosingSetCommand('node scripts/focus-something-else.mjs')).toBe(false)
+  })
+
+  // --- A PAGER IS NOT WORK (point 426 (a), measured live 29.07.2026) ----------
+  // `node scripts/focus.mjs set … | tail -2` reported "boundary recorded", silently
+  // deleted the marker, and the next Stop hook demanded the boundary again with no
+  // record anywhere of why. Shortening the OUTPUT is not carrying on.
+  it('A TRAILING PAGER SURVIVES — it only looks at what the closing script printed', () => {
+    expect(call({ command: 'node scripts/focus.mjs set 1 x | tail -2' }).survives).toBe(true)
+    expect(call({ command: 'node scripts/focus.mjs set 1 x | head -5' }).survives).toBe(true)
+    expect(call({ command: 'node scripts/batch-boundary.mjs 426 | more' }).survives).toBe(true)
+    expect(call({ command: 'node scripts/board.mjs attest | cat' }).survives).toBe(true)
+    // …after a whole chain of closing work, too.
+    expect(
+      call({ command: 'node scripts/focus.mjs confirm && node scripts/dashboard-publish.mjs | tail -2' }).survives,
+    ).toBe(true)
+  })
+
+  it('but a pager NEVER launders real work', () => {
+    expect(call({ command: 'npm test | tail -2' }).survives).toBe(false)
+    expect(call({ command: 'node scripts/board.mjs attest && npm test' }).survives).toBe(false)
+    expect(call({ command: 'node scripts/focus.mjs show | grep x | node other.mjs' }).survives).toBe(false)
+    // A pager in the MIDDLE would hide whatever follows it.
+    expect(call({ command: 'node scripts/focus.mjs show | tail -2 | npm test' }).survives).toBe(false)
+    expect(call({ command: 'node scripts/focus.mjs show | tail -2 && git push' }).survives).toBe(false)
+  })
+
+  it('a pager ALONE is not a closing line', () => {
+    expect(call({ command: 'tail -2' }).survives).toBe(false)
+    expect(call({ command: 'cat .claude/boundary.log' }).survives).toBe(false)
+    expect(call({ command: 'tail -2 | head -1' }).survives).toBe(false)
+  })
+
+  it('the opaque-segment ban is UNTOUCHED by the widening', () => {
+    expect(call({ command: 'node scripts/focus.mjs set 1 x | cat > src/world.ts' }).survives).toBe(false)
+    expect(call({ command: 'node scripts/focus.mjs set 1 x | tail $(npm test)' }).survives).toBe(false)
+    expect(call({ command: 'node scripts/focus.mjs set 1 x | tail -2 > out.txt' }).survives).toBe(false)
+  })
+
+  it('a command merely BEGINNING like a pager is not one', () => {
+    expect(isOutputPagerSegment('tail -2')).toBe(true)
+    expect(isOutputPagerSegment('head')).toBe(true)
+    expect(isOutputPagerSegment('catalogue --build')).toBe(false)
+    expect(isOutputPagerSegment('headless-run.mjs')).toBe(false)
+    expect(isOutputPagerSegment('')).toBe(false)
+    expect(isOutputPagerSegment()).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------------------
+describe('describeWithdrawalTrigger — the record names the call that took it back', () => {
+  it('names the tool and the command', () => {
+    expect(describeWithdrawalTrigger({ toolName: 'Bash', command: 'npm test' })).toBe('Bash: npm test')
+  })
+
+  it('collapses whitespace so a heredoc stays one log line', () => {
+    expect(describeWithdrawalTrigger({ toolName: 'Bash', command: 'git commit -F -\n\n  body\n' })).toBe(
+      'Bash: git commit -F - body',
+    )
+  })
+
+  it('falls back to the file path, then to the bare tool', () => {
+    expect(describeWithdrawalTrigger({ toolName: 'Edit', filePath: 'src/App.tsx' })).toBe('Edit: src/App.tsx')
+    expect(describeWithdrawalTrigger({ toolName: 'Agent' })).toBe('Agent')
+    expect(describeWithdrawalTrigger({})).toBe('unknown tool')
+    expect(describeWithdrawalTrigger()).toBe('unknown tool')
+  })
+
+  it('truncates — this is a log entry, not a transcript', () => {
+    const long = describeWithdrawalTrigger({ toolName: 'Bash', command: 'x'.repeat(5000) })
+    expect(long.length).toBeLessThanOrEqual(WITHDRAWAL_TRIGGER_MAX + 'Bash: '.length + 1)
+    expect(long.endsWith('…')).toBe(true)
   })
 })
 

@@ -1123,6 +1123,49 @@ describe('acquire (atomic test-and-set on the real filesystem)', () => {
     expect(resolve(log)).not.toBe(resolve(BOUNDARY_LOG_PATH))
   })
 
+  // --- SAY IT (point 426 (b)) -------------------------------------------------
+  // The MARKER removal was silent. A pager on a closing line deleted it, the next
+  // Stop hook demanded the boundary again, and no record named the cause.
+  it('THE MARKER WITHDRAWAL IS LOGGED, and the line carries the triggering call', () => {
+    const markerPath = join(dir, 'batch-boundary.json')
+    const log = join(dir, 'boundary.log')
+    acquire('s1', opts())
+    writeFileSync(markerPath, JSON.stringify({ v: 1, sessionId: 's1', point: 426, at: Date.now() }))
+    // No handover flag at all — exactly the silent case: the marker goes, and that
+    // is the whole event.
+    expect(withdrawHandover('s1', { lockPath, trigger: 'Bash: npm test | tail -2' })).toBe(false)
+    expect(existsSync(markerPath)).toBe(false)
+    const text = readFileSync(log, 'utf8')
+    expect(text).toMatch(/MARKER WITHDRAWN for point 426 by s1/)
+    expect(text).toContain('triggered by Bash: npm test | tail -2')
+    expect(resolve(log)).not.toBe(resolve(BOUNDARY_LOG_PATH))
+  })
+
+  it('an unrecorded trigger still produces a line — a silent removal is the bug', () => {
+    const markerPath = join(dir, 'batch-boundary.json')
+    acquire('s1', opts())
+    writeFileSync(markerPath, JSON.stringify({ v: 1, sessionId: 's1', at: Date.now() }))
+    withdrawHandover('s1', { lockPath })
+    const text = readFileSync(join(dir, 'boundary.log'), 'utf8')
+    expect(text).toMatch(/MARKER WITHDRAWN for point \? by s1/)
+    expect(text).toContain('an unrecorded call')
+  })
+
+  it('NO marker means NO line — the log records events, not every tool call', () => {
+    acquire('s1', opts())
+    withdrawHandover('s1', { lockPath, trigger: 'Bash: npm test' })
+    expect(existsSync(join(dir, 'boundary.log'))).toBe(false)
+  })
+
+  it('a STRANGER writes no withdrawal line either', () => {
+    const markerPath = join(dir, 'batch-boundary.json')
+    acquire('s1', opts())
+    writeFileSync(markerPath, JSON.stringify({ v: 1, sessionId: 's1', point: 426, at: Date.now() }))
+    expect(withdrawHandover('s2', { lockPath, trigger: 'Bash: npm test' })).toBe(false)
+    expect(existsSync(markerPath)).toBe(true)
+    expect(existsSync(join(dir, 'boundary.log'))).toBe(false)
+  })
+
   it('after the successor claims, the old session can neither heartbeat nor withdraw', () => {
     acquire('s1', opts())
     markHandover('s1', { lockPath, point: 388 })

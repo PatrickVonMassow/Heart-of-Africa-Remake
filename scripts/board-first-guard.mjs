@@ -32,7 +32,7 @@ import {
   sha256File,
 } from './dashboard-state.mjs'
 import { heldByOtherLiveOwner, withdrawHandover, touchHandover } from './batch-singleton.mjs'
-import { handoverSurvivesCall } from './batch-boundary-core.mjs'
+import { handoverSurvivesCall, describeWithdrawalTrigger } from './batch-boundary-core.mjs'
 import { publishCapability } from './board-currency-core.mjs'
 import { evaluate } from './board-first-core.mjs'
 
@@ -120,7 +120,17 @@ try {
       command: call.command,
     })
     if (keep.survives) touchHandover(payload.session_id || '')
-    else withdrawHandover(payload.session_id || '')
+    else {
+      // The triggering call goes into the record (point 426 (b)): a marker that
+      // vanishes without a reason is rediscovered turn after turn.
+      withdrawHandover(payload.session_id || '', {
+        trigger: describeWithdrawalTrigger({
+          toolName: payload.tool_name,
+          filePath: call.file_path ?? call.notebook_path,
+          command: call.command,
+        }),
+      })
+    }
   } catch {
     /* best effort — a lock we cannot write is not this gate's problem */
   }

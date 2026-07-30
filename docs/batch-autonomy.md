@@ -176,19 +176,33 @@ One decision worth keeping in view: **unknown counts as unarmed.** Erring toward
 "keep working" costs context; erring toward "stop" can cost the whole batch. The
 asymmetry decides it.
 
-**A TAKEN BOUNDARY IS FRAGILE — TAKE IT LAST (29.07.2026, measured).** The marker
-is WITHDRAWN by any tool call that reads as continuing the batch, which is correct
-(working is proof the session is not finished) and is judged by
-`handoverSurvivesCall` → `isClosingSetCommand`. That judgement splits the command
-line at its separators and demands that EVERY segment be a closing-set script — so
-`node scripts/focus.mjs set … | tail -2` counts as ordinary work, because `tail` is
-not one, and the boundary silently disappears. It cost a full extra turn: the
-command reported "boundary recorded", the next Stop hook demanded the boundary
-again, and nothing anywhere said why. Until point 426 makes a trailing pager
-harmless and logs every withdrawal with its trigger, two rules hold: run
-`batch-boundary.mjs` as the LAST action of the turn, and issue it — and the board
-and focus commands around it — as BARE commands with no pipe, no redirection and
-no `&&` chain.
+**A TAKEN BOUNDARY IS WITHDRAWN BY WORK — AND A PAGER IS NOT WORK (point 426).** The
+marker is withdrawn by any tool call that reads as continuing the batch, which is
+correct (working is proof the session is not finished) and is judged by
+`handoverSurvivesCall` → `isClosingSetCommand`: the command line is split at its
+separators and EVERY segment must be a closing-set script. On 29.07.2026 that cost a
+full turn, measured: `node scripts/focus.mjs set … | tail -2` counted as ordinary
+work, because `tail` is not a closing script, so the command reported "boundary
+recorded", the marker silently vanished, and the next Stop hook demanded the boundary
+again with nothing anywhere naming the cause. Two changes, both inside the existing
+mechanism:
+
+- **A trailing output pager is tolerated.** `head`, `tail`, `more` and `cat`
+  (`OUTPUT_PAGERS`) may TRAIL a closing line without making it ordinary — shortening
+  the output is only looking at it. The widening is the narrowest that covers that
+  case, because the dangerous direction is a KEPT handover beside real work: a pager
+  in the MIDDLE still counts as work (it would hide whatever follows), a pager ALONE
+  is not a closing line, and the opaque-segment ban (`$(…)`, backticks, `>`, `<`) is
+  untouched — so `| cat > file` and `| tail $(…)` still withdraw.
+- **Every marker withdrawal is recorded.** `withdrawHandover` appends `MARKER
+  WITHDRAWN for point N by <session> — triggered by <call>` to `.claude/boundary.log`
+  (a sibling of the lock, never the repo default), with the call described by
+  `describeWithdrawalTrigger`. The write is best-effort and may never break a tool
+  call; no marker means no line, since the log records events rather than tool calls.
+
+The standing advice survives the fix as advice rather than as a workaround: take the
+boundary as the LAST action of the turn. A `&&` chain or a redirection around it
+still withdraws, by design.
 
 Pure logic and its witnesses: `scripts/batch-boundary-core.mjs` +
 `scripts/batch-boundary-core.test.mjs` (launcher-state classification, point

@@ -242,6 +242,27 @@ export function isClosingSetPath(p) {
  */
 const OPAQUE_SEGMENT_RE = /\$\(|`|>|</
 
+/**
+ * A PURE OUTPUT PAGER — a segment that only looks at what the segment before it
+ * printed (point 426 (a), measured live 29.07.2026).
+ *
+ * `node scripts/focus.mjs set … | tail -2` silently deleted a taken boundary: the
+ * command reported "boundary recorded", the next Stop hook demanded the boundary
+ * again, and nothing anywhere named the cause. Shortening the OUTPUT is not work.
+ *
+ * The widening is the NARROWEST one that covers "I am only looking at the output",
+ * because the dangerous direction is a KEPT handover beside real work: a pager may
+ * only TRAIL a closing line (never sit in the middle), a pager alone is never a
+ * closing line, and the opaque-segment ban above is untouched — so `cat > file`,
+ * `tail $(…)` and every redirection still count as work.
+ */
+export const OUTPUT_PAGERS = ['head', 'tail', 'more', 'cat']
+const PAGER_SEGMENT_RE = new RegExp(`^(?:${OUTPUT_PAGERS.join('|')})(?:\\.exe)?(?:\\s|$)`, 'i')
+
+export function isOutputPagerSegment(segment) {
+  return PAGER_SEGMENT_RE.test(String(segment ?? '').trim())
+}
+
 export function isClosingSetCommand(command) {
   if (typeof command !== 'string' || !command.trim()) return false
   const segments = command
@@ -249,14 +270,36 @@ export function isClosingSetCommand(command) {
     .map((s) => s.trim())
     .filter(Boolean)
   let sawClosing = false
-  for (const seg of segments) {
+  for (let i = 0; i < segments.length; i += 1) {
+    const seg = segments[i]
     if (OPAQUE_SEGMENT_RE.test(seg)) return false
     if (/^(?:cd|set-location|pushd|popd)\b/i.test(seg)) continue
+    // A pager is tolerated ONLY as the final segment of a line that has already
+    // shown a closing script. In the middle it would hide whatever follows it, and
+    // on its own it is not a closing line at all.
+    if (i === segments.length - 1 && sawClosing && isOutputPagerSegment(seg)) continue
     const head = seg.match(/^(?:node|npx\s+node)\s+(?:"[^"]*"|'[^']*'|\S+)/i)
     if (!head || !CLOSING_SCRIPT_RE.test(head[0])) return false
     sawClosing = true
   }
   return sawClosing
+}
+
+/**
+ * The triggering call, in one line for `.claude/boundary.log` (point 426 (b)).
+ * PURE. Truncated, because a command line can be arbitrarily long and this is a log
+ * entry, not a transcript.
+ */
+export const WITHDRAWAL_TRIGGER_MAX = 200
+
+export function describeWithdrawalTrigger({ toolName, filePath, command } = {}) {
+  const tool = String(toolName ?? '').trim() || 'unknown tool'
+  const clip = (s) => (s.length > WITHDRAWAL_TRIGGER_MAX ? `${s.slice(0, WITHDRAWAL_TRIGGER_MAX)}…` : s)
+  const cmd = typeof command === 'string' ? command.trim().replace(/\s+/g, ' ') : ''
+  if (cmd) return `${tool}: ${clip(cmd)}`
+  const file = typeof filePath === 'string' ? filePath.trim() : ''
+  if (file) return `${tool}: ${clip(file)}`
+  return tool
 }
 
 /**

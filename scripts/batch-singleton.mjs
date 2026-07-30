@@ -1292,10 +1292,27 @@ export function withdrawHandover(sessionId, opts = {}) {
   // THIS the one place a boundary ends: real work withdraws it, closing work
   // does not. Removed even when no handover flag is set, so a marker recorded
   // and then followed by real work is withdrawn just the same.
+  const boundaryPath = opts.boundaryPath ?? statePathsFor(lockPath).boundaryPath
+  // SAY IT (point 426 (b)). The marker removal used to be silent: a pager on a
+  // closing line deleted it, the next Stop hook demanded the boundary again, and no
+  // record anywhere named the cause. Every removal of a TAKEN boundary is now
+  // appended to the boundary log with the triggering call.
+  const marker = readJson(boundaryPath)
   try {
-    ;(opts.remove ?? rmSync)(opts.boundaryPath ?? statePathsFor(lockPath).boundaryPath, { force: true })
+    ;(opts.remove ?? rmSync)(boundaryPath, { force: true })
   } catch {
     /* best effort — a marker we cannot delete is caught by its own freshness */
+  }
+  if (marker) {
+    try {
+      appendFileSync(
+        opts.logPath ?? statePathsFor(lockPath).boundaryLogPath,
+        `[${new Date(opts.now ?? Date.now()).toISOString()}] MARKER WITHDRAWN for point ${marker.point ?? '?'} ` +
+          `by ${sessionId} — triggered by ${opts.trigger ?? 'an unrecorded call'}\n`,
+      )
+    } catch {
+      /* best effort — a log we cannot write may never break a tool call */
+    }
   }
   if (lock.handedOver !== true) return false
   const next = { ...lock, claimedAt: opts.now ?? Date.now() }
