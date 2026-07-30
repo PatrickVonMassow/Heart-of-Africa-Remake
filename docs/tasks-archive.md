@@ -13241,3 +13241,23 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   30.07.2026) — it touches no game code, cannot endanger the demo, every turn it is deferred
   is paid at ~18k tokens, and the word ceiling is already full.
 
+- [x] 441. THE BOARD REFRESH STEALS THE CHAT INPUT'S FOCUS AND THE SCROLL POSITION (user
+  30.07.2026, reported from the phone: "Ein Refresh vom Dashboard nimmt mir den Fokus vom
+  Chat-Eingabefeld und die Scrollposition weg"; bundle H). The viewer
+  (`public/board/index.html`) refetches the board every 30 s and replaces `<main>` WHOLESALE,
+  then re-injects the chat on the `hoa-board-swapped` event (point 423). The draft text
+  survives that swap, but the caret does not: mid-sentence the keyboard closes on a phone and
+  the page jumps back to where the document starts — which makes writing a message from the
+  phone, the whole reason the channel exists, a race against a 30-second timer.
+  TARGET, in this order: (1) do not swap at all when the fetched board is byte-identical to
+  the rendered one — the common case, and it removes most of the damage for free; (2) when it
+  DID change, preserve the reader's place across the swap: scroll offset, which `<details>`
+  are open (the localStorage script already knows), and the chat input's focus WITH its caret
+  position; (3) never swap while the chat input holds focus AND a non-empty draft — defer to
+  the next tick, so a message being typed is never interrupted, with a cap so a permanently
+  focused field cannot freeze the board forever.
+  VERIFIABLE: a Vitest/jsdom case per rule — an identical fetch performs no DOM replacement;
+  a changed fetch restores scroll, open cards and caret; a focused input with a draft defers
+  the swap and the deferral ends at the cap. The live check is by hand on the phone-sized
+  viewport: type into the chat, wait out two refresh ticks, and the caret and the scroll
+  position are still where they were.
