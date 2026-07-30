@@ -2998,7 +2998,31 @@ it is appended.
   VERIFIABLE: `polish` exits 0 twice in a row on a quiet machine on BOTH backends, with
   every surviving check unchanged in what it demands; each of the four resolved with its
   reason recorded in the commit.
-  DOCS in the same commit: `scripts/verify/README.md` where the suite is described.
+  SECOND HALF, found the hard way on 30.07.2026: A RED BRANCH RUN REACHES NOBODY WHO CAN
+  ACT — only the repository owner's inbox. `ci-status-guard` asks about `git rev-parse HEAD`,
+  the HEAD of the session that runs it (`scripts/ci-status-guard.mjs:155`). Through the
+  night the main session's HEAD was `main` and green, while every push of a delegated
+  agent's branch failed CI: thirteen "Run failed" mails between 21:46 and 06:31, and the
+  session that could have fixed it never learned. The cause was cheap — a containment probe
+  costing one git process per (commit, record) pair, 26 to 38 s past its own budget, fixed
+  in one commit — but nothing surfaced it, and the user had to.
+  TARGET: the guard judges every ref this session has PUSHED and not yet seen green, not
+  just its current HEAD — a delegated agent pushes under the parent's session id, so those
+  refs are the parent's responsibility. It reports the ref by name, it notifies ONCE per
+  (ref, sha) rather than per turn, and a ref that no longer exists is dropped rather than
+  reported forever. Cheapness stays a requirement: the common turn changes nothing and must
+  cost nothing, so the ref list comes from the reflog of pushes rather than from asking the
+  API about every branch.
+  AND THE COST RULE THAT CAUSED IT: a check inside the unit layer that walks REAL git
+  history must be bounded by CONSTRUCTION, not by a raised timeout. The pairwise probe had
+  already had its budget raised once; the second raise would have hidden it again. Any such
+  check states its worst case in a comment and stays inside it.
+  VERIFIABLE: pure Vitest — a session whose HEAD is green but which pushed a ref that is
+  red BLOCKS and names that ref; a second turn on the same (ref, sha) does not notify
+  again; a deleted ref is dropped; no pushed refs means no API call at all. Plus a case
+  pinning the containment probe at one git call per record.
+  DOCS in the same commit: `scripts/verify/README.md` where the suite is described, and
+  CLAUDE.md §7.2 where the Stop chain lists what `ci-status-guard` watches.
 
 - [ ] 396. A HANDOVER IS UN-TAKEN BY THE TOOL CALL THAT CAME BEFORE IT (28.07.2026,
   measured in `.claude/boundary.log`, found while closing point 388). Two of the ten
