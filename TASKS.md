@@ -4094,20 +4094,4 @@ also be taken as its own task now and then.
   yields two; the priority ranking is never violated by the disjointness rule; and the
   reporting command's figure matches the picker's own answer on the real work order.
 
-- [ ] 473. THE IDLE-CLAIM DENY COUNTS A READ AS A WRITE (30.07.2026, observed within minutes of
-  point 470 landing; bundle Chat & Tafel). The new rule is right and it proved itself on its own
-  merge — but its classifier judges the command STRING, not the action. Two cases, both measured:
-  a bare `grep -c "…" .batch-dashboard.html`, a pure READ of the board, was DENIED; and a compound
-  invocation whose leading parts were escapes (`focus.mjs`, `board-publish.mjs`) was denied because
-  a later segment was not. The guard's own message promises "reads are never blocked", so the
-  promise and the behaviour disagree, and each disagreement costs a turn.
-  It is the same shape the PreToolUse fence carries (recorded under point 437): judge the command
-  HEAD per SEGMENT, never the whole string, and never let a quoted argument decide. The two should
-  share ONE classifier rather than each growing its own.
-  FINAL STATE: a call whose every segment is a read or an escape is never denied by the idle claim;
-  a compound call is judged segment by segment, and only a genuinely state-changing segment triggers
-  the deny — which then NAMES that segment. The promise in the message and the behaviour match.
-  VERIFIABLE: pure cases — a bare read of the board file, a read piped into another read, a compound
-  of two escapes, and a compound whose last segment writes (denied, naming that segment); plus every
-  existing deny case stays denied.
 
