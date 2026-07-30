@@ -3511,6 +3511,13 @@ it is appended.
   prevented, plus one INDEPENDENCE case per layer — it still acts while the other layers'
   inputs are missing or stale. The full list is `docs/batch-resilience.md` §8.
   MECHANISM REVIEW REQUIRED per layer (CLAUDE.md §7.2); the design itself is reviewed.
+  (6) THE BOUNDARY CARD MUST NAME WHERE THE BATCH ACTUALLY GOES (found 29.07.2026 20:06).
+  It says "Ich übergebe an eine frische Sitzung … Sie nimmt den nächsten Punkt der
+  Warteschlange auf" even while a user window holds an HONOURED claim — and that is not what
+  happens: `batch-autostart.mjs` reserves the batch for a live claim and SKIPS the spawn, so
+  the batch goes to the claiming window. The text misled the user into believing his takeover
+  had been overtaken. The card reads the claim state and says which of the two is happening;
+  a Vitest case per state.
   DOCS in the same commit: `docs/batch-autonomy.md` under the launcher and the session
   lifecycle, CLAUDE.md §6 where the singleton and the context boundary are described, and the
   ledger row for retrospective §3.61.
@@ -3559,6 +3566,39 @@ it is appended.
   the commands and the non-enforceable half are still present — a shortening that drops the
   remaining duty would be worse than the repetition.
   DOCS in the same commit: `docs/batch-autonomy.md` under dashboard currency.
+
+- [ ] 437. THE TWO GUARD MECHANISMS THE WORK ORDER NEVER RECEIVED (30.07.2026; bundle J).
+  Both were agreed with the user on 29.07.2026 and both survived only in a memory carrier
+  (`pending-queue-work-29-07.md`) because the batch lock was held elsewhere that evening —
+  the exact failure point 432 exists to end. They are collected here so the carrier can be
+  deleted.
+  (A) `scripts/path-scope-guard.mjs` — the real ALLOW-list for filesystem access, in the
+  shape the second model's review left it: FAIL-OPEN on an unparseable command; normalise
+  every path spelling this machine produces (`C:\`, `c:/`, `/c/`, `~`); allow the repo, the
+  agent worktrees, the hashed Temp scratchpad, `/tmp`, `~/.claude`, `~/.claude.json`, the
+  claude.exe Packages base, ms-playwright and the toolchain; DENY with the reason stated,
+  never silently. It closes the two gaps the deny-rules cannot express — `~/Documents`
+  minus the project, and worktree agents, whose rules live in the untracked
+  `.claude/settings.local.json`. Fixtures are seeded from the REAL command corpus of the
+  transcripts, not invented, so the allow-list is measured against what actually runs.
+  (B) The BUNDLE-FIRST rule becomes a guard. Today it is memory only
+  (`bundle-first-not-new-point`): a new finding joins an existing bundle point, and a
+  standalone point is the exception. The gate is cheap — a point appended to `TASKS.md`
+  that appears in NO bundle of `docs/work-packages.md` and in no "not bundled" entry blocks
+  the turn end until it is placed or explicitly exempted with a reason. That single check
+  also fixes the second half of the same evening's finding: the bundle scheme drifted out
+  of sync with the open set within an hour of being written, because nothing compared them.
+  VERIFIABLE: pure Vitest per guard — (A) a table of real commands from the corpus, each
+  with its expected allow/deny and, on deny, the stated reason; every path spelling
+  normalised to the same verdict; an unparseable command ALLOWS. (B) an appended point in a
+  bundle passes; one in none blocks; one in the "not bundled" list passes; an unreadable
+  work-packages file ALLOWS (fail-open); the bundle membership reconciles against the full
+  open set, so a point that silently left a bundle is caught too.
+  Both stand down for a session that does not own the batch lock and for a paused batch,
+  like every guard here. MECHANISM REVIEW REQUIRED (CLAUDE.md §7.2); the
+  `.claude/settings.json` wiring is attended-only and must be ABSOLUTE, not cwd-relative.
+  DOCS in the same commit: `docs/batch-autonomy.md` (the guard chain) and, for (B),
+  `docs/work-packages.md` states that its membership is now checked rather than remembered.
 
 ## Closing (only after all points)
 

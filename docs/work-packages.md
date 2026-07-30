@@ -28,7 +28,7 @@ compared it against the work order. Hence the property to preserve:
 | G | Carrion, vultures, staging | 319, 322, 326, 327, 328, 336 |
 | H | Chat and board | 430, 435, 436 — the rest landed 30.07.2026 (308, 410, 411, 416, 421, 423, 424) |
 | I | Session, pool and repo hygiene | 373, 401, 434 — the rest landed 30.07.2026 (329, 396, 399, 409, 426, 427, 429, 431, 433) |
-| J | Model and guard chain | 297, 298, 306, 309, 331, 355, 397, 425, 432 |
+| J | Model and guard chain | 297, 298, 306, 309, 331, 355, 397, 425, 432, 437 |
 | K | Test and verification infrastructure | 200, 295, 330, 387, 418 |
 | L | Docs and knowledge transfer | 303, 333, 422 |
 | M | Controls and performance | 310, 342, 347 |
