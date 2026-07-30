@@ -1061,15 +1061,31 @@ export function heartbeat(sessionId, opts = {}) {
   // batch-boundary-core.mjs); here the handover is carried forward by moving
   // handedOverAt WITH claimedAt, so `claimedAt <= handedOverAt` still holds and
   // nothing else in assessOwner needs to know about the exception.
+  //
+  // …AND UNLESS THE CALL PREDATES THE HANDOVER (point 396, measured in
+  // `.claude/boundary.log`): the Stop chain writes the handover while the
+  // PostToolUse heartbeat of the turn's LAST tool call is still in flight, so two
+  // of ten attempts one morning were cancelled 117 ms and 154 ms after being
+  // written. That is not a session working again — it is a late hook. The handover
+  // survives untouched; `withdrawalIsCausal` decides, honestly rather than by
+  // ignoring withdrawals.
   const next = { ...lock, v: 2, claimedAt: now }
   if (next.handedOver !== undefined || next.handedOverAt !== undefined) {
+    const causal = withdrawalIsCausal({
+      handedOverAt: next.handedOverAt,
+      callAt: opts.callAt,
+      now,
+      settleMs: opts.settleMs,
+    })
     if (opts.preserveHandover === true && next.handedOver === true) {
       next.handedOverAt = now
-    } else {
+    } else if (causal) {
       delete next.handedOver
       delete next.handedOverAt
       delete next.handoverPoint
     }
+    // …else: leave the handover exactly as it stands. NOT touched forward either —
+    // moving handedOverAt here would let a stream of late hooks keep it alive.
   }
   // Backfill the pid identity ONCE for a lock claimed before pids were
   // recorded — and never retry a failed walk on the hot per-tool-call path.
@@ -1271,6 +1287,48 @@ export function markHandover(sessionId, opts = {}) {
 }
 
 /**
+ * A handover younger than this is never withdrawn (point 396). Calibratable via
+ * HOA_HANDOVER_SETTLE_MS.
+ *
+ * ONE SECOND, because the thing being excluded is not a fast session but a LATE
+ * HOOK. Two of the ten boundary attempts on the morning of 28.07.2026 were
+ * cancelled 117 ms and 154 ms after they were written — `HANDOVER point 338` at
+ * 11:42:00.469Z, `WITHDRAWN point 338` at 11:42:00.586Z, and the same shape ten
+ * minutes later. A withdrawal means "the session is working again", and no session
+ * works again within 117 ms: a continuation needs a model round trip. What actually
+ * happened is that the Stop chain wrote the handover while the PostToolUse
+ * heartbeat of the turn's LAST tool call was still in flight, delayed by the very
+ * file contention that produced that morning's EPERM retries.
+ */
+export const HANDOVER_SETTLE_MS = (() => {
+  const env = Number(process.env.HOA_HANDOVER_SETTLE_MS)
+  return Number.isFinite(env) && env >= 0 ? env : 1000
+})()
+
+/**
+ * MAY THIS CALL WITHDRAW THE HANDOVER? PURE.
+ *
+ * A withdrawal may only ever be caused by work that happened AFTER the handover was
+ * written. Where the hook payload carries the call's own timestamp, that answers it
+ * outright; where it does not, the settle window does the same job.
+ *
+ * THIS IS NOT "ignore withdrawals". A session that genuinely carries on working must
+ * still withdraw its boundary, or the five-and-a-half-hour standstill of 28.07.2026
+ * comes back. The rule stays "work after the handover withdraws it" — only measured
+ * honestly.
+ */
+export function withdrawalIsCausal({
+  handedOverAt,
+  callAt = null,
+  now = Date.now(),
+  settleMs = HANDOVER_SETTLE_MS,
+} = {}) {
+  if (!(typeof handedOverAt === 'number' && handedOverAt > 0)) return true
+  if (typeof callAt === 'number' && callAt > 0) return callAt > handedOverAt
+  return now - handedOverAt >= settleMs
+}
+
+/**
  * WITHDRAW a handover — the session is demonstrably still working after all.
  * Owner-guarded, so it is a no-op once a successor has claimed the lock (by then
  * the old session is stood down by ownership anyway).
@@ -1293,11 +1351,22 @@ export function withdrawHandover(sessionId, opts = {}) {
   // does not. Removed even when no handover flag is set, so a marker recorded
   // and then followed by real work is withdrawn just the same.
   const boundaryPath = opts.boundaryPath ?? statePathsFor(lockPath).boundaryPath
+  const now = opts.now ?? Date.now()
+  // A WITHDRAWAL MUST BE CAUSED BY WORK AFTER THE HANDOVER (point 396). The MARKER
+  // is protected by the same test as the flag — deleting it is what forces the
+  // re-take, and that re-take loop is what point 388 was opened on.
+  const marker = readJson(boundaryPath)
+  const writtenAt = Math.max(
+    typeof lock.handedOverAt === 'number' ? lock.handedOverAt : 0,
+    typeof marker?.at === 'number' ? marker.at : 0,
+  )
+  if (writtenAt > 0 && !withdrawalIsCausal({ handedOverAt: writtenAt, callAt: opts.callAt, now, settleMs: opts.settleMs })) {
+    return false
+  }
   // SAY IT (point 426 (b)). The marker removal used to be silent: a pager on a
   // closing line deleted it, the next Stop hook demanded the boundary again, and no
   // record anywhere named the cause. Every removal of a TAKEN boundary is now
   // appended to the boundary log with the triggering call.
-  const marker = readJson(boundaryPath)
   try {
     ;(opts.remove ?? rmSync)(boundaryPath, { force: true })
   } catch {
@@ -1307,7 +1376,7 @@ export function withdrawHandover(sessionId, opts = {}) {
     try {
       appendFileSync(
         opts.logPath ?? statePathsFor(lockPath).boundaryLogPath,
-        `[${new Date(opts.now ?? Date.now()).toISOString()}] MARKER WITHDRAWN for point ${marker.point ?? '?'} ` +
+        `[${new Date(now).toISOString()}] MARKER WITHDRAWN for point ${marker.point ?? '?'} ` +
           `by ${sessionId} — triggered by ${opts.trigger ?? 'an unrecorded call'}\n`,
       )
     } catch {
@@ -1315,7 +1384,7 @@ export function withdrawHandover(sessionId, opts = {}) {
     }
   }
   if (lock.handedOver !== true) return false
-  const next = { ...lock, claimedAt: opts.now ?? Date.now() }
+  const next = { ...lock, claimedAt: now }
   delete next.handedOver
   delete next.handedOverAt
   delete next.handoverPoint

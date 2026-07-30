@@ -29,6 +29,8 @@ import {
   convertPendingSpawn,
   markHandover,
   withdrawHandover,
+  withdrawalIsCausal,
+  HANDOVER_SETTLE_MS,
   touchHandover,
   clearOwnBoundary,
   wedgeNotifyDecision,
@@ -1031,13 +1033,17 @@ describe('acquire (atomic test-and-set on the real filesystem)', () => {
   })
 
   it('withdrawHandover: the owner takes it back before a long tool call; a stranger cannot', () => {
+    const at = Date.now()
+    // `settled` is one settle window past the handover (point 396): a withdrawal must
+    // be caused by work AFTER it, and these calls are the "real work" case.
+    const settled = { lockPath, now: at + HANDOVER_SETTLE_MS + 1 }
     acquire('s1', opts())
-    markHandover('s1', { lockPath, point: 388 })
-    expect(withdrawHandover('s2', { lockPath })).toBe(false)
+    markHandover('s1', { lockPath, point: 388, now: at })
+    expect(withdrawHandover('s2', settled)).toBe(false)
     expect(readOwnerLock(lockPath).handedOver).toBe(true)
-    expect(withdrawHandover('s1', { lockPath })).toBe(true)
+    expect(withdrawHandover('s1', settled)).toBe(true)
     expect(readOwnerLock(lockPath).handedOver).toBeUndefined()
-    expect(withdrawHandover('s1', { lockPath })).toBe(false) // nothing left to withdraw
+    expect(withdrawHandover('s1', settled)).toBe(false) // nothing left to withdraw
   })
 
   // --- FINDING 2: what a taken boundary survives ------------------------------
@@ -1080,14 +1086,16 @@ describe('acquire (atomic test-and-set on the real filesystem)', () => {
 
   it('the withdrawal takes the MARKER with it — that is what ends a boundary now', () => {
     const markerPath = join(dir, 'batch-boundary.json')
+    const at = Date.now()
+    const settled = { lockPath, now: at + HANDOVER_SETTLE_MS + 1 }
     acquire('s1', opts())
-    markHandover('s1', { lockPath, point: 388 })
-    writeFileSync(markerPath, JSON.stringify({ v: 1, sessionId: 's1', point: 388, at: Date.now() }))
-    expect(withdrawHandover('s1', { lockPath })).toBe(true)
+    markHandover('s1', { lockPath, point: 388, now: at })
+    writeFileSync(markerPath, JSON.stringify({ v: 1, sessionId: 's1', point: 388, at }))
+    expect(withdrawHandover('s1', settled)).toBe(true)
     expect(existsSync(markerPath)).toBe(false)
     // A marker recorded and then followed by real work goes too, handover or not.
-    writeFileSync(markerPath, JSON.stringify({ v: 1, sessionId: 's1', point: 388, at: Date.now() }))
-    expect(withdrawHandover('s1', { lockPath })).toBe(false) // no flag left to withdraw
+    writeFileSync(markerPath, JSON.stringify({ v: 1, sessionId: 's1', point: 388, at }))
+    expect(withdrawHandover('s1', settled)).toBe(false) // no flag left to withdraw
     expect(existsSync(markerPath)).toBe(false) // …and the marker is gone all the same
   })
 
@@ -1112,9 +1120,10 @@ describe('acquire (atomic test-and-set on the real filesystem)', () => {
   })
 
   it('FINDING 3: the withdrawal is logged BESIDE the redirected lock, never in the repo', () => {
+    const at = Date.now()
     acquire('s1', opts())
-    markHandover('s1', { lockPath, point: 388 })
-    expect(withdrawHandover('s1', { lockPath })).toBe(true)
+    markHandover('s1', { lockPath, point: 388, now: at })
+    expect(withdrawHandover('s1', { lockPath, now: at + HANDOVER_SETTLE_MS + 1 })).toBe(true)
     const log = join(dir, 'boundary.log')
     expect(existsSync(log)).toBe(true)
     expect(readFileSync(log, 'utf8')).toMatch(/WITHDRAWN point 388 by s1/)
@@ -1129,11 +1138,14 @@ describe('acquire (atomic test-and-set on the real filesystem)', () => {
   it('THE MARKER WITHDRAWAL IS LOGGED, and the line carries the triggering call', () => {
     const markerPath = join(dir, 'batch-boundary.json')
     const log = join(dir, 'boundary.log')
+    const at = Date.now()
     acquire('s1', opts())
-    writeFileSync(markerPath, JSON.stringify({ v: 1, sessionId: 's1', point: 426, at: Date.now() }))
+    writeFileSync(markerPath, JSON.stringify({ v: 1, sessionId: 's1', point: 426, at }))
     // No handover flag at all — exactly the silent case: the marker goes, and that
     // is the whole event.
-    expect(withdrawHandover('s1', { lockPath, trigger: 'Bash: npm test | tail -2' })).toBe(false)
+    expect(
+      withdrawHandover('s1', { lockPath, now: at + HANDOVER_SETTLE_MS + 1, trigger: 'Bash: npm test | tail -2' }),
+    ).toBe(false)
     expect(existsSync(markerPath)).toBe(false)
     const text = readFileSync(log, 'utf8')
     expect(text).toMatch(/MARKER WITHDRAWN for point 426 by s1/)
@@ -1143,9 +1155,10 @@ describe('acquire (atomic test-and-set on the real filesystem)', () => {
 
   it('an unrecorded trigger still produces a line — a silent removal is the bug', () => {
     const markerPath = join(dir, 'batch-boundary.json')
+    const at = Date.now()
     acquire('s1', opts())
-    writeFileSync(markerPath, JSON.stringify({ v: 1, sessionId: 's1', at: Date.now() }))
-    withdrawHandover('s1', { lockPath })
+    writeFileSync(markerPath, JSON.stringify({ v: 1, sessionId: 's1', at }))
+    withdrawHandover('s1', { lockPath, now: at + HANDOVER_SETTLE_MS + 1 })
     const text = readFileSync(join(dir, 'boundary.log'), 'utf8')
     expect(text).toMatch(/MARKER WITHDRAWN for point \? by s1/)
     expect(text).toContain('an unrecorded call')
@@ -1164,6 +1177,120 @@ describe('acquire (atomic test-and-set on the real filesystem)', () => {
     expect(withdrawHandover('s2', { lockPath, trigger: 'Bash: npm test' })).toBe(false)
     expect(existsSync(markerPath)).toBe(true)
     expect(existsSync(join(dir, 'boundary.log'))).toBe(false)
+  })
+
+  // --- A HANDOVER IS NOT UN-TAKEN BY THE CALL THAT CAME BEFORE IT (point 396) --
+  // Two of ten boundary attempts on the morning of 28.07.2026 were cancelled 117 ms
+  // and 154 ms after being written. No session works again in 117 ms; the Stop chain
+  // had written the handover while the LAST tool call's PostToolUse heartbeat was
+  // still in flight.
+  describe('the settle window and the call timestamp', () => {
+    const markerPath = () => join(dir, 'batch-boundary.json')
+    const takeBoundary = (at) => {
+      acquire('s1', opts())
+      markHandover('s1', { lockPath, point: 396, now: at })
+      writeFileSync(markerPath(), JSON.stringify({ v: 1, sessionId: 's1', point: 396, at }))
+    }
+
+    it('THE INCIDENT: a heartbeat 117 ms after the handover leaves flag AND marker alone', () => {
+      const at = NOW
+      takeBoundary(at)
+      expect(heartbeat('s1', { lockPath, now: at + 117, skipBackfill: true })).toBe(true)
+      const lock = readOwnerLock(lockPath)
+      expect(lock.handedOver).toBe(true)
+      expect(lock.handoverPoint).toBe(396)
+      expect(lock.claimedAt).toBe(at + 117) // the heartbeat itself still lands
+      expect(withdrawHandover('s1', { lockPath, now: at + 154 })).toBe(false)
+      expect(existsSync(markerPath())).toBe(true)
+    })
+
+    it('A CALL DATED BEFORE THE HANDOVER never withdraws, however late it arrives', () => {
+      const at = NOW
+      takeBoundary(at)
+      // The hook belongs to the turn's last tool call — its own timestamp predates
+      // the handover even though it is processed a minute later.
+      expect(heartbeat('s1', { lockPath, now: at + 60_000, callAt: at - 5000, skipBackfill: true })).toBe(true)
+      expect(readOwnerLock(lockPath).handedOver).toBe(true)
+      expect(withdrawHandover('s1', { lockPath, now: at + 60_000, callAt: at - 5000 })).toBe(false)
+      expect(existsSync(markerPath())).toBe(true)
+    })
+
+    it('…AND WORK AFTER IT STILL WITHDRAWS, marker included — this is not "ignore withdrawals"', () => {
+      const at = NOW
+      takeBoundary(at)
+      expect(heartbeat('s1', { lockPath, now: at + HANDOVER_SETTLE_MS + 1, skipBackfill: true })).toBe(true)
+      const lock = readOwnerLock(lockPath)
+      expect(lock.handedOver).toBeUndefined()
+      expect(lock.handoverPoint).toBeUndefined()
+      // …and the explicit withdrawal takes the marker with it.
+      takeBoundary(at)
+      expect(withdrawHandover('s1', { lockPath, now: at + HANDOVER_SETTLE_MS + 1 })).toBe(true)
+      expect(existsSync(markerPath())).toBe(false)
+    })
+
+    it('a call timestamp AFTER the handover withdraws inside the settle window too', () => {
+      const at = NOW
+      takeBoundary(at)
+      // Evidence beats the heuristic: the call provably happened after the handover.
+      expect(withdrawHandover('s1', { lockPath, now: at + 200, callAt: at + 100 })).toBe(true)
+      expect(existsSync(markerPath())).toBe(false)
+    })
+
+    it('the point-388 closing-set rule is unchanged by either', () => {
+      const at = NOW
+      takeBoundary(at)
+      // Closing work carries the handover FORWARD, well past the settle window.
+      expect(heartbeat('s1', { lockPath, now: at + 60_000, preserveHandover: true, skipBackfill: true })).toBe(true)
+      const lock = readOwnerLock(lockPath)
+      expect(lock.handedOver).toBe(true)
+      expect(lock.handedOverAt).toBe(at + 60_000)
+      expect(lock.handoverPoint).toBe(396)
+    })
+
+    it('a late hook does NOT touch handedOverAt forward — a stream of them cannot keep it alive', () => {
+      const at = NOW
+      takeBoundary(at)
+      for (let i = 1; i <= 3; i += 1) heartbeat('s1', { lockPath, now: at + i, skipBackfill: true })
+      expect(readOwnerLock(lockPath).handedOverAt).toBe(at)
+      // …so real work one settle window after the HANDOVER still withdraws.
+      expect(heartbeat('s1', { lockPath, now: at + HANDOVER_SETTLE_MS, skipBackfill: true })).toBe(true)
+      expect(readOwnerLock(lockPath).handedOver).toBeUndefined()
+    })
+
+    it('a NON-OWNER still cannot withdraw anything, settled or not', () => {
+      const at = NOW
+      takeBoundary(at)
+      expect(withdrawHandover('s2', { lockPath, now: at + 60_000 })).toBe(false)
+      expect(readOwnerLock(lockPath).handedOver).toBe(true)
+      expect(existsSync(markerPath())).toBe(true)
+    })
+
+    it('withdrawalIsCausal is pure and errs toward withdrawing when it knows nothing', () => {
+      expect(withdrawalIsCausal({ handedOverAt: NOW, now: NOW + 117 })).toBe(false)
+      expect(withdrawalIsCausal({ handedOverAt: NOW, now: NOW + HANDOVER_SETTLE_MS })).toBe(true)
+      expect(withdrawalIsCausal({ handedOverAt: NOW, callAt: NOW - 1 })).toBe(false)
+      expect(withdrawalIsCausal({ handedOverAt: NOW, callAt: NOW + 1 })).toBe(true)
+      // No handover recorded at all → nothing to protect.
+      expect(withdrawalIsCausal({ handedOverAt: null, now: NOW })).toBe(true)
+      expect(withdrawalIsCausal({ handedOverAt: 'soon', now: NOW })).toBe(true)
+      expect(withdrawalIsCausal({})).toBe(true)
+      expect(withdrawalIsCausal()).toBe(true)
+      // A junk call timestamp falls back to the window rather than deciding on it.
+      expect(withdrawalIsCausal({ handedOverAt: NOW, callAt: 0, now: NOW + 117 })).toBe(false)
+      expect(withdrawalIsCausal({ handedOverAt: NOW, callAt: 'now', now: NOW + 117 })).toBe(false)
+      expect(HANDOVER_SETTLE_MS).toBeGreaterThan(154) // both cancelled attempts fall inside it
+    })
+
+    it('the MARKER alone is protected too — its own timestamp counts', () => {
+      // A marker recorded without a lock flag (the shape the pager bug produced) is
+      // guarded by its own `at`, so a late hook cannot delete it either.
+      acquire('s1', opts())
+      writeFileSync(markerPath(), JSON.stringify({ v: 1, sessionId: 's1', point: 396, at: NOW }))
+      expect(withdrawHandover('s1', { lockPath, now: NOW + 117 })).toBe(false)
+      expect(existsSync(markerPath())).toBe(true)
+      expect(withdrawHandover('s1', { lockPath, now: NOW + HANDOVER_SETTLE_MS })).toBe(false) // no flag to withdraw
+      expect(existsSync(markerPath())).toBe(false) // …but the marker did go
+    })
   })
 
   it('after the successor claims, the old session can neither heartbeat nor withdraw', () => {

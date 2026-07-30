@@ -252,6 +252,24 @@ Three changes, and none of them loosens the singleton:
      during which no heartbeat would land (four-eyes review, findings 1 and 4).
    - …but NOT by the work those guards DEMANDED (live finding 2, below): the
      handover and its marker survive a call confined to the CLOSING SET.
+   - …and NOT by a call that happened BEFORE the handover was written (point 396,
+     measured in `.claude/boundary.log`). Two of the ten boundary attempts on the
+     morning of 28.07.2026 were cancelled 117 ms and 154 ms after being written —
+     `HANDOVER point 338` at 11:42:00.469Z, `WITHDRAWN point 338` at 11:42:00.586Z,
+     and the same shape ten minutes later. No session works again within 117 ms: a
+     continuation needs a model round trip. What happened is that the Stop chain
+     wrote the handover while the PostToolUse heartbeat of the turn's LAST tool call
+     was still in flight, delayed by the same file contention that produced that
+     morning's EPERM retries — and the next turn was told to take the boundary
+     again, the very loop point 388 was opened on. So `withdrawalIsCausal` decides:
+     where the payload carries the call's own timestamp (`hookCallTimestamp`) it is
+     compared with `handedOverAt`, and where it does not, a handover younger than
+     `HANDOVER_SETTLE_MS` (1 s, `HOA_HANDOVER_SETTLE_MS`) is never withdrawn. The
+     MARKER FILE is protected by the same test as the flag — deleting it is what
+     forces the re-take — and a late hook does not touch `handedOverAt` forward
+     either, so a stream of them cannot keep a handover alive indefinitely. This is
+     NOT "ignore withdrawals": a session that genuinely carries on working still
+     withdraws its boundary, or the five-and-a-half-hour standstill comes back.
    - While the process is still alive the successor waits `HANDOVER_GRACE_MS`
      (15 minutes, one full launcher tick). A headless `claude -p` exits and is
      taken over at once by the ordinary dead-pid path, so the grace only ever

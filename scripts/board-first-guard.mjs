@@ -32,7 +32,7 @@ import {
   sha256File,
 } from './dashboard-state.mjs'
 import { heldByOtherLiveOwner, withdrawHandover, touchHandover } from './batch-singleton.mjs'
-import { handoverSurvivesCall, describeWithdrawalTrigger } from './batch-boundary-core.mjs'
+import { handoverSurvivesCall, describeWithdrawalTrigger, hookCallTimestamp } from './batch-boundary-core.mjs'
 import { publishCapability } from './board-currency-core.mjs'
 import { evaluate } from './board-first-core.mjs'
 
@@ -129,6 +129,8 @@ try {
           filePath: call.file_path ?? call.notebook_path,
           command: call.command,
         }),
+        // Point 396: a handover is not un-taken by a call that predates it.
+        callAt: hookCallTimestamp(payload),
       })
     }
   } catch {

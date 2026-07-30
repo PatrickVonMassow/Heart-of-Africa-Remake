@@ -292,6 +292,33 @@ export function isClosingSetCommand(command) {
  */
 export const WITHDRAWAL_TRIGGER_MAX = 200
 
+/**
+ * The hook payload's own idea of WHEN the call happened, or null. PURE.
+ *
+ * Point 396 needs it to tell a session that is working again from a PostToolUse hook
+ * that arrived late, and the payload shape is not guaranteed to carry one — so every
+ * plausible field is tried and the answer may honestly be null, in which case the
+ * settle window decides instead. Both a number of milliseconds and an ISO string are
+ * accepted; anything else is ignored rather than guessed at.
+ */
+export function hookCallTimestamp(payload = {}) {
+  const candidates = [
+    payload?.timestamp,
+    payload?.tool_use_at,
+    payload?.toolUseAt,
+    payload?.hook_event_at,
+    payload?.tool_response?.timestamp,
+  ]
+  for (const v of candidates) {
+    if (typeof v === 'number' && Number.isFinite(v) && v > 0) return v
+    if (typeof v === 'string' && v.trim()) {
+      const t = Date.parse(v)
+      if (Number.isFinite(t) && t > 0) return t
+    }
+  }
+  return null
+}
+
 export function describeWithdrawalTrigger({ toolName, filePath, command } = {}) {
   const tool = String(toolName ?? '').trim() || 'unknown tool'
   const clip = (s) => (s.length > WITHDRAWAL_TRIGGER_MAX ? `${s.slice(0, WITHDRAWAL_TRIGGER_MAX)}…` : s)

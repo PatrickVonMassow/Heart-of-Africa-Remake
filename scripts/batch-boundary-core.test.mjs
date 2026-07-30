@@ -21,6 +21,7 @@ import {
   isClosingSetCommand,
   isOutputPagerSegment,
   describeWithdrawalTrigger,
+  hookCallTimestamp,
   WITHDRAWAL_TRIGGER_MAX,
 } from './batch-boundary-core.mjs'
 import { progressGuardDecision } from './batch-singleton.mjs'
@@ -394,6 +395,24 @@ describe('describeWithdrawalTrigger — the record names the call that took it b
     const long = describeWithdrawalTrigger({ toolName: 'Bash', command: 'x'.repeat(5000) })
     expect(long.length).toBeLessThanOrEqual(WITHDRAWAL_TRIGGER_MAX + 'Bash: '.length + 1)
     expect(long.endsWith('…')).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+describe("hookCallTimestamp — when the payload knows WHEN, point 396 uses it", () => {
+  it('accepts milliseconds and an ISO string', () => {
+    expect(hookCallTimestamp({ timestamp: 1_785_000_000_000 })).toBe(1_785_000_000_000)
+    expect(hookCallTimestamp({ timestamp: '2026-07-28T11:42:00.469Z' })).toBe(Date.parse('2026-07-28T11:42:00.469Z'))
+    expect(hookCallTimestamp({ tool_use_at: 1_785_000_000_001 })).toBe(1_785_000_000_001)
+    expect(hookCallTimestamp({ tool_response: { timestamp: 1_785_000_000_002 } })).toBe(1_785_000_000_002)
+  })
+
+  it('answers NULL rather than guessing — the settle window then decides', () => {
+    expect(hookCallTimestamp({})).toBe(null)
+    expect(hookCallTimestamp()).toBe(null)
+    expect(hookCallTimestamp({ timestamp: 'shortly' })).toBe(null)
+    expect(hookCallTimestamp({ timestamp: 0 })).toBe(null)
+    expect(hookCallTimestamp({ timestamp: {} })).toBe(null)
   })
 })
 
