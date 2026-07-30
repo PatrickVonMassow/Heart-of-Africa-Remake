@@ -21,6 +21,7 @@
 //       NEVER a point reference: it is the enumeration/inventory convention
 //       ("(1) Schrift-Norden … (4) Signal-Osten" on the live board), while
 //       every realistic cross-reference on the board is >= 2 digits.
+// The remedy's publish steps come from scripts/board-remedy.mjs — one copy.
 // Either form flags iff the number is a KNOWN TASKS point number (the caller
 // passes the set parsed from TASKS.md) AND differs from the card's own number.
 // A card without an own number (typical for "Von dir zu klären") owns nothing,
@@ -31,6 +32,7 @@
 // bare numbers and commit hashes — stays untouched by construction: no extra
 // exemption list, the two match forms are simply that tight.
 // Fail-open is the WRAPPER's job; this core must never throw on partial input.
+import { REPUBLISH } from './board-remedy.mjs'
 
 const stripTags = (html) => html.replace(/<[^>]*>/g, ' ')
 
@@ -140,8 +142,7 @@ export function evaluate({ dashboardHtml, tasksText } = {}) {
         `DASHBOARD CARD OFF ITS OWN TOPIC: ${list}. Each card must speak STRICTLY about its ` +
         'own point — never report on or describe another TASKS point (status of other points ' +
         'lives in THEIR cards; history belongs in Erledigt). Remove the cross-point passages ' +
-        'from each flagged card, then republish (dashboard-publish.mjs + Artifact) and re-run ' +
-        'dashboard-guard --synced.',
+        `from each flagged card, then ${REPUBLISH}.`,
     }
   } catch {
     return { block: false, reason: '' } // total by contract — the wrapper's fail-open must never depend on luck

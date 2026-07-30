@@ -25,6 +25,7 @@ import {
   removeFile,
 } from './dashboard-state.mjs'
 import { parseNowCardPoint } from './dashboard-guard-core.mjs'
+import { REPUBLISH } from './board-remedy.mjs'
 
 /** The registered dashboard's now-card title point (null: unknown/non-point). */
 function cardPoint() {
@@ -65,8 +66,7 @@ if (cmd === 'set') {
   if (point != null && cp !== point) {
     console.log(
       `NOTE: the dashboard now-card is titled ${cp ?? '<no parseable point>'} — retitle it to ` +
-        `${point}, republish (node scripts/dashboard-publish.mjs + Artifact) and re-run --synced, ` +
-        'or the Stop guard will block the turn.',
+        `${point}, then ${REPUBLISH}, or the Stop guard will block the turn.`,
     )
   }
   process.exit(0)

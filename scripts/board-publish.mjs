@@ -6,12 +6,11 @@
 //   node scripts/board-publish.mjs --check   # fetch the live page and judge it
 //   node scripts/board-publish.mjs --url     # print the URLs and exit
 //
-// WHY A SCRIPT AND NOT THE ARTIFACT TOOL. The headless successor session
-// (`claude -p`, spawned by the OS launcher) has NO Artifact tool. On 28.07.2026
-// it edited the board and recorded `publishDeferred: "headless successor session
-// — no Artifact tool available here"`: in the flagship mode — user away, batch
-// resurrected by the scheduler — the board could not be updated AT ALL. A commit
-// and a push are things that session has.
+// WHY A SCRIPT AND NOT A TOOL. The board used to be publishable only through a
+// tool the headless successor session (`claude -p`, spawned by the OS launcher)
+// does not have. On 28.07.2026 that session edited the board and recorded a
+// deferral: in the flagship mode — user away, batch resurrected by the scheduler
+// — the board could not be updated AT ALL. A commit and a push it has.
 //
 // WHERE IT LANDS, AND WHY NOT ON `main`.
 //   content : an ORPHAN branch `board` of this repository, ONE commit that is
@@ -233,8 +232,8 @@ if (uncovered.length) {
 }
 
 // The fingerprint is stamped on the way OUT, never into the repo file: the repo
-// bytes are what the Artifact mirror attests, and moving them under that record
-// would make the mirror look stale on every publish.
+// bytes are what every publish record attests, and moving them under that record
+// would make the board look stale on every publish.
 const published = stampFingerprint(repoBytes, fingerprint)
 const archive = existsSync(archiveFile) ? readFileSync(archiveFile, 'utf8') : null
 

@@ -2,8 +2,8 @@
 //
 // WHY IT LIVES HERE. The refresher used to sit only inside `.batch-dashboard.html`,
 // which is git-ignored — so no test could see it, and when point 400 moved the
-// board from an artifact (where the fragment WAS the document) into a Pages
-// shell, the script kept polling `location.href`. That is the shell now, and the
+// board off the retired mirror (where the fragment WAS the whole document) into
+// a Pages shell, the script kept polling `location.href`. That is the shell now, and the
 // shell has no `<main>`: the swap was skipped, silently, every 30 seconds, for
 // ever. The built-in fallback could not catch it either — it needs a FAILED
 // fetch, and fetching the shell returns 200. A reader saw hours-old work while

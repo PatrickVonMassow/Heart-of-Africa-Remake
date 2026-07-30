@@ -35,14 +35,14 @@
 // board that is missing work — the 25-minute window of 28.07.2026. The mark is
 // written by the PostToolUse heartbeat (delta A) and read here.
 //
-// It may only ESCALATE to a deny where a publish is actually POSSIBLE. The
-// headless successor session has no Artifact tool; denying it a publish it
-// cannot perform would spin it against a gate it can never satisfy, and a
-// blocked turn produces nothing. `publishCapability` (board-currency-core) is
-// that question, and until the delta-D transport exists it answers yes only for
-// a session that has demonstrably used the Artifact tool itself.
+// It may only ESCALATE to a deny where a publish is actually POSSIBLE. Denying
+// a session a publish it cannot perform would spin it against a gate it can
+// never satisfy, and a blocked turn produces nothing. `publishCapability`
+// (board-currency-core) is that question; since the delta-D transport is a
+// SCRIPT, the answer is yes for every session, headless included.
 
 import { isPublishDue } from './board-currency-core.mjs'
+import { PUBLISH_CMD, SYNCED_CMD } from './board-remedy.mjs'
 
 /** Tools that change state by their nature — no command inspection needed. */
 export const MUTATING_TOOLS = new Set(['Edit', 'Write', 'NotebookEdit', 'Agent'])
@@ -160,11 +160,11 @@ export function classifyTool({ toolName, command, filePath, boardPaths = [] } = 
  * of dashboard-guard-core, including the logged `--defer` valve. An unknown repo
  * hash means "cannot tell" → treated as published (fail-open).
  *
- * EITHER transport counts (point 400, delta D). The pages publish is a real
- * publish — the user reads that page — and once `canPublish` answers yes for
- * every session, a gate that still recognised only the Artifact record would
- * deny a headless session over a remedy it has no tool to run. That is the spin
- * this design forbids, not a stricter gate.
+ * The pages publish is the transport (point 400, delta D) — the user reads that
+ * page. A legacy mirror record still counts where one stands, so an old hash
+ * never re-blocks a board that was live; a gate that recognised only the mirror
+ * would deny a headless session over a remedy it has no tool to run, which is
+ * the spin this design forbids.
  */
 export function isPublished(state, repoHash) {
   if (!repoHash) return true
@@ -261,10 +261,9 @@ export function evaluate({
         '\nDo this now, then repeat the call:\n' +
         '  1. Update the "Woran ich gerade arbeite" card so it names what you are about to do.\n' +
         '  2. node scripts/focus.mjs set <N> "<what>"   (or `confirm` when the card is already right)\n' +
-        '  3. node scripts/board-publish.mjs   → pushes the board to the live page; works in EVERY\n' +
-        '     session, headless included. (The claude.ai mirror is still kept while the user moves\n' +
-        '     their bookmark: node scripts/dashboard-publish.mjs → Artifact → --synced.)\n' +
-        '  4. node scripts/dashboard-guard.mjs --synced <board path>\n' +
+        `  3. ${PUBLISH_CMD}   → pushes the board to the live page; works in EVERY\n` +
+        '     session, headless included.\n' +
+        `  4. ${SYNCED_CMD} <board path>\n` +
         'Reads, those four commands and an edit of the board file are never blocked, and this gate ' +
         'fires at most ONCE per turn — the next call goes through either way.\n' +
         'IF YOU ARE A SUBAGENT: the board is not yours to keep. A subagent inherits the parent ' +

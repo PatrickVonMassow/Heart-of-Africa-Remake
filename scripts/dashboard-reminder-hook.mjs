@@ -9,8 +9,7 @@
 // guard BLOCKS the turn from ending until the assistant explicitly confirms or
 // re-declares its focus (scripts/focus.mjs) — enforcement, not a reminder.
 import fs from 'node:fs'
-import path from 'node:path'
-import { PENDING_PATH, STATE_PATH, readJson, writeJsonAtomic, mergeState } from './dashboard-state.mjs'
+import { PENDING_PATH, STATE_PATH, boardFilePath, readJson, writeJsonAtomic, mergeState } from './dashboard-state.mjs'
 import { heldByOtherLiveOwner, withdrawHandover } from './batch-singleton.mjs'
 
 // Hard singleton (24.07.2026): a session that does not own the live batch lock
@@ -59,13 +58,6 @@ try {
   // clock. Its own key cannot be read by mistake, and board-first keeps
   // reading the field it always read.
   mergeState({ turnStartedAtBySession: { ...((readJson(STATE_PATH) ?? {}).turnStartedAtBySession ?? {}), [sid]: Date.now() } })
-  // Keep the current session's scratchpad target on record so a plain
-  // `node scripts/dashboard-publish.mjs` works even without the env variable.
-  if (process.env.CLAUDE_SCRATCHPAD_DIR) {
-    mergeState({
-      scratchpadPath: path.resolve(process.env.CLAUDE_SCRATCHPAD_DIR, 'hoa-batch-dashboard.html'),
-    })
-  }
 } catch {
   // best effort
 }
@@ -92,13 +84,15 @@ if (standDown) {
       'kein TASKS.md-/Dashboard-Edit. Beantworte die Nutzer-Nachricht normal.',
   )
 } else {
+// The age of the CANONICAL board file (point 435). It used to stat the
+// scratchpad copy of the retired mirror, which most sessions never write — so
+// the note was silent where it mattered and measured the wrong file where it
+// was not.
 let mtimeNote = ''
 try {
-  const path = process.env.CLAUDE_SCRATCHPAD_DIR
-    ? `${process.env.CLAUDE_SCRATCHPAD_DIR}/hoa-batch-dashboard.html`
-    : null
-  if (path && fs.existsSync(path)) {
-    const age = Math.round((Date.now() - fs.statSync(path).mtimeMs) / 60000)
+  const board = boardFilePath()
+  if (fs.existsSync(board)) {
+    const age = Math.round((Date.now() - fs.statSync(board).mtimeMs) / 60000)
     mtimeNote = ` Letzte Dashboard-Dateiänderung vor ~${age} min.`
   }
 } catch {

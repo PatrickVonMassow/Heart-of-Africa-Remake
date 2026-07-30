@@ -25,6 +25,8 @@
 // multi-paragraph; the bloated ones sat at >= 91 words, 5-24 tech tokens,
 // 72+-word single-<p> blobs. The thresholds sit in the empirical gap.
 // Fail-open is the WRAPPER's job; this core must never throw on partial input.
+// The remedy's publish steps come from scripts/board-remedy.mjs — one copy.
+import { REPUBLISH } from './board-remedy.mjs'
 
 /** Max body words for a now/queue card (good cards measured <= 82). */
 export const WORD_BUDGET = 90
@@ -129,8 +131,7 @@ export function evaluate({ dashboardHtml } = {}) {
         'HIGH-LEVEL — what is happening and why it matters, phone-glanceable. Drop commit hashes, ' +
         'file paths, code spans and step-by-step technical detail (git history and TASKS.md carry ' +
         'those), and split a longer body into short <p> paragraphs. Erledigt/Von-dir-zu-klären ' +
-        'cards are exempt. Then republish (dashboard-publish.mjs + Artifact) and re-run ' +
-        'dashboard-guard --synced.',
+        `cards are exempt. Then ${REPUBLISH}.`,
     }
   } catch {
     return { block: false, reason: '' } // total by contract — the wrapper's fail-open must never depend on luck

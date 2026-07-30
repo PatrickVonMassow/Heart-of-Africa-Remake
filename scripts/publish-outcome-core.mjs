@@ -1,4 +1,7 @@
-// Point 399 — did the Artifact publish actually SUCCEED?
+// Point 399 — did the publish actually SUCCEED?
+// LEGACY (claude.ai artifact, retired 29.07.2026): this reads the MIRROR's tool
+// response. The live transport is scripts/board-publish.mjs, which reports its
+// own failures directly.
 //
 // The PostToolUse hook used to record `publishedHash` on the mere OCCURRENCE of
 // an Artifact call, never looking at what came back. A refused, conflicted or
