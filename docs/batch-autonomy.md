@@ -612,18 +612,38 @@ behind, and the successor had to notice by itself. That is judgment where a
 mechanism belongs, and over a fortnight alone it is judgment nobody is there to
 exercise.
 
-The launcher now runs `batch-doctor.mjs --repair` after its environment preflight
-and before it acquires the pending-spawn lock. `repoRepairDecision` reads the exit
-code: **0** spawn, **2** repairs still pending → no spawn, **1** findings that need
-hands → no spawn; both refusals alert and are retried on the next tick, and neither
-touches `failCount` — a torn tree is not a broken environment. No `--gate`, so the
-check costs well under a second; the three-minute suite stays a session's job.
+The launcher now runs the doctor after its environment preflight and before it
+acquires the pending-spawn lock, without `--gate` so the check costs a second or
+two — the three-minute suite stays a session's job.
 
-The same seam is checked from the other side: `batch-resume-hook.mjs` asks the
-doctor READ-ONLY (no `--repair`, no `--gate`) and, for a session that actually owns
-the batch, prepends `resumeRepairMandate` — "REPO NOT CLEAN — DO NOT START
-WORKING", naming the one command that clears it. Two independent looks at one
-naht, because the one that fails is never the one you expected.
+**It may WRITE only where the previous owner is provably gone** (`repoRepairAllowed`:
+`pid-dead`, `pid-reused`, `heartbeat-predates-boot`, `handed-over`, `no-lock`,
+`legacy-stale`). An expired LEASE is deliberately not in that set: such a process is
+ALIVE and merely silent — the 30.07.2026 permission outage had exactly that shape,
+and it stands down at its next hook — so `git merge --abort` or `git stash push -u`
+in its tree would discard the merge it is resolving. There the check is read-only
+and the successor is told instead.
+
+**It never refuses to spawn.** The first draft did, and that was the mechanism
+making things worse than the status quo: an exit-1 state — a committed conflict
+marker, a repair blocked by a file lock — is TRUE at every tick until somebody
+intervenes, so the batch would have stood still for the whole fortnight while
+pushing an urgent notification every fifteen minutes. Refusing also contradicts the
+other half of this change: the mandate exists so a SESSION can deal with an unclean
+tree, and a session is exactly what can fix a mangled work order by hand. So a
+finding means "spawn, and tell it": `repoRepairDecision` returns `mandate: true`,
+the launcher drops `.claude/repo-mandate.json`, and the alert is marked `standing`
+so `standingAlertDue` throttles it to one push per interval. `failCount` stays
+untouched — a torn tree is not a broken environment.
+
+The same seam is checked from the other side: `batch-resume-hook.mjs` prefers that
+fresh one-shot marker (so the common case costs nothing) and otherwise asks the
+doctor itself, without `--repair` and without `--gate`. Note what that does NOT
+mean: the doctor's AUTO level still runs, i.e. a fetch and a strictly-behind
+fast-forward — the same fast-forward a resuming session would do first anyway. For a
+session that actually owns the batch it prepends `resumeRepairMandate`: "REPO NOT
+CLEAN — MEND IT BEFORE YOU WORK", naming the command that clears it. Two independent
+looks at one seam, because the one that fails is never the one you expected.
 
 FAIL-OPEN both times. A doctor that cannot run at all spawns anyway and says so
 loudly (the session side stays silent about it — the launcher's alert already

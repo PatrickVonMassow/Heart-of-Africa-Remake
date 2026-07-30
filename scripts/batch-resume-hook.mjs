@@ -76,12 +76,36 @@ function ownsBatch(ownership) {
   return ownership === 'acquired-spawn' || ownership === 'acquired' || ownership === 'mine'
 }
 
-/** The doctor's READ-ONLY verdict on the tree this session woke up in (point 442).
- *  No `--repair` (a hook must not mutate the tree) and no `--gate` (a hook must not
- *  cost three minutes of tests). Never throws: an unrunnable doctor reports itself
- *  and `resumeRepairMandate` stays silent about it — the launcher's own alert
- *  already carries that news, and a session cannot fix a broken doctor anyway. */
-function readRepoVerdict() {
+/** The doctor's verdict on the tree this session woke up in (point 442).
+ *
+ *  PREFER THE LAUNCHER'S OWN READING. When a successor was just spawned, the
+ *  launcher has already asked the doctor seconds ago and left the answer in
+ *  `repo-mandate.json`; reusing it makes the common case free. The marker is
+ *  one-shot and expires, so a stale one can never mandate anything.
+ *
+ *  Only without one does the hook ask itself, and then WITHOUT `--repair` and
+ *  without `--gate`. Note what that does and does not mean (four-eyes review,
+ *  finding 3): the doctor's AUTO level still runs, i.e. `git fetch origin main` and
+ *  a strictly-behind fast-forward. That is deliberate and harmless — it is the same
+ *  fast-forward a resuming session would do first anyway — but it is not "nothing",
+ *  and the fetch is why the timeout allows for a slow network.
+ *
+ *  Never throws: an unrunnable doctor reports itself and `resumeRepairMandate` stays
+ *  silent about it — the launcher's alert already carries that news, and a session
+ *  cannot mend a broken doctor. */
+const MANDATE_PATH = fileURLToPath(new URL('../.claude/repo-mandate.json', import.meta.url))
+const MANDATE_MAX_AGE_MS = 15 * 60 * 1000
+
+function readRepoVerdict(nowMs = Date.now()) {
+  try {
+    const m = JSON.parse(readFileSync(MANDATE_PATH, 'utf8'))
+    rmSync(MANDATE_PATH, { force: true })
+    if (m && Number.isFinite(m.at) && nowMs - m.at <= MANDATE_MAX_AGE_MS) {
+      return { ran: true, code: Number.isFinite(m.code) ? m.code : 1 }
+    }
+  } catch {
+    /* no marker, or unreadable — ask the doctor directly */
+  }
   try {
     execFileSync(process.execPath, [join(REPO_ROOT, 'scripts', 'batch-doctor.mjs')], {
       windowsHide: true,

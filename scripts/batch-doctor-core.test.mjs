@@ -18,6 +18,7 @@ import {
   alertNamesAnother,
   GATE_COMMANDS,
   INCONCLUSIVE_VERDICT,
+  repoRepairAllowed,
   repoRepairDecision,
   resumeRepairMandate,
 } from './batch-doctor-core.mjs'
@@ -346,40 +347,77 @@ describe('otherSessionsIn — an alert naming only the reader is no evidence', (
 
 // --- Point 442: the repair runs before the successor -----------------------------
 
+describe('repoRepairAllowed — the doctor may WRITE only where the owner is gone', () => {
+  it('permits a repair for every provably-dead verdict', () => {
+    for (const r of ['pid-dead', 'pid-reused', 'heartbeat-predates-boot', 'handed-over', 'no-lock', 'legacy-stale']) {
+      expect(repoRepairAllowed(r)).toBe(true)
+    }
+  })
+
+  it('REFUSES to write on an expired lease — that process is alive and merely silent', () => {
+    expect(repoRepairAllowed('lease-expired')).toBe(false)
+  })
+
+  it('refuses for every verdict that describes a living or unknown owner', () => {
+    for (const r of ['pid-alive', 'fresh-heartbeat', 'renewed', 'handover-grace', 'legacy-fresh', 'error', '', null, undefined]) {
+      expect(repoRepairAllowed(r)).toBe(false)
+    }
+  })
+})
+
 describe('repoRepairDecision — the repo check the launcher runs before spawning', () => {
-  it('spawns on a consistent verdict, with nothing to report', () => {
-    expect(repoRepairDecision({ ran: true, code: 0 })).toEqual({ spawn: true, reason: 'consistent', alert: null })
+  it('spawns on a consistent verdict, with no mandate and nothing to report', () => {
+    expect(repoRepairDecision({ ran: true, code: 0 })).toEqual({
+      spawn: true,
+      mandate: false,
+      reason: 'consistent',
+      standing: false,
+      alert: null,
+    })
   })
 
-  it('REFUSES to spawn while repairs are still pending, and says the tree would be built upon', () => {
-    const d = repoRepairDecision({ ran: true, code: 2 })
-    expect(d.spawn).toBe(false)
-    expect(d.reason).toBe('repairs-pending')
-    expect(d.alert).toMatch(/torn tree/i)
-    expect(d.alert).toMatch(/next tick/i)
+  it('NEVER refuses to spawn on a finding — it spawns and hands over the mandate instead', () => {
+    for (const code of [1, 2, 3, 127, 255]) {
+      const d = repoRepairDecision({ ran: true, code, repaired: true })
+      expect(d.spawn).toBe(true)
+      expect(d.mandate).toBe(true)
+    }
   })
 
-  it('REFUSES to spawn on findings no repair can clear, and says it needs hands', () => {
-    const d = repoRepairDecision({ ran: true, code: 1 })
-    expect(d.spawn).toBe(false)
+  it('marks a finding as a STANDING condition, so its alert is throttled rather than pushed every tick', () => {
+    expect(repoRepairDecision({ ran: true, code: 1, repaired: true }).standing).toBe(true)
+    expect(repoRepairDecision({ ran: true, code: 0 }).standing).toBe(false)
+  })
+
+  it('says in the alert that the successor was started anyway, and why refusing would be worse', () => {
+    const d = repoRepairDecision({ ran: true, code: 1, repaired: true })
+    expect(d.alert).toMatch(/started ANYWAY/)
+    expect(d.alert).toMatch(/standing still/)
     expect(d.reason).toBe('findings-remain')
-    expect(d.alert).toMatch(/hands/i)
   })
 
-  it('treats any other non-zero exit as findings rather than as permission to spawn', () => {
-    for (const code of [3, 7, 127, 255]) expect(repoRepairDecision({ ran: true, code }).spawn).toBe(false)
+  it('distinguishes the read-only tick, and says nothing was mended for the silent owner', () => {
+    const d = repoRepairDecision({ ran: true, code: 1, repaired: false })
+    expect(d.reason).toBe('unclean-not-repaired')
+    expect(d.alert).toMatch(/read-only/)
+    expect(d.alert).toMatch(/alive but silent/)
+    expect(d.mandate).toBe(true)
   })
 
-  it('FAILS OPEN when the doctor itself cannot run — a broken safeguard costs a diagnosis, never the work', () => {
+  it('FAILS OPEN when the doctor cannot run — spawns, no mandate, and says the check proves nothing', () => {
     const d = repoRepairDecision({ ran: false, code: null })
     expect(d.spawn).toBe(true)
+    expect(d.mandate).toBe(false)
     expect(d.reason).toBe('doctor-unrunnable')
+    expect(d.standing).toBe(true)
     expect(d.alert).toMatch(/WITHOUT a repo check/)
   })
 
-  it('fails open on a nonsense exit status too, rather than throwing inside a launcher tick', () => {
-    expect(repoRepairDecision({ ran: true, code: NaN }).spawn).toBe(false)
-    expect(repoRepairDecision()).toEqual({ spawn: true, reason: 'consistent', alert: null })
+  it('treats an unusable exit status as a finding rather than as a clean tree, and never throws', () => {
+    const d = repoRepairDecision({ ran: true, code: NaN })
+    expect(d.spawn).toBe(true)
+    expect(d.mandate).toBe(true)
+    expect(repoRepairDecision()).toEqual({ spawn: true, mandate: false, reason: 'consistent', standing: false, alert: null })
   })
 })
 
@@ -388,15 +426,17 @@ describe('resumeRepairMandate — the same seam, checked from the session side',
     expect(resumeRepairMandate({ ran: true, code: 0 })).toBeNull()
   })
 
-  it('forbids starting work and names the one command that clears it', () => {
+  it('orders the tree mended BEFORE any work, and names the command that does it', () => {
     const m = resumeRepairMandate({ ran: true, code: 2 })
-    expect(m).toMatch(/DO NOT START WORKING/)
+    expect(m).toMatch(/MEND IT BEFORE YOU WORK/)
     expect(m).toMatch(/batch-doctor\.mjs --repair/)
     expect(m).toMatch(/exit 2/)
   })
 
-  it('also fires for findings that need hands, so a mangled work order is never worked around', () => {
-    expect(resumeRepairMandate({ ran: true, code: 1 })).toMatch(/DO NOT START WORKING/)
+  it('also fires for findings that need hands, and says to fix those by hand', () => {
+    const m = resumeRepairMandate({ ran: true, code: 1 })
+    expect(m).toMatch(/MEND IT BEFORE YOU WORK/)
+    expect(m).toMatch(/by hand/)
   })
 
   it('stays SILENT when the doctor could not run — the launcher already alerted, and a session cannot mend it', () => {

@@ -65,7 +65,7 @@ import {
   judgePreviousSpawn,
   spawnBackoffMs,
 } from './batch-autostart-core.mjs'
-import { repoRepairDecision } from './batch-doctor-core.mjs'
+import { repoRepairAllowed, repoRepairDecision } from './batch-doctor-core.mjs'
 import { WATCHER_PID_FILE, watcherSupervision } from './chat-watcher-core.mjs'
 import { SECRET_FAULT } from './chat-secret.mjs'
 import { chatInboxLogLines } from './chat-core.mjs'
@@ -561,23 +561,40 @@ if (!preflight.ok) {
 // leaves the tree torn, and until 30.07.2026 the next one was started into it and
 // had to notice by itself. The doctor already knew how to find and mend exactly
 // this; nobody called it on the way in. It runs without `--gate`, so this stays a
-// repo check of well under a second — the three-minute suite is a session's job,
-// not a launcher tick's. A refusal does NOT touch failCount: a torn tree is not a
-// broken environment, and the next tick retries it.
-const repo = runRepoDoctor()
-const repoVerdict = repoRepairDecision(repo)
-log(`repo check before spawn: ${repoVerdict.reason}${repo.ran ? ` (batch-doctor exit ${repo.code})` : ''}`)
-if (repoVerdict.alert) await notify(repoVerdict.spawn ? 'Repo check could not run' : 'Batch spawn BLOCKED — repo not clean', repoVerdict.alert, repoVerdict.spawn ? 'default' : 'urgent')
-if (!repoVerdict.spawn) {
-  writeJsonAtomic(C('autostart-state.json'), state)
-  process.exit(0)
+// repo check of a second or two — the three-minute suite is a session's job, not a
+// launcher tick's.
+//
+// It may WRITE only where the previous owner is provably gone. An expired LEASE is
+// not that (four-eyes review): such a process is alive and merely silent, it stands
+// down at its next hook, and stashing the merge it is resolving would destroy real
+// work. There the check is read-only and the successor carries the mandate instead.
+//
+// And it never stops the spawn. A finding no repair clears is TRUE at every tick
+// until somebody acts; refusing here would have stood the batch still for a whole
+// unattended fortnight, so the successor starts and is TOLD. The alert is throttled
+// as the standing condition it is, and `failCount` stays untouched — a torn tree is
+// not a broken environment.
+const repaired = repoRepairAllowed(assessment.reason)
+const repo = runRepoDoctor(repaired)
+const repoVerdict = repoRepairDecision({ ...repo, repaired })
+log(`repo check before spawn: ${repoVerdict.reason}${repo.ran ? ` (batch-doctor exit ${repo.code}${repaired ? ', --repair' : ', read-only'})` : ''}`)
+if (repoVerdict.alert) {
+  const due = !repoVerdict.standing || standingAlertDue({ lastAt: state.repoAlertAt ?? null, now })
+  if (due) {
+    state.repoAlertAt = now
+    await notify('Repo not clean before spawn', repoVerdict.alert, 'default')
+  }
+} else {
+  delete state.repoAlertAt
 }
+if (repoVerdict.mandate) writeJsonAtomic(C('repo-mandate.json'), { at: now, code: repo.code ?? null, reason: repoVerdict.reason })
 
-/** Run the doctor's auto + repair levels and report how it went. Never throws:
- *  an unrunnable doctor is reported as such and decided fail-open above. */
-function runRepoDoctor() {
+/** Run the doctor and report how it went. `write` false keeps it to its read-only
+ *  levels. Never throws: an unrunnable doctor is reported as such and decided
+ *  fail-open above. */
+function runRepoDoctor(write) {
   try {
-    execFileSync(process.execPath, [join(REPO, 'scripts', 'batch-doctor.mjs'), '--repair'], {
+    execFileSync(process.execPath, [join(REPO, 'scripts', 'batch-doctor.mjs'), ...(write ? ['--repair'] : [])], {
       cwd: REPO,
       encoding: 'utf8',
       timeout: 120000,
