@@ -13,7 +13,6 @@ import {
   constantTimeEqual,
   MAX_DROP_NOTICES,
   deriveTopics,
-  chatInboxLogLines,
   dropNoticeDecision,
   dropNoticeText,
   envelopeRetentionMs,

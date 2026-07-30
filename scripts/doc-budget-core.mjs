@@ -55,7 +55,14 @@ export const DOC_BUDGETS = [
     // RAISED by the 5 lines point 409 adds: §6 gains the merge-time branch
     // deletion, §7.2 the guard that backstops it. See the word note below —
     // same change, priced once in each unit.
-    maxLines: 1137,
+    // RAISED by the 2 lines the bundle-I merge adds (30.07.2026): §6's delegation
+    // paragraph gains that the pool cap is also a TARGET — a free slot owes a
+    // reason while the queue holds an independent point (point 427) — and §7.2
+    // lists `decision-card-guard`, the new enforcer from point 421. Both are new
+    // RULES with new enforcers behind them, not a longer telling of something
+    // already here; without the first the pool silently runs at a third of its
+    // width, which is what point 427 was written for.
+    maxLines: 1139,
     // RAISED by the 50 measured words of the §7.2 rule that screenshot diffing
     // is not available as a shortcut (point 361). That is the mechanism working
     // as designed rather than a concession: the words buy a NEW standing rule
