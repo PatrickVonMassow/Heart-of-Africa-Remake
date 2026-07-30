@@ -66,6 +66,7 @@ import { otherSessionsIn, gateDemandSatisfied } from './batch-doctor-core.mjs'
 import { gatherBoundary } from './batch-boundary.mjs'
 import { LAUNCHER_TASK_NAME } from './batch-boundary-core.mjs'
 import { gatherInFlight } from './batch-in-flight.mjs'
+import { POOL_CAP, slotsRemedy } from './batch-in-flight-core.mjs'
 import { describeInFlight } from './batch-in-flight-core.mjs'
 import { clearClaim, gatherClaim, gitOperationInProgress, handBackToClaimant } from './batch-claim.mjs'
 import { describeClaim, releaseDecision, reservationDecision } from './batch-claim-core.mjs'
@@ -284,6 +285,7 @@ try {
     launcher: bound.launcher,
     boundaryDue: bound.due,
     inFlight: inFlight.live === true,
+    slotsNeedReason: inFlight.slots?.needsReason === true,
     claim: claimVerdict.verdict,
   })
 
@@ -329,6 +331,13 @@ try {
         `and it is released at the first CLEAN turn end — this one is not clean (${claimVerdict.reason}). ` +
         `Finish what is in flight; do not start anything new.`
       : ''
+
+  if (decision === 'block-slots-free') {
+    // THE POOL RUNS AT ITS CAP, OR SAYS WHY NOT (point 427). The wait itself is
+    // legitimate — its evidence checks out — but empty slots beside a queue of
+    // independent points are not a wait, they are unused capacity.
+    block(slotsRemedy({ slots: inFlight.slots ?? {}, cap: POOL_CAP }) + claimNote)
+  }
 
   if (decision === 'allow-in-flight') {
     // The stop is allowed because the session is WAITING, and it says on what —

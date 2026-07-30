@@ -690,6 +690,7 @@ export function progressGuardDecision({
   launcher = 'unknown', // 'armed' | 'disabled' | 'unknown'
   boundaryDue = null, // point number closed in THIS session without a marker | null
   inFlight = false, // declared work PROVEN still running (assessInFlight().live)
+  slotsNeedReason = false, // free pool slots + an independent queued point + no reason (point 427)
   claim = 'none', // 'none' | 'wait' | 'release' from batch-claim-core's releaseDecision
 }) {
   if (paused) return 'allow'
@@ -730,7 +731,15 @@ export function progressGuardDecision({
   // The declaration cannot become a way to switch the block off: it is bounded by
   // its own expiry and by evidence that has to keep checking out (assessInFlight),
   // and the lock stays HELD, so no successor is spawned beside a waiting session.
-  if (inFlight === true) return 'allow-in-flight'
+  //
+  // …BUT THE CAP IS ALSO A TARGET (point 427). A session that commissions ONE point
+  // and then declares a wait breaks no rule — the cap is an upper bound and nothing
+  // checked the lower one — so one agent built while two slots stood empty for ninety
+  // minutes with a queue full of independent points. The wait is therefore allowed
+  // only once the idle slots are accounted for: either the pool is at its cap, the
+  // queue's remaining points all touch the running branch, the batch is paused, a
+  // closing freeze is recorded, or the declaration carries a written reason.
+  if (inFlight === true) return slotsNeedReason === true ? 'block-slots-free' : 'allow-in-flight'
   if (Number.isInteger(boundaryDue) && boundaryDue > 0) return 'block-take-boundary'
   return 'block-continue'
 }

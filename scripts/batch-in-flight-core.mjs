@@ -342,6 +342,151 @@ export function assessInFlight({
   return out(true, 'live', { ageMs, summary, items })
 }
 
+// ---------------------------------------------------------------------------
+// THE POOL RUNS AT ITS CAP, OR SAYS WHY NOT (point 427, 29.07.2026)
+// ---------------------------------------------------------------------------
+//
+// The user asked it plainly while one agent built and two slots stood empty: "Nur
+// ein Punkt in Arbeit? Ist aktuell keine Parallelisierung sinnvoll?" Nothing was
+// broken: the wait declaration is built and enforced, the idle guard is satisfied,
+// and the cap is an UPPER bound that nothing checks from below. Measured that day:
+// one agent, two free slots, ninety minutes, a queue full of independent points.
+//
+// So the mechanism that already judges the wait also asks the lower bound — and it
+// must not become a nag, which is why every state in which the empty slots are
+// genuinely unusable answers "no reason needed" on its own.
+
+/** The delegation pool cap (CLAUDE.md §6): at most three concurrent agents — and
+ *  since point 427 also a TARGET while independent work is queued. */
+export const POOL_CAP = 3
+
+/**
+ * How many delegated agents the declaration's own evidence SHOWS. PURE.
+ *
+ * Counted from what can actually be seen rather than from a number the session
+ * types: one agent normally declares both its worktree and its branch, so the
+ * larger of the two distinct counts is the honest reading.
+ */
+export function declaredAgentCount(evidence = []) {
+  const worktrees = new Set()
+  const branches = new Set()
+  for (const e of Array.isArray(evidence) ? evidence : []) {
+    if (e?.kind === 'worktree' && e.path) worktrees.add(String(e.path).toLowerCase())
+    if (e?.kind === 'branch' && e.ref) branches.add(String(e.ref).toLowerCase())
+  }
+  return Math.max(worktrees.size, branches.size)
+}
+
+/**
+ * The repository files a point's spec NAMES. PURE.
+ *
+ * The overlap question — "would this queued point collide with the running branch"
+ * — can only be answered from what the spec says it touches. A point that names
+ * nothing is UNKNOWN, and unknown must never produce a demand: see
+ * `independentOpenPoints`.
+ */
+export function filesNamedIn(text) {
+  const out = new Set()
+  const re = /\b(?:src|scripts|docs|public|verification)[\\/][\w.\-\\/]*\w/gi
+  for (const m of String(text ?? '').matchAll(re)) out.add(normPath(m[0]))
+  // Root-level documents the work order names without a directory.
+  for (const m of String(text ?? '').matchAll(/\b(?:CLAUDE|design|TASKS|README)\.md\b/gi)) out.add(normPath(m[0]))
+  return [...out]
+}
+
+/**
+ * The OPEN points of the work order with the files each names. PURE.
+ *
+ * A point's block runs from its `- [ ] N.` line to the next checkbox line, which is
+ * how the work order is written; DEFERRED points are excluded exactly as
+ * `openPointStatus` excludes them, since a deferred point is not commissionable.
+ */
+export function openPointSpecs(tasksText = '') {
+  const out = []
+  let current = null
+  for (const line of String(tasksText ?? '').split('\n')) {
+    const head = line.match(/^- \[( |x)\] (\d+)\./)
+    if (head) {
+      if (current) out.push(current)
+      current =
+        head[1] === ' ' && !/\bDEFERRED\b/.test(line) ? { point: Number(head[2]), text: line } : null
+      continue
+    }
+    if (current) current.text += `\n${line}`
+  }
+  if (current) out.push(current)
+  return out.map((p) => ({ point: p.point, files: filesNamedIn(p.text) }))
+}
+
+/**
+ * Which open points could be commissioned RIGHT NOW, beside the running work? PURE.
+ *
+ * `points` is [{ point, files }]; `runningFiles` is what the running branch touches.
+ * A point counts as a candidate only when it names files AND none of them is in the
+ * running set. Both exclusions err toward SILENCE — a point whose spec names nothing
+ * is not evidence that a slot is wastable.
+ */
+export function independentOpenPoints({ points = [], runningFiles = [] } = {}) {
+  const running = new Set((Array.isArray(runningFiles) ? runningFiles : []).map(normPath).filter(Boolean))
+  return (Array.isArray(points) ? points : []).filter((p) => {
+    const files = (Array.isArray(p?.files) ? p.files : []).map(normPath).filter(Boolean)
+    if (files.length === 0) return false
+    return !files.some((f) => running.has(f) || [...running].some((r) => r.startsWith(`${f}/`) || f.startsWith(`${r}/`)))
+  })
+}
+
+/**
+ * MUST THIS WAIT EXPLAIN ITS IDLE SLOTS? PURE.
+ *
+ * Returns { needsReason, slotsFree, agents, candidates, why }. Every "no" carries
+ * the state that decided it, so the guard's message can say which one applied.
+ */
+export function slotReasonDecision({
+  agents = 0,
+  openPoints = [],
+  runningFiles = [],
+  reason = '',
+  paused = false,
+  closingFreeze = false,
+  cap = POOL_CAP,
+} = {}) {
+  const running = Number.isFinite(agents) && agents > 0 ? Math.floor(agents) : 0
+  const limit = Number.isFinite(cap) && cap > 0 ? Math.floor(cap) : POOL_CAP
+  const slotsFree = Math.max(0, limit - running)
+  const candidates = independentOpenPoints({ points: openPoints, runningFiles })
+  const no = (why) => ({ needsReason: false, slotsFree, agents: running, candidates, why })
+  // A paused batch and a closing freeze are states in which commissioning MORE work
+  // would be wrong — the freeze exists so the closing tests the final state.
+  if (paused === true) return no('paused')
+  if (closingFreeze === true) return no('closing-freeze')
+  if (slotsFree === 0) return no('at-cap')
+  if (candidates.length === 0) return no('queue-overlaps')
+  if (String(reason ?? '').trim()) return no('reason-given')
+  return { needsReason: true, slotsFree, agents: running, candidates, why: 'idle-slots' }
+}
+
+/**
+ * The guard's remedy for unexplained idle slots. PURE, so the wording is pinned
+ * rather than left to a script — the point requires it to name BOTH honest answers.
+ */
+export function slotsRemedy({ slots = {}, cap = POOL_CAP } = {}) {
+  const names = (Array.isArray(slots.candidates) ? slots.candidates : [])
+    .slice(0, 8)
+    .map((c) => c?.point)
+    .filter((p) => p != null)
+    .join(', ')
+  return (
+    `THE AGENT POOL IS BELOW ITS CAP AND NOTHING SAYS WHY: ${slots.agents ?? 0} agent(s) running, ` +
+    `${slots.slotsFree ?? 0} of ${cap} slots FREE, and the queue holds independent open point(s) that touch none of ` +
+    `the running branch's files (${names || 'see the work order'}). The declared wait is fine; the idle slots are ` +
+    'not accounted for. TWO honest answers: (a) COMMISSION another point into a free slot — a worktree-isolated ' +
+    'agent on its own feat/<point>-<slug> branch, on files the running work does not touch; or (b) STATE what ' +
+    'makes the queue\'s next points unsuitable right now: `node scripts/batch-in-flight.mjs --waiting-on "<what>" ' +
+    '<evidence> --slots-free "<why>"` (file overlap with the running branch, a closing freeze, a user pause are ' +
+    'all valid reasons). A paused batch, a recorded closing freeze and a full pool need no reason at all.'
+  )
+}
+
 /**
  * Details that mean A PROBE COULD NOT ANSWER, as opposed to answering "gone".
  * A declaration nobody can check is not proof of anything — it is treated as no

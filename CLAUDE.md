@@ -260,14 +260,14 @@ old→new coverage map live in `scripts/verify/README.md`.
     (If a change genuinely needs the user's eyes BEFORE it is safe to land, that
     is the rare exception: set up a branch-preview deploy rather than merge
     unverified.)
-- **Maximal delegation (user decision 22.07.2026, permanent process).** The main
-  session delegates the MAXIMUM to subagents so as little as possible bottlenecks
-  at it. Each open TASKS point is implemented by a WORKTREE-ISOLATED subagent on
-  its own `feat/<point>-<slug>` branch (gates green, branch pushed, NOT merged by
-  the agent — the main session merges); a POOL of such agents runs in PARALLEL on
-  NON-OVERLAPPING files. Infra, guard, doc and dashboard-restructure work too.
-  What stays at the main session: the picture-verification on BOTH backends, the
-  serial merge → fast-gate → tick → deploy → cleanup, and the Artifact publish
+- **Maximal delegation (user 22.07.2026, permanent).** The main session delegates
+  the MAXIMUM so as little as possible bottlenecks there. Each open TASKS point
+  goes to a WORKTREE-ISOLATED subagent on its own `feat/<point>-<slug>` branch
+  (gates green, branch pushed, NOT merged); a POOL of THREE runs in PARALLEL on
+  NON-OVERLAPPING files, and the cap is also a TARGET: while the queue holds an
+  independent point, a free slot owes a reason (`--slots-free`). Infra and doc
+  work too. What stays here: picture-verification on BOTH backends, the serial
+  merge → fast-gate → tick → deploy → cleanup, and the Artifact publish
   (URL-bound).
 - **Delegation brief instead of a reading assignment (point 365).** A delegated
   agent receives its point as a BRIEF: `node scripts/point-brief.mjs <N>` prints

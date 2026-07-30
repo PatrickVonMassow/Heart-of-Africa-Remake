@@ -18,7 +18,7 @@
 // The ONLY thing it changes is that `batch-progress-guard` stops demanding work
 // the session cannot do while it waits — and it stops the moment the evidence
 // stops checking out, or the declaration ages out.
-import { readFileSync, rmSync, statSync } from 'node:fs'
+import { readFileSync, rmSync, statSync, existsSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { REPO_ROOT } from './repo-paths.mjs'
@@ -35,8 +35,14 @@ import {
   assessInFlight,
   describeInFlight,
   selfReferentialEvidence,
+  slotReasonDecision,
+  slotsRemedy,
+  declaredAgentCount,
+  openPointSpecs,
   IN_FLIGHT_MAX_AGE_MS,
+  POOL_CAP,
 } from './batch-in-flight-core.mjs'
+import { readTasksOpen, TASKS_PATH } from './tasks-source.mjs'
 
 export { IN_FLIGHT_PATH }
 
@@ -207,10 +213,66 @@ const probes = { probePid, refTipAt, worktreeActiveAt, mtimeOf }
  * the declaration it judged. Cheap in the common case: with no marker on disk it
  * returns before any probe runs, so an ordinary turn end pays nothing for this.
  */
+/** The path whose existence records a CLOSING FREEZE (CLAUDE.md §9): while a closing
+ *  run is under way no agent work may land, so empty pool slots are correct. */
+export const CLOSING_FREEZE_PATH = resolve(REPO_ROOT, '.claude', 'closing-freeze')
+const PAUSE_PATH = resolve(REPO_ROOT, '.claude', 'batch-paused')
+
+/** The files the running agent branches touch, against `main`. Best effort: an
+ *  unreadable git yields an EMPTY set, and an empty running set can only make more
+ *  points look independent — so the fallback is checked at the decision, where an
+ *  unknown state must never produce a demand. */
+export function runningBranchFiles(evidence = [], { cwd = REPO_ROOT } = {}) {
+  const refs = [...new Set((evidence ?? []).filter((e) => e?.kind === 'branch' && e.ref).map((e) => String(e.ref)))]
+  const files = new Set()
+  for (const ref of refs) {
+    try {
+      const out = execFileSync('git', ['diff', '--name-only', `main...${ref}`], {
+        cwd,
+        encoding: 'utf8',
+        timeout: 15000,
+        stdio: ['ignore', 'pipe', 'ignore'],
+      })
+      for (const line of out.split(/\r?\n/)) if (line.trim()) files.add(line.trim())
+    } catch {
+      /* unknown ref / not a repo — this branch contributes nothing */
+    }
+  }
+  return [...files]
+}
+
+/**
+ * DOES THIS WAIT OWE A REASON FOR ITS IDLE POOL SLOTS (point 427)? The decision is
+ * pure (`slotReasonDecision`); this gathers the four facts. Anything unreadable ends
+ * as "no demand" — the lower bound on the pool is worth a nudge, never a wedge.
+ */
+export function gatherSlots(declaration, { cwd = REPO_ROOT, tasksPath = TASKS_PATH } = {}) {
+  try {
+    const evidence = Array.isArray(declaration?.evidence) ? declaration.evidence : []
+    const running = runningBranchFiles(evidence, { cwd })
+    // No readable running-file set means the overlap question cannot be answered, and
+    // an unanswerable question is not a reason to demand anything.
+    if (running.length === 0) return { needsReason: false, slotsFree: 0, agents: 0, candidates: [], why: 'overlap-unknown' }
+    return slotReasonDecision({
+      agents: declaredAgentCount(evidence),
+      openPoints: openPointSpecs(readTasksOpen(tasksPath)),
+      runningFiles: running,
+      reason: declaration?.slotsFree ?? '',
+      paused: existsSync(PAUSE_PATH),
+      closingFreeze: existsSync(CLOSING_FREEZE_PATH),
+      cap: POOL_CAP,
+    })
+  } catch {
+    return { needsReason: false, slotsFree: 0, agents: 0, candidates: [], why: 'ungatherable' }
+  }
+}
+
 export function gatherInFlight(sid, { now = Date.now(), lockPath = LOCK_PATH, env = process.env } = {}) {
   const path = statePathsFor(lockPath).inFlightPath
   const declaration = readDeclaration(path)
-  if (!declaration) return { declaration: null, live: false, reason: 'no-declaration', summary: '', items: [] }
+  if (!declaration) {
+    return { declaration: null, live: false, reason: 'no-declaration', summary: '', items: [], slots: null }
+  }
   // The ancestor walk is only needed when the session id no longer matches (a
   // context compaction) — it is the expensive probe, so it stays behind that.
   const ancestor = declaration.sessionId === sid ? null : ourClaudeProcess(sid, { lockPath })
@@ -222,7 +284,11 @@ export function gatherInFlight(sid, { now = Date.now(), lockPath = LOCK_PATH, en
     maxAgeMs: maxAgeMs(env),
     ...probes,
   })
-  return { declaration, ...assessment }
+  // Only worth asking for a wait that would otherwise be allowed: a declaration that
+  // is not live blocks anyway, and paying two git calls to explain a block nobody is
+  // getting would be waste on the Stop hook's path.
+  const slots = assessment.live ? gatherSlots(declaration) : null
+  return { declaration, ...assessment, slots }
 }
 
 // --- CLI -----------------------------------------------------------------------
@@ -238,7 +304,7 @@ if (isMain) {
   }
   const usage =
     'usage: node scripts/batch-in-flight.mjs --waiting-on "<what>" [--pid N] [--branch REF] ' +
-    '[--worktree PATH] [--log PATH] | --status | --clear'
+    '[--worktree PATH] [--log PATH] [--slots-free "<why the free pool slots stay free>"] | --status | --clear'
 
   if (argv[0] === '--clear') {
     clearDeclaration()
@@ -253,10 +319,18 @@ if (isMain) {
     const waitingOn = String(argv[1] ?? '').trim()
     if (!waitingOn) fail(`--waiting-on needs a description of the wait.\n${usage}`)
     const evidence = []
+    let slotsFreeReason = ''
     for (let i = 2; i < argv.length; i += 2) {
       const flag = argv[i]
       const value = argv[i + 1]
       if (value === undefined) fail(`${flag} needs a value.\n${usage}`)
+      if (flag === '--slots-free') {
+        // Point 427: not evidence, a REASON. It answers "why do the free pool slots
+        // stay free", and the guard demands it only when they demonstrably could not.
+        slotsFreeReason = String(value).trim()
+        if (!slotsFreeReason) fail(`--slots-free needs a reason for the idle pool slots.\n${usage}`)
+        continue
+      }
       if (flag === '--pid') {
         // The start time is recorded WITH the pid, so a later probe can tell the
         // same process from a stranger that inherited the number.
@@ -332,6 +406,9 @@ if (isMain) {
       at: now,
       waitingOn,
       evidence,
+      // Empty string when not given, so the decision sees "no reason" rather than
+      // an absent field it has to interpret (point 427).
+      slotsFree: slotsFreeReason,
     }
     // Verify NOW, so a typo is caught here and not at a turn end that then blocks
     // with a reason nobody expected.
@@ -342,6 +419,11 @@ if (isMain) {
           'Nothing recorded — a declaration is only worth as much as what proves it.',
       )
     }
+    // THE CAP IS ALSO A TARGET (point 427). Refused HERE as well as at the turn end,
+    // so the session learns at the declaration rather than at a blocked stop — the
+    // same discipline the evidence check above follows.
+    const slots = gatherSlots(declaration)
+    if (slots.needsReason) fail(`${slotsRemedy({ slots, cap: POOL_CAP })}\nNothing recorded.`)
     writeDeclaration(declaration)
     const mins = Math.round(maxAgeMs() / 60000)
     console.log(
