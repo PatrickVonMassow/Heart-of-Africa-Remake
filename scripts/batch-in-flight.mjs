@@ -136,10 +136,14 @@ const stampOf = (p) => {
  *     contamination point 434 (5b) names. The caller additionally stats the git
  *     metadata BEFORE calling this, so even a git that ignored the flag could not
  *     backdate the other half.
- *   · `--untracked-files=normal` is stated rather than assumed: a global or repo
- *     `status.showUntrackedFiles=no` would otherwise hide exactly the case this
- *     probe exists for — an agent writing NEW files it has not added yet
- *     (four-eyes review, finding 5).
+ *   · `--untracked-files=all` is stated rather than assumed, and it is ALL rather
+ *     than `normal` for a measured reason (four-eyes review, findings 5 and its
+ *     re-check): a global or repo `status.showUntrackedFiles=no` would otherwise
+ *     hide exactly the case this probe exists for, and under `-unormal` a wholly
+ *     NEW directory collapses to one entry — `?? newmod/` — whose DIRECTORY mtime
+ *     does not move when an existing child inside it is edited. An agent that
+ *     creates `src/newthing/` and then works inside it for twenty minutes would
+ *     read `quiet` all over again. `-uall` names the files themselves.
  *   · `--ignore-submodules=all`, because a submodule's own dirtiness is not this
  *     checkout's work and would cost a recursive status.
  *
@@ -165,7 +169,7 @@ export function worktreeFilesActiveAt(root, { limit } = {}) {
         'status',
         '--porcelain',
         '-z',
-        '--untracked-files=normal',
+        '--untracked-files=all',
         '--ignore-submodules=all',
       ],
       {

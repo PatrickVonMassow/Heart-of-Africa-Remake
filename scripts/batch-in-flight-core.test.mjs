@@ -378,10 +378,36 @@ describe('worktreeActiveAt against a REAL checkout (its own temp repo, never thi
       seedRepo(dir)
       backdate(dir, 30 * 60 * 1000)
       // An agent writing a brand-new source file has not run `git add` either. The
-      // probe states `--untracked-files=normal`, so an ambient
+      // probe states `--untracked-files=all`, so an ambient
       // `status.showUntrackedFiles=no` cannot blind it (four-eyes review, finding 5).
       git(dir, 'config', 'status.showUntrackedFiles', 'no')
       writeFileSync(join(dir, 'brand-new.ts'), 'export const x = 1\n')
+
+      const stamp = worktreeActiveAt(dir)
+      expect(stamp.source).toBe('working files')
+      expect(Date.now() - stamp.at).toBeLessThan(60_000)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('…and inside a brand-NEW directory, which `-unormal` would have collapsed', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-wt-newdir-'))
+    try {
+      seedRepo(dir)
+      // The agent creates a new module directory, then works INSIDE it. Under
+      // `-unormal` git reports only `?? newthing/`, and a DIRECTORY's mtime does
+      // not move when an existing child is rewritten — so the twenty minutes of
+      // editing would read `quiet` all over again (four-eyes re-check,
+      // SHOULD-FIX 1). This case fails under `-unormal` and passes under `-uall`.
+      mkdirSync(join(dir, 'newthing'))
+      writeFileSync(join(dir, 'newthing', 'one.ts'), 'export const a = 1\n')
+      backdate(dir, 30 * 60 * 1000)
+      const old = new Date(Date.now() - 30 * 60 * 1000)
+      utimesSync(join(dir, 'newthing'), old, old)
+      // Only the FILE is fresh; its directory still carries the old stamp.
+      writeFileSync(join(dir, 'newthing', 'one.ts'), 'export const a = 2\n')
+      expect(Date.now() - statSync(join(dir, 'newthing')).mtimeMs).toBeGreaterThan(20 * 60 * 1000)
 
       const stamp = worktreeActiveAt(dir)
       expect(stamp.source).toBe('working files')

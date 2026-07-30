@@ -19,6 +19,7 @@ import {
   summarise,
 } from './guard-preflight-core.mjs'
 import { GUARDS, resolveSessionId } from './guard-preflight.mjs'
+import { readOwnerLock } from './batch-singleton.mjs'
 import { isMainModule } from './is-main.mjs'
 
 import { gatherDashboardInputs } from './dashboard-guard.mjs'
@@ -320,11 +321,25 @@ describe('GATHER-STEP REUSE (the drift guard)', () => {
   // is the fail-soft; what they assert is unchanged.
   const REAL_REPO_TIMEOUT_MS = 30_000
 
+  /**
+   * THE ID THESE TWO RUN UNDER (point 434 (8), four-eyes re-check, SHOULD-FIX 2).
+   *
+   * `preflight-test` is a RESERVED probe id since the parallel-alarm fix, and every
+   * ownership door now answers "not mine" for it — which is right, but it means the
+   * five ownership-gated gathers would take their stand-down branch here and these
+   * two tests would stop exercising the full gather path, precisely for the owner's
+   * own suite run that used to reach it. So the REAL owner's id is used when there
+   * is one: ownership then resolves `via: 'session-id'` with `restamp: false`, so
+   * the gathers stay applicable and NOTHING is written. With no lock on disk the
+   * probe id is the fallback, and the contract assertions hold either way.
+   */
+  const realRepoSid = () => readOwnerLock()?.sessionId ?? 'preflight-test'
+
   it(
     'holds each gather step to the applicable/inputs contract on the REAL repo',
     () => {
       for (const guard of GUARDS) {
-        const gathered = guard.gather({ sessionId: 'preflight-test' })
+        const gathered = guard.gather({ sessionId: realRepoSid() })
         expect(gathered, guard.id).toBeTruthy()
         if (gathered.applicable === false) expect(typeof gathered.why, guard.id).toBe('string')
         else expect(typeof gathered.inputs, guard.id).toBe('object')
@@ -338,7 +353,7 @@ describe('GATHER-STEP REUSE (the drift guard)', () => {
     () => {
       // A wrapper that throws on import or on gathering would show up here — and
       // an `error` row is exactly the false-confidence case this must not have.
-      const results = runPreflight(GUARDS, { sessionId: 'preflight-test' })
+      const results = runPreflight(GUARDS, { sessionId: realRepoSid() })
       expect(results.filter((r) => r.status === STATUS.error)).toEqual([])
       expect(results.map((r) => r.id)).toEqual(GUARDS.map((g) => g.id))
     },

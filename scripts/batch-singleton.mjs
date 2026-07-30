@@ -1199,6 +1199,11 @@ export function ownsLock(sessionId, opts = {}) {
   const lockPath = opts.lockPath ?? LOCK_PATH
   const lock = opts.lock !== undefined ? opts.lock : readOwnerLock(lockPath)
   if (!lock) return { mine: false, via: 'no-lock', lock: null }
+  // The id shortcut below is this function's OWN — it does not pass through
+  // `resolveOwnership`, so the probe rule has to be repeated here or a lock left
+  // NAMING a probe would be ownable by that probe (four-eyes re-check, the nit).
+  // Symmetry with `heldByOtherLiveOwner`, which already answers false for one.
+  if (isProbeSessionId(sessionId)) return { mine: false, via: 'probe-id', lock }
   if (sessionId && lock.sessionId === sessionId) return { mine: true, via: 'session-id', lock }
   if (opts.processIdentity === false || !sessionId) return { mine: false, via: 'session-id-mismatch', lock }
   // Cheap necessary conditions BEFORE the expensive walk: a lock with no pid, or

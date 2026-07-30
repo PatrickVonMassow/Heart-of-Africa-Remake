@@ -21,6 +21,7 @@ import {
   spawnDecision,
   classifyParallel,
   isProbeSessionId,
+  ownsLock,
   PROBE_SESSION_PREFIX,
   progressGuardDecision,
   acquire,
@@ -1530,6 +1531,38 @@ describe('a preflight identity is not a session', () => {
       // A REAL session id still acquires exactly as before.
       expect(acquire(REAL, { lockPath })).toBe('acquired')
       expect(readOwnerLock(lockPath)?.sessionId).toBe(REAL)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('a lock left NAMING a probe is still not ownable by that probe', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-probe-stale-'))
+    const lockPath = join(dir, 'batch-lock.json')
+    try {
+      // The state the four nights left behind. `ownsLock` has its own id shortcut
+      // AHEAD of `resolveOwnership`, so without the rule repeated there this read
+      // `mine: true` while `heldByOtherLiveOwner` answered false — the two doors
+      // disagreeing about the same lock (four-eyes re-check, the nit).
+      const now = Date.now()
+      const probeLock = (over) =>
+        writeFileSync(
+          lockPath,
+          JSON.stringify({ v: 2, sessionId: 'preflight-test', kind: 'session', claimedAt: now, ...over }),
+        )
+
+      probeLock({ leaseUntil: now + LEASE_MS })
+      expect(ownsLock('preflight-test', { lockPath })).toMatchObject({ mine: false, via: 'probe-id' })
+      // A LIVE lease is still nobody's to steal, not even from a probe name: the
+      // lock is the authority on ownership and this stays conservative.
+      expect(acquire(REAL, { lockPath })).toBe('held')
+
+      // It heals the ordinary way — the lease runs out and the next real session
+      // takes it. A probe name never becomes permanent, and never needs a rescue.
+      probeLock({ claimedAt: now - 2 * LEASE_MS, leaseUntil: now - LEASE_MS })
+      expect(ownsLock('preflight-test', { lockPath })).toMatchObject({ mine: false, via: 'probe-id' })
+      expect(acquire(REAL, { lockPath })).toBe('acquired')
+      expect(readOwnerLock(lockPath).sessionId).toBe(REAL)
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }
