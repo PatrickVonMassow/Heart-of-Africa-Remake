@@ -45,6 +45,13 @@ import { isPublishDue } from './board-currency-core.mjs'
 import { NONE_CARD_CMD, NOW_CARD_CMD, PUBLISH_CMD, SYNCED_CMD } from './board-remedy.mjs'
 import { claimsNoCurrentWork } from './board-core.mjs'
 import { handoverSurvivesCall } from './batch-boundary-core.mjs'
+import { parseSegments, segmentInvokesScript, isMutatingSegment, shellSegments } from './command-classify-core.mjs'
+
+// The command classifier is SHARED with the fence chokepoint (point 473): both
+// gates judge a shell call the same way — per segment, on the command HEAD, with
+// quoted text deciding nothing. Re-exported so the gate's own callers and tests
+// keep one import.
+export { shellSegments, isMutatingSegment }
 
 /** Tools that change state by their nature — no command inspection needed. */
 export const MUTATING_TOOLS = new Set(['Edit', 'Write', 'NotebookEdit', 'Agent'])
@@ -77,48 +84,9 @@ export const ESCAPE_SCRIPTS = [
 /** Board files an Edit/Write may always touch (suffix match on the path). */
 export const BOARD_FILE_HINTS = ['.batch-dashboard.html', 'hoa-batch-dashboard.html']
 
-/** Shell fragments that mutate the tree, the index or the remote. */
-const MUTATING_SHELL = [
-  // git verbs that write something (history, index, worktree, remote, tags).
-  /\bgit\b[^\n]*?\b(commit|merge|push|rebase|reset|revert|cherry-pick|tag|add|stash|checkout|switch|worktree|apply|am|clean|filter-branch)\b/,
-  // POSIX file mutation.
-  /(^|[\s;&|(])(rm|mv|cp|mkdir|rmdir|touch|chmod|chown|ln|truncate|dd|tee|sed\s+-i)\b/,
-  // Package/tooling runs — `npm run …` builds, installs and test runs all write.
-  /(^|[\s;&|(])(npm|pnpm|yarn|npx)\b/,
-  // PowerShell cmdlets that write.
-  /(^|[\s;&|(])(Remove-Item|New-Item|Set-Content|Add-Content|Out-File|Copy-Item|Move-Item|Rename-Item|Set-ItemProperty|Clear-Content)\b/i,
-  // gh mutations (a PR/release is outward-facing state).
-  /\bgh\s+(pr|release|issue|api)\b[^\n]*?\b(create|edit|merge|close|delete|-X|--method)\b/,
-]
-
-/** Strip stderr redirections so `2>&1` / `2>$null` never reads as a file write. */
-function stripStderrRedirects(segment) {
-  return segment.replace(/\d?>&\d/g, ' ').replace(/\d>\s*(\/dev\/null|\$null|NUL)/gi, ' ')
-}
-
-/** Split a shell command into the segments a shell would run separately. */
-export function shellSegments(command) {
-  return String(command ?? '')
-    .split(/&&|\|\||;|\||\n/)
-    .map((s) => s.trim())
-    .filter(Boolean)
-}
-
 /** Does this single segment invoke one of the gate's own remedy scripts? */
 export function isEscapeSegment(segment) {
-  const s = String(segment ?? '')
-  return ESCAPE_SCRIPTS.some((name) => s.includes(`scripts/${name}`) || s.includes(`scripts\\${name}`))
-}
-
-/** Does this single segment mutate anything? (Escape segments are judged first.) */
-export function isMutatingSegment(segment) {
-  const s = stripStderrRedirects(` ${String(segment ?? '')} `)
-  if (MUTATING_SHELL.some((re) => re.test(s))) return true
-  // A file-writing redirection (`> file`, `>> file`) after the stderr forms are
-  // gone. `=>` and `->` are excluded — an arrow function inside `node -e` is not
-  // a write, and a guard that cries wolf on ordinary text trains its reader to
-  // skip it (retrospective §3.32, the substring false alarm).
-  return /(^|[^\d&=-])>>?\s*[^\s&|>]/.test(s)
+  return segmentInvokesScript(segment, ESCAPE_SCRIPTS)
 }
 
 /** Is this Edit/Write aimed at the board file itself? (Always permitted.) */
@@ -131,30 +99,40 @@ export function isBoardFile(filePath, boardPaths = []) {
 
 /**
  * Classify a tool call: 'read-only' (never gated), 'escape' (the remedy — never
- * gated) or 'mutating' (gated). Anything unrecognised counts as READ-ONLY: this
- * gate must under-block rather than trap, and the Stop chain remains the
- * backstop for whatever slips past.
+ * gated) or 'mutating' (gated), together with the SEGMENT that decided it — the
+ * deny names it, because "this call would change state" is unhelpful about a
+ * chain of five commands (point 473).
+ *
+ * A shell call is judged SEGMENT BY SEGMENT on the command HEAD; quoted text
+ * decides nothing. Anything unrecognised counts as READ-ONLY: this gate must
+ * under-block rather than trap, and the Stop chain remains the backstop for
+ * whatever slips past.
  */
-export function classifyTool({ toolName, command, filePath, boardPaths = [] } = {}) {
+export function classifyCall({ toolName, command, filePath, boardPaths = [] } = {}) {
   const tool = String(toolName ?? '')
   if (MUTATING_TOOLS.has(tool)) {
     // An edit of the board itself is how the gate gets satisfied.
-    if ((tool === 'Edit' || tool === 'Write') && isBoardFile(filePath, boardPaths)) return 'escape'
-    return 'mutating'
+    if ((tool === 'Edit' || tool === 'Write') && isBoardFile(filePath, boardPaths)) return { kind: 'escape', segment: '' }
+    return { kind: 'mutating', segment: '' }
   }
-  if (!SHELL_TOOLS.has(tool)) return 'read-only'
+  if (!SHELL_TOOLS.has(tool)) return { kind: 'read-only', segment: '' }
 
-  const segments = shellSegments(command)
-  if (segments.length === 0) return 'read-only'
+  const segments = parseSegments(command)
+  if (segments.length === 0) return { kind: 'read-only', segment: '' }
   let sawEscape = false
   for (const seg of segments) {
     if (isEscapeSegment(seg)) {
       sawEscape = true
       continue
     }
-    if (isMutatingSegment(seg)) return 'mutating'
+    if (isMutatingSegment(seg)) return { kind: 'mutating', segment: seg.raw }
   }
-  return sawEscape ? 'escape' : 'read-only'
+  return { kind: sawEscape ? 'escape' : 'read-only', segment: '' }
+}
+
+/** The classification alone, for callers that do not need the segment. */
+export function classifyTool(call) {
+  return classifyCall(call).kind
 }
 
 /**
@@ -211,20 +189,29 @@ export function isSessionEndingCall({ toolName, command, filePath } = {}) {
   }
 }
 
-/** The deny text for a board that claims idleness while the session works on. */
-export function noWorkClaimReason() {
+/**
+ * The deny text for a board that claims idleness while the session works on.
+ * `segment` NAMES the state-changing part of a chained command (point 473) —
+ * without it a five-command line says only "something here writes", and the
+ * reader has to guess which part the gate meant.
+ */
+export function noWorkClaimReason(segment = '') {
+  const named = String(segment ?? '').trim()
   return (
     'THE BOARD CLAIMS NOTHING IS RUNNING — and this call would prove it wrong (point 470, user ' +
     '30.07.2026). "Gerade keine laufende Arbeit" stands in "Woran ich gerade arbeite", so the board ' +
     'the user reads on his phone says this session has stopped. It is a claim about the FUTURE of ' +
-    'this turn: it is true only if you stop now.\nDo ONE of these:\n' +
+    'this turn: it is true only if you stop now.\n' +
+    (named ? `The segment that changes state: \`${named}\`\n` : '') +
+    'Do ONE of these:\n' +
     `  - ${NOW_CARD_CMD} <N> "<was gerade läuft>"   → puts a card up for the work; it REPLACES the ` +
     'claim, and this call goes through.\n' +
     '  - STOP: end the turn. The session-ending path (node scripts/batch-boundary.mjs <point>, the ' +
     'focus stamp, the board publish, the work-order tick) is never blocked by this rule.\n' +
     `If the claim itself is wrong, rewrite it — ${NONE_CARD_CMD} "<Grund>" replaces the standing card ` +
-    'rather than adding a second one.\nReads are never blocked, and this rule is fail-open: an ' +
-    'unreadable board never costs a call.'
+    'rather than adding a second one.\nReads are never blocked — a call is judged SEGMENT BY SEGMENT ' +
+    'on the command itself, never on what stands inside its quotes, so a call whose every part reads ' +
+    'goes through. This rule is fail-open: an unreadable board never costs a call.'
   )
 }
 
@@ -273,9 +260,8 @@ export function evaluate({
     const turnStartedAt = Number(s && s.turnStartedAt)
     if (!Number.isFinite(turnStartedAt) || turnStartedAt <= 0) return { block: false, reason: '' }
 
-    if (classifyTool({ toolName, command, filePath, boardPaths }) !== 'mutating') {
-      return { block: false, reason: '' }
-    }
+    const call = classifyCall({ toolName, command, filePath, boardPaths })
+    if (call.kind !== 'mutating') return { block: false, reason: '' }
 
     // THE CLAIM TO STOP (point 470) — judged BEFORE the stand-down, because it
     // does not stand down. Only a string can carry the claim; anything else
@@ -283,7 +269,7 @@ export function evaluate({
     // direction.
     if (typeof boardHtml === 'string' && claimsNoCurrentWork(boardHtml)) {
       if (!isSessionEndingCall({ toolName, command, filePath })) {
-        return { block: true, reason: noWorkClaimReason(), recordFired: false }
+        return { block: true, reason: noWorkClaimReason(call.segment), recordFired: false }
       }
     }
 

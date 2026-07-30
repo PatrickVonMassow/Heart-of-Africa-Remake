@@ -228,6 +228,12 @@ describe('the chokepoint — the four paths with no guard of their own', () => {
       { toolName: 'Edit', filePath: 'src/world/world.ts' },
       { toolName: 'Bash', command: 'node scripts/point-brief.mjs 434' },
       { toolName: 'Grep', command: undefined, filePath: undefined },
+      // Point 473 — the SHARED classifier: a guarded name MENTIONED in a read is
+      // not that action, and `git log --merges` is not a merge.
+      { toolName: 'Bash', command: 'grep -n "board-publish.mjs" docs/batch-autonomy.md' },
+      { toolName: 'Bash', command: 'grep -rn "git push" docs' },
+      { toolName: 'Bash', command: 'git worktree list' },
+      { toolName: 'Bash', command: 'grep -c "TASKS.md" docs/notes.md' },
     ]) {
       expect(call(over), JSON.stringify(over)).toMatchObject({ block: false })
     }
@@ -237,6 +243,117 @@ describe('the chokepoint — the four paths with no guard of their own', () => {
     expect(call({ toolName: 'Bash', command: 'git fetch && git merge origin/main' }).block).toBe(true)
     expect(call({ toolName: 'PowerShell', command: 'git add -A; git push' }).block).toBe(true)
     expect(call({ toolName: 'Bash', command: 'git -c core.pager=cat push origin main' }).block).toBe(true)
+  })
+
+  // ── A WRAPPER MUST NOT HIDE A GUARDED ACTION ──────────────────────────────
+  // Four-eyes review of point 473 (30.07.2026): judging the command HEAD fixed
+  // the false denials at the idle-claim gate, but the old whole-string regexes
+  // had seen THROUGH `bash -c`, `eval` and `$( … )` by accident — and here that
+  // accident was load-bearing. A dispossessed session could otherwise move
+  // shared history through any shell wrapper. Nothing pinned this before, so
+  // all three could regress silently.
+  it('sees a guarded action through a shell wrapper (`bash -c`, `pwsh -Command`, `sh -c`)', () => {
+    expect(call({ toolName: 'Bash', command: 'bash -c "git push origin main"' })).toMatchObject({
+      block: true,
+      kind: 'git-main',
+    })
+    expect(call({ toolName: 'PowerShell', command: 'pwsh -Command "git push"' })).toMatchObject({
+      block: true,
+      kind: 'git-main',
+    })
+    expect(call({ toolName: 'Bash', command: 'sh -c "git merge --no-ff feat/x"' })).toMatchObject({
+      block: true,
+      kind: 'git-main',
+    })
+    expect(call({ toolName: 'Bash', command: 'sh -c "node scripts/board-publish.mjs --now"' })).toMatchObject({
+      block: true,
+      kind: 'board-publish',
+    })
+    expect(call({ toolName: 'Bash', command: 'bash -c "node scripts/focus.mjs confirm"' })).toMatchObject({
+      block: true,
+      kind: 'dashboard-state',
+    })
+    expect(call({ toolName: 'Bash', command: 'bash -c "echo x >> TASKS.md"' })).toMatchObject({
+      block: true,
+      kind: 'tasks',
+    })
+  })
+
+  it('sees a guarded action through `eval`, `$( … )` and backticks', () => {
+    const bt = String.fromCharCode(96)
+    expect(call({ toolName: 'Bash', command: 'eval "git push"' })).toMatchObject({ block: true, kind: 'git-main' })
+    expect(call({ toolName: 'Bash', command: 'echo $(git push)' })).toMatchObject({ block: true, kind: 'git-main' })
+    expect(call({ toolName: 'Bash', command: `echo ${bt}git push${bt}` })).toMatchObject({
+      block: true,
+      kind: 'git-main',
+    })
+    expect(call({ toolName: 'Bash', command: 'echo $(node scripts/board-publish.mjs)' })).toMatchObject({
+      block: true,
+      kind: 'board-publish',
+    })
+  })
+
+  // A WRAPPER'S OWN FLAGS ARE NOT THE PROGRAM (four-eyes round 2, 31.07.2026).
+  // `sudo -u me git push` classified as the program `-u` and went through — a
+  // regression against the old whole-string regex, and nothing pinned it,
+  // "which is exactly how they were missed".
+  it("steps over a wrapper's flags, flag VALUES and positionals to find the program", () => {
+    for (const command of [
+      'sudo -u me git push',
+      'env -i git push',
+      'env -u FOO git push',
+      'nice -n 5 git push',
+      'xargs -n1 git push', // attached value
+      'xargs -I{} bash -c "git push"', // attached value + nested shell
+      'time -p git push',
+      'timeout 60 bash -c "git push"', // a positional of its own
+      'timeout -k 5 60 bash -c "git push"',
+      'sudo -u me env -i nice -n 5 git push', // stacked wrappers
+    ]) {
+      expect(call({ toolName: 'Bash', command }), command).toMatchObject({ block: true, kind: 'git-main' })
+    }
+  })
+
+  it('reads a COMBINED short-flag cluster and an attached payload as the command flag', () => {
+    for (const command of ['bash -lc "git push"', 'bash -ec "git push"', 'bash -c"git push"', 'sh -lc "git merge x"']) {
+      expect(call({ toolName: 'Bash', command }), command).toMatchObject({ block: true, kind: 'git-main' })
+    }
+  })
+
+  it('FAILS CLOSED past the unwrapping depth — not looking is no licence', () => {
+    const esc = (s) => s.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+    const nest = (n) => {
+      let cmd = 'git push'
+      for (let k = 0; k < n; k++) cmd = `bash -c "${esc(cmd)}"`
+      return cmd
+    }
+    expect(call({ toolName: 'Bash', command: nest(6) })).toMatchObject({ block: true, kind: 'git-main' })
+    // Past the cap the classifier stops reading — the fence refuses anyway.
+    expect(call({ toolName: 'Bash', command: nest(9) })).toMatchObject({ block: true, kind: 'nested' })
+    expect(call({ toolName: 'Bash', command: nest(9) }).reason).toContain('wrapped deeper')
+  })
+
+  it('a wrapper around a READ is still a read, and a deep nesting cannot hang it', () => {
+    for (const command of [
+      'bash -c "git status --short"',
+      'bash -c "git log --merges"',
+      'sh -c "node scripts/point-brief.mjs 473"',
+      "grep -c '$(git push)' notes.md", // single-quoted: inert in a real shell too
+      'grep "\\$(git push)" notes.md', // escaped inside double quotes: inert too
+      'grep -n "eval" docs/notes.md',
+      'sudo git log',
+      'env -i git status',
+      'timeout 5 bash -c "echo ok"',
+      'xargs -n1 grep foo',
+      'nice -n 5 git log',
+      'time -p git status',
+      'sudo -u me git diff',
+    ]) {
+      expect(call({ toolName: 'Bash', command }), command).toMatchObject({ block: false })
+    }
+    const deep = 'bash -c "bash -c \'bash -c \\"git push\\"\'"'
+    expect(() => call({ toolName: 'Bash', command: deep })).not.toThrow()
+    expect(call({ toolName: 'Bash', command: deep }).block).toBe(true)
   })
 
   it('stands down for a PAUSED batch', () => {

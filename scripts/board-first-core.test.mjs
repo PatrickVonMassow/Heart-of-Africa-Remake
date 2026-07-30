@@ -8,6 +8,7 @@ import {
   SHELL_TOOLS,
   ESCAPE_SCRIPTS,
   classifyTool,
+  classifyCall,
   isEscapeSegment,
   isMutatingSegment,
   isBoardFile,
@@ -230,6 +231,15 @@ describe('classifyTool', () => {
     expect(classifyTool({ toolName: 'Bash', command: 'git commit -m x' })).toBe('mutating')
     expect(classifyTool({ toolName: 'PowerShell', command: 'Remove-Item x' })).toBe('mutating')
     expect(classifyTool({ toolName: 'Bash', command: '' })).toBe('read-only')
+  })
+
+  it('reports WHICH segment changed state, so the deny can name it', () => {
+    expect(classifyCall({ toolName: 'Bash', command: 'git status && npm run build' })).toEqual({
+      kind: 'mutating',
+      segment: 'npm run build',
+    })
+    expect(classifyCall({ toolName: 'Bash', command: 'git worktree list' })).toEqual({ kind: 'read-only', segment: '' })
+    expect(classifyCall({ toolName: 'Agent' })).toEqual({ kind: 'mutating', segment: '' })
   })
 
   it('classifies a pure remedy chain as escape, but a remedy plus a mutation as mutating', () => {
@@ -468,5 +478,87 @@ describe('the no-work claim binds the turn', () => {
       expect(evaluate(cleanCall({ boardHtml })).block).toBe(false)
     }
     expect(evaluate(cleanCall({ boardHtml: board(idleCard), state: { publishedHash: 'h1' } })).block).toBe(false)
+  })
+
+  // ═══ Point 473 — A READ IS NOT A WRITE ════════════════════════════════════
+  // Within minutes of point 470 landing, the deny fired on two pure reads: a
+  // `grep` of the board whose quoted pattern held a `>`, and a compound whose
+  // leading segments were board commands. The message promises "reads are never
+  // blocked", so each misfire was the promise and the behaviour disagreeing.
+  describe('a read is never denied by the claim', () => {
+    const idle = (over = {}) => evaluate(cleanCall({ boardHtml: board(idleCard), filePath: undefined, ...over }))
+    const bash = (command) => idle({ toolName: 'Bash', command })
+
+    const reads = [
+      'grep -c "<span class=\\"now\\">" .batch-dashboard.html', // MEASURED: the quoted `>`
+      'git worktree list', // MEASURED: the subcommand, not the verb
+      'git worktree list --porcelain | head -20',
+      'grep -n "Gerade keine laufende Arbeit" .batch-dashboard.html | wc -l',
+      'cat .batch-dashboard.html | grep -c "now"',
+      'node scripts/point-brief.mjs 473 | head -40',
+      'node scripts/board-first-guard.mjs --status',
+      'git log --oneline -5 && git status --short',
+      'git stash list',
+      'git tag -l "v*"',
+      'npm ls --depth 0',
+      'grep -rn "npm run build && git push" docs', // mutating words, all quoted
+    ]
+    for (const command of reads) {
+      it(`allows: ${command}`, () => expect(bash(command).block).toBe(false))
+    }
+
+    it('allows a compound of two escape scripts', () => {
+      expect(bash('node scripts/focus.mjs confirm && node scripts/board-publish.mjs').block).toBe(false)
+      expect(bash('node scripts/board.mjs now 473 "läuft"; node scripts/board-publish.mjs').block).toBe(false)
+    })
+
+    it('DENIES a compound whose LAST segment writes, and names that segment', () => {
+      const d = bash('git status --short && git log --oneline && git commit -m "the work"')
+      expect(d.block).toBe(true)
+      expect(d.reason).toContain('git commit -m "the work"')
+      expect(d.reason).not.toContain('git status --short\n') // the reads are not accused
+    })
+
+    it('names the writing segment wherever it stands in the chain', () => {
+      expect(bash('npm run build && git status').reason).toContain('The segment that changes state: `npm run build`')
+      expect(bash('node scripts/focus.mjs confirm && git push origin HEAD').reason).toContain('`git push origin HEAD`')
+    })
+
+    it('keeps the promise its message makes', () => {
+      const { reason } = bash('git commit -m x')
+      expect(reason).toContain('Reads are never blocked')
+      expect(reason).toContain('SEGMENT BY SEGMENT')
+    })
+
+    // The whole risk of loosening a gate: a read must not become a hole.
+    const stillDenied = [
+      'git commit -m "x"',
+      'git commit -m "look at git worktree list"', // a read named INSIDE a write
+      'git push origin HEAD',
+      'git worktree add ../wt feat/473',
+      'git checkout main',
+      'git tag v0.4',
+      'git stash',
+      'npm run test:unit',
+      'npm install',
+      'npx vitest run',
+      'rm -rf dist',
+      'sed -i s/a/b/ src/App.tsx',
+      'Remove-Item -Recurse -Force dist',
+      'echo x > src/App.tsx',
+      'git status && npm run build', // the read leads, the write still counts
+      'node scripts/board-first-guard.mjs --status | tee out.log', // the pipe writes
+      'gh pr create --title x',
+    ]
+    for (const command of stillDenied) {
+      it(`still denies: ${command}`, () => expect(bash(command).block).toBe(true))
+    }
+
+    it('still denies the non-shell state-changing tools', () => {
+      expect(idle({ toolName: 'Agent' }).block).toBe(true)
+      expect(idle({ toolName: 'Write', filePath: 'src/example.ts' }).block).toBe(true)
+      expect(idle({ toolName: 'Edit', filePath: 'src/example.ts' }).block).toBe(true)
+      expect(idle({ toolName: 'NotebookEdit', filePath: 'a.ipynb' }).block).toBe(true)
+    })
   })
 })

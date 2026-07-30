@@ -191,6 +191,29 @@ describe('board-first-guard (spawned)', () => {
       }
     })
 
+    it('lets the two MEASURED reads through (point 473), on the executed path', () => {
+      // Both were denied live on 30.07.2026: a `>` inside a quoted grep pattern,
+      // and `worktree` read as a verb rather than as a subcommand of `list`.
+      seedBoard(idle)
+      for (const command of [
+        'git worktree list',
+        'grep -c "<span class=\\"now\\">" .batch-dashboard.html',
+        'node scripts/focus.mjs confirm && node scripts/board-publish.mjs',
+      ]) {
+        const r = callGuard('Bash', { command })
+        expect(r.status, r.stderr).toBe(0)
+        expect(r.stdout.trim(), `${command} must be allowed`).toBe('')
+      }
+    })
+
+    it('names the state-changing SEGMENT of a chain in its deny', () => {
+      seedBoard(idle)
+      const r = callGuard('Bash', { command: 'git status --short && npm run build' })
+      expect(r.decision.hookSpecificOutput.permissionDecisionReason).toContain(
+        'The segment that changes state: `npm run build`',
+      )
+    })
+
     it('falls back to the ordinary board-first deny once a real card stands', () => {
       seedBoard(real)
       const reason = callGuard('Bash', { command: 'git commit -m x' }).decision.hookSpecificOutput
@@ -238,6 +261,31 @@ describe('board-first-guard (spawned)', () => {
         const r = callGuard(call[0], call[1])
         expect(r.status, r.stderr).toBe(0)
         expect(denial(r), `${call[0]} ${JSON.stringify(call[1])} must be REFUSED`).toContain('FENCED OUT')
+      }
+    } finally {
+      rmSync(fencePath(), { force: true })
+    }
+  })
+
+  it('a wrapper hides nothing from the fence, on the executed path (point 473)', () => {
+    // The head-based classifier must not undo what the old string regexes did by
+    // accident: a dispossessed session moving shared history through `bash -c`,
+    // `eval` or a command substitution.
+    seedFence(7, 8)
+    try {
+      for (const command of [
+        'bash -c "git push origin main"',
+        'eval "git push"',
+        'echo $(git push)',
+        // …and a wrapper's own FLAGS must not become the program either.
+        'sudo -u me git push',
+        'timeout 60 bash -lc "git push"',
+      ]) {
+        expect(denial(callGuard('Bash', { command })), `${command} must be REFUSED`).toContain('FENCED OUT')
+      }
+      // …while a wrapped READ still goes through.
+      for (const command of ['bash -c "git status --short"', 'sudo git log', 'timeout 5 bash -c "echo ok"']) {
+        expect(denial(callGuard('Bash', { command })), `${command} must be allowed`).not.toContain('FENCED OUT')
       }
     } finally {
       rmSync(fencePath(), { force: true })
