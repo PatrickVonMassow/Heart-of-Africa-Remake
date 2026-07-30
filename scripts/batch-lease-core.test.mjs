@@ -3,9 +3,10 @@
 // Every case names the failure of the night of 29./30.07.2026 it would have
 // prevented — that night produced nothing between 21:50 and 04:19 while nine
 // part-failures chained — and each half carries an INDEPENDENCE case: the layer
-// still acts while the OTHER layers' inputs are missing or stale, because on that
-// night the launcher log ended at 02:21 and the whole local watcher layer fell
-// silent as a unit.
+// still acts while the OTHER layers' inputs are missing or stale. That night the
+// launcher was running perfectly and ticked all night; what failed was the
+// conclusion it drew from a heartbeat, so a layer that needs another layer's
+// input to act is a layer that can be talked out of acting.
 //
 // The proof list this suite discharges is docs/batch-resilience.md §8, bullets
 // "Lease" and "Chokepoint"; each clause is named in the test that covers it.
@@ -109,9 +110,10 @@ describe('the lease — ownership ends by arithmetic', () => {
   })
 
   it('INDEPENDENCE: the lease acts with NO fence file, NO declaration and NO launcher state', () => {
-    // Failure I of that night: the launcher log ends at 02:21 — the whole local
-    // watcher layer can fall silent as a unit. The lease is arithmetic on the
-    // lock alone and needs none of the others' inputs.
+    // The lease is arithmetic on the lock alone and needs none of the other
+    // layers' inputs — which is the point: on the lost night the declaration had
+    // expired, the launcher state was intact and every one of them agreed the
+    // owner was alive.
     const lock = lockAt(T0, { leaseUntil: T0 + LEASE_MS })
     expect(leaseExpired(lock, { now: T0 + LEASE_MS + 1 })).toBe(true)
     expect(renewalDecision({ lock, sessionId: 's-owner', fenceState: null, now: T0 + LEASE_MS }).renew).toBe(true)
@@ -243,8 +245,8 @@ describe('the chokepoint — the four paths with no guard of their own', () => {
 
   it('INDEPENDENCE: the chokepoint acts with NO lock, NO lease and NO launcher state', () => {
     // The fence file is the only input. That is the point of giving it a file of
-    // its own: `acquire` deletes the lock, and on the lost night every other
-    // signal was either missing or stale.
+    // its own: `acquire` DELETES the lock, so a mark kept there would be lost at
+    // the one moment it decides anything.
     expect(call({ toolName: 'Bash', command: 'git push' })).toMatchObject({ block: true })
   })
 

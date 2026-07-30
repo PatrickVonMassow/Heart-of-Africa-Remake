@@ -1446,8 +1446,8 @@ describe('constants sanity', () => {
     // decoration. The renewal interval bounds how stale a lease may be when a long
     // call starts; the lease bounds how long a standstill can hold the batch; and
     // the GitHub-Actions watchdog (STALL_MINUTES 120, off this machine) is the
-    // backstop for the case where the local layer dies as a unit — failure I of
-    // the lost night, where the launcher log simply ended.
+    // backstop, judging repository OUTPUT rather than a heartbeat — the signal the
+    // local layer read wrongly all night.
     expect(LEASE_RENEW_INTERVAL_MS).toBeLessThan(LEASE_MS)
     expect(LEASE_MS - LEASE_RENEW_INTERVAL_MS).toBeGreaterThan(40 * 60_000) // the LARGE regression
     expect(LEASE_MS).toBeLessThan(120 * 60_000) // the external watcher's window
