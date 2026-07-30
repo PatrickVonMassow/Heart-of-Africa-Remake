@@ -294,7 +294,9 @@ try {
     // only make the claiming window wait for a grace window it should not have to.
     // The claim is stamped rather than deleted, so `--status` in the other window
     // can say the batch is waiting for it, and the launcher keeps standing down
-    // until it is taken or the claim expires.
+    // while the claimant is provably alive. With the lock free and the claim
+    // untaken, `CLAIM_MAX_AGE_MS` is the TAKE-UP window after which the ordinary
+    // handover resumes — it is not a clock the claimant has to keep feeding.
     // Release, then stamp the claim ONLY if the release actually happened — the
     // stamp says "the batch is waiting for you", so it is never written on the
     // word of a session that freed nothing. Both lines live in handBackToClaimant

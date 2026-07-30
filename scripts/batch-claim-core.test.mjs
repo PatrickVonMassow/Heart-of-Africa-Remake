@@ -24,8 +24,10 @@ import {
   CLAIM_MAX_AGE_MS,
   GIT_STATE_UNVERIFIABLE,
   assessClaim,
+  claimIsBounded,
   claimWriteDecision,
   describeClaim,
+  ownerIsHolding,
   releaseDecision,
   reservationDecision,
 } from './batch-claim-core.mjs'
@@ -92,17 +94,79 @@ describe('assessClaim — a claim only ever moves the batch when it is provably 
     expect(a.ageMs).toBe(2 * 60 * 1000)
   })
 
-  it('IGNORES an expired claim — a window closed hours ago must never hand the batch on', () => {
+  it('IGNORES an old claim once there is NOBODY LEFT TO WAIT FOR — the take-up window', () => {
+    // With the lock free (or its owner gone) an untaken claim must not reserve
+    // the batch for ever: past the take-up window the ordinary handover applies.
     const a = asOwner(claimOf({ at: NOW - CLAIM_MAX_AGE_MS - 1 }))
     expect(a).toMatchObject({ honour: false, reason: 'expired', claimantSid: CLAIMANT })
     // …and it is exactly a boundary, not a fuzzy window.
     expect(asOwner(claimOf({ at: NOW - CLAIM_MAX_AGE_MS })).honour).toBe(true)
   })
 
+  it('29.07.2026 20:00: while a LIVE OWNER holds the lock the claim does NOT age out', () => {
+    // The incident (point 434 (6a)): 30 minutes is shorter than the owner's own
+    // gap between clean turn ends — this repository runs 30-40 minute suites — so
+    // a takeover recorded at the start of one lapsed unseen, and keeping it alive
+    // needed a background refresher that itself died silently (a watcher hit a
+    // 60-minute timeout; the claim would have lapsed at 20:29 with nobody the
+    // wiser). There is somebody to wait for, so nothing has to be fed.
+    const longTurn = claimOf({ at: NOW - 3 * 60 * 60 * 1000 })
+    expect(asOwner(longTurn, { ownerHolding: true })).toMatchObject({ honour: true, reason: 'honour' })
+    // The bound that replaced the clock is the claiming WINDOW's own life: close
+    // it and the claim dies at once, however young it is.
+    expect(asOwner(claimOf(), { ownerHolding: true, probePid: deadClaimant }).reason).toBe('claimant-dead')
+  })
+
+  it('an ERRAND claim keeps its clock even while an owner holds — its pid is not its bound', () => {
+    // The chat watcher's responder claim names the WATCHER's process, which lives
+    // for hours while the errand is capped at ten minutes, so the clock is the
+    // only bound it has (`claimIsBounded`).
+    const errand = claimOf({ at: NOW - CLAIM_MAX_AGE_MS - 1, by: 'chat-watcher' })
+    expect(claimIsBounded(errand)).toBe(true)
+    expect(asOwner(errand, { ownerHolding: true })).toMatchObject({ honour: false, reason: 'expired' })
+    expect(claimIsBounded(claimOf())).toBe(false)
+    expect(claimIsBounded(claimOf({ by: '   ' }))).toBe(false)
+  })
+
   it('honours a shorter calibrated maximum age when one is given', () => {
     const claim = claimOf({ at: NOW - 10 * 60 * 1000 })
     expect(asOwner(claim).honour).toBe(true)
     expect(asOwner(claim, { maxAgeMs: 5 * 60 * 1000 })).toMatchObject({ honour: false, reason: 'expired' })
+  })
+
+  it('THE LAUNCHER\'S OWN pending-spawn lock is NOBODY to wait for', () => {
+    // Four-eyes review (Fable 5, 30.07.2026), finding 1. Read as mere lock
+    // EXISTENCE, `ownerHolding` also matched the launcher's placeholder — and
+    // that closed a loop out of the crash path: the launcher reaps the dead
+    // owner and spawns, the successor's resume hook reads `ownerHolding` off the
+    // launcher's OWN pending lock, honours the claim with no aging, stands down
+    // without converting the spawn, and the next tick spawns again. Forever.
+    const pending = { sessionId: 'launcher-abcdef', kind: 'pending-spawn', pid: 12345 }
+    expect(ownerIsHolding({ lock: pending, claimantSid: CLAIMANT, alive: true })).toBe(false)
+    // A live SESSION owner is what the words mean…
+    expect(ownerIsHolding({ lock: { sessionId: OWNER }, claimantSid: CLAIMANT, alive: true })).toBe(true)
+    // …a DEAD one is not, and neither is the claimant's own lock or no lock.
+    expect(ownerIsHolding({ lock: { sessionId: OWNER }, claimantSid: CLAIMANT, alive: false })).toBe(false)
+    expect(ownerIsHolding({ lock: { sessionId: CLAIMANT }, claimantSid: CLAIMANT, alive: true })).toBe(false)
+    expect(ownerIsHolding({ lock: null, alive: true })).toBe(false)
+    expect(ownerIsHolding()).toBe(false)
+    // …and with nobody to wait for, the take-up window bites as it must.
+    expect(
+      asOwner(claimOf({ at: NOW - CLAIM_MAX_AGE_MS - 1 }), {
+        ownerHolding: ownerIsHolding({ lock: pending, claimantSid: CLAIMANT, alive: true }),
+      }).reason,
+    ).toBe('expired')
+  })
+
+  it('INDEPENDENCE: it decides with no lock, no launcher and no in-flight declaration', () => {
+    // Nothing but the record and one pid probe: the layer still answers, and the
+    // answer defaults to the BOUNDED reading when the caller cannot say whether
+    // an owner holds — the direction that can never strand the batch.
+    expect(assessClaim({ claim: claimOf(), sid: 'x', now: NOW, probePid: aliveClaimant }).honour).toBe(true)
+    expect(
+      assessClaim({ claim: claimOf({ at: NOW - CLAIM_MAX_AGE_MS - 1 }), sid: 'x', now: NOW, probePid: aliveClaimant })
+        .reason,
+    ).toBe('expired')
   })
 
   it('IGNORES a claim by a DEAD session', () => {
@@ -154,11 +218,46 @@ describe('assessClaim — a claim only ever moves the batch when it is provably 
     expect(a).toMatchObject({ honour: false, reason: 'claimant-is-owner' })
   })
 
-  it('reports a release stamp so the claiming window can see the batch is waiting for it', () => {
-    const a = asOwner(claimOf({ releasedAt: NOW - 30_000 }))
-    expect(a).toMatchObject({ honour: true, releasedAt: NOW - 30_000 })
-    expect(describeClaim(a)).toContain('already released for it')
+  it('30.07.2026 10:10: A RELEASED CLAIM IS NOT A CLAIM — it reads as ABSENT', () => {
+    // The incident (point 434 (6c)): a record with `releasedAt` AND `releasedBy`
+    // both set was still honoured. The owning session released to it, the
+    // claiming window never took it, and the batch then ran for an HOUR with no
+    // lock at all while every guard behaved as though it were owned; the boundary
+    // that followed released to the same dead claim a second time (two RELEASED
+    // lines in .claude/boundary.log, no HANDOVER).
+    const spent = asOwner(claimOf({ releasedAt: NOW - 30_000, releasedBy: OWNER }))
+    expect(spent).toMatchObject({ honour: false, reason: 'released', releasedAt: NOW - 30_000 })
+    // …so nothing releases to it a SECOND time…
+    expect(releaseDecision({ assessment: spent }).verdict).toBe('none')
+    // …it reserves NOTHING, which is what makes the batch fall back to the
+    // ordinary handover instead of standing ownerless…
+    expect(reservationDecision({ assessment: spent }).acquire).toBe(true)
+    // …and a returning window may claim straight over it.
+    expect(
+      claimWriteDecision({
+        existing: claimOf({ releasedAt: NOW - 30_000, releasedBy: OWNER }),
+        sid: 'session-back-again',
+        now: NOW,
+        probePid: aliveClaimant,
+      }).action,
+    ).toBe('write')
+    // A `releasedBy` without a stamp is the same event, read the same way.
+    expect(asOwner(claimOf({ releasedBy: OWNER })).reason).toBe('released')
+    expect(describeClaim(spent)).toContain('ALREADY released for it')
     expect(describeClaim(null)).toBe('no claim')
+  })
+
+  it('…but its OWN writer still recognises it, so the spent record gets cleared', () => {
+    // The claimant's own acquire path clears only what it knows is its own;
+    // reading a released record as a stranger's would leave the file lying about
+    // for the next reader to puzzle over.
+    const mine = assessClaim({
+      claim: claimOf({ releasedAt: NOW - 30_000, releasedBy: OWNER }),
+      sid: CLAIMANT,
+      now: NOW,
+      probePid: aliveClaimant,
+    })
+    expect(mine).toMatchObject({ honour: false, mine: true, reason: 'own-claim' })
   })
 })
 
