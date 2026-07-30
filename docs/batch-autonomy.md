@@ -232,6 +232,24 @@ Three changes, and none of them loosens the singleton:
    would be sent home for its predecessor's point and the batch would ping-pong
    instead of work — and only while the launcher really is armed, so the guard
    can never demand a boundary the CLI would refuse.
+   **WHEN IT FALLS DUE IS ASKED BY TIME, NOT BY A COMMIT COUNT (point 399).** The
+   question is "was a point ticked within `BOUNDARY_DUE_MS` (90 min)", and it used
+   to be answered by `lastWorkOrderTick`, which scans the newest FIVE work-order
+   commits. A batch turn routinely appends points: on 28.07.2026 eight append-only
+   commits landed after the tick of point 338, the tick fell out of that window, and
+   the guard demanded NOTHING for the whole 90 minutes in which it should have been
+   demanding the boundary — so the session kept the lock and carried the next point
+   in the same context, the exact cost point 373 exists to avoid. The same blind spot
+   had already been fixed one layer down, on the handover observer. `gatherBoundary`
+   now asks `lastWorkOrderTickSince`: one `git log --since` over the two work-order
+   paths, scoped to the same window as the answer, then `git show` only on the
+   candidates inside it (capped at `TICK_SCAN_MAX`, since this runs in a Stop hook at
+   every turn end). `tickedPointsInDiff` keeps the rule that an archive move is not a
+   tick, an unreadable git answers "not due" rather than throwing, and the
+   count-limited `lastWorkOrderTick` keeps its shape for any caller that wants the
+   most recent closure cheaply — the guard is simply no longer that caller. Measured
+   on this repository the day the fix landed: the count-limited scan answered `null`
+   while the windowed one found the tick of point 412.
 2. **A handover releases the batch — as an annotation, not a release.** At the
    moment the guard ALLOWS the stop, and only there, it marks the lock
    `handedOver` (`markHandover`). `assessOwner` then reads that lock as free, and
