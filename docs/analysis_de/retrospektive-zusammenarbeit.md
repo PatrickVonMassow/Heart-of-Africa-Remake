@@ -571,6 +571,18 @@ Das ist keine fehlende Erkennung, sondern eine **Erkennung ohne Folge** — die 
 
 ---
 
+### 3.62 Die Rettung, die den Schaden verstärkt hätte
+
+Der Entwurf gegen §3.61 war fertig, begründet und mit der etablierten Praxis abgeglichen: Lease statt Lock, ein zweiter Wächter, ein Totmannschalter, Wiederholung gestorbener Agenten. Die Gegenprüfung durch das andere Modell fand darin eine Lücke, die den ganzen Zweck aufgehoben hätte. Läuft die Lease ab und startet ein Nachfolger, startet er in dieselbe kaputte Umgebung und fährt sich identisch fest — und der Fehlerzähler, der eine Endlosschleife bremsen soll, steigt nur, wenn die Prozess-ID verschwunden ist. Eine Kette lebendig-aber-festgefahrener Nachfolger hätte die Nacht durchgebrannt und dabei beschäftigt ausgesehen. Aus einem stillen Ausfall wäre ein lauter geworden, teurer als das Problem.
+
+Zwei weitere Befunde derselben Prüfung gingen in dieselbe Richtung: Der geplante zweite Wächter wäre auf derselben Aufgabenplanung, demselben Node und derselben Platte gelaufen wie der erste — widerlegt durch das eigene Protokoll, das an derselben Stelle abbricht. Und die Meldekette hätte auf einen Dienst gesetzt, der Nachrichten weiterleitet, aber ein *Ausbleiben* nicht bemerken kann.
+
+Das ist eine eigene Klasse, weil kein Test sie zeigt: Der Entwurf war in sich stimmig, jede Schicht einzeln richtig, und die Lücke lag zwischen ihnen — in der Annahme, dass ein Neustart in eine Umgebung führt, die funktioniert. Bemerkenswert ist der Zeitpunkt: gefunden wurde sie an der BESCHREIBUNG, nicht am Code, und damit vor der ersten Zeile.
+
+**Lehre:** Ein Mechanismus, der einen Ausfall behandeln soll, braucht die Frage „was, wenn die Ursache beim Wiederanlauf noch da ist?" — und eine Bremse, die auch dann zählt, wenn der Neustart *lebt* statt zu sterben. Die Gegenprüfung gehört an den Entwurf, nicht erst an das Ergebnis: Am Text kostet der Fund eine Stunde, am gebauten Wächter eine Nacht.
+
+---
+
 ## 4. Die Guards als Immunsystem
 
 Jedes Guard-Skript ist die geronnene Lösung eines real aufgetretenen, wiederholten Problems.
@@ -658,7 +670,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Donnerstag, 30.07.2026, 04:39 · Quellen-Fingerprint: `570f9e3de9d2…`
+Zuletzt aktualisiert: Donnerstag, 30.07.2026, 04:48 · Quellen-Fingerprint: `55ed0591e1ad…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -685,7 +697,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Every dashboard card's body must speak STRICTLY about its own point — never report on or reference another TASKS point inside a card | 1 | niedrig | batch-singleton.mjs, dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
 | hoa dashboard \"Woran ich gerade arbeite\" holds ONE CARD PER parallel point being actively worked (not a single card); cards move from Warteschlange into it (possibly several at once); a point is NEVER in both sections at once | 1 | niedrig | dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
 | Never put a hardcoded `open` attribute on a dashboard `<details>` card — default all closed; localStorage persistence keeps user-opened cards open across refresh | 1 | niedrig | batch-autostart.mjs, dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
-| The batch dashboard \"Von dir zu klären\" section holds ONLY genuine user decisions — no done items, no announcements for in-progress work | 1 | niedrig | dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
+| The batch dashboard \"Von dir zu klären\" section holds ONLY genuine user decisions — no done items, no announcements for in-progress work | 2 | mittel | dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
 | RETIRED 25.07.2026 — the blanket authorization to spin up Fable for hard analyses is withdrawn; Opus 5 does that work, Fable only reviews or stands in as fallback | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Work at High effort by default; the user reserves Extra high for research and design decisions, not implementation | 3 | mittel | — (Regel/Memory) | ◐ Regel |
 | Write idiomatic English in all English text (README, code comments, commit messages) — no German calques like 'stand' for a version | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -742,6 +754,6 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 74 Feedback-/Projekt-Memories · 37 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 20 Prozess-/Meta-TASKS-Punkte (davon 10 offen).
 
-<!-- RETRO-FINGERPRINT: 570f9e3de9d27deac989fa2183ee553b3e858cc495028c9e4e852c886ba3da0c -->
-<!-- RETRO-LAST-REFRESHED: 2026-07-30T02:39:36.417Z -->
+<!-- RETRO-FINGERPRINT: 55ed0591e1adca32fc6f59db9e9034ac161f659511ebddbb948ae0a9b58d28ee -->
+<!-- RETRO-LAST-REFRESHED: 2026-07-30T02:48:48.810Z -->
 <!-- AUTO-GENERATED:END -->
