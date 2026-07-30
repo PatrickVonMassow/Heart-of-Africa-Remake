@@ -319,7 +319,11 @@ layer still acts while the other layers' inputs are missing or stale.
 
 - Lease: an expired lease is takeable by a stranger; a fresh one is not; a renewal
   under a stale fence is refused; a PreToolUse renewal covers a call longer than the
-  window; a fence file that was deleted does not lower the high-water mark.
+  RENEWAL INTERVAL — the guaranteed cover is `LEASE_MS - LEASE_RENEW_INTERVAL_MS`
+  (55 min) and it must exceed the longest legitimate single call (corrected wording,
+  30.07.2026: a call longer than the WINDOW does lose the lease, which is the deal
+  §3 writes down, not a defect a test could assert away); a fence file that was
+  deleted does not lower the high-water mark.
 - Chokepoint: a stale-fence session is refused a push, a tick, a board publish and a
   dashboard-state merge; a current-fence session is not.
 - External watcher: no push movement plus open points yields the alert; movement

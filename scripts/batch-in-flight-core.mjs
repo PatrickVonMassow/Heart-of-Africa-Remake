@@ -61,48 +61,31 @@ export const IN_FLIGHT_MAX_AGE_MS = 45 * 60 * 1000
  * THE WINDOW THE LAUNCHER MUST ASK WITH — and the reason the guard's own is wrong
  * for it (second four-eyes review, 28.07.2026, finding A).
  *
- * `work-stalled` was UNREACHABLE in production. Three constants made it so, and
- * each was defensible alone:
- *   - `assessOwnerWork` marks a declaration `declared: false` once it is older
- *     than `IN_FLIGHT_MAX_AGE_MS` (45 min);
- *   - `assessOwner` licenses the stall verdict only past `WORK_STALL_MS` (90 min)
- *     of heartbeat silence;
- *   - and only while the declaration is the owner's LAST WORD, i.e.
- *     `claimedAt <= declaredAt + WORK_DECLARATION_TOLERANCE_MS`.
- * The declare CLI is itself a tool call, so its own PostToolUse heartbeat lands
- * seconds after `declaration.at` — which means in the honest stall shape the
- * heartbeat age and the declaration age are the SAME number. It cannot be above
- * 90 and below 45 at once, so the verdict never fired: the reviewer drove the real
- * pipeline minute by minute over five hours after a total freeze and got the old
- * four-hour valve every time.
+ * The launcher's question is not the guard's. The GUARD asks "may a turn end ride
+ * on this declaration?", where an aged one must stop counting — that is what
+ * `IN_FLIGHT_MAX_AGE_MS` (45 min) is for. The LAUNCHER asks "what was this owner
+ * waiting on?", and for that age is a poor disqualifier: a declaration does not
+ * become false by growing old, it becomes false when the session went on working
+ * after making it. So the launcher gets its own, far wider window.
  *
- * The launcher's question is not the guard's. The guard asks "may a turn end ride
- * on this declaration?", where an aged one must stop counting. The launcher asks
- * "is this declaration the owner's LAST WORD?" — and for that, age is not the
- * disqualifier: `lastWord` already excludes every session that worked after
- * declaring, which is the only way an old declaration becomes misleading (the
- * replayed near-kill — declare, agent finishes, merge, start a LARGE regression —
- * leaves a heartbeat twelve minutes newer than the declaration and fails it).
+ * WHAT THIS CONSTANT NO LONGER DOES (point 434, 30.07.2026). It used to feed a
+ * VERDICT: `assessOwner` turned a declaration that had stopped moving into
+ * `work-stalled` past `WORK_STALL_MS`, gated by a `lastWord` tolerance — and the
+ * three constants involved were so hard to satisfy at once that the verdict was
+ * unreachable in production while its tests stayed green. All three are gone with
+ * the wedge ladder; liveness is now the LEASE, pure arithmetic on the lock, and
+ * nothing about a declaration extends ownership any more (a wait that needs longer
+ * says so in advance via `extendLease`).
  *
- * WHY NOT JUST `WORK_STALL_MS + WORK_DECLARATION_TOLERANCE_MS`, the minimum that
- * makes the window non-empty: because non-empty is not the same as REACHABLE. In
- * the honest stall shape the heartbeat age and the declaration age are the same
- * number, so that value opens a band barely two minutes wide — and the launcher
- * only looks once per `LAUNCHER_TICK_MS` (15 min). Roughly seven ticks in eight
- * would step straight over it and fall through to the four-hour valve, which is
- * the very outcome finding A reported. The band must therefore be at least a
- * couple of ticks wide, and four hours is where it naturally ends: past that a
- * silent owner has been read as wedged for hours anyway, so the declaration has
- * nothing left to add. `assessOwnerWork`'s own tests pin the width against the tick.
- *
- * WRITTEN OUT RATHER THAN `= WEDGED_MS` (point 433, 30.07.2026). It used to borrow
- * that constant, which then dropped from four hours to 45 minutes so the launcher
- * could rescue an unattended night. Borrowed, this window would have collapsed to
- * 45 minutes with it — and since a declaration ageing out flips `advancing` to
- * false, the launcher would have started TAKING the lock the moment a declaration
- * expired. That is precisely the shot in the back a long verification must never
- * get: an expiry is not evidence of a wedge. The window therefore keeps its own
- * value and its own reason.
+ * WHAT IT STILL DOES, and why it is still four hours: it bounds how long a
+ * declaration stays readable AS a declaration, which is what the launcher REPORTS
+ * from when it takes an expired lease — "it was waiting on the agent for point N"
+ * rather than a bare takeover line. Four hours because a report is cheap and a
+ * wrong one is not: past that the declaration has nothing useful left to say. It
+ * stays WRITTEN OUT rather than borrowed from another constant (point 433's
+ * lesson): it once read `= WEDGED_MS`, and when that dropped from four hours to 45
+ * minutes this window would have collapsed with it — silently, for a reason that
+ * had nothing to do with reporting.
  */
 export const LAUNCHER_WORK_MAX_AGE_MS = 4 * 60 * 60 * 1000
 
