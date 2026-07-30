@@ -8,6 +8,9 @@
 // Usage: node scripts/notify.mjs "<title>" "<message>" [priority]
 //    or: import { notify } from './notify.mjs'; await notify(title, message)
 // Silent no-op if disabled (delete .claude/ntfy-topic to turn off).
+//
+// Since point 434 every alert climbs the ESCALATION LADDER first — see notify()
+// below and scripts/alert-escalation.mjs. HOA_ALERT_ESCALATION=off disables it.
 import { readFileSync } from 'node:fs'
 import { repoPath } from './repo-paths.mjs'
 
@@ -24,13 +27,46 @@ export function ntfyTopic() {
   }
 }
 
-export async function notify(title, message, priority = 'default') {
+/**
+ * Send an alert — through the ESCALATION LADDER (point 434).
+ *
+ * A repeated IDENTICAL alert no longer repeats identically: it backs off with a
+ * rising interval and a rising priority, and its last rung PAUSES the batch with
+ * a board card, because an alert can be slept through and a paused batch cannot.
+ * The decision is `scripts/alert-escalation-core.mjs`; the state, the pause and
+ * the card are `scripts/alert-escalation.mjs`, imported LAZILY so this module
+ * stays a two-import leaf for every caller — and so a test that imports `notify`
+ * never drags in the batch-lock path that throws under a test runner.
+ *
+ * @param {object}  [opts]
+ * @param {string}  [opts.key]       an explicit ladder key; else derived from
+ *                                   title+message with digit runs collapsed, so
+ *                                   "stalled for 121 min" and "…151 min" are ONE
+ *                                   climbing alert rather than two fresh ones.
+ * @param {boolean} [opts.escalate]  false sends unthrottled — for the rare alert
+ *                                   whose every repetition is genuinely news.
+ * @returns {Promise<boolean>} true when the message went out. FALSE also means
+ *          "held back by the ladder", not only "failed"; the ladder log
+ *          (.claude/alert-escalation.log) says which of the two it was.
+ */
+export async function notify(title, message, priority = 'default', { key = null, escalate: useLadder = true } = {}) {
   const topic = ntfyTopic()
   if (!topic) return false // channel not configured — silent
+  let effectivePriority = priority
+  if (useLadder) {
+    try {
+      const { escalate } = await import('./alert-escalation.mjs')
+      const verdict = await escalate({ title, message, key, priority })
+      if (!verdict.deliver) return false
+      if (verdict.priority) effectivePriority = verdict.priority
+    } catch {
+      // FAIL-OPEN = DELIVER: a broken ladder must never swallow an alert.
+    }
+  }
   try {
     const res = await fetch(`https://ntfy.sh/${encodeURIComponent(topic)}`, {
       method: 'POST',
-      headers: { Title: `HoA batch: ${title}`, Priority: String(priority), Tags: 'robot' },
+      headers: { Title: `HoA batch: ${title}`, Priority: String(effectivePriority), Tags: 'robot' },
       body: String(message).slice(0, 3500),
       signal: AbortSignal.timeout(8000),
     })

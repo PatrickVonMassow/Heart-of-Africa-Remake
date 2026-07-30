@@ -96,11 +96,8 @@ scripts/.tile-cache
 # shared across them would compare two different worlds.
 .claude/pre-push-gate-state.json
 
-# Layer 5's own memory (scripts/child-retry.mjs): the recorded child deaths and
-# the per-point retry/token budget. Runtime coordination state like the lock
-# beside it — and deleting it only forgets the outage window, never work.
-.claude/child-retry.json
-.claude/child-retry.json.tmp-*
+# Runtime state of the batch-resilience layers (child-retry, alert-escalation).
+.claude/resilience/
 
 # Local GitHub PAT (ci-status-guard.mjs probes this path) — never committed
 .secrets/

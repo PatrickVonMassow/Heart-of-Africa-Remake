@@ -28,8 +28,9 @@
 // the session. It degrades to NO-RETRY-BY-HAND with the error named — it does
 // NOT degrade to "retry", because a retry taken on a decision the code could not
 // make is exactly the retry-into-an-outage this layer exists to prevent.
-import { appendFileSync, readFileSync } from 'node:fs'
+import { appendFileSync, mkdirSync, readFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
+import { dirname } from 'node:path'
 import { REPO_ROOT, repoPath } from './repo-paths.mjs'
 import { writeJsonAtomic } from './atomic-write.mjs'
 import { ownsLock, readOwnerLock } from './batch-singleton.mjs'
@@ -46,8 +47,22 @@ import {
   retryDecision,
 } from './child-retry-core.mjs'
 
-export const STATE_PATH = repoPath('.claude/child-retry.json')
-export const LOG_PATH = repoPath('.claude/child-retry.log')
+// Both resilience layers keep their runtime state in ONE gitignored directory,
+// so the repository's ignore list grows by a single path rather than by a line
+// per file — this branch shares .gitignore with two parallel ones.
+export const STATE_PATH = repoPath('.claude/resilience/child-retry.json')
+export const LOG_PATH = repoPath('.claude/resilience/child-retry.log')
+
+/** The state directory is created on demand: a fresh checkout has no .claude/
+ *  resilience/, and a layer that only works after somebody made a folder by hand
+ *  is not a layer. */
+function ensureDir(path) {
+  try {
+    mkdirSync(dirname(path), { recursive: true })
+  } catch {
+    /* already there, or unwritable — the caller's own try/catch decides */
+  }
+}
 
 /** The state document, or an empty one. A corrupt file is NOT fatal: the core
  *  tolerates a garbage document, and this layer must answer while every other
@@ -62,6 +77,7 @@ export function readState(path = STATE_PATH) {
 }
 
 export function writeState(state, path = STATE_PATH) {
+  ensureDir(path)
   writeJsonAtomic(path, state)
 }
 
