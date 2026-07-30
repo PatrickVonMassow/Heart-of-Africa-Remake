@@ -18,7 +18,7 @@
 // The ONLY thing it changes is that `batch-progress-guard` stops demanding work
 // the session cannot do while it waits — and it stops the moment the evidence
 // stops checking out, or the declaration ages out.
-import { readFileSync, rmSync, statSync } from 'node:fs'
+import { readFileSync, rmSync, statSync, existsSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { REPO_ROOT } from './repo-paths.mjs'
@@ -35,8 +35,16 @@ import {
   assessInFlight,
   describeInFlight,
   selfReferentialEvidence,
+  slotReasonDecision,
+  slotsRemedy,
+  statusVerdict,
+  closingFreezeActive,
+  declaredAgentCount,
+  openPointSpecs,
   IN_FLIGHT_MAX_AGE_MS,
+  POOL_CAP,
 } from './batch-in-flight-core.mjs'
+import { readTasksOpen, TASKS_PATH } from './tasks-source.mjs'
 
 export { IN_FLIGHT_PATH }
 
@@ -84,6 +92,7 @@ export function refTipAt(ref, { cwd = REPO_ROOT } = {}) {
   if (!name || /[\s~^:?*[\]\\]/.test(name)) return null
   try {
     const out = execFileSync('git', ['log', '-1', '--format=%ct', `${name}^{commit}`], {
+      windowsHide: true,
       cwd,
       encoding: 'utf8',
       timeout: 8000,
@@ -162,6 +171,7 @@ export function resolveRefName(ref, { cwd = REPO_ROOT } = {}) {
   if (!name || name.startsWith('-') || /[\s~^:?*[\]\\]/.test(name)) return null
   try {
     const out = execFileSync('git', ['rev-parse', '--symbolic-full-name', name], {
+      windowsHide: true,
       cwd,
       encoding: 'utf8',
       timeout: 8000,
@@ -186,6 +196,7 @@ export function absPath(value) {
 export function currentBranchOf({ cwd = REPO_ROOT } = {}) {
   try {
     const out = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {
+      windowsHide: true,
       cwd,
       encoding: 'utf8',
       timeout: 8000,
@@ -207,10 +218,131 @@ const probes = { probePid, refTipAt, worktreeActiveAt, mtimeOf }
  * the declaration it judged. Cheap in the common case: with no marker on disk it
  * returns before any probe runs, so an ordinary turn end pays nothing for this.
  */
+/** The path whose existence DECLARES a CLOSING FREEZE (CLAUDE.md §9) by hand: while a
+ *  closing run is under way no agent work may land, so empty pool slots are correct.
+ *  It is the override, not the primary signal — see `closingFreeze()`. */
+export const CLOSING_FREEZE_PATH = resolve(REPO_ROOT, '.claude', 'closing-freeze')
+/** Where `closing-guard` keeps its per-commit checklist. THIS is the signal a closing
+ *  is really running, because it is written as a side effect of doing the closing. */
+export const CLOSING_STATE_PATH = resolve(REPO_ROOT, '.claude', 'closing-state.json')
+const PAUSE_PATH = resolve(REPO_ROOT, '.claude', 'batch-paused')
+
+/**
+ * IS A CLOSING FREEZE UNDER WAY? The decision is pure (`closingFreezeActive`); this
+ * reads the two facts it needs. A hand-placed marker file counts, and so does a
+ * closing checklist recorded for the CURRENT HEAD — the latter is what makes the
+ * recognition reachable at all, since nothing in this repository ever writes the
+ * marker. Unreadable either way answers "no freeze", the direction that keeps the
+ * nudge alive rather than silencing it on a failed read.
+ */
+export function closingFreeze({ cwd = REPO_ROOT, statePath = CLOSING_STATE_PATH } = {}) {
+  let closingState = null
+  try {
+    closingState = JSON.parse(readFileSync(statePath, 'utf8'))
+  } catch {
+    /* no closing has ever been recorded here */
+  }
+  let head = ''
+  try {
+    head = execFileSync('git', ['rev-parse', 'HEAD'], {
+      windowsHide: true,
+      cwd,
+      encoding: 'utf8',
+      timeout: 15000,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim()
+  } catch {
+    /* not a repo — then the state cannot be keyed to this HEAD either */
+  }
+  return closingFreezeActive({ marker: existsSync(CLOSING_FREEZE_PATH), closingState, head })
+}
+
+/** The branch checked out in a declared WORKTREE, or null.
+ *
+ *  Without this the whole slot check would go dark in the commonest shape there is:
+ *  an agent declared with `--worktree` alone names no ref, `runningBranchFiles` came
+ *  back empty, and an empty running-file set is deliberately read as "the overlap
+ *  question cannot be answered" — no demand, ever. The worktree KNOWS its branch, so
+ *  it is asked. */
+export function worktreeBranch(path, { cwd = REPO_ROOT } = {}) {
+  try {
+    const ref = execFileSync('git', ['-C', String(path), 'symbolic-ref', '--quiet', 'HEAD'], {
+      windowsHide: true,
+      cwd,
+      encoding: 'utf8',
+      timeout: 15000,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim()
+    return ref || null
+  } catch {
+    return null // detached HEAD, gone worktree, not a repo
+  }
+}
+
+/** The files the running agent branches touch, against `main`. Best effort: an
+ *  unreadable git yields an EMPTY set, and an empty running set can only make more
+ *  points look independent — so the fallback is checked at the decision, where an
+ *  unknown state must never produce a demand. */
+export function runningBranchFiles(evidence = [], { cwd = REPO_ROOT } = {}) {
+  const refs = new Set()
+  for (const e of evidence ?? []) {
+    if (e?.kind === 'branch' && e.ref) refs.add(String(e.ref))
+    // A worktree is evidence of a branch too — see `worktreeBranch`.
+    if (e?.kind === 'worktree' && e.path) {
+      const ref = worktreeBranch(e.path, { cwd })
+      if (ref) refs.add(ref)
+    }
+  }
+  const files = new Set()
+  for (const ref of refs) {
+    try {
+      const out = execFileSync('git', ['diff', '--name-only', `main...${ref}`], {
+        windowsHide: true,
+        cwd,
+        encoding: 'utf8',
+        timeout: 15000,
+        stdio: ['ignore', 'pipe', 'ignore'],
+      })
+      for (const line of out.split(/\r?\n/)) if (line.trim()) files.add(line.trim())
+    } catch {
+      /* unknown ref / not a repo — this branch contributes nothing */
+    }
+  }
+  return [...files]
+}
+
+/**
+ * DOES THIS WAIT OWE A REASON FOR ITS IDLE POOL SLOTS (point 427)? The decision is
+ * pure (`slotReasonDecision`); this gathers the four facts. Anything unreadable ends
+ * as "no demand" — the lower bound on the pool is worth a nudge, never a wedge.
+ */
+export function gatherSlots(declaration, { cwd = REPO_ROOT, tasksPath = TASKS_PATH } = {}) {
+  try {
+    const evidence = Array.isArray(declaration?.evidence) ? declaration.evidence : []
+    const running = runningBranchFiles(evidence, { cwd })
+    // No readable running-file set means the overlap question cannot be answered, and
+    // an unanswerable question is not a reason to demand anything.
+    if (running.length === 0) return { needsReason: false, slotsFree: 0, agents: 0, candidates: [], why: 'overlap-unknown' }
+    return slotReasonDecision({
+      agents: declaredAgentCount(evidence),
+      openPoints: openPointSpecs(readTasksOpen(tasksPath)),
+      runningFiles: running,
+      reason: declaration?.slotsFree ?? '',
+      paused: existsSync(PAUSE_PATH),
+      closingFreeze: closingFreeze({ cwd }).active,
+      cap: POOL_CAP,
+    })
+  } catch {
+    return { needsReason: false, slotsFree: 0, agents: 0, candidates: [], why: 'ungatherable' }
+  }
+}
+
 export function gatherInFlight(sid, { now = Date.now(), lockPath = LOCK_PATH, env = process.env } = {}) {
   const path = statePathsFor(lockPath).inFlightPath
   const declaration = readDeclaration(path)
-  if (!declaration) return { declaration: null, live: false, reason: 'no-declaration', summary: '', items: [] }
+  if (!declaration) {
+    return { declaration: null, live: false, reason: 'no-declaration', summary: '', items: [], slots: null }
+  }
   // The ancestor walk is only needed when the session id no longer matches (a
   // context compaction) — it is the expensive probe, so it stays behind that.
   const ancestor = declaration.sessionId === sid ? null : ourClaudeProcess(sid, { lockPath })
@@ -222,7 +354,11 @@ export function gatherInFlight(sid, { now = Date.now(), lockPath = LOCK_PATH, en
     maxAgeMs: maxAgeMs(env),
     ...probes,
   })
-  return { declaration, ...assessment }
+  // Only worth asking for a wait that would otherwise be allowed: a declaration that
+  // is not live blocks anyway, and paying two git calls to explain a block nobody is
+  // getting would be waste on the Stop hook's path.
+  const slots = assessment.live ? gatherSlots(declaration) : null
+  return { declaration, ...assessment, slots }
 }
 
 // --- CLI -----------------------------------------------------------------------
@@ -238,7 +374,7 @@ if (isMain) {
   }
   const usage =
     'usage: node scripts/batch-in-flight.mjs --waiting-on "<what>" [--pid N] [--branch REF] ' +
-    '[--worktree PATH] [--log PATH] | --status | --clear'
+    '[--worktree PATH] [--log PATH] [--slots-free "<why the free pool slots stay free>"] | --status | --clear'
 
   if (argv[0] === '--clear') {
     clearDeclaration()
@@ -246,17 +382,35 @@ if (isMain) {
   } else if (argv[0] === '--status' || argv.length === 0) {
     const g = gatherInFlight(sid)
     console.log(JSON.stringify({ ownerSessionId: sid || null, maxAgeMs: maxAgeMs(), ...g }, null, 2))
-    if (!g.declaration) console.log(`\nNothing declared.\n${usage}`)
-    else if (g.live) console.log(`\nA stop would be ALLOWED — waiting on ${describeInFlight(g, g.declaration)}`)
-    else console.log(`\nA stop would be BLOCKED (${g.reason}).`)
+    // The verdict is decided in the pure core, not by an `if` here: since point 427
+    // a declaration can be perfectly live and STILL block, and this command promises
+    // what the hook would decide.
+    const verdict = statusVerdict(g)
+    if (verdict.verdict === 'none') console.log(`\nNothing declared.\n${usage}`)
+    else if (verdict.verdict === 'allowed') {
+      console.log(`\nA stop would be ALLOWED — waiting on ${describeInFlight(g, g.declaration)}`)
+    } else if (verdict.why === 'slots-free') {
+      console.log(
+        `\nA stop would be BLOCKED. The wait itself checks out (${describeInFlight(g, g.declaration)}), but the ` +
+          `agent pool runs below its cap and nothing says why.\n\n${slotsRemedy({ slots: g.slots ?? {}, cap: POOL_CAP })}`,
+      )
+    } else console.log(`\nA stop would be BLOCKED (${verdict.why}).`)
   } else if (argv[0] === '--waiting-on') {
     const waitingOn = String(argv[1] ?? '').trim()
     if (!waitingOn) fail(`--waiting-on needs a description of the wait.\n${usage}`)
     const evidence = []
+    let slotsFreeReason = ''
     for (let i = 2; i < argv.length; i += 2) {
       const flag = argv[i]
       const value = argv[i + 1]
       if (value === undefined) fail(`${flag} needs a value.\n${usage}`)
+      if (flag === '--slots-free') {
+        // Point 427: not evidence, a REASON. It answers "why do the free pool slots
+        // stay free", and the guard demands it only when they demonstrably could not.
+        slotsFreeReason = String(value).trim()
+        if (!slotsFreeReason) fail(`--slots-free needs a reason for the idle pool slots.\n${usage}`)
+        continue
+      }
       if (flag === '--pid') {
         // The start time is recorded WITH the pid, so a later probe can tell the
         // same process from a stranger that inherited the number.
@@ -332,6 +486,9 @@ if (isMain) {
       at: now,
       waitingOn,
       evidence,
+      // Empty string when not given, so the decision sees "no reason" rather than
+      // an absent field it has to interpret (point 427).
+      slotsFree: slotsFreeReason,
     }
     // Verify NOW, so a typo is caught here and not at a turn end that then blocks
     // with a reason nobody expected.
@@ -342,6 +499,11 @@ if (isMain) {
           'Nothing recorded — a declaration is only worth as much as what proves it.',
       )
     }
+    // THE CAP IS ALSO A TARGET (point 427). Refused HERE as well as at the turn end,
+    // so the session learns at the declaration rather than at a blocked stop — the
+    // same discipline the evidence check above follows.
+    const slots = gatherSlots(declaration)
+    if (slots.needsReason) fail(`${slotsRemedy({ slots, cap: POOL_CAP })}\nNothing recorded.`)
     writeDeclaration(declaration)
     const mins = Math.round(maxAgeMs() / 60000)
     console.log(

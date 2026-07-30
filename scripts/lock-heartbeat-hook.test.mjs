@@ -31,6 +31,7 @@ const writeTasks = (points) => writeFileSync(resolve(repo, 'TASKS.md'), tasks(po
 
 const runHook = (payload = {}) =>
   spawnSync(process.execPath, [resolve(repo, 'scripts', 'lock-heartbeat-hook.mjs')], {
+    windowsHide: true,
     encoding: 'utf8',
     cwd: repo,
     input: JSON.stringify({ session_id: 'due-mark-session', hook_event_name: 'PostToolUse', ...payload }),

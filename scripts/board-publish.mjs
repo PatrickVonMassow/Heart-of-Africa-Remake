@@ -88,7 +88,8 @@ async function fetchWithTimeout(url, ms = FETCH_TIMEOUT_MS) {
 }
 
 const args = process.argv.slice(2)
-const git = (a, opts = {}) => execFileSync('git', a, { cwd: REPO_ROOT, encoding: 'utf8', ...opts }).trim()
+const git = (a, opts = {}) =>
+  execFileSync('git', a, { windowsHide: true, cwd: REPO_ROOT, encoding: 'utf8', ...opts }).trim()
 
 if (args.includes('--url')) {
   console.log(`board page   : ${BOARD_PAGE_URL}`)

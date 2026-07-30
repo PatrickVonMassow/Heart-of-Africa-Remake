@@ -12,7 +12,7 @@
 //   · with none declared, the guard behaves exactly as it did before;
 //   · and nothing here may touch the repository's .claude/ (finding 3).
 import { describe, it, expect } from 'vitest'
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { basename, join, resolve } from 'node:path'
@@ -27,6 +27,15 @@ import {
   checkEvidence,
   describeInFlight,
   selfReferentialEvidence,
+  slotReasonDecision,
+  declaredAgentCount,
+  filesNamedIn,
+  openPointSpecs,
+  independentOpenPoints,
+  slotsRemedy,
+  statusVerdict,
+  closingFreezeActive,
+  POOL_CAP,
 } from './batch-in-flight-core.mjs'
 import {
   assessOwner,
@@ -38,7 +47,6 @@ import {
   IN_FLIGHT_PATH,
   LAUNCHER_TICK_MS,
   PID_START_TOLERANCE_MS,
-  WEDGED_MS,
   WORK_STALL_MS,
 } from './batch-singleton.mjs'
 import {
@@ -49,6 +57,8 @@ import {
   resolveRefName,
   writeDeclaration,
   clearDeclaration,
+  worktreeBranch,
+  runningBranchFiles,
 } from './batch-in-flight.mjs'
 
 const NOW = 1_785_100_000_000
@@ -613,7 +623,11 @@ describe('assessOwnerWork → assessOwner: a totally frozen session really is re
     // First fire at the stall bound (the heartbeat trails the declaration by 5 s,
     // so it crosses one minute later), and long before the four-hour valve.
     expect(hits[0]).toBe(Math.round(WORK_STALL_MS / 60_000) + 1)
-    expect(hits[0] * 60_000).toBeLessThan(WEDGED_MS)
+    // …and well inside the window the launcher honours the declaration for. It used
+    // to be compared against WEDGED_MS, which point 433 dropped to 45 minutes so an
+    // unattended night could be rescued; the window this must clear is the
+    // launcher's own, which was written out for exactly that reason.
+    expect(hits[0] * 60_000).toBeLessThan(LAUNCHER_WORK_MAX_AGE_MS)
     const t = tick(hits[0])
     expect(t.verdict).toMatchObject({ alive: true, wedged: true, reason: 'work-stalled' })
     expect(spawnDecision(t.verdict)).toBe('skip-wedged')
@@ -813,7 +827,7 @@ describe('the CLI records RESOLVED evidence, not what was typed', () => {
   it('resolveRefName asks GIT what a ref names, so an alias cannot hide behind a spelling', () => {
     const dir = mkdtempSync(join(tmpdir(), 'hoa-ref-'))
     const git = (...args) =>
-      execFileSync('git', args, { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
+      execFileSync('git', args, { windowsHide: true, cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
     try {
       git('init', '-b', 'main')
       git('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '--allow-empty', '-m', 'x')
@@ -846,6 +860,393 @@ describe('the CLI records RESOLVED evidence, not what was typed', () => {
       ).toEqual([])
     } finally {
       rmSync(dir, { recursive: true, force: true })
+    }
+  })
+})
+
+// ---------------------------------------------------------------------------
+// THE POOL RUNS AT ITS CAP, OR SAYS WHY NOT (point 427)
+// ---------------------------------------------------------------------------
+// The user asked it plainly while one agent built and two slots stood empty. Nothing
+// was broken: the wait declaration is enforced, the idle guard is satisfied, and the
+// cap is an UPPER bound that nothing checked from below. Measured that day: one
+// agent, two free slots, ninety minutes, a queue full of independent points.
+//
+// The failure side here is a NAG, so every state in which the empty slots are
+// genuinely unusable must answer "no reason needed" on its own.
+
+describe('declaredAgentCount — count what can be SEEN, not what is typed', () => {
+  it('one agent declaring its worktree AND its branch is one agent', () => {
+    expect(
+      declaredAgentCount([
+        { kind: 'worktree', path: '/repo/.claude/worktrees/agent-a1' },
+        { kind: 'branch', ref: 'refs/heads/feat/427-x' },
+      ]),
+    ).toBe(1)
+  })
+
+  it('three worktrees are three agents, however the branches are declared', () => {
+    expect(
+      declaredAgentCount([
+        { kind: 'worktree', path: '/repo/wt/a1' },
+        { kind: 'worktree', path: '/repo/wt/a2' },
+        { kind: 'worktree', path: '/repo/wt/a3' },
+        { kind: 'branch', ref: 'refs/heads/feat/x' },
+      ]),
+    ).toBe(3)
+  })
+
+  it('duplicates collapse, and a pid or a log is not an agent', () => {
+    expect(declaredAgentCount([{ kind: 'worktree', path: '/wt/A1' }, { kind: 'worktree', path: '/wt/a1' }])).toBe(1)
+    expect(declaredAgentCount([{ kind: 'pid', pid: 1 }, { kind: 'log', path: '/tmp/x.log' }])).toBe(0)
+    expect(declaredAgentCount([])).toBe(0)
+    expect(declaredAgentCount()).toBe(0)
+    expect(declaredAgentCount('nonsense')).toBe(0)
+  })
+})
+
+describe('filesNamedIn / openPointSpecs — what a queued point says it touches', () => {
+  it('reads the repository paths out of a spec, case-folded the way git is compared', () => {
+    const files = filesNamedIn('Fix `scripts/batch-doctor.mjs` and src/ui/Hud.tsx; docs/batch-autonomy.md too.')
+    expect(files).toContain('scripts/batch-doctor.mjs')
+    expect(files).toContain('src/ui/hud.tsx') // folded, so a Windows path compares equal
+    expect(files).toContain('docs/batch-autonomy.md')
+  })
+
+  it('reads the root-level documents the work order names bare', () => {
+    expect(filesNamedIn('update CLAUDE.md §6 and design.md')).toEqual(expect.arrayContaining(['claude.md', 'design.md']))
+  })
+
+  it('names nothing when the spec names nothing', () => {
+    expect(filesNamedIn('Decide whether the mechanic is worth building at all.')).toEqual([])
+    expect(filesNamedIn('')).toEqual([])
+    expect(filesNamedIn()).toEqual([])
+  })
+
+  it('splits the work order into its OPEN points, DEFERRED and ticked excluded', () => {
+    const tasks = [
+      '- [ ] 500. FIRST POINT touching scripts/a.mjs',
+      '  and also src/ui/B.tsx',
+      '- [x] 501. A closed point touching scripts/closed.mjs',
+      '- [ ] 502. DEFERRED — waiting on the user, scripts/c.mjs',
+      '- [ ] 503. THIRD POINT touching docs/d.md',
+    ].join('\n')
+    const specs = openPointSpecs(tasks)
+    expect(specs.map((s) => s.point)).toEqual([500, 503])
+    expect(specs[0].files).toEqual(expect.arrayContaining(['scripts/a.mjs', 'src/ui/b.tsx']))
+    expect(specs[1].files).toEqual(['docs/d.md'])
+  })
+
+  it('an empty work order yields no points', () => {
+    expect(openPointSpecs('')).toEqual([])
+    expect(openPointSpecs()).toEqual([])
+  })
+})
+
+describe('independentOpenPoints — a candidate must be provably independent', () => {
+  const running = ['scripts/batch-singleton.mjs', 'docs/batch-autonomy.md']
+
+  it('a point touching none of the running files is a candidate', () => {
+    expect(
+      independentOpenPoints({ points: [{ point: 1, files: ['src/world/world.ts'] }], runningFiles: running }),
+    ).toHaveLength(1)
+  })
+
+  it('a point touching ONE running file is not', () => {
+    expect(
+      independentOpenPoints({
+        points: [{ point: 1, files: ['src/world/world.ts', 'scripts/batch-singleton.mjs'] }],
+        runningFiles: running,
+      }),
+    ).toEqual([])
+  })
+
+  it('a DIRECTORY overlap counts — a point on scripts/ collides with a file in it', () => {
+    expect(independentOpenPoints({ points: [{ point: 1, files: ['scripts'] }], runningFiles: running })).toEqual([])
+  })
+
+  it('A POINT THAT NAMES NOTHING IS NEVER A CANDIDATE — unknown must not nag', () => {
+    expect(independentOpenPoints({ points: [{ point: 1, files: [] }], runningFiles: running })).toEqual([])
+    expect(independentOpenPoints({ points: [{ point: 1 }], runningFiles: running })).toEqual([])
+    expect(independentOpenPoints()).toEqual([])
+  })
+})
+
+describe('slotReasonDecision — the cap is a target, and the demand is narrow', () => {
+  const independent = [{ point: 500, files: ['src/world/world.ts'] }]
+  const running = ['scripts/batch-singleton.mjs']
+
+  it('THE MEASURED STATE: one agent, free slots, an independent point → a reason is DEMANDED', () => {
+    const d = slotReasonDecision({ agents: 1, openPoints: independent, runningFiles: running })
+    expect(d).toMatchObject({ needsReason: true, agents: 1, slotsFree: POOL_CAP - 1, why: 'idle-slots' })
+    expect(d.candidates.map((c) => c.point)).toEqual([500])
+  })
+
+  it('the SAME state WITH a reason passes', () => {
+    expect(
+      slotReasonDecision({
+        agents: 1,
+        openPoints: independent,
+        runningFiles: running,
+        reason: 'the queue\'s next points all rewrite the same guard the running agent is rebuilding',
+      }),
+    ).toMatchObject({ needsReason: false, why: 'reason-given' })
+    // Whitespace is not a reason.
+    expect(slotReasonDecision({ agents: 1, openPoints: independent, runningFiles: running, reason: '   ' }).needsReason).toBe(
+      true,
+    )
+  })
+
+  it('a FULL pool passes with no reason at all', () => {
+    expect(
+      slotReasonDecision({ agents: POOL_CAP, openPoints: independent, runningFiles: running }),
+    ).toMatchObject({ needsReason: false, slotsFree: 0, why: 'at-cap' })
+    // …and over the cap is not negative slots.
+    expect(slotReasonDecision({ agents: POOL_CAP + 2, openPoints: independent, runningFiles: running }).slotsFree).toBe(0)
+  })
+
+  it('a queue whose open points ALL touch the running branch passes', () => {
+    expect(
+      slotReasonDecision({
+        agents: 1,
+        openPoints: [{ point: 500, files: ['scripts/batch-singleton.mjs'] }, { point: 501, files: [] }],
+        runningFiles: running,
+      }),
+    ).toMatchObject({ needsReason: false, why: 'queue-overlaps' })
+  })
+
+  it('an EMPTY queue passes — there is nothing to commission', () => {
+    expect(slotReasonDecision({ agents: 1, openPoints: [], runningFiles: running })).toMatchObject({
+      needsReason: false,
+      why: 'queue-overlaps',
+    })
+  })
+
+  it('a PAUSED batch and a recorded CLOSING FREEZE both pass', () => {
+    expect(
+      slotReasonDecision({ agents: 1, openPoints: independent, runningFiles: running, paused: true }),
+    ).toMatchObject({ needsReason: false, why: 'paused' })
+    expect(
+      slotReasonDecision({ agents: 1, openPoints: independent, runningFiles: running, closingFreeze: true }),
+    ).toMatchObject({ needsReason: false, why: 'closing-freeze' })
+  })
+
+  it('a junk cap or agent count falls back rather than demanding on nonsense', () => {
+    expect(slotReasonDecision({ agents: NaN, openPoints: independent, runningFiles: running }).slotsFree).toBe(POOL_CAP)
+    expect(slotReasonDecision({ agents: 1, openPoints: independent, runningFiles: running, cap: 0 }).slotsFree).toBe(
+      POOL_CAP - 1,
+    )
+    expect(() => slotReasonDecision()).not.toThrow()
+    expect(slotReasonDecision().needsReason).toBe(false)
+  })
+})
+
+describe('the running-file set comes from the worktree too, not only from a --branch', () => {
+  // WITHOUT THIS THE WHOLE SLOT CHECK GOES DARK in the commonest shape there is: an
+  // agent declared with `--worktree` alone names no ref, so the running-file set came
+  // back empty — and an empty set is deliberately read as "the overlap question
+  // cannot be answered", which never demands anything. A worktree knows its branch.
+  it('derives the branch from a real worktree and diffs it against main', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-slots-'))
+    try {
+      const git = (...args) =>
+        execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', '-c', 'commit.gpgsign=false', ...args], {
+          windowsHide: true,
+          cwd: dir,
+          encoding: 'utf8',
+          stdio: ['ignore', 'pipe', 'ignore'],
+        })
+      git('init', '-q', '-b', 'main', '.')
+      writeFileSync(join(dir, 'seed.txt'), 'seed\n')
+      git('add', '-A')
+      git('commit', '-q', '-m', 'seed')
+      git('checkout', '-q', '-b', 'feat/500-x')
+      mkdirSync(join(dir, 'scripts'), { recursive: true })
+      writeFileSync(join(dir, 'scripts', 'thing.mjs'), 'export const a = 1\n')
+      git('add', '-A')
+      git('commit', '-q', '-m', 'the agent commits')
+      git('checkout', '-q', 'main')
+
+      expect(worktreeBranch(dir, { cwd: dir })).toBe('refs/heads/main')
+      // The agent's own branch, named directly, is what the diff is taken of.
+      expect(runningBranchFiles([{ kind: 'branch', ref: 'refs/heads/feat/500-x' }], { cwd: dir })).toEqual([
+        'scripts/thing.mjs',
+      ])
+      // …and a worktree checked out on that branch answers the same, with no --branch.
+      git('checkout', '-q', 'feat/500-x')
+      expect(worktreeBranch(dir, { cwd: dir })).toBe('refs/heads/feat/500-x')
+      expect(runningBranchFiles([{ kind: 'worktree', path: dir }], { cwd: dir })).toEqual(['scripts/thing.mjs'])
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('a gone worktree, a detached HEAD or a non-repo answers null and contributes nothing', () => {
+    const gone = join(tmpdir(), 'hoa-slots-does-not-exist-427')
+    expect(worktreeBranch(gone)).toBe(null)
+    expect(runningBranchFiles([{ kind: 'worktree', path: gone }])).toEqual([])
+    expect(runningBranchFiles([{ kind: 'pid', pid: 1 }])).toEqual([])
+    expect(runningBranchFiles([])).toEqual([])
+    expect(runningBranchFiles()).toEqual([])
+  })
+})
+
+describe('slotsRemedy — the block must name BOTH honest answers', () => {
+  const slots = { agents: 1, slotsFree: 2, candidates: [{ point: 500 }, { point: 501 }] }
+
+  it('names commissioning another point AND stating why the queue is unsuitable', () => {
+    const text = slotsRemedy({ slots })
+    expect(text).toMatch(/COMMISSION another point/)
+    expect(text).toMatch(/STATE what\s+makes the queue's next points unsuitable/)
+    expect(text).toContain('--slots-free')
+    expect(text).toContain('feat/<point>-<slug>')
+  })
+
+  it('names the numbers and the candidate points, so the reader need not go looking', () => {
+    const text = slotsRemedy({ slots })
+    expect(text).toContain('1 agent(s) running')
+    expect(text).toContain(`2 of ${POOL_CAP} slots FREE`)
+    expect(text).toContain('500, 501')
+  })
+
+  it('lists the states that need no reason at all — it must not read as a nag', () => {
+    const text = slotsRemedy({ slots })
+    expect(text).toMatch(/paused batch, a recorded closing freeze and a full pool need no reason/)
+  })
+
+  it('survives an empty or absent slot report', () => {
+    expect(() => slotsRemedy()).not.toThrow()
+    expect(slotsRemedy()).toContain('see the work order')
+    expect(slotsRemedy({ slots: { candidates: [null, {}] } })).toContain('see the work order')
+  })
+})
+
+describe('progressGuardDecision — the wait is allowed once the slots are accounted for', () => {
+  const waiting = {
+    sid: 's1',
+    paused: false,
+    openCount: 5,
+    formatSuspect: false,
+    ownership: 'mine',
+    unhandledAlert: false,
+    inFlight: true,
+  }
+
+  it('a declared, live wait with accounted slots still allows the stop', () => {
+    expect(progressGuardDecision(waiting)).toBe('allow-in-flight')
+    expect(progressGuardDecision({ ...waiting, slotsNeedReason: false })).toBe('allow-in-flight')
+  })
+
+  it('…and BLOCKS while the free slots are unexplained', () => {
+    expect(progressGuardDecision({ ...waiting, slotsNeedReason: true })).toBe('block-slots-free')
+  })
+
+  it('the new verdict never overrides the ones that outrank the wait', () => {
+    expect(progressGuardDecision({ ...waiting, slotsNeedReason: true, paused: true })).toBe('allow')
+    expect(progressGuardDecision({ ...waiting, slotsNeedReason: true, unhandledAlert: true })).toBe('block-remediate')
+    expect(progressGuardDecision({ ...waiting, slotsNeedReason: true, ownership: 'held' })).toBe('stand-down')
+    expect(
+      progressGuardDecision({ ...waiting, slotsNeedReason: true, boundary: { valid: true, point: 427 }, launcher: 'armed' }),
+    ).toBe('allow-boundary')
+    expect(progressGuardDecision({ ...waiting, slotsNeedReason: true, claim: 'release' })).toBe('allow-release')
+  })
+
+  it('with nothing in flight the slot question never arises', () => {
+    expect(progressGuardDecision({ ...waiting, inFlight: false, slotsNeedReason: true })).toBe('block-continue')
+  })
+})
+
+describe('closingFreezeActive — the freeze must be recognisable WITHOUT a file nobody writes', () => {
+  const HEAD = 'a'.repeat(40)
+  const state = (commit, steps) => ({ commit, steps })
+  const step = { evidence: 'LARGE regression green on both backends' }
+
+  it('a closing checklist recorded for the CURRENT head IS a freeze', () => {
+    expect(closingFreezeActive({ closingState: state(HEAD, { 'large-regression': step }), head: HEAD })).toEqual({
+      active: true,
+      why: 'closing-state-for-head',
+    })
+  })
+
+  it('…and one recorded for a DIFFERENT commit is not — a closing is per-commit', () => {
+    expect(
+      closingFreezeActive({ closingState: state('b'.repeat(40), { 'large-regression': step }), head: HEAD }).active,
+    ).toBe(false)
+  })
+
+  it('the hand-placed marker still counts, whatever the state says', () => {
+    expect(closingFreezeActive({ marker: true }).why).toBe('freeze-marker')
+    expect(closingFreezeActive({ marker: true, closingState: null, head: '' }).active).toBe(true)
+  })
+
+  it('a blank tick is not a recorded step, so it is not a freeze', () => {
+    expect(closingFreezeActive({ closingState: state(HEAD, { 'large-regression': { evidence: '  ' } }), head: HEAD }).active).toBe(
+      false,
+    )
+    expect(closingFreezeActive({ closingState: state(HEAD, {}), head: HEAD }).active).toBe(false)
+  })
+
+  it('nothing readable answers NO freeze — a failed read must not silence the nudge', () => {
+    expect(closingFreezeActive().active).toBe(false)
+    expect(closingFreezeActive({ closingState: null, head: HEAD }).active).toBe(false)
+    expect(closingFreezeActive({ closingState: 'garbage', head: HEAD }).active).toBe(false)
+    expect(closingFreezeActive({ closingState: state(HEAD, { 'large-regression': step }), head: '' }).active).toBe(false)
+  })
+})
+
+describe('statusVerdict — `--status` must not promise a stop the hook then blocks', () => {
+  const declaration = { at: 1, waitingOn: 'an agent building 500', evidence: [{ kind: 'branch', ref: 'feat/500-x' }] }
+
+  it('THE TRAP: live evidence AND unexplained free slots reads BLOCKED, not allowed', () => {
+    // The old print keyed on `live` alone. This is the exact state point 427 added,
+    // and calling it ALLOWED would send the session into the block it just checked.
+    expect(statusVerdict({ declaration, live: true, slots: { needsReason: true } })).toEqual({
+      verdict: 'blocked',
+      why: 'slots-free',
+    })
+  })
+
+  it('a live wait with accounted slots is allowed, however the slots were accounted for', () => {
+    for (const slots of [null, undefined, { needsReason: false, why: 'at-cap' }, { why: 'reason-given' }]) {
+      expect(statusVerdict({ declaration, live: true, slots }), String(slots?.why)).toEqual({
+        verdict: 'allowed',
+        why: 'live',
+      })
+    }
+  })
+
+  it('nothing declared is its own verdict — not a block', () => {
+    expect(statusVerdict({ declaration: null, live: false, reason: 'no-declaration' }).verdict).toBe('none')
+    expect(statusVerdict().verdict).toBe('none')
+  })
+
+  it('a declaration that is not live keeps reporting the reason it failed on', () => {
+    expect(statusVerdict({ declaration, live: false, reason: 'evidence-gone' })).toEqual({
+      verdict: 'blocked',
+      why: 'evidence-gone',
+    })
+    // A missing reason still says BLOCKED rather than inventing an allowance.
+    expect(statusVerdict({ declaration, live: false })).toEqual({ verdict: 'blocked', why: 'not-live' })
+    // …and only a literal `true` is live: a truthy string must not open the gate.
+    expect(statusVerdict({ declaration, live: 'yes' }).verdict).toBe('blocked')
+  })
+
+  it('agrees with the guard on every combination — one truth, two readers', () => {
+    const guard = (inFlight, slotsNeedReason) =>
+      progressGuardDecision({
+        sid: 's1',
+        paused: false,
+        openCount: 5,
+        formatSuspect: false,
+        ownership: 'mine',
+        unhandledAlert: false,
+        inFlight,
+        slotsNeedReason,
+      })
+    for (const needsReason of [false, true]) {
+      const status = statusVerdict({ declaration, live: true, slots: { needsReason } })
+      const allowed = guard(true, needsReason).startsWith('allow')
+      expect(status.verdict === 'allowed', `needsReason=${needsReason}`).toBe(allowed)
     }
   })
 })

@@ -53,11 +53,32 @@ export const DEAD_CONFIRM_MS = 5 * 60 * 1000
 /** Legacy locks (no pid recorded) fall back to age-only liveness with this
  *  generous bound (the old STALE_MS). */
 export const LEGACY_STALE_MS = 45 * 60 * 1000
-/** An alive-pid owner whose heartbeat is older than this is flagged "wedged"
- *  (hung process). It still BLOCKS takeover — a wedged owner is signalled to
- *  the user, never silently replaced — but the launcher may kill a wedged
- *  process it spawned itself. */
-export const WEDGED_MS = 4 * 60 * 60 * 1000
+/** One tick of the HoA-Batch-Autostart scheduled task. */
+export const LAUNCHER_TICK_MS = 15 * 60 * 1000
+/**
+ * An alive-pid owner whose heartbeat is older than this is flagged "wedged"
+ * (hung process). Past it the launcher may TAKE the batch lock and start a
+ * successor (`wedgeTakeover`, point 433) — never a kill; the wedged process keeps
+ * running and simply stops owning the batch, learning it at its next hook.
+ *
+ * FORTY-FIVE MINUTES, MEASURED (point 433 (b), 30.07.2026). It was FOUR HOURS,
+ * and on the night of 30.07.2026 that read 221 minutes of a total standstill as
+ * "owner alive" and then logged the same wedge finding eight times over two hours
+ * without acting — longer than any unattended stretch in which a rescue is still
+ * worth something. The new value is calibrated against the real thing that starves
+ * the heartbeat (a single long tool call, since the heartbeat is a PostToolUse
+ * hook), measured over this project's own 43 transcripts — 32 440 tool calls:
+ *   p50 1 s · p99 8.9 min · p99.9 10.0 min · only 15 calls above 15 min.
+ * Of the ten calls above 20 min, five were waits on the USER (AskUserQuestion, a
+ * protected-path edit prompt) and three were declared background waits (a Monitor
+ * poll loop, a dev server); the longest undeclared, unattended call was 27.8 min.
+ * So 45 min is 4.5x the p99.9 and better than 1.6x the longest real one, while a
+ * legitimately long run is protected by its own evidence rather than by the clock:
+ * a declared, ADVANCING piece of work reads alive and never wedged at any age.
+ * It also lands exactly on `LEGACY_STALE_MS`, so 45 minutes of silence now costs
+ * the batch lock whether or not the lock records a pid.
+ */
+export const WEDGED_MS = 45 * 60 * 1000
 /** A pending-spawn lock (launcher claimed, claude -p still booting) older than
  *  this with a dead child pid is reapable. */
 export const PENDING_STALE_MS = 10 * 60 * 1000
@@ -70,11 +91,18 @@ export const PENDING_STALE_MS = 10 * 60 * 1000
  *  call, and a session that neither ends nor calls a tool for a quarter of an
  *  hour does not exist. */
 export const HANDOVER_GRACE_MS = 15 * 60 * 1000
-/** An ALIVE owner silent for longer than this is reported out of band (point
- *  388 (c)). Calibratable — the longest legitimate silence in this repository is
- *  the LARGE browser regression at roughly 30-40 minutes, so the default leaves
- *  better than 2x headroom. Override with HOA_WEDGE_NOTIFY_MIN (minutes). */
-export const WEDGE_NOTIFY_MS = 90 * 60 * 1000
+/**
+ * An ALIVE owner silent for longer than this is reported out of band (point
+ * 388 (c)). Override with HOA_WEDGE_NOTIFY_MIN (minutes).
+ *
+ * DERIVED, so the ladder can never invert again (point 433): exactly one launcher
+ * tick BELOW the wedge threshold, so the user hears about a deepening silence one
+ * tick before the launcher acts on it. It used to be 90 min against a four-hour
+ * wedge; with the wedge at 45 min a hard 90 would have sat ABOVE it and made the
+ * first stage unreachable — `wedgeStage` returns 'wedged' as soon as both are
+ * passed.
+ */
+export const WEDGE_NOTIFY_MS = WEDGED_MS - LAUNCHER_TICK_MS
 /** Tool activity younger than this counts a session as "live" for the
  *  parallel-session detector. */
 export const PARALLEL_FRESH_MS = 10 * 60 * 1000
@@ -84,8 +112,6 @@ export const REAP_MUTEX_STALE_MS = 60 * 1000
 /** Start times within this tolerance count as the same process (pid reuse
  *  detection). */
 export const PID_START_TOLERANCE_MS = 2000
-/** One tick of the HoA-Batch-Autostart scheduled task. */
-export const LAUNCHER_TICK_MS = 15 * 60 * 1000
 /** How many launcher ticks of COMPLETE silence — no tool call from the owner AND
  *  no declared work advancing — before the owner counts as stalled (point 402
  *  (d)). Expressed as the silence it spans rather than as a persisted counter, so
@@ -97,7 +123,12 @@ export const LAUNCHER_TICK_MS = 15 * 60 * 1000
  *  at roughly 30-40 minutes — the number `WEDGE_NOTIFY_MS` two entries up is
  *  calibrated against. A 30-minute stall bound therefore sat BELOW the silence
  *  this repository documents as normal, and the verdict it fed can end in a kill.
- *  Six ticks = 90 minutes follows the same better-than-2x headroom rule. */
+ *  Six ticks = 90 minutes follows the same better-than-2x headroom rule.
+ *
+ *  IT NOW SITS ABOVE `WEDGED_MS`, and that is the intended order (point 433): the
+ *  45-minute wedge licenses only a non-destructive TAKE of the lock — the process
+ *  keeps running — while this bound licenses REAPING the launcher's own spawn. The
+ *  ladder is monotone in severity, so the destructive verdict is the slower one. */
 export const WORK_STALL_TICKS = 6
 export const WORK_STALL_MS = WORK_STALL_TICKS * LAUNCHER_TICK_MS
 /** How much later than a declaration its own heartbeat may land and still leave
@@ -309,8 +340,9 @@ export function assessOwner(
     // one piece of the work it declared, and the declaration is the last thing
     // the owner did. A healthy agent — however slow — advances something, so this
     // needs the work to be genuinely frozen. Still ALIVE (the process exists; the
-    // launcher signals and may only reap a spawn of its own making), but wedged
-    // NOW rather than in four hours.
+    // launcher signals and may only reap a spawn of its own making), and wedged
+    // with the STRONGER reason: `work-stalled` is the only verdict that licenses a
+    // reap, while the plain `pid-alive` wedge below licenses the lock take alone.
     return { alive: true, wedged: true, reason: 'work-stalled' }
   }
   return { alive: true, wedged: age > WEDGED_MS, reason: 'pid-alive' }
@@ -460,26 +492,97 @@ export function silenceStage({ ageMs, advancing = false, notifyMs = WEDGE_NOTIFY
  *     legitimate run. It keeps its pre-402 consequence exactly: reap only the
  *     launcher's own headless spawn, and let the next tick take over.
  *
- * The one rule that binds both: the launcher only ever kills a process it spawned
- * itself — judged by `isOwnSpawn`, i.e. pid AND start time, never the pid alone.
- * An interactive window is never killed — the guards make a rogue one stand down
- * and the user is told instead.
+ * THE `isOwnSpawn` CONDITION IS GONE (point 433, second model's review of
+ * docs/batch-resilience.md §3 layer 2). It was the reason the night of 30.07.2026
+ * was lost: the owner had been started BY HAND, so `own` was false, and the whole
+ * verdict fell through to a log line printed nine times. A wedged owner is taken
+ * over whoever started it — the authority already existed, it was merely too narrow.
+ * WHAT THE CONDITION IS STILL NEEDED FOR: killing. Dropping it from the TAKEOVER
+ * was the fix; dropping it from the KILL as well would let the launcher end a
+ * process it never started — including an attended window of the user's that
+ * declared a wait and then went quiet. The second model's review of this very
+ * commit found five places still promising the opposite, one of them a
+ * notification that says "nothing is being killed" while killing. So the reap
+ * stays where it was: the launcher's OWN headless spawn, and only on the stronger
+ * `work-stalled` finding. A foreign wedged owner is DISPOSSESSED instead, which is
+ * what the lost night actually needed — it was the non-stalled path.
  *
  * Returns { stalled, own, notify, kill, takeover }.
  */
 export function wedgeAction({ assessment, lock, lastSpawnPid, lastSpawnAt, probe } = {}) {
   const stalled = assessment?.reason === 'work-stalled'
   const own = isOwnSpawn({ pid: lock?.pid, probe, lastSpawnPid, lastSpawnAt })
+  const reapable = typeof lock?.pid === 'number' && lock.pid > 0
   return {
     stalled,
     own,
     notify: stalled ? 'urgent' : null,
-    kill: own,
+    // Only the POSITIVE stall finding ends a process, and only one this launcher
+    // started: an unknown identity is never a licence to kill.
+    kill: stalled && reapable && own,
     // Taking the lock beside a process that is still running is the incident this
-    // module exists to prevent, so a takeover needs BOTH a positive stall finding
-    // and a process the launcher may reap — and, at the call site, a confirmed exit.
-    takeover: stalled && own,
+    // module exists to prevent, so the call site still waits for a CONFIRMED exit
+    // before it takes over on the back of a kill.
+    takeover: stalled && reapable && own,
   }
+}
+
+/**
+ * MAY THE LAUNCHER TAKE THE BATCH FROM A WEDGED OWNER (point 433 (a))? PURE.
+ *
+ * A verdict without a consequence is a comment. On the night of 30.07.2026 the
+ * launcher logged "WEDGED owner: pid alive but heartbeat 251 min old" and then the
+ * same line at 266, 281, 296, 311, 326, 341, 356 and 371 minutes — eight findings
+ * over two hours, no successor, no release, nothing. The place that can conclude
+ * "wedged" must also be allowed to act.
+ *
+ * The action is deliberately the MILD one: take the lock and let the successor
+ * start. The wedged process is NOT killed — it keeps running and merely stops
+ * owning the batch, which it learns at its next hook when every ownership-gated
+ * guard stands it down. Killing stays what it was: only the launcher's own spawn,
+ * only on the stronger `work-stalled` finding (`wedgeAction`).
+ *
+ * WHAT MAY NEVER TRIGGER IT: an in-flight declaration merely growing old. A long
+ * verification must not be shot in the back, so the take needs the POSITIVE
+ * evidence of heartbeat silence past `WEDGED_MS` — an aged declaration on a
+ * session whose heartbeat is fresh yields nothing, and a declaration whose work is
+ * still ADVANCING keeps the owner alive-and-not-wedged at any age (`assessOwner`).
+ *
+ * Returns { take, reason }.
+ */
+export function wedgeTakeover({ assessment, lock, work = null } = {}) {
+  if (!lock || typeof lock.sessionId !== 'string' || !lock.sessionId) {
+    return { take: false, reason: 'no-owner' }
+  }
+  // A dead owner is not this path's business — the ordinary spawn decision already
+  // frees that lock, and saying "take" here would only duplicate it.
+  if (assessment?.alive !== true) return { take: false, reason: 'not-alive' }
+  if (assessment?.wedged !== true) return { take: false, reason: 'below-threshold' }
+  if (work?.advancing === true) return { take: false, reason: 'work-advancing' }
+  return { take: true, reason: assessment.reason ?? 'wedged' }
+}
+
+/** After how many IDENTICAL consecutive verdicts the repetition itself is the
+ *  signal (point 433 (c)). Two, i.e. the second identical tick — 30 minutes at the
+ *  launcher's cadence — because eight identical lines is what the incident cost. */
+export const VERDICT_REPEAT_ESCALATE_AT = 2
+
+/**
+ * REPETITION IS THE SIGNAL (point 433 (c)). PURE.
+ *
+ * What reads identically eight times is not truer the ninth, only dearer. Given
+ * the verdict's key, the key last seen and how often it had repeated, this decides
+ * whether to escalate (exactly once, at the Nth identical reading) and whether the
+ * plain line may still be logged.
+ *
+ * Returns { key, repeats, escalate, suppressLog }.
+ */
+export function verdictRepeat({ key, lastKey, repeats = 0, escalateAt = VERDICT_REPEAT_ESCALATE_AT } = {}) {
+  const k = typeof key === 'string' ? key : ''
+  if (!k) return { key: '', repeats: 0, escalate: false, suppressLog: false }
+  if (k !== lastKey) return { key: k, repeats: 1, escalate: false, suppressLog: false }
+  const n = (Number.isFinite(repeats) && repeats > 0 ? repeats : 0) + 1
+  return { key: k, repeats: n, escalate: n === escalateAt, suppressLog: n > escalateAt }
 }
 
 /**
@@ -593,6 +696,7 @@ export function progressGuardDecision({
   launcher = 'unknown', // 'armed' | 'disabled' | 'unknown'
   boundaryDue = null, // point number closed in THIS session without a marker | null
   inFlight = false, // declared work PROVEN still running (assessInFlight().live)
+  slotsNeedReason = false, // free pool slots + an independent queued point + no reason (point 427)
   claim = 'none', // 'none' | 'wait' | 'release' from batch-claim-core's releaseDecision
 }) {
   if (paused) return 'allow'
@@ -633,7 +737,15 @@ export function progressGuardDecision({
   // The declaration cannot become a way to switch the block off: it is bounded by
   // its own expiry and by evidence that has to keep checking out (assessInFlight),
   // and the lock stays HELD, so no successor is spawned beside a waiting session.
-  if (inFlight === true) return 'allow-in-flight'
+  //
+  // …BUT THE CAP IS ALSO A TARGET (point 427). A session that commissions ONE point
+  // and then declares a wait breaks no rule — the cap is an upper bound and nothing
+  // checked the lower one — so one agent built while two slots stood empty for ninety
+  // minutes with a queue full of independent points. The wait is therefore allowed
+  // only once the idle slots are accounted for: either the pool is at its cap, the
+  // queue's remaining points all touch the running branch, the batch is paused, a
+  // closing freeze is recorded, or the declaration carries a written reason.
+  if (inFlight === true) return slotsNeedReason === true ? 'block-slots-free' : 'allow-in-flight'
   if (Number.isInteger(boundaryDue) && boundaryDue > 0) return 'block-take-boundary'
   return 'block-continue'
 }
@@ -689,7 +801,7 @@ export function processStartTime(pid) {
     const out = execFileSync(
       'powershell',
       ['-NoProfile', '-Command', `(Get-Process -Id ${Number(pid)}).StartTime.ToFileTimeUtc()`],
-      { encoding: 'utf8', timeout: 10000, stdio: ['ignore', 'pipe', 'ignore'] },
+      { windowsHide: true, encoding: 'utf8', timeout: 10000, stdio: ['ignore', 'pipe', 'ignore'] },
     ).trim()
     const ft = Number(out)
     if (!Number.isFinite(ft) || ft <= 0) return null
@@ -727,6 +839,7 @@ export function findClaudeAncestor() {
       `if($p.Name -match 'claude'){Write-Output ("$($p.ProcessId)|$($p.CreationDate.ToFileTimeUtc())");break};` +
       `$id=$p.ParentProcessId}`
     const out = execFileSync('powershell', ['-NoProfile', '-Command', script], {
+      windowsHide: true,
       encoding: 'utf8',
       timeout: 15000,
       stdio: ['ignore', 'pipe', 'ignore'],
@@ -844,6 +957,14 @@ function exitReapMutex(mutexPath) {
  *   - 'held'      — a (provably or possibly) live other owner exists. STAND DOWN.
  *   - 'lost-race' — a concurrent starter won. STAND DOWN.
  * Options: { kind, pid, pidStartedAt, now, deps } — deps override probes for tests.
+ *
+ * `takeWedged` (point 433) widens 'held' by exactly one case: an owner that is
+ * alive but WEDGED may be dispossessed. Only the launcher passes it, and only after
+ * `wedgeTakeover` said so. It changes nothing about the atomicity — the take runs
+ * through the SAME reap mutex and re-verifies the wedge INSIDE it, so two launchers
+ * can never both act and a lock that came back to life in the race window is left
+ * alone. Nothing is killed; the dispossessed process keeps running and stands down
+ * at its next hook.
  */
 export function acquire(sessionId, opts = {}) {
   if (!sessionId) return 'held'
@@ -893,7 +1014,7 @@ export function acquire(sessionId, opts = {}) {
   if (lock) {
     const probe = lock.pid ? deps.probePid(lock.pid) : null
     const a = assessOwner(lock, { now, bootTime: deps.bootTime, probe })
-    if (a.alive) return 'held'
+    if (a.alive && !(opts.takeWedged === true && a.wedged === true)) return 'held'
   } else {
     // Unreadable/corrupt lock file: reap only if it has settled (not mid-write).
     try {
@@ -908,7 +1029,10 @@ export function acquire(sessionId, opts = {}) {
 
   // Dead owner → takeover under the reap mutex (atomic mkdir): only ONE
   // process at a time may unlink+recreate, and it re-verifies deadness inside
-  // the mutex so it can never clobber a freshly re-claimed live lock.
+  // the mutex so it can never clobber a freshly re-claimed live lock. With
+  // `takeWedged` a WEDGED owner counts the same way — and is re-verified as wedged
+  // inside the mutex, so a lock whose owner wrote a heartbeat in the race window
+  // keeps it.
   if (!enterReapMutex(mutexPath)) return 'held'
   try {
     const recheck = readOwnerLock(lockPath)
@@ -919,7 +1043,7 @@ export function acquire(sessionId, opts = {}) {
       }
       const probe = recheck.pid ? deps.probePid(recheck.pid) : null
       const a = assessOwner(recheck, { now, bootTime: deps.bootTime, probe })
-      if (a.alive) return 'held'
+      if (a.alive && !(opts.takeWedged === true && a.wedged === true)) return 'held'
     }
     try {
       rmSync(lockPath, { force: true })
@@ -953,15 +1077,31 @@ export function heartbeat(sessionId, opts = {}) {
   // batch-boundary-core.mjs); here the handover is carried forward by moving
   // handedOverAt WITH claimedAt, so `claimedAt <= handedOverAt` still holds and
   // nothing else in assessOwner needs to know about the exception.
+  //
+  // …AND UNLESS THE CALL PREDATES THE HANDOVER (point 396, measured in
+  // `.claude/boundary.log`): the Stop chain writes the handover while the
+  // PostToolUse heartbeat of the turn's LAST tool call is still in flight, so two
+  // of ten attempts one morning were cancelled 117 ms and 154 ms after being
+  // written. That is not a session working again — it is a late hook. The handover
+  // survives untouched; `withdrawalIsCausal` decides, honestly rather than by
+  // ignoring withdrawals.
   const next = { ...lock, v: 2, claimedAt: now }
   if (next.handedOver !== undefined || next.handedOverAt !== undefined) {
+    const causal = withdrawalIsCausal({
+      handedOverAt: next.handedOverAt,
+      callAt: opts.callAt,
+      now,
+      settleMs: opts.settleMs,
+    })
     if (opts.preserveHandover === true && next.handedOver === true) {
       next.handedOverAt = now
-    } else {
+    } else if (causal) {
       delete next.handedOver
       delete next.handedOverAt
       delete next.handoverPoint
     }
+    // …else: leave the handover exactly as it stands. NOT touched forward either —
+    // moving handedOverAt here would let a stream of late hooks keep it alive.
   }
   // Backfill the pid identity ONCE for a lock claimed before pids were
   // recorded — and never retry a failed walk on the hot per-tool-call path.
@@ -1163,6 +1303,48 @@ export function markHandover(sessionId, opts = {}) {
 }
 
 /**
+ * A handover younger than this is never withdrawn (point 396). Calibratable via
+ * HOA_HANDOVER_SETTLE_MS.
+ *
+ * ONE SECOND, because the thing being excluded is not a fast session but a LATE
+ * HOOK. Two of the ten boundary attempts on the morning of 28.07.2026 were
+ * cancelled 117 ms and 154 ms after they were written — `HANDOVER point 338` at
+ * 11:42:00.469Z, `WITHDRAWN point 338` at 11:42:00.586Z, and the same shape ten
+ * minutes later. A withdrawal means "the session is working again", and no session
+ * works again within 117 ms: a continuation needs a model round trip. What actually
+ * happened is that the Stop chain wrote the handover while the PostToolUse
+ * heartbeat of the turn's LAST tool call was still in flight, delayed by the very
+ * file contention that produced that morning's EPERM retries.
+ */
+export const HANDOVER_SETTLE_MS = (() => {
+  const env = Number(process.env.HOA_HANDOVER_SETTLE_MS)
+  return Number.isFinite(env) && env >= 0 ? env : 1000
+})()
+
+/**
+ * MAY THIS CALL WITHDRAW THE HANDOVER? PURE.
+ *
+ * A withdrawal may only ever be caused by work that happened AFTER the handover was
+ * written. Where the hook payload carries the call's own timestamp, that answers it
+ * outright; where it does not, the settle window does the same job.
+ *
+ * THIS IS NOT "ignore withdrawals". A session that genuinely carries on working must
+ * still withdraw its boundary, or the five-and-a-half-hour standstill of 28.07.2026
+ * comes back. The rule stays "work after the handover withdraws it" — only measured
+ * honestly.
+ */
+export function withdrawalIsCausal({
+  handedOverAt,
+  callAt = null,
+  now = Date.now(),
+  settleMs = HANDOVER_SETTLE_MS,
+} = {}) {
+  if (!(typeof handedOverAt === 'number' && handedOverAt > 0)) return true
+  if (typeof callAt === 'number' && callAt > 0) return callAt > handedOverAt
+  return now - handedOverAt >= settleMs
+}
+
+/**
  * WITHDRAW a handover — the session is demonstrably still working after all.
  * Owner-guarded, so it is a no-op once a successor has claimed the lock (by then
  * the old session is stood down by ownership anyway).
@@ -1184,13 +1366,41 @@ export function withdrawHandover(sessionId, opts = {}) {
   // THIS the one place a boundary ends: real work withdraws it, closing work
   // does not. Removed even when no handover flag is set, so a marker recorded
   // and then followed by real work is withdrawn just the same.
+  const boundaryPath = opts.boundaryPath ?? statePathsFor(lockPath).boundaryPath
+  const now = opts.now ?? Date.now()
+  // A WITHDRAWAL MUST BE CAUSED BY WORK AFTER THE HANDOVER (point 396). The MARKER
+  // is protected by the same test as the flag — deleting it is what forces the
+  // re-take, and that re-take loop is what point 388 was opened on.
+  const marker = readJson(boundaryPath)
+  const writtenAt = Math.max(
+    typeof lock.handedOverAt === 'number' ? lock.handedOverAt : 0,
+    typeof marker?.at === 'number' ? marker.at : 0,
+  )
+  if (writtenAt > 0 && !withdrawalIsCausal({ handedOverAt: writtenAt, callAt: opts.callAt, now, settleMs: opts.settleMs })) {
+    return false
+  }
+  // SAY IT (point 426 (b)). The marker removal used to be silent: a pager on a
+  // closing line deleted it, the next Stop hook demanded the boundary again, and no
+  // record anywhere named the cause. Every removal of a TAKEN boundary is now
+  // appended to the boundary log with the triggering call.
   try {
-    ;(opts.remove ?? rmSync)(opts.boundaryPath ?? statePathsFor(lockPath).boundaryPath, { force: true })
+    ;(opts.remove ?? rmSync)(boundaryPath, { force: true })
   } catch {
     /* best effort — a marker we cannot delete is caught by its own freshness */
   }
+  if (marker) {
+    try {
+      appendFileSync(
+        opts.logPath ?? statePathsFor(lockPath).boundaryLogPath,
+        `[${new Date(now).toISOString()}] MARKER WITHDRAWN for point ${marker.point ?? '?'} ` +
+          `by ${sessionId} — triggered by ${opts.trigger ?? 'an unrecorded call'}\n`,
+      )
+    } catch {
+      /* best effort — a log we cannot write may never break a tool call */
+    }
+  }
   if (lock.handedOver !== true) return false
-  const next = { ...lock, claimedAt: opts.now ?? Date.now() }
+  const next = { ...lock, claimedAt: now }
   delete next.handedOver
   delete next.handedOverAt
   delete next.handoverPoint

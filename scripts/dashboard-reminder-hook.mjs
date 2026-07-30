@@ -35,7 +35,7 @@ try {
 // Withdrawing the handover here keeps the launcher from spawning a successor
 // beside it. Owner-guarded, so it is a no-op once the successor holds the lock.
 try {
-  withdrawHandover(sid)
+  withdrawHandover(sid, { trigger: "the user's own prompt (UserPromptSubmit)" })
 } catch {
   /* best effort */
 }

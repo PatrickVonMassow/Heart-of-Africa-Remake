@@ -27,6 +27,7 @@ const readState = () => JSON.parse(readFileSync(statePath(), 'utf8'))
 /** Run the guard with a PreToolUse payload; returns { status, stdout, decision }. */
 function callGuard(toolName, toolInput = {}) {
   const r = spawnSync(process.execPath, [resolve(repo, 'scripts', 'board-first-guard.mjs')], {
+    windowsHide: true,
     cwd: repo,
     encoding: 'utf8',
     input: JSON.stringify({
@@ -114,11 +115,11 @@ describe('board-first-guard (spawned)', () => {
     expect(callGuard('Write', { file_path: 'src/x.ts' }).stdout.trim()).toBe('')
 
     const guard = resolve(repo, 'scripts', 'board-first-guard.mjs')
-    const noStdin = spawnSync(process.execPath, [guard], { cwd: repo, encoding: 'utf8', input: '' })
+    const noStdin = spawnSync(process.execPath, [guard], { windowsHide: true, cwd: repo, encoding: 'utf8', input: '' })
     expect(noStdin.status).toBe(0)
     expect(noStdin.stdout.trim()).toBe('')
 
-    const junk = spawnSync(process.execPath, [guard], { cwd: repo, encoding: 'utf8', input: 'not json' })
+    const junk = spawnSync(process.execPath, [guard], { windowsHide: true, cwd: repo, encoding: 'utf8', input: 'not json' })
     expect(junk.status).toBe(0)
     expect(junk.stdout.trim()).toBe('')
   })
@@ -135,6 +136,7 @@ describe('board-first-guard (spawned)', () => {
 
   it('--status reports the verdict without a tool call', () => {
     const r = spawnSync(process.execPath, [resolve(repo, 'scripts', 'board-first-guard.mjs'), '--status'], {
+      windowsHide: true,
       cwd: repo,
       encoding: 'utf8',
     })

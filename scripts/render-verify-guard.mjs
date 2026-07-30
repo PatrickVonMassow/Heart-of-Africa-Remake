@@ -34,7 +34,7 @@ import { heldByOtherLiveOwner } from './batch-singleton.mjs'
 import { isMainModule } from './is-main.mjs'
 
 function git(cmd) {
-  return execSync(cmd, { cwd: REPO_ROOT, encoding: 'utf8' }).trim()
+  return execSync(cmd, { windowsHide: true, cwd: REPO_ROOT, encoding: 'utf8' }).trim()
 }
 
 /**

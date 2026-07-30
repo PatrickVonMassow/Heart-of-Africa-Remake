@@ -48,7 +48,7 @@ function recentLog() {
   try {
     return execSync(
       'git log --all --since="48 hours ago" --format="%H|%cI|%(trailers:key=Co-Authored-By,valueonly,separator=,)"',
-      { cwd: REPO_ROOT, encoding: 'utf8' },
+      { windowsHide: true, cwd: REPO_ROOT, encoding: 'utf8' },
     )
   } catch {
     return ''

@@ -195,7 +195,11 @@ old→new coverage map live in `scripts/verify/README.md`.
   `isBackendSensitivePath` in `scripts/render-verify-core.mjs`, and the guard
   demands accordingly). On merge,
   resolve any conflict CAREFULLY so nothing breaks, and RE-TEST (re-run the
-  relevant regression) whenever a conflict touched real code. `main` therefore
+  relevant regression) whenever a conflict touched real code. THE MERGE ENDS THE
+  BRANCH: delete it — local, remote AND its worktree, via
+  `node scripts/worktree-cleanup.mjs <path>` — before the tick, or the debris of
+  28.07.2026 returns (31 of 36 remote branches already contained in `main`).
+  `branch-hygiene-guard` is only the backstop. `main` therefore
   always reflects finished, verified work — it is the deployed branch (the
   GH-Pages root builds from `main`; the `/poc/` deploy builds from the immutable
   `poc` TAG, not from main). CROSS-CUTTING changes that
@@ -256,14 +260,14 @@ old→new coverage map live in `scripts/verify/README.md`.
     (If a change genuinely needs the user's eyes BEFORE it is safe to land, that
     is the rare exception: set up a branch-preview deploy rather than merge
     unverified.)
-- **Maximal delegation (user decision 22.07.2026, permanent process).** The main
-  session delegates the MAXIMUM to subagents so as little as possible bottlenecks
-  at it. Each open TASKS point is implemented by a WORKTREE-ISOLATED subagent on
-  its own `feat/<point>-<slug>` branch (gates green, branch pushed, NOT merged by
-  the agent — the main session merges); a POOL of such agents runs in PARALLEL on
-  NON-OVERLAPPING files. Infra, guard, doc and dashboard-restructure work too.
-  What stays at the main session: the picture-verification on BOTH backends, the
-  serial merge → fast-gate → tick → deploy → cleanup, and the Artifact publish
+- **Maximal delegation (user 22.07.2026, permanent).** The main session delegates
+  the MAXIMUM so as little as possible bottlenecks there. Each open TASKS point
+  goes to a WORKTREE-ISOLATED subagent on its own `feat/<point>-<slug>` branch
+  (gates green, branch pushed, NOT merged); a POOL of THREE runs in PARALLEL on
+  NON-OVERLAPPING files, and the cap is also a TARGET: while the queue holds an
+  independent point, a free slot owes a reason (`--slots-free`). Infra and doc
+  work too. What stays here: picture-verification on BOTH backends, the serial
+  merge → fast-gate → tick → deploy → cleanup, and the Artifact publish
   (URL-bound).
 - **Delegation brief instead of a reading assignment (point 365).** A delegated
   agent receives its point as a BRIEF: `node scripts/point-brief.mjs <N>` prints
@@ -1049,7 +1053,10 @@ After completion and after every major system:
   (versioned `scripts/git-hooks/`, wired by `npm install`: no stray file, no
   rescue commit mails the user, no push CI would
   reject), `ci-status-guard` (a
-  red CI is noticed), `timestamp-guard` (the chat timestamp) and
+  red CI is noticed), `branch-hygiene-guard` (no branch, remote branch or
+  worktree already contained in `origin/main` survives its merge — carve-outs:
+  in-flight, live worktrees, the `local/` baseline caches and a 10-minute
+  grace), `timestamp-guard` (the chat timestamp) and
   `retro-currency-guard` (the retrospective stays current, each lesson carrying
   a mechanism decision: `docs/analysis_de/lesson-mechanisms.md`), followed
   by `dashboard-sync`. Separately, PreToolUse hooks run `closing-guard` (§9),

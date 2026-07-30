@@ -42,6 +42,12 @@ export const INTENTIONALLY_DORMANT = {
   // this entry in the same commit that adds the line.
   'decision-card-guard.mjs':
     'built and tested; the Stop-hook wiring in .claude/settings.json needs the user attended (protected path)',
+  // Point 409, 29.07.2026. Same one reason as above and no other: the decision
+  // core is pure and Vitest-covered and `--status` runs, but the Stop-hook line
+  // lives in .claude/settings.json, which always prompts. Remove this entry in
+  // the same commit that adds the hook.
+  'branch-hygiene-guard.mjs':
+    'built and tested; the Stop-hook wiring in .claude/settings.json needs the user attended (protected path)',
 }
 
 /**

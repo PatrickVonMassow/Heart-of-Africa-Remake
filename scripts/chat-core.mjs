@@ -457,36 +457,53 @@ export function dropNoticeDecision({ verdict, notified = [], sent = 0, max = MAX
 }
 
 /**
- * WHAT THE LAUNCHER LOGS ABOUT ONE INBOX TICK. PURE — a list of lines, in order.
+ * WHAT THE LAUNCHER MUST SAY ABOUT ONE INBOX TICK. PURE.
  *
- * WHY THIS IS A FUNCTION AND NOT AN `if/else if` AT THE CALL SITE (point 430 B).
- * It was that chain, and the chain made two facts exclusive: a tick whose SPOOL
- * WRITE FAILED took the first branch and the drop-notice clause — which sits in a
- * later `else if` — never ran. So a tick that both failed to store a message and
- * failed to tell the sender about a dropped one logged the storage fault alone,
- * and the refused notice was silent. The whole reason those counts are reported is
- * that a refused notice must never be silent, so both facts now leave here.
+ * `scripts/chat-inbox.mjs` reports one object per tick and the launcher used to
+ * translate it with an `if`/`else if` chain — which is exactly why a report could
+ * go partly unsaid. The drop-notice mismatch (`noticesPlanned` above `notices`: a
+ * notice the transport REFUSED, so the sender is still looking at a message that
+ * never landed) was appended to the SUMMARY line, and the summary only rendered in
+ * the last branch of the chain. So in the spool-failure shape — `ok: false`, which
+ * takes the FIRST branch — a rejected delivery notice was silent, and that is the
+ * shape most likely to carry one: the same tick that cannot write the spool is the
+ * tick whose transport is unwell.
  *
- * `result` is `chat-inbox.mjs`'s JSON verbatim. TOTAL — junk yields no lines.
+ * The lesson is the shape, not the branch: a report with several independent facts
+ * must not be rendered by a chain that can only tell one of them. Each fact is its
+ * own line here, and the caller loops.
+ *
+ * Returns an array of ready-to-log strings — empty when there is genuinely nothing
+ * to say (an unpaired channel is silent by design, and so is a quiet tick).
  */
 export function chatInboxLogLines(result) {
-  const r = result && typeof result === 'object' ? result : null
-  if (!r) return []
-  // Not paired on this machine: deliberately silent, it is the documented opt-out.
-  if (r.configured === false) return []
+  const r = result && typeof result === 'object' ? result : {}
+  const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0)
+  const dropped = Array.isArray(r.dropped) ? r.dropped.filter((d) => d != null).map(String) : []
+  const planned = num(r.noticesPlanned)
+  const sent = num(r.notices)
   const lines = []
-  if (r.ok === false) lines.push(`chat inbox: ${r.reason ?? 'unknown fault'}`)
-  const planned = Number(r.noticesPlanned) || 0
-  const sent = Number(r.notices) || 0
-  // Only worth a word when the two DISAGREE: planned but not sent means the
-  // transport refused the notice, and the sender is then still looking at a
-  // message that never landed with nothing to say so.
-  const refused = planned > 0 && sent !== planned ? `, DROP NOTICE NOT SENT: ${planned - sent} of ${planned}` : ''
-  const dropped = Array.isArray(r.dropped) ? r.dropped : []
-  const accepted = Number(r.accepted) || 0
-  if (accepted > 0 || dropped.length > 0 || refused) {
-    const drops = dropped.length ? ` (dropped: ${dropped.join(', ')})` : ''
-    lines.push(`chat inbox: ${accepted} new, ${Number(r.pending) || 0} pending${drops}${refused}`)
+
+  if (r.ok === false) {
+    lines.push(`chat inbox: ${r.reason ? String(r.reason) : 'failed without naming a reason'}`)
+  } else if (r.configured === false) {
+    /* the channel is not paired on this machine — opt-in, so silence is correct */
+  } else if (num(r.accepted) > 0 || dropped.length > 0) {
+    lines.push(
+      `chat inbox: ${num(r.accepted)} new, ${num(r.pending)} pending` +
+        (dropped.length ? ` (dropped: ${dropped.join(', ')})` : ''),
+    )
+  }
+
+  // INDEPENDENT of every branch above — that independence IS the fix.
+  if (planned > 0 && sent !== planned) {
+    lines.push(
+      sent < planned
+        ? `chat inbox: DROP NOTICE NOT SENT: ${planned - sent} of ${planned} — the transport refused it, so the ` +
+          'sender is still looking at a message that never landed and has nothing telling them so'
+        : `chat inbox: drop-notice counts disagree (${sent} sent, ${planned} planned) — the report is ` +
+          'unreliable, so treat the notices as unconfirmed',
+    )
   }
   return lines
 }

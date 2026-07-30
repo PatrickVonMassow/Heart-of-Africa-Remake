@@ -94,7 +94,7 @@ export function clearClaim(path = CLAIM_PATH) {
  */
 export function gitOperationInProgress({ cwd = REPO_ROOT } = {}) {
   const git = (args) =>
-    execFileSync('git', args, { cwd, encoding: 'utf8', timeout: 8000, stdio: ['ignore', 'pipe', 'ignore'] }).trim()
+    execFileSync('git', args, { windowsHide: true, cwd, encoding: 'utf8', timeout: 8000, stdio: ['ignore', 'pipe', 'ignore'] }).trim()
   try {
     for (const [file, label] of [
       ['MERGE_HEAD', 'merge'],

@@ -51,12 +51,12 @@ export const BASELINE_PATH = repoPath('.claude/mechanism-review-baseline.json')
 const REC = '__C__'
 const FLD = '__F__'
 
-const git = (cmd) => execSync(`git ${cmd}`, { cwd: REPO_ROOT, encoding: 'utf8' }).trim()
+const git = (cmd) => execSync(`git ${cmd}`, { windowsHide: true, cwd: REPO_ROOT, encoding: 'utf8' }).trim()
 
 /** True when `a` is an ancestor of (or equal to) `b`. A git failure answers no. */
 export function isAncestor(a, b) {
   try {
-    execSync(`git merge-base --is-ancestor "${a}" "${b}"`, { cwd: REPO_ROOT, stdio: 'ignore' })
+    execSync(`git merge-base --is-ancestor "${a}" "${b}"`, { windowsHide: true, cwd: REPO_ROOT, stdio: 'ignore' })
     return true
   } catch {
     return false
@@ -72,7 +72,7 @@ export function isAncestor(a, b) {
  * The revision stays QUOTED for the same reason `bootstrapBase` does: cmd.exe
  * eats a bare `^`, and an unquoted probe would call every baseline gone.
  */
-export function commitMissing(sha, run = (cmd) => execSync(cmd, { cwd: REPO_ROOT, encoding: 'utf8' })) {
+export function commitMissing(sha, run = (cmd) => execSync(cmd, { windowsHide: true, cwd: REPO_ROOT, encoding: 'utf8' })) {
   try {
     run(`git rev-parse --verify --quiet "${sha}^{commit}"`)
     return false
@@ -129,7 +129,7 @@ export function bootstrapBase(head, revParse = (r) => git(`rev-parse ${r}`)) {
       // render-verify-guard carries the same note from the same bite.
       const base = revParse(`--verify --quiet "${ref}^{commit}"`)
       if (!base) continue
-      const fork = execSync(`git merge-base "${base}" "${head}"`, { cwd: REPO_ROOT, encoding: 'utf8' }).trim()
+      const fork = execSync(`git merge-base "${base}" "${head}"`, { windowsHide: true, cwd: REPO_ROOT, encoding: 'utf8' }).trim()
       if (fork) return fork
     } catch {
       /* no such branch here — try the next, then fall back to HEAD */

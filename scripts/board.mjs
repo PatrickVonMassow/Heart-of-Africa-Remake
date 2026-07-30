@@ -47,7 +47,7 @@ import {
 } from './board-core.mjs'
 
 const BOARD = resolve(REPO_ROOT, '.batch-dashboard.html')
-const run = (args) => execFileSync(process.execPath, args, { cwd: REPO_ROOT, encoding: 'utf8' })
+const run = (args) => execFileSync(process.execPath, args, { windowsHide: true, cwd: REPO_ROOT, encoding: 'utf8' })
 
 // STDIN IS READ ONCE, AND ONLY WHEN ASKED FOR (point 410): reading fd 0
 // unconditionally would block every call that has no pipe attached. Explicit

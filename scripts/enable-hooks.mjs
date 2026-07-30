@@ -18,7 +18,7 @@ try {
   if (!existsSync(resolve(REPO_ROOT, '.git')) || !existsSync(resolve(REPO_ROOT, HOOKS_PATH))) {
     process.exit(0)
   }
-  const git = (args) => execFileSync('git', args, { cwd: REPO_ROOT, encoding: 'utf8' }).trim()
+  const git = (args) => execFileSync('git', args, { windowsHide: true, cwd: REPO_ROOT, encoding: 'utf8' }).trim()
   let current = ''
   try {
     current = git(['config', '--local', '--get', 'core.hooksPath'])

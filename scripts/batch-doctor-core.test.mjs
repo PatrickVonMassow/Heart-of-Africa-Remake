@@ -4,7 +4,24 @@
 // named stash) instead of leaving a corrupted tree. The planner decides; the
 // wrapper executes and logs.
 import { describe, it, expect } from 'vitest'
-import { planRemediation, needsRepair, isConsistent } from './batch-doctor-core.mjs'
+import {
+  planRemediation,
+  needsRepair,
+  isConsistent,
+  isEvidenceGrade,
+  describeLoad,
+  judgeGateRun,
+  gateKey,
+  gateDemandSatisfied,
+  shouldRecordSatisfaction,
+  otherSessionsIn,
+  alertNamesAnother,
+  GATE_COMMANDS,
+  INCONCLUSIVE_VERDICT,
+} from './batch-doctor-core.mjs'
+
+const quiet = { level: 'quiet', reasons: [], agentWorktrees: [] }
+const busy = { level: 'busy', reasons: ['CPU 91 % busy over 1 s'], agentWorktrees: [] }
 
 const clean = {
   branch: 'main',
@@ -81,5 +98,246 @@ describe('planRemediation', () => {
     })
     expect(plan.map((a) => a.action)).toEqual(['abort-merge', 'quarantine-stash', 'rescue-and-reset'])
     expect(needsRepair(plan)).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// THE GATE MUST NOT BLAME THE CODE FOR THE LOAD (point 431)
+// ---------------------------------------------------------------------------
+// Three times in one afternoon the doctor declared the repo CONSISTENT and then
+// accused the code of a unit suite that was green minutes later on the same
+// commit — it had been competing with a delegated agent's build. A red is only
+// evidence on a measured-quiet machine.
+
+describe('isEvidenceGrade — which reading may convict', () => {
+  it('a measured-quiet machine with no agent worktree is evidence', () => {
+    expect(isEvidenceGrade(quiet)).toBe(true)
+  })
+
+  it('a busy or loaded machine is NOT evidence', () => {
+    expect(isEvidenceGrade(busy)).toBe(false)
+    expect(isEvidenceGrade({ level: 'loaded', agentWorktrees: [] })).toBe(false)
+  })
+
+  it('an UNMEASURED machine is not evidence either — an unread machine was believed once already', () => {
+    expect(isEvidenceGrade({ level: 'unknown', agentWorktrees: [] })).toBe(false)
+    expect(isEvidenceGrade({})).toBe(false)
+    expect(isEvidenceGrade()).toBe(false)
+  })
+
+  it('a quiet CPU still is not evidence while an agent worktree is live', () => {
+    expect(isEvidenceGrade({ level: 'quiet', agentWorktrees: ['.claude/worktrees/agent-a1'] })).toBe(false)
+  })
+})
+
+describe('describeLoad — the message must name what was running', () => {
+  it('names the live agent worktrees, with their count', () => {
+    const text = describeLoad({ level: 'quiet', agentWorktrees: ['wt/agent-a1', 'wt/agent-a2'] })
+    expect(text).toContain('2 live agent worktree')
+    expect(text).toContain('wt/agent-a1')
+    expect(text).toContain('wt/agent-a2')
+  })
+
+  it('names the measured load reasons', () => {
+    expect(describeLoad(busy)).toContain('CPU 91 % busy over 1 s')
+  })
+
+  it('falls back to the bare level rather than claiming nothing ran', () => {
+    expect(describeLoad({ level: 'unknown' })).toContain('unknown')
+    expect(describeLoad()).toContain('unknown')
+  })
+})
+
+describe('judgeGateRun — load vs defect', () => {
+  it('the gate runs the three fast checks, in order', () => {
+    expect(GATE_COMMANDS).toEqual(['npm run test:unit', 'npm run build', 'npm run lint'])
+  })
+
+  it('all green → neither broken nor inconclusive, and not a word of accusation', () => {
+    const v = judgeGateRun(GATE_COMMANDS.map((cmd) => ({ cmd, failed: false, ...quiet })))
+    expect(v.broken).toBe(false)
+    expect(v.inconclusive).toBe(false)
+    expect(v.lines).toEqual([])
+  })
+
+  it('RED on a BUSY machine → INCONCLUSIVE, no stop order, the load named', () => {
+    const v = judgeGateRun([{ cmd: 'npm run test:unit', failed: true, ...busy }])
+    expect(v.broken).toBe(false)
+    expect(v.inconclusive).toBe(true)
+    expect(v.lines[0]).toContain('INCONCLUSIVE (load)')
+    expect(v.lines[0]).toContain('CPU 91 % busy over 1 s')
+    expect(v.lines[0]).toContain('do NOT stop the batch')
+    expect(v.lines[0]).not.toContain('the concurrent writes')
+  })
+
+  it('RED beside a live agent worktree → INCONCLUSIVE even though the CPU read quiet', () => {
+    const v = judgeGateRun([
+      { cmd: 'npm run test:unit', failed: true, level: 'quiet', reasons: [], agentWorktrees: ['wt/agent-a1'] },
+    ])
+    expect(v.inconclusive).toBe(true)
+    expect(v.broken).toBe(false)
+    expect(v.lines[0]).toContain('wt/agent-a1')
+  })
+
+  it("RED on a QUIET machine keeps today's wording and today's stop order", () => {
+    const v = judgeGateRun([{ cmd: 'npm run test:unit', failed: true, ...quiet }])
+    expect(v.broken).toBe(true)
+    expect(v.inconclusive).toBe(false)
+    expect(v.lines[0]).toBe(
+      'gate: npm run test:unit FAILED — the concurrent writes (or the current head) broke it; fix before continuing the batch',
+    )
+  })
+
+  it('the quiet reading reaches the VERDICT, not only the log line', () => {
+    // The bug this guards: a run could print the right line and still exit 0.
+    const red = judgeGateRun([{ cmd: 'npm run lint', failed: true, ...quiet }])
+    expect(red.broken).toBe(true)
+    const noisy = judgeGateRun([{ cmd: 'npm run lint', failed: true, ...busy }])
+    expect(noisy.broken).toBe(false)
+    expect(noisy.inconclusive).toBe(true)
+  })
+
+  it('the machine is judged PER COMMAND — a run that went quiet halfway still convicts', () => {
+    const v = judgeGateRun([
+      { cmd: 'npm run test:unit', failed: true, ...busy },
+      { cmd: 'npm run lint', failed: true, ...quiet },
+    ])
+    expect(v.broken).toBe(true)
+    expect(v.inconclusive).toBe(false)
+  })
+
+  it('EVIDENCE FIRST: the quiet red is ordered before the noisy one', () => {
+    const v = judgeGateRun([
+      { cmd: 'npm run test:unit', failed: true, ...busy },
+      { cmd: 'npm run lint', failed: true, ...quiet },
+    ])
+    expect(v.ordered.map((r) => r.cmd)).toEqual(['npm run lint', 'npm run test:unit'])
+    expect(v.lines[0]).toContain('npm run lint FAILED — the concurrent writes')
+    expect(v.lines[1]).toContain('INCONCLUSIVE')
+  })
+
+  it('a garbage results argument is survived (fail-open), not thrown on', () => {
+    expect(judgeGateRun().broken).toBe(false)
+    expect(judgeGateRun(null).inconclusive).toBe(false)
+    expect(judgeGateRun('nonsense').lines).toEqual([])
+  })
+
+  it('the inconclusive verdict asks for a repeat and lets the batch continue', () => {
+    expect(INCONCLUSIVE_VERDICT).toContain('consistent')
+    expect(INCONCLUSIVE_VERDICT).toContain('once the agent pool is idle')
+    expect(INCONCLUSIVE_VERDICT).toContain('The batch continues')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// THE DEMAND IS SATISFIED BY A STATE, NOT BY A TURN (point 431, second half)
+// ---------------------------------------------------------------------------
+
+describe('gateKey / gateDemandSatisfied — the state is judged, not the turn', () => {
+  it('the same two sessions in either order are the same situation', () => {
+    expect(gateKey({ head: 'abc', parallelSids: ['s1', 's2'] })).toBe(
+      gateKey({ head: 'abc', parallelSids: ['s2', 's1'] }),
+    )
+  })
+
+  it('duplicates and blanks do not change the key', () => {
+    expect(gateKey({ head: 'abc', parallelSids: ['s1', 's1', '', null] })).toBe(
+      gateKey({ head: 'abc', parallelSids: ['s1'] }),
+    )
+  })
+
+  it('a repeated call with an unchanged (HEAD, parallel set) is already satisfied', () => {
+    const state = { satisfiedGate: gateKey({ head: 'abc', parallelSids: ['s2'] }) }
+    expect(gateDemandSatisfied({ state, head: 'abc', parallelSids: ['s2'] })).toBe(true)
+  })
+
+  it('a MOVED head re-opens the demand', () => {
+    const state = { satisfiedGate: gateKey({ head: 'abc', parallelSids: ['s2'] }) }
+    expect(gateDemandSatisfied({ state, head: 'def', parallelSids: ['s2'] })).toBe(false)
+  })
+
+  it('a NEW parallel session re-opens the demand', () => {
+    const state = { satisfiedGate: gateKey({ head: 'abc', parallelSids: ['s2'] }) }
+    expect(gateDemandSatisfied({ state, head: 'abc', parallelSids: ['s2', 's3'] })).toBe(false)
+  })
+
+  it('an unreadable head can never switch the demand off', () => {
+    const state = { satisfiedGate: gateKey({ head: '', parallelSids: [] }) }
+    expect(gateDemandSatisfied({ state, head: '', parallelSids: [] })).toBe(false)
+    expect(gateDemandSatisfied({ state: {}, head: 'abc' })).toBe(false)
+    expect(gateDemandSatisfied()).toBe(false)
+  })
+})
+
+describe('shouldRecordSatisfaction — only a judgeable green may clear the demand', () => {
+  it('a gate run that came out green records it', () => {
+    expect(shouldRecordSatisfaction({ gateRan: true })).toBe(true)
+  })
+
+  it('a doctor run WITHOUT the gate never records it — no suite ran', () => {
+    expect(shouldRecordSatisfaction({ gateRan: false })).toBe(false)
+    expect(shouldRecordSatisfaction()).toBe(false)
+  })
+
+  it('an INCONCLUSIVE red must not buy a pass — that is this bug mirrored', () => {
+    expect(shouldRecordSatisfaction({ gateRan: true, inconclusive: true })).toBe(false)
+  })
+
+  it('a real red, or a repair still pending, keeps the demand live', () => {
+    expect(shouldRecordSatisfaction({ gateRan: true, broken: true })).toBe(false)
+    expect(shouldRecordSatisfaction({ gateRan: true, pendingRepair: true })).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// AN ALERT MUST NAME SOMEONE ELSE (point 431, third half)
+// ---------------------------------------------------------------------------
+// Twice in one evening the hook reported "PARALLEL SESSION DETECTED (10a2d2e0…)"
+// — the id of the very session reading it — and ordered a three-minute gate for
+// it.
+
+describe('otherSessionsIn — an alert naming only the reader is no evidence', () => {
+  const mine = '10a2d2e0-b1c8-4dbd-aec6-56eb221a8eee'
+  const stranger = 'aa11bb22-cccc-dddd-eeee-ff0011223344'
+
+  it("an activity record holding ONLY the reader's own id yields NO alert", () => {
+    const alert = { parallel: [{ sid: mine }] }
+    expect(otherSessionsIn({ alert, readerSid: mine, ownerSid: mine })).toEqual([])
+    expect(alertNamesAnother({ alert, readerSid: mine, ownerSid: mine })).toBe(false)
+  })
+
+  it("a stranger's id yields an alert and NAMES it", () => {
+    const alert = { parallel: [{ sid: stranger }] }
+    expect(otherSessionsIn({ alert, readerSid: mine, ownerSid: mine })).toEqual([stranger])
+    expect(alertNamesAnother({ alert, readerSid: mine, ownerSid: mine })).toBe(true)
+  })
+
+  it('the reader is filtered out of a mixed record, the stranger kept', () => {
+    const alert = { parallel: [{ sid: mine }, { sid: stranger }] }
+    expect(otherSessionsIn({ alert, readerSid: mine, ownerSid: mine })).toEqual([stranger])
+  })
+
+  it('the lock OWNER is excluded too — the owner is not a second writer', () => {
+    const owner = 'owner-sid'
+    const alert = { parallel: [{ sid: owner }] }
+    expect(otherSessionsIn({ alert, readerSid: mine, ownerSid: owner })).toEqual([])
+  })
+
+  it('bare-string entries are accepted, and duplicates collapse', () => {
+    const alert = { parallel: [stranger, { sid: stranger }] }
+    expect(otherSessionsIn({ alert, readerSid: mine })).toEqual([stranger])
+  })
+
+  it('a missing, empty or malformed alert names nobody', () => {
+    expect(otherSessionsIn({ alert: null, readerSid: mine })).toEqual([])
+    expect(otherSessionsIn({ alert: { parallel: [] }, readerSid: mine })).toEqual([])
+    expect(otherSessionsIn({ alert: { parallel: [{}, { sid: '' }, null] }, readerSid: mine })).toEqual([])
+    expect(otherSessionsIn()).toEqual([])
+    expect(alertNamesAnother()).toBe(false)
+  })
+
+  it('an unknown reader id still filters the owner, and never invents a stranger', () => {
+    const alert = { parallel: [{ sid: 'owner-sid' }] }
+    expect(otherSessionsIn({ alert, readerSid: '', ownerSid: 'owner-sid' })).toEqual([])
   })
 })

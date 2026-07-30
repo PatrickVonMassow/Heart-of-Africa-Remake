@@ -113,6 +113,7 @@ export function repoMarker(cwd = REPO) {
   let root = cwd
   try {
     const res = spawnSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], {
+      windowsHide: true,
       cwd, encoding: 'utf8', timeout: 5000,
     })
     const common = (res.stdout ?? '').trim()
@@ -138,6 +139,7 @@ export function listProcesses() {
       return parseWindowsProcessJson(res.stdout ?? '')
     }
     const res = spawnSync('ps', ['-axo', 'pid=,ppid=,comm=,args='], {
+      windowsHide: true,
       encoding: 'utf8', timeout: PS_TIMEOUT_MS, maxBuffer: 64 * 1024 * 1024,
     })
     return parsePsOutput(res.stdout ?? '')

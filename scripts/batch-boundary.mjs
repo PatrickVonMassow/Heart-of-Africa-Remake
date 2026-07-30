@@ -17,6 +17,7 @@ import { writeJsonAtomic } from './atomic-write.mjs'
 import { readTasksOpen, TASKS_PATH, ARCHIVE_PATH } from './tasks-source.mjs'
 import { readOwnerLock } from './batch-singleton.mjs'
 import {
+  BOUNDARY_DUE_MS,
   LAUNCHER_TASK_NAME,
   assessBoundary,
   boundaryDueFrom,
@@ -75,7 +76,7 @@ export function probeLauncherState({ taskName = LAUNCHER_TASK_NAME } = {}) {
         '-Command',
         `(Get-ScheduledTask -TaskName '${taskName}' -ErrorAction Stop).State`,
       ],
-      { encoding: 'utf8', timeout: 15000, stdio: ['ignore', 'pipe', 'ignore'] },
+      { windowsHide: true, encoding: 'utf8', timeout: 15000, stdio: ['ignore', 'pipe', 'ignore'] },
     ).trim()
     return classifyLauncherState(out)
   } catch {
@@ -95,7 +96,7 @@ export function probeLauncherState({ taskName = LAUNCHER_TASK_NAME } = {}) {
  */
 export function lastWorkOrderTick({ cwd = repoPath('.'), refs = ['main'] } = {}) {
   const git = (args) =>
-    execFileSync('git', args, { cwd, encoding: 'utf8', timeout: 8000, stdio: ['ignore', 'pipe', 'ignore'] }).trim()
+    execFileSync('git', args, { windowsHide: true, cwd, encoding: 'utf8', timeout: 8000, stdio: ['ignore', 'pipe', 'ignore'] }).trim()
   const paths = ['--', 'TASKS.md', 'docs/tasks-archive.md']
   for (const ref of refs) {
     try {
@@ -105,6 +106,63 @@ export function lastWorkOrderTick({ cwd = repoPath('.'), refs = ['main'] } = {})
       for (const row of log.split('\n')) {
         const m = row.trim().match(/^([0-9a-f]{7,40}) (\d+)$/)
         if (!m) continue
+        const points = tickedPointsInDiff(git(['show', '--format=', '--unified=0', m[1], ...paths]))
+        if (points.length > 0) {
+          return { point: points[points.length - 1], at: Number(m[2]) * 1000, sha: m[1] }
+        }
+      }
+      return null
+    } catch {
+      /* no such ref / not a repo — try the next */
+    }
+  }
+  return null
+}
+
+/** At most this many work-order commits inside the window are opened with
+ *  `git show`. Ninety minutes never holds forty of them, so the cap only bounds
+ *  the pathological case — this runs in a Stop hook on every turn end. */
+export const TICK_SCAN_MAX = 40
+
+/**
+ * The newest work-order tick WITHIN A TIME WINDOW: { point, at, sha } or null.
+ *
+ * THE GUARD MUST NOT ASK `lastWorkOrderTick` (point 399). That function scans the
+ * newest FIVE work-order commits, and a batch turn routinely appends points: on
+ * 28.07.2026 eight append-only commits landed after the tick of point 338, so the
+ * tick fell out of the window and `boundaryDueFrom` returned null. The guard then
+ * demanded NOTHING throughout the 90 minutes in which it should have been demanding
+ * the point boundary — and a session that is not told to hand over keeps the lock
+ * and carries the next point in the same context, which is the exact cost point 373
+ * exists to avoid.
+ *
+ * The question is "was a point ticked within `BOUNDARY_DUE_MS`", so it is asked by
+ * TIME: one `git log --since` over the two work-order paths, then `git show` only on
+ * the candidates inside that window (`tickedPointsInDiff` keeps the rule that an
+ * archive move is not a tick). `git` is injectable so the sweep can be proven
+ * without a repository; any failure answers null, because this is advisory input to
+ * a guard and never a reason to fail one.
+ */
+export function lastWorkOrderTickSince({
+  cwd = repoPath('.'),
+  refs = ['main'],
+  windowMs = BOUNDARY_DUE_MS,
+  now = Date.now(),
+  maxCandidates = TICK_SCAN_MAX,
+  git = (args) =>
+    execFileSync('git', args, { windowsHide: true, cwd, encoding: 'utf8', timeout: 8000, stdio: ['ignore', 'pipe', 'ignore'] }).trim(),
+} = {}) {
+  const paths = ['--', 'TASKS.md', 'docs/tasks-archive.md']
+  const since = new Date(now - windowMs).toISOString()
+  for (const ref of refs) {
+    try {
+      const log = git(['log', `--since=${since}`, '--format=%H %ct', ref, ...paths])
+      const rows = log
+        .split('\n')
+        .map((r) => r.trim().match(/^([0-9a-f]{7,40}) (\d+)$/))
+        .filter(Boolean)
+        .slice(0, maxCandidates)
+      for (const m of rows) {
         const points = tickedPointsInDiff(git(['show', '--format=', '--unified=0', m[1], ...paths]))
         if (points.length > 0) {
           return { point: points[points.length - 1], at: Number(m[2]) * 1000, sha: m[1] }
@@ -132,6 +190,7 @@ export function closureOf(point, { cwd = repoPath('.') } = {}) {
   try {
     const show = (path) =>
       execFileSync('git', ['show', `main:${path}`], {
+        windowsHide: true,
         cwd,
         encoding: 'utf8',
         timeout: 8000,
@@ -167,7 +226,9 @@ export function gatherBoundary(sid, { now = Date.now(), path = BOUNDARY_PATH } =
       lock && lock.sessionId === sid
         ? (typeof lock.acquiredAt === 'number' ? lock.acquiredAt : lock.startedAt)
         : undefined
-    const candidate = boundaryDueFrom({ tick: lastWorkOrderTick(), ownerSince, now })
+    // TIME, not a commit count (point 399): appending points must not be able to
+    // push the tick out of the window and silence the demand.
+    const candidate = boundaryDueFrom({ tick: lastWorkOrderTickSince({ now }), ownerSince, now })
     if (candidate) {
       // Never DEMAND a boundary the CLI would refuse. With an unarmed launcher
       // `batch-boundary.mjs` says "keep working" while the guard would keep

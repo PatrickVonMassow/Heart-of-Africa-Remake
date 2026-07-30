@@ -60,7 +60,7 @@ import {
   withTestFileBaseline,
 } from './pre-push-gate-core.mjs'
 
-const git = (args) => execFileSync('git', args, { cwd: REPO_ROOT, encoding: 'utf8' })
+const git = (args) => execFileSync('git', args, { windowsHide: true, cwd: REPO_ROOT, encoding: 'utf8' })
 
 /**
  * Files a pushed range touches; EMPTY when the range cannot be resolved — and
@@ -266,6 +266,7 @@ try {
       // have to be counted (point 404).
       const capture = step === 'unit'
       const run = spawnSync(cmd, args, {
+        windowsHide: true,
         cwd: REPO_ROOT,
         stdio: capture ? ['inherit', 'pipe', 'pipe'] : 'inherit',
         ...(capture ? { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 } : {}),

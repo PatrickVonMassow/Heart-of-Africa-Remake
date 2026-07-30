@@ -52,7 +52,10 @@ export const DOC_BUDGETS = [
     // sea mouth. Both are new acceptance CONDITIONS with a new balance
     // value; their evidence chains went to docs/acceptance-evidence.md,
     // which is unbudgeted, so what is priced here is the rules alone.
-    maxLines: 1132,
+    // RAISED by the 5 lines point 409 adds: §6 gains the merge-time branch
+    // deletion, §7.2 the guard that backstops it. See the word note below —
+    // same change, priced once in each unit.
+    maxLines: 1137,
     // RAISED by the 50 measured words of the §7.2 rule that screenshot diffing
     // is not available as a shortcut (point 361). That is the mechanism working
     // as designed rather than a concession: the words buy a NEW standing rule
@@ -121,7 +124,15 @@ export const DOC_BUDGETS = [
     // slack so the current can never hold a swimmer against the ocean
     // (pt. 21). A criterion that no longer describes the game is the drift
     // this budget is not meant to buy.
-    maxWords: 10317,
+    // RAISED by the 68 measured words of point 409: §6's merge step now ENDS
+    // the branch (local, remote and worktree, by the one safe command) and §7.2
+    // names `branch-hygiene-guard` in the chain it exists to enumerate. Not a
+    // longer telling of the merge paragraph — that paragraph described a
+    // workflow whose last step was silently omitted thirty-one times, and a
+    // rule nobody reads is a rule that rots. The guard entry is not optional
+    // either: a session blocked by a guard this file does not list reads the
+    // block as a bug and goes looking for the wrong fix.
+    maxWords: 10385,
     why: 'loaded at every session start — the most expensive document in the project',
   },
   {

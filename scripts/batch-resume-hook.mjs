@@ -43,6 +43,7 @@ function gitStanding() {
   try {
     const g = (args) =>
       execFileSync('git', args, {
+        windowsHide: true,
         cwd: REPO_ROOT,
         encoding: 'utf8',
         timeout: 5000,

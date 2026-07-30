@@ -324,3 +324,103 @@ export function findClaudeExe({ base, readdir, exists, join } = {}) {
     return null
   }
 }
+
+// ---------------------------------------------------------------------------
+// A SPAWN INTO A BROKEN ENVIRONMENT IS NOT A RESCUE (point 433, §4 of
+// docs/batch-resilience.md — the hole the second model's review found)
+// ---------------------------------------------------------------------------
+//
+// Point 433 lets the launcher take the batch from a wedged owner. On its own that
+// turns a silent night into a loud one: the successor spawns into the SAME broken
+// environment, wedges identically, and the runaway brake never catches it because
+// `failCount` only ever rose when the spawn's pid was GONE. A chain of
+// alive-but-wedged successors would burn tokens all night and look busy.
+//
+// Three answers, all pure here and wired in scripts/batch-autostart.mjs.
+
+/**
+ * (i) MAY THE LAUNCHER SPAWN AT ALL? PURE.
+ *
+ * `probes` is one entry per check: { name, ok, detail }. Every probe must pass —
+ * an environment that cannot run the CLI, cannot read git or cannot write the
+ * state directory cannot host a rescue either.
+ *
+ * A probe whose `ok` is neither true nor false (unrunnable, threw) is treated as
+ * INCONCLUSIVE and does NOT block: the preflight exists to stop a hopeless spawn,
+ * not to become a new way for the batch to stand still. What it cannot see —
+ * notably a permission service that refuses tool calls INSIDE a session, which is
+ * what failed on 30.07.2026 — is caught afterwards by `judgePreviousSpawn`.
+ *
+ * Returns { ok, failed: [names], reason }.
+ */
+export function judgeSpawnPreflight({ probes = [] } = {}) {
+  const list = Array.isArray(probes) ? probes.filter((p) => p && typeof p.name === 'string') : []
+  const failed = list.filter((p) => p.ok === false)
+  if (!failed.length) return { ok: true, failed: [], reason: 'preflight clear' }
+  return {
+    ok: false,
+    failed: failed.map((p) => p.name),
+    reason: failed.map((p) => `${p.name}${p.detail ? `: ${p.detail}` : ''}`).join('; '),
+  }
+}
+
+/** How long a spawn gets to prove itself: convert the lock or land a first commit.
+ *  Calibratable via HOA_SPAWN_PROVE_MIN (minutes). Twenty is two boots' worth of
+ *  slack over the ten-minute pending window a spawn already gets. */
+export const SPAWN_PROVE_MS = 20 * 60 * 1000
+
+/**
+ * (ii) DID THE PREVIOUS SPAWN PROVE ITSELF? PURE.
+ *
+ * The old rule counted a failure only when the spawn's pid was GONE, so a spawn
+ * that came up, wedged and kept its process alive counted as success forever.
+ * Living is not working: a spawn that has neither converted the lock nor produced a
+ * commit within `proveMs` is a failure whether it breathes or not.
+ *
+ * Returns { verdict: 'progress' | 'failed' | 'pending' | 'none', reason }.
+ */
+export function judgePreviousSpawn({
+  lastSpawnAt = 0,
+  now = Date.now(),
+  progressed = false,
+  pidAlive = false,
+  lockConverted = false,
+  proveMs = SPAWN_PROVE_MS,
+} = {}) {
+  if (!(lastSpawnAt > 0)) return { verdict: 'none', reason: 'no previous spawn' }
+  if (progressed) return { verdict: 'progress', reason: 'the previous spawn made progress' }
+  if (!pidAlive) {
+    return { verdict: 'failed', reason: 'previous spawn did NOT take over (no new commit, lock not claimed, pid gone)' }
+  }
+  const ageMs = now - lastSpawnAt
+  if (ageMs < proveMs) return { verdict: 'pending', reason: 'the previous spawn is still coming up' }
+  if (lockConverted) return { verdict: 'pending', reason: 'the previous spawn owns the lock and is being judged as the owner' }
+  return {
+    verdict: 'failed',
+    reason:
+      `previous spawn is ALIVE but proved nothing in ${Math.round(ageMs / 60000)} min ` +
+      '(lock not converted, no commit) — a living-but-wedged successor is a failure, not a success',
+  }
+}
+
+/** The floor of the spawn backoff — the old fixed debounce. */
+export const SPAWN_BACKOFF_BASE_MS = 10 * 60 * 1000
+/** Its ceiling. Two hours: long enough to stop burning tokens on a broken night,
+ *  short enough that a recovered machine is picked up the same morning. */
+export const SPAWN_BACKOFF_CAP_MS = 2 * 60 * 60 * 1000
+
+/**
+ * (iii) THE BACKOFF ESCALATES. PURE.
+ *
+ * A fixed ten-minute debounce hammers a refusing environment at the same rate all
+ * night. Each recorded failure doubles the wait, up to the cap; a clean run resets
+ * it, because `failCount` is cleared on progress.
+ */
+export function spawnBackoffMs({
+  failCount = 0,
+  base = SPAWN_BACKOFF_BASE_MS,
+  cap = SPAWN_BACKOFF_CAP_MS,
+} = {}) {
+  const n = Number.isFinite(failCount) && failCount > 0 ? Math.floor(failCount) : 0
+  return Math.min(cap, base * 2 ** n)
+}

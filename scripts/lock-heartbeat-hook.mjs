@@ -39,7 +39,7 @@ import { existsSync, readFileSync, statSync } from 'node:fs'
 import { basename } from 'node:path'
 import { heartbeat, noteActivity } from './batch-singleton.mjs'
 import { deliverPendingMessages } from './chat-spool.mjs'
-import { handoverSurvivesCall } from './batch-boundary-core.mjs'
+import { handoverSurvivesCall, hookCallTimestamp } from './batch-boundary-core.mjs'
 import { classifyPublishResponse, publishStatePatch } from './publish-outcome-core.mjs'
 import { openFingerprintOfTasks, publishDuePatch } from './board-currency-core.mjs'
 import { repoPath } from './repo-paths.mjs'
@@ -78,7 +78,13 @@ try {
       filePath: input.file_path ?? input.notebook_path,
       command: input.command,
     })
-    ownsBatch = heartbeat(sid, { preserveHandover: keep.survives }) === true
+    // A WITHDRAWAL MUST BE CAUSED BY WORK AFTER THE HANDOVER (point 396). THIS is
+    // the hook the incident came from: the Stop chain wrote the handover while this
+    // very heartbeat, belonging to the turn's LAST tool call, was still in flight,
+    // and it then cancelled the boundary 117 ms after it was written. Where the
+    // payload carries the call's own time, `heartbeat` compares it; where it does
+    // not, the settle window does the same job.
+    ownsBatch = heartbeat(sid, { preserveHandover: keep.survives, callAt: hookCallTimestamp(data) }) === true
   }
 } catch {
   /* no lock dir / unreadable — nothing to do */

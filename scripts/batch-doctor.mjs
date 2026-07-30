@@ -15,8 +15,18 @@ import { readFileSync, writeFileSync, existsSync } from 'node:fs'
 import { execFileSync, execSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { isAbsolute, join } from 'node:path'
-import { planRemediation, needsRepair } from './batch-doctor-core.mjs'
-import { readOwnerLock, detectParallel, readUnhandledAlert, markAlertHandled } from './batch-singleton.mjs'
+import {
+  planRemediation,
+  needsRepair,
+  GATE_COMMANDS,
+  judgeGateRun,
+  gateKey,
+  otherSessionsIn,
+  shouldRecordSatisfaction,
+  INCONCLUSIVE_VERDICT,
+} from './batch-doctor-core.mjs'
+import { readOwnerLock, detectParallel, readUnhandledAlert, markAlertHandled, DOCTOR_STATE_PATH } from './batch-singleton.mjs'
+import { readMachine } from './verify/machine-load.mjs'
 
 const REPO = fileURLToPath(new URL('..', import.meta.url))
 const LOG = join(REPO, '.claude', 'doctor.log')
@@ -35,6 +45,7 @@ const log = (m) => {
 
 const git = (args, opts = {}) =>
   execFileSync('git', args, {
+    windowsHide: true,
     cwd: REPO,
     encoding: 'utf8',
     timeout: opts.timeout ?? 30000,
@@ -107,9 +118,20 @@ try {
 }
 
 const owner = readOwnerLock()
+const readerSid = process.env.CLAUDE_SESSION_ID ?? owner?.sessionId ?? ''
 const parallelNow = detectParallel(owner?.sessionId ?? '')
-const alert = readUnhandledAlert()
+const rawAlert = readUnhandledAlert()
+// AN ALERT MUST NAME SOMEONE ELSE (point 431, third half). The alert is a file:
+// written by whoever noticed, read back later — and twice on 29.07.2026 the
+// session it named was the session reading it. One that names nobody but the
+// reader is not evidence of a second writer.
+const alertOthers = otherSessionsIn({ alert: rawAlert, readerSid, ownerSid: owner?.sessionId ?? '' })
+const alert = rawAlert && alertOthers.length > 0 ? rawAlert : null
+if (rawAlert && !alert) {
+  log(`parallel alert IGNORED: it names only this session (${readerSid || 'unknown'}) — an alert that cannot name another session is not evidence of one`)
+}
 const parallelDetected = parallelNow.length > 0 || !!alert
+const parallelSids = [...new Set([...parallelNow.map((p) => p.sid), ...alertOthers])]
 
 log(
   `state: branch=${branch} mergeInProgress=${mergeInProgress} dirty=${dirtyFiles.length} ` +
@@ -170,16 +192,45 @@ for (const a of plan) {
 // --- Optional fast gate --------------------------------------------------------
 
 let gateFailed = false
+let gateInconclusive = false
 if (gate) {
-  for (const cmd of ['npm run test:unit', 'npm run build', 'npm run lint']) {
+  const results = []
+  for (const cmd of GATE_COMMANDS) {
+    // The machine is read PER COMMAND, not once for the run: a gate that started
+    // beside a delegated agent's build and finished after it drained must not
+    // charge the quiet half with the noisy half's verdict.
+    const load = await readMachine()
+    const worktrees = liveAgentWorktrees()
+    let failed = false
     try {
       log(`gate: running ${cmd} …`)
-      execSync(cmd, { cwd: REPO, stdio: 'pipe', timeout: 15 * 60 * 1000 })
+      execSync(cmd, { windowsHide: true, cwd: REPO, stdio: 'pipe', timeout: 15 * 60 * 1000 })
       log(`gate: ${cmd} PASSED`)
     } catch {
-      log(`gate: ${cmd} FAILED — the concurrent writes (or the current head) broke it; fix before continuing the batch`)
-      gateFailed = true
+      failed = true
     }
+    results.push({ cmd, failed, level: load.level, reasons: load.reasons, agentWorktrees: worktrees })
+  }
+  // EVIDENCE FIRST in the log: a reader must see which red is evidence before
+  // the one that is not.
+  const verdict = judgeGateRun(results)
+  for (const line of verdict.lines) log(line)
+  gateFailed = verdict.broken
+  gateInconclusive = verdict.inconclusive
+}
+
+/** Agent worktrees other than the main checkout — a build in one of them
+ *  competes for the machine as surely as a busy CPU does. */
+function liveAgentWorktrees() {
+  try {
+    return git(['worktree', 'list', '--porcelain'])
+      .split(/\r?\n/)
+      .filter((l) => l.startsWith('worktree '))
+      .map((l) => l.slice(9).trim())
+      .slice(1)
+      .filter((p) => /[\\/]worktrees[\\/]/.test(p))
+  } catch {
+    return []
   }
 }
 
@@ -190,6 +241,15 @@ if (!pendingRepair && !gateFailed) {
   markAlertHandled()
   log('parallel alert marked handled')
 }
+// THE DEMAND IS SATISFIED BY A STATE, NOT BY A TURN (point 431, second half).
+// The hook fired this gate every turn while the other session merely existed,
+// at ~3 minutes of unit tests each time. What is judged is THIS head beside
+// THESE sessions; recording the pair holds the demand until one of them moves.
+// Only a run that actually ran the gate to a judgeable green may record it —
+// `shouldRecordSatisfaction` decides, so an inconclusive red cannot buy a pass.
+if (shouldRecordSatisfaction({ gateRan: gate, broken: gateFailed, inconclusive: gateInconclusive, pendingRepair })) {
+  recordGateSatisfied()
+}
 if (pendingRepair) {
   log('VERDICT: repairs planned but NOT executed — rerun with --repair to execute them (all actions are recoverable and logged)')
   process.exit(2)
@@ -198,5 +258,29 @@ if (gateFailed || alertsRemain) {
   log('VERDICT: findings remain (gate failure or alert-level issues) — fix before continuing the batch')
   process.exit(1)
 }
+if (gateInconclusive) {
+  log(INCONCLUSIVE_VERDICT)
+  process.exit(0)
+}
 log('VERDICT: consistent — the batch may continue')
 process.exit(0)
+
+function recordGateSatisfied() {
+  try {
+    // The SAME file markAlertHandled writes, so the two records stay coherent.
+    const statePath = DOCTOR_STATE_PATH
+    const state = existsSync(statePath) ? JSON.parse(readFileSync(statePath, 'utf8')) : {}
+    const head = (() => {
+      try {
+        return git(['rev-parse', 'HEAD'])
+      } catch {
+        return ''
+      }
+    })()
+    if (!head) return
+    writeFileSync(statePath, `${JSON.stringify({ ...state, satisfiedGate: gateKey({ head, parallelSids }) }, null, 2)}\n`)
+    log(`gate demand satisfied for HEAD ${head.slice(0, 8)} beside [${parallelSids.join(', ') || 'no other session'}]`)
+  } catch (e) {
+    log(`warn: could not record the gate satisfaction (${e && e.message}) — the demand simply stays live`)
+  }
+}
