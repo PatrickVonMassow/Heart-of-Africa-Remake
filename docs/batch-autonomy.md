@@ -1279,6 +1279,39 @@ unreadable page is **never** called current.
     node scripts/board-publish.mjs --url     # print the URLs
     node scripts/board-queue.mjs             # rebuild the queue from the work order
     node scripts/board-queue.mjs set <N> "…" # write one queue card's prose
+    node scripts/board-queue.mjs set <N> --title --text-stdin    # …its German title
+    node scripts/board-queue.mjs set <N> --estimate "~2 h"       # …its estimate
+    node scripts/board.mjs title <N> "…"     # retitle a now- OR queue card
+
+**Every text goes in on stdin, and a flag is never prose.** `--text-stdin` now
+fills whichever field it follows in both commands, `--none`'s reason included —
+that gap card is written at every session boundary and was the last place a
+German text still reached the board as a command-line argument, where a Windows
+shell eats the umlauts. Until `board-queue.mjs set` had the flag, a session that
+tried to pipe prose into it stored the literal string `--text-stdin` as the card
+body, and six cards showed the user a flag where their explanation belonged; no
+card-writing command will store a `--…` value as prose any more, and a text that
+really starts with a dash goes after a bare `--`. A **blank line** in any piped
+text becomes a `<p>` boundary, so the sanctioned command can produce what
+`dashboard-conciseness-guard` demands instead of forcing a hand edit.
+
+**The board is written LF, whatever wrote it.** The markup anchors are matched
+with literal newlines, so a board an editor once wrote back in Windows text mode
+made `board-archive-rotate.mjs` miss the Erledigt section entirely and `attest`
+crash on a board that looked perfect in the browser. Every writer normalises now.
+
+**A fallback title is REPORTED, never silently taken.** `queueEntries` still
+falls back `authored → work-order headline → "Punkt N"` (a nameless card is
+worse), but the middle rung is the work order's own headline, which is English by
+rule and written in capitals — so an appended point reached the German board
+shouting, and nothing said so. `board-queue.mjs` names the affected points on
+every rebuild and the publisher names them again, each with the command that
+fixes it; the same report covers the cards still carrying `Schätzung offen`,
+which `auditDashboard` accepts by name and would otherwise let stand for ever.
+The comparison is against the PARSED headline, never a language heuristic.
+`parseTaskTitles` normalises line endings first: its `$`-anchored pattern matched
+nothing at all on a CRLF checkout, so the middle rung had been dead there and the
+user read a run of cards saying "444 Punkt 444, 445 Punkt 445 …" on his phone.
 
 `scripts/board.mjs` runs the publish itself, so the one-command board loop keeps
 the live page current without a second step. **The stamp may not lie:** the

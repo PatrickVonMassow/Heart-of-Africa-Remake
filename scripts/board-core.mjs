@@ -12,6 +12,66 @@ import { QUEUE_STUB_META } from './dashboard-guard-core.mjs'
 export const TEXT_STDIN_FLAG = '--text-stdin'
 
 /**
+ * LF, ALWAYS — applied on every write of the board (point 439).
+ *
+ * The board's markup anchors are matched with literal newlines
+ * (`ERLEDIGT_ANCHOR` below, the section bounds here), so the line ending is not
+ * cosmetic. On 30.07.2026 a now-card had to be retitled by hand because no
+ * command could do it; the editor wrote the file back in Windows text mode,
+ * every `\n` became `\r\n`, the following node writes left the file MIXED — and
+ * `board-archive-rotate.mjs` then failed to find the Erledigt section at all, so
+ * `attest` crashed with a stack trace on a board that looked perfect in the
+ * browser. Normalising on the WAY OUT costs nothing and means no writer has to
+ * be trusted with it.
+ */
+export function normaliseLineEndings(text) {
+  return String(text ?? '').replace(/\r\n?/g, '\n')
+}
+
+/** The literal markup the archive rotation locates the Erledigt section by. */
+export const ERLEDIGT_ANCHOR = '<details class="sect">\n<summary><h2>Erledigt</h2></summary>'
+
+/**
+ * Where the Erledigt section starts in a board, line endings normalised first.
+ * Returns -1 when the anchor is absent; the caller decides how loudly to fail.
+ */
+export function erledigtSectionStart(html) {
+  return normaliseLineEndings(html).indexOf(ERLEDIGT_ANCHOR)
+}
+
+/**
+ * A card text as the paragraphs it renders to: a BLANK LINE is a paragraph
+ * boundary, a single newline is just a wrapped line (point 439).
+ *
+ * WHY: `board.mjs status` wrapped whatever it was given into ONE <p>, and
+ * `dashboard-conciseness-guard` blocks the turn end on "one long unbroken
+ * paragraph — split into paragraphs". Blank lines in the piped text were carried
+ * through verbatim, so they rendered as one run-on block and the guard was right
+ * to refuse it. The only way out was hand-editing the board HTML — the very act
+ * that produced the CRLF damage above. So the sanctioned command can now produce
+ * what the guard demands.
+ */
+export function cardParagraphs(text) {
+  return normaliseLineEndings(text)
+    .split(/\n[ \t]*\n+/)
+    .map((p) => p.replace(/\s*\n\s*/g, ' ').trim())
+    .filter(Boolean)
+}
+
+/**
+ * A card body as indented `<p>` lines — one per paragraph, the stamp (when
+ * given) leading the FIRST one. `escape` is opt-in because only `addVdzk`
+ * escapes today, and silently escaping the others would change markup the
+ * board guard's parsers already read.
+ */
+export function renderCardBody(text, { stamp = null, indent = '    ', escape = null } = {}) {
+  const paras = cardParagraphs(text).map((p) => (escape ? escape(p) : p))
+  if (!paras.length) return ''
+  const lead = stamp ? `<span class="stamp">Stand ${stamp}</span> ` : ''
+  return paras.map((p, i) => `${indent}<p>${i === 0 ? lead : ''}${p}</p>`).join('\n')
+}
+
+/**
  * A card's text — from the argv words, or, when `--text-stdin` stands among
  * them, from what the wrapper read on stdin as UTF-8.
  *
@@ -28,14 +88,34 @@ export const TEXT_STDIN_FLAG = '--text-stdin'
  */
 export function resolveCardText(words, stdinText) {
   const list = (Array.isArray(words) ? words : []).map((w) => String(w))
-  const rest = list.filter((w) => w !== TEXT_STDIN_FLAG)
-  if (rest.length === list.length) return rest.join(' ')
-  if (rest.length) {
-    throw new Error(`board: ${TEXT_STDIN_FLAG} takes the WHOLE text — drop the argument text ("${rest.join(' ')}")`)
+  // A BARE `--` ENDS THE FLAGS (point 439): everything after it is text, however
+  // it starts. Without that escape the refusal below would make a card whose
+  // first word is a dash unwritable.
+  const sep = list.indexOf('--')
+  const flagged = sep < 0 ? list : list.slice(0, sep)
+  const literal = sep < 0 ? [] : list.slice(sep + 1)
+  // A FLAG IS NEVER PROSE (point 439). `board-queue.mjs set` had no
+  // `--text-stdin`, so a session that piped German prose into it stored the
+  // literal string `--text-stdin` as the card body — six cards, three of them
+  // live, showed the user a command-line flag where their explanation belonged.
+  // A value that begins with `--` is therefore refused, and the refusal NAMES
+  // the flag that was meant.
+  const stray = flagged.find((w) => w !== TEXT_STDIN_FLAG && w.startsWith('--'))
+  if (stray) {
+    throw new Error(
+      `board: refusing to write the flag "${stray}" into a card as prose — this command knows ` +
+        `${TEXT_STDIN_FLAG} (pipe the text in). Text that really starts with a dash goes after a bare "--".`,
+    )
+  }
+  const argvWords = [...flagged.filter((w) => w !== TEXT_STDIN_FLAG), ...literal]
+  if (!flagged.includes(TEXT_STDIN_FLAG)) return argvWords.join(' ')
+  if (argvWords.length) {
+    throw new Error(`board: ${TEXT_STDIN_FLAG} takes the WHOLE text — drop the argument text ("${argvWords.join(' ')}")`)
   }
   // Normalise the line ending a Windows pipe adds and the trailing newline every
-  // heredoc carries; the text itself is passed through untouched.
-  const text = (typeof stdinText === 'string' ? stdinText : '').replace(/\r\n/g, '\n').trim()
+  // heredoc carries; the text itself — BLANK LINES INCLUDED, they are what
+  // `cardParagraphs` turns into <p> boundaries — is passed through untouched.
+  const text = normaliseLineEndings(typeof stdinText === 'string' ? stdinText : '').trim()
   if (!text) throw new Error(`board: ${TEXT_STDIN_FLAG} was given but nothing arrived on stdin`)
   return text
 }
@@ -110,7 +190,7 @@ export function promoteToNow(html, point, { title, times, status, stamp = berlin
   const now =
     `<details class="now">\n  <summary><span class="t">${point} — ${title}</span>` +
     `<span class="right"><span class="meta">${times ?? stamp}</span></span></summary>\n` +
-    `  <div class="body">\n    <p><span class="stamp">Stand ${stamp}</span> ${status}</p>\n  </div>\n</details>\n`
+    `  <div class="body">\n${renderCardBody(status, { stamp })}\n  </div>\n</details>\n`
   return insertAsFirstNowCard(html.replace(card, ''), now)
 }
 
@@ -188,9 +268,15 @@ const titleOf = (card) => (card.match(/<span class="t">([^<]*)<\/span>/) ?? [])[
 const metaOf = (card) => (card.match(/<span class="meta">([^<]*)<\/span>/) ?? [])[1] ?? ''
 /** The card's last status text, stamp span stripped — what a move carries over. */
 const statusOf = (card) => {
+  // EVERY paragraph, not only the last (point 439): once a card text may carry
+  // blank-line paragraph breaks, taking the tail alone would silently drop the
+  // body of a multi-paragraph status on the way to the queue or the archive.
+  // Re-joined with a blank line, so the move round-trips through the same rule.
   const paras = [...card.matchAll(/<p>([\s\S]*?)<\/p>/g)].map((p) => p[1])
-  const last = paras[paras.length - 1] ?? ''
-  return last.replace(/<span class="stamp">[^<]*<\/span>\s*/, '').trim()
+  return paras
+    .map((p) => p.replace(/<span class="stamp">[^<]*<\/span>\s*/, '').trim())
+    .filter(Boolean)
+    .join('\n\n')
 }
 
 /**
@@ -235,7 +321,7 @@ export function toQueue(html, point, { text, estimate } = {}) {
   const entry =
     `<details>\n  <summary><span class="num">${point}</span><span class="t">${title}</span>` +
     `<span class="right"><span class="meta">${meta}</span></span>` +
-    `</summary>\n  <div class="body">\n    <p>${body}</p>\n  </div>\n</details>\n`
+    `</summary>\n  <div class="body">\n${renderCardBody(body)}\n  </div>\n</details>\n`
   const out = html.replace(card, '')
   const { from } = sectionBounds(out, 'queue')
   return `${out.slice(0, from)}\n${entry}${out.slice(from).replace(/^\n/, '')}`
@@ -256,7 +342,7 @@ export function toDone(html, point, { text, end = berlinStamp() } = {}) {
   const entry =
     `<details>\n  <summary><span class="num">${point}</span><span class="t">${title}</span>` +
     `<span class="right"><span class="meta">${start} · ${end}</span></span></summary>\n` +
-    `  <div class="body">\n    <p>${body}</p>\n  </div>\n</details>\n`
+    `  <div class="body">\n${renderCardBody(body)}\n  </div>\n</details>\n`
   const out = html.replace(card, '')
   const { from } = sectionBounds(out, 'done')
   return `${out.slice(0, from)}\n${entry}${out.slice(from).replace(/^\n/, '')}`
@@ -298,7 +384,7 @@ export function toNoCurrentWork(html, reason, { stamp = berlinStamp() } = {}) {
   const card =
     `<details class="now">\n  <summary><span class="t">${NO_CURRENT_WORK_TITLE}</span>` +
     `<span class="right"><span class="meta">${stamp}</span></span></summary>\n` +
-    `  <div class="body">\n    <p><span class="stamp">Stand ${stamp}</span> ${text}</p>\n  </div>\n</details>\n`
+    `  <div class="body">\n${renderCardBody(text, { stamp })}\n  </div>\n</details>\n`
   return insertAsFirstNowCard(html, card)
 }
 
@@ -377,13 +463,13 @@ export function addVdzk(html, title, text) {
   // whose title parses as empty, i.e. an invisible open question.
   const esc = (s) => String(s ?? '').trim().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
   const head = esc(title)
-  const body = esc(text)
+  const body = renderCardBody(text, { escape: esc })
   if (!head) throw new Error('board: vdzk-add needs a title — the collapsed card shows nothing else')
   if (!body) throw new Error('board: vdzk-add needs the question itself as the card body')
   const { from } = sectionBounds(html, 'vdzk')
   const card =
     `<details>\n  <summary><span class="t">${head}</span></summary>\n` +
-    `  <div class="body">\n    <p>${body}</p>\n  </div>\n</details>\n`
+    `  <div class="body">\n${body}\n  </div>\n</details>\n`
   return `${html.slice(0, from)}\n${card}${html.slice(from).replace(/^\n/, '')}`
 }
 
@@ -420,6 +506,49 @@ export function setCardStatus(html, point, text, stamp = berlinStamp()) {
     `(<summary><span class="t">${point} —[\\s\\S]*?<div class="body">)[\\s\\S]*?(</div>\\s*</details>)`,
   )
   if (!re.test(html)) throw new Error(`board: no current-work card for point ${point} — add the card first`)
-  const body = `    <p><span class="stamp">Stand ${stamp}</span> ${text}</p>`
+  const body = renderCardBody(text, { stamp })
   return html.replace(re, `$1\n${body}\n  $2`)
+}
+
+/**
+ * Retitle the card for `point` — the current-work card when there is one, the
+ * queue card otherwise. Times, estimate and body are left exactly as they were.
+ *
+ * WHY IT EXISTS (point 439): a now-card had no retitling command at ALL, so the
+ * three current-work cards of 30.07.2026 had to be fixed by hand-editing the
+ * board HTML — the act that then wrote the file back with CRLF and crashed
+ * `attest` (see `normaliseLineEndings`). The queue side had the same gap in a
+ * milder form: only `.claude/board-queue.json` could be hand-typed.
+ */
+export function setCardTitle(html, point, title) {
+  if (typeof html !== 'string' || !html) throw new Error('board: empty document')
+  if (!/^\d+$/.test(String(point))) throw new Error(`board: not a point number: ${point}`)
+  const text = String(title ?? '').trim()
+  if (!text) throw new Error('board: refusing to write an empty title')
+  // The now-card carries its number INSIDE the title span ("439 — …"), the queue
+  // card in a span of its own; each is rewritten in the shape its section fixes.
+  const nowRe = new RegExp(`(<summary><span class="t">)${point} —[^<]*(</span>)`)
+  if (nowRe.test(html)) return html.replace(nowRe, `$1${point} — ${text}$2`)
+  const queueRe = new RegExp(`(<summary><span class="num">${point}</span><span class="t">)[^<]*(</span>)`)
+  if (queueRe.test(html)) return html.replace(queueRe, `$1${text}$2`)
+  throw new Error(`board: no current-work or queue card for point ${point}`)
+}
+
+/** Hours the queue card for `point` promises, or null — what a promotion carries. */
+export function queueEstimateHours(html, point) {
+  const card = queueCard(html, point)
+  return card ? estimateHours(metaOf(card)) : null
+}
+
+/**
+ * What to TELL the caller when a point is promoted with no estimate (point 439):
+ * the now-card then renders its start time alone, so the reader gets a card in
+ * active work with no expected end — the invisibility this point is about. A
+ * string to print, or null when the estimate is there and the header carries it.
+ */
+export function promotionEstimateWarning(html, point) {
+  return queueEstimateHours(html, point) == null
+    ? `board: point ${point} was promoted with NO estimate, so its card shows a start time and no ` +
+        `expected end. Set one and re-promote: node scripts/board-queue.mjs set ${point} --estimate "~2 h"`
+    : null
 }

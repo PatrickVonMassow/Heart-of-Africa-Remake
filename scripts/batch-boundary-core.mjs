@@ -387,10 +387,19 @@ export function boundaryDestination({ claimHonoured = false, claimantSid = null 
  *
  * User-facing prose (the board is read on a phone), so it says the destination in
  * the first sentence and never leaves the reader to infer it.
+ *
+ * IT NAMES NO POINT NUMBER (point 439, 30.07.2026). This text is prescribed for
+ * use VERBATIM, and it goes into the gap card `board.mjs done <n> --none` writes
+ * — a card that owns no point number, so `dashboard-card-topic-guard` counted
+ * every "Punkt N" in it as a reference to a FOREIGN point and blocked the turn
+ * end. Two sanctioned mechanisms thus contradicted each other, and the loser was
+ * always the boundary: the block costs a turn, and every remedy command counts as
+ * work and deletes the boundary marker, so the handover had to be re-taken. The
+ * closed point's own story belongs in Erledigt anyway, which is where `done`
+ * files it in the same edit; this card says only where the batch GOES.
  */
-export function boundaryCardText({ point, destination, claimantSid = null } = {}) {
-  const n = Number.isInteger(Number(point)) && Number(point) > 0 ? Number(point) : null
-  const head = n === null ? 'Der Punkt ist abgeschlossen.' : `Punkt ${n} ist abgeschlossen.`
+export function boundaryCardText({ destination, claimantSid = null } = {}) {
+  const head = 'Der Punkt ist abgeschlossen.'
   if (destination === BOUNDARY_DESTINATIONS.CLAIMING_WINDOW && claimantSid) {
     // The reservation is stated with its LIMIT, not as a promise: it holds until
     // the lock is released for that window, and from then on the first window to

@@ -4,7 +4,15 @@
 //   node scripts/board-queue.mjs                    # rebuild the queue section
 //   node scripts/board-queue.mjs --check            # report what would change
 //   node scripts/board-queue.mjs set <N> "<text>"   # write one point's prose
+//   node scripts/board-queue.mjs set <N> --title --text-stdin      # …its German title
+//   node scripts/board-queue.mjs set <N> --estimate "~2 h"         # …its estimate
 //   node scripts/board-queue.mjs import             # seed the data from the board
+//
+// GERMAN TEXT GOES IN ON STDIN (point 439, the rule of point 410): `--text-stdin`
+// fills whichever field it follows, so an umlaut never passes through a Windows
+// shell. Until it existed, a session that tried to pipe prose in stored the
+// literal string `--text-stdin` as the card body, and six cards showed the user a
+// command-line flag where their explanation belonged.
 //
 // WHY IT HAD TO EXIST (four-eyes review, NEW-1). `board-publish.mjs` refuses a
 // board that does not show every open point, and the case that triggers that
@@ -24,13 +32,20 @@ import { resolve } from 'node:path'
 import { writeTextAtomic } from './atomic-write.mjs'
 import { REPO_ROOT, STATE_PATH, readJson } from './dashboard-state.mjs'
 import { parseKlaerungPoints, parseNowCardPoints } from './dashboard-guard-core.mjs'
+import { normaliseLineEndings } from './board-core.mjs'
 import {
+  ESTIMATE_CMD,
   QUEUE_DATA_PATH,
+  SET_STDIN_FLAG,
+  TITLE_CMD,
   buildQueueSection,
   importQueueFromHtml,
   openPointsOf,
+  parseSetArgs,
   parseTaskTitles,
   setQueueEntry,
+  unestimatedPoints,
+  untranslatedTitlePoints,
 } from './board-queue-core.mjs'
 
 const state = readJson(STATE_PATH) ?? {}
@@ -41,6 +56,30 @@ const [cmd, ...rest] = process.argv.slice(2)
 
 const readData = () => (existsSync(dataFile) ? readJson(dataFile) : null)
 const writeData = (d) => writeTextAtomic(dataFile, `${JSON.stringify(d, null, 2)}\n`)
+
+// STDIN IS READ ONCE, AND ONLY WHEN ASKED FOR (the rule of point 410): reading
+// fd 0 unconditionally would block every call with no pipe attached.
+const stdinText = process.argv.includes(SET_STDIN_FLAG)
+  ? (() => {
+      try {
+        return normaliseLineEndings(readFileSync(0, 'utf8')).trim()
+      } catch (e) {
+        throw new Error(`${SET_STDIN_FLAG} could not read stdin (${e.code ?? e.message}) — pipe the text in`)
+      }
+    })()
+  : ''
+
+/** Everything the generator has to SAY about the cards it just rendered. */
+function reportEntries(entries) {
+  const say = (points, what, cmd) => {
+    if (points.length) console.log(`  ${what}: ${points.join(', ')} — ${cmd}`)
+  }
+  say(entries.filter((e) => e.stub).map((e) => e.point), 'no prose yet', 'node scripts/board-queue.mjs set <N> "<text>"')
+  // THE FALLBACK IS REPORTED (point 439): these cards carry the ENGLISH,
+  // upper-case work-order headline (or the bare number) into a German board.
+  say(untranslatedTitlePoints(entries), 'title still the work order’s (English)', TITLE_CMD)
+  say(unestimatedPoints(entries), 'no estimate yet', ESTIMATE_CMD)
+}
 
 /** Board, work order and the exclusions the other sections already own. */
 function inputs() {
@@ -60,10 +99,20 @@ function inputs() {
 
 try {
   if (cmd === 'set') {
-    const [point, ...words] = rest
-    if (!point || words.length === 0) throw new Error('usage: board-queue.mjs set <N> "<text>"')
-    writeData(setQueueEntry(readData(), point, { body: words.join(' ') }))
-    console.log(`queue prose for point ${point} stored in ${QUEUE_DATA_PATH}`)
+    const parsed = parseSetArgs(rest)
+    if (parsed.stdinField) {
+      if (!stdinText) throw new Error(`${SET_STDIN_FLAG} was given but nothing arrived on stdin`)
+      if (parsed[parsed.stdinField]) {
+        throw new Error(`${SET_STDIN_FLAG} takes the WHOLE ${parsed.stdinField} — drop the argument text`)
+      }
+      parsed[parsed.stdinField] = stdinText
+    }
+    const fields = ['title', 'body', 'estimate'].filter((f) => parsed[f])
+    if (!parsed.point || fields.length === 0) {
+      throw new Error('usage: board-queue.mjs set <N> ["<text>"] [--title …] [--estimate "~2 h"] [--text-stdin]')
+    }
+    writeData(setQueueEntry(readData(), parsed.point, parsed))
+    console.log(`${fields.join(' + ')} for point ${parsed.point} stored in ${QUEUE_DATA_PATH}`)
     console.log('Render it into the board: node scripts/board-queue.mjs')
   } else if (cmd === 'import') {
     // The one-time migration: seed the data from a board that still carries a
@@ -74,21 +123,22 @@ try {
   } else if (cmd === '--check' || cmd === undefined) {
     const { html, open, titles, exclude } = inputs()
     const built = buildQueueSection(html, { open, data: readData(), exclude, titles })
-    const stubs = built.entries.filter((e) => e.stub).map((e) => e.point)
     if (cmd === '--check') {
       console.log(`${built.entries.length} queue card(s) would be rendered${built.html === html ? ' (no change)' : ''}`)
-      if (stubs.length) console.log(`  no prose yet: ${stubs.join(', ')} — node scripts/board-queue.mjs set <N> "<text>"`)
+      reportEntries(built.entries)
       process.exitCode = built.html === html ? 0 : 1
     } else {
       // Atomic (point 443, four-eyes F3): a kill mid-write leaves torn bytes that
-      // the doctor's board repair would push to the public page.
-      if (built.html !== html) writeTextAtomic(boardFile, built.html)
-      console.log(`queue rebuilt from the work order: ${built.entries.length} card(s)${built.html === html ? ' (unchanged)' : ''}`)
-      if (stubs.length) console.log(`  no prose yet: ${stubs.join(', ')} — node scripts/board-queue.mjs set <N> "<text>"`)
+      // the doctor's board repair would push to the public page. LF-normalised
+      // (point 439) so a hand edit's CRLF cannot outlive one rebuild.
+      const out = normaliseLineEndings(built.html)
+      if (out !== html) writeTextAtomic(boardFile, out)
+      console.log(`queue rebuilt from the work order: ${built.entries.length} card(s)${out === html ? ' (unchanged)' : ''}`)
+      reportEntries(built.entries)
       console.log('Publish it: node scripts/board-publish.mjs')
     }
   } else {
-    console.error('usage: board-queue.mjs [--check] | set <N> "<text>" | import')
+    console.error('usage: board-queue.mjs [--check] | set <N> ["<text>"] [--title …] [--estimate …] | import')
     process.exitCode = 2
   }
 } catch (e) {

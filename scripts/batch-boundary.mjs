@@ -256,7 +256,7 @@ export function gatherBoundary(sid, { now = Date.now(), path = BOUNDARY_PATH } =
  * An unreadable claim answers "fresh session": that is what happens with no
  * honoured claim, and it is the state the old text always assumed anyway.
  */
-export function boundaryHandover(point, { sid = readOwnerLock()?.sessionId ?? '' } = {}) {
+export function boundaryHandover({ sid = readOwnerLock()?.sessionId ?? '' } = {}) {
   let claim = { honour: false, claimantSid: null }
   try {
     claim = gatherClaim(sid, { ownerLock: readOwnerLock() })
@@ -264,7 +264,9 @@ export function boundaryHandover(point, { sid = readOwnerLock()?.sessionId ?? ''
     /* no readable claim → nobody is waiting for the batch */
   }
   const where = boundaryDestination({ claimHonoured: claim.honour === true, claimantSid: claim.claimantSid })
-  return { ...where, card: boundaryCardText({ point, ...where }) }
+  // The card takes NO point number (point 439): it goes into the unnumbered gap
+  // card, where the topic guard reads every point reference as a foreign one.
+  return { ...where, card: boundaryCardText(where) }
 }
 
 // --- CLI ----------------------------------------------------------------------
@@ -285,7 +287,7 @@ if (isMain) {
     console.log('boundary marker cleared — the ordinary "do not stop the batch" rule applies again.')
   } else if (arg === '--status' || !arg) {
     const g = gatherBoundary(sid)
-    const handover = boundaryHandover(g.marker?.point ?? null, { sid })
+    const handover = boundaryHandover({ sid })
     console.log(
       JSON.stringify(
         { ownerSessionId: sid || null, ...g, handover, taskName: LAUNCHER_TASK_NAME },
@@ -321,7 +323,7 @@ if (isMain) {
       )
     }
     writeBoundary({ v: 1, sessionId: sid, point, at: Date.now() })
-    const handover = boundaryHandover(point, { sid })
+    const handover = boundaryHandover({ sid })
     const toWindow = handover.destination === BOUNDARY_DESTINATIONS.CLAIMING_WINDOW
     console.log(
       `boundary recorded: point ${point} is closed and the launcher is armed. End this session now — ` +
@@ -332,10 +334,11 @@ if (isMain) {
         'Do NOT start the next point in this context, and do NOT end while a delegated agent is still in ' +
         'flight (its work would be thrown away — let the pool drain first).\n\n' +
         'THE BOARD CARD (point 434 (7)) — it must name where the batch actually goes, so take this text ' +
-        'verbatim rather than writing it again:\n\n' +
+        'verbatim rather than writing it again. It names NO point number on purpose: it goes into the ' +
+        'unnumbered gap card, where the topic guard reads every point reference as a foreign one.\n\n' +
         `${handover.card}\n\n` +
-        `  node scripts/board.mjs done ${point} --text-stdin   (the German goes in on stdin — a Windows shell ` +
-        'mangles the umlauts on the argument path)',
+        `  node scripts/board.mjs done ${point} --none --text-stdin   (the German goes in on stdin — a ` +
+        'Windows shell mangles the umlauts on the argument path)',
     )
   }
 }

@@ -33,6 +33,7 @@
 // prevent.
 
 import { parseTasks, QUEUE_STUB_BODY, QUEUE_STUB_META } from './dashboard-guard-core.mjs'
+import { normaliseLineEndings } from './board-core.mjs'
 import { FINDER_POINTS, RELEASE_TAG_POINT } from './queue-order-guard-core.mjs'
 
 // The stub meta is DEFINED beside the audit rule that exempts it and re-exported
@@ -41,6 +42,12 @@ export { QUEUE_STUB_BODY, QUEUE_STUB_META }
 
 /** Where the queue's prose and order live (git-ignored, like the board itself). */
 export const QUEUE_DATA_PATH = '.claude/board-queue.json'
+
+/** The command that gives a card a German title — named by every report below. */
+export const TITLE_CMD = 'node scripts/board-queue.mjs set <N> --title --text-stdin'
+
+/** …and the one that gives it an estimate. */
+export const ESTIMATE_CMD = 'node scripts/board-queue.mjs set <N> --estimate "~2 h"'
 
 
 /** Minimal HTML escaping for text that goes into a card. */
@@ -63,7 +70,15 @@ export function esc(text) {
 export function parseTaskTitles(text, { maxLength = 90 } = {}) {
   const titles = {}
   if (typeof text !== 'string') return titles
-  for (const line of text.split('\n')) {
+  // LINE ENDINGS NORMALISED FIRST (point 439, root cause found 30.07.2026). The
+  // pattern below is anchored with `$`, and `.` never matches a `\r`: on a
+  // checkout where TASKS.md carries CRLF, `split('\n')` leaves a trailing `\r` on
+  // every line and this function returned ZERO titles — silently. The fallback
+  // chain in `queueEntries` then landed on its LAST rung, and the user read a run
+  // of cards saying "444 Punkt 444, 445 Punkt 445 …" on his phone. The middle
+  // rung had never carried anything on such a checkout; only cards whose title
+  // had been hand-written into the data file looked right.
+  for (const line of normaliseLineEndings(text).split('\n')) {
     const m = line.match(/^- \[[ x]\] (\d+)\.\s*(.+)$/)
     if (!m) continue
     let title = m[2].trim()
@@ -73,6 +88,92 @@ export function parseTaskTitles(text, { maxLength = 90 } = {}) {
     titles[Number(m[1])] = title.replace(/[\s.;:,—–-]+$/u, '')
   }
   return titles
+}
+
+/**
+ * IS THIS CARD TITLE STILL THE WORK ORDER'S? (point 439)
+ *
+ * The fallback chain `entry.title || titles[point] || "Punkt N"` stays — a
+ * nameless card is worse — but it may no longer pass unnoticed. The work-order
+ * headline is ENGLISH by rule (`tasks-md-english`) and written in capitals, so
+ * every appended point reached the German board shouting in the one language the
+ * board is not written in; the user asked TWICE why. On 30.07.2026 eight of 77
+ * cards stood that way.
+ *
+ * The comparison is against the PARSED HEADLINE, never a language heuristic: a
+ * German title that merely resembles the headline is not reported, and one that
+ * IS the headline is — whoever wrote it. That also keeps the same predicate
+ * usable on a board read back from HTML, where provenance is no longer visible.
+ */
+export function isUntranslatedTitle(title, point, titles = {}) {
+  const t = String(title ?? '').trim()
+  if (!t) return true
+  const n = Number(point)
+  if (t === `Punkt ${n}`) return true
+  const headline = String(titles?.[n] ?? '').trim()
+  return headline !== '' && t === headline
+}
+
+/** The points whose rendered card still carries the work order's own headline. */
+export function untranslatedTitlePoints(entries) {
+  return (Array.isArray(entries) ? entries : []).filter((e) => e?.untranslated).map((e) => e.point)
+}
+
+/**
+ * The points whose card carries the named "no estimate yet" marker (point 439).
+ *
+ * `auditDashboard` accepts `QUEUE_STUB_META` BY NAME, which is right — it must
+ * not deadlock against a card only the generator can produce — but it meant an
+ * unestimated card passed for ever: sixteen appended points sat in that hole at
+ * once and nothing said so. The stub stays legitimate; it is now REPORTED.
+ */
+export function unestimatedPoints(entries) {
+  return (Array.isArray(entries) ? entries : [])
+    .filter((e) => String(e?.meta ?? '').trim() === QUEUE_STUB_META)
+    .map((e) => e.point)
+}
+
+/** Undo the escaping `renderQueueCard` applied, so a title read back compares. */
+const unesc = (text) =>
+  String(text ?? '')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
+
+/**
+ * The same two reports, taken from a BOARD rather than from the data — what the
+ * publish check reads, so a session cannot publish an untranslated title without
+ * being told even when the queue was not rebuilt in this turn.
+ */
+export function boardTitleReport(html, titles = {}) {
+  const { points } = importQueueFromHtml(html)
+  const untranslated = []
+  const unestimated = []
+  for (const [key, entry] of Object.entries(points)) {
+    const n = Number(key)
+    if (isUntranslatedTitle(unesc(entry.title), n, titles)) untranslated.push(n)
+    if (!entry.estimate) unestimated.push(n)
+  }
+  const asc = (a, b) => a - b
+  return { untranslated: untranslated.sort(asc), unestimated: unestimated.sort(asc) }
+}
+
+/**
+ * A card-writing command may never STORE a command-line flag as prose (point
+ * 439) — the defect that put a literal `--text-stdin` on six live cards. The
+ * check sits at the store boundary, so no CLI can route around it; a text that
+ * legitimately begins with a single dash is untouched, and a `--` separator on
+ * the CLI strips the flag marker before the value ever gets here.
+ */
+export function assertNotFlagValue(value, field) {
+  const t = String(value ?? '').trim()
+  if (/^--/.test(t)) {
+    throw new Error(
+      `board-queue: refusing to store the flag "${t.split(/\s+/)[0]}" as a card's ${field} — ` +
+        'pass the text itself (--text-stdin pipes it in), or put a text that really starts with a dash after a bare "--".',
+    )
+  }
+  return value
 }
 
 /**
@@ -156,12 +257,15 @@ export function queueEntries({ open = [], data = null, exclude = [], titles = {}
     if (skip.has(point)) continue
     const entry = points[point] ?? { title: null, body: null, estimate: null }
     const stub = !entry.body
+    const title = entry.title || titles[point] || `Punkt ${point}`
     out.push({
       point,
-      title: entry.title || titles[point] || `Punkt ${point}`,
+      title,
       body: entry.body ?? [QUEUE_STUB_BODY],
       meta: entry.estimate || QUEUE_STUB_META,
       stub,
+      // The fallback is still TAKEN — it is no longer taken SILENTLY.
+      untranslated: isUntranslatedTitle(title, point, titles),
     })
   }
   return out
@@ -253,6 +357,9 @@ export function importQueueFromHtml(html) {
 export function setQueueEntry(data, point, { title, body, estimate } = {}) {
   const n = Number(point)
   if (!Number.isInteger(n) || n <= 0) throw new Error(`board: not a point number: ${point}`)
+  assertNotFlagValue(title, 'title')
+  assertNotFlagValue(Array.isArray(body) ? body[0] : body, 'body')
+  assertNotFlagValue(estimate, 'estimate')
   const { order, points } = normaliseQueueData(data)
   const prev = points[n] ?? { title: null, body: null, estimate: null }
   const pick = (next, old) => (typeof next === 'string' && next.trim() ? next.trim() : old)
@@ -263,6 +370,64 @@ export function setQueueEntry(data, point, { title, body, estimate } = {}) {
       [n]: { title: pick(title, prev.title), body: pick(body, prev.body), estimate: pick(estimate, prev.estimate) },
     },
   }
+}
+
+/** The flag that fills ONE field from stdin, spelled as `board.mjs` spells it. */
+export const SET_STDIN_FLAG = '--text-stdin'
+
+/** Every flag `set` knows — named back at a caller that mistyped one. */
+export const SET_FLAGS = Object.freeze(['--title', '--estimate', SET_STDIN_FLAG, '--'])
+
+/**
+ * Split `set`'s argv into its buckets (point 439). PURE, so the flag handling is
+ * pinned by tests rather than by the shape of one `indexOf`.
+ *
+ *   set <N> "<text>"                    body from the argv
+ *   set <N> --text-stdin                body from stdin
+ *   set <N> --title --text-stdin        title from stdin (the umlaut-safe path)
+ *   set <N> --estimate "~2 h"           estimate from the argv
+ *   set <N> -- "-so beginnt der Text"   everything after `--` is literal text
+ *
+ * `stdinField` names which of the three the piped text fills; only one may claim
+ * it, because silently picking would drop the other.
+ */
+export function parseSetArgs(rest) {
+  const args = (Array.isArray(rest) ? rest : []).map((a) => String(a))
+  const buckets = { body: [], title: [], estimate: [] }
+  const out = { point: args[0], title: null, body: null, estimate: null, stdinField: null }
+  let field = 'body'
+  let literal = false
+  for (const a of args.slice(1)) {
+    if (!literal) {
+      // A bare `--` ends the flags for the CURRENT field, so a text that begins
+      // with a dash stays writable without a second command.
+      if (a === '--') {
+        literal = true
+        continue
+      }
+      if (a === '--title' || a === '--estimate') {
+        field = a.slice(2)
+        continue
+      }
+      if (a === SET_STDIN_FLAG) {
+        if (out.stdinField) throw new Error(`board-queue: ${SET_STDIN_FLAG} can fill only ONE field per call`)
+        out.stdinField = field
+        continue
+      }
+      if (a.startsWith('--')) {
+        throw new Error(
+          `board-queue: "${a}" is not a flag this command knows — it takes ${SET_FLAGS.join(', ')}. ` +
+            'A card text that really starts with a dash goes after a bare "--".',
+        )
+      }
+    }
+    buckets[field].push(a)
+  }
+  for (const key of ['title', 'body', 'estimate']) {
+    const joined = buckets[key].join(' ').trim()
+    if (joined) out[key] = joined
+  }
+  return out
 }
 
 /** The open points of a work-order text — the projection's other input. */

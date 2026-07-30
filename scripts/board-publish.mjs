@@ -41,9 +41,10 @@ import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { writeTextAtomic } from './atomic-write.mjs'
 import { REPO_ROOT, STATE_PATH, readJson, mergeState } from './dashboard-state.mjs'
-import { refreshFooter } from './board-core.mjs'
+import { normaliseLineEndings, refreshFooter } from './board-core.mjs'
 import { structureViolations } from './board-structure-core.mjs'
-import { parseTasks } from './dashboard-guard-core.mjs'
+import { QUEUE_STUB_META, parseTasks } from './dashboard-guard-core.mjs'
+import { ESTIMATE_CMD, TITLE_CMD, boardTitleReport, parseTaskTitles } from './board-queue-core.mjs'
 import {
   ARCHIVE_CONTENT_URL,
   ARCHIVE_FILE,
@@ -177,7 +178,11 @@ const fail = (reason) => {
 try {
   const html = readFileSync(boardFile, 'utf8')
   const { open } = parseTasks(readFileSync(tasksPath, 'utf8'))
-  const refreshed = refreshFooter(html, { openCount: open.length })
+  // LF-NORMALISED HERE TOO (point 439). This is the last write before the bytes
+  // go out, so whatever wrote the file before — a hand edit in Windows text mode
+  // included — the published board and the local one agree on their newlines,
+  // and the archive rotation can still find its section next time.
+  const refreshed = normaliseLineEndings(refreshFooter(html, { openCount: open.length }))
   if (refreshed !== html) {
     // Atomic (point 443, four-eyes F3) — and this one writes the very file the
     // next lines read, hash and push to the public page.
@@ -232,6 +237,26 @@ if (uncovered.length) {
   console.error('from the work order; a point with no prose yet gets a stub, which is enough to')
   console.error('publish). Write the prose with: node scripts/board-queue.mjs set <N> "<text>".')
   process.exit(1)
+}
+
+// THE PUBLISH SAYS WHAT THE READER WILL SEE (point 439). A card whose title is
+// still the work order's own headline reaches the German board in ENGLISH and in
+// CAPITALS, and one carrying the named "no estimate yet" marker shows no
+// expected duration — both pass every gate, which is why the first came back a
+// second time. Reported, never refused: the board must stay publishable, the
+// session must simply not be able to publish these unknowingly.
+try {
+  const report = boardTitleReport(repoBytes, parseTaskTitles(readFileSync(tasksPath, 'utf8')))
+  if (report.untranslated.length) {
+    console.error(`board-publish: point(s) ${report.untranslated.join(', ')} still carry the ENGLISH work-order`)
+    console.error(`  headline as their card title. Give them German ones: ${TITLE_CMD}`)
+  }
+  if (report.unestimated.length) {
+    console.error(`board-publish: point(s) ${report.unestimated.join(', ')} have no estimate — their card shows`)
+    console.error(`  "${QUEUE_STUB_META}" instead of an expected duration. Set one: ${ESTIMATE_CMD}`)
+  }
+} catch (e) {
+  console.error(`board-publish: the card-title report could not be built (${e.message})`)
 }
 
 // The fingerprint is stamped on the way OUT, never into the repo file: the repo

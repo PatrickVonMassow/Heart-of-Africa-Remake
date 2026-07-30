@@ -7,6 +7,7 @@
 //
 //   node scripts/board.mjs now    <point> "<status>"  # queue → current work
 //   node scripts/board.mjs status <point> "<text>"    # restate a now-card's status
+//   node scripts/board.mjs title  <point> "<text>"    # retitle a now- OR queue card
 //   node scripts/board.mjs queue  <point> ["<text>"]  # current work → back to queue
 //   node scripts/board.mjs done   <point> ["<text>"] --next <m> "<status>"
 //                                                     # archive + promote in ONE write
@@ -25,6 +26,16 @@
 //
 // The argument form still works and is fine for ASCII; a Windows shell mangles
 // umlauts on the way, which is why every session used to transliterate by hand.
+// `--none` takes it too — that gap card is written at every session boundary, so
+// it was the last place a German text still reached the board as an argument:
+//
+//   node scripts/board.mjs done 434 --none --text-stdin <<'EOF'
+//   Der Punkt ist abgeschlossen. Ich übergebe an eine frische Sitzung …
+//   EOF
+//
+// A BLANK LINE IN THE PIPED TEXT BECOMES A PARAGRAPH (point 439). The
+// conciseness guard blocks a long body squeezed into one <p>, and until now the
+// only way to split one was hand-editing the board HTML.
 //
 // Every editing command publishes the live page itself, so the loop is exactly:
 // (1) an editing command, (2) `attest`.
@@ -37,16 +48,21 @@ import {
   addVdzk,
   berlinStamp,
   closeCard,
+  normaliseLineEndings,
   parseDoneArgs,
   promoteToNow,
+  promotionEstimateWarning,
   removeVdzk,
   resolveCardText,
   setCardStatus,
+  setCardTitle,
   toNow,
   toQueue,
 } from './board-core.mjs'
 import { PUBLISH_CMD } from './board-remedy.mjs'
 import { writeTextAtomic } from './atomic-write.mjs'
+import { QUEUE_DATA_PATH, setQueueEntry } from './board-queue-core.mjs'
+import { readJson } from './dashboard-state.mjs'
 
 const BOARD = resolve(REPO_ROOT, '.batch-dashboard.html')
 const PUBLISH_SCRIPT = 'scripts/board-publish.mjs'
@@ -75,7 +91,11 @@ function edit(fn, done) {
   // ATOMIC (point 443, four-eyes F3). A kill mid-write left torn local bytes,
   // the doctor read the hash mismatch as "the publish is behind", and its repair
   // pushed the torn HTML to the page the user reads from their phone.
-  writeTextAtomic(BOARD, fn(readFileSync(BOARD, 'utf8')))
+  // LF-NORMALISED (point 439): an editor that once wrote this file back in
+  // Windows text mode left it MIXED, and the archive rotation then could not
+  // find the Erledigt section at all — `attest` crashed on a board that looked
+  // perfect in the browser. No writer has to be trusted with the line ending.
+  writeTextAtomic(BOARD, normaliseLineEndings(fn(normaliseLineEndings(readFileSync(BOARD, 'utf8')))))
   console.log(done)
   console.log(run(['scripts/board-archive-rotate.mjs']).trim().split('\n')[0])
   // THE LIVE PAGE IS PUBLISHED HERE (point 400, delta D — four-eyes finding 2).
@@ -114,14 +134,32 @@ try {
     if (!point || words.length === 0) throw new Error('usage: board.mjs status <point> "<text>"|--text-stdin')
     const at = berlinStamp()
     edit((html) => setCardStatus(html, point, textOf(words), at), `status of ${point} restated (Stand ${at})`)
+  } else if (cmd === 'title') {
+    // RETITLING HAD NO COMMAND AT ALL for a now-card (point 439), so the three
+    // current-work cards of 30.07.2026 were fixed by hand-editing the HTML — the
+    // edit that then wrecked the line endings. The queue side is written to the
+    // DATA file as well: the Warteschlange is a projection, so a title that lived
+    // only in the HTML would evaporate on the next rebuild.
+    const [point, ...words] = rest
+    if (!point || words.length === 0) throw new Error('usage: board.mjs title <point> "<text>"|--text-stdin')
+    const title = textOf(words)
+    edit((html) => setCardTitle(html, point, title), `${point} retitled: ${title}`)
+    const dataFile = resolve(REPO_ROOT, QUEUE_DATA_PATH)
+    writeTextAtomic(dataFile, `${JSON.stringify(setQueueEntry(readJson(dataFile), point, { title }), null, 2)}\n`)
+    console.log(`the title is kept in ${QUEUE_DATA_PATH}, so a queue rebuild does not undo it`)
   } else if (cmd === 'now') {
     const [point, ...words] = rest
     if (!point || words.length === 0) throw new Error('usage: board.mjs now <point> "<status>"|--text-stdin')
     const at = berlinStamp()
+    // READ BEFORE THE MOVE: once the queue card is gone, nothing can say whether
+    // it carried an estimate — and a now-card promoted without one renders a
+    // start time and no expected end, which is the invisibility point 439 ends.
+    const noEstimate = promotionEstimateWarning(readFileSync(BOARD, 'utf8'), point)
     edit(
       (html) => toNow(html, point, textOf(words), { stamp: at }),
       `${point} is current work since ${at} (title and estimate taken from its queue card)`,
     )
+    if (noEstimate) console.error(noEstimate)
   } else if (cmd === 'queue') {
     const [point, ...words] = rest
     if (!point) throw new Error('usage: board.mjs queue <point> ["<text>"|--text-stdin]')
@@ -130,8 +168,14 @@ try {
     // ONE edit, one write (point 416): archiving and the successor go into the
     // same document, so the board is never observed without current work.
     const { point, words, next, nextWords, noneWords, hasNone } = parseDoneArgs(rest)
-    if (!point) throw new Error('usage: board.mjs done <point> ["<text>"] [--next <m> "<status>" | --none "<reason>"]')
+    if (!point) {
+      throw new Error(
+        'usage: board.mjs done <point> ["<text>"] [--next <m> "<status>" | --none "<reason>"] ' +
+          `(any "<text>" may be ${TEXT_STDIN_FLAG} — including --none's reason)`,
+      )
+    }
     const at = berlinStamp()
+    const noEstimate = next == null ? null : promotionEstimateWarning(readFileSync(BOARD, 'utf8'), next)
     edit(
       (html) =>
         closeCard(html, point, {
@@ -149,6 +193,7 @@ try {
           ? `${point} archived as done at ${at}; the board now names why nothing is running`
           : `${point} archived as done at ${at}`,
     )
+    if (noEstimate) console.error(noEstimate)
   } else if (cmd === 'vdzk-add') {
     // EVERY decision asked of the user belongs here (point 421): the chat is an
     // inbox he writes into, not a board he reads. `decision-card-guard` blocks a
@@ -184,7 +229,7 @@ try {
     console.log(run(['scripts/prep-guard.mjs', '--prepped']).trim())
   } else {
     console.error(
-      'usage: board.mjs now|status|queue <point> "<text>" | ' +
+      'usage: board.mjs now|status|title|queue <point> "<text>" | ' +
         'done <point> ["<text>"] [--next <m> "<status>" | --none "<reason>"] | ' +
         'vdzk-add "<title>" "<question>" | vdzk-remove "<title>" | ' +
         'promote <point> "<times>" "<title>" "<status>" | focus <point> "<note>" | attest\n' +

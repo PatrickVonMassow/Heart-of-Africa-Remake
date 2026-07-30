@@ -14,16 +14,24 @@ import {
   sliceSections,
   QUEUE_STUB_META,
 } from './dashboard-guard-core.mjs'
+import { concisenessOffenders } from './dashboard-conciseness-guard-core.mjs'
 import {
+  ERLEDIGT_ANCHOR,
   NO_CURRENT_WORK_TITLE,
   TEXT_STDIN_FLAG,
   addHours,
   addVdzk,
   berlinStamp,
+  cardParagraphs,
   closeCard,
+  erledigtSectionStart,
   estimateHours,
   hasCurrentWork,
+  normaliseLineEndings,
   parseDoneArgs,
+  promotionEstimateWarning,
+  queueEstimateHours,
+  renderCardBody,
   resolveCardText,
   hoursLabel,
   nowCard,
@@ -31,6 +39,7 @@ import {
   refreshFooter,
   removeVdzk,
   setCardStatus,
+  setCardTitle,
   toDone,
   toNow,
   toQueue,
@@ -538,6 +547,161 @@ describe('refreshFooter — the count the repository already knows', () => {
     const { open } = parseTasks(readFileSync(resolve(REPO_ROOT, 'TASKS.md'), 'utf8'))
     const codes = auditDashboard(refreshFooter(html, { openCount: open.length }), { open, done: [] }).map((v) => v.code)
     expect(codes).not.toContain('footer-stale')
+  })
+})
+
+// ═══ Point 439 — what the sanctioned commands could NOT do, so it was done by
+// hand instead: retitle a card, split a body into paragraphs, keep the line
+// endings. Each hand edit is what then broke the next mechanism along.
+describe('cardParagraphs / renderCardBody — a blank line is a paragraph boundary', () => {
+  it('splits on a blank line and joins a wrapped one', () => {
+    expect(cardParagraphs('Erster Absatz.\n\nZweiter Absatz.')).toEqual(['Erster Absatz.', 'Zweiter Absatz.'])
+    expect(cardParagraphs('Eine Zeile,\nnoch dieselbe.')).toEqual(['Eine Zeile, noch dieselbe.'])
+    expect(cardParagraphs('Nur einer.')).toEqual(['Nur einer.'])
+    expect(cardParagraphs('  \n\n  ')).toEqual([])
+  })
+
+  it('renders one <p> per paragraph, the stamp leading the FIRST only', () => {
+    const two = renderCardBody('Erster.\n\nZweiter.', { stamp: '16:20' })
+    expect(two.match(/<p>/g)).toHaveLength(2)
+    expect(two).toContain('<p><span class="stamp">Stand 16:20</span> Erster.</p>')
+    expect(two).toContain('<p>Zweiter.</p>')
+    expect(renderCardBody('Nur einer.').match(/<p>/g)).toHaveLength(1)
+  })
+
+  it('lets NO bare blank line reach the file inside a tag', () => {
+    for (const text of ['A.\n\nB.', 'A.\r\n\r\nB.', 'A.\n\n\n\nB.', 'A.\n \nB.']) {
+      const body = renderCardBody(text)
+      expect(body).not.toMatch(/<p>[^<]*\n\s*\n/)
+      expect(body.match(/<p>/g)).toHaveLength(2)
+    }
+  })
+
+  // The whole reason this exists: `board.mjs status` wrapped whatever it was
+  // given into ONE <p>, while dashboard-conciseness-guard blocks the turn end on
+  // "one long unbroken paragraph — split into paragraphs". The only way out was
+  // hand-editing the board HTML, which is what wrecked the line endings.
+  it('lets the sanctioned command produce what the conciseness guard demands', () => {
+    const long = `${'Wort '.repeat(40).trim()}.\n\n${'Wort '.repeat(40).trim()}.`
+    const html = setCardStatus(board(), 361, long, '16:20')
+    expect(concisenessOffenders(`<h2>Woran ich gerade arbeite</h2>${html}`)).toEqual([])
+    // Piped through as ONE paragraph it is exactly the block the guard refuses.
+    const squashed = setCardStatus(board(), 361, long.replace(/\n\n/g, ' '), '16:20')
+    expect(concisenessOffenders(`<h2>Woran ich gerade arbeite</h2>${squashed}`)[0].reason).toMatch(/unbroken paragraph/)
+  })
+
+  it('carries a multi-paragraph status over intact when the card MOVES', () => {
+    const card = nowEntry(373, 'T', '16:20 · ~18:30', 'x')
+    const withBody = setCardStatus(fullBoard({ now: card }), 373, 'Erster.\n\nZweiter.', '16:20')
+    const queued = toQueue(withBody, 373)
+    expect(queued).toContain('<p>Erster.</p>')
+    expect(queued).toContain('<p>Zweiter.</p>')
+    expect(queued).not.toContain('Stand 16:20')
+  })
+})
+
+describe('normaliseLineEndings — the board is LF, whatever wrote it', () => {
+  it('collapses CRLF and a lone CR', () => {
+    expect(normaliseLineEndings('a\r\nb\rc\nd')).toBe('a\nb\nc\nd')
+    expect(normaliseLineEndings(null)).toBe('')
+  })
+
+  // 30.07.2026: a now-card had to be retitled by hand, the editor wrote the file
+  // back in Windows text mode, later node writes left it MIXED — and the archive
+  // rotation could not find the Erledigt section at all, so `attest` crashed with
+  // a stack trace on a board that looked perfect in the browser.
+  it('lets the archive rotation find its section in a board written with CRLF', () => {
+    // The anchor the rotation matches by is LITERAL, newline included — which is
+    // exactly why a CRLF file defeated it.
+    const lf = `<main>\n${ERLEDIGT_ANCHOR}\n<details><summary><span class="num">1</span></summary></details>\n</details>\n`
+    expect(erledigtSectionStart(lf)).toBeGreaterThan(-1)
+    const crlf = lf.replace(/\n/g, '\r\n')
+    expect(crlf.indexOf(ERLEDIGT_ANCHOR)).toBe(-1) // the failure, reproduced
+    expect(erledigtSectionStart(crlf)).toBeGreaterThan(-1) // …and repaired
+    expect(normaliseLineEndings(crlf)).toContain(ERLEDIGT_ANCHOR)
+  })
+})
+
+describe('setCardTitle — the command a now-card never had', () => {
+  const withBoth = () =>
+    fullBoard({
+      now: nowEntry(373, 'DER ALTE TITEL', '16:20 · ~18:30'),
+      queue: queueEntry(369, 'AN OLD HEADLINE', '~2 h'),
+    })
+
+  it('retitles a now-card, keeping its number, times and body', () => {
+    const out = setCardTitle(withBoth(), 373, 'Die Sitzungsgrenze')
+    expect(out).toContain('<span class="t">373 — Die Sitzungsgrenze</span>')
+    expect(out).toContain('<span class="meta">16:20 · ~18:30</span>')
+    expect(out).toContain('<span class="stamp">Stand 16:20</span> läuft')
+    expect(out).not.toContain('DER ALTE TITEL')
+  })
+
+  it('retitles a queue card, keeping its estimate and body', () => {
+    const out = setCardTitle(withBoth(), 369, 'Ein verwaistes Jungtier')
+    expect(out).toContain('<span class="num">369</span><span class="t">Ein verwaistes Jungtier</span>')
+    expect(out).toContain('<span class="meta">~2 h</span>')
+    expect(out).toContain('<p>Warum das ansteht.</p>')
+  })
+
+  it('leaves the OTHER card untouched — one point, one card', () => {
+    const out = setCardTitle(withBoth(), 373, 'Neu')
+    expect(out).toContain('AN OLD HEADLINE')
+  })
+
+  it('refuses rather than silently matching nothing', () => {
+    expect(() => setCardTitle(withBoth(), 999, 'Neu')).toThrow(/no current-work or queue card/)
+    expect(() => setCardTitle(withBoth(), 373, '  ')).toThrow(/empty title/)
+    expect(() => setCardTitle(withBoth(), 'x', 'Neu')).toThrow(/not a point number/)
+    expect(() => setCardTitle('', 373, 'Neu')).toThrow(/empty document/)
+  })
+
+  it('leaves the board free of new audit violations', () => {
+    const before = auditDashboard(withBoth(), { open: [], done: [] }).map((x) => x.code)
+    const after = auditDashboard(setCardTitle(withBoth(), 373, 'Neu'), { open: [], done: [] }).map((x) => x.code)
+    expect(after).toEqual(before)
+  })
+})
+
+describe('the promoted card carries its estimate, or the promotion is REPORTED', () => {
+  it('renders the queue estimate beside the start time', () => {
+    const out = toNow(fullBoard({ queue: queueEntry(369, 'Ein Titel', '~2 h') }), 369, 'x', { stamp: '16:20' })
+    expect(out).toContain('<span class="meta">16:20 · ~18:20</span>')
+  })
+
+  it('reports a promotion with no estimate rather than rendering the card bare', () => {
+    const bare = fullBoard({ queue: queueEntry(369, 'Ohne Schätzung', QUEUE_STUB_META) })
+    expect(queueEstimateHours(bare, 369)).toBeNull()
+    expect(promotionEstimateWarning(bare, 369)).toMatch(/NO estimate/)
+    expect(promotionEstimateWarning(bare, 369)).toMatch(/--estimate/)
+    // …and the card really does come out with a start time alone.
+    expect(toNow(bare, 369, 'x', { stamp: '09:05' })).toContain('<span class="meta">09:05</span>')
+  })
+
+  it('says nothing when the estimate is there', () => {
+    const good = fullBoard({ queue: queueEntry(369, 'Mit Schätzung', '~2 h') })
+    expect(queueEstimateHours(good, 369)).toBe(2)
+    expect(promotionEstimateWarning(good, 369)).toBeNull()
+  })
+
+  it('reports a point that has no queue card at all rather than throwing', () => {
+    expect(promotionEstimateWarning(fullBoard({}), 999)).toMatch(/NO estimate/)
+  })
+})
+
+describe('a flag never reaches a card as prose', () => {
+  it('refuses an argv word beginning with -- and names the flag it knows', () => {
+    expect(() => resolveCardText(['--text-stdinn'], '')).toThrow(/refusing to write the flag/)
+    expect(() => resolveCardText(['--none'], '')).toThrow(/--text-stdin/)
+  })
+  it('accepts one after a bare -- separator', () => {
+    expect(resolveCardText(['--', '--so', 'beginnt', 'der', 'Text'], '')).toBe('--so beginnt der Text')
+  })
+  it('leaves the stdin path alone — that text was never near a shell', () => {
+    expect(resolveCardText([TEXT_STDIN_FLAG], '--kein Flag, sondern Prosa\n')).toBe('--kein Flag, sondern Prosa')
+  })
+  it('keeps the blank lines a piped text carries — they are the paragraph breaks', () => {
+    expect(resolveCardText([TEXT_STDIN_FLAG], '\r\nErster.\r\n\r\nZweiter.\r\n')).toBe('Erster.\n\nZweiter.')
   })
 })
 

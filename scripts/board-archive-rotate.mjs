@@ -12,6 +12,7 @@ import { readFileSync, writeFileSync, existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { REPO_ROOT } from './repo-paths.mjs'
 import { ERLEDIGT_ON_BOARD } from './dashboard-guard-core.mjs'
+import { erledigtSectionStart, normaliseLineEndings } from './board-core.mjs'
 import { REPUBLISH } from './board-remedy.mjs'
 
 const BOARD = resolve(REPO_ROOT, '.batch-dashboard.html')
@@ -20,20 +21,28 @@ const CARD = /<details>\s*<summary>[\s\S]*?<\/details>\s*/g
 
 /** The Erledigt section's inner HTML, and where it sits in the board. */
 function erledigtSpan(html) {
-  const start = html.indexOf('<details class="sect">\n<summary><h2>Erledigt</h2></summary>')
+  const start = erledigtSectionStart(html)
   if (start < 0) throw new Error('Erledigt section not found — did the board markup change?')
   const footer = html.indexOf('<footer', start)
   return { start, end: footer < 0 ? html.length : footer }
 }
 
 const check = process.argv.includes('--check')
-const board = readFileSync(BOARD, 'utf8')
+// NORMALISED BEFORE ANYTHING IS MEASURED (point 439). The anchor above is matched
+// with a literal newline, so a board an editor wrote back in Windows text mode
+// made this script throw a stack trace mid-`attest` on a board that looked
+// perfect in the browser. The offsets below index THESE bytes, so the file is
+// written back normalised too — a mixed file cannot survive one rotation.
+const board = normaliseLineEndings(readFileSync(BOARD, 'utf8'))
 const { start, end } = erledigtSpan(board)
 const section = board.slice(start, end)
 const cards = section.match(CARD) ?? []
 const over = cards.length - ERLEDIGT_ON_BOARD
 
 if (over <= 0) {
+  // A file whose only defect was its line endings is still repaired here — the
+  // next rotation must not meet the same mixed bytes again.
+  if (board !== readFileSync(BOARD, 'utf8') && !check) writeFileSync(BOARD, board)
   console.log(`board holds ${cards.length}/${ERLEDIGT_ON_BOARD} done cards — nothing to rotate`)
   process.exit(0)
 }
@@ -49,7 +58,7 @@ for (const c of moved) newSection = newSection.replace(c, '')
 writeFileSync(BOARD, board.slice(0, start) + newSection + board.slice(end))
 
 // The archive lists newest first, like the board, so the overflow goes on top.
-const archive = readFileSync(ARCHIVE, 'utf8')
+const archive = normaliseLineEndings(readFileSync(ARCHIVE, 'utf8'))
 const anchor = archive.indexOf('<h2>')
 const at = archive.indexOf('\n', archive.indexOf('</h2>', anchor)) + 1
 writeFileSync(ARCHIVE, archive.slice(0, at) + moved.join('') + archive.slice(at))

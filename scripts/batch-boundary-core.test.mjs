@@ -27,6 +27,12 @@ import {
   hookCallTimestamp,
   WITHDRAWAL_TRIGGER_MAX,
 } from './batch-boundary-core.mjs'
+import { NO_CURRENT_WORK_TITLE } from './board-core.mjs'
+import {
+  evaluate as evaluateTopic,
+  knownPoints,
+  topicViolations,
+} from './dashboard-card-topic-guard-core.mjs'
 import { progressGuardDecision } from './batch-singleton.mjs'
 
 const NOW = 1_785_000_000_000
@@ -479,7 +485,7 @@ describe('the boundary card names where the batch actually goes', () => {
     const where = boundaryDestination({ claimHonoured: true, claimantSid: 'session-window-1' })
     expect(where).toEqual({ destination: BOUNDARY_DESTINATIONS.CLAIMING_WINDOW, claimantSid: 'session-window-1' })
     const text = boundaryCardText({ point: 434, ...where })
-    expect(text).toContain('Punkt 434 ist abgeschlossen.')
+    expect(text).toContain('Der Punkt ist abgeschlossen.')
     expect(text).toContain('NICHT an eine frische Sitzung')
     expect(text).toContain('Fenster session-window-1 hat ihn beansprucht')
     expect(text).toContain('Launcher hält den Start deshalb zurück')
@@ -508,10 +514,33 @@ describe('the boundary card names where the batch actually goes', () => {
     )
   })
 
-  it('is total, and never prints a nonsense point number', () => {
-    expect(boundaryCardText({}).startsWith('Der Punkt ist abgeschlossen.')).toBe(true)
-    expect(boundaryCardText({ point: 'vier' }).startsWith('Der Punkt ist abgeschlossen.')).toBe(true)
-    expect(boundaryCardText({ point: 0 }).startsWith('Der Punkt ist abgeschlossen.')).toBe(true)
+  it('is total, and never prints a point number at all', () => {
+    for (const point of [undefined, 'vier', 0, 434]) {
+      expect(boundaryCardText({ point }).startsWith('Der Punkt ist abgeschlossen.')).toBe(true)
+    }
+  })
+
+  // POINT 439: two sanctioned mechanisms used to contradict each other. This text
+  // is prescribed for VERBATIM use in the gap card `done <n> --none` writes — a
+  // card that owns no point number, so the topic guard read every "Punkt N" in it
+  // as a reference to a foreign point and blocked the turn end. The loser was
+  // always the boundary: the block costs a turn, and every remedy command counts
+  // as work and deletes the marker, so the handover had to be re-taken.
+  it('AGREES WITH THE TOPIC GUARD: the prescribed text passes in the card it is written into', () => {
+    const tasks = '- [ ] 434. Etwas Offenes.\n- [ ] 439. Noch etwas.\n- [x] 400. Erledigt.\n'
+    const gapCard = (text) =>
+      '<h2>Woran ich gerade arbeite</h2>\n' +
+      `<details class="now"><summary><span class="t">${NO_CURRENT_WORK_TITLE}</span></summary>` +
+      `<div class="body"><p><span class="stamp">Stand 21:10</span> ${text}</p></div></details>\n` +
+      '<h2>Erledigt</h2>\n'
+    for (const where of [
+      boundaryDestination({}),
+      boundaryDestination({ claimHonoured: true, claimantSid: 'session-window-1' }),
+    ]) {
+      const card = gapCard(boundaryCardText({ point: 434, ...where }))
+      expect(topicViolations(card, knownPoints(tasks))).toEqual([])
+      expect(evaluateTopic({ dashboardHtml: card, tasksText: tasks }).block).toBe(false)
+    }
   })
 
   it('INDEPENDENCE: the card is decided with no lock, no launcher probe and no work order', () => {

@@ -11,16 +11,22 @@ import { auditDashboard, QUEUE_STUB_META } from './dashboard-guard-core.mjs'
 import { FINDER_POINTS, RELEASE_TAG_POINT } from './queue-order-guard-core.mjs'
 import {
   QUEUE_STUB_BODY,
+  assertNotFlagValue,
+  boardTitleReport,
   buildQueueSection,
   importQueueFromHtml,
+  isUntranslatedTitle,
   normaliseQueueData,
   openPointsOf,
   paragraphs,
+  parseSetArgs,
   parseTaskTitles,
   queueEntries,
   queueOrder,
   renderQueueCard,
   setQueueEntry,
+  unestimatedPoints,
+  untranslatedTitlePoints,
 } from './board-queue-core.mjs'
 
 const board = (queue) => `<title>B</title>
@@ -246,5 +252,161 @@ describe('the work order supplies the names and the open set', () => {
   })
   it('never throws on junk', () => {
     for (const raw of [null, 42, {}, '']) expect(() => parseTaskTitles(raw)).not.toThrow()
+  })
+
+  // THE ROOT CAUSE of "444 Punkt 444, 445 Punkt 445 …" on the user's phone
+  // (30.07.2026). The pattern is `$`-anchored and `.` never matches a `\r`, so on
+  // a checkout where TASKS.md carries CRLF this returned ZERO titles — silently,
+  // for every line — and the card fell through to its last fallback rung. A
+  // fixture written only with `\n` passes either way and proves nothing, which is
+  // exactly how it survived; this one feeds the CRLF the file actually had.
+  it('reads a CRLF work order — the ending the file is checked out with', () => {
+    const crlf = tasks.replace(/\n/g, '\r\n')
+    expect(parseTaskTitles(crlf)[412]).toBe('Ein Titel des Punktes')
+    expect(Object.keys(parseTaskTitles(crlf))).toHaveLength(Object.keys(parseTaskTitles(tasks)).length)
+    // …and no `\r` rides along into the card title.
+    for (const title of Object.values(parseTaskTitles(crlf))) expect(title).not.toMatch(/\r/)
+  })
+
+  it('a CRLF work order projects titled cards, not bare numbers', () => {
+    const entries = queueEntries({ open: [412, 413], titles: parseTaskTitles(tasks.replace(/\n/g, '\r\n')) })
+    expect(entries.map((e) => e.title)).toEqual(['Ein Titel des Punktes', 'Ein zweiter Titel'])
+    expect(entries.map((e) => e.title)).not.toContain('Punkt 412')
+  })
+})
+
+// ═══ Point 439 — the fallback stays, but it can no longer pass unnoticed ═══
+// The user asked TWICE why the card titles were English and in capitals. The
+// middle rung of `entry.title || titles[point] || "Punkt N"` is the work-order
+// headline, English by rule and written in capitals; the last is the bare
+// number. Neither said anything, which is why it came back.
+describe('isUntranslatedTitle — measured against the parsed headline, never a language guess', () => {
+  const titles = { 444: 'THE BOARD LOSES ITS UMLAUTS ON THE WAY IN' }
+
+  it('passes an authored German title', () => {
+    expect(isUntranslatedTitle('Die Tafel verliert ihre Umlaute', 444, titles)).toBe(false)
+  })
+  it('reports the raw work-order headline', () => {
+    expect(isUntranslatedTitle(titles[444], 444, titles)).toBe(true)
+  })
+  it('reports the bare-number fallback', () => {
+    expect(isUntranslatedTitle('Punkt 444', 444, {})).toBe(true)
+    expect(isUntranslatedTitle('', 444, {})).toBe(true)
+  })
+  it('does NOT report a German title that merely RESEMBLES the headline', () => {
+    // No language heuristic anywhere: only an exact match against the parsed
+    // headline counts, so a title that borrows its words stays untouched.
+    expect(isUntranslatedTitle('THE BOARD LOSES ITS UMLAUTS ON THE WAY IN (Fassung)', 444, titles)).toBe(false)
+    expect(isUntranslatedTitle('Punkt 4440', 444, {})).toBe(false)
+  })
+  it('never mistakes another point’s headline for this one’s', () => {
+    expect(isUntranslatedTitle(titles[444], 445, titles)).toBe(false)
+  })
+})
+
+describe('the generator SAYS which cards are still unnamed and unestimated', () => {
+  const titles = { 444: 'A WORK ORDER HEADLINE', 445: 'ANOTHER ONE' }
+
+  it('flags the fallback title on the entry itself, and lists the points', () => {
+    const data = { points: { 444: { title: 'Ein deutscher Titel', body: 'Text.', estimate: '~2 h' } } }
+    const entries = queueEntries({ open: [444, 445, 446], data, titles })
+    expect(entries.map((e) => e.untranslated)).toEqual([false, true, true])
+    expect(untranslatedTitlePoints(entries)).toEqual([445, 446])
+  })
+
+  it('lists the cards carrying the named "no estimate yet" marker', () => {
+    // `auditDashboard` accepts that marker BY NAME — rightly, or the board would
+    // deadlock against a card only the generator can produce. So it must be
+    // REPORTED instead: sixteen appended points sat unestimated at once.
+    const data = { points: { 444: { body: 'Text.', estimate: '~2 h' } } }
+    const entries = queueEntries({ open: [444, 445], data, titles })
+    expect(unestimatedPoints(entries)).toEqual([445])
+    expect(entries.map((e) => e.meta)).toEqual(['~2 h', QUEUE_STUB_META])
+    // Reported, and STILL passing the audit — the report is not a new block.
+    const { html } = buildQueueSection(board(''), { open: [210, 444, 445], exclude: [210], titles })
+    expect(auditDashboard(html, { open: [210, 444, 445], done: [], nowMinutes: 9 * 60 }).map((x) => x.code)).not.toContain(
+      'queue-meta',
+    )
+  })
+
+  it('reads the same two reports back off a BOARD, which is what the publish check sees', () => {
+    const html = board(
+      renderQueueCard({ point: 444, title: 'Ein deutscher Titel', body: 'Text.', meta: '~2 h' }) +
+        renderQueueCard({ point: 445, title: titles[445], body: 'Text.', meta: '~1 h' }) +
+        renderQueueCard({ point: 446, title: 'Punkt 446', body: 'Text.', meta: QUEUE_STUB_META }),
+    )
+    expect(boardTitleReport(html, titles)).toEqual({ untranslated: [445, 446], unestimated: [446] })
+  })
+
+  it('survives a board with no queue at all rather than throwing inside a publish', () => {
+    expect(boardTitleReport('<main></main>', titles)).toEqual({ untranslated: [], unestimated: [] })
+  })
+})
+
+describe('a command-line flag is never a card text', () => {
+  // `board-queue.mjs set` had no `--text-stdin`, so a session that tried to pipe
+  // German prose in stored the literal string as the card body — six cards, three
+  // of them live, showed the user a flag where their explanation belonged.
+  it('REFUSES to store a value that begins with --', () => {
+    expect(() => setQueueEntry(null, 452, { body: '--text-stdin' })).toThrow(/--text-stdin/)
+    expect(() => setQueueEntry(null, 452, { title: '--title' })).toThrow(/title/)
+    expect(() => setQueueEntry(null, 452, { estimate: '--estimate' })).toThrow(/estimate/)
+    expect(() => assertNotFlagValue('--whatever', 'body')).toThrow(/refusing to store the flag "--whatever"/)
+  })
+  it('accepts a text that legitimately begins with a single dash', () => {
+    expect(setQueueEntry(null, 452, { body: '– so beginnt der Text' }).points[452].body).toBe('– so beginnt der Text')
+    expect(assertNotFlagValue('-nicht geflaggt', 'body')).toBe('-nicht geflaggt')
+  })
+})
+
+describe('parseSetArgs — the flags behind one `set` call', () => {
+  it('takes the body from the argv by default', () => {
+    expect(parseSetArgs(['452', 'Der', 'Text.'])).toMatchObject({ point: '452', body: 'Der Text.', stdinField: null })
+  })
+  it('routes --title and --estimate into their own fields', () => {
+    expect(parseSetArgs(['452', '--title', 'Ein Titel', '--estimate', '~2 h', 'Der Text.'])).toMatchObject({
+      point: '452',
+      title: 'Ein Titel',
+      estimate: '~2 h Der Text.',
+    })
+  })
+  it('names which field --text-stdin fills — the umlaut-safe path for a TITLE', () => {
+    expect(parseSetArgs(['452', '--text-stdin']).stdinField).toBe('body')
+    expect(parseSetArgs(['452', '--title', '--text-stdin']).stdinField).toBe('title')
+    expect(parseSetArgs(['452', '--estimate', '--text-stdin']).stdinField).toBe('estimate')
+    // Never stored as prose, whichever field it stood in.
+    expect(parseSetArgs(['452', '--text-stdin']).body).toBeNull()
+    expect(parseSetArgs(['452', '--title', '--text-stdin']).title).toBeNull()
+  })
+  it('refuses to guess when two fields claim the pipe', () => {
+    expect(() => parseSetArgs(['452', '--text-stdin', '--title', '--text-stdin'])).toThrow(/only ONE field/)
+  })
+  it('refuses an unknown flag and NAMES the ones it knows', () => {
+    expect(() => parseSetArgs(['452', '--titel', 'x'])).toThrow(/--title/)
+  })
+  it('a bare -- ends the flags, so a text starting with a dash stays writable', () => {
+    expect(parseSetArgs(['452', '--', '--kein', 'Flag']).body).toBe('--kein Flag')
+    expect(parseSetArgs(['452', '--title', '--', '--seltsam']).title).toBe('--seltsam')
+  })
+  it('never throws on nothing at all', () => {
+    expect(parseSetArgs([])).toMatchObject({ point: undefined, body: null })
+    expect(parseSetArgs(null)).toMatchObject({ point: undefined })
+  })
+})
+
+describe('setQueueEntry — a title lands without disturbing anything else', () => {
+  it('writes the title and leaves body and estimate exactly as they were', () => {
+    const before = setQueueEntry(null, 452, { body: 'Der Text.', estimate: '~3 h' })
+    const after = setQueueEntry(before, 452, { title: 'Ein deutscher Titel' })
+    expect(after.points[452]).toEqual({ title: 'Ein deutscher Titel', body: ['Der Text.'], estimate: '~3 h' })
+    expect(after.order).toEqual([452])
+  })
+  it('and an estimate lands without disturbing title or body', () => {
+    const before = setQueueEntry(null, 452, { title: 'Titel', body: 'Text.' })
+    expect(setQueueEntry(before, 452, { estimate: '~4 h' }).points[452]).toEqual({
+      title: 'Titel',
+      body: ['Text.'],
+      estimate: '~4 h',
+    })
   })
 })
