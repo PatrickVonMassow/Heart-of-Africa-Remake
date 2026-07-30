@@ -31,6 +31,8 @@
 import { createHash } from 'node:crypto'
 import { parseQueueCards, parseNowCard } from './queue-order-guard-core.mjs'
 import { parseNowCardPoints } from './dashboard-guard-core.mjs'
+// The remedies' publish steps come from scripts/board-remedy.mjs — one copy.
+import { REPUBLISH } from './board-remedy.mjs'
 
 // ---- calibratable constants -------------------------------------------------
 
@@ -297,8 +299,7 @@ export function evaluate(input) {
     if (closed.length) {
       problems.push(
         `STALE QUEUE CARD(S): point(s) ${closed.join(', ')} are ticked done ([x]) in TASKS.md but still ` +
-          'have a Warteschlange card. Move them to Erledigt, republish (dashboard-publish.mjs + Artifact), ' +
-          're-run --synced.',
+          `have a Warteschlange card. Move them to Erledigt, then ${REPUBLISH}.`,
       )
     }
     if (unknown.length) {
@@ -335,8 +336,7 @@ export function evaluate(input) {
           `${drifted.join(', ')} changed since the last --synced review but the card text did not. ` +
           'Re-read each changed spec and update its card to the CURRENT target state (final state, no ' +
           'iterative phrasing), or — if the card is still accurate — leave it and refresh the snapshot. ' +
-          'Either way: republish (dashboard-publish.mjs + Artifact) and re-run --synced (which re-records ' +
-          'the snapshots and clears this flag).',
+          `Either way: ${REPUBLISH} (which re-records the snapshots and clears this flag).`,
       )
     }
 

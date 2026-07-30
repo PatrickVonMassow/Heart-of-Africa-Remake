@@ -979,31 +979,52 @@ point in the queue, every open point visible, a DECLARED focus
 (`scripts/focus.mjs set <N> "<what>"`), now-card title == declared focus, an
 acknowledged pivot check after every user prompt (`focus.mjs confirm` — armed
 automatically by the UserPromptSubmit hook), a re-affirmation after ~30 min of
-tool work, and publish parity (repo file bytes == the content last published, to
-the live page or via the Artifact tool — so "edited" can never masquerade as
-"live"; the two-file repo/scratchpad split is bridged by
-`scripts/dashboard-publish.mjs`).
+tool work, and publish parity (repo file bytes == the content last pushed to the
+live page — so "edited" can never masquerade as "live").
 
 The standard cycle after any dashboard edit:
 `node scripts/board-publish.mjs` (the live page — works in every session) →
 `node scripts/dashboard-guard.mjs --synced .batch-dashboard.html` (which doubles
-as the focus confirmation when card and focus agree). While the claude.ai mirror
-is still kept, `node scripts/dashboard-publish.mjs` → Artifact publish of the
-synced scratchpad file (same artifact url) runs alongside it; either publish
-satisfies the parity invariant, and each records its own hash. On every work
-switch: `node scripts/focus.mjs set <N> "<what>"`. What stays judgment: the
-machine verifies the card's POINT NUMBER, publish state and freshness, never the
-truth of the prose.
+as the focus confirmation when card and focus agree). On every work switch:
+`node scripts/focus.mjs set <N> "<what>"`. What stays judgment: the machine
+verifies the card's POINT NUMBER, publish state and freshness, never the truth of
+the prose.
+
+**Every remedy names those two commands and nothing else (point 435).** They live
+once, in `scripts/board-remedy.mjs`, and every board guard imports them — until
+30.07.2026 each guard carried its own copy still pointing at the retired claude.ai
+mirror, and a remedy is read at the moment of a block and FOLLOWED. The board's
+CONTRACT — four sections, transport, update discipline — is likewise stated
+exactly once, in the memory `batch-dashboard-artifact`; nothing restates it. The
+canonical file is the git-ignored `.batch-dashboard.html` in the repo root,
+resolved by `boardFilePath()` so nothing measures a stale copy. `scripts/board-remedy.test.mjs`
+holds the three gates: no remedy names the retired path, only the canonical file
+is measured, and the reference count outside a labelled legacy note is zero.
+
+**The prompt-injected reminder states only what no gate can (point 436).** It is
+the most expensive text here — `scripts/dashboard-reminder-hook.mjs` puts it into
+EVERY user prompt — and most of it repeated rules the machine already refuses to
+break: the four sections, their order and the card wrappers (`structureViolations`,
+before any publish), the `open`-attribute ban (`auto-open`) and the queue card's
+header meta (`queue-meta`). Measured, dropping those took it from 2153 to 843
+characters (−61 %), 283 to 112 words, and 31 concatenated source lines to a
+single call. What is left is judgement no check can make —
+information in a foreign section, the phone-portrait look, and proposing a
+structure change as a card instead of making it — plus the commands, with the
+structure itself a POINTER to the memory. The text lives in the pure module
+`scripts/dashboard-reminder-core.mjs` under a measured character budget, and
+`dashboard-reminder-core.test.mjs` pins both directions: `ENFORCED_CLAIMS` may not
+reappear (and the case proves those gates really do fire), `UNENFORCEABLE_DUTIES`
+and `REMINDER_COMMANDS` may not disappear.
 
 ### The board's transport (28.07.2026, point 400)
 
-The board used to be publishable only through the Artifact tool, and the
-**headless successor session has none**. On 28.07. at 15:38 one edited the board
-and recorded `publishDeferred: "headless successor session — no Artifact tool
-available here"` — in the flagship mode (user away, batch resurrected by the
-scheduler) the board could not be updated AT ALL, and the user found a board
-standing still for over an hour before any guard did. A commit and a push are
-things that session has, so the board is published by a script.
+The board used to be publishable only through a tool the **headless successor
+session does not have**. On 28.07. at 15:38 one edited the board and recorded a
+deferral — in the flagship mode (user away, batch resurrected by the scheduler)
+the board could not be updated AT ALL, and the user found a board standing still
+for over an hour before any guard did. A commit and a push are things that
+session has, so the board is published by a script.
 
 | | where | why there |
 |---|---|---|
@@ -1012,7 +1033,7 @@ things that session has, so the board is published by a script.
 | the check | `https://raw.githubusercontent.com/…/board/board.html` | plain HTTPS, no auth, no tool binding — the verification reads the PAGE, not a record of an attempt |
 
 The board carries its open-point set as a `hoa-board-open` meta, stamped on the
-way out (never into the repo file, whose bytes the Artifact mirror attests).
+way out (never into the repo file, whose bytes every publish record attests).
 That fingerprint is what a fetched page is compared against.
 
 **The floor of "current".** The push lands in seconds, but raw.githubusercontent
@@ -1063,14 +1084,15 @@ when the user is away. Residual: the watchdog disabled AND a session wedged at
 the same time. And every Stop guard stays fail-open by CLAUDE.md §7.2 decree, so
 this is not literally 100 %.
 
-The claude.ai artifact stays **mirrored** until the user has moved their
-bookmark; `dashboard-publish.mjs` is unchanged and still does its half.
+The claude.ai mirror was **retired on 29.07.2026** when the user moved their
+bookmark. `dashboard-publish.mjs` is the labelled legacy path and survives only
+for its offline `--defer` valve; nothing in the loop calls it.
 
 **What each half owns (29.07.2026, point 419).** Splitting one document into a
 shell plus a fragment silently took four properties with it — the shell had them,
 the fragment did not, and nothing asked. Each is now owned by the FRAGMENT, which
-is the half that survives every transport (Pages shell, artifact mirror, the raw
-file opened straight from disk):
+is the half that survives every transport (Pages shell, the retired mirror, the
+raw file opened straight from disk):
 
 | property | owner | what enforces it |
 |---|---|---|
@@ -1105,11 +1127,11 @@ the lag while a board published with an older refresher announces nothing.
 ### The board also runs BACK — a message channel from the phone (29.07.2026)
 
 Until now the board was one-way: the user read status and could not answer it.
-The chat is the way back, and it lives on the GH-Pages board rather than in the
-claude.ai artifact for a measured reason — the artifact frame runs under a strict
-CSP with no fetch, XHR or WebSocket to any host, so a page there cannot send
-anything anywhere. Where that mirror is still open, the section renders a
-localized "the chat needs the web board" notice instead of a dead input.
+The chat is the way back, and it lives on the GH-Pages board rather than on the
+retired claude.ai mirror for a measured reason — that frame ran under a strict
+CSP with no fetch, XHR or WebSocket to any host, so a page there could not send
+anything anywhere. Opened outside the web board, the section renders a localized
+"the chat needs the web board" notice instead of a dead input.
 
 **What it guarantees, in each mode.** A message reaches a RUNNING session within
 **seconds** — at its next tool call, *while it makes tool calls* — and it reaches

@@ -7,6 +7,10 @@
 // had pivoted to point 210): every invariant here is ENFORCED at turn end, not
 // suggested. Fail-open is the WRAPPER's job (any I/O error → allow); this core
 // only decides on the inputs it is handed and must never throw on partial ones.
+//
+// Every remedy below names the publish steps from scripts/board-remedy.mjs —
+// one copy, so a transport change cannot leave a block pointing at a dead path.
+import { PUBLISH_CMD, REPUBLISH, SYNCED_CMD } from './board-remedy.mjs'
 
 /** A focus confirmation older than this, with tool work after it, must be re-affirmed. */
 export const FOCUS_FRESH_MS = 30 * 60 * 1000
@@ -733,9 +737,8 @@ export function evaluate(input) {
   if (!marker || !marker.dashboardPath || !markerFileExists) {
     return block(
       'BATCH DASHBOARD NOT REGISTERED. Bring all four dashboard sections in line with the real ' +
-        'state, publish (node scripts/dashboard-publish.mjs, then the Artifact tool), declare your ' +
-        'focus (node scripts/focus.mjs set <N> "<what>"), then run: node scripts/dashboard-guard.mjs ' +
-        `--synced <dashboard.html path>. Open points: ${open.join(', ')}.`,
+        `state, publish (${PUBLISH_CMD}), declare your focus (node scripts/focus.mjs set <N> ` +
+        `"<what>"), then run: ${SYNCED_CMD} <dashboard.html path>. Open points: ${open.join(', ')}.`,
     )
   }
 
@@ -744,8 +747,7 @@ export function evaluate(input) {
     return block(
       `BATCH DASHBOARD OUT OF DATE: HEAD moved to ${head.slice(0, 7)} since the dashboard was ` +
         `last reviewed (${String(marker.head).slice(0, 7)}). Review ALL FOUR sections against the ` +
-        'current state (now-card, queue order, Erledigt), republish (dashboard-publish.mjs + ' +
-        'Artifact), then run: node scripts/dashboard-guard.mjs --synced ' + marker.dashboardPath + '.',
+        `current state (now-card, queue order, Erledigt), then ${REPUBLISH} ${marker.dashboardPath}.`,
     )
   }
 
@@ -785,8 +787,7 @@ export function evaluate(input) {
     return block(
       `BATCH DASHBOARD DOUBLE-LISTS point(s) ${doubled.join(', ')}: BOTH a now-card ("Woran ich ` +
         'gerade arbeite") AND a Warteschlange card. A current-work point must appear ONLY as a ' +
-        'now-card — delete its Warteschlange card, republish (dashboard-publish.mjs + Artifact), then ' +
-        're-run --synced.',
+        `now-card — delete its Warteschlange card, then ${REPUBLISH}.`,
     )
   }
 
@@ -813,8 +814,7 @@ export function evaluate(input) {
       `BATCH DASHBOARD DOUBLE-LISTS "VON DIR ZU KLÄREN" point(s) ${klaerungOverlaps.join('; ')}. ` +
         'A point belongs in exactly ONE section: blocked on the user → ONLY under "Von dir zu ' +
         'klären" (delete its Warteschlange card); being worked → the now-card (delete its VDZK ' +
-        'card); done → only Erledigt. Fix the card(s), republish (dashboard-publish.mjs + ' +
-        'Artifact), then re-run --synced.',
+        `card); done → only Erledigt. Fix the card(s), then ${REPUBLISH}.`,
     )
   }
 
@@ -838,9 +838,8 @@ export function evaluate(input) {
       `DASHBOARD NOW-CARD OUT OF SYNC WITH THE DECLARED FOCUS: the now-card(s) are titled point(s) ` +
         `${nowPoints.size ? [...nowPoints].join(', ') : '<none parseable>'} but the declared focus is ` +
         `${focus.point} ("${focus.note ?? ''}"). ` +
-        'Reconcile NOW: if the work really moved, add/rewrite the now-card (and queue), republish ' +
-        '(dashboard-publish.mjs + Artifact) and re-run --synced; if the declaration is the stale side, ' +
-        'run node scripts/focus.mjs set <N> "<what>".',
+        `Reconcile NOW: if the work really moved, add/rewrite the now-card (and queue), ${REPUBLISH}; ` +
+        'if the declaration is the stale side, run node scripts/focus.mjs set <N> "<what>".',
     )
   }
 
@@ -889,9 +888,8 @@ export function evaluate(input) {
         `NOW-CARD TEXT UNCHANGED THROUGH ~${min} min OF WORK: the "Woran ich gerade arbeite" body is ` +
           'byte-identical to the one reviewed last time, so it cannot be describing what you are doing ' +
           'RIGHT NOW. Rewrite it SHORT and HIGH-LEVEL — the live sub-state in one or two sentences ' +
-          '("Stand HH:MM: …"), no history, no plan — then republish (dashboard-publish.mjs + Artifact) ' +
-          'and re-run --synced. Confirming the focus alone does NOT satisfy this: the text itself is ' +
-          'the deliverable.',
+          `("Stand HH:MM: …"), no history, no plan — then ${REPUBLISH}. Confirming the focus alone ` +
+          'does NOT satisfy this: the text itself is the deliverable.',
       )
     }
   }
@@ -918,23 +916,22 @@ export function evaluate(input) {
       const shown = violations.slice(0, 5).map((x) => `[${x.code}] ${x.msg}`)
       const more = violations.length > 5 ? ` — and ${violations.length - 5} more` : ''
       return block(
-        `DASHBOARD CONSISTENCY AUDIT FAILED: ${shown.join('; ')}${more}. Fix the board, republish ` +
-          '(dashboard-publish.mjs + Artifact), then re-run --synced (it refuses to attest while the ' +
-          'audit fails). Emergency only: node scripts/dashboard-guard.mjs --waive-audit "<reason>".',
+        `DASHBOARD CONSISTENCY AUDIT FAILED: ${shown.join('; ')}${more}. Fix the board, then ` +
+          `${REPUBLISH} (it refuses to attest while the audit fails). Emergency only: ` +
+          'node scripts/dashboard-guard.mjs --waive-audit "<reason>".',
       )
     }
   }
 
   // (9) PUBLISHED — "I updated the file" must not masquerade as "it is live".
-  // The repo dashboard's bytes must equal the content last handed to the
-  // Artifact tool (recorded automatically by the PostToolUse heartbeat), or be
-  // covered by an explicit, logged deferral (headless sessions without the
-  // Artifact tool). An unreadable repo file yields repoHash null → skip
-  // (fail-open; invariant 1 already covers a missing file).
+  // The repo dashboard's bytes must equal the content last pushed to the live
+  // page, or be covered by an explicit, logged deferral (an offline session).
+  // An unreadable repo file yields repoHash null → skip (fail-open; invariant 1
+  // already covers a missing file).
   if (repoHash) {
     const deferred = marker.publishDeferred
-    // EITHER transport counts (point 400, delta D): the pages push is a real
-    // publish of the same bytes, and it is the one every session can run.
+    // The legacy mirror's `publishedHash` still counts where an old record
+    // stands; the pages push is the transport every session can run.
     const covered =
       (marker.publishedHash && marker.publishedHash === repoHash) ||
       (marker.pagesPublishedHash && marker.pagesPublishedHash === repoHash) ||
@@ -942,14 +939,12 @@ export function evaluate(input) {
     if (!covered) {
       return block(
         'DASHBOARD EDITED BUT NOT REPUBLISHED: the repo dashboard file does not match the content ' +
-          'last published to the live page or via the Artifact tool' +
+          'last published to the live page' +
           (marker.publishedHash || marker.pagesPublishedHash ? '' : ' (no publish recorded yet)') +
-          '. Publishing is part of EVERY dashboard update: run node scripts/board-publish.mjs, which ' +
-          'pushes the board to the live page and works in every session. The claude.ai mirror is still ' +
-          'kept alongside it: node scripts/dashboard-publish.mjs, publish the synced scratchpad file ' +
-          'with the Artifact tool (same artifact url), then re-run --synced. ONLY if NEITHER is ' +
-          'reachable (offline): node scripts/dashboard-publish.mjs --defer "<reason>" — and publish at ' +
-          'the first chance.',
+          `. Publishing is part of EVERY dashboard update: run ${PUBLISH_CMD}, which pushes the ` +
+          `board to the live page and works in every session, then ${SYNCED_CMD} <board path>. ONLY ` +
+          'if the page is unreachable (offline): node scripts/dashboard-publish.mjs --defer ' +
+          '"<reason>" — and publish at the first chance.',
       )
     }
   }

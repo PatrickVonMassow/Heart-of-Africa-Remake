@@ -24,6 +24,8 @@
 //   open / done    TASKS.md point numbers (`- [ ] N.` / `- [x] N.`; the repo
 //                  has no in-progress marker — "current" is read from git, not
 //                  from TASKS.md).
+// The remedy's publish steps come from scripts/board-remedy.mjs — one copy.
+import { REPUBLISH } from './board-remedy.mjs'
 
 /** Leading point number of a work branch (`feat/306-cleanup` → 306), else null.
  *  Only NUMBERED slugs count: `main`, `chore/closing-cleanup` and the
@@ -250,9 +252,7 @@ export function formatDriftReport(drifts = DRIFTS) {
 const block = (reason, drift) => ({ block: true, reason, drift })
 const ALLOW = Object.freeze({ block: false, reason: '', drift: null })
 
-const FIX =
-  ' Fix the CARD (rewrite it to the real current work, republish via dashboard-publish.mjs + ' +
-  'Artifact, then dashboard-guard.mjs --synced) — this guard never edits it for you.'
+const FIX = ` Fix the CARD (rewrite it to the real current work, then ${REPUBLISH}) — this guard never edits it for you.`
 
 /**
  * Decide whether the turn may end. Input (all optional — FAIL-OPEN: whatever

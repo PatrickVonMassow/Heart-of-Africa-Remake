@@ -1,7 +1,7 @@
 // Point 372 — one command for the board instead of six.
 //
 // Keeping the board current used to cost six tool calls per change (edit,
-// publish, Artifact, --synced, focus, prep), several times per point, each
+// publish, mirror, --synced, focus, prep), several times per point, each
 // billed at the whole context. That is also why the board lagged: a six-step
 // ritual gets postponed, a one-step one does not.
 //
@@ -26,8 +26,8 @@
 // The argument form still works and is fine for ASCII; a Windows shell mangles
 // umlauts on the way, which is why every session used to transliterate by hand.
 //
-// The Artifact publish is tool-bound and cannot be scripted, so the loop is
-// exactly: (1) an editing command, (2) the Artifact call, (3) `attest`.
+// Every editing command publishes the live page itself, so the loop is exactly:
+// (1) an editing command, (2) `attest`.
 import { readFileSync, writeFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { resolve } from 'node:path'
@@ -45,8 +45,10 @@ import {
   toNow,
   toQueue,
 } from './board-core.mjs'
+import { PUBLISH_CMD } from './board-remedy.mjs'
 
 const BOARD = resolve(REPO_ROOT, '.batch-dashboard.html')
+const PUBLISH_SCRIPT = 'scripts/board-publish.mjs'
 const run = (args) => execFileSync(process.execPath, args, { windowsHide: true, cwd: REPO_ROOT, encoding: 'utf8' })
 
 // STDIN IS READ ONCE, AND ONLY WHEN ASKED FOR (point 410): reading fd 0
@@ -73,11 +75,11 @@ function edit(fn, done) {
   console.log(done)
   console.log(run(['scripts/board-archive-rotate.mjs']).trim().split('\n')[0])
   // THE LIVE PAGE IS PUBLISHED HERE (point 400, delta D — four-eyes finding 2).
-  // This is the one-command board loop, so a loop that only synced the
-  // scratchpad left the LIVE page behind on every edit while the Artifact half
-  // cleared the due mark — the launcher would then alert about a board the
-  // session had updated exactly as documented, which trains the reader to
-  // ignore the one channel that speaks when a session is wedged.
+  // This is the one-command board loop, so a loop that only synced a local copy
+  // left the LIVE page behind on every edit while the due mark was cleared — the
+  // launcher would then alert about a board the session had updated exactly as
+  // documented, which trains the reader to ignore the one channel that speaks
+  // when a session is wedged.
   //
   // A REFUSAL MUST BE READABLE (four-eyes NEW-2). The child's stdio is piped, so
   // a non-zero exit throws — and an uncaught throw here would abort the rest of
@@ -86,19 +88,17 @@ function edit(fn, done) {
   // mirror still runs: the board file is already written either way.
   let published = true
   try {
-    console.log(run(['scripts/board-publish.mjs']).trim().split('\n')[0])
+    console.log(run([PUBLISH_SCRIPT]).trim().split('\n')[0])
   } catch (e) {
     published = false
     console.error(String(e.stderr || '').trimEnd() || `board-publish failed: ${e.message}`)
-    console.error('The LIVE page was NOT updated — fix the above, then: node scripts/board-publish.mjs')
+    console.error(`The LIVE page was NOT updated — fix the above, then: ${PUBLISH_CMD}`)
     process.exitCode = 1
   }
-  console.log(run(['scripts/dashboard-publish.mjs']).trim().split('\n').pop())
   // The success line is GATED (four-eyes NEW-3): printed unconditionally it sat
   // two lines under "The LIVE page was NOT updated", so a session skimming the
   // tail read success in exactly the failure case this reporting exists for.
-  if (published) console.log('The live page is updated. Mirror it while the artifact still exists:')
-  console.log('NEXT: publish the scratchpad file via the Artifact tool, then: node scripts/board.mjs attest')
+  if (published) console.log('The live page is updated. NEXT: node scripts/board.mjs attest')
 }
 
 const [cmd, ...rest] = process.argv.slice(2)
@@ -174,7 +174,7 @@ try {
     console.log(run(['scripts/focus.mjs', 'set', point, textOf(words)]).trim())
   } else if (cmd === 'attest') {
     // Rotation first: a tick that pushed the Erledigt section past its cap would
-    // otherwise fail the audit two steps later, after the Artifact call.
+    // otherwise fail the audit two steps later, after the publish.
     console.log(run(['scripts/board-archive-rotate.mjs']).trim().split('\n')[0])
     console.log(run(['scripts/dashboard-guard.mjs', '--synced', '.batch-dashboard.html']).trim())
     console.log(run(['scripts/prep-guard.mjs', '--prepped']).trim())

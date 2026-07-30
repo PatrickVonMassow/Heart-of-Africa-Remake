@@ -13,8 +13,7 @@
 //   (9) repo file == published content
 //
 // The companion flow after every dashboard edit:
-//   node scripts/dashboard-publish.mjs          # sync repo copy → scratchpad copy
-//   <publish the scratchpad file via the Artifact tool (same artifact url)>
+//   node scripts/board-publish.mjs              # push the board to the live page
 //   node scripts/dashboard-guard.mjs --synced <dashboard.html path>
 // --synced VALIDATES FIRST (point 313): while auditDashboard() reports
 // violations it records NOTHING and exits 1 — the board cannot be attested
@@ -59,6 +58,7 @@ import { openFingerprintOfTasks, syncedPublishPatch } from './board-currency-cor
 import { specSnapshots } from './dashboard-integrity-guard-core.mjs'
 import { readTasksAll } from './tasks-source.mjs'
 import { isMainModule } from './is-main.mjs'
+import { PUBLISH_CMD } from './board-remedy.mjs'
 
 const TASKS = resolve(REPO_ROOT, 'TASKS.md')
 const PAUSE = resolve(REPO_ROOT, '.claude', 'batch-paused')
@@ -198,22 +198,21 @@ if (RUN_AS_SCRIPT && process.argv[2] === '--synced') {
   }
 
   // THEN: was this exact board actually PUBLISHED? (four-eyes finding
-  // 28.07.2026.) attest used to register a board the Artifact tool had
-  // never accepted — the file was consistent, so it printed "registered" over a
-  // phone still showing the previous board. The publish record is only evidence
-  // if it names THIS content; a deferred publish (headless session, no Artifact
-  // tool) is the documented exception and passes with a loud line instead.
+  // 28.07.2026.) attest used to register a board no publish had ever accepted —
+  // the file was consistent, so it printed "registered" over a phone still
+  // showing the previous board. The publish record is only evidence if it names
+  // THIS content; a deferred publish (offline) is the documented exception and
+  // passes with a loud line instead.
   const fileHash = sha256File(p)
-  // EITHER transport counts (point 400, delta D): the pages push and the
-  // Artifact call publish the same bytes, and the pages push is the one every
-  // session can run. Reading only the Artifact record here would refuse to
-  // attest a board that IS live and offer `--defer` as the way out — a false
-  // deferral over a published board.
+  // The pages push is the transport (point 400, delta D); a legacy mirror hash
+  // still counts where an old record stands. Reading only that record would
+  // refuse to attest a board that IS live and offer `--defer` as the way out —
+  // a false deferral over a published board.
   const livePublished = !!fileHash && (priorState.publishedHash === fileHash || priorState.pagesPublishedHash === fileHash)
   if (priorState.publishFailed && !livePublished) {
     console.error('dashboard-guard --synced REFUSED — the last publish attempt FAILED:')
     console.error(`  ${priorState.publishFailed.reason}${priorState.publishFailed.path ? ` (${priorState.publishFailed.path})` : ''}`)
-    console.error('Publish again — node scripts/board-publish.mjs (or the Artifact tool) — then re-run --synced.')
+    console.error(`Publish again — ${PUBLISH_CMD} — then re-run --synced.`)
     process.exit(1)
   }
   if (priorState.publishDeferred) {
@@ -225,9 +224,8 @@ if (RUN_AS_SCRIPT && process.argv[2] === '--synced') {
     console.error(
       `  file ${String(fileHash).slice(0, 12)}… vs last published ${String(priorState.pagesPublishedHash ?? priorState.publishedHash ?? 'none').slice(0, 12)}…`,
     )
-    console.error('Publish it: node scripts/board-publish.mjs — then re-run --synced.')
-    console.error('(The claude.ai mirror is the second path: dashboard-publish.mjs + the Artifact tool.)')
-    console.error('Neither reachable at all — e.g. offline: node scripts/dashboard-publish.mjs --defer "<reason>".')
+    console.error(`Publish it: ${PUBLISH_CMD} — then re-run --synced.`)
+    console.error('Unreachable — e.g. offline: node scripts/dashboard-publish.mjs --defer "<reason>".')
     process.exit(1)
   }
 

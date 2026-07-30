@@ -5,9 +5,13 @@
 // WHY THIS EXISTS. Three cards were missing from the published board for up to
 // 25 minutes while the user was reading it, and the flagship mode is worse than
 // that: the headless successor session (`claude -p`, spawned by the OS launcher)
-// has NO Artifact tool, so on 28.07.2026 it edited the board and recorded
-// `publishDeferred: "headless successor session — no Artifact tool available
-// here"`. In that mode the board could not be updated AT ALL.
+// had no way to publish, so on 28.07.2026 it edited the board and recorded a
+// deferral. In that mode the board could not be updated AT ALL.
+//
+// The LEGACY (claude.ai artifact, retired 29.07.2026) mirror survives here in
+// exactly two places — `publishedHash` and `artifactToolSeen` — so that an old
+// record still counts and never re-blocks a board that was live. Nothing writes
+// them any more; the transport below is what every session runs.
 //
 // The chain this module serves, in the order it was built:
 //   A  the DUE MARK — the open-point set is hashed after every tool call and a
@@ -168,8 +172,8 @@ export function isPublishDue(state) {
 export function syncedPublishPatch({ state, fileHash, fingerprint, at = Date.now() } = {}) {
   const s = state && typeof state === 'object' ? state : {}
   if (s.publishDeferred) return {}
-  // EITHER transport is a publish (delta D, four-eyes finding 1). Reading only
-  // the Artifact record here would refuse to attest a board that IS live and
+  // EITHER record is a publish (delta D, four-eyes finding 1). Reading only the
+  // legacy mirror hash here would refuse to attest a board that IS live and
   // steer the session to `--defer` — a false deferral, and one that then makes
   // `isPublished` true for those bytes. That masking record is the dishonesty
   // this whole point replaces; it must not be re-created by the attestation.
@@ -204,9 +208,8 @@ export function boardMissingPoints(html, open) {
 /**
  * What a SUCCESSFUL pages publish (delta D) writes.
  *
- * The transport is the second way to be published, beside the Artifact mirror,
- * so it records its own hash rather than overwriting `publishedHash` — an
- * Artifact publish is a different event and attesting one that never happened
+ * The transport records its OWN hash rather than overwriting `publishedHash` —
+ * the legacy mirror was a different event and attesting one that never happened
  * would be the exact dishonesty delta D was built to end. `publishDeferred` is
  * dropped because there is nothing left to defer, and `publishFailed` because a
  * publish that succeeded supersedes the one that did not.
@@ -256,9 +259,10 @@ export function liveCheckUrl(url = BOARD_CONTENT_URL, now = Date.now()) {
  * has no way to satisfy, and a blocked turn produces nothing (CLAUDE.md §7.2).
  *
  * `transport: 'pages'` is the delta-D answer and is available to EVERY session,
- * headless included: it is a script, not a tool binding. The Artifact tool
- * remains a valid second path while the claude.ai mirror is still kept, and it
- * counts only when THIS session has actually used it.
+ * headless included: it is a script, not a tool binding — so in practice every
+ * caller passes it and the branch below never decides anything. The branch is
+ * the legacy mirror's, kept only so an old record cannot turn into a false "you
+ * cannot publish"; it counts only when THIS session has actually used the tool.
  */
 export function publishCapability({ state, sessionId = '', transport = null } = {}) {
   if (transport === 'pages') return { canPublish: true, how: 'pages' }

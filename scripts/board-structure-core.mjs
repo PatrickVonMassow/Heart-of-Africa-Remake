@@ -10,11 +10,11 @@
 // behind with no content, and the "Von dir zu klären" heading lost its wrapper.
 //
 // The existing consistency audit DID catch each one — but only at
-// `dashboard-guard --synced`, which runs AFTER the Artifact publish. So a broken
-// board reached the reader and was repaired afterwards. This check therefore runs
-// in `dashboard-publish.mjs`, BEFORE the scratchpad copy the Artifact tool
-// publishes: a malformed board can then not be published at all, whatever
-// produced it and whoever forgot which editing technique is safe.
+// `dashboard-guard --synced`, which runs AFTER the publish. So a broken board
+// reached the reader and was repaired afterwards. This check therefore runs in
+// `board-publish.mjs`, BEFORE the bytes leave: a malformed board can then not be
+// published at all, whatever produced it and whoever forgot which editing
+// technique is safe.
 //
 // It deliberately checks STRUCTURE only — nothing about content, freshness or
 // wording, which the consistency audit already owns. Pure and total: it never
@@ -110,8 +110,8 @@ export function structureViolations(html) {
     }
   }
 
-  // (5) The board carries its own viewport. It used to inherit one: as an
-  // artifact the fragment WAS the document, and the host set it. The Pages shell
+  // (5) The board carries its own viewport. It used to inherit one: on the
+  // retired mirror the fragment WAS the document, and the host set it. The Pages shell
   // sets one too — and then `document.write` replaces the whole document with
   // this fragment and the meta goes with the old one. Chrome falls back to its
   // 980-px desktop viewport and scales the page down by roughly 2.4 on a phone,

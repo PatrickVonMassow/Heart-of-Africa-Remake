@@ -76,7 +76,8 @@ describe('delta B — the publish-due deny', () => {
     const d = evaluate(cleanCall({ state: due(), canPublish: true }))
     expect(d.block).toBe(true)
     expect(d.reason).toContain('OPEN-POINT SET changed')
-    expect(d.reason).toContain('dashboard-publish.mjs')
+    // The LIVE transport (point 435) — the remedy must name a path that exists.
+    expect(d.reason).toContain('node scripts/board-publish.mjs')
   })
 
   it('does NOT deny a session that cannot publish — it would spin against a gate it cannot satisfy', () => {

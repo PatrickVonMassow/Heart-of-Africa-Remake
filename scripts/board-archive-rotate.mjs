@@ -7,11 +7,12 @@
 //   node scripts/board-archive-rotate.mjs --check # report only, exit 1 if due
 //
 // The two files are published artefacts, not sources (both are git-ignored):
-// rotate, then republish BOTH via the Artifact tool.
+// rotate, then publish — board-publish.mjs pushes BOTH pages in one commit.
 import { readFileSync, writeFileSync, existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { REPO_ROOT } from './repo-paths.mjs'
 import { ERLEDIGT_ON_BOARD } from './dashboard-guard-core.mjs'
+import { REPUBLISH } from './board-remedy.mjs'
 
 const BOARD = resolve(REPO_ROOT, '.batch-dashboard.html')
 const ARCHIVE = resolve(REPO_ROOT, '.batch-dashboard-archive.html')
@@ -56,5 +57,5 @@ writeFileSync(ARCHIVE, archive.slice(0, at) + moved.join('') + archive.slice(at)
 const after = (readFileSync(BOARD, 'utf8').slice(start).match(CARD) ?? []).length
 console.log(`moved ${moved.length} card(s) to the archive; board now holds ${cards.length - moved.length}`)
 if (cards.length - moved.length !== ERLEDIGT_ON_BOARD) throw new Error('rotation left the wrong count')
-console.log('republish BOTH pages via the Artifact tool, then run dashboard-guard --synced')
+console.log(`${REPUBLISH} (the publisher pushes board and archive together)`)
 void after

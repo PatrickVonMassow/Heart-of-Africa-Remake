@@ -15,9 +15,12 @@
 //     parallel session).
 // (3) Stamp .claude/tool-activity.json — the dashboard Stop guard's
 //     focus-freshness invariant needs to know that real work happened.
-// (4) Detect a dashboard publish: when the Artifact tool is called on the
+// (4) LEGACY (claude.ai artifact, retired 29.07.2026) — detect a dashboard
+//     publish through the mirror: when the Artifact tool is called on the
 //     dashboard file, record the published content's sha256 in
-//     dashboard-state.json ("published" vs "merely edited", invariant 9).
+//     dashboard-state.json ("published" vs "merely edited", invariant 9). The
+//     live transport is scripts/board-publish.mjs, which records its own hash;
+//     this branch only keeps an old record honest and is otherwise dormant.
 //     The tool's RESPONSE decides whether it counts — a failed publish records
 //     publishFailed and no hash, so the board can never be believed live on the
 //     strength of an attempt alone (four-eyes finding 28.07.2026).
