@@ -567,6 +567,44 @@ describe('auditDashboard — the 25.07 witnesses', () => {
       'empty-body',
     )
   })
+  // POINT 472 — the empty-body rule has NO exemption left. The bundle-group card
+  // of point 452 was the only card that ever bought one (its body held nothing
+  // but nested cards); with the grouping taken back out, an exemption would be a
+  // hole in a guard with nothing left to justify it.
+  it('flags an empty body in EVERY section, and a class="group" buys no exemption', () => {
+    const empty = '<div class="body"></div>'
+    const card = (cls, inner) =>
+      `<details${cls}><summary><span class="num">777</span><span class="t">Task 777</span>` +
+      `<span class="right"><span class="meta">~2 h</span></span></summary>${inner}</details>`
+    // One per section: the queue, "Von dir zu klären", the now-section, Erledigt.
+    const withQueue = boardHtml().replace('<h2>Warteschlange</h2></summary>', `<h2>Warteschlange</h2></summary>\n${card('', empty)}`)
+    expect(codes(withQueue, { open: [210, 211, 204, 777] })).toContain('empty-body')
+    const withKlaerung = boardHtml().replace(
+      '<h2>Von dir zu klären</h2></summary>',
+      `<h2>Von dir zu klären</h2></summary>\n<details><summary><span class="t">Eine Frage</span></summary>${empty}</details>`,
+    )
+    expect(codes(withKlaerung)).toContain('empty-body')
+    expect(
+      codes(boardHtml().replace(/<div class="body"><p>Status[^<]*<\/p><\/div>/, empty)),
+    ).toContain('empty-body')
+    // Erledigt takes TWO cards: the LAST card of that section absorbs the
+    // trailing archive link into its body slice, so only a card with a sibling
+    // behind it can be empty at all.
+    const withDone = boardHtml({ done: [209, 208] }).replace(
+      /(Done 209<\/span>[\s\S]*?<\/summary>)<div class="body"><p>Kurzstand\.<\/p><\/div>/,
+      `$1${empty}`,
+    )
+    expect(withDone).toContain(`</summary>${empty}`)
+    expect(codes(withDone, { done: [209, 208], doneSeen: [209, 208] })).toContain('empty-body')
+    // THE EXEMPTION IS GONE: the very markup that used to be waved through blocks.
+    const grouped = boardHtml().replace(
+      '<h2>Warteschlange</h2></summary>',
+      `<h2>Warteschlange</h2></summary>\n${card(' class="group" data-group="Chat & Tafel"', empty)}`,
+    )
+    expect(codes(grouped, { open: [210, 211, 204, 777] })).toContain('empty-body')
+    // …and parseCards no longer even reports such a flag for anyone to read.
+    expect(parseCards(card(' class="group"', empty))[0]).not.toHaveProperty('isGroup')
+  })
   it('flags a now-card without a time meta and a stale footer count', () => {
     expect(codes(boardHtml().replace('<span class="meta">09:00 · bis ~11:00</span>', '<span class="meta">läuft</span>'))).toContain(
       'now-meta',

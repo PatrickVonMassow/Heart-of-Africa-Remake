@@ -323,14 +323,7 @@ export function parseCards(sectionHtml) {
     // The full title comes along so a violation can NAME the card it means; a
     // point number alone is no help on a card that has none.
     const title = ((summary.match(/class="t">([^<]*)</) ?? [])[1] ?? '').trim()
-    // A BUNDLE GROUP (point 452) carries `class="group"` on its own <details>.
-    // The split above drops the tag name, so the attributes of THIS card are
-    // whatever precedes its first `>` — never the nested cards', which sit past
-    // the body's opening tag.
-    // The class list is matched as WHOLE TOKENS, so neither `class="my-group"`
-    // nor `data-class="group"` can buy the exemption.
-    const isGroup = /^[^>]*\sclass="(?:[^"]* )?group(?: [^"]*)?"/.test(part)
-    cards.push({ meta, body, title, isGroup, points: [...points] })
+    cards.push({ meta, body, title, points: [...points] })
   }
   return cards
 }
@@ -518,13 +511,11 @@ export function auditDashboard(html, input = {}) {
     })
   }
 
-  // EMPTY BODY — a card must explain itself when expanded. A BUNDLE GROUP is the
-  // exception (point 452): its body holds the member cards, and those ARE its
-  // explanation. Demanding a sentence above them only produced a line that said
-  // what the card order already said (user 30.07.2026).
-  const empty = [nowCards, vdzkCards, queueCards, erledigtCards]
-    .flat()
-    .filter((c) => !c.body && !c.isGroup).length
+  // EMPTY BODY — a card must explain itself when expanded. NO EXEMPTION (point
+  // 472): the bundle-group card of point 452 was the only card that ever had
+  // one, because its body held nothing but nested cards. With the grouping taken
+  // back out, the rule bites for every card on the board again.
+  const empty = [nowCards, vdzkCards, queueCards, erledigtCards].flat().filter((c) => !c.body).length
   if (empty) v.push({ code: 'empty-body', msg: `${empty} card(s) have an empty body` })
 
   // DUPLICATE NUMBER within one OPEN section (Erledigt is exempt — several

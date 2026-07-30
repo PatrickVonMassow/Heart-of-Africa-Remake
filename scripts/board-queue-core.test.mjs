@@ -17,14 +17,10 @@ import { concisenessOffenders } from './dashboard-conciseness-guard-core.mjs'
 import { evaluate as evaluateTopic } from './dashboard-card-topic-guard-core.mjs'
 import { FINDER_POINTS, RELEASE_TAG_POINT } from './queue-order-guard-core.mjs'
 import {
-  QUEUE_GROUP_DEFAULT_STATE,
   QUEUE_STUB_BODY,
-  UNBUNDLED_GROUP_NAME,
-  UNBUNDLED_GROUP_REASON,
   assertNotFlagValue,
   boardTitleReport,
   buildQueueSection,
-  groupQueueEntries,
   importQueueFromHtml,
   isUntranslatedTitle,
   normaliseQueueData,
@@ -32,7 +28,6 @@ import {
   paragraphs,
   parseSetArgs,
   parseTaskTitles,
-  parseWorkPackages,
   queueEntries,
   queueOrder,
   renderQueueCard,
@@ -418,204 +413,89 @@ describe('parseSetArgs — the flags behind one `set` call', () => {
   })
 })
 
-// ═══ Point 452 — the board did not know its own bundles ═══════════════════
-// "Auf dem Dashboard sehe ich nur Einzelschritte - keine Bündel" (user
-// 30.07.2026), and with a hundred cards in a flat list, "ich sehe nicht, was
-// kommt und wann".
-const packagesDoc = `# Work packages (bundles)
 
-| Name | Id | What it is | Points |
-|---|---|---|---|
-| **Dorfleben** | A | Village life | 350, 351, 356 |
-| **Chat & Tafel** | H | Chat and board | 439, 452, 465 — the rest landed 30.07.2026 (410, 421) |
-| **Testinfrastruktur** | K | Test infrastructure | 200, 295 |
+// ═══ Point 472 — the queue is ONE FLAT LIST again ═════════════════════════
+// Point 452 had grouped the cards by bundle; the user took it back out the same
+// evening ("Mehr Übersicht bringt sie mir auch nicht, weil die Warteschlange
+// jetzt nicht mehr die Reihenfolge abbildet"). The demand attached to it was NO
+// LEFTOVERS, so what is under test is the ABSENCE of the grouping in everything
+// the board renders — not merely that a flat render is possible.
+describe('the rendered queue — one flat list, no bundle left in the markup', () => {
+  const built = (open, data = null) => buildQueueSection(board(''), { open, data, titles: {} })
 
-**Not bundled**, each for its own reason:
-
-- **184, 203** — the big audits. They sweep the whole codebase.
-- **174** — releases, gated on a full closing run.
-
-## Order of work
-
-**Chat & Tafel first** (30.07.2026): the board must tell the truth. Then
-**Testinfrastruktur → Dorfleben**, then **v0.3 with the full closing**, and the
-big audits last.
-`
-
-describe('parseWorkPackages — the doc is the single source of the bundles', () => {
-  const pkg = parseWorkPackages(packagesDoc)
-
-  it('reads name, id and members, and never the date as a point', () => {
-    expect(pkg.bundles.map((b) => b.name)).toEqual(['Dorfleben', 'Chat & Tafel', 'Testinfrastruktur'])
-    expect(pkg.bundles.find((b) => b.id === 'H').points).toEqual([439, 452, 465, 410, 421])
-    expect(pkg.bundles.flatMap((b) => b.points)).not.toContain(2026)
+  it('renders no group wrapper and no group hook, whatever it is given', () => {
+    const { html } = built([439, 465, 200, 184])
+    expect(html).not.toContain('class="group"')
+    expect(html).not.toContain('data-group')
+    // …and no leftover group summary shape either ("Name · 3 Punkte").
+    expect(html).not.toMatch(/·\s*\d+\s*Punkte/)
   })
 
-  it('reads the working order, tolerating a trailing word and ignoring a non-bundle', () => {
-    expect(pkg.order).toEqual(['Chat & Tafel', 'Testinfrastruktur', 'Dorfleben'])
-    expect(pkg.order).not.toContain('v0.3 with the full closing')
+  it('takes no packages argument any more — an extra option cannot re-group it', () => {
+    // The call site that used to hand the bundles in is gone; passing them now
+    // is simply ignored, which is what "never rendered" has to mean in code.
+    const { html } = buildQueueSection(board(''), {
+      open: [439, 465],
+      titles: {},
+      packages: { bundles: [{ id: 'H', name: 'Chat & Tafel', points: [439, 465] }], order: ['Chat & Tafel'] },
+    })
+    expect(html).not.toContain('class="group"')
+    expect(html).toContain('<span class="num">439</span>')
   })
 
-  it('reads the unbundled points', () => {
-    expect(pkg.unbundled).toEqual([184, 203, 174])
-  })
-
-  it('survives a CRLF checkout and any junk, because a hook rebuilds the board', () => {
-    expect(parseWorkPackages(packagesDoc.replace(/\n/g, '\r\n')).order).toEqual(pkg.order)
-    for (const raw of [null, undefined, 42, '', '# nichts']) {
-      expect(() => parseWorkPackages(raw)).not.toThrow()
-      expect(parseWorkPackages(raw).bundles).toEqual([])
-    }
-  })
-})
-
-describe('groupQueueEntries — every open point under its bundle, exactly once', () => {
-  const pkg = parseWorkPackages(packagesDoc)
-  const entriesFor = (open, data = null) => queueEntries({ open, data, titles: {} })
-
-  it('groups by bundle, in the doc’s working order, points in the doc’s order', () => {
-    const groups = groupQueueEntries(entriesFor([350, 200, 465, 439]), pkg)
-    expect(groups.map((g) => g.name)).toEqual(['Chat & Tafel', 'Testinfrastruktur', 'Dorfleben'])
-    expect(groups[0].entries.map((e) => e.point)).toEqual([439, 465])
-  })
-
-  it('THE INVARIANT: every entry lands in exactly one group, none vanishes', () => {
-    const open = [350, 351, 200, 439, 452, 184, 999]
-    const groups = groupQueueEntries(entriesFor(open), pkg)
-    const placed = groups.flatMap((g) => g.entries.map((e) => e.point))
-    expect(placed.slice().sort((a, b) => a - b)).toEqual(open.slice().sort((a, b) => a - b))
-    expect(new Set(placed).size).toBe(placed.length)
-  })
-
-  it('a point in NO bundle lands in the unbundled group — doc-listed or not', () => {
-    const groups = groupQueueEntries(entriesFor([184, 999]), pkg)
-    expect(groups.map((g) => g.name)).toEqual([UNBUNDLED_GROUP_NAME])
-    // The order inside is the QUEUE's own judgment, unchanged: 184 is a
-    // bug-FINDING point, which `queueOrder` puts behind the fixes by construction.
-    expect(groups[0].entries.map((e) => e.point)).toEqual([999, 184])
-    expect(groups[0].reason).toBe(UNBUNDLED_GROUP_REASON)
-  })
-
-  it('puts the unbundled group LAST — "the big audits last"', () => {
-    const groups = groupQueueEntries(entriesFor([184, 439]), pkg)
-    expect(groups[groups.length - 1].name).toBe(UNBUNDLED_GROUP_NAME)
-  })
-
-  it('drops a bundle whose points are all closed rather than showing an empty group', () => {
-    expect(groupQueueEntries(entriesFor([439]), pkg).map((g) => g.name)).toEqual(['Chat & Tafel'])
-  })
-
-  it('counts the members and SUMS their estimates', () => {
-    const data = { points: { 439: { estimate: '~2 h' }, 452: { estimate: '~1,5 h' }, 465: { estimate: '~3 h' } } }
-    const [group] = groupQueueEntries(entriesFor([439, 452, 465], data), pkg)
-    expect(group).toMatchObject({ count: 3, hours: 6.5, meta: '~6,5 h' })
-  })
-
-  it('says "no estimate yet" IN SO MANY WORDS when nobody has estimated the bundle', () => {
-    // Not an invented sum of nothing: the audit accepts that marker by NAME and
-    // nothing in between, so an unestimated group would otherwise block --synced.
-    expect(groupQueueEntries(entriesFor([439]), pkg)[0].meta).toBe(QUEUE_STUB_META)
-  })
-
-  it('never throws on a missing or half-written doc — a flat queue beats no board', () => {
-    for (const raw of [null, undefined, {}, { bundles: 'no' }]) {
-      expect(() => groupQueueEntries(entriesFor([439]), raw)).not.toThrow()
-    }
-    expect(groupQueueEntries(entriesFor([439]), {})[0].name).toBe(UNBUNDLED_GROUP_NAME)
-  })
-
-  // The whole point: it must hold against the REAL doc and the REAL work order,
-  // not only against a fixture that agrees with the parser.
-  it('places every open point of the LIVE work order exactly once', () => {
-    const doc = readFileSync(resolve(REPO_ROOT, 'docs/work-packages.md'), 'utf8')
-    const tasks = readFileSync(resolve(REPO_ROOT, 'TASKS.md'), 'utf8')
-    const entries = queueEntries({ open: openPointsOf(tasks), titles: parseTaskTitles(tasks) })
-    const groups = groupQueueEntries(entries, parseWorkPackages(doc))
-    const placed = groups.flatMap((g) => g.entries.map((e) => e.point))
-    expect(placed.length).toBe(entries.length)
-    expect(new Set(placed).size).toBe(entries.length)
-    expect(groups.length).toBeGreaterThan(1)
-    // The German names, never the letters (user 30.07.2026).
-    for (const g of groups) expect(g.name).not.toMatch(/^(Bundle|Bündel)?\s*[A-N]$/)
-  })
-})
-
-describe('the rendered groups — nested cards the board’s own parsers still read', () => {
-  const pkg = parseWorkPackages(packagesDoc)
-  const grouped = (open, data = null) =>
-    buildQueueSection(board(''), { open, data, titles: {}, packages: pkg })
-
-  it('renders ONE group card per bundle with the point cards nested inside', () => {
-    const { html } = grouped([439, 465, 200])
-    expect(html).toContain('<details class="group" data-group="Chat &amp; Tafel">')
-    expect(html).toContain('<span class="t">Chat &amp; Tafel · 2 Punkte</span>')
-    // The point cards are unchanged, and they sit INSIDE the group.
-    const groupAt = html.indexOf('data-group="Chat &amp; Tafel"')
-    const nextGroup = html.indexOf('data-group="Testinfrastruktur"')
-    expect(html.slice(groupAt, nextGroup)).toContain('<span class="num">439</span>')
-    expect(html.slice(groupAt, nextGroup)).toContain('<span class="num">465</span>')
-    expect(html.slice(groupAt, nextGroup)).not.toContain('<span class="num">200</span>')
-  })
-
-  it('does NOT restate the order — the nested cards already are it (user 30.07.2026)', () => {
-    const { html } = grouped([439, 465])
-    expect(html).not.toContain('Reihenfolge:')
-    // The order still SHOWS, in the only place it belongs: the card sequence.
-    expect(html.indexOf('<span class="num">439</span>')).toBeLessThan(html.indexOf('<span class="num">465</span>'))
+  it('lists every open point exactly ONCE, in the queue order the cards are read in', () => {
+    const open = [465, 439, 184, 295, RELEASE_TAG_POINT]
+    const { html, entries } = built(open)
+    const rendered = [...html.matchAll(/class="num">(\d+)</g)].map((m) => Number(m[1]))
+    expect(rendered).toEqual(entries.map((e) => e.point))
+    expect(new Set(rendered).size).toBe(rendered.length)
+    expect(rendered.slice().sort((a, b) => a - b)).toEqual(open.slice().sort((a, b) => a - b))
+    // The order is the queue's own judgment, undisturbed: the fixes first, the
+    // bug-FINDING point behind them, the release tag last of all.
+    expect(rendered).toEqual([295, 439, 465, 184, RELEASE_TAG_POINT])
+    expect(FINDER_POINTS.has(184)).toBe(true)
   })
 
   it('carries NO `open` attribute — the reader’s own choice owns that (house rule)', () => {
-    const { html } = grouped([439, 200, 184])
-    expect(html).not.toMatch(/<details[^>]*\sopen[\s>]/)
-    expect(QUEUE_GROUP_DEFAULT_STATE).toBe('collapsed')
+    expect(built([439, 200, 184]).html).not.toMatch(/<details[^>]*\sopen[\s>]/)
   })
 
-  it('leaves the board free of new audit violations, nesting and all', () => {
-    const { html } = grouped([439, 452, 465, 200, 295, 184])
-    const codes = auditDashboard(html, { open: [210, 439, 452, 465, 200, 295, 184], done: [], nowMinutes: 9 * 60 })
-      .map((x) => x.code)
-    expect(codes).not.toContain('empty-body') // a group holding only cards parses as an empty card
-    expect(codes).not.toContain('queue-meta')
-    expect(codes).not.toContain('auto-open')
-    expect(codes).not.toContain('dup-in-section')
-    expect(codes).not.toContain('structure')
+  it('holds every open point of the LIVE work order exactly once, flat', () => {
+    const tasks = readFileSync(resolve(REPO_ROOT, 'TASKS.md'), 'utf8')
+    const open = openPointsOf(tasks)
+    const { html } = buildQueueSection(board(''), { open, titles: parseTaskTitles(tasks) })
+    const rendered = [...html.matchAll(/class="num">(\d+)</g)].map((m) => Number(m[1]))
+    expect(rendered.slice().sort((a, b) => a - b)).toEqual(open.slice().sort((a, b) => a - b))
+    expect(html).not.toContain('class="group"')
   })
 
   it('keeps every point findable by the coverage check that gates the publish', () => {
     const open = [439, 452, 465, 200, 295, 184]
-    const { html } = grouped(open)
+    const { html } = built(open)
     expect(boardMissingPoints(html, open)).toEqual([])
-    // …and by the parser that stops the queue re-adding a promoted point.
     expect([...parseQueuePoints(html)].sort((a, b) => a - b)).toEqual(open.slice().sort((a, b) => a - b))
   })
 
-  it('lets the one-command loop still find and move a nested point card', () => {
-    // `queueCard`/`toNow` match a bare `<details>`; the group is `class="group"`,
-    // so a promotion reaches the point card and never the wrapper.
-    const { html } = grouped([439, 465])
+  it('lets the one-command loop find and promote a card', () => {
+    const { html } = built([439, 465])
     expect(queueCard(html, 439)).toContain('<span class="num">439</span>')
-    expect(queueCard(html, 439)).not.toContain('data-group')
-    const promoted = toNow(html, 439, 'Läuft.', { stamp: '16:20' })
-    expect(promoted).toContain('<span class="t">439 — ')
-    expect(promoted).not.toContain('<span class="num">439</span>')
+    expect(toNow(html, 439, 'Läuft.', { stamp: '16:20' })).toContain('<span class="t">439 — ')
   })
 
-  it('reads its own groups back on import, ignoring the wrappers', () => {
-    const { html } = grouped([439, 465], { points: { 439: { title: 'Ein Titel', body: 'Text.' } } })
+  it('reads its own cards back on import', () => {
+    const { html } = built([439, 465], { points: { 439: { title: 'Ein Titel', body: 'Text.' } } })
     const back = importQueueFromHtml(html)
     expect(back.points[439]).toMatchObject({ title: 'Ein Titel', body: 'Text.' })
     expect(Object.keys(back.points).map(Number).sort((a, b) => a - b)).toEqual([439, 465])
   })
 
-  it('falls back to a FLAT queue when the doc is unreadable — never to no cards', () => {
-    const { html, groups } = buildQueueSection(board(''), { open: [439, 465], titles: {}, packages: null })
-    expect(groups).toBeNull()
-    expect(html).not.toContain('class="group"')
-    expect(html).toContain('<span class="num">439</span>')
-  })
-
-  it('stays concise enough for the guard that reads the board at turn end', () => {
-    const { html } = grouped([439, 452, 465, 200, 295, 184])
+  it('leaves the board free of audit, conciseness and topic violations', () => {
+    const open = [439, 452, 465, 200, 295, 184]
+    const { html } = built(open)
+    const codes = auditDashboard(html, { open: [210, ...open], done: [], nowMinutes: 9 * 60 }).map((x) => x.code)
+    // `queue-stubbed` is the generator's own honest report that these cards have
+    // no prose yet — every OTHER code would be a defect of the flat render.
+    expect(codes.filter((c) => c !== 'queue-stubbed')).toEqual([])
     expect(concisenessOffenders(html)).toEqual([])
     expect(evaluateTopic({ dashboardHtml: html, tasksText: '- [ ] 439. X\n- [ ] 465. Y\n' }).block).toBe(false)
   })

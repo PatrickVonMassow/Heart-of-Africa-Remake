@@ -296,36 +296,6 @@ export function renderQueueCards(entries) {
   return (Array.isArray(entries) ? entries : []).map(renderQueueCard).join('')
 }
 
-/**
- * ONE GROUP CARD, its point cards nested inside (point 452).
- *
- * The markup is deliberately the CARD shape the board's parsers already read,
- * one level up: `class="group"` so `queueCard`/`toNow` cannot mistake it for a
- * point card, `data-group` so the reader's restore script can address a group by
- * name, and — for the unbundled group only — a leading line carrying the reason
- * those points stand outside every bundle.
- *
- * NO ORDER LINE (user 30.07.2026: "die geht ja schon aus der Reihenfolge hervor,
- * in der die Karten aufgeführt werden"). The nested cards ARE the order; naming
- * it again above them said the same thing twice and cost a phone screen's worth
- * of height per group.
- */
-export function renderQueueGroup({ name, entries = [], count, meta, reason = null }) {
-  const lead = [reason].filter(Boolean)
-  return (
-    `<details class="group" data-group="${esc(name)}">\n` +
-    `  <summary><span class="t">${esc(name)} · ${Number(count) || entries.length} Punkte</span>` +
-    `<span class="right"><span class="meta">${esc(meta)}</span></span></summary>\n` +
-    `  <div class="body">\n${lead.map((p) => `    <p>${esc(p)}</p>\n`).join('')}` +
-    `${renderQueueCards(entries)}  </div>\n</details>\n`
-  )
-}
-
-/** Every group, in order — what the Warteschlange section holds when grouped. */
-export function renderQueueGroups(groups) {
-  return (Array.isArray(groups) ? groups : []).map(renderQueueGroup).join('')
-}
-
 /** Where the Warteschlange section's card list begins and ends in the board. */
 export function queueSectionBounds(html) {
   const doc = String(html ?? '')
@@ -342,20 +312,21 @@ export function queueSectionBounds(html) {
  * Replace the Warteschlange section with the projection of `data` over the work
  * order. Returns the new document; the caller decides whether to write it.
  *
+ * ONE FLAT LIST (point 472). Point 452 had grouped the cards by bundle; within
+ * the hour the reasoning had collapsed and the user took it back out: a flat
+ * queue IS the working order, read top to bottom, while a grouped one is not,
+ * because the agent pool draws its three slots from different bundles. The
+ * bundle survives as the internal collision map and as the priority ranking in
+ * `docs/work-packages.md` — it is never rendered.
+ *
  * `exclude` must already hold every point the other sections claim — see the
  * two-writers note at the head of this file.
  */
-export function buildQueueSection(html, { open = [], data = null, exclude = [], titles = {}, packages = null } = {}) {
+export function buildQueueSection(html, { open = [], data = null, exclude = [], titles = {} } = {}) {
   const doc = String(html ?? '')
   const { from, end } = queueSectionBounds(doc)
   const entries = queueEntries({ open, data, exclude, titles })
-  // GROUPED WHEN THE DOC IS THERE, FLAT WHEN IT IS NOT (point 452). An
-  // unreadable `docs/work-packages.md` must cost the grouping, never the board:
-  // a flat queue is the old picture, a missing one is the staleness this whole
-  // projection exists to end.
-  const groups = packages ? groupQueueEntries(entries, packages) : null
-  const body = groups && groups.length ? renderQueueGroups(groups) : renderQueueCards(entries)
-  return { html: `${doc.slice(0, from)}\n${body}${doc.slice(end)}`, entries, groups }
+  return { html: `${doc.slice(0, from)}\n${renderQueueCards(entries)}${doc.slice(end)}`, entries }
 }
 
 /**
@@ -414,178 +385,6 @@ export function setQueueEntry(data, point, { title, body, estimate } = {}) {
       ...points,
       [n]: { title: pick(title, prev.title), body: pick(body, prev.body), estimate: pick(estimate, prev.estimate) },
     },
-  }
-}
-
-// ═══ Point 452 — the board did not know its own bundles ═══════════════════
-// The work order has been worked in BUNDLES since 29.07.2026 and
-// `docs/work-packages.md` holds all of them, but the queue rendered point after
-// point: "Auf dem Dashboard sehe ich nur Einzelschritte - keine Bündel" (user
-// 30.07.2026), and with a hundred cards in a flat list, "ich sehe nicht, was
-// kommt und wann". So the queue renders one GROUP CARD per bundle with the
-// point cards nested inside it — a `<details>` level between the section and the
-// card, which is also why the reader's open-state script keeps working: it
-// restores `<details>` elements, and a group is one.
-
-/** The document that owns the bundles, their order and the unbundled reasons. */
-export const WORK_PACKAGES_PATH = 'docs/work-packages.md'
-
-/** The group the points in no bundle land in — they must never simply vanish. */
-export const UNBUNDLED_GROUP_NAME = 'Ohne Bündel'
-
-/**
- * Why those points are unbundled, in the German the board is written in. The
- * doc states the reasons per point in English; this is the one sentence that
- * carries them onto the board, and it is a constant so it is one edit.
- */
-export const UNBUNDLED_GROUP_REASON =
-  'Nicht gebündelt: die großen Audits durchsuchen die ganze Codebasis und würden jedes Bündel ' +
-  'verschlucken, die Releases hängen an einem vollständigen Abschlusslauf statt an einem Branch, ' +
-  'und einzelne Punkte sind hinter einen anderen gehängt.'
-
-/**
- * WHETHER A GROUP STARTS OPEN — the ONE lever, so flipping it is a one-value
- * change (user decision still open, 30.07.2026).
- *
- * 'collapsed' is the phone case the user described: about a dozen lines of
- * overview instead of a hundred cards. It is achieved by emitting NO `open`
- * attribute, which is also the house rule — `auditDashboard` blocks any
- * `<details open>` on the board, because a hard-coded attribute overrides what
- * the reader themselves opened on every refresh. The other two readings
- * ('current' — only the bundle being worked, 'all') therefore cannot be markup:
- * they belong to the board's own restore script, which addresses a group by the
- * `data-group` attribute every group card carries for exactly that purpose.
- */
-export const QUEUE_GROUP_DEFAULT_STATE = 'collapsed'
-
-/**
- * The bundles, their working order and the unbundled points, read from
- * `docs/work-packages.md`. The doc is the single source: a bundle added there
- * appears on the board without a code change.
- *
- * Total by contract — this feeds a board rebuild that a hook may call, so a
- * half-written doc degrades to "no grouping", never to a throw.
- */
-export function parseWorkPackages(text) {
-  const doc = normaliseLineEndings(text)
-  const bundles = []
-  // The table rows: | **Name** | Id | What it is | Points |. The NAME is what the
-  // board shows; the letter is the table's internal id and never leaves the doc
-  // (user 30.07.2026: "Die Buchstaben sagen nichts aus").
-  for (const row of doc.split('\n')) {
-    const m = row.match(/^\|\s*\*\*([^*|]+)\*\*\s*\|\s*([A-Z])\s*\|[^|]*\|([^|]*)\|/)
-    if (!m) continue
-    // "the rest landed 30.07.2026 (308, 410, …)" names CLOSED points in the same
-    // cell — harmless, the projection only ever renders OPEN ones. The DATE is
-    // not harmless: its day and month read as points 30 and 7, which would hand
-    // two unrelated points to whichever bundle mentions a date. Struck first.
-    const points = [...m[3].replace(/\b\d{1,2}\.\d{1,2}\.\d{4}\b/g, ' ').matchAll(/\b(\d{1,4})\b/g)]
-      .map((x) => Number(x[1]))
-      .filter((n) => n > 0 && n < 10000)
-    bundles.push({ id: m[2], name: m[1].trim(), points: [...new Set(points)] })
-  }
-  const known = new Map(bundles.map((b) => [b.name, b]))
-
-  // The working order: the bold names of the "Order of work" section, in the
-  // order they are written, arrows and all. A bold span that names no bundle
-  // ("v0.3 with the full closing") is simply not one; a bundle named with a
-  // trailing word ("Urlaubsfestigkeit first") still is.
-  const orderSection = doc.slice(doc.indexOf('## Order of work'))
-  const order = []
-  for (const bold of orderSection.matchAll(/\*\*([^*]+)\*\*/g)) {
-    for (const part of bold[1].split(/→|->/)) {
-      const candidate = part.trim()
-      const hit = [...known.keys()].find((name) => candidate === name || candidate.startsWith(`${name} `))
-      if (hit && !order.includes(hit)) order.push(hit)
-    }
-  }
-
-  // The unbundled bullets — every number in the "Not bundled" list, up to the
-  // next heading. Their reasons stay in the doc; the board carries the one
-  // German sentence above.
-  const from = doc.indexOf('**Not bundled**')
-  const unbundled = []
-  if (from >= 0) {
-    const end = doc.indexOf('\n## ', from)
-    for (const bullet of doc.slice(from, end < 0 ? undefined : end).split('\n')) {
-      if (!bullet.trimStart().startsWith('- ')) continue
-      for (const x of bullet.matchAll(/\*\*([\d,\s]+)\*\*/g)) {
-        for (const n of x[1].split(/[,\s]+/)) if (/^\d+$/.test(n)) unbundled.push(Number(n))
-      }
-    }
-  }
-  return { bundles, order, unbundled: [...new Set(unbundled)] }
-}
-
-/**
- * The rendered entries, grouped into their bundles (point 452).
- *
- * Group order follows the doc's "Order of work"; a bundle the order forgets
- * keeps its table position behind the named ones, and the unbundled group is
- * always LAST ("the big audits last"). Inside a group the points keep the order
- * the doc lists them in — that is the order they will be worked.
- *
- * THE INVARIANT: every entry lands in exactly one group. An entry in no bundle
- * goes to the unbundled group whether or not the doc mentions it, because the
- * alternative is a point that silently disappears off the board — the failure
- * the whole projection exists to end.
- */
-export function groupQueueEntries(entries, packages) {
-  const list = Array.isArray(entries) ? entries : []
-  // Coerced, not defaulted: a destructuring default only fires on `undefined`,
-  // and this reads a hand-editable doc through a parser a hook calls.
-  const bundles = Array.isArray(packages?.bundles) ? packages.bundles : []
-  const order = Array.isArray(packages?.order) ? packages.order : []
-  const named = order.map((n) => bundles.find((b) => b?.name === n)).filter(Boolean)
-  const ordered = [...named, ...bundles.filter((b) => !named.includes(b))]
-  const home = new Map()
-  for (const bundle of ordered) {
-    for (const p of Array.isArray(bundle.points) ? bundle.points : []) if (!home.has(p)) home.set(p, bundle.name)
-  }
-
-  const groups = new Map(
-    ordered.map((b) => [b.name, { name: b.name, rank: Array.isArray(b.points) ? b.points : [], entries: [] }]),
-  )
-  const rest = []
-  for (const entry of list) {
-    const name = home.get(entry.point)
-    if (name && groups.has(name)) groups.get(name).entries.push(entry)
-    else rest.push(entry)
-  }
-  const out = []
-  for (const group of groups.values()) {
-    if (!group.entries.length) continue // a bundle whose points are all closed
-    const at = (e) => {
-      const i = group.rank.indexOf(e.point)
-      return i < 0 ? Number.MAX_SAFE_INTEGER : i
-    }
-    out.push(summariseGroup(group.name, [...group.entries].sort((a, b) => at(a) - at(b))))
-  }
-  if (rest.length) out.push(summariseGroup(UNBUNDLED_GROUP_NAME, rest, UNBUNDLED_GROUP_REASON))
-  return out
-}
-
-/** "~2,5 h · Feature" → 2.5 — the notation the queue header already uses. */
-function metaHours(meta) {
-  const m = String(meta ?? '').match(/~\s*(\d+(?:[.,]\d+)?)\s*h/)
-  return m ? Number(m[1].replace(',', '.')) : null
-}
-
-/** One group with the numbers its summary shows: member count and estimate sum. */
-function summariseGroup(name, entries, reason = null) {
-  const hours = entries.map((e) => metaHours(e.meta)).filter((h) => h != null)
-  const sum = hours.reduce((a, b) => a + b, 0)
-  return {
-    name,
-    entries,
-    reason,
-    count: entries.length,
-    hours: hours.length ? sum : null,
-    // The audit demands a "~<n> h" duration on every queue card, or the NAMED
-    // "no estimate yet" marker — nothing in between. A group nobody has
-    // estimated therefore says so in exactly that wording rather than inventing
-    // a sum of nothing.
-    meta: hours.length ? `~${String(Math.round(sum * 2) / 2).replace(/\.0$/, '').replace('.', ',')} h` : QUEUE_STUB_META,
   }
 }
 
