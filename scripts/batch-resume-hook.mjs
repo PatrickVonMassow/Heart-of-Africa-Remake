@@ -315,7 +315,11 @@ try {
           sessionId,
           lock: readOwnerLock(),
           claim,
-          claimHonoured: reservation.honour === true,
+          // The same reading that decided the acquire two branches up: a released
+          // claim still reserving the freed lock (point 461) is why this session
+          // did not take it, so the stand-down must name that window rather than
+          // fall back to "the acquire lost and no lock is readable".
+          claimHonoured: reservationDecision({ assessment: reservation }).acquire === false,
           ancestorPid: ancestor?.pid ?? null,
           takeUpMs: maxAgeMs(),
           now,

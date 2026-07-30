@@ -292,13 +292,17 @@ try {
     // HAND THE BATCH BACK. A real release, not a handover: the user is not the
     // launcher, and leaving a lock behind that names a session which is done would
     // only make the claiming window wait for a grace window it should not have to.
-    // The claim is stamped rather than deleted, and the stamp SPENDS it: from that
-    // moment `assessClaim` reads the record as absent (point 434 (6c)), so nothing
-    // releases to it twice and nothing reserves the free lock for it any more. What
-    // the stamp buys is the other window's `--status`, which can then say the record
-    // is spent and that the lock is there to be taken — the claimant re-runs its own
-    // command, and if the launcher got there first it claims again against the new
-    // owner. Before the stamp a WINDOW's takeover claim is bound by the claimant's
+    // The claim is stamped rather than deleted, and the stamp does two things. It
+    // SPENDS the record — nothing is ever released to it twice (point 434 (6c)),
+    // which is what left the batch ownerless for an hour. And it starts the
+    // RESERVATION (point 461): the freed lock stays the claiming window's while
+    // that window's process lives, against every automated acquirer AND against
+    // this very session's next turn end — re-acquiring what it had just released is
+    // exactly what happened at 17:11, and the user's window then lost the race by
+    // six minutes. So this session does NOT take the lock back; the claimant runs
+    // its own command, and if the reservation has run out and the launcher got
+    // there first, it claims again against the new owner.
+    // Before the stamp a WINDOW's takeover claim is bound by the claimant's
     // own liveness rather than by a clock it has to keep feeding, and for it
     // `CLAIM_MAX_AGE_MS` bounds only how long a FREE lock waits for a claim nobody
     // has taken. An ERRAND claim carrying an issuer (`claimIsBounded`) is the

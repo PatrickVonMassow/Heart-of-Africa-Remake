@@ -167,12 +167,15 @@ export function gatherClaim(
   return { claim, ...assessment }
 }
 
-/** Mark the claim RELEASED: the hand-over HAPPENED, and from that moment the
- *  record is spent (point 434 (6c) — `assessClaim` reads it as absent). The lock
- *  is free, so the claiming window takes it by re-running its own command, and
- *  nothing releases to this record a second time or keeps standing down for it.
- *  Only ever called by the releasing owner; best effort — the release itself is
- *  what matters, and an unstamped claim still ends inside its take-up window. */
+/** Mark the claim RELEASED: the hand-over HAPPENED, so nothing is ever released
+ *  to this record a second time (point 434 (6c)). The stamp is also what starts
+ *  the RESERVATION (point 461): the lock is free, and `assessClaim` keeps it that
+ *  window's — against the launcher, the chat watcher and every other acquirer,
+ *  the releasing session included — while the claimant's process lives, bounded
+ *  by the take-up window counted from this stamp. The claiming window takes it by
+ *  re-running its own command. Only ever called by the releasing owner; best
+ *  effort — but an UNSTAMPED release reserves nothing, so the claiming window is
+ *  back to racing for the lock it was handed. */
 export function markClaimReleased(claim, { path = CLAIM_PATH, now = Date.now(), by = '' } = {}) {
   try {
     if (!claim || typeof claim !== 'object') return false
@@ -283,11 +286,22 @@ if (isMain) {
               'min from when it was RECORDED, and then the ordinary handover takes over so the batch is never ' +
               'left ownerless.'),
       )
+    } else if (view.reserve === true) {
+      console.log(
+        `\nThe batch was ALREADY RELEASED for ${view.claimantSid} (this record can never be honoured a second ` +
+          'time, point 434) and the free lock is RESERVED for that window while its process lives (point 461): ' +
+          'no launcher tick, no chat responder and no other window may take it. Run `node scripts/batch-claim.mjs ' +
+          `--session ${view.claimantSid}` +
+          '` in THAT window to take it — from another window this reservation refuses. It is not open-ended: ' +
+          `${Math.round(maxAgeMs() / 60000)} min after the release the ordinary handover applies again, and a ` +
+          'claimant that closes its window frees the lock at once.',
+      )
     } else if (view.reason === 'released') {
       console.log(
-        `\nThe batch was ALREADY RELEASED for ${view.claimantSid} (this record is spent, point 434). The lock is ` +
-          'free: run `node scripts/batch-claim.mjs --session <id>` to take it. Nothing reserves it any more — ' +
-          'if the launcher got there first, claim again against the new owner.',
+        `\nThe batch was ALREADY RELEASED for ${view.claimantSid} (this record is spent, point 434) and its ` +
+          'claimant is gone or out of time, so nothing reserves the lock any more. It is free: run `node ' +
+          'scripts/batch-claim.mjs --session <id>` to take it — if the launcher got there first, claim again ' +
+          'against the new owner.',
       )
     } else console.log(`\nThe recorded claim is NOT honoured (${view.reason}) — it changes nothing.`)
     process.exit(0)

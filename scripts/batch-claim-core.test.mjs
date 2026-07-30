@@ -226,13 +226,12 @@ describe('assessClaim — a claim only ever moves the batch when it is provably 
     // that followed released to the same dead claim a second time (two RELEASED
     // lines in .claude/boundary.log, no HANDOVER).
     const spent = asOwner(claimOf({ releasedAt: NOW - 30_000, releasedBy: OWNER }))
-    expect(spent).toMatchObject({ honour: false, reason: 'released', releasedAt: NOW - 30_000 })
-    // …so nothing releases to it a SECOND time…
+    expect(spent).toMatchObject({ honour: false, releasedAt: NOW - 30_000 })
+    // …so nothing releases to it a SECOND time. This is the property point 461
+    // must not undo: the record still RESERVES, but it is never honourable again.
     expect(releaseDecision({ assessment: spent }).verdict).toBe('none')
-    // …it reserves NOTHING, which is what makes the batch fall back to the
-    // ordinary handover instead of standing ownerless…
-    expect(reservationDecision({ assessment: spent }).acquire).toBe(true)
-    // …and a returning window may claim straight over it.
+    // …and a returning window may claim straight over it (the door back, for the
+    // case where the lock has meanwhile gone to somebody else).
     expect(
       claimWriteDecision({
         existing: claimOf({ releasedAt: NOW - 30_000, releasedBy: OWNER }),
@@ -241,10 +240,110 @@ describe('assessClaim — a claim only ever moves the batch when it is provably 
         probePid: aliveClaimant,
       }).action,
     ).toBe('write')
-    // A `releasedBy` without a stamp is the same event, read the same way.
-    expect(asOwner(claimOf({ releasedBy: OWNER })).reason).toBe('released')
-    expect(describeClaim(spent)).toContain('ALREADY released for it')
+    // A dead claimant is the case the incident was actually made of: nothing to
+    // hand to, so the batch falls back to the ordinary handover at once.
+    const gone = asOwner(claimOf({ releasedAt: NOW - 30_000, releasedBy: OWNER }), { probePid: deadClaimant })
+    expect(gone).toMatchObject({ honour: false, reserve: false, reason: 'released' })
+    expect(reservationDecision({ assessment: gone }).acquire).toBe(true)
+    expect(describeClaim(gone)).toContain('ALREADY released for it')
     expect(describeClaim(null)).toBe('no claim')
+  })
+
+  // POINT 461, observed live 30.07.2026 17:10-17:16. `.claude/boundary.log` records
+  // `RELEASED to 103806e3… by 3c5d6964…` at 17:10:22 and the lock shows `acquiredAt`
+  // 17:11 — the RELEASING session took the batch back at its own next turn end,
+  // because a released claim reserved NOTHING. The user's window then had to win a
+  // race against automated acquirers, and the window that is answering the user is
+  // exactly the one not polling: it lost by six minutes, and the takeover had to be
+  // forced by stopping the owner process.
+  describe('a RELEASED claim holds the door while its claimant lives', () => {
+    const releasedNow = (over = {}) => claimOf({ releasedAt: NOW - 30_000, releasedBy: OWNER, ...over })
+
+    it('RESERVES the freed lock — against the releasing session itself', () => {
+      // `asOwner` IS the releasing session's reading at its next turn end.
+      const a = asOwner(releasedNow())
+      expect(a).toMatchObject({ honour: false, reserve: true, reason: 'released-reserved', claimantSid: CLAIMANT })
+      expect(reservationDecision({ assessment: a })).toEqual({
+        acquire: false,
+        reason: 'reserved-released',
+        claimantSid: CLAIMANT,
+      })
+      // A stranger reading the same record is held off just as firmly.
+      expect(
+        reservationDecision({
+          assessment: assessClaim({ claim: releasedNow(), sid: 'session-third', now: NOW, probePid: aliveClaimant }),
+        }).acquire,
+      ).toBe(false)
+      // And the words say which of the two states this is.
+      expect(describeClaim(a)).toContain('stays RESERVED for that window')
+    })
+
+    it('still lets the CLAIMANT ITSELF take the lock — through its own branch', () => {
+      // The own-claim branch is asked BEFORE the released one, so the window the
+      // batch was freed for is never held off by its own reservation.
+      const own = assessClaim({
+        claim: releasedNow(),
+        sid: CLAIMANT,
+        ancestor: { pid: CLAIMANT_PID, startedAt: CLAIMANT_STARTED },
+        now: NOW,
+        probePid: aliveClaimant,
+      })
+      expect(own).toMatchObject({ honour: false, reserve: false, mine: true, reason: 'own-claim' })
+      expect(reservationDecision({ assessment: own }).acquire).toBe(true)
+    })
+
+    it('frees the lock INSTANTLY for a claimant that is gone — the probe decides, not a deadline', () => {
+      for (const probe of [
+        deadClaimant,
+        () => ({ exists: true, startedAt: CLAIMANT_STARTED + 10 * 60 * 1000 }), // pid reused
+        () => ({ exists: true, startedAt: null }), // start time unverifiable
+      ]) {
+        const a = asOwner(releasedNow(), { probePid: probe })
+        expect(a).toMatchObject({ honour: false, reserve: false, reason: 'released' })
+        expect(reservationDecision({ assessment: a }).acquire).toBe(true)
+      }
+      // An unidentified claimant is the same: nothing to probe, nothing to hold.
+      expect(asOwner(releasedNow({ pid: 0 })).reserve).toBe(false)
+    })
+
+    it('counts the take-up window FROM THE RELEASE, and ends there', () => {
+      // The claim itself may be hours old — a live owner's turn is long, and that
+      // is why it does not age (bound 1). Counting the reservation from `claim.at`
+      // would expire every reservation a long-held batch produces before it began.
+      expect(asOwner(releasedNow({ at: NOW - 5 * 60 * 60 * 1000 })).reserve).toBe(true)
+      // It IS bounded, so a window left open but never taking what it asked for
+      // cannot hold the batch: past the take-up window the handover applies again.
+      expect(asOwner(releasedNow({ releasedAt: NOW - CLAIM_MAX_AGE_MS - 1 })).reserve).toBe(false)
+      expect(asOwner(releasedNow({ releasedAt: NOW - CLAIM_MAX_AGE_MS })).reserve).toBe(true)
+    })
+
+    it('refuses a stamp nobody can reason about — a future one, or none at all', () => {
+      // A future stamp is the same unreadable clock the `at` check refuses, and a
+      // `releasedBy` with no stamp gives no window to measure. Both read as spent:
+      // the direction that can never strand the batch.
+      expect(asOwner(releasedNow({ releasedAt: NOW + 60_000 }))).toMatchObject({ reserve: false, reason: 'released' })
+      expect(asOwner(claimOf({ releasedBy: OWNER }))).toMatchObject({ reserve: false, reason: 'released' })
+      // And a claim stamped from the future in `at` never reaches this branch.
+      expect(asOwner(releasedNow({ at: NOW + 60_000 })).reason).toBe('clock-skew')
+    })
+
+    it('reserves NOTHING for an ERRAND claim — its pid names the issuer, not a taker', () => {
+      // The chat watcher's responder claim records the WATCHER's process, which
+      // lives for hours while the errand is capped at ten minutes. Reserving on it
+      // would hold the batch for a taker that does not exist.
+      const errand = asOwner(releasedNow({ by: 'chat-watcher' }))
+      expect(errand).toMatchObject({ reserve: false, reason: 'released' })
+      expect(reservationDecision({ assessment: errand }).acquire).toBe(true)
+    })
+
+    it('is never HONOURED, however alive the claimant is — nothing is released twice', () => {
+      const a = asOwner(releasedNow())
+      expect(a.honour).toBe(false)
+      expect(releaseDecision({ assessment: a })).toEqual({ verdict: 'none', reason: 'released-reserved' })
+      // The whole point of bound 1a survives: the second RELEASED line that left
+      // the batch ownerless for an hour cannot be written.
+      expect(a.reserve).toBe(true)
+    })
   })
 
   it('…but its OWN writer still recognises it, so the spent record gets cleared', () => {
@@ -378,18 +477,37 @@ describe('reservationDecision — a free lock still belongs to the window that c
   it('never reads a stray value as a reservation', () => {
     for (const v of ['yes', 1, {}, []]) {
       expect(reservationDecision({ assessment: { honour: v } }).acquire).toBe(true)
+      // The released reservation (point 461) is held to the same exactness — a
+      // truthy stray must never lock the batch away from every acquirer.
+      expect(reservationDecision({ assessment: { reserve: v } }).acquire).toBe(true)
     }
   })
 
-  it('the three doors ask ONE question: the guard, the resume hook and the launcher', () => {
+  it('every door asks ONE question: the guard, the resume hook, the launcher, the watcher', () => {
     // The gate the wrappers run, spelled out on the real assessment they compute —
     // an honoured foreign claim closes every door, the claimant's own closes none.
+    // Since point 461 they all ask through `reservationDecision`, never through the
+    // raw `honour` flag: the launcher and the chat watcher read the flag and
+    // therefore spawned straight into a reservation the release had just created.
     const foreign = gatherAssessment(OWNER)
     const own = gatherAssessment(CLAIMANT)
     expect(reservationDecision({ assessment: foreign }).acquire).toBe(false)
-    expect(foreign.honour).toBe(true) // what batch-autostart reads at its spawn gate
+    expect(foreign.honour).toBe(true)
     expect(reservationDecision({ assessment: own }).acquire).toBe(true)
     expect(own.honour).toBe(false)
+  })
+
+  // The WIRING, not only the decision. Two doors read the raw `honour` flag and
+  // therefore walked straight into a reservation the release had just created —
+  // the launcher's spawn gate and the chat watcher's wake gate (point 461). A
+  // decision nobody asks is no gate, so the call is pinned where it is made.
+  it('the launcher and the watcher ask the DECISION, not the raw honour flag', () => {
+    for (const file of ['batch-autostart.mjs', 'chat-watcher.mjs', 'batch-boundary.mjs', 'batch-resume-hook.mjs']) {
+      const text = readFileSync(resolve(REPO_ROOT, 'scripts', file), 'utf8')
+      expect(text).toContain('reservationDecision(')
+      // …and none of them decides on `assessClaim(…).honour` any more.
+      expect(text).not.toMatch(/assessClaim\([^)]*\)[\s\S]{0,40}\.honour/)
+    }
   })
 
   /** What the wrappers gather: a live claim on disk, judged by the asking session,
