@@ -3819,8 +3819,85 @@ it is appended.
   keeps today's path; and the take is guarded by the atomic acquire so a racing launcher
   loses cleanly. Plus one case pinning that the in-flight declaration's EXPIRY alone never
   triggers a take — a long verification must not be shot in the back.
+  PRECISION, from the second model's review of the resilience design: the launcher is NOT
+  without authority — `wedgeAction` may kill and take over, but ONLY its own spawn
+  (`batch-singleton.mjs:470–483`). The night's owner was started by hand, so `isOwnSpawn`
+  was false and the verdict fell through to a log line. The fix is to drop that condition,
+  not to invent power that already exists. It was NINE such lines, not eight.
+  AND THE PART WITHOUT WHICH THIS POINT MAKES THINGS WORSE (same review): a successor
+  spawned into the SAME broken environment wedges identically, and the runaway brake never
+  catches it, because `failCount` rises only when the spawn's pid is GONE
+  (`batch-autostart.mjs:385`). A chain of alive-but-wedged successors would burn tokens all
+  night and look busy. Three parts, all in this point: (i) an environment PREFLIGHT before
+  the spawn — can a trivial tool call complete at all? a spawn into a refusing environment
+  is not a rescue; (ii) `failCount` counts the successor that LIVES but neither converts the
+  lock nor produces a first commit within a calibratable M minutes; (iii) the spawn backoff
+  ESCALATES instead of hammering at a fixed interval.
+  VERIFIABLE additionally: a refusing preflight blocks the spawn; a live successor without
+  lock conversion or first commit raises failCount; the backoff rises across repeats; and a
+  wedged owner that is NOT the launcher's own spawn is taken over.
   DOCS in the same commit: `docs/batch-autonomy.md` under the launcher, and the ledger row
   for retrospective §3.61.
+
+- [ ] 434. THE BATCH MUST NOT BE ABLE TO STAND STILL — THE LAYERS AROUND POINT 433
+  (30.07.2026, user: preventing this reliably outranks batch progress; bundle I). The night of
+  29./30.07. produced nothing: work stopped at 21:50 and the state at 04:19 was byte-for-byte
+  the same. NINE part-failures chained (A-I), and the pattern behind all of them is that every
+  layer could OBSERVE the stall while none could ACT — and where authority existed, a condition
+  kept it from reaching.
+  THE ANALYSIS, THE RESEARCHED PRACTICE AND THE DESIGN ARE `docs/batch-resilience.md`, second
+  revision, reviewed by the second model against the code and the logs. Read it first; this
+  point is the build order, not a second telling. Point 433 is layer 2 and carries the spawn
+  safety without which the whole thing gets louder rather than safer.
+  IN THIS POINT, in this order:
+  (1) THE EXTERNAL WATCHER — layers 3 and 4 merged, and the FIRST thing built here, because it
+  is the only layer with no shared local cause of death. A GitHub Actions cron reads push age
+  against the open-point count (both live in the repo) and posts to the existing ntfy topic
+  (Actions secret, never in the repo) when nothing moved. It RELEASES AND ALERTS, it never
+  spawns — one spawner is enough, and the launcher owns the debounce state a second one could
+  not see. It is also the dead man's switch: ntfy forwards messages and cannot notice an
+  ABSENCE, so the party that expects a check-in has to be the one that computes progress.
+  Justified empirically by failure I: the launcher log ENDS at 02:21, so the whole local
+  watcher layer can fall silent as a unit.
+  (2) THE LEASE — the right core and the largest rebuild, so it follows 433 with its own
+  four-eyes review. `leaseUntil` in the lock file, renewed in PRE-ToolUse rather than post:
+  the existing heartbeat fires after a call returns, so a lease renewed by it would have to
+  outlive the longest single call, and this repo legitimately runs 30-40 minute suites and has
+  recorded 87 minutes of silence with work advancing. Renewing BEFORE the long call keeps the
+  window short and the reader side pure arithmetic — there is NO probing at the acquire door.
+  The FENCE lives in its own never-deleted monotonic file under the existing reap mutex, never
+  inside the lock file, which `acquire` deletes. It is checked at ONE PreToolUse chokepoint
+  (the `board-first-guard` slot) for the paths that have no guard today — the TASKS.md tick and
+  archive move, `git merge`/`push` to main, the board publish, `dashboard-state.json` merges;
+  the lock's own writers are already sessionId-guarded and need nothing. Standby is the
+  accepted loss case, written down: the wall clock advances while no code runs, the owner loses
+  the lease blamelessly, and the cost is bounded to uncommitted in-context work.
+  KNOWN BLIND SPOT to record with it: a worktree subagent's calls renew the PARENT's lease,
+  so a wedged parent with one ticking child never expires — which is why the external watcher
+  judges repository OUTPUT and not a heartbeat.
+  (3) RETRY A CHILD, NOT AN OUTAGE. Transience is an allowlist (HTTP 5xx/429/529,
+  ECONNRESET/ETIMEDOUT, the harness' own API-error death); a red gate, a guard block or an
+  escalated brief is never transient and the default is no retry. Two retries with backoff, same
+  branch, same brief revision, and if the child committed since its spawn the retry prompt says
+  CONTINUE rather than repeat. Stop conditions: the SAME transient signature across two or more
+  children in one window is an ENVIRONMENT OUTAGE — pause and report, never retry (both agents
+  died on one 500 that night, and two retries each would have bought four more deaths); never
+  retry a child that reported a step complete; cap the tokens one point may consume.
+  (4) DEMOLITION, in the same commit that makes the lease authoritative: `WORK_STALL_*`, the
+  `wedgeAction`/`isOwnSpawn` construction, the silence staging and the four-hour `WEDGED_MS`
+  valve go. Three overlapping liveness verdicts must not coexist.
+  STILL TO ROOT-CAUSE before the lease is frozen: why the owner produced nothing after waking
+  at 02:21 with a fresh heartbeat (failure H — heartbeat is not progress), and why the launcher
+  log stops at 02:21 (failure I).
+  MUST NOT BE BUILT: a rescue that depends on the wedged session noticing; a second LOCAL
+  watchdog; two spawners; a window that kills a running verification; a silent recovery.
+  VERIFIABLE: pure core plus Vitest per layer, each case naming the night it would have
+  prevented, plus one INDEPENDENCE case per layer — it still acts while the other layers'
+  inputs are missing or stale. The full list is `docs/batch-resilience.md` §8.
+  MECHANISM REVIEW REQUIRED per layer (CLAUDE.md §7.2); the design itself is reviewed.
+  DOCS in the same commit: `docs/batch-autonomy.md` under the launcher and the session
+  lifecycle, CLAUDE.md §6 where the singleton and the context boundary are described, and the
+  ledger row for retrospective §3.61.
 
 ## Closing (only after all points)
 
