@@ -4087,6 +4087,29 @@ it is appended.
   `request.mjs` in favour of extending the carrier. Record the implementation review before it
   lands.
 
+- [ ] 463. TWO LIVENESS READINGS THE FORCED HANDOVER PROVED WRONG (30.07.2026, both
+  observed while taking the batch back by force; bundle I).
+  PART A — A KILLED OWNER READS AS ALIVE FOR FIVE MINUTES. `assessOwner`
+  (`scripts/batch-singleton.mjs`) returns `fresh-heartbeat` for any heartbeat younger than
+  `DEAD_CONFIRM_MS` WITHOUT probing the pid, so a stopped owner keeps the batch for up to
+  five minutes and the claimant is told, wrongly, that a live session holds it. FINAL STATE:
+  when the lock carries a pid and a start time, a fresh heartbeat is confirmed by the same
+  identity probe the claim path already uses; a heartbeat that is fresh but whose process is
+  provably gone reads as DEAD at once. The generous window stays for a lock WITHOUT a usable
+  pid (a legacy or foreign-host lock), where the probe cannot decide — that is what the
+  window was for.
+  PART B — A GUARD THAT DOES NOT STAND DOWN. `scripts/guide-brevity-guard.mjs` checks only
+  `.claude/batch-paused`; it has no `heldByOtherLiveOwner` stand-down, and it blocked the
+  turn end of a session that did NOT own the batch over doc debt the OWNER had just committed.
+  The house rule is that every guard stands down for a non-owner and for a paused batch.
+  FINAL STATE: the guard stands down like the others. IN THE SAME POINT, sweep the guard
+  directory for the same omission — a guard is either wired with the stand-down or is
+  deliberately global with the reason written beside it — and record the sweep's result in
+  the commit message, so this is a one-off audit rather than a recurring surprise.
+  VERIFIABLE: the pure layer covers both — a fresh heartbeat with a dead pid assessed as
+  dead, a fresh heartbeat without a pid still assessed alive, and the guard's stand-down for
+  a non-owner; the sweep is evidenced by the commit message naming every guard checked.
+
 ## Closing (only after all points)
 
 New points are appended BEFORE this section — it stays last in the file.
