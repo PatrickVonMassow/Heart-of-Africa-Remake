@@ -23,6 +23,7 @@ import {
   readPending,
   spoolMessage,
 } from './chat-spool.mjs'
+import { pendingAgeMs, sweepPlan } from './chat-watcher-core.mjs'
 
 const dirs = []
 const tmp = () => {
@@ -43,6 +44,23 @@ describe('one file per message', () => {
     spoolMessage(msg({ id: 'm2', ntfyId: 'n2', text: 'zweite', receivedAt: NOW + 10 }), dir)
     spoolMessage(msg({ text: 'erste' }), dir)
     expect(readPending(dir).map((m) => m.text)).toEqual(['erste', 'zweite'])
+  })
+
+  // Point 424: the deferral deadline is measured against the SPOOLED receivedAt,
+  // never against the file's mtime or the watcher's own uptime — otherwise a
+  // restarted watcher would reset the clock and defer the same message for
+  // another full window, again and again.
+  it('carries the receivedAt through, so a restarted reader measures the REAL wait', () => {
+    const dir = join(tmp(), 'spool')
+    const arrived = NOW - 34 * 60 * 1000 // the reported case: pending since 15:31
+    spoolMessage(msg({ receivedAt: arrived }), dir)
+    // A fresh reader — nothing in memory, the file just touched, as a restart
+    // leaves it — still reads the original arrival time.
+    utimesSync(join(dir, readdirSync(dir)[0]), new Date(NOW), new Date(NOW))
+    const [pending] = readPending(dir)
+    expect(pending.receivedAt).toBe(arrived)
+    expect(pendingAgeMs(pending, NOW)).toBe(34 * 60 * 1000)
+    expect(sweepPlan({ pending: [pending], now: NOW }).overdue).toHaveLength(1)
   })
 
   it('creates the directory itself — the channel may be paired at any moment', () => {

@@ -171,7 +171,28 @@
         forget: 'Kopplung lösen',
       }
 
-      const chatState = { secret: null, topics: null, seen: new Set(), timer: null, open: false }
+      // `draft`, `messages` and `open` outlive the DOM on purpose (point 423):
+      // the board's 30-second refresh replaces <main>, which the chat lives in,
+      // so the section is rebuilt regularly. Without these the reader would lose
+      // the half-typed message, the conversation and the open panel on a timer.
+      const chatState = {
+        secret: null,
+        topics: null,
+        seen: new Set(),
+        timer: null,
+        open: false,
+        draft: '',
+        messages: [],
+        // Whether the reader was TYPING when the content was swapped, and where
+        // the caret stood. On a phone a rebuilt-but-unfocused field closes the
+        // keyboard mid-word, which reads as the channel dying under the thumbs.
+        focused: false,
+        caret: null,
+      }
+      // The board content swap is announced by the refresher (BOARD_SWAP_EVENT
+      // in scripts/board-refresher-core.mjs); nothing about the chat may enter
+      // the board CONTENT, so re-injection — not markup — is the fix.
+      const CHAT_SWAP_EVENT = 'hoa-board-swapped'
 
       const chatEl = (tag, props, ...kids) => {
         const el = document.createElement(tag)
@@ -232,7 +253,17 @@
         list.scrollTop = list.scrollHeight // autoscroll to the newest
       }
 
+      /** Remember a message so a rebuilt panel can show the conversation again. */
+      function chatRemember(m) {
+        chatState.messages.push(m)
+        if (chatState.messages.length > 200) chatState.messages.splice(0, chatState.messages.length - 200)
+      }
+
       function chatNote(text) {
+        // Total on purpose: a connect started before a board swap resolves into
+        // a panel that no longer exists (and, when the page is being torn down,
+        // into no document at all).
+        if (typeof document === 'undefined' || !document) return
         const n = document.getElementById('hoa-chat-note')
         if (n) n.textContent = text || ''
       }
@@ -287,7 +318,10 @@
           const placeholder = list.querySelector('.chat-empty')
           if (placeholder) placeholder.remove()
         }
-        for (const m of fresh) chatRenderMessage(list, m)
+        for (const m of fresh) {
+          chatRemember(m)
+          chatRenderMessage(list, m)
+        }
       }
 
       async function chatSend(text) {
@@ -322,13 +356,37 @@
       async function chatConnect(panel) {
         panel.textContent = ''
         const list = chatEl('div', { className: 'chat-list', id: 'hoa-chat-list' })
-        list.append(chatEl('p', { className: 'msg chat-empty', textContent: CHAT_TEXT.empty }))
+        // The conversation is replayed from the remembered messages, so a panel
+        // rebuilt after a board swap is not silently emptied (`seen` would keep
+        // the poll from fetching them a second time).
+        if (chatState.messages.length) for (const m of chatState.messages) chatRenderMessage(list, m)
+        else list.append(chatEl('p', { className: 'msg chat-empty', textContent: CHAT_TEXT.empty }))
         const note = chatEl('div', { className: 'chat-note', id: 'hoa-chat-note', textContent: CHAT_TEXT.hint })
         const input = chatEl('input', {
           type: 'text',
           placeholder: CHAT_TEXT.placeholder,
           maxLength: CHAT_MAX_LEN,
           id: 'hoa-chat-input',
+          value: chatState.draft,
+        })
+        const rememberCaret = () => {
+          chatState.caret = input.selectionStart
+        }
+        input.addEventListener('input', () => {
+          chatState.draft = input.value
+          rememberCaret()
+        })
+        // Caret-moving gestures that type nothing, so the reader lands back in
+        // the same word and not at the end of their sentence.
+        for (const ev of ['keyup', 'click', 'select']) input.addEventListener(ev, rememberCaret)
+        input.addEventListener('focus', () => {
+          chatState.focused = true
+        })
+        input.addEventListener('blur', () => {
+          // A blur raised because the SWAP removed the field is not the reader
+          // leaving it — the node is already disconnected by then. Only a real
+          // blur (the field still in the document) gives the keyboard up.
+          if (input.isConnected) chatState.focused = false
         })
         // Disabled until the topics are derived and the first poll came back:
         // a send before that would post nowhere and read as a lost message.
@@ -348,22 +406,33 @@
           chatPair(panel)
         })
         panel.append(list, note, form, forget)
+        // Put the reader back INTO the field they were typing in — never into a
+        // field they never touched, so a first load steals no focus.
+        if (chatState.focused) {
+          input.focus()
+          const at = chatState.caret === null ? input.value.length : Math.min(chatState.caret, input.value.length)
+          if (typeof input.setSelectionRange === 'function') input.setSelectionRange(at, at)
+        }
 
         form.addEventListener('submit', async (ev) => {
           ev.preventDefault()
           const text = input.value.trim()
           if (!text || !chatState.topics) return // Enter must not outrun the connect either
           input.value = ''
+          chatState.draft = ''
           chatNote(CHAT_TEXT.sending)
           try {
             const sent = await chatSend(text)
             chatState.seen.add(sent.id)
             const placeholder = list.querySelector('.chat-empty')
             if (placeholder) placeholder.remove()
-            chatRenderMessage(list, { id: sent.id, ts: sent.ts, text: sent.text, side: 'you' })
+            const mine = { id: sent.id, ts: sent.ts, text: sent.text, side: 'you' }
+            chatRemember(mine)
+            chatRenderMessage(list, mine)
             chatNote(CHAT_TEXT.hint)
           } catch (e) {
             input.value = text
+            chatState.draft = text // an unsent message survives a swap too
             chatNote(CHAT_TEXT.sendFailed)
           }
         })
@@ -453,8 +522,42 @@
         const sub = document.querySelector('main h1 + .sub') ?? document.querySelector('main h1')
         if (sub && sub.parentNode) sub.parentNode.insertBefore(host, sub.nextSibling)
         else document.body.insertBefore(host, document.body.firstChild)
+        // A REBUILD MUST NOT CLOSE THE CHAT (point 423). The board swaps its
+        // content every 30 seconds, so this runs again and again while the
+        // reader has the panel open; leaving it collapsed would look exactly
+        // like the section disappearing, which is the bug being fixed.
+        if (chatState.open) {
+          chatState.open = false // chatTogglePanel flips it back and rebuilds
+          chatStopPolling() // the old timer belonged to the discarded panel
+          chatTogglePanel(panel, toggle)
+        }
+        watchBoardContent()
       }
       window.injectChat = injectChat // the jsdom test drives the real function
+
+      // A SECOND, TRANSPORT-INDEPENDENT NET. The swap event comes from the
+      // refresher script the BOARD CONTENT carries, so a board still published
+      // with an older copy of that script would announce nothing. Watching the
+      // content container costs nothing and covers exactly that lag: whenever
+      // <main>'s children change and the chat is gone, it goes back in.
+      let chatWatchedMain = null
+      function watchBoardContent() {
+        if (typeof MutationObserver !== 'function') return
+        const main = document.querySelector('main')
+        if (!main || main === chatWatchedMain) return
+        chatWatchedMain = main
+        new MutationObserver(() => {
+          if (!document.getElementById('hoa-chat')) injectChat()
+        }).observe(main, { childList: true })
+      }
+
+      // THE SWAP AND THE INJECTION ARE TIED TOGETHER. The refresher replaces
+      // <main>, the chat lives inside it, and injectChat used to run only once
+      // per document — so every successful refresh removed the channel and
+      // nothing put it back (the reader saw it vanish the moment they returned
+      // to the browser). The listener sits on `window`, which survives the
+      // document.write below, and injectChat is idempotent.
+      window.addEventListener(CHAT_SWAP_EVENT, injectChat)
 
       // Keep the failure honest and self-explaining: a blank page would read as
       // "no work", which is the exact misreading this whole mechanism exists to

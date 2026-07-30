@@ -457,6 +457,41 @@ export function dropNoticeDecision({ verdict, notified = [], sent = 0, max = MAX
 }
 
 /**
+ * WHAT THE LAUNCHER LOGS ABOUT ONE INBOX TICK. PURE — a list of lines, in order.
+ *
+ * WHY THIS IS A FUNCTION AND NOT AN `if/else if` AT THE CALL SITE (point 430 B).
+ * It was that chain, and the chain made two facts exclusive: a tick whose SPOOL
+ * WRITE FAILED took the first branch and the drop-notice clause — which sits in a
+ * later `else if` — never ran. So a tick that both failed to store a message and
+ * failed to tell the sender about a dropped one logged the storage fault alone,
+ * and the refused notice was silent. The whole reason those counts are reported is
+ * that a refused notice must never be silent, so both facts now leave here.
+ *
+ * `result` is `chat-inbox.mjs`'s JSON verbatim. TOTAL — junk yields no lines.
+ */
+export function chatInboxLogLines(result) {
+  const r = result && typeof result === 'object' ? result : null
+  if (!r) return []
+  // Not paired on this machine: deliberately silent, it is the documented opt-out.
+  if (r.configured === false) return []
+  const lines = []
+  if (r.ok === false) lines.push(`chat inbox: ${r.reason ?? 'unknown fault'}`)
+  const planned = Number(r.noticesPlanned) || 0
+  const sent = Number(r.notices) || 0
+  // Only worth a word when the two DISAGREE: planned but not sent means the
+  // transport refused the notice, and the sender is then still looking at a
+  // message that never landed with nothing to say so.
+  const refused = planned > 0 && sent !== planned ? `, DROP NOTICE NOT SENT: ${planned - sent} of ${planned}` : ''
+  const dropped = Array.isArray(r.dropped) ? r.dropped : []
+  const accepted = Number(r.accepted) || 0
+  if (accepted > 0 || dropped.length > 0 || refused) {
+    const drops = dropped.length ? ` (dropped: ${dropped.join(', ')})` : ''
+    lines.push(`chat inbox: ${accepted} new, ${Number(r.pending) || 0} pending${drops}${refused}`)
+  }
+  return lines
+}
+
+/**
  * A whole poll response → what to spool and what the next state is. ASYNC, PURE.
  *
  * THE CURSOR IS NOT THE DEDUPE (the delivery discipline this point was written
@@ -499,7 +534,17 @@ export async function ingest({
   const notified = pruneIdLedger(state.notified, { now, retentionMs })
   // What the verification actually reads: the transport ledger PLUS every
   // envelope id still inside its window, whether or not `seen` still holds it.
-  const lookup = [...seen, ...envelopeKeys(envelopes)]
+  //
+  // A NOTIFIED ENVELOPE IS IN THERE TOO (point 430 A). A message dropped as
+  // CLOCK-AHEAD becomes acceptable simply by waiting — its stamp is fixed while
+  // `now` advances — so a replay after the wait, with its transport id evicted
+  // from the count-capped `seen` by a flood, could be ACCEPTED minutes after the
+  // sender was told "NICHT angekommen". That pair contradicts itself, and the
+  // notice is the half that cannot be taken back. So a notified envelope id is
+  // refused for as long as it is remembered: the notice asked the sender to fix
+  // the clock and send again, and a resend is a new envelope. It also settles the
+  // second notice by construction — a `duplicate` earns none.
+  const lookup = [...seen, ...envelopeKeys(envelopes), ...envelopeKeys(notified)]
   let cursor = Number.isFinite(state.cursor) ? Number(state.cursor) : 0
 
   const accepted = []
@@ -543,6 +588,8 @@ export async function ingest({
           text: dropNoticeText({ reason: plan.reason, when: formatChatStamp(verdict.ts) }),
         })
         notified.push({ id: verdict.envelopeId, at: now })
+        // Effective within THIS tick as well, not only from the next state read.
+        lookup.push(`m:${verdict.envelopeId}`)
       }
     }
   }

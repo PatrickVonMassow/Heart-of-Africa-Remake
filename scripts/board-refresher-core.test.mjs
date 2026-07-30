@@ -6,7 +6,7 @@
 // board embeds is what runs here.
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from 'vitest'
-import { BOARD_CONTENT_URL, REFRESHER_SOURCE, refresherScript } from './board-refresher-core.mjs'
+import { BOARD_CONTENT_URL, BOARD_SWAP_EVENT, REFRESHER_SOURCE, refresherScript } from './board-refresher-core.mjs'
 
 /** Build the refresher from the shipped source with injected collaborators. */
 function build(env) {
@@ -146,5 +146,46 @@ describe('the swap must not collapse what the reader opened', () => {
     const script = refresherScript()
     expect(script).toContain('typeof window.__hoaBoardRestore === "function"')
     expect(script).not.toMatch(/onSwap:\s*window\.__hoaBoardRestore\s*[,}]/)
+  })
+})
+
+// Point 423: the chat is injected INTO the board content, so a swap deletes it.
+// The seam between the versioned refresher and the viewer's injection is this
+// announced event — it has to be raised, and raising it must never be able to
+// turn a working refresh into an error.
+describe('a successful swap announces itself so the injected chat can return', () => {
+  it('dispatches the swap event on the window it was given', async () => {
+    document.body.innerHTML = '<main><p>alt</p></main>'
+    const heard = []
+    const win = {
+      DOMParser,
+      Event: globalThis.Event,
+      scrollY: 0,
+      sessionStorage: { setItem() {} },
+      location: { reload() {} },
+      dispatchEvent: (ev) => heard.push(ev.type),
+    }
+    // eslint-disable-next-line no-new-func
+    const refresh = new Function(`${REFRESHER_SOURCE}; return createBoardRefresher;`)()({
+      document,
+      window: win,
+      fetch: () => Promise.resolve({ ok: true, status: 200, text: () => Promise.resolve(page('<p>neu</p>')) }),
+      source: BOARD_CONTENT_URL,
+    })
+    expect(await refresh()).toBe('swapped')
+    expect(heard).toEqual([BOARD_SWAP_EVENT])
+  })
+
+  it('stays silent when nothing changed — there is nothing to re-inject', async () => {
+    const heard = []
+    const { refresh } = harness({ body: '<p>gleich</p>', response: page('<p>gleich</p>') })
+    expect(await refresh()).toBe('unchanged')
+    expect(heard).toEqual([])
+  })
+
+  it('still swaps on a window that cannot dispatch at all (the test harness, an old host)', async () => {
+    const { refresh } = harness({ body: '<p>alt</p>', response: page('<p>neu</p>') })
+    expect(await refresh()).toBe('swapped')
+    expect(document.querySelector('main').innerHTML).toContain('neu')
   })
 })

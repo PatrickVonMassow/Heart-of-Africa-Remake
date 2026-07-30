@@ -56,6 +56,8 @@ import { openPointStatus, ARCHIVE_PATH, TASKS_PATH } from './tasks-source.mjs'
 import { buildSpawnArgs, buildSpawnOptions, claudeExeBase, findClaudeExe } from './batch-autostart-core.mjs'
 import {
   CLAIM_SESSION_PREFIX,
+  DEFERRAL_MS,
+  RESPONDER_MAX_MESSAGES,
   RESPONDER_MAX_MS,
   WATCHER_PID_FILE,
   ackPlan,
@@ -64,6 +66,7 @@ import {
   claimIsOurs,
   reconnectDelayMs,
   responderClaim,
+  sweepPlan,
   wakeDecision,
 } from './chat-watcher-core.mjs'
 
@@ -181,7 +184,12 @@ const state = {
   identity: { pid: process.pid, pidStartedAt: null },
   child: null,
   childTimer: null,
+  sweepTimer: null,
   handed: [],
+  /** Envelope ids this watcher already handed to a responder. The sweep skips
+   *  them, so a responder that answered nothing leaves its messages pending
+   *  (deliberately) without being woken for them again every window. */
+  woken: [],
   /** When the live responder was spawned — the floor a reply receipt must beat
    *  to count as ITS answer rather than an earlier session's. */
   spawnedAt: null,
@@ -265,6 +273,8 @@ function spawnResponder(messages) {
   state.child = child
   state.handed = messages
   state.spawnedAt = Date.now()
+  state.woken.push(...messages.map((m) => m?.id).filter(Boolean))
+  if (state.woken.length > SEEN_MAX) state.woken = state.woken.slice(-SEEN_MAX)
 
   // THE HANDLERS AND THE TIMEOUT GO ON BEFORE THE CLAIM WRITE (four-eyes review
   // 29.07.2026, finding 2). They used to be attached AFTER it, so a `writeClaim`
@@ -330,6 +340,7 @@ function shutdown(why, code = 0) {
   shuttingDown = true
   try {
     if (state.childTimer) clearTimeout(state.childTimer)
+    if (state.sweepTimer) clearInterval(state.sweepTimer)
     // A responder is OURS, so an orderly stop takes it with us: the launcher
     // stops this process precisely when the batch is paused, and leaving a
     // headless session behind under a claim nobody holds any more is the exact
@@ -464,6 +475,45 @@ async function handleLine(secret, maxAgeMs, line) {
   spawnResponder([verdict.message])
 }
 
+// --- The deferral deadline (point 424) -----------------------------------------
+//
+// A message left to a live owner is left to its NEXT TOOL CALL, and a session that
+// declared a wait makes none — measured, a message sat pending for 34 minutes
+// under a correctly logged `skip / owner-live`. So the skip is revisited: every
+// tick the pending spool is re-read, and anything past `DEFERRAL_MS` is decided
+// again with the owner gate lifted. Every other stand-down still binds, and the
+// responder runs under the same bounded claim as any other wake.
+
+/** How often the pending spool is re-examined. A third of the window, so an
+ *  overdue message waits at most a third of it longer than the deadline. */
+const sweepIntervalMs = () => Math.max(15_000, Math.round(deferralMs() / 3))
+
+/** The deadline, calibratable — the env var is read once per call so a test can
+ *  set it, and a nonsense value falls back to the default rather than to zero
+ *  (which would spawn beside every live owner). */
+function deferralMs() {
+  const raw = Number(process.env.HOA_CHAT_DEFER_MS)
+  return Number.isFinite(raw) && raw > 0 ? raw : DEFERRAL_MS
+}
+
+/** One sweep: take what the owner did not. Total — a sweep must never throw
+ *  inside a timer and take the watcher down with it. */
+function sweepDeferred() {
+  try {
+    if (state.child) return // our own responder is answering; `woken` covers its messages
+    const plan = sweepPlan({ pending: readPending(), now: Date.now(), windowMs: deferralMs(), wokenIds: state.woken })
+    if (plan.overdue.length === 0) return
+    const gathered = gatherState(state.sessionId, false)
+    const decision = wakeDecision({ accepted: true, ...gathered, deferralExpired: true })
+    const record = { event: 'defer-sweep', pending: plan.overdue.length, windowMs: plan.windowMs, ...decision }
+    log(record)
+    if (decision.decision !== 'spawn') return
+    spawnResponder(plan.overdue.slice(-RESPONDER_MAX_MESSAGES))
+  } catch (e) {
+    log({ event: 'defer-sweep-failed', reason: (e && e.message) || String(e) })
+  }
+}
+
 async function run() {
   // The worktree refusal comes FIRST, before the channel is even looked at: a
   // run from the wrong checkout must be loud whether or not a secret happens to
@@ -520,8 +570,13 @@ async function run() {
       log({ event: 'adopted', responderPid: adopt.responderPid })
     }
     writePidFile()
+    // The deferral deadline, on its own clock: the arrival decision cannot know
+    // how long the owner will stay idle, so the skip is revisited here. The DRY
+    // RUN gets no sweep — it decides and reports, and spawns nothing.
+    state.sweepTimer = setInterval(sweepDeferred, sweepIntervalMs())
+    if (typeof state.sweepTimer.unref === 'function') state.sweepTimer.unref()
   }
-  log({ event: 'watching', mode: dryRun ? 'dry-run' : 'live', sessionId: state.sessionId })
+  log({ event: 'watching', mode: dryRun ? 'dry-run' : 'live', sessionId: state.sessionId, deferralMs: deferralMs() })
 
   let attempt = 0
   for (;;) {

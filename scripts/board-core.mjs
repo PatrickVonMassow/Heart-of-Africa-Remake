@@ -8,6 +8,38 @@
 // imports nothing, so the direction cannot become a cycle.
 import { QUEUE_STUB_META } from './dashboard-guard-core.mjs'
 
+/** The flag that takes a card's text from STDIN instead of the argv (point 410). */
+export const TEXT_STDIN_FLAG = '--text-stdin'
+
+/**
+ * A card's text — from the argv words, or, when `--text-stdin` stands among
+ * them, from what the wrapper read on stdin as UTF-8.
+ *
+ * WHY THE SECOND PATH EXISTS: German prose handed to this script as a
+ * command-line ARGUMENT arrives mangled on Windows, so every session had taken
+ * to transliterating its umlauts by hand ("faellt weg", "kuenftig") — and the
+ * board is German prose the user reads on a phone, where that reads as broken.
+ * The transliteration was the workaround, not the defect; the defect is the
+ * shell in the path. On stdin the shell never sees the text.
+ *
+ * The argument form keeps working (ASCII is safe and it is the shorter call),
+ * but the two may not be mixed: a caller that passes both meant one of them,
+ * and silently picking would drop the other.
+ */
+export function resolveCardText(words, stdinText) {
+  const list = (Array.isArray(words) ? words : []).map((w) => String(w))
+  const rest = list.filter((w) => w !== TEXT_STDIN_FLAG)
+  if (rest.length === list.length) return rest.join(' ')
+  if (rest.length) {
+    throw new Error(`board: ${TEXT_STDIN_FLAG} takes the WHOLE text — drop the argument text ("${rest.join(' ')}")`)
+  }
+  // Normalise the line ending a Windows pipe adds and the trailing newline every
+  // heredoc carries; the text itself is passed through untouched.
+  const text = (typeof stdinText === 'string' ? stdinText : '').replace(/\r\n/g, '\n').trim()
+  if (!text) throw new Error(`board: ${TEXT_STDIN_FLAG} was given but nothing arrived on stdin`)
+  return text
+}
+
 /** Berlin wall clock — the stamp every status carries (point 371). */
 export function berlinStamp(now = new Date()) {
   return new Intl.DateTimeFormat('de-DE', {
@@ -75,19 +107,24 @@ export function promoteToNow(html, point, { title, times, status, stamp = berlin
   const card = queueCard(html, point)
   if (!card) throw new Error(`board: no queue card for point ${point}`)
   if (!title || !status) throw new Error('board: promote needs a title and a status')
-  let out = html.replace(card, '')
   const now =
     `<details class="now">\n  <summary><span class="t">${point} — ${title}</span>` +
     `<span class="right"><span class="meta">${times ?? stamp}</span></span></summary>\n` +
     `  <div class="body">\n    <p><span class="stamp">Stand ${stamp}</span> ${status}</p>\n  </div>\n</details>\n`
-  // At the TOP of the section, not the bottom: the focus guard reads the FIRST
-  // now-card, so the point just taken up must lead — otherwise declaring focus
-  // on it immediately contradicts the board and blocks the turn.
+  return insertAsFirstNowCard(html.replace(card, ''), now)
+}
+
+/**
+ * Put a rendered card at the TOP of the current-work section — not the bottom:
+ * the focus guard reads the FIRST now-card, so the point just taken up must
+ * lead, or declaring focus on it immediately contradicts the board.
+ */
+function insertAsFirstNowCard(html, card) {
   const head = '<summary><h2>Woran ich gerade arbeite</h2></summary>'
-  const at = out.indexOf(head)
+  const at = html.indexOf(head)
   if (at < 0) throw new Error('board: current-work section not found')
   const from = at + head.length
-  return `${out.slice(0, from)}\n${now}${out.slice(from).replace(/^\n/, '')}`
+  return `${html.slice(0, from)}\n${card}${html.slice(from).replace(/^\n/, '')}`
 }
 
 /** The four section headings, in the order the board fixes them. */
@@ -223,6 +260,131 @@ export function toDone(html, point, { text, end = berlinStamp() } = {}) {
   const out = html.replace(card, '')
   const { from } = sectionBounds(out, 'done')
   return `${out.slice(0, from)}\n${entry}${out.slice(from).replace(/^\n/, '')}`
+}
+
+// ═══ Point 416 — closing a point must not leave the board blank ═══
+// Closing used to be two board edits — archive the finished card, promote the
+// next one — and between them "Woran ich gerade arbeite" was EMPTY. The user
+// reported that hole twice within one hour ("you are not working on
+// anything?"), and `board-core.test.mjs` refuses to sweep a board without
+// current work, so the window also turned the whole unit layer red and the
+// pre-push gate blocked an otherwise green merge. The test is RIGHT; what was
+// missing is a way to close a point without opening the hole. Below is that
+// way: one call, one document, no observable in-between.
+
+/** Does "Woran ich gerade arbeite" hold a card? False on a board without the section. */
+export function hasCurrentWork(html) {
+  try {
+    const { from, end } = sectionBounds(html, 'now')
+    return /<details\b/.test(html.slice(from, end))
+  } catch {
+    return false
+  }
+}
+
+/** The title of the card that stands in for current work when there is none. */
+export const NO_CURRENT_WORK_TITLE = 'Gerade keine laufende Arbeit'
+
+/**
+ * A current-work card that NAMES the absence of current work — the honest form
+ * of an empty section, for the rare tick where nothing can be promoted (empty
+ * queue, or a session boundary about to be taken). It carries no point number,
+ * so it adds none of the point-per-section conflicts; declare a non-point focus
+ * (`focus.mjs set - "<why>"`) alongside it.
+ */
+export function toNoCurrentWork(html, reason, { stamp = berlinStamp() } = {}) {
+  const text = String(reason ?? '').trim()
+  if (!text) throw new Error('board: --none needs a reason — the reader must learn WHY nothing is running')
+  const card =
+    `<details class="now">\n  <summary><span class="t">${NO_CURRENT_WORK_TITLE}</span>` +
+    `<span class="right"><span class="meta">${stamp}</span></span></summary>\n` +
+    `  <div class="body">\n    <p><span class="stamp">Stand ${stamp}</span> ${text}</p>\n  </div>\n</details>\n`
+  return insertAsFirstNowCard(html, card)
+}
+
+/**
+ * Archive `point` AND settle what current work is afterwards, in ONE document.
+ * Either a successor is promoted from the queue (`next` + `nextStatus`), or the
+ * absence is named (`none`), or — with parallel work — the section still holds
+ * another card on its own. Anything else is REFUSED: leaving the section empty
+ * is the defect, and forgetting must not be able to reach it.
+ */
+export function closeCard(html, point, { text, end = berlinStamp(), next = null, nextStatus, none, stamp } = {}) {
+  if (next != null && none) throw new Error('board: done takes EITHER --next or --none, never both')
+  const at = stamp ?? end
+  const archived = toDone(html, point, { text, end })
+  if (next != null) {
+    const status = String(nextStatus ?? '').trim()
+    if (!status) throw new Error(`board: --next ${next} needs the new card's status text`)
+    return toNow(archived, next, status, { stamp: at })
+  }
+  if (none) return toNoCurrentWork(archived, none, { stamp: at })
+  if (!hasCurrentWork(archived)) {
+    throw new Error(
+      `board: archiving ${point} would leave "Woran ich gerade arbeite" EMPTY, which the reader ` +
+        'reads as "nothing is happening" and the unit layer reads as a failure. Say what follows in ' +
+        `the SAME edit: done ${point} --next <m> "<status>" to promote the next point, or ` +
+        `done ${point} --none "<reason>" when there is genuinely nothing to promote.`,
+    )
+  }
+  return archived
+}
+
+/**
+ * Split `done`'s argv into its buckets: the closing text, an optional
+ * `--next <m> "<status>"` and an optional `--none "<reason>"`. Pure so the
+ * flag handling is pinned by tests rather than by the shape of one `indexOf`.
+ */
+export function parseDoneArgs(rest) {
+  const args = (Array.isArray(rest) ? rest : []).map((a) => String(a))
+  const out = { point: args[0], words: [], next: null, nextWords: [], noneWords: [], hasNone: false }
+  let bucket = 'words'
+  for (const a of args.slice(1)) {
+    if (a === '--next') {
+      if (out.next != null) throw new Error('board: --next given twice')
+      bucket = 'next-point'
+      continue
+    }
+    if (a === '--none') {
+      out.hasNone = true
+      bucket = 'noneWords'
+      continue
+    }
+    if (bucket === 'next-point') {
+      if (!/^\d+$/.test(a)) throw new Error(`board: --next takes the successor's POINT NUMBER, got "${a}"`)
+      out.next = a
+      bucket = 'nextWords'
+      continue
+    }
+    out[bucket].push(a)
+  }
+  if (bucket === 'next-point') throw new Error('board: --next needs a point number')
+  return out
+}
+
+/**
+ * Put a question to the user as a "Von dir zu klären" card, at the TOP of the
+ * section (point 421). Until now the board could only DROP such a card, so the
+ * one thing the rule demands — that every decision asked of the user stands
+ * there — had to be hand-edited into the HTML, and the guard's remedy could not
+ * name a command. The card carries a TITLE ONLY in its collapsed header, per the
+ * board's binding structure, and the body says what is to be decided.
+ */
+export function addVdzk(html, title, text) {
+  // ESCAPED, unlike the other card builders (four-eyes review 30.07.2026): the
+  // guard's remedy line hands out a literal `"<Titel der Frage>"` placeholder, so
+  // a paste of it is the LIKELY first call — and an unescaped `<` produces a card
+  // whose title parses as empty, i.e. an invisible open question.
+  const esc = (s) => String(s ?? '').trim().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  const head = esc(title)
+  const body = esc(text)
+  if (!head) throw new Error('board: vdzk-add needs a title — the collapsed card shows nothing else')
+  if (!body) throw new Error('board: vdzk-add needs the question itself as the card body')
+  const { from } = sectionBounds(html, 'vdzk')
+  const card =
+    `<details>\n  <summary><span class="t">${head}</span></summary>\n` +
+    `  <div class="body">\n    <p>${body}</p>\n  </div>\n</details>\n`
+  return `${html.slice(0, from)}\n${card}${html.slice(from).replace(/^\n/, '')}`
 }
 
 /**

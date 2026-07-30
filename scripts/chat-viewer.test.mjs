@@ -18,6 +18,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { JSDOM } from 'jsdom'
 import { describe, expect, it } from 'vitest'
+import { REFRESHER_SOURCE } from './board-refresher-core.mjs'
 import { structureViolations } from './board-structure-core.mjs'
 import { boardHtml } from './dashboard-guard-fixtures.mjs'
 import { TEST_VECTOR as VECTOR, deriveTopics, makeEnvelope } from './chat-core.mjs'
@@ -257,6 +258,150 @@ describe('the chat as the reader meets it', () => {
     expect(await api.chatVerify(VECTOR.secret, { direction: 'outbox', id: env.id, ts: env.ts, text: env.text }, env.sig)).toBe(false)
     // …and it shows up in the list right away.
     expect(doc.getElementById('hoa-chat-list').textContent).toContain('bitte Punkt 12 zuerst')
+    dom.window.close()
+  })
+})
+
+// Point 423 — the user reported it from the phone: "returning to the browser I
+// only see the agent section after a refresh". The chat is injected UNDER the
+// board's heading, which puts it inside <main>, and the 30-second refresher
+// replaces <main> wholesale while injectChat ran once per document. So every
+// successful refresh deleted the channel and nothing put it back.
+describe('the chat survives the board’s own 30-second refresh', () => {
+  /** Perform the real swap in the loaded page, exactly as the refresher does. */
+  async function swap(dom, freshBoard) {
+    const win = dom.window
+    // jsdom reports a non-visual document as hidden, and the refresher skips a
+    // hidden page on purpose. The case under test is the VISIBLE one — which is
+    // when the reader sees the section vanish.
+    Object.defineProperty(win.document, 'visibilityState', { value: 'visible', configurable: true })
+    // eslint-disable-next-line no-new-func
+    const make = new win.Function(`${REFRESHER_SOURCE}; return createBoardRefresher;`)()
+    const refresh = make({
+      document: win.document,
+      window: win,
+      fetch: async () => okResponse(freshBoard),
+      source: 'https://example.invalid/board.html',
+    })
+    const outcome = await refresh()
+    await settle(dom, () => true, 3) // let the listener and the observer run
+    return outcome
+  }
+
+  const changed = board.replace('Kurzstand.', 'Neuer Stand um 03:10.')
+
+  it('still carries exactly ONE chat section after a swap — the case that failed', async () => {
+    const dom = await loadViewer({ fetchImpl: async () => okResponse(board) })
+    const doc = dom.window.document
+    expect(doc.getElementById('hoa-chat')).toBeTruthy()
+    expect(await swap(dom, changed)).toBe('swapped')
+    expect(doc.body.textContent).toContain('Neuer Stand um 03:10.')
+    expect(doc.querySelectorAll('#hoa-chat')).toHaveLength(1)
+    dom.window.close()
+  })
+
+  it('keeps an unsent draft and the open panel across the swap', async () => {
+    const dom = await loadViewer({
+      secret: VECTOR.secret,
+      fetchImpl: async (url) => okResponse(String(url).includes('ntfy.sh') ? '' : board),
+    })
+    const doc = dom.window.document
+    doc.querySelector('#hoa-chat .chat-toggle').click()
+    await settle(dom, () => doc.getElementById('hoa-chat-input'))
+    const input = doc.getElementById('hoa-chat-input')
+    input.value = 'halb getippt, noch nicht gesendet'
+    input.dispatchEvent(new dom.window.Event('input'))
+
+    expect(await swap(dom, changed)).toBe('swapped')
+    await settle(dom, () => doc.getElementById('hoa-chat-input'))
+    expect(doc.querySelector('#hoa-chat .chat-panel').hidden).toBe(false)
+    expect(doc.querySelector('#hoa-chat .chat-toggle').getAttribute('aria-expanded')).toBe('true')
+    expect(doc.getElementById('hoa-chat-input').value).toBe('halb getippt, noch nicht gesendet')
+    dom.window.close()
+  })
+
+  it('leaves the reader typing — focus and caret come back with the field', async () => {
+    const dom = await loadViewer({
+      secret: VECTOR.secret,
+      fetchImpl: async (url) => okResponse(String(url).includes('ntfy.sh') ? '' : board),
+    })
+    const doc = dom.window.document
+    doc.querySelector('#hoa-chat .chat-toggle').click()
+    await settle(dom, () => doc.getElementById('hoa-chat-input'))
+    const input = doc.getElementById('hoa-chat-input')
+    input.focus()
+    input.dispatchEvent(new dom.window.Event('focus'))
+    input.value = 'mitten im Wort'
+    input.dispatchEvent(new dom.window.Event('input'))
+    input.setSelectionRange(6, 6) // caret inside the text, not at its end
+    input.dispatchEvent(new dom.window.Event('keyup'))
+
+    expect(await swap(dom, changed)).toBe('swapped')
+    await settle(dom, () => doc.getElementById('hoa-chat-input'))
+    const rebuilt = doc.getElementById('hoa-chat-input')
+    expect(doc.activeElement).toBe(rebuilt)
+    expect(rebuilt.selectionStart).toBe(6)
+    dom.window.close()
+  })
+
+  it('steals no focus on a first load — nobody was typing yet', async () => {
+    const dom = await loadViewer({
+      secret: VECTOR.secret,
+      fetchImpl: async (url) => okResponse(String(url).includes('ntfy.sh') ? '' : board),
+    })
+    const doc = dom.window.document
+    doc.querySelector('#hoa-chat .chat-toggle').click()
+    await settle(dom, () => doc.getElementById('hoa-chat-input'))
+    expect(doc.activeElement).not.toBe(doc.getElementById('hoa-chat-input'))
+    dom.window.close()
+  })
+
+  it('keeps the conversation the reader had already read', async () => {
+    const good = await makeEnvelope({
+      secret: VECTOR.secret,
+      direction: 'outbox',
+      text: 'Antwort, die nicht verschwinden darf',
+      id: 'keep1',
+      ts: Date.now(),
+    })
+    const { outbox } = await deriveTopics(VECTOR.secret)
+    const line = (env) => JSON.stringify({ id: `n-${env.id}`, time: 1, event: 'message', message: JSON.stringify(env) })
+    const dom = await loadViewer({
+      secret: VECTOR.secret,
+      fetchImpl: async (url) => {
+        const u = String(url)
+        if (!u.includes('ntfy.sh')) return okResponse(board)
+        return okResponse(u.includes(outbox) ? `${line(good)}\n` : '')
+      },
+    })
+    const doc = dom.window.document
+    doc.querySelector('#hoa-chat .chat-toggle').click()
+    await settle(dom, () => doc.getElementById('hoa-chat-list')?.textContent.includes('nicht verschwinden'))
+    expect(await swap(dom, changed)).toBe('swapped')
+    await settle(dom, () => doc.getElementById('hoa-chat-list')?.textContent.includes('nicht verschwinden'))
+    expect(doc.getElementById('hoa-chat-list').textContent).toContain('Antwort, die nicht verschwinden darf')
+    dom.window.close()
+  })
+
+  it('stays idempotent — two swaps in a row never yield two sections', async () => {
+    const dom = await loadViewer({ fetchImpl: async () => okResponse(board) })
+    const doc = dom.window.document
+    await swap(dom, changed)
+    await swap(dom, board)
+    expect(doc.querySelectorAll('#hoa-chat')).toHaveLength(1)
+    expect(doc.querySelectorAll('#hoa-chat-style')).toHaveLength(1)
+    dom.window.close()
+  })
+
+  it('returns even when the swap announces nothing — a board on an older refresher', async () => {
+    const dom = await loadViewer({ fetchImpl: async () => okResponse(board) })
+    const doc = dom.window.document
+    const main = doc.querySelector('main')
+    const fresh = new JSDOM(changed).window.document.querySelector('main')
+    main.innerHTML = fresh.innerHTML // the swap, with no event raised at all
+    expect(doc.getElementById('hoa-chat')).toBeNull()
+    await settle(dom, () => doc.getElementById('hoa-chat'))
+    expect(doc.querySelectorAll('#hoa-chat')).toHaveLength(1)
     dom.window.close()
   })
 })

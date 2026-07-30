@@ -15,12 +15,19 @@ import {
   parseKlaerungPoints,
   nowCardText,
   looksDoubleEncoded,
+  findTransliterations,
   sliceSections,
   parseCards,
   auditDashboard,
   evaluate,
   ERLEDIGT_ON_BOARD,
   ETA_GRACE_MIN,
+  ETA_MARGIN_MIN,
+  ETA_REVISION_LIMIT,
+  ETA_RULE,
+  etaMinutes,
+  etaRevisionPatch,
+  etaStatus,
   QUEUE_STUB_BODY,
   QUEUE_STUB_META,
 } from './dashboard-guard-core.mjs'
@@ -822,6 +829,101 @@ describe('a current-work estimate stays ahead of the clock (user 28.07.2026)', (
   it('ignores a card that states no expected end at all', () => {
     expect(codes('10:44', 13 * 60)).not.toContain('now-eta-past')
   })
+
+  // Point 411 — the user reported the stale end times three times in one night.
+  // Flagging a PASSED estimate is one tick too late by construction: the card is
+  // already wrong when the guard speaks, and the reader had been looking at it
+  // for the half hour a delegated build takes.
+  it('flags an estimate that is CLOSE, before the promise breaks', () => {
+    // 20 minutes left: still honest, nothing said.
+    expect(codes('10:44 · ~13:20', 13 * 60)).not.toContain('now-eta-soon')
+    // 10 minutes left: flagged while the board is still true.
+    expect(codes('10:44 · ~13:10', 13 * 60)).toContain('now-eta-soon')
+    expect(codes('10:44 · ~13:10', 13 * 60)).not.toContain('now-eta-past')
+  })
+
+  it('says the PASSED case louder, and never both at once for one card', () => {
+    const v = auditDashboard(board('10:44 · ~11:15'), { open: [1], done: [], nowMinutes: 13 * 60 })
+    const past = v.find((x) => x.code === 'now-eta-past')
+    expect(past.msg).toContain('ALREADY PASSED')
+    expect(v.find((x) => x.code === 'now-eta-soon')).toBeUndefined()
+  })
+
+  it('hands over the estimating RULE with either flag — the estimates were optimistic every time', () => {
+    for (const meta of ['10:44 · ~13:10', '10:44 · ~11:15']) {
+      const v = auditDashboard(board(meta), { open: [1], done: [], nowMinutes: 13 * 60 })
+      const hit = v.find((x) => x.code === 'now-eta-soon' || x.code === 'now-eta-past')
+      expect(hit.msg, meta).toContain(ETA_RULE)
+    }
+  })
+
+  it('adds the METHOD observation once one card has been re-estimated too often', () => {
+    const args = (revisions) => ({ open: [1], done: [], nowMinutes: 13 * 60, etaRevisions: revisions })
+    const twice = auditDashboard(board('10:44 · ~13:10'), args({ byPoint: { 388: ETA_REVISION_LIMIT } }))
+    expect(twice.find((x) => x.code === 'now-eta-soon').msg).not.toContain('METHOD')
+    const thrice = auditDashboard(board('10:44 · ~13:10'), args({ byPoint: { 388: ETA_REVISION_LIMIT + 1 } }))
+    expect(thrice.find((x) => x.code === 'now-eta-soon').msg).toContain('METHOD')
+    // And it never throws on a garbled counter.
+    for (const bad of [null, 42, 'nope', { byPoint: 'x' }, { byPoint: { 388: 'viele' } }]) {
+      expect(() => auditDashboard(board('10:44 · ~13:10'), args(bad))).not.toThrow()
+    }
+  })
+
+  it('never mistakes a wrapped estimate for a close or a past one', () => {
+    // 23:50 against an estimate of 00:30 the next day: 40 minutes left, honest.
+    expect(codes('23:40 · ~00:30', 23 * 60 + 50)).not.toContain('now-eta-soon')
+    expect(codes('23:40 · ~00:30', 23 * 60 + 50)).not.toContain('now-eta-past')
+    // An estimate inside the same day is still flagged when it comes close.
+    expect(codes('23:00 · ~23:30', 23 * 60 + 20)).toContain('now-eta-soon')
+  })
+
+  it('is silent without a clock, and never throws on a garbled meta', () => {
+    expect(codes('10:44 · ~13:10', null)).not.toContain('now-eta-soon')
+    for (const meta of ['', 'irgendwas', '~99:99', '~:15', '10:44 · ~']) {
+      expect(() => codes(meta, 13 * 60), meta).not.toThrow()
+    }
+  })
+})
+
+describe('the estimate helpers, on their own (point 411)', () => {
+  it('reads the end and the start, wrapping past midnight', () => {
+    expect(etaMinutes('10:44 · ~13:10')).toEqual({ eta: 13 * 60 + 10, start: 10 * 60 + 44 })
+    expect(etaMinutes('23:40 · ~00:30')).toEqual({ eta: 1440 + 30, start: 23 * 60 + 40 })
+    expect(etaMinutes('10:44')).toBeNull()
+    expect(etaMinutes(null)).toBeNull()
+  })
+
+  it('classifies ok / soon / past around the margin and the grace', () => {
+    const at = (meta, nowMinutes) => etaStatus({ meta, nowMinutes })
+    expect(at('10:00 · ~13:00', 12 * 60).state).toBe('ok')
+    // Exactly the margin is still ok; one minute inside it is not.
+    expect(at('10:00 · ~13:00', 13 * 60 - ETA_MARGIN_MIN).state).toBe('ok')
+    expect(at('10:00 · ~13:00', 13 * 60 - ETA_MARGIN_MIN + 1).state).toBe('soon')
+    expect(at('10:00 · ~13:00', 13 * 60 + ETA_GRACE_MIN).state).toBe('soon')
+    expect(at('10:00 · ~13:00', 13 * 60 + ETA_GRACE_MIN + 1).state).toBe('past')
+    expect(at('10:00 · ~13:00', null)).toBeNull()
+    expect(at('10:00', 12 * 60)).toBeNull()
+    expect(etaStatus()).toBeNull()
+  })
+
+  it('counts a moved estimate per session, and starts fresh in a new one', () => {
+    const card = (eta) => ({ meta: `10:00 · ~${eta}`, points: [388] })
+    let state = {}
+    state = etaRevisionPatch({ state, sessionId: 's1', cards: [card('12:00')] })
+    expect(state.etaRevisions.byPoint).toEqual({}) // the FIRST estimate is no revision
+    state = etaRevisionPatch({ state, sessionId: 's1', cards: [card('13:00')] })
+    state = etaRevisionPatch({ state, sessionId: 's1', cards: [card('14:00')] })
+    expect(state.etaRevisions.byPoint).toEqual({ 388: 2 })
+    // An unchanged estimate is not a revision.
+    state = etaRevisionPatch({ state, sessionId: 's1', cards: [card('14:00')] })
+    expect(state.etaRevisions.byPoint).toEqual({ 388: 2 })
+    // A new session estimates afresh — the count is about one sitting.
+    const next = etaRevisionPatch({ state, sessionId: 's2', cards: [card('09:00')] })
+    expect(next.etaRevisions.byPoint).toEqual({})
+    // Total on junk.
+    expect(() => etaRevisionPatch()).not.toThrow()
+    expect(etaRevisionPatch({ state: 'nope', cards: 'nope' }).etaRevisions.byPoint).toEqual({})
+  })
 })
 
 // The rule has to bite in the STOP chain, not only at a manual --synced: a card
@@ -932,5 +1034,69 @@ describe('the placeholder rule has a floor, and reads the card the generator rea
     expect(rendered[0]).toContain('&lt;N&gt;')
     const open = [210, ...Array.from({ length: 10 }, (_, i) => i + 1)]
     expect(codesFor(rendered, open)).toContain('queue-stubbed')
+  })
+})
+
+// Point 410 — the board is German prose the user reads on a phone, and
+// "faellt weg" / "kuenftig" read to him as broken text. The stdin path removes
+// the REASON to transliterate; this rule removes the habit, which would
+// otherwise return the next time the argument path looks convenient.
+describe('a transliterated umlaut on a card is a defect (point 410)', () => {
+  const board = ({ title = '410 — Die Tafel', body = 'Stand 14:12 — läuft' } = {}) =>
+    `<main><h1>B</h1>` +
+    `<details class="sect"><summary><h2>Woran ich gerade arbeite</h2></summary>\n` +
+    `<details class="now"><summary><span class="t">${title}</span><span class="right">` +
+    `<span class="meta">10:44 · ~15:15</span></span></summary><div class="body"><p>${body}</p></div></details>\n` +
+    `</details>` +
+    `<details class="sect"><summary><h2>Von dir zu klären</h2></summary>\n</details>` +
+    `<details class="sect"><summary><h2>Warteschlange</h2></summary>\n</details>` +
+    `<details class="sect"><summary><h2>Erledigt</h2></summary>\n` +
+    `<p class="archive-link">im <a href="https://example.invalid/a">Archiv</a>.</p></details></main>`
+  const audit = (opts) => auditDashboard(board(opts), { open: [410], done: [] })
+  const codes = (opts) => audit(opts).map((x) => x.code)
+
+  it('accepts real umlauts', () => {
+    expect(
+      codes({ body: 'Stand 14:12 — die Prüfung läuft, künftig fällt der Umweg über die Shell weg.' }),
+    ).not.toContain('transliterated-umlaut')
+  })
+
+  it('flags a transliterated body and NAMES the card', () => {
+    const hit = audit({ body: 'Stand 14:12 — der Umweg faellt kuenftig weg.' }).find(
+      (x) => x.code === 'transliterated-umlaut',
+    )
+    expect(hit).toBeDefined()
+    expect(hit.msg).toContain('410 — Die Tafel')
+    expect(hit.msg).toContain('faellt')
+    expect(hit.msg).toContain('--text-stdin')
+  })
+
+  it('flags a transliterated TITLE too, not only the body', () => {
+    expect(codes({ title: '410 — Pruefung der Tafel' })).toContain('transliterated-umlaut')
+  })
+
+  it('leaves legitimate words that merely carry those letters alone', () => {
+    expect(
+      codes({ body: 'Stand 14:12 — Quelle, Steuer, Aequator, Feuer, Museum, neue Route, Duell.' }),
+    ).not.toContain('transliterated-umlaut')
+  })
+
+  it('never throws on an unreadable board', () => {
+    expect(findTransliterations(null)).toEqual([])
+    expect(findTransliterations(undefined)).toEqual([])
+    expect(() => auditDashboard(null, { open: [1], done: [] })).not.toThrow()
+  })
+
+  it('catches the words the user reported, and the compounds around them', () => {
+    expect(findTransliterations('faellt weg')).toContain('faellt')
+    expect(findTransliterations('kuenftig')).toContain('kuenftig')
+    expect(findTransliterations('Ueberpruefung')).toContain('ueberpruefung')
+    expect(findTransliterations('ausgefuehrt')).toContain('ausgefuehrt')
+    expect(findTransliterations('groesser')).toContain('groesser')
+  })
+
+  it('reaches the turn end through the audit invariant', () => {
+    const broken = boardHtml().replace('Kurzstand.', 'Kurzstand, faellt kuenftig weg.')
+    expect(JSON.stringify(evaluate(green({ html: broken })))).toContain('transliterated-umlaut')
   })
 })

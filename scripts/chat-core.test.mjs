@@ -12,6 +12,7 @@ import {
   constantTimeEqual,
   MAX_DROP_NOTICES,
   deriveTopics,
+  chatInboxLogLines,
   dropNoticeDecision,
   dropNoticeText,
   envelopeRetentionMs,
@@ -356,6 +357,36 @@ describe('A DROPPED MESSAGE DOES NOT LOOK DELIVERED — the drop notice', () => 
     expect(again.notices).toEqual([])
   })
 
+  // Point 430 A — the residual the four-eyes review of 417 left standing on
+  // purpose. A clock-ahead message becomes acceptable simply by WAITING: its
+  // stamp is fixed while `now` advances. So a replay after the wait, with its
+  // transport id evicted from the count-capped `seen` by a flood in between,
+  // could be accepted minutes after the sender was told it had NOT arrived.
+  it('never ACCEPTS an envelope the sender was already told did not arrive', async () => {
+    const e = await event({ id: 'nfy1', msgId: 'vorgestellt', ts: AHEAD_TS })
+    const first = await ingest({ events: [e], secret: SECRET, now: NOW })
+    expect(first.notices).toHaveLength(1)
+    // The clock has caught up — the very same envelope is now inside the window —
+    // and the flood has evicted its transport id from `seen`.
+    const caughtUp = AHEAD_TS + 1000
+    const flooded = { ...first.state, seen: [] }
+    const again = await ingest({ events: [{ ...e, id: 'nfy2' }], secret: SECRET, now: caughtUp, state: flooded })
+    expect(again.accepted).toEqual([]) // NOT delivered — the notice stands
+    expect(again.dropped.map((d) => d.reason)).toEqual(['duplicate'])
+    expect(again.notices).toEqual([]) // and no second, contradicting notice
+    // The refusal survives the state round trip, so the next tick behaves alike.
+    expect(again.state.notified.map((n) => n.id)).toEqual(['vorgestellt'])
+  })
+
+  it('refuses it within the SAME tick too, not only from the next state read', async () => {
+    const e = await event({ id: 'nfy1', msgId: 'vorgestellt', ts: AHEAD_TS })
+    // Two copies in one response: the notice is written for the first, and the
+    // second may neither be accepted nor earn a notice of its own.
+    const r = await ingest({ events: [e, { ...e, id: 'nfy2' }], secret: SECRET, now: NOW })
+    expect(r.notices).toHaveLength(1)
+    expect(r.accepted).toEqual([])
+  })
+
   it('caps a BURST — a broken clock may not become an outbox flood', async () => {
     const events = []
     for (let i = 0; i < MAX_DROP_NOTICES + 4; i++) {
@@ -366,6 +397,40 @@ describe('A DROPPED MESSAGE DOES NOT LOOK DELIVERED — the drop notice', () => 
     expect(r.notices).toHaveLength(MAX_DROP_NOTICES)
     // Only what was actually announced is recorded as announced.
     expect(r.state.notified).toHaveLength(MAX_DROP_NOTICES)
+  })
+
+  // Point 430 B — the second residual: the launcher's log used an `if/else if`
+  // chain, so a tick whose SPOOL WRITE failed took the first branch and the
+  // drop-notice clause never ran. A refused notice must never be silent.
+  it('logs BOTH the spool fault and the refused notice from one tick', () => {
+    const lines = chatInboxLogLines({
+      ok: false,
+      reason: 'spool write failed for 1 message(s): EPERM',
+      configured: true,
+      accepted: 0,
+      dropped: ['stale'],
+      notices: 0,
+      noticesPlanned: 1,
+      pending: 3,
+    })
+    expect(lines).toHaveLength(2)
+    expect(lines[0]).toContain('spool write failed')
+    expect(lines[1]).toContain('DROP NOTICE NOT SENT: 1 of 1')
+  })
+
+  it('keeps the ordinary tick as quiet as it was', () => {
+    // Nothing happened: no line at all, so a quarter-hourly tick writes nothing.
+    expect(chatInboxLogLines({ ok: true, configured: true, accepted: 0, dropped: [], pending: 0 })).toEqual([])
+    // Not paired on this machine: the documented silent opt-out.
+    expect(chatInboxLogLines({ ok: true, configured: false, accepted: 0 })).toEqual([])
+    // Notices all sent: the counts agree, so they earn no word.
+    const sent = chatInboxLogLines({
+      ok: true, configured: true, accepted: 1, dropped: ['stale'], notices: 1, noticesPlanned: 1, pending: 2,
+    })
+    expect(sent).toEqual(['chat inbox: 1 new, 2 pending (dropped: stale)'])
+    // And it is total.
+    for (const bad of [null, undefined, 42, 'nope']) expect(chatInboxLogLines(bad)).toEqual([])
+    expect(chatInboxLogLines({ ok: false, configured: true })).toEqual(['chat inbox: unknown fault'])
   })
 
   it('gates each drop purely, with the deciding gate named', () => {

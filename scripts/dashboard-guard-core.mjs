@@ -217,6 +217,49 @@ export function looksDoubleEncoded(text) {
   return [...new Set(found)]
 }
 
+// ═══ Point 410 — the board must not lose its umlauts ═══
+// The user reads the board as German prose on a phone, and "faellt weg" /
+// "kuenftig" read as broken. The cause was the path the text took: `board.mjs`
+// took a card's text as a command-line ARGUMENT, a Windows shell mangled the
+// umlauts, and every session learned to transliterate by hand to stay safe. The
+// stdin path (board-core `resolveCardText`) removes the reason; this rule
+// removes the habit, because a workaround returns the moment the old path looks
+// convenient again.
+//
+// A WORD LIST, deliberately: this is a spelling smell, not a linguistics
+// problem. STEMS are matched anywhere in a word so compounds and inflections
+// come along ("Ueberpruefung", "ausgefuehrt"), and every stem is long enough
+// that legitimate text cannot contain it — the digraphs themselves are useless
+// as a signal, since "Quelle", "Steuer" and "Aequator" all carry one. A false
+// positive costs one word in this list; a false negative costs the reader.
+export const TRANSLITERATION_STEMS = [
+  // ae
+  'faell', 'flaech', 'waehr', 'naechst', 'spaet', 'aender', 'erklaer', 'haett', 'waere', 'taeglich',
+  'zusaetzlich', 'saemtlich', 'erwaehn', 'waehl', 'naeh', 'staerk', 'laeng', 'gemaess', 'raeum',
+  'traeg', 'itaet', 'aehnlich', 'maessig', 'zaehl', 'erhaelt', 'behaelt',
+  // ue
+  'ueber', 'kuenft', 'zurueck', 'fuer', 'fuehr', 'fuehl', 'muess', 'stueck', 'gruen', 'wuerde',
+  'wuensch', 'pruef', 'frueh', 'natuerlich', 'duerf', 'gueltig', 'schluessel', 'unterstuetz',
+  'buend', 'kuerz', 'muend',
+  // oe
+  'oeffn', 'moeglich', 'koenn', 'hoech', 'groess', 'schoen', 'gehoer', 'erhoeh', 'noetig',
+  'stoer', 'boes', 'oefter', 'loesch', 'loesung', 'zerstoer',
+]
+
+/**
+ * Every transliterated German word in `text`, lower-cased and de-duplicated.
+ * Total: a non-string yields none, so an unreadable board never throws.
+ */
+export function findTransliterations(text) {
+  const s = typeof text === 'string' ? text : ''
+  const hits = new Set()
+  for (const word of s.match(/[A-Za-zÄÖÜäöüß]+/g) ?? []) {
+    const lower = word.toLowerCase()
+    if (TRANSLITERATION_STEMS.some((stem) => lower.includes(stem))) hits.add(lower)
+  }
+  return [...hits]
+}
+
 /** Slice the board into its <h2>-anchored sections: titles in document order
  *  plus each section's html (the last runs to EOF, footer included). */
 export function sliceSections(html) {
@@ -273,7 +316,10 @@ export function parseCards(sectionHtml) {
     // never a plain hyphen, which would read "2026-07-25 —" as point 2026.
     const t = (summary.match(/class="t">\s*([\d+·/ ]*\d)\s*[—–:]/) ?? [])[1]
     if (t) for (const n of numbers(t)) points.add(n)
-    cards.push({ meta, body, points: [...points] })
+    // The full title comes along so a violation can NAME the card it means; a
+    // point number alone is no help on a card that has none.
+    const title = ((summary.match(/class="t">([^<]*)</) ?? [])[1] ?? '').trim()
+    cards.push({ meta, body, title, points: [...points] })
   }
   return cards
 }
@@ -291,11 +337,92 @@ export function parseCards(sectionHtml) {
  */
 export const ETA_GRACE_MIN = 5
 
+/**
+ * HOW MUCH TIME MAY BE LEFT ON A PROMISE BEFORE IT IS FLAGGED (point 411).
+ *
+ * The past-due rule was one tick too late by construction: the card is already
+ * WRONG when the guard speaks, and between two turn ends — half an hour while a
+ * delegated agent builds — the reader sees a promise that expired long ago. The
+ * user reported it three times in one night; measured then, two cards stood at
+ * ~00:45 and ~00:17 while the clock read 01:52. So the comparison shifts: the
+ * guard fires while the estimate still has less than this margin LEFT. Fifteen
+ * minutes is the launcher's own tick width — the coarsest interval on this
+ * machine at which anything happens by itself.
+ */
+export const ETA_MARGIN_MIN = 15
+
+/** How often one card's estimate may be moved in a session before the guard says
+ *  that the METHOD is the problem rather than the number. */
+export const ETA_REVISION_LIMIT = 2
+
+/** The rule an estimate must follow, in the words the remedy hands over. The
+ *  estimates were optimistic EVERY time, which is the actual cause. */
+export const ETA_RULE =
+  'An estimate is the time by which the work will be VISIBLY DONE — merged, verified, board updated — ' +
+  'not the time the current step might end.'
+
+/**
+ * A now-card meta → its promised end and its start, in minutes since midnight.
+ * PURE, null when the meta names no `~HH:MM`.
+ *
+ * A card opened before midnight may legitimately estimate into the next day; an
+ * end earlier than its own start is that case, not a past one, so the end wraps.
+ */
+export function etaMinutes(meta) {
+  const end = /~\s*(\d{1,2}):(\d{2})/.exec(String(meta ?? ''))
+  if (!end) return null
+  const start = /(\d{1,2}):(\d{2})/.exec(String(meta ?? ''))
+  let eta = Number(end[1]) * 60 + Number(end[2])
+  const from = start ? Number(start[1]) * 60 + Number(start[2]) : null
+  if (from !== null && eta < from) eta += 1440
+  return { eta, start: from }
+}
+
+/**
+ * IS THIS PROMISE STILL HONEST? PURE. Null when there is no estimate to judge.
+ *
+ * Returns { minutesLeft, state } with state 'ok' | 'soon' | 'past'.
+ */
+export function etaStatus({ meta, nowMinutes, marginMin = ETA_MARGIN_MIN, graceMin = ETA_GRACE_MIN } = {}) {
+  if (!Number.isFinite(nowMinutes)) return null
+  const parsed = etaMinutes(meta)
+  if (!parsed) return null
+  const minutesLeft = parsed.eta - nowMinutes
+  if (parsed.eta + graceMin < nowMinutes) return { minutesLeft, state: 'past' }
+  if (minutesLeft < marginMin) return { minutesLeft, state: 'soon' }
+  return { minutesLeft, state: 'ok' }
+}
+
+/**
+ * COUNT THE TIMES ONE CARD'S ESTIMATE MOVED IN THIS SESSION. PURE.
+ *
+ * `state` is the persisted dashboard state, `cards` the current now-cards. The
+ * counter is per SESSION: a new session starts from zero, because the point of
+ * the count is the estimating done in one sitting. Returns the patch to persist.
+ */
+export function etaRevisionPatch({ state = {}, sessionId = '', cards = [] } = {}) {
+  const prior = state && typeof state.etaRevisions === 'object' && state.etaRevisions ? state.etaRevisions : {}
+  const sameSession = prior.session === sessionId && sessionId !== ''
+  const byPoint = sameSession && prior.byPoint && typeof prior.byPoint === 'object' ? { ...prior.byPoint } : {}
+  const etas = sameSession && prior.etas && typeof prior.etas === 'object' ? { ...prior.etas } : {}
+  for (const card of Array.isArray(cards) ? cards : []) {
+    const parsed = etaMinutes(card?.meta)
+    if (!parsed) continue
+    for (const point of Array.isArray(card.points) ? card.points : []) {
+      const key = String(point)
+      const before = etas[key]
+      if (Number.isFinite(before) && before !== parsed.eta) byPoint[key] = (Number(byPoint[key]) || 0) + 1
+      etas[key] = parsed.eta
+    }
+  }
+  return { etaRevisions: { session: sessionId, byPoint, etas } }
+}
+
 export function auditDashboard(html, input = {}) {
   const v = []
   if (typeof html !== 'string' || !html) return v
   // Totality: every list comes from JSON/parsers and may be anything.
-  const { doneSeen = null, nowMinutes = null } = input ?? {}
+  const { doneSeen = null, nowMinutes = null, etaRevisions = null } = input ?? {}
   const open = Array.isArray(input?.open) ? input.open : []
   const done = Array.isArray(input?.done) ? input.done : []
   const { order, sections } = sliceSections(html)
@@ -451,24 +578,45 @@ export function auditDashboard(html, input = {}) {
   // reminded: the 388 card stood two hours past its estimate. `nowMinutes` is
   // injected (minutes since midnight, Europe/Berlin) so the rule is pure; a
   // caller that passes nothing skips it.
+  // AND IT FIRES BEFORE THE PROMISE BREAKS (point 411): a card flagged only once
+  // its estimate has PASSED is flagged one tick too late — it was already wrong
+  // when the guard spoke, and the reader had been looking at it for half an hour.
   if (Number.isFinite(nowMinutes)) {
     const overdue = []
+    const soon = []
     for (const c of nowCards) {
-      const end = /~\s*(\d{1,2}):(\d{2})/.exec(c.meta ?? '')
-      if (!end) continue
-      const start = /(\d{1,2}):(\d{2})/.exec(c.meta ?? '')
-      let eta = Number(end[1]) * 60 + Number(end[2])
-      // A card opened before midnight may legitimately estimate into the next
-      // day; an end earlier than its own start is that case, not a past one.
-      if (start && eta < Number(start[1]) * 60 + Number(start[2])) eta += 1440
-      if (eta + ETA_GRACE_MIN < nowMinutes) overdue.push(...(c.points.length ? c.points : ['?']))
+      const status = etaStatus({ meta: c.meta, nowMinutes })
+      if (!status || status.state === 'ok') continue
+      const named = c.points.length ? c.points : ['?']
+      ;(status.state === 'past' ? overdue : soon).push(...named)
+    }
+    // A THIRD REVISION IS A SIGNAL ABOUT THE METHOD, not about the number: the
+    // estimates were optimistic every single time, so the card that keeps being
+    // moved gets that said with it.
+    const revised = (points) => {
+      const counts = (etaRevisions && etaRevisions.byPoint) || {}
+      const hits = points.filter((p) => (Number(counts[String(p)]) || 0) > ETA_REVISION_LIMIT)
+      return hits.length
+        ? ` — the estimate for ${[...new Set(hits)].join(', ')} has been moved more than ${ETA_REVISION_LIMIT} times ` +
+          'this session: the METHOD is off, not the number. Estimate the whole path to done, generously.'
+        : ''
     }
     if (overdue.length) {
       v.push({
         code: 'now-eta-past',
         msg:
-          `current-work card(s) ${overdue.join(', ')} promise an end time that has passed — give each a ` +
-          'realistic new "~HH:MM" (or move the card to Erledigt if it is done), republish, re-run --synced',
+          `current-work card(s) ${overdue.join(', ')} promise an end time that has ALREADY PASSED — give each a ` +
+          `realistic new "~HH:MM" (or move the card to Erledigt if it is done), republish, re-run --synced. ` +
+          `${ETA_RULE}${revised(overdue)}`,
+      })
+    }
+    if (soon.length) {
+      v.push({
+        code: 'now-eta-soon',
+        msg:
+          `current-work card(s) ${soon.join(', ')} promise an end time less than ${ETA_MARGIN_MIN} minutes away — ` +
+          'the reader is about to be looking at a broken promise. Give each a realistic new "~HH:MM" (or move the ' +
+          `card to Erledigt if it is done), republish, re-run --synced. ${ETA_RULE}${revised(soon)}`,
       })
     }
   }
@@ -506,6 +654,26 @@ export function auditDashboard(html, input = {}) {
         `double-encoded sequence(s) found: ${moji.slice(0, 6).join(' ')}${moji.length > 6 ? ` … (+${moji.length - 6})` : ''} — repair the encoding. ` +
         'If a card DELIBERATELY quotes mojibake (a card about this very bug class), rephrase it ' +
         'without the literal sequence — quoting damaged bytes on the board is itself damage.',
+    })
+  }
+
+  // THE UMLAUTS SURVIVE THE WAY IN (point 410). Checked over the CARDS, not the
+  // raw file: the viewer's script, a URL or a CSS class is none of the reader's
+  // business, and only prose can be transliterated.
+  const transliterated = []
+  for (const c of [nowCards, vdzkCards, queueCards, erledigtCards].flat()) {
+    const hits = [...findTransliterations(c.title), ...findTransliterations(c.body)]
+    if (hits.length) {
+      transliterated.push(`"${c.title || c.points.join(', ') || '<untitled>'}" (${[...new Set(hits)].slice(0, 4).join(', ')})`)
+    }
+  }
+  if (transliterated.length) {
+    v.push({
+      code: 'transliterated-umlaut',
+      msg:
+        `card(s) ${transliterated.slice(0, 4).join('; ')} spell German words with ae/ue/oe instead of ` +
+        'ä/ö/ü — the reader sees that as broken text. Write the real umlauts and pass the text on ' +
+        'stdin, where no shell can mangle it: node scripts/board.mjs status <N> --text-stdin',
     })
   }
 
@@ -731,7 +899,19 @@ export function evaluate(input) {
   // (8b) FULL-CONSISTENCY AUDIT (point 313) — evaluated BEFORE the publish
   // check (fix first, publish once). A logged waiver covers exactly ONE file
   // hash: any further edit re-arms the audit.
-  const violations = auditDashboard(html, { open, done, doneSeen: marker.doneSeen, nowMinutes })
+  const violations = auditDashboard(html, {
+    open,
+    done,
+    doneSeen: marker.doneSeen,
+    nowMinutes,
+    // The per-session revision count the attestation persists (point 411) — and
+    // only for THIS sitting (four-eyes review 30.07.2026): a new session would
+    // otherwise inherit the previous one's over-limit counts until its first
+    // clean attestation, and the "your METHOD is off" sentence would be about
+    // somebody else's estimating.
+    etaRevisions:
+      marker.etaRevisions && marker.etaRevisions.session === sessionId ? marker.etaRevisions : null,
+  })
   if (violations.length) {
     const waived = marker.auditWaived && repoHash && marker.auditWaived.repoHash === repoHash
     if (!waived) {

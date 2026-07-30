@@ -1032,20 +1032,22 @@ After completion and after every major system:
   (no commit authored outside the §6 model allowlist), `dashboard-guard`,
   `dashboard-conciseness-guard`, `dashboard-card-topic-guard` and
   `dashboard-integrity-guard` (the progress board is published, concise,
-  one-topic-per-card and consistent with the real state), `prep-guard` (no
+  one-topic-per-card and consistent with the real state),
+  `decision-card-guard` (every decision asked of the user stands as a
+  board card), `prep-guard` (no
   idle wait while a background validation runs), `batch-progress-guard` (no
   idle stop without a boundary or wait), `render-verify-guard` (no
   render-set change — scene/shader/HUD, `src/world/` geometry, the browser
   suites — finished without the picture check, on both backends where they can
   differ), `mechanism-review-guard` (no new or changed
-  guard, gate or git hook without a recorded review by the OTHER model —
+  guard, gate or hook without the OTHER model's recorded review —
   `scripts/mechanism-review.mjs --record`), `queue-order-guard`, `tasks-spec-guard` and `tasks-archive-guard`
   (the queue order, the final-state-only spec rule, and the open/archived split
   of the work order), `doc-budget-guard` (this file, design.md and the work
-  order's preamble stay within measured ceilings; budgets and both honest exits
-  in `scripts/doc-budget-core.mjs`), `commit-scope-guard` and `pre-push-gate`
-  (versioned `scripts/git-hooks/`, wired by `npm install`: no stray file rides
-  along, no rescue commit mails the user, no push lands a state CI would
+  order's preamble stay within measured ceilings; budgets in
+  `scripts/doc-budget-core.mjs`), `commit-scope-guard` and `pre-push-gate`
+  (versioned `scripts/git-hooks/`, wired by `npm install`: no stray file, no
+  rescue commit mails the user, no push CI would
   reject), `ci-status-guard` (a
   red CI is noticed), `timestamp-guard` (the chat timestamp) and
   `retro-currency-guard` (the retrospective stays current, each lesson carrying

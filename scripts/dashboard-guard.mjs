@@ -45,6 +45,7 @@ import {
   parseTasks,
   parseNowCardPoint,
   auditDashboard,
+  etaRevisionPatch,
   parseCards,
   sliceSections,
   nowCardText,
@@ -53,7 +54,7 @@ import {
 
 /** Hash of the now-card BODIES — the text the reader sees (invariant 8c). */
 const nowHash = (html) => createHash('sha256').update(nowCardText(html)).digest('hex')
-import { heldByOtherLiveOwner } from './batch-singleton.mjs'
+import { heldByOtherLiveOwner, readOwnerLock } from './batch-singleton.mjs'
 import { openFingerprintOfTasks, syncedPublishPatch } from './board-currency-core.mjs'
 import { specSnapshots } from './dashboard-integrity-guard-core.mjs'
 import { readTasksAll } from './tasks-source.mjs'
@@ -186,6 +187,7 @@ if (RUN_AS_SCRIPT && process.argv[2] === '--synced') {
     done,
     doneSeen: priorState.doneSeen ?? null,
     nowMinutes: berlinMinutes(),
+    etaRevisions: priorState.etaRevisions ?? null,
   })
   const waived = priorState.auditWaived && priorState.auditWaived.repoHash === sha256File(p)
   if (violations.length && !waived) {
@@ -256,11 +258,28 @@ if (RUN_AS_SCRIPT && process.argv[2] === '--synced') {
   } catch {
     /* an unreadable work order must not fail an otherwise clean attestation */
   }
+  // The attestation is where an estimate is (re)written, so it is where the
+  // revisions are counted (point 411): a third move in one session says the
+  // estimating METHOD is off, and the next flag says so with the card.
+  let etaPatch = {}
+  try {
+    etaPatch = etaRevisionPatch({
+      state: priorState,
+      // The attesting session, read from the batch lock: `--synced` is a CLI call
+      // with no hook payload. Unknown identity resets the counter, which only
+      // ever WITHHOLDS the observation — the safe direction for a hint.
+      sessionId: readOwnerLock()?.sessionId ?? '',
+      cards: parseCards(sliceSections(readFileSync(p, 'utf8')).sections['Woran ich gerade arbeite'] ?? ''),
+    })
+  } catch {
+    /* the counter is an OBSERVATION — never a reason to refuse an attestation */
+  }
   mergeState({
     dashboardPath: p,
     head: head(),
     syncedAt: Date.now(),
     doneSeen,
+    ...etaPatch,
     auditWaived: undefined,
     // A failure record that the live bytes have overtaken is spent: leaving it
     // would wedge every later attestation AND keep the launcher watchdog

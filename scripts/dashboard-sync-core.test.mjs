@@ -4,9 +4,13 @@
 // plus totality on malformed input (the wrapper's fail-open rests on the core
 // never throwing). The motivating regression — the card silently describing
 // the finished point-306 work while the state had moved on — is pinned.
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { describe, it, expect } from 'vitest'
 import {
+  DRIFTS,
   branchPoint,
+  formatDriftReport,
   parseWorktreeBranches,
   parseTasksPoints,
   parseCardTitle,
@@ -258,6 +262,81 @@ describe('evaluate — blocks on real drift', () => {
   it('never tells the assistant to fix anything but the CARD (read-only guard)', () => {
     const r = evaluate({ cards: cards(['999 — Phantom']), state: state() })
     expect(r.reason).toContain('Fix the CARD')
+  })
+})
+
+// Point 308's last deliverable: the REPORT of what this guard catches. It is a
+// table the verdicts are stamped from rather than prose in a document, so these
+// cases pin the one thing that can rot — the tie between the two.
+describe('the drift catalogue is the code, not a description of it', () => {
+  const cards = (titles) => nowCardTitles(boardHtml(titles))
+
+  /** One scenario per catalogued drift, so the table cannot list a check the
+   *  guard does not have. */
+  const scenarios = {
+    'no-card': { cards: [], state: state() },
+    'head-drift': { cards: cards(['306 — Closing-Guard']), state: state({ headBranch: 'feat/224-workflow', open: [224, 306] }) },
+    'unknown-point': { cards: cards(['999 — Phantom']), state: state() },
+    'stale-done': { cards: cards(['306 — Closing-Guard']), state: state({ done: [290, 306], open: [305, 308] }) },
+    'agent-claim': { cards: cards(['Fable-Verifikationen + Agent-Pool']), state: state() },
+  }
+
+  it('every catalogued drift is actually producible, and stamps its own id', () => {
+    for (const d of DRIFTS) {
+      const scenario = scenarios[d.id]
+      expect(scenario, `no scenario for catalogued drift ${d.id}`).toBeDefined()
+      const r = evaluate(scenario)
+      expect(r.block, d.id).toBe(true)
+      expect(r.drift, d.id).toBe(d.id)
+    }
+  })
+
+  it('no block path produces a drift the catalogue does not list', () => {
+    const known = new Set(DRIFTS.map((d) => d.id))
+    for (const scenario of Object.values(scenarios)) {
+      const r = evaluate(scenario)
+      expect(known.has(r.drift), `uncatalogued drift ${r.drift}`).toBe(true)
+    }
+    // An allow carries no drift at all.
+    expect(evaluate({ cards: cards(['306 — Closing-Guard']), state: state() }).drift).toBeNull()
+  })
+
+  // The producibility direction needs a scenario per id, i.e. a human. This one
+  // does not: it reads the SOURCE, so a block path added tomorrow with a new id —
+  // or with none — fails here without anybody remembering to add a case
+  // (four-eyes review 30.07.2026, finding 1).
+  it('every block() call site in the core stamps a CATALOGUED id', () => {
+    const source = readFileSync(resolve(process.cwd(), 'scripts', 'dashboard-sync-core.mjs'), 'utf8')
+    // The call sites inside `evaluate` only — the helper's own definition aside.
+    const sites = [...source.matchAll(/\n(\s+)return block\(([\s\S]*?)\n\1\)/g)]
+    expect(sites.length).toBeGreaterThanOrEqual(DRIFTS.length)
+    const known = new Set(DRIFTS.map((d) => d.id))
+    for (const site of sites) {
+      const stamped = [...site[2].matchAll(/'([a-z-]+)',\s*$/gm)].pop()
+      expect(stamped, `a block() call stamps no drift id:\n${site[0]}`).toBeTruthy()
+      expect(known.has(stamped[1]), `uncatalogued drift id ${stamped?.[1]}`).toBe(true)
+    }
+  })
+
+  it('each catalogued entry says what it detects AND gives a concrete example', () => {
+    for (const d of DRIFTS) {
+      expect(d.detects.length, d.id).toBeGreaterThan(20)
+      expect(d.example.length, d.id).toBeGreaterThan(10)
+    }
+    // The ids are unique — a duplicate would make the report lie about coverage.
+    expect(new Set(DRIFTS.map((d) => d.id)).size).toBe(DRIFTS.length)
+  })
+
+  it('renders every entry into the report, and is total', () => {
+    const report = formatDriftReport()
+    for (const d of DRIFTS) {
+      expect(report).toContain(`[${d.id}]`)
+      expect(report).toContain(d.example)
+    }
+    // It says the one thing a reader must not get wrong about this guard.
+    expect(report).toMatch(/never edits the card/i)
+    expect(() => formatDriftReport(null)).not.toThrow()
+    expect(() => formatDriftReport([{}])).not.toThrow()
   })
 })
 

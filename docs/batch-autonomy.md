@@ -818,6 +818,25 @@ The lesson under all four: the shell may only carry what a reader can lose
 without harm. A property the board NEEDS belongs in the fragment, because the
 fragment is what gets written into someone else's document.
 
+**The chat is INJECTED into the content, so every content swap must put it back
+(29.07.2026, point 423).** Nothing about the message channel may enter the board
+content, so the viewer builds it and inserts it into the rendered board — and
+since it sits under the board's heading, it sits inside `<main>`, which is
+exactly what the 30-second refresher replaces wholesale. `injectChat` ran once
+per document load, so every successful refresh deleted the channel and nothing
+restored it; on a phone that reads as "the section is gone", because returning to
+the browser makes the page visible and fires the poll in the same moment the
+reader looks. The seam is therefore a documented signal, not markup and not a
+shared variable: the refresher dispatches `hoa-board-swapped` on `window` after a
+swap (`BOARD_SWAP_EVENT` in `scripts/board-refresher-core.mjs`), the viewer
+listens and re-injects, and the injection is idempotent. The reader's
+typed-but-unsent draft, the open/closed state, the messages already read and the
+fact that they were TYPING (focus and caret position) live in the viewer's
+`chatState`, so they survive the rebuild — otherwise the channel would lose words
+on a 30-second timer, and a rebuilt-but-unfocused field would shut the phone
+keyboard mid-word. A first load restores nothing, so it steals no focus. A `MutationObserver` on `<main>` covers
+the lag while a board published with an older refresher announces nothing.
+
 ### The board also runs BACK — a message channel from the phone (29.07.2026)
 
 Until now the board was one-way: the user read status and could not answer it.
@@ -828,8 +847,23 @@ anything anywhere. Where that mirror is still open, the section renders a
 localized "the chat needs the web board" notice instead of a dead input.
 
 **What it guarantees, in each mode.** A message reaches a RUNNING session within
-**seconds** — at its next tool call — and it reaches an IDLE machine within
-**seconds** too, because the watcher below wakes a responder for it. The
+**seconds** — at its next tool call, *while it makes tool calls* — and it reaches
+an IDLE machine within **seconds** too, because the watcher below wakes a
+responder for it. The "at its next tool call" half is only a bound while the
+session is actually acting, and that had to be made true rather than assumed
+(point 424): a session that has DECLARED A WAIT makes no tool calls, and its
+delegated agent works in a worktree whose own spool is empty, so a message left to
+it waited 34 minutes under a correctly logged `skip / owner-live`. The deferral
+therefore has a DEADLINE. The watcher re-reads the pending spool on its own clock
+and anything older than `DEFERRAL_MS` (3 minutes, calibratable via
+`HOA_CHAT_DEFER_MS`) is decided again with the owner gate lifted — it wakes a
+responder as it would for an idle machine, under the same bounded claim. Age is
+the trigger and no declaration is read: a session that is genuinely working
+collects the message within seconds, so its messages never get old, and the
+deadline can only fire on one that is idle or waiting. The age is measured from
+the SPOOLED `receivedAt`, so a restarted watcher cannot reset the clock, and a
+message already handed to a responder is never handed again — one answer, not one
+per window. The
 launcher's 15-minute tick is now only the BACKSTOP: it is what still delivers if
 the watcher is down, and it is what brings the watcher back. The first two bounds
 come from reusing something that already runs (the launcher ticks and already
@@ -839,6 +873,7 @@ already runs on every tool call); the third costs one open connection.
 | the machine is… | who delivers | bound |
 |---|---|---|
 | running a batch session | the PostToolUse hook, from the local spool | seconds |
+| a session that owns the batch but WAITS (no tool calls) | nobody at first; past `DEFERRAL_MS` the watcher wakes a responder anyway | ≤ ~4 min |
 | idle, watcher up | the watcher wakes a light responder | seconds |
 | idle, watcher down | the next launcher tick spawns a session with the message in its prompt | ≤ 15 min |
 | paused by the user | nobody — the message is spooled and waits for the go | until resumed |
@@ -1037,6 +1072,24 @@ nothing is lost in practice: the acceptance window matches ntfy's cache, so an
 `expired` message is one the transport has dropped as well. `ahead` is safe by
 construction — acceptance requires `age >= -skew`, and at every earlier moment
 such an envelope's age was more negative still, so no past poll can have taken it.
+
+**A NOTIFIED ENVELOPE IS NEVER ACCEPTED AFTERWARDS (point 430).** `ahead` is safe
+against a PAST acceptance, but not against a FUTURE one: the envelope's stamp is
+fixed while `now` advances, so waiting alone brings it inside the window, and a
+replay whose transport id a flood had evicted from the count-capped `seen` could be
+accepted minutes after the sender was told "NICHT angekommen". The notice is the
+half that cannot be taken back, so the notified ledger is read by the verification
+too — a notified envelope drops as `duplicate` for as long as it is remembered.
+That matches what the notice asks for (fix the clock and send AGAIN, which is a new
+envelope) and settles the second notice by construction, since a `duplicate` earns
+none. The same tick is covered as well, not only the next state read.
+
+**Both facts of one tick reach the log (point 430).** The launcher's chat log was an
+`if/else if` chain, which made a failed SPOOL WRITE and a refused DROP NOTICE
+mutually exclusive: the storage fault took the first branch and the notice clause
+never ran, so the one thing those counts exist to make loud went silent. The lines
+are composed by `chatInboxLogLines` in `scripts/chat-core.mjs` instead — a pure
+function returning both.
 
 The notice **never quotes the message**: the two topics are derived separately so
 that knowing one reveals nothing about the other, and the signed timestamp

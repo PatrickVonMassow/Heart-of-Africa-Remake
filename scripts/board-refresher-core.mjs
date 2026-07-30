@@ -21,6 +21,21 @@ export const BOARD_CONTENT_URL =
   'https://raw.githubusercontent.com/PatrickVonMassow/Heart-of-Africa-Remake/board/board.html'
 
 /**
+ * The signal the refresher raises on `window` after a successful swap
+ * (point 423).
+ *
+ * WHY A SIGNAL AND NOT MARKUP: the message channel is INJECTED by the viewer
+ * into the rendered board, because nothing about the chat may enter the board
+ * CONTENT. Since the chat moved under the board's heading it sits inside
+ * `<main>` — and the swap replaces `<main>` wholesale, so every successful
+ * refresh deleted the channel while the reader was looking at it (returning to
+ * the browser makes the page visible, which fires the poll at once). The
+ * refresher is versioned source and the injection lives in the viewer, so the
+ * seam between them is this documented event rather than a shared variable.
+ */
+export const BOARD_SWAP_EVENT = 'hoa-board-swapped'
+
+/**
  * The refresher, as the text the board embeds. It is a function DECLARATION
  * rather than an IIFE so the test can call it with injected collaborators; the
  * board appends the one line that starts it with the real ones.
@@ -52,6 +67,16 @@ function createBoardRefresher(env) {
         if (fresh.innerHTML === cur.innerHTML) return 'unchanged';
         cur.innerHTML = fresh.innerHTML;
         if (typeof env.onSwap === 'function') env.onSwap();
+        // THE SWAP ANNOUNCES ITSELF (point 423). Whatever the viewer injected
+        // into the replaced content — the message channel — is gone now and has
+        // to be put back. Guarded on both sides: the test harness hands in a
+        // plain object as its window, and a missing Event constructor must never
+        // turn a working refresh into a caught error.
+        try {
+          if (typeof win.dispatchEvent === 'function' && typeof win.Event === 'function') {
+            win.dispatchEvent(new win.Event('${BOARD_SWAP_EVENT}'));
+          }
+        } catch (e) {}
         return 'swapped';
       })
       .catch(function () { canFetch = false; return 'error'; });
