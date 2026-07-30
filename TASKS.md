@@ -3712,8 +3712,24 @@ it is appended.
   STILL TO ROOT-CAUSE before the lease is frozen: why the owner produced nothing after waking
   at 02:21 with a fresh heartbeat (failure H — heartbeat is not progress), and why the launcher
   log stops at 02:21 (failure I).
+  (5) JUDGE A DELEGATED AGENT BY ITS OUTPUT, NOT BY ITS LOG — added 30.07.2026 after doing
+  exactly the opposite. A bundle agent's transcript log had been silent for 59 minutes, the
+  in-flight declaration reported "evidence-gone: silent for 59 min", and it was declared dead
+  and replaced. It was ALIVE: its worktree had committed four minutes earlier and the branch
+  tip moved a minute before the replacement was spawned. The successor then rebuilt two points
+  the original had already finished, and both were heading for the same third one. The
+  declaration mechanism accepts a worktree, a pid, a branch or a log as evidence and treats
+  them as equal; a LOG is the weakest of the four, because an agent that works without printing
+  looks identical to one that died. Therefore: where the declared work is an AGENT, git
+  activity in its worktree or on its branch is the primary evidence, a silent log alone never
+  justifies the conclusion "dead", and the probe reports WHICH evidence it judged on. A
+  respawn additionally re-checks git activity immediately before it spawns. This is the same
+  rule as (2) above — liveness is read from output — applied to the layer that spawns children
+  rather than sessions, and it is the rule this point's own design document states while its
+  author broke it.
   MUST NOT BE BUILT: a rescue that depends on the wedged session noticing; a second LOCAL
-  watchdog; two spawners; a window that kills a running verification; a silent recovery.
+  watchdog; two spawners; a window that kills a running verification; a silent recovery;
+  and no conclusion of death from silence alone where output can be measured.
   VERIFIABLE: pure core plus Vitest per layer, each case naming the night it would have
   prevented, plus one INDEPENDENCE case per layer — it still acts while the other layers'
   inputs are missing or stale. The full list is `docs/batch-resilience.md` §8.

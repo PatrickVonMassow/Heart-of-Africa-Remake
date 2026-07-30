@@ -183,6 +183,26 @@ Three parts, and they belong to 433 because that is the layer that spawns:
 
 This also answers "the successor runs straight into the same outage".
 
+### Layer 5b — the same rule, applied to children (added 30.07.2026, after breaking it)
+
+While this document was being written, a bundle agent's log fell silent for 59 minutes.
+The in-flight declaration reported `evidence-gone: silent for 59 min`, and the agent was
+declared dead and replaced. It was alive: its worktree had committed four minutes
+earlier, and the branch tip moved one minute before the replacement was spawned. The
+successor rebuilt two finished points, and both were about to build a third.
+
+The declaration accepts a worktree, a pid, a branch or a log as evidence and weighs them
+equally. A log is the weakest: an agent that works without printing is indistinguishable
+from one that died. So where the declared work is an AGENT, git activity in its worktree
+or on its branch is the PRIMARY evidence, a silent log alone never supports the
+conclusion "dead", the probe names which evidence it judged on, and a respawn re-checks
+git activity immediately before spawning.
+
+This is §2's heartbeat-versus-progress rule one level down, at the layer that spawns
+children rather than sessions — and it was broken by the author of the paragraph that
+states it, which is the most honest argument in this document for why the rule needs a
+mechanism instead of a reader.
+
 ## 5. What must NOT be built
 
 - **No rescue that depends on the wedged session noticing.** It is definitionally
