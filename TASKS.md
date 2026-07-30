@@ -4060,9 +4060,14 @@ also be taken as its own task now and then.
   or stop. Reads, the board commands themselves and an edit of the board file stay exempt, as
   they are today, and the gate stays fail-open. A session that legitimately ends right after
   `--none` is untouched, which is the case the flag exists for.
-  IT ALSO DOUBLES (observed 21:00, the same evening): a second `--none` APPENDED a second idle
-  card beside the first, so the board carried the false claim twice over. The idle card is a
-  STATE, not an entry — writing it replaces any idle card already standing, never adds one.
+  IT STACKS, AND THE SANCTIONED PATH IS WHY (observed three times the same evening, the last time
+  THREE idle cards deep, all reported by the user). The idle card is written by
+  `board.mjs done <n> --none`, which requires a current-work card for the point it closes — so once
+  the point is already ticked, there is NO sanctioned way to put the boundary card up, and the
+  session hand-edits the board file instead. Hand-edits append, so every further handover attempt
+  adds another copy, and one of those edits also broke the section markup. The idle card is a STATE,
+  not an entry: writing it replaces any idle card already standing, and it must be writable WITHOUT
+  a point to close, because the boundary is exactly the moment when no point is open.
   VERIFIABLE: pure cases in the guard's decision core — a board carrying the no-work claim
   denies a state-changing call and allows a read, a board carrying a real now-card allows
   both, and the deny names the remedy; plus one case pinning that the boundary path
