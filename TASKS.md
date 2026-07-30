@@ -3567,6 +3567,17 @@ it is appended.
   number while still passing the audit; `--estimate` writes without disturbing title or body; a
   promoted now-card renders its queue estimate beside the start time; a promotion without one
   is reported.
+  AND TWO SANCTIONED MECHANISMS CONTRADICT EACH OTHER (30.07.2026, at the boundary of the
+  pre-spawn repair point). `batch-boundary.mjs` prints a board text to be used VERBATIM, and
+  that text names the CLOSED point ("Punkt N ist abgeschlossen. Ich übergebe an eine frische
+  Sitzung …") — while the card it goes into belongs to the NEXT point, so
+  `dashboard-card-topic-guard` blocks the turn end for referencing another point. The loser is
+  always the boundary: the block costs a turn, and every remedy command counts as work and
+  deletes the boundary marker again, so the handover has to be re-taken. Fix ONE of the two so
+  they agree: the prescribed text names the handover WITHOUT naming the closed point (preferred
+  — the closed point's own story belongs in Erledigt anyway), or the topic guard exempts the
+  sentence the boundary script itself dictates. VERIFIABLE in the pure layer: the boundary text
+  passes the topic guard's decision for the card it is written into.
   DOCS in the same commit: `docs/batch-autonomy.md` where the board commands are listed.
 
 - [ ] 440. WHAT ELSE IS BILLED ON EVERY TURN FOR NOTHING — A MEASURED INVENTORY (user
