@@ -4060,6 +4060,9 @@ also be taken as its own task now and then.
   or stop. Reads, the board commands themselves and an edit of the board file stay exempt, as
   they are today, and the gate stays fail-open. A session that legitimately ends right after
   `--none` is untouched, which is the case the flag exists for.
+  IT ALSO DOUBLES (observed 21:00, the same evening): a second `--none` APPENDED a second idle
+  card beside the first, so the board carried the false claim twice over. The idle card is a
+  STATE, not an entry — writing it replaces any idle card already standing, never adds one.
   VERIFIABLE: pure cases in the guard's decision core — a board carrying the no-work claim
   denies a state-changing call and allows a read, a board carrying a real now-card allows
   both, and the deny names the remedy; plus one case pinning that the boundary path
