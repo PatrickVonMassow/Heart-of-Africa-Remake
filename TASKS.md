@@ -4108,6 +4108,13 @@ also be taken as its own task now and then.
   AND IT IS WATCHED, not assumed: the reuse is recorded per point, and if a reused agent's work
   draws more review findings than a fresh one's over the next ten points, the rule is dropped rather
   than defended. That comparison is part of what the reporting command prints.
+  AND THE STORED ORDER IS NOT THE DOCUMENTED ONE (measured 30.07.2026, right after the flat queue
+  came back). The queue renders from a hand-curated order array in the board data, and that array
+  predates the ranking in docs/work-packages.md: the first card is 440 while the documented working
+  order opens with Urlaubsfestigkeit. So the flat list reads as an order and is not the one the work
+  is actually taken in — the same lie the grouping was reverted for, one layer down. The order the
+  queue renders must BE the picker's order, derived from the documented ranking, never a second
+  hand-kept list that can drift from it.
   MEASURED, not asserted: the point is delivered when a command reports, for the current work
   order, how many agents the top of the queue can actually feed, and that figure is 3 (or the
   reason it cannot be). `--slots-free` already demands a reason for an idle slot; this makes
