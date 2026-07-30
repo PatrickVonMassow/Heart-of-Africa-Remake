@@ -583,6 +583,18 @@ Das ist eine eigene Klasse, weil kein Test sie zeigt: Der Entwurf war in sich st
 
 ---
 
+### 3.63 Drei Wochen rote Pipeline, und gemerkt hat es das Postfach
+
+Am Morgen des 30.07.2026 meldete der Nutzer, sein Postfach werde von Fehlermails überflutet. Die Messung danach: von den letzten hundert CI-Läufen sind **53 fehlgeschlagen, 26 davon auf `main`**, verteilt vom 9. bis zum 30. Juli. Nicht ein Vorfall, sondern ein Dauerzustand — und die einzige Instanz, die ihn bemerkte, war der Mailversand von GitHub an den Menschen.
+
+Zwei Ursachen greifen ineinander. Die erste ist eine Lücke im Blickfeld: `ci-status-guard` fragt nach dem HEAD **seiner eigenen Sitzung**. In der Nacht stand der Hauptbaum auf `main` und war grün, während jeder Push eines delegierten Agenten auf seinem Zweig rot lief — elf Läufe, elf Mails, und die Sitzung, die es hätte beheben können, erfuhr nie davon. Die zweite ist grundsätzlicher: das lokale Vor-Push-Tor fährt **dieselbe** Testschicht wie CI, fängt also alles außer dem, was sich nach Plattform unterscheidet. Genau das war der Auslöser — eine Negativkontrolle behauptete einen Windows-Vorfall (die Entfernung folgt einer Verknüpfung und löscht deren Ziel) auf jeder Plattform, war auf der schreibenden Maschine grün und auf dem Linux-Runner zwangsläufig rot.
+
+Bemerkenswert ist der Diagnose-Irrweg dazwischen: Lokal lief ein anderer Test ins Zeitlimit, und das sah nach der Erklärung aus. Es war eine echte, unabhängige Verschlechterung — eine Prüfung mit einem Git-Prozess pro Paar, siebenhundert Prozesse — aber nicht die Ursache der Mails. Ohne den Blick ins CI-Protokoll wäre der Fix behoben und das Problem geblieben.
+
+**Lehre:** Ein Tor, das dieselbe Prüfung wie die Fernumgebung fährt, deckt alles ab **außer der Umgebung selbst** — Plattform, Uhr, Dateisystem. Deshalb reicht „rot bemerken" nicht: Was zählt, ist die Bestätigung, dass der gepushte Stand dort GRÜN wurde, wo er wirklich läuft. Und ein Test, dessen Gegenstand Betriebssystemverhalten ist, formuliert seine Behauptung pro Plattform — sonst bedeutet sie auf der Plattform, die sie ausführt, gar nichts.
+
+---
+
 ## 4. Die Guards als Immunsystem
 
 Jedes Guard-Skript ist die geronnene Lösung eines real aufgetretenen, wiederholten Problems.
@@ -670,7 +682,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Donnerstag, 30.07.2026, 05:31 · Quellen-Fingerprint: `0b5049da7bcd…`
+Zuletzt aktualisiert: Donnerstag, 30.07.2026, 07:09 · Quellen-Fingerprint: `d5f89b9ef780…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -752,8 +764,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | CORRECTED 19.07.2026 — WebGPU IS testable headless/autonomously via system Chrome (channel:'chrome') + --headless=new; the 'untestable' belief held only for Playwright's BUNDLED Chromium | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 74 Feedback-/Projekt-Memories · 38 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 20 Prozess-/Meta-TASKS-Punkte (davon 9 offen).
+Erfasste Quellen: 74 Feedback-/Projekt-Memories · 39 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 20 Prozess-/Meta-TASKS-Punkte (davon 9 offen).
 
-<!-- RETRO-FINGERPRINT: 0b5049da7bcd83273cccdf04499c553aed30128893cda51875cbcd360aa00795 -->
-<!-- RETRO-LAST-REFRESHED: 2026-07-30T03:31:24.399Z -->
+<!-- RETRO-FINGERPRINT: d5f89b9ef780ea65bf72f41ff177992254296c638586e2fe112abf8dc99c64f9 -->
+<!-- RETRO-LAST-REFRESHED: 2026-07-30T05:09:38.760Z -->
 <!-- AUTO-GENERATED:END -->

@@ -3017,6 +3017,24 @@ it is appended.
   history must be bounded by CONSTRUCTION, not by a raised timeout. The pairwise probe had
   already had its budget raised once; the second raise would have hidden it again. Any such
   check states its worst case in a comment and stays inside it.
+  MEASURED 30.07.2026, AND IT IS NOT AN INCIDENT BUT A STATE: of the last 100 runs, 53
+  failed — 26 of them on `main`, spread over 2026-07-09 to 2026-07-30 (9 on the 27th, 9 on
+  the 29th, 13 on the 30th). So the repository owner has been receiving failure mail for
+  three weeks while every local gate was green.
+  WHY THE LOCAL GATE CANNOT SEE IT, which is the load-bearing insight: the pre-push gate
+  runs the SAME unit suite as CI, so it catches everything EXCEPT what differs by platform.
+  The 30.07. cause was exactly that — a negative control that asserted a WINDOWS incident
+  (git's removal following a junction into its target) on every platform, so it failed on
+  every hosted Ubuntu run and passed on the machine that wrote it. A test whose subject is
+  OS behaviour asserts PER PLATFORM, and never by skipping, or the assertion silently means
+  nothing on the platform that actually runs it.
+  THEREFORE THE TARGET IS "CONFIRM GREEN", NOT "NOTICE RED": after a push, the session may
+  not treat the work as landed until the run for that exact sha has CONCLUDED green — which
+  closes the whole class regardless of cause, platform differences included, where merely
+  noticing red closes only the cases someone happens to look at. Blocking must stay cheap
+  and honest: one API call per pushed sha, the answer cached per sha, offline or
+  rate-limited fails OPEN with a stated reason, and a run still in progress is a WAIT rather
+  than a pass.
   VERIFIABLE: pure Vitest — a session whose HEAD is green but which pushed a ref that is
   red BLOCKS and names that ref; a second turn on the same (ref, sha) does not notify
   again; a deleted ref is dropped; no pushed refs means no API call at all. Plus a case
