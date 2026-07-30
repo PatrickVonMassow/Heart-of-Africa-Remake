@@ -663,6 +663,16 @@ Zum selben Tag gehört die Gegenprobe, wie lange so etwas unbemerkt liegen kann.
 
 **Lehre:** Ein `catch`, das einen Wert zurückgibt statt weiterzureichen, ist eine Entscheidung über die Wahrheit — und gehört nur dorthin, wo der Ersatzwert in die SICHERE Richtung zeigt. Bei jeder Erhebung ist zu fragen: Führt ihr Fehlschlag zu WENIGER Befunden oder zu MEHR? Nur die erste Richtung darf verschluckt werden.
 
+### 3.72 Null Treffer sahen aus wie null Titel
+
+Der Nutzer meldete am 30.07.2026 aus dem Browser: „Viele Karten auf dem Dashboard sind kaputt: kein Titel, keine Beschreibung." Gemessen las der Titel-Parser aus der Arbeitsliste nicht acht oder achtzig, sondern **null** Titel. Die Datei lag auf der Platte mit Windows-Zeilenenden, obwohl die Repository-Regel für den Arbeitsbaum ausdrücklich Unix-Zeilenenden vorschreibt; ein zeilenweise zerlegter Text behält dann je Zeile ein Wagenrücklauf-Zeichen, das in JavaScript weder von `.` getroffen wird noch vor `$` stehen darf. Kein Muster passte auf eine einzige Zeile — auf keine der 4126.
+
+Das eigentlich Lehrreiche ist nicht der Zeilenendfehler, sondern was aus dem leeren Ergebnis wurde. Für jeden Aufrufer war „null geparste Titel" nicht unterscheidbar von „noch kein Punkt hat einen Titel", und beides führt zum selben unauffälligen Verhalten: Der Ersatzwert greift. Der schweigende Rückfall aus §3.65 war damit nicht mehr die Ausnahme für acht frisch angehängte Karten, sondern der Normalbetrieb für 96 von 97 — und niemandem fiel es auf, weil ein Rückfall ja vorgesehen ist. Derselbe Defekt traf gleichzeitig einen Wächter, der daraufhin 96 Karten als „Punkt existiert nicht" meldete statt zu sagen, dass er die Quelle nicht lesen konnte.
+
+Es ist die Umkehrung von §3.71: Dort wurde ein Fehlschlag nach innen in einen plausiblen Wert übersetzt, hier ist der plausible Wert gar keine Übersetzung — die leere Menge ist ein völlig legitimes Ergebnis, das nur in diesem Fall eine Katastrophe bedeutet. Fail-Open hilft dagegen so wenig wie ein `try`, weil nichts geworfen hat.
+
+**Lehre:** Wo eine Erhebung über einer bekannt nicht-leeren Quelle läuft, ist die leere Menge ein Befund und keine Antwort — sie wird gemeldet, nicht verwendet. Und ein Test, der eine Datei nur in der Form prüft, in der der Autor sie geschrieben hat, beweist nichts über die Form, in der sie ankommt: Der Testtext bekommt die Zeilenenden, die die Wirklichkeit liefert.
+
 ---
 
 ## 4. Die Guards als Immunsystem
@@ -752,7 +762,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Donnerstag, 30.07.2026, 17:10 · Quellen-Fingerprint: `67aefb05faba…`
+Zuletzt aktualisiert: Donnerstag, 30.07.2026, 20:12 · Quellen-Fingerprint: `475358834bb9…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -829,8 +839,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | CORRECTED 19.07.2026 — WebGPU IS testable headless/autonomously via system Chrome (channel:'chrome') + --headless=new; the 'untestable' belief held only for Playwright's BUNDLED Chromium | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 69 Feedback-/Projekt-Memories · 40 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 14 Prozess-/Meta-TASKS-Punkte (davon 0 offen).
+Erfasste Quellen: 69 Feedback-/Projekt-Memories · 40 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 25 Prozess-/Meta-TASKS-Punkte (davon 11 offen).
 
-<!-- RETRO-FINGERPRINT: 67aefb05fabafb49e8f4a604bd4fb472796f2842ab2f56bee7e106e37ecb470d -->
-<!-- RETRO-LAST-REFRESHED: 2026-07-30T15:10:28.549Z -->
+<!-- RETRO-FINGERPRINT: 475358834bb9add5399e0d7f4c83bd6bb9e6dea57a5f516b340981e3bf073416 -->
+<!-- RETRO-LAST-REFRESHED: 2026-07-30T18:12:37.994Z -->
 <!-- AUTO-GENERATED:END -->
