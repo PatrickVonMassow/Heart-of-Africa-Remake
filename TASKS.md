@@ -4094,6 +4094,17 @@ also be taken as its own task now and then.
   above the group cards, the points that would be started next — one line, as many as the pool has
   slots, each with its number and German title. It is DERIVED from the picker, never written by hand,
   so it cannot drift from what actually happens.
+  AND THE ASSIGNMENT, not only the order (user 30.07.2026: "Das heißt der nächste Punkt eines
+  Bündels wird mit frischem Kontext bearbeitet? Wo ist dann die Ersparnis?"). The objection is
+  correct and it refutes what docs/work-packages.md claimed: every point goes to a
+  worktree-isolated subagent with a FRESH context and a brief, and the main session hands over at
+  each point boundary — so NOTHING is carried between two points of a bundle, and the "related
+  points stay fresh" benefit did not exist. It exists only if the SAME still-running agent is
+  handed the bundle's next point, as 439 → 452 was that evening: that agent already had the module
+  in context and skipped the reading entirely. FINAL STATE for this half: when the next point of a
+  bundle touches files an agent is ALREADY working in, it goes to THAT agent as a follow-up ticket
+  rather than to a new one — it is the same decision the picker makes, so it lives in the same
+  mechanism. A new agent is spawned only when no running one holds the files.
   MEASURED, not asserted: the point is delivered when a command reports, for the current work
   order, how many agents the top of the queue can actually feed, and that figure is 3 (or the
   reason it cannot be). `--slots-free` already demands a reason for an idle slot; this makes

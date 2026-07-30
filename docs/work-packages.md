@@ -10,8 +10,15 @@ neither reviewable nor attributable when one of them is wrong.
 
 What the bundle still IS, and why the grouping earns its keep:
 
-- **The ORDER.** Related points are worked in sequence, so the same code stays
-  fresh across them instead of being re-learned per point.
+- **The ORDER.** It is the priority ranking, nothing more. It was first written
+  here as "the same code stays fresh across the points instead of being
+  re-learned" — THAT IS FALSE and the user caught it (30.07.2026): every point
+  goes to a worktree-isolated subagent with a FRESH context and a brief, and the
+  main session hands over at each point boundary, so nothing is carried between
+  two points of a bundle. The freshness only becomes real when the SAME running
+  agent is handed the bundle's next point instead of a new one being spawned —
+  which is what happened with 439 → 452 that evening, and is why point 471 makes
+  it the rule rather than an accident.
 - **The COLLISION MAP.** The split follows SHARED FILES, so it says which points
   must NOT run in parallel. Two points in the same bundle that touch the same
   module go on ONE branch — one commit each — because parallel agents would
