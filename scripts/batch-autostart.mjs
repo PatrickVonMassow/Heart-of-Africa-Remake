@@ -21,7 +21,7 @@
 //     it and notifies. A rogue interactive session is never killed — the
 //     guards make it stand down — but the user is notified urgently.
 // Disable: Disable-ScheduledTask -TaskName HoA-Batch-Autostart
-import { readFileSync, writeFileSync, existsSync, readdirSync, renameSync, openSync } from 'node:fs'
+import { readFileSync, writeFileSync, existsSync, readdirSync, renameSync, openSync, rmSync } from 'node:fs'
 import { spawn, execSync, execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
@@ -43,6 +43,8 @@ import {
   wedgeOwnerKey,
   silenceStage,
   wedgeAction,
+  wedgeTakeover,
+  verdictRepeat,
   isOwnSpawn,
   PENDING_STALE_MS,
   WEDGE_NOTIFY_MS,
@@ -65,6 +67,9 @@ import {
   recordSpawn,
   reapableSpawns,
   pruneSpawns,
+  judgeSpawnPreflight,
+  judgePreviousSpawn,
+  spawnBackoffMs,
 } from './batch-autostart-core.mjs'
 import { WATCHER_PID_FILE, watcherSupervision } from './chat-watcher-core.mjs'
 import { SECRET_FAULT } from './chat-secret.mjs'
@@ -376,15 +381,31 @@ const work = assessOwnerWork({
 const assessment = assessOwner(lock, { now, bootTime: bootTimeMs(), probe, work })
 
 // --- Verify the previous spawn ------------------------------------------------
+// LIVING IS NOT WORKING (point 433, §4 of docs/batch-resilience.md). This used to
+// count a failure ONLY when the spawn's pid was gone, so a successor that came up,
+// wedged and kept breathing counted as a success forever — and a chain of such
+// successors would burn a whole night's tokens while looking busy. The decision is
+// pure (`judgePreviousSpawn`); this only gathers the three facts.
 if (state.lastSpawnAt > 0) {
   const progressed = (curHead && state.lastHead && curHead !== state.lastHead) ||
     (lock && typeof lock.claimedAt === 'number' && lock.claimedAt > state.lastSpawnAt)
-  if (progressed) {
+  const proveMin = Number(process.env.HOA_SPAWN_PROVE_MIN)
+  const v = judgePreviousSpawn({
+    lastSpawnAt: state.lastSpawnAt,
+    now,
+    progressed,
+    pidAlive: !!(state.lastPid && pidAlive(state.lastPid)),
+    // The spawn proved the lock is its own the moment it converted the pending
+    // lock to itself — then it is judged as the OWNER, by the wedge ladder above.
+    lockConverted: !!(lock && lock.kind !== 'pending-spawn' && lock.pid === state.lastPid),
+    proveMs: Number.isFinite(proveMin) && proveMin > 0 ? proveMin * 60000 : undefined,
+  })
+  if (v.verdict === 'progress') {
     if (state.failCount > 0) log(`previous spawn made progress — clearing failCount (${state.failCount})`)
     state.failCount = 0
-  } else if (!state.lastPid || !pidAlive(state.lastPid)) {
+  } else if (v.verdict === 'failed') {
     state.failCount = (state.failCount || 0) + 1
-    log(`previous spawn did NOT take over (no new commit, lock not claimed, pid gone) — failCount=${state.failCount}`)
+    log(`${v.reason} — failCount=${state.failCount}`)
   }
 }
 state.lastTickAt = now
@@ -483,10 +504,22 @@ if (verdict === 'skip-alive') {
   process.exit(0)
 }
 let takeoverAfterKill = false
+let takeWedgedLock = false
 if (verdict === 'skip-wedged') {
   // `probe` is the lock owner's own { exists, startedAt } — the identity half of
   // "is this really the process we spawned" (four-eyes finding 1.3).
   const act = wedgeAction({ assessment, lock, lastSpawnPid: state.lastPid, lastSpawnAt: state.lastSpawnAt, probe })
+  // REPETITION IS THE SIGNAL (point 433 (c)). The identical wedge line went out
+  // eight times over two hours on 30.07.2026; what reads the same eight times is
+  // not truer the ninth, only dearer. The key is the silence's identity, so it
+  // holds still across ticks while nobody works.
+  const rep = verdictRepeat({
+    key: `${assessment.reason}#${wedgeOwnerKey(lock)}`,
+    lastKey: state.wedgeVerdictKey,
+    repeats: state.wedgeVerdictRepeats,
+  })
+  state.wedgeVerdictKey = rep.key
+  state.wedgeVerdictRepeats = rep.repeats
   if (act.stalled) {
     // NOT a clock reading (point 402 (d)): the owner has made no tool call for
     // two launcher ticks AND every piece of work it declared has stopped moving.
@@ -499,14 +532,41 @@ if (verdict === 'skip-wedged') {
         (act.own ? 'It was spawned by the launcher, so it is being reaped and taken over.' : 'It is not the launcher\'s own spawn, so nothing is being killed — please look.'),
       'urgent',
     )
-  } else {
+  } else if (!rep.suppressLog) {
     log(`WEDGED owner: pid ${lock.pid} alive but heartbeat ${Math.round((now - lock.claimedAt) / 60000)} min old`)
+  } else {
+    log(`WEDGED owner: pid ${lock.pid} — same verdict for the ${rep.repeats}. tick; already escalated, not repeating it`)
   }
-  // The consequence of point 388 (c) is the NOTIFICATION above, and it never
-  // kills: at 90 minutes a silent owner may well be inside a long verification.
-  // The reaping valve fires only on the launcher's OWN headless spawn and never
-  // on an interactive window — an unattended `claude -p` that hangs has nobody to
-  // read the notification, while a user's window has.
+  // THE VERDICT MUST HAVE A CONSEQUENCE (point 433 (a)). A wedged owner loses the
+  // batch: the launcher takes the lock through the SAME atomic acquire (so two
+  // launchers can never both act) and spawns the successor. Nothing is killed here
+  // — the wedged process keeps running and learns at its next hook that it no
+  // longer owns the batch, which stands every ownership-gated guard down.
+  const takeover = wedgeTakeover({ assessment, lock, work })
+  takeWedgedLock = takeover.take
+  if (takeWedgedLock) {
+    log(
+      `TAKING the batch from the wedged owner ${lock.sessionId} (pid ${lock.pid ?? 'unknown'}, silent ` +
+        `${Math.round((now - lock.claimedAt) / 60000)} min, ${takeover.reason}) — it keeps running but no longer owns the batch`,
+    )
+  }
+  // Escalate on the REPETITION, not on every reading: once the same verdict has
+  // stood for `VERDICT_REPEAT_ESCALATE_AT` ticks the take has demonstrably not
+  // resolved it (a lost race, a lock that keeps coming back), and that is the
+  // finding worth a person's attention.
+  if (rep.escalate) {
+    log(`ESCALATING: the wedge verdict "${assessment.reason}" has now stood for ${rep.repeats} launcher ticks unresolved`)
+    await notify(
+      'Batch wedge UNRESOLVED',
+      `The launcher has read the same verdict (${assessment.reason}) for ${rep.repeats} ticks — the owning session ` +
+        `(pid ${lock.pid ?? 'unknown'}) has been silent for ${Math.round((now - lock.claimedAt) / 60000)} minutes and ` +
+        `taking the batch from it has not resolved the standstill. Please look; the launcher will stop repeating this line.`,
+      'urgent',
+    )
+  }
+  // The reaping valve fires only on the launcher's OWN headless spawn and never on
+  // an interactive window — an unattended `claude -p` that hangs has nobody to read
+  // the notification, while a user's window has.
   if (act.kill) {
     try { process.kill(lock.pid) } catch { /* gone */ }
     // Taking the lock beside a process that is still running IS the e9407cae
@@ -519,13 +579,15 @@ if (verdict === 'skip-wedged') {
         : `killed ${act.stalled ? 'stalled' : 'wedged'} own spawn pid ${lock.pid} — next tick may take over`,
     )
   }
-  if (!takeoverAfterKill) {
+  if (!takeoverAfterKill && !takeWedgedLock) {
     writeJsonAtomic(C('autostart-state.json'), state)
     process.exit(0)
   }
 }
 if (takeoverAfterKill) {
   log(`owner reaped for a frozen wait (${assessment.reason}) — taking over`)
+} else if (takeWedgedLock) {
+  log(`wedged owner dispossessed (${assessment.reason}) — taking over`)
 } else if (lock) {
   // "handed-over" is not death: the owner finished a point and passed the batch
   // on (point 388). Logged distinctly so the end-to-end chain can be READ out of
@@ -542,17 +604,82 @@ if (takeoverAfterKill) {
   log('no owner lock — taking over')
 }
 
-// Debounce: a spawn less than 10 min ago is still coming up.
+// Debounce, and it ESCALATES (point 433 (iii)): the base ten minutes is what a
+// healthy spawn needs to come up, but each recorded failure doubles the wait up to
+// the cap, so a refusing environment is no longer hammered at a fixed rate all
+// night. `failCount` is cleared the moment a spawn makes progress, so the ladder
+// falls back to the floor by itself.
+const backoffMs = spawnBackoffMs({ failCount: state.failCount })
 const lastSpawn = readJson(C('autostart-last.json'))
-if (lastSpawn && typeof lastSpawn.at === 'number' && now - lastSpawn.at < 10 * 60 * 1000) {
-  log(`skip: a spawn ${Math.round((now - lastSpawn.at) / 60000)} min ago is still claiming the lock`)
+if (lastSpawn && typeof lastSpawn.at === 'number' && now - lastSpawn.at < backoffMs) {
+  log(
+    `skip: a spawn ${Math.round((now - lastSpawn.at) / 60000)} min ago is still claiming the lock ` +
+      `(backoff ${Math.round(backoffMs / 60000)} min at failCount ${state.failCount || 0})`,
+  )
   writeJsonAtomic(C('autostart-state.json'), state)
   process.exit(0)
 }
 
+// --- ENVIRONMENT PREFLIGHT: a spawn into a broken environment is not a rescue ---
+// Point 433 (i). The probes are deliberately CHEAP and local — no model call, no
+// network — and they answer the question the design doc asks: can anything at all
+// run here? What they cannot see is a permission service that refuses tool calls
+// INSIDE a session (the 30.07.2026 outage); `judgePreviousSpawn` above is what
+// catches that, one tick later, by refusing to call a breathing successor a success.
+const preflight = judgeSpawnPreflight({ probes: environmentProbes() })
+if (!preflight.ok) {
+  state.failCount = (state.failCount || 0) + 1
+  log(`PREFLIGHT REFUSED — not spawning: ${preflight.reason} (failCount=${state.failCount})`)
+  await notify(
+    'Batch spawn BLOCKED',
+    `The launcher would have started a successor but the environment failed its preflight (${preflight.reason}). ` +
+      'Spawning into a broken environment is not a rescue, so nothing was started. Please look at the machine.',
+    'urgent',
+  )
+  writeJsonAtomic(C('autostart-state.json'), state)
+  process.exit(0)
+}
+
+/** The cheap, local checks that must hold before a successor is worth starting. An
+ *  UNRUNNABLE probe returns `ok: null` — inconclusive never blocks (the preflight
+ *  must not become a new way for the batch to stand still). */
+function environmentProbes() {
+  const probes = []
+  // 1. git answers — the successor's first act is reading the work order out of a
+  //    checkout, and a repo that cannot be read cannot be worked in.
+  try {
+    const h = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: REPO, encoding: 'utf8', timeout: 30000, windowsHide: true }).trim()
+    probes.push({ name: 'git', ok: /^[0-9a-f]{40}$/.test(h), detail: h ? '' : 'git rev-parse HEAD returned nothing' })
+  } catch (e) {
+    probes.push({ name: 'git', ok: false, detail: `git rev-parse HEAD failed (${e && e.message})` })
+  }
+  // 2. the state directory is writable — every lock, marker and log the session
+  //    needs lives there, and a read-only or full disk wedges a session silently.
+  const canary = C(`preflight-${process.pid}.tmp`)
+  try {
+    writeFileSync(canary, `${now}\n`)
+    rmSync(canary, { force: true })
+    probes.push({ name: 'state-writable', ok: true })
+  } catch (e) {
+    probes.push({ name: 'state-writable', ok: false, detail: `cannot write ${canary} (${e && e.message})` })
+  }
+  return probes
+}
+
 // --- ATOMIC pending acquire: the launcher must WIN the lock before spawning ----
 const launcherSid = `launcher-${randomUUID()}`
-const acq = acquire(launcherSid, { kind: 'pending-spawn', pid: process.pid, pidStartedAt: now - Math.round(process.uptime() * 1000) })
+const acq = acquire(launcherSid, {
+  kind: 'pending-spawn',
+  pid: process.pid,
+  pidStartedAt: now - Math.round(process.uptime() * 1000),
+  // Point 433 (a): the ONE case in which a live lock may be dispossessed. The
+  // wedge is re-verified inside acquire's reap mutex, so an owner that wrote a
+  // heartbeat in the race window keeps its lock and this tick logs "held".
+  takeWedged: takeWedgedLock,
+  extra: takeWedgedLock
+    ? { takenFromWedged: { sessionId: lock.sessionId, pid: lock.pid ?? null, silentMs: now - lock.claimedAt } }
+    : undefined,
+})
 if (acq !== 'acquired') {
   log(`skip: atomic acquire returned "${acq}" — a session claimed the lock in the race window; NOT spawning`)
   writeJsonAtomic(C('autostart-state.json'), state)

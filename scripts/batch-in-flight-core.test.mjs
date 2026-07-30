@@ -38,7 +38,6 @@ import {
   IN_FLIGHT_PATH,
   LAUNCHER_TICK_MS,
   PID_START_TOLERANCE_MS,
-  WEDGED_MS,
   WORK_STALL_MS,
 } from './batch-singleton.mjs'
 import {
@@ -613,7 +612,11 @@ describe('assessOwnerWork → assessOwner: a totally frozen session really is re
     // First fire at the stall bound (the heartbeat trails the declaration by 5 s,
     // so it crosses one minute later), and long before the four-hour valve.
     expect(hits[0]).toBe(Math.round(WORK_STALL_MS / 60_000) + 1)
-    expect(hits[0] * 60_000).toBeLessThan(WEDGED_MS)
+    // …and well inside the window the launcher honours the declaration for. It used
+    // to be compared against WEDGED_MS, which point 433 dropped to 45 minutes so an
+    // unattended night could be rescued; the window this must clear is the
+    // launcher's own, which was written out for exactly that reason.
+    expect(hits[0] * 60_000).toBeLessThan(LAUNCHER_WORK_MAX_AGE_MS)
     const t = tick(hits[0])
     expect(t.verdict).toMatchObject({ alive: true, wedged: true, reason: 'work-stalled' })
     expect(spawnDecision(t.verdict)).toBe('skip-wedged')

@@ -37,7 +37,7 @@
 //
 // Where the two verdicts are close, this file chooses the BLOCK: a wrong block
 // costs one command, a wrong allow cost five and a half hours.
-import { resolveOwnership, PID_START_TOLERANCE_MS, WEDGED_MS } from './batch-singleton.mjs'
+import { resolveOwnership, PID_START_TOLERANCE_MS } from './batch-singleton.mjs'
 
 /** How old a declaration may be before the guard stops honouring it. Wide enough
  *  for a LARGE browser regression or a delegated agent building a point (both run
@@ -79,11 +79,20 @@ export const IN_FLIGHT_MAX_AGE_MS = 45 * 60 * 1000
  * only looks once per `LAUNCHER_TICK_MS` (15 min). Roughly seven ticks in eight
  * would step straight over it and fall through to the four-hour valve, which is
  * the very outcome finding A reported. The band must therefore be at least a
- * couple of ticks wide, and `WEDGED_MS` is where it naturally ends: past the old
- * valve a silent owner reads wedged anyway, so the declaration has nothing left to
- * add. `assessOwnerWork`'s own tests pin the width against the tick.
+ * couple of ticks wide, and four hours is where it naturally ends: past that a
+ * silent owner has been read as wedged for hours anyway, so the declaration has
+ * nothing left to add. `assessOwnerWork`'s own tests pin the width against the tick.
+ *
+ * WRITTEN OUT RATHER THAN `= WEDGED_MS` (point 433, 30.07.2026). It used to borrow
+ * that constant, which then dropped from four hours to 45 minutes so the launcher
+ * could rescue an unattended night. Borrowed, this window would have collapsed to
+ * 45 minutes with it — and since a declaration ageing out flips `advancing` to
+ * false, the launcher would have started TAKING the lock the moment a declaration
+ * expired. That is precisely the shot in the back a long verification must never
+ * get: an expiry is not evidence of a wedge. The window therefore keeps its own
+ * value and its own reason.
  */
-export const LAUNCHER_WORK_MAX_AGE_MS = WEDGED_MS
+export const LAUNCHER_WORK_MAX_AGE_MS = 4 * 60 * 60 * 1000
 
 /** How recently a declared LOG file must have been written to count as proof that
  *  the run behind it is alive. A suite that has not appended a line in this long

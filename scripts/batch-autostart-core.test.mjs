@@ -35,6 +35,12 @@ import {
   pendingSinceHandover,
   STANDING_ALERT_INTERVAL_MS,
   standingAlertDue,
+  judgeSpawnPreflight,
+  judgePreviousSpawn,
+  spawnBackoffMs,
+  SPAWN_PROVE_MS,
+  SPAWN_BACKOFF_BASE_MS,
+  SPAWN_BACKOFF_CAP_MS,
 } from './batch-autostart-core.mjs'
 import { isOwnSpawn } from './batch-singleton.mjs'
 
@@ -393,5 +399,125 @@ describe('standingAlertDue — the push for a standing fault', () => {
     // A junk interval falls back to the default rather than to "always push".
     expect(standingAlertDue({ lastAt: NOW, now: NOW + 60_000, intervalMs: 'soon' })).toBe(false)
     expect(standingAlertDue({ lastAt: NOW, now: NOW + 60_000, intervalMs: 0 })).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// A SPAWN INTO A BROKEN ENVIRONMENT IS NOT A RESCUE (point 433, the hole the
+// second model's review found in docs/batch-resilience.md §4)
+// ---------------------------------------------------------------------------
+// Letting the launcher take the batch from a wedged owner, on its own, would turn a
+// silent night into a loud one: the successor wedges the same way and the runaway
+// brake never catches it, because failCount only ever rose when the spawn's pid was
+// GONE. These three decisions are what stop a chain of breathing corpses.
+
+describe('judgeSpawnPreflight — can anything run here at all?', () => {
+  it('all probes green → clear to spawn', () => {
+    expect(judgeSpawnPreflight({ probes: [{ name: 'git', ok: true }, { name: 'state-writable', ok: true }] })).toMatchObject({
+      ok: true,
+      failed: [],
+    })
+  })
+
+  it('A REFUSING PROBE BLOCKS THE SPAWN and the reason names it', () => {
+    const v = judgeSpawnPreflight({
+      probes: [
+        { name: 'git', ok: false, detail: 'git rev-parse HEAD failed (EPERM)' },
+        { name: 'state-writable', ok: true },
+      ],
+    })
+    expect(v.ok).toBe(false)
+    expect(v.failed).toEqual(['git'])
+    expect(v.reason).toContain('EPERM')
+  })
+
+  it('every failure is named, not just the first', () => {
+    const v = judgeSpawnPreflight({ probes: [{ name: 'git', ok: false }, { name: 'state-writable', ok: false }] })
+    expect(v.failed).toEqual(['git', 'state-writable'])
+  })
+
+  it('an INCONCLUSIVE probe never blocks — the preflight must not become a new standstill', () => {
+    for (const ok of [null, undefined, 'maybe']) {
+      expect(judgeSpawnPreflight({ probes: [{ name: 'git', ok }] }).ok).toBe(true)
+    }
+  })
+
+  it('no probes at all, or junk, is clear (fail-open)', () => {
+    expect(judgeSpawnPreflight({ probes: [] }).ok).toBe(true)
+    expect(judgeSpawnPreflight({ probes: 'nonsense' }).ok).toBe(true)
+    expect(judgeSpawnPreflight().ok).toBe(true)
+    expect(judgeSpawnPreflight({ probes: [null, {}, { ok: false }] }).ok).toBe(true)
+  })
+})
+
+describe('judgePreviousSpawn — living is not working', () => {
+  const NOW2 = 1_784_900_000_000
+  const spawnedAt = NOW2 - 40 * 60_000
+
+  it('progress clears everything, whatever the pid is doing', () => {
+    expect(judgePreviousSpawn({ lastSpawnAt: spawnedAt, now: NOW2, progressed: true, pidAlive: false }).verdict).toBe('progress')
+  })
+
+  it("a vanished pid is today's failure, unchanged", () => {
+    const v = judgePreviousSpawn({ lastSpawnAt: spawnedAt, now: NOW2, pidAlive: false })
+    expect(v.verdict).toBe('failed')
+    expect(v.reason).toContain('pid gone')
+  })
+
+  it('THE NEW CASE: alive but proved nothing past the window → failed', () => {
+    const v = judgePreviousSpawn({ lastSpawnAt: spawnedAt, now: NOW2, pidAlive: true, lockConverted: false })
+    expect(v.verdict).toBe('failed')
+    expect(v.reason).toContain('ALIVE but proved nothing')
+  })
+
+  it('inside the window it is still coming up — a boot is not a failure', () => {
+    const v = judgePreviousSpawn({ lastSpawnAt: NOW2 - SPAWN_PROVE_MS + 60_000, now: NOW2, pidAlive: true })
+    expect(v.verdict).toBe('pending')
+  })
+
+  it('a spawn that CONVERTED the lock is judged as the owner, not here', () => {
+    const v = judgePreviousSpawn({ lastSpawnAt: spawnedAt, now: NOW2, pidAlive: true, lockConverted: true })
+    expect(v.verdict).toBe('pending')
+    expect(v.reason).toContain('owns the lock')
+  })
+
+  it('no previous spawn → nothing to judge', () => {
+    expect(judgePreviousSpawn({ lastSpawnAt: 0 }).verdict).toBe('none')
+    expect(judgePreviousSpawn().verdict).toBe('none')
+  })
+
+  it('a CHAIN of breathing corpses reaches the runaway brake', () => {
+    // The brake pauses the batch at failCount 3. Before this decision existed, an
+    // alive-but-wedged successor scored zero every time and the chain never ended.
+    let failCount = 0
+    for (let i = 0; i < 3; i += 1) {
+      const v = judgePreviousSpawn({ lastSpawnAt: spawnedAt, now: NOW2, pidAlive: true, lockConverted: false })
+      if (v.verdict === 'failed') failCount += 1
+    }
+    expect(failCount).toBe(3)
+  })
+})
+
+describe('spawnBackoffMs — the ladder rises instead of hammering', () => {
+  it('a healthy launcher waits the old fixed debounce', () => {
+    expect(spawnBackoffMs({ failCount: 0 })).toBe(SPAWN_BACKOFF_BASE_MS)
+    expect(spawnBackoffMs()).toBe(SPAWN_BACKOFF_BASE_MS)
+  })
+
+  it('EACH FAILURE DOUBLES THE WAIT, strictly rising', () => {
+    const ladder = [0, 1, 2, 3].map((failCount) => spawnBackoffMs({ failCount }))
+    expect(ladder).toEqual([10, 20, 40, 80].map((m) => m * 60_000))
+    for (let i = 1; i < ladder.length; i += 1) expect(ladder[i]).toBeGreaterThan(ladder[i - 1])
+  })
+
+  it('and stops at the cap rather than growing without bound', () => {
+    expect(spawnBackoffMs({ failCount: 40 })).toBe(SPAWN_BACKOFF_CAP_MS)
+    expect(SPAWN_BACKOFF_CAP_MS).toBeGreaterThan(SPAWN_BACKOFF_BASE_MS)
+  })
+
+  it('junk falls back to the floor, never to zero', () => {
+    for (const failCount of [-5, NaN, 'many', null, undefined]) {
+      expect(spawnBackoffMs({ failCount })).toBe(SPAWN_BACKOFF_BASE_MS)
+    }
   })
 })

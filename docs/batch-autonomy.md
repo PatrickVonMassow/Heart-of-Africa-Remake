@@ -243,17 +243,69 @@ Three changes, and none of them loosens the singleton:
      taken over at once by the ordinary dead-pid path, so the grace only ever
      costs an interactive window something.
 3. **A silent owner is reported, and a deepening silence escalates.** Past a
-   calibratable age (`WEDGE_NOTIFY_MS`, 90 minutes, `HOA_WEDGE_NOTIFY_MIN` to
-   tune) the launcher sends one `high` ntfy notification, and one `urgent` one
+   calibratable age (`WEDGE_NOTIFY_MS`, `HOA_WEDGE_NOTIFY_MIN` to tune) the
+   launcher sends one `high` ntfy notification, and one `urgent` one
    again when the same silence crosses `WEDGED_MS` — keyed on session + pid + the
    heartbeat it fell silent at + the stage, so the same stall is not repeated
    tick after tick, while a deeper or a later one is. One report and then
    permanent silence would repeat the incident's own shape, which was that nobody
-   looked. It neither spawns nor kills on age: a long verify run
-   legitimately starves the heartbeat. The pre-existing four-hour valve that
-   kills the launcher's OWN headless spawn is left standing (four-eyes review,
-   finding 5) — it can never catch a verify run, and an unattended `claude -p`
-   that hangs has nobody to read a notification.
+   looked.
+4. **AND THE VERDICT NOW HAS A CONSEQUENCE (point 433, 30.07.2026).** For one
+   night it did not, and the night was lost: at 21:50 both delegated agents died on
+   a server-side 500, the environment's permission classifier went down moments
+   later, and the owning session could not execute a single command. It had not
+   crashed — it stood. From 00:06 the launcher logged the identical line every
+   fifteen minutes — "WEDGED owner: pid alive but heartbeat 251 min old", then 266,
+   281, 296 … 371 — nine findings over two hours, no successor, no release, nothing.
+   A verdict without a consequence is a comment. Four changes, all in the launcher:
+   - **The threshold, measured.** `WEDGED_MS` was FOUR HOURS, longer than any
+     unattended stretch worth rescuing; it is now **45 minutes**, calibrated against
+     the only thing that legitimately starves the heartbeat — one long tool call,
+     since the heartbeat is a PostToolUse hook. Measured over this project's 43
+     transcripts (32 440 tool calls): p99 8.9 min, p99.9 10.0 min, fifteen calls
+     above 15 min; of the ten above 20 min, five were waits on the USER and three
+     were declared background waits, so the longest undeclared unattended call was
+     27.8 min. `WEDGE_NOTIFY_MS` is now DERIVED as one launcher tick below it, so
+     the ladder can never invert.
+   - **The launcher acts.** `wedgeTakeover` licenses taking the lock through the
+     SAME atomic acquire (`takeWedged`, re-verified inside the reap mutex, so two
+     launchers can never both act and an owner that came back to life in the race
+     window keeps its lock). Nothing is killed: the wedged process keeps running,
+     stops owning the batch, and learns it at its next hook when the guards stand it
+     down. The new lock records `takenFromWedged`, so the morning reader sees why.
+   - **The own-spawn condition is GONE.** `wedgeAction` could always kill and take
+     over — but only the launcher's OWN spawn, and that night's owner had been
+     started by hand, so the verdict fell through to a log line. A wedged owner is
+     now taken over whoever started it. The reap still needs the stronger
+     `work-stalled` finding; age alone may dispossess but never end a process.
+   - **Repetition is the signal.** `verdictRepeat` escalates once when the same
+     verdict has stood for two ticks and then stops printing it. What reads
+     identically nine times is not truer the tenth, only dearer.
+   What may NEVER trigger a take: an in-flight declaration merely growing old. A
+   declaration whose work still ADVANCES keeps the owner alive-and-not-wedged at any
+   age, and `LAUNCHER_WORK_MAX_AGE_MS` was written out as its own four-hour value
+   instead of borrowing `WEDGED_MS` precisely so the drop to 45 minutes could not
+   turn an expiry into a dispossession. A long verification is not shot in the back.
+5. **A spawn into a broken environment is not a rescue (point 433, the hole the
+   second model's review found — `docs/batch-resilience.md` §4).** Item 4 alone
+   would turn a silent night into a loud one: the successor wedges the same way, and
+   the runaway brake never caught it because `failCount` rose only when the spawn's
+   pid was GONE — a chain of alive-but-wedged successors burns tokens all night and
+   looks busy. Three answers:
+   - **A preflight before the spawn** (`judgeSpawnPreflight`): cheap, local probes —
+     git answers, the state directory is writable — and a refusal blocks the spawn,
+     raises `failCount` and notifies urgently. An INCONCLUSIVE probe never blocks:
+     the preflight must not become a new way for the batch to stand still. It cannot
+     see a permission service that refuses tool calls INSIDE a session, which is
+     exactly what failed that night — that is what the next item is for.
+   - **Living is not working** (`judgePreviousSpawn`): a spawn that neither converts
+     the lock nor produces a first commit within a calibratable window
+     (`SPAWN_PROVE_MS`, 20 min, `HOA_SPAWN_PROVE_MIN`) counts as a FAILURE even
+     though its process breathes. Three of those reach the runaway brake, which
+     pauses the batch and signals.
+   - **The backoff escalates** (`spawnBackoffMs`): the ten-minute debounce doubles
+     per recorded failure up to two hours, and falls back to the floor the moment a
+     spawn makes progress.
 
 ### What the first live run found (28.07.2026)
 
@@ -459,8 +511,8 @@ kill. Six ticks follows the same better-than-2x headroom rule.
 Three deliberate narrownesses, so none reads as an oversight.
 
 - **Only a CURRENT declaration may tighten the bound** — but "current" is measured
-  with the LAUNCHER's window, `LAUNCHER_WORK_MAX_AGE_MS` (= `WEDGED_MS`, four
-  hours), never with the Stop guard's `IN_FLIGHT_MAX_AGE_MS`. Past it a
+  with the LAUNCHER's window, `LAUNCHER_WORK_MAX_AGE_MS` (four hours), never with
+  the Stop guard's `IN_FLIGHT_MAX_AGE_MS`. Past it a
   declaration still proves progress but no longer licenses the stall verdict, and
   the pre-402 four-hour valve covers the rest exactly as before.
   **This is where the feature was dead code** (second four-eyes review,
@@ -475,7 +527,10 @@ Three deliberate narrownesses, so none reads as an oversight.
   an aged declaration must stop counting, while the launcher asks "is this the
   owner's LAST WORD?", where age is not the disqualifier — and widening the
   launcher's window reopens no idle-night hole, because `lastWord` already
-  excludes every session that worked after declaring. The window is `WEDGED_MS`
+  excludes every session that worked after declaring. The window is four hours —
+  written out rather than borrowed from `WEDGED_MS`, which point 433 dropped to 45
+  minutes; borrowed, it would have collapsed with it and turned a declaration's
+  EXPIRY into a dispossession —
   rather than the bare minimum that makes it non-empty (`WORK_STALL_MS +
   WORK_DECLARATION_TOLERANCE_MS`) because non-empty is not reachable: that value
   opens a band two minutes wide, and the launcher looks once per
@@ -523,9 +578,11 @@ probes from its own working directory, not from the one the declaration was
 written in. `normRef` keeps a string belt for what git will not resolve (`heads/…`
 and a `…@{0}` revision expression have no symbolic name), and `@` joins `main` and
 `HEAD` on the always-refused list.
-And past the hours-long `WEDGED_MS` threshold the launcher notifies REGARDLESS of
+And past the `WEDGED_MS` threshold the launcher notifies REGARDLESS of
 whether work is advancing (`silenceStage`), naming the evidence in the message —
-notify only, never a kill.
+notify only, never a kill. The TAKE is the stricter of the two: `wedgeTakeover`
+refuses while work advances, so live evidence still protects the owner's lock even
+where it no longer buys it silence.
 
 Pinned in `scripts/batch-singleton-core.test.mjs` (a silent heartbeat with a
 moving branch reads ALIVE, the same silence with every probe quiet reads WEDGED,

@@ -53,11 +53,32 @@ export const DEAD_CONFIRM_MS = 5 * 60 * 1000
 /** Legacy locks (no pid recorded) fall back to age-only liveness with this
  *  generous bound (the old STALE_MS). */
 export const LEGACY_STALE_MS = 45 * 60 * 1000
-/** An alive-pid owner whose heartbeat is older than this is flagged "wedged"
- *  (hung process). It still BLOCKS takeover — a wedged owner is signalled to
- *  the user, never silently replaced — but the launcher may kill a wedged
- *  process it spawned itself. */
-export const WEDGED_MS = 4 * 60 * 60 * 1000
+/** One tick of the HoA-Batch-Autostart scheduled task. */
+export const LAUNCHER_TICK_MS = 15 * 60 * 1000
+/**
+ * An alive-pid owner whose heartbeat is older than this is flagged "wedged"
+ * (hung process). Past it the launcher may TAKE the batch lock and start a
+ * successor (`wedgeTakeover`, point 433) — never a kill; the wedged process keeps
+ * running and simply stops owning the batch, learning it at its next hook.
+ *
+ * FORTY-FIVE MINUTES, MEASURED (point 433 (b), 30.07.2026). It was FOUR HOURS,
+ * and on the night of 30.07.2026 that read 221 minutes of a total standstill as
+ * "owner alive" and then logged the same wedge finding eight times over two hours
+ * without acting — longer than any unattended stretch in which a rescue is still
+ * worth something. The new value is calibrated against the real thing that starves
+ * the heartbeat (a single long tool call, since the heartbeat is a PostToolUse
+ * hook), measured over this project's own 43 transcripts — 32 440 tool calls:
+ *   p50 1 s · p99 8.9 min · p99.9 10.0 min · only 15 calls above 15 min.
+ * Of the ten calls above 20 min, five were waits on the USER (AskUserQuestion, a
+ * protected-path edit prompt) and three were declared background waits (a Monitor
+ * poll loop, a dev server); the longest undeclared, unattended call was 27.8 min.
+ * So 45 min is 4.5x the p99.9 and better than 1.6x the longest real one, while a
+ * legitimately long run is protected by its own evidence rather than by the clock:
+ * a declared, ADVANCING piece of work reads alive and never wedged at any age.
+ * It also lands exactly on `LEGACY_STALE_MS`, so 45 minutes of silence now costs
+ * the batch lock whether or not the lock records a pid.
+ */
+export const WEDGED_MS = 45 * 60 * 1000
 /** A pending-spawn lock (launcher claimed, claude -p still booting) older than
  *  this with a dead child pid is reapable. */
 export const PENDING_STALE_MS = 10 * 60 * 1000
@@ -70,11 +91,18 @@ export const PENDING_STALE_MS = 10 * 60 * 1000
  *  call, and a session that neither ends nor calls a tool for a quarter of an
  *  hour does not exist. */
 export const HANDOVER_GRACE_MS = 15 * 60 * 1000
-/** An ALIVE owner silent for longer than this is reported out of band (point
- *  388 (c)). Calibratable — the longest legitimate silence in this repository is
- *  the LARGE browser regression at roughly 30-40 minutes, so the default leaves
- *  better than 2x headroom. Override with HOA_WEDGE_NOTIFY_MIN (minutes). */
-export const WEDGE_NOTIFY_MS = 90 * 60 * 1000
+/**
+ * An ALIVE owner silent for longer than this is reported out of band (point
+ * 388 (c)). Override with HOA_WEDGE_NOTIFY_MIN (minutes).
+ *
+ * DERIVED, so the ladder can never invert again (point 433): exactly one launcher
+ * tick BELOW the wedge threshold, so the user hears about a deepening silence one
+ * tick before the launcher acts on it. It used to be 90 min against a four-hour
+ * wedge; with the wedge at 45 min a hard 90 would have sat ABOVE it and made the
+ * first stage unreachable — `wedgeStage` returns 'wedged' as soon as both are
+ * passed.
+ */
+export const WEDGE_NOTIFY_MS = WEDGED_MS - LAUNCHER_TICK_MS
 /** Tool activity younger than this counts a session as "live" for the
  *  parallel-session detector. */
 export const PARALLEL_FRESH_MS = 10 * 60 * 1000
@@ -84,8 +112,6 @@ export const REAP_MUTEX_STALE_MS = 60 * 1000
 /** Start times within this tolerance count as the same process (pid reuse
  *  detection). */
 export const PID_START_TOLERANCE_MS = 2000
-/** One tick of the HoA-Batch-Autostart scheduled task. */
-export const LAUNCHER_TICK_MS = 15 * 60 * 1000
 /** How many launcher ticks of COMPLETE silence — no tool call from the owner AND
  *  no declared work advancing — before the owner counts as stalled (point 402
  *  (d)). Expressed as the silence it spans rather than as a persisted counter, so
@@ -97,7 +123,12 @@ export const LAUNCHER_TICK_MS = 15 * 60 * 1000
  *  at roughly 30-40 minutes — the number `WEDGE_NOTIFY_MS` two entries up is
  *  calibrated against. A 30-minute stall bound therefore sat BELOW the silence
  *  this repository documents as normal, and the verdict it fed can end in a kill.
- *  Six ticks = 90 minutes follows the same better-than-2x headroom rule. */
+ *  Six ticks = 90 minutes follows the same better-than-2x headroom rule.
+ *
+ *  IT NOW SITS ABOVE `WEDGED_MS`, and that is the intended order (point 433): the
+ *  45-minute wedge licenses only a non-destructive TAKE of the lock — the process
+ *  keeps running — while this bound licenses REAPING the launcher's own spawn. The
+ *  ladder is monotone in severity, so the destructive verdict is the slower one. */
 export const WORK_STALL_TICKS = 6
 export const WORK_STALL_MS = WORK_STALL_TICKS * LAUNCHER_TICK_MS
 /** How much later than a declaration its own heartbeat may land and still leave
@@ -309,8 +340,9 @@ export function assessOwner(
     // one piece of the work it declared, and the declaration is the last thing
     // the owner did. A healthy agent — however slow — advances something, so this
     // needs the work to be genuinely frozen. Still ALIVE (the process exists; the
-    // launcher signals and may only reap a spawn of its own making), but wedged
-    // NOW rather than in four hours.
+    // launcher signals and may only reap a spawn of its own making), and wedged
+    // with the STRONGER reason: `work-stalled` is the only verdict that licenses a
+    // reap, while the plain `pid-alive` wedge below licenses the lock take alone.
     return { alive: true, wedged: true, reason: 'work-stalled' }
   }
   return { alive: true, wedged: age > WEDGED_MS, reason: 'pid-alive' }
@@ -460,26 +492,91 @@ export function silenceStage({ ageMs, advancing = false, notifyMs = WEDGE_NOTIFY
  *     legitimate run. It keeps its pre-402 consequence exactly: reap only the
  *     launcher's own headless spawn, and let the next tick take over.
  *
- * The one rule that binds both: the launcher only ever kills a process it spawned
- * itself — judged by `isOwnSpawn`, i.e. pid AND start time, never the pid alone.
- * An interactive window is never killed — the guards make a rogue one stand down
- * and the user is told instead.
+ * THE `isOwnSpawn` CONDITION IS GONE (point 433, second model's review of
+ * docs/batch-resilience.md §3 layer 2). It was the reason the night of 30.07.2026
+ * was lost: the owner had been started BY HAND, so `own` was false, and the whole
+ * verdict fell through to a log line printed nine times. A wedged owner is taken
+ * over whoever started it — the authority already existed, it was merely too narrow.
+ * `own` is still REPORTED, because the message should say which kind of process is
+ * being reaped, and the reap still needs the strong `work-stalled` finding: age
+ * alone may take the lock (`wedgeTakeover`) but never end a process.
  *
  * Returns { stalled, own, notify, kill, takeover }.
  */
 export function wedgeAction({ assessment, lock, lastSpawnPid, lastSpawnAt, probe } = {}) {
   const stalled = assessment?.reason === 'work-stalled'
   const own = isOwnSpawn({ pid: lock?.pid, probe, lastSpawnPid, lastSpawnAt })
+  const reapable = typeof lock?.pid === 'number' && lock.pid > 0
   return {
     stalled,
     own,
     notify: stalled ? 'urgent' : null,
-    kill: own,
+    // Only the POSITIVE stall finding ends a process — the plain clock verdict may
+    // dispossess but never kill.
+    kill: stalled && reapable,
     // Taking the lock beside a process that is still running is the incident this
-    // module exists to prevent, so a takeover needs BOTH a positive stall finding
-    // and a process the launcher may reap — and, at the call site, a confirmed exit.
-    takeover: stalled && own,
+    // module exists to prevent, so the call site still waits for a CONFIRMED exit
+    // before it takes over on the back of a kill.
+    takeover: stalled && reapable,
   }
+}
+
+/**
+ * MAY THE LAUNCHER TAKE THE BATCH FROM A WEDGED OWNER (point 433 (a))? PURE.
+ *
+ * A verdict without a consequence is a comment. On the night of 30.07.2026 the
+ * launcher logged "WEDGED owner: pid alive but heartbeat 251 min old" and then the
+ * same line at 266, 281, 296, 311, 326, 341, 356 and 371 minutes — eight findings
+ * over two hours, no successor, no release, nothing. The place that can conclude
+ * "wedged" must also be allowed to act.
+ *
+ * The action is deliberately the MILD one: take the lock and let the successor
+ * start. The wedged process is NOT killed — it keeps running and merely stops
+ * owning the batch, which it learns at its next hook when every ownership-gated
+ * guard stands it down. Killing stays what it was: only the launcher's own spawn,
+ * only on the stronger `work-stalled` finding (`wedgeAction`).
+ *
+ * WHAT MAY NEVER TRIGGER IT: an in-flight declaration merely growing old. A long
+ * verification must not be shot in the back, so the take needs the POSITIVE
+ * evidence of heartbeat silence past `WEDGED_MS` — an aged declaration on a
+ * session whose heartbeat is fresh yields nothing, and a declaration whose work is
+ * still ADVANCING keeps the owner alive-and-not-wedged at any age (`assessOwner`).
+ *
+ * Returns { take, reason }.
+ */
+export function wedgeTakeover({ assessment, lock, work = null } = {}) {
+  if (!lock || typeof lock.sessionId !== 'string' || !lock.sessionId) {
+    return { take: false, reason: 'no-owner' }
+  }
+  // A dead owner is not this path's business — the ordinary spawn decision already
+  // frees that lock, and saying "take" here would only duplicate it.
+  if (assessment?.alive !== true) return { take: false, reason: 'not-alive' }
+  if (assessment?.wedged !== true) return { take: false, reason: 'below-threshold' }
+  if (work?.advancing === true) return { take: false, reason: 'work-advancing' }
+  return { take: true, reason: assessment.reason ?? 'wedged' }
+}
+
+/** After how many IDENTICAL consecutive verdicts the repetition itself is the
+ *  signal (point 433 (c)). Two, i.e. the second identical tick — 30 minutes at the
+ *  launcher's cadence — because eight identical lines is what the incident cost. */
+export const VERDICT_REPEAT_ESCALATE_AT = 2
+
+/**
+ * REPETITION IS THE SIGNAL (point 433 (c)). PURE.
+ *
+ * What reads identically eight times is not truer the ninth, only dearer. Given
+ * the verdict's key, the key last seen and how often it had repeated, this decides
+ * whether to escalate (exactly once, at the Nth identical reading) and whether the
+ * plain line may still be logged.
+ *
+ * Returns { key, repeats, escalate, suppressLog }.
+ */
+export function verdictRepeat({ key, lastKey, repeats = 0, escalateAt = VERDICT_REPEAT_ESCALATE_AT } = {}) {
+  const k = typeof key === 'string' ? key : ''
+  if (!k) return { key: '', repeats: 0, escalate: false, suppressLog: false }
+  if (k !== lastKey) return { key: k, repeats: 1, escalate: false, suppressLog: false }
+  const n = (Number.isFinite(repeats) && repeats > 0 ? repeats : 0) + 1
+  return { key: k, repeats: n, escalate: n === escalateAt, suppressLog: n > escalateAt }
 }
 
 /**
@@ -844,6 +941,14 @@ function exitReapMutex(mutexPath) {
  *   - 'held'      — a (provably or possibly) live other owner exists. STAND DOWN.
  *   - 'lost-race' — a concurrent starter won. STAND DOWN.
  * Options: { kind, pid, pidStartedAt, now, deps } — deps override probes for tests.
+ *
+ * `takeWedged` (point 433) widens 'held' by exactly one case: an owner that is
+ * alive but WEDGED may be dispossessed. Only the launcher passes it, and only after
+ * `wedgeTakeover` said so. It changes nothing about the atomicity — the take runs
+ * through the SAME reap mutex and re-verifies the wedge INSIDE it, so two launchers
+ * can never both act and a lock that came back to life in the race window is left
+ * alone. Nothing is killed; the dispossessed process keeps running and stands down
+ * at its next hook.
  */
 export function acquire(sessionId, opts = {}) {
   if (!sessionId) return 'held'
@@ -893,7 +998,7 @@ export function acquire(sessionId, opts = {}) {
   if (lock) {
     const probe = lock.pid ? deps.probePid(lock.pid) : null
     const a = assessOwner(lock, { now, bootTime: deps.bootTime, probe })
-    if (a.alive) return 'held'
+    if (a.alive && !(opts.takeWedged === true && a.wedged === true)) return 'held'
   } else {
     // Unreadable/corrupt lock file: reap only if it has settled (not mid-write).
     try {
@@ -908,7 +1013,10 @@ export function acquire(sessionId, opts = {}) {
 
   // Dead owner → takeover under the reap mutex (atomic mkdir): only ONE
   // process at a time may unlink+recreate, and it re-verifies deadness inside
-  // the mutex so it can never clobber a freshly re-claimed live lock.
+  // the mutex so it can never clobber a freshly re-claimed live lock. With
+  // `takeWedged` a WEDGED owner counts the same way — and is re-verified as wedged
+  // inside the mutex, so a lock whose owner wrote a heartbeat in the race window
+  // keeps it.
   if (!enterReapMutex(mutexPath)) return 'held'
   try {
     const recheck = readOwnerLock(lockPath)
@@ -919,7 +1027,7 @@ export function acquire(sessionId, opts = {}) {
       }
       const probe = recheck.pid ? deps.probePid(recheck.pid) : null
       const a = assessOwner(recheck, { now, bootTime: deps.bootTime, probe })
-      if (a.alive) return 'held'
+      if (a.alive && !(opts.takeWedged === true && a.wedged === true)) return 'held'
     }
     try {
       rmSync(lockPath, { force: true })
