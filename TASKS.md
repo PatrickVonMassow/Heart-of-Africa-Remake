@@ -1371,7 +1371,21 @@ it is appended.
   · the SPHINX MODEL (point 315) — same file, same monument. Whichever lands second
     rebases on the first; do not build the new Sphinx twice at two sizes.
   · the COLLIDERS must follow the drawn masses, not the old ones (point 378's rule: the
-    collider is derived from the placement the renderer draws).
+    collider is derived from the placement the renderer draws). This is a REPORTED bug the
+    user ruled belongs here rather than in a point of its own (dump
+    `hoa-state-2026-07-29-4196407680`, Giza, WebGPU, medium: the traveller walks into the
+    pyramid). Root cause, already measured — do not re-analyse: `gizaColliders`
+    (`src/scenes/place/gizaSite.ts`) uses only the cone footprint
+    (`pyramidFootprint` = base/√2), while the DRAWN masses reach further —
+    Khafre's bedrock plinth to 1.14·base and Menkaure's granite skirt to 1.02·base
+    (`gizaSitePyramidParts` in `src/render/landmarks.ts`).
+  · the PLACE MAP inside Giza is EMPTY (second dump, same seed, `mapOpen: true`,
+    `mode: place (giza)`), and it is fixed here. Measured cause: `MapOverlay`'s `PlacePlan`
+    (`src/ui/MapOverlay.tsx`) draws the layout's buildings, dwellings and lanes, but
+    `buildGizaLayout` leaves `interactives`/`dwellings`/`paths`/`rocks` empty — the
+    monuments exist ONLY as colliders, which the plan does not read. Fix it GENERICALLY
+    over `layout.colliders`, so a future monument-like place inherits a drawn plan instead
+    of the same blank sheet, with a Vitest case that the Giza plan is non-empty.
   · the BACKDROP and panorama (points 181/381) — a taller monument may now rise past the
     ground line the silhouettes stand on; the seam checks in
     `src/scenes/place/backdrop.test.ts` must still hold.
