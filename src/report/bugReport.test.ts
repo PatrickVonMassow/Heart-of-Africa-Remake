@@ -165,6 +165,26 @@ describe('describeReport (the .txt that must stand on its own)', () => {
     expect(text).toContain('div.map-label.italic')
   })
 
+  // The wildlife section is the evidence a wildlife report stands on (point
+  // 454) — the file that orients the reader must NAME it, in both languages,
+  // together with what it holds and what bounds it.
+  it('names the JSON wildlife section with its sizes and its bounds', () => {
+    const counts = { radius: 120, cap: 80, animals: 17, carcasses: 2, flocks: 1 }
+    const text = describeReport(input({ wildlife: counts }))
+    expect(text).toContain('hoa-state-2026-07-27-4711.json → "wildlife"')
+    expect(text).toContain(en.stateDump.report.wildlifeNote)
+    expect(text).toContain('(17 animals, 2 carcasses, 1 flocks within 120, cap 80)')
+    const german = describeReport(input({ texts: de.stateDump.report, wildlife: counts }))
+    expect(german).toContain(de.stateDump.report.wildlifeNote)
+    expect(german).not.toContain(en.stateDump.report.wildlifeNote)
+  })
+
+  it('still names the section when no counts were handed over', () => {
+    const text = describeReport(input({ wildlife: null }))
+    expect(text).toContain(en.stateDump.report.wildlifeNote)
+    expect(text).not.toContain(' animals, ')
+  })
+
   it('omits the duplicate section when no label is doubled', () => {
     const text = describeReport(input({ overlay: [overlay[2]] }))
     expect(text).not.toContain(en.stateDump.report.duplicateNote)

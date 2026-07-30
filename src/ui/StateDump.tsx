@@ -13,7 +13,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useGame } from '../state/store'
 import { useUi } from '../state/ui'
-import { dumpFilename, dumpGameState, dumpSummary, type DumpEnvironment } from '../state/stateDump'
+import {
+  dumpFilename,
+  dumpGameState,
+  dumpSummary,
+  wildlifeReportCounts,
+  type DumpEnvironment,
+} from '../state/stateDump'
 import { getStrings, useLocale, useStrings } from '../i18n'
 import { captureRenderedFrame } from '../render/frameCapture'
 import { describeBackend } from '../render/backendInfo'
@@ -109,6 +115,9 @@ export function StateDump() {
       png: dataUrlToBytes(capture.current),
       overlay: overlay.current,
       summary: dumpSummary(game, useUi.getState().detailLevel),
+      // Read back from the very JSON that goes into the archive, so the
+      // description can never name other counts than the file holds.
+      wildlife: wildlifeReportCounts(json),
       env: environment,
       texts: s.stateDump.report,
     })
