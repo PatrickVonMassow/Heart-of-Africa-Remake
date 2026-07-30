@@ -34,7 +34,7 @@ export const RECORDS_PATH = repoPath('.claude/mechanism-reviews.jsonl')
 // waiting to happen, and this runs on Windows (four-eyes review, 27.07.2026).
 const FLD = '__F__'
 
-const git = (cmd) => execSync(`git ${cmd}`, { cwd: REPO_ROOT, encoding: 'utf8' }).trim()
+const git = (cmd) => execSync(`git ${cmd}`, { windowsHide: true, cwd: REPO_ROOT, encoding: 'utf8' }).trim()
 
 /** Every recorded review. A malformed line is skipped, never fatal — the ledger
  *  outlives the code that writes it, and one bad line must not blind the gate. */

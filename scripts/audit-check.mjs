@@ -19,7 +19,7 @@ const ALLOW = new Map([
 
 let json
 try {
-  const out = execSync('npm audit --json', { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 })
+  const out = execSync('npm audit --json', { windowsHide: true, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 })
   json = JSON.parse(out)
 } catch (e) {
   // npm audit exits non-zero when vulnerabilities exist; the JSON is still stdout.

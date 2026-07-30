@@ -1525,7 +1525,7 @@ describe('scenario 1: two racing starters → exactly one wins (real processes)'
             execFile(
               process.execPath,
               [worker, lockPath, sid, ...(deadPid ? [String(deadPid)] : [])],
-              { timeout: 30000 },
+              { windowsHide: true, timeout: 30000 },
               (err, stdout) => (err ? rej(err) : res(stdout.trim())),
             )
           }),

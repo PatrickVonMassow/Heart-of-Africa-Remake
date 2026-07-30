@@ -458,7 +458,7 @@ describe('the load probe contract the wrapper depends on', () => {
         [resolve(REPO_ROOT, 'scripts/verify/machine-load.mjs'), '--json'],
         // Forced, so this pins the SHAPE in a fixed moment rather than measuring
         // the machine — the documented wiring self-test of point 296.
-        { cwd: REPO_ROOT, encoding: 'utf8', env: { ...process.env, VERIFY_LOAD_FORCE: 'busy' }, timeout: 30000 },
+        { windowsHide: true, cwd: REPO_ROOT, encoding: 'utf8', env: { ...process.env, VERIFY_LOAD_FORCE: 'busy' }, timeout: 30000 },
         // A NON-ZERO exit is expected here: the probe exits 2 on a machine that
         // is not quiet. The wrapper reads its stdout, not its status, and this
         // test pins exactly that.

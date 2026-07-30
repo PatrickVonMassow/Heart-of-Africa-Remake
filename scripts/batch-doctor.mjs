@@ -45,6 +45,7 @@ const log = (m) => {
 
 const git = (args, opts = {}) =>
   execFileSync('git', args, {
+    windowsHide: true,
     cwd: REPO,
     encoding: 'utf8',
     timeout: opts.timeout ?? 30000,
@@ -203,7 +204,7 @@ if (gate) {
     let failed = false
     try {
       log(`gate: running ${cmd} …`)
-      execSync(cmd, { cwd: REPO, stdio: 'pipe', timeout: 15 * 60 * 1000 })
+      execSync(cmd, { windowsHide: true, cwd: REPO, stdio: 'pipe', timeout: 15 * 60 * 1000 })
       log(`gate: ${cmd} PASSED`)
     } catch {
       failed = true

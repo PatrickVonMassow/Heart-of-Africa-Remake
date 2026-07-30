@@ -82,7 +82,7 @@ export function parseWrapperArgs(argv) {
 }
 
 function git(args, cwd = ROOT) {
-  const res = spawnSync('git', args, { cwd, encoding: 'utf8' })
+  const res = spawnSync('git', args, { windowsHide: true, cwd, encoding: 'utf8' })
   if (res.status !== 0) return null
   return (res.stdout ?? '').trim()
 }
@@ -121,7 +121,7 @@ function prepareBaselineTree(sha) {
     // run, so say what to do rather than destroy somebody else's tree.
     throw new Error(`${dir} exists but is not a checkout — another classification may be preparing it; retry, or remove it by hand`)
   }
-  const res = spawnSync('git', ['worktree', 'add', '--detach', dir, sha], { cwd: mainRoot, encoding: 'utf8' })
+  const res = spawnSync('git', ['worktree', 'add', '--detach', dir, sha], { windowsHide: true, cwd: mainRoot, encoding: 'utf8' })
   if (res.status !== 0) throw new Error(`git worktree add failed: ${(res.stderr ?? '').trim()}`)
   console.log(`# baseline checkout ${dir}`)
   return { dir, base, mainRoot }
@@ -142,15 +142,16 @@ function pruneOldBaselines({ base, mainRoot, keepDir }) {
   entries.sort((a, b) => b.t - a.t)
   for (const e of entries.slice(KEEP_BASELINES)) {
     if (e.dir === keepDir || Date.now() - e.t < PRUNE_MIN_AGE_MS) continue
-    spawnSync('git', ['worktree', 'remove', '--force', e.dir], { cwd: mainRoot, encoding: 'utf8' })
+    spawnSync('git', ['worktree', 'remove', '--force', e.dir], { windowsHide: true, cwd: mainRoot, encoding: 'utf8' })
     if (existsSync(e.dir)) rmSync(e.dir, { recursive: true, force: true })
   }
-  spawnSync('git', ['worktree', 'prune'], { cwd: mainRoot, encoding: 'utf8' })
+  spawnSync('git', ['worktree', 'prune'], { windowsHide: true, cwd: mainRoot, encoding: 'utf8' })
 }
 
 function runSuiteOnce({ suitePath, cwd, baseUrl, label }) {
   console.log(`# ${label}`)
   const res = spawnSync(process.execPath, [suitePath], {
+    windowsHide: true,
     cwd,
     encoding: 'utf8',
     env: baseUrl ? { ...process.env, BASE_URL: baseUrl } : process.env,

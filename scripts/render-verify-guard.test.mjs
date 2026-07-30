@@ -142,7 +142,7 @@ describe('the Stop hook re-baselines on that error and only that one', () => {
 // an unquoted `^`, so every existing baseline read as "gone").
 describe('commitMissing runs a real git probe (no injection)', () => {
   it('says PRESENT for the current HEAD and GONE for a sha that does not exist', () => {
-    const head = execSync('git rev-parse HEAD', { encoding: 'utf8' }).trim()
+    const head = execSync('git rev-parse HEAD', { windowsHide: true, encoding: 'utf8' }).trim()
     expect(commitMissing(head)).toBe(false)
     expect(commitMissing('0'.repeat(40))).toBe(true)
   })

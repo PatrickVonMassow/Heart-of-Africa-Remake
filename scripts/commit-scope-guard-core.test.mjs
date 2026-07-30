@@ -249,7 +249,7 @@ describe('the commit-msg hook', () => {
     try {
       const file = resolve(dir, 'COMMIT_EDITMSG')
       writeFileSync(file, message, 'utf8')
-      return spawnSync(process.execPath, [GUARD, '--message', file], { encoding: 'utf8' })
+      return spawnSync(process.execPath, [GUARD, '--message', file], { windowsHide: true, encoding: 'utf8' })
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }
@@ -267,6 +267,7 @@ describe('the commit-msg hook', () => {
   it('lets an ordinary message through, and never blocks on an unreadable file', () => {
     expect(judge('Hold the freed lock for the window it was freed for\n').status).toBe(0)
     const missing = spawnSync(process.execPath, [GUARD, '--message', resolve(tmpdir(), 'no-such-msg')], {
+      windowsHide: true,
       encoding: 'utf8',
     })
     expect(missing.status).toBe(0)

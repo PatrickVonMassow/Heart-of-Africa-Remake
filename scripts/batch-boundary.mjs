@@ -76,7 +76,7 @@ export function probeLauncherState({ taskName = LAUNCHER_TASK_NAME } = {}) {
         '-Command',
         `(Get-ScheduledTask -TaskName '${taskName}' -ErrorAction Stop).State`,
       ],
-      { encoding: 'utf8', timeout: 15000, stdio: ['ignore', 'pipe', 'ignore'] },
+      { windowsHide: true, encoding: 'utf8', timeout: 15000, stdio: ['ignore', 'pipe', 'ignore'] },
     ).trim()
     return classifyLauncherState(out)
   } catch {
@@ -96,7 +96,7 @@ export function probeLauncherState({ taskName = LAUNCHER_TASK_NAME } = {}) {
  */
 export function lastWorkOrderTick({ cwd = repoPath('.'), refs = ['main'] } = {}) {
   const git = (args) =>
-    execFileSync('git', args, { cwd, encoding: 'utf8', timeout: 8000, stdio: ['ignore', 'pipe', 'ignore'] }).trim()
+    execFileSync('git', args, { windowsHide: true, cwd, encoding: 'utf8', timeout: 8000, stdio: ['ignore', 'pipe', 'ignore'] }).trim()
   const paths = ['--', 'TASKS.md', 'docs/tasks-archive.md']
   for (const ref of refs) {
     try {
@@ -150,7 +150,7 @@ export function lastWorkOrderTickSince({
   now = Date.now(),
   maxCandidates = TICK_SCAN_MAX,
   git = (args) =>
-    execFileSync('git', args, { cwd, encoding: 'utf8', timeout: 8000, stdio: ['ignore', 'pipe', 'ignore'] }).trim(),
+    execFileSync('git', args, { windowsHide: true, cwd, encoding: 'utf8', timeout: 8000, stdio: ['ignore', 'pipe', 'ignore'] }).trim(),
 } = {}) {
   const paths = ['--', 'TASKS.md', 'docs/tasks-archive.md']
   const since = new Date(now - windowMs).toISOString()
@@ -190,6 +190,7 @@ export function closureOf(point, { cwd = repoPath('.') } = {}) {
   try {
     const show = (path) =>
       execFileSync('git', ['show', `main:${path}`], {
+        windowsHide: true,
         cwd,
         encoding: 'utf8',
         timeout: 8000,

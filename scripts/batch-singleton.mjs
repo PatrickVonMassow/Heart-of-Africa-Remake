@@ -795,7 +795,7 @@ export function processStartTime(pid) {
     const out = execFileSync(
       'powershell',
       ['-NoProfile', '-Command', `(Get-Process -Id ${Number(pid)}).StartTime.ToFileTimeUtc()`],
-      { encoding: 'utf8', timeout: 10000, stdio: ['ignore', 'pipe', 'ignore'] },
+      { windowsHide: true, encoding: 'utf8', timeout: 10000, stdio: ['ignore', 'pipe', 'ignore'] },
     ).trim()
     const ft = Number(out)
     if (!Number.isFinite(ft) || ft <= 0) return null
@@ -833,6 +833,7 @@ export function findClaudeAncestor() {
       `if($p.Name -match 'claude'){Write-Output ("$($p.ProcessId)|$($p.CreationDate.ToFileTimeUtc())");break};` +
       `$id=$p.ParentProcessId}`
     const out = execFileSync('powershell', ['-NoProfile', '-Command', script], {
+      windowsHide: true,
       encoding: 'utf8',
       timeout: 15000,
       stdio: ['ignore', 'pipe', 'ignore'],

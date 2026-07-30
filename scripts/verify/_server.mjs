@@ -39,7 +39,7 @@ export function waitForServer(url, timeoutMs) {
 
 export function killTree(child) {
   if (!child || child.killed) return
-  if (isWin) spawnSync('taskkill', ['/pid', String(child.pid), '/T', '/F'], { stdio: 'ignore' })
+  if (isWin) spawnSync('taskkill', ['/pid', String(child.pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' })
   else process.kill(-child.pid, 'SIGTERM')
 }
 
@@ -57,7 +57,7 @@ export async function launchServer(npmScript, label, cwd) {
     const port = await getFreePort()
     const base = `http://localhost:${port}/`
     console.log(`# starting ${label} server (:${port})…`)
-    const child = spawn(`${npmScript} -- --port ${port} --strictPort`, { cwd, shell: true, detached: !isWin, stdio: 'ignore' })
+    const child = spawn(`${npmScript} -- --port ${port} --strictPort`, { windowsHide: true, cwd, shell: true, detached: !isWin, stdio: 'ignore' })
     try {
       await waitForServer(base, 60000)
       return { child, base }

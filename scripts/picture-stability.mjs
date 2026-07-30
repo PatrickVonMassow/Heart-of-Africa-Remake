@@ -37,7 +37,7 @@ if (!suite || suite === '--help' || suite === '-h') {
   process.exit(suite ? 0 : 1)
 }
 
-const git = (...a) => execFileSync('git', a, { cwd: ROOT, encoding: 'utf8' })
+const git = (...a) => execFileSync('git', a, { windowsHide: true, cwd: ROOT, encoding: 'utf8' })
 
 if (git('status', '--porcelain', 'verification/').trim() !== '') {
   console.error(
@@ -51,6 +51,7 @@ if (git('status', '--porcelain', 'verification/').trim() !== '') {
 /** Frames the suite rewrote, by mtime against a mark taken before the run. */
 function runSuiteAndCollect(mark, into) {
   const r = spawnSync(process.execPath, [join(ROOT, 'scripts', 'verify', 'run-all.mjs'), suite], {
+    windowsHide: true,
     cwd: ROOT,
     stdio: 'inherit',
     env: process.env,

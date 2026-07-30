@@ -90,6 +90,7 @@ export function refTipAt(ref, { cwd = REPO_ROOT } = {}) {
   if (!name || /[\s~^:?*[\]\\]/.test(name)) return null
   try {
     const out = execFileSync('git', ['log', '-1', '--format=%ct', `${name}^{commit}`], {
+      windowsHide: true,
       cwd,
       encoding: 'utf8',
       timeout: 8000,
@@ -168,6 +169,7 @@ export function resolveRefName(ref, { cwd = REPO_ROOT } = {}) {
   if (!name || name.startsWith('-') || /[\s~^:?*[\]\\]/.test(name)) return null
   try {
     const out = execFileSync('git', ['rev-parse', '--symbolic-full-name', name], {
+      windowsHide: true,
       cwd,
       encoding: 'utf8',
       timeout: 8000,
@@ -192,6 +194,7 @@ export function absPath(value) {
 export function currentBranchOf({ cwd = REPO_ROOT } = {}) {
   try {
     const out = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {
+      windowsHide: true,
       cwd,
       encoding: 'utf8',
       timeout: 8000,
@@ -228,6 +231,7 @@ const PAUSE_PATH = resolve(REPO_ROOT, '.claude', 'batch-paused')
 export function worktreeBranch(path, { cwd = REPO_ROOT } = {}) {
   try {
     const ref = execFileSync('git', ['-C', String(path), 'symbolic-ref', '--quiet', 'HEAD'], {
+      windowsHide: true,
       cwd,
       encoding: 'utf8',
       timeout: 15000,
@@ -257,6 +261,7 @@ export function runningBranchFiles(evidence = [], { cwd = REPO_ROOT } = {}) {
   for (const ref of refs) {
     try {
       const out = execFileSync('git', ['diff', '--name-only', `main...${ref}`], {
+        windowsHide: true,
         cwd,
         encoding: 'utf8',
         timeout: 15000,

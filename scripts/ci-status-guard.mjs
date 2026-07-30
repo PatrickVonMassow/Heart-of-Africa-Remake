@@ -37,6 +37,7 @@ const TOKEN_PATHS = [
 
 function git(args) {
   return execFileSync('git', args, {
+    windowsHide: true,
     cwd: REPO_ROOT,
     encoding: 'utf8',
     timeout: 5000,

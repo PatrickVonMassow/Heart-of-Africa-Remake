@@ -137,6 +137,34 @@ from advisory claim-and-check to a HARD mutual exclusion in
 - **Trust self-heals.** A headless `claude -p` in an untrusted workspace ignores
   the allow-list (a permission prompt would hang the unattended run). The launcher
   sets `hasTrustDialogAccepted` for the repo in `~/.claude.json` before spawning.
+- **NOTHING MAY OPEN A CONSOLE WINDOW (point 401, user report 28.07.2026: "es
+  poppen immer wieder Konsolenfenster auf, die mir den Fokus stehlen").** On Windows
+  a child console process gets a NEW console window unless `CREATE_NO_WINDOW` is
+  set, which in Node is `windowsHide: true`. Only 7 script files set it; every member
+  of the Stop chain that shells out to git did not — and the Stop chain runs at EVERY
+  turn end with several git calls per guard, so a turn ended in dozens of window
+  flashes. Two causes, both measured:
+  - **Cause 1, fixed:** every child-process call under `scripts/` now sets the flag.
+    It is behaviour-neutral — it suppresses a window, not output. Because the fix is
+    mechanical, only a gate keeps it: `scripts/window-hide-core.mjs` audits the whole
+    script tree (comments and string bodies MASKED, so prose that mentions `spawn`
+    cannot match) and `scripts/window-hide-core.test.mjs` FAILS the unit layer on any
+    call without the flag — the same shape as the quality-preset completeness gate,
+    so a newly added `execFileSync` is caught at once. Its `ALLOW` map holds the
+    documented exceptions, each with a written reason, and a stale entry is itself a
+    failure: an `awaiting` entry is a debt, and deleting it is how the debt is proven
+    paid. Verified as a negative control against the pre-401 tree: 70 offenders
+    before, none after.
+  - **Cause 2, ATTENDED and still open:** the `HoA-Batch-Autostart` task runs
+    `node.exe` directly with LogonType `Interactive`, so Task Scheduler opens a
+    visible console every 15 minutes — ~96 windows a day on its own. The session it
+    spawns does not need that console (the spawn already passes `detached: true`,
+    `stdio` to a log file and `windowsHide: true`), so the task action must stop being
+    a bare `node.exe`: either a hidden-launch wrapper, or the task set to run without
+    a visible window. That touches the USER'S machine, not the repository, so it needs
+    the user's go for the specific change — and the task's re-enabled state (user
+    27.07.2026) must survive it. Until then the 15-minute flash remains, and it is the
+    only one left.
 
 ## The point boundary — ending a session is now part of the design (27.07.2026)
 

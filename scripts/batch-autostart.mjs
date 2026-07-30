@@ -104,7 +104,7 @@ const readJson = (p) => { try { return JSON.parse(readFileSync(p, 'utf8')) } cat
 const writeJsonAtomic = (p, obj) => {
   try { const t = `${p}.tmp`; writeFileSync(t, JSON.stringify(obj, null, 2)); renameSync(t, p) } catch { /* ignore */ }
 }
-const head = () => { try { return execSync('git rev-parse HEAD', { cwd: REPO, encoding: 'utf8' }).trim() } catch { return '' } }
+const head = () => { try { return execSync('git rev-parse HEAD', { windowsHide: true, cwd: REPO, encoding: 'utf8' }).trim() } catch { return '' } }
 const pidAlive = (pid) => { try { process.kill(pid, 0); return true } catch (e) { return e && e.code === 'EPERM' } }
 // Synchronous, because this launcher is a straight-line script: a reaped process
 // takes a moment to disappear, and a takeover may only proceed once it HAS.
@@ -308,6 +308,7 @@ if (existsSync(C('batch-paused'))) { log('skip: batch is user-paused'); bail() }
 // is bringing the batch back and a board check may never be a reason it does not.
 try {
   const out = execFileSync(process.execPath, [R('board-watchdog.mjs'), '--last-key', state.boardWatchKey ?? ''], {
+    windowsHide: true,
     cwd: REPO,
     encoding: 'utf8',
     timeout: 60000,

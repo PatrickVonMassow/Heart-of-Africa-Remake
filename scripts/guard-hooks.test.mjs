@@ -29,7 +29,7 @@ const SESSION = 'hook-test-session'
 let repo
 
 const node = (args, opts = {}) =>
-  spawnSync(process.execPath, args, { encoding: 'utf8', cwd: repo, maxBuffer: 64 * 1024 * 1024, ...opts })
+  spawnSync(process.execPath, args, { windowsHide: true, encoding: 'utf8', cwd: repo, maxBuffer: 64 * 1024 * 1024, ...opts })
 
 /** `node <repo>/scripts/<name>` with a Stop-hook payload on stdin. */
 function runHook(name, { args = [], session = SESSION, env } = {}) {
@@ -62,6 +62,7 @@ const write = (rel, text) => {
 
 const git = (...args) =>
   spawnSync('git', ['-c', 'core.hooksPath=', '-c', 'commit.gpgsign=false', ...args], {
+    windowsHide: true,
     cwd: repo,
     encoding: 'utf8',
   })
@@ -431,6 +432,7 @@ describe('render-verify-guard', () => {
       writeFileSync(statePath, before)
 
       const r = spawnSync(process.execPath, [resolve(broken, 'scripts', 'render-verify-guard.mjs')], {
+        windowsHide: true,
         input: JSON.stringify({ session_id: SESSION, hook_event_name: 'Stop' }),
         encoding: 'utf8',
         cwd: broken,

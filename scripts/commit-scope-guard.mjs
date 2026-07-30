@@ -22,7 +22,7 @@ import {
   formatMessageVerdict,
 } from './commit-scope-guard-core.mjs'
 
-const git = (args) => execFileSync('git', args, { encoding: 'utf8' })
+const git = (args) => execFileSync('git', args, { windowsHide: true, encoding: 'utf8' })
 
 const refuse = (text) => {
   process.stderr.write(`${text}\n`)

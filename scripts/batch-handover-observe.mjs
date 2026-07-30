@@ -33,7 +33,7 @@ function commitsSince(sinceMs) {
     const out = execFileSync(
       'git',
       ['log', '--format=%H%x09%ct%x09%s', `--since=${Math.floor(sinceMs / 1000)}`, 'main'],
-      { cwd: repoPath('.'), encoding: 'utf8', timeout: 8000, stdio: ['ignore', 'pipe', 'ignore'] },
+      { windowsHide: true, cwd: repoPath('.'), encoding: 'utf8', timeout: 8000, stdio: ['ignore', 'pipe', 'ignore'] },
     )
     return out
       .split('\n')
@@ -59,7 +59,7 @@ function commitsSince(sinceMs) {
 function tickCommitFor(point, { cwd = repoPath('.'), ref = 'main', limit = 50 } = {}) {
   if (!Number.isInteger(point) || point <= 0) return null
   const git = (args) =>
-    execFileSync('git', args, { cwd, encoding: 'utf8', timeout: 8000, stdio: ['ignore', 'pipe', 'ignore'] }).trim()
+    execFileSync('git', args, { windowsHide: true, cwd, encoding: 'utf8', timeout: 8000, stdio: ['ignore', 'pipe', 'ignore'] }).trim()
   const paths = ['--', 'TASKS.md', 'docs/tasks-archive.md']
   try {
     for (const row of git(['log', `-${limit}`, '--format=%H %ct', ref, ...paths]).split('\n')) {

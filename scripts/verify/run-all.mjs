@@ -65,6 +65,7 @@ if (backendPlan.length > 0) {
   const self = fileURLToPath(import.meta.url)
   const runBackend = (pass) =>
     spawnSync(process.execPath, [self, ...args], {
+      windowsHide: true,
       cwd: join(HERE, '..', '..'),
       stdio: 'inherit',
       env: {
@@ -125,6 +126,7 @@ if (loadMode !== 'off') {
 const SUITE_TIMEOUT_MS = Number(process.env.VERIFY_SUITE_TIMEOUT_MS) || 45 * 60 * 1000
 function runSuite(name, baseUrl) {
   const res = spawnSync(process.execPath, [join(HERE, `${name}.mjs`)], {
+    windowsHide: true,
     encoding: 'utf8',
     // The suites read BASE_URL (default :5173/:4173); pass the actual server
     // URL so they hit the regression's own server, not a manual dev server.
@@ -206,10 +208,10 @@ let changedFilesCache = null
 function changedFiles() {
   if (changedFilesCache) return changedFilesCache
   const root = join(HERE, '..', '..')
-  let base = spawnSync('git', ['merge-base', 'HEAD', 'main'], { cwd: root, encoding: 'utf8' })
-  if (base.status !== 0) base = spawnSync('git', ['merge-base', 'HEAD', 'origin/main'], { cwd: root, encoding: 'utf8' })
+  let base = spawnSync('git', ['merge-base', 'HEAD', 'main'], { windowsHide: true, cwd: root, encoding: 'utf8' })
+  if (base.status !== 0) base = spawnSync('git', ['merge-base', 'HEAD', 'origin/main'], { windowsHide: true, cwd: root, encoding: 'utf8' })
   if (base.status !== 0) return (changedFilesCache = [])
-  const diff = spawnSync('git', ['diff', '--name-only', base.stdout.trim(), '--'], { cwd: root, encoding: 'utf8' })
+  const diff = spawnSync('git', ['diff', '--name-only', base.stdout.trim(), '--'], { windowsHide: true, cwd: root, encoding: 'utf8' })
   changedFilesCache = diff.status === 0 ? diff.stdout.split('\n').map((l) => l.trim()).filter(Boolean) : []
   return changedFilesCache
 }
@@ -237,7 +239,7 @@ function classifyAgainstBaselineRuns() {
     }
     const args = [join(HERE, 'baseline-classify.mjs'), suite]
     for (const c of failed) args.push('--failed', c.name)
-    spawnSync(process.execPath, args, { cwd: join(HERE, '..', '..'), stdio: 'inherit' })
+    spawnSync(process.execPath, args, { windowsHide: true, cwd: join(HERE, '..', '..'), stdio: 'inherit' })
   }
 }
 
@@ -247,6 +249,7 @@ function classifyAgainstBaselineRuns() {
 // per-engine backend (WebGPU vs WebGL2 fallback).
 function runCrossBrowser(baseUrl, depth) {
   const res = spawnSync(process.execPath, [join(HERE, 'crossbrowser.mjs')], {
+    windowsHide: true,
     encoding: 'utf8',
     env: { ...process.env, BASE_URL: baseUrl, CROSSBROWSER_DEPTH: depth },
   })
@@ -271,7 +274,7 @@ const results = []
 // whole verification is one already-allowed command.
 if (!skipPreflight && (fullRun || filter.includes('build'))) {
   console.log('# type-check + production build…')
-  const build = spawnSync('npm run build', { cwd: join(HERE, '..', '..'), shell: true, encoding: 'utf8' })
+  const build = spawnSync('npm run build', { windowsHide: true, cwd: join(HERE, '..', '..'), shell: true, encoding: 'utf8' })
   const buildOk = build.status === 0
   console.log(`${buildOk ? 'PASS' : 'FAIL'}  build        (tsc -b + vite build, exit ${build.status})`)
   if (!buildOk) {
@@ -283,7 +286,7 @@ if (!skipPreflight && (fullRun || filter.includes('build'))) {
 }
 if (!skipPreflight && (fullRun || filter.includes('lint'))) {
   console.log('# lint (oxlint)…')
-  const lint = spawnSync('npx oxlint', { cwd: join(HERE, '..', '..'), shell: true, encoding: 'utf8' })
+  const lint = spawnSync('npx oxlint', { windowsHide: true, cwd: join(HERE, '..', '..'), shell: true, encoding: 'utf8' })
   const out = (lint.stdout ?? '') + (lint.stderr ?? '')
   const lintOk = lint.status === 0 && !/warning|error/i.test(out)
   console.log(`${lintOk ? 'PASS' : 'FAIL'}  lint         (oxlint, exit ${lint.status})`)
@@ -298,7 +301,7 @@ if (!skipPreflight && (fullRun || filter.includes('lint'))) {
 if (!skipPreflight && (fullRun || filter.includes('unit'))) {
   console.log('# unit + component tests (vitest, jsdom)…')
   const root = join(HERE, '..', '..')
-  const tc = spawnSync('npx tsc -p tsconfig.vitest.json --noEmit', { cwd: root, shell: true, encoding: 'utf8' })
+  const tc = spawnSync('npx tsc -p tsconfig.vitest.json --noEmit', { windowsHide: true, cwd: root, shell: true, encoding: 'utf8' })
   if (tc.status !== 0) {
     console.log('FAIL  test-types   (tsc -p tsconfig.vitest.json)')
     console.log((tc.stdout ?? '') + (tc.stderr ?? ''))
@@ -308,6 +311,7 @@ if (!skipPreflight && (fullRun || filter.includes('unit'))) {
   console.log('PASS  test-types   (tsc -p tsconfig.vitest.json)')
   // NO_COLOR keeps the summary free of ANSI escapes so the count parses cleanly.
   const unit = spawnSync('npx vitest run', {
+    windowsHide: true,
     cwd: root, shell: true, encoding: 'utf8',
     env: { ...process.env, NO_COLOR: '1', FORCE_COLOR: '0' },
   })
@@ -363,7 +367,7 @@ try {
 // prod-runtime smoke for speed).
 if (!skipPreflight && ((fullRun && tier !== 'small') || filter.includes('preview'))) {
   console.log('# building for the production-preview smoke test…')
-  const build = spawnSync('npm run build', { cwd: join(HERE, '..', '..'), shell: true, stdio: 'inherit' })
+  const build = spawnSync('npm run build', { windowsHide: true, cwd: join(HERE, '..', '..'), shell: true, stdio: 'inherit' })
   if (build.status !== 0) {
     console.log('FAIL  build failed — skipping preview')
     results.push(false)

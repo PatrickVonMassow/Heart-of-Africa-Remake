@@ -825,7 +825,7 @@ describe('the CLI records RESOLVED evidence, not what was typed', () => {
   it('resolveRefName asks GIT what a ref names, so an alias cannot hide behind a spelling', () => {
     const dir = mkdtempSync(join(tmpdir(), 'hoa-ref-'))
     const git = (...args) =>
-      execFileSync('git', args, { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
+      execFileSync('git', args, { windowsHide: true, cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
     try {
       git('init', '-b', 'main')
       git('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '--allow-empty', '-m', 'x')
@@ -1049,6 +1049,7 @@ describe('the running-file set comes from the worktree too, not only from a --br
     try {
       const git = (...args) =>
         execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', '-c', 'commit.gpgsign=false', ...args], {
+          windowsHide: true,
           cwd: dir,
           encoding: 'utf8',
           stdio: ['ignore', 'pipe', 'ignore'],
