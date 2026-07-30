@@ -36,7 +36,7 @@ the one the user reads (memory `bundle-names`, retrospective §3.66).
 | **Chat & Tafel** | H | Chat and board | 440, 451, 465, 467, 469, 470 — the rest landed 30.07.2026 (308, 410, 411, 416, 421, 423, 424, 430, 435, 436, 441, 439, 452) |
 | **Session- & Repo-Hygiene** | I | Session, pool and repo hygiene | 373, 401, 434, 461, 462, 463 — the rest landed 30.07.2026 (329, 396, 399, 409, 426, 427, 429, 431, 433, 458) |
 | **Modell & Wächter** | J | Model and guard chain | 297, 298, 306, 309, 331, 355, 397, 425, 432, 437, 438, 457, 468 |
-| **Testinfrastruktur** | K | Test and verification infrastructure | 200, 295, 330, 387, 418, 455, 456, 460, 464, 466 |
+| **Testinfrastruktur** | K | Test and verification infrastructure | 295, 330, 387, 418, 455, 456, 460, 464, 466 |
 | **Dokumentation** | L | Docs and knowledge transfer | 303, 333, 422 — the rest landed 30.07.2026 (459) |
 | **Steuerung & Performance** | M | Controls and performance | 310, 342, 347 |
 | **Urlaubsfestigkeit** | N | Unattended operation for a fortnight — recovery from a failure at ANY moment, quota waiting, the boot path, the readiness check and the chaos drill that proves it | 442, 443, 444, 445, 446, 447, 448, 449, 450 |
@@ -52,7 +52,7 @@ change) and 449 last, because the drill is what makes the others more than a cla
 
 **Not bundled**, each for its own reason:
 
-- **184, 203, 205, 207** — the big audits. They sweep the whole codebase and would
+- **184, 200, 203, 205, 207** — the big audits. They sweep the whole codebase and would
   swallow any bundle they were put in.
 - **174, 224** — releases, gated on a full closing run rather than on a branch.
 - **285**.
