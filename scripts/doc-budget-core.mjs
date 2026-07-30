@@ -18,10 +18,11 @@
 //   - PREAMBLE ONLY for the work order: its POINTS are legitimate growth (a
 //     queue may be long), while its framing sections are where rules pile up.
 //     A line budget on the whole file would punish appending work.
-//   - Not budgeted: docs/acceptance-evidence.md, docs/design-reference.md and
-//     the archive (reference material, read on demand — their size costs
-//     nothing per turn), and the retrospective (its job is to hold every
-//     problem class; capping it would trade the wrong thing away).
+//   - Not budgeted: docs/acceptance-evidence.md, docs/acceptance-criteria-detail.md,
+//     docs/design-reference.md and the archive (reference material, read on
+//     demand — their size costs nothing per turn), and the retrospective (its
+//     job is to hold every problem class; capping it would trade the wrong
+//     thing away).
 
 /**
  * The budgets. `headingRe` limits the measurement to the part of a file BEFORE
@@ -30,127 +31,24 @@
 export const DOC_BUDGETS = [
   {
     path: 'CLAUDE.md',
-    // RAISED by the 26 measured words (2 lines) of board-first-guard's THIRD
-    // condition in §7.2 (point 400): the gate also denies while the OPEN-POINT
-    // SET has changed without a publish since — and only where the session can
-    // publish at all. A new deny in the chain this section exists to enumerate;
-    // a reader who does not know it reads the block as a guard bug and goes
-    // looking for the wrong fix. The capability half is not a flourish either:
-    // it is the reason a headless session is not trapped, and leaving it out
-    // invites exactly the "then just remove the check" repair.
-    // RAISED AGAIN by the 42 measured words (4 lines) of the delta-D TRANSPORT
-    // in the same §7.2 sentence (point 400): the board is published to a live
-    // page by a SCRIPT, which is what makes the deny above bind a headless
-    // session at all, and the check reads that page rather than a record of an
-    // attempt. Not a longer telling of the deny — it is the reason the deny is
-    // no longer exempt for the mode the batch spends most of its life in, and a
-    // session that did not know a script publishes would go on recording a
-    // deferral and leaving the user's board an hour behind, which is the exact
-    // failure this point was written for.
-    // RAISED by the 13 lines point 316 adds to §7.1 pts 4 and 21: the
-    // no-pinning guarantee at a blocked boundary and the slack water at a
-    // sea mouth. Both are new acceptance CONDITIONS with a new balance
-    // value; their evidence chains went to docs/acceptance-evidence.md,
-    // which is unbudgeted, so what is priced here is the rules alone.
-    // RAISED by the 5 lines point 409 adds: §6 gains the merge-time branch
-    // deletion, §7.2 the guard that backstops it. See the word note below —
-    // same change, priced once in each unit.
-    // RAISED by the 2 lines the bundle-I merge adds (30.07.2026): §6's delegation
-    // paragraph gains that the pool cap is also a TARGET — a free slot owes a
-    // reason while the queue holds an independent point (point 427) — and §7.2
-    // lists `decision-card-guard`, the new enforcer from point 421. Both are new
-    // RULES with new enforcers behind them, not a longer telling of something
-    // already here; without the first the pool silently runs at a third of its
-    // width, which is what point 427 was written for.
-    maxLines: 1139,
-    // RAISED by the 50 measured words of the §7.2 rule that screenshot diffing
-    // is not available as a shortcut (point 361). That is the mechanism working
-    // as designed rather than a concession: the words buy a NEW standing rule
-    // and a command to re-test it, not a longer telling of something already
-    // here. It is also cheap to hold — the rule forecloses a proposal that will
-    // otherwise be re-derived from first principles by every session that
-    // notices how expensive the picture check is, and re-deriving it costs a
-    // replay corpus.
-    // RAISED by the 48 measured words of the startup-liveness condition in
-    // §7.1 pt 14 (point 337): the loading picture may stand still no longer
-    // than a balance value, and that budget counts a busy renderer's long
-    // frame as well as a blocked thread. A NEW acceptance condition with a
-    // NEW named balance value — the evidence chain behind it went to
-    // docs/acceptance-evidence.md §14, which is deliberately unbudgeted, so
-    // what is priced here is only the rule itself.
-    // RAISED by the 122 measured words (8 lines) that turn §7.1 pt 20's F6
-    // from a state dump into the COMPLETE bug report (point 339): a new
-    // DELIVERABLE (one zip carrying picture, state, overlay list and the
-    // player's description), a new capture MECHANISM that must be stated
-    // because the obvious implementation is wrong (the readback happens
-    // inside a rendered frame; `preserveDrawingBuffer` is refused on cost),
-    // and a new verify suite on both backends. The alternative — leaving
-    // §7.1 describing a popup that no longer exists — is the drift this
-    // budget is not meant to buy.
-    // RAISED by the 98 measured words (8 lines) of the §7.2 shutter rule
-    // (point 375): a verify frame declares its subject and is REFUSED when the
-    // subject is not in the rendered picture. A NEW standing rule with a new
-    // mechanism and a new gate — not a longer telling of the projection rule it
-    // stands beside, which says how to judge "is it in view" but never demanded
-    // that the evidence itself be judged. It is cheap to hold and expensive to
-    // omit: the case behind it (two runs photographing different places, both
-    // green) is invisible to every existing check, so a session that did not
-    // read the rule would file the wrong picture as evidence again.
-    // RAISED by the 19 measured words that turn §7.1 pt 4's flora-only collider
-    // rule into the rule for EVERY bird's-eye collider (point 378): a collider
-    // is derived from the placement the renderer DRAWS, never from the
-    // behaviour position beside it. Not a longer telling of the point-129
-    // sentence it replaces — that sentence spoke only of plants, and the gap it
-    // left is exactly what shipped: the animals' circles sat up to a body-width
-    // off their drawn bodies, so the traveller walked through the animal he saw
-    // and was blocked on empty ground. A rule stated for one subsystem is not a
-    // rule; the words buy its generality.
-    // RAISED by the 71 measured words (6 lines) of the §6 WAY BACK (point 395):
-    // the user claims the batch into the window they are sitting at, the owner
-    // releases at a clean moment, and the same command then takes it. Not a
-    // longer telling of the boundary paragraph it stands under — that paragraph
-    // is the way OUT (the session ends, the launcher brings up a fresh one) and
-    // says nothing about a way IN. The words buy the one command a returning
-    // session must run and the bounds that keep it from being abused. Omitting
-    // them would leave the stand-down message naming a mechanism this file never
-    // mentions, and a session that had not read it would go on killing the other
-    // window's lock by hand — exactly the move the mechanism replaces.
-    // RAISED by the 93 measured words (7 lines) of the §6 RESCUE-commit rule
-    // (point 408): work committed because a session or agent was killed
-    // mid-build carries `[skip ci]` and a `Rescue:` trailer, so a red run on a
-    // state nobody claimed was finished cannot mail the repository owner. A NEW
-    // condition on the rule it stands beside — "push after every commit" made
-    // the mails inevitable and said nothing about them — not a longer telling
-    // of it. It is cheap to hold and expensive to omit: the convention is
-    // useless unread, since a session that does not know the trailer exists
-    // will simply write an ordinary message and mail the user again, and the
-    // hook that enforces it would then refuse a commit whose fix is stated
-    // nowhere in this file.
-    // RAISED by the 136 measured words of the same two point-316 conditions:
-    // a blocked step slides instead of pinning (pt. 4) and a sea mouth runs
-    // slack so the current can never hold a swimmer against the ocean
-    // (pt. 21). A criterion that no longer describes the game is the drift
-    // this budget is not meant to buy.
-    // RAISED by the 68 measured words of point 409: §6's merge step now ENDS
-    // the branch (local, remote and worktree, by the one safe command) and §7.2
-    // names `branch-hygiene-guard` in the chain it exists to enumerate. Not a
-    // longer telling of the merge paragraph — that paragraph described a
-    // workflow whose last step was silently omitted thirty-one times, and a
-    // rule nobody reads is a rule that rots. The guard entry is not optional
-    // either: a session blocked by a guard this file does not list reads the
-    // block as a bug and goes looking for the wrong fix.
-    // RAISED by the 34 measured words of point 434's lease in §6, and by that
-    // margin only: the passage was written 74 words long and cut twice against
-    // this ceiling, and the paragraph it joins gave back everything it could —
-    // the "cheaper model" line, which the model-policy bullet below it already
-    // says, and the claim command's parenthesis. What is left is a RULE a session
-    // cannot work without: ownership of the batch now ENDS by arithmetic at a
-    // moment both sides can compute, and a session that stopped renewing is
-    // refused merge/push, the tick, the board publish and dashboard-state. One
-    // that does not know this reads a fence denial as a broken guard and goes
-    // looking for the wrong fix — the failure the entry above this one prices.
-    // The LINE budget was not touched: the passage came out five lines under.
-    maxWords: 10419,
+    // LOWERED to the size point 459 achieved (987 lines / 8964 words, down from
+    // 1134 / 10419): §7.1 nos. 20 and 21 — the two largest criteria — keep their
+    // number, title, a short acceptance condition and their pointers, while
+    // their detail moved verbatim to docs/acceptance-criteria-detail.md, which is
+    // unbudgeted reference material like the evidence chains beside it. The whole
+    // saving is banked: this file is sent with EVERY turn of EVERY session and
+    // inherited by every delegated subagent, so a ceiling left at the old figure
+    // would simply be refilled and the ~18k tokens per turn paid again. The raise
+    // log this replaces belonged to a ceiling that no longer exists; the standing
+    // rule is unchanged — a genuinely new rule raises the budget by its measured
+    // size with the reason written here, a longer telling of something already in
+    // the file does not. The margin left is a sentence, not a section. The same
+    // point's §6 precision — a cross-cutting change beyond a small commit is
+    // delegated like any point, only the arming and the bookkeeping stay — is
+    // inside the measured figure above, so it is paid for by the move, not by
+    // the margin.
+    maxLines: 991,
+    maxWords: 8992,
     why: 'loaded at every session start — the most expensive document in the project',
   },
   {
