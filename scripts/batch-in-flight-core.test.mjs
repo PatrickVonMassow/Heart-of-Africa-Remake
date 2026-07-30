@@ -33,6 +33,8 @@ import {
   openPointSpecs,
   independentOpenPoints,
   slotsRemedy,
+  statusVerdict,
+  closingFreezeActive,
   POOL_CAP,
 } from './batch-in-flight-core.mjs'
 import {
@@ -1151,5 +1153,100 @@ describe('progressGuardDecision — the wait is allowed once the slots are accou
 
   it('with nothing in flight the slot question never arises', () => {
     expect(progressGuardDecision({ ...waiting, inFlight: false, slotsNeedReason: true })).toBe('block-continue')
+  })
+})
+
+describe('closingFreezeActive — the freeze must be recognisable WITHOUT a file nobody writes', () => {
+  const HEAD = 'a'.repeat(40)
+  const state = (commit, steps) => ({ commit, steps })
+  const step = { evidence: 'LARGE regression green on both backends' }
+
+  it('a closing checklist recorded for the CURRENT head IS a freeze', () => {
+    expect(closingFreezeActive({ closingState: state(HEAD, { 'large-regression': step }), head: HEAD })).toEqual({
+      active: true,
+      why: 'closing-state-for-head',
+    })
+  })
+
+  it('…and one recorded for a DIFFERENT commit is not — a closing is per-commit', () => {
+    expect(
+      closingFreezeActive({ closingState: state('b'.repeat(40), { 'large-regression': step }), head: HEAD }).active,
+    ).toBe(false)
+  })
+
+  it('the hand-placed marker still counts, whatever the state says', () => {
+    expect(closingFreezeActive({ marker: true }).why).toBe('freeze-marker')
+    expect(closingFreezeActive({ marker: true, closingState: null, head: '' }).active).toBe(true)
+  })
+
+  it('a blank tick is not a recorded step, so it is not a freeze', () => {
+    expect(closingFreezeActive({ closingState: state(HEAD, { 'large-regression': { evidence: '  ' } }), head: HEAD }).active).toBe(
+      false,
+    )
+    expect(closingFreezeActive({ closingState: state(HEAD, {}), head: HEAD }).active).toBe(false)
+  })
+
+  it('nothing readable answers NO freeze — a failed read must not silence the nudge', () => {
+    expect(closingFreezeActive().active).toBe(false)
+    expect(closingFreezeActive({ closingState: null, head: HEAD }).active).toBe(false)
+    expect(closingFreezeActive({ closingState: 'garbage', head: HEAD }).active).toBe(false)
+    expect(closingFreezeActive({ closingState: state(HEAD, { 'large-regression': step }), head: '' }).active).toBe(false)
+  })
+})
+
+describe('statusVerdict — `--status` must not promise a stop the hook then blocks', () => {
+  const declaration = { at: 1, waitingOn: 'an agent building 500', evidence: [{ kind: 'branch', ref: 'feat/500-x' }] }
+
+  it('THE TRAP: live evidence AND unexplained free slots reads BLOCKED, not allowed', () => {
+    // The old print keyed on `live` alone. This is the exact state point 427 added,
+    // and calling it ALLOWED would send the session into the block it just checked.
+    expect(statusVerdict({ declaration, live: true, slots: { needsReason: true } })).toEqual({
+      verdict: 'blocked',
+      why: 'slots-free',
+    })
+  })
+
+  it('a live wait with accounted slots is allowed, however the slots were accounted for', () => {
+    for (const slots of [null, undefined, { needsReason: false, why: 'at-cap' }, { why: 'reason-given' }]) {
+      expect(statusVerdict({ declaration, live: true, slots }), String(slots?.why)).toEqual({
+        verdict: 'allowed',
+        why: 'live',
+      })
+    }
+  })
+
+  it('nothing declared is its own verdict — not a block', () => {
+    expect(statusVerdict({ declaration: null, live: false, reason: 'no-declaration' }).verdict).toBe('none')
+    expect(statusVerdict().verdict).toBe('none')
+  })
+
+  it('a declaration that is not live keeps reporting the reason it failed on', () => {
+    expect(statusVerdict({ declaration, live: false, reason: 'evidence-gone' })).toEqual({
+      verdict: 'blocked',
+      why: 'evidence-gone',
+    })
+    // A missing reason still says BLOCKED rather than inventing an allowance.
+    expect(statusVerdict({ declaration, live: false })).toEqual({ verdict: 'blocked', why: 'not-live' })
+    // …and only a literal `true` is live: a truthy string must not open the gate.
+    expect(statusVerdict({ declaration, live: 'yes' }).verdict).toBe('blocked')
+  })
+
+  it('agrees with the guard on every combination — one truth, two readers', () => {
+    const guard = (inFlight, slotsNeedReason) =>
+      progressGuardDecision({
+        sid: 's1',
+        paused: false,
+        openCount: 5,
+        formatSuspect: false,
+        ownership: 'mine',
+        unhandledAlert: false,
+        inFlight,
+        slotsNeedReason,
+      })
+    for (const needsReason of [false, true]) {
+      const status = statusVerdict({ declaration, live: true, slots: { needsReason } })
+      const allowed = guard(true, needsReason).startsWith('allow')
+      expect(status.verdict === 'allowed', `needsReason=${needsReason}`).toBe(allowed)
+    }
   })
 })

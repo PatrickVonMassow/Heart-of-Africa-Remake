@@ -38,6 +38,7 @@
 // Where the two verdicts are close, this file chooses the BLOCK: a wrong block
 // costs one command, a wrong allow cost five and a half hours.
 import { resolveOwnership, PID_START_TOLERANCE_MS } from './batch-singleton.mjs'
+import { CLOSING_STEPS, missingSteps } from './closing-guard-core.mjs'
 
 /** How old a declaration may be before the guard stops honouring it. Wide enough
  *  for a LARGE browser regression or a delegated agent building a point (both run
@@ -436,6 +437,31 @@ export function independentOpenPoints({ points = [], runningFiles = [] } = {}) {
 }
 
 /**
+ * IS A CLOSING FREEZE UNDER WAY? PURE.
+ *
+ * CLAUDE.md §9 freezes the code during a closing run: nothing may land or merge, so
+ * empty pool slots are not waste but the rule. The question is how a machine KNOWS —
+ * and the answer must not be a file nobody writes. `.claude/closing-freeze` is
+ * honoured as a deliberate manual declaration, but the reachable signal is the state
+ * the closing guard ALREADY keeps: `.claude/closing-state.json` is keyed to the exact
+ * commit being closed, so a state naming the current HEAD with at least one recorded
+ * step means a closing is running on this very tree. Nothing new to remember.
+ *
+ * It errs toward SILENCE, deliberately: the state survives the tag, so on a HEAD
+ * whose closing has finished this still answers "frozen" until HEAD moves. That
+ * suppresses a nudge for a few minutes — the harmless direction. The costly
+ * direction would be nagging a session mid-closing to commission more work, which
+ * is exactly what the freeze forbids.
+ *
+ * Returns { active, why }.
+ */
+export function closingFreezeActive({ marker = false, closingState = null, head = '' } = {}) {
+  if (marker === true) return { active: true, why: 'freeze-marker' }
+  const recorded = CLOSING_STEPS.length - missingSteps(closingState, String(head ?? '')).length
+  return recorded > 0 ? { active: true, why: 'closing-state-for-head' } : { active: false, why: 'none' }
+}
+
+/**
  * MUST THIS WAIT EXPLAIN ITS IDLE SLOTS? PURE.
  *
  * Returns { needsReason, slotsFree, agents, candidates, why }. Every "no" carries
@@ -485,6 +511,26 @@ export function slotsRemedy({ slots = {}, cap = POOL_CAP } = {}) {
     '<evidence> --slots-free "<why>"` (file overlap with the running branch, a closing freeze, a user pause are ' +
     'all valid reasons). A paused batch, a recorded closing freeze and a full pool need no reason at all.'
   )
+}
+
+/**
+ * WHAT `--status` MUST SAY. PURE.
+ *
+ * The command advertises itself as "what the Stop hook would decide", and point 427
+ * gave the hook a SECOND way to block: a declaration whose evidence checks out
+ * perfectly while the free pool slots are unaccounted for. The CLI's old two-branch
+ * print keyed on `live` alone and would have called that state ALLOWED — a status
+ * that lies is worse than no status at all, because the session checks it, believes
+ * it, and then walks into the very block it just asked about.
+ *
+ * Returns { verdict: 'none' | 'allowed' | 'blocked', why }: the machine reason only,
+ * so the prose (and the remedy) stays in the CLI where the wording belongs.
+ */
+export function statusVerdict({ declaration = null, live = false, reason = '', slots = null } = {}) {
+  if (!declaration) return { verdict: 'none', why: 'no-declaration' }
+  if (live !== true) return { verdict: 'blocked', why: String(reason || 'not-live') }
+  if (slots?.needsReason === true) return { verdict: 'blocked', why: 'slots-free' }
+  return { verdict: 'allowed', why: 'live' }
 }
 
 /**
