@@ -12,7 +12,7 @@
 //   · with none declared, the guard behaves exactly as it did before;
 //   · and nothing here may touch the repository's .claude/ (finding 3).
 import { describe, it, expect } from 'vitest'
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { basename, join, resolve } from 'node:path'
@@ -55,6 +55,8 @@ import {
   resolveRefName,
   writeDeclaration,
   clearDeclaration,
+  worktreeBranch,
+  runningBranchFiles,
 } from './batch-in-flight.mjs'
 
 const NOW = 1_785_100_000_000
@@ -1034,6 +1036,55 @@ describe('slotReasonDecision — the cap is a target, and the demand is narrow',
     )
     expect(() => slotReasonDecision()).not.toThrow()
     expect(slotReasonDecision().needsReason).toBe(false)
+  })
+})
+
+describe('the running-file set comes from the worktree too, not only from a --branch', () => {
+  // WITHOUT THIS THE WHOLE SLOT CHECK GOES DARK in the commonest shape there is: an
+  // agent declared with `--worktree` alone names no ref, so the running-file set came
+  // back empty — and an empty set is deliberately read as "the overlap question
+  // cannot be answered", which never demands anything. A worktree knows its branch.
+  it('derives the branch from a real worktree and diffs it against main', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-slots-'))
+    try {
+      const git = (...args) =>
+        execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', '-c', 'commit.gpgsign=false', ...args], {
+          cwd: dir,
+          encoding: 'utf8',
+          stdio: ['ignore', 'pipe', 'ignore'],
+        })
+      git('init', '-q', '-b', 'main', '.')
+      writeFileSync(join(dir, 'seed.txt'), 'seed\n')
+      git('add', '-A')
+      git('commit', '-q', '-m', 'seed')
+      git('checkout', '-q', '-b', 'feat/500-x')
+      mkdirSync(join(dir, 'scripts'), { recursive: true })
+      writeFileSync(join(dir, 'scripts', 'thing.mjs'), 'export const a = 1\n')
+      git('add', '-A')
+      git('commit', '-q', '-m', 'the agent commits')
+      git('checkout', '-q', 'main')
+
+      expect(worktreeBranch(dir, { cwd: dir })).toBe('refs/heads/main')
+      // The agent's own branch, named directly, is what the diff is taken of.
+      expect(runningBranchFiles([{ kind: 'branch', ref: 'refs/heads/feat/500-x' }], { cwd: dir })).toEqual([
+        'scripts/thing.mjs',
+      ])
+      // …and a worktree checked out on that branch answers the same, with no --branch.
+      git('checkout', '-q', 'feat/500-x')
+      expect(worktreeBranch(dir, { cwd: dir })).toBe('refs/heads/feat/500-x')
+      expect(runningBranchFiles([{ kind: 'worktree', path: dir }], { cwd: dir })).toEqual(['scripts/thing.mjs'])
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('a gone worktree, a detached HEAD or a non-repo answers null and contributes nothing', () => {
+    const gone = join(tmpdir(), 'hoa-slots-does-not-exist-427')
+    expect(worktreeBranch(gone)).toBe(null)
+    expect(runningBranchFiles([{ kind: 'worktree', path: gone }])).toEqual([])
+    expect(runningBranchFiles([{ kind: 'pid', pid: 1 }])).toEqual([])
+    expect(runningBranchFiles([])).toEqual([])
+    expect(runningBranchFiles()).toEqual([])
   })
 })
 

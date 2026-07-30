@@ -218,12 +218,41 @@ const probes = { probePid, refTipAt, worktreeActiveAt, mtimeOf }
 export const CLOSING_FREEZE_PATH = resolve(REPO_ROOT, '.claude', 'closing-freeze')
 const PAUSE_PATH = resolve(REPO_ROOT, '.claude', 'batch-paused')
 
+/** The branch checked out in a declared WORKTREE, or null.
+ *
+ *  Without this the whole slot check would go dark in the commonest shape there is:
+ *  an agent declared with `--worktree` alone names no ref, `runningBranchFiles` came
+ *  back empty, and an empty running-file set is deliberately read as "the overlap
+ *  question cannot be answered" — no demand, ever. The worktree KNOWS its branch, so
+ *  it is asked. */
+export function worktreeBranch(path, { cwd = REPO_ROOT } = {}) {
+  try {
+    const ref = execFileSync('git', ['-C', String(path), 'symbolic-ref', '--quiet', 'HEAD'], {
+      cwd,
+      encoding: 'utf8',
+      timeout: 15000,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim()
+    return ref || null
+  } catch {
+    return null // detached HEAD, gone worktree, not a repo
+  }
+}
+
 /** The files the running agent branches touch, against `main`. Best effort: an
  *  unreadable git yields an EMPTY set, and an empty running set can only make more
  *  points look independent — so the fallback is checked at the decision, where an
  *  unknown state must never produce a demand. */
 export function runningBranchFiles(evidence = [], { cwd = REPO_ROOT } = {}) {
-  const refs = [...new Set((evidence ?? []).filter((e) => e?.kind === 'branch' && e.ref).map((e) => String(e.ref)))]
+  const refs = new Set()
+  for (const e of evidence ?? []) {
+    if (e?.kind === 'branch' && e.ref) refs.add(String(e.ref))
+    // A worktree is evidence of a branch too — see `worktreeBranch`.
+    if (e?.kind === 'worktree' && e.path) {
+      const ref = worktreeBranch(e.path, { cwd })
+      if (ref) refs.add(ref)
+    }
+  }
   const files = new Set()
   for (const ref of refs) {
     try {
