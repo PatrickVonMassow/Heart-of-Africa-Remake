@@ -228,6 +228,12 @@ describe('the chokepoint — the four paths with no guard of their own', () => {
       { toolName: 'Edit', filePath: 'src/world/world.ts' },
       { toolName: 'Bash', command: 'node scripts/point-brief.mjs 434' },
       { toolName: 'Grep', command: undefined, filePath: undefined },
+      // Point 473 — the SHARED classifier: a guarded name MENTIONED in a read is
+      // not that action, and `git log --merges` is not a merge.
+      { toolName: 'Bash', command: 'grep -n "board-publish.mjs" docs/batch-autonomy.md' },
+      { toolName: 'Bash', command: 'grep -rn "git push" docs' },
+      { toolName: 'Bash', command: 'git worktree list' },
+      { toolName: 'Bash', command: 'grep -c "TASKS.md" docs/notes.md' },
     ]) {
       expect(call(over), JSON.stringify(over)).toMatchObject({ block: false })
     }

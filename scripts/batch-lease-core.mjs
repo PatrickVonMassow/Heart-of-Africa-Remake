@@ -33,7 +33,16 @@
 //    "allow" costs a stale board; being wrong toward "deny" costs a block-loop,
 //    which this project has already paid ~30 turns for once.
 
-import { shellSegments, isMutatingSegment } from './board-first-core.mjs'
+// ONE classifier for both PreToolUse gates (point 473): the board-first deny and
+// this chokepoint judge a shell call the same way — per segment, on the command
+// HEAD, with quoted text deciding nothing.
+import {
+  parseSegments,
+  isMutatingSegment,
+  gitSubcommand,
+  segmentInvokesScript,
+  segmentMentionsFile,
+} from './command-classify-core.mjs'
 
 /**
  * HOW LONG ONE RENEWAL BUYS.
@@ -271,11 +280,9 @@ const DASHBOARD_STATE_SCRIPTS = ['focus.mjs', 'dashboard-sync.mjs', 'board-queue
 /** The work order and its archive — the tick and the archive move. */
 const TASKS_FILES = ['TASKS.md', 'tasks-archive.md']
 
-const hasScript = (segment, names) =>
-  names.some((n) => segment.includes(`scripts/${n}`) || segment.includes(`scripts\\${n}`))
-
-/** `git merge` / `git push` in verb position, so `git log --merges` is not a hit. */
-const GIT_SHARED_HISTORY = /\bgit\s+(?:-[^\s]+\s+(?:[^\s-][^\s]*\s+)?)*(merge|push)\b/
+/** git verbs that move SHARED history — read off the subcommand, so neither
+ *  `git log --merges` nor a quoted "push" is ever a hit. */
+const GIT_SHARED_HISTORY = new Set(['merge', 'push'])
 
 const asPosix = (p) => String(p ?? '').replace(/\\/g, '/')
 
@@ -307,8 +314,8 @@ export function fenceGuardedAction({ toolName, command, filePath } = {}) {
     }
   }
   if (tool !== 'Bash' && tool !== 'PowerShell') return null
-  for (const segment of shellSegments(command)) {
-    if (GIT_SHARED_HISTORY.test(segment)) {
+  for (const segment of parseSegments(command)) {
+    if (GIT_SHARED_HISTORY.has(gitSubcommand(segment))) {
       // A dispossessed session may still commit locally; what it may not do is
       // move shared history. `git push` is matched in every form rather than only
       // where "main" appears literally — `git push origin HEAD:main` names the
@@ -316,16 +323,16 @@ export function fenceGuardedAction({ toolName, command, filePath } = {}) {
       // that has already lost the batch is not to write to the remote at all.
       return { kind: 'git-main', what: 'a `git merge` / `git push` (shared history)' }
     }
-    if (hasScript(segment, BOARD_PUBLISH_SCRIPTS)) {
+    if (segmentInvokesScript(segment, BOARD_PUBLISH_SCRIPTS)) {
       return { kind: 'board-publish', what: 'a board publish' }
     }
-    if (hasScript(segment, DASHBOARD_STATE_SCRIPTS)) {
+    if (segmentInvokesScript(segment, DASHBOARD_STATE_SCRIPTS)) {
       return { kind: 'dashboard-state', what: 'a merge into .claude/dashboard-state.json' }
     }
-    if (/tasks-archive\.mjs|tasks-archive-guard\.mjs/.test(segment)) {
+    if (segmentInvokesScript(segment, ['tasks-archive.mjs', 'tasks-archive-guard.mjs'])) {
       return { kind: 'tasks', what: 'an archive move in the work order' }
     }
-    if (TASKS_FILES.some((f) => segment.includes(f)) && isMutatingSegment(segment)) {
+    if (segmentMentionsFile(segment, TASKS_FILES) && isMutatingSegment(segment)) {
       return { kind: 'tasks', what: 'a write to the work order' }
     }
   }

@@ -141,7 +141,10 @@ of them free choices:
   can never be blocked. The chokepoint therefore runs BEFORE the ordinary
   `heldByOtherLiveOwner` stand-down — a dispossessed session is not the owner, so
   that exit is precisely the door it would leave by — and it refuses four families
-  of call and nothing else. Reads, local commits and its own file work continue,
+  of call and nothing else. Which call belongs to a family is read through the
+  SHARED classifier (`command-classify-core.mjs`, point 473), per segment and on the
+  command head: `git log --merges` is not a merge, and a guarded script NAMED inside
+  a grep is not that script being run. Reads, local commits and its own file work continue,
   and every other guard still stands down for it, so the Stop chain cannot demand
   of it the publish this refuses.
 

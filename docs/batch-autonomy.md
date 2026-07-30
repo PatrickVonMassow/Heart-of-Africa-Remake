@@ -1316,6 +1316,20 @@ single never-blocked command, and standing down would leave the lie on the board
 for the rest of a turn that demonstrably kept working. `batch-boundary.mjs` reads
 the board and prints whichever of the two commands actually works.
 
+**A READ IS JUDGED AS ONE (point 473).** The first classifier matched regexes over
+the whole command STRING, and within minutes it denied two pure reads: a `grep` of
+the board whose quoted pattern held a `>`, and `git worktree list`, whose verb it
+never saw as a subcommand. `scripts/command-classify-core.mjs` is now the ONE
+classifier both PreToolUse gates ask — the idle claim and the fence chokepoint,
+which each had their own before. A call is split into the segments a shell would
+run, and each is judged on its command HEAD plus, where that is not enough, its
+SUBCOMMAND: `worktree list` vs `add`, `npm ls` vs `run`, `git stash list` vs
+`push`, `git tag` vs `git tag v0.4`. Quoted text decides nothing, a pipe into
+`tee` and a `> file` are writes while `2>&1` is not, only a genuinely
+state-changing segment denies — and the deny NAMES that segment. Anything
+undecidable reads as READ: this gate under-blocks by design, because a blocked
+turn produces nothing.
+
 **The board is written LF, whatever wrote it.** The markup anchors are matched
 with literal newlines, so a board an editor once wrote back in Windows text mode
 made `board-archive-rotate.mjs` miss the Erledigt section entirely and `attest`

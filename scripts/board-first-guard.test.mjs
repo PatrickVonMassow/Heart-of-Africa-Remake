@@ -191,6 +191,29 @@ describe('board-first-guard (spawned)', () => {
       }
     })
 
+    it('lets the two MEASURED reads through (point 473), on the executed path', () => {
+      // Both were denied live on 30.07.2026: a `>` inside a quoted grep pattern,
+      // and `worktree` read as a verb rather than as a subcommand of `list`.
+      seedBoard(idle)
+      for (const command of [
+        'git worktree list',
+        'grep -c "<span class=\\"now\\">" .batch-dashboard.html',
+        'node scripts/focus.mjs confirm && node scripts/board-publish.mjs',
+      ]) {
+        const r = callGuard('Bash', { command })
+        expect(r.status, r.stderr).toBe(0)
+        expect(r.stdout.trim(), `${command} must be allowed`).toBe('')
+      }
+    })
+
+    it('names the state-changing SEGMENT of a chain in its deny', () => {
+      seedBoard(idle)
+      const r = callGuard('Bash', { command: 'git status --short && npm run build' })
+      expect(r.decision.hookSpecificOutput.permissionDecisionReason).toContain(
+        'The segment that changes state: `npm run build`',
+      )
+    })
+
     it('falls back to the ordinary board-first deny once a real card stands', () => {
       seedBoard(real)
       const reason = callGuard('Bash', { command: 'git commit -m x' }).decision.hookSpecificOutput

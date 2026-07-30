@@ -31,10 +31,19 @@ export const BLOCKING_VERDICT = 'do-not-merge'
  *   scripts/guard-hooks.test.mjs  the only proof that the hooks actually FIRE
  *                              when spawned; weaken it and every guard's wiring
  *                              rests on a source review again
+ *   scripts/command-classify-core.mjs  the ONE classifier both PreToolUse gates
+ *                              ask "does this call change anything" (point 473).
+ *                              Its name carries no guard/gate, so no naming rule
+ *                              reaches it — while a widening waves work past the
+ *                              fence and a narrowing denies reads. Its sweep is
+ *                              named with it, for the same reason guard-hooks'
+ *                              is: the rules are only as true as the test.
  */
 export const NAMED_MECHANISM_FILES = Object.freeze([
   '.claude/settings.json',
   'scripts/guard-hooks.test.mjs',
+  'scripts/command-classify-core.mjs',
+  'scripts/command-classify-core.test.mjs',
 ])
 
 /**
