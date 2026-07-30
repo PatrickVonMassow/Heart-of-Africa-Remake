@@ -567,10 +567,18 @@ or an agent wedged in a printing loop would be replaceable only by hand; and whe
 neither worktree nor branch can be read the answer is `unmeasurable`, which refuses
 as well — "I could not look" must never read as "it is gone". Run it AGAIN in the
 seconds before the spawn: on 30.07 the branch tip moved one minute before the
-replacement was started. Name BOTH the worktree and the branch where you can: the
-worktree stamp reads gitdir mtimes, which a supervisor's own `git status` inside
-that worktree refreshes from outside, while the branch stamp is commit-based and
-has no such path (four-eyes review, finding 5).
+replacement was started.
+
+**The worktree stamp measures the WORK, not the git commands** (point 434 (5b)).
+It reads TWO sources and the verdict NAMES the one that answered: the gitdir mtimes
+(index, HEAD, COMMIT_EDITMSG — the last git OPERATION) and the newest WORKING FILE,
+found through `git --no-optional-locks status --porcelain -z`. The second half is
+what the first cannot see — an agent editing source for twenty minutes runs no git
+command, and exactly that worktree read "quiet for 21 min" while its agent was
+mid-edit. The `--no-optional-locks` is why the probe does not refresh the index it
+reads, so a supervisor's own look can no longer become the evidence (four-eyes
+review, finding 5). Name BOTH the worktree and the branch where you can: a
+commit-based branch stamp is still the strongest single source there is.
 
 Decision logic: `scripts/batch-in-flight-core.mjs` (pure, dependency-injected,
 Vitest-covered in `scripts/batch-in-flight-core.test.mjs`). IO and probes:

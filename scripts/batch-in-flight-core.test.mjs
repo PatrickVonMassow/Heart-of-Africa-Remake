@@ -12,7 +12,7 @@
 //   · with none declared, the guard behaves exactly as it did before;
 //   · and nothing here may touch the repository's .claude/ (finding 3).
 import { describe, it, expect } from 'vitest'
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { basename, join, resolve } from 'node:path'
@@ -28,6 +28,9 @@ import {
   assessInFlight,
   assessOwnerWork,
   checkEvidence,
+  combineWorktreeStamps,
+  porcelainPaths,
+  worktreeStamp,
   describeInFlight,
   evidenceVerdict,
   respawnDecision,
@@ -61,6 +64,8 @@ import {
   writeDeclaration,
   clearDeclaration,
   worktreeBranch,
+  worktreeActiveAt,
+  worktreeFilesActiveAt,
   runningBranchFiles,
 } from './batch-in-flight.mjs'
 
@@ -205,6 +210,202 @@ describe('checkEvidence — every kind is answered by a probe, never by the clai
       detail: 'unknown-kind',
     })
     expect(checkEvidence(null, { now: NOW }).ok).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// THE PROBE MEASURES THE AGENT'S WORK, NOT ITS GIT COMMANDS (point 434 (5b))
+// ---------------------------------------------------------------------------
+// Measured live on 30.07.2026: a worktree read "quiet for 21 min" to the
+// declaration while its agent was mid-edit, because the probe stat'd four GIT
+// paths and an agent writing source files runs no git command. The contamination
+// ran the other way too — a reader's own `git status` refreshed the index and
+// reset the clock, so the observer's look became the evidence.
+describe('the worktree stamp reads BOTH sources and says which one answered', () => {
+  const wt = { kind: 'worktree', path: '/tmp/w' }
+
+  it('30.07.2026: git metadata old but WORKING FILES fresh reads alive, and names them', () => {
+    const probe = () => combineWorktreeStamps({ gitAt: NOW - 21 * 60 * 1000, filesAt: NOW - 60_000 })
+    const item = checkEvidence(wt, { now: NOW, worktreeActiveAt: probe })
+    expect(item.ok).toBe(true)
+    expect(item.detail).toContain('active 1 min ago')
+    expect(item.detail).toContain('working files')
+    // …and the whole declaration therefore judges on the work's own output.
+    expect(evidenceVerdict([item])).toMatchObject({ judgedOn: 'git', outputFresh: true })
+  })
+
+  it('BOTH old still reads quiet, and the detail names the newest source', () => {
+    const probe = () =>
+      combineWorktreeStamps({ gitAt: NOW - WORK_FRESH_MS - 1, filesAt: NOW - 40 * 60 * 1000 })
+    const item = checkEvidence(wt, { now: NOW, worktreeActiveAt: probe })
+    expect(item.ok).toBe(false)
+    expect(item.detail).toContain('quiet for')
+    expect(item.detail).toContain('newest: git metadata')
+  })
+
+  it('a stamp that cannot be read at all is still `worktree-gone`, never a guess', () => {
+    expect(checkEvidence(wt, { now: NOW, worktreeActiveAt: () => combineWorktreeStamps({}) })).toMatchObject({
+      ok: false,
+      detail: 'worktree-gone',
+    })
+    // A bare number keeps its old meaning exactly — including its unnamed detail.
+    expect(checkEvidence(wt, { now: NOW, worktreeActiveAt: () => NOW - 60_000 }).detail).toBe('active 1 min ago')
+  })
+
+  it('combineWorktreeStamps takes the newest, and a tie goes to the files a reader cannot fake', () => {
+    expect(combineWorktreeStamps({ gitAt: 5, filesAt: 9 })).toEqual({ at: 9, source: 'working files' })
+    expect(combineWorktreeStamps({ gitAt: 9, filesAt: 5 })).toEqual({ at: 9, source: 'git metadata' })
+    expect(combineWorktreeStamps({ gitAt: 7, filesAt: 7 })).toEqual({ at: 7, source: 'working files' })
+    expect(combineWorktreeStamps({ gitAt: 7 })).toEqual({ at: 7, source: 'git metadata' })
+    expect(combineWorktreeStamps({ filesAt: 7 })).toEqual({ at: 7, source: 'working files' })
+    expect(combineWorktreeStamps({ gitAt: null, filesAt: NaN })).toBe(null)
+    expect(combineWorktreeStamps()).toBe(null)
+  })
+
+  it('worktreeStamp accepts both shapes and refuses everything else', () => {
+    expect(worktreeStamp(12)).toEqual({ at: 12, source: null })
+    expect(worktreeStamp({ at: 12, source: 'working files' })).toEqual({ at: 12, source: 'working files' })
+    expect(worktreeStamp({ at: 12 })).toEqual({ at: 12, source: null })
+    for (const bad of [null, undefined, 'x', {}, { at: 'x' }, { at: NaN }, Infinity]) {
+      expect(worktreeStamp(bad), String(bad)).toBe(null)
+    }
+  })
+
+  it('--agent-check keeps its meaning, and names the working files when they carry it', () => {
+    const alive = agentOutputVerdict({
+      worktreeAt: combineWorktreeStamps({ gitAt: NOW - 21 * 60 * 1000, filesAt: NOW - 60_000 }),
+      now: NOW,
+    })
+    expect(alive).toMatchObject({ verdict: 'alive', judgedOn: 'git' })
+    expect(alive.detail).toContain('working files')
+    // A branch tip that is newer than the worktree still decides, and is not
+    // mislabelled with the worktree's source.
+    const byBranch = agentOutputVerdict({
+      worktreeAt: combineWorktreeStamps({ gitAt: NOW - 60 * 60 * 1000, filesAt: NOW - 50 * 60 * 1000 }),
+      branchTipAt: NOW - 60_000,
+      now: NOW,
+    })
+    expect(byBranch).toMatchObject({ verdict: 'alive', judgedOn: 'git' })
+    expect(byBranch.detail).not.toContain('working files')
+    // Both quiet: still quiet — the respawn permission is unchanged.
+    const quiet = agentOutputVerdict({
+      worktreeAt: combineWorktreeStamps({ gitAt: NOW - 90 * 60 * 1000, filesAt: NOW - 80 * 60 * 1000 }),
+      now: NOW,
+    })
+    expect(quiet).toMatchObject({ verdict: 'quiet', judgedOn: 'git' })
+    expect(quiet.detail).toContain('newest: working files')
+    expect(respawnDecision({ output: quiet }).respawn).toBe(true)
+    expect(respawnDecision({ output: alive }).respawn).toBe(false)
+    // A bare number still answers exactly as it did.
+    expect(agentOutputVerdict({ worktreeAt: NOW - 60_000, now: NOW })).toMatchObject({ verdict: 'alive' })
+    expect(agentOutputVerdict({ worktreeAt: null, now: NOW })).toMatchObject({ verdict: 'unmeasurable' })
+  })
+
+  it('porcelainPaths reads NUL records, skips the rename SOURCE and honours the limit', () => {
+    const rec = (...parts) => `${parts.join('\0')}\0`
+    expect(porcelainPaths(rec(' M src/a.ts', '?? src/b with space.ts'))).toEqual([
+      'src/a.ts',
+      'src/b with space.ts',
+    ])
+    // A rename record is followed by the path the file no longer has — skip it.
+    expect(porcelainPaths(rec('R  new.ts', 'old.ts', ' M kept.ts'))).toEqual(['new.ts', 'kept.ts'])
+    expect(porcelainPaths(rec('C  copy.ts', 'orig.ts'))).toEqual(['copy.ts'])
+    expect(porcelainPaths(rec(' M a', ' M b', ' M c'), { limit: 2 })).toEqual(['a', 'b'])
+    for (const junk of ['', null, undefined, '\0\0', 'XY']) expect(porcelainPaths(junk), String(junk)).toEqual([])
+  })
+})
+
+// ---------------------------------------------------------------------------
+describe('worktreeActiveAt against a REAL checkout (its own temp repo, never this one)', () => {
+  const git = (dir, ...args) =>
+    execFileSync('git', args, {
+      windowsHide: true,
+      cwd: dir,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim()
+
+  const backdate = (dir, ageMs) => {
+    const when = new Date(Date.now() - ageMs)
+    for (const p of ['.git', '.git/index', '.git/HEAD', '.git/COMMIT_EDITMSG']) {
+      try {
+        utimesSync(join(dir, p), when, when)
+      } catch {
+        /* COMMIT_EDITMSG may not exist — the other three carry the stamp */
+      }
+    }
+  }
+
+  it('an agent EDITING with no git command reads alive, on the working files', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-wt-probe-'))
+    try {
+      git(dir, 'init', '-b', 'main')
+      writeFileSync(join(dir, 'a.txt'), 'first\n')
+      git(dir, 'add', 'a.txt')
+      git(dir, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-m', 'x')
+      // The git metadata is 30 minutes old; the agent has just written a file.
+      backdate(dir, 30 * 60 * 1000)
+      writeFileSync(join(dir, 'a.txt'), 'mid-edit\n')
+
+      const stamp = worktreeActiveAt(dir)
+      expect(stamp).toBeTruthy()
+      expect(stamp.source).toBe('working files')
+      expect(Date.now() - stamp.at).toBeLessThan(60_000)
+      // What the declaration then says about it — the 30.07 verdict, corrected.
+      expect(checkEvidence({ kind: 'worktree', path: dir }, { now: Date.now(), worktreeActiveAt }).ok).toBe(true)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('a clean, long-idle checkout still reads quiet — on the git metadata', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-wt-idle-'))
+    try {
+      git(dir, 'init', '-b', 'main')
+      writeFileSync(join(dir, 'a.txt'), 'first\n')
+      git(dir, 'add', 'a.txt')
+      git(dir, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-m', 'x')
+      backdate(dir, 40 * 60 * 1000)
+
+      const stamp = worktreeActiveAt(dir)
+      expect(stamp.source).toBe('git metadata')
+      const item = checkEvidence({ kind: 'worktree', path: dir }, { now: Date.now(), worktreeActiveAt })
+      expect(item.ok).toBe(false)
+      expect(item.detail).toContain('newest: git metadata')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('LOOKING AT IT IS NOT EVIDENCE: the probe does not refresh the index it reads', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-wt-clean-'))
+    try {
+      git(dir, 'init', '-b', 'main')
+      writeFileSync(join(dir, 'a.txt'), 'first\n')
+      git(dir, 'add', 'a.txt')
+      git(dir, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-m', 'x')
+      backdate(dir, 30 * 60 * 1000)
+      const before = statSync(join(dir, '.git', 'index')).mtimeMs
+
+      worktreeActiveAt(dir)
+      worktreeActiveAt(dir)
+
+      expect(statSync(join(dir, '.git', 'index')).mtimeMs).toBe(before)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('answers null for a path that is not a checkout at all', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-wt-none-'))
+    try {
+      expect(worktreeActiveAt(dir)).toBe(null)
+      expect(worktreeActiveAt('')).toBe(null)
+      expect(worktreeFilesActiveAt(dir)).toBe(null)
+      expect(worktreeFilesActiveAt('')).toBe(null)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 })
 
