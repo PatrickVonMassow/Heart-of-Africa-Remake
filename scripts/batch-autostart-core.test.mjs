@@ -1,4 +1,4 @@
-﻿// THE SPAWN ENVIRONMENT â€” the witness for point 402 (a), 28.07.2026.
+// THE SPAWN ENVIRONMENT — the witness for point 402 (a), 28.07.2026.
 //
 // Four batch sessions died in one afternoon and none of them crashed. The
 // executioner named itself four times in .claude/autostart-run.log:
@@ -7,7 +7,7 @@
 //     Set CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 to wait indefinitely.
 //
 // The launcher passed no `env` at all, so every headless worker inherited a
-// ten-minute ceiling on its background tasks â€” while the batch's designed steady
+// ten-minute ceiling on its background tasks — while the batch's designed steady
 // state is to delegate a point to a worktree-isolated agent and wait for it, and
 // such an agent routinely takes longer than that. This file pins the fix at the
 // only level it can be pinned: the launcher itself may never be imported (it
@@ -50,7 +50,7 @@ import {
 } from './batch-autostart-core.mjs'
 import { isOwnSpawn } from './batch-singleton.mjs'
 
-describe('buildSpawnOptions â€” the ten-minute execution is switched off', () => {
+describe('buildSpawnOptions — the ten-minute execution is switched off', () => {
   it('THE FIX: the child carries the background-wait ceiling as 0 (wait indefinitely)', () => {
     const opts = buildSpawnOptions({ cwd: '/repo', stdio: ['ignore', 1, 1], env: { PATH: '/bin' } })
     expect(opts.env[BG_WAIT_CEILING_ENV]).toBe('0')
@@ -76,7 +76,7 @@ describe('buildSpawnOptions â€” the ten-minute execution is switched off', 
     expect(opts.env[BG_WAIT_CEILING_ENV]).toBe('900000')
   })
 
-  it('an empty or blank override is not a value â€” the default stands', () => {
+  it('an empty or blank override is not a value — the default stands', () => {
     for (const raw of ['', '   ']) {
       expect(buildSpawnOptions({ env: { [BG_WAIT_CEILING_OVERRIDE_ENV]: raw } }).env[BG_WAIT_CEILING_ENV]).toBe('0')
     }
@@ -89,7 +89,7 @@ describe('buildSpawnOptions â€” the ten-minute execution is switched off', 
   })
 })
 
-describe('buildSpawnArgs â€” print mode, the model chain, and no prompt that can block', () => {
+describe('buildSpawnArgs — print mode, the model chain, and no prompt that can block', () => {
   it('spawns print mode with the resume prompt and the permission flag', () => {
     const args = buildSpawnArgs()
     expect(args[0]).toBe('-p')
@@ -107,7 +107,7 @@ describe('buildSpawnArgs â€” print mode, the model chain, and no prompt tha
 })
 
 describe('the resume prompt', () => {
-  it('tells the session that a WAIT MUST BE VISIBLE â€” poll, never sit silent (point 402 (b))', () => {
+  it('tells the session that a WAIT MUST BE VISIBLE — poll, never sit silent (point 402 (b))', () => {
     // A silent wait is what made a working session indistinguishable from a
     // corpse: every poll is a tool call and every tool call refreshes the
     // heartbeat, which is what the launcher reads liveness from.
@@ -124,7 +124,7 @@ describe('the resume prompt', () => {
 // ---------------------------------------------------------------------------
 // THE LEDGER OF SPAWNS (four-eyes review 28.07.2026, finding 1.4). Switching the
 // runtime ceiling off removed the only thing that ever ended a `claude -p` whose
-// turn had finished but whose background task never exits â€” a left-running dev
+// turn had finished but whose background task never exits — a left-running dev
 // server is routine here, and a leaked session holds the ports the next session's
 // verify suites need. `state.lastPid` cannot track them: a handover overwrites it.
 // So the launcher remembers what it spawned, and reaps from that.
@@ -143,7 +143,7 @@ describe('recordSpawn (a short, honest ledger)', () => {
     expect(recordSpawn([{ pid: 7, at: NOW - 86_400_000 }], { pid: 7, at: NOW })).toEqual([{ pid: 7, at: NOW }])
   })
 
-  it('stays capped â€” it exists to find a leak within a tick or two, not to keep history', () => {
+  it('stays capped — it exists to find a leak within a tick or two, not to keep history', () => {
     let led = []
     for (let i = 0; i < SPAWN_LEDGER_MAX + 5; i++) led = recordSpawn(led, { pid: 100 + i, at: NOW + i })
     expect(led).toHaveLength(SPAWN_LEDGER_MAX)
@@ -183,7 +183,7 @@ describe('reapableSpawns (what the removed runtime ceiling used to reap)', () =>
     expect(reap({ lock: { kind: 'pending-spawn', spawnedPid: 800, pid: 900 } }).map((s) => s.pid)).toEqual([])
   })
 
-  it('A RECYCLED PID IS NOT OUR SPAWN â€” identity is pid AND start time', () => {
+  it('A RECYCLED PID IS NOT OUR SPAWN — identity is pid AND start time', () => {
     // The number was inherited by a stranger (an interactive window, say). It
     // must not be killed on the strength of the pid alone.
     expect(reap({ probePid: probe({ 800: NOW - 60_000, 900: NEWER + 300 }) }).map((s) => s.pid)).toEqual([])
@@ -214,7 +214,7 @@ describe('reapableSpawns (what the removed runtime ceiling used to reap)', () =>
     const args = { spawns: [{ pid: 900, at: OLD }], now: NOW, probePid: probe({ 900: OLD + 300 }), isOwnSpawn }
     expect(reapableSpawns({ ...args, lock: null })).toEqual([])
     expect(reapableSpawns({ ...args, lock: { pid: 0 } })).toEqual([])
-    // â€¦but once a NEWER spawn exists, the older one is a leak even with no lock.
+    // …but once a NEWER spawn exists, the older one is a leak even with no lock.
     expect(reap({ lock: null }).map((s) => s.pid)).toEqual([800])
   })
 
@@ -251,7 +251,7 @@ describe('pruneSpawns', () => {
 describe('chatPromptSuffix', () => {
   const msg = (text, ts = 1_700_000_000_000) => ({ id: 'm', ts, text })
 
-  it('adds NOTHING when there is nothing â€” the prompt stays byte-identical', () => {
+  it('adds NOTHING when there is nothing — the prompt stays byte-identical', () => {
     for (const empty of [[], null, undefined, 'nope', 42, [{}, { text: '   ' }]]) {
       expect(chatPromptSuffix(empty)).toBe('')
     }
@@ -276,7 +276,7 @@ describe('chatPromptSuffix', () => {
     expect(chatPromptSuffix([msg('wie weit bist du?')])).toContain('scripts/chat-reply.mjs')
   })
 
-  it('caps the count and the length â€” a prompt is not a transcript', () => {
+  it('caps the count and the length — a prompt is not a transcript', () => {
     const many = Array.from({ length: 20 }, (_, i) => msg(`nachricht ${i}`))
     const s = chatPromptSuffix(many)
     expect(s).toContain('nachricht 19') // the NEWEST survive
@@ -304,7 +304,7 @@ describe('chatPromptSuffix', () => {
 
 // --- THE HANDOVER STAMP (four-eyes review, 29.07.2026) ------------------------
 //
-// The launcher does not consume the spool â€” the per-tool-call delivery will â€” so
+// The launcher does not consume the spool — the per-tool-call delivery will — so
 // what stops a message being re-delivered at every spawn is this stamp alone.
 // The obvious version got it wrong twice: it used the clock from the TOP of the
 // tick (the chat poll runs a hundred lines later) and it advanced BEFORE the
@@ -326,7 +326,7 @@ describe('pendingSinceHandover / nextChatHandedAt', () => {
     expect(pendingSinceHandover([{ id: 'a', ts: 50, text: 'x' }], 60)).toHaveLength(0)
   })
 
-  it('is total â€” junk in, empty out, never a throw', () => {
+  it('is total — junk in, empty out, never a throw', () => {
     for (const bad of [null, undefined, 'nope', 42, [null, {}, { receivedAt: 'soon' }]]) {
       expect(() => pendingSinceHandover(bad, 0)).not.toThrow()
       expect(pendingSinceHandover(bad, 0)).toEqual([])
@@ -346,7 +346,7 @@ describe('pendingSinceHandover / nextChatHandedAt', () => {
     expect(pendingSinceHandover(arrived, 1000)).toHaveLength(1)
   })
 
-  it('(b) does NOT advance when the spawn failed â€” those messages stay pending', () => {
+  it('(b) does NOT advance when the spawn failed — those messages stay pending', () => {
     const arrived = [msg(1500, 'mach 401 zuerst')]
     const stamped = nextChatHandedAt({ spawned: false, previous: 700, now: 2000 })
     expect(stamped).toBe(700)
@@ -363,11 +363,11 @@ describe('pendingSinceHandover / nextChatHandedAt', () => {
 // A STANDING CONDITION IS NOT AN EVENT (four-eyes follow-up F3, 29.07.2026).
 //
 // An unreadable chat secret is true at EVERY tick until somebody fixes the file,
-// and the tick runs every few minutes â€” pushed unconditionally it wakes an
+// and the tick runs every few minutes — pushed unconditionally it wakes an
 // unattended phone all night. The log line stays per tick; the push is throttled
 // by this, and the stamp is cleared when the condition goes away so a recurrence
 // after a repair is reported at once.
-describe('standingAlertDue â€” the push for a standing fault', () => {
+describe('standingAlertDue — the push for a standing fault', () => {
   const NOW = 1_700_000_000_000
 
   it('pushes the FIRST time the condition is seen', () => {
@@ -389,7 +389,7 @@ describe('standingAlertDue â€” the push for a standing fault', () => {
     expect(standingAlertDue({ lastAt: NOW, now: NOW + STANDING_ALERT_INTERVAL_MS - 1 })).toBe(false)
   })
 
-  it('is measured in HOURS, not minutes â€” an unattended night must stay quiet', () => {
+  it('is measured in HOURS, not minutes — an unattended night must stay quiet', () => {
     expect(STANDING_ALERT_INTERVAL_MS).toBeGreaterThanOrEqual(4 * 60 * 60 * 1000)
   })
 
@@ -410,15 +410,15 @@ describe('standingAlertDue â€” the push for a standing fault', () => {
 
 // ---------------------------------------------------------------------------
 // A SPAWN INTO A BROKEN ENVIRONMENT IS NOT A RESCUE (point 433, the hole the
-// second model's review found in docs/batch-resilience.md Â§4)
+// second model's review found in docs/batch-resilience.md §4)
 // ---------------------------------------------------------------------------
 // Letting the launcher take the batch from a wedged owner, on its own, would turn a
 // silent night into a loud one: the successor wedges the same way and the runaway
 // brake never catches it, because failCount only ever rose when the spawn's pid was
 // GONE. These three decisions are what stop a chain of breathing corpses.
 
-describe('judgeSpawnPreflight â€” can anything run here at all?', () => {
-  it('all probes green â†’ clear to spawn', () => {
+describe('judgeSpawnPreflight — can anything run here at all?', () => {
+  it('all probes green → clear to spawn', () => {
     expect(judgeSpawnPreflight({ probes: [{ name: 'git', ok: true }, { name: 'state-writable', ok: true }] })).toMatchObject({
       ok: true,
       failed: [],
@@ -442,7 +442,7 @@ describe('judgeSpawnPreflight â€” can anything run here at all?', () => {
     expect(v.failed).toEqual(['git', 'state-writable'])
   })
 
-  it('an INCONCLUSIVE probe never blocks â€” the preflight must not become a new standstill', () => {
+  it('an INCONCLUSIVE probe never blocks — the preflight must not become a new standstill', () => {
     for (const ok of [null, undefined, 'maybe']) {
       expect(judgeSpawnPreflight({ probes: [{ name: 'git', ok }] }).ok).toBe(true)
     }
@@ -456,7 +456,7 @@ describe('judgeSpawnPreflight â€” can anything run here at all?', () => {
   })
 })
 
-describe('judgePreviousSpawn â€” living is not working', () => {
+describe('judgePreviousSpawn — living is not working', () => {
   const NOW2 = 1_784_900_000_000
   const spawnedAt = NOW2 - 40 * 60_000
 
@@ -470,13 +470,13 @@ describe('judgePreviousSpawn â€” living is not working', () => {
     expect(v.reason).toContain('pid gone')
   })
 
-  it('THE NEW CASE: alive but proved nothing past the window â†’ failed', () => {
+  it('THE NEW CASE: alive but proved nothing past the window → failed', () => {
     const v = judgePreviousSpawn({ lastSpawnAt: spawnedAt, now: NOW2, pidAlive: true, lockConverted: false })
     expect(v.verdict).toBe('failed')
     expect(v.reason).toContain('ALIVE but proved nothing')
   })
 
-  it('inside the window it is still coming up â€” a boot is not a failure', () => {
+  it('inside the window it is still coming up — a boot is not a failure', () => {
     const v = judgePreviousSpawn({ lastSpawnAt: NOW2 - SPAWN_PROVE_MS + 60_000, now: NOW2, pidAlive: true })
     expect(v.verdict).toBe('pending')
   })
@@ -487,7 +487,7 @@ describe('judgePreviousSpawn â€” living is not working', () => {
     expect(v.reason).toContain('owns the lock')
   })
 
-  it('no previous spawn â†’ nothing to judge', () => {
+  it('no previous spawn → nothing to judge', () => {
     expect(judgePreviousSpawn({ lastSpawnAt: 0 }).verdict).toBe('none')
     expect(judgePreviousSpawn().verdict).toBe('none')
   })
@@ -504,7 +504,7 @@ describe('judgePreviousSpawn â€” living is not working', () => {
   })
 })
 
-describe('spawnBackoffMs â€” the ladder rises instead of hammering', () => {
+describe('spawnBackoffMs — the ladder rises instead of hammering', () => {
   it('a healthy launcher waits the old fixed debounce', () => {
     expect(spawnBackoffMs({ failCount: 0 })).toBe(SPAWN_BACKOFF_BASE_MS)
     expect(spawnBackoffMs()).toBe(SPAWN_BACKOFF_BASE_MS)
@@ -531,12 +531,12 @@ describe('spawnBackoffMs â€” the ladder rises instead of hammering', () => 
 // --- A QUOTA BLOCK IS A WAITING STATE, NOT A FAILURE (point 444) --------------
 //
 // The witness is `.claude/autostart-run.log` of 22.07.2026, which carries the
-// refusal three times over Ã¢â‚¬â€ and against which the launcher counted three
+// refusal three times over — and against which the launcher counted three
 // failures, doubled its wait twice and then wrote `.claude/batch-paused`. That is
 // a night lost to a condition that repairs itself on the hour.
-const LIMIT_LINE = "You've hit your session limit Ã‚Â· resets 4:20pm (Europe/Berlin)"
+const LIMIT_LINE = "You've hit your session limit · resets 4:20pm (Europe/Berlin)"
 
-describe('detectQuotaSignature Ã¢â‚¬â€ reading the spawnÃ¢â‚¬â„¢s own last words', () => {
+describe('detectQuotaSignature — reading the spawn’s own last words', () => {
   it('THE REAL LINE out of autostart-run.log is recognised, with its reset hint', () => {
     const r = detectQuotaSignature(`some output\n${LIMIT_LINE}\n`)
     expect(r.hit).toBe(true)
@@ -565,7 +565,7 @@ describe('detectQuotaSignature Ã¢â‚¬â€ reading the spawnÃ¢â‚¬â
     }
   })
 
-  it('only the TAIL counts Ã¢â‚¬â€ a limit line quoted mid-report is not this spawnÃ¢â‚¬â„¢s death', () => {
+  it('only the TAIL counts — a limit line quoted mid-report is not this spawn’s death', () => {
     const buried = [LIMIT_LINE, ...Array.from({ length: QUOTA_SIGNATURE_TAIL_LINES + 3 }, (_, i) => `line ${i}`)]
     expect(detectQuotaSignature(buried.join('\n')).hit).toBe(false)
     // the same line inside the window still counts
@@ -578,7 +578,7 @@ describe('detectQuotaSignature Ã¢â‚¬â€ reading the spawnÃ¢â‚¬â
   })
 })
 
-describe('judgeSpawnOutcome Ã¢â‚¬â€ the limit gets its own state', () => {
+describe('judgeSpawnOutcome — the limit gets its own state', () => {
   const NOW = Date.UTC(2026, 6, 31, 3, 0, 0)
   const hit = { hit: true, signature: LIMIT_LINE, resetHint: '4:20pm (Europe/Berlin)' }
 
@@ -665,7 +665,7 @@ describe('judgeSpawnOutcome Ã¢â‚¬â€ the limit gets its own state', ()
     expect(r).toMatchObject({ state: 'progress', failCount: 0, quota: null, note: null })
   })
 
-  it('a spawn still coming up concludes NOTHING Ã¢â‚¬â€ the block and the count are carried', () => {
+  it('a spawn still coming up concludes NOTHING — the block and the count are carried', () => {
     const standing = { since: NOW - 3600_000, probes: 4 }
     for (const verdict of ['pending', 'none']) {
       const r = judgeSpawnOutcome({ verdict, quotaHit: null, failCount: 2, quota: standing, now: NOW })
@@ -677,7 +677,7 @@ describe('judgeSpawnOutcome Ã¢â‚¬â€ the limit gets its own state', ()
     }
   })
 
-  it('junk in, no crash out Ã¢â‚¬â€ the decision is fail-open', () => {
+  it('junk in, no crash out — the decision is fail-open', () => {
     for (const args of [undefined, {}, { verdict: 'nonsense' }, { verdict: 'failed', failCount: NaN, quotaHit: hit }]) {
       expect(() => judgeSpawnOutcome(args)).not.toThrow()
     }
@@ -687,7 +687,7 @@ describe('judgeSpawnOutcome Ã¢â‚¬â€ the limit gets its own state', ()
   })
 })
 
-describe('spawnBackoffMs Ã¢â‚¬â€ the quota short-circuit', () => {
+describe('spawnBackoffMs — the quota short-circuit', () => {
   it('a standing block probes at the floor whatever the ladder had climbed to', () => {
     for (const failCount of [0, 1, 5, 40]) {
       expect(spawnBackoffMs({ failCount, quota: true })).toBe(SPAWN_BACKOFF_BASE_MS)
@@ -696,18 +696,18 @@ describe('spawnBackoffMs Ã¢â‚¬â€ the quota short-circuit', () => {
   })
 })
 
-describe('announceSpawn Ã¢â‚¬â€ a standing block is not news every quarter of an hour', () => {
+describe('announceSpawn — a standing block is not news every quarter of an hour', () => {
   it('a probe under a known block is logged, not pushed', () => {
     expect(announceSpawn({ quota: { since: 1, probes: 3 } })).toBe(false)
   })
 
-  it('an ordinary spawn Ã¢â‚¬â€ and the first one after the block clears Ã¢â‚¬â€ announces itself', () => {
+  it('an ordinary spawn — and the first one after the block clears — announces itself', () => {
     expect(announceSpawn({ quota: null })).toBe(true)
     expect(announceSpawn()).toBe(true)
   })
 })
 
-describe('spawnProgressed Ã¢â‚¬â€ the launcherÃ¢â‚¬â„¢s own pending lock is not progress', () => {
+describe('spawnProgressed — the launcher’s own pending lock is not progress', () => {
   const SPAWNED = 1_785_200_000_000
 
   it('a moved head is progress', () => {
@@ -719,9 +719,9 @@ describe('spawnProgressed Ã¢â‚¬â€ the launcherÃ¢â‚¬â„¢s own
     expect(spawnProgressed({ lock, lastSpawnAt: SPAWNED })).toBe(true)
   })
 
-  it('THE TRAP: the launcherÃ¢â‚¬â„¢s own pending-spawn lock is stamped AFTER the spawn and is not progress', () => {
+  it('THE TRAP: the launcher’s own pending-spawn lock is stamped AFTER the spawn and is not progress', () => {
     // acquire() writes it at the top of the tick and updateOwnLock() re-stamps it
-    // to Date.now() when it binds the child Ã¢â‚¬â€ always later than `lastSpawnAt`. A
+    // to Date.now() when it binds the child — always later than `lastSpawnAt`. A
     // spawn refused by the usage limit converts nothing and leaves it standing, so
     // counting it would read every stillborn spawn as a success and no refusal
     // would ever be classified.
