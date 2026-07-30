@@ -17,11 +17,13 @@
 //   - TASKS.md open/done ticks
 //   - the .now card titles of the registered dashboard
 //
-// Manual drive: node scripts/dashboard-sync.mjs --status
+// Manual drive: node scripts/dashboard-sync.mjs --status  (state + verdict)
+//               node scripts/dashboard-sync.mjs --drifts  (what it catches)
 import { readFileSync, existsSync } from 'node:fs'
 import { execSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import {
+  formatDriftReport,
   nowCardTitles,
   parseWorktreeBranches,
   parseTasksPoints,
@@ -74,6 +76,14 @@ function readCards() {
   } catch {
     return null // dashboard unreadable → core fails open
   }
+}
+
+// --drifts: the catalogue of what this guard blocks on (point 308's report
+// deliverable). Generated from the DRIFTS table the verdicts are stamped from,
+// so it cannot describe a check the code no longer has.
+if (process.argv[2] === '--drifts') {
+  console.log(formatDriftReport())
+  process.exit(0)
 }
 
 // --status: print the gathered state and the verdict (manual inspection).

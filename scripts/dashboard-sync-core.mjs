@@ -193,8 +193,62 @@ export function matches(card, state) {
   return false
 }
 
-const block = (reason) => ({ block: true, reason })
-const ALLOW = { block: false, reason: '' }
+/**
+ * THE DRIFT CATALOGUE — what this guard actually catches, as data (point 308's
+ * last deliverable). It is a TABLE and not a paragraph in a document for the
+ * reason this whole file exists: prose about a mechanism ages away from the
+ * mechanism. `evaluate` stamps the id it fired on into its verdict, and a test
+ * pins the two directions — every id here is producible, and no block path
+ * produces an id that is not here. `node scripts/dashboard-sync.mjs --drifts`
+ * prints it.
+ */
+export const DRIFTS = Object.freeze([
+  Object.freeze({
+    id: 'no-card',
+    detects: 'the board shows NO current work while the work order still has open points',
+    example: '»Woran ich gerade arbeite« is empty while 308 and 411 are open',
+  }),
+  Object.freeze({
+    id: 'head-drift',
+    detects: 'the working tree is on a point branch that no now-card names',
+    example: 'the card says »306« but HEAD is on »feat/224-workflow«',
+  }),
+  Object.freeze({
+    id: 'unknown-point',
+    detects: 'a now-card names a point that exists neither in the work order nor on any branch',
+    example: 'a card »999 — Phantom« survives a typo or a renumbering',
+  }),
+  Object.freeze({
+    id: 'stale-done',
+    detects: 'every point a now-card names is ticked done and no branch still works one',
+    example: 'the »306« card still stands after 306 was merged and its branch pruned',
+  }),
+  Object.freeze({
+    id: 'agent-claim',
+    detects: 'a card claims running delegated work while no agent worktree exists and HEAD is on no work branch',
+    example: '»Fable-Verifikationen + Agent-Pool« with an empty pool',
+  }),
+])
+
+/** The catalogue as a readable report — the `--drifts` output. PURE. */
+export function formatDriftReport(drifts = DRIFTS) {
+  const list = Array.isArray(drifts) ? drifts : []
+  const lines = [
+    'dashboard-sync: the drifts this guard BLOCKS a turn end on (read-only — it never edits the card).',
+    '',
+  ]
+  for (const d of list) {
+    lines.push(`  [${d?.id}] ${d?.detects}`)
+    lines.push(`      e.g. ${d?.example}`)
+  }
+  lines.push('')
+  lines.push('Signals it reads: the HEAD branch, the branches of the other git worktrees (the agent pool),')
+  lines.push('the work order ticks, and the now-card titles. Anything unreadable ALLOWS the stop.')
+  return lines.join('\n')
+}
+
+const block = (reason, drift) => ({ block: true, reason, drift })
+const ALLOW = { block: false, reason: '', drift: null }
 
 const FIX =
   ' Fix the CARD (rewrite it to the real current work, republish via dashboard-publish.mjs + ' +
@@ -229,6 +283,7 @@ export function evaluate(input) {
         'DASHBOARD SYNC: no »Woran ich gerade arbeite« card found while TASKS.md still has open ' +
           `point(s) ${open.slice(0, 6).join(', ')}${open.length > 6 ? ', …' : ''}.` +
           FIX,
+        'no-card',
       )
     }
     return ALLOW
@@ -251,6 +306,7 @@ export function evaluate(input) {
       `DASHBOARD SYNC: HEAD is on ${headBranch} (point ${headPoint}) but no now-card names point ` +
         `${headPoint} — the card(s) say ${cards.map((c) => `»${c.raw}«`).join(', ')}.` +
         FIX,
+      'head-drift',
     )
   }
 
@@ -269,6 +325,7 @@ export function evaluate(input) {
           `DASHBOARD SYNC: now-card »${c.raw}« names point(s) ${unknown.join(', ')} that exist ` +
             'neither in TASKS.md nor on any branch.' +
             FIX,
+          'unknown-point',
         )
       }
 
@@ -280,6 +337,7 @@ export function evaluate(input) {
           `DASHBOARD SYNC: now-card »${c.raw}« only names point(s) ${points.join(', ')} that are ` +
             'ALL ticked done in TASKS.md, and no branch still works them — the card is stale.' +
             FIX,
+          'stale-done',
         )
       }
     }
@@ -292,6 +350,7 @@ export function evaluate(input) {
         `DASHBOARD SYNC: now-card »${c.raw}« claims running agent work, but the worktree agent ` +
           'pool is empty and HEAD is not on a work branch.' +
           FIX,
+        'agent-claim',
       )
     }
 
