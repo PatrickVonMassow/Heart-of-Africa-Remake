@@ -104,6 +104,12 @@ function shellRecordKind(command) {
       // Retiring an entry is the second half of the same duty, so a turn that
       // only drains the carrier is a recording turn too.
       if (/\s--drained\b/.test(segment)) return 'finding-drained'
+      // Depositing a request, and both ways of retiring one, are the same duty
+      // for the second kind (point 462). `--requests` merely LISTS, and the
+      // word boundary keeps it out.
+      if (/\s--request\b/.test(segment)) return 'request-deposited'
+      if (/\s--queued\b/.test(segment)) return 'request-queued'
+      if (/\s--blocked\b/.test(segment)) return 'request-blocked'
     }
     // THE DECLARED WAIT IS A RECORD (four-eyes review of the arming, 30.07.2026).
     // A turn that hands work OUT — the pool of three, the mandated delegation —

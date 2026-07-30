@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { auditFindings, malformedEntries, markDrained, parseCarrier, parseHead, tallyTurn, turnTakesBoundary } from './findings-core.mjs'
+import {
+  auditFindings,
+  classifyCall,
+  malformedEntries,
+  markDrained,
+  parseCarrier,
+  parseHead,
+  tallyTurn,
+  turnTakesBoundary,
+} from './findings-core.mjs'
 import {
   formatRequest,
   markBlocked,
@@ -183,6 +192,21 @@ describe('a malformed request warns and never blocks', () => {
   it('formats a request for the owner without throwing on a half-written one', () => {
     expect(formatRequest(requestEntries(deposit())[0])).toContain('append VERBATIM')
     expect(formatRequest(null)).toBe('')
+  })
+})
+
+describe('depositing and retiring a request are durable records', () => {
+  const record = (command) => classifyCall({ name: 'Bash', command }).record
+
+  it('counts the deposit and both retirements', () => {
+    expect(record('node scripts/finding.mjs --request "t" --spec-file spec.md')).toBe('request-deposited')
+    expect(record('node scripts/finding.mjs --queued "t" --point 481')).toBe('request-queued')
+    expect(record('node scripts/finding.mjs --blocked "t" --why "x"')).toBe('request-blocked')
+  })
+
+  it('does NOT count merely listing them', () => {
+    expect(record('node scripts/finding.mjs --requests')).toBeUndefined()
+    expect(record('node scripts/finding.mjs --show "t"')).toBeUndefined()
   })
 })
 
