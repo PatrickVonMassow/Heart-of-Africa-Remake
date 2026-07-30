@@ -1,9 +1,30 @@
 # Work packages (bundles)
 
-A bundle is ONE branch, ONE verification and ONE regression round; a commit per
-member point stays. The split follows SHARED FILES and a shared verification, not
-theme alone — two points that touch the same module cost one round together and
-two apart, which is the whole saving.
+**ONE BRANCH PER POINT, not per bundle** (user decision 30.07.2026). The original
+rule read "a bundle is ONE branch, ONE verification and ONE regression round".
+The user weighed it and decided against, on two grounds that hold: the regression
+is already SCOPED per change — a scripts- or docs-only point runs the Vitest layer
+and nothing else, so the "saved round" it would buy is two minutes — and a whole
+bundle on one branch lands every one of its features in a single merge, which is
+neither reviewable nor attributable when one of them is wrong.
+
+What the bundle still IS, and why the grouping earns its keep:
+
+- **The ORDER.** Related points are worked in sequence, so the same code stays
+  fresh across them instead of being re-learned per point.
+- **The COLLISION MAP.** The split follows SHARED FILES, so it says which points
+  must NOT run in parallel. Two points in the same bundle that touch the same
+  module go on ONE branch — one commit each — because parallel agents would
+  otherwise overwrite each other. That is the only case where a branch carries
+  more than one point.
+- **The BOARD.** The queue is grouped by bundle, which is what makes ~100 open
+  points readable on a phone.
+
+Where the heavy verification really is per-branch expensive — the render bundles,
+whose points need the browser suites on both backends — the saving is taken at the
+END instead: several finished per-point branches merge, and ONE regression runs
+over the merged result. Per-point branches and per-bundle regression rounds are
+not in conflict.
 
 Bundles A–J were agreed with the user on 29.07.2026. K, L and M were cut the same
 evening for the open points the original scheme never covered, under the user's
