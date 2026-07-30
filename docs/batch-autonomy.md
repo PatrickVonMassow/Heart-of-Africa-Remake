@@ -104,6 +104,36 @@ from advisory claim-and-check to a HARD mutual exclusion in
   state, dirty tree, conflict markers, main↔origin divergence, TASKS.md) and
   remediates recoverably (abort half-merge, quarantine stash, rescue branch +
   reset to origin/main), logging everything to `.claude/doctor.log`.
+- **The doctor's gate accuses no one it cannot convict (point 431, 29.07.2026).**
+  Three times in one afternoon `--gate` declared the repo CONSISTENT and then
+  reported the unit suite as broken by "the concurrent writes"; the same suite,
+  standalone on the same commit minutes later, was fully green — the gate had been
+  competing with a delegated agent's build. So the gate now reads the machine per
+  command (the point-296 quiet check, plus a scan for live agent worktrees) and
+  `judgeGateRun` grades each red: only a red on a MEASURED-QUIET machine with no
+  live worktree keeps the old wording and the stop order, a red under load is
+  INCONCLUSIVE — it names what was running and asks for a repeat once the pool is
+  idle, exit 0, the batch continues. In the log the evidence-grade red is printed
+  FIRST, so a reader sees which verdict counts. An unmeasured machine is not quiet:
+  it was believed once already.
+- **The demand is satisfied by a state, not by a turn (point 431).** The hook fired
+  the ~3-minute gate every turn while the other session merely existed. What is
+  judged is the STATE — this HEAD beside these parallel session ids — so a green
+  gate records that pair (`satisfiedGate` in `doctor-state.json`) and
+  `batch-progress-guard` drops the demand until the head moves or a new session
+  appears. Only a judgeable green records it: no `--gate`, a real red, an
+  inconclusive red or a pending repair all keep the demand live
+  (`shouldRecordSatisfaction`).
+- **An alert must name someone ELSE (point 431).** Twice in one evening the hook
+  reported "PARALLEL SESSION DETECTED (10a2d2e0…)" — the id of the session reading
+  it. The live detector always excluded the owner, but the alert is a FILE: written
+  by whoever noticed, read back later. Both the doctor and the guard now run the
+  record through `otherSessionsIn`, which drops the reader's and the owner's own
+  ids; an alert left naming nobody is discarded (and the doctor logs that it was),
+  and the block message names the OTHER session it found. An alert that cannot say
+  who else was there is not evidence of anyone else being there.
+  Decisions pure in `scripts/batch-doctor-core.mjs`, covered by
+  `scripts/batch-doctor-core.test.mjs`.
 - **Trust self-heals.** A headless `claude -p` in an untrusted workspace ignores
   the allow-list (a permission prompt would hang the unattended run). The launcher
   sets `hasTrustDialogAccepted` for the repo in `~/.claude.json` before spawning.

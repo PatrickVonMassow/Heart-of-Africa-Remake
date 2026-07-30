@@ -202,6 +202,23 @@ export function gateDemandSatisfied({ state, head, parallelSids = [] } = {}) {
   return typeof state?.satisfiedGate === 'string' && state.satisfiedGate === key
 }
 
+/**
+ * May THIS doctor run record the satisfaction? PURE.
+ *
+ * Only a run that ACTUALLY ran the gate and got a judgeable green may. A run
+ * without `--gate` never ran the suites; a red is a finding; and an INCONCLUSIVE
+ * red must not switch the demand off either — otherwise a busy machine would
+ * silently buy a pass, which is the mirror image of the bug this point fixes.
+ */
+export function shouldRecordSatisfaction({
+  gateRan = false,
+  broken = false,
+  inconclusive = false,
+  pendingRepair = false,
+} = {}) {
+  return !!gateRan && !broken && !inconclusive && !pendingRepair
+}
+
 // ---------------------------------------------------------------------------
 // AN ALERT MUST NAME SOMEONE ELSE (point 431, third half)
 // ---------------------------------------------------------------------------

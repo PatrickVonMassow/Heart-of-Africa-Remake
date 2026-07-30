@@ -22,6 +22,7 @@ import {
   judgeGateRun,
   gateKey,
   otherSessionsIn,
+  shouldRecordSatisfaction,
   INCONCLUSIVE_VERDICT,
 } from './batch-doctor-core.mjs'
 import { readOwnerLock, detectParallel, readUnhandledAlert, markAlertHandled, DOCTOR_STATE_PATH } from './batch-singleton.mjs'
@@ -238,10 +239,14 @@ const pendingRepair = needsRepair(plan) && !repair
 if (!pendingRepair && !gateFailed) {
   markAlertHandled()
   log('parallel alert marked handled')
-  // THE DEMAND IS SATISFIED BY A STATE, NOT BY A TURN (point 431, second half).
-  // The hook fired this gate every turn while the other session merely existed,
-  // at ~3 minutes of unit tests each time. What is judged is THIS head beside
-  // THESE sessions; recording the pair holds the demand until one of them moves.
+}
+// THE DEMAND IS SATISFIED BY A STATE, NOT BY A TURN (point 431, second half).
+// The hook fired this gate every turn while the other session merely existed,
+// at ~3 minutes of unit tests each time. What is judged is THIS head beside
+// THESE sessions; recording the pair holds the demand until one of them moves.
+// Only a run that actually ran the gate to a judgeable green may record it —
+// `shouldRecordSatisfaction` decides, so an inconclusive red cannot buy a pass.
+if (shouldRecordSatisfaction({ gateRan: gate, broken: gateFailed, inconclusive: gateInconclusive, pendingRepair })) {
   recordGateSatisfied()
 }
 if (pendingRepair) {
