@@ -15,9 +15,20 @@
  *   divergence: { ahead, behind },  // main vs origin/main
  *   tasksParses,            // TASKS.md checkbox format parses
  *   parallelDetected,       // a parallel session was live during the window
+ *
+ *   THE TORN STATES A KILL LEAVES BEHIND (point 443) — every one of them
+ *   OPTIONAL, so a caller that does not gather them plans exactly what it
+ *   planned before:
+ *   staleGitLocks: [{ path, ageMs }],        // (a) killed commit/push leftovers
+ *   worktrees: { pruneNeeded, orphanDirs },  // (b) half-registered / unknown on disk
+ *   strayProcesses: [{ pid, kind, cmd }],    // (c) an aborted verification's leftovers
+ *   tasksRecoverable,                        // (d) HEAD holds a parseable TASKS.md
+ *   stalePendingSpawn: { sessionId, ageMs }, // (e) a pending-spawn lock nobody converted
+ *   boardBehind: { reason },                 // (f) local board newer than the published page
+ *   ownerAlive,                              // a live owner forbids the process sweep
  * }
  * Returns an ordered list of actions:
- *   { action, level: 'auto' | 'repair' | 'alert', reason }
+ *   { action, level: 'auto' | 'repair' | 'alert', reason, targets? }
  * 'auto'   — safe, run on every doctor invocation
  * 'repair' — destructive-looking (still fully recoverable), runs only with --repair
  * 'alert'  — cannot be fixed mechanically; report loudly
@@ -25,6 +36,21 @@
 export function planRemediation(state) {
   const plan = []
   const div = state.divergence ?? { ahead: 0, behind: 0 }
+
+  // (a) FIRST, ALWAYS. A stale `index.lock` refuses every write git is asked for
+  // below — the abort, the stash, the reset — so clearing it is not one repair
+  // among several but the precondition of the rest of this plan.
+  const locks = state.staleGitLocks ?? []
+  if (locks.length > 0) {
+    plan.push({
+      action: 'clear-stale-git-locks',
+      level: 'repair',
+      targets: locks.map((l) => l.path),
+      reason:
+        `${locks.length} stale git lock file(s) survive a killed commit or push (${locks.map((l) => l.path).join(', ')}). ` +
+        'No git process can be holding them any more, and while they lie there every write git is asked for is refused.',
+    })
+  }
 
   if (state.mergeInProgress) {
     plan.push({
@@ -59,12 +85,28 @@ export function planRemediation(state) {
   }
   // ahead-only is the NORMAL owner state (unpushed commits) — no action.
 
+  // (d) A TRUNCATED WORK ORDER IS VERSIONED, so it is repairable rather than
+  // merely reportable. The alert stays for the case that is genuinely beyond a
+  // mechanism — HEAD's own copy does not parse either, i.e. the damage was
+  // committed — because restoring one broken file over another is not a repair.
   if (!state.tasksParses) {
-    plan.push({
-      action: 'alert-tasks-format',
-      level: 'alert',
-      reason: 'TASKS.md checkboxes no longer parse — a concurrent edit may have mangled the work order. Fix by hand; never read this as "batch complete".',
-    })
+    plan.push(
+      state.tasksRecoverable
+        ? {
+            action: 'restore-tasks-from-head',
+            level: 'repair',
+            reason:
+              'TASKS.md no longer parses, but HEAD carries a parseable copy — a kill during a write truncated the working file. ' +
+              'Restore it from HEAD; the damaged bytes are kept aside first, so nothing is thrown away unseen.',
+          }
+        : {
+            action: 'alert-tasks-format',
+            level: 'alert',
+            reason:
+              'TASKS.md checkboxes no longer parse and HEAD holds no parseable copy either — a concurrent edit may have mangled ' +
+              'the work order and the damage is committed. Fix by hand; never read this as "batch complete".',
+          },
+    )
   }
 
   if (state.conflictMarkers) {
@@ -72,6 +114,74 @@ export function planRemediation(state) {
       action: 'alert-conflict-markers',
       level: 'alert',
       reason: 'Tracked files contain conflict markers (<<<<<<<) — a conflicted merge was committed or left unresolved. Inspect and fix by hand.',
+    })
+  }
+
+  // (b) Worktrees, in two halves. `git worktree prune` is bookkeeping and safe
+  // enough to run unconditionally; a DIRECTORY git no longer lists is a real
+  // deletion and stays repair-gated. Six were lying around on 30.07.2026, four
+  // of them from the previous night.
+  const wt = state.worktrees ?? {}
+  if (wt.pruneNeeded) {
+    plan.push({
+      action: 'prune-worktrees',
+      level: 'auto',
+      reason: "git still administers worktree(s) whose directory is gone — `git worktree prune` clears the record (bookkeeping, nothing on disk is touched).",
+    })
+  }
+  const orphans = wt.orphanDirs ?? []
+  if (orphans.length > 0) {
+    plan.push({
+      action: 'remove-orphan-worktrees',
+      level: 'repair',
+      targets: orphans,
+      reason:
+        `${orphans.length} worktree director(y/ies) under .claude/worktrees/ that git no longer knows (${orphans.join(', ')}). ` +
+        'A half-finished removal leaves exactly these; they are removed through scripts/worktree-cleanup.mjs, which detaches ' +
+        'the node_modules junction first so the MAIN tree keeps its dependencies.',
+    })
+  }
+
+  // (c) An aborted verification leaves a headless browser and a dev server
+  // running, and they eat CPU for the rest of an unattended fortnight. Matched
+  // by COMMAND LINE and by this checkout's path — never by process name — and
+  // only while no live session could own them.
+  const strays = state.strayProcesses ?? []
+  if (strays.length > 0 && !state.ownerAlive) {
+    plan.push({
+      action: 'kill-stray-verify-processes',
+      level: 'repair',
+      targets: strays.map((s) => s.pid),
+      reason:
+        `${strays.length} leftover process(es) of an aborted verification in THIS checkout ` +
+        `(${strays.map((s) => `${s.pid} ${s.kind}`).join(', ')}), with no live session that could own them. ` +
+        'They hold ports the next verify run needs and burn CPU until somebody notices.',
+    })
+  }
+
+  // (e) A pending-spawn lock is a launcher's reservation that the spawned
+  // session converts to itself. One that nobody converted, past its own stale
+  // window and with a dead pid, reserves the batch against every future tick.
+  if (state.stalePendingSpawn) {
+    plan.push({
+      action: 'clear-stale-pending-lock',
+      level: 'repair',
+      reason:
+        `A pending-spawn lock (${state.stalePendingSpawn.sessionId}) has stood for ` +
+        `${Math.round((state.stalePendingSpawn.ageMs ?? 0) / 60000)} min without a session converting it, and its process is gone. ` +
+        'Until it is cleared, every launcher tick reads the batch as reserved and spawns nothing.',
+    })
+  }
+
+  // (f) The board is the only thing the user can see while away, so a publish
+  // that died between the local edit and the push is a silent blackout.
+  if (state.boardBehind) {
+    plan.push({
+      action: 'republish-board',
+      level: 'repair',
+      reason:
+        `The published board is behind the local one (${state.boardBehind.reason}). ` +
+        'The reader on the phone sees a board that stands still; `node scripts/board-publish.mjs` re-runs the transport.',
     })
   }
 
@@ -128,9 +238,51 @@ export function isConsistent(plan) {
  *  sitting in. A read-only check plus the mandate is what such a tick gets. */
 const REPAIR_SAFE_REASONS = new Set(['pid-dead', 'pid-reused', 'heartbeat-predates-boot', 'handed-over', 'no-lock', 'legacy-stale'])
 
-export function repoRepairAllowed(reason) {
-  return REPAIR_SAFE_REASONS.has(String(reason ?? ''))
+/**
+ * MAY THIS TICK LET THE DOCTOR WRITE? PURE.
+ *
+ * THE LEASE SHADOWS A PROVABLY DEAD PID (point 443 (g), four-eyes re-review of the
+ * pre-spawn check). `assessOwner` tests the expired lease BEFORE it probes the pid,
+ * so an owner that is BOTH dead and lease-expired — the machine slept, the launcher
+ * was off for an hour, i.e. the likely shape of an unattended fortnight — reads
+ * `lease-expired`, and the launcher then declined to mend its tree even though the
+ * process was gone. The direction was safe (the successor still inherits the repair
+ * through the mandate, so the batch never stopped), but it is a diagnosis lost for
+ * nothing.
+ *
+ * So the lease-expired branch now asks the pid itself. `probe` is `probePid`'s
+ * shape; `lock` supplies the recorded start time so PID REUSE counts as gone too —
+ * a number inherited by a stranger's process is not the owner. An unprobed or
+ * still-running pid keeps the read-only treatment, unchanged: the finding this
+ * closes is the dead one, not the silent one.
+ */
+export function repoRepairAllowed(reason, { probe = null, lock = null } = {}) {
+  const r = String(reason ?? '')
+  if (REPAIR_SAFE_REASONS.has(r)) return true
+  if (r !== 'lease-expired') return false
+  return pidProvablyGone({ probe, lock })
 }
+
+/** Is the process behind a lock provably gone? PURE. Absent evidence means NO —
+ *  an unreadable probe must never license a write into a live owner's tree. */
+export function pidProvablyGone({ probe = null, lock = null } = {}) {
+  const pid = typeof lock?.pid === 'number' && lock.pid > 0 ? lock.pid : null
+  if (pid === null) return false // a legacy lock records no pid: nothing to prove
+  if (!probe) return false
+  if (probe.exists !== true) return true // the pid is gone
+  // The pid exists but belongs to a DIFFERENT process (reuse) — the owner is gone
+  // just as surely. The tolerance is batch-singleton's own PID_START_TOLERANCE_MS.
+  return (
+    typeof lock.pidStartedAt === 'number' &&
+    typeof probe.startedAt === 'number' &&
+    Math.abs(probe.startedAt - lock.pidStartedAt) > PID_START_TOLERANCE_MS
+  )
+}
+
+/** Mirrors batch-singleton's constant. Duplicated rather than imported so this
+ *  module stays pure and dependency-free; `scripts/batch-doctor-core.test.mjs`
+ *  asserts the two agree. */
+export const PID_START_TOLERANCE_MS = 2000
 
 /** What the launcher does with the doctor's exit code before spawning. PURE.
  *
@@ -182,6 +334,50 @@ export function resumeRepairMandate({ ran = true, code = 0 } = {}) {
     'work order, committed conflict markers — fix by hand, and only then continue the batch. Building on a torn tree ' +
     'is how one interrupted merge becomes a day of wrong work.'
   )
+}
+
+// ---------------------------------------------------------------------------
+// THE MANDATE MARKER (point 442's seam, put under test by point 443 (h))
+// ---------------------------------------------------------------------------
+//
+// The launcher leaves its doctor verdict in `.claude/repo-mandate.json` so the
+// session it spawns seconds later need not re-run the check. Three mechanics
+// keep that shortcut honest, and until 30.07.2026 all three lived in untested
+// wiring inside scripts/batch-resume-hook.mjs:
+//   ONE-SHOT   the marker is consumed by the first reader, readable or not — a
+//              corrupt one used to throw past the deletion and be re-parsed at
+//              every session start for ever.
+//   EXPIRY     a marker older than the window describes a tree that has since
+//              been worked in; it mandates nothing.
+//   FALSE      a CLEAN tick deletes any marker a failed earlier tick left, so a
+//              healthy successor is never handed "repo not clean".
+// The consumption itself is in scripts/batch-doctor-states.mjs; this is the rule.
+
+/** How long a launcher's verdict describes the tree a session wakes up in. */
+export const MANDATE_MAX_AGE_MS = 15 * 60 * 1000
+
+/**
+ * What a marker's RAW BYTES mean. PURE — the caller has already deleted the file.
+ *
+ * Returns `{ verdict, ran, code }`: 'mandate' with the doctor's exit code, 'clean'
+ * for a marker that recorded exit 0, or 'none' for absent/unreadable/expired — all
+ * three of which mean "the launcher's verdict is unusable, ask the doctor yourself".
+ * A marker with an unusable code counts as a FINDING (code 1), never as clean: the
+ * launcher only ever writes one when it has something to say.
+ */
+export function mandateMarkerVerdict({ raw = null, now = Date.now(), maxAgeMs = MANDATE_MAX_AGE_MS } = {}) {
+  if (typeof raw !== 'string' || !raw.trim()) return { verdict: 'none', ran: false, code: null }
+  let m
+  try {
+    m = JSON.parse(raw)
+  } catch {
+    return { verdict: 'none', ran: false, code: null }
+  }
+  if (!m || !Number.isFinite(m.at) || now - m.at > maxAgeMs || now - m.at < 0) {
+    return { verdict: 'none', ran: false, code: null }
+  }
+  const code = Number.isFinite(m.code) ? Number(m.code) : 1
+  return code === 0 ? { verdict: 'clean', ran: true, code: 0 } : { verdict: 'mandate', ran: true, code }
 }
 
 // ---------------------------------------------------------------------------

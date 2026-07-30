@@ -25,8 +25,24 @@ import {
   shouldRecordSatisfaction,
   INCONCLUSIVE_VERDICT,
 } from './batch-doctor-core.mjs'
-import { readOwnerLock, detectParallel, readUnhandledAlert, markAlertHandled, DOCTOR_STATE_PATH } from './batch-singleton.mjs'
-import { readMachine } from './verify/machine-load.mjs'
+import {
+  clearStaleGitLocks,
+  clearStalePendingSpawn,
+  findBoardBehind,
+  findStaleGitLocks,
+  findStalePendingSpawn,
+  findStrayVerifyProcesses,
+  findWorktreeTrouble,
+  killStrayProcesses,
+  pruneWorktrees,
+  removeOrphanWorktrees,
+  republishBoard,
+  restoreTasksFromHead,
+  tasksRecoverableFromHead,
+  tasksTextParses,
+} from './batch-doctor-states.mjs'
+import { readOwnerLock, detectParallel, readUnhandledAlert, markAlertHandled, assessOwner, bootTimeMs, probePid, LOCK_PATH, DOCTOR_STATE_PATH } from './batch-singleton.mjs'
+import { readMachine, listProcesses, repoMarker } from './verify/machine-load.mjs'
 
 const REPO = fileURLToPath(new URL('..', import.meta.url))
 const LOG = join(REPO, '.claude', 'doctor.log')
@@ -109,10 +125,7 @@ try {
 
 let tasksParses = true
 try {
-  const t = readFileSync(join(REPO, 'TASKS.md'), 'utf8')
-  const sawCheckbox = /^- \[/m.test(t)
-  const parses = /^- \[[ x]\] \d+\./m.test(t)
-  tasksParses = !sawCheckbox || parses
+  tasksParses = tasksTextParses(readFileSync(join(REPO, 'TASKS.md'), 'utf8'))
 } catch {
   tasksParses = false
 }
@@ -133,10 +146,50 @@ if (rawAlert && !alert) {
 const parallelDetected = parallelNow.length > 0 || !!alert
 const parallelSids = [...new Set([...parallelNow.map((p) => p.sid), ...alertOthers])]
 
+// --- THE TORN STATES A KILL LEAVES BEHIND (point 443) ---------------------------
+// A kill during a critical action leaves more behind than a half merge, and until
+// 30.07.2026 the doctor could not see any of it. Each gather is wrapped fail-open:
+// one unreadable state must never cost the diagnosis of the other five.
+const nowMs = Date.now()
+
+const gather = (what, fn, fallback) => {
+  try {
+    return fn()
+  } catch (e) {
+    log(`warn: could not read ${what} (${(e && e.message) || e}) — that state is not judged this run`)
+    return fallback
+  }
+}
+
+// TRUE is the safe fallback here, not false: `ownerAlive` GATES the process sweep,
+// so an unreadable owner state must suppress the kill, never license it.
+const ownerAlive = gather(
+  'the owner liveness',
+  () => (owner ? assessOwner(owner, { now: nowMs, bootTime: bootTimeMs(), probe: owner.pid ? probePid(owner.pid) : null }).alive : false),
+  true,
+)
+const gitDir = gather('the git directory', () => git(['rev-parse', '--absolute-git-dir']), '')
+const staleGitLocks = gather('the git lock files', () => findStaleGitLocks({ gitDir, now: nowMs }), [])
+const worktrees = gather('the worktree list', () => findWorktreeTrouble({ repo: REPO, git, now: nowMs }), {})
+const strays = gather(
+  'the process table',
+  () => findStrayVerifyProcesses({ processes: listProcesses(), pid: process.pid, repoMarker: repoMarker(REPO) }),
+  [],
+)
+const tasksRecoverable = tasksParses ? false : gather('HEAD:TASKS.md', () => tasksRecoverableFromHead({ git }), false)
+const stalePendingSpawn = gather('the batch lock', () => findStalePendingSpawn({ lockPath: LOCK_PATH, now: nowMs, probe: probePid }), null)
+const boardBehind = gather('the board publish record', () => findBoardBehind({ repo: REPO }), null)
+
 log(
   `state: branch=${branch} mergeInProgress=${mergeInProgress} dirty=${dirtyFiles.length} ` +
     `conflictMarkers=${conflictMarkers} divergence=+${divergence.ahead}/-${divergence.behind} ` +
     `tasksParses=${tasksParses} parallelNow=${parallelNow.length} unhandledAlert=${alert ? 'yes' : 'no'}`,
+)
+log(
+  `torn states: gitLocks=${staleGitLocks.length} worktreePrune=${!!worktrees.pruneNeeded} ` +
+    `orphanWorktrees=${(worktrees.orphanDirs ?? []).length} strayProcesses=${strays.length} ` +
+    `tasksRecoverable=${tasksRecoverable} stalePendingSpawn=${stalePendingSpawn ? 'yes' : 'no'} ` +
+    `boardBehind=${boardBehind ? 'yes' : 'no'} ownerAlive=${ownerAlive}`,
 )
 
 // --- Plan + execute ------------------------------------------------------------
@@ -149,6 +202,13 @@ const plan = planRemediation({
   divergence,
   tasksParses,
   parallelDetected,
+  staleGitLocks,
+  worktrees,
+  strayProcesses: strays,
+  tasksRecoverable,
+  stalePendingSpawn,
+  boardBehind,
+  ownerAlive,
 })
 
 if (plan.length === 0) log('repo state CONSISTENT — no remediation needed')
@@ -182,6 +242,49 @@ for (const a of plan) {
     } else if (a.action === 'fast-forward') {
       git(['merge', '--ff-only', 'origin/main'])
       log('EXECUTED fast-forward: local main fast-forwarded to origin/main')
+    } else if (a.action === 'clear-stale-git-locks') {
+      // (a) — and FIRST in the plan, so everything above could write at all.
+      const removed = clearStaleGitLocks(staleGitLocks)
+      log(`EXECUTED clear-stale-git-locks: removed ${removed.length} stale lock file(s) (${removed.join(', ')})`)
+    } else if (a.action === 'prune-worktrees') {
+      pruneWorktrees(git)
+      log("EXECUTED prune-worktrees: git's record of vanished worktrees cleared")
+    } else if (a.action === 'remove-orphan-worktrees') {
+      const { removed, refused } = removeOrphanWorktrees(worktrees.orphanDirs ?? [], { git })
+      log(`EXECUTED remove-orphan-worktrees: removed ${removed.length} orphan worktree director(y/ies) (${removed.join(', ') || 'none'})`)
+      for (const r of refused) {
+        // A target that judges REGISTERED at execute time is a live worktree, not
+        // debris — refusing it is the finding, not a failure of the run.
+        log(`REFUSED remove-orphan-worktrees for ${r.path}: ${r.reason}`)
+        alertsRemain = true
+      }
+    } else if (a.action === 'kill-stray-verify-processes') {
+      const { killed, failed } = killStrayProcesses(strays)
+      log(`EXECUTED kill-stray-verify-processes: ended ${killed.length} leftover process(es) of an aborted verification (pid ${killed.join(', ') || 'none'})`)
+      for (const f of failed) {
+        log(`FAILED to end pid ${f.pid} (${f.reason}) — it is not this user's to signal; end it by hand`)
+        alertsRemain = true
+      }
+    } else if (a.action === 'restore-tasks-from-head') {
+      const r = restoreTasksFromHead({ repo: REPO, git, now: nowMs })
+      log(
+        r.restored
+          ? `EXECUTED restore-tasks-from-head: TASKS.md restored from HEAD; the damaged bytes are kept at ${r.backup ?? '(the file was missing)'}`
+          : 'SKIPPED restore-tasks-from-head: the working copy parses again — nothing to restore',
+      )
+    } else if (a.action === 'clear-stale-pending-lock') {
+      // Re-read at execute time: a launcher tick or a returning session can win
+      // the lock between the gather and here, and deleting a LIVE reservation is
+      // how two sessions end up in one batch.
+      const r = clearStalePendingSpawn({ lockPath: LOCK_PATH, now: Date.now(), probe: probePid, expect: stalePendingSpawn })
+      log(
+        r.removed
+          ? `EXECUTED clear-stale-pending-lock: the pending-spawn lock of ${r.reason} was removed — the next tick may spawn again`
+          : `SKIPPED clear-stale-pending-lock: ${r.reason} — nothing was removed`,
+      )
+    } else if (a.action === 'republish-board') {
+      republishBoard({ repo: REPO })
+      log('EXECUTED republish-board: scripts/board-publish.mjs re-ran — the reader sees the current board again')
     }
   } catch (e) {
     log(`FAILED ${a.action}: ${e && e.message} — fix by hand`)

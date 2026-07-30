@@ -231,3 +231,129 @@ describe('the launcher keys a board fault only on a real notification', () => {
     expect(code).toMatch(/else if \(r\.key === null\)/)
   })
 })
+
+// ---------------------------------------------------------------------------
+// POINT 443 (g) + (h) — wiring the launcher cannot prove any other way.
+//
+// The pure rules are pinned in batch-doctor-core.test.mjs and the filesystem
+// mechanics in batch-doctor-states.test.mjs. What NEITHER can see is whether the
+// launcher actually calls them: this file cannot be imported (the assertion at the
+// top of this suite is exactly why), so the source-reading witness the spawn
+// builders and the board watchdog already get is the only instrument available.
+describe('the launcher lets a provably dead pid outrank an expired lease (443 g)', () => {
+  const codeLines = readFileSync(resolve(process.cwd(), 'scripts', 'batch-autostart.mjs'), 'utf8')
+    .split('\n')
+    .filter((l) => !l.trimStart().startsWith('//'))
+  const code = codeLines.join('\n')
+
+  it('passes the pid probe AND the lock into repoRepairAllowed', () => {
+    // Without both, the decision cannot tell a dead owner from a silent one, and
+    // an owner that is BOTH dead and lease-expired keeps its tree unmended.
+    expect(code).toMatch(/repoRepairAllowed\(assessment\.reason,\s*\{[^}]*\bprobe\b[^}]*\block\b[^}]*\}\)/)
+  })
+
+  it('still decides the WRITE through the pure core, never inline', () => {
+    expect(code).toMatch(/import \{[^}]*repoRepairAllowed[^}]*\} from '\.\/batch-doctor-core\.mjs'/)
+    expect(codeLines.filter((l) => /repoRepairAllowed\(/.test(l))).toHaveLength(1)
+  })
+})
+
+describe('the launcher persists its state on the two spawn-failure exits (443 h)', () => {
+  const codeLines = readFileSync(resolve(process.cwd(), 'scripts', 'batch-autostart.mjs'), 'utf8')
+    .split('\n')
+    .filter((l) => !l.trimStart().startsWith('//'))
+  const code = codeLines.join('\n')
+
+  it('leaves NO bare process.exit(1) after the repo alert was recorded', () => {
+    // `state.repoAlertAt` is written minutes before these two exits. A bare exit
+    // throws it away, so the standing repo alert fires again at the very next
+    // tick — an unthrottled alarm every quarter of an hour, in a mode that is
+    // already alarming.
+    const alertAt = codeLines.findIndex((l) => /state\.repoAlertAt = now/.test(l))
+    expect(alertAt, 'the repo alert stamp must exist').toBeGreaterThanOrEqual(0)
+    const after = codeLines.slice(alertAt)
+    for (const l of after) {
+      if (/process\.exit\(1\)/.test(l)) throw new Error(`a bare exit(1) after the repo alert: ${l.trim()}`)
+    }
+  })
+
+  it('exits both failure paths through bail(), which writes the state first', () => {
+    expect(code).toMatch(/no bundled claude\.exe found[\s\S]{0,400}?bail\(1\)/)
+    expect(code).toMatch(/could not spawn claude[\s\S]{0,400}?bail\(1\)/)
+    expect(code).toMatch(/const bail =[^\n]*writeJsonAtomic\(C\('autostart-state\.json'\), state\)/)
+  })
+
+  it('writes and clears the mandate marker through the tested helpers', () => {
+    expect(code).toMatch(/import \{[^}]*writeMandateMarker[^}]*\} from '\.\/batch-doctor-states\.mjs'/)
+    expect(code).toMatch(/writeMandateMarker\(\{ path: C\('repo-mandate\.json'\)/)
+    expect(code).toMatch(/clearMandateMarker\(\{ path: C\('repo-mandate\.json'\) \}\)/)
+    // The hand-written rmSync/writeJsonAtomic pair is gone: one-shot, expiry and
+    // the false-mandate clear are one mechanism now, and it is under test.
+    expect(code).not.toMatch(/rmSync\(C\('repo-mandate\.json'\)/)
+    expect(code).not.toMatch(/writeJsonAtomic\(C\('repo-mandate\.json'\)/)
+  })
+})
+
+// The doctor's own wiring: the states module is what makes the six torn states
+// visible at all, and a plan the wrapper never executes is a plan that repairs
+// nothing.
+describe('the doctor gathers and executes the torn states (443 a-f)', () => {
+  const doctor = readFileSync(resolve(process.cwd(), 'scripts', 'batch-doctor.mjs'), 'utf8')
+
+  it('gathers every one of the six', () => {
+    for (const fn of [
+      'findStaleGitLocks',
+      'findWorktreeTrouble',
+      'findStrayVerifyProcesses',
+      'tasksRecoverableFromHead',
+      'findStalePendingSpawn',
+      'findBoardBehind',
+    ]) {
+      expect(doctor.includes(`${fn}(`), `${fn} is never called`).toBe(true)
+    }
+  })
+
+  it('executes every action its planner can plan', () => {
+    for (const [action, fn] of [
+      ['clear-stale-git-locks', 'clearStaleGitLocks'],
+      ['prune-worktrees', 'pruneWorktrees'],
+      ['remove-orphan-worktrees', 'removeOrphanWorktrees'],
+      ['kill-stray-verify-processes', 'killStrayProcesses'],
+      ['restore-tasks-from-head', 'restoreTasksFromHead'],
+      ['clear-stale-pending-lock', 'clearStalePendingSpawn'],
+      ['republish-board', 'republishBoard'],
+    ]) {
+      expect(doctor.includes(`'${action}'`), `${action} is planned but never executed`).toBe(true)
+      expect(doctor.includes(`${fn}(`), `${action}'s repair (${fn}) is never called`).toBe(true)
+    }
+  })
+
+  it('reads the work-order parse rule from the shared helper, not a second copy', () => {
+    expect(doctor).toMatch(/tasksTextParses\(/)
+    expect(doctor).not.toMatch(/sawCheckbox/)
+  })
+
+  // --- The four-eyes fixes, at the one place a module test cannot reach them ---
+  it('gathers ownerAlive INSIDE the fail-open wrapper, and defaults it to TRUE', () => {
+    // `ownerAlive` GATES the process sweep, so an unreadable owner state must
+    // SUPPRESS the kill, never license it — and outside the wrapper a probe fault
+    // would abort the whole gather block (four-eyes F5).
+    expect(doctor).toMatch(/const ownerAlive = gather\(/)
+    expect(doctor).toMatch(/'the owner liveness',[\s\S]{0,400}?\n {2}true,\n\)/)
+  })
+
+  it('re-reads the pending lock at execute time rather than deleting the path blind', () => {
+    expect(doctor).toMatch(/clearStalePendingSpawn\(\{ lockPath: LOCK_PATH,[^\n]*probe: probePid,[^\n]*expect: stalePendingSpawn \}\)/)
+  })
+
+  it('reports a REFUSED worktree removal and a FAILED kill as findings, not as successes', () => {
+    expect(doctor).toMatch(/const \{ removed, refused \} = removeOrphanWorktrees\(/)
+    expect(doctor).toMatch(/REFUSED remove-orphan-worktrees/)
+    expect(doctor).toMatch(/const \{ killed, failed \} = killStrayProcesses\(/)
+    expect(doctor).toMatch(/FAILED to end pid/)
+    // Both must raise the exit code rather than pass silently.
+    const between = (from, to) => doctor.slice(doctor.indexOf(from), doctor.indexOf(to))
+    expect(between('REFUSED remove-orphan-worktrees', "a.action === 'restore-tasks-from-head'")).toMatch(/alertsRemain = true/)
+    expect(between('FAILED to end pid', "a.action === 'restore-tasks-from-head'")).toMatch(/alertsRemain = true/)
+  })
+})

@@ -37,8 +37,9 @@
 // itself is wedged and no Stop hook will ever run again.
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+import { writeTextAtomic } from './atomic-write.mjs'
 import { REPO_ROOT, STATE_PATH, readJson, mergeState } from './dashboard-state.mjs'
 import { refreshFooter } from './board-core.mjs'
 import { structureViolations } from './board-structure-core.mjs'
@@ -178,7 +179,9 @@ try {
   const { open } = parseTasks(readFileSync(tasksPath, 'utf8'))
   const refreshed = refreshFooter(html, { openCount: open.length })
   if (refreshed !== html) {
-    writeFileSync(boardFile, refreshed)
+    // Atomic (point 443, four-eyes F3) — and this one writes the very file the
+    // next lines read, hash and push to the public page.
+    writeTextAtomic(boardFile, refreshed)
     console.log(`footer refreshed: ${open.length} open point(s)`)
   }
 } catch (e) {

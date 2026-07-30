@@ -618,11 +618,21 @@ two — the three-minute suite stays a session's job.
 
 **It may WRITE only where the previous owner is provably gone** (`repoRepairAllowed`:
 `pid-dead`, `pid-reused`, `heartbeat-predates-boot`, `handed-over`, `no-lock`,
-`legacy-stale`). An expired LEASE is deliberately not in that set: such a process is
-ALIVE and merely silent — the 30.07.2026 permission outage had exactly that shape,
-and it stands down at its next hook — so `git merge --abort` or `git stash push -u`
-in its tree would discard the merge it is resolving. There the check is read-only
-and the successor is told instead.
+`legacy-stale`). An expired LEASE alone is deliberately not in that set: such a
+process is usually ALIVE and merely silent — the 30.07.2026 permission outage had
+exactly that shape, and it stands down at its next hook — so `git merge --abort` or
+`git stash push -u` in its tree would discard the merge it is resolving. There the
+check is read-only and the successor is told instead.
+
+**But the lease no longer SHADOWS a provably dead pid** (point 443 (g), four-eyes
+re-review). `assessOwner` tests the expired lease BEFORE it probes the pid, so an
+owner that is BOTH dead and lease-expired — the machine slept, the launcher was off
+for an hour, i.e. the likely shape of an unattended fortnight — read `lease-expired`,
+and the launcher declined to mend its tree even though the process was gone.
+`repoRepairAllowed` now consults the probe on that one branch and permits the write
+once the process is provably gone (the pid absent, or its start time proving REUSE).
+Absent evidence still means "not gone": an unreadable probe may never license a
+write into a live owner's tree.
 
 **It never refuses to spawn.** The first draft did, and that was the mechanism
 making things worse than the status quo: an exit-1 state — a committed conflict
@@ -649,6 +659,104 @@ FAIL-OPEN both times. A doctor that cannot run at all spawns anyway and says so
 loudly (the session side stays silent about it — the launcher's alert already
 carries that news, and a session cannot mend a broken doctor). A safeguard may cost
 a diagnosis; it may never cost the work.
+
+**THE MANDATE MARKER, under test at last** (point 443 (h)). The shortcut above rests
+on three mechanics that lived in untested wiring: it is ONE-SHOT (the first reader
+consumes it, readable or not — a corrupt marker used to throw past the deletion and
+be re-parsed at every session start for ever), it EXPIRES (past
+`MANDATE_MAX_AGE_MS` it describes a tree that has since been worked in, and a marker
+stamped in the future is not trusted either), and a CLEAN tick DELETES any marker a
+failed earlier tick left, so no healthy successor is ever handed a false "repo not
+clean". The rule is now pure in `mandateMarkerVerdict`, the file handling in
+`consumeMandateMarker` / `writeMandateMarker` / `clearMandateMarker`, and both are
+swept by the Vitest layer. In the same pass the launcher's two spawn-failure exits —
+a missing `claude.exe`, a `spawn` that threw — were changed from a bare
+`process.exit(1)` to `bail(1)`: `state.repoAlertAt` is set minutes earlier, and
+throwing it away means the STANDING repo alert fires unthrottled at every following
+tick, in a mode that is already alarming.
+
+### Every critical action is a transaction (30.07.2026, point 443)
+
+**THE PRINCIPLE: every critical action is a transaction with an idempotent cleanup
+step, and that step runs at every start BEFORE any work — never "the session
+remembers to".** Point 442 gave the cleanup a caller; this gives it eyes. A kill
+during a critical action leaves more behind than a half merge, and none of the
+following was visible to the doctor before:
+
+- **(a) stale git locks.** `index.lock`, `refs/**/*.lock` and `packed-refs.lock`
+  survive a killed commit or push, and while one lies there EVERY git write is
+  refused — including the doctor's own repairs, which is why this action is planned
+  FIRST. Age is the proof, and it is generous (`GIT_LOCK_STALE_MS`, 10 min): a
+  younger lock may belong to a running git, and taking one from it corrupts exactly
+  what this repairs.
+- **(b) worktrees.** Two shapes, one bookkeeping and one a real deletion: a
+  registration whose directory is gone (`git worktree prune`, planned `auto`), and a
+  DIRECTORY under `.claude/worktrees/` that git no longer lists — six were lying
+  around on 30.07.2026, four from the previous night. The removal is repair-gated and
+  goes through `scripts/worktree-cleanup.mjs`, which detaches the `node_modules`
+  junction first; without that order the delete takes the MAIN tree's dependencies
+  with it. A one-hour idle window guards it, so a tree being created right now is
+  never mistaken for debris.
+- **(c) orphaned verification processes.** A headless browser and a dev server left
+  by an aborted verify run hold the ports the next run needs and eat CPU for the rest
+  of the absence. Matched by COMMAND LINE and by this checkout's path (the shared
+  `classifyProcess`/`strayProcesses` of `verify/machine-load-core.mjs`) — never by
+  process name, and never a stranger's browser — and only where no live session could
+  own them.
+- **(d) a truncated `TASKS.md`.** `tasksParses` has detected this since the doctor was
+  written and nothing repaired it, yet the file is VERSIONED. It is restored from
+  `HEAD` with the damaged bytes kept aside under `.claude/`, and by `git show` rather
+  than `git checkout --`, so the index stays as the interrupted session left it.
+  Where HEAD is broken too the alert stays: restoring one broken file over another is
+  not a repair.
+- **(e) a stale pending-spawn lock.** A launcher's reservation that no session ever
+  converted reserves the batch against every future tick. Two proofs, not one: past
+  its own stale window AND the recorded process gone — the window alone would race a
+  slow but healthy spawn.
+- **(f) a half-published board.** The board is the one thing the user can see while
+  away. The detection is deliberately LOCAL — no fetch in a launcher tick: the
+  publisher records the sha256 of the bytes it pushed (`pagesPublishedHash`) and
+  persists a failure (`publishFailed`), so a local board whose hash differs IS the
+  half-published state. `scripts/board-publish.mjs` re-runs. And the local file is
+  now written ATOMICALLY (`writeTextAtomic`, four-eyes F3): it used to be a plain
+  `writeFileSync`, so a kill mid-write left torn bytes — which this very check
+  reads as "behind" and this very repair would then PUSH to the public page.
+
+The decisions are pure in `planRemediation` (`scripts/batch-doctor-core.mjs`); the
+gathering and the repairs are in `scripts/batch-doctor-states.mjs`, each taking its
+repository root and `git` runner as a parameter so the Vitest layer drives every one
+of them on a throwaway repository. **Idempotence is the property under test**: each
+case repairs, re-detects (which must find nothing) and repairs a second time, which
+must neither throw nor change anything. A cleanup that is only safe the first time is
+not a cleanup a launcher may run at every tick.
+
+**ABSENT DATA, NEVER WRONG DATA** — the four-eyes finding, and the rule this module is
+read against from now on. An inner `catch` that turns a FAILURE into plausible-looking
+data defeats the outer fail-open, which can only protect against data that is MISSING.
+`listWorktreePaths` swallowing a `git worktree list` failure returned `[]` — "git knows
+of no worktree" — and every live agent tree past the idle window then read as an orphan;
+in repair mode that deletes a running agent's uncommitted work, and the idle window is
+no shield, because a directory's mtime never moves while the agent writes in
+SUBdirectories. Registration is the only shield, so an unreadable list must mean NOT
+JUDGED. The same shape sat in `restoreTasksFromHead`, where an unreadable `TASKS.md`
+counted as a missing one and would have been overwritten from HEAD with no backup
+taken: only `ENOENT` means "nothing to keep". And where a repair is destructive the
+EXECUTE step re-judges rather than trusting the gather — `removeOrphanWorktrees`
+refuses a target that is registered now (`judgeTarget` treats a registered worktree as
+a licensed `--force` removal), and `clearStalePendingSpawn` re-reads the lock it is
+about to delete, because a launcher tick or a returning session can win it in between
+and two sessions in one batch is the incident the singleton exists to prevent.
+
+**AGE IS EVIDENCE EVERYWHERE, not only where it was convenient.** Locks get ten
+minutes and worktrees an hour; the process sweep had nothing, so a verify run started
+thirty seconds ago was indistinguishable from a fortnight-old leftover. `ownerAlive`
+covers a run the BATCH started — not one the user starts in a bare terminal with the
+launcher armed, and not a delegated agent's in-flight gate outliving its dead parent
+(`pid-dead` licenses `--repair`). `STRAY_MIN_AGE_MS` now gates it, and a process whose
+age cannot be established is spared: a spared leftover eats CPU, a killed live run
+destroys work. The same asymmetry decides the other fallbacks — `ownerAlive` defaults
+to TRUE when it cannot be read, so an unreadable owner SUPPRESSES the sweep, and
+`EPERM` on a kill is reported as a FAILURE rather than counted as an ending.
 
 ### The watcher that does not live on this machine (30.07.2026, point 434)
 

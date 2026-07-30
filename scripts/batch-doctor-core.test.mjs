@@ -21,6 +21,10 @@ import {
   repoRepairAllowed,
   repoRepairDecision,
   resumeRepairMandate,
+  pidProvablyGone,
+  mandateMarkerVerdict,
+  MANDATE_MAX_AGE_MS,
+  PID_START_TOLERANCE_MS,
 } from './batch-doctor-core.mjs'
 
 const quiet = { level: 'quiet', reasons: [], agentWorktrees: [] }
@@ -345,6 +349,106 @@ describe('otherSessionsIn — an alert naming only the reader is no evidence', (
   })
 })
 
+// --- Point 443: the torn states the doctor did not yet know ----------------------
+//
+// The FILESYSTEM half of each state — detection and idempotent repair on a
+// throwaway repository — is in scripts/batch-doctor-states.test.mjs. What is
+// pinned here is the PLAN: which level each action is planned at, in which order,
+// and which of them a live owner forbids.
+
+describe('planRemediation — the torn states a kill leaves behind (point 443)', () => {
+  const actions = (state) => planRemediation({ ...clean, ...state }).map((a) => a.action)
+
+  it('(a) plans stale git locks FIRST — every repair below it needs a writable index', () => {
+    const plan = planRemediation({
+      ...clean,
+      mergeInProgress: true,
+      staleGitLocks: [{ path: '.git/index.lock', ageMs: 3_600_000 }],
+    })
+    expect(plan.map((a) => a.action)).toEqual(['clear-stale-git-locks', 'abort-merge'])
+    expect(plan[0].level).toBe('repair')
+    expect(plan[0].targets).toEqual(['.git/index.lock'])
+    expect(plan[0].reason).toMatch(/killed commit or push/)
+  })
+
+  it('(b) plans the PRUNE as auto bookkeeping and the DIRECTORY removal as a repair', () => {
+    const plan = planRemediation({ ...clean, worktrees: { pruneNeeded: true, orphanDirs: ['/repo/.claude/worktrees/a'] } })
+    expect(plan.map((a) => a.action)).toEqual(['prune-worktrees', 'remove-orphan-worktrees'])
+    expect(plan[0].level).toBe('auto')
+    expect(plan[1].level).toBe('repair')
+    expect(plan[1].targets).toEqual(['/repo/.claude/worktrees/a'])
+    expect(plan[1].reason).toMatch(/worktree-cleanup\.mjs/)
+  })
+
+  it('(c) sweeps leftover verification processes ONLY where no live session could own them', () => {
+    const strayProcesses = [{ pid: 100, kind: 'automation-browser', cmd: 'chrome --headless' }]
+    expect(actions({ strayProcesses, ownerAlive: false })).toEqual(['kill-stray-verify-processes'])
+    expect(actions({ strayProcesses, ownerAlive: true })).toEqual([])
+  })
+
+  it('(d) REPAIRS a truncated work order from HEAD, and only alerts where HEAD is broken too', () => {
+    const repairable = planRemediation({ ...clean, tasksParses: false, tasksRecoverable: true })
+    expect(repairable.map((a) => a.action)).toEqual(['restore-tasks-from-head'])
+    expect(repairable[0].level).toBe('repair')
+    expect(repairable[0].reason).toMatch(/kept aside/)
+
+    const beyond = planRemediation({ ...clean, tasksParses: false, tasksRecoverable: false })
+    expect(beyond.map((a) => a.action)).toEqual(['alert-tasks-format'])
+    expect(beyond[0].level).toBe('alert')
+    expect(needsRepair(beyond)).toBe(false)
+  })
+
+  it('(e) clears a stale pending-spawn lock, naming what it reserved and for how long', () => {
+    const plan = planRemediation({ ...clean, stalePendingSpawn: { sessionId: 'launcher-9', ageMs: 45 * 60 * 1000 } })
+    expect(plan.map((a) => a.action)).toEqual(['clear-stale-pending-lock'])
+    expect(plan[0].level).toBe('repair')
+    expect(plan[0].reason).toMatch(/launcher-9/)
+    expect(plan[0].reason).toMatch(/45 min/)
+  })
+
+  it('(f) re-runs the board transport when the published page is behind the local one', () => {
+    const plan = planRemediation({ ...clean, boardBehind: { reason: 'the last publish FAILED — push rejected' } })
+    expect(plan.map((a) => a.action)).toEqual(['republish-board'])
+    expect(plan[0].level).toBe('repair')
+    expect(plan[0].reason).toMatch(/push rejected/)
+    expect(plan[0].reason).toMatch(/board-publish\.mjs/)
+  })
+
+  it('a caller that gathers NONE of them plans exactly what it planned before', () => {
+    expect(planRemediation(clean)).toEqual([])
+    expect(isConsistent(planRemediation(clean))).toBe(true)
+    // Empty gatherings are the same as absent ones — a fail-open read must not
+    // turn into a phantom finding.
+    expect(
+      actions({ staleGitLocks: [], worktrees: { pruneNeeded: false, orphanDirs: [] }, strayProcesses: [], stalePendingSpawn: null, boardBehind: null }),
+    ).toEqual([])
+  })
+
+  it('plans all of them together in one pass — the shape the 449 drill leaves behind', () => {
+    const plan = planRemediation({
+      ...clean,
+      staleGitLocks: [{ path: '.git/index.lock', ageMs: 3_600_000 }],
+      worktrees: { pruneNeeded: true, orphanDirs: ['/repo/.claude/worktrees/a'] },
+      strayProcesses: [{ pid: 7, kind: 'verify-run', cmd: 'node scripts/verify/flow.mjs' }],
+      tasksParses: false,
+      tasksRecoverable: true,
+      stalePendingSpawn: { sessionId: 'launcher-9', ageMs: 60 * 60 * 1000 },
+      boardBehind: { reason: 'the local board differs' },
+      ownerAlive: false,
+    })
+    expect(plan.map((a) => a.action)).toEqual([
+      'clear-stale-git-locks',
+      'restore-tasks-from-head',
+      'prune-worktrees',
+      'remove-orphan-worktrees',
+      'kill-stray-verify-processes',
+      'clear-stale-pending-lock',
+      'republish-board',
+    ])
+    expect(needsRepair(plan)).toBe(true)
+  })
+})
+
 // --- Point 442: the repair runs before the successor -----------------------------
 
 describe('repoRepairAllowed — the doctor may WRITE only where the owner is gone', () => {
@@ -354,14 +458,87 @@ describe('repoRepairAllowed — the doctor may WRITE only where the owner is gon
     }
   })
 
-  it('REFUSES to write on an expired lease — that process is alive and merely silent', () => {
+  it('REFUSES to write on an expired lease whose process is STILL RUNNING — alive and merely silent', () => {
     expect(repoRepairAllowed('lease-expired')).toBe(false)
+    expect(repoRepairAllowed('lease-expired', { lock: { pid: 42 }, probe: { exists: true, startedAt: null } })).toBe(false)
   })
 
   it('refuses for every verdict that describes a living or unknown owner', () => {
     for (const r of ['pid-alive', 'fresh-heartbeat', 'renewed', 'handover-grace', 'legacy-fresh', 'error', '', null, undefined]) {
       expect(repoRepairAllowed(r)).toBe(false)
     }
+  })
+
+  // --- Point 443 (g): the lease no longer SHADOWS a provably dead pid ------------
+  // `assessOwner` tests the expired lease BEFORE it probes the pid, so an owner
+  // that is BOTH dead and lease-expired — machine slept, launcher off for an hour —
+  // read 'lease-expired' and its tree went unmended for nothing.
+  it('DOES permit the write when the lease expired AND the pid is provably gone', () => {
+    expect(repoRepairAllowed('lease-expired', { lock: { pid: 42 }, probe: { exists: false, startedAt: null } })).toBe(true)
+  })
+
+  it('counts PID REUSE as gone too — a number inherited by a stranger is not the owner', () => {
+    const lock = { pid: 42, pidStartedAt: 1_000_000 }
+    expect(repoRepairAllowed('lease-expired', { lock, probe: { exists: true, startedAt: 1_000_000 + 60_000 } })).toBe(true)
+    // Inside the tolerance it is the SAME process, and that one is merely silent.
+    expect(repoRepairAllowed('lease-expired', { lock, probe: { exists: true, startedAt: 1_000_000 + 500 } })).toBe(false)
+  })
+
+  it('treats absent evidence as NOT gone — an unreadable probe may never license a write', () => {
+    expect(repoRepairAllowed('lease-expired', { lock: { pid: 42 }, probe: null })).toBe(false)
+    expect(repoRepairAllowed('lease-expired', { lock: null, probe: { exists: false } })).toBe(false)
+    // A legacy lock records no pid: there is nothing to prove dead.
+    expect(repoRepairAllowed('lease-expired', { lock: { pid: null }, probe: { exists: false } })).toBe(false)
+    expect(pidProvablyGone()).toBe(false)
+  })
+
+  it('the probe never rescues a verdict that is not lease-expired', () => {
+    expect(repoRepairAllowed('pid-alive', { lock: { pid: 42 }, probe: { exists: false } })).toBe(false)
+    expect(repoRepairAllowed('fresh-heartbeat', { lock: { pid: 42 }, probe: { exists: false } })).toBe(false)
+  })
+
+  it('shares batch-singleton’s pid-reuse tolerance rather than inventing its own', async () => {
+    const singleton = await import('./batch-singleton.mjs')
+    expect(PID_START_TOLERANCE_MS).toBe(singleton.PID_START_TOLERANCE_MS)
+  })
+})
+
+// --- Point 443 (h): the mandate marker's rule -------------------------------------
+
+describe('mandateMarkerVerdict — what the launcher’s marker means to its successor', () => {
+  const NOW = 1_800_000_000_000
+
+  it('carries a finding through as a MANDATE, with the doctor’s exit code', () => {
+    expect(mandateMarkerVerdict({ raw: JSON.stringify({ at: NOW, code: 2 }), now: NOW + 1000 })).toEqual({
+      verdict: 'mandate',
+      ran: true,
+      code: 2,
+    })
+  })
+
+  it('a recorded exit 0 is CLEAN — the launcher writes a marker either way', () => {
+    expect(mandateMarkerVerdict({ raw: JSON.stringify({ at: NOW, code: 0 }), now: NOW })).toEqual({ verdict: 'clean', ran: true, code: 0 })
+  })
+
+  it('EXPIRES: past the window the marker describes a tree that has since been worked in', () => {
+    const raw = JSON.stringify({ at: NOW - MANDATE_MAX_AGE_MS - 1, code: 1 })
+    expect(mandateMarkerVerdict({ raw, now: NOW }).verdict).toBe('none')
+    expect(mandateMarkerVerdict({ raw: JSON.stringify({ at: NOW - 1000, code: 1 }), now: NOW }).verdict).toBe('mandate')
+  })
+
+  it('a marker STAMPED IN THE FUTURE is not trusted either — a clock jump must not bind', () => {
+    expect(mandateMarkerVerdict({ raw: JSON.stringify({ at: NOW + 60_000, code: 1 }), now: NOW }).verdict).toBe('none')
+  })
+
+  it('never throws on junk, and junk never mandates', () => {
+    for (const raw of [null, undefined, '', '   ', '{ not json', 'null', JSON.stringify({ code: 1 })]) {
+      expect(mandateMarkerVerdict({ raw, now: NOW })).toEqual({ verdict: 'none', ran: false, code: null })
+    }
+    expect(mandateMarkerVerdict()).toEqual({ verdict: 'none', ran: false, code: null })
+  })
+
+  it('an unusable code counts as a FINDING, never as a clean tree', () => {
+    expect(mandateMarkerVerdict({ raw: JSON.stringify({ at: NOW, code: null }), now: NOW })).toEqual({ verdict: 'mandate', ran: true, code: 1 })
   })
 })
 

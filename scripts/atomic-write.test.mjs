@@ -11,6 +11,7 @@ import {
   isTransientWriteError,
   writeJsonAtomic,
   tryWriteJsonAtomic,
+  writeTextAtomic,
   TRANSIENT_WRITE_CODES,
   WRITE_RETRY_DELAYS_MS,
 } from './atomic-write.mjs'
@@ -113,4 +114,95 @@ describe('tryWriteJsonAtomic — the failure as DATA, so a caller can say so', (
       rmSync(dir, { recursive: true, force: true })
     }
   })
+})
+
+// ---------------------------------------------------------------------------
+// THE BOARD'S HTML GETS THE SAME WRITE (point 443, four-eyes F3).
+//
+// `.batch-dashboard.html` was written with a plain writeFileSync, so a kill in
+// the middle of one left TORN LOCAL BYTES — and that is not a local problem: the
+// doctor's board check reads the resulting hash mismatch as "the publish is
+// behind", and its repair pushes those bytes to the page the user reads from
+// their phone.
+describe('writeTextAtomic — the board transport’s local half', () => {
+  it('writes through a temp file and renames, so a torn file is never reachable', () => {
+    const seen = []
+    const r = writeTextAtomic('C:/repo/.batch-dashboard.html', '<html>board</html>', {
+      write: (p, t) => seen.push({ p, t }),
+      rename: (from, to) => seen.push({ from, to }),
+      sleep: () => {},
+    })
+    expect(r).toEqual({ ok: true, attempts: 1 })
+    // The BYTES go to the temp name, never to the target the reader/hasher opens.
+    expect(seen[0].p).toMatch(/\.batch-dashboard\.html\.tmp-/)
+    expect(seen[0].t).toBe('<html>board</html>')
+    expect(seen[1]).toEqual({ from: seen[0].p, to: 'C:/repo/.batch-dashboard.html' })
+  })
+
+  it('writes the text VERBATIM — no JSON encoding of an HTML string', () => {
+    // The regression this guards: reusing writeJsonAtomic for the board would
+    // publish a quoted, escaped string instead of the markup.
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-atomic-text-'))
+    const path = join(dir, 'board.html')
+    try {
+      writeTextAtomic(path, '<html>\n  <body>ü & "quoted"</body>\n</html>\n')
+      expect(readFileSync(path, 'utf8')).toBe('<html>\n  <body>ü & "quoted"</body>\n</html>\n')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('survives the same Windows moment the locks do', () => {
+    const { rename, state } = flakyRename(2)
+    const r = writeTextAtomic('C:/repo/.batch-dashboard.html', '<html/>', {
+      write: () => {},
+      rename,
+      remove: () => {},
+      sleep: () => {},
+    })
+    expect(r.ok).toBe(true)
+    expect(r.attempts).toBe(3)
+    expect(new Set(state.names).size).toBe(3) // a fresh temp name per attempt
+  })
+
+  it('throws the last error when every attempt fails, leaving the target untouched', () => {
+    expect(() =>
+      writeTextAtomic('C:/repo/.batch-dashboard.html', '<html/>', {
+        write: () => {},
+        rename: () => {
+          throw err('EBUSY')
+        },
+        remove: () => {},
+        sleep: () => {},
+      }),
+    ).toThrow(/EBUSY/)
+  })
+
+  it('writeJsonAtomic still behaves exactly as before — it is the same writer now', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-atomic-json-'))
+    const path = join(dir, 'state.json')
+    try {
+      expect(writeJsonAtomic(path, { a: 1 })).toEqual({ ok: true, attempts: 1 })
+      expect(readFileSync(path, 'utf8')).toBe(JSON.stringify({ a: 1 }, null, 2))
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+})
+
+// The board scripts must USE it — a plain writeFileSync on the board file is
+// exactly the bug, and no behavioural test can see which function was called.
+describe('the board writes its HTML atomically', () => {
+  const src = (f) => readFileSync(new URL(f, import.meta.url), 'utf8')
+
+  for (const file of ['./board.mjs', './board-queue.mjs', './board-publish.mjs']) {
+    it(`${file} writes through writeTextAtomic, never writeFileSync`, () => {
+      const code = src(file)
+        .split('\n')
+        .filter((l) => !l.trimStart().startsWith('//'))
+        .join('\n')
+      expect(code.includes('writeTextAtomic(')).toBe(true)
+      expect(code.includes('writeFileSync(')).toBe(false)
+    })
+  }
 })
