@@ -134,6 +134,17 @@ from advisory claim-and-check to a HARD mutual exclusion in
   who else was there is not evidence of anyone else being there.
   Decisions pure in `scripts/batch-doctor-core.mjs`, covered by
   `scripts/batch-doctor-core.test.mjs`.
+- **A PROBE OF OUR OWN MAY NOT RAISE IT (point 434 (8)).** The launcher logged
+  `PARALLEL SESSIONS DETECTED: owner=preflight-test plus <real session>` sixteen
+  times across four nights. The guard preflight's real-repo test runs every guard's
+  `gather()` under the synthetic id `preflight-test`, and the batch-progress-guard's
+  gather ACQUIRES the lock with the id it is handed — so a Vitest run, with the lock
+  free, became the owner of the batch, and every REAL session then read as a second
+  driver. The `preflight-` namespace is therefore RESERVED (`isProbeSessionId`; a
+  real session id is a UUID and can never carry it): `acquire` refuses it the lock,
+  `classifyParallel` is blind to it on either side, and the ancestor memo does not
+  record it. The detector keeps its teeth against two real sessions — that case is
+  pinned beside this one in `scripts/batch-singleton-core.test.mjs`.
 - **Trust self-heals.** A headless `claude -p` in an untrusted workspace ignores
   the allow-list (a permission prompt would hang the unattended run). The launcher
   sets `hasTrustDialogAccepted` for the repo in `~/.claude.json` before spawning.

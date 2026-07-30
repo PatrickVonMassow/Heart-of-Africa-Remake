@@ -20,6 +20,8 @@ import {
   assessOwner,
   spawnDecision,
   classifyParallel,
+  isProbeSessionId,
+  PROBE_SESSION_PREFIX,
   progressGuardDecision,
   acquire,
   heartbeat,
@@ -1166,6 +1168,20 @@ describe('acquire (atomic test-and-set on the real filesystem)', () => {
     expect(failed).toBe(2)
   })
 
+  it('a PROBE gets the same answer and leaves no record behind (point 434 (8))', () => {
+    const ancestorCachePath = join(dir, 'session-process-probe.json')
+    const walk = () => ({ pid: process.pid, startedAt: NOW })
+    expect(ourClaudeProcess('preflight-test', { ancestorCachePath, findAncestorFn: walk })).toMatchObject({
+      pid: process.pid,
+    })
+    // Nothing written: a synthetic id must not accrete in real state as a session.
+    expect(existsSync(ancestorCachePath)).toBe(false)
+    // A real id is still memoised, so the walk is still paid for only once.
+    expect(ourClaudeProcess('sid3', { ancestorCachePath, findAncestorFn: walk })).toMatchObject({ pid: process.pid })
+    expect(existsSync(ancestorCachePath)).toBe(true)
+    expect(Object.keys(JSON.parse(readFileSync(ancestorCachePath, 'utf8')))).toEqual(['sid3'])
+  })
+
   it('heldByOtherLiveOwner: true for a foreign live lock, false for mine/free/dead', () => {
     expect(heldByOther('sX')).toBe(false) // free
     acquire('s1', opts())
@@ -1398,6 +1414,83 @@ describe('classifyParallel (active detector, subagent-safe)', () => {
       now: NOW,
     })
     expect(parallel).toEqual([])
+  })
+})
+
+// ---------------------------------------------------------------------------
+// A PROBE OF OUR OWN MAY NOT TRIP THE ALARM (point 434 (8))
+// ---------------------------------------------------------------------------
+// The launcher logged `PARALLEL SESSIONS DETECTED: owner=preflight-test plus
+// <real session>` sixteen times across four nights. Cause: the guard preflight's
+// real-repo test runs every guard's gather() under the synthetic id
+// `preflight-test`, and the batch-progress-guard's gather ACQUIRES the lock with
+// the id it is handed — so a Vitest run became the owner of the batch, and every
+// real session then read as a second driver. That alert means "stop everything".
+describe('a preflight identity is not a session', () => {
+  const REAL = '10a2d2e0-b1c8-4dbd-aec6-56eb221a8eee'
+  const OTHER = '830a6878-915f-4838-92fc-4af7859c4758'
+
+  it('the four nights: a preflight in flight yields NO parallel-session verdict', () => {
+    expect(
+      classifyParallel({
+        sessionsSeen: { [REAL]: NOW - 3600_000 },
+        activity: { [REAL]: NOW - 30_000 },
+        ownerSid: 'preflight-test',
+        now: NOW,
+      }),
+    ).toEqual([])
+  })
+
+  it('…while TWO REAL sessions still do — the detector keeps its teeth', () => {
+    expect(
+      classifyParallel({
+        sessionsSeen: { [REAL]: NOW - 3600_000, [OTHER]: NOW - 600_000 },
+        activity: { [REAL]: NOW - 1000, [OTHER]: NOW - 30_000 },
+        ownerSid: REAL,
+        now: NOW,
+      }).map((p) => p.sid),
+    ).toEqual([OTHER])
+  })
+
+  it('a probe with fresh activity is never flagged as the second driver either', () => {
+    expect(
+      classifyParallel({
+        sessionsSeen: { [REAL]: NOW - 3600_000, 'preflight-test': NOW - 600_000 },
+        activity: { [REAL]: NOW - 1000, 'preflight-test': NOW - 1000 },
+        ownerSid: REAL,
+        now: NOW,
+      }),
+    ).toEqual([])
+  })
+
+  it('acquire REFUSES a probe the lock, and writes none — the alarm has no source left', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-probe-lock-'))
+    const lockPath = join(dir, 'batch-lock.json')
+    try {
+      // The exact call the preflight's real-repo test makes, with the lock FREE.
+      expect(acquire('preflight-test', { lockPath })).toBe('probe')
+      expect(existsSync(lockPath)).toBe(false)
+      expect(readOwnerLock(lockPath)).toBe(null)
+      // A probe never owns, so it never drives the batch either.
+      expect(progressGuardDecision({ sid: 'preflight-test', paused: false, openCount: 5, ownership: 'probe' })).toBe(
+        'stand-down',
+      )
+      // A REAL session id still acquires exactly as before.
+      expect(acquire(REAL, { lockPath })).toBe('acquired')
+      expect(readOwnerLock(lockPath)?.sessionId).toBe(REAL)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('only the reserved namespace counts — a real session id is a UUID', () => {
+    for (const sid of ['preflight-test', 'preflight-', 'PREFLIGHT-anything', '  preflight-x  ']) {
+      expect(isProbeSessionId(sid), sid).toBe(true)
+    }
+    for (const sid of [REAL, OTHER, 'launcher-abc', 'preflight', 'x-preflight-y', '', null, undefined, 42]) {
+      expect(isProbeSessionId(sid), String(sid)).toBe(false)
+    }
+    expect(PROBE_SESSION_PREFIX).toBe('preflight-')
   })
 })
 

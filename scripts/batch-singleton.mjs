@@ -443,6 +443,28 @@ export function ownerStateKey(lock, suffix = '') {
 
 
 /**
+ * A SESSION ID THIS REPOSITORY'S OWN PROBES USE, never a real session. PURE.
+ *
+ * THE ALARM IT CAUSED (point 434 (8), root-caused 30.07.2026): the guard preflight's
+ * real-repo test runs every guard's `gather()` under the synthetic id
+ * `preflight-test`, and `gatherBatchProgressInputs` ACQUIRES the batch lock with the
+ * id it is handed. So a Vitest run, with the lock free, made a probe the owner of the
+ * batch — and the launcher then read `owner=preflight-test` and reported every REAL
+ * session as a second driver: `PARALLEL SESSIONS DETECTED`, sixteen times across four
+ * nights. That alert is one of the few that mean "stop everything", so a probe of our
+ * own must not be able to raise it.
+ *
+ * A real session id is a UUID and can never carry this prefix, so the namespace is
+ * reserved rather than shared. Two consequences, both here: `acquire` refuses a probe
+ * the lock, and the classifier below is blind to one on either side.
+ */
+export const PROBE_SESSION_PREFIX = 'preflight-'
+
+export function isProbeSessionId(sid) {
+  return typeof sid === 'string' && sid.trim().toLowerCase().startsWith(PROBE_SESSION_PREFIX)
+}
+
+/**
  * Parallel-session classifier. A parallel session is a sid that
  *   - started as a TOP-LEVEL session (recorded by the SessionStart hook —
  *     subagents/worktree agents never fire SessionStart, so they can never be
@@ -464,8 +486,11 @@ export function ownerStateKey(lock, suffix = '') {
 export function classifyParallel({ sessionsSeen, activity, ownerSid, now, exclude = [] }) {
   const out = []
   const skip = new Set((exclude ?? []).filter(Boolean))
+  // A PROBE OWNER MEANS THE REAL OWNER IS UNKNOWN (point 434 (8)): every genuine
+  // session would then read as the second driver, which is the false alarm itself.
+  if (isProbeSessionId(ownerSid)) return out
   for (const [sid, lastToolAt] of Object.entries(activity ?? {})) {
-    if (!sid || sid === ownerSid || skip.has(sid)) continue
+    if (!sid || sid === ownerSid || skip.has(sid) || isProbeSessionId(sid)) continue
     if (!(sessionsSeen && Object.prototype.hasOwnProperty.call(sessionsSeen, sid))) continue
     if (typeof lastToolAt !== 'number' || now - lastToolAt > PARALLEL_FRESH_MS) continue
     out.push({ sid, lastToolAt })
@@ -790,6 +815,9 @@ function exitReapMutex(mutexPath) {
  */
 export function acquire(sessionId, opts = {}) {
   if (!sessionId) return 'held'
+  // A PROBE IS NOT A SESSION (point 434 (8)): it may never own the batch. See
+  // `isProbeSessionId` for the four nights of false alarms this cost.
+  if (isProbeSessionId(sessionId)) return 'probe'
   const lockPath = opts.lockPath ?? LOCK_PATH
   const mutexPath = `${lockPath}.reaping`
   const now = opts.now ?? Date.now()
@@ -1125,7 +1153,9 @@ export function ourClaudeProcess(sessionId, opts = {}) {
     cache = null // unreadable cache → walk, but do not try to write it back
   }
   const anc = (opts.findAncestorFn ?? findClaudeAncestor)()
-  if (cache) {
+  // A probe gets the same ANSWER and leaves no record (point 434 (8)): a synthetic
+  // id must not accrete in the repository's real state under a session's name.
+  if (cache && !isProbeSessionId(sessionId)) {
     try {
       const next = { ...cache, [sessionId]: { pid: anc?.pid ?? null, startedAt: anc?.startedAt ?? null, at: now } }
       for (const [k, v] of Object.entries(next)) if (now - (v?.at ?? 0) > 24 * 3600 * 1000) delete next[k]
