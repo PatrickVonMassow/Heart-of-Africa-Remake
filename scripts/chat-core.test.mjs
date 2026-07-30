@@ -9,6 +9,7 @@ import {
   SEEN_MAX,
   assessEvent,
   canonicalMessage,
+  chatInboxLogLines,
   constantTimeEqual,
   MAX_DROP_NOTICES,
   deriveTopics,
@@ -604,5 +605,102 @@ describe('cross-direction replay', () => {
   it('names exactly the two directions', () => {
     expect(DIRECTIONS).toEqual(['inbox', 'outbox'])
     expect(Object.isFrozen(DIRECTIONS)).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// EVERY FACT IN AN INBOX REPORT GETS SAID (the launcher's log)
+// ---------------------------------------------------------------------------
+// The launcher translated one inbox report with an `if`/`else if` chain, so it could
+// only ever tell ONE of the report's independent facts. The fact it dropped was the
+// loudest: `noticesPlanned > notices` means a drop notice the transport REFUSED —
+// the sender is still looking at a message that never landed — and it was appended
+// to a summary line that only rendered in the LAST branch. The spool-failure report
+// (`ok: false`) takes the FIRST branch, and that is precisely the tick most likely
+// to carry a refused notice: the transport is already unwell.
+describe('chatInboxLogLines — a chain could only say one fact; each gets its own line', () => {
+  const has = (lines, re) => lines.some((l) => re.test(l))
+
+  it('THE HOLE: a spool failure that ALSO refused a drop notice says BOTH', () => {
+    const lines = chatInboxLogLines({
+      ok: false,
+      reason: 'spool write failed for 2 message(s): EACCES',
+      configured: true,
+      accepted: 0,
+      dropped: ['ahead'],
+      notices: 0,
+      noticesPlanned: 1,
+      pending: 3,
+    })
+    expect(has(lines, /spool write failed/)).toBe(true)
+    expect(has(lines, /DROP NOTICE NOT SENT: 1 of 1/)).toBe(true)
+    expect(lines).toHaveLength(2)
+  })
+
+  it('the refused notice is reported whatever else the tick did — including nothing', () => {
+    // accepted 0 and nothing dropped: the old chain rendered no summary at all, so
+    // the notice rode along on a line that was never written.
+    const lines = chatInboxLogLines({
+      ok: true,
+      configured: true,
+      accepted: 0,
+      dropped: [],
+      notices: 1,
+      noticesPlanned: 3,
+      pending: 0,
+    })
+    expect(has(lines, /NOT SENT: 2 of 3/)).toBe(true)
+  })
+
+  it('an ordinary tick reads as it always did', () => {
+    expect(chatInboxLogLines({ ok: true, configured: true, accepted: 2, dropped: [], pending: 5 })).toEqual([
+      'chat inbox: 2 new, 5 pending',
+    ])
+    expect(
+      chatInboxLogLines({ ok: true, configured: true, accepted: 1, dropped: ['ahead', 'stale'], pending: 1 }),
+    ).toEqual(['chat inbox: 1 new, 1 pending (dropped: ahead, stale)'])
+  })
+
+  it('every notice sent as planned adds no line — this must not become noise', () => {
+    expect(
+      chatInboxLogLines({
+        ok: true,
+        configured: true,
+        accepted: 1,
+        dropped: ['ahead'],
+        notices: 2,
+        noticesPlanned: 2,
+        pending: 0,
+      }),
+    ).toEqual(['chat inbox: 1 new, 0 pending (dropped: ahead)'])
+  })
+
+  it('an unpaired channel and a quiet tick stay SILENT — the opt-out is real', () => {
+    expect(chatInboxLogLines({ ok: true, configured: false, accepted: 0, pending: 0 })).toEqual([])
+    expect(chatInboxLogLines({ ok: true, configured: true, accepted: 0, dropped: [], pending: 4 })).toEqual([])
+  })
+
+  it('a failure without a reason still speaks rather than vanishing', () => {
+    expect(chatInboxLogLines({ ok: false })).toEqual(['chat inbox: failed without naming a reason'])
+  })
+
+  it('counts that disagree the wrong way are called unreliable, never silently fine', () => {
+    const lines = chatInboxLogLines({
+      ok: true,
+      configured: true,
+      accepted: 0,
+      dropped: [],
+      notices: 5,
+      noticesPlanned: 2,
+    })
+    expect(has(lines, /counts disagree \(5 sent, 2 planned\)/)).toBe(true)
+  })
+
+  it('junk input never throws and never invents a fact', () => {
+    for (const junk of [undefined, null, 'nonsense', 42, {}, { dropped: 'not-an-array' }]) {
+      expect(() => chatInboxLogLines(junk)).not.toThrow()
+    }
+    expect(chatInboxLogLines({})).toEqual([])
+    expect(chatInboxLogLines({ ok: true, configured: true, accepted: 'x', dropped: [null], pending: 'y' })).toEqual([])
   })
 })

@@ -457,6 +457,58 @@ export function dropNoticeDecision({ verdict, notified = [], sent = 0, max = MAX
 }
 
 /**
+ * WHAT THE LAUNCHER MUST SAY ABOUT ONE INBOX TICK. PURE.
+ *
+ * `scripts/chat-inbox.mjs` reports one object per tick and the launcher used to
+ * translate it with an `if`/`else if` chain — which is exactly why a report could
+ * go partly unsaid. The drop-notice mismatch (`noticesPlanned` above `notices`: a
+ * notice the transport REFUSED, so the sender is still looking at a message that
+ * never landed) was appended to the SUMMARY line, and the summary only rendered in
+ * the last branch of the chain. So in the spool-failure shape — `ok: false`, which
+ * takes the FIRST branch — a rejected delivery notice was silent, and that is the
+ * shape most likely to carry one: the same tick that cannot write the spool is the
+ * tick whose transport is unwell.
+ *
+ * The lesson is the shape, not the branch: a report with several independent facts
+ * must not be rendered by a chain that can only tell one of them. Each fact is its
+ * own line here, and the caller loops.
+ *
+ * Returns an array of ready-to-log strings — empty when there is genuinely nothing
+ * to say (an unpaired channel is silent by design, and so is a quiet tick).
+ */
+export function chatInboxLogLines(result) {
+  const r = result && typeof result === 'object' ? result : {}
+  const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0)
+  const dropped = Array.isArray(r.dropped) ? r.dropped.filter((d) => d != null).map(String) : []
+  const planned = num(r.noticesPlanned)
+  const sent = num(r.notices)
+  const lines = []
+
+  if (r.ok === false) {
+    lines.push(`chat inbox: ${r.reason ? String(r.reason) : 'failed without naming a reason'}`)
+  } else if (r.configured === false) {
+    /* the channel is not paired on this machine — opt-in, so silence is correct */
+  } else if (num(r.accepted) > 0 || dropped.length > 0) {
+    lines.push(
+      `chat inbox: ${num(r.accepted)} new, ${num(r.pending)} pending` +
+        (dropped.length ? ` (dropped: ${dropped.join(', ')})` : ''),
+    )
+  }
+
+  // INDEPENDENT of every branch above — that independence IS the fix.
+  if (planned > 0 && sent !== planned) {
+    lines.push(
+      sent < planned
+        ? `chat inbox: DROP NOTICE NOT SENT: ${planned - sent} of ${planned} — the transport refused it, so the ` +
+          'sender is still looking at a message that never landed and has nothing telling them so'
+        : `chat inbox: drop-notice counts disagree (${sent} sent, ${planned} planned) — the report is ` +
+          'unreliable, so treat the notices as unconfirmed',
+    )
+  }
+  return lines
+}
+
+/**
  * A whole poll response → what to spool and what the next state is. ASYNC, PURE.
  *
  * THE CURSOR IS NOT THE DEDUPE (the delivery discipline this point was written

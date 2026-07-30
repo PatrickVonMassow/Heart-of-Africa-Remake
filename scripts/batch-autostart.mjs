@@ -73,6 +73,7 @@ import {
 } from './batch-autostart-core.mjs'
 import { WATCHER_PID_FILE, watcherSupervision } from './chat-watcher-core.mjs'
 import { SECRET_FAULT } from './chat-secret.mjs'
+import { chatInboxLogLines } from './chat-core.mjs'
 import { openPointStatus } from './tasks-source.mjs'
 import { BOARD_PAGE_URL } from './board-currency-core.mjs'
 
@@ -215,17 +216,11 @@ try {
     state.chatSecretAlertAt = now
     await notify('Chat secret unreadable', `The board chat is DOWN: ${r.reason}. Messages from the phone are dropped until it is fixed.`, 'default')
   }
-  if (r.ok === false) log(`chat inbox: ${r.reason}`)
-  else if (r.configured === false) { /* channel not paired on this machine — silent */ }
-  else if (r.accepted > 0 || (r.dropped ?? []).length > 0) {
-    // The drop-notice counts are only worth a word when they DISAGREE: planned
-    // but not sent means the transport refused the notice, and the user is then
-    // still looking at a message that never landed with nothing to say so.
-    const notices = r.noticesPlanned > 0 && r.notices !== r.noticesPlanned
-      ? `, DROP NOTICE NOT SENT: ${r.noticesPlanned - r.notices} of ${r.noticesPlanned}`
-      : ''
-    log(`chat inbox: ${r.accepted} new, ${r.pending} pending${r.dropped?.length ? ` (dropped: ${r.dropped.join(', ')})` : ''}${notices}`)
-  }
+  // Every fact in the report gets its own line, decided in the pure core. An
+  // `if`/`else if` chain here could only ever tell ONE of them, and the fact it
+  // dropped was the loudest: a refused drop notice in the very tick whose spool
+  // write failed.
+  for (const line of chatInboxLogLines(r)) log(line)
   pendingChat = Array.isArray(r.messages) ? r.messages : []
 } catch (e) {
   log(`chat inbox skipped (${(e && e.message) || e})`)
