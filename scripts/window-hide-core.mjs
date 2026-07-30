@@ -98,6 +98,10 @@ export function findChildProcessCalls(text) {
         api,
         line: src.slice(0, m.index).split('\n').length,
         hasFlag: /windowsHide/.test(masked.slice(openIdx, end)),
+        // The call's own argument text, so an exception can be scoped to WHAT the
+        // call does rather than to the line it happens to sit on — a line number
+        // survives no merge, and a stale exception is itself a failure here.
+        args: masked.slice(openIdx, end),
       })
     }
   }
@@ -115,7 +119,7 @@ export function findChildProcessCalls(text) {
  */
 export const ALLOW = {
   'scripts/batch-autostart.mjs': {
-    lines: [741],
+    matching: 'buildSpawnOptions',
     why: 'the options come from buildSpawnOptions(), which sets windowsHide: true itself (scripts/batch-autostart-core.mjs)',
   },
   'scripts/board.mjs': { awaiting: 'bundle H', why: 'held by the parallel board/chat agent when point 401 landed' },
@@ -145,11 +149,13 @@ export function auditWindowHide(files = []) {
     const allow = ALLOW[path]
     for (const call of findChildProcessCalls(f?.text ?? '')) {
       if (call.hasFlag) continue
-      if (allow && (!allow.lines || allow.lines.includes(call.line))) {
+      // An exception may be scoped by what the call CONTAINS (`matching`); without a
+      // scope it covers the whole file, which is what an `awaiting` debt needs.
+      if (allow && (!allow.matching || String(call.args ?? '').includes(allow.matching))) {
         usedPaths.add(path)
         continue
       }
-      offenders.push({ path, ...call })
+      offenders.push({ path, api: call.api, line: call.line, hasFlag: call.hasFlag })
     }
   }
   const unusedAllow = Object.keys(ALLOW).filter((p) => !usedPaths.has(p))

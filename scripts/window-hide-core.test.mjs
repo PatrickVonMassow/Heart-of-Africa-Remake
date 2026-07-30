@@ -44,10 +44,17 @@ describe('maskCode — prose that mentions an API must be invisible', () => {
 describe('findChildProcessCalls — the call sites, and nothing else', () => {
   it('finds a call and reads its flag', () => {
     const src = 'execFileSync("git", a, { cwd, windowsHide: true })\nspawnSync("git", b, { cwd })\n'
-    expect(findChildProcessCalls(src)).toEqual([
+    expect(findChildProcessCalls(src)).toMatchObject([
       { api: 'execFileSync', line: 1, hasFlag: true },
       { api: 'spawnSync', line: 2, hasFlag: false },
     ])
+  })
+
+  it('carries the call\'s own argument text, so an exception need not pin a LINE', () => {
+    // A line number survives no merge: the one exception in ALLOW moved from 741 to
+    // 736 the first time another session's commit landed beside this point.
+    const [call] = findChildProcessCalls('spawn(exe, args, buildSpawnOptions({ cwd }))')
+    expect(call.args).toContain('buildSpawnOptions')
   })
 
   it('is not fooled by regex.exec or a longer identifier', () => {
@@ -62,11 +69,14 @@ describe('findChildProcessCalls — the call sites, and nothing else', () => {
 
   it('reads a MULTI-LINE call as one call, flag included', () => {
     const src = ['execFileSync("git", args, {', '  windowsHide: true,', '  cwd: root,', '})'].join('\n')
-    expect(findChildProcessCalls(src)).toEqual([{ api: 'execFileSync', line: 1, hasFlag: true }])
+    expect(findChildProcessCalls(src)).toMatchObject([{ api: 'execFileSync', line: 1, hasFlag: true }])
+    expect(findChildProcessCalls(src)).toHaveLength(1)
   })
 
   it('a call with no options object at all is an offender, not a skip', () => {
-    expect(findChildProcessCalls('execSync("git status")')).toEqual([{ api: 'execSync', line: 1, hasFlag: false }])
+    expect(findChildProcessCalls('execSync("git status")')).toMatchObject([
+      { api: 'execSync', line: 1, hasFlag: false },
+    ])
   })
 
   it('covers every API that can open a window', () => {
@@ -98,12 +108,19 @@ describe('auditWindowHide — the verdict, and its exceptions', () => {
     }
   })
 
-  it('a line-scoped exception covers only that line', () => {
+  it('a `matching` exception covers only the call it describes', () => {
     const path = 'scripts/batch-autostart.mjs'
-    const allowedLine = ALLOW[path].lines[0]
-    const text = `${'\n'.repeat(allowedLine - 1)}spawn(e, a, opts)\nspawn(e, a, other)`
+    const needle = ALLOW[path].matching
+    const text = `spawn(e, a, ${needle}({ cwd }))\nspawn(e, a, somethingElse({ cwd }))`
     const v = auditWindowHide([{ path, text }])
-    expect(v.offenders.map((o) => o.line)).toEqual([allowedLine + 1])
+    expect(v.offenders.map((o) => o.line)).toEqual([2])
+  })
+
+  it('an unscoped exception covers the whole file — what an `awaiting` debt needs', () => {
+    const path = Object.keys(ALLOW).find((p) => ALLOW[p].awaiting)
+    const v = auditWindowHide([{ path, text: 'execSync(a)\nspawnSync(b, c, { cwd })' }])
+    expect(v.offenders).toEqual([])
+    expect(ALLOW[path].awaiting).toBeTruthy()
   })
 
   it('AN EXCEPTION THAT NO LONGER APPLIES IS ITSELF A FAILURE', () => {
