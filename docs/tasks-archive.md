@@ -12400,3 +12400,189 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   a non-zero sloped-sample count on both backends.
   DOCS in the same commit: `scripts/verify/README.md`, where the polish suite's checks
   are described.
+
+- [x] 308. DASHBOARD SYNC GUARD — enforce that the »Woran ich gerade arbeite« card stays in sync
+  A written rule (»keep the dashboard current«) has no automation — at point 306, I forgot to update
+  the card while closing work ran in the background. The rule MUST be mechanically enforced: build a
+  Stop-hook guard that BLOCKS a turn-end if the card title does NOT match the real current state
+  (running agents, checked-out Git branch, TASKS.md point state). The guard is READ-ONLY: it does
+  not update the card, only detects and blocks drift. Core decision logic (git branch checks, card
+  title parse, TASKS.md scan) must be pure and Vitest-coverable. Deliverables: pure core logic +
+  15+ test cases (stale-card detection, branch-match, agent-pool polling) + fail-open Stop-hook
+  wrapper + a report of what drifts the guard catches (e.g. card says »306« but HEAD is on
+  »feat/224-…«). This guard exemplifies point 307's mechanism-first principle: instead of relying
+  on memory, a technical gate enforces rule compliance.
+
+- [x] 410. THE BOARD LOSES ITS UMLAUTS ON THE WAY IN (28.07.2026, user spotted
+  "faellt weg" and "kuenftig" on a current-work card). The board is German prose the
+  user reads on a phone; transliterated umlauts read as broken. The cause is the path
+  the text takes: `scripts/board.mjs` receives a card's text as a COMMAND-LINE
+  ARGUMENT, and German text passed through the shell on Windows arrives mangled — so
+  every session has been transliterating by hand to stay safe, which is the defect
+  rather than the workaround. Cards written straight into the HTML carry proper
+  umlauts; cards written through `board.mjs` do not. Both kinds sit on the board today
+  (the ones written on 28.07. were corrected by hand).
+  THE FIX: `board.mjs` takes the text on STDIN (`--text-stdin`, and the argument form
+  keeps working for ASCII), reading it as UTF-8 explicitly, so the shell never sees
+  the prose. Everything it writes stays UTF-8 end to end — the HTML file is written
+  with an explicit encoding, never the platform default.
+  ENFORCE IT: `dashboard-guard-core.mjs` gains one check over the board's text —
+  a card body containing a transliterated umlaut in a German word (`ae`/`ue`/`oe`
+  inside a word the surrounding text shows to be German, e.g. `Pruefung`, `faellt`,
+  `kuenftig`, `ueber`, `Flaeche`) FAILS the audit, naming the card. A word list is
+  enough; this is a spelling smell, not a linguistics problem, and a false positive is
+  cheap to whitelist. Without the check the workaround simply returns the next time a
+  session finds the argument path convenient.
+  VERIFIABLE: pure Vitest — text with real umlauts survives the stdin path byte for
+  byte; a transliterated body fails the audit naming the card; a legitimate word that
+  merely contains those letters (`Quelle`, `Steuer`, `Aequator`) does not fire; an
+  unreadable board never throws. Live: write a card with umlauts through the new path
+  and read them back from the published page.
+  DOCS in the same commit: the memory entry `batch-dashboard-artifact` gains the one
+  sentence naming the stdin path as the way to write a card.
+
+- [x] 411. THE BOARD'S PROMISED END TIME IS ALWAYS FOUND STALE BY THE READER, NEVER
+  BY ME (29.07.2026, user reported it for the third time in one night: "Die
+  End-Uhrzeiten sind mal wieder total veraltet"). The `~HH:MM` on a current-work card
+  is a promise to someone reading from a phone. `dashboard-guard-core.mjs` already has
+  `now-eta-past`, which blocks a turn end once the estimate has PASSED (plus a 5-minute
+  grace). That is one tick too late by construction: the card is already wrong when the
+  guard speaks, and between two turn ends — which can be half an hour apart while a
+  delegated agent builds — the reader sees a promise that expired long ago. Measured
+  tonight: 300 stood at `~00:45` and 402 at `~00:17` while the clock read 01:52.
+  THE FIX, and it is a shift of one comparison: the guard fires when the estimate has
+  less than a calibratable margin LEFT (default 15 minutes, the launcher's own tick
+  width), not after it has passed. The remedy text stays the same — give it a realistic
+  new time or move the card — so the session is nudged while the board is still honest.
+  The existing past-due case remains, one severity louder.
+  AND THE SECOND HALF, which is the actual cause: the estimates were optimistic every
+  single time. The remedy line therefore states the rule the estimate must follow — the
+  time by which the work will be VISIBLY done including its verification, not the time
+  the current step might end — and a card whose estimate is moved more than twice in one
+  session gets the observation printed with it, because a third revision is a signal that
+  the estimate method is wrong rather than the number.
+  VERIFIABLE: pure Vitest — an estimate 20 minutes out passes, one 10 minutes out is
+  flagged, one that has passed is flagged more loudly, a card opened before midnight and
+  estimating into the next day is never mistaken for past-due (the existing wrap case),
+  a missing estimate keeps its current behaviour, and a garbled meta never throws.
+  DOCS in the same commit: the memory entry `batch-dashboard-artifact`, which states what
+  the board's four sections promise.
+
+- [x] 416. AN ARCHIVED CARD LEAVES THE BOARD EMPTY, AND A GREEN PUSH TURNS RED
+  (29.07.2026, hit TWICE within one hour and BOTH times reported by the user before any
+  guard spoke: "you are not working on anything?" and "again no card in progress").
+  Closing a point is two board edits — archive the finished card, promote the next one —
+  and between them the "Woran ich gerade arbeite" section is EMPTY. That is not only a
+  bad look on the phone: `scripts/board-core.test.mjs` asserts "the live board must
+  carry current work for this sweep to mean anything", so the empty window turns the
+  whole unit layer red, and the pre-push gate then blocks a merge that is otherwise
+  perfectly green. Measured tonight: a 155-file run reporting one failed file, the merge
+  of a finished point blocked, and the red read at first glance like the load flake this
+  night was already full of.
+  THE FIX: make the archive and the next promotion ONE board edit. `board.mjs done <n>`
+  gains the successor — `board.mjs done <n> --next <m> "<status>"` — writing both cards
+  in a single write, so the file is never observed without current work. Where a session
+  genuinely has nothing to promote (the queue is empty, or it is about to take a session
+  boundary), it must say so ON the board rather than leave a hole: a single card naming
+  what is happening instead. That case is rare and belongs in the same command
+  (`--none "<reason>"`), so the empty state cannot be reached by forgetting.
+  THE TEST STAYS AS IT IS: it is right that an empty current-work section is a defect —
+  do not weaken it to tolerate the hole. It fired correctly both times; what was missing
+  was a way to close a point without creating the hole in the first place.
+  VERIFIABLE: pure Vitest — `done --next` produces a board that never lacks a now-card
+  (assert on the intermediate string, not only the result); `--none` writes the naming
+  card; `done` without either is REFUSED when it would empty the section, naming the two
+  ways out; and the existing board audits still pass on the produced board.
+  DOCS in the same commit: the memory entry `batch-dashboard-artifact`, which states how
+  a card moves.
+
+- [x] 421. A DECISION ASKED IN THE CHAT NEVER REACHES THE BOARD (29.07.2026, user:
+  "Du hast mir Handlungsaufforderungen im Chat vom Dashboard geschrieben. Die dürfen dort
+  höchstens zusätzlich stehen. In jedem Fall müssen sie als Karte in 'Von dir zu klären'
+  erscheinen." — and, decisively, "In den Chatbereich schaue ich nicht regelmäßig. Den
+  öffne ich nur, wenn ich dir etwas schreiben will."). THE CHAT IS AN INBOX, NOT A
+  NOTICE-BOARD: the user writes there, the user does not read there. A question put only
+  into a chat reply is therefore a question that was never asked — it waits in a channel
+  nobody watches while the board, which IS read, shows nothing pending. Observed today: a
+  typography decision was put to the user in chat with three options and no "Von dir zu
+  klären" card ever existed for it.
+  THE RULE: every request for a user DECISION exists as a card in "Von dir zu klären".
+  The chat may carry it as well — additionally, never instead. A card is removed when the
+  decision is answered (`board.mjs vdzk-remove`), which is the existing mechanism.
+  ENFORCE IT, do not remember it (the project has paid for reminders repeatedly). A Stop
+  hook `decision-card-guard` blocks the turn end when the turn's own reply to the user
+  ASKS for a decision while "Von dir zu klären" holds no card for it. Detecting a question
+  is the hard half and it must fail SAFE — a false block costs a turn, a false pass costs
+  a decision the user never sees, so the trigger is deliberately broad: a reply containing
+  a question mark addressed at the user, or one of the decision phrasings the project
+  actually uses ("sag mir", "welche Variante", "deine Entscheidung", "soll ich", "willst
+  du"), demands that the VDZK section have gained a card in this turn OR already carry one
+  whose title shares a content word with the question. The remedy line names the one
+  command that fixes it.
+  VERIFIABLE: pure Vitest over a `decision-card-guard-core.mjs` — a reply with a decision
+  question and no VDZK card blocks; the same reply with a matching card passes; a reply
+  with a rhetorical question inside a status sentence and an unrelated card blocks (fail
+  safe, and the test says so in its name); an answer containing no question passes; a
+  malformed board or a missing reply allows the stop (fail-open, like every guard here).
+  Plus the guard's own entry in the four-eyes ledger, since it is a mechanism.
+  DOCS in the same commit: CLAUDE.md §7.2 (the Stop-chain list) and the memory entry
+  `dashboard-vdzk-only-decisions`, which states what that section holds — it gains the
+  converse rule, that every decision MUST be there.
+
+- [x] 423. THE BOARD'S OWN REFRESH DELETES THE MESSAGE CHANNEL (29.07.2026, user
+  reported it from the phone: "Wechsle ich auf dem Handy zurück zur Browser-App sehe ich
+  die Agenten-Sektion erst nach einem Refresh — vorher fehlt sie. Noch schlimmer: Das
+  passiert auch beim automatischen Refresh."). The chat section is built by the viewer
+  and inserted UNDER the board's heading — which puts it INSIDE `<main>`
+  (`public/board/index.html`, `injectChat`: `document.querySelector('main h1 + .sub')`,
+  then `insertBefore`). The fragment's 30-second refresher REPLACES `<main>` wholesale,
+  and `injectChat` runs only once per document load, so every successful refresh removes
+  the chat and nothing puts it back. On a phone it reads as "the section is gone": returning
+  to the browser makes the page visible, the refresher fires at once, and the chat vanishes
+  in the same moment the reader looks at it; only a full reload — a new document — brings it
+  back. Before the heading move it sat at body level and survived the swap, so this is a
+  regression of that change, not of the transport.
+  FIX: the swap and the injection must be tied together — after `<main>` is replaced the
+  viewer re-runs `injectChat` (which is already idempotent). The refresher is versioned
+  source (`scripts/board-refresher-core.mjs`) and the injection lives in the viewer, so the
+  seam is a documented signal, not a shared variable: the refresher dispatches an event on
+  `window` after a successful swap, and the viewer listens and re-injects. Nothing about
+  the chat may enter the board CONTENT — that rule is unchanged and is why re-injection,
+  not markup, is the fix. Keep the reader's typed-but-unsent text and the open/closed state
+  across a re-injection, or the channel loses words on a 30-second timer.
+  VERIFIABLE: pure Vitest in jsdom — (a) a document with the chat injected, put through one
+  successful swap, still carries exactly one `#hoa-chat` afterwards (this is the case that
+  fails today); (b) an unsent draft and the panel's open state survive that swap; (c) the
+  idempotence holds — two swaps in a row never yield two sections; (d) the existing
+  `scripts/chat-viewer.test.mjs` cases stay green.
+  DOCS in the same commit: `docs/batch-autonomy.md` (the board's transport section — the
+  chat is injected, so every content swap must re-inject it) and the memory entry
+  `batch-dashboard-artifact`, whose chat paragraph states where the section lives.
+
+- [x] 424. A MESSAGE WAITS AS LONG AS THE OWNER WAITS (29.07.2026, user: "habe ich dort um
+  15:31 etwas geschrieben (also vor deutlich mehr als 15 min) und es gab keine Reaktion").
+  Measured on the live state: the message reached the spool at 15:31 and was still PENDING
+  at 16:05. The watcher did its job — it logged `decision: skip, reason: owner-live` and
+  left the message to the running session, which is correct, because a live owner has the
+  context. The delivery, though, only happens in the PostToolUse heartbeat, i.e. AT THE
+  OWNER'S NEXT TOOL CALL. That session had declared a wait (`batch-in-flight`, "Agent baut
+  Punkt 392") and was doing exactly what a waiting session should do: nothing. Its agent
+  worked in a WORKTREE, whose own `.claude/chat-spool` is empty, so the agent's calls could
+  not deliver it either. The guarantee "within seconds, at the next tool call" therefore
+  silently degrades to "whenever the owner happens to act again" — and the mode where the
+  user most needs the channel (long delegated build, user on the phone) is precisely the
+  mode where the owner is idle longest.
+  FIX: give the deferral a DEADLINE. A message that stays pending past a calibratable
+  window (default 3 minutes) is no longer covered by "the owner will get it": the watcher
+  stops skipping and spawns the responder as it would with no live owner, under the same
+  bounded claim it already uses. A declared WAIT is the trigger to look at, not the mere
+  existence of a live session — a session that is genuinely working produces tool calls and
+  will collect the message on its own within seconds.
+  VERIFIABLE: pure Vitest over `chat-watcher-core` — a pending message younger than the
+  window with a live owner still skips (unchanged behaviour); the same message past the
+  window is taken; a message the owner consumed in between is not taken twice; the claim
+  and its expiry are unchanged. Plus a `chat-spool` case pinning that the pending age is
+  read from the spooled `receivedAt`, so a restarted watcher cannot reset the clock.
+  DOCS in the same commit: `docs/batch-autonomy.md` (the message-channel section states
+  what each mode guarantees — the "seconds while a session runs" line gains the deadline
+  that makes it true).
