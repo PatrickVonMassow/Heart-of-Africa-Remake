@@ -237,7 +237,10 @@ export function turnTakesBoundary(calls = []) {
       if (!/^(?:\S*node\s+)?\S*batch-boundary\.mjs\b/.test(segment)) continue
       const words = segment.split(/\s+/).filter(Boolean)
       const at = words.findIndex((w) => /batch-boundary\.mjs$/.test(w))
-      if (words.slice(at + 1).some((w) => /^\d+$/.test(w))) return true
+      // The quotes come off first: a PowerShell caller writes `… "462"`, and a
+      // gate that stood down on that would be silently off for half the shells
+      // (four-eyes finding 3, Fable 5).
+      if (words.slice(at + 1).some((w) => /^\d+$/.test(w.replace(/^["']|["']$/g, '')))) return true
     }
   }
   return false
@@ -356,9 +359,13 @@ export const HEAD_SEP = ' · '
  * about instead of silently counting as a finding titled "[request] · …".
  */
 export function parseHead(line) {
-  const m = /^- \[( |x)\] (\S+) · (\S+) · (.*)$/.exec(String(line ?? ''))
+  // `- [X]` counts as ticked (four-eyes finding 4, Fable 5): a hand tick with a
+  // capital X used to fall through BOTH the pending count and the malformed
+  // report, so the entry simply vanished — the one thing this carrier may
+  // never do.
+  const m = /^- \[( |x|X)\] (\S+) · (\S+) · (.*)$/.exec(String(line ?? ''))
   if (!m) return null
-  const done = m[1] === 'x'
+  const done = m[1] !== ' '
   const base = { done, at: m[2], session: m[3] }
   const prefix = `${REQUEST_MARKER}${HEAD_SEP}`
   if (!m[4].startsWith(prefix)) return { ...base, kind: 'finding', state: done ? 'drained' : 'pending', title: m[4] }
@@ -449,7 +456,7 @@ export function findPending(text, title, kind = 'finding') {
 export function malformedEntries(text = '') {
   const bad = []
   for (const line of String(text ?? '').split(/\r?\n/)) {
-    if (!/^- \[[ x]\] /.test(line)) continue
+    if (!/^- \[[ xX]\] /.test(line)) continue
     if (parseHead(line)) continue
     bad.push(line.trim())
   }

@@ -53,6 +53,37 @@ export const REQUIRED_FIELDS = Object.freeze(['spec', 'why'])
 /** One line, whitespace collapsed — a head field may never break the line. */
 const oneLine = (value) => String(value ?? '').replace(/\s+/g, ' ').trim()
 
+/** A line that is nothing but a (possibly escaped) field marker. */
+const TAG_LINE_RE = /^(\\*)#([a-z]+)\s*$/
+
+/**
+ * A BODY LINE THAT IS ITSELF A FIELD MARKER IS ESCAPED (four-eyes finding 1,
+ * Fable 5, 30.07.2026). The spec is appended VERBATIM, and the specs most likely
+ * to be deposited here are about this very mechanism — one containing a bare
+ * `#spec` line would otherwise be truncated on read-back, its tail misfiled into
+ * another field, and a `#blocked` line inside a spec would contaminate the very
+ * reason the user is shown. One backslash is added on the way in and taken off
+ * on the way out, so a line that already begins with backslashes survives too.
+ */
+export function escapeBodyLine(line) {
+  const m = TAG_LINE_RE.exec(String(line ?? ''))
+  return m && BY_TAG.has(m[2]) ? `\\${line}` : String(line ?? '')
+}
+
+/** The inverse of `escapeBodyLine` — total, and a no-op on an ordinary line. */
+export function unescapeBodyLine(line) {
+  const text = String(line ?? '')
+  const m = TAG_LINE_RE.exec(text)
+  return m && m[1].length > 0 && BY_TAG.has(m[2]) ? text.slice(1) : text
+}
+
+/** One field's value as the indented, escaped lines it is written as. */
+function bodyLines(value) {
+  return String(value)
+    .split(/\r?\n/)
+    .map((line) => (line.trim() === '' ? '' : `${INDENT}${escapeBodyLine(line)}`))
+}
+
 /** Trim leading and trailing blank lines, keeping the ones inside. */
 function trimBlankEdges(lines) {
   let from = 0
@@ -89,15 +120,16 @@ export function parseFields(body = []) {
   const sections = new Map()
   const loose = []
   let current = null
-  for (const line of Array.isArray(body) ? body : []) {
-    const m = /^#([a-z]+)\s*$/.exec(line)
-    if (m && BY_TAG.has(m[1])) {
-      current = BY_TAG.get(m[1]).key
+  for (const raw of Array.isArray(body) ? body : []) {
+    const line = String(raw ?? '')
+    const m = TAG_LINE_RE.exec(line)
+    if (m && !m[1] && BY_TAG.has(m[2])) {
+      current = BY_TAG.get(m[2]).key
       if (!sections.has(current)) sections.set(current, [])
       continue
     }
-    if (current === null) loose.push(line)
-    else sections.get(current).push(line)
+    if (current === null) loose.push(unescapeBodyLine(line))
+    else sections.get(current).push(unescapeBodyLine(line))
   }
   const fields = {}
   for (const [key, lines] of sections) fields[key] = trimBlankEdges(lines).join('\n')
@@ -116,7 +148,7 @@ export function requestEntry({ at, session, title, state = 'pending', ...fields 
     const value = String(fields[field.key] ?? '')
     if (!value.trim()) continue
     out.push(`${INDENT}#${field.tag}`)
-    for (const line of value.split(/\r?\n/)) out.push(line.trim() === '' ? '' : `${INDENT}${line}`)
+    out.push(...bodyLines(value))
   }
   return out.join('\n')
 }
@@ -204,9 +236,7 @@ function transition(text, title, state, extra = null) {
   lines[at] = withState(lines[at], state)
   if (extra && String(extra.value ?? '').trim()) {
     const { end } = readBody(lines, at + 1)
-    const block = [`${INDENT}#${extra.tag}`]
-    for (const line of String(extra.value).split(/\r?\n/)) block.push(line.trim() === '' ? '' : `${INDENT}${line}`)
-    lines.splice(end, 0, ...block)
+    lines.splice(end, 0, `${INDENT}#${extra.tag}`, ...bodyLines(extra.value))
   }
   return { text: lines.join('\n'), title: hits[0].title }
 }

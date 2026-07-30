@@ -32,7 +32,7 @@
 // block `--synced` and create the very block loop this design exists to
 // prevent.
 
-import { parseTasks, QUEUE_STUB_BODY, QUEUE_STUB_META } from './dashboard-guard-core.mjs'
+import { parseTasks, QUEUE_STUB_BODY, QUEUE_STUB_META, TRANSLITERATION_STEMS } from './dashboard-guard-core.mjs'
 import { normaliseLineEndings } from './board-core.mjs'
 import { FINDER_POINTS, RELEASE_TAG_POINT } from './queue-order-guard-core.mjs'
 
@@ -294,6 +294,17 @@ export const REQUEST_CARD_MAX = 5
 /** The card's title — no leading number, so no parser reads it as a point. */
 export const REQUEST_CARD_TITLE = 'Anfragen aus anderen Fenstern'
 
+/** ae/oe/ue back to ä/ö/ü, but ONLY in a word the audit's stem list flags. */
+const UMLAUT = { ae: 'ä', oe: 'ö', ue: 'ü' }
+export function repairTransliteration(word) {
+  const w = String(word ?? '')
+  if (!TRANSLITERATION_STEMS.some((stem) => w.toLowerCase().includes(stem))) return w
+  return w.replace(/[AaOoUu][eE]/g, (digraph) => {
+    const letter = UMLAUT[digraph.toLowerCase()]
+    return /[A-Z]/.test(digraph[0]) ? letter.toUpperCase() : letter
+  })
+}
+
 /**
  * A deposit's title, made safe for a board card.
  *
@@ -306,6 +317,13 @@ export const REQUEST_CARD_TITLE = 'Anfragen aus anderen Fenstern'
 export function boardSafeTitle(title, { maxLength = 60 } = {}) {
   let t = String(title ?? '').replace(/\s+/g, ' ').trim()
   const stem = (path) => (path.split('/').pop() ?? path).replace(/\.[a-z]+$/i, '')
+  // A TITLE IS THE ONE FIELD THAT TRAVELS AS AN ARGUMENT (four-eyes finding 2,
+  // Fable 5): the depositing window is told its umlauts do not survive a Windows
+  // shell, so it writes "fuer"/"pruefen" — and the board audit rejects exactly
+  // that, on the OWNER's turn, for text it never wrote. The repair is applied
+  // only to the words the audit's own stem list flags, so ordinary German
+  // ("Steuerung", "Aequator") is untouched.
+  t = t.replace(/[A-Za-zÄÖÜäöüß]+/g, repairTransliteration)
   t = t
     .replace(/\b(?:src|scripts|docs)\/[\w./-]+/g, (m) => stem(m))
     .replace(/\b[\w-]+\.(?:mjs|cjs|ts|tsx|js|md)\b/g, (m) => stem(m))

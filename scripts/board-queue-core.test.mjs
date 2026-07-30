@@ -10,7 +10,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { REPO_ROOT } from './repo-paths.mjs'
-import { auditDashboard, parseQueuePoints, QUEUE_STUB_META } from './dashboard-guard-core.mjs'
+import { auditDashboard, findTransliterations, parseQueuePoints, QUEUE_STUB_META } from './dashboard-guard-core.mjs'
 import { boardMissingPoints } from './board-currency-core.mjs'
 import { queueCard, toNow } from './board-core.mjs'
 import { concisenessOffenders } from './dashboard-conciseness-guard-core.mjs'
@@ -570,6 +570,29 @@ describe('the pending-request card', () => {
 
   it('leaves an ordinary German title alone', () => {
     expect(boardSafeTitle('  Sitzungsübergabe   härten ')).toBe('Sitzungsübergabe härten')
+  })
+
+  it('repairs the transliteration a shell-mangled title arrives with', () => {
+    // Four-eyes finding 2 (Fable 5): the title is the one field that travels as
+    // an argument, so a depositor writes "fuer"/"pruefen" — and the board audit
+    // then blocks the OWNER for text it never wrote.
+    // Only the flagged words are repaired: "loesen" is not on the audit's stem
+    // list, so it is not the guard's business and not this function's either.
+    const t = boardSafeTitle('Bitte fuer die Warteschlange pruefen und moeglichst loesen')
+    expect(t).toBe('Bitte für die Warteschlange prüfen und möglichst loesen')
+    expect(findTransliterations(t)).toEqual([])
+    expect(boardSafeTitle('Ueberpruefung zurueckstellen')).toBe('Überprüfung zurückstellen')
+  })
+
+  it('leaves a word the audit does not flag untouched', () => {
+    expect(boardSafeTitle('Steuerung am Aequator neu justieren')).toBe('Steuerung am Aequator neu justieren')
+  })
+
+  it('keeps a hostile title out of the audit on the real card', () => {
+    const html = renderRequestsCard([
+      { at: '2026-07-30T20:11:00.000Z', title: 'Bitte fuer Punkt 465 pruefen (465) scripts/finding.mjs', route: 'tasks' },
+    ])
+    expect(findTransliterations(html)).toEqual([])
   })
 })
 

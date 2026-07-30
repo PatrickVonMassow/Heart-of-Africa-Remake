@@ -10,6 +10,7 @@ import {
   turnTakesBoundary,
 } from './findings-core.mjs'
 import {
+  escapeBodyLine,
   formatRequest,
   markBlocked,
   markQueued,
@@ -19,6 +20,7 @@ import {
   requestEntry,
   requestRoute,
   requestWarnings,
+  unescapeBodyLine,
 } from './findings-request-core.mjs'
 
 const SPEC = [
@@ -140,6 +142,38 @@ describe('the states and the escape hatch', () => {
   })
 })
 
+describe('a spec that talks ABOUT this mechanism survives it', () => {
+  // Four-eyes finding 1 (Fable 5, 30.07.2026): the specs most likely to be
+  // deposited here are specs about the carrier itself, and a bare field marker
+  // inside one used to truncate the field it was supposed to carry verbatim.
+  const spec = ['Die Felder heißen:', '#spec', '#why', 'und der Rest.'].join('\n')
+
+  it('keeps a field marker that stands INSIDE the spec', () => {
+    const entry = requestEntries(deposit({ spec }))[0]
+    expect(entry.fields.spec).toBe(spec)
+    expect(entry.fields.why).toBe('Eine Stunde lang konnte nichts eingereiht werden.')
+  })
+
+  it('keeps a line that already begins with backslashes', () => {
+    const tricky = ['\\#spec', '\\\\#why', 'Ende.'].join('\n')
+    expect(requestEntries(deposit({ spec: tricky }))[0].fields.spec).toBe(tricky)
+  })
+
+  it('does not let a marker inside the spec contaminate the blocked reason', () => {
+    const text = deposit({ spec: ['vorher', '#blocked', 'nachher'].join('\n') })
+    const entry = requestEntries(markBlocked(text, 'Nebenfenster', 'Der echte Grund.').text)[0]
+    expect(entry.fields.blockedWhy).toBe('Der echte Grund.')
+    expect(entry.fields.spec).toBe(['vorher', '#blocked', 'nachher'].join('\n'))
+  })
+
+  it('escapes and unescapes nothing else', () => {
+    expect(escapeBodyLine('#ziel')).toBe('#ziel')
+    expect(escapeBodyLine('ein Satz mit #spec darin')).toBe('ein Satz mit #spec darin')
+    expect(unescapeBodyLine('\\#ziel')).toBe('\\#ziel')
+    expect(unescapeBodyLine('gewöhnlich')).toBe('gewöhnlich')
+  })
+})
+
 describe('the route', () => {
   it('sends a request with open questions to a decision card, never to the work order', () => {
     const text = deposit({ openQuestions: 'Soll die Sperre auch für Doku gelten?' })
@@ -170,6 +204,15 @@ describe('a malformed request warns and never blocks', () => {
     const entry = requestEntries(text)[0]
     expect(entry.fields.loose).toBe('lose Zeile')
     expect(requestWarnings(entry).join(' ')).toMatch(/before the first #field/)
+  })
+
+  it('counts a hand tick with a capital X as ticked instead of losing the entry', () => {
+    // Four-eyes finding 4 (Fable 5): it used to fall through the pending count
+    // AND the malformed report, so the entry vanished from both.
+    const ticked = '- [X] 2026-07-29T18:50:00.000Z · 10a2d2e0 · Ein Befund von Hand abgehakt\n'
+    expect(parseHead(ticked.trim()).done).toBe(true)
+    expect(parseCarrier(ticked).drained).toBe(1)
+    expect(malformedEntries(ticked)).toEqual([])
   })
 
   it('reports a head that lost its state field rather than counting it as a finding', () => {
@@ -215,6 +258,9 @@ describe('the gate is the point boundary, not every turn end', () => {
 
   it('recognises the turn that TAKES the boundary', () => {
     expect(boundary('node scripts/batch-boundary.mjs 462')).toBe(true)
+    // A PowerShell caller quotes it (four-eyes finding 3, Fable 5).
+    expect(boundary('node scripts/batch-boundary.mjs "462"')).toBe(true)
+    expect(boundary('node C:/repo/scripts/batch-boundary.mjs 462')).toBe(true)
   })
 
   it('does not read the read-only forms as taking it', () => {

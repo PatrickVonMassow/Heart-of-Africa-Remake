@@ -227,7 +227,12 @@ if (has('--blocked')) {
   const why = flag('--why')
   if (!title) fail('--blocked needs the title (or part of it) of the request that cannot be carried in')
   if (!why) fail('--blocked needs a reason the user can act on: --blocked "<title>" --why "<reason>"')
-  const hits = pendingRequests(readCarrier()).filter((r) => r.title.toLowerCase().includes(title.toLowerCase()))
+  // ONE read, and the transition runs on THAT text (four-eyes finding 5, Fable
+  // 5): re-reading after the card was written could find a second matching
+  // deposit appended in between — the very concurrency this carrier is for —
+  // and then throw with the user's card already up.
+  const before = readCarrier()
+  const hits = pendingRequests(before).filter((r) => r.title.toLowerCase().includes(title.toLowerCase()))
   if (hits.length === 0) fail(`no pending request matches "${title}" — check: node scripts/finding.mjs --requests`)
   if (hits.length > 1) {
     fail(`"${title}" matches ${hits.length} pending requests — name it more precisely:\n${hits.map((h) => `  · ${h.title}`).join('\n')}`)
@@ -249,7 +254,7 @@ if (has('--blocked')) {
       `the decision card could not be written, so the request stays pending — ${String(e.stderr || e.message).trim()}`,
     )
   }
-  const result = markBlocked(readCarrier(), title, why)
+  const result = markBlocked(before, title, why)
   writeFileSync(CARRIER, result.text, 'utf8')
   console.log(`blocked and escalated to the user: ${result.title}`)
   process.exit(0)
