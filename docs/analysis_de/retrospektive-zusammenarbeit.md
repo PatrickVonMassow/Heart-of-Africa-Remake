@@ -621,6 +621,28 @@ Es ist dieselbe Klasse wie die Regel, einen gefundenen Fehler in sichtbaren Wort
 
 **Lehre:** Eine Kennung, die der Leser nachschlagen muss, ist im Gespräch mit ihm keine Kennung, sondern eine Hürde. Was nach außen geht, trägt den Namen; die Kurzform bleibt drinnen. Und wer ein neues Paket schneidet, vergibt den Namen im selben Moment — ein Buchstabe allein ist keine vollständige Definition.
 
+### 3.67 Das Review, das seinen Autor überlebt
+
+Dreimal an einem Vormittag (30.07.2026) hat ein delegierter Agent sein Zweitmodell-Review im Hintergrund gestartet und die Arbeit beendet, bevor das Urteil zurückkam. Das Urteil landete jedes Mal bei der Elternsitzung — einmal mit „nicht mergen" und zwei Blockern, von denen einer den Hauptzweig rot gemacht hätte. Der Zweig sah geprüft aus: Es hatte ein Review gegeben, es war nur nie jemand da, der die Funde umsetzt.
+
+Das ist nicht die Nachlässigkeit eines Agenten, sondern eine Lücke in der Form. Ein Review ist keine Prüfung, die man ANSTÖSST, sondern eine, die man ABSCHLIESST; wer den Anstoß für die Erfüllung hält, hat die teuerste Hälfte weggelassen. Dieselbe Verwechslung wie beim Herzschlag, der für Fortschritt gehalten wird, nur auf der Qualitätsseite.
+
+**Lehre:** Ein aufgezeichnetes Urteil „nicht mergen" oder „mit Korrekturen" erfüllt kein Tor — erst ein späteres Urteil über einen späteren Commit tut das. Und wer ein Review beauftragt, bleibt im Zug, bis es da ist.
+
+### 3.68 Der Test, der nur im Nebenbaum grün ist
+
+Zwei Blocker desselben Tages hatten dieselbe Ursache: Ein Test bestand, weil eine git-ignorierte Datei im Arbeitsbaum des Agenten FEHLT — im Hauptbaum aber existiert. Er prüfte damit nicht das Verhalten, sondern die Zufälligkeit seiner Umgebung, und wäre beim Merge rot geworden. Der zweite Fall war der erste, eine Zeile weiter.
+
+Die Isolation, die parallele Agenten überhaupt erst möglich macht, ist also zugleich eine Falle: Der Nebenbaum ist eben NICHT der Hauptbaum, und alles, was nicht im Repository liegt — Sperren, Kanäle, Laufzeitzustand —, fehlt dort. Ein Test, der echte Pfade liest, misst deshalb im Nebenbaum systematisch etwas anderes als dort, wo er später laufen muss.
+
+**Lehre:** Jeder neue Test bekommt seine Pfade eingespritzt, nie gelesen. Und die Prüffrage vor dem Abgeben lautet nicht „ist er grün?", sondern „wäre er auch im Hauptbaum grün, mit allem Laufzeitzustand, der dort liegt?"
+
+### 3.69 Die Sonde, die ihren eigenen Blick misst
+
+Die frisch gebaute Lebendigkeits-Prüfung sollte einen delegierten Agenten an seinem ERGEBNIS beurteilen statt an seinem Protokoll — die Lehre aus dem Agenten, der nach 59 stillen Minuten für tot erklärt wurde und arbeitete. Gemessen datierte sie vier Git-Dateien, also den letzten Git-BEFEHL, nicht die letzte Bearbeitung. Ein Agent, der zwanzig Minuten Quelltext schreibt, ohne git aufzurufen, galt wieder als still; ein eigener Blick in seinen Arbeitsbaum konnte die Uhr zurücksetzen. Die Korrektur fiel beim ersten Anlauf zu kurz aus: Git meldet ein KOMPLETT NEUES Verzeichnis standardmäßig nur als Verzeichnis, und dessen Zeitstempel bewegt sich nicht, wenn darin eine Datei geändert wird — die Lücke bestand für jeden neu angelegten Ordner fort.
+
+**Lehre:** „Am Ergebnis messen" ist erst dann umgesetzt, wenn das Gemessene wirklich das Ergebnis ist. Ein Stellvertreter, der leicht zu beschaffen ist — eine Metadatei, ein Verzeichnisdatum —, ist die wahrscheinlichste Stelle, an der die Regel formal erfüllt und faktisch verfehlt wird. Und eine Sonde, die der Beobachter durch bloßes Hinsehen verändert, misst ihn statt des Beobachteten.
+
 ---
 
 ## 4. Die Guards als Immunsystem
@@ -710,7 +732,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Donnerstag, 30.07.2026, 10:10 · Quellen-Fingerprint: `596d0d540848…`
+Zuletzt aktualisiert: Donnerstag, 30.07.2026, 13:55 · Quellen-Fingerprint: `1f9587ac35ff…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -793,8 +815,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | CORRECTED 19.07.2026 — WebGPU IS testable headless/autonomously via system Chrome (channel:'chrome') + --headless=new; the 'untestable' belief held only for Playwright's BUNDLED Chromium | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 75 Feedback-/Projekt-Memories · 39 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 21 Prozess-/Meta-TASKS-Punkte (davon 8 offen).
+Erfasste Quellen: 75 Feedback-/Projekt-Memories · 39 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 21 Prozess-/Meta-TASKS-Punkte (davon 7 offen).
 
-<!-- RETRO-FINGERPRINT: 596d0d540848453a4c05951f613de1869add4d8f43b432146be21bb47c835c7b -->
-<!-- RETRO-LAST-REFRESHED: 2026-07-30T08:10:56.337Z -->
+<!-- RETRO-FINGERPRINT: 1f9587ac35ff1230f4771a2eef4cce94bc47aad78dab6d5298d2cc5031d00f25 -->
+<!-- RETRO-LAST-REFRESHED: 2026-07-30T11:55:56.018Z -->
 <!-- AUTO-GENERATED:END -->
