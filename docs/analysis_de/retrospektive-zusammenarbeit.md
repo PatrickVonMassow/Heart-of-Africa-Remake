@@ -682,7 +682,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Donnerstag, 30.07.2026, 07:46 · Quellen-Fingerprint: `096365cf7bc8…`
+Zuletzt aktualisiert: Donnerstag, 30.07.2026, 07:50 · Quellen-Fingerprint: `7999810bcfcd…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -764,8 +764,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | CORRECTED 19.07.2026 — WebGPU IS testable headless/autonomously via system Chrome (channel:'chrome') + --headless=new; the 'untestable' belief held only for Playwright's BUNDLED Chromium | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 74 Feedback-/Projekt-Memories · 39 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 20 Prozess-/Meta-TASKS-Punkte (davon 9 offen).
+Erfasste Quellen: 74 Feedback-/Projekt-Memories · 39 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 20 Prozess-/Meta-TASKS-Punkte (davon 7 offen).
 
-<!-- RETRO-FINGERPRINT: 096365cf7bc803971c34d95cf2d93bebcc62f37a19dd749064e63c76b3304160 -->
-<!-- RETRO-LAST-REFRESHED: 2026-07-30T05:46:24.527Z -->
+<!-- RETRO-FINGERPRINT: 7999810bcfcdc5b36050964c73a630954b76a45afab6242ed7466690c3678aaa -->
+<!-- RETRO-LAST-REFRESHED: 2026-07-30T05:50:59.529Z -->
 <!-- AUTO-GENERATED:END -->
