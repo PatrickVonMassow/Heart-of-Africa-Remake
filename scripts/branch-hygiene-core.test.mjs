@@ -273,6 +273,28 @@ describe('assessBranchHygiene — a branch on main\'s own tip', () => {
     expect(r.findings.map((f) => f.name)).toEqual(['feat/111-done'])
   })
 
+  it('exempts the REMOTE ref too — the workflow pushes a branch the moment it is cut', () => {
+    const r = assessBranchHygiene({
+      readable: true,
+      repoRoot: '/repo',
+      remoteMerged: [{ name: 'origin/feat/999-just-cut', tipAt: old, tipSha: TIP }],
+      mainTip: TIP,
+    })
+    expect(r.block).toBe(false)
+    expect(r.findings).toEqual([])
+  })
+
+  it('still reports a REMOTE branch whose tip is behind main', () => {
+    const r = assessBranchHygiene({
+      readable: true,
+      repoRoot: '/repo',
+      remoteMerged: [{ name: 'origin/feat/111-done', tipAt: old, tipSha: 'b'.repeat(40) }],
+      mainTip: TIP,
+    })
+    expect(r.block).toBe(true)
+    expect(r.findings.map((f) => f.name)).toEqual(['origin/feat/111-done'])
+  })
+
   it('without a known main tip it behaves exactly as before — the exemption cannot swallow the sweep', () => {
     const r = assessBranchHygiene({
       readable: true,

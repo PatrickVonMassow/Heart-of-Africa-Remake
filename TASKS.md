@@ -3503,7 +3503,17 @@ it is appended.
   costs turns and teaches a session to avoid naming things in a search. The fence judges per
   SEGMENT and by the command HEAD, the way the findings core already does, and quoted text
   never decides.
-  All six stand down for a session that does not own the batch lock and for a paused batch,
+  (G) TWO CARVE-OUTS THAT EXEMPT MORE THAN THEY ARGUE FOR (four-eyes review 30.07.2026).
+  The findings guard grants its delegation exemption from the COMMAND STRING alone: a turn
+  that merely RUNS the in-flight declaration is exempt even when the CLI REFUSED it (no lock,
+  no evidence, dead evidence), and nothing checks that work was handed out at all — so the
+  one path the exemption exists for is also the path a turn can take without investigating.
+  It is honoured only when the turn actually spawned an agent, or when the declaration file
+  proves it was written inside this turn. And the branch sweep reads the in-flight file RAW —
+  no age, no liveness — while the expiry lives in a consumer it never calls, so a dead
+  session's declaration shields its branch and worktree from the sweep for ever; the sweep
+  applies the same expiry the progress guard applies.
+  All eight stand down for a session that does not own the batch lock and for a paused batch,
   like every guard here. MECHANISM REVIEW REQUIRED (CLAUDE.md §7.2); the
   `.claude/settings.json` wiring is attended-only and must be ABSOLUTE, not cwd-relative.
   DOCS in the same commit: `docs/batch-autonomy.md` (the guard chain), for (B)
@@ -3520,6 +3530,9 @@ it is appended.
   never as clean. For (F): a table of real invocations from the transcript corpus — a search
   naming a script ALLOWS, a commit whose message carries a forbidden verb ALLOWS, the
   forbidden write itself still DENIES, and a chained invocation is judged segment by segment.
+  For (G): a turn that ran the declaration but recorded nothing is NOT exempt while one that
+  spawned an agent is; a branch named by an EXPIRED declaration is swept again while a live
+  one stays exempt.
 
 - [ ] 438. THE PROJECT HOOKS CANNOT FIRE OUTSIDE THE REPO ROOT (29.07.2026, measured in a
   `/doctor` run and reviewed by the second model; bundle J). All 31 project hooks in

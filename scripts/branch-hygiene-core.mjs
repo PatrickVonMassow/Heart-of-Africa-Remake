@@ -189,7 +189,12 @@ export function assessBranchHygiene({
     if (!name || PROTECTED_REFS.has(name)) continue
     const bare = name.replace(/^origin\//, '')
     if (heldBranches.has(bare) || heldBranches.has(name) || protectedByWorktree.has(bare)) continue
-    if (fresh(b?.tipAt)) continue
+    // The same exemption the local loop carries, and for the same branch: the
+    // workflow pushes a feature branch the moment it is cut, for durability, so
+    // between the cut and the first commit the REMOTE ref stands on main's tip
+    // too — and the grace cannot save it, because a branch with no commits of
+    // its own is dated by main's history (four-eyes review 30.07.2026).
+    if (fresh(b?.tipAt) || onMainTip(b?.tipSha)) continue
     findings.push({
       kind: 'remote',
       name: String(b.name),
