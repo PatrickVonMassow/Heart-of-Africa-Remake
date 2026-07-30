@@ -639,9 +639,21 @@ describe('the WHAT YOU RETURN block', () => {
     expect(brief.slice(brief.indexOf('--- WHAT YOU RETURN ---'))).not.toContain('\n--- ')
   })
 
+  /**
+   * The BLOCK's own text, not the whole brief. Asserting against the brief would
+   * let a future HEADER line that happens to mention a gate command stand in for
+   * a dropped demand — the check must fail when the block loses one.
+   */
+  const blockOf = (point) => {
+    const brief = assembleBrief({ point })
+    const at = brief.indexOf('--- WHAT YOU RETURN ---')
+    expect(at, 'the brief has no return block at all').toBeGreaterThan(-1)
+    return brief.slice(at)
+  }
+
   it('names EVERY field it demands back', () => {
-    const brief = assembleBrief({ point: { number: 400, done: false, body: 'x' } })
-    for (const [re, what] of REQUIRED) expect(brief, `demands ${what}`).toMatch(re)
+    const block = blockOf({ number: 400, done: false, body: 'x' })
+    for (const [re, what] of REQUIRED) expect(block, `demands ${what}`).toMatch(re)
   })
 
   it('names the point number it is the protocol for', () => {
@@ -651,24 +663,23 @@ describe('the WHAT YOU RETURN block', () => {
   })
 
   it('FORBIDS the prose the merge does not read, and says why', () => {
-    const brief = assembleBrief({ point: { number: 400, done: false, body: 'x' } })
+    const block = blockOf({ number: 400, done: false, body: 'x' })
     for (const banned of ['diffs', 'file contents', 'command logs', 'code blocks', 'restated spec text']) {
-      expect(brief, `forbids ${banned}`).toContain(banned)
+      expect(block, `forbids ${banned}`).toContain(banned)
     }
-    expect(brief).toMatch(/merge reads git .*never reads your report/)
+    expect(block).toMatch(/merge reads git .*never reads your report/)
   })
 
   it('gives the length as GUIDANCE, never as a cap that could truncate an escalation', () => {
-    const brief = assembleBrief({ point: { number: 400, done: false, body: 'x' } })
-    expect(brief).toMatch(/under ~40 lines/)
-    expect(brief).toMatch(/GUIDANCE, not a cap/)
-    expect(brief).toMatch(/never truncate/)
+    const block = blockOf({ number: 400, done: false, body: 'x' })
+    expect(block).toMatch(/under ~40 lines/)
+    expect(block).toMatch(/GUIDANCE, not a cap/)
+    expect(block).toMatch(/never truncate/)
   })
 
   it('survives a brief with no sections, no cross-references and no notes', () => {
-    const brief = assembleBrief({ point: { number: 401, done: false, body: 'x' } })
-    expect(brief).toContain('--- WHAT YOU RETURN ---')
-    for (const [re] of REQUIRED) expect(brief).toMatch(re)
+    const block = blockOf({ number: 401, done: false, body: 'x' })
+    for (const [re] of REQUIRED) expect(block).toMatch(re)
   })
 
   it('rides along on a real built brief — OPEN and ARCHIVED alike', () => {
