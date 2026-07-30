@@ -518,8 +518,9 @@ becoming an idle night:
 | property | how |
 | --- | --- |
 | **Evidence, not assertion — and RECENCY, never existence** | Every item is answered by a probe, and every answer must be FRESH. A `pid` must be alive AND have started when the declaration says (`probePid`, compared with `PID_START_TOLERANCE_MS` the way `resolveOwnership` compares the lock's — a reused pid is a stranger). A `branch` counts only while its tip commit is younger than `WORK_FRESH_MS` (15 min); a `worktree` only while git activity in it is (its gitdir's index/HEAD/COMMIT_EDITMSG and the directory's own mtime); a `log` only while it is younger than `LOG_FRESH_MS` (15 min). Windows are overridable per item at the format level (`freshMs`; the CLI has no flag for it). An unknown kind never passes. Declaring is verified up front, so a typo fails at the command, not at a turn end |
-| **All of it, not some** | One finished agent ends the declaration. That is the point: the finished agent's work is now the session's next action, and re-declaring the rest is one command |
-| **It expires** | `IN_FLIGHT_MAX_AGE_MS` (45 min, `HOA_IN_FLIGHT_MAX_MIN` to tune). Past it the guard blocks exactly as before, whatever the declaration says and however live its evidence looks |
+| **All of it, not some — except a SILENT LOG beside moving output** | One finished agent ends the declaration. That is the point: the finished agent's work is now the session's next action, and re-declaring the rest is one command. The one exception is point 434 (5): a `log` that has gone quiet never on its own supports the conclusion "dead" while a `branch` or `worktree` in the same declaration is still moving. On 30.07.2026 a bundle agent was declared dead on `evidence-gone: silent for 59 min` while its worktree had committed four minutes earlier, and the successor rebuilt two finished points. The ignored item is reported, never hidden (`ignored`), and the reverse never holds: a quiet worktree beside a fresh log still blocks |
+| **It ends with the WORK, not on a clock** | `IN_FLIGHT_MAX_AGE_MS` (45 min, `HOA_IN_FLIGHT_MAX_MIN` to tune) still blocks — but only where nothing in the declaration is producing OUTPUT (point 434 (6b)). Nothing refreshes a declaration while the work runs, so as a flat expiry it read `live:false, expired` on 29.07.2026 while its agent had been building for 63 minutes and was mid-merge. A branch or worktree that still moves needs no deadline: it stops checking out `WORK_FRESH_MS` after the last commit, all by itself. A pid or a log, which can look alive indefinitely without producing anything, keeps the clock |
+| **The verdict NAMES its evidence** | Every assessment reports `judgedOn` — `git` (the work's own output), `process`, `log` or `none` — and `describeInFlight` puts it in the allow message and the boundary log. The 30.07 mistake was invisible precisely because "evidence-gone" never said which source had answered |
 | **Ownership, by the lock's own rules** | Honoured only for the session that holds the batch lock **and** wrote the declaration — resolved by `resolveOwnership`, the same function the lock uses, so a context compaction that mints a new session id keeps it while a genuinely second window fails it. No second notion of liveness was invented for this |
 | **The pool runs at its cap, or says why not** (point 427) | Delegation allows THREE concurrent agents, and until now the cap was only an UPPER bound: a session could commission ONE point, declare a wait, break no rule, and leave two slots empty for ninety minutes beside a queue of independent points — which is what the user found and asked about. The wait is now allowed only once the idle slots are accounted for. `gatherSlots` counts the agents the declaration's own evidence SHOWS (`declaredAgentCount` over worktrees and branches), reads the open work order, and asks `slotReasonDecision`. It answers "no reason needed" on its own for every state in which the slots are genuinely unusable — pool at its cap, a queue whose remaining points all touch the running branch's files, `.claude/batch-paused`, a closing freeze (CLAUDE.md §9), recognised from the closing checklist `closing-guard` already records for the CURRENT head (`.claude/closing-state.json`) — writing it is a side effect of DOING the closing, so nothing has to be remembered; `.claude/closing-freeze` stays as a hand-placed override — and otherwise demands `--slots-free "<why>"`. The demand also errs toward silence by construction: a queued point whose spec names NO files is never a candidate, and an unreadable running-file set answers "no demand". It is refused at the declaration as well as at the turn end (`block-slots-free`, wording pinned in `slotsRemedy`), so the session learns at the command rather than at a blocked stop |
 
@@ -545,6 +546,26 @@ how long a session may idle: a session that stops on `allow-in-flight` and is
 never re-invoked would sit on the lock exactly as the night of 28.07.2026 did.
 Detecting that from OUTSIDE the session was named here as a separate mechanism
 with its own risk; it is the one point 402 built, below.
+
+**Before you REPLACE a delegated agent, ask its output** (point 434 (5)). The
+declaration decides whether a wait may continue; the costlier question — may this
+agent be declared dead and respawned — has its own command, and it is answered
+from the work's own git activity:
+
+```
+node scripts/batch-in-flight.mjs --agent-check --worktree <path> [--branch <ref>] [--log <path>]
+```
+
+Exit 0 permits the replacement, exit 1 refuses it, and both print WHY and on which
+evidence (`agentOutputVerdict` / `respawnDecision`). Three rules, all from the
+30.07 incident: git activity is the primary evidence and its window
+(`RESPAWN_GRACE_MS`, 30 min) is deliberately WIDER than the wait's, because
+killing a live agent costs everything it built and then costs the rebuild too; a
+fresh log still refuses (only SILENCE proves nothing); and where neither worktree
+nor branch can be read the answer is `unmeasurable`, which refuses as well — "I
+could not look" must never read as "it is gone". Run it AGAIN in the seconds
+before the spawn: on 30.07 the branch tip moved one minute before the replacement
+was started.
 
 Decision logic: `scripts/batch-in-flight-core.mjs` (pure, dependency-injected,
 Vitest-covered in `scripts/batch-in-flight-core.test.mjs`). IO and probes:
@@ -876,8 +897,38 @@ session — the failure the whole singleton exists to prevent.
 
 **Four bounds, each measurable rather than a matter of taste.**
 
-1. **It EXPIRES** (`CLAIM_MAX_AGE_MS`, 30 min, `HOA_CLAIM_MAX_MIN`). A claim file
-   left by a window that was closed hours ago must never hand the batch to nobody.
+1. **It is bounded by the thing it WAITS FOR, not by a clock somebody feeds**
+   (point 434 (6a), 30.07.2026). As a flat 30-minute expiry this bound was shorter
+   than the owner's own gap between clean turn ends — a 30-40 minute suite outlives
+   it — so a takeover recorded at the start of one lapsed unseen, and keeping it
+   alive needed a background refresher that itself died silently (measured
+   29.07.2026 20:00 in session 10a2d2e0: a watcher hit a 60-minute timeout and the
+   claim would have lapsed at 20:29 with nobody the wiser). So **while a live owner
+   still holds the lock the claim does NOT age**: it is honoured for as long as the
+   window that wrote it lives, which bound 2 reads off the process rather than off
+   a deadline. The clock survives in exactly the two places where nothing else
+   bounds the wait — an ERRAND claim carrying its own issuer (`claim.by`, e.g. the
+   chat watcher's responder claim, whose recorded pid is the WATCHER's and
+   therefore no bound on the errand at all; `claimIsBounded`), and a claim with
+   **nobody left to wait for**. In that second case `CLAIM_MAX_AGE_MS` (30 min,
+   `HOA_CLAIM_MAX_MIN`) is the **take-up window**: the lock is free, the claiming
+   window has that long to run its command, and after it the ordinary handover
+   takes over so the batch is never left ownerless. `assessClaim`'s `ownerHolding`
+   defaults to FALSE, so a caller that cannot answer gets the bounded reading —
+   the direction that can never strand the batch.
+1a. **A RELEASED claim is NOT a claim** (point 434 (6c), measured 30.07.2026
+   10:10-10:16). A record with `releasedAt` AND `releasedBy` both set was still
+   honoured: the owning session released to it, the claiming window never took it,
+   and the batch then ran for an HOUR with no lock at all while every guard and
+   heartbeat behaved as though it were owned — and the boundary that followed
+   released to the same dead claim a second time (`.claude/boundary.log`: two
+   RELEASED lines, no HANDOVER). The stamp means the hand-over already happened,
+   so every reader but the claim's own writer treats it as ABSENT: nothing
+   releases to it twice, it reserves nothing, and a returning window may claim
+   straight over it. The claimant loses only the reservation — the lock is FREE
+   and its own re-run of `batch-claim.mjs --session <id>` still takes it — and the
+   batch gains that a release with no live taker falls back to the ordinary
+   handover rather than standing ownerless.
 2. **The claimant must be ALIVE, by IDENTITY.** The recorded pid must exist AND
    have started when the claim says — a reused pid is a stranger. Same rule
    `checkEvidence` applies to a declared background run; `resolveOwnership`
@@ -915,10 +966,25 @@ Two consequences that are easy to miss and were both built:
   (`batch-progress-guard`) does not re-acquire. Without that third one a stood-down
   window would take the freed lock at its next turn end, see the claim, judge the
   moment clean and release again — repeated "handed back" messages and RELEASED
-  spam in `boundary.log`. The claimant's OWN claim reserves nothing against itself
+  spam in `boundary.log`. Bound 1a closes the same door from the other side: once
+  the release has happened the record is spent, so a window that does take the
+  freed lock finds nothing to release to and carries on working instead. The claimant's OWN claim reserves nothing against itself
   (`assessClaim` answers `mine`, never `honour`), so the window the batch is
-  waiting for still acquires; and all three stand-downs are bounded by the same
-  expiry, so a claim can never strand the batch.
+  waiting for still acquires; and all three stand-downs end at the same two
+  bounds — the claiming window's own life, and the take-up window once the lock
+  is free — so a claim can never strand the batch.
+- **The stand-down and the boundary card SAY which of the two is happening.**
+  `batch-resume-hook`'s way-back text used to end at "re-running the SAME command
+  takes it" and never mentioned that a claim ages at all, so a returning session
+  claimed once, waited, and never learned why nothing happened; it now states both
+  halves of bound 1. And the boundary card used to announce "Ich übergebe an eine
+  frische Sitzung … Sie nimmt den nächsten Punkt der Warteschlange auf" even while
+  a window held an honoured claim — which is exactly when `batch-autostart`
+  reserves the batch and SKIPS the spawn, so the batch went to that window and the
+  card told the user his takeover had been overtaken. `batch-boundary.mjs` now
+  reads the claim through the same `gatherClaim` and prints the German card for
+  the state it found (`boundaryDestination` / `boundaryCardText`, one Vitest case
+  per state).
 
 Where two verdicts are close the mechanism chooses NOT to release: the owner
 keeping the batch for one more turn is a nuisance, a merge cut in half is a repair
