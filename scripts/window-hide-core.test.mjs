@@ -18,6 +18,7 @@ import {
   maskCode,
   findChildProcessCalls,
   auditWindowHide,
+  allowCovers,
   formatWindowHideVerdict,
 } from './window-hide-core.mjs'
 
@@ -44,10 +45,19 @@ describe('maskCode — prose that mentions an API must be invisible', () => {
 describe('findChildProcessCalls — the call sites, and nothing else', () => {
   it('finds a call and reads its flag', () => {
     const src = 'execFileSync("git", a, { cwd, windowsHide: true })\nspawnSync("git", b, { cwd })\n'
-    expect(findChildProcessCalls(src)).toEqual([
+    expect(findChildProcessCalls(src)).toMatchObject([
       { api: 'execFileSync', line: 1, hasFlag: true },
       { api: 'spawnSync', line: 2, hasFlag: false },
     ])
+  })
+
+  it('carries the call\'s own argument span, so an exception can name what it DOES', () => {
+    // A line number describes where a call is; `optionsFrom` in ALLOW needs to know
+    // what it does. The pinned-line exception broke the very hour it was written,
+    // when an unrelated commit in the same file moved the call by five lines.
+    const [call] = findChildProcessCalls('spawn(exe, args, buildSpawnOptions({ cwd }))')
+    expect(call.args).toContain('buildSpawnOptions(')
+    expect(call.hasFlag).toBe(false)
   })
 
   it('is not fooled by regex.exec or a longer identifier', () => {
@@ -62,11 +72,13 @@ describe('findChildProcessCalls — the call sites, and nothing else', () => {
 
   it('reads a MULTI-LINE call as one call, flag included', () => {
     const src = ['execFileSync("git", args, {', '  windowsHide: true,', '  cwd: root,', '})'].join('\n')
-    expect(findChildProcessCalls(src)).toEqual([{ api: 'execFileSync', line: 1, hasFlag: true }])
+    expect(findChildProcessCalls(src)).toMatchObject([{ api: 'execFileSync', line: 1, hasFlag: true }])
   })
 
   it('a call with no options object at all is an offender, not a skip', () => {
-    expect(findChildProcessCalls('execSync("git status")')).toEqual([{ api: 'execSync', line: 1, hasFlag: false }])
+    expect(findChildProcessCalls('execSync("git status")')).toMatchObject([
+      { api: 'execSync', line: 1, hasFlag: false },
+    ])
   })
 
   it('covers every API that can open a window', () => {
@@ -86,7 +98,7 @@ describe('auditWindowHide — the verdict, and its exceptions', () => {
 
   it('an unflagged call is an offender, named with its file and line', () => {
     const v = auditWindowHide([{ path: 'scripts/x.mjs', text: '\nspawnSync("git", a, { cwd })' }])
-    expect(v.offenders).toEqual([{ path: 'scripts/x.mjs', api: 'spawnSync', line: 2, hasFlag: false }])
+    expect(v.offenders).toMatchObject([{ path: 'scripts/x.mjs', api: 'spawnSync', line: 2, hasFlag: false }])
     expect(formatWindowHideVerdict(v)).toContain('scripts/x.mjs:2')
     expect(formatWindowHideVerdict(v)).toContain('windowsHide')
   })
@@ -98,12 +110,33 @@ describe('auditWindowHide — the verdict, and its exceptions', () => {
     }
   })
 
-  it('a line-scoped exception covers only that line', () => {
+  it('an optionsFrom exception covers the helper call and NOTHING else in the file', () => {
+    // The narrowing that replaced the line pin: it follows the call when an edit moves
+    // it, and it stops covering the moment the call stops using the helper.
     const path = 'scripts/batch-autostart.mjs'
-    const allowedLine = ALLOW[path].lines[0]
-    const text = `${'\n'.repeat(allowedLine - 1)}spawn(e, a, opts)\nspawn(e, a, other)`
+    const helper = ALLOW[path].optionsFrom[0]
+    const text = `spawn(e, a, ${helper}({ cwd }))\nspawn(e, a, { cwd })`
     const v = auditWindowHide([{ path, text }])
-    expect(v.offenders.map((o) => o.line)).toEqual([allowedLine + 1])
+    expect(v.offenders.map((o) => o.line)).toEqual([2])
+    // …and it is indifferent to WHERE the covered call sits.
+    const moved = auditWindowHide([{ path, text: `\n\n\n\nspawn(e, a, ${helper}({ cwd }))` }])
+    expect(moved.offenders).toEqual([])
+  })
+
+  it('a line-scoped exception is still honoured for a case that needs one', () => {
+    const text = '\nspawnSync("git", a, { cwd })\nspawnSync("git", b, { cwd })'
+    const calls = findChildProcessCalls(text)
+    expect(allowCovers({ lines: [2] }, calls[0])).toBe(true)
+    expect(allowCovers({ lines: [2] }, calls[1])).toBe(false)
+  })
+
+  it('an exception with no narrowing key covers the whole file — what an `awaiting` debt needs', () => {
+    const [call] = findChildProcessCalls('spawnSync("git", a, { cwd })')
+    expect(allowCovers({ awaiting: 'bundle X', why: 'held by another agent' }, call)).toBe(true)
+    // Both keys must hold when both are given, and junk covers nothing.
+    expect(allowCovers({ lines: [1], optionsFrom: ['nope'] }, call)).toBe(false)
+    expect(allowCovers(null, call)).toBe(false)
+    expect(allowCovers(undefined, undefined)).toBe(false)
   })
 
   it('AN EXCEPTION THAT NO LONGER APPLIES IS ITSELF A FAILURE', () => {

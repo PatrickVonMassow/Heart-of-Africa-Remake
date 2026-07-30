@@ -36,6 +36,7 @@ const consumedDir = () => resolve(spoolDir(), 'consumed')
 
 const runHook = (sessionId = OWNER) =>
   spawnSync(process.execPath, [resolve(repo, 'scripts', 'lock-heartbeat-hook.mjs')], {
+    windowsHide: true,
     encoding: 'utf8',
     cwd: repo,
     input: JSON.stringify({

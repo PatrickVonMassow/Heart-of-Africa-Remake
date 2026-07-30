@@ -76,10 +76,12 @@ function balancedEnd(masked, openIdx) {
 /**
  * Every child-process call in one file. PURE.
  *
- * Returns [{ api, line, hasFlag }]. `hasFlag` is true when `windowsHide` appears
- * anywhere in the call's own argument span — deliberately generous, because
+ * Returns [{ api, line, hasFlag, args }]. `hasFlag` is true when `windowsHide`
+ * appears anywhere in the call's own argument span — deliberately generous, because
  * `{ ...opts, windowsHide: true }` and a helper spread are both legitimate and a
  * stricter reading would only invite the flag to be written somewhere unreadable.
+ * `args` is that same masked span, so an exception can be written against WHAT the
+ * call does instead of which line it sits on (see `ALLOW`).
  */
 export function findChildProcessCalls(text) {
   const src = String(text ?? '')
@@ -94,10 +96,12 @@ export function findChildProcessCalls(text) {
       const openIdx = m.index + api.length
       const end = balancedEnd(masked, openIdx)
       if (end < 0) continue
+      const args = masked.slice(openIdx, end)
       found.push({
         api,
         line: src.slice(0, m.index).split('\n').length,
-        hasFlag: /windowsHide/.test(masked.slice(openIdx, end)),
+        hasFlag: /windowsHide/.test(args),
+        args,
       })
     }
   }
@@ -109,23 +113,44 @@ export function findChildProcessCalls(text) {
  * the shape `scripts/audit-check.mjs`'s ALLOW map uses — an exception nobody can read
  * is how a gate becomes decoration.
  *
+ * An exception is written against WHAT the call does (`optionsFrom`: it takes its
+ * options from a named helper that sets the flag), never against WHICH LINE it sits
+ * on. A `lines` pin is still honoured for a case that needs one, but it is not the
+ * default any more, and the reason is measured: this map's first entry pinned line
+ * 741, another commit landed in the same file the same hour, the call moved to 736,
+ * and the gate went red on correct code while the real rule still held. A line
+ * number describes where a call is; the exemption is about what it does.
+ *
  * `awaiting` marks an exception that is expected to GO: the flag belongs there, and
  * the only reason it is not there yet is that another agent held the file when point
  * 401 was built. Removing the entry is what proves the debt was paid.
  */
 export const ALLOW = {
   'scripts/batch-autostart.mjs': {
-    lines: [741],
+    optionsFrom: ['buildSpawnOptions'],
     why: 'the options come from buildSpawnOptions(), which sets windowsHide: true itself (scripts/batch-autostart-core.mjs)',
   },
-  'scripts/board.mjs': { awaiting: 'bundle H', why: 'held by the parallel board/chat agent when point 401 landed' },
-  'scripts/board-publish.mjs': { awaiting: 'bundle H', why: 'held by the parallel board/chat agent when point 401 landed' },
-  'scripts/board-first-guard.test.mjs': { awaiting: 'bundle H', why: 'held by the parallel board/chat agent when point 401 landed' },
-  'scripts/chat-watcher.mjs': { awaiting: 'bundle H', why: 'held by the parallel board/chat agent when point 401 landed' },
-  'scripts/chat-delivery-hook.test.mjs': { awaiting: 'bundle H', why: 'held by the parallel board/chat agent when point 401 landed' },
-  'scripts/dashboard-guard.mjs': { awaiting: 'bundle H', why: 'held by the parallel board/chat agent when point 401 landed' },
-  'scripts/dashboard-integrity-guard.mjs': { awaiting: 'bundle H', why: 'held by the parallel board/chat agent when point 401 landed' },
-  'scripts/dashboard-sync.mjs': { awaiting: 'bundle H', why: 'held by the parallel board/chat agent when point 401 landed' },
+  'scripts/chat-watcher.mjs': {
+    optionsFrom: ['buildSpawnOptions'],
+    why: 'the responder spawn shares buildSpawnOptions() with the launcher, which sets windowsHide: true itself',
+  },
+}
+
+/**
+ * Does this documented exception cover this call? PURE.
+ *
+ * Narrowing keys are ANDed, and an entry with none of them covers the whole file —
+ * which is what an `awaiting` debt needs, since the agent holding the file may move
+ * its calls around before the debt is paid.
+ */
+export function allowCovers(allow, call) {
+  if (!allow || typeof allow !== 'object') return false
+  if (Array.isArray(allow.lines) && !allow.lines.includes(call?.line)) return false
+  if (Array.isArray(allow.optionsFrom)) {
+    const args = String(call?.args ?? '')
+    if (!allow.optionsFrom.some((name) => name && args.includes(`${name}(`))) return false
+  }
+  return true
 }
 
 /**
@@ -145,7 +170,7 @@ export function auditWindowHide(files = []) {
     const allow = ALLOW[path]
     for (const call of findChildProcessCalls(f?.text ?? '')) {
       if (call.hasFlag) continue
-      if (allow && (!allow.lines || allow.lines.includes(call.line))) {
+      if (allow && allowCovers(allow, call)) {
         usedPaths.add(path)
         continue
       }

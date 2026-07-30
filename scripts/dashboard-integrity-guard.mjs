@@ -31,6 +31,7 @@ const GIT_TIMEOUT_MS = 3000
 function git(args) {
   try {
     return execSync(`git ${args}`, {
+      windowsHide: true,
       cwd: REPO_ROOT,
       encoding: 'utf8',
       timeout: GIT_TIMEOUT_MS,

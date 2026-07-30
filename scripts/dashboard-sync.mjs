@@ -38,7 +38,7 @@ const PAUSE = R('../.claude/batch-paused')
 
 function git(args) {
   try {
-    return execSync(`git ${args}`, { cwd: REPO_ROOT, encoding: 'utf8' }).trim()
+    return execSync(`git ${args}`, { windowsHide: true, cwd: REPO_ROOT, encoding: 'utf8' }).trim()
   } catch {
     return null
   }
