@@ -266,8 +266,23 @@ export function gatherMechanismReviewInputs({ sessionId = '' } = {}) {
   // at all. A hook that costs a process per ledger line on every turn end is a
   // hook people switch off.
   const records = pendingCommits.length ? readRecords().filter((r) => isAncestor(r.sha, head)) : []
+  // ONE git spawn per RECORD, not one per (commit, record) PAIR. The pairwise
+  // form cost 13 × 52 ≈ 700 processes on the night of 30.07.2026 — 26 to 38
+  // seconds on Windows, past this check's own budget, so CI failed on every push
+  // of a long-lived guard branch and mailed the repository owner thirteen times.
+  // The semantics are identical: a pending commit lies in `baseline..head`, so
+  // "record contains commit" is exactly "commit appears in the record's history
+  // since the baseline", which one `rev-list` per record answers in full.
+  for (const r of records) {
+    r.containedShas = new Set(
+      git(`rev-list ${r.sha} --not ${effective}`)
+        .split(/\r?\n/)
+        .map((l) => l.trim())
+        .filter(Boolean),
+    )
+  }
   for (const c of pendingCommits) {
-    c.coveringRecordShas = records.filter((r) => isAncestor(c.sha, r.sha)).map((r) => r.sha)
+    c.coveringRecordShas = records.filter((r) => r.containedShas?.has(c.sha)).map((r) => r.sha)
   }
 
   return {
