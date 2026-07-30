@@ -3822,6 +3822,53 @@ it is appended.
   DOCS in the same commit: `docs/batch-autonomy.md` under the launcher, and the ledger row
   for retrospective §3.61.
 
+- [ ] 434. THE BATCH MUST NOT BE ABLE TO STAND STILL — FOUR MORE LAYERS, EACH INDEPENDENT
+  (30.07.2026, user: preventing this reliably outranks batch progress; bundle I). The night
+  of 29./30.07. produced nothing: work stopped at 21:50 and the state at 04:19 was
+  byte-for-byte the same. Seven part-failures chained, and EVERY layer could observe the
+  stall while NONE could act on it. The analysis, the researched state of the practice and
+  the full design are `docs/batch-resilience.md` — read that first; this point is the build
+  order, not a second telling.
+  LAYER 1, THE CORE: the lock becomes a LEASE. `.claude/batch-lock.json` gains `leaseUntil`
+  (extended by the heartbeat that already runs on every tool call) and `fence` (incremented
+  on every acquisition). An expired lease is FREE — no probe, no verdict, no authority
+  required, because expiry is arithmetic rather than judgement, and that removes the step
+  this night died on. The fence refuses a stale owner's late write, so a session that wakes
+  after hours learns it is no longer the owner instead of corrupting state. The window is
+  MEASURED against the real gap between two tool calls across the transcript corpus and set
+  well above its 99th percentile; a declared in-flight wait EXTENDS the lease while the
+  declared work is provably moving, so a long verification is never shot in the back.
+  LAYER 2 is point 433 and already in flight — the launcher may act. Layer 1 makes it cheap:
+  it stops judging wedgedness and simply finds an expired lease.
+  LAYER 3: a SECOND watcher that does not share the launcher's decision core, judging on
+  OUTPUT (a new commit, a board publish, a boundary entry) rather than on a heartbeat
+  timestamp — the documented hard case is the worker that looks alive while nothing advances.
+  No movement plus a held lease → release and spawn. Two actors with authority tie-break on
+  the fence: whoever acquires first raises it, the loser stands down.
+  LAYER 4: a dead man's switch OUTSIDE this machine. The batch checks in after every closed
+  point and at least every N minutes, carrying the open-point count so a check-in that
+  arrives while nothing progresses is still visible as a failure. This is the only layer that
+  survives the machine being off or both local watchers dying. Escalation ladder, because one
+  message to a sleeping user is silence: local rescue, then a notification, then a
+  repeated-verdict escalation at a rising interval, then a paused batch with a board card
+  that tells the morning what happened.
+  LAYER 5: a delegated agent that dies on a TRANSIENT API error is retried by the parent with
+  backoff and a bounded count, on its existing branch, and a transient child death is never
+  reported as a completed step. Commit-early and the rescue commit stay as they are.
+  MUST NOT BE BUILT (each is a failure mode, not a shortcut): a rescue that depends on the
+  wedged session noticing; one bigger watchdog instead of independent ones; a shorter window
+  that kills a running verification; a silent recovery that leaves the morning without a
+  reason.
+  VERIFIABLE: each layer gets a pure core plus Vitest, and each case states the night it
+  would have prevented — the list is `docs/batch-resilience.md` §5. Additionally one case
+  per layer proving INDEPENDENCE: the layer still acts while the other layers' inputs are
+  missing or stale.
+  MECHANISM REVIEW REQUIRED for every layer (CLAUDE.md §7.2); the design itself was reviewed
+  by the second model before the build.
+  DOCS in the same commit: `docs/batch-autonomy.md` under the launcher and the session
+  lifecycle, CLAUDE.md §6 where the context boundary and the singleton are described, and
+  the ledger row for retrospective §3.61.
+
 ## Closing (only after all points)
 
 New points are appended BEFORE this section — it stays last in the file.
