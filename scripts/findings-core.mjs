@@ -105,6 +105,18 @@ function shellRecordKind(command) {
       // only drains the carrier is a recording turn too.
       if (/\s--drained\b/.test(segment)) return 'finding-drained'
     }
+    // THE DECLARED WAIT IS A RECORD (four-eyes review of the arming, 30.07.2026).
+    // A turn that hands work OUT — the pool of three, the mandated delegation —
+    // has no result to record yet: it arrives turns later, where the merge is the
+    // record. Counted as an unrecorded investigation, the guard would fire on the
+    // batch's MOST COMMON turn shape, and the sanctioned answer would degenerate
+    // into a reflexive `--none`, which is precisely the desensitization this
+    // file's own header forbids. The declaration is the honest durable trace of
+    // such a turn: it names what was handed out, it is probed for liveness, and
+    // it expires on its own.
+    if (/^(?:\S*node\s+)?\S*batch-in-flight\.mjs\b/.test(segment) && /\s--waiting-on\b/.test(segment)) {
+      return 'wait-declared'
+    }
   }
   return null
 }

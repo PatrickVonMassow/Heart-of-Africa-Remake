@@ -43,6 +43,8 @@ import { gatherDocBudgetInputs } from './doc-budget-guard.mjs'
 import { gatherModelGuardInputs } from './model-guard.mjs'
 import { gatherRenderVerifyInputs } from './render-verify-guard.mjs'
 import { gatherMechanismReviewInputs } from './mechanism-review-guard.mjs'
+import { gatherBranchHygiene } from './branch-hygiene-guard.mjs'
+import { assessBranchHygiene, formatBranchHygiene } from './branch-hygiene-core.mjs'
 
 import {
   ACTIONS,
@@ -140,6 +142,14 @@ export const GUARDS = [
     decide: ({ docs }) => {
       const verdict = evaluateDocBudgets(docs)
       return { block: verdict.block, reason: formatDocBudgetVerdict(verdict) }
+    },
+  },
+  {
+    id: 'branch-hygiene-guard',
+    gather: gatherBranchHygiene,
+    decide: (inputs) => {
+      const verdict = assessBranchHygiene(inputs)
+      return { block: verdict.block, reason: formatBranchHygiene(verdict.findings) }
     },
   },
 ]

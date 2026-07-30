@@ -111,6 +111,18 @@
           },
           {
             "type": "command",
+            "command": "node scripts/findings-guard.mjs"
+          },
+          {
+            "type": "command",
+            "command": "node scripts/decision-card-guard.mjs"
+          },
+          {
+            "type": "command",
+            "command": "node scripts/branch-hygiene-guard.mjs"
+          },
+          {
+            "type": "command",
             "command": "node scripts/guard-health-guard.mjs"
           },
           {

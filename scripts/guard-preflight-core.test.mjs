@@ -251,6 +251,7 @@ describe('GATHER-STEP REUSE (the drift guard)', () => {
   it('registers every guard whose wrapper exports a gather step', () => {
     expect(Object.keys(byId).sort()).toEqual(
       [
+        'branch-hygiene-guard',
         'dashboard-guard',
         'doc-budget-guard',
         'mechanism-review-guard',
