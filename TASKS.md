@@ -3546,6 +3546,13 @@ it is appended.
   For (G): a turn that ran the declaration but recorded nothing is NOT exempt while one that
   spawned an agent is; a branch named by an EXPIRED declaration is swept again while a live
   one stays exempt.
+  (H) ONE SMALL CLI WART IN THE SAME FAMILY (31.07.2026, hit while preparing a merge):
+  `scripts/mechanism-review.mjs` treats every unrecognised flag as `--record` with an empty
+  sha, so `--status` answers with `fatal: ambiguous argument '^{commit}'` instead of naming
+  what the tool wants. An unrecognised flag prints the usage block the record path already
+  has and exits non-zero. VERIFIABLE: pure Vitest — an unknown flag yields the usage and a
+  non-zero exit, `--list` and a bare invocation still list the ledger, and a well-formed
+  `--record` is untouched.
 
 - [ ] 438. THE PROJECT HOOKS CANNOT FIRE OUTSIDE THE REPO ROOT (29.07.2026, measured in a
   `/doctor` run and reviewed by the second model; bundle Modell & Wächter). All 31 project hooks in
