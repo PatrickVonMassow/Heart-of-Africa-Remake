@@ -208,6 +208,22 @@ describe('file mutation and redirection', () => {
   ]
   for (const c of reads) it(`reads: ${c}`, () => expect(isMutatingSegment(c)).toBe(false))
 
+  it('looks INTO a nested shell — the one place a quoted argument IS the command', () => {
+    expect(isMutatingSegment('bash -c "npm run build"')).toBe(true)
+    expect(isMutatingSegment('sh -c "git push origin main"')).toBe(true)
+    expect(isMutatingSegment('pwsh -Command "Remove-Item x"')).toBe(true)
+    expect(isMutatingSegment('cmd /c "npm install"')).toBe(true)
+    expect(isMutatingSegment('bash -c "git status --short"')).toBe(false)
+    expect(isMutatingSegment('bash -c "bash -c \'git commit -m x\'"')).toBe(true)
+  })
+
+  it('sees the verb behind find -exec / -delete', () => {
+    expect(isMutatingSegment('find . -name "*.tmp" -delete')).toBe(true)
+    expect(isMutatingSegment('find . -name "*.tmp" -exec rm {} ;')).toBe(true)
+    expect(isMutatingSegment('find . -name "*.mjs" -exec grep -l x {} ;')).toBe(false)
+    expect(isMutatingSegment('find scripts -name "*.test.mjs"')).toBe(false)
+  })
+
   it('an unknown program reads — this gate under-blocks rather than traps', () => {
     expect(segmentIntent('some-new-tool --do-something')).toBe('read')
     expect(segmentIntent('')).toBe('read')

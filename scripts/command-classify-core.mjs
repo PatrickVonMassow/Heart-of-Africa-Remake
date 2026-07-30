@@ -213,6 +213,19 @@ const WRITING_HEADS = new Set([
 /** Interpreters — only after one of these does a path argument mean "run this". */
 const INTERPRETERS = new Set(['node', 'npx', 'bun', 'deno', 'tsx', 'ts-node', 'sh', 'bash', 'zsh', 'pwsh', 'powershell', 'cmd'])
 
+/** Shells that take the real command as a STRING argument (`sh -c "…"`). */
+const SHELL_HEADS = new Set(['sh', 'bash', 'zsh', 'pwsh', 'powershell', 'cmd'])
+const SHELL_COMMAND_FLAGS = /^(-c|-command|\/c|-file)$/i
+
+/** A word's program name: no path, no extension, lower-cased. */
+const baseOf = (text) =>
+  String(text ?? '')
+    .replace(/\\/g, '/')
+    .split('/')
+    .pop()
+    .replace(/\.(exe|cmd|bat|ps1)$/i, '')
+    .toLowerCase()
+
 /** The program a segment runs, lower-cased and stripped of path and extension. */
 export function commandHead(segment) {
   const seg = asSegments(segment)[0]
@@ -221,12 +234,7 @@ export function commandHead(segment) {
     const t = w.text
     if (!t) continue
     if (!w.quoted && /^[A-Za-z_][A-Za-z0-9_]*=/.test(t)) continue // FOO=bar prefix
-    const base = t
-      .replace(/\\/g, '/')
-      .split('/')
-      .pop()
-      .replace(/\.(exe|cmd|bat|ps1)$/i, '')
-      .toLowerCase()
+    const base = baseOf(t)
     if (WRAPPERS.has(base)) continue
     return base
   }
@@ -241,8 +249,7 @@ function argsOf(seg) {
   for (const w of words) {
     if (!started) {
       if (!w.quoted && /^[A-Za-z_][A-Za-z0-9_]*=/.test(w.text)) continue
-      const base = w.text.replace(/\\/g, '/').split('/').pop().toLowerCase()
-      if (WRAPPERS.has(base)) continue
+      if (WRAPPERS.has(baseOf(w.text))) continue
       started = true
       continue
     }
@@ -372,6 +379,21 @@ function intentOfParsed(seg) {
   if (!head) return 'read'
   // `--help` / `--version` print and exit, whatever verb they stand beside.
   if (argsOf(seg).some((a) => !a.quoted && (a.text === '--help' || a.text === '--version'))) return 'read'
+  // `bash -c "npm run build"` — the argument after -c IS the command, not an
+  // argument, so it is the one place quoted text must be looked into. Without
+  // this the head rule would read a nested shell as the harmless word `bash`.
+  if (SHELL_HEADS.has(head)) {
+    const args = argsOf(seg)
+    const i = args.findIndex((a) => SHELL_COMMAND_FLAGS.test(a.text))
+    if (i >= 0 && args[i + 1]) return segmentIntent(args[i + 1].text)
+  }
+  // `find . -delete` / `find . -exec rm {} \;` — the verb stands behind -exec.
+  if (head === 'find') {
+    const args = argsOf(seg)
+    if (args.some((a) => a.text === '-delete')) return 'write'
+    const i = args.findIndex((a) => a.text === '-exec' || a.text === '-execdir')
+    if (i >= 0 && args[i + 1]) return WRITING_HEADS.has(baseOf(args[i + 1].text)) ? 'write' : 'read'
+  }
   if (head === 'git') return gitIntent(seg)
   if (head === 'npm' || head === 'pnpm' || head === 'yarn') return packageIntent(seg)
   if (head === 'gh') return ghIntent(seg)
