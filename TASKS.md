@@ -3970,6 +3970,12 @@ it is appended.
   the deliberately UNBUDGETED reference material (same class as `docs/acceptance-evidence.md`,
   which the budget module's own comment exempts because on-demand reference costs nothing per
   turn), and the what-is-budgeted comment names it there.
+  THE USER'S RULING (30.07.2026, answering the board card): "Ja, machen, aber auf
+  Spezifikations- und Implementierungsebene mit vier Augen prüfen und gründlich testen, bevor
+  es produktiv geht." The spec review by the other model happened before this point was
+  written; the IMPLEMENTATION is reviewed by the other model as well, and the full gates
+  (build, lint, `test:unit`, `npm audit`) plus a rebuilt brief for a point citing §7.1 no. 20
+  or no. 21 must be green BEFORE the merge to main.
   IN THE SAME POINT, one precision to §6 that the delegation count settled (four-eyes,
   30.07.2026: of the last 60 first-parent commits on `main`, 42 are main-only bookkeeping and
   only 9 were delegable, all small): a cross-cutting change BEYOND a small commit — a new
@@ -4109,6 +4115,68 @@ it is appended.
   VERIFIABLE: the pure layer covers both — a fresh heartbeat with a dead pid assessed as
   dead, a fresh heartbeat without a pid still assessed alive, and the guard's stand-down for
   a non-owner; the sweep is evidenced by the commit message naming every guard checked.
+
+- [ ] 464. A RED UNIT LAYER REACHED `main` THROUGH THE PRE-PUSH GATE (user 30.07.2026:
+  "Sorge dafür, dass das sicher nicht mehr passiert."; bundle K). CI run 30555562185 on
+  `main`, commit `4d580957`, failed at step `npm run test:unit` — the guide-brevity audit,
+  because that commit pushed `docs/analysis_de/vibe-coding-anleitung.md` over its budget. The
+  commit four minutes later paid for it, so the red was brief, but it MAILED the repository
+  owner and it is the second such report in one day. The pre-push gate exists precisely to
+  make this impossible, and on the same afternoon it PROVED it can fail closed (it refused a
+  push of this session's with "unit ran an unreadable file count … nothing was compared").
+  So the defect is not "the gate is missing" but "the gate's verdict is not binding".
+  FIRST, ESTABLISH THE PATH, do not guess it: reconstruct from the gate's own log and the
+  reflog which decision let `4d580957` through — the gate not running at all, a stale green
+  from an earlier run being reused, `--no-verify`, or a hook that exits 0 on its own error.
+  Write the answer into the commit message; the fix depends on it and a guessed cause here
+  would produce a guard that guards nothing.
+  FINAL STATE, whichever path it was: a push of `main` carries a RECORDED gate verdict — the
+  HEAD sha it was computed for, the suite counts, the verdict — and a push whose recorded
+  verdict does not belong to the exact sha being pushed is REFUSED, not warned about. An
+  internal error in the gate refuses the push as well: this is the one guard in the project
+  that must fail CLOSED, because the thing on the other side is a red `main` and a mail to
+  the user. `--no-verify` is refused for `main` the same way.
+  VERIFIABLE: the pure layer covers the verdict record (accepted for the matching sha,
+  refused for a different one, refused when absent, refused on an internal error), and a live
+  push attempt on a deliberately red tree is refused.
+
+- [ ] 465. A NOW-CARD OUTLIVES THE SESSION THAT WROTE IT (user 30.07.2026, from the board
+  screenshot: "'Gerade keine laufende Arbeit' ist auch nicht wirklich wahr … beim nächsten
+  Mal wird es wieder so eine geben, oder?"; bundle H). After the forced handover the
+  stopped session's card "Gerade keine laufende Arbeit" (17:09) still stood in "Woran ich
+  gerade arbeite" BESIDE the new session's card, so the board claimed work and no work at
+  once. It was removed by hand — which is the defect: a now-card is written by a session and
+  cleared by NOBODY when that session dies or loses the batch.
+  FINAL STATE: a now-card carries the session that wrote it. At publish time a card counts as
+  ORPHANED when its session no longer holds the batch lock, or when its stamp predates the
+  current owner's `acquiredAt`; an orphaned card is REMOVED rather than left standing, and
+  the publish gate refuses a board that still shows one — the same shape as its existing
+  refusal of a board missing a card for an open point. The board must rather refuse itself
+  than show something false; that is the property this and point 439 (a card title falling
+  silently back to "Punkt N") have in common.
+  VERIFIABLE: the pure layer covers orphan detection (foreign session, stamp older than the
+  current acquisition, own live card kept) and the gate's refusal; a live handover leaves no
+  stale card behind.
+
+- [ ] 466. THE DOC VERIFICATION CHECKS A SENTENCE THE README NO LONGER HAS (30.07.2026,
+  found by the agent that shrank the always-loaded instruction file; reproduced on unmodified
+  `main`, so it is PRE-EXISTING and was not caused by that work; bundle K).
+  `scripts/verify/docs.mjs` fails two checks — "README states an acceptance-criteria count"
+  and "README count matches CLAUDE.md §7.1" — because the README no longer carries the
+  "All N acceptance criteria" phrase the check greps for. A verification that is red for a
+  reason nobody is fixing trains everyone to ignore it, which is the failure mode that let a
+  red run sit unnoticed for three weeks before.
+  FINAL STATE: decide it in the commit and act, do not silence it — either the README carries
+  the count again (and the check keeps it honest), or the two checks go and their intent is
+  written into the commit message. Whichever way, `node scripts/verify/docs.mjs` exits 0 on a
+  clean `main`.
+  IN THE SAME POINT: `docs.mjs` gains the `Detail:` pointer check that mirrors its existing
+  `Evidence:` checks — every acceptance criterion whose detail was moved out must resolve to
+  a real section in `docs/acceptance-criteria-detail.md`, so the move can never rot the way an
+  unchecked pointer does. That is a gate change and therefore needs the other model's recorded
+  review before it lands (`mechanism-review-guard`).
+  VERIFIABLE: `docs.mjs` green on `main`; the pure layer covers the pointer check against a
+  present, a missing and a misspelled detail section.
 
 ## Closing (only after all points)
 
