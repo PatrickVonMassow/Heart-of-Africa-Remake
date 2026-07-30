@@ -673,6 +673,22 @@ Es ist die Umkehrung von §3.71: Dort wurde ein Fehlschlag nach innen in einen p
 
 **Lehre:** Wo eine Erhebung über einer bekannt nicht-leeren Quelle läuft, ist die leere Menge ein Befund und keine Antwort — sie wird gemeldet, nicht verwendet. Und ein Test, der eine Datei nur in der Form prüft, in der der Autor sie geschrieben hat, beweist nichts über die Form, in der sie ankommt: Der Testtext bekommt die Zeilenenden, die die Wirklichkeit liefert.
 
+### 3.73 Der Schreiber war repariert, der Schaden nicht
+
+Ein Befehl hatte über Wochen bei jedem Aufruf sein eigenes Flag als Kartentext gespeichert. Der Defekt wurde am 30.07.2026 behoben, sauber und mit Test — und der Nutzer meldete am selben Abend zum zweiten Mal, die Karten hätten keine Beschreibung. Denn 31 gespeicherte Texte lauteten weiterhin `--text-stdin`. Der Fix hatte den SCHREIBER geheilt und die DATEN nicht angefasst, und niemand hatte danach gefragt, weil ein grüner Test wie ein erledigter Fall aussieht.
+
+Dasselbe Muster ein zweites Mal in derselben Stunde: Beim Neuschreiben der 31 Texte zog der Speicherpfad jeden zweiabsätzigen Text zu einem einzigen Block zusammen. Auch das war ein Schreiberfehler mit Datenfolge — nur fiel er diesmal sofort auf, weil ein Wächter die Absatzlosigkeit zählt.
+
+**Lehre:** Ein Fix an einem Schreiber ist erst halb fertig. Die zweite Hälfte ist die Frage, was er in der Zwischenzeit geschrieben hat — und die Antwort gehört in denselben Vorgang, nicht in eine spätere Beschwerde. Wo ein Defekt Daten erzeugt hat, wird beim Beheben mitgezählt, wie viele.
+
+### 3.74 Eine Behauptung über die Zukunft ist prüfbar
+
+„Gerade keine laufende Arbeit" stand auf der Tafel, während drei Dinge liefen; der Nutzer musste es melden. Seine Anweisung war nicht „korrigier das", sondern: „Nicht auf Zuruf korrigieren, sondern per Mechanismus etablieren, dass das nicht mehr passieren kann."
+
+Der Reiz des Falls liegt darin, dass die Aussage zunächst unprüfbar wirkt — ob gerade nichts läuft, weiß nur die Sitzung selbst. Sie ist aber gar keine Aussage über die Gegenwart, sondern über die ZUKUNFT des Zuges: Sie stimmt genau dann, wenn die Sitzung jetzt aufhört. Damit hat sie eine Gegenprobe, die von selbst kommt — die nächste zustandsändernde Handlung. Wer sie tut, hat die Behauptung widerlegt, und das kann eine Sperre vor der Handlung feststellen, ohne irgendetwas über den inneren Zustand zu wissen.
+
+**Lehre:** Eine Behauptung, die nicht direkt messbar ist, ist oft trotzdem prüfbar — man muss nur den Zeitpunkt finden, an dem die Wirklichkeit ihr widerspricht. Bevor eine Regel als „nur durch Disziplin durchsetzbar" abgelegt wird, ist die Frage zu stellen, welche spätere Handlung sie zur Lüge machen würde.
+
 ---
 
 ## 4. Die Guards als Immunsystem
@@ -762,7 +778,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Donnerstag, 30.07.2026, 20:25 · Quellen-Fingerprint: `525b32263c58…`
+Zuletzt aktualisiert: Donnerstag, 30.07.2026, 21:03 · Quellen-Fingerprint: `98a76c5c3878…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -839,8 +855,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | CORRECTED 19.07.2026 — WebGPU IS testable headless/autonomously via system Chrome (channel:'chrome') + --headless=new; the 'untestable' belief held only for Playwright's BUNDLED Chromium | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 69 Feedback-/Projekt-Memories · 40 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 25 Prozess-/Meta-TASKS-Punkte (davon 11 offen).
+Erfasste Quellen: 69 Feedback-/Projekt-Memories · 40 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 25 Prozess-/Meta-TASKS-Punkte (davon 10 offen).
 
-<!-- RETRO-FINGERPRINT: 525b32263c58a2d2f25542548e28c1ee758e61cc66da27a51a04ead4c6ac8c65 -->
-<!-- RETRO-LAST-REFRESHED: 2026-07-30T18:25:32.509Z -->
+<!-- RETRO-FINGERPRINT: 98a76c5c38788b4b9acf7af56e964709a608c0b46bf44eb7a714721b26995b78 -->
+<!-- RETRO-LAST-REFRESHED: 2026-07-30T19:03:17.397Z -->
 <!-- AUTO-GENERATED:END -->
