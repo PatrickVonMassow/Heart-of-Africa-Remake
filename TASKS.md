@@ -4060,9 +4060,14 @@ also be taken as its own task now and then.
   or stop. Reads, the board commands themselves and an edit of the board file stay exempt, as
   they are today, and the gate stays fail-open. A session that legitimately ends right after
   `--none` is untouched, which is the case the flag exists for.
-  IT ALSO DOUBLES (observed 21:00, the same evening): a second `--none` APPENDED a second idle
-  card beside the first, so the board carried the false claim twice over. The idle card is a
-  STATE, not an entry — writing it replaces any idle card already standing, never adds one.
+  IT STACKS, AND THE SANCTIONED PATH IS WHY (observed three times the same evening, the last time
+  THREE idle cards deep, all reported by the user). The idle card is written by
+  `board.mjs done <n> --none`, which requires a current-work card for the point it closes — so once
+  the point is already ticked, there is NO sanctioned way to put the boundary card up, and the
+  session hand-edits the board file instead. Hand-edits append, so every further handover attempt
+  adds another copy, and one of those edits also broke the section markup. The idle card is a STATE,
+  not an entry: writing it replaces any idle card already standing, and it must be writable WITHOUT
+  a point to close, because the boundary is exactly the moment when no point is open.
   VERIFIABLE: pure cases in the guard's decision core — a board carrying the no-work claim
   denies a state-changing call and allows a read, a board carrying a real now-card allows
   both, and the deny names the remedy; plus one case pinning that the boundary path
@@ -4086,25 +4091,10 @@ also be taken as its own task now and then.
   grouping) count as ONE slot. Where the top bundles are not file-disjoint from each other, the
   ranking itself is adjusted so that they are — the priority order decides WHICH bundles lead,
   the disjointness decides only their arrangement among near-equals.
-  ITS VISIBLE HALF (user 30.07.2026, on seeing the grouped board): "Wo kann ich ab jetzt sehen,
-  welcher Punkt als nächstes bearbeitet wird? Das ist nicht mehr ersichtlich, oder?" — correct, and
-  the grouping caused it: before, the next point was the first card in the queue; now it is behind a
-  collapsed bundle, and once the picker draws from several bundles it is not the first card of the
-  first group either. So the board NAMES what the picker answers: at the head of the Warteschlange,
-  above the group cards, the points that would be started next — one line, as many as the pool has
-  slots, each with its number and German title. It is DERIVED from the picker, never written by hand,
-  so it cannot drift from what actually happens.
-  AND THE ASSIGNMENT, not only the order (user 30.07.2026: "Das heißt der nächste Punkt eines
-  Bündels wird mit frischem Kontext bearbeitet? Wo ist dann die Ersparnis?"). The objection is
-  correct and it refutes what docs/work-packages.md claimed: every point goes to a
-  worktree-isolated subagent with a FRESH context and a brief, and the main session hands over at
-  each point boundary — so NOTHING is carried between two points of a bundle, and the "related
-  points stay fresh" benefit did not exist. It exists only if the SAME still-running agent is
-  handed the bundle's next point, as 439 → 452 was that evening: that agent already had the module
-  in context and skipped the reading entirely. FINAL STATE for this half: when the next point of a
-  bundle touches files an agent is ALREADY working in, it goes to THAT agent as a follow-up ticket
-  rather than to a new one — it is the same decision the picker makes, so it lives in the same
-  mechanism. A new agent is spawned only when no running one holds the files.
+  THE NEXT-UP LINE IS NOT PART OF THIS POINT ANY MORE. It was added here when the queue was
+  grouped and the next point had disappeared behind a collapsed bundle; the grouping was taken back
+  out the same evening (point 472), so the first card of the flat queue names it again and a
+  separate line would only be a second place for the same fact to go stale.
   THE REUSE IS NARROW AND IT IS THE RISKY HALF (user 30.07.2026: "Das klingt riskant, weil sein
   Kontext dann noch mit den Anforderungen des vorherigen Punktes verwaessert ist." — correct, and it
   bounds the rule rather than cancelling it). CONDITIONS, all of them: reuse ONLY when the next point
