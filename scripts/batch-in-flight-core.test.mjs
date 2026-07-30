@@ -21,11 +21,16 @@ import {
   IN_FLIGHT_MAX_AGE_MS,
   LAUNCHER_WORK_MAX_AGE_MS,
   LOG_FRESH_MS,
+  LOG_OVERRIDES_QUIET_GIT_MS,
+  RESPAWN_GRACE_MS,
   WORK_FRESH_MS,
+  agentOutputVerdict,
   assessInFlight,
   assessOwnerWork,
   checkEvidence,
   describeInFlight,
+  evidenceVerdict,
+  respawnDecision,
   selfReferentialEvidence,
   slotReasonDecision,
   declaredAgentCount,
@@ -215,23 +220,106 @@ describe('assessInFlight — a fresh declaration with live evidence, and every w
     expect(describeInFlight(a, declaration())).toContain('three delegated agents')
   })
 
-  it('BLOCKS past the maximum age, however live the evidence looks', () => {
-    const a = assess({ at: NOW - IN_FLIGHT_MAX_AGE_MS - 1 })
+  it('BLOCKS past the maximum age where nothing is producing OUTPUT', () => {
+    // A pid and a log are assertion-shaped: they can look alive indefinitely
+    // without anything being produced, so the clock still bounds them.
+    const noOutput = { evidence: [{ kind: 'pid', pid: RUN_PID, startedAt: RUN_STARTED, label: 'test:large' }] }
+    const a = assess({ ...noOutput, at: NOW - IN_FLIGHT_MAX_AGE_MS - 1 })
     expect(a.live).toBe(false)
     expect(a.reason).toBe('expired')
+    expect(a.judgedOn).toBe('process')
     // …and the boundary of the window itself still holds (no off-by-one gap).
-    expect(assess({ at: NOW - IN_FLIGHT_MAX_AGE_MS }).live).toBe(true)
+    expect(assess({ ...noOutput, at: NOW - IN_FLIGHT_MAX_AGE_MS }).live).toBe(true)
+  })
+
+  it('29.07.2026: a declaration whose OUTPUT still moves does NOT age out', () => {
+    // The incident (point 434 (6b)): at 19:51 the declaration read
+    // `live:false, expired` while its agent had been building for 63 minutes and
+    // was mid-merge. Nothing refreshes a declaration while the work runs, so the
+    // clock was measuring the paperwork rather than the work.
+    const a = assess({ at: NOW - 63 * 60 * 1000 })
+    expect(a).toMatchObject({ live: true, reason: 'live', judgedOn: 'git' })
+    // …and it still ends by itself the moment the output goes quiet: no clock to
+    // feed, no background refresher that could die silently. Inside the age
+    // window the reason is the evidence, past it the clock — never live either
+    // way, which is the property that matters.
+    expect(assess({ at: NOW - 5 * 60 * 1000 }, { refTipAt: () => NOW - WORK_FRESH_MS - 1 })).toMatchObject({
+      live: false,
+      reason: 'evidence-gone',
+    })
+    expect(assess({ at: NOW - 63 * 60 * 1000 }, { refTipAt: () => NOW - WORK_FRESH_MS - 1 }).live).toBe(false)
   })
 
   it('honours a caller-supplied maximum age (the calibratable knob)', () => {
     const short = assessInFlight({
-      declaration: declaration({ at: NOW - 10 * 60 * 1000 }),
+      declaration: declaration({
+        at: NOW - 10 * 60 * 1000,
+        evidence: [{ kind: 'pid', pid: RUN_PID, startedAt: RUN_STARTED, label: 'test:large' }],
+      }),
       sid: SID,
       now: NOW,
       maxAgeMs: 5 * 60 * 1000,
       ...probes(),
     })
     expect(short).toMatchObject({ live: false, reason: 'expired' })
+  })
+
+  it('30.07.2026: a SILENT LOG beside moving git output is not death', () => {
+    // The incident (point 434 (5)): a bundle agent's log had been silent for 59
+    // minutes, this function answered `evidence-gone: silent for 59 min`, and the
+    // agent was declared dead and replaced — while its worktree had committed
+    // four minutes earlier. The successor rebuilt two finished points.
+    const withLog = declaration({
+      evidence: [
+        { kind: 'worktree', path: '/w/agent-bundle', label: 'bundle agent' },
+        { kind: 'log', path: '/w/agent-bundle.log', label: 'its transcript' },
+      ],
+    })
+    const a = assessInFlight({
+      declaration: withLog,
+      sid: SID,
+      now: NOW,
+      ...probes({ worktreeActiveAt: () => NOW - 4 * 60 * 1000, mtimeOf: () => NOW - 59 * 60 * 1000 }),
+    })
+    expect(a).toMatchObject({ live: true, reason: 'live', judgedOn: 'git' })
+    expect(a.ignored.join(' ')).toContain('silent for 59 min')
+    // The verdict SAYS what it rests on — the mistake was invisible because
+    // "evidence-gone" never named the source that had answered.
+    expect(describeInFlight(a, withLog)).toContain('judged on the work’s own git output')
+    expect(describeInFlight(a, withLog)).toContain('NOT counted as dead')
+  })
+
+  it('a silent log is forgiven ONLY beside live output — never on its own', () => {
+    const logOnly = declaration({ evidence: [{ kind: 'log', path: '/w/run.log' }] })
+    expect(
+      assessInFlight({ declaration: logOnly, sid: SID, now: NOW, ...probes({ mtimeOf: () => NOW - 59 * 60 * 1000 }) }),
+    ).toMatchObject({ live: false, reason: 'evidence-gone', judgedOn: 'none' })
+    // …and a quiet WORKTREE beside a fresh log still blocks: output is the
+    // primary evidence in both directions.
+    const both = declaration({
+      evidence: [
+        { kind: 'worktree', path: '/w/a' },
+        { kind: 'log', path: '/w/a.log' },
+      ],
+    })
+    expect(
+      assessInFlight({
+        declaration: both,
+        sid: SID,
+        now: NOW,
+        ...probes({ worktreeActiveAt: () => NOW - WORK_FRESH_MS - 1, mtimeOf: () => NOW - 1000 }),
+      }),
+    ).toMatchObject({ live: false, reason: 'evidence-gone' })
+  })
+
+  it('INDEPENDENCE: it decides on the evidence alone, every other layer stale or absent', () => {
+    // No lock, no launcher, no claim, no heartbeat, and a declaration older than
+    // every clock in this family — nothing but the probes. The layer still acts.
+    const only = declaration({ at: NOW - 6 * 60 * 60 * 1000, evidence: [{ kind: 'branch', ref: 'feat/434-x' }] })
+    expect(assessInFlight({ declaration: only, sid: SID, now: NOW, ...probes() })).toMatchObject({
+      live: true,
+      judgedOn: 'git',
+    })
   })
 
   it('BLOCKS when a declared background process has died', () => {
@@ -389,6 +477,94 @@ describe('progressGuardDecision — the declaration relaxes the two unsatisfiabl
     for (const v of ['yes', 1, {}, []]) {
       expect(progressGuardDecision({ ...base, inFlight: v })).toBe('block-continue')
     }
+  })
+})
+
+// ---------------------------------------------------------------------------
+// POINT 434 (5): the costlier verdict — may a delegated agent be REPLACED? On
+// 30.07.2026 that was answered from a transcript log while the agent's worktree
+// had committed four minutes earlier, and the successor rebuilt two finished
+// points. Every case below is written from that night.
+describe('agentOutputVerdict / respawnDecision — an agent is judged by what it produces', () => {
+  const verdict = (over) => agentOutputVerdict({ now: NOW, ...over })
+
+  it('30.07.2026: a worktree that committed four minutes ago REFUSES the respawn', () => {
+    const v = verdict({ worktreeAt: NOW - 4 * 60 * 1000, logAt: NOW - 59 * 60 * 1000 })
+    expect(v).toMatchObject({ verdict: 'alive', judgedOn: 'git' })
+    expect(respawnDecision({ output: v })).toMatchObject({ respawn: false, reason: 'agent-alive' })
+  })
+
+  it('…and so does a branch tip that moved a minute before the spawn', () => {
+    // The re-check immediately before spawning is the point: the branch tip moved
+    // one minute before the replacement was started, and nobody looked again.
+    const v = verdict({ branchTipAt: NOW - 60 * 1000 })
+    expect(respawnDecision({ output: v }).respawn).toBe(false)
+  })
+
+  it('permits the respawn only where git output COULD be measured and stood still', () => {
+    const v = verdict({ worktreeAt: NOW - RESPAWN_GRACE_MS - 1, branchTipAt: NOW - RESPAWN_GRACE_MS - 1 })
+    expect(v.verdict).toBe('quiet')
+    expect(respawnDecision({ output: v })).toMatchObject({ respawn: true, reason: 'output-quiet', judgedOn: 'git' })
+    // The window's own edge holds: at exactly the grace it is still alive.
+    expect(verdict({ worktreeAt: NOW - RESPAWN_GRACE_MS }).verdict).toBe('alive')
+  })
+
+  it('a SILENT LOG alone never permits it — and neither does an unmeasurable agent', () => {
+    const silent = verdict({ logAt: NOW - 59 * 60 * 1000 })
+    expect(silent.verdict).toBe('unmeasurable')
+    expect(respawnDecision({ output: silent })).toMatchObject({ respawn: false, reason: 'output-unmeasurable' })
+    expect(respawnDecision({})).toMatchObject({ respawn: false, reason: 'output-unmeasurable' })
+    expect(respawnDecision({ output: verdict({}) }).respawn).toBe(false)
+  })
+
+  it('a FRESH log with quiet git still refuses — silence is the only thing that proves nothing', () => {
+    const v = verdict({ worktreeAt: NOW - RESPAWN_GRACE_MS - 1, logAt: NOW - 60 * 1000 })
+    expect(v).toMatchObject({ verdict: 'alive', judgedOn: 'log' })
+    expect(respawnDecision({ output: v }).respawn).toBe(false)
+  })
+
+  it('…but a printing loop cannot make an agent UNREPLACEABLE (four-eyes finding 4)', () => {
+    // A fresh log refuses the respawn, and must not refuse it forever: an agent
+    // wedged printing while its output stands still would otherwise be
+    // replaceable only by hand — a standstill of the kind this point ends.
+    const wedged = verdict({ worktreeAt: NOW - LOG_OVERRIDES_QUIET_GIT_MS - 1, logAt: NOW - 60 * 1000 })
+    expect(wedged).toMatchObject({ verdict: 'quiet', judgedOn: 'git' })
+    expect(respawnDecision({ output: wedged }).respawn).toBe(true)
+    // Just inside the bound the log still holds, so thinking aloud for a while
+    // is never punished.
+    expect(verdict({ worktreeAt: NOW - LOG_OVERRIDES_QUIET_GIT_MS, logAt: NOW - 60 * 1000 }).verdict).toBe('alive')
+    expect(LOG_OVERRIDES_QUIET_GIT_MS).toBeGreaterThan(RESPAWN_GRACE_MS)
+  })
+
+  it('is wider than the WAIT window, because the two mistakes cost differently', () => {
+    // Ending a wait too early costs one command; killing a live agent costs
+    // everything it built and is then rebuilt a second time.
+    expect(RESPAWN_GRACE_MS).toBeGreaterThan(WORK_FRESH_MS)
+  })
+
+  it('INDEPENDENCE: it needs no lock, no declaration and no launcher — only the stamps', () => {
+    expect(verdict({ worktreeAt: NOW - 1000 }).verdict).toBe('alive')
+    expect(agentOutputVerdict({ now: NOW, worktreeAt: 'kürzlich' }).verdict).toBe('unmeasurable')
+  })
+})
+
+// ---------------------------------------------------------------------------
+describe('evidenceVerdict — the verdict names the source it rests on', () => {
+  const item = (kind, ok) => ({ ok, kind, describe: `${kind} x`, detail: ok ? 'fresh' : 'quiet' })
+
+  it('ranks output above a process and a process above a log', () => {
+    expect(evidenceVerdict([item('log', true), item('branch', true)]).judgedOn).toBe('git')
+    expect(evidenceVerdict([item('log', true), item('pid', true)]).judgedOn).toBe('process')
+    expect(evidenceVerdict([item('log', true)]).judgedOn).toBe('log')
+    expect(evidenceVerdict([item('log', false)]).judgedOn).toBe('none')
+    expect(evidenceVerdict().judgedOn).toBe('none')
+  })
+
+  it('separates what is fresh from what is silent, for the report', () => {
+    const v = evidenceVerdict([item('worktree', true), item('log', false)])
+    expect(v.outputFresh).toBe(true)
+    expect(v.fresh).toHaveLength(1)
+    expect(v.silent).toEqual(['log x — quiet'])
   })
 })
 

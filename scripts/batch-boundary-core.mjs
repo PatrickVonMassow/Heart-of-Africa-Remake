@@ -349,6 +349,69 @@ export function handoverSurvivesCall({ toolName, filePath, command } = {}) {
   return { survives: false, reason: 'no-target' }
 }
 
+// --- WHERE THE BATCH ACTUALLY GOES (point 434 (7), found 29.07.2026 20:06) ----
+//
+// The boundary card said "Ich übergebe an eine frische Sitzung … Sie nimmt den
+// nächsten Punkt der Warteschlange auf" while a user window held an HONOURED
+// claim — and that is not what happens: `batch-autostart.mjs` reserves the batch
+// for a live claim and SKIPS the spawn, so the batch goes to the claiming
+// window. The text misled the user into believing his takeover had been
+// overtaken by a headless successor. The card therefore READS the claim state
+// and names which of the two is happening, in the German the user reads.
+
+export const BOUNDARY_DESTINATIONS = Object.freeze({
+  /** No claim: the OS launcher spawns the successor, which takes the next point. */
+  FRESH_SESSION: 'fresh-session',
+  /** A live claim reserves the batch: the launcher skips the spawn and the
+   *  claiming window continues the work. */
+  CLAIMING_WINDOW: 'claiming-window',
+})
+
+/**
+ * WHO CONTINUES AFTER THIS BOUNDARY? PURE.
+ *
+ * `claimHonoured` is `assessClaim(...).honour` — the very predicate the launcher
+ * bails on — so the card cannot drift from the launcher's own reading. A claim
+ * that is merely RECORDED (expired, dead, already released) changes nothing, and
+ * the card then correctly announces the fresh session.
+ */
+export function boundaryDestination({ claimHonoured = false, claimantSid = null } = {}) {
+  const sid = typeof claimantSid === 'string' && claimantSid.trim() ? claimantSid.trim() : null
+  return claimHonoured === true && sid
+    ? { destination: BOUNDARY_DESTINATIONS.CLAIMING_WINDOW, claimantSid: sid }
+    : { destination: BOUNDARY_DESTINATIONS.FRESH_SESSION, claimantSid: null }
+}
+
+/**
+ * THE BOUNDARY CARD, in German, one text per state. PURE.
+ *
+ * User-facing prose (the board is read on a phone), so it says the destination in
+ * the first sentence and never leaves the reader to infer it.
+ */
+export function boundaryCardText({ point, destination, claimantSid = null } = {}) {
+  const n = Number.isInteger(Number(point)) && Number(point) > 0 ? Number(point) : null
+  const head = n === null ? 'Der Punkt ist abgeschlossen.' : `Punkt ${n} ist abgeschlossen.`
+  if (destination === BOUNDARY_DESTINATIONS.CLAIMING_WINDOW && claimantSid) {
+    // The reservation is stated with its LIMIT, not as a promise: it holds until
+    // the lock is released for that window, and from then on the first window to
+    // acquire wins (a released claim is spent — see `assessClaim`). Promising
+    // more would repeat, one step later, the very misdirection this card was
+    // rewritten to remove (four-eyes review, finding 2).
+    return (
+      `${head} Der Stapel geht NICHT an eine frische Sitzung: Fenster ${claimantSid} hat ihn beansprucht, der ` +
+      'Launcher hält den Start deshalb zurück und reserviert den Stapel für dieses Fenster. Weitergearbeitet ' +
+      `wird dort, sobald es den Anspruch einlöst (\`node scripts/batch-claim.mjs --session ${claimantSid}\`). ` +
+      'Löst es ihn nach der Freigabe nicht gleich ein, greift die gewöhnliche Übergabe — der Stapel bleibt ' +
+      'nie ohne Eigentümer. Hier läuft nichts weiter.'
+    )
+  }
+  return (
+    `${head} Ich übergebe an eine frische Sitzung: Der Launcher startet sie innerhalb seines Intervalls, und ` +
+    'sie nimmt den nächsten Punkt der Warteschlange auf. Kein Fenster hat den Stapel beansprucht. Hier läuft ' +
+    'nichts weiter.'
+  )
+}
+
 /**
  * Should the recorded boundary be honoured, and if not, why? Returns
  *   'allow-boundary'  — end the session here; the launcher brings up the next one

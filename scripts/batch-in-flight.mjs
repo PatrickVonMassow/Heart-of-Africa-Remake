@@ -7,6 +7,11 @@
 //                                    [--worktree PATH]… [--log PATH]…
 //   node scripts/batch-in-flight.mjs --status   what the Stop hook would decide
 //   node scripts/batch-in-flight.mjs --clear    the wait is over
+//   node scripts/batch-in-flight.mjs --agent-check [--worktree PATH] [--branch REF]
+//                                    [--log PATH]
+//                                    may this delegated agent be REPLACED? Exit 0
+//                                    yes, exit 1 no. Run it IMMEDIATELY before
+//                                    the respawn (point 434 (5)).
 //
 // Declaring is DELIBERATE and verified up front, exactly like taking a boundary:
 // the command refuses unless this is the batch lock's owner and every piece of
@@ -32,8 +37,10 @@ import {
   IN_FLIGHT_PATH,
 } from './batch-singleton.mjs'
 import {
+  agentOutputVerdict,
   assessInFlight,
   describeInFlight,
+  respawnDecision,
   selfReferentialEvidence,
   slotReasonDecision,
   slotsRemedy,
@@ -43,6 +50,7 @@ import {
   openPointSpecs,
   IN_FLIGHT_MAX_AGE_MS,
   POOL_CAP,
+  RESPAWN_GRACE_MS,
 } from './batch-in-flight-core.mjs'
 import { readTasksOpen, TASKS_PATH } from './tasks-source.mjs'
 
@@ -361,6 +369,27 @@ export function gatherInFlight(sid, { now = Date.now(), lockPath = LOCK_PATH, en
   return { declaration, ...assessment, slots }
 }
 
+/**
+ * MAY A DELEGATED AGENT BE REPLACED (point 434 (5))? The decision is pure
+ * (`agentOutputVerdict` + `respawnDecision`); this only runs the same three
+ * probes the declaration uses, so "is it still working" is answered from ONE
+ * body of evidence rather than from two that can disagree.
+ *
+ * It is deliberately cheap and side-effect free, because its whole value lies in
+ * being run AGAIN in the seconds before the spawn: on 30.07.2026 the branch tip
+ * moved one minute before the replacement was started.
+ */
+export function checkAgentOutput({ worktree = null, branch = null, log = null, now = Date.now(), graceMs } = {}) {
+  const output = agentOutputVerdict({
+    worktreeAt: worktree ? worktreeActiveAt(worktree) : null,
+    branchTipAt: branch ? refTipAt(branch) : null,
+    logAt: log ? mtimeOf(log) : null,
+    now,
+    ...(Number.isFinite(graceMs) && graceMs > 0 ? { graceMs } : {}),
+  })
+  return { output, ...respawnDecision({ output }) }
+}
+
 // --- CLI -----------------------------------------------------------------------
 
 const isMain = process.argv[1] && import.meta.url === new URL(`file://${process.argv[1].replace(/\\/g, '/')}`).href
@@ -374,9 +403,42 @@ if (isMain) {
   }
   const usage =
     'usage: node scripts/batch-in-flight.mjs --waiting-on "<what>" [--pid N] [--branch REF] ' +
-    '[--worktree PATH] [--log PATH] [--slots-free "<why the free pool slots stay free>"] | --status | --clear'
+    '[--worktree PATH] [--log PATH] [--slots-free "<why the free pool slots stay free>"] | --status | --clear | ' +
+    '--agent-check [--worktree PATH] [--branch REF] [--log PATH]'
 
-  if (argv[0] === '--clear') {
+  if (argv[0] === '--agent-check') {
+    const opt = (name) => {
+      const i = argv.indexOf(name)
+      return i >= 0 && i + 1 < argv.length ? argv[i + 1] : null
+    }
+    const worktree = opt('--worktree')
+    const branch = opt('--branch')
+    const log = opt('--log')
+    if (!worktree && !branch && !log) {
+      fail(
+        'nothing to check. Name what the agent PRODUCES — its worktree (--worktree PATH) and/or its branch ' +
+          `(--branch REF); --log PATH may ride along but never decides.\n${usage}`,
+      )
+    }
+    const r = checkAgentOutput({ worktree, branch, log })
+    console.log(JSON.stringify({ worktree, branch, log, graceMs: RESPAWN_GRACE_MS, ...r }, null, 2))
+    if (r.respawn) {
+      console.log(
+        `\nA REPLACEMENT IS PERMITTED: ${r.detail} (judged on ${r.judgedOn}). Re-run this exact command in the ` +
+          'seconds before you spawn — an agent that commits in between must not be shot by a stale reading.',
+      )
+      process.exit(0)
+    }
+    console.log(
+      r.reason === 'agent-alive'
+        ? `\nDO NOT REPLACE THIS AGENT: ${r.detail} (judged on ${r.judgedOn}). It is working. On 30.07.2026 an ` +
+            'agent was declared dead after 59 silent LOG minutes while its worktree had committed four minutes ' +
+            'earlier, and the successor rebuilt two finished points.'
+        : `\nDO NOT REPLACE THIS AGENT YET: ${r.detail}. Its OUTPUT could not be measured, and silence is not ` +
+            'evidence of death — find the worktree or the branch and ask again, or look at the agent itself.',
+    )
+    process.exit(1)
+  } else if (argv[0] === '--clear') {
     clearDeclaration()
     console.log('in-flight declaration cleared — the ordinary "do not stop the batch" rule applies again.')
   } else if (argv[0] === '--status' || argv.length === 0) {

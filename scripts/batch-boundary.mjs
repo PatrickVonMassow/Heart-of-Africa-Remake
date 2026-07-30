@@ -16,10 +16,14 @@ import { repoPath } from './repo-paths.mjs'
 import { writeJsonAtomic } from './atomic-write.mjs'
 import { readTasksOpen, TASKS_PATH, ARCHIVE_PATH } from './tasks-source.mjs'
 import { readOwnerLock } from './batch-singleton.mjs'
+import { gatherClaim } from './batch-claim.mjs'
 import {
+  BOUNDARY_DESTINATIONS,
   BOUNDARY_DUE_MS,
   LAUNCHER_TASK_NAME,
   assessBoundary,
+  boundaryCardText,
+  boundaryDestination,
   boundaryDueFrom,
   classifyLauncherState,
   pointClosure,
@@ -242,6 +246,27 @@ export function gatherBoundary(sid, { now = Date.now(), path = BOUNDARY_PATH } =
   return { marker, closure, boundary, launcher, due }
 }
 
+/**
+ * WHERE THE BATCH GOES AFTER THIS BOUNDARY, and the German card that says so
+ * (point 434 (7)). The decision is pure (`boundaryDestination` /
+ * `boundaryCardText`); this only reads the claim state through the SAME
+ * `gatherClaim` the guard and the launcher use, so the card cannot announce a
+ * successor the launcher will not spawn.
+ *
+ * An unreadable claim answers "fresh session": that is what happens with no
+ * honoured claim, and it is the state the old text always assumed anyway.
+ */
+export function boundaryHandover(point, { sid = readOwnerLock()?.sessionId ?? '' } = {}) {
+  let claim = { honour: false, claimantSid: null }
+  try {
+    claim = gatherClaim(sid, { ownerLock: readOwnerLock() })
+  } catch {
+    /* no readable claim → nobody is waiting for the batch */
+  }
+  const where = boundaryDestination({ claimHonoured: claim.honour === true, claimantSid: claim.claimantSid })
+  return { ...where, card: boundaryCardText({ point, ...where }) }
+}
+
 // --- CLI ----------------------------------------------------------------------
 
 const isMain =
@@ -260,9 +285,10 @@ if (isMain) {
     console.log('boundary marker cleared — the ordinary "do not stop the batch" rule applies again.')
   } else if (arg === '--status' || !arg) {
     const g = gatherBoundary(sid)
+    const handover = boundaryHandover(g.marker?.point ?? null, { sid })
     console.log(
       JSON.stringify(
-        { ownerSessionId: sid || null, ...g, taskName: LAUNCHER_TASK_NAME },
+        { ownerSessionId: sid || null, ...g, handover, taskName: LAUNCHER_TASK_NAME },
         null,
         2,
       ),
@@ -295,11 +321,21 @@ if (isMain) {
       )
     }
     writeBoundary({ v: 1, sessionId: sid, point, at: Date.now() })
+    const handover = boundaryHandover(point, { sid })
+    const toWindow = handover.destination === BOUNDARY_DESTINATIONS.CLAIMING_WINDOW
     console.log(
       `boundary recorded: point ${point} is closed and the launcher is armed. End this session now — ` +
-        'the OS task starts a fresh one within its interval and batch-resume-hook re-orients it. Do NOT ' +
-        'start the next point in this context, and do NOT end while a delegated agent is still in ' +
-        'flight (its work would be thrown away — let the pool drain first).',
+        (toWindow
+          ? `the batch does NOT go to a fresh session: window ${handover.claimantSid} holds an honoured claim, ` +
+            'so batch-autostart reserves the batch for it and SKIPS the spawn. '
+          : 'the OS task starts a fresh one within its interval and batch-resume-hook re-orients it. ') +
+        'Do NOT start the next point in this context, and do NOT end while a delegated agent is still in ' +
+        'flight (its work would be thrown away — let the pool drain first).\n\n' +
+        'THE BOARD CARD (point 434 (7)) — it must name where the batch actually goes, so take this text ' +
+        'verbatim rather than writing it again:\n\n' +
+        `${handover.card}\n\n` +
+        `  node scripts/board.mjs done ${point} --text-stdin   (the German goes in on stdin — a Windows shell ` +
+        'mangles the umlauts on the argument path)',
     )
   }
 }

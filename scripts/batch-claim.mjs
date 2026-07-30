@@ -41,6 +41,7 @@ import {
   assessClaim,
   claimWriteDecision,
   describeClaim,
+  ownerIsHolding,
   releaseDecision,
   CLAIM_MAX_AGE_MS,
   GIT_STATE_UNVERIFIABLE,
@@ -138,11 +139,26 @@ export function gatherClaim(
         ? { pid: lock.pid, startedAt: lock.pidStartedAt ?? null }
         : ourClaudeProcess(sid, { lockPath })
   }
+  const lock = ownerLock === undefined ? readOwnerLock(lockPath) : ownerLock
+  // IS THERE ANYBODY TO WAIT FOR (point 434 (6a))? While a LIVE SESSION owner
+  // holds the lock the claim does not age out under that owner's own long turns;
+  // with nobody holding, the take-up window applies again so an untaken claim can
+  // never leave the batch ownerless. The predicate is `ownerIsHolding` — lock
+  // existence alone would also match the launcher's pending-spawn placeholder
+  // (four-eyes review, finding 1).
+  const ownerHolding = ownerIsHolding({
+    lock,
+    claimantSid: claim.sessionId,
+    alive: lock
+      ? assessOwner(lock, { now, bootTime: bootTimeMs(), probe: lock.pid ? probePid(lock.pid) : null }).alive === true
+      : false,
+  })
   const assessment = assessClaim({
     claim,
     sid,
     ancestor: identity,
-    ownerSid: (ownerLock === undefined ? readOwnerLock(lockPath) : ownerLock)?.sessionId ?? '',
+    ownerSid: lock?.sessionId ?? '',
+    ownerHolding,
     now,
     maxAgeMs: maxAgeMs(env),
     probePid,
@@ -150,10 +166,12 @@ export function gatherClaim(
   return { claim, ...assessment }
 }
 
-/** Mark the claim RELEASED, so the claimant's `--status` can say the batch is
- *  waiting for it and the launcher keeps standing down until it is taken. Only
- *  ever called by the releasing owner; best effort — the release itself is what
- *  matters, and a claim we cannot stamp is still honoured on its own age. */
+/** Mark the claim RELEASED: the hand-over HAPPENED, and from that moment the
+ *  record is spent (point 434 (6c) — `assessClaim` reads it as absent). The lock
+ *  is free, so the claiming window takes it by re-running its own command, and
+ *  nothing releases to this record a second time or keeps standing down for it.
+ *  Only ever called by the releasing owner; best effort — the release itself is
+ *  what matters, and an unstamped claim still ends inside its take-up window. */
 export function markClaimReleased(claim, { path = CLAIM_PATH, now = Date.now(), by = '' } = {}) {
   try {
     if (!claim || typeof claim !== 'object') return false
@@ -223,9 +241,20 @@ if (isMain) {
     ? assessOwner(lock, { now, bootTime: bootTimeMs(), probe: lock.pid ? probePid(lock.pid) : null })
     : { alive: false, reason: 'no-lock' }
 
+  const holdingFor = (other) =>
+    ownerIsHolding({ lock, claimantSid: other?.sessionId ?? '', alive: ownerAlive.alive === true })
+
   if (has('--status')) {
     const claim = readClaim()
-    const view = assessClaim({ claim, sid, ownerSid: lock?.sessionId ?? '', now, maxAgeMs: maxAgeMs(), probePid })
+    const view = assessClaim({
+      claim,
+      sid,
+      ownerSid: lock?.sessionId ?? '',
+      ownerHolding: holdingFor(claim),
+      now,
+      maxAgeMs: maxAgeMs(),
+      probePid,
+    })
     console.log(
       JSON.stringify(
         {
@@ -246,8 +275,18 @@ if (isMain) {
         `\nA claim is PENDING: ${describeClaim(view)}. ` +
           (lock && ownerAlive.alive
             ? `The owner (${lock.sessionId}) releases at its next CLEAN turn end — not mid-merge and not while a ` +
-              'delegated agent or a verification is still running.'
-            : 'No live owner holds the batch — re-run the claim with --session <id> and it is yours at once.'),
+              'delegated agent or a verification is still running. While it holds the lock this claim does NOT ' +
+              'age out; it ends when the claiming window closes.'
+            : 'No live owner holds the batch — re-run the claim with --session <id> and it is yours at once. ' +
+              `Do not wait: with no owner to wait for the claim is honoured only for ${Math.round(maxAgeMs() / 60000)} ` +
+              'min from when it was RECORDED, and then the ordinary handover takes over so the batch is never ' +
+              'left ownerless.'),
+      )
+    } else if (view.reason === 'released') {
+      console.log(
+        `\nThe batch was ALREADY RELEASED for ${view.claimantSid} (this record is spent, point 434). The lock is ` +
+          'free: run `node scripts/batch-claim.mjs --session <id>` to take it. Nothing reserves it any more — ' +
+          'if the launcher got there first, claim again against the new owner.',
       )
     } else console.log(`\nThe recorded claim is NOT honoured (${view.reason}) — it changes nothing.`)
     process.exit(0)
@@ -300,7 +339,15 @@ if (isMain) {
     )
   }
   const existing = readClaim()
-  const write = claimWriteDecision({ existing, sid, ancestor, now, maxAgeMs: maxAgeMs(), probePid })
+  const write = claimWriteDecision({
+    existing,
+    sid,
+    ancestor,
+    ownerHolding: holdingFor(existing),
+    now,
+    maxAgeMs: maxAgeMs(),
+    probePid,
+  })
   if (write.action === 'refuse') {
     fail(
       `session ${write.claimantSid} claimed the batch ${Math.round((write.ageMs ?? 0) / 60000)} min ago and that ` +
@@ -335,7 +382,12 @@ if (isMain) {
           : ` (A ${check.reason.replace(/^git-/, '')} is in progress in this checkout right now.)`
         : '') +
       ` Re-run \`node scripts/batch-claim.mjs --session ${sid}\` to take the batch once it is free — the same ` +
-      `command claims and takes. The claim expires in ${mins} min, and it is ignored outright if this window ` +
-      'closes, so it can never strand the batch.',
+      'command claims and takes. WHILE THAT OWNER LIVES the claim does NOT age out (point 434): it holds for as ' +
+      'long as THIS window is open and is ignored outright the moment it closes, so a long verification in the ' +
+      'other session can no longer let the takeover lapse unnoticed. WITH NO LIVE OWNER it is honoured for ' +
+      `${mins} min from NOW — the moment it was recorded — and then the ordinary handover takes over rather than ` +
+      'leaving the batch ownerless. And once the owner has RELEASED for it the claim is spent: the lock is free ' +
+      'and the first window to acquire wins, so re-run this command AT ONCE when the release is reported; if the ' +
+      'launcher got there first, claim again against the new owner.',
   )
 }

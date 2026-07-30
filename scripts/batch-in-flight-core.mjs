@@ -30,20 +30,31 @@
 //      finished agent's work is now the session's next action (merge it), and
 //      re-declaring the remaining two is one command. Erring the other way would
 //      let a session sleep behind an evidence list it long outgrew.
-//   3. IT EXPIRES. Past `IN_FLIGHT_MAX_AGE_MS` the guard blocks exactly as
-//      before, whatever the declaration says and however live its evidence looks.
-//      A wait that outlives the work it was declared for is an idle night with
-//      paperwork.
+//   3. IT ENDS WITH THE WORK, not on a clock somebody has to feed (point 434
+//      (6b), 30.07.2026). A wait that outlives the work it was declared for is
+//      an idle night with paperwork — but the wall clock was the wrong instrument
+//      for saying so: on 29.07.2026 the declaration read `live:false, expired`
+//      while its agent had been building for 63 minutes and was mid-merge, and
+//      nothing refreshes a declaration while the work runs. What ends the wait is
+//      the EVIDENCE going quiet: output (a branch, a worktree) stops checking out
+//      within `WORK_FRESH_MS` of the last commit, all by itself. Past
+//      `IN_FLIGHT_MAX_AGE_MS` the guard blocks exactly as before wherever nothing
+//      is producing output — a pid that merely exists, a log that is merely
+//      appended to — so the clock still bounds the assertion-shaped evidence it
+//      was written for.
 //
 // Where the two verdicts are close, this file chooses the BLOCK: a wrong block
 // costs one command, a wrong allow cost five and a half hours.
 import { resolveOwnership, PID_START_TOLERANCE_MS } from './batch-singleton.mjs'
 import { CLOSING_STEPS, missingSteps } from './closing-guard-core.mjs'
 
-/** How old a declaration may be before the guard stops honouring it. Wide enough
- *  for a LARGE browser regression or a delegated agent building a point (both run
- *  well past half an hour), short enough that a forgotten declaration cannot
- *  cover a night. Calibratable via HOA_IN_FLIGHT_MAX_MIN (scripts/batch-in-flight.mjs). */
+/** How old a declaration may be before the guard stops honouring it — where
+ *  nothing in it is producing OUTPUT (point 434 (6b); a declaration whose branch
+ *  or worktree still moves is judged on that instead and does not age out). Wide
+ *  enough for a LARGE browser regression or a delegated agent building a point
+ *  (both run well past half an hour), short enough that a forgotten declaration
+ *  cannot cover a night. Calibratable via HOA_IN_FLIGHT_MAX_MIN
+ *  (scripts/batch-in-flight.mjs). */
 export const IN_FLIGHT_MAX_AGE_MS = 45 * 60 * 1000
 
 /**
@@ -118,6 +129,60 @@ export const WORK_FRESH_MS = 15 * 60 * 1000
 /** The evidence kinds a probe can actually answer. An unknown kind is never
  *  "assume fine": it fails, and the declaration with it. */
 export const EVIDENCE_KINDS = ['pid', 'branch', 'worktree', 'log']
+
+/**
+ * EVIDENCE THAT IS THE WORK'S OWN OUTPUT (point 434 (5), 30.07.2026).
+ *
+ * The four kinds were weighed EQUALLY, and on 30.07.2026 that cost two finished
+ * points. A bundle agent's transcript log had been silent for 59 minutes, this
+ * file answered `evidence-gone: silent for 59 min`, the agent was declared dead
+ * and replaced — while its worktree had committed four minutes earlier and its
+ * branch tip moved one minute before the replacement was spawned. The successor
+ * rebuilt two points the original had already finished.
+ *
+ * A LOG is the weakest of the four: an agent that works without printing looks
+ * exactly like one that died. A PID is stronger but says only that a process
+ * exists, not that it is producing anything. A BRANCH and a WORKTREE are the
+ * work's own OUTPUT — they move only when something real happened, and they go
+ * quiet on their own the moment it stops. So they are the PRIMARY evidence: a
+ * silent log beside moving output never supports the conclusion "dead", and
+ * output that is still moving needs no deadline to stay honest (see
+ * `assessInFlight`).
+ *
+ * ONE CAVEAT, named rather than hidden (four-eyes review, Fable 5, finding 5):
+ * `worktreeActiveAt` reads the gitdir's index/HEAD mtimes, and a supervisor that
+ * runs `git status` inside an agent's worktree refreshes the index from OUTSIDE
+ * — so a dead agent's worktree can be made to look active by somebody looking at
+ * it. The branch stamp (`refTipAt`) is commit-based and has no such path. It is
+ * left as it is because the alternative is worse in the common case (an agent
+ * normally declares its worktree and nothing else, and requiring a commit would
+ * re-open the 45-minute expiry this point closed), but a declaration that names
+ * BOTH is strictly the stronger one, and the respawn check below asks for both.
+ */
+export const OUTPUT_KINDS = new Set(['branch', 'worktree'])
+
+/**
+ * WHICH EVIDENCE CARRIES THE VERDICT? PURE.
+ *
+ * `items` is the output of `checkEvidence`, one per declared piece. Returns
+ * { judgedOn, outputFresh, fresh, silent } — `judgedOn` is the strongest kind
+ * that still checks out ('git' > 'process' > 'log', 'none' when nothing does),
+ * and it is REPORTED wherever a verdict is printed, because the 30.07 mistake
+ * was not visible in the verdict itself: "evidence-gone" named a log without
+ * ever saying that a stronger source had been asked and had answered.
+ */
+export function evidenceVerdict(items = []) {
+  const list = Array.isArray(items) ? items : []
+  const ok = list.filter((i) => i?.ok === true)
+  const outputFresh = ok.some((i) => OUTPUT_KINDS.has(i.kind))
+  const judgedOn = outputFresh ? 'git' : ok.some((i) => i.kind === 'pid') ? 'process' : ok.length > 0 ? 'log' : 'none'
+  return {
+    judgedOn,
+    outputFresh,
+    fresh: ok.map((i) => `${i.describe} — ${i.detail}`),
+    silent: list.filter((i) => i?.ok !== true).map((i) => `${i.describe} — ${i.detail}`),
+  }
+}
 
 /** Branch refs that can never be evidence of a DELEGATED agent's progress,
  *  whatever the declaring session names them (four-eyes review 28.07.2026,
@@ -307,8 +372,24 @@ export function checkEvidence(
  *                 wrote, while a genuinely second window still fails it.
  *   now, maxAgeMs, and the four probes of `checkEvidence`.
  *
- * Returns { live, reason, ageMs, summary, items }. `live` true is the ONLY value
- * that may relax the block; every other path leaves the guard exactly as it was.
+ * Returns { live, reason, ageMs, summary, items, judgedOn, ignored }. `live` true
+ * is the ONLY value that may relax the block; every other path leaves the guard
+ * exactly as it was. `judgedOn` names the evidence the verdict rests on, so a
+ * transcript reader can see whether a log or the work's own output decided it.
+ *
+ * TWO RULES COME FROM POINT 434 (30.07.2026), and both say the same thing —
+ * liveness is read from OUTPUT, never from a clock and never from silence:
+ *   (5) A SILENT LOG ALONE IS NOT DEATH. Where the declared work is an agent
+ *       whose branch or worktree is still moving, a log that has gone quiet is
+ *       ignored (and named in `ignored`). Every other kind still has to hold —
+ *       a dead pid, a stalled branch or a quiet worktree blocks as before.
+ *   (6b) MOVING OUTPUT DOES NOT AGE OUT. The declaration used to expire after 45
+ *       minutes and was never refreshed while the work ran, so on 29.07.2026 it
+ *       read `live:false, expired` while its agent had been building for 63
+ *       minutes and was mid-merge. The expiry now only bites where nothing is
+ *       producing output — a pid that merely exists, a log that is merely being
+ *       written. Fresh output needs no deadline: it goes quiet on its own inside
+ *       `WORK_FRESH_MS`, which is the bound the expiry was standing in for.
  */
 export function assessInFlight({
   declaration,
@@ -318,7 +399,16 @@ export function assessInFlight({
   maxAgeMs = IN_FLIGHT_MAX_AGE_MS,
   ...probes
 } = {}) {
-  const out = (live, reason, extra = {}) => ({ live, reason, ageMs: null, summary: '', items: [], ...extra })
+  const out = (live, reason, extra = {}) => ({
+    live,
+    reason,
+    ageMs: null,
+    summary: '',
+    items: [],
+    judgedOn: 'none',
+    ignored: [],
+    ...extra,
+  })
   if (!declaration || typeof declaration !== 'object') return out(false, 'no-declaration')
   if (typeof declaration.at !== 'number') return out(false, 'malformed')
 
@@ -331,16 +421,123 @@ export function assessInFlight({
   // A declaration from the future is a clock the guard cannot reason about →
   // block. Costs one re-declaration; the other direction costs a night.
   if (!(ageMs >= 0)) return out(false, 'clock-skew', { ageMs })
-  if (ageMs > maxAgeMs) return out(false, 'expired', { ageMs })
 
   const evidence = Array.isArray(declaration.evidence) ? declaration.evidence : []
   if (evidence.length === 0) return out(false, 'no-evidence', { ageMs })
 
   const items = evidence.map((e) => checkEvidence(e, { now, ...probes }))
-  const dead = items.filter((i) => !i.ok)
+  const verdict = evidenceVerdict(items)
   const summary = items.map((i) => `${i.describe} — ${i.detail}`).join('; ')
-  if (dead.length > 0) return out(false, 'evidence-gone', { ageMs, summary, items })
-  return out(true, 'live', { ageMs, summary, items })
+  const base = { ageMs, summary, items, judgedOn: verdict.judgedOn }
+  // The clock is the FALLBACK bound, not the rule (see the header): it decides
+  // only where no output is moving.
+  if (ageMs > maxAgeMs && !verdict.outputFresh) return out(false, 'expired', base)
+
+  const dead = items.filter((i) => !i.ok)
+  if (dead.length > 0) {
+    const silentLogsOnly = dead.every((i) => i.kind === 'log')
+    if (!(silentLogsOnly && verdict.outputFresh)) return out(false, 'evidence-gone', base)
+    // A quiet log beside output that is still moving. Reported, never fatal.
+    return out(true, 'live', { ...base, ignored: verdict.silent })
+  }
+  return out(true, 'live', base)
+}
+
+// ---------------------------------------------------------------------------
+// NEVER REPLACE AN AGENT WITHOUT ASKING ITS OUTPUT FIRST (point 434 (5))
+// ---------------------------------------------------------------------------
+//
+// The declaration above decides whether a WAIT may continue. This decides the
+// costlier question: may a delegated agent be declared dead and RESPAWNED? On
+// 30.07.2026 that was answered from a transcript log ("silent for 59 min") while
+// the agent's worktree had committed four minutes earlier, and the successor
+// rebuilt two finished points. So the answer is read from the work's own output,
+// and it is re-read IMMEDIATELY before the spawn — an agent that committed while
+// the decision was being made must not be shot by a stale reading.
+
+/** How long an agent's output may stand still before a replacement is even
+ *  considered. Deliberately WIDER than `WORK_FRESH_MS`, because the two decisions
+ *  have opposite cost shapes: ending a wait too early costs one command, while
+ *  killing a live agent costs everything it has built and un-does it twice (the
+ *  original's work plus the successor's). */
+export const RESPAWN_GRACE_MS = 30 * 60 * 1000
+
+/**
+ * How long a FRESH LOG may keep an agent alive whose git output could be measured
+ * and has stood still (four-eyes review, Fable 5, 30.07.2026, finding 4).
+ *
+ * A fresh log is genuine evidence that something is happening, so it refuses the
+ * respawn — but it must not refuse it FOREVER: an agent wedged in a printing loop
+ * would then be unreplaceable except by hand, which is a standstill of exactly the
+ * kind this point exists to end. Past this bound, measured-quiet output outranks
+ * a log that has produced nothing but lines. Twice the grace, so an agent that
+ * simply thinks aloud for a while is never touched.
+ */
+export const LOG_OVERRIDES_QUIET_GIT_MS = 2 * RESPAWN_GRACE_MS
+
+/**
+ * IS A DELEGATED AGENT STILL PRODUCING? PURE — every stamp is injected as epoch
+ * ms, or null where the probe could not answer.
+ *
+ * Returns { verdict, judgedOn, ageMs, detail }:
+ *   'alive'        — something moved inside the grace window. `judgedOn` names
+ *                    what: 'git' (its worktree or branch) or 'log'.
+ *   'quiet'        — git output COULD be measured and has stood still.
+ *   'unmeasurable' — neither a worktree nor a branch could be read, so the only
+ *                    thing left is silence, and silence is not evidence of death
+ *                    (docs/batch-resilience.md §5). The caller must LOOK.
+ */
+export function agentOutputVerdict({
+  worktreeAt = null,
+  branchTipAt = null,
+  logAt = null,
+  now,
+  graceMs = RESPAWN_GRACE_MS,
+  logOverrideMs = LOG_OVERRIDES_QUIET_GIT_MS,
+} = {}) {
+  const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null)
+  const git = [num(worktreeAt), num(branchTipAt)].filter((v) => v !== null)
+  const log = num(logAt)
+  const newestGit = git.length > 0 ? Math.max(...git) : null
+  if (newestGit !== null && now - newestGit <= graceMs) {
+    return {
+      verdict: 'alive',
+      judgedOn: 'git',
+      ageMs: now - newestGit,
+      detail: `git output ${minutes(now - newestGit)} min old`,
+    }
+  }
+  // A FRESH log is genuine evidence that something is happening — it is only
+  // SILENCE that proves nothing — but it may not outrank measured, quiet output
+  // indefinitely (see `LOG_OVERRIDES_QUIET_GIT_MS`).
+  const gitLongQuiet = newestGit !== null && now - newestGit > logOverrideMs
+  if (log !== null && now - log <= graceMs && !gitLongQuiet) {
+    return { verdict: 'alive', judgedOn: 'log', ageMs: now - log, detail: `log written ${minutes(now - log)} min ago` }
+  }
+  if (newestGit === null) {
+    return { verdict: 'unmeasurable', judgedOn: 'none', ageMs: null, detail: 'no worktree and no branch could be read' }
+  }
+  return {
+    verdict: 'quiet',
+    judgedOn: 'git',
+    ageMs: now - newestGit,
+    detail: `no commit and no git activity for ${minutes(now - newestGit)} min`,
+  }
+}
+
+/**
+ * MAY THIS AGENT BE REPLACED? PURE. Takes the verdict above.
+ * Returns { respawn, reason, judgedOn, detail }.
+ *
+ * Only a measurable, quiet output permits it. 'alive' and 'unmeasurable' both
+ * refuse — the second because "I could not look" must never read as "it is gone",
+ * the same asymmetry `GIT_STATE_UNVERIFIABLE` enforces on the release side.
+ */
+export function respawnDecision({ output } = {}) {
+  const o = output ?? { verdict: 'unmeasurable', judgedOn: 'none', detail: 'nothing probed' }
+  if (o.verdict === 'alive') return { respawn: false, reason: 'agent-alive', judgedOn: o.judgedOn, detail: o.detail }
+  if (o.verdict === 'quiet') return { respawn: true, reason: 'output-quiet', judgedOn: o.judgedOn, detail: o.detail }
+  return { respawn: false, reason: 'output-unmeasurable', judgedOn: o.judgedOn ?? 'none', detail: o.detail ?? '' }
 }
 
 // ---------------------------------------------------------------------------
@@ -596,6 +793,7 @@ export function assessOwnerWork({ declaration, lock, now, maxAgeMs = LAUNCHER_WO
     reason: 'no-declaration',
     summary: '',
     items: [],
+    judgedOn: 'none',
     ...o,
   })
   if (!declaration || typeof declaration !== 'object' || typeof declaration.at !== 'number') return out({})
@@ -620,7 +818,10 @@ export function assessOwnerWork({ declaration, lock, now, maxAgeMs = LAUNCHER_WO
   const items = evidence.map((e) => checkEvidence(e, { now, ...probes }))
   const summary = items.map((i) => `${i.describe} — ${i.detail}`).join('; ')
   const answerable = items.filter((i) => !UNANSWERABLE_DETAILS.has(i.detail))
-  if (answerable.length === 0) return out({ declared: current, declaredAt, reason: 'unanswerable', summary, items })
+  const judgedOn = evidenceVerdict(items).judgedOn
+  if (answerable.length === 0) {
+    return out({ declared: current, declaredAt, reason: 'unanswerable', summary, items, judgedOn })
+  }
 
   const advancing = answerable.some((i) => i.ok)
   return out({
@@ -630,13 +831,29 @@ export function assessOwnerWork({ declaration, lock, now, maxAgeMs = LAUNCHER_WO
     reason: advancing ? 'advancing' : current ? 'no-progress' : 'expired',
     summary,
     items,
+    judgedOn,
   })
 }
 
-/** The one line the guard puts in the boundary log and in its allow message. */
+/** How the reported evidence kind reads in a sentence. */
+const JUDGED_ON_WORDS = {
+  git: 'the work’s own git output',
+  process: 'a live process (no git output)',
+  log: 'a log file only — the weakest evidence there is',
+  none: 'nothing that still checks out',
+}
+
+/** The one line the guard puts in the boundary log and in its allow message.
+ *  It NAMES the evidence the verdict rests on (point 434 (5)): the 30.07 mistake
+ *  was invisible because the verdict never said which source had answered. */
 export function describeInFlight(assessment, declaration) {
   const what = declaration?.waitingOn ? String(declaration.waitingOn) : 'in-flight work'
   const mins = Number.isFinite(assessment?.ageMs) ? Math.round(assessment.ageMs / 60000) : null
   const age = mins === null ? '' : ` (declared ${mins} min ago)`
-  return `${what}${age}: ${assessment?.summary || 'no evidence'}`
+  const on = JUDGED_ON_WORDS[assessment?.judgedOn] ?? JUDGED_ON_WORDS.none
+  const ignored =
+    Array.isArray(assessment?.ignored) && assessment.ignored.length > 0
+      ? ` [silent but NOT counted as dead: ${assessment.ignored.join('; ')}]`
+      : ''
+  return `${what}${age}: ${assessment?.summary || 'no evidence'} — judged on ${on}${ignored}`
 }
