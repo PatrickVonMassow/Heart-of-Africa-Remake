@@ -27,6 +27,7 @@ import {
   claimIsBounded,
   claimWriteDecision,
   describeClaim,
+  ownerIsHolding,
   releaseDecision,
   reservationDecision,
 } from './batch-claim-core.mjs'
@@ -131,6 +132,30 @@ describe('assessClaim — a claim only ever moves the batch when it is provably 
     const claim = claimOf({ at: NOW - 10 * 60 * 1000 })
     expect(asOwner(claim).honour).toBe(true)
     expect(asOwner(claim, { maxAgeMs: 5 * 60 * 1000 })).toMatchObject({ honour: false, reason: 'expired' })
+  })
+
+  it('THE LAUNCHER\'S OWN pending-spawn lock is NOBODY to wait for', () => {
+    // Four-eyes review (Fable 5, 30.07.2026), finding 1. Read as mere lock
+    // EXISTENCE, `ownerHolding` also matched the launcher's placeholder — and
+    // that closed a loop out of the crash path: the launcher reaps the dead
+    // owner and spawns, the successor's resume hook reads `ownerHolding` off the
+    // launcher's OWN pending lock, honours the claim with no aging, stands down
+    // without converting the spawn, and the next tick spawns again. Forever.
+    const pending = { sessionId: 'launcher-abcdef', kind: 'pending-spawn', pid: 12345 }
+    expect(ownerIsHolding({ lock: pending, claimantSid: CLAIMANT, alive: true })).toBe(false)
+    // A live SESSION owner is what the words mean…
+    expect(ownerIsHolding({ lock: { sessionId: OWNER }, claimantSid: CLAIMANT, alive: true })).toBe(true)
+    // …a DEAD one is not, and neither is the claimant's own lock or no lock.
+    expect(ownerIsHolding({ lock: { sessionId: OWNER }, claimantSid: CLAIMANT, alive: false })).toBe(false)
+    expect(ownerIsHolding({ lock: { sessionId: CLAIMANT }, claimantSid: CLAIMANT, alive: true })).toBe(false)
+    expect(ownerIsHolding({ lock: null, alive: true })).toBe(false)
+    expect(ownerIsHolding()).toBe(false)
+    // …and with nobody to wait for, the take-up window bites as it must.
+    expect(
+      asOwner(claimOf({ at: NOW - CLAIM_MAX_AGE_MS - 1 }), {
+        ownerHolding: ownerIsHolding({ lock: pending, claimantSid: CLAIMANT, alive: true }),
+      }).reason,
+    ).toBe('expired')
   })
 
   it('INDEPENDENCE: it decides with no lock, no launcher and no in-flight declaration', () => {

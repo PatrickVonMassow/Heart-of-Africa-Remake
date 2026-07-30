@@ -82,6 +82,32 @@ export function claimIsBounded(claim) {
   return typeof claim?.by === 'string' && claim.by.trim() !== ''
 }
 
+/**
+ * IS THERE ANYBODY TO WAIT FOR — the input `assessClaim` suspends its clock on.
+ * PURE, so both readers derive it the same way and cannot drift apart.
+ *
+ * IT IS NOT LOCK EXISTENCE (four-eyes review, Fable 5, 30.07.2026, finding 1).
+ * Derived as `!!lock?.sessionId` it also matched the LAUNCHER's `pending-spawn`
+ * placeholder, whose session id is a `launcher-<uuid>` and whose process is a
+ * `claude -p` still booting. That produced a loop out of the crash path: the
+ * launcher reads the claim with no owner (`ownerHolding` false), finds it
+ * expired, reaps the dead owner and spawns — and the successor's resume hook
+ * then read `ownerHolding` off the launcher's OWN pending lock, honoured the
+ * claim with no aging, stood down without converting the pending spawn, and the
+ * next tick spawned again. Two readers disagreeing about one state is the
+ * disease this point was written for, so the predicate demands what the words
+ * mean: a LIVE SESSION owner, and never the claimant itself.
+ *
+ * `alive` is the caller's `assessOwner(...).alive` — the lock's own liveness
+ * rule, not a second one invented here.
+ */
+export function ownerIsHolding({ lock = null, claimantSid = '', alive = false } = {}) {
+  if (!lock || typeof lock.sessionId !== 'string' || !lock.sessionId) return false
+  if (lock.kind === 'pending-spawn') return false
+  if (claimantSid && lock.sessionId === claimantSid) return false
+  return alive === true
+}
+
 /** What the git probe answers when it could not find OUT (a timeout under load, a
  *  git that would not run) — as opposed to `null`, which means it looked and found
  *  nothing half-done. The two must not collapse into one value: "I could not look"

@@ -41,6 +41,7 @@ import {
   assessClaim,
   claimWriteDecision,
   describeClaim,
+  ownerIsHolding,
   releaseDecision,
   CLAIM_MAX_AGE_MS,
   GIT_STATE_UNVERIFIABLE,
@@ -139,16 +140,25 @@ export function gatherClaim(
         : ourClaudeProcess(sid, { lockPath })
   }
   const lock = ownerLock === undefined ? readOwnerLock(lockPath) : ownerLock
+  // IS THERE ANYBODY TO WAIT FOR (point 434 (6a))? While a LIVE SESSION owner
+  // holds the lock the claim does not age out under that owner's own long turns;
+  // with nobody holding, the take-up window applies again so an untaken claim can
+  // never leave the batch ownerless. The predicate is `ownerIsHolding` — lock
+  // existence alone would also match the launcher's pending-spawn placeholder
+  // (four-eyes review, finding 1).
+  const ownerHolding = ownerIsHolding({
+    lock,
+    claimantSid: claim.sessionId,
+    alive: lock
+      ? assessOwner(lock, { now, bootTime: bootTimeMs(), probe: lock.pid ? probePid(lock.pid) : null }).alive === true
+      : false,
+  })
   const assessment = assessClaim({
     claim,
     sid,
     ancestor: identity,
     ownerSid: lock?.sessionId ?? '',
-    // IS THERE ANYBODY TO WAIT FOR (point 434 (6a))? A lock held by someone other
-    // than the claimant is exactly that, and while it stands the claim does not
-    // age out under the owner's own long turns. With no lock the take-up window
-    // applies again, so an untaken claim can never leave the batch ownerless.
-    ownerHolding: !!lock?.sessionId && lock.sessionId !== claim.sessionId,
+    ownerHolding,
     now,
     maxAgeMs: maxAgeMs(env),
     probePid,
@@ -231,7 +241,8 @@ if (isMain) {
     ? assessOwner(lock, { now, bootTime: bootTimeMs(), probe: lock.pid ? probePid(lock.pid) : null })
     : { alive: false, reason: 'no-lock' }
 
-  const ownerHolding = !!lock?.sessionId && ownerAlive.alive === true
+  const holdingFor = (other) =>
+    ownerIsHolding({ lock, claimantSid: other?.sessionId ?? '', alive: ownerAlive.alive === true })
 
   if (has('--status')) {
     const claim = readClaim()
@@ -239,7 +250,7 @@ if (isMain) {
       claim,
       sid,
       ownerSid: lock?.sessionId ?? '',
-      ownerHolding: ownerHolding && lock.sessionId !== claim?.sessionId,
+      ownerHolding: holdingFor(claim),
       now,
       maxAgeMs: maxAgeMs(),
       probePid,
@@ -267,8 +278,9 @@ if (isMain) {
               'delegated agent or a verification is still running. While it holds the lock this claim does NOT ' +
               'age out; it ends when the claiming window closes.'
             : 'No live owner holds the batch — re-run the claim with --session <id> and it is yours at once. ' +
-              `Do not wait: with the lock free the claim only reserves it for ${Math.round(maxAgeMs() / 60000)} ` +
-              'min, and then the ordinary handover takes over so the batch is never left ownerless.'),
+              `Do not wait: with no owner to wait for the claim is honoured only for ${Math.round(maxAgeMs() / 60000)} ` +
+              'min from when it was RECORDED, and then the ordinary handover takes over so the batch is never ' +
+              'left ownerless.'),
       )
     } else if (view.reason === 'released') {
       console.log(
@@ -331,7 +343,7 @@ if (isMain) {
     existing,
     sid,
     ancestor,
-    ownerHolding: ownerHolding && lock.sessionId !== existing?.sessionId,
+    ownerHolding: holdingFor(existing),
     now,
     maxAgeMs: maxAgeMs(),
     probePid,
@@ -372,8 +384,10 @@ if (isMain) {
       ` Re-run \`node scripts/batch-claim.mjs --session ${sid}\` to take the batch once it is free — the same ` +
       'command claims and takes. WHILE THAT OWNER LIVES the claim does NOT age out (point 434): it holds for as ' +
       'long as THIS window is open and is ignored outright the moment it closes, so a long verification in the ' +
-      'other session can no longer let the takeover lapse unnoticed. ONCE THE LOCK IS FREE the clock starts: the ' +
-      `claim then reserves the batch for ${mins} min, and after that the ordinary handover takes over rather ` +
-      'than leaving the batch ownerless — so re-run the command promptly once the release is reported.',
+      'other session can no longer let the takeover lapse unnoticed. WITH NO LIVE OWNER it is honoured for ' +
+      `${mins} min from NOW — the moment it was recorded — and then the ordinary handover takes over rather than ` +
+      'leaving the batch ownerless. And once the owner has RELEASED for it the claim is spent: the lock is free ' +
+      'and the first window to acquire wins, so re-run this command AT ONCE when the release is reported; if the ' +
+      'launcher got there first, claim again against the new owner.',
   )
 }

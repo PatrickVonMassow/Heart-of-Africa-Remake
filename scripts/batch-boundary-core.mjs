@@ -392,11 +392,17 @@ export function boundaryCardText({ point, destination, claimantSid = null } = {}
   const n = Number.isInteger(Number(point)) && Number(point) > 0 ? Number(point) : null
   const head = n === null ? 'Der Punkt ist abgeschlossen.' : `Punkt ${n} ist abgeschlossen.`
   if (destination === BOUNDARY_DESTINATIONS.CLAIMING_WINDOW && claimantSid) {
+    // The reservation is stated with its LIMIT, not as a promise: it holds until
+    // the lock is released for that window, and from then on the first window to
+    // acquire wins (a released claim is spent — see `assessClaim`). Promising
+    // more would repeat, one step later, the very misdirection this card was
+    // rewritten to remove (four-eyes review, finding 2).
     return (
       `${head} Der Stapel geht NICHT an eine frische Sitzung: Fenster ${claimantSid} hat ihn beansprucht, der ` +
       'Launcher hält den Start deshalb zurück und reserviert den Stapel für dieses Fenster. Weitergearbeitet ' +
       `wird dort, sobald es den Anspruch einlöst (\`node scripts/batch-claim.mjs --session ${claimantSid}\`). ` +
-      'Hier läuft nichts weiter.'
+      'Löst es ihn nach der Freigabe nicht gleich ein, greift die gewöhnliche Übergabe — der Stapel bleibt ' +
+      'nie ohne Eigentümer. Hier läuft nichts weiter.'
     )
   }
   return (

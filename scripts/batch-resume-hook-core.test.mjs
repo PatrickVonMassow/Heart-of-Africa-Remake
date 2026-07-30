@@ -183,21 +183,25 @@ describe('the other stand-downs stay honest', () => {
       const { text } = standDownMessage({ sessionId: 's1', now, takeUpMs: 30 * 60 * 1000, ...c })
       // …that it does NOT expire while an owner holds — the half that made the
       // old 30-minute deadline wrong…
-      expect(text).toContain('while a live owner holds the lock the claim does NOT expire')
+      expect(text).toContain('while a LIVE owner holds the lock the claim does NOT expire')
       expect(text).toContain('as long as THIS window is open')
-      // …and that the free lock is only reserved for the take-up window.
-      expect(text).toContain('reserves the batch for 30 min')
+      // …that with nobody to wait for it is bounded FROM WHEN IT WAS RECORDED,
+      // which is the clock the code actually runs (`ageMs` counts from
+      // `claim.at`, never from the moment the lock fell free)…
+      expect(text).toContain('honoured for 30 min FROM WHEN IT WAS RECORDED')
       expect(text).toContain('ordinary handover')
+      // …and that a release ends the claim rather than reserving anything.
+      expect(text).toContain('the first window to acquire wins')
     }
   })
 
   it('prints the calibrated take-up window rather than a hard-coded number', () => {
     expect(standDownMessage({ sessionId: 's1', lock: liveLock, takeUpMs: 45 * 60 * 1000, now }).text).toContain(
-      'reserves the batch for 45 min',
+      'honoured for 45 min FROM WHEN IT WAS RECORDED',
     )
     // A nonsense window falls back to the default rather than to zero minutes.
     expect(standDownMessage({ sessionId: 's1', lock: liveLock, takeUpMs: 'bald', now }).text).toContain(
-      `reserves the batch for ${CLAIM_MAX_AGE_MS / 60000} min`,
+      `honoured for ${CLAIM_MAX_AGE_MS / 60000} min FROM WHEN IT WAS RECORDED`,
     )
   })
 

@@ -80,11 +80,13 @@ function wayBack(sessionId, takeUpMin) {
     `\`node scripts/batch-claim.mjs --session ${sessionId}\` — that claims the batch, the owning session ` +
     'releases it at its next CLEAN turn end (never mid-merge, never with a delegated agent or a ' +
     'verification still running), and re-running the SAME command takes it. Nothing else is needed from ' +
-    'the user. THE CLOCK, stated rather than hidden: while a live owner holds the lock the claim does NOT ' +
-    'expire — it holds for as long as THIS window is open and is ignored the moment it closes; but once the ' +
-    `lock is FREE the claim only reserves the batch for ${takeUpMin} min, and after that the ordinary handover ` +
-    'takes over so the batch is never left ownerless. So re-run the command promptly once the release is ' +
-    'reported. To inspect first: `node scripts/batch-claim.mjs --status`.'
+    'the user. THE CLOCK, stated rather than hidden: while a LIVE owner holds the lock the claim does NOT ' +
+    'expire — it holds for as long as THIS window is open and is ignored the moment it closes. With NO live ' +
+    `owner it is honoured for ${takeUpMin} min FROM WHEN IT WAS RECORDED, and after that the ordinary handover ` +
+    'takes over so the batch is never left ownerless. And once the owner has RELEASED for it the claim is ' +
+    'spent: the lock is free and the first window to acquire wins, so re-run the command AT ONCE — if the ' +
+    'launcher got there first, simply claim again against the new owner. To inspect: ' +
+    '`node scripts/batch-claim.mjs --status`.'
   )
 }
 

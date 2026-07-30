@@ -21,6 +21,7 @@ import {
   IN_FLIGHT_MAX_AGE_MS,
   LAUNCHER_WORK_MAX_AGE_MS,
   LOG_FRESH_MS,
+  LOG_OVERRIDES_QUIET_GIT_MS,
   RESPAWN_GRACE_MS,
   WORK_FRESH_MS,
   agentOutputVerdict,
@@ -520,6 +521,19 @@ describe('agentOutputVerdict / respawnDecision — an agent is judged by what it
     const v = verdict({ worktreeAt: NOW - RESPAWN_GRACE_MS - 1, logAt: NOW - 60 * 1000 })
     expect(v).toMatchObject({ verdict: 'alive', judgedOn: 'log' })
     expect(respawnDecision({ output: v }).respawn).toBe(false)
+  })
+
+  it('…but a printing loop cannot make an agent UNREPLACEABLE (four-eyes finding 4)', () => {
+    // A fresh log refuses the respawn, and must not refuse it forever: an agent
+    // wedged printing while its output stands still would otherwise be
+    // replaceable only by hand — a standstill of the kind this point ends.
+    const wedged = verdict({ worktreeAt: NOW - LOG_OVERRIDES_QUIET_GIT_MS - 1, logAt: NOW - 60 * 1000 })
+    expect(wedged).toMatchObject({ verdict: 'quiet', judgedOn: 'git' })
+    expect(respawnDecision({ output: wedged }).respawn).toBe(true)
+    // Just inside the bound the log still holds, so thinking aloud for a while
+    // is never punished.
+    expect(verdict({ worktreeAt: NOW - LOG_OVERRIDES_QUIET_GIT_MS, logAt: NOW - 60 * 1000 }).verdict).toBe('alive')
+    expect(LOG_OVERRIDES_QUIET_GIT_MS).toBeGreaterThan(RESPAWN_GRACE_MS)
   })
 
   it('is wider than the WAIT window, because the two mistakes cost differently', () => {

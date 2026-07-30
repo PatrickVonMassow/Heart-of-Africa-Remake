@@ -148,6 +148,16 @@ export const EVIDENCE_KINDS = ['pid', 'branch', 'worktree', 'log']
  * silent log beside moving output never supports the conclusion "dead", and
  * output that is still moving needs no deadline to stay honest (see
  * `assessInFlight`).
+ *
+ * ONE CAVEAT, named rather than hidden (four-eyes review, Fable 5, finding 5):
+ * `worktreeActiveAt` reads the gitdir's index/HEAD mtimes, and a supervisor that
+ * runs `git status` inside an agent's worktree refreshes the index from OUTSIDE
+ * — so a dead agent's worktree can be made to look active by somebody looking at
+ * it. The branch stamp (`refTipAt`) is commit-based and has no such path. It is
+ * left as it is because the alternative is worse in the common case (an agent
+ * normally declares its worktree and nothing else, and requiring a commit would
+ * re-open the 45-minute expiry this point closed), but a declaration that names
+ * BOTH is strictly the stronger one, and the respawn check below asks for both.
  */
 export const OUTPUT_KINDS = new Set(['branch', 'worktree'])
 
@@ -453,6 +463,19 @@ export function assessInFlight({
 export const RESPAWN_GRACE_MS = 30 * 60 * 1000
 
 /**
+ * How long a FRESH LOG may keep an agent alive whose git output could be measured
+ * and has stood still (four-eyes review, Fable 5, 30.07.2026, finding 4).
+ *
+ * A fresh log is genuine evidence that something is happening, so it refuses the
+ * respawn — but it must not refuse it FOREVER: an agent wedged in a printing loop
+ * would then be unreplaceable except by hand, which is a standstill of exactly the
+ * kind this point exists to end. Past this bound, measured-quiet output outranks
+ * a log that has produced nothing but lines. Twice the grace, so an agent that
+ * simply thinks aloud for a while is never touched.
+ */
+export const LOG_OVERRIDES_QUIET_GIT_MS = 2 * RESPAWN_GRACE_MS
+
+/**
  * IS A DELEGATED AGENT STILL PRODUCING? PURE — every stamp is injected as epoch
  * ms, or null where the probe could not answer.
  *
@@ -470,6 +493,7 @@ export function agentOutputVerdict({
   logAt = null,
   now,
   graceMs = RESPAWN_GRACE_MS,
+  logOverrideMs = LOG_OVERRIDES_QUIET_GIT_MS,
 } = {}) {
   const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null)
   const git = [num(worktreeAt), num(branchTipAt)].filter((v) => v !== null)
@@ -483,9 +507,11 @@ export function agentOutputVerdict({
       detail: `git output ${minutes(now - newestGit)} min old`,
     }
   }
-  if (log !== null && now - log <= graceMs) {
-    // The log is the weakest source, but a FRESH one still means something is
-    // happening — it is only SILENCE that proves nothing.
+  // A FRESH log is genuine evidence that something is happening — it is only
+  // SILENCE that proves nothing — but it may not outrank measured, quiet output
+  // indefinitely (see `LOG_OVERRIDES_QUIET_GIT_MS`).
+  const gitLongQuiet = newestGit !== null && now - newestGit > logOverrideMs
+  if (log !== null && now - log <= graceMs && !gitLongQuiet) {
     return { verdict: 'alive', judgedOn: 'log', ageMs: now - log, detail: `log written ${minutes(now - log)} min ago` }
   }
   if (newestGit === null) {

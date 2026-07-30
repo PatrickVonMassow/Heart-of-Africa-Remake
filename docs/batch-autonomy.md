@@ -561,11 +561,16 @@ evidence (`agentOutputVerdict` / `respawnDecision`). Three rules, all from the
 30.07 incident: git activity is the primary evidence and its window
 (`RESPAWN_GRACE_MS`, 30 min) is deliberately WIDER than the wait's, because
 killing a live agent costs everything it built and then costs the rebuild too; a
-fresh log still refuses (only SILENCE proves nothing); and where neither worktree
-nor branch can be read the answer is `unmeasurable`, which refuses as well — "I
-could not look" must never read as "it is gone". Run it AGAIN in the seconds
-before the spawn: on 30.07 the branch tip moved one minute before the replacement
-was started.
+fresh log still refuses (only SILENCE proves nothing) — but not forever: past
+`LOG_OVERRIDES_QUIET_GIT_MS` (twice the grace) measured-quiet output outranks it,
+or an agent wedged in a printing loop would be replaceable only by hand; and where
+neither worktree nor branch can be read the answer is `unmeasurable`, which refuses
+as well — "I could not look" must never read as "it is gone". Run it AGAIN in the
+seconds before the spawn: on 30.07 the branch tip moved one minute before the
+replacement was started. Name BOTH the worktree and the branch where you can: the
+worktree stamp reads gitdir mtimes, which a supervisor's own `git status` inside
+that worktree refreshes from outside, while the branch stamp is commit-based and
+has no such path (four-eyes review, finding 5).
 
 Decision logic: `scripts/batch-in-flight-core.mjs` (pure, dependency-injected,
 Vitest-covered in `scripts/batch-in-flight-core.test.mjs`). IO and probes:
@@ -911,11 +916,17 @@ session — the failure the whole singleton exists to prevent.
    chat watcher's responder claim, whose recorded pid is the WATCHER's and
    therefore no bound on the errand at all; `claimIsBounded`), and a claim with
    **nobody left to wait for**. In that second case `CLAIM_MAX_AGE_MS` (30 min,
-   `HOA_CLAIM_MAX_MIN`) is the **take-up window**: the lock is free, the claiming
-   window has that long to run its command, and after it the ordinary handover
-   takes over so the batch is never left ownerless. `assessClaim`'s `ownerHolding`
-   defaults to FALSE, so a caller that cannot answer gets the bounded reading —
-   the direction that can never strand the batch.
+   `HOA_CLAIM_MAX_MIN`) bounds it — counted, like every age here, **from when the
+   claim was recorded**, never from the moment the lock fell free — and after it the
+   ordinary handover takes over so the batch is never left ownerless. `assessClaim`'s
+   `ownerHolding` defaults to FALSE, so a caller that cannot answer gets the bounded
+   reading, the direction that can never strand the batch. And it means a LIVE
+   SESSION owner and nothing else (`ownerIsHolding`): read as bare lock existence it
+   also matched the launcher's own `pending-spawn` placeholder, and the crash path
+   then closed a loop — the launcher reaps the dead owner and spawns, the successor
+   reads `ownerHolding` off that placeholder, honours the claim with no aging, stands
+   down without converting the spawn, and the next tick spawns again (four-eyes
+   review, Fable 5, 30.07.2026).
 1a. **A RELEASED claim is NOT a claim** (point 434 (6c), measured 30.07.2026
    10:10-10:16). A record with `releasedAt` AND `releasedBy` both set was still
    honoured: the owning session released to it, the claiming window never took it,
@@ -928,7 +939,13 @@ session — the failure the whole singleton exists to prevent.
    straight over it. The claimant loses only the reservation — the lock is FREE
    and its own re-run of `batch-claim.mjs --session <id>` still takes it — and the
    batch gains that a release with no live taker falls back to the ordinary
-   handover rather than standing ownerless.
+   handover rather than standing ownerless. THE PRICE, stated because the texts
+   must not promise otherwise: from the release on, the first window to acquire
+   wins, so an attended user can lose the lock to a launcher tick and then has to
+   claim again against the new owner. That is the deliberate trade — a race that
+   costs one command against an hour with no owner at all — and every text that
+   mentions the release says it (the stand-down's way back, the claim CLI, and the
+   German boundary card's closing sentence).
 2. **The claimant must be ALIVE, by IDENTITY.** The recorded pid must exist AND
    have started when the claim says — a reused pid is a stranger. Same rule
    `checkEvidence` applies to a declared background run; `resolveOwnership`
