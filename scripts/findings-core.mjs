@@ -216,17 +216,48 @@ export function turnCalls(transcriptText, turnStartedAt) {
 }
 
 /**
+ * Does this turn TAKE the session boundary? (point 462)
+ *
+ * `batch-boundary.mjs <point>` records the boundary; `--status`, `--clear` and
+ * the bare call only read. The distinction matters because the request gate
+ * below fires at the boundary and nowhere else: it is the one moment an owner
+ * may write TASKS.md, and a gate that fired on every turn end would demand
+ * something a mid-branch owner cannot do.
+ */
+export function turnTakesBoundary(calls = []) {
+  for (const call of Array.isArray(calls) ? calls : []) {
+    if (!SHELL_TOOLS.has(String(call?.name ?? ''))) continue
+    for (const segment of segments(call.command)) {
+      if (!/^(?:\S*node\s+)?\S*batch-boundary\.mjs\b/.test(segment)) continue
+      const words = segment.split(/\s+/).filter(Boolean)
+      const at = words.findIndex((w) => /batch-boundary\.mjs$/.test(w))
+      if (words.slice(at + 1).some((w) => /^\d+$/.test(w))) return true
+    }
+  }
+  return false
+}
+
+/**
  * Judge the turn.
  *
  * Inputs (all plain data):
- *   tally          from tallyTurn()
- *   ownsBatch      does this session hold the batch lock
- *   carrierPending how many findings still sit in the memory carrier
- *   threshold      override for DEFAULT_THRESHOLD (tests inject their own)
+ *   tally           from tallyTurn()
+ *   ownsBatch       does this session hold the batch lock
+ *   carrierPending  how many FINDINGS still sit in the memory carrier
+ *   carrierRequests how many REQUESTS still sit there (point 462)
+ *   atBoundary      is this turn taking the session boundary
+ *   threshold       override for DEFAULT_THRESHOLD (tests inject their own)
  *
  * Returns { ok, violations: [{ kind, detail }] }.
  */
-export function auditFindings({ tally, ownsBatch = false, carrierPending = 0, threshold = DEFAULT_THRESHOLD } = {}) {
+export function auditFindings({
+  tally,
+  ownsBatch = false,
+  carrierPending = 0,
+  carrierRequests = 0,
+  atBoundary = false,
+  threshold = DEFAULT_THRESHOLD,
+} = {}) {
   const t = tally ?? { investigative: 0, agents: 0, records: [] }
   const records = Array.isArray(t.records) ? t.records : []
   const violations = []
@@ -257,6 +288,24 @@ export function auditFindings({ tally, ownsBatch = false, carrierPending = 0, th
     })
   }
 
+  // THE REQUEST GATE IS THE POINT BOUNDARY (point 462). A request is a FINISHED
+  // spec deposited by a window the user talked to; only the owner may append it,
+  // and only where it may write TASKS.md at all — which is the boundary, not
+  // every turn end. Demanding it mid-branch would block a session for something
+  // the workflow forbids it to do, and that is how a guard gets routed around.
+  if (ownsBatch && atBoundary && Number(carrierRequests) > 0) {
+    violations.push({
+      kind: 'request-not-queued',
+      detail:
+        `${carrierRequests} Anfrage(n) eines anderen Fensters liegen im Träger, und diese Sitzung nimmt gerade ` +
+        'die Grenze. Der Nutzer hat sie einem Fenster gesagt, das den Stapel nicht hielt — ohne Übernahme ' +
+        'sterben sie hier. Spec ansehen: node scripts/finding.mjs --show "<Titel>", dann VERBATIM in ' +
+        'TASKS.md anhängen und node scripts/finding.mjs --queued "<Titel>" --point <N>. Offene Fragen ' +
+        'gehen NIE in den Arbeitsauftrag, sondern als Karte an den Nutzer; undurchführbar: ' +
+        'node scripts/finding.mjs --blocked "<Titel>" --why "<Grund>". Danach die Grenze erneut nehmen.',
+    })
+  }
+
   return { ok: violations.length === 0, violations }
 }
 
@@ -279,21 +328,64 @@ export function formatFindings(violations) {
 //   - [ ] <ISO> · <session> · <title>
 //         <detail>
 // `- [ ]` is pending, `- [x]` has reached the work order.
+//
+// A REQUEST (point 462) is the same carrier with a second kind: a window the
+// user is TALKING TO writes the finished spec, the owner appends it verbatim.
+// Its head names the kind and its state, and its body carries the fields
+// (findings-request-core.mjs owns those):
+//   - [ ] <ISO> · <session> · [request] · pending · <title>
+//         #spec … #why … #quotes …
+// `pending` → `queued <point>` on the drain, or `blocked` when it cannot be.
 
-/** Parse the carrier's entries out of its markdown. */
+/** The marker that makes a carrier entry a request rather than a finding. */
+export const REQUEST_MARKER = '[request]'
+
+/** The field separator of a head line — one place, both kinds. */
+export const HEAD_SEP = ' · '
+
+/**
+ * One head line as plain data, or null when the line is not a well-formed head.
+ * Returning null for a BROKEN request head is deliberate: `malformedEntries`
+ * reads the same function, so a hand edit that lost the state field is warned
+ * about instead of silently counting as a finding titled "[request] · …".
+ */
+export function parseHead(line) {
+  const m = /^- \[( |x)\] (\S+) · (\S+) · (.*)$/.exec(String(line ?? ''))
+  if (!m) return null
+  const done = m[1] === 'x'
+  const base = { done, at: m[2], session: m[3] }
+  const prefix = `${REQUEST_MARKER}${HEAD_SEP}`
+  if (!m[4].startsWith(prefix)) return { ...base, kind: 'finding', state: done ? 'drained' : 'pending', title: m[4] }
+  const tail = m[4].slice(prefix.length)
+  const cut = tail.indexOf(HEAD_SEP)
+  if (cut < 0) return null
+  return { ...base, kind: 'request', state: tail.slice(0, cut).trim(), title: tail.slice(cut + HEAD_SEP.length) }
+}
+
+/**
+ * Parse the carrier's entries out of its markdown.
+ *
+ * `pending` holds the waiting FINDINGS and `requests` the waiting REQUESTS —
+ * separately, because the two are gated at different moments (see
+ * `auditFindings`). Anything already retired counts as drained, whichever kind.
+ */
 export function parseCarrier(text = '') {
   const pending = []
+  const requests = []
   let drained = 0
   for (const line of String(text ?? '').split(/\r?\n/)) {
-    const m = /^- \[( |x)\] (\S+) · (\S+) · (.*)$/.exec(line)
-    if (!m) continue
-    if (m[1] === 'x') {
+    const head = parseHead(line)
+    if (!head) continue
+    const waiting = !head.done && head.state === 'pending'
+    if (!waiting) {
       drained++
       continue
     }
-    pending.push({ at: m[2], session: m[3], title: m[4] })
+    const entry = { at: head.at, session: head.session, title: head.title }
+    if (head.kind === 'request') requests.push(entry)
+    else pending.push(entry)
   }
-  return { pending, drained }
+  return { pending, requests, drained }
 }
 
 /** Render one carrier entry (title is single-line; detail is indented under it). */
@@ -317,20 +409,32 @@ export function carrierEntry({ at, session, title, detail }) {
  * retiring the wrong finding while saying the right one.
  */
 export function markDrained(text, title) {
-  const needle = String(title ?? '').trim().toLowerCase()
-  if (!needle) return null
-  const lines = String(text ?? '').split(/\r?\n/)
-  const hits = []
-  for (let i = 0; i < lines.length; i++) {
-    const m = /^- \[ \] (\S+) · (\S+) · (.*)$/.exec(lines[i])
-    if (!m) continue
-    if (!m[3].toLowerCase().includes(needle)) continue
-    hits.push({ index: i, title: m[3] })
-  }
-  if (hits.length === 0) return null
+  const hits = findPending(text, title, 'finding')
+  if (hits === null || hits.length === 0) return null
   if (hits.length > 1) return { ambiguous: hits.map((h) => h.title) }
+  const lines = String(text ?? '').split(/\r?\n/)
   lines[hits[0].index] = lines[hits[0].index].replace('- [ ] ', '- [x] ')
   return { text: lines.join('\n'), title: hits[0].title }
+}
+
+/**
+ * The waiting entries of ONE kind whose title contains `needle`, as
+ * [{ index, title, head }] — the lookup both `markDrained` and the request
+ * transitions share, so "which entry did you mean" is decided in one place.
+ * Returns null on an empty needle.
+ */
+export function findPending(text, title, kind = 'finding') {
+  const needle = String(title ?? '').trim().toLowerCase()
+  if (!needle) return null
+  const hits = []
+  const lines = String(text ?? '').split(/\r?\n/)
+  for (let i = 0; i < lines.length; i++) {
+    const head = parseHead(lines[i])
+    if (!head || head.kind !== kind || head.done || head.state !== 'pending') continue
+    if (!head.title.toLowerCase().includes(needle)) continue
+    hits.push({ index: i, title: head.title, head })
+  }
+  return hits
 }
 
 /** Lines that look like an entry but do not parse — a hand edit that broke the
@@ -340,7 +444,7 @@ export function malformedEntries(text = '') {
   const bad = []
   for (const line of String(text ?? '').split(/\r?\n/)) {
     if (!/^- \[[ x]\] /.test(line)) continue
-    if (/^- \[[ x]\] (\S+) · (\S+) · (.*)$/.test(line)) continue
+    if (parseHead(line)) continue
     bad.push(line.trim())
   }
   return bad
