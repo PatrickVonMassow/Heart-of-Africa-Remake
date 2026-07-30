@@ -98,8 +98,12 @@ const MANDATE_MAX_AGE_MS = 15 * 60 * 1000
 
 function readRepoVerdict(nowMs = Date.now()) {
   try {
-    const m = JSON.parse(readFileSync(MANDATE_PATH, 'utf8'))
+    const raw = readFileSync(MANDATE_PATH, 'utf8')
+    // Deleted BEFORE it is parsed (four-eyes re-review, finding 2): a corrupt marker
+    // used to throw past the deletion and then be re-parsed at every session start
+    // forever. One-shot means one-shot, readable or not.
     rmSync(MANDATE_PATH, { force: true })
+    const m = JSON.parse(raw)
     if (m && Number.isFinite(m.at) && nowMs - m.at <= MANDATE_MAX_AGE_MS) {
       return { ran: true, code: Number.isFinite(m.code) ? m.code : 1 }
     }

@@ -586,6 +586,12 @@ if (repoVerdict.alert) {
   }
 } else {
   delete state.repoAlertAt
+  // And the MARKER goes with the condition (four-eyes re-review, finding 1). A tick
+  // whose spawn failed leaves one behind; without this line only its 15-minute
+  // expiry keeps the next, CLEAN tick from handing a false "repo not clean" to a
+  // healthy successor — and that expiry equals the tick interval, i.e. about a
+  // minute of margin. One deletion closes the class instead of leaning on timing.
+  rmSync(C('repo-mandate.json'), { force: true })
 }
 if (repoVerdict.mandate) writeJsonAtomic(C('repo-mandate.json'), { at: now, code: repo.code ?? null, reason: repoVerdict.reason })
 
