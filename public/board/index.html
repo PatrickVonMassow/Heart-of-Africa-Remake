@@ -500,13 +500,144 @@
         else chatPair(panel)
       }
 
+      /* HOA-BOARD-SWAP-BEGIN
+         THE REFRESH GATE (point 441).
+
+         The board CONTENT carries its own 30-second refresher: it fetches the
+         published bytes and, when they differ from what <main> holds, replaces
+         <main> wholesale. Two things made that fire on EVERY tick instead of on
+         a real change — the chat is injected INTO <main>, and the board's own
+         localStorage script marks the cards the reader opened with `open`
+         attributes. Neither is in the published bytes, so the refresher's
+         comparison could never hold, and every 30 seconds the reader lost the
+         keyboard, the caret and the scroll position mid-sentence.
+
+         The viewer owns the TRANSPORT, so it gates it: `window.fetch` is
+         wrapped before the board — and with it the refresher — is written into
+         this document, and the wrapper decides per poll whether the refresher
+         gets the fresh bytes at all. Deciding here rather than in the refresher
+         is also what makes it deployable: the refresher is baked into the
+         published board content, this file ships with the site.
+
+         The decision is pure and is unit-tested straight out of this block by
+         scripts/board-viewer-refresh.test.mjs. */
+
+      // How many consecutive polls a half-typed message may hold back. At the
+      // board's 30-second tick that is two minutes: long enough to finish a
+      // sentence, short enough that a field left focused on a phone cannot
+      // freeze the board for ever.
+      const BOARD_HOLD_TICKS = 4
+
+      /**
+       * What a poll should do with the bytes it just fetched.
+       *   'unchanged' — the published board IS the one on screen: touch nothing
+       *   'hold'      — it changed, but the reader is mid-word: try next tick
+       *   'swap'      — render it
+       * `state.held` counts the consecutive holds and is the cap's whole memory.
+       */
+      function boardSwapDecision(state, fetched, rendered, typing) {
+        // Nothing on screen yet: there is no place to keep and nothing to
+        // interrupt, so the very first board is never held back.
+        if (rendered === null) {
+          state.held = 0
+          return 'swap'
+        }
+        if (fetched === rendered) {
+          state.held = 0
+          return 'unchanged'
+        }
+        if (typing && state.held < BOARD_HOLD_TICKS) {
+          state.held += 1
+          return 'hold'
+        }
+        state.held = 0
+        return 'swap'
+      }
+      /* HOA-BOARD-SWAP-END */
+
+      const boardRefresh = { rendered: null, held: 0, scroll: null, gated: false }
+
+      /** True only while the reader is actually writing: the field exists, holds
+       *  the focus, and carries something worth not interrupting. */
+      function chatIsTyping() {
+        const input = document.getElementById('hoa-chat-input')
+        if (!input || document.activeElement !== input) return false
+        return String(input.value || '').trim() !== ''
+      }
+
+      /** A response shaped like the one the refresher expects. `body` is called
+       *  when the refresher asks for the text, never earlier. */
+      const boardResponse = (res, body) => ({
+        ok: true,
+        status: res ? res.status : 200,
+        statusText: res ? res.statusText : 'OK',
+        text: () => Promise.resolve(body()),
+      })
+
+      /** The live <main>, serialised as a whole document. Handed back instead of
+       *  the fetched bytes, it lets the refresher conclude — correctly — that
+       *  nothing changed, which costs the reader's place nothing at all. Read
+       *  LAZILY (see boardResponse): the chat writes into <main> from its own
+       *  poll, and the comparison must see the document as it is at that moment. */
+      function boardMirrorBody() {
+        const main = document.querySelector('main')
+        return '<html><body><main>' + (main ? main.innerHTML : '') + '</main></body></html>'
+      }
+
+      /** Give the reader back the offset the swap scrolled away from. */
+      function boardRestorePlace() {
+        if (boardRefresh.scroll === null) return
+        const y = boardRefresh.scroll
+        boardRefresh.scroll = null
+        try {
+          window.scrollTo(0, y)
+        } catch (e) {
+          /* a host that cannot scroll */
+        }
+      }
+
+      /** Wrap `window.fetch` so every board poll — the viewer's first one and the
+       *  refresher's every 30 s — passes the decision above. Idempotent, and
+       *  installed BEFORE the board is written, because the refresher captures
+       *  whatever `fetch` is at the moment its script runs. */
+      function gateBoardRefresh() {
+        if (boardRefresh.gated || typeof window.fetch !== 'function') return
+        boardRefresh.gated = true
+        const native = window.fetch.bind(window)
+        window.fetch = function (input, init) {
+          const url = typeof input === 'string' ? input : String((input && input.url) || '')
+          if (url.slice(0, SOURCE.length) !== SOURCE) return native(input, init) // the chat's own traffic
+          return native(input, init).then((res) => {
+            if (!res || !res.ok) return res
+            return res.text().then((html) => {
+              const verdict = boardSwapDecision(boardRefresh, html, boardRefresh.rendered, chatIsTyping())
+              if (verdict !== 'swap' && document.querySelector('main')) return boardResponse(res, boardMirrorBody)
+              // A place is only worth keeping once the reader HAS one.
+              if (boardRefresh.rendered !== null) boardRefresh.scroll = window.scrollY
+              boardRefresh.rendered = html
+              return boardResponse(res, () => html)
+            })
+          })
+        }
+      }
+      gateBoardRefresh()
+
       /**
        * Build the chat and put it at the top of whatever document is live now.
        * IDEMPOTENT — it runs after the board render, on the failure path and
        * again on load, and must add exactly one section however often it runs.
        */
+      let chatHost = null
       function injectChat() {
-        if (!document.body || document.getElementById('hoa-chat')) return
+        if (!document.body) return
+        const standing = document.getElementById('hoa-chat')
+        // The section this realm built stays. A COPY — which a swap could carry
+        // in, markup without one of its listeners — is replaced, never trusted:
+        // it would look like a chat and answer to nothing.
+        if (standing) {
+          if (standing === chatHost) return
+          standing.remove()
+        }
         chatStyles()
         const host = chatEl('section', { id: 'hoa-chat' })
         const toggle = chatEl('button', { type: 'button', className: 'chat-toggle', textContent: CHAT_TEXT.title })
@@ -522,6 +653,7 @@
         const sub = document.querySelector('main h1 + .sub') ?? document.querySelector('main h1')
         if (sub && sub.parentNode) sub.parentNode.insertBefore(host, sub.nextSibling)
         else document.body.insertBefore(host, document.body.firstChild)
+        chatHost = host
         // A REBUILD MUST NOT CLOSE THE CHAT (point 423). The board swaps its
         // content every 30 seconds, so this runs again and again while the
         // reader has the panel open; leaving it collapsed would look exactly
@@ -547,8 +679,19 @@
         if (!main || main === chatWatchedMain) return
         chatWatchedMain = main
         new MutationObserver(() => {
-          if (!document.getElementById('hoa-chat')) injectChat()
+          onBoardSwapped()
         }).observe(main, { childList: true })
+      }
+
+      /**
+       * Everything the reader is owed after <main> was replaced, in the order it
+       * has to happen: the channel back, then the place they were reading at.
+       * The scroll comes LAST because the chat section and the reopened cards
+       * are what the offset means anything against.
+       */
+      function onBoardSwapped() {
+        injectChat()
+        boardRestorePlace()
       }
 
       // THE SWAP AND THE INJECTION ARE TIED TOGETHER. The refresher replaces
@@ -557,7 +700,7 @@
       // nothing put it back (the reader saw it vanish the moment they returned
       // to the browser). The listener sits on `window`, which survives the
       // document.write below, and injectChat is idempotent.
-      window.addEventListener(CHAT_SWAP_EVENT, injectChat)
+      window.addEventListener(CHAT_SWAP_EVENT, onBoardSwapped)
 
       // Keep the failure honest and self-explaining: a blank page would read as
       // "no work", which is the exact misreading this whole mechanism exists to
