@@ -4061,3 +4061,25 @@ also be taken as its own task now and then.
   VERIFIABLE: a Vitest case asserting a group card renders WITHOUT an order line and still
   raises no `empty-body` violation, one asserting a non-group card with an empty body still
   does; plus a check that no card body in `.claude/board-queue.json` is a bare command flag.
+
+- [ ] 470. "NOTHING IS RUNNING" MUST BE IMPOSSIBLE WHILE THE SESSION WORKS (user 30.07.2026:
+  "Nicht auf Zuruf korrigieren, sondern per Mechanismus etablieren, dass das nicht mehr
+  passieren kann."; bundle Chat & Tafel). Observed the same evening: `board.mjs done <n>
+  --none "<reason>"` put "Gerade keine laufende Arbeit" into the current-work section, the
+  session then went on working for eleven minutes, and the user read a board that claimed
+  idleness while three things were in flight. The user had to point it out — which is exactly
+  the class this project answers with a mechanism, never with a correction.
+  THE ASYMMETRY THAT MAKES IT ENFORCEABLE: "nothing is running" is a statement about the
+  FUTURE of the turn. It is true only if the session stops now. So it can be verified: the
+  claim stands until the session takes its next state-changing action, and that action is the
+  proof it was false.
+  FINAL STATE: `--none` writes its card as a CLAIM TO STOP. The PreToolUse board gate
+  (`board-first-guard`) then DENIES the next state-changing call while the board's current-work
+  section carries that claim — with the remedy in the message: put up a card naming the work,
+  or stop. Reads, the board commands themselves and an edit of the board file stay exempt, as
+  they are today, and the gate stays fail-open. A session that legitimately ends right after
+  `--none` is untouched, which is the case the flag exists for.
+  VERIFIABLE: pure cases in the guard's decision core — a board carrying the no-work claim
+  denies a state-changing call and allows a read, a board carrying a real now-card allows
+  both, and the deny names the remedy; plus one case pinning that the boundary path
+  (`batch-boundary.mjs`, which legitimately ends the session) is not blocked by it.
