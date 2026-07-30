@@ -12963,3 +12963,150 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   left" once it is after midnight. It is a false NEGATIVE, so the standing requirement —
   never wrongly call an estimate overdue — still holds, which is why it did not block the
   estimate point. Fix it here, with a case at the wrap.
+
+- [x] 434. THE BATCH MUST NOT BE ABLE TO STAND STILL — THE LAYERS AROUND POINT 433
+  (30.07.2026, user: preventing this reliably outranks batch progress; bundle I). The night of
+  29./30.07. produced nothing: work stopped at 21:50 and the state at 04:19 was byte-for-byte
+  the same. NINE part-failures chained (A-I), and the pattern behind all of them is that every
+  layer could OBSERVE the stall while none could ACT — and where authority existed, a condition
+  kept it from reaching.
+  THE ANALYSIS, THE RESEARCHED PRACTICE AND THE DESIGN ARE `docs/batch-resilience.md`, second
+  revision, reviewed by the second model against the code and the logs. Read it first; this
+  point is the build order, not a second telling. Point 433 is layer 2 and carries the spawn
+  safety without which the whole thing gets louder rather than safer.
+  IN THIS POINT, in this order:
+  (1) THE EXTERNAL WATCHER — layers 3 and 4 merged, and the FIRST thing built here, because it
+  is the only layer with no shared local cause of death. A GitHub Actions cron reads push age
+  against the open-point count (both live in the repo) and posts to the existing ntfy topic
+  (Actions secret, never in the repo) when nothing moved. It RELEASES AND ALERTS, it never
+  spawns — one spawner is enough, and the launcher owns the debounce state a second one could
+  not see. It is also the dead man's switch: ntfy forwards messages and cannot notice an
+  ABSENCE, so the party that expects a check-in has to be the one that computes progress.
+  Justified by failure H: the local layer ticked all night and read a heartbeat as life, so a
+  second layer asking the same question off the same local evidence buys nothing — the outside
+  one judges repository OUTPUT. (The first telling justified this with failure I, "the launcher
+  log ends at 02:21"; that reading was WRONG and is withdrawn — see the root-cause below.)
+  (1) IS BUILT, 30.07.2026: `.github/workflows/batch-watchdog.yml`, every 30 min from
+  GitHub, `STALL_MINUTES` 120, alert-only. It came out NARROWER than specified above — it
+  does not release the lease, because releasing from outside would need repository write
+  access from a job that cannot see the fence, which is a second failure mode rather than a
+  second safeguard; the release stays in layer 2 where the atomic acquire lives. Documented
+  in `docs/batch-autonomy.md` and `docs/batch-resilience.md` §3. What REMAINS of this part:
+  nothing for the watcher itself, but its ntfy alert shares a channel with the CI-red alert,
+  so the ESCALATION LADDER (rising interval, and a paused batch with a board card as the
+  last rung) is still owed and belongs with part (3).
+  (2) THE LEASE — the right core and the largest rebuild, so it follows 433 with its own
+  four-eyes review. `leaseUntil` in the lock file, renewed in PRE-ToolUse rather than post:
+  the existing heartbeat fires after a call returns, so a lease renewed by it would have to
+  outlive the longest single call, and this repo legitimately runs 30-40 minute suites and has
+  recorded 87 minutes of silence with work advancing. Renewing BEFORE the long call keeps the
+  window short and the reader side pure arithmetic — there is NO probing at the acquire door.
+  The FENCE lives in its own never-deleted monotonic file under the existing reap mutex, never
+  inside the lock file, which `acquire` deletes. It is checked at ONE PreToolUse chokepoint
+  (the `board-first-guard` slot) for the paths that have no guard today — the TASKS.md tick and
+  archive move, `git merge`/`push` to main, the board publish, `dashboard-state.json` merges;
+  the lock's own writers are already sessionId-guarded and need nothing. Standby is the
+  accepted loss case, written down: the wall clock advances while no code runs, the owner loses
+  the lease blamelessly, and the cost is bounded to uncommitted in-context work.
+  KNOWN BLIND SPOT to record with it: a worktree subagent's calls renew the PARENT's lease,
+  so a wedged parent with one ticking child never expires — which is why the external watcher
+  judges repository OUTPUT and not a heartbeat.
+  (3) RETRY A CHILD, NOT AN OUTAGE. Transience is an allowlist (HTTP 5xx/429/529,
+  ECONNRESET/ETIMEDOUT, the harness' own API-error death); a red gate, a guard block or an
+  escalated brief is never transient and the default is no retry. Two retries with backoff, same
+  branch, same brief revision, and if the child committed since its spawn the retry prompt says
+  CONTINUE rather than repeat. Stop conditions: the SAME transient signature across two or more
+  children in one window is an ENVIRONMENT OUTAGE — pause and report, never retry (both agents
+  died on one 500 that night, and two retries each would have bought four more deaths); never
+  retry a child that reported a step complete; cap the tokens one point may consume.
+  (4) DEMOLITION, in the same commit that makes the lease authoritative: `WORK_STALL_*`, the
+  `wedgeAction`/`isOwnSpawn` construction, the silence staging and the four-hour `WEDGED_MS`
+  valve go. Three overlapping liveness verdicts must not coexist.
+  ROOT-CAUSED 30.07.2026 from `.claude/autostart.log`, and one of the two records was WRONG.
+  FAILURE I DID NOT HAPPEN: the launcher log does not end at 02:21 — it ticks every 15 minutes
+  right through to 08:36. What ends at 02:21 is the `WEDGED owner` LINE, and it ends because the
+  owner's heartbeat ticked once; the verdict flips to `skip: owner alive (fresh-heartbeat)` and
+  stays there for the remaining two hours while nothing is produced. So H and I are ONE failure,
+  not two, and the local watcher layer never fell silent. The external watcher keeps its
+  justification — a machine that is off, asleep or has a disabled task takes the local layer with
+  it — but that justification is now a RISK, not an observed event, and §1/§3 of
+  `docs/batch-resilience.md` say so. FAILURE H is root-caused as far as the artefacts reach: the
+  heartbeat ticked sporadically through the dead stretch (0, 15, 30, 1 minutes old at successive
+  ticks), so the session was making SOME calls and producing nothing — exactly the case a
+  heartbeat-renewed liveness test cannot see, and the reason the outside layer judges repository
+  OUTPUT. No further cause is recoverable from the artefacts, and the design already assumes this
+  one; the lease may be frozen.
+  (8) THE PREFLIGHT REGISTERS AS A SESSION AND RAISES A FALSE ALARM (found 30.07.2026 while
+  root-causing the above). Point 433's environment preflight appears in the launcher log as
+  `PARALLEL SESSIONS DETECTED: owner=preflight-test plus <real session>` — four times that night
+  alone. The parallel-session detector is one of the few alerts that means "stop everything", so a
+  probe of our own must not be able to trip it: the preflight's session identity is excluded from
+  that detector (or it stops registering as a session at all), with a Vitest case pinning that a
+  preflight in flight yields no parallel-session verdict while two REAL sessions still do.
+  (5) JUDGE A DELEGATED AGENT BY ITS OUTPUT, NOT BY ITS LOG — added 30.07.2026 after doing
+  exactly the opposite. A bundle agent's transcript log had been silent for 59 minutes, the
+  in-flight declaration reported "evidence-gone: silent for 59 min", and it was declared dead
+  and replaced. It was ALIVE: its worktree had committed four minutes earlier and the branch
+  tip moved a minute before the replacement was spawned. The successor then rebuilt two points
+  the original had already finished, and both were heading for the same third one. The
+  declaration mechanism accepts a worktree, a pid, a branch or a log as evidence and treats
+  them as equal; a LOG is the weakest of the four, because an agent that works without printing
+  looks identical to one that died. Therefore: where the declared work is an AGENT, git
+  activity in its worktree or on its branch is the primary evidence, a silent log alone never
+  justifies the conclusion "dead", and the probe reports WHICH evidence it judged on. A
+  respawn additionally re-checks git activity immediately before it spawns. This is the same
+  rule as (2) above — liveness is read from output — applied to the layer that spawns children
+  rather than sessions, and it is the rule this point's own design document states while its
+  author broke it.
+  (5b) AND THE PROBE MUST MEASURE THE AGENT'S WORK, NOT ITS GIT COMMANDS (found 30.07.2026 on
+  the delivered code, and it is the same mistake one layer further in). `worktreeActiveAt`
+  stats exactly four paths — the gitdir, `index`, `HEAD`, `COMMIT_EDITMSG` — so what it dates
+  is the last GIT operation, not the last edit. An agent that has been writing source files
+  for twenty minutes without running a git command reads as `quiet`; measured live, the same
+  worktree read "quiet for 21 min" to the declaration while the agent was mid-edit. The
+  contamination runs the other way too: a reader's own `git status` on that worktree can
+  refresh the index and reset the clock, so the observer's look becomes the evidence.
+  TARGET: the probe dates the newest mtime among the worktree's TRACKED WORKING FILES as well
+  as the git metadata (cheap: `git -C <wt> status --porcelain` names the changed paths, or the
+  newest mtime under the checkout excluding `node_modules`/`dist`), and the verdict says which
+  of the two it read. VERIFIABLE in the pure layer: a worktree whose git metadata is old but
+  whose working files are fresh reads `alive`; both old reads `quiet`; and the detail names the
+  evidence in each case.
+  MUST NOT BE BUILT: a rescue that depends on the wedged session noticing; a second LOCAL
+  watchdog; two spawners; a window that kills a running verification; a silent recovery;
+  and no conclusion of death from silence alone where output can be measured.
+  VERIFIABLE: pure core plus Vitest per layer, each case naming the night it would have
+  prevented, plus one INDEPENDENCE case per layer — it still acts while the other layers'
+  inputs are missing or stale. The full list is `docs/batch-resilience.md` §8.
+  MECHANISM REVIEW REQUIRED per layer (CLAUDE.md §7.2); the design itself is reviewed.
+  (6) THE DEADLINES OF THE HANDOVER ARE WRONG FROM BOTH SIDES, and they belong to this
+  point because they are the same clock family as the lease. A batch CLAIM expires after
+  30 minutes — shorter than the owner's own gap between clean turn ends — so a takeover
+  silently fails; and keeping it alive is itself a background refresher that DIES SILENTLY
+  (measured 29.07.2026 20:00 in session 10a2d2e0: a watcher hit a 60-minute timeout and the
+  claim would have lapsed at 20:29 unnoticed). The IN-FLIGHT declaration has the same shape:
+  it expires after 45 minutes and is never refreshed while the work runs, so at 19:51 it read
+  `live:false, expired` while its agent had been building for 63 minutes and was mid-merge —
+  the declared-work check was lying while only the heartbeat proved liveness. TARGET: the
+  handover must not hang on a deadline somebody has to keep feeding; judge it by OUTPUT the
+  way (2) and (5) do. In the same edit, `scripts/batch-resume-hook*.mjs` states the expiry it
+  currently hides — it prints "re-running the SAME command takes it" and never says the claim
+  ages out, so a returning session claims once, waits, and never learns why nothing happened.
+  THIRD SIDE OF THE SAME CLOCK, measured 30.07.2026 10:10-10:16: a claim record that had
+  ALREADY been released (`releasedAt` and `releasedBy` both set in `.claude/batch-claim.json`)
+  was still honoured. The owning session released to it, the claiming window never took it,
+  and the batch then ran for an hour with NO lock at all while every guard and heartbeat
+  behaved as though it were owned; the boundary that followed released to the same dead claim
+  a second time (`.claude/boundary.log`, two RELEASED lines, no HANDOVER). A released claim is
+  not a claim — the reader must treat it as absent, and a release with no live taker must fall
+  back to the ordinary handover rather than leaving the batch ownerless.
+  (7) THE BOUNDARY CARD MUST NAME WHERE THE BATCH ACTUALLY GOES (found 29.07.2026 20:06).
+  It says "Ich übergebe an eine frische Sitzung … Sie nimmt den nächsten Punkt der
+  Warteschlange auf" even while a user window holds an HONOURED claim — and that is not what
+  happens: `batch-autostart.mjs` reserves the batch for a live claim and SKIPS the spawn, so
+  the batch goes to the claiming window. The text misled the user into believing his takeover
+  had been overtaken. The card reads the claim state and says which of the two is happening;
+  a Vitest case per state.
+  DOCS in the same commit: `docs/batch-autonomy.md` under the launcher and the session
+  lifecycle, CLAUDE.md §6 where the singleton and the context boundary are described, and the
+  ledger row for retrospective §3.61.
