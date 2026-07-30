@@ -293,13 +293,16 @@ export function renderQueueCards(entries) {
  * The markup is deliberately the CARD shape the board's parsers already read,
  * one level up: `class="group"` so `queueCard`/`toNow` cannot mistake it for a
  * point card, `data-group` so the reader's restore script can address a group by
- * name, and a body that OPENS with a text line — a `<details>` holding nothing
- * but nested cards parses as a card with an empty body, which the audit rejects.
- * That line is also the one the user asked for: what comes, and in which order.
+ * name, and — for the unbundled group only — a leading line carrying the reason
+ * those points stand outside every bundle.
+ *
+ * NO ORDER LINE (user 30.07.2026: "die geht ja schon aus der Reihenfolge hervor,
+ * in der die Karten aufgeführt werden"). The nested cards ARE the order; naming
+ * it again above them said the same thing twice and cost a phone screen's worth
+ * of height per group.
  */
 export function renderQueueGroup({ name, entries = [], count, meta, reason = null }) {
-  const order = entries.map((e) => Number(e.point)).join(' → ')
-  const lead = [reason, order ? `Reihenfolge: ${order}.` : null].filter(Boolean)
+  const lead = [reason].filter(Boolean)
   return (
     `<details class="group" data-group="${esc(name)}">\n` +
     `  <summary><span class="t">${esc(name)} · ${Number(count) || entries.length} Punkte</span>` +

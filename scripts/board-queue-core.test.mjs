@@ -545,8 +545,11 @@ describe('the rendered groups — nested cards the board’s own parsers still r
     expect(html.slice(groupAt, nextGroup)).not.toContain('<span class="num">200</span>')
   })
 
-  it('names WHAT COMES and IN WHICH ORDER — the user’s actual complaint', () => {
-    expect(grouped([439, 465]).html).toContain('<p>Reihenfolge: 439 → 465.</p>')
+  it('does NOT restate the order — the nested cards already are it (user 30.07.2026)', () => {
+    const { html } = grouped([439, 465])
+    expect(html).not.toContain('Reihenfolge:')
+    // The order still SHOWS, in the only place it belongs: the card sequence.
+    expect(html.indexOf('<span class="num">439</span>')).toBeLessThan(html.indexOf('<span class="num">465</span>'))
   })
 
   it('carries NO `open` attribute — the reader’s own choice owns that (house rule)', () => {

@@ -4042,3 +4042,22 @@ also be taken as its own task now and then.
   VERIFIABLE: one Vitest case per fixed reader whose fixture text carries CRLF explicitly (a
   fixture written with `\n` passes before the fix and proves nothing), plus one asserting the
   empty-parse report fires for a non-empty source.
+
+- [ ] 469. TWO DEFECTS THE GROUPED QUEUE SHIPPED WITH (user 30.07.2026, both reported from
+  the live board within minutes of the merge; bundle Chat & Tafel). (a) THE ORDER LINE IS
+  REDUNDANT: each bundle card opened with "Reihenfolge: 444 → 445 → …", which says exactly
+  what the card sequence below it already says ("die geht ja schon aus der Reihenfolge hervor,
+  in der die Karten aufgeführt werden") and costs a phone screen's height per group. It was
+  written because `auditDashboard` counts a `<details>` whose body holds only nested cards as
+  an EMPTY BODY. (b) TWENTY-NINE CARD TEXTS ARE THE STRING `--text-stdin`: the sibling defect
+  of point 439 destroyed the body of every card written through that path before the fix
+  landed (426, 427, 430, 442–466 and 468). The flag path is repaired, but the DATA it
+  corrupted was never restored, so the board shows a card with a title and no description —
+  the second half of the user's original complaint.
+  FINAL STATE: the order line is gone and the audit no longer demands a sentence above a
+  group's member cards (a group's members ARE its body); and every corrupted card carries real
+  German prose again — two or three sentences saying what the point is and why it matters, in
+  the board's voice, never the English work-order headline.
+  VERIFIABLE: a Vitest case asserting a group card renders WITHOUT an order line and still
+  raises no `empty-body` violation, one asserting a non-group card with an empty body still
+  does; plus a check that no card body in `.claude/board-queue.json` is a bare command flag.
