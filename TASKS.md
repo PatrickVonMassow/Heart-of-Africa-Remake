@@ -3832,41 +3832,6 @@ it is appended.
   PRIORITY: behind 458 and 459 — it is a wall-clock and diagnosis saving, not the context
   saving it was drafted for.
 
-- [ ] 461. A RELEASED CLAIM MUST HOLD THE DOOR WHILE ITS CLAIMANT LIVES (30.07.2026,
-  observed live; bundle Session- & Repo-Hygiene). `.claude/boundary.log` records `RELEASED to 103806e3… by
-  3c5d6964…` at 17:10:22; the lock shows `acquiredAt` 17:11 — the RELEASING session took it
-  back at its next turn end (`scripts/batch-progress-guard.mjs`), because a released claim is
-  read as ABSENT (`assessClaim`, `scripts/batch-claim-core.mjs`) and reserves nothing. The
-  user's window then had to WIN A RACE against automated acquirers, and the window that is
-  answering the user is exactly the one not polling. It lost by six minutes, and the takeover
-  had to be forced by stopping the owner process.
-  THE RULE THAT MUST SURVIVE (point 434, `batch-claim-core.mjs` comment): a released claim may
-  never be honoured TWICE — that left the batch ownerless for an hour on 30.07.2026. So the
-  fix is NOT to keep the claim honourable.
-  FINAL STATE: a RELEASED claim RESERVES the free lock — it stays unhonourable, but no OTHER
-  window may acquire — for as long as its claimant is PROVABLY alive by the pid + start-time
-  identity probe `assessClaim` already runs, bounded by the existing take-up window. A dead or
-  closed claimant frees the lock instantly (the probe, not a deadline, decides), so the batch
-  can never idle out a reservation. `assessClaim`'s released branch returns a `reserve` state
-  instead of plain absent; `reservationDecision` refuses the acquire on it; the two sites that
-  read the raw predicate — `scripts/batch-autostart.mjs` and `scripts/chat-watcher.mjs` —
-  switch to `reservationDecision`; the claimant's own path is unchanged (its own-claim branch
-  is checked BEFORE the released branch). The reservation lives in the CLAIM file, never in
-  the lock: a new lock kind would have to be learned by `assessOwner`, `spawnDecision`,
-  `heldByOtherLiveOwner`, `resolveOwnership`, `acquire`, `release`, the launcher assessment
-  and the boundary card, and a reserved lock would today read as not-alive and be spawned
-  into. `HANDOVER_GRACE_MS` is NOT reused — it means the pid-alive handover before a successor
-  takeover, and overloading it couples two calibrations.
-  The user-facing texts that state the spent-claim rule (`scripts/batch-claim.mjs`,
-  `scripts/batch-boundary-core.mjs`) are updated in the same commit.
-  VERIFIABLE (`scripts/batch-claim-core.test.mjs`): a released claim with a live claimant
-  reserves and refuses a foreign acquire; with a dead claimant it frees immediately; the
-  claimant itself still takes the lock through its own branch; a claim is never honoured
-  twice; a future-stamped entry is still refused.
-  FOUR-EYES: the concept was reviewed by Fable 5 on 30.07.2026 — it corrected the first draft,
-  which put the reservation on the LOCK. Record the implementation review before it lands
-  (`mechanism-review-guard`).
-
 - [ ] 462. A WINDOW THAT IS NOT THE MASTER MUST BE ABLE TO ENQUEUE WHAT THE USER SAYS (user
   30.07.2026: "Es ist problematisch, dass ich regelmäßig mit einer Sitzung rede, die nicht der
   Master ist … Gibt es eine sichere Lösung?"; bundle Session- & Repo-Hygiene). For an hour this window held a
