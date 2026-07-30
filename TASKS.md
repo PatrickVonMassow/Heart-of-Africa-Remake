@@ -2798,10 +2798,10 @@ it is appended.
   (d) THE HARNESS PRIMITIVES, EVALUATED AGAINST OUR HAND-BUILT LAYER (user question
   30.07.2026: is there not an established mechanism for token-frugal parallel batch work
   rather than reinventing it?). Partly there is, and parts are already in use — worktree
-  agent isolation per `docs/batch-autonomy.md`; the cron/wakeup primitives were tried and
-  deliberately superseded by the OS autostart task (`docs/rule-corpus-audit.md` A31); one
-  Workflow run happened and was curtailed after the ~3M-token incident. NOT evaluated
-  since: the Workflow tool's BUDGET primitive — a hard output-token ceiling with a
+  agent isolation per `docs/batch-autonomy.md`; the OS autostart task is the launcher, held
+  against the cron/wakeup primitives on the reasons in `docs/rule-corpus-audit.md` A31; the
+  Workflow tool stands under the token ceiling of memory `workflows-token-budget`. NOT
+  evaluated: the Workflow tool's BUDGET primitive — a hard output-token ceiling with a
   remaining() query, precisely the control that was missing on 20.07. — together with its
   run-resume, which replays the unchanged prefix of agent calls after a crash and is the
   crash-resume we hand-built; background agents with a monitor instead of the hand-written
@@ -3476,7 +3476,14 @@ it is appended.
   already uses, and the tick path refuses `[ ]`→`[x]` for such a point without a recorded run
   at the CURRENT HEAD. A point WITHOUT a proof line ticks as before — the line is opt-in, so
   adding the gate never blocks the existing corpus.
-  All three stand down for a session that does not own the batch lock and for a paused batch,
+  (D) A DORMANT RECORD THAT OUTLIVES ITS DORMANCY (four-eyes review 30.07.2026). The
+  guard-health audit reads a guard's dormant entry ONLY while that guard is unwired, so a
+  guard that is wired AND still carries a dormant entry produces no violation and the stale
+  record stands unnoticed — the map goes on claiming an enforcer is inert while it enforces.
+  The audit gains the inverse check: a WIRED enforcer with a dormant entry is a violation
+  naming both sides, so the entry must be removed in the same commit that adds the hook
+  line. The convention the arming commit states thereby becomes the mechanism it describes.
+  All four stand down for a session that does not own the batch lock and for a paused batch,
   like every guard here. MECHANISM REVIEW REQUIRED (CLAUDE.md §7.2); the
   `.claude/settings.json` wiring is attended-only and must be ABSOLUTE, not cwd-relative.
   DOCS in the same commit: `docs/batch-autonomy.md` (the guard chain), for (B)
@@ -3485,7 +3492,9 @@ it is appended.
   VERIFIABLE for (C): pure Vitest — a point with a proof line and no recorded run BLOCKS the
   tick; the same point with a run recorded at the current HEAD passes; a run recorded at an
   OLDER head does not count; a point without a proof line is untouched; an unreadable ledger
-  ALLOWS (fail-open).
+  ALLOWS (fail-open). For (D): a wired enforcer with a dormant entry BLOCKS and the message
+  names both the enforcer and its stale entry; a wired enforcer without one passes; an
+  unwired-and-recorded one keeps passing as today.
 
 - [ ] 438. THE PROJECT HOOKS CANNOT FIRE OUTSIDE THE REPO ROOT (29.07.2026, measured in a
   `/doctor` run and reviewed by the second model; bundle J). All 31 project hooks in
