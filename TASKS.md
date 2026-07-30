@@ -3718,27 +3718,6 @@ it is appended.
   vanish. The total saving is stated as one number in the commit, and the per-turn fixed load
   is re-measured after the cuts so the claim is a measurement rather than an intention.
 
-- [ ] 441. THE BOARD REFRESH STEALS THE CHAT INPUT'S FOCUS AND THE SCROLL POSITION (user
-  30.07.2026, reported from the phone: "Ein Refresh vom Dashboard nimmt mir den Fokus vom
-  Chat-Eingabefeld und die Scrollposition weg"; bundle H). The viewer
-  (`public/board/index.html`) refetches the board every 30 s and replaces `<main>` WHOLESALE,
-  then re-injects the chat on the `hoa-board-swapped` event (point 423). The draft text
-  survives that swap, but the caret does not: mid-sentence the keyboard closes on a phone and
-  the page jumps back to where the document starts — which makes writing a message from the
-  phone, the whole reason the channel exists, a race against a 30-second timer.
-  TARGET, in this order: (1) do not swap at all when the fetched board is byte-identical to
-  the rendered one — the common case, and it removes most of the damage for free; (2) when it
-  DID change, preserve the reader's place across the swap: scroll offset, which `<details>`
-  are open (the localStorage script already knows), and the chat input's focus WITH its caret
-  position; (3) never swap while the chat input holds focus AND a non-empty draft — defer to
-  the next tick, so a message being typed is never interrupted, with a cap so a permanently
-  focused field cannot freeze the board forever.
-  VERIFIABLE: a Vitest/jsdom case per rule — an identical fetch performs no DOM replacement;
-  a changed fetch restores scroll, open cards and caret; a focused input with a draft defers
-  the swap and the deferral ends at the cap. The live check is by hand on the phone-sized
-  viewport: type into the chat, wait out two refresh ticks, and the caret and the scroll
-  position are still where they were.
-
 - [ ] 444. A QUOTA BLOCK IS A WAITING STATE, NOT A FAILURE (user decision 30.07.2026: no
   pacing — "wenn du durch die Kontingent-Bremse blockiert wirst, musst du es immer wieder
   probieren, um zu merken, wann du neues Budget hast und ab dann weiterarbeiten"; bundle
@@ -4124,3 +4103,26 @@ The closing cycle itself is CLAUDE.md §9: the machine-readable checklist in
 scripts/closing-guard-core.mjs is the authority, and the PreToolUse guard denies a
 version tag until every step is recorded with evidence. A standalone closing run may
 also be taken as its own task now and then.
+
+- [ ] 467. THE VERSIONED BOARD REFRESHER REACHES NO READER (30.07.2026, found by the agent
+  that fixed the refresh stealing the chat's focus; bundle Chat & Tafel). Two halves of one
+  hole. (a) `scripts/board-refresher-core.mjs` exports `refresherScript()` /
+  `REFRESHER_SOURCE`, but NO production script imports them — neither `scripts/board.mjs` nor
+  `scripts/board-publish.mjs` touches the module; the script text that actually runs lives
+  literally inside `.batch-dashboard.html`, and a SECOND, DIVERGED hand-copy sits in
+  `origin/board:board.html`, where it does not even dispatch the `hoa-board-swapped` event the
+  chat re-injection is documented to ride on. So a fix made in the versioned source reaches
+  nobody, and the two copies drift with nothing comparing them. (b) The module's own comment
+  claims `structureViolations` refuses a board that does not carry the versioned script — it
+  contains no such check, so the promise "versioned, therefore it cannot break silently" is
+  not held by anything.
+  FINAL STATE: ONE source of the refresher script, injected by the publish path, so what the
+  reader runs is what the repository versions; the diverged copy in the `board` branch is
+  produced by that path rather than maintained by hand; and the structure check the comment
+  promises either EXISTS and fails a board whose script does not match the versioned source,
+  or the comment goes. The `hoa-board-swapped` dispatch must be present in whatever the reader
+  actually runs.
+  VERIFIABLE: a Vitest case asserting the published board's script is byte-identical to
+  `REFRESHER_SOURCE`, one asserting the structure check refuses a board carrying a foreign or
+  absent script, and one covering the event dispatch. Plus one published board reviewed by
+  eye — a swap must still re-inject the chat.
