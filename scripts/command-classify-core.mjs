@@ -100,8 +100,14 @@ export function lexCommand(command) {
       continue
     }
     // A word — up to the next unquoted operator or blank.
+    //
+    // `sub` collects the parts a shell would still EXPAND: everything outside
+    // single quotes. `$(…)` and backticks are live there and inert inside `'…'`,
+    // which is the difference between `echo $(git push)` (a push) and
+    // `grep '$(git push)' f` (a search).
     const start = i
     let text = ''
+    let sub = ''
     let quoted = false
     let emittedRedirect = false
     while (i < n) {
@@ -115,10 +121,12 @@ export function lexCommand(command) {
           // Windows paths survive.
           if (quote === '"' && src[i] === '\\' && src[i + 1] === '"') {
             text += '"'
+            sub += '"'
             i += 2
             continue
           }
           text += src[i]
+          if (quote === '"') sub += src[i]
           i++
         }
         i++ // the closing quote (or the end of an unterminated one)
@@ -137,9 +145,10 @@ export function lexCommand(command) {
         break
       }
       text += c
+      sub += c
       i++
     }
-    if (!emittedRedirect && (text || quoted)) tokens.push({ type: 'word', text, quoted, start, end: i })
+    if (!emittedRedirect && (text || quoted)) tokens.push({ type: 'word', text, sub, quoted, start, end: i })
   }
   return tokens
 }
@@ -170,7 +179,7 @@ export function parseSegments(command) {
     if (!current) current = { start: t.start, end: t.end, words: [], redirects: [], raw: '' }
     current.end = t.end
     if (t.type === 'word') {
-      current.words.push({ text: t.text, quoted: t.quoted })
+      current.words.push({ text: t.text, sub: t.sub ?? '', quoted: t.quoted })
     } else {
       const next = tokens[k + 1]
       const target = next && next.type === 'word' ? next : null
@@ -259,6 +268,85 @@ function argsOf(seg) {
 }
 
 const hasFlag = (args, flags) => args.some((a) => flags.some((f) => a.text === f || a.text.startsWith(`${f}=`)))
+
+// ── The wrappers that HIDE a command ─────────────────────────────────────────
+//
+// Point 473, four-eyes review (Fable 5): the old whole-string regexes matched
+// `git push` wherever it stood, so they saw through `bash -c "…"`, `eval` and
+// `$( … )` BY ACCIDENT. Judging the head alone lost that, and at the LEASE FENCE
+// that is a real regression: a dispossessed session could have pushed shared
+// history through any shell wrapper. The head rule stays — but everything that
+// carries an inner command is unwrapped and judged too, and here the
+// conservative direction wins over the fail-open one.
+
+/** The command strings a segment executes BESIDES its own head. */
+export function nestedCommands(segment) {
+  const seg = asSegments(segment)[0]
+  if (!seg) return []
+  const out = []
+  const head = commandHead(seg)
+  const args = argsOf(seg)
+  // `sh -c "…"` / `pwsh -Command "…"` / `cmd /c "…"` — the argument IS the
+  // command. Single quotes around it change nothing: they stop the OUTER shell
+  // from expanding, the inner one still runs it.
+  if (SHELL_HEADS.has(head)) {
+    const i = args.findIndex((a) => SHELL_COMMAND_FLAGS.test(a.text))
+    if (i >= 0 && args[i + 1]) out.push(args[i + 1].text)
+  }
+  // `eval` is the same case without a flag.
+  if (head === 'eval') out.push(args.map((a) => a.text).join(' '))
+  // `$( … )` and backticks run BEFORE the outer command, so `echo $(git push)`
+  // pushes. Only the expandable text counts — inside single quotes both are
+  // inert, which is what keeps `grep '$(git push)' f` a search.
+  out.push(...substitutions(seg.words.map((w) => w.sub ?? '').join(' ')))
+  return out.filter((c) => String(c ?? '').trim())
+}
+
+/** The command substitutions inside a piece of expandable text. */
+function substitutions(text) {
+  const s = String(text ?? '')
+  const out = []
+  for (let i = 0; i < s.length; i++) {
+    if (s[i] === '$' && s[i + 1] === '(') {
+      let depth = 1
+      let j = i + 2
+      for (; j < s.length && depth > 0; j++) {
+        if (s[j] === '(') depth++
+        else if (s[j] === ')') depth--
+      }
+      out.push(s.slice(i + 2, depth === 0 ? j - 1 : s.length)) // unbalanced → to the end
+      i = j - 1
+      continue
+    }
+    if (s[i] === '`') {
+      const end = s.indexOf('`', i + 1)
+      out.push(s.slice(i + 1, end === -1 ? s.length : end))
+      i = end === -1 ? s.length : end
+    }
+  }
+  return out
+}
+
+/** How deep a wrapper chain is followed. Far past anything real; a guard. */
+const MAX_NESTING = 6
+
+/**
+ * Every segment a call runs — the top-level ones AND the segments of every
+ * command nested inside a wrapper. This is what the LEASE FENCE iterates, so a
+ * `bash -c`, an `eval` or a `$( … )` cannot hide a guarded action from it.
+ */
+export function expandSegments(command, { maxDepth = MAX_NESTING } = {}) {
+  const out = []
+  const walk = (cmd, depth) => {
+    if (depth > maxDepth) return
+    for (const seg of parseSegments(cmd)) {
+      out.push(seg)
+      for (const nested of nestedCommands(seg)) walk(nested, depth + 1)
+    }
+  }
+  walk(command, 0)
+  return out
+}
 
 /** Positional arguments (flags and their values dropped). */
 function positionals(args, { valueFlags = [] } = {}) {
@@ -373,20 +461,22 @@ function redirectWrites(redirects) {
 }
 
 /** 'write' or 'read' for ONE parsed segment. Unrecognised → 'read'. */
-function intentOfParsed(seg) {
+function intentOfParsed(seg, depth = 0) {
   if (redirectWrites(seg.redirects)) return 'write'
+  // A WRAPPED command counts as its own: `bash -c "npm run build"`,
+  // `eval "git push"`, `echo $(git push)`. These are the one place a quoted
+  // string must be looked INTO, because there it is the command and not an
+  // argument. Judged BEFORE `--help`, so `bash --help -c "git push"` cannot
+  // talk its way past.
+  if (depth < MAX_NESTING) {
+    for (const nested of nestedCommands(seg)) {
+      if (segmentIntent(nested, { depth: depth + 1 }) === 'write') return 'write'
+    }
+  }
   const head = commandHead(seg)
   if (!head) return 'read'
   // `--help` / `--version` print and exit, whatever verb they stand beside.
   if (argsOf(seg).some((a) => !a.quoted && (a.text === '--help' || a.text === '--version'))) return 'read'
-  // `bash -c "npm run build"` — the argument after -c IS the command, not an
-  // argument, so it is the one place quoted text must be looked into. Without
-  // this the head rule would read a nested shell as the harmless word `bash`.
-  if (SHELL_HEADS.has(head)) {
-    const args = argsOf(seg)
-    const i = args.findIndex((a) => SHELL_COMMAND_FLAGS.test(a.text))
-    if (i >= 0 && args[i + 1]) return segmentIntent(args[i + 1].text)
-  }
   // `find . -delete` / `find . -exec rm {} \;` — the verb stands behind -exec.
   if (head === 'find') {
     const args = argsOf(seg)
@@ -413,8 +503,8 @@ function asSegments(input) {
 }
 
 /** 'write' when ANY segment of the input changes state, else 'read'. */
-export function segmentIntent(segment) {
-  for (const seg of asSegments(segment)) if (intentOfParsed(seg) === 'write') return 'write'
+export function segmentIntent(segment, { depth = 0 } = {}) {
+  for (const seg of asSegments(segment)) if (intentOfParsed(seg, depth) === 'write') return 'write'
   return 'read'
 }
 
@@ -443,6 +533,9 @@ export function segmentInvokesScript(segment, names = []) {
   const list = (Array.isArray(names) ? names : [names]).filter(Boolean).map(String)
   const matches = (text) => {
     const p = String(text).replace(/\\/g, '/')
+    // A word holding a whole command line (`sh -c "node scripts/x.mjs"`) is not
+    // a path argument; it is unwrapped by `expandSegments` and judged there.
+    if (/\s/.test(p)) return false
     return list.some((n) => p === n || p.endsWith(`/${n}`))
   }
   const head = commandHead(seg)

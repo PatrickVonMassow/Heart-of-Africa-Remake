@@ -19,6 +19,8 @@ import {
   firstMutatingSegment,
   segmentInvokesScript,
   segmentMentionsFile,
+  nestedCommands,
+  expandSegments,
 } from './command-classify-core.mjs'
 
 describe('the lexer', () => {
@@ -215,6 +217,40 @@ describe('file mutation and redirection', () => {
     expect(isMutatingSegment('cmd /c "npm install"')).toBe(true)
     expect(isMutatingSegment('bash -c "git status --short"')).toBe(false)
     expect(isMutatingSegment('bash -c "bash -c \'git commit -m x\'"')).toBe(true)
+    // A wrapper cannot talk its way out with a --help that is not its own.
+    expect(isMutatingSegment('bash --help -c "git push"')).toBe(true)
+  })
+
+  it('carries the intent of `eval` and of a command substitution', () => {
+    const bt = String.fromCharCode(96)
+    expect(isMutatingSegment('eval "git push"')).toBe(true)
+    expect(isMutatingSegment('eval git commit -m x')).toBe(true)
+    expect(isMutatingSegment('echo $(git push)')).toBe(true)
+    expect(isMutatingSegment(`echo ${bt}git push${bt}`)).toBe(true)
+    expect(isMutatingSegment('echo "result: $(npm run build)"')).toBe(true)
+    // …and a substitution that only reads stays a read.
+    expect(isMutatingSegment('echo $(git rev-parse HEAD)')).toBe(false)
+    expect(isMutatingSegment('eval "git status"')).toBe(false)
+    // SINGLE quotes make both inert — in a real shell too, so this is no hole.
+    expect(isMutatingSegment("grep -c '$(git push)' notes.md")).toBe(false)
+    expect(isMutatingSegment(`grep -c '${bt}git push${bt}' notes.md`)).toBe(false)
+  })
+
+  it('survives an unbalanced or absurdly deep wrapper without hanging', () => {
+    expect(() => isMutatingSegment('echo $(git push')).not.toThrow()
+    expect(isMutatingSegment('echo $(git push')).toBe(true) // unbalanced → read to the end
+    const deep = 'bash -c "'.repeat(20) + 'git push' + '"'.repeat(20)
+    expect(() => isMutatingSegment(deep)).not.toThrow()
+  })
+
+  it('expandSegments exposes the nested segments the fence iterates', () => {
+    expect(expandSegments('bash -c "git push origin main"').map((s) => s.raw)).toEqual([
+      'bash -c "git push origin main"',
+      'git push origin main',
+    ])
+    expect(nestedCommands('echo $(git push)')).toEqual(['git push'])
+    expect(nestedCommands('git status')).toEqual([])
+    expect(nestedCommands(null)).toEqual([])
   })
 
   it('sees the verb behind find -exec / -delete', () => {

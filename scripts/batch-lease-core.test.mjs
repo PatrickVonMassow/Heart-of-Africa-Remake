@@ -245,6 +245,69 @@ describe('the chokepoint — the four paths with no guard of their own', () => {
     expect(call({ toolName: 'Bash', command: 'git -c core.pager=cat push origin main' }).block).toBe(true)
   })
 
+  // ── A WRAPPER MUST NOT HIDE A GUARDED ACTION ──────────────────────────────
+  // Four-eyes review of point 473 (30.07.2026): judging the command HEAD fixed
+  // the false denials at the idle-claim gate, but the old whole-string regexes
+  // had seen THROUGH `bash -c`, `eval` and `$( … )` by accident — and here that
+  // accident was load-bearing. A dispossessed session could otherwise move
+  // shared history through any shell wrapper. Nothing pinned this before, so
+  // all three could regress silently.
+  it('sees a guarded action through a shell wrapper (`bash -c`, `pwsh -Command`, `sh -c`)', () => {
+    expect(call({ toolName: 'Bash', command: 'bash -c "git push origin main"' })).toMatchObject({
+      block: true,
+      kind: 'git-main',
+    })
+    expect(call({ toolName: 'PowerShell', command: 'pwsh -Command "git push"' })).toMatchObject({
+      block: true,
+      kind: 'git-main',
+    })
+    expect(call({ toolName: 'Bash', command: 'sh -c "git merge --no-ff feat/x"' })).toMatchObject({
+      block: true,
+      kind: 'git-main',
+    })
+    expect(call({ toolName: 'Bash', command: 'sh -c "node scripts/board-publish.mjs --now"' })).toMatchObject({
+      block: true,
+      kind: 'board-publish',
+    })
+    expect(call({ toolName: 'Bash', command: 'bash -c "node scripts/focus.mjs confirm"' })).toMatchObject({
+      block: true,
+      kind: 'dashboard-state',
+    })
+    expect(call({ toolName: 'Bash', command: 'bash -c "echo x >> TASKS.md"' })).toMatchObject({
+      block: true,
+      kind: 'tasks',
+    })
+  })
+
+  it('sees a guarded action through `eval`, `$( … )` and backticks', () => {
+    const bt = String.fromCharCode(96)
+    expect(call({ toolName: 'Bash', command: 'eval "git push"' })).toMatchObject({ block: true, kind: 'git-main' })
+    expect(call({ toolName: 'Bash', command: 'echo $(git push)' })).toMatchObject({ block: true, kind: 'git-main' })
+    expect(call({ toolName: 'Bash', command: `echo ${bt}git push${bt}` })).toMatchObject({
+      block: true,
+      kind: 'git-main',
+    })
+    expect(call({ toolName: 'Bash', command: 'echo $(node scripts/board-publish.mjs)' })).toMatchObject({
+      block: true,
+      kind: 'board-publish',
+    })
+  })
+
+  it('a wrapper around a READ is still a read, and a deep nesting cannot hang it', () => {
+    for (const command of [
+      'bash -c "git status --short"',
+      'bash -c "git log --merges"',
+      'sh -c "node scripts/point-brief.mjs 473"',
+      "grep -c '$(git push)' notes.md", // single-quoted: inert in a real shell too
+      'grep -n "eval" docs/notes.md',
+    ]) {
+      expect(call({ toolName: 'Bash', command }), command).toMatchObject({ block: false })
+    }
+    const deep = 'bash -c "bash -c \'bash -c \\"git push\\"\'"'
+    expect(() => call({ toolName: 'Bash', command: deep })).not.toThrow()
+    expect(call({ toolName: 'Bash', command: deep }).block).toBe(true)
+  })
+
   it('stands down for a PAUSED batch', () => {
     expect(call({ toolName: 'Bash', command: 'git push', paused: true }).block).toBe(false)
   })

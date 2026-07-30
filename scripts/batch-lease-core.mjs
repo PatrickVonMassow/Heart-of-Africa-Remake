@@ -35,9 +35,13 @@
 
 // ONE classifier for both PreToolUse gates (point 473): the board-first deny and
 // this chokepoint judge a shell call the same way — per segment, on the command
-// HEAD, with quoted text deciding nothing.
+// HEAD, with quoted text deciding nothing. `expandSegments` also unwraps what
+// CARRIES a command (`bash -c "…"`, `eval`, `$( … )`), because at THIS gate the
+// safe direction is the conservative one: the old string regexes saw through a
+// wrapper by accident, and losing that would let a dispossessed session push
+// shared history through any shell (four-eyes review, 30.07.2026).
 import {
-  parseSegments,
+  expandSegments,
   isMutatingSegment,
   gitSubcommand,
   segmentInvokesScript,
@@ -314,7 +318,7 @@ export function fenceGuardedAction({ toolName, command, filePath } = {}) {
     }
   }
   if (tool !== 'Bash' && tool !== 'PowerShell') return null
-  for (const segment of parseSegments(command)) {
+  for (const segment of expandSegments(command)) {
     if (GIT_SHARED_HISTORY.has(gitSubcommand(segment))) {
       // A dispossessed session may still commit locally; what it may not do is
       // move shared history. `git push` is matched in every form rather than only

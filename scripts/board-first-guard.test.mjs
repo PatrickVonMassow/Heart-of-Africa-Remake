@@ -267,6 +267,22 @@ describe('board-first-guard (spawned)', () => {
     }
   })
 
+  it('a wrapper hides nothing from the fence, on the executed path (point 473)', () => {
+    // The head-based classifier must not undo what the old string regexes did by
+    // accident: a dispossessed session moving shared history through `bash -c`,
+    // `eval` or a command substitution.
+    seedFence(7, 8)
+    try {
+      for (const command of ['bash -c "git push origin main"', 'eval "git push"', 'echo $(git push)']) {
+        expect(denial(callGuard('Bash', { command })), `${command} must be REFUSED`).toContain('FENCED OUT')
+      }
+      // …while a wrapped READ still goes through.
+      expect(denial(callGuard('Bash', { command: 'bash -c "git status --short"' }))).not.toContain('FENCED OUT')
+    } finally {
+      rmSync(fencePath(), { force: true })
+    }
+  })
+
   it('the refusal repeats — it is a correctness gate, not a once-per-turn nudge', () => {
     // The board-first deny stands down after firing once, so a session that
     // ignores it can still work. This one must NOT: repeating the push is exactly

@@ -1326,9 +1326,14 @@ run, and each is judged on its command HEAD plus, where that is not enough, its
 SUBCOMMAND: `worktree list` vs `add`, `npm ls` vs `run`, `git stash list` vs
 `push`, `git tag` vs `git tag v0.4`. Quoted text decides nothing, a pipe into
 `tee` and a `> file` are writes while `2>&1` is not, only a genuinely
-state-changing segment denies — and the deny NAMES that segment. Anything
-undecidable reads as READ: this gate under-blocks by design, because a blocked
-turn produces nothing.
+state-changing segment denies — and the deny NAMES that segment. What CARRIES a
+command is unwrapped and judged too (`bash -c "…"`, `eval`, `$( … )`, backticks),
+so a wrapper hides neither a write from the idle claim nor a `git push` from the
+fence; inside single quotes both are inert, exactly as a shell reads them.
+Anything undecidable reads as READ at the idle claim — it under-blocks by design,
+because a blocked turn produces nothing — while the lease fence is the opposite
+case and judges conservatively: a session that lost the batch must not move
+shared history.
 
 **The board is written LF, whatever wrote it.** The markup anchors are matched
 with literal newlines, so a board an editor once wrote back in Windows text mode
