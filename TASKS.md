@@ -4043,36 +4043,6 @@ also be taken as its own task now and then.
   fixture written with `\n` passes before the fix and proves nothing), plus one asserting the
   empty-parse report fires for a non-empty source.
 
-- [ ] 470. "NOTHING IS RUNNING" MUST BE IMPOSSIBLE WHILE THE SESSION WORKS (user 30.07.2026:
-  "Nicht auf Zuruf korrigieren, sondern per Mechanismus etablieren, dass das nicht mehr
-  passieren kann."; bundle Chat & Tafel). Observed the same evening: `board.mjs done <n>
-  --none "<reason>"` put "Gerade keine laufende Arbeit" into the current-work section, the
-  session then went on working for eleven minutes, and the user read a board that claimed
-  idleness while three things were in flight. The user had to point it out — which is exactly
-  the class this project answers with a mechanism, never with a correction.
-  THE ASYMMETRY THAT MAKES IT ENFORCEABLE: "nothing is running" is a statement about the
-  FUTURE of the turn. It is true only if the session stops now. So it can be verified: the
-  claim stands until the session takes its next state-changing action, and that action is the
-  proof it was false.
-  FINAL STATE: `--none` writes its card as a CLAIM TO STOP. The PreToolUse board gate
-  (`board-first-guard`) then DENIES the next state-changing call while the board's current-work
-  section carries that claim — with the remedy in the message: put up a card naming the work,
-  or stop. Reads, the board commands themselves and an edit of the board file stay exempt, as
-  they are today, and the gate stays fail-open. A session that legitimately ends right after
-  `--none` is untouched, which is the case the flag exists for.
-  IT STACKS, AND THE SANCTIONED PATH IS WHY (observed three times the same evening, the last time
-  THREE idle cards deep, all reported by the user). The idle card is written by
-  `board.mjs done <n> --none`, which requires a current-work card for the point it closes — so once
-  the point is already ticked, there is NO sanctioned way to put the boundary card up, and the
-  session hand-edits the board file instead. Hand-edits append, so every further handover attempt
-  adds another copy, and one of those edits also broke the section markup. The idle card is a STATE,
-  not an entry: writing it replaces any idle card already standing, and it must be writable WITHOUT
-  a point to close, because the boundary is exactly the moment when no point is open.
-  VERIFIABLE: pure cases in the guard's decision core — a board carrying the no-work claim
-  denies a state-changing call and allows a read, a board carrying a real now-card allows
-  both, and the deny names the remedy; plus one case pinning that the boundary path
-  (`batch-boundary.mjs`, which legitimately ends the session) is not blocked by it.
-
 - [ ] 471. THE WORK ORDER STARVES THE POOL IT IS SUPPOSED TO FEED (user 30.07.2026, drawn
   from the branch-per-point ruling: "Dann sollte die aktuelle Abarbeitungsreihenfolge dahingend
   optimiert werden, dass sie den potenziellen Vorteil der Bündel optimal nutzt"; bundle
