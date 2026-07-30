@@ -51,7 +51,12 @@ import { resolveOwnership, PID_START_TOLERANCE_MS } from './batch-singleton.mjs'
  * THE TAKE-UP WINDOW: how long a claim stays honourable once there is nobody
  * left to wait for — the lock free (or its owner gone) and the claim not yet
  * taken. Past it the ordinary handover applies again, so a claim can never leave
- * the batch ownerless.
+ * the batch ownerless. The same window bounds the reservation a RELEASED claim
+ * holds on the freed lock (point 461), counted from the RELEASE — the moment
+ * there is nobody left to wait for — so a window left open but never taking what
+ * it asked for cannot hold the batch either. `HANDOVER_GRACE_MS` is deliberately
+ * NOT reused for it: that one means the pid-alive handover before a successor
+ * takeover, and overloading it would couple two calibrations.
  *
  * IT IS NO LONGER THE CLAIM'S LIFETIME (point 434 (6a), 30.07.2026). As a flat
  * expiry it was shorter than the owner's own gap between clean turn ends: the
@@ -120,6 +125,32 @@ export function ownerIsHolding({ lock = null, claimantSid = '', alive = false } 
 export const GIT_STATE_UNVERIFIABLE = 'unverifiable'
 
 /**
+ * IS THE CLAIMANT STILL THE PROCESS IT SAYS IT IS? PURE — the probe is injected.
+ *
+ * LIVENESS BY IDENTITY, never by existence: a claim from a window that has been
+ * closed must not move the batch, and a pid the OS handed to somebody else is a
+ * stranger. Shared by the two branches that need it — the honour path and the
+ * reservation a RELEASED claim holds (point 461) — so a reservation can never
+ * outlive a claimant the honour path would already have read as gone, which is
+ * the one way a reservation could stall the batch.
+ *
+ * Returns { alive, reason }; `reason` names the failing half and is what
+ * `assessClaim` reports.
+ */
+export function claimantLiveness({ claim, probePid = null, tolerance = PID_START_TOLERANCE_MS } = {}) {
+  const pid = Number(claim?.pid)
+  if (!Number.isInteger(pid) || pid <= 0) return { alive: false, reason: 'claimant-unidentified' }
+  const probe = probePid ? probePid(pid) : null
+  if (!probe || probe.exists !== true) return { alive: false, reason: 'claimant-dead' }
+  if (typeof claim.pidStartedAt !== 'number') return { alive: false, reason: 'claimant-no-start-time' }
+  if (typeof probe.startedAt !== 'number') return { alive: false, reason: 'claimant-start-time-unverifiable' }
+  if (Math.abs(probe.startedAt - claim.pidStartedAt) > tolerance) {
+    return { alive: false, reason: 'claimant-pid-reused' }
+  }
+  return { alive: true, reason: 'alive' }
+}
+
+/**
  * JUDGE A CLAIM. PURE — the pid probe is injected.
  *
  * Inputs:
@@ -140,23 +171,35 @@ export const GIT_STATE_UNVERIFIABLE = 'unverifiable'
  *               bounded reading — the direction that can never strand the batch.
  *   now, maxAgeMs, probePid, tolerance
  *
- * Returns { honour, mine, reason, ageMs, claimantSid, releasedAt }. `honour` true
- * is the ONLY value that changes anybody's behaviour; every other path leaves the
- * batch exactly as it was.
+ * Returns { honour, reserve, mine, reason, ageMs, claimantSid, releasedAt }.
+ * `honour` true is the ONLY value that releases anything; `reserve` true holds a
+ * FREE lock and moves nothing. Every other path leaves the batch exactly as it was.
  *
- * A RELEASED CLAIM IS NOT A CLAIM (point 434 (6c), measured 30.07.2026
- * 10:10-10:16). A record with `releasedAt` AND `releasedBy` both set was still
- * honoured: the owning session released to it, the claiming window never took
- * it, and the batch then ran for an hour with NO lock at all while every guard
- * and heartbeat behaved as though it were owned — and the boundary that followed
- * released to the same dead claim a second time (`.claude/boundary.log`: two
- * RELEASED lines, no HANDOVER). The stamp means the hand-over already happened,
- * so the reader must treat it as ABSENT: nothing is released to it twice, it
- * reserves nothing, and a new claim may be written straight over it. What the
- * claimant loses is the reservation — the lock is FREE and its own re-run of
- * `batch-claim.mjs --session <id>` still takes it — and what the batch gains is
- * that a release with no live taker falls back to the ordinary handover instead
- * of leaving the batch ownerless.
+ * A RELEASED CLAIM IS NEVER HONOURED AGAIN, BUT IT STILL HOLDS THE DOOR
+ * (point 434 (6c) + point 461, both measured 30.07.2026). Two incidents, one
+ * record:
+ *   - 10:10-10:16 — a record with `releasedAt` AND `releasedBy` set was still
+ *     HONOURED. The owner released to it, the claiming window never took it, and
+ *     the batch ran for an hour with NO lock while every guard behaved as though
+ *     it were owned; the boundary that followed released to the same dead claim a
+ *     second time (`.claude/boundary.log`: two RELEASED lines, no HANDOVER). So a
+ *     released record is never honourable again — nothing releases to it twice.
+ *   - 17:10-17:16 — reading it as plain ABSENT made it reserve nothing, so the
+ *     RELEASING session re-acquired the lock it had just freed at its own next
+ *     turn end (`acquiredAt` 17:11), and the user's window had to WIN A RACE
+ *     against automated acquirers — which is exactly the window that is answering
+ *     the user rather than polling. It lost by six minutes.
+ * The resolution keeps both: unhonourable AND reserving. While its claimant is
+ * PROVABLY alive — the same pid + start-time identity probe the honour path runs,
+ * never a deadline — no OTHER window may take the freed lock (`reservationDecision`),
+ * and the claimant's own path is untouched because the own-claim branch is asked
+ * BEFORE this one. A dead or closed claimant frees the lock INSTANTLY, so the
+ * batch can never idle out a reservation, and the take-up window (`maxAgeMs`,
+ * counted from the RELEASE — that is the moment there is nobody left to wait for)
+ * caps a window that stays open but never takes what it asked for. An ERRAND claim
+ * (`claimIsBounded`) reserves nothing here: its pid names its ISSUER, not its
+ * taker, so it proves nothing about anybody waiting. A new claim may still be
+ * written straight over a released record.
  */
 export function assessClaim({
   claim,
@@ -171,6 +214,7 @@ export function assessClaim({
 } = {}) {
   const out = (honour, reason, extra = {}) => ({
     honour,
+    reserve: false,
     mine: false,
     reason,
     ageMs: null,
@@ -200,25 +244,35 @@ export function assessClaim({
   }
   if (ownerSid && claim.sessionId === ownerSid) return out(false, 'claimant-is-owner', { ...base, ageMs })
 
-  // ALREADY HANDED OVER → absent, for everybody but its own writer (see above).
+  // ALREADY HANDED OVER → never honourable again, for everybody but its own
+  // writer (see above). It still RESERVES the free lock while its claimant is
+  // provably alive (point 461): the same identity probe, no second notion of
+  // liveness, and no deadline anybody has to feed.
   if (base.releasedAt !== null || (typeof claim.releasedBy === 'string' && claim.releasedBy.trim() !== '')) {
-    return out(false, 'released', { ...base, ageMs })
+    // An ERRAND claim's pid names its ISSUER rather than its taker, so it proves
+    // nobody is waiting. Asked first: it needs no probe at all.
+    if (claimIsBounded(claim)) return out(false, 'released', { ...base, ageMs })
+    // THE TAKE-UP WINDOW, counted from the RELEASE: that is the moment there is
+    // nobody left to wait for, and counting from `claim.at` instead would expire
+    // every reservation a long-held batch produces before it ever began. Without a
+    // usable stamp — `releasedBy` alone, or a stamp from the future, which is a
+    // clock nobody here can reason about — there is no window to measure, and the
+    // reading that cannot strand the batch is the one that reserves nothing.
+    // Checked BEFORE the probe: a long-expired record then costs no OS call
+    // (four-eyes review, Fable 5, 30.07.2026, finding 4).
+    const sinceRelease = base.releasedAt === null ? null : now - base.releasedAt
+    if (sinceRelease === null || !(sinceRelease >= 0) || sinceRelease > maxAgeMs) {
+      return out(false, 'released', { ...base, ageMs })
+    }
+    // A dead or closed claimant frees the lock INSTANTLY — the probe decides, so
+    // a reservation can never idle the batch out.
+    if (!claimantLiveness({ claim, probePid, tolerance }).alive) return out(false, 'released', { ...base, ageMs })
+    return out(false, 'released-reserved', { ...base, ageMs, reserve: true })
   }
 
-  // LIVENESS BY IDENTITY, never by existence: a claim from a window that has been
-  // closed must not move the batch, and a pid the OS handed to somebody else is
-  // not the claimant. THIS is the bound that replaced the flat expiry.
-  const pid = Number(claim.pid)
-  if (!Number.isInteger(pid) || pid <= 0) return out(false, 'claimant-unidentified', { ...base, ageMs })
-  const probe = probePid ? probePid(pid) : null
-  if (!probe || probe.exists !== true) return out(false, 'claimant-dead', { ...base, ageMs })
-  if (typeof claim.pidStartedAt !== 'number') return out(false, 'claimant-no-start-time', { ...base, ageMs })
-  if (typeof probe.startedAt !== 'number') {
-    return out(false, 'claimant-start-time-unverifiable', { ...base, ageMs })
-  }
-  if (Math.abs(probe.startedAt - claim.pidStartedAt) > tolerance) {
-    return out(false, 'claimant-pid-reused', { ...base, ageMs })
-  }
+  // LIVENESS BY IDENTITY — the bound that replaced the flat expiry.
+  const live = claimantLiveness({ claim, probePid, tolerance })
+  if (!live.alive) return out(false, live.reason, { ...base, ageMs })
 
   // THE CLOCK, where and only where nothing else bounds the wait: an errand claim
   // that carries its own issuer, or a claim with no live owner left to wait for.
@@ -267,8 +321,12 @@ export function releaseDecision({ assessment, inFlightLive = false, gitOperation
  * judge the moment clean, release again, and say "handed back" once more. Every
  * site that acquires therefore asks this first.
  *
- * `honour` is exactly the reservation: `assessClaim` answers `mine` (never
- * `honour`) for the claimant's OWN claim, so the window the batch is waiting for
+ * TWO STATES RESERVE, and the second one is point 461. `honour` is the pending
+ * claim nobody has released to yet; `reserve` is the claim that HAS been released
+ * to and whose claimant is still alive — the gap the incident of 17:10 fell
+ * through, when the releasing session itself re-acquired the lock it had just
+ * freed. Neither is the claimant's own claim: `assessClaim` answers `mine` (never
+ * `honour`, never `reserve`) for that, so the window the batch is waiting for
  * still acquires — which is the whole point of freeing it.
  *
  * Returns { acquire, reason, claimantSid }.
@@ -277,6 +335,9 @@ export function reservationDecision({ assessment } = {}) {
   const a = assessment ?? null
   if (a && a.honour === true) {
     return { acquire: false, reason: 'reserved', claimantSid: a.claimantSid ?? null }
+  }
+  if (a && a.reserve === true) {
+    return { acquire: false, reason: 'reserved-released', claimantSid: a.claimantSid ?? null }
   }
   return { acquire: true, reason: a?.mine === true ? 'own-claim' : (a?.reason ?? 'no-claim'), claimantSid: a?.claimantSid ?? null }
 }
@@ -313,14 +374,19 @@ export function claimWriteDecision({
 
 /** The one line the guard puts in the boundary log and in its message, and the
  *  CLI prints. A released record says so in words, because it was HONOURED twice
- *  in a row on 30.07.2026 while every line about it looked ordinary. */
+ *  in a row on 30.07.2026 while every line about it looked ordinary — and it says
+ *  whether the freed lock is still RESERVED for that window (point 461), because
+ *  "spent" alone read as "up for grabs" and the batch was taken back. */
 export function describeClaim(assessment) {
   if (!assessment || !assessment.claimantSid) return 'no claim'
   const mins = Number.isFinite(assessment.ageMs) ? Math.round(assessment.ageMs / 60000) : null
   const age = mins === null ? '' : ` (claimed ${mins} min ago)`
   const released =
-    typeof assessment.releasedAt === 'number'
-      ? ', ALREADY released for it — the hand-over happened, this record is spent'
-      : ''
+    assessment.reserve === true
+      ? ', ALREADY released for it — the hand-over happened, so this record can never be honoured again, but the ' +
+        'free lock stays RESERVED for that window while it lives and until the take-up window runs out'
+      : typeof assessment.releasedAt === 'number'
+        ? ', ALREADY released for it — the hand-over happened, this record is spent'
+        : ''
   return `session ${assessment.claimantSid}${age} — ${assessment.reason}${released}`
 }

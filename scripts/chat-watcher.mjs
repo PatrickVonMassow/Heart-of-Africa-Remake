@@ -50,7 +50,7 @@ import { knownMessages, claimMessage, readPending, spoolMessage } from './chat-s
 import { readReplyReceipt } from './chat-reply.mjs'
 import { assessOwner, bootTimeMs, probePid, readOwnerLock } from './batch-singleton.mjs'
 import { clearClaim, maxAgeMs as claimMaxAgeMs, readClaim, writeClaim } from './batch-claim.mjs'
-import { assessClaim } from './batch-claim-core.mjs'
+import { assessClaim, reservationDecision } from './batch-claim-core.mjs'
 import { isPaused } from './batch-lock.mjs'
 import { openPointStatus, ARCHIVE_PATH, TASKS_PATH } from './tasks-source.mjs'
 import { buildSpawnArgs, buildSpawnOptions, claudeExeBase, findClaudeExe } from './batch-autostart-core.mjs'
@@ -169,8 +169,15 @@ function gatherState(sessionId, responderLive) {
   // Our OWN claim is not a reason to stand down — `responderLive` already covers
   // the responder it belongs to, and it says so in a more useful word.
   const foreignClaim = claimIsOurs(claim, sessionId) ? null : claim
+  // A claim stands in the way while it is honoured AND while it merely RESERVES a
+  // freed lock (point 461) — `reservationDecision` is the shared reading of both,
+  // so the watcher cannot wake a responder into a lock that is being handed to the
+  // user's window. The field keeps the name `wakeDecision` knows it by: what it
+  // has always meant here is "a claim speaks for that lock", not the honour flag.
   const claimHonoured = foreignClaim
-    ? assessClaim({ claim: foreignClaim, now, maxAgeMs: claimMaxAgeMs(), probePid }).honour === true
+    ? reservationDecision({
+        assessment: assessClaim({ claim: foreignClaim, now, maxAgeMs: claimMaxAgeMs(), probePid }),
+      }).acquire === false
     : false
   return { paused: isPaused(), formatAlarm: formatAlarm(), ownerAlive, responderLive, claimHonoured }
 }

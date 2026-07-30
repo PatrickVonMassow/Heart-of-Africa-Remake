@@ -376,10 +376,12 @@ export const BOUNDARY_DESTINATIONS = Object.freeze({
 /**
  * WHO CONTINUES AFTER THIS BOUNDARY? PURE.
  *
- * `claimHonoured` is `assessClaim(...).honour` — the very predicate the launcher
- * bails on — so the card cannot drift from the launcher's own reading. A claim
- * that is merely RECORDED (expired, dead, already released) changes nothing, and
- * the card then correctly announces the fresh session.
+ * `claimHonoured` is the launcher's own bail predicate — today
+ * `reservationDecision(...).acquire === false`, which covers the pending claim AND
+ * the released one still reserving the freed lock (point 461) — so the card cannot
+ * drift from what the launcher will actually do. A claim that is merely RECORDED
+ * (expired, dead, released by a claimant that is gone) reserves nothing, and the
+ * card then correctly announces the fresh session.
  */
 export function boundaryDestination({ claimHonoured = false, claimantSid = null } = {}) {
   const sid = typeof claimantSid === 'string' && claimantSid.trim() ? claimantSid.trim() : null
@@ -427,17 +429,22 @@ export function boundaryCardCommand({ point, pointCardStanding = false } = {}) {
 export function boundaryCardText({ destination, claimantSid = null } = {}) {
   const head = 'Der Punkt ist abgeschlossen.'
   if (destination === BOUNDARY_DESTINATIONS.CLAIMING_WINDOW && claimantSid) {
-    // The reservation is stated with its LIMIT, not as a promise: it holds until
-    // the lock is released for that window, and from then on the first window to
-    // acquire wins (a released claim is spent — see `assessClaim`). Promising
-    // more would repeat, one step later, the very misdirection this card was
-    // rewritten to remove (four-eyes review, finding 2).
+    // The reservation is stated with its LIMIT, not as a promise. It survives the
+    // release now (point 461 — the freed lock stays that window's while its
+    // process lives), so the card no longer has to warn about losing a race; but
+    // it ends, and it ends silently, so the card names the two things that end it:
+    // closing the window, and letting the take-up window run out. Promising more
+    // would repeat, one step later, the very misdirection this card was rewritten
+    // to remove (four-eyes review, finding 2).
     return (
       `${head} Der Stapel geht NICHT an eine frische Sitzung: Fenster ${claimantSid} hat ihn beansprucht, der ` +
       'Launcher hält den Start deshalb zurück und reserviert den Stapel für dieses Fenster. Weitergearbeitet ' +
       `wird dort, sobald es den Anspruch einlöst (\`node scripts/batch-claim.mjs --session ${claimantSid}\`). ` +
-      'Löst es ihn nach der Freigabe nicht gleich ein, greift die gewöhnliche Übergabe — der Stapel bleibt ' +
-      'nie ohne Eigentümer. Hier läuft nichts weiter.'
+      'Die Reservierung bleibt auch nach der Freigabe bestehen, solange dieses Fenster offen ist — kein ' +
+      'Launcher-Lauf und keine andere Sitzung nimmt sie ihm beim Rundenende weg. Wird sie innerhalb der ' +
+      'Übernahmefrist nicht eingelöst oder das Fenster geschlossen, greift die gewöhnliche Übergabe — der ' +
+      'Stapel bleibt nie ohne Eigentümer. ' +
+      'Hier läuft nichts weiter.'
     )
   }
   return (

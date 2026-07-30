@@ -17,6 +17,7 @@ import { writeJsonAtomic } from './atomic-write.mjs'
 import { readTasksOpen, TASKS_PATH, ARCHIVE_PATH } from './tasks-source.mjs'
 import { readOwnerLock } from './batch-singleton.mjs'
 import { gatherClaim } from './batch-claim.mjs'
+import { reservationDecision } from './batch-claim-core.mjs'
 import {
   BOUNDARY_DESTINATIONS,
   BOUNDARY_DUE_MS,
@@ -284,7 +285,14 @@ export function boundaryHandover({ sid = readOwnerLock()?.sessionId ?? '' } = {}
   } catch {
     /* no readable claim → nobody is waiting for the batch */
   }
-  const where = boundaryDestination({ claimHonoured: claim.honour === true, claimantSid: claim.claimantSid })
+  // The launcher's own reading, not a second one: it skips its spawn for a claim
+  // that is honoured AND for a released one still reserving the freed lock
+  // (point 461), so the card must name the claiming window in both states or it
+  // announces a fresh session the launcher will not start.
+  const where = boundaryDestination({
+    claimHonoured: reservationDecision({ assessment: claim }).acquire === false,
+    claimantSid: claim.claimantSid,
+  })
   // The card takes NO point number (point 439): it goes into the unnumbered gap
   // card, where the topic guard reads every point reference as a foreign one.
   return { ...where, card: boundaryCardText(where) }

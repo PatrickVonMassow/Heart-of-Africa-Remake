@@ -190,8 +190,14 @@ describe('the other stand-downs stay honest', () => {
       // `claim.at`, never from the moment the lock fell free)…
       expect(text).toContain('honoured for 30 min FROM WHEN IT WAS RECORDED')
       expect(text).toContain('ordinary handover')
-      // …and that a release ends the claim rather than reserving anything.
-      expect(text).toContain('the first window to acquire wins')
+      // …and what a RELEASE means for this window (point 461): the record is
+      // spent, but the freed lock is HELD for it — the text must not send the
+      // user into the race they lost by six minutes on 30.07.2026 — and it is
+      // held only for the take-up window, which is the half that ends it.
+      expect(text).toContain('can never be honoured a second time')
+      expect(text).toContain('stays RESERVED for this window')
+      expect(text).toContain('for up to 30 min from the release')
+      expect(text).not.toContain('the first window to acquire wins')
     }
   })
 

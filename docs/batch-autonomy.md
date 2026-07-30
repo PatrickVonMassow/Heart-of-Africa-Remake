@@ -1039,7 +1039,7 @@ The chain, and where each link lives:
 | claim | the returning window | `acquire` first: with no live owner the claim is satisfied AT ONCE and the command reports the batch is yours. Otherwise `.claude/batch-claim.json` records `{ sessionId, pid, pidStartedAt, at }` |
 | see | the owner's Stop hook | `batch-progress-guard` gathers the claim before the parallel detector and asks `releaseDecision` whether this is a clean moment |
 | release | the owner's Stop hook | at a clean moment: `handBackToClaimant` — a real release, not a handover — and ONLY where the release really happened is the claim stamped `releasedAt`; `.claude/boundary.log` gets `RELEASED to <sid> by <sid>`, and the session is told out loud that it is no longer the batch worker. Where the lock did not name this session there is nothing to release, and nothing is stamped: the stamp is a promise to the claiming window and a session that freed nothing must not make it |
-| take | the returning window | the SAME command again: `acquire` succeeds and clears the claim. (Its next `SessionStart` does the same thing by itself.) |
+| take | the returning window | the SAME command again: `acquire` succeeds and clears the claim. (Its next `SessionStart` does the same thing by itself.) The stamp keeps the freed lock RESERVED for it in the meantime (bound 1a), so this is not a race |
 
 **A claim is a REQUEST, never a transfer.** Nothing in it writes the lock:
 ownership is still gained only through the atomic `acquire` in
@@ -1081,18 +1081,44 @@ session — the failure the whole singleton exists to prevent.
    heartbeat behaved as though it were owned — and the boundary that followed
    released to the same dead claim a second time (`.claude/boundary.log`: two
    RELEASED lines, no HANDOVER). The stamp means the hand-over already happened,
-   so every reader but the claim's own writer treats it as ABSENT: nothing
-   releases to it twice, it reserves nothing, and a returning window may claim
-   straight over it. The claimant loses only the reservation — the lock is FREE
-   and its own re-run of `batch-claim.mjs --session <id>` still takes it — and the
-   batch gains that a release with no live taker falls back to the ordinary
-   handover rather than standing ownerless. THE PRICE, stated because the texts
-   must not promise otherwise: from the release on, the first window to acquire
-   wins, so an attended user can lose the lock to a launcher tick and then has to
-   claim again against the new owner. That is the deliberate trade — a race that
-   costs one command against an hour with no owner at all — and every text that
-   mentions the release says it (the stand-down's way back, the claim CLI, and the
-   German boundary card's closing sentence).
+   so no reader but the claim's own writer may ever HONOUR it again: nothing
+   releases to it twice, and a returning window may claim straight over it.
+1b. **…but it RESERVES the freed lock while its claimant lives** (point 461,
+   observed live 30.07.2026 17:10-17:16). Reading a released record as plain ABSENT
+   was the other half of the same hour: `boundary.log` records `RELEASED to
+   103806e3… by 3c5d6964…` at 17:10:22 and the lock shows `acquiredAt` 17:11 — the
+   RELEASING session took the batch back at its own next turn end, because what it
+   had just freed reserved nothing. The user's window then had to WIN A RACE
+   against automated acquirers, and the window that is answering the user is
+   exactly the one not polling: it lost by six minutes, and the takeover had to be
+   forced by stopping the owner process. So a released claim is unhonourable AND
+   reserving. `assessClaim` answers `reserve` instead of plain absent, and
+   `reservationDecision` refuses the acquire on it — for the launcher, the chat
+   watcher, the resume hook, a third window's Stop guard and the releasing session
+   alike. What it does NOT refuse is a deliberate `batch-claim.mjs --session <id>`
+   from another window: that path acquires a free lock directly, as it always has,
+   and it is the manual override the mechanism is meant to keep. The reservation
+   holds off the automated acquirers, not a person at a keyboard, and the texts say
+   so rather than promising a protection that is not there; and the acquire that
+   overrides CLEARS the spent record, so it cannot go on reserving against the
+   launcher's crash recovery. THE BOUNDS are the ones already there, not a new
+   clock: the claimant must
+   be PROVABLY alive by the pid + start-time identity probe (a closed window frees
+   the lock instantly — the probe decides, never a deadline), the take-up window
+   caps it counted FROM THE RELEASE (a window left open but never taking what it
+   asked for cannot hold the batch), an ERRAND claim reserves nothing because its
+   pid names its issuer rather than a taker, and the claimant's own path is
+   untouched because the own-claim branch is asked first. `HANDOVER_GRACE_MS` is
+   deliberately not reused — it means the pid-alive handover before a successor
+   takeover, and overloading it would couple two calibrations. The reservation
+   lives in the CLAIM file and never in the lock: a new lock kind would have to be
+   learned by `assessOwner`, `spawnDecision`, `heldByOtherLiveOwner`,
+   `resolveOwnership`, `acquire`, `release`, the launcher assessment and the
+   boundary card, and a reserved lock would read as not-alive and be spawned into
+   (four-eyes review, Fable 5, 30.07.2026 — it corrected the first draft, which put
+   the reservation on the lock). Every text that mentions a release says what is
+   reserved and what ends it: the stand-down's way back, the claim CLI's `--status`
+   and the German boundary card.
 2. **The claimant must be ALIVE, by IDENTITY.** The recorded pid must exist AND
    have started when the claim says — a reused pid is a stranger. Same rule
    `checkEvidence` applies to a declared background run; `resolveOwnership`
@@ -1123,26 +1149,29 @@ Two consequences that are easy to miss and were both built:
   excludes the honoured claimant from `detectParallel`. A session that announced
   itself through the sanctioned channel is not the covert second driver the
   detector was written for; an unannounced one is still flagged exactly as before.
-- **A live claim RESERVES the batch.** Once the owner lets go, the lock lies FREE
-  until the claiming window runs its next command, and ANY window that reaches an
-  acquire in that gap would take it. So all three doors ask
-  `reservationDecision` first: `batch-autostart` skips its tick,
-  `batch-resume-hook` does not acquire, and the owner's own Stop guard
-  (`batch-progress-guard`) does not re-acquire. Without that third one a stood-down
-  window would take the freed lock at its next turn end, see the claim, judge the
-  moment clean and release again — repeated "handed back" messages and RELEASED
-  spam in `boundary.log`. Bound 1a closes the same door from the other side: once
-  the release has happened the record is spent, so a window that does take the
-  freed lock finds nothing to release to and carries on working instead. The claimant's OWN claim reserves nothing against itself
-  (`assessClaim` answers `mine`, never `honour`), so the window the batch is
-  waiting for still acquires; and all three stand-downs end at the same two
-  bounds — the claiming window's own life, and the take-up window once the lock
-  is free — so a claim can never strand the batch.
+- **A claim RESERVES the batch, before AND after the release.** Once the owner lets
+  go, the lock lies FREE until the claiming window runs its next command, and ANY
+  window that reaches an acquire in that gap would take it. So every door asks
+  `reservationDecision` first — `batch-autostart` skips its tick, `chat-watcher`
+  wakes no responder, `batch-resume-hook` does not acquire, the owner's own Stop
+  guard (`batch-progress-guard`) does not re-acquire, and the boundary card names
+  the claiming window because the launcher will not spawn. Without the Stop guard's
+  one, a stood-down window would take the freed lock at its next turn end, see the
+  claim, judge the moment clean and release again — repeated "handed back" messages
+  and RELEASED spam in `boundary.log`. Bounds 1a and 1b are the two halves of the
+  released state: never honourable again (so nothing releases to it twice), still
+  reserving (so nobody takes the lock off the window it was freed for). The
+  claimant's OWN claim reserves nothing against itself (`assessClaim` answers
+  `mine`, never `honour` and never `reserve`), so the window the batch is waiting
+  for still acquires; and every stand-down ends at the same two bounds — the
+  claiming window's own life, and the take-up window — so a claim can never strand
+  the batch.
 - **The stand-down and the boundary card SAY which of the two is happening.**
   `batch-resume-hook`'s way-back text used to end at "re-running the SAME command
   takes it" and never mentioned that a claim ages at all, so a returning session
   claimed once, waited, and never learned why nothing happened; it now states both
-  halves of bound 1. And the boundary card used to announce "Ich übergebe an eine
+  halves of bound 1 and, since bound 1b, what a release leaves standing instead of
+  sending the user into a race. And the boundary card used to announce "Ich übergebe an eine
   frische Sitzung … Sie nimmt den nächsten Punkt der Warteschlange auf" even while
   a window held an honoured claim — which is exactly when `batch-autostart`
   reserves the batch and SKIPS the spawn, so the batch went to that window and the

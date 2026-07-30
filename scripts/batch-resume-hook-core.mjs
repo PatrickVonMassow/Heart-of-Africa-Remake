@@ -32,7 +32,8 @@ export const STAND_DOWN_KINDS = Object.freeze({
   OTHER_RESPONDER: 'other-responder',
   /** A live owner holds the lock — the original, and still the common, case. */
   LIVE_OWNER: 'live-owner',
-  /** Nobody owns the lock, but an honoured claim reserves it for a window. */
+  /** Nobody owns the lock, but a claim reserves it for a window — either still
+   *  pending, or already released for it and held while that window lives. */
   RESERVED: 'reserved',
   /** The acquire simply lost and no lock is readable — say so plainly. */
   UNKNOWN: 'unknown',
@@ -73,6 +74,12 @@ export function standDownKind({ lock = null, claim = null, claimHonoured = false
  * and once the lock is free it only reserves the batch for the take-up window,
  * after which the ordinary handover takes over. `takeUpMin` is the take-up
  * window in minutes, injected so this stays pure.
+ *
+ * AND IT NO LONGER SENDS THE USER INTO A RACE (point 461). It used to end "the
+ * first window to acquire wins, so re-run the command AT ONCE" — which was true,
+ * and which the user LOST by six minutes on 30.07.2026 while the releasing session
+ * itself took the lock back. The released claim now holds the freed lock for its
+ * claimant, so the text says what is actually reserved and what ends it.
  */
 function wayBack(sessionId, takeUpMin) {
   return (
@@ -83,10 +90,11 @@ function wayBack(sessionId, takeUpMin) {
     'the user. THE CLOCK, stated rather than hidden: while a LIVE owner holds the lock the claim does NOT ' +
     'expire — it holds for as long as THIS window is open and is ignored the moment it closes. With NO live ' +
     `owner it is honoured for ${takeUpMin} min FROM WHEN IT WAS RECORDED, and after that the ordinary handover ` +
-    'takes over so the batch is never left ownerless. And once the owner has RELEASED for it the claim is ' +
-    'spent: the lock is free and the first window to acquire wins, so re-run the command AT ONCE — if the ' +
-    'launcher got there first, simply claim again against the new owner. To inspect: ' +
-    '`node scripts/batch-claim.mjs --status`.'
+    'takes over so the batch is never left ownerless. Once the owner has RELEASED for it the claim can never be ' +
+    'honoured a second time, but the freed lock stays RESERVED for this window while it is open — no launcher ' +
+    `tick and no other session takes it at a turn end — for up to ${takeUpMin} min from the release. Re-run the command ` +
+    'within that window; miss it and the ordinary handover applies, and you simply claim again against the new ' +
+    'owner. To inspect: `node scripts/batch-claim.mjs --status`.'
   )
 }
 
