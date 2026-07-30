@@ -4067,3 +4067,38 @@ also be taken as its own task now and then.
   denies a state-changing call and allows a read, a board carrying a real now-card allows
   both, and the deny names the remedy; plus one case pinning that the boundary path
   (`batch-boundary.mjs`, which legitimately ends the session) is not blocked by it.
+
+- [ ] 471. THE WORK ORDER STARVES THE POOL IT IS SUPPOSED TO FEED (user 30.07.2026, drawn
+  from the branch-per-point ruling: "Dann sollte die aktuelle Abarbeitungsreihenfolge dahingend
+  optimiert werden, dass sie den potenziellen Vorteil der Bündel optimal nutzt"; bundle
+  Session- & Repo-Hygiene). With one branch per point settled, a bundle's remaining value is
+  its ORDER and its COLLISION MAP — and those two pull in opposite directions, which nothing
+  in the order accounts for. A bundle is defined BY SHARED FILES, so its members are precisely
+  the points that CANNOT run beside each other. "Order of work" in `docs/work-packages.md` is a
+  strict bundle-after-bundle ranking, so a pool of three drawing from the top of it can be fed
+  by ONE agent whenever the leading bundle's points collide — the cap becomes 1 of 3 without
+  anything reporting it. The three slots ran full on 30.07.2026 only because that evening's
+  points happened to come from three different bundles.
+  FINAL STATE: the picker takes the next point from each of the top N DISTINCT bundles rather
+  than the top N points, so the leading bundle contributes one agent and the next ones fill the
+  remaining slots; the ranking in `docs/work-packages.md` stays the PRIORITY and is not
+  reordered by the picker. Two points that must share a branch (same files, per point 452's
+  grouping) count as ONE slot. Where the top bundles are not file-disjoint from each other, the
+  ranking itself is adjusted so that they are — the priority order decides WHICH bundles lead,
+  the disjointness decides only their arrangement among near-equals.
+  ITS VISIBLE HALF (user 30.07.2026, on seeing the grouped board): "Wo kann ich ab jetzt sehen,
+  welcher Punkt als nächstes bearbeitet wird? Das ist nicht mehr ersichtlich, oder?" — correct, and
+  the grouping caused it: before, the next point was the first card in the queue; now it is behind a
+  collapsed bundle, and once the picker draws from several bundles it is not the first card of the
+  first group either. So the board NAMES what the picker answers: at the head of the Warteschlange,
+  above the group cards, the points that would be started next — one line, as many as the pool has
+  slots, each with its number and German title. It is DERIVED from the picker, never written by hand,
+  so it cannot drift from what actually happens.
+  MEASURED, not asserted: the point is delivered when a command reports, for the current work
+  order, how many agents the top of the queue can actually feed, and that figure is 3 (or the
+  reason it cannot be). `--slots-free` already demands a reason for an idle slot; this makes
+  the ORDER answer for it instead of the session.
+  VERIFIABLE: pure cases on the picker — a leading bundle of colliding points yields one
+  candidate and the next bundles fill the rest; a file-disjoint pair inside one bundle still
+  yields two; the priority ranking is never violated by the disjointness rule; and the
+  reporting command's figure matches the picker's own answer on the real work order.
