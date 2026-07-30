@@ -3953,6 +3953,92 @@ it is appended.
   commit blocks, a positive one on the current commit passes; the brief's text is pinned by its
   existing test.
 
+- [ ] 458. A DELEGATED AGENT'S RETURN IS A PROTOCOL, NOT A NARRATIVE (30.07.2026,
+  measured while assessing the delegation economics; bundle I). Point 365 bounded the INPUT
+  side of delegation — a brief costs ~1.8k tokens against ~108k for reading the work order
+  and design.md whole — but NOTHING bounds what the agent writes BACK, and its final text is
+  the only thing that enters the main session's context. It is also the one part the main
+  session does not need in prose: the merge reads git for every fact it acts on (branch,
+  SHAs, changed files), never the report.
+  FINAL STATE: `assembleBrief` (`scripts/point-brief-core.mjs`) closes EVERY brief with a
+  `--- WHAT YOU RETURN ---` block, appended as the FINAL section, after NOTES, for OPEN and
+  DONE/ARCHIVED points alike, so a regenerated brief carries it and no prompt template has to
+  remember it. The block demands exactly: the point number; the branch name; the commit SHAs
+  in order; the gates actually run (build, lint, `test:unit`, and each browser suite by name)
+  each with its verdict; the changed files as PATHS ONLY; open items and escalations; and the
+  point-365 question answered — did the brief suffice, and what was missing. It FORBIDS
+  diffs, file contents, logs, code blocks and restated spec text, and says why (the merge
+  reads git, not the report). It names a target length ("keep this under ~40 lines") as
+  guidance, NOT a cap — a truncated escalation costs more than a long one, so nothing is ever
+  cut.
+  VERIFIABLE (`scripts/point-brief-core.test.mjs`): the block is present in an assembled
+  brief; it names every required field; it survives a brief with no sections and no
+  cross-referenced points; and the existing all-points ceiling sweep stays green with the
+  block included (the largest real brief measures 19.5k against `BRIEF_TOKEN_CEILING` 24000,
+  so the ~500 added tokens fit).
+
+- [ ] 459. CLAUDE.MD PAYS ITS RENT ON EVERY TURN (user 30.07.2026, measured that day;
+  bundle L). CLAUDE.md is 72014 characters — about 18k tokens — and it is sent with EVERY
+  turn of EVERY session and inherited by every delegated subagent, three of which run in
+  parallel. Unlike the accumulated conversation, which the point boundary resets, this load
+  never resets. It is also at 100.0 % of its own word ceiling today (10419 words against
+  `maxWords: 10419`, `scripts/doc-budget-core.mjs`), so the next point that must touch it is
+  blocked until this one lands.
+  FINAL STATE: the two largest acceptance criteria, §7.1 no. 20 (comfort, audio and the debug
+  menu) and no. 21 (water realism), keep in CLAUDE.md their NUMBER, their bold TITLE (the
+  brief resolver parses criteria as `^(\d+)\.\s+\*\*title\*\*`, so both must survive
+  verbatim), an acceptance condition of at most four sentences drawn from the criterion's
+  existing opening wording where possible, and their existing `Evidence:` line; their detail
+  moves VERBATIM — not rewritten, and nothing appears in both files — into
+  `docs/acceptance-criteria-detail.md` under the SAME numbers, exactly as the evidence chains
+  moved to `docs/acceptance-evidence.md`. Each shortened criterion points at its detail
+  section, and §7.1's 1..32 numbering, the reference-not-duplicate convention and every
+  existing cross-reference stay intact.
+  `scripts/doc-budget-core.mjs` has CLAUDE.md's ceiling LOWERED — `maxLines` AND `maxWords` —
+  to the new measured size plus the usual sentence-sized headroom, with the reason in the
+  comment beside it, so the saving cannot be silently re-spent. The detail file itself joins
+  the deliberately UNBUDGETED reference material (same class as `docs/acceptance-evidence.md`,
+  which the budget module's own comment exempts because on-demand reference costs nothing per
+  turn), and the what-is-budgeted comment names it there.
+  IN THE SAME POINT, one precision to §6 that the delegation count settled (four-eyes,
+  30.07.2026: of the last 60 first-parent commits on `main`, 42 are main-only bookkeeping and
+  only 9 were delegable, all small): a cross-cutting change BEYOND a small commit — a new
+  mechanism, a multi-file guard rebuild — is delegated to a worktree agent like any point;
+  what stays with the main session is the arming in `.claude/settings.json` or the git hooks,
+  which needs an attended session, and the main-only bookkeeping.
+  VERIFIABLE: `npm run test:unit` green (the doc-budget layer included); a brief for a point
+  citing §7.1 no. 20 or no. 21 still BUILDS — `point-brief.mjs` fails loudly on a `§` that
+  resolves nowhere, so a successful build is the proof that no reference was orphaned; and
+  CLAUDE.md's measured size is reported in the commit message.
+  PRIORITY: this point may be pulled FORWARD past the v0.2 bugfixes-only rule (user
+  30.07.2026) — it touches no game code, cannot endanger the demo, every turn it is deferred
+  is paid at ~18k tokens, and the word ceiling is already full.
+
+- [ ] 460. A RED VERIFICATION MUST BE DIAGNOSABLE WITHOUT RE-RUNNING IT (30.07.2026; bundle
+  K). `runSuite` in `scripts/verify/run-all.mjs` captures each suite's complete output, prints
+  only the verdict line plus, on a failure, the `FAIL`/`ERR:` lines and a hardcoded 12-line
+  tail — and then DISCARDS the rest. So the context is already bounded; what is missing is the
+  EVIDENCE. Diagnosing a red suite today means running it again, and a browser suite on two
+  backends is the most expensive wall-clock item we have.
+  FINAL STATE: `runSuite` — and the preview and cross-browser paths — writes each suite's
+  complete captured output to `local/verify-logs/<run-stamp>/<suite>-<backend>.log` (`local/`
+  is git-ignored) and prints that path beside the verdict line, so a session reads the tail of
+  a NAMED file instead of re-running the suite. The failure tail length becomes calibratable
+  (`VERIFY_FAIL_TAIL`, default the current 12) and applies to EVERY failure, not only a crash.
+  What must NOT change: the SUITES' own stdout stays full — the runner parses `^PASS`/`^FAIL`
+  counts, `console errors: (\d+)` and `failedChecks` out of it, and condensing the suites
+  rather than the runner would blind exactly that parsing. A suite invoked DIRECTLY (`node
+  scripts/verify/render.mjs`, the render-verify-guard's per-backend runs) is out of scope; the
+  documented route for a condensed run is the runner's filter form, and
+  `scripts/verify/README.md` says so. NOT the mechanism: a context compaction — a lossy
+  summary of guard, lease and focus state is exactly what the point boundary was built to
+  avoid.
+  VERIFIABLE: the pure shaping (verdict line, the path line, the calibratable tail length,
+  what a green versus a red suite prints) is covered in the Vitest layer; the live path is
+  proven by an existing browser suite run writing its log file.
+  PRIORITY: behind 458 and 459 — it is a wall-clock and diagnosis saving, not the context
+  saving it was drafted for.
+
 ## Closing (only after all points)
 
 New points are appended BEFORE this section — it stays last in the file.
