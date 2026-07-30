@@ -30,7 +30,7 @@ import {
 } from './board-core.mjs'
 
 const BOARD = resolve(REPO_ROOT, '.batch-dashboard.html')
-const run = (args) => execFileSync(process.execPath, args, { cwd: REPO_ROOT, encoding: 'utf8' })
+const run = (args) => execFileSync(process.execPath, args, { windowsHide: true, cwd: REPO_ROOT, encoding: 'utf8' })
 
 
 /** Apply a pure card edit, rotate the archive overflow, publish, and say what is left by hand. */

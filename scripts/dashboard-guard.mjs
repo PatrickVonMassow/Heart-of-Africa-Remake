@@ -85,7 +85,7 @@ function berlinMinutes() {
 
 function head() {
   try {
-    return execSync('git rev-parse HEAD', { cwd: REPO_ROOT, encoding: 'utf8' }).trim()
+    return execSync('git rev-parse HEAD', { windowsHide: true, cwd: REPO_ROOT, encoding: 'utf8' }).trim()
   } catch {
     return ''
   }

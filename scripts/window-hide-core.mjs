@@ -122,14 +122,16 @@ export const ALLOW = {
     matching: 'buildSpawnOptions',
     why: 'the options come from buildSpawnOptions(), which sets windowsHide: true itself (scripts/batch-autostart-core.mjs)',
   },
-  'scripts/board.mjs': { awaiting: 'bundle H', why: 'held by the parallel board/chat agent when point 401 landed' },
-  'scripts/board-publish.mjs': { awaiting: 'bundle H', why: 'held by the parallel board/chat agent when point 401 landed' },
-  'scripts/board-first-guard.test.mjs': { awaiting: 'bundle H', why: 'held by the parallel board/chat agent when point 401 landed' },
-  'scripts/chat-watcher.mjs': { awaiting: 'bundle H', why: 'held by the parallel board/chat agent when point 401 landed' },
-  'scripts/chat-delivery-hook.test.mjs': { awaiting: 'bundle H', why: 'held by the parallel board/chat agent when point 401 landed' },
-  'scripts/dashboard-guard.mjs': { awaiting: 'bundle H', why: 'held by the parallel board/chat agent when point 401 landed' },
-  'scripts/dashboard-integrity-guard.mjs': { awaiting: 'bundle H', why: 'held by the parallel board/chat agent when point 401 landed' },
-  'scripts/dashboard-sync.mjs': { awaiting: 'bundle H', why: 'held by the parallel board/chat agent when point 401 landed' },
+  // The nine `awaiting: bundle H` debts that used to sit here are PAID: the files
+  // those calls live in were free again, the flag is written out in each of them, and
+  // the entries are gone — which is precisely what this map demands as proof.
+  // scripts/chat-watcher.mjs is the one that did NOT become a literal flag: its
+  // responder spawn shares buildSpawnOptions() with the launcher, so it is covered the
+  // same way that call is, by what it does.
+  'scripts/chat-watcher.mjs': {
+    matching: 'buildSpawnOptions',
+    why: 'the responder spawn shares buildSpawnOptions() with the launcher, which sets windowsHide: true itself',
+  },
 }
 
 /**
@@ -139,14 +141,23 @@ export const ALLOW = {
  * Returns { ok, offenders, unusedAllow }. `unusedAllow` matters as much as the
  * offenders: an exception that no longer applies is a rule pretending to be needed,
  * and the `awaiting` entries in particular must disappear once the flag lands.
+ *
+ * The exception map is INJECTABLE (defaulting to `ALLOW`) so the rules governing it
+ * can be pinned without a live entry of each kind having to exist. That is not
+ * hypothetical tidiness: the unscoped-entry rule — an entry with no `matching` covers
+ * the whole file, which is what an `awaiting` debt needs while another agent holds it
+ * — was tested by reaching into `ALLOW` for a real debt, so PAYING the last debt
+ * turned the rule's own test red. A gate must not be harder to satisfy as it gets
+ * cleaner.
  */
-export function auditWindowHide(files = []) {
+export function auditWindowHide(files = [], { allow: allowMap = ALLOW } = {}) {
+  const map = allowMap && typeof allowMap === 'object' ? allowMap : {}
   const offenders = []
   const usedPaths = new Set()
   for (const f of Array.isArray(files) ? files : []) {
     const path = String(f?.path ?? '').replace(/\\/g, '/')
     if (!path) continue
-    const allow = ALLOW[path]
+    const allow = map[path]
     for (const call of findChildProcessCalls(f?.text ?? '')) {
       if (call.hasFlag) continue
       // An exception may be scoped by what the call CONTAINS (`matching`); without a
@@ -158,7 +169,7 @@ export function auditWindowHide(files = []) {
       offenders.push({ path, api: call.api, line: call.line, hasFlag: call.hasFlag })
     }
   }
-  const unusedAllow = Object.keys(ALLOW).filter((p) => !usedPaths.has(p))
+  const unusedAllow = Object.keys(map).filter((p) => !usedPaths.has(p))
   return { ok: offenders.length === 0 && unusedAllow.length === 0, offenders, unusedAllow }
 }
 

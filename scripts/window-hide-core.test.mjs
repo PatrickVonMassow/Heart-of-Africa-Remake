@@ -117,10 +117,20 @@ describe('auditWindowHide — the verdict, and its exceptions', () => {
   })
 
   it('an unscoped exception covers the whole file — what an `awaiting` debt needs', () => {
-    const path = Object.keys(ALLOW).find((p) => ALLOW[p].awaiting)
-    const v = auditWindowHide([{ path, text: 'execSync(a)\nspawnSync(b, c, { cwd })' }])
+    // Pinned against an INJECTED map, not against a live debt: this rule was once
+    // tested by reaching into ALLOW for a real `awaiting` entry, so paying the last
+    // debt turned the rule's own test red. The rule outlives the debts it was for.
+    const allow = { 'scripts/held.mjs': { awaiting: 'bundle X', why: 'held by another agent while 401 landed' } }
+    const v = auditWindowHide([{ path: 'scripts/held.mjs', text: 'execSync(a)\nspawnSync(b, c, { cwd })' }], { allow })
     expect(v.offenders).toEqual([])
-    expect(ALLOW[path].awaiting).toBeTruthy()
+    expect(v.unusedAllow).toEqual([])
+  })
+
+  it('every exception in the REAL map is scoped — no debt is outstanding any more', () => {
+    for (const [path, entry] of Object.entries(ALLOW)) {
+      expect(entry.awaiting, `${path} still carries an unpaid debt`).toBeUndefined()
+      expect(typeof entry.matching, `${path} is unscoped, so it covers the whole file`).toBe('string')
+    }
   })
 
   it('AN EXCEPTION THAT NO LONGER APPLIES IS ITSELF A FAILURE', () => {
