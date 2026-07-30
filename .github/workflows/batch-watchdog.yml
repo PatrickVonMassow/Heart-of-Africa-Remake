@@ -1,0 +1,97 @@
+# THE WATCHER THAT DOES NOT LIVE ON THE MACHINE IT WATCHES.
+#
+# On the night of 30.07.2026 the batch stood still for six hours. Every local
+# layer could SEE it — the launcher wrote "WEDGED owner" nine times over two
+# hours — and none could act; then the launcher's own log simply stopped at
+# 02:21, which is the proof that the whole local watcher layer can fall silent as
+# one unit (standby, a disabled scheduled task, a dead launcher). A second local
+# watchdog would share every one of those causes.
+#
+# So the question "did the repository move?" is asked from OUTSIDE: this job needs
+# the machine to be neither awake nor healthy. Its answer is deliberately narrow —
+# it ALERTS, it never spawns and never writes to the repository. One spawner is
+# enough (the launcher owns the debounce state a second one could not see), and a
+# watchdog that mutates what it watches is a new failure mode rather than a guard.
+#
+# DESIGN CONSTRAINT, learned the same morning: this workflow must never FAIL. The
+# owner's inbox had just been flooded by 53 failed runs, so a watchdog that goes
+# red would add to exactly the noise it exists to cut through. Every step ends
+# successfully; the finding travels by ntfy, not by a red run.
+#
+# Threshold and cadence live in `env` below so they can be tuned without touching
+# the logic. See docs/batch-resilience.md §3 (layers 3+4, merged into this job).
+name: Batch watchdog
+
+on:
+  schedule:
+    # Every 30 minutes. GitHub's cron is best-effort and can drift by 15+ minutes
+    # under load, which is acceptable for a night watchman and is the documented
+    # limit of this layer.
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: batch-watchdog
+  cancel-in-progress: false
+
+env:
+  # How long `main` may stand still while work is open before this is a stall.
+  # Deliberately well above a long verification plus a merge: the point boundary
+  # itself takes minutes, and a single LARGE regression can take half an hour.
+  STALL_MINUTES: '120'
+
+jobs:
+  did-the-repository-move:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # Two commits are enough to date HEAD; the open-point count comes from the
+      # work order in the same checkout.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Judge movement against the open work
+        id: judge
+        run: |
+          set -u
+          now=$(date -u +%s)
+          last=$(git log -1 --format=%ct)
+          idle=$(( (now - last) / 60 ))
+          # The work order carries only OPEN points (the finished ones live in
+          # docs/tasks-archive.md), so a plain count is the honest number.
+          open=$(grep -c '^- \[ \] [0-9]' TASKS.md || true)
+          open=${open:-0}
+          echo "idle_minutes=$idle" >> "$GITHUB_OUTPUT"
+          echo "open_points=$open" >> "$GITHUB_OUTPUT"
+          if [ "$idle" -ge "$STALL_MINUTES" ] && [ "$open" -gt 0 ]; then
+            echo "stalled=yes" >> "$GITHUB_OUTPUT"
+            echo "STALL: main has not moved for ${idle} min while ${open} point(s) are open."
+          else
+            echo "stalled=no" >> "$GITHUB_OUTPUT"
+            echo "OK: main moved ${idle} min ago, ${open} point(s) open."
+          fi
+
+      # The alert is the whole product of this job. Without the secret it says so
+      # in the log and still succeeds — an unconfigured watchdog is a gap to
+      # report, never a red run.
+      - name: Alert ntfy on a stalled batch
+        if: steps.judge.outputs.stalled == 'yes'
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          IDLE: ${{ steps.judge.outputs.idle_minutes }}
+          OPEN: ${{ steps.judge.outputs.open_points }}
+        run: |
+          if [ -n "${NTFY_TOPIC:-}" ]; then
+            curl -fsS -m 10 \
+              -H "Title: HoA batch: standing still" \
+              -H "Priority: high" \
+              -H "Tags: warning" \
+              -d "main has not moved for ${IDLE} min while ${OPEN} point(s) are open. Checked from GitHub, so this arrives even when the machine is off or its launcher is dead. ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+              "https://ntfy.sh/${NTFY_TOPIC}" || echo "ntfy alert failed (non-fatal)"
+          else
+            echo "NTFY_TOPIC secret not set — the stall was found but cannot be announced"
+          fi
