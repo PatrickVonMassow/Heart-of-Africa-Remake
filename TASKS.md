@@ -4116,6 +4116,30 @@ it is appended.
   dead, a fresh heartbeat without a pid still assessed alive, and the guard's stand-down for
   a non-owner; the sweep is evidenced by the commit message naming every guard checked.
 
+- [ ] 464. A RED UNIT LAYER REACHED `main` THROUGH THE PRE-PUSH GATE (user 30.07.2026:
+  "Sorge dafür, dass das sicher nicht mehr passiert."; bundle K). CI run 30555562185 on
+  `main`, commit `4d580957`, failed at step `npm run test:unit` — the guide-brevity audit,
+  because that commit pushed `docs/analysis_de/vibe-coding-anleitung.md` over its budget. The
+  commit four minutes later paid for it, so the red was brief, but it MAILED the repository
+  owner and it is the second such report in one day. The pre-push gate exists precisely to
+  make this impossible, and on the same afternoon it PROVED it can fail closed (it refused a
+  push of this session's with "unit ran an unreadable file count … nothing was compared").
+  So the defect is not "the gate is missing" but "the gate's verdict is not binding".
+  FIRST, ESTABLISH THE PATH, do not guess it: reconstruct from the gate's own log and the
+  reflog which decision let `4d580957` through — the gate not running at all, a stale green
+  from an earlier run being reused, `--no-verify`, or a hook that exits 0 on its own error.
+  Write the answer into the commit message; the fix depends on it and a guessed cause here
+  would produce a guard that guards nothing.
+  FINAL STATE, whichever path it was: a push of `main` carries a RECORDED gate verdict — the
+  HEAD sha it was computed for, the suite counts, the verdict — and a push whose recorded
+  verdict does not belong to the exact sha being pushed is REFUSED, not warned about. An
+  internal error in the gate refuses the push as well: this is the one guard in the project
+  that must fail CLOSED, because the thing on the other side is a red `main` and a mail to
+  the user. `--no-verify` is refused for `main` the same way.
+  VERIFIABLE: the pure layer covers the verdict record (accepted for the matching sha,
+  refused for a different one, refused when absent, refused on an internal error), and a live
+  push attempt on a deliberately red tree is refused.
+
 ## Closing (only after all points)
 
 New points are appended BEFORE this section — it stays last in the file.
