@@ -35,14 +35,19 @@
 // was meant: a fallback substituted in silence, and an internal shorthand spoken to him — plus
 // one clause on the existing "read at every start" tip, that the dearest text is the one
 // carried in EVERY request, especially where it repeats what a gate already refuses
-// (+8 lines, +105 words, measured). Two further lessons of that morning were deliberately NOT
-// added here: they are the long-form half and live in the retrospective.
+// (+9 lines, +105 words, measured as the audit counts them — the raise is +8, because the
+// document stood one line under the old ceiling and that slack was absorbed). Two further
+// lessons of that morning were deliberately NOT added here: they are the long-form half and
+// live in the retrospective.
 export const LIMITS = {
   maxLines: 409,
-  // Deliberately a little loose (~5 % headroom): a budget with almost no room
-  // blocks a clarifying half-sentence, and a guard that fires on legitimate
-  // edits teaches people to raise the number instead of to cut. It must bite on
-  // a growing case study, not on an honest rewording.
+  // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
+  // pointed out that this comment had long stopped describing the numbers. The
+  // rule above ("raised only by the measured size of genuinely new tips")
+  // converges on zero slack by construction, and granting slack would itself be
+  // the unearned loosening the rule forbids. So any net growth blocks, and the
+  // block message names the honest way out: cut the long telling over into the
+  // retrospective, which is where it belongs anyway.
   maxWords: 3503,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
