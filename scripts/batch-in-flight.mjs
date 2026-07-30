@@ -245,6 +245,7 @@ export function closingFreeze({ cwd = REPO_ROOT, statePath = CLOSING_STATE_PATH 
   let head = ''
   try {
     head = execFileSync('git', ['rev-parse', 'HEAD'], {
+      windowsHide: true,
       cwd,
       encoding: 'utf8',
       timeout: 15000,
