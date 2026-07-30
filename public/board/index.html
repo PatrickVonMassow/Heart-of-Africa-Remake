@@ -183,6 +183,11 @@
         open: false,
         draft: '',
         messages: [],
+        // Whether the reader was TYPING when the content was swapped, and where
+        // the caret stood. On a phone a rebuilt-but-unfocused field closes the
+        // keyboard mid-word, which reads as the channel dying under the thumbs.
+        focused: false,
+        caret: null,
       }
       // The board content swap is announced by the refresher (BOARD_SWAP_EVENT
       // in scripts/board-refresher-core.mjs); nothing about the chat may enter
@@ -364,8 +369,24 @@
           id: 'hoa-chat-input',
           value: chatState.draft,
         })
+        const rememberCaret = () => {
+          chatState.caret = input.selectionStart
+        }
         input.addEventListener('input', () => {
           chatState.draft = input.value
+          rememberCaret()
+        })
+        // Caret-moving gestures that type nothing, so the reader lands back in
+        // the same word and not at the end of their sentence.
+        for (const ev of ['keyup', 'click', 'select']) input.addEventListener(ev, rememberCaret)
+        input.addEventListener('focus', () => {
+          chatState.focused = true
+        })
+        input.addEventListener('blur', () => {
+          // A blur raised because the SWAP removed the field is not the reader
+          // leaving it — the node is already disconnected by then. Only a real
+          // blur (the field still in the document) gives the keyboard up.
+          if (input.isConnected) chatState.focused = false
         })
         // Disabled until the topics are derived and the first poll came back:
         // a send before that would post nowhere and read as a lost message.
@@ -385,6 +406,13 @@
           chatPair(panel)
         })
         panel.append(list, note, form, forget)
+        // Put the reader back INTO the field they were typing in — never into a
+        // field they never touched, so a first load steals no focus.
+        if (chatState.focused) {
+          input.focus()
+          const at = chatState.caret === null ? input.value.length : Math.min(chatState.caret, input.value.length)
+          if (typeof input.setSelectionRange === 'function') input.setSelectionRange(at, at)
+        }
 
         form.addEventListener('submit', async (ev) => {
           ev.preventDefault()

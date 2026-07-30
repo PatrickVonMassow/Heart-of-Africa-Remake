@@ -830,9 +830,11 @@ reader looks. The seam is therefore a documented signal, not markup and not a
 shared variable: the refresher dispatches `hoa-board-swapped` on `window` after a
 swap (`BOARD_SWAP_EVENT` in `scripts/board-refresher-core.mjs`), the viewer
 listens and re-injects, and the injection is idempotent. The reader's
-typed-but-unsent draft, the open/closed state and the messages already read live
-in the viewer's `chatState`, so they survive the rebuild — otherwise the channel
-would lose words on a 30-second timer. A `MutationObserver` on `<main>` covers
+typed-but-unsent draft, the open/closed state, the messages already read and the
+fact that they were TYPING (focus and caret position) live in the viewer's
+`chatState`, so they survive the rebuild — otherwise the channel would lose words
+on a 30-second timer, and a rebuilt-but-unfocused field would shut the phone
+keyboard mid-word. A first load restores nothing, so it steals no focus. A `MutationObserver` on `<main>` covers
 the lag while a board published with an older refresher announces nothing.
 
 ### The board also runs BACK — a message channel from the phone (29.07.2026)

@@ -320,6 +320,42 @@ describe('the chat survives the board’s own 30-second refresh', () => {
     dom.window.close()
   })
 
+  it('leaves the reader typing — focus and caret come back with the field', async () => {
+    const dom = await loadViewer({
+      secret: VECTOR.secret,
+      fetchImpl: async (url) => okResponse(String(url).includes('ntfy.sh') ? '' : board),
+    })
+    const doc = dom.window.document
+    doc.querySelector('#hoa-chat .chat-toggle').click()
+    await settle(dom, () => doc.getElementById('hoa-chat-input'))
+    const input = doc.getElementById('hoa-chat-input')
+    input.focus()
+    input.dispatchEvent(new dom.window.Event('focus'))
+    input.value = 'mitten im Wort'
+    input.dispatchEvent(new dom.window.Event('input'))
+    input.setSelectionRange(6, 6) // caret inside the text, not at its end
+    input.dispatchEvent(new dom.window.Event('keyup'))
+
+    expect(await swap(dom, changed)).toBe('swapped')
+    await settle(dom, () => doc.getElementById('hoa-chat-input'))
+    const rebuilt = doc.getElementById('hoa-chat-input')
+    expect(doc.activeElement).toBe(rebuilt)
+    expect(rebuilt.selectionStart).toBe(6)
+    dom.window.close()
+  })
+
+  it('steals no focus on a first load — nobody was typing yet', async () => {
+    const dom = await loadViewer({
+      secret: VECTOR.secret,
+      fetchImpl: async (url) => okResponse(String(url).includes('ntfy.sh') ? '' : board),
+    })
+    const doc = dom.window.document
+    doc.querySelector('#hoa-chat .chat-toggle').click()
+    await settle(dom, () => doc.getElementById('hoa-chat-input'))
+    expect(doc.activeElement).not.toBe(doc.getElementById('hoa-chat-input'))
+    dom.window.close()
+  })
+
   it('keeps the conversation the reader had already read', async () => {
     const good = await makeEnvelope({
       secret: VECTOR.secret,
