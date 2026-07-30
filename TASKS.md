@@ -1054,6 +1054,18 @@ it is appended.
   → fail-open) and a synthetic high-criticality tick that fires the guard. This point IS itself
   high-criticality (a must-work guard) → build it under its OWN rule: Fable-5 plan-review
   BEFORE, Fable-5 safety-review AFTER, merge to main ONLY when all green. No player-visible text.
+  THE REVIEW CAN OUTLIVE ITS AUTHOR, and then nobody applies it (measured 30.07.2026). A
+  delegated agent spawned its Fable-5 reviewer in the background and then STOPPED; the review
+  landed in the PARENT session minutes later with verdict `do-not-merge` and two blockers —
+  one of which would have reddened `main`'s unit gate the moment the branch merged, because a
+  test passed only in a worktree that lacks a git-ignored file the main tree has. The branch
+  looked reviewed and was not. So the marker this point defines counts a review only where its
+  FINDINGS were acted on: a recorded `do-not-merge`/`merge-with-fixes` verdict does not satisfy
+  the gate until a LATER record for a LATER commit says so, and an author that ends its turn
+  with a review still in flight is reported rather than accepted. Vitest: a lone
+  `do-not-merge` record blocks; the same record followed by a `merge` record on a descendant
+  commit allows; a review recorded against a commit that is not an ancestor of the merge does
+  not count.
 
 - [ ] 299. BIRD'S-EYE SETTLEMENT COLLISION — you must not walk THROUGH a settlement (user
   24.07.2026, screenshot; for AFTER the v0.2 tag). Now that entry is Space-only (point 244),
