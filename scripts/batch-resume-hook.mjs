@@ -33,7 +33,8 @@ import {
 import { readClaim, clearClaim, maxAgeMs } from './batch-claim.mjs'
 import { assessClaim, ownerIsHolding, reservationDecision } from './batch-claim-core.mjs'
 import { standDownMessage } from './batch-resume-hook-core.mjs'
-import { resumeRepairMandate } from './batch-doctor-core.mjs'
+import { MANDATE_MAX_AGE_MS, resumeRepairMandate } from './batch-doctor-core.mjs'
+import { consumeMandateMarker } from './batch-doctor-states.mjs'
 import { isPaused, pauseReason } from './batch-lock.mjs'
 
 const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url))
@@ -94,22 +95,14 @@ function ownsBatch(ownership) {
  *  silent about it — the launcher's alert already carries that news, and a session
  *  cannot mend a broken doctor. */
 const MANDATE_PATH = fileURLToPath(new URL('../.claude/repo-mandate.json', import.meta.url))
-const MANDATE_MAX_AGE_MS = 15 * 60 * 1000
 
 function readRepoVerdict(nowMs = Date.now()) {
-  try {
-    const raw = readFileSync(MANDATE_PATH, 'utf8')
-    // Deleted BEFORE it is parsed (four-eyes re-review, finding 2): a corrupt marker
-    // used to throw past the deletion and then be re-parsed at every session start
-    // forever. One-shot means one-shot, readable or not.
-    rmSync(MANDATE_PATH, { force: true })
-    const m = JSON.parse(raw)
-    if (m && Number.isFinite(m.at) && nowMs - m.at <= MANDATE_MAX_AGE_MS) {
-      return { ran: true, code: Number.isFinite(m.code) ? m.code : 1 }
-    }
-  } catch {
-    /* no marker, or unreadable — ask the doctor directly */
-  }
+  // One-shot, expiring, junk-proof — and now UNDER TEST (point 443 (h)): the read
+  // and the deletion live in scripts/batch-doctor-states.mjs, the rule that judges
+  // the bytes in batch-doctor-core.mjs, and both are swept by the Vitest layer.
+  // They were hand-written here and covered by nothing.
+  const m = consumeMandateMarker({ path: MANDATE_PATH, now: nowMs, maxAgeMs: MANDATE_MAX_AGE_MS })
+  if (m.verdict === 'mandate' || m.verdict === 'clean') return { ran: m.ran, code: m.code }
   try {
     execFileSync(process.execPath, [join(REPO_ROOT, 'scripts', 'batch-doctor.mjs')], {
       windowsHide: true,
