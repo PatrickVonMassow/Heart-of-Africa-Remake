@@ -13172,3 +13172,28 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   work — never "the session remembers to".
   VERIFIABLE: one Vitest case per state on a temporary repo (detection AND repair), and the
   drill of 449 leaves at least three of them behind at once.
+
+- [x] 458. A DELEGATED AGENT'S RETURN IS A PROTOCOL, NOT A NARRATIVE (30.07.2026,
+  measured while assessing the delegation economics; bundle I). Point 365 bounded the INPUT
+  side of delegation — a brief costs ~1.8k tokens against ~108k for reading the work order
+  and design.md whole — but NOTHING bounds what the agent writes BACK, and its final text is
+  the only thing that enters the main session's context. It is also the one part the main
+  session does not need in prose: the merge reads git for every fact it acts on (branch,
+  SHAs, changed files), never the report.
+  FINAL STATE: `assembleBrief` (`scripts/point-brief-core.mjs`) closes EVERY brief with a
+  `--- WHAT YOU RETURN ---` block, appended as the FINAL section, after NOTES, for OPEN and
+  DONE/ARCHIVED points alike, so a regenerated brief carries it and no prompt template has to
+  remember it. The block demands exactly: the point number; the branch name; the commit SHAs
+  in order; the gates actually run (build, lint, `test:unit`, and each browser suite by name)
+  each with its verdict; the changed files as PATHS ONLY; open items and escalations; and the
+  point-365 question answered — did the brief suffice, and what was missing. It FORBIDS
+  diffs, file contents, logs, code blocks and restated spec text, and says why (the merge
+  reads git, not the report). It names a target length ("keep this under ~40 lines") as
+  guidance, NOT a cap — a truncated escalation costs more than a long one, so nothing is ever
+  cut.
+  VERIFIABLE (`scripts/point-brief-core.test.mjs`): the block is present in an assembled
+  brief; it names every required field; it survives a brief with no sections and no
+  cross-referenced points; and the existing all-points ceiling sweep stays green with the
+  block included (the largest real brief measures 19.5k against `BRIEF_TOKEN_CEILING` 24000,
+  so the ~500 added tokens fit).
+
