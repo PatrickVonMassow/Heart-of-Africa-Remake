@@ -15,6 +15,7 @@ import {
   QUEUE_STUB_META,
 } from './dashboard-guard-core.mjs'
 import { concisenessOffenders } from './dashboard-conciseness-guard-core.mjs'
+import { structureViolations } from './board-structure-core.mjs'
 import {
   ERLEDIGT_ANCHOR,
   NO_CURRENT_WORK_TITLE,
@@ -23,8 +24,11 @@ import {
   addVdzk,
   berlinStamp,
   cardParagraphs,
+  claimsNoCurrentWork,
   closeCard,
   erledigtSectionStart,
+  noCurrentWorkCards,
+  toNoCurrentWork,
   estimateHours,
   hasCurrentWork,
   normaliseLineEndings,
@@ -710,5 +714,86 @@ describe('nowCard', () => {
     const html = fullBoard({ now: nowEntry(361, 'T', '14:34 · ~19:00') })
     expect(nowCard(html, 361)).toContain('361 — T')
     expect(nowCard(html, 999)).toBeNull()
+  })
+})
+
+// ═══ Point 470 — the idle card is a STATE, not an entry ══════════════════════
+// Observed 30.07.2026, reported by the user four times in one evening: THREE
+// "Gerade keine laufende Arbeit" cards stood stacked in the current-work
+// section, the last time beside a live now-card. The cause is mechanical — the
+// only sanctioned writer needed a point to close, so at a boundary (where the
+// point is already ticked) the session hand-edited the board file, and a
+// hand-edit APPENDS.
+describe('the no-work card replaces rather than appends', () => {
+  const emptyBoard = () => fullBoard({ queue: queueEntry(470, 'Die leere Karte', '~1 h') })
+
+  it('leaves exactly ONE idle card however often it is written', () => {
+    let html = emptyBoard()
+    for (const reason of ['Sitzungsgrenze.', 'Immer noch Sitzungsgrenze.', 'Der Nachfolger übernimmt.']) {
+      html = toNoCurrentWork(html, reason, { stamp: '22:27' })
+      expect(noCurrentWorkCards(html)).toHaveLength(1)
+    }
+    // …and the LAST reason is the one standing: it is a state, so it is current.
+    expect(html).toContain('Der Nachfolger übernimmt.')
+    expect(html).not.toContain('Immer noch Sitzungsgrenze.')
+  })
+
+  it('is writable with NO point to close — the boundary case that forced the hand edit', () => {
+    const out = toNoCurrentWork(emptyBoard(), 'Der Punkt ist abgeschlossen.', { stamp: '22:27' })
+    expect(hasCurrentWork(out)).toBe(true)
+    expect(claimsNoCurrentWork(out)).toBe(true)
+  })
+
+  it('produces markup the board guards accept — structurally and by audit', () => {
+    const out = toNoCurrentWork(emptyBoard(), 'Der Punkt ist abgeschlossen.', { stamp: '22:27' })
+    const before = new Set(structureViolations(emptyBoard()).map((v) => v.code))
+    expect(structureViolations(out).map((v) => v.code).filter((c) => !before.has(c))).toEqual([])
+    const auditBefore = new Set(auditDashboard(emptyBoard(), { open: [470], done: [] }).map((v) => v.code))
+    const added = auditDashboard(out, { open: [470], done: [] })
+      .map((v) => v.code)
+      .filter((c) => !auditBefore.has(c))
+    expect(added).toEqual([])
+  })
+
+  it('refuses to claim idleness while a numbered card stands — the pair the user read', () => {
+    const busy = fullBoard({ now: nowEntry(470, 'Läuft', '22:30 · ~23:00') })
+    expect(() => toNoCurrentWork(busy, 'Nichts läuft.')).toThrow(/refusing to claim that nothing is running/)
+    // …and it names both sanctioned ways out rather than leaving a hand edit as the only one.
+    expect(() => toNoCurrentWork(busy, 'Nichts läuft.')).toThrow(/done 470 --none[\s\S]*queue 470/)
+  })
+
+  it('is swept away the moment real work is promoted — the claim is then false', () => {
+    const idle = toNoCurrentWork(emptyBoard(), 'Sitzungsgrenze.', { stamp: '22:27' })
+    const out = toNow(idle, 470, 'Angefangen.', { stamp: '22:30' })
+    expect(noCurrentWorkCards(out)).toHaveLength(0)
+    expect(claimsNoCurrentWork(out)).toBe(false)
+    expect(out).toContain('<span class="t">470 — Die leere Karte</span>')
+  })
+
+  it('closeCard --none still names the gap, and still only once', () => {
+    const board = fullBoard({ now: nowEntry(300, 'Fertig', '10:07 · ~14:30') })
+    const once = closeCard(board, 300, { text: 'Fertig.', end: '16:45', none: 'Sitzungsgrenze.' })
+    expect(noCurrentWorkCards(once)).toHaveLength(1)
+    // Writing it again over the standing one does not stack it.
+    expect(noCurrentWorkCards(toNoCurrentWork(once, 'Immer noch.'))).toHaveLength(1)
+  })
+
+  it('claimsNoCurrentWork reads the SECTION, not the whole document', () => {
+    // The same words quoted in the archive are a report, not a claim.
+    const archived = fullBoard({
+      now: nowEntry(470, 'Läuft', '22:30 · ~23:00'),
+      done:
+        `<details>\n  <summary><span class="num">300</span><span class="t">${NO_CURRENT_WORK_TITLE}</span>` +
+        `</summary>\n  <div class="body">\n    <p>Text</p>\n  </div>\n</details>\n`,
+    })
+    expect(claimsNoCurrentWork(archived)).toBe(false)
+  })
+
+  it('is total on junk input rather than throwing into a guard', () => {
+    for (const junk of [null, undefined, 42, {}, '']) {
+      expect(() => claimsNoCurrentWork(junk)).not.toThrow()
+      expect(claimsNoCurrentWork(junk)).toBe(false)
+      expect(noCurrentWorkCards(junk)).toEqual([])
+    }
   })
 })

@@ -6,7 +6,7 @@
 // module writes must satisfy the audit that reads it, and spelling that value a
 // second time here is how the two would drift apart. dashboard-guard-core
 // imports nothing, so the direction cannot become a cycle.
-import { QUEUE_STUB_META } from './dashboard-guard-core.mjs'
+import { QUEUE_STUB_META, parseNowCardPoints } from './dashboard-guard-core.mjs'
 
 /** The flag that takes a card's text from STDIN instead of the argv (point 410). */
 export const TEXT_STDIN_FLAG = '--text-stdin'
@@ -191,7 +191,10 @@ export function promoteToNow(html, point, { title, times, status, stamp = berlin
     `<details class="now">\n  <summary><span class="t">${point} — ${title}</span>` +
     `<span class="right"><span class="meta">${times ?? stamp}</span></span></summary>\n` +
     `  <div class="body">\n${renderCardBody(status, { stamp })}\n  </div>\n</details>\n`
-  return insertAsFirstNowCard(html.replace(card, ''), now)
+  // The idle card goes with it (point 470): the moment a point is current work,
+  // "nothing is running" is false, and leaving it standing is how the board came
+  // to say both at once.
+  return insertAsFirstNowCard(stripNoCurrentWork(html.replace(card, '')), now)
 }
 
 /**
@@ -372,20 +375,81 @@ export function hasCurrentWork(html) {
 export const NO_CURRENT_WORK_TITLE = 'Gerade keine laufende Arbeit'
 
 /**
+ * The idle card's markup, matched globally. Built from the title so the two can
+ * never drift apart.
+ */
+const noWorkCardPattern = () =>
+  new RegExp(
+    `<details class="now">\\s*<summary><span class="t">${NO_CURRENT_WORK_TITLE}</span>[\\s\\S]*?</details>\\s*`,
+    'g',
+  )
+
+/** Every idle card standing in the document — normally none or one. */
+export function noCurrentWorkCards(html) {
+  return String(html ?? '').match(noWorkCardPattern()) ?? []
+}
+
+/** The document without any idle card. The state is REPLACED, never appended. */
+export function stripNoCurrentWork(html) {
+  return String(html ?? '').replace(noWorkCardPattern(), '')
+}
+
+/**
+ * Does the board's current-work section CLAIM that nothing is running
+ * (point 470)? This is the predicate `board-first-guard` denies on, so it is
+ * scoped to the section: an idle card quoted anywhere else — in the archive, in
+ * a queue entry's prose — is not the claim.
+ *
+ * A document without the section is answered from the whole text: a fragment is
+ * all the caller has, and reading it is closer to the truth than saying "no".
+ */
+export function claimsNoCurrentWork(html) {
+  const text = String(html ?? '')
+  let scope = text
+  try {
+    const { from, end } = sectionBounds(text, 'now')
+    scope = text.slice(from, end)
+  } catch {
+    /* no section — judge the fragment as it stands */
+  }
+  return noWorkCardPattern().test(scope)
+}
+
+/**
  * A current-work card that NAMES the absence of current work — the honest form
  * of an empty section, for the rare tick where nothing can be promoted (empty
  * queue, or a session boundary about to be taken). It carries no point number,
  * so it adds none of the point-per-section conflicts; declare a non-point focus
  * (`focus.mjs set - "<why>"`) alongside it.
+ *
+ * IT IS A STATE, NOT AN ENTRY (point 470). Writing it REPLACES any idle card
+ * already standing. On 30.07.2026 three of them stood stacked on the board the
+ * user reads, because the only sanctioned writer needed a point to close and the
+ * session hand-edited the file instead — and a hand-edit APPENDS. Two idle cards
+ * are now unreachable through this path, whatever calls it and however often.
+ *
+ * AND IT MUST BE TRUE WHEN IT IS WRITTEN. A numbered card standing in the
+ * section is work the board itself says is running, so the claim would
+ * contradict the document it is written into — exactly the pair the user read
+ * that evening ("470 läuft" above "Gerade keine laufende Arbeit"). Refused, with
+ * both sanctioned ways out named.
  */
 export function toNoCurrentWork(html, reason, { stamp = berlinStamp() } = {}) {
   const text = String(reason ?? '').trim()
   if (!text) throw new Error('board: --none needs a reason — the reader must learn WHY nothing is running')
+  const standing = [...parseNowCardPoints(html)]
+  if (standing.length) {
+    throw new Error(
+      `board: refusing to claim that nothing is running while ${standing.join(', ')} still stands as current ` +
+        'work — the board would contradict itself in one screen. Close that card in the same edit ' +
+        `(done ${standing[0]} --none "<reason>") or send it back (queue ${standing[0]}).`,
+    )
+  }
   const card =
     `<details class="now">\n  <summary><span class="t">${NO_CURRENT_WORK_TITLE}</span>` +
     `<span class="right"><span class="meta">${stamp}</span></span></summary>\n` +
     `  <div class="body">\n${renderCardBody(text, { stamp })}\n  </div>\n</details>\n`
-  return insertAsFirstNowCard(html, card)
+  return insertAsFirstNowCard(stripNoCurrentWork(html), card)
 }
 
 /**
