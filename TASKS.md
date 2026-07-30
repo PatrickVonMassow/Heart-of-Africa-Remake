@@ -3648,6 +3648,17 @@ it is appended.
   text still reaches the board as a command-line ARGUMENT, so `--none` gains `--text-stdin`
   like every other text (point 410's rule: a Windows shell mangles the umlauts, and the
   audit then flags the card it just wrote).
+  ALSO IN THIS POINT, the same family once more: THE SANCTIONED COMMAND CANNOT SATISFY THE
+  GUARD THAT JUDGES ITS OUTPUT. `board.mjs status` wraps whatever it is given into ONE `<p>`,
+  while `dashboard-conciseness-guard` blocks the turn end on "one long unbroken paragraph —
+  split into paragraphs". Blank lines in the piped text are carried through verbatim, so they
+  render as one run-on block and the guard is right to refuse it. The only way out is
+  hand-editing the board HTML — the very act this point already documents as damaging (measured
+  30.07.2026: three publish rounds, then a hand edit anyway). TARGET: a blank line in any card
+  text becomes a `<p>` boundary on write, for `status`, `queue` and `done` alike, so the
+  documented command can produce what the guard demands. VERIFIABLE in the pure layer: a
+  two-paragraph text yields two `<p>` elements, a single-paragraph one yields exactly one, and
+  no card text can reach the file with a bare blank line inside a tag.
   DOCS in the same commit: `docs/batch-autonomy.md` where the board commands are listed.
 
 - [ ] 440. WHAT ELSE IS BILLED ON EVERY TURN FOR NOTHING — A MEASURED INVENTORY (user
