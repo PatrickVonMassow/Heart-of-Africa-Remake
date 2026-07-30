@@ -134,6 +134,22 @@ from advisory claim-and-check to a HARD mutual exclusion in
   who else was there is not evidence of anyone else being there.
   Decisions pure in `scripts/batch-doctor-core.mjs`, covered by
   `scripts/batch-doctor-core.test.mjs`.
+- **A PROBE OF OUR OWN MAY NOT RAISE IT (point 434 (8)).** The launcher logged
+  `PARALLEL SESSIONS DETECTED: owner=preflight-test plus <real session>` sixteen
+  times across four nights. The guard preflight's real-repo test runs every
+  REGISTERED guard's `gather()` under the synthetic id `preflight-test`, and five of
+  those ask `heldByOtherLiveOwner('preflight-test')`. When the session that OWNS the
+  batch runs the unit suite in its own tree — the fast gate after every merge — the
+  Vitest process's claude ancestor IS the lock's pid, so ownership resolved by
+  PROCESS and `ownsLock` RESTAMPED the live lock's `sessionId` to `preflight-test`.
+  The launcher then read that as the owner beside the real session. No free lock is
+  needed for this, which is why it recurred at fast-gate frequency. The `preflight-`
+  namespace is therefore RESERVED (`isProbeSessionId`; a real session id is a UUID
+  and can never carry it): `resolveOwnership` never answers "mine" for a probe, so
+  nothing restamps a lock to one; `acquire` refuses it the lock outright;
+  `classifyParallel` is blind to it on either side; and the ancestor memo does not
+  record it. The detector keeps its teeth against two real sessions — that case is
+  pinned beside this one in `scripts/batch-singleton-core.test.mjs`.
 - **Trust self-heals.** A headless `claude -p` in an untrusted workspace ignores
   the allow-list (a permission prompt would hang the unattended run). The launcher
   sets `hasTrustDialogAccepted` for the repo in `~/.claude.json` before spawning.
@@ -567,10 +583,18 @@ or an agent wedged in a printing loop would be replaceable only by hand; and whe
 neither worktree nor branch can be read the answer is `unmeasurable`, which refuses
 as well — "I could not look" must never read as "it is gone". Run it AGAIN in the
 seconds before the spawn: on 30.07 the branch tip moved one minute before the
-replacement was started. Name BOTH the worktree and the branch where you can: the
-worktree stamp reads gitdir mtimes, which a supervisor's own `git status` inside
-that worktree refreshes from outside, while the branch stamp is commit-based and
-has no such path (four-eyes review, finding 5).
+replacement was started.
+
+**The worktree stamp measures the WORK, not the git commands** (point 434 (5b)).
+It reads TWO sources and the verdict NAMES the one that answered: the gitdir mtimes
+(index, HEAD, COMMIT_EDITMSG — the last git OPERATION) and the newest WORKING FILE,
+found through `git --no-optional-locks status --porcelain -z`. The second half is
+what the first cannot see — an agent editing source for twenty minutes runs no git
+command, and exactly that worktree read "quiet for 21 min" while its agent was
+mid-edit. The `--no-optional-locks` is why the probe does not refresh the index it
+reads, so a supervisor's own look can no longer become the evidence (four-eyes
+review, finding 5). Name BOTH the worktree and the branch where you can: a
+commit-based branch stamp is still the strongest single source there is.
 
 Decision logic: `scripts/batch-in-flight-core.mjs` (pure, dependency-injected,
 Vitest-covered in `scripts/batch-in-flight-core.test.mjs`). IO and probes:

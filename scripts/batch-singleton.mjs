@@ -307,6 +307,16 @@ export function assessOwner(lock, { now, bootTime, probe, leaseMs = LEASE_MS } =
 export function resolveOwnership({ lock, sessionId, ancestor, tolerance = PID_START_TOLERANCE_MS }) {
   const no = (via) => ({ mine: false, via, restamp: false })
   if (!lock || typeof lock.sessionId !== 'string') return no('no-lock')
+  // A PROBE IS NEVER MINE (point 434 (8)). This is the door the false alarm came
+  // through: five registered gathers ask `heldByOtherLiveOwner('preflight-test')`,
+  // and when the BATCH OWNER runs the unit suite in its own tree, the Vitest
+  // process's claude ancestor IS the lock's pid — so ownership resolved `via:
+  // 'process'` and the restamp below rewrote the LIVE lock's sessionId to
+  // `preflight-test`. The launcher then read `owner=preflight-test` beside the
+  // real session and reported a parallel batch. Refused here, in the pure
+  // resolver, so every door that asks — ownsLock, heldByOtherLiveOwner, acquire —
+  // gets the same answer.
+  if (isProbeSessionId(sessionId)) return no('probe-id')
   if (sessionId && lock.sessionId === sessionId) return { mine: true, via: 'session-id', restamp: false }
   if (!sessionId) return no('no-session-id')
   // A launcher's pending-spawn lock names a process that is not this session's
@@ -443,6 +453,37 @@ export function ownerStateKey(lock, suffix = '') {
 
 
 /**
+ * A SESSION ID THIS REPOSITORY'S OWN PROBES USE, never a real session. PURE.
+ *
+ * THE ALARM IT CAUSED (point 434 (8), root-caused 30.07.2026 and CORRECTED by the
+ * four-eyes review): the guard preflight's real-repo test runs every registered
+ * guard's `gather()` under the synthetic id `preflight-test`, and five of those
+ * gathers ask `heldByOtherLiveOwner('preflight-test')`. When the session that OWNS
+ * the batch runs the unit suite in its own tree — the fast gate after every merge —
+ * the Vitest process's claude ancestor is exactly the lock's pid, so ownership
+ * resolved `via: 'process'` and `ownsLock` RESTAMPED the live lock's sessionId to
+ * `preflight-test`. The launcher then read `owner=preflight-test` beside the real
+ * session and logged `PARALLEL SESSIONS DETECTED`, sixteen times across four nights.
+ * That alert is one of the few that mean "stop everything", so a probe of our own
+ * must not be able to raise it.
+ *
+ * (The first reading of this — that `acquire` handed a probe the free lock from a
+ * guard's gather — was WRONG: `batch-progress-guard` is not a registered preflight
+ * guard and its `acquire` is on its own Stop path. The restamp above is the path
+ * that exists, and it needs no free lock, which fits the frequency far better.)
+ *
+ * A real session id is a UUID and can never carry this prefix, so the namespace is
+ * reserved rather than shared. Three consequences: `resolveOwnership` never answers
+ * "mine" for a probe (so nothing restamps a lock to one), `acquire` refuses it the
+ * lock outright, and the classifier below is blind to one on either side.
+ */
+export const PROBE_SESSION_PREFIX = 'preflight-'
+
+export function isProbeSessionId(sid) {
+  return typeof sid === 'string' && sid.trim().toLowerCase().startsWith(PROBE_SESSION_PREFIX)
+}
+
+/**
  * Parallel-session classifier. A parallel session is a sid that
  *   - started as a TOP-LEVEL session (recorded by the SessionStart hook —
  *     subagents/worktree agents never fire SessionStart, so they can never be
@@ -464,8 +505,11 @@ export function ownerStateKey(lock, suffix = '') {
 export function classifyParallel({ sessionsSeen, activity, ownerSid, now, exclude = [] }) {
   const out = []
   const skip = new Set((exclude ?? []).filter(Boolean))
+  // A PROBE OWNER MEANS THE REAL OWNER IS UNKNOWN (point 434 (8)): every genuine
+  // session would then read as the second driver, which is the false alarm itself.
+  if (isProbeSessionId(ownerSid)) return out
   for (const [sid, lastToolAt] of Object.entries(activity ?? {})) {
-    if (!sid || sid === ownerSid || skip.has(sid)) continue
+    if (!sid || sid === ownerSid || skip.has(sid) || isProbeSessionId(sid)) continue
     if (!(sessionsSeen && Object.prototype.hasOwnProperty.call(sessionsSeen, sid))) continue
     if (typeof lastToolAt !== 'number' || now - lastToolAt > PARALLEL_FRESH_MS) continue
     out.push({ sid, lastToolAt })
@@ -790,6 +834,9 @@ function exitReapMutex(mutexPath) {
  */
 export function acquire(sessionId, opts = {}) {
   if (!sessionId) return 'held'
+  // A PROBE IS NOT A SESSION (point 434 (8)): it may never own the batch. See
+  // `isProbeSessionId` for the four nights of false alarms this cost.
+  if (isProbeSessionId(sessionId)) return 'probe'
   const lockPath = opts.lockPath ?? LOCK_PATH
   const mutexPath = `${lockPath}.reaping`
   const now = opts.now ?? Date.now()
@@ -1125,7 +1172,9 @@ export function ourClaudeProcess(sessionId, opts = {}) {
     cache = null // unreadable cache → walk, but do not try to write it back
   }
   const anc = (opts.findAncestorFn ?? findClaudeAncestor)()
-  if (cache) {
+  // A probe gets the same ANSWER and leaves no record (point 434 (8)): a synthetic
+  // id must not accrete in the repository's real state under a session's name.
+  if (cache && !isProbeSessionId(sessionId)) {
     try {
       const next = { ...cache, [sessionId]: { pid: anc?.pid ?? null, startedAt: anc?.startedAt ?? null, at: now } }
       for (const [k, v] of Object.entries(next)) if (now - (v?.at ?? 0) > 24 * 3600 * 1000) delete next[k]
@@ -1150,6 +1199,11 @@ export function ownsLock(sessionId, opts = {}) {
   const lockPath = opts.lockPath ?? LOCK_PATH
   const lock = opts.lock !== undefined ? opts.lock : readOwnerLock(lockPath)
   if (!lock) return { mine: false, via: 'no-lock', lock: null }
+  // The id shortcut below is this function's OWN — it does not pass through
+  // `resolveOwnership`, so the probe rule has to be repeated here or a lock left
+  // NAMING a probe would be ownable by that probe (four-eyes re-check, the nit).
+  // Symmetry with `heldByOtherLiveOwner`, which already answers false for one.
+  if (isProbeSessionId(sessionId)) return { mine: false, via: 'probe-id', lock }
   if (sessionId && lock.sessionId === sessionId) return { mine: true, via: 'session-id', lock }
   if (opts.processIdentity === false || !sessionId) return { mine: false, via: 'session-id-mismatch', lock }
   // Cheap necessary conditions BEFORE the expensive walk: a lock with no pid, or

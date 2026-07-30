@@ -20,6 +20,9 @@ import {
   assessOwner,
   spawnDecision,
   classifyParallel,
+  isProbeSessionId,
+  ownsLock,
+  PROBE_SESSION_PREFIX,
   progressGuardDecision,
   acquire,
   heartbeat,
@@ -1166,6 +1169,20 @@ describe('acquire (atomic test-and-set on the real filesystem)', () => {
     expect(failed).toBe(2)
   })
 
+  it('a PROBE gets the same answer and leaves no record behind (point 434 (8))', () => {
+    const ancestorCachePath = join(dir, 'session-process-probe.json')
+    const walk = () => ({ pid: process.pid, startedAt: NOW })
+    expect(ourClaudeProcess('preflight-test', { ancestorCachePath, findAncestorFn: walk })).toMatchObject({
+      pid: process.pid,
+    })
+    // Nothing written: a synthetic id must not accrete in real state as a session.
+    expect(existsSync(ancestorCachePath)).toBe(false)
+    // A real id is still memoised, so the walk is still paid for only once.
+    expect(ourClaudeProcess('sid3', { ancestorCachePath, findAncestorFn: walk })).toMatchObject({ pid: process.pid })
+    expect(existsSync(ancestorCachePath)).toBe(true)
+    expect(Object.keys(JSON.parse(readFileSync(ancestorCachePath, 'utf8')))).toEqual(['sid3'])
+  })
+
   it('heldByOtherLiveOwner: true for a foreign live lock, false for mine/free/dead', () => {
     expect(heldByOther('sX')).toBe(false) // free
     acquire('s1', opts())
@@ -1398,6 +1415,167 @@ describe('classifyParallel (active detector, subagent-safe)', () => {
       now: NOW,
     })
     expect(parallel).toEqual([])
+  })
+})
+
+// ---------------------------------------------------------------------------
+// A PROBE OF OUR OWN MAY NOT TRIP THE ALARM (point 434 (8))
+// ---------------------------------------------------------------------------
+// The launcher logged `PARALLEL SESSIONS DETECTED: owner=preflight-test plus
+// <real session>` sixteen times across four nights. Cause (corrected by the
+// four-eyes review): the guard preflight's real-repo test runs every registered
+// guard's gather() under the synthetic id `preflight-test`, and five of those ask
+// `heldByOtherLiveOwner('preflight-test')`. When the session that OWNS the batch
+// runs the unit suite in its own tree, the Vitest process's claude ancestor IS the
+// lock's pid — so ownership resolved by PROCESS and `ownsLock` restamped the LIVE
+// lock's sessionId to `preflight-test`. The launcher then read that as the owner
+// beside the real session. The alert means "stop everything", so a probe of our own
+// must not be able to raise it.
+describe('a preflight identity is not a session', () => {
+  const REAL = '10a2d2e0-b1c8-4dbd-aec6-56eb221a8eee'
+  const OTHER = '830a6878-915f-4838-92fc-4af7859c4758'
+
+  it('the four nights: a preflight in flight yields NO parallel-session verdict', () => {
+    expect(
+      classifyParallel({
+        sessionsSeen: { [REAL]: NOW - 3600_000 },
+        activity: { [REAL]: NOW - 30_000 },
+        ownerSid: 'preflight-test',
+        now: NOW,
+      }),
+    ).toEqual([])
+  })
+
+  it('…while TWO REAL sessions still do — the detector keeps its teeth', () => {
+    expect(
+      classifyParallel({
+        sessionsSeen: { [REAL]: NOW - 3600_000, [OTHER]: NOW - 600_000 },
+        activity: { [REAL]: NOW - 1000, [OTHER]: NOW - 30_000 },
+        ownerSid: REAL,
+        now: NOW,
+      }).map((p) => p.sid),
+    ).toEqual([OTHER])
+  })
+
+  it('a probe with fresh activity is never flagged as the second driver either', () => {
+    expect(
+      classifyParallel({
+        sessionsSeen: { [REAL]: NOW - 3600_000, 'preflight-test': NOW - 600_000 },
+        activity: { [REAL]: NOW - 1000, 'preflight-test': NOW - 1000 },
+        ownerSid: REAL,
+        now: NOW,
+      }),
+    ).toEqual([])
+  })
+
+  it('THE PATH THAT DID IT: a probe never owns by PROCESS, so nothing restamps the lock', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-probe-restamp-'))
+    const lockPath = join(dir, 'batch-lock.json')
+    try {
+      // The live lock of the batch owner, naming THIS process — which is what the
+      // owner's own unit-suite run looks like from inside Vitest.
+      const now = Date.now()
+      const ours = { pid: process.pid, startedAt: now - 60_000 }
+      writeFileSync(
+        lockPath,
+        JSON.stringify({
+          v: 2,
+          sessionId: REAL,
+          kind: 'session',
+          claimedAt: now,
+          acquiredAt: now,
+          leaseUntil: now + LEASE_MS,
+          pid: ours.pid,
+          pidStartedAt: ours.startedAt,
+        }),
+      )
+      // Pure resolver first: by process this WOULD have been "mine" with a restamp.
+      expect(resolveOwnership({ lock: readOwnerLock(lockPath), sessionId: REAL, ancestor: ours })).toMatchObject({
+        mine: true,
+        via: 'session-id',
+      })
+      expect(resolveOwnership({ lock: readOwnerLock(lockPath), sessionId: 'preflight-test', ancestor: ours })).toEqual({
+        mine: false,
+        via: 'probe-id',
+        restamp: false,
+      })
+      // …and the door the five preflight gathers actually knock on leaves the lock
+      // untouched: the sessionId is still the REAL owner's, with no restamp record.
+      expect(
+        heldByOtherLiveOwner('preflight-test', {
+          lockPath,
+          now,
+          findAncestorFn: () => ours,
+          probePidFn: () => ({ exists: true, startedAt: ours.startedAt }),
+        }),
+      ).toBe(true)
+      const after = readOwnerLock(lockPath)
+      expect(after.sessionId).toBe(REAL)
+      expect(after.sessionIdBefore).toBeUndefined()
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('acquire REFUSES a probe the lock, and writes none — the second door is shut too', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-probe-lock-'))
+    const lockPath = join(dir, 'batch-lock.json')
+    try {
+      expect(acquire('preflight-test', { lockPath })).toBe('probe')
+      expect(existsSync(lockPath)).toBe(false)
+      expect(readOwnerLock(lockPath)).toBe(null)
+      // A probe never owns, so it never drives the batch either.
+      expect(progressGuardDecision({ sid: 'preflight-test', paused: false, openCount: 5, ownership: 'probe' })).toBe(
+        'stand-down',
+      )
+      // A REAL session id still acquires exactly as before.
+      expect(acquire(REAL, { lockPath })).toBe('acquired')
+      expect(readOwnerLock(lockPath)?.sessionId).toBe(REAL)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('a lock left NAMING a probe is still not ownable by that probe', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-probe-stale-'))
+    const lockPath = join(dir, 'batch-lock.json')
+    try {
+      // The state the four nights left behind. `ownsLock` has its own id shortcut
+      // AHEAD of `resolveOwnership`, so without the rule repeated there this read
+      // `mine: true` while `heldByOtherLiveOwner` answered false — the two doors
+      // disagreeing about the same lock (four-eyes re-check, the nit).
+      const now = Date.now()
+      const probeLock = (over) =>
+        writeFileSync(
+          lockPath,
+          JSON.stringify({ v: 2, sessionId: 'preflight-test', kind: 'session', claimedAt: now, ...over }),
+        )
+
+      probeLock({ leaseUntil: now + LEASE_MS })
+      expect(ownsLock('preflight-test', { lockPath })).toMatchObject({ mine: false, via: 'probe-id' })
+      // A LIVE lease is still nobody's to steal, not even from a probe name: the
+      // lock is the authority on ownership and this stays conservative.
+      expect(acquire(REAL, { lockPath })).toBe('held')
+
+      // It heals the ordinary way — the lease runs out and the next real session
+      // takes it. A probe name never becomes permanent, and never needs a rescue.
+      probeLock({ claimedAt: now - 2 * LEASE_MS, leaseUntil: now - LEASE_MS })
+      expect(ownsLock('preflight-test', { lockPath })).toMatchObject({ mine: false, via: 'probe-id' })
+      expect(acquire(REAL, { lockPath })).toBe('acquired')
+      expect(readOwnerLock(lockPath).sessionId).toBe(REAL)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('only the reserved namespace counts — a real session id is a UUID', () => {
+    for (const sid of ['preflight-test', 'preflight-', 'PREFLIGHT-anything', '  preflight-x  ']) {
+      expect(isProbeSessionId(sid), sid).toBe(true)
+    }
+    for (const sid of [REAL, OTHER, 'launcher-abc', 'preflight', 'x-preflight-y', '', null, undefined, 42]) {
+      expect(isProbeSessionId(sid), String(sid)).toBe(false)
+    }
+    expect(PROBE_SESSION_PREFIX).toBe('preflight-')
   })
 })
 

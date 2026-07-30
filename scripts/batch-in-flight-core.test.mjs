@@ -12,7 +12,7 @@
 //   · with none declared, the guard behaves exactly as it did before;
 //   · and nothing here may touch the repository's .claude/ (finding 3).
 import { describe, it, expect } from 'vitest'
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { basename, join, resolve } from 'node:path'
@@ -28,6 +28,9 @@ import {
   assessInFlight,
   assessOwnerWork,
   checkEvidence,
+  combineWorktreeStamps,
+  porcelainPaths,
+  worktreeStamp,
   describeInFlight,
   evidenceVerdict,
   respawnDecision,
@@ -61,6 +64,8 @@ import {
   writeDeclaration,
   clearDeclaration,
   worktreeBranch,
+  worktreeActiveAt,
+  worktreeFilesActiveAt,
   runningBranchFiles,
 } from './batch-in-flight.mjs'
 
@@ -209,6 +214,255 @@ describe('checkEvidence — every kind is answered by a probe, never by the clai
 })
 
 // ---------------------------------------------------------------------------
+// THE PROBE MEASURES THE AGENT'S WORK, NOT ITS GIT COMMANDS (point 434 (5b))
+// ---------------------------------------------------------------------------
+// Measured live on 30.07.2026: a worktree read "quiet for 21 min" to the
+// declaration while its agent was mid-edit, because the probe stat'd four GIT
+// paths and an agent writing source files runs no git command. The contamination
+// ran the other way too — a reader's own `git status` refreshed the index and
+// reset the clock, so the observer's look became the evidence.
+describe('the worktree stamp reads BOTH sources and says which one answered', () => {
+  const wt = { kind: 'worktree', path: '/tmp/w' }
+
+  it('30.07.2026: git metadata old but WORKING FILES fresh reads alive, and names them', () => {
+    const probe = () => combineWorktreeStamps({ gitAt: NOW - 21 * 60 * 1000, filesAt: NOW - 60_000 })
+    const item = checkEvidence(wt, { now: NOW, worktreeActiveAt: probe })
+    expect(item.ok).toBe(true)
+    expect(item.detail).toContain('active 1 min ago')
+    expect(item.detail).toContain('working files')
+    // …and the whole declaration therefore judges on the work's own output.
+    expect(evidenceVerdict([item])).toMatchObject({ judgedOn: 'git', outputFresh: true })
+  })
+
+  it('BOTH old still reads quiet, and the detail names the newest source', () => {
+    const probe = () =>
+      combineWorktreeStamps({ gitAt: NOW - WORK_FRESH_MS - 1, filesAt: NOW - 40 * 60 * 1000 })
+    const item = checkEvidence(wt, { now: NOW, worktreeActiveAt: probe })
+    expect(item.ok).toBe(false)
+    expect(item.detail).toContain('quiet for')
+    expect(item.detail).toContain('newest: git metadata')
+  })
+
+  it('a stamp that cannot be read at all is still `worktree-gone`, never a guess', () => {
+    expect(checkEvidence(wt, { now: NOW, worktreeActiveAt: () => combineWorktreeStamps({}) })).toMatchObject({
+      ok: false,
+      detail: 'worktree-gone',
+    })
+    // A bare number keeps its old meaning exactly — including its unnamed detail.
+    expect(checkEvidence(wt, { now: NOW, worktreeActiveAt: () => NOW - 60_000 }).detail).toBe('active 1 min ago')
+  })
+
+  it('combineWorktreeStamps takes the newest, and a tie goes to the files a reader cannot fake', () => {
+    expect(combineWorktreeStamps({ gitAt: 5, filesAt: 9 })).toEqual({ at: 9, source: 'working files' })
+    expect(combineWorktreeStamps({ gitAt: 9, filesAt: 5 })).toEqual({ at: 9, source: 'git metadata' })
+    expect(combineWorktreeStamps({ gitAt: 7, filesAt: 7 })).toEqual({ at: 7, source: 'working files' })
+    expect(combineWorktreeStamps({ gitAt: 7 })).toEqual({ at: 7, source: 'git metadata' })
+    expect(combineWorktreeStamps({ filesAt: 7 })).toEqual({ at: 7, source: 'working files' })
+    expect(combineWorktreeStamps({ gitAt: null, filesAt: NaN })).toBe(null)
+    expect(combineWorktreeStamps()).toBe(null)
+  })
+
+  it('worktreeStamp accepts both shapes and refuses everything else', () => {
+    expect(worktreeStamp(12)).toEqual({ at: 12, source: null })
+    expect(worktreeStamp({ at: 12, source: 'working files' })).toEqual({ at: 12, source: 'working files' })
+    expect(worktreeStamp({ at: 12 })).toEqual({ at: 12, source: null })
+    for (const bad of [null, undefined, 'x', {}, { at: 'x' }, { at: NaN }, Infinity]) {
+      expect(worktreeStamp(bad), String(bad)).toBe(null)
+    }
+  })
+
+  it('--agent-check keeps its meaning, and names the working files when they carry it', () => {
+    const alive = agentOutputVerdict({
+      worktreeAt: combineWorktreeStamps({ gitAt: NOW - 21 * 60 * 1000, filesAt: NOW - 60_000 }),
+      now: NOW,
+    })
+    expect(alive).toMatchObject({ verdict: 'alive', judgedOn: 'git' })
+    expect(alive.detail).toContain('working files')
+    // A branch tip that is newer than the worktree still decides, and is not
+    // mislabelled with the worktree's source.
+    const byBranch = agentOutputVerdict({
+      worktreeAt: combineWorktreeStamps({ gitAt: NOW - 60 * 60 * 1000, filesAt: NOW - 50 * 60 * 1000 }),
+      branchTipAt: NOW - 60_000,
+      now: NOW,
+    })
+    expect(byBranch).toMatchObject({ verdict: 'alive', judgedOn: 'git' })
+    expect(byBranch.detail).not.toContain('working files')
+    // Both quiet: still quiet — the respawn permission is unchanged.
+    const quiet = agentOutputVerdict({
+      worktreeAt: combineWorktreeStamps({ gitAt: NOW - 90 * 60 * 1000, filesAt: NOW - 80 * 60 * 1000 }),
+      now: NOW,
+    })
+    expect(quiet).toMatchObject({ verdict: 'quiet', judgedOn: 'git' })
+    expect(quiet.detail).toContain('newest: working files')
+    expect(respawnDecision({ output: quiet }).respawn).toBe(true)
+    expect(respawnDecision({ output: alive }).respawn).toBe(false)
+    // A bare number still answers exactly as it did.
+    expect(agentOutputVerdict({ worktreeAt: NOW - 60_000, now: NOW })).toMatchObject({ verdict: 'alive' })
+    expect(agentOutputVerdict({ worktreeAt: null, now: NOW })).toMatchObject({ verdict: 'unmeasurable' })
+  })
+
+  it('porcelainPaths reads NUL records, skips the rename SOURCE and honours the limit', () => {
+    const rec = (...parts) => `${parts.join('\0')}\0`
+    expect(porcelainPaths(rec(' M src/a.ts', '?? src/b with space.ts'))).toEqual([
+      'src/a.ts',
+      'src/b with space.ts',
+    ])
+    // A rename record is followed by the path the file no longer has — skip it.
+    expect(porcelainPaths(rec('R  new.ts', 'old.ts', ' M kept.ts'))).toEqual(['new.ts', 'kept.ts'])
+    expect(porcelainPaths(rec('C  copy.ts', 'orig.ts'))).toEqual(['copy.ts'])
+    expect(porcelainPaths(rec(' M a', ' M b', ' M c'), { limit: 2 })).toEqual(['a', 'b'])
+    // `-z` is unquoted and unescaped, so a legal path with an edge space survives
+    // verbatim — trimming it would make its stat miss (four-eyes review, finding 6).
+    expect(porcelainPaths(rec('?? odd name .ts', '?? tab\tname.ts'))).toEqual(['odd name .ts', 'tab\tname.ts'])
+    for (const junk of ['', null, undefined, '\0\0', 'XY']) expect(porcelainPaths(junk), String(junk)).toEqual([])
+  })
+})
+
+// ---------------------------------------------------------------------------
+describe('worktreeActiveAt against a REAL checkout (its own temp repo, never this one)', () => {
+  // The repo is built with the AMBIENT config neutralised: a machine with a global
+  // `commit.gpgsign`, a global `core.hooksPath` or an `init.templateDir` carrying
+  // hooks would otherwise fail or HANG these commits (four-eyes review, finding 4).
+  // `status.showUntrackedFiles=no` is neutralised the same way — the probe states
+  // the flag itself, and this keeps the test honest about that.
+  const gitEnv = { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_SYSTEM: '/dev/null' }
+  const git = (dir, ...args) =>
+    execFileSync('git', ['-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=', ...args], {
+      windowsHide: true,
+      cwd: dir,
+      env: gitEnv,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim()
+
+  const seedRepo = (dir) => {
+    git(dir, 'init', '-b', 'main')
+    writeFileSync(join(dir, 'a.txt'), 'first\n')
+    git(dir, 'add', 'a.txt')
+    git(dir, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-m', 'x')
+  }
+
+  const backdate = (dir, ageMs) => {
+    const when = new Date(Date.now() - ageMs)
+    for (const p of ['.git', '.git/index', '.git/HEAD', '.git/COMMIT_EDITMSG']) {
+      try {
+        utimesSync(join(dir, p), when, when)
+      } catch {
+        /* COMMIT_EDITMSG may not exist — the other three carry the stamp */
+      }
+    }
+  }
+
+  it('an agent EDITING with no git command reads alive, on the working files', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-wt-probe-'))
+    try {
+      seedRepo(dir)
+      // The git metadata is 30 minutes old; the agent has just written a file.
+      backdate(dir, 30 * 60 * 1000)
+      writeFileSync(join(dir, 'a.txt'), 'mid-edit\n')
+
+      const stamp = worktreeActiveAt(dir)
+      expect(stamp).toBeTruthy()
+      expect(stamp.source).toBe('working files')
+      expect(Date.now() - stamp.at).toBeLessThan(60_000)
+      // What the declaration then says about it — the 30.07 verdict, corrected.
+      expect(checkEvidence({ kind: 'worktree', path: dir }, { now: Date.now(), worktreeActiveAt }).ok).toBe(true)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('a NEW, not-yet-added file counts too — that is the mid-edit case itself', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-wt-untracked-'))
+    try {
+      seedRepo(dir)
+      backdate(dir, 30 * 60 * 1000)
+      // An agent writing a brand-new source file has not run `git add` either. The
+      // probe states `--untracked-files=all`, so an ambient
+      // `status.showUntrackedFiles=no` cannot blind it (four-eyes review, finding 5).
+      git(dir, 'config', 'status.showUntrackedFiles', 'no')
+      writeFileSync(join(dir, 'brand-new.ts'), 'export const x = 1\n')
+
+      const stamp = worktreeActiveAt(dir)
+      expect(stamp.source).toBe('working files')
+      expect(Date.now() - stamp.at).toBeLessThan(60_000)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('…and inside a brand-NEW directory, which `-unormal` would have collapsed', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-wt-newdir-'))
+    try {
+      seedRepo(dir)
+      // The agent creates a new module directory, then works INSIDE it. Under
+      // `-unormal` git reports only `?? newthing/`, and a DIRECTORY's mtime does
+      // not move when an existing child is rewritten — so the twenty minutes of
+      // editing would read `quiet` all over again (four-eyes re-check,
+      // SHOULD-FIX 1). This case fails under `-unormal` and passes under `-uall`.
+      mkdirSync(join(dir, 'newthing'))
+      writeFileSync(join(dir, 'newthing', 'one.ts'), 'export const a = 1\n')
+      backdate(dir, 30 * 60 * 1000)
+      const old = new Date(Date.now() - 30 * 60 * 1000)
+      utimesSync(join(dir, 'newthing'), old, old)
+      // Only the FILE is fresh; its directory still carries the old stamp.
+      writeFileSync(join(dir, 'newthing', 'one.ts'), 'export const a = 2\n')
+      expect(Date.now() - statSync(join(dir, 'newthing')).mtimeMs).toBeGreaterThan(20 * 60 * 1000)
+
+      const stamp = worktreeActiveAt(dir)
+      expect(stamp.source).toBe('working files')
+      expect(Date.now() - stamp.at).toBeLessThan(60_000)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('a clean, long-idle checkout still reads quiet — on the git metadata', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-wt-idle-'))
+    try {
+      seedRepo(dir)
+      backdate(dir, 40 * 60 * 1000)
+
+      const stamp = worktreeActiveAt(dir)
+      expect(stamp.source).toBe('git metadata')
+      const item = checkEvidence({ kind: 'worktree', path: dir }, { now: Date.now(), worktreeActiveAt })
+      expect(item.ok).toBe(false)
+      expect(item.detail).toContain('newest: git metadata')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('LOOKING AT IT IS NOT EVIDENCE: the probe does not refresh the index it reads', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-wt-clean-'))
+    try {
+      seedRepo(dir)
+      backdate(dir, 30 * 60 * 1000)
+      const before = statSync(join(dir, '.git', 'index')).mtimeMs
+
+      worktreeActiveAt(dir)
+      worktreeActiveAt(dir)
+
+      expect(statSync(join(dir, '.git', 'index')).mtimeMs).toBe(before)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('answers null for a path that is not a checkout at all', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'hoa-wt-none-'))
+    try {
+      expect(worktreeActiveAt(dir)).toBe(null)
+      expect(worktreeActiveAt('')).toBe(null)
+      expect(worktreeFilesActiveAt(dir)).toBe(null)
+      expect(worktreeFilesActiveAt('')).toBe(null)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+})
+
+// ---------------------------------------------------------------------------
 describe('assessInFlight — a fresh declaration with live evidence, and every way it stops holding', () => {
   it('holds while it is fresh and ALL of its evidence checks out', () => {
     const a = assess()
@@ -283,7 +537,7 @@ describe('assessInFlight — a fresh declaration with live evidence, and every w
     expect(a.ignored.join(' ')).toContain('silent for 59 min')
     // The verdict SAYS what it rests on — the mistake was invisible because
     // "evidence-gone" never named the source that had answered.
-    expect(describeInFlight(a, withLog)).toContain('judged on the work’s own git output')
+    expect(describeInFlight(a, withLog)).toContain('judged on the work’s own output — a commit or a written file')
     expect(describeInFlight(a, withLog)).toContain('NOT counted as dead')
   })
 

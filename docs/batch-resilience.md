@@ -365,6 +365,15 @@ children rather than sessions — and it was broken by the author of the paragra
 states it, which is the most honest argument in this document for why the rule needs a
 mechanism instead of a reader.
 
+And the same mistake sat one layer further in. The worktree probe stat'd four GIT
+paths — the gitdir, `index`, `HEAD`, `COMMIT_EDITMSG` — so what it dated was the last
+git OPERATION: an agent writing source files for twenty minutes reads as `quiet`, which
+is exactly what was measured live while an agent was mid-edit. The contamination ran the
+other way too, since a reader's own `git status` in that worktree refreshes the index and
+resets the clock. So the probe now also dates the newest WORKING FILE — through `git
+--no-optional-locks status --porcelain -z`, which cannot rewrite the index it reads — and
+every verdict names WHICH of the two sources answered.
+
 ## 5. What must NOT be built
 
 - **No rescue that depends on the wedged session noticing.** It is definitionally

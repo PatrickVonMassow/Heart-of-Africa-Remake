@@ -132,17 +132,86 @@ export const EVIDENCE_KINDS = ['pid', 'branch', 'worktree', 'log']
  * output that is still moving needs no deadline to stay honest (see
  * `assessInFlight`).
  *
- * ONE CAVEAT, named rather than hidden (four-eyes review, Fable 5, finding 5):
- * `worktreeActiveAt` reads the gitdir's index/HEAD mtimes, and a supervisor that
- * runs `git status` inside an agent's worktree refreshes the index from OUTSIDE
- * — so a dead agent's worktree can be made to look active by somebody looking at
- * it. The branch stamp (`refTipAt`) is commit-based and has no such path. It is
- * left as it is because the alternative is worse in the common case (an agent
- * normally declares its worktree and nothing else, and requiring a commit would
- * re-open the 45-minute expiry this point closed), but a declaration that names
- * BOTH is strictly the stronger one, and the respawn check below asks for both.
+ * THE CAVEAT THAT WAS NAMED HERE IS NOW ANSWERED (point 434 (5b), 30.07.2026).
+ * `worktreeActiveAt` used to stat exactly four GIT paths — the gitdir, `index`,
+ * `HEAD`, `COMMIT_EDITMSG` — so what it dated was the last git OPERATION, not the
+ * last edit, and it failed in both directions: an agent writing source files for
+ * twenty minutes without running a git command read as `quiet` (measured live: the
+ * same worktree said "quiet for 21 min" while its agent was mid-edit), while a
+ * supervisor's own `git status` on that worktree refreshed the index and made the
+ * observer's look the evidence. It now also dates the newest WORKING FILE, and the
+ * verdict says WHICH of the two it read (`combineWorktreeStamps`). A reader cannot
+ * fake that half: looking at a checkout does not rewrite the files in it.
  */
 export const OUTPUT_KINDS = new Set(['branch', 'worktree'])
+
+/** How a worktree stamp names where it came from. Both are asked; the NEWEST of
+ *  the two carries the verdict, and its name goes into the detail string. */
+export const WORKTREE_SOURCE = { files: 'working files', git: 'git metadata' }
+
+/**
+ * THE NEWEST OF THE TWO WORKTREE STAMPS, AND WHICH ONE IT WAS. PURE.
+ *
+ * `gitAt` is the git metadata's mtime, `filesAt` the newest working-file mtime.
+ * Returns { at, source } — or null when neither could be read, which keeps the
+ * `worktree-gone` path exactly as it was. A tie goes to the working files: they
+ * are the half a reader cannot contaminate.
+ */
+export function combineWorktreeStamps({ gitAt = null, filesAt = null } = {}) {
+  const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null)
+  const g = num(gitAt)
+  const f = num(filesAt)
+  if (g === null && f === null) return null
+  if (f !== null && (g === null || f >= g)) return { at: f, source: WORKTREE_SOURCE.files }
+  return { at: g, source: WORKTREE_SOURCE.git }
+}
+
+/**
+ * NORMALISE WHAT A WORKTREE PROBE ANSWERED. PURE.
+ *
+ * The probe may answer `{ at, source }` (the current shape) or a bare epoch ms
+ * (what every caller used to pass, and what a test injecting a plain number still
+ * passes). Both are read; an unusable value answers null. A bare number carries no
+ * source, so nothing is invented for it — the detail simply names none.
+ */
+export function worktreeStamp(value) {
+  if (typeof value === 'number' && Number.isFinite(value)) return { at: value, source: null }
+  if (value && typeof value === 'object' && typeof value.at === 'number' && Number.isFinite(value.at)) {
+    return { at: value.at, source: typeof value.source === 'string' && value.source ? value.source : null }
+  }
+  return null
+}
+
+/**
+ * THE PATHS `git status --porcelain -z` NAMED. PURE.
+ *
+ * NUL-separated so no path is ever quoted or escaped (a `"` in the plain
+ * `--porcelain` output would otherwise have to be unescaped by hand). Each record
+ * is `XY <path>`; a rename/copy record is followed by a SECOND chunk holding the
+ * source path, which is skipped — it is the path the file no longer has.
+ *
+ * `limit` bounds the work: a checkout with thousands of dirty paths must not turn a
+ * liveness probe into a tree walk. `git status` sorts by PATH, not by mtime, so a
+ * checkout dirtier than the limit can miss the newest file — the caller then falls
+ * back to the git metadata, which can only UNDER-report freshness, never invent it.
+ *
+ * The path is taken verbatim: `-z` exists precisely so nothing is quoted or
+ * escaped, and trimming it would corrupt the (legal) path that begins or ends with
+ * a space (four-eyes review, finding 6).
+ */
+export function porcelainPaths(out, { limit = 400 } = {}) {
+  const chunks = String(out ?? '').split('\0')
+  const paths = []
+  for (let i = 0; i < chunks.length && paths.length < limit; i += 1) {
+    const chunk = chunks[i]
+    if (!chunk || chunk.length < 4) continue
+    const xy = chunk.slice(0, 2)
+    const path = chunk.slice(3)
+    if (path) paths.push(path)
+    if (xy.includes('R') || xy.includes('C')) i += 1 // the rename/copy source chunk
+  }
+  return paths
+}
 
 /**
  * WHICH EVIDENCE CARRIES THE VERDICT? PURE.
@@ -266,7 +335,9 @@ const minutes = (ms) => Math.round(ms / 60000)
  * ONE piece of evidence, checked. PURE — every probe is injected:
  *   probePid         — (pid) => { exists: boolean, startedAt: number|null }
  *   refTipAt         — (ref) => number|null  epoch ms of the branch tip commit
- *   worktreeActiveAt — (path) => number|null epoch ms of the last git activity
+ *   worktreeActiveAt — (path) => { at, source }|number|null, when the worktree last
+ *                      MOVED and which of its two sources said so (see
+ *                      `combineWorktreeStamps`); a bare number keeps its old meaning
  *   mtimeOf          — (path) => number|null epoch ms, null when absent
  *
  * EVERY kind is now judged on RECENCY, not on existence — a pid by the identity
@@ -322,12 +393,15 @@ export function checkEvidence(
   if (kind === 'worktree') {
     const path = String(item.path ?? '').trim()
     if (!path) return no(`worktree ?${label}`, 'no-path')
-    const active = worktreeActiveAt ? worktreeActiveAt(path) : null
-    if (typeof active !== 'number') return no(`worktree ${path}${label}`, 'worktree-gone')
-    const idle = now - active
+    const stamp = worktreeStamp(worktreeActiveAt ? worktreeActiveAt(path) : null)
+    if (!stamp) return no(`worktree ${path}${label}`, 'worktree-gone')
+    const idle = now - stamp.at
+    // NAME THE EVIDENCE (point 434 (5b)): git metadata and the working files are
+    // both asked, and a verdict that does not say which one answered is exactly
+    // how "quiet for 21 min" hid a mid-edit agent.
     return idle <= window(workFreshMs)
-      ? yes(`worktree ${path}${label}`, `active ${minutes(idle)} min ago`)
-      : no(`worktree ${path}${label}`, `quiet for ${minutes(idle)} min`)
+      ? yes(`worktree ${path}${label}`, `active ${minutes(idle)} min ago${stamp.source ? ` (${stamp.source})` : ''}`)
+      : no(`worktree ${path}${label}`, `quiet for ${minutes(idle)} min${stamp.source ? ` (newest: ${stamp.source})` : ''}`)
   }
   if (kind === 'log') {
     const path = String(item.path ?? '').trim()
@@ -479,15 +553,21 @@ export function agentOutputVerdict({
   logOverrideMs = LOG_OVERRIDES_QUIET_GIT_MS,
 } = {}) {
   const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null)
-  const git = [num(worktreeAt), num(branchTipAt)].filter((v) => v !== null)
+  // The worktree probe answers { at, source } (point 434 (5b)) and a bare number
+  // is still accepted, so a caller injecting one keeps its old meaning.
+  const wt = worktreeStamp(worktreeAt)
+  const git = [wt ? wt.at : null, num(branchTipAt)].filter((v) => v !== null)
   const log = num(logAt)
   const newestGit = git.length > 0 ? Math.max(...git) : null
+  // Say which source the newest stamp came from where the WORKTREE is the newest
+  // one and it named itself; a branch tip is already named by `commit`.
+  const named = wt && wt.source && wt.at === newestGit ? wt.source : null
   if (newestGit !== null && now - newestGit <= graceMs) {
     return {
       verdict: 'alive',
       judgedOn: 'git',
       ageMs: now - newestGit,
-      detail: `git output ${minutes(now - newestGit)} min old`,
+      detail: `work output ${minutes(now - newestGit)} min old${named ? ` (${named})` : ''}`,
     }
   }
   // A FRESH log is genuine evidence that something is happening — it is only
@@ -504,7 +584,7 @@ export function agentOutputVerdict({
     verdict: 'quiet',
     judgedOn: 'git',
     ageMs: now - newestGit,
-    detail: `no commit and no git activity for ${minutes(now - newestGit)} min`,
+    detail: `no commit and nothing written for ${minutes(now - newestGit)} min${named ? ` (newest: ${named})` : ''}`,
   }
 }
 
@@ -820,8 +900,10 @@ export function assessOwnerWork({ declaration, lock, now, maxAgeMs = LAUNCHER_WO
 
 /** How the reported evidence kind reads in a sentence. */
 const JUDGED_ON_WORDS = {
-  git: 'the work’s own git output',
-  process: 'a live process (no git output)',
+  // Not "git output" any more: the worktree half may be a written FILE (point
+  // 434 (5b)), and the per-item detail names which of the two it was.
+  git: 'the work’s own output — a commit or a written file',
+  process: 'a live process (nothing produced)',
   log: 'a log file only — the weakest evidence there is',
   none: 'nothing that still checks out',
 }

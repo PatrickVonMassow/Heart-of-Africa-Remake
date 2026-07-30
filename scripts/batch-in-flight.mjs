@@ -39,7 +39,9 @@ import {
 import {
   agentOutputVerdict,
   assessInFlight,
+  combineWorktreeStamps,
   describeInFlight,
+  porcelainPaths,
   respawnDecision,
   selfReferentialEvidence,
   slotReasonDecision,
@@ -113,22 +115,98 @@ export function refTipAt(ref, { cwd = REPO_ROOT } = {}) {
   }
 }
 
+const stampOf = (p) => {
+  try {
+    return statSync(p).mtimeMs
+  } catch {
+    return null
+  }
+}
+
 /**
- * WHEN did git last do something in this worktree? Epoch ms, or null when the
- * path is not a checkout (or is gone). A worktree's `.git` is a FILE pointing at
- * `…/.git/worktrees/<name>`; that directory carries the index, HEAD and
- * COMMIT_EDITMSG a working agent rewrites on every commit, and the directory's
- * own mtime moves with each of those renames. The newest of them is the answer —
- * the same "is anything still happening" question the log kind asks.
+ * WHEN was a WORKING FILE in this checkout last written? Epoch ms, or null when
+ * git cannot answer. This is the half the git metadata cannot see: an agent
+ * editing source for twenty minutes runs no git command at all.
+ *
+ * `git status --porcelain -z` names exactly the paths that are dirty or new —
+ * cheaper than walking a checkout, and it already respects `.gitignore`, so
+ * `node_modules/` and `dist/` never enter. Three flags carry weight:
+ *   · `--no-optional-locks` keeps OUR OWN look from becoming the evidence —
+ *     without it git may refresh (and rewrite) the index, which is the
+ *     contamination point 434 (5b) names. The caller additionally stats the git
+ *     metadata BEFORE calling this, so even a git that ignored the flag could not
+ *     backdate the other half.
+ *   · `--untracked-files=all` is stated rather than assumed, and it is ALL rather
+ *     than `normal` for a measured reason (four-eyes review, findings 5 and its
+ *     re-check): a global or repo `status.showUntrackedFiles=no` would otherwise
+ *     hide exactly the case this probe exists for, and under `-unormal` a wholly
+ *     NEW directory collapses to one entry — `?? newmod/` — whose DIRECTORY mtime
+ *     does not move when an existing child inside it is edited. An agent that
+ *     creates `src/newthing/` and then works inside it for twenty minutes would
+ *     read `quiet` all over again. `-uall` names the files themselves.
+ *   · `--ignore-submodules=all`, because a submodule's own dirtiness is not this
+ *     checkout's work and would cost a recursive status.
+ *
+ * `limit` bounds the stats, not the newest-wins comparison; `git status` sorts by
+ * PATH, so a checkout dirtier than the limit can miss the newest file and fall
+ * back to the git metadata. That is the safe direction (it can only under-report
+ * freshness), and an agent worktree does not reach it.
+ *
+ * Any failure answers null — evidence that cannot be established never counts as
+ * established, the same rule `refTipAt` follows.
+ */
+export function worktreeFilesActiveAt(root, { limit } = {}) {
+  const dir = String(root ?? '').trim()
+  if (!dir) return null
+  let out = ''
+  try {
+    out = execFileSync(
+      'git',
+      [
+        '--no-optional-locks',
+        '-C',
+        dir,
+        'status',
+        '--porcelain',
+        '-z',
+        '--untracked-files=all',
+        '--ignore-submodules=all',
+      ],
+      {
+        windowsHide: true,
+        encoding: 'utf8',
+        timeout: 15000,
+        maxBuffer: 8 * 1024 * 1024,
+        stdio: ['ignore', 'pipe', 'ignore'],
+      },
+    )
+  } catch {
+    return null
+  }
+  let newest = null
+  for (const rel of porcelainPaths(out, limit ? { limit } : {})) {
+    // An untracked DIRECTORY is reported as `dir/`; its own mtime moves when a
+    // file is created in it, which is the answer wanted here either way.
+    const at = stampOf(resolve(dir, rel))
+    if (typeof at === 'number' && (newest === null || at > newest)) newest = at
+  }
+  return newest
+}
+
+/**
+ * WHEN did this worktree last MOVE? `{ at, source }`, or null when the path is
+ * not a checkout (or is gone).
+ *
+ * TWO SOURCES, AND THE VERDICT SAYS WHICH ONE ANSWERED (point 434 (5b)):
+ *   · GIT METADATA — a worktree's `.git` is a FILE pointing at
+ *     `…/.git/worktrees/<name>`; that directory carries the index, HEAD and
+ *     COMMIT_EDITMSG a working agent rewrites on every commit. This dates the last
+ *     git OPERATION, which is why it alone read a mid-edit agent as `quiet`.
+ *   · WORKING FILES — the newest dirty/new path (see `worktreeFilesActiveAt`).
+ * The metadata is stat'd FIRST, before anything shells out, so this probe cannot
+ * date its own call.
  */
 export function worktreeActiveAt(path) {
-  const stamp = (p) => {
-    try {
-      return statSync(p).mtimeMs
-    } catch {
-      return null
-    }
-  }
   const root = String(path ?? '').trim()
   if (!root) return null
   let gitdir = null
@@ -145,9 +223,10 @@ export function worktreeActiveAt(path) {
   }
   if (!gitdir) return null
   const stamps = [gitdir, join(gitdir, 'index'), join(gitdir, 'HEAD'), join(gitdir, 'COMMIT_EDITMSG')]
-    .map(stamp)
+    .map(stampOf)
     .filter((v) => typeof v === 'number')
-  return stamps.length ? Math.max(...stamps) : null
+  const gitAt = stamps.length ? Math.max(...stamps) : null
+  return combineWorktreeStamps({ gitAt, filesAt: worktreeFilesActiveAt(root) })
 }
 
 export function mtimeOf(path) {
