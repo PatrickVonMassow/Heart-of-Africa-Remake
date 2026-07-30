@@ -3739,36 +3739,6 @@ it is appended.
   viewport: type into the chat, wait out two refresh ticks, and the caret and the scroll
   position are still where they were.
 
-- [ ] 443. THE TORN STATES THE DOCTOR DOES NOT YET KNOW (30.07.2026, same user demand as 442;
-  bundle Urlaubsfestigkeit). A kill during a critical action leaves more behind than a half
-  merge. Extend the doctor's state model and its remedy plan by, each with its own detection
-  and its idempotent repair: (a) stale `.git/index.lock` and `.git/refs/**/*.lock` from a
-  killed commit or push; (b) half-registered worktrees (`git worktree prune`) AND worktree
-  DIRECTORIES on disk that git no longer knows — six were lying around on 30.07.2026, four of
-  them from the previous night; (c) orphaned browser/node processes of an aborted verification,
-  which otherwise eat CPU for the rest of the absence — matched by their command line, never
-  by name alone, and only when no live session owns them; (d) a truncated `TASKS.md` restored
-  from `HEAD` (it is versioned; `tasksParses` already detects the damage but nothing repairs
-  it); (e) a stale pending-spawn lock; (f) a half-published board (the local file newer than
-  the published page — `scripts/board-publish.mjs` re-runs).
-  (g) THE LEASE SHADOWS A PROVABLY DEAD PID (four-eyes re-review of the pre-spawn check,
-  30.07.2026). `assessOwner` checks the expired lease BEFORE the pid probe, so an owner that
-  is BOTH dead and lease-expired — the machine slept, the launcher was off for an hour, i.e.
-  the likely shape of an unattended fortnight — reads `lease-expired`, and the launcher
-  therefore declines to mend its tree even though the process is provably gone. The successor
-  still inherits the repair through the mandate, so this is the safe direction and never stops
-  the batch; the improvement is to let the lease-expired branch consult the pid probe and allow
-  the write once the process is gone.
-  (h) Persist the launcher state on the two `process.exit(1)` failure paths after the repo
-  alert was recorded (a missing claude.exe, a spawn that threw), so a repo alert cannot slip
-  past its own throttle in an already-alarming mode; and cover the mandate marker's one-shot,
-  expiry and false-mandate mechanics with tests — they live in untested wiring today.
-  THE PRINCIPLE, to be written into `docs/batch-autonomy.md`: every critical action is a
-  transaction with an idempotent cleanup step, and that step runs at every start BEFORE any
-  work — never "the session remembers to".
-  VERIFIABLE: one Vitest case per state on a temporary repo (detection AND repair), and the
-  drill of 449 leaves at least three of them behind at once.
-
 - [ ] 444. A QUOTA BLOCK IS A WAITING STATE, NOT A FAILURE (user decision 30.07.2026: no
   pacing — "wenn du durch die Kontingent-Bremse blockiert wirst, musst du es immer wieder
   probieren, um zu merken, wann du neues Budget hast und ab dann weiterarbeiten"; bundle
