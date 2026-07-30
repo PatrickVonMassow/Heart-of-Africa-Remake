@@ -3295,6 +3295,13 @@ it is appended.
   `…/<session>/subagents/agent-*.jsonl`, whose `message.model` fields record the serving
   model per request. The pause stays mandatory; what changes is that the way out is stated
   instead of rediscovered.
+  THE REMEDY HAS A TRAP OF ITS OWN, measured 30.07.2026: rewriting the trailer with
+  `git filter-branch` leaves the old commits alive under `refs/original/…`, and the guard
+  reads `git log --all`, so it stays RED on a branch that is already fixed — invisibly, because
+  every worktree shares one `.git` and nobody looks there. The remedy line therefore states the
+  cleanup (`git update-ref -d refs/original/refs/heads/<branch>`) as part of the fix, and the
+  Vitest case pins that a rewritten branch with the backup ref still present is reported with
+  that ref NAMED, rather than as a second policy breach.
   VERIFIABLE: pure Vitest — `commit-msg` core accepts each allowed spelling (Opus 5,
   Opus 4.8, Fable 5, with and without the `(1M context)` suffix), rejects a bare
   `Claude <noreply@anthropic.com>`, rejects a named forbidden model, and ignores a purely
@@ -3648,6 +3655,16 @@ it is appended.
   text still reaches the board as a command-line ARGUMENT, so `--none` gains `--text-stdin`
   like every other text (point 410's rule: a Windows shell mangles the umlauts, and the
   audit then flags the card it just wrote).
+  AND THE FLAG ITSELF REACHED THE BOARD AS PROSE (found 30.07.2026). `board-queue.mjs set`
+  has NO `--text-stdin`, so a session that tried to pipe German prose into it stored the
+  literal string `--text-stdin` as the card body — and six cards, three of them live in the
+  queue, showed the user a command-line flag where their explanation belonged. Two of those
+  cards additionally carried umlauts mangled by the Windows shell (`W?chter`), because the
+  title could only be hand-written into `.claude/board-queue.json`. So: `board-queue.mjs set`
+  gains `--text-stdin` like every other text command, and no card-writing command may store a
+  value that begins with `--` as prose — it refuses and names the flag it expected. Vitest:
+  a body of `--text-stdin` is refused; a body legitimately beginning with a dash after a `--`
+  separator is accepted.
   ALSO IN THIS POINT, the same family once more: THE SANCTIONED COMMAND CANNOT SATISFY THE
   GUARD THAT JUDGES ITS OUTPUT. `board.mjs status` wraps whatever it is given into ONE `<p>`,
   while `dashboard-conciseness-guard` blocks the turn end on "one long unbroken paragraph —
