@@ -602,6 +602,34 @@ Vitest-covered in `scripts/batch-in-flight-core.test.mjs`). IO and probes:
 derived from the caller's lock path via `statePathsFor`, so a redirected lock
 redirects it too (finding 3).
 
+### The repair runs before the successor (30.07.2026, point 442)
+
+`scripts/batch-doctor-core.mjs` has known how to find and mend an interrupted
+session's leftovers — a half-done merge, an unattributable dirty tree, a diverged
+`main` — since the parallel-session incident. What was missing was a CALLER on the
+way in: the launcher spawned a successor into whatever the previous death had left
+behind, and the successor had to notice by itself. That is judgment where a
+mechanism belongs, and over a fortnight alone it is judgment nobody is there to
+exercise.
+
+The launcher now runs `batch-doctor.mjs --repair` after its environment preflight
+and before it acquires the pending-spawn lock. `repoRepairDecision` reads the exit
+code: **0** spawn, **2** repairs still pending → no spawn, **1** findings that need
+hands → no spawn; both refusals alert and are retried on the next tick, and neither
+touches `failCount` — a torn tree is not a broken environment. No `--gate`, so the
+check costs well under a second; the three-minute suite stays a session's job.
+
+The same seam is checked from the other side: `batch-resume-hook.mjs` asks the
+doctor READ-ONLY (no `--repair`, no `--gate`) and, for a session that actually owns
+the batch, prepends `resumeRepairMandate` — "REPO NOT CLEAN — DO NOT START
+WORKING", naming the one command that clears it. Two independent looks at one
+naht, because the one that fails is never the one you expected.
+
+FAIL-OPEN both times. A doctor that cannot run at all spawns anyway and says so
+loudly (the session side stays silent about it — the launcher's alert already
+carries that news, and a session cannot mend a broken doctor). A safeguard may cost
+a diagnosis; it may never cost the work.
+
 ### The watcher that does not live on this machine (30.07.2026, point 434)
 
 `.github/workflows/batch-watchdog.yml` asks, every thirty minutes and from

@@ -18,6 +18,8 @@ import {
   alertNamesAnother,
   GATE_COMMANDS,
   INCONCLUSIVE_VERDICT,
+  repoRepairDecision,
+  resumeRepairMandate,
 } from './batch-doctor-core.mjs'
 
 const quiet = { level: 'quiet', reasons: [], agentWorktrees: [] }
@@ -339,5 +341,65 @@ describe('otherSessionsIn — an alert naming only the reader is no evidence', (
   it('an unknown reader id still filters the owner, and never invents a stranger', () => {
     const alert = { parallel: [{ sid: 'owner-sid' }] }
     expect(otherSessionsIn({ alert, readerSid: '', ownerSid: 'owner-sid' })).toEqual([])
+  })
+})
+
+// --- Point 442: the repair runs before the successor -----------------------------
+
+describe('repoRepairDecision — the repo check the launcher runs before spawning', () => {
+  it('spawns on a consistent verdict, with nothing to report', () => {
+    expect(repoRepairDecision({ ran: true, code: 0 })).toEqual({ spawn: true, reason: 'consistent', alert: null })
+  })
+
+  it('REFUSES to spawn while repairs are still pending, and says the tree would be built upon', () => {
+    const d = repoRepairDecision({ ran: true, code: 2 })
+    expect(d.spawn).toBe(false)
+    expect(d.reason).toBe('repairs-pending')
+    expect(d.alert).toMatch(/torn tree/i)
+    expect(d.alert).toMatch(/next tick/i)
+  })
+
+  it('REFUSES to spawn on findings no repair can clear, and says it needs hands', () => {
+    const d = repoRepairDecision({ ran: true, code: 1 })
+    expect(d.spawn).toBe(false)
+    expect(d.reason).toBe('findings-remain')
+    expect(d.alert).toMatch(/hands/i)
+  })
+
+  it('treats any other non-zero exit as findings rather than as permission to spawn', () => {
+    for (const code of [3, 7, 127, 255]) expect(repoRepairDecision({ ran: true, code }).spawn).toBe(false)
+  })
+
+  it('FAILS OPEN when the doctor itself cannot run — a broken safeguard costs a diagnosis, never the work', () => {
+    const d = repoRepairDecision({ ran: false, code: null })
+    expect(d.spawn).toBe(true)
+    expect(d.reason).toBe('doctor-unrunnable')
+    expect(d.alert).toMatch(/WITHOUT a repo check/)
+  })
+
+  it('fails open on a nonsense exit status too, rather than throwing inside a launcher tick', () => {
+    expect(repoRepairDecision({ ran: true, code: NaN }).spawn).toBe(false)
+    expect(repoRepairDecision()).toEqual({ spawn: true, reason: 'consistent', alert: null })
+  })
+})
+
+describe('resumeRepairMandate — the same seam, checked from the session side', () => {
+  it('says nothing on a clean tree, so a healthy resume gains no noise', () => {
+    expect(resumeRepairMandate({ ran: true, code: 0 })).toBeNull()
+  })
+
+  it('forbids starting work and names the one command that clears it', () => {
+    const m = resumeRepairMandate({ ran: true, code: 2 })
+    expect(m).toMatch(/DO NOT START WORKING/)
+    expect(m).toMatch(/batch-doctor\.mjs --repair/)
+    expect(m).toMatch(/exit 2/)
+  })
+
+  it('also fires for findings that need hands, so a mangled work order is never worked around', () => {
+    expect(resumeRepairMandate({ ran: true, code: 1 })).toMatch(/DO NOT START WORKING/)
+  })
+
+  it('stays SILENT when the doctor could not run — the launcher already alerted, and a session cannot mend it', () => {
+    expect(resumeRepairMandate({ ran: false, code: null })).toBeNull()
   })
 })

@@ -65,6 +65,7 @@ import {
   judgePreviousSpawn,
   spawnBackoffMs,
 } from './batch-autostart-core.mjs'
+import { repoRepairDecision } from './batch-doctor-core.mjs'
 import { WATCHER_PID_FILE, watcherSupervision } from './chat-watcher-core.mjs'
 import { SECRET_FAULT } from './chat-secret.mjs'
 import { chatInboxLogLines } from './chat-core.mjs'
@@ -554,6 +555,41 @@ if (!preflight.ok) {
   )
   writeJsonAtomic(C('autostart-state.json'), state)
   process.exit(0)
+}
+
+// Point 442. The repo comes BEFORE the successor. A session that died mid-merge
+// leaves the tree torn, and until 30.07.2026 the next one was started into it and
+// had to notice by itself. The doctor already knew how to find and mend exactly
+// this; nobody called it on the way in. It runs without `--gate`, so this stays a
+// repo check of well under a second — the three-minute suite is a session's job,
+// not a launcher tick's. A refusal does NOT touch failCount: a torn tree is not a
+// broken environment, and the next tick retries it.
+const repo = runRepoDoctor()
+const repoVerdict = repoRepairDecision(repo)
+log(`repo check before spawn: ${repoVerdict.reason}${repo.ran ? ` (batch-doctor exit ${repo.code})` : ''}`)
+if (repoVerdict.alert) await notify(repoVerdict.spawn ? 'Repo check could not run' : 'Batch spawn BLOCKED — repo not clean', repoVerdict.alert, repoVerdict.spawn ? 'default' : 'urgent')
+if (!repoVerdict.spawn) {
+  writeJsonAtomic(C('autostart-state.json'), state)
+  process.exit(0)
+}
+
+/** Run the doctor's auto + repair levels and report how it went. Never throws:
+ *  an unrunnable doctor is reported as such and decided fail-open above. */
+function runRepoDoctor() {
+  try {
+    execFileSync(process.execPath, [join(REPO, 'scripts', 'batch-doctor.mjs'), '--repair'], {
+      cwd: REPO,
+      encoding: 'utf8',
+      timeout: 120000,
+      windowsHide: true,
+    })
+    return { ran: true, code: 0 }
+  } catch (e) {
+    // A non-zero exit lands here too — that is the doctor's verdict, not a failure
+    // to run it. Only a missing binary/file or the timeout means it never ran.
+    if (e && typeof e.status === 'number') return { ran: true, code: e.status }
+    return { ran: false, code: null, detail: (e && e.message) || String(e) }
+  }
 }
 
 /** The cheap, local checks that must hold before a successor is worth starting. An

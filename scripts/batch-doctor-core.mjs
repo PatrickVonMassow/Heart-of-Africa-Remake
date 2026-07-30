@@ -89,6 +89,78 @@ export function isConsistent(plan) {
 }
 
 // ---------------------------------------------------------------------------
+// THE REPAIR RUNS BEFORE THE SUCCESSOR, NOT AFTER THE DAMAGE (point 442)
+// ---------------------------------------------------------------------------
+//
+// Everything above was, until 30.07.2026, a tool a session used IF it thought of
+// it. Nothing called it on the way in: the launcher spawned a successor into
+// whatever the previous session's death had left behind — a half-finished merge,
+// a quarantine-worthy dirty tree — and the successor had to notice by itself.
+// That is judgment where a mechanism belongs, and unattended it is judgment
+// nobody is there to exercise.
+//
+// So the launcher runs `batch-doctor.mjs --repair` before it spawns and this
+// function decides what its exit code means. The doctor's codes: 0 consistent
+// (or an inconclusive gate, which is not a repo finding), 2 repairs planned but
+// not executed, 1 findings that no mechanical repair can clear.
+//
+// FAIL-OPEN, deliberately. A doctor that cannot run — missing, crashed, node
+// itself unhappy — must not become the one thing that stops the batch for a
+// fortnight. An unrunnable doctor SPAWNS and says so loudly; that is the same
+// choice every guard in this project makes, for the same reason: a broken
+// safeguard may cost a diagnosis, never the work.
+
+/** What the launcher does with the doctor's exit code before spawning. PURE.
+ *
+ *  `ran` false means the doctor could not be executed at all. `code` is its exit
+ *  status. Returns `{ spawn, reason, alert }` — `alert` is the notification text
+ *  when one is warranted, else null. */
+export function repoRepairDecision({ ran = true, code = 0 } = {}) {
+  if (!ran) {
+    return {
+      spawn: true,
+      reason: 'doctor-unrunnable',
+      alert:
+        'The launcher could not run batch-doctor before spawning, so the successor was started WITHOUT a repo check. ' +
+        'A safeguard that cannot run must not stop the batch — but it also proves nothing, so look at the machine.',
+    }
+  }
+  const n = Number.isFinite(code) ? Number(code) : NaN
+  if (n === 0) return { spawn: true, reason: 'consistent', alert: null }
+  if (n === 2) {
+    return {
+      spawn: false,
+      reason: 'repairs-pending',
+      alert:
+        'The launcher ran batch-doctor --repair before spawning and repairs are STILL pending afterwards. ' +
+        'Nothing was started: a successor inheriting a torn tree is how a bad state gets built upon. Retrying next tick.',
+    }
+  }
+  return {
+    spawn: false,
+    reason: 'findings-remain',
+    alert:
+      'The launcher ran batch-doctor before spawning and findings remain that no mechanical repair clears — ' +
+      'a mangled work order or committed conflict markers. Nothing was started; this needs hands. Retrying next tick.',
+  }
+}
+
+/** The mandate a resuming session is given when the tree it woke up in is not
+ *  clean (point 442, the other side of the seam). PURE — the hook only prints it. */
+export function resumeRepairMandate({ ran = true, code = 0 } = {}) {
+  const d = repoRepairDecision({ ran, code })
+  if (d.reason === 'consistent' || d.reason === 'doctor-unrunnable') return null
+  return (
+    'REPO NOT CLEAN — DO NOT START WORKING. The tree this session woke up in still carries findings from an ' +
+    'interrupted session (batch-doctor exit ' +
+    String(code) +
+    '). FIRST run `node scripts/batch-doctor.mjs --repair` and follow its verdict; only when it reports ' +
+    '"consistent" may the batch continue. Building on a torn tree is how one interrupted merge becomes a day of ' +
+    'wrong work.'
+  )
+}
+
+// ---------------------------------------------------------------------------
 // THE GATE MUST NOT BLAME THE CODE FOR THE LOAD (point 431, 29.07.2026)
 // ---------------------------------------------------------------------------
 //
