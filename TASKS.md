@@ -3483,7 +3483,27 @@ it is appended.
   The audit gains the inverse check: a WIRED enforcer with a dormant entry is a violation
   naming both sides, so the entry must be removed in the same commit that adds the hook
   line. The convention the arming commit states thereby becomes the mechanism it describes.
-  All four stand down for a session that does not own the batch lock and for a paused batch,
+  (E) THE PREFLIGHT MUST NAME WHAT IT CANNOT JUDGE (30.07.2026). `guard-preflight`'s registry
+  covers only the guards someone remembered to add, so a wired Stop hook outside it reports
+  nothing while it would block — and CLAUDE.md §7.2 tells the session to preflight and answer
+  LAST, so a false clean reproduces the answer-twice loop the preflight exists to prevent
+  (one such loop was measured at ~30 turns). Every wired Stop hook gets a gather/decide pair
+  in the registry — `findings-guard` and `decision-card-guard` need a small extraction, and
+  the branch sweep is registered already — AND the preflight PRINTS any wired-but-
+  unregistered Stop hook by name, so the next omission is visible instead of silent. Second,
+  smaller half: `decision-card-guard` swallows a card added before the session's FIRST Stop
+  evaluation into its baseline, so its own remedy can read as unperformed; the block reason
+  names the extracted topic words, so a matching title can actually be written.
+  (F) THE FENCE JUDGES THE COMMAND STRING, NOT THE ACTION (observed three times on
+  30.07.2026 while a fenced-out session worked). A read-only search was refused for merely
+  NAMING a script; a local commit was refused because its MESSAGE carried a forbidden verb,
+  and since the whole invocation is judged the commit went with it; recording the finding
+  about it was refused because its text named a script. A quoted argument or a here-document
+  body decides the verdict. It never lets a forbidden write through — it errs safe — but it
+  costs turns and teaches a session to avoid naming things in a search. The fence judges per
+  SEGMENT and by the command HEAD, the way the findings core already does, and quoted text
+  never decides.
+  All six stand down for a session that does not own the batch lock and for a paused batch,
   like every guard here. MECHANISM REVIEW REQUIRED (CLAUDE.md §7.2); the
   `.claude/settings.json` wiring is attended-only and must be ABSOLUTE, not cwd-relative.
   DOCS in the same commit: `docs/batch-autonomy.md` (the guard chain), for (B)
@@ -3494,7 +3514,12 @@ it is appended.
   OLDER head does not count; a point without a proof line is untouched; an unreadable ledger
   ALLOWS (fail-open). For (D): a wired enforcer with a dormant entry BLOCKS and the message
   names both the enforcer and its stale entry; a wired enforcer without one passes; an
-  unwired-and-recorded one keeps passing as today.
+  unwired-and-recorded one keeps passing as today. For (E): the registry covers every wired
+  Stop hook (the same drift test that already pins the list), an unregistered one is NAMED in
+  the report rather than implied clean, and a non-applicable gather reads as "not judged",
+  never as clean. For (F): a table of real invocations from the transcript corpus — a search
+  naming a script ALLOWS, a commit whose message carries a forbidden verb ALLOWS, the
+  forbidden write itself still DENIES, and a chained invocation is judged segment by segment.
 
 - [ ] 438. THE PROJECT HOOKS CANNOT FIRE OUTSIDE THE REPO ROOT (29.07.2026, measured in a
   `/doctor` run and reviewed by the second model; bundle J). All 31 project hooks in
