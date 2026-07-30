@@ -249,21 +249,24 @@ export function assessClaim({
   // provably alive (point 461): the same identity probe, no second notion of
   // liveness, and no deadline anybody has to feed.
   if (base.releasedAt !== null || (typeof claim.releasedBy === 'string' && claim.releasedBy.trim() !== '')) {
-    const live = claimantLiveness({ claim, probePid, tolerance })
-    // A dead or closed claimant frees the lock INSTANTLY — the probe decides, so
-    // a reservation can never idle the batch out. An ERRAND claim's pid names its
-    // issuer rather than its taker, so it proves nobody is waiting.
-    if (!live.alive || claimIsBounded(claim)) return out(false, 'released', { ...base, ageMs })
+    // An ERRAND claim's pid names its ISSUER rather than its taker, so it proves
+    // nobody is waiting. Asked first: it needs no probe at all.
+    if (claimIsBounded(claim)) return out(false, 'released', { ...base, ageMs })
     // THE TAKE-UP WINDOW, counted from the RELEASE: that is the moment there is
     // nobody left to wait for, and counting from `claim.at` instead would expire
     // every reservation a long-held batch produces before it ever began. Without a
     // usable stamp — `releasedBy` alone, or a stamp from the future, which is a
     // clock nobody here can reason about — there is no window to measure, and the
     // reading that cannot strand the batch is the one that reserves nothing.
+    // Checked BEFORE the probe: a long-expired record then costs no OS call
+    // (four-eyes review, Fable 5, 30.07.2026, finding 4).
     const sinceRelease = base.releasedAt === null ? null : now - base.releasedAt
     if (sinceRelease === null || !(sinceRelease >= 0) || sinceRelease > maxAgeMs) {
       return out(false, 'released', { ...base, ageMs })
     }
+    // A dead or closed claimant frees the lock INSTANTLY — the probe decides, so
+    // a reservation can never idle the batch out.
+    if (!claimantLiveness({ claim, probePid, tolerance }).alive) return out(false, 'released', { ...base, ageMs })
     return out(false, 'released-reserved', { ...base, ageMs, reserve: true })
   }
 
@@ -381,7 +384,7 @@ export function describeClaim(assessment) {
   const released =
     assessment.reserve === true
       ? ', ALREADY released for it — the hand-over happened, so this record can never be honoured again, but the ' +
-        'free lock stays RESERVED for that window while it lives'
+        'free lock stays RESERVED for that window while it lives and until the take-up window runs out'
       : typeof assessment.releasedAt === 'number'
         ? ', ALREADY released for it — the hand-over happened, this record is spent'
         : ''

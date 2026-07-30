@@ -502,12 +502,40 @@ describe('reservationDecision — a free lock still belongs to the window that c
   // the launcher's spawn gate and the chat watcher's wake gate (point 461). A
   // decision nobody asks is no gate, so the call is pinned where it is made.
   it('the launcher and the watcher ask the DECISION, not the raw honour flag', () => {
-    for (const file of ['batch-autostart.mjs', 'chat-watcher.mjs', 'batch-boundary.mjs', 'batch-resume-hook.mjs']) {
+    for (const file of [
+      'batch-autostart.mjs',
+      'chat-watcher.mjs',
+      'batch-boundary.mjs',
+      'batch-resume-hook.mjs',
+      // The door whose 17:11 re-acquire IS the incident: it was already wired
+      // correctly, and nothing pinned it against drift (four-eyes finding 2).
+      'batch-progress-guard.mjs',
+    ]) {
       const text = readFileSync(resolve(REPO_ROOT, 'scripts', file), 'utf8')
       expect(text).toContain('reservationDecision(')
       // …and none of them decides on `assessClaim(…).honour` any more.
       expect(text).not.toMatch(/assessClaim\([^)]*\)[\s\S]{0,40}\.honour/)
     }
+  })
+
+  // THE ONE DOOR THAT IS DELIBERATELY NOT GATED, pinned so it stays a decision
+  // rather than an oversight (four-eyes finding 1). `batch-claim.mjs --session`
+  // acquires a free lock directly: it is a person taking the batch into the window
+  // they are sitting at, which is the mechanism's whole purpose and its manual
+  // override. The reservation holds off the AUTOMATED acquirers, and the text says
+  // exactly that instead of promising a protection that is not there.
+  // A claimant that has been released to is still the sanctioned second session,
+  // and the parallel detector's block demands the doctor before any further batch
+  // work — the one thing a handover never gets past (four-eyes finding 3).
+  it('the parallel detector excludes a RESERVED claimant too, not only an honoured one', () => {
+    const guard = readFileSync(resolve(REPO_ROOT, 'scripts', 'batch-progress-guard.mjs'), 'utf8')
+    expect(guard).toMatch(/exclude:\s*\(claimInfo\.honour \|\| claimInfo\.reserve\)/)
+  })
+
+  it('the manual claim CLI stays an override — and says so', () => {
+    const cli = readFileSync(resolve(REPO_ROOT, 'scripts', 'batch-claim.mjs'), 'utf8')
+    expect(cli).toContain('A deliberate claim from a DIFFERENT window')
+    expect(cli).toContain('holds off the automated acquirers, not a person at a keyboard')
   })
 
   /** What the wrappers gather: a live claim on disk, judged by the asking session,
