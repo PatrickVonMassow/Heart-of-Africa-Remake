@@ -46,6 +46,21 @@ export function sleepSync(ms) {
  * Returns { ok: true, attempts }.
  */
 export function writeJsonAtomic(path, obj, opts = {}) {
+  return writeTextAtomic(path, JSON.stringify(obj, null, 2), opts)
+}
+
+/**
+ * The same write for TEXT — the board's HTML above all (point 443, four-eyes F3).
+ *
+ * `.batch-dashboard.html` was written with a plain `writeFileSync`, so a kill in
+ * the middle of one left TORN LOCAL BYTES. That is not merely a local problem: the
+ * doctor's board check reads the resulting hash mismatch as "the publish is
+ * behind", and its repair then PUSHES those bytes to the page the user reads from
+ * their phone. tmp + rename makes a half-written file unreachable, and the retry
+ * ladder covers the Windows moment (a scanner holding the target) exactly as it
+ * does for the locks. Same options, same contract, same `{ ok, attempts }`.
+ */
+export function writeTextAtomic(path, text, opts = {}) {
   const {
     delays = WRITE_RETRY_DELAYS_MS,
     sleep = sleepSync,
@@ -54,7 +69,6 @@ export function writeJsonAtomic(path, obj, opts = {}) {
     remove = rmSync,
     pid = process.pid,
   } = opts
-  const text = JSON.stringify(obj, null, 2)
   let last = null
   for (let attempt = 0; attempt <= delays.length; attempt++) {
     // A FRESH temp name per attempt: the previous one may be exactly the file

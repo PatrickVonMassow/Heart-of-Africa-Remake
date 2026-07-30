@@ -717,7 +717,10 @@ following was visible to the doctor before:
   away. The detection is deliberately LOCAL — no fetch in a launcher tick: the
   publisher records the sha256 of the bytes it pushed (`pagesPublishedHash`) and
   persists a failure (`publishFailed`), so a local board whose hash differs IS the
-  half-published state. `scripts/board-publish.mjs` re-runs.
+  half-published state. `scripts/board-publish.mjs` re-runs. And the local file is
+  now written ATOMICALLY (`writeTextAtomic`, four-eyes F3): it used to be a plain
+  `writeFileSync`, so a kill mid-write left torn bytes — which this very check
+  reads as "behind" and this very repair would then PUSH to the public page.
 
 The decisions are pure in `planRemediation` (`scripts/batch-doctor-core.mjs`); the
 gathering and the repairs are in `scripts/batch-doctor-states.mjs`, each taking its

@@ -19,8 +19,9 @@
 // now-cards and "Von dir zu klären" already claim. A card re-added for a point
 // already promoted would trip the double-listing invariant (4b) and block the
 // turn that published it.
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+import { writeTextAtomic } from './atomic-write.mjs'
 import { REPO_ROOT, STATE_PATH, readJson } from './dashboard-state.mjs'
 import { parseKlaerungPoints, parseNowCardPoints } from './dashboard-guard-core.mjs'
 import {
@@ -39,7 +40,7 @@ const tasksFile = resolve(REPO_ROOT, 'TASKS.md')
 const [cmd, ...rest] = process.argv.slice(2)
 
 const readData = () => (existsSync(dataFile) ? readJson(dataFile) : null)
-const writeData = (d) => writeFileSync(dataFile, `${JSON.stringify(d, null, 2)}\n`)
+const writeData = (d) => writeTextAtomic(dataFile, `${JSON.stringify(d, null, 2)}\n`)
 
 /** Board, work order and the exclusions the other sections already own. */
 function inputs() {
@@ -79,7 +80,9 @@ try {
       if (stubs.length) console.log(`  no prose yet: ${stubs.join(', ')} — node scripts/board-queue.mjs set <N> "<text>"`)
       process.exitCode = built.html === html ? 0 : 1
     } else {
-      if (built.html !== html) writeFileSync(boardFile, built.html)
+      // Atomic (point 443, four-eyes F3): a kill mid-write leaves torn bytes that
+      // the doctor's board repair would push to the public page.
+      if (built.html !== html) writeTextAtomic(boardFile, built.html)
       console.log(`queue rebuilt from the work order: ${built.entries.length} card(s)${built.html === html ? ' (unchanged)' : ''}`)
       if (stubs.length) console.log(`  no prose yet: ${stubs.join(', ')} — node scripts/board-queue.mjs set <N> "<text>"`)
       console.log('Publish it: node scripts/board-publish.mjs')

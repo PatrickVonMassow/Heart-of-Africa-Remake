@@ -28,7 +28,7 @@
 //
 // Every editing command publishes the live page itself, so the loop is exactly:
 // (1) an editing command, (2) `attest`.
-import { readFileSync, writeFileSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { resolve } from 'node:path'
 import { REPO_ROOT } from './repo-paths.mjs'
@@ -46,6 +46,7 @@ import {
   toQueue,
 } from './board-core.mjs'
 import { PUBLISH_CMD } from './board-remedy.mjs'
+import { writeTextAtomic } from './atomic-write.mjs'
 
 const BOARD = resolve(REPO_ROOT, '.batch-dashboard.html')
 const PUBLISH_SCRIPT = 'scripts/board-publish.mjs'
@@ -71,7 +72,10 @@ function edit(fn, done) {
   // Both ends of the round trip name their encoding (point 410). The write used
   // to take the platform default, which is the other half of the way a German
   // card could reach the file as something the reader sees as damage.
-  writeFileSync(BOARD, fn(readFileSync(BOARD, 'utf8')), { encoding: 'utf8' })
+  // ATOMIC (point 443, four-eyes F3). A kill mid-write left torn local bytes,
+  // the doctor read the hash mismatch as "the publish is behind", and its repair
+  // pushed the torn HTML to the page the user reads from their phone.
+  writeTextAtomic(BOARD, fn(readFileSync(BOARD, 'utf8')))
   console.log(done)
   console.log(run(['scripts/board-archive-rotate.mjs']).trim().split('\n')[0])
   // THE LIVE PAGE IS PUBLISHED HERE (point 400, delta D — four-eyes finding 2).
