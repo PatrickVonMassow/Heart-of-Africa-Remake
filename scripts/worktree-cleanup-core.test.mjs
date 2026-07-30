@@ -145,15 +145,33 @@ describe('the incident, replayed on a THROWAWAY repository', () => {
     }
   })
 
-  it('NEGATIVE CONTROL: the bare `git worktree remove --force` destroys the link target', () => {
-    // Without this case the positive one below proves nothing: node's own
-    // rmSync does NOT follow a junction, so a test built on it would stay green
-    // with the fix removed. This is the command both 29.07.2026 removals used,
-    // and it deletes what is on the far side of the link.
+  // THE NEGATIVE CONTROL IS PLATFORM-BOUND, and pretending otherwise cost the
+  // repository owner eleven "Run failed" mails on 30.07.2026: the incident is a
+  // WINDOWS one — git's removal follows a junction and deletes what is on the far
+  // side — while on Linux the same command removes the link and leaves the target
+  // alone. Asserting the damage everywhere therefore failed every CI run on the
+  // hosted Ubuntu runner while the whole suite was green on the machine that
+  // wrote it. So the control asserts the damage only where the damage exists, and
+  // elsewhere it asserts the platform's OWN behaviour rather than skipping —
+  // silence would let a future regression hide behind "not applicable here".
+  const REPRODUCES_THE_DAMAGE = process.platform === 'win32'
+
+  it('NEGATIVE CONTROL: the bare `git worktree remove --force` treats the link as its platform does', () => {
+    // Without this case the positive one below proves nothing on Windows: node's
+    // own rmSync does NOT follow a junction, so a test built on it would stay
+    // green with the fix removed. This is the command both 29.07.2026 removals
+    // used.
     expect(existsSync(probe)).toBe(true)
     git(['worktree', 'remove', '--force', worktree])
     expect(existsSync(worktree)).toBe(false)
-    expect(existsSync(probe)).toBe(false) // the damage, reproduced
+    if (REPRODUCES_THE_DAMAGE) {
+      expect(existsSync(probe)).toBe(false) // the damage, reproduced
+    } else {
+      // Linux/macOS: the link goes, the target stays. The fix is still required —
+      // it is what makes the WINDOWS path safe — and the positive case below
+      // pins it on every platform.
+      expect(existsSync(probe)).toBe(true)
+    }
   })
 
   it('cleanupWorktree removes the worktree and leaves the LINK TARGET intact', () => {
