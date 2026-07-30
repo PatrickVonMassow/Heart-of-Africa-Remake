@@ -302,8 +302,11 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 - **Was bei jedem Start mitgelesen wird, wächst — und du bezahlst es jedes Mal.** Jede
   einzelne Ergänzung ist berechtigt; irgendwann ist der größte Teil der Datei Geschichte.
+  Am teuersten sind Texte, die bei *jeder* Anfrage mitgehen — zumal wenn sie wiederholen,
+  was eine Prüfung ohnehin erzwingt.
   → *Prompt:* „Gib jedem Dokument, das bei jedem Start gelesen wird, eine **gemessene
   Obergrenze** mit zwei Auswegen: Detail auslagern, oder die Grenze anheben und begründen.
+  Der Commit, der eine Prüfung einführt, streicht den Text, den sie ersetzt.
   Ausgelagert wird **verschoben, nicht umformuliert**, und jeder Leser der alten Stelle wird
   nachgezogen. In der Aufgabenliste steht nur Offenes, Erledigtes wandert wortgleich ins
   Archiv."
@@ -349,6 +352,12 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   auch bei gesperrter Aufgabenliste schreibt, ein ebenso billiges ‚nichts gefunden', und eine
   Prüfung, die einen Zug **nicht enden lässt**, der untersucht und nichts hinterlassen hat —
   samt Leerungspflicht, sobald wieder geschrieben werden darf."
+
+- **Was beim Leser ankommt, ist nicht das Gemeinte.** Fehlt eine Angabe, setzt das Programm
+  klaglos einen Ersatz ein — im Code sieht das nach Sorgfalt aus, gefunden wird es vom Leser.
+  Dasselbe gilt für interne Kennungen (Nummern, Kürzel, Modulnamen) in dem, was du ihm sagst.
+  → *Prompt:* „Jeder Rückfall auf einen Ersatzwert wird **gemeldet**, dort wo er greift, mit
+  dem Befehl, der ihn behebt. Nach außen geht der **sprechende Name**, nie das Kürzel."
 
 ---
 
@@ -397,4 +406,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 Wenn du diese eine Nachricht an den Anfang stellst, hast du 80 % der Lehren dieses
 Projekts eingebaut, bevor die erste Zeile Code entsteht.
 
-<!-- GUIDE-FINGERPRINT: 7999810bcfcdc5b36050964c73a630954b76a45afab6242ed7466690c3678aaa -->
+<!-- GUIDE-FINGERPRINT: 596d0d540848453a4c05951f613de1869add4d8f43b432146be21bb47c835c7b -->

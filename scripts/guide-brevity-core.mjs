@@ -31,13 +31,19 @@
 // present tense (+13 lines, +146 words for those two together), and the four-eyes
 // counter-check on a MECHANISM needing its own enforcement — what the record has to name,
 // and that the author's own "looks fine" is not one (+5 lines, +46 words).
+// Raised again on 30.07.2026 by ONE genuinely new tip — what reaches the reader is not what
+// was meant: a fallback substituted in silence, and an internal shorthand spoken to him — plus
+// one clause on the existing "read at every start" tip, that the dearest text is the one
+// carried in EVERY request, especially where it repeats what a gate already refuses
+// (+8 lines, +105 words, measured). Two further lessons of that morning were deliberately NOT
+// added here: they are the long-form half and live in the retrospective.
 export const LIMITS = {
-  maxLines: 401,
+  maxLines: 409,
   // Deliberately a little loose (~5 % headroom): a budget with almost no room
   // blocks a clarifying half-sentence, and a guard that fires on legitimate
   // edits teaches people to raise the number instead of to cut. It must bite on
   // a growing case study, not on an honest rewording.
-  maxWords: 3398,
+  maxWords: 3503,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,
