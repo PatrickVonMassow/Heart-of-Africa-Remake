@@ -68,8 +68,8 @@ export const DEATH_RETENTION_MS = 6 * 60 * 60 * 1000
  * So these are checked before anything else, and any hit ends the question.
  */
 export const NON_TRANSIENT_PATTERNS = [
-  { label: 'gate-red', re: /\b(?:gate|ci|regression|vitest|test|tests|build|lint|audit|typecheck)\b[^\n]{0,60}\b(?:red|fail|failed|failing|failure|error[s]?)\b/i },
-  { label: 'gate-red', re: /\b(?:fail|failed|failing|failure)\b[^\n]{0,60}\b(?:gate|ci|regression|vitest|test|tests|build|lint|audit)\b/i },
+  { label: 'gate-red', re: /\b(?:gate|ci|regression|vitest|test|tests|build|(?:ox)?lint|audit|typecheck)\b[^\n]{0,60}\b(?:red|fail|failed|failing|failure|error[s]?)\b/i },
+  { label: 'gate-red', re: /\b(?:fail|failed|failing|failure)\b[^\n]{0,60}\b(?:gate|ci|regression|vitest|test|tests|build|(?:ox)?lint|audit)\b/i },
   { label: 'guard-block', re: /\bguard\b[^\n]{0,60}\b(?:block|blocked|blocks|denied|deny)\b/i },
   { label: 'guard-block', re: /\b(?:block|blocked|denied)\b[^\n]{0,60}\bguard\b/i },
   { label: 'guard-block', re: /\bPreToolUse\b|\bStop hook\b/i },
@@ -87,9 +87,16 @@ export const NON_TRANSIENT_PATTERNS = [
  * not a status code. `Overloaded` is Anthropic's 529 by another name and
  * normalises to it, so the outage detector sees the two spellings as ONE
  * signature — which matters, since the same outage can print either.
+ *
+ * THE CONTEXT WORDS ARE DELIBERATELY NARROW. A bare `code` and a bare `error`
+ * stood here and were REMOVED by the four-eyes review, which found that
+ * "oxlint found 1 error: 503 warnings suppressed" read as a transient http-503
+ * and "the child exited with code 502" as a transient http-502. A lint red is in
+ * the NEVER-retry class, and retrying one buys the identical red a second time.
+ * `api error` stays, because that IS the harness's own death.
  */
 export const TRANSIENT_PATTERNS = [
-  { signature: null, re: /\b(?:http|https|status|statuscode|status[ _-]?code|code|error|api error)\b\W{0,4}(429|5\d\d)\b/i, group: 1 },
+  { signature: null, re: /\b(?:http|https|status|statuscode|status[ _-]?code|api error)\b\W{0,4}(429|5\d\d)\b/i, group: 1 },
   { signature: null, re: /\b(429|5\d\d)\b\s*(?:internal server error|bad gateway|service unavailable|gateway time-?out|too many requests|overloaded)/i, group: 1 },
   { signature: 'http-529', re: /\boverloaded(?:_error)?\b/i },
   { signature: 'http-429', re: /\brate[ _-]?limit(?:ed|ing)?\b/i },

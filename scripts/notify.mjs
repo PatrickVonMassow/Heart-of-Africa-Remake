@@ -16,11 +16,15 @@ import { repoPath } from './repo-paths.mjs'
 
 // The topic is a shared secret in the URL — anyone who knows it can read/post.
 // Kept in a gitignored file so it is easy to rotate and never committed.
-const TOPIC_FILE = repoPath('.claude/ntfy-topic')
+export const TOPIC_FILE = repoPath('.claude/ntfy-topic')
 
-export function ntfyTopic() {
+/** The configured topic, or null. The PATH is a parameter so a test can point at
+ *  a temp file: the topic exists in the real working directory and is in active
+ *  use, so a test that read the real one would behave differently on `main` than
+ *  in a worktree — and would write real ladder state while doing it. */
+export function ntfyTopic(topicFile = TOPIC_FILE) {
   try {
-    const t = readFileSync(TOPIC_FILE, 'utf8').trim()
+    const t = readFileSync(topicFile, 'utf8').trim()
     return t || null
   } catch {
     return null
@@ -45,20 +49,35 @@ export function ntfyTopic() {
  *                                   climbing alert rather than two fresh ones.
  * @param {boolean} [opts.escalate]  false sends unthrottled — for the rare alert
  *                                   whose every repetition is genuinely news.
+ * @param {string}  [opts.topicFile] where the topic is read from (tests only).
+ * @param {object}  [opts.escalation] injected ladder module (tests only).
  * @returns {Promise<boolean>} true when the message went out. FALSE also means
  *          "held back by the ladder", not only "failed"; the ladder log
- *          (.claude/alert-escalation.log) says which of the two it was.
+ *          (.claude/resilience/alert-escalation.log) says which of the two it was.
+ *
+ * THE PRIORITY IS PART OF THE CONTRACT, not decoration: an alert posted at
+ * `high`/`urgent` is a standing CONDITION and its ladder may end in a paused
+ * batch, while one posted at `low`/`default` is an EVENT and can only ever be
+ * throttled. A caller that notifies about something routine and recurring must
+ * not declare it urgent.
  */
-export async function notify(title, message, priority = 'default', { key = null, escalate: useLadder = true } = {}) {
-  const topic = ntfyTopic()
+export async function notify(
+  title,
+  message,
+  priority = 'default',
+  { key = null, escalate: useLadder = true, topicFile = TOPIC_FILE, escalation = null } = {},
+) {
+  const topic = ntfyTopic(topicFile)
   if (!topic) return false // channel not configured — silent
   let effectivePriority = priority
+  let commit = null
   if (useLadder) {
     try {
-      const { escalate } = await import('./alert-escalation.mjs')
+      const { escalate } = escalation ?? (await import('./alert-escalation.mjs'))
       const verdict = await escalate({ title, message, key, priority })
       if (!verdict.deliver) return false
       if (verdict.priority) effectivePriority = verdict.priority
+      commit = verdict.commit ?? null
     } catch {
       // FAIL-OPEN = DELIVER: a broken ladder must never swallow an alert.
     }
@@ -70,6 +89,9 @@ export async function notify(title, message, priority = 'default', { key = null,
       body: String(message).slice(0, 3500),
       signal: AbortSignal.timeout(8000),
     })
+    // The rung is booked only on a CONFIRMED delivery, so a transient send
+    // failure cannot silence a standing alert for a whole rung gap.
+    if (res.ok) commit?.()
     return res.ok
   } catch {
     return false // never let a notification failure break anything

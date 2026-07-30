@@ -191,6 +191,12 @@ It answers exactly one of four verdicts and never spawns anything:
   that says CONTINUE where the child had already committed and REPEAT where it
   had not. Whether it committed is read from the BRANCH, never from a quiet log,
   which is layer 5b's rule applied at the moment of the retry decision.
+  Precisely, the probe counts commits on the branch that are **not yet on
+  `main`** (`git rev-list --count main..<branch>`), so a branch already merged
+  reads as "nothing to continue" — the right answer for a retry prompt, and the
+  reason `--committed` / `--no-committed` can override it. Any git failure
+  answers "not committed": evidence that cannot be established never counts as
+  established.
 - **NO-RETRY** — the default. A death outside the allowlist, a child that
   reported a step complete, a changed branch or brief revision, the second retry
   already spent, or the point's token budget gone.
@@ -211,6 +217,14 @@ window and the per-point retry/token budget) lives in `.claude/resilience/`;
 deleting it forgets the window, never work. `--status`, `--complete --point <n>`
 and `--forget --point <n>` read and adjust it by hand.
 
+**It is deliberately NOT idempotent per death.** Running the identical command
+twice for ONE death books two retries against that point's budget. The command
+has a single disciplined caller — the main session, once per dead child — and a
+death carries no id the command could deduplicate on without inventing one. The
+failure mode is therefore the safe direction: a double-run exhausts the budget
+early and stops retrying, it never grants an extra attempt. `--forget --point
+<n>` re-opens a budget spent by mistake.
+
 **THE ESCALATION LADDER, the remainder of part (1), built with it** — the
 external watchdog of layers 3+4 alerts every 30 minutes and shares its ntfy topic
 with the CI-red alert, so a repeated identical alert must not repeat identically.
@@ -225,14 +239,41 @@ count is ONE climbing alert while CI-red keeps its own ladder on the shared
 topic. Six hours of silence resets a ladder. The ladder may only RAISE a
 caller's priority, never lower it.
 
-Two asymmetries there are deliberate. **Fail-open means DELIVER**: an unreadable
-ladder file, a clock that jumped backwards or a throw anywhere inside sends the
-message unthrottled, because a throttle that swallows an alert is worse than a
-duplicate buzz. And **the ladder does not stand down for a non-owner** — it
-governs a channel rather than a session's actions, and its principal caller, the
-OS launcher, owns no lock and never will; a lock-keyed stand-down would switch it
-off precisely in the unattended case it exists for. It does stand down for an
-already-paused batch (the pause is a state, not an action to repeat), and
+**THE PAUSE RUNG IS FOR CONDITIONS, NOT FOR EVENTS** — the blocker the four-eyes
+review found, and the one thing to understand before adding a caller. The
+ladder's premise, "the same alert again means the same condition is still
+unanswered", is true of the watchdog, of CI-red and of a wedged owner. It is
+false of an EVENT notification: `batch-autostart` posts "Resurrected" on every
+successor spawn — the designed healthy flow several times a night — and its text
+is identical once digit runs collapse. Simulated at a 45-minute point cadence it
+reached the last rung after about five hours and would have paused a perfectly
+healthy batch, the exact opposite of this layer's purpose; the six-hour reset
+never fires on a busy night. So **the pause rung requires the CALLER's own
+declared priority to be `high` or above**. An alert posted at `low`/`default` is
+an event: it throttles to at most one every 120 minutes and keeps going out,
+never pausing and never falling permanently silent. The gate reads the caller's
+priority, never the rung's own raised one, which would defeat it. **A caller's
+priority is therefore part of the contract, not decoration** — routine recurring
+notifications must not be declared urgent. (Still owed on the caller side, in the
+file that owns them: `Resurrected` and `Leaked worker reaped` should also pass
+`{ escalate: false }`, since their every occurrence is genuinely news.)
+
+**The rung is booked only after the message is actually out.** Booking it before
+the POST meant one transient ntfy failure silenced a standing alert for a whole
+rung gap — up to two hours — which is the failure `board-watchdog.mjs` documents
+guarding against. `escalate()` returns a commit callback; `notify()` calls it on
+a confirmed delivery, and an uncommitted send simply re-decides at the same rung
+next time. The PAUSE is not deferred: it is the safety action and happens even if
+the notification then fails to send.
+
+Two further asymmetries are deliberate. **Fail-open means DELIVER**: an
+unreadable ladder file, a clock that jumped backwards or a throw anywhere inside
+sends the message unthrottled, because a throttle that swallows an alert is worse
+than a duplicate buzz. And **the ladder does not stand down for a non-owner** —
+it governs a channel rather than a session's actions, and its principal caller,
+the OS launcher, owns no lock and never will; a lock-keyed stand-down would
+switch it off precisely in the unattended case it exists for. It does stand down
+for an already-paused batch (the pause is a state, not an action to repeat), and
 `HOA_ALERT_ESCALATION=off` disables it entirely.
 
 ## 4. The hole the review found: failure B is not healed, only made louder

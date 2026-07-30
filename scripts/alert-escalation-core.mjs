@@ -48,6 +48,45 @@ export const ALERT_PRIORITIES = ['default', 'default', 'high', 'high', 'urgent']
  *  gap: a condition that flaps just under the ceiling must still climb. */
 export const ALERT_RESET_MS = 6 * 60 * 60 * 1000
 
+/** ntfy priorities, weakest first. */
+export const PRIORITY_ORDER = ['min', 'low', 'default', 'high', 'urgent']
+
+export function priorityRank(p) {
+  const i = PRIORITY_ORDER.indexOf(String(p))
+  return i < 0 ? PRIORITY_ORDER.indexOf('default') : i
+}
+
+/** The ladder may only ever RAISE a caller's priority, never lower it — a
+ *  capability-breach alert stays urgent on its first send even though rung 0's
+ *  own priority is "default". */
+export function higherPriority(a, b) {
+  if (!PRIORITY_ORDER.includes(String(a))) return b ?? a
+  if (!PRIORITY_ORDER.includes(String(b))) return a
+  return priorityRank(a) >= priorityRank(b) ? a : b
+}
+
+/**
+ * THE PAUSE RUNG IS FOR CONDITIONS, NOT FOR EVENTS (four-eyes review, blocker).
+ *
+ * The ladder's premise — "the same alert again means the same condition is still
+ * unanswered" — holds for the watchdog's "nothing has moved", for CI-red and for
+ * a wedged owner. It is FALSE for an EVENT notification: `batch-autostart` posts
+ * "Resurrected" on every successor spawn, which under the context-boundary
+ * policy is the designed HEALTHY flow several times a night, and its text is
+ * identical once digit runs collapse. Simulated at a 45-minute point cadence it
+ * reaches the last rung after ~5 hours and would pause a perfectly healthy batch
+ * — the exact opposite of this layer's purpose, and the 6-hour reset never fires
+ * on a busy night.
+ *
+ * So pausing requires the CALLER's own declared priority to be at least this.
+ * An event notification is posted at `low`/`default` and therefore CANNOT pause:
+ * it throttles at the top gap and keeps going out for as long as it recurs,
+ * rather than either pausing or falling permanently silent. Condition-shaped
+ * callers already post at `high`/`urgent`. The gate reads the CALLER's priority,
+ * never the rung's own raised one, which would defeat it.
+ */
+export const PAUSE_MIN_PRIORITY = 'high'
+
 /** Keeps a title's last word and a message's first word from merging into one
  *  token — two alerts that differ only at that seam stay two alerts. */
 const SEPARATOR = ' | '
@@ -94,6 +133,10 @@ export function escalationDecision({
   now = Date.now(),
   entry = null,
   paused = false,
+  // The CALLER's own declared priority — the gate on the pause rung reads this,
+  // never the rung's raised one. See PAUSE_MIN_PRIORITY.
+  priority = 'default',
+  pauseMinPriority = PAUSE_MIN_PRIORITY,
   gaps = ALERT_GAPS_MS,
   resetMs = ALERT_RESET_MS,
   priorities = ALERT_PRIORITIES,
@@ -115,6 +158,8 @@ export function escalationDecision({
   }
 
   const rung = entry.rung
+  const mayPause = priorityRank(priority) >= priorityRank(pauseMinPriority)
+
   if (rung > pauseRung) {
     return { key, action: 'suppress', rung, nextRung: rung, priority: prio(rung), dueInMs: Infinity, reset: false, reason: 'the ladder is at its top: the batch is paused for this alert and the board card names why — repeating the buzz adds nothing' }
   }
@@ -125,6 +170,12 @@ export function escalationDecision({
   }
 
   if (rung === pauseRung) {
+    // AN EVENT-SHAPED ALERT NEVER PAUSES and never goes permanently silent: it
+    // settles at the top gap and keeps recurring. Staying ON the last rung
+    // (nextRung === pauseRung) is what makes that a ceiling rather than a cliff.
+    if (!mayPause) {
+      return { key, action: 'send', rung, nextRung: pauseRung, priority: prio(rung), dueInMs: 0, reset: false, reason: `ceiling: an alert raised at "${priority}" is an EVENT, not an unanswered condition — it throttles to one every ${Math.round(gaps[pauseRung] / 60000)} min and never pauses the batch` }
+    }
     return paused
       ? { key, action: 'send', rung, nextRung: rung + 1, priority: prio(rung), dueInMs: 0, reset: false, reason: 'last rung reached, and the batch is ALREADY paused — the alert goes out, the pause is not re-applied' }
       : { key, action: 'pause-and-send', rung, nextRung: rung + 1, priority: prio(rung), dueInMs: 0, reset: false, reason: `last rung: this alert has gone unanswered through ${rung} risings — the batch pauses so it cannot be slept through` }

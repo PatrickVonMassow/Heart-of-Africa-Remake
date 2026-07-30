@@ -34,14 +34,20 @@ import { dirname } from 'node:path'
 import { REPO_ROOT, repoPath } from './repo-paths.mjs'
 import { writeJsonAtomic } from './atomic-write.mjs'
 import {
+  PRIORITY_ORDER,
   advanceLadder,
   alertKey,
   clearLadder,
   describeEscalation,
   escalationDecision,
   escalationPauseReason,
+  higherPriority,
   ladderEntry,
 } from './alert-escalation-core.mjs'
+
+// Re-exported: the priority helpers are PURE and belong to the core, but callers
+// and tests reach for them through this module.
+export { PRIORITY_ORDER, higherPriority }
 
 // One gitignored directory for both resilience layers' runtime state — see the
 // same note in scripts/child-retry.mjs.
@@ -55,19 +61,6 @@ function ensureDir(path) {
   } catch {
     /* already there, or unwritable — the caller's own try/catch decides */
   }
-}
-
-/** ntfy priorities, weakest first — used to make sure the ladder can only ever
- *  RAISE a caller's priority, never lower it. A capability-breach alert stays
- *  urgent on its first send even though rung 0's own priority is default. */
-export const PRIORITY_ORDER = ['min', 'low', 'default', 'high', 'urgent']
-
-export function higherPriority(a, b) {
-  const ia = PRIORITY_ORDER.indexOf(String(a))
-  const ib = PRIORITY_ORDER.indexOf(String(b))
-  if (ia < 0) return b ?? a
-  if (ib < 0) return a
-  return ia >= ib ? a : b
 }
 
 export function readLadder(path = LADDER_PATH) {
@@ -159,7 +152,7 @@ export async function escalate({
     const state = readLadder(ladderPath)
     const { isPaused, setPaused } = pause ?? (await pauseApi())
     const paused = isPaused()
-    const decision = escalationDecision({ key: k, now, entry: ladderEntry(state, k), paused })
+    const decision = escalationDecision({ key: k, now, entry: ladderEntry(state, k), paused, priority })
 
     if (decision.action === 'suppress') {
       logLine(`[${k}] ${describeEscalation(decision)}`, logPath)
@@ -174,15 +167,34 @@ export async function escalate({
         `${reason} Bitte prüfen, was die Meldung ausgelöst hat, und die Pause danach aufheben.`,
       )
       logLine(`[${k}] PAUSED THE BATCH — ${decision.reason}`, logPath)
+      // The pause is deliberately NOT deferred to the commit: it is the safety
+      // action, and it must happen even if the notification then fails to send.
     }
 
-    writeLadder(advanceLadder(state, { key: k, decision, now }), ladderPath)
-    logLine(`[${k}] ${describeEscalation(decision)}`, logPath)
-    return { deliver: true, priority: higherPriority(priority, decision.priority), decision }
+    // THE LADDER ADVANCES ONLY AFTER THE MESSAGE IS ACTUALLY OUT (four-eyes
+    // review): booking the rung before the POST meant one transient ntfy failure
+    // silenced a STANDING alert for a whole rung gap — up to two hours — which is
+    // precisely the failure board-watchdog.mjs documents guarding against. The
+    // caller commits after a confirmed delivery; an uncommitted send simply
+    // re-decides at the same rung next time, so the alert keeps trying.
+    const commit = () => {
+      try {
+        // The DECISION's clock, not a fresh one: delivery follows the decision by
+        // milliseconds, and re-reading the wall clock here would make the rung's
+        // own timestamp disagree with the gap that was just measured against it.
+        writeLadder(advanceLadder(state, { key: k, decision, now }), ladderPath)
+        logLine(`[${k}] ${describeEscalation(decision)}`, logPath)
+        return true
+      } catch (e) {
+        logLine(`[${k}] delivered, but the rung could not be booked: ${e?.message ?? e}`, logPath)
+        return false
+      }
+    }
+    return { deliver: true, priority: higherPriority(priority, decision.priority), decision, commit }
   } catch (e) {
     // FAIL-OPEN = DELIVER.
     logLine(`escalation failed, delivering unthrottled: ${e?.message ?? e}`, logPath)
-    return { deliver: true, priority: null, decision: null, error: String(e?.message ?? e) }
+    return { deliver: true, priority: null, decision: null, commit: () => false, error: String(e?.message ?? e) }
   }
 }
 

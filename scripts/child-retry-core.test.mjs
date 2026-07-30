@@ -51,7 +51,9 @@ describe('classifyDeath — transience is an allowlist, never a guess', () => {
   it('normalises Overloaded and 529 to ONE signature, so the outage detector sees one cause', () => {
     // Would have prevented: the same outage printing two spellings looks like two
     // unrelated accidents and never trips the two-children threshold.
-    expect(classifyDeath('Overloaded').signature).toBe(classifyDeath('Error: 529').signature)
+    // The status form must carry a real context word since the review narrowed
+    // them — "API Error: 529" is the harness's own spelling.
+    expect(classifyDeath('Overloaded').signature).toBe(classifyDeath('API Error: 529').signature)
   })
 
   it.each([
@@ -65,6 +67,31 @@ describe('classifyDeath — transience is an allowlist, never a guess', () => {
     const c = classifyDeath(text)
     expect(c.transient).toBe(false)
     expect(c.signature).toBe(label)
+  })
+
+  it('does NOT read an oxlint red that prints a 5xx-looking number as transient', () => {
+    // FOUND BY THE FOUR-EYES REVIEW: with `error` among the status-context words,
+    // "oxlint found 1 error: 503 warnings suppressed" classified as a transient
+    // http-503 and would have been retried into the identical lint red twice.
+    const c = classifyDeath('oxlint found 1 error: 503 warnings suppressed')
+    expect(c.transient).toBe(false)
+    expect(c.signature).toBe('gate-red')
+  })
+
+  it('does NOT read a process EXIT CODE as an HTTP status', () => {
+    // Same review: with `code` among the context words, "exited with code 502"
+    // was a transient http-502. An exit code is not a status code.
+    expect(classifyDeath('the child exited with code 502').transient).toBe(false)
+  })
+
+  it('catches an oxlint failure, not only a bare "lint" one', () => {
+    expect(classifyDeath('oxlint failed').signature).toBe('gate-red')
+  })
+
+  it('still allowlists the harness death whose text is literally "API Error: <code>"', () => {
+    // The narrowing must not cost the real case it exists for.
+    expect(classifyDeath('API Error: 500').signature).toBe('http-500')
+    expect(classifyDeath('API Error: 529').signature).toBe('http-529')
   })
 
   it('does NOT read a red gate that happens to print 500 as an HTTP 500', () => {
@@ -224,6 +251,14 @@ describe('retryDecision — a child that reported a step complete is never retri
   it('refuses on a LATER death too, because the completion is remembered in the state', () => {
     const state = recordCompletion(emptyState(), { point: 421 })
     expect(retryDecision({ ...base, death: 'API Error: 500', state }).verdict).toBe('no-retry')
+  })
+
+  it('recordCompletion keeps the point’s accumulated tokens when the caller reports none', () => {
+    // The command records a reported completion in the SAME invocation that
+    // decides on it (four-eyes review), so this transition must not zero the
+    // budget on the way past.
+    const spent = recordRetry(emptyState(), { point: 421, tokensUsed: 4242 })
+    expect(recordCompletion(spent, { point: 421 }).points['421']).toMatchObject({ tokens: 4242, completedSteps: 1 })
   })
 })
 

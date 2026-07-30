@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { escalate, higherPriority, readLadder, writeLadder, logLine, boardCard, PRIORITY_ORDER } from './alert-escalation.mjs'
 import { ALERT_GAPS_MS, ALERT_PAUSE_RUNG } from './alert-escalation-core.mjs'
-import { notify } from './notify.mjs'
+import { notify, ntfyTopic } from './notify.mjs'
 
 const T0 = Date.UTC(2026, 6, 30, 0, 0, 0)
 const MIN_MS = 60 * 1000
@@ -119,15 +119,18 @@ describe('escalate — the full climb, on real files', () => {
     const first = await escalate({ title: 'Batch steht', message: 'kein Push seit 121 Minuten', env: {}, now: T0, ...h })
     expect(first.deliver).toBe(true)
     expect(first.decision.rung).toBe(0)
+    first.commit()
 
     // Same alert, different minute count — the SAME key, and inside the gap.
     const second = await escalate({ title: 'Batch steht', message: 'kein Push seit 151 Minuten', env: {}, now: T0 + 5 * MIN_MS, ...h })
     expect(second.deliver).toBe(false)
     expect(second.decision.rung).toBe(1)
+    expect(second.commit).toBeUndefined() // nothing was sent, nothing to book
 
     const third = await escalate({ title: 'Batch steht', message: 'kein Push seit 181 Minuten', env: {}, now: T0 + 16 * MIN_MS, ...h })
     expect(third.deliver).toBe(true)
     expect(third.decision.rung).toBe(1)
+    third.commit()
     expect(readLadder(h.ladderPath).alerts[Object.keys(readLadder(h.ladderPath).alerts)[0]].rung).toBe(2)
   })
 
@@ -139,7 +142,8 @@ describe('escalate — the full climb, on real files', () => {
     let paused = null
     const pause = { isPaused: () => paused != null, setPaused: (r) => (paused = r) }
     for (let i = 0; i <= ALERT_PAUSE_RUNG; i++) {
-      await escalate({ title: 'Batch steht', message: `kein Push seit ${100 + i * 30} Minuten`, env: {}, now, ...h, pause })
+      const v = await escalate({ title: 'Batch steht', message: `kein Push seit ${100 + i * 30} Minuten`, env: {}, priority: 'high', now, ...h, pause })
+      v.commit?.()
       now += ALERT_GAPS_MS[Math.min(i + 1, ALERT_GAPS_MS.length - 1)] + MIN_MS
     }
     expect(paused).toMatch(/Eskalation/)
@@ -155,7 +159,8 @@ describe('escalate — the full climb, on real files', () => {
     const pause = { isPaused: () => true, setPaused }
     let now = T0
     for (let i = 0; i <= ALERT_PAUSE_RUNG + 1; i++) {
-      await escalate({ title: 'Batch steht', message: `kein Push seit ${100 + i * 30} Minuten`, env: {}, now, ...h, pause })
+      const v = await escalate({ title: 'Batch steht', message: `kein Push seit ${100 + i * 30} Minuten`, env: {}, priority: 'high', now, ...h, pause })
+      v.commit?.()
       now += ALERT_GAPS_MS[Math.min(i + 1, ALERT_GAPS_MS.length - 1)] + MIN_MS
     }
     expect(setPaused).not.toHaveBeenCalled()
@@ -166,10 +171,11 @@ describe('escalate — the full climb, on real files', () => {
     // Would have prevented: a CI-red alert being throttled into silence by the
     // watchdog's climb, or vice versa.
     const h = harness()
-    await escalate({ title: 'Batch steht', message: 'kein Push seit 121 Minuten', env: {}, now: T0, ...h })
+    ;(await escalate({ title: 'Batch steht', message: 'kein Push seit 121 Minuten', env: {}, now: T0, ...h })).commit()
     const ci = await escalate({ title: 'CI rot', message: 'main ist rot', env: {}, now: T0 + MIN_MS, ...h })
     expect(ci.deliver).toBe(true)
     expect(ci.decision.rung).toBe(0)
+    ci.commit()
     expect(Object.keys(readLadder(h.ladderPath).alerts)).toHaveLength(2)
   })
 })
@@ -193,24 +199,114 @@ describe('the reason reaches the morning reader', () => {
   })
 })
 
-describe('notify — the wiring', () => {
+describe('notify — the wiring, on an injected topic', () => {
+  // HERMETIC BY CONSTRUCTION (four-eyes review, blocker). These cases used to
+  // pass only because .claude/ntfy-topic does not exist in a worktree. It DOES
+  // exist in the main working directory — the channel is in active use — so on
+  // `main` the same tests found a topic, consulted the REAL ladder, wrote REAL
+  // state into .claude/resilience/ and asserted the opposite of what happened.
+  const topicAt = (name = 'topic') => {
+    const p = join(dir, name)
+    writeFileSync(p, 'hoa-test-topic' + String.fromCharCode(10))
+    return p
+  }
+  const okFetch = () => vi.fn(async () => ({ ok: true }))
+
+  it('reads the topic from the injected path, not from the working directory', () => {
+    expect(ntfyTopic(topicAt())).toBe('hoa-test-topic')
+    expect(ntfyTopic(join(dir, 'absent'))).toBeNull()
+  })
+
   it('sends nothing and asks the ladder nothing when no topic is configured', async () => {
-    // The channel being off must not accumulate ladder state that then throttles
-    // the first REAL alert after it is switched on.
-    const fetchSpy = vi.fn()
+    const fetchSpy = okFetch()
     vi.stubGlobal('fetch', fetchSpy)
-    await notify('t', 'm')
+    const escalation = { escalate: vi.fn() }
+    await expect(notify('t', 'm', 'default', { topicFile: join(dir, 'absent'), escalation })).resolves.toBe(false)
+    expect(fetchSpy).not.toHaveBeenCalled()
+    expect(escalation.escalate).not.toHaveBeenCalled()
+  })
+
+  it('POSTs the first alert and books the rung only after the POST succeeded', async () => {
+    const fetchSpy = okFetch()
+    vi.stubGlobal('fetch', fetchSpy)
+    const commit = vi.fn()
+    const escalation = { escalate: vi.fn(async () => ({ deliver: true, priority: 'high', commit })) }
+    await expect(notify('Batch steht', 'kein Push seit 121 Minuten', 'high', { topicFile: topicAt(), escalation })).resolves.toBe(true)
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+    expect(fetchSpy.mock.calls[0][1].headers.Priority).toBe('high')
+    expect(commit).toHaveBeenCalledTimes(1)
+  })
+
+  it('does NOT book the rung when the POST fails — a standing alert stays loud', async () => {
+    // Booking before the POST silenced a standing alert for a whole rung gap,
+    // up to two hours; board-watchdog.mjs documents guarding against exactly
+    // this.
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false })))
+    const commit = vi.fn()
+    const escalation = { escalate: vi.fn(async () => ({ deliver: true, priority: 'high', commit })) }
+    await expect(notify('t', 'm', 'high', { topicFile: topicAt(), escalation })).resolves.toBe(false)
+    expect(commit).not.toHaveBeenCalled()
+  })
+
+  it('does not book the rung when the POST throws either', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('offline') }))
+    const commit = vi.fn()
+    const escalation = { escalate: vi.fn(async () => ({ deliver: true, priority: 'high', commit })) }
+    await expect(notify('t', 'm', 'high', { topicFile: topicAt(), escalation })).resolves.toBe(false)
+    expect(commit).not.toHaveBeenCalled()
+  })
+
+  it('does not POST at all when the ladder holds the alert back', async () => {
+    const fetchSpy = okFetch()
+    vi.stubGlobal('fetch', fetchSpy)
+    const escalation = { escalate: vi.fn(async () => ({ deliver: false, priority: 'default', decision: {} })) }
+    await expect(notify('t', 'm', 'default', { topicFile: topicAt(), escalation })).resolves.toBe(false)
     expect(fetchSpy).not.toHaveBeenCalled()
   })
 
-  it('accepts the ladder options without breaking the old three-argument callers', async () => {
-    // Every existing caller (launcher, board watchdog, model guard, deferral)
-    // still calls notify(title, message, priority).
-    const fetchSpy = vi.fn(async () => ({ ok: true }))
+  it('POSTs unthrottled with escalate:false, never consulting the ladder', async () => {
+    const fetchSpy = okFetch()
     vi.stubGlobal('fetch', fetchSpy)
-    await expect(notify('t', 'm', 'high')).resolves.toBe(false) // no topic in a worktree
-    await expect(notify('t', 'm', 'high', { escalate: false })).resolves.toBe(false)
-    await expect(notify('t', 'm', 'high', { key: 'explicit' })).resolves.toBe(false)
+    const escalation = { escalate: vi.fn() }
+    await expect(notify('Resurrected', 'successor spawned', 'low', { topicFile: topicAt(), escalate: false, escalation })).resolves.toBe(true)
+    expect(escalation.escalate).not.toHaveBeenCalled()
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('DELIVERS when the ladder module itself throws (fail-open = deliver)', async () => {
+    const fetchSpy = okFetch()
+    vi.stubGlobal('fetch', fetchSpy)
+    const escalation = { escalate: async () => { throw new Error('ladder broken') } }
+    await expect(notify('t', 'm', 'urgent', { topicFile: topicAt(), escalation })).resolves.toBe(true)
+    expect(fetchSpy.mock.calls[0][1].headers.Priority).toBe('urgent')
+  })
+
+  it('carries the caller priority into the ladder, so the pause gate can read it', async () => {
+    vi.stubGlobal('fetch', okFetch())
+    const escalate = vi.fn(async () => ({ deliver: true, priority: 'low', commit: () => {} }))
+    await notify('Resurrected', 'successor spawned', 'low', { topicFile: topicAt(), escalation: { escalate } })
+    expect(escalate.mock.calls[0][0]).toMatchObject({ priority: 'low' })
+  })
+
+  it('still accepts the old three-argument call shape every existing caller uses', async () => {
+    const fetchSpy = okFetch()
+    vi.stubGlobal('fetch', fetchSpy)
+    // No topicFile: the real path, which in this worktree has no topic.
+    await expect(notify('t', 'm', 'high')).resolves.toBe(false)
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+
+  it('END TO END through the real ladder: the second identical alert is not POSTed', async () => {
+    // The case the non-hermetic tests could not reach at all — notify() and the
+    // REAL escalate() together.
+    const fetchSpy = okFetch()
+    vi.stubGlobal('fetch', fetchSpy)
+    const h = harness()
+    const escalation = { escalate: (args) => escalate({ ...args, env: {}, ...h }) }
+    const opts = { topicFile: topicAt(), escalation }
+    await expect(notify('Batch steht', 'kein Push seit 121 Minuten', 'high', opts)).resolves.toBe(true)
+    await expect(notify('Batch steht', 'kein Push seit 151 Minuten', 'high', opts)).resolves.toBe(false)
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
   })
 })
 
@@ -228,7 +324,7 @@ describe('INDEPENDENCE — the ladder acts while the other layers are missing', 
     // A stale or swept state file must not lock the channel: the ladder simply
     // starts over and still delivers.
     const h = harness()
-    await escalate({ title: 'x', message: 'y', env: {}, now: T0, ...h })
+    ;(await escalate({ title: 'x', message: 'y', env: {}, now: T0, ...h })).commit()
     rmSync(h.ladderPath, { force: true })
     const again = await escalate({ title: 'x', message: 'y', env: {}, now: T0 + MIN_MS, ...h })
     expect(again.deliver).toBe(true)

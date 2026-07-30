@@ -265,6 +265,12 @@ async function main() {
   // must not leave footprints in the state either.
   if (decision.verdict !== 'stand-down') {
     let next = recordDeath(state, { point, branch, childId, signature: decision.signature, verdict: decision.verdict, at: Date.now() })
+    // A reported completion is PERSISTED here, not only used for this verdict
+    // (four-eyes review): otherwise a later death of the same point would be
+    // retried unless the caller happened to run --complete as well, and the
+    // "never retry a child that reported a step complete" rule would hold for
+    // exactly one invocation.
+    if (has('--reported-complete')) next = recordCompletion(next, { point, tokensUsed: tokensRaw })
     if (decision.verdict === 'retry') next = recordRetry(next, { point, branch, briefRevision, tokensUsed: Number.isFinite(tokensRaw) ? tokensRaw : undefined })
     writeState(next)
   }
