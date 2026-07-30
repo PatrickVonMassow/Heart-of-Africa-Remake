@@ -48,18 +48,28 @@ const PAUSE = resolve(REPO_ROOT, '.claude', 'batch-paused')
  */
 const TRANSPORT = 'pages'
 
-/** State + focus + the registered board's current hash and paths. */
+/** State + focus + the registered board's current hash, content and paths. */
 function gather() {
   const state = readJson(STATE_PATH)
   const boardFile = state && state.dashboardPath ? resolve(REPO_ROOT, state.dashboardPath) : null
-  const repoHash = boardFile && existsSync(boardFile) ? sha256File(boardFile) : null
+  const present = boardFile && existsSync(boardFile)
+  const repoHash = present ? sha256File(boardFile) : null
   const boardPaths = [state && state.dashboardPath, state && state.scratchpadPath].filter(Boolean)
-  return { state, focus: readJson(FOCUS_PATH), repoHash, boardPaths }
+  // The board's CONTENT (point 470): the no-work claim is read from it. An
+  // unreadable board yields null, which the core treats as "no claim" — the
+  // fail-open direction, so a missing board never costs a call.
+  let boardHtml = null
+  try {
+    if (present) boardHtml = readFileSync(boardFile, 'utf8')
+  } catch {
+    /* unreadable → no claim */
+  }
+  return { state, focus: readJson(FOCUS_PATH), repoHash, boardPaths, boardHtml }
 }
 
 // ---- CLI: --status --------------------------------------------------------
 if (process.argv.includes('--status')) {
-  const { state, focus, repoHash, boardPaths } = gather()
+  const { state, focus, repoHash, boardPaths, boardHtml } = gather()
   const verdict = evaluate({
     toolName: 'Write',
     filePath: 'src/example.ts',
@@ -67,6 +77,7 @@ if (process.argv.includes('--status')) {
     focus,
     repoHash,
     boardPaths,
+    boardHtml,
     canPublish: publishCapability({ state, transport: TRANSPORT }).canPublish,
   })
   const turn = Number(state && state.turnStartedAt)
@@ -206,7 +217,7 @@ try {
   if (heldByOtherLiveOwner(payload.session_id || '')) process.exit(0)
 
   const input = input0
-  const { state, focus, repoHash, boardPaths } = gather()
+  const { state, focus, repoHash, boardPaths, boardHtml } = gather()
   const decision = evaluate({
     toolName: payload.tool_name,
     command: input.command,
@@ -215,6 +226,7 @@ try {
     focus,
     repoHash,
     boardPaths,
+    boardHtml,
     canPublish: publishCapability({ state, sessionId: payload.session_id || '', transport: TRANSPORT }).canPublish,
   })
   if (decision.block) {
@@ -232,12 +244,21 @@ try {
     // NTP correction) would otherwise leave `fired < turnStartedAt`, which reads
     // as "not yet fired" for the rest of the turn while a fresh focus stamp is
     // equally in the past — armed with no way to disarm.
-    let released = false
-    try {
-      mergeState({ boardFirstFiredAt: Math.max(Date.now(), Number(state && state.turnStartedAt) || 0) })
-      released = true
-    } catch {
-      /* unwritable state — fall through to allow */
+    //
+    // …EXCEPT for the point-470 claim deny (`recordFired === false`). That one
+    // does not consume the stand-down and does not need it: its remedy is a
+    // single board command, which this gate never blocks, and standing down
+    // would leave "nothing is running" on the user's board for the rest of a
+    // turn that demonstrably kept working. It therefore also needs no writable
+    // state to be emitted safely.
+    let released = decision.recordFired === false
+    if (!released) {
+      try {
+        mergeState({ boardFirstFiredAt: Math.max(Date.now(), Number(state && state.turnStartedAt) || 0) })
+        released = true
+      } catch {
+        /* unwritable state — fall through to allow */
+      }
     }
     if (!released) process.exit(0) // unwritable state → allow, never trap the turn
     process.stdout.write(

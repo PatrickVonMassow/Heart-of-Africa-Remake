@@ -366,3 +366,107 @@ describe('evaluate — the gate', () => {
     expect(evaluate({ toolName: 123, command: {}, state: [], focus: [] }).block).toBe(false)
   })
 })
+
+// ═══ Point 470 — "nothing is running" is a CLAIM TO STOP ═════════════════════
+// The board carried "Gerade keine laufende Arbeit" while three things were in
+// flight; the user reported it four times in one evening. The claim is a
+// statement about the FUTURE of the turn, so the next state-changing call is the
+// proof it was false — and that call is what this rule refuses.
+describe('the no-work claim binds the turn', () => {
+  const sect = (name, body) =>
+    `<details class="sect"><summary><h2>${name}</h2></summary>\n${body}</details>\n`
+  const board = (now) =>
+    `<main>\n${sect('Woran ich gerade arbeite', now)}${sect('Von dir zu klären', '')}` +
+    `${sect('Warteschlange', '')}${sect('Erledigt', '')}</main>\n`
+  const idleCard =
+    '<details class="now">\n  <summary><span class="t">Gerade keine laufende Arbeit</span>' +
+    '<span class="right"><span class="meta">22:27</span></span></summary>\n' +
+    '  <div class="body">\n    <p>Der Punkt ist abgeschlossen.</p>\n  </div>\n</details>\n'
+  const realCard =
+    '<details class="now">\n  <summary><span class="t">470 — Die Tafel</span>' +
+    '<span class="right"><span class="meta">22:30 · ~23:00</span></span></summary>\n' +
+    '  <div class="body">\n    <p>läuft</p>\n  </div>\n</details>\n'
+
+  /** A call the gate would otherwise wave through: focus fresh, board published. */
+  const cleanCall = (over = {}) => ({
+    toolName: 'Write',
+    filePath: 'src/example.ts',
+    state: armedState(),
+    focus: focusAt(AFTER),
+    repoHash: 'h1',
+    canPublish: true,
+    ...over,
+  })
+
+  it('DENIES a state-changing call while the board claims idleness', () => {
+    const d = evaluate(cleanCall({ boardHtml: board(idleCard) }))
+    expect(d.block).toBe(true)
+    expect(d.reason).toContain('THE BOARD CLAIMS NOTHING IS RUNNING')
+  })
+
+  it('allows a READ of any kind while the same claim stands', () => {
+    for (const call of [
+      { toolName: 'Read', filePath: 'src/x.ts' },
+      { toolName: 'Grep', command: undefined },
+      { toolName: 'Bash', command: 'git status --short', filePath: undefined },
+      { toolName: 'Bash', command: 'node scripts/point-brief.mjs 470', filePath: undefined },
+    ]) {
+      expect(evaluate(cleanCall({ boardHtml: board(idleCard), ...call })).block).toBe(false)
+    }
+  })
+
+  it('allows BOTH while a real now-card stands — the board then describes the work', () => {
+    expect(evaluate(cleanCall({ boardHtml: board(realCard) })).block).toBe(false)
+    expect(
+      evaluate(cleanCall({ boardHtml: board(realCard), toolName: 'Read', filePath: 'src/x.ts' })).block,
+    ).toBe(false)
+  })
+
+  it('names the remedy: put a card up for the work, or stop', () => {
+    const { reason } = evaluate(cleanCall({ boardHtml: board(idleCard) }))
+    expect(reason).toContain('node scripts/board.mjs now')
+    expect(reason).toContain('node scripts/board.mjs none')
+    expect(reason).toMatch(/STOP/)
+    expect(reason).toContain('scripts/batch-boundary.mjs')
+  })
+
+  it('never blocks the SESSION-ENDING path — that is the case the claim exists for', () => {
+    for (const call of [
+      { toolName: 'Bash', command: 'node scripts/batch-boundary.mjs 470' },
+      { toolName: 'Bash', command: 'node scripts/board-publish.mjs' },
+      { toolName: 'Bash', command: 'node scripts/focus.mjs confirm' },
+      { toolName: 'Bash', command: 'node scripts/mechanism-review.mjs --record' },
+      { toolName: 'Bash', command: 'node scripts/board.mjs none --text-stdin' },
+      { toolName: 'Edit', filePath: '.batch-dashboard.html' },
+      { toolName: 'Edit', filePath: 'TASKS.md' },
+    ]) {
+      expect(evaluate(cleanCall({ boardHtml: board(idleCard), filePath: undefined, ...call })).block).toBe(false)
+    }
+  })
+
+  it('does NOT stand down after firing — the lie would otherwise stand for the turn', () => {
+    const state = armedState({ boardFirstFiredAt: TURN + 1 })
+    const d = evaluate(cleanCall({ state, boardHtml: board(idleCard) }))
+    expect(d.block).toBe(true)
+    // …and it says so, so the wrapper does not consume the once-per-turn budget.
+    expect(d.recordFired).toBe(false)
+    // The ordinary board-first deny still DOES stand down and still records.
+    expect(evaluate(denyingCall({ state })).block).toBe(false)
+    expect(evaluate(denyingCall()).recordFired).toBe(true)
+  })
+
+  it('still denies a commit, a test run and an agent — the calls that prove it false', () => {
+    for (const command of ['git commit -m "x"', 'npm run test:unit', 'git push origin HEAD']) {
+      expect(evaluate(cleanCall({ boardHtml: board(idleCard), toolName: 'Bash', command, filePath: undefined })).block)
+        .toBe(true)
+    }
+    expect(evaluate(cleanCall({ boardHtml: board(idleCard), toolName: 'Agent', filePath: undefined })).block).toBe(true)
+  })
+
+  it('is fail-open on a board it cannot read, and stays inactive without a turn stamp', () => {
+    for (const boardHtml of [null, undefined, 42, {}, '']) {
+      expect(evaluate(cleanCall({ boardHtml })).block).toBe(false)
+    }
+    expect(evaluate(cleanCall({ boardHtml: board(idleCard), state: { publishedHash: 'h1' } })).block).toBe(false)
+  })
+})

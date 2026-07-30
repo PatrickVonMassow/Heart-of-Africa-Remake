@@ -10,7 +10,7 @@
 // What only a spawn can show: the stdin contract, the deny payload's exact
 // shape, the fired-once write-through into dashboard-state.json, and the
 // promise that an unreadable state never costs the caller a tool call.
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach } from 'vitest'
 import { spawnSync } from 'node:child_process'
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -132,6 +132,72 @@ describe('board-first-guard (spawned)', () => {
     } finally {
       rmSync(pause, { force: true })
     }
+  })
+
+  // --- THE NO-WORK CLAIM (point 470) -----------------------------------------
+  // Spawned, because the claim is read from a FILE the wrapper resolves through
+  // `dashboardPath` — a pure test can prove the rule but not that the wrapper
+  // ever hands it the board.
+  describe('a board claiming idleness binds the turn', () => {
+    const boardPath = () => resolve(repo, '.batch-dashboard.html')
+    const sect = (name, body) => `<details class="sect"><summary><h2>${name}</h2></summary>\n${body}</details>\n`
+    const seedBoard = (now) => {
+      writeFileSync(
+        boardPath(),
+        `<main>\n${sect('Woran ich gerade arbeite', now)}${sect('Von dir zu klären', '')}` +
+          `${sect('Warteschlange', '')}${sect('Erledigt', '')}</main>\n`,
+      )
+      const state = readState()
+      writeJson(statePath(), { ...state, dashboardPath: '.batch-dashboard.html' })
+    }
+    const idle =
+      '<details class="now">\n  <summary><span class="t">Gerade keine laufende Arbeit</span>' +
+      '<span class="right"><span class="meta">22:27</span></span></summary>\n' +
+      '  <div class="body">\n    <p>Der Punkt ist abgeschlossen.</p>\n  </div>\n</details>\n'
+    const real =
+      '<details class="now">\n  <summary><span class="t">470 — Die Tafel</span>' +
+      '<span class="right"><span class="meta">22:30 · ~23:00</span></span></summary>\n' +
+      '  <div class="body">\n    <p>läuft</p>\n  </div>\n</details>\n'
+
+    afterEach(() => rmSync(boardPath(), { force: true }))
+
+    it('denies a state-changing call and says how to put it right', () => {
+      seedBoard(idle)
+      const r = callGuard('Bash', { command: 'git commit -m x' })
+      expect(r.status, r.stderr).toBe(0)
+      const reason = r.decision.hookSpecificOutput.permissionDecisionReason
+      expect(reason).toContain('THE BOARD CLAIMS NOTHING IS RUNNING')
+      expect(reason).toContain('node scripts/board.mjs now')
+    })
+
+    it('keeps denying — it must not stand down and leave the lie up for the turn', () => {
+      seedBoard(idle)
+      expect(callGuard('Bash', { command: 'git commit -m x' }).decision).toBeTruthy()
+      expect(callGuard('Bash', { command: 'npm run test:unit' }).decision).toBeTruthy()
+      // …and it did not spend the once-per-turn budget of the ordinary deny.
+      expect(readState().boardFirstFiredAt ?? 0).toBe(0)
+    })
+
+    it('lets the session-ending path and every read through', () => {
+      seedBoard(idle)
+      for (const call of [
+        ['Bash', { command: 'node scripts/batch-boundary.mjs 470' }],
+        ['Bash', { command: 'node scripts/board.mjs none --text-stdin' }],
+        ['Read', { file_path: 'src/x.ts' }],
+      ]) {
+        const r = callGuard(call[0], call[1])
+        expect(r.status, r.stderr).toBe(0)
+        expect(r.stdout.trim(), `${call[0]} ${JSON.stringify(call[1])} must be allowed`).toBe('')
+      }
+    })
+
+    it('falls back to the ordinary board-first deny once a real card stands', () => {
+      seedBoard(real)
+      const reason = callGuard('Bash', { command: 'git commit -m x' }).decision.hookSpecificOutput
+        .permissionDecisionReason
+      expect(reason).toContain('BOARD FIRST')
+      expect(reason).not.toContain('THE BOARD CLAIMS NOTHING IS RUNNING')
+    })
   })
 
   // --- THE FENCE CHOKEPOINT (point 434) --------------------------------------

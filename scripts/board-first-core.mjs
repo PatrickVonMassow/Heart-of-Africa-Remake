@@ -42,7 +42,9 @@
 // SCRIPT, the answer is yes for every session, headless included.
 
 import { isPublishDue } from './board-currency-core.mjs'
-import { PUBLISH_CMD, SYNCED_CMD } from './board-remedy.mjs'
+import { NONE_CARD_CMD, NOW_CARD_CMD, PUBLISH_CMD, SYNCED_CMD } from './board-remedy.mjs'
+import { claimsNoCurrentWork } from './board-core.mjs'
+import { handoverSurvivesCall } from './batch-boundary-core.mjs'
 
 /** Tools that change state by their nature — no command inspection needed. */
 export const MUTATING_TOOLS = new Set(['Edit', 'Write', 'NotebookEdit', 'Agent'])
@@ -175,6 +177,57 @@ export function isPublished(state, repoHash) {
   return !!(d && d.repoHash === repoHash)
 }
 
+// ═══ Point 470 — "nothing is running" is a CLAIM TO STOP ═════════════════════
+//
+// The board carried "Gerade keine laufende Arbeit" while three things were in
+// flight, and the user reported it four times in one evening. The asymmetry that
+// makes it enforceable: "nothing is running" is a statement about the FUTURE of
+// the turn. It is true only if the session stops now — so the next
+// state-changing call is the proof it was false, and that call is the one this
+// gate refuses.
+//
+// WHAT STAYS OPEN, so the claim can never trap a session:
+//   - reads, and everything `classifyTool` already treats as escape (the board
+//     commands themselves, an edit of the board file);
+//   - the whole CLOSING SET (`handoverSurvivesCall`) — the calls that END a
+//     session rather than carry it on: `batch-boundary.mjs`, the focus stamp, the
+//     board publish, the mechanism-review record, the work-order tick. That set
+//     is the case the claim exists for, so blocking it would be exactly wrong.
+// Everything else — a commit, a test run, an agent, a source edit — is the
+// session working on, and it is denied while the claim stands.
+//
+// THIS DENY DOES NOT STAND DOWN after firing once, unlike the focus/publish
+// conditions above it. Those can be blocked on facts a session may be unable to
+// change; this one is a sentence the session itself wrote, its remedy is one
+// command, and that command is never blocked. A stand-down here would leave the
+// lie on the board for the rest of the turn — which is the whole defect.
+
+/** Is this call part of ENDING the session rather than carrying it on? */
+export function isSessionEndingCall({ toolName, command, filePath } = {}) {
+  try {
+    return handoverSurvivesCall({ toolName, command, filePath }).survives === true
+  } catch {
+    return false
+  }
+}
+
+/** The deny text for a board that claims idleness while the session works on. */
+export function noWorkClaimReason() {
+  return (
+    'THE BOARD CLAIMS NOTHING IS RUNNING — and this call would prove it wrong (point 470, user ' +
+    '30.07.2026). "Gerade keine laufende Arbeit" stands in "Woran ich gerade arbeite", so the board ' +
+    'the user reads on his phone says this session has stopped. It is a claim about the FUTURE of ' +
+    'this turn: it is true only if you stop now.\nDo ONE of these:\n' +
+    `  - ${NOW_CARD_CMD} <N> "<was gerade läuft>"   → puts a card up for the work; it REPLACES the ` +
+    'claim, and this call goes through.\n' +
+    '  - STOP: end the turn. The session-ending path (node scripts/batch-boundary.mjs <point>, the ' +
+    'focus stamp, the board publish, the work-order tick) is never blocked by this rule.\n' +
+    `If the claim itself is wrong, rewrite it — ${NONE_CARD_CMD} "<Grund>" replaces the standing card ` +
+    'rather than adding a second one.\nReads are never blocked, and this rule is fail-open: an ' +
+    'unreadable board never costs a call.'
+  )
+}
+
 /** The moment the focus was last declared or confirmed (0 when never). */
 export function focusStampedAt(focus) {
   if (!focus || typeof focus !== 'object') return 0
@@ -194,9 +247,13 @@ export function focusStampedAt(focus) {
  *   boardPaths                    extra board paths an edit may always target
  *   canPublish                    may THIS session publish at all? (delta B —
  *                                 false disables the publish-due deny entirely)
+ *   boardHtml                     the board file's content (point 470 — the
+ *                                 no-work claim is read from it)
  *
- * Returns { block, reason }. Never throws on partial input — the wrapper's
- * fail-open must not depend on luck.
+ * Returns { block, reason, recordFired }. `recordFired` is false for the
+ * point-470 claim deny, which must NOT consume the once-per-turn stand-down (see
+ * the block above `isSessionEndingCall`). Never throws on partial input — the
+ * wrapper's fail-open must not depend on luck.
  */
 export function evaluate({
   toolName,
@@ -207,6 +264,7 @@ export function evaluate({
   repoHash = null,
   boardPaths = [],
   canPublish = false,
+  boardHtml = null,
 } = {}) {
   try {
     const s = state && typeof state === 'object' ? state : null
@@ -215,14 +273,24 @@ export function evaluate({
     const turnStartedAt = Number(s && s.turnStartedAt)
     if (!Number.isFinite(turnStartedAt) || turnStartedAt <= 0) return { block: false, reason: '' }
 
+    if (classifyTool({ toolName, command, filePath, boardPaths }) !== 'mutating') {
+      return { block: false, reason: '' }
+    }
+
+    // THE CLAIM TO STOP (point 470) — judged BEFORE the stand-down, because it
+    // does not stand down. Only a string can carry the claim; anything else
+    // (null, an unreadable file) is silently no claim, which is the fail-open
+    // direction.
+    if (typeof boardHtml === 'string' && claimsNoCurrentWork(boardHtml)) {
+      if (!isSessionEndingCall({ toolName, command, filePath })) {
+        return { block: true, reason: noWorkClaimReason(), recordFired: false }
+      }
+    }
+
     // Already fired this turn → stand down. At most one denial per turn, so an
     // ignored gate can never lock the session out of working.
     const firedAt = Number(s.boardFirstFiredAt ?? 0)
     if (Number.isFinite(firedAt) && firedAt >= turnStartedAt) return { block: false, reason: '' }
-
-    if (classifyTool({ toolName, command, filePath, boardPaths }) !== 'mutating') {
-      return { block: false, reason: '' }
-    }
 
     const stampedAt = focusStampedAt(focus)
     const focusFresh = stampedAt >= turnStartedAt
@@ -253,6 +321,7 @@ export function evaluate({
 
     return {
       block: true,
+      recordFired: true,
       reason:
         'BOARD FIRST — the board must describe the work BEFORE it starts, not after it ends ' +
         '(user 27.07.2026). The user reads the published board while the turn runs; every other ' +

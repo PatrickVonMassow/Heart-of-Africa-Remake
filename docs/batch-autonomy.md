@@ -1282,6 +1282,7 @@ unreadable page is **never** called current.
     node scripts/board-queue.mjs set <N> --title --text-stdin    # …its German title
     node scripts/board-queue.mjs set <N> --estimate "~2 h"       # …its estimate
     node scripts/board.mjs title <N> "…"     # retitle a now- OR queue card
+    node scripts/board.mjs none "<Grund>"    # the gap card, with NO point to close
 
 **Every text goes in on stdin, and a flag is never prose.** `--text-stdin` now
 fills whichever field it follows in both commands, `--none`'s reason included —
@@ -1294,6 +1295,26 @@ card-writing command will store a `--…` value as prose any more, and a text th
 really starts with a dash goes after a bare `--`. A **blank line** in any piped
 text becomes a `<p>` boundary, so the sanctioned command can produce what
 `dashboard-conciseness-guard` demands instead of forcing a hand edit.
+
+**"Gerade keine laufende Arbeit" is a STATE and a CLAIM TO STOP (point 470).**
+The user reported the same defect four times in one evening: the card stood while
+three things were in flight, the last time three copies deep. Both halves were
+mechanical. Writing it needed a point to close (`done <n> --none`), and the
+boundary is exactly the moment when no point is open — so the session hand-edited
+the board file, and a hand-edit APPENDS (one of them also broke the section
+markup). `board.mjs none` now writes it with no point at all, it REPLACES any
+copy standing instead of adding one, promoting real work sweeps it away, and it
+is refused outright while a numbered card still stands. The other half is the
+claim itself: "nothing is running" is a statement about the FUTURE of the turn,
+true only if the session stops now — so `board-first-guard` denies the next
+state-changing call while it stands, naming both ways out (put a card up, or
+stop). Reads, the board's own commands and the whole session-ending set
+(`batch-boundary.mjs`, the focus stamp, the publish, the tick) stay open, and the
+rule is fail-open: an unreadable board never costs a call. Unlike the
+focus/publish deny it does NOT stand down after firing once — its remedy is a
+single never-blocked command, and standing down would leave the lie on the board
+for the rest of a turn that demonstrably kept working. `batch-boundary.mjs` reads
+the board and prints whichever of the two commands actually works.
 
 **The board is written LF, whatever wrote it.** The markup anchors are matched
 with literal newlines, so a board an editor once wrote back in Windows text mode
