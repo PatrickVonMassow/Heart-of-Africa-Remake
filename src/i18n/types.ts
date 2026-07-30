@@ -187,6 +187,7 @@ export interface Strings {
       pictureNote: string
       pictureMissing: string
       stateNote: string
+      wildlifeNote: string
       overlayNote: string
       duplicateNote: string
     }

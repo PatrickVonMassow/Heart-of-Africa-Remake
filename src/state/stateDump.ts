@@ -7,6 +7,7 @@
 // any other function fields are stripped by the JSON replacer.
 
 import { balance, START_YEAR } from '../config/balance'
+import { wildlifeSection, type WildlifeDump } from '../systems/wildlifeDump'
 import { regionAt, worldToLatLon, type RegionId } from '../world/geo'
 import type { GameState } from './store'
 
@@ -102,6 +103,11 @@ function dataOnly(_key: string, value: unknown): unknown {
  * The whole game state as pretty JSON. Passing `useGame.getState()` directly
  * is intended: the replacer removes the actions, everything else is plain
  * serialisable data (objects, arrays, primitives — no Maps/Sets/refs).
+ *
+ * The `wildlife` section (point 454) reads the live wildlife runtime through
+ * its registered read-only source: bounded by a radius and a cap that the
+ * section itself names, deterministic like the rest of this serialiser, and
+ * empty (`active: false`) wherever no travel scene is mounted.
  */
 export function dumpGameState(game: GameState, opts: DumpOptions = {}): string {
   const dump = {
@@ -112,10 +118,37 @@ export function dumpGameState(game: GameState, opts: DumpOptions = {}): string {
     summary: dumpSummary(game, opts.detailLevel),
     env: opts.env,
     game,
+    wildlife: wildlifeSection(game.pos),
     balance,
     ui: opts.ui,
   }
   return JSON.stringify(dump, dataOnly, 2)
+}
+
+/** The wildlife counts the report's description file names (point 454), read
+ *  back from the dump that is actually shipped in the archive — so the text
+ *  can never disagree with the JSON beside it. Null when the JSON carries no
+ *  wildlife section (an older dump, or a state that failed to parse). */
+export function wildlifeReportCounts(json: string): {
+  radius: number
+  cap: number
+  animals: number
+  carcasses: number
+  flocks: number
+} | null {
+  try {
+    const w = (JSON.parse(json) as { wildlife?: WildlifeDump }).wildlife
+    if (!w) return null
+    return {
+      radius: w.bounds.radius,
+      cap: w.bounds.capPerList,
+      animals: w.counts.animalsListed,
+      carcasses: w.counts.carcassesListed,
+      flocks: w.counts.flocks,
+    }
+  } catch {
+    return null
+  }
 }
 
 /** Download filename `hoa-state-<YYYY-MM-DD>-<seed>.json` (design.md §21.1). */

@@ -33,6 +33,8 @@ export interface ReportTexts {
   /** Says the capture failed, so nobody looks for a PNG that is not there. */
   pictureMissing: string
   stateNote: string
+  /** Names the JSON's `wildlife` section and what bounds it (point 454). */
+  wildlifeNote: string
   overlayNote: string
   /** Heading for same-text labels at overlapping boxes, if any were found. */
   duplicateNote: string
@@ -49,6 +51,15 @@ export interface ReportInput {
   png: Uint8Array | null
   overlay: OverlayItem[]
   summary: DumpSummary
+  /** Bounds and sizes of the JSON's wildlife section, read back from that
+   *  same JSON; omitted when the dump carries none. */
+  wildlife?: {
+    radius: number
+    cap: number
+    animals: number
+    carcasses: number
+    flocks: number
+  } | null
   env: DumpEnvironment
   texts: ReportTexts
   /** Wall-clock generation time; injectable for deterministic tests. */
@@ -85,6 +96,15 @@ export function dataUrlToBytes(dataUrl: string | null | undefined): Uint8Array |
 
 function line(label: string, value: string | number): string {
   return `${label}: ${value}`
+}
+
+/** ` (12 animals, 1 carcasses, 3 flocks within 120, cap 80)` — the sizes and
+ *  the bounds of the wildlife section, appended to its line. Empty when the
+ *  dump carries no such section. */
+function wildlifeCounts(input: ReportInput): string {
+  const w = input.wildlife
+  if (!w) return ''
+  return ` (${w.animals} animals, ${w.carcasses} carcasses, ${w.flocks} flocks within ${w.radius}, cap ${w.cap})`
 }
 
 /**
@@ -136,6 +156,10 @@ export function describeReport(input: ReportInput): string {
     '-'.repeat(t.files.length),
     input.png && input.png.length > 0 ? `${stem}.png — ${t.pictureNote}` : t.pictureMissing,
     `${stem}.json — ${t.stateNote}`,
+    // The wildlife section is named explicitly (point 454): it is the evidence
+    // a wildlife report stands or falls on, and it is bounded — the counts say
+    // how much of it the file actually holds.
+    `${stem}.json → "wildlife" — ${t.wildlifeNote}${wildlifeCounts(input)}`,
     `${stem}-overlay.json — ${t.overlayNote} (${input.overlay.length})`,
   ]
   if (dupes.length > 0) {

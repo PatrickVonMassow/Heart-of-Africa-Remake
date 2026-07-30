@@ -258,6 +258,8 @@ export const de: Strings = {
       pictureNote: 'die 3-D-Szene, aus dem Canvas zurückgelesen. Sie enthält WEDER die Anzeigeleiste NOCH eine schwebende Beschriftung – die sind HTML und kommen nie ins Bild.',
       pictureMissing: '(kein Bildschirmfoto: die Aufnahme ist fehlgeschlagen – Zustand und Beschriftungsliste sind trotzdem vollständig.)',
       stateNote: 'der vollständige Spielzustand, die Balance-Werte und der UI-Zustand als JSON.',
+      wildlifeNote:
+        'der Abschnitt ebendieser JSON-Datei mit der Tierwelt um den Reisenden: jedes Tier mit Art, Position, Zustand und Ziel, jeder Kadaver mit seiner Restzeit und seinen Fressern sowie jeder Geierschwarm mit dem Kadaver, den er beansprucht. Begrenzt – der Abschnitt nennt seinen Radius, seine Obergrenze und wie viele Einträge weggelassen wurden.',
       overlayNote: 'jede in diesem Moment sichtbare Beschriftung und jedes Anzeigeelement, mit Text und Bildschirmrechteck – hier stehen die Anzeigeleiste und die Kartenbeschriftungen.',
       duplicateNote: 'Beschriftungen mit gleichem Text an überlappenden Stellen',
     },

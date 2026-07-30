@@ -26,6 +26,7 @@ import {
   type DebugEventFailure,
   type WildlifeDramaKind,
 } from '../../systems/debugEvents'
+import { setWildlifeDumpSource } from '../../systems/wildlifeDump'
 import { setAnimalCollider, collidableAnimalsNear } from './wildlifeCollision'
 import {
   recordDrawnBody,
@@ -2011,6 +2012,21 @@ function Herds() {
   useEffect(() => {
     setAnimalCollider(nearAnimalObstacles)
     return () => setAnimalCollider(null)
+  }, [])
+
+  // Let the F6 bug report READ the wildlife (point 454). Registered
+  // unconditionally like the drama trigger above — F6 ships in the delivered
+  // build, which has no `window.__wildlife`. The source only hands the live
+  // records over; the bounding and the shaping happen in systems/wildlifeDump,
+  // on the keypress, never in a frame. Cleared on unmount so a dump taken in a
+  // settlement can never read a stale herd.
+  useEffect(() => {
+    setWildlifeDumpSource(() => ({
+      herds: herdsRef.current,
+      flocks: scavengers.current,
+      hunt: LION_STATE,
+    }))
+    return () => setWildlifeDumpSource(null)
   }, [])
 
   useFrame(({ clock }, delta) => {
