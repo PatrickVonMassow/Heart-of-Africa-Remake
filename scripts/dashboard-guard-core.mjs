@@ -904,8 +904,13 @@ export function evaluate(input) {
     done,
     doneSeen: marker.doneSeen,
     nowMinutes,
-    // The per-session revision count the attestation persists (point 411).
-    etaRevisions: marker.etaRevisions ?? null,
+    // The per-session revision count the attestation persists (point 411) — and
+    // only for THIS sitting (four-eyes review 30.07.2026): a new session would
+    // otherwise inherit the previous one's over-limit counts until its first
+    // clean attestation, and the "your METHOD is off" sentence would be about
+    // somebody else's estimating.
+    etaRevisions:
+      marker.etaRevisions && marker.etaRevisions.session === sessionId ? marker.etaRevisions : null,
   })
   if (violations.length) {
     const waived = marker.auditWaived && repoHash && marker.auditWaived.repoHash === repoHash

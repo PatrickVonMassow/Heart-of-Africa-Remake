@@ -248,7 +248,7 @@ export function formatDriftReport(drifts = DRIFTS) {
 }
 
 const block = (reason, drift) => ({ block: true, reason, drift })
-const ALLOW = { block: false, reason: '', drift: null }
+const ALLOW = Object.freeze({ block: false, reason: '', drift: null })
 
 const FIX =
   ' Fix the CARD (rewrite it to the real current work, republish via dashboard-publish.mjs + ' +
