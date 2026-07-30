@@ -227,7 +227,20 @@ await page.evaluate(() => {
 })
 await page.waitForFunction(() => window.__rivers, null, { timeout: 60000 })
 await page.evaluate(() => window.__game.getState().debugJumpTo(-2.2, 34.8)) // Serengeti savanna
-await page.waitForTimeout(2500)
+// Wait for the CONDITION the check needs — a herd streamed in around the new
+// position — never for the wall clock.
+await page.waitForFunction(
+  () => {
+    const herds = window.__wildlife?.herdsRef?.current
+    if (!herds) return false
+    const p = window.__game.getState().pos
+    return Object.values(herds).some((list) =>
+      list.some((a) => Math.hypot(a.x - p.x, a.z - p.z) < 100),
+    )
+  },
+  null,
+  { timeout: 60000 },
+)
 await page.keyboard.press('F6')
 await page.waitForSelector('.state-dump-json', { timeout: 5000 })
 const travelDump = await page.evaluate(() => document.querySelector('.state-dump-json')?.textContent ?? '')
