@@ -3803,6 +3803,51 @@ it is appended.
   lifecycle, CLAUDE.md §6 where the singleton and the context boundary are described, and the
   ledger row for retrospective §3.61.
 
+- [ ] 435. THE REMEDY TEXTS SEND EVERY SESSION DOWN A RETIRED PATH (30.07.2026, rule-corpus
+  review of 107 entries; bundle H). The claude.ai artifact was retired on 29.07.2026 — the
+  user moved their bookmark to the Pages URL — but **43 references across seven files still
+  name it**, and they sit in the worst possible places: the remedy text of every board Stop
+  guard (`dashboard-guard-core.mjs`, `dashboard-card-topic-guard-core.mjs`,
+  `dashboard-conciseness-guard-core.mjs`, `dashboard-integrity-guard-core.mjs`,
+  `board-first-core.mjs`), and `board.mjs`, which prints "NEXT: publish … via the Artifact
+  tool" on EVERY board edit. A remedy text is read at the moment of a block and FOLLOWED, so
+  this is not stale prose — it is an instruction into a path that no longer exists.
+  `board-first-core.mjs` even asserts "the mirror is still kept while the user moves their
+  bookmark", which the move already ended.
+  TARGET: every remedy names `node scripts/board.mjs` / `node scripts/board-publish.mjs` plus
+  `--synced`, the Artifact NEXT-lines are gone from `board.mjs` and `board-archive-rotate.mjs`,
+  and `dashboard-publish.mjs` is either marked as the legacy path or removed. The board
+  CONTRACT itself gets ONE binding statement (the memory `batch-dashboard-artifact`), and
+  every other place refers to it rather than restating it — the corpus is meant to SHRINK.
+  ALSO IN THIS POINT, same review, same cause: the mtime note and `scratchpadPath` in
+  `dashboard-reminder-hook.mjs` still measure the scratchpad copy of the artifact era rather
+  than the canonical `.batch-dashboard.html`, so they are silent or measure the wrong file.
+  VERIFIABLE: a pure test asserting that no remedy string in the board guard family mentions
+  the artifact path, and one that the canonical board file is the only one measured. Plus a
+  grep-level case that the count of artifact references is zero outside a clearly labelled
+  legacy note.
+  DOCS in the same commit: the memory `batch-dashboard-artifact` as the single binding
+  contract, and `docs/batch-autonomy.md` where the transport is described.
+
+- [ ] 436. THE MOST EXPENSIVE TEXT IN THE PROJECT REPEATS WHAT THE MACHINE ALREADY ENFORCES
+  (30.07.2026, rule-corpus review; bundle H). `dashboard-reminder-hook.mjs` injects ~30 lines
+  of board-structure prose into EVERY user prompt — the single most expensive text here — and
+  most of it is now enforced mechanically: the four sections, their order and the card shape
+  are checked by `board-structure-core.mjs` BEFORE every publish, the `open`-attribute ban
+  blocks in `dashboard-guard-core` (`auto-open`), and the queue's header meta is checked
+  there too (`queue-meta`). Reminding of a rule a gate already refuses to break is the exact
+  pattern this project replaced everywhere else.
+  TARGET: the injected text keeps ONLY what no mechanism can check — no information in a
+  foreign section, the mobile-portrait look, and that an urgent structural recommendation
+  goes in as a card — plus the commands. For the structure it points at the one binding
+  contract (see point 435). Measure the before/after size and record it in the commit: this
+  is a context-cost change and the number is the point.
+  VERIFIABLE: a pure test pinning that the injected text no longer restates a
+  machine-enforced rule (a list of the enforced claims, none of which may appear), and that
+  the commands and the non-enforceable half are still present — a shortening that drops the
+  remaining duty would be worse than the repetition.
+  DOCS in the same commit: `docs/batch-autonomy.md` under dashboard currency.
+
 ## Closing (only after all points)
 
 New points are appended BEFORE this section — it stays last in the file.
