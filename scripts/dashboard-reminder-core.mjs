@@ -27,6 +27,12 @@ export const CONTRACT_MEMORY = 'batch-dashboard-artifact'
  * The claims a gate already enforces, with the phrasing each used to be stated
  * in. None of them may return to the injected text — the test reads this list,
  * so a NEW gate means deleting a sentence here rather than adding one.
+ *
+ * THESE PATTERNS ARE KEYWORD-LEVEL, NOT PARAPHRASE-PROOF (four-eyes review,
+ * 30.07.2026, which demonstrated it: "Genau 4 Sektionen in fester Ordnung"
+ * dodges all three of the structure patterns). The primary defence against the
+ * text growing back is therefore REMINDER_CHAR_BUDGET below, which no rewording
+ * escapes; the patterns catch the literal relapse, which is the likely one.
  */
 export const ENFORCED_CLAIMS = [
   { id: 'four-sections', by: 'board-structure-core (sections-wrong)', pattern: /vier sektionen/i },

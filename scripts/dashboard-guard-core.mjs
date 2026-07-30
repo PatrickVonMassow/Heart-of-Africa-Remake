@@ -373,9 +373,13 @@ export const ETA_RULE =
  * end earlier than its own start is that case, not a past one, so the end wraps.
  */
 export function etaMinutes(meta) {
-  const end = /~\s*(\d{1,2}):(\d{2})/.exec(String(meta ?? ''))
+  const text = String(meta ?? '')
+  const end = /~\s*(\d{1,2}):(\d{2})/.exec(text)
   if (!end) return null
-  const start = /(\d{1,2}):(\d{2})/.exec(String(meta ?? ''))
+  // The start is the stamp BEFORE the estimate. Reading the whole string finds
+  // the estimate's own digits in a meta that carries no start at all, and a
+  // phantom start is what would let the rollover below lift a clock it must not.
+  const start = /(\d{1,2}):(\d{2})/.exec(text.slice(0, end.index))
   let eta = Number(end[1]) * 60 + Number(end[2])
   const from = start ? Number(start[1]) * 60 + Number(start[2]) : null
   if (from !== null && eta < from) eta += 1440
@@ -391,8 +395,17 @@ export function etaStatus({ meta, nowMinutes, marginMin = ETA_MARGIN_MIN, graceM
   if (!Number.isFinite(nowMinutes)) return null
   const parsed = etaMinutes(meta)
   if (!parsed) return null
-  const minutesLeft = parsed.eta - nowMinutes
-  if (parsed.eta + graceMin < nowMinutes) return { minutesLeft, state: 'past' }
+  // BOTH SIDES OF MIDNIGHT MUST BE ON ONE CLOCK. `etaMinutes` lifts an end that
+  // wraps past midnight onto the card's own day, while `nowMinutes` counts from
+  // THIS midnight — so once the clock rolled over, an overdue estimate read as
+  // nearly a full day of slack ('23:40 · ~00:30' at 00:35 reported 1435 minutes
+  // left). `now` is lifted onto the card's day only when it sits more than half a
+  // day BEHIND the card's start, which is only ever the rollover: a clock a minute
+  // behind the stamp is skew and stays untouched, so this can never INVENT an
+  // overdue verdict — the standing requirement of the estimate flags.
+  const now = parsed.start !== null && parsed.start - nowMinutes > 720 ? nowMinutes + 1440 : nowMinutes
+  const minutesLeft = parsed.eta - now
+  if (parsed.eta + graceMin < now) return { minutesLeft, state: 'past' }
   if (minutesLeft < marginMin) return { minutesLeft, state: 'soon' }
   return { minutesLeft, state: 'ok' }
 }

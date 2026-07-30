@@ -16,7 +16,7 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { PUBLISH_CMD, REPUBLISH, SYNCED_CMD } from './board-remedy.mjs'
+import { EDIT_CMD, PUBLISH_CMD, REPUBLISH, SYNCED_CMD } from './board-remedy.mjs'
 import { BOARD_FILE_DEFAULT, boardFilePath } from './dashboard-state.mjs'
 import { evaluate as dashboardEvaluate } from './dashboard-guard-core.mjs'
 import { evaluate as topicEvaluate } from './dashboard-card-topic-guard-core.mjs'
@@ -62,6 +62,10 @@ describe('board remedy texts (point 435)', () => {
   it('states the publish loop once, and it is the live transport', () => {
     expect(PUBLISH_CMD).toBe('node scripts/board-publish.mjs')
     expect(SYNCED_CMD).toBe('node scripts/dashboard-guard.mjs --synced')
+    // EDIT_CMD is pinned to a LITERAL too (four-eyes finding, 30.07.2026). The
+    // reminder builds its command list from the same constant it prints, so a
+    // wrong path here would be injected into every prompt with the suite green.
+    expect(EDIT_CMD).toBe('node scripts/board.mjs')
     expect(REPUBLISH).toContain(PUBLISH_CMD)
     expect(REPUBLISH).toContain(SYNCED_CMD)
     expect(REPUBLISH).not.toMatch(RETIRED)
