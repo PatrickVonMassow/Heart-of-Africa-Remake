@@ -86,7 +86,7 @@ the one the user reads (memory `bundle-names`, retrospective §3.66).
 | **Monumente** | E | Monument sites | 315, 379, 391 |
 | **Tierverhalten** | F | Animal behaviour | 264, 265, 269, 312, 362, 363, 364, 414 |
 | **Kadaver & Geier** | G | Carrion, vultures, staging | 319, 322, 326, 327, 328, 336, 453 |
-| **Chat & Tafel** | H | Chat and board | 440, 451, 465, 467, 470, 472 — the rest landed 30.07.2026 (308, 410, 411, 416, 421, 423, 424, 430, 435, 436, 441, 439, 452) |
+| **Chat & Tafel** | H | Chat and board | 440, 451, 465, 467, 470 — the rest landed 30.07.2026 (308, 410, 411, 416, 421, 423, 424, 430, 435, 436, 441, 439, 452, 472) |
 | **Session- & Repo-Hygiene** | I | Session, pool and repo hygiene | 373, 401, 434, 461, 462, 463, 471 — the rest landed 30.07.2026 (329, 396, 399, 409, 426, 427, 429, 431, 433, 458) |
 | **Modell & Wächter** | J | Model and guard chain | 297, 298, 306, 309, 331, 355, 397, 425, 432, 437, 438, 457, 468 |
 | **Testinfrastruktur** | K | Test and verification infrastructure | 295, 330, 387, 418, 455, 456, 460, 464, 466 |

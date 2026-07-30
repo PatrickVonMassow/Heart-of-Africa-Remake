@@ -13387,3 +13387,38 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   VERIFIABLE: a Vitest case asserting a group card renders WITHOUT an order line and still
   raises no `empty-body` violation, one asserting a non-group card with an empty body still
   does; plus a check that no card body in `.claude/board-queue.json` is a bare command flag.
+
+- [x] 472. TAKE THE BUNDLE GROUPING BACK OUT OF THE QUEUE (user 30.07.2026, after taking the
+  scheme's own justification apart: "Mehr Übersicht bringt sie mir auch nicht, weil die
+  Warteschlange jetzt nicht mehr die Reihenfolge abbildet. Ich sehe gar keinen Vorteil mehr
+  durch die Bündelung." — then, on the recommendation below: "Ja, mach es so, wie empfohlen.";
+  bundle Chat & Tafel). Point 452 grouped the queue by bundle on the user's own request. Within
+  the hour the reasoning behind the bundles had collapsed under their questions — the
+  regression is scoped per change, nothing is carried between two points of a bundle, and the
+  one real context carry needs file overlap and is capped — and the last argument standing, the
+  overview, fell too: a flat queue WAS the working order, read top to bottom, while a grouped
+  one is not, because the pool draws its three slots from different groups. The grouping costs
+  clarity instead of adding it.
+  FINAL STATE: the Warteschlange renders as ONE FLAT LIST again, in the order the points will
+  actually be started (the picker's order, point 471 — so the first card is genuinely the next
+  point, and the "next up" line that point wanted becomes unnecessary and is dropped from it).
+  The bundle survives ONLY as the internal collision map — which points touch the same files and
+  therefore may not run in parallel — and as the priority ranking in `docs/work-packages.md`. It
+  is never rendered.
+  NO LEFTOVERS — this is the user's explicit demand ("Schaue gründlich, dass du beim Umbau keine
+  Altlasten übrig lässt"). Everything the grouping brought in goes with it, not just the call
+  site: the group renderer and its grouping helper, the group default-state constant, the
+  `data-group` hook, and — the one that would otherwise rot quietly — the `isGroup` EMPTY-BODY
+  EXEMPTION in `scripts/dashboard-guard-core.mjs`, which exists solely because a group card's
+  body held only nested cards. With no group cards, that exemption is a hole in a guard with
+  nothing left to justify it. Its tests go with it, and the empty-body rule must be proven to
+  bite again for every card. The board's stored data and the published page are rebuilt so no
+  `class="group"` markup survives anywhere.
+  FOUR EYES ON THE RESULT (user demand, same message): the other model reviews the finished
+  branch — specifically hunting for exactly the leftovers above, plus any doc sentence that
+  still describes a grouped queue.
+  VERIFIABLE: the rendered queue contains no `class="group"` and no `data-group`; every open
+  point appears exactly once, in the picker's order; a card with an empty body raises
+  `empty-body` again with no exemption available; a grep over `scripts/` and `docs/` finds no
+  surviving reference to the group renderer, the default-state constant or the exemption; and
+  the published board is reviewed by eye in phone portrait.
