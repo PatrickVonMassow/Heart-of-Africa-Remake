@@ -237,7 +237,8 @@ paused batch that explains itself cannot. Two alerts count as identical when
 their text matches with digit runs collapsed, so the watchdog's rising minute
 count is ONE climbing alert while CI-red keeps its own ladder on the shared
 topic. Six hours of silence resets a ladder. The ladder may only RAISE a
-caller's priority, never lower it.
+caller's priority, never lower it — and, per the contract below, it raises only
+for an alert that is allowed to reach the pause rung at all.
 
 **THE PAUSE RUNG IS FOR CONDITIONS, NOT FOR EVENTS** — the blocker the four-eyes
 review found, and the one thing to understand before adding a caller. The
@@ -254,9 +255,16 @@ an event: it throttles to at most one every 120 minutes and keeps going out,
 never pausing and never falling permanently silent. The gate reads the caller's
 priority, never the rung's own raised one, which would defeat it. **A caller's
 priority is therefore part of the contract, not decoration** — routine recurring
-notifications must not be declared urgent. (Still owed on the caller side, in the
-file that owns them: `Resurrected` and `Leaked worker reaped` should also pass
-`{ escalate: false }`, since their every occurrence is genuinely news.)
+notifications must not be declared urgent.
+
+**Priority escalation and the pause are ONE ladder**, so an alert that may not
+pause does not climb in priority either: below the threshold every rung is
+delivered at the caller's own priority. Otherwise the rung-4 "urgent" would have
+buzzed the phone for a routine successor spawn every two hours — the same
+contract broken from the other side. (Still owed on the caller side, in the file
+that owns them: `Resurrected` and `Leaked worker reaped` should also pass
+`{ escalate: false }`, since their every occurrence is genuinely news. Until that
+lands they are throttled rather than mis-escalated, which is the safe direction.)
 
 **The rung is booked only after the message is actually out.** Booking it before
 the POST meant one transient ntfy failure silenced a standing alert for a whole

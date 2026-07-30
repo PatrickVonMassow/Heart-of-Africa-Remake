@@ -4,11 +4,11 @@ import { describe, it, expect } from 'vitest'
 import {
   ALERT_GAPS_MS,
   ALERT_PAUSE_RUNG,
+  ALERT_PRIORITIES,
   PAUSE_MIN_PRIORITY,
   PRIORITY_ORDER,
   higherPriority,
   priorityRank,
-  ALERT_PRIORITIES,
   ALERT_RESET_MS,
   advanceLadder,
   alertKey,
@@ -75,11 +75,22 @@ describe('escalationDecision — a repeated identical alert backs off', () => {
     expect(ALERT_GAPS_MS[4]).toBeGreaterThan(ALERT_GAPS_MS[3])
   })
 
-  it('raises the priority with the rung, so the fourth buzz does not look like the first', () => {
-    const first = escalationDecision(at(null)).priority
-    const top = escalationDecision(at({ rung: ALERT_PAUSE_RUNG, lastSentAt: NOW - ALERT_GAPS_MS[ALERT_PAUSE_RUNG], firstSentAt: NOW - 300 * MIN, sends: 4 })).priority
+  it('raises a CONDITION’s priority with the rung, so the fourth buzz does not look like the first', () => {
+    const first = escalationDecision({ ...at(null), priority: 'high' }).priority
+    const top = escalationDecision({ ...at({ rung: ALERT_PAUSE_RUNG, lastSentAt: NOW - ALERT_GAPS_MS[ALERT_PAUSE_RUNG], firstSentAt: NOW - 300 * MIN, sends: 4 }), priority: 'high' }).priority
     expect(first).toBe('default')
     expect(top).toBe('urgent')
+  })
+
+  it('does NOT raise an EVENT’s priority at any rung — it is delivered as the caller declared it', () => {
+    // Priority escalation and the pause are ONE ladder (four-eyes re-review): an
+    // alert that may not pause has no business buzzing at urgent either. Before
+    // this, the launcher's routine "Resurrected" reached the phone at URGENT
+    // every two hours on a busy night.
+    for (let rung = 0; rung <= ALERT_PAUSE_RUNG; rung++) {
+      const entry = rung === 0 ? null : { rung, lastSentAt: NOW - ALERT_GAPS_MS[rung], firstSentAt: NOW - 300 * MIN, sends: rung }
+      expect(escalationDecision({ ...at(entry), priority: 'low' }).priority).toBe('low')
+    }
   })
 })
 
@@ -154,12 +165,14 @@ describe('escalationDecision — an EVENT never pauses a healthy batch', () => {
     expect(d.action).toBe('suppress')
   })
 
-  it('reads the CALLER’s priority, not the rung’s raised one', () => {
-    // The ladder raises a rung-4 alert to "urgent"; if the gate read THAT, every
-    // event alert would pause the batch and the gate would be decorative.
+  it('reads the CALLER’s priority, not the rung’s own', () => {
+    // The rung's own priority at the top of the ladder is "urgent". If the gate
+    // read THAT rather than the caller's argument, every event alert would pause
+    // the batch and the gate would be decorative.
+    expect(ALERT_PRIORITIES[ALERT_PAUSE_RUNG]).toBe('urgent')
     const d = escalationDecision({ ...at(topEntry), priority: 'low' })
-    expect(d.priority).toBe('urgent')
     expect(d.action).toBe('send')
+    expect(d.priority).toBe('low')
   })
 
   it('pauses for exactly the priorities at or above the threshold', () => {

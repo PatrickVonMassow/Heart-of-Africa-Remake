@@ -142,7 +142,15 @@ export function escalationDecision({
   priorities = ALERT_PRIORITIES,
 } = {}) {
   const pauseRung = gaps.length - 1
-  const prio = (rung) => priorities[Math.min(rung, priorities.length - 1)] ?? 'default'
+  const mayPause = priorityRank(priority) >= priorityRank(pauseMinPriority)
+
+  // PRIORITY ESCALATION AND THE PAUSE ARE ONE LADDER, so an alert that may not
+  // pause has no business buzzing at urgent either (four-eyes re-review). Below
+  // the threshold the alert is an EVENT: it is throttled, but delivered at the
+  // caller's OWN priority — otherwise the launcher's "Resurrected" would reach
+  // the phone at urgent every two hours while the module's own contract calls it
+  // routine. Above the threshold the rung raises as before.
+  const prio = (rung) => (mayPause ? (priorities[Math.min(rung, priorities.length - 1)] ?? 'default') : priority)
 
   if (!entry) {
     return { key, action: 'send', rung: 0, nextRung: 1, priority: prio(0), dueInMs: 0, reset: false, reason: 'first time this alert is raised' }
@@ -158,8 +166,6 @@ export function escalationDecision({
   }
 
   const rung = entry.rung
-  const mayPause = priorityRank(priority) >= priorityRank(pauseMinPriority)
-
   if (rung > pauseRung) {
     return { key, action: 'suppress', rung, nextRung: rung, priority: prio(rung), dueInMs: Infinity, reset: false, reason: 'the ladder is at its top: the batch is paused for this alert and the board card names why — repeating the buzz adds nothing' }
   }

@@ -9,6 +9,11 @@ import { join } from 'node:path'
 import { escalate, higherPriority, readLadder, writeLadder, logLine, boardCard, PRIORITY_ORDER } from './alert-escalation.mjs'
 import { ALERT_GAPS_MS, ALERT_PAUSE_RUNG } from './alert-escalation-core.mjs'
 import { notify, ntfyTopic } from './notify.mjs'
+import { repoPath } from './repo-paths.mjs'
+
+// Whether the real runtime-state directory existed BEFORE this suite ran. The
+// suite must not change that answer — see the last case in the notify block.
+const RESILIENCE_DIR_EXISTED = existsSync(repoPath('.claude/resilience'))
 
 const T0 = Date.UTC(2026, 6, 30, 0, 0, 0)
 const MIN_MS = 60 * 1000
@@ -33,6 +38,7 @@ beforeEach(() => {
 afterEach(() => {
   rmSync(dir, { recursive: true, force: true })
   vi.unstubAllGlobals()
+  vi.unstubAllEnvs()
 })
 
 describe('higherPriority — the ladder may RAISE a caller’s priority, never lower it', () => {
@@ -289,11 +295,27 @@ describe('notify — the wiring, on an injected topic', () => {
   })
 
   it('still accepts the old three-argument call shape every existing caller uses', async () => {
-    const fetchSpy = okFetch()
-    vi.stubGlobal('fetch', fetchSpy)
-    // No topicFile: the real path, which in this worktree has no topic.
-    await expect(notify('t', 'm', 'high')).resolves.toBe(false)
-    expect(fetchSpy).not.toHaveBeenCalled()
+    // HERMETIC, and the second time this lesson was learnt (four-eyes re-review):
+    // the earlier version asserted `false` here with the comment "the real path,
+    // which in this worktree has no topic". On `main` the topic file EXISTS, so
+    // the assertion inverted and the fast gate would have gone red the moment
+    // this branch landed — while the call also wrote a real ladder log.
+    //
+    // What the case actually proves is the FOURTH PARAMETER'S DEFAULT: three
+    // arguments must not throw on the destructuring. So the ladder is switched
+    // off for the call (no state written anywhere) and the assertion is on the
+    // SHAPE, which is the same on every machine.
+    vi.stubEnv('HOA_ALERT_ESCALATION', 'off')
+    vi.stubGlobal('fetch', okFetch())
+    await expect(notify('t', 'm', 'high')).resolves.toBeTypeOf('boolean')
+    await expect(notify('t', 'm')).resolves.toBeTypeOf('boolean')
+    await expect(notify('t')).resolves.toBeTypeOf('boolean')
+  })
+
+  it('writes no ladder state into the repository when the tests run', () => {
+    // The guard on the whole class of defect above: whatever the suite did, it
+    // must not have created the real runtime-state directory.
+    expect(existsSync(repoPath('.claude/resilience'))).toBe(RESILIENCE_DIR_EXISTED)
   })
 
   it('END TO END through the real ladder: the second identical alert is not POSTed', async () => {
