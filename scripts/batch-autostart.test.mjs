@@ -332,4 +332,28 @@ describe('the doctor gathers and executes the torn states (443 a-f)', () => {
     expect(doctor).toMatch(/tasksTextParses\(/)
     expect(doctor).not.toMatch(/sawCheckbox/)
   })
+
+  // --- The four-eyes fixes, at the one place a module test cannot reach them ---
+  it('gathers ownerAlive INSIDE the fail-open wrapper, and defaults it to TRUE', () => {
+    // `ownerAlive` GATES the process sweep, so an unreadable owner state must
+    // SUPPRESS the kill, never license it — and outside the wrapper a probe fault
+    // would abort the whole gather block (four-eyes F5).
+    expect(doctor).toMatch(/const ownerAlive = gather\(/)
+    expect(doctor).toMatch(/'the owner liveness',[\s\S]{0,400}?\n {2}true,\n\)/)
+  })
+
+  it('re-reads the pending lock at execute time rather than deleting the path blind', () => {
+    expect(doctor).toMatch(/clearStalePendingSpawn\(\{ lockPath: LOCK_PATH,[^\n]*probe: probePid,[^\n]*expect: stalePendingSpawn \}\)/)
+  })
+
+  it('reports a REFUSED worktree removal and a FAILED kill as findings, not as successes', () => {
+    expect(doctor).toMatch(/const \{ removed, refused \} = removeOrphanWorktrees\(/)
+    expect(doctor).toMatch(/REFUSED remove-orphan-worktrees/)
+    expect(doctor).toMatch(/const \{ killed, failed \} = killStrayProcesses\(/)
+    expect(doctor).toMatch(/FAILED to end pid/)
+    // Both must raise the exit code rather than pass silently.
+    const between = (from, to) => doctor.slice(doctor.indexOf(from), doctor.indexOf(to))
+    expect(between('REFUSED remove-orphan-worktrees', "a.action === 'restore-tasks-from-head'")).toMatch(/alertsRemain = true/)
+    expect(between('FAILED to end pid', "a.action === 'restore-tasks-from-head'")).toMatch(/alertsRemain = true/)
+  })
 })

@@ -727,6 +727,34 @@ case repairs, re-detects (which must find nothing) and repairs a second time, wh
 must neither throw nor change anything. A cleanup that is only safe the first time is
 not a cleanup a launcher may run at every tick.
 
+**ABSENT DATA, NEVER WRONG DATA** — the four-eyes finding, and the rule this module is
+read against from now on. An inner `catch` that turns a FAILURE into plausible-looking
+data defeats the outer fail-open, which can only protect against data that is MISSING.
+`listWorktreePaths` swallowing a `git worktree list` failure returned `[]` — "git knows
+of no worktree" — and every live agent tree past the idle window then read as an orphan;
+in repair mode that deletes a running agent's uncommitted work, and the idle window is
+no shield, because a directory's mtime never moves while the agent writes in
+SUBdirectories. Registration is the only shield, so an unreadable list must mean NOT
+JUDGED. The same shape sat in `restoreTasksFromHead`, where an unreadable `TASKS.md`
+counted as a missing one and would have been overwritten from HEAD with no backup
+taken: only `ENOENT` means "nothing to keep". And where a repair is destructive the
+EXECUTE step re-judges rather than trusting the gather — `removeOrphanWorktrees`
+refuses a target that is registered now (`judgeTarget` treats a registered worktree as
+a licensed `--force` removal), and `clearStalePendingSpawn` re-reads the lock it is
+about to delete, because a launcher tick or a returning session can win it in between
+and two sessions in one batch is the incident the singleton exists to prevent.
+
+**AGE IS EVIDENCE EVERYWHERE, not only where it was convenient.** Locks get ten
+minutes and worktrees an hour; the process sweep had nothing, so a verify run started
+thirty seconds ago was indistinguishable from a fortnight-old leftover. `ownerAlive`
+covers a run the BATCH started — not one the user starts in a bare terminal with the
+launcher armed, and not a delegated agent's in-flight gate outliving its dead parent
+(`pid-dead` licenses `--repair`). `STRAY_MIN_AGE_MS` now gates it, and a process whose
+age cannot be established is spared: a spared leftover eats CPU, a killed live run
+destroys work. The same asymmetry decides the other fallbacks — `ownerAlive` defaults
+to TRUE when it cannot be read, so an unreadable owner SUPPRESSES the sweep, and
+`EPERM` on a kill is reported as a FAILURE rather than counted as an ending.
+
 ### The watcher that does not live on this machine (30.07.2026, point 434)
 
 `.github/workflows/batch-watchdog.yml` asks, every thirty minutes and from

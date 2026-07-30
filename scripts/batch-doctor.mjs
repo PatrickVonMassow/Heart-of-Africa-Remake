@@ -151,7 +151,6 @@ const parallelSids = [...new Set([...parallelNow.map((p) => p.sid), ...alertOthe
 // 30.07.2026 the doctor could not see any of it. Each gather is wrapped fail-open:
 // one unreadable state must never cost the diagnosis of the other five.
 const nowMs = Date.now()
-const ownerAlive = owner ? assessOwner(owner, { now: nowMs, bootTime: bootTimeMs(), probe: owner.pid ? probePid(owner.pid) : null }).alive : false
 
 const gather = (what, fn, fallback) => {
   try {
@@ -162,6 +161,13 @@ const gather = (what, fn, fallback) => {
   }
 }
 
+// TRUE is the safe fallback here, not false: `ownerAlive` GATES the process sweep,
+// so an unreadable owner state must suppress the kill, never license it.
+const ownerAlive = gather(
+  'the owner liveness',
+  () => (owner ? assessOwner(owner, { now: nowMs, bootTime: bootTimeMs(), probe: owner.pid ? probePid(owner.pid) : null }).alive : false),
+  true,
+)
 const gitDir = gather('the git directory', () => git(['rev-parse', '--absolute-git-dir']), '')
 const staleGitLocks = gather('the git lock files', () => findStaleGitLocks({ gitDir, now: nowMs }), [])
 const worktrees = gather('the worktree list', () => findWorktreeTrouble({ repo: REPO, git, now: nowMs }), {})
@@ -244,11 +250,21 @@ for (const a of plan) {
       pruneWorktrees(git)
       log("EXECUTED prune-worktrees: git's record of vanished worktrees cleared")
     } else if (a.action === 'remove-orphan-worktrees') {
-      const removed = removeOrphanWorktrees(worktrees.orphanDirs ?? [], { git })
-      log(`EXECUTED remove-orphan-worktrees: removed ${removed.length} orphan worktree director(y/ies) (${removed.join(', ')})`)
+      const { removed, refused } = removeOrphanWorktrees(worktrees.orphanDirs ?? [], { git })
+      log(`EXECUTED remove-orphan-worktrees: removed ${removed.length} orphan worktree director(y/ies) (${removed.join(', ') || 'none'})`)
+      for (const r of refused) {
+        // A target that judges REGISTERED at execute time is a live worktree, not
+        // debris — refusing it is the finding, not a failure of the run.
+        log(`REFUSED remove-orphan-worktrees for ${r.path}: ${r.reason}`)
+        alertsRemain = true
+      }
     } else if (a.action === 'kill-stray-verify-processes') {
-      const killed = killStrayProcesses(strays)
-      log(`EXECUTED kill-stray-verify-processes: ended ${killed.length} leftover process(es) of an aborted verification (pid ${killed.join(', ')})`)
+      const { killed, failed } = killStrayProcesses(strays)
+      log(`EXECUTED kill-stray-verify-processes: ended ${killed.length} leftover process(es) of an aborted verification (pid ${killed.join(', ') || 'none'})`)
+      for (const f of failed) {
+        log(`FAILED to end pid ${f.pid} (${f.reason}) — it is not this user's to signal; end it by hand`)
+        alertsRemain = true
+      }
     } else if (a.action === 'restore-tasks-from-head') {
       const r = restoreTasksFromHead({ repo: REPO, git, now: nowMs })
       log(
@@ -257,8 +273,15 @@ for (const a of plan) {
           : 'SKIPPED restore-tasks-from-head: the working copy parses again — nothing to restore',
       )
     } else if (a.action === 'clear-stale-pending-lock') {
-      clearStalePendingSpawn({ lockPath: LOCK_PATH })
-      log(`EXECUTED clear-stale-pending-lock: the pending-spawn lock of ${stalePendingSpawn?.sessionId ?? 'unknown'} was removed — the next tick may spawn again`)
+      // Re-read at execute time: a launcher tick or a returning session can win
+      // the lock between the gather and here, and deleting a LIVE reservation is
+      // how two sessions end up in one batch.
+      const r = clearStalePendingSpawn({ lockPath: LOCK_PATH, now: Date.now(), probe: probePid, expect: stalePendingSpawn })
+      log(
+        r.removed
+          ? `EXECUTED clear-stale-pending-lock: the pending-spawn lock of ${r.reason} was removed — the next tick may spawn again`
+          : `SKIPPED clear-stale-pending-lock: ${r.reason} — nothing was removed`,
+      )
     } else if (a.action === 'republish-board') {
       republishBoard({ repo: REPO })
       log('EXECUTED republish-board: scripts/board-publish.mjs re-ran — the reader sees the current board again')

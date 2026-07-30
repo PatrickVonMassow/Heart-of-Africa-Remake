@@ -20,9 +20,10 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameS
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { join, resolve } from 'node:path'
-import { normPath } from './worktree-cleanup-core.mjs'
+import { REFUSALS, judgeTarget, normPath } from './worktree-cleanup-core.mjs'
 import { cleanupWorktree } from './worktree-cleanup.mjs'
 import { strayProcesses, STRAY_KIND } from './verify/machine-load-core.mjs'
+import { processStartTime } from './batch-singleton.mjs'
 import { MANDATE_MAX_AGE_MS, mandateMarkerVerdict } from './batch-doctor-core.mjs'
 
 /** A git runner bound to one checkout. Injectable everywhere below. */
@@ -54,11 +55,30 @@ export const gitIn =
 
 export const GIT_LOCK_STALE_MS = 10 * 60 * 1000
 
-/** The lock files a killed git leaves, with their age. Never throws. */
+/** The lock files a killed git leaves, with their age. Never throws.
+ *
+ *  IT SWEEPS THE PER-WORKTREE ADMIN DIRS TOO (four-eyes F5). Every worktree has
+ *  its OWN index at `<gitdir>/worktrees/<name>/index`, so a killed AGENT commit —
+ *  by far the most common kill in this project — leaves its lock there and not in
+ *  the main `.git/index.lock` this originally looked at. The agent's next commit
+ *  then fails and nothing here explained why. */
 export function findStaleGitLocks({ gitDir, now = Date.now(), staleMs = GIT_LOCK_STALE_MS } = {}) {
   const root = gitDir ? resolve(gitDir) : null
   if (!root || !existsSync(root)) return []
-  const candidates = [join(root, 'index.lock'), join(root, 'packed-refs.lock'), ...walkLocks(join(root, 'refs'))]
+  const lockRoots = [root]
+  try {
+    for (const e of readdirSync(join(root, 'worktrees'), { withFileTypes: true })) {
+      if (e.isDirectory()) lockRoots.push(join(root, 'worktrees', e.name))
+    }
+  } catch {
+    /* no per-worktree admin dirs — the main one is still swept */
+  }
+  const candidates = lockRoots.flatMap((r) => [
+    join(r, 'index.lock'),
+    join(r, 'HEAD.lock'),
+    join(r, 'packed-refs.lock'),
+    ...walkLocks(join(r, 'refs')),
+  ])
   const out = []
   for (const path of candidates) {
     let age
@@ -123,16 +143,23 @@ export function clearStaleGitLocks(locks = []) {
 
 export const WORKTREE_IDLE_MS = 60 * 60 * 1000
 
-/** Every path `git worktree list` knows, main checkout first. [] when git fails. */
+/**
+ * Every path `git worktree list` knows, main checkout first.
+ *
+ * IT THROWS RATHER THAN RETURNING `[]` — and that is the shape to watch for in
+ * this whole module (four-eyes finding F1). An inner swallow that turns a FAILURE
+ * into plausible-looking data defeats the outer fail-open, which can only protect
+ * against ABSENT data. An empty list here reads as "git knows of no worktree", and
+ * `findWorktreeTrouble` would then report every live agent's tree as an orphan;
+ * the 30 s timeout on a loaded machine and a torn `.git/worktrees` admin entry
+ * both produce exactly that failure, and in repair mode it would delete a running
+ * agent's uncommitted work. Absent data, never wrong data.
+ */
 export function listWorktreePaths(git) {
-  try {
-    return git(['worktree', 'list', '--porcelain'])
-      .split(/\r?\n/)
-      .filter((l) => l.startsWith('worktree '))
-      .map((l) => l.slice(9).trim())
-  } catch {
-    return []
-  }
+  return git(['worktree', 'list', '--porcelain'])
+    .split(/\r?\n/)
+    .filter((l) => l.startsWith('worktree '))
+    .map((l) => l.slice(9).trim())
 }
 
 /** Both spellings of a path — git and the filesystem disagree about Windows
@@ -148,7 +175,16 @@ function bothSpellings(p) {
   return out
 }
 
-/** `{ pruneNeeded, orphanDirs }` — the two shapes above. Never throws. */
+/**
+ * `{ pruneNeeded, orphanDirs }` — the two shapes above.
+ *
+ * THROWS when `git worktree list` cannot be read (see above): the registration is
+ * the ONLY shield a live agent's tree has here — the idle window does not help,
+ * because a directory's mtime never moves while the agent writes in its
+ * SUBdirectories — so a missing list must mean "not judged this run", never
+ * "nothing is registered". The doctor's `gather` wrapper turns that into an
+ * unjudged state and the planner plans nothing.
+ */
 export function findWorktreeTrouble({ repo, git, now = Date.now(), idleMs = WORKTREE_IDLE_MS } = {}) {
   const listed = listWorktreePaths(git)
   const pruneNeeded = listed.slice(1).some((p) => !existsSync(p))
@@ -181,16 +217,39 @@ export function pruneWorktrees(git) {
   git(['worktree', 'prune'])
 }
 
-/** Remove the orphans through the ONE safe remover. IDEMPOTENT: a directory
- *  already gone leaves only git's record to prune, which `cleanupWorktree`
- *  handles and reports as such. */
+/**
+ * Remove the orphans through the ONE safe remover. Returns `{ removed, refused }`.
+ *
+ * IT RE-JUDGES AT EXECUTE TIME (four-eyes finding F1, second half). The targets
+ * were decided at gather time, seconds or minutes earlier, and `judgeTarget`
+ * treats a REGISTERED worktree as a licensed removal (`git worktree remove
+ * --force`, uncommitted work and all). So a target that turns out registered NOW —
+ * because git had failed at gather time and has recovered since, or because an
+ * agent registered a tree in between — is REFUSED rather than deleted: only
+ * `orphan-under-worktrees-dir` is an orphan, and only an orphan is removed here.
+ * A `git worktree list` that fails at this moment PROPAGATES, so the caller
+ * reports the action as failed and nothing is deleted on absent evidence.
+ *
+ * IDEMPOTENT: a directory already gone still judges as an orphan by its path, and
+ * `cleanupWorktree` reports it as "already gone — only git's record was pruned".
+ */
 export function removeOrphanWorktrees(dirs = [], { git } = {}) {
   const removed = []
-  for (const d of dirs) {
-    const result = cleanupWorktree(d, { git })
-    if (result.ok) removed.push(d)
+  const refused = []
+  if (!dirs.length) return { removed, refused }
+  const worktrees = listWorktreePaths(git)
+  const mainRoot = worktrees[0] ?? null
+  for (const target of dirs) {
+    const verdict = judgeTarget({ target, mainRoot, worktrees, allowOrphan: true })
+    if (!verdict.ok || verdict.reason !== 'orphan-under-worktrees-dir') {
+      refused.push({ path: target, reason: verdict.ok ? verdict.reason : (REFUSALS[verdict.reason] ?? verdict.reason) })
+      continue
+    }
+    const result = cleanupWorktree(target, { git })
+    if (result.ok) removed.push(target)
+    else refused.push({ path: target, reason: REFUSALS[result.verdict?.reason] ?? result.verdict?.reason })
   }
-  return removed
+  return { removed, refused }
 }
 
 // ---------------------------------------------------------------------------
@@ -212,30 +271,74 @@ export function removeOrphanWorktrees(dirs = [], { git } = {}) {
 export const KILLABLE_STRAY_KINDS = new Set([STRAY_KIND.verifyRun, STRAY_KIND.browser, STRAY_KIND.devServer])
 
 /**
- * The leftovers of this checkout's aborted verification. `processes` is the
- * `{ pid, ppid, name, cmd }` table (injectable — the tests hand one in rather
- * than reading the machine).
+ * AGE IS EVIDENCE HERE TOO (four-eyes finding F2). Locks get ten minutes and
+ * worktrees an hour, and this had nothing: a verify run started thirty seconds ago
+ * was indistinguishable from a fortnight-old leftover. `ownerAlive` covers a run
+ * the BATCH started, but not a run the user starts in a bare terminal with the
+ * launcher armed, and not a delegated agent's in-flight gate outliving its dead
+ * parent (`pid-dead` licenses `--repair`). Both were killed mid-run. Same window
+ * as the pending lock: ten minutes of running is not a leftover yet.
  */
-export function findStrayVerifyProcesses({ processes = [], pid = process.pid, repoMarker = '' } = {}) {
-  return strayProcesses({ processes, pid, repoMarker })
-    .filter((s) => s.fromThisRepo && KILLABLE_STRAY_KINDS.has(s.kind))
-    .map((s) => ({ pid: s.pid, kind: s.kind, cmd: s.cmd }))
+export const STRAY_MIN_AGE_MS = 10 * 60 * 1000
+
+/**
+ * The leftovers of this checkout's aborted verification. `processes` is the
+ * `{ pid, ppid, name, cmd }` table and `startTime` the per-pid start-time probe —
+ * both injectable, so the tests hand a table in rather than reading the machine.
+ *
+ * A process whose age CANNOT be established is left alone. Absent evidence is not
+ * evidence, and the cost of the two verdicts is not symmetrical: a spared leftover
+ * eats CPU, a killed live run destroys work.
+ */
+export function findStrayVerifyProcesses({
+  processes = [],
+  pid = process.pid,
+  repoMarker = '',
+  now = Date.now(),
+  minAgeMs = STRAY_MIN_AGE_MS,
+  startTime = processStartTime,
+} = {}) {
+  const out = []
+  for (const s of strayProcesses({ processes, pid, repoMarker })) {
+    if (!s.fromThisRepo || !KILLABLE_STRAY_KINDS.has(s.kind)) continue
+    let started = null
+    try {
+      started = startTime(s.pid)
+    } catch {
+      started = null
+    }
+    if (!Number.isFinite(started)) continue // no age, no proof, no kill
+    const ageMs = now - started
+    if (ageMs < minAgeMs) continue // still running its own run
+    out.push({ pid: s.pid, kind: s.kind, cmd: s.cmd, ageMs })
+  }
+  return out
 }
 
-/** Kill them. IDEMPOTENT: a pid already gone throws and is counted as done. */
+/**
+ * End them. Returns `{ killed, failed }`.
+ *
+ * ESRCH — "no such process" — IS the goal state, so it counts as ended and makes
+ * the action idempotent. Anything else (EPERM above all: a process this user may
+ * not signal) is a FAILURE and is reported as one; counting it as "ended" would
+ * have the doctor announce a sweep that did not happen, and the same processes
+ * would be re-found and re-"ended" at every tick (four-eyes F5).
+ */
 export function killStrayProcesses(strays = [], { kill = (p) => process.kill(p) } = {}) {
   const killed = []
+  const failed = []
   for (const s of strays) {
     const pid = typeof s === 'number' ? s : s?.pid
     if (!Number.isFinite(pid) || pid <= 0) continue
     try {
       kill(pid)
-    } catch {
-      /* already gone — the state this action exists to reach */
+      killed.push(pid)
+    } catch (e) {
+      if (e && e.code === 'ESRCH') killed.push(pid)
+      else failed.push({ pid, reason: (e && (e.code || e.message)) || 'unknown' })
     }
-    killed.push(pid)
   }
-  return killed
+  return { killed, failed }
 }
 
 // ---------------------------------------------------------------------------
@@ -277,8 +380,13 @@ export function restoreTasksFromHead({ repo, git, now = Date.now() } = {}) {
   let current = null
   try {
     current = readFileSync(path, 'utf8')
-  } catch {
-    /* missing entirely — the restore below is still the repair */
+  } catch (e) {
+    // ONLY "it is not there" means "there is nothing to keep" (the F1 shape
+    // again). An UNREADABLE file — EBUSY from a scanner, EACCES — is a failure,
+    // and treating it as missing would overwrite a possibly intact work order
+    // from HEAD with no backup taken. Let it propagate; the doctor logs the
+    // action as failed and the alert stands.
+    if (!e || e.code !== 'ENOENT') throw e
   }
   if (current !== null && tasksTextParses(current)) return { restored: false, backup: null }
   const good = git(['show', 'HEAD:TASKS.md'])
@@ -328,10 +436,26 @@ export function findStalePendingSpawn({ lockPath, now = Date.now(), staleMs = PE
   return { sessionId: String(lock.sessionId ?? 'unknown'), ageMs, pid }
 }
 
-/** Remove it. IDEMPOTENT: an absent lock is a silent success. */
-export function clearStalePendingSpawn({ lockPath } = {}) {
+/**
+ * Remove it — but RE-READ FIRST (four-eyes finding F4). The gather ran seconds or
+ * minutes ago, and a launcher tick or a returning session can win the lock in
+ * between; an unconditional `rmSync` on the lock path would then delete a LIVE
+ * reservation and let two sessions be spawned into one batch, which is the exact
+ * incident the singleton exists to prevent. The verdict is recomputed here, and
+ * `expect` additionally pins the identity so a DIFFERENT stale lock is not silently
+ * swept under the first one's name.
+ *
+ * Returns `{ removed, reason }`. IDEMPOTENT: a second call re-reads, finds nothing
+ * stale (the file is gone) and removes nothing.
+ */
+export function clearStalePendingSpawn({ lockPath, now = Date.now(), staleMs = PENDING_LOCK_STALE_MS, probe, expect: expected = null } = {}) {
+  const still = findStalePendingSpawn({ lockPath, now, staleMs, probe })
+  if (!still) return { removed: false, reason: 'no-longer-stale' }
+  if (expected?.sessionId && still.sessionId !== expected.sessionId) {
+    return { removed: false, reason: `a different lock holds it now (${still.sessionId})` }
+  }
   rmSync(lockPath, { force: true })
-  return true
+  return { removed: true, reason: still.sessionId }
 }
 
 // ---------------------------------------------------------------------------
@@ -391,14 +515,22 @@ const defaultRun = (exe, args, cwd) =>
 /** Read AND DELETE the marker, readable or not. The deletion happens BEFORE the
  *  parse: a corrupt marker used to throw past it and be re-parsed at every
  *  session start for ever. One-shot means one-shot. */
-export function consumeMandateMarker({ path, now = Date.now(), maxAgeMs = MANDATE_MAX_AGE_MS } = {}) {
+export function consumeMandateMarker({ path, now = Date.now(), maxAgeMs = MANDATE_MAX_AGE_MS, remove = rmSync } = {}) {
   let raw = null
   try {
     raw = readFileSync(path, 'utf8')
   } catch {
     return mandateMarkerVerdict({ raw: null, now, maxAgeMs })
   }
-  rmSync(path, { force: true })
+  try {
+    remove(path, { force: true })
+  } catch {
+    // EBUSY/EPERM — a scanner holding the file for a few milliseconds (the class
+    // scripts/atomic-write.mjs exists for). This runs inside a SessionStart hook,
+    // so throwing here would take the resume down over a stale status file. The
+    // expiry is the backstop, and a mandate delivered twice only asks a session to
+    // check the repo twice (four-eyes F5).
+  }
   return mandateMarkerVerdict({ raw, now, maxAgeMs })
 }
 

@@ -17,6 +17,7 @@ import {
   GIT_LOCK_STALE_MS,
   KILLABLE_STRAY_KINDS,
   PENDING_LOCK_STALE_MS,
+  STRAY_MIN_AGE_MS,
   WORKTREE_IDLE_MS,
   clearMandateMarker,
   clearStaleGitLocks,
@@ -121,6 +122,32 @@ describe('(a) stale git locks from a killed commit or push', () => {
     expect(findStaleGitLocks({ gitDir: join(tmp, 'nowhere') })).toEqual([])
     expect(findStaleGitLocks()).toEqual([])
   })
+
+  // --- F5: the lock a killed AGENT commit actually leaves ----------------------
+  // Every worktree has its own index at .git/worktrees/<name>/index, so an agent
+  // killed mid-commit leaves the lock THERE, not in the main .git/index.lock this
+  // originally swept. The agent's next commit then failed with nothing explaining
+  // why — and the agent worktree is where most kills in this project happen.
+  it('DETECTS and REPAIRS a per-worktree index lock, and the repair is IDEMPOTENT', () => {
+    const wt = join(repo, '.claude', 'worktrees', 'agent-1')
+    git(['worktree', 'add', '-q', '-b', 'feat/agent-1', wt])
+    const admin = join(gitDir(), 'worktrees', 'agent-1')
+    expect(existsSync(admin)).toBe(true)
+    const lock = join(admin, 'index.lock')
+    const head = join(admin, 'HEAD.lock')
+    for (const p of [lock, head]) {
+      writeFileSync(p, '')
+      backdate(p, GIT_LOCK_STALE_MS * 2)
+    }
+
+    const found = findStaleGitLocks({ gitDir: gitDir(), now: NOW })
+    expect(found.map((f) => f.path).sort()).toEqual([head, lock].sort())
+
+    clearStaleGitLocks(found)
+    expect(existsSync(lock)).toBe(false)
+    expect(findStaleGitLocks({ gitDir: gitDir(), now: NOW })).toEqual([])
+    expect(() => clearStaleGitLocks(found)).not.toThrow()
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -167,7 +194,7 @@ describe('(b) worktrees git no longer knows', () => {
     writeFileSync(join(orphan, 'leftover.txt'), 'x')
     backdate(orphan, WORKTREE_IDLE_MS * 2)
 
-    expect(removeOrphanWorktrees([orphan], { git })).toEqual([orphan])
+    expect(removeOrphanWorktrees([orphan], { git })).toEqual({ removed: [orphan], refused: [] })
     expect(existsSync(orphan)).toBe(false)
     // The MAIN tree is untouched — the whole reason the removal goes through
     // scripts/worktree-cleanup.mjs rather than an rm -rf.
@@ -180,6 +207,76 @@ describe('(b) worktrees git no longer knows', () => {
 
   it('reports nothing on a clean repository', () => {
     expect(findWorktreeTrouble({ repo, git, now: NOW })).toEqual({ pruneNeeded: false, orphanDirs: [] })
+  })
+
+  // --- F1: a failed `git worktree list` must not INVENT orphans ----------------
+  // The chain the reviewer demonstrated: `git worktree list` hits its 30 s timeout
+  // under load (documented on this machine) or a torn .git/worktrees admin entry;
+  // the empty list reads as "nothing is registered"; every live agent tree older
+  // than the idle window is reported as an orphan; repair mode is on; and at
+  // execute time git has recovered, so judgeTarget calls the tree REGISTERED —
+  // which it treats as a LICENSED removal — and `git worktree remove --force`
+  // deletes a running agent's uncommitted work. The idle window is no help: a
+  // directory's mtime never moves while an agent writes in SUBdirectories.
+  describe('F1 — absent data, never wrong data', () => {
+    const failingGit = (fail) => (args, opts) => {
+      if (fail() && args[0] === 'worktree' && args[1] === 'list') throw new Error('fatal: could not read worktree list (timeout)')
+      return git(args, opts)
+    }
+
+    it('PROPAGATES a failed worktree list instead of reporting an empty one', () => {
+      expect(() => listWorktreePaths(failingGit(() => true))).toThrow(/worktree list/)
+    })
+
+    it('does NOT call a live registered worktree an orphan when git cannot be read', () => {
+      const live = join(repo, '.claude', 'worktrees', 'agent-live')
+      git(['worktree', 'add', '-q', '-b', 'feat/live', live])
+      writeFileSync(join(live, 'work-in-progress.txt'), 'uncommitted work a delegated agent is writing')
+      backdate(live, WORKTREE_IDLE_MS * 2)
+
+      // The gather THROWS, so the doctor's fail-open wrapper marks the state
+      // unjudged. What it must never do is answer with `orphanDirs: [live]`.
+      expect(() => findWorktreeTrouble({ repo, git: failingGit(() => true), now: NOW })).toThrow(/worktree list/)
+      expect(existsSync(join(live, 'work-in-progress.txt'))).toBe(true)
+    })
+
+    it('REFUSES a removal target that is REGISTERED at execute time, keeping its uncommitted work', () => {
+      const live = join(repo, '.claude', 'worktrees', 'agent-live')
+      git(['worktree', 'add', '-q', '-b', 'feat/live', live])
+      const wip = join(live, 'work-in-progress.txt')
+      writeFileSync(wip, 'uncommitted work a delegated agent is writing')
+
+      // Exactly the state the failure chain produces: a live tree handed in as a
+      // target because the gather could not see the registration.
+      const r = removeOrphanWorktrees([live], { git })
+      expect(r.removed).toEqual([])
+      expect(r.refused).toHaveLength(1)
+      expect(r.refused[0].path).toBe(live)
+      expect(existsSync(wip)).toBe(true)
+      expect(readFileSync(wip, 'utf8')).toMatch(/uncommitted work/)
+      expect(listWorktreePaths(git)).toHaveLength(2) // still registered
+    })
+
+    it('refuses rather than deletes when git cannot be read AT EXECUTE time either', () => {
+      const orphan = join(repo, '.claude', 'worktrees', 'agent-dead')
+      mkdirSync(orphan, { recursive: true })
+      writeFileSync(join(orphan, 'leftover.txt'), 'x')
+      expect(() => removeOrphanWorktrees([orphan], { git: failingGit(() => true) })).toThrow(/worktree list/)
+      expect(existsSync(orphan)).toBe(true)
+    })
+
+    it('still removes a genuine orphan once the list CAN be read', () => {
+      const orphan = join(repo, '.claude', 'worktrees', 'agent-dead')
+      mkdirSync(orphan, { recursive: true })
+      expect(removeOrphanWorktrees([orphan], { git }).removed).toEqual([orphan])
+    })
+
+    it('never removes the MAIN checkout even if it is handed in as a target', () => {
+      const r = removeOrphanWorktrees([repo], { git })
+      expect(r.removed).toEqual([])
+      expect(r.refused[0].path).toBe(repo)
+      expect(existsSync(join(repo, 'TASKS.md'))).toBe(true)
+    })
   })
 })
 
@@ -203,36 +300,91 @@ describe('(c) leftover processes of an aborted verification', () => {
     { pid: 301, ppid: 300, name: 'chrome.exe', cmd: `chrome --headless=new ${marker}/x` },
   ]
 
+  /** Everything old enough to sweep — the age gate is exercised on its own below. */
+  const oldEnough = () => NOW - STRAY_MIN_AGE_MS * 2
+  const find = (marker, extra = {}) =>
+    findStrayVerifyProcesses({ processes: table(marker), pid: 300, repoMarker: marker, now: NOW, startTime: oldEnough, ...extra })
+
   it('DETECTS this checkout’s verify/browser/dev-server leftovers by COMMAND LINE, never by name', () => {
     const marker = repo.replace(/\\/g, '/').toLowerCase()
-    const found = findStrayVerifyProcesses({ processes: table(marker), pid: 300, repoMarker: marker })
+    const found = find(marker)
     expect(found.map((s) => s.pid).sort((a, b) => a - b)).toEqual([100, 101, 102])
     for (const s of found) expect(KILLABLE_STRAY_KINDS.has(s.kind)).toBe(true)
   })
 
   it('REPAIRS by ending them, and the repair is IDEMPOTENT', () => {
     const marker = repo.replace(/\\/g, '/').toLowerCase()
-    const found = findStrayVerifyProcesses({ processes: table(marker), pid: 300, repoMarker: marker })
+    const found = find(marker)
     const killed = []
-    expect(killStrayProcesses(found, { kill: (p) => killed.push(p) }).sort((a, b) => a - b)).toEqual([100, 101, 102])
+    const r = killStrayProcesses(found, { kill: (p) => killed.push(p) })
+    expect(r.killed.sort((a, b) => a - b)).toEqual([100, 101, 102])
+    expect(r.failed).toEqual([])
     expect(killed.sort((a, b) => a - b)).toEqual([100, 101, 102])
 
     // Second run: the table no longer holds them, so nothing is planned — and a
-    // kill of an already-gone pid (which throws ESRCH) is tolerated, not fatal.
+    // kill of an already-gone pid (ESRCH) counts as ended rather than throwing.
     const after = table(marker).filter((p) => ![100, 101, 102].includes(p.pid))
-    expect(findStrayVerifyProcesses({ processes: after, pid: 300, repoMarker: marker })).toEqual([])
-    expect(() =>
-      killStrayProcesses(found, {
-        kill: () => {
-          throw Object.assign(new Error('ESRCH'), { code: 'ESRCH' })
-        },
-      }),
-    ).not.toThrow()
+    expect(findStrayVerifyProcesses({ processes: after, pid: 300, repoMarker: marker, now: NOW, startTime: oldEnough })).toEqual([])
+    const second = killStrayProcesses(found, {
+      kill: () => {
+        throw Object.assign(new Error('ESRCH'), { code: 'ESRCH' })
+      },
+    })
+    expect(second.killed.sort((a, b) => a - b)).toEqual([100, 101, 102])
+    expect(second.failed).toEqual([])
   })
 
   it('finds nothing in an empty or unreadable process table', () => {
     expect(findStrayVerifyProcesses({ processes: [], pid: 1, repoMarker: 'x' })).toEqual([])
     expect(findStrayVerifyProcesses()).toEqual([])
+  })
+
+  // --- F2: age is evidence here too --------------------------------------------
+  // ownerAlive covers a run the BATCH started. It does not cover a run the user
+  // starts in a bare terminal with the launcher armed, nor a delegated agent's
+  // in-flight gate outliving its dead parent (pid-dead licenses --repair). Both
+  // were killed mid-run, because a 30-second-old verify run looked exactly like a
+  // fortnight-old leftover.
+  describe('F2 — a running verification is not a leftover', () => {
+    const marker = () => repo.replace(/\\/g, '/').toLowerCase()
+
+    it('SPARES a run that started moments ago', () => {
+      const justStarted = () => NOW - 30_000
+      expect(find(marker(), { startTime: justStarted })).toEqual([])
+    })
+
+    it('sweeps only once the run is past the pending-lock window, and reports its age', () => {
+      const m = marker()
+      const atTheEdge = () => NOW - STRAY_MIN_AGE_MS + 1000
+      expect(find(m, { startTime: atTheEdge })).toEqual([])
+      const past = () => NOW - STRAY_MIN_AGE_MS - 1000
+      const found = find(m, { startTime: past })
+      expect(found.map((s) => s.pid).sort((a, b) => a - b)).toEqual([100, 101, 102])
+      for (const s of found) expect(s.ageMs).toBeGreaterThanOrEqual(STRAY_MIN_AGE_MS)
+    })
+
+    it('SPARES a process whose age cannot be established — absent evidence is not evidence', () => {
+      expect(find(marker(), { startTime: () => null })).toEqual([])
+      expect(
+        find(marker(), {
+          startTime: () => {
+            throw new Error('the start-time probe failed')
+          },
+        }),
+      ).toEqual([])
+    })
+  })
+
+  // --- F5: EPERM is a FAILURE, not an ending -----------------------------------
+  it('reports a pid it may not signal as FAILED rather than counting it as ended', () => {
+    const strays = [{ pid: 100, kind: 'verify-run', cmd: 'x' }, { pid: 101, kind: 'automation-browser', cmd: 'y' }]
+    const r = killStrayProcesses(strays, {
+      kill: (p) => {
+        if (p === 101) throw Object.assign(new Error('EPERM'), { code: 'EPERM' })
+      },
+    })
+    expect(r.killed).toEqual([100])
+    expect(r.failed).toEqual([{ pid: 101, reason: 'EPERM' }])
   })
 })
 
@@ -285,6 +437,19 @@ describe('(d) a truncated work order', () => {
     expect(tasksTextParses('# Work order\n\nnothing here yet\n')).toBe(true)
     expect(tasksTextParses(null)).toBe(false)
   })
+
+  // --- F1's shape once more: unreadable is NOT missing --------------------------
+  it('PROPAGATES an unreadable working copy instead of treating it as deleted', () => {
+    // A read failure that is NOT "it is not there" — a scanner holding the file
+    // (EBUSY), a permission fault, or (portably reproducible) a directory in its
+    // place. Read as "missing", it would overwrite a possibly intact work order
+    // from HEAD and take no backup at all, because there was "nothing to keep".
+    rmSync(join(repo, 'TASKS.md'), { force: true })
+    mkdirSync(join(repo, 'TASKS.md'))
+    expect(() => restoreTasksFromHead({ repo, git, now: NOW })).toThrow(/EISDIR|EPERM|EACCES|EBUSY/)
+    // Nothing was written, and no backup was dropped.
+    expect(readdirSync(join(repo, '.claude')).filter((n) => n.startsWith('tasks-damaged-'))).toEqual([])
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -318,10 +483,48 @@ describe('(e) a pending-spawn lock nobody converted', () => {
 
   it('REPAIRS by removing it, and the repair is IDEMPOTENT', () => {
     writeLock({})
-    clearStalePendingSpawn({ lockPath: lockPath() })
+    expect(clearStalePendingSpawn({ lockPath: lockPath(), now: NOW, probe: gone })).toEqual({ removed: true, reason: 'launcher-abc' })
     expect(existsSync(lockPath())).toBe(false)
     expect(findStalePendingSpawn({ lockPath: lockPath(), now: NOW, probe: gone })).toBeNull()
-    expect(() => clearStalePendingSpawn({ lockPath: lockPath() })).not.toThrow()
+    // Second run re-reads, finds nothing stale and removes nothing.
+    expect(clearStalePendingSpawn({ lockPath: lockPath(), now: NOW, probe: gone })).toEqual({ removed: false, reason: 'no-longer-stale' })
+  })
+
+  // --- F4: re-read before removing ---------------------------------------------
+  // The gather ran seconds or minutes before the execute, and a launcher tick or a
+  // returning session can win the lock in between. Deleting a LIVE reservation is
+  // how two sessions end up spawned into one batch — the incident the singleton
+  // exists to prevent.
+  describe('F4 — the execute re-reads the lock it is about to delete', () => {
+    it('KEEPS a lock that a live session took over between gather and execute', () => {
+      writeLock({})
+      const stale = findStalePendingSpawn({ lockPath: lockPath(), now: NOW, probe: gone })
+      expect(stale).not.toBeNull()
+      // Between the two: a real session claims the batch.
+      writeFileSync(lockPath(), JSON.stringify({ sessionId: 'live-session', kind: 'session', claimedAt: NOW - 1000, pid: 999 }))
+      const r = clearStalePendingSpawn({ lockPath: lockPath(), now: NOW, probe: gone, expect: stale })
+      expect(r.removed).toBe(false)
+      expect(existsSync(lockPath())).toBe(true)
+      expect(JSON.parse(readFileSync(lockPath(), 'utf8')).sessionId).toBe('live-session')
+    })
+
+    it('KEEPS a lock whose process came back to life between gather and execute', () => {
+      writeLock({})
+      const stale = findStalePendingSpawn({ lockPath: lockPath(), now: NOW, probe: gone })
+      const r = clearStalePendingSpawn({ lockPath: lockPath(), now: NOW, probe: alive, expect: stale })
+      expect(r).toEqual({ removed: false, reason: 'no-longer-stale' })
+      expect(existsSync(lockPath())).toBe(true)
+    })
+
+    it('KEEPS a DIFFERENT stale lock rather than sweeping it under the first one’s name', () => {
+      writeLock({})
+      const stale = findStalePendingSpawn({ lockPath: lockPath(), now: NOW, probe: gone })
+      writeLock({ sessionId: 'launcher-xyz' })
+      const r = clearStalePendingSpawn({ lockPath: lockPath(), now: NOW, probe: gone, expect: stale })
+      expect(r.removed).toBe(false)
+      expect(r.reason).toMatch(/launcher-xyz/)
+      expect(existsSync(lockPath())).toBe(true)
+    })
   })
 })
 
@@ -424,6 +627,18 @@ describe('(h) the mandate marker the launcher hands to its successor', () => {
     expect(existsSync(`${marker()}.tmp`)).toBe(false)
     expect(JSON.parse(readFileSync(marker(), 'utf8')).at).toBe(NOW)
   })
+
+  // --- F5: this runs inside a SessionStart hook --------------------------------
+  it('still answers when the DELETION fails — a held status file may not take the resume down', () => {
+    writeMandateMarker({ path: marker(), at: NOW, code: 2 })
+    const held = () => {
+      throw Object.assign(new Error('EBUSY: resource busy or locked'), { code: 'EBUSY' })
+    }
+    // Throwing here would crash the SessionStart hook over a scanner holding a
+    // status file. The verdict still arrives; the expiry is the marker's backstop.
+    expect(consumeMandateMarker({ path: marker(), now: NOW, remove: held })).toEqual({ verdict: 'mandate', ran: true, code: 2 })
+    expect(existsSync(marker())).toBe(true) // it really was not removed
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -446,7 +661,7 @@ describe('several torn states at once (the shape point 449 drills)', () => {
     expect(tasksRecoverableFromHead({ git })).toBe(true)
 
     clearStaleGitLocks(locks)
-    removeOrphanWorktrees(wt.orphanDirs, { git })
+    expect(removeOrphanWorktrees(wt.orphanDirs, { git }).removed).toEqual([orphan])
     restoreTasksFromHead({ repo, git, now: NOW })
 
     expect(findStaleGitLocks({ gitDir: join(repo, '.git'), now: NOW })).toEqual([])
