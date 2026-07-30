@@ -347,6 +347,19 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   Abbrüchen zu **zufälligen** Zeitpunkten und frag danach nicht ‚läuft es weiter?', sondern
   ‚läuft es **dort** weiter, wo es sollte, und gilt Unfertiges als unfertig?'"
 
+- **Ein abgefangener Fehler, der einen Wert zurückgibt, ist eine Behauptung.** Die übliche
+  Absicherung — „wenn die Prüfung selbst kaputtgeht, tu lieber nichts" — schützt nur gegen
+  **fehlende** Daten. Verwandelt ein `catch` weiter innen den Fehlschlag schon in einen
+  plausiblen Wert (eine leere Liste, eine 0, ein `false`), sieht die Absicherung nie einen
+  Fehler, und die Aktion läuft mit einer Lüge weiter. Bei uns hätte das jeden lebenden
+  Arbeitsordner gelöscht: „git kann gerade nicht antworten" war zu „git kennt keinen
+  Arbeitsordner" geworden, also galt jeder als verwaist.
+  → *Prompt:* „Geh jedes `catch` durch, das einen Ersatzwert zurückgibt, und frag: Führt
+  dieser Wert zu **weniger** Aktion oder zu **mehr**? Nur weniger darf verschluckt werden;
+  alles andere wird nach oben durchgereicht, damit die äußere Absicherung überhaupt greifen
+  kann. Und lass eine zerstörende Aktion ihr Ziel **direkt vor der Ausführung** noch einmal
+  prüfen, nicht nur beim Einsammeln."
+
 ---
 
 ## Drei Meta-Regeln, die alles zusammenhalten
@@ -392,4 +405,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 Wenn du diese eine Nachricht an den Anfang stellst, hast du 80 % der Lehren dieses
 Projekts eingebaut, bevor die erste Zeile Code entsteht.
 
-<!-- GUIDE-FINGERPRINT: 4a7d876e4881dab3fcc849451da2a420552e939e0f1efa7f6fca3cfdeaa3d91a -->
+<!-- GUIDE-FINGERPRINT: 67aefb05fabafb49e8f4a604bd4fb472796f2842ab2f56bee7e106e37ecb470d -->
