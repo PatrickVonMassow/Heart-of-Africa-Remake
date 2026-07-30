@@ -818,6 +818,23 @@ The lesson under all four: the shell may only carry what a reader can lose
 without harm. A property the board NEEDS belongs in the fragment, because the
 fragment is what gets written into someone else's document.
 
+**The chat is INJECTED into the content, so every content swap must put it back
+(29.07.2026, point 423).** Nothing about the message channel may enter the board
+content, so the viewer builds it and inserts it into the rendered board — and
+since it sits under the board's heading, it sits inside `<main>`, which is
+exactly what the 30-second refresher replaces wholesale. `injectChat` ran once
+per document load, so every successful refresh deleted the channel and nothing
+restored it; on a phone that reads as "the section is gone", because returning to
+the browser makes the page visible and fires the poll in the same moment the
+reader looks. The seam is therefore a documented signal, not markup and not a
+shared variable: the refresher dispatches `hoa-board-swapped` on `window` after a
+swap (`BOARD_SWAP_EVENT` in `scripts/board-refresher-core.mjs`), the viewer
+listens and re-injects, and the injection is idempotent. The reader's
+typed-but-unsent draft, the open/closed state and the messages already read live
+in the viewer's `chatState`, so they survive the rebuild — otherwise the channel
+would lose words on a 30-second timer. A `MutationObserver` on `<main>` covers
+the lag while a board published with an older refresher announces nothing.
+
 ### The board also runs BACK — a message channel from the phone (29.07.2026)
 
 Until now the board was one-way: the user read status and could not answer it.
