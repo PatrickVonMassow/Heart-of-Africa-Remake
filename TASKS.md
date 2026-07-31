@@ -3637,23 +3637,6 @@ it is appended.
   vanish. The total saving is stated as one number in the commit, and the per-turn fixed load
   is re-measured after the cuts so the claim is a measurement rather than an intention.
 
-- [ ] 444. A QUOTA BLOCK IS A WAITING STATE, NOT A FAILURE (user decision 30.07.2026: no
-  pacing — "wenn du durch die Kontingent-Bremse blockiert wirst, musst du es immer wieder
-  probieren, um zu merken, wann du neues Budget hast und ab dann weiterarbeiten"; bundle
-  Urlaubsfestigkeit). Nothing in the launcher classifies a usage-limit abort today, so it
-  lands in the ordinary failure ladder — `failCount` grows, the backoff climbs to its
-  two-hour ceiling (`scripts/batch-autostart-core.mjs`), and days of an unattended fortnight
-  are lost to a wait that is not a fault. The limit abort is recognised by its own signature
-  and treated as its own state: NO `failCount`, NO `.claude/batch-paused`, and a probe in the
-  ordinary 15-minute tick — cheap, because a blocked start fails at once and consumes
-  practically nothing, so the reason for the backoff (burning tokens on a broken night) does
-  not apply. Every probe and the moment work resumed are logged, so the real reset rhythm
-  becomes measurable instead of assumed.
-  VERIFIABLE: Vitest on the pure decision — a limit signature yields `state: 'quota'`, leaves
-  the fail counter untouched, writes no pause file and schedules the next tick at the normal
-  interval; an ordinary failure still climbs the ladder. Plus a fake-signature drill through
-  one real tick.
-
 - [ ] 445. EVERY PARK CARRIES A RESTART CLOCK (30.07.2026, out of the fortnight-alone review;
   bundle Urlaubsfestigkeit). `.claude/batch-paused` stops the batch until someone removes it
   by hand. Unattended that means: a cause which would have cleared itself in twenty minutes —
