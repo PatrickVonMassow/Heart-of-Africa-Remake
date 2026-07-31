@@ -370,6 +370,25 @@ export function judgeSpawnPreflight({ probes = [] } = {}) {
 export const SPAWN_PROVE_MS = 20 * 60 * 1000
 
 /**
+ * DID ANYTHING ACTUALLY MOVE SINCE THE LAST SPAWN? PURE.
+ *
+ * Two facts count: the repository head advanced, or a SESSION claimed the batch
+ * lock after the spawn. The second needs the qualification this function exists
+ * for (point 444). The launcher writes its OWN `pending-spawn` lock milliseconds
+ * after `lastSpawnAt` and rebinds it to the child, so that lock's `claimedAt` is
+ * ALWAYS later than the spawn — and a spawn that dies before converting it leaves
+ * it standing. Counted as progress, that reads a stillborn spawn as a success,
+ * which is exactly the state `judgePreviousSpawn` is asked about; a usage-limit
+ * refusal, which converts nothing, would never be classified at all.
+ */
+export function spawnProgressed({ curHead = '', lastHead = '', lock = null, lastSpawnAt = 0 } = {}) {
+  if (curHead && lastHead && curHead !== lastHead) return true
+  if (!lock || !Number.isFinite(lock.claimedAt)) return false
+  if (lock.kind === 'pending-spawn') return false // not converted = not proof of anything
+  return lock.claimedAt > lastSpawnAt
+}
+
+/**
  * (ii) DID THE PREVIOUS SPAWN PROVE ITSELF? PURE.
  *
  * The old rule counted a failure only when the spawn's pid was GONE, so a spawn
@@ -415,12 +434,199 @@ export const SPAWN_BACKOFF_CAP_MS = 2 * 60 * 60 * 1000
  * A fixed ten-minute debounce hammers a refusing environment at the same rate all
  * night. Each recorded failure doubles the wait, up to the cap; a clean run resets
  * it, because `failCount` is cleared on progress.
+ *
+ * `quota` short-circuits the whole ladder (point 444). A usage limit is a WAITING
+ * state, not a broken environment: the reason for the backoff — burning tokens on
+ * a night that cannot work — does not apply to a start that is refused before it
+ * costs anything, and the only way to learn that the budget is back is to try.
  */
 export function spawnBackoffMs({
   failCount = 0,
+  quota = false,
   base = SPAWN_BACKOFF_BASE_MS,
   cap = SPAWN_BACKOFF_CAP_MS,
 } = {}) {
+  const floor = Number.isFinite(base) && base > 0 ? base : SPAWN_BACKOFF_BASE_MS
+  if (quota) return floor
   const n = Number.isFinite(failCount) && failCount > 0 ? Math.floor(failCount) : 0
   return Math.min(cap, base * 2 ** n)
+}
+
+// ---------------------------------------------------------------------------
+// A QUOTA BLOCK IS A WAITING STATE, NOT A FAILURE (point 444, user 30.07.2026)
+// ---------------------------------------------------------------------------
+//
+// Nothing here classified a usage-limit abort, so it landed in the ordinary
+// failure ladder above: `failCount` grew, the wait doubled towards its two-hour
+// ceiling, and after three of them the runaway brake wrote `.claude/batch-paused`
+// — a batch stopped for the night by a condition that fixes itself. The words the
+// spawn leaves behind in `.claude/autostart-run.log` say plainly which of the two
+// happened; until now nobody read them.
+//
+// The user's instruction is the whole policy, and it rules out pacing: "wenn du
+// durch die Kontingent-Bremse blockiert wirst, musst du es immer wieder probieren,
+// um zu merken, wann du neues Budget hast und ab dann weiterarbeiten". So the
+// limit gets its OWN state — no failure counted, no pause file, and a probe in the
+// ordinary tick. That is affordable precisely because a blocked start fails at
+// once and consumes practically nothing; what it buys is that work resumes within
+// one tick of the reset instead of within whatever the ladder had climbed to.
+
+/** The lines a refused start prints. The first is verbatim what
+ *  `.claude/autostart-run.log` carries three times over from 22.07.2026:
+ *  "You've hit your session limit · resets 4:20pm (Europe/Berlin)". The rest are
+ *  the CLI's other refusal wordings, kept narrow ON PURPOSE — a session's own
+ *  prose about limits must never be read as a refusal, so nothing here matches a
+ *  WARNING ("approaching your usage limit") or a bare mention of the word. */
+export const QUOTA_SIGNATURES = Object.freeze([
+  /you'?ve hit your (?:session|usage|weekly|opus|\d+-hour) limit\b/i,
+  /\b(?:claude ai |claude )?usage limit reached\b/i,
+  /\b\d+-hour limit reached\b/i,
+  /\bsession limit reached\b/i,
+])
+
+/** How far back in the spawn's output a signature still counts. A refusal is the
+ *  LAST thing the process prints before it exits, so the window is small: it is
+ *  what keeps a quoted limit line in the middle of a session's report from being
+ *  mistaken for that session's own death. */
+export const QUOTA_SIGNATURE_TAIL_LINES = 12
+
+/** "resets 4:20pm (Europe/Berlin)" or the epoch some wordings append after a
+ *  pipe — whatever the line offers about WHEN, as plain text for the log. */
+function resetHintOf(line) {
+  const epoch = /\|\s*(\d{9,13})\s*$/.exec(line)
+  if (epoch) {
+    const n = Number(epoch[1])
+    return new Date(n < 1e12 ? n * 1000 : n).toISOString()
+  }
+  const m = /\bresets?\b\s+(.+)$/i.exec(line)
+  return m ? m[1].trim().slice(0, 80) : null
+}
+
+/**
+ * DID THIS SPAWN DIE OF THE USAGE LIMIT? PURE.
+ *
+ * `text` is the run-log segment the spawn itself wrote (the launcher records the
+ * log's size at each spawn, so the segment is exactly that spawn's output). Only
+ * the last `tailLines` non-empty lines are searched, newest first.
+ *
+ * Returns { hit, signature, resetHint } — never throws, so a garbled log reads as
+ * "no signature" and the ordinary ladder keeps its verdict.
+ */
+export function detectQuotaSignature(text, { tailLines = QUOTA_SIGNATURE_TAIL_LINES } = {}) {
+  const miss = { hit: false, signature: null, resetHint: null }
+  try {
+    const lines = String(text ?? '')
+      .replace(/\r/g, '')
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean)
+    const n = Number.isFinite(tailLines) && tailLines > 0 ? Math.floor(tailLines) : QUOTA_SIGNATURE_TAIL_LINES
+    const tail = lines.slice(-n)
+    for (let i = tail.length - 1; i >= 0; i -= 1) {
+      const line = tail[i]
+      if (!QUOTA_SIGNATURES.some((re) => re.test(line))) continue
+      return { hit: true, signature: line.slice(0, 200), resetHint: resetHintOf(line) }
+    }
+    return miss
+  } catch {
+    return miss
+  }
+}
+
+/** The runaway brake's threshold, exported so the launcher and this decision
+ *  cannot disagree about when a pause would be written. */
+export const RUNAWAY_FAIL_LIMIT = 3
+
+/**
+ * WHAT THE LAUNCHER MAKES OF THE PREVIOUS SPAWN. PURE — the state machine that
+ * sits between `judgePreviousSpawn` and everything the tick does with its answer.
+ *
+ * Inputs: that verdict, the quota probe of the spawn's own output, the current
+ * `failCount` and the standing quota record (or null).
+ *
+ * Returns { state, failCount, quota, pause, nextProbeMs, note }:
+ *   state 'quota'    the limit refused the start — failCount UNTOUCHED, no pause,
+ *                    next probe at the ordinary interval, the probe logged.
+ *   state 'failed'   an ordinary failure — the ladder climbs exactly as before.
+ *   state 'progress' work is happening; a standing quota record is cleared and
+ *                    the MOMENT OF RESUMPTION is the note, so the real reset
+ *                    rhythm can be read out of the log instead of assumed.
+ *   'pending'/'none' nothing concluded: everything is carried unchanged.
+ */
+export function judgeSpawnOutcome({
+  verdict = 'none',
+  quotaHit = null,
+  failCount = 0,
+  quota = null,
+  now = Date.now(),
+} = {}) {
+  const count = Number.isFinite(failCount) && failCount > 0 ? Math.floor(failCount) : 0
+  const at = Number.isFinite(now) ? Number(now) : Date.now()
+  const standing = quota && Number.isFinite(quota.since) ? quota : null
+  const mins = (from) => Math.max(0, Math.round((at - from) / 60000))
+
+  if (verdict === 'progress') {
+    const note = standing
+      ? `QUOTA BLOCK OVER: work resumed after ${standing.probes ?? 0} probe(s) over ${mins(standing.since)} min ` +
+        `(the block was first seen at ${new Date(standing.since).toISOString()})`
+      : null
+    return { state: 'progress', failCount: 0, quota: null, pause: false, nextProbeMs: spawnBackoffMs({ failCount: 0 }), note }
+  }
+
+  if (verdict === 'failed' && quotaHit && quotaHit.hit === true) {
+    const since = standing ? standing.since : at
+    const probes = (standing?.probes ?? 0) + 1
+    const record = {
+      since,
+      probes,
+      lastAt: at,
+      signature: quotaHit.signature ?? null,
+      resetHint: quotaHit.resetHint ?? null,
+    }
+    return {
+      state: 'quota',
+      failCount: count, // untouched: a wait is not a fault
+      quota: record,
+      pause: false,
+      nextProbeMs: spawnBackoffMs({ quota: true }),
+      note:
+        `QUOTA BLOCK: the start was refused by the usage limit — probe ${probes}, blocked for ${mins(since)} min` +
+        `${record.resetHint ? `, resets ${record.resetHint}` : ''}. No failure counted, no pause; ` +
+        `the next probe rides the ordinary tick. Signature: "${record.signature}"`,
+    }
+  }
+
+  if (verdict === 'failed') {
+    const next = count + 1
+    return {
+      state: 'failed',
+      failCount: next,
+      quota: null, // whatever this is, it is not the limit
+      pause: next >= RUNAWAY_FAIL_LIMIT,
+      nextProbeMs: spawnBackoffMs({ failCount: next }),
+      note: standing ? 'the quota block ended in an ORDINARY failure — the ladder applies again' : null,
+    }
+  }
+
+  return {
+    state: verdict === 'pending' ? 'pending' : 'none',
+    failCount: count,
+    quota: standing,
+    pause: false,
+    nextProbeMs: spawnBackoffMs({ failCount: count, quota: !!standing }),
+    note: null,
+  }
+}
+
+/**
+ * IS THIS SPAWN WORTH A PUSH? PURE.
+ *
+ * Every spawn pushes a "Resurrected" notice. Probing every quarter of an hour
+ * through a limit window would turn that into a phone buzzing all night for a
+ * condition that is standing rather than new — so a probe under a known block is
+ * logged and not pushed. The first spawn after the block clears announces itself
+ * normally, because by then the record is gone.
+ */
+export function announceSpawn({ quota = null } = {}) {
+  return !quota
 }

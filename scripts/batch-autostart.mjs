@@ -21,7 +21,7 @@
 //     it and notifies. A rogue interactive session is never killed — the
 //     guards make it stand down — but the user is notified urgently.
 // Disable: Disable-ScheduledTask -TaskName HoA-Batch-Autostart
-import { readFileSync, writeFileSync, existsSync, readdirSync, renameSync, openSync, rmSync } from 'node:fs'
+import { readFileSync, writeFileSync, existsSync, readdirSync, renameSync, openSync, closeSync, readSync, statSync, rmSync } from 'node:fs'
 import { spawn, execSync, execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
@@ -63,7 +63,12 @@ import {
   pruneSpawns,
   judgeSpawnPreflight,
   judgePreviousSpawn,
+  spawnProgressed,
   spawnBackoffMs,
+  detectQuotaSignature,
+  judgeSpawnOutcome,
+  announceSpawn,
+  RUNAWAY_FAIL_LIMIT,
 } from './batch-autostart-core.mjs'
 import { repoRepairAllowed, repoRepairDecision } from './batch-doctor-core.mjs'
 import { clearMandateMarker, writeMandateMarker } from './batch-doctor-states.mjs'
@@ -125,6 +130,68 @@ const lock = readOwnerLock()
 const probe = lock && lock.pid ? probePid(lock.pid) : null
 /** Every exit persists the state, so a sweep that ran is never forgotten. */
 const bail = (code = 0) => { writeJsonAtomic(C('autostart-state.json'), state); process.exit(code) }
+
+// --- WHAT THE PREVIOUS SPAWN SAID BEFORE IT DIED (point 444) -------------------
+// A `claude -p` refused by the usage limit prints one line and exits, and that
+// line is the only evidence of the difference between "the batch is broken" and
+// "the budget is spent". The spawned session's stdout and stderr both land in
+// .claude/autostart-run.log, so the launcher records the log's SIZE at each spawn
+// and reads exactly what has been appended since — no timestamps to parse and no
+// chance of reading an older session's words as this one's.
+const RUN_LOG = join(REPO, '.claude', 'autostart-run.log')
+/** Bound: a refusal is a handful of bytes, a working session's report is not. */
+const RUN_LOG_SEGMENT_MAX = 64 * 1024
+const runLogSize = () => { try { return statSync(RUN_LOG).size } catch { return 0 } }
+/** The tail of the run log written since `from`. Never throws: an unreadable log
+ *  means "no signature", and the ordinary failure ladder keeps its verdict. */
+function readRunLogSegment(from) {
+  try {
+    const size = runLogSize()
+    const start = Number.isFinite(from) && from >= 0 && from <= size ? from : Math.max(0, size - RUN_LOG_SEGMENT_MAX)
+    const len = Math.min(size - start, RUN_LOG_SEGMENT_MAX)
+    if (len <= 0) return ''
+    const fd = openSync(RUN_LOG, 'r')
+    try {
+      const buf = Buffer.alloc(len)
+      readSync(fd, buf, 0, len, size - len)
+      return buf.toString('utf8')
+    } finally { closeSync(fd) }
+  } catch { return '' }
+}
+
+// --- THE DRILL: one real tick over a fake signature, with no side effect -------
+// `--quota-report [segmentFile]` runs the REAL classification and the REAL
+// decision, in this process, against the REAL state file — reading the spawn
+// segment from the file named (default: the live run log) — prints the verdict as
+// JSON and exits BEFORE the first side effect of a tick. Nothing is swept, nothing
+// is spawned, nothing is written. scripts/quota-drill.mjs is its caller: it hands
+// in a segment carrying a limit line and asserts what comes back.
+{
+  const i = process.argv.indexOf('--quota-report')
+  if (i >= 0) {
+    const arg = process.argv[i + 1]
+    const file = arg && !arg.startsWith('--') ? arg : null
+    let segment = ''
+    if (file) { try { segment = readFileSync(file, 'utf8') } catch (e) { segment = ''; console.error(`unreadable segment file: ${e && e.message}`) } }
+    else segment = readRunLogSegment(state.runLogAt)
+    const quotaHit = detectQuotaSignature(segment)
+    const outcome = judgeSpawnOutcome({
+      verdict: 'failed',
+      quotaHit,
+      failCount: state.failCount || 0,
+      quota: state.quota ?? null,
+      now,
+    })
+    console.log(JSON.stringify({
+      segmentBytes: segment.length,
+      quotaHit,
+      failCountBefore: state.failCount || 0,
+      ...outcome,
+      announce: announceSpawn({ quota: outcome.quota }),
+    }))
+    process.exit(0)
+  }
+}
 
 // --- LEAKED SPAWNS: reap what the removed runtime ceiling used to reap --------
 // `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0` means a `claude -p` waits forever for
@@ -376,8 +443,7 @@ const assessment = assessOwner(lock, { now, bootTime: bootTimeMs(), probe })
 // successors would burn a whole night's tokens while looking busy. The decision is
 // pure (`judgePreviousSpawn`); this only gathers the three facts.
 if (state.lastSpawnAt > 0) {
-  const progressed = (curHead && state.lastHead && curHead !== state.lastHead) ||
-    (lock && typeof lock.claimedAt === 'number' && lock.claimedAt > state.lastSpawnAt)
+  const progressed = spawnProgressed({ curHead, lastHead: state.lastHead, lock, lastSpawnAt: state.lastSpawnAt })
   const proveMin = Number(process.env.HOA_SPAWN_PROVE_MIN)
   const v = judgePreviousSpawn({
     lastSpawnAt: state.lastSpawnAt,
@@ -389,13 +455,27 @@ if (state.lastSpawnAt > 0) {
     lockConverted: !!(lock && lock.kind !== 'pending-spawn' && lock.pid === state.lastPid),
     proveMs: Number.isFinite(proveMin) && proveMin > 0 ? proveMin * 60000 : undefined,
   })
-  if (v.verdict === 'progress') {
-    if (state.failCount > 0) log(`previous spawn made progress — clearing failCount (${state.failCount})`)
-    state.failCount = 0
-  } else if (v.verdict === 'failed') {
-    state.failCount = (state.failCount || 0) + 1
-    log(`${v.reason} — failCount=${state.failCount}`)
-  }
+  // A QUOTA BLOCK IS A WAITING STATE (point 444). The verdict above cannot tell
+  // a broken environment from a spent budget — both look like "the pid is gone" —
+  // so a failed spawn's own output is read for the limit's signature before the
+  // ladder is allowed to climb. The classification and the state machine are both
+  // pure (`detectQuotaSignature`, `judgeSpawnOutcome`); this only gathers.
+  const quotaHit = v.verdict === 'failed' ? detectQuotaSignature(readRunLogSegment(state.runLogAt)) : null
+  const outcome = judgeSpawnOutcome({
+    verdict: v.verdict,
+    quotaHit,
+    failCount: state.failCount || 0,
+    quota: state.quota ?? null,
+    now,
+  })
+  if (outcome.state === 'progress' && (state.failCount || 0) > 0) log(`previous spawn made progress — clearing failCount (${state.failCount})`)
+  if (outcome.state === 'failed') log(`${v.reason} — failCount=${outcome.failCount}`)
+  // Every probe and the moment work resumed go into the log, so the real reset
+  // rhythm can be measured out of it instead of assumed.
+  if (outcome.note) log(outcome.note)
+  state.failCount = outcome.failCount
+  if (outcome.quota) state.quota = outcome.quota
+  else delete state.quota
 }
 state.lastTickAt = now
 
@@ -440,7 +520,10 @@ if (
 // below, which reports itself. One verdict, one consequence, one line.
 
 // --- Runaway / stuck watchdog: pause + signal ----------------------------------
-if (state.failCount >= 3) {
+// It is NEVER reached by a quota block (point 444): a limit refusal counts no
+// failure at all, so an unattended fortnight is no longer paused by a budget that
+// comes back on the hour.
+if (state.failCount >= RUNAWAY_FAIL_LIMIT) {
   log(`RUNAWAY: ${state.failCount} spawns with no git progress — pausing the batch and notifying`)
   try { writeFileSync(C('batch-paused'), `autostart watchdog: ${state.failCount} resurrections made no progress (auth expired? model flag? failing point? push failing?) — investigate, then delete this file.\n`) } catch { /* ignore */ }
   await notify('Batch STALLED', `${state.failCount} headless resurrections made no progress since ${state.lastHead.slice(0, 7)}. Auto-paused. Check auth / git push / the current point.`, 'urgent')
@@ -535,12 +618,16 @@ if (dispossessed) {
 // the cap, so a refusing environment is no longer hammered at a fixed rate all
 // night. `failCount` is cleared the moment a spawn makes progress, so the ladder
 // falls back to the floor by itself.
-const backoffMs = spawnBackoffMs({ failCount: state.failCount })
+// A standing QUOTA block short-circuits the ladder to its floor (point 444): the
+// only way to learn that the budget is back is to try, and a refused start costs
+// practically nothing, so the probe rides the ordinary tick.
+const backoffMs = spawnBackoffMs({ failCount: state.failCount, quota: !!state.quota })
 const lastSpawn = readJson(C('autostart-last.json'))
 if (lastSpawn && typeof lastSpawn.at === 'number' && now - lastSpawn.at < backoffMs) {
   log(
     `skip: a spawn ${Math.round((now - lastSpawn.at) / 60000)} min ago is still claiming the lock ` +
-      `(backoff ${Math.round(backoffMs / 60000)} min at failCount ${state.failCount || 0})`,
+      `(backoff ${Math.round(backoffMs / 60000)} min at failCount ${state.failCount || 0}` +
+      `${state.quota ? `, quota block standing since ${new Date(state.quota.since).toISOString()}` : ''})`,
   )
   writeJsonAtomic(C('autostart-state.json'), state)
   process.exit(0)
@@ -707,7 +794,13 @@ try {
 
 // Author the run: verify-able spawn (log to file, record pid+head), atomic markers.
 writeJsonAtomic(C('autostart-last.json'), { at: now, head: curHead })
-log(`RESUMING: launching ${exe} -p (batch has ${open} open point(s), failCount=${state.failCount})`)
+log(
+  `RESUMING: launching ${exe} -p (batch has ${open} open point(s), failCount=${state.failCount}` +
+    `${state.quota ? `, QUOTA PROBE ${(state.quota.probes ?? 0) + 1}` : ''})`,
+)
+// Read BEFORE the spawn: everything appended past this offset is the child's own
+// output, which is where the usage limit says so (point 444).
+const runLogAt = runLogSize()
 let child
 try {
   const out = openSync(join(REPO, '.claude', 'autostart-run.log'), 'a')
@@ -751,6 +844,8 @@ writeJsonAtomic(C('autostart-state.json'), {
   lastHead: curHead,
   lastSpawnAt: now,
   lastPid: child.pid,
+  // Where this spawn's own words begin in .claude/autostart-run.log (point 444).
+  runLogAt,
   // The ledger, so a handover overwriting lastPid can no longer lose track of a
   // process that is still running (four-eyes finding 1.4).
   spawns: recordSpawn(state.spawns, { pid: child.pid, at: now }),
@@ -761,5 +856,13 @@ writeJsonAtomic(C('autostart-state.json'), {
   chatHandedAt: nextChatHandedAt({ spawned: true, previous: state.chatHandedAt, now: Date.now() }),
 })
 log(`launched pid ${child.pid} under pending-spawn lock ${launcherSid}`)
-await notify('Resurrected', `No live session — launched a headless worker to continue the batch (${open} open, failCount ${state.failCount}). Progress on GitHub.`, 'low')
+// A PROBE UNDER A STANDING BLOCK IS NOT NEWS (point 444). Probing every quarter of
+// an hour through a limit window would otherwise buzz an unattended phone all
+// night for a condition that repairs itself; the probes stay in the log, and the
+// first spawn after the block clears announces itself normally.
+if (announceSpawn({ quota: state.quota })) {
+  await notify('Resurrected', `No live session — launched a headless worker to continue the batch (${open} open, failCount ${state.failCount}). Progress on GitHub.`, 'low')
+} else {
+  log(`quota probe launched — no push (the block has stood ${Math.round((now - state.quota.since) / 60000)} min)`)
+}
 process.exit(0)

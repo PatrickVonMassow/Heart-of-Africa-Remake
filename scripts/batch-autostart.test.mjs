@@ -357,3 +357,58 @@ describe('the doctor gathers and executes the torn states (443 a-f)', () => {
     expect(between('FAILED to end pid', "a.action === 'restore-tasks-from-head'")).toMatch(/alertsRemain = true/)
   })
 })
+
+// ---------------------------------------------------------------------------
+// THE QUOTA STATE IS ACTUALLY WIRED (point 444).
+//
+// Same reasoning as the block above: the decision is pure and pinned in
+// batch-autostart-core.test.mjs, but only this file ever counts a failure, writes
+// the pause and schedules the next probe — and it cannot be imported. So the
+// source is the witness that the pure verdict is the one that acts.
+describe('the launcher treats a quota block as a waiting state', () => {
+  const source = readFileSync(resolve(process.cwd(), 'scripts', 'batch-autostart.mjs'), 'utf8')
+  const codeLines = source.split('\n').filter((l) => !l.trimStart().startsWith('//'))
+  const code = codeLines.join('\n')
+
+  it('classifies a failed spawn’s own output before the ladder may climb', () => {
+    const imports = source.match(/import\s*\{[^}]*\}\s*from\s*'\.\/batch-autostart-core\.mjs'/)[0]
+    for (const name of ['detectQuotaSignature', 'judgeSpawnOutcome', 'announceSpawn', 'spawnProgressed', 'RUNAWAY_FAIL_LIMIT']) {
+      expect(imports, `${name} must come from the core`).toMatch(new RegExp(`\\b${name}\\b`))
+    }
+    expect(code).toMatch(/detectQuotaSignature\(readRunLogSegment\(/)
+  })
+
+  it('the fail counter and the quota record come from the PURE verdict, never from arithmetic here', () => {
+    expect(code).toMatch(/state\.failCount\s*=\s*outcome\.failCount/)
+    // The old `state.failCount = (state.failCount || 0) + 1` in the judge block is
+    // what made a usage limit indistinguishable from a broken machine.
+    expect(code.match(/state\.failCount\s*=\s*\(state\.failCount\s*\|\|\s*0\)\s*\+\s*1/g) ?? []).toHaveLength(1)
+    expect(code, 'the preflight refusal is the ONLY place that still counts a failure itself').toMatch(
+      /PREFLIGHT REFUSED/,
+    )
+  })
+
+  it('the runaway brake reads the shared threshold, so it cannot drift from the decision', () => {
+    expect(code).toMatch(/state\.failCount\s*>=\s*RUNAWAY_FAIL_LIMIT/)
+  })
+
+  it('a standing block short-circuits the backoff to its floor', () => {
+    expect(code).toMatch(/spawnBackoffMs\(\{\s*failCount:\s*state\.failCount,\s*quota:\s*!!state\.quota\s*\}\)/)
+  })
+
+  it('records where each spawn’s own words begin, so the segment is that spawn’s', () => {
+    expect(code).toMatch(/const runLogAt = runLogSize\(\)/)
+    expect(code).toMatch(/\brunLogAt\b,/)
+  })
+
+  it('a probe under a standing block is logged, not pushed', () => {
+    expect(code).toMatch(/announceSpawn\(\{\s*quota:\s*state\.quota\s*\}\)/)
+  })
+
+  it('the --quota-report drill exits before the tick’s first side effect', () => {
+    const drill = codeLines.findIndex((l) => /--quota-report/.test(l))
+    const sweep = codeLines.findIndex((l) => /reapableSpawns\(/.test(l))
+    expect(drill, 'no --quota-report hook').toBeGreaterThanOrEqual(0)
+    expect(drill, 'the drill must exit before the ledger sweep kills anything').toBeLessThan(sweep)
+  })
+})

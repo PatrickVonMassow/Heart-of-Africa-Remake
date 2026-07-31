@@ -37,10 +37,16 @@ import {
   standingAlertDue,
   judgeSpawnPreflight,
   judgePreviousSpawn,
+  spawnProgressed,
   spawnBackoffMs,
   SPAWN_PROVE_MS,
   SPAWN_BACKOFF_BASE_MS,
   SPAWN_BACKOFF_CAP_MS,
+  QUOTA_SIGNATURE_TAIL_LINES,
+  RUNAWAY_FAIL_LIMIT,
+  detectQuotaSignature,
+  judgeSpawnOutcome,
+  announceSpawn,
 } from './batch-autostart-core.mjs'
 import { isOwnSpawn } from './batch-singleton.mjs'
 
@@ -519,5 +525,220 @@ describe('spawnBackoffMs — the ladder rises instead of hammering', () => {
     for (const failCount of [-5, NaN, 'many', null, undefined]) {
       expect(spawnBackoffMs({ failCount })).toBe(SPAWN_BACKOFF_BASE_MS)
     }
+  })
+})
+
+// --- A QUOTA BLOCK IS A WAITING STATE, NOT A FAILURE (point 444) --------------
+//
+// The witness is `.claude/autostart-run.log` of 22.07.2026, which carries the
+// refusal three times over — and against which the launcher counted three
+// failures, doubled its wait twice and then wrote `.claude/batch-paused`. That is
+// a night lost to a condition that repairs itself on the hour.
+const LIMIT_LINE = "You've hit your session limit · resets 4:20pm (Europe/Berlin)"
+
+describe('detectQuotaSignature — reading the spawn’s own last words', () => {
+  it('THE REAL LINE out of autostart-run.log is recognised, with its reset hint', () => {
+    const r = detectQuotaSignature(`some output\n${LIMIT_LINE}\n`)
+    expect(r.hit).toBe(true)
+    expect(r.signature).toBe(LIMIT_LINE)
+    expect(r.resetHint).toBe('4:20pm (Europe/Berlin)')
+  })
+
+  it('the other refusal wordings too, epoch hint included', () => {
+    expect(detectQuotaSignature('Claude AI usage limit reached|1753980000').hit).toBe(true)
+    expect(detectQuotaSignature('Claude AI usage limit reached|1753980000').resetHint).toMatch(/^\d{4}-\d{2}-\d{2}T/)
+    expect(detectQuotaSignature('5-hour limit reached').hit).toBe(true)
+    expect(detectQuotaSignature("You've hit your weekly limit").hit).toBe(true)
+  })
+
+  it('a WARNING is not a refusal, and neither is prose about limits', () => {
+    for (const text of [
+      'You are approaching your usage limit',
+      'Background tasks still running after 600s; terminating.',
+      'wenn du durch die Kontingent-Bremse blockiert wirst, probiere es wieder',
+      'the collision limit was raised',
+      '',
+      null,
+      undefined,
+    ]) {
+      expect(detectQuotaSignature(text).hit).toBe(false)
+    }
+  })
+
+  it('only the TAIL counts — a limit line quoted mid-report is not this spawn’s death', () => {
+    const buried = [LIMIT_LINE, ...Array.from({ length: QUOTA_SIGNATURE_TAIL_LINES + 3 }, (_, i) => `line ${i}`)]
+    expect(detectQuotaSignature(buried.join('\n')).hit).toBe(false)
+    // the same line inside the window still counts
+    expect(detectQuotaSignature([...buried.slice(1), LIMIT_LINE].join('\n')).hit).toBe(true)
+  })
+
+  it('blank lines do not consume the window, and CRLF is no obstacle', () => {
+    const text = `${'\r\n'.repeat(30)}${LIMIT_LINE}\r\n`
+    expect(detectQuotaSignature(text).hit).toBe(true)
+  })
+})
+
+describe('judgeSpawnOutcome — the limit gets its own state', () => {
+  const NOW = Date.UTC(2026, 6, 31, 3, 0, 0)
+  const hit = { hit: true, signature: LIMIT_LINE, resetHint: '4:20pm (Europe/Berlin)' }
+
+  it('THE POINT: a limit signature yields state "quota", no fail count, no pause, the ordinary interval', () => {
+    const r = judgeSpawnOutcome({ verdict: 'failed', quotaHit: hit, failCount: 0, quota: null, now: NOW })
+    expect(r.state).toBe('quota')
+    expect(r.failCount).toBe(0)
+    expect(r.pause).toBe(false)
+    expect(r.nextProbeMs).toBe(SPAWN_BACKOFF_BASE_MS)
+    expect(r.quota).toMatchObject({ since: NOW, probes: 1, signature: LIMIT_LINE, resetHint: '4:20pm (Europe/Berlin)' })
+    expect(r.note).toMatch(/QUOTA BLOCK/)
+  })
+
+  it('a fail count already standing is CARRIED, never bumped, by a quota probe', () => {
+    const r = judgeSpawnOutcome({ verdict: 'failed', quotaHit: hit, failCount: 2, quota: null, now: NOW })
+    expect(r.failCount).toBe(2)
+    expect(r.pause).toBe(false)
+  })
+
+  it('probing all night NEVER reaches the runaway brake, and never slows down', () => {
+    let state = { failCount: 0, quota: null }
+    const seen = []
+    for (let tick = 0; tick < 40; tick += 1) {
+      const r = judgeSpawnOutcome({
+        verdict: 'failed',
+        quotaHit: hit,
+        failCount: state.failCount,
+        quota: state.quota,
+        now: NOW + tick * 15 * 60_000,
+      })
+      state = { failCount: r.failCount, quota: r.quota }
+      seen.push(r)
+    }
+    expect(seen.every((r) => r.state === 'quota')).toBe(true)
+    expect(seen.every((r) => r.pause === false)).toBe(true)
+    expect(seen.every((r) => r.nextProbeMs === SPAWN_BACKOFF_BASE_MS)).toBe(true)
+    expect(state.failCount).toBe(0)
+    expect(state.quota.probes).toBe(40)
+    expect(state.quota.since).toBe(NOW) // the block keeps its first moment
+    expect(seen.at(-1).note).toMatch(/probe 40, blocked for 585 min/)
+  })
+
+  it('AN ORDINARY FAILURE STILL CLIMBS THE LADDER, brake included', () => {
+    let failCount = 0
+    const ladder = []
+    for (let i = 0; i < RUNAWAY_FAIL_LIMIT; i += 1) {
+      const r = judgeSpawnOutcome({ verdict: 'failed', quotaHit: { hit: false }, failCount, now: NOW })
+      failCount = r.failCount
+      ladder.push(r)
+      expect(r.state).toBe('failed')
+      expect(r.quota).toBeNull()
+    }
+    expect(failCount).toBe(RUNAWAY_FAIL_LIMIT)
+    expect(ladder.map((r) => r.nextProbeMs)).toEqual([20, 40, 80].map((m) => m * 60_000))
+    expect(ladder.slice(0, -1).every((r) => r.pause === false)).toBe(true)
+    expect(ladder.at(-1).pause).toBe(true)
+  })
+
+  it('an unprobed failure (no quota lookup at all) is an ordinary failure', () => {
+    for (const quotaHit of [null, undefined, { hit: false }, {}]) {
+      expect(judgeSpawnOutcome({ verdict: 'failed', quotaHit, failCount: 0, now: NOW }).state).toBe('failed')
+    }
+  })
+
+  it('a block that ends in an ORDINARY failure drops the record and resumes the ladder', () => {
+    const standing = { since: NOW - 3 * 3600_000, probes: 12 }
+    const r = judgeSpawnOutcome({ verdict: 'failed', quotaHit: { hit: false }, failCount: 0, quota: standing, now: NOW })
+    expect(r.state).toBe('failed')
+    expect(r.failCount).toBe(1)
+    expect(r.quota).toBeNull()
+  })
+
+  it('THE MOMENT WORK RESUMED is logged, and the record cleared', () => {
+    const standing = { since: NOW - 4 * 3600_000, probes: 16, signature: LIMIT_LINE }
+    const r = judgeSpawnOutcome({ verdict: 'progress', failCount: 0, quota: standing, now: NOW })
+    expect(r.state).toBe('progress')
+    expect(r.quota).toBeNull()
+    expect(r.note).toMatch(/QUOTA BLOCK OVER: work resumed after 16 probe\(s\) over 240 min/)
+    expect(r.nextProbeMs).toBe(SPAWN_BACKOFF_BASE_MS)
+  })
+
+  it('progress without a block says nothing extra, and still clears the ladder', () => {
+    const r = judgeSpawnOutcome({ verdict: 'progress', failCount: 7, quota: null, now: NOW })
+    expect(r).toMatchObject({ state: 'progress', failCount: 0, quota: null, note: null })
+  })
+
+  it('a spawn still coming up concludes NOTHING — the block and the count are carried', () => {
+    const standing = { since: NOW - 3600_000, probes: 4 }
+    for (const verdict of ['pending', 'none']) {
+      const r = judgeSpawnOutcome({ verdict, quotaHit: null, failCount: 2, quota: standing, now: NOW })
+      expect(r.state).toBe(verdict)
+      expect(r.failCount).toBe(2)
+      expect(r.quota).toBe(standing)
+      expect(r.pause).toBe(false)
+      expect(r.nextProbeMs).toBe(SPAWN_BACKOFF_BASE_MS) // a standing block keeps the probe cheap
+    }
+  })
+
+  it('junk in, no crash out — the decision is fail-open', () => {
+    for (const args of [undefined, {}, { verdict: 'nonsense' }, { verdict: 'failed', failCount: NaN, quotaHit: hit }]) {
+      expect(() => judgeSpawnOutcome(args)).not.toThrow()
+    }
+    expect(judgeSpawnOutcome({ verdict: 'failed', failCount: 'many', quotaHit: hit }).failCount).toBe(0)
+    // a malformed record cannot fake a block into existence
+    expect(judgeSpawnOutcome({ verdict: 'progress', quota: { probes: 3 } }).note).toBeNull()
+  })
+})
+
+describe('spawnBackoffMs — the quota short-circuit', () => {
+  it('a standing block probes at the floor whatever the ladder had climbed to', () => {
+    for (const failCount of [0, 1, 5, 40]) {
+      expect(spawnBackoffMs({ failCount, quota: true })).toBe(SPAWN_BACKOFF_BASE_MS)
+    }
+    expect(SPAWN_BACKOFF_BASE_MS).toBeLessThan(SPAWN_BACKOFF_CAP_MS)
+  })
+})
+
+describe('announceSpawn — a standing block is not news every quarter of an hour', () => {
+  it('a probe under a known block is logged, not pushed', () => {
+    expect(announceSpawn({ quota: { since: 1, probes: 3 } })).toBe(false)
+  })
+
+  it('an ordinary spawn — and the first one after the block clears — announces itself', () => {
+    expect(announceSpawn({ quota: null })).toBe(true)
+    expect(announceSpawn()).toBe(true)
+  })
+})
+
+describe('spawnProgressed — the launcher’s own pending lock is not progress', () => {
+  const SPAWNED = 1_785_200_000_000
+
+  it('a moved head is progress', () => {
+    expect(spawnProgressed({ curHead: 'b'.repeat(40), lastHead: 'a'.repeat(40), lastSpawnAt: SPAWNED })).toBe(true)
+  })
+
+  it('a SESSION that claimed the lock after the spawn is progress', () => {
+    const lock = { kind: 'session', claimedAt: SPAWNED + 60_000 }
+    expect(spawnProgressed({ lock, lastSpawnAt: SPAWNED })).toBe(true)
+  })
+
+  it('THE TRAP: the launcher’s own pending-spawn lock is stamped AFTER the spawn and is not progress', () => {
+    // acquire() writes it at the top of the tick and updateOwnLock() re-stamps it
+    // to Date.now() when it binds the child — always later than `lastSpawnAt`. A
+    // spawn refused by the usage limit converts nothing and leaves it standing, so
+    // counting it would read every stillborn spawn as a success and no refusal
+    // would ever be classified.
+    const lock = { kind: 'pending-spawn', claimedAt: SPAWNED + 12, spawnedPid: 4242 }
+    expect(spawnProgressed({ lock, lastSpawnAt: SPAWNED })).toBe(false)
+    expect(spawnProgressed({ curHead: 'a'.repeat(40), lastHead: 'a'.repeat(40), lock, lastSpawnAt: SPAWNED })).toBe(false)
+  })
+
+  it('an older claim, no lock, and junk are all "nothing moved"', () => {
+    expect(spawnProgressed({ lock: { kind: 'session', claimedAt: SPAWNED - 1 }, lastSpawnAt: SPAWNED })).toBe(false)
+    expect(spawnProgressed({ lastSpawnAt: SPAWNED })).toBe(false)
+    expect(spawnProgressed({ lock: { kind: 'session', claimedAt: 'soon' }, lastSpawnAt: SPAWNED })).toBe(false)
+    expect(spawnProgressed()).toBe(false)
+  })
+
+  it('an unknown head on either side is not evidence of a move', () => {
+    expect(spawnProgressed({ curHead: '', lastHead: 'a'.repeat(40), lastSpawnAt: SPAWNED })).toBe(false)
+    expect(spawnProgressed({ curHead: 'b'.repeat(40), lastHead: '', lastSpawnAt: SPAWNED })).toBe(false)
   })
 })
