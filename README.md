@@ -21,21 +21,21 @@ PoC playable directly in the browser at:
 <table>
   <tr valign="top">
     <td width="50%">
-      <a href="https://github.com/user-attachments/assets/ded4dedd-3b13-46e3-b09a-983bbe3178fa"><img src="https://github.com/user-attachments/assets/ded4dedd-3b13-46e3-b09a-983bbe3178fa" alt="Inside a village" width="100%"></a><br>
+      <a href="https://github.com/user-attachments/assets/725e8026-ae21-4ce2-94fd-c60f29f0a42d"><img src="https://github.com/user-attachments/assets/725e8026-ae21-4ce2-94fd-c60f29f0a42d" alt="Inside a village" width="100%"></a><br>
       <strong>Village.</strong> Procedurally varied dwellings, inhabitants going about their routines.
     </td>
     <td width="50%">
-      <a href="https://github.com/user-attachments/assets/1cff2bc4-3579-499f-b6e8-9a2e4b4f4038"><img src="https://github.com/user-attachments/assets/1cff2bc4-3579-499f-b6e8-9a2e4b4f4038" alt="Inside a port city" width="100%"></a><br>
+      <a href="https://github.com/user-attachments/assets/d7e2f702-618d-4217-9713-1be15f006343"><img src="https://github.com/user-attachments/assets/d7e2f702-618d-4217-9713-1be15f006343" alt="Inside a port city" width="100%"></a><br>
       <strong>Port city.</strong> Trade, equipment, gifts and treasure prices.
     </td>
   </tr>
   <tr valign="top">
-    <td>
-      <a href="https://github.com/user-attachments/assets/4f2b165f-9cfb-4de6-8517-bc1ce19af9de"><img src="https://github.com/user-attachments/assets/4f2b165f-9cfb-4de6-8517-bc1ce19af9de" alt="Coastal dunes seen from the travel view" width="100%"></a><br>
+    <td width="50%">
+      <a href="https://github.com/user-attachments/assets/e715be9f-f3db-4376-b781-360d1297c75e"><img src="https://github.com/user-attachments/assets/e715be9f-f3db-4376-b781-360d1297c75e" alt="Coastal dunes seen from the travel view" width="100%"></a><br>
       <strong>Coastal dunes.</strong> Real elevation data, cascaded shadows, wildlife herds on the move.
     </td>
-    <td>
-      <a href="https://github.com/user-attachments/assets/7a936324-3c3e-47d0-bd7b-4be9e55d9742"><img src="https://github.com/user-attachments/assets/7a936324-3c3e-47d0-bd7b-4be9e55d9742" alt="Savanna seen from the travel view" width="100%"></a><br>
+    <td width="50%">
+      <a href="https://github.com/user-attachments/assets/190f5e04-d365-4fde-9ab3-cb1946d6d641"><img src="https://github.com/user-attachments/assets/190f5e04-d365-4fde-9ab3-cb1946d6d641" alt="Savanna seen from the travel view" width="100%"></a><br>
       <strong>Savanna.</strong> Biome-based terrain texturing and ambient wildlife.
     </td>
   </tr>
