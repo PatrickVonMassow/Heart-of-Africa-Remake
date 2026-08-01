@@ -22,21 +22,21 @@ PoC playable directly in the browser at:
   <tr valign="top">
     <td width="50%">
       <a href="https://github.com/user-attachments/assets/725e8026-ae21-4ce2-94fd-c60f29f0a42d"><img src="https://github.com/user-attachments/assets/725e8026-ae21-4ce2-94fd-c60f29f0a42d" alt="Inside a village" width="100%"></a><br>
-      <strong>Village.</strong> Procedurally varied dwellings, inhabitants going about their routines.
+      <strong>Village:</strong> Procedurally varied dwellings, inhabitants going about their routines.
     </td>
     <td width="50%">
       <a href="https://github.com/user-attachments/assets/d7e2f702-618d-4217-9713-1be15f006343"><img src="https://github.com/user-attachments/assets/d7e2f702-618d-4217-9713-1be15f006343" alt="Inside a port city" width="100%"></a><br>
-      <strong>Port city.</strong> Trade, equipment, gifts and treasure prices.
+      <strong>Port city:</strong> Trade, equipment, gifts and treasure prices.
     </td>
   </tr>
   <tr valign="top">
     <td width="50%">
       <a href="https://github.com/user-attachments/assets/e715be9f-f3db-4376-b781-360d1297c75e"><img src="https://github.com/user-attachments/assets/e715be9f-f3db-4376-b781-360d1297c75e" alt="Coastal dunes seen from the travel view" width="100%"></a><br>
-      <strong>Coastal dunes.</strong> Real elevation data, cascaded shadows, wildlife herds on the move.
+      <strong>Coastal dunes:</strong> Real elevation data, cascaded shadows, wildlife herds on the move.
     </td>
     <td width="50%">
       <a href="https://github.com/user-attachments/assets/190f5e04-d365-4fde-9ab3-cb1946d6d641"><img src="https://github.com/user-attachments/assets/190f5e04-d365-4fde-9ab3-cb1946d6d641" alt="Savanna seen from the travel view" width="100%"></a><br>
-      <strong>Savanna.</strong> Biome-based terrain texturing and ambient wildlife.
+      <strong>Savanna:</strong> Biome-based terrain texturing and ambient wildlife.
     </td>
   </tr>
 </table>
@@ -186,7 +186,7 @@ plus 15 Playwright browser suites; the test strategy and coverage map live in
 by **Electronic Arts**. It was the follow-up to *The Seven Cities of Gold*
 (1984).
 
-- **Dani Bunten Berry** (credited on the 1985 release as Dan Bunten) — design
+- **Danielle Bunten Berry** (credited on the 1985 release as Dan Bunten) — design
   and programming
 - **David Warhol** — music and sound effects
 - **Electronic Arts** — publisher
