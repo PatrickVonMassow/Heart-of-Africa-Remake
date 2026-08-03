@@ -352,6 +352,16 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Prüfe jedes `catch` mit Ersatzwert: Führt er zu **weniger** Aktion oder zu
   **mehr**? Nur weniger darf verschluckt werden."
 
+- **Der Umzug nimmt nur mit, was versioniert ist.** Wechselst du Rechner oder Umgebung, kommt
+  das Projekt an — die Mechanik drumherum nicht: geplante Aufgaben, Geheimnisse, gespeicherte
+  Regeln, installierte Werkzeuge liegen außerhalb und bleiben zurück. Nichts meldet das; die
+  Wächterkette schweigt, weil sie selbst zu dem gehört, was fehlt.
+  → *Prompt:* „Führe eine Liste dessen, was das Projekt zum Arbeiten braucht und **nicht** im
+  Repository liegt, und lass sie bei jedem Start prüfen — jede Zeile gegen eine Beobachtung,
+  nicht gegen eine Vermutung. Ein fehlendes Stück ist ein **Befund**, keine Stille."
+  *(‚Läuft das Projekt hier?' ist nicht dieselbe Frage wie ‚arbeitet die Mechanik hier?' — die
+  erste war in fünf Minuten beantwortet, die zweite kostete einen halben Tag.)*
+
 ---
 
 ## Drei Meta-Regeln, die alles zusammenhalten
@@ -396,4 +406,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 Wenn du diese eine Nachricht an den Anfang stellst, hast du 80 % der Lehren dieses
 Projekts eingebaut, bevor die erste Zeile Code entsteht.
 
-<!-- GUIDE-FINGERPRINT: 98a76c5c38788b4b9acf7af56e964709a608c0b46bf44eb7a714721b26995b78 -->
+<!-- GUIDE-FINGERPRINT: e6f575423371da02b0088c792bc8fee2ba3b4f969c187baca547397f0ea43cc7 -->
