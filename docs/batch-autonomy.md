@@ -1208,7 +1208,8 @@ open questions.
   VERBATIM and numbers it.
 - **A non-empty `openQuestions` routes to a decision card, NEVER to a TASKS
   append** — an undecided spec in the queue is a question standing where an
-  instruction belongs.
+  instruction belongs. `--queued` REFUSES such a deposit and names `--blocked`;
+  the route is enforced, not merely displayed.
 - **`blocked` is the escape hatch.** `--blocked` writes the decision card FIRST
   and only then retires the entry, so an undrainable request is escalated to the
   user visibly instead of being parked. If the card cannot be written the request

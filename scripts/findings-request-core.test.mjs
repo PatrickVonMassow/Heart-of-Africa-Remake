@@ -221,6 +221,20 @@ describe('the route', () => {
     expect(requestRoute(requestEntries(text)[0])).toBe('vdzk')
   })
 
+  it('REFUSES to queue a request with open questions, not merely says so', () => {
+    // Four-eyes finding 2 (Fable 5, 31.07.2026): the route was display-only, so
+    // "NEVER to a TASKS append" queued fine.
+    const open = `${deposit({ openQuestions: 'Soll das auch für die Doku gelten?' })}\n`
+    expect(() => markQueued(open, 'Nebenfenster', 481)).toThrow(/OPEN QUESTIONS/)
+    expect(() => markQueued(open, 'Nebenfenster', 481)).toThrow(/--blocked/)
+    expect(pendingRequests(open)).toHaveLength(1)
+  })
+
+  it('still lets the same request take the escape hatch to the user', () => {
+    const open = `${deposit({ openQuestions: 'Soll das auch für die Doku gelten?' })}\n`
+    expect(markBlocked(open, 'Nebenfenster', 'Erst entscheiden.').title).toContain('Nebenfenster')
+  })
+
   it('sends a decided request into the work order', () => {
     expect(requestRoute(requestEntries(deposit())[0])).toBe('tasks')
   })

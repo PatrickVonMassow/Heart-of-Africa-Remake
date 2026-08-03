@@ -273,10 +273,30 @@ function transition(text, title, state, extra = null) {
   return { ...applied, identity, state, extra }
 }
 
-/** `pending` → `queued <point>`: the deposit reached the work order. */
+/**
+ * `pending` → `queued <point>`: the deposit reached the work order.
+ *
+ * A REQUEST WITH OPEN QUESTIONS IS REFUSED HERE (four-eyes finding 2, Fable 5,
+ * 31.07.2026). `requestRoute` decided it and `formatRequest` printed it, but
+ * nothing ENFORCED it: the rule was display-only, so an undecided spec queued
+ * cleanly — while the guard's own block text names this very call as the way to
+ * carry a deposit in. A question standing where an instruction belongs is the
+ * failure the route exists to prevent, and this is the last place that can still
+ * stop it.
+ */
 export function markQueued(text, title, point) {
   const n = Number(point)
   if (!Number.isInteger(n) || n <= 0) throw new Error(`finding: not a point number: ${point}`)
+  const hits = findPending(text, title, 'request')
+  if (hits && hits.length === 1) {
+    const entry = requestEntries(text).find((e) => e.index === hits[0].index)
+    if (entry && requestRoute(entry) === 'vdzk') {
+      throw new Error(
+        `finding: "${entry.title}" carries OPEN QUESTIONS — an undecided spec never enters the work order, ` +
+          'it goes to the user as a decision card: node scripts/finding.mjs --blocked "<title>" --why "<the open question>"',
+      )
+    }
+  }
   return transition(text, title, `queued ${n}`)
 }
 

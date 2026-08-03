@@ -170,6 +170,16 @@ describe('the refusals a caller will actually meet', () => {
     expect(run(['--queued', 'Nebenfenster', '--point', 'bald'], true)).toMatch(/point number/)
   })
 
+  it('refuses to queue a deposit that still carries open questions', () => {
+    writeFileSync(join(dir, 'q.md'), 'Soll das auch für die Doku gelten?\n', 'utf8')
+    deposit('Mit offener Frage', ['--open-questions-file', join(dir, 'q.md')])
+    const err = run(['--queued', 'offener Frage', '--point', '481'], true)
+    expect(err).toMatch(/OPEN QUESTIONS/)
+    expect(err).toMatch(/--blocked/)
+    expect(run(['--requests'])).toMatch(/1 request\(s\) waiting/)
+    expect(readFileSync(join(dir, 'findings-carrier.md'), 'utf8')).not.toContain('queued 481')
+  })
+
   it('refuses an ambiguous title rather than queueing the wrong deposit', () => {
     deposit('Anfrage A aus dem Nebenfenster')
     deposit('Anfrage B aus dem Nebenfenster')
