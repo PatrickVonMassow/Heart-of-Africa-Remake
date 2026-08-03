@@ -701,6 +701,16 @@ Bemerkenswert ist die Asymmetrie. Was versioniert im Repository liegt, zieht sel
 
 ---
 
+### 3.76 Ein Urteil gehört dem Stand, den es gemessen hat
+
+Während das Push-Tor seinen Testlauf fuhr, wurde in denselben Arbeitsbaum ein Zweig gemergt. Der Lauf hatte 194 Testdateien ausgeführt, der Baum enthielt danach 197 — und das Tor verweigerte den Push mit der Begründung, ein bestandener Lauf über einer *kleineren* Menge sei kein grüner Lauf.
+
+Der Reiz liegt darin, dass hier nichts kaputt war: Beide Stände waren für sich grün, der Merge war geprüft, kein Test schlug fehl. Falsch war allein die Zuordnung — das Urteil wäre einem Stand zugeschrieben worden, den es nie gesehen hat. Ohne die Dateizählung wäre das unbemerkt geblieben, denn genau diese Verwechslung sieht von außen aus wie ein Erfolg. Sie ist die stille Schwester des grünen Tests am falschen Bild (§3.5): dort misst die Prüfung das Falsche, hier misst sie das Richtige am falschen Gegenstand.
+
+**Lehre:** Wer eine lange Prüfung startet, hat den Baum bis zu ihrem Ende festgeschrieben. Parallelität ist genau dort erlaubt, wo sie den geprüften Stand nicht anfasst — und wo eine Prüfung Minuten braucht, ist die Versuchung, die Wartezeit „nebenbei" zu nutzen, am größten.
+
+---
+
 ## 4. Die Guards als Immunsystem
 
 Jedes Guard-Skript ist die geronnene Lösung eines real aufgetretenen, wiederholten Problems.
@@ -788,7 +798,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Montag, 03.08.2026, 14:41 · Quellen-Fingerprint: `e6f575423371…`
+Zuletzt aktualisiert: Montag, 03.08.2026, 17:23 · Quellen-Fingerprint: `245dd16d717b…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -865,8 +875,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | CORRECTED 19.07.2026 — WebGPU IS testable headless/autonomously via system Chrome (channel:'chrome') + --headless=new; the 'untestable' belief held only for Playwright's BUNDLED Chromium | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 69 Feedback-/Projekt-Memories · 40 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 26 Prozess-/Meta-TASKS-Punkte (davon 11 offen).
+Erfasste Quellen: 69 Feedback-/Projekt-Memories · 40 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 26 Prozess-/Meta-TASKS-Punkte (davon 10 offen).
 
-<!-- RETRO-FINGERPRINT: e6f575423371da02b0088c792bc8fee2ba3b4f969c187baca547397f0ea43cc7 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-03T12:41:21.570Z -->
+<!-- RETRO-FINGERPRINT: 245dd16d717b57f43fc42d55529a87ca6270e9c8d3d9793e700774308fc9d548 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-03T15:23:08.476Z -->
 <!-- AUTO-GENERATED:END -->
