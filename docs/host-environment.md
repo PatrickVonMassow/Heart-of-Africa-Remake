@@ -35,5 +35,15 @@ and `LD_LIBRARY_PATH=/usr/lib/wsl/lib`. **If the host exposes no WSL GPU, that d
 argument prevents the container from starting at all** — removing it and the mount is the
 way back, at the cost of falling back to software rendering.
 
-Both settings live in the container definition, so they take effect only on a container
-rebuild, never on a restart.
+The repository itself is bind-mounted from the Windows filesystem over 9p, so it never
+physically moved. Measured 03.08.2026 on 300 small files: **write 1447 ms, read 1046 ms,
+stat 606 ms** against **8 ms / 1 ms / 1 ms** on the container's own disk — a factor of 180
+to 1000 per file operation. That, not Linux and not the tests, is why the unit layer takes
+twenty minutes here and why anything that spawns a process per record takes minutes.
+`node_modules` — the bulk of those files — therefore lives on a container volume, mounted
+over the bind. The volume starts empty, so `postCreateCommand` runs `npm install` to fill
+it, and the image creates the mount point owned by `node` (the volume inherits that
+ownership; `node` has no general sudo to fix it afterwards).
+
+All of these settings live in the container definition, so they take effect only on a
+container rebuild, never on a restart.
