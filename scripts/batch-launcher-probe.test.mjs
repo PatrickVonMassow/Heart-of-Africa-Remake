@@ -15,9 +15,14 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { probeLauncherState } from './batch-boundary.mjs'
+import { probePid } from './batch-singleton.mjs'
 import { LAUNCHER_RECORD_VERSION, LAUNCHER_STALE_TICKS } from './batch-launcher-core.mjs'
 
 const TICK_MS = 15 * 60 * 1000
+
+/** When THIS process started, read the same way the daemon reads it for its own
+ *  record — so a record built here is as complete as a real one. */
+const OWN_STARTED_AT = probePid(process.pid).startedAt ?? Date.now() - Math.round(process.uptime() * 1000)
 
 const withRecord = (record) => {
   const dir = mkdtempSync(join(tmpdir(), 'hoa-launcher-'))
@@ -30,6 +35,7 @@ const withRecord = (record) => {
 const liveRecord = (over = {}) => ({
   v: LAUNCHER_RECORD_VERSION,
   pid: process.pid,
+  pidStartedAt: OWN_STARTED_AT,
   startedAt: Date.now(),
   lastTickAt: Date.now(),
   tickMs: TICK_MS,
@@ -111,6 +117,19 @@ describe('probeLauncherState — the Linux path reads the daemon, on evidence on
       expect(probeLauncherState({ platform: 'linux', recordPath: missing.path })).toBe('unknown')
     } finally {
       missing.cleanup()
+    }
+  })
+
+  it('refuses a record naming a live pid with no start time — this very process proves it', () => {
+    // Everything else about this record is impeccable: current schema, stamped a
+    // moment ago, and its pid is REALLY alive (it is ours). All it omits is the one
+    // field that could tell our daemon apart from any other process wearing that
+    // number, so it may not read armed.
+    const { path, cleanup } = withRecord(liveRecord({ pidStartedAt: undefined }))
+    try {
+      expect(probeLauncherState({ platform: 'linux', recordPath: path })).toBe('unknown')
+    } finally {
+      cleanup()
     }
   })
 

@@ -75,6 +75,17 @@ describe('classifyDaemonRecord — the daemon record decides, and only on eviden
     expect(classify({}, { exists: true, startedAt: null })).toBe('ready')
   })
 
+  it('refuses a record that names a live pid but no start time to check it against', () => {
+    // The recycle check is the ONLY thing standing between "some process with this
+    // number is alive" and "our daemon is alive". A record that omits the start time
+    // skips it, so a freshly stamped record naming any live pid at all — pid 1 does
+    // — would read armed on nothing but its own presence.
+    expect(classify({ pidStartedAt: undefined })).toBe('unknown')
+    expect(classify({ pidStartedAt: null })).toBe('unknown')
+    expect(classify({ pidStartedAt: 'a while ago' })).toBe('unknown')
+    expect(classify({ pid: 1, pidStartedAt: undefined }, { exists: true, startedAt: null })).toBe('unknown')
+  })
+
   it('reads a deliberately stopped daemon as disabled, not as unreadable', () => {
     expect(classify({ stopped: true }, { exists: false, startedAt: null })).toBe('disabled')
   })

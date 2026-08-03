@@ -90,7 +90,8 @@ export function launcherRemedy(platform = process.platform) {
  *   staleTicks — how many silent intervals disarm it
  *
  * AN ARMED VERDICT IS NEVER GRANTED BY THE MERE PRESENCE OF A FILE. A record whose
- * pid is dead, whose pid was recycled, whose last tick is older than the margin, or
+ * pid is dead, whose pid was recycled, whose pid carries no start time to check that
+ * against, whose last tick is older than the margin, or
  * whose schema this code does not know all read 'unknown' — which the guard treats
  * as not armed. The asymmetry is the boundary's own: erring toward "keep working"
  * costs context, erring toward "stop" can cost the whole batch.
@@ -117,9 +118,14 @@ export function classifyDaemonRecord({
   // unreadable start time would read as "started at the epoch" and disarm every
   // healthy daemon.
   const recorded = record.pidStartedAt == null ? NaN : Number(record.pidStartedAt)
+  // A record that names no start time SKIPS the recycle check, and skipping it is
+  // how a version-correct, freshly stamped record naming ANY live pid — pid 1
+  // suffices — used to read 'ready'. The daemon always writes the field, so
+  // demanding it disarms no legitimate record and restores this module's own
+  // contract: presence is never evidence.
+  if (!Number.isFinite(recorded)) return 'unknown'
   const observed = probe.startedAt == null ? NaN : Number(probe.startedAt)
   if (
-    Number.isFinite(recorded) &&
     Number.isFinite(observed) &&
     Math.abs(recorded - observed) > LAUNCHER_PID_TOLERANCE_MS
   ) {
