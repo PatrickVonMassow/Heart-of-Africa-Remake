@@ -55,8 +55,11 @@ always had it, Linux gets `swiftshader` (the container has no GPU, no DRI driver
 and no system libEGL, and Chrome ≥120 will not fall back to software WebGL on its
 own), macOS `metal`. A host whose graphics stack differs from its platform's norm —
 a Linux box with a real GPU — overrides it with `VERIFY_ANGLE=gl` (or `vulkan`)
-without touching the code. Linux additionally launches with `--no-sandbox`, which
-container images need; Windows and macOS keep their argument list unchanged.
+without touching the code, and **should**: SwiftShader is software rendering, where
+requestAnimationFrame drops to ~1 fps and interaction tests become meaninglessly
+slow. It is the backend that lets a GPU-less container start at all, not the one to
+judge a picture on. Linux additionally launches with `--no-sandbox`, which container
+images need; Windows and macOS keep their argument list unchanged.
 
 Without a system Chrome the **WebGPU lane fails LOUD** — `WebGPU backend
 unavailable on this host` — and stops. It is never quietly served by WebGL 2, and
