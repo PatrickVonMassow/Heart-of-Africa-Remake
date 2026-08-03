@@ -4057,4 +4057,13 @@ also be taken as its own task now and then.
   ~12.6 fps and has no GPU, so the WebGPU lane cannot be verified here at all (its only adapter,
   SwiftShader's, dies on the scene), and the two timing-bound `collision` walker checks report
   that nothing moved in their window. Whether those two are green on GPU hardware is measured
-  there, not decided here.
+  there, not decided here. The bring-up cannot fetch a browser either: the current Chrome-for-
+  Testing builds redirect to a host this network blocks, so the browser in place was taken from
+  the last build Playwright serves directly and installed by hand. It survives only as long as
+  the container does — a rebuild costs the browser, and with it every picture check. The durable
+  fix is a browser in the image, or the download host reachable.
+  ONE RED STAYS UNEXPLAINED and is not this point's host story: `flow`'s frame `05-journal-hint`
+  finds no `.journal` although the entries it photographs are demonstrably written. Measure
+  `journalOpen` and `journalDnd` at that moment rather than reasoning about them; if it is a
+  product defect it belongs in its own point, if it is the frame rate it belongs in the caveat
+  above.
