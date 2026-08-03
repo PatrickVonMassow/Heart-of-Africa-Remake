@@ -28,8 +28,12 @@ const LAUNCHER = pathToFileURL(join(dirname(fileURLToPath(import.meta.url)), 'ba
 const TICK_MS = 10 * 60 * 1000
 /** How many daemons start at once. The count the live probe failed at. */
 const RACERS = 6
-/** How long the survivors get to converge. Convergence is a publish apart. */
-const SETTLE_MS = 10_000
+/** How long the losers get to boot, look and leave. Convergence itself is one
+ *  publish — measured at ~1.5 s for the whole race on a quiet machine — so this is
+ *  margin, not a budget: a green round never waits it out, and it is generous for
+ *  the same reason `vitest.config.ts` raised its own timeouts, because six extra
+ *  node boots beside four vitest workers are what the machine is actually doing. */
+const SETTLE_MS = 30_000
 
 const EXIT_YIELDED = 20
 const EXIT_REFUSED = 21
@@ -75,6 +79,7 @@ function race(place, count) {
         HOA_TICK_MS: String(TICK_MS),
       },
       stdio: 'ignore',
+      windowsHide: true,
     })
     kid.on('exit', (code) => {
       kid.stoppedWith = code
@@ -86,6 +91,15 @@ function race(place, count) {
   return { kids, running }
 }
 
+/** Does the pid still exist? A process that has died but not yet been reaped is
+ *  still a pid to `kill(pid, 0)`, so the answer is polled briefly rather than
+ *  taken from the first look — the claim is "it is gone", not "it went in one go". */
+async function gone(pid, waitMs = 5000) {
+  const deadline = Date.now() + waitMs
+  while (probePid(pid).exists && Date.now() < deadline) await sleep(100)
+  return probePid(pid).exists
+}
+
 async function settle(running, deadlineMs) {
   const deadline = Date.now() + deadlineMs
   while (running.size > 1 && Date.now() < deadline) await sleep(100)
@@ -94,7 +108,7 @@ async function settle(running, deadlineMs) {
 }
 
 describe('runDaemon — six starts at once leave exactly one launcher', () => {
-  it('lets one daemon own the record and every other leave it alone', { timeout: 90_000 }, async () => {
+  it('lets one daemon own the record and every other leave it alone', { timeout: 150_000 }, async () => {
     // Two rounds, because a race that happens to come out right once proves
     // nothing; the defect this pins produced two to five survivors every round.
     for (let round = 0; round < 2; round++) {
@@ -126,7 +140,7 @@ describe('runDaemon — six starts at once leave exactly one launcher', () => {
         const stopped = await stopDaemon({ recordPath: place.recordPath, tickMs: TICK_MS })
         expect(stopped.stopped).toBe(true)
         expect(stopped.state).toBe('disabled')
-        expect(probePid(survivors[0].pid).exists).toBe(false)
+        expect(await gone(survivors[0].pid)).toBe(false)
       } finally {
         for (const kid of kids) {
           try {

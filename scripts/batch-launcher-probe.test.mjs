@@ -34,7 +34,7 @@ const withRecord = (record) => {
 
 /** A pid that HAS existed and no longer does: a child run to completion. The one
  *  dead pid a test can name without guessing at a number the OS may hand out. */
-const exitedPid = () => spawnSync(process.execPath, ['-e', ''], { stdio: 'ignore' }).pid
+const exitedPid = () => spawnSync(process.execPath, ['-e', ''], { stdio: 'ignore', windowsHide: true }).pid
 
 /** A record for THIS process — the one pid a test can prove is alive. */
 const liveRecord = (over = {}) => ({
