@@ -101,9 +101,13 @@ Notes:
   `__movement`, `__events`, `__lionHunt`, `__wildlife`, `__player`, `__rivers`,
   `__culturalLandmarks`, `__terrainType`, `__setLang`, `__voiceMarkup`);
   they do not work against the production build.
-- Chromium must run with `--use-angle=d3d11 --enable-gpu` (already set in
-  the scripts). With the SwiftShader fallback, requestAnimationFrame drops
-  to ~1 fps and interaction tests become meaninglessly slow.
+- Chromium must run with `--enable-gpu` and the ANGLE backend its PLATFORM can
+  provide — `--use-angle=d3d11` on Windows, and on Linux whatever the host's GPU
+  offers (`VERIFY_ANGLE=gl`). The verify suites pick it themselves (point 475,
+  `scripts/verify/launch-args-core.mjs`); the perf tools here still hard-code the
+  Windows flag. Beware the SwiftShader fallback — the only backend a GPU-less
+  container can run: requestAnimationFrame drops to ~1 fps and interaction tests
+  become meaninglessly slow, so a machine that verifies pictures wants a real GPU.
 - The default language is English (design.md §17); suites that assert
   German strings switch the language explicitly via `__setLang`. Journal
   entries are asserted by their language-neutral keys.

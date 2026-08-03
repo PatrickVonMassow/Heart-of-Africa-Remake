@@ -12,6 +12,7 @@
     "test:unit": "vitest run",
     "test:watch": "vitest",
     "typecheck:test": "tsc -p tsconfig.vitest.json --noEmit",
+    "verify:bringup": "node scripts/verify-bringup.mjs",
     "test:e2e": "node scripts/verify/run-all.mjs",
     "test:small": "node scripts/verify/run-all.mjs small",
     "test:large": "node scripts/verify/run-all.mjs large",
