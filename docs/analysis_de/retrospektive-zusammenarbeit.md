@@ -691,6 +691,16 @@ Der Reiz des Falls liegt darin, dass die Aussage zunächst unprüfbar wirkt — 
 
 ---
 
+### 3.75 Der Umzug trennte das Projekt von seiner Mechanik
+
+Am 03.08.2026 zog das Projekt von Windows in eine Linux-Umgebung. Das Spiel selbst kam unbeschadet an — Bau, Linter und 6034 Unit-Tests waren auf dem neuen Rechner sofort grün. Die Mechanik um das Projekt herum kam nicht mit, und zwar in fünf voneinander unabhängigen Stücken: der Starter, der nach einer Sitzung die nächste weckt, war eine Windows-Aufgabe und hatte hier kein Gegenstück (es gibt in diesem Container überhaupt keinen Zeitplaner); kein Browser war installiert, und die Prüfungen starteten ihn mit einer reinen Windows-Grafikeinstellung; das GitHub-Token lag unter einem Windows-Pfad, weshalb die CI-Wache unauthentifiziert und damit einen Rate-Limit-Treffer vom Verstummen entfernt lief; der gesamte Erinnerungsbestand — 72 Dateien bindender Projektregeln — fehlte; und ein Guard-Scan, der unter Windows unauffällig war, brauchte hier zwei Minuten statt einer Sekunde und färbte jeden Zweig-Lauf rot.
+
+Bemerkenswert ist die Asymmetrie. Was versioniert im Repository liegt, zieht selbstverständlich mit; was AUSSERHALB liegt — geplante Aufgaben, Geheimnisse, Erinnerungen, installierte Werkzeuge — bleibt zurück, ohne dass irgendetwas es meldet. Keine einzige dieser fünf Lücken hat sich von selbst gezeigt: Vier fielen erst auf, weil der Nutzer nach roten Läufen fragte oder Bildschirmfotos schickte, die fünfte, weil ein Review sie nebenbei maß. Die Wächterkette, die sonst jede Regelverletzung meldet, schwieg — sie ist selbst Teil dessen, was nicht mitgezogen war.
+
+**Lehre:** Eine Umgebung ist Teil des Systems, auch wenn sie nicht im Repository steht. Was ein Projekt zum Arbeiten braucht und NICHT versioniert ist, gehört auf eine ausdrückliche Liste, die ein Umzug abarbeitet — sonst ist der erste Beweis für ihre Existenz ihr Fehlen. Und die Prüfung „läuft das Projekt hier?" ist nicht dieselbe wie „arbeitet die Mechanik hier?": Die erste war in fünf Minuten grün, die zweite kostete einen halben Tag.
+
+---
+
 ## 4. Die Guards als Immunsystem
 
 Jedes Guard-Skript ist die geronnene Lösung eines real aufgetretenen, wiederholten Problems.
@@ -778,7 +788,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Donnerstag, 30.07.2026, 21:03 · Quellen-Fingerprint: `98a76c5c3878…`
+Zuletzt aktualisiert: Montag, 03.08.2026, 14:40 · Quellen-Fingerprint: `e6f575423371…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -855,8 +865,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | CORRECTED 19.07.2026 — WebGPU IS testable headless/autonomously via system Chrome (channel:'chrome') + --headless=new; the 'untestable' belief held only for Playwright's BUNDLED Chromium | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 69 Feedback-/Projekt-Memories · 40 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 25 Prozess-/Meta-TASKS-Punkte (davon 10 offen).
+Erfasste Quellen: 69 Feedback-/Projekt-Memories · 40 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 26 Prozess-/Meta-TASKS-Punkte (davon 11 offen).
 
-<!-- RETRO-FINGERPRINT: 98a76c5c38788b4b9acf7af56e964709a608c0b46bf44eb7a714721b26995b78 -->
-<!-- RETRO-LAST-REFRESHED: 2026-07-30T19:03:17.397Z -->
+<!-- RETRO-FINGERPRINT: e6f575423371da02b0088c792bc8fee2ba3b4f969c187baca547397f0ea43cc7 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-03T12:40:02.303Z -->
 <!-- AUTO-GENERATED:END -->
