@@ -1236,8 +1236,11 @@ guard here, and it is fail-open. Findings keep their own, unchanged rule.
 **The board shows what waits.** The queue rebuild renders one card under the
 Warteschlange naming the pending requests, so the user sees his instruction
 arrived and where it stands without asking. Its titles are neutralised for the
-board (paths, `§`-refs and point references) so a deposit can never trip the
-conciseness or card-topic guards on the owner's turn.
+board — paths, `§`-refs, point references and the umlauts a shell mangled — and
+the `blocked` decision card's title goes through the same neutralisation. That
+keeps the SHAPES a deposit usually carries from being judged on the owner's turn
+for text it never wrote; it is a neutralisation, not a proof, because the guards
+read the whole card and a body written elsewhere can still need a hand edit.
 
 Pure layer: `scripts/findings-request-core.mjs` (with the head/kind parsing in
 `scripts/findings-core.mjs`), Vitest-covered in

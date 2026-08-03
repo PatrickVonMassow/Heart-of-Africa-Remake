@@ -336,6 +336,24 @@ export function boardSafeTitle(title, { maxLength = 60 } = {}) {
   return t.length > maxLength ? `${t.slice(0, maxLength - 1).trimEnd()}…` : t
 }
 
+/** The fixed half of the card an undrainable request becomes — ours, so it is
+ *  never neutralised, and `vdzk-remove` finds the card by it. */
+export const BLOCKED_CARD_PREFIX = 'Anfrage nicht übernehmbar: '
+
+/**
+ * The title of the decision card a request that cannot be carried in becomes.
+ *
+ * The deposit's own title goes through the SAME neutralisation as the queue card
+ * (four-eyes finding 4, Fable 5, 31.07.2026): it was written in another window
+ * and lands on a card the OWNER publishes, so a path, a `§`, a point reference
+ * or a shell-mangled umlaut would be judged on the owner's turn, for text it
+ * never wrote. The `--blocked` path passed it through raw while the queue card
+ * already routed through `boardSafeTitle`.
+ */
+export function blockedCardTitle(title) {
+  return `${BLOCKED_CARD_PREFIX}${boardSafeTitle(title)}`
+}
+
 /**
  * The card naming the pending requests, or '' when none wait (an empty card
  * would be a permanent fixture saying nothing, and the audit refuses an empty

@@ -31,6 +31,7 @@
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { dirname } from 'node:path'
+import { blockedCardTitle } from './board-queue-core.mjs'
 import { carrierEntry, malformedEntries, markDrained, parseCarrier } from './findings-core.mjs'
 import { carrierPath, memoryIndexPath } from './findings-paths.mjs'
 import {
@@ -274,7 +275,7 @@ if (has('--blocked')) {
   try {
     const out = execFileSync(
       process.execPath,
-      ['scripts/board.mjs', 'vdzk-add', `Anfrage nicht übernehmbar: ${hits[0].title}`, '--text-stdin'],
+      ['scripts/board.mjs', 'vdzk-add', blockedCardTitle(hits[0].title), '--text-stdin'],
       { cwd: REPO_ROOT, encoding: 'utf8', windowsHide: true, input: `${why}\n\nDie Anfrage liegt im Träger; sie wird nicht in den Arbeitsauftrag übernommen, solange das so bleibt.\n` },
     )
     console.log(out.trim().split('\n')[0])

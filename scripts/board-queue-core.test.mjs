@@ -30,6 +30,7 @@ import {
   parseTaskTitles,
   queueEntries,
   queueOrder,
+  blockedCardTitle,
   boardSafeTitle,
   renderQueueCard,
   renderRequestsCard,
@@ -586,6 +587,21 @@ describe('the pending-request card', () => {
 
   it('leaves a word the audit does not flag untouched', () => {
     expect(boardSafeTitle('Steuerung am Aequator neu justieren')).toBe('Steuerung am Aequator neu justieren')
+  })
+
+  it('neutralises the blocked card’s title the same way the queue card’s is', () => {
+    // Four-eyes finding 4 (Fable 5, 31.07.2026): `--blocked` handed the raw
+    // deposit title to vdzk-add while the queue card already routed through
+    // boardSafeTitle — and the audit reads the whole published board, titles
+    // included, on the OWNER's turn.
+    const raw = 'Bitte fuer Punkt 465 pruefen (465) scripts/finding.mjs'
+    expect(findTransliterations(`<span class="t">Anfrage nicht übernehmbar: ${raw}</span>`).length).toBeGreaterThan(0)
+    const safe = blockedCardTitle(raw)
+    expect(findTransliterations(`<span class="t">${safe}</span>`)).toEqual([])
+    expect(safe).toContain('Anfrage nicht übernehmbar: ')
+    expect(safe).not.toMatch(/scripts\/|\.mjs/)
+    expect(safe).not.toMatch(/\bPunkt 465\b/)
+    expect(safe).not.toMatch(/\(465\)/)
   })
 
   it('keeps a hostile title out of the audit on the real card', () => {
