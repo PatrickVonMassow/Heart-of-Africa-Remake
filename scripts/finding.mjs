@@ -151,7 +151,7 @@ function headRevision() {
  * that resolved the deposit and this write, another window may have appended one
  * — for `--blocked` the whole board.mjs subprocess sits in that gap — and
  * writing the old text back would erase it without a word, destroying the very
- * artifact this carrier exists to preserve. The transition is therefore
+ * deposit this carrier exists to preserve. The transition is therefore
  * re-applied by the resolved IDENTITY (timestamp, session, full title), so a
  * deposit that arrived meanwhile survives and no second match can be retired by
  * accident. If the entry is no longer pending, nothing is written and the caller
