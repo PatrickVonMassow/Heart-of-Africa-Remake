@@ -8,7 +8,7 @@
 // ("was there something worth keeping?"), and a guard that blocks on its own
 // blindness would train the reader to route around it.
 import { readFileSync } from 'node:fs'
-import { auditFindings, formatFindings, parseCarrier, tallyTurn, turnCalls } from './findings-core.mjs'
+import { auditFindings, formatFindings, parseCarrier, tallyTurn, turnCalls, turnTakesBoundary } from './findings-core.mjs'
 import { carrierPath, ownsBatch } from './findings-paths.mjs'
 import { repoPath } from './repo-paths.mjs'
 
@@ -71,15 +71,27 @@ function main() {
   // arbitrary slice of history, so condition 1 stands down; condition 2 does
   // not depend on the turn at all and still applies.
   let tally = { investigative: 0, agents: 0, records: [] }
+  // Whether this turn TAKES the boundary is read from the same calls (point
+  // 462) — the request gate fires there and nowhere else. No stamp, no calls,
+  // no boundary: the gate then simply stands down, like condition 1.
+  let atBoundary = false
   if (Number.isFinite(turnStartedAt) && turnStartedAt > 0 && transcriptPath) {
     try {
-      tally = tallyTurn(turnCalls(readFileSync(transcriptPath, 'utf8'), turnStartedAt))
+      const calls = turnCalls(readFileSync(transcriptPath, 'utf8'), turnStartedAt)
+      tally = tallyTurn(calls)
+      atBoundary = turnTakesBoundary(calls)
     } catch {
       /* unreadable transcript — fail open on condition 1 */
     }
   }
 
-  const verdict = auditFindings({ tally, ownsBatch: owner, carrierPending: carrier.pending.length })
+  const verdict = auditFindings({
+    tally,
+    ownsBatch: owner,
+    carrierPending: carrier.pending.length,
+    carrierRequests: carrier.requests.length,
+    atBoundary,
+  })
 
   if (status) {
     console.log(`turn calls     : ${tally.investigative} investigative, ${tally.agents} agent(s)`)
@@ -87,7 +99,10 @@ function main() {
     console.log(
       `owns the batch : ${sessionId ? (owner ? 'yes' : 'no') : 'unbekannt — keine session_id (--session <id> nachreichen)'}`,
     )
-    console.log(`carrier        : ${carrier.pending.length} waiting, ${carrier.drained} landed`)
+    console.log(`at the boundary: ${atBoundary ? 'yes' : 'no'}`)
+    console.log(
+      `carrier        : ${carrier.pending.length} waiting, ${carrier.requests.length} request(s), ${carrier.drained} landed`,
+    )
     console.log(`verdict        : ${verdict.ok ? 'allow' : 'BLOCK'}`)
     if (!verdict.ok) console.log(formatFindings(verdict.violations))
     return

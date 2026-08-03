@@ -1234,6 +1234,88 @@ The one residual is the same one the in-flight declaration has: the guard only
 runs at a TURN END. A session that has stopped and is never re-invoked never sees
 the claim — its lock then ages out the honest way, and the claim expires with it.
 
+### A window that is NOT the master can still enqueue what the user says (30.07.2026, point 462)
+
+Claiming the batch is one way back; it takes minutes to hours, and the
+conversation does not wait. On 30.07.2026 a window held a pending claim for an
+hour while the user settled three decisions and had two documents evaluated.
+`TASKS.md` is main-only and batch-owned, so nothing could be enqueued — the specs
+lived in a scratchpad **outside** the repository and would have died with the
+window.
+
+**The spec must be written by the window the user is TALKING TO.** Only it holds
+the conversation the spec comes from, and the owner will never see it. A note
+saying "the user wants something" is worthless, so the deposit is the FINISHED
+final-state spec, leaving the owner only the mechanical half it alone may do.
+
+That deposit goes into the **findings carrier**, which already is the lock-free
+atomic append by a non-owner, already has a drain protocol and already has its
+guard wired. No second carrier: two carriers are two drain disciplines to forget
+one of. The chat inbox stays untouched — it carries the user's phone words,
+signed, capped and delivered as untrusted input; a window-authored multi-KB spec
+is a different writer and a different trust model.
+
+    node scripts/finding.mjs --request "<title>" --spec-file <path> \
+         --why-file <path> --quotes-file <path> [--constraints-file <path>] \
+         [--doc-impact-file <path>] [--open-questions-file <path>] \
+         [--bundle "<deutscher Name>"] [--refs "<…>"] [--rev <sha>]
+    node scripts/finding.mjs --requests | --show "<title>"      # what waits, and its spec
+    node scripts/finding.mjs --queued "<title>" --point <N>     # it reached the work order
+    node scripts/finding.mjs --blocked "<title>" --why "<reason>"
+
+Every long field arrives as a FILE. A final-state spec on a PowerShell command
+line hits the quoting rules and the ~32K limit, and its umlauts do not survive
+the shell — the same reason the board takes its German prose on stdin.
+
+An entry carries the title, the spec, the bounds the user named (verbatim and
+separate from the spec), the observed problem, the user's decisive sentences with
+their date — the "user DD.MM.YYYY" citations the work order requires exist ONLY
+in the depositing window — the design.md/CLAUDE.md/memory changes the ruling
+implies, a proposed bundle, the refs plus the revision it was cut from, and any
+open questions.
+
+- **`pending` → `queued <point>`** on the drain: the owner appends the spec
+  VERBATIM and numbers it.
+- **A non-empty `openQuestions` routes to a decision card, NEVER to a TASKS
+  append** — an undecided spec in the queue is a question standing where an
+  instruction belongs. `--queued` REFUSES such a deposit and names `--blocked`;
+  the route is enforced, not merely displayed.
+- **`blocked` is the escape hatch.** `--blocked` writes the decision card FIRST
+  and only then retires the entry, so an undrainable request is escalated to the
+  user visibly instead of being parked. If the card cannot be written the request
+  stays pending and says so.
+- **The write-back re-reads the carrier.** A transition is decided on the text
+  that was read and applied to the text that is there NOW, by the deposit's exact
+  identity (timestamp, session, full title). Another window's append lands in
+  exactly that gap — for `--blocked` the whole card subprocess sits in it — and
+  writing the old text back would erase it silently.
+- **A malformed entry warns, never blocks** — a half-written deposit is still
+  listed and named, because dropping it is the exact failure the carrier ends.
+- **A body line that is itself a field marker is escaped** with one leading
+  backslash in the file and restored on read. The specs most likely deposited
+  here are specs about this mechanism, and one containing a bare `#spec` line
+  would otherwise lose everything after it out of the field it must carry
+  verbatim.
+
+**The gate is the point boundary**, not every turn end: a mid-branch owner cannot
+write `TASKS.md` at all, so `findings-guard` fires the request rule only on the
+turn that TAKES the boundary (`batch-boundary.mjs <point>`; `--status`/`--clear`
+only read). It stands down for a non-owner and for a paused batch like every
+guard here, and it is fail-open. Findings keep their own, unchanged rule.
+
+**The board shows what waits.** The queue rebuild renders one card under the
+Warteschlange naming the pending requests, so the user sees his instruction
+arrived and where it stands without asking. Its titles are neutralised for the
+board — paths, `§`-refs, point references and the umlauts a shell mangled — and
+the `blocked` decision card's title goes through the same neutralisation. That
+keeps the SHAPES a deposit usually carries from being judged on the owner's turn
+for text it never wrote; it is a neutralisation, not a proof, because the guards
+read the whole card and a body written elsewhere can still need a hand edit.
+
+Pure layer: `scripts/findings-request-core.mjs` (with the head/kind parsing in
+`scripts/findings-core.mjs`), Vitest-covered in
+`scripts/findings-request-core.test.mjs`.
+
 ## The two true residuals (NOT in the agent's control)
 
 1. **Auth needs a logged-in profile.** `claude` needs the user's interactive,

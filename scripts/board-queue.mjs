@@ -47,6 +47,8 @@ import {
   unestimatedPoints,
   untranslatedTitlePoints,
 } from './board-queue-core.mjs'
+import { carrierPath } from './findings-paths.mjs'
+import { pendingRequests, requestRoute } from './findings-request-core.mjs'
 
 const state = readJson(STATE_PATH) ?? {}
 const boardFile = resolve(REPO_ROOT, state.dashboardPath ?? '.batch-dashboard.html')
@@ -81,6 +83,24 @@ function reportEntries(entries) {
   say(unestimatedPoints(entries), 'no estimate yet', ESTIMATE_CMD)
 }
 
+/**
+ * The requests other windows deposited in the findings carrier (point 462).
+ * FAIL-SOFT on purpose: the carrier lives in the memory directory, outside the
+ * repository, and a missing or half-written one must cost the queue rebuild
+ * nothing — the board is the more important of the two.
+ */
+function carrierRequests() {
+  try {
+    return pendingRequests(readFileSync(carrierPath(), 'utf8')).map((r) => ({
+      at: r.at,
+      title: r.title,
+      route: requestRoute(r),
+    }))
+  } catch {
+    return []
+  }
+}
+
 /** Board, work order and the exclusions the other sections already own. */
 function inputs() {
   if (!existsSync(boardFile)) throw new Error(`board not found: ${boardFile}`)
@@ -90,6 +110,7 @@ function inputs() {
     html,
     open: openPointsOf(tasks),
     titles: parseTaskTitles(tasks),
+    requests: carrierRequests(),
     // Erledigt is NOT excluded: a point there is closed, so it is not open, and
     // the open set already leaves it out. Excluding it too would hide a point
     // that is open AND wrongly archived — a real inconsistency the audit reports.
@@ -121,11 +142,17 @@ try {
     writeData(data)
     console.log(`imported ${Object.keys(data.points).length} queue card(s) into ${QUEUE_DATA_PATH}`)
   } else if (cmd === '--check' || cmd === undefined) {
-    const { html, open, titles, exclude } = inputs()
-    const built = buildQueueSection(html, { open, data: readData(), exclude, titles })
+    const { html, open, titles, exclude, requests } = inputs()
+    const built = buildQueueSection(html, { open, data: readData(), exclude, titles, requests })
+    const saySoIfRequests = () => {
+      if (requests.length) {
+        console.log(`  ${requests.length} deposited request(s) named under the queue — node scripts/finding.mjs --requests`)
+      }
+    }
     if (cmd === '--check') {
       console.log(`${built.entries.length} queue card(s) would be rendered${built.html === html ? ' (no change)' : ''}`)
       reportEntries(built.entries)
+      saySoIfRequests()
       process.exitCode = built.html === html ? 0 : 1
     } else {
       // Atomic (point 443, four-eyes F3): a kill mid-write leaves torn bytes that
@@ -135,6 +162,7 @@ try {
       if (out !== html) writeTextAtomic(boardFile, out)
       console.log(`queue rebuilt from the work order: ${built.entries.length} card(s)${out === html ? ' (unchanged)' : ''}`)
       reportEntries(built.entries)
+      saySoIfRequests()
       console.log('Publish it: node scripts/board-publish.mjs')
     }
   } else {

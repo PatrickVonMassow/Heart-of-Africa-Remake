@@ -8,6 +8,7 @@ import {
   malformedEntries,
   markDrained,
   parseCarrier,
+  parseHead,
   tallyTurn,
   turnCalls,
 } from './findings-core.mjs'
@@ -219,6 +220,25 @@ describe('the carrier round-trips', () => {
   it('returns null when nothing matched, so the caller can report it', () => {
     expect(markDrained(entry, 'gibt es nicht')).toBeNull()
     expect(markDrained(entry, '')).toBeNull()
+  })
+
+  it('keeps a finding titled like a request head a FINDING', () => {
+    // Four-eyes finding 3 (Fable 5, 31.07.2026): the marker prefix made the
+    // entry parse back as a request, and requests are gated only at the point
+    // boundary — so it escaped the every-turn-end findings gate.
+    const sneaky = carrierEntry({
+      at: '2026-07-31T09:00:00.000Z',
+      session: 'ab12cd34',
+      title: '[request] · pending · Wirkt wie eine Anfrage',
+      detail: 'Belegt.',
+    })
+    const head = parseHead(sneaky.split('\n')[0])
+    expect(head.kind).toBe('finding')
+    expect(head.title).toContain('Wirkt wie eine Anfrage')
+    const parsed = parseCarrier(sneaky)
+    expect(parsed.pending).toHaveLength(1)
+    expect(parsed.requests).toEqual([])
+    expect(malformedEntries(sneaky)).toEqual([])
   })
 
   it('refuses an ambiguous match rather than silencing the wrong finding', () => {

@@ -10,7 +10,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { REPO_ROOT } from './repo-paths.mjs'
-import { auditDashboard, parseQueuePoints, QUEUE_STUB_META } from './dashboard-guard-core.mjs'
+import { auditDashboard, findTransliterations, parseQueuePoints, QUEUE_STUB_META } from './dashboard-guard-core.mjs'
 import { boardMissingPoints } from './board-currency-core.mjs'
 import { queueCard, toNow } from './board-core.mjs'
 import { concisenessOffenders } from './dashboard-conciseness-guard-core.mjs'
@@ -30,7 +30,10 @@ import {
   parseTaskTitles,
   queueEntries,
   queueOrder,
+  blockedCardTitle,
+  boardSafeTitle,
   renderQueueCard,
+  renderRequestsCard,
   setQueueEntry,
   unestimatedPoints,
   untranslatedTitlePoints,
@@ -515,5 +518,122 @@ describe('setQueueEntry — a title lands without disturbing anything else', () 
       body: ['Text.'],
       estimate: '~4 h',
     })
+  })
+})
+
+// --- the deposits of other windows, named under the queue (point 462) --------
+
+describe('the pending-request card', () => {
+  const req = (title, over = {}) => ({ at: '2026-07-30T20:11:00.000Z', title, route: 'tasks', ...over })
+
+  it('renders nothing at all while no request waits', () => {
+    expect(renderRequestsCard([])).toBe('')
+    expect(renderRequestsCard(undefined)).toBe('')
+    expect(renderRequestsCard([{ at: 'x' }])).toBe('')
+  })
+
+  it('names every waiting deposit, with its day', () => {
+    const html = renderRequestsCard([req('Sitzungsübergabe härten'), req('Kartenbeschriftung prüfen')])
+    expect(html).toContain('2 Anfragen warten')
+    expect(html).toContain('30.07. Sitzungsübergabe härten')
+    expect(html).toContain('30.07. Kartenbeschriftung prüfen')
+  })
+
+  it('says which one needs the user rather than the work order', () => {
+    expect(renderRequestsCard([req('Eine offene Frage', { route: 'vdzk' })])).toContain('braucht deine Entscheidung')
+  })
+
+  it('caps the list instead of growing the card without end', () => {
+    const html = renderRequestsCard(Array.from({ length: 8 }, (_, i) => req(`Anfrage ${i}`)))
+    expect(html).toContain('… und 3 weitere.')
+  })
+
+  it('carries no point number, so no parser reads it as a queued point', () => {
+    const html = renderRequestsCard([req('Eine Anfrage')])
+    expect(parseQueuePoints(`<h2>Warteschlange</h2>${html}`).size).toBe(0)
+    expect(importQueueFromHtml(board(html)).order).toEqual([])
+  })
+
+  it('neutralises a title that would trip the board guards on the OWNER’s turn', () => {
+    const t = boardSafeTitle('Punkt 462: scripts/finding.mjs und design.md §19.5 (462) c2950bc0')
+    expect(t).not.toMatch(/scripts\//)
+    expect(t).not.toMatch(/\.mjs|\.md/)
+    expect(t).not.toContain('§')
+    expect(t).not.toMatch(/\bPunkt 462\b/)
+    expect(t).not.toMatch(/\(462\)/)
+  })
+
+  it('truncates a long title rather than filling the card with one', () => {
+    const t = boardSafeTitle('Ein sehr langer Titel, der auf einem Telefon niemals in eine Zeile passen würde')
+    expect(t.length).toBeLessThanOrEqual(60)
+    expect(t.endsWith('…')).toBe(true)
+  })
+
+  it('leaves an ordinary German title alone', () => {
+    expect(boardSafeTitle('  Sitzungsübergabe   härten ')).toBe('Sitzungsübergabe härten')
+  })
+
+  it('repairs the transliteration a shell-mangled title arrives with', () => {
+    // Four-eyes finding 2 (Fable 5): the title is the one field that travels as
+    // an argument, so a depositor writes "fuer"/"pruefen" — and the board audit
+    // then blocks the OWNER for text it never wrote.
+    // Only the flagged words are repaired: "loesen" is not on the audit's stem
+    // list, so it is not the guard's business and not this function's either.
+    const t = boardSafeTitle('Bitte fuer die Warteschlange pruefen und moeglichst loesen')
+    expect(t).toBe('Bitte für die Warteschlange prüfen und möglichst loesen')
+    expect(findTransliterations(t)).toEqual([])
+    expect(boardSafeTitle('Ueberpruefung zurueckstellen')).toBe('Überprüfung zurückstellen')
+  })
+
+  it('leaves a word the audit does not flag untouched', () => {
+    expect(boardSafeTitle('Steuerung am Aequator neu justieren')).toBe('Steuerung am Aequator neu justieren')
+  })
+
+  it('neutralises the blocked card’s title the same way the queue card’s is', () => {
+    // Four-eyes finding 4 (Fable 5, 31.07.2026): `--blocked` handed the raw
+    // deposit title to vdzk-add while the queue card already routed through
+    // boardSafeTitle — and the audit reads the whole published board, titles
+    // included, on the OWNER's turn.
+    const raw = 'Bitte fuer Punkt 465 pruefen (465) scripts/finding.mjs'
+    expect(findTransliterations(`<span class="t">Anfrage nicht übernehmbar: ${raw}</span>`).length).toBeGreaterThan(0)
+    const safe = blockedCardTitle(raw)
+    expect(findTransliterations(`<span class="t">${safe}</span>`)).toEqual([])
+    expect(safe).toContain('Anfrage nicht übernehmbar: ')
+    expect(safe).not.toMatch(/scripts\/|\.mjs/)
+    expect(safe).not.toMatch(/\bPunkt 465\b/)
+    expect(safe).not.toMatch(/\(465\)/)
+  })
+
+  it('keeps a hostile title out of the audit on the real card', () => {
+    const html = renderRequestsCard([
+      { at: '2026-07-30T20:11:00.000Z', title: 'Bitte fuer Punkt 465 pruefen (465) scripts/finding.mjs', route: 'tasks' },
+    ])
+    expect(findTransliterations(html)).toEqual([])
+  })
+})
+
+describe('the request card inside a rebuilt queue', () => {
+  const withRequests = (requests) =>
+    buildQueueSection(board(''), { open: [439, 465], data: null, titles: {}, requests }).html
+
+  it('sits in the Warteschlange and leaves the point cards untouched', () => {
+    const html = withRequests([{ at: '2026-07-30T20:11:00.000Z', title: 'Sitzungsübergabe härten', route: 'tasks' }])
+    expect(html).toContain('Anfragen aus anderen Fenstern')
+    expect([...parseQueuePoints(html)].sort((a, b) => a - b)).toEqual([439, 465])
+  })
+
+  it('disappears again on the next rebuild once the deposit was queued', () => {
+    expect(withRequests([])).not.toContain('Anfragen aus anderen Fenstern')
+  })
+
+  it('breaks no audit, conciseness or topic rule', () => {
+    const html = withRequests([
+      { at: '2026-07-30T20:11:00.000Z', title: 'Punkt 465 in scripts/finding.mjs härten', route: 'vdzk' },
+      { at: '2026-07-31T06:00:00.000Z', title: 'Kartenbeschriftung prüfen', route: 'tasks' },
+    ])
+    const codes = auditDashboard(html, { open: [210, 439, 465], done: [], nowMinutes: 9 * 60 }).map((x) => x.code)
+    expect(codes.filter((c) => c !== 'queue-stubbed')).toEqual([])
+    expect(concisenessOffenders(html)).toEqual([])
+    expect(evaluateTopic({ dashboardHtml: html, tasksText: '- [ ] 439. X\n- [ ] 465. Y\n' }).block).toBe(false)
   })
 })

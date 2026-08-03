@@ -32,7 +32,7 @@
 // block `--synced` and create the very block loop this design exists to
 // prevent.
 
-import { parseTasks, QUEUE_STUB_BODY, QUEUE_STUB_META } from './dashboard-guard-core.mjs'
+import { parseTasks, QUEUE_STUB_BODY, QUEUE_STUB_META, TRANSLITERATION_STEMS } from './dashboard-guard-core.mjs'
 import { normaliseLineEndings } from './board-core.mjs'
 import { FINDER_POINTS, RELEASE_TAG_POINT } from './queue-order-guard-core.mjs'
 
@@ -280,6 +280,113 @@ export function queueEntries({ open = [], data = null, exclude = [], titles = {}
   return out
 }
 
+// ---- the pending requests of other windows (point 462) ---------------------
+//
+// A window the user is talking to but which does not hold the batch deposits a
+// finished spec in the findings carrier. It cannot publish the board — the lease
+// fence refuses a non-owner exactly that — so the card is rendered HERE, by the
+// owner's queue rebuild, and the user sees his instruction arrived and where it
+// stands without asking.
+
+/** How many pending requests the card names before it says "and n more". */
+export const REQUEST_CARD_MAX = 5
+
+/** The card's title — no leading number, so no parser reads it as a point. */
+export const REQUEST_CARD_TITLE = 'Anfragen aus anderen Fenstern'
+
+/** ae/oe/ue back to ä/ö/ü, but ONLY in a word the audit's stem list flags. */
+const UMLAUT = { ae: 'ä', oe: 'ö', ue: 'ü' }
+export function repairTransliteration(word) {
+  const w = String(word ?? '')
+  if (!TRANSLITERATION_STEMS.some((stem) => w.toLowerCase().includes(stem))) return w
+  return w.replace(/[AaOoUu][eE]/g, (digraph) => {
+    const letter = UMLAUT[digraph.toLowerCase()]
+    return /[A-Z]/.test(digraph[0]) ? letter.toUpperCase() : letter
+  })
+}
+
+/**
+ * A deposit's title, made safe for a board card.
+ *
+ * The title is written in another window, by another session, and lands on a
+ * card the OWNER then publishes — so a title carrying a file path, a `§` or a
+ * point reference would block the owner's turn end on the conciseness and
+ * card-topic guards, for text it never wrote. Neutralising it here keeps the
+ * meaning readable and the guards satisfied by construction.
+ */
+export function boardSafeTitle(title, { maxLength = 60 } = {}) {
+  let t = String(title ?? '').replace(/\s+/g, ' ').trim()
+  const stem = (path) => (path.split('/').pop() ?? path).replace(/\.[a-z]+$/i, '')
+  // A TITLE IS THE ONE FIELD THAT TRAVELS AS AN ARGUMENT (four-eyes finding 2,
+  // Fable 5): the depositing window is told its umlauts do not survive a Windows
+  // shell, so it writes "fuer"/"pruefen" — and the board audit rejects exactly
+  // that, on the OWNER's turn, for text it never wrote. The repair is applied
+  // only to the words the audit's own stem list flags, so ordinary German
+  // ("Steuerung", "Aequator") is untouched.
+  t = t.replace(/[A-Za-zÄÖÜäöüß]+/g, repairTransliteration)
+  t = t
+    .replace(/\b(?:src|scripts|docs)\/[\w./-]+/g, (m) => stem(m))
+    .replace(/\b[\w-]+\.(?:mjs|cjs|ts|tsx|js|md)\b/g, (m) => stem(m))
+    .replace(/§\s*/g, 'Abschnitt ')
+    .replace(/\b[0-9a-f]{7,40}\b/g, (m) => (/\d/.test(m) ? 'Rev.' : m))
+    .replace(/\b(punkt|point)\s+(\d{1,3})\b/gi, '$1 Nr. $2')
+    .replace(/\((\d{2,3})\)/g, '[Nr. $1]')
+    .replace(/\s+/g, ' ')
+    .trim()
+  return t.length > maxLength ? `${t.slice(0, maxLength - 1).trimEnd()}…` : t
+}
+
+/** The fixed half of the card an undrainable request becomes — ours, so it is
+ *  never neutralised, and `vdzk-remove` finds the card by it. */
+export const BLOCKED_CARD_PREFIX = 'Anfrage nicht übernehmbar: '
+
+/**
+ * The title of the decision card a request that cannot be carried in becomes.
+ *
+ * The deposit's own title goes through the SAME neutralisation as the queue card
+ * (four-eyes finding 4, Fable 5, 31.07.2026): it was written in another window
+ * and lands on a card the OWNER publishes, so a path, a `§`, a point reference
+ * or a shell-mangled umlaut would be judged on the owner's turn, for text it
+ * never wrote. The `--blocked` path passed it through raw while the queue card
+ * already routed through `boardSafeTitle`.
+ */
+export function blockedCardTitle(title) {
+  return `${BLOCKED_CARD_PREFIX}${boardSafeTitle(title)}`
+}
+
+/**
+ * The card naming the pending requests, or '' when none wait (an empty card
+ * would be a permanent fixture saying nothing, and the audit refuses an empty
+ * body anyway). The meta is the named "no estimate yet" marker: a deposit that
+ * has not become a point cannot carry a duration, and the audit accepts that
+ * marker by name.
+ */
+export function renderRequestsCard(requests, { max = REQUEST_CARD_MAX } = {}) {
+  const list = (Array.isArray(requests) ? requests : []).filter((r) => r && r.title)
+  if (!list.length) return ''
+  const shown = list.slice(0, max)
+  const day = (at) => {
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(at ?? ''))
+    return m ? `${m[3]}.${m[2]}.` : ''
+  }
+  const body = [
+    list.length === 1
+      ? 'Eine Anfrage wartet darauf, in den Arbeitsauftrag übernommen zu werden.'
+      : `${list.length} Anfragen warten darauf, in den Arbeitsauftrag übernommen zu werden.`,
+    ...shown.map((r) => {
+      const when = day(r.at)
+      const mark = r.route === 'vdzk' ? ' — braucht deine Entscheidung' : ''
+      return `${when ? `${when} ` : ''}${boardSafeTitle(r.title)}${mark}`
+    }),
+  ]
+  if (list.length > shown.length) body.push(`… und ${list.length - shown.length} weitere.`)
+  return (
+    `<details>\n  <summary><span class="num">✳</span><span class="t">${esc(REQUEST_CARD_TITLE)}</span>` +
+    `<span class="right"><span class="meta">${esc(QUEUE_STUB_META)}</span></span></summary>\n` +
+    `  <div class="body">\n${body.map((p) => `    <p>${esc(p)}</p>\n`).join('')}  </div>\n</details>\n`
+  )
+}
+
 /** One card, in exactly the markup the board guard's parsers read. */
 export function renderQueueCard({ point, title, body, meta }) {
   return (
@@ -321,12 +428,18 @@ export function queueSectionBounds(html) {
  *
  * `exclude` must already hold every point the other sections claim — see the
  * two-writers note at the head of this file.
+ *
+ * `requests` are the deposits of other windows (point 462); they render as ONE
+ * card at the end of the section. Because the whole section is rewritten here,
+ * a request that has since been queued disappears from the board on the next
+ * rebuild without anything having to remember it.
  */
-export function buildQueueSection(html, { open = [], data = null, exclude = [], titles = {} } = {}) {
+export function buildQueueSection(html, { open = [], data = null, exclude = [], titles = {}, requests = [] } = {}) {
   const doc = String(html ?? '')
   const { from, end } = queueSectionBounds(doc)
   const entries = queueEntries({ open, data, exclude, titles })
-  return { html: `${doc.slice(0, from)}\n${renderQueueCards(entries)}${doc.slice(end)}`, entries }
+  const cards = `${renderQueueCards(entries)}${renderRequestsCard(requests)}`
+  return { html: `${doc.slice(0, from)}\n${cards}${doc.slice(end)}`, entries }
 }
 
 /**
