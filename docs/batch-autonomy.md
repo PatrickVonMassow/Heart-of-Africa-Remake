@@ -32,9 +32,8 @@ outside the agent's control.
    a self-scheduling detached node daemon, `scripts/batch-launcher.mjs`
    (`--start` / `--stop` / `--status`), which records its pid and its last tick in
    `.claude/batch-launcher.json`, refuses to run twice, and outlives the session
-   that started it. Everything below this sentence is the same on both hosts,
-   because only the trigger changed: the tick runs the same launcher, through the
-   same singleton.
+   that started it. The rest of this entry holds on both hosts, because only the
+   trigger changed: the tick runs the same launcher, through the same singleton.
    The launcher spawns a headless `claude -p` to resume the batch **only** when the
    owner is PROVABLY dead per the hard singleton (`scripts/batch-singleton.mjs`):
    heartbeat AND a real OS pid check — a live claude process blocks takeover no
