@@ -7,8 +7,11 @@
 // (localhost) page. This module centralises the launch so the backend is one env var,
 // and asserts the backend that initialised is the one requested — no silent fallback
 // (the guardrail, the whole point of the lane).
+import { accessSync, constants } from 'node:fs'
+import { delimiter, isAbsolute, join } from 'node:path'
 import { chromium } from 'playwright'
 import { armRunRecorder, markBackendAsserted } from '../render-verify-recorder.mjs'
+import { systemChromeCandidates, verifyLaunchOptions, webgpuLaneVerdict } from './launch-args-core.mjs'
 
 // Which backend the verify run targets. 'webgpu' = system Chrome, headless=new (the
 // player's primary backend); 'webgl' = the bundled Chromium with ANGLE (the WebGL2
@@ -18,23 +21,62 @@ import { armRunRecorder, markBackendAsserted } from '../render-verify-recorder.m
 // flake-free on WebGPU (point 184's condition b), per the user's tier design.
 export const VERIFY_GL = (process.env.VERIFY_GL ?? 'webgl').toLowerCase() === 'webgpu' ? 'webgpu' : 'webgl'
 
+/** Is this an executable file? (Total — an unreadable path is simply "no".) */
+function isExecutable(path) {
+  try {
+    accessSync(path, constants.X_OK)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** The first system-Chrome candidate that exists, or null. A bare name is looked up on
+ *  PATH; an absolute path is probed directly. Returns null on a platform the pure core
+ *  declines to probe (Windows, macOS), where Playwright resolves the channel itself. */
+function findSystemChrome(platform = process.platform) {
+  for (const candidate of systemChromeCandidates(platform)) {
+    if (isAbsolute(candidate)) {
+      if (isExecutable(candidate)) return candidate
+      continue
+    }
+    for (const dir of String(process.env.PATH ?? '').split(delimiter)) {
+      if (!dir) continue
+      const full = join(dir, candidate)
+      if (isExecutable(full)) return full
+    }
+  }
+  return null
+}
+
 /** Launch the browser for the requested backend. WebGPU needs SYSTEM Chrome —
  *  Playwright's bundled Chromium fails requestDevice headless; channel:'chrome' with
  *  --headless=new works on a secure-context page (the point-184 breakthrough). The
- *  WebGL2 lane keeps the historical bundled-Chromium + ANGLE D3D11 launch. */
+ *  WebGL2 lane uses the bundled Chromium with the ANGLE backend its PLATFORM can
+ *  provide (point 475 — `d3d11` is Direct3D and exists only on Windows; the args come
+ *  from launch-args-core.mjs, which keeps Windows byte for byte).
+ *
+ *  Nothing here installs a browser. The bring-up is one documented command,
+ *  `npm run verify:bringup` (scripts/verify/README.md): a suite that silently
+ *  downloaded ~180 MB mid-regression would be a surprise, not a convenience. */
 export async function launchVerifyBrowser() {
+  if (VERIFY_GL === 'webgpu') {
+    // The lane is either run for real or declared unrunnable — never quietly served by
+    // the other backend. Thrown BEFORE the recorder is armed, so a host without system
+    // Chrome leaves no run record at all and render-verify-guard cannot read the
+    // attempt as WebGPU coverage (point 475, condition 3).
+    const verdict = webgpuLaneVerdict({
+      platform: process.platform,
+      systemChrome: findSystemChrome(),
+    })
+    if (!verdict.available) throw new Error(verdict.reason)
+  }
   // Render-verify evidence (user mandate 22.07.2026): record this suite run —
   // backend, exit code, screenshots — from inside the process, so the Stop-hook
   // guard (scripts/render-verify-guard.mjs) can enforce that every render change
   // was verified on BOTH backends. Observe-only; can never fail the suite.
   armRunRecorder(VERIFY_GL)
-  if (VERIFY_GL === 'webgpu') {
-    return chromium.launch({
-      channel: 'chrome',
-      args: ['--headless=new', '--enable-unsafe-webgpu', '--enable-gpu'],
-    })
-  }
-  return chromium.launch({ args: ['--enable-unsafe-webgpu', '--use-angle=d3d11', '--enable-gpu'] })
+  return chromium.launch(verifyLaunchOptions(VERIFY_GL, process.platform, process.env.VERIFY_ANGLE))
 }
 
 /** Guardrail (point 184): throw if the backend that actually initialised is not the

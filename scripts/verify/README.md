@@ -30,6 +30,40 @@ npm test -- flow      # just the named browser suite(s) (dev server managed for 
 lint → **vitest (fail-fast)** → the Playwright browser suites against the dev
 server → the production-preview smoke test.
 
+### Host bring-up — once per machine (point 475)
+
+The browser suites need a browser, and `npm install` does not put one there. One
+documented command does, on every platform:
+
+```
+npm run verify:bringup          # install what is missing, then report
+npm run verify:bringup -- --check   # report only, install nothing
+```
+
+**No suite ever installs implicitly** — a regression that quietly downloads
+~180 MB mid-run is a surprise, not a convenience — so a fresh machine runs this
+once and never again.
+
+| Lane | Needs | Where it comes from |
+|---|---|---|
+| WebGL 2 (`VERIFY_GL=webgl`) | Playwright's **bundled** Chromium | `npm run verify:bringup` installs it (`playwright install chromium`). |
+| WebGPU (`VERIFY_GL=webgpu`) | **System Chrome** (`channel:'chrome'`, point 184) | A package manager, so it needs root: `npx playwright install --with-deps chrome` on Linux, `npx playwright install chrome` on Windows/macOS. The bring-up reports its absence with the command; it cannot install it for you. |
+
+The **ANGLE backend is chosen by platform** (`launch-args-core.mjs`, swept by
+`launch-args-core.test.mjs`): Windows keeps `--use-angle=d3d11` exactly as it
+always had it, Linux gets `swiftshader` (the container has no GPU, no DRI driver
+and no system libEGL, and Chrome ≥120 will not fall back to software WebGL on its
+own), macOS `metal`. A host whose graphics stack differs from its platform's norm —
+a Linux box with a real GPU — overrides it with `VERIFY_ANGLE=gl` (or `vulkan`)
+without touching the code. Linux additionally launches with `--no-sandbox`, which
+container images need; Windows and macOS keep their argument list unchanged.
+
+Without a system Chrome the **WebGPU lane fails LOUD** — `WebGPU backend
+unavailable on this host` — and stops. It is never quietly served by WebGL 2, and
+because nothing launches, no run record is written, so `render-verify-guard` cannot
+mistake the attempt for WebGPU coverage: a WebGL 2 picture says nothing about the
+WebGPU one (point 210).
+
 ### The fast layer's timeout is load-proof, not tight (point 398)
 
 `vitest.config.ts` sets `testTimeout: 20_000` (and the same for `hookTimeout`).
