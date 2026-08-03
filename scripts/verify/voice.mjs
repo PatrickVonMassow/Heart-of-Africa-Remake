@@ -182,8 +182,12 @@ await page
 // the window cannot hide a stall (the attribution takes the MAXIMUM block over
 // it) and cannot invalidate the load-in-window test, which only asks that the
 // model was served after probeStart.
+// Collected WITH HEADROOM, not to the exact threshold: gathering until the gate's
+// own minimum is met leaves a run that reaches it on the last poll one sample from
+// red, which is how a rotating flake is born (this one showed up immediately — 30
+// frames against a demand of more than 30, green only on the retry).
 await page
-  .waitForFunction(() => window.__liveness.raf.length > 30 && window.__liveness.ticks.length > 20, null, { timeout: 30000 })
+  .waitForFunction(() => window.__liveness.raf.length > 45 && window.__liveness.ticks.length > 30, null, { timeout: 60000 })
   .catch(() => {})
 const probe = await page.evaluate(() => {
   const S = window.__liveness
