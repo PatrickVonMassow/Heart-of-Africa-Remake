@@ -182,7 +182,7 @@ const RESUME_BODY =
   'carries ONE stretch of work, not point after point. Once the merged-and-ticked point is done ' +
   'AND no delegated agent is still in flight (let the pool drain — ending mid-flight throws its ' +
   'work away), run `node scripts/batch-boundary.mjs <point>` and END THE SESSION instead of ' +
-  'starting the next point here. The OS task HoA-Batch-Autostart brings up a fresh session and ' +
+  'starting the next point here. The launcher brings up a fresh session and ' +
   'this hook re-orients it; batch-progress-guard permits that stop only against a verifiably ' +
   'closed point and an armed launcher, and blocks every other end as before. ' +
   'First check git status AND the checked-out branch above for work already underway, and ' +
