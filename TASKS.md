@@ -4137,3 +4137,29 @@ also be taken as its own task now and then.
   unavailable WebGPU lane produces an explicit unavailable verdict that `render-verify-guard`
   does NOT read as coverage; and one live SMALL browser run on this machine after the bring-up,
   with its exit code quoted.
+
+- [ ] 476. THE MECHANISM-REVIEW SCAN COSTS TWO MINUTES PER GATHER AND TURNS BRANCH RUNS RED
+  (measured 03.08.2026 by the four-eyes review of point 462 on the Linux host; bundle Modell &
+  Wächter). `mechanism-review-guard`'s gather takes 93–131 SECONDS on a branch that carries
+  unreviewed mechanism commits, against 0.9 s on `main` with none pending. The two real-repo
+  cases in `scripts/guard-preflight-core.test.mjs` run into their 30-second timeout because of
+  it, so EVERY branch with open mechanism commits reports a red unit run that has nothing to do
+  with its own code — the reviewer proved this by diffing: the preflight and mechanism-review
+  files are byte-identical between that branch and `main`.
+  The cost is per COMMIT scanned and was merely hidden on the Windows host, where the same scan
+  ran against a warm filesystem; it is not new, it is newly visible. It matters more than a slow
+  test: a guard whose own gather is the slowest step in the gate trains sessions to skip the
+  gate, and a red that everyone knows to ignore is exactly the state CLAUDE.md §7.2 forbids.
+  FINAL STATE: the gather answers in well under a second for any realistic number of pending
+  mechanism commits — by scanning each commit once and REMEMBERING the verdict (keyed by sha,
+  invalidated when the review log changes), not by narrowing what it examines. The guard's
+  decision must be unchanged for every input it accepts today; this is a cost fix, never a
+  loosening. The two preflight cases stay real-repo cases and keep their 30-second budget — if
+  they still cannot pass inside it after the fix, that is a finding, not a reason to raise the
+  budget.
+  Both files are guard mechanism, so the other model's recorded review is required before the
+  merge (`mechanism-review-guard`).
+  VERIFIABLE: a Vitest case that pins the memo — a second gather over an unchanged repo state
+  performs no repeated per-commit git call — plus one measured before/after figure quoted in
+  the commit, taken on a branch with at least three pending mechanism commits; and the existing
+  guard-preflight cases green inside their unchanged timeout.
