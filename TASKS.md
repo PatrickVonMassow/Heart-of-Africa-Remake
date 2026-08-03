@@ -4036,8 +4036,25 @@ also be taken as its own task now and then.
      "WebGPU backend unavailable on this host" — it is never silently downgraded to WebGL 2 and
      never recorded as backend coverage. The run recorder must not credit a lane that did not run.
   4. The Windows host keeps its current behaviour byte for byte.
+  5. The WebGL 2 lane comes up on WebGL 2 on every host. Measured on this container: SwiftShader
+     DOES expose a WebGPU adapter, so `--enable-unsafe-webgpu` — harmless on Windows, where the
+     bundled Chromium has none — makes the FALLBACK lane initialise a WebGPU that dies on its
+     first attribute buffer, and the page never finishes loading. The lane therefore disables
+     WebGPU where its own backend is the one under test.
+  6. Binding and connecting agree on the address family. The dev server the suites drive resolves
+     `localhost` to `::1` and binds it, while the Node side of `_server.mjs` connects `127.0.0.1`
+     and is refused — on a host with no IPv6 route, every browser suite dies before its first
+     check. One address, chosen explicitly, on both sides.
+  7. The TTS model cache reaches its CDN on a host without IPv6. `ttsCache.mjs`'s `route.fetch`
+     goes out over IPv6 and gets ENETUNREACH, which is the whole of `voice`'s red here; the
+     browser reaches the same CDN fine, and Node's DNS order does not reach Playwright's driver.
   VERIFIABLE: pure Vitest cases on the launch-args helper — win32 yields the D3D11 flag, linux
-  yields the GL flag, and the WebGPU lane's args are unchanged on both; a case proving an
-  unavailable WebGPU lane produces an explicit unavailable verdict that `render-verify-guard`
-  does NOT read as coverage; and one live SMALL browser run on this machine after the bring-up,
-  with its exit code quoted.
+  yields the GL flag and no WebGPU, and the WebGPU lane's args are unchanged on both; a case
+  proving an unavailable WebGPU lane produces an explicit unavailable verdict that
+  `render-verify-guard` does NOT read as coverage; and one live SMALL browser run on this machine
+  after the bring-up, with its exit code quoted.
+  HOST CAVEAT, recorded so no later run misreads it: this container renders in software at
+  ~12.6 fps and has no GPU, so the WebGPU lane cannot be verified here at all (its only adapter,
+  SwiftShader's, dies on the scene), and the two timing-bound `collision` walker checks report
+  that nothing moved in their window. Whether those two are green on GPU hardware is measured
+  there, not decided here.

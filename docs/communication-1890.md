@@ -270,6 +270,14 @@ That is four zones, or three if 3 folds into 2. Each is *invented but shaped
 like* its historical models, per §13.4's standard — and each teaches
 differently, which keeps five-times-the-same-puzzle off the table.
 
+**DECIDED (user, 03.08.2026): THREE zones.** The cut above stands, with the
+Cross-River pocket folded into the tonal West+Centre as its coastal south-east
+— so the game carries the script North, the tonal West+Centre and the signal
+East+South. The nsibidi-like tiered ideography is not dropped by that: it lives
+on inside zone 2 as that coast's own medium, its restricted tier still gated by
+the gift/friendship systems. The MECHANIC itself — how a player learns a zone —
+remains the user's open question.
+
 ---
 
 ## 4.9 The pre-1910 eyewitness record, settled — the West-African strand

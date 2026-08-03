@@ -174,6 +174,10 @@ scope, acceptance criteria and build rules.
 
 This repository contains the **proof of concept**: the core gameplay loop is not fully developed.
 
+All 32 acceptance criteria of `CLAUDE.md` §7.1 are implemented, with the
+screenshot evidence in `verification/`; the simplifications and open items that
+remain are recorded in the code (`// OPEN:`) and in `TASKS.md`.
+
 The full headless regression runs with `npm test` — a fast Vitest (jsdom) layer
 plus 15 Playwright browser suites; the test strategy and coverage map live in
 [`scripts/verify/README.md`](scripts/verify/README.md).
