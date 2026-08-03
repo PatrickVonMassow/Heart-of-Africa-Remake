@@ -167,10 +167,20 @@ export function runBatchTick({ logPath = LAUNCHER_LOG_PATH, timeoutMs = TICK_TIM
  * THE DAEMON LOOP. `tick` is injected so the loop can be exercised without
  * touching the batch — the same shape `lastWorkOrderTickSince` uses for `git`.
  *
- * It refuses to run beside a live daemon: the record is judged first, and an
- * armed record belonging to another live process ends this one immediately. That
- * is the whole "refuses to run twice" — no lock of its own, because the record
- * plus a real pid probe already answers the question.
+ * IT RUNS ONCE, AND THE PUBLISH IS WHAT SAYS SO. The record used to be judged only
+ * at the top: check, then publish — and two starts milliseconds apart both clear a
+ * check nobody has published against yet. Node's own ~50–100 ms boot makes that
+ * window trivial to hit, and six simultaneous starts left two to five daemons
+ * ticking, every round. So the claim is made by the publish itself: ownership is
+ * re-read immediately BEFORE every write, the record is one atomic rename, and
+ * whoever wrote last owns it — every other daemon sees a live foreign pid at its
+ * next publish and leaves WITHOUT writing. That converges to exactly one survivor,
+ * because after the globally last write no other process writes again.
+ *
+ * The same read honours a STOP: a stop mark laid down after this daemon came up is
+ * an order to it too, whichever pid the record names. Otherwise the loser of a race
+ * outlives `--stop` and re-arms the record at its next tick, making the one promise
+ * `--stop` exists to give — nothing will restart the batch — false.
  */
 export async function runDaemon({
   tick = runBatchTick,
@@ -193,12 +203,32 @@ export async function runDaemon({
   const startedAt = Date.now()
   const base = { v: LAUNCHER_RECORD_VERSION, name: LAUNCHER_DAEMON_NAME, pid: process.pid, pidStartedAt, startedAt, tickMs }
   let lastTickAt = startedAt
+  let leaving = null
+  /** Writes the record, unless somebody else's claim or a stop order says not to.
+   *  Returns false when this daemon has just lost the singleton and must leave. */
   const publish = (patch = {}) => {
+    const seen = launcherState({ recordPath, tickMs })
+    if (seen.record?.stopped === true && Number(seen.record.stoppedAt) >= startedAt) {
+      leaving = 'a stop was ordered'
+      return false
+    }
+    if ((seen.state === 'ready' || seen.state === 'running') && Number(seen.record?.pid) !== process.pid) {
+      leaving = `pid ${seen.record?.pid} holds the record (${seen.state})`
+      return false
+    }
     try {
       writeJsonAtomic(recordPath, { ...base, lastTickAt, ...patch })
     } catch (e) {
       appendLog(logPath, `record write failed: ${(e && e.message) || e}`)
     }
+    return true
+  }
+  // Leaves the record exactly as it stands: the daemon that owns it is still
+  // ticking, and a parting `stopped` mark from a loser would disarm a live
+  // launcher — the same lie from the other side.
+  const leave = () => {
+    appendLog(logPath, `launcher leaving (pid ${process.pid}) — ${leaving}`)
+    return 'yielded'
   }
 
   let stopping = false
@@ -211,11 +241,13 @@ export async function runDaemon({
   process.on('SIGTERM', () => stop('SIGTERM'))
   process.on('SIGINT', () => stop('SIGINT'))
 
-  publish()
+  if (!publish()) return leave()
   appendLog(logPath, `launcher up (pid ${process.pid}, every ${Math.round(tickMs / 1000)} s)`)
 
   while (!stopping) {
-    publish({ tickInFlight: true, tickStartedAt: Date.now() })
+    // Checked again right here, before the tick rather than after it: a daemon
+    // that lost the record must not spend an interval running the batch first.
+    if (!publish({ tickInFlight: true, tickStartedAt: Date.now() })) return leave()
     try {
       const code = await tick({ logPath })
       appendLog(logPath, `tick finished (exit ${code === null ? 'killed' : code})`)
@@ -223,7 +255,7 @@ export async function runDaemon({
       appendLog(logPath, `tick threw: ${(e && e.message) || e}`)
     }
     lastTickAt = Date.now()
-    publish({ tickInFlight: false })
+    if (!publish({ tickInFlight: false })) return leave()
     if (stopping) break
     // Interruptible: a stop signal must not have to wait out a whole interval.
     await new Promise((resolve) => {
@@ -238,6 +270,7 @@ export async function runDaemon({
 
   publish({ stopped: true, stoppedAt: Date.now() })
   appendLog(logPath, 'launcher down')
+  return 'stopped'
 }
 
 /** Start the daemon detached, so it outlives the session that started it. */
@@ -262,38 +295,59 @@ export async function startDaemon({ recordPath = LAUNCHER_RECORD_PATH, tickMs = 
   }
 }
 
-/** Stop it, and RECORD that it was stopped — a disarmed launcher must be
- *  distinguishable from an unreadable one, or the fix cannot be named. */
-export async function stopDaemon({ recordPath = LAUNCHER_RECORD_PATH, tickMs = LAUNCHER_TICK_MS } = {}) {
-  const before = launcherState({ recordPath, tickMs })
-  const pid = Number(before.record?.pid)
+/**
+ * Stop it, and RECORD that it was stopped — a disarmed launcher must be
+ * distinguishable from an unreadable one, or the fix cannot be named.
+ *
+ * IT VERIFIES INSTEAD OF ASSUMING. Killing the recorded pid and then reporting the
+ * mark it just wrote cannot tell "stopped" from "stopped one of them": anything
+ * still alive republishes and the launcher is armed again, while `--stop` has
+ * already promised that nothing will restart the batch. So the record is re-read
+ * after the kill, and whatever still reads armed is stopped too — and the verdict
+ * returned is the one the record actually gives, never the one that was written.
+ */
+export async function stopDaemon({
+  recordPath = LAUNCHER_RECORD_PATH,
+  tickMs = LAUNCHER_TICK_MS,
+  rounds = 3,
+} = {}) {
+  const armed = (s) => s.state === 'ready' || s.state === 'running'
   let killed = false
-  if (Number.isInteger(pid) && pid > 0 && probePid(pid).exists) {
-    try {
-      process.kill(pid, 'SIGTERM')
-      killed = true
-    } catch {
-      /* gone between the probe and the signal */
-    }
-    const deadline = Date.now() + 5000
-    while (probePid(pid).exists && Date.now() < deadline) await sleep(200)
-    if (probePid(pid).exists) {
+  let state = launcherState({ recordPath, tickMs })
+  for (let round = 0; round < rounds; round++) {
+    const pid = Number(state.record?.pid)
+    if (Number.isInteger(pid) && pid > 0 && pid !== process.pid && probePid(pid).exists) {
       try {
-        process.kill(pid, 'SIGKILL')
+        process.kill(pid, 'SIGTERM')
+        killed = true
       } catch {
-        /* gone */
+        /* gone between the probe and the signal */
+      }
+      const deadline = Date.now() + 5000
+      while (probePid(pid).exists && Date.now() < deadline) await sleep(200)
+      if (probePid(pid).exists) {
+        try {
+          process.kill(pid, 'SIGKILL')
+        } catch {
+          /* gone */
+        }
+        while (probePid(pid).exists && Date.now() < deadline + 2000) await sleep(100)
       }
     }
+    // Written whatever happened: the daemon marks its own stop on SIGTERM, but a
+    // killed or already-dead one cannot, and the state must still say "disabled"
+    // rather than "unknown".
+    try {
+      writeJsonAtomic(recordPath, { ...(state.record ?? { v: LAUNCHER_RECORD_VERSION }), stopped: true, stoppedAt: Date.now() })
+    } catch {
+      /* reported through the state below */
+    }
+    // The moment a survivor would need to publish itself over that mark.
+    await sleep(300)
+    state = launcherState({ recordPath, tickMs })
+    if (!armed(state)) break
   }
-  // Written whatever happened: the daemon marks its own stop on SIGTERM, but a
-  // killed or already-dead one cannot, and the state must still say "disabled"
-  // rather than "unknown".
-  try {
-    writeJsonAtomic(recordPath, { ...(before.record ?? { v: LAUNCHER_RECORD_VERSION }), stopped: true, stoppedAt: Date.now() })
-  } catch {
-    /* reported through the state below */
-  }
-  return { killed, ...launcherState({ recordPath, tickMs }) }
+  return { killed, stopped: !armed(state), ...state }
 }
 
 // --- CLI ----------------------------------------------------------------------
@@ -345,7 +399,13 @@ if (isMainModule(import.meta.url)) {
     if (process.platform === 'win32') refuseOnWindows()
     const r = await stopDaemon()
     console.log(JSON.stringify(r, null, 2))
-    console.log(`\nThe launcher is now ${r.state}. Nothing will restart the batch until it is started again.`)
+    console.log(
+      r.stopped
+        ? `\nThe launcher is now ${r.state}. Nothing will restart the batch until it is started again.`
+        : `\nThe launcher is STILL ${r.state} (pid ${r.record?.pid}) — it was NOT stopped, and it will go on ` +
+            'ticking. Run --stop again, and --status to read what it says.',
+    )
+    process.exit(r.stopped ? 0 : 1)
   } else if (arg === '--daemon') {
     if (process.platform === 'win32') refuseOnWindows()
     if (inWorktree()) refuseWorktree()
