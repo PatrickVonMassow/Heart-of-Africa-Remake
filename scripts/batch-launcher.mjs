@@ -25,7 +25,7 @@
 //   node scripts/batch-launcher.mjs --stop     stop it
 //   node scripts/batch-launcher.mjs --status   what state it is in
 //   node scripts/batch-launcher.mjs --daemon   INTERNAL: the loop itself
-import { appendFileSync, mkdirSync, openSync, readFileSync, statSync } from 'node:fs'
+import { appendFileSync, closeSync, mkdirSync, openSync, readFileSync, statSync } from 'node:fs'
 import { spawn } from 'node:child_process'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -116,6 +116,18 @@ export function runBatchTick({ logPath = LAUNCHER_LOG_PATH, timeoutMs = TICK_TIM
     } catch {
       /* no log file — the tick still runs */
     }
+    // The daemon runs for weeks and ticks ~96 times a day: a descriptor left open
+    // per tick is a slow leak that would eventually take the launcher down, which
+    // is the one process that must not die.
+    const closeLog = () => {
+      if (typeof fd !== 'number') return
+      try {
+        closeSync(fd)
+      } catch {
+        /* already closed */
+      }
+      fd = 'ignore'
+    }
     let child
     try {
       child = spawn(process.execPath, [repoPath('scripts/batch-autostart.mjs')], {
@@ -124,6 +136,7 @@ export function runBatchTick({ logPath = LAUNCHER_LOG_PATH, timeoutMs = TICK_TIM
         windowsHide: true,
       })
     } catch (e) {
+      closeLog()
       appendLog(logPath, `tick failed to start: ${(e && e.message) || e}`)
       resolve(null)
       return
@@ -138,11 +151,13 @@ export function runBatchTick({ logPath = LAUNCHER_LOG_PATH, timeoutMs = TICK_TIM
     }, timeoutMs)
     child.on('error', (e) => {
       clearTimeout(timer)
+      closeLog()
       appendLog(logPath, `tick errored: ${(e && e.message) || e}`)
       resolve(null)
     })
     child.on('exit', (code) => {
       clearTimeout(timer)
+      closeLog()
       resolve(code)
     })
   })
