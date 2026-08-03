@@ -4103,3 +4103,37 @@ also be taken as its own task now and then.
   and one live round trip on this machine — start the daemon, assert
   `node scripts/batch-boundary.mjs --status` reports it armed, stop it, assert the verdict
   falls back to NOT armed.
+
+- [ ] 475. THE BROWSER VERIFICATION CANNOT RUN ON THIS HOST AT ALL (found 03.08.2026 while
+  checking the Linux move of point 474; same cause, different layer). The picture check is the
+  main session's OWN job under CLAUDE.md §6 — a render/GUI point merges only against a verified
+  picture on both backends — and in the Linux container not one browser suite can start.
+  Measured:
+  - `PLAYWRIGHT_BROWSERS_PATH=/home/node/.pw-browsers` is set and that directory does NOT
+    exist: no bundled Chromium is installed. `playwright` itself imports fine, so the failure
+    arrives at launch time, per suite, not as a missing dependency.
+  - No system browser either — `chromium`, `chromium-browser` and `google-chrome` are all
+    absent from PATH. The WebGPU lane in `scripts/verify/_browser.mjs` launches with
+    `channel: 'chrome'` (the point-184 breakthrough: bundled Chromium fails `requestDevice`
+    headless), so that lane has nothing to run on.
+  - The WebGL 2 lane launches with `--use-angle=d3d11` — a Direct3D backend that exists only
+    on Windows. Even with a browser installed, the flag is wrong for this host; the Linux
+    equivalent is the GL (or Vulkan) ANGLE backend.
+  Consequence while this stands: `render-verify-guard` can never be satisfied here, so every
+  render/GUI point is unmergeable and no closing run can complete on this machine.
+  FINAL STATE:
+  1. One documented bring-up command installs what the suites need on a fresh Linux host, and
+     `scripts/verify/README.md` names it beside the Windows prerequisites. Nothing is installed
+     implicitly by a suite run.
+  2. The ANGLE backend is chosen BY PLATFORM in a pure helper (`--use-angle=d3d11` on win32,
+     the GL backend on Linux), not hard-coded. `launchVerifyBrowser` consumes that helper; the
+     existing `assertBackend` check stays exactly as strict.
+  3. The WebGPU lane runs where a system Chrome exists and, where none does, fails LOUD with
+     "WebGPU backend unavailable on this host" — it is never silently downgraded to WebGL 2 and
+     never recorded as backend coverage. The run recorder must not credit a lane that did not run.
+  4. The Windows host keeps its current behaviour byte for byte.
+  VERIFIABLE: pure Vitest cases on the launch-args helper — win32 yields the D3D11 flag, linux
+  yields the GL flag, and the WebGPU lane's args are unchanged on both; a case proving an
+  unavailable WebGPU lane produces an explicit unavailable verdict that `render-verify-guard`
+  does NOT read as coverage; and one live SMALL browser run on this machine after the bring-up,
+  with its exit code quoted.
