@@ -59,19 +59,26 @@ function findSystemChrome(platform = process.platform) {
  *
  *  Nothing here installs a browser. The bring-up is one documented command,
  *  `npm run verify:bringup` (scripts/verify/README.md): a suite that silently
- *  downloaded ~180 MB mid-regression would be a surprise, not a convenience. */
-export async function launchVerifyBrowser() {
+ *  downloaded ~180 MB mid-regression would be a surprise, not a convenience.
+ *
+ *  The options POSE a host and no suite passes them: `platform` names the platform to
+ *  decide by, and `systemChrome` short-circuits the probe (null = "this host has no
+ *  browser", undefined = "probe it"). They exist because the ordering below is
+ *  load-bearing — the throw must happen BEFORE armRunRecorder — and proving that on a
+ *  machine that HAS a system Chrome would otherwise mean launching a real browser
+ *  (scripts/verify/launch-order.test.mjs). */
+export async function launchVerifyBrowser({ platform = process.platform, systemChrome } = {}) {
   // The probe runs ONCE and its result is what LAUNCHES: the verdict and the launch
   // options read the same path, so the browser the bring-up reports is the browser the
   // lane opens (point 475 — see webgpuLaunchOptions).
-  let systemChrome = null
+  let chrome = systemChrome ?? null
   if (VERIFY_GL === 'webgpu') {
-    systemChrome = findSystemChrome()
+    if (systemChrome === undefined) chrome = findSystemChrome(platform)
     // The lane is either run for real or declared unrunnable — never quietly served by
     // the other backend. Thrown BEFORE the recorder is armed, so a host without a
     // system Chrome/Chromium leaves no run record at all and render-verify-guard cannot
     // read the attempt as WebGPU coverage (point 475, condition 3).
-    const verdict = webgpuLaneVerdict({ platform: process.platform, systemChrome })
+    const verdict = webgpuLaneVerdict({ platform, systemChrome: chrome })
     if (!verdict.available) throw new Error(verdict.reason)
   }
   // Render-verify evidence (user mandate 22.07.2026): record this suite run —
@@ -79,7 +86,7 @@ export async function launchVerifyBrowser() {
   // guard (scripts/render-verify-guard.mjs) can enforce that every render change
   // was verified on BOTH backends. Observe-only; can never fail the suite.
   armRunRecorder(VERIFY_GL)
-  return chromium.launch(verifyLaunchOptions(VERIFY_GL, process.platform, process.env.VERIFY_ANGLE, systemChrome))
+  return chromium.launch(verifyLaunchOptions(VERIFY_GL, platform, process.env.VERIFY_ANGLE, chrome))
 }
 
 /** Guardrail (point 184): throw if the backend that actually initialised is not the
