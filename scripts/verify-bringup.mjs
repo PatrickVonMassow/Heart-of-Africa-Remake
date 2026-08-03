@@ -83,6 +83,7 @@ if (before) {
   const res = spawnSync('npx', ['playwright', 'install', 'chromium'], {
     stdio: 'inherit',
     shell: process.platform === 'win32',
+    windowsHide: true,
   })
   const after = bundledChromium()
   if (after) {
