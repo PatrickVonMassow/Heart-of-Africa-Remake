@@ -65,28 +65,48 @@ export function webglLaunchOptions(platform, angleOverride) {
   }
 }
 
-/** Launch options for the WebGPU lane. Unchanged on every platform: the point-184
- *  breakthrough is SYSTEM Chrome (`channel:'chrome'`) with --headless=new, and nothing
- *  about the host changes which flags that needs — only WHETHER the host has the
- *  browser at all (see webgpuLaneVerdict). */
-export function webgpuLaunchOptions() {
-  return {
-    channel: 'chrome',
-    args: ['--headless=new', '--enable-unsafe-webgpu', '--enable-gpu'],
-  }
+/** Launch options for the WebGPU lane. The flags are unchanged on every platform: the
+ *  point-184 breakthrough is a SYSTEM browser with --headless=new (Playwright's bundled
+ *  Chromium fails requestDevice headless), and nothing about the host changes which
+ *  flags that needs — only WHETHER the host has such a browser (see webgpuLaneVerdict).
+ *
+ *  `systemChrome` is the executable the caller PROBED (systemChromeCandidates →
+ *  findSystemChrome). When there is one it is handed over as `executablePath`, so the
+ *  lane opens EXACTLY the binary the bring-up reported. That is the whole point: the
+ *  `chrome` CHANNEL resolves, inside playwright-core's registry, to /opt/google/chrome/
+ *  chrome and its beta/dev/canary siblings and nothing else, so a host whose browser
+ *  sits anywhere else — a distro `chromium`, a snap, a Chrome installed off that path —
+ *  was reported "present" and then died on Playwright's generic channel error. With the
+ *  path handed through, the report and the launch cannot disagree: Playwright takes
+ *  executablePath in preference to the channel registry, and a path that vanished in
+ *  between fails naming the path. `channel` is dropped in that case — it only ever
+ *  selected the registry entry this launch no longer consults.
+ *
+ *  With nothing probed (Windows, macOS — see systemChromeCandidates) the options are
+ *  byte for byte the historical `channel:'chrome'` launch and Playwright resolves it. */
+export function webgpuLaunchOptions(systemChrome = null) {
+  const args = ['--headless=new', '--enable-unsafe-webgpu', '--enable-gpu']
+  const executablePath = typeof systemChrome === 'string' ? systemChrome.trim() : ''
+  return executablePath ? { executablePath, args } : { channel: 'chrome', args }
 }
 
 /** The options `_browser.mjs` hands chromium.launch for the requested backend. */
-export function verifyLaunchOptions(backend, platform, angleOverride) {
-  return backend === 'webgpu' ? webgpuLaunchOptions() : webglLaunchOptions(platform, angleOverride)
+export function verifyLaunchOptions(backend, platform, angleOverride, systemChrome) {
+  return backend === 'webgpu' ? webgpuLaunchOptions(systemChrome) : webglLaunchOptions(platform, angleOverride)
 }
 
 /** The loud headline of an unrunnable WebGPU lane. Verbatim in the thrown error so a
  *  log or a guard can recognise it without parsing prose. */
 export const WEBGPU_UNAVAILABLE = 'WebGPU backend unavailable on this host'
 
-/** Executables that ARE a system Chrome, in probe order. Names without a separator are
- *  looked up on PATH by the caller; the rest are absolute.
+/** Executables that can serve the WebGPU lane, in probe order. Names without a
+ *  separator are looked up on PATH by the caller; the rest are absolute.
+ *
+ *  A distro `chromium` counts, and only because the resolved path is HANDED to the
+ *  launch (webgpuLaunchOptions): a full Chromium build is the same engine, while the
+ *  `chrome` channel alone would never have found it. Whether a given build really
+ *  brings up a headless WebGPU adapter is not a question any probe can answer — the
+ *  lane's own assertBackend answers it, loudly, on the running renderer.
  *
  *  Windows returns NOTHING deliberately — not "no Chrome", but "do not probe": Chrome's
  *  install location there varies (per-user, per-machine, an enterprise path), Playwright
@@ -131,8 +151,9 @@ export function webgpuLaneVerdict({ platform, systemChrome } = {}) {
     systemChrome: null,
     probed: true,
     reason:
-      `${WEBGPU_UNAVAILABLE}: the lane needs SYSTEM Chrome (channel:'chrome' + --headless=new, ` +
-      "point 184 — Playwright's bundled Chromium has no headless WebGPU adapter), and none of " +
+      `${WEBGPU_UNAVAILABLE}: the lane needs a SYSTEM Chrome/Chromium (launched by path, ` +
+      "--headless=new, point 184 — Playwright's bundled Chromium has no headless WebGPU " +
+      'adapter), and none of ' +
       `[${systemChromeCandidates(platform).join(', ')}] exists on this ${platform} host. ` +
       'Install one (see the host bring-up in scripts/verify/README.md) and re-run. This run is ' +
       'NOT silently downgraded to WebGL 2: a WebGL 2 picture is no evidence about the WebGPU one ' +

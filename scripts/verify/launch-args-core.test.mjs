@@ -74,8 +74,34 @@ describe('webglLaunchOptions', () => {
 })
 
 describe('webgpuLaunchOptions', () => {
-  it('is the point-184 system-Chrome launch, unchanged', () => {
+  it('is the point-184 system-Chrome launch when nothing was probed', () => {
     expect(webgpuLaunchOptions()).toEqual(WEBGPU_LAUNCH)
+    expect(webgpuLaunchOptions(null)).toEqual(WEBGPU_LAUNCH)
+  })
+
+  it('launches the PROBED path, so the bring-up report cannot name another browser', () => {
+    // The defect this pins: the `chrome` channel resolves only to /opt/google/chrome/
+    // chrome (+ beta/dev/canary) inside playwright-core's registry, while the probe
+    // also finds a distro chromium. Reporting one and launching the other was a false
+    // ready-signal; the resolved path is now what launches.
+    expect(webgpuLaunchOptions('/usr/bin/chromium')).toEqual({
+      executablePath: '/usr/bin/chromium',
+      args: WEBGPU_LAUNCH.args,
+    })
+  })
+
+  it('drops the channel once a path is given — Playwright would ignore it anyway', () => {
+    expect(webgpuLaunchOptions('/snap/bin/chromium').channel).toBeUndefined()
+  })
+
+  it('keeps the flag list identical either way — only the browser choice moved', () => {
+    expect(webgpuLaunchOptions('/opt/google/chrome/chrome').args).toEqual(WEBGPU_LAUNCH.args)
+  })
+
+  it('treats a blank or non-string probe result as "nothing found"', () => {
+    expect(webgpuLaunchOptions('')).toEqual(WEBGPU_LAUNCH)
+    expect(webgpuLaunchOptions('   ')).toEqual(WEBGPU_LAUNCH)
+    expect(webgpuLaunchOptions(0)).toEqual(WEBGPU_LAUNCH)
   })
 })
 
@@ -89,6 +115,24 @@ describe('verifyLaunchOptions', () => {
     expect(verifyLaunchOptions('webgpu', 'linux', 'gl')).toEqual(WEBGPU_LAUNCH)
   })
 
+  it('carries the probed browser through to the webgpu lane', () => {
+    expect(verifyLaunchOptions('webgpu', 'linux', undefined, '/usr/bin/chromium')).toEqual({
+      executablePath: '/usr/bin/chromium',
+      args: WEBGPU_LAUNCH.args,
+    })
+  })
+
+  it('never lets a probed browser into the WebGL 2 lane — that one is the bundled Chromium', () => {
+    expect(verifyLaunchOptions('webgl', 'linux', undefined, '/usr/bin/chromium')).toEqual({
+      args: ['--enable-unsafe-webgpu', '--use-angle=swiftshader', '--enable-gpu', '--no-sandbox'],
+    })
+  })
+
+  it('leaves Windows byte for byte where nothing is probed', () => {
+    expect(verifyLaunchOptions('webgpu', 'win32', undefined, null)).toEqual(WEBGPU_LAUNCH)
+    expect(verifyLaunchOptions('webgl', 'win32', undefined, null)).toEqual({ args: WINDOWS_WEBGL_ARGS })
+  })
+
   it('routes anything else to the platform WebGL 2 lane', () => {
     expect(verifyLaunchOptions('webgl', 'win32')).toEqual({ args: WINDOWS_WEBGL_ARGS })
     expect(verifyLaunchOptions('webgl', 'linux').args).toContain('--use-angle=swiftshader')
@@ -98,6 +142,17 @@ describe('verifyLaunchOptions', () => {
 describe('systemChromeCandidates', () => {
   it('probes on Linux, where the point measured the absence', () => {
     expect(systemChromeCandidates('linux')).toContain('google-chrome')
+  })
+
+  it('lists a distro chromium too, and EVERY entry reaches the launch as a path', () => {
+    // The list may only name things the lane can actually open. Since the probe's
+    // result is handed over as executablePath, that is checkable: each candidate must
+    // produce a path launch, never fall back to the channel a chromium would fail on.
+    const candidates = systemChromeCandidates('linux')
+    expect(candidates).toContain('chromium')
+    for (const candidate of candidates) {
+      expect(webgpuLaunchOptions(candidate)).toEqual({ executablePath: candidate, args: WEBGPU_LAUNCH.args })
+    }
   })
 
   it('probes NOTHING on Windows or macOS — Playwright resolves the channel there', () => {

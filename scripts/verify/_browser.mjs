@@ -31,9 +31,10 @@ function isExecutable(path) {
   }
 }
 
-/** The first system-Chrome candidate that exists, or null. A bare name is looked up on
+/** The first system-browser candidate that exists, or null. A bare name is looked up on
  *  PATH; an absolute path is probed directly. Returns null on a platform the pure core
- *  declines to probe (Windows, macOS), where Playwright resolves the channel itself. */
+ *  declines to probe (Windows, macOS), where Playwright resolves the channel itself.
+ *  The path returned is the one the lane LAUNCHES — see webgpuLaunchOptions. */
 function findSystemChrome(platform = process.platform) {
   for (const candidate of systemChromeCandidates(platform)) {
     if (isAbsolute(candidate)) {
@@ -49,8 +50,8 @@ function findSystemChrome(platform = process.platform) {
   return null
 }
 
-/** Launch the browser for the requested backend. WebGPU needs SYSTEM Chrome —
- *  Playwright's bundled Chromium fails requestDevice headless; channel:'chrome' with
+/** Launch the browser for the requested backend. WebGPU needs a SYSTEM Chrome/Chromium
+ *  — Playwright's bundled Chromium fails requestDevice headless; the system browser with
  *  --headless=new works on a secure-context page (the point-184 breakthrough). The
  *  WebGL2 lane uses the bundled Chromium with the ANGLE backend its PLATFORM can
  *  provide (point 475 — `d3d11` is Direct3D and exists only on Windows; the args come
@@ -60,15 +61,17 @@ function findSystemChrome(platform = process.platform) {
  *  `npm run verify:bringup` (scripts/verify/README.md): a suite that silently
  *  downloaded ~180 MB mid-regression would be a surprise, not a convenience. */
 export async function launchVerifyBrowser() {
+  // The probe runs ONCE and its result is what LAUNCHES: the verdict and the launch
+  // options read the same path, so the browser the bring-up reports is the browser the
+  // lane opens (point 475 — see webgpuLaunchOptions).
+  let systemChrome = null
   if (VERIFY_GL === 'webgpu') {
+    systemChrome = findSystemChrome()
     // The lane is either run for real or declared unrunnable — never quietly served by
-    // the other backend. Thrown BEFORE the recorder is armed, so a host without system
-    // Chrome leaves no run record at all and render-verify-guard cannot read the
-    // attempt as WebGPU coverage (point 475, condition 3).
-    const verdict = webgpuLaneVerdict({
-      platform: process.platform,
-      systemChrome: findSystemChrome(),
-    })
+    // the other backend. Thrown BEFORE the recorder is armed, so a host without a
+    // system Chrome/Chromium leaves no run record at all and render-verify-guard cannot
+    // read the attempt as WebGPU coverage (point 475, condition 3).
+    const verdict = webgpuLaneVerdict({ platform: process.platform, systemChrome })
     if (!verdict.available) throw new Error(verdict.reason)
   }
   // Render-verify evidence (user mandate 22.07.2026): record this suite run —
@@ -76,7 +79,7 @@ export async function launchVerifyBrowser() {
   // guard (scripts/render-verify-guard.mjs) can enforce that every render change
   // was verified on BOTH backends. Observe-only; can never fail the suite.
   armRunRecorder(VERIFY_GL)
-  return chromium.launch(verifyLaunchOptions(VERIFY_GL, process.platform, process.env.VERIFY_ANGLE))
+  return chromium.launch(verifyLaunchOptions(VERIFY_GL, process.platform, process.env.VERIFY_ANGLE, systemChrome))
 }
 
 /** Guardrail (point 184): throw if the backend that actually initialised is not the

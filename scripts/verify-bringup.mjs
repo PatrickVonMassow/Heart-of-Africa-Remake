@@ -11,9 +11,11 @@
 //   node scripts/verify-bringup.mjs          install what is missing, then report
 //   node scripts/verify-bringup.mjs --check  report only, install nothing
 //
-// Exit 0 when the WebGL 2 lane can run. The WebGPU lane needs a SYSTEM Chrome, which
-// only a package manager (and root) can put there; this script reports its absence
-// with the command to fix it rather than pretending it can.
+// Exit 0 when the WebGL 2 lane can run. The WebGPU lane needs a SYSTEM Chrome/Chromium,
+// which only a package manager (and root) can put there; this script reports its absence
+// with the command to fix it rather than pretending it can. What it reports PRESENT is
+// the exact executable the lane launches (scripts/verify/launch-args-core.mjs) — the
+// report and the launch are not allowed to name different browsers.
 import { spawnSync } from 'node:child_process'
 import { accessSync, constants, existsSync } from 'node:fs'
 import { delimiter, isAbsolute, join } from 'node:path'
@@ -31,8 +33,10 @@ function isExecutable(path) {
   }
 }
 
-/** The first system Chrome on this host, or null (see launch-args-core.mjs for why
- *  Windows and macOS are deliberately not probed). */
+/** The first system Chrome/Chromium on this host, or null (see launch-args-core.mjs for
+ *  why Windows and macOS are deliberately not probed). What this finds is what the
+ *  WebGPU lane launches — the path is handed to Playwright as executablePath — so a
+ *  "present" here is a promise the lane keeps. */
 function findSystemChrome() {
   for (const candidate of systemChromeCandidates(process.platform)) {
     if (isAbsolute(candidate)) {
@@ -56,14 +60,16 @@ function bundledChromium() {
   }
 }
 
-/** The per-platform way to obtain SYSTEM Chrome, which the WebGPU lane launches as
- *  `channel:'chrome'`. Playwright can install it itself, but on Linux that shells out
- *  to the system package manager and needs root. */
+/** The per-platform way to obtain the WebGPU lane's browser. Playwright can install
+ *  Chrome itself, but on Linux that shells out to the system package manager and needs
+ *  root. On Linux a distro `chromium` serves the lane too — the launcher opens the
+ *  probed path directly rather than through the `chrome` channel, which resolves to
+ *  /opt/google/chrome/chrome alone. */
 function systemChromeHint() {
   if (process.platform === 'linux') {
     return [
       'npx playwright install --with-deps chrome     # needs root: it calls apt/dnf',
-      'or install Google Chrome from the distro package (google-chrome-stable).',
+      'or install a distro package: google-chrome-stable, or chromium.',
     ].join('\n    ')
   }
   return 'npx playwright install chrome'
@@ -99,12 +105,12 @@ if (before) {
 
 const chrome = findSystemChrome()
 if (systemChromeCandidates(process.platform).length === 0) {
-  lines.push('system Chrome (WebGPU lane): not probed on this platform — Playwright resolves it')
+  lines.push('system Chrome (WebGPU lane): not probed on this platform — Playwright resolves the channel')
 } else if (chrome) {
-  lines.push(`system Chrome (WebGPU lane): present — ${chrome}`)
+  lines.push(`system Chrome/Chromium (WebGPU lane): present — ${chrome} (the lane launches this path)`)
 } else {
   lines.push(
-    'system Chrome (WebGPU lane): MISSING — the WebGPU lane will fail LOUD (it is never ' +
+    'system Chrome/Chromium (WebGPU lane): MISSING — the WebGPU lane will fail LOUD (it is never ' +
       'downgraded to WebGL 2). Install it with:\n    ' +
       systemChromeHint(),
   )

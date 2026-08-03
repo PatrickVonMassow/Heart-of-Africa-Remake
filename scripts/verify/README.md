@@ -47,7 +47,19 @@ once and never again.
 | Lane | Needs | Where it comes from |
 |---|---|---|
 | WebGL 2 (`VERIFY_GL=webgl`) | Playwright's **bundled** Chromium | `npm run verify:bringup` installs it (`playwright install chromium`). |
-| WebGPU (`VERIFY_GL=webgpu`) | **System Chrome** (`channel:'chrome'`, point 184) | A package manager, so it needs root: `npx playwright install --with-deps chrome` on Linux, `npx playwright install chrome` on Windows/macOS. The bring-up reports its absence with the command; it cannot install it for you. |
+| WebGPU (`VERIFY_GL=webgpu`) | A **system Chrome/Chromium** (point 184) | A package manager, so it needs root: `npx playwright install --with-deps chrome` on Linux (a distro `chromium` serves it too), `npx playwright install chrome` on Windows/macOS. The bring-up reports its absence with the command; it cannot install it for you. |
+
+**The report and the launch name the same browser.** On Linux the bring-up PROBES
+(`google-chrome`, `chromium`, `/opt/google/chrome/chrome`, `/snap/bin/chromium`, …)
+and the lane launches the path it found, as Playwright's `executablePath`. Handing
+the path over is what makes the report honest: the `chrome` CHANNEL resolves, inside
+playwright-core's registry, to `/opt/google/chrome/chrome` and its beta/dev/canary
+siblings and **nothing else**, so a chromium-only host used to be reported "present"
+and then die on Playwright's generic channel error. Windows and macOS are not probed
+at all and keep the historical `channel:'chrome'` launch byte for byte. Whether a
+particular build really brings up a headless WebGPU adapter is not a probe's question:
+`assertBackend` answers it on the running renderer, and a lane that came up on WebGL 2
+fails loud.
 
 The **ANGLE backend is chosen by platform** (`launch-args-core.mjs`, swept by
 `launch-args-core.test.mjs`): Windows keeps `--use-angle=d3d11` exactly as it
