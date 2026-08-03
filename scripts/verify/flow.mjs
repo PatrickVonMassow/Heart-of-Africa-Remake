@@ -353,7 +353,7 @@ check('Learned language deciphers the hint (latitude)', s.decodedGiven.north ===
 // opening the book. The player's own way to read it is to open it — so open it,
 // rather than photograph a panel this suite has arranged not to appear.
 await page.evaluate(() => window.__game.getState().setJournalOpen(true))
-await page.waitForTimeout(200)
+await page.waitForFunction(() => !!document.querySelector('.journal'), null, { timeout: 5000 })
 await shot('05-journal-hint', { element: '.journal', label: 'the journal holding the hint' })
 await closeDialog()
 await page.evaluate(() => window.__game.getState().setJournalOpen(false))
