@@ -16,6 +16,7 @@ import {
   markQueued,
   parseFields,
   pendingRequests,
+  reapplyTransition,
   requestEntries,
   requestEntry,
   requestRoute,
@@ -139,6 +140,46 @@ describe('the states and the escape hatch', () => {
   it('does not transition an already queued request a second time', () => {
     const once = markQueued(text, 'Nebenfenster', 481)
     expect(markQueued(once.text, 'Nebenfenster', 482)).toBeNull()
+  })
+})
+
+// Four-eyes finding 1 (Fable 5, 31.07.2026): the transition is decided on the
+// text that was read and WRITTEN onto the text that is there now. The live
+// interleave — a second process depositing inside the gap — is in
+// finding-request-cli.test.mjs; what is swept here is the re-apply itself.
+describe('the write-back re-applies onto whatever the carrier says NOW', () => {
+  const text = `${deposit()}\n`
+
+  it('carries a deposit that arrived in the gap through the transition', () => {
+    const hit = markQueued(text, 'Nebenfenster', 481)
+    const fresh = `${text}\n${deposit({ at: '2026-07-31T06:00:00.000Z', title: 'Zweite Anfrage' })}\n`
+    const landed = reapplyTransition(fresh, hit.identity, hit.state)
+    expect(requestEntries(landed.text)[0].state).toBe('queued 481')
+    expect(pendingRequests(landed.text).map((r) => r.title)).toEqual(['Zweite Anfrage'])
+  })
+
+  it('takes the blocked reason with it', () => {
+    const hit = markBlocked(text, 'Nebenfenster', 'Widerspricht der Sperre auf main.')
+    const fresh = `${text}\n${deposit({ at: '2026-07-31T06:00:00.000Z', title: 'Zweite Anfrage' })}\n`
+    const landed = reapplyTransition(fresh, hit.identity, hit.state, hit.extra)
+    const entry = requestEntries(landed.text)[0]
+    expect(entry.state).toBe('blocked')
+    expect(entry.fields.blockedWhy).toBe('Widerspricht der Sperre auf main.')
+    expect(entry.fields.spec).toBe(SPEC)
+    expect(pendingRequests(landed.text)).toHaveLength(1)
+  })
+
+  it('matches the exact deposit, never a newcomer that shares its title', () => {
+    const hit = markQueued(text, 'Nebenfenster', 481)
+    const twin = deposit({ at: '2026-07-31T06:00:00.000Z', session: 'ffff0000' })
+    const landed = reapplyTransition(`${text}\n${twin}\n`, hit.identity, hit.state)
+    expect(pendingRequests(landed.text).map((r) => r.session)).toEqual(['ffff0000'])
+  })
+
+  it('refuses when the entry is no longer pending instead of overwriting', () => {
+    const hit = markQueued(text, 'Nebenfenster', 481)
+    expect(reapplyTransition(hit.text, hit.identity, hit.state)).toBeNull()
+    expect(reapplyTransition('', hit.identity, hit.state)).toBeNull()
   })
 })
 

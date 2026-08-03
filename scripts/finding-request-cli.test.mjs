@@ -20,19 +20,58 @@ import { REPO_ROOT } from './repo-paths.mjs'
 const SPEC = ['FINAL STATE: der Träger bekommt eine zweite Art.', '', '  - [ ] eine Zeile, die wie ein Kopf aussieht', 'Ende.'].join('\n')
 
 let dir
-const run = (args, expectFail = false) => {
+const run = (args, expectFail = false, env = {}) => {
   try {
     return execFileSync(process.execPath, ['scripts/finding.mjs', ...args], {
       cwd: REPO_ROOT,
       encoding: 'utf8',
       windowsHide: true,
-      env: { ...process.env, FINDINGS_MEMORY_DIR: dir },
+      env: { ...process.env, FINDINGS_MEMORY_DIR: dir, ...env },
     })
   } catch (e) {
     if (!expectFail) throw new Error(`finding.mjs ${args.join(' ')} failed: ${e.stderr || e.message}`)
     return String(e.stderr ?? '')
   }
 }
+
+/**
+ * A preload that makes a SECOND window deposit inside the gap between the
+ * carrier read and the carrier write of the process under test.
+ *
+ * The gap is the whole subject of four-eyes finding 1 (Fable 5), and it cannot
+ * be reached from outside the process: it is microseconds wide and no polling
+ * loop would land in it deterministically. Hooking `readFileSync` puts the
+ * concurrent deposit exactly where it hurts — after the running CLI has read the
+ * carrier, before it writes its answer back. The deposit itself is made by a
+ * REAL `finding.mjs --request` process, so what interleaves is the actual append
+ * path, not a hand-built line. Nothing of the mechanism is stubbed; only the
+ * moment is chosen.
+ */
+const interleavingPreload = (title) => {
+  const path = join(dir, 'interleave.cjs')
+  writeFileSync(
+    path,
+    `const fs = require('fs')
+const { execFileSync } = require('child_process')
+const real = fs.readFileSync
+let fired = false
+fs.readFileSync = function (target) {
+  const out = real.apply(fs, arguments)
+  if (!fired && String(target).endsWith('findings-carrier.md')) {
+    fired = true
+    execFileSync(process.execPath, ['scripts/finding.mjs', '--request', ${JSON.stringify(title)},
+      '--spec-file', ${JSON.stringify(join(dir, 'spec.md'))}, '--session', 'otherwin'],
+      { cwd: ${JSON.stringify(REPO_ROOT)}, encoding: 'utf8', env: { ...process.env, NODE_OPTIONS: '' } })
+  }
+  return out
+}
+`,
+    'utf8',
+  )
+  return { NODE_OPTIONS: `--require ${JSON.stringify(path)}` }
+}
+
+const carrierText = () => readFileSync(join(dir, 'findings-carrier.md'), 'utf8')
 
 beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), 'hoa-carrier-'))
@@ -93,6 +132,26 @@ describe('a non-owner deposits a request and the owner drains it', () => {
     expect(out).toMatch(/WARNING: no observed problem/)
     expect(out).toMatch(/WARNING: no user quotes/)
     expect(run(['--requests'])).toMatch(/1 request\(s\) waiting/)
+  })
+})
+
+describe('a deposit that lands while the owner is draining', () => {
+  it('survives the write-back instead of being erased by it', () => {
+    deposit('Erste Anfrage aus dem Nebenfenster')
+    const out = run(
+      ['--queued', 'Erste Anfrage', '--point', '481'],
+      false,
+      interleavingPreload('Zweite Anfrage aus dem Nebenfenster'),
+    )
+    expect(out).toMatch(/as point 481/)
+    const text = carrierText()
+    // The drained one is retired…
+    expect(text).toContain('queued 481')
+    expect(text).toContain('Erste Anfrage aus dem Nebenfenster')
+    // …and the one that arrived in the gap is still there, still pending.
+    expect(text).toContain('Zweite Anfrage aus dem Nebenfenster')
+    expect(run(['--requests'])).toMatch(/1 request\(s\) waiting/)
+    expect(run(['--requests'])).toContain('Zweite Anfrage')
   })
 })
 

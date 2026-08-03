@@ -38,6 +38,7 @@ import {
   markBlocked,
   markQueued,
   pendingRequests,
+  reapplyTransition,
   requestEntry,
   requestRoute,
   requestWarnings,
@@ -141,6 +142,32 @@ function headRevision() {
   }
 }
 
+/**
+ * Write a resolved request transition back — onto a FRESH read of the carrier,
+ * never onto the text the decision was made on. Returns the written text.
+ *
+ * THE GAP IS REAL (four-eyes finding 1, Fable 5, 31.07.2026). Between the read
+ * that resolved the deposit and this write, another window may have appended one
+ * — for `--blocked` the whole board.mjs subprocess sits in that gap — and
+ * writing the old text back would erase it without a word, destroying the very
+ * artifact this carrier exists to preserve. The transition is therefore
+ * re-applied by the resolved IDENTITY (timestamp, session, full title), so a
+ * deposit that arrived meanwhile survives and no second match can be retired by
+ * accident. If the entry is no longer pending, nothing is written and the caller
+ * is told rather than left with a silent overwrite.
+ */
+function writeBack(result) {
+  const landed = reapplyTransition(readCarrier(), result.identity, result.state, result.extra)
+  if (!landed) {
+    fail(
+      `"${result.title}" is no longer pending — another window changed it while this ran. ` +
+        'Nothing was written; check: node scripts/finding.mjs --requests',
+    )
+  }
+  writeFileSync(CARRIER, landed.text, 'utf8')
+  return landed.text
+}
+
 /** Report one request the way the drain lists it. */
 function listRequest(entry) {
   const route = requestRoute(entry) === 'vdzk' ? 'DECISION CARD' : 'TASKS append'
@@ -216,9 +243,9 @@ if (has('--queued')) {
         result.ambiguous.map((t) => `  · ${t}`).join('\n'),
     )
   }
-  writeFileSync(CARRIER, result.text, 'utf8')
+  const landed = writeBack(result)
   console.log(`carried into the work order as point ${point}: ${result.title}`)
-  console.log(`(${pendingRequests(result.text).length} request(s) still waiting)`)
+  console.log(`(${pendingRequests(landed).length} request(s) still waiting)`)
   process.exit(0)
 }
 
@@ -227,10 +254,12 @@ if (has('--blocked')) {
   const why = flag('--why')
   if (!title) fail('--blocked needs the title (or part of it) of the request that cannot be carried in')
   if (!why) fail('--blocked needs a reason the user can act on: --blocked "<title>" --why "<reason>"')
-  // ONE read, and the transition runs on THAT text (four-eyes finding 5, Fable
-  // 5): re-reading after the card was written could find a second matching
-  // deposit appended in between — the very concurrency this carrier is for —
-  // and then throw with the user's card already up.
+  // THE DEPOSIT IS RESOLVED ONCE, on THIS text (four-eyes finding 5, Fable 5):
+  // re-RESOLVING by the search string after the card was written could find a
+  // second matching deposit appended in between — the very concurrency this
+  // carrier is for — and then throw with the user's card already up. The WRITE
+  // still re-reads (see `writeBack`), but by exact identity, which cannot pick
+  // up a stranger.
   const before = readCarrier()
   const hits = pendingRequests(before).filter((r) => r.title.toLowerCase().includes(title.toLowerCase()))
   if (hits.length === 0) fail(`no pending request matches "${title}" — check: node scripts/finding.mjs --requests`)
@@ -255,7 +284,7 @@ if (has('--blocked')) {
     )
   }
   const result = markBlocked(before, title, why)
-  writeFileSync(CARRIER, result.text, 'utf8')
+  writeBack(result)
   console.log(`blocked and escalated to the user: ${result.title}`)
   process.exit(0)
 }

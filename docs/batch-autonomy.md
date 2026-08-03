@@ -1213,6 +1213,11 @@ open questions.
   and only then retires the entry, so an undrainable request is escalated to the
   user visibly instead of being parked. If the card cannot be written the request
   stays pending and says so.
+- **The write-back re-reads the carrier.** A transition is decided on the text
+  that was read and applied to the text that is there NOW, by the deposit's exact
+  identity (timestamp, session, full title). Another window's append lands in
+  exactly that gap — for `--blocked` the whole card subprocess sits in it — and
+  writing the old text back would erase it silently.
 - **A malformed entry warns, never blocks** — a half-written deposit is still
   listed and named, because dropping it is the exact failure the carrier ends.
 - **A body line that is itself a field marker is escaped** with one leading

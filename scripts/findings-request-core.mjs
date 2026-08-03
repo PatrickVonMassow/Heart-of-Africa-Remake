@@ -221,24 +221,56 @@ function withState(line, state) {
 }
 
 /**
+ * Apply a transition to the ONE pending request with exactly this identity —
+ * deposit timestamp, session and full title — rather than to whatever a search
+ * string happens to match. Returns { text, title } or null when that entry is
+ * no longer pending.
+ *
+ * THIS IS THE WRITE-BACK PATH (four-eyes finding 1, Fable 5, 31.07.2026). The
+ * CLI reads the carrier, decides, and only then writes; in that gap another
+ * window may append a deposit — the very concurrency this carrier exists for —
+ * and text computed from the old read would erase it. So the caller re-reads
+ * immediately before writing and re-applies here. The identity is exact because
+ * a re-RESOLVE by substring could find a deposit appended in the gap and retire
+ * the wrong one; that is the concern of four-eyes finding 5, and it stays
+ * answered.
+ */
+export function reapplyTransition(text, identity, state, extra = null) {
+  const want = identity ?? {}
+  const lines = String(text ?? '').split(/\r?\n/)
+  for (let i = 0; i < lines.length; i++) {
+    const head = parseHead(lines[i])
+    if (!head || head.kind !== 'request' || head.done || head.state !== 'pending') continue
+    if (head.at !== want.at || head.session !== want.session || head.title !== want.title) continue
+    lines[i] = withState(lines[i], state)
+    if (extra && String(extra.value ?? '').trim()) {
+      const { end } = readBody(lines, i + 1)
+      lines.splice(end, 0, `${INDENT}#${extra.tag}`, ...bodyLines(extra.value))
+    }
+    return { text: lines.join('\n'), title: head.title }
+  }
+  return null
+}
+
+/**
  * Move the one pending request whose title matches into `state`, optionally
- * appending a field to its body. Returns { text, title } on exactly one match,
- * { ambiguous: [titles] } on several and null on none — the same protocol
- * `markDrained` follows, for the same reason: retiring the wrong deposit while
- * reporting the right one is worse than refusing.
+ * appending a field to its body. Returns { text, title, identity, state, extra }
+ * on exactly one match, { ambiguous: [titles] } on several and null on none —
+ * the same protocol `markDrained` follows, for the same reason: retiring the
+ * wrong deposit while reporting the right one is worse than refusing.
+ *
+ * `identity` is what the caller re-applies with (see `reapplyTransition`);
+ * `text` is the result on the text handed in, which a pure caller can use
+ * directly.
  */
 function transition(text, title, state, extra = null) {
   const hits = findPending(text, title, 'request')
   if (hits === null || hits.length === 0) return null
   if (hits.length > 1) return { ambiguous: hits.map((h) => h.title) }
-  const lines = String(text ?? '').split(/\r?\n/)
-  const at = hits[0].index
-  lines[at] = withState(lines[at], state)
-  if (extra && String(extra.value ?? '').trim()) {
-    const { end } = readBody(lines, at + 1)
-    lines.splice(end, 0, `${INDENT}#${extra.tag}`, ...bodyLines(extra.value))
-  }
-  return { text: lines.join('\n'), title: hits[0].title }
+  const identity = { at: hits[0].head.at, session: hits[0].head.session, title: hits[0].title }
+  const applied = reapplyTransition(text, identity, state, extra)
+  if (!applied) return null
+  return { ...applied, identity, state, extra }
 }
 
 /** `pending` → `queued <point>`: the deposit reached the work order. */
