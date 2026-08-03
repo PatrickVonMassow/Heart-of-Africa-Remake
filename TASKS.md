@@ -4006,64 +4006,225 @@ also be taken as its own task now and then.
   yields two; the priority ranking is never violated by the disjointness rule; and the
   reporting command's figure matches the picker's own answer on the real work order.
 
+Feature: the communication PoC. Reference: docs/communication-poc-spec.md, which
+carries the lexicon, the staged contrasts and the decisions the brief left open.
+The user's brief of 03.08.2026 gives every point here PRIORITY over the rest of
+the queue.
 
+Build order, chosen so no two parallel agents own the same file:
+  wave 1  477 (src/communication) · 482 (src/world, place layout) · 479 (the figure)
+  wave 2  478 (speech, needs 477) · 484 (journal, needs 477) · 488 (edge, needs 482)
+  wave 3  480 (tag game, needs 479) · 485 (labels, needs 484)
+  wave 4  481 (children teach) · 483 (adults teach)
+  wave 5  486 (drums) · 487 (digging)
 
-- [ ] 475. THE BROWSER VERIFICATION CANNOT RUN ON THIS HOST AT ALL (found 03.08.2026 while
-  checking the Linux move of point 474; same cause, different layer). The picture check is the
-  main session's OWN job under CLAUDE.md §6 — a render/GUI point merges only against a verified
-  picture on both backends — and in the Linux container not one browser suite can start.
-  Measured:
-  - `PLAYWRIGHT_BROWSERS_PATH=/home/node/.pw-browsers` is set and that directory does NOT
-    exist: no bundled Chromium is installed. `playwright` itself imports fine, so the failure
-    arrives at launch time, per suite, not as a missing dependency.
-  - No system browser either — `chromium`, `chromium-browser` and `google-chrome` are all
-    absent from PATH. The WebGPU lane in `scripts/verify/_browser.mjs` launches with
-    `channel: 'chrome'` (the point-184 breakthrough: bundled Chromium fails `requestDevice`
-    headless), so that lane has nothing to run on.
-  - The WebGL 2 lane launches with `--use-angle=d3d11` — a Direct3D backend that exists only
-    on Windows. Even with a browser installed, the flag is wrong for this host; the Linux
-    equivalent is the GL (or Vulkan) ANGLE backend.
-  Consequence while this stands: `render-verify-guard` can never be satisfied here, so every
-  render/GUI point is unmergeable and no closing run can complete on this machine.
+- [ ] 477. THE TONAL LEXICON, THE PHRASE AND WHAT COUNTS AS HEARD (user
+  03.08.2026, docs/communication-poc-spec.md). The foundation every other part
+  stands on, and the one piece that is pure data and pure logic.
   FINAL STATE:
-  1. One documented bring-up command installs what the suites need on a fresh Linux host, and
-     `scripts/verify/README.md` names it beside the Windows prerequisites. Nothing is installed
-     implicitly by a suite run.
-  2. The ANGLE backend is chosen BY PLATFORM in a pure helper (`--use-angle=d3d11` on win32,
-     the GL backend on Linux), not hard-coded. `launchVerifyBrowser` consumes that helper; the
-     existing `assertBackend` check stays exactly as strict.
-  3. The WebGPU lane runs where a system Chrome exists and, where none does, fails LOUD with
-     "WebGPU backend unavailable on this host" — it is never silently downgraded to WebGL 2 and
-     never recorded as backend coverage. The run recorder must not credit a lane that did not run.
-  4. The Windows host keeps its current behaviour byte for byte.
-  5. The WebGL 2 lane comes up on WebGL 2 on every host. Measured on this container: SwiftShader
-     DOES expose a WebGPU adapter, so `--enable-unsafe-webgpu` — harmless on Windows, where the
-     bundled Chromium has none — makes the FALLBACK lane initialise a WebGPU that dies on its
-     first attribute buffer, and the page never finishes loading. The lane therefore disables
-     WebGPU where its own backend is the one under test.
-  6. Binding and connecting agree on the address family. The dev server the suites drive resolves
-     `localhost` to `::1` and binds it, while the Node side of `_server.mjs` connects `127.0.0.1`
-     and is refused — on a host with no IPv6 route, every browser suite dies before its first
-     check. One address, chosen explicitly, on both sides.
-  7. The TTS model cache reaches its CDN on a host without IPv6. `ttsCache.mjs`'s `route.fetch`
-     goes out over IPv6 and gets ENETUNREACH, which is the whole of `voice`'s red here; the
-     browser reaches the same CDN fine, and Node's DNS order does not reach Playwright's driver.
-  VERIFIABLE: pure Vitest cases on the launch-args helper — win32 yields the D3D11 flag, linux
-  yields the GL flag and no WebGPU, and the WebGPU lane's args are unchanged on both; a case
-  proving an unavailable WebGPU lane produces an explicit unavailable verdict that
-  `render-verify-guard` does NOT read as coverage; and one live SMALL browser run on this machine
-  after the bring-up, with its exit code quoted.
-  HOST CAVEAT, recorded so no later run misreads it: this container renders in software at
-  ~12.6 fps and has no GPU, so the WebGPU lane cannot be verified here at all (its only adapter,
-  SwiftShader's, dies on the scene), and the two timing-bound `collision` walker checks report
-  that nothing moved in their window. Whether those two are green on GPU hardware is measured
-  there, not decided here. The bring-up cannot fetch a browser either: the current Chrome-for-
-  Testing builds redirect to a host this network blocks, so the browser in place was taken from
-  the last build Playwright serves directly and installed by hand. It survives only as long as
-  the container does — a rebuild costs the browser, and with it every picture check. The durable
-  fix is a browser in the image, or the download host reachable.
-  ONE RED STAYS UNEXPLAINED and is not this point's host story: `flow`'s frame `05-journal-hint`
-  finds no `.journal` although the entries it photographs are demonstrably written. Measure
-  `journalOpen` and `journalDnd` at that moment rather than reasoning about them; if it is a
-  product defect it belongs in its own point, if it is the frame rate it belongs in the caveat
-  above.
+  1. One registry (`src/communication/lexicon.ts`) holds every concept with its
+     sequence, in a shape a later region can extend without touching consumers.
+     Eleven concepts: COME, GO_THERE, FOLLOW, HERE, THERE, NO (the children's)
+     and RIVER, UPSTREAM, DOWNSTREAM, BIG_ROCK, DIG (the adults').
+  2. Five syllables each, an EVEN number of them high. That is what makes any two
+     sequences differ in at least TWO syllables, so one misheard beat can never
+     turn one concept into another — it can only produce a non-word, which the
+     player notices. Four syllables cannot do this for eleven concepts: a
+     four-long binary code with every pair two apart holds at most eight. The
+     assignment is the table in docs/communication-poc-spec.md.
+  3. All four opposite pairs are exact reverses of each other: COME/GO_THERE,
+     HERE/THERE, FOLLOW/NO, UPSTREAM/DOWNSTREAM.
+  4. An utterance is ATOMIC — nothing parses it into parts, and loudness, tempo,
+     rhythm and syllable length carry no meaning anywhere. A PHRASE is an ordered
+     list of atoms, which is how a villager says "dig + here"; the atoms are
+     separated by the same constant pause the drums use, and nothing else.
+  5. The store of what the player has HEARD lives here: an utterance becomes
+     observed the first time he is close enough to hear it, each atom of a phrase
+     on its own. Journal, labels and drums all read this one store, and the
+     player's free-text hypothesis per utterance lives beside it and travels with
+     the save.
+  6. The journal's sort order is defined here, once: lexicographic with `ba`
+     before `BA`, consistent across differing lengths.
+  VERIFIABLE: pure Vitest — the registry is complete against the concept union
+  (a twelfth concept cannot compile without a sequence), every sequence is
+  well-formed, unique and even-weight, no two are less than two syllables apart,
+  the four mirror pairs are exact reverses, a phrase observes each atom once, and
+  the sort is stable over mixed lengths.
+
+- [ ] 478. THE SPOKEN UTTERANCE, HEARD ONLY UP CLOSE (user 03.08.2026).
+  FINAL STATE:
+  1. Speaking an utterance plays its syllables — a low sample for `ba`, a high one
+     for `BA` — at a constant pace, and a phrase plays its atoms with the constant
+     pause between them.
+  2. The range is SHORT and spatial. Among the children the player hears the
+     children, among the adults the adults, and in the middle of the village there
+     is no permanent babble of both.
+  3. Hearing records the utterance as observed through point 477's store — seeing
+     a gesture from too far to hear teaches nothing.
+  4. Pace, pause and the attenuation curve are balance values under
+     `balance.communication.*`, debug-editable per §21, and the audio sits under
+     the existing ambience volume so one slider still governs.
+  VERIFIABLE: pure Vitest on the attenuation curve and the observation
+  bookkeeping (out of range records nothing, in range records once, a phrase
+  records each atom); browser only for the fact that sound plays.
+
+- [ ] 479. VILLAGERS GET ARMS AND GESTURES (user 03.08.2026). The figures are
+  cones with sphere heads today; a gesture needs something to gesture with.
+  FINAL STATE:
+  1. The villager figure gains arms and, where a gesture needs them, hands and
+     legs, in the existing style — the same restraint the other figures show, not
+     a new visual language.
+  2. Four gestures read at conversational distance: BECKON, POINT at a visible
+     spot or person, REFUSE, and INDICATE A DIRECTION.
+  3. A gesture never explains itself. It is one half of a situation whose other
+     half is what actually happens next.
+  4. Driven from the same behaviour layer that speaks, so a figure saying COME
+     also beckons, in step.
+  5. The added geometry carries its `QUALITY_PRESETS` entries on every level.
+  6. Point 351's chase reads by SPEED AND POSTURE because the figures had no legs;
+     that wording is corrected in the same commit, and the chase keeps reading
+     the way it was designed to.
+  VERIFIABLE: pure Vitest on the gesture state machine (bounded duration, no two
+  gestures at once on one figure, the pose returns to rest); browser screenshots
+  on both backends for the four poses.
+
+- [ ] 480. THE CHILDREN'S GAME OF TAG (point 351, pulled forward by the user
+  03.08.2026 because the PoC teaches its first concepts through it). Point 351's
+  specification is unchanged and binding, with one amendment from point 479: the
+  figures now have legs, so the sprint may read through them as well as through
+  speed and posture.
+
+- [ ] 481. THE CHILDREN TEACH THE GENERAL CONCEPTS (user 03.08.2026).
+  FINAL STATE:
+  1. Each situation carries ONE atomic utterance with its gesture and the action
+     that follows: a child calls the others (COME), sends one to a visible spot
+     (GO_THERE), a fleeing child asks another along (FOLLOW), a child names where
+     it stands (HERE), points at something distant (THERE), refuses (NO).
+  2. Every one of the six recurs in more than one situation, so none can be
+     mistaken for a rule of the game.
+  3. The two look-alikes are staged apart, or they teach nothing. COME is spoken
+     at least once by a child STANDING STILL, against FOLLOW's caller who is
+     running away. THERE is spoken at least once with NOBODY moving afterwards,
+     against GO_THERE, which is always followed by the addressee walking there.
+  4. The children play far enough from the adults for point 478's range rule to
+     separate them.
+  VERIFIABLE: pure Vitest on the situation scheduler — every concept in at least
+  two distinct situations, the two staged contrasts present, an utterance atomic
+  and single, and no situation without its gesture and its following action.
+
+- [ ] 482. A RIVER VILLAGE, A REACHABLE BANK AND A LANDMARK ROCK (user
+  03.08.2026). The PoC needs one village in the tonal West/Centre belt that lies
+  ON a river the player can walk to. Candidate: the Bambara village, whose Ségou
+  heartland lies on the Niger and whose people carry the balafon tradition;
+  today's course model puts the river about half a degree away, so either the
+  village or that stretch of the Niger moves. Both are permitted (the standing
+  licence to move a village for accuracy, and the river course is stylised) —
+  run the conflict checklist and record which was chosen and why.
+  FINAL STATE:
+  1. The village sits directly on a real river of the world model. Centre and huts
+     stay dry, and the walkable area REACHES a bank the player can stand at.
+  2. The walkable region is no longer a plain circle where the bank demands more.
+     This point OWNS that change: the leave check, the collision resolve and the
+     boundary the settlement edge is painted on all read one shape, and point 488
+     paints THAT shape rather than a radius.
+  3. In the bird's-eye view the river is the actual river; in the first-person
+     view it lies on the SAME side and is genuinely reachable, not a painted
+     panorama. The water is drawn in the scene, not faked in the backdrop.
+  4. The current has a direction a player can SEE from the bank — this is what the
+     whole UPSTREAM/DOWNSTREAM teaching hangs on, so it is verified, not assumed.
+  5. Two short walkable stretches along the bank, upstream and downstream.
+  6. A single conspicuous boulder a short way upstream, from the existing rock
+     dressing and collision, unmistakable against any other rock nearby, at or
+     beside the bank path, seed-deterministic, with a defined digging spot exactly
+     where the renderer draws it — and visible in the bird's-eye view as well,
+     which is where the digging happens (point 487).
+  7. New water and geometry carry their `QUALITY_PRESETS` entries.
+  VERIFIABLE: pure Vitest — the village keeps the §4.2 river clearance, the bank
+  point and the rock are both inside the walkable region, the two stretches run in
+  opposite senses along the flow, and the rock's dig position equals its rendered
+  placement over a sweep of seeds. Browser on both backends: the river is on the
+  same side in both views, and a frame at the bank shows the flow direction.
+
+- [ ] 483. THE ADULTS TEACH RIVER, UPSTREAM, DOWNSTREAM, ROCK AND DIGGING (user
+  03.08.2026). Visible errands carry the five landscape and action concepts,
+  mixed with the general ones the children taught.
+  FINAL STATE:
+  1. RIVER appears where it cannot collapse into "fetch water": someone sent to
+     the bank with a known movement concept plus RIVER, someone called back with
+     RIVER plus COME, and a third errand beginning or ending there with the same
+     utterance. The villagers actually walk to the bank.
+  2. UPSTREAM and DOWNSTREAM are taught by mirrored errands along the two
+     stretches — against the visible current and with it.
+  3. BIG_ROCK is a reference point in at least two errands, and at least ONE of
+     them carries no upstream walk at all — otherwise the rock and the direction
+     produce the identical picture and neither is learnable.
+  4. DIG is taught by visible ground work in the village — a pit, a post hole, a
+     patch worked over — in more than one situation, from the existing tools and
+     animations plus only what a recognisable digging motion needs.
+  5. Errand rates and dwell times are balance values, debug-editable.
+  VERIFIABLE: pure Vitest on the errand scheduler (each concept in at least two
+  distinct situations, the mirrored pair genuinely mirrored, the rock's
+  no-upstream situation present, every target reachable); browser for the walk to
+  the bank.
+
+- [ ] 484. THE JOURNAL'S COMMUNICATION OBSERVATIONS (user 03.08.2026).
+  FINAL STATE:
+  1. A second, clearly separate section beside the existing entries lists every
+     utterance the player has actually heard, in its sound sequence, sorted by
+     point 477's rule.
+  2. Each carries a free-text field for his own hypothesis. The game never
+     interprets that text.
+  3. The notes save and restore with the game (point 477's store).
+  4. Both languages, and the journal stays non-modal per §16.1.
+  VERIFIABLE: pure Vitest on store and component — an unheard utterance is absent,
+  a heard one appears once, the order holds over mixed lengths, a note survives a
+  save/load round trip.
+
+- [ ] 485. THE HYPOTHESIS OVER THE SPEAKER'S HEAD (user 03.08.2026).
+  FINAL STATE:
+  1. When a figure speaks an utterance the player has already observed, his
+     current hypothesis appears briefly above that figure; where he has entered
+     none, `???`. A phrase shows one reading per atom, in order.
+  2. Unmistakably attached to the speaker, brief, and the scene never accumulates
+     standing text.
+  3. Editing the note in the journal changes what appears immediately.
+  4. The syllables stay audible — the hypothesis is shown beside the utterance,
+     never instead of it.
+  VERIFIABLE: pure Vitest on the label's lifetime and its binding to the note;
+  browser screenshot for the attachment to the figure.
+
+- [ ] 486. THE DRUMS AND THE CHIEF'S MESSAGE (user 03.08.2026).
+  FINAL STATE:
+  1. A drummer transmits on two drums: the large low one for `ba`, the small high
+     one for `BA`, with the strike visible on the drum being played.
+  2. The sequences are exactly those spoken in the village, a constant pause
+     separates the concepts, and nothing else encodes anything.
+  3. Afterwards the message is displayed, each concept with the player's
+     hypothesis above it, each element clickable to change it — the SAME note as
+     in the journal, so a change in one place is the change in the other.
+  4. The display can be REOPENED. A player who forgets the message must not be
+     locked out of the feature.
+  5. The message is GO_THERE · RIVER · FOLLOW · UPSTREAM · BIG_ROCK · THERE · DIG,
+     built only from concepts observable beforehand.
+  VERIFIABLE: pure Vitest — the drum sequence equals the spoken one concept for
+  concept, the pause is constant, a hypothesis edited at the drums reads back from
+  the journal store and the other way round, and the display reopens.
+
+- [ ] 487. DIGGING AT THE ROCK, AND WHAT IS BURIED THERE (user 03.08.2026).
+  FINAL STATE:
+  1. Digging with the shovel at the rock's defined spot recovers an artefact;
+     anywhere else recovers nothing. The spot is the one the renderer draws.
+  2. It uses the shovel mechanic the game already has, in the bird's-eye view —
+     the brief calls this "execution outside the village" while placing the rock
+     at the walkable bank, so the rock exists in both views and the digging
+     happens where digging already works. This is a best guess and stands as a
+     decision card.
+  3. The artefact can be brought to the chief, and doing so is acknowledged.
+  4. Both languages, journal entries with voice markup like every other text.
+  VERIFIABLE: pure Vitest on the dig check and the hand-over; browser for the flow.
+
+- [ ] 488. THE SETTLEMENT EDGE PAINTED ON THE GROUND (point 352, pulled forward by
+  the user 03.08.2026 so the player can see how far he may walk). Point 352's
+  specification is binding with one amendment from point 482: the band follows the
+  walkable BOUNDARY, which is no longer a plain circle everywhere, and it reads
+  that boundary from the one source the leave check uses — never a second constant.
