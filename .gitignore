@@ -76,6 +76,13 @@ scripts/.tile-cache
 .claude/ntfy-topic
 .claude/autostart-state.json
 .claude/autostart-run.log
+# The Linux launcher daemon's own record and log (point 474). Runtime state of
+# THIS machine's trigger: a committed record would hand a clone a pid from
+# somebody else's container, and an armed verdict is the one thing that must
+# never be inherited.
+.claude/batch-launcher.json
+.claude/batch-launcher.json.tmp-*
+.claude/batch-launcher.log
 .claude/ci-status-guard-state.json
 .claude/sessions-seen.json
 .claude/session-activity.json
