@@ -17,13 +17,15 @@
 // `ok: false`, which classifies as UNKNOWN — reported, never mistaken for quiet,
 // and never a reason to stop a run.
 import os from 'node:os'
+import { readFileSync, readdirSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { isMainModule } from '../is-main.mjs'
 import {
   LEVEL, classifyLoad, cpuBusyFraction, decideRun, forcedLevel, formatLoadReport, gpuEngineUtilisation,
-  onLoadMode, parseGpuCounterJson, parsePsOutput, parseWindowsProcessJson, strayProcesses,
+  onLoadMode, parseGpuCounterJson, parsePercentUtilisation, parsePsOutput, parseWindowsProcessJson,
+  strayProcesses,
 } from './machine-load-core.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -78,13 +80,60 @@ try {
 }
 `
 
+/** Where a Linux driver publishes its own busy percentage. amdgpu's shape, copied
+ *  by several others; absent on the drivers that publish nothing. */
+const DRM_BUSY_GLOB = '/sys/class/drm'
+
+/**
+ * LINUX: the busiest device, read without a new dependency (point 474). Two
+ * sources in order of directness — the driver's own sysfs counter first, then
+ * `nvidia-smi` where it is installed. Neither present is an honest `unreadable`,
+ * never a comforting zero: the load gate must say it is blind rather than certify
+ * a machine it did not measure.
+ */
+function readLinuxGpuUtilisation() {
+  const readings = []
+  try {
+    for (const card of readdirSync(DRM_BUSY_GLOB)) {
+      try {
+        readings.push(readFileSync(join(DRM_BUSY_GLOB, card, 'device', 'gpu_busy_percent'), 'utf8'))
+      } catch {
+        /* this card publishes no busy counter — the next one may */
+      }
+    }
+  } catch {
+    /* no /sys/class/drm at all (a container without one) */
+  }
+  const fromSysfs = parsePercentUtilisation(readings)
+  if (fromSysfs !== null) return { fraction: fromSysfs, unreadable: null }
+  try {
+    const res = spawnSync('nvidia-smi', ['--query-gpu=utilization.gpu', '--format=csv,noheader,nounits'], {
+      encoding: 'utf8', timeout: GPU_TIMEOUT_MS, maxBuffer: 1024 * 1024,
+    })
+    if (res.status === 0) {
+      const fromSmi = parsePercentUtilisation([res.stdout ?? ''])
+      if (fromSmi !== null) return { fraction: fromSmi, unreadable: null }
+    }
+  } catch {
+    /* nvidia-smi absent or unusable — reported as unreadable below */
+  }
+  return {
+    fraction: null,
+    unreadable: 'no GPU busy counter on this host (no sysfs gpu_busy_percent, no nvidia-smi)',
+  }
+}
+
 /**
  * `{ fraction, unreadable }` — the busiest engine as a fraction in [0,1], or a
  * one-line reason why the device could not be read. Never throws.
  */
 export function readGpuUtilisation() {
   if (process.platform !== 'win32') {
-    return { fraction: null, unreadable: 'no per-adapter GPU engine counter on this platform' }
+    try {
+      return readLinuxGpuUtilisation()
+    } catch {
+      return { fraction: null, unreadable: 'the GPU counter read failed' }
+    }
   }
   try {
     const res = spawnSync('powershell', ['-NoProfile', '-NonInteractive', '-Command', GPU_COUNTER_PS], {
