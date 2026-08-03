@@ -401,9 +401,22 @@ export function parseCarrier(text = '') {
   return { pending, requests, drained }
 }
 
+/**
+ * A FINDING TITLE MAY NOT OPEN WITH THE REQUEST MARKER (four-eyes finding 3,
+ * Fable 5, 31.07.2026). `- [ ] <at> · <s> · [request] · pending · X` parses back
+ * as a REQUEST, and requests are gated only on the turn that TAKES the point
+ * boundary — so such a finding would slip past the every-turn-end findings gate
+ * altogether. The marker is neutralised rather than refused: dropping a recorded
+ * finding is the one thing this carrier may never do, and `(request)` keeps the
+ * title readable while it can no longer be a kind.
+ */
+function neutraliseKindMarker(title) {
+  return title.startsWith(`${REQUEST_MARKER}${HEAD_SEP}`) ? `(request)${title.slice(REQUEST_MARKER.length)}` : title
+}
+
 /** Render one carrier entry (title is single-line; detail is indented under it). */
 export function carrierEntry({ at, session, title, detail }) {
-  const head = `- [ ] ${at} · ${session} · ${String(title ?? '').replace(/\s+/g, ' ').trim()}`
+  const head = `- [ ] ${at} · ${session} · ${neutraliseKindMarker(String(title ?? '').replace(/\s+/g, ' ').trim())}`
   const body = String(detail ?? '')
     .split(/\r?\n/)
     .map((l) => l.trim())

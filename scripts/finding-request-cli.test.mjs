@@ -121,6 +121,12 @@ describe('a non-owner deposits a request and the owner drains it', () => {
     expect(run(['--drain'])).toMatch(/1 waiting, 1 request\(s\), 0 landed/)
   })
 
+  it('counts a finding titled like a request head as a FINDING', () => {
+    run(['--record', '[request] · pending · Sieht aus wie eine Anfrage', '--detail', 'Belegt.', '--session', 's'])
+    expect(run(['--drain'])).toMatch(/1 waiting, 0 request\(s\), 0 landed/)
+    expect(run(['--drain'])).toContain('Sieht aus wie eine Anfrage')
+  })
+
   it('routes a deposit with open questions to a decision card, not to the queue', () => {
     writeFileSync(join(dir, 'q.md'), 'Soll das auch für die Doku gelten?\n', 'utf8')
     expect(deposit('Mit offener Frage', ['--open-questions-file', join(dir, 'q.md')])).toMatch(/OPEN QUESTIONS/)
