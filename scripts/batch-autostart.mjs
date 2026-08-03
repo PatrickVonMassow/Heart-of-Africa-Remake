@@ -1,6 +1,8 @@
 // OS-scheduler launcher (user mandate 22.07.2026) — resurrects a DEAD batch when
 // nothing else can, and VERIFIES its own work / RAISES A SIGNAL when the batch
-// is sick, not just dead. A Windows Scheduled Task runs this every few minutes.
+// is sick, not just dead. The launcher's TRIGGER runs this every few minutes: a
+// Windows Scheduled Task there, the scripts/batch-launcher.mjs daemon on Linux
+// (point 474). This file does not care which — only that it is ticked.
 //
 // HARD SINGLETON (24.07.2026, after the e9407cae incident — this launcher
 // double-spawned against a live-but-heartbeat-starved interactive session):
@@ -20,7 +22,8 @@
 //     owner, it KILLS that rogue spawn (it created it, it may reap it), logs
 //     it and notifies. A rogue interactive session is never killed — the
 //     guards make it stand down — but the user is notified urgently.
-// Disable: Disable-ScheduledTask -TaskName HoA-Batch-Autostart
+// Disable: `node scripts/batch-launcher.mjs --stop` (Linux) /
+//          `Disable-ScheduledTask -TaskName HoA-Batch-Autostart` (Windows)
 import { readFileSync, writeFileSync, existsSync, readdirSync, renameSync, openSync, closeSync, readSync, statSync, rmSync } from 'node:fs'
 import { spawn, execSync, execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
@@ -285,7 +288,7 @@ try {
 // topic, so a message arriving into an IDLE machine wakes a light responder
 // within seconds instead of at the next tick of this launcher.
 //
-// IT GETS NO SCHEDULED TASK OF ITS OWN. `HoA-Batch-Autostart` already runs every
+// IT GETS NO TRIGGER OF ITS OWN. The launcher already runs every
 // few minutes, at boot included, and is the one thing here that runs when
 // nothing else does — so start-at-boot, restart-after-crash and stop-on-pause
 // are three readings of the SAME line rather than three mechanisms. The decision

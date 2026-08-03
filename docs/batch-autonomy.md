@@ -24,8 +24,17 @@ outside the agent's control.
 3. **SessionStart hook `scripts/batch-resume-hook.mjs`** (across sessions). When a
    NEW session starts, it claims the batch lock and re-issues the continue
    instruction — so a freshly opened session auto-resumes the batch.
-4. **OS Scheduled Task `HoA-Batch-Autostart`** (survives crashes AND reboots). Runs
-   `scripts/batch-autostart.mjs` every 15 min (indefinite) with `StartWhenAvailable`.
+4. **The launcher** (survives crashes AND reboots). Runs `scripts/batch-autostart.mjs`
+   every 15 min. Its TRIGGER differs by host and nothing else (point 474,
+   03.08.2026): on **Windows** it is the Scheduled Task `HoA-Batch-Autostart`
+   (indefinite, `StartWhenAvailable`); on **Linux** — where the repository lives
+   today, in a container with no `cron`, `crond`, `systemctl` or `at` at all — it is
+   a self-scheduling detached node daemon, `scripts/batch-launcher.mjs`
+   (`--start` / `--stop` / `--status`), which records its pid and its last tick in
+   `.claude/batch-launcher.json`, refuses to run twice, and outlives the session
+   that started it. Everything below this sentence is the same on both hosts,
+   because only the trigger changed: the tick runs the same launcher, through the
+   same singleton.
    The launcher spawns a headless `claude -p` to resume the batch **only** when the
    owner is PROVABLY dead per the hard singleton (`scripts/batch-singleton.mjs`):
    heartbeat AND a real OS pid check — a live claude process blocks takeover no
@@ -66,9 +75,9 @@ outside the agent's control.
 | 9 | A guard has a bug / throws | all guards are **fail-open** (error → allow) so they can never freeze the session; the scheduler still backstops the idle case | none |
 | 10 | `claude.exe` moved by an app update | launcher globs `claude-code\*\claude.exe` and picks the newest | none |
 | 11 | Batch stuck on one item (needs data / a user decision) | the guard says "pick a DIFFERENT open item"; only if ALL are user-blocked does it pause with a `Von dir zu klären` card | correct behaviour — nothing to do without the user |
-| 12 | Scheduled task deleted (by the user or a cleanup tool) | — | not recoverable by the agent; re-create with the command below |
+| 12 | The launcher is gone (the scheduled task deleted, the daemon never started or killed) | on Linux the session re-arms it itself (`node scripts/batch-launcher.mjs --start`); on Windows the task must be re-created | Windows only: the agent cannot create a scheduled task — re-create it with the command below |
 | 13 | Session ENDS at a point boundary (27.07.2026, deliberate — the context is the batch's dominant cost) | (4) the launcher spawns the successor once the old pid is provably dead; `batch-progress-guard` allows the stop only against a verified-closed point AND an armed task | a few idle minutes per point, traded for a fresh context |
-| 14 | The scheduled task is DISABLED while the boundary is in use | the guard reads the task's REAL state each time and blocks the stop when it is not armed (`unknown` counts as unarmed), so the session keeps working instead of stranding the batch | the user must re-arm it (`Enable-ScheduledTask`, elevated) |
+| 14 | The launcher is DISABLED while the boundary is in use | the guard reads the launcher's REAL state each time — the task's `State` on Windows, the daemon's own record on Linux, both in one ready/running/disabled/unknown vocabulary — and blocks the stop when it is not armed (`unknown` counts as unarmed), so the session keeps working instead of stranding the batch | Windows: the user must re-arm it (`Enable-ScheduledTask`, elevated). Linux: the session re-arms it itself |
 | 15 | **The RUNTIME kills the session for waiting on a delegated agent** (28.07.2026, four deaths in one afternoon) | the spawn carries `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0`, so a `claude -p` waits indefinitely for its background tasks instead of terminating at 600 s; what bounds a wait instead is PROGRESS — see the section below | none for a healthy wait; a genuinely frozen one is reported and taken over after six launcher ticks (90 min), and only while the declaration is the owner's last word |
 | 16 | The user writes from the phone and NOTHING is running (29.07.2026) | (5) the watcher wakes a light responder within seconds under a bounded claim; if the watcher is itself down, (4) still delivers the message into the next spawn prompt | ≤ 15 min in the watcher-down case — the pre-watcher bound, never worse |
 
@@ -181,16 +190,21 @@ from advisory claim-and-check to a HARD mutual exclusion in
     The exception map is injectable so the rules ABOUT it are pinned independently of
     which entries happen to exist — paying the last debt must not redden the test that
     describes what a debt is.
-  - **Cause 2, ATTENDED and still open:** the `HoA-Batch-Autostart` task runs
-    `node.exe` directly with LogonType `Interactive`, so Task Scheduler opens a
-    visible console every 15 minutes — ~96 windows a day on its own. The session it
-    spawns does not need that console (the spawn already passes `detached: true`,
-    `stdio` to a log file and `windowsHide: true`), so the task action must stop being
-    a bare `node.exe`: either a hidden-launch wrapper, or the task set to run without
-    a visible window. That touches the USER'S machine, not the repository, so it needs
-    the user's go for the specific change — and the task's re-enabled state (user
-    27.07.2026) must survive it. Until then the 15-minute flash remains, and it is the
-    only one left.
+  - **Cause 2, WINDOWS-HOST ONLY, and moot while the project runs on Linux:** the
+    `HoA-Batch-Autostart` task runs `node.exe` directly with LogonType
+    `Interactive`, so Task Scheduler opens a visible console every 15 minutes —
+    ~96 windows a day on its own. The session it spawns does not need that console
+    (the spawn already passes `detached: true`, `stdio` to a log file and
+    `windowsHide: true`), so the task action must stop being a bare `node.exe`:
+    either a hidden-launch wrapper, or the task set to run without a visible
+    window. That touches the USER'S machine, not the repository, so it needs the
+    user's go for the specific change — and the task's re-enabled state (user
+    27.07.2026) must survive it. The `scripts/run-hidden.vbs` wrapper written for
+    this is GONE (point 474): it was dead weight on the host the project now runs
+    on, and re-writing sixty lines of VBScript is cheaper than carrying them
+    through every audit until the Windows host is used again. The Linux daemon has
+    no equivalent problem — it is started detached with `stdio: 'ignore'` and
+    opens no window at all.
 
 ## The point boundary — ending a session is now part of the design (27.07.2026)
 
@@ -211,20 +225,24 @@ How it works:
    DRAIN (a subagent lives inside the session — ending mid-flight throws its
    unfinished work away, and only its pushed commits survive), and then runs
    `node scripts/batch-boundary.mjs <point>`. That command REFUSES unless the work
-   order confirms the point closed and the scheduled task is armed, so the session
+   order confirms the point closed and the launcher is armed, so the session
    finds out at the boundary rather than at a blocked turn end. On success it
    writes `.claude/batch-boundary.json` (session id + point + timestamp).
 2. At the turn end `batch-progress-guard` re-judges the claim itself — the marker
    is a claim, not proof. It ALLOWS the stop only when the point is closed per
    `TASKS.md` + `docs/tasks-archive.md`, the marker is fresh and belongs to this
-   session, and `Get-ScheduledTask -TaskName HoA-Batch-Autostart` reports an armed
-   state. It then consumes the marker.
+   session, and the launcher reports an armed state — `Get-ScheduledTask -TaskName
+   HoA-Batch-Autostart` on Windows, the daemon's own record on Linux. It then
+   consumes the marker.
 3. Anything else blocks exactly as before: a point still open, a stale or foreign
    marker, an unhandled parallel-session alert, an unparseable work order — and,
-   the important one, an **unarmed launcher**. A disabled task must never be able
-   to turn "end this session" into "end the batch", so `disabled` and `unknown`
-   both block and the message names the fix
-   (`Enable-ScheduledTask -TaskName 'HoA-Batch-Autostart'`, elevated, by the user).
+   the important one, an **unarmed launcher**. A disabled launcher must never be
+   able to turn "end this session" into "end the batch", so `disabled` and
+   `unknown` both block and the message names the fix FOR THIS HOST — on Windows
+   `Enable-ScheduledTask -TaskName 'HoA-Batch-Autostart'`, elevated, by the user;
+   on Linux `node scripts/batch-launcher.mjs --start`, which the session may run
+   itself. Verify either with `node scripts/batch-boundary.mjs --status`, whose
+   `launcherProbe` field always reports the launcher's real state.
 
 One decision worth keeping in view: **unknown counts as unarmed.** Erring toward
 "keep working" costs context; erring toward "stop" can cost the whole batch. The
@@ -812,9 +830,9 @@ too, so it can be exercised on demand.
 WHY IT IS NOT A SECOND LOCAL WATCHDOG. On the night of 30.07.2026 the batch stood
 still for six hours. The launcher DID diagnose it — nine "WEDGED owner" lines over
 two hours — and could not act; then its log simply stops at 02:21. That stop is
-the evidence: standby, a disabled scheduled task or a dead launcher takes the
-whole local layer down as ONE unit, and a twin on the same task scheduler, the
-same node binary and the same disk would have gone with it. Independence, not
+the evidence: standby, a disarmed launcher or a dead one takes the whole local
+layer down as ONE unit, and a twin on the same trigger, the same node binary and
+the same disk would have gone with it. Independence, not
 thoroughness, is what this layer buys.
 
 WHAT IT DELIBERATELY DOES NOT DO. It never spawns and never writes to the
@@ -1258,9 +1276,9 @@ Mitigation, and why it is small in practice: the moment the user logs in, the ta
 resurrects the batch (promptly, thanks to `StartWhenAvailable` + the boot-time
 check). A forced update reboots and then waits at the login screen for the user
 anyway; the batch simply resumes when they next log in. To make that resume
-**instant on login** (instead of within ~15 min), add an at-logon trigger once,
-from an **elevated** PowerShell (modifying the task needs admin rights, which the
-agent does not have):
+**instant on login** (instead of within ~15 min) on the WINDOWS host, add an
+at-logon trigger once, from an **elevated** PowerShell (modifying the task needs
+admin rights, which the agent does not have):
 
 ```powershell
 $t = New-ScheduledTaskTrigger -AtLogOn
@@ -1628,9 +1646,10 @@ orientation. Its reply is obligatory — it is also the receipt (see below) — 
 it is bounded at ten minutes, after which it is killed and the reservation
 released.
 
-**Lifecycle: no second scheduled task.** `HoA-Batch-Autostart` already runs every
-few minutes, at boot included, and is the one thing here that runs when nothing
-else does — so it is the supervisor. Each tick asks `watcherSupervision` whether
+**Lifecycle: no second launcher.** The launcher (the Scheduled Task on Windows,
+the `batch-launcher.mjs` daemon on Linux) already runs every few minutes, at boot
+included, and is the one thing here that runs when nothing else does — so it is
+the supervisor. Each tick asks `watcherSupervision` whether
 the watcher is alive (by pid AND start time, so a recycled pid is never mistaken
 for it) and starts one if it is not, kills it while the batch is paused, and
 leaves a healthy one alone. Start-at-boot, restart-after-crash and stop-on-pause
@@ -1983,7 +2002,11 @@ impossible, not skipping the inspection.
 
 - **Pause** (stop all resurrection + the in-session guard): create `.claude/batch-paused`.
   Resume: delete it.
-- **Disable the OS task**: `schtasks /delete /tn HoA-Batch-Autostart /f`
+- **Stop the launcher**: on Linux `node scripts/batch-launcher.mjs --stop` (start
+  it again with `--start`, read it with `--status`); on Windows
+  `schtasks /delete /tn HoA-Batch-Autostart /f`. Either way the batch stops being
+  resurrected and the point boundary is refused — which is correct: nothing would
+  restart it.
 - **Logs**: `.claude/autostart.log` (gitignored) records every launcher decision.
 - **Chat**: pair a phone with `node scripts/chat-secret.mjs --init`; the launcher
   polls it on every tick. `--rotate` un-pairs every device. Turning it off is
