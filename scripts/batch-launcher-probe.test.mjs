@@ -11,6 +11,7 @@
 // `platform`, `exec` and the record path are injected, so neither claim depends
 // on which machine the suite happens to run on.
 import { describe, it, expect } from 'vitest'
+import { spawnSync } from 'node:child_process'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -30,6 +31,10 @@ const withRecord = (record) => {
   if (record !== null) writeFileSync(path, JSON.stringify(record), 'utf8')
   return { path, cleanup: () => rmSync(dir, { recursive: true, force: true }) }
 }
+
+/** A pid that HAS existed and no longer does: a child run to completion. The one
+ *  dead pid a test can name without guessing at a number the OS may hand out. */
+const exitedPid = () => spawnSync(process.execPath, ['-e', ''], { stdio: 'ignore' }).pid
 
 /** A record for THIS process — the one pid a test can prove is alive. */
 const liveRecord = (over = {}) => ({
@@ -95,9 +100,10 @@ describe('probeLauncherState — the Linux path reads the daemon, on evidence on
   })
 
   it('reads a dead pid, a stale record and a missing record as unknown', () => {
-    // A pid that cannot exist: pid 0 is never a process, and the classifier
-    // refuses it before any probe.
-    const dead = withRecord(liveRecord({ pid: 0 }))
+    // A pid that really WAS a process and is not one any more — the probe has to
+    // be reached and has to answer for it. (pid 0 would be refused before the
+    // probe is consulted at all, so it proves nothing about the probe.)
+    const dead = withRecord(liveRecord({ pid: exitedPid() }))
     try {
       expect(probeLauncherState({ platform: 'linux', recordPath: dead.path })).toBe('unknown')
     } finally {
