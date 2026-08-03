@@ -3815,49 +3815,6 @@ it is appended.
   PRIORITY: behind 458 and 459 — it is a wall-clock and diagnosis saving, not the context
   saving it was drafted for.
 
-- [ ] 462. A WINDOW THAT IS NOT THE MASTER MUST BE ABLE TO ENQUEUE WHAT THE USER SAYS (user
-  30.07.2026: "Es ist problematisch, dass ich regelmäßig mit einer Sitzung rede, die nicht der
-  Master ist … Gibt es eine sichere Lösung?"; bundle Session- & Repo-Hygiene). For an hour this window held a
-  pending claim while the user settled three decisions and had two documents evaluated.
-  TASKS.md is main-only and batch-owned, so nothing could be enqueued; the specs lived in a
-  scratchpad file OUTSIDE the repository and would have died with the window.
-  THE INSIGHT THAT DECIDES THE DESIGN: the spec must be written by the window the user is
-  TALKING TO — only it holds the conversation the spec comes from, and the owner will never
-  see it. A note saying "the user wants something" is worthless; the deposit must be the
-  FINISHED final-state spec, leaving the owner only the mechanical part it alone may do.
-  FINAL STATE: the FINDINGS CARRIER gains a `request` kind — it is already the lock-free
-  atomic append by a non-owner, it already has a drain protocol, and its guard is already
-  wired as a Stop hook. No second carrier is built: two carriers are two drain disciplines to
-  forget one of. The chat inbox stays untouched — it carries the user's phone words, signed,
-  capped at 2000 characters and delivered as untrusted input; a window-authored multi-KB spec
-  is a different writer and a different trust model.
-  A request entry carries, and the owner appends VERBATIM without interpreting: `title`;
-  `spec` (TASKS-ready final state, both-language text obligations already resolved);
-  `constraints` (the user's named bounds, verbatim, separate from the spec); `why` (the
-  observed problem); `userQuotes` (the decisive sentences with their date — the "user
-  DD.MM.YYYY" citations the work order requires exist ONLY in the depositing window);
-  `docImpact` (the design.md/CLAUDE.md/memory changes the ruling implies, per the
-  same-commit rule); `bundle` (proposed, German name); `refs` (files, points, design.md §§)
-  plus the git revision the spec was cut from; `openQuestions`; `session`; `at`; `state`.
-  A non-empty `openQuestions` routes to a VDZK decision card, NEVER to a TASKS append.
-  The spec is passed by `--spec-file`, not as a command argument: a final-state spec through a
-  PowerShell argument hits quoting and the ~32K command-line limit.
-  STATES AND THE ESCAPE HATCH: `pending` → `queued <point>` on the drain. A MALFORMED entry
-  never blocks — it warns, like the existing malformed-entry path. An undrainable request ends
-  in `blocked` via `--blocked "<title>" --why "<reason>"`, and that same command writes the
-  VDZK card, so it is escalated to the user VISIBLY rather than parked. The gate is the point
-  boundary (a mid-branch owner cannot write TASKS.md at all), so `auditFindings` becomes
-  kind-aware rather than inheriting the every-turn-end block. Fail-open on any internal error,
-  like every guard here.
-  THE BOARD shows pending requests under the queue, so the user sees his instruction arrived
-  and where it stands without asking.
-  VERIFIABLE: the pure layer covers the new kind's parse/append/drain, the `queued`/`blocked`
-  transitions, the kind-aware gate, the malformed-warns-never-blocks rule and the VDZK
-  write-through; a live round trip deposits a request from a non-owner session and drains it.
-  FOUR-EYES: reviewed by Fable 5 on 30.07.2026, which rejected the first draft's separate
-  `request.mjs` in favour of extending the carrier. Record the implementation review before it
-  lands.
-
 - [ ] 463. TWO LIVENESS READINGS THE FORCED HANDOVER PROVED WRONG (30.07.2026, both
   observed while taking the batch back by force; bundle Session- & Repo-Hygiene).
   PART A — A KILLED OWNER READS AS ALIVE FOR FIVE MINUTES. `assessOwner`
