@@ -25,10 +25,9 @@ und nicht erst beim zweiten Schaden. Fast alles Folgende wendet das an.
 
 Die Prompts unten sind **Aufträge, einen Mechanismus zu bauen** — keine Merksätze.
 „Jedes neue Feature bekommt einen Test" ist eine *Regel*, die vergessen wird;
-„Etabliere einen Mechanismus, der das garantiert" ist ein *Auftrag*, an dessen Ende
-etwas steht, das die Regel erzwingt. Formuliere deine eigenen genauso. Wo ein
-Mechanismus prinzipiell **nicht** möglich ist (etwa „sieht das für einen Menschen
-richtig aus?"), steht das dabei — dann trägt nur die Aufmerksamkeit.
+„Etabliere einen Mechanismus, der das garantiert" ist ein *Auftrag*. Formuliere deine
+eigenen genauso. Wo ein Mechanismus prinzipiell **nicht** möglich ist (etwa „sieht das
+für einen Menschen richtig aus?"), steht das dabei — dann trägt nur die Aufmerksamkeit.
 
 Eine **Schätzung** wie *(Kosten ≈ 2x)* meint den Mehrverbrauch der betroffenen Arbeit,
 nicht des Projekts.
@@ -44,12 +43,11 @@ Lege **zwei** Modelle fest und gib ihnen klare Rollen:
   springt als **Ausweichstufe** ein, wenn das primäre nicht in seiner höchsten
   Version verfügbar ist.
 
-> *Prompt:* „Arbeite grundsätzlich mit **\<primäres Modell\>**, unabhängig davon,
-> wie schwer eine Aufgabe ist. **\<sekundäres Modell\>** setzt du nur für das
-> Vier-Augen-Prinzip ein — es prüft Plan und Ergebnis gegen — oder als
-> Ausweichstufe, wenn das primäre nicht in der höchsten Version verfügbar ist.
-> Etabliere einen Mechanismus, der ein Arbeitsergebnis eines **anderen** Modells
-> erkennt und die Arbeit stoppt, statt sie stillschweigend zu übernehmen."
+> *Prompt:* „Arbeite grundsätzlich mit **\<primäres Modell\>**, unabhängig von der
+> Schwierigkeit. **\<sekundäres Modell\>** setzt du nur für das Vier-Augen-Prinzip ein
+> oder als Ausweichstufe. Etabliere einen Mechanismus, der ein Arbeitsergebnis eines
+> **anderen** Modells erkennt und die Arbeit stoppt, statt sie stillschweigend zu
+> übernehmen."
 
 Ein zweites Modell nützt nicht, weil es *besser* wäre, sondern weil es **andere
 blinde Flecken** hat — diesen Wert hebt nur eine Prüfung, keine Übergabe. Und ein
@@ -214,10 +212,9 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   oder er ist nur in der Arbeitskopie grün, in der er lief — was **nicht** im Projekt liegt
   (lokale Dateien, Zugänge, Laufzeitzustand), fehlt in der Kopie eines parallelen Helfers.
   → *Prompt:* „Jeder Test bekommt seine Pfade **eingespritzt**, statt sie zu suchen, und
-  Zeitgrenzen werden an die gemessene Last angepasst, nicht verdrahtet. Die Frage vor dem
-  Abgeben ist nicht ‚ist er grün?', sondern ‚wäre er auch im **Hauptstand** grün?' Einen
-  roten Lauf bewerte ich erst auf einer ruhigen Maschine; eine Wiederholung zählt nur, wenn
-  die Last dazwischen weg war."
+  Zeitgrenzen richten sich nach der gemessenen Last. Die Frage vor dem Abgeben ist nicht ‚ist
+  er grün?', sondern ‚wäre er auch im **Hauptstand** grün?' Einen roten Lauf bewerte ich erst
+  auf einer ruhigen Maschine."
 
 
 - **Messung und Vorschau verunreinigt.** Halbfertiges wird als ‚fertig' beurteilt; Popups
@@ -234,10 +231,10 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   Formprüfung **vor** den Schritt nach außen, so dass sie die Auslieferung verhindern kann;
   nur Inhaltliches darf danach laufen."
 
-- **Regeln und Wächter verrotten — nur merkt es niemand.** Regeln wachsen an: Widersprüche
-  (auch innerhalb *einer* Datei), Doppelungen, Regeln, die eine nie gebaute Absicherung
-  behaupten. Und ein Wächter, der nie auslöst, ist so kaputt wie einer, der immer auslöst:
-  der erste lässt die Regel abgesichert erscheinen, der zweite erzieht zum Überlesen.
+- **Regeln und Wächter verrotten — nur merkt es niemand.** Regeln wachsen an: Widersprüche,
+  Doppelungen, Regeln, die eine nie gebaute Absicherung behaupten. Und ein Wächter, der nie
+  auslöst, ist so kaputt wie einer, der immer auslöst: der erste lässt die Regel abgesichert
+  erscheinen, der zweite erzieht zum Überlesen.
   → *Prompt:* „Etabliere einen Mechanismus, der den ganzen Bestand periodisch zur Durchsicht
   zwingt — auf Aktualität, Dopplung, Widerspruch und **Wirkungslosigkeit**, zuerst die am
   häufigsten eingeblendeten Texte. Jede Regel wird gegen den Code geprüft, nicht gegen die
@@ -283,11 +280,10 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   sind Texte, die bei *jeder* Anfrage mitgehen — zumal wenn sie wiederholen, was eine Prüfung
   ohnehin erzwingt.
   → *Prompt:* „Gib jedem Dokument, das bei jedem Start gelesen wird, eine **gemessene
-  Obergrenze**. Blockiert sie eine Ergänzung, ist die Reihenfolge: kürzen, **zusammenführen**
-  (zwei Einträge mit derselben Ursache lesen sich als einer meist besser), Detail auslagern —
-  die Grenze anheben ist das **letzte** Mittel und braucht eine Begründung. Ausgelagert wird
-  verschoben, nicht umformuliert; und der Commit, der eine Prüfung einführt, streicht den
-  Text, den sie ersetzt."
+  Obergrenze**. Blockiert sie eine Ergänzung, ist die Reihenfolge: kürzen, **zusammenführen**,
+  Detail auslagern — die Grenze anheben ist das **letzte** Mittel und braucht eine Begründung.
+  Ausgelagert wird verschoben, nicht umformuliert; und der Commit, der eine Prüfung einführt,
+  streicht den Text, den sie ersetzt."
 
 - **Im Präsens behauptet, nie nachgesehen.** „Das Feld wird bereits gesetzt" — im Code
   steht es nicht. Eine falsche Tatsachenbehauptung liefert etwas, das nichts tut und
@@ -303,9 +299,8 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   etwas ausführt, melde ein Scheitern im selben Atemzug wie die Freigabe."
 
 - **Die Messung sah weniger, als sie behauptet.** Sie schaut nur die letzten *n* Einträge an,
-  misst erst *nach* dem Vorgang, oder ein Teil der Testdateien lud gar nicht und fiel aus der
-  Bilanz — nicht geladen ist nicht rot, sondern abwesend, und liest sich *grüner* als ein
-  Fehlschlag.
+  misst erst *nach* dem Vorgang, oder ein Teil der Testdateien lud gar nicht — nicht geladen
+  ist nicht rot, sondern abwesend, und liest sich *grüner* als ein Fehlschlag.
   → *Prompt:* „Leite das Fenster jeder Messung aus dem **Gegenstand** ab: eine Frage über einen
   Zeitraum nach Zeit, nie nach Anzahl; eine über einen Lauf **während** des Laufs. Melde die
   **Zahl der ausgeführten Prüfungen** mit — ein Rückgang ist ein Rot —, und irrt eine Heuristik
@@ -322,10 +317,10 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   auch bei gesperrter Aufgabenliste schreibt, und eine Prüfung, die einen Zug **nicht enden
   lässt**, der untersucht und nichts hinterlassen hat."
 
-- **Still ersetzt statt sichtbar gescheitert.** Fehlt eine Angabe oder passt eine Eingabe
-  nicht zum erwarteten Format, setzt das Programm klaglos einen Ersatz ein — im Code sieht das
-  nach Sorgfalt aus, der Folgefehler taucht weit entfernt auf, gefunden wird er vom Leser.
-  Dasselbe gilt für interne Kennungen (Nummern, Kürzel, Modulnamen) in dem, was du ihm sagst.
+- **Still ersetzt statt sichtbar gescheitert.** Fehlt eine Angabe oder passt eine Eingabe nicht
+  zum erwarteten Format, setzt das Programm klaglos einen Ersatz ein — im Code sieht das nach
+  Sorgfalt aus, der Folgefehler taucht weit entfernt auf. Dasselbe gilt für interne Kennungen
+  in dem, was du ihm sagst.
   → *Prompt:* „Jede eingabeverarbeitende Stelle wird gegen **mehrere Eingabeformen** getestet
   und scheitert **sichtbar**, statt einen plausiblen Ersatz einzusetzen; jeder Rückfall wird
   **gemeldet**, dort wo er greift, mit dem Befehl, der ihn behebt. Nach außen geht der
@@ -352,15 +347,12 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Prüfe jedes `catch` mit Ersatzwert: Führt er zu **weniger** Aktion oder zu
   **mehr**? Nur weniger darf verschluckt werden."
 
-- **Der Umzug nimmt nur mit, was versioniert ist.** Wechselst du Rechner oder Umgebung, kommt
-  das Projekt an — die Mechanik drumherum nicht: geplante Aufgaben, Geheimnisse, gespeicherte
-  Regeln, installierte Werkzeuge liegen außerhalb und bleiben zurück. Nichts meldet das; die
-  Wächterkette schweigt, weil sie selbst zu dem gehört, was fehlt.
-  → *Prompt:* „Führe eine Liste dessen, was das Projekt zum Arbeiten braucht und **nicht** im
-  Repository liegt, und lass sie bei jedem Start prüfen — jede Zeile gegen eine Beobachtung,
-  nicht gegen eine Vermutung. Ein fehlendes Stück ist ein **Befund**, keine Stille."
-  *(‚Läuft das Projekt hier?' ist nicht dieselbe Frage wie ‚arbeitet die Mechanik hier?' — die
-  erste war in fünf Minuten beantwortet, die zweite kostete einen halben Tag.)*
+- **Der Umzug nimmt nur mit, was versioniert ist.** Auf einem neuen Rechner kommt das Projekt
+  an, die Mechanik drumherum nicht: geplante Aufgaben, Geheimnisse, gespeicherte Regeln,
+  Werkzeuge liegen außerhalb. Nichts meldet ihr Fehlen — die Wächter gehören selbst dazu.
+  → *Prompt:* „Führe eine Liste dessen, was das Projekt braucht und **nicht** im Repository
+  liegt, und prüfe sie bei jedem Start gegen eine **Beobachtung**. Ein fehlendes Stück ist ein
+  **Befund**, keine Stille."
 
 ---
 
