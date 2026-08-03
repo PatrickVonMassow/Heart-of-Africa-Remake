@@ -4008,59 +4008,6 @@ also be taken as its own task now and then.
 
 
 
-- [ ] 474. THE PROJECT MOVED TO LINUX AND THE BATCH MACHINERY DID NOT (user 03.08.2026,
-  "Räume die Windows-Reste weg und baue den Starter für Linux neu"). The repository now lives
-  in a Linux container at `/workspace/hoa` (WSL2 kernel, PID 1 is `sh`, node 20.20.2, the
-  `claude` CLI present); the former home was `C:\Users\Patri\Documents\Developing\hoa`. Build,
-  lint and the Vitest layer already pass there unchanged — what did NOT come along is the
-  batch machinery. Measured on 03.08.2026:
-  - `probeLauncherState` (`scripts/batch-boundary.mjs`, around line 78) returns `'unknown'`
-    off win32, and `batch-progress-guard` treats `'unknown'` as NOT armed. On Linux therefore
-    NO point boundary can ever be verified — the one stop the batch is allowed to make is
-    refused, so an autonomous run cannot hand over at all. This is the blocking finding.
-  - There is NO OS scheduler in the container: `cron`, `crond`, `systemctl` and `at` are all
-    absent, so the Windows Scheduled Task `HoA-Batch-Autostart` has no equivalent to be
-    re-registered as. `scripts/run-hidden.vbs` (its hidden-window wrapper) is dead weight here.
-  - `readGpuUtilisation` (`scripts/verify/machine-load.mjs`, around line 86) is Windows-only.
-    It degrades honestly (`unreadable: 'no per-adapter GPU engine counter on this platform'`),
-    so it blocks nothing — but the load gate it feeds is blind on this machine.
-  - `.claude/settings.local.json` still lists PowerShell permission entries and
-    `additionalDirectories` under `C:\Users\Patri\…`, including a worktree path that no longer
-    exists. Dead, not harmful.
-  - `docs/batch-autonomy.md` documents the launcher as `schtasks /delete /tn HoA-Batch-Autostart`.
-  What is already platform-neutral and must NOT be touched: `processStartTime` and
-  `findClaudeAncestor` in `scripts/batch-singleton.mjs` read `/proc` natively, so the hard
-  singleton — pid liveness, start time, ancestor walk — works on Linux as it stands.
-  FINAL STATE:
-  1. A Linux launcher exists as a SELF-SCHEDULING node daemon (no cron dependency): started
-     detached, it ticks `scripts/batch-autostart.mjs` on the same interval the Scheduled Task
-     used, writes its pid and its last tick to `.claude/`, refuses to run twice, and survives
-     the session that started it. One documented command starts it, one stops it, one reports
-     its state. It never spawns past the existing singleton — the tick path is unchanged,
-     only its trigger is.
-  2. `probeLauncherState` answers on Linux from that daemon's own recorded state with the same
-     vocabulary it uses on Windows (`ready`/`running`/`disabled`/`unknown`), so
-     `batch-progress-guard` can verify an armed launcher here. A stale or missing pid reads as
-     NOT armed — an armed verdict is never granted by the mere presence of a file.
-  3. The Windows path stays intact and selected by `process.platform`: this project must keep
-     running on the Windows host as it did. Nothing becomes Linux-only.
-  4. The dead Windows leftovers go: `scripts/run-hidden.vbs` is removed, the PowerShell and
-     `C:\Users\Patri\…` entries leave `.claude/settings.local.json`, and every doc that names
-     the Scheduled Task as THE launcher (`docs/batch-autonomy.md` first) documents both hosts
-     with the command that applies to each.
-  5. `readGpuUtilisation` gains a Linux reading where one is available without a new dependency
-     (`/sys/class/drm/*/device/gpu_busy_percent`, else `nvidia-smi` if present) and keeps its
-     honest `unreadable` answer where none is.
-  Both `batch-boundary.mjs` and the guard it feeds are mechanism files, so the other model's
-  recorded review is required before the merge (`mechanism-review-guard`).
-  VERIFIABLE: pure Vitest cases on the daemon-state classifier — a fresh record with a live pid
-  reads `ready`, a record whose pid is dead reads `unknown`, a record older than the tick
-  interval by a margin reads `unknown`, and a missing record reads `unknown`; a case pinning
-  that `probeLauncherState` still takes the PowerShell path when `process.platform` is `win32`;
-  and one live round trip on this machine — start the daemon, assert
-  `node scripts/batch-boundary.mjs --status` reports it armed, stop it, assert the verdict
-  falls back to NOT armed.
-
 - [ ] 475. THE BROWSER VERIFICATION CANNOT RUN ON THIS HOST AT ALL (found 03.08.2026 while
   checking the Linux move of point 474; same cause, different layer). The picture check is the
   main session's OWN job under CLAUDE.md §6 — a render/GUI point merges only against a verified
@@ -4094,29 +4041,3 @@ also be taken as its own task now and then.
   unavailable WebGPU lane produces an explicit unavailable verdict that `render-verify-guard`
   does NOT read as coverage; and one live SMALL browser run on this machine after the bring-up,
   with its exit code quoted.
-
-- [ ] 476. THE MECHANISM-REVIEW SCAN COSTS TWO MINUTES PER GATHER AND TURNS BRANCH RUNS RED
-  (measured 03.08.2026 by the four-eyes review of point 462 on the Linux host; bundle Modell &
-  Wächter). `mechanism-review-guard`'s gather takes 93–131 SECONDS on a branch that carries
-  unreviewed mechanism commits, against 0.9 s on `main` with none pending. The two real-repo
-  cases in `scripts/guard-preflight-core.test.mjs` run into their 30-second timeout because of
-  it, so EVERY branch with open mechanism commits reports a red unit run that has nothing to do
-  with its own code — the reviewer proved this by diffing: the preflight and mechanism-review
-  files are byte-identical between that branch and `main`.
-  The cost is per COMMIT scanned and was merely hidden on the Windows host, where the same scan
-  ran against a warm filesystem; it is not new, it is newly visible. It matters more than a slow
-  test: a guard whose own gather is the slowest step in the gate trains sessions to skip the
-  gate, and a red that everyone knows to ignore is exactly the state CLAUDE.md §7.2 forbids.
-  FINAL STATE: the gather answers in well under a second for any realistic number of pending
-  mechanism commits — by scanning each commit once and REMEMBERING the verdict (keyed by sha,
-  invalidated when the review log changes), not by narrowing what it examines. The guard's
-  decision must be unchanged for every input it accepts today; this is a cost fix, never a
-  loosening. The two preflight cases stay real-repo cases and keep their 30-second budget — if
-  they still cannot pass inside it after the fix, that is a finding, not a reason to raise the
-  budget.
-  Both files are guard mechanism, so the other model's recorded review is required before the
-  merge (`mechanism-review-guard`).
-  VERIFIABLE: a Vitest case that pins the memo — a second gather over an unchanged repo state
-  performs no repeated per-commit git call — plus one measured before/after figure quoted in
-  the commit, taken on a branch with at least three pending mechanism commits; and the existing
-  guard-preflight cases green inside their unchanged timeout.
