@@ -7,11 +7,10 @@
 // (localhost) page. This module centralises the launch so the backend is one env var,
 // and asserts the backend that initialised is the one requested — no silent fallback
 // (the guardrail, the whole point of the lane).
-import { accessSync, constants } from 'node:fs'
-import { delimiter, isAbsolute, join } from 'node:path'
 import { chromium } from 'playwright'
 import { armRunRecorder, markBackendAsserted } from '../render-verify-recorder.mjs'
-import { systemChromeCandidates, verifyLaunchOptions, webgpuLaneVerdict } from './launch-args-core.mjs'
+import { verifyLaunchOptions, webgpuLaneVerdict } from './launch-args-core.mjs'
+import { findSystemChrome } from './system-chrome.mjs'
 
 // Which backend the verify run targets. 'webgpu' = system Chrome, headless=new (the
 // player's primary backend); 'webgl' = the bundled Chromium with ANGLE (the WebGL2
@@ -20,35 +19,6 @@ import { systemChromeCandidates, verifyLaunchOptions, webgpuLaneVerdict } from '
 // unchanged); it flips to 'webgpu' only once every suite is proven green AND
 // flake-free on WebGPU (point 184's condition b), per the user's tier design.
 export const VERIFY_GL = (process.env.VERIFY_GL ?? 'webgl').toLowerCase() === 'webgpu' ? 'webgpu' : 'webgl'
-
-/** Is this an executable file? (Total — an unreadable path is simply "no".) */
-function isExecutable(path) {
-  try {
-    accessSync(path, constants.X_OK)
-    return true
-  } catch {
-    return false
-  }
-}
-
-/** The first system-browser candidate that exists, or null. A bare name is looked up on
- *  PATH; an absolute path is probed directly. Returns null on a platform the pure core
- *  declines to probe (Windows, macOS), where Playwright resolves the channel itself.
- *  The path returned is the one the lane LAUNCHES — see webgpuLaunchOptions. */
-function findSystemChrome(platform = process.platform) {
-  for (const candidate of systemChromeCandidates(platform)) {
-    if (isAbsolute(candidate)) {
-      if (isExecutable(candidate)) return candidate
-      continue
-    }
-    for (const dir of String(process.env.PATH ?? '').split(delimiter)) {
-      if (!dir) continue
-      const full = join(dir, candidate)
-      if (isExecutable(full)) return full
-    }
-  }
-  return null
-}
 
 /** Launch the browser for the requested backend. WebGPU needs a SYSTEM Chrome/Chromium
  *  — Playwright's bundled Chromium fails requestDevice headless; the system browser with

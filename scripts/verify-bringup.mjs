@@ -17,38 +17,15 @@
 // the exact executable the lane launches (scripts/verify/launch-args-core.mjs) — the
 // report and the launch are not allowed to name different browsers.
 import { spawnSync } from 'node:child_process'
-import { accessSync, constants, existsSync } from 'node:fs'
-import { delimiter, isAbsolute, join } from 'node:path'
+import { existsSync } from 'node:fs'
 import { chromium } from 'playwright'
 import { systemChromeCandidates } from './verify/launch-args-core.mjs'
+// The SAME probe the lane launches through (scripts/verify/system-chrome.mjs), not a
+// second copy of the walk: a report and a launch that resolve differently is the very
+// defect this command exists to rule out.
+import { findSystemChrome } from './verify/system-chrome.mjs'
 
 const checkOnly = process.argv.slice(2).includes('--check')
-
-function isExecutable(path) {
-  try {
-    accessSync(path, constants.X_OK)
-    return true
-  } catch {
-    return false
-  }
-}
-
-/** The first system Chrome/Chromium on this host, or null (see launch-args-core.mjs for
- *  why Windows and macOS are deliberately not probed). What this finds is what the
- *  WebGPU lane launches — the path is handed to Playwright as executablePath — so a
- *  "present" here is a promise the lane keeps. */
-function findSystemChrome() {
-  for (const candidate of systemChromeCandidates(process.platform)) {
-    if (isAbsolute(candidate)) {
-      if (isExecutable(candidate)) return candidate
-      continue
-    }
-    for (const dir of String(process.env.PATH ?? '').split(delimiter)) {
-      if (dir && isExecutable(join(dir, candidate))) return join(dir, candidate)
-    }
-  }
-  return null
-}
 
 /** Playwright's bundled Chromium — the WebGL 2 lane's browser. */
 function bundledChromium() {
