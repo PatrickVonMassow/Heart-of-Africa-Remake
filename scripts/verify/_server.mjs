@@ -51,13 +51,21 @@ export function killTree(child) {
  * `--strictPort` makes vite fail loudly rather than drift if the chosen port
  * were somehow taken in the tiny window before it binds; that (astronomically
  * rare) race is closed by one retry on a fresh port.
+ *
+ * Server and client are pinned to 127.0.0.1 rather than `localhost` (point 475).
+ * `localhost` is two addresses, and the two sides did not pick the same one: vite
+ * resolved it to ::1 and bound only that, while Node's connect reached for 127.0.0.1
+ * and was refused — on a host with no IPv6 route, every browser suite died at
+ * "server did not come up" before its first check. One address, named on both sides,
+ * cannot disagree; 127.0.0.1 is a secure context like localhost, so nothing the suites
+ * rely on changes.
  */
 export async function launchServer(npmScript, label, cwd) {
   for (let attempt = 1; attempt <= 2; attempt++) {
     const port = await getFreePort()
-    const base = `http://localhost:${port}/`
+    const base = `http://127.0.0.1:${port}/`
     console.log(`# starting ${label} server (:${port})…`)
-    const child = spawn(`${npmScript} -- --port ${port} --strictPort`, { windowsHide: true, cwd, shell: true, detached: !isWin, stdio: 'ignore' })
+    const child = spawn(`${npmScript} -- --host 127.0.0.1 --port ${port} --strictPort`, { windowsHide: true, cwd, shell: true, detached: !isWin, stdio: 'ignore' })
     try {
       await waitForServer(base, 60000)
       return { child, base }

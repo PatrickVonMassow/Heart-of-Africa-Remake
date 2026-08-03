@@ -53,11 +53,26 @@ function platformArgs(platform) {
   return platform === 'linux' ? ['--no-sandbox'] : []
 }
 
+/** What the WebGL 2 lane says about WebGPU. The lane's whole job is the FALLBACK
+ *  backend, so the safe answer would always be "off" — but Windows keeps
+ *  `--enable-unsafe-webgpu` byte for byte, because there the bundled Chromium brings up
+ *  no headless WebGPU adapter at all (point 184) and the flag has never done anything.
+ *
+ *  On Linux it does. Measured 03.08.2026 in the container: SwiftShader DOES expose a
+ *  WebGPU adapter under that flag, the game initialises it in preference to WebGL 2, and
+ *  it dies on its first attribute buffer ("createBuffer failed, size (288) is too large
+ *  for the implementation") — the page never finishes loading, so `assertBackend` never
+ *  gets to notice the wrong backend. Turning WebGPU off is what makes the fallback lane
+ *  exercise the fallback. */
+function webgpuArg(platform) {
+  return platform === 'linux' ? '--disable-features=WebGPU' : '--enable-unsafe-webgpu'
+}
+
 /** Launch options for the WebGL 2 fallback lane (Playwright's bundled Chromium). */
 export function webglLaunchOptions(platform, angleOverride) {
   return {
     args: [
-      '--enable-unsafe-webgpu',
+      webgpuArg(platform),
       `--use-angle=${angleBackend(platform, angleOverride)}`,
       '--enable-gpu',
       ...platformArgs(platform),

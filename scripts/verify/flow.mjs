@@ -348,6 +348,12 @@ check('Hint stores grave coordinates (language-neutral)',
   !!hint && typeof hint.text === 'object' && typeof hint.text.params?.lat === 'number')
 check('Learned language deciphers the hint (latitude)', s.decodedGiven.north === true &&
   s.journal.some((e) => titleKey(e) === 'journal.titles.decoded'))
+// Do-not-disturb is on for this run (line ~110, so the long walks are not
+// interrupted), and DND is exactly the setting that stops a new entry from
+// opening the book. The player's own way to read it is to open it — so open it,
+// rather than photograph a panel this suite has arranged not to appear.
+await page.evaluate(() => window.__game.getState().setJournalOpen(true))
+await page.waitForTimeout(200)
 await shot('05-journal-hint', { element: '.journal', label: 'the journal holding the hint' })
 await closeDialog()
 await page.evaluate(() => window.__game.getState().setJournalOpen(false))
