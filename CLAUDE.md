@@ -293,7 +293,8 @@ old→new coverage map live in `scripts/verify/README.md`.
   TAKEN: after merge and tick run `node scripts/batch-boundary.mjs
   <point>` and stop. `batch-progress-guard` BLOCKS a stop that closed a point
   without that marker, allows one only against the work order and an armed
-  `HoA-Batch-Autostart`, then marks the lock HANDED OVER so the launcher spawns
+  launcher (`scripts/batch-launcher.mjs --start` on Linux, the
+  `HoA-Batch-Autostart` task on Windows), then marks the lock HANDED OVER so it spawns
   the successor — five hours were lost to a session that stopped holding it.
   Attended, ask for `/clear`. OWNERSHIP IS A LEASE (30.07.2026): `leaseUntil` on
   the lock, renewed BEFORE each call; an owner that stops renewing stops owning

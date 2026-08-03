@@ -223,12 +223,14 @@ Remediation, automatic and logged:
    Verify with `node scripts/batch-singleton.mjs status` (expect this
    session as owner, `pid-alive`).
 6. When ready to resume the batch: delete `.claude/batch-paused`.
-7. **Re-enable the scheduled task — ONLY after steps 1–6 are done and verified**
+7. **Re-arm the launcher — ONLY after steps 1–6 are done and verified**
    (the singleton merged to `main`, the rogue pid dead, the old lock deleted,
-   `status` showing the expected owner):
-   `Enable-ScheduledTask -TaskName 'HoA-Batch-Autostart'`
-   Optional (elevated shell, per the task's ACL): tighten the tick from 15 to
-   5 min — the launcher is cheap and now spawn-safe:
+   `status` showing the expected owner). On the LINUX host:
+   `node scripts/batch-launcher.mjs --start` (point 474 — no OS scheduler exists
+   there, so the launcher is a detached node daemon). On the WINDOWS host,
+   elevated: `Enable-ScheduledTask -TaskName 'HoA-Batch-Autostart'`
+   Optional, WINDOWS only (elevated shell, per the task's ACL): tighten the tick
+   from 15 to 5 min — the launcher is cheap and now spawn-safe:
    ```powershell
    $t = Get-ScheduledTask -TaskName 'HoA-Batch-Autostart'
    $t.Triggers[0].Repetition.Interval = 'PT5M'

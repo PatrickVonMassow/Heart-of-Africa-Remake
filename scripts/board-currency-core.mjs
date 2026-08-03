@@ -66,7 +66,7 @@ export const BOARD_PAGE_URL = `https://${BOARD_OWNER.toLowerCase()}.github.io/${
  */
 export const LIVE_GRACE_MS = 6 * 60 * 1000
 
-/** The launcher's tick (Windows Scheduled Task) — one tick of patience. */
+/** The launcher's tick — one tick of patience. */
 export const WATCHDOG_TICK_MS = 15 * 60 * 1000
 
 // ── The fingerprint (deltas A + E) ─────────────────────────────────────────

@@ -75,7 +75,8 @@ export const DEAD_CONFIRM_MS = 5 * 60 * 1000
 /** Legacy locks (no pid recorded) fall back to age-only liveness with this
  *  generous bound (the old STALE_MS). */
 export const LEGACY_STALE_MS = 45 * 60 * 1000
-/** One tick of the HoA-Batch-Autostart scheduled task. */
+/** One tick of the launcher — the HoA-Batch-Autostart task on Windows, the
+ *  scripts/batch-launcher.mjs daemon on Linux. */
 export const LAUNCHER_TICK_MS = 15 * 60 * 1000
 /** A pending-spawn lock (launcher claimed, claude -p still booting) older than
  *  this with a dead child pid is reapable. */

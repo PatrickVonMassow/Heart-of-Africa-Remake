@@ -64,7 +64,7 @@ import {
 } from './batch-singleton.mjs'
 import { otherSessionsIn, gateDemandSatisfied } from './batch-doctor-core.mjs'
 import { gatherBoundary } from './batch-boundary.mjs'
-import { LAUNCHER_TASK_NAME } from './batch-boundary-core.mjs'
+import { launcherRemedy } from './batch-launcher-core.mjs'
 import { gatherInFlight } from './batch-in-flight.mjs'
 import { POOL_CAP, slotsRemedy, describeInFlight } from './batch-in-flight-core.mjs'
 import { clearClaim, gatherClaim, gitOperationInProgress, handBackToClaimant } from './batch-claim.mjs'
@@ -420,7 +420,7 @@ try {
         `launcher would skip every tick (that cost five and a half idle hours on 28.07.2026). Do ONE of two ` +
         `things. (a) If the point is finished and NO delegated agent is still in flight, hand over: run ` +
         `\`node scripts/batch-boundary.mjs ${bound.due}\` and then stop — the batch is passed to a fresh session ` +
-        `that the OS task starts and batch-resume-hook re-orients, which is how the context cost stays down. ` +
+        `that the launcher starts and batch-resume-hook re-orients, which is how the context cost stays down. ` +
         `(b) If work is still in flight (an agent pool draining, a verification running, the merge unfinished), ` +
         `CONTINUE it in this turn — poll, never idle — and take the boundary when it is done. If you cannot ` +
         `poll it inside this turn, DECLARE the wait instead: \`node scripts/batch-in-flight.mjs --waiting-on ` +
@@ -431,12 +431,16 @@ try {
   }
 
   if (decision === 'block-launcher') {
+    // The remedy is PLATFORM-AWARE (point 474): on Windows the launcher is a
+    // Scheduled Task only the user can re-arm, on Linux a daemon this session may
+    // start itself. Naming the wrong one leaves the batch stranded with an
+    // instruction nobody can carry out.
+    const remedy = launcherRemedy()
     block(
-      `POINT BOUNDARY REFUSED — point ${bound.boundary?.point ?? '?'} is closed, but the OS launcher task ` +
-        `"${LAUNCHER_TASK_NAME}" is ${bound.launcher}, so NOTHING would restart the batch and ending here ` +
+      `POINT BOUNDARY REFUSED — point ${bound.boundary?.point ?? '?'} is closed, but the launcher ` +
+        `"${remedy.name}" is ${bound.launcher}, so NOTHING would restart the batch and ending here ` +
         `would strand it. Keep working: continue with the next open point in this session. To make the ` +
-        `boundary usable, the user must run \`Enable-ScheduledTask -TaskName '${LAUNCHER_TASK_NAME}'\` in an ` +
-        `elevated PowerShell (the assistant cannot); verify with \`node scripts/batch-boundary.mjs --status\`.`,
+        `boundary usable, ${remedy.how}; verify with \`node scripts/batch-boundary.mjs --status\`.`,
     )
   }
 

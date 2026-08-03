@@ -9,7 +9,7 @@ import {
   STRAY_KIND, TIMING_SENSITIVE_SUITES,
   annotateResult, annotateStageFailure, classifyLoad, classifyProcess, cpuBusyFraction, decideRun,
   forcedLevel, formatLoadReport, gpuEngineUtilisation, isTimingSensitive, killAdvice, onLoadMode, ownTree,
-  parseGpuCounterJson, parsePsOutput, parseWindowsProcessJson, strayProcesses,
+  parseGpuCounterJson, parsePercentUtilisation, parsePsOutput, parseWindowsProcessJson, strayProcesses,
 } from './machine-load-core.mjs'
 import { DEV_SUITES } from './tiers.mjs'
 
@@ -230,6 +230,29 @@ describe('parseGpuCounterJson', () => {
     expect(parseGpuCounterJson('').error).toBeTruthy()
     expect(parseGpuCounterJson(null).error).toBeTruthy()
     expect(parseGpuCounterJson('{"count":3}').samples).toEqual([])
+  })
+})
+
+describe('parsePercentUtilisation — the Linux reading (point 474)', () => {
+  it('reads the sysfs busy percentage of the busiest device', () => {
+    // /sys/class/drm/card0/device/gpu_busy_percent, one whole percentage plus its
+    // newline — two adapters MAXed, never summed.
+    expect(parsePercentUtilisation(['37\n', '4\n'])).toBeCloseTo(0.37, 6)
+  })
+
+  it('reads the nvidia-smi csv shape, one device per line', () => {
+    expect(parsePercentUtilisation(['0\n61\n12\n'])).toBeCloseTo(0.61, 6)
+  })
+
+  it('reads an idle device as a measured zero, and NO device as null', () => {
+    expect(parsePercentUtilisation(['0\n'])).toBe(0)
+    expect(parsePercentUtilisation([])).toBe(null)
+    expect(parsePercentUtilisation(['', '   ', 'Unable to determine the device handle'])).toBe(null)
+    expect(parsePercentUtilisation(null)).toBe(null)
+  })
+
+  it('clamps rather than throwing on a driver that over-reports', () => {
+    expect(parsePercentUtilisation(['180'])).toBe(1)
   })
 })
 

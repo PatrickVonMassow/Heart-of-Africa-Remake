@@ -53,16 +53,6 @@ const FLD = '__F__'
 
 const git = (cmd) => execSync(`git ${cmd}`, { windowsHide: true, cwd: REPO_ROOT, encoding: 'utf8' }).trim()
 
-/** True when `a` is an ancestor of (or equal to) `b`. A git failure answers no. */
-export function isAncestor(a, b) {
-  try {
-    execSync(`git merge-base --is-ancestor "${a}" "${b}"`, { windowsHide: true, cwd: REPO_ROOT, stdio: 'ignore' })
-    return true
-  } catch {
-    return false
-  }
-}
-
 /**
  * True when `sha` names no reachable commit — the ONE condition under which an
  * undiffable range may move the gate. A git failure here answers "cannot tell",
@@ -261,18 +251,40 @@ export function gatherMechanismReviewInputs({ sessionId = '' } = {}) {
   // Which recorded reviews CONTAIN each pending commit. A record only counts when
   // it is reachable from HEAD — a review recorded on an abandoned branch judged a
   // state that is not the one being shipped.
-  // Nothing pending means nothing to cover: the ancestry probes below are one
-  // git spawn per record, and the overwhelmingly common turn changes no mechanism
-  // at all. A hook that costs a process per ledger line on every turn end is a
-  // hook people switch off.
-  const records = pendingCommits.length ? readRecords().filter((r) => isAncestor(r.sha, head)) : []
-  // ONE git spawn per RECORD, not one per (commit, record) PAIR. The pairwise
-  // form cost 13 × 52 ≈ 700 processes on the night of 30.07.2026 — 26 to 38
-  // seconds on Windows, past this check's own budget, so CI failed on every push
-  // of a long-lived guard branch and mailed the repository owner thirteen times.
-  // The semantics are identical: a pending commit lies in `baseline..head`, so
-  // "record contains commit" is exactly "commit appears in the record's history
-  // since the baseline", which one `rev-list` per record answers in full.
+  // Nothing pending means nothing to cover, and the ancestry work below costs git
+  // processes: the overwhelmingly common turn changes no mechanism at all, and a
+  // hook that costs a process per ledger line on every turn end is a hook people
+  // switch off.
+  //
+  // ONE git spawn for the whole LEDGER, not two per record (point 474, measured
+  // 03.08.2026 on the Linux host). This loop had already been cut from one spawn
+  // per (commit, record) PAIR to one per record after the night of 30.07.2026;
+  // per record was still 83 × 2 = 166 processes here, 139 seconds, which put the
+  // fast gate over its budget on EVERY feature branch that touches a mechanism
+  // file. A shell spawn is simply dearer in this container than it was on the
+  // Windows host, so a per-record cost no longer fits.
+  //
+  // The narrowing is EXACT, not an approximation. A record can only cover a
+  // pending commit when that commit is reachable from the record's sha and NOT
+  // from `effective` — so the record's own sha must itself lie in
+  // `effective..head`. A record at or before `effective` has everything it
+  // reaches already reachable from `effective`, so its `containedShas` is empty
+  // by construction and it could never have covered anything. That set is also
+  // reachable from head by definition, which is exactly what the old
+  // per-record ancestry filter asked, so both spawn loops collapse into the one
+  // `rev-list` below (the `isAncestor` helper that served the old filter went
+  // with it — nothing else called it).
+  const branchRange = pendingCommits.length
+    ? new Set(
+        git(`rev-list ${head} --not ${effective}`)
+          .split(/\r?\n/)
+          .map((l) => l.trim())
+          .filter(Boolean),
+      )
+    : new Set()
+  const records = pendingCommits.length ? readRecords().filter((r) => branchRange.has(r.sha)) : []
+  // One spawn per SURVIVING record — in practice the reviews recorded on this
+  // branch, which is a handful, never the whole ledger.
   for (const r of records) {
     r.containedShas = new Set(
       git(`rev-list ${r.sha} --not ${effective}`)

@@ -31,6 +31,8 @@ import {
   pointClosure,
   tickedPointsInDiff,
 } from './batch-boundary-core.mjs'
+import { launcherRemedy } from './batch-launcher-core.mjs'
+import { launcherState } from './batch-launcher.mjs'
 import { BOARD_FILE_DEFAULT } from './dashboard-state.mjs'
 import { nowCard } from './board-core.mjs'
 
@@ -70,14 +72,37 @@ export function clearBoundary(path = BOUNDARY_PATH) {
 }
 
 /**
- * The launcher's REAL state, probed — never assumed. Windows only (the task is a
- * Windows Scheduled Task); anywhere else, and on any failure, the answer is
+ * The launcher's REAL state, probed — never assumed. On any failure the answer is
  * 'unknown', which the guard treats as NOT armed.
+ *
+ * TWO HOSTS, ONE VOCABULARY (point 474). On Windows the launcher is the Scheduled
+ * Task, read off `Get-ScheduledTask`. Everywhere else there is no OS scheduler to
+ * ask — the launcher is this repository's own detached daemon
+ * (`scripts/batch-launcher.mjs`) and the probe reads that daemon's recorded state,
+ * which is published in the SAME ready/running/disabled/unknown words, so a single
+ * `classifyLauncherState` maps both. Until this existed `probeLauncherState`
+ * answered 'unknown' off win32 and no point boundary could ever be verified on
+ * Linux: the one stop the batch is allowed to make was refused outright.
+ *
+ * `platform` and `exec` are injectable so the Windows path can be proven from a
+ * Linux test run, and the Linux path from a Windows one.
  */
-export function probeLauncherState({ taskName = LAUNCHER_TASK_NAME } = {}) {
-  if (process.platform !== 'win32') return 'unknown'
+export function probeLauncherState({
+  taskName = LAUNCHER_TASK_NAME,
+  platform = process.platform,
+  exec = execFileSync,
+  recordPath,
+  now,
+} = {}) {
+  if (platform !== 'win32') {
+    try {
+      return classifyLauncherState(launcherState({ recordPath, now }).state)
+    } catch {
+      return 'unknown'
+    }
+  }
   try {
-    const out = execFileSync(
+    const out = exec(
       'powershell',
       [
         '-NoProfile',
@@ -317,13 +342,31 @@ if (isMain) {
   } else if (arg === '--status' || !arg) {
     const g = gatherBoundary(sid)
     const handover = boundaryHandover({ sid })
+    const remedy = launcherRemedy()
+    // `gatherBoundary` probes the launcher only when a boundary is claimed or due
+    // — right for a hook that runs at every turn end, wrong for the command every
+    // message points at to VERIFY the launcher. So the status asks outright, and
+    // `launcherProbe` is that answer whether or not a marker exists.
+    const launcherProbe = probeLauncherState()
     console.log(
       JSON.stringify(
-        { ownerSessionId: sid || null, ...g, handover, taskName: LAUNCHER_TASK_NAME },
+        // `launcher` is already the STATE gatherBoundary saw; the name and the
+        // fresh probe are separate fields so none can shadow another.
+        {
+          ownerSessionId: sid || null,
+          ...g,
+          handover,
+          launcherName: remedy.name,
+          launcherProbe,
+          platform: process.platform,
+        },
         null,
         2,
       ),
     )
+    if (launcherProbe !== 'armed') {
+      console.log(`\nThe launcher "${remedy.name}" is ${launcherProbe} — no boundary stop is possible. To arm it, ${remedy.how}.`)
+    }
     if (!g.marker) console.log('\nNo boundary recorded. Usage: node scripts/batch-boundary.mjs <point>')
     else if (g.boundary.valid && g.launcher === 'armed') console.log('\nA boundary stop would be ALLOWED.')
     else console.log(`\nA boundary stop would be REFUSED (${g.boundary.reason}, launcher ${g.launcher}).`)
@@ -345,10 +388,10 @@ if (isMain) {
     }
     const launcher = probeLauncherState()
     if (launcher !== 'armed') {
+      const remedy = launcherRemedy()
       fail(
-        `the launcher task "${LAUNCHER_TASK_NAME}" is ${launcher} — nothing would restart the batch, so ` +
-          'ending here would strand it. Keep working, and ask the user to run ' +
-          `\`Enable-ScheduledTask -TaskName '${LAUNCHER_TASK_NAME}'\` in an elevated PowerShell. Nothing recorded.`,
+        `the launcher "${remedy.name}" is ${launcher} — nothing would restart the batch, so ending here would ` +
+          `strand it. Keep working, and ${remedy.how}. Nothing recorded.`,
       )
     }
     writeBoundary({ v: 1, sessionId: sid, point, at: Date.now() })
@@ -359,7 +402,8 @@ if (isMain) {
         (toWindow
           ? `the batch does NOT go to a fresh session: window ${handover.claimantSid} holds an honoured claim, ` +
             'so batch-autostart reserves the batch for it and SKIPS the spawn. '
-          : 'the OS task starts a fresh one within its interval and batch-resume-hook re-orients it. ') +
+          : `the launcher (${launcherRemedy().name}) starts a fresh one within its interval and ` +
+            'batch-resume-hook re-orients it. ') +
         'Do NOT start the next point in this context, and do NOT end while a delegated agent is still in ' +
         'flight (its work would be thrown away — let the pool drain first).\n\n' +
         'THE BOARD CARD (point 434 (7)) — it must name where the batch actually goes, so take this text ' +

@@ -377,6 +377,34 @@ export function gpuEngineUtilisation({ samples = [], count = 0 } = {}) {
 }
 
 /**
+ * LINUX: the busiest device, as a fraction in [0,1], from percentage readings.
+ * PURE (point 474).
+ *
+ * Feeds two probes that both hand back whole percentages, one number per device:
+ * `/sys/class/drm/*​/device/gpu_busy_percent` (amdgpu and the drivers that copied
+ * its sysfs shape) and `nvidia-smi --query-gpu=utilization.gpu`. The devices are
+ * MAXed, not summed, for the same reason the Windows engines are: two adapters at
+ * 50 % is not one device at 100 %.
+ *
+ * Returns null when NOTHING readable came back — never a comforting zero. A
+ * present-but-idle device reads 0, which is a measurement; an empty list is not.
+ */
+export function parsePercentUtilisation(readings) {
+  const values = []
+  for (const raw of Array.isArray(readings) ? readings : []) {
+    for (const line of String(raw ?? '').split(/[\r\n]+/)) {
+      const m = /-?\d+(?:\.\d+)?/.exec(line)
+      if (!m) continue
+      const v = Number(m[0])
+      if (!Number.isFinite(v) || v < 0) continue
+      values.push(v)
+    }
+  }
+  if (values.length === 0) return null
+  return Math.min(1, Math.max(0, Math.max(...values) / 100))
+}
+
+/**
  * The verdict on the machine. `ok: false` (a probe that threw or timed out)
  * yields `unknown` — reported, never silently treated as quiet.
  *

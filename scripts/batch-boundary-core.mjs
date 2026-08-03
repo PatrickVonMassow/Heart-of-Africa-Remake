@@ -4,7 +4,7 @@
 // session carries point after point. Run 24/7 that is the dominant cost
 // (1.25 %/h of the weekly quota against the ~0.6 %/h that fits). The cure is the
 // mechanism that already exists: the session ENDS at a point boundary and the OS
-// task `HoA-Batch-Autostart` brings up a fresh one, which `batch-resume-hook`
+// LAUNCHER brings up a fresh one, which `batch-resume-hook`
 // re-orients. Nothing new drives the batch — what changes is that ending is now
 // a LEGAL way to finish a turn.
 //
@@ -40,25 +40,30 @@
 //     the heartbeat past it, and a live pid still gets a grace window.
 //   - the launcher REPORTS a silent owner instead of only logging it.
 //
-// The one import is the board's command NAMES (board-remedy, a constants module
-// that imports nothing): this core prints the instruction a session follows
-// literally at a boundary, and a second spelling of those commands here is how
-// the printed path and the working path came apart in the first place.
+// The imports are NAMES, from two constants modules that import nothing: the
+// board's commands (board-remedy) and the launcher's identity
+// (batch-launcher-core). This core prints the instruction a session follows
+// literally at a boundary, and a second spelling of those names here is how the
+// printed path and the working path came apart in the first place.
 import { EDIT_CMD, NONE_CARD_CMD } from './board-remedy.mjs'
+import { LAUNCHER_TASK_NAME } from './batch-launcher-core.mjs'
 
 /** How long a recorded boundary marker stays usable. Long enough for the merge,
  *  the tick, the push and the closing report of a point; short enough that a
  *  marker from an abandoned attempt cannot authorise a stop an hour later. */
 export const BOUNDARY_FRESH_MS = 60 * 60 * 1000
 
-/** The OS scheduled task that resurrects the batch. */
-export const LAUNCHER_TASK_NAME = 'HoA-Batch-Autostart'
+/** The Windows launcher's name, re-exported so the old import path keeps working.
+ *  One spelling, in batch-launcher-core, which also knows the Linux daemon's. */
+export { LAUNCHER_TASK_NAME }
 
 /**
- * Map a raw `Get-ScheduledTask ... .State` value to armed / disabled / unknown.
- * Accepts both the string names and the numeric ScheduledTask states
- * (0 Unknown, 1 Disabled, 2 Queued, 3 Ready, 4 Running), because PowerShell
- * hands back either depending on how the value is formatted.
+ * Map a raw launcher state to armed / disabled / unknown. Its vocabulary is the
+ * Windows one — `Get-ScheduledTask ... .State`, as strings or as the numeric
+ * ScheduledTask states (0 Unknown, 1 Disabled, 2 Queued, 3 Ready, 4 Running),
+ * because PowerShell hands back either depending on how the value is formatted —
+ * and the Linux daemon publishes its own state in the SAME words (point 474), so
+ * both hosts are judged here and nowhere else.
  *
  * ARMED means "this task will fire again on its own": Ready, Queued and Running
  * all do. Disabled does not, and Unknown is not evidence that it will.

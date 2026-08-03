@@ -294,7 +294,7 @@ export function adoptDecision({ claim, probe } = {}) {
 
 // --- Lifecycle: the launcher tick is the supervisor ----------------------------
 //
-// NO SECOND SCHEDULED TASK. `HoA-Batch-Autostart` already runs every few minutes,
+// NO SECOND LAUNCHER. The launcher already runs every few minutes,
 // at boot included, and it is the one thing on this machine that runs when
 // nothing else does. So it is the supervisor: each tick it asks whether the
 // watcher is alive, starts one if it is not, and kills it while the batch is
