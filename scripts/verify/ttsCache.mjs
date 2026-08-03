@@ -28,6 +28,21 @@ const ABORTED_PATHS = [/\/onnx\/model\.onnx$/]
 
 const keyFor = (url) => createHash('sha1').update(url.split('?')[0]).digest('hex')
 
+/** Fetch a cache MISS through Node rather than through Playwright's `route.fetch`
+ *  (point 475). The driver picks the address family itself and picked IPv6 on a host
+ *  that has no IPv6 route, so every recording run died with ENETUNREACH on the model
+ *  download while the BROWSER reached the same CDN without trouble — and no Node DNS
+ *  setting reaches inside the driver. Node's own fetch tries the families in order and
+ *  falls back, which is all this needs. The shape mirrors what the caller used
+ *  (`status()`, `headers()`, plus the body already read), so the recording path reads
+ *  the same on every platform — no branch, nothing for one host to drift away from. */
+async function recordingFetch(url) {
+  const res = await fetch(url, { redirect: 'follow' })
+  const body = Buffer.from(await res.arrayBuffer())
+  const headers = Object.fromEntries(res.headers)
+  return { status: () => res.status, headers: () => headers, body }
+}
+
 export function ttsCacheComplete() {
   return existsSync(COMPLETE_MARKER)
 }
@@ -101,8 +116,8 @@ export async function installTtsCache(page) {
       return route.abort()
     }
     stats.misses++
-    const res = await route.fetch()
-    const body = await res.body()
+    const res = await recordingFetch(url)
+    const body = res.body
     if (res.status() === 200) {
       writeFileSync(bodyPath, body)
       writeFileSync(metaPath, JSON.stringify({ url: url.split('?')[0], contentType: res.headers()['content-type'] ?? 'application/octet-stream' }))

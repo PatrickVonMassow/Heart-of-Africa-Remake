@@ -60,10 +60,25 @@ describe('webglLaunchOptions', () => {
     expect(webglLaunchOptions('win32')).toEqual({ args: WINDOWS_WEBGL_ARGS })
   })
 
-  it('swaps only the ANGLE backend on Linux and adds the container sandbox flag', () => {
+  it('swaps the ANGLE backend on Linux, turns WebGPU OFF and adds the container sandbox flag', () => {
     expect(webglLaunchOptions('linux')).toEqual({
-      args: ['--enable-unsafe-webgpu', '--use-angle=swiftshader', '--enable-gpu', '--no-sandbox'],
+      args: ['--disable-features=WebGPU', '--use-angle=swiftshader', '--enable-gpu', '--no-sandbox'],
     })
+  })
+
+  // The fallback lane must exercise the FALLBACK. On Linux the software backend really
+  // does bring up a WebGPU adapter, so leaving the unsafe-webgpu flag on hands the lane
+  // the very backend it is not testing (point 475).
+  it('never leaves WebGPU enabled in the WebGL 2 lane on Linux', () => {
+    expect(webglLaunchOptions('linux').args).not.toContain('--enable-unsafe-webgpu')
+    expect(webglLaunchOptions('linux').args).toContain('--disable-features=WebGPU')
+  })
+
+  it('keeps the historical WebGPU flag where it has never done anything', () => {
+    for (const platform of ['win32', 'darwin']) {
+      expect(webglLaunchOptions(platform).args).toContain('--enable-unsafe-webgpu')
+      expect(webglLaunchOptions(platform).args).not.toContain('--disable-features=WebGPU')
+    }
   })
 
   it('adds --no-sandbox on Linux only', () => {
@@ -124,7 +139,7 @@ describe('verifyLaunchOptions', () => {
 
   it('never lets a probed browser into the WebGL 2 lane — that one is the bundled Chromium', () => {
     expect(verifyLaunchOptions('webgl', 'linux', undefined, '/usr/bin/chromium')).toEqual({
-      args: ['--enable-unsafe-webgpu', '--use-angle=swiftshader', '--enable-gpu', '--no-sandbox'],
+      args: ['--disable-features=WebGPU', '--use-angle=swiftshader', '--enable-gpu', '--no-sandbox'],
     })
   })
 

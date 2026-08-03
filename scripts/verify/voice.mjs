@@ -172,6 +172,23 @@ check('the start entry narrates on the first user gesture', bootSpoke, '')
 await page
   .waitForFunction(() => document.querySelector('.journal .speak')?.textContent === '■', null, { timeout: 300000 })
   .catch(() => {})
+// KEEP RECORDING UNTIL THE MEASUREMENT IS TRUSTWORTHY (point 475). The window
+// used to close the moment narration began, which on fast hardware already
+// carries far more than the 30 frames the trust gate below demands — but a
+// software-rendered container delivers ~12 fps, and under the cold load nearer
+// one, so the same window closed on 8 frames and the gate reported "not
+// trustworthy". That verdict was CORRECT and must not be softened by lowering
+// the demand; the fix is to let the probe gather the samples it needs. Extending
+// the window cannot hide a stall (the attribution takes the MAXIMUM block over
+// it) and cannot invalidate the load-in-window test, which only asks that the
+// model was served after probeStart.
+// Collected WITH HEADROOM, not to the exact threshold: gathering until the gate's
+// own minimum is met leaves a run that reaches it on the last poll one sample from
+// red, which is how a rotating flake is born (this one showed up immediately — 30
+// frames against a demand of more than 30, green only on the retry).
+await page
+  .waitForFunction(() => window.__liveness.raf.length > 45 && window.__liveness.ticks.length > 30, null, { timeout: 60000 })
+  .catch(() => {})
 const probe = await page.evaluate(() => {
   const S = window.__liveness
   S.recording = false
@@ -250,7 +267,12 @@ try {
   autoSpoke = false
 }
 check('English: new journal entry auto-narrates without a click', autoSpoke, '')
-await shot('66-voice-auto-narration', { element: '.journal .entry:last-child', label: 'the new entry narrating itself' })
+// The entries list ends with the scroll anchor that keeps the newest content in
+// view (point 29), so the newest ENTRY is the second-to-last child — never the
+// last child, and never the last of its TYPE either, since the anchor is a div
+// as well. Counting from the back names it exactly, and names it loudly if the
+// anchor ever goes away.
+await shot('66-voice-auto-narration', { element: '.journal .entries > .entry:nth-last-child(2)', label: 'the new entry narrating itself' })
 await page.locator('.journal .speak').last().click()
 await page.waitForTimeout(400)
 

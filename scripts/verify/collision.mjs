@@ -364,7 +364,11 @@ await accessPointsFree('Village')
 // walkers until one that has been out walking disappears inside — at that
 // moment it must stand at its home center (it slipped in through the door).
 const walkerResult = await page.evaluate(async () => {
-  const deadline = Date.now() + 150000
+  // A TIMEOUT on a polled condition, not a fixed wait: it costs nothing when the
+  // transition happens promptly, and the errand it waits for is paced by the
+  // frame clock — a host rendering in software takes several times as long to
+  // walk a villager home as the hardware this bound was written on.
+  const deadline = Date.now() + 420000
   const wasOut = new Set()
   return await new Promise((resolve) => {
     const iv = setInterval(() => {
@@ -405,15 +409,20 @@ const pinResult = await page.evaluate(async () => {
   if (!w) return { ok: false, reason: 'no __placeWalkers' }
   let maxPinned = 0
   let anyMoved = false
-  const last = w.states.map((s) => ({ x: s.x, z: s.z }))
+  // Movement is measured against the START position, not against the previous
+  // sample. A per-sample delta asks "did a walker cover 0.2 m in the last 150 ms",
+  // which is a question about the SAMPLING RATE and the frame rate rather than
+  // about the walkers: on a software-rendered host at ~12 fps every walker moves,
+  // and the check still read "nothing moved". Cumulative displacement asks what
+  // the check means to ask — did anyone get anywhere.
+  const start = w.states.map((s) => ({ x: s.x, z: s.z }))
   const t0 = Date.now()
   // Watch for the window + a generous margin so a would-be pin has time to pass it.
   while (Date.now() - t0 < (win + 5) * 1000) {
     for (let i = 0; i < w.states.length; i++) {
       const s = w.states[i]
       if (s.pinned > maxPinned) maxPinned = s.pinned
-      if (Math.hypot(s.x - last[i].x, s.z - last[i].z) > 0.2) anyMoved = true
-      last[i] = { x: s.x, z: s.z }
+      if (Math.hypot(s.x - start[i].x, s.z - start[i].z) > 0.2) anyMoved = true
     }
     await sleep(150)
   }
