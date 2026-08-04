@@ -645,6 +645,20 @@ Consequences for anyone extending this directory:
 - **A new frame should wait for the picture it names.** Poll the app's own state
   until the view has settled rather than a fixed wait (see `fixedWaits.mjs`);
   that is also the first work any future determinism effort has to do.
+- **Measure a BUILT scene, and say so (point 499).** `_browser.mjs` carries two
+  helpers for exactly this, and anything reading pixels or a settling value should
+  use them: `waitForSceneBuilt(page)` waits for the renderer's triangle count to
+  pass a floor and stop GROWING for 5 s, and `waitForReadingStable(page, readFn)`
+  watches EVERY number a reading carries — the ones the check asserts, not one
+  proxy beside them — and reports whether it truly settled, with `requireChange`
+  for a value pushed into the scene that needs a moment to take hold. Both return
+  their verdict rather than a bare value, so a suite can FAIL with "the scene never
+  finished" instead of measuring an empty frame. Traced on the container host: the
+  first-person scene is black at 3 s, sits still at 33 346 triangles from 9 s to
+  13 s, and only reaches its final 83 037 at 24.6 s. Six checks across four suites
+  were reporting product failures against pictures and readings that had not
+  formed — a black frame reads as "no ground detail", an unrendered probe pair as
+  "no fire shadow", a half-lerped season as "the preset is wrong".
 
 ## A frame must show what its name claims (point 375)
 
