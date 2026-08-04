@@ -4255,39 +4255,29 @@ Build order, chosen so no two parallel agents own the same file:
   background — the case that silently passed today.
 
 
-- [ ] 490. THE LAUNCHER LOOKS FOR THE CLI WHERE THIS HOST HAS NONE (measured
-  04.08.2026, 05:22 — the batch had stood still since 02:15). The session that
-  closed its point took the boundary at 01:50 and handed over; the launcher
-  ACCEPTED the handover at 02:15 (`HANDOVER accepted: … spawning the successor`,
-  `repo check before spawn: consistent`) and then failed at the one step that
-  matters: `FAIL: no bundled claude.exe found`. Thirteen ticks in a row, every
-  fifteen minutes, three hours of nothing — and only the user's question surfaced
-  it, because a spawn that never happens is silent by construction.
-  CAUSE: `claudeExeBase()` in `scripts/batch-autostart-core.mjs` builds
-  `${LOCALAPPDATA}/Packages/Claude_pzs8sxrjxfjjc/…/claude-code` — the Windows
-  bundle, and the ONLY shape the resolver knew. The batch now runs on the Linux
-  host the browser verification moved to, where `LOCALAPPDATA` is unset, the base
-  collapses to `/Packages/…`, the readdir throws and `findClaudeExe` returns null.
-  The CLI is there the whole time, at `/usr/local/share/npm-global/bin/claude`.
-  Both spawners share the lookup, so the message watcher (`chat-watcher.mjs`) was
-  mute for the same reason — the layer that is supposed to speak when a session is
-  wedged could not spawn either.
+
+- [ ] 491. QUEUE PROSE WRITTEN ONLY INTO THE HTML IS LOST ON THE NEXT REBUILD
+  (measured 04.08.2026, and it cost the German text of thirteen cards). The
+  Warteschlange is a PROJECTION: `scripts/board-queue.mjs` renders it from
+  `.claude/board-queue.json`. But `node scripts/board.mjs queue <N> "<text>"`
+  writes the rendered card into `.batch-dashboard.html` ALONE, and nothing writes
+  it back to the data file. So the German titles, estimates and prose of points
+  477–489 stood correctly on the board and evaporated at the first
+  `board-queue.mjs` run — the board reverted to the work order's English
+  headlines and "Noch keine Beschreibung auf dem Board". They were recoverable
+  only because the previous publish commit was still reachable on the board
+  branch; one more publish would have made the loss permanent.
   FINAL STATE:
-  1. The lookup is host-neutral and ORDERED, each step a shape a real host has:
-     an explicit `HOA_CLAUDE_CLI`, then the Windows bundle, then `PATH`, then the
-     usual install dirs (a service-manager tick inherits a thin `PATH`). Every
-     candidate must EXIST before it is returned — handing `spawn` a path that is
-     not there only moves the failure one line down.
-  2. The trust self-heal in `scripts/batch-autostart.mjs` keys on the repo path it
-     actually runs in, not on the two hard-coded `C:/Users/Patri/…` spellings.
-  3. A resolver that finds nothing stays loud: the urgent ntfy alert names the
-     platform and the directories it tried, so the next port fails audibly rather
-     than silently.
-  4. `docs/batch-autonomy.md` states where the CLI is looked up and that the
-     override exists.
-  VERIFIABLE: pure Vitest over the resolver — an override wins, a missing override
-  falls through, the Windows bundle still wins its version sort, a POSIX `PATH`
-  hit resolves, a thin `PATH` falls back to the install dirs, nothing found
-  returns null and never throws; live on this host, the resolver names
-  `/usr/local/share/npm-global/bin/claude` and a launcher tick spawns a successor
-  instead of logging `FAIL`.
+  1. Whatever writes a queue card writes the DATA file, exactly as `board.mjs
+     title` already does for titles ("the Warteschlange is a projection, so a
+     title that lived only in the HTML would evaporate on the next rebuild" — the
+     comment is right, and `queue` is the case it does not cover).
+  2. A rebuild that would DROP prose or a title an existing card carries refuses,
+     or restores it from the HTML first. A projection may narrow the board's
+     content silently only where the work order genuinely says less.
+  3. `board-queue.mjs` reports what it changed per card, not only the totals: the
+     run that destroyed thirteen cards printed "queue rebuilt … 109 card(s)" and
+     a hint listing them as "no prose yet", which reads like a state, not a loss.
+  VERIFIABLE: pure Vitest — a card written through `board.mjs queue` survives a
+  rebuild; a rebuild that would blank an existing card's prose is refused or
+  restores it; the report names the cards it emptied.

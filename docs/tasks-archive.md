@@ -13697,3 +13697,39 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   `journalOpen` and `journalDnd` at that moment rather than reasoning about them; if it is a
   product defect it belongs in its own point, if it is the frame rate it belongs in the caveat
   above.
+- [x] 490. THE LAUNCHER LOOKS FOR THE CLI WHERE THIS HOST HAS NONE (measured
+  04.08.2026, 05:22 — the batch had stood still since 02:15). The session that
+  closed its point took the boundary at 01:50 and handed over; the launcher
+  ACCEPTED the handover at 02:15 (`HANDOVER accepted: … spawning the successor`,
+  `repo check before spawn: consistent`) and then failed at the one step that
+  matters: `FAIL: no bundled claude.exe found`. Thirteen ticks in a row, every
+  fifteen minutes, three hours of nothing — and only the user's question surfaced
+  it, because a spawn that never happens is silent by construction.
+  CAUSE: `claudeExeBase()` in `scripts/batch-autostart-core.mjs` builds
+  `${LOCALAPPDATA}/Packages/Claude_pzs8sxrjxfjjc/…/claude-code` — the Windows
+  bundle, and the ONLY shape the resolver knew. The batch now runs on the Linux
+  host the browser verification moved to, where `LOCALAPPDATA` is unset, the base
+  collapses to `/Packages/…`, the readdir throws and `findClaudeExe` returns null.
+  The CLI is there the whole time, at `/usr/local/share/npm-global/bin/claude`.
+  Both spawners share the lookup, so the message watcher (`chat-watcher.mjs`) was
+  mute for the same reason — the layer that is supposed to speak when a session is
+  wedged could not spawn either.
+  FINAL STATE:
+  1. The lookup is host-neutral and ORDERED, each step a shape a real host has:
+     an explicit `HOA_CLAUDE_CLI`, then the Windows bundle, then `PATH`, then the
+     usual install dirs (a service-manager tick inherits a thin `PATH`). Every
+     candidate must EXIST before it is returned — handing `spawn` a path that is
+     not there only moves the failure one line down.
+  2. The trust self-heal in `scripts/batch-autostart.mjs` keys on the repo path it
+     actually runs in, not on the two hard-coded `C:/Users/Patri/…` spellings.
+  3. A resolver that finds nothing stays loud: the urgent ntfy alert names the
+     platform and the directories it tried, so the next port fails audibly rather
+     than silently.
+  4. `docs/batch-autonomy.md` states where the CLI is looked up and that the
+     override exists.
+  VERIFIABLE: pure Vitest over the resolver — an override wins, a missing override
+  falls through, the Windows bundle still wins its version sort, a POSIX `PATH`
+  hit resolves, a thin `PATH` falls back to the install dirs, nothing found
+  returns null and never throws; live on this host, the resolver names
+  `/usr/local/share/npm-global/bin/claude` and a launcher tick spawns a successor
+  instead of logging `FAIL`.
