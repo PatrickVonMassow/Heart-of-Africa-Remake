@@ -1,0 +1,72 @@
+{
+  "name": "Claude Code Sandbox",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "args": {
+      "TZ": "${localEnv:TZ:Europe/Berlin}",
+      "CLAUDE_CODE_VERSION": "latest",
+      "GIT_DELTA_VERSION": "0.18.2",
+      "ZSH_IN_DOCKER_VERSION": "1.2.0"
+    }
+  },
+  // --device=/dev/dxg plus the /usr/lib/wsl mount below hand the WSL2 GPU to the
+  // container, so the browser verification renders on real hardware instead of
+  // SwiftShader (~1 fps, which makes motion and interaction checks meaningless).
+  // If the host exposes no WSL GPU, the container REFUSES TO START: drop
+  // "--device=/dev/dxg" here and the /usr/lib/wsl mount below to get back.
+  "runArgs": ["--cap-add=NET_ADMIN", "--cap-add=NET_RAW", "--device=/dev/dxg"],
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "anthropic.claude-code",
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "eamodio.gitlens"
+      ],
+      "settings": {
+        "editor.formatOnSave": true,
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "editor.codeActionsOnSave": {
+          "source.fixAll.eslint": "explicit"
+        },
+        "terminal.integrated.defaultProfile.linux": "zsh",
+        "terminal.integrated.profiles.linux": {
+          "bash": {
+            "path": "bash",
+            "icon": "terminal-bash"
+          },
+          "zsh": {
+            "path": "zsh"
+          }
+        }
+      }
+    }
+  },
+  "remoteUser": "node",
+  "mounts": [
+    "source=claude-code-bashhistory-${devcontainerId},target=/commandhistory,type=volume",
+    "source=claude-code-config-${devcontainerId},target=/home/node/.claude,type=volume",
+    "source=claude-code-ghconfig-${devcontainerId},target=/home/node/.config/gh,type=volume",
+    "source=${localWorkspaceFolder}/../hoa,target=/workspace/hoa,type=bind",
+    "source=/usr/lib/wsl,target=/usr/lib/wsl,type=bind,readonly",
+    // The repository is bind-mounted from the Windows filesystem over 9p, where
+    // reading 300 small files costs ~1 s against ~1 ms on the container's own
+    // disk (measured 03.08.2026). node_modules is the bulk of those files, so it
+    // lives on a container volume instead — source stays visible in Explorer.
+    // The volume starts EMPTY: postCreateCommand runs `npm install` to fill it.
+    "source=claude-code-hoa-node-modules-${devcontainerId},target=/workspace/hoa/node_modules,type=volume"
+  ],
+  "containerEnv": {
+    "NODE_OPTIONS": "--max-old-space-size=4096",
+    "CLAUDE_CONFIG_DIR": "/home/node/.claude",
+    "POWERLEVEL9K_DISABLE_GITSTATUS": "true",
+    "GH_TOKEN": "${localEnv:GH_TOKEN}",
+    "PLAYWRIGHT_BROWSERS_PATH": "/home/node/.pw-browsers",
+    "LD_LIBRARY_PATH": "/usr/lib/wsl/lib"
+  },
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=delegated",
+  "workspaceFolder": "/workspace/hoa",
+  "postCreateCommand": "git config --global --add safe.directory /workspace && git config --global --add safe.directory /workspace/hoa && mkdir -p /home/node/.claude/hooks && cp /workspace/.devcontainer/CLAUDE.md /home/node/.claude/CLAUDE.md && cp /workspace/.devcontainer/hooks/*.cjs /home/node/.claude/hooks/ && cd /workspace/hoa && npm install",
+  "postStartCommand": "sudo /usr/local/bin/init-firewall.sh",
+  "waitFor": "postStartCommand"
+}

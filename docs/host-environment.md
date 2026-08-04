@@ -43,7 +43,7 @@ twenty minutes here and why anything that spawns a process per record takes minu
 `node_modules` — the bulk of those files — therefore lives on a container volume, mounted
 over the bind. The volume starts empty, so `postCreateCommand` runs `npm install` to fill
 it, and the image creates the mount point owned by `node` (the volume inherits that
-ownership; `node` has no general sudo to fix it afterwards).
+ownership). Since 04.08.2026 the image also grants `node` passwordless root, on the user's decision that no step inside the container is handed back to him — the egress firewall stays configured but is, against anything running as `node`, no longer a hard boundary.
 
 All of these settings live in the container definition, so they take effect only on a
 container rebuild, never on a restart.
