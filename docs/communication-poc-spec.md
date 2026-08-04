@@ -125,12 +125,26 @@ forgets the message is not locked out of the feature.
 
 ## Where the digging happens
 
-The rock stands at the bank a short way upstream, inside the village's walkable
-area, and it is also a real feature of the bird's-eye world — the brief asks for
-both ("in der Vogelperspektive sichtbar", "in kurzer Entfernung flussaufwärts").
-The digging itself uses the shovel mechanic the game already has, at the spot the
-renderer draws. This is a best guess where the brief is silent about the
-perspective, and it is on the board as a decision the user may reverse.
+DECIDED by the user 04.08.2026: the rock stands OUTSIDE the village, at the river,
+and it is reached in the BIRD'S-EYE view — "am begehbaren Ufer" meant walkable
+there, not inside the settlement. The loop the user named:
+
+1. The player learns the language IN the village.
+2. With it he understands the chief's message and what it asks of him.
+3. He travels in the bird's-eye view to the rock at the river outside the village.
+4. He digs there, with the shovel mechanic the game already has, at the spot the
+   renderer draws.
+5. He travels back to the village and hands what he dug up to the chief. That
+   solves the puzzle.
+
+So the rock needs no walkable bank zone inside the settlement and no first-person
+elaboration. The village keeps its own reachable bank, because that is where the
+adults teach RIVER, UPSTREAM and DOWNSTREAM by pointing at real water.
+
+BIG_ROCK is therefore taught on a boulder the village itself has, and applied to a
+different one upstream — the concept is learned on an example and used on an
+instance, which is how the rest of the lexicon works too. That reading is the
+build's; it is on the board as a card the user may reverse.
 
 ## What is deliberately NOT decided here
 

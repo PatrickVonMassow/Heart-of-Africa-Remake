@@ -4143,17 +4143,25 @@ Build order, chosen so no two parallel agents own the same file:
   4. The current has a direction a player can SEE from the bank — this is what the
      whole UPSTREAM/DOWNSTREAM teaching hangs on, so it is verified, not assumed.
   5. Two short walkable stretches along the bank, upstream and downstream.
-  6. A single conspicuous boulder a short way upstream, from the existing rock
-     dressing and collision, unmistakable against any other rock nearby, at or
-     beside the bank path, seed-deterministic, with a defined digging spot exactly
-     where the renderer draws it — and visible in the bird's-eye view as well,
-     which is where the digging happens (point 487).
-  7. New water and geometry carry their `QUALITY_PRESETS` entries.
+  6. A single conspicuous boulder OUTSIDE the village (user 04.08.2026), at the
+     river a short way upstream, as a real feature of the BIRD'S-EYE world —
+     that is where it is reached, walked to and dug at (point 487). It carries a
+     defined digging spot exactly where the renderer draws it, is
+     seed-deterministic, unmistakable against any other rock nearby, and lies at
+     a travel distance the chief's message (follow the river upstream) actually
+     describes. It needs no walkable bank zone inside the settlement and no
+     first-person elaboration.
+  7. A second, ordinary boulder stands in the village itself: BIG_ROCK is taught
+     on it and applied to the one upstream. The build's reading of the user's
+     loop, on the board as a card he may reverse.
+  8. New water and geometry carry their `QUALITY_PRESETS` entries.
   VERIFIABLE: pure Vitest — the village keeps the §4.2 river clearance, the bank
-  point and the rock are both inside the walkable region, the two stretches run in
-  opposite senses along the flow, and the rock's dig position equals its rendered
-  placement over a sweep of seeds. Browser on both backends: the river is on the
-  same side in both views, and a frame at the bank shows the flow direction.
+  point is inside the walkable region, the upstream rock lies outside it and on
+  the river, the two stretches run in opposite senses along the flow, and the
+  rock's dig position equals its rendered placement over a sweep of seeds.
+  Browser on both backends: the river is on the same side in both views, a frame
+  at the bank shows the flow direction, and the upstream rock is in the
+  bird's-eye picture.
 
 - [ ] 483. THE ADULTS TEACH RIVER, UPSTREAM, DOWNSTREAM, ROCK AND DIGGING (user
   03.08.2026). Visible errands carry the five landscape and action concepts,
@@ -4224,12 +4232,13 @@ Build order, chosen so no two parallel agents own the same file:
   FINAL STATE:
   1. Digging with the shovel at the rock's defined spot recovers an artefact;
      anywhere else recovers nothing. The spot is the one the renderer draws.
-  2. It uses the shovel mechanic the game already has, in the bird's-eye view —
-     the brief calls this "execution outside the village" while placing the rock
-     at the walkable bank, so the rock exists in both views and the digging
-     happens where digging already works. This is a best guess and stands as a
-     decision card.
-  3. The artefact can be brought to the chief, and doing so is acknowledged.
+  2. It uses the shovel mechanic the game already has, in the BIRD'S-EYE view, at
+     the rock OUTSIDE the village (user decision 04.08.2026). The loop is: learn
+     the language in the village, understand the chief's message, travel to the
+     rock at the river, dig, travel back.
+  3. The artefact is carried back and HANDED TO THE CHIEF, and that hand-over is
+     what solves the puzzle — acknowledged in the chief's own tongue and in the
+     journal, not merely picked up.
   4. Both languages, journal entries with voice markup like every other text.
   VERIFIABLE: pure Vitest on the dig check and the hand-over; browser for the flow.
 
