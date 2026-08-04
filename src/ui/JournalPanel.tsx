@@ -10,6 +10,7 @@
 // traces on the page.
 
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { heardUtterances } from '../communication/heard'
 import { useGame, type JournalEntry } from '../state/store'
 import { useUi } from '../state/ui'
 import { START_YEAR } from '../config/balance'
@@ -77,6 +78,51 @@ function BloodMarks({ entry }: { entry: JournalEntry }) {
         />
       ))}
     </div>
+  )
+}
+
+/**
+ * The observations the player collected of a people's speech (design.md §13.4):
+ * a section of its own beside the written entries, listing every utterance he
+ * has actually HEARD — in its sound sequence, in the lexicon's order — each with
+ * a free-text field for his own reading. The game never interprets that text; it
+ * only stores it, and it travels with the save like the rest of the memory.
+ *
+ * The field keeps its own draft while typing: the store trims the note, so a
+ * directly bound value would swallow every space the moment it is typed.
+ */
+function Observations() {
+  const t = useStrings()
+  const memory = useGame((s) => s.communication)
+  const setHypothesis = useGame((s) => s.setUtteranceHypothesis)
+  const [drafts, setDrafts] = useState<Record<string, string>>({})
+  const heard = heardUtterances(memory)
+  if (heard.length === 0) return null
+  return (
+    <section className="observations">
+      <h3>{t.journalPanel.observations}</h3>
+      <p className="observations-hint">{t.journalPanel.observationsHint}</p>
+      {heard.map((h) => (
+        <div className="observation" key={h.utterance}>
+          <div className="utterance">{h.utterance}</div>
+          <div className="first-heard">
+            {t.journalPanel.firstHeard(t.formatDate(h.firstHeardDay, START_YEAR))}
+          </div>
+          <input
+            type="text"
+            className="hypothesis"
+            value={drafts[h.utterance] ?? h.hypothesis}
+            placeholder={t.journalPanel.hypothesis}
+            aria-label={t.journalPanel.hypothesisFor(h.utterance)}
+            onChange={(e) => {
+              const text = e.target.value
+              setDrafts((d) => ({ ...d, [h.utterance]: text }))
+              setHypothesis(h.utterance, text)
+            }}
+          />
+        </div>
+      ))}
+    </section>
   )
 }
 
@@ -256,6 +302,7 @@ export function JournalPanel() {
         })}
         <div ref={endRef} />
       </div>
+      <Observations />
     </div>
   )
 }

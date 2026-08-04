@@ -22,6 +22,11 @@ import {
 } from '../systems/economy'
 import { ELEPHANT_GRAVEYARD } from '../world/data/landmarks'
 import { UNSPECIFIC_WORDS } from '../world/lore'
+import {
+  deserializeMemory, emptyMemory, observePhrase, observeUtterance, serializeMemory,
+  setHypothesis, type CommunicationMemory,
+} from '../communication/heard'
+import type { Phrase, UtteranceId } from '../communication/lexicon'
 import type { SketchId } from '../journal/sketches'
 import { getStrings, type TextRef } from '../i18n'
 import { stripVoiceMarkup } from '../journal/voiceMarkup'
@@ -140,6 +145,10 @@ export interface GameState {
   orientationGiven: Record<string, boolean>
   journal: JournalEntry[]
   journalOpen: boolean
+  /** What the player has HEARD of a people's speech, and the readings he wrote
+   *  for it (design.md §13.4, docs/communication-poc-spec.md). The journal's
+   *  observation section renders it; the game never interprets a note. */
+  communication: CommunicationMemory
   /** Health points (design.md §6); 0 = death of the character. */
   health: number
   afflictions: Afflictions
@@ -272,6 +281,12 @@ export interface GameState {
   debugSetAffliction: (kind: keyof Afflictions, value: boolean | 0 | 1 | 2) => void
   addEntry: (title: TextRef, text: TextRef, kind?: JournalEntry['kind'], sketch?: SketchId) => void
   setJournalOpen: (open: boolean) => void
+  /** Record one utterance as heard on the current day (design.md §13.4). */
+  hearUtterance: (utterance: UtteranceId) => void
+  /** Record a spoken phrase — each of its atoms on its own (§13.4). */
+  hearPhrase: (phrase: Phrase) => void
+  /** Write the player's own reading of a heard utterance; '' clears it. */
+  setUtteranceHypothesis: (utterance: UtteranceId, text: string) => void
   setToast: (msg: string | null) => void
   saveCheckpoint: () => void
   /** Load a port-visit snapshot; the latest without an index (design.md §18). */
@@ -445,6 +460,7 @@ function startState(seed: number) {
       { id: 1, day: 0, title: { key: 'journal.titles.departure' }, text: { key: 'journal.start' }, kind: 'event' as const, sketch: 'harbor' as SketchId },
     ],
     journalOpen: true,
+    communication: emptyMemory(),
     health: balance.health.max,
     afflictions: { fever: false, dehydration: false, sunblind: false, wounds: 0 as const },
     sunblindRecovery: 0,
@@ -602,6 +618,27 @@ export const useGame = create<GameState>()((set, get) => ({
 
   setJournalOpen: (open) => set({ journalOpen: open }),
   setToast: (msg) => set({ toast: msg }),
+
+  // Communication observations (design.md §13.4). The memory functions return
+  // the SAME object when nothing changes, so a re-heard utterance triggers no
+  // render and the journal list stays stable.
+  hearUtterance: (utterance) =>
+    set((s) => {
+      const next = observeUtterance(s.communication, utterance, Math.floor(s.day))
+      return next === s.communication ? {} : { communication: next }
+    }),
+
+  hearPhrase: (phrase) =>
+    set((s) => {
+      const next = observePhrase(s.communication, phrase, Math.floor(s.day))
+      return next === s.communication ? {} : { communication: next }
+    }),
+
+  setUtteranceHypothesis: (utterance, text) =>
+    set((s) => {
+      const next = setHypothesis(s.communication, utterance, text)
+      return next === s.communication ? {} : { communication: next }
+    }),
 
   moveTravel: (dirX, dirZ, dt) => {
     const s = get()
@@ -1938,6 +1975,7 @@ export const useGame = create<GameState>()((set, get) => ({
       honoredFriend: s.honoredFriend, friendForfeited: s.friendForfeited, regionRobbed: s.regionRobbed,
       hostileUntil: s.hostileUntil, lastFriendAidDay: s.lastFriendAidDay,
       freeCamps: s.freeCamps, villageCamps: s.villageCamps,
+      communication: serializeMemory(s.communication),
       nextEntryId,
     }
     try {
@@ -2005,6 +2043,10 @@ export const useGame = create<GameState>()((set, get) => ({
         lastFriendAidDay: snap.lastFriendAidDay ?? -9999,
         freeCamps: snap.freeCamps ?? [],
         villageCamps: snap.villageCamps ?? {},
+        // Heard utterances and their notes (design.md §13.4). deserializeMemory
+        // is tolerant, so a snapshot from before this system yields an empty
+        // memory rather than a broken one.
+        communication: deserializeMemory(snap.communication),
         defeat: null,
         deathCause: null,
         mode: 'place',
