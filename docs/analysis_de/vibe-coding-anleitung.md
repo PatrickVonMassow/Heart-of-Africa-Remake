@@ -219,8 +219,7 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 - **Regeln und Wächter verrotten — nur merkt es niemand.** Der Bestand wächst an Widersprüchen
   und an Regeln, die eine nie gebaute Absicherung behaupten. Ein Wächter, der nie auslöst,
-  ist so kaputt wie einer, der immer auslöst — und manche Regel bricht nicht, weil ihr
-  Wächter versagt, sondern weil sie nie einen hatte: Sie steht ja ordentlich da.
+  ist so kaputt wie einer, der immer auslöst.
   → *Prompt:* „Etabliere einen Mechanismus, der den ganzen Bestand periodisch zur Durchsicht
   zwingt — auf Aktualität, Dopplung, Widerspruch und **Wirkungslosigkeit**, zuerst die am
   häufigsten eingeblendeten Texte. Schreib zu **jeder** Regel, was sie misst — Test, Prüfung
@@ -232,12 +231,10 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   Prüfungen veralten von selbst und klagen gesunden Code an.
   → *Prompt:* „Etabliere einen Mechanismus, der vor einer Code-Änderung auf einen roten Test
   hin ein **Experiment** verlangt: Belastet der Befund das Produkt oder die Messung? Gemessen
-  wird nur an einem eingeschwungenen Zustand, und eine Prüfung schlägt auch dann fehl, wenn
-  ihr Messwert in die *unerwartete* Richtung ausschlägt — nicht nur über der Grenze. Eine
-  feste Wartezeit vor einer Messung ist dabei eine **verkleidete Maschinengeschwindigkeit**:
-  Auf einem langsameren Rechner misst sie das Nichts und klagt das Produkt an. Die
-  Bereitschaftsbedingung kommt aus dem gemessenen Gegenstand selbst — und lange genug, dass
-  ein Stillstand von Fertigsein unterscheidbar ist."
+  wird nur an einem eingeschwungenen Zustand, dessen Bereitschaft der gemessene **Gegenstand**
+  meldet — nie eine Uhr, denn eine feste Wartezeit ist verkleidete Maschinengeschwindigkeit.
+  Eine Prüfung schlägt auch dann fehl, wenn ihr Messwert in die *unerwartete* Richtung
+  ausschlägt — nicht nur über der Grenze."
 
 - **Derselbe Fakt steht an fünf Stellen — und veraltet an vier.** Wer baut, aktualisiert die Stelle, an der
   er gerade schreibt; die übrigen Kopien rotten unbemerkt, und das ‚Was' im Design-Doc passt
