@@ -4286,12 +4286,29 @@ Build order, chosen so no two parallel agents own the same file:
   installed at all, and Playwright's bundled Chromium brings up no WebGPU adapter.
   The rule that the picture is checked on BOTH backends (CLAUDE.md §6/§7.2) has
   been unenforceable since 03.08.2026, and the closing cycle demands exactly it.
-  MEASURED on the host 04.08.2026: `/dev/dxg` EXISTS and `/usr/lib/wsl/lib` carries
-  `libd3d12.so`, `libd3d12core.so`, `libdxcore.so` and the NVIDIA WSL stack — the
-  GPU is reachable from inside the container. Missing are a system Chrome and a
-  driver stack to reach that GPU (`/usr/share/vulkan/icd.d` does not exist, no Mesa
-  d3d12/dzn). So this is a host SETUP question, not a passthrough question.
+  PERFORMANCE IS PART OF THIS POINT (user 04.08.2026): the suites must come back
+  at a speed as close as possible to what they had running natively under Windows
+  without a container.
+  MEASURED on the host 04.08.2026: the GPU is not merely reachable, it is ALREADY
+  DRAWING. Both browsers report `ANGLE (Microsoft Corporation, D3D12 (NVIDIA
+  GeForce RTX 4070 Ti), OpenGL 4.2)` when launched with `--use-angle=gl
+  --ignore-gpu-blocklist --enable-gpu`, `nvidia-smi` from `/usr/lib/wsl/lib`
+  names the card, and Mesa's `d3d12_dri.so` is installed. The suites nevertheless
+  render in SOFTWARE — a flow run burned ~1100 % CPU in the GPU process — because
+  their launch arguments never ask for the device. System Chrome is installed and
+  launches cleanly THROUGH PLAYWRIGHT; its bare command-line crash
+  (`chrome_crashpad_handler: --database is required`) is an artefact of launching
+  it by hand and is not this point's problem. What is genuinely missing is VULKAN:
+  `vulkaninfo` enumerates only llvmpipe, Mesa is 22.3.6 (Debian 12) which ships no
+  Dozen, and `/usr/share/vulkan/icd.d` does not exist — so `navigator.gpu` is
+  undefined in BOTH browsers. WebGPU is blocked on the Vulkan driver, not on
+  Chrome. So this is a host SETUP question, not a passthrough question.
   FINAL STATE:
+  0. The WebGL 2 lane draws on the GPU, not on llvmpipe: the launch arguments ask
+     for the device, `launch-args-core.mjs` owns them for both lanes, and the win
+     is MEASURED — one suite's wall clock before and after, recorded in
+     `docs/host-environment.md`. This is the bulk of the performance ask and does
+     not wait for Vulkan.
   1. One idempotent, repo-owned setup script (`scripts/verify-host-setup.sh`)
      installs what the lane needs: Google Chrome stable, Mesa's D3D12 Gallium and
      Dozen (Vulkan-on-D3D12) drivers, and the loader wiring (ICD path,
@@ -4313,42 +4330,16 @@ Build order, chosen so no two parallel agents own the same file:
   5. If the drivers cannot carry the game — the lane comes up but no frame draws —
      the point is NOT closed by relaxing the rule: it is reported with the failing
      output, and the user's lane 2 (the second backend run by hand on his Windows
-     machine) becomes its own point.
-  VERIFIABLE: `backend-lane-check.mjs` green on the host; one render suite
+     machine) becomes its own point. Chrome's own SwiftShader adapter
+     (`--use-webgpu-adapter=swiftshader`) may stand in as a LIVENESS lane in that
+     case, but never silently: whichever adapter a run got is NAMED in the
+     readiness output, so a software lane can never be mistaken for the card.
+  VERIFIABLE: `backend-lane-check.mjs` green on the host, NAMING the adapter it
+  got; a measured wall-clock comparison of one suite on llvmpipe against the same
+  suite on the GPU; one render suite
   completing under `VERIFY_GL=webgpu` with `assertBackend` confirming WebGPU; pure
   Vitest over the browser resolution — a host with system Chrome resolves to it, a
   host without fails loud instead of quietly using the bundled build.
-
-- [ ] 494. NO STEP INSIDE THE CONTAINER IS EVER HANDED BACK TO THE USER (user
-  04.08.2026, standing rule with full rights granted). On 04.08.2026 the session
-  handed him `sudo bash scripts/verify-host-setup.sh`, which cannot work — the
-  official Claude Code image grants `node` exactly one passwordless command, the
-  firewall script — and then a `docker exec -u root …` line that would also have
-  failed, because the sandbox firewall is iptables-wide and blocks the package
-  sources for root as well. Two round trips of the user's time for work that was
-  the session's. The rule is memory `container-work-is-mine`; this point is the
-  MECHANISM, because a rule that only a reader can see is the same failure point
-  440 measured one layer down.
-  FINAL STATE:
-  1. A guard reads the turn's outgoing answer and BLOCKS it when it asks the user
-     to execute a step that runs inside the container — an install, a package
-     manager, a script invocation, a file edit under the workspace. It matches
-     the ASK ("run", "führe aus", a fenced command block addressed to him),
-     not the mere mention of a command.
-  2. What stays allowed is asking for a CAPABILITY that does not exist inside the
-     container at all: a right, a device, a mount, a line in the image. The guard
-     must not push the session into silently failing instead of asking for those,
-     so the distinction is what its cases pin down.
-  3. The remedy line names the way out: find the route and take it; if the
-     capability is genuinely missing, ask once for the capability.
-  4. Wired into the Stop chain in `.claude/settings.json`, fail-open like every
-     other guard, with a pure Vitest-covered decision core, and reviewed by the
-     other model per `mechanism-review-guard` before it counts as done.
-  VERIFIABLE: pure Vitest over the decision core — an answer containing "führe
-  bitte `npm run …` aus" or a sudo/docker-exec instruction addressed to the user
-  is blocked; an answer asking for a GPU device, a mount or an image line passes;
-  a command quoted as a REPORT of what the session itself ran passes; and the
-  guard returns "allow" on any internal error.
 
 - [ ] 495. A VERSIONED GIT HOOK WITHOUT ITS EXECUTABLE BIT IS SILENTLY INERT
   (found 04.08.2026). `scripts/git-hooks/pre-push` was committed 100644. Git for
