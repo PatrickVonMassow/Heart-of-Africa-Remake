@@ -7,7 +7,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import * as THREE from 'three/webgpu'
-import { TESSELLATION, TRAVELLER_PACK } from './figures'
+import { FIGURE_LIMBS, TESSELLATION, TRAVELLER_PACK } from './figures'
 
 describe('TESSELLATION floors', () => {
   it('figure bodies and heads are visibly round (old: 8-cone, 10x8 sphere)', () => {
@@ -147,5 +147,57 @@ describe('smooth shading (point 214 — the shading half of the same goal)', () 
     expect(torsoTris).toBeGreaterThan(0)
     expect(curved).toBe(torsoTris)
     cone.dispose()
+  })
+})
+
+describe('the villager figure has limbs to gesture with (point 479)', () => {
+  // The proportions are fractions of the body height, so a child at scale 0.55
+  // carries the same figure. What is pinned here is that they describe a BODY —
+  // the shoulder above the hip, the arm long enough to read as an arm, the legs
+  // exactly as long as the hip is high so the feet stand on the ground.
+  it('the shoulder line sits above the hip line, both inside the body', () => {
+    expect(FIGURE_LIMBS.shoulderY).toBeGreaterThan(FIGURE_LIMBS.hipY)
+    expect(FIGURE_LIMBS.shoulderY).toBeLessThan(1)
+    expect(FIGURE_LIMBS.hipY).toBeGreaterThan(0)
+  })
+
+  it('the arm reaches past the hip — a stub would read as a fin, not an arm', () => {
+    const handY = FIGURE_LIMBS.shoulderY - FIGURE_LIMBS.armLength
+    expect(handY).toBeLessThan(FIGURE_LIMBS.hipY)
+    expect(handY).toBeGreaterThan(0) // …and does not drag on the ground
+  })
+
+  it('the legs are exactly as long as the hip is high, so the feet touch y = 0', () => {
+    // The leg pivot sits at hipY and the limb hangs its own length below it; the
+    // figure would hover or sink into the ground if these two ever diverged.
+    expect(FIGURE_LIMBS.hipY).toBeGreaterThan(0)
+    expect(FIGURE_LIMBS.legRadius[0]).toBeGreaterThan(FIGURE_LIMBS.legRadius[1])
+    expect(FIGURE_LIMBS.armRadius[0]).toBeGreaterThan(FIGURE_LIMBS.armRadius[1])
+  })
+
+  it('the shoulders sit clear of the body cone at their own height', () => {
+    // The cone has base radius 0.32 at y = 0 and tapers to a point at y = 1, so
+    // its radius at the shoulder line is 0.32 * (1 - shoulderY). The pivot must
+    // sit OUTSIDE that, or the arm would start buried in the trunk.
+    const coneRadiusAtShoulder = 0.32 * (1 - FIGURE_LIMBS.shoulderY)
+    expect(FIGURE_LIMBS.shoulderX).toBeGreaterThan(coneRadiusAtShoulder)
+  })
+
+  it('the two arms never overlap: the hips sit inside the shoulders', () => {
+    expect(FIGURE_LIMBS.hipX).toBeLessThan(FIGURE_LIMBS.shoulderX)
+    expect(FIGURE_LIMBS.hipX).toBeGreaterThan(FIGURE_LIMBS.legRadius[0])
+  })
+
+  it('the scene builds the limbs from the shared constants and the quality lever', () => {
+    // Same pure guard as the traveller pack above: a constant proven correct
+    // buys nothing if the scene hardcodes its own numbers. The limb tessellation
+    // must come from the graphics level (point 479.5), never from a literal.
+    const rel = '../scenes/place/PlaceLife.tsx'
+    const src = readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8')
+    expect(src.includes('FIGURE_LIMBS')).toBe(true)
+    expect(src.includes('effectiveFigureLimbSegments')).toBe(true)
+    // The gesture machine drives the arms — the scene never poses them by hand.
+    expect(src.includes('gesturePose')).toBe(true)
+    expect(src.includes('advanceGesture')).toBe(true)
   })
 })

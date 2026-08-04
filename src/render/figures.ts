@@ -36,6 +36,41 @@ export const TESSELLATION = {
   goods: [16, 10],
 } as const
 
+/**
+ * The villager figure's limbs (point 479). The figure was a cone with a sphere
+ * head, which cannot show what it is talking about — and the pointing gesture is
+ * what the HERE/THERE concepts hang on. Arms are therefore permanent; LEGS are
+ * opt-in, because a floor-length wrap is the period dress for most of the adults
+ * and legs under it would draw nothing. The running children get them.
+ *
+ * All values are FRACTIONS of the figure's body height, so a child at scale 0.55
+ * carries the same proportions. The body cone spans y 0..1 with base radius 0.32
+ * and tapers to a point, so the shoulder line sits where the cone is already
+ * narrow (radius ≈ 0.064 at 0.8) and the arms read against the sky rather than
+ * against the trunk.
+ */
+export const FIGURE_LIMBS = {
+  /** Shoulder pivot height, in body heights. */
+  shoulderY: 0.8,
+  /** Shoulder pivot half-separation, in body heights. +x is the figure's LEFT. */
+  shoulderX: 0.105,
+  /** Arm length from shoulder to hand centre. */
+  armLength: 0.5,
+  /** Arm cylinder radii [top, bottom]. */
+  armRadius: [0.048, 0.036] as [number, number],
+  /** Hand sphere radius — the small sphere family already tessellated for reach. */
+  handRadius: 0.058,
+  /** Hip pivot height = leg length: the tunic ends here and the legs run down. */
+  hipY: 0.38,
+  /** Hip pivot half-separation. */
+  hipX: 0.082,
+  /** Leg cylinder radii [top, bottom]. */
+  legRadius: [0.062, 0.048] as [number, number],
+} as const
+// The limb cylinders' RADIAL SEGMENT count is not here: it is a graphics-level
+// lever (`figureLimbSegments` in src/config/quality.ts), read through
+// `effectiveFigureLimbSegments`.
+
 /** The bird's-eye traveller's backpack (the brown carry-crate), consumed by
  *  the traveller build in `src/scenes/travel/TravelScene.tsx`.
  *

@@ -6,7 +6,7 @@
 // pounded in a mortar, a drummer plays, and water is carried from the well.
 // Pure animation, no mechanics.
 
-import { createContext, useContext, useEffect, useMemo, useRef } from 'react'
+import { createContext, useContext, useEffect, useMemo, useRef, type RefObject } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three/webgpu'
 import { mulberry32 } from '../../world/noise'
@@ -15,12 +15,27 @@ import {
   createFaunaMaterial,
   faceVelocity,
   gaitBodyLift,
+  gaitCadence,
   gaitPhase,
   gaitRig,
   isStance,
   legSwingAngle,
 } from '../../render/fauna'
-import { TESSELLATION } from '../../render/figures'
+import { FIGURE_LIMBS, TESSELLATION } from '../../render/figures'
+import {
+  GESTURE_KINDS,
+  advanceGesture,
+  aimAt,
+  armAim,
+  gesturePose,
+  REST_POSE,
+  restGesture,
+  startGesture,
+  type FigurePose,
+  type GestureKind,
+  type GestureState,
+} from '../../render/gesture'
+import { effectiveFigureLimbSegments, useUi } from '../../state/ui'
 import { cloakForCloth, wearsByRank } from '../../systems/dress'
 import { useColdCloaks, type ColdDress } from './useColdCloaks'
 import { presenceAt } from '../../systems/seasonalLife'
@@ -42,20 +57,105 @@ const NPC_RADIUS = WALKER_RADIUS
  */
 const ColdCloaksContext = createContext<ColdDress | null>(null)
 
-/** Simple primitive human figure; `kneel` folds it down for sitting work. */
+/**
+ * Radial segments of the limb primitives at the current graphics level (point
+ * 479, `QUALITY_PRESETS.figureLimbSegments`). A context rather than a per-figure
+ * store subscription: a settlement mounts a couple of dozen Figures and they all
+ * read the same number, so PlaceLife subscribes once and hands it down.
+ */
+const LimbDetailContext = createContext<number>(8)
+
+/** The two shoulder pivots in render order: index 0 is the figure's LEFT arm
+ *  (local +x), index 1 its RIGHT (local −x, because forward is +z and up is +y). */
+const REST_POSE_ARMS = [REST_POSE.left, REST_POSE.right] as const
+
+/**
+ * One hand up steadying a load carried on the head, the other hanging — the
+ * period-true carrying posture, and the pose the figures with a basket or a
+ * bundle on their heads take now that they have arms (point 479). A shared,
+ * never-written constant: every head-carrier holds it identically, so one
+ * object serves them all.
+ */
+const HEAD_CARRY_POSE: { current: FigurePose } = {
+  current: { left: armAim(0.16, 1.3), right: { ...REST_POSE.right }, lean: 0.02, turn: 0 },
+}
+
+/**
+ * Simple primitive human figure; `kneel` folds it down for sitting work.
+ *
+ * Since point 479 the figure has ARMS — a cone with a sphere head cannot show
+ * what it is talking about, and the pointing gesture is the anchor the
+ * communication PoC's HERE/THERE hang on. LEGS are opt-in: a floor-length wrap
+ * is the period dress for most adults and legs under it would draw nothing, so
+ * they go on the figures that RUN (the children), whose stride then reads.
+ *
+ * The gesture itself is driven from outside through `gesture`, a ref the caller
+ * owns and this figure advances — one state per figure, which is why two
+ * gestures can never run on one body. `pose` is the direct alternative for a
+ * figure whose arms are doing work rather than speaking (the drummer, the
+ * porter's carry).
+ */
 function Figure({
   cloth,
   skin = '#5c3317',
   scale = 1,
   kneel = false,
+  legs = false,
+  gesture,
+  pose,
+  gait,
 }: {
   cloth: string
   skin?: string
   scale?: number
   kneel?: boolean
+  /** Draw legs and let `gait` swing them (ignored while kneeling). */
+  legs?: boolean
+  /** The figure's own gesture state; this figure advances and applies it. */
+  gesture?: RefObject<GestureState>
+  /** A pose written by the caller each frame; wins over `gesture` when set. */
+  pose?: RefObject<FigurePose | null>
+  /** Gait phase (rad) driving the leg swing — the caller accumulates the
+   *  distance walked, because only it knows this figure's world scale. */
+  gait?: RefObject<number>
 }) {
   const bodyH = kneel ? 0.55 : 1.0
   const cold = useContext(ColdCloaksContext)
+  const segments = useContext(LimbDetailContext)
+  const L = FIGURE_LIMBS
+  // Legs only on a standing figure — a kneeling one has folded them away.
+  const withLegs = legs && !kneel
+  const hipY = withLegs ? bodyH * L.hipY : 0
+  const trunkH = bodyH - hipY
+  const trunk = useRef<THREE.Group>(null)
+  const arms = useRef<Array<THREE.Group | null>>([])
+  const legPivots = useRef<Array<THREE.Group | null>>([])
+
+  useFrame((_, rawDt) => {
+    const dt = Math.min(rawDt, 0.1)
+    let shown = pose?.current ?? null
+    if (!shown && gesture?.current) {
+      gesture.current = advanceGesture(gesture.current, dt)
+      shown = gesturePose(gesture.current)
+    }
+    if (shown) {
+      const left = arms.current[0]
+      const right = arms.current[1]
+      if (left) left.rotation.set(shown.left.pitch, shown.left.yaw, shown.left.roll)
+      if (right) right.rotation.set(shown.right.pitch, shown.right.yaw, shown.right.roll)
+      const t = trunk.current
+      // Lean tips the trunk forward about the hip (+x carries the top to +z, the
+      // figure's front); the turn is the refusal's shake.
+      if (t) t.rotation.set(shown.lean, shown.turn, 0)
+    }
+    if (withLegs && gait) {
+      const phase = gait.current ?? 0
+      const a = legPivots.current[0]
+      const b = legPivots.current[1]
+      if (a) a.rotation.x = legSwingAngle(phase, 0)
+      if (b) b.rotation.x = legSwingAngle(phase, Math.PI)
+    }
+  })
   // The wrap this figure actually wears — null when the season is off, and null
   // for most figures when the record gates the garment on RANK. Barth on the
   // Hausa zenne: "Only the wealthier amongst them can afford" it, while his
@@ -66,35 +166,86 @@ function Figure({
   const wrap = cold && (!cold.rankOnly || wearsByRank(cloth, cold.palette))
     ? cloakForCloth(cold.cloaks, cold.palette, cloth)
     : null
+  const armLen = bodyH * L.armLength
   return (
     <group scale={[scale, scale * (kneel ? 0.75 : 1), scale]}>
-      <mesh position={[0, bodyH * 0.5, 0]} castShadow>
-        <coneGeometry args={[0.32, bodyH, TESSELLATION.figureBody]} />
-        <meshStandardMaterial color={cloth} roughness={0.95} />
-      </mesh>
-      {/* The seasonal wrap goes OVER the everyday dress (Mayr): a shell around
-          the shoulders, leaving the dress showing below. Where the record says
-          the head is muffled in it (the Somali tobe in the karif), the shell
-          rises past the head instead — that is the one head-wear case, and the
-          shape difference IS the finding. */}
-      {wrap && (
-        <mesh position={[0, bodyH * (cold!.wear === 'head' ? 0.82 : 0.66), 0]} castShadow>
-          <coneGeometry
-            args={[0.355, bodyH * (cold!.wear === 'head' ? 1.0 : 0.68), TESSELLATION.figureBody]}
-          />
-          <meshStandardMaterial
-            color={wrap}
-            roughness={0.8} // greased hide sits glossier than the cloth beneath
-          />
+      {/* The trunk pivots at the hip so a lean or a shake carries the arms and
+          the head with it, and the legs (below) stay planted. */}
+      <group ref={trunk} position={[0, hipY, 0]}>
+        <mesh position={[0, trunkH * 0.5, 0]} castShadow>
+          <coneGeometry args={[0.32, trunkH, TESSELLATION.figureBody]} />
+          <meshStandardMaterial color={cloth} roughness={0.95} />
         </mesh>
-      )}
-      {/* The head shows unless the wrap is drawn over it. */}
-      {!(wrap && cold!.wear === 'head') && (
-        <mesh position={[0, bodyH + 0.18, 0]} castShadow>
-          <sphereGeometry args={[0.16, ...TESSELLATION.figureHead]} />
-          <meshStandardMaterial color={skin} roughness={0.85} />
-        </mesh>
-      )}
+        {/* The seasonal wrap goes OVER the everyday dress (Mayr): a shell around
+            the shoulders, leaving the dress showing below. Where the record says
+            the head is muffled in it (the Somali tobe in the karif), the shell
+            rises past the head instead — that is the one head-wear case, and the
+            shape difference IS the finding. */}
+        {wrap && (
+          <mesh position={[0, bodyH * (cold!.wear === 'head' ? 0.82 : 0.66) - hipY, 0]} castShadow>
+            <coneGeometry
+              args={[0.355, bodyH * (cold!.wear === 'head' ? 1.0 : 0.68), TESSELLATION.figureBody]}
+            />
+            <meshStandardMaterial
+              color={wrap}
+              roughness={0.8} // greased hide sits glossier than the cloth beneath
+            />
+          </mesh>
+        )}
+        {/* The head shows unless the wrap is drawn over it. */}
+        {!(wrap && cold!.wear === 'head') && (
+          <mesh position={[0, bodyH + 0.18 - hipY, 0]} castShadow>
+            <sphereGeometry args={[0.16, ...TESSELLATION.figureHead]} />
+            <meshStandardMaterial color={skin} roughness={0.85} />
+          </mesh>
+        )}
+        {/* Arms (point 479). One pivot per shoulder, the limb hanging down its
+            local −y, so a rotation IS the gesture. `YXZ` order because the pose
+            is stated as (bearing, elevation): yaw must apply to an arm that is
+            already raised, or it would spin a vertical limb about its own axis
+            and move nothing (see `armDirection` in render/gesture.ts). */}
+        {[0, 1].map((i) => (
+          <group
+            key={i}
+            position={[(i === 0 ? 1 : -1) * bodyH * L.shoulderX, bodyH * L.shoulderY - hipY, 0]}
+            ref={(el) => {
+              arms.current[i] = el
+              if (el) {
+                el.rotation.order = 'YXZ'
+                el.rotation.set(REST_POSE_ARMS[i].pitch, 0, REST_POSE_ARMS[i].roll)
+              }
+            }}
+          >
+            <mesh position={[0, -armLen * 0.5, 0]} castShadow>
+              <cylinderGeometry args={[L.armRadius[0], L.armRadius[1], armLen, segments]} />
+              <meshStandardMaterial color={skin} roughness={0.88} />
+            </mesh>
+            <mesh position={[0, -armLen, 0]} castShadow>
+              <sphereGeometry args={[L.handRadius, ...TESSELLATION.figureHand]} />
+              <meshStandardMaterial color={skin} roughness={0.85} />
+            </mesh>
+          </group>
+        ))}
+      </group>
+      {/* Legs, on the figures that run (point 479/480). They swing about their
+          hips on the DISTANCE-driven gait phase the fauna and the §2.5
+          silhouettes already use, so a faster child steps faster and a stopped
+          one stands still — never a wall-clock bob. */}
+      {withLegs &&
+        [0, 1].map((i) => (
+          <group
+            key={i}
+            position={[(i === 0 ? 1 : -1) * bodyH * L.hipX, hipY, 0]}
+            ref={(el) => {
+              legPivots.current[i] = el
+            }}
+          >
+            <mesh position={[0, -hipY * 0.5, 0]} castShadow>
+              <cylinderGeometry args={[L.legRadius[0], L.legRadius[1], hipY, segments]} />
+              <meshStandardMaterial color={skin} roughness={0.88} />
+            </mesh>
+          </group>
+        ))}
     </group>
   )
 }
@@ -157,13 +308,30 @@ function Weaver({ x, z, cloth, weave }: { x: number; z: number; cloth: string; w
   )
 }
 
-/** Two children chasing each other in a circle. */
+/** Height factor of a child figure against a grown one. */
+const KID_SCALE = 0.55
+
+/**
+ * Two children chasing each other in a circle. They are the figures that RUN, so
+ * they are the ones that carry legs (point 479): the swing rides the DISTANCE
+ * each child covers at the cadence its own short legs dictate, exactly as the
+ * fauna and the §2.5 silhouettes do — a stopped child's legs are still, and the
+ * body dips onto the stance leg instead of riding a wall-clock bob.
+ */
 function Kids({ x, z, cloth, colliders }: { x: number; z: number; cloth: string[]; colliders: Collider[] }) {
   const refs = useRef<Array<THREE.Group | null>>([])
+  // The world leg length these children walk on, and the cadence it dictates.
+  const legLength = FIGURE_LIMBS.hipY * KID_SCALE
+  const cadence = useMemo(() => gaitCadence(legLength), [legLength])
   // Each kid's current position, eased toward the circling target so it slides
   // smoothly along any obstacle instead of sticking at the absolute circle point
   // and then jumping once the point clears the obstacle.
   const pos = useRef<Array<{ x: number; z: number } | null>>([null, null])
+  // Distance walked per child, and the gait phase the Figure reads back.
+  const walked = useRef<number[]>([0, 0])
+  const gaitA = useRef(0)
+  const gaitB = useRef(0)
+  const gaits = [gaitA, gaitB]
   useFrame((state, dt) => {
     const t = state.clock.elapsedTime
     refs.current.forEach((g, i) => {
@@ -182,7 +350,10 @@ function Kids({ x, z, cloth, colliders }: { x: number; z: number; cloth: string[
       const dz = pz - p.z
       p.x = px
       p.z = pz
-      g.position.set(px, Math.abs(Math.sin(t * 6 + i)) * 0.12, pz)
+      walked.current[i] = (walked.current[i] ?? 0) + Math.hypot(dx, dz)
+      const phase = gaitPhase(walked.current[i], cadence)
+      gaits[i].current = phase
+      g.position.set(px, gaitBodyLift(phase, legLength), pz)
       if (Math.hypot(dx, dz) > 1e-4) g.rotation.y = Math.atan2(dx, dz)
     })
   })
@@ -195,7 +366,7 @@ function Kids({ x, z, cloth, colliders }: { x: number; z: number; cloth: string[
             refs.current[i] = el
           }}
         >
-          <Figure cloth={cloth[i % cloth.length]} scale={0.55} />
+          <Figure cloth={cloth[i % cloth.length]} scale={KID_SCALE} legs gait={gaits[i]} />
         </group>
       ))}
     </>
@@ -382,6 +553,9 @@ function Porters({
     })
   }, [seed, stops, count])
   const refs = useRef<Array<THREE.Group | null>>([])
+  // The carrying pose (point 479): both arms forward and up, the hands at the
+  // crate's front corners. Constant — a porter holds the load, it does not wave.
+  const carry = useRef<FigurePose | null>({ left: armAim(0.3, 0.45), right: armAim(-0.3, 0.45), lean: 0.05, turn: 0 })
   // Where each porter actually stands, so its move can be swept from there.
   const pos = useRef<Array<{ x: number; z: number } | null>>([])
   useFrame(({ clock }) => {
@@ -411,7 +585,7 @@ function Porters({
             refs.current[i] = el
           }}
         >
-          <Figure cloth={cloth[i % cloth.length]} />
+          <Figure cloth={cloth[i % cloth.length]} pose={carry} />
           {/* Carried crate */}
           <mesh position={[0, 1.05, 0.3]} castShadow>
             <boxGeometry args={[0.45, 0.35, 0.35]} />
@@ -423,13 +597,81 @@ function Porters({
   )
 }
 
-/** Two inhabitants standing together in conversation, gesturing. */
+/** Seconds of quiet between two gestures in the conversation. */
+const TALKER_GESTURE_GAP = 1.6
+
+/** Where a talker stands and which way it faces. */
+interface TalkerStance {
+  x: number
+  z: number
+  yaw: number
+}
+
+/** Widest bearing a figure points at. Beyond it the arm would reach back over
+ *  its own shoulder at something the speaker is not even facing. */
+const TALKER_POINT_ARC = 1.2
+
+/**
+ * The aim the next gesture of a conversing pair takes, in the speaker's OWN
+ * frame: an open bearing off to the side for a direction, and for everything
+ * else something REAL — the settlement's middle (fire, well, lanes) when the
+ * speaker is facing it, otherwise the partner it is turned toward. A figure
+ * never points over its own shoulder at what it cannot see.
+ */
+function talkerAim(
+  stances: readonly TalkerStance[],
+  kind: GestureKind,
+  who: number,
+): { bearing: number; elevation: number } {
+  const me = stances[who]
+  const partner = stances[1 - who]
+  const shoulderY = FIGURE_LIMBS.shoulderY
+  if (kind === 'indicate') return { bearing: who === 0 ? 1.15 : -1.15, elevation: 0.05 }
+  if (kind === 'point') {
+    const middle = aimAt(me, { x: 0, y: 0.4, z: 0 }, shoulderY)
+    if (Math.abs(middle.bearing) <= TALKER_POINT_ARC) return middle
+    // The middle lies behind this speaker: point at the person in front of it.
+    return aimAt(me, { x: partner.x, y: shoulderY * 0.7, z: partner.z }, shoulderY)
+  }
+  return aimAt(me, { x: partner.x, y: shoulderY, z: partner.z }, shoulderY)
+}
+
+/**
+ * Two inhabitants standing together in conversation, gesturing (point 479).
+ *
+ * The two take turns: one beckons, points at something in the settlement,
+ * refuses, or waves a direction, while the other listens. THE GESTURE EXPLAINS
+ * NOTHING — there is no label and no caption; it is the body half of an exchange
+ * whose other half is whatever happens next, which is the rule this project set
+ * for the whole communication PoC.
+ *
+ * This scheduler is the AMBIENT driver. Once the speaking layer exists (the
+ * communication points), it drives the very same `gesture` refs through
+ * `startGesture`, so a figure saying COME beckons in step — the coupling point
+ * is the ref, and nothing about the figure has to change for it.
+ */
 function Talkers({ x, z, cloth }: { x: number; z: number; cloth: string[] }) {
   const a = useRef<THREE.Group>(null)
   const b = useRef<THREE.Group>(null)
-  useFrame(({ clock }) => {
+  const gestureA = useRef<GestureState>(restGesture())
+  const gestureB = useRef<GestureState>(restGesture())
+  const schedule = useRef({ wait: 1.2, turn: 0, step: 0 })
+
+  // The two stand half a metre apart facing each other, so figure A looks along
+  // world +x and figure B along −x. Their aims are computed in each one's own
+  // frame from that facing.
+  const stances = useMemo<TalkerStance[]>(
+    () => [
+      { x: x - 0.5, z, yaw: Math.PI / 2 },
+      { x: x + 0.5, z, yaw: -Math.PI / 2 },
+    ],
+    [x, z],
+  )
+
+  useFrame(({ clock }, rawDt) => {
+    const dt = Math.min(rawDt, 0.1)
     const t = clock.elapsedTime
-    // Alternating gestures: slight turns and nods toward each other.
+    // Slight turns toward each other, as before — the conversation's idle.
     if (a.current) {
       a.current.rotation.y = Math.PI / 2 + Math.sin(t * 1.15) * 0.18
       a.current.position.y = Math.max(0, Math.sin(t * 2.3)) * 0.03
@@ -438,14 +680,61 @@ function Talkers({ x, z, cloth }: { x: number; z: number; cloth: string[] }) {
       b.current.rotation.y = -Math.PI / 2 + Math.sin(t * 1.15 + Math.PI) * 0.18
       b.current.position.y = Math.max(0, Math.sin(t * 2.3 + Math.PI)) * 0.03
     }
+    const s = schedule.current
+    // Only schedule while BOTH are at rest: a gesture is never cut short by the
+    // clock, and the pair never talks over each other.
+    if (gestureA.current.kind !== null || gestureB.current.kind !== null) return
+    s.wait -= dt
+    if (s.wait > 0) return
+    const kind = GESTURE_KINDS[s.step % GESTURE_KINDS.length]
+    const who = s.turn
+    const aim = talkerAim(stances, kind, who)
+    const next = startGesture(kind, { ...aim, phase: who * 1.7 })
+    if (who === 0) gestureA.current = next
+    else gestureB.current = next
+    s.step++
+    s.turn = 1 - who
+    s.wait = TALKER_GESTURE_GAP
   })
+
+  // Dev hook for the headless verification (CLAUDE.md §7.2): the live gesture
+  // state and the pose it draws, plus a way to hold one pose for a screenshot.
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    const w = window as unknown as Record<string, unknown>
+    const read = () =>
+      [gestureA.current, gestureB.current].map((g) => ({
+        kind: g.kind,
+        t: g.t,
+        duration: g.duration,
+        bearing: g.bearing,
+        pose: gesturePose(g),
+      }))
+    w.__placeGestures = read
+    w.__placeForceGesture = (who: number, kind: GestureKind, seconds?: number) => {
+      const aim = talkerAim(stances, kind, who)
+      const next = startGesture(kind, { ...aim, duration: seconds, phase: who * 1.7 })
+      if (who === 0) gestureA.current = next
+      else gestureB.current = next
+      // The scheduler already stands down while a gesture runs; this only resets
+      // the quiet gap, so the ambient conversation resumes normally afterwards.
+      schedule.current.wait = TALKER_GESTURE_GAP
+    }
+    w.__placeTalkers = stances
+    return () => {
+      delete w.__placeGestures
+      delete w.__placeForceGesture
+      delete w.__placeTalkers
+    }
+  }, [stances])
+
   return (
     <group position={[x, 0, z]}>
       <group ref={a} position={[-0.5, 0, 0]}>
-        <Figure cloth={cloth[0]} />
+        <Figure cloth={cloth[0]} gesture={gestureA} />
       </group>
       <group ref={b} position={[0.5, 0, 0]}>
-        <Figure cloth={cloth[1 % cloth.length]} />
+        <Figure cloth={cloth[1 % cloth.length]} gesture={gestureB} />
       </group>
     </group>
   )
@@ -455,16 +744,26 @@ function Talkers({ x, z, cloth }: { x: number; z: number; cloth: string[] }) {
 function Pounder({ x, z, cloth }: { x: number; z: number; cloth: string }) {
   const pestle = useRef<THREE.Mesh>(null)
   const body = useRef<THREE.Group>(null)
+  // Both hands on the pestle (point 479): the arms ride the stroke, so the grip
+  // rises with the shaft instead of hanging beside a tool that lifts itself.
+  const pose = useRef<FigurePose | null>({ left: armAim(0.2, 0.5), right: armAim(-0.2, 0.5), lean: 0.1, turn: 0 })
   useFrame(({ clock }) => {
     const t = clock.elapsedTime
     const stroke = Math.abs(Math.sin(t * 2.4))
     if (pestle.current) pestle.current.position.y = 1.05 + stroke * 0.38
     if (body.current) body.current.position.y = -stroke * 0.06
+    const p = pose.current
+    if (p) {
+      const elevation = 0.35 + stroke * 0.55
+      Object.assign(p.left, armAim(0.2, elevation))
+      Object.assign(p.right, armAim(-0.2, elevation))
+      p.lean = 0.14 - stroke * 0.08
+    }
   })
   return (
     <group position={[x, 0, z]} rotation={[0, Math.atan2(-x, -z), 0]}>
       <group ref={body} position={[0, 0, -0.55]}>
-        <Figure cloth={cloth} />
+        <Figure cloth={cloth} pose={pose} />
       </group>
       {/* Mortar */}
       <mesh position={[0, 0.21, 0]} castShadow>
@@ -480,36 +779,29 @@ function Pounder({ x, z, cloth }: { x: number; z: number; cloth: string }) {
   )
 }
 
-/** Drummer beating a hide drum — the audible village drums made visible. */
+/** Drummer beating a hide drum — the audible village drums made visible.
+ *  Since the figure has arms (point 479) the beat is struck by the drummer's own
+ *  hands: the pair of floating hand spheres that stood in for them is gone. */
 function Drummer({ x, z, cloth }: { x: number; z: number; cloth: string }) {
-  const hands = useRef<Array<THREE.Mesh | null>>([])
+  const pose = useRef<FigurePose | null>({ left: { ...REST_POSE.left }, right: { ...REST_POSE.right }, lean: 0.12, turn: 0 })
   useFrame(({ clock }) => {
     const t = clock.elapsedTime * 4.2 // matches the drum-bar tempo roughly
-    hands.current.forEach((h, i) => {
-      if (h) h.position.y = 0.78 + Math.max(0, Math.sin(t + i * Math.PI)) * 0.16
-    })
+    const p = pose.current
+    if (!p) return
+    // Both hands sit over the drum head just in front of the chest; each lifts
+    // and falls half a beat apart, so the drum is struck alternately.
+    const lift = (i: number) => Math.max(0, Math.sin(t + i * Math.PI)) * 0.42
+    Object.assign(p.left, armAim(0.1, -0.2 + lift(0)))
+    Object.assign(p.right, armAim(-0.1, -0.2 + lift(1)))
   })
   return (
     <group position={[x, 0, z]} rotation={[0, Math.atan2(-x + 3.5, -z + 2.5), 0]}>
-      <Figure cloth={cloth} />
+      <Figure cloth={cloth} pose={pose} />
       {/* Drum */}
       <mesh position={[0, 0.34, 0.48]} castShadow>
         <cylinderGeometry args={[0.26, 0.2, 0.66, 9]} />
         <meshStandardMaterial color="#8a5a30" roughness={0.9} />
       </mesh>
-      {[-0.14, 0.14].map((hx, i) => (
-        <mesh
-          key={hx}
-          ref={(el) => {
-            hands.current[i] = el
-          }}
-          position={[hx, 0.78, 0.42]}
-          castShadow
-        >
-          <sphereGeometry args={[0.07, ...TESSELLATION.figureHand]} />
-          <meshStandardMaterial color="#5c3317" roughness={0.85} />
-        </mesh>
-      ))}
     </group>
   )
 }
@@ -675,7 +967,7 @@ function TaskWalker({
   return (
     <>
       <group ref={standing} visible={false}>
-        <Figure cloth={cloth} />
+        <Figure cloth={cloth} pose={HEAD_CARRY_POSE} />
         {carry === 'bundle' ? (
           <mesh position={[0, 1.42, 0]} castShadow>
             <boxGeometry args={[0.38, 0.22, 0.3]} />
@@ -910,7 +1202,7 @@ function Walkers({
             refs.current[i] = el
           }}
         >
-          <Figure cloth={def.cloth} />
+          <Figure cloth={def.cloth} pose={def.carries ? HEAD_CARRY_POSE : undefined} />
           {/* Some carry a basket or bundle on the head */}
           {def.carries && (
             <mesh position={[0, 1.42, 0]} castShadow>
@@ -994,6 +1286,10 @@ export function PlaceLife({
   // people has none: see the evidence notes in systems/dress.ts.
   const cloaks = useColdCloaks(placeId, style.cloth)
 
+  // The limb tessellation of the current graphics level (point 479). Read ONCE
+  // here, not per figure: a settlement mounts a couple of dozen of them.
+  const limbSegments = useUi(effectiveFigureLimbSegments)
+
   // Seasonal presence (point 142, "the young men are gone"): the adult walkers
   // thin in a people's away season — the Maasai at the dry-season highland
   // camps (PERIOD), the Tuareg on the autumn caravan, the Sahel farmers out at
@@ -1010,46 +1306,50 @@ export function PlaceLife({
   if (kind === 'port') {
     return (
       <ColdCloaksContext.Provider value={cloaks}>
-        <Porters seed={localSeed} stops={buildings} cloth={style.cloth} colliders={colliders} count={1 + size} />
-        <Traders seed={localSeed} cloth={style.cloth} />
-        <Talkers x={PORT_TALKERS[0]} z={PORT_TALKERS[1]} cloth={style.cloth} />
-        <Walkers seed={localSeed} homes={homes} errands={errands} cloth={style.cloth} count={2 + size * 2} colliders={colliders} />
+        <LimbDetailContext.Provider value={limbSegments}>
+          <Porters seed={localSeed} stops={buildings} cloth={style.cloth} colliders={colliders} count={1 + size} />
+          <Traders seed={localSeed} cloth={style.cloth} />
+          <Talkers x={PORT_TALKERS[0]} z={PORT_TALKERS[1]} cloth={style.cloth} />
+          <Walkers seed={localSeed} homes={homes} errands={errands} cloth={style.cloth} count={2 + size * 2} colliders={colliders} />
+        </LimbDetailContext.Provider>
       </ColdCloaksContext.Provider>
     )
   }
   return (
     <ColdCloaksContext.Provider value={cloaks}>
-      <Cook x={firePos[0] + 1.2} z={firePos[1] + 1.0} cloth={style.cloth[0]} />
-      <Weaver x={-8.5} z={-7} cloth={style.cloth[1 % style.cloth.length]} weave={style.bandColor} />
-      <Kids x={7} z={7.5} cloth={style.cloth} colliders={colliders} />
-      <Goats seed={localSeed} count={pen ? 4 : 3} pen={pen} colliders={colliders} />
-      <Walkers seed={localSeed} homes={homes} errands={errands} cloth={style.cloth} count={Math.max(1, Math.round(5 * presence))} colliders={colliders} />
-      {/* Inhabitant/prop interactions (design.md §19). */}
-      <FireTender x={firePos[0] - 1.3} z={firePos[1] - 0.7} cloth={style.cloth[2 % style.cloth.length]} />
-      <Talkers x={VILLAGE_SPOTS.talkers[0]} z={VILLAGE_SPOTS.talkers[1]} cloth={style.cloth} />
-      <Pounder x={VILLAGE_SPOTS.pounder[0]} z={VILLAGE_SPOTS.pounder[1]} cloth={style.cloth[0]} />
-      <Drummer x={VILLAGE_SPOTS.drummer[0]} z={VILLAGE_SPOTS.drummer[1]} cloth={style.cloth[1 % style.cloth.length]} />
-      <Well x={VILLAGE_SPOTS.well[0]} z={VILLAGE_SPOTS.well[1]} />
-      {homes.length > 0 && (
-        <TaskWalker
-          home={homes[0]}
-          target={[firePos[0] + 0.7, firePos[1] + 1.8]}
-          cloth={style.cloth[0]}
-          carry="bundle"
-          colliders={colliders}
-          startDelay={4}
-        />
-      )}
-      {homes.length > 1 && (
-        <TaskWalker
-          home={homes[1]}
-          target={[VILLAGE_SPOTS.well[0] - 1.1, VILLAGE_SPOTS.well[1]]}
-          cloth={style.cloth[1 % style.cloth.length]}
-          carry="jar"
-          colliders={colliders}
-          startDelay={9}
-        />
-      )}
+      <LimbDetailContext.Provider value={limbSegments}>
+        <Cook x={firePos[0] + 1.2} z={firePos[1] + 1.0} cloth={style.cloth[0]} />
+        <Weaver x={-8.5} z={-7} cloth={style.cloth[1 % style.cloth.length]} weave={style.bandColor} />
+        <Kids x={7} z={7.5} cloth={style.cloth} colliders={colliders} />
+        <Goats seed={localSeed} count={pen ? 4 : 3} pen={pen} colliders={colliders} />
+        <Walkers seed={localSeed} homes={homes} errands={errands} cloth={style.cloth} count={Math.max(1, Math.round(5 * presence))} colliders={colliders} />
+        {/* Inhabitant/prop interactions (design.md §19). */}
+        <FireTender x={firePos[0] - 1.3} z={firePos[1] - 0.7} cloth={style.cloth[2 % style.cloth.length]} />
+        <Talkers x={VILLAGE_SPOTS.talkers[0]} z={VILLAGE_SPOTS.talkers[1]} cloth={style.cloth} />
+        <Pounder x={VILLAGE_SPOTS.pounder[0]} z={VILLAGE_SPOTS.pounder[1]} cloth={style.cloth[0]} />
+        <Drummer x={VILLAGE_SPOTS.drummer[0]} z={VILLAGE_SPOTS.drummer[1]} cloth={style.cloth[1 % style.cloth.length]} />
+        <Well x={VILLAGE_SPOTS.well[0]} z={VILLAGE_SPOTS.well[1]} />
+        {homes.length > 0 && (
+          <TaskWalker
+            home={homes[0]}
+            target={[firePos[0] + 0.7, firePos[1] + 1.8]}
+            cloth={style.cloth[0]}
+            carry="bundle"
+            colliders={colliders}
+            startDelay={4}
+          />
+        )}
+        {homes.length > 1 && (
+          <TaskWalker
+            home={homes[1]}
+            target={[VILLAGE_SPOTS.well[0] - 1.1, VILLAGE_SPOTS.well[1]]}
+            cloth={style.cloth[1 % style.cloth.length]}
+            carry="jar"
+            colliders={colliders}
+            startDelay={9}
+          />
+        )}
+      </LimbDetailContext.Provider>
     </ColdCloaksContext.Provider>
   )
 }
