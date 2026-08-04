@@ -129,13 +129,24 @@ export const REQUEST_PATTERNS = [
   // result. The plainest hand-over there is, and the one shape that can carry no
   // second-person word at all — "Run `npm run build` and paste the output here"
   // addresses nobody by name and every other pattern here let it through.
+  //
+  // The clause must also carry a hand-BACK DIRECTION — `me|us|here` / `mir|uns|
+  // hier` (leading lookahead, so its position in the clause does not matter).
+  // That is the rung's own rationale, "he runs it, I read the result": without a
+  // direction the same verb+object shape is ordinary declarative prose, and this
+  // project writes it constantly — "Die Tafel zeigt die Ergebnisse der
+  // LARGE-Regression", "Das Board zeigt jetzt den Fehler aus `npm run build`",
+  // "The dashboard will show the results of `npm run test:large`" all blocked
+  // (four-eyes review, Fable 5, 04.08.2026). A report cue cannot rescue them —
+  // cues are clause-local by design, so an "Ich habe publiziert;" one clause
+  // earlier does not reach. Every real hand-over keeps the direction word.
   {
     id: 'en-hand-back',
-    re: /\b(?:paste|send|post|share|show|attach|upload)\b[^\n]{0,40}\b(?:output|log|logs|result\w*|error\w*|transcript|console)\b/i,
+    re: /^(?=[^\n]*\b(?:me|us|here)\b)[^\n]*\b(?:paste|send|post|share|show|attach|upload)\b[^\n]{0,40}\b(?:output|log|logs|result\w*|error\w*|transcript|console)\b/i,
   },
   {
     id: 'de-hand-back',
-    re: /\b(?:schick\w*|send\w*|post\w*|zeig\w*|gib|gibst|häng\w*)\b[^\n]{0,40}\b(?:ausgabe|log|logs|ergebnis\w*|fehler\w*|output|konsole|transcript)\b/i,
+    re: /^(?=[^\n]*\b(?:mir|uns|hier)\b)[^\n]*\b(?:schick\w*|send\w*|post\w*|zeig\w*|gib|gibst|häng\w*)\b[^\n]{0,40}\b(?:ausgabe|log|logs|ergebnis\w*|fehler\w*|output|konsole|transcript)\b/i,
   },
 ]
 

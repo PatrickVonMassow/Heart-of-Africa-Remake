@@ -230,6 +230,43 @@ describe('a reassurance without a negation word is no demand either', () => {
   })
 })
 
+// The hand-back rungs demand a hand-BACK DIRECTION — "paste it HERE", "schick
+// MIR das Log". Without one, the same verb+object shape is ordinary declarative
+// prose about what a page or a board shows, which this project writes constantly
+// and which the first version of these rungs blocked (four-eyes review, Fable 5,
+// 04.08.2026). A report cue cannot rescue those sentences: cues are clause-local
+// by design, so an "Ich habe publiziert;" one clause earlier never reaches them.
+describe('a hand-back needs a direction, or it is only prose', () => {
+  const prose = [
+    ['German, what the board shows', 'Die Tafel zeigt die Ergebnisse der LARGE-Regression (`npm test`) nach dem Publish.'],
+    ['German, what the board shows now', 'Das Board zeigt jetzt den Fehler aus `npm run build` als eigene Karte.'],
+    ['English, what the dashboard will show', 'The dashboard will show the results of `npm run test:large` once published.'],
+  ]
+  for (const [what, answer] of prose) {
+    it(`allows: ${what}`, () => {
+      expect(blocked(answer), answer).toBe(false)
+    })
+  }
+
+  // The rungs stay ALIVE: each direction word still carries its catch, and these
+  // shapes have no other request marker to fall back on, so they pin the rungs
+  // themselves rather than a neighbour's pattern.
+  const handBacks = [
+    ['German, "schick mir"', 'Danach schick mir das Log von `npm run test:unit`.'],
+    ['German, "zeig uns"', 'Zeig uns den Fehler aus `npm run lint`.'],
+    ['English, "post … here"', 'Post the console output here after `npm run dev` starts.'],
+  ]
+  for (const [what, answer] of handBacks) {
+    it(`blocks: ${what}`, () => {
+      expect(blocked(answer), answer).toBe(true)
+    })
+  }
+
+  it('and a direction word in a REPORT clause is still no hand-over', () => {
+    expect(blocked('Ich habe `npm test` laufen lassen und zeige dir hier die Ergebnisse.')).toBe(false)
+  })
+})
+
 describe('the ordinary answer is never touched', () => {
   const fine = [
     ['a bare mention', 'Der Build läuft über `npm run build`; die Logik liegt in `scripts/x.mjs`.'],
