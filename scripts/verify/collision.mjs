@@ -434,6 +434,44 @@ check(
   JSON.stringify(pinResult),
 )
 
+// === The PoC village's teaching stone (work-order 482) ========================
+// The adults teach the word for a rock at a stone in the open (docs/
+// communication-poc-spec.md), so it has to BE there: a solid the player walks up
+// to and not through, standing where the layout says — and in the picture, which
+// is the only place a "visible from the village" claim can be judged.
+await page.evaluate(() => window.__game.getState().enterPlace('bambara-village'))
+await page
+  .waitForFunction((want) => window.__game.getState().placeId === want && !!window.__placeLayout, 'bambara-village', { timeout: 30000 })
+  .catch(() => {})
+await page.evaluate(() => window.__game.getState().setJournalOpen(false))
+await page.waitForTimeout(400)
+const teachingStone = await page.evaluate(() => window.__placeLayout.teachingStone ?? null)
+check('PoC village: the teaching stone is in the layout', !!teachingStone, JSON.stringify(teachingStone))
+if (teachingStone) {
+  await ejectTest(
+    'Teaching stone',
+    `(cs)=>cs.findIndex((c)=>!c.kind&&Math.hypot(c.x-(${teachingStone.x}),c.z-(${teachingStone.z}))<0.01)`,
+  )
+  // Stand a couple of steps off it, looking at it, so the frame shows the stone
+  // the way a player walking up to it sees it.
+  await page.evaluate((s) => {
+    const p = window.__placePlayer
+    const len = Math.hypot(s.x, s.z) || 1
+    p.x = s.x - (s.x / len) * (s.r + 2.6)
+    p.z = s.z - (s.z / len) * (s.r + 2.6)
+    p.yaw = Math.atan2(-(s.x - p.x), -(s.z - p.z))
+  }, teachingStone)
+  // Let the scene consume the teleport on ITS clock before the shutter judges:
+  // two animation frames, not a wall-clock guess (CLAUDE.md §7.2). On a loaded
+  // host a frame can take a second, and the camera would still be easing toward
+  // the stone when the picture is taken.
+  await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(null)))))
+  await shot('54-collision-teaching-stone', {
+    local: { x: teachingStone.x, z: teachingStone.z },
+    label: 'the teaching stone in the PoC village',
+  })
+}
+
 console.log('console errors:', errors.length)
 for (const e of errors) console.log('ERR:', e.slice(0, 300))
 await browser.close()
