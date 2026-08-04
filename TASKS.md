@@ -4357,3 +4357,33 @@ Build order, chosen so no two parallel agents own the same file:
   own the lock. `node scripts/guard-health-guard.mjs --status` still reports
   every enforcer wired with the new one counted, and no row in
   `docs/rule-corpus-audit.md` is left with an empty measured-by cell.
+
+- [ ] 498. WHAT THE SOFTWARE SECOND LANE COSTS THE FULL REGRESSION, MEASURED
+  (user 04.08.2026, asking against the open decision "Zweite Bahn läuft in
+  Software — reicht das?"). Point 493 restored both lanes and measured ONE
+  suite: `flow` runs 58 s on the hardware WebGL lane and 3 min 41 s on the
+  software WebGPU lane, a factor of 3.8. What nobody has measured is the number
+  the user actually decides on — the WHOLE regression. A LARGE run is two passes
+  (the full set on WebGL 2 with preflight and prod preview, then every suite
+  except `touch`/`voice` on WebGPU), so the software lane is not a small tail:
+  it is a second near-complete pass at software speed. The pre-container figure
+  on record is "30–40 minutes" (`docs/batch-resilience.md`), taken on Windows
+  where BOTH passes had the GPU.
+  FINAL STATE:
+  1. One LARGE run on `main` is timed end to end, and the two passes are timed
+     SEPARATELY — the WebGL pass and the WebGPU pass — because only the split
+     shows what the software lane costs and what the GPU gained.
+  2. `docs/host-environment.md` records all of it beside the existing per-suite
+     figures: the two pass durations, the total, the 30–40 min Windows baseline
+     it is compared against, and the date and machine state of the run (a
+     measurement taken under a running agent pool is worth less, and says so).
+  3. The comparison is stated HONESTLY in both directions: the WebGL pass is
+     faster than it was on Windows, the WebGPU pass slower, and the answer to
+     "is the total worse than before" follows from the measured numbers rather
+     than from the factor 3.8 extrapolated.
+  4. The measured total is carried onto the open decision card, so the user
+     decides against a number rather than an estimate.
+  VERIFIABLE: `docs/host-environment.md` names both pass durations, the total
+  and the baseline with its date; the run's own log is quoted for each figure;
+  and no figure in that section is an extrapolation — every one is a wall-clock
+  reading of a run that happened.
