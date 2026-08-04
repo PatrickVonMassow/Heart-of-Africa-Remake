@@ -14,6 +14,8 @@
 //       sub-work notes ("Diagnose-Vorarbeit erledigt", "(b) erledigt") from
 //       tripping it — better a missed claim than a false block.
 // Fail-open is the WRAPPER's job; this core must never throw on partial input.
+// The remedies' publish steps come from scripts/board-remedy.mjs — one copy.
+import { REPUBLISH } from './board-remedy.mjs'
 
 /** The bug-FINDING / QA-framework point numbers; every other open point is a fix. */
 // The big bug-FINDING / QA-framework block (worked after the known-bug fixes).
@@ -109,6 +111,13 @@ export function finderBeforeOpenFix(queueOrder, tasksOpenSet) {
     const n = Number(v)
     return open.has(n) && !FINDER_POINTS.has(n) && n !== RELEASE_TAG_POINT
   }
+  // The rule orders the work BEFORE the release only (user 26.07.2026: bugs,
+  // then features, then the hardening tickets, then the tag). Cards queued
+  // AFTER the release tag are post-release work and order themselves freely —
+  // reading them as fixes that a finder had jumped ahead of would block the
+  // turn for correctly deferred work.
+  const tagAt = queueOrder.findIndex((v) => Number(v) === RELEASE_TAG_POINT)
+  if (tagAt !== -1) queueOrder = queueOrder.slice(0, tagAt + 1)
   const offenders = []
   for (let i = 0; i < queueOrder.length; i++) {
     const n = Number(queueOrder[i])
@@ -167,7 +176,7 @@ export function evaluate({ dashboardHtml, tasksMd } = {}) {
         `QUEUE ORDER WRONG: finder/QA point(s) ${misordered.join(', ')} are queued AHEAD of open fix ` +
           `work. Known-bug fixes and user-requested extensions come BEFORE the finder/QA tickets ` +
           `(${[...FINDER_POINTS].join(', ')}); ${RELEASE_TAG_POINT} stays last. Reorder the ` +
-          'Warteschlange cards, republish (dashboard-publish.mjs + Artifact), re-run --synced.',
+          `Warteschlange cards, then ${REPUBLISH}.`,
       )
     }
 
@@ -179,7 +188,7 @@ export function evaluate({ dashboardHtml, tasksMd } = {}) {
         `DASHBOARD CLAIMS DONE WHAT IS OPEN: the card(s) for point(s) ${claims.join(', ')} contain a ` +
           'done-claim ("behoben"/"erledigt"/"gelöst"/"done"/…) while the point is still open ([ ]) in ' +
           'TASKS.md. Either the claim is false — correct the card text — or the work truly is done — ' +
-          'tick the point in TASKS.md. Then republish (dashboard-publish.mjs + Artifact) and re-run --synced.',
+          `tick the point in TASKS.md. Then ${REPUBLISH}.`,
       )
     }
 

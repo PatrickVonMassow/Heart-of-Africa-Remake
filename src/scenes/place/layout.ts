@@ -15,6 +15,9 @@ import type { BuildingType } from '../../state/ui'
 
 export const PLACE_RADIUS = 28 // walkable radius in meters; leaving it exits the place
 
+/** How far inside the southern edge a settlement drops the arriving traveller. */
+export const SPAWN_INSET = 10
+
 export interface Interactive {
   type: BuildingType | 'villager'
   pos: [number, number]
@@ -56,6 +59,11 @@ export interface FenceDef {
 export interface PlaceLayout {
   /** Walkable radius; leaving it exits the place (larger for big cities). */
   radius: number
+  /** Distance south of the centre at which the traveller arrives, facing north
+   *  (design.md §2.3). Normally just inside the walkable edge; an open-plain
+   *  monument site keeps its own approach distance, so a disc widened for the
+   *  desert does not push the arrival away from the monuments (point 390). */
+  spawnZ: number
   interactives: Interactive[]
   dwellings: DwellingDef[]
   fences: FenceDef[]
@@ -112,6 +120,50 @@ export function nearestActionable(
     }
   }
   return near
+}
+
+/** Half-thickness of the drawn fence run, per material. */
+const FENCE_PANEL_RADIUS: Record<FenceDef['kind'], number> = { thorn: 0.6, stone: 0.5, woven: 0.42 }
+
+/** Neighbouring posts further apart than this multiple of the ring's own post
+ *  spacing span a GATE the renderer leaves open — they are never joined. Posts
+ *  sit evenly along the arc, so the smallest neighbour distance is the spacing
+ *  itself and a gate always skips at least one post (≥ 2× the spacing). */
+const FENCE_PANEL_SPAN_FACTOR = 1.5
+
+/**
+ * The collider run of one fence, DERIVED from the posts the renderer draws
+ * (points 129/378/413): a capsule per drawn panel, i.e. per pair of neighbouring
+ * posts, so the blocked band matches the continuous woven/stone/thorn wall in
+ * the picture. One circle per post left a chain of dots whose blocked band
+ * pinched at every midpoint and whose contact normal pointed away from a post
+ * instead of away from the wall.
+ */
+export function fenceColliders(f: FenceDef): Collider[] {
+  const r = FENCE_PANEL_RADIUS[f.kind]
+  const n = f.posts.length
+  if (n === 0) return []
+  if (n === 1) return [{ x: f.posts[0][0], z: f.posts[0][1], r }]
+  let spacing = Infinity
+  for (let i = 0; i < n; i++) {
+    const a = f.posts[i]
+    const b = f.posts[(i + 1) % n]
+    const d = Math.hypot(b[0] - a[0], b[1] - a[1])
+    if (d > 1e-6 && d < spacing) spacing = d
+  }
+  const maxSpan = spacing * FENCE_PANEL_SPAN_FACTOR
+  const out: Collider[] = []
+  for (let i = 0; i < n; i++) {
+    const a = f.posts[i]
+    const b = f.posts[(i + 1) % n]
+    const d = Math.hypot(b[0] - a[0], b[1] - a[1])
+    if (d <= maxSpan) out.push({ kind: 'segment', x1: a[0], z1: a[1], x2: b[0], z2: b[1], r })
+    // Across a gate the renderer still draws this post's own short panel, but
+    // nothing that bridges the opening — so the post stays a circle and the
+    // gate stays walkable.
+    else out.push({ x: a[0], z: a[1], r })
+  }
+  return out
 }
 
 /** Fence posts along a circular arc, skipping given gap angles. */
@@ -788,10 +840,7 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
         colliders.push({ x: d.x, z: d.z, r: d.r + 0.3 }) // round hut
     }
   }
-  for (const f of fences) {
-    const r = f.kind === 'thorn' ? 0.6 : f.kind === 'stone' ? 0.5 : 0.42
-    for (const [x, z] of f.posts) colliders.push({ x, z, r })
-  }
+  for (const f of fences) colliders.push(...fenceColliders(f))
   for (const t of flora) colliders.push({ x: t.x, z: t.z, r: 0.45 })
   for (const [x, z, s] of rocks) colliders.push({ x, z, r: 0.35 + s * 0.5 })
   if (place.kind === 'village') {
@@ -815,5 +864,5 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     errands[i] = nudgeToFree(colliders, errands[i][0], errands[i][1], WALKER_RADIUS)
   }
 
-  return { radius, interactives, dwellings, fences, paths, flora, rocks, pen, errands, colliders }
+  return { radius, spawnZ: radius - SPAWN_INSET, interactives, dwellings, fences, paths, flora, rocks, pen, errands, colliders }
 }

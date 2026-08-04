@@ -1,0 +1,13 @@
+#!/bin/sh
+# Versioned git hook (core.hooksPath = scripts/git-hooks), so the rule lives in
+# the repository and is reviewable, rather than in an unversioned .git/hooks.
+# Enable once per clone:  git config core.hooksPath scripts/git-hooks
+#
+# Runs the fast gate before a push reaches the remote, so CI is never the first
+# place a broken state is noticed. Deliberate exception: git push --no-verify
+#
+# Worktrees share one .git/config, so this hook also runs in a worktree whose
+# branch predates the gate. Skip silently there rather than block a push over a
+# file that branch cannot have — a hook must never make a checkout unpushable.
+[ -f scripts/pre-push-gate.mjs ] || exit 0
+exec node scripts/pre-push-gate.mjs "$@"

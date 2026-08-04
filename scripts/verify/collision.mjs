@@ -6,6 +6,7 @@
 // surface and never penetrates. Reachability of paths/accesses is verified
 // geometrically. Dev server only (dev hooks).
 import { launchVerifyBrowser, assertBackend } from './_browser.mjs'
+import { frameShutter } from './frameSubject.mjs'
 import { fileURLToPath } from 'node:url'
 
 // A fixed dev seed makes the procedural settlement layout deterministic so the
@@ -20,7 +21,9 @@ const check = (name, ok, detail) => {
 
 const browser = await launchVerifyBrowser()
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
-// Shared helpers for both collider shapes (circle and oriented box).
+// Shared helpers for all three collider shapes: circle, oriented box and the
+// fence panel's capsule around a segment (point 413). A shape this helper does
+// not know reads every point as NaN-blocked, so it must track collision.ts.
 await page.addInitScript(() => {
   window.__clearanceTo = (c, x, z) => {
     if (c.kind === 'box') {
@@ -34,6 +37,13 @@ await page.addInitScript(() => {
       const qz = Math.max(-c.hz, Math.min(c.hz, lz))
       if (qx === lx && qz === lz) return -Math.min(c.hx - Math.abs(lx), c.hz - Math.abs(lz))
       return Math.hypot(lx - qx, lz - qz)
+    }
+    if (c.kind === 'segment') {
+      const ex = c.x2 - c.x1
+      const ez = c.z2 - c.z1
+      const l2 = ex * ex + ez * ez
+      const t = l2 < 1e-12 ? 0 : Math.max(0, Math.min(1, ((x - c.x1) * ex + (z - c.z1) * ez) / l2))
+      return Math.hypot(x - (c.x1 + ex * t), z - (c.z1 + ez * t)) - c.r
     }
     return Math.hypot(x - c.x, z - c.z) - c.r
   }
@@ -108,11 +118,15 @@ async function ejectTest(sceneLabel, pick) {
     const idx = eval(pickSrc)(cs)
     const c = cs[idx]
     if (!c) return null
+    // A fence panel has no centre field — its middle is the segment's midpoint
+    // (point 413); every other shape carries its own.
+    const cx = c.kind === 'segment' ? (c.x1 + c.x2) / 2 : c.x
+    const cz = c.kind === 'segment' ? (c.z1 + c.z2) / 2 : c.z
     const p = window.__placePlayer
-    p.x = c.x
-    p.z = c.z
+    p.x = cx
+    p.z = cz
     p.yaw = 0
-    return { cx: c.x, cz: c.z, cr: window.__colliderSize(c) }
+    return { cx, cz, cr: window.__colliderSize(c) }
   }, pick)
   if (!info) {
     check(`${sceneLabel}: eject target found`, false, `pick matched nothing: ${pick}`)
@@ -241,7 +255,9 @@ async function accessPointsFree(sceneLabel) {
 // === Port (Cairo) ============================================================
 // Eject from: biggest building (box collider), and a mid-size circle collider.
 await ejectTest('Port', '(cs)=>cs.reduce((b,c,i,a)=>window.__colliderSize(c)>window.__colliderSize(a[b])?i:b,0)')
-await ejectTest('Port', '(cs)=>cs.reduce((b,c,i,a)=>(c.kind!=="box"&&(b<0||c.r>a[b].r))?i:b,-1)') // biggest circle prop
+// Biggest circle prop. A fence panel has an `r` too but no centre to eject
+// from, so segments are skipped here (point 413).
+await ejectTest('Port', '(cs)=>cs.reduce((b,c,i,a)=>(c.kind!=="box"&&c.kind!=="segment"&&(b<0||c.r>a[b].r))?i:b,-1)')
 const funcTypes = await page.evaluate(() =>
   window.__placeLayout.interactives.filter((b) => b.type !== 'villager').map((b) => b.type),
 )
@@ -253,18 +269,21 @@ await accessPointsFree('Port')
 await dwellingDoorsReachable('Port')
 
 // Ram screenshot: teleport in front of the biggest wall and nudge into it.
-await page.evaluate(() => {
+const shot = frameShutter(page, OUT)
+const rammedWall = await page.evaluate(() => {
   const c = [...window.__placeColliders].sort((a, b) => window.__colliderSize(b) - window.__colliderSize(a))[0]
   const p = window.__placePlayer
   const len = Math.hypot(c.x, c.z) || 1
   p.x = c.x - (c.x / len) * (window.__colliderSize(c) + 2)
   p.z = c.z - (c.z / len) * (window.__colliderSize(c) + 2)
   p.yaw = Math.atan2(-(c.x - p.x), -(c.z - p.z))
+  return { x: c.x, z: c.z }
 })
 await pushFrames(16)
 check('Port: no penetration at the wall', (await clearance()) >= -0.03, `clearance ${(await clearance()).toFixed(3)}`)
-await page.screenshot({ path: `${OUT}52-collision-port-wall.png` })
-console.log('shot 52-collision-port-wall.png')
+// Point 375: the wall the player is pressed against must be the thing in the
+// picture — projected through the place camera, not assumed from the teleport.
+await shot('52-collision-port-wall', { local: { x: rammedWall.x, z: rammedWall.z }, label: 'the rammed wall' })
 
 // Corner clipping (§7.1.16): drop the player exactly onto each corner of the
 // biggest box building; the resolver must eject it with positive clearance —
@@ -299,8 +318,11 @@ await page.evaluate(() => window.__game.getState().setJournalOpen(false))
 await page.waitForTimeout(400)
 
 await ejectTest('Village', '(cs)=>cs.reduce((b,c,i,a)=>window.__colliderSize(c)>window.__colliderSize(a[b])?i:b,0)') // chief hut
-await ejectTest('Village', '(cs)=>cs.reduce((b,c,i,a)=>(c.kind!=="box"&&c.r>=1.5&&c.r<=2.2&&(b<0||c.r<a[b].r))?i:b,-1)') // dwelling hut
-await ejectTest('Village', '(cs)=>cs.reduce((b,c,i,a)=>(c.kind!=="box"&&c.r<=0.65&&(b<0))?i:b,-1)') // thorn fence post
+await ejectTest('Village', '(cs)=>cs.reduce((b,c,i,a)=>(c.kind!=="box"&&c.kind!=="segment"&&c.r>=1.5&&c.r<=2.2&&(b<0||c.r<a[b].r))?i:b,-1)') // dwelling hut
+// The fence is now a run of panels, not a chain of posts (point 413): eject
+// from the MIDDLE of a panel, where the old post-circle chain had its thinnest,
+// most sideways-pushing spot.
+await ejectTest('Village', '(cs)=>cs.reduce((b,c,i)=>(c.kind==="segment"&&b<0)?i:b,-1)') // fence panel
 
 // Chief hut operable despite collision: standing at its door and pressing the
 // Space use key opens the audience dialog (design.md §2.3).
@@ -329,8 +351,7 @@ check('Village: chief hut opens with Space at its door', audienceOpened)
 await page.evaluate(() => window.__ui?.getState?.().setDialog(null))
 await page.waitForTimeout(200)
 await dwellingDoorsReachable('Village')
-await page.screenshot({ path: `${OUT}53-collision-village-chief-hut.png` })
-console.log('shot 53-collision-village-chief-hut.png')
+await shot('53-collision-village-chief-hut', { place: 'maasai-village', label: "the chief's hut and its door" })
 await page.keyboard.press('Escape')
 await page.evaluate(() => { const p = window.__placePlayer; p.x = 0; p.z = 0 })
 await page.waitForFunction(() => !document.querySelector('.dialog'), null, { timeout: 8000 }).catch(() => {})
@@ -343,7 +364,11 @@ await accessPointsFree('Village')
 // walkers until one that has been out walking disappears inside — at that
 // moment it must stand at its home center (it slipped in through the door).
 const walkerResult = await page.evaluate(async () => {
-  const deadline = Date.now() + 150000
+  // A TIMEOUT on a polled condition, not a fixed wait: it costs nothing when the
+  // transition happens promptly, and the errand it waits for is paced by the
+  // frame clock — a host rendering in software takes several times as long to
+  // walk a villager home as the hardware this bound was written on.
+  const deadline = Date.now() + 420000
   const wasOut = new Set()
   return await new Promise((resolve) => {
     const iv = setInterval(() => {
@@ -384,15 +409,20 @@ const pinResult = await page.evaluate(async () => {
   if (!w) return { ok: false, reason: 'no __placeWalkers' }
   let maxPinned = 0
   let anyMoved = false
-  const last = w.states.map((s) => ({ x: s.x, z: s.z }))
+  // Movement is measured against the START position, not against the previous
+  // sample. A per-sample delta asks "did a walker cover 0.2 m in the last 150 ms",
+  // which is a question about the SAMPLING RATE and the frame rate rather than
+  // about the walkers: on a software-rendered host at ~12 fps every walker moves,
+  // and the check still read "nothing moved". Cumulative displacement asks what
+  // the check means to ask — did anyone get anywhere.
+  const start = w.states.map((s) => ({ x: s.x, z: s.z }))
   const t0 = Date.now()
   // Watch for the window + a generous margin so a would-be pin has time to pass it.
   while (Date.now() - t0 < (win + 5) * 1000) {
     for (let i = 0; i < w.states.length; i++) {
       const s = w.states[i]
       if (s.pinned > maxPinned) maxPinned = s.pinned
-      if (Math.hypot(s.x - last[i].x, s.z - last[i].z) > 0.2) anyMoved = true
-      last[i] = { x: s.x, z: s.z }
+      if (Math.hypot(s.x - start[i].x, s.z - start[i].z) > 0.2) anyMoved = true
     }
     await sleep(150)
   }

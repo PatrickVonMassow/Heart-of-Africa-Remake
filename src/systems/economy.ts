@@ -4,7 +4,7 @@
 
 import { balance } from '../config/balance'
 import type { LatLon, Material, RegionId } from '../world/geo'
-import { PLACES, REGION_VALUES, regionAt, type PlaceDef } from '../world/geo'
+import { KNOWN_FROM_START_PLACES, PLACES, REGION_VALUES, regionAt, type PlaceDef } from '../world/geo'
 import { isBlocked, sampleTerrain } from '../world/terrain'
 import { mulberry32 } from '../world/noise'
 import { CULTURAL_LANDMARKS, ELEPHANT_GRAVEYARD, MOUNTAINS, NATURAL_SITES, WATERFALLS } from '../world/data/landmarks'
@@ -140,6 +140,33 @@ export const LANDMARK_POINTS: LandmarkPoint[] = [
   ...CULTURAL_LANDMARKS.map((c) => ({ id: c.id, lat: c.lat, lon: c.lon, kind: c.kind })),
   ...NATURAL_SITES.map((n) => ({ id: n.id, lat: n.lat, lon: n.lon, kind: n.kind })),
 ]
+
+/**
+ * Landmarks an ~1890 explorer already knew (design.md §17.2, point 338): a
+ * landmark that IS one of the known-from-start map points — the Giza plateau,
+ * which is both a §4.4 cultural landmark and the enterable monument site.
+ * Everyone in 1890 knew the pyramids stood there; only their surroundings were
+ * to be explored. They start SEEN, so sighting them credits no discovery bounty
+ * (§10) and writes no first-sighting entry. Derived, not listed, so the two
+ * halves of such a site can never disagree again.
+ */
+export const KNOWN_FROM_START_LANDMARKS: readonly string[] = LANDMARK_POINTS.filter((lm) =>
+  KNOWN_FROM_START_PLACES.includes(lm.id),
+).map((lm) => lm.id)
+
+/**
+ * One site, one SHAPE — the twin of `landmarkLabelHiddenByMapPoint` (point 338).
+ * The label rule gives the name to the map point, because that is what the
+ * player can act on; the shape rule goes the other way, because the landmark
+ * draws the site's real masses while the map point only carries a schematic
+ * marker. Once both records share one coordinate the little marker sits
+ * concentric INSIDE those masses, and at Giza its smallest pale cone pushed out
+ * through a pyramid's face in the bird's-eye frame. Keyed on shared identity
+ * like its twin, never on distance.
+ */
+export function mapPointGlyphHiddenByLandmark(placeId: string): boolean {
+  return LANDMARK_POINTS.some((lm) => lm.id === placeId)
+}
 
 // Dev hook for the headless verification (CLAUDE.md §7.2).
 if (import.meta.env.DEV && typeof window !== 'undefined') {

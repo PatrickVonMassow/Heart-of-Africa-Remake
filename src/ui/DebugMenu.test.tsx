@@ -31,15 +31,18 @@ withWorld()
 // defaults so each test restores them (deterministic, no cross-test bleed).
 const DEFAULTS = {
   mouseSensitivity: balance.mouseSensitivity,
+  lookPitchLimitDeg: balance.lookPitchLimitDeg,
   ambienceVolume: balance.ambienceVolume,
   footstepVolume: balance.footstepVolume,
   ambientVolume: balance.ambientVolume,
   walkerUnstuckSeconds: balance.walkerUnstuckSeconds,
+  startupFreezeBudgetMs: balance.startup.pictureFreezeBudgetMs,
   birdsongVolume: balance.birdsongVolume,
   surfNearRadius: balance.surf.nearRadius,
   surfCutoff: balance.surf.cutoff,
   canoeSpeedup: balance.canoeSpeedup,
   riverWidthFactor: balance.river.widthFactor,
+  riverMouthSlackDeg: balance.river.mouthSlackDeg,
   canteenCapacity: balance.health.canteenCapacity,
   vigilPredatorDelay: balance.vigil.predatorDelay,
   rescueBurst: balance.family.rescueBurst,
@@ -51,6 +54,7 @@ const DEFAULTS = {
   juvenileDrinkCrocBias: balance.family.juvenileDrinkCrocBias,
   calfAdoptionRadius: balance.family.adoptionRadius,
   calfEscapeSeconds: balance.family.escapeSeconds,
+  calfReunionSeconds: balance.family.reunionSeconds,
   crocStrikeRadius: balance.crocodile.strikeRadius,
   crocAmbushBankBand: balance.crocodile.ambushBankBand,
   crocMouthOffset: balance.crocodile.mouthOffsetLocal,
@@ -97,15 +101,18 @@ beforeEach(() => {
 
 afterEach(() => {
   balance.mouseSensitivity = DEFAULTS.mouseSensitivity
+  balance.lookPitchLimitDeg = DEFAULTS.lookPitchLimitDeg
   balance.ambienceVolume = DEFAULTS.ambienceVolume
   balance.footstepVolume = DEFAULTS.footstepVolume
   balance.ambientVolume = DEFAULTS.ambientVolume
   balance.walkerUnstuckSeconds = DEFAULTS.walkerUnstuckSeconds
+  balance.startup.pictureFreezeBudgetMs = DEFAULTS.startupFreezeBudgetMs
   balance.birdsongVolume = DEFAULTS.birdsongVolume
   balance.surf.nearRadius = DEFAULTS.surfNearRadius
   balance.surf.cutoff = DEFAULTS.surfCutoff
   balance.canoeSpeedup = DEFAULTS.canoeSpeedup
   balance.river.widthFactor = DEFAULTS.riverWidthFactor
+  balance.river.mouthSlackDeg = DEFAULTS.riverMouthSlackDeg
   balance.health.canteenCapacity = DEFAULTS.canteenCapacity
   balance.vigil.predatorDelay = DEFAULTS.vigilPredatorDelay
   balance.family.rescueBurst = DEFAULTS.rescueBurst
@@ -117,6 +124,7 @@ afterEach(() => {
   balance.family.juvenileDrinkCrocBias = DEFAULTS.juvenileDrinkCrocBias
   balance.family.adoptionRadius = DEFAULTS.calfAdoptionRadius
   balance.family.escapeSeconds = DEFAULTS.calfEscapeSeconds
+  balance.family.reunionSeconds = DEFAULTS.calfReunionSeconds
   balance.crocodile.strikeRadius = DEFAULTS.crocStrikeRadius
   balance.crocodile.ambushBankBand = DEFAULTS.crocAmbushBankBand
   balance.crocodile.mouthOffsetLocal = DEFAULTS.crocMouthOffset
@@ -132,6 +140,7 @@ afterEach(() => {
   useUi.getState().setGroundDebugFlat(false)
   useUi.getState().setSeasonCollapseEnabled(true)
   useUi.getState().setWheelZoomEnabled(false)
+  useUi.getState().setInvertLook(true)
   useUi.getState().setJournalDnd(false)
   if (useUi.getState().debugOpen) useUi.getState().toggleDebug()
 })
@@ -141,6 +150,8 @@ describe('DebugMenu localization (settings.mjs de/en label checks)', () => {
     render(<DebugMenu />)
     expect(screen.getByText(en.debug.title)).toBeInTheDocument()
     expect(screen.getByText(en.debug.mouseSensitivity)).toBeInTheDocument()
+    expect(screen.getByText(en.debug.lookPitchLimit)).toBeInTheDocument()
+    expect(screen.getByText(en.debug.invertLook)).toBeInTheDocument()
     expect(screen.getByText(en.debug.ambienceVolume)).toBeInTheDocument()
     expect(screen.getByText(en.debug.travelSpeed)).toBeInTheDocument()
   })
@@ -149,6 +160,8 @@ describe('DebugMenu localization (settings.mjs de/en label checks)', () => {
     useLocale.getState().setLang('de')
     render(<DebugMenu />)
     expect(screen.getByText(de.debug.mouseSensitivity)).toBeInTheDocument()
+    expect(screen.getByText(de.debug.lookPitchLimit)).toBeInTheDocument()
+    expect(screen.getByText(de.debug.invertLook)).toBeInTheDocument()
     expect(screen.getByText(de.debug.ambienceVolume)).toBeInTheDocument()
     // The English labels are gone once German is active.
     expect(screen.queryByText(en.debug.mouseSensitivity)).not.toBeInTheDocument()
@@ -183,11 +196,15 @@ describe('DebugMenu language selector (i18n.mjs)', () => {
 describe('DebugMenu editable fields write through to balance (settings.mjs fillField)', () => {
   const editable: Array<{ label: string; read: () => number; value: number }> = [
     { label: en.debug.mouseSensitivity, read: () => balance.mouseSensitivity, value: 0.002 },
+    // The vertical look clamp (point 392), calibratable like its siblings.
+    { label: en.debug.lookPitchLimit, read: () => balance.lookPitchLimitDeg, value: 70 },
     { label: en.debug.ambienceVolume, read: () => balance.ambienceVolume, value: 0.5 },
     { label: en.debug.footstepVolume, read: () => balance.footstepVolume, value: 3 },
     { label: en.debug.ambientVolume, read: () => balance.ambientVolume, value: 0.3 },
     // The inhabitant unstuck window (point 155).
     { label: en.debug.walkerUnstuck, read: () => balance.walkerUnstuckSeconds, value: 8 },
+    // The loading picture's freeze budget the startup gate binds (point 337).
+    { label: en.debug.startupFreezeBudget, read: () => balance.startup.pictureFreezeBudgetMs, value: 6000 },
     // Per-source birdsong volume and the coastal surf fade bounds (point 153).
     { label: en.debug.birdsongVolume, read: () => balance.birdsongVolume, value: 0.5 },
     { label: en.debug.surfNearRadius, read: () => balance.surf.nearRadius, value: 0.8 },
@@ -198,6 +215,7 @@ describe('DebugMenu editable fields write through to balance (settings.mjs fillF
     // Build-time geometry value (point 136): the edit persists in balance and
     // applies on the next reload — the write-through is what the menu owes.
     { label: en.debug.riverWidthFactor, read: () => balance.river.widthFactor, value: 2 },
+    { label: en.debug.riverMouthSlackDeg, read: () => balance.river.mouthSlackDeg, value: 0.9 },
     // The vigil's predator draw delay (design.md §19.8, point 121 (f)).
     { label: en.debug.vigilPredatorDelay, read: () => balance.vigil.predatorDelay, value: 20 },
     // The parental rescue burst (design.md §19.8, point 127).
@@ -215,6 +233,8 @@ describe('DebugMenu editable fields write through to balance (settings.mjs fillF
     { label: en.debug.calfAdoptionRadius, read: () => balance.family.adoptionRadius, value: 25 },
     // The freed calf's escape run before it may be adopted (design.md §19.8/§21.2, point 311).
     { label: en.debug.calfEscapeSeconds, read: () => balance.family.escapeSeconds, value: 9 },
+    // The separation window after which a juvenile's bond resolves (design.md §19.8/§21.2, point 341).
+    { label: en.debug.calfReunionSeconds, read: () => balance.family.reunionSeconds, value: 60 },
     // The crocodile's bank strike radius (design.md §19.16, point 130).
     { label: en.debug.crocStrikeRadius, read: () => balance.crocodile.strikeRadius, value: 8 },
     // The broadened waterline ambush band and the mouth anchor (points 275/268).
@@ -294,6 +314,19 @@ describe('DebugMenu remaining boolean toggles write through (design.md §21, poi
     expect(dnd.checked).toBe(false)
     fireEvent.click(dnd)
     expect(useUi.getState().journalDnd).toBe(true)
+  })
+
+  it('the inverted vertical look ships CHECKED and toggles both ways (point 392)', () => {
+    render(<DebugMenu />)
+    const invert = screen.getByText(en.debug.invertLook).closest('label')?.querySelector('input') as HTMLInputElement
+    // Checked by DEFAULT: the store field itself is inverted, the checkbox only
+    // reports it — nothing flips the sense somewhere else.
+    expect(invert.checked).toBe(true)
+    expect(useUi.getState().invertLook).toBe(true)
+    fireEvent.click(invert)
+    expect(useUi.getState().invertLook).toBe(false)
+    fireEvent.click(invert)
+    expect(useUi.getState().invertLook).toBe(true)
   })
 
   it('the graphics-level picker writes through to the store (design.md §21, point 276)', () => {

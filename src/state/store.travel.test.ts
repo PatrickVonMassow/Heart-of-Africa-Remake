@@ -9,6 +9,7 @@ import { CULTURAL_LANDMARKS } from '../world/data/landmarks'
 import { balance } from '../config/balance'
 import { totalGifts } from './store'
 import { g, freshGame, withWorld, jumpTo, terrainAt, COORD } from '../test/store'
+import { isBlocked } from '../world/terrain'
 import { regionAt, placeById, latLonToWorld } from '../world/geo'
 import { WATERFALLS } from '../world/data/landmarks'
 import { riverFlow } from '../world/geoIndex'
@@ -305,6 +306,40 @@ describe('river current drift (design.md §11)', () => {
     expect(boosted).toBeGreaterThan(0)
     expect(unboosted).toBeGreaterThan(0)
     expect(boosted).toBeGreaterThan(unboosted)
+  })
+})
+
+describe('the river mouth never holds the traveller (point 316)', () => {
+  // The reported softlock: swimming without a canoe in the Nile's Rosetta
+  // mouth (~31.4N/30.4E), the downstream current outran the swim speed and the
+  // Mediterranean fenced the pocket in on every side. Both layers of the fix
+  // are exercised together here, exactly as the player meets them: the drift
+  // runs each frame, and he swims for the open river.
+  const NOTCH = { lat: 31.4, lon: 30.5 }
+
+  it('lets a swimmer in the Nile mouth notch work his way out', () => {
+    if (terrainAt(NOTCH.lat, NOTCH.lon) !== 'water') return // guard: coordinate must be mouth water
+    jumpTo(NOTCH.lat, NOTCH.lon)
+    const start = { ...g().pos }
+    // Swim upstream (south-east, away from the sea) while the current works on
+    // him — 20 s of play at 0.1 s steps.
+    for (let i = 0; i < 200; i++) {
+      g().moveTravel(1, 1, 0.1)
+      g().driftCurrent(0.1)
+    }
+    // He is clearly out of the pocket, not oscillating around its tip.
+    expect(dist(g().pos, start)).toBeGreaterThan(2) // world units: > 0.2 deg
+    expect(g().pos.z).toBeGreaterThan(start.z) // z grows southward: upstream
+  })
+
+  it('never lets the drift push him into the blocked sea', () => {
+    if (terrainAt(NOTCH.lat, NOTCH.lon) !== 'water') return
+    jumpTo(NOTCH.lat, NOTCH.lon)
+    for (let i = 0; i < 200; i++) {
+      g().driftCurrent(0.1)
+      const ll = { lat: -g().pos.z / 10, lon: g().pos.x / 10 }
+      expect(isBlocked(terrainAt(ll.lat, ll.lon), ll.lat, ll.lon)).toBe(false)
+    }
   })
 })
 

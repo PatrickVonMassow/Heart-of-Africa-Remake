@@ -20,7 +20,21 @@ import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { isAbsolute, join } from 'node:path'
 import { randomUUID } from 'node:crypto'
-import { acquire, convertPendingSpawn, readOwnerLock, noteTopLevelSession } from './batch-singleton.mjs'
+import {
+  acquire,
+  assessOwner,
+  bootTimeMs,
+  convertPendingSpawn,
+  readOwnerLock,
+  noteTopLevelSession,
+  findClaudeAncestor,
+  probePid,
+} from './batch-singleton.mjs'
+import { readClaim, clearClaim, maxAgeMs } from './batch-claim.mjs'
+import { assessClaim, ownerIsHolding, reservationDecision } from './batch-claim-core.mjs'
+import { standDownMessage } from './batch-resume-hook-core.mjs'
+import { MANDATE_MAX_AGE_MS, resumeRepairMandate } from './batch-doctor-core.mjs'
+import { consumeMandateMarker } from './batch-doctor-states.mjs'
 import { isPaused, pauseReason } from './batch-lock.mjs'
 
 const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url))
@@ -33,6 +47,7 @@ function gitStanding() {
   try {
     const g = (args) =>
       execFileSync('git', args, {
+        windowsHide: true,
         cwd: REPO_ROOT,
         encoding: 'utf8',
         timeout: 5000,
@@ -54,6 +69,52 @@ function gitStanding() {
     )
   } catch {
     return ''
+  }
+}
+
+/** True for the three ownership values that mean "this session works the batch". */
+function ownsBatch(ownership) {
+  return ownership === 'acquired-spawn' || ownership === 'acquired' || ownership === 'mine'
+}
+
+/** The doctor's verdict on the tree this session woke up in (point 442).
+ *
+ *  PREFER THE LAUNCHER'S OWN READING. When a successor was just spawned, the
+ *  launcher has already asked the doctor seconds ago and left the answer in
+ *  `repo-mandate.json`; reusing it makes the common case free. The marker is
+ *  one-shot and expires, so a stale one can never mandate anything.
+ *
+ *  Only without one does the hook ask itself, and then WITHOUT `--repair` and
+ *  without `--gate`. Note what that does and does not mean (four-eyes review,
+ *  finding 3): the doctor's AUTO level still runs, i.e. `git fetch origin main` and
+ *  a strictly-behind fast-forward. That is deliberate and harmless — it is the same
+ *  fast-forward a resuming session would do first anyway — but it is not "nothing",
+ *  and the fetch is why the timeout allows for a slow network.
+ *
+ *  Never throws: an unrunnable doctor reports itself and `resumeRepairMandate` stays
+ *  silent about it — the launcher's alert already carries that news, and a session
+ *  cannot mend a broken doctor. */
+const MANDATE_PATH = fileURLToPath(new URL('../.claude/repo-mandate.json', import.meta.url))
+
+function readRepoVerdict(nowMs = Date.now()) {
+  // One-shot, expiring, junk-proof — and now UNDER TEST (point 443 (h)): the read
+  // and the deletion live in scripts/batch-doctor-states.mjs, the rule that judges
+  // the bytes in batch-doctor-core.mjs, and both are swept by the Vitest layer.
+  // They were hand-written here and covered by nothing.
+  const m = consumeMandateMarker({ path: MANDATE_PATH, now: nowMs, maxAgeMs: MANDATE_MAX_AGE_MS })
+  if (m.verdict === 'mandate' || m.verdict === 'clean') return { ran: m.ran, code: m.code }
+  try {
+    execFileSync(process.execPath, [join(REPO_ROOT, 'scripts', 'batch-doctor.mjs')], {
+      windowsHide: true,
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+      timeout: 30000,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    })
+    return { ran: true, code: 0 }
+  } catch (e) {
+    if (e && typeof e.status === 'number') return { ran: true, code: e.status }
+    return { ran: false, code: null }
   }
 }
 
@@ -101,18 +162,29 @@ const RESUME_BODY =
   'backends); TASKS.md is MAIN-only — tick the point on main at the merge; cross-cutting ' +
   'changes (guards, docs, dashboard, process files) go directly to main. MAXIMAL ' +
   'DELEGATION (user decision 22.07.2026): delegate implementation AND infra/guard/doc/' +
-  'dashboard work to parallel WORKTREE-ISOLATED Fable subagents on NON-OVERLAPPING files ' +
+  'dashboard work to parallel WORKTREE-ISOLATED subagents on NON-OVERLAPPING files — with ' +
+  'OPUS 5, per the model policy stated below; Fable only reviews or stands in ' +
   '(each point on its own branch, gates green, pushed, not merged by the agent); the main ' +
   'session keeps only the picture-verification on both backends, the serial merge -> ' +
-  'fast-gate -> tick -> deploy -> cleanup, and the Artifact publish. Every defect the user ' +
+  'fast-gate -> tick -> deploy -> cleanup, and the board publish. Every defect the user ' +
   'reports on the deployed build during the batch is APPENDED as its own implementation-ready ' +
   'TASKS point (append-and-defer) on main and delegated in turn — never fixed ad hoc or ' +
-  'dropped; keep the agent pool MODERATE (about 2-3 concurrent), reduce parallelism if the ' +
-  'report volume threatens context (user grant 22.07.2026), and delegate tightly-coupled ' +
+  'dropped; the agent pool is capped at AT MOST 3 concurrent agents (user 26.07.2026 — ' +
+  'parallel strands multiply the RATE of consumption and the throughput together, not ' +
+  'the cost per finished point; the real surcharge is rework where two strands touch the ' +
+  'same code); throttle DOWN further if the report volume ' +
+  'threatens context (user grant 22.07.2026), never up, and delegate tightly-coupled ' +
   'same-file points TOGETHER on ONE branch sequentially so shared files never collide. ' +
   'CLOSING FREEZE (user decision 22.07.2026): during a closing run the code is FROZEN — ' +
   'no parallel agent work lands/merges while the closing runs; merge or park in-flight ' +
   'branches first, resume the pool only after. ' +
+  'POINT BOUNDARY (user 27.07.2026): the context is the batch\'s dominant cost, so a session ' +
+  'carries ONE stretch of work, not point after point. Once the merged-and-ticked point is done ' +
+  'AND no delegated agent is still in flight (let the pool drain — ending mid-flight throws its ' +
+  'work away), run `node scripts/batch-boundary.mjs <point>` and END THE SESSION instead of ' +
+  'starting the next point here. The launcher brings up a fresh session and ' +
+  'this hook re-orients it; batch-progress-guard permits that stop only against a verifiably ' +
+  'closed point and an armed launcher, and blocks every other end as before. ' +
   'First check git status AND the checked-out branch above for work already underway, and ' +
   'do not double-start regressions. This session now holds the batch lock ' +
   '(.claude/batch-lock.json); the PostToolUse heartbeat keeps it fresh while you work.'
@@ -135,11 +207,12 @@ try {
     // forbidden commit.
     const header =
       `[batch-resume] TASKS.md has ${open.length} open point(s): ${nums}. ` +
-      'MODEL POLICY (allowlist): ONLY Opus 5 (default), Opus 4.8 (fallback) or Fable 5 ' +
-      '(occasional four-eyes work) may run the batch — Sonnet, Haiku and every other model ' +
-      'are NOT acceptable. If the serving model is not on that list, do NOT work: create ' +
-      '.claude/batch-paused (reason: forbidden serving model) and send an ntfy alert via ' +
-      'scripts/notify.mjs instead.'
+      'MODEL POLICY (25.07.2026): Opus 5 is the WORKER at any difficulty; the fallback chain ' +
+      'is Opus 5 -> Fable 5 -> Opus 4.8. Fable is used ONLY for four-eyes review (one model ' +
+      'plans/builds, the other checks) or as that fallback — never because a task looks hard. ' +
+      'Sonnet, Haiku and every other model are NOT acceptable: if the serving model is not one ' +
+      'of the three, do NOT work — create .claude/batch-paused (reason: forbidden serving ' +
+      'model) and send an ntfy alert via scripts/notify.mjs instead.'
     const now = Date.now()
     if (isPaused()) {
       const why = pauseReason()
@@ -150,45 +223,108 @@ try {
           'or delete .claude/batch-paused) before resuming.',
       )
     } else {
+      // A RESERVATION (point 395): the user claimed the batch back into the window
+      // they are sitting at. A freshly started session — most of all one the OS
+      // launcher spawned — must NOT take the lock the owner is about to release
+      // for that window, or the claim would hand the batch straight back to a
+      // headless successor. Only a live, unexpired claim by a session that is not
+      // THIS one reserves; the walk that establishes our own identity is paid for
+      // only when a claim file actually exists.
+      const claim = readClaim()
+      // Resolved ONCE and reused: the stand-down below needs the same identity
+      // to tell "I am the responder the watcher woke" from "some responder is
+      // running", and the ancestor walk is the expensive half of this branch.
+      const ancestor = claim ? findClaudeAncestor() : null
+      // The lock is read BEFORE the claim is judged: whether a LIVE SESSION owner
+      // still holds it decides whether the claim ages at all (point 434 (6a)) —
+      // with somebody to wait for it does not, with nobody it is bounded by the
+      // take-up window so an untaken claim can never leave the batch ownerless.
+      // `ownerIsHolding` is the shared predicate: this hook runs in the session
+      // the LAUNCHER just spawned, so the lock it finds is routinely the
+      // launcher's own `pending-spawn` placeholder — reading that as an owner
+      // would honour the claim for ever, stand this session down without
+      // converting the spawn, and loop with the next tick (four-eyes review,
+      // finding 1).
+      const lock = readOwnerLock()
+      const reservation = claim
+        ? assessClaim({
+            claim,
+            sid: sessionId,
+            ancestor,
+            ownerSid: lock?.sessionId ?? '',
+            ownerHolding: ownerIsHolding({
+              lock,
+              claimantSid: claim.sessionId,
+              alive: lock
+                ? assessOwner(lock, { now, bootTime: bootTimeMs(), probe: lock.pid ? probePid(lock.pid) : null })
+                    .alive === true
+                : false,
+            }),
+            now,
+            maxAgeMs: maxAgeMs(),
+            probePid,
+          })
+        : { honour: false, mine: false, claimantSid: null }
+
       // Ownership: pending-spawn conversion first (launcher-spawned session),
       // then the ordinary atomic acquire. NO path overrides a live lock.
       const auth = autostartAuthorization(now)
       let ownership = 'none'
-      const lock = readOwnerLock()
-      if (lock && lock.kind === 'pending-spawn') {
-        if (convertPendingSpawn(sessionId, { authorized: !!auth })) ownership = 'acquired-spawn'
-      }
-      if (ownership === 'none') {
-        const r = acquire(sessionId)
-        if (r === 'acquired' || r === 'mine') ownership = r
+      // The same predicate the owner's Stop guard applies before ITS acquire, so
+      // the rule lives in one place and cannot drift between the two doors.
+      if (reservationDecision({ assessment: reservation }).acquire) {
+        if (lock && lock.kind === 'pending-spawn') {
+          if (convertPendingSpawn(sessionId, { authorized: !!auth })) ownership = 'acquired-spawn'
+        }
+        if (ownership === 'none') {
+          const r = acquire(sessionId)
+          if (r === 'acquired' || r === 'mine') ownership = r
+        }
       }
       if (auth) clearAuthorized()
+      // The claim has done its job the moment its own window owns the batch.
+      if (reservation.mine && (ownership === 'acquired' || ownership === 'mine')) clearClaim()
 
+      // Point 442, the other side of the seam: the launcher repairs before it
+      // spawns, and the session it spawned checks the same thing on arrival. Two
+      // independent looks at one naht, because the one that fails is never the one
+      // you expected — and only a session that OWNS the batch is told to repair,
+      // so a stood-down window never starts mending a tree it may not touch.
+      const mandate = ownsBatch(ownership) ? resumeRepairMandate(readRepoVerdict()) : null
+      const repoLine = mandate ? ` ${mandate}` : ''
       if (ownership === 'acquired-spawn') {
         console.log(
-          `${header} ${gitStanding()} Resumed by the OS autostart launcher (the previous owner was ` +
+          `${header} ${gitStanding()}${repoLine} Resumed by the OS autostart launcher (the previous owner was ` +
             `provably dead). ${RESUME_BODY} ` +
-            'Read the handoff memory resume-184-qa-framework first. Do NOT idle-stop ' +
-            '(the batch-progress-guard enforces this).',
+            'Do NOT idle-stop (the batch-progress-guard enforces this).',
         )
       } else if (ownership === 'acquired' || ownership === 'mine') {
         console.log(
-          `${header} ${gitStanding()} Standing user instruction: continue the batch autonomously, ` +
+          `${header} ${gitStanding()}${repoLine} Standing user instruction: continue the batch autonomously, ` +
             `point by point, then the Closing steps — without waiting for the user to say ` +
             `"continue". ${RESUME_BODY}`,
         )
       } else {
-        const cur = readOwnerLock()
-        const ageMin = cur ? Math.round((now - cur.claimedAt) / 60000) : 0
-        console.log(
-          `${header} But another session OWNS the batch lock (session ${cur ? cur.sessionId : 'unknown'}, ` +
-            `pid ${cur && cur.pid ? cur.pid : 'unknown'}, heartbeat ${ageMin} min ago, .claude/batch-lock.json) ` +
-            'and its liveness check passed. STAND DOWN: this session is NOT the batch worker. Do NOT ' +
-            'run batch actions, do NOT merge to main, do NOT edit TASKS.md or the dashboard. Answer the ' +
-            'user normally. If the user confirms this is the sole session, run ' +
-            '`node scripts/batch-singleton.mjs status` to inspect and `node scripts/batch-singleton.mjs release` ' +
-            'to free the lock, then restart the session.',
-        )
+        // THE STAND-DOWN NAMES ITS SITUATION FIRST (four-eyes review 29.07.2026).
+        // Four situations reach this branch and they need different words — most
+        // of all the MESSAGE RESPONDER, which the single old text forbade the one
+        // thing it was woken to do (append the user's instruction as a point), so
+        // an instruction from the phone was read, obeyed into silence and lost.
+        // The decision and every word of it are pure in batch-resume-hook-core.mjs.
+        const stand = standDownMessage({
+          sessionId,
+          lock: readOwnerLock(),
+          claim,
+          // The same reading that decided the acquire two branches up: a released
+          // claim still reserving the freed lock (point 461) is why this session
+          // did not take it, so the stand-down must name that window rather than
+          // fall back to "the acquire lost and no lock is readable".
+          claimHonoured: reservationDecision({ assessment: reservation }).acquire === false,
+          ancestorPid: ancestor?.pid ?? null,
+          takeUpMs: maxAgeMs(),
+          now,
+        })
+        console.log(`${header} ${stand.text}`)
       }
     }
   }

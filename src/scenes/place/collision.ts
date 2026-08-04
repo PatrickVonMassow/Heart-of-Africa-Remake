@@ -24,7 +24,25 @@ export interface BoxCollider {
   rot: number
 }
 
-export type Collider = CircleCollider | BoxCollider
+/**
+ * Capsule around the segment (x1,z1)→(x2,z2): a continuous WALL PANEL rather
+ * than a point (point 413). A fence is drawn as an unbroken run of panels
+ * between its posts, and a row of one circle per post left a blocked band that
+ * pinched to nothing at each midpoint — a goat crossed it, and where it did not
+ * it was shoved sideways along a post's radius (the "abrupt turn" of the same
+ * report). One segment per drawn panel gives a band of even thickness whose
+ * contact normal is the wall's own, so the mover stops at it and slides.
+ */
+export interface SegmentCollider {
+  kind: 'segment'
+  x1: number
+  z1: number
+  x2: number
+  z2: number
+  r: number
+}
+
+export type Collider = CircleCollider | BoxCollider | SegmentCollider
 
 /**
  * Oriented-box collider for a rotated rectangle (half extents hx/hz, yaw
@@ -81,6 +99,29 @@ function pushOut(c: Collider, px: number, pz: number, radius: number): [number, 
     return [c.x + cos * ox + sin * oz, c.z - sin * ox + cos * oz]
   }
 
+  if (c.kind === 'segment') {
+    // Nearest point on the panel's axis, then the circle case around it.
+    const ex = c.x2 - c.x1
+    const ez = c.z2 - c.z1
+    const len2 = ex * ex + ez * ez
+    const t = len2 < 1e-12 ? 0 : clamp(((px - c.x1) * ex + (pz - c.z1) * ez) / len2, 0, 1)
+    const qx = c.x1 + ex * t
+    const qz = c.z1 + ez * t
+    const sdx = px - qx
+    const sdz = pz - qz
+    const smin = c.r + radius
+    const sd2 = sdx * sdx + sdz * sdz
+    if (sd2 >= smin * smin) return [px, pz]
+    const sd = Math.sqrt(sd2)
+    if (sd < 1e-4) {
+      // Exactly on the axis: leave along the panel's left normal, so the exit
+      // side stays deterministic instead of depending on floating-point noise.
+      const len = Math.sqrt(len2) || 1
+      return [qx + (-ez / len) * smin, qz + (ex / len) * smin]
+    }
+    return [qx + (sdx / sd) * smin, qz + (sdz / sd) * smin]
+  }
+
   const dx = px - c.x
   const dz = pz - c.z
   const min = c.r + radius
@@ -98,12 +139,12 @@ function pushOut(c: Collider, px: number, pz: number, radius: number): [number, 
 }
 
 /**
- * Move a circle of radius `radius` to the target position, resolving
- * overlaps with the colliders. Iterates until no collider pushes anymore
- * (corners between neighboring or even overlapping objects), capped to
- * keep the per-frame cost bounded.
+ * Push a circle of radius `radius` standing at the target position out of every
+ * collider it overlaps. Iterates until no collider pushes anymore (corners
+ * between neighboring or even overlapping objects), capped to keep the
+ * per-frame cost bounded.
  */
-export function resolveMove(
+function resolveOverlaps(
   colliders: Collider[],
   x: number,
   z: number,
@@ -120,6 +161,62 @@ export function resolveMove(
       pz = nz
     }
     if (!moved) break
+  }
+  return [px, pz]
+}
+
+/** Most substeps one swept resolve may take. It caps the distance a single move
+ *  can cover (`MAX_SWEEP_SUBSTEPS × radius/2`, ~9.6 m for an inhabitant) rather
+ *  than letting a huge jump fall back to a tunnelling position test — far more
+ *  than any walker, goat or the player covers in a frame, so nothing legitimate
+ *  is truncated, and a genuine teleport passes no `from` in the first place. */
+const MAX_SWEEP_SUBSTEPS = 64
+
+/**
+ * Move a circle of radius `radius` to the target position.
+ *
+ * With `from` — the mover's PREVIOUS position — the move is SWEPT (point 413):
+ * the path from `from` to the target is walked in substeps no longer than half
+ * the mover's radius, each of them resolved against the colliders, so the mover
+ * is caught at the near edge of the first collider it meets and then slides
+ * along it. Every collider, inflated by the mover's own radius, is at least
+ * 2·radius thick, so a sample spacing of radius/2 cannot step over one — the
+ * position test alone landed a long step on the far side of a wall, overlapping
+ * nothing and pushed back by nothing (the goat through the fence).
+ *
+ * Without `from` the call stays a pure position test — an already-overlapping
+ * mover is still pushed out, which is what a spawn or a teleport needs.
+ */
+export function resolveMove(
+  colliders: Collider[],
+  x: number,
+  z: number,
+  radius: number,
+  from?: readonly [number, number],
+): [number, number] {
+  if (!from) return resolveOverlaps(colliders, x, z, radius)
+  let px = from[0]
+  let pz = from[1]
+  let dx = x - px
+  let dz = z - pz
+  const dist = Math.hypot(dx, dz)
+  const stepLen = Math.max(radius * 0.5, 1e-3)
+  let steps = Math.max(1, Math.ceil(dist / stepLen))
+  if (steps > MAX_SWEEP_SUBSTEPS) {
+    // Longer than one resolve may sweep: travel as far as the substep budget
+    // allows along the same direction. Falling through at full length would be
+    // exactly the tunnelling this replaces.
+    const f = (MAX_SWEEP_SUBSTEPS * stepLen) / dist
+    dx *= f
+    dz *= f
+    steps = MAX_SWEEP_SUBSTEPS
+  }
+  const sx = dx / steps
+  const sz = dz / steps
+  for (let i = 0; i < steps; i++) {
+    const [nx, nz] = resolveOverlaps(colliders, px + sx, pz + sz, radius)
+    px = nx
+    pz = nz
   }
   return [px, pz]
 }

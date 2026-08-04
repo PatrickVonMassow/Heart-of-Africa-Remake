@@ -2,7 +2,13 @@
 // the window.__movement dev-hook asserts of scripts/verify/enrichments.mjs and
 // scripts/verify/settings.mjs — same coverage, no browser.
 import { describe, it, expect } from 'vitest'
-import { movementPenalty, placeWalkVelocity, pushOutOfCircles, resolveTravelMove } from './movement'
+import {
+  movementPenalty,
+  placeWalkVelocity,
+  pushOutOfCircles,
+  resolveTravelMove,
+  slideAlongBlocked,
+} from './movement'
 
 describe('movementPenalty', () => {
   it('jungle without a machete slows the traveller', () => {
@@ -308,5 +314,51 @@ describe('resolveTravelMove (swept tree/animal collision, design.md §19)', () =
     const pos = simulate([0, 0], () => [0.15, 0], 40, [OB])
     expect(dist(pos, 0, 0)).toBeGreaterThanOrEqual(1.5 - 1e-6)
     expect(pos[0]).toBeGreaterThan(3) // kept travelling after parting from it
+  })
+})
+
+describe('slideAlongBlocked (the overland boundary slide, point 316)', () => {
+  // The reported softlock: swimming in the Nile delta mouth notch, the current
+  // outran the swim speed upstream while the ocean boundary refused every step —
+  // the overland move resolved a blocked target as a HARD STOP, so there was no
+  // lateral escape at all. Settlement collision and the tree/animal resolver had
+  // slid for months; this path never did.
+  const northBlocked = (_x: number, z: number) => z > 1e-9
+
+  it('returns the intended target when nothing blocks', () => {
+    const out = slideAlongBlocked(0, 0, 0, -1, northBlocked)!
+    expect(out.x).toBeCloseTo(0, 9)
+    expect(out.z).toBeCloseTo(-1, 9)
+  })
+  it('slides ALONG a boundary the intended step runs into', () => {
+    const out = slideAlongBlocked(0, 0, 0, 1, northBlocked)
+    expect(out).not.toBeNull()
+    expect(northBlocked(out!.x, out!.z)).toBe(false)
+    expect(Math.abs(out!.x)).toBeGreaterThan(0.2)
+  })
+  it('keeps the step LENGTH while sliding', () => {
+    const out = slideAlongBlocked(0, 0, 0, 2, northBlocked)!
+    expect(Math.hypot(out.x, out.z)).toBeCloseTo(2, 6)
+  })
+  it('returns null only when the whole fan is blocked (a genuine dead end)', () => {
+    expect(slideAlongBlocked(0, 0, 0, 1, () => true)).toBeNull()
+  })
+  it('is null on a zero-length step rather than inventing a direction', () => {
+    expect(slideAlongBlocked(0, 0, 0, 0, () => false)).toBeNull()
+  })
+  it('escapes a CORNER that still opens to one side (the notch shape)', () => {
+    // Blocked north AND east — the traveller pushes north into the corner and
+    // the only opening is due west, one quarter-turn away: within the fan.
+    const corner = (x: number, z: number) => z > 1e-9 || x > 1e-9
+    const out = slideAlongBlocked(0, 0, 0, 1, corner)
+    expect(out).not.toBeNull()
+    expect(corner(out!.x, out!.z)).toBe(false)
+    expect(out!.x).toBeLessThan(0) // slid west, the open side
+  })
+  it('does NOT turn back on itself when the fan finds nothing forward', () => {
+    // Everything but due south is blocked: a slide may not become a retreat, so
+    // the caller keeps its blocked notice instead of silently reversing.
+    const onlySouthFree = (_x: number, z: number) => z > -0.5
+    expect(slideAlongBlocked(0, 0, 0, 1, onlySouthFree)).toBeNull()
   })
 })

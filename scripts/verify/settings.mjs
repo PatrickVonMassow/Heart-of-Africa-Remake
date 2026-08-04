@@ -13,6 +13,7 @@
 // rebuild + frame check), the screenshots and the console-error gate.
 // Dev server only (dev hooks).
 import { launchVerifyBrowser, assertBackend } from './_browser.mjs'
+import { frameShutter } from './frameSubject.mjs'
 import { leakVerdict } from './textureLeak.mjs'
 import { fileURLToPath } from 'node:url'
 import sharp from 'sharp'
@@ -27,6 +28,7 @@ const check = (name, ok, detail) => {
 
 const browser = await launchVerifyBrowser()
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
+const shot = frameShutter(page, OUT)
 const errors = []
 page.on('console', (m) => {
   if (m.type() === 'error') errors.push(m.text())
@@ -198,6 +200,189 @@ check(
   `rest y ${restY}`,
 )
 
+// --- Vertical first-person look (design.md §17.5, point 392) -----------------
+// Driven LIVE through the very handler a player's mouse feeds: real mousemove
+// events carrying movementY. Headless deliberately skips the pointer lock
+// (navigator.webdriver), and the scene applies raw movement in that case, so
+// this exercises the production path, not a test-only hook.
+const SENS = await page.evaluate(() => window.__balance.mouseSensitivity)
+const PITCH_LIMIT = await page.evaluate(() => (window.__balance.lookPitchLimitDeg * Math.PI) / 180)
+
+/** Wait until the scene's own frame loop has carried the look onto the camera —
+ *  the application's clock, never the wall clock. */
+const lookSettled = () =>
+  page.waitForFunction(
+    () =>
+      window.__placeCamera &&
+      window.__placePlayer &&
+      Math.abs(window.__placeCamera.rotation.x - window.__placePlayer.pitch) < 1e-9,
+    null,
+    { timeout: 15000 },
+  )
+
+async function resetLook() {
+  await page.evaluate(() => {
+    window.__ui.getState().setDialog(null)
+    window.__ui.getState().setInvertLook(true)
+    const p = window.__placePlayer
+    p.x = 0
+    p.z = 0
+    p.yaw = 0
+    p.pitch = 0
+  })
+  await lookSettled()
+}
+
+/** Dispatch `times` mouse moves of (dx, dy) px and read the resulting look. The
+ *  handler applies them synchronously, so the state is readable at once. */
+async function mouseLook(dx, dy, times = 1) {
+  return await page.evaluate(
+    ({ dx, dy, times }) => {
+      for (let i = 0; i < times; i++) {
+        window.dispatchEvent(new MouseEvent('mousemove', { movementX: dx, movementY: dy, bubbles: true }))
+      }
+      return { yaw: window.__placePlayer.yaw, pitch: window.__placePlayer.pitch }
+    },
+    { dx, dy, times },
+  )
+}
+
+await resetLook()
+// Inverted by default (user 28.07.2026): mouse FORWARD (movementY < 0) = down.
+const down1 = await mouseLook(0, -200)
+check(
+  'pushing the mouse forward looks DOWN (inverted default, point 392)',
+  down1.pitch < 0 && Math.abs(down1.pitch + 200 * SENS) < 1e-6,
+  `pitch ${down1.pitch.toFixed(4)} rad`,
+)
+check('the vertical look leaves the yaw alone', Math.abs(down1.yaw) < 1e-9, `yaw ${down1.yaw}`)
+
+await resetLook()
+const up1 = await mouseLook(0, 300)
+check(
+  'pulling the mouse back looks UP at the same sensitivity as the yaw',
+  Math.abs(up1.pitch - 300 * SENS) < 1e-6,
+  `pitch ${up1.pitch.toFixed(4)} rad, expected ${(300 * SENS).toFixed(4)}`,
+)
+
+// The clamp: no sequence of moves passes it, in either direction.
+const clampedUp = await mouseLook(0, 5000, 20)
+check(
+  'the look clamps short of straight up (point 392)',
+  Math.abs(clampedUp.pitch - PITCH_LIMIT) < 1e-9 && PITCH_LIMIT < Math.PI / 2,
+  `pitch ${clampedUp.pitch.toFixed(4)} rad, clamp ${PITCH_LIMIT.toFixed(4)}`,
+)
+const clampedDown = await mouseLook(0, -5000, 20)
+check(
+  'the look clamps short of straight down (point 392)',
+  Math.abs(clampedDown.pitch + PITCH_LIMIT) < 1e-9,
+  `pitch ${clampedDown.pitch.toFixed(4)} rad`,
+)
+
+// The camera itself carries the pitch (YXZ), and the bob stays a position
+// offset: the eye height is unchanged by looking around.
+await lookSettled()
+const camAtClamp = await page.evaluate(() => ({
+  x: window.__placeCamera.rotation.x,
+  order: window.__placeCamera.rotation.order,
+  y: window.__placeCamera.position.y,
+}))
+check(
+  'the pitch reaches the camera as its X rotation, eye height untouched',
+  Math.abs(camAtClamp.x + PITCH_LIMIT) < 1e-6 && camAtClamp.order === 'YXZ' && Math.abs(camAtClamp.y - 1.5) < 0.01,
+  JSON.stringify(camAtClamp),
+)
+
+// The debug checkbox's store field flips the sense — and only the vertical one.
+await resetLook()
+await page.evaluate(() => window.__ui.getState().setInvertLook(false))
+const plain = await mouseLook(-120, -200)
+check(
+  'switching the inversion off looks UP on a forward push, yaw unchanged in sense',
+  plain.pitch > 0 && Math.abs(plain.pitch - 200 * SENS) < 1e-6 && plain.yaw > 0,
+  `pitch ${plain.pitch.toFixed(4)}, yaw ${plain.yaw.toFixed(4)}`,
+)
+await page.evaluate(() => window.__ui.getState().setInvertLook(true))
+
+// --- The pitched frames a human judges (CLAUDE.md §7.2) ----------------------
+// Each declares what it must SHOW: the roof of a building overhead, the ground
+// at the traveller's own feet, and the ground beyond the walkable disc edge.
+const tallest = await page.evaluate(() => {
+  const ds = window.__placeLayout?.dwellings ?? []
+  let best = null
+  for (const d of ds) {
+    const top = d.h * (d.floors || 1)
+    if (!best || top > best.top) best = { x: d.x, z: d.z, r: d.r, top }
+  }
+  return best
+})
+if (tallest) {
+  // Stand just clear of the building, on its INWARD side: the layout is seeded
+  // per run, so a tall house near the rim would otherwise put the standpoint
+  // outside the walkable radius — which leaves the settlement (design.md §2.3)
+  // and photographs the travel scene instead.
+  const stand = await page.evaluate(
+    ({ b }) => {
+      const len = Math.hypot(b.x, b.z) || 1
+      const gap = b.r + 4
+      const p = window.__placePlayer
+      p.x = b.x - (b.x / len) * gap
+      p.z = b.z - (b.z / len) * gap
+      p.yaw = Math.atan2(-(b.x - p.x), -(b.z - p.z))
+      p.pitch = 0
+      return { x: p.x, z: p.z, radius: window.__placeLayout.radius }
+    },
+    { b: tallest },
+  )
+  // Drive the pitch live rather than assigning it: same path as the player's.
+  await mouseLook(0, Math.round(0.75 / SENS))
+  await shot('143-look-up-rooftop', {
+    local: { x: tallest.x, y: tallest.top, z: tallest.z },
+    label: 'the roof line overhead with the view pitched up',
+  })
+  check(
+    'the up-pitched frame stands inside the settlement',
+    Math.hypot(stand.x, stand.z) < stand.radius,
+    `at ${stand.x.toFixed(1)}/${stand.z.toFixed(1)} of radius ${stand.radius}`,
+  )
+}
+
+// Looking down at one's own feet: the ground the player stands on.
+await resetLook()
+await page.evaluate(() => {
+  const p = window.__placePlayer
+  p.x = 0
+  p.z = 6
+})
+await mouseLook(0, -Math.round(1.1 / SENS))
+// The subject is the ground a stride in FRONT of the boots (yaw 0 faces -Z):
+// the point directly under the camera sits below even a 63° downward look,
+// since the frame's own half-FOV is 25°.
+await shot('144-look-down-feet', {
+  local: { x: 0, y: 0, z: 4.8 },
+  label: 'the ground at the traveller’s feet with the view pitched down',
+})
+
+// Looking down over the walkable disc edge: the §2.5 seam from above.
+const edge = await page.evaluate(() => {
+  const r = window.__placeLayout.radius
+  const p = window.__placePlayer
+  p.x = 0
+  p.z = r - 6
+  p.yaw = Math.PI // face +Z, outward over the edge
+  p.pitch = 0
+  return r
+})
+// A 20° downward look holds BOTH the disc edge a few metres ahead and the
+// ground beyond it inside the frame's 25° half-FOV.
+await mouseLook(0, -Math.round(0.35 / SENS))
+await shot('145-look-down-disc-edge', {
+  local: { x: 0, y: 0, z: edge + 8 },
+  label: 'the ground past the walkable disc edge, seen over it',
+})
+
+await resetLook()
+
 // --- Debug menu open: user-select computed style + screenshot ----------------
 // The German label/field/dropdown asserts moved to Vitest (DebugMenu.test.tsx);
 // the debug menu is opened here for the real-CSS user-select check and the
@@ -216,8 +401,9 @@ const select = await page.evaluate(() => {
 })
 check('GUI text is not selectable', select.bar === 'none' && select.label === 'none', JSON.stringify(select))
 check('form inputs keep normal text selection', select.input === 'text', JSON.stringify(select))
-await page.screenshot({ path: `${OUT}67-settings-debug-menu.png` })
-console.log('shot 67-settings-debug-menu.png')
+// Point 375: the frames prove the thing they are named after is on screen —
+// the open debug menu, the feeding lion, the rendered TRAA frame.
+await shot('67-settings-debug-menu', { element: '.debug-menu', label: 'the German debug menu' })
 
 // Close the debug menu and restore English before the scene checks.
 await page.evaluate(() => window.__setLang('en'))
@@ -290,8 +476,11 @@ check('feeding: tearing movement animates', pitchSwing > 0.005,
 check('feeding: prey lies on its side', feedA.preyOnSide > 1.0, `${feedA.preyOnSide?.toFixed(2)}`)
 check('feeding: stain beneath the carcass', feedA.stainActive === true && feedA.stainRadius > 0.3,
   `radius ${feedA.stainRadius?.toFixed(2)}`)
-await page.screenshot({ path: `${OUT}68-lion-feeding.png` })
-console.log('shot 68-lion-feeding.png')
+const lionAt = await page.evaluate(() => {
+  const l = window.__lionHunt?.lion.current
+  return l ? { x: l.position.x, z: l.position.z } : null
+})
+await shot('68-lion-feeding', { world: lionAt ?? { x: 0, z: 0 }, label: 'the feeding lion', settle: false })
 
 // --- Tab toggles the journal without focus problems (design.md §17) ----------
 // The journalOpen toggle itself is asserted in Vitest (store.debug.test.ts);
@@ -410,8 +599,10 @@ const meanLuma = async (png) => {
 const errsBeforeTraa = errors.length
 await page.evaluate(() => window.__ui.getState().setTraaEnabled(true))
 await page.waitForTimeout(2500)
-const traaShot = await page.screenshot({ path: `${OUT}69-traa-on.png` })
-console.log('shot 69-traa-on.png')
+const traaShot = await shot('69-traa-on', {
+  general: 'the TRAA pipeline rebuild is judged by the mean luma of this whole frame, which is therefore the subject',
+  scene: 'travel',
+})
 const traaMean = await meanLuma(traaShot)
 check('TRAA on: scene renders non-black', traaMean > 8, `mean ${traaMean.toFixed(1)}`)
 check('TRAA on: no new console errors', errors.length === errsBeforeTraa,

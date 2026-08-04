@@ -3,7 +3,7 @@
 // plus three tiny markers under .claude/, all git-ignored:
 //
 //   dashboard-state.json      — registered dashboard path, reviewed HEAD,
-//                               published-content hash, scratchpad path
+//                               published-content hash
 //   current-focus.json        — the DECLARED current work focus (point + note)
 //   focus-check-pending.json  — armed by every user prompt; cleared by an
 //                               explicit focus confirm/set or a --synced review
@@ -13,14 +13,26 @@
 // write concurrently with a CLI command in the same turn.
 import { readFileSync, writeFileSync, renameSync, rmSync } from 'node:fs'
 import { createHash } from 'node:crypto'
-import { fileURLToPath } from 'node:url'
+import { REPO_ROOT, repoPath } from './repo-paths.mjs'
 
-const R = (p) => fileURLToPath(new URL(p, import.meta.url))
-export const REPO_ROOT = R('..')
-export const STATE_PATH = R('../.claude/dashboard-state.json')
-export const FOCUS_PATH = R('../.claude/current-focus.json')
-export const PENDING_PATH = R('../.claude/focus-check-pending.json')
-export const ACTIVITY_PATH = R('../.claude/tool-activity.json')
+export { REPO_ROOT }
+export const STATE_PATH = repoPath('.claude/dashboard-state.json')
+export const FOCUS_PATH = repoPath('.claude/current-focus.json')
+export const PENDING_PATH = repoPath('.claude/focus-check-pending.json')
+export const ACTIVITY_PATH = repoPath('.claude/tool-activity.json')
+
+/** Where the board lives when no path has been registered yet. */
+export const BOARD_FILE_DEFAULT = '.batch-dashboard.html'
+
+/**
+ * The CANONICAL board file (point 435) — the registered path, or the repo-root
+ * default. One resolver, so nothing measures a stale copy of the board instead:
+ * the reminder hook used to stat the retired mirror's scratchpad file.
+ */
+export function boardFilePath(state = readJson(STATE_PATH)) {
+  const rel = (state && typeof state === 'object' && state.dashboardPath) || BOARD_FILE_DEFAULT
+  return repoPath(rel)
+}
 
 /** Parse a JSON file; null when absent/unreadable/torn (caller decides). */
 export function readJson(path) {

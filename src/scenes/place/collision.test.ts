@@ -7,6 +7,7 @@ import {
   boxCollider,
   hasEscapeDirection,
   nudgeToFree,
+  resolveMove,
   spawnPointFree,
   standingClear,
   tryNudgeToFree,
@@ -116,5 +117,118 @@ describe('tryNudgeToFree (point 198 — report whether a free spot was actually 
     const r = tryNudgeToFree([{ x: 0, z: 0, r: 1 }], 0, 0, R, undefined, 0)
     expect(r.found).toBe(false)
     expect(r.pos).toEqual([0, 0])
+  })
+})
+
+// --- Fence panels and the swept move (point 413) -----------------------------
+// The reported defect: a goat walked THROUGH a compound fence, and where it did
+// not it "changed direction abruptly". Two causes stacked — the collider was a
+// row of post circles where the picture draws a continuous wall, and the resolve
+// was a position test that a long enough step simply steps over.
+
+describe('segment collider — a panel, not a dot (point 413)', () => {
+  // A woven panel between two posts 0.9 apart, the spacing a fence ring uses.
+  const panel: Collider = { kind: 'segment', x1: -0.45, z1: 0, x2: 0.45, z2: 0, r: 0.42 }
+
+  it('blocks the whole run between the posts, midpoint included', () => {
+    for (let x = -0.45; x <= 0.451; x += 0.05) {
+      expect(standingClear([panel], x, 0, R), `x=${x.toFixed(2)}`).toBe(false)
+    }
+  })
+
+  it('is clear beyond the panel band and at its ends', () => {
+    expect(standingClear([panel], 0, 0.42 + R + 0.01, R)).toBe(true)
+    expect(standingClear([panel], 0.45 + 0.42 + R + 0.01, 0, R)).toBe(true)
+  })
+
+  it('pushes out along the WALL normal, not sideways along a post radius', () => {
+    // Standing just inside the panel at its midpoint: the correction must be
+    // perpendicular to the panel (the abrupt sideways jerk was the old
+    // post-circle radius, which at the midpoint points along the wall).
+    const [x, z] = resolveMove([panel], 0, 0.1, R)
+    expect(x).toBeCloseTo(0, 6)
+    expect(z).toBeCloseTo(0.42 + R, 6)
+  })
+
+  it('leaves a mover exactly on the axis on a deterministic side', () => {
+    const a = resolveMove([panel], 0, 0, R)
+    const b = resolveMove([panel], 0, 0, R)
+    expect(a).toEqual(b)
+    expect(standingClear([panel], a[0], a[1], R)).toBe(true)
+  })
+})
+
+describe('resolveMove swept from the previous position (point 413)', () => {
+  const panel: Collider = { kind: 'segment', x1: -3, z1: 0, x2: 3, z2: 0, r: 0.42 }
+  const band = 0.42 + R
+
+  it('stops a step that crosses a fence panel — the un-swept call walks through it', () => {
+    // A single frame carrying the mover from one side to the other.
+    const swept = resolveMove([panel], 0, 2, R, [0, -2])
+    expect(swept[1]).toBeLessThan(0) // still on the near side
+    expect(swept[1]).toBeCloseTo(-band, 2) // and standing against the wall
+    // The old behaviour, kept for spawns/teleports: the far side, overlapping
+    // nothing — this is exactly the goat-through-the-fence case.
+    expect(resolveMove([panel], 0, 2, R)[1]).toBe(2)
+  })
+
+  it('stops a step of ten collider widths at the NEAR edge', () => {
+    const wall: Collider = { x: 0, z: 0, r: 0.42 }
+    const width = 2 * wall.r
+    const [x, z] = resolveMove([wall], 0, 0, R, [0, -width * 10])
+    expect(z).toBeLessThan(0)
+    expect(Math.hypot(x, z)).toBeCloseTo(wall.r + R, 3)
+  })
+
+  it('truncates a move longer than one sweep budget instead of tunnelling it', () => {
+    // A move no walker makes (60 m in a frame) is cut short at the budget, not
+    // handed to the position test — a truncated walk is a frame late, a
+    // tunnelled one is through the wall.
+    const [, z] = resolveMove([], 0, 50, R, [0, -10])
+    expect(z).toBeGreaterThan(-10)
+    expect(z).toBeLessThan(50)
+  })
+
+  it('never lands on the far side, whatever the step length', () => {
+    for (const from of [-0.5, -1, -2, -5, -20]) {
+      const [, z] = resolveMove([panel], 0, Math.abs(from), R, [0, from])
+      expect(z, `from z=${from}`).toBeLessThan(0)
+    }
+  })
+
+  it('still slides along a wall instead of stopping dead', () => {
+    // Pushing diagonally into the panel: the along-wall component survives.
+    const [x, z] = resolveMove([panel], 1, 0.5, R, [0, -0.9])
+    expect(x).toBeGreaterThan(0.4)
+    expect(z).toBeLessThan(0)
+    expect(standingClear([panel], x, z, R)).toBe(true)
+  })
+
+  it('still pushes an inhabitant standing inside an overlap out (no regression)', () => {
+    const rock: Collider = { x: 0, z: 0, r: 1 }
+    // Same spot in and out: the mover starts inside and must still be freed.
+    const [x, z] = resolveMove([rock], 0.1, 0, R, [0.1, 0])
+    expect(Math.hypot(x, z)).toBeCloseTo(1 + R, 6)
+    expect(standingClear([rock], x, z, R)).toBe(true)
+  })
+
+  it('reaches the target untouched when the path is clear', () => {
+    const [x, z] = resolveMove([panel], 4, -1, R, [-4, -1])
+    expect(x).toBeCloseTo(4, 6)
+    expect(z).toBeCloseTo(-1, 6)
+  })
+
+  it('resolves a zero-length move exactly like the position test', () => {
+    const rock: Collider = { x: 0, z: 0, r: 1 }
+    expect(resolveMove([rock], 0.2, 0.2, R, [0.2, 0.2])).toEqual(resolveMove([rock], 0.2, 0.2, R))
+  })
+
+  it('goes through a gate the panels leave open', () => {
+    // Two panels with a 3 m opening between them: the swept move must pass.
+    const left: Collider = { kind: 'segment', x1: -6, z1: 0, x2: -1.5, z2: 0, r: 0.42 }
+    const right: Collider = { kind: 'segment', x1: 1.5, z1: 0, x2: 6, z2: 0, r: 0.42 }
+    const [x, z] = resolveMove([left, right], 0, 2, R, [0, -2])
+    expect(z).toBeCloseTo(2, 6)
+    expect(x).toBeCloseTo(0, 6)
   })
 })

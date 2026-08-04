@@ -1147,6 +1147,157 @@ export function crocodileMouthAnchor(
 }
 
 /**
+ * The crocodile's own body length in geometry-local units (design.md §19.16):
+ * from the snout tip (the jaw tubes reach local z ~1.55) to the tail tip
+ * (`tailBaseZ` −0.7 less the 1.45-long tail cone, ~−2.15). Used as the yardstick
+ * for "the carcass lies BESIDE the feeding crocodile" — a catch further than its
+ * own body from it is not a catch it is holding.
+ */
+export const CROCODILE_BODY_LENGTH_LOCAL = 3.7
+
+/** Turn rate (rad/s) while hauling a catch back to the water: the crocodile
+ *  swings its prey around toward its channel; a facing never snaps (design.md
+ *  §19). */
+export const CROCODILE_DRAG_TURN = 2.2
+/** World units within which the haul counts its home water as reached. */
+export const CROCODILE_DRAG_ARRIVED = 0.2
+/** Headings scanned when the jaws must be turned onto water (see below). */
+const CROCODILE_JAW_HEADINGS = 12
+
+/**
+ * Where a crocodile's FEEDING PAIR may legally stand (design.md §19.16, point
+ * 383): the ambusher takes its catch BACK INTO the water — its own body centre
+ * on a water cell and the carcass beside it, within its own body length, on
+ * water too. The reported picture was the exact inverse (the crocodile wholly on
+ * the sand, the carcass at the waterline), because nothing ever tied the two to
+ * each other or to the shoreline. Pure over an `isWater` probe so both the sweep
+ * test and the in-game invariant assert can share one rule.
+ */
+export function crocodileFeedPairValid(
+  cx: number,
+  cz: number,
+  vx: number,
+  vz: number,
+  scale: number,
+  isWater: (x: number, z: number) => boolean,
+): boolean {
+  if (!isWater(cx, cz) || !isWater(vx, vz)) return false
+  return Math.hypot(vx - cx, vz - cz) <= CROCODILE_BODY_LENGTH_LOCAL * scale
+}
+
+/** Nearest heading (to `rot`) whose jaws anchor lies on water, or null when no
+ *  heading does — the degenerate channel narrower than the crocodile's reach. */
+function jawHeadingOnWater(
+  cx: number,
+  cz: number,
+  rot: number,
+  scale: number,
+  mouthOffsetLocal: number,
+  isWater: (x: number, z: number) => boolean,
+): number | null {
+  let best: number | null = null
+  let bestTurn = Infinity
+  for (let i = 0; i < CROCODILE_JAW_HEADINGS; i++) {
+    const r = (i / CROCODILE_JAW_HEADINGS) * Math.PI * 2
+    const [mx, mz] = crocodileMouthAnchor(cx, cz, r, scale, mouthOffsetLocal)
+    if (!isWater(mx, mz)) continue
+    let dh = r - rot
+    while (dh > Math.PI) dh -= Math.PI * 2
+    while (dh < -Math.PI) dh += Math.PI * 2
+    if (Math.abs(dh) < bestTurn) {
+      bestTurn = Math.abs(dh)
+      best = r
+    }
+  }
+  return best
+}
+
+/**
+ * THE DRAG-INTO-WATER LEG (design.md §19.16, point 383) — one step of it, and of
+ * the feeding hold it settles into.
+ *
+ * §19.16's ambusher comes OUT of the water for the burst and takes its catch
+ * BACK IN: "it drags the body under, and the river keeps it". That leg did not
+ * exist. The seizure left both where the strike happened — on the bank — and the
+ * grip then pulled the CROCODILE to its victim (the inverse coupling), so the
+ * pair fed on dry land while the render drew the catch at the crocodile's stale
+ * water height: the reported screenshot, crocodile on sand, carcass sunk at the
+ * waterline.
+ *
+ * Called every frame from the seizure until the carcass is gone, so the pair can
+ * never drift apart or out of the water — even if the water mask itself moves
+ * under them (the calibratable river width factor is edited at runtime).
+ *
+ *  - NOT yet settled: step toward the home water it lunged from (a validated
+ *    water cell) at `dragSpeed`, turning toward it at a capped rate — a visible
+ *    haul, never a teleport. The catch rides the jaws throughout.
+ *  - Home reached but the jaws still off the water (a channel narrower than the
+ *    crocodile's own reach): turn the HEAD onto the water rather than haul
+ *    further, so the catch still ends up in the river.
+ *  - Settled (body centre AND jaws on water): hold — the feed happens here.
+ *
+ * Pure over an `isWater` probe so the whole placement is unit-testable.
+ */
+export interface CrocodileHold {
+  /** The crocodile's body centre after this step. */
+  x: number
+  z: number
+  /** Its facing after this step. */
+  rot: number
+  /** Where the held catch lies — at the jaws. */
+  victimX: number
+  victimZ: number
+  /** True while the catch is still being hauled back into the water. */
+  dragging: boolean
+  /** Settled although the rule CANNOT be met here — a puddle smaller than the
+   *  crocodile's own reach, or a home spot that is no longer water at all. The
+   *  haul always terminates (I4); the caller's invariant assert stands down for
+   *  this case rather than accusing the world of a bug the placement cannot fix. */
+  stranded: boolean
+}
+export function crocodileHaulStep(
+  cx: number,
+  cz: number,
+  rot: number,
+  scale: number,
+  homeX: number,
+  homeZ: number,
+  mouthOffsetLocal: number,
+  dragSpeed: number,
+  dt: number,
+  isWater: (x: number, z: number) => boolean,
+): CrocodileHold {
+  const jaws = (x: number, z: number, r: number): [number, number] =>
+    crocodileMouthAnchor(x, z, r, scale, mouthOffsetLocal)
+  const settled = (x: number, z: number, r: number): boolean => {
+    const [mx, mz] = jaws(x, z, r)
+    return isWater(x, z) && isWater(mx, mz)
+  }
+  const hold = (x: number, z: number, r: number, dragging: boolean, stranded = false): CrocodileHold => {
+    const [mx, mz] = jaws(x, z, r)
+    return { x, z, rot: r, victimX: mx, victimZ: mz, dragging, stranded }
+  }
+  if (settled(cx, cz, rot)) return hold(cx, cz, rot, false)
+  const dx = homeX - cx
+  const dz = homeZ - cz
+  const d = Math.hypot(dx, dz)
+  if (d <= CROCODILE_DRAG_ARRIVED) {
+    // Home reached and still not settled: the body is in its water but the jaws
+    // reach past the far bank. Turn the HEAD onto the water rather than haul on.
+    if (!isWater(cx, cz)) return hold(cx, cz, rot, false, true) // the home itself dried up
+    const target = jawHeadingOnWater(cx, cz, rot, scale, mouthOffsetLocal, isWater)
+    if (target === null) return hold(cx, cz, rot, false, true) // nothing better exists
+    const r2 = turnToward(rot, target, CROCODILE_DRAG_TURN * dt)
+    return hold(cx, cz, r2, !settled(cx, cz, r2))
+  }
+  const step = Math.min(d, dragSpeed * dt)
+  const nx = cx + (dx / d) * step
+  const nz = cz + (dz / d) * step
+  const nrot = turnToward(rot, Math.atan2(dx, dz), CROCODILE_DRAG_TURN * dt)
+  return hold(nx, nz, nrot, !settled(nx, nz, nrot))
+}
+
+/**
  * The feeding motion of a crocodile that has seized a victim (design.md §19.16,
  * point 268): while it grips and consumes, the croc animates as EATING — the
  * classic death-roll / head thrash paired with a gulp bob — so the meal reads as
@@ -2053,6 +2204,145 @@ export function adoptionHeld(juvenile: { caught?: number; escape?: number }): bo
   return juvenile.caught !== undefined || inEscapeRun(juvenile)
 }
 
+/** A minimal structural view of the §19.8 parent↔child bond — kept narrow so
+ *  the link bookkeeping is unit-testable without the render `Animal` type. */
+export interface FamilyLinked {
+  parent?: FamilyLinked
+  child?: FamilyLinked
+}
+
+/**
+ * Clear the §19.8 parent↔child bond on BOTH sides (point 341). Called wherever
+ * an animal LEAVES the herd arrays — the streaming cull of design.md §19.4 and
+ * the carcass removal — and by the separation resolve below.
+ *
+ * The cull removes an animal by distance from the player and used to clear
+ * NEITHER side, which is where the family phantom was born: a calf kept its
+ * streamed-out parent, and the follow branch only tests `!parent.dead` — a
+ * culled parent is not dead — so the calf walked to a frozen phantom position
+ * and nursed at nothing, while the orphan adoption (which waits for a DEAD
+ * parent) never fired. With both sides cleared the very next adoption pass sees
+ * a parentless juvenile and hands it a living herd-mate.
+ *
+ * Symmetric on purpose: a removed CALF must not leave its parent shielding a
+ * ghost either. A back-reference that points elsewhere (a re-parented calf) is
+ * left untouched, so severing one pair can never cut another's.
+ */
+export function severFamilyLinks(a: FamilyLinked): void {
+  const parent = a.parent
+  if (parent !== undefined) {
+    if (parent.child === a) parent.child = undefined
+    a.parent = undefined
+  }
+  const child = a.child
+  if (child !== undefined) {
+    if (child.parent === a) child.parent = undefined
+    a.child = undefined
+  }
+}
+
+/**
+ * The separation window (design.md §19.8, point 341): how long this juvenile
+ * has been out of reach of its parent, and whether the bond must now RESOLVE.
+ *
+ * The bond's own ending. A calf beyond its leash walks straight back to its
+ * parent, and since the §19.5 water revision no river or lake stops that walk —
+ * but a walk toward a parent it can never reach has no ending at all. So the
+ * separation gets a hard deadline like every other §19.8 drama (invariant I4):
+ * out of reach — farther than the follow radius — for longer than
+ * `windowSeconds` resolves the bond, and the caller severs both links and hands
+ * the calf to the orphan adoption (`findAdopter`), which gives it a living
+ * parent nearby or leaves it an ordinary parentless juvenile.
+ *
+ * The clock runs ONLY while the calf is genuinely out of reach: back inside the
+ * follow radius resets it, so a gambol at the leash edge or a short flight never
+ * trips the window. A §19.8 ending already running on the young (`held` — caught
+ * by a predator, or escaping after its parent's sacrifice) FREEZES the clock:
+ * that drama owns the pair until it resolves (point 311's ordering).
+ *
+ * Boundary: the window is over once the accumulated time REACHES it (a tick
+ * landing exactly on `windowSeconds` resolves), mirroring the escape run's hard
+ * deadline. A `windowSeconds` of zero or less switches the window OFF — a debug
+ * edit to zero must not sever every family bond on the next frame.
+ */
+export function tickFamilySeparation(
+  separated: number | undefined,
+  distance: number,
+  followRadius: number,
+  dt: number,
+  windowSeconds: number,
+  held = false,
+): { separated: number | undefined; resolve: boolean } {
+  if (held) return { separated, resolve: false } // the running ending owns the pair
+  if (distance <= followRadius) return { separated: undefined, resolve: false } // in reach → clock reset
+  if (windowSeconds <= 0) return { separated: undefined, resolve: false } // window off
+  const t = (separated ?? 0) + dt
+  if (t >= windowSeconds) return { separated: undefined, resolve: true }
+  return { separated: t, resolve: false }
+}
+
+/**
+ * Does the END of a juvenile's bond open the mourning window (design.md §19.8,
+ * point 369)? THE TRIGGER IS DEATH, NOT DISTANCE. A bond ends two ways: the
+ * parent DIES in the world (mourned), or the bond resolves administratively —
+ * the parent was streamed out from under the calf, or the separation window
+ * released a pair that drifted apart (point 341). Only the first is grieved: a
+ * calf that simply lost track of its parent watched nothing happen, and a
+ * mourning pose there would be a lie about what the PLAYER watched.
+ */
+export function orphanMourns(parent: { dead?: boolean } | null | undefined): boolean {
+  return parent !== null && parent !== undefined && parent.dead === true
+}
+
+/**
+ * Tick the orphan's mourning window (design.md §19.8, point 369): the seconds
+ * left, or `undefined` once it has run out. The escape run's hard-deadline
+ * shape, deliberately shared — the demeanour ALWAYS resolves back to play
+ * (invariant I4), whatever else happens to the calf meanwhile.
+ */
+export function tickMourning(mourn: number | undefined, dt: number): number | undefined {
+  return tickEscapeRun(mourn, dt)
+}
+
+/** Is this juvenile inside its §19.8 mourning window (point 369)? */
+export function isMourning(young: { mourn?: number }): boolean {
+  return young.mourn !== undefined && young.mourn > 0
+}
+
+/**
+ * The play gate (design.md §19.8, point 369): may this juvenile break into a
+ * gambol bout right now? `base` is the ordinary play condition (a playful
+ * species, inside its leash, no hunt running); grief silences it for the whole
+ * window, so an orphan whose parent has just died does not go straight back to
+ * gambolling. DANGER outranks both — a seized or hunted calf takes its flight
+ * branch long before this gate is consulted.
+ */
+export function calfMayPlay(base: boolean, young: { mourn?: number }): boolean {
+  return base && !isMourning(young)
+}
+
+/**
+ * Where a juvenile keeps (design.md §19.8, points 341/369): its LIVING parent —
+ * the ADOPTIVE one once point 262 has found it, so being adopted changes WHO it
+ * follows and not its demeanour, and the two mechanics never cancel each other —
+ * or, for an orphan still inside its mourning window, the spot where its parent
+ * fell. `null` for an ordinary parentless juvenile, which roams with the herd
+ * exactly as before.
+ *
+ * The mourning anchor is a POINT, never a reference to the body: the carcass is
+ * removed long before the window ends, and nothing may survive holding an animal
+ * that is gone (point 341's lesson).
+ */
+export function juvenileAnchor(young: {
+  parent?: { x: number; z: number; dead?: boolean }
+  mourn?: number
+  mournAt?: { x: number; z: number }
+}): { x: number; z: number } | null {
+  if (young.parent && young.parent.dead !== true) return young.parent
+  if (isMourning(young) && young.mournAt) return young.mournAt
+  return null
+}
+
 /** Orphan adoption (design.md §19.8, point 262): the nearest ELIGIBLE adult
  *  that can take in `juvenile`, or `null` when none is within `radius`. Eligible
  *  is a LIVE adult (not another juvenile) of the young's OWN species — the herds
@@ -2073,17 +2363,26 @@ export function findAdopter<A extends AdoptionAdult>(
   juvenile: { species?: string; x: number; z: number; caught?: number; escape?: number },
   adults: readonly A[],
   radius: number,
-  opts: { isPredator?: (species: string) => boolean; killer?: A | null } = {},
+  opts: {
+    isPredator?: (species: string) => boolean
+    killer?: A | null
+    /** One further candidate barred from THIS adoption (point 341): the parent a
+     *  separation resolve just released, so the freed calf is not handed straight
+     *  back to the adult it spent the whole window failing to reach. */
+    exclude?: A | null
+  } = {},
 ): A | null {
   if (adoptionHeld(juvenile)) return null // the §19.8 ending resolves first (point 311)
   const isPredator = opts.isPredator ?? isPredatorSpecies
   const killer = opts.killer ?? null
+  const excluded = opts.exclude ?? null
   const r2 = radius * radius
   let best: A | null = null
   let bestD2 = Infinity
   for (const a of adults) {
     if ((a as unknown) === (juvenile as unknown)) continue // never itself
     if (a === killer) continue // never the hunter that killed the parent
+    if (a === excluded) continue // never the parent a separation just released (point 341)
     if (a.dead) continue // never a dead adult
     if (a.young) continue // must be an adult, not another juvenile
     if (a.species !== undefined) {

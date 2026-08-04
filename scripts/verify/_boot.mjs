@@ -2,13 +2,18 @@
 // (process point 4, 2026-07-14): every script repeated the same launch /
 // clear / wait-for-game block — this is the single home for it.
 import { chromium } from 'playwright'
+import { webglLaunchOptions } from './launch-args-core.mjs'
 
 export const BASE = process.env.BASE_URL ?? 'http://localhost:5173/'
 
 /** Launch a page and boot the game to a fresh state (localStorage cleared).
  *  Returns { browser, page, errors } — errors collects console/page errors. */
 export async function bootGame({ viewport = { width: 1440, height: 900 } } = {}) {
-  const browser = await chromium.launch({ args: ['--enable-unsafe-webgpu', '--use-angle=d3d11', '--enable-gpu'] })
+  // Same WebGL 2 lane as launchVerifyBrowser, args chosen by PLATFORM (point 475 —
+  // --use-angle=d3d11 is Direct3D and exists only on Windows, where this yields the
+  // identical list it always did). bootGame stays a plain launch: it is also used by
+  // scratch probes, which must not arm the render-verify run recorder.
+  const browser = await chromium.launch(webglLaunchOptions(process.platform, process.env.VERIFY_ANGLE))
   const page = await browser.newPage({ viewport })
   const errors = []
   page.on('console', (m) => {

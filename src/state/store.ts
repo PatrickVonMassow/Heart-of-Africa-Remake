@@ -10,11 +10,13 @@ import { KNOWN_FROM_START_PLACES, PLACES, REGION_VALUES, latLonToWorld, placeByI
 import { isBlocked, sampleTerrain } from '../world/terrain'
 import { mulberry32 } from '../world/noise'
 import { WATERFALLS } from '../world/data/landmarks'
-import { lakeDistance, riverDistance, riverFlow } from '../world/geoIndex'
+import { lakeDistance, riverDistance } from '../world/geoIndex'
 import { rollEvent, resolveEvent, type EventContext, type EventKind, type EventOutcome } from '../systems/events'
 import { REGION_PREDATORS } from '../scenes/travel/wildlifeBehavior'
-import { movementPenalty } from '../systems/movement'
+import { movementPenalty, slideAlongBlocked } from '../systems/movement'
+import { currentDriftDegPerSecond, waterTravelCost } from '../systems/current'
 import {
+  KNOWN_FROM_START_LANDMARKS,
   LANDMARK_POINTS, TREASURE_IDS, ferryCost, ferryDays, generateTreasureSites, treasureBid, treasureBuyPrice,
   type TreasureId, type TreasureSite,
 } from '../systems/economy'
@@ -433,7 +435,10 @@ function startState(seed: number) {
     graveyardIvoryLeft: balance.economy.graveyardIvory,
     bazaarQuotes: {},
     pendingBounties: [] as Array<{ kind: 'village' | 'landmark'; id: string }>,
-    landmarksSeen: [] as string[],
+    // The pyramids of Giza were known to every ~1890 explorer (design.md §17.2,
+    // point 338): the known-from-start landmarks start SEEN, so they earn no
+    // discovery bounty and write no first-sighting entry.
+    landmarksSeen: [...KNOWN_FROM_START_LANDMARKS] as string[],
     valuableShown: {} as Record<string, boolean>,
     orientationGiven: {} as Record<string, boolean>,
     journal: [
@@ -639,7 +644,7 @@ export const useGame = create<GameState>()((set, get) => ({
       case 'water':
       // Enclosed sea water (design.md §11) is swum/crossed like inland water.
       case 'ocean':
-        cost = hasCanoe ? tc.water / balance.canoeSpeedup : tc.water
+        cost = waterTravelCost(hasCanoe)
         break
       default: // savanna and the like
         cost = tc.savanna
@@ -654,11 +659,28 @@ export const useGame = create<GameState>()((set, get) => ({
     const step = speed * dt
     const nx = s.pos.x + (dirX / len) * step
     const nz = s.pos.z + (dirZ / len) * step
-    const next = worldToLatLon(nx, nz)
-    const nextT = sampleTerrain(next.lat, next.lon, s.seed)
+    let next = worldToLatLon(nx, nz)
+    let nextT = sampleTerrain(next.lat, next.lon, s.seed)
+    let tx = nx
+    let tz = nz
     if (isBlocked(nextT.type, next.lat, next.lon)) {
-      set({ toast: getStrings().toasts.oceanBlocked })
-      return
+      // SLIDE along the boundary rather than stopping dead (point 316): a
+      // swimmer pushed against the ocean by the river current had no lateral
+      // escape and was stuck for good in the delta's mouth notch. Only a
+      // genuine dead end — every direction in the fan blocked — still reports
+      // the blocked notice.
+      const slid = slideAlongBlocked(s.pos.x, s.pos.z, nx - s.pos.x, nz - s.pos.z, (px, pz) => {
+        const ll = worldToLatLon(px, pz)
+        return isBlocked(sampleTerrain(ll.lat, ll.lon, s.seed).type, ll.lat, ll.lon)
+      })
+      if (!slid) {
+        set({ toast: getStrings().toasts.oceanBlocked })
+        return
+      }
+      tx = slid.x
+      tz = slid.z
+      next = worldToLatLon(tx, tz)
+      nextT = sampleTerrain(next.lat, next.lon, s.seed)
     }
     // Movement-penalty warning (design.md §11): the first time a missing item
     // slows the traveller — a machete in the jungle, a canoe in water, a rope
@@ -702,7 +724,7 @@ export const useGame = create<GameState>()((set, get) => ({
     const newFood = Math.max(0, s.foodDays - foodDelta)
     const newDay = clampDay(s.day + dayDelta, START_YEAR)
 
-    const patch: Partial<GameState> = { pos: { x: nx, z: nz }, day: newDay, foodDays: newFood }
+    const patch: Partial<GameState> = { pos: { x: tx, z: tz }, day: newDay, foodDays: newFood }
 
     const newRegion = regionAt(next.lat, next.lon)
     if (newRegion !== s.region) patch.region = newRegion
@@ -792,31 +814,40 @@ export const useGame = create<GameState>()((set, get) => ({
     const ter = sampleTerrain(ll.lat, ll.lon, s.seed)
     // The current only sweeps while the traveller is on the water (design.md §11).
     if (ter.type !== 'water' && ter.type !== 'ocean') return
-    const flow = riverFlow(ll.lat, ll.lon)
-    if (flow.strength <= 0) return
-    // Stronger near the waterfalls (design.md §11/§4.4).
-    let boost = 1
-    for (const wf of WATERFALLS) {
-      const d = Math.hypot(ll.lat - wf.lat, ll.lon - wf.lon)
-      if (d < balance.currentWaterfallRadius) {
-        boost = Math.max(boost, 1 + (balance.currentWaterfallBoost - 1) * (1 - d / balance.currentWaterfallRadius))
-      }
-    }
     // Without a canoe the traveller is far more at the current's mercy; a canoe
-    // rides it under control (design.md §11).
+    // rides it under control (design.md §11). One shared formula with the
+    // sea-mouth escapability sweep (systems/current.ts, point 316).
     const hasCanoe = (s.equipment.canoe ?? 0) > 0
-    const susceptibility = hasCanoe ? 0.5 : 1.6
-    const stepDeg = flow.strength * balance.currentDrift * boost * susceptibility * Math.min(dt, 0.1)
-    const nlat = ll.lat + flow.dirLat * stepDeg
-    const nlon = ll.lon + flow.dirLon * stepDeg
-    const nt = sampleTerrain(nlat, nlon, s.seed)
-    if (isBlocked(nt.type, nlat, nlon)) return // do not sweep into blocked open ocean
+    const drift = currentDriftDegPerSecond(ll.lat, ll.lon, hasCanoe)
+    if (drift.lat === 0 && drift.lon === 0) return
+    const step = Math.min(dt, 0.1)
+    let nlat = ll.lat + drift.lat * step
+    let nlon = ll.lon + drift.lon * step
+    let nt = sampleTerrain(nlat, nlon, s.seed)
+    if (isBlocked(nt.type, nlat, nlon)) {
+      // The current never sweeps INTO blocked open ocean — but it must not stop
+      // dead against it either (point 316): a drift pinned head-on at the coast
+      // used to freeze while the traveller stood in a mouth pocket. The same
+      // resolve the overland move uses lets it run ALONG the boundary instead,
+      // and only a genuinely enclosed direction fan cancels the drift outright.
+      const from = latLonToWorld(ll.lat, ll.lon)
+      const to = latLonToWorld(nlat, nlon)
+      const slid = slideAlongBlocked(from.x, from.z, to.x - from.x, to.z - from.z, (px, pz) => {
+        const p = worldToLatLon(px, pz)
+        return isBlocked(sampleTerrain(p.lat, p.lon, s.seed).type, p.lat, p.lon)
+      })
+      if (!slid) return
+      const ln = worldToLatLon(slid.x, slid.z)
+      nlat = ln.lat
+      nlon = ln.lon
+      nt = sampleTerrain(nlat, nlon, s.seed)
+    }
     const nw = latLonToWorld(nlat, nlon)
     // Being swept covers ground, so time and provisions advance too (design.md
     // §11): otherwise the current would move the traveller for free. The cost
     // matches water travel over the drifted distance.
     const driftDist = Math.hypot(nw.x - s.pos.x, nw.z - s.pos.z)
-    const cost = hasCanoe ? balance.terrainCost.water / balance.canoeSpeedup : balance.terrainCost.water
+    const cost = waterTravelCost(hasCanoe)
     const dayDelta = driftDist * balance.daysPerUnit * cost
     const newDay = clampDay(s.day + dayDelta, START_YEAR)
     set({
@@ -1939,7 +1970,7 @@ export const useGame = create<GameState>()((set, get) => ({
         explored: snap.explored ?? {},
         // The ten ports are known from the start (point 288): a legacy save from
         // before this rule migrates by marking them discovered, so their labels
-        // never regress to "?" on load.
+        // never regress to a kind placeholder on load.
         visitedPlaces: Array.from(new Set([...KNOWN_FROM_START_PLACES, ...(snap.visitedPlaces ?? [])])),
         villagePhases: snap.villagePhases ?? {}, // legacy saves lack it (point 170)
         health: snap.health ?? balance.health.max,
@@ -1961,7 +1992,10 @@ export const useGame = create<GameState>()((set, get) => ({
         treasureSites: snap.treasureSites ?? generateTreasureSites(snap.seed ?? 0),
         graveyardIvoryLeft: snap.graveyardIvoryLeft ?? balance.economy.graveyardIvory,
         pendingBounties: snap.pendingBounties ?? [],
-        landmarksSeen: snap.landmarksSeen ?? [],
+        // The Giza plateau is known from the start (point 338) — a legacy save
+        // from before that rule migrates by marking it seen, exactly as the
+        // known-from-start PLACES migrate above.
+        landmarksSeen: Array.from(new Set([...KNOWN_FROM_START_LANDMARKS, ...(snap.landmarksSeen ?? [])])),
         valuableShown: snap.valuableShown ?? {},
         orientationGiven: snap.orientationGiven ?? {},
         honoredFriend: snap.honoredFriend ?? {},

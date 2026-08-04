@@ -23,13 +23,68 @@ export const BACKDROP_OUTER = 340 // outermost ring radius
 // (historically the first 5 of 24 rings) — resolution-independent.
 export const BACKDROP_TAPER_SPAN = 5 / 23
 
+// Where PlaceScene mounts the two ground surfaces, measured out from the
+// walkable radius: the geometry backdrop's inner rim, and the ground disc's
+// edge. The disc therefore overhangs the walkable limit, so the player never
+// looks at the plate's own edge from the last step he may take.
+export const BACKDROP_INNER_OFFSET = 12
+export const GROUND_DISC_OVERHANG = 14
 // The settlement ground disc overhangs the backdrop's inner rim by this many
-// place-units (PlaceScene mounts the backdrop at r0 = layout.radius + 12 and the
-// ground disc at layout.radius + 14, so the disc edge is r0 + this).
-export const BACKDROP_DISC_OVERLAP = 2
+// place-units (the difference between the two mounts above).
+export const BACKDROP_DISC_OVERLAP = GROUND_DISC_OVERHANG - BACKDROP_INNER_OFFSET
 // How far the inner rim tucks below the settlement ground disc, so the rim is
 // hidden under the disc rather than joining it flush.
 export const BACKDROP_RIM_DROP = 2
+
+// --- How far a walkable disc may reach (point 390) ---------------------------
+
+/** Radius of the captured §2.5 panorama band cylinder (place units). The band
+ *  IS the horizon on a normal entry, so everything that has to read as standing
+ *  in FRONT of it — the ground plate, the drifting silhouettes — must stay
+ *  inside this. */
+export const PANORAMA_RADIUS = 200
+
+/** Clearance kept between the OUTERMOST drifting silhouette ring and the band,
+ *  so a silhouette always stands clearly in front of the horizon rather than
+ *  being swallowed by it. */
+export const PANORAMA_RING_CLEARANCE = 5
+
+/**
+ * The walkable radius an OPEN-PLAIN place may carry (point 390).
+ *
+ * Where the surroundings are a built or broken edge the disc may end at it,
+ * because the eye reads a boundary. Where they are an open plain running
+ * unbroken to the horizon — the desert monument sites — the picture promises
+ * ground the whole way, so the disc must reach as far as the scene's own
+ * construction allows. That limit is NOT the terrain: the geometry backdrop is
+ * a compressed miniature anchored to the disc edge, so its relief always begins
+ * immediately past the plate whatever the radius. The limit is the §2.5
+ * panorama band, which stands at a FIXED `PANORAMA_RADIUS` — the drifting
+ * silhouettes are placed at `walkRadius + BACKDROP_INNER_OFFSET + ringSpan` and
+ * would disappear behind the band the moment they passed it.
+ *
+ * @param silhouetteRingSpan how far past the backdrop's inner rim the outermost
+ *   drifting silhouette can sit (`balance.panoramaWildlife.ringInner +
+ *   ringSpread`).
+ */
+export function openPlainWalkRadius(silhouetteRingSpan: number): number {
+  return PANORAMA_RADIUS - PANORAMA_RING_CLEARANCE - BACKDROP_INNER_OFFSET - silhouetteRingSpan
+}
+
+/** Chord the walkable ground disc's edge keeps: 192 segments at the historical
+ *  74 m edge. A 48-gon there put 9.7 m chords on the ground line and read as
+ *  the hard straight edge of point 381. */
+const GROUND_DISC_CHORD = (2 * Math.PI * 74) / 192
+
+/**
+ * Radial segments of the walkable ground disc, DERIVED from its own edge so the
+ * chord length holds as the disc grows (point 390 widened the Giza plate). A
+ * fixed count would have coarsened the ground line exactly where the widened
+ * desert plate puts the player closest to it.
+ */
+export function groundDiscSegments(discEdge: number): number {
+  return Math.max(192, Math.ceil((2 * Math.PI * discEdge) / GROUND_DISC_CHORD))
+}
 
 /** Inner-rim fade-in (0 at r0 → 1 past the taper band) as a pure function of
  * the radius, shared by the mesh build and `backdropHeightAt`. */
@@ -57,6 +112,63 @@ export function backdropBase(r: number, r0: number): number {
 }
 
 /**
+ * The backdrop surface at radius `r` for a given exaggerated relief — the ONE
+ * shape formula, shared by the mesh build and `backdropHeightAt`, so no third
+ * consumer can drift from the drawn geometry.
+ *
+ * Two bounds, both slope-free of any per-site constant:
+ *  - UP, `r * BACKDROP_MAX_SLOPE`: a mountainous surround stays a distant range
+ *    instead of arcing over the camera (§2.5).
+ *  - DOWN, the base curve itself: outside the ground disc the surroundings may
+ *    RISE but never sink below the plane the player stands on. The old floor was
+ *    a flat −6, which tore the horizon open (point 381): the taper reaches 1
+ *    within ~40 % of r0, so a surround sampling lower than the place centre —
+ *    a plateau over a valley (Giza over the Nile), any coast, any river within
+ *    the band's 1.7° reach — plunged 6 units in a few metres, while the eye's
+ *    grazing line over the disc edge descends only eyeHeight/(2·discEdge) per
+ *    unit (~0.01 at Giza). The surface therefore never met that line again
+ *    inside BACKDROP_OUTER: past the disc rim there was NO ground at all, and
+ *    the frame showed the disc's hard edge, then the captured band's low rows
+ *    and the sky behind them. Measured before the fix, the sight line escaped
+ *    in 48/320 azimuths from Giza's centre and in 3–241/320 from the far rim at
+ *    EVERY place — the condition is the disc radius (a wider disc flattens the
+ *    grazing line) plus a lower surround, never a site.
+ *
+ * Clamping the fall at the base costs nothing visible: a dip below the disc
+ * plane is what the disc edge occludes anyway. Water and lowland keep their
+ * terrain COLOUR, so a sea still reads as sea — as a plain at the horizon
+ * rather than a hole in it.
+ */
+export function backdropSurfaceY(r: number, r0: number, relief: number): number {
+  const base = backdropBase(r, r0)
+  // Under the disc overhang the rim carries NO relief: a steeply rising
+  // surround would otherwise push it through the plate the player walks on.
+  // Nothing is lost — the plate hides this span — and the base still feathers
+  // the rim up to exactly the disc plane at the edge.
+  if (r < r0 + BACKDROP_DISC_OVERLAP) return base
+  const capped = Math.min(r * BACKDROP_MAX_SLOPE, Math.max(0, relief))
+  return capped * backdropTaper(r, r0) + base
+}
+
+/**
+ * Radius of mesh ring `ri` — logarithmic spacing (more detail near the place),
+ * but with ring 1 pinned to the GROUND-DISC EDGE (point 381).
+ *
+ * Without that pin no vertex fell on the edge at all: the log ladder's second
+ * ring cleared it (74.4 against Giza's 74), so the strip from the tucked rim
+ * INTERPOLATED across the join and the drawn surface sat a third of a unit
+ * below the plate exactly where the plate ends — the pale slab with a visible
+ * thickness in the report. With the pin the mesh meets the disc plane at the
+ * disc edge, which is where `backdropBase` says it should.
+ */
+export function backdropRingRadius(ri: number, r0: number, rings: number = BACKDROP_RINGS): number {
+  if (ri <= 0) return r0
+  const edge = r0 + BACKDROP_DISC_OVERLAP
+  if (ri === 1) return edge
+  return edge * Math.pow(BACKDROP_OUTER / edge, (ri - 1) / (rings - 2))
+}
+
+/**
  * Height of the backdrop surface at a point (x, z) around the place centre —
  * the same formula the backdrop mesh is built from, so panorama wildlife can
  * sit on the relief instead of floating above it or sinking into it (§2.5).
@@ -72,9 +184,7 @@ export function backdropHeightAt(
 ): number {
   const r = Math.hypot(x, z)
   const smp = sampleTerrain(lat - z * BACKDROP_SCALE, lon + x * BACKDROP_SCALE, seed)
-  const relief = (smp.height - centerH) * BACKDROP_HEIGHT
-  const capped = Math.min(r * BACKDROP_MAX_SLOPE, Math.max(-6, relief))
-  return capped * backdropTaper(r, r0) + backdropBase(r, r0)
+  return backdropSurfaceY(r, r0, (smp.height - centerH) * BACKDROP_HEIGHT)
 }
 
 /**

@@ -39,6 +39,10 @@
           },
           {
             "type": "command",
+            "command": "node scripts/push-arrival-guard.mjs"
+          },
+          {
+            "type": "command",
             "command": "node scripts/dashboard-guard.mjs"
           },
           {
@@ -55,11 +59,23 @@
           },
           {
             "type": "command",
+            "command": "node scripts/mechanism-review-guard.mjs"
+          },
+          {
+            "type": "command",
             "command": "node scripts/queue-order-guard.mjs"
           },
           {
             "type": "command",
             "command": "node scripts/tasks-spec-guard.mjs"
+          },
+          {
+            "type": "command",
+            "command": "node scripts/tasks-archive-guard.mjs"
+          },
+          {
+            "type": "command",
+            "command": "node scripts/doc-budget-guard.mjs"
           },
           {
             "type": "command",
@@ -87,12 +103,45 @@
           },
           {
             "type": "command",
+            "command": "node scripts/guide-brevity-guard.mjs"
+          },
+          {
+            "type": "command",
+            "command": "node scripts/rule-review-guard.mjs"
+          },
+          {
+            "type": "command",
+            "command": "node scripts/findings-guard.mjs"
+          },
+          {
+            "type": "command",
+            "command": "node scripts/decision-card-guard.mjs"
+          },
+          {
+            "type": "command",
+            "command": "node scripts/branch-hygiene-guard.mjs"
+          },
+          {
+            "type": "command",
+            "command": "node scripts/guard-health-guard.mjs"
+          },
+          {
+            "type": "command",
             "command": "node scripts/dashboard-sync.mjs"
           }
         ]
       }
     ],
     "PreToolUse": [
+      {
+        "matcher": "Edit|Write|NotebookEdit|Agent|Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/board-first-guard.mjs"
+          }
+        ]
+      },
       {
         "matcher": "Agent",
         "hooks": [
@@ -124,6 +173,15 @@
     "PostToolUse": [
       {
         "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/prep-arm-hook.mjs"
+          }
+        ]
+      },
+      {
+        "matcher": "PowerShell",
         "hooks": [
           {
             "type": "command",

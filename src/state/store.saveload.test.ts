@@ -11,6 +11,7 @@ import { balance } from '../config/balance'
 import { listCheckpoints, type CheckpointMeta } from './store'
 import { g, freshGame, withWorld } from '../test/store'
 import { KNOWN_FROM_START_PLACES } from '../world/geo'
+import { KNOWN_FROM_START_LANDMARKS } from '../systems/economy'
 
 withWorld()
 
@@ -149,6 +150,22 @@ describe('loadCheckpoint restores a specific visit (design.md §18)', () => {
     // The visited village is preserved, and nothing is duplicated.
     expect(g().visitedPlaces).toContain('maasai-village')
     expect(new Set(g().visitedPlaces).size).toBe(g().visitedPlaces.length)
+  })
+
+  // Point 338: the Giza plateau is known from the start on BOTH its halves —
+  // the map point and the §4.4 cultural landmark. A save from before that rule
+  // migrates the landmark half the same way point 288 migrated the places.
+  it('a legacy save without the known landmarks loads them marked sighted', () => {
+    localStorage.setItem(CHECKPOINTS_KEY, JSON.stringify([{
+      placeId: 'cairo', money: 120, foodDays: 12, day: 4, health: 88, seed: 42,
+      // Pre-338 save: only the actually-sighted landmarks were recorded.
+      landmarksSeen: ['kilimanjaro'],
+    }]))
+    expect(g().loadCheckpoint(0)).toBe(true)
+    for (const id of KNOWN_FROM_START_LANDMARKS) expect(g().landmarksSeen).toContain(id)
+    // The sighted landmark is preserved, and nothing is duplicated.
+    expect(g().landmarksSeen).toContain('kilimanjaro')
+    expect(new Set(g().landmarksSeen).size).toBe(g().landmarksSeen.length)
   })
 })
 

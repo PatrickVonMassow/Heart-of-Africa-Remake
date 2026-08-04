@@ -19,6 +19,11 @@ export interface BalanceConfig {
   walkerUnstuckSeconds: number
   /** Mouse-look sensitivity in the first-person view, radians per pixel. */
   mouseSensitivity: number
+  /** Vertical first-person look clamp in DEGREES from the horizon (design.md
+   *  §17.5, point 392): how far up and down the view may pitch. Calibratable,
+   *  but structurally capped just short of vertical (`PITCH_LIMIT_CEILING_DEG`
+   *  in src/systems/lookPitch.ts) so the world can never roll over. */
+  lookPitchLimitDeg: number
   /** Single ambience volume: the noise beds (wind/surf/murmur), their gust/swell
    *  modulation and the proximity animal calls are all scaled by it (1 = full). */
   ambienceVolume: number
@@ -300,6 +305,13 @@ export interface BalanceConfig {
     mouthOffsetLocal: number
     /** Speed of the lunge burst (units/s) — visible motion, never a teleport. */
     lungeSpeed: number
+    /** Speed (units/s) of the DRAG-INTO-WATER leg (point 383): §19.16's kill is
+     *  hauled back into the river — the feed never happens on the bank. Fast
+     *  enough to read as part of the seizure, slow enough to be seen. */
+    dragSpeed: number
+    /** Hard deadline on that haul (s, invariant I4): a drag that cannot reach
+     *  water settles where it stands rather than pinning the drama forever. */
+    dragSeconds: number
     /** Hard cap on the gripped hold (s, point 186): the grip normally ends with the
      *  victim's caught-countdown, but a victim that VANISHES mid-grip (streamed out
      *  in a chunk despawn, taken by another system) would freeze it forever, so the
@@ -383,6 +395,23 @@ export interface BalanceConfig {
      *  past the feeding predator instead of escaping. A hard deadline — the
      *  adoption resumes the moment it expires. Calibratable/debug-editable. */
     escapeSeconds: number
+    /** Separation window (design.md §19.8/§21.2, point 341): how long (seconds) a
+     *  juvenile may stay OUT OF REACH of its parent — farther than followRadius —
+     *  before the bond RESOLVES: both links are cleared and the young goes through
+     *  the orphan adoption, so it gains a living parent nearby or roams on
+     *  parentless instead of walking at a parent it can never reach. The clock
+     *  runs only while the calf is genuinely out of reach, so a gambol at the
+     *  leash edge never trips it. Zero switches the window off.
+     *  Calibratable/debug-editable. */
+    reunionSeconds: number
+    /** Orphan mourning window (design.md §19.8/§21.2, point 369): how long
+     *  (seconds) a juvenile whose parent DIED in front of it stays subdued —
+     *  keeping to the spot its parent fell and NOT gambolling — before it plays
+     *  again. Only a death opens the window: a bond that merely resolved
+     *  administratively (point 341 — the parent was streamed out, or the pair
+     *  drifted apart) is not mourned. Fear outranks it: every danger response
+     *  takes the frame. Calibratable/debug-editable. */
+    mourningSeconds: number
   }
   /** Rivers (design.md §11.3, point 136). */
   river: {
@@ -394,6 +423,14 @@ export interface BalanceConfig {
      * applies on the next reload.
      */
     widthFactor: number
+    /**
+     * How far up its own course (degrees) a SEA mouth's current slackens to
+     * nothing (design.md §11.3, point 316) — the tidal/backwater reach that
+     * keeps a mouth from funnelling a swimmer into a coast-locked pocket. Read
+     * at build time (the flow index bakes the ramp per segment); a debug edit
+     * applies on the next reload.
+     */
+    mouthSlackDeg: number
   }
   season: {
     /** Master factor for the seasonal weather look (0 disables, 1 full; design.md §19/§21). */
@@ -409,6 +446,17 @@ export interface BalanceConfig {
     shelteredRainDamp: number
     /** How much full rain damps an UNSHELTERED open flame (0..1, large: rain drowns it toward embers). */
     openRainDamp: number
+  }
+  /** Startup picture liveness (point 337). */
+  startup: {
+    /** How long the loading picture may stand still, in milliseconds — the
+     *  budget the live gate (`scripts/verify/startup.mjs`) binds. It covers the
+     *  WHOLE standstill, both the part a blocked main thread causes and the
+     *  part a busy renderer causes inside one long animation frame, so a busy
+     *  renderer cannot excuse a freeze the player plainly sees. Calibratable:
+     *  raise it only with a measurement that says the slower state is
+     *  acceptable, never to quieten a regression. */
+    pictureFreezeBudgetMs: number
   }
   touch: {
     /** Virtual-stick travel radius (px) and its resting dead zone (px). */
@@ -463,6 +511,7 @@ export const balance: BalanceConfig = {
   placeStrafeFactor: 0.8,
   walkerUnstuckSeconds: 4, // an inhabitant wedged this long is teleport-nudged free (point 155)
   mouseSensitivity: 0.0011,
+  lookPitchLimitDeg: 85, // just short of vertical (point 392); the view never rolls over
   ambienceVolume: 0.1,
   footstepVolume: 2, // footsteps twice as loud as the rest (user request)
   ambientVolume: 0.5, // every other ambient sound half as loud (user request)
@@ -661,12 +710,28 @@ export const balance: BalanceConfig = {
     // 14-unit flee radius with room to spare — and well above the ~5 s struggle
     // window, so the escape is never cut short by the drama it follows.
     escapeSeconds: 12,
+    // Calibratable (point 341): the bond's deadline. Sized well above one whole
+    // play cycle — a bout runs 8 s and the idle gap 12 s (20 s), and the follow
+    // leg back from the gambol edge (18 units at 4.5 units/s against a walking
+    // parent) adds a few more — so a healthy pair, which drops inside the leash
+    // once per cycle, never approaches it, while a calf that genuinely cannot
+    // reach its parent is re-homed inside a minute of play.
+    reunionSeconds: 45,
+    // Calibratable (point 369): the orphan's subdued window. Sized above one
+    // whole play cycle (an 8 s bout plus the 12 s idle gap) so the calf visibly
+    // SKIPS a gambol it would otherwise have played — the picture the point
+    // exists for — and in the register of the other §19.8 vigils (the elephants
+    // hold 30 s at the bones). It outlives the body itself (a carcass dissolves
+    // in ~9 s), so the later part of the watch is held at the spot it fell.
+    mourningSeconds: 30,
   },
   crocodile: {
     strikeRadius: 5, // calibratable: bank visitors inside this of a hidden crocodile trigger the lunge
     ambushBankBand: 4, // calibratable (point 275): a prey at the waterline within this of a hidden croc is a legal target even without drinking — kept < strikeRadius so the ambush stays occasional
     mouthOffsetLocal: 1.15, // calibratable (point 268): local forward reach to the jaws (snout tip ~1.5), so the seized victim lies IN the mouth, gripped
     lungeSpeed: 12, // calibratable: the burst speed of the lunge — fast and short, never a teleport
+    dragSpeed: 5, // calibratable (point 383): how fast the catch is hauled back into the water — a visible drag, not a snap
+    dragSeconds: 6, // calibratable (point 383): hard deadline on that haul (I4) — far above the ~1 s a bank kill needs
     gripSeconds: 8, // calibratable: hard release cap on the grip (> the ~5 s caught window) so a vanished victim never pins the crocodile (point 186)
     driveOffRestSeconds: 20, // calibratable: a repelled crocodile keeps to its water this long — long enough for the freed victim to leave the bank, so a rescue is not undone the next frame
   },
@@ -680,6 +745,7 @@ export const balance: BalanceConfig = {
   },
   river: {
     widthFactor: 1.6, // wider-than-scale rivers for canoe playability (point 136)
+    mouthSlackDeg: 0.6, // calibratable: ~65 km of slack water at a sea mouth (point 316)
   },
   season: {
     weatherStrength: 1, // full seasonal atmosphere; calibratable, debug-editable
@@ -692,6 +758,14 @@ export const balance: BalanceConfig = {
     // only dips a touch (steamier), the unsheltered flame is drowned toward embers.
     shelteredRainDamp: 0.25, // calibratable, debug-editable
     openRainDamp: 0.7, // calibratable, debug-editable
+  },
+  startup: {
+    // Measured post-fix on the headless verify lanes (point 337): the worst
+    // standstill is the renderer's own device/adapter init at ~1.0 s (WebGPU)
+    // and ~2.1 s (WebGL 2), not a shader compile any more. 4 s leaves room for
+    // a loaded machine while still catching the defect this guards, which was
+    // 21 s of blocked thread and 20 s without a painted frame.
+    pictureFreezeBudgetMs: 4000, // calibratable, debug-editable
   },
   touch: {
     stickRadius: 60, // px from the stick centre to full deflection

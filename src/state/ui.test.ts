@@ -30,6 +30,18 @@ beforeEach(() => {
     wheelZoomEnabled: false, journalDnd: false, travelZoom: DEFAULT_TRAVEL_ZOOM, bazaarBid: null,
     traaEnabled: true, touchActive: false, detailLevel: 'medium', ssaoEnabled: true, shadowMapHalf: false,
     shadowsEnabled: true, fireShadowsEnabled: true, groundDebugFlat: false, seasonCollapseEnabled: true,
+    invertLook: true,
+  })
+})
+
+describe('vertical look inversion (design.md §17.5, point 392)', () => {
+  it('ships INVERTED and is toggled from there, not flipped elsewhere', () => {
+    expect(useUi.getInitialState().invertLook).toBe(true) // the store's own default
+    expect(u().invertLook).toBe(true)
+    u().setInvertLook(false)
+    expect(u().invertLook).toBe(false)
+    u().setInvertLook(true)
+    expect(u().invertLook).toBe(true)
   })
 })
 

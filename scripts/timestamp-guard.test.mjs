@@ -122,6 +122,7 @@ describe('end-to-end guard process', () => {
   /** Run the real guard with a hook-style stdin payload; state is isolated. */
   function runGuard(payload, { session = 'e2e' } = {}) {
     const out = execFileSync(process.execPath, [GUARD], {
+      windowsHide: true,
       input: JSON.stringify({ session_id: session, ...payload }),
       encoding: 'utf8',
       env: { ...process.env, TIMESTAMP_GUARD_STATE: join(dir, `state-${session}.json`) },
@@ -170,6 +171,7 @@ describe('end-to-end guard process', () => {
     expect(released?.systemMessage).toContain('timestamp-guard')
     // A garbled (unparseable-JSON stdin) invocation also blocks.
     const out = execFileSync(process.execPath, [GUARD], {
+      windowsHide: true,
       input: 'not json at all',
       encoding: 'utf8',
       env: { ...process.env, TIMESTAMP_GUARD_STATE: join(dir, 'state-garbled.json') },

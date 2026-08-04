@@ -7,18 +7,23 @@ import { setupGeodata } from '../test/geodata'
 import { createWaterMaterial } from './water'
 
 describe('ocean water material', () => {
+  // Built ONCE for both cases. Constructing the node material costs well over a
+  // second, and paying it inside a case put the first one within reach of
+  // vitest's 5 s default: on 28.07.2026 it timed out there inside the full run
+  // on a QUIET machine while passing in 1.5 s alone. The invariants are
+  // read-only, so one material answers both.
+  let material: ReturnType<typeof createWaterMaterial>['material']
   beforeAll(async () => {
     await setupGeodata()
+    material = createWaterMaterial().material
   })
 
   it('is transparent and never writes depth', () => {
-    const { material } = createWaterMaterial()
     expect(material.transparent).toBe(true)
     expect(material.depthWrite).toBe(false)
   })
 
   it('drives opacity and color through node graphs (land mask, depth tint)', () => {
-    const { material } = createWaterMaterial()
     // The land-flag mask and bathymetry tint live in these node graphs; a
     // refactor that drops them would fall back to plain uniform values.
     expect(material.opacityNode).toBeTruthy()

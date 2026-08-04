@@ -6,6 +6,7 @@
 // procedural per run (design.md §18).
 
 import { RIVERS_DATA, type RiverDef } from './data/rivers'
+import { GIZA_PLATEAU } from './data/gizaPlateau'
 import { riverDistanceExact } from './hydro'
 import { RIVER_WIDTH_DEG } from './riverWidth'
 
@@ -259,12 +260,15 @@ const CLEARED_PORTS: PlaceDef[] = PORTS.map((p) => ({
 
 // Enterable monument sites (design.md §4.4, point 273): world-famous landmarks
 // the traveller walks around in first person like a settlement, but with no
-// trade, elder or hints — a walkable monument space. Giza sits a short way
-// south-west of Cairo: the map scale (10 units/°) cannot resolve the real 13 km
-// between them, so the plateau is placed clear of the city's enter radius — the
-// same symbolic compaction the point-82 Giza skyline uses.
+// trade, elder or hints — a walkable monument space. Giza sits west of Cairo
+// across the Nile: the map scale (10 units/°) cannot resolve the real 13 km
+// between them, so the plateau stands clear of the city's enter radius — the
+// same symbolic compaction the point-82 Giza skyline uses. Its coordinate is
+// the SHARED ./data/gizaPlateau constant, which the cultural landmark of §4.4
+// reads too: one real site, one position (the two used to drift ~0.3° apart
+// and the bird's-eye view drew the plateau twice).
 const MONUMENT_SITES: PlaceDef[] = [
-  { id: 'giza', kind: 'monument', lat: 29.75, lon: 30.85, region: 'north' },
+  { id: 'giza', kind: 'monument', lat: GIZA_PLATEAU.lat, lon: GIZA_PLATEAU.lon, region: 'north' },
 ]
 const MONUMENTS: PlaceDef[] = MONUMENT_SITES.map((m) => ({
   ...m,
@@ -279,9 +283,22 @@ export function placeById(id: string): PlaceDef {
   return p
 }
 
+/**
+ * One site, one label (design.md §4.4/§17.2): where a map point and a landmark
+ * denote the SAME site, only the map point's name renders — it is the one the
+ * player can act on (it names the enterable place and obeys the §17.2 discovery
+ * gate). The rule keys on shared IDENTITY, never on proximity: a distance
+ * heuristic would silently swallow a genuinely neighbouring landmark, while two
+ * records of one site already share their id (Giza is the only such pair today,
+ * and a sweep in world.test.ts holds that true).
+ */
+export function landmarkLabelHiddenByMapPoint(landmarkId: string): boolean {
+  return PLACES.some((p) => p.id === landmarkId)
+}
+
 // Settlements an ~1890 explorer already knew and could name from the outset
 // (design.md §3.2/§17.2): the ten port cities. They start DISCOVERED — their
-// map labels show their names from the start (never "?", §17.2) and returning to
+// map labels show their names from the start (never a placeholder, §17.2) and returning to
 // them credits no discovery bounty (design.md §10). Every period-famous inland
 // centre in the model is itself one of these ports (Timbuktu, Khartoum on the
 // caravan/Nile routes). The Giza monument site is likewise world-famous and

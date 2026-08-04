@@ -15,98 +15,26 @@ import {
   parseKlaerungPoints,
   nowCardText,
   looksDoubleEncoded,
+  findTransliterations,
   sliceSections,
   parseCards,
   auditDashboard,
   evaluate,
+  ERLEDIGT_ON_BOARD,
+  ETA_GRACE_MIN,
+  ETA_MARGIN_MIN,
+  ETA_REVISION_LIMIT,
+  ETA_RULE,
+  etaMinutes,
+  etaRevisionPatch,
+  etaStatus,
+  QUEUE_STUB_BODY,
+  QUEUE_STUB_META,
 } from './dashboard-guard-core.mjs'
 
-/** Minimal dashboard HTML in the real board's markup (incl. an Erledigt section
- *  that also uses `.num`, which the queue parser must NOT pick up). `nowCards`
- *  renders SEVERAL now-cards for the parallel-work workflow (numbers become
- *  `N — Task N` titles, strings stay literal non-point titles) and overrides
- *  the single `nowPoint`/`nowTitle` pair. `klaerung` renders point-tied
- *  "Von dir zu klären" cards (leading number in the title); `klaerungExtra`
- *  adds no-number cards like the real ntfy one. */
-function boardHtml({
-  nowPoint = 210,
-  nowTitle = 'Meereskante glätten',
-  nowCards = null,
-  queue = [211, 204],
-  done = [209],
-  klaerung = [],
-  klaerungExtra = [],
-} = {}) {
-  // Cards carry the shapes the point-313 audit requires (duration meta in the
-  // queue, a time meta on the now-card, a non-empty body, no `open`), so the
-  // pre-313 invariant tests keep reading a fully consistent board.
-  const body = '<div class="body"><p>Kurzstand.</p></div>'
-  const q = queue
-    .map(
-      (n) =>
-        `<details><summary><span class="num">${n}</span><span class="t">Task ${n}</span>` +
-        `<span class="right"><span class="meta">~2 h</span></span></summary>${body}</details>`,
-    )
-    .join('\n')
-  const d = done
-    .map(
-      (n) =>
-        `<details><summary><span class="num">${n}</span><span class="t">Done ${n}</span>` +
-        `<span class="right"><span class="meta">09:00 – 10:00</span></span></summary>${body}</details>`,
-    )
-    .join('\n')
-  const k = [
-    ...klaerung.map(
-      (n) => `<details><summary><span class="t">${n} — Frage zu Punkt ${n}</span></summary>${body}</details>`,
-    ),
-    ...klaerungExtra.map((t) => `<details><summary><span class="t">${t}</span></summary>${body}</details>`),
-  ].join('\n')
-  const nowTitles = (nowCards ?? [nowPoint == null ? nowTitle : `${nowPoint} — ${nowTitle}`]).map((c) =>
-    typeof c === 'number' ? `${c} — Task ${c}` : c,
-  )
-  const now = nowTitles
-    .map(
-      (t) => `<details class="now"><summary><span class="t">${t}</span>
-<span class="right"><span class="meta">09:00 · bis ~11:00</span></span></summary>
-<div class="body"><p>Status (Stand 09:00): der point-200-Vergleich darf hier NICHT zählen.</p></div></details>`,
-    )
-    .join('\n')
-  return `<main><h1>Dashboard</h1>
-<h2>Woran ich gerade arbeite</h2>
-${now}
-<h2>Von dir zu klären</h2>
-${k}
-<h2>Warteschlange</h2>
-${q}
-<h2>Erledigt</h2>
-${d}
-</main>`
-}
+import { boardHtml, green } from './dashboard-guard-fixtures.mjs'
+import { renderQueueCard } from './board-queue-core.mjs'
 
-/** A fully consistent input — every invariant satisfied → allow. */
-function green(overrides = {}) {
-  const html = overrides.html ?? boardHtml()
-  return {
-    paused: false,
-    open: [210, 211, 204],
-    done: [209],
-    marker: {
-      dashboardPath: '.batch-dashboard.html',
-      head: 'abc1234',
-      publishedHash: 'hash-1',
-    },
-    markerFileExists: true,
-    head: 'abc1234',
-    html,
-    repoHash: 'hash-1',
-    focus: { point: 210, note: 'smooth the sea edge', setAt: 1000, confirmedAt: 1000 },
-    pending: null,
-    sessionId: 'sess-a',
-    lastToolAt: 500,
-    now: 2000,
-    ...overrides,
-  }
-}
 
 describe('parseTasks', () => {
   const text = [
@@ -438,6 +366,12 @@ describe('evaluate — publish parity (edited must not masquerade as live)', () 
   it('allows when repo and published hashes match', () => {
     expect(evaluate(green()).decision).toBe('allow')
   })
+  it('accepts the PAGES publish as a publish — it is the one a headless session can run', () => {
+    const marker = { dashboardPath: '.batch-dashboard.html', head: 'abc1234', pagesPublishedHash: 'hash-1' }
+    expect(evaluate(green({ marker })).decision).toBe('allow')
+    // …but only for exactly those bytes: an older pages push covers nothing.
+    expect(evaluate(green({ marker: { ...marker, pagesPublishedHash: 'hash-0' } })).decision).toBe('block')
+  })
   it('honors an explicit deferral for the CURRENT content only', () => {
     const marker = {
       dashboardPath: '.batch-dashboard.html',
@@ -606,11 +540,70 @@ describe('auditDashboard — the 25.07 witnesses', () => {
     expect(codes(boardHtml({ done: [206, 206, 209] }))).not.toContain('dup-in-section')
   })
 
+  it('requires the Erledigt heading to stay wrapped in its collapsible section', () => {
+    // The board as published: wrapped, no `open` → clean.
+    expect(codes(boardHtml())).not.toContain('section-not-collapsible')
+    // A republish that unwrapped it (plain heading again) blocks.
+    const unwrapped = boardHtml()
+      .replace('<details class="sect">\n<summary><h2>Erledigt</h2></summary>', '<h2>Erledigt</h2>')
+      .replace(/<\/details>\n<\/main>/, '</main>')
+    expect(codes(unwrapped)).toContain('section-not-collapsible')
+    // And it must still start CLOSED — the standing no-auto-open mandate covers
+    // the wrapper like any card.
+    expect(codes(boardHtml().replace('<details class="sect">', '<details class="sect" open>'))).toContain('auto-open')
+  })
+  it('never counts the section wrapper as a card of the preceding section', () => {
+    // The wrapper's opening tag falls just before the <h2> the slice ends at,
+    // so a naive split would hand Warteschlange a point-less, body-less card.
+    const html = boardHtml()
+    expect(codes(html)).not.toContain('queue-meta')
+    expect(codes(html)).not.toContain('empty-body')
+    expect(parseCards(sliceSections(html).sections['Warteschlange']).length).toBe(2) // 211, 204 — not the wrapper
+  })
+
   it('flags a missing section, a wrong order and an empty card body', () => {
     expect(codes(boardHtml().replace('<h2>Erledigt</h2>', ''))).toContain('structure')
     expect(codes(boardHtml().replace('<div class="body"><p>Kurzstand.</p></div>', '<div class="body"></div>'))).toContain(
       'empty-body',
     )
+  })
+  // POINT 472 — the empty-body rule has NO exemption left. The bundle-group card
+  // of point 452 was the only card that ever bought one (its body held nothing
+  // but nested cards); with the grouping taken back out, an exemption would be a
+  // hole in a guard with nothing left to justify it.
+  it('flags an empty body in EVERY section, and a class="group" buys no exemption', () => {
+    const empty = '<div class="body"></div>'
+    const card = (cls, inner) =>
+      `<details${cls}><summary><span class="num">777</span><span class="t">Task 777</span>` +
+      `<span class="right"><span class="meta">~2 h</span></span></summary>${inner}</details>`
+    // One per section: the queue, "Von dir zu klären", the now-section, Erledigt.
+    const withQueue = boardHtml().replace('<h2>Warteschlange</h2></summary>', `<h2>Warteschlange</h2></summary>\n${card('', empty)}`)
+    expect(codes(withQueue, { open: [210, 211, 204, 777] })).toContain('empty-body')
+    const withKlaerung = boardHtml().replace(
+      '<h2>Von dir zu klären</h2></summary>',
+      `<h2>Von dir zu klären</h2></summary>\n<details><summary><span class="t">Eine Frage</span></summary>${empty}</details>`,
+    )
+    expect(codes(withKlaerung)).toContain('empty-body')
+    expect(
+      codes(boardHtml().replace(/<div class="body"><p>Status[^<]*<\/p><\/div>/, empty)),
+    ).toContain('empty-body')
+    // Erledigt takes TWO cards: the LAST card of that section absorbs the
+    // trailing archive link into its body slice, so only a card with a sibling
+    // behind it can be empty at all.
+    const withDone = boardHtml({ done: [209, 208] }).replace(
+      /(Done 209<\/span>[\s\S]*?<\/summary>)<div class="body"><p>Kurzstand\.<\/p><\/div>/,
+      `$1${empty}`,
+    )
+    expect(withDone).toContain(`</summary>${empty}`)
+    expect(codes(withDone, { done: [209, 208], doneSeen: [209, 208] })).toContain('empty-body')
+    // THE EXEMPTION IS GONE: the very markup that used to be waved through blocks.
+    const grouped = boardHtml().replace(
+      '<h2>Warteschlange</h2></summary>',
+      `<h2>Warteschlange</h2></summary>\n${card(' class="group" data-group="Chat & Tafel"', empty)}`,
+    )
+    expect(codes(grouped, { open: [210, 211, 204, 777] })).toContain('empty-body')
+    // …and parseCards no longer even reports such a flag for anyone to read.
+    expect(parseCards(card(' class="group"', empty))[0]).not.toHaveProperty('isGroup')
   })
   it('flags a now-card without a time meta and a stale footer count', () => {
     expect(codes(boardHtml().replace('<span class="meta">09:00 · bis ~11:00</span>', '<span class="meta">läuft</span>'))).toContain(
@@ -777,5 +770,387 @@ describe('evaluate — check ordering and totality', () => {
     ).not.toThrow()
     // No open-points info at all reads as "nothing enforceable" → allow.
     expect(evaluate({}).decision).toBe('allow')
+  })
+})
+
+// Point 371 — the board stops growing, folds away, and dates its own status.
+// Each case is the shape the guard must FAIL on, because each of the three
+// requirements was lost once already by a plain republish.
+describe('the board keeps its shape (point 371)', () => {
+  const card = (n, body) =>
+    `<details>\n  <summary><span class="num">${n}</span><span class="t">T${n}</span><span class="right"><span class="meta">~1 h</span></span></summary>\n  <div class="body"><p>${body}</p></div>\n</details>\n`
+  const board = ({ done = 1, link = true, nowBody = 'Stand 14:12 — läuft' } = {}) =>
+    `<main><h1>B</h1>` +
+    `<details class="sect"><summary><h2>Woran ich gerade arbeite</h2></summary>\n<details class="now"><summary><span class="t">1 — X</span></summary><div class="body"><p>${nowBody}</p></div></details>\n</details>` +
+    `<details class="sect"><summary><h2>Von dir zu klären</h2></summary>\n</details>` +
+    `<details class="sect"><summary><h2>Warteschlange</h2></summary>\n</details>` +
+    `<details class="sect"><summary><h2>Erledigt</h2></summary>\n` +
+    Array.from({ length: done }, (_, i) => card(900 + i, 'fertig')).join('') +
+    (link ? '<p class="archive-link">im <a href="https://example.invalid/a">Archiv</a>.</p>' : '') +
+    `</details>` +
+    `<footer>Stand: 27.07.2026 · 1 offene Punkte</footer></main>`
+  // auditDashboard(html, input) returns the violation ARRAY; these structural
+  // cases need no point lists beyond the one open point the fixture names.
+  const codes = (html) => auditDashboard(html, { open: [1], done: [] }).map((x) => x.code)
+
+  it('passes a board that keeps its twenty, links the archive and dates its status', () => {
+    expect(codes(board())).not.toContain('erledigt-overflow')
+    expect(codes(board())).not.toContain('archive-link-missing')
+    expect(codes(board())).not.toContain('now-card-undated')
+  })
+
+  it('fails when the Erledigt section grew past the twenty the board keeps', () => {
+    expect(codes(board({ done: ERLEDIGT_ON_BOARD + 1 }))).toContain('erledigt-overflow')
+  })
+
+  it('fails when the archive link is gone, which would orphan the moved cards', () => {
+    expect(codes(board({ link: false }))).toContain('archive-link-missing')
+  })
+
+  it('fails when a current-work card states no time for its status', () => {
+    expect(codes(board({ nowBody: 'läuft noch' }))).toContain('now-card-undated')
+  })
+
+  it('demands every section fold, not only Erledigt', () => {
+    const flat = board().replace(
+      '<details class="sect"><summary><h2>Warteschlange</h2></summary>',
+      '<h2>Warteschlange</h2>',
+    )
+    expect(codes(flat)).toContain('section-not-collapsible')
+  })
+})
+
+// The expected end of a current-work card is a promise to a reader who checks
+// the board from a phone (user 28.07.2026). A "~HH:MM" that has passed reads as
+// a stalled batch while the work is running, so it BLOCKS rather than reminds —
+// the 388 card had stood two hours past its estimate.
+describe('a current-work estimate stays ahead of the clock (user 28.07.2026)', () => {
+  const board = (meta) =>
+    `<main><h1>B</h1>` +
+    `<details class="sect"><summary><h2>Woran ich gerade arbeite</h2></summary>\n` +
+    `<details class="now"><summary><span class="t">388 — T</span><span class="right">` +
+    `<span class="meta">${meta}</span></span></summary><div class="body"><p>Stand 14:12 — läuft</p></div></details>\n` +
+    `</details>` +
+    `<details class="sect"><summary><h2>Von dir zu klären</h2></summary>\n</details>` +
+    `<details class="sect"><summary><h2>Warteschlange</h2></summary>\n</details>` +
+    `<details class="sect"><summary><h2>Erledigt</h2></summary>\n` +
+    `<p class="archive-link">im <a href="https://example.invalid/a">Archiv</a>.</p></details>` +
+    `<footer>Stand: 28.07.2026 · 1 offene Punkte</footer></main>`
+  const codes = (meta, nowMinutes) =>
+    auditDashboard(board(meta), { open: [1], done: [], nowMinutes }).map((x) => x.code)
+
+  it('passes while the estimate is still ahead', () => {
+    expect(codes('10:44 · ~15:15', 13 * 60)).not.toContain('now-eta-past')
+  })
+
+  it('blocks once the estimate has passed, naming the card', () => {
+    const v = auditDashboard(board('10:44 · ~11:15'), { open: [1], done: [], nowMinutes: 13 * 60 })
+    const hit = v.find((x) => x.code === 'now-eta-past')
+    expect(hit).toBeDefined()
+    expect(hit.msg).toContain('388')
+  })
+
+  it('grants a few minutes of grace so a republish on the minute cannot flap', () => {
+    expect(codes('10:44 · ~13:00', 13 * 60 + ETA_GRACE_MIN)).not.toContain('now-eta-past')
+    expect(codes('10:44 · ~13:00', 13 * 60 + ETA_GRACE_MIN + 1)).toContain('now-eta-past')
+  })
+
+  it('reads an estimate earlier than its own start as the next day, not as overdue', () => {
+    expect(codes('23:40 · ~00:30', 23 * 60 + 50)).not.toContain('now-eta-past')
+  })
+
+  it('stays silent when no clock is handed in — the rule is pure, never guessed', () => {
+    expect(codes('10:44 · ~11:15', null)).not.toContain('now-eta-past')
+    expect(codes('10:44 · ~11:15', undefined)).not.toContain('now-eta-past')
+  })
+
+  it('ignores a card that states no expected end at all', () => {
+    expect(codes('10:44', 13 * 60)).not.toContain('now-eta-past')
+  })
+
+  // Point 411 — the user reported the stale end times three times in one night.
+  // Flagging a PASSED estimate is one tick too late by construction: the card is
+  // already wrong when the guard speaks, and the reader had been looking at it
+  // for the half hour a delegated build takes.
+  it('flags an estimate that is CLOSE, before the promise breaks', () => {
+    // 20 minutes left: still honest, nothing said.
+    expect(codes('10:44 · ~13:20', 13 * 60)).not.toContain('now-eta-soon')
+    // 10 minutes left: flagged while the board is still true.
+    expect(codes('10:44 · ~13:10', 13 * 60)).toContain('now-eta-soon')
+    expect(codes('10:44 · ~13:10', 13 * 60)).not.toContain('now-eta-past')
+  })
+
+  it('says the PASSED case louder, and never both at once for one card', () => {
+    const v = auditDashboard(board('10:44 · ~11:15'), { open: [1], done: [], nowMinutes: 13 * 60 })
+    const past = v.find((x) => x.code === 'now-eta-past')
+    expect(past.msg).toContain('ALREADY PASSED')
+    expect(v.find((x) => x.code === 'now-eta-soon')).toBeUndefined()
+  })
+
+  it('hands over the estimating RULE with either flag — the estimates were optimistic every time', () => {
+    for (const meta of ['10:44 · ~13:10', '10:44 · ~11:15']) {
+      const v = auditDashboard(board(meta), { open: [1], done: [], nowMinutes: 13 * 60 })
+      const hit = v.find((x) => x.code === 'now-eta-soon' || x.code === 'now-eta-past')
+      expect(hit.msg, meta).toContain(ETA_RULE)
+    }
+  })
+
+  it('adds the METHOD observation once one card has been re-estimated too often', () => {
+    const args = (revisions) => ({ open: [1], done: [], nowMinutes: 13 * 60, etaRevisions: revisions })
+    const twice = auditDashboard(board('10:44 · ~13:10'), args({ byPoint: { 388: ETA_REVISION_LIMIT } }))
+    expect(twice.find((x) => x.code === 'now-eta-soon').msg).not.toContain('METHOD')
+    const thrice = auditDashboard(board('10:44 · ~13:10'), args({ byPoint: { 388: ETA_REVISION_LIMIT + 1 } }))
+    expect(thrice.find((x) => x.code === 'now-eta-soon').msg).toContain('METHOD')
+    // And it never throws on a garbled counter.
+    for (const bad of [null, 42, 'nope', { byPoint: 'x' }, { byPoint: { 388: 'viele' } }]) {
+      expect(() => auditDashboard(board('10:44 · ~13:10'), args(bad))).not.toThrow()
+    }
+  })
+
+  it('never mistakes a wrapped estimate for a close or a past one', () => {
+    // 23:50 against an estimate of 00:30 the next day: 40 minutes left, honest.
+    expect(codes('23:40 · ~00:30', 23 * 60 + 50)).not.toContain('now-eta-soon')
+    expect(codes('23:40 · ~00:30', 23 * 60 + 50)).not.toContain('now-eta-past')
+    // An estimate inside the same day is still flagged when it comes close.
+    expect(codes('23:00 · ~23:30', 23 * 60 + 20)).toContain('now-eta-soon')
+  })
+
+  it('is silent without a clock, and never throws on a garbled meta', () => {
+    expect(codes('10:44 · ~13:10', null)).not.toContain('now-eta-soon')
+    for (const meta of ['', 'irgendwas', '~99:99', '~:15', '10:44 · ~']) {
+      expect(() => codes(meta, 13 * 60), meta).not.toThrow()
+    }
+  })
+})
+
+describe('the estimate helpers, on their own (point 411)', () => {
+  it('reads the end and the start, wrapping past midnight', () => {
+    expect(etaMinutes('10:44 · ~13:10')).toEqual({ eta: 13 * 60 + 10, start: 10 * 60 + 44 })
+    expect(etaMinutes('23:40 · ~00:30')).toEqual({ eta: 1440 + 30, start: 23 * 60 + 40 })
+    expect(etaMinutes('10:44')).toBeNull()
+    expect(etaMinutes(null)).toBeNull()
+  })
+
+  it('reads an estimate against a clock that rolled past midnight', () => {
+    const at = (meta, nowMinutes) => etaStatus({ meta, nowMinutes })
+    // Before midnight the wrapped estimate is still honest.
+    expect(at('23:40 · ~00:30', 23 * 60 + 50)).toEqual({ minutesLeft: 40, state: 'ok' })
+    // After it, five minutes PAST 00:30 — not 1435 minutes short of it.
+    expect(at('23:40 · ~00:30', 35).minutesLeft).toBe(-5)
+    expect(at('23:40 · ~00:30', 30 + ETA_GRACE_MIN + 1).state).toBe('past')
+    // The same rollover for an estimate that never wrapped.
+    expect(at('23:00 · ~23:30', 10)).toEqual({ minutesLeft: -40, state: 'past' })
+    // A clock a minute behind the card's own stamp is skew, never a rollover.
+    expect(at('10:44 · ~13:10', 10 * 60 + 43).state).toBe('ok')
+    // A meta with no start stamp cannot be rolled, so it is never called overdue.
+    expect(etaMinutes('~13:00')).toEqual({ eta: 13 * 60, start: null })
+    expect(at('~13:00', 10).state).toBe('ok')
+  })
+
+  it('classifies ok / soon / past around the margin and the grace', () => {
+    const at = (meta, nowMinutes) => etaStatus({ meta, nowMinutes })
+    expect(at('10:00 · ~13:00', 12 * 60).state).toBe('ok')
+    // Exactly the margin is still ok; one minute inside it is not.
+    expect(at('10:00 · ~13:00', 13 * 60 - ETA_MARGIN_MIN).state).toBe('ok')
+    expect(at('10:00 · ~13:00', 13 * 60 - ETA_MARGIN_MIN + 1).state).toBe('soon')
+    expect(at('10:00 · ~13:00', 13 * 60 + ETA_GRACE_MIN).state).toBe('soon')
+    expect(at('10:00 · ~13:00', 13 * 60 + ETA_GRACE_MIN + 1).state).toBe('past')
+    expect(at('10:00 · ~13:00', null)).toBeNull()
+    expect(at('10:00', 12 * 60)).toBeNull()
+    expect(etaStatus()).toBeNull()
+  })
+
+  it('counts a moved estimate per session, and starts fresh in a new one', () => {
+    const card = (eta) => ({ meta: `10:00 · ~${eta}`, points: [388] })
+    let state = {}
+    state = etaRevisionPatch({ state, sessionId: 's1', cards: [card('12:00')] })
+    expect(state.etaRevisions.byPoint).toEqual({}) // the FIRST estimate is no revision
+    state = etaRevisionPatch({ state, sessionId: 's1', cards: [card('13:00')] })
+    state = etaRevisionPatch({ state, sessionId: 's1', cards: [card('14:00')] })
+    expect(state.etaRevisions.byPoint).toEqual({ 388: 2 })
+    // An unchanged estimate is not a revision.
+    state = etaRevisionPatch({ state, sessionId: 's1', cards: [card('14:00')] })
+    expect(state.etaRevisions.byPoint).toEqual({ 388: 2 })
+    // A new session estimates afresh — the count is about one sitting.
+    const next = etaRevisionPatch({ state, sessionId: 's2', cards: [card('09:00')] })
+    expect(next.etaRevisions.byPoint).toEqual({})
+    // Total on junk.
+    expect(() => etaRevisionPatch()).not.toThrow()
+    expect(etaRevisionPatch({ state: 'nope', cards: 'nope' }).etaRevisions.byPoint).toEqual({})
+  })
+})
+
+// The rule has to bite in the STOP chain, not only at a manual --synced: a card
+// whose status text is refreshed and whose HEAD has not moved satisfies every
+// other invariant while its header ages. Found by the four-eyes review.
+describe('the expected-end rule reaches the turn end', () => {
+  it('blocks the stop when a current-work estimate has passed', () => {
+    const stale = boardHtml().replace(/class="meta">[^<]*</, 'class="meta">10:44 · ~11:15<')
+    const withClock = evaluate(green({ html: stale, nowMinutes: 13 * 60 }))
+    expect(JSON.stringify(withClock)).toContain('now-eta-past')
+    // Without a clock the rule stays silent — it is never guessed.
+    expect(JSON.stringify(evaluate(green({ html: stale })))).not.toContain('now-eta-past')
+  })
+})
+
+describe('a queue of placeholders is a regression, not a valid board (point 419 d)', () => {
+  // The failure this counts: when the queue became a projection, the prose was
+  // never migrated — 79 of 81 cards carried the stub body and every existing
+  // rule passed, because the stub is exempt by name and coverage only asks that
+  // a point appear somewhere. Formally perfect, materially empty.
+  const stubCard = (n) =>
+    `<details><summary><span class="num">${n}</span><span class="t">Task ${n}</span>` +
+    `<span class="right"><span class="meta">${QUEUE_STUB_META}</span></span></summary>` +
+    `<div class="body"><p>${QUEUE_STUB_BODY}</p></div></details>`
+  const realCard = (n) =>
+    `<details><summary><span class="num">${n}</span><span class="t">Task ${n}</span>` +
+    `<span class="right"><span class="meta">~2 h</span></span></summary>` +
+    `<div class="body"><p>Echte Beschreibung für ${n}.</p></div></details>`
+
+  const boardWith = (cards) =>
+    boardHtml().replace(
+      /(<summary><h2>Warteschlange<\/h2><\/summary>\n)[\s\S]*?(\n<\/details>)/,
+      `$1${cards.join('\n')}$2`,
+    )
+  const codesFor = (cards, open) =>
+    auditDashboard(boardWith(cards), { open, done: [] }).map((x) => x.code)
+
+  it('flags a queue that is mostly placeholder', () => {
+    const cards = [1, 2, 3, 4, 5, 6, 7, 8].map(stubCard)
+    expect(codesFor(cards, [210, 1, 2, 3, 4, 5, 6, 7, 8])).toContain('queue-stubbed')
+  })
+
+  it('accepts a handful of fresh points among written ones', () => {
+    const cards = [realCard(1), realCard(2), realCard(3), realCard(4), realCard(5), realCard(6), stubCard(7)]
+    expect(codesFor(cards, [210, 1, 2, 3, 4, 5, 6, 7])).not.toContain('queue-stubbed')
+  })
+
+  it('flags a RUN of placeholders even when the share is under the ceiling', () => {
+    // 4 of 20 is 20 %, under the share ceiling — but a reader meets them in a row.
+    const cards = [
+      ...[1, 2, 3, 4].map(stubCard),
+      ...Array.from({ length: 16 }, (_, i) => realCard(i + 5)),
+    ]
+    const open = [210, ...Array.from({ length: 20 }, (_, i) => i + 1)]
+    expect(codesFor(cards, open)).toContain('queue-stubbed')
+  })
+
+  it('says nothing about an empty queue', () => {
+    expect(codesFor([], [210])).not.toContain('queue-stubbed')
+  })
+
+  it('recognises the exact body the generator emits, not a lookalike', () => {
+    const lookalike = [1, 2, 3, 4, 5, 6, 7, 8].map(
+      (n) =>
+        `<details><summary><span class="num">${n}</span><span class="t">Task ${n}</span>` +
+        `<span class="right"><span class="meta">~1 h</span></span></summary>` +
+        `<div class="body"><p>Noch offen, aber hier steht echter Text über den Punkt.</p></div></details>`,
+    )
+    expect(codesFor(lookalike, [210, 1, 2, 3, 4, 5, 6, 7, 8])).not.toContain('queue-stubbed')
+  })
+})
+
+describe('the placeholder rule has a floor, and reads the card the generator really writes', () => {
+  // Both findings of the second model's review of that rule.
+  const boardWith = (cards) =>
+    boardHtml().replace(
+      /(<summary><h2>Warteschlange<\/h2><\/summary>\n)[\s\S]*?(\n<\/details>)/,
+      `$1${cards.join('\n')}$2`,
+    )
+  const codesFor = (cards, open) =>
+    auditDashboard(boardWith(cards), { open, done: [] }).map((x) => x.code)
+  const stubCard = (n) => renderQueueCard({ point: n, title: `Task ${n}`, body: null, meta: QUEUE_STUB_META })
+  const realCard = (n) =>
+    renderQueueCard({ point: n, title: `Task ${n}`, body: `Echte Beschreibung für ${n}.`, meta: '~2 h' })
+
+  it('tolerates a single fresh point on a SHORT queue, where the bare ratio would not', () => {
+    // 1 of 3 is 33 %, over the share ceiling — and must not block a turn end.
+    expect(codesFor([stubCard(1), realCard(2), realCard(3)], [210, 1, 2, 3])).not.toContain('queue-stubbed')
+  })
+
+  it('still tolerates three, and flags the fourth on a short queue', () => {
+    const three = [stubCard(1), stubCard(2), realCard(3), stubCard(4), realCard(5)]
+    expect(codesFor(three, [210, 1, 2, 3, 4, 5])).not.toContain('queue-stubbed')
+    const four = [stubCard(1), stubCard(2), realCard(3), stubCard(4), realCard(5), stubCard(6)]
+    expect(codesFor(four, [210, 1, 2, 3, 4, 5, 6])).toContain('queue-stubbed')
+  })
+
+  it('catches the all-placeholder queue the rule was written for', () => {
+    const cards = Array.from({ length: 20 }, (_, i) => stubCard(i + 1))
+    const open = [210, ...Array.from({ length: 20 }, (_, i) => i + 1)]
+    expect(codesFor(cards, open)).toContain('queue-stubbed')
+  })
+
+  // The stub body goes through esc() on the way out and parseCards on the way
+  // back; building the fixture from the raw constant would not exercise that.
+  it('recognises a stub rendered through the real generator, entities and all', () => {
+    const rendered = Array.from({ length: 10 }, (_, i) => stubCard(i + 1))
+    expect(rendered[0]).toContain('&lt;N&gt;')
+    const open = [210, ...Array.from({ length: 10 }, (_, i) => i + 1)]
+    expect(codesFor(rendered, open)).toContain('queue-stubbed')
+  })
+})
+
+// Point 410 — the board is German prose the user reads on a phone, and
+// "faellt weg" / "kuenftig" read to him as broken text. The stdin path removes
+// the REASON to transliterate; this rule removes the habit, which would
+// otherwise return the next time the argument path looks convenient.
+describe('a transliterated umlaut on a card is a defect (point 410)', () => {
+  const board = ({ title = '410 — Die Tafel', body = 'Stand 14:12 — läuft' } = {}) =>
+    `<main><h1>B</h1>` +
+    `<details class="sect"><summary><h2>Woran ich gerade arbeite</h2></summary>\n` +
+    `<details class="now"><summary><span class="t">${title}</span><span class="right">` +
+    `<span class="meta">10:44 · ~15:15</span></span></summary><div class="body"><p>${body}</p></div></details>\n` +
+    `</details>` +
+    `<details class="sect"><summary><h2>Von dir zu klären</h2></summary>\n</details>` +
+    `<details class="sect"><summary><h2>Warteschlange</h2></summary>\n</details>` +
+    `<details class="sect"><summary><h2>Erledigt</h2></summary>\n` +
+    `<p class="archive-link">im <a href="https://example.invalid/a">Archiv</a>.</p></details></main>`
+  const audit = (opts) => auditDashboard(board(opts), { open: [410], done: [] })
+  const codes = (opts) => audit(opts).map((x) => x.code)
+
+  it('accepts real umlauts', () => {
+    expect(
+      codes({ body: 'Stand 14:12 — die Prüfung läuft, künftig fällt der Umweg über die Shell weg.' }),
+    ).not.toContain('transliterated-umlaut')
+  })
+
+  it('flags a transliterated body and NAMES the card', () => {
+    const hit = audit({ body: 'Stand 14:12 — der Umweg faellt kuenftig weg.' }).find(
+      (x) => x.code === 'transliterated-umlaut',
+    )
+    expect(hit).toBeDefined()
+    expect(hit.msg).toContain('410 — Die Tafel')
+    expect(hit.msg).toContain('faellt')
+    expect(hit.msg).toContain('--text-stdin')
+  })
+
+  it('flags a transliterated TITLE too, not only the body', () => {
+    expect(codes({ title: '410 — Pruefung der Tafel' })).toContain('transliterated-umlaut')
+  })
+
+  it('leaves legitimate words that merely carry those letters alone', () => {
+    expect(
+      codes({ body: 'Stand 14:12 — Quelle, Steuer, Aequator, Feuer, Museum, neue Route, Duell.' }),
+    ).not.toContain('transliterated-umlaut')
+  })
+
+  it('never throws on an unreadable board', () => {
+    expect(findTransliterations(null)).toEqual([])
+    expect(findTransliterations(undefined)).toEqual([])
+    expect(() => auditDashboard(null, { open: [1], done: [] })).not.toThrow()
+  })
+
+  it('catches the words the user reported, and the compounds around them', () => {
+    expect(findTransliterations('faellt weg')).toContain('faellt')
+    expect(findTransliterations('kuenftig')).toContain('kuenftig')
+    expect(findTransliterations('Ueberpruefung')).toContain('ueberpruefung')
+    expect(findTransliterations('ausgefuehrt')).toContain('ausgefuehrt')
+    expect(findTransliterations('groesser')).toContain('groesser')
+  })
+
+  it('reaches the turn end through the audit invariant', () => {
+    const broken = boardHtml().replace('Kurzstand.', 'Kurzstand, faellt kuenftig weg.')
+    expect(JSON.stringify(evaluate(green({ html: broken })))).toContain('transliterated-umlaut')
   })
 })

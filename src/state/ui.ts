@@ -65,6 +65,13 @@ export interface UiState {
   /** Debug: force the season wetness (0 dry .. 1 wet); null = derived from the date (design.md §21). */
   seasonWetnessOverride: number | null
   /**
+   * Inverted vertical look (design.md §17.5/§21.3, point 392), DEFAULT ON:
+   * pushing the mouse (or the right stick) FORWARD looks DOWN, pulling back
+   * looks UP — the flight-stick convention the user chose. The debug-menu
+   * checkbox turns it off; the horizontal look never changes with it.
+   */
+  invertLook: boolean
+  /**
    * Debug unlock (design.md §21): allow zooming *out* beyond the default
    * camera distance. Zooming in is always available.
    */
@@ -139,6 +146,7 @@ export interface UiState {
   setFpsVisible: (visible: boolean) => void
   setTraaEnabled: (enabled: boolean) => void
   setSeasonWetnessOverride: (wetness: number | null) => void
+  setInvertLook: (invert: boolean) => void
   setWheelZoomEnabled: (enabled: boolean) => void
   setTravelZoom: (zoom: number) => void
   setJournalDnd: (dnd: boolean) => void
@@ -179,6 +187,7 @@ export const useUi = create<UiState>()((set) => ({
   fpsVisible: true,
   traaEnabled: true,
   seasonWetnessOverride: null,
+  invertLook: true, // inverted vertical look is the shipped default (point 392)
   wheelZoomEnabled: false,
   journalDnd: false,
   travelZoom: DEFAULT_TRAVEL_ZOOM,
@@ -207,6 +216,7 @@ export const useUi = create<UiState>()((set) => ({
   setFpsVisible: (fpsVisible) => set({ fpsVisible }),
   setTraaEnabled: (traaEnabled) => set({ traaEnabled }),
   setSeasonWetnessOverride: (seasonWetnessOverride) => set({ seasonWetnessOverride }),
+  setInvertLook: (invertLook) => set({ invertLook }),
   // Disabling the unlock clamps any zoom-out back to the default distance;
   // a zoomed-in view is kept.
   setWheelZoomEnabled: (wheelZoomEnabled) =>

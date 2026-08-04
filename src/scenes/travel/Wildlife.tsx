@@ -26,7 +26,16 @@ import {
   type DebugEventFailure,
   type WildlifeDramaKind,
 } from '../../systems/debugEvents'
-import { setAnimalCollider } from './wildlifeCollision'
+import { setWildlifeDumpSource } from '../../systems/wildlifeDump'
+import { setAnimalCollider, collidableAnimalsNear } from './wildlifeCollision'
+import {
+  recordDrawnBody,
+  drawnCollisionCircle,
+  BODY_RADIUS,
+  SPECIES,
+  type DrawnBody,
+  type Species,
+} from './animalBodies'
 import { isOnScreen } from './frameVisibility'
 import { latLonToWorld, regionAt, PLACES, UNITS_PER_DEGREE, worldToLatLon } from '../../world/geo'
 import { RIVER_WIDTH_DEG, sampleTerrain } from '../../world/terrain'
@@ -76,7 +85,14 @@ import {
   REGION_PREDATORS,
   parentAttackOutcome,
   findAdopter,
+  adoptionHeld,
+  severFamilyLinks,
+  tickFamilySeparation,
   tickEscapeRun,
+  orphanMourns,
+  tickMourning,
+  calfMayPlay,
+  juvenileAnchor,
   isPredatorSpecies,
   PREDATOR_PREY,
   REGION_PREY,
@@ -101,7 +117,8 @@ import {
   crocodileLungeReady,
   crocodileAmbushResting,
   crocodileWaterlinePrey,
-  crocodileMouthAnchor,
+  crocodileHaulStep,
+  crocodileFeedPairValid,
   crocodileFeedPose,
   crocodileIdleYaw,
   crocodileGripExpired,
@@ -157,11 +174,6 @@ const CHUNK_SIZE = 24
 // existing scavenger/cull/render machinery works a dead hyena exactly like a
 // dead zebra. Live predators never spawn here — spawnChunk picks species
 // explicitly, and the one live hunter stays the scripted <LionHunt>.
-type Species = 'elephant' | 'giraffe' | 'zebra' | 'wildebeest' | 'antelope' | 'warthog' | 'flamingo' | 'crocodile' | 'plover' | PredatorKind
-const SPECIES: Species[] = [
-  'elephant', 'giraffe', 'zebra', 'wildebeest', 'antelope', 'warthog', 'flamingo', 'crocodile', 'plover',
-  'lion', 'cheetah', 'leopard', 'hyena',
-]
 const MAX_INSTANCES: Record<Species, number> = {
   elephant: 60,
   giraffe: 60,
@@ -221,6 +233,12 @@ interface Animal {
   parent?: Animal
   /** The parent's calf/foal, guarded against predators (design.md §19). */
   child?: Animal
+  /** Seconds this juvenile has been OUT OF REACH of its parent (design.md §19.8,
+   *  point 341): accumulated while it stands farther away than the follow radius,
+   *  reset the moment it is back inside. At balance.family.reunionSeconds the bond
+   *  RESOLVES — links cleared, the young handed to the orphan adoption — so a walk
+   *  toward a parent it can never reach always has an ending. */
+  separated?: number
   /** Shore animals that also wade in and bathe, not just drink (design.md §19). */
   bathe?: boolean
   /** Persisted flee/dodge heading, turned toward its target at a bounded rate so
@@ -300,6 +318,21 @@ interface Animal {
    *  until balance.vigil.seconds or until the carcass is gone; then the field
    *  clears and the parent simply rejoins the herd. */
   vigil?: { x: number; z: number; carcass: Animal; time: number }
+  /** The orphan's mourning window (design.md §19.8, point 369): seconds left in
+   *  which a juvenile whose parent DIED keeps to the body and does NOT gambol —
+   *  the same standing-by-a-body watch the §19.8 vigil holds, applied to a
+   *  juvenile at its parent. Counted down every frame and cleared at zero, so
+   *  the demeanour always resolves back to play (invariant I4). Only a DEATH
+   *  arms it: a bond that merely resolved administratively (point 341) leaves
+   *  nothing to grieve. Fear outranks it — the flight, hunt and seizure branches
+   *  all sit ABOVE the family follow, so a grieving calf never stands still for
+   *  a predator, and the field is deliberately kept out of `dramaStateOf` so the
+   *  player-shy bolt keeps firing too. */
+  mourn?: number
+  /** Where its parent fell (point 369): the watch's anchor, held as a POINT and
+   *  never a reference — the carcass is removed long before the window ends, and
+   *  nothing may survive holding a body that is gone (point 341). */
+  mournAt?: { x: number; z: number }
   /** Closest lion-to-calf approach seen by this guarding parent (point 191):
    *  feeds guardEngagement's release-on-recede, so a PASSING hunt is guarded
    *  only while it closes in — never leapfrog-followed to the kill. */
@@ -308,6 +341,12 @@ interface Animal {
    *  judges animals the ground sweep has seen — a staged injection with a
    *  hard-coded y is corrected on its first sweep visit, not flagged. */
   grounded?: boolean
+  /** The transform the render loop last composed for this animal (point 378):
+   *  written from the instance matrix itself, read by the collider so the
+   *  circle sits where the body is DRAWN. Never read back by the simulation —
+   *  the render offsets must not accumulate into the behaviour position (the
+   *  point-383 write-back lesson). */
+  drawn?: DrawnBody
   /** Consecutive anchoring-assert visits this animal has been buried/floating
    *  (point 200): the tripwire fires only at 2+, tolerating a 1-frame transient. */
   floatStrike?: number
@@ -320,7 +359,23 @@ interface Animal {
    *  absent = hidden at its spot; set = lunging at / gripping a victim or
    *  slinking back home. Its own state — the scripted LION hunt is never
    *  touched by an ambush. */
-  lunge?: { victim: Animal | null; timer: number; homeX: number; homeZ: number; gripped: boolean; retreat?: boolean }
+  lunge?: {
+    victim: Animal | null
+    timer: number
+    homeX: number
+    homeZ: number
+    gripped: boolean
+    /** The DRAG-INTO-WATER leg (point 383): seized, but still being hauled off
+     *  the bank back into the channel. `gripped` — the feeding hold — only
+     *  begins once crocodile and catch are both on water. */
+    dragging?: boolean
+    /** Where the catch was SEIZED — the bank spot the drag started from (point
+     *  383). The body itself ends up in the river, so a keeper's vigil stands
+     *  here, at the waterline, rather than out in the channel. */
+    seizeX?: number
+    seizeZ?: number
+    retreat?: boolean
+  }
   /** Elapsed time a DRIVEN-OFF crocodile's rest expires at (point 130 under the
    *  broadened waterline trigger): while it holds, this crocodile takes no new
    *  ambush target, so a repelled ambusher truly withdraws instead of re-seizing
@@ -451,10 +506,30 @@ function dramaStateOf(a: Animal, isHunted: boolean): DramaState {
   }
 }
 
+/** Open the orphan's mourning window (design.md §19.8, point 369): a juvenile
+ *  whose parent has just DIED keeps to the spot it fell for
+ *  balance.family.mourningSeconds and does not gambol, then plays again. Two
+ *  callers, and between them they cover every death: the SACRIFICE, which frees
+ *  the calf and cuts the bond a few lines BEFORE the parent dies (so the sweep
+ *  below could never see it), and the orphan sweep in the family pass, which
+ *  catches every other cause — the hunt, the crocodile, the trample, a drowning.
+ *  Deliberately NOT armed on an administrative ending (a streamed-out parent, the
+ *  point-341 separation): the calf watched nothing happen. */
+const mournOrphan = (young: Animal | null | undefined, body: { x: number; z: number }) => {
+  if (!young || young.dead || young.young !== true) return
+  young.mourn = balance.family.mourningSeconds
+  young.mournAt = { x: body.x, z: body.z }
+}
+
 /** Pointer to the herds of the mounted <Herds>, so <LionHunt> can pick a nearby
  *  calf to hunt (both live in this module). Set each frame by <Herds>, cleared on
  *  unmount. */
 let ACTIVE_HERDS: Record<Species, Animal[]> | null = null
+
+/** Frame stamp of the herd draw pass the collider must match (point 378): only
+ *  an animal DRAWN in that pass carries a collision circle, so a body the frame
+ *  never rendered (capped out, streamed away) leaves no phantom collider. */
+let ACTIVE_DRAW_FRAME = 0
 
 /** Base render scale per prey species (warthog small, wildebeest sturdy). The
  *  giraffe geometry is already giraffe-sized (~3.6 units tall, fauna.ts), so
@@ -755,28 +830,6 @@ const VULTURE_FLY_SPEED = 16
 const FALLS_DRIFT_BOOST = 4
 const FALLS_DRIFT_RADIUS_DEG = 0.5
 
-/** Body radius per species (world units, at scale 1): animals spawn with — and
- *  keep — at least the sum of two bodies' radii between their centres, so they
- *  neither spawn inside one another nor walk through each other (design.md
- *  §19). The elephant×smaller-prey pair is exempt at runtime: trampling is a
- *  designed interaction (the herd walks OVER a too-slow animal). */
-const BODY_RADIUS: Record<Species, number> = {
-  elephant: 1.3,
-  giraffe: 0.9,
-  zebra: 0.7,
-  wildebeest: 0.75,
-  antelope: 0.6,
-  warthog: 0.45,
-  flamingo: 0.25,
-  crocodile: 0.55,
-  plover: 0.12,
-  // Predator entries complete the record (point 146); their list members are
-  // always dead, and every proximity pass skips carcasses.
-  lion: 0.8,
-  cheetah: 0.55,
-  leopard: 0.55,
-  hyena: 0.6,
-}
 /** Grid cell size for the runtime separation pass (≥ 2·max body radius). */
 const SEPARATION_CELL = 4
 // Body separation acts as a bounded force (units/s), not a per-frame teleport:
@@ -789,6 +842,16 @@ const SEPARATION_MAX_SPEED = 2.2
  * through them. Reads the streamed herds shared each frame via ACTIVE_HERDS;
  * carcasses are passable. The Wildlife component registers this with
  * `setAnimalCollider` so the movement loop can call it (see wildlifeCollision).
+ *
+ * The circle comes from the transform the RENDERER composed for that instance
+ * (point 378), never from the behaviour position: the drawn body carries the
+ * render offsets — the idle shuffle (up to ~1.1 units, more than a grazer's
+ * whole body), the drink/bathe slide to the bank (measured up to 8.9 units),
+ * the caught struggle, the crocodile's ambush placement — and a collider built
+ * from `a.x`/`a.z` therefore sat BESIDE the animal: the traveller walked
+ * through the drawn body and was blocked on empty ground next to it (the user's
+ * report). An animal the last pass did not draw contributes nothing, so an
+ * unrendered body leaves no phantom collider either (the point-129 rule).
  */
 function nearAnimalObstacles(px: number, pz: number, radius: number): Array<[number, number, number]> {
   const herds = ACTIVE_HERDS
@@ -797,9 +860,10 @@ function nearAnimalObstacles(px: number, pz: number, radius: number): Array<[num
   for (const sp of SPECIES) {
     const br = BODY_RADIUS[sp]
     for (const a of herds[sp]) {
-      if (a.dead) continue
-      const r = br * a.scale
-      if (Math.abs(a.x - px) < radius + r && Math.abs(a.z - pz) < radius + r) out.push([a.x, a.z, r])
+      const circle = drawnCollisionCircle(a, br, ACTIVE_DRAW_FRAME)
+      if (circle === null) continue
+      const [cx, cz, r] = circle
+      if (Math.abs(cx - px) < radius + r && Math.abs(cz - pz) < radius + r) out.push(circle)
     }
   }
   return out
@@ -1708,7 +1772,11 @@ function Herds() {
       herdState.current.clear()
       for (const f of scavengers.current) f.target = null
     }
-    w.__wildlife = { herdsRef, stains, spawnedChunks, scavenger, restock, calfMeshRefs, herdState, fire: FIRE_STATE, lion: LION_STATE, igniteFire: igniteFireAt, simTime: () => simTimeRef.current, frames: () => frameCountRef.current }
+    // meshRefs + colliders (point 378): the verification reads the ADULT instance
+    // matrices themselves and the circles the movement loop really collides
+    // against, so the two can be checked against each other.
+    w.__wildlife = { herdsRef, stains, spawnedChunks, scavenger, restock, meshRefs, calfMeshRefs, herdState,
+      colliders: (x: number, z: number, r: number) => collidableAnimalsNear(x, z, r), fire: FIRE_STATE, lion: LION_STATE, igniteFire: igniteFireAt, simTime: () => simTimeRef.current, frames: () => frameCountRef.current }
     return () => {
       delete w.__wildlife
     }
@@ -1946,6 +2014,21 @@ function Herds() {
     return () => setAnimalCollider(null)
   }, [])
 
+  // Let the F6 bug report READ the wildlife (point 454). Registered
+  // unconditionally like the drama trigger above — F6 ships in the delivered
+  // build, which has no `window.__wildlife`. The source only hands the live
+  // records over; the bounding and the shaping happen in systems/wildlifeDump,
+  // on the keypress, never in a frame. Cleared on unmount so a dump taken in a
+  // settlement can never read a stale herd.
+  useEffect(() => {
+    setWildlifeDumpSource(() => ({
+      herds: herdsRef.current,
+      flocks: scavengers.current,
+      hunt: LION_STATE,
+    }))
+    return () => setWildlifeDumpSource(null)
+  }, [])
+
   useFrame(({ clock }, delta) => {
     const dt = Math.min(delta, 0.1)
     // Accumulate the SIM clock (point 177): drama verifications budget in these
@@ -2058,6 +2141,12 @@ function Herds() {
           if (a.origin === undefined) a.origin = a.chunk // birth chunk, pre-re-home
           a.chunk = v.rehomeTo
         }
+        // A removed animal leaves NO family link behind (point 341): this cull is
+        // where the §19.8 phantom was born — a calf kept its streamed-out parent
+        // (not dead, so the follow branch and the orphan adoption both accepted
+        // it) and walked to a frozen position to nurse at nothing. Severing both
+        // sides hands it to the adoption pass below in this very frame.
+        if (!v.keep) severFamilyLinks(a)
         return v.keep
       })
     }
@@ -2131,7 +2220,13 @@ function Herds() {
               // The vigil (design.md §19.8, point 121): a parent that stayed
               // clear of the kill does not resume grazing — it walks to the
               // carcass and stands over it (behaviour in the vigil pre-pass).
-              par.vigil = { x: a.x, z: a.z, carcass: a, time: 0 }
+              // A CROCODILE kill has been hauled into the river (point 383), so
+              // the keeper stands at the WATERLINE its calf was seized from —
+              // never out in the channel over a body the river has taken.
+              const seized = croc
+                ? herds.crocodile.find((k) => k.lunge?.victim === a)?.lunge
+                : undefined
+              par.vigil = { x: seized?.seizeX ?? a.x, z: seized?.seizeZ ?? a.z, carcass: a, time: 0 }
               par.child = undefined
               a.parent = undefined
             }
@@ -2148,7 +2243,12 @@ function Herds() {
           { // ground-follow (point 203(A)): a mover carries its own standing height
             const gfl = worldToLatLon(a.x, a.z)
             const gft = sampleTerrain(gfl.lat, gfl.lon, seed)
-            if (gft.type !== 'water' && gft.type !== 'ocean') a.y = groundedBodyY(gft.height)
+            // The charge follows the calf into the shallows where a crocodile has
+            // hauled it (point 383): over water it rides the sheet chest-deep,
+            // like a crossing swimmer, instead of keeping its bank height.
+            if (gft.type === 'water')
+              a.y = sheetAnchorY(waterSurfaceY(gfl.lat, gfl.lon, seed, gft.height), gft.height, 0.32)
+            else if (gft.type !== 'ocean') a.y = groundedBodyY(gft.height)
           }
           if (d < PARENT_SACRIFICE_DIST) {
             // The defence roll (design.md §19.8, points 124/125/146): ONE
@@ -2222,6 +2322,11 @@ function Herds() {
                 // this frame — a re-parented calf walks back to its new parent
                 // past the feeding predator instead of fleeing.
                 calf.escape = balance.family.escapeSeconds
+                // …and it grieves what it just watched (point 369): the parent
+                // dies below, so the sweep in the family pass — which reads a
+                // DEAD parent through a link this branch has already cut — can
+                // never see this ending. Armed here, at the death itself.
+                mournOrphan(calf, a)
               }
               if (calf.caughtBy === 'crocodile') {
                 // The sacrifice at the waterline (point 130): the crocodile
@@ -2303,6 +2408,7 @@ function Herds() {
               calf.parent = undefined // freed — it keeps fleeing on its own
               a.child = undefined
               calf.escape = balance.family.escapeSeconds // the escape run owns it (point 311)
+              mournOrphan(calf, a) // …and grieves the shield that fell for it (point 369)
               takeAnimal(a, { stain: true })
               LION_STATE.victim = a // the hunt closes out feeding on the parent
             }
@@ -2617,8 +2723,25 @@ function Herds() {
     // down here for EVERY species (predator cubs included, so the field can
     // never linger unticked), and the adoption resumes the moment it expires:
     // point 262's guarantee is deferred, not dropped.
+    // SEPARATION (point 341): the bond gets the same hard deadline. A juvenile
+    // out of reach of its LIVING parent — farther than the follow radius — for
+    // longer than balance.family.reunionSeconds has the bond RESOLVED here:
+    // both links cleared and the young handed straight to the adoption below, so
+    // a walk toward a parent it can never reach always ends. The clock runs only
+    // while the calf is genuinely out of reach (a gambol at the leash edge or a
+    // short flight resets it) and freezes inside a running §19.8 ending, whose
+    // own deadline resolves first. The just-released parent is barred from that
+    // frame's adoption, so the calf is not handed back to the very adult it
+    // spent the whole window failing to reach — from the NEXT frame on it is an
+    // ordinary candidate again, so a pair that merely drifted apart re-forms.
+    // Predator cubs stay out of BOTH passes (as before): they can never be
+    // adopted, so releasing a cub from a living lioness — one long hunt away
+    // from its side — would end that pairing for good. Their phantom case is
+    // already covered by the cull severing the pair above.
     {
       const ADOPTION_RADIUS = balance.family.adoptionRadius
+      const FOLLOW_RADIUS = balance.family.followRadius
+      const REUNION_SECONDS = balance.family.reunionSeconds
       for (const sp of SPECIES) {
         // Predators never adopt (a lion cub whose lioness died stays orphaned);
         // the pool is thus homogeneous and non-predator, so findAdopter's
@@ -2626,10 +2749,48 @@ function Herds() {
         const predatorHerd = isPredatorSpecies(sp)
         for (const a of herds[sp]) {
           if (a.escape !== undefined) a.escape = tickEscapeRun(a.escape, dt)
+          // The orphan's mourning window (point 369) runs on its OWN clock: it
+          // is counted down here for EVERY animal — predator cubs included, so
+          // the field can never linger unticked — and neither the adoption below
+          // nor a danger response pauses it. At zero the watch is packed away
+          // and the young plays again (invariant I4: it always resolves).
+          if (a.mourn !== undefined) {
+            a.mourn = tickMourning(a.mourn, dt)
+            if (a.mourn === undefined) a.mournAt = undefined
+          }
           if (predatorHerd) continue
           if (a.dead || a.young !== true) continue
-          if (a.parent && !a.parent.dead) continue // still has a living parent
-          const adopter = findAdopter(a, herds[sp], ADOPTION_RADIUS)
+          let released: Animal | null = null
+          if (a.parent && !a.parent.dead) {
+            const sep = tickFamilySeparation(
+              a.separated,
+              Math.hypot(a.parent.x - a.x, a.parent.z - a.z),
+              FOLLOW_RADIUS,
+              dt,
+              REUNION_SECONDS,
+              adoptionHeld(a),
+            )
+            a.separated = sep.separated
+            if (!sep.resolve) continue // still has a living parent within reach of reuniting
+            released = a.parent
+            severFamilyLinks(a)
+          } else {
+            a.separated = undefined // no living parent to be separated from
+            // The orphan's mourning window (design.md §19.8, point 369): a
+            // parent that DIED in the world — by any cause that leaves the link
+            // standing (the hunt, the crocodile, the trample, a drowning) — is
+            // grieved before the calf plays again. The two sacrifice sites cut
+            // the bond themselves and arm it at the death instead, so nothing is
+            // counted twice. Severing here is the point-341 rule applied to a
+            // body: no juvenile keeps a parent that is gone, and the adoption
+            // below then picks it up as an ordinary orphan — subdued, but
+            // following its new parent.
+            if (orphanMourns(a.parent)) {
+              mournOrphan(a, a.parent as Animal)
+              severFamilyLinks(a)
+            }
+          }
+          const adopter = findAdopter(a, herds[sp], ADOPTION_RADIUS, { exclude: released })
           if (adopter) {
             a.parent = adopter
             adopter.child = a
@@ -2786,7 +2947,17 @@ function Herds() {
             a.trampleTo || a.vigil || a.crossing !== undefined || a.caught !== undefined
           )
             continue
-          if (a.child && !a.child.dead && (a.child.inWater !== undefined || a.child.mired !== undefined)) continue
+          // A parent CHARGING a predator that holds its calf is such a drama
+          // mover too (point 383): a crocodile hauls its catch into the river, so
+          // the charge now genuinely reaches the water — and a setback mid-charge
+          // would break the §19.8 rescue/sacrifice at the waterline that §19.16
+          // builds on. This list and the collision push's `inDrama` mirror each
+          // other; the push already exempted a child-caught parent.
+          if (
+            a.child && !a.child.dead &&
+            (a.child.inWater !== undefined || a.child.mired !== undefined || a.child.caught !== undefined)
+          )
+            continue
           const ll = worldToLatLon(a.x, a.z)
           const terSample = sampleTerrain(ll.lat, ll.lon, seed)
           const ter = terSample.type
@@ -2828,6 +2999,39 @@ function Herds() {
     const crocByVictim = new Map<Animal, Animal>()
     {
       const bc = balance.crocodile
+      // The one water probe the drag leg and its invariant share (point 383):
+      // a crocodile's home is a water cell and nothing else (crocodileAllowedAt).
+      const isWaterAt = (x: number, z: number): boolean => {
+        const ll = worldToLatLon(x, z)
+        return crocodileAllowedAt(sampleTerrain(ll.lat, ll.lon, seed).type)
+      }
+      // Re-seat a crocodile that just moved onto the DRAWN water sheet at its
+      // new spot (the same derivation the resting re-anchor uses — never the
+      // canoe-float surface, whose local-bed floor stands proud of the ribbon).
+      const seatOnWater = (c: Animal) => {
+        const wll = worldToLatLon(c.x, c.z)
+        const wt = sampleTerrain(wll.lat, wll.lon, seed)
+        c.y = renderedSheetY(wll.lat, wll.lon, seed) ?? waterSurfaceY(wll.lat, wll.lon, seed, wt.height) ?? wt.height + 0.3
+      }
+      // One step of the haul/hold, and the catch carried with it (point 383):
+      // the crocodile owns the pair's placement from the seizure until the
+      // carcass is gone, so the two can never end up on opposite sides of the
+      // shoreline — the reported picture. The catch rides the JAWS throughout
+      // (point 268) and at the crocodile's own waterline, so a dead one dissolves
+      // in the river beside it rather than on the sand where it fell.
+      const haulCatch = (c: Animal, v: Animal) => {
+        const hold = crocodileHaulStep(
+          c.x, c.z, c.rot, c.scale, c.lunge!.homeX, c.lunge!.homeZ,
+          bc.mouthOffsetLocal, bc.dragSpeed, dt, isWaterAt,
+        )
+        c.x = hold.x
+        c.z = hold.z
+        c.rot = hold.rot
+        v.x = hold.victimX
+        v.z = hold.victimZ
+        v.y = c.y
+        return hold
+      }
       for (const c of herds.crocodile) {
         if (c.dead) continue
         // Keep every RESTING crocodile ON water (design.md §19.16, point 242): a
@@ -2925,12 +3129,13 @@ function Herds() {
           c.lunge.retreat ||
           c.lunge.victim === null ||
           c.lunge.victim.gone === true ||
-          // Gripping: slink home only once the catch is fully RESOLVED — the croc
-          // stays coupled to its victim through the struggle AND the sink that
-          // follows the kill (point 250: no swimming away while the prey still
-          // dissolves on its own). Mid-burst (not yet gripped): a victim that died
-          // or vanished before contact ends the run.
-          (c.lunge.gripped
+          // Gripping (or still hauling the catch in, point 383): slink home only
+          // once the catch is fully RESOLVED — the croc stays coupled to its
+          // victim through the struggle AND the sink that follows the kill (point
+          // 250: no swimming away while the prey still dissolves on its own).
+          // Mid-burst (nothing seized yet): a victim that died or vanished before
+          // contact ends the run.
+          (c.lunge.gripped || c.lunge.dragging
             ? !crocodileHoldsCatch(true, c.lunge.victim.caught, c.lunge.victim.dead === true, c.lunge.victim.dissolve)
             : c.lunge.victim.dead)
         ) {
@@ -2944,7 +3149,7 @@ function Herds() {
             c.z += (dz / d) * Math.min(d, bc.lungeSpeed * 0.3 * dt)
             c.rot = Math.atan2(dx, dz)
           }
-        } else if (!c.lunge.gripped) {
+        } else if (!c.lunge.gripped && !c.lunge.dragging) {
           // The burst: fast, short and visible — never a teleport.
           c.lunge.timer += dt
           const v = c.lunge.victim
@@ -2956,55 +3161,97 @@ function Herds() {
           if (c.lunge.timer > 4) {
             c.lunge.retreat = true // the moment passed — back under
           } else if (d < 0.9) {
-            // Seized AT the waterline: the victim struggles there through the
-            // shared window while a parent may still charge in and save it.
+            // Seized AT the waterline: the victim struggles through the shared
+            // window while a parent may still charge in and save it — but the
+            // ambusher does not eat it on the beach. The seizure hands straight
+            // over to the DRAG-INTO-WATER leg (point 383): §19.16's kill goes
+            // back into the river, and only there does the feeding grip begin.
             v.x = tx
             v.z = tz
             v.drink = undefined
             v.caught = CAUGHT_DURATION
             v.caughtBy = 'crocodile'
-            c.lunge.gripped = true
-            c.lunge.timer = 0 // restart the clock for the grip's hard deadline (point 186)
+            c.lunge.dragging = true
+            c.lunge.seizeX = tx
+            c.lunge.seizeZ = tz
+            c.lunge.timer = 0 // the haul's own clock (its I4 deadline)
           } else {
             c.x += (dx / d) * bc.lungeSpeed * dt
             c.z += (dz / d) * bc.lungeSpeed * dt
             c.rot = Math.atan2(dx, dz)
           }
+        } else if (c.lunge.dragging) {
+          // THE DRAG INTO THE WATER (design.md §19.16, point 383): the ambusher
+          // hauls its catch off the bank and back into its channel — the leg that
+          // did not exist, which is why the pair used to feed where the strike
+          // happened. The catch rides the jaws the whole way; the parent's rescue
+          // window runs on unchanged (its charge simply follows the calf to the
+          // water). Bounded by dragSeconds (I4): a haul that cannot reach water
+          // settles rather than pinning the drama.
+          c.lunge.timer += dt
+          const v = c.lunge.victim
+          devAssert(c.lunge.timer <= bc.dragSeconds + 2, 'croc-drag-bounded', () => `drag ${c.lunge?.timer.toFixed(1)}s`)
+          const hauled = haulCatch(c, v)
+          crocByVictim.set(v, c)
+          if (!hauled.dragging || c.lunge.timer > bc.dragSeconds) {
+            // In the water: seat the body on the sheet it now lies in, hand the
+            // catch its waterline, and start the feeding grip (and its own
+            // point-186 deadline) here.
+            seatOnWater(c)
+            v.y = c.y
+            c.lunge.dragging = false
+            c.lunge.gripped = true
+            c.lunge.timer = 0
+          }
         } else {
-          // Gripping — two coupled phases, the croc holding its victim throughout
-          // (point 250), so the prey's removal is the croc's own feed:
+          // Feeding IN THE WATER (design.md §19.16, points 250/383) — two coupled
+          // phases, the croc holding its victim throughout, so the prey's removal
+          // is the croc's own feed:
           //  (1) STRUGGLE (caught still counting): hold the thrashing victim at
-          //      the waterline. The point-186 hard deadline releases a VANISHED
+          //      the jaws. The point-186 hard deadline releases a VANISHED
           //      victim whose countdown froze (streamed out in a chunk despawn,
           //      taken by another system) so the drama can never pin the croc —
           //      the §19.8 "every started drama resolves" rule (invariant I4).
           //  (2) SINK (the kill resolved, caught cleared, the body dissolving in
-          //      the water): the croc drags it under through the dissolve
+          //      the water): the croc keeps it under through the dissolve
           //      (design.md §19.16 — the river keeps the body, no bank carcass);
           //      the retreat branch above releases the croc only once the body is
           //      gone. The dissolve is self-bounded (CARCASS_DISSOLVE_SECONDS), so
           //      the grip deadline is not applied here (it would cut the croc loose
           //      mid-sink and re-decouple the carcass — the point-250 bug).
+          // The PAIR's placement is the croc's, in BOTH phases (point 383): the
+          // catch is carried at its jaws on the water beside it — never the old
+          // inverse coupling, which pulled the CROCODILE to a victim standing on
+          // the bank and fed it there. Re-run every frame, so a water mask that
+          // moves under them (the calibratable river width is debug-editable)
+          // simply resumes the haul instead of stranding the meal on land.
           const v = c.lunge.victim
+          // (Kept inside the feeding phase rather than flipping back to the drag
+          // phase: the grip's own deadline must keep running, so a flapping mask
+          // can never restart it and pin the croc.)
+          const hold = haulCatch(c, v)
           if (v.caught !== undefined) {
             c.lunge.timer += dt
             // Point 207(i): the grip deadline is a hard invariant — a timer past
             // it (while still struggling) means the release below failed.
             devAssert(c.lunge.timer <= bc.gripSeconds + 2, 'croc-grip-bounded', () => `grip ${c.lunge?.timer.toFixed(1)}s`)
-            if (crocodileGripExpired(c.lunge.timer, bc.gripSeconds)) {
-              c.lunge.retreat = true
-            } else {
-              c.x = v.x - Math.sin(c.rot) * 0.6
-              c.z = v.z - Math.cos(c.rot) * 0.6
-              // The victim renders AT the jaws (point 268): register this croc as
-              // its holder so the render draws it at the mouth anchor, not on the
-              // back. Purely a render lookup — the drama-driving v.x/v.z (which the
-              // parent charge measures) is untouched.
-              crocByVictim.set(v, c)
-            }
+            if (crocodileGripExpired(c.lunge.timer, bc.gripSeconds)) c.lunge.retreat = true
+            // The victim renders AT the jaws (point 268): register this croc as
+            // its holder so the render draws it where the sim just placed it.
+            else crocByVictim.set(v, c)
           }
-          // SINK phase (v.caught === undefined, v.dead): hold position over the
-          // sinking body — no move, no deadline; released by the retreat branch.
+          // Point 383 as an in-game invariant: a settled feed has BOTH bodies on
+          // water, the carcass within a body length of the croc. A violation is
+          // exactly the reported picture and fails any suite through the assert
+          // channel. Skipped while the haul still runs — that is the fix working —
+          // and where the world itself cannot satisfy the rule (a puddle narrower
+          // than the crocodile), which is the placement's limit, not a defect.
+          if (!hold.dragging && !hold.stranded)
+            devAssert(
+              crocodileFeedPairValid(c.x, c.z, v.x, v.z, c.scale, isWaterAt),
+              'croc-feeds-in-water',
+              () => `croc ${c.x.toFixed(1)},${c.z.toFixed(1)} catch ${v.x.toFixed(1)},${v.z.toFixed(1)}`,
+            )
         }
       }
     }
@@ -3638,6 +3885,10 @@ function Herds() {
       }
     }
 
+    // Frame stamp of THIS draw pass (point 378): every instance written below
+    // carries it, and the collider accepts only circles stamped with it.
+    const drawFrame = frameCountRef.current
+    ACTIVE_DRAW_FRAME = drawFrame
     for (const sp of SPECIES) {
       const mesh = meshRefs.current[sp]
       if (!mesh) continue
@@ -3654,12 +3905,18 @@ function Herds() {
       let crocStrikeThis = false
       const write = (a: Animal) => {
         if (a.young && calfMesh) {
-          if (cIdx < MAX_CALF_INSTANCES) calfMesh.setMatrixAt(cIdx++, mtx)
+          // Over the calf budget: this juvenile is NOT drawn this frame, so it
+          // must not be stamped either — an undrawn body may never leave a
+          // collider behind (point 378/129).
+          if (cIdx >= MAX_CALF_INSTANCES) return
+          calfMesh.setMatrixAt(cIdx++, mtx)
         } else if (crocStrikeThis) {
           pool.crocStrike.setMatrixAt(sIdx++, mtx)
         } else {
           mesh.setMatrixAt(aIdx++, mtx)
         }
+        // Point 378: the collider's single source is the matrix just written.
+        recordDrawnBody(a, mtx.elements, drawFrame)
       }
       let eIdx = 0
       for (let i = 0; i < n; i++) {
@@ -3812,6 +4069,26 @@ function Herds() {
         // flee/dodge below.
         let familyHeld = false
         if (sp !== 'elephant') {
+          // Where this juvenile keeps (design.md §19.8, points 341/369): its
+          // LIVING parent — the adoptive one once the point-262 adoption found
+          // it — or, for an orphan still inside its mourning window, the spot
+          // its parent fell. `null` for an ordinary parentless juvenile, which
+          // roams with the herd exactly as before. Read ONCE, above the chain,
+          // so the follow branch and the mourner's watch are one behaviour.
+          const keep = a.young === true ? juvenileAnchor(a) : null
+          // FEAR OUTRANKS GRIEF (point 369). An orphan standing WATCH at the body
+          // yields the whole frame to a danger response — a hunt running nearby,
+          // or an elephant inside the dart ring — and falls back to the ordinary
+          // prey behaviour it had as a parentless juvenile: it flees. Only the
+          // watch yields; a calf with a LIVING parent keeps the family's own hold
+          // exactly as before (the herd around it is its shield). Without this a
+          // 30-second window could have held a calf beside a carcass while a
+          // predator walked in — a worse picture than a cheerful one.
+          const atBody = keep !== null && keep === a.mournAt
+          const fearYields =
+            atBody &&
+            (lionActive ||
+              elephantPos.some(([ex, ez]) => Math.hypot(ex - a.x, ez - a.z) < PREY_PANIC_RADIUS * PREY_PANIC_EXIT))
           if ((a.caught !== undefined && a.caught > 0) || a.fireTrapped !== undefined) {
             // Caught by a predator (resolved in the full-list pre-pass above)
             // — or by the grass-fire line (point 145a), same thrash:
@@ -3819,19 +4096,17 @@ function Herds() {
             // still reach the predator and save it (§19). Not young-gated:
             // the seized vigil-keeper (point 121 (f)) is the one ADULT that
             // can be caught, and it thrashes like any taken prey.
-            // Point 268: a crocodile's catch lies AT ITS JAWS. When a gripping
-            // croc holds this victim, anchor the thrash at the croc's mouth
-            // (ahead of the croc along its facing) instead of the victim's own
-            // spot on the water — so the prey reads as being eaten in the mouth,
-            // not resting on the croc's back. Land prey (lion/fire) is unchanged.
+            // Point 268: a crocodile's catch lies AT ITS JAWS. The SIM places it
+            // there — at the jaws of the crocodile that holds it, on the water it
+            // hauled the catch into (point 383) — so the render simply thrashes
+            // it around that spot. It recomputed the mouth anchor here until
+            // point 383; sim and render owning the same placement separately is
+            // precisely how the pair drifted onto opposite sides of the shoreline.
+            // Land prey (lion/fire) is unchanged.
             const holdingCroc = a.caughtBy === 'crocodile' ? crocByVictim.get(a) : undefined
             if (holdingCroc) {
-              const [mx, mz] = crocodileMouthAnchor(
-                holdingCroc.x, holdingCroc.z, holdingCroc.rot, holdingCroc.scale,
-                balance.crocodile.mouthOffsetLocal,
-              )
-              px = mx + Math.sin(t * 13 + a.phase) * 0.1
-              pz = mz + Math.cos(t * 11 + a.phase) * 0.1
+              px = a.x + Math.sin(t * 13 + a.phase) * 0.1
+              pz = a.z + Math.cos(t * 11 + a.phase) * 0.1
               bodyY = holdingCroc.y + 0.05 // riding at the croc's waterline, gripped
               a.jawAnchor = [px, pz] // dev observability (point 268)
             } else {
@@ -3871,6 +4146,7 @@ function Herds() {
             }
             px = a.x
             pz = a.z
+            bodyY = a.y // the height just derived for THIS spot (see the kick branch)
             yaw = Math.atan2(cdx, cdz)
             pitch = 0.08
             familyHeld = true
@@ -3976,6 +4252,7 @@ function Herds() {
             }
             px = a.x
             pz = a.z
+            bodyY = a.y // resync off any drink slide (see the kick branch)
             yaw = Math.atan2(dxm, dzm)
             pitch = -0.15 // head down toward the stuck calf
             familyHeld = true
@@ -4052,9 +4329,16 @@ function Herds() {
             }
             pitch = 0
             familyHeld = true
-          } else if (a.young && a.parent && !a.parent.dead) {
-            const toX = a.parent.x - a.x
-            const toZ = a.parent.z - a.z
+          } else if (a.young && keep && !fearYields) {
+            // Follow, play and nurse around whatever this young keeps to — the
+            // living parent, or the body of the one that just died (point 369).
+            // The mourner reaches this branch DELIBERATELY: every danger response
+            // sits ABOVE it (seized, hunted, crossing, in the water) and the
+            // player-shy bolt below owns the frame before the watch does, so a
+            // grieving calf never stands still for a predator. What grief changes
+            // here is only the demeanour: the gambol gate stays shut.
+            const toX = keep.x - a.x
+            const toZ = keep.z - a.z
             const d = Math.hypot(toX, toZ)
             // Player shyness (design.md §19): ANY juvenile — even of a stout
             // species whose adults stand their ground — bolts from the nearby
@@ -4134,8 +4418,13 @@ function Herds() {
               // inside it — so play and follow never alternate per frame.
               if (a.playLock && d < GAMBOL_RANGE * 0.6) a.playLock = undefined
               if (!a.playLock && d > GAMBOL_RANGE) a.playLock = true
-              const canPlay =
-                !lionActive && !a.playLock && (CALF_HUNT_SPECIES as readonly string[]).includes(sp)
+              // Grief silences the play (point 369): for the whole mourning
+              // window the calf does not break into a gambol bout — the picture
+              // that used to say nothing had happened.
+              const canPlay = calfMayPlay(
+                !lionActive && !a.playLock && (CALF_HUNT_SPECIES as readonly string[]).includes(sp),
+                a,
+              )
               const bout = canPlay ? gambolState(t, a.phase, GAMBOL_PERIOD, GAMBOL_ACTIVE) : null
               // The drying waterhole (design.md §19.8, point 123): a bout that
               // ENDS at a lake bank whose season has dried to mud may stick the
@@ -4211,7 +4500,9 @@ function Herds() {
               } else {
                 a.hop = undefined
                 a.boutDetour = undefined
-                pitch = -0.22 // nurse: head up toward the parent's flank
+                // At a living parent it nurses; at the spot its parent fell it
+                // holds the §19.8 vigil's lowered head instead (point 369).
+                pitch = keep === a.mournAt ? -0.15 : -0.22
               }
             }
             familyHeld = true
@@ -4523,7 +4814,15 @@ function Herds() {
           a.mired !== undefined
         const face = thrashing ? yaw : turnToward(a.face ?? yaw, yaw, FACE_TURN * dt)
         a.face = face
-        if (sp !== 'elephant' && !thrashing && yaw !== idleYaw) a.rot = face
+        // A crocodile mid-ambush owns its own facing (points 257/383): the burst,
+        // the haul and the feeding hold all set `a.rot` in the sim, and the feed
+        // pose's death-roll is a RELATIVE overlay on it. Writing the rendered
+        // facing back would feed that overlay in frame after frame — the point-257
+        // accumulation — and since the catch is placed AT the jaws, the wrench
+        // would swing the pair over the shoreline: measured, ~12 % of a feed's
+        // frames had one of the two on land.
+        const crocOwnsFacing = sp === 'crocodile' && a.lunge !== undefined
+        if (sp !== 'elephant' && !thrashing && !crocOwnsFacing && yaw !== idleYaw) a.rot = face
         vpos.set(px, bodyY, pz)
         if (pitch !== 0) {
           euler.set(pitch, face, 0, 'YXZ')
@@ -4620,6 +4919,7 @@ function Herds() {
         const farOffScreen = Math.hypot(a.x - pos.x, a.z - pos.z) > despawnR
         if (consumed || farOffScreen) {
           a.gone = true // releases a scavenger flight bound to this carcass
+          severFamilyLinks(a) // no survivor holds a removed animal (point 341)
           list.splice(i, 1)
         }
       }

@@ -95,6 +95,26 @@ heartbeat **only for the owner**.
   dead-owner lock each produce exactly one `acquired`
   (`batch-singleton-core.test.mjs`, scenario 1).
 
+### 2a. The lock WRITE can fail — a failure path in its own right
+
+Atomic acquisition assumes the write lands. On Windows it does not always: the
+`renameSync` of `batch-lock.json.tmp-<pid>` over the lock hits a sharing
+violation whenever another process holds the target for that instant (a reader,
+a second session, a real-time scanner). Twice measured, and both times the
+symptom was not the litter but the silence.
+
+| # | Failure mode | Evidence | What it costs | Fix |
+| --- | --- | --- | --- | --- |
+| 8 | `heartbeat()` loses its write and reports nothing: `claimedAt` stays at its OLD value while the call returns normally | 14 orphaned `.claude/batch-lock.json.tmp-<pid>` files between 19:36 and 20:52 on 25.07.2026 — roughly every fifth write | Liveness is decided on exactly that timestamp (`assessOwner`, `DEAD_CONFIRM_MS`), so a run of failures ages a LIVE session toward "provably dead" — and a takeover on a false-dead reading IS the 24.07 incident. The pid probe held as the second gate; that is no reason to let the first rot | Bounded retry with backoff (`scripts/atomic-write.mjs`), the tmp removed on every failed attempt, and the error PROPAGATED — a heartbeat that did not land must never read as one that did |
+| 9 | `markHandover()` throws that same EPERM through the Stop guard into its fail-open catch | 5 × `FAIL-OPEN: … EPERM … rename batch-lock.json.tmp-<pid>` in `.claude/boundary.log` on 28.07.2026, 3 of them at a boundary stop | The stop proceeds, the boundary marker has already been consumed, the lock keeps no handed-over flag and NOTHING says so — the launcher skips forever on a live pid | The write comes first and the marker is consumed only if it landed; `markHandover` returns `{ handed, reason, error }` instead of throwing, and a failure is stated in the same breath as the allow |
+| 10 | The Stop chain rewrote the lock three times within milliseconds (acquire's heartbeat, an explicit heartbeat, `markHandover`), and a scanner opens each freshly renamed file | the third write is the one that failed, every time | see #9 | The redundant heartbeat is gone — `acquire` already refreshes the lock |
+| 11 | Orphaned `<lock>.tmp-*` files accrete | the 14 files above | Litter only, but it hides #8 | `sweepOrphanTmp` on acquire removes them, and ONLY where the encoded pid is provably dead AND the file has settled past `REAP_MUTEX_STALE_MS` — a live process mid-write keeps its tmp |
+
+The write stays ATOMIC throughout: tmp plus rename, never an in-place truncate,
+so a concurrent reader can never see half a lock. Pure witnesses in
+`scripts/atomic-write.test.mjs` and the point-340 block of
+`scripts/batch-singleton-core.test.mjs`.
+
 ### 3. STAND-DOWN everywhere
 
 `heldByOtherLiveOwner(sid)` gates the **entire** guard chain: dashboard-guard,
@@ -176,6 +196,10 @@ Remediation, automatic and logged:
 6. Detector: genuine second session flagged; subagents and stale sessions not.
 7. Doctor planner: consistent → continue; diverged → rescue+reset (repair-
    gated); dirty-during-parallel → quarantine; owner WIP alone → untouched.
+8. The lock write (§2a): a rename failing twice then succeeding still writes and
+   leaves no tmp; failing every attempt throws and still leaves no tmp; the
+   retry is bounded; the sweep takes a dead pid's settled orphan and spares a
+   live one and a just-written one; `acquire` sweeps exactly the dead orphan.
 
 ## Apply steps (for the main session — in this order)
 
@@ -199,12 +223,14 @@ Remediation, automatic and logged:
    Verify with `node scripts/batch-singleton.mjs status` (expect this
    session as owner, `pid-alive`).
 6. When ready to resume the batch: delete `.claude/batch-paused`.
-7. **Re-enable the scheduled task — ONLY after steps 1–6 are done and verified**
+7. **Re-arm the launcher — ONLY after steps 1–6 are done and verified**
    (the singleton merged to `main`, the rogue pid dead, the old lock deleted,
-   `status` showing the expected owner):
-   `Enable-ScheduledTask -TaskName 'HoA-Batch-Autostart'`
-   Optional (elevated shell, per the task's ACL): tighten the tick from 15 to
-   5 min — the launcher is cheap and now spawn-safe:
+   `status` showing the expected owner). On the LINUX host:
+   `node scripts/batch-launcher.mjs --start` (point 474 — no OS scheduler exists
+   there, so the launcher is a detached node daemon). On the WINDOWS host,
+   elevated: `Enable-ScheduledTask -TaskName 'HoA-Batch-Autostart'`
+   Optional, WINDOWS only (elevated shell, per the task's ACL): tighten the tick
+   from 15 to 5 min — the launcher is cheap and now spawn-safe:
    ```powershell
    $t = Get-ScheduledTask -TaskName 'HoA-Batch-Autostart'
    $t.Triggers[0].Repetition.Interval = 'PT5M'

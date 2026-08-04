@@ -32,10 +32,41 @@ scripts/.tile-cache
 # Batch coordination state (scripts/batch-lock.mjs): runtime lock + pause marker
 .claude/batch-lock.json
 .claude/batch-paused
+# The fence (point 434): runtime state like the lock, and NEVER deleted by any
+# code — but this machine's high-water mark is not the repository's business, and
+# a committed one would hand a clone a fence from somebody else's history.
+.claude/batch-fence.json
+.claude/batch-fence.json.tmp-*
 .batch-dashboard.html
+.batch-dashboard-archive.html
+# The derived queue's prose and order (point 400, delta C) — session state that
+# belongs beside the board it renders, not in the source history.
+.claude/board-queue.json
+# The chat channel's shared SECRET and its runtime state. The secret is what
+# stands between a PUBLIC board page and a session with permissions pre-granted,
+# so it is never committed — and neither is a topic name derived from it.
+.claude/chat-secret
+.claude/chat-state.json
+# The stage-1 spool, its archived remains, and the spool DIRECTORY that replaced
+# it (one file per message plus the consumed archive the replay ledger reads).
+# All of it is the user's own words — never repository content.
+.claude/chat-spool.jsonl
+.claude/chat-spool.jsonl.migrated-*
+.claude/chat-spool/
+# The message watcher's own runtime state (point 407). Both belong here for the
+# same reason .claude/batch-claim.json does — batch-doctor's stash sweeps what
+# git does not know about, and each of these has a failure mode when it goes:
+# the PIDFILE deleted makes the next launcher tick start a SECOND watcher beside
+# the live one, and the RECEIPT deleted makes an answered message read as
+# unanswered, so the next session answers the user all over again.
+.claude/chat-watcher.json
+.claude/chat-watcher.json.tmp-*
+.claude/chat-reply-receipt.json
+.claude/chat-reply-receipt.json.tmp-*
 .claude/dashboard-state.json
 .claude/current-focus.json
 .claude/focus-check-pending.json
+.claude/session-process.json
 .claude/tool-activity.json
 .claude/wait-prep.json
 .claude/render-verify-state.json
@@ -45,6 +76,13 @@ scripts/.tile-cache
 .claude/ntfy-topic
 .claude/autostart-state.json
 .claude/autostart-run.log
+# The Linux launcher daemon's own record and log (point 474). Runtime state of
+# THIS machine's trigger: a committed record would hand a clone a pid from
+# somebody else's container, and an armed verdict is the one thing that must
+# never be inherited.
+.claude/batch-launcher.json
+.claude/batch-launcher.json.tmp-*
+.claude/batch-launcher.log
 .claude/ci-status-guard-state.json
 .claude/sessions-seen.json
 .claude/session-activity.json
@@ -54,9 +92,38 @@ scripts/.tile-cache
 .claude/batch-lock.json.tmp-*
 .claude/batch-lock.json.reaping
 .claude/timestamp-guard-state.json
+.claude/decision-card-guard-state.json
+.claude/batch-boundary.json
+.claude/batch-boundary.json.tmp-*
+.claude/batch-in-flight.json
+.claude/batch-in-flight.json.tmp-*
+.claude/batch-claim.json
+.claude/batch-claim.json.tmp-*
+# Per-branch baseline of the mechanism four-eyes gate — local bookkeeping. The
+# ledger it is judged against (.claude/mechanism-reviews.jsonl) IS tracked: a
+# review happens on a branch and the gate bites in the session that merges it.
+.claude/mechanism-review-baseline.json
+# The pre-push gate's memory of the last green unit run (test-file count). Per
+# CHECKOUT on purpose: each worktree has its own dependency tree, and a baseline
+# shared across them would compare two different worlds.
+.claude/pre-push-gate-state.json
+
+# Runtime state of the batch-resilience layers (child-retry, alert-escalation).
+.claude/resilience/
 
 # Local GitHub PAT (ci-status-guard.mjs probes this path) — never committed
 .secrets/
 
 # Local, non-versioned artefacts (retrospectives, scratch notes) — never on git
 /local/
+
+# Personal working material that must not reach the repository (25.07.2026):
+# a voice reference recording and the music sources were swept in by commits
+# that staged everything. scripts/commit-scope-guard now blocks that class.
+/Referenzstimme*.wav
+/music/
+
+# Cover/marketing images are working material, not project source (27.07.2026):
+# they were swept in by a commit that staged everything (a0c599b) and the README
+# serves its picture from the GitHub attachment CDN, not from here.
+/cover/

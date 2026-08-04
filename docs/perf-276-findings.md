@@ -186,6 +186,22 @@ render features:
    dressing does not grow over a session at a fixed anchor (point 278)" in
    `scripts/verify/enrichments.mjs`.
 
+   **The fate of `feat/278-dressing-growth` — verdict, 30.07.2026 (point 329 (b)).**
+   The branch-cleanup of 25.07.2026 removed 133 merged branches and 26 orphaned
+   worktrees but held two back whose unmerged work had to be JUDGED rather than
+   deleted; this was the second of them, believed to carry an alternative fix plus
+   enrichments checks and pure tests that main might lack. It carries nothing main
+   lacks. Its tip was recovered from a dangling commit (`afab68d5`, 24.07. 10:15) —
+   the branch itself was already gone locally and from GitHub — and `git diff`
+   between that tip and main's `cc11bb1b` (24.07. 10:19, four minutes later) is
+   EMPTY: the same tree, re-committed onto main. Line by line, all 222 substantive
+   lines it added across the five files (the five `retainedSpawnChunks` cases, the
+   live enrichments gate, `Wildlife.tsx`, `wildlifeBehavior.ts` and this document)
+   are present in main verbatim. So there is no check to salvage, nothing landed, and
+   nothing to re-verify. Both branches of point 329 are now closed: (a) retired
+   unmerged with its lever moved to point 310, (b) closed as a duplicate of what
+   shipped.
+
 ## The campfire shadow map (point 289) — measured verdict, 24.07.2026
 
 The village fire light can cast a cube shadow map (design.md §19.10, debug

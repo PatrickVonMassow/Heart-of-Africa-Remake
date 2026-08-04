@@ -28,7 +28,11 @@ async function main() {
   const name = data.tool_name ?? data.toolName ?? ''
   const cmd = String(input.command ?? '')
   const bg = input.run_in_background === true || input.runInBackground === true
-  if (name === 'Bash' && bg && WAIT_CMD.test(cmd) && !NOT_WAIT.test(cmd)) {
+  // BOTH shells arm the guard: this environment's PRIMARY shell is PowerShell,
+  // and matching only Bash made the guard half-dead — a background regression
+  // launched the usual way never armed it, so the rule counted as enforced while
+  // firing at almost nothing (found by the 25.07 rule/guard audit).
+  if ((name === 'Bash' || name === 'PowerShell') && bg && WAIT_CMD.test(cmd) && !NOT_WAIT.test(cmd)) {
     const label = (cmd.match(/run-all\.mjs\s+([\w-]+)/)?.[1]) ?? (cmd.match(/npm\s+(run\s+)?(test\S*)/)?.[2]) ?? 'a background validation'
     try {
       writeFileSync(MARKER, JSON.stringify({ task: label, prepped: false, at: Date.now(), auto: true }, null, 2))

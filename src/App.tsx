@@ -9,6 +9,7 @@ import { TravelScene } from './scenes/travel/TravelScene'
 import { PlaceScene } from './scenes/place/PlaceScene'
 import { Effects } from './render/Effects'
 import { setRenderContext } from './render/renderContext'
+import { enableAsyncPipelineCompile, type PipelineBackend } from './render/asyncPipelines'
 import { Hud } from './ui/Hud'
 import { AmbienceController } from './ui/AmbienceController'
 
@@ -79,10 +80,23 @@ export default function App() {
           // Surface the automatic WebGL 2 fallback to the player (CLAUDE.md §3).
           const backend = (renderer as unknown as { backend?: { isWebGPUBackend?: boolean } }).backend
           useUi.getState().setWebglFallback(backend?.isWebGPUBackend !== true)
+          // Shader pipelines compile OFF the critical path (point 337). Without
+          // this the startup frame waits out ~62 program links and the picture
+          // stands still for a quarter of a minute; see render/asyncPipelines.ts
+          // for the measurement and the mechanism. Armed before the first frame
+          // — the very frame that used to pay for the whole set.
+          // `__asyncPipelinesOff` (dev only) restores the old blocking path, so
+          // the startup suite can prove its budget gate still bites.
+          const pipelines =
+            import.meta.env.DEV && (window as unknown as Record<string, unknown>).__asyncPipelinesOff
+              ? null
+              : enableAsyncPipelineCompile(backend as unknown as PipelineBackend | undefined)
           // Dev hook for the headless verification (CLAUDE.md §7.2): the
-          // pipeline-rebuild leak gate reads renderer.info.memory.
+          // pipeline-rebuild leak gate reads renderer.info.memory, the startup
+          // suite reads how much of the program set is still compiling.
           if (import.meta.env.DEV) {
             ;(window as unknown as Record<string, unknown>).__renderer = renderer
+            ;(window as unknown as Record<string, unknown>).__shaderPipelines = () => pipelines?.state() ?? null
           }
           // Filmic look: soft shadows + ACES tone mapping.
           renderer.shadowMap.enabled = true

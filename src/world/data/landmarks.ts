@@ -3,8 +3,9 @@
 // special site (elephant graveyard). Positions are real (~1890 geography);
 // only the elephant graveyard is fictional and placed by educated guess.
 
-import { riverDistanceExact } from '../hydro'
 import { RIVER_WIDTH_DEG } from '../terrain'
+import { clearedOfRiversBy } from '../riverClearance'
+import { GIZA_FIELD_RADIUS_DEG, GIZA_PLATEAU } from './gizaPlateau'
 
 export interface MountainDef {
   /** Landmark id; display names come from the language files (i18n). */
@@ -90,37 +91,20 @@ export interface CulturalLandmarkDef {
 // river geometry), bounded; a site already clear returns unchanged after one
 // query. Since point 156 EVERY cultural landmark and the natural sites run
 // through this shift — the widened rivers reach anchors that used to be clear.
-
-function clearedOfRiversBy(lat: number, lon: number, clearanceDeg: number): { lat: number; lon: number } {
-  let a = lat
-  let o = lon
-  for (let i = 0; i < 40; i++) {
-    const d = riverDistanceExact(a, o, 1)
-    if (d >= clearanceDeg) break
-    const e = 0.02
-    const gLat = riverDistanceExact(a + e, o, 1) - riverDistanceExact(a - e, o, 1)
-    const gLon = riverDistanceExact(a, o + e, 1) - riverDistanceExact(a, o - e, 1)
-    const gl = Math.hypot(gLat, gLon)
-    if (gl < 1e-6) {
-      o += e // dead centre of a channel: fixed eastward nudge, re-aim
-      continue
-    }
-    const step = Math.min(0.08, clearanceDeg - d + 0.01)
-    a += (gLat / gl) * step
-    o += (gLon / gl) * step
-  }
-  return { lat: a, lon: o }
-}
+// The shift itself lives in ../riverClearance (shared with the Giza plateau
+// constant, which geo.ts cannot reach through this module).
 
 const CULTURAL_LANDMARK_DEFS: CulturalLandmarkDef[] = [
   { id: 'meroe', lon: 33.75, lat: 16.94, kind: 'pyramids' },
   // Just west of Cairo across the Nile — via the travel-scene panorama the
-  // field also stands on the port's first-person horizon (point 82).
-  // West of the Nile's rendered band (axis ~31.22 at this latitude, at the
-  // calibratable RIVER_WIDTH_DEG half-width): the whole FIELD FOOTPRINT
-  // (±~0.29° incl. the Sphinx) must stand on the west-bank desert, not in
-  // the channel (user report; auto-cleared like every field since 156).
-  { id: 'giza', lon: 30.59, lat: 29.98, kind: 'giza-pyramids' },
+  // field also stands on the port's first-person horizon (point 82). West of
+  // the Nile's rendered band (axis ~31.22 at this latitude, at the calibratable
+  // RIVER_WIDTH_DEG half-width): the whole FIELD FOOTPRINT (±~0.29° incl. the
+  // Sphinx) must stand on the west-bank desert, not in the channel (user
+  // report; auto-cleared like every field since 156). The position comes from
+  // the shared ./gizaPlateau constant, which the ENTERABLE monument map point
+  // reads too — the plateau is one site and must have one coordinate.
+  { id: 'giza', lon: GIZA_PLATEAU.lon, lat: GIZA_PLATEAU.lat, kind: 'giza-pyramids' },
   { id: 'great-zimbabwe', lon: 30.93, lat: -20.27, kind: 'stone-city' },
   { id: 'lalibela', lon: 39.04, lat: 12.03, kind: 'rock-churches' },
   { id: 'kilwa', lon: 39.51, lat: -8.96, kind: 'coastal-ruins' },
@@ -137,7 +121,10 @@ const CULTURAL_LANDMARK_DEFS: CulturalLandmarkDef[] = [
 // sites ~0.3°.
 const LANDMARK_FIELD_RADIUS_DEG: Record<string, number> = {
   meroe: 0.73,
-  giza: 0.35,
+  // Giza's anchor is ALREADY resolved against this clearance in ./gizaPlateau,
+  // so the pass below finds it clear and returns it unchanged — which is what
+  // keeps the landmark and the monument map point bit-identical.
+  giza: GIZA_FIELD_RADIUS_DEG,
 }
 const LANDMARK_DEFAULT_RADIUS_DEG = 0.3
 export const CULTURAL_LANDMARKS: CulturalLandmarkDef[] = CULTURAL_LANDMARK_DEFS.map((c) => ({

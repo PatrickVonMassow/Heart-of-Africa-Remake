@@ -4,9 +4,13 @@
 // plus totality on malformed input (the wrapper's fail-open rests on the core
 // never throwing). The motivating regression — the card silently describing
 // the finished point-306 work while the state had moved on — is pinned.
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { describe, it, expect } from 'vitest'
 import {
+  DRIFTS,
   branchPoint,
+  formatDriftReport,
   parseWorktreeBranches,
   parseTasksPoints,
   parseCardTitle,
@@ -72,6 +76,31 @@ describe('parseCardTitle / cardTitle', () => {
   it('collects every standalone point of a combined title but skips version- and time-fragments', () => {
     const c = parseCardTitle('306 + 308 parallel (v0.2, seit 22:29)')
     expect(c.points).toEqual([306, 308])
+  })
+
+  it('reads the »NNN: …« card form the board actually uses', () => {
+    const c = parseCardTitle('337: Ladebild friert beim Start ein')
+    expect(c.point).toBe(337)
+    expect(c.points).toEqual([337])
+    expect(c.label).toBe('Ladebild friert beim Start ein')
+  })
+
+  // Regression witness: a number inside the PROSE is not a point reference. The
+  // old "every standalone number" rule read the 15 of »~15 Sekunden« as point
+  // 15, found it ticked done, and blocked the turn calling a current card stale.
+  it('ignores numbers inside the prose, so a current card is not called stale', () => {
+    expect(parseCardTitle('337: Ladebild steht ~15 Sekunden still').points).toEqual([337])
+    expect(parseCardTitle('312: Flucht ins Wasser zündet in 3 von 10 Fällen').points).toEqual([312])
+  })
+
+  it('accepts the other list forms of a combined card', () => {
+    expect(parseCardTitle('316/319 — Mündung und Krokodil').points).toEqual([316, 319])
+    expect(parseCardTitle('121, 130 und 146: Familien-Dramen').points).toEqual([121, 130, 146])
+  })
+
+  it('does not take a clock time or a version at the start for a point', () => {
+    expect(parseCardTitle('22:29 Uhr weitergemacht').points).toEqual([])
+    expect(parseCardTitle('0.2 nachgezogen').points).toEqual([])
   })
 
   it('cardTitle reads the FIRST now-card of the real markup, never the meta time or other sections', () => {
@@ -233,6 +262,81 @@ describe('evaluate — blocks on real drift', () => {
   it('never tells the assistant to fix anything but the CARD (read-only guard)', () => {
     const r = evaluate({ cards: cards(['999 — Phantom']), state: state() })
     expect(r.reason).toContain('Fix the CARD')
+  })
+})
+
+// Point 308's last deliverable: the REPORT of what this guard catches. It is a
+// table the verdicts are stamped from rather than prose in a document, so these
+// cases pin the one thing that can rot — the tie between the two.
+describe('the drift catalogue is the code, not a description of it', () => {
+  const cards = (titles) => nowCardTitles(boardHtml(titles))
+
+  /** One scenario per catalogued drift, so the table cannot list a check the
+   *  guard does not have. */
+  const scenarios = {
+    'no-card': { cards: [], state: state() },
+    'head-drift': { cards: cards(['306 — Closing-Guard']), state: state({ headBranch: 'feat/224-workflow', open: [224, 306] }) },
+    'unknown-point': { cards: cards(['999 — Phantom']), state: state() },
+    'stale-done': { cards: cards(['306 — Closing-Guard']), state: state({ done: [290, 306], open: [305, 308] }) },
+    'agent-claim': { cards: cards(['Fable-Verifikationen + Agent-Pool']), state: state() },
+  }
+
+  it('every catalogued drift is actually producible, and stamps its own id', () => {
+    for (const d of DRIFTS) {
+      const scenario = scenarios[d.id]
+      expect(scenario, `no scenario for catalogued drift ${d.id}`).toBeDefined()
+      const r = evaluate(scenario)
+      expect(r.block, d.id).toBe(true)
+      expect(r.drift, d.id).toBe(d.id)
+    }
+  })
+
+  it('no block path produces a drift the catalogue does not list', () => {
+    const known = new Set(DRIFTS.map((d) => d.id))
+    for (const scenario of Object.values(scenarios)) {
+      const r = evaluate(scenario)
+      expect(known.has(r.drift), `uncatalogued drift ${r.drift}`).toBe(true)
+    }
+    // An allow carries no drift at all.
+    expect(evaluate({ cards: cards(['306 — Closing-Guard']), state: state() }).drift).toBeNull()
+  })
+
+  // The producibility direction needs a scenario per id, i.e. a human. This one
+  // does not: it reads the SOURCE, so a block path added tomorrow with a new id —
+  // or with none — fails here without anybody remembering to add a case
+  // (four-eyes review 30.07.2026, finding 1).
+  it('every block() call site in the core stamps a CATALOGUED id', () => {
+    const source = readFileSync(resolve(process.cwd(), 'scripts', 'dashboard-sync-core.mjs'), 'utf8')
+    // The call sites inside `evaluate` only — the helper's own definition aside.
+    const sites = [...source.matchAll(/\n(\s+)return block\(([\s\S]*?)\n\1\)/g)]
+    expect(sites.length).toBeGreaterThanOrEqual(DRIFTS.length)
+    const known = new Set(DRIFTS.map((d) => d.id))
+    for (const site of sites) {
+      const stamped = [...site[2].matchAll(/'([a-z-]+)',\s*$/gm)].pop()
+      expect(stamped, `a block() call stamps no drift id:\n${site[0]}`).toBeTruthy()
+      expect(known.has(stamped[1]), `uncatalogued drift id ${stamped?.[1]}`).toBe(true)
+    }
+  })
+
+  it('each catalogued entry says what it detects AND gives a concrete example', () => {
+    for (const d of DRIFTS) {
+      expect(d.detects.length, d.id).toBeGreaterThan(20)
+      expect(d.example.length, d.id).toBeGreaterThan(10)
+    }
+    // The ids are unique — a duplicate would make the report lie about coverage.
+    expect(new Set(DRIFTS.map((d) => d.id)).size).toBe(DRIFTS.length)
+  })
+
+  it('renders every entry into the report, and is total', () => {
+    const report = formatDriftReport()
+    for (const d of DRIFTS) {
+      expect(report).toContain(`[${d.id}]`)
+      expect(report).toContain(d.example)
+    }
+    // It says the one thing a reader must not get wrong about this guard.
+    expect(report).toMatch(/never edits the card/i)
+    expect(() => formatDriftReport(null)).not.toThrow()
+    expect(() => formatDriftReport([{}])).not.toThrow()
   })
 })
 
