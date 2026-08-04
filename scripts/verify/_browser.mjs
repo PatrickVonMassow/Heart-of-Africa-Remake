@@ -116,8 +116,16 @@ export async function waitForStable(page, readFn, { eps = 1e-3, settleMs = 200, 
  *
  *  Two things follow, and this helper is both: watch the fields the caller ASSERTS
  *  rather than one proxy beside them, and report `settled` so a timeout fails as
- *  "the reading never settled" instead of as a wrong measurement. */
-export async function waitForReadingStable(page, readFn, { eps = 1e-3, settleMs = 500, samples = 3, timeout = 60000 } = {}) {
+ *  "the reading never settled" instead of as a wrong measurement.
+ *
+ *  `requireChange` covers the OTHER half of the same trap, and the measured one: a
+ *  setting pushed into the scene does not take hold in the same instant, so a poll
+ *  started right after it finds the reading still standing where it was and calls
+ *  that settled — the dry season measured grayMix 0.146 after 1.5 s of quiet that
+ *  was simply the pause before the lerp began. With it, the quiet only counts once
+ *  the reading has actually MOVED, and a reading that never moves inside the
+ *  timeout is reported `settled: false` rather than read as an answer. */
+export async function waitForReadingStable(page, readFn, { eps = 1e-3, settleMs = 500, samples = 3, requireChange = false, timeout = 60000 } = {}) {
   const numbersOf = (v) => {
     const out = []
     const walk = (x) => {
@@ -130,17 +138,19 @@ export async function waitForReadingStable(page, readFn, { eps = 1e-3, settleMs 
   const start = Date.now()
   let prev = await page.evaluate(readFn)
   let quiet = 0
+  let moved = !requireChange
   while (Date.now() - start < timeout) {
     await page.waitForTimeout(settleMs)
     const cur = await page.evaluate(readFn)
     const a = numbersOf(prev)
     const b = numbersOf(cur)
     const still = a.length === b.length && a.every((n, i) => Math.abs(n - b[i]) <= eps)
+    if (!still) moved = true
     quiet = still ? quiet + 1 : 0
     prev = cur
-    if (quiet >= samples) return { value: cur, settled: true, waitedMs: Date.now() - start }
+    if (moved && quiet >= samples) return { value: cur, settled: true, moved: true, waitedMs: Date.now() - start }
   }
-  return { value: prev, settled: false, waitedMs: Date.now() - start }
+  return { value: prev, settled: false, moved, waitedMs: Date.now() - start }
 }
 
 /** Wait until the scene has finished BUILDING, not until a clock runs out (point 499).
