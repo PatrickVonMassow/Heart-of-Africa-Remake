@@ -79,7 +79,9 @@ async function ensureServer() {
 
 /**
  * Install the cache routes on a Playwright page. Returns a live stats object
- * ({ hits, misses, aborted, passedThrough }) the caller can assert on.
+ * ({ hits, misses, aborted, strict, served, fetchErrors }) the caller can assert
+ * on. `fetchErrors` holds every recording fetch that failed — a suite that ignores
+ * it would record an incomplete cache and mark it complete.
  */
 export async function installTtsCache(page) {
   mkdirSync(CACHE_DIR, { recursive: true })
@@ -87,48 +89,68 @@ export async function installTtsCache(page) {
   // `served` timestamps every model/runtime asset the page asked for (wall
   // clock), so a suite can PROVE its cold-load probe really spans the load
   // rather than a window the engine had already finished behind it (point 304).
-  const stats = { hits: 0, misses: 0, aborted: 0, strict, served: [] }
+  const stats = { hits: 0, misses: 0, aborted: 0, strict, served: [], fetchErrors: [] }
   await page.route('**/*', async (route) => {
-    const url = route.request().url()
-    let host
     try {
-      host = new URL(url).hostname
-    } catch {
-      return route.continue()
+      return await handleRoute(route, { strict, stats })
+    } catch (err) {
+      // A recording fetch that REJECTS (an unreachable CDN, a dropped connection)
+      // used to escape this handler as an unhandled rejection and kill the whole
+      // suite process — exit 1, not one PASS or FAIL line, nothing to classify
+      // (04.08.2026: the container firewall allowed huggingface.co but not the CDN
+      // it redirects to, and both TTS suites died that way). The route is aborted
+      // instead: the page then sees the asset fail, the suite's own checks report
+      // what that costs, and the reason is recorded here for the caller to name.
+      stats.fetchErrors.push({ url: route.request().url().split('?')[0], message: String(err?.message ?? err) })
+      try {
+        return await route.abort()
+      } catch {
+        // The route may already be resolved or the page gone — nothing left to do.
+      }
     }
-    if (!CACHED_HOSTS.some((re) => re.test(host))) return route.continue()
-    if (ABORTED_PATHS.some((re) => re.test(url.split('?')[0]))) {
-      stats.aborted++
-      return route.abort()
-    }
-    const key = keyFor(url)
-    stats.served.push({ url: url.split('?')[0], at: Date.now() })
-    const bodyPath = join(CACHE_DIR, `${key}.bin`)
-    const metaPath = join(CACHE_DIR, `${key}.json`)
-    if (existsSync(bodyPath) && existsSync(metaPath)) {
-      stats.hits++
-      const port = await ensureServer()
-      return route.fulfill({ status: 302, headers: { location: `http://127.0.0.1:${port}/${key}` } })
-    }
-    if (strict) {
-      // A complete cache must never need the network — surface the gap.
-      stats.misses++
-      return route.abort()
-    }
-    stats.misses++
-    const res = await recordingFetch(url)
-    const body = res.body
-    if (res.status() === 200) {
-      writeFileSync(bodyPath, body)
-      writeFileSync(metaPath, JSON.stringify({ url: url.split('?')[0], contentType: res.headers()['content-type'] ?? 'application/octet-stream' }))
-    }
-    if (res.status() === 200) {
-      // Serve even the first (recording) hit via the local stream: fulfilling
-      // huge bodies through the DevTools protocol kills the browser.
-      const port = await ensureServer()
-      return route.fulfill({ status: 302, headers: { location: `http://127.0.0.1:${port}/${key}` } })
-    }
-    return route.fulfill({ status: res.status(), contentType: res.headers()['content-type'] ?? 'application/octet-stream', body })
   })
   return stats
+}
+
+/** The cache decision for one request. Throws on a network failure; the caller
+ *  above turns that into an abort plus a recorded reason. */
+async function handleRoute(route, { strict, stats }) {
+  const url = route.request().url()
+  let host
+  try {
+    host = new URL(url).hostname
+  } catch {
+    return route.continue()
+  }
+  if (!CACHED_HOSTS.some((re) => re.test(host))) return route.continue()
+  if (ABORTED_PATHS.some((re) => re.test(url.split('?')[0]))) {
+    stats.aborted++
+    return route.abort()
+  }
+  const key = keyFor(url)
+  stats.served.push({ url: url.split('?')[0], at: Date.now() })
+  const bodyPath = join(CACHE_DIR, `${key}.bin`)
+  const metaPath = join(CACHE_DIR, `${key}.json`)
+  if (existsSync(bodyPath) && existsSync(metaPath)) {
+    stats.hits++
+    const port = await ensureServer()
+    return route.fulfill({ status: 302, headers: { location: `http://127.0.0.1:${port}/${key}` } })
+  }
+  if (strict) {
+    // A complete cache must never need the network — surface the gap.
+    stats.misses++
+    return route.abort()
+  }
+  stats.misses++
+  const res = await recordingFetch(url)
+  const body = res.body
+  if (res.status() === 200) {
+    writeFileSync(bodyPath, body)
+    writeFileSync(metaPath, JSON.stringify({ url: url.split('?')[0], contentType: res.headers()['content-type'] ?? 'application/octet-stream' }))
+    // Serve even the first (recording) hit via the local stream: fulfilling
+    // huge bodies through the DevTools protocol kills the browser.
+    const port = await ensureServer()
+    return route.fulfill({ status: 302, headers: { location: `http://127.0.0.1:${port}/${key}` } })
+  }
+  return route.fulfill({ status: res.status(), contentType: res.headers()['content-type'] ?? 'application/octet-stream', body })
 }
