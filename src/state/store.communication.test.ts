@@ -6,6 +6,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { hasHeard, heardUtterances, hypothesisFor } from '../communication/heard'
 import { utteranceOf } from '../communication/lexicon'
+import { isSpeechLabelVisible, labelReadings, NO_READING } from '../communication/speechLabel'
 import { g, freshGame, withWorld } from '../test/store'
 
 withWorld()
@@ -106,5 +107,37 @@ describe('observations travel with the save (design.md §18)', () => {
 
     expect(g().loadCheckpoint()).toBe(true)
     expect(heardUtterances(g().communication)).toHaveLength(0)
+  })
+})
+
+// The label over a speaker's head reads the SAME note as the journal (design.md
+// §13.4, work-order point 485): both derive from the store, so a note edited in
+// the journal is the note that stands over the speaker.
+describe('the overhead label reads the journal note (design.md §13.4)', () => {
+  it('shows ??? until the player writes a reading, then his own words', () => {
+    g().hearUtterance(COME)
+    expect(labelReadings(g().communication, [COME])[0].reading).toBe(NO_READING)
+
+    g().setUtteranceHypothesis(COME, 'come here')
+    expect(labelReadings(g().communication, [COME])[0].reading).toBe('come here')
+
+    // Clearing the field in the journal takes the label straight back.
+    g().setUtteranceHypothesis(COME, '')
+    expect(labelReadings(g().communication, [COME])[0].reading).toBe(NO_READING)
+  })
+
+  it('shows one reading per atom of a heard phrase, in the spoken order', () => {
+    g().hearPhrase([DIG, HERE])
+    g().setUtteranceHypothesis(DIG, 'dig')
+    expect(labelReadings(g().communication, [DIG, HERE])).toEqual([
+      { utterance: DIG, reading: 'dig' },
+      { utterance: HERE, reading: NO_READING },
+    ])
+  })
+
+  it('shows no label for speech that was never observed', () => {
+    g().hearUtterance(COME)
+    expect(isSpeechLabelVisible(g().communication, [COME])).toBe(true)
+    expect(isSpeechLabelVisible(g().communication, [DIG])).toBe(false)
   })
 })

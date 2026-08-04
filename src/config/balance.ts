@@ -509,6 +509,8 @@ export interface BalanceConfig {
     phrasePauseSeconds: number
     /** How far an utterance carries, in place-scene units. */
     hearingRadius: number
+    /** How long the hypothesis stands over a speaker's head, for one atom. */
+    labelSeconds: number
   }
 }
 
@@ -808,6 +810,10 @@ export const balance: BalanceConfig = {
     // group and the adults' group are never heard at once from the middle.
     phrasePauseSeconds: 0.9,
     hearingRadius: 10,
+    // Long enough to read one reading and look back at the speaker, short
+    // enough that the scene never carries standing text; a phrase adds one
+    // pause per further atom (speechLabelSeconds).
+    labelSeconds: 2.6,
   },
 }
 

@@ -1282,3 +1282,40 @@ textarea {
   font-weight: 700;
   opacity: 0.75;
 }
+
+/* What a villager is saying, over his head (design.md §13.4): the syllables as
+   the journal lists them, and under each the player's own reading in the same
+   hand he wrote it in — never instead of the speech, always beside it. No
+   z-index of its own, so the HUD panels and modals above keep their order
+   (§17.4). */
+.speech-label {
+  display: flex;
+  gap: 8px;
+  padding: 3px 8px;
+  border: 1px solid var(--hud-border);
+  border-radius: 4px;
+  background: rgba(24, 18, 10, 0.72);
+  color: var(--hud-text);
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translateY(-8px);
+}
+
+.speech-label .speech-atom {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.15;
+}
+
+.speech-label .syllables {
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+  letter-spacing: 1px;
+}
+
+.speech-label .reading {
+  font: 13px 'Segoe Script', 'Bradley Hand', 'Comic Sans MS', cursive;
+  color: #f0e4c8;
+  opacity: 0.85;
+}

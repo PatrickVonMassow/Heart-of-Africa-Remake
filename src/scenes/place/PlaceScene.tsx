@@ -81,6 +81,7 @@ import {
 } from '../../render/fauna'
 import { REGION_PLACE_STYLES, type RegionPlaceStyle } from './regionStyles'
 import { PlaceLife } from './PlaceLife'
+import { SpeechLabels } from './SpeechLabels'
 import { resolveMove } from './collision'
 import { buildLayout, isOnLane, nearestActionable, PLACE_RADIUS, SPAWN_INSET, type Interactive, type PathDef, type DwellingDef, type FenceDef } from './layout'
 import { getPanoramaCapture } from '../travel/panoramaCapture'
@@ -2514,6 +2515,10 @@ export function PlaceScene() {
           colliders={layout.colliders}
         />
       )}
+
+      {/* The hypothesis over a speaker's head (design.md §13.4): mounted once,
+          empty until a figure speaks. */}
+      <SpeechLabels />
     </>
   )
 }
