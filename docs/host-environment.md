@@ -27,6 +27,17 @@ needs, both in `.devcontainer/init-firewall.sh`:
   address pool and the single address resolved at boot is usually not the one the download
   lands on minutes later.
 
+**Measured 04.08.2026 (point 493), so nobody has to guess again.** In the container as it
+stands, WebGL 2 comes up as `ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero)),
+SwiftShader driver)` — pure software — and `navigator.gpu` is UNDEFINED in Playwright's
+bundled Chromium, with or without `--enable-unsafe-webgpu`. So there is no WebGPU lane at
+all here, and the WebGL 2 lane runs on the CPU. Putting `/usr/lib/wsl/lib` on the loader
+path changes neither: the D3D12 libraries are present, but no Vulkan loader and no Mesa
+d3d12/dzn driver exist to use them, and there is no `/usr/share/vulkan/icd.d` at all.
+`scripts/verify-host-setup.sh` installs both halves (root, once) and
+`scripts/verify/backend-lane-check.mjs` proves the result at the picture rather than at a
+version string.
+
 Rendering needs a real GPU. Without one, Chrome falls back to SwiftShader, which drops the
 frame rate to roughly one frame per second and makes every motion or interaction check
 meaninglessly slow — a green run there proves nothing about timing. Under WSL2 the GPU
