@@ -27,7 +27,7 @@ export const ENFORCER_RE = /^(?!.*-core\.)([a-z0-9-]+-(?:guard|gate|hook))\.mjs$
  * An entry here is a DECISION on the record; an empty reason is not accepted,
  * so "park it quietly" is not available as an escape.
  */
-// EMPTY SINCE 30.07.2026, and the way it emptied is the point. All three entries
+// It EMPTIED on 30.07.2026, and the way it emptied is the point. All three entries
 // carried the SAME one reason — the Stop-hook line lives in
 // `.claude/settings.json`, a protected path that always raises a permission
 // prompt, so none of them could be wired by the unattended night that built them.
@@ -40,7 +40,12 @@ export const ENFORCER_RE = /^(?!.*-core\.)([a-z0-9-]+-(?:guard|gate|hook))\.mjs$
 // The map stays: an enforcer may be dormant on the record, never quietly. An entry
 // without a written reason is refused, so "park it" is not available as an escape,
 // and the entry must be removed in the same commit that adds the hook line.
-export const INTENTIONALLY_DORMANT = {}
+export const INTENTIONALLY_DORMANT = {
+  'container-ask-guard.mjs':
+    'built and tested on feat/494-container-ask-guard; the Stop-chain line lives in ' +
+    '.claude/settings.json, a protected path that needs an attended session. This entry is removed ' +
+    'in the SAME commit that adds the hook line.',
+}
 
 /**
  * Enforcers known to lack a tested decision core, recorded 25.07.2026. This is
