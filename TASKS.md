@@ -4028,39 +4028,6 @@ Build order, chosen so no two parallel agents own the same file:
   wave 4  481 (children teach) · 483 (adults teach)
   wave 5  486 (drums) · 487 (digging)
 
-- [ ] 477. THE TONAL LEXICON, THE PHRASE AND WHAT COUNTS AS HEARD (user
-  03.08.2026, docs/communication-poc-spec.md). The foundation every other part
-  stands on, and the one piece that is pure data and pure logic.
-  FINAL STATE:
-  1. One registry (`src/communication/lexicon.ts`) holds every concept with its
-     sequence, in a shape a later region can extend without touching consumers.
-     Eleven concepts: COME, GO_THERE, FOLLOW, HERE, THERE, NO (the children's)
-     and RIVER, UPSTREAM, DOWNSTREAM, BIG_ROCK, DIG (the adults').
-  2. Five syllables each, an EVEN number of them high. That is what makes any two
-     sequences differ in at least TWO syllables, so one misheard beat can never
-     turn one concept into another — it can only produce a non-word, which the
-     player notices. Four syllables cannot do this for eleven concepts: a
-     four-long binary code with every pair two apart holds at most eight. The
-     assignment is the table in docs/communication-poc-spec.md.
-  3. All four opposite pairs are exact reverses of each other: COME/GO_THERE,
-     HERE/THERE, FOLLOW/NO, UPSTREAM/DOWNSTREAM.
-  4. An utterance is ATOMIC — nothing parses it into parts, and loudness, tempo,
-     rhythm and syllable length carry no meaning anywhere. A PHRASE is an ordered
-     list of atoms, which is how a villager says "dig + here"; the atoms are
-     separated by the same constant pause the drums use, and nothing else.
-  5. The store of what the player has HEARD lives here: an utterance becomes
-     observed the first time he is close enough to hear it, each atom of a phrase
-     on its own. Journal, labels and drums all read this one store, and the
-     player's free-text hypothesis per utterance lives beside it and travels with
-     the save.
-  6. The journal's sort order is defined here, once: lexicographic with `ba`
-     before `BA`, consistent across differing lengths.
-  VERIFIABLE: pure Vitest — the registry is complete against the concept union
-  (a twelfth concept cannot compile without a sequence), every sequence is
-  well-formed, unique and even-weight, no two are less than two syllables apart,
-  the four mirror pairs are exact reverses, a phrase observes each atom once, and
-  the sort is stable over mixed lengths.
-
 - [ ] 478. THE SPOKEN UTTERANCE, HEARD ONLY UP CLOSE (user 03.08.2026).
   FINAL STATE:
   1. Speaking an utterance plays its syllables — a low sample for `ba`, a high one
