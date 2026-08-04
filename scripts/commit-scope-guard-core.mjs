@@ -15,6 +15,11 @@
  *  decision: add it HERE, in a reviewable diff, not by waving the guard off. */
 export const ALLOWED_TOP_DIRS = [
   '.claude',
+  // The dev container's definition (04.08.2026). It lived only on the host, so every gap in
+  // it was found the hard way — a missing browser, a missing GPU stack, a firewall that
+  // blocks what the setup needs. Versioned here, a rebuild reproduces the environment the
+  // verification actually requires instead of the one it happened to have.
+  '.devcontainer',
   '.github',
   'cover',
   'docs',

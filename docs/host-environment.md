@@ -72,15 +72,30 @@ and `LD_LIBRARY_PATH=/usr/lib/wsl/lib`. **If the host exposes no WSL GPU, that d
 argument prevents the container from starting at all** — removing it and the mount is the
 way back, at the cost of falling back to software rendering.
 
-The repository itself is bind-mounted from the Windows filesystem over 9p, so it never
-physically moved. Measured 03.08.2026 on 300 small files: **write 1447 ms, read 1046 ms,
-stat 606 ms** against **8 ms / 1 ms / 1 ms** on the container's own disk — a factor of 180
-to 1000 per file operation. That, not Linux and not the tests, is why the unit layer takes
-twenty minutes here and why anything that spawns a process per record takes minutes.
-`node_modules` — the bulk of those files — therefore lives on a container volume, mounted
-over the bind. The volume starts empty, so `postCreateCommand` runs `npm install` to fill
-it, and the image creates the mount point owned by `node` (the volume inherits that
-ownership; `node` has no general sudo to fix it afterwards).
+The working copy lives on a container volume at `/workspace/hoa` (since 04.08.2026), not on
+a bind mount of the Windows filesystem. The reason is measured, on 300 small files: on the
+9p bind **write 1590 ms, read 621 ms, stat 331 ms**, on the volume **5 ms / 3 ms / 1 ms** —
+a factor of 200 to 300 per file operation. That, not Linux and not the tests, was why the
+unit layer took twenty minutes and anything spawning a process per record took minutes.
+`fill-workspace.sh` clones the volume from the Windows folder, which stays mounted
+READ-ONLY at `/backup/hoa` as the backup it now is; `postCreateCommand` then runs
+`npm install`, and the image creates the mount point owned by `node` so the volume inherits
+that ownership. Since 04.08.2026 the image also grants `node` passwordless root, on the
+user's decision that no step inside the container is handed back to him — the egress
+firewall stays configured but is, against anything running as `node`, no longer a hard
+boundary.
+
+**The definition Docker reads is the host's, not this repository's.** VS Code builds from
+`<devcontainer folder>/.devcontainer/` on the Windows side, mounted at `/workspace`; the
+copy under `.devcontainer/` here exists so the definition travels with a clone. The two
+drift silently: on 04.08.2026 the repository copy still held a `git clone` that the real
+one had already replaced, and a rebuild from it would have failed. Change one, copy it to
+the other in the same commit, and `diff` all four files (`Dockerfile`, `devcontainer.json`,
+`fill-workspace.sh`, `init-firewall.sh`) when a container question comes up.
+
+The image ships **npm 11**. The bundled npm 10.8.2 of `node:20` does not know
+`package-lock.json`'s `libc` field and strips it silently, which left the tree dirty after
+every container create.
 
 All of these settings live in the container definition, so they take effect only on a
 container rebuild, never on a restart.

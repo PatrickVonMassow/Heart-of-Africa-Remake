@@ -4331,3 +4331,68 @@ Build order, chosen so no two parallel agents own the same file:
   completing under `VERIFY_GL=webgpu` with `assertBackend` confirming WebGPU; pure
   Vitest over the browser resolution — a host with system Chrome resolves to it, a
   host without fails loud instead of quietly using the bundled build.
+
+- [ ] 494. NO STEP INSIDE THE CONTAINER IS EVER HANDED BACK TO THE USER (user
+  04.08.2026, standing rule with full rights granted). On 04.08.2026 the session
+  handed him `sudo bash scripts/verify-host-setup.sh`, which cannot work — the
+  official Claude Code image grants `node` exactly one passwordless command, the
+  firewall script — and then a `docker exec -u root …` line that would also have
+  failed, because the sandbox firewall is iptables-wide and blocks the package
+  sources for root as well. Two round trips of the user's time for work that was
+  the session's. The rule is memory `container-work-is-mine`; this point is the
+  MECHANISM, because a rule that only a reader can see is the same failure point
+  440 measured one layer down.
+  FINAL STATE:
+  1. A guard reads the turn's outgoing answer and BLOCKS it when it asks the user
+     to execute a step that runs inside the container — an install, a package
+     manager, a script invocation, a file edit under the workspace. It matches
+     the ASK ("run", "führe aus", a fenced command block addressed to him),
+     not the mere mention of a command.
+  2. What stays allowed is asking for a CAPABILITY that does not exist inside the
+     container at all: a right, a device, a mount, a line in the image. The guard
+     must not push the session into silently failing instead of asking for those,
+     so the distinction is what its cases pin down.
+  3. The remedy line names the way out: find the route and take it; if the
+     capability is genuinely missing, ask once for the capability.
+  4. Wired into the Stop chain in `.claude/settings.json`, fail-open like every
+     other guard, with a pure Vitest-covered decision core, and reviewed by the
+     other model per `mechanism-review-guard` before it counts as done.
+  VERIFIABLE: pure Vitest over the decision core — an answer containing "führe
+  bitte `npm run …` aus" or a sudo/docker-exec instruction addressed to the user
+  is blocked; an answer asking for a GPU device, a mount or an image line passes;
+  a command quoted as a REPORT of what the session itself ran passes; and the
+  guard returns "allow" on any internal error.
+
+- [ ] 495. A VERSIONED GIT HOOK WITHOUT ITS EXECUTABLE BIT IS SILENTLY INERT
+  (found 04.08.2026). `scripts/git-hooks/pre-push` was committed 100644. Git for
+  Windows runs a hook whichever mode it carries, so the gate worked on the old
+  host and fell silent the moment the working copy moved to Linux — the only
+  trace was one hint line inside a SUCCESSFUL push ("hook was ignored because
+  it's not set as executable"), which no gate reads. The bit is restored, so this
+  point is not the fix but the MECHANISM that keeps the next hook from repeating
+  it: `scripts/enable-hooks.mjs` already wires `core.hooksPath` on every
+  `npm install` and is the one place that knows the hook directory.
+  FINAL STATE:
+  1. `enable-hooks.mjs` also ensures every file directly under
+     `scripts/git-hooks/` is executable for the user on POSIX — `chmod` the
+     working file AND `git update-index --chmod=+x` where the INDEX mode is
+     644, so a fresh clone gets it too rather than needing the same repair.
+     Windows has no such mode; the step is skipped there, not faked.
+  2. It stays FAIL-OPEN and quiet, like the rest of that script: a read-only
+     checkout, a tarball without `.git`, a hook directory that does not exist —
+     each leaves the install green. Only a mode it actually changed is reported,
+     one line per file, so a silent repair cannot pass for "nothing was wrong".
+  3. The DETECTION half widens the enforcer built for exactly this question:
+     `guard-health-guard` ("no enforcer may sit in the tree unable to fire")
+     already reads the active hook directory, but only its CONTENT. It also
+     judges the arming — a hook in the active directory without the executable
+     bit is a finding like an unwired guard, reported the same way, on POSIX
+     only. Widening it, not a sibling guard beside it.
+  4. A Vitest case pins both decisions: given a listing of hook files with their
+     modes, which need a chmod, and which count as unable to fire. Pure
+     functions, so no test touches a real repository.
+  VERIFIABLE: `npm run test:unit` covers both decision functions, including the
+  no-op case, a 644 hook, a non-POSIX platform and an unreadable directory;
+  `git ls-files -s scripts/git-hooks/` reports 100755 for every hook; and
+  `node scripts/guard-health-guard.mjs --status` names a hook whose bit was
+  removed.
