@@ -278,7 +278,7 @@ describe('the launcher persists its state on the two spawn-failure exits (443 h)
   })
 
   it('exits both failure paths through bail(), which writes the state first', () => {
-    expect(code).toMatch(/no bundled claude\.exe found[\s\S]{0,400}?bail\(1\)/)
+    expect(code).toMatch(/no claude CLI found[\s\S]{0,400}?bail\(1\)/)
     expect(code).toMatch(/could not spawn claude[\s\S]{0,400}?bail\(1\)/)
     expect(code).toMatch(/const bail =[^\n]*writeJsonAtomic\(C\('autostart-state\.json'\), state\)/)
   })

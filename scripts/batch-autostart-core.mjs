@@ -298,14 +298,46 @@ export function pruneSpawns({ spawns, probePid } = {}) {
   )
 }
 
-// --- WHERE THE BUNDLED claude.exe LIVES ---------------------------------------
+// --- WHERE THE CLI LIVES ------------------------------------------------------
 //
-// Two spawners need it now — the launcher and the message watcher
+// Two spawners need it — the launcher and the message watcher
 // (scripts/chat-watcher.mjs) — so the lookup lives here rather than twice. The
-// filesystem calls are INJECTED, which is what keeps this file testable without
-// a Windows install: the defaults are the real ones.
+// filesystem calls are INJECTED, which is what keeps this file testable on any
+// host: the defaults are the real ones.
+//
+// THE HOST IS NOT ALWAYS WINDOWS (point 490, 04.08.2026). This lookup knew
+// exactly one shape — the versioned bundle under %LOCALAPPDATA% — and the batch
+// moved to the Linux host the browser verification now runs on, where
+// `LOCALAPPDATA` is unset, the base collapses to `/Packages/…`, the readdir
+// throws and the resolver returns null. With it went every resurrection: after
+// the 01:50 boundary handover the launcher logged `FAIL: no bundled claude.exe
+// found` at thirteen consecutive ticks and no successor ever started, while the
+// CLI sat on PATH the whole time. A spawn that never happens is silent by
+// construction, so the lookup is ORDERED and host-neutral now, each step a shape
+// a real host has.
 
-/** The versioned install directory of the bundled CLI. */
+/** An explicit path to the CLI — the escape hatch for a host none of the steps
+ *  below knows, so the next port is a variable rather than a code change. */
+export const CLAUDE_CLI_ENV = 'HOA_CLAUDE_CLI'
+
+/** The npm package installs its bin as `claude`; on the Linux host that name is a
+ *  symlink to a file still called `claude.exe`, so both names are tried. */
+export const CLI_NAMES = ['claude', 'claude.exe']
+
+/** Install directories worth trying when PATH is thin — a launcher tick spawned
+ *  by a service manager routinely inherits little more than /usr/bin. */
+export function cliFallbackDirs(env = process.env) {
+  const home = env?.HOME ?? ''
+  return [
+    '/usr/local/share/npm-global/bin',
+    '/usr/local/bin',
+    '/usr/bin',
+    home ? `${home}/.npm-global/bin` : null,
+    home ? `${home}/.local/bin` : null,
+  ].filter(Boolean)
+}
+
+/** The versioned install directory of the bundled Windows CLI. */
 export function claudeExeBase(env = process.env) {
   return `${env.LOCALAPPDATA ?? ''}/Packages/Claude_pzs8sxrjxfjjc/LocalCache/Roaming/Claude/claude-code`
 }
@@ -323,6 +355,56 @@ export function findClaudeExe({ base, readdir, exists, join } = {}) {
   } catch {
     return null
   }
+}
+
+/** The directories on PATH, split the way `platform` writes them. PURE. */
+export function pathDirs({ env = process.env, platform = process.platform } = {}) {
+  return String(env?.PATH ?? env?.Path ?? '')
+    .split(platform === 'win32' ? ';' : ':')
+    .map((d) => d.trim())
+    .filter(Boolean)
+}
+
+/**
+ * The CLI this host can actually spawn, or null. Ordered: the explicit override
+ * first, then the Windows bundle, then PATH, then the usual install dirs.
+ *
+ * Every candidate must EXIST before it is returned — an override naming nothing
+ * falls THROUGH rather than being handed to `spawn`, because a resolver that
+ * returns an unusable path only moves the same failure one line down, into a
+ * spawn error whose message no longer names the real cause.
+ */
+export function resolveClaudeCli({ env = process.env, platform = process.platform, readdir, exists, join } = {}) {
+  const usable = (p) => {
+    try {
+      return typeof p === 'string' && p !== '' && exists(p) === true
+    } catch {
+      return false
+    }
+  }
+  const override = typeof env?.[CLAUDE_CLI_ENV] === 'string' ? env[CLAUDE_CLI_ENV].trim() : ''
+  if (usable(override)) return override
+
+  const bundled = findClaudeExe({ base: claudeExeBase(env), readdir, exists, join })
+  if (usable(bundled)) return bundled
+
+  for (const dir of [...pathDirs({ env, platform }), ...cliFallbackDirs(env)]) {
+    for (const name of CLI_NAMES) {
+      const candidate = join(dir, name)
+      if (usable(candidate)) return candidate
+    }
+  }
+  return null
+}
+
+/** What the resolver looked at, for the alert that fires when it found nothing:
+ *  a silent absence is the failure mode this point exists to end. PURE. */
+export function cliSearchSummary({ env = process.env, platform = process.platform } = {}) {
+  const dirs = [...pathDirs({ env, platform }), ...cliFallbackDirs(env)]
+  return (
+    `platform ${platform}; ${CLAUDE_CLI_ENV}=${env?.[CLAUDE_CLI_ENV] ?? '(unset)'}; ` +
+    `bundle base ${claudeExeBase(env)}; ${dirs.length} director(ies) searched for ${CLI_NAMES.join('/')}`
+  )
 }
 
 // ---------------------------------------------------------------------------

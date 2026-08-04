@@ -53,7 +53,7 @@ import { clearClaim, maxAgeMs as claimMaxAgeMs, readClaim, writeClaim } from './
 import { assessClaim, reservationDecision } from './batch-claim-core.mjs'
 import { isPaused } from './batch-lock.mjs'
 import { openPointStatus, ARCHIVE_PATH, TASKS_PATH } from './tasks-source.mjs'
-import { buildSpawnArgs, buildSpawnOptions, claudeExeBase, findClaudeExe } from './batch-autostart-core.mjs'
+import { buildSpawnArgs, buildSpawnOptions, resolveClaudeCli, cliSearchSummary } from './batch-autostart-core.mjs'
 import {
   CLAIM_SESSION_PREFIX,
   DEFERRAL_MS,
@@ -261,9 +261,12 @@ function onResponderExit(code) {
 function spawnResponder(messages) {
   const prompt = buildResponderPrompt(messages)
   if (!prompt) return false
-  const exe = findClaudeExe({ base: claudeExeBase(), readdir: readdirSync, exists: existsSync, join })
+  const exe = resolveClaudeCli({ readdir: readdirSync, exists: existsSync, join })
   if (!exe) {
-    log({ event: 'spawn-failed', reason: 'no bundled claude.exe found' })
+    // Host-neutral since point 490 — this watcher was mute on the Linux host for
+    // exactly the launcher's reason, and it is the layer that speaks when a
+    // session is wedged, so its silence hides two failures at once.
+    log({ event: 'spawn-failed', reason: `no claude CLI found — ${cliSearchSummary()}` })
     return false
   }
   let child

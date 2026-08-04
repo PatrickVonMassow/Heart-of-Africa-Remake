@@ -56,8 +56,8 @@ import {
   buildSpawnArgs,
   buildSpawnOptions,
   chatPromptSuffix,
-  claudeExeBase,
-  findClaudeExe,
+  resolveClaudeCli,
+  cliSearchSummary,
   nextChatHandedAt,
   standingAlertDue,
   pendingSinceHandover,
@@ -766,14 +766,17 @@ if (acq !== 'acquired') {
   process.exit(0)
 }
 
-// --- Find the newest bundled claude.exe ---------------------------------------
+// --- Find the CLI this host can spawn -----------------------------------------
 // The lookup itself lives in batch-autostart-core.mjs, because the message
 // watcher spawns the same executable and a second copy of this path would drift.
-const exe = findClaudeExe({ base: claudeExeBase(), readdir: readdirSync, exists: existsSync, join })
+// It is host-neutral since point 490: the Windows-only shape cost three silent
+// hours on the Linux host, so a failure here now NAMES what it searched.
+const exe = resolveClaudeCli({ readdir: readdirSync, exists: existsSync, join })
 if (!exe) {
   release(launcherSid)
-  log('FAIL: no bundled claude.exe found')
-  await notify('claude.exe missing', 'The autostart launcher could not find the bundled claude.exe — resurrection is down.', 'urgent')
+  const searched = cliSearchSummary()
+  log(`FAIL: no claude CLI found — ${searched}`)
+  await notify('claude CLI missing', `The autostart launcher found no claude CLI — resurrection is down. ${searched}`, 'urgent')
   // `bail`, not a bare exit (point 443 (h)). Everything this tick learned would
   // otherwise be thrown away — including `state.repoAlertAt`, which was set MINUTES
   // ago above. Losing it means the repo alert fires again at the very next tick,
@@ -788,7 +791,14 @@ try {
   const cfg = JSON.parse(readFileSync(cfgPath, 'utf8'))
   cfg.projects ??= {}
   let changed = false
-  for (const k of ['C:/Users/Patri/Documents/Developing/hoa', 'c:/Users/Patri/Documents/Developing/hoa']) {
+  // The repo THIS launcher runs in, plus the spellings a Windows host writes for
+  // it. Hard-coding only the Windows pair (point 490) meant the Linux host's own
+  // path was never trusted, so a headless `-p` there would have met the trust
+  // dialog it cannot answer.
+  const repoKeys = new Set([REPO.replace(/\\/g, '/'), REPO])
+  const first = [...repoKeys][0]
+  if (/^[a-zA-Z]:/.test(first)) repoKeys.add(first[0].toLowerCase() + first.slice(1)).add(first[0].toUpperCase() + first.slice(1))
+  for (const k of repoKeys) {
     cfg.projects[k] ??= {}
     if (cfg.projects[k].hasTrustDialogAccepted !== true) { cfg.projects[k].hasTrustDialogAccepted = true; changed = true }
   }

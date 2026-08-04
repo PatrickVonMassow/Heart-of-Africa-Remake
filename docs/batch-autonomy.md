@@ -45,8 +45,11 @@ outside the agent's control.
    word — reads wedged (see "Liveness is judged by PROGRESS" below). The spawn itself goes through the SAME atomic acquire (a
    `pending-spawn` lock is won BEFORE spawning; losing the race means no spawn).
    Guards: skips while paused, while the batch is complete, and while the owner is
-   alive; a debounce marker avoids double-spawns; it finds the newest bundled
-   `claude.exe` dynamically (survives app updates). It also THROWS when imported
+   alive; a debounce marker avoids double-spawns; it resolves the CLI dynamically
+   and HOST-NEUTRALLY (`resolveClaudeCli`, point 490 — an explicit
+   `HOA_CLAUDE_CLI`, then the newest bundled Windows `claude.exe`, then `PATH`,
+   then the usual install dirs; every candidate must exist, and finding none
+   alerts with the platform and the directory count it searched). It also THROWS when imported
    rather than run — the whole file executes at module load, so a bare `import()`
    of it (a syntax check, a tooling scan) used to be indistinguishable from
    running it, and once launched a session inside a git worktree.
@@ -72,7 +75,7 @@ outside the agent's control.
 | 7 | Power loss / hard crash | same as #5/#6 (boot-time check) | user login |
 | 8 | Two sessions (scheduler + a manually opened one) | the HARD SINGLETON (`scripts/batch-singleton.mjs`, 24.07.2026): atomic test-and-set acquire (exactly one winner, proven by real process races), pid-backed liveness (no false-dead under long tool calls), stand-down gates in EVERY guard for non-owners, and the active parallel-session detector with auto-remediation (launcher kills its own rogue spawn; the owner is blocked into `scripts/batch-doctor.mjs` verification). Full analysis: `docs/batch-singleton-analysis.md` | none — a second session refuses to act even if it exists |
 | 9 | A guard has a bug / throws | all guards are **fail-open** (error → allow) so they can never freeze the session; the scheduler still backstops the idle case | none |
-| 10 | `claude.exe` moved by an app update | launcher globs `claude-code\*\claude.exe` and picks the newest | none |
+| 10 | The CLI moved — an app update, or a different host entirely | `resolveClaudeCli` (point 490): explicit `HOA_CLAUDE_CLI` → newest bundled Windows `claude.exe` → `PATH` → the usual install dirs, each candidate checked to exist. The Windows-only lookup cost three silent hours the night the batch moved to Linux | none — and a resolver that finds nothing now names the platform and what it searched |
 | 11 | Batch stuck on one item (needs data / a user decision) | the guard says "pick a DIFFERENT open item"; only if ALL are user-blocked does it pause with a `Von dir zu klären` card | correct behaviour — nothing to do without the user |
 | 12 | The launcher is gone (the scheduled task deleted, the daemon never started or killed) | on Linux the session re-arms it itself (`node scripts/batch-launcher.mjs --start`); on Windows the task must be re-created | Windows only: the agent cannot create a scheduled task — re-create it with the command below |
 | 13 | Session ENDS at a point boundary (27.07.2026, deliberate — the context is the batch's dominant cost) | (4) the launcher spawns the successor once the old pid is provably dead; `batch-progress-guard` allows the stop only against a verified-closed point AND an armed task | a few idle minutes per point, traded for a fresh context |

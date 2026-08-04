@@ -47,6 +47,11 @@ import {
   detectQuotaSignature,
   judgeSpawnOutcome,
   announceSpawn,
+  resolveClaudeCli,
+  cliSearchSummary,
+  cliFallbackDirs,
+  pathDirs,
+  CLAUDE_CLI_ENV,
 } from './batch-autostart-core.mjs'
 import { isOwnSpawn } from './batch-singleton.mjs'
 
@@ -740,5 +745,112 @@ describe('spawnProgressed — the launcher’s own pending lock is not progress'
   it('an unknown head on either side is not evidence of a move', () => {
     expect(spawnProgressed({ curHead: '', lastHead: 'a'.repeat(40), lastSpawnAt: SPAWNED })).toBe(false)
     expect(spawnProgressed({ curHead: 'b'.repeat(40), lastHead: '', lastSpawnAt: SPAWNED })).toBe(false)
+  })
+})
+
+// --- WHERE THE CLI LIVES — the witness for point 490, 04.08.2026 -------------
+//
+// The batch stood still for three hours on the night the host became Linux. The
+// launcher did everything right up to the last step — it accepted the boundary
+// handover, it ran the repo check — and then looked for the CLI under
+// %LOCALAPPDATA%, which does not exist here, and logged `FAIL: no bundled
+// claude.exe found` at thirteen consecutive ticks while the binary sat on PATH.
+// These cases pin the ORDER and, just as importantly, that nothing in the chain
+// can return a path the host cannot start.
+describe('resolveClaudeCli — the CLI on THIS host, whatever host it is', () => {
+  const join = (...p) => p.join('/')
+  // A tiny filesystem: only the listed paths exist, and only the listed dirs read.
+  const fs = (paths, dirs = {}) => ({
+    exists: (p) => paths.includes(p),
+    readdir: (base) => {
+      if (!(base in dirs)) throw new Error('ENOENT')
+      return dirs[base]
+    },
+    join,
+  })
+
+  const WIN_BASE = 'C:/lad/Packages/Claude_pzs8sxrjxfjjc/LocalCache/Roaming/Claude/claude-code'
+
+  it('finds the CLI on PATH when there is no Windows bundle — the case that cost three hours', () => {
+    const env = { PATH: '/nope:/usr/local/share/npm-global/bin:/usr/bin' }
+    expect(
+      resolveClaudeCli({
+        env,
+        platform: 'linux',
+        ...fs(['/usr/local/share/npm-global/bin/claude']),
+      }),
+    ).toBe('/usr/local/share/npm-global/bin/claude')
+  })
+
+  it('still prefers the newest Windows bundle where one exists', () => {
+    const env = { LOCALAPPDATA: 'C:/lad', PATH: 'C:/bin' }
+    expect(
+      resolveClaudeCli({
+        env,
+        platform: 'win32',
+        ...fs([`${WIN_BASE}/1.10.0/claude.exe`, `${WIN_BASE}/1.9.0/claude.exe`, 'C:/bin/claude.exe'], {
+          [WIN_BASE]: ['1.9.0', '1.10.0'],
+        }),
+      }),
+    ).toBe(`${WIN_BASE}/1.10.0/claude.exe`)
+  })
+
+  it('lets an explicit override win over everything else', () => {
+    const env = { [CLAUDE_CLI_ENV]: '/opt/claude/bin/claude', PATH: '/usr/bin' }
+    expect(
+      resolveClaudeCli({ env, platform: 'linux', ...fs(['/opt/claude/bin/claude', '/usr/bin/claude']) }),
+    ).toBe('/opt/claude/bin/claude')
+  })
+
+  it('falls THROUGH an override that names nothing, rather than handing spawn a dead path', () => {
+    const env = { [CLAUDE_CLI_ENV]: '/gone/claude', PATH: '/usr/bin' }
+    expect(resolveClaudeCli({ env, platform: 'linux', ...fs(['/usr/bin/claude']) })).toBe('/usr/bin/claude')
+  })
+
+  it('falls back to the usual install dirs when PATH is thin — a service tick inherits little', () => {
+    expect(
+      resolveClaudeCli({ env: { PATH: '' }, platform: 'linux', ...fs(['/usr/local/bin/claude']) }),
+    ).toBe('/usr/local/bin/claude')
+  })
+
+  it('accepts either bin name — the npm bin is a symlink to a file still called claude.exe', () => {
+    expect(
+      resolveClaudeCli({ env: { PATH: '/usr/bin' }, platform: 'linux', ...fs(['/usr/bin/claude.exe']) }),
+    ).toBe('/usr/bin/claude.exe')
+  })
+
+  it('returns null when nothing qualifies, and never throws on a hostile filesystem', () => {
+    expect(resolveClaudeCli({ env: { PATH: '/usr/bin' }, platform: 'linux', ...fs([]) })).toBe(null)
+    expect(
+      resolveClaudeCli({
+        env: { PATH: '/usr/bin' },
+        platform: 'linux',
+        join,
+        readdir: () => {
+          throw new Error('ENOENT')
+        },
+        exists: () => {
+          throw new Error('EACCES')
+        },
+      }),
+    ).toBe(null)
+  })
+
+  it('splits PATH the way the platform writes it', () => {
+    expect(pathDirs({ env: { PATH: 'C:/a;C:/b' }, platform: 'win32' })).toEqual(['C:/a', 'C:/b'])
+    expect(pathDirs({ env: { PATH: '/a:/b' }, platform: 'linux' })).toEqual(['/a', '/b'])
+    expect(pathDirs({ env: {}, platform: 'linux' })).toEqual([])
+  })
+
+  it('keeps the fallback dirs free of a half-built HOME path', () => {
+    expect(cliFallbackDirs({ HOME: '/home/x' })).toContain('/home/x/.npm-global/bin')
+    expect(cliFallbackDirs({}).every((d) => d.startsWith('/'))).toBe(true)
+  })
+
+  it('says what it searched, so an absence is never silent again', () => {
+    const summary = cliSearchSummary({ env: { PATH: '/usr/bin' }, platform: 'linux' })
+    expect(summary).toContain('platform linux')
+    expect(summary).toContain('(unset)')
+    expect(summary).toMatch(/\d+ director/)
   })
 })
