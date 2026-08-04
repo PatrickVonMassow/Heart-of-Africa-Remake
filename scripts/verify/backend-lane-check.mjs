@@ -8,7 +8,8 @@
 // Reports, per lane: whether a browser opens, what renderer it actually got, whether that
 // renderer is SOFTWARE, and whether a frame was drawn. Exit 0 only when both lanes draw.
 import { chromium } from 'playwright'
-import { findSystemChrome, laneRenderers, softwareRendererVerdict } from './backend-lane-core.mjs'
+import { laneRenderers, softwareRendererVerdict } from './backend-lane-core.mjs'
+import { findSystemChrome } from './system-chrome.mjs'
 
 const SOFTWARE_HINTS = ['swiftshader', 'llvmpipe', 'softpipe', 'lavapipe']
 

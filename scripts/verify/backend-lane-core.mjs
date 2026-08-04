@@ -1,31 +1,10 @@
 // The pure half of the backend-lane check (point 493), so the decisions it makes are
-// testable without a browser: which lanes exist on this host, and whether the renderer a
+// testable without a browser: which lanes this host can open, and whether the renderer a
 // lane came up with is a software rasteriser.
-import { existsSync } from 'node:fs'
-import { execFileSync } from 'node:child_process'
-import { systemChromeCandidates, webglLaunchOptions, webgpuLaunchOptions, WEBGPU_UNAVAILABLE } from './launch-args-core.mjs'
-
-/** The first candidate that exists on this host, or null. Absolute paths are checked
- *  directly, bare names resolved on PATH — the same order the lane launches in. */
-export function findSystemChrome(platform = process.platform, { exists = existsSync, which = whichOnPath } = {}) {
-  for (const candidate of systemChromeCandidates(platform)) {
-    if (candidate.includes('/')) {
-      if (exists(candidate)) return candidate
-      continue
-    }
-    const resolved = which(candidate)
-    if (resolved) return resolved
-  }
-  return null
-}
-
-function whichOnPath(name) {
-  try {
-    return execFileSync('command', ['-v', name], { shell: true, encoding: 'utf8' }).trim() || null
-  } catch {
-    return null
-  }
-}
+//
+// WHERE the browser is stays system-chrome.mjs's job (point 475) — that walk exists once
+// and two copies naming different browsers is the exact failure it was written to end.
+import { webglLaunchOptions, webgpuLaunchOptions, WEBGPU_UNAVAILABLE } from './launch-args-core.mjs'
 
 /** The lanes to probe, in report order. A lane with no launch options carries the REASON
  *  in its place, so the check prints why rather than a bare failure. */
@@ -42,14 +21,15 @@ export function laneRenderers(systemChrome, platform = process.platform) {
       reason:
         `${WEBGPU_UNAVAILABLE}: no system Chrome on this host. Playwright's bundled Chromium ` +
         'reports navigator.gpu as undefined here (measured 04.08.2026), so the lane cannot open. ' +
-        'Install one from outside the container (sudo cannot — the image allows node only the firewall script): ' +
-        'docker exec -u root <container> bash -lc "cd /workspace/hoa && bash scripts/verify-host-setup.sh"',
+        'Install one from outside the container (sudo cannot — the image allows node only the ' +
+        'firewall script): docker exec -u root <container> bash -lc "cd /workspace/hoa && bash ' +
+        'scripts/verify-host-setup.sh"',
     },
   ]
 }
 
 /** Is this renderer string a software rasteriser? The picture it draws is CORRECT — that is
- *  the trap. Only the speed betrays it, so the check has to name it rather than pass it. */
+ *  the trap. Only the clock betrays it, so the check has to name it rather than pass it. */
 export function softwareRendererVerdict(renderer, hints) {
   if (typeof renderer !== 'string' || renderer.length === 0) {
     return { software: false, reason: 'no renderer string' }

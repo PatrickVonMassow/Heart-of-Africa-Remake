@@ -1,32 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { findSystemChrome, laneRenderers, softwareRendererVerdict } from './backend-lane-core.mjs'
-
-describe('findSystemChrome (point 493)', () => {
-  it('resolves a bare candidate through PATH', () => {
-    const found = findSystemChrome('linux', { exists: () => false, which: (n) => (n === 'chromium' ? '/usr/bin/chromium' : null) })
-    expect(found).toBe('/usr/bin/chromium')
-  })
-
-  it('takes an absolute candidate from the filesystem, never through PATH', () => {
-    const found = findSystemChrome('linux', {
-      exists: (p) => p === '/opt/google/chrome/chrome',
-      which: (name) => {
-        // Bare names legitimately go to PATH; an absolute one must not.
-        if (name.includes('/')) throw new Error(`PATH consulted for an absolute candidate: ${name}`)
-        return null
-      },
-    })
-    expect(found).toBe('/opt/google/chrome/chrome')
-  })
-
-  it('returns null when the host has none — never a guess', () => {
-    expect(findSystemChrome('linux', { exists: () => false, which: () => null })).toBeNull()
-  })
-
-  it('probes nothing on Windows, where the channel registry has always resolved it', () => {
-    expect(findSystemChrome('win32', { exists: () => true, which: () => '/never' })).toBeNull()
-  })
-})
+import { laneRenderers, softwareRendererVerdict } from './backend-lane-core.mjs'
 
 describe('laneRenderers (point 493)', () => {
   it('offers both lanes when a system Chrome was found, and hands its PATH to the WebGPU one', () => {
