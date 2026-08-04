@@ -228,6 +228,17 @@ describe('a reassurance without a negation word is no demand either', () => {
   it('but a reassurance in a NEIGHBOURING clause does not shelter a demand', () => {
     expect(blocked('Der Rest ist erledigt. Bitte führe `npm run test:large` aus.')).toBe(true)
   })
+
+  // The exemption is for MODAL requests only. An imperative hands the step over
+  // and then merely promises the reward — the promise is no reassurance, and
+  // reading it as one made the guard's verdict depend on punctuation: the comma
+  // variant split the promise into its own clause and blocked, the "und" variant
+  // kept it in the demand's clause and passed.
+  it('does not let an IMPERATIVE clear itself by promising the reward', () => {
+    expect(blocked('Führe `npm run build` aus und dann ist alles erledigt.')).toBe(true)
+    expect(blocked('Führe `npm run build` aus, dann ist alles erledigt.')).toBe(true)
+    expect(blocked("Just run `npm ci` and you're all set.")).toBe(true)
+  })
 })
 
 // The hand-back rungs demand a hand-BACK DIRECTION — "paste it HERE", "schick

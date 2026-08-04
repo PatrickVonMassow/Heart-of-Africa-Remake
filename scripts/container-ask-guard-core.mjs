@@ -191,6 +191,19 @@ export const REASSURANCE_CUES = [
 ]
 
 /**
+ * The requests the reassurance exemption above may clear: the MODAL ones, which
+ * is the whole shape it was written for ("you should be all set" reads as an
+ * obligation only because of the modal). An IMPERATIVE is never a reassurance —
+ * "Führe `npm run build` aus und dann ist alles erledigt" tells him to run it and
+ * then merely promises the reward, and the unrestricted exemption cleared it
+ * (four-eyes review, Fable 5, 04.08.2026). Note it is the CLAUSE separator that
+ * used to save the comma variant: "Führe … aus, dann ist alles erledigt" splits
+ * the promise off and blocked either way, so the exemption's reach depended on
+ * punctuation alone.
+ */
+export const REASSURABLE_REQUESTS = new Set(['de-modal', 'en-modal'])
+
+/**
  * The clause speaks about what the SESSION did — a command quoted as a report,
  * not handed over. `\bich\b` is the workhorse here: a real hand-over almost
  * never says "I" in the same clause, and clause-level scoping keeps an honest
@@ -371,7 +384,7 @@ const excerpt = (s) => {
  */
 export function judgeRequest({ block, clause, before = '', after = '', request }) {
   if (firstMatch(NEGATION_CUES, clause)) return null
-  if (firstMatch(REASSURANCE_CUES, clause)) return null
+  if (REASSURABLE_REQUESTS.has(request) && firstMatch(REASSURANCE_CUES, clause)) return null
   if (firstMatch(REPORT_CUES, clause)) return null
   if (firstMatch(JUDGEMENT_CUES, clause)) return null
   if (firstMatch(CAPABILITY_CUES, clause)) return null
