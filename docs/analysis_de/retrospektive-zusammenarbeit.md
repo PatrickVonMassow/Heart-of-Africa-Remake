@@ -39,6 +39,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 27.07. | Gemessene Verbrauchstreiber → Kurzbrief je Auftrag statt Dokumentensuche; Board-Gate **vor** der Arbeit; Vorprüfung der Wächter |
 | 28.07. | Fünfeinhalb Stunden Stillstand → die Grenze wird **genommen**, nicht nur erlaubt; erste vollständig beobachtete Übergabe; drei Messfenster schmaler als das Gemessene (§3.44) |
 | 28.07. | Board dreimal am selben Handgriff zerbrochen → Strukturprüfung **vor** die Veröffentlichung (§3.45); 3546 grüne Tests über einer stillschweigend geschrumpften Menge (§3.46) |
+| 04.08. | Eine Nacht am Falschen gearbeitet: der Vorrang stand als Prosa, die Warteschlange las die alte Rangfolge (§3.77); zweimal Container-Arbeit an den Nutzer zurückgereicht → Regel + Wächter (§3.78) |
 
 Muster: Ab dem 22.07. explodiert die Commit-Rate (Delegation) — und genau dann häufen sich die Infrastruktur-Vorfälle. **Skalierung der Autonomie erzeugt eine eigene Problemklasse, die die Feature-Arbeit zeitweise überholt.**
 
@@ -709,6 +710,24 @@ Der Reiz liegt darin, dass hier nichts kaputt war: Beide Stände waren für sich
 
 **Lehre:** Wer eine lange Prüfung startet, hat den Baum bis zu ihrem Ende festgeschrieben. Parallelität ist genau dort erlaubt, wo sie den geprüften Stand nicht anfasst — und wo eine Prüfung Minuten braucht, ist die Versuchung, die Wartezeit „nebenbei" zu nutzen, am größten.
 
+### 3.77 Eine Priorität, die nur der Leser sieht, ist keine
+
+Der Nutzer gab am Abend des 03.08. ein Feature in Auftrag und sagte ausdrücklich, es habe Vorrang vor allem anderen. Die Sitzung nahm es korrekt auf — zwölf implementierungsreife Punkte, eine Referenzspezifikation, um 01:29 committet — und schrieb den Vorrang als **Prosa** in die Arbeitsordnung: „gibt jedem Punkt hier Vorrang vor dem Rest der Warteschlange". Am Morgen war nichts davon gebaut. Gearbeitet worden war die ganze Nacht, nur an Testinfrastruktur.
+
+Der Grund ist mechanisch und darum bitter: Die Warteschlange, aus der sich jede Nachfolgesitzung orientiert, leitet ihre Reihenfolge aus der Rangfolge-Datei und einer gespeicherten Liste ab. Prosa liest dort niemand. Die Rangfolge begann weiterhin mit dem alten Paket, das neue Feature lag auf Platz 60 — und weil eine Sitzung an der Punktgrenze endet und die nächste den Chat nicht kennt, nahm jede brav den Kopf der Liste. Keine Sitzung hat sich falsch verhalten; die Übergabe transportierte schlicht die falsche Ordnung.
+
+Das ist §3.16 („Mechanismus zuerst") in seiner unangenehmsten Form: Hier gab es den Mechanismus sogar, er wurde nur nicht **gefüttert**. Eine Regel, die in dem Dokument steht, das die Maschine liest, aber in einem Feld, das sie nicht auswertet, ist genauso wirkungslos wie eine Erinnerung.
+
+**Lehre:** Jede Priorisierung muss dort landen, wo der Picker sie liest — Deklaration, Rangfolge und gespeicherte Ordnung sind EINE Aussage, wächtergeprüft. Und die Priorität gilt dem ZIEL, nicht der Liste: Was das priorisierte Feature schneller fertig macht, gehört mit nach vorn, auch wenn es nicht Teil davon ist (Nutzer 04.08.).
+
+### 3.78 Die Arbeit, die an den Nutzer zurückgereicht wurde
+
+Zwei Mal an einem Vormittag bekam der Nutzer einen Befehl in die Hand: erst `sudo` für ein Einrichtungsskript, dann einen `docker exec`-Aufruf. Beide konnten nicht funktionieren — das offizielle Abbild erlaubt dem Container-Benutzer genau einen Befehl ohne Passwort, und die Sandbox-Firewall bindet iptables-weit auch root, sodass die Paketquellen mit jeder Berechtigung unerreichbar sind. Der zweite Vorschlag stammte sogar von einem anderen Assistenten, dem dieselben Fakten fehlten.
+
+Bemerkenswert ist nicht der Irrtum über die Rechte, sondern der Reflex davor: Eine blockierte Aktion wurde als *Auftrag an den Nutzer* umgeformt statt als Aufforderung, den funktionierenden Weg zu finden. Das ist dieselbe Bewegung wie beim Handbuch-Verweis in §3.10 — nur teurer, weil sie den Menschen in eine Sackgasse schickt, die messbar gewesen wäre: Ein `curl` gegen die beiden Paketquellen hätte die Antwort in zwei Sekunden gegeben, bevor irgendjemand etwas tun musste.
+
+**Lehre:** Ein Schritt innerhalb der Maschine, auf der ich arbeite, gehört mir. Fehlt eine Fähigkeit wirklich, wird EINMAL um die Fähigkeit gebeten — nie um ihre Ausführung. Und bevor überhaupt gebeten wird, wird gemessen, ob der Weg mit dieser Fähigkeit trägt.
+
 ---
 
 ## 4. Die Guards als Immunsystem
@@ -798,7 +817,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Montag, 03.08.2026, 17:23 · Quellen-Fingerprint: `245dd16d717b…`
+Zuletzt aktualisiert: Dienstag, 04.08.2026, 10:43 · Quellen-Fingerprint: `a3a36516b48f…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -821,6 +840,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | CLAUDE.md §7.1 references design.md instead of retelling it; future doc edits must preserve the verifiable conditions, script mappings, numbering and checked numbers | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Autonomously insert a full CLOSING cycle (regression + dead-code/stale-doc cleanup + .md audit) when warranted — after extensive rework or many small completed tasks — without waiting for the user to ask | 1 | niedrig | closing-guard.mjs | ✔ Mechanismus |
 | hoa commit messages must not reference the TASKS point (\"Point N\") | 1 | niedrig | commit-scope-guard.mjs | ✔ Mechanismus |
+| Never ask the user to run anything inside the container — he granted full rights; do it myself | 1 | niedrig | worktree-reminder.mjs | ✔ Mechanismus |
 | The batch dashboard's Warteschlange must ALWAYS list every open TASKS point — no open point may be missing | 1 | niedrig | dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs, queue-order-guard.mjs | ✔ Mechanismus |
 | Every dashboard card's body must speak STRICTLY about its own point — never report on or reference another TASKS point inside a card | 1 | niedrig | batch-singleton.mjs, dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs, decision-card-guard.mjs | ✔ Mechanismus |
 | hoa dashboard \"Woran ich gerade arbeite\" holds ONE CARD PER parallel point being actively worked (not a single card); cards move from Warteschlange into it (possibly several at once); a point is NEVER in both sections at once | 1 | niedrig | dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
@@ -875,8 +895,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | CORRECTED 19.07.2026 — WebGPU IS testable headless/autonomously via system Chrome (channel:'chrome') + --headless=new; the 'untestable' belief held only for Playwright's BUNDLED Chromium | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 69 Feedback-/Projekt-Memories · 40 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 26 Prozess-/Meta-TASKS-Punkte (davon 10 offen).
+Erfasste Quellen: 70 Feedback-/Projekt-Memories · 40 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 26 Prozess-/Meta-TASKS-Punkte (davon 10 offen).
 
-<!-- RETRO-FINGERPRINT: 245dd16d717b57f43fc42d55529a87ca6270e9c8d3d9793e700774308fc9d548 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-03T15:23:08.476Z -->
+<!-- RETRO-FINGERPRINT: a3a36516b48f0fdbbd27e8039897f163aa55087b594f2f8d875fe4ba9d25792f -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-04T08:43:21.931Z -->
 <!-- AUTO-GENERATED:END -->
