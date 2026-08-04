@@ -217,6 +217,37 @@ waterfall" map label as its water. **A check that stages a scene must pin what
 the scene depends on before anything can move it** — the drift freeze moved to
 the jump, and three separate sessions then staged the identical cell and rect.
 
+### A staging miss must NAME ITSELF, never accuse the product (point 336)
+
+`enrichments` stages the five §19.16 crocodile endings — the plain grip, the
+rescue, the sacrifice, too-late, and the victim that vanishes mid-grip. On four
+consecutive runs a DIFFERENT one of them went red, and every time the GAME had
+behaved correctly: the STAGING had missed its own precondition. One branching
+helper served all five and each mode leaned on a different IMPLICIT assumption —
+a parked distance, an arrival time, a drink state, a lunge that had to fire — so
+every fix shifted the next mode's timing. Fixing one case per run is a treadmill.
+
+The rebuilt shape generalises to any staged multi-outcome check:
+
+- **Shared plumbing, per-ending setup.** Finding the bank, staging the pair,
+  holding the stand and restoring the world stay shared; each ending owns a small
+  setup of its own, so a change to one cannot move another's timing.
+- **Every precondition is explicit and ASSERTED before the ending is measured.**
+  A miss returns `stagingOk:false` with a `missing:'<what>'` sentence, and
+  `checkDrama` prints it as `FAIL STAGING (not a product failure)` — never as a
+  game bug. The distance a parked parent actually kept, the reach a charging one
+  actually closed to: measured and stated, not hoped for.
+- **Every outcome roll is pinned** (`balance.parentDefense.forceOutcome`), while
+  the assertions still read the REAL resolved state — who lived, who died,
+  whether the crocodile let go. Pinning the dice is not masking; relaxing an
+  assertion would be.
+- **The seizure is established deterministically**: the stand is re-established
+  on every FRAME rather than at the 80 ms poll cadence, every competing-drama
+  flag the ambush scan skips over is cleared AND COUNTED, the crossing/mire/
+  adoption rolls are zeroed for the scenario (prevented, not cured), and the grip
+  is polled on a sim-time budget.
+- **A staging miss is RE-STAGED (bounded); a behaviour result is never retried.**
+
 ## Is the machine QUIET? — before the run (point 296)
 
 A timing verdict taken under load is not evidence. On 27.07.2026 that cost three
