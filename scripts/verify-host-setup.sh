@@ -11,23 +11,37 @@
 #     up as "ANGLE (Microsoft Corporation, D3D12 (NVIDIA GeForce RTX 4070 Ti), OpenGL 4.2)"
 #     — measured 170 vs 22.7 renderer calls per second on the identical scene, and the
 #     `flow` suite went from red-and-unfinished-in-10-minutes to GREEN IN 58 SECONDS.
-#   - WebGPU had no Vulkan device to run on: Debian 12 ships Mesa 22.3.6 and even the
-#     25.0.7 backport is built WITHOUT Dozen (dzn), the Vulkan-on-D3D12 driver, so
-#     `vulkaninfo` enumerated llvmpipe alone. Dozen is not packaged anywhere — it is built
-#     here, from the Debian mesa source, with -Dvulkan-drivers=microsoft-experimental.
+#   - WebGPU is the one that stays SOFTWARE, and not for want of trying. Debian 12 ships
+#     Mesa 22.3.6 and even the 25.0.7 backport is built WITHOUT Dozen (dzn), the
+#     Vulkan-on-D3D12 driver, so the loader offered llvmpipe alone. Dozen builds cleanly
+#     from the Debian mesa source (--with-dzn below) and `vulkaninfo` then enumerates
+#     "Microsoft Direct3D12 (NVIDIA GeForce RTX 4070 Ti)" — but Chrome 151 DECLINES it:
+#     asked for an adapter with the loader scoped to dzn alone, Dawn still answers with
+#     its own bundled SwiftShader, and with the full ICD set visible the browser HANGS at
+#     adapter time. So the WebGPU lane runs on SwiftShader, correct and slow, and is
+#     labelled as such by backend-lane-check.mjs. The dzn build stays here, opt-in, as the
+#     starting point for the next attempt (a Chrome that accepts a system Vulkan device).
 #
 # Everything installs system-wide, so this needs root ONCE. It is idempotent: a second run
 # installs nothing and says so.
 #
-#   sudo bash scripts/verify-host-setup.sh        # install what is missing
-#   bash scripts/verify-host-setup.sh --check     # no root; report what is missing
+#   sudo bash scripts/verify-host-setup.sh             # install what is missing
+#   sudo bash scripts/verify-host-setup.sh --with-dzn  # …and build Dozen (see above)
+#   bash scripts/verify-host-setup.sh --check          # no root; report what is missing
 #
 # PROVE it at the picture afterwards — a package list is not evidence:
 #   node scripts/verify/backend-lane-check.mjs
 set -euo pipefail
 
 CHECK_ONLY=0
-[ "${1:-}" = "--check" ] && CHECK_ONLY=1
+WITH_DZN=0
+for arg in "$@"; do
+  case "$arg" in
+    --check) CHECK_ONLY=1 ;;
+    --with-dzn) WITH_DZN=1 ;;
+    *) printf 'verify-host-setup: unknown argument %s\n' "$arg" >&2; exit 2 ;;
+  esac
+done
 
 MESA_VERSION=25.0.7
 DZN_LIB=/usr/lib/x86_64-linux-gnu/libvulkan_dzn.so
@@ -49,8 +63,9 @@ ldconfig -p | grep -q 'libGL\.so\.1' ||
   missing+=("libgl1/libegl1 (without them ANGLE's gl backend has no driver and WebGL 2 drops to SwiftShader)")
 ls /usr/lib/x86_64-linux-gnu/dri/d3d12_dri.so >/dev/null 2>&1 ||
   missing+=("mesa's d3d12 Gallium driver (the one that reaches /dev/dxg)")
-{ [ -e "$DZN_LIB" ] && [ -e "$DZN_ICD" ]; } ||
-  missing+=("Dozen / dzn, Vulkan-on-D3D12 (built here — no distribution packages it; without it WebGPU has only llvmpipe)")
+if [ "$WITH_DZN" = "1" ] && { [ ! -e "$DZN_LIB" ] || [ ! -e "$DZN_ICD" ]; }; then
+  missing+=("Dozen / dzn, Vulkan-on-D3D12 (built here — no distribution packages it)")
+fi
 [ -e /etc/ld.so.conf.d/wsl.conf ] ||
   missing+=("/usr/lib/wsl/lib on the loader path (the WSL D3D12 libraries the drivers open)")
 
@@ -127,12 +142,18 @@ fi
 printf '%s\n' '/usr/lib/wsl/lib' >/etc/ld.so.conf.d/wsl.conf
 ldconfig
 
-# --- 6. Dozen (dzn) — Vulkan on D3D12 ----------------------------------------------------
+# --- 6. Dozen (dzn) — Vulkan on D3D12, OPT-IN --------------------------------------------
 # No distribution builds this: it is Mesa's `microsoft-experimental` Vulkan driver, off in
 # every packaged build, and it is the ONLY way a Vulkan device on this host is the GeForce
 # rather than llvmpipe. Built from the same Mesa source Debian backports, with gallium and
 # LLVM switched off, so the compile is minutes rather than an hour.
-if [ ! -e "$DZN_LIB" ] || [ ! -e "$DZN_ICD" ]; then
+#
+# OPT-IN because it does not yet buy the lane anything and is not free of risk: Chrome 151
+# ignores it for WebGPU (measured — scoped to dzn alone, Dawn still returns SwiftShader),
+# and with every ICD visible a browser launched with --enable-features=Vulkan HANGS at
+# adapter time. Both lanes this repo ships pass with it installed, because neither asks the
+# Vulkan loader anything. Build it when re-attempting the hardware WebGPU lane.
+if [ "$WITH_DZN" = "1" ] && { [ ! -e "$DZN_LIB" ] || [ ! -e "$DZN_ICD" ]; }; then
   apt-get install -y --no-install-recommends -t bookworm-backports \
     meson directx-headers-dev ninja-build python3-mako bison flex libdrm-dev pkg-config \
     libexpat1-dev zlib1g-dev python3-yaml curl xz-utils

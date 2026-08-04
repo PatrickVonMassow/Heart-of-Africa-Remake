@@ -27,42 +27,47 @@ needs, both in `.devcontainer/init-firewall.sh`:
   address pool and the single address resolved at boot is usually not the one the download
   lands on minutes later.
 
-**Measured 04.08.2026 (point 493), so nobody has to guess again.** In the container as it
-stands, WebGL 2 comes up as `ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero)),
-SwiftShader driver)` — pure software — and `navigator.gpu` is UNDEFINED in Playwright's
-bundled Chromium, with or without `--enable-unsafe-webgpu`. So there is no WebGPU lane at
-all here, and the WebGL 2 lane runs on the CPU. Putting `/usr/lib/wsl/lib` on the loader
-path changes neither: the D3D12 libraries are present, but no Vulkan loader and no Mesa
-d3d12/dzn driver exist to use them, and there is no `/usr/share/vulkan/icd.d` at all.
-`scripts/verify-host-setup.sh` installs both halves (root, once) and
-`scripts/verify/backend-lane-check.mjs` proves the result at the picture rather than at a
-version string.
+**Measured 04.08.2026 (point 493), so nobody has to guess again.** The GPU behind
+`/dev/dxg` IS reachable from the container, and what stood between the suites and it was
+packages, not hardware:
 
-**The firewall binds root too** (measured 04.08.2026). It is iptables-wide, so a `docker exec
--u root` shell is as fenced in as `node`: `deb.debian.org` and `dl.google.com` are not on the
-allowlist and are unreachable, and `apt-get` therefore fails whoever runs it. The durable way
-to add the GPU stack is the container IMAGE, whose build runs outside the sandbox:
+- **WebGL 2 now runs on the card.** `--use-angle=gl` with `GALLIUM_DRIVER=d3d12` in the
+  browser's environment comes up as `ANGLE (Microsoft Corporation, D3D12 (NVIDIA GeForce
+  RTX 4070 Ti), OpenGL 4.6)`. Measured against the SwiftShader lane it replaced: **170 vs
+  22.7 renderer calls per second** on the identical scene, and the `flow` suite went from
+  red-and-unfinished-after-ten-minutes to **green in 58 seconds**. Both halves are
+  load-bearing — without `libgl1`/`libegl1` ANGLE finds no driver, and without the Gallium
+  pin Mesa 25 serves llvmpipe while every interface still looks healthy (Mesa 22.3.6 chose
+  d3d12 by itself; the backport does not).
+- **WebGPU runs, in software.** System Chrome exposes `navigator.gpu` on a secure-context
+  page — the earlier "undefined" reading came from probing `about:blank`/`data:` URLs,
+  which are not secure contexts — and the lane draws the real game once ANGLE *and* Dawn
+  are both pinned to Chrome's bundled SwiftShader. Left to disagree they report an adapter,
+  initialise `isWebGPUBackend`, advance the frame counter and paint nothing: the page throws
+  `Instance dropped in popErrorScope` and the canvas stays black behind a live HUD.
+- **Hardware WebGPU is the open item.** Vulkan on this host means Dozen (dzn,
+  Vulkan-on-D3D12). No distribution ships it — not Debian 12's Mesa 22.3.6, not the 25.0.7
+  backport — but it builds from the Debian mesa source
+  (`sudo bash scripts/verify-host-setup.sh --with-dzn`) and `vulkaninfo` then enumerates
+  `Microsoft Direct3D12 (NVIDIA GeForce RTX 4070 Ti)`. Chrome 151 still declines it: with
+  the loader scoped to dzn alone, Dawn answers with its own SwiftShader anyway, and with
+  the full ICD set visible a browser launched with `--enable-features=Vulkan` HANGS at
+  adapter time. So the build is opt-in, and the hardware WebGPU lane waits for a Chrome
+  that accepts a system Vulkan device.
 
-```dockerfile
-RUN apt-get update && apt-get install -y --no-install-recommends \
-      libvulkan1 mesa-vulkan-drivers libgl1-mesa-dri vulkan-tools \
-      ca-certificates curl gnupg \
- && install -d -m 0755 /etc/apt/keyrings \
- && curl -fsSL https://dl.google.com/linux/linux_signing_key.pub \
-      | gpg --dearmor -o /etc/apt/keyrings/google-chrome.gpg \
- && echo 'deb [arch=amd64 signed-by=/etc/apt/keyrings/google-chrome.gpg] https://dl.google.com/linux/chrome/deb/ stable main' \
-      > /etc/apt/sources.list.d/google-chrome.list \
- && apt-get update && apt-get install -y --no-install-recommends google-chrome-stable \
- && echo /usr/lib/wsl/lib > /etc/ld.so.conf.d/wsl.conf && ldconfig \
- && rm -rf /var/lib/apt/lists/*
-```
+`scripts/verify-host-setup.sh` installs all of it (root, once, idempotent) and
+`scripts/verify/backend-lane-check.mjs` proves the result at the PICTURE — it boots the
+real game on each lane, reads the pixels back out of the canvas and names the device that
+drew them, so a software rasteriser can never be reported as if it were the GPU.
 
-What that buys is not symmetrical, and saying so up front avoids a wasted rebuild: Mesa's
-d3d12 driver reaching `/dev/dxg` is the standard WSL path and should take WebGL 2 off the CPU
-— that is the speed. The WebGPU lane additionally needs a Vulkan driver over D3D12 (dzn),
-which is experimental; if it does not carry the game, the fallback is the user's lane 2 (the
-second backend run by hand on Windows). `scripts/verify/backend-lane-check.mjs` answers both
-questions at the picture, in one run.
+**Two container facts worth keeping.** The image leaves `~/.config` owned by root; Chrome
+derives its crash-database path from it, cannot create one, and aborts with
+`chrome_crashpad_handler: --database is required` before a page loads (Playwright's own
+launch routes around it, a bare one does not). And `deb.debian.org` moves between address
+ranges, so an `apt-get` that worked an hour ago can fail — the additive fix is
+`dig +short A deb.debian.org | while read -r ip; do sudo ipset add allowed-domains
+"${ip%.*}.0/24" -exist; done`. Never re-run `init-firewall.sh` to "refresh" it: it flushes
+every rule while the default policy stays DROP and can seal the container.
 
 Rendering needs a real GPU. Without one, Chrome falls back to SwiftShader, which drops the
 frame rate to roughly one frame per second and makes every motion or interaction check

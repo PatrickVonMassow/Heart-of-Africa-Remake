@@ -429,7 +429,11 @@ await page2.goto(BASE)
 await page2.evaluate(() => localStorage.clear())
 await page2.reload()
 await page2.waitForFunction(() => window.__game && window.__ui, null, { timeout: 60000 })
-await page2.waitForTimeout(700)
+// The mouse-look check reads the PLACE player's yaw, so wait for that player rather
+// than for a wall-clock 700 ms: the settlement scene mounts in a fraction of a second
+// on the GPU lane and takes several on a software one, and the fixed wait read a yaw
+// of `null` there and failed a check about mouse-look for a reason that was not it.
+await page2.waitForFunction(() => window.__placePlayer, null, { timeout: 60000 })
 // Under browser automation the game deliberately SKIPS the real pointer lock
 // (it would grab the OS cursor under system-Chrome --headless=new) and instead
 // applies mouse-look from raw movement — so assert the behaviour (the view turns
@@ -437,7 +441,8 @@ await page2.waitForTimeout(700)
 const yawBefore = await page2.evaluate(() => window.__placePlayer?.yaw ?? null)
 await page2.mouse.move(640, 400)
 await page2.mouse.move(760, 400)
-await page2.waitForTimeout(60)
+await page2.waitForFunction((was) => (window.__placePlayer?.yaw ?? was) !== was, yawBefore, { timeout: 15000 })
+  .catch(() => {})
 const fresh = await page2.evaluate(() => ({ overlay: !!document.querySelector('.overlay'), yaw: window.__placePlayer?.yaw ?? null }))
 check(
   'a fresh start (no overlay) engages mouse-look (the view turns on a mouse move)',
