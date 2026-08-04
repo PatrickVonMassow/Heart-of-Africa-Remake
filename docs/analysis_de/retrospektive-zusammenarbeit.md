@@ -41,6 +41,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 28.07. | Board dreimal am selben Handgriff zerbrochen → Strukturprüfung **vor** die Veröffentlichung (§3.45); 3546 grüne Tests über einer stillschweigend geschrumpften Menge (§3.46) |
 | 04.08. | Eine Nacht am Falschen gearbeitet: der Vorrang stand als Prosa, die Warteschlange las die alte Rangfolge (§3.77); zweimal Container-Arbeit an den Nutzer zurückgereicht → Regel + Wächter (§3.78) |
 | 04.08. | Zweimal am eigenen Netz ausgesperrt — der Firewall-Neubau reißt zuerst ein → additives Werkzeug, fail-offener Neubau, Wächter (§3.80); die Sprachregel hatte nie einen Mechanismus, und die Bestandsprüfung sah es nicht (§3.81) |
+| 04.08. abends | Sechs rote Suiten eingeordnet: vier waren der Prüfstand — gesperrtes Auslieferungsnetz und feste Wartezeiten von einer schnelleren Maschine (§3.83); der Starter enteignet jeden Besitzer nach einer halben Stunde (Punkt 504) |
 
 Muster: Ab dem 22.07. explodiert die Commit-Rate (Delegation) — und genau dann häufen sich die Infrastruktur-Vorfälle. **Skalierung der Autonomie erzeugt eine eigene Problemklasse, die die Feature-Arbeit zeitweise überholt.**
 
@@ -767,6 +768,16 @@ Isoliert hat es am Ende ein anderer Schnitt: dieselbe Prüfung auf demselben Sta
 
 **Lehre:** Ein Vergleich isoliert nur, was er nicht mit beiden Seiten teilt. Sitzt die Änderung in der Messapparatur selbst, ist der Zeitvergleich („vorher/nachher") das falsche Werkzeug — richtig ist der Schaltervergleich am GLEICHEN Stand. Und die zweite Hälfte dieser Klasse: Sechs rote Suiten standen unbemerkt auf `main`, weil nach dem Umzug niemand den vollen Lauf mehr gefahren hatte. Was nur gelegentlich läuft, ist kein Netz, sondern eine Stichprobe.
 
+### 3.83 Die Stoppuhr, die auf einer anderen Maschine geeicht war
+
+Die Einordnung derselben sechs Suiten drehte das Urteil aus §3.82 zur Hälfte um. Der Schaltervergleich hatte die neue Bahn korrekt entlastet — nur folgte daraus **nicht**, dass das Produkt schuld war. Vier der sechs waren der Prüfstand selbst.
+
+Zwei starben an einem Auslieferungsnetz: Der erlaubte Namensserver antwortete, leitete den Modell-Download aber auf einen gesperrten Rechnerpool um. Der fehlgeschlagene Abruf platzte innerhalb eines Playwright-Weiterleiters und riss den Prozess mit — deshalb druckten beide **gar keine** Fehlerzeile. Ein Absturz sieht in einer Sammelübersicht aus wie ein Testergebnis, ist aber keines.
+
+Die anderen fotografierten Szenen, die noch nicht fertig gebaut waren. Die Wartezeiten waren feste Sekundenzahlen, geeicht auf der schnelleren Maschine des Nutzers. Auf dem langsameren Wirt ist das Ego-Bild nach vier Sekunden schwarz, nach 7,7 Sekunden ein flauer Waschton und trägt erst ab etwa 17 Sekunden sein Korn. Gemessen wurde also durchweg das Nichts — und als Verlust der Oberflächenstruktur berichtet. Die Kurve ist dabei nicht glatt, sondern **stufig**: Zwischen 9,0 und 13,2 Sekunden stand die Geometriezahl still, eine kurze Beruhigungsfrist hätte mitten auf diesem Plateau „fertig" gemeldet.
+
+**Lehren:** Eine Entlastung ist kein Schuldspruch für den Rest — „nicht die Bahn" beantwortet nicht „wer dann". Eine Messung braucht ihre Bereitschaftsbedingung aus dem **gemessenen Gegenstand** (hier die Geometriezahl des Renderers), nie aus einer Uhr; eine feste Wartezeit kodiert stillschweigend eine Maschinengeschwindigkeit und wird beim nächsten Umzug zur Falschanklage. Und ein Plateau ist kein Ziel: Wer auf „ändert sich nicht mehr" wartet, muss lange genug warten, dass Stillstand von Fertigsein unterscheidbar ist.
+
 ---
 
 ## 4. Die Guards als Immunsystem
@@ -856,7 +867,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Dienstag, 04.08.2026, 19:46 · Quellen-Fingerprint: `5e9374e2f0b0…`
+Zuletzt aktualisiert: Dienstag, 04.08.2026, 22:18 · Quellen-Fingerprint: `45c21a78bc65…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -927,6 +938,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Run the both-backend browser verify on the feat BRANCH before merging to main — merging an unverified render change first triggers a render-verify Stop-guard block-loop | 1 | niedrig | render-verify-guard.mjs | ✔ Mechanismus |
 | Headless probes must screenshot the DEFAULT zoom too (zoom-gated dressing like haze only shows there); headless WebGPU is impossible, so WebGPU-only branches stay user-checked | 2 | mittel | render-verify-guard.mjs | ✔ Mechanismus |
 | Every GUI/rendering fix must be verified on BOTH WebGPU and WebGL2 before it counts as done — never mark a render fix done on one path | 2 | mittel | render-verify-guard.mjs | ✔ Mechanismus |
+| A resumed batch session must check the previous owner's PROCESS before working — the launcher's \"provably dead\" verdict was wrong and double-spawned | 1 | niedrig | render-verify-guard.mjs | ✔ Mechanismus |
 | Rotating verify AND unit failures under a running agent pool are LOAD, not bugs — 8 of 12 unit runs red from load alone; judge a red only on a quiet machine | 2 | mittel | render-verify-guard.mjs | ✔ Mechanismus |
 | The named \"version release\" process and its trigger — queue/run a version release for a version the user names (full closing → user approval → tag → mirror poc → publish /TAG/ and /poc/) | 1 | niedrig | lock-release-hook.mjs | ✔ Mechanismus |
 | Standing licence to move, REMOVE or ADD villages when it helps — but every change must be checked against the other requirements first, and the check has already caught a real bug | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -934,8 +946,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | CORRECTED 19.07.2026 — WebGPU IS testable headless/autonomously via system Chrome (channel:'chrome') + --headless=new; the 'untestable' belief held only for Playwright's BUNDLED Chromium | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 70 Feedback-/Projekt-Memories · 42 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 29 Prozess-/Meta-TASKS-Punkte (davon 13 offen).
+Erfasste Quellen: 71 Feedback-/Projekt-Memories · 42 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 30 Prozess-/Meta-TASKS-Punkte (davon 14 offen).
 
-<!-- RETRO-FINGERPRINT: 5e9374e2f0b0a4102c8556dc42d2f6026f3457b6ead84c0d82d804bab8a3c7d8 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-04T17:46:45.548Z -->
+<!-- RETRO-FINGERPRINT: 45c21a78bc656961531dbd70abbf3e04b0e94be6c825cebfc64ecc77c025a472 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-04T20:18:10.024Z -->
 <!-- AUTO-GENERATED:END -->

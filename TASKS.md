@@ -4501,3 +4501,39 @@ Build order, chosen so no two parallel agents own the same file:
   VERIFIABLE: the `enrichments` snow check passes two consecutive runs, the
   frame it judges is stored in `verification/`, and the commit says which of the
   two causes was found.
+
+- [ ] 504. EVERY BATCH OWNER IS DISPOSSESSED AT HALF AN HOUR OF AGE
+  (measured 04.08.2026, 18:50Z and root-caused at 19:00Z). The autostart launcher
+  logged "owner provably dead (pid-reused) — taking over" and spawned a second
+  session while the owner it judged dead was ALIVE and mid-work: it was running a
+  browser suite for the point-499 classification and its own dev server was
+  serving. Fifteen minutes earlier the SAME pid had read "owner alive". Nothing
+  about the process changed — only the pid-reuse verdict did.
+  ROOT CAUSE, MEASURED: the DERIVED pid start time drifts against the RECORDED
+  one. Probing the owner's pid five times with the repo's own `probePid` returned
+  `startedAt` 1785867604027–604031 while the lock recorded 1785867601073 for that
+  very process — ~2.96 s apart, past the fixed `PID_START_TOLERANCE_MS = 2000`
+  (`scripts/batch-doctor-core.mjs`). The probe derives the start time from a
+  boot-time base (uptime/btime) that walks against the wall clock in this WSL2
+  container, so the gap GROWS with the owner's age: at 15 minutes the drift was
+  ~1 s and the tick read "pid-alive", at 30 minutes it was ~3 s and the same tick
+  read "pid-reused". This is systematic, not a one-off — it dispossesses EVERY
+  owner on EVERY long point, and it is exactly the double session the hard
+  singleton of 24.07.2026 exists to prevent. Two browser-suite runs on one
+  machine also invalidate every timing measurement the batch takes.
+  FINAL STATE:
+  1. PID identity is no longer judged by comparing two start times read from
+     clocks that drift apart. Either both are re-derived from ONE reading at
+     compare time, or identity is keyed on a drift-free handle (`/proc/<pid>`
+     inode plus an argv match), or the tolerance grows with the owner's age.
+     Whichever is chosen is written down with the measurement that justifies it.
+  2. A "pid-reused" verdict against a pid whose `/proc` entry still names the
+     SAME argv and session is not believed. The takeover additionally requires
+     the corroborating signals the tick already reads — declared work advancing,
+     heartbeat age — before it dispossesses an owner.
+  3. A Vitest case feeds a DRIFTING clock base and proves a live owner of any age
+     is never read as recycled; a genuinely recycled pid must still be caught, so
+     the test covers both directions.
+  VERIFIABLE: the unit layer pins both directions against a drifting base, and a
+  batch owner older than an hour is still read as alive by
+  `node scripts/batch-doctor.mjs` on this host.
