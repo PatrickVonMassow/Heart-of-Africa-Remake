@@ -246,6 +246,12 @@ describe('compound and wrapped command lines', () => {
     expect(blocks("sh -c 'sudo ipset destroy allowed-domains'")).toBe(true)
     expect(blocks('bash -lc "sudo /usr/local/bin/init-firewall.sh"')).toBe(true)
   })
+  it('unwraps an ANSI-C quoted payload, which runs exactly like the bare form', () => {
+    expect(blocks("bash -c $'sudo iptables -F'")).toBe(true)
+    expect(blocks("eval $'sudo ipset destroy allowed-domains'")).toBe(true)
+    // …but $'…' after anything that is not a runner is just a string.
+    expect(blocks("echo $'iptables -F'")).toBe(false)
+  })
   it('peels sudo flags and env assignments off the real command', () => {
     expect(blocks('sudo -n iptables -F')).toBe(true)
     expect(blocks('sudo -u root iptables -F')).toBe(true) // the value of -u is not the command

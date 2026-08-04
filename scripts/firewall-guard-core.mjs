@@ -156,9 +156,14 @@ export const SANCTIONED_RE = /scripts[/\\]firewall-(?:allow|rebuild|guard)\.mjs/
  * its shell siblings, `su [user] -c '…'` (with or without a `sudo` in front),
  * and `eval '…'`, which is `bash -c` without the bash. The quote and the
  * payload are the same two groups whichever alternative matched.
+ *
+ * The `$?` before the quote covers ANSI-C quoting (`bash -c $'…'`), which runs
+ * exactly like the bare form. It is deliberately tied to the RUNNER, not to
+ * quoting in general: a `$'…'` after any other command is just a string, and
+ * `echo $'iptables -F'` must stay allowed.
  */
 export const SHELL_RUNNER_RE =
-  /\b(?:(?:bash|sh|zsh|dash|ksh)\s+-[a-z]*c|su(?:\s+(?:-[a-z]+|[\w.-]+))*?\s+-[a-z]*c|eval)\s+(['"])([\s\S]*?)\1/
+  /\b(?:(?:bash|sh|zsh|dash|ksh)\s+-[a-z]*c|su(?:\s+(?:-[a-z]+|[\w.-]+))*?\s+-[a-z]*c|eval)\s+\$?(['"])([\s\S]*?)\1/
 
 /**
  * Unwrap a quoted payload (see SHELL_RUNNER_RE) so a mutation hidden inside it
