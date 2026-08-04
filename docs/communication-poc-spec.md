@@ -108,12 +108,27 @@ Three pairs need a deliberately staged contrast, or they teach nothing:
   no upstream walk — pointing at the rock from the bank, or an errand that starts
   there and comes back.
 
+## How it sounds
+
+A syllable is a sample: a low one for `ba`, a high one for `BA`, differing in
+PITCH alone. An utterance plays its five syllables at a constant pace, and a
+phrase plays its atoms with the constant pause between them and nothing else.
+The plan is pure (`src/communication/speaking.ts`); the ambience engine plays it
+through the same bus as the rest of the soundscape, so the single ambience
+volume still governs it.
+
 ## How close you must stand
 
-The utterances carry a short distance and fall off sharply. Among the children
-the player hears the children; among the adults, the adults; in the middle of
-the village, no permanent babble of both. The two groups are placed far enough
-apart for that to hold.
+The utterances carry a short distance and fall off sharply — the level falls
+with the square of the distance and is cut to silence at the hearing radius, so
+"audible" and "recorded as heard" are one and the same condition: what the
+player could not hear teaches him nothing, however plainly he saw the gesture.
+Among the children the player hears the children; among the adults, the adults;
+in the middle of the village, no permanent babble of both. The two groups are
+placed far enough apart for that to hold.
+
+Pace, pause, radius and the sharpness of the fall are balance values under
+`balance.communication.*`, editable in the debug menu while the game runs.
 
 ## The message
 
