@@ -33,17 +33,24 @@ const PAUSE = repoPath('.claude', 'batch-paused')
  * the user, so a command handed over there is a work instruction, not a
  * hand-back.
  *
- * Not registered in guard-preflight.mjs, on purpose: the text this judges is
- * composed AFTER a preflight would run, so a preflight answer could only ever be
- * about the previous turn's message — a false all-clear in the shape the
- * preflight exists to avoid.
+ * Registered with guard-preflight.mjs so the Stop chain stays spawn-tested, but
+ * it can only ever stand down there: the answer this judges is composed AFTER a
+ * preflight runs, and a preflight has no transcript path to hand it. The `why`
+ * says so rather than reading as a clean bill.
  */
 export function gatherContainerAskInputs({ sessionId = '', transcriptPath = '' } = {}) {
   if (existsSync(PAUSE)) return { applicable: false, why: 'the batch is paused' }
   if (heldByOtherLiveOwner(sessionId)) {
     return { applicable: false, why: 'another live session owns the batch lock', cause: 'not-lock-owner' }
   }
-  if (!transcriptPath || !existsSync(transcriptPath)) {
+  if (!transcriptPath) {
+    return {
+      applicable: false,
+      why: 'no transcript handed over — the answer this judges is composed after a preflight runs, ' +
+        'so only the Stop hook itself can judge it',
+    }
+  }
+  if (!existsSync(transcriptPath)) {
     return { applicable: false, why: 'no readable transcript — nothing to judge' }
   }
   const lastText = extractLastAssistantText(readFileSync(transcriptPath, 'utf8'))
