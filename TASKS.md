@@ -4537,3 +4537,44 @@ Build order, chosen so no two parallel agents own the same file:
   VERIFIABLE: the unit layer pins both directions against a drifting base, and a
   batch owner older than an hour is still read as alive by
   `node scripts/batch-doctor.mjs` on this host.
+
+- [ ] 505. HARDWARE WEBGPU: WORK THROUGH OTHER BROWSER BUILDS
+  (user decision 04.08.2026, the "Zweite Bahn läuft in Software" card, option 3 —
+  keep investing, open outcome). Today the WebGPU verification lane draws through
+  Chrome's bundled SwiftShader: `verify-host-setup.sh --with-dzn` builds Dozen from
+  the Debian mesa source and `vulkaninfo` enumerates `Microsoft Direct3D12 (NVIDIA
+  GeForce RTX 4070 Ti)`, but Chrome 151 declines it — scoped to dzn alone Dawn
+  answers with its own SwiftShader in one second, and with the full ICD set visible
+  `--enable-features=Vulkan` HANGS at adapter time (>40 s, reproduced).
+  `docs/host-environment.md` records that verdict; this point tests whether it is a
+  limit of this BROWSER BUILD rather than of the host.
+  FINAL STATE:
+  1. Other browser builds are tried against the existing dzn ICD, cheapest first,
+     and each attempt is recorded with build + exact version, ICD scope, flags, and
+     what the adapter answered (own software path / hang / hardware). At minimum:
+     a newer Chrome for Testing or Chromium channel (beyond 151, incl. dev and
+     canary), the WebGPU adapter-selection and unsafe-webgpu flags against dzn, and
+     a Chrome build whose bundled Dawn is newer than the one that declines today.
+  2. The outcome may be either — that is the point's premise. Reached: the WebGPU
+     lane draws through the 4070 Ti, `scripts/verify/backend-lane-check.mjs` NAMES
+     that device on the WebGPU lane (never a software rasteriser reported as if it
+     were the GPU), and that build becomes the lane's browser. Not reached: the
+     point closes on a WRITTEN verdict naming every build tried and its refusal —
+     the software lane stays, and the shortfall stays visible rather than silently
+     accepted.
+  3. The hang path stays contained whichever way it ends: no ICD is installed by
+     default, the dzn build stays opt-in behind `verify-host-setup.sh --with-dzn`,
+     and no default verification run may block at adapter time. A build that hangs
+     is recorded and abandoned, not worked around with a longer timeout.
+  4. `docs/host-environment.md` §"Hardware WebGPU is the open item" states the
+     CURRENT verdict in the same commit as the result — its standing warning
+     ("read this before rebuilding dzn: the verdict is worth more than the build")
+     keeps holding, extended by the browser builds this point ruled out.
+  5. Nothing in the verification's default path changes for a reader who does not
+     opt in: the software WebGPU lane keeps working exactly as it does today while
+     this point runs, so the both-backend picture check is never interrupted by it.
+  VERIFIABLE: `node scripts/verify/backend-lane-check.mjs` on the WebGPU lane
+  prints the device that actually drew the frame, and the picture of one built
+  scene is inspected once; the host-environment section lists every build tried
+  with its outcome; a default (non-opt-in) verification run shows no ICD present
+  and no adapter stall.
