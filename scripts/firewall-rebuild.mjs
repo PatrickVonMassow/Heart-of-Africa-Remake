@@ -50,6 +50,15 @@ import { repoPath } from './repo-paths.mjs'
 /** The container's own firewall script. Read-only from this repo's point of view. */
 export const FIREWALL_SCRIPT = '/usr/local/bin/init-firewall.sh'
 
+/**
+ * This file, for the detached relaunch. Resolved through `repoPath` rather than
+ * `new URL(import.meta.url).pathname`, which hands back a PERCENT-ENCODED path:
+ * a repo under `/work space/` or any path with a `#` would relaunch a file that
+ * does not exist — and the failure lands on the supervisor, i.e. on the half
+ * that is supposed to be the recovery.
+ */
+export const SELF_PATH = repoPath('scripts', 'firewall-rebuild.mjs')
+
 /** Where the run records itself. Git-ignored (`/local/`). */
 export const STATE_DIR = repoPath('local')
 export const STATE_PATH = repoPath('local', 'firewall-rebuild-state.json')
@@ -94,8 +103,22 @@ export const GATE_DELETES = [
 ]
 export const GATE_DELETE_REPEAT = 5
 
-/** Phases a run passes through. `ok` is the only one that is not a problem. */
-export const PHASES = ['idle', 'running', 'ok', 'failed', 'watchdog-opened']
+/**
+ * Phases a run passes through. `ok` is the only one that is not a problem.
+ * `gate-open` is the record of a bare unseal — `--open`, the launcher's rescue
+ * path, a supervisor killed by a signal: the gate is open and no rebuild is
+ * behind it. Without that record `--status` answered "no run on record" while
+ * the firewall was OFF, which is the complacent direction.
+ */
+export const PHASES = ['idle', 'running', 'ok', 'failed', 'watchdog-opened', 'gate-open']
+
+/**
+ * Signals that must still reach the gate. `process.on('exit')` does NOT fire on
+ * any of them, so a `pkill -f node`, a container stop or an OOM kill of the
+ * process group would otherwise leave the child dead mid-flush and the gate
+ * SHUT — the exact failure this whole script exists to make impossible.
+ */
+export const SUPERVISOR_SIGNALS = ['SIGTERM', 'SIGINT', 'SIGHUP']
 
 // ---- pure helpers ---------------------------------------------------------
 
@@ -172,6 +195,13 @@ export function formatStatus(state, now = Date.now()) {
         `firewall-rebuild: the WATCHDOG fired ${secs}s ago — the run had not reported success in time.\n` +
         'The gate was re-opened, so the FIREWALL IS OFF and the container is reachable. Read the log.'
       )
+    case 'gate-open':
+      return (
+        `firewall-rebuild: the gate was OPENED ${secs}s ago with no rebuild behind it` +
+        `${state.gateOpenReason ? ` (${state.gateOpenReason})` : ''}.\n` +
+        'THE FIREWALL IS OFF and the container is reachable. This is not a resting state — rebuild with\n' +
+        '  node scripts/firewall-rebuild.mjs --run'
+      )
     default:
       return 'firewall-rebuild: unknown state.'
   }
@@ -242,6 +272,44 @@ export function openGate() {
   return done
 }
 
+/**
+ * The recovery call, IDEMPOTENT AND UNLATCHED. It used to fire once per process
+ * and then go quiet, which cost twice over: a run that tripped the watchdog and
+ * only afterwards failed between init-firewall.sh's DROP policies and its
+ * allowlist ACCEPT stayed SEALED with nothing left to rescue it, and in the
+ * ordinary case — the rebuild's own verification failing after the ruleset is
+ * fully in place — `--status` announced a firewall that was OFF while it was in
+ * fact restrictive. Opening an already-open gate costs three cheap iptables
+ * calls; not opening a shut one costs the session.
+ */
+export function createReopener({ open = openGate, record = log } = {}) {
+  return (why) => {
+    const done = open()
+    record(`WATCHDOG/RECOVERY: gate re-opened — ${why}. THE FIREWALL IS OFF.`)
+    return done
+  }
+}
+
+/**
+ * Wire EVERY way out of the supervisor to the gate: a clean exit, a crash, and
+ * the three signals `process.on('exit')` never sees. Injected rather than
+ * closed over so the wiring itself is testable without a live firewall.
+ */
+export function installRecovery({ on, exit, reopen, isDone, onSignal = () => {} }) {
+  on('exit', () => {
+    if (!isDone()) reopen('supervisor exited without a successful rebuild')
+  })
+  for (const signal of SUPERVISOR_SIGNALS) {
+    on(signal, () => {
+      if (!isDone()) {
+        reopen(`supervisor killed by ${signal}`)
+        onSignal(signal)
+      }
+      exit(0)
+    })
+  }
+}
+
 // ---- modes ----------------------------------------------------------------
 
 function planText() {
@@ -286,12 +354,7 @@ function doRun({ watchdogMs, force }) {
   // 2 + 3. One detached supervisor holds the watchdog AND the rebuild, so the
   //    deadline and the child's exit are observed by the same process and can
   //    never race two independent watchers against each other.
-  const child = spawn(process.execPath, [
-    new URL(import.meta.url).pathname,
-    '--supervise',
-    '--watchdog-ms',
-    String(watchdogMs),
-  ], {
+  const child = spawn(process.execPath, [SELF_PATH, '--supervise', '--watchdog-ms', String(watchdogMs)], {
     detached: true,
     stdio: 'ignore',
     windowsHide: true,
@@ -315,17 +378,16 @@ function doRun({ watchdogMs, force }) {
 function doSupervise({ watchdogMs }) {
   const startedAt = Date.now()
   let phase = 'running'
-  let gateReopened = false
+  const reopen = createReopener()
 
-  const reopen = (why) => {
-    if (gateReopened) return
-    gateReopened = true
-    openGate()
-    log(`WATCHDOG/RECOVERY: gate re-opened — ${why}. THE FIREWALL IS OFF.`)
-  }
-
-  process.on('exit', () => {
-    if (phase !== 'ok') reopen('supervisor exited without a successful rebuild')
+  installRecovery({
+    on: (event, handler) => process.on(event, handler),
+    exit: (code) => process.exit(code),
+    reopen,
+    isDone: () => phase === 'ok',
+    // A signal leaves no exit code to report, so the record says what is true:
+    // the gate is open and nothing is behind it.
+    onSignal: (signal) => writeState({ phase: 'gate-open', gateOpenReason: `supervisor killed by ${signal}` }),
   })
 
   writeState({ phase: 'running', startedAt, exitCode: null })
@@ -388,6 +450,9 @@ function doOpen() {
   const done = openGate()
   const failed = done.filter((d) => !d.ok)
   log(`manual --open: ${done.length - failed.length}/${done.length} commands ok`)
+  // Recorded, or the next `--status` would answer "no run on record" while the
+  // firewall is OFF — a silence that reads like "nothing happened here".
+  writeState({ phase: 'gate-open', gateOpenReason: 'manual --open', exitCode: null })
   console.log(
     'firewall-rebuild --open: the gate was opened. THE FIREWALL IS NOW OFF — outbound traffic is\n' +
       'unrestricted. This is the emergency unseal, not a resting state: rebuild with\n' +
@@ -420,6 +485,7 @@ if (isMainModule(import.meta.url)) {
     console.error(`firewall-rebuild: ${e && e.message} — opening the gate to be safe.`)
     try {
       openGate()
+      writeState({ phase: 'gate-open', gateOpenReason: 'launcher rescue', exitCode: null })
     } catch {
       /* nothing further can be done from here */
     }

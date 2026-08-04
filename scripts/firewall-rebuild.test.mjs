@@ -8,14 +8,20 @@
 // set may only ever OPEN. A flush or a DROP policy sneaking in here would turn
 // the recovery path into a second way to seal the container.
 import { describe, it, expect } from 'vitest'
+import { existsSync } from 'node:fs'
+import { isAbsolute } from 'node:path'
 import {
   GATE_COMMANDS,
   GATE_DELETES,
   PHASES,
+  SELF_PATH,
   STALE_MS,
+  SUPERVISOR_SIGNALS,
   WATCHDOG_MS,
   classifyState,
+  createReopener,
   formatStatus,
+  installRecovery,
   parseArgs,
   runInFlight,
   watchdogDue,
@@ -74,6 +80,133 @@ describe('the gate only ever opens', () => {
       '--reject-with',
       'icmp-admin-prohibited',
     ])
+  })
+})
+
+// The recovery call used to LATCH: once per process, then silence. Two ways
+// that bit, and both are the failure this script exists to prevent:
+//   * the watchdog fires at 4 min on a slow run, the run then fails between
+//     init-firewall.sh's DROP policies (line 139) and its allowlist ACCEPT
+//     (line 148) — and the reopen that was owed there was a no-op. SEALED.
+//   * the likelier one: the rebuild's own verification fails after the ruleset
+//     is fully in place, the reopen is swallowed, and `--status` reports "the
+//     gate was re-opened, THE FIREWALL IS OFF" over a firewall that is in fact
+//     fully restrictive — a false status in the complacent direction.
+describe('the recovery call is unlatched', () => {
+  const spy = () => {
+    const calls = []
+    const reopen = createReopener({ open: () => (calls.push('open'), []), record: (line) => calls.push(line) })
+    return { calls, reopen }
+  }
+
+  it('opens the gate AGAIN on a second call — the once-per-process latch is gone', () => {
+    const { calls, reopen } = spy()
+    reopen('no success within 240s') // the watchdog
+    reopen('the rebuild exited 1') // the failure that follows it
+    reopen('supervisor exited without a successful rebuild') // and the exit path
+    expect(calls.filter((c) => c === 'open')).toHaveLength(3)
+  })
+
+  it('logs a reason with every open, so the log shows each recovery and not just the first', () => {
+    const { calls, reopen } = spy()
+    reopen('no success within 240s')
+    reopen('the rebuild exited 1')
+    const lines = calls.filter((c) => c !== 'open')
+    expect(lines).toHaveLength(2)
+    for (const line of lines) expect(line).toMatch(/THE FIREWALL IS OFF/)
+    expect(lines[1]).toContain('the rebuild exited 1')
+  })
+
+  it('returns what the gate reported, and never throws on a gate that failed', () => {
+    const reopen = createReopener({ open: () => [{ cmd: 'iptables -P OUTPUT ACCEPT', ok: false }], record: () => {} })
+    expect(reopen('why')).toEqual([{ cmd: 'iptables -P OUTPUT ACCEPT', ok: false }])
+  })
+})
+
+// `process.on('exit')` does not fire on a signal. A `pkill -f node`, a container
+// stop or an OOM kill of the process group therefore left the child dead
+// mid-flush and the gate SHUT — with the supervisor gone, nothing was left to
+// re-open it.
+describe('installRecovery wires every way out of the supervisor', () => {
+  const wire = ({ done = false } = {}) => {
+    const handlers = new Map()
+    const reopened = []
+    const exits = []
+    const signalled = []
+    installRecovery({
+      on: (event, handler) => handlers.set(event, handler),
+      exit: (code) => exits.push(code),
+      reopen: (why) => reopened.push(why),
+      isDone: () => done,
+      onSignal: (sig) => signalled.push(sig),
+    })
+    return { handlers, reopened, exits, signalled }
+  }
+
+  it('registers SIGTERM, SIGINT and SIGHUP beside the plain exit', () => {
+    const { handlers } = wire()
+    expect([...handlers.keys()].sort()).toEqual(['SIGHUP', 'SIGINT', 'SIGTERM', 'exit'])
+    expect(SUPERVISOR_SIGNALS).toEqual(['SIGTERM', 'SIGINT', 'SIGHUP'])
+  })
+
+  it('opens the gate and exits 0 on each signal, naming which one', () => {
+    for (const signal of SUPERVISOR_SIGNALS) {
+      const { handlers, reopened, exits, signalled } = wire()
+      handlers.get(signal)()
+      expect(reopened).toHaveLength(1)
+      expect(reopened[0]).toContain(signal)
+      expect(signalled).toEqual([signal])
+      // exit(0): the supervisor is the rescue, not a status reporter — a
+      // non-zero exit here would only make a killed run look like a failure.
+      expect(exits).toEqual([0])
+    }
+  })
+
+  it('still opens the gate on a plain exit', () => {
+    const { handlers, reopened } = wire()
+    handlers.get('exit')()
+    expect(reopened).toEqual(['supervisor exited without a successful rebuild'])
+  })
+
+  it('leaves a SUCCESSFUL rebuild sealed — the gate is only forced open when it is owed', () => {
+    const { handlers, reopened, exits, signalled } = wire({ done: true })
+    handlers.get('exit')()
+    handlers.get('SIGTERM')()
+    expect(reopened).toEqual([])
+    expect(signalled).toEqual([])
+    expect(exits).toEqual([0]) // the signal still terminates, it just seals nothing open
+  })
+
+  it('opens the gate on a signal that arrives AFTER the watchdog already opened it', () => {
+    // The composed shape of the bug: watchdog, then a kill. With the latch in
+    // place the second call did nothing at all.
+    const opens = []
+    const reopen = createReopener({ open: () => (opens.push('open'), []), record: () => {} })
+    const handlers = new Map()
+    installRecovery({
+      on: (e, h) => handlers.set(e, h),
+      exit: () => {},
+      reopen,
+      isDone: () => false,
+    })
+    reopen('no success within 240s')
+    handlers.get('SIGTERM')()
+    handlers.get('exit')()
+    expect(opens).toHaveLength(3)
+  })
+})
+
+// `new URL(import.meta.url).pathname` hands back a PERCENT-ENCODED path, so a
+// repo under `/work space/` relaunched a file that does not exist — and the
+// relaunch is the supervisor, i.e. the half that is supposed to be the recovery.
+describe('SELF_PATH — the file the detached supervisor is relaunched from', () => {
+  it('is an absolute path to this very script, and it exists', () => {
+    expect(isAbsolute(SELF_PATH)).toBe(true)
+    expect(SELF_PATH.replace(/\\/g, '/')).toMatch(/\/scripts\/firewall-rebuild\.mjs$/)
+    expect(existsSync(SELF_PATH)).toBe(true)
+  })
+  it('carries no percent-encoding', () => {
+    expect(SELF_PATH).not.toMatch(/%[0-9A-Fa-f]{2}/)
   })
 })
 
@@ -164,9 +297,26 @@ describe('formatStatus', () => {
     expect(tripped).toMatch(/WATCHDOG/)
     expect(tripped).toMatch(/FIREWALL IS OFF/)
   })
+  // `--open` and the launcher's rescue path wrote no state at all, so the next
+  // `--status` answered "no run on record" — a silence that reads like "nothing
+  // happened here" over a firewall that is OFF.
+  it('reports a bare unseal as an OPEN gate, not as an absence of runs', () => {
+    const text = formatStatus({ phase: 'gate-open', gateOpenReason: 'manual --open', updatedAt: now - 2000 }, now)
+    expect(text).not.toMatch(/no run on record/)
+    expect(text).toMatch(/FIREWALL IS OFF/)
+    expect(text).toMatch(/manual --open/)
+    expect(text).toMatch(/--run/) // it must leave a way back to a restrictive firewall
+  })
+  it('reports an unseal whose reason was not recorded without inventing one', () => {
+    const text = formatStatus({ phase: 'gate-open', updatedAt: now }, now)
+    expect(text).toMatch(/FIREWALL IS OFF/)
+    expect(text).not.toMatch(/undefined|\(\)/)
+  })
+
   it('never throws on a malformed record', () => {
     expect(() => formatStatus({ phase: 'running' })).not.toThrow()
     expect(() => formatStatus(undefined)).not.toThrow()
+    expect(() => formatStatus({ phase: 'gate-open' })).not.toThrow()
   })
 })
 
