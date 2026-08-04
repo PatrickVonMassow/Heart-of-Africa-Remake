@@ -40,6 +40,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 28.07. | Fünfeinhalb Stunden Stillstand → die Grenze wird **genommen**, nicht nur erlaubt; erste vollständig beobachtete Übergabe; drei Messfenster schmaler als das Gemessene (§3.44) |
 | 28.07. | Board dreimal am selben Handgriff zerbrochen → Strukturprüfung **vor** die Veröffentlichung (§3.45); 3546 grüne Tests über einer stillschweigend geschrumpften Menge (§3.46) |
 | 04.08. | Eine Nacht am Falschen gearbeitet: der Vorrang stand als Prosa, die Warteschlange las die alte Rangfolge (§3.77); zweimal Container-Arbeit an den Nutzer zurückgereicht → Regel + Wächter (§3.78) |
+| 04.08. | Zweimal am eigenen Netz ausgesperrt — der Firewall-Neubau reißt zuerst ein → additives Werkzeug, fail-offener Neubau, Wächter (§3.80); die Sprachregel hatte nie einen Mechanismus, und die Bestandsprüfung sah es nicht (§3.81) |
 
 Muster: Ab dem 22.07. explodiert die Commit-Rate (Delegation) — und genau dann häufen sich die Infrastruktur-Vorfälle. **Skalierung der Autonomie erzeugt eine eigene Problemklasse, die die Feature-Arbeit zeitweise überholt.**
 
@@ -738,6 +739,24 @@ Die Klasse ist eng verwandt mit §3.55, aber an einer schärferen Stelle: Dort v
 
 **Lehre:** Was ein Mechanismus scharf macht, gehört mitversioniert und mitgeprüft, nicht nur der Mechanismus selbst. Und für die Klasse „Befund in einer geglückten Ausgabe" gibt es nur eine Abhilfe: Sie muss zu einer eigenen Prüfung werden, die den Erfolgsfall liest — sonst ist die Meldung formal vorhanden und faktisch unsichtbar.
 
+### 3.80 Die Reparatur, die den Reparierenden mitnimmt
+
+Zweimal an einem Nachmittag sperrte sich eine Sitzung selbst aus dem Netz aus und starb an der eigenen Schnittstelle. Der Auslöser war harmlos: Der Prüf-Browser ließ sich nicht laden, weil ein Auslieferungsnetz seine Adressen wechselt und die Sperrliste des Containers die neue nicht kannte. Es gab aber nur **ein** Werkzeug für die Firewall, und dieses Werkzeug ist ein Neubau — es reißt zuerst alle Regeln ein, während die Grundsperre stehen bleibt, und braucht danach zwei bis drei Minuten zum Wiederaufbauen. In diesem ganzen Fenster ist der Container dicht. Die Zwei-Minuten-Grenze des Werkzeugaufrufs schnitt mittendrin ab; zurück blieb eine Maschine ohne jede Freigabe und eine Sitzung, die nichts mehr tun konnte — auch nicht sich selbst reparieren.
+
+Das ist eine eigene Klasse, und sie ist schärfer als „ein Schritt ist fehlgeschlagen". Ein fehlgeschlagener Bau lässt sich neu starten, ein fehlgeschlagener Test neu laufen. Eine fehlgeschlagene Reparatur an der **Infrastruktur, über die man selbst arbeitet**, nimmt die Fähigkeit zur nächsten Reparatur gleich mit. Der Unterschied zu §3.79 ist die Richtung: Dort war ein Mechanismus stumm und niemand merkte es; hier war der Mechanismus laut und riss den Beobachter mit.
+
+Zwei Dinge fehlten, und beide sind billiger als der Vorfall. Erstens **die kleinere Handlung**: Die Sperrliste lässt sich rein ergänzend erweitern — ein Befehl, keine Sekunde ohne Netz. Sie existierte nur nicht, also griff die Sitzung zum einzigen vorhandenen Werkzeug, dem größten. Zweitens **die Richtung des Scheiterns**: Ein Neubau, der abbricht, muss offen enden, nicht geschlossen. Beides ist jetzt gebaut, dazu ein Wächter, der den einreißenden Aufruf gar nicht mehr durchlässt. Die Gegenprüfung des zweiten Modells fand am fertigen Stand noch zwei Wege, auf denen das Tor doch zugeblieben wäre — nach dem Zuschlagen der Wach-Uhr und beim harten Abschuss des Prozesses —, und einen davon in der schlimmsten Ausprägung: Die Statusanzeige hätte „offen" gemeldet, während zu war.
+
+**Lehre:** Wer an der Leitung arbeitet, auf der er sitzt, braucht eine Handlung, die kleiner ist als der Neubau — und für den Neubau eine Fehlerrichtung, die nach OFFEN zeigt. Ein Werkzeug, dessen einzige Ausführung eine Verwundbarkeitsphase hat, ist ein Werkzeug mit einem Zeitfenster zum Selbstmord; die Abhilfe ist nicht Vorsicht, sondern ein zweites, additives Werkzeug daneben.
+
+### 3.81 Die Regel, die gar keinen Mechanismus hatte — und die Prüfung, die das nicht sah
+
+Der Nutzer fragte mitten in der Arbeit, warum die Antworten die ganze Zeit auf Englisch kämen, und schloss richtig weiter: „Falls der Mechanismus nicht klappt, klappen vielleicht auch andere nicht." Die Antwort war unbequemer als ein defekter Mechanismus — es gab **keinen**. Dass Antworten auf Deutsch gehören, stand ausschließlich in einer Gedächtniszeile. Die Nachbarregel beweist den Unterschied: Für den Zeitstempel existieren ein Einspeise-Haken **und** ein blockierender Wächter, der den fertigen Antworttext liest, und der ist noch nie durchgerutscht.
+
+Das eigentlich Lehrreiche liegt eine Ebene höher. Der Bestand war am 30.07. vollständig geprüft worden, und die Sprachregel steht dort als „OK" mit **leerer Befundspalte**. Diese Prüfung fragte nämlich, ob der Regel*text* noch stimmt — nicht, ob die Regel *gemessen* wird. Und der Wächter, der genau für diese Frage gebaut wurde, hat dieselbe blinde Stelle von der anderen Seite: Er beweist, dass jeder verdrahtete Durchsetzer feuern **kann** (34 von 34 an diesem Tag), und sagt nichts über eine Regel, die nie einen bekommen hat. Zwischen beiden Prüfungen liegt genau der Spalt, in den diese Regel gefallen ist.
+
+**Lehre:** Eine Regelprüfung braucht die Achse „was misst das eigentlich?" neben „stimmt der Text noch?". Wo die Antwort „nichts" lautet, gibt es genau zwei zulässige Ausgänge — ein Mechanismus wird gebaut, oder die Regel wird **mit Begründung** als bewusst nicht durchgesetzt vermerkt. Ein stilles „OK" ist der dritte, und der ist derselbe Fehler wie §3.16, nur eine Ebene früher: Er lässt eine Regel als durchgesetzt gelten, bevor sie es je war.
+
 ---
 
 ## 4. Die Guards als Immunsystem
@@ -827,7 +846,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Dienstag, 04.08.2026, 14:59 · Quellen-Fingerprint: `f5b6aa2fe844…`
+Zuletzt aktualisiert: Dienstag, 04.08.2026, 17:08 · Quellen-Fingerprint: `1f2abf1c0b44…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -850,7 +869,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | CLAUDE.md §7.1 references design.md instead of retelling it; future doc edits must preserve the verifiable conditions, script mappings, numbering and checked numbers | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Autonomously insert a full CLOSING cycle (regression + dead-code/stale-doc cleanup + .md audit) when warranted — after extensive rework or many small completed tasks — without waiting for the user to ask | 1 | niedrig | closing-guard.mjs | ✔ Mechanismus |
 | hoa commit messages must not reference the TASKS point (\"Point N\") | 1 | niedrig | commit-scope-guard.mjs | ✔ Mechanismus |
-| Never ask the user to run anything inside the container — he granted full rights; do it myself | 1 | niedrig | worktree-reminder.mjs | ✔ Mechanismus |
+| Never ask the user to run anything inside the container — he granted full rights; do it myself | 1 | niedrig | container-ask-guard.mjs, worktree-reminder.mjs | ✔ Mechanismus |
 | The batch dashboard's Warteschlange must ALWAYS list every open TASKS point — no open point may be missing | 1 | niedrig | dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs, queue-order-guard.mjs | ✔ Mechanismus |
 | Every dashboard card's body must speak STRICTLY about its own point — never report on or reference another TASKS point inside a card | 1 | niedrig | batch-singleton.mjs, dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs, decision-card-guard.mjs | ✔ Mechanismus |
 | hoa dashboard \"Woran ich gerade arbeite\" holds ONE CARD PER parallel point being actively worked (not a single card); cards move from Warteschlange into it (possibly several at once); a point is NEVER in both sections at once | 1 | niedrig | dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
@@ -905,8 +924,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | CORRECTED 19.07.2026 — WebGPU IS testable headless/autonomously via system Chrome (channel:'chrome') + --headless=new; the 'untestable' belief held only for Playwright's BUNDLED Chromium | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 70 Feedback-/Projekt-Memories · 40 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 27 Prozess-/Meta-TASKS-Punkte (davon 11 offen).
+Erfasste Quellen: 70 Feedback-/Projekt-Memories · 42 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 27 Prozess-/Meta-TASKS-Punkte (davon 11 offen).
 
-<!-- RETRO-FINGERPRINT: f5b6aa2fe84456aeb066afc2fe074e85fe931a7a44d58a276619adff3c57a777 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-04T12:59:20.881Z -->
+<!-- RETRO-FINGERPRINT: 1f2abf1c0b444c7e1b4aa74f5563f43853aec9343dd0b9be5e568d1253a7da99 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-04T15:08:52.008Z -->
 <!-- AUTO-GENERATED:END -->
