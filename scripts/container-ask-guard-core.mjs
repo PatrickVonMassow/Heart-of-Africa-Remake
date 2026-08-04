@@ -95,9 +95,20 @@ export const REQUEST_PATTERNS = [
   // repository's own German prose. The polite request keeps its own pattern
   // above ("kannst du bitte … ausführen"), so nothing real is lost.
   { id: 'de-modal', re: /\bdu\s+(?:musst|müsstest|solltest|brauchst)\b/i },
-  { id: 'de-you-execute', re: /\b(?:du|dir|dein\w*)\b[^\n]{0,60}\b(?:ausführen|auszuführen|ausgeführt werden)\b/i },
+  // Second person plus an action, in ANY conjugation. This list held only the
+  // infinitives (`ausführen|auszuführen|ausgeführt werden`), so every conjugated
+  // demand walked straight past it — "wenn du `npm run build` ausführst", "wenn
+  // du `node scripts/board-publish.mjs` startest" (four-eyes review, Fable 5,
+  // 04.08.2026). The forms below are second-person verb endings, so the "du"
+  // in front of them is being told to do something, not being pointed at a fact.
+  {
+    id: 'de-you-execute',
+    re: /\b(?:du|dir|dein\w*)\b[^\n]{0,60}\b(?:ausführ\w*|auszuführen|ausgeführt|führst|startest|starte(?:n|st)?|läufst|laufen\s+lässt|lässt|installier(?:st|en)|trägst|einträgst|änderst|editierst|erstellst|löschst|kopierst|baust|setzt|machst|schreibst|ergänzt|mountest|hinterlegst|aktivierst|konfigurierst|schaltest|richtest)\b/i,
+  },
   { id: 'en-please-action', re: /\bplease\b[^\n]{0,50}\b(?:run|execute|install|start|add|edit|create|apply|delete|open)\b/i },
-  { id: 'en-modal', re: /\byou\s+(?:need to|have to|should|must)\b/i },
+  // "you'll want to …" is the same obligation in a softer coat, and it was the
+  // widest English hand-over the first list missed.
+  { id: 'en-modal', re: /\byou(?:'ll| will)?\s+(?:need to|have to|should|must|want to|may want to|might want to)\b/i },
   {
     id: 'en-polite-action',
     re: /\b(?:can|could|would)\s+you(?:\s+mind)?\b[^\n]{0,50}\b(?:run\w*|execut\w*|install\w*|start\w*|add|edit\w*|creat\w*|appl\w*|delet\w*|open\w*|paste|copy)\b/i,
@@ -106,8 +117,26 @@ export const REQUEST_PATTERNS = [
   // An English line-start imperative counts only when the line also addresses
   // the user: this project's own documents are full of "- Run the LARGE
   // regression …" instructions, and an answer quoting one is not a hand-over.
-  { id: 'en-imperative', re: /^[\s*\-–>]*(?:run|execute|install|open|edit|apply)\b[^\n]{0,80}\b(?:you|your|please)\b/im },
+  // The verb list and the leading adverb are wider than they look because
+  // "Try running … on your end" and "Just type … in your terminal" are the
+  // everyday English hand-over and neither opens with a bare "run".
+  {
+    id: 'en-imperative',
+    re: /^[\s*\-–>]*(?:just|simply|then|now|first|finally|please)?\s*(?:run|execute|install|open|edit|apply|try|type|paste|start|launch|copy|add|create|delete)\b[^\n]{0,80}\b(?:you|your|please)\b/im,
+  },
   { id: 'en-go-ahead', re: /\bgo ahead and\b/i },
+  // "…and paste the output here" / "schick mir das Log": he runs it, I read the
+  // result. The plainest hand-over there is, and the one shape that can carry no
+  // second-person word at all — "Run `npm run build` and paste the output here"
+  // addresses nobody by name and every other pattern here let it through.
+  {
+    id: 'en-hand-back',
+    re: /\b(?:paste|send|post|share|show|attach|upload)\b[^\n]{0,40}\b(?:output|log|logs|result\w*|error\w*|transcript|console)\b/i,
+  },
+  {
+    id: 'de-hand-back',
+    re: /\b(?:schick\w*|send\w*|post\w*|zeig\w*|gib|gibst|häng\w*)\b[^\n]{0,40}\b(?:ausgabe|log|logs|ergebnis\w*|fehler\w*|output|konsole|transcript)\b/i,
+  },
 ]
 
 /**
@@ -136,6 +165,21 @@ export const NEGATION_CUES = [
 ]
 
 /**
+ * The same reassurance WITHOUT a negation word: the clause declares the user
+ * DONE rather than denying a demand — "you should be all set", "damit ist alles
+ * erledigt". It reads as an obligation modal ("you should …", "du solltest …"),
+ * its report sits in the previous clause, and it carries nothing the negation
+ * list above can see, so it blocked falsely (four-eyes review, Fable 5,
+ * 04.08.2026). Widening the REPORT cue to the neighbouring clause would have
+ * caught it too — and would also have cleared "Ich habe alles gebaut, bitte
+ * führe `npm run test:large` aus", which is the hand-over this guard exists for.
+ */
+export const REASSURANCE_CUES = [
+  { id: 'en-all-set', re: /\b(?:all set|good to go|set on your (?:side|end)|you'?re (?:all set|good|set|done|fine))\b/i },
+  { id: 'de-erledigt', re: /\b(?:erledigt|geschafft|abgehakt)\b/i },
+]
+
+/**
  * The clause speaks about what the SESSION did — a command quoted as a report,
  * not handed over. `\bich\b` is the workhorse here: a real hand-over almost
  * never says "I" in the same clause, and clause-level scoping keeps an honest
@@ -148,7 +192,17 @@ export const NEGATION_CUES = [
 export const REPORT_CUES = [
   { id: 'de-first-person', re: /\bich\b/i },
   { id: 'de-passive-report', re: /\b(?:wurde[n]?\s+(?:ausgeführt|gestartet|gebaut)|lief(?:en)?|gelaufen|ergab)\b/i },
-  { id: 'en-first-person', re: /\b(?:i|i've|i'm)\b/ },
+  // CASE-SENSITIVE on purpose, and capital `I` is the point: the first version
+  // listed only the lowercase forms and carried no `i` flag, so the one spelling
+  // real English uses never matched and this cue was dead (four-eyes review,
+  // Fable 5, 04.08.2026). The flag itself is NOT the fix — with it, `\bi\b`
+  // matches the `i` in "führe `npm i` aus" and in a `-i` flag, and a hand-over
+  // would clear itself on its own command. English capitalises the pronoun; the
+  // contractions are allowed either case because a lowercase "i've" is only ever
+  // the pronoun. A pronoun in a TIME clause is excluded: "Would you mind running
+  // `npm run lint` before I merge?" says "I" about the step AFTER the one being
+  // handed over, and reviving this cue without the exclusion cleared that demand.
+  { id: 'en-first-person', re: /(?<!\b(?:before|after|once|until|while|when)\s)\bI\b|\b[Ii]'(?:m|ve|ll)\b/ },
   { id: 'en-report', re: /\b(?:was run|were run|for reference|for the record|fyi)\b/i },
   { id: 'de-info', re: /\b(?:zur info|zum nachlesen|nachvollziehen)\b/i },
 ]
@@ -159,9 +213,19 @@ export const REPORT_CUES = [
  * decision card). None of that is a step inside the container.
  */
 export const JUDGEMENT_CUES = [
-  { id: 'de-look', re: /\b(?:schau\w*|anschau\w*|ansehen|sieh\w*|sieht|aussehen|aussieht|betrachte|nachles\w*|lies|liest|find(?:e|est)|steht)\b/i },
+  // The verb "sehen" is spelled out rather than folded into a `seh\w*` stem:
+  // that stem also swallows "sehr", which would hand an exemption to any
+  // emphatic sentence. Its absence made "du solltest gleich Ergebnisse sehen"
+  // — the user being told he will SEE something — read as a demand.
+  {
+    id: 'de-look',
+    re: /\b(?:schau\w*|anschau\w*|ansehen|sieh\w*|sieht|sehen|sehe|seht|gesehen|aussehen|aussieht|betrachte|nachles\w*|lies|liest|find(?:e|est)|steht)\b/i,
+  },
   { id: 'de-judge', re: /\b(?:beurteil\w*|urteil\w*|meinung|entscheid\w*|bestätig\w*|genehmig\w*|freigab\w*|abnahme|gut genug|bescheid|sag(?:e|st)?\s+mir|antworte)\b/i },
-  { id: 'en-judge', re: /\b(?:take a look|have a look|let me know|tell me|looks? right|your call|approve|confirm|decide|review)\b/i },
+  // NOT "look at": "Run `npm ci` on your machine before you look at it" is a
+  // hand-over whose own sentence would have cleared it. "take/have a look"
+  // stays, because that IS the whole request.
+  { id: 'en-judge', re: /\b(?:take a look|have a look|let me know|tell me|looks? right|you(?:'ll| will| can)? see|your call|approve|confirm|decide|review)\b/i },
 ]
 
 /**
@@ -296,6 +360,7 @@ const excerpt = (s) => {
  */
 export function judgeRequest({ block, clause, before = '', after = '', request }) {
   if (firstMatch(NEGATION_CUES, clause)) return null
+  if (firstMatch(REASSURANCE_CUES, clause)) return null
   if (firstMatch(REPORT_CUES, clause)) return null
   if (firstMatch(JUDGEMENT_CUES, clause)) return null
   if (firstMatch(CAPABILITY_CUES, clause)) return null

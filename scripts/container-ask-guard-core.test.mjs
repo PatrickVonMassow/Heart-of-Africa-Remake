@@ -75,6 +75,23 @@ describe('the ASK is what is blocked — every shape of it', () => {
     ['English politeness', 'Can you run `npm run build` once on your side?'],
     ['English politeness, conditional', 'Could you please execute `node scripts/board-publish.mjs` for me?'],
     ['English politeness, "would you mind"', 'Would you mind running `npm run lint` before I merge?'],
+    // The conjugated German demand. The first list held the infinitives only
+    // ("ausführen"), so every one of these walked past it.
+    ['German subordinate clause, conjugated', 'Es wäre gut, wenn du `npm run build` ausführst.'],
+    ['German subordinate clause, "startest"', 'Es wäre gut, wenn du `node scripts/board-publish.mjs` startest.'],
+    ['German "du" + "laufen lässt"', 'Am besten, wenn du `npm run test:unit` einmal laufen lässt.'],
+    // English hand-overs that carry no request verb the first list knew. The
+    // German side was markedly wider than the English one, which is the same
+    // hole in four spellings.
+    ['English, run-and-report-back', 'Run `npm run build` and paste the output here.'],
+    ['English, softened obligation', "You'll want to run `npm ci` before the next start."],
+    ['English, "try running … on your end"', 'Try running `npm run dev` on your end.'],
+    ['English, "just type … in your terminal"', 'Just type `npm run build` in your terminal.'],
+    ['English, send me the log', 'Could you send me the log of `npm run test:unit`?'],
+    // `npm i` is why the first-person report cue is case-SENSITIVE: giving it an
+    // `i` flag (the obvious one-character fix) makes `\bi\b` match this very
+    // command, and the hand-over clears itself on its own argument.
+    ['a hand-over whose command contains a bare `i`', 'Bitte führe `npm i` aus.'],
   ]
   for (const [what, answer] of asks) {
     it(`blocks: ${what}`, () => {
@@ -140,12 +157,27 @@ describe('a command quoted as a REPORT passes', () => {
     ['passive report', 'Die Gates liefen hier durch: `npm run build`, `npm run lint`, `npm audit`.'],
     ['English report', 'For the record: `npm run build` was run on the branch and is green.'],
     ['plan for myself', 'Als Nächstes führe ich `node scripts/board-publish.mjs` aus.'],
+    // These four are the SAME-CLAUSE English "I" — the form real English writes
+    // the pronoun in, and the only form the first version could not see, because
+    // its pattern listed lowercase alternatives without an `i` flag. The English
+    // report cases above happened to clear on OTHER cues ("For the record",
+    // "was run"), which is exactly why the dead pattern stayed invisible.
+    ['English, same-clause "I ran it"', 'I ran `npm run test:unit` here — 412 green.'],
+    ['English, "I already ran" inside the demand clause', 'You should know I already ran `npm run test:unit` here.'],
+    ['English, quoting a rule and reporting compliance', 'The doc says: you must run `npm test` before a tag — I did that already in this turn.'],
+    ['English, "I have run"', "I've run `npm run lint` and `npm audit`; both are clean."],
   ]
   for (const [what, answer] of reports) {
     it(`allows: ${what}`, () => {
       expect(blocked(answer), answer).toBe(false)
     })
   }
+
+  it('but a first person in a TIME clause is no report of the step handed over', () => {
+    // "before I merge" speaks about MY next step, not about the one he is asked
+    // to take. Reviving the English cue without this exclusion cleared it.
+    expect(blocked('Would you mind running `npm run lint` before I merge?')).toBe(true)
+  })
 
   it('but a report clause does not shelter a demand beside it', () => {
     expect(blocked('Ich habe alles gebaut, bitte führe `npm run test:large` aus.')).toBe(true)
@@ -175,6 +207,29 @@ describe('a NEGATED demand is no demand', () => {
   })
 })
 
+// The same reassurance with no negation word in it. "you should be all set" and
+// "du solltest gleich Ergebnisse sehen" are obligation modals by shape, their
+// report sits one clause back, and nothing in the negation list can see them —
+// so the guard blocked the session for closing its turn the way its own remedy
+// prescribes (four-eyes review, Fable 5, 04.08.2026).
+describe('a reassurance without a negation word is no demand either', () => {
+  const reassurances = [
+    ['English, "you should be all set"', "I've run `npm run build`; you should be all set."],
+    ['English, good to go', 'I ran `npm run lint` on the branch, so you are good to go.'],
+    ['German, "du solltest … sehen"', 'Ich habe `npm run build` gestartet, du solltest gleich Ergebnisse sehen.'],
+    ['German, "ist erledigt"', 'Das ist erledigt, du musst `npm run test:unit` hier gar nicht mehr anfassen.'],
+  ]
+  for (const [what, answer] of reassurances) {
+    it(`allows: ${what}`, () => {
+      expect(blocked(answer), answer).toBe(false)
+    })
+  }
+
+  it('but a reassurance in a NEIGHBOURING clause does not shelter a demand', () => {
+    expect(blocked('Der Rest ist erledigt. Bitte führe `npm run test:large` aus.')).toBe(true)
+  })
+})
+
 describe('the ordinary answer is never touched', () => {
   const fine = [
     ['a bare mention', 'Der Build läuft über `npm run build`; die Logik liegt in `scripts/x.mjs`.'],
@@ -188,6 +243,7 @@ describe('the ordinary answer is never touched', () => {
     ['a review request on a document', 'Bitte lies `docs/maximum-qa.md` und sag, ob die Reihenfolge stimmt.'],
     ['pointing at where something stands', 'Du kannst die Details in `docs/batch-autonomy.md` nachlesen.'],
     ['an English plan bullet quoted from a document', '- Run the LARGE browser regression (`npm test`) once to establish the baseline'],
+    ['a bulleted checklist line naming a tool', '- Try `npm run test:small` first, the LARGE tier only at the closing'],
     ['my own next steps as a list', '- `npm run build`\n- `npm run lint`\n- danach merge ich'],
   ]
   for (const [what, answer] of fine) {
@@ -204,6 +260,15 @@ describe('the ordinary answer is never touched', () => {
   it('and a request without its command in the same block is not read as a hand-over', () => {
     const answer = 'Bitte führe das noch aus.\n\nDer Standardbefehl ist `npm run build`.'
     expect(blocked(answer)).toBe(false)
+  })
+
+  it('lets "du kannst …" through, deliberately, even in front of a sudo line', () => {
+    // A KNOWN and accepted miss, pinned so no later widening takes it back by
+    // accident: reading a bare "du kannst" as a demand was the widest
+    // false-positive class in the probe over this repository's own prose (see
+    // the `de-modal` comment). A false pass costs a missed catch; a false block
+    // costs the session its turn, so this one stays.
+    expect(blocked('Du kannst das mit `sudo bash …` selbst erledigen.')).toBe(false)
   })
 })
 
