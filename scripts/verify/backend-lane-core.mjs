@@ -8,10 +8,13 @@ import { webglLaunchOptions, webgpuLaunchOptions, WEBGPU_UNAVAILABLE } from './l
 
 /** The lanes to probe, in report order. A lane with no launch options carries the REASON
  *  in its place, so the check prints why rather than a bare failure. */
-export function laneRenderers(systemChrome, platform = process.platform) {
-  const webgl = { name: 'webgl2', launchOptions: webglLaunchOptions(platform) }
+export function laneRenderers(systemChrome, platform = process.platform, baseEnv, galliumOverride) {
+  const webgl = { name: 'webgl2', launchOptions: webglLaunchOptions(platform, undefined, baseEnv, galliumOverride) }
   if (systemChrome) {
-    return [webgl, { name: 'webgpu', launchOptions: webgpuLaunchOptions(systemChrome) }]
+    return [
+      webgl,
+      { name: 'webgpu', launchOptions: webgpuLaunchOptions(systemChrome, platform, baseEnv, galliumOverride) },
+    ]
   }
   return [
     webgl,
@@ -19,11 +22,9 @@ export function laneRenderers(systemChrome, platform = process.platform) {
       name: 'webgpu',
       launchOptions: null,
       reason:
-        `${WEBGPU_UNAVAILABLE}: no system Chrome on this host. Playwright's bundled Chromium ` +
-        'reports navigator.gpu as undefined here (measured 04.08.2026), so the lane cannot open. ' +
-        'Install one from outside the container (sudo cannot — the image allows node only the ' +
-        'firewall script): docker exec -u root <container> bash -lc "cd /workspace/hoa && bash ' +
-        'scripts/verify-host-setup.sh"',
+        `${WEBGPU_UNAVAILABLE}: no system Chrome on this host, and Playwright's bundled ` +
+        'Chromium is not a substitute (point 184 — its headless requestDevice fails). ' +
+        'Install one: sudo bash scripts/verify-host-setup.sh',
     },
   ]
 }

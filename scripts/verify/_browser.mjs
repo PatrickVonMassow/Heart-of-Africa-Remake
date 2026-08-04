@@ -56,7 +56,11 @@ export async function launchVerifyBrowser({ platform = process.platform, systemC
   // guard (scripts/render-verify-guard.mjs) can enforce that every render change
   // was verified on BOTH backends. Observe-only; can never fail the suite.
   armRunRecorder(VERIFY_GL)
-  return chromium.launch(verifyLaunchOptions(VERIFY_GL, platform, process.env.VERIFY_ANGLE, chrome))
+  return chromium.launch(
+    // process.env is handed over so the lane can pin the Gallium driver in it (point 493:
+    // unpinned, Mesa 25 silently serves llvmpipe and every suite runs on the CPU).
+    verifyLaunchOptions(VERIFY_GL, platform, process.env.VERIFY_ANGLE, chrome, process.env, process.env.VERIFY_GALLIUM),
+  )
 }
 
 /** Guardrail (point 184): throw if the backend that actually initialised is not the
