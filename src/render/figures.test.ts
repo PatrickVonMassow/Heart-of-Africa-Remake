@@ -8,6 +8,7 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import * as THREE from 'three/webgpu'
 import { FIGURE_LIMBS, TESSELLATION, TRAVELLER_PACK } from './figures'
+import { REST_POSE, armDirection } from './gesture'
 
 describe('TESSELLATION floors', () => {
   it('figure bodies and heads are visibly round (old: 8-cone, 10x8 sphere)', () => {
@@ -155,6 +156,39 @@ describe('the villager figure has limbs to gesture with (point 479)', () => {
   // carries the same figure. What is pinned here is that they describe a BODY —
   // the shoulder above the hip, the arm long enough to read as an arm, the legs
   // exactly as long as the hip is high so the feet stand on the ground.
+  it('a RESTING arm stands clear of the body cone — the picture\'s own verdict', () => {
+    // The first rendered frame showed figures that looked ARMLESS with a dark
+    // stripe down the front: at a shoulder high on the cone and a small outward
+    // roll, the whole limb sat inside the trunk and only its self-shadow showed.
+    // The invariant is therefore geometric and pinned here: sample the arm along
+    // its length, and past its first third the limb must stand OUTSIDE the cone
+    // by its own radius, so it reads as a limb.
+    const dir = armDirection(REST_POSE.left)
+    const coneRadiusAt = (y: number) => FIGURE_LIMBS.bodyRadius * (1 - y)
+    let clearFrom = 1
+    for (let i = 20; i >= 0; i--) {
+      const t = i / 20
+      const x = FIGURE_LIMBS.shoulderX + FIGURE_LIMBS.armLength * dir[0] * t
+      const y = FIGURE_LIMBS.shoulderY + FIGURE_LIMBS.armLength * dir[1] * t
+      const z = FIGURE_LIMBS.armLength * dir[2] * t
+      const radial = Math.hypot(x, z)
+      if (radial - coneRadiusAt(y) >= FIGURE_LIMBS.armRadius[0]) clearFrom = Math.min(clearFrom, t)
+      else break
+    }
+    expect(clearFrom, 'the arm must be free of the trunk over most of its length').toBeLessThanOrEqual(0.34)
+
+    // …and the hand, the end the eye follows, is clear by more than its radius.
+    const hx = FIGURE_LIMBS.shoulderX + FIGURE_LIMBS.armLength * dir[0]
+    const hy = FIGURE_LIMBS.shoulderY + FIGURE_LIMBS.armLength * dir[1]
+    expect(hx - coneRadiusAt(hy)).toBeGreaterThan(FIGURE_LIMBS.handRadius)
+
+    // The shoulder itself, by contrast, MEETS the body: an arm that starts a
+    // visible gap away from the trunk reads as a floating stick.
+    expect(FIGURE_LIMBS.shoulderX - coneRadiusAt(FIGURE_LIMBS.shoulderY)).toBeLessThan(
+      FIGURE_LIMBS.armRadius[0],
+    )
+  })
+
   it('the shoulder line sits above the hip line, both inside the body', () => {
     expect(FIGURE_LIMBS.shoulderY).toBeGreaterThan(FIGURE_LIMBS.hipY)
     expect(FIGURE_LIMBS.shoulderY).toBeLessThan(1)
@@ -175,12 +209,22 @@ describe('the villager figure has limbs to gesture with (point 479)', () => {
     expect(FIGURE_LIMBS.armRadius[0]).toBeGreaterThan(FIGURE_LIMBS.armRadius[1])
   })
 
-  it('the shoulders sit clear of the body cone at their own height', () => {
-    // The cone has base radius 0.32 at y = 0 and tapers to a point at y = 1, so
-    // its radius at the shoulder line is 0.32 * (1 - shoulderY). The pivot must
-    // sit OUTSIDE that, or the arm would start buried in the trunk.
-    const coneRadiusAtShoulder = 0.32 * (1 - FIGURE_LIMBS.shoulderY)
+  it('the shoulders sit outside the cone axis at their own height', () => {
+    // The cone tapers to a point, so its radius at the shoulder line is
+    // bodyRadius * (1 - shoulderY). The pivot sits OUTSIDE that, or the arm
+    // would start buried in the trunk.
+    const coneRadiusAtShoulder = FIGURE_LIMBS.bodyRadius * (1 - FIGURE_LIMBS.shoulderY)
     expect(FIGURE_LIMBS.shoulderX).toBeGreaterThan(coneRadiusAtShoulder)
+  })
+
+  it('the scene builds the trunk cone from the shared radius, not a literal', () => {
+    // A legged figure shortens the cone; scaling its base radius by the same
+    // factor keeps the TAPER identical, which is what makes the clearance above
+    // hold for the children too.
+    const rel = '../scenes/place/PlaceLife.tsx'
+    const src = readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8')
+    expect(src.includes('L.bodyRadius * (trunkH / bodyH)')).toBe(true)
+    expect(src.includes('coneGeometry args={[trunkRadius')).toBe(true)
   })
 
   it('the two arms never overlap: the hips sit inside the shoulders', () => {

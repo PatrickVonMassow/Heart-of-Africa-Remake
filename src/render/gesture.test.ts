@@ -318,7 +318,7 @@ describe('the arm maths matches what three.js actually draws', () => {
   it('a rest arm hangs down — the limb reads as an arm, not as a raised one', () => {
     for (const a of [REST_POSE.left, REST_POSE.right]) {
       const [, y] = armDirection(a)
-      expect(y).toBeLessThan(-0.9)
+      expect(y).toBeLessThan(-0.85)
     }
     // …and each hangs out to its OWN side, so the two never overlap.
     expect(armDirection(REST_POSE.left)[0]).toBeGreaterThan(0)

@@ -127,6 +127,10 @@ function Figure({
   const withLegs = legs && !kneel
   const hipY = withLegs ? bodyH * L.hipY : 0
   const trunkH = bodyH - hipY
+  // Shrinking the cone's base radius by the same factor as its height keeps the
+  // TAPER identical, so a legged figure is not a fatter one at shoulder height —
+  // and the arm clearance pinned in figures.test.ts holds for every figure.
+  const trunkRadius = L.bodyRadius * (trunkH / bodyH)
   const trunk = useRef<THREE.Group>(null)
   const arms = useRef<Array<THREE.Group | null>>([])
   const legPivots = useRef<Array<THREE.Group | null>>([])
@@ -173,7 +177,7 @@ function Figure({
           the head with it, and the legs (below) stay planted. */}
       <group ref={trunk} position={[0, hipY, 0]}>
         <mesh position={[0, trunkH * 0.5, 0]} castShadow>
-          <coneGeometry args={[0.32, trunkH, TESSELLATION.figureBody]} />
+          <coneGeometry args={[trunkRadius, trunkH, TESSELLATION.figureBody]} />
           <meshStandardMaterial color={cloth} roughness={0.95} />
         </mesh>
         {/* The seasonal wrap goes OVER the everyday dress (Mayr): a shell around

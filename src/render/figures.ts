@@ -50,12 +50,24 @@ export const TESSELLATION = {
  * against the trunk.
  */
 export const FIGURE_LIMBS = {
-  /** Shoulder pivot height, in body heights. */
-  shoulderY: 0.8,
+  /** Body-cone base radius at the ground, in body heights: the cone tapers to a
+   *  point at the top, so its radius at height y is `bodyRadius * (1 - y)`. A
+   *  figure WITH legs shrinks its cone's base radius by the same factor as its
+   *  height, which keeps that taper identical — so the arm clearance below holds
+   *  for every figure, legs or no legs. */
+  bodyRadius: 0.32,
+  /** Shoulder pivot height, in body heights. Deliberately LOW on the cone: it
+   *  tapers to a point, so up at 0.8 the body is only 0.064 wide and an arm
+   *  attached there either floats a visible gap away from the trunk or hides
+   *  inside it. At 0.62 the cone is 0.12 wide, the shoulder MEETS the body, and
+   *  the arm separates from it a short way down — which is what makes it read as
+   *  a limb rather than as a stripe of shadow (the picture's own verdict on the
+   *  first attempt at 0.8). */
+  shoulderY: 0.62,
   /** Shoulder pivot half-separation, in body heights. +x is the figure's LEFT. */
-  shoulderX: 0.105,
+  shoulderX: 0.15,
   /** Arm length from shoulder to hand centre. */
-  armLength: 0.5,
+  armLength: 0.44,
   /** Arm cylinder radii [top, bottom]. */
   armRadius: [0.048, 0.036] as [number, number],
   /** Hand sphere radius — the small sphere family already tessellated for reach. */

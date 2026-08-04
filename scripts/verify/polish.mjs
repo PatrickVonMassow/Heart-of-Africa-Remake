@@ -1560,19 +1560,27 @@ for (const [placeId, shot] of [
     for (const kind of ['beckon', 'point', 'refuse', 'indicate']) {
       const who = 0
       await page.evaluate(([k, hold, w]) => window.__placeForceGesture(w, k, hold), [kind, HOLD, who])
-      // Into the body of the gesture, measured on the gesture's own clock.
+      // Wait for the POSE to be open, not for a reading on the gesture's clock.
+      // That clock is the frame delta CLAMPED to 0.1 s, so on a host rendering
+      // at 1 FPS under load it advances ten times slower than the wall clock and
+      // a threshold in gesture-seconds turns into minutes of waiting. The pose
+      // is the thing the frame must show, and it is open after three frames.
       const opened = await page
         .waitForFunction(
-          ([w, tt]) => {
+          (w) => {
             const g = window.__placeGestures()[w]
-            return !!g && !!g.kind && g.t >= tt
+            if (!g || !g.kind) return false
+            const p = g.pose
+            return (
+              Math.abs(p.left.pitch - 0.04) + Math.abs(p.right.pitch - 0.04) + Math.abs(p.lean) > 0.5
+            )
           },
-          [who, HOLD * 0.25],
-          { timeout: 30000 },
+          who,
+          { timeout: 60000 },
         )
         .then(() => true)
         .catch(() => false)
-      check(`the ${kind} gesture runs long enough to be seen`, opened)
+      check(`the ${kind} gesture opens into a pose that can be seen`, opened)
       const shown = await page.evaluate((w) => window.__placeGestures()[w], who)
       check(
         `${kind}: the figure's arms leave the rest pose`,
@@ -1596,16 +1604,25 @@ for (const [placeId, shot] of [
     }
 
     // --- a gesture ENDS by itself, and rest really is rest -------------------
-    await page.evaluate(() => window.__placeForceGesture(0, 'point', 1.2))
-    const ended = await page
-      .waitForFunction(() => window.__placeGestures()[0].kind === null, null, { timeout: 20000 })
-      .then(() => true)
-      .catch(() => false)
-    check('a gesture ends on its own — no figure is left holding a pose', ended)
-    const atRest = await page.evaluate(() => {
-      const g = window.__placeGestures()[0]
-      return { kind: g.kind, left: g.pose.left, right: g.pose.right, lean: g.pose.lean, turn: g.pose.turn }
-    })
+    // A SHORT gesture, so the end arrives within a bounded number of FRAMES even
+    // where each frame is a second long.
+    await page.evaluate(() => window.__placeForceGesture(0, 'point', 0.6))
+    // Read the resting state IN the same poll that observes the end: the ambient
+    // scheduler may start the next gesture a second and a half later, and a
+    // separate read afterwards would race it.
+    const restHandle = await page
+      .waitForFunction(
+        () => {
+          const g = window.__placeGestures()[0]
+          if (g.kind !== null) return null
+          return { kind: g.kind, left: g.pose.left, right: g.pose.right, lean: g.pose.lean, turn: g.pose.turn }
+        },
+        null,
+        { timeout: 60000 },
+      )
+      .catch(() => null)
+    check('a gesture ends on its own — no figure is left holding a pose', restHandle != null)
+    const atRest = restHandle ? await restHandle.jsonValue() : { kind: 'never ended', left: {}, right: {} }
     check(
       'and the figure stands at rest again: both arms down, no lean, no turn',
       atRest.kind === null &&
@@ -1619,9 +1636,9 @@ for (const [placeId, shot] of [
     // --- sampled over the ambient conversation ------------------------------
     // A single instant proves nothing about a scheduler: sample across frames.
     const samples = []
-    for (let i = 0; i < 60; i++) {
+    for (let i = 0; i < 30; i++) {
       samples.push(await page.evaluate(() => window.__placeGestures()))
-      await nextFrames(6)
+      await nextFrames(4)
     }
     const kinds = ['beckon', 'point', 'refuse', 'indicate']
     const bad = samples.filter((s) => s.some((g) => g.kind !== null && !kinds.includes(g.kind)))

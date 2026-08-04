@@ -77,13 +77,18 @@ export interface FigurePose {
 export type ArmSide = 'left' | 'right'
 
 /**
- * Arms at rest: hanging, turned a little out of the trunk so they read as arms
- * and not as a second silhouette edge. Frozen — the poses below are built fresh,
- * never mutated in place, so a caller can hold this as a comparison baseline.
+ * Arms at rest: hanging, and rolled OUT far enough to follow the flare of the
+ * body cone rather than sink into it. The outward roll is not decoration — at a
+ * smaller angle the whole forearm ends up inside the trunk and the figure reads
+ * as armless with an odd stripe of self-shadow down its front, which is exactly
+ * what the first rendered frame showed. `src/render/figures.test.ts` pins the
+ * clearance against the cone so it cannot silently regress.
+ * Frozen — the poses below are built fresh, never mutated in place, so a caller
+ * can hold this as a comparison baseline.
  */
 export const REST_POSE: FigurePose = Object.freeze({
-  left: Object.freeze({ pitch: 0.04, yaw: 0, roll: 0.13 }) as ArmPose,
-  right: Object.freeze({ pitch: 0.04, yaw: 0, roll: -0.13 }) as ArmPose,
+  left: Object.freeze({ pitch: 0.04, yaw: 0, roll: 0.46 }) as ArmPose,
+  right: Object.freeze({ pitch: 0.04, yaw: 0, roll: -0.46 }) as ArmPose,
   lean: 0,
   turn: 0,
 }) as FigurePose
@@ -297,7 +302,7 @@ export function gesturePose(s: GestureState): FigurePose {
       // toward the shoulder. The scoop rides `u`, so both beats always fit.
       const scoop = 0.5 - 0.5 * Math.cos(u * 4 * Math.PI)
       arm = {
-        pitch: -(1.05 + scoop * 0.55),
+        pitch: -(1.35 + scoop * 0.5),
         yaw: s.bearing * 0.55,
         roll: restArm.roll * 0.4,
       }
@@ -311,8 +316,10 @@ export function gesturePose(s: GestureState): FigurePose {
     }
     case 'refuse': {
       // Both arms out and up, palms forward; the trunk shakes three times.
-      arm = { pitch: -1.15, yaw: 0, roll: (side === 'left' ? 1 : -1) * 0.62 }
-      other = { pitch: -1.15, yaw: 0, roll: (otherSide === 'left' ? 1 : -1) * 0.62 }
+      // Above the horizontal, or it reads as reaching down rather than refusing:
+      // a hanging arm is at pitch 0, so π/2 only gets it level.
+      arm = { pitch: -1.85, yaw: 0, roll: (side === 'left' ? 1 : -1) * 0.7 }
+      other = { pitch: -1.85, yaw: 0, roll: (otherSide === 'left' ? 1 : -1) * 0.7 }
       turn = Math.sin(u * 6 * Math.PI + s.phase) * 0.42
       lean = -0.05
       break
