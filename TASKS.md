@@ -4375,55 +4375,6 @@ Build order, chosen so no two parallel agents own the same file:
   `node scripts/guard-health-guard.mjs --status` names a hook whose bit was
   removed.
 
-- [ ] 496. NO TURN CAN SEAL THE CONTAINER OFF FROM ITS OWN API (user
-  04.08.2026, second occurrence — "du hast dich wohl schon wieder ausgesperrt").
-  `/usr/local/bin/init-firewall.sh` is the container's only firewall path, and it
-  is a REBUILD: it flushes every iptables rule and destroys the `allowed-domains`
-  ipset at the top while the default policies stay DROP, then spends two to three
-  minutes fetching GitHub's meta ranges and resolving sixteen domains. Every
-  second of that window the container is sealed, and anything that interrupts it
-  leaves it sealed for good — no allowlist, `api.anthropic.com` unreachable, the
-  session dead with ConnectionRefused. On 04.08.2026 the Bash tool's own
-  two-minute timeout did exactly that (exit 143) and the user had to kill the
-  session. The trigger was mundane: `cdn.playwright.dev` and the Chrome-for-
-  Testing storage answer with rotating addresses that the boot-time allowlist no
-  longer covers, a browser install failed, and the session reached for the
-  rebuild because no smaller tool existed.
-  FINAL STATE:
-  1. The SMALLER TOOL exists and is the normal way:
-     `node scripts/firewall-allow.mjs [domain…]` resolves each name and adds its
-     addresses to the LIVE `allowed-domains` ipset — additive only. It never
-     flushes, never destroys the set, never touches a policy, so there is no
-     window in which the container is offline and nothing to interrupt. `--net24`
-     adds the surrounding /24 for the rotating CDN pools. With no argument it
-     tops up the domains this project needs (the Playwright CDN and its
-     Chrome-for-Testing storage, Hugging Face, npm, the API host itself). It
-     reports per domain what it added and verifies reachability afterwards.
-  2. A genuine REBUILD never runs in the foreground: `node
-     scripts/firewall-rebuild.mjs` starts the container script DETACHED from the
-     tool call (own process group, output to `local/firewall-rebuild.log`) so no
-     tool timeout can kill it mid-flush, and arms a WATCHDOG that restores
-     `iptables -P OUTPUT ACCEPT` and `-P INPUT ACCEPT` when the rebuild has not
-     reported success within its budget. Fail-OPEN by design: a broken rebuild
-     leaves the container reachable rather than sealed, because a reachable
-     session can repair itself and a sealed one cannot.
-  3. A PreToolUse(Bash) guard REFUSES the shapes that seal the container —
-     `init-firewall.sh` invoked directly, `iptables -F`/`-X`/`-P`, `ipset
-     destroy`, `iptables-restore` — and its remedy names the two commands above.
-     It judges the command the session is about to RUN, so a mention inside a
-     message or a `--help` text is not a match.
-  4. Guard core pure and Vitest-covered, fail-OPEN on any internal error, wired
-     in `.claude/settings.json`, and reviewed by the other model per
-     `mechanism-review-guard` before it counts as done.
-  VERIFIABLE: pure Vitest over the decision core — `sudo /usr/local/bin/init-
-  firewall.sh`, `iptables -F`, `iptables -P OUTPUT DROP`, `ipset destroy
-  allowed-domains` and an `iptables-restore` redirect are each refused with the
-  remedy naming `firewall-allow.mjs`; `node scripts/firewall-allow.mjs` itself,
-  `iptables -L -n`, `ipset list` and a string merely QUOTING one of those inside
-  an echo pass; the guard allows on any internal error; and
-  `node scripts/firewall-allow.mjs cdn.playwright.dev --net24` makes the CDN
-  reachable (curl status) without any policy or rule changing.
-
 - [ ] 497. THE GERMAN-LANGUAGE RULE HAS NO MECHANISM AT ALL, AND THE AUDIT
   PASSED IT ANYWAY (user 04.08.2026: "Warum schreibst du die ganze Zeit auf
   Englisch? Klappt der Mechanismus nicht? Falls ja, klappen vielleicht auch
