@@ -78,6 +78,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   && echo /usr/lib/wsl/lib > /etc/ld.so.conf.d/wsl.conf && ldconfig \
   && apt-get clean && rm -rf /var/lib/apt/lists/*
 
+# node:20 bundles npm 10.8.2, which does not know the lockfile's `libc` field and SILENTLY
+# STRIPS it — 63 optional platform packages, on every `npm install`, leaving the tree dirty
+# after each container create (postCreateCommand runs one). npm 11 preserves it, so the
+# image carries npm 11 and `npm install` is a no-op on a current lockfile.
+RUN npm install -g npm@11 && npm --version
+
 # Ensure default node user has access to /usr/local/share
 RUN mkdir -p /usr/local/share/npm-global && \
   chown -R node:node /usr/local/share
