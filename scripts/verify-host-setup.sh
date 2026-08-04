@@ -57,7 +57,10 @@ say() { printf '%s\n' "$*"; }
 missing=()
 have google-chrome-stable || have google-chrome ||
   missing+=("google-chrome-stable (the WebGPU lane needs a SYSTEM Chrome — point 184)")
-[ -O "${TARGET_HOME}/.config" ] ||
+# Ask WHO owns it, not whether WE do: `[ -O ]` tests the EFFECTIVE uid, so under
+# the sudo this script needs, a directory correctly owned by the target user
+# reads as missing and the whole run repeats itself while claiming to be a no-op.
+[ "$(stat -c %U "${TARGET_HOME}/.config" 2>/dev/null)" = "$TARGET_USER" ] ||
   missing+=("${TARGET_HOME}/.config owned by ${TARGET_USER} (Chrome cannot place its crash database and dies at launch)")
 ldconfig -p | grep -q 'libGL\.so\.1' ||
   missing+=("libgl1/libegl1 (without them ANGLE's gl backend has no driver and WebGL 2 drops to SwiftShader)")
