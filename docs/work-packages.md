@@ -93,6 +93,7 @@ the one the user reads (memory `bundle-names`, retrospective §3.66).
 | **Dokumentation** | L | Docs and knowledge transfer | 303, 333, 422 — the rest landed 30.07.2026 (459) |
 | **Steuerung & Performance** | M | Controls and performance | 310, 342, 347 |
 | **Urlaubsfestigkeit** | N | Unattended operation for a fortnight — recovery from a failure at ANY moment, quota waiting, the boot path, the readiness check and the chaos drill that proves it | 442, 443, 444, 445, 446, 447, 448, 449, 450 |
+| **Kommunikation** | O | The communication PoC: the tonal language, who speaks it, where it is spoken, what the player may write down | 477, 478, 479, 480, 481, 482, 483, 484, 485, 486, 487, 488 (480 IS point 351 and 488 IS point 352, pulled forward — they close together) |
 
 **Urlaubsfestigkeit** was cut on 30.07.2026 on the user's demand that the batch be
 worked for two weeks without them, surviving an outage of Claude, of their internet
@@ -114,7 +115,17 @@ change) and 449 last, because the drill is what makes the others more than a cla
 
 ## Order of work
 
-**Urlaubsfestigkeit first** (30.07.2026): the user must be able to leave for two
+**Kommunikation first** (user 03.08.2026, restated 04.08.2026): the communication
+PoC outranks the whole queue — it is the feature the game is being built toward,
+and the user asked for it before everything else. Its own build order is the wave
+plan in TASKS.md (wave 1: 477 · 482 · 479), chosen so no two parallel agents own
+the same file. **493 runs alongside it**, not after: the second backend lane is
+what lets the wave's render points be merged under the both-backend rule at all.
+THIS PARAGRAPH IS THE QUEUE'S ORDER — when it disagreed with TASKS.md between the
+03. and the 04.08.2026, the queue kept feeding infrastructure while the point the
+user had put first sat at position 60 (that is what the flat list is read as).
+
+Then **Urlaubsfestigkeit** (30.07.2026): the user must be able to leave for two
 weeks and rely on the batch being worked without them, so the layer that keeps it
 running outranks everything it would keep running. Then **Chat & Tafel →
 Session- & Repo-Hygiene → Modell & Wächter → Testinfrastruktur**, then the visible

@@ -4304,3 +4304,42 @@ Build order, chosen so no two parallel agents own the same file:
   probe alike, is handed an explicit timeout above Playwright's default (the
   existing shutter cases extended to the probe path); a `timeout: 0` (which
   DISABLES the deadline) fails the same assertion.
+
+- [ ] 493. THE SECOND BACKEND LANE ON THE VERIFICATION HOST (user decision
+  04.08.2026, "Weg 1" on the board card). Since the browser suites moved into the
+  Linux container, every render verification runs SINGLE-lane: no system Chrome is
+  installed at all, and Playwright's bundled Chromium brings up no WebGPU adapter.
+  The rule that the picture is checked on BOTH backends (CLAUDE.md §6/§7.2) has
+  been unenforceable since 03.08.2026, and the closing cycle demands exactly it.
+  MEASURED on the host 04.08.2026: `/dev/dxg` EXISTS and `/usr/lib/wsl/lib` carries
+  `libd3d12.so`, `libd3d12core.so`, `libdxcore.so` and the NVIDIA WSL stack — the
+  GPU is reachable from inside the container. Missing are a system Chrome and a
+  driver stack to reach that GPU (`/usr/share/vulkan/icd.d` does not exist, no Mesa
+  d3d12/dzn). So this is a host SETUP question, not a passthrough question.
+  FINAL STATE:
+  1. One idempotent, repo-owned setup script (`scripts/verify-host-setup.sh`)
+     installs what the lane needs: Google Chrome stable, Mesa's D3D12 Gallium and
+     Dozen (Vulkan-on-D3D12) drivers, and the loader wiring (ICD path,
+     `LD_LIBRARY_PATH`) that points them at `/usr/lib/wsl/lib`. It needs root, so it
+     is run ONCE under sudo; a second run changes nothing and says so.
+  2. `launchVerifyBrowser()` resolves that Chrome by the host's own path and FAILS
+     LOUD when a `VERIFY_GL=webgpu` run finds none — never a silent fall back to
+     bundled Chromium, which is how the missing lane stayed invisible.
+  3. A readiness command judges the lane by the PICTURE, not by a version string:
+     `node scripts/verify/backend-lane-check.mjs` exits non-zero unless system
+     Chrome launches, an adapter is returned, `window.__renderer` reports WebGPU
+     AND a frame is actually drawn — on 03.08.2026 the software lane offered the
+     interface and then died at the first buffer, which is precisely what this
+     must catch.
+  4. The both-backend rule is restored in practice: the render suites run under
+     `VERIFY_GL=webgpu` on this host with `assertBackend` confirming it, and
+     `render-verify-guard` demands the second lane again wherever a change can
+     render differently per backend.
+  5. If the drivers cannot carry the game — the lane comes up but no frame draws —
+     the point is NOT closed by relaxing the rule: it is reported with the failing
+     output, and the user's lane 2 (the second backend run by hand on his Windows
+     machine) becomes its own point.
+  VERIFIABLE: `backend-lane-check.mjs` green on the host; one render suite
+  completing under `VERIFY_GL=webgpu` with `assertBackend` confirming WebGPU; pure
+  Vitest over the browser resolution — a host with system Chrome resolves to it, a
+  host without fails loud instead of quietly using the bundled build.
