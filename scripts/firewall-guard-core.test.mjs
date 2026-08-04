@@ -4,6 +4,8 @@
 // would only teach the session to rephrase the command that sealed the
 // container, so the pass side carries most of the cases here.
 import { describe, it, expect } from 'vitest'
+import { spawnSync } from 'node:child_process'
+import { resolve } from 'node:path'
 import {
   EXCERPT_CHARS,
   IPSET_MUTATING,
@@ -461,6 +463,105 @@ describe('the deny message', () => {
     const verdict = evaluate({ command: heredoc })
     expect(verdict.block).toBe(true)
     expect(verdict.reason).toMatch(/Write tool/)
+  })
+})
+
+// THE WRAPPER, PROVEN BY RUNNING IT (the shape guard-hooks.test.mjs uses).
+//
+// WHY this exists rather than a source review: everything above judges the pure
+// core, and the core can be perfect while the process around it says nothing.
+// The body sits behind `isMainModule(import.meta.url)`, the verdict has to
+// travel out as a PreToolUse JSON payload on stdout, and the exit code has to
+// stay 0 whichever way it lands \u2014 a hook that exits non-zero is an error, not a
+// denial. None of that is visible in the code; only spawning it shows it. The
+// harness's own promise is fail-OPEN, so the allow cases carry as much weight
+// here as the deny: a guard that crashes the Bash tool would be removed within
+// the hour, and then nothing guards the container at all.
+describe('the wrapper, spawned the way the harness spawns it', { timeout: 60_000 }, () => {
+  const GUARD = resolve(process.cwd(), 'scripts', 'firewall-guard.mjs')
+
+  /** `node scripts/firewall-guard.mjs` with a PreToolUse payload on stdin. */
+  const hook = (payload, args = []) => {
+    const r = spawnSync(process.execPath, [GUARD, ...args], {
+      input: typeof payload === 'string' ? payload : JSON.stringify(payload),
+      encoding: 'utf8',
+      windowsHide: true,
+    })
+    let decision = null
+    try {
+      decision = r.stdout.trim() ? JSON.parse(r.stdout.trim()).hookSpecificOutput : null
+    } catch {
+      /* not a decision payload \u2014 the assertions report the raw stdout instead */
+    }
+    return { ...r, decision }
+  }
+  const bash = (command) => ({
+    hook_event_name: 'PreToolUse',
+    tool_name: 'Bash',
+    tool_input: { command },
+  })
+
+  it('DENIES the command that sealed the container, as a PreToolUse payload', () => {
+    const r = hook(bash('sudo /usr/local/bin/init-firewall.sh'))
+    expect(r.status, `exited ${r.status}: ${r.stderr}`).toBe(0)
+    expect(r.decision, `stdout was ${JSON.stringify(r.stdout)}`).toBeTruthy()
+    expect(r.decision.hookEventName).toBe('PreToolUse')
+    expect(r.decision.permissionDecision).toBe('deny')
+    expect(r.decision.permissionDecisionReason).toMatch(/scripts\/firewall-rebuild\.mjs --run/)
+  })
+
+  it('DENIES a hand-typed mutation and the rephrasings, through the real process', () => {
+    for (const command of ['sudo iptables -F', 'eval "sudo iptables -F"', 'echo iptables -F | xargs sudo']) {
+      const r = hook(bash(command))
+      expect(r.status, `${command} exited ${r.status}: ${r.stderr}`).toBe(0)
+      expect(r.decision?.permissionDecision, `${command} was not denied`).toBe('deny')
+    }
+  })
+
+  it('says NOTHING at all for a read, a sanctioned route and an everyday command', () => {
+    for (const command of [
+      'iptables -L -n',
+      'ip link show up',
+      'node scripts/firewall-rebuild.mjs --status',
+      'node scripts/firewall-allow.mjs api.github.com',
+      'npm run test:unit',
+    ]) {
+      const r = hook(bash(command))
+      expect(r.status, `${command} exited ${r.status}: ${r.stderr}`).toBe(0)
+      // An allow is SILENCE, not an "allow" payload: anything on stdout that the
+      // harness cannot parse is a hook error, and a hook error is a broken tool.
+      expect(r.stdout.trim(), `${command} printed something`).toBe('')
+    }
+  })
+
+  it('ignores a tool that is not a shell', () => {
+    const r = hook({ hook_event_name: 'PreToolUse', tool_name: 'Read', tool_input: { command: 'sudo iptables -F' } })
+    expect(r.status).toBe(0)
+    expect(r.stdout.trim()).toBe('')
+  })
+
+  it('is fail-OPEN on garbled, empty and absent input', () => {
+    for (const input of ['', 'not json at all', '{"tool_name":', '{}', 'null']) {
+      const r = hook(input)
+      expect(r.status, `input ${JSON.stringify(input)} exited ${r.status}: ${r.stderr}`).toBe(0)
+      expect(r.stdout.trim()).toBe('')
+    }
+  })
+
+  it('answers --check, which is how the guard is asked ahead of time', () => {
+    const denied = spawnSync(process.execPath, [GUARD, '--check', 'sudo iptables -F'], {
+      encoding: 'utf8',
+      windowsHide: true,
+    })
+    expect(denied.status, denied.stderr).toBe(0)
+    expect(denied.stdout).toMatch(/WOULD DENY \(iptables-mutate\)/)
+
+    const allowed = spawnSync(process.execPath, [GUARD, '--check', 'iptables -L -n'], {
+      encoding: 'utf8',
+      windowsHide: true,
+    })
+    expect(allowed.status, allowed.stderr).toBe(0)
+    expect(allowed.stdout).toMatch(/firewall-guard: OK/)
   })
 })
 
