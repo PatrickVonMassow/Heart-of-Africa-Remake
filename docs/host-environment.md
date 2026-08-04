@@ -26,6 +26,13 @@ needs, both in `.devcontainer/init-firewall.sh`:
   archive to. Resolved as `/24` ranges, because Google serves it from a large rotating
   address pool and the single address resolved at boot is usually not the one the download
   lands on minutes later.
+- `us.aws.cdn.hf.co` and `cdn.jsdelivr.net` — the same redirect trap, one layer down, and
+  it cost the whole regression on 04.08.2026 (point 499). `huggingface.co` was allowed and
+  answered; the Kokoro model download **redirects** from it to an AWS pool that was not,
+  and the ORT-WASM runtime comes from jsdelivr, which was not either. Both TTS suites
+  (`handwriting`, `voice`) then died on the unreachable host with no FAIL line at all. Both
+  are `/24` pools, both are in `DEFAULT_TOPUP`, so `node scripts/firewall-allow.mjs` alone
+  restores them after a restart — and both are green once they are reachable.
 
 **Measured 04.08.2026 (point 493), so nobody has to guess again.** The GPU behind
 `/dev/dxg` IS reachable from the container, and what stood between the suites and it was

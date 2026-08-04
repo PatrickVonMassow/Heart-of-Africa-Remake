@@ -106,10 +106,21 @@ describe('the default top-up set', () => {
       expect(hosts, host).toContain(host)
     }
   })
+  it('covers both hosts the TTS asset cache fetches from, not just the API host', () => {
+    // 04.08.2026: `huggingface.co` alone was allowed. The model download REDIRECTS
+    // to the CDN, and the ORT-WASM runtime comes from jsdelivr, so both suites that
+    // install the cache (handwriting, voice) died on an unreachable host with no
+    // FAIL line. The API host answering 302 is not evidence the file is reachable.
+    const hosts = DEFAULT_TOPUP.map((d) => d.host)
+    expect(hosts).toContain('us.aws.cdn.hf.co')
+    expect(hosts).toContain('cdn.jsdelivr.net')
+  })
   it('widens exactly the rotating pools to /24 and leaves the stable hosts alone', () => {
     const by = Object.fromEntries(DEFAULT_TOPUP.map((d) => [d.host, d.net24]))
     expect(by['cdn.playwright.dev']).toBe(true)
     expect(by['storage.googleapis.com']).toBe(true)
+    expect(by['us.aws.cdn.hf.co']).toBe(true)
+    expect(by['cdn.jsdelivr.net']).toBe(true)
     expect(by['registry.npmjs.org']).toBe(false)
     expect(by['api.anthropic.com']).toBe(false)
   })

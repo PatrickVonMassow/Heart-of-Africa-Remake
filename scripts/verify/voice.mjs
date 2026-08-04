@@ -282,10 +282,15 @@ await browser.close()
 // Cache verdict (point 88): once complete, the whole suite must run without
 // a single CDN request for the TTS assets; the first (recording) run instead
 // proves it captured them.
+// A recording fetch that FAILED is named here rather than swallowed: it used to
+// escape as an unhandled rejection and kill the process before a single check ran
+// (04.08.2026), so the cache verdict now depends on it too — a cache recorded past
+// a network error is incomplete, and marking it complete would make every later
+// STRICT run abort on the gap instead of reporting the CDN that was unreachable.
 if (ttsStats.strict) {
-  check('TTS assets served offline from the local cache', ttsStats.hits > 0 && ttsStats.misses === 0, JSON.stringify({ ...ttsStats, served: ttsStats.served.length }))
+  check('TTS assets served offline from the local cache', ttsStats.hits > 0 && ttsStats.misses === 0 && ttsStats.fetchErrors.length === 0, JSON.stringify({ ...ttsStats, served: ttsStats.served.length }))
 } else {
-  check('TTS assets recorded into the local cache', ttsStats.hits + ttsStats.misses > 0, JSON.stringify({ ...ttsStats, served: ttsStats.served.length }))
+  check('TTS assets recorded into the local cache', ttsStats.hits + ttsStats.misses > 0 && ttsStats.fetchErrors.length === 0, JSON.stringify({ ...ttsStats, served: ttsStats.served.length }))
   if (failures === 0 && errors.length === 0) markTtsCacheComplete()
 }
 process.exit(failures > 0 || errors.length > 0 ? 1 : 0)

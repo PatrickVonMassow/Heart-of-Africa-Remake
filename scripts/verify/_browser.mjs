@@ -102,3 +102,89 @@ export async function waitForStable(page, readFn, { eps = 1e-3, settleMs = 200, 
   }
   return prev
 }
+
+/** Wait until EVERY numeric field of a page reading stops changing, and SAY whether
+ *  it actually settled (point 499).
+ *
+ *  `waitForStable` above watches ONE number and returns the last value at its
+ *  timeout, indistinguishable from a settled one. On the container host — where the
+ *  frame rate is a fraction of the Windows machine these waits were calibrated on —
+ *  a settlement lerp ran past the 6 s window, and three `polish` checks then measured
+ *  a HALF-LERPED state and reported it as a product failure (dry sky grayMix 0.146
+ *  instead of 0, wet sun 2.348 instead of 1.44). Given the time it needs, every one
+ *  of those values reaches its target exactly.
+ *
+ *  Two things follow, and this helper is both: watch the fields the caller ASSERTS
+ *  rather than one proxy beside them, and report `settled` so a timeout fails as
+ *  "the reading never settled" instead of as a wrong measurement.
+ *
+ *  `requireChange` covers the OTHER half of the same trap, and the measured one: a
+ *  setting pushed into the scene does not take hold in the same instant, so a poll
+ *  started right after it finds the reading still standing where it was and calls
+ *  that settled — the dry season measured grayMix 0.146 after 1.5 s of quiet that
+ *  was simply the pause before the lerp began. With it, the quiet only counts once
+ *  the reading has actually MOVED, and a reading that never moves inside the
+ *  timeout is reported `settled: false` rather than read as an answer. */
+export async function waitForReadingStable(page, readFn, { eps = 1e-3, settleMs = 500, samples = 3, requireChange = false, timeout = 60000 } = {}) {
+  const numbersOf = (v) => {
+    const out = []
+    const walk = (x) => {
+      if (typeof x === 'number') out.push(x)
+      else if (x && typeof x === 'object') for (const k of Object.keys(x).sort()) walk(x[k])
+    }
+    walk(v)
+    return out
+  }
+  const start = Date.now()
+  let prev = await page.evaluate(readFn)
+  let quiet = 0
+  let moved = !requireChange
+  while (Date.now() - start < timeout) {
+    await page.waitForTimeout(settleMs)
+    const cur = await page.evaluate(readFn)
+    const a = numbersOf(prev)
+    const b = numbersOf(cur)
+    const still = a.length === b.length && a.every((n, i) => Math.abs(n - b[i]) <= eps)
+    if (!still) moved = true
+    quiet = still ? quiet + 1 : 0
+    prev = cur
+    if (moved && quiet >= samples) return { value: cur, settled: true, moved: true, waitedMs: Date.now() - start }
+  }
+  return { value: prev, settled: false, moved, waitedMs: Date.now() - start }
+}
+
+/** Wait until the scene has finished BUILDING, not until a clock runs out (point 499).
+ *
+ *  The renderer streams a scene in over many seconds: measured on the container host,
+ *  first-person Cairo stood at 12 792 triangles and a BLACK picture after 6 s, a flat
+ *  untextured wash after 7.7 s, and only at ~16.7 s carried its ground micro-structure
+ *  (72 751 triangles). Every suite that photographed it after a fixed 4 s wait was
+ *  therefore measuring an unfinished scene and blaming the product for it.
+ *
+ *  The condition is the renderer's OWN geometry count: it must pass a floor and then
+ *  stop GROWING. Growth only — animals and dressing make it wobble downward as things
+ *  leave the frustum, and waiting for that to stop would never return.
+ *
+ *  `settleMs` is 5 s because the curve is STEPPED, not smooth: traced at 250 ms on the
+ *  container host, the count sat still at 33 346 from 9.0 s to 13.2 s and only reached
+ *  its final 83 037 at 24.6 s, with the ground detail appearing at 18.8 s. A shorter
+ *  settle returns inside one of those plateaus — a 700 ms one returned at 10.5 s and
+ *  38 280 triangles, on a picture that was still black. */
+export async function waitForSceneBuilt(page, { minTriangles = 20000, settleMs = 5000, pollMs = 200, timeout = 120000 } = {}) {
+  const read = () => page.evaluate(() => window.__renderer?.info?.render?.triangles ?? 0)
+  const start = Date.now()
+  let peak = 0
+  let quietSince = null
+  while (Date.now() - start < timeout) {
+    const tris = await read()
+    if (tris > peak) {
+      peak = tris
+      quietSince = null
+    } else if (peak >= minTriangles) {
+      quietSince ??= Date.now()
+      if (Date.now() - quietSince >= settleMs) return { triangles: peak, built: true, waitedMs: Date.now() - start }
+    }
+    await page.waitForTimeout(pollMs)
+  }
+  return { triangles: peak, built: false, waitedMs: Date.now() - start }
+}

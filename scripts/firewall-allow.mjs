@@ -63,6 +63,14 @@ export const DEFAULT_TOPUP = [
   { host: 'storage.googleapis.com', net24: true },
   { host: 'huggingface.co', net24: false },
   { host: 'cdn-lfs-us-1.hf.co', net24: false },
+  // Where huggingface.co REDIRECTS the Kokoro model download today (measured
+  // 04.08.2026): an AWS eu-west-3 pool, so a single boot-time address misses it
+  // the same way storage.googleapis.com did. `huggingface.co` being reachable
+  // proves nothing about the file — the API host answered 302 while the CDN was
+  // unreachable, which is what killed `handwriting` and `voice`.
+  { host: 'us.aws.cdn.hf.co', net24: true },
+  // The ORT-WASM runtime the TTS worker loads (the other host ttsCache.mjs owns).
+  { host: 'cdn.jsdelivr.net', net24: true },
   { host: 'registry.npmjs.org', net24: false },
 ]
 

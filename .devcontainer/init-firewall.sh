@@ -78,6 +78,8 @@ for domain in \
     "storage.googleapis.com" \
     "huggingface.co" \
     "cdn-lfs-us-1.hf.co" \
+    "us.aws.cdn.hf.co" \
+    "cdn.jsdelivr.net" \
     "deb.debian.org" \
     "security.debian.org" \
     "dl.google.com"; do
