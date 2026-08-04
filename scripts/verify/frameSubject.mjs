@@ -35,6 +35,17 @@ import {
 // quiet machine (the wait ends on the condition) and only delays a real refusal.
 const DEFAULT_TIMEOUT = 15000
 
+// How long the WRITE of the picture may take. Separate from the probe budget
+// above, because it measures something else: the probe waits for the subject to
+// be in the picture (a judgment), this waits for the browser to hand the pixels
+// over (I/O). Passing nothing let it inherit Playwright's silent 30 s default,
+// and on a host that renders through SwiftShader with no GPU a full-page or
+// element capture under suite load exceeds that — `enrichments` died on the
+// map-overlay capture 4700 lines before its own subject, on main as much as on
+// any branch, and the timeout named neither the shutter nor the machine. A slow
+// capture is not a failed check; a hung one still fails, four times later.
+const CAPTURE_TIMEOUT = 120000
+
 /**
  * Runs INSIDE the page. Returns the probe when the subject is in the picture,
  * `null` while it is not (so `waitForFunction` keeps polling on the animation
@@ -171,7 +182,9 @@ export async function captureFrame(page, outDir, name, decl, { timeout = DEFAULT
     throw new Error(`frame ${d.frame}: its subject is not in the rendered picture — ${verdict.reason}`)
   }
   const path = `${outDir}${d.frame}.png`
-  const options = decl.clip ? { path, clip: decl.clip } : { path }
+  const options = decl.clip
+    ? { path, clip: decl.clip, timeout: CAPTURE_TIMEOUT }
+    : { path, timeout: CAPTURE_TIMEOUT }
   // Returns the PNG buffer, like `page.screenshot` itself — a few frames are
   // ALSO a pixel probe (settings.mjs reads the TRAA frame's mean luma).
   const buffer = decl.locator ? await page.locator(decl.locator).screenshot(options) : await page.screenshot(options)
