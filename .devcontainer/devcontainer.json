@@ -42,6 +42,14 @@
       }
     }
   },
+  // The dev server and every verify suite open a port; VS Code announces each one with a
+  // toast in the corner. The batch opens them constantly, so the notification is pure noise —
+  // silent still FORWARDS the port, it only stops the popup.
+  "portsAttributes": {
+    "5173": { "label": "vite dev", "onAutoForward": "silent" },
+    "4173": { "label": "vite preview", "onAutoForward": "silent" }
+  },
+  "otherPortsAttributes": { "onAutoForward": "silent" },
   "remoteUser": "node",
   "mounts": [
     "source=claude-code-bashhistory-${devcontainerId},target=/commandhistory,type=volume",
