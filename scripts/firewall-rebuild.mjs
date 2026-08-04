@@ -39,7 +39,7 @@
 //    guarantees the container stays reachable while the rebuild finishes or
 //    fails.
 //
-// Every state change is written to local/firewall/ (git-ignored) so `--status`
+// Every state change is written to local/ (git-ignored) so `--status`
 // can answer from a second, short-lived process — the reader never has to hold
 // a long call open.
 import { execFileSync, spawn } from 'node:child_process'
@@ -51,9 +51,9 @@ import { repoPath } from './repo-paths.mjs'
 export const FIREWALL_SCRIPT = '/usr/local/bin/init-firewall.sh'
 
 /** Where the run records itself. Git-ignored (`/local/`). */
-export const STATE_DIR = repoPath('local', 'firewall')
-export const STATE_PATH = repoPath('local', 'firewall', 'rebuild-state.json')
-export const LOG_PATH = repoPath('local', 'firewall', 'rebuild.log')
+export const STATE_DIR = repoPath('local')
+export const STATE_PATH = repoPath('local', 'firewall-rebuild-state.json')
+export const LOG_PATH = repoPath('local', 'firewall-rebuild.log')
 
 /**
  * How long the rebuild may take before the watchdog re-opens the gate. Generous
