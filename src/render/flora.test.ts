@@ -9,12 +9,14 @@ import {
   buildPalm,
   buildPapyrus,
   buildRock,
+  buildErraticBoulder,
   buildTermiteMound,
   buildBaobab,
   splitFoliage,
 } from './flora'
 import type * as THREE from 'three/webgpu'
 import { FLORA_COLOR_LIFT, seasonTintCpu } from './seasonTint'
+import { ROCK_FOOTPRINT_UNITS, ROCK_HEIGHT_UNITS } from '../world/communicationRock'
 
 // The baked foliage attribute (point 144 retry). The 16.07 critical bug: the
 // dry-season collapse keyed on the per-vertex JITTERED colour, so neighbouring
@@ -43,7 +45,7 @@ describe('the baked foliage attribute (point 144 — per part, binary, never col
     for (const build of [
       buildAcacia, buildJungleTree, () => buildPalm(false), () => buildPalm(true),
       buildBush, buildRock, buildBaobab, buildTermiteMound, buildDeadTree,
-      buildPapyrus, buildKopje, buildGrassTuft,
+      buildPapyrus, buildKopje, buildGrassTuft, buildErraticBoulder,
     ]) {
       foliageOf(build())
     }
@@ -67,7 +69,7 @@ describe('the baked foliage attribute (point 144 — per part, binary, never col
       const g = foliageOf(build())
       expect(g.twos).toBe(g.total)
     }
-    for (const build of [buildRock, buildTermiteMound, buildDeadTree, buildKopje]) {
+    for (const build of [buildRock, buildTermiteMound, buildDeadTree, buildKopje, buildErraticBoulder]) {
       const g = foliageOf(build())
       expect(g.ones + g.twos).toBe(0) // dead wood and stone never collapse
     }
@@ -360,5 +362,38 @@ describe('splitFoliage — crown/trunk split for the matrix-borne collapse (poin
         expect(g.attributes.color.count).toBe(g.attributes.position.count)
       }
     }
+  })
+})
+
+// The communication PoC's erratic (work-order 482): the collider and the dig
+// spot are declared in world/communicationRock.ts, so the MESH must be the size
+// that module promises — the points-129/378 rule that a collider is derived
+// from what the renderer draws, applied to a hand-built landmark.
+describe('the erratic boulder is the block world/communicationRock.ts declares', () => {
+  const extents = (geo: THREE.BufferGeometry) => {
+    const pos = geo.getAttribute('position') as THREE.BufferAttribute
+    let maxR = 0
+    let maxY = 0
+    for (let i = 0; i < pos.count; i++) {
+      maxR = Math.max(maxR, Math.hypot(pos.getX(i), pos.getZ(i)))
+      maxY = Math.max(maxY, pos.getY(i))
+    }
+    return { maxR, maxY }
+  }
+
+  it('fits its declared footprint radius and reaches its declared height', () => {
+    const { maxR, maxY } = extents(buildErraticBoulder())
+    expect(maxR).toBeLessThanOrEqual(ROCK_FOOTPRINT_UNITS + 1e-6)
+    expect(maxY).toBeLessThanOrEqual(ROCK_HEIGHT_UNITS + 1e-6)
+    // And it really uses them — a block far smaller than its collider would be
+    // an invisible wall, one far shorter would not read from a distance.
+    expect(maxR).toBeGreaterThan(ROCK_FOOTPRINT_UNITS * 0.8)
+    expect(maxY).toBeGreaterThan(ROCK_HEIGHT_UNITS * 0.9)
+  })
+
+  it('stands taller than the tallest dressing pile it must not be confused with', () => {
+    // A kopje at its largest instance scale (0.75 + r4*0.55 → 1.3).
+    const kopje = extents(buildKopje())
+    expect(extents(buildErraticBoulder()).maxY).toBeGreaterThan(kopje.maxY * 1.3 * 1.5)
   })
 })

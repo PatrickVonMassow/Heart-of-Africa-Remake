@@ -93,6 +93,27 @@ for (const [lat, lon, name, label] of shots) {
   await shot(name, { world: { lat, lon }, label })
 }
 
+// Work-order 482: the communication PoC's two ends of the errand — the Bambara
+// village standing on the Niger, and the erratic upstream where 487 will dig.
+// The coordinates come from the scene's OWN dev hook, so the frames are aimed at
+// what the renderer actually placed for this run's seed, never at a coordinate
+// copied into this script.
+const poc = await page.evaluate(() => window.__communicationRock ?? null)
+if (!poc) {
+  errors.push('window.__communicationRock is missing — the erratic was not placed')
+} else {
+  await jump(poc.village.lat, poc.village.lon)
+  await shot('18-worldmodel-bambara-village-niger', {
+    world: { lat: poc.village.lat, lon: poc.village.lon },
+    label: 'the Bambara village on the Niger',
+  })
+  await jump(poc.lat, poc.lon)
+  await shot('19-worldmodel-communication-erratic', {
+    world: { lat: poc.lat, lon: poc.lon },
+    label: `the erratic ${poc.upstreamDeg.toFixed(1)}° upstream of the Bambara village`,
+  })
+}
+
 console.log('console errors:', errors.length ? errors : 'none')
 await browser.close()
 process.exit(errors.length ? 1 : 0)
