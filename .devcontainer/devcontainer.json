@@ -55,14 +55,15 @@
     "source=claude-code-bashhistory-${devcontainerId},target=/commandhistory,type=volume",
     "source=claude-code-config-${devcontainerId},target=/home/node/.claude,type=volume",
     "source=claude-code-ghconfig-${devcontainerId},target=/home/node/.config/gh,type=volume",
-    "source=${localWorkspaceFolder}/../hoa,target=/workspace/hoa,type=bind",
+    // THE REPOSITORY LIVES ON A VOLUME NOW (04.08.2026). On the 9p bind of the Windows
+    // disk, 300 small files cost 1447 ms to write against 8 ms here — a factor every git
+    // command and every test run paid. The PATH is deliberately unchanged: /workspace/hoa
+    // keeps the memory slug, the scripts and every document reference valid.
+    "source=claude-code-hoa-repo-${devcontainerId},target=/workspace/hoa,type=volume",
+    // The Windows folder stays, READ-ONLY, as the backup it now is — and as the source
+    // .devcontainer/fill-workspace.sh clones from on first start.
+    "source=${localWorkspaceFolder}/../hoa,target=/backup/hoa,type=bind,readonly",
     "source=/usr/lib/wsl,target=/usr/lib/wsl,type=bind,readonly",
-    // The repository is bind-mounted from the Windows filesystem over 9p, where
-    // reading 300 small files costs ~1 s against ~1 ms on the container's own
-    // disk (measured 03.08.2026). node_modules is the bulk of those files, so it
-    // lives on a container volume instead — source stays visible in Explorer.
-    // The volume starts EMPTY: postCreateCommand runs `npm install` to fill it.
-    "source=claude-code-hoa-node-modules-${devcontainerId},target=/workspace/hoa/node_modules,type=volume"
   ],
   "containerEnv": {
     "NODE_OPTIONS": "--max-old-space-size=4096",
@@ -74,7 +75,7 @@
   },
   "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=delegated",
   "workspaceFolder": "/workspace/hoa",
-  "postCreateCommand": "git config --global --add safe.directory /workspace && git config --global --add safe.directory /workspace/hoa && mkdir -p /home/node/.claude/hooks && cp /workspace/.devcontainer/CLAUDE.md /home/node/.claude/CLAUDE.md && cp /workspace/.devcontainer/hooks/*.cjs /home/node/.claude/hooks/ && cd /workspace/hoa && npm install",
+  "postCreateCommand": "git config --global --add safe.directory /workspace && git config --global --add safe.directory /workspace/hoa && mkdir -p /home/node/.claude/hooks && cp /workspace/.devcontainer/CLAUDE.md /home/node/.claude/CLAUDE.md && cp /workspace/.devcontainer/hooks/*.cjs /home/node/.claude/hooks/ && bash /workspace/.devcontainer/fill-workspace.sh && cd /workspace/hoa && npm install",
   "postStartCommand": "sudo /usr/local/bin/init-firewall.sh",
   "waitFor": "postStartCommand"
 }
