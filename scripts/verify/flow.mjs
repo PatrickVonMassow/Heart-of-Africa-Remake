@@ -411,6 +411,12 @@ await shot('07-victory', { element: '.overlay', label: 'the victory overlay' })
 // requestPointerLock across two loads: fresh (no overlay) grabs, with a
 // checkpoint (overlay up) does not.
 const page2 = await browser.newPage({ viewport: { width: 1280, height: 800 } })
+// The first page stays open, so this one opens as a BACKGROUND tab — and Chromium
+// throttles a background tab's requestAnimationFrame, which is the frame clock the
+// settlement scene mounts on. On the GPU lane it got there before the throttle mattered;
+// on the software WebGPU lane the scene never mounted at all and the run died waiting for
+// __placePlayer, three minutes in, on the first attempt of every run. One line of focus.
+await page2.bringToFront()
 page2.on('console', (m) => m.type() === 'error' && errors.push('page2: ' + m.text()))
 page2.on('pageerror', (e) => errors.push('page2 PAGEERROR: ' + e.message))
 await page2.addInitScript(() => {
