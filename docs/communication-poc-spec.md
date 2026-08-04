@@ -55,6 +55,11 @@ and it is on the board as a decision the user may reverse.
 
 ## The lexicon
 
+The table below is the registry in `src/communication/lexicon.ts`, keyed by
+lect so a second region is a new entry there and no consumer changes; what the
+player has heard, and the reading he wrote for it, live in
+`src/communication/heard.ts`.
+
 | Concept | Sequence | Shape |
 |---|---|---|
 | COME | `BA-BA-ba-ba-ba` | falling, toward the speaker |

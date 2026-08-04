@@ -503,6 +503,13 @@ export interface BalanceConfig {
     /** Gifts paid to the traveler for one sold piece of gear. */
     sellGifts: number
   }
+  /** Village speech and drums (design.md §13.4, docs/communication-poc-spec.md). */
+  communication: {
+    /** Constant pause between the atoms of a phrase — spoken and drummed alike. */
+    phrasePauseSeconds: number
+    /** How far an utterance carries, in place-scene units. */
+    hearingRadius: number
+  }
 }
 
 export const balance: BalanceConfig = {
@@ -793,6 +800,14 @@ export const balance: BalanceConfig = {
   village: {
     giftPrices: { food: 1, medicine: 1, machete: 2, shovel: 2, rope: 1, canteen: 1 },
     sellGifts: 1,
+  },
+  communication: {
+    // Calibratable starting values (educated guess, CLAUDE.md §2). The pause is
+    // long enough to read one atom as finished before the next begins; the
+    // radius is a bit over twice the interact radius (4.5), so the children's
+    // group and the adults' group are never heard at once from the middle.
+    phrasePauseSeconds: 0.9,
+    hearingRadius: 10,
   },
 }
 
