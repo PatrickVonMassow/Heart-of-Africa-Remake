@@ -13766,3 +13766,96 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   well-formed, unique and even-weight, no two are less than two syllables apart,
   the four mirror pairs are exact reverses, a phrase observes each atom once, and
   the sort is stable over mixed lengths.
+
+- [x] 484. THE JOURNAL'S COMMUNICATION OBSERVATIONS (user 03.08.2026).
+  FINAL STATE:
+  1. A second, clearly separate section beside the existing entries lists every
+     utterance the player has actually heard, in its sound sequence, sorted by
+     point 477's rule.
+  2. Each carries a free-text field for his own hypothesis. The game never
+     interprets that text.
+  3. The notes save and restore with the game (point 477's store).
+  4. Both languages, and the journal stays non-modal per §16.1.
+  VERIFIABLE: pure Vitest on store and component — an unheard utterance is absent,
+  a heard one appears once, the order holds over mixed lengths, a note survives a
+  save/load round trip.
+
+- [x] 494. NO STEP INSIDE THE CONTAINER IS EVER HANDED BACK TO THE USER (user
+  04.08.2026, standing rule with full rights granted). On 04.08.2026 the session
+  handed him `sudo bash scripts/verify-host-setup.sh`, which cannot work — the
+  official Claude Code image grants `node` exactly one passwordless command, the
+  firewall script — and then a `docker exec -u root …` line that would also have
+  failed, because the sandbox firewall is iptables-wide and blocks the package
+  sources for root as well. Two round trips of the user's time for work that was
+  the session's. The rule is memory `container-work-is-mine`; this point is the
+  MECHANISM, because a rule that only a reader can see is the same failure point
+  440 measured one layer down.
+  FINAL STATE:
+  1. A guard reads the turn's outgoing answer and BLOCKS it when it asks the user
+     to execute a step that runs inside the container — an install, a package
+     manager, a script invocation, a file edit under the workspace. It matches
+     the ASK ("run", "führe aus", a fenced command block addressed to him),
+     not the mere mention of a command.
+  2. What stays allowed is asking for a CAPABILITY that does not exist inside the
+     container at all: a right, a device, a mount, a line in the image. The guard
+     must not push the session into silently failing instead of asking for those,
+     so the distinction is what its cases pin down.
+  3. The remedy line names the way out: find the route and take it; if the
+     capability is genuinely missing, ask once for the capability.
+  4. Wired into the Stop chain in `.claude/settings.json`, fail-open like every
+     other guard, with a pure Vitest-covered decision core, and reviewed by the
+     other model per `mechanism-review-guard` before it counts as done.
+  VERIFIABLE: pure Vitest over the decision core — an answer containing "führe
+  bitte `npm run …` aus" or a sudo/docker-exec instruction addressed to the user
+  is blocked; an answer asking for a GPU device, a mount or an image line passes;
+  a command quoted as a REPORT of what the session itself ran passes; and the
+  guard returns "allow" on any internal error.
+
+- [x] 496. NO TURN CAN SEAL THE CONTAINER OFF FROM ITS OWN API (user
+  04.08.2026, second occurrence — "du hast dich wohl schon wieder ausgesperrt").
+  `/usr/local/bin/init-firewall.sh` is the container's only firewall path, and it
+  is a REBUILD: it flushes every iptables rule and destroys the `allowed-domains`
+  ipset at the top while the default policies stay DROP, then spends two to three
+  minutes fetching GitHub's meta ranges and resolving sixteen domains. Every
+  second of that window the container is sealed, and anything that interrupts it
+  leaves it sealed for good — no allowlist, `api.anthropic.com` unreachable, the
+  session dead with ConnectionRefused. On 04.08.2026 the Bash tool's own
+  two-minute timeout did exactly that (exit 143) and the user had to kill the
+  session. The trigger was mundane: `cdn.playwright.dev` and the Chrome-for-
+  Testing storage answer with rotating addresses that the boot-time allowlist no
+  longer covers, a browser install failed, and the session reached for the
+  rebuild because no smaller tool existed.
+  FINAL STATE:
+  1. The SMALLER TOOL exists and is the normal way:
+     `node scripts/firewall-allow.mjs [domain…]` resolves each name and adds its
+     addresses to the LIVE `allowed-domains` ipset — additive only. It never
+     flushes, never destroys the set, never touches a policy, so there is no
+     window in which the container is offline and nothing to interrupt. `--net24`
+     adds the surrounding /24 for the rotating CDN pools. With no argument it
+     tops up the domains this project needs (the Playwright CDN and its
+     Chrome-for-Testing storage, Hugging Face, npm, the API host itself). It
+     reports per domain what it added and verifies reachability afterwards.
+  2. A genuine REBUILD never runs in the foreground: `node
+     scripts/firewall-rebuild.mjs` starts the container script DETACHED from the
+     tool call (own process group, output to `local/firewall-rebuild.log`) so no
+     tool timeout can kill it mid-flush, and arms a WATCHDOG that restores
+     `iptables -P OUTPUT ACCEPT` and `-P INPUT ACCEPT` when the rebuild has not
+     reported success within its budget. Fail-OPEN by design: a broken rebuild
+     leaves the container reachable rather than sealed, because a reachable
+     session can repair itself and a sealed one cannot.
+  3. A PreToolUse(Bash) guard REFUSES the shapes that seal the container —
+     `init-firewall.sh` invoked directly, `iptables -F`/`-X`/`-P`, `ipset
+     destroy`, `iptables-restore` — and its remedy names the two commands above.
+     It judges the command the session is about to RUN, so a mention inside a
+     message or a `--help` text is not a match.
+  4. Guard core pure and Vitest-covered, fail-OPEN on any internal error, wired
+     in `.claude/settings.json`, and reviewed by the other model per
+     `mechanism-review-guard` before it counts as done.
+  VERIFIABLE: pure Vitest over the decision core — `sudo /usr/local/bin/init-
+  firewall.sh`, `iptables -F`, `iptables -P OUTPUT DROP`, `ipset destroy
+  allowed-domains` and an `iptables-restore` redirect are each refused with the
+  remedy naming `firewall-allow.mjs`; `node scripts/firewall-allow.mjs` itself,
+  `iptables -L -n`, `ipset list` and a string merely QUOTING one of those inside
+  an echo pass; the guard allows on any internal error; and
+  `node scripts/firewall-allow.mjs cdn.playwright.dev --net24` makes the CDN
+  reachable (curl status) without any policy or rule changing.

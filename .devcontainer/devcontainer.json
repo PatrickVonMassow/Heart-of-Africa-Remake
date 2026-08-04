@@ -55,6 +55,12 @@
     "source=claude-code-bashhistory-${devcontainerId},target=/commandhistory,type=volume",
     "source=claude-code-config-${devcontainerId},target=/home/node/.claude,type=volume",
     "source=claude-code-ghconfig-${devcontainerId},target=/home/node/.config/gh,type=volume",
+    // SECURITY BOUNDARY: /workspace itself is writable, but the configuration
+    // controlling future container builds and host mounts must not be. This nested
+    // read-only bind shadows /workspace/.devcontainer from the writable workspace
+    // mount. Even passwordless root cannot remove it without CAP_SYS_ADMIN, which
+    // this container deliberately does not receive.
+    "source=${localWorkspaceFolder}/.devcontainer,target=/workspace/.devcontainer,type=bind,readonly",
     // THE REPOSITORY LIVES ON A VOLUME NOW (04.08.2026). On the 9p bind of the Windows
     // disk, 300 small files cost 1447 ms to write against 8 ms here — a factor every git
     // command and every test run paid. The PATH is deliberately unchanged: /workspace/hoa
@@ -63,7 +69,7 @@
     // The Windows folder stays, READ-ONLY, as the backup it now is — and as the source
     // .devcontainer/fill-workspace.sh clones from on first start.
     "source=${localWorkspaceFolder}/../hoa,target=/backup/hoa,type=bind,readonly",
-    "source=/usr/lib/wsl,target=/usr/lib/wsl,type=bind,readonly",
+    "source=/usr/lib/wsl,target=/usr/lib/wsl,type=bind,readonly"
   ],
   "containerEnv": {
     "NODE_OPTIONS": "--max-old-space-size=4096",
@@ -76,6 +82,7 @@
   "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=delegated",
   "workspaceFolder": "/workspace/hoa",
   "postCreateCommand": "git config --global --add safe.directory /workspace && git config --global --add safe.directory /workspace/hoa && mkdir -p /home/node/.claude/hooks && cp /workspace/.devcontainer/CLAUDE.md /home/node/.claude/CLAUDE.md && cp /workspace/.devcontainer/hooks/*.cjs /home/node/.claude/hooks/ && bash /workspace/.devcontainer/fill-workspace.sh && cd /workspace/hoa && npm install",
-  "postStartCommand": "sudo /usr/local/bin/init-firewall.sh",
+  // Fail closed if the security overlay was not mounted read-only as intended.
+  "postStartCommand": "sudo /usr/local/bin/init-firewall.sh && (test ! -w /workspace/.devcontainer/devcontainer.json || { echo 'ERROR: /workspace/.devcontainer is writable' >&2; exit 1; })",
   "waitFor": "postStartCommand"
 }

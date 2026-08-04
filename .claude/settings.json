@@ -119,6 +119,10 @@
           },
           {
             "type": "command",
+            "command": "node scripts/container-ask-guard.mjs"
+          },
+          {
+            "type": "command",
             "command": "node scripts/branch-hygiene-guard.mjs"
           },
           {
@@ -166,6 +170,24 @@
           {
             "type": "command",
             "command": "node scripts/closing-guard.mjs"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/firewall-guard.mjs"
+          }
+        ]
+      },
+      {
+        "matcher": "PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/firewall-guard.mjs"
           }
         ]
       }

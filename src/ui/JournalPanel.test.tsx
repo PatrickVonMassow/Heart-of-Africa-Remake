@@ -4,8 +4,10 @@
 // intact, the read-aloud control is offered for English only. The actual TTS
 // audio and handwriting animation stay in Playwright.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { render } from '@testing-library/react'
+import { fireEvent, render } from '@testing-library/react'
 import { JournalPanel } from './JournalPanel'
+import { hypothesisFor } from '../communication/heard'
+import { compareUtterances, utteranceOf } from '../communication/lexicon'
 import { en } from '../i18n/en'
 import { de } from '../i18n/de'
 import { useLocale } from '../i18n'
@@ -91,5 +93,106 @@ describe('entry kinds, ordering and sketches (design.md §15/§16)', () => {
     // The departure entry carries the harbor sketch, drawn as three-free SVG.
     render(<JournalPanel />)
     expect(document.querySelector('.journal .sketch')).toBeInTheDocument()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Speech observations (design.md §13.4, docs/communication-poc-spec.md): the
+// section beside the entries listing what the player HEARD, each with his own
+// free-text reading. The store side is pinned in store.communication.test.ts.
+// ---------------------------------------------------------------------------
+
+const COME = utteranceOf('COME')
+const DIG = utteranceOf('DIG')
+const HERE = utteranceOf('HERE')
+
+/** Text of the observation section, '' when it is not rendered at all. */
+const observationText = () => document.querySelector('.journal .observations')?.textContent ?? ''
+
+/** The utterances listed, in the order the section renders them. */
+const listedUtterances = () =>
+  Array.from(document.querySelectorAll('.journal .observation .utterance')).map(
+    (el) => el.textContent ?? '',
+  )
+
+/** The one hypothesis field currently rendered. */
+const hypothesisField = () =>
+  document.querySelector('.observation .hypothesis') as HTMLInputElement
+
+describe('journal observation section (design.md §13.4)', () => {
+  it('stays absent while the player has heard nothing', () => {
+    render(<JournalPanel />)
+    expect(document.querySelector('.journal .observations')).not.toBeInTheDocument()
+  })
+
+  it('lists a heard utterance once, and never an unheard one', () => {
+    g().hearUtterance(COME)
+    g().hearUtterance(COME) // heard again — still one line
+    render(<JournalPanel />)
+    expect(listedUtterances()).toEqual([COME])
+    expect(observationText()).not.toContain(DIG)
+  })
+
+  it('sorts the utterances by the lexicon rule, mixed lengths included', () => {
+    // 'ba' before 'BA' syllable by syllable; a shorter prefix comes first.
+    const short = 'ba-BA'
+    for (const u of [DIG, HERE, short, COME]) g().hearUtterance(u)
+    render(<JournalPanel />)
+    const expected = [DIG, HERE, short, COME].sort(compareUtterances)
+    expect(listedUtterances()).toEqual(expected)
+    // The rule itself: the low-tone opening sorts ahead of the high-tone ones.
+    expect(expected[0]).toBe(short)
+  })
+
+  it('keeps the section separate from the written entries', () => {
+    g().hearUtterance(COME)
+    render(<JournalPanel />)
+    expect(document.querySelector('.entries .observations')).not.toBeInTheDocument()
+    expect(document.querySelector('.observations .entry')).not.toBeInTheDocument()
+  })
+
+  it('writes a typed reading into the store and shows it back', () => {
+    g().hearUtterance(DIG)
+    render(<JournalPanel />)
+    fireEvent.change(hypothesisField(), { target: { value: 'dig here' } })
+    expect(hypothesisFor(g().communication, DIG)).toBe('dig here')
+    expect(hypothesisField().value).toBe('dig here')
+  })
+
+  it('keeps a space the player types inside his note', () => {
+    // The store trims; a directly bound field would swallow a trailing space
+    // mid-word, so the field keeps its own draft while typing.
+    g().hearUtterance(DIG)
+    render(<JournalPanel />)
+    fireEvent.change(hypothesisField(), { target: { value: 'dig ' } })
+    expect(hypothesisField().value).toBe('dig ')
+    fireEvent.change(hypothesisField(), { target: { value: 'dig here' } })
+    expect(hypothesisField().value).toBe('dig here')
+    expect(hypothesisFor(g().communication, DIG)).toBe('dig here')
+  })
+
+  it('shows a note restored from a save', () => {
+    g().hearUtterance(HERE)
+    g().setUtteranceHypothesis(HERE, 'this place')
+    g().saveCheckpoint()
+    g().newGame()
+    expect(g().loadCheckpoint()).toBe(true)
+    g().setJournalOpen(true)
+    render(<JournalPanel />)
+    expect(hypothesisField().value).toBe('this place')
+  })
+
+  it('labels the section in both languages', () => {
+    g().hearUtterance(COME)
+    const { unmount } = render(<JournalPanel />)
+    expect(observationText()).toContain(en.journalPanel.observations)
+    expect(observationText()).toContain(en.journalPanel.observationsHint)
+    unmount()
+    useLocale.getState().setLang('de')
+    render(<JournalPanel />)
+    expect(observationText()).toContain(de.journalPanel.observations)
+    expect(observationText()).toContain(de.journalPanel.observationsHint)
+    // No voice markup ever reaches the screen (design.md §15).
+    expect(observationText()).not.toMatch(/\[\/?[a-z]+\]/)
   })
 })
