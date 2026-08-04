@@ -36,9 +36,11 @@ packages, not hardware:
   RTX 4070 Ti), OpenGL 4.6)`. Measured against the SwiftShader lane it replaced: **170 vs
   22.7 renderer calls per second** on the identical scene, and the `flow` suite went from
   red-and-unfinished-after-ten-minutes to **green in 58 seconds**. Both halves are
-  load-bearing — without `libgl1`/`libegl1` ANGLE finds no driver, and without the Gallium
-  pin Mesa 25 serves llvmpipe while every interface still looks healthy (Mesa 22.3.6 chose
-  d3d12 by itself; the backport does not).
+  load-bearing, and the next container rebuild needs BOTH: without `libgl1`, `libglx-mesa0`
+  and `libegl1` ANGLE has nothing to dlopen (`Could not dlopen libGL.so.1` → `Exiting GPU
+  process due to errors during initialization`), and without the Gallium pin Mesa 25 serves
+  llvmpipe while every interface still looks healthy (Mesa 22.3.6 chose d3d12 by itself;
+  the 25.0.7 backport does not).
 - **WebGPU runs, in software.** System Chrome exposes `navigator.gpu` on a secure-context
   page — the earlier "undefined" reading came from probing `about:blank`/`data:` URLs,
   which are not secure contexts — and the lane draws the real game once ANGLE *and* Dawn
@@ -50,10 +52,12 @@ packages, not hardware:
   backport — but it builds from the Debian mesa source
   (`sudo bash scripts/verify-host-setup.sh --with-dzn`) and `vulkaninfo` then enumerates
   `Microsoft Direct3D12 (NVIDIA GeForce RTX 4070 Ti)`. Chrome 151 still declines it: with
-  the loader scoped to dzn alone, Dawn answers with its own SwiftShader anyway, and with
-  the full ICD set visible a browser launched with `--enable-features=Vulkan` HANGS at
-  adapter time. So the build is opt-in, and the hardware WebGPU lane waits for a Chrome
-  that accepts a system Vulkan device.
+  `VK_ICD_FILENAMES`/`VK_DRIVER_FILES` scoped to dzn ALONE, Dawn answers with its own
+  bundled SwiftShader anyway (in one second), and with the full ICD set visible a browser
+  launched with `--enable-features=Vulkan` HANGS at adapter time (>40 s, reproduced). So
+  the build is OPT-IN and the default install places no ICD — nothing can wander into the
+  hang — and the hardware WebGPU lane waits for a browser that accepts a system Vulkan
+  device. **Read this before rebuilding dzn: the verdict is worth more than the build.**
 
 `scripts/verify-host-setup.sh` installs all of it (root, once, idempotent) and
 `scripts/verify/backend-lane-check.mjs` proves the result at the PICTURE — it boots the
@@ -64,10 +68,11 @@ drew them, so a software rasteriser can never be reported as if it were the GPU.
 derives its crash-database path from it, cannot create one, and aborts with
 `chrome_crashpad_handler: --database is required` before a page loads (Playwright's own
 launch routes around it, a bare one does not). And `deb.debian.org` moves between address
-ranges, so an `apt-get` that worked an hour ago can fail — the additive fix is
-`dig +short A deb.debian.org | while read -r ip; do sudo ipset add allowed-domains
-"${ip%.*}.0/24" -exist; done`. Never re-run `init-firewall.sh` to "refresh" it: it flushes
-every rule while the default policy stays DROP and can seal the container.
+ranges, so an `apt-get` that worked an hour ago can fail. The supported, ADDITIVE fix is
+`node scripts/firewall-allow.mjs <host> --net24`. Never re-run `init-firewall.sh` to
+"refresh" it, and never `iptables -F/-X/-P`, `ipset destroy` or `iptables-restore`: they
+flush every rule while the default policy stays DROP and can seal the container. A
+PreToolUse guard refuses all four.
 
 Rendering needs a real GPU. Without one, Chrome falls back to SwiftShader, which drops the
 frame rate to roughly one frame per second and makes every motion or interaction check
