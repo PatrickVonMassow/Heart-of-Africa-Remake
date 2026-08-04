@@ -4383,3 +4383,96 @@ Build order, chosen so no two parallel agents own the same file:
   `git ls-files -s scripts/git-hooks/` reports 100755 for every hook; and
   `node scripts/guard-health-guard.mjs --status` names a hook whose bit was
   removed.
+
+- [ ] 496. NO TURN CAN SEAL THE CONTAINER OFF FROM ITS OWN API (user
+  04.08.2026, second occurrence — "du hast dich wohl schon wieder ausgesperrt").
+  `/usr/local/bin/init-firewall.sh` is the container's only firewall path, and it
+  is a REBUILD: it flushes every iptables rule and destroys the `allowed-domains`
+  ipset at the top while the default policies stay DROP, then spends two to three
+  minutes fetching GitHub's meta ranges and resolving sixteen domains. Every
+  second of that window the container is sealed, and anything that interrupts it
+  leaves it sealed for good — no allowlist, `api.anthropic.com` unreachable, the
+  session dead with ConnectionRefused. On 04.08.2026 the Bash tool's own
+  two-minute timeout did exactly that (exit 143) and the user had to kill the
+  session. The trigger was mundane: `cdn.playwright.dev` and the Chrome-for-
+  Testing storage answer with rotating addresses that the boot-time allowlist no
+  longer covers, a browser install failed, and the session reached for the
+  rebuild because no smaller tool existed.
+  FINAL STATE:
+  1. The SMALLER TOOL exists and is the normal way:
+     `node scripts/firewall-allow.mjs [domain…]` resolves each name and adds its
+     addresses to the LIVE `allowed-domains` ipset — additive only. It never
+     flushes, never destroys the set, never touches a policy, so there is no
+     window in which the container is offline and nothing to interrupt. `--net24`
+     adds the surrounding /24 for the rotating CDN pools. With no argument it
+     tops up the domains this project needs (the Playwright CDN and its
+     Chrome-for-Testing storage, Hugging Face, npm, the API host itself). It
+     reports per domain what it added and verifies reachability afterwards.
+  2. A genuine REBUILD never runs in the foreground: `node
+     scripts/firewall-rebuild.mjs` starts the container script DETACHED from the
+     tool call (own process group, output to `local/firewall-rebuild.log`) so no
+     tool timeout can kill it mid-flush, and arms a WATCHDOG that restores
+     `iptables -P OUTPUT ACCEPT` and `-P INPUT ACCEPT` when the rebuild has not
+     reported success within its budget. Fail-OPEN by design: a broken rebuild
+     leaves the container reachable rather than sealed, because a reachable
+     session can repair itself and a sealed one cannot.
+  3. A PreToolUse(Bash) guard REFUSES the shapes that seal the container —
+     `init-firewall.sh` invoked directly, `iptables -F`/`-X`/`-P`, `ipset
+     destroy`, `iptables-restore` — and its remedy names the two commands above.
+     It judges the command the session is about to RUN, so a mention inside a
+     message or a `--help` text is not a match.
+  4. Guard core pure and Vitest-covered, fail-OPEN on any internal error, wired
+     in `.claude/settings.json`, and reviewed by the other model per
+     `mechanism-review-guard` before it counts as done.
+  VERIFIABLE: pure Vitest over the decision core — `sudo /usr/local/bin/init-
+  firewall.sh`, `iptables -F`, `iptables -P OUTPUT DROP`, `ipset destroy
+  allowed-domains` and an `iptables-restore` redirect are each refused with the
+  remedy naming `firewall-allow.mjs`; `node scripts/firewall-allow.mjs` itself,
+  `iptables -L -n`, `ipset list` and a string merely QUOTING one of those inside
+  an echo pass; the guard allows on any internal error; and
+  `node scripts/firewall-allow.mjs cdn.playwright.dev --net24` makes the CDN
+  reachable (curl status) without any policy or rule changing.
+
+- [ ] 497. THE GERMAN-LANGUAGE RULE HAS NO MECHANISM AT ALL, AND THE AUDIT
+  PASSED IT ANYWAY (user 04.08.2026: "Warum schreibst du die ganze Zeit auf
+  Englisch? Klappt der Mechanismus nicht? Falls ja, klappen vielleicht auch
+  andere Mechanismen nicht."). Answers to the user are German (memory
+  `language-german`); on 04.08.2026 a whole session narrated in English and
+  nothing objected. The reason is not a broken enforcer but a MISSING one: the
+  rule lives only in a memory line. Its neighbour proves the point — the
+  chat-timestamp rule carries an injection hook AND a blocking Stop guard
+  (`timestamp-guard.mjs`) that reads the outgoing reply, and it has not slipped
+  once. `docs/rule-corpus-audit.md` row A25 nevertheless records
+  `language-german` as "OK" with an EMPTY finding column, because that audit
+  asked whether each rule's TEXT was current, never whether anything MEASURES
+  it. `guard-health-guard` has the same blind spot from the other side: it
+  proves every wired enforcer can fire (32 of 32 today) and says nothing about a
+  rule that never got one.
+  FINAL STATE:
+  1. A Stop-chain guard judges the LANGUAGE of the turn's outgoing answer and
+     blocks a reply whose prose is not German. It rides the layer that already
+     works for the stamp: the same reply text `timestamp-guard` reads, a pure
+     decision core, Vitest-covered, fail-OPEN on any internal error, standing
+     down for a session that does not own the batch lock and for a paused batch.
+  2. The decision is made on PROSE ONLY, so the code rules stay untouched: fenced
+     code blocks, inline code spans, file paths, identifiers, commit subjects,
+     command output and quoted English source text are stripped before judging.
+     A German sentence naming English identifiers passes; an English sentence of
+     narration does not. The verdict is a stopword-ratio decision over what
+     remains, with a minimum word count below which it abstains rather than
+     guesses — an abstain is an allow.
+  3. The remedy line says what to do rather than scolding: write the answer in
+     German, code and commits stay English, and it names `language-german`.
+  4. The DETECTION half closes the audit's blind spot rather than adding a
+     sibling to it: `docs/rule-corpus-audit.md` gains a WHAT-MEASURES-THIS axis,
+     filled for every row — an enforcer name, a test, or "nothing". Every row
+     that reads "nothing" is either given a mechanism or recorded as
+     deliberately unenforced WITH the reason, the way A19
+     (`english-no-germanisms`) already is. A25 becomes the worked example.
+  VERIFIABLE: pure Vitest over the decision core — an English narration
+  paragraph is blocked; a German answer containing English identifiers, paths,
+  a fenced diff and a quoted English error message passes; a two-word answer
+  abstains; the guard allows on any internal error and when the session does not
+  own the lock. `node scripts/guard-health-guard.mjs --status` still reports
+  every enforcer wired with the new one counted, and no row in
+  `docs/rule-corpus-audit.md` is left with an empty measured-by cell.
