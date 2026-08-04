@@ -38,6 +38,32 @@ d3d12/dzn driver exist to use them, and there is no `/usr/share/vulkan/icd.d` at
 `scripts/verify/backend-lane-check.mjs` proves the result at the picture rather than at a
 version string.
 
+**The firewall binds root too** (measured 04.08.2026). It is iptables-wide, so a `docker exec
+-u root` shell is as fenced in as `node`: `deb.debian.org` and `dl.google.com` are not on the
+allowlist and are unreachable, and `apt-get` therefore fails whoever runs it. The durable way
+to add the GPU stack is the container IMAGE, whose build runs outside the sandbox:
+
+```dockerfile
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      libvulkan1 mesa-vulkan-drivers libgl1-mesa-dri vulkan-tools \
+      ca-certificates curl gnupg \
+ && install -d -m 0755 /etc/apt/keyrings \
+ && curl -fsSL https://dl.google.com/linux/linux_signing_key.pub \
+      | gpg --dearmor -o /etc/apt/keyrings/google-chrome.gpg \
+ && echo 'deb [arch=amd64 signed-by=/etc/apt/keyrings/google-chrome.gpg] https://dl.google.com/linux/chrome/deb/ stable main' \
+      > /etc/apt/sources.list.d/google-chrome.list \
+ && apt-get update && apt-get install -y --no-install-recommends google-chrome-stable \
+ && echo /usr/lib/wsl/lib > /etc/ld.so.conf.d/wsl.conf && ldconfig \
+ && rm -rf /var/lib/apt/lists/*
+```
+
+What that buys is not symmetrical, and saying so up front avoids a wasted rebuild: Mesa's
+d3d12 driver reaching `/dev/dxg` is the standard WSL path and should take WebGL 2 off the CPU
+— that is the speed. The WebGPU lane additionally needs a Vulkan driver over D3D12 (dzn),
+which is experimental; if it does not carry the game, the fallback is the user's lane 2 (the
+second backend run by hand on Windows). `scripts/verify/backend-lane-check.mjs` answers both
+questions at the picture, in one run.
+
 Rendering needs a real GPU. Without one, Chrome falls back to SwiftShader, which drops the
 frame rate to roughly one frame per second and makes every motion or interaction check
 meaninglessly slow — a green run there proves nothing about timing. Under WSL2 the GPU

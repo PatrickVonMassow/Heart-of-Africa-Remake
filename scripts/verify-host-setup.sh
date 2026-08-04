@@ -25,9 +25,19 @@
 # Widening the sudoers file to NOPASSWD: ALL would undo a deliberate part of the image's
 # hardening — the docker route grants root for one command instead of forever.
 #
-# WHAT DOES NOT SURVIVE: a container REBUILD discards this, because it changes the running
-# container and not the image. Re-running it costs one command (it is idempotent); baking it
-# into the container definition is the durable fix and lives on the host, not in this repo.
+# AND ROOT ALONE IS NOT ENOUGH (measured 04.08.2026): the sandbox firewall allows a fixed
+# domain list, iptables-wide, so it binds root exactly as it binds `node`. deb.debian.org and
+# dl.google.com are NOT on it — both are unreachable from inside — and apt-get therefore
+# fails whoever runs it. Two ways past, in order of preference:
+#   1. Install these packages in the container IMAGE. The build runs outside the sandbox, so
+#      the firewall never sees it, and the result survives every rebuild. This is the durable
+#      fix; the container definition lives on the host, not in this repository.
+#   2. Add "deb.debian.org", "deb.security.debian.org" and "dl.google.com" to the allowlist in
+#      .devcontainer/init-firewall.sh, re-run it (`sudo /usr/local/bin/init-firewall.sh` — the
+#      ONE command node may run as root), then run this script through docker exec.
+#
+# WHAT DOES NOT SURVIVE: a container REBUILD discards route 2, because it changes the running
+# container and not the image. Re-running it costs one command (it is idempotent).
 #
 # Usage:  docker exec -u root <container> bash -lc "cd /workspace/hoa && bash scripts/verify-host-setup.sh"
 #         bash scripts/verify-host-setup.sh --check   (no root, reports what is missing)
