@@ -25,9 +25,8 @@ und nicht erst beim zweiten Schaden. Fast alles Folgende wendet das an.
 
 Die Prompts unten sind **Aufträge, einen Mechanismus zu bauen** — keine Merksätze.
 „Jedes neue Feature bekommt einen Test" ist eine *Regel*, die vergessen wird;
-„Etabliere einen Mechanismus, der das garantiert" ist ein *Auftrag*. Formuliere deine
-eigenen genauso. Wo ein Mechanismus prinzipiell **nicht** möglich ist (etwa „sieht das
-für einen Menschen richtig aus?"), steht das dabei — dann trägt nur die Aufmerksamkeit.
+„Etabliere einen Mechanismus, der das garantiert" ist ein *Auftrag*. Wo einer prinzipiell
+**nicht** möglich ist (etwa „sieht das für einen Menschen richtig aus?"), steht das dabei.
 
 Eine **Schätzung** wie *(Kosten ≈ 2x)* meint den Mehrverbrauch der betroffenen Arbeit,
 nicht des Projekts.
@@ -49,27 +48,22 @@ Lege **zwei** Modelle fest und gib ihnen klare Rollen:
 > **anderen** Modells erkennt und die Arbeit stoppt, statt sie stillschweigend zu
 > übernehmen."
 
-Ein zweites Modell nützt nicht, weil es *besser* wäre, sondern weil es **andere
-blinde Flecken** hat — diesen Wert hebt nur eine Prüfung, keine Übergabe. Und ein
-unbemerkt schwächeres Modell liefert selbstbewusst Attrappen.
+Ein zweites Modell nützt nicht, weil es *besser* wäre, sondern weil es **andere blinde
+Flecken** hat — diesen Wert hebt nur eine Prüfung, keine Übergabe.
 
-Die **Obergrenze**: Eine Gegenprüfung kostet etwa so viel wie die Arbeit; die Grenze
-zieht die **Sichtbarkeit des Fehlers**. Was den Ablauf steuert oder Arbeit vernichten
-kann (Wächter, Sperren, Speichern/Laden, Veröffentlichungen), wird immer gegengeprüft;
-was ein schneller Test sofort zeigt, nie.
+Die **Obergrenze** zieht die **Sichtbarkeit des Fehlers**: Was den Ablauf steuert oder
+Arbeit vernichten kann (Wächter, Sperren, Speichern/Laden, Veröffentlichungen), wird
+immer gegengeprüft; was ein schneller Test sofort zeigt, nie.
 
 ---
 
 ## So setzt du ein Projekt auf (Prompts zum Kopieren)
 
-1. **Zielbild zuerst — und nimm dir dafür Zeit.** Bevor die erste Zeile Code entsteht,
-   gehört das Zielbild ausgearbeitet: was das Ergebnis können soll, wie es sich
-   anfühlt, wo die Grenzen liegen. Jede Stunde hier spart ein Vielfaches an Umbau,
-   denn ein Modell baut sehr schnell sehr viel vom Falschen, wenn das Ziel unscharf
-   ist. Das Ausarbeiten ist dabei selbst eine ideale LLM-Aufgabe: Lass dich befragen,
-   dir Lücken, Widersprüche und offene Entscheidungen zeigen und das Ergebnis
-   ausformulieren — du entscheidest, es schreibt. Jede Zeile des `design.md`, das
-   diesem Projekt zugrunde liegt, stammt von Claude.
+1. **Zielbild zuerst — und nimm dir dafür Zeit.** Jede Stunde hier spart ein Vielfaches
+   an Umbau: Ein Modell baut sehr schnell sehr viel vom Falschen, wenn das Ziel unscharf
+   ist. Das Ausarbeiten ist selbst eine ideale LLM-Aufgabe — lass dich befragen, dir
+   Lücken und Widersprüche zeigen und das Ergebnis ausformulieren; du entscheidest, es
+   schreibt.
    > „Bevor wir irgendetwas bauen, erarbeiten wir gemeinsam ein `design.md`, das
    > beschreibt, was am Ende existieren soll. Frag mich so lange aus, bis keine
    > wesentliche Lücke bleibt, zeig mir Widersprüche und offene Entscheidungen, und
@@ -117,9 +111,7 @@ was ein schneller Test sofort zeigt, nie.
    > geschaltet wird — und ohne festgehaltenen Prüf-Eintrag (wer, mit welchem
    > Ergebnis, welcher Stand) darf der Zug nicht enden."
 
-   Ein „passt schon" des Autors selbst zählt nicht als Gegenprüfung.
-
-   *(Kosten ≈ 2x)*
+   Ein „passt schon" des Autors zählt nicht. *(Kosten ≈ 2x)*
 
 6. **Fortschritt sichtbar machen (wenn du mitlesen willst).**
    > „Führe ein knappes Fortschritts-Board (eine Datei oder Seite) und **etabliere einen
@@ -231,10 +223,9 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   Formprüfung **vor** den Schritt nach außen, so dass sie die Auslieferung verhindern kann;
   nur Inhaltliches darf danach laufen."
 
-- **Regeln und Wächter verrotten — nur merkt es niemand.** Regeln wachsen an: Widersprüche,
-  Doppelungen, Regeln, die eine nie gebaute Absicherung behaupten. Und ein Wächter, der nie
-  auslöst, ist so kaputt wie einer, der immer auslöst: der erste lässt die Regel abgesichert
-  erscheinen, der zweite erzieht zum Überlesen.
+- **Regeln und Wächter verrotten — nur merkt es niemand.** Der Bestand wächst an
+  Widersprüchen und an Regeln, die eine nie gebaute Absicherung behaupten. Ein Wächter, der
+  nie auslöst, ist so kaputt wie einer, der immer auslöst.
   → *Prompt:* „Etabliere einen Mechanismus, der den ganzen Bestand periodisch zur Durchsicht
   zwingt — auf Aktualität, Dopplung, Widerspruch und **Wirkungslosigkeit**, zuerst die am
   häufigsten eingeblendeten Texte. Jede Regel wird gegen den Code geprüft, nicht gegen die
@@ -276,9 +267,8 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   daneben."
 
 - **Was bei jedem Start mitgelesen wird, wächst — und du bezahlst es jedes Mal.** Jede
-  Ergänzung ist berechtigt; irgendwann ist der größte Teil der Datei Geschichte. Am teuersten
-  sind Texte, die bei *jeder* Anfrage mitgehen — zumal wenn sie wiederholen, was eine Prüfung
-  ohnehin erzwingt.
+  Ergänzung ist berechtigt; irgendwann ist der größte Teil der Datei Geschichte — am
+  teuersten die, die wiederholt, was eine Prüfung ohnehin erzwingt.
   → *Prompt:* „Gib jedem Dokument, das bei jedem Start gelesen wird, eine **gemessene
   Obergrenze**. Blockiert sie eine Ergänzung, ist die Reihenfolge: kürzen, **zusammenführen**,
   Detail auslagern — die Grenze anheben ist das **letzte** Mittel und braucht eine Begründung.
@@ -301,10 +291,9 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 - **Die Messung sah weniger, als sie behauptet.** Sie schaut nur die letzten *n* Einträge an,
   misst erst *nach* dem Vorgang, oder ein Teil der Testdateien lud gar nicht — nicht geladen
   ist nicht rot, sondern abwesend, und liest sich *grüner* als ein Fehlschlag.
-  → *Prompt:* „Leite das Fenster jeder Messung aus dem **Gegenstand** ab: eine Frage über einen
-  Zeitraum nach Zeit, nie nach Anzahl; eine über einen Lauf **während** des Laufs. Melde die
-  **Zahl der ausgeführten Prüfungen** mit — ein Rückgang ist ein Rot —, und irrt eine Heuristik
-  zur Entwarnung hin, braucht sie einen zweiten Beleg."
+  → *Prompt:* „Leite das Fenster jeder Messung aus dem **Gegenstand** ab: eine Frage über
+  einen Zeitraum nach Zeit, nie nach Anzahl. Melde die **Zahl der ausgeführten Prüfungen**
+  mit — ein Rückgang ist ein Rot."
 
 - **Plötzlich rot, obwohl niemand den Code angefasst hat.** Zwei Teile buchstabieren
   dieselbe Regel getrennt — eines schreibt, eines prüft; das blockiert *alle* Arbeit.
@@ -354,22 +343,18 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   liegt, und prüfe sie bei jedem Start gegen eine **Beobachtung**. Ein fehlendes Stück ist ein
   **Befund**, keine Stille."
 
-- **Eine Priorität, die nur in Prosa steht, wirkt nicht.** Du sagst „das kommt vor allem
-  anderen", der Assistent schreibt es getreu in die Aufgabenliste — und arbeitet trotzdem
-  weiter das Alte ab. Der Grund ist banal: Die Reihenfolge, aus der er sich bedient, steht in
-  einem anderen Feld, und Prosa liest die Maschine dort nicht. Besonders tückisch bei langen
-  autonomen Läufen, weil jede Nachfolge-Sitzung deinen Chat gar nicht kennt.
-  → *Prompt:* „Wenn ich etwas priorisiere, trag es an die Stelle ein, aus der die Arbeit
-  tatsächlich gezogen wird, und lass eine Prüfung fehlschlagen, wenn Deklaration und
-  Reihenfolge auseinanderlaufen. Und priorisiere das **Ziel**: Was das vorgezogene Feature
-  schneller fertig macht, kommt mit nach vorn, auch wenn es nicht dazugehört."
+- **Eine Priorität, die nur in Prosa steht, wirkt nicht.** Sie landet getreu in der
+  Aufgabenliste — aber die Reihenfolge, aus der gearbeitet wird, steht woanders. Tückisch bei
+  autonomen Läufen: die Nachfolge-Sitzung kennt deinen Chat nicht.
+  → *Prompt:* „Trag Priorisiertes dort ein, wo die Arbeit gezogen wird, und lass eine Prüfung
+  fehlschlagen, wenn beides auseinanderläuft. Priorisiere das **Ziel**: Was das Feature
+  schneller fertig macht, kommt mit nach vorn."
 
-- **Blockiert heißt nicht: du bist dran.** Stößt der Assistent auf eine fehlende Berechtigung,
-  reicht er dir gern einen Befehl zum Ausführen — der oft gar nicht funktionieren kann, weil
-  er die Umgebung nur vermutet hat. Zwei Runden deiner Zeit für Arbeit, die seine war.
-  → *Prompt:* „Ein Schritt in der Umgebung, in der du arbeitest, gehört dir. Bevor du mich um
-  irgendetwas bittest: **miss**, ob der Weg überhaupt trägt. Fehlt wirklich eine Fähigkeit,
-  bitte **einmal um die Fähigkeit** — nie um ihre Ausführung."
+- **Blockiert heißt nicht: du bist dran.** Bei fehlender Berechtigung bekommst du gern einen
+  Befehl gereicht — oft einen, der gar nicht funktionieren kann, weil die Umgebung nur
+  vermutet war.
+  → *Prompt:* „Ein Schritt in deiner Umgebung gehört dir. **Miss** erst, ob der Weg trägt.
+  Fehlt wirklich eine Fähigkeit, bitte **einmal um die Fähigkeit** — nie um ihre Ausführung."
 
 ---
 
@@ -386,11 +371,9 @@ Zwei Mechanismen, die das Netz ehrlich halten:
    > *Prompt:* „Struktur von Dingen, die ich festgelegt habe, friert ein. Schlag
    > Änderungen vor, setz sie nicht ungefragt um."
 
-3. **Parallel arbeiten geht nur mit Isolierung.** Ohne eigene Arbeitskopien vervielfacht
-   Delegation das Chaos. Die Grenze setzt nicht dein Kontingent, sondern der
-   **Haupt-Agent**: bei ihm endet jeder Strang, und je mehr Fremdstoff sein Kontext
-   aufnimmt, desto schlechter urteilt er. Verlass dich nie auf „nur lesen" — was ein
-   Helfer anfassen kann, fasst er an.
+3. **Parallel arbeiten geht nur mit Isolierung.** Die Grenze setzt nicht dein Kontingent,
+   sondern der **Haupt-Agent**: bei ihm endet jeder Strang, und je mehr Fremdstoff sein
+   Kontext aufnimmt, desto schlechter urteilt er. Verlass dich nie auf „nur lesen".
    > *Prompt:* „Arbeite jede Aufgabe auf einem eigenen Feature-Branch mit eigener
    > Arbeitskopie und führe sie erst nach `main`, wenn sie fertig und verifiziert ist.
    > Auch ein nur lesender Helfer bekommt eine eigene Arbeitskopie.
