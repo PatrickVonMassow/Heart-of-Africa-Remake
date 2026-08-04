@@ -323,8 +323,10 @@ export function formatReason(offence) {
     'mode with less warning.\n\n' +
     'Take one of the two routes instead:\n' +
     '  • one more host has to be reachable →\n' +
-    '      node scripts/firewall-allow.mjs <domain|ip|cidr> [--cidr24]\n' +
-    '    Additive only: it never flushes, so it cannot seal anything.\n' +
+    '      node scripts/firewall-allow.mjs <domain|ip|cidr> [--net24]\n' +
+    '      node scripts/firewall-allow.mjs             # tops up this project’s own set\n' +
+    '    Additive only: it never flushes, so it cannot seal anything, and it verifies\n' +
+    '    afterwards that the host actually answers.\n' +
     '  • the firewall really has to be rebuilt →\n' +
     '      node scripts/firewall-rebuild.mjs          # the plan, changes nothing\n' +
     '      node scripts/firewall-rebuild.mjs --run    # opens the gate, arms a watchdog, detaches\n' +
@@ -335,9 +337,16 @@ export function formatReason(offence) {
   )
 }
 
-/** The guard's verdict for one tool call. Total: it never throws. */
-export function evaluate({ command = '' } = {}) {
+/**
+ * The guard's verdict for one tool call. Total: it never throws.
+ *
+ * The input is read INSIDE the try, not destructured in the parameter list — a
+ * throwing getter there would escape before the first line of the body, and the
+ * fail-open promise would hold everywhere except the one place it is needed.
+ */
+export function evaluate(input) {
   try {
+    const command = (input && input.command) || ''
     const offence = findOffence(command)
     if (!offence) return { block: false, reason: '' }
     return { block: true, reason: formatReason(offence), id: offence.id }

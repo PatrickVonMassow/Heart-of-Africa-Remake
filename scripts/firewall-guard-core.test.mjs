@@ -72,6 +72,8 @@ describe('iptables', () => {
       'sudo iptables-save > /tmp/rules.txt',
       'iptables --version',
       'iptables -h',
+      'iptables --help',
+      'man iptables',
     ]) {
       expect(blocks(cmd), cmd).toBe(false)
     }
@@ -109,6 +111,8 @@ describe('ipset', () => {
       'ipset test allowed-domains 1.2.3.4',
       'ipset save',
       'ipset --version',
+      'ipset --help',
+      'ipset help add',
     ]) {
       expect(blocks(cmd), cmd).toBe(false)
     }
@@ -145,8 +149,9 @@ describe('the other firewall front-ends and the network path', () => {
 describe('the sanctioned routes always pass', () => {
   it('never blocks the additive top-up', () => {
     for (const cmd of [
+      'node scripts/firewall-allow.mjs',
       'node scripts/firewall-allow.mjs api.github.com',
-      'node scripts/firewall-allow.mjs storage.googleapis.com --cidr24',
+      'node scripts/firewall-allow.mjs cdn.playwright.dev --net24',
       'node scripts/firewall-allow.mjs 1.2.3.4 10.0.0.0/8 --dry-run',
     ]) {
       expect(blocks(cmd), cmd).toBe(false)
@@ -235,6 +240,15 @@ describe('everyday commands are untouched', () => {
 })
 
 describe('totality — the core never throws and never invents a block', () => {
+  it('allows when reading the input itself throws — the fail-open promise', () => {
+    const exploding = {
+      get command() {
+        throw new Error('internal failure')
+      },
+    }
+    expect(() => evaluate(exploding)).not.toThrow()
+    expect(evaluate(exploding).block).toBe(false)
+  })
   it('allows empty, missing and non-string input', () => {
     expect(evaluate({ command: '' }).block).toBe(false)
     expect(evaluate({}).block).toBe(false)
@@ -299,6 +313,7 @@ describe('the deny message', () => {
   it('always leaves a route out, never only a refusal', () => {
     const reason = formatReason({ what: 'a packet-filter change', excerpt: 'sudo iptables -F' })
     expect(reason).toContain('scripts/firewall-allow.mjs')
+    expect(reason).toContain('--net24')
     expect(reason).toContain('scripts/firewall-rebuild.mjs --run')
     expect(reason).toContain('--status')
     expect(reason).toContain('--open')

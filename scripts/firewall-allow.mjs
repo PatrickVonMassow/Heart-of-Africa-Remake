@@ -17,15 +17,23 @@
 // container, which is the whole reason it is a separate script rather than a
 // flag on the rebuild.
 //
+//   node scripts/firewall-allow.mjs                    # top up what this project needs
 //   node scripts/firewall-allow.mjs cdn.example.com
 //   node scripts/firewall-allow.mjs 1.2.3.4 10.0.0.0/8
-//   node scripts/firewall-allow.mjs storage.googleapis.com --cidr24
+//   node scripts/firewall-allow.mjs storage.googleapis.com --net24
 //   node scripts/firewall-allow.mjs api.example.com --dry-run
 //
-// `--cidr24` adds the /24 around each resolved address, for the rotating CDN
+// `--net24` adds the /24 around each resolved address, for the rotating CDN
 // pools where the address resolved now is not the one the download lands on
-// minutes later (the reason init-firewall.sh already does this for
-// storage.googleapis.com).
+// minutes later — the trigger of the incident: `cdn.playwright.dev` redirects to
+// Chrome-for-Testing archives on Google's storage pool, the boot-time allowlist
+// held one address out of that pool, the browser install failed, and the session
+// reached for the rebuild because no smaller tool existed.
+//
+// With NO argument it tops up exactly that set — the Playwright CDN and its
+// Chrome-for-Testing storage, Hugging Face, npm and the API host itself — and
+// then VERIFIES each one is actually reachable, so the answer to "did that help?"
+// comes from the network rather than from an exit code.
 //
 // A top-up is NOT persistent: the ipset lives in the kernel and a container
 // restart re-runs init-firewall.sh from scratch. A host that is needed on every
@@ -39,11 +47,37 @@ import { isMainModule } from './is-main.mjs'
 /** The ipset init-firewall.sh creates and the OUTPUT chain matches against. */
 export const DEFAULT_SET = 'allowed-domains'
 
+/**
+ * What a bare `firewall-allow` tops up: the hosts this project reaches for and
+ * whose addresses drift. `net24` marks the rotating pools — the ones a single
+ * boot-time address does not cover, which is what broke the browser install.
+ *
+ * `api.anthropic.com` is in here for a reason that is not convenience: it is the
+ * host the session itself needs. A container that can reach nothing else can
+ * still be repaired from inside as long as that one answers.
+ */
+export const DEFAULT_TOPUP = [
+  { host: 'api.anthropic.com', net24: false },
+  { host: 'cdn.playwright.dev', net24: true },
+  { host: 'playwright.download.prss.microsoft.com', net24: true },
+  { host: 'storage.googleapis.com', net24: true },
+  { host: 'huggingface.co', net24: false },
+  { host: 'cdn-lfs-us-1.hf.co', net24: false },
+  { host: 'registry.npmjs.org', net24: false },
+]
+
 /** Per-command ceiling. An `ipset add` is instant; anything slower is stuck. */
 export const COMMAND_TIMEOUT_MS = 10_000
 
 /** DNS ceiling. The firewall permits port 53 unconditionally, so this is fast. */
 export const RESOLVE_TIMEOUT_MS = 15_000
+
+/**
+ * Reachability probe ceiling. Short on purpose: a blocked host does not answer
+ * at all, and the whole point of this script is that nothing it does can hang
+ * long enough to hit a tool timeout.
+ */
+export const PROBE_TIMEOUT_MS = 8_000
 
 const IPV4 = /^(?:\d{1,3}\.){3}\d{1,3}$/
 const IPV4_CIDR = /^(?:\d{1,3}\.){3}\d{1,3}\/(?:3[0-2]|[12]?\d)$/
@@ -82,17 +116,32 @@ export function to24(ip) {
 export function parseArgs(argv = []) {
   const targets = []
   const unknown = []
-  const opts = { cidr24: false, dryRun: false, set: DEFAULT_SET }
+  const opts = { net24: false, dryRun: false, verify: true, set: DEFAULT_SET }
   for (let i = 0; i < argv.length; i++) {
     const a = String(argv[i])
-    if (a === '--cidr24') opts.cidr24 = true
+    // `--cidr24` is kept as an alias only so an older note in a transcript still
+    // works; `--net24` is the name.
+    if (a === '--net24' || a === '--cidr24') opts.net24 = true
     else if (a === '--dry-run' || a === '-n') opts.dryRun = true
+    else if (a === '--no-verify') opts.verify = false
     else if (a === '--set') opts.set = String(argv[++i] ?? DEFAULT_SET)
     else if (a.startsWith('-')) unknown.push(a)
     else if (isIpv4(a) || isIpv4Cidr(a) || isDomain(a)) targets.push(a)
     else unknown.push(a)
   }
   return { targets, opts, unknown }
+}
+
+/**
+ * What to top up: the named targets, or — with none given — the project's own
+ * set, each with the /24 treatment its address pool needs. An explicit
+ * `--net24` applies to every named target; the default set carries its own
+ * per-host answer, because widening a stable host to a /24 opens more than it
+ * has to.
+ */
+export function planTargets(targets = [], { net24 = false } = {}) {
+  if (targets.length) return targets.map((target) => ({ target, net24 }))
+  return DEFAULT_TOPUP.map(({ host, net24: hostNet24 }) => ({ target: host, net24: net24 || hostNet24 }))
 }
 
 /**
@@ -108,13 +157,13 @@ export function addArgs(set, entry) {
  * Which entries a target contributes. Pure, so the expansion is testable without
  * a resolver: `resolved` is the address list DNS gave for a domain.
  */
-export function entriesFor(target, resolved = [], { cidr24 = false } = {}) {
+export function entriesFor(target, resolved = [], { net24 = false } = {}) {
   if (isIpv4Cidr(target)) return [target]
-  if (isIpv4(target)) return cidr24 ? [to24(target)] : [target]
+  if (isIpv4(target)) return net24 ? [to24(target)] : [target]
   const out = []
   for (const ip of resolved) {
     if (!isIpv4(ip)) continue
-    out.push(cidr24 ? to24(ip) : ip)
+    out.push(net24 ? to24(ip) : ip)
   }
   return [...new Set(out)]
 }
@@ -155,19 +204,42 @@ async function resolve4(host) {
   return Promise.race([dns.resolve4(host), timer])
 }
 
+/**
+ * Is the host actually reachable now? ANY HTTP answer counts — a 404 or a 400
+ * came back through the firewall, which is the only question being asked. Only a
+ * transport failure means the allowlist did not take.
+ *
+ * This is the difference between "the command exited 0" and "the thing works".
+ * The incident began with an install that failed while everything looked fine.
+ */
+export async function probeReachable(host, timeoutMs = PROBE_TIMEOUT_MS) {
+  try {
+    const res = await fetch(`https://${host}/`, {
+      method: 'HEAD',
+      redirect: 'manual',
+      signal: AbortSignal.timeout(timeoutMs),
+    })
+    return { ok: true, detail: `HTTP ${res.status}` }
+  } catch (e) {
+    return { ok: false, detail: (e && (e.cause?.code || e.name || e.message)) || 'no answer' }
+  }
+}
+
+const USAGE =
+  'usage: node scripts/firewall-allow.mjs [domain|ip|cidr]… [--net24] [--dry-run] [--no-verify] [--set <name>]\n' +
+  '       with no target it tops up what this project needs:\n' +
+  `         ${DEFAULT_TOPUP.map((d) => d.host).join(', ')}`
+
 async function main(argv) {
   const { targets, opts, unknown } = parseArgs(argv)
   if (unknown.length) {
     console.error(`firewall-allow: not a host, address or known flag: ${unknown.join(', ')}`)
-    console.error('usage: node scripts/firewall-allow.mjs <domain|ip|cidr>… [--cidr24] [--dry-run] [--set <name>]')
+    console.error(USAGE)
     return 1
   }
-  if (!targets.length) {
-    console.error('usage: node scripts/firewall-allow.mjs <domain|ip|cidr>… [--cidr24] [--dry-run] [--set <name>]')
-    console.error('Adds to the existing allowlist. It never flushes and never rebuilds —')
-    console.error('for a full rebuild use: node scripts/firewall-rebuild.mjs --run')
-    return 1
-  }
+
+  const plan = planTargets(targets, opts)
+  if (!targets.length) console.log('firewall-allow: no target given — topping up this project’s own set.\n')
 
   if (!opts.dryRun && !setExists(opts.set)) {
     console.error(
@@ -179,53 +251,83 @@ async function main(argv) {
     return 2
   }
 
-  const planned = []
-  for (const target of targets) {
-    let resolved = []
-    if (isDomain(target)) {
-      try {
-        resolved = await resolve4(target)
-      } catch (e) {
-        console.error(`firewall-allow: could not resolve ${target}: ${e && e.message}`)
-        return 3
-      }
-      if (!resolved.length) {
-        console.error(`firewall-allow: ${target} resolved to no IPv4 address`)
-        return 3
-      }
-    }
-    for (const entry of entriesFor(target, resolved, opts)) planned.push({ target, entry })
-  }
-
-  let added = 0
-  for (const { target, entry } of planned) {
-    const args = addArgs(opts.set, entry)
-    if (opts.dryRun) {
-      console.log(`would run: sudo -n ${args.join(' ')}   # ${target}`)
+  // Resolve first, add second, so a resolver failure on one host is reported
+  // beside the others instead of aborting the run half-applied.
+  const work = []
+  for (const { target, net24 } of plan) {
+    if (!isDomain(target)) {
+      work.push({ target, net24, entries: entriesFor(target, [], { net24 }) })
       continue
     }
     try {
-      run(args)
-      added++
-      console.log(`added ${entry} for ${target}`)
+      const resolved = await resolve4(target)
+      if (!resolved.length) {
+        work.push({ target, net24, entries: [], error: 'resolved to no IPv4 address' })
+        continue
+      }
+      work.push({ target, net24, entries: entriesFor(target, resolved, { net24 }) })
     } catch (e) {
-      // Additive by construction: a failed add left the firewall untouched, so
-      // there is nothing to roll back and no reason to abandon the rest.
-      console.error(`firewall-allow: could not add ${entry} for ${target}: ${e && e.message}`)
+      work.push({ target, net24, entries: [], error: (e && e.message) || 'could not resolve' })
     }
   }
 
+  // One line per TARGET, not per address: the question is always "is this host
+  // open now", and a rotating pool would otherwise bury it under ten addresses.
+  const width = Math.max(...work.map((w) => w.target.length), 10)
+  let failures = 0
+  for (const item of work) {
+    const label = item.target.padEnd(width)
+    if (item.error) {
+      console.error(`${label}  — ${item.error}`)
+      failures++
+      continue
+    }
+    if (opts.dryRun) {
+      console.log(`${label}  would add ${item.entries.length} entr${item.entries.length === 1 ? 'y' : 'ies'}: ${item.entries.join(', ')}`)
+      continue
+    }
+    let added = 0
+    const errors = []
+    for (const entry of item.entries) {
+      try {
+        run(addArgs(opts.set, entry))
+        added++
+      } catch (e) {
+        // Additive by construction: a failed add left the firewall untouched, so
+        // there is nothing to roll back and no reason to abandon the rest.
+        errors.push((e && e.message) || 'failed')
+      }
+    }
+    const how = item.net24 ? ' (as /24 ranges)' : ''
+    let line = `${label}  ${added}/${item.entries.length} added${how}`
+    if (errors.length) {
+      failures++
+      line += `  — ${errors[0]}`
+    } else if (opts.verify && isDomain(item.target)) {
+      const probe = await probeReachable(item.target)
+      if (!probe.ok) failures++
+      line += `  — ${probe.ok ? 'reachable' : 'STILL UNREACHABLE'} (${probe.detail})`
+    }
+    console.log(line)
+  }
+
   if (opts.dryRun) {
-    console.log(`\n${planned.length} entr${planned.length === 1 ? 'y' : 'ies'} planned — nothing was changed.`)
+    console.log('\nPLAN ONLY — nothing was changed.')
     return 0
   }
-  console.log(`\n${added}/${planned.length} entries added to "${opts.set}".`)
   console.log(
-    'This is a RUNTIME top-up: the ipset lives in the kernel and a container restart re-runs\n' +
+    '\nThis is a RUNTIME top-up: the ipset lives in the kernel and a container restart re-runs\n' +
       'init-firewall.sh from scratch. A host needed on every boot belongs in the domain list of\n' +
       '.devcontainer/init-firewall.sh.',
   )
-  return added === planned.length ? 0 : 4
+  if (failures) {
+    console.error(
+      `\n${failures} target(s) did not come out reachable. Nothing was flushed and nothing was\n` +
+        'undone — the firewall is exactly as it was. If the allowlist itself is gone:\n' +
+        '  node scripts/firewall-rebuild.mjs --run',
+    )
+  }
+  return failures ? 4 : 0
 }
 
 if (isMainModule(import.meta.url)) {
