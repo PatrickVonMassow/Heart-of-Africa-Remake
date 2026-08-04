@@ -1,0 +1,312 @@
+// The container-ask guard's whole behaviour space (point 494).
+//
+// This guard walks a ridge: it must catch the HAND-OVER of a container step
+// while leaving the one legitimate request standing — asking for a CAPABILITY
+// the container does not have. A guard that got that wrong would push the
+// session into failing silently rather than asking, which is worse than the
+// problem. So the allow cases below are not an afterthought; they are half the
+// specification, and they outnumber the blocks on purpose.
+import { describe, it, expect } from 'vitest'
+import { spawnSync } from 'node:child_process'
+import { mkdtempSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { resolve } from 'node:path'
+import {
+  blocksOf,
+  clausesOf,
+  evaluate,
+  findContainerAsks,
+  firstMatch,
+  judgeRequest,
+  splitFence,
+  CAPABILITY_CUES,
+  CONTAINER_STEP_PATTERNS,
+  EXECUTION_STEP_PATTERNS,
+  REMEDY,
+  REPORT_CUES,
+  REQUEST_PATTERNS,
+} from './container-ask-guard-core.mjs'
+import { findRepeatDemands } from './closing-reply-core.mjs'
+
+const blocked = (text) => evaluate({ lastText: text }).block
+
+describe('the two real hand-overs of 04.08.2026', () => {
+  it('blocks the sudo script line the user was handed', () => {
+    expect(blocked('Führe bitte `sudo bash scripts/verify-host-setup.sh` aus, dann sehen wir weiter.')).toBe(true)
+  })
+
+  it('blocks the docker-exec line, whichever terminal it names', () => {
+    const answer = [
+      'Bitte in einem Windows-Terminal ausführen:',
+      '',
+      '```bash',
+      'docker exec -u root hoa-dev apt-get install -y libgl1',
+      '```',
+    ].join('\n')
+    expect(blocked(answer)).toBe(true)
+  })
+
+  it('names what it found and hands over the way out', () => {
+    const verdict = evaluate({ lastText: 'Bitte führe `npm run test:unit` aus.' })
+    expect(verdict.block).toBe(true)
+    expect(verdict.reason).toContain('npm-command')
+    expect(verdict.reason).toContain(REMEDY)
+    expect(verdict.reason).toMatch(/ask ONCE for that capability/)
+  })
+
+  it('asks for no second copy of the answer (the point-403 ratchet)', () => {
+    const verdict = evaluate({ lastText: 'Bitte führe `npm run build` aus.' })
+    expect(findRepeatDemands(verdict.reason)).toEqual([])
+  })
+})
+
+describe('the ASK is what is blocked — every shape of it', () => {
+  const asks = [
+    ['polite German request', 'Kannst du bitte `npm run build` starten?'],
+    ['modal address', 'Du musst dafür `node scripts/board-publish.mjs` laufen lassen.'],
+    ['list-item imperative', '- Starte danach `npm run dev` neu\n- Danach passt es'],
+    ['English please-run', 'Please run `npm run build` on your side once more.'],
+    ['English modal', 'You need to run `git push origin main` for me.'],
+    ['file edit under the workspace', 'Bitte trage in `.claude/settings.json` die Hook-Zeile ein.'],
+    ['package install', 'Bitte installiere `apt-get install -y libgl1` im laufenden Container.'],
+    ['fenced block with a second-person lead-in', 'Bei dir im Terminal:\n\n```\ndocker exec -it hoa-dev bash\n```'],
+    ['chmod on a repo file', 'Bitte setze `chmod +x scripts/verify-host-setup.sh` ab.'],
+    ['addressed English imperative', 'Run `npm ci` on your machine before you look at it.'],
+  ]
+  for (const [what, answer] of asks) {
+    it(`blocks: ${what}`, () => {
+      expect(blocked(answer), answer).toBe(true)
+    })
+  }
+
+  it('blocks each offending block once, and reports at most three', () => {
+    const answer = [
+      'Bitte führe `npm run build` aus.',
+      '',
+      'Danach bitte `npm run lint` starten.',
+      '',
+      'Und bitte `npm run test:unit` ausführen.',
+      '',
+      'Zuletzt bitte `npm audit` laufen lassen.',
+    ].join('\n')
+    const findings = findContainerAsks(answer)
+    expect(findings).toHaveLength(4)
+    expect(evaluate({ lastText: answer }).reason.split('|')).toHaveLength(3)
+  })
+})
+
+describe('the CAPABILITY request stays allowed — the ridge this guard walks', () => {
+  const allowed = [
+    ['a device / an image line', 'Mir fehlt eine Fähigkeit: bitte ergänze in der `devcontainer.json` die Zeile `"runArgs": ["--gpus", "all"]`.'],
+    ['a right', 'Bitte gib dem Benutzer `node` passwortlose sudo-Rechte für `apt-get` — dann mache ich den Rest selbst.'],
+    ['a mount', 'Bitte mounte das Verzeichnis `local/` in den Container, sonst sehe ich die Dumps nicht.'],
+    ['a firewall allowlist entry', 'Der Proxy blockt die Paketquellen. Bitte nimm `deb.debian.org` in die Firewall-Allowlist auf.'],
+    ['a credential', 'Bitte hinterlege das Token in `.secrets/`, dann kann ich `git push` selbst fahren.'],
+    ['a rebuild of the image', 'Bitte baue das Container-Image neu, es braucht `apt-get install -y libgl1` als Zeile im Dockerfile.'],
+  ]
+  for (const [what, answer] of allowed) {
+    it(`allows asking for ${what}`, () => {
+      expect(blocked(answer), answer).toBe(false)
+    })
+  }
+
+  it('does NOT let the location of the terminal count as a capability', () => {
+    // The second offender's framing: run it "on your Windows side". Where the
+    // shell runs is irrelevant — `docker exec` lands inside this container.
+    expect(blocked('Auf deinem Windows-Host: bitte `docker exec -u root hoa-dev bash` starten.')).toBe(true)
+  })
+
+  it('does not let a capability sentence three clauses away clear a demand', () => {
+    const answer = 'Der Firewall-Allowlist fehlt ein Eintrag. Bitte führe `npm run build` aus und schick mir das Log.'
+    expect(blocked(answer)).toBe(true)
+  })
+})
+
+describe('a command quoted as a REPORT passes', () => {
+  const reports = [
+    ['plain past tense', 'Ich habe `npm run test:unit` ausgeführt — grün.'],
+    ['fenced transcript', 'Ich habe das selbst ausgeführt:\n\n```bash\nnpm run lint\n```'],
+    ['passive report', 'Die Gates liefen hier durch: `npm run build`, `npm run lint`, `npm audit`.'],
+    ['English report', 'For the record: `npm run build` was run on the branch and is green.'],
+    ['plan for myself', 'Als Nächstes führe ich `node scripts/board-publish.mjs` aus.'],
+  ]
+  for (const [what, answer] of reports) {
+    it(`allows: ${what}`, () => {
+      expect(blocked(answer), answer).toBe(false)
+    })
+  }
+
+  it('but a report clause does not shelter a demand beside it', () => {
+    expect(blocked('Ich habe alles gebaut, bitte führe `npm run test:large` aus.')).toBe(true)
+  })
+})
+
+describe('the ordinary answer is never touched', () => {
+  const fine = [
+    ['a bare mention', 'Der Build läuft über `npm run build`; die Logik liegt in `scripts/x.mjs`.'],
+    ['judging the deployed picture', 'Bitte schau dir https://example.org/poc/ an und sag mir, ob die Karte hell genug ist.'],
+    ['approving a permission prompt', 'Bitte bestätige den Berechtigungs-Prompt, dann ändere ich `.claude/settings.json` selbst.'],
+    ['a decision question', 'Soll ich `npm run test:large` vor dem Merge laufen lassen?'],
+    ['asking for a decision that names a command', 'Bitte entscheide, ob `npm run test:large` vor dem Merge nötig ist.'],
+    ['a status note about a file', 'Bitte beachte, dass `src/world/world.ts` jetzt die Flussbreite skaliert.'],
+    ['asking for a go on a tag', 'Bitte gib mir Bescheid, ob ich `v0.3` taggen darf.'],
+    ['an ask with no container step at all', 'Bitte öffne das Fenster und schalte den Monitor ein.'],
+    ['a review request on a document', 'Bitte lies `docs/maximum-qa.md` und sag, ob die Reihenfolge stimmt.'],
+    ['pointing at where something stands', 'Du kannst die Details in `docs/batch-autonomy.md` nachlesen.'],
+    ['an English plan bullet quoted from a document', '- Run the LARGE browser regression (`npm test`) once to establish the baseline'],
+    ['my own next steps as a list', '- `npm run build`\n- `npm run lint`\n- danach merge ich'],
+  ]
+  for (const [what, answer] of fine) {
+    it(`allows: ${what}`, () => {
+      expect(blocked(answer), answer).toBe(false)
+    })
+  }
+
+  it('judges per block, so a demand cannot borrow an exemption from another paragraph', () => {
+    const answer = 'Im Image fehlt eine Zeile für libgl1.\n\nBitte führe `npm run build` aus.'
+    expect(blocked(answer)).toBe(true)
+  })
+
+  it('and a request without its command in the same block is not read as a hand-over', () => {
+    const answer = 'Bitte führe das noch aus.\n\nDer Standardbefehl ist `npm run build`.'
+    expect(blocked(answer)).toBe(false)
+  })
+})
+
+describe('fail-open by construction', () => {
+  for (const input of [undefined, null, '', '   ', 42, {}, [], () => {}]) {
+    it(`allows on input ${JSON.stringify(input) ?? String(input)}`, () => {
+      expect(evaluate({ lastText: input })).toEqual({ block: false, reason: '' })
+    })
+  }
+
+  it('allows when the input object itself throws', () => {
+    const hostile = {
+      get lastText() {
+        throw new Error('boom')
+      },
+    }
+    expect(evaluate(hostile)).toEqual({ block: false, reason: '' })
+  })
+
+  it('allows on a missing argument', () => {
+    expect(evaluate()).toEqual({ block: false, reason: '' })
+    expect(findContainerAsks(undefined)).toEqual([])
+  })
+})
+
+describe('the text model: blocks, fences, clauses', () => {
+  it('keeps a fenced block with the paragraph that introduces it, blank line or not', () => {
+    const blocks = blocksOf('Bitte ausführen:\n\n```sh\nnpm run build\n```\n\nDanach melde ich mich.')
+    expect(blocks).toHaveLength(2)
+    expect(blocks[0]).toContain('npm run build')
+    expect(blocks[1]).toContain('Danach melde ich mich.')
+  })
+
+  it('separates plain paragraphs', () => {
+    expect(blocksOf('Erstens.\n\nZweitens.\n\n\nDrittens.')).toEqual(['Erstens.', 'Zweitens.', 'Drittens.'])
+  })
+
+  it('splits prose from fenced code', () => {
+    const { prose, code } = splitFence('Lead-in:\n```bash\nnpm run lint\n```')
+    expect(prose).toBe('Lead-in:')
+    expect(code).toBe('npm run lint')
+  })
+
+  it('never splits a clause inside a file name or a script argument', () => {
+    expect(clausesOf('Bitte `bash scripts/verify-host-setup.sh` starten, danach `npm run test:unit`.')).toEqual([
+      'Bitte `bash scripts/verify-host-setup.sh` starten',
+      'danach `npm run test:unit`',
+    ])
+  })
+
+  it('firstMatch reports the pattern id, or null', () => {
+    expect(firstMatch(EXECUTION_STEP_PATTERNS, 'docker exec -it x sh')).toBe('docker-exec')
+    expect(firstMatch(CONTAINER_STEP_PATTERNS, 'apt-get update')).toBe('package-manager')
+    expect(firstMatch(REQUEST_PATTERNS, 'Bitte starte den Dienst')).toBe('de-polite-action')
+    expect(firstMatch(REPORT_CUES, 'Ich habe es gemacht')).toBe('de-first-person')
+    expect(firstMatch(CAPABILITY_CUES, 'ein Mount für local/')).toBe('device-mount')
+    expect(firstMatch(EXECUTION_STEP_PATTERNS, 'nichts davon')).toBe(null)
+    expect(firstMatch(EXECUTION_STEP_PATTERNS, null)).toBe(null)
+  })
+})
+
+describe('the exemption ladder, rung by rung', () => {
+  const base = { block: 'bitte `npm run build` ausführen', request: 'de-polite-action' }
+
+  it('a report cue in the clause wins over everything', () => {
+    expect(judgeRequest({ ...base, clause: 'ich habe es ausgeführt' })).toBe(null)
+  })
+
+  it('a judgement cue in the clause wins', () => {
+    expect(judgeRequest({ ...base, clause: 'bitte bestätige das' })).toBe(null)
+  })
+
+  it("a capability cue in the clause itself beats even an execution step", () => {
+    expect(judgeRequest({ ...base, clause: 'bitte gib mir sudo-Rechte dafür' })).toBe(null)
+  })
+
+  it('an execution step beats a capability cue that only stands NEARBY', () => {
+    const finding = judgeRequest({
+      ...base,
+      clause: 'bitte führe das aus',
+      before: 'im Image fehlt eine Zeile',
+    })
+    expect(finding).toMatchObject({ kind: 'execution', step: 'npm-command' })
+  })
+
+  it('a capability cue nearby does clear a weaker container step', () => {
+    expect(
+      judgeRequest({
+        block: 'bitte `apt-get install -y libgl1` ergänzen',
+        clause: 'bitte ergänze das',
+        after: 'das gehört in das Dockerfile',
+        request: 'de-polite-action',
+      }),
+    ).toBe(null)
+  })
+
+  it('a request with no container step in its block is not a hand-over', () => {
+    expect(judgeRequest({ block: 'bitte melde dich', clause: 'bitte melde dich', request: 'de-imperative' })).toBe(null)
+  })
+
+  it('quotes the offending clause, shortened', () => {
+    const finding = judgeRequest({ ...base, clause: `bitte führe ${'x'.repeat(300)} aus` })
+    expect(finding.clause.length).toBeLessThanOrEqual(160)
+    expect(finding.clause.endsWith('…')).toBe(true)
+  })
+})
+
+describe('the wrapper (spawned the way the hook spawns it)', () => {
+  const guard = resolve(process.cwd(), 'scripts', 'container-ask-guard.mjs')
+  const run = (args, input) =>
+    spawnSync(process.execPath, [guard, ...args], { encoding: 'utf8', input, windowsHide: true })
+
+  it('--check reports a hand-over in a text file', () => {
+    const dir = mkdtempSync(resolve(tmpdir(), 'container-ask-'))
+    const file = resolve(dir, 'answer.txt')
+    writeFileSync(file, 'Führe bitte `sudo bash scripts/verify-host-setup.sh` aus.')
+    const r = run(['--check', file])
+    expect(r.status).toBe(0)
+    expect(r.stdout).toMatch(/WOULD BLOCK/)
+  })
+
+  it('--check stays quiet on a clean answer', () => {
+    const dir = mkdtempSync(resolve(tmpdir(), 'container-ask-'))
+    const file = resolve(dir, 'answer.txt')
+    writeFileSync(file, 'Ich habe `npm run build` ausgeführt — grün.')
+    expect(run(['--check', file]).stdout).toMatch(/OK/)
+  })
+
+  it('allows the stop when the payload names no transcript (fail-open)', () => {
+    const r = run([], JSON.stringify({ session_id: 'x', hook_event_name: 'Stop' }))
+    expect(r.status).toBe(0)
+    expect(r.stdout.trim()).toBe('')
+  })
+
+  it('allows the stop on garbled stdin', () => {
+    const r = run([], 'not json at all')
+    expect(r.status).toBe(0)
+    expect(r.stdout.trim()).toBe('')
+  })
+})
