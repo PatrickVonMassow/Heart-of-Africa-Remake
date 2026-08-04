@@ -4151,9 +4151,11 @@ Build order, chosen so no two parallel agents own the same file:
      a travel distance the chief's message (follow the river upstream) actually
      describes. It needs no walkable bank zone inside the settlement and no
      first-person elaboration.
-  7. A second, ordinary boulder stands in the village itself: BIG_ROCK is taught
-     on it and applied to the one upstream. The build's reading of the user's
-     loop, on the board as a card he may reverse.
+  7. A SMALL boulder stands in the village, visible from it: BIG_ROCK is taught
+     on that one (user 04.08.2026). The target upstream is deliberately LARGER
+     and further away, so the player has to make the transfer himself — the
+     concept is learned on a near example and applied to a distant instance,
+     which is the whole point of the mechanic.
   8. New water and geometry carry their `QUALITY_PRESETS` entries.
   VERIFIABLE: pure Vitest — the village keeps the §4.2 river clearance, the bank
   point is inside the walkable region, the upstream rock lies outside it and on
