@@ -189,6 +189,49 @@ describe('villages keep clearance from rivers (design.md §4.2)', () => {
     }
   })
 
+  // Point 482: the communication PoC needs ONE village that lies ON a river.
+  // The Bambara heartland at Ségou IS a Niger town in fact, and the model's
+  // upper Niger was the inaccurate half — it ran 0.7-1.2° south of the true
+  // channel — so the RIVER moved onto its real stations, not the village.
+  it('the Bambara village lies at the Niger, at the §4.2 clearance minimum', () => {
+    const v = placeById('bambara-village')
+    const d = riverDistance(v.lat, v.lon)
+    expect(d).toBeGreaterThanOrEqual(VILLAGE_RIVER_CLEARANCE_DEG - 1e-9)
+    expect(d).toBeLessThanOrEqual(0.45) // pushed off the water, not away from the Niger
+    // The heartland anchor sits ON the corrected channel — the clearance rule
+    // does the whole work here, which is what "on the river" means in the model.
+    const raw = VILLAGE_HEARTLANDS.find((h) => h.id === 'bambara-village')
+    expect(raw?.lat).toBe(13.45) // Ségou
+    expect(raw?.lon).toBe(-6.27)
+    expect(riverDistance(raw?.lat ?? 0, raw?.lon ?? 0)).toBeLessThan(0.02)
+    // Dry land, never a water cell.
+    const t = sampleTerrain(v.lat, v.lon, SEED)
+    expect(t.type).not.toBe('water')
+    expect(t.type).not.toBe('ocean')
+  })
+
+  it('the corrected upper Niger runs through its real ~1890 river stations', () => {
+    // Regression witness against sliding back to the stylized bend: the axis the
+    // renderer draws must pass each station, Ségou included (the Bambara
+    // heartland). Tolerance 0.15° ≈ the axis sampling step plus spline rounding.
+    const niger = RIVERS.find((r) => r.id === 'niger')
+    expect(niger).toBeDefined()
+    const axis = densifyRiver(niger?.points ?? [])
+    const stations: Array<readonly [string, number, number]> = [
+      ['Siguiri', 11.42, -9.17],
+      ['Bamako', 12.65, -8.0],
+      ['Koulikoro', 12.86, -7.56],
+      ['Ségou', 13.45, -6.27],
+      ['Mopti', 14.5, -4.2],
+      ['Kabara (Timbuktu)', 16.55, -3.0],
+    ]
+    for (const [name, lat, lon] of stations) {
+      let best = Infinity
+      for (const p of axis) best = Math.min(best, Math.hypot(p.lat - lat, p.lon - lon))
+      expect(best, name).toBeLessThan(0.15)
+    }
+  })
+
   it('the Nubian village sits clear of the Nile water but stays riverside', () => {
     const v = placeById('nubian-village')
     const d = riverDistance(v.lat, v.lon)
