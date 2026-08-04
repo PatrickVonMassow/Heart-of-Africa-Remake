@@ -14,7 +14,7 @@ import {
   findRawFrames,
   formatRawFrameFindings,
 } from './frameSubject-core.mjs'
-import { probeFrameSubject } from './frameSubject.mjs'
+import { captureFrame, probeFrameSubject } from './frameSubject.mjs'
 
 const lakeVictoria = () => normaliseDeclaration('12-worldmodel-lake-victoria', { world: { lat: -0.8, lon: 33 }, label: 'Lake Victoria' })
 
@@ -269,6 +269,55 @@ describe('findRawFrames', () => {
     expect(findRawFrames(null)).toBe(0)
     expect(formatRawFrameFindings([])).toBe('')
     expect(formatRawFrameFindings([{ file: 'a.mjs', count: 2 }])).toContain('a.mjs: 2')
+  })
+})
+
+// The WRITE carries its own budget. Playwright's silent 30 s default is not
+// enough on a host rendering through SwiftShader with no GPU: the capture that
+// takes 5 s in isolation exceeds it under suite load, and the suite then dies
+// far from the check it was running — a machine speed reported as a red frame.
+describe('captureFrame budgets the picture write', () => {
+  const fakePage = (calls) => ({
+    evaluate: async () => ({ ok: true, available: true, mode: null }),
+    screenshot: async (options) => {
+      calls.push({ via: 'page', options })
+      return Buffer.alloc(0)
+    },
+    locator: (selector) => ({
+      screenshot: async (options) => {
+        calls.push({ via: 'locator', selector, options })
+        return Buffer.alloc(0)
+      },
+    }),
+  })
+
+  it('hands the full-page write an explicit timeout instead of inheriting one', async () => {
+    const calls = []
+    await captureFrame(fakePage(calls), 'out/', '115-savanna-dry', { general: 'the whole dressing is the subject' })
+    expect(calls).toHaveLength(1)
+    expect(calls[0].via).toBe('page')
+    expect(calls[0].options.path).toBe('out/115-savanna-dry.png')
+    expect(calls[0].options.timeout).toBeGreaterThan(30000)
+  })
+
+  it('budgets a clipped write and an element write the same way', async () => {
+    const clipped = []
+    const clip = { x: 1, y: 2, width: 3, height: 4 }
+    await captureFrame(fakePage(clipped), 'out/', '115-savanna-dry', {
+      general: 'the whole dressing is the subject',
+      clip,
+    })
+    expect(clipped[0].options.clip).toEqual(clip)
+    expect(clipped[0].options.timeout).toBeGreaterThan(30000)
+
+    const element = []
+    await captureFrame(fakePage(element), 'out/', '92-map-fog-of-war', {
+      general: 'the fog of war is the subject',
+      locator: '.map-overlay',
+    })
+    expect(element[0].via).toBe('locator')
+    expect(element[0].selector).toBe('.map-overlay')
+    expect(element[0].options.timeout).toBeGreaterThan(30000)
   })
 })
 
