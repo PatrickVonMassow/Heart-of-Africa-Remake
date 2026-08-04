@@ -4154,19 +4154,6 @@ Build order, chosen so no two parallel agents own the same file:
   no-upstream situation present, every target reachable); browser for the walk to
   the bank.
 
-- [ ] 484. THE JOURNAL'S COMMUNICATION OBSERVATIONS (user 03.08.2026).
-  FINAL STATE:
-  1. A second, clearly separate section beside the existing entries lists every
-     utterance the player has actually heard, in its sound sequence, sorted by
-     point 477's rule.
-  2. Each carries a free-text field for his own hypothesis. The game never
-     interprets that text.
-  3. The notes save and restore with the game (point 477's store).
-  4. Both languages, and the journal stays non-modal per §16.1.
-  VERIFIABLE: pure Vitest on store and component — an unheard utterance is absent,
-  a heard one appears once, the order holds over mixed lengths, a note survives a
-  save/load round trip.
-
 - [ ] 485. THE HYPOTHESIS OVER THE SPEAKER'S HEAD (user 03.08.2026).
   FINAL STATE:
   1. When a figure speaks an utterance the player has already observed, his
