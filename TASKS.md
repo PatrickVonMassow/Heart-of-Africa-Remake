@@ -4422,3 +4422,82 @@ Build order, chosen so no two parallel agents own the same file:
   VERIFIABLE: a LARGE run on `main` reaches the WebGPU pass and reports the six
   suites either green or reduced to named, recorded open points; no threshold in
   the verify suites was changed without a written reason in the same commit.
+
+- [ ] 500. THE LEAVE CAPTURE BAKES A TERRAINLESS BAND ON A SLOW HOST
+  (measured 04.08.2026 during the point-499 triage, 3 of 3 runs). The `polish`
+  check on the maasai-village leave capture reads the bottom quarter of the
+  panorama backdrop as opaque 0.000 — the captured band carries no terrain at
+  all. This is NOT the fixed-wait class the triage closed: the capture fires as
+  the travel scene MOUNTS, so no amount of waiting afterwards can change what it
+  photographed. The cause named by the reading is `panoramaCaptureReady`, which
+  gates on terrain chunks being COMMITTED rather than on their being DRAWABLE —
+  on the fast Windows host the two coincide, on this one they do not.
+  FINAL STATE:
+  1. The capture gate holds until the surrounding terrain actually RENDERS, not
+     until its chunks exist. The condition is read from what the renderer draws,
+     never from a chunk count or a wall-clock allowance.
+  2. Point 227's grey-horizon symptom cannot return on a slow host: the check
+     that caught this stays, and is not weakened.
+  3. A capture that would still be unready at its deadline says so — a black or
+     terrainless band is never written silently.
+  VERIFIABLE: the `polish` leave-capture check passes three consecutive runs on
+  the container host, and the same run on the WebGPU (software) lane; the
+  captured band is inspected as a PICTURE once, not only as a number.
+
+- [ ] 501. THE COMPASS PROBE PILLAR NEVER REACHES THE PANORAMA BAND
+  (measured 04.08.2026 during the point-499 triage, 3 of 3 runs). The `polish`
+  orientation check reads west 0 px / east 0 px for its DEV probe pillar, while
+  the water fractions of the SAME capture became non-zero once the scene was
+  built — so the capture happens, but the pillar is not in it. The unverified
+  suspicion the triage recorded: `hasPanoramaCapture` short-circuits a
+  re-capture, so the check's `delete window.__placePanorama` clears the hook but
+  not the cached capture, and the pillar is added to a capture that is never
+  taken again.
+  FINAL STATE:
+  1. The suspicion is CONFIRMED OR REFUTED first, at the code, before anything
+     is changed — a fix built on the wrong cause is the more expensive mistake.
+  2. Either the probe reliably enters the capture it is set up for, or the
+     orientation is measured another way that does not depend on injecting
+     geometry into a cached capture. Whichever is chosen is written down with
+     its reason.
+  VERIFIABLE: the `polish` compass check passes three consecutive runs and fails
+  when the panorama orientation is deliberately inverted — a check that cannot
+  fail proves nothing.
+
+- [ ] 502. FORCED RAIN DOES NOT SWELL THE CURRENT FOR THE DROWNING DRAMA
+  (measured 04.08.2026 during the point-499 triage, 2 of 2 runs identical). The
+  `enrichments` wet-season water drama stages a calf crossing and reads
+  `{drowned:false, rescued:true, out:true}` — the DRY-season outcome — while the
+  paired dry-season check passes. Two candidates the triage could not separate:
+  the 400 ms after `setSeasonWetnessOverride(1)` is too short for
+  `CURRENT_WEATHER.wetness` to reach the wildlife system, or the swollen-current
+  rule itself regressed.
+  FINAL STATE:
+  1. The two are SEPARATED by the discriminator the triage named: read
+     `CURRENT_WEATHER.wetness` at staging time. A timing cause is fixed by
+     waiting on that reading, never by a longer sleep.
+  2. If the rule regressed, the wet-season current is restored so a calf
+     crossing a swollen river can drown per design.md §19.8, and the fix carries
+     a Vitest case at the rule level — the browser check is the picture, not the
+     only proof.
+  VERIFIABLE: the `enrichments` wet-season drama reports a drowning outcome on
+  two consecutive runs, the dry-season pair still passes, and the staged
+  `wetness` reading is asserted rather than assumed.
+
+- [ ] 503. HIGH ATLAS SEASONAL SNOW SITS UNDER ITS BAR
+  (measured 04.08.2026 during the point-499 triage, 2 of 2 runs, stable — not a
+  timing effect). The `enrichments` February High Atlas frame reads 1.2–1.3 %
+  snow against a 2 % bar. The seasonality half of the same check passes
+  trivially (Feb 1.3 % vs Jul 0.0 %), so the contrast is intact and only the
+  absolute amount is short. Either the snow is genuinely thinner than when the
+  bar was set, or the crop/exposure the check measures has moved.
+  FINAL STATE:
+  1. Decided AT THE PICTURE, as the ground micro-detail was: a February High
+     Atlas frame is looked at and judged against design.md §19.9 — does the
+     range read as snow-capped to a human?
+  2. The bar is NOT lowered to close this. If the picture is right and the crop
+     moved, the check is corrected with the reason written down; if the picture
+     is wrong, the snow cover is restored.
+  VERIFIABLE: the `enrichments` snow check passes two consecutive runs, the
+  frame it judges is stored in `verification/`, and the commit says which of the
+  two causes was found.
