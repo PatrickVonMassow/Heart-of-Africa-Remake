@@ -13,7 +13,7 @@
 // Dev server only (dev hooks). Everything else about the report — the zip byte
 // layout, the assembly, the overlay snapshot, the text field and the key
 // bindings — is pinned in the Vitest layer.
-import { launchVerifyBrowser, assertBackend, waitForStable, VERIFY_GL } from './_browser.mjs'
+import { launchVerifyBrowser, assertBackend, waitForSceneBuilt, VERIFY_GL } from './_browser.mjs'
 import { readFile } from 'node:fs/promises'
 import sharp from 'sharp'
 
@@ -68,12 +68,17 @@ await assertBackend(page)
 // Wait for the SCENE, not for the clock: the frame must actually carry
 // geometry before its readback proves anything, and the streaming count must
 // have stopped moving.
-await page.waitForFunction(() => (window.__renderer?.info?.render?.triangles ?? 0) > 50000, null, { timeout: 60000 })
-await waitForStable(page, () => window.__renderer?.info?.render?.triangles ?? 0, {
-  eps: 20000,
-  settleMs: 500,
-  timeout: 30000,
-})
+//
+// That was already the intent here, but the settle it used was too loose to
+// deliver it (point 499): an eps of 20 000 triangles let it return at ~50 000 on
+// a scene that grows to ~88 000, and the capture then came back as a perfectly
+// uniform 28 kB PNG — the exact blank this suite exists to catch, blamed on the
+// product. On the SAME host, with the scene proven finished, one F6 press yields
+// a 1.2 MB picture at sd 48 against a live frame of sd 55. `waitForSceneBuilt`
+// waits for growth to stop rather than for a tolerance to be met, and `built`
+// is asserted so a scene that never finishes is a named finding.
+const sceneBuilt = await waitForSceneBuilt(page)
+check('the scene finishes building before the frame is captured', sceneBuilt.built, JSON.stringify(sceneBuilt))
 await page.evaluate(() => window.__game.getState().setJournalOpen(false))
 
 // --- F6 opens the report with the description field focused ------------------
