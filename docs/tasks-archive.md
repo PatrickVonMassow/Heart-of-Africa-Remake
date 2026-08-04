@@ -13779,3 +13779,34 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   VERIFIABLE: pure Vitest on store and component — an unheard utterance is absent,
   a heard one appears once, the order holds over mixed lengths, a note survives a
   save/load round trip.
+
+- [x] 494. NO STEP INSIDE THE CONTAINER IS EVER HANDED BACK TO THE USER (user
+  04.08.2026, standing rule with full rights granted). On 04.08.2026 the session
+  handed him `sudo bash scripts/verify-host-setup.sh`, which cannot work — the
+  official Claude Code image grants `node` exactly one passwordless command, the
+  firewall script — and then a `docker exec -u root …` line that would also have
+  failed, because the sandbox firewall is iptables-wide and blocks the package
+  sources for root as well. Two round trips of the user's time for work that was
+  the session's. The rule is memory `container-work-is-mine`; this point is the
+  MECHANISM, because a rule that only a reader can see is the same failure point
+  440 measured one layer down.
+  FINAL STATE:
+  1. A guard reads the turn's outgoing answer and BLOCKS it when it asks the user
+     to execute a step that runs inside the container — an install, a package
+     manager, a script invocation, a file edit under the workspace. It matches
+     the ASK ("run", "führe aus", a fenced command block addressed to him),
+     not the mere mention of a command.
+  2. What stays allowed is asking for a CAPABILITY that does not exist inside the
+     container at all: a right, a device, a mount, a line in the image. The guard
+     must not push the session into silently failing instead of asking for those,
+     so the distinction is what its cases pin down.
+  3. The remedy line names the way out: find the route and take it; if the
+     capability is genuinely missing, ask once for the capability.
+  4. Wired into the Stop chain in `.claude/settings.json`, fail-open like every
+     other guard, with a pure Vitest-covered decision core, and reviewed by the
+     other model per `mechanism-review-guard` before it counts as done.
+  VERIFIABLE: pure Vitest over the decision core — an answer containing "führe
+  bitte `npm run …` aus" or a sudo/docker-exec instruction addressed to the user
+  is blocked; an answer asking for a GPU device, a mount or an image line passes;
+  a command quoted as a REPORT of what the session itself ran passes; and the
+  guard returns "allow" on any internal error.

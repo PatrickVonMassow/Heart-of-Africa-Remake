@@ -40,12 +40,7 @@ export const ENFORCER_RE = /^(?!.*-core\.)([a-z0-9-]+-(?:guard|gate|hook))\.mjs$
 // The map stays: an enforcer may be dormant on the record, never quietly. An entry
 // without a written reason is refused, so "park it" is not available as an escape,
 // and the entry must be removed in the same commit that adds the hook line.
-export const INTENTIONALLY_DORMANT = {
-  'container-ask-guard.mjs':
-    'built and tested on feat/494-container-ask-guard; the Stop-chain line lives in ' +
-    '.claude/settings.json, a protected path that needs an attended session. This entry is removed ' +
-    'in the SAME commit that adds the hook line.',
-}
+export const INTENTIONALLY_DORMANT = {}
 
 /**
  * Enforcers known to lack a tested decision core, recorded 25.07.2026. This is
