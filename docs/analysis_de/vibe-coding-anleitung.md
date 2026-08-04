@@ -354,6 +354,23 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   liegt, und prüfe sie bei jedem Start gegen eine **Beobachtung**. Ein fehlendes Stück ist ein
   **Befund**, keine Stille."
 
+- **Eine Priorität, die nur in Prosa steht, wirkt nicht.** Du sagst „das kommt vor allem
+  anderen", der Assistent schreibt es getreu in die Aufgabenliste — und arbeitet trotzdem
+  weiter das Alte ab. Der Grund ist banal: Die Reihenfolge, aus der er sich bedient, steht in
+  einem anderen Feld, und Prosa liest die Maschine dort nicht. Besonders tückisch bei langen
+  autonomen Läufen, weil jede Nachfolge-Sitzung deinen Chat gar nicht kennt.
+  → *Prompt:* „Wenn ich etwas priorisiere, trag es an die Stelle ein, aus der die Arbeit
+  tatsächlich gezogen wird, und lass eine Prüfung fehlschlagen, wenn Deklaration und
+  Reihenfolge auseinanderlaufen. Und priorisiere das **Ziel**: Was das vorgezogene Feature
+  schneller fertig macht, kommt mit nach vorn, auch wenn es nicht dazugehört."
+
+- **Blockiert heißt nicht: du bist dran.** Stößt der Assistent auf eine fehlende Berechtigung,
+  reicht er dir gern einen Befehl zum Ausführen — der oft gar nicht funktionieren kann, weil
+  er die Umgebung nur vermutet hat. Zwei Runden deiner Zeit für Arbeit, die seine war.
+  → *Prompt:* „Ein Schritt in der Umgebung, in der du arbeitest, gehört dir. Bevor du mich um
+  irgendetwas bittest: **miss**, ob der Weg überhaupt trägt. Fehlt wirklich eine Fähigkeit,
+  bitte **einmal um die Fähigkeit** — nie um ihre Ausführung."
+
 ---
 
 ## Drei Meta-Regeln, die alles zusammenhalten
@@ -398,4 +415,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 Wenn du diese eine Nachricht an den Anfang stellst, hast du 80 % der Lehren dieses
 Projekts eingebaut, bevor die erste Zeile Code entsteht.
 
-<!-- GUIDE-FINGERPRINT: 245dd16d717b57f43fc42d55529a87ca6270e9c8d3d9793e700774308fc9d548 -->
+<!-- GUIDE-FINGERPRINT: a3a36516b48f0fdbbd27e8039897f163aa55087b594f2f8d875fe4ba9d25792f -->
