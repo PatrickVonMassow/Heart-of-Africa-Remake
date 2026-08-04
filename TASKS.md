@@ -4382,9 +4382,17 @@ Build order, chosen so no two parallel agents own the same file:
      checkout, a tarball without `.git`, a hook directory that does not exist —
      each leaves the install green. Only a mode it actually changed is reported,
      one line per file, so a silent repair cannot pass for "nothing was wrong".
-  3. A Vitest case pins the decision: given a listing of hook files with their
-     modes, which need a chmod and which are already right. The decision is a
-     pure function so the test never touches a real repository.
-  VERIFIABLE: `npm run test:unit` covers the decision function, including the
-  no-op case, a 644 hook, a non-POSIX platform and an unreadable directory; and
-  `git ls-files -s scripts/git-hooks/` reports 100755 for every hook.
+  3. The DETECTION half widens the enforcer built for exactly this question:
+     `guard-health-guard` ("no enforcer may sit in the tree unable to fire")
+     already reads the active hook directory, but only its CONTENT. It also
+     judges the arming — a hook in the active directory without the executable
+     bit is a finding like an unwired guard, reported the same way, on POSIX
+     only. Widening it, not a sibling guard beside it.
+  4. A Vitest case pins both decisions: given a listing of hook files with their
+     modes, which need a chmod, and which count as unable to fire. Pure
+     functions, so no test touches a real repository.
+  VERIFIABLE: `npm run test:unit` covers both decision functions, including the
+  no-op case, a 644 hook, a non-POSIX platform and an unreadable directory;
+  `git ls-files -s scripts/git-hooks/` reports 100755 for every hook; and
+  `node scripts/guard-health-guard.mjs --status` names a hook whose bit was
+  removed.
