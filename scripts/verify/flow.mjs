@@ -433,7 +433,10 @@ await page2.waitForFunction(() => window.__game && window.__ui, null, { timeout:
 // than for a wall-clock 700 ms: the settlement scene mounts in a fraction of a second
 // on the GPU lane and takes several on a software one, and the fixed wait read a yaw
 // of `null` there and failed a check about mouse-look for a reason that was not it.
-await page2.waitForFunction(() => window.__placePlayer, null, { timeout: 60000 })
+// 180 s, not 60: measured, the settlement mounts in 5 s on a quiet software-WebGPU lane
+// and blew past 60 s under load, so the generous budget is what stops a flake — it costs
+// nothing on the run that resolves in five seconds.
+await page2.waitForFunction(() => window.__placePlayer, null, { timeout: 180000 })
 // Under browser automation the game deliberately SKIPS the real pointer lock
 // (it would grab the OS cursor under system-Chrome --headless=new) and instead
 // applies mouse-look from raw movement — so assert the behaviour (the view turns
