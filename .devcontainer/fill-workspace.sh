@@ -29,8 +29,29 @@ if [ ! -d "$BACKUP/.git" ]; then
   exit 1
 fi
 
+# git clone REFUSES any non-empty destination, and the volume is rarely pristine: a start that
+# died after the clone still ran `npm install`, so an empty node_modules/ sits there and turns
+# the fill into a hard failure (seen 04.08.2026). So clone into a temporary directory INSIDE
+# the volume and move the result into place — same filesystem, so the move is a rename, and
+# whatever was already there is kept rather than deleted.
+# The backup is a Windows bind: its files belong to no uid the container knows, so git rejects
+# it as "dubious ownership" before it reads a single object. The exception belongs HERE and not
+# in devcontainer.json — it is this script's own precondition, and a clone is worthless without it.
+for dir in "$BACKUP" "$BACKUP/.git"; do
+  git config --global --get-all safe.directory | grep -qxF "$dir" \
+    || git config --global --add safe.directory "$dir"
+done
+
 echo "fill-workspace: cloning from the read-only backup (full history, all branches)…"
-git clone "$BACKUP" "$WORK"
+TMP="$WORK/.fill-tmp"
+rm -rf "$TMP"
+mkdir -p "$WORK"
+git clone "$BACKUP" "$TMP"
+shopt -s dotglob
+mv "$TMP"/* "$WORK"/
+shopt -u dotglob
+rmdir "$TMP"
+
 git -C "$WORK" remote set-url origin "$(git -C "$BACKUP" remote get-url origin)"
 git -C "$WORK" fetch origin --prune || echo "fill-workspace: fetch failed — the clone stands, only the refs may lag."
 
