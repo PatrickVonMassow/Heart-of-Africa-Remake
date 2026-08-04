@@ -98,6 +98,10 @@ export const REQUEST_PATTERNS = [
   { id: 'de-you-execute', re: /\b(?:du|dir|dein\w*)\b[^\n]{0,60}\b(?:ausführen|auszuführen|ausgeführt werden)\b/i },
   { id: 'en-please-action', re: /\bplease\b[^\n]{0,50}\b(?:run|execute|install|start|add|edit|create|apply|delete|open)\b/i },
   { id: 'en-modal', re: /\byou\s+(?:need to|have to|should|must)\b/i },
+  {
+    id: 'en-polite-action',
+    re: /\b(?:can|could|would)\s+you(?:\s+mind)?\b[^\n]{0,50}\b(?:run\w*|execut\w*|install\w*|start\w*|add|edit\w*|creat\w*|appl\w*|delet\w*|open\w*|paste|copy)\b/i,
+  },
   { id: 'en-run-this', re: /\b(?:run|execute)\s+(?:this|that|it|the following|these)\b/i },
   // An English line-start imperative counts only when the line also addresses
   // the user: this project's own documents are full of "- Run the LARGE
@@ -114,6 +118,21 @@ export const REQUEST_PATTERNS = [
 export const SECOND_PERSON_PATTERNS = [
   { id: 'de-second-person', re: /\b(?:du|dir|dich|dein\w*|bei dir|bitte)\b/i },
   { id: 'en-second-person', re: /\b(?:you|your|yours|please)\b/i },
+]
+
+/**
+ * The clause NEGATES its own demand: "du musst nichts weiter tun", "you need to
+ * do nothing here", "darum brauchst du dich nicht zu kümmern". Found by the
+ * four-eyes review (Fable 5, 04.08.2026) as the guard's most expensive false
+ * alarm, because it is exactly the sentence this guard's own remedy asks for —
+ * the report that the session did the work itself. The reassurance and the
+ * report usually sit in DIFFERENT clauses ("…, ich habe es bereits ausgeführt"),
+ * so the report cue below cannot reach it; the negation can, in the clause that
+ * carries the modal.
+ */
+export const NEGATION_CUES = [
+  { id: 'de-negation', re: /\b(?:nichts|nicht|kein\w*|niemals)\b/i },
+  { id: 'en-negation', re: /\b(?:nothing|no need|not|never|don'?t|doesn'?t)\b/i },
 ]
 
 /**
@@ -161,6 +180,11 @@ export const CAPABILITY_CUES = [
   { id: 'image', re: /\b(?:image|abbild|dockerfile|devcontainer|container-?definition|rebuild|neu bauen|basis-?image)\b/i },
   { id: 'network', re: /\b(?:allowlist|freigabeliste|firewall|proxy|whitelist)\b/i },
   { id: 'credential', re: /\b(?:credential\w*|secret|zugangsdaten|api-?key|token)\b/i },
+  // An ATTENDED SESSION is a capability too — the only way a protected path
+  // (.claude/settings.json, the git hooks) can be written at all, and this
+  // project's own prescribed next step there. Asking for one is not a hand-over;
+  // it is asking to be allowed to do the work oneself.
+  { id: 'attended-session', re: /\b(?:beaufsichtigte[nrms]?\s+sitzung|attended session|geschützte[rnms]?\s+pfad|protected path)\b/i },
   { id: 'absent', re: /\b(?:gibt es im container nicht|existiert im container nicht|im container nicht (?:vorhanden|verfügbar)|außerhalb des containers|outside the container|not available inside the container)\b/i },
 ]
 
@@ -263,9 +287,15 @@ const excerpt = (s) => {
  * step patterns, and the unmistakable execution steps beat only the WIDER
  * (neighbouring-clause) capability reading — never the clause's own.
  *
+ * The REPORT cue stays clause-local on purpose. Widening it to the neighbours
+ * would have been the other way to clear the negated reassurance — and it would
+ * also clear "Ich habe alles gebaut, bitte führe `npm run test:large` aus",
+ * which is the hand-over this guard exists for.
+ *
  * Returns a finding, or null when the request is allowed.
  */
 export function judgeRequest({ block, clause, before = '', after = '', request }) {
+  if (firstMatch(NEGATION_CUES, clause)) return null
   if (firstMatch(REPORT_CUES, clause)) return null
   if (firstMatch(JUDGEMENT_CUES, clause)) return null
   if (firstMatch(CAPABILITY_CUES, clause)) return null

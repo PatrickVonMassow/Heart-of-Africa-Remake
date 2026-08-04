@@ -72,6 +72,9 @@ describe('the ASK is what is blocked — every shape of it', () => {
     ['fenced block with a second-person lead-in', 'Bei dir im Terminal:\n\n```\ndocker exec -it hoa-dev bash\n```'],
     ['chmod on a repo file', 'Bitte setze `chmod +x scripts/verify-host-setup.sh` ab.'],
     ['addressed English imperative', 'Run `npm ci` on your machine before you look at it.'],
+    ['English politeness', 'Can you run `npm run build` once on your side?'],
+    ['English politeness, conditional', 'Could you please execute `node scripts/board-publish.mjs` for me?'],
+    ['English politeness, "would you mind"', 'Would you mind running `npm run lint` before I merge?'],
   ]
   for (const [what, answer] of asks) {
     it(`blocks: ${what}`, () => {
@@ -110,6 +113,14 @@ describe('the CAPABILITY request stays allowed — the ridge this guard walks', 
     })
   }
 
+  it('allows asking for an ATTENDED SESSION on a protected path', () => {
+    // The project's own prescribed next step for .claude/settings.json and the
+    // git hooks: not a hand-over, but asking to be ALLOWED to do the work.
+    const answer =
+      'Bitte starte eine beaufsichtigte Sitzung, damit ich die Hook-Zeile in `.claude/settings.json` selbst eintragen kann.'
+    expect(blocked(answer)).toBe(false)
+  })
+
   it('does NOT let the location of the terminal count as a capability', () => {
     // The second offender's framing: run it "on your Windows side". Where the
     // shell runs is irrelevant — `docker exec` lands inside this container.
@@ -138,6 +149,29 @@ describe('a command quoted as a REPORT passes', () => {
 
   it('but a report clause does not shelter a demand beside it', () => {
     expect(blocked('Ich habe alles gebaut, bitte führe `npm run test:large` aus.')).toBe(true)
+  })
+})
+
+// The reassurance the guard's own remedy asks for — "I did it, there is nothing
+// left for you". It reads as a modal addressed to the user and its report sits
+// in the NEXT clause, so nothing but the negation can clear it. Blocking these
+// would train the session to contort exactly where it complied.
+describe('a NEGATED demand is no demand', () => {
+  const reassurances = [
+    ['German, nothing left to do', 'Du musst nichts weiter tun, ich habe `npm run build` bereits ausgeführt.'],
+    ['English, nothing to do', 'You need to do nothing here; I already ran `npm run lint`.'],
+    ['German, no need to care', 'Du brauchst dich um `npm audit` nicht zu kümmern, das habe ich erledigt.'],
+    ['German, no step for you', 'Für dich fällt kein Schritt an — `node scripts/board-publish.mjs` habe ich selbst gefahren.'],
+  ]
+  for (const [what, answer] of reassurances) {
+    it(`allows: ${what}`, () => {
+      expect(blocked(answer), answer).toBe(false)
+    })
+  }
+
+  it('and the negation is judged in the clause that carries the request, not message-wide', () => {
+    // The demand stands on its own clause; a negation elsewhere must not reach it.
+    expect(blocked('Es gibt keine Alternative. Bitte führe `npm run build` aus.')).toBe(true)
   })
 })
 

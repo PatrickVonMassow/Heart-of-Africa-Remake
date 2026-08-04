@@ -53,6 +53,12 @@ export function gatherContainerAskInputs({ sessionId = '', transcriptPath = '' }
   if (!existsSync(transcriptPath)) {
     return { applicable: false, why: 'no readable transcript — nothing to judge' }
   }
+  // KNOWN AND ACCEPTED (four-eyes review, 04.08.2026): this returns the FIRST
+  // text block of the last assistant message, so a demand in a second text block
+  // of the same message is not seen. The shared reader is the timestamp guard's,
+  // which needs exactly the reply's OPENING, and forking it here would give this
+  // project two answers to "what did the assistant say". The miss direction is
+  // ALLOW, so the gap costs a missed block, never a false one.
   const lastText = extractLastAssistantText(readFileSync(transcriptPath, 'utf8'))
   if (lastText === null) return { applicable: false, why: 'no assistant reply text in the transcript' }
   return { applicable: true, inputs: { lastText } }

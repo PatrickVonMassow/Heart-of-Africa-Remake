@@ -42,9 +42,9 @@ export const ENFORCER_RE = /^(?!.*-core\.)([a-z0-9-]+-(?:guard|gate|hook))\.mjs$
 // and the entry must be removed in the same commit that adds the hook line.
 export const INTENTIONALLY_DORMANT = {
   'container-ask-guard.mjs':
-    'gebaut und getestet auf feat/494-container-ask-guard; die Stop-Zeile in .claude/settings.json ' +
-    'ist ein geschützter Pfad und braucht eine beaufsichtigte Sitzung. Der Eintrag wird in DEMSELBEN ' +
-    'Commit entfernt, der den Hook einträgt.',
+    'built and tested on feat/494-container-ask-guard; the Stop-chain line lives in ' +
+    '.claude/settings.json, a protected path that needs an attended session. This entry is removed ' +
+    'in the SAME commit that adds the hook line.',
 }
 
 /**
