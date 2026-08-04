@@ -324,6 +324,17 @@ export const CLAUDE_CLI_ENV = 'HOA_CLAUDE_CLI'
  *  symlink to a file still called `claude.exe`, so both names are tried. */
 export const CLI_NAMES = ['claude', 'claude.exe']
 
+/**
+ * The bin names to try, in the order THIS platform can execute them. On Windows
+ * an npm global install drops three shims side by side — the extension-less
+ * `claude` (a sh script), `claude.cmd` and `claude.ps1` — and `spawn` without a
+ * shell cannot run the first of them, so the executable spellings must come
+ * first there (four-eyes review 04.08.2026, finding 3). PURE.
+ */
+export function cliNames(platform = process.platform) {
+  return platform === 'win32' ? ['claude.exe', 'claude.cmd', 'claude'] : CLI_NAMES
+}
+
 /** Install directories worth trying when PATH is thin — a launcher tick spawned
  *  by a service manager routinely inherits little more than /usr/bin. */
 export function cliFallbackDirs(env = process.env) {
@@ -374,10 +385,15 @@ export function pathDirs({ env = process.env, platform = process.platform } = {}
  * returns an unusable path only moves the same failure one line down, into a
  * spawn error whose message no longer names the real cause.
  */
-export function resolveClaudeCli({ env = process.env, platform = process.platform, readdir, exists, join } = {}) {
+export function resolveClaudeCli({ env = process.env, platform = process.platform, readdir, exists, join, isFile } = {}) {
+  // `exists` says yes to a DIRECTORY too, and a directory named `claude` on PATH
+  // would be handed to `spawn` (review finding 3). Where the caller can tell them
+  // apart it must; where it cannot, existence is the old, weaker answer.
   const usable = (p) => {
     try {
-      return typeof p === 'string' && p !== '' && exists(p) === true
+      if (typeof p !== 'string' || p === '') return false
+      if (exists(p) !== true) return false
+      return typeof isFile === 'function' ? isFile(p) === true : true
     } catch {
       return false
     }
@@ -388,8 +404,8 @@ export function resolveClaudeCli({ env = process.env, platform = process.platfor
   const bundled = findClaudeExe({ base: claudeExeBase(env), readdir, exists, join })
   if (usable(bundled)) return bundled
 
-  for (const dir of [...pathDirs({ env, platform }), ...cliFallbackDirs(env)]) {
-    for (const name of CLI_NAMES) {
+  for (const dir of new Set([...pathDirs({ env, platform }), ...cliFallbackDirs(env)])) {
+    for (const name of cliNames(platform)) {
       const candidate = join(dir, name)
       if (usable(candidate)) return candidate
     }
@@ -400,11 +416,49 @@ export function resolveClaudeCli({ env = process.env, platform = process.platfor
 /** What the resolver looked at, for the alert that fires when it found nothing:
  *  a silent absence is the failure mode this point exists to end. PURE. */
 export function cliSearchSummary({ env = process.env, platform = process.platform } = {}) {
-  const dirs = [...pathDirs({ env, platform }), ...cliFallbackDirs(env)]
+  const dirs = new Set([...pathDirs({ env, platform }), ...cliFallbackDirs(env)])
   return (
     `platform ${platform}; ${CLAUDE_CLI_ENV}=${env?.[CLAUDE_CLI_ENV] ?? '(unset)'}; ` +
-    `bundle base ${claudeExeBase(env)}; ${dirs.length} director(ies) searched for ${CLI_NAMES.join('/')}`
+    `bundle base ${claudeExeBase(env)}; ${dirs.size} director(ies) searched for ${cliNames(platform).join('/')}`
   )
+}
+
+// --- WHICH PROJECT KEYS THE TRUST SELF-HEAL MUST WRITE ------------------------
+//
+// The launcher marks its own repo as trusted so a headless `-p` never meets the
+// trust dialog it cannot answer. That heal used to name two hard-coded
+// `C:/Users/Patri/…` spellings, which the move to Linux made useless — and the
+// obvious repair (use the launcher's own `REPO`) is wrong in a way only a test
+// catches: `fileURLToPath(new URL('..', …))` KEEPS ITS TRAILING SEPARATOR, while
+// the CLI keys `projects` by the resolved path WITHOUT one. Writing
+// `/workspace/hoa/` next to the `/workspace/hoa` the CLI reads heals nothing and
+// looks like it did. This is pure so the spellings can be proven (four-eyes
+// review 04.08.2026, finding 1).
+
+/** Every spelling of `repoPath` the CLI might key its `projects` map by. PURE. */
+export function repoTrustKeys(repoPath) {
+  const raw = String(repoPath ?? '').trim()
+  if (!raw) return []
+  // Strip the trailing separator — but never turn a root ("/" or "C:/") into ''.
+  const slashed = raw.replace(/\\/g, '/')
+  const trimmed = slashed.length > 1 ? slashed.replace(/\/+$/, '') || slashed[0] : slashed
+  const keys = new Set([trimmed])
+  if (/^[a-zA-Z]:/.test(trimmed)) {
+    // A Windows path is written with either slash and either drive-letter case,
+    // and the CLI has been observed using each; all four are cheap to trust.
+    for (const p of [trimmed[0].toLowerCase() + trimmed.slice(1), trimmed[0].toUpperCase() + trimmed.slice(1)]) {
+      keys.add(p).add(p.replace(/\//g, '\\'))
+    }
+  }
+  return [...keys]
+}
+
+/** Where the CLI keeps `.claude.json`. `CLAUDE_CONFIG_DIR` wins where it is set —
+ *  it is set on the Linux host, and reading `~/.claude.json` there found nothing
+ *  at all, so the heal warned and did nothing (review finding 2). PURE. */
+export function claudeConfigPath({ env = process.env, home = '', join: j = (a, b) => `${a}/${b}` } = {}) {
+  const dir = typeof env?.CLAUDE_CONFIG_DIR === 'string' && env.CLAUDE_CONFIG_DIR.trim() !== '' ? env.CLAUDE_CONFIG_DIR.trim() : home
+  return j(dir, '.claude.json')
 }
 
 // ---------------------------------------------------------------------------

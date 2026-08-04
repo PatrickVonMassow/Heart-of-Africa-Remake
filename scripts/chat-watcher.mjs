@@ -261,7 +261,18 @@ function onResponderExit(code) {
 function spawnResponder(messages) {
   const prompt = buildResponderPrompt(messages)
   if (!prompt) return false
-  const exe = resolveClaudeCli({ readdir: readdirSync, exists: existsSync, join })
+  const exe = resolveClaudeCli({
+    readdir: readdirSync,
+    exists: existsSync,
+    isFile: (p) => {
+      try {
+        return statSync(p).isFile()
+      } catch {
+        return false
+      }
+    },
+    join,
+  })
   if (!exe) {
     // Host-neutral since point 490 — this watcher was mute on the Linux host for
     // exactly the launcher's reason, and it is the layer that speaks when a

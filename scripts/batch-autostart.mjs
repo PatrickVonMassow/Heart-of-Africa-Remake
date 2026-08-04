@@ -58,6 +58,8 @@ import {
   chatPromptSuffix,
   resolveClaudeCli,
   cliSearchSummary,
+  repoTrustKeys,
+  claudeConfigPath,
   nextChatHandedAt,
   standingAlertDue,
   pendingSinceHandover,
@@ -771,7 +773,20 @@ if (acq !== 'acquired') {
 // watcher spawns the same executable and a second copy of this path would drift.
 // It is host-neutral since point 490: the Windows-only shape cost three silent
 // hours on the Linux host, so a failure here now NAMES what it searched.
-const exe = resolveClaudeCli({ readdir: readdirSync, exists: existsSync, join })
+const exe = resolveClaudeCli({
+  readdir: readdirSync,
+  exists: existsSync,
+  // `existsSync` says yes to a directory as well, so the file test is injected:
+  // a directory named `claude` on PATH must not be handed to `spawn`.
+  isFile: (p) => {
+    try {
+      return statSync(p).isFile()
+    } catch {
+      return false
+    }
+  },
+  join,
+})
 if (!exe) {
   release(launcherSid)
   const searched = cliSearchSummary()
@@ -786,19 +801,18 @@ if (!exe) {
 }
 
 // Self-heal trust so a headless -p honours the allow-list (idempotent).
+// Both halves of this are host-dependent and both were wrong before point 490:
+// the config lives under CLAUDE_CONFIG_DIR where that is set (it is, on the Linux
+// host — reading ~/.claude.json there found NOTHING and the heal only warned),
+// and the project keys must be this repo's own spellings WITHOUT the trailing
+// separator `REPO` carries. Both are decided in the pure core, where they are
+// tested; a missing file is healed rather than treated as a failure.
 try {
-  const cfgPath = join(os.homedir(), '.claude.json')
-  const cfg = JSON.parse(readFileSync(cfgPath, 'utf8'))
+  const cfgPath = claudeConfigPath({ home: os.homedir(), join })
+  const cfg = existsSync(cfgPath) ? JSON.parse(readFileSync(cfgPath, 'utf8')) : {}
   cfg.projects ??= {}
   let changed = false
-  // The repo THIS launcher runs in, plus the spellings a Windows host writes for
-  // it. Hard-coding only the Windows pair (point 490) meant the Linux host's own
-  // path was never trusted, so a headless `-p` there would have met the trust
-  // dialog it cannot answer.
-  const repoKeys = new Set([REPO.replace(/\\/g, '/'), REPO])
-  const first = [...repoKeys][0]
-  if (/^[a-zA-Z]:/.test(first)) repoKeys.add(first[0].toLowerCase() + first.slice(1)).add(first[0].toUpperCase() + first.slice(1))
-  for (const k of repoKeys) {
+  for (const k of repoTrustKeys(REPO)) {
     cfg.projects[k] ??= {}
     if (cfg.projects[k].hasTrustDialogAccepted !== true) { cfg.projects[k].hasTrustDialogAccepted = true; changed = true }
   }
@@ -839,11 +853,21 @@ try {
   const suffix = chatPromptSuffix(fresh)
   if (suffix) log(`carrying ${fresh.length} chat message(s) into the spawn prompt`)
   child = spawn(exe, buildSpawnArgs({ prompt: RESUME_PROMPT + suffix }), buildSpawnOptions({ cwd: REPO, stdio: ['ignore', out, out] }))
+  // ENOENT, EACCES and EISDIR do NOT throw here — `spawn` reports them
+  // ASYNCHRONOUSLY, so without this handler the one failure class the resolver
+  // can still produce would take the tick down as an unhandled event instead of
+  // through the loud path below (four-eyes review 04.08.2026, finding 4). The
+  // bookkeeping past this point has already run by then, so the handler only
+  // speaks — the runaway ladder does the rest at the next tick.
+  child.on('error', (e) => {
+    log(`FAIL: could not spawn claude (${e && e.message}) — exe ${exe}`)
+    void notify('Spawn failed', `Could not launch the claude CLI at ${exe}: ${e && e.message}`, 'urgent')
+  })
   child.unref()
 } catch (e) {
   release(launcherSid)
   log(`FAIL: could not spawn claude (${e && e.message})`)
-  await notify('Spawn failed', `Could not launch claude.exe: ${e && e.message}`, 'urgent')
+  await notify('Spawn failed', `Could not launch the claude CLI: ${e && e.message}`, 'urgent')
   bail(1) // same reason as the missing-exe path above (point 443 (h))
 }
 // Rebind the pending lock to the child so the singleton's liveness follows the

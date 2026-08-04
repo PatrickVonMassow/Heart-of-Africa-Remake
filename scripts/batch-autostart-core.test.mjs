@@ -50,7 +50,10 @@ import {
   resolveClaudeCli,
   cliSearchSummary,
   cliFallbackDirs,
+  cliNames,
   pathDirs,
+  repoTrustKeys,
+  claudeConfigPath,
   CLAUDE_CLI_ENV,
 } from './batch-autostart-core.mjs'
 import { isOwnSpawn } from './batch-singleton.mjs'
@@ -852,5 +855,91 @@ describe('resolveClaudeCli — the CLI on THIS host, whatever host it is', () =>
     expect(summary).toContain('platform linux')
     expect(summary).toContain('(unset)')
     expect(summary).toMatch(/\d+ director/)
+  })
+})
+
+// --- WHAT THE FOUR-EYES REVIEW OF POINT 490 FOUND (04.08.2026) ---------------
+//
+// The resurrection path itself was right and verified live; both real defects sat
+// in the parts with no coverage. They are pinned here, in the pure core they were
+// moved into for exactly that reason.
+describe('repoTrustKeys — the heal must name the key the CLI actually reads', () => {
+  it('DROPS the trailing separator fileURLToPath leaves behind', () => {
+    // `REPO` is `/workspace/hoa/`; the CLI keys its projects map by `/workspace/hoa`.
+    // Writing the slashed form heals nothing and looks like it did.
+    expect(repoTrustKeys('/workspace/hoa/')).toEqual(['/workspace/hoa'])
+  })
+
+  it('covers both drive-letter cases and both separators on Windows', () => {
+    const keys = repoTrustKeys('C:\\Users\\Patri\\Documents\\Developing\\hoa\\')
+    expect(keys).toContain('C:/Users/Patri/Documents/Developing/hoa')
+    expect(keys).toContain('c:/Users/Patri/Documents/Developing/hoa')
+    expect(keys).toContain('C:\\Users\\Patri\\Documents\\Developing\\hoa')
+    expect(keys.every((k) => !k.endsWith('/') && !k.endsWith('\\'))).toBe(true)
+  })
+
+  it('never trims a root away to nothing, and is total', () => {
+    expect(repoTrustKeys('/')).toEqual(['/'])
+    expect(repoTrustKeys('')).toEqual([])
+    expect(repoTrustKeys()).toEqual([])
+  })
+})
+
+describe('claudeConfigPath — CLAUDE_CONFIG_DIR wins where it is set', () => {
+  const join = (a, b) => `${a}/${b}`
+
+  it('follows CLAUDE_CONFIG_DIR — the Linux host has no ~/.claude.json at all', () => {
+    expect(claudeConfigPath({ env: { CLAUDE_CONFIG_DIR: '/home/node/.claude' }, home: '/home/node', join })).toBe(
+      '/home/node/.claude/.claude.json',
+    )
+  })
+
+  it('falls back to the home directory when the variable is unset or blank', () => {
+    expect(claudeConfigPath({ env: {}, home: '/home/node', join })).toBe('/home/node/.claude.json')
+    expect(claudeConfigPath({ env: { CLAUDE_CONFIG_DIR: '  ' }, home: '/h', join })).toBe('/h/.claude.json')
+  })
+})
+
+describe('the resolver may only return something spawn can execute', () => {
+  const join = (...p) => p.join('/')
+
+  it('REFUSES a directory named claude on PATH — exists() says yes to those', () => {
+    const opts = {
+      env: { PATH: '/opt/bin' },
+      platform: 'linux',
+      join,
+      readdir: () => {
+        throw new Error('ENOENT')
+      },
+      exists: (p) => p === '/opt/bin/claude',
+      isFile: () => false,
+    }
+    expect(resolveClaudeCli(opts)).toBe(null)
+    expect(resolveClaudeCli({ ...opts, isFile: () => true })).toBe('/opt/bin/claude')
+  })
+
+  it('prefers the executable shims on Windows — spawn cannot run the sh script', () => {
+    expect(cliNames('win32')).toEqual(['claude.exe', 'claude.cmd', 'claude'])
+    expect(cliNames('linux')[0]).toBe('claude')
+    expect(
+      resolveClaudeCli({
+        env: { PATH: 'C:/npm' },
+        platform: 'win32',
+        join,
+        readdir: () => {
+          throw new Error('ENOENT')
+        },
+        exists: (p) => ['C:/npm/claude', 'C:/npm/claude.cmd'].includes(p),
+        isFile: () => true,
+      }),
+    ).toBe('C:/npm/claude.cmd')
+  })
+
+  it('counts each searched directory once, however PATH and the fallbacks overlap', () => {
+    expect(cliSearchSummary({ env: { PATH: '/usr/bin:/usr/local/bin' }, platform: 'linux' })).toMatch(
+      /(\d+) director/,
+    )
+    const n = Number(cliSearchSummary({ env: { PATH: '/usr/bin' }, platform: 'linux' }).match(/(\d+) director/)[1])
+    expect(n).toBe(new Set(['/usr/bin', ...cliFallbackDirs({})]).size)
   })
 })
