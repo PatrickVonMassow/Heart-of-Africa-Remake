@@ -1,6 +1,6 @@
 // Headless verification for CLAUDE.md §7.1.31 (settlement orientation after
 // a gift and distant panorama wildlife, design.md §17/§2). Dev server only.
-import { launchVerifyBrowser, waitForStable, assertBackend } from './_browser.mjs'
+import { launchVerifyBrowser, waitForStable, waitForReadingStable, assertBackend } from './_browser.mjs'
 import { frameShutter } from './frameSubject.mjs'
 import { judgeFootingSeries, judgePitchSeries, MIN_SLOPED_SAMPLES } from './footingSeries.mjs'
 import { fileURLToPath } from 'node:url'
@@ -814,16 +814,24 @@ if (mosque) {
   await page.evaluate(() => window.__game.getState().enterPlace('maasai-village'))
   await page.waitForFunction(() => !!window.__placeSeason, null, { timeout: 30000 })
 
-  const read = () => page.evaluate(() => window.__placeSeason())
+  // Poll until the WHOLE season reading settles — sun, sky, tint and rain, the
+  // values the checks below assert — and say whether it truly did (point 499).
+  // Watching only `sun` over a 6 s window measured a half-lerped state on the
+  // slower container host and blamed the product for it: dry grayMix 0.146 where
+  // the preset is 0, wet sun 2.348 where the rains take it to 1.44. Given the
+  // time, every one of these reaches its target exactly, so the lerp was never
+  // the bug — the window was.
+  const settle = async (label) => {
+    const r = await waitForReadingStable(page, () => window.__placeSeason(), { settleMs: 500, samples: 3, timeout: 60000 })
+    check(`the ${label} settlement season reading settles before it is read`, r.settled, `after ${r.waitedMs} ms`)
+    return r.value
+  }
   await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(0))
-  // Poll until the dome-gray lerp settles (point 200), not a fixed wall wait.
-  await waitForStable(page, () => window.__placeSeason().sun, { settleMs: 200, timeout: 6000 })
-  const dry = await read()
+  const dry = await settle('dry')
   await frame('110-village-season-dry', { place: 'maasai-village', label: 'the settlement in the dry season' })
 
   await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(1))
-  await waitForStable(page, () => window.__placeSeason().sun, { settleMs: 200, timeout: 6000 })
-  const wet = await read()
+  const wet = await settle('wet')
   await frame('111-village-season-wet', { place: 'maasai-village', label: 'the settlement in the wet season' })
 
   check(
