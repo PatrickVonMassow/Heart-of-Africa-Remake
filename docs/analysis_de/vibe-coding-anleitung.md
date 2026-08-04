@@ -233,7 +233,11 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Etabliere einen Mechanismus, der vor einer Code-Änderung auf einen roten Test
   hin ein **Experiment** verlangt: Belastet der Befund das Produkt oder die Messung? Gemessen
   wird nur an einem eingeschwungenen Zustand, und eine Prüfung schlägt auch dann fehl, wenn
-  ihr Messwert in die *unerwartete* Richtung ausschlägt — nicht nur über der Grenze."
+  ihr Messwert in die *unerwartete* Richtung ausschlägt — nicht nur über der Grenze. Eine
+  feste Wartezeit vor einer Messung ist dabei eine **verkleidete Maschinengeschwindigkeit**:
+  Auf einem langsameren Rechner misst sie das Nichts und klagt das Produkt an. Die
+  Bereitschaftsbedingung kommt aus dem gemessenen Gegenstand selbst — und lange genug, dass
+  ein Stillstand von Fertigsein unterscheidbar ist."
 
 - **Derselbe Fakt steht an fünf Stellen — und veraltet an vier.** Wer baut, aktualisiert die Stelle, an der
   er gerade schreibt; die übrigen Kopien rotten unbemerkt, und das ‚Was' im Design-Doc passt
@@ -396,4 +400,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 Wenn du diese eine Nachricht an den Anfang stellst, hast du 80 % der Lehren dieses
 Projekts eingebaut, bevor die erste Zeile Code entsteht.
 
-<!-- GUIDE-FINGERPRINT: 5e9374e2f0b0a4102c8556dc42d2f6026f3457b6ead84c0d82d804bab8a3c7d8 -->
+<!-- GUIDE-FINGERPRINT: 45c21a78bc656961531dbd70abbf3e04b0e94be6c825cebfc64ecc77c025a472 -->
