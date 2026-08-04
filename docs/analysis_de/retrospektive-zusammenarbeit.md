@@ -757,6 +757,16 @@ Das eigentlich Lehrreiche liegt eine Ebene höher. Der Bestand war am 30.07. vol
 
 **Lehre:** Eine Regelprüfung braucht die Achse „was misst das eigentlich?" neben „stimmt der Text noch?". Wo die Antwort „nichts" lautet, gibt es genau zwei zulässige Ausgänge — ein Mechanismus wird gebaut, oder die Regel wird **mit Begründung** als bewusst nicht durchgesetzt vermerkt. Ein stilles „OK" ist der dritte, und der ist derselbe Fehler wie §3.16, nur eine Ebene früher: Er lässt eine Regel als durchgesetzt gelten, bevor sie es je war.
 
+### 3.82 Der Vergleichsstand, der die Startlogik mit dem Verglichenen teilt
+
+Nach dem Umzug lief die vollständige Regression zum ersten Mal wieder — und endete mit sechs roten Suiten, ohne die zweite Backend-Bahn überhaupt zu erreichen. Der Verdacht lag nahe: Am selben Tag war die Prüfumgebung von Software-Rendering auf die echte Grafikkarte umgestellt worden, und die auffälligsten Fehlschläge waren Bildmaße — Kantenenergie 0,00 auf dem Boden, Schneeanteil 1,1 % statt Weiß. Ein Treiberwechsel verändert Filterung und Präzision; das *könnte* die Zahlen bewegt haben.
+
+Das dafür gebaute Werkzeug beantwortet die Frage nicht. Es checkt den Stand VOR der Änderung aus und lässt die Suite dort laufen — aber gegen die AKTUELLEN gemeinsamen Starthelfer und Abhängigkeiten. Beim gewöhnlichen Produktfehler ist das die richtige Näherung; hier war die Änderung genau in diesen Starthelfern, also fuhren beide Seiten des Vergleichs über dieselbe neue Bahn. Das Werkzeug sagt das sogar selbst dazu — „treat the verdict as advisory" —, und diese Zeile ist der ganze Unterschied zwischen einer Messung und einer Beruhigung.
+
+Isoliert hat es am Ende ein anderer Schnitt: dieselbe Prüfung auf demselben Stand, einmal mit und einmal ohne Karte (der Umschalter, den die Bahn selbst mitbrachte). Beide Male 0,00. Damit war die Bahn entlastet und der Fehler als echt erkannt — in drei Minuten, ohne einen einzigen Auschecken-Vorgang.
+
+**Lehre:** Ein Vergleich isoliert nur, was er nicht mit beiden Seiten teilt. Sitzt die Änderung in der Messapparatur selbst, ist der Zeitvergleich („vorher/nachher") das falsche Werkzeug — richtig ist der Schaltervergleich am GLEICHEN Stand. Und die zweite Hälfte dieser Klasse: Sechs rote Suiten standen unbemerkt auf `main`, weil nach dem Umzug niemand den vollen Lauf mehr gefahren hatte. Was nur gelegentlich läuft, ist kein Netz, sondern eine Stichprobe.
+
 ---
 
 ## 4. Die Guards als Immunsystem
@@ -846,7 +856,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Dienstag, 04.08.2026, 18:40 · Quellen-Fingerprint: `1db7a406d2b7…`
+Zuletzt aktualisiert: Dienstag, 04.08.2026, 19:46 · Quellen-Fingerprint: `5e9374e2f0b0…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -924,8 +934,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | CORRECTED 19.07.2026 — WebGPU IS testable headless/autonomously via system Chrome (channel:'chrome') + --headless=new; the 'untestable' belief held only for Playwright's BUNDLED Chromium | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 70 Feedback-/Projekt-Memories · 42 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 28 Prozess-/Meta-TASKS-Punkte (davon 12 offen).
+Erfasste Quellen: 70 Feedback-/Projekt-Memories · 42 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 29 Prozess-/Meta-TASKS-Punkte (davon 13 offen).
 
-<!-- RETRO-FINGERPRINT: 1db7a406d2b7aa2d154bb958d4ba6220fee3eb2c9e5384ced5db9b00c53c857d -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-04T16:40:36.863Z -->
+<!-- RETRO-FINGERPRINT: 5e9374e2f0b0a4102c8556dc42d2f6026f3457b6ead84c0d82d804bab8a3c7d8 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-04T17:46:45.548Z -->
 <!-- AUTO-GENERATED:END -->
