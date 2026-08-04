@@ -67,7 +67,9 @@ function Figure({
     ? cloakForCloth(cold.cloaks, cold.palette, cloth)
     : null
   return (
-    <group scale={[scale, scale * (kneel ? 0.75 : 1), scale]}>
+    // Named so a speaking figure can be found in the scene graph — the overhead
+    // speech label rides on this object (design.md §13.4).
+    <group name="inhabitant" scale={[scale, scale * (kneel ? 0.75 : 1), scale]}>
       <mesh position={[0, bodyH * 0.5, 0]} castShadow>
         <coneGeometry args={[0.32, bodyH, TESSELLATION.figureBody]} />
         <meshStandardMaterial color={cloth} roughness={0.95} />
