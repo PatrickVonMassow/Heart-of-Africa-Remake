@@ -13766,3 +13766,16 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   well-formed, unique and even-weight, no two are less than two syllables apart,
   the four mirror pairs are exact reverses, a phrase observes each atom once, and
   the sort is stable over mixed lengths.
+
+- [x] 484. THE JOURNAL'S COMMUNICATION OBSERVATIONS (user 03.08.2026).
+  FINAL STATE:
+  1. A second, clearly separate section beside the existing entries lists every
+     utterance the player has actually heard, in its sound sequence, sorted by
+     point 477's rule.
+  2. Each carries a free-text field for his own hypothesis. The game never
+     interprets that text.
+  3. The notes save and restore with the game (point 477's store).
+  4. Both languages, and the journal stays non-modal per §16.1.
+  VERIFIABLE: pure Vitest on store and component — an unheard utterance is absent,
+  a heard one appears once, the order holds over mixed lengths, a note survives a
+  save/load round trip.

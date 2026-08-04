@@ -728,6 +728,16 @@ Bemerkenswert ist nicht der Irrtum über die Rechte, sondern der Reflex davor: E
 
 **Lehre:** Ein Schritt innerhalb der Maschine, auf der ich arbeite, gehört mir. Fehlt eine Fähigkeit wirklich, wird EINMAL um die Fähigkeit gebeten — nie um ihre Ausführung. Und bevor überhaupt gebeten wird, wird gemessen, ob der Weg mit dieser Fähigkeit trägt.
 
+### 3.79 Die Scharfstellung war geerbt, nicht versioniert
+
+Der Push-Wächter — Bau, Linter, Abhängigkeitsprüfung und die gesamte Testschicht vor jedem Push — lag seit seiner Einführung ohne Ausführungsrecht im Verzeichnis. Auf dem alten Rechner spielte das keine Rolle: Git für Windows entscheidet an der Kopfzeile einer Datei, ob sie ein Hook ist, nicht am Dateimodus. Linux entscheidet am Modus. In dem Augenblick, in dem die Arbeitskopie in den Container zog, war der Wächter stumm — und blieb es, bis er zufällig auffiel.
+
+Der Rückmeldeweg ist die eigentliche Schärfe daran. Git schweigt nicht: Es schreibt „hook was ignored because it's not set as executable". Aber es schreibt das in einen **erfolgreichen** Push. Der Befund lebt also genau dort, wo niemand hinsieht — in der Ausgabe einer geglückten Aktion —, und keine unserer Prüfungen liest die Ausgabe einer geglückten Aktion. Dieselbe Sitzung fand am selben Tag den Zwilling dazu: Die versionierte Kopie der Container-Definition und die, aus der Docker wirklich baut, waren auseinandergelaufen; ein Neubau aus der Kopie wäre gescheitert. Auch hier war das Artefakt versioniert, seine Wirksamkeit nicht.
+
+Die Klasse ist eng verwandt mit §3.55, aber an einer schärferen Stelle: Dort verlor ein Umzug zugesicherte EIGENSCHAFTEN. Hier verlor er die SCHARFSTELLUNG eines Wächters — und ein stummer Wächter ist schlimmer als keiner, weil die Regel als durchgesetzt gilt und niemand mehr hinschaut (§3.16).
+
+**Lehre:** Was ein Mechanismus scharf macht, gehört mitversioniert und mitgeprüft, nicht nur der Mechanismus selbst. Und für die Klasse „Befund in einer geglückten Ausgabe" gibt es nur eine Abhilfe: Sie muss zu einer eigenen Prüfung werden, die den Erfolgsfall liest — sonst ist die Meldung formal vorhanden und faktisch unsichtbar.
+
 ---
 
 ## 4. Die Guards als Immunsystem
@@ -817,7 +827,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Dienstag, 04.08.2026, 10:43 · Quellen-Fingerprint: `a3a36516b48f…`
+Zuletzt aktualisiert: Dienstag, 04.08.2026, 14:59 · Quellen-Fingerprint: `f5b6aa2fe844…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -895,8 +905,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | CORRECTED 19.07.2026 — WebGPU IS testable headless/autonomously via system Chrome (channel:'chrome') + --headless=new; the 'untestable' belief held only for Playwright's BUNDLED Chromium | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 70 Feedback-/Projekt-Memories · 40 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 26 Prozess-/Meta-TASKS-Punkte (davon 10 offen).
+Erfasste Quellen: 70 Feedback-/Projekt-Memories · 40 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 27 Prozess-/Meta-TASKS-Punkte (davon 11 offen).
 
-<!-- RETRO-FINGERPRINT: a3a36516b48f0fdbbd27e8039897f163aa55087b594f2f8d875fe4ba9d25792f -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-04T08:43:21.931Z -->
+<!-- RETRO-FINGERPRINT: f5b6aa2fe84456aeb066afc2fe074e85fe931a7a44d58a276619adff3c57a777 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-04T12:59:20.881Z -->
 <!-- AUTO-GENERATED:END -->
