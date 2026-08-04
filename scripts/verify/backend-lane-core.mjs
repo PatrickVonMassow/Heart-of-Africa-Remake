@@ -42,7 +42,8 @@ export function laneRenderers(systemChrome, platform = process.platform) {
       reason:
         `${WEBGPU_UNAVAILABLE}: no system Chrome on this host. Playwright's bundled Chromium ` +
         'reports navigator.gpu as undefined here (measured 04.08.2026), so the lane cannot open. ' +
-        'Install one: sudo bash scripts/verify-host-setup.sh',
+        'Install one from outside the container (sudo cannot — the image allows node only the firewall script): ' +
+        'docker exec -u root <container> bash -lc "cd /workspace/hoa && bash scripts/verify-host-setup.sh"',
     },
   ]
 }

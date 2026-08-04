@@ -14,7 +14,22 @@
 # Both missing pieces install system-wide, so this script needs root ONCE. It is idempotent:
 # a second run installs nothing and says so.
 #
-# Usage:  sudo bash scripts/verify-host-setup.sh
+# HOW TO GET ROOT HERE — `sudo` is NOT the way (measured 04.08.2026). The official Claude
+# Code image grants the `node` user exactly one passwordless command:
+#     node ALL=(root) NOPASSWD: /usr/local/bin/init-firewall.sh
+# Anything else prompts for a password that was never set, so `sudo bash …` dead-ends for
+# the user as much as for a session. Run it from OUTSIDE the container instead, e.g. in
+# PowerShell on the Windows host:
+#     docker ps                                   # find the container name
+#     docker exec -it -u root <name> bash -lc "cd /workspace/hoa && bash scripts/verify-host-setup.sh"
+# Widening the sudoers file to NOPASSWD: ALL would undo a deliberate part of the image's
+# hardening — the docker route grants root for one command instead of forever.
+#
+# WHAT DOES NOT SURVIVE: a container REBUILD discards this, because it changes the running
+# container and not the image. Re-running it costs one command (it is idempotent); baking it
+# into the container definition is the durable fix and lives on the host, not in this repo.
+#
+# Usage:  docker exec -u root <container> bash -lc "cd /workspace/hoa && bash scripts/verify-host-setup.sh"
 #         bash scripts/verify-host-setup.sh --check   (no root, reports what is missing)
 set -euo pipefail
 
@@ -38,13 +53,15 @@ if [ "$CHECK_ONLY" = "1" ]; then
   say "verify-host-setup: MISSING on this host —"
   for m in "${missing[@]}"; do say "  · $m"; done
   say ""
-  say "Install with: sudo bash scripts/verify-host-setup.sh"
+  say "Install it from OUTSIDE the container (sudo cannot: the image allows node only the firewall script):"
+  say "  docker exec -it -u root <container> bash -lc \"cd /workspace/hoa && bash scripts/verify-host-setup.sh\""
   exit 1
 fi
 
 if [ "$(id -u)" != "0" ]; then
   say "verify-host-setup: this needs root (it installs system packages)."
-  say "Run: sudo bash scripts/verify-host-setup.sh    — or --check to see what is missing."
+  say "From OUTSIDE the container: docker exec -it -u root <container> bash -lc \"cd /workspace/hoa && bash scripts/verify-host-setup.sh\""
+  say "Or --check (no root) to see what is missing."
   exit 1
 fi
 
