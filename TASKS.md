@@ -4362,3 +4362,29 @@ Build order, chosen so no two parallel agents own the same file:
   is blocked; an answer asking for a GPU device, a mount or an image line passes;
   a command quoted as a REPORT of what the session itself ran passes; and the
   guard returns "allow" on any internal error.
+
+- [ ] 495. A VERSIONED GIT HOOK WITHOUT ITS EXECUTABLE BIT IS SILENTLY INERT
+  (found 04.08.2026). `scripts/git-hooks/pre-push` was committed 100644. Git for
+  Windows runs a hook whichever mode it carries, so the gate worked on the old
+  host and fell silent the moment the working copy moved to Linux — the only
+  trace was one hint line inside a SUCCESSFUL push ("hook was ignored because
+  it's not set as executable"), which no gate reads. The bit is restored, so this
+  point is not the fix but the MECHANISM that keeps the next hook from repeating
+  it: `scripts/enable-hooks.mjs` already wires `core.hooksPath` on every
+  `npm install` and is the one place that knows the hook directory.
+  FINAL STATE:
+  1. `enable-hooks.mjs` also ensures every file directly under
+     `scripts/git-hooks/` is executable for the user on POSIX — `chmod` the
+     working file AND `git update-index --chmod=+x` where the INDEX mode is
+     644, so a fresh clone gets it too rather than needing the same repair.
+     Windows has no such mode; the step is skipped there, not faked.
+  2. It stays FAIL-OPEN and quiet, like the rest of that script: a read-only
+     checkout, a tarball without `.git`, a hook directory that does not exist —
+     each leaves the install green. Only a mode it actually changed is reported,
+     one line per file, so a silent repair cannot pass for "nothing was wrong".
+  3. A Vitest case pins the decision: given a listing of hook files with their
+     modes, which need a chmod and which are already right. The decision is a
+     pure function so the test never touches a real repository.
+  VERIFIABLE: `npm run test:unit` covers the decision function, including the
+  no-op case, a 644 hook, a non-POSIX platform and an unreadable directory; and
+  `git ls-files -s scripts/git-hooks/` reports 100755 for every hook.
