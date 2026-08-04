@@ -27,6 +27,15 @@
 //     watchdogged). A guard that offered no way through would only teach the
 //     session to phrase the same command differently.
 //
+// WHERE THE LINE IS. It catches plausible REPHRASINGS — `eval '…'`, `su -c`,
+// an `xargs` pipe, `nsenter`, `env -`, a subshell/brace group/function — because
+// those are what someone reaches for when the obvious form is denied and they
+// still believe they need it. It does NOT chase deliberate evasion: a
+// substituted tool name (`sudo $(which iptables)`), a variable holding it, a
+// `node -e`/`python3 -c` one-liner, a renamed copy. The only actor this guard
+// protects is the session typing the command, and chasing those buys false
+// positives on ordinary substitution and interpreter use rather than safety.
+//
 // FAIL DIRECTION: allow. Every shape it cannot parse falls through to no
 // finding, and the wrapper is fail-open on top of that. A missed mutation costs
 // one risky command; a false deny costs the session the ability to work.
@@ -41,6 +50,7 @@ export const FIREWALL_SCRIPT_NAME = 'init-firewall.sh'
 const WRAPPERS = new Set([
   'sudo',
   'doas',
+  'su',
   'env',
   'nohup',
   'setsid',
@@ -53,6 +63,8 @@ const WRAPPERS = new Set([
   'stdbuf',
   'unbuffer',
   'timeout',
+  'xargs',
+  'nsenter',
   'then',
   'do',
   'else',
@@ -120,28 +132,75 @@ export const IPSET_READONLY = new Set([
 
 /** `ip` sub-objects whose verbs can cut the container off. */
 const IP_OBJECTS = new Set(['route', 'rule', 'link', 'addr', 'address', 'netns', 'neigh'])
-const IP_MUTATING = new Set(['add', 'del', 'delete', 'change', 'replace', 'append', 'flush', 'set', 'up', 'down'])
-
-/** The sanctioned routes. A segment naming one is never an offence. */
-export const SANCTIONED_RE = /scripts[/\\]firewall-(?:allow|rebuild)\.mjs/
 
 /**
- * Unwrap `bash -c '<inner>'` (and sh/zsh/dash) so a mutation hidden in the
- * quoted payload is still scanned. Done BEFORE quotes are blanked, because
- * blanking would otherwise erase exactly this payload.
+ * `ip` verbs that CHANGE something. `up`/`down` are deliberately absent: they
+ * only mutate as the tail of `ip link set … up`, which `set` already catches,
+ * while `ip link show up`, `ip -br link show up` and `ip addr show up` are pure
+ * READS — `up` there is a filter for the interfaces that are up. Matching it
+ * anywhere after the object denied all three, and a guard that blocks ordinary
+ * reads gets disarmed by the next session.
+ */
+const IP_MUTATING = new Set(['add', 'del', 'delete', 'change', 'replace', 'append', 'flush', 'set'])
+
+/**
+ * The sanctioned routes. A segment naming one is never an offence.
+ * `firewall-guard.mjs` is in here for its `--check '<command>'` self-test: the
+ * command it is ASKED about is an argument, never an execution, and without
+ * this the guard denied the one call the four-eyes review is told to make.
+ */
+export const SANCTIONED_RE = /scripts[/\\]firewall-(?:allow|rebuild|guard)\.mjs/
+
+/**
+ * Everything that takes a QUOTED command line and runs it: `bash -c '…'` and
+ * its shell siblings, `su [user] -c '…'` (with or without a `sudo` in front),
+ * and `eval '…'`, which is `bash -c` without the bash. The quote and the
+ * payload are the same two groups whichever alternative matched.
+ */
+export const SHELL_RUNNER_RE =
+  /\b(?:(?:bash|sh|zsh|dash|ksh)\s+-[a-z]*c|su(?:\s+(?:-[a-z]+|[\w.-]+))*?\s+-[a-z]*c|eval)\s+(['"])([\s\S]*?)\1/
+
+/**
+ * Unwrap a quoted payload (see SHELL_RUNNER_RE) so a mutation hidden inside it
+ * is still scanned. Done BEFORE quotes are blanked, because blanking would
+ * otherwise erase exactly this payload.
  *
  * Bounded, so a pathological nesting cannot spin: five levels is far past
  * anything a human writes, and the sixth simply falls through to allow.
  */
 export function unwrapShellRunners(command, maxDepth = 5) {
   let text = String(command ?? '')
-  const re = /\b(?:bash|sh|zsh|dash|ksh)\s+-[a-z]*c\s+(['"])([\s\S]*?)\1/
   for (let i = 0; i < maxDepth; i++) {
-    const m = re.exec(text)
+    const m = SHELL_RUNNER_RE.exec(text)
     if (!m) break
     text = text.slice(0, m.index) + ' ' + m[2] + ' ' + text.slice(m.index + m[0].length)
   }
   return text
+}
+
+/**
+ * `A | xargs B` runs B with A's output appended to it, so neither half is a
+ * command the segment scan can judge on its own: `echo "-F" | xargs sudo
+ * iptables` hides the flag on the left, `echo iptables -F | xargs sudo` hides
+ * the tool. Fold the pair into ONE synthetic segment — B plus A's arguments —
+ * and APPEND it, so both halves keep being judged on their own terms too.
+ *
+ * The quotes are dropped from the synthetic segment rather than blanked: what
+ * the pipe delivers to B is the string, not the quoting around it.
+ */
+export function foldXargs(command) {
+  const text = String(command ?? '')
+  const parts = text.split('|')
+  const folded = []
+  for (let i = 1; i < parts.length; i++) {
+    const right = parts[i].trim()
+    if (!/^xargs\b/.test(right)) continue
+    const producedArgs = parts[i - 1].trim().split(/\s+/).filter(Boolean).slice(1)
+    const target = right.replace(/^xargs\b/, '').trim()
+    const line = `${target} ${producedArgs.join(' ')}`.replace(/['"]/g, '').trim()
+    if (line) folded.push(line)
+  }
+  return folded.length ? `${text}\n${folded.join('\n')}` : text
 }
 
 /**
@@ -186,12 +245,25 @@ export function baseNameOf(token) {
 }
 
 /**
+ * Strip the shell syntax that GROUPS a command without being one: a subshell
+ * `( … )`, a brace group `{ …; }` and a function definition `f() { … }`. All
+ * three read as ordinary command words otherwise — `(sudo` is not `sudo`, and
+ * `-F)` is not the `-F` the mutation pattern looks for.
+ */
+export function unwrapGrouping(segment) {
+  return String(segment ?? '')
+    .replace(/^[\s({]+/, '')
+    .replace(/^[A-Za-z_]\w*\s*\(\s*\)\s*\{?\s*/, '')
+    .replace(/[\s);}]+$/, '')
+}
+
+/**
  * The command a segment actually runs, plus its arguments — with `sudo`, `env
  * VAR=…`, `timeout 300` and the rest of the wrapper words peeled off. `sudo -u
  * root` needs its value skipped too, or `root` would read as the command.
  */
 export function commandOf(segment) {
-  const tokens = String(segment ?? '')
+  const tokens = unwrapGrouping(segment)
     .trim()
     .split(/\s+/)
     .filter(Boolean)
@@ -202,9 +274,14 @@ export function commandOf(segment) {
       i++
       continue
     }
+    if (t === '-' || t === '--') {
+      i++ // `env - <cmd>` clears the environment; `--` ends a wrapper's flags
+      continue
+    }
     if (/^-[-\w]/.test(t)) {
-      // a wrapper's own flag; `-u`/`-g`/`--user`/`--group` also eat their value
-      if (/^(?:-u|-g|--user|--group)$/.test(t)) i++
+      // a wrapper's own flag; these eat their value too (`sudo -u root`,
+      // `nsenter -t 1`) — but never a value that is itself a flag
+      if (/^(?:-u|-g|-t|--user|--group|--target)$/.test(t) && !/^-/.test(tokens[i + 1] ?? '-')) i++
       i++
       continue
     }
@@ -300,7 +377,7 @@ export function offenceIn(segment) {
 /** The first offence in a command line, or null. Never throws. */
 export function findOffence(command) {
   try {
-    const text = blankQuoted(unwrapShellRunners(command))
+    const text = blankQuoted(foldXargs(unwrapShellRunners(command)))
     for (const segment of segmentsOf(text)) {
       const offence = offenceIn(segment)
       if (offence) return { ...offence, excerpt: segment.slice(0, EXCERPT_CHARS) }
@@ -333,7 +410,10 @@ export function formatReason(offence) {
     '      node scripts/firewall-rebuild.mjs --status # the outcome\n' +
     '    No tool timeout can reach a detached run, and the watchdog re-opens the gate if it fails.\n' +
     '  • sealed already → node scripts/firewall-rebuild.mjs --open (emergency unseal).\n\n' +
-    'Reading is not blocked: `iptables -L -n`, `iptables -S`, `iptables-save`, `ipset list` all pass.'
+    'Reading is not blocked: `iptables -L -n`, `iptables -S`, `iptables-save`, `ipset list` all pass.\n' +
+    'WRITING ABOUT IT is not blocked either — but a heredoc is judged line by line, because that is\n' +
+    'how a heredoc EXECUTES one. If this was prose (`cat <<EOF` into a doc, an incident note), use the\n' +
+    'Write tool for the file instead of piping it through the shell.'
   )
 }
 

@@ -13,9 +13,11 @@ import {
   commandOf,
   evaluate,
   findOffence,
+  foldXargs,
   formatReason,
   offenceIn,
   segmentsOf,
+  unwrapGrouping,
   unwrapShellRunners,
 } from './firewall-guard-core.mjs'
 import { GUARDED_TOOLS, commandFrom } from './firewall-guard.mjs'
@@ -141,8 +143,26 @@ describe('the other firewall front-ends and the network path', () => {
     expect(blocks('sudo firewall-cmd --state')).toBe(false)
     expect(blocks('ip route')).toBe(false)
     expect(blocks('ip route | grep default')).toBe(false) // the init script's own probe
+    expect(blocks('ip route show table all')).toBe(false)
+    expect(blocks('ip route get 1.1.1.1')).toBe(false)
+    expect(blocks('ip neigh')).toBe(false)
+    expect(blocks('ip netns list')).toBe(false)
     expect(blocks('ip -4 addr show')).toBe(false)
     expect(blocks('ip link')).toBe(false)
+  })
+  // `up` was matched ANYWHERE after the object, so the standard way to list the
+  // interfaces that are actually up read as `ip link set … up`. A guard that
+  // denies a plain read is a guard the next session disarms.
+  it('lets the up-FILTER reads through, which are not `set … up`', () => {
+    expect(blocks('ip link show up')).toBe(false)
+    expect(blocks('ip -br link show up')).toBe(false)
+    expect(blocks('ip addr show up')).toBe(false)
+    expect(blocks('ip -br -c link show up')).toBe(false)
+  })
+  it('still denies the mutation those reads were confused with', () => {
+    expect(blocks('sudo ip link set eth0 up')).toBe(true)
+    expect(blocks('sudo ip link set eth0 down')).toBe(true)
+    expect(blocks('sudo ip link set dev eth0 down')).toBe(true)
   })
 })
 
@@ -163,9 +183,26 @@ describe('the sanctioned routes always pass', () => {
       'node scripts/firewall-rebuild.mjs --run',
       'node scripts/firewall-rebuild.mjs --status',
       'node scripts/firewall-rebuild.mjs --open',
+      'node scripts/firewall-rebuild.mjs --run --watchdog-ms 30000 --force',
     ]) {
       expect(blocks(cmd), cmd).toBe(false)
     }
+  })
+  // The guard's own self-check hands it the command as an ARGUMENT — asking is
+  // not running. It is the call the four-eyes review is told to make, and the
+  // wrapper's header names it, so denying it would deny the review its way in.
+  it('never blocks its own --check, whatever it is asked about', () => {
+    for (const cmd of [
+      "node scripts/firewall-guard.mjs --check 'sudo iptables -F'",
+      'node scripts/firewall-guard.mjs --check \'eval "sudo iptables -F"\'',
+      "node scripts/firewall-guard.mjs --check 'sudo /usr/local/bin/init-firewall.sh'",
+    ]) {
+      expect(blocks(cmd), cmd).toBe(false)
+    }
+  })
+  it('but a real command CHAINED after a sanctioned one is still judged on its own', () => {
+    expect(blocks('node scripts/firewall-guard.mjs --check x && sudo iptables -F')).toBe(true)
+    expect(blocks('node scripts/firewall-allow.mjs api.github.com ; sudo ipset destroy allowed-domains')).toBe(true)
   })
 })
 
@@ -217,6 +254,79 @@ describe('compound and wrapped command lines', () => {
     expect(blocks('iptables -L -n | grep -c ACCEPT')).toBe(false)
     expect(blocks('ipset list | head -20')).toBe(false)
     expect(blocks('npm run test:unit && git push')).toBe(false)
+  })
+})
+
+// Plausible REPHRASINGS of the same command, not evasion: each of these is
+// what someone reaches for when the obvious form is denied and they still
+// believe they need it. The list below them is the deliberate line: forms that
+// hide the tool name from any static reader, which the guard does not chase
+// because chasing them buys false positives rather than safety — the only
+// actor this guard protects is the session running it.
+describe('the rephrasings that used to slip through', () => {
+  it('denies a quoted payload handed to eval, which is bash -c without the bash', () => {
+    expect(blocks('eval "sudo iptables -F"')).toBe(true)
+    expect(blocks("eval 'sudo ipset destroy allowed-domains'")).toBe(true)
+    expect(blocks('eval "sudo /usr/local/bin/init-firewall.sh"')).toBe(true)
+  })
+  it('denies the su spellings, with and without a user and either side of the -c', () => {
+    expect(blocks('sudo su -c "iptables -F"')).toBe(true)
+    expect(blocks('sudo su root -c "iptables -F"')).toBe(true)
+    expect(blocks('su -c "iptables -F" root')).toBe(true)
+    expect(blocks('su -c "ipset destroy allowed-domains"')).toBe(true)
+  })
+  it('denies a command assembled across an xargs pipe, whichever half carries what', () => {
+    expect(blocks('echo "-F" | xargs sudo iptables')).toBe(true) // the flag comes down the pipe
+    expect(blocks('echo iptables -F | xargs sudo')).toBe(true) // the tool comes down the pipe
+    expect(blocks('echo "destroy allowed-domains" | xargs sudo ipset')).toBe(true)
+  })
+  it('denies a run inside another namespace', () => {
+    expect(blocks('nsenter -t 1 -n iptables -F')).toBe(true)
+    expect(blocks('nsenter -t 1 -n -- iptables -F')).toBe(true)
+    expect(blocks('sudo nsenter -t 1 -n ipset destroy allowed-domains')).toBe(true)
+  })
+  it('denies the container script behind a cleared environment', () => {
+    expect(blocks('sudo env - /usr/local/bin/init-firewall.sh')).toBe(true)
+    expect(blocks('sudo env -i /usr/local/bin/init-firewall.sh')).toBe(true)
+  })
+  it('denies a subshell, a brace group and a shell function', () => {
+    expect(blocks('(sudo iptables -F)')).toBe(true)
+    expect(blocks('( sudo iptables -F )')).toBe(true)
+    expect(blocks('{ sudo iptables -F; }')).toBe(true)
+    expect(blocks('f() { sudo iptables -F; }; f')).toBe(true)
+  })
+  it('reports each of them under the rule that actually bit', () => {
+    expect(idOf('eval "sudo iptables -F"')).toBe('iptables-mutate')
+    expect(idOf('echo iptables -F | xargs sudo')).toBe('iptables-mutate')
+    expect(idOf('sudo env - /usr/local/bin/init-firewall.sh')).toBe('init-firewall')
+  })
+  // The widenings above must not cost the pipe, the group or the pipeline their
+  // ordinary uses — every one of these is a shape the session runs daily.
+  it('leaves the innocent forms of every widened shape alone', () => {
+    expect(blocks('find . -name "*.log" | xargs rm')).toBe(false)
+    expect(blocks('ipset list | xargs echo')).toBe(false)
+    expect(blocks('git ls-files | xargs grep -l iptables')).toBe(false)
+    expect(blocks('ipset list allowed-domains | xargs -n1 sudo ipset test allowed-domains')).toBe(false)
+    expect(blocks('(cd /tmp && ls)')).toBe(false)
+    expect(blocks('{ npm run build; npm run lint; }')).toBe(false)
+    expect(blocks('run() { npm test; }; run')).toBe(false)
+    expect(blocks('eval "$(ssh-agent -s)"')).toBe(false)
+    expect(blocks('env - node --version')).toBe(false)
+  })
+})
+
+// The line the review drew, recorded so nobody re-opens it as an oversight:
+// these hide the tool name from any static reader, and the only actor the guard
+// protects is the session typing the command. Chasing them buys false positives
+// on ordinary substitution and interpreter use, not safety.
+describe('deliberate evasion is out of scope, and that is a decision', () => {
+  it('does not chase a substituted or variable-held tool name', () => {
+    expect(blocks('sudo $(which iptables) -F')).toBe(false)
+    expect(blocks('x=iptables; sudo $x -F')).toBe(false)
+  })
+  it('does not chase an interpreter one-liner or a renamed copy', () => {
+    expect(blocks('node -e "require(\'child_process\').execSync(\'sudo iptables -F\')"')).toBe(false)
+    expect(blocks('ln -s /sbin/iptables /tmp/x && sudo /tmp/x -F')).toBe(false)
   })
 })
 
@@ -280,8 +390,26 @@ describe('the helpers', () => {
   })
   it('unwrapShellRunners lifts the payload out and stops at its bound', () => {
     expect(unwrapShellRunners('bash -c "echo hi"')).toContain('echo hi')
+    expect(unwrapShellRunners('eval "echo hi"')).toContain('echo hi')
+    expect(unwrapShellRunners('su postgres -c "echo hi"')).toContain('echo hi')
     expect(unwrapShellRunners('x')).toBe('x')
     expect(() => unwrapShellRunners('bash -c "bash -c \'x\'"')).not.toThrow()
+  })
+  it('foldXargs folds the pipe into the one command it composes, and keeps both halves', () => {
+    const folded = foldXargs('echo "-F" | xargs sudo iptables')
+    expect(folded).toContain('echo "-F" | xargs sudo iptables') // the original is still judged
+    expect(folded).toContain('sudo iptables -F') // and so is what it assembles
+    expect(foldXargs('echo iptables -F | xargs sudo')).toContain('sudo iptables -F')
+    expect(foldXargs('ls | grep x')).toBe('ls | grep x') // no xargs, no synthetic segment
+    expect(foldXargs('')).toBe('')
+    expect(() => foldXargs('| xargs')).not.toThrow()
+  })
+  it('unwrapGrouping strips the syntax that groups a command without being one', () => {
+    expect(unwrapGrouping('(sudo iptables -F)')).toBe('sudo iptables -F')
+    expect(unwrapGrouping('{ sudo iptables -F; }')).toBe('sudo iptables -F')
+    expect(unwrapGrouping('f() { sudo iptables -F')).toBe('sudo iptables -F')
+    expect(unwrapGrouping('npm run build')).toBe('npm run build')
+    expect(unwrapGrouping('')).toBe('')
   })
   it('segmentsOf splits on every shell separator and drops the blanks', () => {
     expect(segmentsOf('a && b ; c | d || e')).toEqual(['a', 'b', 'c', 'd', 'e'])
@@ -318,6 +446,21 @@ describe('the deny message', () => {
     expect(reason).toContain('--status')
     expect(reason).toContain('--open')
     expect(reason).toMatch(/iptables -L -n/) // says plainly that reading is fine
+  })
+  // The accepted price of catching a heredoc that EXECUTES: a heredoc that only
+  // WRITES about the incident is judged line by line too, and prose that quotes
+  // `sudo iptables -F` is denied. That is defensible only if the message names
+  // the way out, or the session is left rephrasing a document.
+  it('names the route for PROSE, which the heredoc rule also catches', () => {
+    const reason = formatReason({ what: 'a packet-filter change', excerpt: 'sudo iptables -F' })
+    expect(reason).toMatch(/heredoc/i)
+    expect(reason).toMatch(/Write tool/)
+  })
+  it('is what a denied heredoc of prose actually gets told', () => {
+    const heredoc = "cat >> docs/incident.md <<'EOF'\nsudo iptables -F\nEOF"
+    const verdict = evaluate({ command: heredoc })
+    expect(verdict.block).toBe(true)
+    expect(verdict.reason).toMatch(/Write tool/)
   })
 })
 
