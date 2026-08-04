@@ -4281,3 +4281,26 @@ Build order, chosen so no two parallel agents own the same file:
   VERIFIABLE: pure Vitest — a card written through `board.mjs queue` survives a
   rebuild; a rebuild that would blank an existing card's prose is refused or
   restores it; the report names the cards it emptied.
+
+
+- [ ] 492. THE PIXEL PROBES STILL INHERIT PLAYWRIGHT'S SILENT 30-SECOND DEFAULT
+  (found 04.08.2026 by the four-eyes review of the shutter's capture budget). Only
+  the frame WRITES go through `captureFrame`, and only they now carry an explicit
+  budget. The pathless pixel PROBES — `page.screenshot(...)` with no `path`,
+  returning a buffer so a check can measure luma or colour — deliberately bypass
+  the shutter (the raw-frame gate matches `path:` writes only) and still inherit
+  Playwright's undeclared 30 s. On a host that renders through SwiftShader with no
+  GPU, a probe under suite load exceeds that exactly as the writes did, and the
+  suite dies far from the check it was running: `enrichments.mjs` alone probes at
+  seven sites, `polish.mjs` and `settings.mjs` at more.
+  FINAL STATE:
+  1. ONE named capture budget covers both shapes — the write and the probe — from
+     a single place, so no capture in the harness carries an undeclared deadline.
+  2. A probe that exceeds it fails naming the harness and the site, not as a bare
+     Playwright timeout.
+  3. The budget's value and its reason are written down once, beside the probe
+     budget it sits next to, rather than repeated per call site.
+  VERIFIABLE: pure Vitest — every screenshot call the harness makes, write and
+  probe alike, is handed an explicit timeout above Playwright's default (the
+  existing shutter cases extended to the probe path); a `timeout: 0` (which
+  DISABLES the deadline) fails the same assertion.
