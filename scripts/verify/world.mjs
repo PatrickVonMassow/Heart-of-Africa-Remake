@@ -78,6 +78,59 @@ if (process.env.FRAME_SUBJECT_SELFTEST) {
   process.exit(ok ? 0 : 1)
 }
 
+// A frame is only worth judging once the scene is actually DRAWING: right after
+// the start the terrain chunks are still building and the picture is empty
+// paper, into which a subject projects just as well as into a finished one. Poll
+// the renderer's OWN frame clock (never a wall-clock sleep, CLAUDE.md §7.2)
+// until frames are arriving at a real rate again.
+const waitForLiveFrames = async () => {
+  await page
+    .waitForFunction(
+      () => {
+        const p = window.__perf
+        if (!p || typeof p.frames !== 'function') return false
+        const f = p.frames()
+        if (f.length < 40) return false
+        return f.slice(-30).every((e) => e.dt > 0 && e.dt < 400)
+      },
+      null,
+      { timeout: 90000 },
+    )
+    .catch(() => {})
+}
+await waitForLiveFrames()
+
+// Work-order 482: the communication PoC's two ends of the errand — the Bambara
+// village standing on the Niger, and the erratic upstream where 487 will dig.
+// The coordinates come from the scene's OWN dev hook, so the frames are aimed at
+// what the renderer actually placed for this run's seed, never at a coordinate
+// copied into this script.
+const poc = await page.evaluate(() => window.__communicationRock ?? null)
+if (!poc) {
+  errors.push('window.__communicationRock is missing — the erratic was not placed')
+} else {
+  // Both frames are taken inside the player's own zoom range (point 172:
+  // 0.125-0.5), close enough that they show what they claim — at the wide
+  // default a village and a single block of stone are a few pixels of nothing.
+  // The village is framed a step wider so its huts AND the water fit; the
+  // erratic at the closest zoom, where its shape is the evidence.
+  await page.evaluate(() => window.__ui.getState().setTravelZoom(0.25))
+  await jump(poc.village.lat, poc.village.lon)
+  await waitForLiveFrames()
+  await shot('18-worldmodel-bambara-village-niger', {
+    world: { lat: poc.village.lat, lon: poc.village.lon },
+    label: 'the Bambara village on the Niger',
+  })
+  await page.evaluate(() => window.__ui.getState().setTravelZoom(0.125))
+  await jump(poc.lat, poc.lon)
+  await waitForLiveFrames()
+  await shot('19-worldmodel-communication-erratic', {
+    world: { lat: poc.lat, lon: poc.lon },
+    label: `the erratic ${poc.upstreamDeg.toFixed(1)}° upstream of the Bambara village`,
+  })
+  await page.evaluate(() => window.__ui.getState().setTravelZoom(0.5))
+}
+
 const shots = [
   [30.0, 31.3, '10-worldmodel-nile-delta-cairo', 'the Nile delta at Cairo'],
   [15.6, 32.6, '11-worldmodel-khartoum-confluence', 'the Nile confluence at Khartoum'],
@@ -91,27 +144,6 @@ const shots = [
 for (const [lat, lon, name, label] of shots) {
   await jump(lat, lon)
   await shot(name, { world: { lat, lon }, label })
-}
-
-// Work-order 482: the communication PoC's two ends of the errand — the Bambara
-// village standing on the Niger, and the erratic upstream where 487 will dig.
-// The coordinates come from the scene's OWN dev hook, so the frames are aimed at
-// what the renderer actually placed for this run's seed, never at a coordinate
-// copied into this script.
-const poc = await page.evaluate(() => window.__communicationRock ?? null)
-if (!poc) {
-  errors.push('window.__communicationRock is missing — the erratic was not placed')
-} else {
-  await jump(poc.village.lat, poc.village.lon)
-  await shot('18-worldmodel-bambara-village-niger', {
-    world: { lat: poc.village.lat, lon: poc.village.lon },
-    label: 'the Bambara village on the Niger',
-  })
-  await jump(poc.lat, poc.lon)
-  await shot('19-worldmodel-communication-erratic', {
-    world: { lat: poc.lat, lon: poc.lon },
-    label: `the erratic ${poc.upstreamDeg.toFixed(1)}° upstream of the Bambara village`,
-  })
 }
 
 console.log('console errors:', errors.length ? errors : 'none')
