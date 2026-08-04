@@ -3997,6 +3997,16 @@ also be taken as its own task now and then.
   is actually taken in — the same lie the grouping was reverted for, one layer down. The order the
   queue renders must BE the picker's order, derived from the documented ranking, never a second
   hand-kept list that can drift from it.
+  WHAT THE DRIFT COST, measured 04.08.2026: the user's brief of 03.08.2026 put the communication
+  PoC before the whole queue, and the session wrote that priority into TASKS.md as PROSE ("gives
+  every point here PRIORITY over the rest of the queue") at 01:29. No picker reads prose. The
+  ranking in docs/work-packages.md still opened with Urlaubsfestigkeit and the stored order still
+  led with 440, so every successor session that night re-oriented from the queue, took its top and
+  spent the hours until 09:21 on test infrastructure while the twelve points the user had put first
+  sat at queue position 60. A declared priority that only the reader can see is not a priority.
+  SO, in addition: a priority declared in the work order must be MACHINE-READ into the ranking, and
+  a guard must fail when the two disagree — the declaration, the ranking and the stored order are
+  one statement or the turn does not end.
   MEASURED, not asserted: the point is delivered when a command reports, for the current work
   order, how many agents the top of the queue can actually feed, and that figure is 3 (or the
   reason it cannot be). `--slots-free` already demands a reason for an idle slot; this makes
