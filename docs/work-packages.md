@@ -115,6 +115,13 @@ change) and 449 last, because the drill is what makes the others more than a cla
 
 ## Order of work
 
+**THE RULE IS THE GOAL, NOT THE LIST** (user 04.08.2026): what ranks first is the
+communication PoC being FINISHED as fast as possible. That pulls forward not only
+its own twelve points but anything that raises the rate at which they can be
+worked — the second backend lane (493) is the first such case, because without it
+every picture check of the feature crawls. A point that makes the PoC land sooner
+belongs at the top even when it is not part of the PoC.
+
 **Kommunikation first** (user 03.08.2026, restated 04.08.2026): the communication
 PoC outranks the whole queue — it is the feature the game is being built toward,
 and the user asked for it before everything else. Its own build order is the wave
