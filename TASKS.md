@@ -4544,10 +4544,13 @@ Build order, chosen so no two parallel agents own the same file:
      151 build that declines, while Chrome for Testing (Beta 152, Dev 153, Canary
      153) and `dl.google.com/linux/chrome/deb` both answer from the container, so
      the download path is open. That version axis is the WEAKEST, and the point says
-     so rather than spending on it first: Dozen sits at Vulkan 1.2 with 1.3 blocked
-     on unavailable D3D12 APIs, and Dawn silently skips a driver whose feature set
-     falls short — which is exactly the observed one-second fall back to SwiftShader
-     with dzn as the only ICD. A newer Dawn demands more, not less.
+     so rather than spending on it first: the installed dzn ICD declares
+     `api_version 1.1.305` — Vulkan 1.1, measured in the container — and Dawn
+     silently skips a driver whose feature set falls short, which is exactly the
+     observed one-second fall back to SwiftShader with dzn as the only ICD (a
+     pre-emptive refusal, not a failed initialisation). A newer Dawn demands more,
+     not less. There is NO native NVIDIA Vulkan ICD on this host, so Dozen is the
+     only Vulkan path to the card at all.
   8. A second ENGINE is NOT a way around dzn, and the point does not spend on it:
      Firefox/wgpu does go through the system Vulkan loader, but that loader serves
      the same Dozen, so it inherits the same ceiling — and Mozilla expects WebGPU on
@@ -4635,3 +4638,24 @@ Build order, chosen so no two parallel agents own the same file:
   case proves a suite that loses its device reports the loss as its failure
   rather than a truncated pass; and `VERIFY_GL=webgpu npm test -- invariants`
   either completes on this host or names the device loss as its verdict.
+
+- [ ] 508. EACH NOW-CARD IS JUDGED BY ITS OWN NUMBER (measured 05.08.2026, bundle
+  Chat & Tafel). `parseNowCard` in `scripts/queue-order-guard-core.mjs` cuts the
+  WHOLE "Woran ich gerade arbeite" section out as ONE text and files it under the
+  FIRST card's number. Several now-cards at once are explicitly allowed (one per
+  point in active work), so every word in any of them is charged to the first: today
+  "Fertig ist der Weltteil" in the 482 card blocked the turn end with the message
+  that the 485 card claimed completion, and the topic guard reported 482 for a
+  cross-reference that stood in a different card. A guard that names the wrong card
+  sends the session to edit correct text, which is worse than not firing.
+  FINAL STATE:
+  1. The section is split per `<details class="now">`, and every now-card is judged
+     against its OWN point number — by the done-claim check, the card-topic check
+     and the conciseness check alike.
+  2. A card without a recognisable number is reported as such, never silently
+     merged into its neighbour.
+  3. The guards keep failing open on an unparseable board.
+  VERIFIABLE: pure Vitest on a board with three now-cards where only the SECOND
+  carries a done-claim, a cross-point mention and an over-long paragraph — each
+  finding must name the second card's point, and a single-now-card board must behave
+  exactly as it does today.
