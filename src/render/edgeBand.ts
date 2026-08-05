@@ -47,13 +47,16 @@ export interface SweptLook {
  */
 export const SWEPT_GROUND_BY_KIND: Record<PlaceKind, SweptLook> = {
   // A village floor is swept daily and beaten hard by feet and goats: the
-  // strongest read of the three.
-  village: { tone: 0.2, relief: 0.5, mottle: 0.6 },
+  // strongest read of the three. Calibrated against the PICTURE, not the
+  // number: the tone has to carry the whole read on its own, because losing the
+  // mottling BRIGHTENS the swept side and eats into it (measured, the ground
+  // ends up ~1/5 darker inside, not 1/4).
+  village: { tone: 0.28, relief: 0.5, mottle: 0.6 },
   // A port's outskirts are busier but sandier — the same story, stated softer.
-  port: { tone: 0.16, relief: 0.42, mottle: 0.5 },
+  port: { tone: 0.24, relief: 0.42, mottle: 0.5 },
   // The monument site is open desert sand with visitors' tracks over it; too
   // strong a step would read as a drawn ring on an otherwise even plate.
-  monument: { tone: 0.12, relief: 0.3, mottle: 0.35 },
+  monument: { tone: 0.18, relief: 0.3, mottle: 0.35 },
 }
 
 // --- Pure math (mirrored by the shader below) ---------------------------------
@@ -140,7 +143,8 @@ const EDGE_TONE_U = uniform(0)
 const EDGE_RELIEF_U = uniform(0)
 const EDGE_MOTTLE_U = uniform(0)
 
-/** Read-only view of the driven state, for tests and the bug report. */
+/** Read-only view of the driven state, for the tests that compare the band's
+ *  drawn boundary with the leave check's own. */
 export function edgeBandState() {
   return {
     base: EDGE_BASE_U.value as number,
