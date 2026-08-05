@@ -13955,3 +13955,20 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   VERIFIABLE: a LARGE run on `main` reaches the WebGPU pass and reports the six
   suites either green or reduced to named, recorded open points; no threshold in
   the verify suites was changed without a written reason in the same commit.
+
+- [x] 478. THE SPOKEN UTTERANCE, HEARD ONLY UP CLOSE (user 03.08.2026).
+  FINAL STATE:
+  1. Speaking an utterance plays its syllables — a low sample for `ba`, a high one
+     for `BA` — at a constant pace, and a phrase plays its atoms with the constant
+     pause between them.
+  2. The range is SHORT and spatial. Among the children the player hears the
+     children, among the adults the adults, and in the middle of the village there
+     is no permanent babble of both.
+  3. Hearing records the utterance as observed through point 477's store — seeing
+     a gesture from too far to hear teaches nothing.
+  4. Pace, pause and the attenuation curve are balance values under
+     `balance.communication.*`, debug-editable per §21, and the audio sits under
+     the existing ambience volume so one slider still governs.
+  VERIFIABLE: pure Vitest on the attenuation curve and the observation
+  bookkeeping (out of range records nothing, in range records once, a phrase
+  records each atom); browser only for the fact that sound plays.
