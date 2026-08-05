@@ -2676,7 +2676,18 @@ for (const [placeId, shot] of [
         },
         { b: bearing, back },
       )
-    /** Is the game unobstructed from here, and how much of it is in frame? */
+    /**
+     * Is the game unobstructed from here, and how much of it is in frame?
+     *
+     * Projection ALONE is not enough, and that lesson cost a picture: a frame in
+     * which the pair projects inside the viewport can still be a frame of the
+     * huts they are standing behind. So each of the two is ray-probed against
+     * the RENDERED scene on its own sight line, the way the point-485 speaker is
+     * — the first surface drawn must be the CHILD ITSELF, which is what its
+     * distance says. The ratio is bounded on both sides: a hut in front reads
+     * far too near, and a ray that sails past a small figure hits the ground far
+     * beyond it.
+     */
     const readsFromHere = () =>
       page.evaluate(() => {
         const t = window.__placeTag()
@@ -2686,8 +2697,6 @@ for (const [placeId, shot] of [
         const q = t.target >= 0 ? t.children[t.target] : null
         const cx = a && q ? (a.x + q.x) / 2 : t.children.reduce((s2, c) => s2 + c.x, 0) / t.children.length
         const cz = a && q ? (a.z + q.z) / 2 : t.children.reduce((s2, c) => s2 + c.z, 0) / t.children.length
-        // Chest height of a child. Nothing may be drawn in FRONT of the game: a
-        // hut or an adult between reads as a hit far nearer than the target.
         const h = window.__placeRayHit(cx, 0.75, cz)
         const clear = h.hitDistance == null || h.hitDistance >= h.targetDistance * 0.9
         // The SAME matrix math the frame shutter projects a `local` subject
@@ -2701,7 +2710,14 @@ for (const [placeId, shot] of [
           if (!(w > 0)) return false
           // Inside 0.85 of the frame rather than 1.0: a child clipped by the
           // very edge is in the picture by arithmetic and not by eye.
-          return Math.abs(clip[0] / w) <= 0.85 && Math.abs(clip[1] / w) <= 0.85 && clip[2] / w < 1
+          if (!(Math.abs(clip[0] / w) <= 0.85 && Math.abs(clip[1] / w) <= 0.85 && clip[2] / w < 1)) return false
+          // And it must actually be DRAWN there: chest height of a child, and
+          // the first surface along that line has to be the child.
+          const hit = window.__placeRayHit(c.x, 0.5, c.z)
+          if (hit.hitDistance == null) return false
+          const ratio = hit.hitDistance / hit.targetDistance
+          // Close enough to read, too: a correctly-framed speck proves nothing.
+          return ratio >= 0.8 && ratio <= 1.2 && hit.targetDistance <= 14
         }
         let inFrame = 0
         for (const c of t.children) if (shows(c)) inFrame++
