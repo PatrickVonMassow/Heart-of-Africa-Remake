@@ -141,6 +141,27 @@ Verifiable: `src/i18n/villages.test.ts` asserts one
 distinct, markup-clean text per village in both languages, and
 `src/state/store.travel.test.ts` that the entry carries its people.
 
+Every walkable place is journaled on its first entry (point 394):
+`src/i18n/arrival.test.ts` is the completeness gate — it walks every
+entry in `PLACES` (ports, villages, the Giza monument site, and
+whatever kind is added next), resolves the reference
+`src/journal/arrival.ts` names for each situation the place can reach,
+and fails when one has no text of its own in EITHER language, when two
+places share a text, or when the markup does not strip to well-formed
+prose; the same suite holds each modelled transition's return text
+distinct per direction. `src/state/store.arrival.test.ts` proves the
+rule in the store: the first entry is written exactly once per place
+(port vignette, monument entry, village vignette), a re-entry writes a
+return entry only when the situation moved and stays silent otherwise
+(a later port entry reporting only its checkpoint), the entries are
+stored as language-neutral key+params that render in both languages,
+and the arrival state survives the checkpoint — including a legacy
+snapshot, whose villages keep their entry while the known-from-start
+ports re-earn theirs. The situations themselves are pure and pinned in
+`src/systems/placeSituation.ts` with `src/systems/rinderpest.test.ts`
+(the village plague phase; the Nile flood at Giza and Berbera's fair
+season are exercised through the two suites above).
+
 ## 9. Status bar.
 
 Verifiable: the hint element is a descendant

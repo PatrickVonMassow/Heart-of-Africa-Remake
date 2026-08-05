@@ -474,6 +474,42 @@ check(
   'with a checkpoint present, no start overlay appears (save-load disabled for the PoC) and the game runs',
   !withCp.overlay && withCp.mode !== null,
 )
+
+// --- Every walkable place is journaled on its first entry (design.md §16, point 394) ---
+// The unit layer sweeps the TEXTS (src/i18n/arrival.test.ts) and the store rule
+// (src/state/store.arrival.test.ts). What only the live game can show is that
+// walking into the monument site really produces an entry the journal RENDERS —
+// Giza was the reported case, and a monument is the kind that had no text at all.
+await page2.evaluate(() => {
+  window.__game.getState().enterPlace('giza')
+  window.__game.getState().setJournalOpen(true)
+})
+const gizaKey = 'journal.monumentFirstVisit'
+await page2
+  .waitForFunction((k) => window.__game.getState().journal.at(-1)?.text?.key === k, gizaKey, { timeout: 15000 })
+  .catch(() => {})
+// The entry is revealed stroke by stroke (pt. 29), so wait for the writing to end
+// before reading the rendered text — a mid-animation read is a short string, not
+// a missing entry. Condition-based; a real failure exhausts the window.
+await page2
+  .waitForFunction(() => document.querySelectorAll('.journal .entry.writing').length === 0, null, { timeout: 25000 })
+  .catch(() => {})
+const giza = await page2.evaluate(() => {
+  const last = [...document.querySelectorAll('.journal .entry')].at(-1)
+  return {
+    storedKey: window.__game.getState().journal.at(-1)?.text?.key ?? '',
+    title: last?.querySelector('h4')?.textContent ?? '',
+    text: last?.querySelector('p')?.textContent ?? '',
+  }
+})
+check(
+  'entering the Giza monument site writes its own arrival entry the journal shows',
+  giza.storedKey === gizaKey &&
+    giza.text.length > 80 &&
+    !giza.text.includes('[') && // the voice markup is stripped before display (§15.2)
+    !giza.text.includes('journal.'), // a raw key would mean the text is missing
+  `"${giza.title}" — ${giza.text.length} chars`,
+)
 await page2.close()
 
 console.log('---')

@@ -531,8 +531,13 @@ export interface Strings {
       departure: string
       region(p: TextParams): string
       arrival(p: TextParams): string
+      /** Re-entering a port whose situation changed (design.md §16, pt. 394). */
+      portReturn(p: TextParams): string
       village(p: TextParams): string
       villageReturn(p: TextParams): string
+      /** Arrival at a walkable monument site, and a changed return (§16). */
+      monument(p: TextParams): string
+      monumentReturn(p: TextParams): string
       audience: string
       mistake: string
       chiefHint: string
@@ -586,7 +591,18 @@ export interface Strings {
     }
     start: string
     regionEntry(p: TextParams): string
+    /** Every re-entry into a port: the checkpoint notice (design.md §18). */
     portArrival(p: TextParams): string
+    /**
+     * Arrival texts of the walkable places (design.md §16, point 394). Each
+     * place has its own — what the traveller sees on arriving at THAT place in
+     * ~1890 — and the return variants describe ONLY what has changed since the
+     * place was last journaled, chosen by its `../systems/placeSituation` key.
+     */
+    portFirstVisit(p: TextParams): string
+    portReturn(p: TextParams): string
+    monumentFirstVisit(p: TextParams): string
+    monumentReturn(p: TextParams): string
     villageFirstVisit(p: TextParams): string
     villageReturn(p: TextParams): string
     giftRevered(p: TextParams): string
