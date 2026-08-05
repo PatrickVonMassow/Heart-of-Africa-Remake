@@ -4473,16 +4473,15 @@ Build order, chosen so no two parallel agents own the same file:
   batch owner older than an hour is still read as alive by
   `node scripts/batch-doctor.mjs` on this host.
 
-- [ ] 505. HARDWARE WEBGPU: WORK THROUGH OTHER BROWSER BUILDS
+- [ ] 505. HARDWARE WEBGPU FOR THE SECOND LANE
   (user decision 04.08.2026, the "Zweite Bahn läuft in Software" card, option 3 —
-  keep investing, open outcome). Today the WebGPU verification lane draws through
-  Chrome's bundled SwiftShader: `verify-host-setup.sh --with-dzn` builds Dozen from
-  the Debian mesa source and `vulkaninfo` enumerates `Microsoft Direct3D12 (NVIDIA
-  GeForce RTX 4070 Ti)`, but Chrome 151 declines it — scoped to dzn alone Dawn
-  answers with its own SwiftShader in one second, and with the full ICD set visible
-  `--enable-features=Vulkan` HANGS at adapter time (>40 s, reproduced).
-  `docs/host-environment.md` records that verdict; this point tests whether it is a
-  limit of this BROWSER BUILD rather than of the host.
+  keep investing.) The WebGPU verification lane drew through Chrome's bundled
+  SwiftShader because Dawn discards the self-built Dozen device (clause 6), and
+  `verify-host-setup.sh --with-dzn` plus `docs/host-environment.md` hold that
+  history. MEASURED 05.08.2026: Dawn's OpenGLES backend hands the lane the
+  4070 Ti without Dozen in the picture at all (clause 8a). The point therefore
+  WIRES that lane, keeps the feature-level gap visible (clause 10), and leaves
+  core-level WebGPU as the remaining open path.
   FINAL STATE:
   1. Other browser builds are tried against the existing dzn ICD, cheapest first,
      and each attempt is recorded with build + exact version, ICD scope, flags, and
@@ -4527,20 +4526,23 @@ Build order, chosen so no two parallel agents own the same file:
      channel is equally predictable — a newer Dawn demands more, not less.
   8. THE ORDER OF ATTEMPTS is fixed by cost and risk, cheapest and most harmless
      first, each recorded with what the adapter answered:
-     (a0) The CHEAPEST pre-test of all, before any driver chain is touched:
-         `--force-webgpu-compat` on the SwiftShader lane that runs today. It answers
-         "does our renderer survive compatibility validation at all" with no GLES
-         backend involved.
-     (a) WebGPU COMPATIBILITY through Dawn's OpenGLES backend — `--use-gl=angle
-         --use-angle=gl --use-webgpu-adapter=opengles --force-webgpu-compat` with
-         `GALLIUM_DRIVER=d3d12`, no Vulkan flag and no ICD in sight. It bypasses
-         Dozen ENTIRELY and rides the GL chain this host demonstrably runs on the
-         4070 Ti. It is a PROBE ON AN UNKNOWN CARRIER, not a safe bet: Dawn's GLES
-         backend needs OpenGL ES 3.1 plus `GL_EXT_color_buffer_float` and is
-         compat-only, and WebGPU Compatibility has shipped for ANDROID, with no
-         desktop-Linux announcement. A newer Chrome channel matters HERE — compat
-         rolls out by platform — and nowhere else. Whether the three.js/TSL pipeline
-         survives the reduced profile is decided only at the drawn pixel.
+     (a0) `--force-webgpu-compat` on the SwiftShader lane is MEASURED INEFFECTIVE:
+         the adapter keeps `core-features-and-limits` and `compatibilityMode` stays
+         false, so that lane cannot answer the compat question at all.
+     (a) REACHED, measured 05.08.2026 — WebGPU COMPATIBILITY through Dawn's
+         OpenGLES backend: `--use-gl=angle --use-angle=gl
+         --use-webgpu-adapter=opengles --force-webgpu-compat` with
+         `GALLIUM_DRIVER=d3d12`, no Vulkan flag and no ICD in sight, bypasses Dozen
+         ENTIRELY and rides the GL chain this host runs on the card. A real compat
+         adapter comes up (no `core-features-and-limits`, three sets
+         `compatibilityMode` and drops MSAA) and it DRAWS on the 4070 Ti: the same
+         session's GL chain reports `ANGLE (Microsoft Corporation, D3D12 (NVIDIA
+         GeForce RTX 4070 Ti), OpenGL 4.6)`, 103.7 renderer calls/s against 15.3 on
+         the software lane at the same moment, 487 KB frames against the software
+         lane's 29 KB, no console error. WHAT REMAINS: make it the lane's WebGPU
+         path in `launch-args-core.mjs` (the software args stay the fallback for a
+         host without the GL chain), pin it in the Vitest layer, and correct that
+         file's stale `OpenGL 4.2` comment — 4.6 is what this host reports.
      (b) A one-line change to the SELF-BUILT Mesa dzn (`fullDrawIndexUint32 = true`
          in `src/microsoft/vulkan/dzn_device.c`). Its price is stated wherever it is
          used: against a 24-bit index limit this is a specification lie, harmless for
