@@ -4715,3 +4715,24 @@ Build order, chosen so no two parallel agents own the same file:
   position sits within a small radius of the origin while its layout anchor lies
   elsewhere; a Vitest case pins the placement function against the uninitialised
   case that produced the zero.
+
+- [ ] 510. THE RENDER-VERIFY CORE COUNTS A RUN THAT NEVER CONFIRMED ITS BACKEND
+  (four-eyes review of point 505's gate change, 05.08.2026 — the reviewer cleared
+  that change and left these three beside it).
+  FINAL STATE:
+  1. `coveringRun` (`scripts/render-verify-core.mjs`) counts a run only when it
+     also CONFIRMED its backend. Today it reads the exit code alone, so a run that
+     never reached `assertBackend` covers — and since that call is what writes the
+     feature level, such a run carries neither signal and still passes. Vitest
+     pins both directions.
+  2. `coveringRun(runs, b, since, null)` no longer throws: the options default
+     catches `null` as well as `undefined`, or the totality test stops claiming
+     more than holds. The outer guard catches it fail-open today, so this is
+     honesty about the core's contract, not a live defect.
+  3. The CLOSING (§9) demands a core-level WebGPU sighting once per release, so a
+     compatibility-level lane never becomes the sole WebGPU evidence for a tag.
+     The turn gate stays level-agnostic — demanding core there would hard-block
+     every render change on a host whose only adapter is compat (point 505).
+  VERIFIABLE: Vitest — an unasserted run never covers, an asserted one does, and
+  the options default survives `null`; `scripts/closing-guard-core.mjs` carries the
+  core-level step and `--status` lists it.
