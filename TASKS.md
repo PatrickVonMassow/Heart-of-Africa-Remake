@@ -4628,6 +4628,14 @@ Build order, chosen so no two parallel agents own the same file:
   second, so "a green run there proves nothing about timing" — but nothing acts
   on it, so every run shows red for it and a real regression would hide in that
   noise.
+  COLLISION CARRIES TWO MORE OF THE SAME (measured 05.08.2026, three runs on the
+  software lane, green on WebGL 2): "inhabitant walked out and re-entered its
+  dwelling through the door — no walk→inside transition observed" and "no inhabitant
+  stays pinned past the unstuck window", the latter reporting `"ok":true` beside
+  `anyMoved:false` — it FAILS while its rule holds, because at roughly one frame per
+  second nothing moves far enough inside the observation window to measure. That is
+  the MEASURED-NOTHING signature, and a check that reports a rule as broken while
+  saying the rule held is the worst kind of red: it reads as a product defect.
   IT IS NOT ONLY REDS: on 05.08.2026 `VERIFY_GL=webgpu run-all polish` ran 27
   minutes in a synced branch, printed nothing after "starting dev server", wrote no
   frame at all and had to be killed, while `world collision` had passed on the same
