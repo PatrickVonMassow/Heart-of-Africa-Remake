@@ -4695,6 +4695,13 @@ Build order, chosen so no two parallel agents own the same file:
   4. The escalation chain itself stays untouched: five unanswered alerts still
      pause the batch. The point removes the false alert, never the response to a
      real one.
+  5. A self-pause no longer writes a card into "Von dir zu klären" (user
+     05.08.2026: "das liegt nicht in meiner Hand. Analysiere und behebe du das").
+     That section holds GENUINE user decisions only; diagnosing a pause and
+     lifting it is the session's own work. The pause is instead reported where the
+     session's own state is reported — the now-card — so the reader sees it
+     without being asked to act on it.
   VERIFIABLE: a lock carrying a placeholder id plus one live session produces no
   parallel-session alert in the pure core's tests, and the same setup replayed
-  against the real detector stays silent.
+  against the real detector stays silent; a Vitest case pins that the pause path
+  writes no "Von dir zu klären" card.
