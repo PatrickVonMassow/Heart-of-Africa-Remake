@@ -353,7 +353,13 @@ Verifiable (`scripts/verify/settings.mjs`,
   current drowns (dead, sinking, never rescued or scavenged) while the
   SAME setup in the dry season still clambers out alive, and a rescuing
   parent that wades a swollen current too long drowns beside its calf
-  (both live in `scripts/verify/enrichments.mjs`); elephant
+  (both live in `scripts/verify/enrichments.mjs`). The drama reads its
+  own UNSLACKED current (`dramaCurrent`): the point-316 sea-mouth slack
+  is the TRAVELLER's rule (§21) and had tamed the swollen current under
+  every calf the rains drifted into a river's last reach, which the
+  staged lower-Nile drift replays at rule level against the real river
+  in `src/scenes/travel/wildlifeBehavior.test.ts` — both season endings,
+  with the slack pinned as the traveller's alone. Elephant
   mourning (point 126): a herd entering the graveyard's calibratable
   radius turns aside in its own gentle arcs (the universal turn cap
   holds), stands over the bones with lowered searching heads for the
