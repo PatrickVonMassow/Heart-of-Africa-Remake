@@ -4698,3 +4698,57 @@ Build order, chosen so no two parallel agents own the same file:
   full text, a mentioning one the single line, an unknown number fails); the brief for
   488 contains point 352's specification in full, and the brief's size for a point with
   no adopted reference is unchanged.
+
+- [ ] 517. THE LEASE-EXPIRY TAKEOVER IGNORES AN HONOURED CLAIM (measured
+  05.08.2026). The launcher tick took the batch from session 91c1ac42 after 67
+  minutes without a lease renewal (LEASE EXPIRED) and spawned a FRESH headless
+  successor, although a claim from the user's own window d68e8df9 had stood since
+  14:14 with `honour: true` — the same tick had still respected that claim at
+  12:36Z ("reserved — the user is working in that window"). The boundary path knows
+  the CLAIMING_WINDOW target (`boundaryHandover` in `scripts/batch-boundary.mjs`);
+  the lease-expiry path in `scripts/batch-launcher-core.mjs` does not, and spawns a
+  successor unconditionally. The consequence is that a user who wants to take over
+  WITHOUT forcing anything can wait arbitrarily long: the batch moves from session
+  to session past him.
+  FINAL STATE:
+  1. On lease expiry the launcher reads the claim state before it decides. With an
+     HONOURED claim standing, the lock is RELEASED and RESERVED for the claiming
+     window instead of being handed to a new successor — the same target the
+     boundary path already resolves.
+  2. Both paths reach that decision through ONE shared function, so a future change
+     cannot fix one and leave the other behind; the boundary path keeps its current
+     behaviour byte for byte.
+  3. A claim that is expired, or whose claimant is dead, still yields a successor —
+     the reservation follows the claim's own `honour` verdict, nothing else.
+  4. The reservation is bounded: a claiming window that never takes the lock does
+     not stall the batch forever, and what the bound is, is stated where the
+     reservation is written.
+  VERIFIABLE: pure Vitest on the launcher's decision (lease expired + honoured claim
+  → reserve, never spawn; lease expired + no claim → spawn; lease expired + expired
+  claim → spawn; the bound elapses → spawn), and the boundary path's existing tests
+  stay green unchanged.
+
+- [ ] 518. THE SHUTTER JUDGES ITS AIM BEFORE THE WAIT AND NEVER RE-JUDGES (found
+  05.08.2026 while closing point 489). `captureFrame` checks that the frame's
+  declared subject is in the picture, and only THEN waits up to 120 s for the scene
+  to finish drawing. Nothing re-judges the aim afterwards. Where the camera drifts
+  during that wait, the frame is written with its subject out of view while the
+  shutter reports it was in view — precisely the class of defect points 375 and 489
+  exist to prevent. The drift is not hypothetical: the Nile current carries the
+  traveller downstream for as long as he stands in the river (CLAUDE.md §7.1 pt. 21),
+  which is why frames 117/118 had to be re-aimed immediately before each shot rather
+  than once at the start.
+  FINAL STATE:
+  1. The subject check runs AGAIN after the readiness wait, immediately before the
+     shutter opens, and that second reading is the one that decides. A frame whose
+     subject left the picture during the wait FAILS LOUDLY, naming what was found
+     instead — the same message the first check already produces.
+  2. The re-probe costs nothing where nothing moved: it is the existing projection
+     read, not a second settle.
+  3. The re-aim that points 117/118 carry today is no longer the mechanism that
+     keeps a drifting frame honest — it may stay as an aim, but the guarantee comes
+     from the shutter.
+  VERIFIABLE: pure Vitest on the shutter's decision (subject in view before AND
+  after → written; in view before, gone after → refused with the second reading in
+  the message; a frame that needs no readiness wait behaves exactly as today), and
+  live the two Aswan frames stay green.
