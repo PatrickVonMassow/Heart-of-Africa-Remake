@@ -12,7 +12,7 @@
 // behaviour (activeElement/canvas), the TRAA pipeline toggle (real pipeline
 // rebuild + frame check), the screenshots and the console-error gate.
 // Dev server only (dev hooks).
-import { launchVerifyBrowser, assertBackend } from './_browser.mjs'
+import { launchVerifyBrowser, assertBackend, waitForSceneBuilt } from './_browser.mjs'
 import { frameShutter } from './frameSubject.mjs'
 import { leakVerdict } from './textureLeak.mjs'
 import { fileURLToPath } from 'node:url'
@@ -43,7 +43,14 @@ await page.waitForFunction(() => window.__game && window.__balance, null, { time
 // throws on a silent WebGL2 fallback under VERIFY_GL=webgpu (the lane's guardrail).
 await page.waitForFunction(() => window.__renderer, null, { timeout: 60000 })
 await assertBackend(page)
-await page.waitForTimeout(4000)
+// Wait for the SCENE to finish building, not for the wall clock (point 499). The
+// 4 s that stood here was calibrated on a faster host; here the first-person Cairo
+// picture is still BLACK at 6 s and only carries its ground micro-structure from
+// ~17 s, so the edge-energy check below measured an empty frame and reported the
+// feature as gone. `built:false` is surfaced rather than swallowed — a scene that
+// never finishes is its own finding, not a silent zero.
+const sceneBuilt = await waitForSceneBuilt(page)
+check('the first-person scene finishes building before it is measured', sceneBuilt.built, JSON.stringify(sceneBuilt))
 await page.evaluate(() => window.__game.getState().setJournalOpen(false))
 await page.waitForTimeout(400)
 

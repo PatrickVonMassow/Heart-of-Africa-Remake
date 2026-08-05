@@ -345,11 +345,22 @@ for (const c of [
   { id: 'sudd', lat: 8.0, lon: 30.5 },
 ]) {
   await page.evaluate((s) => window.__game.getState().debugJumpTo(s.lat, s.lon), c)
-  await page.waitForTimeout(500)
   // A rendered scene (terrain + geometry) compresses to a sizeable PNG; an empty
   // black frame would be tiny. Combined with the console-error gate this confirms
   // the camera-over-the-site frame renders.
-  const buf = await page.screenshot({ clip: { x: 480, y: 300, width: 320, height: 320 } })
+  //
+  // POLL for the streamed chunks instead of sleeping 500 ms on them (point 499):
+  // on the container host the first two jumps of this loop landed on a scene that
+  // had not finished streaming and photographed black, while the nine that
+  // followed passed at the identical wait — the signature of a cold start, not of
+  // a missing landmark. The bar is unchanged; only the moment it is read is.
+  const deadline = Date.now() + 45000
+  let buf
+  do {
+    buf = await page.screenshot({ clip: { x: 480, y: 300, width: 320, height: 320 } })
+    if (buf.length > 3000) break
+    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => setTimeout(r, 250))))
+  } while (Date.now() < deadline)
   check(`cultural landmark ${c.id} renders a non-black frame`, buf.length > 3000, `png bytes ${buf.length}`)
 }
 // Reveal a site's label and screenshot it as evidence.

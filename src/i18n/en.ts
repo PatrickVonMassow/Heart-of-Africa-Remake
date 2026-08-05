@@ -216,6 +216,11 @@ export const en: Strings = {
     stopReading: 'Stop reading',
     voiceLoading: 'Loading voice …',
     voiceError: 'The narration voice could not be loaded.',
+    observations: 'Overheard',
+    observationsHint: 'What I heard them say, and what I take it to mean.',
+    hypothesis: 'My reading',
+    hypothesisFor: (utterance: string) => `My reading of ${utterance}`,
+    firstHeard: (date: string) => `First heard ${date}`,
   },
 
   mapOverlay: {

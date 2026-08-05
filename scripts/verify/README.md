@@ -61,17 +61,29 @@ particular build really brings up a headless WebGPU adapter is not a probe's que
 `assertBackend` answers it on the running renderer, and a lane that came up on WebGL 2
 fails loud.
 
-The **ANGLE backend is chosen by platform** (`launch-args-core.mjs`, swept by
-`launch-args-core.test.mjs`): Windows keeps `--use-angle=d3d11` exactly as it
-always had it, Linux gets `swiftshader` (the container has no GPU, no DRI driver
-and no system libEGL, and Chrome ≥120 will not fall back to software WebGL on its
-own), macOS `metal`. A host whose graphics stack differs from its platform's norm —
-a Linux box with a real GPU — overrides it with `VERIFY_ANGLE=gl` (or `vulkan`)
-without touching the code, and **should**: SwiftShader is software rendering, where
-requestAnimationFrame drops to ~1 fps and interaction tests become meaninglessly
-slow. It is the backend that lets a GPU-less container start at all, not the one to
-judge a picture on. Linux additionally launches with `--no-sandbox`, which container
-images need; Windows and macOS keep their argument list unchanged.
+The **graphics stack is chosen by platform** (`launch-args-core.mjs`, swept by
+`launch-args-core.test.mjs`): Windows keeps `--use-angle=d3d11` exactly as it always
+had it, macOS `metal`, and Linux gets `--use-angle=gl` with `GALLIUM_DRIVER=d3d12`
+in the browser's environment. That pair is what reaches the GPU behind `/dev/dxg`
+in the WSL container — `ANGLE (Microsoft Corporation, D3D12 (NVIDIA GeForce RTX
+4070 Ti), OpenGL 4.6)` — measured at 170 renderer calls per second against the 22.7
+of the SwiftShader lane it replaced (point 493; the `flow` suite went from red and
+unfinished after ten minutes to green in 58 seconds). Both halves are load-bearing:
+without `libgl1`/`libegl1` ANGLE has no driver to open, and without the Gallium pin
+Mesa 25 serves llvmpipe while every interface still looks healthy. `VERIFY_ANGLE`
+and `VERIFY_GALLIUM` override either without touching the code (`VERIFY_GALLIUM=none`
+sets nothing at all). Linux additionally launches with `--no-sandbox`,
+`--ignore-gpu-blocklist` and `--disable-dev-shm-usage`, which container images need;
+Windows and macOS keep their argument list unchanged.
+
+The **WebGPU lane pins the opposite way** on Linux — `--use-angle=swiftshader`
+`--enable-features=Vulkan` `--use-vulkan=swiftshader`, all three. There is no
+hardware Vulkan device Chrome will accept on this host (see `docs/host-environment.md`),
+and with the stacks left to disagree the lane reports an adapter, initialises
+`isWebGPUBackend` and paints NOTHING: the page throws `Instance dropped in
+popErrorScope` and the canvas stays black behind a live HUD. It is the correct
+picture at software speed, and `backend-lane-check.mjs` labels it as software so it
+can never be read as the GPU.
 
 Without a system Chrome the **WebGPU lane fails LOUD** — `WebGPU backend
 unavailable on this host` — and stops. It is never quietly served by WebGL 2, and
@@ -633,6 +645,20 @@ Consequences for anyone extending this directory:
 - **A new frame should wait for the picture it names.** Poll the app's own state
   until the view has settled rather than a fixed wait (see `fixedWaits.mjs`);
   that is also the first work any future determinism effort has to do.
+- **Measure a BUILT scene, and say so (point 499).** `_browser.mjs` carries two
+  helpers for exactly this, and anything reading pixels or a settling value should
+  use them: `waitForSceneBuilt(page)` waits for the renderer's triangle count to
+  pass a floor and stop GROWING for 5 s, and `waitForReadingStable(page, readFn)`
+  watches EVERY number a reading carries — the ones the check asserts, not one
+  proxy beside them — and reports whether it truly settled, with `requireChange`
+  for a value pushed into the scene that needs a moment to take hold. Both return
+  their verdict rather than a bare value, so a suite can FAIL with "the scene never
+  finished" instead of measuring an empty frame. Traced on the container host: the
+  first-person scene is black at 3 s, sits still at 33 346 triangles from 9 s to
+  13 s, and only reaches its final 83 037 at 24.6 s. Six checks across four suites
+  were reporting product failures against pictures and readings that had not
+  formed — a black frame reads as "no ground detail", an unrendered probe pair as
+  "no fire shadow", a half-lerped season as "the preset is wrong".
 
 ## A frame must show what its name claims (point 375)
 

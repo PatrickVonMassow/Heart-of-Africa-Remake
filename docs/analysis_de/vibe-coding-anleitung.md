@@ -25,9 +25,8 @@ und nicht erst beim zweiten Schaden. Fast alles Folgende wendet das an.
 
 Die Prompts unten sind **Aufträge, einen Mechanismus zu bauen** — keine Merksätze.
 „Jedes neue Feature bekommt einen Test" ist eine *Regel*, die vergessen wird;
-„Etabliere einen Mechanismus, der das garantiert" ist ein *Auftrag*. Formuliere deine
-eigenen genauso. Wo ein Mechanismus prinzipiell **nicht** möglich ist (etwa „sieht das
-für einen Menschen richtig aus?"), steht das dabei — dann trägt nur die Aufmerksamkeit.
+„Etabliere einen Mechanismus, der das garantiert" ist ein *Auftrag*. Wo einer prinzipiell
+**nicht** möglich ist (etwa „sieht das für einen Menschen richtig aus?"), steht das dabei.
 
 Eine **Schätzung** wie *(Kosten ≈ 2x)* meint den Mehrverbrauch der betroffenen Arbeit,
 nicht des Projekts.
@@ -49,27 +48,22 @@ Lege **zwei** Modelle fest und gib ihnen klare Rollen:
 > **anderen** Modells erkennt und die Arbeit stoppt, statt sie stillschweigend zu
 > übernehmen."
 
-Ein zweites Modell nützt nicht, weil es *besser* wäre, sondern weil es **andere
-blinde Flecken** hat — diesen Wert hebt nur eine Prüfung, keine Übergabe. Und ein
-unbemerkt schwächeres Modell liefert selbstbewusst Attrappen.
+Ein zweites Modell nützt nicht, weil es *besser* wäre, sondern weil es **andere blinde
+Flecken** hat — diesen Wert hebt nur eine Prüfung, keine Übergabe.
 
-Die **Obergrenze**: Eine Gegenprüfung kostet etwa so viel wie die Arbeit; die Grenze
-zieht die **Sichtbarkeit des Fehlers**. Was den Ablauf steuert oder Arbeit vernichten
-kann (Wächter, Sperren, Speichern/Laden, Veröffentlichungen), wird immer gegengeprüft;
-was ein schneller Test sofort zeigt, nie.
+Die **Obergrenze** zieht die **Sichtbarkeit des Fehlers**: Was den Ablauf steuert oder
+Arbeit vernichten kann (Wächter, Sperren, Speichern/Laden, Veröffentlichungen), wird
+immer gegengeprüft; was ein schneller Test sofort zeigt, nie.
 
 ---
 
 ## So setzt du ein Projekt auf (Prompts zum Kopieren)
 
-1. **Zielbild zuerst — und nimm dir dafür Zeit.** Bevor die erste Zeile Code entsteht,
-   gehört das Zielbild ausgearbeitet: was das Ergebnis können soll, wie es sich
-   anfühlt, wo die Grenzen liegen. Jede Stunde hier spart ein Vielfaches an Umbau,
-   denn ein Modell baut sehr schnell sehr viel vom Falschen, wenn das Ziel unscharf
-   ist. Das Ausarbeiten ist dabei selbst eine ideale LLM-Aufgabe: Lass dich befragen,
-   dir Lücken, Widersprüche und offene Entscheidungen zeigen und das Ergebnis
-   ausformulieren — du entscheidest, es schreibt. Jede Zeile des `design.md`, das
-   diesem Projekt zugrunde liegt, stammt von Claude.
+1. **Zielbild zuerst — und nimm dir dafür Zeit.** Jede Stunde hier spart ein Vielfaches
+   an Umbau: Ein Modell baut sehr schnell sehr viel vom Falschen, wenn das Ziel unscharf
+   ist. Das Ausarbeiten ist selbst eine ideale LLM-Aufgabe — lass dich befragen, dir
+   Lücken und Widersprüche zeigen und das Ergebnis ausformulieren; du entscheidest, es
+   schreibt.
    > „Bevor wir irgendetwas bauen, erarbeiten wir gemeinsam ein `design.md`, das
    > beschreibt, was am Ende existieren soll. Frag mich so lange aus, bis keine
    > wesentliche Lücke bleibt, zeig mir Widersprüche und offene Entscheidungen, und
@@ -117,9 +111,7 @@ was ein schneller Test sofort zeigt, nie.
    > geschaltet wird — und ohne festgehaltenen Prüf-Eintrag (wer, mit welchem
    > Ergebnis, welcher Stand) darf der Zug nicht enden."
 
-   Ein „passt schon" des Autors selbst zählt nicht als Gegenprüfung.
-
-   *(Kosten ≈ 2x)*
+   Ein „passt schon" des Autors zählt nicht. *(Kosten ≈ 2x)*
 
 6. **Fortschritt sichtbar machen (wenn du mitlesen willst).**
    > „Führe ein knappes Fortschritts-Board (eine Datei oder Seite) und **etabliere einen
@@ -132,9 +124,9 @@ was ein schneller Test sofort zeigt, nie.
 
 ## Automatische Tests — und ihre Tiefe abstufen
 
-Automatische Tests sind das Rückgrat; ohne sie ist „Vibe Coding" ein Blindflug. Aber
-nicht jede Änderung braucht die volle Batterie — sonst wird Testen so langsam, dass es
-umgangen wird. Bewährt haben sich **abgestufte Umfänge**:
+Automatische Tests sind das Rückgrat; ohne sie ist „Vibe Coding" ein Blindflug. Aber nicht
+jede Änderung braucht die volle Batterie — sonst wird Testen umgangen. Bewährt haben sich
+**abgestufte Umfänge**:
 
 - **Schnell (nach JEDER Änderung):** die Unit-Schicht ohne Browser — Logik, Zustand, reine
   Funktionen. Läuft in Sekunden, kann nie durch Browser-Timing flackern. Hierhin gehört
@@ -164,38 +156,35 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 ## Die häufigsten Fallstricke → und was hilft
 
-- **Grüner Test, falsches Bild.** Der Test ist grün, das Ergebnis trotzdem falsch — er prüfte
-  einen Hilfswert, einen unerreichbaren Debug-Zustand, einen geratenen Näherungswert.
+- **Grüner Test, falsches Bild.** Der Test ist grün, das Ergebnis trotzdem falsch — er
+  prüfte einen Hilfswert, einen unerreichbaren Zustand, einen geratenen Wert.
   → *Prompt:* „Etabliere einen Mechanismus, der eine sichtbare Änderung erst als fertig
   gelten lässt, wenn sie am **echten gerenderten Bild** unter einer Bedingung geprüft wurde,
-  die ein Nutzer wirklich erreicht — und der bei einer **neuen** Blick-, Bewegungs- oder
-  Zoomachse zuerst auflistet, welche alten Zusagen dadurch an einem neuen Rand prüfbar
-  werden." *(Kosten ≈ 1,5x.)* *(Zuletzt: Sieht das für einen Menschen richtig aus?)*
+  die ein Nutzer wirklich erreicht — und der bei einer **neuen** Blick- oder Zoomachse
+  auflistet, welche alten Zusagen dadurch an einem neuen Rand prüfbar werden." *(Kosten ≈ 1,5x.)* *(Zuletzt: Sieht das für einen Menschen richtig aus?)*
 
 - **Neue Features zerbrechen alte.** Eine Änderung repariert X und bricht das unbeobachtete Y.
   → *Prompt:* „Etabliere einen Mechanismus, der jede Mechanik auch im **Danach-Zustand** prüft
   und nach jedem Zusammenführen die schnelle Testschicht erzwingt. Bau ‚Invarianten' ein, die
-  im Entwicklungsmodus laut meckern — so wird jeder Testlauf zum Detektor."
+  im Entwicklungsmodus laut meckern — jeder Testlauf wird so zum Detektor."
 
 - **Angeblich behoben, aber nicht.** Der Fix wird als fertig gemeldet, das Symptom bleibt.
   → *Prompt:* „Ein Fix zählt erst als fertig, wenn das **Symptom am Ort des Symptoms** als
-  behoben gezeigt wurde. Beißt du dich zweimal fest, wechsle die Perspektive — anderes
-  Modell, frische Read-only-Diagnose zuerst."
+  behoben gezeigt wurde. Beißt du dich zweimal fest, wechsle das Modell."
 
 - **Zahlen geschätzt statt gemessen.** ‚Das dauert ~2 Minuten', ‚das ist schneller'.
-  → *Prompt:* „Fange ungemessene Zahlen ab: Laufzeiten, Performance und Kosten nennst du nur
-  **gemessen** — Performance auf der **Ziel-Hardware**, nicht auf der Build-Maschine."
+  → *Prompt:* „Laufzeiten, Performance und Kosten nennst du nur **gemessen** — Performance
+  auf der **Ziel-Hardware**, nicht auf der Build-Maschine."
 
-- **Das Kontingent ist die Grenze, nicht die Zeit.** Der Verbrauch hängt an der Größe
-  jedes Kontexts, nicht an den Stunden: lange Sitzungen, die alles mitschleppen, und
-  Helfer, die ihren Auftrag erst in großen Dokumenten *suchen* müssen.
+- **Das Kontingent ist die Grenze, nicht die Zeit.** Der Verbrauch hängt an der Größe jedes
+  Kontexts, nicht an den Stunden: lange Sitzungen, und Helfer, die ihren Auftrag erst in
+  großen Dokumenten *suchen*.
   → *Prompt:* „Nenne mir die **gemessenen** Treiber. Schicke jedem Helfer seinen Auftrag als
   fertigen Kurzbrief mit, und fang für jede Aufgabe einen **frischen Kontext** an."
   *(Ein billigeres Modell für ‚einfache' Aufgaben ist der falsche Hebel — die Nacharbeit kostet mehr.)*
 
-- **Der autonome Lauf bleibt stehen — still oder wartend.** Bei langen Läufen endet der
-  Fortschritt unbemerkt, oder er hängt an einer Rückfrage an dich. Beides ist gleich teuer,
-  gerade wenn du weg bist.
+- **Der autonome Lauf bleibt stehen — still oder wartend.** Der Fortschritt endet unbemerkt,
+  oder er hängt an einer Rückfrage — beides gleich teuer, wenn du weg bist.
   → *Prompt:* „Bei einer autonomen Daueraufgabe sei die **letzte Aktion jedes Schritts** immer
   ein Schritt an der Aufgabe, und baue einen Mechanismus, der ein stilles Anhalten verhindert.
   Bleib **nie mit einer Rückfrage an mich stehen**: Triff die vernünftigste Annahme; nur was
@@ -204,142 +193,136 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 - **Kommunikation verfehlt.** Zu technisch, zu lang, an der Zielgruppe vorbei.
   → *Prompt:* „Beschreibe Bugs und Status in der Sprache der Zielgruppe — Symptom zuerst,
-  kurz, fürs Handy lesbar — und halte meine Format- und Sprachvorgaben auf **allen**
-  sichtbaren Ausgaben ein."
+  kurz, fürs Handy lesbar — und halte meine Format- und Sprachvorgaben auf **allen** Ausgaben
+  ein."
 
 
 - **Der Test hing an seiner Umgebung, nicht am Verhalten.** Zeitgrenzen reißen unter Last;
-  oder er ist nur in der Arbeitskopie grün, in der er lief — was **nicht** im Projekt liegt
-  (lokale Dateien, Zugänge, Laufzeitzustand), fehlt in der Kopie eines parallelen Helfers.
+  oder er ist nur in der Arbeitskopie grün, in der er lief.
   → *Prompt:* „Jeder Test bekommt seine Pfade **eingespritzt**, statt sie zu suchen, und
   Zeitgrenzen richten sich nach der gemessenen Last. Die Frage vor dem Abgeben ist nicht ‚ist
   er grün?', sondern ‚wäre er auch im **Hauptstand** grün?' Einen roten Lauf bewerte ich erst
   auf einer ruhigen Maschine."
 
 
-- **Messung und Vorschau verunreinigt.** Halbfertiges wird als ‚fertig' beurteilt; Popups
-  stören Messungen.
+- **Messung und Vorschau verunreinigt.** Halbfertiges wird als ‚fertig' beurteilt.
   → *Prompt:* „Hol mein Urteil immer am **veröffentlichten** Stand ein, nie an einem
   Zwischen-Zweig, und halte Messläufe von störenden Fenstern frei."
 
 - **„Erfolgreich" heißt nicht „angekommen".** Ein Befehl meldet Erfolg, das Gewollte ist
-  trotzdem nicht passiert — etwa ein Upload, der den falschen Zweig überträgt und „alles
-  aktuell" meldet.
-  → *Prompt:* „Etabliere einen Mechanismus, der nach jeder Aktion mit Fernwirkung
-  (Hochladen, Veröffentlichen, Ausliefern) den **Zielzustand** belegt statt der
-  Erfolgsmeldung; eine Abfrage ohne Treffer ist ein Befund, keine Antwort. Setze jede
-  Formprüfung **vor** den Schritt nach außen, so dass sie die Auslieferung verhindern kann;
-  nur Inhaltliches darf danach laufen."
+  trotzdem nicht passiert — etwa ein Upload, der den falschen Zweig überträgt. Und eine
+  Warnung in der Ausgabe einer **geglückten** Aktion ist faktisch unsichtbar.
+  → *Prompt:* „Etabliere einen Mechanismus, der nach jeder Aktion mit Fernwirkung den
+  **Zielzustand** belegt statt der Erfolgsmeldung; eine Abfrage ohne Treffer ist ein Befund.
+  Wo eine Warnung nur im Erfolgsfall steht, braucht sie eine Prüfung, die ihn liest. Jede
+  Formprüfung läuft **vor** dem Schritt nach außen."
 
-- **Regeln und Wächter verrotten — nur merkt es niemand.** Regeln wachsen an: Widersprüche,
-  Doppelungen, Regeln, die eine nie gebaute Absicherung behaupten. Und ein Wächter, der nie
-  auslöst, ist so kaputt wie einer, der immer auslöst: der erste lässt die Regel abgesichert
-  erscheinen, der zweite erzieht zum Überlesen.
+- **Regeln und Wächter verrotten — nur merkt es niemand.** Der Bestand wächst an Widersprüchen
+  und an Regeln, die eine nie gebaute Absicherung behaupten. Ein Wächter, der nie auslöst,
+  ist so kaputt wie einer, der immer auslöst.
   → *Prompt:* „Etabliere einen Mechanismus, der den ganzen Bestand periodisch zur Durchsicht
   zwingt — auf Aktualität, Dopplung, Widerspruch und **Wirkungslosigkeit**, zuerst die am
-  häufigsten eingeblendeten Texte. Jede Regel wird gegen den Code geprüft, nicht gegen die
-  Nachbarregel, und jeder Wächter gegen sich selbst: Hat er je ausgelöst? Kann er überhaupt?
-  Doppelt er einen anderen? Ist seine Meldung umsetzbar?" *(Kosten: einmalig hoch)*
+  häufigsten eingeblendeten Texte. Schreib zu **jeder** Regel, was sie misst — Test, Prüfung
+  oder **nichts**; bei ‚nichts' nur zwei Ausgänge: Mechanismus bauen, oder **mit Begründung**
+  als bewusst nicht erzwungen vermerken. Jeden Wächter prüfst du gegen sich selbst: Hat er je
+  ausgelöst? Kann er überhaupt? Doppelt er einen anderen?" *(Kosten: einmalig hoch)*
 
-- **Der rote Test klagt den Falschen an.** Er täuscht gefährlicher als ein grüner, weil er
-  zum schnellen Eingriff verleitet: Prüfungen veralten von selbst und klagen gesunden Code an.
+- **Der rote Test klagt den Falschen an.** Er täuscht gefährlicher als ein grüner:
+  Prüfungen veralten von selbst und klagen gesunden Code an.
   → *Prompt:* „Etabliere einen Mechanismus, der vor einer Code-Änderung auf einen roten Test
   hin ein **Experiment** verlangt: Belastet der Befund das Produkt oder die Messung? Gemessen
-  wird nur an einem eingeschwungenen Zustand, und eine Prüfung schlägt auch dann fehl, wenn
-  ihr Messwert in die *unerwartete* Richtung ausschlägt — nicht nur über der Grenze."
+  wird nur an einem eingeschwungenen Zustand, dessen Bereitschaft der gemessene **Gegenstand**
+  meldet — nie eine Uhr, denn eine feste Wartezeit ist verkleidete Maschinengeschwindigkeit.
+  Eine Prüfung schlägt auch dann fehl, wenn ihr Messwert in die *unerwartete* Richtung
+  ausschlägt — nicht nur über der Grenze."
 
-- **Derselbe Fakt steht an fünf Stellen — und veraltet an vier.** Wer baut, aktualisiert die
-  Stelle, an der er gerade schreibt; die übrigen Kopien rotten unbemerkt, und das ‚Was' im
-  Design-Doc passt irgendwann nicht mehr zum ‚Wie' im Code.
+- **Derselbe Fakt steht an fünf Stellen — und veraltet an vier.** Wer baut, aktualisiert die Stelle, an der
+  er gerade schreibt; die übrigen Kopien rotten unbemerkt, und das ‚Was' im Design-Doc passt
+  nicht mehr zum ‚Wie' im Code.
   → *Prompt:* „Etabliere einen Mechanismus, der jedem Fakt genau **einen** verbindlichen Ort
   zuweist; alle anderen verweisen darauf. Wo sich eine Wiederholung nicht vermeiden lässt,
   prüft ein Test sie gegen den **Code**, dem der Fakt gehört, nie gegen die Nachbarprosa.
   Berührt eine Änderung das Design, aktualisiere Design-Doc und Code im **selben** Commit."
 
-- **„Aufgeräumt" ohne Beweisliste.** Man räumt dort auf, wo man den Schaden vermutet,
-  und übersieht den Rest — den dann jemand anders findet.
+- **„Aufgeräumt" ohne Beweisliste.** Man räumt auf, wo man den Schaden vermutet,
+  und übersieht den Rest.
   → *Prompt:* „Etabliere einen Mechanismus, der nach jedem Zwischenfall eine
   **Beweisliste** erzwingt: Liegt alles am Zielort? Gibt es Reste (Waisen-Dateien, Tests
   ohne echte Prüfung)? Passen Dokumente und Code zusammen? Läuft alles grün?"
 
 - **Der Autor sieht seine eigene Annahme nicht.** Wer entwirft und baut, prüft gegen dieselbe
-  Vorstellung, aus der der Fehler stammt — besonders teuer bei Dingen, die *immer* laufen müssen.
+  Vorstellung, aus der der Fehler stammt — teuer bei Dingen, die *immer* laufen müssen.
   → *Prompt:* „Etabliere einen Mechanismus, der vor dem Bau **Schwierigkeit × Kritikalität**
   einschätzt und bei Kritischem **ein anderes Modell** erst den Plan und dann das Ergebnis
   gegenprüfen lässt — gegen die echten Daten, und vor dem Zusammenführen." *(Kosten ≈ 2x)*
 
 - **Die teuerste Prüfung großflächig verlangt.** Bildbegutachtung, ein zweiter Lauf, ein
-  zweites Modell kosten ein Vielfaches — pauschal für ganze Verzeichnisse gefordert, zahlst
-  du sie auch dort, wo sie nichts beweisen kann.
+  zweites Modell kosten ein Vielfaches — pauschal gefordert, zahlst du sie auch dort, wo sie
+  nichts beweisen kann.
   → *Prompt:* „Verlange die teuerste Prüfung nur für Änderungen, die dort wirklich abweichen
   können, und schreib die Grenze samt Begründung in den prüfenden Code, nicht in eine Regel
   daneben."
 
-- **Was bei jedem Start mitgelesen wird, wächst — und du bezahlst es jedes Mal.** Jede
-  Ergänzung ist berechtigt; irgendwann ist der größte Teil der Datei Geschichte. Am teuersten
-  sind Texte, die bei *jeder* Anfrage mitgehen — zumal wenn sie wiederholen, was eine Prüfung
-  ohnehin erzwingt.
+- **Was bei jedem Start mitgelesen wird, wächst — und du bezahlst es jedes Mal.** Jede Ergänzung ist
+  berechtigt; irgendwann ist der größte Teil Geschichte — am teuersten der, der wiederholt,
+  was eine Prüfung ohnehin erzwingt.
   → *Prompt:* „Gib jedem Dokument, das bei jedem Start gelesen wird, eine **gemessene
   Obergrenze**. Blockiert sie eine Ergänzung, ist die Reihenfolge: kürzen, **zusammenführen**,
   Detail auslagern — die Grenze anheben ist das **letzte** Mittel und braucht eine Begründung.
   Ausgelagert wird verschoben, nicht umformuliert; und der Commit, der eine Prüfung einführt,
   streicht den Text, den sie ersetzt."
 
-- **Im Präsens behauptet, nie nachgesehen.** „Das Feld wird bereits gesetzt" — im Code
-  steht es nicht. Eine falsche Tatsachenbehauptung liefert etwas, das nichts tut und
-  dabei grün ist.
+- **Im Präsens behauptet, nie nachgesehen.** „Das Feld wird bereits gesetzt" — im Code steht
+  es nicht. Eine falsche Tatsachenbehauptung liefert etwas, das nichts tut und grün ist.
   → *Prompt:* „Was du im **Präsens** behauptest, sieh vorher nach. Was erst gebaut
   werden muss, schreib in die Zukunftsform. Und prüfe jede Zusicherung, die ein
   Dokument über den Code macht, gegen den Code — oder kennzeichne sie als Absicht."
 
 - **Jedes Teil grün, die Kette trotzdem tot.** Alle Bausteine sind getestet, am Ende
-  passiert trotzdem nichts — zwischen zweien hat niemand nachgesehen.
+  passiert trotzdem nichts — dazwischen hat niemand nachgesehen.
   → *Prompt:* „Was aus mehreren Schritten besteht, spiel **einmal vollständig durch**
   und lies das Ergebnis aus den Protokollen, nicht aus den Tests. Wo eine Prüfung auch
   etwas ausführt, melde ein Scheitern im selben Atemzug wie die Freigabe."
 
-- **Die Messung sah weniger, als sie behauptet.** Sie schaut nur die letzten *n* Einträge an,
-  misst erst *nach* dem Vorgang, oder ein Teil der Testdateien lud gar nicht — nicht geladen
-  ist nicht rot, sondern abwesend, und liest sich *grüner* als ein Fehlschlag.
-  → *Prompt:* „Leite das Fenster jeder Messung aus dem **Gegenstand** ab: eine Frage über einen
-  Zeitraum nach Zeit, nie nach Anzahl; eine über einen Lauf **während** des Laufs. Melde die
-  **Zahl der ausgeführten Prüfungen** mit — ein Rückgang ist ein Rot —, und irrt eine Heuristik
-  zur Entwarnung hin, braucht sie einen zweiten Beleg."
+- **Die Messung sah weniger, als sie behauptet.** Sie schaut nur die letzten *n* Einträge
+  an, misst erst *nach* dem Vorgang, oder ein Teil der Testdateien lud gar nicht — nicht
+  geladen ist nicht rot, sondern abwesend, und liest sich *grüner* als ein Fehlschlag.
+  → *Prompt:* „Leite das Fenster jeder Messung aus dem **Gegenstand** ab: eine Frage über
+  einen Zeitraum nach Zeit, nie nach Anzahl. Melde die **Zahl der ausgeführten Prüfungen**
+  mit — ein Rückgang ist ein Rot."
 
-- **Plötzlich rot, obwohl niemand den Code angefasst hat.** Zwei Teile buchstabieren
-  dieselbe Regel getrennt — eines schreibt, eines prüft; das blockiert *alle* Arbeit.
+- **Plötzlich rot, obwohl niemand den Code angefasst hat.** Zwei Teile buchstabieren dieselbe Regel
+  getrennt — eines schreibt, eines prüft; das blockiert *alle* Arbeit.
   → *Prompt:* „Wo ein Teil schreibt, was ein anderes prüft, **importiere** den geprüften
   Wert. Wird etwas ohne Code-Änderung rot, frag: welcher **Zustand** hat sich geändert?"
 
-- **Der Befund stirbt mit dem Gespräch.** Ein echter Fehler fällt nebenbei auf und bleibt im
-  Chat — die Aufgabenliste ist gerade gesperrt.
+- **Der Befund stirbt mit dem Gespräch.** Ein echter Fehler fällt nebenbei auf und
+  bleibt im Chat, weil die Aufgabenliste gesperrt ist.
   → *Prompt:* „Etabliere einen Mechanismus, der Befunde sichert: ein billiges Kommando, das
   auch bei gesperrter Aufgabenliste schreibt, und eine Prüfung, die einen Zug **nicht enden
   lässt**, der untersucht und nichts hinterlassen hat."
 
-- **Still ersetzt statt sichtbar gescheitert.** Fehlt eine Angabe oder passt eine Eingabe nicht
-  zum erwarteten Format, setzt das Programm klaglos einen Ersatz ein — im Code sieht das nach
-  Sorgfalt aus, der Folgefehler taucht weit entfernt auf. Dasselbe gilt für interne Kennungen
-  in dem, was du ihm sagst.
+- **Still ersetzt statt sichtbar gescheitert.** Fehlt eine Angabe, setzt das Programm
+  klaglos einen Ersatz ein — im Code sieht das nach Sorgfalt aus, der Folgefehler taucht
+  weit entfernt auf.
   → *Prompt:* „Jede eingabeverarbeitende Stelle wird gegen **mehrere Eingabeformen** getestet
   und scheitert **sichtbar**, statt einen plausiblen Ersatz einzusetzen; jeder Rückfall wird
-  **gemeldet**, dort wo er greift, mit dem Befehl, der ihn behebt. Nach außen geht der
-  **sprechende Name**, nie das Kürzel."
+  **gemeldet**, mit dem Befehl, der ihn behebt."
 
-- **Die Gegenprüfung wurde angestoßen, nie abgeschlossen.** Der Helfer startet das Review
-  und ist fertig, bevor das Urteil kommt — es landet bei niemandem. Der Zweig sieht geprüft
-  aus, und ein aufgezeichnetes „nicht zusammenführen" wirkt wie ein Haken.
+- **Die Gegenprüfung wurde angestoßen, nie abgeschlossen.** Der Helfer startet das Review und ist
+  fertig, bevor das Urteil kommt — es landet bei niemandem. Der Zweig sieht geprüft aus, und
+  ein aufgezeichnetes „nicht zusammenführen" wirkt wie ein Haken.
   → *Prompt:* „Wer eine Gegenprüfung beauftragt, bleibt dran, bis sie da ist. Ein Urteil
   öffnet das Tor nur, wenn es **zustimmt** — ein ‚nicht zusammenführen' ist erst durch ein
   **späteres** Urteil über den korrigierten Stand erledigt."
 
-- **Der Ausfall kommt nie an der bequemen Stelle.** Er trifft mitten in einer Aktion, und am
-  tückischsten Abläufe mit **zwei Hälften**, deren zweite bei der Gegenseite liegt: fällt sie
-  dazwischen aus, meldet jede Seite korrektes Verhalten, und das Ganze ist verloren.
+- **Der Ausfall kommt nie an der bequemen Stelle.** Am tückischsten bei Abläufen mit **zwei
+  Hälften**, deren zweite bei der Gegenseite liegt: fällt sie dazwischen aus, meldet jede
+  Seite korrektes Verhalten und alles ist verloren.
   → *Prompt:* „Behandle jede kritische Aktion als Vorgang mit einem **wiederholbaren
-  Aufräumschritt**, der bei jedem Start läuft, bevor gearbeitet wird. Prüfe die Erholung mit
-  Abbrüchen zu **zufälligen** Zeitpunkten und frag danach nicht ‚läuft es weiter?', sondern
-  ‚läuft es **dort** weiter, wo es sollte, und gilt Unfertiges als unfertig?'"
+  Aufräumschritt**, der bei jedem Start läuft. Prüfe die Erholung mit Abbrüchen zu
+  **zufälligen** Zeitpunkten und frag danach nicht ‚läuft es weiter?', sondern ‚läuft es
+  **dort** weiter, wo es sollte, und gilt Unfertiges als unfertig?'"
 
 - **„Im Zweifel nichts tun" schützt nur gegen fehlende Daten, nicht gegen falsche.** Wird ein
   Fehlschlag weiter innen schon in einen Ersatzwert verwandelt, läuft die Aktion mit einer
@@ -347,12 +330,32 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Prüfe jedes `catch` mit Ersatzwert: Führt er zu **weniger** Aktion oder zu
   **mehr**? Nur weniger darf verschluckt werden."
 
-- **Der Umzug nimmt nur mit, was versioniert ist.** Auf einem neuen Rechner kommt das Projekt
-  an, die Mechanik drumherum nicht: geplante Aufgaben, Geheimnisse, gespeicherte Regeln,
-  Werkzeuge liegen außerhalb. Nichts meldet ihr Fehlen — die Wächter gehören selbst dazu.
+- **Der Umzug nimmt nur mit, was versioniert ist.** Das Projekt kommt an, die Mechanik
+  drumherum nicht: geplante Aufgaben, Geheimnisse, Werkzeuge — und die **Scharfstellung** der
+  Wächter selbst, etwa ein Dateirecht, das der alte Rechner nicht brauchte. Ein stummer
+  Wächter ist schlimmer als keiner: die Regel gilt als durchgesetzt.
   → *Prompt:* „Führe eine Liste dessen, was das Projekt braucht und **nicht** im Repository
-  liegt, und prüfe sie bei jedem Start gegen eine **Beobachtung**. Ein fehlendes Stück ist ein
-  **Befund**, keine Stille."
+  liegt, und prüfe sie bei jedem Start gegen eine **Beobachtung**. Was einen Mechanismus
+  scharf macht, gehört mitversioniert und mitgeprüft. Ein fehlendes Stück ist ein **Befund**, keine Stille."
+
+- **Eine Priorität, die nur in Prosa steht, wirkt nicht.** Sie landet getreu in der Aufgabenliste
+  — aber die Reihenfolge, aus der gearbeitet wird, steht woanders, und die Nachfolge-Sitzung
+  kennt deinen Chat nicht.
+  → *Prompt:* „Trag Priorisiertes dort ein, wo die Arbeit gezogen wird, und lass eine Prüfung
+  fehlschlagen, wenn beides auseinanderläuft. Priorisiere das **Ziel**: Was das Feature
+  schneller fertig macht, kommt mit nach vorn."
+
+- **Blockiert heißt nicht: du bist dran.** Bei fehlender Berechtigung bekommst du
+  gern einen Befehl gereicht — oft einen, der gar nicht funktionieren kann.
+  → *Prompt:* „Ein Schritt in deiner Umgebung gehört dir. **Miss** erst, ob der Weg trägt.
+  Fehlt wirklich eine Fähigkeit, bitte **einmal um die Fähigkeit** — nie um ihre Ausführung."
+
+- **Die Reparatur nimmt den Reparierenden mit.** Wer die Leitung repariert, auf der er
+  sitzt — Netz, Rechte, Umgebung —, verliert mit dem Fehlschlag die nächste Reparatur mit.
+  Am schlimmsten bei Werkzeugen, die erst abreißen und dann neu aufbauen.
+  → *Prompt:* „Bevor du deine eigene Umgebung änderst: Gibt es eine **kleinere Handlung**,
+  die nur **ergänzt**? Sonst bau sie. Und lass jeden Neuaufbau nach **offen** scheitern —
+  ein zu offener Stand ist reparierbar, ein zugesperrter nicht."
 
 ---
 
@@ -369,17 +372,13 @@ Zwei Mechanismen, die das Netz ehrlich halten:
    > *Prompt:* „Struktur von Dingen, die ich festgelegt habe, friert ein. Schlag
    > Änderungen vor, setz sie nicht ungefragt um."
 
-3. **Parallel arbeiten geht nur mit Isolierung.** Ohne eigene Arbeitskopien vervielfacht
-   Delegation das Chaos. Die Grenze setzt nicht dein Kontingent, sondern der
-   **Haupt-Agent**: bei ihm endet jeder Strang, und je mehr Fremdstoff sein Kontext
-   aufnimmt, desto schlechter urteilt er. Verlass dich nie auf „nur lesen" — was ein
-   Helfer anfassen kann, fasst er an.
+3. **Parallel arbeiten geht nur mit Isolierung.** Die Grenze setzt nicht dein Kontingent,
+   sondern der **Haupt-Agent**: bei ihm endet jeder Strang, und je mehr Fremdstoff sein
+   Kontext aufnimmt, desto schlechter urteilt er. Verlass dich nie auf „nur lesen".
    > *Prompt:* „Arbeite jede Aufgabe auf einem eigenen Feature-Branch mit eigener
-   > Arbeitskopie und führe sie erst nach `main`, wenn sie fertig und verifiziert ist.
-   > Auch ein nur lesender Helfer bekommt eine eigene Arbeitskopie.
-   > Teile parallele Aufgaben so auf, dass sie **nicht dieselben Dateien** anfassen, und
-   > arbeite an höchstens **drei** gleichzeitig. Reduziere die Zahl, sobald das
-   > Zusammenführen Nacharbeit erzeugt."
+   > Arbeitskopie und führe sie erst nach `main`, wenn sie verifiziert ist — auch ein nur
+   > lesender Helfer bekommt eine eigene. Teile parallele Aufgaben so auf, dass sie **nicht
+   > dieselben Dateien** anfassen, und arbeite an höchstens **drei** gleichzeitig."
 
    *(Aufschlag ≈ 10–25 % je zusätzlichem Strang, geschätzt — Nacharbeit + Aufsicht)*
 
@@ -398,4 +397,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 Wenn du diese eine Nachricht an den Anfang stellst, hast du 80 % der Lehren dieses
 Projekts eingebaut, bevor die erste Zeile Code entsteht.
 
-<!-- GUIDE-FINGERPRINT: 245dd16d717b57f43fc42d55529a87ca6270e9c8d3d9793e700774308fc9d548 -->
+<!-- GUIDE-FINGERPRINT: c70dbeb9a9cf5e947212eec2ee34452002cadbd51718fe0c41e9cb54eda5e530 -->

@@ -4154,19 +4154,6 @@ Build order, chosen so no two parallel agents own the same file:
   no-upstream situation present, every target reachable); browser for the walk to
   the bank.
 
-- [ ] 484. THE JOURNAL'S COMMUNICATION OBSERVATIONS (user 03.08.2026).
-  FINAL STATE:
-  1. A second, clearly separate section beside the existing entries lists every
-     utterance the player has actually heard, in its sound sequence, sorted by
-     point 477's rule.
-  2. Each carries a free-text field for his own hypothesis. The game never
-     interprets that text.
-  3. The notes save and restore with the game (point 477's store).
-  4. Both languages, and the journal stays non-modal per §16.1.
-  VERIFIABLE: pure Vitest on store and component — an unheard utterance is absent,
-  a heard one appears once, the order holds over mixed lengths, a note survives a
-  save/load round trip.
-
 - [ ] 485. THE HYPOTHESIS OVER THE SPEAKER'S HEAD (user 03.08.2026).
   FINAL STATE:
   1. When a figure speaks an utterance the player has already observed, his
@@ -4293,72 +4280,334 @@ Build order, chosen so no two parallel agents own the same file:
   existing shutter cases extended to the probe path); a `timeout: 0` (which
   DISABLES the deadline) fails the same assertion.
 
-- [ ] 493. THE SECOND BACKEND LANE ON THE VERIFICATION HOST (user decision
-  04.08.2026, "Weg 1" on the board card). Since the browser suites moved into the
-  Linux container, every render verification runs SINGLE-lane: no system Chrome is
-  installed at all, and Playwright's bundled Chromium brings up no WebGPU adapter.
-  The rule that the picture is checked on BOTH backends (CLAUDE.md §6/§7.2) has
-  been unenforceable since 03.08.2026, and the closing cycle demands exactly it.
-  MEASURED on the host 04.08.2026: `/dev/dxg` EXISTS and `/usr/lib/wsl/lib` carries
-  `libd3d12.so`, `libd3d12core.so`, `libdxcore.so` and the NVIDIA WSL stack — the
-  GPU is reachable from inside the container. Missing are a system Chrome and a
-  driver stack to reach that GPU (`/usr/share/vulkan/icd.d` does not exist, no Mesa
-  d3d12/dzn). So this is a host SETUP question, not a passthrough question.
+- [ ] 495. A VERSIONED GIT HOOK WITHOUT ITS EXECUTABLE BIT IS SILENTLY INERT
+  (found 04.08.2026). `scripts/git-hooks/pre-push` was committed 100644. Git for
+  Windows runs a hook whichever mode it carries, so the gate worked on the old
+  host and fell silent the moment the working copy moved to Linux — the only
+  trace was one hint line inside a SUCCESSFUL push ("hook was ignored because
+  it's not set as executable"), which no gate reads. The bit is restored, so this
+  point is not the fix but the MECHANISM that keeps the next hook from repeating
+  it: `scripts/enable-hooks.mjs` already wires `core.hooksPath` on every
+  `npm install` and is the one place that knows the hook directory.
   FINAL STATE:
-  1. One idempotent, repo-owned setup script (`scripts/verify-host-setup.sh`)
-     installs what the lane needs: Google Chrome stable, Mesa's D3D12 Gallium and
-     Dozen (Vulkan-on-D3D12) drivers, and the loader wiring (ICD path,
-     `LD_LIBRARY_PATH`) that points them at `/usr/lib/wsl/lib`. It needs root, so it
-     is run ONCE under sudo; a second run changes nothing and says so.
-  2. `launchVerifyBrowser()` resolves that Chrome by the host's own path and FAILS
-     LOUD when a `VERIFY_GL=webgpu` run finds none — never a silent fall back to
-     bundled Chromium, which is how the missing lane stayed invisible.
-  3. A readiness command judges the lane by the PICTURE, not by a version string:
-     `node scripts/verify/backend-lane-check.mjs` exits non-zero unless system
-     Chrome launches, an adapter is returned, `window.__renderer` reports WebGPU
-     AND a frame is actually drawn — on 03.08.2026 the software lane offered the
-     interface and then died at the first buffer, which is precisely what this
-     must catch.
-  4. The both-backend rule is restored in practice: the render suites run under
-     `VERIFY_GL=webgpu` on this host with `assertBackend` confirming it, and
-     `render-verify-guard` demands the second lane again wherever a change can
-     render differently per backend.
-  5. If the drivers cannot carry the game — the lane comes up but no frame draws —
-     the point is NOT closed by relaxing the rule: it is reported with the failing
-     output, and the user's lane 2 (the second backend run by hand on his Windows
-     machine) becomes its own point.
-  VERIFIABLE: `backend-lane-check.mjs` green on the host; one render suite
-  completing under `VERIFY_GL=webgpu` with `assertBackend` confirming WebGPU; pure
-  Vitest over the browser resolution — a host with system Chrome resolves to it, a
-  host without fails loud instead of quietly using the bundled build.
+  1. `enable-hooks.mjs` also ensures every file directly under
+     `scripts/git-hooks/` is executable for the user on POSIX — `chmod` the
+     working file AND `git update-index --chmod=+x` where the INDEX mode is
+     644, so a fresh clone gets it too rather than needing the same repair.
+     Windows has no such mode; the step is skipped there, not faked.
+  2. It stays FAIL-OPEN and quiet, like the rest of that script: a read-only
+     checkout, a tarball without `.git`, a hook directory that does not exist —
+     each leaves the install green. Only a mode it actually changed is reported,
+     one line per file, so a silent repair cannot pass for "nothing was wrong".
+  3. The DETECTION half widens the enforcer built for exactly this question:
+     `guard-health-guard` ("no enforcer may sit in the tree unable to fire")
+     already reads the active hook directory, but only its CONTENT. It also
+     judges the arming — a hook in the active directory without the executable
+     bit is a finding like an unwired guard, reported the same way, on POSIX
+     only. Widening it, not a sibling guard beside it.
+  4. A Vitest case pins both decisions: given a listing of hook files with their
+     modes, which need a chmod, and which count as unable to fire. Pure
+     functions, so no test touches a real repository.
+  VERIFIABLE: `npm run test:unit` covers both decision functions, including the
+  no-op case, a 644 hook, a non-POSIX platform and an unreadable directory;
+  `git ls-files -s scripts/git-hooks/` reports 100755 for every hook; and
+  `node scripts/guard-health-guard.mjs --status` names a hook whose bit was
+  removed.
 
-- [ ] 494. NO STEP INSIDE THE CONTAINER IS EVER HANDED BACK TO THE USER (user
-  04.08.2026, standing rule with full rights granted). On 04.08.2026 the session
-  handed him `sudo bash scripts/verify-host-setup.sh`, which cannot work — the
-  official Claude Code image grants `node` exactly one passwordless command, the
-  firewall script — and then a `docker exec -u root …` line that would also have
-  failed, because the sandbox firewall is iptables-wide and blocks the package
-  sources for root as well. Two round trips of the user's time for work that was
-  the session's. The rule is memory `container-work-is-mine`; this point is the
-  MECHANISM, because a rule that only a reader can see is the same failure point
-  440 measured one layer down.
+- [ ] 497. THE GERMAN-LANGUAGE RULE HAS NO MECHANISM AT ALL, AND THE AUDIT
+  PASSED IT ANYWAY (user 04.08.2026: "Warum schreibst du die ganze Zeit auf
+  Englisch? Klappt der Mechanismus nicht? Falls ja, klappen vielleicht auch
+  andere Mechanismen nicht."). Answers to the user are German (memory
+  `language-german`); on 04.08.2026 a whole session narrated in English and
+  nothing objected. The reason is not a broken enforcer but a MISSING one: the
+  rule lives only in a memory line. Its neighbour proves the point — the
+  chat-timestamp rule carries an injection hook AND a blocking Stop guard
+  (`timestamp-guard.mjs`) that reads the outgoing reply, and it has not slipped
+  once. `docs/rule-corpus-audit.md` row A25 nevertheless records
+  `language-german` as "OK" with an EMPTY finding column, because that audit
+  asked whether each rule's TEXT was current, never whether anything MEASURES
+  it. `guard-health-guard` has the same blind spot from the other side: it
+  proves every wired enforcer can fire (32 of 32 today) and says nothing about a
+  rule that never got one.
   FINAL STATE:
-  1. A guard reads the turn's outgoing answer and BLOCKS it when it asks the user
-     to execute a step that runs inside the container — an install, a package
-     manager, a script invocation, a file edit under the workspace. It matches
-     the ASK ("run", "führe aus", a fenced command block addressed to him),
-     not the mere mention of a command.
-  2. What stays allowed is asking for a CAPABILITY that does not exist inside the
-     container at all: a right, a device, a mount, a line in the image. The guard
-     must not push the session into silently failing instead of asking for those,
-     so the distinction is what its cases pin down.
-  3. The remedy line names the way out: find the route and take it; if the
-     capability is genuinely missing, ask once for the capability.
-  4. Wired into the Stop chain in `.claude/settings.json`, fail-open like every
-     other guard, with a pure Vitest-covered decision core, and reviewed by the
-     other model per `mechanism-review-guard` before it counts as done.
-  VERIFIABLE: pure Vitest over the decision core — an answer containing "führe
-  bitte `npm run …` aus" or a sudo/docker-exec instruction addressed to the user
-  is blocked; an answer asking for a GPU device, a mount or an image line passes;
-  a command quoted as a REPORT of what the session itself ran passes; and the
-  guard returns "allow" on any internal error.
+  1. A Stop-chain guard judges the LANGUAGE of the turn's outgoing answer and
+     blocks a reply whose prose is not German. It rides the layer that already
+     works for the stamp: the same reply text `timestamp-guard` reads, a pure
+     decision core, Vitest-covered, fail-OPEN on any internal error, standing
+     down for a session that does not own the batch lock and for a paused batch.
+  2. The decision is made on PROSE ONLY, so the code rules stay untouched: fenced
+     code blocks, inline code spans, file paths, identifiers, commit subjects,
+     command output and quoted English source text are stripped before judging.
+     A German sentence naming English identifiers passes; an English sentence of
+     narration does not. The verdict is a stopword-ratio decision over what
+     remains, with a minimum word count below which it abstains rather than
+     guesses — an abstain is an allow.
+  3. The remedy line says what to do rather than scolding: write the answer in
+     German, code and commits stay English, and it names `language-german`.
+  4. The DETECTION half closes the audit's blind spot rather than adding a
+     sibling to it: `docs/rule-corpus-audit.md` gains a WHAT-MEASURES-THIS axis,
+     filled for every row — an enforcer name, a test, or "nothing". Every row
+     that reads "nothing" is either given a mechanism or recorded as
+     deliberately unenforced WITH the reason, the way A19
+     (`english-no-germanisms`) already is. A25 becomes the worked example.
+  VERIFIABLE: pure Vitest over the decision core — an English narration
+  paragraph is blocked; a German answer containing English identifiers, paths,
+  a fenced diff and a quoted English error message passes; a two-word answer
+  abstains; the guard allows on any internal error and when the session does not
+  own the lock. `node scripts/guard-health-guard.mjs --status` still reports
+  every enforcer wired with the new one counted, and no row in
+  `docs/rule-corpus-audit.md` is left with an empty measured-by cell.
+
+- [ ] 498. WHAT THE SOFTWARE SECOND LANE COSTS THE FULL REGRESSION, MEASURED
+  (user 04.08.2026, asking against the open decision "Zweite Bahn läuft in
+  Software — reicht das?"). Point 493 restored both lanes and measured ONE
+  suite: `flow` runs 58 s on the hardware WebGL lane and 3 min 41 s on the
+  software WebGPU lane, a factor of 3.8. What nobody has measured is the number
+  the user actually decides on — the WHOLE regression. A LARGE run is two passes
+  (the full set on WebGL 2 with preflight and prod preview, then every suite
+  except `touch`/`voice` on WebGPU), so the software lane is not a small tail:
+  it is a second near-complete pass at software speed. The pre-container figure
+  on record is "30–40 minutes" (`docs/batch-resilience.md`), taken on Windows
+  where BOTH passes had the GPU.
+  FINAL STATE:
+  1. One LARGE run on `main` is timed end to end, and the two passes are timed
+     SEPARATELY — the WebGL pass and the WebGPU pass — because only the split
+     shows what the software lane costs and what the GPU gained.
+  2. `docs/host-environment.md` records all of it beside the existing per-suite
+     figures: the two pass durations, the total, the 30–40 min Windows baseline
+     it is compared against, and the date and machine state of the run (a
+     measurement taken under a running agent pool is worth less, and says so).
+  3. The comparison is stated HONESTLY in both directions: the WebGL pass is
+     faster than it was on Windows, the WebGPU pass slower, and the answer to
+     "is the total worse than before" follows from the measured numbers rather
+     than from the factor 3.8 extrapolated.
+  4. The measured total is carried onto the open decision card, so the user
+     decides against a number rather than an estimate.
+  VERIFIABLE: `docs/host-environment.md` names both pass durations, the total
+  and the baseline with its date; the run's own log is quoted for each figure;
+  and no figure in that section is an extrapolation — every one is a wall-clock
+  reading of a run that happened.
+
+- [ ] 500. THE LEAVE CAPTURE BAKES A TERRAINLESS BAND ON A SLOW HOST
+  (measured 04.08.2026 during the point-499 triage, 3 of 3 runs). The `polish`
+  check on the maasai-village leave capture reads the bottom quarter of the
+  panorama backdrop as opaque 0.000 — the captured band carries no terrain at
+  all. This is NOT the fixed-wait class the triage closed: the capture fires as
+  the travel scene MOUNTS, so no amount of waiting afterwards can change what it
+  photographed. The cause named by the reading is `panoramaCaptureReady`, which
+  gates on terrain chunks being COMMITTED rather than on their being DRAWABLE —
+  on the fast Windows host the two coincide, on this one they do not.
+  FINAL STATE:
+  1. The capture gate holds until the surrounding terrain actually RENDERS, not
+     until its chunks exist. The condition is read from what the renderer draws,
+     never from a chunk count or a wall-clock allowance.
+  2. Point 227's grey-horizon symptom cannot return on a slow host: the check
+     that caught this stays, and is not weakened.
+  3. A capture that would still be unready at its deadline says so — a black or
+     terrainless band is never written silently.
+  VERIFIABLE: the `polish` leave-capture check passes three consecutive runs on
+  the container host, and the same run on the WebGPU (software) lane; the
+  captured band is inspected as a PICTURE once, not only as a number.
+
+- [ ] 501. THE COMPASS PROBE PILLAR NEVER REACHES THE PANORAMA BAND
+  (measured 04.08.2026 during the point-499 triage, 3 of 3 runs). The `polish`
+  orientation check reads west 0 px / east 0 px for its DEV probe pillar, while
+  the water fractions of the SAME capture became non-zero once the scene was
+  built — so the capture happens, but the pillar is not in it. The unverified
+  suspicion the triage recorded: `hasPanoramaCapture` short-circuits a
+  re-capture, so the check's `delete window.__placePanorama` clears the hook but
+  not the cached capture, and the pillar is added to a capture that is never
+  taken again.
+  FINAL STATE:
+  1. The suspicion is CONFIRMED OR REFUTED first, at the code, before anything
+     is changed — a fix built on the wrong cause is the more expensive mistake.
+  2. Either the probe reliably enters the capture it is set up for, or the
+     orientation is measured another way that does not depend on injecting
+     geometry into a cached capture. Whichever is chosen is written down with
+     its reason.
+  VERIFIABLE: the `polish` compass check passes three consecutive runs and fails
+  when the panorama orientation is deliberately inverted — a check that cannot
+  fail proves nothing.
+
+- [ ] 502. FORCED RAIN DOES NOT SWELL THE CURRENT FOR THE DROWNING DRAMA
+  (measured 04.08.2026 during the point-499 triage, 2 of 2 runs identical). The
+  `enrichments` wet-season water drama stages a calf crossing and reads
+  `{drowned:false, rescued:true, out:true}` — the DRY-season outcome — while the
+  paired dry-season check passes. Two candidates the triage could not separate:
+  the 400 ms after `setSeasonWetnessOverride(1)` is too short for
+  `CURRENT_WEATHER.wetness` to reach the wildlife system, or the swollen-current
+  rule itself regressed.
+  FINAL STATE:
+  1. The two are SEPARATED by the discriminator the triage named: read
+     `CURRENT_WEATHER.wetness` at staging time. A timing cause is fixed by
+     waiting on that reading, never by a longer sleep.
+  2. If the rule regressed, the wet-season current is restored so a calf
+     crossing a swollen river can drown per design.md §19.8, and the fix carries
+     a Vitest case at the rule level — the browser check is the picture, not the
+     only proof.
+  VERIFIABLE: the `enrichments` wet-season drama reports a drowning outcome on
+  two consecutive runs, the dry-season pair still passes, and the staged
+  `wetness` reading is asserted rather than assumed.
+
+- [ ] 503. HIGH ATLAS SEASONAL SNOW SITS UNDER ITS BAR
+  (measured 04.08.2026 during the point-499 triage, 2 of 2 runs, stable — not a
+  timing effect). The `enrichments` February High Atlas frame reads 1.2–1.3 %
+  snow against a 2 % bar. The seasonality half of the same check passes
+  trivially (Feb 1.3 % vs Jul 0.0 %), so the contrast is intact and only the
+  absolute amount is short. Either the snow is genuinely thinner than when the
+  bar was set, or the crop/exposure the check measures has moved.
+  FINAL STATE:
+  1. Decided AT THE PICTURE, as the ground micro-detail was: a February High
+     Atlas frame is looked at and judged against design.md §19.9 — does the
+     range read as snow-capped to a human?
+  2. The bar is NOT lowered to close this. If the picture is right and the crop
+     moved, the check is corrected with the reason written down; if the picture
+     is wrong, the snow cover is restored.
+  VERIFIABLE: the `enrichments` snow check passes two consecutive runs, the
+  frame it judges is stored in `verification/`, and the commit says which of the
+  two causes was found.
+
+- [ ] 504. EVERY BATCH OWNER IS DISPOSSESSED AT HALF AN HOUR OF AGE
+  (measured 04.08.2026, 18:50Z and root-caused at 19:00Z). The autostart launcher
+  logged "owner provably dead (pid-reused) — taking over" and spawned a second
+  session while the owner it judged dead was ALIVE and mid-work: it was running a
+  browser suite for the point-499 classification and its own dev server was
+  serving. Fifteen minutes earlier the SAME pid had read "owner alive". Nothing
+  about the process changed — only the pid-reuse verdict did.
+  ROOT CAUSE, MEASURED: the DERIVED pid start time drifts against the RECORDED
+  one. Probing the owner's pid five times with the repo's own `probePid` returned
+  `startedAt` 1785867604027–604031 while the lock recorded 1785867601073 for that
+  very process — ~2.96 s apart, past the fixed `PID_START_TOLERANCE_MS = 2000`
+  (`scripts/batch-doctor-core.mjs`). The probe derives the start time from a
+  boot-time base (uptime/btime) that walks against the wall clock in this WSL2
+  container, so the gap GROWS with the owner's age: at 15 minutes the drift was
+  ~1 s and the tick read "pid-alive", at 30 minutes it was ~3 s and the same tick
+  read "pid-reused". This is systematic, not a one-off — it dispossesses EVERY
+  owner on EVERY long point, and it is exactly the double session the hard
+  singleton of 24.07.2026 exists to prevent. Two browser-suite runs on one
+  machine also invalidate every timing measurement the batch takes.
+  FINAL STATE:
+  1. PID identity is no longer judged by comparing two start times read from
+     clocks that drift apart. Either both are re-derived from ONE reading at
+     compare time, or identity is keyed on a drift-free handle (`/proc/<pid>`
+     inode plus an argv match), or the tolerance grows with the owner's age.
+     Whichever is chosen is written down with the measurement that justifies it.
+  2. A "pid-reused" verdict against a pid whose `/proc` entry still names the
+     SAME argv and session is not believed. The takeover additionally requires
+     the corroborating signals the tick already reads — declared work advancing,
+     heartbeat age — before it dispossesses an owner.
+  3. A Vitest case feeds a DRIFTING clock base and proves a live owner of any age
+     is never read as recycled; a genuinely recycled pid must still be caught, so
+     the test covers both directions.
+  VERIFIABLE: the unit layer pins both directions against a drifting base, and a
+  batch owner older than an hour is still read as alive by
+  `node scripts/batch-doctor.mjs` on this host.
+
+- [ ] 505. HARDWARE WEBGPU: WORK THROUGH OTHER BROWSER BUILDS
+  (user decision 04.08.2026, the "Zweite Bahn läuft in Software" card, option 3 —
+  keep investing, open outcome). Today the WebGPU verification lane draws through
+  Chrome's bundled SwiftShader: `verify-host-setup.sh --with-dzn` builds Dozen from
+  the Debian mesa source and `vulkaninfo` enumerates `Microsoft Direct3D12 (NVIDIA
+  GeForce RTX 4070 Ti)`, but Chrome 151 declines it — scoped to dzn alone Dawn
+  answers with its own SwiftShader in one second, and with the full ICD set visible
+  `--enable-features=Vulkan` HANGS at adapter time (>40 s, reproduced).
+  `docs/host-environment.md` records that verdict; this point tests whether it is a
+  limit of this BROWSER BUILD rather than of the host.
+  FINAL STATE:
+  1. Other browser builds are tried against the existing dzn ICD, cheapest first,
+     and each attempt is recorded with build + exact version, ICD scope, flags, and
+     what the adapter answered (own software path / hang / hardware). At minimum:
+     a newer Chrome for Testing or Chromium channel (beyond 151, incl. dev and
+     canary), the WebGPU adapter-selection and unsafe-webgpu flags against dzn, and
+     a Chrome build whose bundled Dawn is newer than the one that declines today.
+  2. The outcome may be either — that is the point's premise. Reached: the WebGPU
+     lane draws through the 4070 Ti, `scripts/verify/backend-lane-check.mjs` NAMES
+     that device on the WebGPU lane (never a software rasteriser reported as if it
+     were the GPU), and that build becomes the lane's browser. Not reached: the
+     point closes on a WRITTEN verdict naming every build tried and its refusal —
+     the software lane stays, and the shortfall stays visible rather than silently
+     accepted.
+  3. The hang path stays contained whichever way it ends: no ICD is installed by
+     default, the dzn build stays opt-in behind `verify-host-setup.sh --with-dzn`,
+     and no default verification run may block at adapter time. A build that hangs
+     is recorded and abandoned, not worked around with a longer timeout.
+  4. `docs/host-environment.md` §"Hardware WebGPU is the open item" states the
+     CURRENT verdict in the same commit as the result — its standing warning
+     ("read this before rebuilding dzn: the verdict is worth more than the build")
+     keeps holding, extended by the browser builds this point ruled out.
+  5. Nothing in the verification's default path changes for a reader who does not
+     opt in: the software WebGPU lane keeps working exactly as it does today while
+     this point runs, so the both-backend picture check is never interrupted by it.
+  VERIFIABLE: `node scripts/verify/backend-lane-check.mjs` on the WebGPU lane
+  prints the device that actually drew the frame, and the picture of one built
+  scene is inspected once; the host-environment section lists every build tried
+  with its outcome; a default (non-opt-in) verification run shows no ICD present
+  and no adapter stall.
+
+- [ ] 506. THE SOFTWARE LANE REDDENS AT CHECKS IT CANNOT DRAW FAST ENOUGH TO
+  ANSWER (measured 05.08.2026, 01:50–03:40, on a machine with no second verify
+  run — the quiet repeat point 499 asked for). Four checks fail on the software
+  WebGPU lane and pass, measured, on the hardware WebGL 2 lane, and every one of
+  them is a rate the lane cannot deliver rather than a broken product:
+  `polish` "settlement walker (goat): the planted foot holds its ground spot"
+  reports MEASURED NOTHING — 1 usable stance interval where it needs 3, against
+  23 intervals with a worst travel of 0.337 on the WebGL lane; `polish` "the dry
+  settlement season reading settles before it is read — after 60176 ms";
+  `settings` "a footstep fires with a surface class while walking (point 97)",
+  twice, green on WebGL; and `benchmark` dies outright with
+  `page.waitForFunction: Timeout 300000ms exceeded` (`benchmark.mjs:89`) because
+  its fixed 864-frame route cannot finish in software. `docs/host-environment.md`
+  already states the underlying fact — SwiftShader draws roughly one frame per
+  second, so "a green run there proves nothing about timing" — but nothing acts
+  on it, so every run shows red for it and a real regression would hide in that
+  noise.
+  FINAL STATE:
+  1. The run MEASURES the lane's delivered frame rate once, from the running
+     page, and reports it in the run header — every verdict below names the lane
+     it was taken on rather than assuming one.
+  2. A check whose subject is a RATE or a wall-clock budget (stance intervals per
+     walk, a settle deadline, the fixed-frame benchmark route) declares the
+     throughput it needs. Below it the check SKIPS, naming the measured figure
+     and that the lane cannot answer it; it never reds and never passes silently.
+  3. NO product threshold moves. The skip is a property of the lane; on a lane
+     that meets the throughput the identical check runs unchanged and must still
+     fail on a real regression.
+  4. Lane skips are counted in the run summary, so a lane that skips half a suite
+     can never be mistaken for a green both-backend verification — what the §7.2
+     both-backend rule counts is what actually RAN.
+  VERIFIABLE: on this host `VERIFY_GL=webgpu npm test -- polish settings
+  benchmark` ends green with exactly those four checks reported as lane skips
+  naming the measured frame rate, while `VERIFY_GL=webgl` runs all four for real;
+  a Vitest case pins the pure skip decision (needed vs measured throughput) in
+  both directions, including that a hardware lane never skips.
+
+- [ ] 507. A LOST WEBGPU DEVICE ENDS THE RUN QUIETLY AND THE PICTURE BLACK
+  (measured 05.08.2026, both quiet runs of `invariants` on the software WebGPU
+  lane). The suite ends `2 pass, 0 fail` with 9 and 2 console errors —
+  `AbortError: Failed to execute 'mapAsync' on 'GPUBuffer': A valid external
+  Instance reference no longer exists`, `THREE.WebGPURenderer: WebGPU Device
+  Lost: Reason: unknown`, `OperationError: Instance dropped in popErrorScope`.
+  The checks after the loss never run at all; only the console-error gate turns
+  the suite red, so the count reads like a partial pass and the loss itself is
+  named nowhere. The same loss in the shipped game is what point 493 photographed
+  on the mispinned lane: a black canvas behind a live HUD.
+  FINAL STATE:
+  1. The renderer NOTICES a lost device: `device.lost` is awaited, and the loss
+     goes to the dev-mode assert channel with its reason, so every test run and
+     every manual session detects it at the moment it happens.
+  2. A suite whose device dies FAILS AT THE LOSS, naming it, instead of reporting
+     the checks it managed before — a check count that stops early may never read
+     as a pass.
+  3. The player is told rather than left with a black picture: a lost device
+     raises the same localized, dismissible notice path as the WebGL 2 fallback
+     (both languages, from the language files), naming that the picture stopped
+     and what to do — never a silent black canvas behind a live HUD.
+  4. Whether the loss is the software lane's device giving up under a long run or
+     a teardown racing an in-flight readback is decided BY THE EVIDENCE the first
+     step now produces, and the answer is written into
+     `docs/host-environment.md`'s lane section.
+  VERIFIABLE: a Vitest case proves the loss handler fires the assert and the
+  localized notice from a simulated `device.lost` in both languages; a browser
+  case proves a suite that loses its device reports the loss as its failure
+  rather than a truncated pass; and `VERIFY_GL=webgpu npm test -- invariants`
+  either completes on this host or names the device loss as its verdict.

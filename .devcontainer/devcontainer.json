@@ -1,0 +1,88 @@
+{
+  "name": "Claude Code Sandbox",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "args": {
+      "TZ": "${localEnv:TZ:Europe/Berlin}",
+      "CLAUDE_CODE_VERSION": "latest",
+      "GIT_DELTA_VERSION": "0.18.2",
+      "ZSH_IN_DOCKER_VERSION": "1.2.0"
+    }
+  },
+  // --device=/dev/dxg plus the /usr/lib/wsl mount below hand the WSL2 GPU to the
+  // container, so the browser verification renders on real hardware instead of
+  // SwiftShader (~1 fps, which makes motion and interaction checks meaningless).
+  // If the host exposes no WSL GPU, the container REFUSES TO START: drop
+  // "--device=/dev/dxg" here and the /usr/lib/wsl mount below to get back.
+  "runArgs": ["--cap-add=NET_ADMIN", "--cap-add=NET_RAW", "--device=/dev/dxg"],
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "anthropic.claude-code",
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "eamodio.gitlens"
+      ],
+      "settings": {
+        "editor.formatOnSave": true,
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "editor.codeActionsOnSave": {
+          "source.fixAll.eslint": "explicit"
+        },
+        "terminal.integrated.defaultProfile.linux": "zsh",
+        "terminal.integrated.profiles.linux": {
+          "bash": {
+            "path": "bash",
+            "icon": "terminal-bash"
+          },
+          "zsh": {
+            "path": "zsh"
+          }
+        }
+      }
+    }
+  },
+  // The dev server and every verify suite open a port; VS Code announces each one with a
+  // toast in the corner. The batch opens them constantly, so the notification is pure noise —
+  // silent still FORWARDS the port, it only stops the popup.
+  "portsAttributes": {
+    "5173": { "label": "vite dev", "onAutoForward": "silent" },
+    "4173": { "label": "vite preview", "onAutoForward": "silent" }
+  },
+  "otherPortsAttributes": { "onAutoForward": "silent" },
+  "remoteUser": "node",
+  "mounts": [
+    "source=claude-code-bashhistory-${devcontainerId},target=/commandhistory,type=volume",
+    "source=claude-code-config-${devcontainerId},target=/home/node/.claude,type=volume",
+    "source=claude-code-ghconfig-${devcontainerId},target=/home/node/.config/gh,type=volume",
+    // SECURITY BOUNDARY: /workspace itself is writable, but the configuration
+    // controlling future container builds and host mounts must not be. This nested
+    // read-only bind shadows /workspace/.devcontainer from the writable workspace
+    // mount. Even passwordless root cannot remove it without CAP_SYS_ADMIN, which
+    // this container deliberately does not receive.
+    "source=${localWorkspaceFolder}/.devcontainer,target=/workspace/.devcontainer,type=bind,readonly",
+    // THE REPOSITORY LIVES ON A VOLUME NOW (04.08.2026). On the 9p bind of the Windows
+    // disk, 300 small files cost 1447 ms to write against 8 ms here — a factor every git
+    // command and every test run paid. The PATH is deliberately unchanged: /workspace/hoa
+    // keeps the memory slug, the scripts and every document reference valid.
+    "source=claude-code-hoa-repo-${devcontainerId},target=/workspace/hoa,type=volume",
+    // The Windows folder stays, READ-ONLY, as the backup it now is — and as the source
+    // .devcontainer/fill-workspace.sh clones from on first start.
+    "source=${localWorkspaceFolder}/../hoa,target=/backup/hoa,type=bind,readonly",
+    "source=/usr/lib/wsl,target=/usr/lib/wsl,type=bind,readonly"
+  ],
+  "containerEnv": {
+    "NODE_OPTIONS": "--max-old-space-size=4096",
+    "CLAUDE_CONFIG_DIR": "/home/node/.claude",
+    "POWERLEVEL9K_DISABLE_GITSTATUS": "true",
+    "GH_TOKEN": "${localEnv:GH_TOKEN}",
+    "PLAYWRIGHT_BROWSERS_PATH": "/home/node/.pw-browsers",
+    "LD_LIBRARY_PATH": "/usr/lib/wsl/lib"
+  },
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=delegated",
+  "workspaceFolder": "/workspace/hoa",
+  "postCreateCommand": "git config --global --add safe.directory /workspace && git config --global --add safe.directory /workspace/hoa && mkdir -p /home/node/.claude/hooks && cp /workspace/.devcontainer/CLAUDE.md /home/node/.claude/CLAUDE.md && cp /workspace/.devcontainer/hooks/*.cjs /home/node/.claude/hooks/ && bash /workspace/.devcontainer/fill-workspace.sh && cd /workspace/hoa && npm install",
+  // Fail closed if the security overlay was not mounted read-only as intended.
+  "postStartCommand": "sudo /usr/local/bin/init-firewall.sh && (test ! -w /workspace/.devcontainer/devcontainer.json || { echo 'ERROR: /workspace/.devcontainer is writable' >&2; exit 1; })",
+  "waitFor": "postStartCommand"
+}
