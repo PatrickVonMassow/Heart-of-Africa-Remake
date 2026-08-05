@@ -580,6 +580,14 @@ its own subject never occurred:
   prop, and none inside another goat — sampled over 20 reads of the herd, with
   the deepest penetration and the closest pair reported, plus the frame
   `143-village-goat-separation`.
+- **The hypothesis over the speaker's head (point 485).** The label's lifetime
+  and its binding to the note are pure Vitest; the browser owes only the
+  ATTACHMENT, which no unit test can see. A named inhabitant is made to speak a
+  heard utterance, and the rendered label's DOM box is compared with that
+  figure's own projected anchor — read in the SAME evaluate, over 8 frames, so
+  no frame passes between deciding and measuring. The delivered bug was a label
+  parked at the scene origin, which this misses by hundreds of pixels. Plus the
+  frame `146-speech-hypothesis-label`.
 
 Kept largely intact (already browser-only): `flow.mjs` (the one E2E core loop +
 buy-price layout geometry), `collision.mjs`, `gamepad.mjs`, `polish.mjs`,

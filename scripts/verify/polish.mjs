@@ -562,6 +562,219 @@ const stepUntil = async (ready, arg = null, capFrames = 240) => {
     }, aimed.pose)
   }
 }
+// --- The hypothesis over the speaker's head (design.md §13.4, point 485) ------
+// The lifetime and the note binding are pinned in the Vitest layer. What only a
+// browser can answer is the ATTACHMENT: the note must ride on the FIGURE that
+// speaks, not sit at a world coordinate. The delivered bug was exactly that —
+// R3F keeps its objects' local matrices itself, so a group moved from a frame
+// callback that does not publish the move is read at the position it was born
+// with, and every label stood at the scene origin. Measured here against the
+// figure's own projected anchor, in the SAME evaluate as the rendered label's
+// DOM box, so no frame passes between deciding and measuring.
+{
+  const COME = 'BA-BA-ba-ba-ba'
+  const pose = await page.evaluate(() => {
+    const p = window.__placePlayer
+    return p ? { x: p.x, z: p.z, yaw: p.yaw, pitch: p.pitch } : null
+  })
+  // The figures are named for this (point 485), so they can be collected out of
+  // the scene graph and their world translation read off the matrix.
+  const candidates = await page.evaluate(() => {
+    const scene = window.__placeScene
+    if (!scene) return []
+    const found = []
+    scene.traverse((o) => {
+      if (o.name === 'inhabitant' && found.length < 10) found.push(o)
+    })
+    window.__speechProbeFigures = found
+    return found.map((o) => {
+      o.updateWorldMatrix(true, false)
+      const e = o.matrixWorld.elements
+      return { x: e[12], y: e[13], z: e[14] }
+    })
+  })
+  // The picture is the evidence here, so the speaker must be one the camera can
+  // SEE: a figure standing behind a hut still carries its label (drei's <Html>
+  // is not depth-tested), and a frame of a note floating over a roof would prove
+  // the attachment to nobody. Each candidate is stood in front of and ray-probed
+  // against the rendered scene — the same instrument the silhouette footing uses.
+  // The first surface drawn along the sight line must be the FIGURE ITSELF, and
+  // that is what its DISTANCE says: a hut wall in front reads far too near, and a
+  // ray that sails PAST a smaller figure hits the ground far beyond it. Hence the
+  // ratio is bounded on BOTH sides — "nothing in front" alone accepted a miss,
+  // and a frame of a note over an empty patch of village was the result.
+  const STAND_BACK = 5
+  let speaker = null
+  let speakerIndex = -1
+  const probes = []
+  for (let i = 0; i < candidates.length; i++) {
+    await page.evaluate(
+      ({ at, back }) => {
+        const p = window.__placePlayer
+        // Stand between the settlement centre and the figure, looking OUTWARD:
+        // the open village edge then lies behind the speaker instead of a hut
+        // wall, so the note and the head under it read against the sky. Falls
+        // back to the current bearing for a figure standing on the centre itself.
+        const out = Math.hypot(at.x, at.z)
+        const ux = out > 1 ? at.x / out : (at.x - p.x) / (Math.hypot(at.x - p.x, at.z - p.z) || 1)
+        const uz = out > 1 ? at.z / out : (at.z - p.z) / (Math.hypot(at.x - p.x, at.z - p.z) || 1)
+        p.x = at.x - ux * back
+        p.z = at.z - uz * back
+        p.pitch = 0
+        // Place-camera yaw 0 looks toward -Z, so aim with the +PI complement.
+        p.yaw = Math.atan2(at.x - p.x, at.z - p.z) + Math.PI
+      },
+      { at: candidates[i], back: STAND_BACK },
+    )
+    await nextFrames(2)
+    const hit = await page.evaluate((at) => {
+      if (!window.__placeRayHit) return null
+      // Chest height, so the ray meets the body cone rather than the head sphere.
+      const h = window.__placeRayHit(at.x, at.y + 1, at.z)
+      return { ratio: h.hitDistance == null ? null : h.hitDistance / h.targetDistance, name: h.hitName }
+    }, candidates[i])
+    probes.push(hit ? `${hit.ratio == null ? 'sky' : hit.ratio.toFixed(2)}@${hit.name}` : 'none')
+    if (hit && hit.ratio !== null && hit.ratio >= 0.85 && hit.ratio <= 1.15) {
+      speaker = candidates[i]
+      speakerIndex = i
+      break
+    }
+  }
+  check(
+    'the settlement offers a figure in clear view to speak over (point 485)',
+    !!speaker,
+    `chosen #${speakerIndex} of ${candidates.length} named figures; sight lines [${probes.join(', ')}]`,
+  )
+  if (speaker) {
+    // Speak over THAT figure, not over whichever one the scene lists first: the
+    // chosen object is given a unique name for the dev hook to resolve. The
+    // channel stores the object itself, so a later React render restoring the
+    // shared name cannot detach the label.
+    // A label shows only over speech the player has ALREADY observed, so the
+    // utterance is heard first — that gate is what the label is worth.
+    const spoke = await page.evaluate(
+      ({ u, idx }) => {
+        window.__game.getState().hearUtterance(u)
+        const figure = window.__speechProbeFigures?.[idx]
+        if (!figure) return false
+        figure.name = 'speech-probe-figure'
+        // A long lifetime on purpose: the LIFETIME is pure-tested in Vitest, and
+        // a label that expired mid-measurement would only make this check flake.
+        const ok = window.__speech?.speak('probe-speaker', [u], 'speech-probe-figure', 120) === true
+        figure.name = 'inhabitant'
+        return ok
+      },
+      { u: COME, idx: speakerIndex },
+    )
+    check('a figure can speak over its head at all (point 485)', spoke, `spoke ${spoke}`)
+    await nextFrames(3)
+    // The anchor point, the figure's own body and the rendered label's DOM box
+    // are read in ONE evaluate, so no frame passes between deciding where the
+    // speaker is and measuring where its note landed.
+    const read = () =>
+      page.evaluate((idx) => {
+        const pt = window.__speech?.anchorScreen('probe-speaker')
+        const el = document.querySelector('.speech-label')
+        const figure = window.__speechProbeFigures?.[idx]
+        if (!pt || !el || !figure) return null
+        figure.updateWorldMatrix(true, false)
+        const e = figure.matrixWorld.elements
+        const cam = window.__placeCamera
+        const v = new (Object.getPrototypeOf(cam.position).constructor)(e[12], e[13] + 1, e[14])
+        v.project(cam)
+        const r = el.getBoundingClientRect()
+        return {
+          dx: r.left + r.width / 2 - pt.x,
+          dy: r.top + r.height / 2 - pt.y,
+          height: r.height,
+          bodyX: ((v.x + 1) / 2) * window.innerWidth,
+          bodyY: ((1 - v.y) / 2) * window.innerHeight,
+          vw: window.innerWidth,
+          vh: window.innerHeight,
+          labelBottom: r.bottom,
+          syllables: el.querySelector('.syllables')?.textContent ?? '',
+          reading: el.querySelector('.reading')?.textContent ?? '',
+        }
+      }, speakerIndex)
+    const samples = []
+    for (let k = 0; k < 8; k++) {
+      const s = await read()
+      if (s) samples.push(s)
+      await nextFrames(1)
+    }
+    // Horizontally the label is EXACTLY over its anchor — drei centres it there —
+    // so a few pixels of slack is all a walking figure needs. Vertically the CSS
+    // lifts the box by 8 px, which drei's distanceFactor scales with the label
+    // itself, so the allowance is expressed in the label's OWN height rather than
+    // as a screen constant that would pass at one distance and fail at another.
+    const worstX = samples.length ? Math.max(...samples.map((s) => Math.abs(s.dx))) : Infinity
+    const worstY = samples.length ? Math.max(...samples.map((s) => Math.abs(s.dy) - 0.35 * s.height)) : Infinity
+    check(
+      'the note rides on the figure that speaks, not on a world coordinate (point 485)',
+      samples.length >= 6 && worstX <= 6 && worstY <= 6,
+      samples.length >= 6
+        ? `worst sideways offset ${worstX.toFixed(1)} px, worst vertical offset past the scaled lift ${worstY.toFixed(1)} px, over ${samples.length} frames`
+        : `MEASURED NOTHING — only ${samples.length} frames carried both a label and its anchor`,
+    )
+    // And the picture must SHOW that: the speaker's own body stands inside the
+    // frame, directly under its note. A label over an empty patch of village
+    // would satisfy every number above and prove nothing to a human eye.
+    const underNote = samples.filter(
+      (s) => s.bodyX > 0 && s.bodyX < s.vw && s.bodyY > s.labelBottom && s.bodyY < s.vh,
+    )
+    check(
+      'the speaking figure itself stands in the frame, under its note (point 485)',
+      underNote.length >= 6,
+      samples.length
+        ? `body at (${samples[0].bodyX.toFixed(0)}, ${samples[0].bodyY.toFixed(0)}), label bottom ${samples[0].labelBottom.toFixed(0)} — ${underNote.length}/${samples.length} frames`
+        : 'MEASURED NOTHING',
+    )
+    // Point 485 (1)/(4): the syllables stand BESIDE the reading, never instead of
+    // it, and an unwritten reading reads `???`.
+    const last = samples[samples.length - 1] ?? { syllables: '', reading: '' }
+    check(
+      'the label shows the syllables beside the reading, `???` where none is written (point 485)',
+      last.syllables === COME && last.reading === '???',
+      JSON.stringify(last),
+    )
+    // Point 485 (3): editing the note in the journal changes the label at once —
+    // one source seen twice, nothing copied onto the label.
+    await page.evaluate((u) => window.__game.getState().setUtteranceHypothesis(u, 'come here'), COME)
+    await nextFrames(2)
+    const afterEdit = await read()
+    check(
+      'a reading written in the journal stands over the head immediately (point 485)',
+      !!afterEdit && afterEdit.reading === 'come here',
+      JSON.stringify(afterEdit),
+    )
+    // The subject is where the figure stands NOW — it may have walked on since
+    // it was chosen — so the shutter judges the frame against the live anchor.
+    const at = await page.evaluate((idx) => {
+      const figure = window.__speechProbeFigures?.[idx]
+      if (!figure) return null
+      figure.updateWorldMatrix(true, false)
+      const e = figure.matrixWorld.elements
+      return { x: e[12], y: e[13], z: e[14] }
+    }, speakerIndex)
+    await frame('146-speech-hypothesis-label', {
+      local: { x: (at ?? speaker).x, y: (at ?? speaker).y + 2.3, z: (at ?? speaker).z },
+      label: 'the reading over the speaking figure',
+    })
+    await page.evaluate((u) => {
+      window.__game.getState().setUtteranceHypothesis(u, '')
+      window.__speech?.clear()
+      delete window.__speechProbeFigures
+    }, COME)
+  }
+  await page.evaluate((saved) => {
+    const p = window.__placePlayer
+    if (!p || !saved) return
+    p.x = saved.x
+    p.z = saved.z
+    p.yaw = saved.yaw
+    if (saved.pitch !== undefined) p.pitch = saved.pitch
+  }, pose)
+}
 // Point 300, slope footing: a silhouette on a dune must lie ON the incline —
 // its body pitched over its own wheelbase, and each foot then seated on the
 // ground under ITS OWN spot — so the planted foot touches the ground drawn
