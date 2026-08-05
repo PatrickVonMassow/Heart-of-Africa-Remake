@@ -2730,48 +2730,58 @@ for (const [placeId, shot] of [
     // slow machine: a chase that is momentarily boxed between two huts offers no
     // clear line from any bearing, which is a passing state of the game and not
     // a defect in it. A single sweep made that moment fail the whole suite. Two
-    // ranges are tried before the wait, because a pair that has just sprinted
+    // ranges are tried before each wait, because a pair that has just sprinted
     // apart does not fit one frame at close range.
-    let bestBearing = null
-    let bestBack = 5.5
+    //
+    // THE STANDPOINT IS SHOT FROM WHERE IT WAS VALIDATED. Scoring the bearings
+    // and then re-standing on the winner looked tidier and produced a frame of
+    // the inside of a hut: re-standing recomputes the aim against a pair that
+    // has run on, so the camera lands 5.5 m from somewhere nobody validated. The
+    // reading is taken again after the shutter's own delay, too, because the
+    // children keep running through it — and only a standpoint that still holds
+    // both of them opens it.
+    let stood = null
     let shotProbe = 'no clear standpoint in any sweep'
-    for (let attempt = 0; attempt < 4 && bestBearing === null; attempt++) {
+    for (let attempt = 0; attempt < 4 && !stood; attempt++) {
       for (const back of [5.5, 8.5]) {
-        let best = -1
-        for (let k = 0; k < 16; k++) {
-          const bearing = (k / 16) * Math.PI * 2
-          const at = await standAt(bearing, back)
+        for (let k = 0; k < 16 && !stood; k++) {
+          const at = await standAt((k / 16) * Math.PI * 2, back)
           if (!at) break
           await nextFrames(2)
           const r = await readsFromHere()
-          // Score: BOTH of the pair first, then everyone else who happens to be
-          // in shot. An obstructed line scores nothing at all.
-          const score = r.clear ? r.pair * 10 + r.inFrame : -1
-          if (r.clear && r.pair === 2 && score > best) {
-            best = score
-            bestBearing = bearing
-            bestBack = back
-            shotProbe = `attempt ${attempt + 1}, ${back} m, bearing ${k}/16: pair=${r.pair} inFrame=${r.inFrame}`
+          if (!(r.clear && r.pair === 2)) continue
+          // It reads from here NOW — does it still, once the shutter's settle
+          // delay has passed? Only then is this the frame.
+          await nextFrames(4)
+          const still = await readsFromHere()
+          if (still.pair === 2) {
+            stood = at
+            shotProbe = `attempt ${attempt + 1}, ${back} m, bearing ${k}/16: pair=${still.pair} inFrame=${still.inFrame}`
           }
         }
-        if (bestBearing !== null) break
+        if (stood) break
       }
-      if (bestBearing === null) await nextFrames(30)
+      if (!stood) await nextFrames(30)
     }
-    // Stand on the WINNING bearing: the sweep left the camera on the last one
-    // tried. The chase has run on since, so the aim is taken freshly — the pair
-    // is re-read where it is NOW, which is the whole reason `standAt` recomputes
-    // rather than replaying a stored point.
-    const stood = bestBearing === null ? null : await standAt(bestBearing, bestBack)
     check(
       'the game is photographable: a clear standpoint holds the chaser and its quarry in frame',
       !!stood,
       shotProbe,
     )
     if (stood) {
-      await nextFrames(4)
+      // The subject is read where the pair is NOW, not where it was when the
+      // standpoint was picked: the settle delay above is eight frames of running
+      // children, and the shutter must be told what it is actually looking at.
+      const subject = await page.evaluate(() => {
+        const t = window.__placeTag()
+        if (!t || t.chaser < 0 || t.target < 0) return null
+        const a = t.children[t.chaser]
+        const q = t.children[t.target]
+        return { x: (a.x + q.x) / 2, z: (a.z + q.z) / 2 }
+      })
+      const aim = subject ?? { x: stood.cx, z: stood.cz }
       await frame('480-village-tag', {
-        local: { x: stood.cx, y: 0.6, z: stood.cz },
+        local: { x: aim.x, y: 0.6, z: aim.z },
         label: 'the children playing tag',
       })
     }
