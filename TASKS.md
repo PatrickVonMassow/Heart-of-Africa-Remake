@@ -4407,44 +4407,6 @@ Build order, chosen so no two parallel agents own the same file:
   when the panorama orientation is deliberately inverted — a check that cannot
   fail proves nothing.
 
-- [ ] 502. FORCED RAIN DOES NOT SWELL THE CURRENT FOR THE DROWNING DRAMA
-  (measured 04.08.2026 during the point-499 triage, 2 of 2 runs identical). The
-  `enrichments` wet-season water drama stages a calf crossing and reads
-  `{drowned:false, rescued:true, out:true}` — the DRY-season outcome — while the
-  paired dry-season check passes. Two candidates the triage could not separate:
-  the 400 ms after `setSeasonWetnessOverride(1)` is too short for
-  `CURRENT_WEATHER.wetness` to reach the wildlife system, or the swollen-current
-  rule itself regressed.
-  FINAL STATE:
-  1. The two are SEPARATED by the discriminator the triage named: read
-     `CURRENT_WEATHER.wetness` at staging time. A timing cause is fixed by
-     waiting on that reading, never by a longer sleep.
-  2. If the rule regressed, the wet-season current is restored so a calf
-     crossing a swollen river can drown per design.md §19.8, and the fix carries
-     a Vitest case at the rule level — the browser check is the picture, not the
-     only proof.
-  VERIFIABLE: the `enrichments` wet-season drama reports a drowning outcome on
-  two consecutive runs, the dry-season pair still passes, and the staged
-  `wetness` reading is asserted rather than assumed.
-
-- [ ] 503. HIGH ATLAS SEASONAL SNOW SITS UNDER ITS BAR
-  (measured 04.08.2026 during the point-499 triage, 2 of 2 runs, stable — not a
-  timing effect). The `enrichments` February High Atlas frame reads 1.2–1.3 %
-  snow against a 2 % bar. The seasonality half of the same check passes
-  trivially (Feb 1.3 % vs Jul 0.0 %), so the contrast is intact and only the
-  absolute amount is short. Either the snow is genuinely thinner than when the
-  bar was set, or the crop/exposure the check measures has moved.
-  FINAL STATE:
-  1. Decided AT THE PICTURE, as the ground micro-detail was: a February High
-     Atlas frame is looked at and judged against design.md §19.9 — does the
-     range read as snow-capped to a human?
-  2. The bar is NOT lowered to close this. If the picture is right and the crop
-     moved, the check is corrected with the reason written down; if the picture
-     is wrong, the snow cover is restored.
-  VERIFIABLE: the `enrichments` snow check passes two consecutive runs, the
-  frame it judges is stored in `verification/`, and the commit says which of the
-  two causes was found.
-
 - [ ] 504. EVERY BATCH OWNER IS DISPOSSESSED AT HALF AN HOUR OF AGE
   (measured 04.08.2026, 18:50Z and root-caused at 19:00Z). The autostart launcher
   logged "owner provably dead (pid-reused) — taking over" and spawned a second
