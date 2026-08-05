@@ -147,10 +147,9 @@ jede Änderung braucht die volle Batterie — sonst wird Testen umgangen. Bewäh
 Zwei Mechanismen, die das Netz ehrlich halten:
 
 > *Prompt:* „Etabliere einen Mechanismus, der eine Wiederholung **sichtbar** macht: Ein
-> flakender Browser-Test darf einmal wiederholt werden, muss dann aber eine ‚auf
-> Wiederholung bestanden — untersuchen'-Zeile hinterlassen, und der Release-Lauf muss
-> strikt ohne Wiederholung grün sein. Und einen, der feste Wartezeiten aufspürt —
-> gewartet wird auf eine Bedingung oder die App-Uhr, nie auf die Wanduhr."
+> flakender Test darf einmal wiederholt werden, muss dann aber eine ‚auf Wiederholung
+> bestanden — untersuchen'-Zeile hinterlassen, und der Release-Lauf muss strikt ohne
+> Wiederholung grün sein. Und einen, der feste Wartezeiten aufspürt."
 
 ---
 
@@ -201,8 +200,7 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   oder er ist nur in der Arbeitskopie grün, in der er lief.
   → *Prompt:* „Jeder Test bekommt seine Pfade **eingespritzt**, statt sie zu suchen, und
   Zeitgrenzen richten sich nach der gemessenen Last. Die Frage vor dem Abgeben ist nicht ‚ist
-  er grün?', sondern ‚wäre er auch im **Hauptstand** grün?' Einen roten Lauf bewerte ich erst
-  auf einer ruhigen Maschine."
+  er grün?', sondern ‚wäre er auch im **Hauptstand** grün?'"
 
 
 - **Messung und Vorschau verunreinigt.** Halbfertiges wird als ‚fertig' beurteilt.
@@ -217,28 +215,26 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   Wo eine Warnung nur im Erfolgsfall steht, braucht sie eine Prüfung, die ihn liest. Jede
   Formprüfung läuft **vor** dem Schritt nach außen."
 
-- **Regeln und Wächter verrotten — nur merkt es niemand.** Der Bestand wächst an Widersprüchen
-  und an Regeln, die eine nie gebaute Absicherung behaupten. Ein Wächter, der nie auslöst,
-  ist so kaputt wie einer, der immer auslöst.
+- **Regeln und Wächter verrotten — nur merkt es niemand.** Der Bestand wächst an
+  Widersprüchen und an Regeln, die eine nie gebaute Absicherung behaupten. Ein Wächter, der
+  nie auslöst, ist so kaputt wie einer, der immer auslöst.
   → *Prompt:* „Etabliere einen Mechanismus, der den ganzen Bestand periodisch zur Durchsicht
-  zwingt — auf Aktualität, Dopplung, Widerspruch und **Wirkungslosigkeit**, zuerst die am
-  häufigsten eingeblendeten Texte. Schreib zu **jeder** Regel, was sie misst — Test, Prüfung
-  oder **nichts**; bei ‚nichts' nur zwei Ausgänge: Mechanismus bauen, oder **mit Begründung**
-  als bewusst nicht erzwungen vermerken. Jeden Wächter prüfst du gegen sich selbst: Hat er je
-  ausgelöst? Kann er überhaupt? Doppelt er einen anderen?" *(Kosten: einmalig hoch)*
+  zwingt — auf Aktualität, Dopplung, Widerspruch und **Wirkungslosigkeit**. Schreib zu
+  **jeder** Regel, was sie misst; steht dort **nichts**, gibt es nur zwei Ausgänge:
+  Mechanismus bauen oder **mit Begründung** als bewusst nicht erzwungen vermerken. Jeden
+  Wächter prüfst du gegen sich selbst: Hat er je ausgelöst? Kann er überhaupt?"
+  *(Kosten: einmalig hoch)*
 
 - **Der rote Test klagt den Falschen an.** Er täuscht gefährlicher als ein grüner:
   Prüfungen veralten von selbst und klagen gesunden Code an.
-  → *Prompt:* „Etabliere einen Mechanismus, der vor einer Code-Änderung auf einen roten Test
-  hin ein **Experiment** verlangt: Belastet der Befund das Produkt oder die Messung? Gemessen
-  wird nur an einem eingeschwungenen Zustand, dessen Bereitschaft der gemessene **Gegenstand**
-  meldet — nie eine Uhr, denn eine feste Wartezeit ist verkleidete Maschinengeschwindigkeit.
-  Eine Prüfung schlägt auch dann fehl, wenn ihr Messwert in die *unerwartete* Richtung
-  ausschlägt — nicht nur über der Grenze."
+  → *Prompt:* „Etabliere einen Mechanismus, der auf einen roten Test hin erst ein
+  **Experiment** verlangt: Belastet der Befund das Produkt oder die Messung? Gemessen wird
+  nur an einem eingeschwungenen Zustand, dessen Bereitschaft der gemessene **Gegenstand**
+  meldet — nie eine Uhr. Eine Prüfung schlägt auch dann fehl, wenn ihr Messwert in die
+  *unerwartete* Richtung ausschlägt."
 
-- **Derselbe Fakt steht an fünf Stellen — und veraltet an vier.** Wer baut, aktualisiert die Stelle, an der
-  er gerade schreibt; die übrigen Kopien rotten unbemerkt, und das ‚Was' im Design-Doc passt
-  nicht mehr zum ‚Wie' im Code.
+- **Derselbe Fakt steht an fünf Stellen — und veraltet an vier.** Wer baut, aktualisiert die
+  Stelle, an der er gerade schreibt; die übrigen Kopien rotten unbemerkt.
   → *Prompt:* „Etabliere einen Mechanismus, der jedem Fakt genau **einen** verbindlichen Ort
   zuweist; alle anderen verweisen darauf. Wo sich eine Wiederholung nicht vermeiden lässt,
   prüft ein Test sie gegen den **Code**, dem der Fakt gehört, nie gegen die Nachbarprosa.
@@ -357,6 +353,12 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   die nur **ergänzt**? Sonst bau sie. Und lass jeden Neuaufbau nach **offen** scheitern —
   ein zu offener Stand ist reparierbar, ein zugesperrter nicht."
 
+- **Einigkeit ist keine Evidenz.** Mehrere Modelle können sich über eine Ursache einig
+  sein und gemeinsam danebenliegen; die Einigkeit fühlt sich dann an wie ein Beweis.
+  → *Prompt:* „Bevor du eine Liste von Versuchen vorschlägst: Welcher **eine Test** macht
+  die Ursache **sichtbar**? Führ ihn zuerst aus. Und sag mir, ob schon ein **anderer Weg
+  läuft**, der dasselbe trägt — statt den blockierten zu reparieren."
+
 ---
 
 ## Drei Meta-Regeln, die alles zusammenhalten
@@ -397,4 +399,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 Wenn du diese eine Nachricht an den Anfang stellst, hast du 80 % der Lehren dieses
 Projekts eingebaut, bevor die erste Zeile Code entsteht.
 
-<!-- GUIDE-FINGERPRINT: c70dbeb9a9cf5e947212eec2ee34452002cadbd51718fe0c41e9cb54eda5e530 -->
+<!-- GUIDE-FINGERPRINT: 38bf5ec026c6ed40a442cba21fbbb7d158336911a3225105840b089d356fa3a7 -->

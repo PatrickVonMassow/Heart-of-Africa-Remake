@@ -4715,3 +4715,93 @@ Build order, chosen so no two parallel agents own the same file:
   position sits within a small radius of the origin while its layout anchor lies
   elsewhere; a Vitest case pins the placement function against the uninitialised
   case that produced the zero.
+
+- [ ] 510. THE RENDER-VERIFY CORE COUNTS A RUN THAT NEVER CONFIRMED ITS BACKEND
+  (four-eyes review of point 505's gate change, 05.08.2026 — the reviewer cleared
+  that change and left these three beside it).
+  FINAL STATE:
+  1. `coveringRun` (`scripts/render-verify-core.mjs`) counts a run only when it
+     also CONFIRMED its backend. Today it reads the exit code alone, so a run that
+     never reached `assertBackend` covers — and since that call is what writes the
+     feature level, such a run carries neither signal and still passes. Vitest
+     pins both directions.
+  2. `coveringRun(runs, b, since, null)` no longer throws: the options default
+     catches `null` as well as `undefined`, or the totality test stops claiming
+     more than holds. The outer guard catches it fail-open today, so this is
+     honesty about the core's contract, not a live defect.
+  3. The CLOSING (§9) demands a core-level WebGPU sighting once per release, so a
+     compatibility-level lane never becomes the sole WebGPU evidence for a tag.
+     The turn gate stays level-agnostic — demanding core there would hard-block
+     every render change on a host whose only adapter is compat (point 505).
+  VERIFIABLE: Vitest — an unasserted run never covers, an asserted one does, and
+  the options default survives `null`; `scripts/closing-guard-core.mjs` carries the
+  core-level step and `--status` lists it.
+
+- [ ] 511. THE MEMORY INDEX STILL CARRIES WHAT THIRTY GUARDS NOW ENFORCE
+  (measured 05.08.2026 on the user's question about context cost). The numbers
+  first, so the effort goes where the cost is: the memory INDEX is 13.2 KB / 86
+  lines (~3.3k tokens) per session and the 74 entry files load only on recall,
+  while `CLAUDE.md` is 61.6 KB (~15k tokens) and is paid AGAIN by every subagent —
+  ~82 % of the session floor against the index's ~16 %, and the floor multiplies
+  per agent. Splitting `CLAUDE.md` is the real lever, is the user's call and is
+  published as the decision card "Bauanleitung für Subagenten aufteilen?"; this
+  point does the part that needs no decision.
+  FINAL STATE:
+  1. Every memory entry whose rule is ENFORCED by an armed guard is retired from
+     the index, its content living on wherever the guard documents itself. An
+     entry stays when it carries a JUDGEMENT a guard cannot make (taste, history,
+     a user ruling) — the test is "would a session behave differently without it,
+     given the guard already fires?".
+  2. `docs/rule-corpus-audit.md` records the measurement above and each retirement
+     with its enforcing guard, so the next audit starts from evidence.
+  VERIFIABLE: the index names no entry whose whole content is an armed guard's
+  rule; the audit doc lists each retired entry beside the guard that replaced it.
+
+- [ ] 512. THE BUILD ORDER IS PAID AGAIN BY EVERY SUBAGENT (user decision
+  05.08.2026 on the card "Bauanleitung für Subagenten aufteilen?"). Measured:
+  `CLAUDE.md` is 61.6 KB — §1–5 8.0 KB, §6 13.6 KB, §7 37.5 KB (of which §7.2 is
+  7.4 KB), §9 2.0 KB — and every delegated agent receives all of it, though a
+  building agent never touches the 32 acceptance criteria, the batch handover, the
+  board rules, the model policy or the release mechanics. An agent-facing core is
+  ~19 KB, so ~68 % of the rule document falls away per agent.
+  FINAL STATE:
+  1. `CLAUDE.md` keeps ONE binding text and gains a declared SPLIT: the
+     agent-facing core (goal, scope guardrails, stack, structure, commands, the
+     working rules a builder obeys — commits, branch discipline, language, voice
+     markup, test layers — and §7.2 self-verification) and the session part (batch
+     ownership and handover, board, delegation machinery, model policy, release
+     and closing). Neither is a summary of the other: every rule lives in exactly
+     one of them, and nothing is dropped.
+  2. Delegated agents receive the core only. The mechanism is the one that already
+     exists for this purpose — the point brief (`scripts/point-brief.mjs`) — so a
+     builder gets brief + core and no longer the whole document.
+  3. A rule that moves keeps its enforcement: any guard, hook or test that reads
+     `CLAUDE.md` by section is updated in the same commit, and the doc-budget
+     entries follow the split.
+  4. The session part stays the authority for a session that OWNS the batch, so
+     nothing about the batch, the board or a release becomes less binding.
+  VERIFIABLE: a delegated agent's prompt carries the core and not the session
+  part; `scripts/point-brief.mjs` names which document it assumes; every rule of
+  the old file is findable in exactly one of the two halves (a test sweeps the
+  section headings for coverage and for duplication).
+
+- [ ] 513. A BRANCH CI RUN MUST NOT MAIL THE OWNER (user decision 05.08.2026 on
+  the card "Rote CI-Läufe auf Agenten-Zweigen — welcher Weg?", option 3). Two
+  deliberate rules work against each other: a branch push runs lint and
+  dependencies only (the full gate per intermediate commit costs more than a red
+  branch is worth), while the pipeline runs in full on EVERY branch push. An agent
+  that commits mid-work therefore produces red runs, and each one mails the
+  repository owner.
+  FINAL STATE:
+  1. A CI run on a `feat/**` branch no longer notifies the owner by mail. Red on a
+     branch is expressly normal; the run still executes and its result stays
+     visible in the run list.
+  2. `main` is untouched: a red run there still mails, because that is the branch
+     the deploy builds from.
+  3. The rescue-commit mail path (`[skip ci]` plus the `Rescue:` trailer, which
+     deliberately mails on a red state) keeps working as specified — this point
+     silences the ROUTINE branch run, not the deliberate alarm.
+  4. `docs/` states where notifications now come from, so a silent branch failure
+     is never mistaken for a green one.
+  VERIFIABLE: a deliberately red push to a throwaway `feat/` branch produces a run
+  and no mail; the same failure on `main` still mails; the rescue path still does.

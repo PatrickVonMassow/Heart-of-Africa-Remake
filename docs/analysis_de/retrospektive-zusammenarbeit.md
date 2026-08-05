@@ -42,6 +42,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 04.08. | Eine Nacht am Falschen gearbeitet: der Vorrang stand als Prosa, die Warteschlange las die alte Rangfolge (§3.77); zweimal Container-Arbeit an den Nutzer zurückgereicht → Regel + Wächter (§3.78) |
 | 04.08. | Zweimal am eigenen Netz ausgesperrt — der Firewall-Neubau reißt zuerst ein → additives Werkzeug, fail-offener Neubau, Wächter (§3.80); die Sprachregel hatte nie einen Mechanismus, und die Bestandsprüfung sah es nicht (§3.81) |
 | 04.08. abends | Sechs rote Suiten eingeordnet: vier waren der Prüfstand — gesperrtes Auslieferungsnetz und feste Wartezeiten von einer schnelleren Maschine (§3.83); der Starter enteignet jeden Besitzer nach einer halben Stunde (Punkt 504) |
+| 05.08. | Vier Recherchen ohne eine Messung: die fehlende Treiberfähigkeit stand hinter einem Befehl, die Lösung dann in einer längst laufenden Kette (§3.84) — die zweite Bahn zeichnet seither auf der Grafikkarte |
 
 Muster: Ab dem 22.07. explodiert die Commit-Rate (Delegation) — und genau dann häufen sich die Infrastruktur-Vorfälle. **Skalierung der Autonomie erzeugt eine eigene Problemklasse, die die Feature-Arbeit zeitweise überholt.**
 
@@ -778,6 +779,16 @@ Die anderen fotografierten Szenen, die noch nicht fertig gebaut waren. Die Warte
 
 **Lehren:** Eine Entlastung ist kein Schuldspruch für den Rest — „nicht die Bahn" beantwortet nicht „wer dann". Eine Messung braucht ihre Bereitschaftsbedingung aus dem **gemessenen Gegenstand** (hier die Geometriezahl des Renderers), nie aus einer Uhr; eine feste Wartezeit kodiert stillschweigend eine Maschinengeschwindigkeit und wird beim nächsten Umzug zur Falschanklage. Und ein Plateau ist kein Ziel: Wer auf „ändert sich nicht mehr" wartet, muss lange genug warten, dass Stillstand von Fertigsein unterscheidbar ist.
 
+### 3.84 Vier Recherchen, keine Messung — und die Antwort lag hinter einem Befehl
+
+Die zweite Verifikationsbahn zeichnete seit Wochen in Software. Die Ursachensuche lief über vier unabhängige Recherchen (drei fremde Modelle, eine eigene) und förderte lauter plausible Erklärungen zutage: eine fehlende Startflagge, eine zu niedrig gemeldete Schnittstellenversion, ein fehlendes Austauschformat für Bildspeicher. Aus den Plausibelsten baute ich eine **Reihenfolge von Versuchen** — drei Browser-Runden, bevor irgendein Schritt die Ablehnung überhaupt sichtbar gemacht hätte.
+
+Die Zweitprüfung tat dann das, was am Anfang gehört hätte: einen Befehl ausführen, der die Fähigkeiten des Treibers gegen die Pflichtliste des Browsers hält. Genau **eine** Fähigkeit fehlt — und die Ablehnung steht wörtlich im Quelltext des Browsers. Damit waren meine ersten drei Schritte nicht bloß unwahrscheinlich, sondern **vorhersagbar wirkungslos**: Keine Startflagge greift in die Adapterprüfung hinein. Zwei der vier Recherche-Leithypothesen ließen sich am selben Datensatz in Minuten widerlegen, eine dritte an einem Blick ins Dateisystem.
+
+Der Fund selbst kam dann aus einer anderen Richtung als jede Hypothese: Nicht der blockierte Treiber wurde repariert, sondern eine **schon funktionierende Kette** benutzt, die niemand als Kandidat geführt hatte — dieselbe Grafikkette, über die die andere Bahn längst auf der Karte lief.
+
+**Lehren:** Mehrere unabhängige Meinungen ersetzen keine Messung — sie können einträchtig danebenliegen, und ihre Einigkeit fühlt sich wie Evidenz an. Vor einer Reihenfolge von Reparaturversuchen steht der eine Test, der die **Ursache sichtbar** macht; kostet er nichts, gibt es keine Entschuldigung, ihn hinter Versuch drei zu setzen. Und wenn eine Kette blockiert ist, lohnt vor ihrer Reparatur die Frage, ob im Haus schon eine andere Kette läuft, die dasselbe trägt.
+
 ---
 
 ## 4. Die Guards als Immunsystem
@@ -867,7 +878,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Mittwoch, 05.08.2026, 04:33 · Quellen-Fingerprint: `c70dbeb9a9cf…`
+Zuletzt aktualisiert: Mittwoch, 05.08.2026, 09:34 · Quellen-Fingerprint: `38bf5ec026c6…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -946,8 +957,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | CORRECTED 19.07.2026 — WebGPU IS testable headless/autonomously via system Chrome (channel:'chrome') + --headless=new; the 'untestable' belief held only for Playwright's BUNDLED Chromium | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 71 Feedback-/Projekt-Memories · 42 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 30 Prozess-/Meta-TASKS-Punkte (davon 13 offen).
+Erfasste Quellen: 71 Feedback-/Projekt-Memories · 42 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 31 Prozess-/Meta-TASKS-Punkte (davon 14 offen).
 
-<!-- RETRO-FINGERPRINT: c70dbeb9a9cf5e947212eec2ee34452002cadbd51718fe0c41e9cb54eda5e530 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-05T02:33:34.014Z -->
+<!-- RETRO-FINGERPRINT: 38bf5ec026c6ed40a442cba21fbbb7d158336911a3225105840b089d356fa3a7 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-05T07:34:20.353Z -->
 <!-- AUTO-GENERATED:END -->
