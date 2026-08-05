@@ -16,21 +16,29 @@
  *  win32 keeps `d3d11` — the historical value, unchanged byte for byte; the Windows
  *  host is the one this project has always verified on and nothing about it moved.
  *
- *  Linux headless gets `swiftshader`: the container has no GPU, no DRI driver and no
- *  system libEGL/libGL, so ANGLE's `gl` backend has no native driver to sit on. Chrome
- *  ≥120 does NOT silently fall back to software rendering for WebGL when the GPU path
- *  fails (it needs an explicit opt-in), so a `gl` lane on such a host does not degrade
- *  gracefully — it yields a context-less page and the suite dies at `window.__renderer`.
- *  SwiftShader is ANGLE's own bundled software backend, ships inside the browser
- *  download and needs nothing from the host. A Linux machine WITH a GPU can be pointed
- *  at its hardware backend through VERIFY_ANGLE (below) without touching this file.
+ *  Linux headless gets `gl` (point 493, 04.08.2026). The earlier `swiftshader` was
+ *  chosen on 03.08.2026 from a premise that has since been measured false — "the
+ *  container has no GPU, no DRI driver and no system libEGL/libGL". It has all three:
+ *  /dev/dxg is passed through, /usr/lib/wsl/lib carries libd3d12/libd3d12core/libdxcore,
+ *  and Mesa's d3d12 Gallium driver turns that into hardware GL. With `gl` the lane comes
+ *  up as "ANGLE (Microsoft Corporation, D3D12 (NVIDIA GeForce RTX 4070 Ti), OpenGL 4.2)"
+ *  against SwiftShader's "Vulkan 1.3.0 (SwiftShader Device (Subzero))" — measured on the
+ *  identical scene at 170 vs 22.7 renderer calls per second, a 7.5× picture rate. What
+ *  the host needs for it is installed by scripts/verify-host-setup.sh (libgl1, libegl1,
+ *  mesa DRI) and by the devcontainer's X11 socket.
+ *
+ *  It DEGRADES rather than breaks: with the X socket gone the same flags still come up,
+ *  on SwiftShader (measured — the 03.08 note's "context-less page" does not happen here),
+ *  so a host without the graphics stack loses speed and keeps its picture. Which one a
+ *  run actually got is not left to inference: backend-lane-check.mjs prints the renderer
+ *  string and names a software rasteriser as one.
  *
  *  darwin gets `metal`, the only backend ANGLE has there.
  */
 const ANGLE_BY_PLATFORM = {
   win32: 'd3d11',
   darwin: 'metal',
-  linux: 'swiftshader',
+  linux: 'gl',
 }
 
 /** Fallback for a platform not named above — software, so it cannot assume a driver. */
@@ -46,11 +54,43 @@ export function angleBackend(platform, override) {
   return ANGLE_BY_PLATFORM[platform] ?? ANGLE_FALLBACK
 }
 
-/** Chromium's sandbox needs unprivileged user namespaces, which container images
- *  routinely withhold; every headless CI Linux run therefore passes --no-sandbox.
+/** The Gallium driver the ANGLE `gl` backend should load, as an ENVIRONMENT value —
+ *  Mesa reads it there, not from a browser flag.
+ *
+ *  Linux gets `d3d12`, the driver that reaches /dev/dxg (point 493). Mesa 22.3.6 picked it
+ *  by itself; Mesa 25 does not — with the variable unset the identical host reports
+ *  "ANGLE (Mesa, llvmpipe …)" and every suite runs on the CPU while looking perfectly
+ *  healthy. That silent downgrade is why it is pinned rather than left to the loader.
+ *
+ *  `override` is the raw VERIFY_GALLIUM value, for a Linux host with a different stack;
+ *  the literal `none` sets nothing at all. Empty/absent means "decide by platform". */
+export function galliumDriver(platform, override) {
+  const forced = typeof override === 'string' ? override.trim().toLowerCase() : ''
+  if (forced) return forced === 'none' ? '' : forced
+  return platform === 'linux' ? 'd3d12' : ''
+}
+
+/** The environment a lane's browser launches with: `baseEnv` plus what the graphics stack
+ *  needs. Handed over WHOLE because Playwright REPLACES the environment when given one —
+ *  passing the delta alone would strip PATH, HOME and the display the driver needs. */
+export function laneEnv(platform, baseEnv, galliumOverride) {
+  const gallium = galliumDriver(platform, galliumOverride)
+  const base = { ...(baseEnv ?? {}) }
+  return gallium ? { ...base, GALLIUM_DRIVER: gallium } : base
+}
+
+/** What a Linux container launch needs beyond the ANGLE choice.
+ *
+ *  --no-sandbox: Chromium's sandbox needs unprivileged user namespaces, which container
+ *  images routinely withhold.
+ *  --ignore-gpu-blocklist: Chrome blocklists the D3D12-through-Mesa driver by default and
+ *  would drop to software without ever saying so.
+ *  --disable-dev-shm-usage: /dev/shm is 64 MB in a default container; the GPU process
+ *  dies on a large frame otherwise.
+ *
  *  Windows and macOS keep exactly the argument list they always had. */
 function platformArgs(platform) {
-  return platform === 'linux' ? ['--no-sandbox'] : []
+  return platform === 'linux' ? ['--ignore-gpu-blocklist', '--disable-dev-shm-usage', '--no-sandbox'] : []
 }
 
 /** What the WebGL 2 lane says about WebGPU. The lane's whole job is the FALLBACK
@@ -68,8 +108,15 @@ function webgpuArg(platform) {
   return platform === 'linux' ? '--disable-features=WebGPU' : '--enable-unsafe-webgpu'
 }
 
-/** Launch options for the WebGL 2 fallback lane (Playwright's bundled Chromium). */
-export function webglLaunchOptions(platform, angleOverride) {
+/** Launch options for the WebGL 2 fallback lane (Playwright's bundled Chromium).
+ *
+ *  `baseEnv` is the environment to build the browser's on (the caller's process.env).
+ *  It is OPT-IN: given one, the options carry a complete `env`; without one they are
+ *  args only, exactly as before. Playwright replaces the environment when handed one,
+ *  so half an environment is worse than none — the opt-in makes that explicit rather
+ *  than leaving a caller to discover it. */
+export function webglLaunchOptions(platform, angleOverride, baseEnv, galliumOverride) {
+  const env = laneEnv(platform, baseEnv, galliumOverride)
   return {
     args: [
       webgpuArg(platform),
@@ -77,13 +124,35 @@ export function webglLaunchOptions(platform, angleOverride) {
       '--enable-gpu',
       ...platformArgs(platform),
     ],
+    ...(baseEnv ? { env } : {}),
   }
 }
 
-/** Launch options for the WebGPU lane. The flags are unchanged on every platform: the
+/** The three flags a GPU-less Linux host needs before the WebGPU lane DRAWS (measured
+ *  04.08.2026, point 493). Without them system Chrome still reports a WebGPU adapter and
+ *  three.js still initialises `isWebGPUBackend` — and then every frame goes nowhere: the
+ *  page throws "OperationError: Instance dropped in popErrorScope" ~2 s in, the canvas
+ *  stays BLACK behind a live HUD, and `info.memory.renderTargets` climbs past 1000 while
+ *  the renderer re-creates what the dropped instance ate. Exactly the trap point 493
+ *  names: an interface that answers, and no picture.
+ *
+ *  The cause is two graphics stacks disagreeing. Dawn picks Chrome's bundled SwiftShader
+ *  Vulkan, while ANGLE (the compositor's GL side) finds no `libGL.so.1` and the loader's
+ *  only system ICD is Mesa 22.3.6 lavapipe; the GPU process then drops the Dawn instance
+ *  under it. Pinning BOTH sides to the browser's own bundled SwiftShader ends the
+ *  disagreement. All three are required — measured, every proper subset of them still
+ *  dropped the instance on 2/2 runs, while the full set drew the real game on 3/3
+ *  (~4 fps, the same order as the WebGL 2 lane's SwiftShader).
+ *
+ *  Linux only, and deliberately so: the flags describe a host with no usable driver.
+ *  Windows and macOS keep the argument list byte for byte. */
+const LINUX_WEBGPU_SOFTWARE_ARGS = ['--use-angle=swiftshader', '--enable-features=Vulkan', '--use-vulkan=swiftshader']
+
+/** Launch options for the WebGPU lane. The
  *  point-184 breakthrough is a SYSTEM browser with --headless=new (Playwright's bundled
- *  Chromium fails requestDevice headless), and nothing about the host changes which
- *  flags that needs — only WHETHER the host has such a browser (see webgpuLaneVerdict).
+ *  Chromium fails requestDevice headless), and the host decides only WHETHER such a
+ *  browser exists (see webgpuLaneVerdict) and which driver flags it needs
+ *  (LINUX_WEBGPU_SOFTWARE_ARGS above).
  *
  *  `systemChrome` is the executable the caller PROBED (systemChromeCandidates →
  *  findSystemChrome). When there is one it is handed over as `executablePath`, so the
@@ -99,15 +168,23 @@ export function webglLaunchOptions(platform, angleOverride) {
  *
  *  With nothing probed (Windows, macOS — see systemChromeCandidates) the options are
  *  byte for byte the historical `channel:'chrome'` launch and Playwright resolves it. */
-export function webgpuLaunchOptions(systemChrome = null) {
-  const args = ['--headless=new', '--enable-unsafe-webgpu', '--enable-gpu']
+export function webgpuLaunchOptions(systemChrome = null, platform = process.platform, baseEnv, galliumOverride) {
+  const args = [
+    '--headless=new',
+    '--enable-unsafe-webgpu',
+    '--enable-gpu',
+    ...(platform === 'linux' ? [...LINUX_WEBGPU_SOFTWARE_ARGS, ...platformArgs(platform)] : []),
+  ]
   const executablePath = typeof systemChrome === 'string' ? systemChrome.trim() : ''
-  return executablePath ? { executablePath, args } : { channel: 'chrome', args }
+  const env = baseEnv ? { env: laneEnv(platform, baseEnv, galliumOverride) } : {}
+  return executablePath ? { executablePath, args, ...env } : { channel: 'chrome', args, ...env }
 }
 
 /** The options `_browser.mjs` hands chromium.launch for the requested backend. */
-export function verifyLaunchOptions(backend, platform, angleOverride, systemChrome) {
-  return backend === 'webgpu' ? webgpuLaunchOptions(systemChrome) : webglLaunchOptions(platform, angleOverride)
+export function verifyLaunchOptions(backend, platform, angleOverride, systemChrome, baseEnv, galliumOverride) {
+  return backend === 'webgpu'
+    ? webgpuLaunchOptions(systemChrome, platform, baseEnv, galliumOverride)
+    : webglLaunchOptions(platform, angleOverride, baseEnv, galliumOverride)
 }
 
 /** The loud headline of an unrunnable WebGPU lane. Verbatim in the thrown error so a

@@ -209,6 +209,12 @@ describe('DebugMenu editable fields write through to balance (settings.mjs fillF
     { label: en.debug.birdsongVolume, read: () => balance.birdsongVolume, value: 0.5 },
     { label: en.debug.surfNearRadius, read: () => balance.surf.nearRadius, value: 0.8 },
     { label: en.debug.surfCutoff, read: () => balance.surf.cutoff, value: 5 },
+    // Village speech (design.md §13.4/§21.2): pace, phrase pause and the short
+    // hearing range with its falloff sharpness.
+    { label: en.debug.speechSyllable, read: () => balance.communication.syllableSeconds, value: 0.45 },
+    { label: en.debug.speechPhrasePause, read: () => balance.communication.phrasePauseSeconds, value: 1.4 },
+    { label: en.debug.speechHearingRadius, read: () => balance.communication.hearingRadius, value: 14 },
+    { label: en.debug.speechHearingFalloff, read: () => balance.communication.hearingFalloff, value: 12 },
     { label: en.debug.canoeSpeedup, read: () => balance.canoeSpeedup, value: 5 },
     // Nested balance field (balance.health.canteenCapacity).
     { label: en.debug.canteenCapacity, read: () => balance.health.canteenCapacity, value: 600 },

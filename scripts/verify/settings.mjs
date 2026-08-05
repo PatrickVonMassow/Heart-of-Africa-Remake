@@ -12,7 +12,7 @@
 // behaviour (activeElement/canvas), the TRAA pipeline toggle (real pipeline
 // rebuild + frame check), the screenshots and the console-error gate.
 // Dev server only (dev hooks).
-import { launchVerifyBrowser, assertBackend } from './_browser.mjs'
+import { launchVerifyBrowser, assertBackend, waitForSceneBuilt } from './_browser.mjs'
 import { frameShutter } from './frameSubject.mjs'
 import { leakVerdict } from './textureLeak.mjs'
 import { fileURLToPath } from 'node:url'
@@ -43,7 +43,14 @@ await page.waitForFunction(() => window.__game && window.__balance, null, { time
 // throws on a silent WebGL2 fallback under VERIFY_GL=webgpu (the lane's guardrail).
 await page.waitForFunction(() => window.__renderer, null, { timeout: 60000 })
 await assertBackend(page)
-await page.waitForTimeout(4000)
+// Wait for the SCENE to finish building, not for the wall clock (point 499). The
+// 4 s that stood here was calibrated on a faster host; here the first-person Cairo
+// picture is still BLACK at 6 s and only carries its ground micro-structure from
+// ~17 s, so the edge-energy check below measured an empty frame and reported the
+// feature as gone. `built:false` is surfaced rather than swallowed — a scene that
+// never finishes is its own finding, not a silent zero.
+const sceneBuilt = await waitForSceneBuilt(page)
+check('the first-person scene finishes building before it is measured', sceneBuilt.built, JSON.stringify(sceneBuilt))
 await page.evaluate(() => window.__game.getState().setJournalOpen(false))
 await page.waitForTimeout(400)
 
@@ -583,6 +590,35 @@ check('surf plays at the coast and is exactly 0 far inland (point 153)',
   surf153.atCoast > 0 && surf153.inland === 0, JSON.stringify(surf153))
 check('the surf gust also fades to silence inland (no leak past the target)',
   surf153.wobbleCoast > 0 && surf153.wobbleInland === 0, JSON.stringify(surf153))
+// --- Village speech really plays (design.md §13.4) ---------------------------
+// The plan (pace, pause, attenuation) is pinned in the Vitest layer; the browser
+// owes only the fact that a spoken utterance SCHEDULES audio — and that one
+// spoken from beyond the hearing radius schedules nothing at all.
+const speech = await page.evaluate(() => {
+  window.__balance.ambienceVolume = 0.5
+  const a = window.__ambience
+  a.start()
+  const near = { ...a.speechProbe() }
+  a.speak('BA-BA-ba-ba-ba', 0) // right beside the speaker
+  const spokenNear = { ...a.speechProbe() }
+  a.speak('BA-BA-ba-ba-ba', window.__balance.communication.hearingRadius * 3) // out of earshot
+  const spokenFar = { ...a.speechProbe() }
+  a.speakPhrase(['BA-ba-ba-BA-ba', 'BA-ba-BA-ba-ba'], 0) // dig + here
+  const phrase = { ...a.speechProbe() }
+  return { near, spokenNear, spokenFar, phrase }
+})
+check('a nearby utterance schedules its syllables with a positive level (design.md §13.4)',
+  speech.spokenNear.spoken === speech.near.spoken + 1 &&
+    speech.spokenNear.syllables === speech.near.syllables + 5 &&
+    speech.spokenNear.lastPeak > 0,
+  JSON.stringify(speech))
+check('an utterance from beyond the hearing radius schedules nothing',
+  speech.spokenFar.spoken === speech.spokenNear.spoken &&
+    speech.spokenFar.syllables === speech.spokenNear.syllables,
+  JSON.stringify(speech))
+check('a phrase plays every atom (two five-syllable atoms)',
+  speech.phrase.syllables === speech.spokenFar.syllables + 10, JSON.stringify(speech))
+
 check('the birdsong slider scales that source gain (point 153)',
   surf153.birdsFull > 0 && surf153.birdsHalf > 0 && surf153.birdsHalf < surf153.birdsFull && surf153.birdsOff === 0,
   JSON.stringify(surf153))

@@ -5,6 +5,8 @@ import { describe, it, expect } from 'vitest'
 import {
   WEBGPU_UNAVAILABLE,
   angleBackend,
+  galliumDriver,
+  laneEnv,
   systemChromeCandidates,
   verifyLaunchOptions,
   webglLaunchOptions,
@@ -18,11 +20,39 @@ import { coveringRun } from '../render-verify-core.mjs'
  *  behaviour BYTE FOR BYTE, and a derived expectation would move with the code. */
 const WINDOWS_WEBGL_ARGS = ['--enable-unsafe-webgpu', '--use-angle=d3d11', '--enable-gpu']
 
-/** Likewise for the WebGPU lane, which condition 4 leaves untouched on every host. */
+/** The Linux WebGL 2 lane after point 493 put it on the container's real GPU: ANGLE's
+ *  `gl` backend reaches Mesa's d3d12 driver through /dev/dxg (7.5× the picture rate of
+ *  the software backend it replaced). Frozen, not derived — a lost flag here costs the
+ *  hardware silently, which is exactly how the lane sat on SwiftShader unnoticed. */
+const LINUX_WEBGL_ARGS = [
+  '--disable-features=WebGPU',
+  '--use-angle=gl',
+  '--enable-gpu',
+  '--ignore-gpu-blocklist',
+  '--disable-dev-shm-usage',
+  '--no-sandbox',
+]
+
+/** Likewise for the WebGPU lane on Windows, which condition 4 leaves untouched. */
 const WEBGPU_LAUNCH = {
   channel: 'chrome',
   args: ['--headless=new', '--enable-unsafe-webgpu', '--enable-gpu'],
 }
+
+/** The Linux WebGPU lane adds what a driverless host needs before a frame DRAWS
+ *  (point 493). Frozen here rather than derived: all three were measured, and a
+ *  quietly dropped one takes the picture with it while every interface still answers. */
+const LINUX_WEBGPU_ARGS = [
+  '--headless=new',
+  '--enable-unsafe-webgpu',
+  '--enable-gpu',
+  '--use-angle=swiftshader',
+  '--enable-features=Vulkan',
+  '--use-vulkan=swiftshader',
+  '--ignore-gpu-blocklist',
+  '--disable-dev-shm-usage',
+  '--no-sandbox',
+]
 
 describe('angleBackend', () => {
   it('keeps Direct3D 11 on Windows — the historical value', () => {
@@ -31,7 +61,7 @@ describe('angleBackend', () => {
 
   it('never asks Linux for Direct3D (the flag names a Windows-only backend)', () => {
     expect(angleBackend('linux')).not.toBe('d3d11')
-    expect(angleBackend('linux')).toBe('swiftshader')
+    expect(angleBackend('linux')).toBe('gl')
   })
 
   it('gives macOS its only backend', () => {
@@ -55,15 +85,51 @@ describe('angleBackend', () => {
   })
 })
 
+describe('galliumDriver', () => {
+  it('pins Linux to the driver that reaches /dev/dxg', () => {
+    // Point 493: unpinned, Mesa 25 serves llvmpipe and the suites run on the CPU while
+    // every interface looks healthy. The pin is what makes the GPU the default.
+    expect(galliumDriver('linux')).toBe('d3d12')
+  })
+
+  it('names nothing on a platform whose loader needs no help', () => {
+    expect(galliumDriver('win32')).toBe('')
+    expect(galliumDriver('darwin')).toBe('')
+  })
+
+  it('honours VERIFY_GALLIUM, trimmed and lower-cased, and takes "none" as "unset"', () => {
+    expect(galliumDriver('linux', ' Zink \n')).toBe('zink')
+    expect(galliumDriver('linux', 'none')).toBe('')
+  })
+})
+
+describe('laneEnv', () => {
+  it('carries the whole base environment through — Playwright REPLACES it', () => {
+    const env = laneEnv('linux', { PATH: '/usr/bin', HOME: '/home/node', DISPLAY: ':0' })
+    expect(env.PATH).toBe('/usr/bin')
+    expect(env.HOME).toBe('/home/node')
+    expect(env.DISPLAY).toBe(':0')
+    expect(env.GALLIUM_DRIVER).toBe('d3d12')
+  })
+
+  it('adds nothing where the platform names no driver', () => {
+    expect(laneEnv('win32', { PATH: 'C:\\bin' })).toEqual({ PATH: 'C:\\bin' })
+  })
+
+  it('never mutates the environment it was handed', () => {
+    const base = { PATH: '/usr/bin' }
+    laneEnv('linux', base)
+    expect(base.GALLIUM_DRIVER).toBeUndefined()
+  })
+})
+
 describe('webglLaunchOptions', () => {
   it('reproduces the Windows launch byte for byte', () => {
     expect(webglLaunchOptions('win32')).toEqual({ args: WINDOWS_WEBGL_ARGS })
   })
 
-  it('swaps the ANGLE backend on Linux, turns WebGPU OFF and adds the container sandbox flag', () => {
-    expect(webglLaunchOptions('linux')).toEqual({
-      args: ['--disable-features=WebGPU', '--use-angle=swiftshader', '--enable-gpu', '--no-sandbox'],
-    })
+  it('puts Linux on the hardware ANGLE backend, turns WebGPU OFF and adds the container flags', () => {
+    expect(webglLaunchOptions('linux')).toEqual({ args: LINUX_WEBGL_ARGS })
   })
 
   // The fallback lane must exercise the FALLBACK. On Linux the software backend really
@@ -81,17 +147,42 @@ describe('webglLaunchOptions', () => {
     }
   })
 
-  it('adds --no-sandbox on Linux only', () => {
-    expect(webglLaunchOptions('win32').args).not.toContain('--no-sandbox')
-    expect(webglLaunchOptions('darwin').args).not.toContain('--no-sandbox')
-    expect(webglLaunchOptions('linux').args).toContain('--no-sandbox')
+  it('carries an environment ONLY when handed one — half an env is worse than none', () => {
+    expect(webglLaunchOptions('linux').env).toBeUndefined()
+    expect(webglLaunchOptions('linux', undefined, { PATH: '/usr/bin' }).env).toEqual({
+      PATH: '/usr/bin',
+      GALLIUM_DRIVER: 'd3d12',
+    })
+    expect(webgpuLaunchOptions(null, 'linux').env).toBeUndefined()
+    expect(webgpuLaunchOptions('/usr/bin/google-chrome', 'linux', { PATH: '/usr/bin' }).env).toEqual({
+      PATH: '/usr/bin',
+      GALLIUM_DRIVER: 'd3d12',
+    })
+  })
+
+  it('adds the container flags on Linux only', () => {
+    for (const flag of ['--no-sandbox', '--ignore-gpu-blocklist', '--disable-dev-shm-usage']) {
+      expect(webglLaunchOptions('win32').args).not.toContain(flag)
+      expect(webglLaunchOptions('darwin').args).not.toContain(flag)
+      expect(webglLaunchOptions('linux').args).toContain(flag)
+    }
   })
 })
 
 describe('webgpuLaunchOptions', () => {
   it('is the point-184 system-Chrome launch when nothing was probed', () => {
-    expect(webgpuLaunchOptions()).toEqual(WEBGPU_LAUNCH)
-    expect(webgpuLaunchOptions(null)).toEqual(WEBGPU_LAUNCH)
+    expect(webgpuLaunchOptions(undefined, 'win32')).toEqual(WEBGPU_LAUNCH)
+    expect(webgpuLaunchOptions(null, 'win32')).toEqual(WEBGPU_LAUNCH)
+  })
+
+  it('carries the driver flags a Linux host needs to DRAW, and only there', () => {
+    // Point 493: without these the lane reports WebGPU and paints nothing —
+    // "Instance dropped in popErrorScope", a black canvas under a live HUD.
+    expect(webgpuLaunchOptions('/usr/bin/google-chrome', 'linux').args).toEqual(LINUX_WEBGPU_ARGS)
+    for (const flag of ['--use-angle=swiftshader', '--enable-features=Vulkan', '--use-vulkan=swiftshader']) {
+      expect(webgpuLaunchOptions(null, 'win32').args).not.toContain(flag)
+      expect(webgpuLaunchOptions(null, 'darwin').args).not.toContain(flag)
+    }
   })
 
   it('launches the PROBED path, so the bring-up report cannot name another browser', () => {
@@ -99,47 +190,47 @@ describe('webgpuLaunchOptions', () => {
     // chrome (+ beta/dev/canary) inside playwright-core's registry, while the probe
     // also finds a distro chromium. Reporting one and launching the other was a false
     // ready-signal; the resolved path is now what launches.
-    expect(webgpuLaunchOptions('/usr/bin/chromium')).toEqual({
+    expect(webgpuLaunchOptions('/usr/bin/chromium', 'win32')).toEqual({
       executablePath: '/usr/bin/chromium',
       args: WEBGPU_LAUNCH.args,
     })
   })
 
   it('drops the channel once a path is given — Playwright would ignore it anyway', () => {
-    expect(webgpuLaunchOptions('/snap/bin/chromium').channel).toBeUndefined()
+    expect(webgpuLaunchOptions('/snap/bin/chromium', 'linux').channel).toBeUndefined()
   })
 
   it('keeps the flag list identical either way — only the browser choice moved', () => {
-    expect(webgpuLaunchOptions('/opt/google/chrome/chrome').args).toEqual(WEBGPU_LAUNCH.args)
+    expect(webgpuLaunchOptions('/opt/google/chrome/chrome', 'win32').args).toEqual(WEBGPU_LAUNCH.args)
   })
 
   it('treats a blank or non-string probe result as "nothing found"', () => {
-    expect(webgpuLaunchOptions('')).toEqual(WEBGPU_LAUNCH)
-    expect(webgpuLaunchOptions('   ')).toEqual(WEBGPU_LAUNCH)
-    expect(webgpuLaunchOptions(0)).toEqual(WEBGPU_LAUNCH)
+    expect(webgpuLaunchOptions('', 'win32')).toEqual(WEBGPU_LAUNCH)
+    expect(webgpuLaunchOptions('   ', 'win32')).toEqual(WEBGPU_LAUNCH)
+    expect(webgpuLaunchOptions(0, 'win32')).toEqual(WEBGPU_LAUNCH)
   })
 })
 
 describe('verifyLaunchOptions', () => {
   it('routes the webgpu lane to the unchanged system-Chrome launch on BOTH platforms', () => {
     expect(verifyLaunchOptions('webgpu', 'win32')).toEqual(WEBGPU_LAUNCH)
-    expect(verifyLaunchOptions('webgpu', 'linux')).toEqual(WEBGPU_LAUNCH)
+    expect(verifyLaunchOptions('webgpu', 'linux')).toEqual({ channel: 'chrome', args: LINUX_WEBGPU_ARGS })
   })
 
-  it('is not diverted by an ANGLE override — that lane carries no ANGLE flag', () => {
-    expect(verifyLaunchOptions('webgpu', 'linux', 'gl')).toEqual(WEBGPU_LAUNCH)
+  it('is not diverted by an ANGLE override — VERIFY_ANGLE steers the WebGL 2 lane only', () => {
+    expect(verifyLaunchOptions('webgpu', 'linux', 'gl').args).toEqual(LINUX_WEBGPU_ARGS)
   })
 
   it('carries the probed browser through to the webgpu lane', () => {
     expect(verifyLaunchOptions('webgpu', 'linux', undefined, '/usr/bin/chromium')).toEqual({
       executablePath: '/usr/bin/chromium',
-      args: WEBGPU_LAUNCH.args,
+      args: LINUX_WEBGPU_ARGS,
     })
   })
 
   it('never lets a probed browser into the WebGL 2 lane — that one is the bundled Chromium', () => {
     expect(verifyLaunchOptions('webgl', 'linux', undefined, '/usr/bin/chromium')).toEqual({
-      args: ['--disable-features=WebGPU', '--use-angle=swiftshader', '--enable-gpu', '--no-sandbox'],
+      args: LINUX_WEBGL_ARGS,
     })
   })
 
@@ -150,7 +241,7 @@ describe('verifyLaunchOptions', () => {
 
   it('routes anything else to the platform WebGL 2 lane', () => {
     expect(verifyLaunchOptions('webgl', 'win32')).toEqual({ args: WINDOWS_WEBGL_ARGS })
-    expect(verifyLaunchOptions('webgl', 'linux').args).toContain('--use-angle=swiftshader')
+    expect(verifyLaunchOptions('webgl', 'linux').args).toContain('--use-angle=gl')
   })
 })
 
@@ -166,7 +257,7 @@ describe('systemChromeCandidates', () => {
     const candidates = systemChromeCandidates('linux')
     expect(candidates).toContain('chromium')
     for (const candidate of candidates) {
-      expect(webgpuLaunchOptions(candidate)).toEqual({ executablePath: candidate, args: WEBGPU_LAUNCH.args })
+      expect(webgpuLaunchOptions(candidate, 'linux')).toEqual({ executablePath: candidate, args: LINUX_WEBGPU_ARGS })
     }
   })
 

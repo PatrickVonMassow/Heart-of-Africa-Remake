@@ -39,6 +39,9 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 27.07. | Gemessene Verbrauchstreiber → Kurzbrief je Auftrag statt Dokumentensuche; Board-Gate **vor** der Arbeit; Vorprüfung der Wächter |
 | 28.07. | Fünfeinhalb Stunden Stillstand → die Grenze wird **genommen**, nicht nur erlaubt; erste vollständig beobachtete Übergabe; drei Messfenster schmaler als das Gemessene (§3.44) |
 | 28.07. | Board dreimal am selben Handgriff zerbrochen → Strukturprüfung **vor** die Veröffentlichung (§3.45); 3546 grüne Tests über einer stillschweigend geschrumpften Menge (§3.46) |
+| 04.08. | Eine Nacht am Falschen gearbeitet: der Vorrang stand als Prosa, die Warteschlange las die alte Rangfolge (§3.77); zweimal Container-Arbeit an den Nutzer zurückgereicht → Regel + Wächter (§3.78) |
+| 04.08. | Zweimal am eigenen Netz ausgesperrt — der Firewall-Neubau reißt zuerst ein → additives Werkzeug, fail-offener Neubau, Wächter (§3.80); die Sprachregel hatte nie einen Mechanismus, und die Bestandsprüfung sah es nicht (§3.81) |
+| 04.08. abends | Sechs rote Suiten eingeordnet: vier waren der Prüfstand — gesperrtes Auslieferungsnetz und feste Wartezeiten von einer schnelleren Maschine (§3.83); der Starter enteignet jeden Besitzer nach einer halben Stunde (Punkt 504) |
 
 Muster: Ab dem 22.07. explodiert die Commit-Rate (Delegation) — und genau dann häufen sich die Infrastruktur-Vorfälle. **Skalierung der Autonomie erzeugt eine eigene Problemklasse, die die Feature-Arbeit zeitweise überholt.**
 
@@ -709,6 +712,72 @@ Der Reiz liegt darin, dass hier nichts kaputt war: Beide Stände waren für sich
 
 **Lehre:** Wer eine lange Prüfung startet, hat den Baum bis zu ihrem Ende festgeschrieben. Parallelität ist genau dort erlaubt, wo sie den geprüften Stand nicht anfasst — und wo eine Prüfung Minuten braucht, ist die Versuchung, die Wartezeit „nebenbei" zu nutzen, am größten.
 
+### 3.77 Eine Priorität, die nur der Leser sieht, ist keine
+
+Der Nutzer gab am Abend des 03.08. ein Feature in Auftrag und sagte ausdrücklich, es habe Vorrang vor allem anderen. Die Sitzung nahm es korrekt auf — zwölf implementierungsreife Punkte, eine Referenzspezifikation, um 01:29 committet — und schrieb den Vorrang als **Prosa** in die Arbeitsordnung: „gibt jedem Punkt hier Vorrang vor dem Rest der Warteschlange". Am Morgen war nichts davon gebaut. Gearbeitet worden war die ganze Nacht, nur an Testinfrastruktur.
+
+Der Grund ist mechanisch und darum bitter: Die Warteschlange, aus der sich jede Nachfolgesitzung orientiert, leitet ihre Reihenfolge aus der Rangfolge-Datei und einer gespeicherten Liste ab. Prosa liest dort niemand. Die Rangfolge begann weiterhin mit dem alten Paket, das neue Feature lag auf Platz 60 — und weil eine Sitzung an der Punktgrenze endet und die nächste den Chat nicht kennt, nahm jede brav den Kopf der Liste. Keine Sitzung hat sich falsch verhalten; die Übergabe transportierte schlicht die falsche Ordnung.
+
+Das ist §3.16 („Mechanismus zuerst") in seiner unangenehmsten Form: Hier gab es den Mechanismus sogar, er wurde nur nicht **gefüttert**. Eine Regel, die in dem Dokument steht, das die Maschine liest, aber in einem Feld, das sie nicht auswertet, ist genauso wirkungslos wie eine Erinnerung.
+
+**Lehre:** Jede Priorisierung muss dort landen, wo der Picker sie liest — Deklaration, Rangfolge und gespeicherte Ordnung sind EINE Aussage, wächtergeprüft. Und die Priorität gilt dem ZIEL, nicht der Liste: Was das priorisierte Feature schneller fertig macht, gehört mit nach vorn, auch wenn es nicht Teil davon ist (Nutzer 04.08.).
+
+### 3.78 Die Arbeit, die an den Nutzer zurückgereicht wurde
+
+Zwei Mal an einem Vormittag bekam der Nutzer einen Befehl in die Hand: erst `sudo` für ein Einrichtungsskript, dann einen `docker exec`-Aufruf. Beide konnten nicht funktionieren — das offizielle Abbild erlaubt dem Container-Benutzer genau einen Befehl ohne Passwort, und die Sandbox-Firewall bindet iptables-weit auch root, sodass die Paketquellen mit jeder Berechtigung unerreichbar sind. Der zweite Vorschlag stammte sogar von einem anderen Assistenten, dem dieselben Fakten fehlten.
+
+Bemerkenswert ist nicht der Irrtum über die Rechte, sondern der Reflex davor: Eine blockierte Aktion wurde als *Auftrag an den Nutzer* umgeformt statt als Aufforderung, den funktionierenden Weg zu finden. Das ist dieselbe Bewegung wie beim Handbuch-Verweis in §3.10 — nur teurer, weil sie den Menschen in eine Sackgasse schickt, die messbar gewesen wäre: Ein `curl` gegen die beiden Paketquellen hätte die Antwort in zwei Sekunden gegeben, bevor irgendjemand etwas tun musste.
+
+**Lehre:** Ein Schritt innerhalb der Maschine, auf der ich arbeite, gehört mir. Fehlt eine Fähigkeit wirklich, wird EINMAL um die Fähigkeit gebeten — nie um ihre Ausführung. Und bevor überhaupt gebeten wird, wird gemessen, ob der Weg mit dieser Fähigkeit trägt.
+
+### 3.79 Die Scharfstellung war geerbt, nicht versioniert
+
+Der Push-Wächter — Bau, Linter, Abhängigkeitsprüfung und die gesamte Testschicht vor jedem Push — lag seit seiner Einführung ohne Ausführungsrecht im Verzeichnis. Auf dem alten Rechner spielte das keine Rolle: Git für Windows entscheidet an der Kopfzeile einer Datei, ob sie ein Hook ist, nicht am Dateimodus. Linux entscheidet am Modus. In dem Augenblick, in dem die Arbeitskopie in den Container zog, war der Wächter stumm — und blieb es, bis er zufällig auffiel.
+
+Der Rückmeldeweg ist die eigentliche Schärfe daran. Git schweigt nicht: Es schreibt „hook was ignored because it's not set as executable". Aber es schreibt das in einen **erfolgreichen** Push. Der Befund lebt also genau dort, wo niemand hinsieht — in der Ausgabe einer geglückten Aktion —, und keine unserer Prüfungen liest die Ausgabe einer geglückten Aktion. Dieselbe Sitzung fand am selben Tag den Zwilling dazu: Die versionierte Kopie der Container-Definition und die, aus der Docker wirklich baut, waren auseinandergelaufen; ein Neubau aus der Kopie wäre gescheitert. Auch hier war das Artefakt versioniert, seine Wirksamkeit nicht.
+
+Die Klasse ist eng verwandt mit §3.55, aber an einer schärferen Stelle: Dort verlor ein Umzug zugesicherte EIGENSCHAFTEN. Hier verlor er die SCHARFSTELLUNG eines Wächters — und ein stummer Wächter ist schlimmer als keiner, weil die Regel als durchgesetzt gilt und niemand mehr hinschaut (§3.16).
+
+**Lehre:** Was ein Mechanismus scharf macht, gehört mitversioniert und mitgeprüft, nicht nur der Mechanismus selbst. Und für die Klasse „Befund in einer geglückten Ausgabe" gibt es nur eine Abhilfe: Sie muss zu einer eigenen Prüfung werden, die den Erfolgsfall liest — sonst ist die Meldung formal vorhanden und faktisch unsichtbar.
+
+### 3.80 Die Reparatur, die den Reparierenden mitnimmt
+
+Zweimal an einem Nachmittag sperrte sich eine Sitzung selbst aus dem Netz aus und starb an der eigenen Schnittstelle. Der Auslöser war harmlos: Der Prüf-Browser ließ sich nicht laden, weil ein Auslieferungsnetz seine Adressen wechselt und die Sperrliste des Containers die neue nicht kannte. Es gab aber nur **ein** Werkzeug für die Firewall, und dieses Werkzeug ist ein Neubau — es reißt zuerst alle Regeln ein, während die Grundsperre stehen bleibt, und braucht danach zwei bis drei Minuten zum Wiederaufbauen. In diesem ganzen Fenster ist der Container dicht. Die Zwei-Minuten-Grenze des Werkzeugaufrufs schnitt mittendrin ab; zurück blieb eine Maschine ohne jede Freigabe und eine Sitzung, die nichts mehr tun konnte — auch nicht sich selbst reparieren.
+
+Das ist eine eigene Klasse, und sie ist schärfer als „ein Schritt ist fehlgeschlagen". Ein fehlgeschlagener Bau lässt sich neu starten, ein fehlgeschlagener Test neu laufen. Eine fehlgeschlagene Reparatur an der **Infrastruktur, über die man selbst arbeitet**, nimmt die Fähigkeit zur nächsten Reparatur gleich mit. Der Unterschied zu §3.79 ist die Richtung: Dort war ein Mechanismus stumm und niemand merkte es; hier war der Mechanismus laut und riss den Beobachter mit.
+
+Zwei Dinge fehlten, und beide sind billiger als der Vorfall. Erstens **die kleinere Handlung**: Die Sperrliste lässt sich rein ergänzend erweitern — ein Befehl, keine Sekunde ohne Netz. Sie existierte nur nicht, also griff die Sitzung zum einzigen vorhandenen Werkzeug, dem größten. Zweitens **die Richtung des Scheiterns**: Ein Neubau, der abbricht, muss offen enden, nicht geschlossen. Beides ist jetzt gebaut, dazu ein Wächter, der den einreißenden Aufruf gar nicht mehr durchlässt. Die Gegenprüfung des zweiten Modells fand am fertigen Stand noch zwei Wege, auf denen das Tor doch zugeblieben wäre — nach dem Zuschlagen der Wach-Uhr und beim harten Abschuss des Prozesses —, und einen davon in der schlimmsten Ausprägung: Die Statusanzeige hätte „offen" gemeldet, während zu war.
+
+**Lehre:** Wer an der Leitung arbeitet, auf der er sitzt, braucht eine Handlung, die kleiner ist als der Neubau — und für den Neubau eine Fehlerrichtung, die nach OFFEN zeigt. Ein Werkzeug, dessen einzige Ausführung eine Verwundbarkeitsphase hat, ist ein Werkzeug mit einem Zeitfenster zum Selbstmord; die Abhilfe ist nicht Vorsicht, sondern ein zweites, additives Werkzeug daneben.
+
+### 3.81 Die Regel, die gar keinen Mechanismus hatte — und die Prüfung, die das nicht sah
+
+Der Nutzer fragte mitten in der Arbeit, warum die Antworten die ganze Zeit auf Englisch kämen, und schloss richtig weiter: „Falls der Mechanismus nicht klappt, klappen vielleicht auch andere nicht." Die Antwort war unbequemer als ein defekter Mechanismus — es gab **keinen**. Dass Antworten auf Deutsch gehören, stand ausschließlich in einer Gedächtniszeile. Die Nachbarregel beweist den Unterschied: Für den Zeitstempel existieren ein Einspeise-Haken **und** ein blockierender Wächter, der den fertigen Antworttext liest, und der ist noch nie durchgerutscht.
+
+Das eigentlich Lehrreiche liegt eine Ebene höher. Der Bestand war am 30.07. vollständig geprüft worden, und die Sprachregel steht dort als „OK" mit **leerer Befundspalte**. Diese Prüfung fragte nämlich, ob der Regel*text* noch stimmt — nicht, ob die Regel *gemessen* wird. Und der Wächter, der genau für diese Frage gebaut wurde, hat dieselbe blinde Stelle von der anderen Seite: Er beweist, dass jeder verdrahtete Durchsetzer feuern **kann** (34 von 34 an diesem Tag), und sagt nichts über eine Regel, die nie einen bekommen hat. Zwischen beiden Prüfungen liegt genau der Spalt, in den diese Regel gefallen ist.
+
+**Lehre:** Eine Regelprüfung braucht die Achse „was misst das eigentlich?" neben „stimmt der Text noch?". Wo die Antwort „nichts" lautet, gibt es genau zwei zulässige Ausgänge — ein Mechanismus wird gebaut, oder die Regel wird **mit Begründung** als bewusst nicht durchgesetzt vermerkt. Ein stilles „OK" ist der dritte, und der ist derselbe Fehler wie §3.16, nur eine Ebene früher: Er lässt eine Regel als durchgesetzt gelten, bevor sie es je war.
+
+### 3.82 Der Vergleichsstand, der die Startlogik mit dem Verglichenen teilt
+
+Nach dem Umzug lief die vollständige Regression zum ersten Mal wieder — und endete mit sechs roten Suiten, ohne die zweite Backend-Bahn überhaupt zu erreichen. Der Verdacht lag nahe: Am selben Tag war die Prüfumgebung von Software-Rendering auf die echte Grafikkarte umgestellt worden, und die auffälligsten Fehlschläge waren Bildmaße — Kantenenergie 0,00 auf dem Boden, Schneeanteil 1,1 % statt Weiß. Ein Treiberwechsel verändert Filterung und Präzision; das *könnte* die Zahlen bewegt haben.
+
+Das dafür gebaute Werkzeug beantwortet die Frage nicht. Es checkt den Stand VOR der Änderung aus und lässt die Suite dort laufen — aber gegen die AKTUELLEN gemeinsamen Starthelfer und Abhängigkeiten. Beim gewöhnlichen Produktfehler ist das die richtige Näherung; hier war die Änderung genau in diesen Starthelfern, also fuhren beide Seiten des Vergleichs über dieselbe neue Bahn. Das Werkzeug sagt das sogar selbst dazu — „treat the verdict as advisory" —, und diese Zeile ist der ganze Unterschied zwischen einer Messung und einer Beruhigung.
+
+Isoliert hat es am Ende ein anderer Schnitt: dieselbe Prüfung auf demselben Stand, einmal mit und einmal ohne Karte (der Umschalter, den die Bahn selbst mitbrachte). Beide Male 0,00. Damit war die Bahn entlastet und der Fehler als echt erkannt — in drei Minuten, ohne einen einzigen Auschecken-Vorgang.
+
+**Lehre:** Ein Vergleich isoliert nur, was er nicht mit beiden Seiten teilt. Sitzt die Änderung in der Messapparatur selbst, ist der Zeitvergleich („vorher/nachher") das falsche Werkzeug — richtig ist der Schaltervergleich am GLEICHEN Stand. Und die zweite Hälfte dieser Klasse: Sechs rote Suiten standen unbemerkt auf `main`, weil nach dem Umzug niemand den vollen Lauf mehr gefahren hatte. Was nur gelegentlich läuft, ist kein Netz, sondern eine Stichprobe.
+
+### 3.83 Die Stoppuhr, die auf einer anderen Maschine geeicht war
+
+Die Einordnung derselben sechs Suiten drehte das Urteil aus §3.82 zur Hälfte um. Der Schaltervergleich hatte die neue Bahn korrekt entlastet — nur folgte daraus **nicht**, dass das Produkt schuld war. Vier der sechs waren der Prüfstand selbst.
+
+Zwei starben an einem Auslieferungsnetz: Der erlaubte Namensserver antwortete, leitete den Modell-Download aber auf einen gesperrten Rechnerpool um. Der fehlgeschlagene Abruf platzte innerhalb eines Playwright-Weiterleiters und riss den Prozess mit — deshalb druckten beide **gar keine** Fehlerzeile. Ein Absturz sieht in einer Sammelübersicht aus wie ein Testergebnis, ist aber keines.
+
+Die anderen fotografierten Szenen, die noch nicht fertig gebaut waren. Die Wartezeiten waren feste Sekundenzahlen, geeicht auf der schnelleren Maschine des Nutzers. Auf dem langsameren Wirt ist das Ego-Bild nach vier Sekunden schwarz, nach 7,7 Sekunden ein flauer Waschton und trägt erst ab etwa 17 Sekunden sein Korn. Gemessen wurde also durchweg das Nichts — und als Verlust der Oberflächenstruktur berichtet. Die Kurve ist dabei nicht glatt, sondern **stufig**: Zwischen 9,0 und 13,2 Sekunden stand die Geometriezahl still, eine kurze Beruhigungsfrist hätte mitten auf diesem Plateau „fertig" gemeldet.
+
+**Lehren:** Eine Entlastung ist kein Schuldspruch für den Rest — „nicht die Bahn" beantwortet nicht „wer dann". Eine Messung braucht ihre Bereitschaftsbedingung aus dem **gemessenen Gegenstand** (hier die Geometriezahl des Renderers), nie aus einer Uhr; eine feste Wartezeit kodiert stillschweigend eine Maschinengeschwindigkeit und wird beim nächsten Umzug zur Falschanklage. Und ein Plateau ist kein Ziel: Wer auf „ändert sich nicht mehr" wartet, muss lange genug warten, dass Stillstand von Fertigsein unterscheidbar ist.
+
 ---
 
 ## 4. Die Guards als Immunsystem
@@ -798,7 +867,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Montag, 03.08.2026, 17:23 · Quellen-Fingerprint: `245dd16d717b…`
+Zuletzt aktualisiert: Mittwoch, 05.08.2026, 04:33 · Quellen-Fingerprint: `c70dbeb9a9cf…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -821,6 +890,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | CLAUDE.md §7.1 references design.md instead of retelling it; future doc edits must preserve the verifiable conditions, script mappings, numbering and checked numbers | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Autonomously insert a full CLOSING cycle (regression + dead-code/stale-doc cleanup + .md audit) when warranted — after extensive rework or many small completed tasks — without waiting for the user to ask | 1 | niedrig | closing-guard.mjs | ✔ Mechanismus |
 | hoa commit messages must not reference the TASKS point (\"Point N\") | 1 | niedrig | commit-scope-guard.mjs | ✔ Mechanismus |
+| Never ask the user to run anything inside the container — he granted full rights; do it myself | 1 | niedrig | container-ask-guard.mjs, worktree-reminder.mjs | ✔ Mechanismus |
 | The batch dashboard's Warteschlange must ALWAYS list every open TASKS point — no open point may be missing | 1 | niedrig | dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs, queue-order-guard.mjs | ✔ Mechanismus |
 | Every dashboard card's body must speak STRICTLY about its own point — never report on or reference another TASKS point inside a card | 1 | niedrig | batch-singleton.mjs, dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs, decision-card-guard.mjs | ✔ Mechanismus |
 | hoa dashboard \"Woran ich gerade arbeite\" holds ONE CARD PER parallel point being actively worked (not a single card); cards move from Warteschlange into it (possibly several at once); a point is NEVER in both sections at once | 1 | niedrig | dashboard-card-topic-guard.mjs, dashboard-conciseness-guard.mjs, dashboard-guard-fixtures.mjs, dashboard-guard.mjs, dashboard-integrity-guard.mjs, dashboard-reminder-hook.mjs | ✔ Mechanismus |
@@ -868,6 +938,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Run the both-backend browser verify on the feat BRANCH before merging to main — merging an unverified render change first triggers a render-verify Stop-guard block-loop | 1 | niedrig | render-verify-guard.mjs | ✔ Mechanismus |
 | Headless probes must screenshot the DEFAULT zoom too (zoom-gated dressing like haze only shows there); headless WebGPU is impossible, so WebGPU-only branches stay user-checked | 2 | mittel | render-verify-guard.mjs | ✔ Mechanismus |
 | Every GUI/rendering fix must be verified on BOTH WebGPU and WebGL2 before it counts as done — never mark a render fix done on one path | 2 | mittel | render-verify-guard.mjs | ✔ Mechanismus |
+| A resumed batch session must check the previous owner's PROCESS before working — the launcher's \"provably dead\" verdict was wrong and double-spawned | 1 | niedrig | render-verify-guard.mjs | ✔ Mechanismus |
 | Rotating verify AND unit failures under a running agent pool are LOAD, not bugs — 8 of 12 unit runs red from load alone; judge a red only on a quiet machine | 2 | mittel | render-verify-guard.mjs | ✔ Mechanismus |
 | The named \"version release\" process and its trigger — queue/run a version release for a version the user names (full closing → user approval → tag → mirror poc → publish /TAG/ and /poc/) | 1 | niedrig | lock-release-hook.mjs | ✔ Mechanismus |
 | Standing licence to move, REMOVE or ADD villages when it helps — but every change must be checked against the other requirements first, and the check has already caught a real bug | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -875,8 +946,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | CORRECTED 19.07.2026 — WebGPU IS testable headless/autonomously via system Chrome (channel:'chrome') + --headless=new; the 'untestable' belief held only for Playwright's BUNDLED Chromium | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 69 Feedback-/Projekt-Memories · 40 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 26 Prozess-/Meta-TASKS-Punkte (davon 10 offen).
+Erfasste Quellen: 71 Feedback-/Projekt-Memories · 42 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 30 Prozess-/Meta-TASKS-Punkte (davon 13 offen).
 
-<!-- RETRO-FINGERPRINT: 245dd16d717b57f43fc42d55529a87ca6270e9c8d3d9793e700774308fc9d548 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-03T15:23:08.476Z -->
+<!-- RETRO-FINGERPRINT: c70dbeb9a9cf5e947212eec2ee34452002cadbd51718fe0c41e9cb54eda5e530 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-05T02:33:34.014Z -->
 <!-- AUTO-GENERATED:END -->

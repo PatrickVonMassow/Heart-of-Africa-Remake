@@ -829,6 +829,68 @@ textarea {
   margin-bottom: 2px;
 }
 
+/* Speech observations (design.md §13.4): a section of its own under the
+   entries — a ruled-off appendix of the book, scrolling independently so a long
+   chronicle never pushes the heard utterances out of reach. */
+.journal .observations {
+  border-top: 2px solid #8a6f45;
+  padding: 10px 18px 12px;
+  max-height: 38%;
+  overflow-y: auto;
+  flex: 0 0 auto;
+  background: rgba(160, 120, 40, 0.07);
+}
+
+.journal .observations h3 {
+  margin: 0;
+  font-size: 15px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  opacity: 0.8;
+}
+
+.journal .observations-hint {
+  margin: 2px 0 8px;
+  font-size: 12px;
+  font-style: italic;
+  opacity: 0.65;
+}
+
+.journal .observation {
+  margin-bottom: 10px;
+}
+
+.journal .observation .utterance {
+  font-family: 'Courier New', monospace;
+  font-size: 15px;
+  letter-spacing: 1px;
+}
+
+.journal .observation .first-heard {
+  font-size: 11px;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  opacity: 0.6;
+}
+
+.journal .observation .hypothesis {
+  width: 100%;
+  margin-top: 3px;
+  padding: 3px 6px;
+  box-sizing: border-box;
+  background: rgba(255, 255, 255, 0.35);
+  border: 1px solid #b39a6c;
+  border-radius: 3px;
+  color: var(--paper-ink);
+  font: 14px 'Segoe Script', 'Bradley Hand', 'Comic Sans MS', cursive;
+}
+
+.journal .observation .hypothesis:focus {
+  outline: none;
+  border-color: #8a6f45;
+  background: rgba(255, 255, 255, 0.55);
+}
+
 /* Region name beside the border lines (bird's-eye view, design.md §3). */
 .region-label {
   font: italic 13px Georgia, serif;

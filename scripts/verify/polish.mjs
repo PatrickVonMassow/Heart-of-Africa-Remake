@@ -1,6 +1,6 @@
 // Headless verification for CLAUDE.md §7.1.31 (settlement orientation after
 // a gift and distant panorama wildlife, design.md §17/§2). Dev server only.
-import { launchVerifyBrowser, waitForStable, assertBackend } from './_browser.mjs'
+import { launchVerifyBrowser, waitForStable, waitForReadingStable, waitForSceneBuilt, assertBackend } from './_browser.mjs'
 import { frameShutter } from './frameSubject.mjs'
 import { judgeFootingSeries, judgePitchSeries, MIN_SLOPED_SAMPLES } from './footingSeries.mjs'
 import { fileURLToPath } from 'node:url'
@@ -814,16 +814,24 @@ if (mosque) {
   await page.evaluate(() => window.__game.getState().enterPlace('maasai-village'))
   await page.waitForFunction(() => !!window.__placeSeason, null, { timeout: 30000 })
 
-  const read = () => page.evaluate(() => window.__placeSeason())
+  // Poll until the WHOLE season reading settles — sun, sky, tint and rain, the
+  // values the checks below assert — and say whether it truly did (point 499).
+  // Watching only `sun` over a 6 s window measured a half-lerped state on the
+  // slower container host and blamed the product for it: dry grayMix 0.146 where
+  // the preset is 0, wet sun 2.348 where the rains take it to 1.44. Given the
+  // time, every one of these reaches its target exactly, so the lerp was never
+  // the bug — the window was.
+  const settle = async (label) => {
+    const r = await waitForReadingStable(page, () => window.__placeSeason(), { settleMs: 500, samples: 3, requireChange: true, timeout: 60000 })
+    check(`the ${label} settlement season reading settles before it is read`, r.settled, `after ${r.waitedMs} ms`)
+    return r.value
+  }
   await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(0))
-  // Poll until the dome-gray lerp settles (point 200), not a fixed wall wait.
-  await waitForStable(page, () => window.__placeSeason().sun, { settleMs: 200, timeout: 6000 })
-  const dry = await read()
+  const dry = await settle('dry')
   await frame('110-village-season-dry', { place: 'maasai-village', label: 'the settlement in the dry season' })
 
   await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(1))
-  await waitForStable(page, () => window.__placeSeason().sun, { settleMs: 200, timeout: 6000 })
-  const wet = await read()
+  const wet = await settle('wet')
   await frame('111-village-season-wet', { place: 'maasai-village', label: 'the settlement in the wet season' })
 
   check(
@@ -1845,7 +1853,13 @@ for (const [placeId, shot] of [
     p.z = 8.0
     p.yaw = 0 // facing the fire pit at (-3.5, 2.5)
   })
-  await page.waitForTimeout(1500)
+  // The pairs below are read off PIXELS, so the scene must have finished drawing
+  // (point 499). After 1.5 s it has not here: both probe points then landed on the
+  // same unrendered ground and every contrast came out as exactly 0.0 — ON and OFF
+  // alike, three stones each, which is a blind probe rather than a missing shadow.
+  // Built, the same measurement reads OFF 8/-5/12 and ON 56/40/53, inside the
+  // recorded ranges. Neither threshold below is touched.
+  await waitForSceneBuilt(page)
 
   // The fire ring's stones ARE the visible occluders (light at the pit centre,
   // 1.1 m up): each stone's fire-shadow lands radially outward at ~1.2 m from
@@ -1902,12 +1916,24 @@ for (const [placeId, shot] of [
   // Campfire shadows are now level-driven (point 276): ON at the medium default,
   // so the OFF state must be FORCED via the debug flag, not assumed from the
   // default (which used to be off under point 289 alone).
+  // Poll the cube-map tear-down/rebuild out rather than sleeping a fixed 1.5 s on
+  // it: the measurement is the condition, so read it until two successive reads
+  // agree, and judge the reading it settles on.
+  const settledContrasts = async () => {
+    let prev = await fireContrasts()
+    const deadline = Date.now() + 25000
+    while (Date.now() < deadline) {
+      await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => setTimeout(r, 400))))
+      const cur = await fireContrasts()
+      if (cur.every((c, i) => Math.abs(c - prev[i]) <= 4)) return cur
+      prev = cur
+    }
+    return prev
+  }
   await page.evaluate(() => window.__ui.getState().setFireShadowsEnabled(false))
-  await page.waitForTimeout(1500) // cube map tear-down + TRAA settle
-  const contrastOff = await fireContrasts()
+  const contrastOff = await settledContrasts()
   await page.evaluate(() => window.__ui.getState().setFireShadowsEnabled(true))
-  await page.waitForTimeout(1500) // cube map + TRAA settle
-  const contrastOn = await fireContrasts()
+  const contrastOn = await settledContrasts()
   await frame('138-fire-shadows-on', { local: { x: -3.5, z: 2.5, y: 0.5 }, label: 'the fire pit and its stone ring' })
   await page.evaluate(() => {
     window.__ui.getState().setFireShadowsEnabled(false)

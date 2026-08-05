@@ -276,6 +276,17 @@ export function DebugMenu() {
         onChange={(v) => { balance.surf.nearRadius = Math.max(0, v); bump() }} />
       <NumberField label={t.debug.surfCutoff} value={balance.surf.cutoff} step={0.5}
         onChange={(v) => { balance.surf.cutoff = Math.max(0.1, v); bump() }} />
+      {/* Village speech (design.md §13.4/§21.2): the pace of the syllables, the
+          pause between the atoms of a phrase and the short, sharply falling
+          hearing range. The voices sit under the ambience volume above. */}
+      <NumberField label={t.debug.speechSyllable} value={balance.communication.syllableSeconds} step={0.05}
+        onChange={(v) => { balance.communication.syllableSeconds = Math.max(0.05, v); bump() }} />
+      <NumberField label={t.debug.speechPhrasePause} value={balance.communication.phrasePauseSeconds} step={0.1}
+        onChange={(v) => { balance.communication.phrasePauseSeconds = Math.max(0, v); bump() }} />
+      <NumberField label={t.debug.speechHearingRadius} value={balance.communication.hearingRadius} step={1}
+        onChange={(v) => { balance.communication.hearingRadius = Math.max(0, v); bump() }} />
+      <NumberField label={t.debug.speechHearingFalloff} value={balance.communication.hearingFalloff} step={2}
+        onChange={(v) => { balance.communication.hearingFalloff = Math.max(0, v); bump() }} />
       <NumberField label={t.debug.foodPerDay} value={balance.foodPerDay}
         onChange={(v) => set('foodPerDay', Math.max(0, v))} />
       <NumberField label={t.debug.canteenDrain} value={balance.health.canteenDrainPerDay} step={0.1}
