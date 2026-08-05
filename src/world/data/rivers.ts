@@ -166,10 +166,18 @@ export const RIVERS_DATA: RiverDef[] = [
     sourceName: 'Guinea highlands (Tembakounda)',
     mouthName: 'Niger Delta on the Gulf of Guinea',
     points: [
-      [-10.75, 9.08], [-10.0, 10.0], [-9.0, 10.8], [-8.0, 11.4], [-7.0, 12.2],
+      // Upper course on its REAL stations (corrected): Faranah, Kouroussa,
+      // Siguiri, Bamako, Koulikoro, Ségou, Markala, Diafarabé. The former
+      // stylized bend ran 0.7-1.2° SOUTH of the true channel and left Ségou —
+      // the Bambara heartland, a river town in fact — a stretch inland; the
+      // river moved rather than the village, because the model was the
+      // inaccurate half (the peoples' heartlands are authentic by §4.2).
+      [-10.75, 9.08], [-10.74, 10.04], [-9.88, 10.65], [-9.17, 11.42],
+      [-8.0, 12.65], [-7.56, 12.86], [-6.27, 13.45], [-6.07, 13.7],
+      [-5.05, 14.15],
       // Passes south of Timbuktu (16.77): the stylized river band
       // (RIVER_WIDTH_DEG) must not swallow the port site.
-      [-5.9, 13.2], [-4.9, 13.9], [-4.2, 14.5], [-3.5, 15.5], [-3.0, 16.55],
+      [-4.2, 14.5], [-3.5, 15.5], [-3.0, 16.55],
       [-1.9, 16.95], [-0.35, 16.97], [-0.05, 16.27], [0.5, 15.5], [1.2, 14.6],
       [2.1, 13.5], [3.0, 12.4], [3.35, 11.9], [4.75, 10.83], [4.83, 9.13],
       [5.5, 8.3], [6.77, 7.8], [6.78, 6.15], [6.45, 5.3], [6.07, 4.3],

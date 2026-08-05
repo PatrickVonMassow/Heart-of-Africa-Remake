@@ -3,7 +3,7 @@
 // moved to the fast Vitest suite (src/world/world.test.ts); what stays here
 // needs a real browser: console-error-free rendering and screenshots of the
 // bird's-eye view at characteristic locations. Dev server only.
-import { launchVerifyBrowser, assertBackend } from './_browser.mjs'
+import { launchVerifyBrowser, assertBackend, waitForReadingStable } from './_browser.mjs'
 import { frameShutter } from './frameSubject.mjs'
 import { fileURLToPath } from 'node:url'
 import { mkdirSync, existsSync, rmSync } from 'node:fs'
@@ -76,6 +76,73 @@ if (process.env.FRAME_SUBJECT_SELFTEST) {
   console.log(`      refusal: ${refusal ?? 'NONE — the frame was accepted'}; file written: ${written}`)
   await browser.close()
   process.exit(ok ? 0 : 1)
+}
+
+// A frame is only worth judging once the scene has finished BUILDING: after a
+// jump the terrain chunks stream in over seconds, and until they land the
+// picture is empty paper — into which a named subject projects exactly as well
+// as into a finished one, so the shutter (point 375) passes it. That is not
+// theory: on a loaded host this suite wrote a 47 kB, wholly blank
+// `18-worldmodel-bambara-village-niger` and exited 0.
+//
+// A FRAME-RATE probe cannot see this. Frames arrive at a fine rate while the
+// scene is still empty — an empty scene renders fastest of all — which is why
+// the earlier "are frames live?" wait returned on the blank picture. The signal
+// that means "built" is the renderer's OWN geometry count settling (point 499,
+// `waitForSceneBuilt`); here it must also survive a JUMP, where the count first
+// falls as the old region unloads and then climbs as the new one streams. So the
+// reading is watched for stability in BOTH directions over the 5 s point 499
+// measured the streaming plateaus at, and is held to a floor that a blank
+// picture cannot clear.
+const MIN_SCENE_TRIANGLES = 20000
+const waitForSceneAt = async (what) => {
+  const r = await waitForReadingStable(
+    page,
+    () => ({ triangles: window.__renderer?.info?.render?.triangles ?? 0 }),
+    // eps 2000: wildlife and dressing entering/leaving the frustum jitter the
+    // count by a few hundred without the scene changing in any way that matters.
+    { eps: 2000, settleMs: 1000, samples: 5, timeout: 120000 },
+  )
+  const triangles = r.value?.triangles ?? 0
+  if (!r.settled || triangles < MIN_SCENE_TRIANGLES) {
+    errors.push(
+      `scene never finished building for ${what}: ${triangles} triangles after ${r.waitedMs} ms (settled=${r.settled}) — a frame taken here would show empty paper`,
+    )
+  }
+  console.log(`scene built for ${what}: ${triangles} triangles after ${r.waitedMs} ms`)
+  return r
+}
+await waitForSceneAt('the opening travel view')
+
+// Work-order 482: the communication PoC's two ends of the errand — the Bambara
+// village standing on the Niger, and the erratic upstream where 487 will dig.
+// The coordinates come from the scene's OWN dev hook, so the frames are aimed at
+// what the renderer actually placed for this run's seed, never at a coordinate
+// copied into this script.
+const poc = await page.evaluate(() => window.__communicationRock ?? null)
+if (!poc) {
+  errors.push('window.__communicationRock is missing — the erratic was not placed')
+} else {
+  // Both frames are taken inside the player's own zoom range (point 172:
+  // 0.125-0.5), close enough that they show what they claim — at the wide
+  // default a village and a single block of stone are a few pixels of nothing.
+  // The village is framed a step wider so its huts AND the water fit; the
+  // erratic at the closest zoom, where its shape is the evidence.
+  await page.evaluate(() => window.__ui.getState().setTravelZoom(0.25))
+  await jump(poc.village.lat, poc.village.lon)
+  await waitForSceneAt('the Bambara village on the Niger')
+  await shot('18-worldmodel-bambara-village-niger', {
+    world: { lat: poc.village.lat, lon: poc.village.lon },
+    label: 'the Bambara village on the Niger',
+  })
+  await page.evaluate(() => window.__ui.getState().setTravelZoom(0.125))
+  await jump(poc.lat, poc.lon)
+  await waitForSceneAt('the erratic upstream of the Bambara village')
+  await shot('19-worldmodel-communication-erratic', {
+    world: { lat: poc.lat, lon: poc.lon },
+    label: `the erratic ${poc.upstreamDeg.toFixed(1)}° upstream of the Bambara village`,
+  })
+  await page.evaluate(() => window.__ui.getState().setTravelZoom(0.5))
 }
 
 const shots = [
