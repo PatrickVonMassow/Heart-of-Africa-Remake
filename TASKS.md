@@ -4641,10 +4641,40 @@ Build order, chosen so no two parallel agents own the same file:
      lifting it is the session's own work. The pause is instead reported where the
      session's own state is reported — the now-card — so the reader sees it
      without being asked to act on it.
+  WHERE THE PLACEHOLDER COMES FROM, MEASURED 05.08.2026 21:08 — the point above
+  treats it as weather; it is written by our own code. `ownsLock(sessionId)`
+  (`scripts/batch-singleton.mjs`) RESTAMPS the lock's `sessionId` to whatever id
+  the CALLER passed as soon as process ancestry proves the lock belongs to this
+  process tree. Any caller reaching it with a throwaway id — `--session x` through
+  `resolveSessionId` — therefore renames a LIVE owner's lock to that id, which is
+  exactly the `sessionIdBefore: <real id>` / `sessionId: "x"` pair both incidents
+  left behind. `isProbeSessionId` is the only filter and does not recognise a bare
+  placeholder.
+  WHAT IT COST TODAY, and why item 2 above is not enough on its own: the renamed
+  owner could no longer prove itself either, because `ownsLock` with the REAL id
+  then answered `pid-reused` — point 504's drifting start-time compare, on the same
+  lock, in the same minute. The live session was fenced out of its OWN batch (no
+  merge, no push, no tick) with two delegated agents still building, and the claim
+  path could not resolve it: the owner that must honour a claim at its next clean
+  moment IS that fenced session, so the handover deadlocks. Ownership was restored
+  by writing the recorded `sessionIdBefore` back by hand — the repair the toolchain
+  does not offer.
+  6. A RESTAMP DEMANDS A PLAUSIBLE SESSION ID. `ownsLock` renames a lock only for
+     an id of the shape a real session carries; a placeholder, a probe id or an
+     empty string leaves the recorded owner untouched and answers the ownership
+     question without writing. Renaming a lock is a side effect of asking a
+     question, so the question must be safe to ask.
+  7. AN OWNER HOLDING THE LOCK'S PID HAS A SUPPORTED WAY BACK. Where the lock's
+     `pid` is this very process (argv and session match) but the id no longer does,
+     one command re-stamps it — `node scripts/batch-doctor.mjs --repair` treats it
+     as a torn state and names it in its verdict, rather than reporting "consistent"
+     as it did today. Hand-editing the lock is then never the only path.
   VERIFIABLE: a lock carrying a placeholder id plus one live session produces no
   parallel-session alert in the pure core's tests, and the same setup replayed
   against the real detector stays silent; a Vitest case pins that the pause path
-  writes no "Von dir zu klären" card.
+  writes no "Von dir zu klären" card; a placeholder id passed to `ownsLock` leaves
+  the lock's recorded owner byte-identical while a real id still restamps; and the
+  doctor reports the pid-mine/id-foreign lock as torn and repairs it.
 
 - [ ] 516. A BRIEF DOES NOT CARRY THE SPECIFICATION IT DECLARES BINDING (measured
   05.08.2026 while point 488 was built). Point 488's text reads "point 352's
