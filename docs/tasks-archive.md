@@ -14251,3 +14251,9 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   that the mask radius varies with angle by a bounded but clearly non-zero amount
   and differs between seeds (no two stains alike, none circular); screenshot 137
   refreshed, judged on BOTH backends.
+
+- [x] 480. THE CHILDREN'S GAME OF TAG (point 351, pulled forward by the user
+  03.08.2026 because the PoC teaches its first concepts through it). Point 351's
+  specification is unchanged and binding, with one amendment from point 479: the
+  figures now have legs, so the sprint may read through them as well as through
+  speed and posture.

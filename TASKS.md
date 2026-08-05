@@ -3989,12 +3989,6 @@ Build order, chosen so no two parallel agents own the same file:
   wave 4  481 (children teach) · 483 (adults teach)
   wave 5  486 (drums) · 487 (digging)
 
-- [ ] 480. THE CHILDREN'S GAME OF TAG (point 351, pulled forward by the user
-  03.08.2026 because the PoC teaches its first concepts through it). Point 351's
-  specification is unchanged and binding, with one amendment from point 479: the
-  figures now have legs, so the sprint may read through them as well as through
-  speed and posture.
-
 - [ ] 481. THE CHILDREN TEACH THE GENERAL CONCEPTS (user 03.08.2026).
   FINAL STATE:
   1. Each situation carries ONE atomic utterance with its gesture and the action
