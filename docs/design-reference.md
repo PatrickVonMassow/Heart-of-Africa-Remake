@@ -171,6 +171,7 @@ are adjustable at runtime). The complete set, grouped as the menu presents it:
 - Ambience volume (default 0.1): the master control for the whole soundscape — the noise beds (wind, surf, crowd murmur), their gust/swell modulation and the proximity animal calls all scale under it.
 - Per-source volumes sitting over that master: footsteps, the general ambient bed and the birdsong.
 - The coastal surf fade: the near radius within which the surf plays at full gain and the cutoff distance from the coast beyond which it is exactly silent, so the sea is heard at the shore and in seaside ports but never inland.
+- Village speech (§13.4): the length of one spoken syllable (the constant pace of every utterance), the constant pause between the atoms of a phrase, the hearing radius beyond which an utterance is silent — and unheard, so a gesture seen from too far away teaches nothing — and the sharpness of the fall inside it, which is what keeps two groups of speakers from babbling over each other in the middle of a village. The voices themselves play under the ambience volume above, so that one slider still governs the whole soundscape.
 
 **Provisions, water and health** (§6)
 

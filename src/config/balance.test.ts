@@ -175,3 +175,17 @@ describe('camps, village trade & shop prices (design.md §6/§9/§10)', () => {
     })
   })
 })
+
+describe('village speech (design.md §13.4)', () => {
+  it('the pace, the phrase pause and the short, sharply falling hearing range', () => {
+    expect(balance.communication).toEqual({
+      syllableSeconds: 0.3,
+      phrasePauseSeconds: 0.9,
+      hearingRadius: 10,
+      hearingFalloff: 24,
+    })
+    // A five-syllable atom stays well under two seconds, so a seven-atom
+    // message is heard in one go rather than sat through.
+    expect(balance.communication.syllableSeconds * 5).toBeLessThan(2)
+  })
+})

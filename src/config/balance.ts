@@ -509,6 +509,10 @@ export interface BalanceConfig {
     phrasePauseSeconds: number
     /** How far an utterance carries, in place-scene units. */
     hearingRadius: number
+    /** Seconds per spoken syllable — the constant pace of every utterance. */
+    syllableSeconds: number
+    /** Steepness of the hearing falloff; the level at the rim is 1/(1+falloff). */
+    hearingFalloff: number
   }
 }
 
@@ -808,6 +812,13 @@ export const balance: BalanceConfig = {
     // group and the adults' group are never heard at once from the middle.
     phrasePauseSeconds: 0.9,
     hearingRadius: 10,
+    // One five-syllable atom takes 1.5 s at this pace — slow enough to count
+    // the beats by ear, quick enough that a seven-atom message stays short.
+    syllableSeconds: 0.3,
+    // A sharp fall: half way to the radius a voice is already at ~14 % and at
+    // the rim at 4 %, so the children's group and the adults' group are never
+    // both a permanent babble from the middle of the village.
+    hearingFalloff: 24,
   },
 }
 
