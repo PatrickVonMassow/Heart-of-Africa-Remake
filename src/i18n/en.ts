@@ -568,8 +568,11 @@ export const en: Strings = {
       departure: 'Departure',
       region: (p: TextParams) => `Region: ${en.regions[p.region as keyof typeof en.regions]}`,
       arrival: (p: TextParams) => `Arrival in ${PLACES[p.place as string]}`,
+      portReturn: (p: TextParams) => `${PLACES[p.place as string]} Once More`,
       village: (p: TextParams) => PLACES[p.place as string],
       villageReturn: (p: TextParams) => `Back in ${PLACES[p.place as string]}`,
+      monument: (p: TextParams) => PLACES[p.place as string],
+      monumentReturn: (p: TextParams) => `${PLACES[p.place as string]} Once More`,
       audience: 'Audience with the Chief',
       mistake: 'A Grave Mistake',
       chiefHint: "The Chief's Words",
@@ -656,6 +659,77 @@ export const en: Strings = {
     },
     portArrival: (p: TextParams) =>
       `I have reached ${PLACES[p.place as string]}. [excited]The clamor of the harbor, the cries of the traders, the smell of salt and spices[/excited] — here I can replenish my stores and gather my strength. [pause]My notes are safely put away. [mute](Checkpoint saved)[/mute]`,
+    // The first entry into a port (point 394): what the traveller actually sees
+    // on arriving at THAT city in ~1890 — Khartoum a ruin opposite the Khalifa's
+    // Omdurman, Timbuktu a mud town in the sand, Boma a bolted-together station.
+    // Berbera reads its documented fair season (docs/peoples-1890.md §4.0.2).
+    portFirstVisit: (p: TextParams) => {
+      const name = PLACES[p.place as string]
+      const texts: Record<string, string> = {
+        cairo: `The gates of Cairo, and the din of them. [excited]Donkey-boys bawling for a fare, dragomans hawking themselves in half a dozen tongues, the covered lanes of the Muski so narrow that two laden camels stop the whole street.[/excited] [awe]Above the roofs stand the minarets of the Citadel, and beyond them a brown line of desert where the pyramids are.[/awe] [somber]English officers take their coffee in the Ezbekiyeh gardens as though the country belonged to them.[/somber]`,
+        tangier: `[awe]Tangier is white — a heap of lime-washed cubes climbing the hillside, the Kasbah and the Sultan's flag above them.[/awe] There is no quay: the steamer anchored out in the bay, Moorish boatmen rowed us through the swell and carried us the last few yards ashore on their shoulders. [pause]Outside the walls the great market spreads over the hill, grain and charcoal and country people down from the Rif. [somber]The consulates of half Europe watch one another along a single street; Morocco is still the Sultan's, and everyone here is waiting.[/somber]`,
+        khartoum: `[somber]Khartoum is a ruin.[/somber] Since the city fell and Gordon died on the palace stair, its bricks have been ferried over the water to build the Khalifa's own town at Omdurman; grass stands in the streets where the consulates were. [pause][awe]Below the point the two Niles meet — the Blue running dark and swift against the pale White — and the whole traffic of the Sudan crosses at the ferry.[/awe] [fear]I am tolerated here. That is the whole of my standing.[/fear]`,
+        'st-louis': `[awe]St. Louis lies on its long island in the river mouth, and it is the most French thing I have found in Africa:[pause] two-storeyed houses with iron balconies, streets laid out with a ruler, the tricolour over the governor's residence.[/awe] A bridge of boats crosses to the mainland, and the rails run from here down to Dakar. [excited]In the sheds along the quay the whole gum of the Senegal is weighed and sacked,[/excited] and the signares of the old merchant families keep house in a style I had not looked for at this latitude.`,
+        timbuktu: `[somber]Timbuktu — and I must set it down honestly: the golden city of the books is a town of grey mud.[/somber] The sand has come in among the houses, whole quarters stand empty, and the market here is a poor thing beside Jenne's. [awe]Yet the great mosques stand, Djinguereber's tower of mud and jutting timbers above every flat roof,[pause] and the salt still comes down from Taoudenni in slabs the length of a man, forty days out of the desert.[/awe] [fear]The Tuareg take their toll of the town as they please; there is no other law in it.[/fear]`,
+        lagos: `[fear]Lagos is entered over the bar,[/fear] and the bar nearly had us: the steamer lay off in the swell and surf-boats brought us through the broken water with the Kru men singing the stroke. [pause][awe]Behind it the lagoon opens out as calm as a mill pond, and the town lies along it — the British flag, roofs of corrugated iron, and a whole quarter built by the freedmen home from Bahia, with shutters and stucco out of Pernambuco.[/awe] [somber]Everything here smells of palm oil, and everything here is reckoned in puncheons of it.[/somber]`,
+        boma: `[somber]Boma is not a city; it is a station.[/somber] A row of iron houses shipped out in pieces and bolted together on the bank, a flagstaff with the blue banner and its gold star, and the mangrove crowding up to the clearing on either hand. [pause][awe]The Congo goes past a good two leagues wide, brown and silent, and the sea is still sixty miles down it.[/awe] [fear]In the sheds the ivory lies stacked like cordwood, and nobody says aloud what it cost to bring down.[/fear] [weary]The fever has thinned the staff here; I am warned not to sleep near the water.[/weary]`,
+        berbera:
+          p.situation === 'deserted'
+            ? `[somber]Berbera in the hot months is a name on a shore.[/somber] The mat town of the fair has been carried away bundle by bundle on the camels that brought it; there remain a few stone houses, the wells, and the burnt ground where twenty thousand people camped the winter through. [fear]A man at the well told me quite calmly that the lions come down to drink there now.[/fear] [weary]The karif comes off the hills like a breath from an oven, and what trade there is happens in the shade and half in a whisper.[/weary]`
+            : `[excited]Berbera in its season is a city of matting.[/excited] Thousands of huts of mats and boughs have gone up along the shore, and the caravans are in from the Ogaden and from Harar — camels by the hundred, sheep in flocks that cover the beach, hides, gum, ostrich feathers, coffee in plaited baskets. [awe]Dhows lie out in the roads waiting on the wind for Aden.[/awe] [somber]Not a soul here believes any of it is permanent, and they are right.[/somber]`,
+        zanzibar: `[awe]Zanzibar is smelled before it is seen — cloves, on the wind, a good way out.[/awe] The harbour is a forest of dhow masts; the Sultan's palace and the great new house of wonders stand along the front with their tiers of iron balconies, and behind them the stone town closes into lanes where two men can barely pass, every door carved and studded like a strong-box. [pause]Here the caravans of the whole mainland are fitted out — porters, cloth, beads, coils of wire — and every consul on this ocean keeps his agent. [somber]The market where men were sold has been shut these seventeen years; the trade itself has only moved inland.[/somber]`,
+        capetown: `[awe]Table Mountain stands over the town like a wall with its cloth laid out on it,[/awe] and after the Africa I have come through, Cape Town is a shock: gas lamps, oak avenues, a dock full of mail steamers, and Adderley Street talking of nothing but diamonds and the new gold on the Rand. [pause]Above the town the Malay quarter keeps its own hours and its own call to prayer. [somber]The rails run from here to Kimberley and further every year; what is settled in this street is felt a thousand miles north of it.[/somber]`,
+      }
+      const text =
+        texts[p.place as string] ??
+        `I have reached ${name}. [excited]The harbour, the cries of the traders, the smell of salt and tar[/excited] — a place to set my stores in order before going on.`
+      return `${text} [pause]My notes are safely put away. [mute](Checkpoint saved)[/mute]`
+    },
+    // Re-entering a port whose situation has changed (point 394): only the
+    // change is described. Berbera's fair season is the one modelled today.
+    portReturn: (p: TextParams) => {
+      const transitionKey = `${p.fromSituation as string}_${p.toSituation as string}`
+      const texts: Record<string, Record<string, string>> = {
+        berbera: {
+          fair_deserted: `[somber]Berbera has emptied since I stood here last.[/somber] The whole town of matting is gone — carried off bundle by bundle on the camels that brought it — and the shore where the caravans lay is bare burnt ground. [pause][fear]At the well they told me, without any particular alarm, that the lions come down to drink there in this season.[/fear]`,
+          deserted_fair: `[excited]Berbera has filled up again.[/excited] Where I walked over empty ground there stands a mile of huts of mats and boughs, camels in from the Ogaden by the hundred, and the hides and gum piled ready for the dhows to Aden. [pause][awe]It is the same shore, and I would not have known it.[/awe]`,
+        },
+      }
+      const text =
+        texts[p.place as string]?.[transitionKey] ??
+        `[somber]${PLACES[p.place as string]} is not the town I left.[pause] What has changed here since my last visit stands plainly in the streets.[/somber]`
+      return `${text} [pause]My notes are safely put away. [mute](Checkpoint saved)[/mute]`
+    },
+    // Arrival at a walkable monument site (point 394; research: docs/giza-1890.md):
+    // the PERIOD picture, not the modern postcard — Khufu's broken apex, Khafre's
+    // pale casing cap, the Sphinx buried to the shoulders — and the Nile flood of
+    // the visit date, which before the dam made the plateau an island every autumn.
+    monumentFirstVisit: (p: TextParams) => {
+      const flood = p.situation === 'flood'
+      const texts: Record<string, string> = {
+        giza: flood
+          ? `[awe]The inundation is out, and the pyramids stand on an island.[/awe] From the desert edge I looked back over a sheet of brown water reaching to the palms of Cairo, the causeway across it like a dike and every village sitting up on its mound. [pause][awe]Khufu is a mountain of tawny steps with its apex broken off flat; Khafre beside it still carries a pale smooth cap of its old casing near the peak,[pause] as though a second and finer summit had been set upon the first.[/awe] [somber]Of the Sphinx only the head and a little of the breast stand clear — paws, body and enclosure lie under the sand, and the face has been noseless these many centuries.[/somber] [pause]The donkey-boys of the hotel take their fares out by boat in this season, and are none the poorer for it.`
+          : `[awe]I stood at last beneath the Great Pyramid, and no engraving prepares a man for it:[pause] a mountain of tawny steps, the apex broken off flat, the courses so deep that one must be hauled up each of them.[/awe] Khafre beside it carries a pale smooth cap of its old casing near the peak, [emph]as though a second and finer summit had been set upon the first.[/emph] [pause][somber]Of the Sphinx only the head and a little of the breast are free; the paws, the body and the whole enclosure lie under the sand, and the face has been noseless these many centuries.[/somber] [pause]Below the plateau the fields lie dry and cracked, and Cook's people ride up from the hotel on donkeys while the guides quarrel over them for backsheesh.`,
+      }
+      return (
+        texts[p.place as string] ??
+        `[awe]I have reached ${PLACES[p.place as string]}, and stood a long while before it without writing anything down.[/awe] [pause]Some things are older than any account of them.`
+      )
+    },
+    // Re-entering a monument site in a changed situation (point 394).
+    monumentReturn: (p: TextParams) => {
+      const transitionKey = `${p.fromSituation as string}_${p.toSituation as string}`
+      const texts: Record<string, Record<string, string>> = {
+        giza: {
+          lowWater_flood: `[awe]I came back to Giza in the flood, and the plateau has become an island.[/awe] The cracked fields I walked over are a brown lake to the horizon, the causeway stands out of it like a dike, and the boats come up to the desert edge where the donkeys used to wait. [pause][somber]Not a stone has moved, and the whole place stands differently for the water.[/somber]`,
+          flood_lowWater: `[somber]The water has gone off the land since I was here.[/somber] Where I saw a lake between the city and the plateau there is black cracked mud going green at the edges, oxen turning at the water-wheels, and the causeway an ordinary road again. [pause][awe]The pyramids look larger over dry fields than they did over the flood — there is nothing left between them and the eye.[/awe]`,
+        },
+      }
+      return (
+        texts[p.place as string]?.[transitionKey] ??
+        `[somber]I came back to ${PLACES[p.place as string]}, and the season has changed the place more than the years have.[/somber]`
+      )
+    },
     villageFirstVisit: (p: TextParams) => {
       const name = PLACES[p.place as string]
       // Each people's village reads like its ~1890 self (design.md §16) —

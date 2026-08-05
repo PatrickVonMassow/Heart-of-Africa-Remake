@@ -3,7 +3,8 @@
 
 import { create } from 'zustand'
 import { balance, prices, START_FOOD_DAYS, START_GIFTS, START_MONEY, START_YEAR } from '../config/balance'
-import { rinderpestPhaseAtDay, villageSituationChanged } from '../systems/rinderpest'
+import { placeSituationAt, situationChanged } from '../systems/placeSituation'
+import { firstArrivalEntry, returnArrivalEntry } from '../journal/arrival'
 import { clampDay, dayOfMonthJump, dayOfYearJump } from '../systems/season'
 import type { LatLon, Material, RegionId } from '../world/geo'
 import { KNOWN_FROM_START_PLACES, PLACES, REGION_VALUES, latLonToWorld, placeById, regionAt, worldToLatLon } from '../world/geo'
@@ -173,11 +174,16 @@ export interface GameState {
   region: RegionId
   visitedRegions: RegionId[]
   visitedPlaces: string[]
-  /** The rinderpest phase last JOURNALED per village (point 170): a re-entry
-   *  whose phase differs from the stored one emits a return vignette describing
-   *  the change, then updates this. Non-rinderpest peoples stay 'clean' and so
-   *  never change or re-fire. */
-  villagePhases: Record<string, string>
+  /** Places whose FIRST-ENTRY journal entry has been written (design.md §16,
+   *  point 394). Deliberately NOT visitedPlaces, which doubles as the §17.2
+   *  discovery set and therefore holds the known-from-start ports and Giza
+   *  from the outset — they would never count as newly entered. */
+  enteredPlaces: string[]
+  /** The situation last JOURNALED per place (points 170/394): a re-entry whose
+   *  situation differs from the stored one emits a return entry describing the
+   *  change, then updates this. A place with no modelled situation reports a
+   *  constant key and so never changes or re-fires (systems/placeSituation). */
+  placeSituations: Record<string, string>
   /** Audience state per village. */
   /** Explored map cells for the self-drawing map (design.md §19). */
   explored: Record<string, true>
@@ -478,7 +484,11 @@ function startState(seed: number) {
     // labels name them at once and returning to them earns no bounty. Cairo (the
     // start) is one of them; ordinary villages stay discovery-gated.
     visitedPlaces: [...KNOWN_FROM_START_PLACES],
-    villagePhases: {} as Record<string, string>,
+    // Nothing has been ARRIVED at yet (point 394). Cairo is deliberately not
+    // seeded: the run opens inside it without an arrival ever happening, so
+    // the first walk back in writes the city's own vignette.
+    enteredPlaces: [] as string[],
+    placeSituations: {} as Record<string, string>,
     explored: withExplored({}, cairo.lat, cairo.lon) ?? {},
     goodwill: {},
     reveredGiftGiven: {},
@@ -1292,6 +1302,12 @@ export const useGame = create<GameState>()((set, get) => ({
     const s = get()
     const place = placeById(id)
     const first = !s.visitedPlaces.includes(id)
+    // Arrival journaling (design.md §16, point 394): the FIRST entry into any
+    // walkable scene writes that place's own entry, a later one writes only
+    // when the modelled situation moved. Read before the state is replaced.
+    const firstEntry = !s.enteredPlaces.includes(id)
+    const situation = placeSituationAt(place, s.day, START_YEAR)
+    const storedSituation = s.placeSituations[id]
     set({
       mode: 'place',
       placeId: id,
@@ -1305,6 +1321,9 @@ export const useGame = create<GameState>()((set, get) => ({
       // === regionAt); this stays authoritative if a future place is off-band.
       region: place.region,
       visitedPlaces: first ? [...s.visitedPlaces, id] : s.visitedPlaces,
+      enteredPlaces: firstEntry ? [...s.enteredPlaces, id] : s.enteredPlaces,
+      // The situation just journaled — compared against on the next entry.
+      placeSituations: { ...s.placeSituations, [id]: situation },
       // A first-visited village is itself a bounty-worthy discovery (§10).
       pendingBounties:
         first && place.kind === 'village'
@@ -1333,56 +1352,32 @@ export const useGame = create<GameState>()((set, get) => ({
           { key: 'journal.bounty', params: { amount, count: pending.length, villages, landmarks } },
         )
       }
-      get().saveCheckpoint()
+    }
+    // Every walkable place is journaled on its first entry (design.md §16,
+    // point 394) — a port, a village and a monument share nothing but the fact
+    // of arrival, so each writes its OWN text. On a later entry only a CHANGED
+    // situation earns an entry: the rinderpest phase of a village (point 170),
+    // the Nile flood at Giza, Berbera's fair season. A place whose situation is
+    // unchanged (or was never journaled, as in a legacy save) stays silent, so
+    // the entry never spams; a port still reports its checkpoint.
+    if (firstEntry) {
+      const entry = firstArrivalEntry(place, situation)
+      get().addEntry(entry.title, entry.text, 'event', entry.sketch)
+    } else if (situationChanged(storedSituation, situation)) {
+      const entry = returnArrivalEntry(place, storedSituation as string, situation)
+      get().addEntry(entry.title, entry.text, 'event', entry.sketch)
+    } else if (place.kind === 'port') {
       get().addEntry(
         { key: 'journal.titles.arrival', params: { place: id } },
         { key: 'journal.portArrival', params: { place: id } },
         'event',
         'harbor',
       )
-    } else if (first && place.kind === 'village') {
-      // The first visit reads like the place (design.md §16): the entry is
-      // people-specific, drawn from the village's ~1890 way of life. A monument
-      // site (point 273) has no people, so it never logs a village vignette.
-      // The rinderpest years (design.md §16, point 133): the vignette reads
-      // the PLAGUE PHASE of the visit date — a Maasai village met in 1890 and
-      // one met in 1892 are different worlds.
-      const phase = rinderpestPhaseAtDay(place.peopleId ?? '', s.day, START_YEAR)
-      get().addEntry(
-        { key: 'journal.titles.village', params: { place: id } },
-        { key: 'journal.villageFirstVisit', params: { place: id, people: place.peopleId ?? '', phase } },
-        'event',
-        'hut',
-      )
-      // Remember the phase we just journaled, so a later visit can tell whether
-      // the situation has CHANGED (point 170).
-      if (place.kind === 'village') set((st) => ({ villagePhases: { ...st.villagePhases, [id]: phase } }))
-    } else if (place.kind === 'village') {
-      // Return visit (design.md §16, point 170): if the plague phase has moved
-      // since this village was last journaled, add a RETURN vignette that
-      // describes ONLY the change — the horror of what befell it since — and
-      // update the stored phase. Non-rinderpest peoples keep a constant phase,
-      // so this stays silent for them (villageSituationChanged is false).
-      const currentPhase = rinderpestPhaseAtDay(place.peopleId ?? '', s.day, START_YEAR)
-      const stored = s.villagePhases[id]
-      if (stored === undefined) {
-        // A village visited before this system existed (legacy save): seed its
-        // phase silently — we cannot describe a change from an unknown past, but
-        // now a FUTURE change will fire.
-        set((st) => ({ villagePhases: { ...st.villagePhases, [id]: currentPhase } }))
-      } else if (villageSituationChanged(stored, currentPhase)) {
-        get().addEntry(
-          { key: 'journal.titles.villageReturn', params: { place: id } },
-          {
-            key: 'journal.villageReturn',
-            params: { place: id, people: place.peopleId ?? '', fromPhase: stored, toPhase: currentPhase },
-          },
-          'event',
-          'hut',
-        )
-        set((st) => ({ villagePhases: { ...st.villagePhases, [id]: currentPhase } }))
-      }
     }
+    // The port checkpoint is taken AFTER the arrival entry (design.md §18), so
+    // a successor resuming from it opens the journal on the arrival he was
+    // written — saving first left the entry outside its own snapshot.
+    if (place.kind === 'port') get().saveCheckpoint()
     // Honored Friend (design.md §12): food, water and medicine free of
     // charge in every village of the region — granted when needed.
     if (place.kind === 'village' && s.honoredFriend[place.region]) {
@@ -1961,7 +1956,8 @@ export const useGame = create<GameState>()((set, get) => ({
       journal: s.journal, region: s.region, visitedRegions: s.visitedRegions,
       health: s.health, afflictions: s.afflictions, sunblindRecovery: s.sunblindRecovery,
       dryDays: s.dryDays, canteenFill: s.canteenFill, woundHealDays: s.woundHealDays,
-      visitedPlaces: s.visitedPlaces, villagePhases: s.villagePhases, goodwill: s.goodwill, reveredGiftGiven: s.reveredGiftGiven,
+      visitedPlaces: s.visitedPlaces, enteredPlaces: s.enteredPlaces, placeSituations: s.placeSituations,
+      goodwill: s.goodwill, reveredGiftGiven: s.reveredGiftGiven,
       knowingVillages: s.knowingVillages, hintsGiven: s.hintsGiven, decodedGiven: s.decodedGiven,
       languagesLearned: s.languagesLearned, unspecificGiven: s.unspecificGiven, giftLoreGiven: s.giftLoreGiven,
       graveLatLon: s.graveLatLon, foodWarned: s.foodWarned, foodOutWarned: s.foodOutWarned,
@@ -2010,7 +2006,20 @@ export const useGame = create<GameState>()((set, get) => ({
         // before this rule migrates by marking them discovered, so their labels
         // never regress to a kind placeholder on load.
         visitedPlaces: Array.from(new Set([...KNOWN_FROM_START_PLACES, ...(snap.visitedPlaces ?? [])])),
-        villagePhases: snap.villagePhases ?? {}, // legacy saves lack it (point 170)
+        // Point 170's per-village phases became the per-place situations of
+        // point 394; a save from either generation loads, and one from before
+        // both starts empty.
+        placeSituations:
+          snap.placeSituations ??
+          ((snap as { villagePhases?: Record<string, string> }).villagePhases || {}),
+        // A legacy save knows only visitedPlaces. Its VILLAGES were genuinely
+        // entered, so they keep their first entry; the known-from-start ports
+        // and Giza sit in that list from the outset without ever having been
+        // walked into, so they are dropped and earn their arrival on the next
+        // visit rather than losing it forever.
+        enteredPlaces:
+          snap.enteredPlaces ??
+          ((snap.visitedPlaces ?? []) as string[]).filter((p) => !KNOWN_FROM_START_PLACES.includes(p)),
         health: snap.health ?? balance.health.max,
         penaltyJournaled: snap.penaltyJournaled ?? { jungle: false, water: false, mountain: false, canoeOnLand: false },
         dangerWarned: snap.dangerWarned ?? { unarmed: false, desert: false, water: false, wetland: false },

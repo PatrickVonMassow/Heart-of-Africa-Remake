@@ -569,8 +569,11 @@ export const de: Strings = {
       departure: 'Aufbruch',
       region: (p: TextParams) => `Region: ${de.regions[p.region as keyof typeof de.regions]}`,
       arrival: (p: TextParams) => `Ankunft in ${PLACES[p.place as string]}`,
+      portReturn: (p: TextParams) => `${PLACES[p.place as string]} – noch einmal`,
       village: (p: TextParams) => PLACES[p.place as string],
       villageReturn: (p: TextParams) => `Wieder in ${PLACES[p.place as string]}`,
+      monument: (p: TextParams) => PLACES[p.place as string],
+      monumentReturn: (p: TextParams) => `${PLACES[p.place as string]} – noch einmal`,
       audience: 'Audienz beim Oberhaupt',
       mistake: 'Ein schwerer Fehler',
       chiefHint: 'Die Worte des Oberhaupts',
@@ -664,6 +667,79 @@ export const de: Strings = {
     },
     portArrival: (p: TextParams) =>
       `Ich habe ${PLACES[p.place as string]} erreicht. [excited]Der Lärm des Hafens, die Rufe der Händler, der Geruch von Salz und Gewürzen[/excited] – hier kann ich Vorräte auffrischen und Kräfte sammeln. [pause]Meine Aufzeichnungen habe ich in Sicherheit gebracht. [mute](Checkpoint gespeichert)[/mute]`,
+    // Der erste Eintritt in eine Hafenstadt (Punkt 394): was der Reisende um
+    // 1890 an DIESEM Ort tatsächlich sieht – Khartum eine Ruine gegenüber dem
+    // Omdurman des Khalifa, Timbuktu eine Lehmstadt im Sand, Boma eine
+    // zusammengeschraubte Station. Berbera liest seine belegte Messesaison
+    // (docs/peoples-1890.md §4.0.2).
+    portFirstVisit: (p: TextParams) => {
+      const name = PLACES[p.place as string]
+      const texts: Record<string, string> = {
+        cairo: `Die Tore von Kairo, und ihr Lärm. [excited]Eseljungen, die um eine Fuhre schreien, Dragomane, die sich in einem halben Dutzend Sprachen anbieten, und die überdachten Gassen des Muski so eng, dass zwei beladene Kamele die ganze Straße verstopfen.[/excited] [awe]Über den Dächern stehen die Minarette der Zitadelle, dahinter ein brauner Strich Wüste, wo die Pyramiden liegen.[/awe] [somber]In den Ezbekiyeh-Gärten trinken englische Offiziere ihren Kaffee, als gehörte ihnen das Land.[/somber]`,
+        tangier: `[awe]Tanger ist weiß – ein Haufen gekalkter Würfel, der den Hang hinaufklettert, darüber die Kasbah und die Flagge des Sultans.[/awe] Einen Kai gibt es nicht: Der Dampfer ankerte draußen in der Bucht, maurische Bootsleute ruderten uns durch die Dünung und trugen uns die letzten Schritte auf den Schultern an Land. [pause]Vor den Mauern breitet sich der große Markt über den Hügel, Getreide und Holzkohle und Landvolk aus dem Rif. [somber]Die Konsulate des halben Europa belauern einander in einer einzigen Straße; noch gehört Marokko dem Sultan, und alle hier warten ab.[/somber]`,
+        khartoum: `[somber]Khartum ist eine Ruine.[/somber] Seit die Stadt fiel und Gordon auf der Palasttreppe starb, schafft man ihre Ziegel über das Wasser, um daraus Omdurman zu bauen, die Stadt des Khalifa; wo die Konsulate standen, steht Gras in den Straßen. [pause][awe]Unterhalb der Landspitze treffen sich die beiden Nile – der Blaue dunkel und reißend gegen den blassen Weißen –, und der ganze Verkehr des Sudan setzt an der Fähre über.[/awe] [fear]Man duldet mich hier. Mehr ist meine Stellung nicht.[/fear]`,
+        'st-louis': `[awe]St. Louis liegt auf seiner langen Insel in der Flussmündung, und es ist das Französischste, was ich in Afrika gefunden habe:[pause] zweistöckige Häuser mit eisernen Balkonen, mit dem Lineal gezogene Straßen, die Trikolore über dem Sitz des Gouverneurs.[/awe] Eine Schiffbrücke führt aufs Festland, und die Schienen laufen von hier hinunter nach Dakar. [excited]In den Schuppen am Kai wird das gesamte Gummi des Senegal gewogen und in Säcke gefüllt,[/excited] und die Signaren der alten Handelsfamilien führen ein Haus, wie ich es unter diesem Breitengrad nicht erwartet hätte.`,
+        timbuktu: `[somber]Timbuktu – und ich muss es ehrlich festhalten: Die goldene Stadt der Bücher ist eine Stadt aus grauem Lehm.[/somber] Der Sand steht zwischen den Häusern, ganze Viertel liegen leer, und der Markt ist ein armseliges Ding neben dem von Jenne. [awe]Doch die großen Moscheen stehen, der Turm der Djinguereber aus Lehm und vorstehendem Gebälk über allen flachen Dächern,[pause] und noch immer kommt das Salz aus Taoudenni herein, in Platten so lang wie ein Mann, vierzig Tage durch die Wüste.[/awe] [fear]Die Tuareg nehmen sich von der Stadt, was ihnen beliebt; ein anderes Gesetz gibt es hier nicht.[/fear]`,
+        lagos: `[fear]Nach Lagos kommt man über die Barre,[/fear] und die Barre hätte uns beinahe gehabt: Der Dampfer lag draußen in der Dünung, und Brandungsboote brachten uns durch das gebrochene Wasser, die Kru-Leute den Schlag dazu singend. [pause][awe]Dahinter öffnet sich die Lagune still wie ein Mühlteich, und die Stadt liegt an ihr – die britische Flagge, Dächer aus Wellblech, und ein ganzes Viertel, das die aus Bahia Heimgekehrten gebaut haben, mit Fensterläden und Stuck wie in Pernambuco.[/awe] [somber]Alles riecht hier nach Palmöl, und alles wird hier in Fässern davon gerechnet.[/somber]`,
+        boma: `[somber]Boma ist keine Stadt; es ist eine Station.[/somber] Eine Reihe eiserner Häuser, in Teilen herausgeschifft und am Ufer zusammengeschraubt, ein Flaggenmast mit dem blauen Banner und seinem goldenen Stern, und beiderseits drängt die Mangrove an die Rodung heran. [pause][awe]Der Kongo zieht gute zwei Meilen breit vorbei, braun und lautlos, und bis zum Meer sind es noch sechzig Meilen hinab.[/awe] [fear]In den Schuppen liegt das Elfenbein gestapelt wie Brennholz, und niemand sagt laut, was es gekostet hat, es herunterzubringen.[/fear] [weary]Das Fieber hat die Belegschaft gelichtet; man warnt mich, nicht am Wasser zu schlafen.[/weary]`,
+        berbera:
+          p.situation === 'deserted'
+            ? `[somber]Berbera ist in den heißen Monaten ein Name an einer Küste.[/somber] Die Mattenstadt der Messe ist Bündel für Bündel fortgetragen worden, auf denselben Kamelen, die sie brachten; geblieben sind ein paar Steinhäuser, die Brunnen und der verbrannte Boden, auf dem zwanzigtausend Menschen den Winter über lagerten. [fear]Ein Mann am Brunnen sagte mir ganz ruhig, jetzt kämen dort die Löwen zum Trinken herunter.[/fear] [weary]Der Karif kommt von den Bergen herab wie ein Atem aus dem Ofen, und was an Handel geschieht, geschieht im Schatten und halb im Flüsterton.[/weary]`
+            : `[excited]Berbera ist in seiner Saison eine Stadt aus Matten.[/excited] Tausende Hütten aus Matten und Zweigen sind am Ufer aufgeschlagen, und die Karawanen sind da, aus dem Ogaden und aus Harar – Kamele zu Hunderten, Schafherden, die den Strand bedecken, Häute, Gummi, Straußenfedern, Kaffee in geflochtenen Körben. [awe]Draußen auf der Reede liegen die Dhauen und warten auf den Wind nach Aden.[/awe] [somber]Keiner hier glaubt, dass irgendetwas davon bleibt, und sie haben recht.[/somber]`,
+        zanzibar: `[awe]Sansibar riecht man, ehe man es sieht – Nelken, im Wind, ein gutes Stück draußen.[/awe] Der Hafen ist ein Wald aus Dhaumasten; der Palast des Sultans und das große neue Haus der Wunder stehen mit ihren Reihen eiserner Balkone an der Front, und dahinter schließt sich die Steinstadt zu Gassen, in denen zwei Männer kaum aneinander vorbeikommen, jede Tür geschnitzt und beschlagen wie eine Truhe. [pause]Hier werden die Karawanen des ganzen Festlands ausgerüstet – Träger, Tuch, Perlen, Rollen von Draht –, und jeder Konsul dieses Ozeans hält seinen Agenten. [somber]Der Markt, auf dem Menschen verkauft wurden, ist seit siebzehn Jahren geschlossen; der Handel selbst ist nur landeinwärts gezogen.[/somber]`,
+        capetown: `[awe]Der Tafelberg steht über der Stadt wie eine Mauer, mit seinem Tuch darüber ausgebreitet,[/awe] und nach dem Afrika, durch das ich gekommen bin, ist Kapstadt ein Schlag: Gaslaternen, Eichenalleen, ein Dock voller Postdampfer und eine Adderley Street, die von nichts spricht als von Diamanten und dem neuen Gold am Rand. [pause]Oberhalb der Stadt hält das Malaienviertel seine eigenen Stunden und seinen eigenen Gebetsruf. [somber]Die Schienen laufen von hier nach Kimberley und jedes Jahr weiter; was in dieser Straße entschieden wird, spürt man tausend Meilen nördlich davon.[/somber]`,
+      }
+      const text =
+        texts[p.place as string] ??
+        `Ich habe ${name} erreicht. [excited]Der Hafen, die Rufe der Händler, der Geruch von Salz und Teer[/excited] – ein Ort, um meine Vorräte zu ordnen, ehe es weitergeht.`
+      return `${text} [pause]Meine Aufzeichnungen habe ich in Sicherheit gebracht. [mute](Checkpoint gespeichert)[/mute]`
+    },
+    // Rückkehr in eine Hafenstadt, deren Lage sich geändert hat (Punkt 394):
+    // beschrieben wird NUR die Änderung. Modelliert ist heute Berberas Saison.
+    portReturn: (p: TextParams) => {
+      const transitionKey = `${p.fromSituation as string}_${p.toSituation as string}`
+      const texts: Record<string, Record<string, string>> = {
+        berbera: {
+          fair_deserted: `[somber]Berbera hat sich geleert, seit ich zuletzt hier stand.[/somber] Die ganze Mattenstadt ist fort – Bündel für Bündel auf denselben Kamelen davongetragen, die sie brachten –, und das Ufer, auf dem die Karawanen lagen, ist nackter, verbrannter Boden. [pause][fear]Am Brunnen sagte man mir ohne besondere Erregung, in dieser Jahreszeit kämen dort die Löwen zum Trinken.[/fear]`,
+          deserted_fair: `[excited]Berbera ist wieder voll.[/excited] Wo ich über leeren Boden ging, steht eine Meile Hütten aus Matten und Zweigen, Kamele zu Hunderten aus dem Ogaden, und Häute und Gummi liegen bereit für die Dhauen nach Aden. [pause][awe]Es ist dasselbe Ufer, und ich hätte es nicht wiedererkannt.[/awe]`,
+        },
+      }
+      const text =
+        texts[p.place as string]?.[transitionKey] ??
+        `[somber]${PLACES[p.place as string]} ist nicht die Stadt, die ich verlassen habe.[pause] Was sich hier seit meinem letzten Besuch geändert hat, steht offen in den Straßen.[/somber]`
+      return `${text} [pause]Meine Aufzeichnungen habe ich in Sicherheit gebracht. [mute](Checkpoint gespeichert)[/mute]`
+    },
+    // Ankunft an einer begehbaren Monumentstätte (Punkt 394; Recherche:
+    // docs/giza-1890.md): das Bild der ZEIT, nicht die moderne Postkarte –
+    // Chufus abgebrochene Spitze, Chephrens blasse Verkleidungskappe, die bis
+    // zu den Schultern versandete Sphinx – und die Nilflut des Besuchsdatums,
+    // die das Plateau vor dem Staudamm jeden Herbst zur Insel machte.
+    monumentFirstVisit: (p: TextParams) => {
+      const flood = p.situation === 'flood'
+      const texts: Record<string, string> = {
+        giza: flood
+          ? `[awe]Die Überschwemmung steht, und die Pyramiden stehen auf einer Insel.[/awe] Vom Wüstenrand blickte ich zurück über eine braune Wasserfläche, die bis an die Palmen von Kairo reicht, den Damm quer hindurch wie einen Deich und jedes Dorf oben auf seinem Hügel. [pause][awe]Chufu ist ein Berg aus lohfarbenen Stufen mit flach abgebrochener Spitze; Chephren daneben trägt nahe dem Gipfel noch eine blasse, glatte Kappe seiner alten Verkleidung,[pause] als hätte man dem ersten Gipfel einen zweiten, feineren aufgesetzt.[/awe] [somber]Von der Sphinx ragen nur der Kopf und ein wenig der Brust heraus – Pranken, Leib und die ganze Grube liegen unter dem Sand, und das Gesicht ist seit Jahrhunderten ohne Nase.[/somber] [pause]Die Eseljungen vom Hotel fahren ihre Gäste in dieser Jahreszeit mit dem Boot hinaus und stehen sich nicht schlechter dabei.`
+          : `[awe]Endlich stand ich unter der Großen Pyramide, und kein Stich bereitet einen Menschen darauf vor:[pause] ein Berg aus lohfarbenen Stufen, die Spitze flach abgebrochen, die Lagen so hoch, dass man über jede einzelne hinaufgezogen werden muss.[/awe] Chephren daneben trägt nahe dem Gipfel eine blasse, glatte Kappe seiner alten Verkleidung, [emph]als hätte man dem ersten Gipfel einen zweiten, feineren aufgesetzt.[/emph] [pause][somber]Von der Sphinx sind nur der Kopf und ein wenig der Brust frei; Pranken, Leib und die ganze Grube liegen unter dem Sand, und das Gesicht ist seit Jahrhunderten ohne Nase.[/somber] [pause]Unterhalb des Plateaus liegen die Felder trocken und rissig, und Cooks Leute reiten vom Hotel herauf auf Eseln, während die Führer sich um sie zanken, des Bakschischs wegen.`,
+      }
+      return (
+        texts[p.place as string] ??
+        `[awe]Ich habe ${PLACES[p.place as string]} erreicht und stand lange davor, ohne etwas aufzuschreiben.[/awe] [pause]Manche Dinge sind älter als jeder Bericht über sie.`
+      )
+    },
+    // Rückkehr an eine Monumentstätte in veränderter Lage (Punkt 394).
+    monumentReturn: (p: TextParams) => {
+      const transitionKey = `${p.fromSituation as string}_${p.toSituation as string}`
+      const texts: Record<string, Record<string, string>> = {
+        giza: {
+          lowWater_flood: `[awe]Ich kam zur Flutzeit nach Gizeh zurück, und das Plateau ist eine Insel geworden.[/awe] Die rissigen Felder, über die ich ging, sind ein brauner See bis zum Horizont, der Damm steht daraus hervor wie ein Deich, und die Boote kommen bis an den Wüstenrand, wo sonst die Esel warteten. [pause][somber]Kein Stein hat sich bewegt, und doch steht der ganze Ort anders im Wasser.[/somber]`,
+          flood_lowWater: `[somber]Das Wasser ist vom Land gegangen, seit ich hier war.[/somber] Wo ich einen See zwischen der Stadt und dem Plateau sah, liegt schwarzer, rissiger Schlamm, an den Rändern schon grün, Ochsen drehen an den Schöpfrädern, und der Damm ist wieder ein gewöhnlicher Weg. [pause][awe]Über trockenen Feldern wirken die Pyramiden größer als über der Flut – es steht nichts mehr zwischen ihnen und dem Auge.[/awe]`,
+        },
+      }
+      return (
+        texts[p.place as string]?.[transitionKey] ??
+        `[somber]Ich kam nach ${PLACES[p.place as string]} zurück, und die Jahreszeit hat den Ort mehr verändert als die Jahre.[/somber]`
+      )
+    },
     villageFirstVisit: (p: TextParams) => {
       const name = PLACES[p.place as string]
       // Jedes Dorf liest sich wie es selbst um 1890 (design.md §16) – und die
