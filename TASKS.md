@@ -4855,3 +4855,42 @@ Build order, chosen so no two parallel agents own the same file:
   the body do not; an unknown point and a malformed time both throw; the file is
   written with LF endings whatever it held before), plus a case that the
   `now-eta-soon` remedy text names the new command.
+
+- [ ] 521. THE ENRICHMENT SUITE AIMS BY STOPWATCH AND ABORTS BEFORE ITS OWN
+  EVIDENCE (found 05.08.2026 while closing point 323). `scripts/verify/
+  enrichments.mjs` jumps the traveller with `debugJumpTo` — which sets the
+  POSITION instantly while the travel camera SPRINGS toward it — and then waits a
+  fixed 1500 ms before shooting. Whether the camera has arrived is therefore a
+  question of frame rate: on a loaded machine, or on the slower backend, it has
+  not, and `72-water-victoria-falls` fails "subject not in the picture". The
+  failure is not cosmetic — it ABORTS the run before frame 137, the picture the
+  blood-stain criterion is judged by, so a green product looks red and its evidence
+  never gets taken. Measured: four such aborts on WebGPU under load, 245/245 green
+  on the same tree once the machine quietened.
+  FINAL STATE: the wait after a jump POLLS the camera having arrived — the spring's
+  own settle, read through the existing `window.__camera` projection the shutter
+  already uses — instead of counting milliseconds, with a stated timeout that fails
+  with the measured distance still to go. `scripts/verify/fixedWaits.test.mjs`
+  already forbids fixed waits in the verify scripts; this one survives because it
+  is written as a bare `waitForTimeout` the rule's pattern misses, so the rule is
+  widened to catch it in the same pass.
+  VERIFIABLE: pure Vitest that the fixed-wait rule flags this shape, and the
+  enrichments suite green on BOTH backends on a machine that is deliberately busy.
+
+- [ ] 522. THE BURNING GRASS DOES NOT BURN (observed 05.08.2026 while closing point
+  323). `verification/131-burning-grass.png` is the frame that proves the §19.9
+  bush fire, and no fire is visible in it to the eye — the frame passes its checks
+  and shows dry grass. Either the dressing does not draw at the moment the shutter
+  opens (the fire is a moving effect and the frame may catch it between states), or
+  it draws too faintly to read at that distance and zoom, or the check measures
+  something the picture does not show. This is exactly the "looks-wrong-but-passes"
+  class: a green check standing in front of an invisible feature.
+  FINAL STATE: the fire READS in the frame a human looks at — flame and smoke
+  visible at the zoom the criterion is judged at — and the check that guards it
+  measures the drawn fire (pixels of flame/smoke in the frame region), not a state
+  flag beside it. If the effect turns out to be drawing correctly and only the
+  frame's aim or moment is wrong, the aim is fixed and the finding recorded as
+  such; a feature that cannot be seen is not delivered either way.
+  VERIFIABLE: the refreshed frame 131 shows the fire to a human on both backends,
+  and its check fails when the fire is switched off in the debug menu — proving the
+  check reads the picture rather than the intent.
