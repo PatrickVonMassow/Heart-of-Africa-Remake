@@ -19,8 +19,9 @@
 // subject projects into an empty grey frame exactly as well as into a finished
 // one, so proving the aim is not enough. The scene counts as drawn when the
 // renderer's own per-frame counters stand still (`sceneReady-core.mjs`); a frame
-// that never gets there is refused just as loudly as a mis-aimed one. Only a
-// HUD `element` frame skips the wait — see `needsSceneReady`.
+// that never gets there is refused just as loudly as a mis-aimed one. A HUD
+// `element` frame skips the wait and a frame taken deliberately in motion
+// (`settle: false`) waits only for a picture to be there — see `sceneReadyMode`.
 //
 // Usage in a suite:
 //   import { frameShutter } from './frameSubject.mjs'
@@ -39,7 +40,7 @@ import {
   awaitSceneReady,
   formatSceneReadyFailure,
   formatSceneReadyPass,
-  needsSceneReady,
+  sceneReadyMode,
 } from './sceneReady-core.mjs'
 
 // How long the shutter gives the picture to arrive before it judges. Generous
@@ -257,8 +258,9 @@ export async function captureFrame(page, outDir, name, decl, { timeout = DEFAULT
   // generous) readiness wait, and the aim cannot go stale while the world
   // streams in — nothing moves the camera during the wait.
   let sceneVerdict = null
-  if (needsSceneReady(d)) {
-    sceneVerdict = await waitForSceneReady(page, scene)
+  const mode = sceneReadyMode(d)
+  if (mode !== 'none') {
+    sceneVerdict = await waitForSceneReady(page, { mode, ...scene })
     if (sceneVerdict.timedOut) {
       console.log(formatSceneReadyFailure(d.frame, sceneVerdict, scene))
       throw new Error(`frame ${d.frame}: the scene never finished drawing — ${sceneVerdict.reason}`)

@@ -346,6 +346,22 @@ describe('captureFrame waits for the picture to be drawn (point 489)', () => {
     expect(calls.some((c) => c.via === 'page' || c.via === 'locator')).toBe(false)
   })
 
+  it('does not hold a frame taken deliberately in motion back until the scene stands still', async () => {
+    // `settle: false` says the picture IS the moment (a lunge, a fire line): the
+    // shutter still checks that something is drawn, but never waits it out.
+    const calls = []
+    const moving = () =>
+      Array.from({ length: 15 }, (_, i) => ({ t: Date.now() - (14 - i) * 500, drawCalls: 300 + i * 20, triangles: 900000 + i * 80000 }))
+    await captureFrame(fakePage(calls, { scene: moving }), 'out/', '131-burning-grass', {
+      world: { lat: 13.5, lon: 5.0 },
+      label: 'the Sahel fire line',
+      settle: false,
+    })
+    expect(calls.filter((c) => c.via === 'scene-sample').length).toBe(1)
+    expect(calls.some((c) => c.via === 'sleep')).toBe(false)
+    expect(calls.some((c) => c.via === 'page')).toBe(true)
+  })
+
   it('does not hold up a HUD element frame — its subject is DOM, not the world', async () => {
     const calls = []
     await captureFrame(fakePage(calls), 'out/', '84-movement-penalty', { element: '.movement-penalty' })

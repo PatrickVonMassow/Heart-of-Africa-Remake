@@ -53,17 +53,29 @@ export const SCENE_READY_DEFAULTS = {
 }
 
 /**
- * Does this frame's subject live in the drawn scene?
+ * How much of the picture this frame has to wait for. Three answers:
  *
- * Everything does EXCEPT an `element` frame: a HUD/overlay subject is DOM, it is
- * complete the moment it is on screen, and making it wait for the world behind
- * it would only slow the suites down. A frame may state it either way with
- * `sceneReady: true|false` — an element drawn over the scene can opt in, and a
- * page without a scene at all (the production preview) opts out.
+ *   'none'    a HUD `element` frame. Its subject is DOM, complete the moment it
+ *             is on screen; waiting for the world behind it only costs time.
+ *   'drawn'   a frame DELIBERATELY taken in motion (`settle: false` — the
+ *             crocodile's lunge, the lioness over her cub, the fire line). It
+ *             must not be empty paper, but it may not wait for the scene to
+ *             stand still either: what it photographs is a moment, and a 5 s
+ *             quiet window would photograph the aftermath instead.
+ *   'settled' everything else — the counts must have stopped moving.
+ *
+ * `sceneReady: true|false` overrides: an element drawn over the scene can ask
+ * for the full wait, and a page with no scene at all can waive it.
  */
+export function sceneReadyMode(d) {
+  if (typeof d?.sceneReady === 'boolean') return d.sceneReady ? 'settled' : 'none'
+  if (d?.kind === 'element') return 'none'
+  return d?.settle === false ? 'drawn' : 'settled'
+}
+
+/** Does this frame wait for the picture at all? */
 export function needsSceneReady(d) {
-  if (typeof d?.sceneReady === 'boolean') return d.sceneReady
-  return d?.kind !== 'element'
+  return sceneReadyMode(d) !== 'none'
 }
 
 const finite = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : 0)
@@ -92,6 +104,10 @@ const round = (n) => Math.round(n)
  * asked at all (no `window.__renderer` — a production build has no dev hook);
  * that is reported as `unavailable`, NOT as "not ready", because no amount of
  * waiting would change it.
+ *
+ * `mode` says how much is demanded (see `sceneReadyMode`): 'settled' — the
+ * default — asks for a drawn picture that has stopped moving, 'drawn' only that
+ * there is a picture at all.
  *
  * Returns { ready, reason, unavailable?, spanMs, samples, drawCalls, triangles }.
  */
@@ -126,18 +142,25 @@ export function judgeSceneReady(samples, opts = {}) {
   if (triangles.max <= 0 || drawCalls.max <= 0) {
     return { ...base, ready: false, reason: 'no frame has been drawn yet (0 draw calls)' }
   }
+  // The FLOOR is asked of every mode: a frame taken in motion may be a moment,
+  // but it may not be empty paper. It reads the LAST sample rather than the
+  // window's peak, because in 'drawn' mode there is no window to speak of yet.
+  const drawn = finite(all[all.length - 1].triangles)
+  if (drawn < o.minTriangles) {
+    return {
+      ...base,
+      ready: false,
+      reason: `only ${drawn} triangles are drawn — below the ${o.minTriangles} a drawn scene never falls under, so this is empty paper`,
+    }
+  }
+  if (o.mode === 'drawn') {
+    return { ...base, ready: true, reason: `${drawn} triangles are drawn; this frame is deliberately taken in motion and waits for no more` }
+  }
   if (win.length < o.minSamples || spanMs < o.quietMs) {
     return {
       ...base,
       ready: false,
       reason: `the scene has stood still for only ${round(spanMs)} ms of the ${o.quietMs} ms the wait asks for (${win.length} reading(s))`,
-    }
-  }
-  if (triangles.max < o.minTriangles) {
-    return {
-      ...base,
-      ready: false,
-      reason: `only ${triangles.max} triangles are drawn — below the ${o.minTriangles} a drawn scene never falls under, so this is empty paper`,
     }
   }
   if (triangles.ratio > o.tolerance) {

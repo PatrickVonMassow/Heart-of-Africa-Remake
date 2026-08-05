@@ -747,8 +747,12 @@ clock alone; `world` waited on a healthy frame RATE, which an EMPTY scene reache
 fastest of all.
 
 So the shutter also waits for the scene to be DRAWN, for every frame whose
-subject lives in it (all kinds except `element`; a frame states it either way
-with `sceneReady: true|false`). The condition is the renderer's own PER-FRAME
+subject lives in it. How much it waits for is the frame's own declaration
+(`sceneReadyMode`): an `element` frame waits for nothing (its subject is DOM); a
+frame taken deliberately in motion (`settle: false` — the crocodile's lunge, the
+fire line) waits only until there IS a picture, because a quiet window would
+photograph the aftermath; everything else waits for the scene to stand still.
+`sceneReady: true|false` overrides either way. The condition is the renderer's own PER-FRAME
 counters — `info.render.drawCalls` and `info.render.triangles`, never the
 cumulative `info.render.calls`, which climbs on a finished scene as fast as on a
 building one — standing still within 10 % over a trailing 5 s window, above a

@@ -6,6 +6,7 @@ import {
   formatSceneReadyPass,
   judgeSceneReady,
   needsSceneReady,
+  sceneReadyMode,
 } from './sceneReady-core.mjs'
 
 /** A sample series ending at `end`, one reading every `stepMs`, values from `fn`. */
@@ -23,23 +24,56 @@ function series({ end = 100000, stepMs = 500, count = 20, drawCalls, triangles }
   return out
 }
 
-describe('needsSceneReady', () => {
-  it('waits for every subject that lives in the drawn scene', () => {
-    for (const kind of ['world', 'local', 'place', 'general']) expect(needsSceneReady({ kind })).toBe(true)
+describe('sceneReadyMode', () => {
+  it('asks a settled scene of every subject that lives in it', () => {
+    for (const kind of ['world', 'local', 'place', 'general']) expect(sceneReadyMode({ kind })).toBe('settled')
   })
 
   it('does not hold up a HUD element frame', () => {
+    expect(sceneReadyMode({ kind: 'element' })).toBe('none')
     expect(needsSceneReady({ kind: 'element' })).toBe(false)
   })
 
+  it('asks a frame taken deliberately in motion only for a picture', () => {
+    // The lunge, the fire line, the lioness over her cub: waiting for the scene
+    // to stand still would photograph the aftermath.
+    expect(sceneReadyMode({ kind: 'world', settle: false })).toBe('drawn')
+    expect(needsSceneReady({ kind: 'world', settle: false })).toBe(true)
+  })
+
   it('lets a frame state it either way', () => {
-    expect(needsSceneReady({ kind: 'element', sceneReady: true })).toBe(true)
-    expect(needsSceneReady({ kind: 'world', sceneReady: false })).toBe(false)
+    expect(sceneReadyMode({ kind: 'element', sceneReady: true })).toBe('settled')
+    expect(sceneReadyMode({ kind: 'world', sceneReady: false })).toBe('none')
+    expect(sceneReadyMode({ kind: 'world', settle: false, sceneReady: true })).toBe('settled')
   })
 
   it('is total on missing input', () => {
-    expect(needsSceneReady(null)).toBe(true)
+    expect(sceneReadyMode(null)).toBe('settled')
     expect(needsSceneReady(undefined)).toBe(true)
+  })
+})
+
+describe('judgeSceneReady in the "drawn" mode', () => {
+  const now = 100000
+
+  it('passes a moving scene as soon as there IS a picture', () => {
+    const v = judgeSceneReady(
+      series({ end: now, count: 12, drawCalls: (k) => 300 + k * 20, triangles: (k) => 800000 + k * 90000 }),
+      { now, mode: 'drawn' },
+    )
+    expect(v.ready).toBe(true)
+    expect(v.reason).toMatch(/deliberately taken in motion/)
+  })
+
+  it('still refuses empty paper — a moment is not an excuse for a blank frame', () => {
+    const v = judgeSceneReady(series({ end: now, count: 12, drawCalls: 99, triangles: 5500 }), { now, mode: 'drawn' })
+    expect(v.ready).toBe(false)
+    expect(v.reason).toMatch(/empty paper/)
+  })
+
+  it('needs no quiet window at all — one drawn reading is enough', () => {
+    const v = judgeSceneReady([{ t: now, drawCalls: 300, triangles: 900000 }], { now, mode: 'drawn' })
+    expect(v.ready).toBe(true)
   })
 })
 
