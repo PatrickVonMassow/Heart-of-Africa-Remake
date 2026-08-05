@@ -4888,3 +4888,25 @@ Build order, chosen so no two parallel agents own the same file:
   VERIFIABLE: the refreshed frame 131 shows the fire to a human on both backends,
   and its check fails when the fire is switched off in the debug menu — proving the
   check reads the picture rather than the intent.
+
+- [ ] 523. THE PANORAMA LEAVE-CAPTURE COMES OUT EMPTY, AND TWO CHECKS ON `main`
+  HAVE BEEN RED FOR IT (measured 05.08.2026 while closing point 480, on BOTH
+  backends, and classified PRE-EXISTING on `main` by
+  `node scripts/verify/baseline-classify.mjs polish --ref origin/main`). The two
+  failing checks are `the leave capture bakes the surrounding terrain into the band
+  (point 227)` and `the band is compass-true`. The numbers name the cause rather
+  than a threshold: the leave-capture reads OPAQUE 0.000 with 0 px west and 0 px
+  east — it captures NOTHING, so both checks judge an empty image and neither can
+  pass. Whatever the band looks like in the game, its evidence has been absent long
+  enough that a red on `main` stopped being noticed, which is exactly the state
+  point 387 exists to end.
+  FINAL STATE: the leave-capture produces a non-empty image again — the cause is
+  found and named (a capture taken before the panorama is drawn, a target that
+  moved, or a capture path that silently yields a blank surface), not worked around
+  by lowering the opacity floor. Both checks then judge a real picture and pass on
+  both backends. If the capture legitimately cannot run headless on one backend,
+  that is a recorded deferral naming the backend, never a quiet skip.
+  VERIFIABLE: `polish` green on WebGL 2 and WebGPU on a quiet machine, with the
+  leave-capture's opacity and its west/east pixel counts printed in the run so an
+  empty capture can never again read as a threshold miss; plus a pure test that the
+  check FAILS on an all-transparent capture instead of reporting a band verdict.
