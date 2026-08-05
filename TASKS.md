@@ -4160,12 +4160,6 @@ Build order, chosen so no two parallel agents own the same file:
   4. Both languages, journal entries with voice markup like every other text.
   VERIFIABLE: pure Vitest on the dig check and the hand-over; browser for the flow.
 
-- [ ] 488. THE SETTLEMENT EDGE PAINTED ON THE GROUND (point 352, pulled forward by
-  the user 03.08.2026 so the player can see how far he may walk). Point 352's
-  specification is binding with one amendment from point 482: the band follows the
-  walkable BOUNDARY, which is no longer a plain circle everywhere, and it reads
-  that boundary from the one source the leave check uses — never a second constant.
-
 - [ ] 491. QUEUE PROSE WRITTEN ONLY INTO THE HTML IS LOST ON THE NEXT REBUILD
   (measured 04.08.2026, and it cost the German text of thirteen cards). The
   Warteschlange is a PROJECTION: `scripts/board-queue.mjs` renders it from

@@ -14194,3 +14194,9 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   a settled one is, a never-settling one times out); live, a world frame taken
   immediately after entering the scene contains the terrain rather than the
   background — the case that silently passed today.
+
+- [x] 488. THE SETTLEMENT EDGE PAINTED ON THE GROUND (point 352, pulled forward by
+  the user 03.08.2026 so the player can see how far he may walk). Point 352's
+  specification is binding with one amendment from point 482: the band follows the
+  walkable BOUNDARY, which is no longer a plain circle everywhere, and it reads
+  that boundary from the one source the leave check uses — never a second constant.
