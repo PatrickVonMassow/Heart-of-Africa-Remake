@@ -139,6 +139,28 @@ const TAG_FIELDS: ReadonlyArray<{
   { key: 'unstuckSeconds', label: 'tagUnstuck', step: 0.5, min: 0.1 },
   { key: 'leanAtSprint', label: 'tagLean', step: 0.02, min: 0 },
   { key: 'turnRate', label: 'tagTurnRate', step: 0.2, min: 0.1 },
+  { key: 'playRadius', label: 'tagPlayRadius', step: 1, min: 2 },
+]
+
+/**
+ * Every calibratable value of what the children SAY at that game (work-order
+ * point 481): how often a situation is staged, how long its following action
+ * runs, and how readily a call is refused. Same table shape as the chase's, for
+ * the same reason — the completeness is visible at a glance.
+ */
+const CHILD_SPEECH_FIELDS: ReadonlyArray<{
+  key: keyof typeof balance.villageLife.childSpeech
+  label: DebugLabelKey
+  step: number
+  min: number
+  max?: number
+}> = [
+  { key: 'intervalSeconds', label: 'childSpeechInterval', step: 0.5, min: 0.5 },
+  { key: 'intervalSpread', label: 'childSpeechSpread', step: 0.05, min: 0, max: 1 },
+  { key: 'actionSeconds', label: 'childSpeechAction', step: 0.5, min: 0.5 },
+  { key: 'actionPace', label: 'childSpeechPace', step: 0.1, min: 0.1 },
+  { key: 'refusalChance', label: 'childSpeechRefusal', step: 0.05, min: 0, max: 1 },
+  { key: 'replySeconds', label: 'childSpeechReply', step: 0.5, min: 0 },
 ]
 
 function NumberField({
@@ -352,6 +374,21 @@ export function DebugMenu() {
           step={step}
           onChange={(v) => {
             balance.villageLife.tag[key] = Math.min(max ?? Infinity, Math.max(min, v))
+            bump()
+          }}
+        />
+      ))}
+      {/* What the children SAY at that game (point 481): the rate of the staged
+          situations, the life of the action that follows each one and how often
+          a call is refused. */}
+      {CHILD_SPEECH_FIELDS.map(({ key, label, step, min, max }) => (
+        <NumberField
+          key={key}
+          label={t.debug[label]}
+          value={balance.villageLife.childSpeech[key]}
+          step={step}
+          onChange={(v) => {
+            balance.villageLife.childSpeech[key] = Math.min(max ?? Infinity, Math.max(min, v))
             bump()
           }}
         />

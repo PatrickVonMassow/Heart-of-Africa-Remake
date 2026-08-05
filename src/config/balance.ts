@@ -581,6 +581,25 @@ export interface BalanceConfig {
       leanAtSprint: number
       /** How fast the drawn body may turn, in rad/s. */
       turnRate: number
+      /** Radius of the children's play ground — how far from its middle they
+       *  may roam. It is what keeps them a GROUP the player can stand among
+       *  (point 481/478), not a scatter across the whole settlement. */
+      playRadius: number
+    }
+    /** What the children SAY at their game (work-order point 481). */
+    childSpeech: {
+      /** Seconds between two staged situations. */
+      intervalSeconds: number
+      /** Random spread of that interval, 0..1 (0 = a metronome). */
+      intervalSpread: number
+      /** How long a following action steers the child it falls on. */
+      actionSeconds: number
+      /** The pace a child moves at while carrying out what it was told (m/s). */
+      actionPace: number
+      /** Chance that a call is answered with a refusal instead of obeyed. */
+      refusalChance: number
+      /** How long after a call a refusal still reads as its answer. */
+      replySeconds: number
     }
   }
   /** Village speech and drums (design.md §13.4, docs/communication-poc-spec.md). */
@@ -939,6 +958,22 @@ export const balance: BalanceConfig = {
       // ~3.6 rad/s: a body turns a half circle in about a second — quick enough
       // for a chase to read as agile, slow enough that no figure snaps about-face.
       turnRate: 3.6,
+      // A ground 20 m across: room for a chase to breathe, small enough that the
+      // group stays one group a player can stand among and hear (point 481).
+      playRadius: 10,
+    },
+    // What the children SAY (work-order point 481). Calibratable starting
+    // values: an utterance every few seconds is often enough to be heard several
+    // times in one visit and rare enough that the group is not a chatterbox, and
+    // an action outlives the utterance it followed (1.5 s of syllables) so the
+    // player sees the two belong together.
+    childSpeech: {
+      intervalSeconds: 6,
+      intervalSpread: 0.35,
+      actionSeconds: 5,
+      actionPace: 1.6, // a brisk errand walk, well under the chase's trot
+      refusalChance: 0.35,
+      replySeconds: 5,
     },
   },
   communication: {
