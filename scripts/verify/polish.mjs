@@ -2645,23 +2645,28 @@ for (const [placeId, shot] of [
     )
     check('the game fired none of its own invariant asserts', asserts.length === 0, asserts.join(' | '))
 
-    // The picture. The frame must show CHILDREN RUNNING, so the standpoint is
-    // chosen the way the point-485 speaker shot chooses one rather than by a
-    // formula: the single outward bearing this used before put whatever the
-    // village had — an adult, the elder's hut — between the camera and the
-    // game, and a frame whose subject is behind a grown figure proves nothing
-    // to a human eye. So SWEEP the bearings around the group, ray-probe each
-    // sight line against the RENDERED scene, and keep the first one that is
-    // both clear and actually holds two children in the picture, judged by
-    // PROJECTING them through the live camera (§7.2) rather than by a radius.
+    // The picture. The frame must show THE CHASE, so the standpoint is chosen
+    // the way the point-485 speaker shot chooses one rather than by a formula.
+    // Two rules earned by looking at what the earlier tries actually produced:
+    // aim at the CHASER AND ITS QUARRY — the pair IS the game, while the group
+    // centroid drifts to wherever the stragglers are and framed a tree and an
+    // empty paddock — and take the BEST bearing rather than the first passable
+    // one, because the first clear sight line is as often the one looking out
+    // of the village across open ground. Every bearing is ray-probed against
+    // the RENDERED scene for an unobstructed line and scored by PROJECTING the
+    // children through the live camera (§7.2), never by a radius.
     const standAt = async (bearing) =>
       page.evaluate(
         ({ b, back }) => {
           const t = window.__placeTag()
           const p = window.__placePlayer
           if (!t || !p || !t.children.length) return null
-          const cx = t.children.reduce((a, c) => a + c.x, 0) / t.children.length
-          const cz = t.children.reduce((a, c) => a + c.z, 0) / t.children.length
+          // The pair the game is about, falling back to the group's middle
+          // between rounds.
+          const a = t.chaser >= 0 ? t.children[t.chaser] : null
+          const q = t.target >= 0 ? t.children[t.target] : null
+          const cx = a && q ? (a.x + q.x) / 2 : t.children.reduce((s2, c) => s2 + c.x, 0) / t.children.length
+          const cz = a && q ? (a.z + q.z) / 2 : t.children.reduce((s2, c) => s2 + c.z, 0) / t.children.length
           p.x = cx + Math.sin(b) * back
           p.z = cz + Math.cos(b) * back
           // Place-camera yaw 0 looks toward −Z, hence the +PI complement.
@@ -2669,50 +2674,70 @@ for (const [placeId, shot] of [
           p.pitch = -0.05
           return { cx, cz }
         },
-        { b: bearing, back: 6.5 },
+        { b: bearing, back: 5.5 },
       )
-    /** Is the game both unobstructed and in frame from where we stand? */
+    /** Is the game unobstructed from here, and how much of it is in frame? */
     const readsFromHere = () =>
       page.evaluate(() => {
         const t = window.__placeTag()
         const cam = window.__placeCamera
-        if (!t || !cam || !window.__placeRayHit) return { clear: false, inFrame: 0 }
-        const cx = t.children.reduce((a, c) => a + c.x, 0) / t.children.length
-        const cz = t.children.reduce((a, c) => a + c.z, 0) / t.children.length
-        // Chest height of a child. Nothing may be drawn in FRONT of the group:
-        // a hut or an adult between reads as a hit far nearer than the target.
+        if (!t || !cam || !window.__placeRayHit) return { clear: false, inFrame: 0, pair: 0 }
+        const a = t.chaser >= 0 ? t.children[t.chaser] : null
+        const q = t.target >= 0 ? t.children[t.target] : null
+        const cx = a && q ? (a.x + q.x) / 2 : t.children.reduce((s2, c) => s2 + c.x, 0) / t.children.length
+        const cz = a && q ? (a.z + q.z) / 2 : t.children.reduce((s2, c) => s2 + c.z, 0) / t.children.length
+        // Chest height of a child. Nothing may be drawn in FRONT of the game: a
+        // hut or an adult between reads as a hit far nearer than the target.
         const h = window.__placeRayHit(cx, 0.75, cz)
         const clear = h.hitDistance == null || h.hitDistance >= h.targetDistance * 0.9
         // The SAME matrix math the frame shutter projects a `local` subject
         // with (scripts/verify/frameSubject.mjs) — no THREE in the page here.
         const apply = (e, v) =>
           [0, 1, 2, 3].map((r) => e[r] * v[0] + e[r + 4] * v[1] + e[r + 8] * v[2] + e[r + 12] * v[3])
-        let inFrame = 0
-        for (const c of t.children) {
+        const shows = (c) => {
           const eye = apply(cam.matrixWorldInverse.elements, [c.x, 0.5, c.z, 1])
           const clip = apply(cam.projectionMatrix.elements, eye)
           const w = clip[3]
-          if (!(w > 0)) continue
-          const x = clip[0] / w
-          const y = clip[1] / w
-          const z = clip[2] / w
-          // Inside 0.9 of the frame rather than 1.0: a child clipped by the very
-          // edge is in the picture by arithmetic and not by eye.
-          if (Math.abs(x) <= 0.9 && Math.abs(y) <= 0.9 && z < 1) inFrame++
+          if (!(w > 0)) return false
+          // Inside 0.85 of the frame rather than 1.0: a child clipped by the
+          // very edge is in the picture by arithmetic and not by eye.
+          return Math.abs(clip[0] / w) <= 0.85 && Math.abs(clip[1] / w) <= 0.85 && clip[2] / w < 1
         }
-        return { clear, inFrame }
+        let inFrame = 0
+        for (const c of t.children) if (shows(c)) inFrame++
+        // The pair carries the picture: a frame holding two stragglers while the
+        // chase runs off-screen shows village life, not a game of tag.
+        const pair = (a && shows(a) ? 1 : 0) + (q && shows(q) ? 1 : 0)
+        return { clear, inFrame, pair }
       })
-    let stood = null
+    let bestBearing = null
+    let best = -1
     let shotProbe = 'none'
-    for (let k = 0; k < 12 && !stood; k++) {
-      const at = await standAt((k / 12) * Math.PI * 2)
+    for (let k = 0; k < 16; k++) {
+      const bearing = (k / 16) * Math.PI * 2
+      const at = await standAt(bearing)
       if (!at) break
       await nextFrames(2)
       const r = await readsFromHere()
-      shotProbe = `bearing ${k}/12: clear=${r.clear} inFrame=${r.inFrame}`
-      if (r.clear && r.inFrame >= 2) stood = at
+      // Score: BOTH of the pair first, then everyone else who happens to be in
+      // shot. An obstructed line scores nothing at all.
+      const score = r.clear ? r.pair * 10 + r.inFrame : -1
+      if (r.clear && r.pair === 2 && score > best) {
+        best = score
+        bestBearing = bearing
+        shotProbe = `bearing ${k}/16: clear=${r.clear} pair=${r.pair} inFrame=${r.inFrame}`
+      }
     }
-    check('the game is photographable: a clear standpoint holds two children in frame', !!stood, shotProbe)
+    // Stand on the WINNING bearing: the sweep left the camera on the last one
+    // tried. The chase has run on since, so the aim is taken freshly — the pair
+    // is re-read where it is NOW, which is the whole reason `standAt` recomputes
+    // rather than replaying a stored point.
+    const stood = bestBearing === null ? null : await standAt(bestBearing)
+    check(
+      'the game is photographable: a clear standpoint holds the chaser and its quarry in frame',
+      !!stood,
+      shotProbe,
+    )
     if (stood) {
       await nextFrames(4)
       await frame('480-village-tag', {
