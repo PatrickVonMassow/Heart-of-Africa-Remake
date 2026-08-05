@@ -4,6 +4,7 @@
 // the POC systems require (CLAUDE.md §8).
 
 import { balance } from '../config/balance'
+import { clampWander } from '../render/edgeBand'
 import { refreshAmbienceVolume } from '../systems/ambience'
 import { totalGifts, useGame, type EquipmentId } from '../state/store'
 import { EVENT_KINDS, type EventKind } from '../systems/events'
@@ -369,6 +370,12 @@ export function DebugMenu() {
         onChange={(v) => { balance.season.weatherStrength = Math.max(0, Math.min(1, v)); bump() }} />
       <NumberField label={t.debug.wetGroundStrength} value={balance.season.wetGroundStrength} step={0.1}
         onChange={(v) => { balance.season.wetGroundStrength = Math.max(0, Math.min(1, v)); bump() }} />
+      <NumberField label={t.debug.edgeBandWidth} value={balance.placeEdgeBand.widthM} step={0.5}
+        onChange={(v) => { balance.placeEdgeBand.widthM = Math.max(0.2, v); bump() }} />
+      <NumberField label={t.debug.edgeBandWander} value={balance.placeEdgeBand.wanderM} step={0.1}
+        onChange={(v) => { balance.placeEdgeBand.wanderM = clampWander(v, balance.placeEdgeBand.widthM); bump() }} />
+      <NumberField label={t.debug.edgeBandStrength} value={balance.placeEdgeBand.strength} step={0.1}
+        onChange={(v) => { balance.placeEdgeBand.strength = Math.max(0, Math.min(1, v)); bump() }} />
       <label>
         <span>{t.debug.season}</span>
         <select

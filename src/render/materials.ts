@@ -10,6 +10,7 @@
 // repetition.
 
 import * as THREE from 'three/webgpu'
+import { edgeBandUniforms, sweptNode } from './edgeBand'
 import { seasonTintNode, wetGroundColor, wetGroundRoughness } from './seasonTint'
 import {
   cameraViewMatrix,
@@ -314,8 +315,16 @@ export function createGroundMaterial(
   // negative = NaN) — the NaN propagated to a flat-black ground patch that the
   // WebGL 2 path never showed (point 111).
   const cells = mx_worley_noise_float(vec3(p.mul(0.22), 9.0)).clamp(0, 1)
-  let col = mix(color(base), color(alt), large.clamp(0, 1))
-  col = mix(col, color(patch), cells.oneMinus().pow(3).mul(sand ? 0.14 : 0.5))
+  const even = mix(color(base), color(alt), large.clamp(0, 1))
+  // The settlement edge (design.md §2.6, point 352/488): 1 on the swept ground
+  // inside, 0 on the open land outside, ramping across a soft band at the
+  // boundary the leave check reads. Three terms of THIS material carry it —
+  // there is no second pass and no drawn ring.
+  const swept = sweptNode()
+  // Textural: the open ground keeps its blotchy dark patches, the swept inside
+  // loses them (trodden and swept even).
+  let col = mix(even, color(patch), cells.oneMinus().pow(3).mul(sand ? 0.14 : 0.5))
+  col = mix(col, even, swept.mul(edgeBandUniforms.mottle))
   const pathMask = (() => {
     if (!paths) return float(0)
     // Mask canvas maps the square ±extent around the place origin.
@@ -337,11 +346,23 @@ export function createGroundMaterial(
   // settlement-only, so this never double-tints the travel scene.
   // Rain wets the settlement ground (design.md §19.13, point 225): darker and
   // glossier as the storm soaks it, driven by the shared GROUND_WET_U uniform.
-  m.colorNode = wetGroundColor(seasonTintNode(col).mul(surfaceStructure('ground')))
+  // Tonal edge term (point 352/488): the compacted, swept inside sits a little
+  // darker than the open land. MULTIPLIED ONTO the season-tinted colour, not
+  // mixed into the base — so the inside/outside contrast is the same ratio in
+  // the dry-season straw as in the rains and the edge cannot bleach away
+  // (design.md §19.13; `sweptGroundColor` is its CPU mirror).
+  const sweptTone = float(1).sub(swept.mul(edgeBandUniforms.tone))
+  m.colorNode = wetGroundColor(seasonTintNode(col).mul(sweptTone).mul(surfaceStructure('ground')))
   // Baked micro-relief; trodden paths are worn flat (the tangent deflection
   // fades where the mask is strong). Sand keeps a softer, finer grain so the
-  // open plateau reads as smooth desert sand rather than a pebbled field.
-  m.normalNode = surfaceNormal('ground', pathMask.oneMinus().mul(sand ? 0.4 : 0.85).add(0.15))
+  // open plateau reads as smooth desert sand rather than a pebbled field. The
+  // swept settlement ground is worn flatter the same way the paths are, so the
+  // edge reads as a change in the SURFACE as well as in the tone.
+  const sweptRelief = float(1).sub(swept.mul(edgeBandUniforms.relief))
+  m.normalNode = surfaceNormal(
+    'ground',
+    pathMask.oneMinus().mul(sand ? 0.4 : 0.85).add(0.15).mul(sweptRelief),
+  )
   // Wet gloss: the base roughness (1) pulls down toward a sheen with the wet
   // factor, so the micro-relief normals catch a highlight. `m.roughness` stays
   // its scalar default — the node overrides it.
