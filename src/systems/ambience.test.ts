@@ -8,6 +8,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import {
   coastSurfGain,
+  playSpeech,
   playThunder,
   proximityGain,
   refreshAmbienceVolume,
@@ -22,6 +23,8 @@ import {
 } from './ambience'
 import { thunderDelaySeconds } from './season'
 import { balance } from '../config/balance'
+import { phraseOf, utteranceOf, SEQUENCE_LENGTH } from '../communication/lexicon'
+import { phrasePlan, utterancePlan } from '../communication/speaking'
 
 describe('coastSurfGain (point 153 — the coastal surf fade)', () => {
   const near = 0.4
@@ -250,8 +253,14 @@ class FakeFilter extends FakeNode {
 class FakeOscillator extends FakeNode {
   type = ''
   frequency = new FakeParam()
-  start() {}
-  stop() {}
+  startedAt: number | null = null
+  stoppedAt: number | null = null
+  start(t = 0) {
+    this.startedAt = t
+  }
+  stop(t = 0) {
+    this.stoppedAt = t
+  }
 }
 class FakeBuffer {
   data: Float32Array
@@ -303,8 +312,12 @@ class FakeCtx {
   createBiquadFilter() {
     return new FakeFilter()
   }
+  /** Every oscillator the engine ever built — the spoken syllables among them. */
+  oscillators: FakeOscillator[] = []
   createOscillator() {
-    return new FakeOscillator()
+    const o = new FakeOscillator()
+    this.oscillators.push(o)
+    return o
   }
   resume() {
     return Promise.resolve()
@@ -551,5 +564,93 @@ describe('setAmbienceAnimals (design.md §19.1 — the proximity call rises and 
     balance.ambienceVolume = 0
     expect(reRise()).toBe(0) // muted: a near animal schedules no audible level
     balance.ambienceVolume = defaultVolume
+  })
+})
+
+// Village speech (design.md §13.4, docs/communication-poc-spec.md): the PURE
+// timing/level plan is pinned in src/communication/speaking.test.ts; here the
+// SCHEDULING is — that a plan becomes one voice per syllable on the
+// AudioContext clock, through the same ambient bus the §21 volume governs, and
+// that an inaudible plan schedules nothing at all. The browser check in
+// scripts/verify/settings.mjs proves the sound really plays.
+describe('playSpeech (design.md §13.4 — the syllables reach the audio clock)', () => {
+  const defaultVolume = balance.ambienceVolume
+  let ctx: FakeCtx
+
+  beforeAll(() => {
+    vi.useFakeTimers() // the emitters' setTimeout loops never run
+    ;(window as unknown as { AudioContext: unknown }).AudioContext = FakeCtx
+    startAmbience() // a no-op if an earlier block already started the engine
+    const c = FakeCtx.last
+    if (!c) throw new Error('the fake audio context was not created')
+    ctx = c
+  })
+  afterAll(() => {
+    vi.useRealTimers()
+    balance.ambienceVolume = defaultVolume
+  })
+
+  /** The oscillators one call added. */
+  const spoken = (play: () => void): FakeOscillator[] => {
+    const before = ctx.oscillators.length
+    play()
+    return ctx.oscillators.slice(before)
+  }
+
+  it('schedules one voice per syllable, at the plan offsets on the audio clock', () => {
+    ctx.currentTime = 40
+    const plan = utterancePlan(utteranceOf('COME'), 0, { syllableSeconds: 0.3, volume: 1 })
+    const voices = spoken(() => playSpeech(plan))
+    expect(voices).toHaveLength(plan.syllables.length)
+    voices.forEach((v, i) => {
+      expect(v.startedAt).toBeCloseTo(40 + plan.syllables[i].startOffset, 10)
+      expect(v.stoppedAt as number).toBeGreaterThan(v.startedAt as number)
+    })
+  })
+
+  it('gives the high syllable a higher carrier than the low one — the two samples', () => {
+    ctx.currentTime = 60
+    const plan = utterancePlan(utteranceOf('COME'), 0, { syllableSeconds: 0.3, volume: 1 })
+    const voices = spoken(() => playSpeech(plan))
+    const pitch = (i: number) => voices[i].frequency.events[0].value ?? 0
+    const high = plan.syllables.findIndex((s) => s.tone === 'high')
+    const low = plan.syllables.findIndex((s) => s.tone === 'low')
+    expect(pitch(high)).toBeGreaterThan(pitch(low))
+  })
+
+  it('keeps the phrase pause on the clock between the atoms', () => {
+    ctx.currentTime = 80
+    const plan = phrasePlan(phraseOf(['DIG', 'HERE']), 0, {
+      syllableSeconds: 0.3,
+      pauseSeconds: 0.9,
+      volume: 1,
+    })
+    const voices = spoken(() => playSpeech(plan))
+    expect(voices).toHaveLength(2 * SEQUENCE_LENGTH)
+    const gap =
+      (voices[SEQUENCE_LENGTH].startedAt as number) - (voices[SEQUENCE_LENGTH - 1].startedAt as number)
+    expect(gap).toBeCloseTo(0.3 + 0.9, 10) // the last beat's step, then the pause
+  })
+
+  it('schedules nothing for a speaker out of earshot or a muted soundscape', () => {
+    ctx.currentTime = 100
+    expect(spoken(() => playSpeech(utterancePlan(utteranceOf('DIG'), 999, { volume: 1 })))).toHaveLength(0)
+    balance.ambienceVolume = 0
+    expect(spoken(() => playSpeech(utterancePlan(utteranceOf('DIG'), 0)))).toHaveLength(0)
+    balance.ambienceVolume = defaultVolume
+  })
+
+  it('is quieter from further away, and never louder than right beside the speaker', () => {
+    ctx.currentTime = 120
+    const peakOf = (distance: number) => {
+      const voices = spoken(() => playSpeech(utterancePlan(utteranceOf('DIG'), distance, { volume: 1 })))
+      const gain = (voices[0].connected[0] as FakeFilter).connected[0] as FakeGain
+      return Math.max(...gain.gain.events.map((e) => e.value ?? 0))
+    }
+    const near = peakOf(0)
+    const far = peakOf(6)
+    expect(near).toBeGreaterThan(0)
+    expect(far).toBeGreaterThan(0)
+    expect(far).toBeLessThan(near)
   })
 })

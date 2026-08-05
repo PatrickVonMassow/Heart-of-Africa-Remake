@@ -44,6 +44,8 @@ import { gatherModelGuardInputs } from './model-guard.mjs'
 import { gatherRenderVerifyInputs } from './render-verify-guard.mjs'
 import { gatherMechanismReviewInputs } from './mechanism-review-guard.mjs'
 import { gatherBranchHygiene } from './branch-hygiene-guard.mjs'
+import { gatherContainerAskInputs } from './container-ask-guard.mjs'
+import { evaluate as containerAskEvaluate } from './container-ask-guard-core.mjs'
 import { assessBranchHygiene, formatBranchHygiene } from './branch-hygiene-core.mjs'
 
 import {
@@ -143,6 +145,16 @@ export const GUARDS = [
       const verdict = evaluateDocBudgets(docs)
       return { block: verdict.block, reason: formatDocBudgetVerdict(verdict) }
     },
+  },
+  {
+    // Registered so the Stop chain stays fully spawn-tested (guard-hooks.test
+    // reads the chain from settings.json and demands a registration for every
+    // hook gated on isMainModule). It always reports NOT-APPLICABLE here: the
+    // answer it judges does not exist yet when a preflight runs, and its `why`
+    // says exactly that instead of pretending to a clean bill.
+    id: 'container-ask-guard',
+    gather: gatherContainerAskInputs,
+    decide: containerAskEvaluate,
   },
   {
     id: 'branch-hygiene-guard',

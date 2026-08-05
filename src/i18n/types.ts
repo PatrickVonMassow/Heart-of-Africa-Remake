@@ -395,6 +395,11 @@ export interface Strings {
     birdsongVolume: string
     surfNearRadius: string
     surfCutoff: string
+    /** Village speech: pace, phrase pause and how far an utterance carries (§13.4). */
+    speechSyllable: string
+    speechPhrasePause: string
+    speechHearingRadius: string
+    speechHearingFalloff: string
     foodPerDay: string
     canteenDrain: string
     canteenDesertDrain: string

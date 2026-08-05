@@ -5,6 +5,8 @@
 
 import type { PlaceKind, RegionId } from '../world/geo'
 import { balance } from '../config/balance'
+import type { Tone } from '../communication/lexicon'
+import { phrasePlan, utterancePlan, type SpeechPlan } from '../communication/speaking'
 
 export interface AmbienceScene {
   region: RegionId
@@ -722,6 +724,75 @@ export function playThunder(delaySeconds: number, strength = 1): void {
   }
 }
 
+// --- Village speech (design.md §13.4, docs/communication-poc-spec.md) --------
+// The two spoken samples: one carrier pitch per tone, low for `ba` and high for
+// `BA`, with a vowel formant over it so a syllable reads as a voice rather than
+// a beep. Only the PITCH distinguishes them — loudness, tempo and length carry
+// no meaning anywhere in the language.
+const SPEECH_TONE: Record<Tone, { carrier: number; formant: number }> = {
+  low: { carrier: 138, formant: 820 },
+  high: { carrier: 226, formant: 1240 },
+}
+
+/** Dev/verify probe: proves a spoken utterance really SCHEDULED audio. */
+const speechProbe =
+  import.meta.env.DEV && typeof window !== 'undefined'
+    ? ((window as unknown as { __villageSpeech?: { spoken: number; syllables: number; lastPeak: number } }).__villageSpeech ??= {
+        spoken: 0,
+        syllables: 0,
+        lastPeak: 0,
+      })
+    : null
+
+/** One spoken syllable: a voiced carrier through its formant, softly enveloped. */
+function speakSyllable(ac: AudioContext, dest: AudioNode, t0: number, tone: Tone, dur: number, peak: number) {
+  const { carrier, formant } = SPEECH_TONE[tone]
+  const osc = ac.createOscillator()
+  osc.type = 'sawtooth'
+  osc.frequency.setValueAtTime(carrier, t0)
+  osc.frequency.linearRampToValueAtTime(carrier * 0.94, t0 + dur) // the small fall of a spoken beat
+  const filter = ac.createBiquadFilter()
+  filter.type = 'bandpass'
+  filter.frequency.value = formant
+  filter.Q.value = 3.2
+  const g = ac.createGain()
+  g.gain.setValueAtTime(0.0001, t0)
+  g.gain.linearRampToValueAtTime(peak, t0 + Math.min(0.03, dur * 0.25))
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur)
+  osc.connect(filter)
+  filter.connect(g)
+  g.connect(dest)
+  osc.start(t0)
+  osc.stop(t0 + dur + 0.05)
+}
+
+/**
+ * Speaks a pure SpeechPlan (src/communication/speaking.ts): its syllables at the
+ * constant pace, a phrase's atoms with the constant pause between them, all on
+ * the AudioContext clock — so a re-render or a scene change mid-phrase can never
+ * cancel what is already scheduled. Every voice goes through the SAME ambient
+ * bus as the rest of the soundscape, so the single §21 ambience volume still
+ * governs it. A plan that carries no audible syllable (out of range, muted)
+ * schedules nothing at all.
+ */
+export function playSpeech(plan: SpeechPlan): void {
+  if (plan.syllables.length === 0) return
+  if (speechProbe) speechProbe.spoken++ // an audible plan, even without a started engine
+  if (!ctx || !master) return
+  const ac = ctx
+  const dest = ambientBus ?? master
+  const t0 = ac.currentTime
+  for (const s of plan.syllables) {
+    speakSyllable(ac, dest, t0 + s.startOffset, s.tone, s.duration, Math.max(0.0001, s.peak))
+  }
+  // Counted SEPARATELY from `spoken`, so the live gate proves audio was really
+  // scheduled at a positive level — not merely that a counter moved.
+  if (speechProbe) {
+    speechProbe.syllables += plan.syllables.length
+    speechProbe.lastPeak = Math.max(...plan.syllables.map((s) => s.peak))
+  }
+}
+
 /** Report the closest wildlife to the player (design.md §19): each field is a
  *  0..1 proximity that raises that voice's calls, scaled by the ambience
  *  volume. Called every frame by the travel scene while animals are near. */
@@ -793,5 +864,10 @@ if (import.meta.env.DEV && typeof window !== 'undefined') {
     setScene: (next: AmbienceScene) => setAmbienceScene(next),
     refresh: () => refreshAmbienceVolume(),
     surfWobble: () => wobbles.find((w) => w.name === 'surf')?.gain.gain.value ?? 0,
+    // Village speech (design.md §13.4): speak an utterance/phrase from a given
+    // distance, and read what was actually scheduled.
+    speak: (utterance: string, distance: number) => playSpeech(utterancePlan(utterance, distance)),
+    speakPhrase: (phrase: string[], distance: number) => playSpeech(phrasePlan(phrase, distance)),
+    speechProbe: () => ({ ...(speechProbe ?? { spoken: 0, syllables: 0, lastPeak: 0 }) }),
   }
 }

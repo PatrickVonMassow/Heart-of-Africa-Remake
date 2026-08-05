@@ -252,6 +252,7 @@ describe('GATHER-STEP REUSE (the drift guard)', () => {
     expect(Object.keys(byId).sort()).toEqual(
       [
         'branch-hygiene-guard',
+        'container-ask-guard',
         'dashboard-guard',
         'doc-budget-guard',
         'mechanism-review-guard',

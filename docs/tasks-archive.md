@@ -13766,3 +13766,209 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   well-formed, unique and even-weight, no two are less than two syllables apart,
   the four mirror pairs are exact reverses, a phrase observes each atom once, and
   the sort is stable over mixed lengths.
+
+- [x] 484. THE JOURNAL'S COMMUNICATION OBSERVATIONS (user 03.08.2026).
+  FINAL STATE:
+  1. A second, clearly separate section beside the existing entries lists every
+     utterance the player has actually heard, in its sound sequence, sorted by
+     point 477's rule.
+  2. Each carries a free-text field for his own hypothesis. The game never
+     interprets that text.
+  3. The notes save and restore with the game (point 477's store).
+  4. Both languages, and the journal stays non-modal per §16.1.
+  VERIFIABLE: pure Vitest on store and component — an unheard utterance is absent,
+  a heard one appears once, the order holds over mixed lengths, a note survives a
+  save/load round trip.
+
+- [x] 494. NO STEP INSIDE THE CONTAINER IS EVER HANDED BACK TO THE USER (user
+  04.08.2026, standing rule with full rights granted). On 04.08.2026 the session
+  handed him `sudo bash scripts/verify-host-setup.sh`, which cannot work — the
+  official Claude Code image grants `node` exactly one passwordless command, the
+  firewall script — and then a `docker exec -u root …` line that would also have
+  failed, because the sandbox firewall is iptables-wide and blocks the package
+  sources for root as well. Two round trips of the user's time for work that was
+  the session's. The rule is memory `container-work-is-mine`; this point is the
+  MECHANISM, because a rule that only a reader can see is the same failure point
+  440 measured one layer down.
+  FINAL STATE:
+  1. A guard reads the turn's outgoing answer and BLOCKS it when it asks the user
+     to execute a step that runs inside the container — an install, a package
+     manager, a script invocation, a file edit under the workspace. It matches
+     the ASK ("run", "führe aus", a fenced command block addressed to him),
+     not the mere mention of a command.
+  2. What stays allowed is asking for a CAPABILITY that does not exist inside the
+     container at all: a right, a device, a mount, a line in the image. The guard
+     must not push the session into silently failing instead of asking for those,
+     so the distinction is what its cases pin down.
+  3. The remedy line names the way out: find the route and take it; if the
+     capability is genuinely missing, ask once for the capability.
+  4. Wired into the Stop chain in `.claude/settings.json`, fail-open like every
+     other guard, with a pure Vitest-covered decision core, and reviewed by the
+     other model per `mechanism-review-guard` before it counts as done.
+  VERIFIABLE: pure Vitest over the decision core — an answer containing "führe
+  bitte `npm run …` aus" or a sudo/docker-exec instruction addressed to the user
+  is blocked; an answer asking for a GPU device, a mount or an image line passes;
+  a command quoted as a REPORT of what the session itself ran passes; and the
+  guard returns "allow" on any internal error.
+
+- [x] 496. NO TURN CAN SEAL THE CONTAINER OFF FROM ITS OWN API (user
+  04.08.2026, second occurrence — "du hast dich wohl schon wieder ausgesperrt").
+  `/usr/local/bin/init-firewall.sh` is the container's only firewall path, and it
+  is a REBUILD: it flushes every iptables rule and destroys the `allowed-domains`
+  ipset at the top while the default policies stay DROP, then spends two to three
+  minutes fetching GitHub's meta ranges and resolving sixteen domains. Every
+  second of that window the container is sealed, and anything that interrupts it
+  leaves it sealed for good — no allowlist, `api.anthropic.com` unreachable, the
+  session dead with ConnectionRefused. On 04.08.2026 the Bash tool's own
+  two-minute timeout did exactly that (exit 143) and the user had to kill the
+  session. The trigger was mundane: `cdn.playwright.dev` and the Chrome-for-
+  Testing storage answer with rotating addresses that the boot-time allowlist no
+  longer covers, a browser install failed, and the session reached for the
+  rebuild because no smaller tool existed.
+  FINAL STATE:
+  1. The SMALLER TOOL exists and is the normal way:
+     `node scripts/firewall-allow.mjs [domain…]` resolves each name and adds its
+     addresses to the LIVE `allowed-domains` ipset — additive only. It never
+     flushes, never destroys the set, never touches a policy, so there is no
+     window in which the container is offline and nothing to interrupt. `--net24`
+     adds the surrounding /24 for the rotating CDN pools. With no argument it
+     tops up the domains this project needs (the Playwright CDN and its
+     Chrome-for-Testing storage, Hugging Face, npm, the API host itself). It
+     reports per domain what it added and verifies reachability afterwards.
+  2. A genuine REBUILD never runs in the foreground: `node
+     scripts/firewall-rebuild.mjs` starts the container script DETACHED from the
+     tool call (own process group, output to `local/firewall-rebuild.log`) so no
+     tool timeout can kill it mid-flush, and arms a WATCHDOG that restores
+     `iptables -P OUTPUT ACCEPT` and `-P INPUT ACCEPT` when the rebuild has not
+     reported success within its budget. Fail-OPEN by design: a broken rebuild
+     leaves the container reachable rather than sealed, because a reachable
+     session can repair itself and a sealed one cannot.
+  3. A PreToolUse(Bash) guard REFUSES the shapes that seal the container —
+     `init-firewall.sh` invoked directly, `iptables -F`/`-X`/`-P`, `ipset
+     destroy`, `iptables-restore` — and its remedy names the two commands above.
+     It judges the command the session is about to RUN, so a mention inside a
+     message or a `--help` text is not a match.
+  4. Guard core pure and Vitest-covered, fail-OPEN on any internal error, wired
+     in `.claude/settings.json`, and reviewed by the other model per
+     `mechanism-review-guard` before it counts as done.
+  VERIFIABLE: pure Vitest over the decision core — `sudo /usr/local/bin/init-
+  firewall.sh`, `iptables -F`, `iptables -P OUTPUT DROP`, `ipset destroy
+  allowed-domains` and an `iptables-restore` redirect are each refused with the
+  remedy naming `firewall-allow.mjs`; `node scripts/firewall-allow.mjs` itself,
+  `iptables -L -n`, `ipset list` and a string merely QUOTING one of those inside
+  an echo pass; the guard allows on any internal error; and
+  `node scripts/firewall-allow.mjs cdn.playwright.dev --net24` makes the CDN
+  reachable (curl status) without any policy or rule changing.
+
+- [x] 493. THE SECOND BACKEND LANE ON THE VERIFICATION HOST (user decision
+  04.08.2026, "Weg 1" on the board card). Since the browser suites moved into the
+  Linux container, every render verification runs SINGLE-lane: no system Chrome is
+  installed at all, and Playwright's bundled Chromium brings up no WebGPU adapter.
+  The rule that the picture is checked on BOTH backends (CLAUDE.md §6/§7.2) has
+  been unenforceable since 03.08.2026, and the closing cycle demands exactly it.
+  PERFORMANCE IS PART OF THIS POINT (user 04.08.2026): the suites must come back
+  at a speed as close as possible to what they had running natively under Windows
+  without a container.
+  MEASURED on the host 04.08.2026: the GPU is not merely reachable, it is ALREADY
+  DRAWING. Both browsers report `ANGLE (Microsoft Corporation, D3D12 (NVIDIA
+  GeForce RTX 4070 Ti), OpenGL 4.2)` when launched with `--use-angle=gl
+  --ignore-gpu-blocklist --enable-gpu`, `nvidia-smi` from `/usr/lib/wsl/lib`
+  names the card, and Mesa's `d3d12_dri.so` is installed. The suites nevertheless
+  render in SOFTWARE — a flow run burned ~1100 % CPU in the GPU process — because
+  their launch arguments never ask for the device. System Chrome is installed and
+  launches cleanly THROUGH PLAYWRIGHT; its bare command-line crash
+  (`chrome_crashpad_handler: --database is required`) is an artefact of launching
+  it by hand and is not this point's problem. What is genuinely missing is VULKAN:
+  `vulkaninfo` enumerates only llvmpipe, Mesa is 22.3.6 (Debian 12) which ships no
+  Dozen, and `/usr/share/vulkan/icd.d` does not exist — so `navigator.gpu` is
+  undefined in BOTH browsers. WebGPU is blocked on the Vulkan driver, not on
+  Chrome. So this is a host SETUP question, not a passthrough question.
+  FINAL STATE:
+  0. The WebGL 2 lane draws on the GPU, not on llvmpipe: the launch arguments ask
+     for the device, `launch-args-core.mjs` owns them for both lanes, and the win
+     is MEASURED — one suite's wall clock before and after, recorded in
+     `docs/host-environment.md`. This is the bulk of the performance ask and does
+     not wait for Vulkan.
+  1. One idempotent, repo-owned setup script (`scripts/verify-host-setup.sh`)
+     installs what the lane needs: Google Chrome stable, Mesa's D3D12 Gallium and
+     Dozen (Vulkan-on-D3D12) drivers, and the loader wiring (ICD path,
+     `LD_LIBRARY_PATH`) that points them at `/usr/lib/wsl/lib`. It needs root, so it
+     is run ONCE under sudo; a second run changes nothing and says so.
+  2. `launchVerifyBrowser()` resolves that Chrome by the host's own path and FAILS
+     LOUD when a `VERIFY_GL=webgpu` run finds none — never a silent fall back to
+     bundled Chromium, which is how the missing lane stayed invisible.
+  3. A readiness command judges the lane by the PICTURE, not by a version string:
+     `node scripts/verify/backend-lane-check.mjs` exits non-zero unless system
+     Chrome launches, an adapter is returned, `window.__renderer` reports WebGPU
+     AND a frame is actually drawn — on 03.08.2026 the software lane offered the
+     interface and then died at the first buffer, which is precisely what this
+     must catch.
+  4. The both-backend rule is restored in practice: the render suites run under
+     `VERIFY_GL=webgpu` on this host with `assertBackend` confirming it, and
+     `render-verify-guard` demands the second lane again wherever a change can
+     render differently per backend.
+  5. If the drivers cannot carry the game — the lane comes up but no frame draws —
+     the point is NOT closed by relaxing the rule: it is reported with the failing
+     output, and the user's lane 2 (the second backend run by hand on his Windows
+     machine) becomes its own point. Chrome's own SwiftShader adapter
+     (`--use-webgpu-adapter=swiftshader`) may stand in as a LIVENESS lane in that
+     case, but never silently: whichever adapter a run got is NAMED in the
+     readiness output, so a software lane can never be mistaken for the card.
+  VERIFIABLE: `backend-lane-check.mjs` green on the host, NAMING the adapter it
+  got; a measured wall-clock comparison of one suite on llvmpipe against the same
+  suite on the GPU; one render suite
+  completing under `VERIFY_GL=webgpu` with `assertBackend` confirming WebGPU; pure
+  Vitest over the browser resolution — a host with system Chrome resolves to it, a
+  host without fails loud instead of quietly using the bundled build.
+
+- [x] 499. THE FULL REGRESSION IS RED ON `main`, AND NOBODY HAD RUN IT
+  (measured 04.08.2026, 18:37–19:33). The first LARGE run since the suites moved
+  into the container ended `6 SUITE(S) FAILED — 23 suites run`, and it never
+  reached the WebGPU pass, because a failed WebGL 2 pass stops the run. Six red:
+  `handwriting` (crashed with no FAIL line at all), `voice` (same), `polish`
+  (6 then 9 checks), `settings` (1), `enrichments` (4 then 5), `report` (2).
+  ISOLATED ALREADY, so nobody repeats it: this is NOT the GPU lane of point 493.
+  The `settings` check "first-person ground shows micro-detail (edge energy)"
+  reads laplacian mean 0.00 on the hardware lane AND 0.00/0.01 with
+  `VERIFY_GALLIUM=none` (software) — the same failure with and without the card.
+  `baseline-classify` against the pre-change commit also called it PRE-EXISTING,
+  with the honest caveat that a baseline checkout runs against the CURRENT
+  shared boot helpers and so cannot isolate a harness change; the
+  with/without-GPU comparison can, and did.
+  FINAL STATE:
+  1. Every one of the six is CLASSIFIED before anything is fixed: a real product
+     defect, a stale test assumption, or a harness fault. The two suites that
+     printed no FAIL line at all (`handwriting`, `voice`) are read from their
+     own output first — a crash or a wall-timeout kill is not a test result.
+  2. Each real defect becomes its own work-order point with its own branch; this
+     point is the CLASSIFICATION and the triage, not a bundle to fix everything
+     in one commit. A stale assumption is corrected in the test WITH the reason
+     written down, never by loosening a threshold until it passes.
+  3. The ground micro-detail failure is judged against acceptance criterion 15
+     (surface micro-structure at eye height — ground grain/pebble relief): a
+     laplacian mean of 0.00 says the picture has none, so either the feature
+     regressed or the check no longer measures it. Decide which BY THE PICTURE,
+     not by the number.
+  4. The run is repeated on a QUIET machine once the classification is done —
+     the measured run reported "2× another verify/browser suite run already
+     running", so its reds are evidence, not verdicts.
+  VERIFIABLE: a LARGE run on `main` reaches the WebGPU pass and reports the six
+  suites either green or reduced to named, recorded open points; no threshold in
+  the verify suites was changed without a written reason in the same commit.
+
+- [x] 478. THE SPOKEN UTTERANCE, HEARD ONLY UP CLOSE (user 03.08.2026).
+  FINAL STATE:
+  1. Speaking an utterance plays its syllables — a low sample for `ba`, a high one
+     for `BA` — at a constant pace, and a phrase plays its atoms with the constant
+     pause between them.
+  2. The range is SHORT and spatial. Among the children the player hears the
+     children, among the adults the adults, and in the middle of the village there
+     is no permanent babble of both.
+  3. Hearing records the utterance as observed through point 477's store — seeing
+     a gesture from too far to hear teaches nothing.
+  4. Pace, pause and the attenuation curve are balance values under
+     `balance.communication.*`, debug-editable per §21, and the audio sits under
+     the existing ambience volume so one slider still governs.
+  VERIFIABLE: pure Vitest on the attenuation curve and the observation
+  bookkeeping (out of range records nothing, in range records once, a phrase
+  records each atom); browser only for the fact that sound plays.
