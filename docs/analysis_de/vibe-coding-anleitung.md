@@ -156,11 +156,13 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 ## Die häufigsten Fallstricke → und was hilft
 
 - **Grüner Test, falsches Bild.** Der Test ist grün, das Ergebnis trotzdem falsch — er
-  prüfte einen Hilfswert, einen unerreichbaren Zustand, einen geratenen Wert.
+  prüfte einen Hilfswert, einen unerreichbaren Zustand, einen geratenen Wert. Oder das
+  Beweisbild entstand, bevor die Szene fertig geladen war.
   → *Prompt:* „Etabliere einen Mechanismus, der eine sichtbare Änderung erst als fertig
   gelten lässt, wenn sie am **echten gerenderten Bild** unter einer Bedingung geprüft wurde,
-  die ein Nutzer wirklich erreicht — und der bei einer **neuen** Blick- oder Zoomachse
-  auflistet, welche alten Zusagen dadurch an einem neuen Rand prüfbar werden." *(Kosten ≈ 1,5x.)* *(Zuletzt: Sieht das für einen Menschen richtig aus?)*
+  die ein Nutzer wirklich erreicht — und der ein Prüfbild erst schreibt, wenn die
+  Darstellung fertig ist." *(Kosten ≈ 1,5x.)* *(Zuletzt: Sieht das für einen Menschen
+  richtig aus?)*
 
 - **Neue Features zerbrechen alte.** Eine Änderung repariert X und bricht das unbeobachtete Y.
   → *Prompt:* „Etabliere einen Mechanismus, der jede Mechanik auch im **Danach-Zustand** prüft
@@ -399,4 +401,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 Wenn du diese eine Nachricht an den Anfang stellst, hast du 80 % der Lehren dieses
 Projekts eingebaut, bevor die erste Zeile Code entsteht.
 
-<!-- GUIDE-FINGERPRINT: 38bf5ec026c6ed40a442cba21fbbb7d158336911a3225105840b089d356fa3a7 -->
+<!-- GUIDE-FINGERPRINT: decebd51a4d1689bf1ebe35db12941cf88072d32eba2ec6b173ff7e1c8542add -->

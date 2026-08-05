@@ -30,6 +30,16 @@ export interface BalanceConfig {
     /** Master strength of the whole edge, 0 (invisible) .. 1 (the full per-kind look). */
     strength: number
   }
+  /** The blood a kill or a trample soaks into the ground (design.md §19.5,
+   *  points 267/323): how big the patch reads and how ragged its outline runs. */
+  bloodStain: {
+    /** Size factor on every patch's radius (1 = the base ~0.9 m kill patch). */
+    sizeScale: number
+    /** How far the seeded outline swings off that radius, as a fraction of it:
+     *  0 draws a machined circle, 0.25 a clearly ragged one. Hard-capped by
+     *  `STAIN_MAX_IRREGULARITY` so the contour can never fold through itself. */
+    irregularity: number
+  }
   /** Mouse-look sensitivity in the first-person view, radians per pixel. */
   mouseSensitivity: number
   /** Vertical first-person look clamp in DEGREES from the horizon (design.md
@@ -600,6 +610,13 @@ export const balance: BalanceConfig = {
     widthM: 3,
     wanderM: 0.9,
     strength: 1,
+  },
+  bloodStain: {
+    // Calibratable: the base patch keeps the size point 267 shipped, and a
+    // quarter of the radius of swing reads as an unmistakably organic outline
+    // at the bird's-eye zooms a player can reach without turning into a star.
+    sizeScale: 1,
+    irregularity: 0.24,
   },
   mouseSensitivity: 0.0011,
   lookPitchLimitDeg: 85, // just short of vertical (point 392); the view never rolls over

@@ -500,6 +500,8 @@ export const en: Strings = {
     edgeBandWidth: 'Settlement edge: width (m)',
     edgeBandWander: 'Settlement edge: wander (m)',
     edgeBandStrength: 'Settlement edge: strength',
+    bloodStainSize: 'Blood stain: size',
+    bloodStainIrregularity: 'Blood stain: ragged outline',
     season: 'Season (weather)',
     seasonAuto: 'From the calendar',
     seasonDry: 'Dry season',

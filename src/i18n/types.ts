@@ -469,6 +469,8 @@ export interface Strings {
     edgeBandWidth: string
     edgeBandWander: string
     edgeBandStrength: string
+    bloodStainSize: string
+    bloodStainIrregularity: string
     season: string
     seasonAuto: string
     seasonDry: string

@@ -1532,16 +1532,6 @@ it is appended.
   both languages, no silent path); settings.mjs live-checks the banner on an unmet
   precondition and a successful stage; both languages.
 
-- [ ] 323. BLOOD STAINS ARE PERFECT CIRCLES (user 25.07.2026: they should have
-  natural, irregular contours). Point 267 made the stain a terrain-following ground
-  TINT, but its footprint is still a circle. Give it an organic outline: a
-  per-stain seeded noise/domain-warp on the tint's radial falloff (the technique
-  the §3.3 biome borders use), so every stain has its own ragged contour and no
-  circle reads anywhere; size and irregularity calibratable. VERIFIABLE: pure test
-  that the mask radius varies with angle by a bounded but clearly non-zero amount
-  and differs between seeds (no two stains alike, none circular); screenshot 137
-  refreshed, judged on BOTH backends.
-
 - [ ] 326. A PARENT DIES WITH NO VISIBLE CAUSE AFTER A CROCODILE KILL (user
   25.07.2026: crocodile took a calf, crocodile gone, the parent stood at the death
   spot and simply fell over dead — reading as suicide). Every §19.8 death must have
@@ -4357,6 +4347,15 @@ Build order, chosen so no two parallel agents own the same file:
   3. A Vitest case feeds a DRIFTING clock base and proves a live owner of any age
      is never read as recycled; a genuinely recycled pid must still be caught, so
      the test covers both directions.
+  REPRODUCED ON A SECOND OWNER (05.08.2026, 20:37): the launcher spawned session
+  e3f5442b against the LIVE owner 7c21e596 (pid 2257916, 30:44 of age, eight
+  running child shells including a browser suite in a worktree). Measured on the
+  spot: the in-flight declaration recorded `pidStartedAt` 1785953215453 while
+  `probePid` returned 1785953218212 for the same pid at that moment — 2759 ms
+  apart, past the same fixed 2000 ms tolerance, on the same drift curve (~1 s at
+  15 min, ~3 s at 30 min). The intruder stood down without touching the batch, so
+  the damage stayed at one duplicated session; the drift is confirmed systematic
+  and owner-independent.
   VERIFIABLE: the unit layer pins both directions against a drifting base, and a
   batch owner older than an hour is still read as alive by
   `node scripts/batch-doctor.mjs` on this host.
@@ -4632,10 +4631,40 @@ Build order, chosen so no two parallel agents own the same file:
      lifting it is the session's own work. The pause is instead reported where the
      session's own state is reported — the now-card — so the reader sees it
      without being asked to act on it.
+  WHERE THE PLACEHOLDER COMES FROM, MEASURED 05.08.2026 21:08 — the point above
+  treats it as weather; it is written by our own code. `ownsLock(sessionId)`
+  (`scripts/batch-singleton.mjs`) RESTAMPS the lock's `sessionId` to whatever id
+  the CALLER passed as soon as process ancestry proves the lock belongs to this
+  process tree. Any caller reaching it with a throwaway id — `--session x` through
+  `resolveSessionId` — therefore renames a LIVE owner's lock to that id, which is
+  exactly the `sessionIdBefore: <real id>` / `sessionId: "x"` pair both incidents
+  left behind. `isProbeSessionId` is the only filter and does not recognise a bare
+  placeholder.
+  WHAT IT COST TODAY, and why item 2 above is not enough on its own: the renamed
+  owner could no longer prove itself either, because `ownsLock` with the REAL id
+  then answered `pid-reused` — point 504's drifting start-time compare, on the same
+  lock, in the same minute. The live session was fenced out of its OWN batch (no
+  merge, no push, no tick) with two delegated agents still building, and the claim
+  path could not resolve it: the owner that must honour a claim at its next clean
+  moment IS that fenced session, so the handover deadlocks. Ownership was restored
+  by writing the recorded `sessionIdBefore` back by hand — the repair the toolchain
+  does not offer.
+  6. A RESTAMP DEMANDS A PLAUSIBLE SESSION ID. `ownsLock` renames a lock only for
+     an id of the shape a real session carries; a placeholder, a probe id or an
+     empty string leaves the recorded owner untouched and answers the ownership
+     question without writing. Renaming a lock is a side effect of asking a
+     question, so the question must be safe to ask.
+  7. AN OWNER HOLDING THE LOCK'S PID HAS A SUPPORTED WAY BACK. Where the lock's
+     `pid` is this very process (argv and session match) but the id no longer does,
+     one command re-stamps it — `node scripts/batch-doctor.mjs --repair` treats it
+     as a torn state and names it in its verdict, rather than reporting "consistent"
+     as it did today. Hand-editing the lock is then never the only path.
   VERIFIABLE: a lock carrying a placeholder id plus one live session produces no
   parallel-session alert in the pure core's tests, and the same setup replayed
   against the real detector stays silent; a Vitest case pins that the pause path
-  writes no "Von dir zu klären" card.
+  writes no "Von dir zu klären" card; a placeholder id passed to `ownsLock` leaves
+  the lock's recorded owner byte-identical while a real id still restamps; and the
+  doctor reports the pid-mine/id-foreign lock as torn and repairs it.
 
 - [ ] 516. A BRIEF DOES NOT CARRY THE SPECIFICATION IT DECLARES BINDING (measured
   05.08.2026 while point 488 was built). Point 488's text reads "point 352's
@@ -4757,6 +4786,12 @@ Build order, chosen so no two parallel agents own the same file:
      stand-still wait as any other scene frame, and only a clipped or locator-bound
      capture keeps the no-wait mode. `scripts/verify/sceneReady.test.mjs` pins the
      current rule (its "its subject is DOM" case) and changes with it.
+     REPRODUCED ON `main` (05.08.2026 21:25, both backends green): a plain `flow`
+     run rewrote `verification/02-port-cairo-trade.png` with the settlement behind
+     the trade dialog BLACK, where the committed frame shows Cairo's alley. So this
+     is not one branch's accident — every element frame in the set is one slow load
+     away from photographing an empty world, and the eight frames that run rewrote
+     were restored rather than committed.
   The re-probe of item 1 applies in the STAND-STILL mode only: the drawn-only wait
   is near zero, and re-probing there would add flake on exactly the fast-moving
   subjects that mode serves. The stale comment in `frameSubject.mjs` claiming
@@ -4798,3 +4833,64 @@ Build order, chosen so no two parallel agents own the same file:
   (`document.fonts.check`) and measures a different width from the generic fallback,
   so a silent fallback fails loudly instead of quietly producing plain text.
   Screenshot 81 refreshed on the bundled face.
+
+- [ ] 520. THE BOARD DEMANDS A TIME IT GIVES NO WAY TO WRITE (found 05.08.2026
+  while closing point 394). `dashboard-guard` refuses the turn end when a
+  current-work card's estimate is less than 15 minutes away (`now-eta-soon`) and
+  instructs "give each a realistic new `~HH:MM`" — but `scripts/board.mjs` has no
+  command that writes one: `status`, `title`, `now`, `queue` and `done` all leave
+  the card's `<span class="meta">` untouched, and `promote` takes a times argument
+  only when a card is first raised out of the queue. The only remaining way is to
+  hand-edit `.batch-dashboard.html` — precisely the act that, per the comment on
+  `setCardTitle` in `scripts/board-core.mjs` (point 439), once wrote CRLF into the
+  file and crashed `attest`. A guard that names a remedy the toolchain cannot
+  perform sends every session down that path.
+  FINAL STATE: `node scripts/board.mjs eta <point> "~HH:MM"` rewrites ONLY the
+  estimate half of that card's meta span (the start time stays as it is), refuses
+  a point that has no current-work card and a time that is not in the board's
+  `~HH:MM` shape, and publishes like every other editing command — so the loop
+  stays "one editing command, then `attest`". The guard message names this command
+  instead of describing the edit.
+  VERIFIABLE: pure Vitest on the rewrite (the estimate changes, the start time and
+  the body do not; an unknown point and a malformed time both throw; the file is
+  written with LF endings whatever it held before), plus a case that the
+  `now-eta-soon` remedy text names the new command.
+
+- [ ] 521. THE ENRICHMENT SUITE AIMS BY STOPWATCH AND ABORTS BEFORE ITS OWN
+  EVIDENCE (found 05.08.2026 while closing point 323). `scripts/verify/
+  enrichments.mjs` jumps the traveller with `debugJumpTo` — which sets the
+  POSITION instantly while the travel camera SPRINGS toward it — and then waits a
+  fixed 1500 ms before shooting. Whether the camera has arrived is therefore a
+  question of frame rate: on a loaded machine, or on the slower backend, it has
+  not, and `72-water-victoria-falls` fails "subject not in the picture". The
+  failure is not cosmetic — it ABORTS the run before frame 137, the picture the
+  blood-stain criterion is judged by, so a green product looks red and its evidence
+  never gets taken. Measured: four such aborts on WebGPU under load, 245/245 green
+  on the same tree once the machine quietened.
+  FINAL STATE: the wait after a jump POLLS the camera having arrived — the spring's
+  own settle, read through the existing `window.__camera` projection the shutter
+  already uses — instead of counting milliseconds, with a stated timeout that fails
+  with the measured distance still to go. `scripts/verify/fixedWaits.test.mjs`
+  already forbids fixed waits in the verify scripts; this one survives because it
+  is written as a bare `waitForTimeout` the rule's pattern misses, so the rule is
+  widened to catch it in the same pass.
+  VERIFIABLE: pure Vitest that the fixed-wait rule flags this shape, and the
+  enrichments suite green on BOTH backends on a machine that is deliberately busy.
+
+- [ ] 522. THE BURNING GRASS DOES NOT BURN (observed 05.08.2026 while closing point
+  323). `verification/131-burning-grass.png` is the frame that proves the §19.9
+  bush fire, and no fire is visible in it to the eye — the frame passes its checks
+  and shows dry grass. Either the dressing does not draw at the moment the shutter
+  opens (the fire is a moving effect and the frame may catch it between states), or
+  it draws too faintly to read at that distance and zoom, or the check measures
+  something the picture does not show. This is exactly the "looks-wrong-but-passes"
+  class: a green check standing in front of an invisible feature.
+  FINAL STATE: the fire READS in the frame a human looks at — flame and smoke
+  visible at the zoom the criterion is judged at — and the check that guards it
+  measures the drawn fire (pixels of flame/smoke in the frame region), not a state
+  flag beside it. If the effect turns out to be drawing correctly and only the
+  frame's aim or moment is wrong, the aim is fixed and the finding recorded as
+  such; a feature that cannot be seen is not delivered either way.
+  VERIFIABLE: the refreshed frame 131 shows the fire to a human on both backends,
+  and its check fails when the fire is switched off in the debug menu — proving the
+  check reads the picture rather than the intent.

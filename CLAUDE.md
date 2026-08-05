@@ -517,13 +517,13 @@ changes with it in the same commit.
     which previously showed visible steps.
 12. **Atmosphere.** The atmosphere elements of `design.md` §19 are
     implemented — the ambient wildlife of §19.2–§19.8 (streaming and
-    carcass discipline, the predator hunt with its food webs and feeding,
-    elephant herds and trampling, movement discipline and body separation
-    incl. the open-ocean backstop, vultures, shore and grazing life, and
-    the herds' family life with calf predation and water drama), the
-    climate and landscape dressing of §19.9, the "Graphics and atmosphere"
-    section (§2.4), and the elephant-graveyard dressing of §4.4 (readable
-    at a glance).
+    carcass discipline, the predator hunt with its food webs and feeding
+    over its ragged ground stain, elephant herds and trampling, movement
+    discipline and body separation incl. the open-ocean backstop,
+    vultures, shore and grazing life, and the herds' family life with
+    calf predation and water drama), §19.9's climate and landscape
+    dressing, §2.4's "Graphics and atmosphere", and §4.4's
+    elephant-graveyard dressing (readable at a glance).
    SUPERSEDED AS A TARGET (user 25.07.2026, design.md §19.5): water is for
    crossing, not for lingering — a FLIGHT is never restricted by river or lake at
    all, and the §19.5 revision states it. What the evidence section pins is what
