@@ -1775,8 +1775,20 @@ function Herds() {
     // meshRefs + colliders (point 378): the verification reads the ADULT instance
     // matrices themselves and the circles the movement loop really collides
     // against, so the two can be checked against each other.
+    // waterDrama: the exact numbers the §19.8 drown rule decides on at a spot —
+    // the wetness that has REACHED the wildlife system (CURRENT_WEATHER, not the
+    // debug override), the drama current there and the effective flow against
+    // the drown threshold. A staged water-drama check asserts this reading
+    // instead of assuming a forced season arrived (point 502).
     w.__wildlife = { herdsRef, stains, spawnedChunks, scavenger, restock, meshRefs, calfMeshRefs, herdState,
-      colliders: (x: number, z: number, r: number) => collidableAnimalsNear(x, z, r), fire: FIRE_STATE, lion: LION_STATE, igniteFire: igniteFireAt, simTime: () => simTimeRef.current, frames: () => frameCountRef.current }
+      colliders: (x: number, z: number, r: number) => collidableAnimalsNear(x, z, r), fire: FIRE_STATE, lion: LION_STATE, igniteFire: igniteFireAt, simTime: () => simTimeRef.current, frames: () => frameCountRef.current,
+      waterDrama: (lat: number, lon: number) => {
+        const bw = balance.waterDrama
+        const wetness = CURRENT_WEATHER.wetness
+        const strength = dramaCurrent(lat, lon).strength
+        const season = seasonFlowFactor(wetness, bw.dryFlowFactor, bw.wetFlowFactor)
+        return { wetness, strength, season, effective: strength * season, drownThreshold: bw.drownFlowThreshold }
+      } }
     return () => {
       delete w.__wildlife
     }
