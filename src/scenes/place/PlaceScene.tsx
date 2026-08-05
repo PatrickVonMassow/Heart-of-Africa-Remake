@@ -2558,6 +2558,7 @@ export function PlaceScene() {
           errands={layout.errands}
           pen={layout.pen}
           colliders={layout.colliders}
+          radius={layout.radius}
         />
       )}
 

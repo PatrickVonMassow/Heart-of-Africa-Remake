@@ -43,7 +43,8 @@ import { placeById } from '../../world/geo'
 import { useGame } from '../../state/store'
 import { START_YEAR, balance } from '../../config/balance'
 import type { RegionPlaceStyle } from './regionStyles'
-import { resolveMove, tryNudgeToFree, WALKER_RADIUS, type Collider } from './collision'
+import { nudgeToFree, resolveMove, standingClear, tryNudgeToFree, WALKER_RADIUS, type Collider } from './collision'
+import { createTagGame, stepTagGame, type TagWorld } from './tagGame'
 import { animalAnchors, animalBodies, animalScene, stepAnimal, turnToward, ANIMAL_TURN_RATE } from './animalSpots'
 import { PORT_TALKERS, VILLAGE_SPOTS } from './lifeSpots'
 
@@ -318,61 +319,145 @@ function Weaver({ x, z, cloth, weave }: { x: number; z: number; cloth: string; w
 const KID_SCALE = 0.55
 
 /**
- * Two children chasing each other in a circle. They are the figures that RUN, so
- * they are the ones that carry legs (point 479): the swing rides the DISTANCE
- * each child covers at the cadence its own short legs dictate, exactly as the
- * fauna and the §2.5 silhouettes do — a stopped child's legs are still, and the
- * body dips onto the stance leg instead of riding a wall-clock bob.
+ * The children's game of tag (design.md §19.10, point 480/351). One of them is
+ * IT and chases the others; whoever is caught becomes the new IT. The behaviour
+ * itself is the pure `tagGame` module — this component only feeds it the
+ * settlement and draws the result.
+ *
+ * They are the figures that RUN, so they are the ones that carry legs (point
+ * 479): the swing rides the DISTANCE each child covers at the cadence its own
+ * short legs dictate, exactly as the fauna and the §2.5 silhouettes do — a
+ * stopped child's legs are still, and the body dips onto the stance leg instead
+ * of riding a wall-clock bob. The sprint therefore reads three ways at once: the
+ * LEG CADENCE, the SPEED, and the POSTURE — a forward lean while running flat
+ * out, upright and near-still while recovering, which is the reading that
+ * survives at any distance the cadence no longer resolves at.
  */
-function Kids({ x, z, cloth, colliders }: { x: number; z: number; cloth: string[]; colliders: Collider[] }) {
+function Kids({
+  x,
+  z,
+  count,
+  seed,
+  cloth,
+  colliders,
+  radius,
+}: {
+  x: number
+  z: number
+  count: number
+  seed: number
+  cloth: string[]
+  colliders: Collider[]
+  radius: number
+}) {
   const refs = useRef<Array<THREE.Group | null>>([])
   // The world leg length these children walk on, and the cadence it dictates.
   const legLength = FIGURE_LIMBS.hipY * KID_SCALE
   const cadence = useMemo(() => gaitCadence(legLength), [legLength])
-  // Each kid's current position, eased toward the circling target so it slides
-  // smoothly along any obstacle instead of sticking at the absolute circle point
-  // and then jumping once the point clears the obstacle.
-  const pos = useRef<Array<{ x: number; z: number } | null>>([null, null])
-  // Distance walked per child, and the gait phase the Figure reads back.
-  const walked = useRef<number[]>([0, 0])
-  const gaitA = useRef(0)
-  const gaitB = useRef(0)
-  const gaits = [gaitA, gaitB]
-  useFrame((state, dt) => {
-    const t = state.clock.elapsedTime
-    refs.current.forEach((g, i) => {
+
+  // The settlement as the chase sees it: ONE predicate for the colliders, the
+  // fire ring (a collider like any other) and the walkable rim, so a child can
+  // never end a step where a walker may not stand.
+  const world = useMemo<TagWorld>(
+    () => ({
+      radius: Math.max(1, radius - NPC_RADIUS * 2),
+      childRadius: NPC_RADIUS,
+      blocked: (px, pz) =>
+        Math.hypot(px, pz) > Math.max(1, radius - NPC_RADIUS * 2) ||
+        !standingClear(colliders, px, pz, NPC_RADIUS),
+      nudge: (px, pz) => {
+        const r = tryNudgeToFree(colliders, px, pz, NPC_RADIUS)
+        return { x: r.pos[0], z: r.pos[1], found: r.found }
+      },
+    }),
+    [colliders, radius],
+  )
+
+  // The group, spawned on validated ground (point 155): a play spot covered by a
+  // hut is nudged to the nearest free one before the first frame.
+  const game = useMemo(() => {
+    const rand = mulberry32((seed + 5171) >>> 0)
+    const spots = Array.from({ length: count }, (_, i) => {
+      const a = (i / Math.max(1, count)) * Math.PI * 2
+      const [sx, sz] = nudgeToFree(colliders, x + Math.cos(a) * 2.4, z + Math.sin(a) * 2.4, NPC_RADIUS)
+      return { x: sx, z: sz }
+    })
+    return createTagGame(spots, rand, balance.villageLife.tag)
+  }, [x, z, count, seed, colliders])
+
+  // One gait phase ref per child, handed to its Figure.
+  const gaits = useRef<Array<RefObject<number>>>([])
+  if (gaits.current.length !== count) {
+    gaits.current = Array.from({ length: count }, (_, i) => gaits.current[i] ?? { current: 0 })
+  }
+  const poses = useRef<Array<RefObject<FigurePose | null>>>([])
+  if (poses.current.length !== count) {
+    poses.current = Array.from(
+      { length: count },
+      (_, i) =>
+        poses.current[i] ?? {
+          current: { left: { ...REST_POSE.left }, right: { ...REST_POSE.right }, lean: 0, turn: 0 },
+        },
+    )
+  }
+
+  useFrame((_, rawDt) => {
+    const dt = Math.min(rawDt, 0.1)
+    stepTagGame(game, dt, balance.villageLife.tag, world)
+    game.children.forEach((c, i) => {
+      const g = refs.current[i]
       if (!g) return
-      const a = t * 1.4 + i * Math.PI
-      const tx = x + Math.cos(a) * 2.2
-      const tz = z + Math.sin(a) * 2.2
-      let p = pos.current[i]
-      if (!p) {
-        p = { x: tx, z: tz }
-        pos.current[i] = p
-      }
-      const k = Math.min(1, dt * 3.5)
-      const [px, pz] = resolveMove(colliders, p.x + (tx - p.x) * k, p.z + (tz - p.z) * k, NPC_RADIUS, [p.x, p.z])
-      const dx = px - p.x
-      const dz = pz - p.z
-      p.x = px
-      p.z = pz
-      walked.current[i] = (walked.current[i] ?? 0) + Math.hypot(dx, dz)
-      const phase = gaitPhase(walked.current[i], cadence)
-      gaits[i].current = phase
-      g.position.set(px, gaitBodyLift(phase, legLength), pz)
-      if (Math.hypot(dx, dz) > 1e-4) g.rotation.y = Math.atan2(dx, dz)
+      const phase = gaitPhase(c.walked, cadence)
+      gaits.current[i].current = phase
+      g.position.set(c.x, gaitBodyLift(phase, legLength), c.z)
+      g.rotation.y = c.heading
+      const pose = poses.current[i].current
+      if (pose) pose.lean = c.lean
     })
   })
+
+  // Dev hook for the headless verification (CLAUDE.md §7.2): the live game.
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    const w = window as unknown as Record<string, unknown>
+    w.__placeTag = () => ({
+      playing: game.playing,
+      chaser: game.chaser,
+      target: game.target,
+      tags: game.tags,
+      chaserFor: game.chaserFor,
+      children: game.children.map((c) => ({
+        x: c.x,
+        z: c.z,
+        heading: c.heading,
+        reserve: c.reserve,
+        effort: c.effort,
+        press: c.press,
+        pace: c.pace,
+        pinned: c.pinned,
+      })),
+    })
+    return () => {
+      delete w.__placeTag
+    }
+  }, [game])
+
   return (
     <>
-      {[0, 1].map((i) => (
+      {game.children.map((_, i) => (
         <group
           key={i}
           ref={(el) => {
             refs.current[i] = el
           }}
         >
-          <Figure cloth={cloth[i % cloth.length]} scale={KID_SCALE} legs gait={gaits[i]} />
+          <Figure
+            cloth={cloth[i % cloth.length]}
+            scale={KID_SCALE}
+            legs
+            gait={gaits.current[i]}
+            pose={poses.current[i]}
+          />
         </group>
       ))}
     </>
@@ -1271,6 +1356,7 @@ export function PlaceLife({
   errands,
   pen,
   colliders,
+  radius,
 }: {
   kind: 'port' | 'village'
   /** Settlement size (design.md §4.1): big cities show more bustle. */
@@ -1284,6 +1370,8 @@ export function PlaceLife({
   errands: Array<[number, number]>
   pen: PenDef | null
   colliders: Collider[]
+  /** The settlement's walkable radius — the children's play area (point 480). */
+  radius: number
 }) {
   let hash = 0
   for (const c of placeId) hash = (hash * 31 + c.charCodeAt(0)) | 0
@@ -1301,15 +1389,22 @@ export function PlaceLife({
   // Seasonal presence (point 142, "the young men are gone"): the adult walkers
   // thin in a people's away season — the Maasai at the dry-season highland
   // camps (PERIOD), the Tuareg on the autumn caravan, the Sahel farmers out at
-  // the field huts in the rains — while the children, the elder and the home
-  // vignettes REMAIN (the research's shape: "a camp of women, children and
-  // elders"). Sedentary peoples never thin. Read once per visit, like the
-  // dress: time does not advance inside a settlement.
+  // the field huts in the rains — while the elder and the home vignettes REMAIN
+  // (the research's shape: "a camp of women, children and elders"). The children
+  // thin WITH the camp but never vanish (point 480): the group that plays tag is
+  // smaller in the away season, so the player count genuinely changes with the
+  // calendar, and at one child the game falls back to ordinary idling rather
+  // than having a child chase itself. Sedentary peoples never thin. Read once
+  // per visit, like the dress: time does not advance inside a settlement.
   const presence = useMemo(() => {
     const place = placeById(placeId)
     if (!place?.peopleId) return 1
     return presenceAt(place.peopleId, useGame.getState().day, START_YEAR)
   }, [placeId])
+
+  // How many children play here today. Fixed for the visit, like the presence
+  // it scales with, and never below one.
+  const kidCount = Math.max(1, Math.round(balance.villageLife.tag.childCount * presence))
 
   if (kind === 'port') {
     return (
@@ -1328,7 +1423,15 @@ export function PlaceLife({
       <LimbDetailContext.Provider value={limbSegments}>
         <Cook x={firePos[0] + 1.2} z={firePos[1] + 1.0} cloth={style.cloth[0]} />
         <Weaver x={-8.5} z={-7} cloth={style.cloth[1 % style.cloth.length]} weave={style.bandColor} />
-        <Kids x={7} z={7.5} cloth={style.cloth} colliders={colliders} />
+        <Kids
+          x={7}
+          z={7.5}
+          count={kidCount}
+          seed={localSeed}
+          cloth={style.cloth}
+          colliders={colliders}
+          radius={radius}
+        />
         <Goats seed={localSeed} count={pen ? 4 : 3} pen={pen} colliders={colliders} />
         <Walkers seed={localSeed} homes={homes} errands={errands} cloth={style.cloth} count={Math.max(1, Math.round(5 * presence))} colliders={colliders} />
         {/* Inhabitant/prop interactions (design.md §19). */}
