@@ -42,7 +42,7 @@ import { RIVER_WIDTH_DEG, sampleTerrain } from '../../world/terrain'
 import { renderedSheetY, waterSurfaceY } from './waterSurface'
 import { drinkWalkDistance, crocodileNeedsReanchor } from './waterEdgeRules'
 import { climateZoneAt, CURRENT_WEATHER } from '../../systems/season'
-import { lakeDistance, riverDistance, riverFlow } from '../../world/geoIndex'
+import { dramaCurrent, lakeDistance, riverDistance } from '../../world/geoIndex'
 import { hashChunk, mulberry32 } from '../../world/noise'
 import { balance } from '../../config/balance'
 import {
@@ -2477,7 +2477,10 @@ function Herds() {
             // current (point 122, calibratable in balance.waterDrama).
             const bw = balance.waterDrama
             const season = seasonFlowFactor(CURRENT_WEATHER.wetness, bw.dryFlowFactor, bw.wetFlowFactor)
-            const flow = riverFlow(ll.lat, ll.lon)
+            // dramaCurrent, not riverFlow: the sea-mouth slack is the
+            // traveller's rule (point 316) and killed the drowning on the last
+            // reach of every sea-bound river (geoIndex.dramaCurrent).
+            const flow = dramaCurrent(ll.lat, ll.lon)
             if (flow.strength > 0) {
               const boost =
                 fd < FALLS_DRIFT_RADIUS_DEG ? 1 + (FALLS_DRIFT_BOOST - 1) * (1 - fd / FALLS_DRIFT_RADIUS_DEG) : 1
@@ -2589,7 +2592,7 @@ function Herds() {
               a.wadeTime = (a.wadeTime ?? 0) + dt
               const bw = balance.waterDrama
               const season = seasonFlowFactor(CURRENT_WEATHER.wetness, bw.dryFlowFactor, bw.wetFlowFactor)
-              const wadeFlow = riverFlow(ll.lat, ll.lon)
+              const wadeFlow = dramaCurrent(ll.lat, ll.lon) // same drama current as the calf's
               const swept = fallsDistanceDeg(ll.lat, ll.lon) < FALLS_DEATH_RADIUS_DEG
               const drowned =
                 waterStruggleFate(
