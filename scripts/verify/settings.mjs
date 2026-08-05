@@ -13,7 +13,7 @@
 // rebuild + frame check), the screenshots and the console-error gate.
 // Dev server only (dev hooks).
 import { launchVerifyBrowser, assertBackend, waitForSceneBuilt } from './_browser.mjs'
-import { frameShutter } from './frameSubject.mjs'
+import { frameShutter, capturePixels } from './frameSubject.mjs'
 import { leakVerdict } from './textureLeak.mjs'
 import { fileURLToPath } from 'node:url'
 import sharp from 'sharp'
@@ -69,7 +69,7 @@ check('first-person eye height lowered to 1.5', Math.abs(eyeY - 1.5) < 1e-6, `${
 // not the AO bonus.) The threshold guards "structured vs soft wash" at the
 // level the player actually ships with.
 {
-  const shot = await page.screenshot()
+  const shot = await capturePixels(page, 'ground micro-relief contrast')
   const crop = await sharp(shot).extract({ left: 500, top: 700, width: 600, height: 170 }).greyscale().raw().toBuffer({ resolveWithObject: true })
   const { data, info } = crop
   let energy = 0
@@ -97,7 +97,7 @@ check('first-person eye height lowered to 1.5', Math.abs(eyeY - 1.5) < 1e-6, `${
 {
   const frames = []
   for (let i = 0; i < 4; i++) {
-    frames.push(await page.screenshot())
+    frames.push(await capturePixels(page, 'ground shimmer frame diff'))
     await page.waitForTimeout(250)
   }
   let minFrac = Infinity
@@ -645,7 +645,7 @@ check('TRAA on: no new console errors', errors.length === errsBeforeTraa,
   errors.slice(errsBeforeTraa).join(' | ').slice(0, 300))
 await page.evaluate(() => window.__ui.getState().setTraaEnabled(false))
 await page.waitForTimeout(1500)
-const msaaMean = await meanLuma(await page.screenshot())
+const msaaMean = await meanLuma(await capturePixels(page, 'MSAA path mean luma'))
 check('TRAA off again: MSAA path renders non-black', msaaMean > 8, `mean ${msaaMean.toFixed(1)}`)
 check('TRAA off again: no new console errors', errors.length === errsBeforeTraa,
   errors.slice(errsBeforeTraa).join(' | ').slice(0, 300))
@@ -672,7 +672,7 @@ const texCount = () => page.evaluate(() => window.__renderer.info.memory.texture
 // A screenshot is the reliable way to make a throttled headless page render;
 // an 8x8 clip keeps it cheap. rAF alone cannot be awaited here — it is the very
 // thing that stalls.
-const forceFrame = () => page.screenshot({ clip: { x: 0, y: 0, width: 8, height: 8 } })
+const forceFrame = () => capturePixels(page, 'forced frame for the texture count', { clip: { x: 0, y: 0, width: 8, height: 8 } })
 /** Force frames until the texture count repeats, i.e. the rebuilt pipeline has
  *  finished allocating. Reports whether it actually settled. */
 const settledReading = async (tries = 12) => {
@@ -739,7 +739,7 @@ const leak = leakVerdict({
   before: firstCycle.count, after: afterStress.count, cycles: 5, tolerance: 2, liveBefore, liveAfter,
 })
 check('TRAA toggle stress: no render-target leak across rebuilds', leak.ok, leak.detail)
-const stressMean = await meanLuma(await page.screenshot())
+const stressMean = await meanLuma(await capturePixels(page, 'TRAA toggle stress mean luma'))
 check('TRAA toggle stress: scene still renders non-black', stressMean > 8, `mean ${stressMean.toFixed(1)}`)
 check('TRAA toggle stress: no new console errors', errors.length === errsBeforeTraa,
   errors.slice(errsBeforeTraa).join(' | ').slice(0, 300))
@@ -817,7 +817,7 @@ const atLow = await cycleF9()
 check('F9 → low: post off, shadows low-res, no campfire shadows',
   atLow.level === 'low' && atLow.ssao === false && atLow.traa === false && atLow.bloom === false &&
   atLow.shadowRes === PRESETS.low.shadowRes && atLow.fireShadows === false, JSON.stringify(atLow))
-const lowMean = await meanLuma(await page.screenshot())
+const lowMean = await meanLuma(await capturePixels(page, 'F9 low detail mean luma'))
 check('F9 low: scene still renders non-black', lowMean > 8, `mean ${lowMean.toFixed(1)}`)
 // F9 #2: low → high (wraps to the top; SSAO on, sharper shadows).
 const atHigh = await cycleF9()

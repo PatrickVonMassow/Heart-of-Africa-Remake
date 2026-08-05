@@ -254,7 +254,9 @@ export function formatFramePass(d, probe) {
  * anywhere in the verify scripts writes a frame that declared no subject — the
  * exact hole point 375 closes. Every frame goes through the shutter instead.
  * A screenshot WITHOUT a path is a pixel probe (it returns a buffer the suite
- * asserts on) and is deliberately not matched.
+ * asserts on) and is deliberately not matched here — it declares no subject
+ * because it is a measurement, and `findUnbudgetedCaptures` below is what holds
+ * it to the harness' capture budget.
  */
 export const RAW_FRAME_RE = /\.screenshot\(\s*\{(?:[^{}]|\{[^{}]*\})*?\bpath\s*:/g
 
@@ -275,5 +277,39 @@ export function formatRawFrameFindings(findings) {
     "  const shot = frameShutter(page, OUT)",
     "  await shot('12-worldmodel-lake-victoria', { world: { lat: -0.8, lon: 33.0 }, label: 'Lake Victoria' })",
     "  await shot('115-savanna-dry', { general: 'the whole savanna dressing is the subject' })",
+  ].join('\n')
+}
+
+/**
+ * THE SECOND GATE (point 492). The gate above matches `path:` WRITES only, so a
+ * pathless pixel PROBE — `page.screenshot({ clip })` returning a buffer a check
+ * measures on — passes it by design and kept inheriting Playwright's silent 30 s
+ * default. Under suite load on a GPU-less host that deadline is exceeded exactly
+ * as the writes' was, and the suite then dies far from the check it was running.
+ * So every probe goes through `capturePixels` (frameSubject.mjs), which carries
+ * the one named budget and names the site — and a raw `.screenshot(` left in a
+ * suite is counted here.
+ *
+ * Counts the captures a file takes directly: every `.screenshot(` call, minus
+ * the `path:` writes the first gate already reports (they are the same calls,
+ * and reporting one hole twice would send the reader after the wrong fix).
+ */
+export function findUnbudgetedCaptures(source) {
+  const text = String(source ?? '')
+  const all = (text.match(/\.screenshot\(/g) || []).length
+  return Math.max(0, all - findRawFrames(text))
+}
+
+/** Human-readable verdict for files that still take a capture with no budget. */
+export function formatUnbudgetedCaptureFindings(findings) {
+  if (!findings.length) return ''
+  return [
+    'UNBUDGETED CAPTURE(S) — a screenshot is taken with Playwright’s silent 30 s default:',
+    ...findings.map((f) => `  · ${f.file}: ${f.count}`),
+    '',
+    'Every pixel probe goes through the harness capture budget, which names the site',
+    'when it is exceeded (scripts/verify/frameSubject.mjs):',
+    "  const buf = await capturePixels(page, 'TRAA mean luma')",
+    "  const buf = await capturePixels(page, 'snow cover fraction', { clip })",
   ].join('\n')
 }
