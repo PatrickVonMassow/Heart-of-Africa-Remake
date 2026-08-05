@@ -4868,8 +4868,21 @@ Build order, chosen so no two parallel agents own the same file:
   already forbids fixed waits in the verify scripts; this one survives because it
   is written as a bare `waitForTimeout` the rule's pattern misses, so the rule is
   widened to catch it in the same pass.
+  THE SAME CLASS IN `polish`, measured 06.08.2026 while closing point 480: the tag
+  frame's standpoint took FOUR iterations to find (a tree and an empty paddock, two
+  children behind an adult, a hut wall filling the screen), and a fresh run on the
+  other backend still wrote a frame with the chase pair NOT in it while every tag
+  check passed — so the aim is fragile in both suites, and a frame can miss its
+  subject without anything failing. The frame that carries the criterion is
+  additionally shot from beside a hut whose unlit side fills the picture's left
+  quarter: legible, but the standpoint is chosen by luck rather than by a rule.
+  The aim therefore belongs where the shutter can judge it — the subject
+  declaration (§7.2, point 375) names the PAIR, and the shutter refuses the frame
+  when it is not drawn, instead of the script hunting for a standpoint by hand.
   VERIFIABLE: pure Vitest that the fixed-wait rule flags this shape, and the
-  enrichments suite green on BOTH backends on a machine that is deliberately busy.
+  enrichments suite green on BOTH backends on a machine that is deliberately busy;
+  for the tag frame, a run whose standpoint misses the pair FAILS instead of
+  writing the frame.
 
 - [ ] 522. THE BURNING GRASS DOES NOT BURN (observed 05.08.2026 while closing point
   323). `verification/131-burning-grass.png` is the frame that proves the §19.9
