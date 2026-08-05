@@ -603,41 +603,59 @@ const stepUntil = async (ready, arg = null, capFrames = 240) => {
   // ray that sails PAST a smaller figure hits the ground far beyond it. Hence the
   // ratio is bounded on BOTH sides — "nothing in front" alone accepted a miss,
   // and a frame of a note over an empty patch of village was the result.
+  // Every position here is read LIVE: these figures WALK, and a probe cast at
+  // the spot one was standing on when the list was built misses it entirely
+  // once a loaded machine lets a second pass between. That stale target is what
+  // made this selection find nobody at all on a busy run.
   const STAND_BACK = 5
-  let speaker = null
-  let speakerIndex = -1
-  const probes = []
-  for (let i = 0; i < candidates.length; i++) {
+  /** Stand `STAND_BACK` in front of figure `i`, on the outward bearing, and
+   *  report what the frame draws at its chest. */
+  const aimAt = async (i) => {
     await page.evaluate(
-      ({ at, back }) => {
+      ({ idx, back }) => {
+        const figure = window.__speechProbeFigures?.[idx]
         const p = window.__placePlayer
+        if (!figure || !p) return
+        figure.updateWorldMatrix(true, false)
+        const e = figure.matrixWorld.elements
+        const at = { x: e[12], z: e[14] }
         // Stand between the settlement centre and the figure, looking OUTWARD:
         // the open village edge then lies behind the speaker instead of a hut
         // wall, so the note and the head under it read against the sky. Falls
         // back to the current bearing for a figure standing on the centre itself.
         const out = Math.hypot(at.x, at.z)
-        const ux = out > 1 ? at.x / out : (at.x - p.x) / (Math.hypot(at.x - p.x, at.z - p.z) || 1)
-        const uz = out > 1 ? at.z / out : (at.z - p.z) / (Math.hypot(at.x - p.x, at.z - p.z) || 1)
+        const len = Math.hypot(at.x - p.x, at.z - p.z) || 1
+        const ux = out > 1 ? at.x / out : (at.x - p.x) / len
+        const uz = out > 1 ? at.z / out : (at.z - p.z) / len
         p.x = at.x - ux * back
         p.z = at.z - uz * back
         p.pitch = 0
         // Place-camera yaw 0 looks toward -Z, so aim with the +PI complement.
         p.yaw = Math.atan2(at.x - p.x, at.z - p.z) + Math.PI
       },
-      { at: candidates[i], back: STAND_BACK },
+      { idx: i, back: STAND_BACK },
     )
     await nextFrames(2)
-    const hit = await page.evaluate((at) => {
-      if (!window.__placeRayHit) return null
-      // Chest height, so the ray meets the body cone rather than the head sphere.
-      const h = window.__placeRayHit(at.x, at.y + 1, at.z)
+    return page.evaluate((idx) => {
+      const figure = window.__speechProbeFigures?.[idx]
+      if (!figure || !window.__placeRayHit) return null
+      figure.updateWorldMatrix(true, false)
+      const e = figure.matrixWorld.elements
+      // Chest height, and against the figure's position NOW — it may have
+      // walked on since the pose was set.
+      const h = window.__placeRayHit(e[12], e[13] + 1, e[14])
       return { ratio: h.hitDistance == null ? null : h.hitDistance / h.targetDistance, name: h.hitName }
-    }, candidates[i])
+    }, i)
+  }
+  let speaker = null
+  let speakerIndex = -1
+  const probes = []
+  for (let i = 0; i < candidates.length && speakerIndex < 0; i++) {
+    const hit = await aimAt(i)
     probes.push(hit ? `${hit.ratio == null ? 'sky' : hit.ratio.toFixed(2)}@${hit.name}` : 'none')
     if (hit && hit.ratio !== null && hit.ratio >= 0.85 && hit.ratio <= 1.15) {
       speaker = candidates[i]
       speakerIndex = i
-      break
     }
   }
   check(
@@ -747,6 +765,10 @@ const stepUntil = async (ready, arg = null, capFrames = 240) => {
       !!afterEdit && afterEdit.reading === 'come here',
       JSON.stringify(afterEdit),
     )
+    // Re-aim before the shutter: the speaker has kept walking through the
+    // measurement, and the frame is the evidence that its note stands over ITS
+    // head — so the camera is put back in front of it, wherever it is now.
+    await aimAt(speakerIndex)
     // The subject is where the figure stands NOW — it may have walked on since
     // it was chosen — so the shutter judges the frame against the live anchor.
     const at = await page.evaluate((idx) => {
