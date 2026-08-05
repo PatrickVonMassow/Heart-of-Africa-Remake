@@ -4155,39 +4155,6 @@ Build order, chosen so no two parallel agents own the same file:
   walkable BOUNDARY, which is no longer a plain circle everywhere, and it reads
   that boundary from the one source the leave check uses — never a second constant.
 
-- [ ] 489. A FRAME MUST WAIT FOR THE PICTURE, NOT FOR THE CLOCK (measured
-  04.08.2026 while bringing the browser verification up on the Linux host). The
-  first frames a container run wrote showed the HUD over empty grey and were
-  accepted: the shutter proves its SUBJECT is in the picture (point 375), and a HUD
-  label is in the picture long before the world is. Measured with a probe: after
-  entering the travel scene the renderer climbs from 99 draw calls and 5.5k
-  triangles at 5 s to 222 and 745k at 30 s — the world streams roughly five times
-  slower here than on the hardware the suites' waits were written for, and a
-  screenshot taken meanwhile is green and empty.
-  TWO SUITES ARE MEASURED CASES, not one (05.08.2026): the `world` suite waited on a
-  healthy frame RATE, which an empty scene reaches FASTEST of all — it wrote a 47 kB
-  blank village frame and exited 0 — and `collision` wrote a blank
-  `52-collision-port-wall.png` the same way while reporting every check green. Both
-  are the same race, so the readiness wait belongs in the shared capture path rather
-  than in one suite.
-  FINAL STATE:
-  1. A frame whose subject is a place, a landmark or anything in the world waits
-     for the SCENE to be ready — the renderer's own draw-call and triangle counts
-     having stopped climbing — before the shutter opens, on every host and at
-     whatever speed that host reaches it. A HUD-only frame needs no such wait.
-  2. The wait is a polled condition with a generous timeout, never a fixed sleep
-     (`scripts/verify/fixedWaits.test.mjs` enforces that), and a frame that times
-     out fails loudly rather than being written half-drawn.
-  3. `verification/` is not regenerated from a host that cannot draw the reference
-     picture. Until this point lands, a container run's screenshots are restored,
-     not committed — they are evidence, and an empty one is a false one.
-  VERIFIABLE: pure Vitest on the readiness predicate (a rising count is not ready,
-  a settled one is, a never-settling one times out); live, a world frame taken
-  immediately after entering the scene contains the terrain rather than the
-  background — the case that silently passed today.
-
-
-
 - [ ] 491. QUEUE PROSE WRITTEN ONLY INTO THE HTML IS LOST ON THE NEXT REBUILD
   (measured 04.08.2026, and it cost the German text of thirteen cards). The
   Warteschlange is a PROJECTION: `scripts/board-queue.mjs` renders it from
