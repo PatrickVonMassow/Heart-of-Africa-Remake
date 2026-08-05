@@ -516,6 +516,61 @@ export interface BalanceConfig {
     /** Gifts paid to the traveler for one sold piece of gear. */
     sellGifts: number
   }
+  /** Village life vignettes (design.md §19.10). */
+  villageLife: {
+    /** The children's game of tag (work-order 480/351). */
+    tag: {
+      /** How many children play in a village at full seasonal presence. */
+      childCount: number
+      /** The chaser's flat-out pace (m/s) at a full reserve. */
+      sprintSpeed: number
+      /** The runner's top pace as a factor over the chaser's (> 1). */
+      runnerBoost: number
+      /** Cruise (trot) pace as a fraction of the sprint; at or below it the
+       *  reserve refills. */
+      trotFactor: number
+      /** The deliberate recovery pace, as a fraction of the sprint. */
+      recoverFactor: number
+      /** The pace a chase never falls below, as a fraction of the sprint. */
+      floorFactor: number
+      /** Reserve spent per second at the full sprint pace. */
+      drainPerSecond: number
+      /** Reserve refilled per second at or below the trot. */
+      recoverPerSecond: number
+      /** Low threshold: at or below it a child breaks off into recovery. */
+      breakOff: number
+      /** High threshold: at or above it a recovering child presses again. */
+      resume: number
+      /** A runner sprints while the chaser is this close. */
+      pressureDistance: number
+      /** A chaser presses only at a target within this reach. */
+      chaseReach: number
+      /** Inside this distance the chaser presses whatever the gap is doing. */
+      commitDistance: number
+      /** The small distance a catch happens within. */
+      catchDistance: number
+      /** How much nearer a candidate must be before the chaser switches to it. */
+      targetSwitchMargin: number
+      /** The freshly-tagged child's immunity against an instant re-tag. */
+      immunitySeconds: number
+      /** Backstop: one chaser's tenure before the group breaks off into idling. */
+      resolveCapSeconds: number
+      /** How long the group idles before starting again. */
+      idleSeconds: number
+      /** Time constant of the gap-trend ease (the burst cadence). */
+      trendTau: number
+      /** Gap trend at or below which the chaser opens a burst. */
+      trendEnter: number
+      /** Gap trend at or above which it breaks the burst off. */
+      trendLeave: number
+      /** Per-child spread of the RATES and the opening reserve (never a pace). */
+      variation: number
+      /** Seconds without real movement before a child is nudged free. */
+      unstuckSeconds: number
+      /** Forward lean (rad) at the full sprint. */
+      leanAtSprint: number
+    }
+  }
   /** Village speech and drums (design.md §13.4, docs/communication-poc-spec.md). */
   communication: {
     /** Constant pause between the atoms of a phrase — spoken and drummed alike. */
@@ -827,6 +882,42 @@ export const balance: BalanceConfig = {
   village: {
     giftPrices: { food: 1, medicine: 1, machete: 2, shovel: 2, rope: 1, canteen: 1 },
     sellGifts: 1,
+  },
+  villageLife: {
+    // The children's game of tag (design.md §19.10, work-order 480/351).
+    // Calibratable starting values (educated guess, CLAUDE.md §2), tuned so a
+    // pursuit is decided by a runner running out of steam within a quarter of
+    // the backstop cap, never by the cap itself.
+    tag: {
+      childCount: 4,
+      sprintSpeed: 3.4, // a child at a flat run, a little under an adult's sprint
+      // Strictly above 1: a FRESH runner must be faster than a fresh chaser (so
+      // a catch is never immediate) while a SPENT one sits at the shared floor
+      // (so a catch stays reachable) — and the drain follows the pace run, which
+      // is why the hunted child is the one that tires first.
+      runnerBoost: 1.12,
+      trotFactor: 0.5,
+      recoverFactor: 0.38,
+      floorFactor: 0.34, // winded, never frozen — a still child mid-game reads as a bug
+      drainPerSecond: 0.14,
+      recoverPerSecond: 0.06,
+      breakOff: 0.4, // deliberately above the reserve at which EITHER role's curve meets the trot
+      resume: 0.85,
+      pressureDistance: 11,
+      chaseReach: 14,
+      commitDistance: 2,
+      catchDistance: 0.8,
+      targetSwitchMargin: 1.5,
+      immunitySeconds: 1.4,
+      resolveCapSeconds: 45, // BACKSTOP per chaser tenure, not the mechanism
+      idleSeconds: 8,
+      trendTau: 0.6,
+      trendEnter: 0.02, // a steady chase trends at zero — the burst must still open
+      trendLeave: 0.12,
+      variation: 0.2,
+      unstuckSeconds: 1.5,
+      leanAtSprint: 0.28,
+    },
   },
   communication: {
     // Calibratable starting values (educated guess, CLAUDE.md §2). The pause is
