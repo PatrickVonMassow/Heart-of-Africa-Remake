@@ -306,6 +306,44 @@ export function buildRock(): THREE.BufferGeometry {
   return merge([r]) // through merge so it carries the (zero) foliage attribute
 }
 
+/**
+ * The erratic of the communication PoC (work-order 482): the same weathered
+ * rock as the dressing, but a single UPRIGHT block on a low foot of splinters —
+ * ~1.8 units across and ~3.2 tall, where the tallest dressing pile (a kopje at
+ * its largest instance scale) reaches ~1.9. It is meant to be recognised from a
+ * distance and mistaken for nothing else, which is why it differs in SHAPE
+ * (standing, not squatting) and not only in size. Built at the world scale the
+ * scene draws it at, so `world/communicationRock.ts`'s footprint and height are
+ * the mesh's own.
+ */
+export function buildErraticBoulder(): THREE.BufferGeometry {
+  const parts: THREE.BufferGeometry[] = []
+  // The standing block: a stretched dodecahedron, leant slightly off plumb so
+  // it reads as a fallen erratic rather than a placed pillar.
+  const block = new THREE.DodecahedronGeometry(0.62, 0)
+  block.scale(1.28, 2.5, 1.1)
+  block.rotateZ(0.13)
+  block.rotateY(0.4)
+  block.translate(0, 1.62, 0)
+  tint(block, '#7f776d', 0.11, 171)
+  parts.push(block)
+  // Splinters at its foot, the way a weathered block sheds them.
+  const foot = [
+    [0.42, 0.2, 0.2, 0.3],
+    [-0.4, 0.16, -0.18, 0.28],
+    [0.06, 0.14, -0.42, 0.24],
+  ] as const
+  foot.forEach(([x, y, z, r], i) => {
+    const chip = new THREE.DodecahedronGeometry(r, 0)
+    chip.scale(1, 0.68, 0.9)
+    chip.rotateY(i * 1.1)
+    chip.translate(x, y, z)
+    tint(chip, '#8a8178', 0.13, 174 + i)
+    parts.push(chip)
+  })
+  return merge(parts)
+}
+
 /** Baobab: massive bottle trunk with a sparse, flat branch crown. ~3 units. */
 export function buildBaobab(): THREE.BufferGeometry {
   const trunk = new THREE.CylinderGeometry(0.42, 0.62, 2.2, 8)

@@ -45,6 +45,7 @@ import { sampleTerrain, type TerrainType } from '../../world/terrain'
 import { REFINE_RING_MAX, chunkNeedsRefine, refinedSegments, setTerrainRefine } from './terrainLod'
 import { drainChunkQueue, orderChunkJobs, planChunkWindow, predictedNextCenter, type ChunkJob } from './terrainQueue'
 import { lakeDistance, riverDistance } from '../../world/geoIndex'
+import { communicationRockSite, ROCK_DRESSING_CLEARANCE, ROCK_VILLAGE_ID } from '../../world/communicationRock'
 import { LAKES } from '../../world/data/lakes'
 import { CULTURAL_LANDMARKS, ELEPHANT_GRAVEYARD, MOUNTAINS, NATURAL_SITES, WATERFALLS } from '../../world/data/landmarks'
 import { consumeTouchLook, consumeTouchPinch, moveAxes, onKeyPress, wheelTargetsScene } from '../../systems/input'
@@ -89,6 +90,7 @@ import {
   buildPalm,
   buildPapyrus,
   buildRock,
+  buildErraticBoulder,
   buildTermiteMound,
   splitFoliage,
 } from '../../render/flora'
@@ -1072,6 +1074,13 @@ export function placedFloraAt(ccx: number, ccz: number, i: number, seed: number)
     const w = latLonToWorld(p.lat, p.lon)
     if (Math.hypot(x - w.x, z - w.z) < 4) return null
   }
+  // The communication PoC's erratic must be UNMISTAKABLE against any other rock
+  // nearby (work-order 482), so the dressing keeps clear of it — decided HERE,
+  // in the one placement the renderer and the collider share, so the clearing
+  // can never drift apart from what is drawn.
+  const rock = communicationRockSite(seed)
+  const rw = latLonToWorld(rock.lat, rock.lon)
+  if (Math.hypot(x - rw.x, z - rw.z) < ROCK_DRESSING_CLEARANCE) return null
   const r4 = hashChunk(ccx, ccz, i * 4 + 3, seed)
   return { species, x, z, height: s.height, r4, roll }
 }
@@ -1136,7 +1145,10 @@ function evictFloraChunkCache(cx: number, cz: number, range: number): void {
  * LARGE collidable species only (small or sparse dressing never blocks — "no
  * getting stuck on a blade of grass", user decision, point 129).
  */
-function collidableFloraNear(px: number, pz: number, seed: number): Array<[number, number, number]> {
+// Exported for the collision tests (communicationRock.test.ts, which pins the
+// erratic's circle to the site the scene draws); not a component.
+// eslint-disable-next-line react/only-export-components
+export function collidableFloraNear(px: number, pz: number, seed: number): Array<[number, number, number]> {
   const out: Array<[number, number, number]> = []
   const pcx = Math.floor(px / CHUNK_SIZE)
   const pcz = Math.floor(pz / CHUNK_SIZE)
@@ -1150,6 +1162,14 @@ function collidableFloraNear(px: number, pz: number, seed: number): Array<[numbe
         out.push([placed.x, placed.z, baseR * (0.75 + placed.r4 * 0.55)])
       }
     }
+  }
+  // The erratic of the communication PoC is solid rock like the dressing it is
+  // built from, and its circle comes from the SAME site the scene draws it at
+  // (work-order 482) — never a second, hand-kept position.
+  const rock = communicationRockSite(seed)
+  const rw = latLonToWorld(rock.lat, rock.lon)
+  if (Math.abs(rw.x - px) <= QUERY + rock.radius && Math.abs(rw.z - pz) <= QUERY + rock.radius) {
+    out.push([rw.x, rw.z, rock.radius])
   }
   return out
 }
@@ -2030,6 +2050,72 @@ function ElephantGraveyard() {
   )
 }
 
+// The erratic's geometry, a module singleton like every other travel-scene
+// geometry (point 96): a fresh one per mount would re-link its shader program
+// on every return from a settlement.
+let erraticGeoCache: THREE.BufferGeometry | null = null
+function getErraticGeo(): THREE.BufferGeometry {
+  if (!erraticGeoCache) erraticGeoCache = buildErraticBoulder()
+  return erraticGeoCache
+}
+
+/**
+ * The communication PoC's landmark boulder (work-order 482, dug at in 487;
+ * docs/communication-poc-spec.md). The chief's drum message sends the player
+ * UPSTREAM along the river to "the big rock", so the rock is a real feature of
+ * the bird's-eye world — outside the village, standing alone on the Niger's
+ * bank, with the dressing cleared around it so nothing else can be mistaken for
+ * it. Position, footprint and dig spot all come from the ONE seeded site
+ * (world/communicationRock.ts), so the picture and the shovel cannot disagree.
+ *
+ * Drawn inside `travel-dressing`, with the trees and animals: like them it is
+ * travel-scale symbolism, and the settlement panorama (which captures the map
+ * landscape at person scale) would put a 30-km monolith on the horizon.
+ */
+function CommunicationRock() {
+  const seed = useGame((s) => s.seed)
+  const castShadow = useUi(effectiveFloraCastShadow)
+  const site = useMemo(() => {
+    const s = communicationRockSite(seed)
+    const p = latLonToWorld(s.lat, s.lon)
+    return { ...s, x: p.x, z: p.z, y: Math.max(0.2, sampleTerrain(s.lat, s.lon, seed).height) }
+  }, [seed])
+
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    const w = window as unknown as Record<string, unknown>
+    const village = placeById(ROCK_VILLAGE_ID)
+    w.__communicationRock = {
+      lat: site.lat,
+      lon: site.lon,
+      // The village the message is spoken in — the verification photographs
+      // both ends of the errand from this one hook.
+      village: { lat: village.lat, lon: village.lon },
+      x: site.x,
+      z: site.z,
+      y: site.y,
+      radius: site.radius,
+      height: site.height,
+      upstreamDeg: site.upstreamDeg,
+    }
+    return () => {
+      delete w.__communicationRock
+    }
+  }, [site])
+
+  return (
+    <mesh
+      geometry={getErraticGeo()}
+      material={LANDMARK_MATERIAL}
+      position={[site.x, site.y, site.z]}
+      rotation={[0, site.yaw, 0]}
+      castShadow={castShadow}
+      receiveShadow
+      dispose={null}
+    />
+  )
+}
+
 /**
  * Built cultural landmarks (design.md §4.4): the pyramids of Meroë, Great
  * Zimbabwe, the rock-hewn churches of Lalibela, the coastal ruins of Kilwa,
@@ -2893,6 +2979,7 @@ export function TravelScene() {
       <group name="travel-dressing">
         <Vegetation />
         <Wildlife />
+        <CommunicationRock />
       </group>
       {PLACES.map((p) => (
         <PlaceMarker key={p.id} place={p} />

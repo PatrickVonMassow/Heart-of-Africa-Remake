@@ -9,7 +9,8 @@ import { buildLayout, fenceColliders, type PlaceLayout, type Interactive, type D
 import { spawnPointFree, standingClear, WALKER_RADIUS } from './collision'
 import { ANIMAL_RADIUS, animalAnchors } from './animalSpots'
 import { closestOnPolyline } from './lanePlan'
-import { PLACES } from '../../world/geo'
+import { PLACES, placeById } from '../../world/geo'
+import { ROCK_VILLAGE_ID, ROCK_HEIGHT_UNITS, communicationRockSite } from '../../world/communicationRock'
 import { VILLAGE_PLANS } from './regionStyles'
 
 const SEEDS = [7, 42, 1337]
@@ -403,5 +404,72 @@ describe('animal anchors stand on free ground (point 413)', () => {
         ).toBe(true)
       }
     }
+  })
+})
+
+// The communication PoC's TWO stones (work-order 482, user 04.08.2026): a small
+// one INSIDE the PoC village, where the adults teach the word for a rock, and a
+// far bigger erratic OUTSIDE, upstream, where the message sends the player to
+// dig. The transfer between them is the puzzle, so the two must be clearly
+// different in size and distance — that difference is checked here, across both
+// layers, rather than trusted to two separate files staying in step.
+describe('the teaching stone in the PoC village (work-order 482)', () => {
+  it.each(SEEDS)('seed %i: stands in the open, inside the walkable area, on its own collider', (seed) => {
+    const layout = buildLayout(ROCK_VILLAGE_ID, seed)
+    const stone = layout.teachingStone
+    expect(stone, 'the PoC village always has its teaching stone').not.toBeNull()
+    if (!stone) return
+    const d = Math.hypot(stone.x, stone.z)
+    // Well inside the walkable disc and away from the very centre, so it is
+    // visible from the middle of the village and reachable on foot.
+    expect(d).toBeGreaterThan(6)
+    expect(d).toBeLessThan(layout.radius - stone.r - 2)
+    // Its collider is the drawn stone, and it is the ONLY collider there.
+    const own = layout.colliders.filter(
+      (c): c is { kind?: 'circle'; x: number; z: number; r: number } =>
+        (c.kind === undefined || c.kind === 'circle') &&
+        Math.hypot(c.x - stone.x, c.z - stone.z) < 0.01,
+    )
+    expect(own).toHaveLength(1)
+    expect(own[0].r).toBeCloseTo(stone.r, 6)
+    // Clear of every other solid body — a player must be able to walk up to it.
+    for (const body of solidBodies(layout, false)) {
+      expect(Math.hypot(body.x - stone.x, body.z - stone.z)).toBeGreaterThan(body.r + stone.r)
+    }
+    // A villager errand stands at it (the adults' pointing situations).
+    expect(layout.errands.some((e) => Math.hypot(e[0] - stone.x, e[1] - stone.z) < stone.r + 3)).toBe(true)
+  })
+
+  it('stands in the PoC village only — no other settlement grows one', () => {
+    for (const p of PLACES) {
+      if (p.id === ROCK_VILLAGE_ID) continue
+      expect(buildLayout(p.id, 42).teachingStone, p.id).toBeNull()
+    }
+  })
+
+  it('is markedly larger than the loose rock dressing around it', () => {
+    const layout = buildLayout(ROCK_VILLAGE_ID, 42)
+    const stone = layout.teachingStone
+    expect(stone).not.toBeNull()
+    if (!stone) return
+    // The scatter rocks run scale 0.3-1.0; the teaching stone is well above them
+    // so it reads as THE stone rather than one more pebble.
+    for (const [, , s] of layout.rocks) expect(stone.scale).toBeGreaterThan(s * 2)
+  })
+
+  it('is the SMALL near stone: the erratic upstream is bigger and a journey away', () => {
+    const layout = buildLayout(ROCK_VILLAGE_ID, 42)
+    const stone = layout.teachingStone
+    expect(stone).not.toBeNull()
+    if (!stone) return
+    const village = placeById(ROCK_VILLAGE_ID)
+    const rock = communicationRockSite(42)
+    // Size: the erratic is a block of the WORLD scale (1 unit ~ 11 km of map),
+    // the teaching stone a boulder of the settlement scale (metres) — different
+    // classes of object, compared through the constants both scenes draw from.
+    expect(ROCK_HEIGHT_UNITS * 1000).toBeGreaterThan(stone.scale)
+    // Distance: the teaching stone is a few steps away, the erratic a journey.
+    expect(Math.hypot(stone.x, stone.z)).toBeLessThan(layout.radius)
+    expect(Math.hypot(rock.lat - village.lat, rock.lon - village.lon)).toBeGreaterThan(1)
   })
 })

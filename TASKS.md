@@ -2253,11 +2253,12 @@ it is appended.
   below which the pace never falls while a chase runs — a child frozen mid-game reads as
   a bug, a trotting one reads as winded — and per-child variation in reserve and
   recovery, so the group never tires in unison.
-  HOW IT READS, given the figures the game has: the villagers are cones with sphere
-  heads and NO legs (only the fauna and the §2.5 silhouettes have a stride), so the
-  sprint cannot be shown by leg cadence. It is carried by SPEED and POSTURE — a forward
-  lean while sprinting, upright and near-still while recovering. Giving human figures
-  legs is NOT part of this point.
+  HOW IT READS, given the figures the game has: point 479 gave the running children
+  legs with a distance-driven gait, so the sprint reads through LEG CADENCE as well as
+  through SPEED and POSTURE — a forward lean while sprinting, upright and near-still
+  while recovering. All three carry it together; none of them alone is the signal, and
+  the posture reading stays load-bearing because it survives at any distance the cadence
+  no longer resolves at.
   USE THE WILDLIFE STEERING, NOT THE WALKER SLIDE. The village walkers resolve obstacles
   by sliding along a collider and stopping — which is exactly what reads as bumping into
   things. `deflectedStep` (`src/scenes/travel/wildlifeBehavior.ts`, used by every fleeing
@@ -4196,6 +4197,12 @@ Build order, chosen so no two parallel agents own the same file:
   triangles at 5 s to 222 and 745k at 30 s — the world streams roughly five times
   slower here than on the hardware the suites' waits were written for, and a
   screenshot taken meanwhile is green and empty.
+  TWO SUITES ARE MEASURED CASES, not one (05.08.2026): the `world` suite waited on a
+  healthy frame RATE, which an empty scene reaches FASTEST of all — it wrote a 47 kB
+  blank village frame and exited 0 — and `collision` wrote a blank
+  `52-collision-port-wall.png` the same way while reporting every check green. Both
+  are the same race, so the readiness wait belongs in the shared capture path rather
+  than in one suite.
   FINAL STATE:
   1. A frame whose subject is a place, a landmark or anything in the world waits
      for the SCENE to be ready — the renderer's own draw-call and triangle counts
@@ -4521,6 +4528,43 @@ Build order, chosen so no two parallel agents own the same file:
   5. Nothing in the verification's default path changes for a reader who does not
      opt in: the software WebGPU lane keeps working exactly as it does today while
      this point runs, so the both-backend picture check is never interrupted by it.
+  6. THE FLAG SET COMES FIRST, and it is free. Google's own recipe for hardware
+     WebGPU in headless Chrome on Linux is `--no-sandbox --headless=new
+     --use-angle=vulkan --enable-features=Vulkan --disable-vulkan-surface
+     --enable-unsafe-webgpu`. `--disable-vulkan-surface` turns off the
+     `VK_KHR_surface` instance extension that headless has no display for — the
+     plausible seat of the reproduced >40 s adapter hang — and it appears NOWHERE in
+     this repository (checked 05.08.2026), while the lane pins software outright
+     (`--use-angle=swiftshader --use-vulkan=swiftshader`, `launch-args-core.mjs`).
+     The hardware attempt therefore ran WITHOUT the flag the recipe requires.
+     `--use-vulkan=native` and `--use-webgpu-adapter=default` are unused too. This
+     axis costs no download and is tried before any build is fetched.
+  7. The axes are ranked by what the evidence says, cheapest and likeliest first:
+     the flag set (item 6); then a newer Chrome channel — the host carries only the
+     151 build that declines, while Chrome for Testing (Beta 152, Dev 153, Canary
+     153) and `dl.google.com/linux/chrome/deb` both answer from the container, so
+     the download path is open. That version axis is the WEAKEST, and the point says
+     so rather than spending on it first: the installed dzn ICD declares
+     `api_version 1.1.305` — Vulkan 1.1, measured in the container — and Dawn
+     silently skips a driver whose feature set falls short, which is exactly the
+     observed one-second fall back to SwiftShader with dzn as the only ICD (a
+     pre-emptive refusal, not a failed initialisation). A newer Dawn demands more,
+     not less. There is NO native NVIDIA Vulkan ICD on this host, so Dozen is the
+     only Vulkan path to the card at all.
+  8. A second ENGINE is NOT a way around dzn, and the point does not spend on it:
+     Firefox/wgpu does go through the system Vulkan loader, but that loader serves
+     the same Dozen, so it inherits the same ceiling — and Mozilla expects WebGPU on
+     Linux only in 2026, behind flags. Worth knowing for its own sake, and recorded
+     here so it is not re-derived: the suites themselves are barely Chromium-bound
+     (of 55 verify scripts exactly one uses CDP, and it is already the documented
+     WebGL2-only skip), so the coupling is `launch-args-core.mjs` and
+     `system-chrome.mjs` alone.
+  9. The one axis that bypasses Dozen entirely is named with its price, and is a
+     LAST resort: `chromium.connectOverCDP()` to a Chrome on the WINDOWS host, where
+     WebGPU runs natively on D3D12 with the 4070 Ti. It costs CDP fidelity, needs the
+     dev server reachable from the host, and hangs the lane on a browser OUTSIDE the
+     container — which contradicts the batch's headless autonomy. It is taken only if
+     items 6–7 fail, and the contradiction is stated in the verdict either way.
   VERIFIABLE: `node scripts/verify/backend-lane-check.mjs` on the WebGPU lane
   prints the device that actually drew the frame, and the picture of one built
   scene is inspected once; the host-environment section lists every build tried
@@ -4594,3 +4638,24 @@ Build order, chosen so no two parallel agents own the same file:
   case proves a suite that loses its device reports the loss as its failure
   rather than a truncated pass; and `VERIFY_GL=webgpu npm test -- invariants`
   either completes on this host or names the device loss as its verdict.
+
+- [ ] 508. EACH NOW-CARD IS JUDGED BY ITS OWN NUMBER (measured 05.08.2026, bundle
+  Chat & Tafel). `parseNowCard` in `scripts/queue-order-guard-core.mjs` cuts the
+  WHOLE "Woran ich gerade arbeite" section out as ONE text and files it under the
+  FIRST card's number. Several now-cards at once are explicitly allowed (one per
+  point in active work), so every word in any of them is charged to the first: today
+  "Fertig ist der Weltteil" in the 482 card blocked the turn end with the message
+  that the 485 card claimed completion, and the topic guard reported 482 for a
+  cross-reference that stood in a different card. A guard that names the wrong card
+  sends the session to edit correct text, which is worse than not firing.
+  FINAL STATE:
+  1. The section is split per `<details class="now">`, and every now-card is judged
+     against its OWN point number — by the done-claim check, the card-topic check
+     and the conciseness check alike.
+  2. A card without a recognisable number is reported as such, never silently
+     merged into its neighbour.
+  3. The guards keep failing open on an unparseable board.
+  VERIFIABLE: pure Vitest on a board with three now-cards where only the SECOND
+  carries a done-claim, a cross-point mention and an over-long paragraph — each
+  finding must name the second card's point, and a single-now-card board must behave
+  exactly as it does today.

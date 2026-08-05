@@ -82,7 +82,12 @@ post pipeline), geometry last — the cuts that only genuinely weak GPUs feel.
   so the plant instance count falls quadratically (`floraStreaming.ts`). Low
   tightens it to 0.55.
 - **`floraCastShadow`** — Whether ground flora (bush / papyrus / rock) casts sun
-  shadows. Off on low.
+  shadows. Off on low. The communication PoC's erratic boulder (work-order 482)
+  is rock dressing too and rides this same lever rather than inventing a lever
+  of its own — it is one mesh, so a separate geometry knob would move nothing
+  measurable. Its village counterpart, the teaching stone, is drawn inside a
+  settlement and follows the place scene's `sunShadows` like every other prop
+  there.
 - **`weatherIntensity`** — Atmospheric haze/rain intensity factor (`1` = full);
   low thins the pall to 0.6 so fewer full-screen fragments are shaded
   (design.md §19.13).

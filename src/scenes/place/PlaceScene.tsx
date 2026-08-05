@@ -82,7 +82,7 @@ import {
 import { REGION_PLACE_STYLES, type RegionPlaceStyle } from './regionStyles'
 import { PlaceLife } from './PlaceLife'
 import { resolveMove } from './collision'
-import { buildLayout, isOnLane, nearestActionable, PLACE_RADIUS, SPAWN_INSET, type Interactive, type PathDef, type DwellingDef, type FenceDef } from './layout'
+import { buildLayout, isOnLane, nearestActionable, PLACE_RADIUS, SPAWN_INSET, type Interactive, type PathDef, type DwellingDef, type FenceDef, type PlaceLayout } from './layout'
 import { getPanoramaCapture } from '../travel/panoramaCapture'
 import {
   silhouetteScale,
@@ -1146,6 +1146,31 @@ function GroundScatter({
       <instancedMesh ref={tuftMesh} args={[tuftGeo, material, 96]} receiveShadow frustumCulled={false} />
       <instancedMesh ref={rockMesh} args={[rockGeo, material, 20]} castShadow receiveShadow frustumCulled={false} />
     </>
+  )
+}
+
+/**
+ * The teaching stone (work-order 482, docs/communication-poc-spec.md): ONE
+ * boulder standing in the open of the PoC village. It is deliberately a small,
+ * near stone — the erratic the chief's drum message sends the player to is a
+ * much larger block far upstream, and making that transfer is the puzzle. Its
+ * position and radius are the layout's, so the drawn stone and its collider are
+ * the same object (points 129/378).
+ */
+function TeachingStone({ stone }: { stone: PlaceLayout['teachingStone'] }) {
+  const geo = useMemo(() => buildRock(), [])
+  if (!stone) return null
+  return (
+    <mesh
+      geometry={geo}
+      position={[stone.x, 0, stone.z]}
+      rotation={[0, stone.x * 1.7 + stone.z, 0]}
+      scale={stone.scale}
+      castShadow
+      receiveShadow
+    >
+      <meshStandardMaterial vertexColors roughness={0.95} />
+    </mesh>
   )
 }
 
@@ -2494,6 +2519,12 @@ export function PlaceScene() {
       <PlaceFlora slots={layout.flora} style={sandy ? REGION_PLACE_STYLES.north : style} material={floraMaterial} geos={floraGeos} />
 
       <GroundScatter placeId={place.id} seed={seed} isPort={sandy} grassFactor={style.grass} rocks={layout.rocks} radius={layout.radius} />
+
+      {/* The communication PoC's teaching stone (work-order 482): the boulder in
+          the open the adults teach the word for a rock at. Drawn from the same
+          rock dressing as the scatter, at its own bigger scale, exactly at the
+          layout position its collider comes from. */}
+      <TeachingStone stone={layout.teachingStone} />
 
       {/* Ambient settlement life — ports and villages only; a monument has its
           own sparse crowd (above) and no bustle/hints. */}
