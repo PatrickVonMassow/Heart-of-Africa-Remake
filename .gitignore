@@ -63,6 +63,12 @@ scripts/.tile-cache
 .claude/chat-watcher.json.tmp-*
 .claude/chat-reply-receipt.json
 .claude/chat-reply-receipt.json.tmp-*
+# The isolated worktrees delegated agents are given. They are CHECKOUTS of this
+# same repository, so git already tracks their content on their own branches —
+# but the directory itself is untracked, and batch-doctor reads any untracked
+# path in the shared tree as unattributable work from a parallel session and
+# plans to quarantine it. It is tooling state, not authorship.
+.claude/worktrees/
 .claude/dashboard-state.json
 .claude/current-focus.json
 .claude/focus-check-pending.json
