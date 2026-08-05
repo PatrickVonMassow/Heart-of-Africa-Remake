@@ -493,6 +493,32 @@ describe('capturePixels budgets the pixel probe', () => {
     )
     await expect(capturePixels(page, 'campfire light contrast')).rejects.toThrow(/Timeout 30000ms exceeded/)
   })
+
+  // The four-eyes review (06.08.2026) found the pinned constant guarded and the
+  // per-site OVERRIDE not: a call site could still hand in Playwright's "no
+  // deadline", which is the hang the budget exists to bound.
+  it('refuses a per-site override that switches the deadline off', async () => {
+    const calls = []
+    await expect(capturePixels(fakePage(calls), 'TRAA mean luma', { timeout: 0 })).rejects.toThrow(
+      /disables the deadline/,
+    )
+    await expect(capturePixels(fakePage(calls), 'TRAA mean luma', { timeout: -1 })).rejects.toThrow(
+      /disables the deadline/,
+    )
+    expect(calls, 'no capture is taken with a disabled deadline').toHaveLength(0)
+  })
+
+  // A crash is not a slow machine. Retelling it as "the machine, not the product"
+  // would send the reader after the wrong cause, so only a budget failure is retold.
+  it('rethrows a non-timeout failure untouched, call log and all', async () => {
+    const crash = new Error('page.screenshot: Target page, context or browser has been closed\n  call log:\n  - x')
+    const page = {
+      screenshot: async () => {
+        throw crash
+      },
+    }
+    await expect(capturePixels(page, 'campfire light contrast')).rejects.toBe(crash)
+  })
 })
 
 // THE GATE: no verify script may write a frame that declared no subject. Runs in

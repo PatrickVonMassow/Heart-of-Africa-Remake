@@ -296,13 +296,27 @@ export async function captureFrame(page, outDir, name, decl, { timeout = DEFAULT
  * timeout thrown thousands of lines from the check that was running.
  */
 export async function capturePixels(page, site, { clip, locator, timeout = CAPTURE_BUDGET_MS } = {}) {
+  // A per-site override may raise or lower the budget, but never REMOVE it:
+  // Playwright reads `timeout: 0` as "no deadline", which is precisely the hang
+  // this helper exists to bound (four-eyes review 06.08.2026 — the constant was
+  // pinned against 0, the override was not).
+  if (!(timeout > 0)) {
+    throw new Error(
+      `pixel probe "${site}": timeout ${timeout} disables the deadline — the capture budget may be ` +
+        'raised or lowered per site, never switched off (scripts/verify/frameSubject.mjs).',
+    )
+  }
   const options = clip ? { clip, timeout } : { timeout }
   const started = Date.now()
   try {
     return locator ? await page.locator(locator).screenshot(options) : await page.screenshot(options)
   } catch (error) {
-    const waited = ((Date.now() - started) / 1000).toFixed(1)
+    // Only a BUDGET failure is retold as one. A page crash or a closed target is
+    // a different fact, and calling it "the machine, not the product" would send
+    // the reader after the wrong cause — it is rethrown untouched, call log and all.
     const reason = error && error.message ? error.message.split('\n')[0] : String(error)
+    if (!/timeout/i.test(reason)) throw error
+    const waited = ((Date.now() - started) / 1000).toFixed(1)
     throw new Error(
       `pixel probe "${site}": the verification harness allowed the capture ${Math.round(timeout / 1000)} s ` +
         `and no pixels arrived (waited ${waited} s${clip ? `, clip ${clip.width}x${clip.height}` : ''}` +
