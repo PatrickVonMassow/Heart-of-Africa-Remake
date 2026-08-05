@@ -4705,3 +4705,23 @@ Build order, chosen so no two parallel agents own the same file:
   carries a done-claim, a cross-point mention and an over-long paragraph — each
   finding must name the second card's point, and a single-now-card board must behave
   exactly as it does today.
+
+- [ ] 509. NO INHABITANT STANDS ON THE SETTLEMENT ORIGIN (observed 05.08.2026 while
+  verifying another point, bundle Dorfleben). In `maasai-village` several
+  `inhabitant` groups report the world position exactly `(0,0,0)`. A ray probe finds
+  a body cone there, so figures ARE being drawn at the origin — either stacked on
+  one another or left at an uninitialised transform. Point 155 closed the
+  stuck-walker case; this is the other failure of the same layer, and an exact zero
+  is the signature of a placement that never happened rather than one that went
+  wrong.
+  FINAL STATE:
+  1. Every inhabitant of every settlement stands at the spot its layout assigns it;
+     none reports the settlement origin unless its layout genuinely places it there.
+  2. Whatever produced the exact zero is fixed at its source, not by nudging the
+     figure away afterwards.
+  3. The dev-mode assert channel reports an inhabitant at an unplaced transform, so
+     the next occurrence is caught by any run rather than by a passing observation.
+  VERIFIABLE: a browser check over every settlement asserts no inhabitant's world
+  position sits within a small radius of the origin while its layout anchor lies
+  elsewhere; a Vitest case pins the placement function against the uninitialised
+  case that produced the zero.
