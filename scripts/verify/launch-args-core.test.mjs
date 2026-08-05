@@ -6,13 +6,16 @@ import {
   WEBGPU_UNAVAILABLE,
   angleBackend,
   galliumDriver,
+  glChainProbePaths,
   laneEnv,
+  linuxWebgpuArgs,
   systemChromeCandidates,
   verifyLaunchOptions,
   webglLaunchOptions,
   webgpuLaneVerdict,
   webgpuLaunchOptions,
 } from './launch-args-core.mjs'
+import { hasHardwareGlChain } from './system-chrome.mjs'
 import { coveringRun } from '../render-verify-core.mjs'
 
 /** The exact WebGL 2 argument list Windows launched with before point 475. Frozen
@@ -39,16 +42,35 @@ const WEBGPU_LAUNCH = {
   args: ['--headless=new', '--enable-unsafe-webgpu', '--enable-gpu'],
 }
 
-/** The Linux WebGPU lane adds what a driverless host needs before a frame DRAWS
- *  (point 493). Frozen here rather than derived: all three were measured, and a
- *  quietly dropped one takes the picture with it while every interface still answers. */
-const LINUX_WEBGPU_ARGS = [
+/** The Linux WebGPU FALLBACK lane: what a host without the GL chain needs before a frame
+ *  DRAWS at all (point 493). Frozen here rather than derived: all three were measured, and
+ *  a quietly dropped one takes the picture with it while every interface still answers.
+ *  It is no longer the default — it is what remains when the chain is absent. */
+const LINUX_WEBGPU_SOFTWARE_ARGS = [
   '--headless=new',
   '--enable-unsafe-webgpu',
   '--enable-gpu',
   '--use-angle=swiftshader',
   '--enable-features=Vulkan',
   '--use-vulkan=swiftshader',
+  '--ignore-gpu-blocklist',
+  '--disable-dev-shm-usage',
+  '--no-sandbox',
+]
+
+/** The Linux WebGPU lane WITH the GL chain (point 505): Dawn's OpenGLES backend on the
+ *  same Mesa-d3d12 chain the WebGL 2 lane rides, measured at 103.7 renderer calls per
+ *  second against the software lane's 15.3 and 487 KB frames against 29 KB. Frozen, all
+ *  four: without --force-webgpu-compat Chrome refuses the GLES adapter outright, and
+ *  without --use-webgpu-adapter=opengles Dawn goes back to looking for Vulkan. */
+const LINUX_WEBGPU_GLES_ARGS = [
+  '--headless=new',
+  '--enable-unsafe-webgpu',
+  '--enable-gpu',
+  '--use-gl=angle',
+  '--use-angle=gl',
+  '--use-webgpu-adapter=opengles',
+  '--force-webgpu-compat',
   '--ignore-gpu-blocklist',
   '--disable-dev-shm-usage',
   '--no-sandbox',
@@ -178,7 +200,7 @@ describe('webgpuLaunchOptions', () => {
   it('carries the driver flags a Linux host needs to DRAW, and only there', () => {
     // Point 493: without these the lane reports WebGPU and paints nothing —
     // "Instance dropped in popErrorScope", a black canvas under a live HUD.
-    expect(webgpuLaunchOptions('/usr/bin/google-chrome', 'linux').args).toEqual(LINUX_WEBGPU_ARGS)
+    expect(webgpuLaunchOptions('/usr/bin/google-chrome', 'linux').args).toEqual(LINUX_WEBGPU_SOFTWARE_ARGS)
     for (const flag of ['--use-angle=swiftshader', '--enable-features=Vulkan', '--use-vulkan=swiftshader']) {
       expect(webgpuLaunchOptions(null, 'win32').args).not.toContain(flag)
       expect(webgpuLaunchOptions(null, 'darwin').args).not.toContain(flag)
@@ -211,20 +233,110 @@ describe('webgpuLaunchOptions', () => {
   })
 })
 
+describe('the Linux WebGPU lane picks its path by the GL chain (point 505)', () => {
+  it("rides Dawn's OpenGLES backend where the chain is installed", () => {
+    expect(webgpuLaunchOptions('/usr/bin/google-chrome', 'linux', undefined, undefined, true).args).toEqual(
+      LINUX_WEBGPU_GLES_ARGS,
+    )
+  })
+
+  it('keeps the software flags where it is not — the fallback, unchanged', () => {
+    expect(webgpuLaunchOptions('/usr/bin/google-chrome', 'linux', undefined, undefined, false).args).toEqual(
+      LINUX_WEBGPU_SOFTWARE_ARGS,
+    )
+  })
+
+  it('defaults to the software path — an unasked question is never answered "hardware"', () => {
+    expect(webgpuLaunchOptions('/usr/bin/google-chrome', 'linux').args).toEqual(LINUX_WEBGPU_SOFTWARE_ARGS)
+  })
+
+  it('never mixes the two chains — each flag belongs to exactly one lane', () => {
+    // Both at once is the failure mode that costs the picture silently: ANGLE pinned to
+    // SwiftShader while Dawn is told to take the GL chain leaves the two stacks
+    // disagreeing, which is precisely the black canvas of point 493.
+    expect(linuxWebgpuArgs(true)).not.toContain('--use-angle=swiftshader')
+    expect(linuxWebgpuArgs(true)).not.toContain('--use-vulkan=swiftshader')
+    expect(linuxWebgpuArgs(false)).not.toContain('--use-webgpu-adapter=opengles')
+    expect(linuxWebgpuArgs(false)).not.toContain('--force-webgpu-compat')
+  })
+
+  it('carries the compat flag on the GLES path — without it Chrome refuses the adapter', () => {
+    expect(linuxWebgpuArgs(true)).toContain('--force-webgpu-compat')
+    expect(linuxWebgpuArgs(true)).toContain('--use-webgpu-adapter=opengles')
+  })
+
+  it('leaves Windows and macOS byte for byte whatever the chain answer is', () => {
+    for (const platform of ['win32', 'darwin']) {
+      for (const chain of [true, false, undefined]) {
+        expect(webgpuLaunchOptions(null, platform, undefined, undefined, chain)).toEqual({
+          channel: 'chrome',
+          args: WEBGPU_LAUNCH.args,
+        })
+      }
+    }
+  })
+
+  it('leaves the WebGL 2 lane untouched — the chain answer steers the WebGPU lane only', () => {
+    expect(verifyLaunchOptions('webgl', 'linux', undefined, null, undefined, undefined, true)).toEqual({
+      args: LINUX_WEBGL_ARGS,
+    })
+  })
+
+  it('routes the chain answer through verifyLaunchOptions to the webgpu lane', () => {
+    expect(verifyLaunchOptions('webgpu', 'linux', undefined, '/usr/bin/chromium', undefined, undefined, true)).toEqual({
+      executablePath: '/usr/bin/chromium',
+      args: LINUX_WEBGPU_GLES_ARGS,
+    })
+  })
+})
+
+describe('glChainProbePaths / hasHardwareGlChain', () => {
+  it('names both libraries ANGLE dlopens, each with its loader alternatives', () => {
+    const groups = glChainProbePaths('linux')
+    expect(groups).toHaveLength(2)
+    expect(groups[0].some((p) => p.endsWith('/libGL.so.1'))).toBe(true)
+    expect(groups[1].some((p) => p.endsWith('/libEGL.so.1'))).toBe(true)
+    expect(groups.every((g) => g.length > 1)).toBe(true) // more than one loader directory
+  })
+
+  it('probes nothing off Linux — no other platform routes a lane through Mesa', () => {
+    expect(glChainProbePaths('win32')).toEqual([])
+    expect(glChainProbePaths('darwin')).toEqual([])
+    expect(hasHardwareGlChain('win32', () => true)).toBe(false)
+    expect(hasHardwareGlChain('darwin', () => true)).toBe(false)
+  })
+
+  it('answers yes only when EVERY library is found somewhere', () => {
+    expect(hasHardwareGlChain('linux', () => true)).toBe(true)
+    expect(hasHardwareGlChain('linux', () => false)).toBe(false)
+    // libGL alone is not the chain: ANGLE needs the EGL side too.
+    expect(hasHardwareGlChain('linux', (p) => p.endsWith('libGL.so.1'))).toBe(false)
+  })
+
+  it('accepts a library found in any ONE of the loader directories', () => {
+    const last = new Set(glChainProbePaths('linux').map((group) => group[group.length - 1]))
+    expect(hasHardwareGlChain('linux', (p) => last.has(p))).toBe(true)
+  })
+
+  it('answers a boolean on the real host, whatever this machine has installed', () => {
+    expect(typeof hasHardwareGlChain('linux')).toBe('boolean')
+  })
+})
+
 describe('verifyLaunchOptions', () => {
   it('routes the webgpu lane to the unchanged system-Chrome launch on BOTH platforms', () => {
     expect(verifyLaunchOptions('webgpu', 'win32')).toEqual(WEBGPU_LAUNCH)
-    expect(verifyLaunchOptions('webgpu', 'linux')).toEqual({ channel: 'chrome', args: LINUX_WEBGPU_ARGS })
+    expect(verifyLaunchOptions('webgpu', 'linux')).toEqual({ channel: 'chrome', args: LINUX_WEBGPU_SOFTWARE_ARGS })
   })
 
   it('is not diverted by an ANGLE override — VERIFY_ANGLE steers the WebGL 2 lane only', () => {
-    expect(verifyLaunchOptions('webgpu', 'linux', 'gl').args).toEqual(LINUX_WEBGPU_ARGS)
+    expect(verifyLaunchOptions('webgpu', 'linux', 'gl').args).toEqual(LINUX_WEBGPU_SOFTWARE_ARGS)
   })
 
   it('carries the probed browser through to the webgpu lane', () => {
     expect(verifyLaunchOptions('webgpu', 'linux', undefined, '/usr/bin/chromium')).toEqual({
       executablePath: '/usr/bin/chromium',
-      args: LINUX_WEBGPU_ARGS,
+      args: LINUX_WEBGPU_SOFTWARE_ARGS,
     })
   })
 
@@ -257,7 +369,10 @@ describe('systemChromeCandidates', () => {
     const candidates = systemChromeCandidates('linux')
     expect(candidates).toContain('chromium')
     for (const candidate of candidates) {
-      expect(webgpuLaunchOptions(candidate, 'linux')).toEqual({ executablePath: candidate, args: LINUX_WEBGPU_ARGS })
+      expect(webgpuLaunchOptions(candidate, 'linux')).toEqual({
+        executablePath: candidate,
+        args: LINUX_WEBGPU_SOFTWARE_ARGS,
+      })
     }
   })
 

@@ -16,8 +16,9 @@
 //   node scripts/verify/backend-lane-check.mjs
 import { chromium } from 'playwright'
 import { laneRenderers, softwareRendererVerdict } from './backend-lane-core.mjs'
+import { featureLevelOf } from '../render-verify-core.mjs'
 import { launchServer, killTree } from './_server.mjs'
-import { findSystemChrome } from './system-chrome.mjs'
+import { findSystemChrome, hasHardwareGlChain } from './system-chrome.mjs'
 
 const SOFTWARE_HINTS = ['swiftshader', 'llvmpipe', 'softpipe', 'lavapipe']
 
@@ -38,8 +39,14 @@ function readLane() {
   return new Promise((resolve) => {
     requestAnimationFrame(() => {
       const renderer = window.__renderer
+      const device = renderer?.backend?.device
       const out = {
         isWebGPU: renderer?.backend?.isWebGPUBackend === true,
+        // The FEATURE LEVEL the lane came up at (point 505) — the third signal beside
+        // backend and pixel, since a compat adapter draws a real picture and reports
+        // hardware-like strings while running a code path the player never enters.
+        compatibilityMode: renderer?.backend?.compatibilityMode === true,
+        coreFeatures: device?.features ? device.features.has('core-features-and-limits') : null,
         calls: renderer?.info?.render?.calls ?? 0,
         renderTargets: renderer?.info?.memory?.renderTargets ?? 0,
         colours: 0,
@@ -164,7 +171,13 @@ function laneFaults(got, wantWebGPU) {
 }
 
 const systemChrome = findSystemChrome(process.platform)
-const lanes = laneRenderers(systemChrome, process.platform, process.env, process.env.VERIFY_GALLIUM)
+const lanes = laneRenderers(
+  systemChrome,
+  process.platform,
+  process.env,
+  process.env.VERIFY_GALLIUM,
+  hasHardwareGlChain(process.platform),
+)
 const { child, base } = await launchServer('npm run dev', 'dev', process.cwd())
 let failed = false
 
@@ -188,11 +201,19 @@ try {
       SOFTWARE_HINTS,
     )
     const device = wantWebGPU ? `adapter=${JSON.stringify(got.adapter)}` : `renderer="${got.renderer ?? 'none'}"`
+    // Named, never inferred: a compat lane is REAL WebGPU on real hardware and still no
+    // proof about the player's core path (point 505).
+    const level = wantWebGPU ? featureLevelOf(got) : null
     console.log(
       `${faults.length === 0 ? 'PASS' : 'FAIL'}  ${lane.name.padEnd(6)} ${device}` +
         `  colours=${got.colours}` +
+        `${wantWebGPU ? `  level=${level ?? 'unreadable'}` : ''}` +
         `${verdict.software ? '  [SOFTWARE RASTERISER — the picture is right, the clock is not]' : ''}`,
     )
+    if (level === 'compatibility') {
+      console.log('        · WebGPU COMPATIBILITY, not core: three.js runs its compat branches and drops MSAA here,')
+      console.log('          which the player never does. Real coverage of the WebGPU lane, not of the core path.')
+    }
     for (const fault of faults) console.log(`        · ${fault}`)
     if (faults.length > 0) failed = true
   }
