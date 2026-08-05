@@ -444,7 +444,14 @@ await page
   .waitForFunction((want) => window.__game.getState().placeId === want && !!window.__placeLayout, 'bambara-village', { timeout: 30000 })
   .catch(() => {})
 await page.evaluate(() => window.__game.getState().setJournalOpen(false))
-await page.waitForTimeout(400)
+// Wait on the CONDITION the pause stood for — the journal actually gone from the
+// DOM — and then on the app's own clock for the frame that redraws without it
+// (CLAUDE.md §7.2: never a wall-clock guess, which is too short on a loaded host
+// and wasted time on a quiet one).
+await page
+  .waitForFunction(() => !window.__game.getState().journalOpen && !document.querySelector('.journal'), null, { timeout: 8000 })
+  .catch(() => {})
+await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(null)))))
 const teachingStone = await page.evaluate(() => window.__placeLayout.teachingStone ?? null)
 check('PoC village: the teaching stone is in the layout', !!teachingStone, JSON.stringify(teachingStone))
 if (teachingStone) {
