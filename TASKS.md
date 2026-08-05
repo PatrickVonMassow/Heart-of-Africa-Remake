@@ -4655,3 +4655,33 @@ Build order, chosen so no two parallel agents own the same file:
      is never mistaken for a green one.
   VERIFIABLE: a deliberately red push to a throwaway `feat/` branch produces a run
   and no mail; the same failure on `main` still mails; the rescue path still does.
+
+- [ ] 514. THE COMPATIBILITY LANE HAS TWO REDS THE WEBGL LANE DOES NOT (measured
+  05.08.2026 on `main`, both lanes run minutes apart on the same machine, right
+  after the lane moved onto the card in point 505). `enrichments` on the WebGPU
+  compatibility lane died twice for different reasons — run 1 after 157 green
+  checks with `page.evaluate: TypeError: Cannot read properties of undefined
+  (reading 'herdsRef')`, i.e. `window.__wildlife` was gone at the moment of
+  access; run 2 with `frame 72-water-victoria-falls — its subject is not in the
+  rendered picture`. The SAME suite on WebGL 2, twice, showed neither: 244 pass
+  and only the measures-nothing dressing flake point 200 already lists. The lane
+  is now the project's second evidence lane, so its own faults have to be
+  separated from the product's.
+  FINAL STATE:
+  1. Each of the two is CLASSIFIED, on a quiet machine, as either a lane fault or
+     a product defect — the suspicion is recorded so nobody re-derives it: the
+     dev hook is deleted on unmount and the compat lane builds the scene on a
+     different schedule, so the access may fall into a window the suite does not
+     wait through; and the falls frame may sit differently because compat forces
+     MSAA off.
+  2. What turns out to be the suite's own timing is fixed at the READINESS, not
+     with a longer wait: the access waits for the hook the same way the boot
+     sequence does.
+  3. What turns out to be a product difference between the feature levels is
+     stated in `docs/host-environment.md`, so a reader knows which lane can carry
+     which verdict.
+  4. Nothing here weakens the shutter: a frame whose subject is not in the picture
+     stays a failure — the point fixes the cause, never the assertion.
+  VERIFIABLE: `enrichments` runs green twice in a row on the compatibility lane on
+  a quiet machine, or the host-environment section names the difference that makes
+  it structurally impossible there.
