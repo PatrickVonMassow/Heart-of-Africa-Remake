@@ -10,6 +10,7 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { DebugMenu } from './DebugMenu'
 import { balance } from '../config/balance'
 import { EDGE_BAND_MAX_WANDER_M } from '../render/edgeBand'
+import { STAIN_MAX_IRREGULARITY } from '../render/groundStains'
 import { en } from '../i18n/en'
 import { de } from '../i18n/de'
 import { useLocale } from '../i18n'
@@ -63,6 +64,8 @@ const DEFAULTS = {
   edgeBandWidth: balance.placeEdgeBand.widthM,
   edgeBandWander: balance.placeEdgeBand.wanderM,
   edgeBandStrength: balance.placeEdgeBand.strength,
+  bloodStainSize: balance.bloodStain.sizeScale,
+  bloodStainIrregularity: balance.bloodStain.irregularity,
   placeStrafeFactor: balance.placeStrafeFactor,
   inventoryCapacity: balance.inventoryCapacity,
   randomEventsEnabled: balance.randomEventsEnabled,
@@ -136,6 +139,8 @@ afterEach(() => {
   balance.placeEdgeBand.widthM = DEFAULTS.edgeBandWidth
   balance.placeEdgeBand.wanderM = DEFAULTS.edgeBandWander
   balance.placeEdgeBand.strength = DEFAULTS.edgeBandStrength
+  balance.bloodStain.sizeScale = DEFAULTS.bloodStainSize
+  balance.bloodStain.irregularity = DEFAULTS.bloodStainIrregularity
   balance.placeStrafeFactor = DEFAULTS.placeStrafeFactor
   balance.inventoryCapacity = DEFAULTS.inventoryCapacity
   balance.randomEventsEnabled = DEFAULTS.randomEventsEnabled
@@ -261,6 +266,9 @@ describe('DebugMenu editable fields write through to balance (settings.mjs fillF
     { label: en.debug.edgeBandWidth, read: () => balance.placeEdgeBand.widthM, value: 4.5 },
     { label: en.debug.edgeBandWander, read: () => balance.placeEdgeBand.wanderM, value: 0.4 },
     { label: en.debug.edgeBandStrength, read: () => balance.placeEdgeBand.strength, value: 0.6 },
+    // The blood patches' size and ragged outline (design.md §19.5, point 323).
+    { label: en.debug.bloodStainSize, read: () => balance.bloodStain.sizeScale, value: 1.4 },
+    { label: en.debug.bloodStainIrregularity, read: () => balance.bloodStain.irregularity, value: 0.3 },
   ]
 
   it.each(editable)('editing "$label" updates the balance singleton at runtime', ({ label, read, value }) => {
@@ -284,6 +292,14 @@ describe('DebugMenu numeric clamps (design.md §21, point 173)', () => {
     fireEvent.change(numberField(en.debug.edgeBandWander), { target: { value: '99' } })
     expect(balance.placeEdgeBand.wanderM).toBeLessThanOrEqual(EDGE_BAND_MAX_WANDER_M)
     expect(balance.placeEdgeBand.wanderM).toBeLessThan(balance.placeEdgeBand.widthM / 2)
+  })
+
+  it('caps the blood stain outline swing so the contour cannot fold through itself', () => {
+    render(<DebugMenu />)
+    fireEvent.change(numberField(en.debug.bloodStainIrregularity), { target: { value: '9' } })
+    expect(balance.bloodStain.irregularity).toBe(STAIN_MAX_IRREGULARITY)
+    fireEvent.change(numberField(en.debug.bloodStainIrregularity), { target: { value: '-3' } })
+    expect(balance.bloodStain.irregularity).toBe(0)
   })
 
   it('rounds the inventory capacity and floors it at 1 (the only rounding field)', () => {

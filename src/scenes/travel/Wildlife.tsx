@@ -579,8 +579,9 @@ const CROSS_SWIM_SPEED = 2.6
  *  accumulates into the animal's position so it never teleports (design.md §19). */
 const FLEE_SPEED = 5
 const MAX_STAINS = 60
-/** Radius (world units) of the blood patch a kill or a trample soaks into the
- *  ground (design.md §19.5) — the radius the old decal disc had. */
+/** Base radius (world units) of the blood patch a kill or a trample soaks into
+ *  the ground (design.md §19.5) — the radius the old decal disc had. The
+ *  calibratable `balance.bloodStain.sizeScale` scales it at upload. */
 const STAIN_RADIUS = 0.9
 /** Radius of the scripted hunt's stain at full spread; it grows into this while
  *  the predator feeds. */
@@ -1706,11 +1707,13 @@ function Herds() {
   const vscl = useMemo(() => new THREE.Vector3(), [])
   const fireFlames = useRef<THREE.InstancedMesh>(null)
   const fireBand = useRef<THREE.InstancedMesh>(null)
-  // A stain is a round patch of GROUND the terrain material tints red (point
-  // 267, render/groundStains.ts) — no mesh of its own, so it follows the relief
+  // A stain is a patch of GROUND the terrain material tints red (point 267,
+  // render/groundStains.ts) — no mesh of its own, so it follows the relief
   // exactly. It used to be a disc laid into the local slope plane, which on a
-  // slope still let the rising ground poke a hole through the middle. `y` is the
-  // ground height at the spot, kept for the verification's projection only.
+  // slope still let the rising ground poke a hole through the middle. `r` is the
+  // patch's base radius; the drawn outline wanders around it on its own seeded
+  // contour (point 323). `y` is the ground height at the spot, kept for the
+  // verification's projection only.
   const stains = useRef<Array<{ x: number; y: number; z: number; r: number }>>([])
   /** Scratch list (herd stains + the scripted hunt's) uploaded each frame. */
   const stainUpload = useRef<Array<{ x: number; z: number; r: number }>>([])
@@ -4918,7 +4921,9 @@ function Herds() {
     patches.length = 0
     for (const st of stains.current) patches.push(st)
     if (HUNT_STAIN.active) patches.push(HUNT_STAIN)
-    setGroundStains(patches, pos.x, pos.z)
+    // Size and outline swing come from the balance config each frame (point
+    // 323), so a debug edit reshapes the patches already on the ground.
+    setGroundStains(patches, pos.x, pos.z, balance.bloodStain)
 
     // Remove carcasses a scavenger has fully consumed, and cull any left far
     // off-screen: a single scavenger cannot keep up with every kill, so an
