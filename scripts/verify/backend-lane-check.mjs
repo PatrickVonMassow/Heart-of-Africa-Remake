@@ -196,11 +196,16 @@ try {
     }
     const wantWebGPU = lane.name === 'webgpu'
     const faults = laneFaults(got, wantWebGPU)
-    const verdict = softwareRendererVerdict(
-      wantWebGPU ? JSON.stringify(got.adapter) : got.renderer,
-      SOFTWARE_HINTS,
-    )
-    const device = wantWebGPU ? `adapter=${JSON.stringify(got.adapter)}` : `renderer="${got.renderer ?? 'none'}"`
+    // On the WebGPU lane BOTH strings are read, and neither alone would do: Chrome hands
+    // an unprivileged page an all-empty GPUAdapterInfo, and against that empty string the
+    // software test can only answer "no renderer string" — a software lane would have
+    // passed unlabelled, which is the one thing this check exists to prevent. The GL
+    // chain of the same session names the device the OpenGLES backend sits on.
+    const named = wantWebGPU ? `${JSON.stringify(got.adapter)} ${got.renderer ?? ''}` : got.renderer
+    const verdict = softwareRendererVerdict(named, SOFTWARE_HINTS)
+    const device = wantWebGPU
+      ? `adapter=${JSON.stringify(got.adapter)} chain="${got.renderer ?? 'none'}"`
+      : `renderer="${got.renderer ?? 'none'}"`
     // Named, never inferred: a compat lane is REAL WebGPU on real hardware and still no
     // proof about the player's core path (point 505).
     const level = wantWebGPU ? featureLevelOf(got) : null
