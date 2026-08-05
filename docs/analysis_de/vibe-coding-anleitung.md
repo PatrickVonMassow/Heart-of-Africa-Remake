@@ -162,6 +162,17 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   die ein Nutzer wirklich erreicht — und der bei einer **neuen** Blick- oder Zoomachse
   auflistet, welche alten Zusagen dadurch an einem neuen Rand prüfbar werden." *(Kosten ≈ 1,5x.)* *(Zuletzt: Sieht das für einen Menschen richtig aus?)*
 
+- **Das Beweisbild, das nichts zeigt.** Der Screenshot, der ein Feature belegen soll, wurde
+  aufgenommen, bevor die Szene fertig geladen war — er zeigt eine leere, schwarze Welt, und
+  die Prüfung meldet trotzdem grün, weil sie nur das Auslösen prüft, nicht das Bild.
+  → *Prompt:* „Etabliere einen Mechanismus, der ein Prüfbild erst schreibt, wenn die
+  **Darstellung fertig** ist — und zwar entschieden danach, WAS aufgenommen wird (ganzer
+  Bildschirm = volle Wartezeit), nicht danach, was das Bild angeblich zeigt. Sieh dir neu
+  entstandene Bilder außerdem selbst an, statt dem Exit-Code zu glauben." *(Kosten ≈ 1,2x.)*
+  Merke dir dazu die Ausnahme von der Faustregel „Last erzeugt falsche **Rote**, keine
+  falschen Grünen": Sie gilt für Prüfungen, die etwas **messen**. Eine Prüfung, die nur
+  **auslöst**, liefert unter Last ein grünes Bild von nichts.
+
 - **Neue Features zerbrechen alte.** Eine Änderung repariert X und bricht das unbeobachtete Y.
   → *Prompt:* „Etabliere einen Mechanismus, der jede Mechanik auch im **Danach-Zustand** prüft
   und nach jedem Zusammenführen die schnelle Testschicht erzwingt. Bau ‚Invarianten' ein, die
@@ -399,4 +410,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 Wenn du diese eine Nachricht an den Anfang stellst, hast du 80 % der Lehren dieses
 Projekts eingebaut, bevor die erste Zeile Code entsteht.
 
-<!-- GUIDE-FINGERPRINT: 38bf5ec026c6ed40a442cba21fbbb7d158336911a3225105840b089d356fa3a7 -->
+<!-- GUIDE-FINGERPRINT: decebd51a4d1689bf1ebe35db12941cf88072d32eba2ec6b173ff7e1c8542add -->
