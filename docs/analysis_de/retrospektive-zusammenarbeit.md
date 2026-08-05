@@ -789,6 +789,14 @@ Der Fund selbst kam dann aus einer anderen Richtung als jede Hypothese: Nicht de
 
 **Lehren:** Mehrere unabhängige Meinungen ersetzen keine Messung — sie können einträchtig danebenliegen, und ihre Einigkeit fühlt sich wie Evidenz an. Vor einer Reihenfolge von Reparaturversuchen steht der eine Test, der die **Ursache sichtbar** macht; kostet er nichts, gibt es keine Entschuldigung, ihn hinter Versuch drei zu setzen. Und wenn eine Kette blockiert ist, lohnt vor ihrer Reparatur die Frage, ob im Haus schon eine andere Kette läuft, die dasselbe trägt.
 
+### 3.85 Das Bild, das seinen eigenen Beweis nicht führt
+
+Ein Prüfbild trug den Namen "Handschrift im Tagebuch" und zeigte eine **schwarze Welt**: keinen Boden, keine Häuser, nur frei schwebende Gebäudeschilder. Der Verschluss, der genau das verhindern soll — ein Bild muss zeigen, was sein Name behauptet — hatte ihn durchgelassen, und zwar systematisch: Ist das erklärte Motiv ein **Bedienelement**, gilt es in dem Moment als fertig, in dem es auf dem Schirm steht, also wird gar nicht auf die fertig gezeichnete Szene gewartet. Aufgenommen wird trotzdem die **ganze Seite** mitsamt der halb gestreamten Welt dahinter. 21 Bilder im Bestand hängen an dieser Kombination.
+
+Zweimal wäre der Befund an diesem Abend fast als Umgebungsrauschen abgelegt worden — die Maschine war belastet, und "Last erzeugt falsche Rote" ist eine gute, oft richtige Regel. Sie stimmt hier nur nicht: Der Fehlschlag war kein Rot, sondern ein **stilles Grün** auf einem leeren Bild. Erst der eigene Nachlauf auf ruhiger Maschine, auf dem Hauptzweig, mit dem Blick auf das entstandene Bild statt auf den Exit-Code, machte daraus einen reproduzierten Fund.
+
+**Lehren:** Ein Verschluss, der nur das Motiv prüft, aber die **Aufnahme** nicht kennt, prüft die falsche Hälfte — was ganzseitig fotografiert wird, muss auch ganzseitig fertig sein. Und die Regel "Last erzeugt falsche Rote, keine falschen Grüne" hat eine Ausnahme, die man kennen muss: Sie gilt für Prüfungen, die etwas *messen*. Eine Prüfung, die nur *auslöst*, liefert unter Last ein grünes Bild von nichts.
+
 ---
 
 ## 4. Die Guards als Immunsystem
@@ -878,7 +886,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Mittwoch, 05.08.2026, 09:34 · Quellen-Fingerprint: `38bf5ec026c6…`
+Zuletzt aktualisiert: Mittwoch, 05.08.2026, 22:31 · Quellen-Fingerprint: `decebd51a4d1…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -957,8 +965,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | CORRECTED 19.07.2026 — WebGPU IS testable headless/autonomously via system Chrome (channel:'chrome') + --headless=new; the 'untestable' belief held only for Playwright's BUNDLED Chromium | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 71 Feedback-/Projekt-Memories · 42 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 31 Prozess-/Meta-TASKS-Punkte (davon 14 offen).
+Erfasste Quellen: 71 Feedback-/Projekt-Memories · 42 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 32 Prozess-/Meta-TASKS-Punkte (davon 15 offen).
 
-<!-- RETRO-FINGERPRINT: 38bf5ec026c6ed40a442cba21fbbb7d158336911a3225105840b089d356fa3a7 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-05T07:34:20.353Z -->
+<!-- RETRO-FINGERPRINT: decebd51a4d1689bf1ebe35db12941cf88072d32eba2ec6b173ff7e1c8542add -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-05T20:31:07.927Z -->
 <!-- AUTO-GENERATED:END -->
