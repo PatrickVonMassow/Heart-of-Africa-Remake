@@ -4736,3 +4736,23 @@ Build order, chosen so no two parallel agents own the same file:
   VERIFIABLE: Vitest — an unasserted run never covers, an asserted one does, and
   the options default survives `null`; `scripts/closing-guard-core.mjs` carries the
   core-level step and `--status` lists it.
+
+- [ ] 511. THE MEMORY INDEX STILL CARRIES WHAT THIRTY GUARDS NOW ENFORCE
+  (measured 05.08.2026 on the user's question about context cost). The numbers
+  first, so the effort goes where the cost is: the memory INDEX is 13.2 KB / 86
+  lines (~3.3k tokens) per session and the 74 entry files load only on recall,
+  while `CLAUDE.md` is 61.6 KB (~15k tokens) and is paid AGAIN by every subagent —
+  ~82 % of the session floor against the index's ~16 %, and the floor multiplies
+  per agent. Splitting `CLAUDE.md` is the real lever, is the user's call and is
+  published as the decision card "Bauanleitung für Subagenten aufteilen?"; this
+  point does the part that needs no decision.
+  FINAL STATE:
+  1. Every memory entry whose rule is ENFORCED by an armed guard is retired from
+     the index, its content living on wherever the guard documents itself. An
+     entry stays when it carries a JUDGEMENT a guard cannot make (taste, history,
+     a user ruling) — the test is "would a session behave differently without it,
+     given the guard already fires?".
+  2. `docs/rule-corpus-audit.md` records the measurement above and each retirement
+     with its enforcing guard, so the next audit starts from evidence.
+  VERIFIABLE: the index names no entry whose whole content is an armed guard's
+  rule; the audit doc lists each retired entry beside the guard that replaced it.
