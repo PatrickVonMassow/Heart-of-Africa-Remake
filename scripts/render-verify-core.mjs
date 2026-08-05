@@ -73,6 +73,7 @@ export const NON_RENDER_VERIFY = new Set([
   'machine-load-core.mjs',
   'machine-load.mjs',
   'run-all.mjs',
+  'sceneReady-core.mjs', // the scene-readiness verdict; frameSubject.mjs polls the page for it
   'snowMetric.mjs', // the snow-vs-sand pixel verdict; enrichments.mjs feeds it a crop
   'system-chrome.mjs', // WHERE the lane's browser is on this host; _browser.mjs opens it
   'textureLeak.mjs', // the texture-delta decision layer; settings.mjs runs it

@@ -15,6 +15,13 @@
 // on the wall clock — the same rule `fixedWaits.mjs` enforces. A frame that
 // never gets its subject in view is refused, named and NOT written.
 //
+// And it waits for the picture to be DRAWN before it opens (point 489): a
+// subject projects into an empty grey frame exactly as well as into a finished
+// one, so proving the aim is not enough. The scene counts as drawn when the
+// renderer's own per-frame counters stand still (`sceneReady-core.mjs`); a frame
+// that never gets there is refused just as loudly as a mis-aimed one. Only a
+// HUD `element` frame skips the wait — see `needsSceneReady`.
+//
 // Usage in a suite:
 //   import { frameShutter } from './frameSubject.mjs'
 //   const shot = frameShutter(page, OUT)
@@ -27,6 +34,13 @@ import {
   formatFrameFailure,
   formatFramePass,
 } from './frameSubject-core.mjs'
+import {
+  SCENE_READY_DEFAULTS,
+  awaitSceneReady,
+  formatSceneReadyFailure,
+  formatSceneReadyPass,
+  needsSceneReady,
+} from './sceneReady-core.mjs'
 
 // How long the shutter gives the picture to arrive before it judges. Generous
 // on purpose: the bird's-eye camera settles in a fixed number of FRAMES, so on
@@ -156,10 +170,67 @@ export function probeFrameSubject(d) {
 }
 
 /**
- * Capture one frame. Refuses — loudly, without writing the file — when the
- * declared subject is not in the picture.
+ * Runs INSIDE the page. Installs the scene sampler on first call and returns the
+ * buffer it has collected since — `null` when this page has no renderer hook to
+ * sample (the production build).
+ *
+ * The sampler runs CONTINUOUSLY rather than only while a capture waits, for two
+ * reasons: a scene that has stood finished for a minute is then ready at once
+ * instead of costing every frame a fresh quiet window, and the buffer spans the
+ * moment BEFORE the capture, so a jump that has just torn the old region down is
+ * still visible in the window and cannot be mistaken for a settled picture.
+ *
+ * Self-contained by necessity: Playwright ships this function's source into the
+ * page, so it may not reference anything from this module.
  */
-export async function captureFrame(page, outDir, name, decl, { timeout = DEFAULT_TIMEOUT } = {}) {
+export function sampleSceneCounts(cfg) {
+  const w = window
+  if (!w.__renderer) return null
+  if (!w.__sceneReadySampler) {
+    w.__sceneReadySamples = w.__sceneReadySamples || []
+    w.__sceneReadySampler = setInterval(() => w.__sampleSceneCounts && w.__sampleSceneCounts(), cfg.everyMs)
+  }
+  w.__sampleSceneCounts = () => {
+    const r = w.__renderer && w.__renderer.info && w.__renderer.info.render
+    if (!r) return
+    const list = w.__sceneReadySamples
+    // The PER-FRAME counters. `info.render.calls` is cumulative (render passes
+    // since start-up) and climbs on a finished scene as fast as on a building
+    // one, which is exactly the false signal this wait exists to replace.
+    list.push({ t: Date.now(), drawCalls: r.drawCalls || 0, triangles: r.triangles || 0 })
+    const cut = Date.now() - cfg.keepMs
+    while (list.length && list[0].t < cut) list.shift()
+  }
+  // Sample on the way out too, so the buffer ALWAYS carries this instant. Left
+  // to the interval alone there is a sampling period in which a jump has already
+  // torn the old region down while the buffer still shows only the settled
+  // readings from before it — a window that looks quiet and would open the
+  // shutter on an empty picture.
+  w.__sampleSceneCounts()
+  return w.__sceneReadySamples.slice()
+}
+
+/**
+ * Wait until the scene has finished drawing (point 489). Returns the verdict;
+ * the caller decides what a timeout means. Never waits for a page that has no
+ * renderer hook — there is no scene there to be ready.
+ */
+export async function waitForSceneReady(page, opts = {}) {
+  const o = { ...SCENE_READY_DEFAULTS, ...opts }
+  const cfg = { everyMs: Math.max(100, Math.min(500, o.pollMs)), keepMs: Math.max(30000, o.quietMs * 4) }
+  return awaitSceneReady({
+    ...o,
+    read: () => page.evaluate(sampleSceneCounts, cfg),
+    sleep: (ms) => page.waitForTimeout(ms),
+  })
+}
+
+/**
+ * Capture one frame. Refuses — loudly, without writing the file — when the
+ * declared subject is not in the picture, or when the scene never finished
+ * drawing.
+ */
+export async function captureFrame(page, outDir, name, decl, { timeout = DEFAULT_TIMEOUT, scene = {} } = {}) {
   const d = normaliseDeclaration(name, decl)
   const started = Date.now()
   let probe = null
@@ -181,6 +252,18 @@ export async function captureFrame(page, outDir, name, decl, { timeout = DEFAULT
     console.log(message)
     throw new Error(`frame ${d.frame}: its subject is not in the rendered picture — ${verdict.reason}`)
   }
+  // The AIM is judged first and the picture second, in that order on purpose: a
+  // mis-aimed frame is refused in seconds instead of after the (deliberately
+  // generous) readiness wait, and the aim cannot go stale while the world
+  // streams in — nothing moves the camera during the wait.
+  let sceneVerdict = null
+  if (needsSceneReady(d)) {
+    sceneVerdict = await waitForSceneReady(page, scene)
+    if (sceneVerdict.timedOut) {
+      console.log(formatSceneReadyFailure(d.frame, sceneVerdict, scene))
+      throw new Error(`frame ${d.frame}: the scene never finished drawing — ${sceneVerdict.reason}`)
+    }
+  }
   const path = `${outDir}${d.frame}.png`
   const options = decl.clip
     ? { path, clip: decl.clip, timeout: CAPTURE_TIMEOUT }
@@ -188,7 +271,7 @@ export async function captureFrame(page, outDir, name, decl, { timeout = DEFAULT
   // Returns the PNG buffer, like `page.screenshot` itself — a few frames are
   // ALSO a pixel probe (settings.mjs reads the TRAA frame's mean luma).
   const buffer = decl.locator ? await page.locator(decl.locator).screenshot(options) : await page.screenshot(options)
-  console.log(formatFramePass(d, probe))
+  console.log(formatFramePass(d, probe) + formatSceneReadyPass(sceneVerdict))
   return buffer
 }
 

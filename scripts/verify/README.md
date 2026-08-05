@@ -736,6 +736,39 @@ the buffer for the few frames that are both.)
 bites — it stands the traveller in Cairo, claims Lake Victoria, and requires the
 capture to be refused and no file written.
 
+### …and the picture must be DRAWN when it is taken (point 489)
+
+Proving the aim is not enough: a subject projects into an empty grey frame
+exactly as well as into a finished one. Measured on the Linux container host, the
+travel scene climbs from 99 draw calls / 5.5k triangles at 5 s to 222 / 745k at
+30 s, and two suites photographed that gap and exited 0 — `world` a 47 kB blank
+village, `collision` an empty `52-collision-port-wall.png`. Neither waited on the
+clock alone; `world` waited on a healthy frame RATE, which an EMPTY scene reaches
+fastest of all.
+
+So the shutter also waits for the scene to be DRAWN, for every frame whose
+subject lives in it (all kinds except `element`; a frame states it either way
+with `sceneReady: true|false`). The condition is the renderer's own PER-FRAME
+counters — `info.render.drawCalls` and `info.render.triangles`, never the
+cumulative `info.render.calls`, which climbs on a finished scene as fast as on a
+building one — standing still within 10 % over a trailing 5 s window, above a
+floor of 20 000 triangles. Judged on the SPREAD, not on growth: a falling count
+is a region unloading after a jump, which is no more a finished picture. The
+tolerance is relative because a finished scene never stands perfectly still —
+wildlife and culling moved the counts by 1-7 % in every settled state measured,
+against 20-98 % while building.
+
+The wait is polled, never a fixed sleep, and a scene that does not settle inside
+`timeoutMs` (120 s) REFUSES the frame loudly instead of writing half a picture.
+The verdict is pure (`sceneReady-core.mjs`, pinned by `sceneReady.test.mjs`
+including its timeout path); the in-page sampler and the poll live in
+`frameSubject.mjs`. A page with no `window.__renderer` at all (the production
+preview) cannot be judged and is not held up — the frame is written with that
+said in its log line. The live proof runs in `world.mjs`: the first world frame
+is taken straight out of the scene switch, with nothing waiting in between, and
+its own byte count is asserted against the blank picture (measured here: 37-48 kB
+empty, 1008 kB drawn).
+
 **Its first finding, and what it was (27.07.2026).** `polish`'s
 `93-orientation-highlight` was refused on a quiet machine, twice: no
 `.building-highlight` was inside the viewport. The §17.3 feature was sound — the
