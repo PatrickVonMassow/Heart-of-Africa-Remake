@@ -1156,8 +1156,10 @@ describe('an outside claim on a child: what was SAID steers it (point 481)', () 
 
 describe('the play ground is a disc of its own (point 481.4)', () => {
   it('keeps the children inside a ground that is NOT the settlement centre', () => {
-    const centre = { x: 14, z: -14 }
-    const play = 8
+    // The ground the shipped village actually derives (lifeSpots.test.ts): a
+    // corner disc well off the settlement's own middle.
+    const centre = { x: 10.9, z: -10.9 }
+    const play = 7
     const world: TagWorld = {
       radius: play,
       centerX: centre.x,

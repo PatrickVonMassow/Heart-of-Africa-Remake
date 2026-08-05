@@ -8,6 +8,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   MIN_PLAY_RADIUS,
+  SPECTATOR_MARGIN,
   PORT_TALKERS,
   VILLAGE_SPOTS,
   childPlayGround,
@@ -71,13 +72,17 @@ describe('the children play out of the adults’ earshot (point 481.4)', () => {
     }
   })
 
-  it('keeps the ground inside the settlement, with room to run', () => {
-    const g = ground()
-    expect(Math.hypot(g.x, g.z)).toBeLessThan(WALK)
-    // The ground overlaps the walkable disc generously: the middle is at least
-    // its own radius' worth inside the far rim.
-    expect(WALK - Math.hypot(g.x, g.z)).toBeGreaterThan(g.radius * 0.5)
-    expect(g.radius).toBeGreaterThanOrEqual(MIN_PLAY_RADIUS)
+  it('keeps the whole ground inside the settlement, with room to stand and watch', () => {
+    for (let fx = -9; fx <= 9; fx += 3) {
+      for (let fz = -9; fz <= 9; fz += 3) {
+        const g = ground([fx, fz])
+        // The far edge of the ground plus a spectator's margin still lies inside
+        // the walkable rim: watching from any side never walks the player out of
+        // the village (leaving the rim leaves the place).
+        expect(Math.hypot(g.x, g.z) + g.radius + SPECTATOR_MARGIN).toBeLessThanOrEqual(WALK + 1e-6)
+        expect(g.radius).toBeGreaterThanOrEqual(MIN_PLAY_RADIUS)
+      }
+    }
   })
 
   it('takes the biggest ground that is far enough — it only shrinks when it must', () => {

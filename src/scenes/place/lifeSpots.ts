@@ -55,6 +55,15 @@ export interface PlayGround {
 export const MIN_PLAY_RADIUS = 4
 
 /**
+ * Room kept between the ground's far edge and the walkable rim, so a player can
+ * stand around the group and watch it from ANY side. Walking past the rim
+ * LEAVES the settlement (design.md §2), so a ground pushed hard against it
+ * would put the spectator out of the village on half the bearings — and
+ * watching is how the whole teaching is learned.
+ */
+export const SPECTATOR_MARGIN = 5
+
+/**
  * Places the children's play ground (point 481.4): the LARGEST disc, on the
  * bearing furthest from every adult station, whose whole area still clears them
  * by `minClearance` — the §13.4 hearing radius, so a player standing anywhere
@@ -81,10 +90,10 @@ export function childPlayGround(
   const rMin = Math.min(rMax, MIN_PLAY_RADIUS)
   let best: PlayGround = { x: 0, z: 0, radius: rMax, clearance: -Infinity }
   for (let r = rMax; r >= rMin - 1e-9; r -= 0.5) {
-    // Out toward the rim: the ground's own middle sits a good part of its radius
-    // inside the walkable edge, so the disc overlaps the settlement generously
-    // while its middle is as far from the village's life as the place allows.
-    const centreDistance = Math.max(0, walkRadius - r * 0.75)
+    // Out toward the rim, but not against it: the whole ground stays inside the
+    // walkable area with a spectator's margin around it, and its middle is then
+    // as far from the village's life as the place allows.
+    const centreDistance = Math.max(0, walkRadius - r - SPECTATOR_MARGIN)
     let atThisSize: PlayGround = { x: 0, z: 0, radius: r, clearance: -Infinity }
     for (let k = 0; k < bearings; k++) {
       const a = (k / bearings) * Math.PI * 2
