@@ -1213,7 +1213,7 @@ const stainPixels = await (async () => {
   }
   await captureFrame(page, OUT, '137-blood-ground-tint', {
     world: { x: spot.x, z: spot.z },
-    label: 'the blood stain soaked into the ground',
+    label: 'the blood stain soaked into the ground, on its own ragged outline',
     settle: false,
     clip: shot,
   })
@@ -1254,7 +1254,14 @@ const stainPixels = await (async () => {
   // across every row and column the pool's pixels must be CONTIGUOUS. An
   // unpainted island inside it — the point-267 bug, ground poking through the
   // decal — leaves a gap between the first and the last soaked pixel of every
-  // row and column that crosses it.
+  // row and column that crosses it. It is also what proves the point-323
+  // outline cannot cost the point-267 promise: the contour warps the rim by
+  // BEARING only, so the pool stays one solid run however ragged its edge is.
+  // The outline's own irregularity is asserted in the pure layer
+  // (src/render/groundStains.test.ts), not here — the bird's-eye camera is
+  // tilted, so even a perfect circle projects to an ellipse and a pixel-space
+  // roundness bar would be either brittle or meaningless. The refreshed crop
+  // (screenshot 137) is what a human judges the shape by.
   let gaps = 0
   const scan = (outer, inner, at) => {
     for (let o = 0; o < outer; o++) {

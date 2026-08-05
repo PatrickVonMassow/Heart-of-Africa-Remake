@@ -5,6 +5,7 @@
 
 import { balance } from '../config/balance'
 import { clampWander } from '../render/edgeBand'
+import { clampIrregularity } from '../render/groundStains'
 import { refreshAmbienceVolume } from '../systems/ambience'
 import { totalGifts, useGame, type EquipmentId } from '../state/store'
 import { EVENT_KINDS, type EventKind } from '../systems/events'
@@ -376,6 +377,10 @@ export function DebugMenu() {
         onChange={(v) => { balance.placeEdgeBand.wanderM = clampWander(v, balance.placeEdgeBand.widthM); bump() }} />
       <NumberField label={t.debug.edgeBandStrength} value={balance.placeEdgeBand.strength} step={0.1}
         onChange={(v) => { balance.placeEdgeBand.strength = Math.max(0, Math.min(1, v)); bump() }} />
+      <NumberField label={t.debug.bloodStainSize} value={balance.bloodStain.sizeScale} step={0.1}
+        onChange={(v) => { balance.bloodStain.sizeScale = Math.max(0, v); bump() }} />
+      <NumberField label={t.debug.bloodStainIrregularity} value={balance.bloodStain.irregularity} step={0.05}
+        onChange={(v) => { balance.bloodStain.irregularity = clampIrregularity(v); bump() }} />
       <label>
         <span>{t.debug.season}</span>
         <select

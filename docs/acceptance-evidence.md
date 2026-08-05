@@ -207,8 +207,19 @@ the longitude, then the dig).
 Verifiable (`scripts/verify/settings.mjs`,
 `scripts/verify/enrichments.mjs`), by topic:
 - Feeding and trampling: automated checks force the feed state
-  (carcass, head animation, stain in the local ground slope, leave
-  phase) and provoke a trampling via an injected elephant.
+  (carcass, head animation, the blood soaked into the ground, leave
+  phase) and provoke a trampling via an injected elephant. The stain is
+  a property OF the ground on its own ragged outline (§19.5, points
+  267/323): `scripts/verify/enrichments.mjs` shoots the same relief with
+  and without it at a reachable zoom and measures the soaked pool
+  CONTIGUOUS across every row and column — no see-through hole — with
+  screenshot 137 as the crop a human judges the shape by;
+  `src/render/groundStains.test.ts` pins the outline itself (its radius
+  swings with the bearing by a bounded but clearly non-zero amount, no
+  two seeds draw the same contour, none is circular, the swing is
+  hard-capped whatever the debug menu sets, and the falloff still
+  decreases outward along every bearing, so a ragged rim can never open
+  a hole inside the pool).
 - Elephant herds and the dodge: an elephant herd roams together (its
   centre moves, it stays clustered, it turns only in gentle arcs);
   prey ignore a distant elephant but dart away from a close one
