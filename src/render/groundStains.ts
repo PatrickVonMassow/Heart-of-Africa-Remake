@@ -10,7 +10,7 @@
 //
 // So the stain became a property of the ground, in the mould of the rain-wet
 // ground tint (point 225, seasonTint.ts): the terrain material mixes its albedo
-// toward blood inside a round, world-space patch. Being a shading term of the
+// toward blood inside a world-space patch. Being a shading term of the
 // ground surface it follows the relief EXACTLY — there is no second surface that
 // could part from it, at any slope, at any zoom, on either backend.
 //
@@ -32,17 +32,16 @@
 
 import * as THREE from 'three/webgpu'
 import {
-  atan,
   color,
   float,
   max,
   mix,
   mx_fractal_noise_float,
   positionWorld,
-  sin,
   uniform,
   uniformArray,
   vec3,
+  vec4,
 } from 'three/tsl'
 
 /** Ground-tint slots the terrain shader evaluates per fragment. The nearest
@@ -87,10 +86,15 @@ export function clampIrregularity(v: number): number {
 }
 
 // The contour's harmonics: how many times the outline bows over a full turn.
-// Coprime orders, so the four never line up into a rosette, and amplitudes
-// summing to 1, so the warp stays inside ±1 and the swing is exactly the
+// Amplitudes sum to 1, so the warp stays inside ±1 and the swing is exactly the
 // calibrated fraction. Order 2 gives the broad lopsidedness of a pool that ran
-// one way, 8 the small frays at its rim.
+// one way, 8 the small frays at its rim; between them the orders share no common
+// factor, so the four never line up into a rosette.
+//
+// The ORDERS are load-bearing beyond their look: 3 = 2+1, 5 = 3+2 and 8 = 5+3,
+// so `stainWarpFromOffset` reaches every one by a single complex multiplication
+// from the two before it. Changing an order means changing that chain (and the
+// test that pins the two spellings against each other).
 const CONTOUR_HARMONICS: readonly { order: number; amp: number }[] = [
   { order: 2, amp: 0.44 },
   { order: 3, amp: 0.28 },
@@ -98,7 +102,10 @@ const CONTOUR_HARMONICS: readonly { order: number; amp: number }[] = [
   { order: 8, amp: 0.1 },
 ]
 
-/** Number of seeded phases a stain's outline needs (one per harmonic). */
+/** The harmonic orders, in packing order (verification/tests). */
+export const CONTOUR_ORDERS: readonly number[] = CONTOUR_HARMONICS.map((h) => h.order)
+
+/** Number of seeded harmonics a stain's outline carries. */
 export const STAIN_PHASES = CONTOUR_HARMONICS.length
 
 const TAU = Math.PI * 2
@@ -139,22 +146,81 @@ export function stainContourRadius(s: GroundStain, angle: number, look: StainLoo
   return s.r * look.sizeScale * stainContourFactor(stainSeed(s), angle, look.irregularity)
 }
 
+/**
+ * The same warp the shader computes, from the OFFSET to the stain's centre
+ * rather than from a bearing — and this is the form the fragment code uses.
+ *
+ * Why not the plain `sin(order·angle + phase)` above: that spelling costs an
+ * `atan` and one `sin` per harmonic PER SLOT, on every ground fragment of the
+ * bird's-eye view. Angle-sum identities remove all five transcendentals: with
+ * the unit direction (c, s) = (dx, dz)/d, every cos/sin of a multiple of the
+ * bearing follows from complex multiplication, and `sin(k·angle + phase)` is
+ * `sin(k·angle)·cos(phase) + cos(k·angle)·sin(phase)`. So the amplitudes and
+ * the seeded phases are pre-multiplied into the two packed vectors below and
+ * the whole warp is two dot products over multiply-adds. The pure test pins
+ * this against the readable spelling — the two must agree exactly.
+ *
+ * `packedCos[i]` is `amp_i·cos(phase_i)`, `packedSin[i]` is `amp_i·sin(phase_i)`.
+ */
+export function stainWarpFromOffset(
+  packedCos: readonly [number, number, number, number],
+  packedSin: readonly [number, number, number, number],
+  dx: number,
+  dz: number,
+): number {
+  // At the exact centre the bearing is undefined; the floor keeps the direction
+  // finite (and the middle of a patch is fully soaked either way).
+  const inv = 1 / Math.sqrt(Math.max(1e-8, dx * dx + dz * dz))
+  const c1 = dx * inv
+  const s1 = dz * inv
+  const c2 = c1 * c1 - s1 * s1
+  const s2 = 2 * c1 * s1
+  const c3 = c2 * c1 - s2 * s1
+  const s3 = s2 * c1 + c2 * s1
+  const c5 = c3 * c2 - s3 * s2
+  const s5 = s3 * c2 + c3 * s2
+  const c8 = c5 * c3 - s5 * s3
+  const s8 = s5 * c3 + c5 * s3
+  return (
+    s2 * packedCos[0] + s3 * packedCos[1] + s5 * packedCos[2] + s8 * packedCos[3] +
+    c2 * packedSin[0] + c3 * packedSin[1] + c5 * packedSin[2] + c8 * packedSin[3]
+  )
+}
+
+/** The two packed vectors of a stain's outline (see `stainWarpFromOffset`). */
+export function stainWarpPacking(seed: number): {
+  cos: [number, number, number, number]
+  sin: [number, number, number, number]
+} {
+  const cos = [0, 0, 0, 0] as [number, number, number, number]
+  const sin = [0, 0, 0, 0] as [number, number, number, number]
+  for (let i = 0; i < CONTOUR_HARMONICS.length; i++) {
+    const p = stainPhase(seed, i)
+    cos[i] = CONTOUR_HARMONICS[i].amp * Math.cos(p)
+    sin[i] = CONTOUR_HARMONICS[i].amp * Math.sin(p)
+  }
+  return { cos, sin }
+}
+
 // Slot packing, chosen so the fragment shader needs neither a square root nor a
 // divide: (centre x, centre z, r², 1/(r² − (core·r)²)). An INACTIVE slot is all
 // zero — its falloff term is (0 − d²)·0 = 0, i.e. it contributes nothing and
 // can never divide by zero.
 const SLOTS = Array.from({ length: MAX_GROUND_STAINS }, () => new THREE.Vector4(0, 0, 0, 0))
 
-// The outline of the slot in the same index: the four seeded harmonic phases.
-// They are constant for a patch's whole life, so they are computed here once per
-// upload rather than hashed per fragment.
-const WARP_SLOTS = Array.from({ length: MAX_GROUND_STAINS }, () => new THREE.Vector4(0, 0, 0, 0))
+// The outline of the slot in the same index: the seeded harmonic phases, with
+// their amplitudes already folded in (`stainWarpPacking`). They are constant for
+// a patch's whole life, so they are built here once per upload rather than
+// hashed — and trigonometry'd — per fragment.
+const WARP_COS_SLOTS = Array.from({ length: MAX_GROUND_STAINS }, () => new THREE.Vector4(0, 0, 0, 0))
+const WARP_SIN_SLOTS = Array.from({ length: MAX_GROUND_STAINS }, () => new THREE.Vector4(0, 0, 0, 0))
 
 /** The uniform array the terrain material samples (one vec4 per slot). */
 export const GROUND_STAIN_U = uniformArray(SLOTS, 'vec4')
 
-/** The matching outline phases (one vec4 per slot). */
-export const GROUND_STAIN_WARP_U = uniformArray(WARP_SLOTS, 'vec4')
+/** The matching outline packing (one vec4 per slot, per component). */
+export const GROUND_STAIN_WARP_COS_U = uniformArray(WARP_COS_SLOTS, 'vec4')
+export const GROUND_STAIN_WARP_SIN_U = uniformArray(WARP_SIN_SLOTS, 'vec4')
 
 /** The calibrated outline swing — one value for every patch on screen. */
 export const GROUND_STAIN_IRREGULARITY_U = uniform(STAIN_LOOK_DEFAULT.irregularity)
@@ -164,9 +230,9 @@ export function groundStainSlots(): readonly THREE.Vector4[] {
   return SLOTS
 }
 
-/** Read-only view of the packed outline phases (verification/tests). */
-export function groundStainWarpSlots(): readonly THREE.Vector4[] {
-  return WARP_SLOTS
+/** Read-only view of the packed outlines (verification/tests). */
+export function groundStainWarpSlots(): { cos: readonly THREE.Vector4[]; sin: readonly THREE.Vector4[] } {
+  return { cos: WARP_COS_SLOTS, sin: WARP_SIN_SLOTS }
 }
 
 /**
@@ -211,14 +277,16 @@ export function setGroundStains(
     const r = s ? s.r * scale : 0
     if (!s || !(r > 0)) {
       SLOTS[i].set(0, 0, 0, 0)
-      WARP_SLOTS[i].set(0, 0, 0, 0)
+      WARP_COS_SLOTS[i].set(0, 0, 0, 0)
+      WARP_SIN_SLOTS[i].set(0, 0, 0, 0)
       continue
     }
     const rSq = r * r
     const coreSq = rSq * STAIN_CORE * STAIN_CORE
     SLOTS[i].set(s.x, s.z, rSq, 1 / (rSq - coreSq))
-    const seed = stainSeed(s)
-    WARP_SLOTS[i].set(stainPhase(seed, 0), stainPhase(seed, 1), stainPhase(seed, 2), stainPhase(seed, 3))
+    const w = stainWarpPacking(stainSeed(s))
+    WARP_COS_SLOTS[i].set(w.cos[0], w.cos[1], w.cos[2], w.cos[3])
+    WARP_SIN_SLOTS[i].set(w.sin[0], w.sin[1], w.sin[2], w.sin[3])
   }
 }
 
@@ -264,6 +332,7 @@ export function groundStainCoverage(
 // does not carry its vec4 type through, and the float node aliases differ per
 // construction site. The casts below bridge only that gap.
 type FloatNode = ReturnType<typeof float>
+type VecNode = ReturnType<typeof vec4>
 
 /** The per-fragment soak, 0..1, over all slots (see groundStainCoverage). */
 export function groundStainMask(): FloatNode {
@@ -278,23 +347,28 @@ export function groundStainMask(): FloatNode {
       z: FloatNode
       w: FloatNode
     }
-    const ph = GROUND_STAIN_WARP_U.element(i) as unknown as {
-      x: FloatNode
-      y: FloatNode
-      z: FloatNode
-      w: FloatNode
-    }
+    const pc = GROUND_STAIN_WARP_COS_U.element(i) as unknown as VecNode
+    const ps = GROUND_STAIN_WARP_SIN_U.element(i) as unknown as VecNode
     const dx = px.sub(s.x)
     const dz = pz.sub(s.y)
     const dSq = dx.mul(dx).add(dz.mul(dz))
-    // Mirror of `stainContourFactor`: the seeded harmonics of the outline at
-    // this bearing. A function of the bearing ALONE — so the falloff still
-    // decays monotonically outward and no ragged rim can open an interior hole.
-    const a = atan(dz, dx)
-    const warp = sin(a.mul(CONTOUR_HARMONICS[0].order).add(ph.x)).mul(CONTOUR_HARMONICS[0].amp)
-      .add(sin(a.mul(CONTOUR_HARMONICS[1].order).add(ph.y)).mul(CONTOUR_HARMONICS[1].amp))
-      .add(sin(a.mul(CONTOUR_HARMONICS[2].order).add(ph.z)).mul(CONTOUR_HARMONICS[2].amp))
-      .add(sin(a.mul(CONTOUR_HARMONICS[3].order).add(ph.w)).mul(CONTOUR_HARMONICS[3].amp))
+    // Mirror of `stainWarpFromOffset`, line for line: the seeded harmonics of
+    // the outline at this bearing, reached by complex multiplication so no
+    // transcendental runs per ground fragment. A function of the BEARING alone —
+    // so the falloff still decays monotonically outward and no ragged rim can
+    // open an interior hole.
+    const inv = dSq.max(1e-8).inverseSqrt()
+    const c1 = dx.mul(inv)
+    const s1 = dz.mul(inv)
+    const c2 = c1.mul(c1).sub(s1.mul(s1))
+    const s2 = c1.mul(s1).mul(2)
+    const c3 = c2.mul(c1).sub(s2.mul(s1))
+    const s3 = s2.mul(c1).add(c2.mul(s1))
+    const c5 = c3.mul(c2).sub(s3.mul(s2))
+    const s5 = s3.mul(c2).add(c3.mul(s2))
+    const c8 = c5.mul(c3).sub(s5.mul(s3))
+    const s8 = s5.mul(c3).add(c5.mul(s3))
+    const warp = vec4(s2, s3, s5, s8).dot(pc).add(vec4(c2, c3, c5, c8).dot(ps))
     const gSq = float(1).add(GROUND_STAIN_IRREGULARITY_U.mul(warp)).pow2()
     // (r²g² − d²) · 1/(r²−core²) · 1/g². A cleared slot is all zero, so its term
     // is (0 − d²)·0·… = 0 — no tint, and no division by a radius that is not
@@ -302,11 +376,12 @@ export function groundStainMask(): FloatNode {
     const t = s.z.mul(gSq).sub(dSq).mul(s.w).mul(float(1).div(gSq)).clamp(0, 1)
     m = max(m, t.mul(t)) as unknown as FloatNode
   }
-  // Blood does not pool as a drawn circle: one world-space noise field (ONE
-  // evaluation for all slots) frays the rim and mottles the soak, so the patch
-  // reads as earth drinking it unevenly. It shifts the soak by at most ±18 %
-  // and the fully soaked middle clamps back to 1, so the fray works the rim
-  // only — no speck of bare ground ever opens inside the pool.
+  // On top of the outline, one world-space noise field (ONE evaluation for all
+  // slots) mottles how deeply the earth drank: it shifts the soak by at most
+  // ±18 % and the fully soaked middle clamps back to 1, so it works the rim
+  // only — no speck of bare ground ever opens inside the pool. It cannot shape
+  // the outline itself (a factor never moves a zero crossing); the seeded
+  // contour above is what keeps the footprint off a circle.
   const grain = mx_fractal_noise_float(vec3(positionWorld.xz.mul(1.7), 4.0), 2).mul(0.5).add(0.5)
   return m.mul(grain.mul(0.36).add(0.82)).clamp(0, 1) as unknown as FloatNode
 }

@@ -7,6 +7,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   clampIrregularity,
+  CONTOUR_ORDERS,
   groundStainCoverage,
   groundStainSlots,
   groundStainWarpSlots,
@@ -16,6 +17,8 @@ import {
   stainContourFactor,
   stainContourRadius,
   stainSeed,
+  stainWarpFromOffset,
+  stainWarpPacking,
   STAIN_CORE,
   STAIN_LOOK_DEFAULT,
   STAIN_MAX_IRREGULARITY,
@@ -162,20 +165,47 @@ describe('the stain outline is no circle (point 323)', () => {
   })
 })
 
-describe('setGroundStains — the seeded outline it uploads', () => {
-  it('packs one seeded phase per harmonic, and clears them with the slot', () => {
-    setGroundStains([{ x: 7, z: -2, r: 0.9 }], 7, -2)
-    const w = groundStainWarpSlots()[0]
-    expect(STAIN_PHASES).toBe(4)
-    const phases = [w.x, w.y, w.z, w.w]
-    for (const p of phases) {
-      expect(p).toBeGreaterThanOrEqual(0)
-      expect(p).toBeLessThanOrEqual(Math.PI * 2)
+describe('the shader spelling of the warp equals the readable one (point 323)', () => {
+  it('the offset form reproduces the harmonic sum at every bearing', () => {
+    // The fragment code reaches the harmonics by complex multiplication instead
+    // of an atan and four sines. That is only allowed while it computes the SAME
+    // number — this is the check that says so.
+    for (const seed of [0.07, 0.31, 0.5, 0.83, 0.99]) {
+      const w = stainWarpPacking(seed)
+      for (let i = 0; i < 128; i++) {
+        const ang = (i / 128) * Math.PI * 2 - Math.PI
+        const packed = stainWarpFromOffset(w.cos, w.sin, Math.cos(ang) * 0.6, Math.sin(ang) * 0.6)
+        // The contour factor is 1 + swing·warp, so the warp is what is left
+        // when the (clamped) swing is divided back out.
+        const swing = clampIrregularity(1)
+        expect(packed).toBeCloseTo((stainContourFactor(seed, ang, 1) - 1) / swing, 9)
+      }
     }
-    // Four INDEPENDENT phases — a repeated one would fold harmonics together.
-    expect(new Set(phases.map((p) => p.toFixed(6))).size).toBe(4)
+  })
+
+  it('the recurrence chain matches the harmonic orders it is written for', () => {
+    // 3 = 2+1, 5 = 3+2, 8 = 5+3: change an order and the chain must change too.
+    expect([...CONTOUR_ORDERS]).toEqual([2, 3, 5, 8])
+    expect(STAIN_PHASES).toBe(4)
+  })
+
+  it('the exact centre is finite, not a division by a zero direction', () => {
+    const w = stainWarpPacking(0.42)
+    expect(Number.isFinite(stainWarpFromOffset(w.cos, w.sin, 0, 0))).toBe(true)
+  })
+})
+
+describe('setGroundStains — the seeded outline it uploads', () => {
+  it('packs the amplitude-scaled phases of every harmonic, and clears them with the slot', () => {
+    setGroundStains([{ x: 7, z: -2, r: 0.9 }], 7, -2)
+    const { cos, sin } = groundStainWarpSlots()
+    const want = stainWarpPacking(stainSeed({ x: 7, z: -2, r: 0.9 }))
+    expect([cos[0].x, cos[0].y, cos[0].z, cos[0].w]).toEqual(want.cos)
+    expect([sin[0].x, sin[0].y, sin[0].z, sin[0].w]).toEqual(want.sin)
     setGroundStains([], 0, 0)
-    for (const s of groundStainWarpSlots()) expect([s.x, s.y, s.z, s.w]).toEqual([0, 0, 0, 0])
+    for (const s of [...groundStainWarpSlots().cos, ...groundStainWarpSlots().sin]) {
+      expect([s.x, s.y, s.z, s.w]).toEqual([0, 0, 0, 0])
+    }
   })
 
   it('scales the packed radius by the calibratable size factor', () => {
