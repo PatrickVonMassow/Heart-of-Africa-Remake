@@ -78,16 +78,9 @@ export function rinderpestPhaseAtDay(peopleId: string, day: number, startYear: n
   return rinderpestPhase(peopleId, d.getUTCFullYear(), d.getUTCMonth() + 1)
 }
 
-/** Whether re-entering a village should add a RETURN vignette (point 170):
- *  the plague phase last journaled here differs from the phase now. A people
- *  with no phase model keeps a constant phase ('clean'), so this is false for
- *  them by construction — only maasai/sidama ever re-fire. */
-export function villageSituationChanged(
-  storedPhase: string | undefined,
-  currentPhase: RinderpestPhase,
-): boolean {
-  return storedPhase !== undefined && storedPhase !== currentPhase
-}
+// The return-vignette predicate that used to live here is now the generic
+// `situationChanged` of ./placeSituation (point 394): a village's phase is one
+// place situation among several, and the rule is the same for all of them.
 
 // Dev hook for the headless verification (CLAUDE.md §7.2).
 if (import.meta.env.DEV && typeof window !== 'undefined') {

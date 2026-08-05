@@ -4,8 +4,8 @@ import {
   rinderpestCarrionActive,
   rinderpestPhase,
   rinderpestPhaseAtDay,
-  villageSituationChanged,
 } from './rinderpest'
+import { situationChanged } from './placeSituation'
 
 // The date table of point 133 (research: docs/peoples-1890.md §5): the game's
 // window IS the panzootic, and the phase is a pure function of people + date.
@@ -73,16 +73,16 @@ describe('rinderpestPhase (design.md §16/§19.13, point 133)', () => {
   })
 })
 
-describe('villageSituationChanged (return-vignette predicate, point 170)', () => {
+describe('the plague phase as a return-entry situation (points 170/394)', () => {
   it('fires only when a KNOWN stored phase differs from the current one', () => {
-    expect(villageSituationChanged('preDamaged', 'struck')).toBe(true)
-    expect(villageSituationChanged('struck', 'aftermath')).toBe(true)
-    expect(villageSituationChanged('preDamaged', 'aftermath')).toBe(true)
+    expect(situationChanged('preDamaged', 'struck')).toBe(true)
+    expect(situationChanged('struck', 'aftermath')).toBe(true)
+    expect(situationChanged('preDamaged', 'aftermath')).toBe(true)
     // Unchanged → silent.
-    expect(villageSituationChanged('struck', 'struck')).toBe(false)
-    expect(villageSituationChanged('aftermath', 'aftermath')).toBe(false)
+    expect(situationChanged('struck', 'struck')).toBe(false)
+    expect(situationChanged('aftermath', 'aftermath')).toBe(false)
     // No stored phase (never journaled / legacy) → silent, not a spurious entry.
-    expect(villageSituationChanged(undefined, 'struck')).toBe(false)
+    expect(situationChanged(undefined, 'struck')).toBe(false)
   })
 
   it('a non-rinderpest people keeps a constant phase, so it never re-fires', () => {
@@ -91,7 +91,7 @@ describe('villageSituationChanged (return-vignette predicate, point 170)', () =>
     const start = 1890
     for (const day of [0, 400, 1000, 2000]) {
       const p = rinderpestPhaseAtDay('tuareg', day, start)
-      expect(villageSituationChanged(p, rinderpestPhaseAtDay('tuareg', day + 365, start))).toBe(false)
+      expect(situationChanged(p, rinderpestPhaseAtDay('tuareg', day + 365, start))).toBe(false)
     }
   })
 })
