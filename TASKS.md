@@ -477,6 +477,17 @@ it is appended.
   for the window), not the global dead-count, so a concurrent drama can't fail it.
   LESSON reinforced (memory `verify-suites-need-a-quiet-machine`): never run a
   verify suite while a worktree agent builds — evaluate a red only on a quiet box.
+  OBSERVED 05.08.2026 (a WebGL enrichments run on the Linux container host, while
+  closing point 489): first try 243 pass / 2 fail at the point-119 trampling and the
+  point-128 scavenger-drama checks, green on retry (245/0) — neither in that diff's
+  touch set, so a THIRD and FOURTH rotating site on this host. The same day, under
+  load, the point-278 dressing-growth check read `{samples:[0,0,0,0,0]}` — the
+  `__sleepSim(6)` settle elapsed with too few frames for the streamer to populate the
+  desert anchor, so `liveInstances()` legitimately read 0; on a quiet machine the same
+  check reads `{samples:[18,18,18,18,18]}` and passes. That is this point's pattern (1)
+  exactly: a streaming behaviour measured against a settle rather than against its own
+  condition. Fix it by polling until the anchor's instance count is non-zero, not by
+  lengthening the settle.
 
 - [ ] 203. EXTEND 184 — a SYSTEMATIC visual + liveness bug-finder (user request
   20.07.2026: "Bugs wie die … sollten leicht für dich zu finden sein … Kannst
@@ -4155,39 +4166,6 @@ Build order, chosen so no two parallel agents own the same file:
   walkable BOUNDARY, which is no longer a plain circle everywhere, and it reads
   that boundary from the one source the leave check uses — never a second constant.
 
-- [ ] 489. A FRAME MUST WAIT FOR THE PICTURE, NOT FOR THE CLOCK (measured
-  04.08.2026 while bringing the browser verification up on the Linux host). The
-  first frames a container run wrote showed the HUD over empty grey and were
-  accepted: the shutter proves its SUBJECT is in the picture (point 375), and a HUD
-  label is in the picture long before the world is. Measured with a probe: after
-  entering the travel scene the renderer climbs from 99 draw calls and 5.5k
-  triangles at 5 s to 222 and 745k at 30 s — the world streams roughly five times
-  slower here than on the hardware the suites' waits were written for, and a
-  screenshot taken meanwhile is green and empty.
-  TWO SUITES ARE MEASURED CASES, not one (05.08.2026): the `world` suite waited on a
-  healthy frame RATE, which an empty scene reaches FASTEST of all — it wrote a 47 kB
-  blank village frame and exited 0 — and `collision` wrote a blank
-  `52-collision-port-wall.png` the same way while reporting every check green. Both
-  are the same race, so the readiness wait belongs in the shared capture path rather
-  than in one suite.
-  FINAL STATE:
-  1. A frame whose subject is a place, a landmark or anything in the world waits
-     for the SCENE to be ready — the renderer's own draw-call and triangle counts
-     having stopped climbing — before the shutter opens, on every host and at
-     whatever speed that host reaches it. A HUD-only frame needs no such wait.
-  2. The wait is a polled condition with a generous timeout, never a fixed sleep
-     (`scripts/verify/fixedWaits.test.mjs` enforces that), and a frame that times
-     out fails loudly rather than being written half-drawn.
-  3. `verification/` is not regenerated from a host that cannot draw the reference
-     picture. Until this point lands, a container run's screenshots are restored,
-     not committed — they are evidence, and an empty one is a false one.
-  VERIFIABLE: pure Vitest on the readiness predicate (a rising count is not ready,
-  a settled one is, a never-settling one times out); live, a world frame taken
-  immediately after entering the scene contains the terrain rather than the
-  background — the case that silently passed today.
-
-
-
 - [ ] 491. QUEUE PROSE WRITTEN ONLY INTO THE HTML IS LOST ON THE NEXT REBUILD
   (measured 04.08.2026, and it cost the German text of thirteen cards). The
   Warteschlange is a PROJECTION: `scripts/board-queue.mjs` renders it from
@@ -4705,3 +4683,119 @@ Build order, chosen so no two parallel agents own the same file:
   parallel-session alert in the pure core's tests, and the same setup replayed
   against the real detector stays silent; a Vitest case pins that the pause path
   writes no "Von dir zu klären" card.
+
+- [ ] 516. A BRIEF DOES NOT CARRY THE SPECIFICATION IT DECLARES BINDING (measured
+  05.08.2026 while point 488 was built). Point 488's text reads "point 352's
+  specification is binding with one amendment from point 482", and the brief cut for
+  488 carried — per its own design — only the ONE identifying line of each
+  cross-referenced point. So the part that was declared binding was exactly the part
+  missing, and the building agent had to run `point-brief.mjs 352` for itself before
+  it could start. The one-line identification is right for a point merely MENTIONED;
+  it is wrong for one whose specification the reading point adopts.
+  FINAL STATE:
+  1. Where a point ADOPTS another point's specification — "X's specification is
+     binding", "per point X", "as specified in X" and the like — the brief inlines
+     that point VERBATIM, under its number, the way it inlines the design.md
+     sections it cites. A point that is merely referenced for orientation keeps its
+     one identifying line.
+  2. The distinction is made by the referencing WORDING, not by a hand-kept list, and
+     an adopted point's own adopted references resolve one further level, with a
+     depth cap that is stated in the brief rather than silently applied.
+  3. An adopted point that resolves nowhere fails the brief LOUDLY, like every other
+     unresolvable reference.
+  4. The reference map names each adopted point as adopted, so the reader sees why the
+     full text is there.
+  VERIFIABLE: pure Vitest on the reference classifier (an adopting phrase yields the
+  full text, a mentioning one the single line, an unknown number fails); the brief for
+  488 contains point 352's specification in full, and the brief's size for a point with
+  no adopted reference is unchanged.
+
+- [ ] 517. THE LEASE-EXPIRY TAKEOVER IGNORES AN HONOURED CLAIM (measured
+  05.08.2026). The launcher tick took the batch from session 91c1ac42 after 67
+  minutes without a lease renewal (LEASE EXPIRED) and spawned a FRESH headless
+  successor, although a claim from the user's own window d68e8df9 had stood since
+  14:14 with `honour: true` — the same tick had still respected that claim at
+  12:36Z ("reserved — the user is working in that window"). The boundary path knows
+  the CLAIMING_WINDOW target (`boundaryHandover` in `scripts/batch-boundary.mjs`);
+  the lease-expiry path in `scripts/batch-launcher-core.mjs` does not, and spawns a
+  successor unconditionally. The consequence is that a user who wants to take over
+  WITHOUT forcing anything can wait arbitrarily long: the batch moves from session
+  to session past him.
+  FINAL STATE:
+  1. On lease expiry the launcher reads the claim state before it decides. With an
+     HONOURED claim standing, the lock is RELEASED and RESERVED for the claiming
+     window instead of being handed to a new successor — the same target the
+     boundary path already resolves.
+  2. Both paths reach that decision through ONE shared function, so a future change
+     cannot fix one and leave the other behind; the boundary path keeps its current
+     behaviour byte for byte.
+  3. A claim that is expired, or whose claimant is dead, still yields a successor —
+     the reservation follows the claim's own `honour` verdict, nothing else.
+  4. The reservation is bounded: a claiming window that never takes the lock does
+     not stall the batch forever, and what the bound is, is stated where the
+     reservation is written.
+  VERIFIABLE: pure Vitest on the launcher's decision (lease expired + honoured claim
+  → reserve, never spawn; lease expired + no claim → spawn; lease expired + expired
+  claim → spawn; the bound elapses → spawn), and the boundary path's existing tests
+  stay green unchanged.
+
+- [ ] 518. THE SHUTTER JUDGES ITS AIM BEFORE THE WAIT AND NEVER RE-JUDGES (found
+  05.08.2026 while closing point 489). `captureFrame` checks that the frame's
+  declared subject is in the picture, and only THEN waits up to 120 s for the scene
+  to finish drawing. Nothing re-judges the aim afterwards. Where the camera drifts
+  during that wait, the frame is written with its subject out of view while the
+  shutter reports it was in view — precisely the class of defect points 375 and 489
+  exist to prevent. The drift is not hypothetical: the Nile current carries the
+  traveller downstream for as long as he stands in the river (CLAUDE.md §7.1 pt. 21),
+  which is why frames 117/118 had to be re-aimed immediately before each shot rather
+  than once at the start.
+  FINAL STATE:
+  1. The subject check runs AGAIN after the readiness wait, immediately before the
+     shutter opens, and that second reading is the one that decides. A frame whose
+     subject left the picture during the wait FAILS LOUDLY, naming what was found
+     instead — the same message the first check already produces.
+  2. The re-probe costs nothing where nothing moved: it is the existing projection
+     read, not a second settle.
+  3. The re-aim that points 117/118 carry today is no longer the mechanism that
+     keeps a drifting frame honest — it may stay as an aim, but the guarantee comes
+     from the shutter.
+  TWO MORE FINDINGS FROM THE FOUR-EYES REVIEW OF 489 (Fable 5, 05.08.2026, verdict
+  merge-with-fixes — they belong here because they are the same gate and the same
+  file, and one verification round should close all three):
+  4. STILLNESS CONFLATES FINISHED WITH NOT-RENDERING. The readiness verdict reads
+     only the draw-call and triangle counts, so a render loop that has STALLED
+     freezes them exactly as a finished scene does — and the shutter opens on a
+     half-built frame. The wait must additionally demand that the frame counter is
+     ADVANCING, so "the numbers stopped moving" can only mean the scene settled,
+     never that drawing stopped.
+  5. THE QUIET WINDOW HAS ALMOST NO MARGIN. `quietMs` is 5 s against a plateau
+     measured at 4 s — one second of reserve on the host the wait was written for,
+     and this is the class of value that a slower host eats first. Set it from the
+     measured plateau with a stated factor, calibratable like every other such
+     value, rather than as a bare constant. The blank-frame FLOOR is re-measured in
+     the same pass: `sceneReady-core.mjs` states blank frames stand at 5.5k
+     triangles while `world.mjs` measured blank washes at 14–16k against a 20k
+     floor — two comments in the same change contradict each other, and the
+     surviving one is whichever the measurement supports.
+  6. `settle: false` IS UNREACHABLE FOR EVERY KIND BUT `world`.
+     `normaliseDeclaration` (`scripts/verify/frameSubject-core.mjs`) keeps the
+     `settle` field only for `world` frames and drops it silently for `general`,
+     `local` and `place`, so those can never ask for the drawn-only mode. The
+     measured consequence is in `scripts/verify/visualsweep.mjs`: its filmstrip
+     frames are `general` frames taken WHILE THE TRAVELLER DRIVES AWAY — the motion
+     IS the strip — and they now serve the full stand-still wait, which under
+     continuous streaming risks the 120 s timeout and in any case destroys the
+     1.8 s cadence the strip exists for. The mode must be reachable from every kind
+     whose frame can legitimately photograph a moment, and a dropped field must
+     never be the silent answer.
+  The re-probe of item 1 applies in the STAND-STILL mode only: the drawn-only wait
+  is near zero, and re-probing there would add flake on exactly the fast-moving
+  subjects that mode serves. The stale comment in `frameSubject.mjs` claiming
+  nothing moves the camera during the wait is corrected in the same commit — commit
+  `02be8c7d` already falsifies it. The Vitest gap the review names is closed with
+  it: the readiness mode is currently tested on hand-built objects only, never
+  through `normaliseDeclaration`, which is what hid item 6.
+  VERIFIABLE: pure Vitest on the shutter's decision (subject in view before AND
+  after → written; in view before, gone after → refused with the second reading in
+  the message; a frame that needs no readiness wait behaves exactly as today), and
+  live the two Aswan frames stay green.

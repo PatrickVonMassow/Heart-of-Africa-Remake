@@ -14,7 +14,7 @@ import {
   findRawFrames,
   formatRawFrameFindings,
 } from './frameSubject-core.mjs'
-import { captureFrame, probeFrameSubject } from './frameSubject.mjs'
+import { captureFrame, probeFrameSubject, sampleSceneCounts } from './frameSubject.mjs'
 
 const lakeVictoria = () => normaliseDeclaration('12-worldmodel-lake-victoria', { world: { lat: -0.8, lon: 33 }, label: 'Lake Victoria' })
 
@@ -276,28 +276,124 @@ describe('findRawFrames', () => {
 // enough on a host rendering through SwiftShader with no GPU: the capture that
 // takes 5 s in isolation exceeds it under suite load, and the suite then dies
 // far from the check it was running — a machine speed reported as a red frame.
-describe('captureFrame budgets the picture write', () => {
-  const fakePage = (calls) => ({
-    evaluate: async () => ({ ok: true, available: true, mode: null }),
+/** A page that answers both reads the shutter makes: the subject probe and the
+ *  scene sampler (point 489). `scene` is the sample buffer it hands back — the
+ *  default is a settled one, so a capture that is not ABOUT the wait writes at
+ *  once. */
+const fakePage = (calls, { scene = settledSamples() } = {}) => ({
+  evaluate: async (fn) => {
+    if (fn === sampleSceneCounts) {
+      calls.push({ via: 'scene-sample' })
+      return typeof scene === 'function' ? scene(calls.filter((c) => c.via === 'scene-sample').length) : scene
+    }
+    return subjectFound
+  },
+  // The subject is in the picture in every case here; what these tests are about
+  // is what happens between proving that and opening the shutter.
+  waitForFunction: async () => ({ jsonValue: async () => subjectFound, dispose: async () => {} }),
+  waitForTimeout: async (ms) => calls.push({ via: 'sleep', ms }),
+  screenshot: async (options) => {
+    calls.push({ via: 'page', options })
+    return Buffer.alloc(0)
+  },
+  locator: (selector) => ({
     screenshot: async (options) => {
-      calls.push({ via: 'page', options })
+      calls.push({ via: 'locator', selector, options })
       return Buffer.alloc(0)
     },
-    locator: (selector) => ({
-      screenshot: async (options) => {
-        calls.push({ via: 'locator', selector, options })
-        return Buffer.alloc(0)
-      },
-    }),
+  }),
+})
+
+const subjectFound = { ok: true, available: true, visible: true, onScreen: true, settled: true, mode: null }
+
+/** A buffer of readings that stand still over the whole quiet window. */
+function settledSamples(end = Date.now()) {
+  return Array.from({ length: 15 }, (_, i) => ({ t: end - (14 - i) * 500, drawCalls: 458, triangles: 2676537 }))
+}
+
+describe('captureFrame waits for the picture to be drawn (point 489)', () => {
+  it('opens the shutter on a world frame only once the scene stands still', async () => {
+    const calls = []
+    // Climbing for the first three reads, settled from the fourth: the shape the
+    // container host draws while the terrain streams in.
+    const scene = (n) =>
+      n < 4
+        ? Array.from({ length: 15 }, (_, i) => ({ t: Date.now() - (14 - i) * 500, drawCalls: 99 + i * 8, triangles: 5500 + i * 50000 }))
+        : settledSamples()
+    await captureFrame(fakePage(calls, { scene }), 'out/', '12-worldmodel-lake-victoria', {
+      world: { lat: -0.8, lon: 33 },
+      label: 'Lake Victoria',
+    })
+    const order = calls.map((c) => c.via)
+    expect(order.filter((v) => v === 'scene-sample').length).toBe(4)
+    expect(order.filter((v) => v === 'sleep').length).toBe(3)
+    // The picture is written LAST — after the wait, never during it.
+    expect(order[order.length - 1]).toBe('page')
   })
+
+  it('REFUSES the frame when the scene never settles, and writes nothing', async () => {
+    const calls = []
+    const climbing = () =>
+      Array.from({ length: 15 }, (_, i) => ({ t: Date.now() - (14 - i) * 500, drawCalls: 99 + i * 8, triangles: 5500 + i * 50000 }))
+    await expect(
+      captureFrame(fakePage(calls, { scene: climbing }), 'out/', '18-worldmodel-bambara-village-niger', {
+        world: { lat: 12.6, lon: -8.0 },
+        label: 'the Bambara village',
+        // A zero budget makes the timeout path immediate; the wait itself is
+        // pinned with a fake clock in sceneReady.test.mjs.
+      }, { scene: { timeoutMs: 0 } }),
+    ).rejects.toThrow(/never finished drawing/)
+    expect(calls.some((c) => c.via === 'page' || c.via === 'locator')).toBe(false)
+  })
+
+  it('does not hold a frame taken deliberately in motion back until the scene stands still', async () => {
+    // `settle: false` says the picture IS the moment (a lunge, a fire line): the
+    // shutter still checks that something is drawn, but never waits it out.
+    const calls = []
+    const moving = () =>
+      Array.from({ length: 15 }, (_, i) => ({ t: Date.now() - (14 - i) * 500, drawCalls: 300 + i * 20, triangles: 900000 + i * 80000 }))
+    await captureFrame(fakePage(calls, { scene: moving }), 'out/', '131-burning-grass', {
+      world: { lat: 13.5, lon: 5.0 },
+      label: 'the Sahel fire line',
+      settle: false,
+    })
+    expect(calls.filter((c) => c.via === 'scene-sample').length).toBe(1)
+    expect(calls.some((c) => c.via === 'sleep')).toBe(false)
+    expect(calls.some((c) => c.via === 'page')).toBe(true)
+  })
+
+  it('does not hold up a HUD element frame — its subject is DOM, not the world', async () => {
+    const calls = []
+    await captureFrame(fakePage(calls), 'out/', '84-movement-penalty', { element: '.movement-penalty' })
+    expect(calls.some((c) => c.via === 'scene-sample')).toBe(false)
+    expect(calls.some((c) => c.via === 'page')).toBe(true)
+  })
+
+  it('writes a frame on a page that has no renderer to sample at all', async () => {
+    // The production preview: no dev hook, so readiness cannot be judged — and
+    // waiting for one that will never appear would refuse a good frame.
+    const calls = []
+    await captureFrame(fakePage(calls, { scene: null }), 'out/', '09-production-build', {
+      general: 'the production build renders at all — it exposes no dev hook to project a subject through',
+    })
+    expect(calls.filter((c) => c.via === 'scene-sample').length).toBe(1)
+    expect(calls.some((c) => c.via === 'page')).toBe(true)
+  })
+})
+
+describe('captureFrame budgets the picture write', () => {
+  /** The write itself, whatever the shutter did before it (point 489 reads the
+   *  scene counters first, so the write is no longer the only call). */
+  const written = (calls) => calls.filter((c) => c.via === 'page' || c.via === 'locator')
 
   it('hands the full-page write an explicit timeout instead of inheriting one', async () => {
     const calls = []
     await captureFrame(fakePage(calls), 'out/', '115-savanna-dry', { general: 'the whole dressing is the subject' })
-    expect(calls).toHaveLength(1)
-    expect(calls[0].via).toBe('page')
-    expect(calls[0].options.path).toBe('out/115-savanna-dry.png')
-    expect(calls[0].options.timeout).toBeGreaterThan(30000)
+    const write = written(calls)
+    expect(write).toHaveLength(1)
+    expect(write[0].via).toBe('page')
+    expect(write[0].options.path).toBe('out/115-savanna-dry.png')
+    expect(write[0].options.timeout).toBeGreaterThan(30000)
   })
 
   it('budgets a clipped write and an element write the same way', async () => {
@@ -307,17 +403,17 @@ describe('captureFrame budgets the picture write', () => {
       general: 'the whole dressing is the subject',
       clip,
     })
-    expect(clipped[0].options.clip).toEqual(clip)
-    expect(clipped[0].options.timeout).toBeGreaterThan(30000)
+    expect(written(clipped)[0].options.clip).toEqual(clip)
+    expect(written(clipped)[0].options.timeout).toBeGreaterThan(30000)
 
     const element = []
     await captureFrame(fakePage(element), 'out/', '92-map-fog-of-war', {
       general: 'the fog of war is the subject',
       locator: '.map-overlay',
     })
-    expect(element[0].via).toBe('locator')
-    expect(element[0].selector).toBe('.map-overlay')
-    expect(element[0].options.timeout).toBeGreaterThan(30000)
+    expect(written(element)[0].via).toBe('locator')
+    expect(written(element)[0].selector).toBe('.map-overlay')
+    expect(written(element)[0].options.timeout).toBeGreaterThan(30000)
   })
 })
 
