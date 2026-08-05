@@ -433,6 +433,7 @@ export const en: Strings = {
     speechPhrasePause: 'Speech: pause between words (s)',
     speechHearingRadius: 'Speech: hearing radius',
     speechHearingFalloff: 'Speech: falloff sharpness',
+    speechLabelSeconds: 'Speech: note above the head (s)',
     foodPerDay: 'Food use per day (0 = infinite)',
     canteenDrain: 'Water use per day (land)',
     canteenDesertDrain: 'Water use per day (desert)',

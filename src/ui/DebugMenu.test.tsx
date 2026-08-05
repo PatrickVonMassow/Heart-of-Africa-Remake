@@ -215,6 +215,8 @@ describe('DebugMenu editable fields write through to balance (settings.mjs fillF
     { label: en.debug.speechPhrasePause, read: () => balance.communication.phrasePauseSeconds, value: 1.4 },
     { label: en.debug.speechHearingRadius, read: () => balance.communication.hearingRadius, value: 14 },
     { label: en.debug.speechHearingFalloff, read: () => balance.communication.hearingFalloff, value: 12 },
+    // How long the player's reading stands over the speaker's head (point 485).
+    { label: en.debug.speechLabelSeconds, read: () => balance.communication.labelSeconds, value: 4 },
     { label: en.debug.canoeSpeedup, read: () => balance.canoeSpeedup, value: 5 },
     // Nested balance field (balance.health.canteenCapacity).
     { label: en.debug.canteenCapacity, read: () => balance.health.canteenCapacity, value: 600 },

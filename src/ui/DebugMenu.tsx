@@ -287,6 +287,9 @@ export function DebugMenu() {
         onChange={(v) => { balance.communication.hearingRadius = Math.max(0, v); bump() }} />
       <NumberField label={t.debug.speechHearingFalloff} value={balance.communication.hearingFalloff} step={2}
         onChange={(v) => { balance.communication.hearingFalloff = Math.max(0, v); bump() }} />
+      {/* How long the player's reading stands over the speaker's head (point 485). */}
+      <NumberField label={t.debug.speechLabelSeconds} value={balance.communication.labelSeconds} step={0.2}
+        onChange={(v) => { balance.communication.labelSeconds = Math.max(0, v); bump() }} />
       <NumberField label={t.debug.foodPerDay} value={balance.foodPerDay}
         onChange={(v) => set('foodPerDay', Math.max(0, v))} />
       <NumberField label={t.debug.canteenDrain} value={balance.health.canteenDrainPerDay} step={0.1}

@@ -400,6 +400,7 @@ export interface Strings {
     speechPhrasePause: string
     speechHearingRadius: string
     speechHearingFalloff: string
+    speechLabelSeconds: string
     foodPerDay: string
     canteenDrain: string
     canteenDesertDrain: string

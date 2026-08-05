@@ -434,6 +434,7 @@ export const de: Strings = {
     speechPhrasePause: 'Sprache: Pause zwischen Wörtern (s)',
     speechHearingRadius: 'Sprache: Hörweite',
     speechHearingFalloff: 'Sprache: Abfallschärfe',
+    speechLabelSeconds: 'Sprache: Notiz über dem Kopf (s)',
     foodPerDay: 'Nahrungsverbrauch/Tag (0 = ewig)',
     canteenDrain: 'Wasserverbrauch/Tag (Land)',
     canteenDesertDrain: 'Wasserverbrauch/Tag (Wüste)',

@@ -183,9 +183,15 @@ describe('village speech (design.md §13.4)', () => {
       phrasePauseSeconds: 0.9,
       hearingRadius: 10,
       hearingFalloff: 24,
+      labelSeconds: 2.6,
     })
     // A five-syllable atom stays well under two seconds, so a seven-atom
     // message is heard in one go rather than sat through.
     expect(balance.communication.syllableSeconds * 5).toBeLessThan(2)
+    // The note over the head outlasts the syllables it annotates — it is read
+    // after the voice, never instead of it (work-order point 485).
+    expect(balance.communication.labelSeconds).toBeGreaterThan(
+      balance.communication.syllableSeconds * 5,
+    )
   })
 })
