@@ -649,10 +649,12 @@ function talkerAim(
  * whose other half is whatever happens next, which is the rule this project set
  * for the whole communication PoC.
  *
- * This scheduler is the AMBIENT driver. Once the speaking layer exists (the
- * communication points), it drives the very same `gesture` refs through
- * `startGesture`, so a figure saying COME beckons in step — the coupling point
- * is the ref, and nothing about the figure has to change for it.
+ * This scheduler is the AMBIENT driver. The speaking layer (`src/communication/`)
+ * is vocabulary and audio so far — no inhabitant utters anything in the scene
+ * yet. When the teaching situations put words in a figure's mouth, they drive
+ * the very same `gesture` refs through `startGesture`, so a figure saying COME
+ * beckons in step — the coupling point is the ref, and nothing about the figure
+ * has to change for it.
  */
 function Talkers({ x, z, cloth }: { x: number; z: number; cloth: string[] }) {
   const a = useRef<THREE.Group>(null)
