@@ -17,6 +17,19 @@ export interface BalanceConfig {
    *  has a walk target) before it is teleport-nudged to the nearest free spot
    *  (point 155) — a small invisible correction, inhabitants only. */
   walkerUnstuckSeconds: number
+  /** The settlement edge painted on the ground (design.md §2.6, point 352/488):
+   *  where the swept, trodden ground gives way to open land. The band's PLACE is
+   *  never configured — it sits at the boundary the leave check reads
+   *  (`src/scenes/place/boundary.ts`); only its look is calibratable. */
+  placeEdgeBand: {
+    /** How wide the give-way reads, in metres (the full ramp, centred on the boundary). */
+    widthM: number
+    /** How far the outline may meander off the true boundary, in metres. Hard-capped
+     *  by `EDGE_BAND_MAX_WANDER_M`: it may look natural, it may not mislead. */
+    wanderM: number
+    /** Master strength of the whole edge, 0 (invisible) .. 1 (the full per-kind look). */
+    strength: number
+  }
   /** Mouse-look sensitivity in the first-person view, radians per pixel. */
   mouseSensitivity: number
   /** Vertical first-person look clamp in DEGREES from the horizon (design.md
@@ -523,6 +536,14 @@ export const balance: BalanceConfig = {
   placeWalkSpeed: 10,
   placeStrafeFactor: 0.8,
   walkerUnstuckSeconds: 4, // an inhabitant wedged this long is teleport-nudged free (point 155)
+  placeEdgeBand: {
+    // Calibratable: ~3 m of give-way reads as a soft change underfoot at walking
+    // pace without turning into a stripe, and 0.9 m of wander bows the outline
+    // visibly while staying well inside the 1.5 m honesty cap.
+    widthM: 3,
+    wanderM: 0.9,
+    strength: 1,
+  },
   mouseSensitivity: 0.0011,
   lookPitchLimitDeg: 85, // just short of vertical (point 392); the view never rolls over
   ambienceVolume: 0.1,

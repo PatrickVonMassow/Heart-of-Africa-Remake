@@ -913,6 +913,34 @@ duration, the conversing pair takes turns and a figure between gestures stands
 exactly at rest (`scripts/verify/polish.mjs`, screenshots
 479-gesture-beckon / -point / -refuse / -indicate).
 
+THE SETTLEMENT EDGE ON THE GROUND (§2.6, points 352/488): where the inhabited
+ground ends, the swept, trodden earth gives way to open land across a soft band —
+three terms of the ground material that is already drawn (a multiplicative
+darkening of the compacted inside, its blotchy patch mottling faded out, its
+micro-relief worn flatter), never a ring or a glow, and NO quality key, because a
+term in a shaded material has no cost to switch off.
+Verifiable: the band holds no radius of its own — `src/scenes/place/boundary.ts`
+is the one boundary, the leave check asks it, and its per-angle sampling fills the
+band's lookup, so a boundary that stops being a circle needs no second edit. The
+pure tests BISECT the leave check and compare it with the radius the band draws
+at, for every place in the roster at 32 bearings, follow a moved boundary,
+reproduce a deliberately non-circular one, cover `PLACE_KINDS` totality, cap the
+wander below both the honesty limit and the band's own half-width (so the true
+line always lies inside the visible give-way), and prove the tone step is a RATIO
+that survives both ends of the year against the real season curve
+(`src/render/edgeBand.test.ts`); a source-level test refuses a second hand-rolled
+distance-against-radius test in the scene (`src/scenes/place/boundary.test.ts`).
+Live, the picture is measured by ATTRIBUTION rather than correlation — the
+settlement's grass scatter also stops at the edge, so each of three ground crops
+(5 m inside, at the boundary, 4 m outside, each placed by projecting the ground
+point through the live place camera) is photographed with the edge drawn and again
+with its calibratable strength at 0, and the RATIO of the two must fall inside,
+half-fall at the boundary and be 1 outside — in a village, a port and at the
+monument site, each in a dry and a wet month; walking straight out is then stepped
+in the real walk loop and the place is left within 1.5 m of the drawn line
+(`scripts/verify/polish.mjs`, screenshots 488-village-edge-band /
+488-port-edge-band / 488-monument-edge-band).
+
 ## 16. Collision inside settlements.
 
 Verifiable: an automated

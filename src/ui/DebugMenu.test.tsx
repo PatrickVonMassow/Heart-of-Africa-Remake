@@ -9,6 +9,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { DebugMenu } from './DebugMenu'
 import { balance } from '../config/balance'
+import { EDGE_BAND_MAX_WANDER_M } from '../render/edgeBand'
 import { en } from '../i18n/en'
 import { de } from '../i18n/de'
 import { useLocale } from '../i18n'
@@ -59,6 +60,9 @@ const DEFAULTS = {
   crocAmbushBankBand: balance.crocodile.ambushBankBand,
   crocMouthOffset: balance.crocodile.mouthOffsetLocal,
   wetGroundStrength: balance.season.wetGroundStrength,
+  edgeBandWidth: balance.placeEdgeBand.widthM,
+  edgeBandWander: balance.placeEdgeBand.wanderM,
+  edgeBandStrength: balance.placeEdgeBand.strength,
   placeStrafeFactor: balance.placeStrafeFactor,
   inventoryCapacity: balance.inventoryCapacity,
   randomEventsEnabled: balance.randomEventsEnabled,
@@ -129,6 +133,9 @@ afterEach(() => {
   balance.crocodile.ambushBankBand = DEFAULTS.crocAmbushBankBand
   balance.crocodile.mouthOffsetLocal = DEFAULTS.crocMouthOffset
   balance.season.wetGroundStrength = DEFAULTS.wetGroundStrength
+  balance.placeEdgeBand.widthM = DEFAULTS.edgeBandWidth
+  balance.placeEdgeBand.wanderM = DEFAULTS.edgeBandWander
+  balance.placeEdgeBand.strength = DEFAULTS.edgeBandStrength
   balance.placeStrafeFactor = DEFAULTS.placeStrafeFactor
   balance.inventoryCapacity = DEFAULTS.inventoryCapacity
   balance.randomEventsEnabled = DEFAULTS.randomEventsEnabled
@@ -250,6 +257,10 @@ describe('DebugMenu editable fields write through to balance (settings.mjs fillF
     { label: en.debug.crocMouthOffset, read: () => balance.crocodile.mouthOffsetLocal, value: 1.4 },
     // The wet-ground strength (design.md §19.13, point 225).
     { label: en.debug.wetGroundStrength, read: () => balance.season.wetGroundStrength, value: 0.5 },
+    // The settlement edge painted on the ground (design.md §2.6, point 352/488).
+    { label: en.debug.edgeBandWidth, read: () => balance.placeEdgeBand.widthM, value: 4.5 },
+    { label: en.debug.edgeBandWander, read: () => balance.placeEdgeBand.wanderM, value: 0.4 },
+    { label: en.debug.edgeBandStrength, read: () => balance.placeEdgeBand.strength, value: 0.6 },
   ]
 
   it.each(editable)('editing "$label" updates the balance singleton at runtime', ({ label, read, value }) => {
@@ -266,6 +277,13 @@ describe('DebugMenu numeric clamps (design.md §21, point 173)', () => {
     const input = numberField(en.debug.strafeFactor)
     fireEvent.change(input, { target: { value: '-5' } })
     expect(balance.placeStrafeFactor).toBe(0)
+  })
+
+  it('caps the settlement edge wander so the painted edge cannot lie', () => {
+    render(<DebugMenu />)
+    fireEvent.change(numberField(en.debug.edgeBandWander), { target: { value: '99' } })
+    expect(balance.placeEdgeBand.wanderM).toBeLessThanOrEqual(EDGE_BAND_MAX_WANDER_M)
+    expect(balance.placeEdgeBand.wanderM).toBeLessThan(balance.placeEdgeBand.widthM / 2)
   })
 
   it('rounds the inventory capacity and floors it at 1 (the only rounding field)', () => {

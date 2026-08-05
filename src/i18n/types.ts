@@ -440,6 +440,9 @@ export interface Strings {
     waterCrossChance: string
     seasonStrength: string
     wetGroundStrength: string
+    edgeBandWidth: string
+    edgeBandWander: string
+    edgeBandStrength: string
     season: string
     seasonAuto: string
     seasonDry: string

@@ -2195,6 +2195,288 @@ for (const [placeId, shot] of [
   )
 }
 
+// --- The settlement edge painted on the ground (design.md §2.6, point 352/488) ---
+// The band must TELL THE TRUTH, so this measures it in the rendered picture and
+// against the leave check itself, in EVERY kind of place and at BOTH ends of the
+// year — a step visible only in the dry-season straw would be half a feature.
+{
+  // Ground crops: how far inside / outside the boundary each sample sits.
+  const SAMPLES = [
+    { name: 'inside', at: -5 },
+    { name: 'boundary', at: 0 },
+    { name: 'outside', at: 4 },
+  ]
+
+  /** Project a ground point through the live place camera (point 172/375: the
+   *  picture decides where a crop sits, never an assumed screen position). */
+  const groundPixel = (x, z) =>
+    page.evaluate(
+      ([px, pz]) => {
+        const cam = window.__placeCamera
+        if (!cam) return null
+        const apply = (e, v) => [0, 1, 2, 3].map((r) => e[r] * v[0] + e[r + 4] * v[1] + e[r + 8] * v[2] + e[r + 12] * v[3])
+        const eye = apply(cam.matrixWorldInverse.elements, [px, 0, pz, 1])
+        const clip = apply(cam.projectionMatrix.elements, eye)
+        if (!(clip[3] > 0)) return null
+        return { x: clip[0] / clip[3], y: clip[1] / clip[3] }
+      },
+      [x, z],
+    )
+
+  /** A bearing whose corridor across the boundary is free of buildings, fences,
+   *  rocks and plants — a hut in a crop would measure the hut, not the ground. */
+  const clearBearing = () =>
+    page.evaluate(() => {
+      const L = window.__placeLayout
+      const r = L.radius
+      const near = (x, z, ax, az, d) => Math.hypot(x - ax, z - az) < d
+      const blocked = (ax, az) => {
+        for (const c of L.colliders ?? []) {
+          if (c.kind === 'segment') {
+            if (near(c.x1, c.z1, ax, az, 4) || near(c.x2, c.z2, ax, az, 4)) return true
+          } else if (near(c.x, c.z, ax, az, (c.r ?? Math.hypot(c.hx ?? 0, c.hz ?? 0)) + 4)) return true
+        }
+        for (const f of L.flora ?? []) if (near(f.x, f.z, ax, az, 4)) return true
+        for (const rk of L.rocks ?? []) if (near(rk[0], rk[1], ax, az, 4)) return true
+        return false
+      }
+      for (let i = 0; i < 180; i++) {
+        const b = (i / 180) * Math.PI * 2
+        let ok = true
+        for (let d = r - 9; d <= r + 6 && ok; d += 1.5) {
+          if (blocked(Math.cos(b) * d, Math.sin(b) * d)) ok = false
+        }
+        if (ok) return b
+      }
+      return null
+    })
+
+  /** Mean luminance of a crop centred on a ground point. */
+  const groundLuma = async (buf, ndc, w, h) => {
+    const view = page.viewportSize()
+    const left = Math.round(((ndc.x + 1) / 2) * view.width - w / 2)
+    const top = Math.round(((1 - ndc.y) / 2) * view.height - h / 2)
+    if (left < 0 || top < 0 || left + w > view.width || top + h > view.height) return null
+    const { data, info } = await sharp(buf).extract({ left, top, width: w, height: h }).raw().toBuffer({ resolveWithObject: true })
+    let sum = 0
+    for (let i = 0; i < info.width * info.height; i++) {
+      sum += 0.35 * data[i * info.channels] + 0.5 * data[i * info.channels + 1] + 0.15 * data[i * info.channels + 2]
+    }
+    return sum / (info.width * info.height)
+  }
+
+  /** Aim the camera at a ground point ahead by bisecting the pitch on the
+   *  PROJECTION — no assumption about the pitch convention or the field of view. */
+  const aimAt = async (bearing, distance, standAt) => {
+    await page.evaluate(
+      ([b, stand]) => {
+        const p = window.__placePlayer
+        p.x = Math.cos(b) * stand
+        p.z = Math.sin(b) * stand
+        // Forward is -Z rotated by yaw, so this faces straight out of the place.
+        p.yaw = Math.atan2(-Math.cos(b), -Math.sin(b))
+        p.pitch = -0.2
+      },
+      [bearing, standAt],
+    )
+    const tx = Math.cos(bearing) * distance
+    const tz = Math.sin(bearing) * distance
+    let lo = -1.4
+    let hi = 0.2
+    let ndc = null
+    for (let i = 0; i < 22; i++) {
+      const mid = (lo + hi) / 2
+      await page.evaluate((v) => { window.__placePlayer.pitch = v }, mid)
+      await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))))
+      ndc = await groundPixel(tx, tz)
+      // pitch 0 is the horizon and + looks UP (design.md §17.5, point 392): a
+      // target below the frame centre needs a LOWER pitch, so it is the lower
+      // half that stays in play.
+      if (!ndc) { hi = mid; continue }
+      if (ndc.y > 0) lo = mid
+      else hi = mid
+      if (Math.abs(ndc.y) < 0.01) break
+    }
+    return ndc
+  }
+
+  /** Let the scene draw N frames — the app's own clock, never the wall clock. */
+  const settleFrames = (frames = 3) =>
+    page.evaluate(
+      (n) =>
+        new Promise((res) => {
+          let i = 0
+          const step = () => (++i >= n ? res() : requestAnimationFrame(step))
+          requestAnimationFrame(step)
+        }),
+      frames,
+    )
+
+  const enterFor = async (id) => {
+    await page.evaluate((want) => {
+      const g = window.__game.getState()
+      if (g.placeId) g.leavePlace()
+      g.enterPlace(want)
+    }, id)
+    await page.waitForFunction(
+      (want) => window.__game.getState().placeId === want && !!window.__placeLayout && !!window.__placeCamera,
+      id,
+      { timeout: 40000 },
+    )
+    await page.evaluate(() => window.__game.getState().setJournalOpen(false))
+    await settleFrames(8)
+  }
+
+  /** Read the crop until it stops moving: the settlement's own state settles on
+   *  entry and the wet ground keeps SOAKING through a storm (§19.13), so the
+   *  measurement waits on the picture rather than on a guessed number of
+   *  milliseconds. Returns the settled reading (or the last one taken). */
+  const settledLuma = async (ndc) => {
+    let prev = null
+    for (let i = 0; i < 40; i++) {
+      await settleFrames(2)
+      const cur = await groundLuma(await page.screenshot(), ndc, 150, 46)
+      if (cur === null) return null
+      if (prev !== null && Math.abs(cur - prev) < 0.3) return cur
+      prev = cur
+    }
+    return prev
+  }
+
+  /** The band's OWN effect on a crop: its luminance with the edge drawn over
+   *  its luminance with the edge switched off from the debug menu's own value,
+   *  same camera, same frame content. Attribution, not correlation — the
+   *  settlement's grass scatter also stops at the edge, and a plain
+   *  inside-vs-outside difference could not tell the two apart. It doubles as
+   *  the live proof that the calibratable strength lands without a reload. */
+  const bandRatio = async (ndc) => {
+    const shot = async (strength) => {
+      await page.evaluate((s) => { window.__balance.placeEdgeBand.strength = s }, strength)
+      await settleFrames(3)
+      return groundLuma(await page.screenshot(), ndc, 150, 46)
+    }
+    // ON, OFF, ON — and the two ONs averaged. In the rains the ground SOAKS
+    // while the shots are taken (the §19.13 wet accumulation keeps darkening
+    // it), which biased a plain on/off pair by more than the edge itself; a
+    // symmetric triple cancels that linear drift instead of racing it.
+    const on1 = await shot(1)
+    const off = await shot(0)
+    const on2 = await shot(1)
+    if (on1 === null || on2 === null || !(off > 0)) return null
+    return (on1 + on2) / 2 / off
+  }
+
+  const readGround = async (id, wetness, seasonName, shoot) => {
+    await enterFor(id)
+    await page.evaluate((w) => window.__ui.getState().setSeasonWetnessOverride(w), wetness)
+    const bearing = await clearBearing()
+    if (bearing === null) {
+      check(`${id} (${seasonName}): a clear ground corridor across the edge exists`, false, 'every bearing blocked')
+      return null
+    }
+    const radius = await page.evaluate(() => window.__placeLayout.radius)
+    // One standing spot for all three crops, so only the aim moves between them.
+    const stand = radius - 6
+    const out = {}
+    for (const s of SAMPLES) {
+      const ndc = await aimAt(bearing, radius + s.at, stand)
+      if (!ndc || Math.abs(ndc.y) > 0.35 || Math.abs(ndc.x) > 0.5) {
+        check(`${id} (${seasonName}): the ${s.name} ground crop is in the picture`, false, `ndc ${JSON.stringify(ndc)}`)
+        return null
+      }
+      // Wait out the season change and, in the rains, the soak that keeps
+      // building — on the PICTURE, not on a stopwatch — before the pair is taken.
+      if (await settledLuma(ndc) === null) {
+        check(`${id} (${seasonName}): the ${s.name} ground crop is measurable`, false, 'crop off-frame')
+        return null
+      }
+      out[s.name] = await bandRatio(ndc)
+      if (out[s.name] === null) {
+        check(`${id} (${seasonName}): the ${s.name} ground crop could be measured`, false, 'crop off-frame')
+        return null
+      }
+    }
+    if (shoot) {
+      // Human-viewable evidence, composed so the edge is READABLE rather than
+      // merely present: standing just inside the line and looking ALONG it, so
+      // the give-way runs across the frame with the swept ground on one side
+      // and the open land on the other — a frame looking straight out over it
+      // shows the band nearly edge-on and reads as a distance gradient.
+      await page.evaluate(
+        ([b, r]) => {
+          const p = window.__placePlayer
+          p.x = Math.cos(b) * (r - 2.5)
+          p.z = Math.sin(b) * (r - 2.5)
+          p.yaw = Math.PI - b // along the boundary's tangent
+          // Shallow enough to keep the horizon in the frame: a picture of
+          // nothing but ground shows the band without showing WHERE it is.
+          p.pitch = -0.22
+        },
+        [bearing, radius],
+      )
+      await settleFrames(6)
+      await frame(shoot.name, { place: id, label: shoot.label })
+    }
+    return out
+  }
+
+  const kinds = [
+    { id: 'maasai-village', shoot: { name: '488-village-edge-band', label: 'the swept village ground giving way at the edge' } },
+    { id: 'capetown', shoot: { name: '488-port-edge-band', label: 'the port ground giving way at the edge' } },
+    { id: 'giza', shoot: { name: '488-monument-edge-band', label: 'the monument plateau giving way at the edge' } },
+  ]
+  for (const { id, shoot } of kinds) {
+    for (const [wetness, seasonName] of [[0, 'dry'], [1, 'wet']]) {
+      const r = await readGround(id, wetness, seasonName, wetness === 0 ? shoot : null)
+      if (!r) continue
+      const shown = `inside ×${r.inside.toFixed(3)} · boundary ×${r.boundary.toFixed(3)} · outside ×${r.outside.toFixed(3)}`
+      check(
+        `${id} (${seasonName}): the swept ground inside is measurably darkened, the open land outside is untouched`,
+        1 - r.inside > 0.04 && Math.abs(1 - r.outside) < 0.025,
+        shown,
+      )
+      check(
+        `${id} (${seasonName}): the crop AT the boundary lies between the two — a give-way, not a step`,
+        r.inside < r.boundary - 0.008 && r.boundary < r.outside - 0.008,
+        shown,
+      )
+    }
+  }
+  await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(null))
+
+  // The truth check (design.md §2.6): walking straight out over the visible band
+  // is the frame in which the place is left. Stepped in the REAL walk loop, not
+  // teleported, and judged against the boundary the band draws at.
+  {
+    await enterFor('maasai-village')
+    const bearing = (await clearBearing()) ?? 0
+    const crossing = await page.evaluate(async (b) => {
+      const p = window.__placePlayer
+      const L = window.__placeLayout
+      p.x = Math.cos(b) * (L.radius - 3)
+      p.z = Math.sin(b) * (L.radius - 3)
+      p.yaw = Math.atan2(-Math.cos(b), -Math.sin(b))
+      p.pitch = 0
+      const radius = L.radius
+      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW' }))
+      const started = Date.now()
+      let last = Math.hypot(p.x, p.z)
+      while (Date.now() - started < 15000) {
+        await new Promise((r) => requestAnimationFrame(r))
+        if (!window.__game.getState().placeId) break
+        last = Math.hypot(p.x, p.z)
+      }
+      window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyW' }))
+      return { left: !window.__game.getState().placeId, last, radius }
+    }, bearing)
+    check(
+      'walking straight over the painted edge is the frame in which the village is left (design.md §2.6)',
+      crossing.left && Math.abs(crossing.last - crossing.radius) < 1.5,
+      `left at ${crossing.last?.toFixed(2)} m of a ${crossing.radius} m boundary`,
+    )
+  }
+}
+
 console.log('console errors:', errors.length)
 for (const e of errors) console.log('ERR:', e.slice(0, 300))
 await browser.close()

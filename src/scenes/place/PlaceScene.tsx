@@ -83,6 +83,8 @@ import { REGION_PLACE_STYLES, type RegionPlaceStyle } from './regionStyles'
 import { PlaceLife } from './PlaceLife'
 import { SpeechLabels } from './SpeechLabels'
 import { resolveMove } from './collision'
+import { buildBoundaryLut, isOutsidePlace } from './boundary'
+import { clearEdgeBand, setEdgeBandBoundary, setEdgeBandLook } from '../../render/edgeBand'
 import { buildLayout, isOnLane, nearestActionable, PLACE_RADIUS, SPAWN_INSET, type Interactive, type PathDef, type DwellingDef, type FenceDef, type PlaceLayout } from './layout'
 import { getPanoramaCapture } from '../travel/panoramaCapture'
 import {
@@ -1943,6 +1945,14 @@ export function PlaceScene() {
     () => (placeId ? buildLayout(placeId, seed) : null),
     [placeId, seed],
   )
+  // The settlement edge on the ground (design.md §2.6, point 352/488): the band
+  // is pointed at the boundary the leave check reads, sampled over the full
+  // turn — it never carries a radius of its own.
+  useEffect(() => {
+    if (!layout) return
+    setEdgeBandBoundary(buildBoundaryLut(layout))
+    return () => clearEdgeBand()
+  }, [layout])
   const isPort = place?.kind === 'port'
   const isMonument = place?.kind === 'monument'
   const isVillage = place?.kind === 'village'
@@ -2230,6 +2240,9 @@ export function PlaceScene() {
     // stood. Overcast dims the sun and the sky light — and the §19.10 fire glow
     // is a fixed point light, so it carries visibly further for it.
     if (place) {
+      // The edge band's look, driven per frame like the season tint so a debug
+      // edit lands live (the band's PLACE comes from the boundary effect above).
+      setEdgeBandLook(place.kind, balance.placeEdgeBand)
       const wet = effectiveWetness(
         useGame.getState().day, place.lat, place.lon, START_YEAR,
         elevationAt(place.lat, place.lon), useUi.getState().seasonWetnessOverride,
@@ -2351,8 +2364,9 @@ export function PlaceScene() {
 
     // Walking beyond the settlement's edge leaves it (design.md §2 "Switching"):
     // no exit key, purely position-based — the LOGICAL position, not the bobbed
-    // camera.
-    if (Math.hypot(p.x, p.z) > layout.radius) {
+    // camera. THE boundary source (point 488): the ground band the player sees
+    // is driven from the same function, so the painted edge cannot lie.
+    if (isOutsidePlace(layout, p.x, p.z)) {
       useGame.getState().leavePlace()
       return
     }
