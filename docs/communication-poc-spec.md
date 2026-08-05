@@ -125,7 +125,12 @@ with the square of the distance and is cut to silence at the hearing radius, so
 player could not hear teaches him nothing, however plainly he saw the gesture.
 Among the children the player hears the children; among the adults, the adults;
 in the middle of the village, no permanent babble of both. The two groups are
-placed far enough apart for that to hold.
+placed far enough apart for that to hold: the children's play ground is DERIVED
+(`childPlayGround` in `src/scenes/place/lifeSpots.ts`) as the largest disc, on
+the bearing furthest from every fixed adult vignette, whose whole area still
+clears them by the hearing radius — and it shrinks rather than gives up where a
+layout leaves no room. The chase is bounded by that ground, so no child wanders
+into the cook's earshot.
 
 Pace, pause, radius and the sharpness of the fall are balance values under
 `balance.communication.*`, editable in the debug menu while the game runs.

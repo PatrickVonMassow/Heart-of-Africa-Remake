@@ -1016,6 +1016,42 @@ swept, ray-probed standpoint that both has a clear sight line and holds two
 children inside the projected picture (`scripts/verify/polish.mjs`, screenshot
 480-village-tag).
 
+AT THAT GAME THE CHILDREN TEACH THE SIX GENERAL CONCEPTS (§13.4,
+docs/communication-poc-spec.md, point 481). Twelve situations, two per concept:
+one atomic utterance, the gesture the speaker makes while it says it, and the
+ACTION that visibly follows — a child calls the others in (COME), sends one to a
+named spot (GO_THERE), asks another along as it runs (FOLLOW), names where it
+stands (HERE), points something out beyond the ground (THERE) and refuses (NO).
+Nothing is ever translated: the meaning lives in what happens next. The two
+look-alikes are staged apart, because otherwise they teach nothing — COME is
+spoken by a child STANDING STILL against FOLLOW's caller running away, and THERE
+by a child after whom NOBODY moves against GO_THERE, which always ends in the
+addressee walking to the spot. The scheduler is a fair queue (the least-staged
+castable situation goes next), so nothing starves inside a visit; a refusal is
+offered out of turn as the answer to the call just spoken, and the freshly-tagged
+child's HERE as a moment whose state is gone within seconds. The group plays on
+its own ground — the largest disc on the bearing furthest from every fixed adult
+vignette whose whole area still clears them by the §13.4 hearing radius — so
+among the children the player hears the children and among the adults the adults.
+The chase carries out what was said: the situation decides a runner's direction,
+the chase keeps the collisions, the stamina and the floor pace, and between
+rounds that claim is what moves anyone at all. Rate, action life, errand pace and
+refusal chance are calibratable (`balance.villageLife.childSpeech`) and
+debug-editable in both languages, as is the play radius.
+Verifiable: pure Vitest on the catalogue and the scheduler
+(`src/scenes/place/childSituations.test.ts`) — one atom per situation and it is
+the concept's own; a gesture and a following action on every one; every concept
+in more than one situation, and heard in at least two DIFFERENT ones over a
+driven visit; every situation staged within a visit; both staged contrasts; the
+refusals only ever as answers, cancelling what the child was told; the errands
+really carried out and every one of them expiring. The separation rule is pinned
+in `src/scenes/place/lifeSpots.test.ts` (every adult station outside the hearing
+radius of the whole play ground, swept over the fire's position, shrinking rather
+than giving up), and the chase's side of it in
+`src/scenes/place/tagGame.test.ts` (a claim steers a runner and never the chaser,
+the floor pace holds under any claim, the break moves only who was told to, and
+the group stays inside an off-centre ground while the game still resolves).
+
 ## 16. Collision inside settlements.
 
 Verifiable: an automated
