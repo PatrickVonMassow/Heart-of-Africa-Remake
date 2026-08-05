@@ -4672,3 +4672,29 @@ Build order, chosen so no two parallel agents own the same file:
   VERIFIABLE: `enrichments` runs green twice in a row on the compatibility lane on
   a quiet machine, or the host-environment section names the difference that makes
   it structurally impossible there.
+
+- [ ] 515. THE PARALLEL-SESSION DETECTOR COUNTS A PLACEHOLDER OWNER AS A SECOND
+  SESSION (measured 05.08.2026). The batch PAUSED ITSELF at 13:06 because the
+  alert "PARALLEL batch sessions" had gone five times unanswered. The alert was
+  FALSE. `.claude/batch-lock.json` carried the placeholder `x` as its `sessionId`
+  (still visible as `sessionIdBefore`, restamped 12:07). The detector compares the
+  lock's owner id against the observed session ids; a placeholder matches no real
+  id, so EVERY live session read as an additional one. The log proves it twice
+  over: `08:06 owner=x plus 45289138-…`, `11:06 owner=x plus 52543006-…` — two
+  different "second" ids against the same placeholder owner, and on both occasions
+  exactly ONE claude process was running (pid 1470, the very pid the lock names).
+  The cost is not the alert but the escalation: a self-pause that only a human can
+  lift, on evidence that was never there.
+  FINAL STATE:
+  1. A lock whose `sessionId` is not a valid session id counts as owner UNKNOWN,
+     never as a foreign owner. The detector may then report "owner unknown"; it may
+     not report parallel sessions.
+  2. A session whose pid equals the lock's pid is NEVER a second session, whatever
+     the ids say — the pid is the stronger evidence and settles it first.
+  3. Both cases are covered by Vitest in the pure decision core.
+  4. The escalation chain itself stays untouched: five unanswered alerts still
+     pause the batch. The point removes the false alert, never the response to a
+     real one.
+  VERIFIABLE: a lock carrying a placeholder id plus one live session produces no
+  parallel-session alert in the pure core's tests, and the same setup replayed
+  against the real detector stays silent.
