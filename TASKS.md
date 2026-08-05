@@ -4118,19 +4118,6 @@ Build order, chosen so no two parallel agents own the same file:
   no-upstream situation present, every target reachable); browser for the walk to
   the bank.
 
-- [ ] 485. THE HYPOTHESIS OVER THE SPEAKER'S HEAD (user 03.08.2026).
-  FINAL STATE:
-  1. When a figure speaks an utterance the player has already observed, his
-     current hypothesis appears briefly above that figure; where he has entered
-     none, `???`. A phrase shows one reading per atom, in order.
-  2. Unmistakably attached to the speaker, brief, and the scene never accumulates
-     standing text.
-  3. Editing the note in the journal changes what appears immediately.
-  4. The syllables stay audible — the hypothesis is shown beside the utterance,
-     never instead of it.
-  VERIFIABLE: pure Vitest on the label's lifetime and its binding to the note;
-  browser screenshot for the attachment to the figure.
-
 - [ ] 486. THE DRUMS AND THE CHIEF'S MESSAGE (user 03.08.2026).
   FINAL STATE:
   1. A drummer transmits on two drums: the large low one for `ba`, the small high
