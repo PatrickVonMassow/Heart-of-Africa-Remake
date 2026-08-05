@@ -1462,47 +1462,6 @@ it is appended.
   CLAUDE.md §7.1 pt 20 keeps naming what the menu must offer. Both sit at measured
   ceilings, so any added words are paid for by a measured raise with its justification or
   by shortening elsewhere.
-- [ ] 394. EVERY WALKABLE PLACE IS JOURNALLED ON ITS FIRST ENTRY (user 28.07.2026: there
-  is no journal entry when the Giza site is entered, and "beim erstmaligen Eintritt in eine
-  Ich-Perspektiven-Szene sollte es immer einen Text geben"). WHAT EXISTS TODAY: villages
-  carry a first-visit vignette in that people's own ~1890 voice (§16, §7.1 pt 8) and at
-  least one carries a RETURN vignette for a changed situation (point 170, `src/i18n/*.ts`);
-  ports and the monument site carry neither. The gap is not that a text is missing at Giza
-  — it is that nothing makes the text obligatory, so the next walkable place will arrive
-  without one too.
-  TARGET, as a RULE rather than a patch: entering a first-person scene for the FIRST time
-  always writes a journal entry, and re-entering writes one when the situation has changed
-  since the last visit. Both in German and English, both with the §15 voice markup, both
-  written for the place rather than assembled from a template — a port, a village and a
-  monument have nothing in common but the fact of arrival, and a shared boilerplate would
-  read as one (§7.1 pt 8 says exactly this for villages; it now holds for all of them).
-  WHAT COUNTS AS A CHANGED SITUATION is already modelled and is not to be invented anew:
-  the reputation state of §12 (honoured friend, hostility after a rejected gift, the
-  aftermath of a robbery), the season and weather of §19.9 at the visit date, and a
-  place-specific state where one exists. Reuse point 170's return-vignette selection rather
-  than building a second mechanism beside it.
-  ENFORCEMENT, so the gap cannot reopen: a pure completeness test walks every entry in
-  `PLACES` (`src/world/geo.ts` — ports, villages, monument sites, and whatever kind is
-  added next) and fails when a place has no first-entry text in EITHER language. That is
-  the same shape as the `QUALITY_PRESETS` gate: a new place cannot ship silent.
-  THE TEXTS THIS POINT OWES: the ten ports and the Giza monument site (villages already
-  have theirs). Each names what the traveller actually sees on arriving at THAT place in
-  ~1890 — the research docs are the source (`docs/giza-1890.md` for the plateau,
-  `docs/peoples-1890.md` and the port entries for the cities), never invention.
-  AND IT BINDS THE QUEUED SITES: work-order point 379 (Abu Simbel becomes a walkable site)
-  delivers its own first-entry and return texts as part of that point, not afterwards —
-  the completeness test above will refuse the merge otherwise, which is the intended way
-  round.
-  VERIFIABLE: pure Vitest — the completeness sweep over `PLACES` in both languages, the
-  first entry written exactly once per place, a return entry written when the modelled
-  situation differs and NOT when it is unchanged, every text carrying voice markup that
-  strips to well-formed prose, and the entries surviving the language switch as
-  language-neutral records (§17.7). Live: entering Giza writes an entry the journal shows.
-  DOCS in the same commit: design.md §16 states the rule for every walkable place, and
-  `docs/acceptance-evidence.md` §8 gains the chain. design.md sits at its measured ceiling,
-  so the words are paid for by a measured raise with its justification or by shortening
-  elsewhere.
-
 - [ ] 319. CROCODILE KILL AFTERMATH: PREY DISSOLVES WITHOUT SINK OR VISIBLE SCAVENGER
   (user 25.07.2026: a crocodile seized an animal, the crocodile disappeared at some
   point, and the prey then kept slowly dissolving — possibly "eaten" with no vulture
