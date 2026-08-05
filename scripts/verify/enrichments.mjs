@@ -3921,7 +3921,10 @@ const runDrownScenario = async () =>
       }
     }
     if (!calf) return { staged: false, tries }
-    const out = { staged: true, tries, drowned: false, rescued: false, out: false, lionFed: false }
+    // The numbers the §19.8 rule actually decides on at this spot (point 502):
+    // asserted below instead of assuming the forced season arrived.
+    const reading = window.__wildlife.waterDrama(spot[0], spot[1])
+    const out = { staged: true, tries, reading, drowned: false, rescued: false, out: false, lionFed: false }
     // 65 s: the 260-unit park means a dry-season parent arrives ~43 s in, and
     // rescue + walk-back must still fit (the drown branch breaks early).
     await window.__pollSim(65, () => {
@@ -3935,18 +3938,25 @@ const runDrownScenario = async () =>
   })
 // (a) Forced rains: the current holds the calf under until it drowns.
 await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(1))
-await page.waitForTimeout(400)
+// Wait for the wetness to REACH the wildlife system, not for a fixed 400 ms.
+await page.waitForFunction(() => window.__wildlife.waterDrama(29, 31).wetness === 1)
 const drowned = await runDrownScenario()
 check('in the forced rains a calf in a strong current drowns — dead, never rescued (point 122)',
   !drowned.noSpot && drowned.staged && drowned.drowned && !drowned.rescued && drowned.lionFed,
   JSON.stringify(drowned))
+check('the forced rains reach the drowning rule: full wetness and a flow above the drown threshold (point 502)',
+  drowned.reading?.wetness === 1 && drowned.reading.effective >= drowned.reading.drownThreshold,
+  JSON.stringify(drowned.reading))
 // (b) The dry season: the SAME setup still clambers out alive on its own.
 await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(0))
-await page.waitForTimeout(400)
+await page.waitForFunction(() => window.__wildlife.waterDrama(29, 31).wetness === 0)
 const clambered = await runDrownScenario()
 check('in the dry season the same mid-channel calf clambers out alive (point 122)',
   !clambered.noSpot && clambered.staged && clambered.out && !clambered.drowned,
   JSON.stringify(clambered))
+check('the dry season reaches the rule: no wetness and a flow below the drown threshold (point 502)',
+  clambered.reading?.wetness === 0 && clambered.reading.effective < clambered.reading.drownThreshold,
+  JSON.stringify(clambered.reading))
 await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(null))
 await page.waitForTimeout(300)
 
