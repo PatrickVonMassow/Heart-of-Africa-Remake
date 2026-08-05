@@ -156,22 +156,13 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 ## Die häufigsten Fallstricke → und was hilft
 
 - **Grüner Test, falsches Bild.** Der Test ist grün, das Ergebnis trotzdem falsch — er
-  prüfte einen Hilfswert, einen unerreichbaren Zustand, einen geratenen Wert.
+  prüfte einen Hilfswert, einen unerreichbaren Zustand, einen geratenen Wert. Oder das
+  Beweisbild entstand, bevor die Szene fertig geladen war.
   → *Prompt:* „Etabliere einen Mechanismus, der eine sichtbare Änderung erst als fertig
   gelten lässt, wenn sie am **echten gerenderten Bild** unter einer Bedingung geprüft wurde,
-  die ein Nutzer wirklich erreicht — und der bei einer **neuen** Blick- oder Zoomachse
-  auflistet, welche alten Zusagen dadurch an einem neuen Rand prüfbar werden." *(Kosten ≈ 1,5x.)* *(Zuletzt: Sieht das für einen Menschen richtig aus?)*
-
-- **Das Beweisbild, das nichts zeigt.** Der Screenshot, der ein Feature belegen soll, wurde
-  aufgenommen, bevor die Szene fertig geladen war — er zeigt eine leere, schwarze Welt, und
-  die Prüfung meldet trotzdem grün, weil sie nur das Auslösen prüft, nicht das Bild.
-  → *Prompt:* „Etabliere einen Mechanismus, der ein Prüfbild erst schreibt, wenn die
-  **Darstellung fertig** ist — und zwar entschieden danach, WAS aufgenommen wird (ganzer
-  Bildschirm = volle Wartezeit), nicht danach, was das Bild angeblich zeigt. Sieh dir neu
-  entstandene Bilder außerdem selbst an, statt dem Exit-Code zu glauben." *(Kosten ≈ 1,2x.)*
-  Merke dir dazu die Ausnahme von der Faustregel „Last erzeugt falsche **Rote**, keine
-  falschen Grünen": Sie gilt für Prüfungen, die etwas **messen**. Eine Prüfung, die nur
-  **auslöst**, liefert unter Last ein grünes Bild von nichts.
+  die ein Nutzer wirklich erreicht — und der ein Prüfbild erst schreibt, wenn die
+  Darstellung fertig ist." *(Kosten ≈ 1,5x.)* *(Zuletzt: Sieht das für einen Menschen
+  richtig aus?)*
 
 - **Neue Features zerbrechen alte.** Eine Änderung repariert X und bricht das unbeobachtete Y.
   → *Prompt:* „Etabliere einen Mechanismus, der jede Mechanik auch im **Danach-Zustand** prüft
