@@ -2655,7 +2655,7 @@ for (const [placeId, shot] of [
     // of the village across open ground. Every bearing is ray-probed against
     // the RENDERED scene for an unobstructed line and scored by PROJECTING the
     // children through the live camera (§7.2), never by a radius.
-    const standAt = async (bearing) =>
+    const standAt = async (bearing, back = 5.5) =>
       page.evaluate(
         ({ b, back }) => {
           const t = window.__placeTag()
@@ -2674,7 +2674,7 @@ for (const [placeId, shot] of [
           p.pitch = -0.05
           return { cx, cz }
         },
-        { b: bearing, back: 5.5 },
+        { b: bearing, back },
       )
     /** Is the game unobstructed from here, and how much of it is in frame? */
     const readsFromHere = () =>
@@ -2710,29 +2710,43 @@ for (const [placeId, shot] of [
         const pair = (a && shows(a) ? 1 : 0) + (q && shows(q) ? 1 : 0)
         return { clear, inFrame, pair }
       })
+    // The sweep is RETRIED as the game runs, and that is not a courtesy to a
+    // slow machine: a chase that is momentarily boxed between two huts offers no
+    // clear line from any bearing, which is a passing state of the game and not
+    // a defect in it. A single sweep made that moment fail the whole suite. Two
+    // ranges are tried before the wait, because a pair that has just sprinted
+    // apart does not fit one frame at close range.
     let bestBearing = null
-    let best = -1
-    let shotProbe = 'none'
-    for (let k = 0; k < 16; k++) {
-      const bearing = (k / 16) * Math.PI * 2
-      const at = await standAt(bearing)
-      if (!at) break
-      await nextFrames(2)
-      const r = await readsFromHere()
-      // Score: BOTH of the pair first, then everyone else who happens to be in
-      // shot. An obstructed line scores nothing at all.
-      const score = r.clear ? r.pair * 10 + r.inFrame : -1
-      if (r.clear && r.pair === 2 && score > best) {
-        best = score
-        bestBearing = bearing
-        shotProbe = `bearing ${k}/16: clear=${r.clear} pair=${r.pair} inFrame=${r.inFrame}`
+    let bestBack = 5.5
+    let shotProbe = 'no clear standpoint in any sweep'
+    for (let attempt = 0; attempt < 4 && bestBearing === null; attempt++) {
+      for (const back of [5.5, 8.5]) {
+        let best = -1
+        for (let k = 0; k < 16; k++) {
+          const bearing = (k / 16) * Math.PI * 2
+          const at = await standAt(bearing, back)
+          if (!at) break
+          await nextFrames(2)
+          const r = await readsFromHere()
+          // Score: BOTH of the pair first, then everyone else who happens to be
+          // in shot. An obstructed line scores nothing at all.
+          const score = r.clear ? r.pair * 10 + r.inFrame : -1
+          if (r.clear && r.pair === 2 && score > best) {
+            best = score
+            bestBearing = bearing
+            bestBack = back
+            shotProbe = `attempt ${attempt + 1}, ${back} m, bearing ${k}/16: pair=${r.pair} inFrame=${r.inFrame}`
+          }
+        }
+        if (bestBearing !== null) break
       }
+      if (bestBearing === null) await nextFrames(30)
     }
     // Stand on the WINNING bearing: the sweep left the camera on the last one
     // tried. The chase has run on since, so the aim is taken freshly — the pair
     // is re-read where it is NOW, which is the whole reason `standAt` recomputes
     // rather than replaying a stored point.
-    const stood = bestBearing === null ? null : await standAt(bestBearing)
+    const stood = bestBearing === null ? null : await standAt(bestBearing, bestBack)
     check(
       'the game is photographable: a clear standpoint holds the chaser and its quarry in frame',
       !!stood,
