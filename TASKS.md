@@ -4388,41 +4388,6 @@ Build order, chosen so no two parallel agents own the same file:
   and no figure in that section is an extrapolation — every one is a wall-clock
   reading of a run that happened.
 
-- [ ] 499. THE FULL REGRESSION IS RED ON `main`, AND NOBODY HAD RUN IT
-  (measured 04.08.2026, 18:37–19:33). The first LARGE run since the suites moved
-  into the container ended `6 SUITE(S) FAILED — 23 suites run`, and it never
-  reached the WebGPU pass, because a failed WebGL 2 pass stops the run. Six red:
-  `handwriting` (crashed with no FAIL line at all), `voice` (same), `polish`
-  (6 then 9 checks), `settings` (1), `enrichments` (4 then 5), `report` (2).
-  ISOLATED ALREADY, so nobody repeats it: this is NOT the GPU lane of point 493.
-  The `settings` check "first-person ground shows micro-detail (edge energy)"
-  reads laplacian mean 0.00 on the hardware lane AND 0.00/0.01 with
-  `VERIFY_GALLIUM=none` (software) — the same failure with and without the card.
-  `baseline-classify` against the pre-change commit also called it PRE-EXISTING,
-  with the honest caveat that a baseline checkout runs against the CURRENT
-  shared boot helpers and so cannot isolate a harness change; the
-  with/without-GPU comparison can, and did.
-  FINAL STATE:
-  1. Every one of the six is CLASSIFIED before anything is fixed: a real product
-     defect, a stale test assumption, or a harness fault. The two suites that
-     printed no FAIL line at all (`handwriting`, `voice`) are read from their
-     own output first — a crash or a wall-timeout kill is not a test result.
-  2. Each real defect becomes its own work-order point with its own branch; this
-     point is the CLASSIFICATION and the triage, not a bundle to fix everything
-     in one commit. A stale assumption is corrected in the test WITH the reason
-     written down, never by loosening a threshold until it passes.
-  3. The ground micro-detail failure is judged against acceptance criterion 15
-     (surface micro-structure at eye height — ground grain/pebble relief): a
-     laplacian mean of 0.00 says the picture has none, so either the feature
-     regressed or the check no longer measures it. Decide which BY THE PICTURE,
-     not by the number.
-  4. The run is repeated on a QUIET machine once the classification is done —
-     the measured run reported "2× another verify/browser suite run already
-     running", so its reds are evidence, not verdicts.
-  VERIFIABLE: a LARGE run on `main` reaches the WebGPU pass and reports the six
-  suites either green or reduced to named, recorded open points; no threshold in
-  the verify suites was changed without a written reason in the same commit.
-
 - [ ] 500. THE LEAVE CAPTURE BAKES A TERRAINLESS BAND ON A SLOW HOST
   (measured 04.08.2026 during the point-499 triage, 3 of 3 runs). The `polish`
   check on the maasai-village leave capture reads the bottom quarter of the
@@ -4578,3 +4543,71 @@ Build order, chosen so no two parallel agents own the same file:
   scene is inspected once; the host-environment section lists every build tried
   with its outcome; a default (non-opt-in) verification run shows no ICD present
   and no adapter stall.
+
+- [ ] 506. THE SOFTWARE LANE REDDENS AT CHECKS IT CANNOT DRAW FAST ENOUGH TO
+  ANSWER (measured 05.08.2026, 01:50–03:40, on a machine with no second verify
+  run — the quiet repeat point 499 asked for). Four checks fail on the software
+  WebGPU lane and pass, measured, on the hardware WebGL 2 lane, and every one of
+  them is a rate the lane cannot deliver rather than a broken product:
+  `polish` "settlement walker (goat): the planted foot holds its ground spot"
+  reports MEASURED NOTHING — 1 usable stance interval where it needs 3, against
+  23 intervals with a worst travel of 0.337 on the WebGL lane; `polish` "the dry
+  settlement season reading settles before it is read — after 60176 ms";
+  `settings` "a footstep fires with a surface class while walking (point 97)",
+  twice, green on WebGL; and `benchmark` dies outright with
+  `page.waitForFunction: Timeout 300000ms exceeded` (`benchmark.mjs:89`) because
+  its fixed 864-frame route cannot finish in software. `docs/host-environment.md`
+  already states the underlying fact — SwiftShader draws roughly one frame per
+  second, so "a green run there proves nothing about timing" — but nothing acts
+  on it, so every run shows red for it and a real regression would hide in that
+  noise.
+  FINAL STATE:
+  1. The run MEASURES the lane's delivered frame rate once, from the running
+     page, and reports it in the run header — every verdict below names the lane
+     it was taken on rather than assuming one.
+  2. A check whose subject is a RATE or a wall-clock budget (stance intervals per
+     walk, a settle deadline, the fixed-frame benchmark route) declares the
+     throughput it needs. Below it the check SKIPS, naming the measured figure
+     and that the lane cannot answer it; it never reds and never passes silently.
+  3. NO product threshold moves. The skip is a property of the lane; on a lane
+     that meets the throughput the identical check runs unchanged and must still
+     fail on a real regression.
+  4. Lane skips are counted in the run summary, so a lane that skips half a suite
+     can never be mistaken for a green both-backend verification — what the §7.2
+     both-backend rule counts is what actually RAN.
+  VERIFIABLE: on this host `VERIFY_GL=webgpu npm test -- polish settings
+  benchmark` ends green with exactly those four checks reported as lane skips
+  naming the measured frame rate, while `VERIFY_GL=webgl` runs all four for real;
+  a Vitest case pins the pure skip decision (needed vs measured throughput) in
+  both directions, including that a hardware lane never skips.
+
+- [ ] 507. A LOST WEBGPU DEVICE ENDS THE RUN QUIETLY AND THE PICTURE BLACK
+  (measured 05.08.2026, both quiet runs of `invariants` on the software WebGPU
+  lane). The suite ends `2 pass, 0 fail` with 9 and 2 console errors —
+  `AbortError: Failed to execute 'mapAsync' on 'GPUBuffer': A valid external
+  Instance reference no longer exists`, `THREE.WebGPURenderer: WebGPU Device
+  Lost: Reason: unknown`, `OperationError: Instance dropped in popErrorScope`.
+  The checks after the loss never run at all; only the console-error gate turns
+  the suite red, so the count reads like a partial pass and the loss itself is
+  named nowhere. The same loss in the shipped game is what point 493 photographed
+  on the mispinned lane: a black canvas behind a live HUD.
+  FINAL STATE:
+  1. The renderer NOTICES a lost device: `device.lost` is awaited, and the loss
+     goes to the dev-mode assert channel with its reason, so every test run and
+     every manual session detects it at the moment it happens.
+  2. A suite whose device dies FAILS AT THE LOSS, naming it, instead of reporting
+     the checks it managed before — a check count that stops early may never read
+     as a pass.
+  3. The player is told rather than left with a black picture: a lost device
+     raises the same localized, dismissible notice path as the WebGL 2 fallback
+     (both languages, from the language files), naming that the picture stopped
+     and what to do — never a silent black canvas behind a live HUD.
+  4. Whether the loss is the software lane's device giving up under a long run or
+     a teardown racing an in-flight readback is decided BY THE EVIDENCE the first
+     step now produces, and the answer is written into
+     `docs/host-environment.md`'s lane section.
+  VERIFIABLE: a Vitest case proves the loss handler fires the assert and the
+  localized notice from a simulated `device.lost` in both languages; a browser
+  case proves a suite that loses its device reports the loss as its failure
+  rather than a truncated pass; and `VERIFY_GL=webgpu npm test -- invariants`
+  either completes on this host or names the device loss as its verdict.

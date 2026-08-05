@@ -13920,3 +13920,38 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   completing under `VERIFY_GL=webgpu` with `assertBackend` confirming WebGPU; pure
   Vitest over the browser resolution — a host with system Chrome resolves to it, a
   host without fails loud instead of quietly using the bundled build.
+
+- [x] 499. THE FULL REGRESSION IS RED ON `main`, AND NOBODY HAD RUN IT
+  (measured 04.08.2026, 18:37–19:33). The first LARGE run since the suites moved
+  into the container ended `6 SUITE(S) FAILED — 23 suites run`, and it never
+  reached the WebGPU pass, because a failed WebGL 2 pass stops the run. Six red:
+  `handwriting` (crashed with no FAIL line at all), `voice` (same), `polish`
+  (6 then 9 checks), `settings` (1), `enrichments` (4 then 5), `report` (2).
+  ISOLATED ALREADY, so nobody repeats it: this is NOT the GPU lane of point 493.
+  The `settings` check "first-person ground shows micro-detail (edge energy)"
+  reads laplacian mean 0.00 on the hardware lane AND 0.00/0.01 with
+  `VERIFY_GALLIUM=none` (software) — the same failure with and without the card.
+  `baseline-classify` against the pre-change commit also called it PRE-EXISTING,
+  with the honest caveat that a baseline checkout runs against the CURRENT
+  shared boot helpers and so cannot isolate a harness change; the
+  with/without-GPU comparison can, and did.
+  FINAL STATE:
+  1. Every one of the six is CLASSIFIED before anything is fixed: a real product
+     defect, a stale test assumption, or a harness fault. The two suites that
+     printed no FAIL line at all (`handwriting`, `voice`) are read from their
+     own output first — a crash or a wall-timeout kill is not a test result.
+  2. Each real defect becomes its own work-order point with its own branch; this
+     point is the CLASSIFICATION and the triage, not a bundle to fix everything
+     in one commit. A stale assumption is corrected in the test WITH the reason
+     written down, never by loosening a threshold until it passes.
+  3. The ground micro-detail failure is judged against acceptance criterion 15
+     (surface micro-structure at eye height — ground grain/pebble relief): a
+     laplacian mean of 0.00 says the picture has none, so either the feature
+     regressed or the check no longer measures it. Decide which BY THE PICTURE,
+     not by the number.
+  4. The run is repeated on a QUIET machine once the classification is done —
+     the measured run reported "2× another verify/browser suite run already
+     running", so its reds are evidence, not verdicts.
+  VERIFIABLE: a LARGE run on `main` reaches the WebGPU pass and reports the six
+  suites either green or reduced to named, recorded open points; no threshold in
+  the verify suites was changed without a written reason in the same commit.

@@ -66,6 +66,35 @@ packages, not hardware:
   hang — and the hardware WebGPU lane waits for a browser that accepts a system Vulkan
   device. **Read this before rebuilding dzn: the verdict is worth more than the build.**
 
+**What the software WebGPU lane can and cannot answer, measured 05.08.2026** (point 499's
+quiet repeat: the six suites that reddened in the LARGE run, re-run alone with no other
+verify run on the machine). `gamepad` went green — its red was load. Five stayed red, and
+not one of them is a product defect this lane found:
+
+- `polish` and `settings` fail four checks that measure a RATE the lane cannot deliver —
+  the goat's planted foot reports "MEASURED NOTHING, 1 usable stance interval" against 23
+  measured on the WebGL lane, the dry-season reading does not settle inside 60 s, and the
+  walking footstep never fires. All four are green, measured, on WebGL 2 (point 506).
+- `benchmark` dies at `page.waitForFunction: Timeout 300000ms exceeded` — its fixed
+  864-frame route cannot finish at software speed (point 506).
+- `enrichments` dies in a pixel probe on Playwright's undeclared 30 s (point 492).
+- `invariants` loses the WebGPU device mid-run (`Device Lost`, `mapAsync` on a dropped
+  instance) and still reports `2 pass, 0 fail` — the checks after the loss never ran
+  (point 507).
+- The panorama reds (leave capture, compass probe) appear on BOTH lanes and are the real
+  defects of points 500/501.
+
+Quiet, the hardware WebGL 2 lane keeps exactly four reds, each twice and each already a
+named point: the leave capture and the two band probes (500/501) in `polish`, the calf that
+does not drown and the High Atlas snow (502/503) in `enrichments`. The dressing-growth check
+reporting `samples [0,0,0,0,0]` failed in one run of two — the measures-nothing flake point
+200 lists. Nothing else on that lane is red.
+
+The frames this lane WRITES carry the same shortfall: on the software pass
+`100-cairo-giza-skyline.png` came back 29 KB against 568 KB from a lane with the GPU — an
+all-but-empty picture the shutter still accepted, which is what point 489 is for. Do not
+record acceptance screenshots from the software lane.
+
 `scripts/verify-host-setup.sh` installs all of it (root, once, idempotent) and
 `scripts/verify/backend-lane-check.mjs` proves the result at the PICTURE — it boots the
 real game on each lane, reads the pixels back out of the canvas and names the device that
