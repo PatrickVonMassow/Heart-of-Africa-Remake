@@ -29,6 +29,10 @@
 //   await shot('12-worldmodel-lake-victoria', { world: { lat: -0.8, lon: 33 }, label: 'Lake Victoria' })
 //   await shot('98-place-plan', { element: '.map-place-plan', label: 'the town plan' })
 //   await shot('115-savanna-dry', { general: 'the whole savanna dressing is the subject' })
+//
+// A check that only MEASURES pixels (no file, no subject) takes the same route
+// for its budget:
+//   const buf = await capturePixels(page, 'TRAA mean luma')
 import {
   normaliseDeclaration,
   judgeFrameSubject,
@@ -50,16 +54,19 @@ import {
 // quiet machine (the wait ends on the condition) and only delays a real refusal.
 const DEFAULT_TIMEOUT = 15000
 
-// How long the WRITE of the picture may take. Separate from the probe budget
-// above, because it measures something else: the probe waits for the subject to
-// be in the picture (a judgment), this waits for the browser to hand the pixels
-// over (I/O). Passing nothing let it inherit Playwright's silent 30 s default,
-// and on a host that renders through SwiftShader with no GPU a full-page or
-// element capture under suite load exceeds that — `enrichments` died on the
-// map-overlay capture 4700 lines before its own subject, on main as much as on
-// any branch, and the timeout named neither the shutter nor the machine. A slow
-// capture is not a failed check; a hung one still fails, four times later.
-const CAPTURE_TIMEOUT = 120000
+// How long a CAPTURE may take — the ONE budget for both shapes the harness
+// takes pictures in: the frame WRITE below and the pathless pixel PROBE
+// (`capturePixels`) a check measures luma or colour on. Separate from the
+// subject budget above, because it measures something else: that one waits for
+// the subject to be in the picture (a judgment), this one waits for the browser
+// to hand the pixels over (I/O). Passing nothing let either inherit Playwright's
+// silent 30 s default, and on a host that renders through SwiftShader with no
+// GPU a capture under suite load exceeds that — `enrichments` died on the
+// map-overlay write 4700 lines before its own subject, on main as much as on any
+// branch, and the timeout named neither the harness nor the machine; its seven
+// pixel probes carried the same undeclared deadline. A slow capture is not a
+// failed check; a hung one still fails, four times later.
+export const CAPTURE_BUDGET_MS = 120000
 
 /**
  * Runs INSIDE the page. Returns the probe when the subject is in the picture,
@@ -268,13 +275,54 @@ export async function captureFrame(page, outDir, name, decl, { timeout = DEFAULT
   }
   const path = `${outDir}${d.frame}.png`
   const options = decl.clip
-    ? { path, clip: decl.clip, timeout: CAPTURE_TIMEOUT }
-    : { path, timeout: CAPTURE_TIMEOUT }
+    ? { path, clip: decl.clip, timeout: CAPTURE_BUDGET_MS }
+    : { path, timeout: CAPTURE_BUDGET_MS }
   // Returns the PNG buffer, like `page.screenshot` itself — a few frames are
   // ALSO a pixel probe (settings.mjs reads the TRAA frame's mean luma).
   const buffer = decl.locator ? await page.locator(decl.locator).screenshot(options) : await page.screenshot(options)
   console.log(formatFramePass(d, probe) + formatSceneReadyPass(sceneVerdict))
   return buffer
+}
+
+/**
+ * Take a PIXEL PROBE: a screenshot with no `path`, returning the PNG buffer a
+ * check measures luma, colour or motion on. It writes no file and declares no
+ * subject — it is a measurement, not evidence — but it is still a capture, so it
+ * carries the SAME budget as the write above instead of Playwright's silent
+ * default (point 492).
+ *
+ * `site` names the check that took it, so an exceeded budget reads as the
+ * harness saying which measurement outran it rather than as a bare Playwright
+ * timeout thrown thousands of lines from the check that was running.
+ */
+export async function capturePixels(page, site, { clip, locator, timeout = CAPTURE_BUDGET_MS } = {}) {
+  // A per-site override may raise or lower the budget, but never REMOVE it:
+  // Playwright reads `timeout: 0` as "no deadline", which is precisely the hang
+  // this helper exists to bound (four-eyes review 06.08.2026 — the constant was
+  // pinned against 0, the override was not).
+  if (!(timeout > 0)) {
+    throw new Error(
+      `pixel probe "${site}": timeout ${timeout} disables the deadline — the capture budget may be ` +
+        'raised or lowered per site, never switched off (scripts/verify/frameSubject.mjs).',
+    )
+  }
+  const options = clip ? { clip, timeout } : { timeout }
+  const started = Date.now()
+  try {
+    return locator ? await page.locator(locator).screenshot(options) : await page.screenshot(options)
+  } catch (error) {
+    // Only a BUDGET failure is retold as one. A page crash or a closed target is
+    // a different fact, and calling it "the machine, not the product" would send
+    // the reader after the wrong cause — it is rethrown untouched, call log and all.
+    const reason = error && error.message ? error.message.split('\n')[0] : String(error)
+    if (!/timeout/i.test(reason)) throw error
+    const waited = ((Date.now() - started) / 1000).toFixed(1)
+    throw new Error(
+      `pixel probe "${site}": the verification harness allowed the capture ${Math.round(timeout / 1000)} s ` +
+        `and no pixels arrived (waited ${waited} s${clip ? `, clip ${clip.width}x${clip.height}` : ''}` +
+        `${locator ? `, locator ${locator}` : ''}). A capture this slow means the machine, not the product — ${reason}`,
+    )
+  }
 }
 
 /** Bind the shutter to a page and an output directory: `shot(name, declaration)`. */
