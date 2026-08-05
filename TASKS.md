@@ -4759,6 +4759,42 @@ Build order, chosen so no two parallel agents own the same file:
   3. The re-aim that points 117/118 carry today is no longer the mechanism that
      keeps a drifting frame honest — it may stay as an aim, but the guarantee comes
      from the shutter.
+  TWO MORE FINDINGS FROM THE FOUR-EYES REVIEW OF 489 (Fable 5, 05.08.2026, verdict
+  merge-with-fixes — they belong here because they are the same gate and the same
+  file, and one verification round should close all three):
+  4. STILLNESS CONFLATES FINISHED WITH NOT-RENDERING. The readiness verdict reads
+     only the draw-call and triangle counts, so a render loop that has STALLED
+     freezes them exactly as a finished scene does — and the shutter opens on a
+     half-built frame. The wait must additionally demand that the frame counter is
+     ADVANCING, so "the numbers stopped moving" can only mean the scene settled,
+     never that drawing stopped.
+  5. THE QUIET WINDOW HAS ALMOST NO MARGIN. `quietMs` is 5 s against a plateau
+     measured at 4 s — one second of reserve on the host the wait was written for,
+     and this is the class of value that a slower host eats first. Set it from the
+     measured plateau with a stated factor, calibratable like every other such
+     value, rather than as a bare constant. The blank-frame FLOOR is re-measured in
+     the same pass: `sceneReady-core.mjs` states blank frames stand at 5.5k
+     triangles while `world.mjs` measured blank washes at 14–16k against a 20k
+     floor — two comments in the same change contradict each other, and the
+     surviving one is whichever the measurement supports.
+  6. `settle: false` IS UNREACHABLE FOR EVERY KIND BUT `world`.
+     `normaliseDeclaration` (`scripts/verify/frameSubject-core.mjs`) keeps the
+     `settle` field only for `world` frames and drops it silently for `general`,
+     `local` and `place`, so those can never ask for the drawn-only mode. The
+     measured consequence is in `scripts/verify/visualsweep.mjs`: its filmstrip
+     frames are `general` frames taken WHILE THE TRAVELLER DRIVES AWAY — the motion
+     IS the strip — and they now serve the full stand-still wait, which under
+     continuous streaming risks the 120 s timeout and in any case destroys the
+     1.8 s cadence the strip exists for. The mode must be reachable from every kind
+     whose frame can legitimately photograph a moment, and a dropped field must
+     never be the silent answer.
+  The re-probe of item 1 applies in the STAND-STILL mode only: the drawn-only wait
+  is near zero, and re-probing there would add flake on exactly the fast-moving
+  subjects that mode serves. The stale comment in `frameSubject.mjs` claiming
+  nothing moves the camera during the wait is corrected in the same commit — commit
+  `02be8c7d` already falsifies it. The Vitest gap the review names is closed with
+  it: the readiness mode is currently tested on hand-built objects only, never
+  through `normaliseDeclaration`, which is what hid item 6.
   VERIFIABLE: pure Vitest on the shutter's decision (subject in view before AND
   after → written; in view before, gone after → refused with the second reading in
   the message; a frame that needs no readiness wait behaves exactly as today), and
