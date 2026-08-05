@@ -6964,9 +6964,18 @@ const settleScalar = async (read, rel = 0.003) => {
       rise: window.__rivers.floodRise(),
     }))
   }
+  // Each frame is taken FROM the reach it names. The traveller stands in the
+  // Nile here, and the current carries him downstream for as long as he stands
+  // there (CLAUDE §7.1 pt. 21) — over the month settle and the shutter's own
+  // readiness wait (point 489) that adds up, and the second frame's subject
+  // dropped off the bottom edge of the picture. Re-aiming costs one jump; the
+  // alternative is a frame that no longer shows the reach it claims.
+  const atAswan = () => page.evaluate(() => window.__game.getState().debugJumpTo(24.09, 32.9))
   const apr = await surfAt(4)
+  await atAswan()
   await shot('117-nile-low-april', { world: { lat: 24.09, lon: 32.9 }, label: 'the Aswan reach at low water' })
   const oct = await surfAt(10)
+  await atAswan()
   await shot('118-nile-flood-october', { world: { lat: 24.09, lon: 32.9 }, label: 'the Aswan reach at the flood crest' })
   console.log('shot 117-nile-low-april.png, 118-nile-flood-october.png')
   check(

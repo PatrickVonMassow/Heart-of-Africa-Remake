@@ -52,7 +52,9 @@ const isNum = (v) => typeof v === 'number' && Number.isFinite(v)
  *   { place: '<place id>', label? }      the interior of that settlement
  *   { element: '<css selector>', label? } a HUD/overlay/modal subject
  *   { general: '<why>' }                 a deliberate general view
- * Optional on every kind: `scene` ('travel' | 'place'), `clip`, `locator`.
+ * Optional on every kind: `scene` ('travel' | 'place'), `clip`, `locator`, and
+ * `sceneReady` (point 489) — whether the frame waits for the drawn scene to
+ * settle. Left out it follows the kind (`needsSceneReady`, sceneReady-core.mjs).
  */
 export function normaliseDeclaration(frame, decl) {
   const name = String(frame ?? '').trim()
@@ -77,6 +79,8 @@ export function normaliseDeclaration(frame, decl) {
     kind,
     label: typeof decl.label === 'string' && decl.label.trim() ? decl.label.trim() : null,
     scene: decl.scene ?? null,
+    // Point 489: only an explicit boolean overrides the kind's own answer.
+    ...(typeof decl.sceneReady === 'boolean' ? { sceneReady: decl.sceneReady } : {}),
   }
   if (kind === 'world') {
     // Either geographic (a place, a landmark — how the world is written down)
