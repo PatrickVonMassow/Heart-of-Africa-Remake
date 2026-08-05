@@ -941,6 +941,49 @@ in the real walk loop and the place is left within 1.5 m of the drawn line
 (`scripts/verify/polish.mjs`, screenshots 488-village-edge-band /
 488-port-edge-band / 488-monument-edge-band).
 
+THE CHILDREN PLAY A GAME OF TAG (§19.10, points 480/351). One of them is IT and
+chases the others; whoever is caught becomes the new IT, and any number plays.
+It is a CHASE, not a route — nothing here holds a ring, an orbit or a tour of
+waypoints, because a path is periodic and the eye reads it within two passes.
+STAMINA is what makes it legible: every child carries a sprint reserve, and the
+pace it can hold is a continuous, monotone function of what is left in it — full
+sprint while fresh, the shared floor only at empty — so a catch happens for a
+reason the viewer can SEE rather than being cut short from outside. The CURVE
+(what a child CAN do) and the two hysteresis thresholds (what it CHOOSES — press
+on, or break off and recover) are kept apart, and the sprint is spent
+deliberately: a runner presses only inside the pressure distance, a chaser only
+while it is actually closing. The sprint reads THREE ways at once — the leg
+cadence point 479 gave the children, the speed, and a forward lean eased in
+proportion to the pace — so the reading survives at any distance the cadence no
+longer resolves at. The steering is the wildlife's `deflectedStep`, not the
+walker slide, so a chase continues past a hut corner instead of stopping against
+it; the settlement reaches the chase as ONE predicate (colliders, the fire ring
+and the walkable rim together). The pursue-and-evade half is a reusable helper
+(`src/systems/pursuit.ts`), the round the module beside the scene
+(`src/scenes/place/tagGame.ts`). All 24 values are calibratable
+(`balance.villageLife.tag`) and debug-editable in both languages.
+Verifiable: the pure layer pins the whole behaviour in 103 cases
+(`src/systems/pursuit.test.ts`, `src/scenes/place/tagGame.test.ts`) — the curve
+monotone, continuous and bounded in slope; a fresh runner strictly faster than a
+fresh chaser and a spent one strictly slower; the reserve never outside its
+bounds and never draining below the trot; the exhausted-forever regression
+witness (a chase driven into the ground still recovers); both thresholds
+boundary-tested; the immunity window boundary-exact against an instant re-tag,
+pair-scoped, and cleared by a chained tag; one catch per step; the group
+shrinking to two and to ONE, where a lone child idles rather than chasing
+itself; a cornered runner caught rather than pinned; the traveller not a wall;
+the walked distance the legs ride excluding a teleport nudge; and the armed
+`devAssert` channel (point 207(i)) silent over a long healthy game while firing
+on each of its five broken states. Live, the game is sampled over 90 seconds of
+the game's OWN clock — never a frame count, which buys different amounts of game
+per machine — and must show the chaser's identity changing, the gap to the quarry
+rising and falling repeatedly, at least one child slowing to recover, headings
+covering a wide spread rather than circling one centre, no child pinned, still
+or outside the rim, and no tag assert fired; the frame is then taken from a
+swept, ray-probed standpoint that both has a clear sight line and holds two
+children inside the projected picture (`scripts/verify/polish.mjs`, screenshot
+480-village-tag).
+
 ## 16. Collision inside settlements.
 
 Verifiable: an automated

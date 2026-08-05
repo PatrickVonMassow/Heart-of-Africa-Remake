@@ -2477,6 +2477,254 @@ for (const [placeId, shot] of [
   }
 }
 
+// --- The children's game of tag (design.md §19.10, point 480/351) ------------
+// What needs a real browser is that the RAF-driven chase is a GAME and not a
+// route: the pure round is pinned in src/scenes/place/tagGame.test.ts, but only
+// the live scene can show that the paths are not periodic, that the gap between
+// chaser and quarry breathes, that the role really moves, and that a child is
+// seen running out of steam. Sampled over an interval, and gated on a round
+// actually being in play — the group idles between rounds by design, so a sample
+// window straddling a break would judge the wrong thing.
+{
+  await page.evaluate(() => {
+    const g = window.__game.getState()
+    if (g.placeId) g.leavePlace()
+  })
+  await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
+  await page.evaluate(() => window.__game.getState().enterPlace('maasai-village'))
+  const live = await page
+    .waitForFunction(
+      () => window.__game.getState().placeId === 'maasai-village' && !!window.__placeTag && !!window.__placeLayout,
+      null,
+      { timeout: 40000 },
+    )
+    .then(() => true)
+    .catch(() => false)
+  check('the village children publish their live game of tag', live)
+  if (live) {
+    await page.evaluate(() => window.__game.getState().setJournalOpen(false))
+    const played = await page
+      .waitForFunction(() => window.__placeTag().playing, null, { timeout: 40000 })
+      .then(() => true)
+      .catch(() => false)
+    check('a round of tag is in play', played)
+
+    // The window is an interval of GAME, read off the game's own clock — never a
+    // count of frames. A frame budget buys wildly different amounts of game on an
+    // idle machine and on one running three other suites, and 420 frames bought
+    // barely 20 s here: the measured first catch is 6.6–11.3 s, so that window
+    // could hold ONE catch or none, and "the chaser's identity changes at least
+    // once" went red with no bug behind it. WINDOW_S is sized off that same
+    // measurement to hold several catches on any machine, and the loop is capped
+    // in frames so a scene that has stopped stepping FAILS LOUDLY on the check
+    // below instead of spinning here forever.
+    const WINDOW_S = 90
+    const start = await page.evaluate(() => window.__placeTag().clock)
+    const samples = []
+    let clock = start
+    for (let i = 0; i < 6000 && clock - start < WINDOW_S; i++) {
+      const s = await page.evaluate(() => window.__placeTag())
+      clock = s.clock
+      samples.push(s)
+      await nextFrames(3)
+    }
+    check(
+      'the scene runs a full interval of the game to judge (its own clock, not a frame count)',
+      clock - start >= WINDOW_S,
+      `${(clock - start).toFixed(1)}s of ${WINDOW_S}s over ${samples.length} samples`,
+    )
+    const playing = samples.filter((s) => s.playing)
+    check(
+      'the group spends the interval playing rather than idling',
+      playing.length > samples.length / 2,
+      `${playing.length} of ${samples.length} samples`,
+    )
+
+    // Exactly ONE chaser at every playing sample, and nobody holds the role
+    // during a break.
+    const badChaser = samples.filter((s) =>
+      s.playing ? !(s.chaser >= 0 && s.chaser < s.children.length) : s.chaser !== -1,
+    )
+    check(
+      'exactly one child is IT while a round runs, and none between rounds',
+      badChaser.length === 0,
+      `${badChaser.length} of ${samples.length} samples`,
+    )
+
+    // The role MOVES: a game where one child chases for the whole interval is a
+    // pursuit, not a game of tag.
+    const chasers = new Set(playing.map((s) => s.chaser))
+    check(
+      "the chaser's identity changes at least once",
+      chasers.size >= 2,
+      `held by ${[...chasers].join(', ') || 'nobody'}`,
+    )
+
+    // The chase BREATHES: the gap to the quarry rises and falls repeatedly.
+    const gaps = playing
+      .filter((s) => s.target >= 0)
+      .map((s) =>
+        Math.hypot(
+          s.children[s.chaser].x - s.children[s.target].x,
+          s.children[s.chaser].z - s.children[s.target].z,
+        ),
+      )
+    let turns = 0
+    for (let i = 2; i < gaps.length; i++) {
+      const a = gaps[i - 1] - gaps[i - 2]
+      const b = gaps[i] - gaps[i - 1]
+      if (a * b < 0) turns++
+    }
+    check(
+      'the distance between chaser and quarry rises and falls repeatedly',
+      turns >= 6,
+      `${turns} turning points over ${gaps.length} readings`,
+    )
+
+    // A catch happens for a reason the viewer can SEE.
+    const recovering = playing.some((s) => s.children.some((c) => c.effort === 'recover'))
+    check('at least one child is seen slowing to get its breath back', recovering)
+
+    // NOT A ROUTE: the headings cover a wide spread, and the group does not hold
+    // one radius (a ring around a centre would be a route too).
+    const bins = new Set()
+    const radii = []
+    for (const s of playing) {
+      for (const c of s.children) {
+        bins.add(Math.floor(((c.heading + Math.PI * 3) % (Math.PI * 2)) / (Math.PI / 6)))
+        radii.push(Math.hypot(c.x, c.z))
+      }
+    }
+    check(
+      'their headings cover a wide spread rather than circling one centre',
+      bins.size >= 9,
+      `${bins.size} of 12 heading sectors`,
+    )
+    const mean = radii.reduce((a, b) => a + b, 0) / Math.max(1, radii.length)
+    const sd = Math.sqrt(radii.reduce((a, b) => a + (b - mean) ** 2, 0) / Math.max(1, radii.length))
+    check(
+      'and they do not hold one radius around the settlement centre',
+      sd > 1,
+      `radius spread ${sd.toFixed(2)} m about ${mean.toFixed(1)} m`,
+    )
+
+    // Nobody pinned, nobody standing still, everybody where a walker may stand.
+    const n = samples[0].children.length
+    const travelled = Array.from({ length: n }, () => 0)
+    for (let i = 1; i < samples.length; i++) {
+      for (let k = 0; k < n; k++) {
+        const a = samples[i - 1].children[k]
+        const b = samples[i].children[k]
+        if (a && b) travelled[k] += Math.hypot(b.x - a.x, b.z - a.z)
+      }
+    }
+    check(
+      'no child stands still for the whole interval',
+      travelled.every((d) => d > 2),
+      `travelled ${travelled.map((d) => d.toFixed(1)).join(', ')} m`,
+    )
+    const pinned = samples.filter((s) => s.children.some((c) => c.pinned > 3))
+    check('no child is pinned against geometry', pinned.length === 0, `${pinned.length} samples`)
+    const outside = await page.evaluate(() => {
+      const L = window.__placeLayout
+      return window.__placeTag().children.filter((c) => Math.hypot(c.x, c.z) > L.radius).length
+    })
+    check('every child stays inside the walkable settlement', outside === 0, `${outside} outside`)
+    const reserves = samples.flatMap((s) => s.children.map((c) => c.reserve))
+    check(
+      'every sprint reserve stays within its bounds',
+      reserves.every((r) => r >= 0 && r <= 1),
+      `${Math.min(...reserves).toFixed(2)}..${Math.max(...reserves).toFixed(2)}`,
+    )
+
+    // The armed invariants stayed silent through all of it (point 207(i)).
+    const asserts = await page.evaluate(() =>
+      (window.__assertLog ?? [])
+        .filter((a) => String(a.code).startsWith('tag-'))
+        .map((a) => a.code + ': ' + a.detail),
+    )
+    check('the game fired none of its own invariant asserts', asserts.length === 0, asserts.join(' | '))
+
+    // The picture. The frame must show CHILDREN RUNNING, so the standpoint is
+    // chosen the way the point-485 speaker shot chooses one rather than by a
+    // formula: the single outward bearing this used before put whatever the
+    // village had — an adult, the elder's hut — between the camera and the
+    // game, and a frame whose subject is behind a grown figure proves nothing
+    // to a human eye. So SWEEP the bearings around the group, ray-probe each
+    // sight line against the RENDERED scene, and keep the first one that is
+    // both clear and actually holds two children in the picture, judged by
+    // PROJECTING them through the live camera (§7.2) rather than by a radius.
+    const standAt = async (bearing) =>
+      page.evaluate(
+        ({ b, back }) => {
+          const t = window.__placeTag()
+          const p = window.__placePlayer
+          if (!t || !p || !t.children.length) return null
+          const cx = t.children.reduce((a, c) => a + c.x, 0) / t.children.length
+          const cz = t.children.reduce((a, c) => a + c.z, 0) / t.children.length
+          p.x = cx + Math.sin(b) * back
+          p.z = cz + Math.cos(b) * back
+          // Place-camera yaw 0 looks toward −Z, hence the +PI complement.
+          p.yaw = Math.atan2(cx - p.x, cz - p.z) + Math.PI
+          p.pitch = -0.05
+          return { cx, cz }
+        },
+        { b: bearing, back: 6.5 },
+      )
+    /** Is the game both unobstructed and in frame from where we stand? */
+    const readsFromHere = () =>
+      page.evaluate(() => {
+        const t = window.__placeTag()
+        const cam = window.__placeCamera
+        if (!t || !cam || !window.__placeRayHit) return { clear: false, inFrame: 0 }
+        const cx = t.children.reduce((a, c) => a + c.x, 0) / t.children.length
+        const cz = t.children.reduce((a, c) => a + c.z, 0) / t.children.length
+        // Chest height of a child. Nothing may be drawn in FRONT of the group:
+        // a hut or an adult between reads as a hit far nearer than the target.
+        const h = window.__placeRayHit(cx, 0.75, cz)
+        const clear = h.hitDistance == null || h.hitDistance >= h.targetDistance * 0.9
+        // The SAME matrix math the frame shutter projects a `local` subject
+        // with (scripts/verify/frameSubject.mjs) — no THREE in the page here.
+        const apply = (e, v) =>
+          [0, 1, 2, 3].map((r) => e[r] * v[0] + e[r + 4] * v[1] + e[r + 8] * v[2] + e[r + 12] * v[3])
+        let inFrame = 0
+        for (const c of t.children) {
+          const eye = apply(cam.matrixWorldInverse.elements, [c.x, 0.5, c.z, 1])
+          const clip = apply(cam.projectionMatrix.elements, eye)
+          const w = clip[3]
+          if (!(w > 0)) continue
+          const x = clip[0] / w
+          const y = clip[1] / w
+          const z = clip[2] / w
+          // Inside 0.9 of the frame rather than 1.0: a child clipped by the very
+          // edge is in the picture by arithmetic and not by eye.
+          if (Math.abs(x) <= 0.9 && Math.abs(y) <= 0.9 && z < 1) inFrame++
+        }
+        return { clear, inFrame }
+      })
+    let stood = null
+    let shotProbe = 'none'
+    for (let k = 0; k < 12 && !stood; k++) {
+      const at = await standAt((k / 12) * Math.PI * 2)
+      if (!at) break
+      await nextFrames(2)
+      const r = await readsFromHere()
+      shotProbe = `bearing ${k}/12: clear=${r.clear} inFrame=${r.inFrame}`
+      if (r.clear && r.inFrame >= 2) stood = at
+    }
+    check('the game is photographable: a clear standpoint holds two children in frame', !!stood, shotProbe)
+    if (stood) {
+      await nextFrames(4)
+      await frame('480-village-tag', {
+        local: { x: stood.cx, y: 0.6, z: stood.cz },
+        label: 'the children playing tag',
+      })
+    }
+  }
+  await page.evaluate(() => window.__game.getState().leavePlace())
+  await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
+}
+
 console.log('console errors:', errors.length)
 for (const e of errors) console.log('ERR:', e.slice(0, 300))
 await browser.close()
