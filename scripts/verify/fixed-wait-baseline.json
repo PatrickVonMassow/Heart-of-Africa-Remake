@@ -4,7 +4,7 @@
   "benchmark.mjs": 2,
   "collision.mjs": 11,
   "crossbrowser.mjs": 1,
-  "enrichments.mjs": 72,
+  "enrichments.mjs": 70,
   "events.mjs": 3,
   "flow.mjs": 30,
   "gamepad.mjs": 8,
