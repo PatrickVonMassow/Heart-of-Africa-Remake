@@ -4528,6 +4528,40 @@ Build order, chosen so no two parallel agents own the same file:
   5. Nothing in the verification's default path changes for a reader who does not
      opt in: the software WebGPU lane keeps working exactly as it does today while
      this point runs, so the both-backend picture check is never interrupted by it.
+  6. THE FLAG SET COMES FIRST, and it is free. Google's own recipe for hardware
+     WebGPU in headless Chrome on Linux is `--no-sandbox --headless=new
+     --use-angle=vulkan --enable-features=Vulkan --disable-vulkan-surface
+     --enable-unsafe-webgpu`. `--disable-vulkan-surface` turns off the
+     `VK_KHR_surface` instance extension that headless has no display for — the
+     plausible seat of the reproduced >40 s adapter hang — and it appears NOWHERE in
+     this repository (checked 05.08.2026), while the lane pins software outright
+     (`--use-angle=swiftshader --use-vulkan=swiftshader`, `launch-args-core.mjs`).
+     The hardware attempt therefore ran WITHOUT the flag the recipe requires.
+     `--use-vulkan=native` and `--use-webgpu-adapter=default` are unused too. This
+     axis costs no download and is tried before any build is fetched.
+  7. The axes are ranked by what the evidence says, cheapest and likeliest first:
+     the flag set (item 6); then a newer Chrome channel — the host carries only the
+     151 build that declines, while Chrome for Testing (Beta 152, Dev 153, Canary
+     153) and `dl.google.com/linux/chrome/deb` both answer from the container, so
+     the download path is open. That version axis is the WEAKEST, and the point says
+     so rather than spending on it first: Dozen sits at Vulkan 1.2 with 1.3 blocked
+     on unavailable D3D12 APIs, and Dawn silently skips a driver whose feature set
+     falls short — which is exactly the observed one-second fall back to SwiftShader
+     with dzn as the only ICD. A newer Dawn demands more, not less.
+  8. A second ENGINE is NOT a way around dzn, and the point does not spend on it:
+     Firefox/wgpu does go through the system Vulkan loader, but that loader serves
+     the same Dozen, so it inherits the same ceiling — and Mozilla expects WebGPU on
+     Linux only in 2026, behind flags. Worth knowing for its own sake, and recorded
+     here so it is not re-derived: the suites themselves are barely Chromium-bound
+     (of 55 verify scripts exactly one uses CDP, and it is already the documented
+     WebGL2-only skip), so the coupling is `launch-args-core.mjs` and
+     `system-chrome.mjs` alone.
+  9. The one axis that bypasses Dozen entirely is named with its price, and is a
+     LAST resort: `chromium.connectOverCDP()` to a Chrome on the WINDOWS host, where
+     WebGPU runs natively on D3D12 with the 4070 Ti. It costs CDP fidelity, needs the
+     dev server reachable from the host, and hangs the lane on a browser OUTSIDE the
+     container — which contradicts the batch's headless autonomy. It is taken only if
+     items 6–7 fail, and the contradiction is stated in the verdict either way.
   VERIFIABLE: `node scripts/verify/backend-lane-check.mjs` on the WebGPU lane
   prints the device that actually drew the frame, and the picture of one built
   scene is inspected once; the host-environment section lists every build tried
