@@ -4571,9 +4571,17 @@ Build order, chosen so no two parallel agents own the same file:
      which verdict.
   4. Nothing here weakens the shutter: a frame whose subject is not in the picture
      stays a failure — the point fixes the cause, never the assertion.
-  VERIFIABLE: `enrichments` runs green twice in a row on the compatibility lane on
-  a quiet machine, or the host-environment section names the difference that makes
-  it structurally impossible there.
+  5. `settings` belongs to the same classification (measured 06.08.2026, twice):
+     on the compatibility lane every check that switches TRAA OFF fails, because
+     the MSAA path it falls back to cannot exist there — `RGBA16Float does not
+     support multisampling` arrives as an uncaptured GPUValidationError and the
+     scene then renders black (mean 2.2). WebGL 2 passes the same suite 52/0
+     minutes apart. If that is structural, the host-environment section says so
+     and the lane's verdict for MSAA checks is recorded as unavailable rather
+     than red.
+  VERIFIABLE: `enrichments` and `settings` run green twice in a row on the
+  compatibility lane on a quiet machine, or the host-environment section names the
+  difference that makes it structurally impossible there.
 
 - [ ] 515. THE PARALLEL-SESSION DETECTOR COUNTS A PLACEHOLDER OWNER AS A SECOND
   SESSION (measured 05.08.2026). The batch PAUSED ITSELF at 13:06 because the
