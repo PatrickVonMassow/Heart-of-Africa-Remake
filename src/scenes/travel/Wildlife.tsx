@@ -42,7 +42,7 @@ import { RIVER_WIDTH_DEG, sampleTerrain } from '../../world/terrain'
 import { renderedSheetY, waterSurfaceY } from './waterSurface'
 import { drinkWalkDistance, crocodileNeedsReanchor } from './waterEdgeRules'
 import { climateZoneAt, CURRENT_WEATHER } from '../../systems/season'
-import { lakeDistance, riverDistance, riverFlow } from '../../world/geoIndex'
+import { dramaCurrent, lakeDistance, riverDistance } from '../../world/geoIndex'
 import { hashChunk, mulberry32 } from '../../world/noise'
 import { balance } from '../../config/balance'
 import {
@@ -1775,8 +1775,20 @@ function Herds() {
     // meshRefs + colliders (point 378): the verification reads the ADULT instance
     // matrices themselves and the circles the movement loop really collides
     // against, so the two can be checked against each other.
+    // waterDrama: the exact numbers the §19.8 drown rule decides on at a spot —
+    // the wetness that has REACHED the wildlife system (CURRENT_WEATHER, not the
+    // debug override), the drama current there and the effective flow against
+    // the drown threshold. A staged water-drama check asserts this reading
+    // instead of assuming a forced season arrived (point 502).
     w.__wildlife = { herdsRef, stains, spawnedChunks, scavenger, restock, meshRefs, calfMeshRefs, herdState,
-      colliders: (x: number, z: number, r: number) => collidableAnimalsNear(x, z, r), fire: FIRE_STATE, lion: LION_STATE, igniteFire: igniteFireAt, simTime: () => simTimeRef.current, frames: () => frameCountRef.current }
+      colliders: (x: number, z: number, r: number) => collidableAnimalsNear(x, z, r), fire: FIRE_STATE, lion: LION_STATE, igniteFire: igniteFireAt, simTime: () => simTimeRef.current, frames: () => frameCountRef.current,
+      waterDrama: (lat: number, lon: number) => {
+        const bw = balance.waterDrama
+        const wetness = CURRENT_WEATHER.wetness
+        const strength = dramaCurrent(lat, lon).strength
+        const season = seasonFlowFactor(wetness, bw.dryFlowFactor, bw.wetFlowFactor)
+        return { wetness, strength, season, effective: strength * season, drownThreshold: bw.drownFlowThreshold }
+      } }
     return () => {
       delete w.__wildlife
     }
@@ -2477,7 +2489,10 @@ function Herds() {
             // current (point 122, calibratable in balance.waterDrama).
             const bw = balance.waterDrama
             const season = seasonFlowFactor(CURRENT_WEATHER.wetness, bw.dryFlowFactor, bw.wetFlowFactor)
-            const flow = riverFlow(ll.lat, ll.lon)
+            // dramaCurrent, not riverFlow: the sea-mouth slack is the
+            // traveller's rule (point 316) and killed the drowning on the last
+            // reach of every sea-bound river (geoIndex.dramaCurrent).
+            const flow = dramaCurrent(ll.lat, ll.lon)
             if (flow.strength > 0) {
               const boost =
                 fd < FALLS_DRIFT_RADIUS_DEG ? 1 + (FALLS_DRIFT_BOOST - 1) * (1 - fd / FALLS_DRIFT_RADIUS_DEG) : 1
@@ -2589,7 +2604,7 @@ function Herds() {
               a.wadeTime = (a.wadeTime ?? 0) + dt
               const bw = balance.waterDrama
               const season = seasonFlowFactor(CURRENT_WEATHER.wetness, bw.dryFlowFactor, bw.wetFlowFactor)
-              const wadeFlow = riverFlow(ll.lat, ll.lon)
+              const wadeFlow = dramaCurrent(ll.lat, ll.lon) // same drama current as the calf's
               const swept = fallsDistanceDeg(ll.lat, ll.lon) < FALLS_DEATH_RADIUS_DEG
               const drowned =
                 waterStruggleFate(

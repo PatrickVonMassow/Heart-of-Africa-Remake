@@ -59,6 +59,12 @@ export interface QualityPreset {
   /** Ambient wildlife spawn-density factor (1 = full, design.md §19.2).
    *  Declared for the §21 registry; consumed by the spawner when wired. */
   wildlifeDensity: number
+  /** Radial segments of the villager figures' arm/leg/hand primitives (point
+   *  479). The limbs are thin and the eye passes within a metre of them at
+   *  conversation range, so the count is what decides whether an arm reads as a
+   *  rod or as a limb; a settlement holds a couple of dozen figures, which is
+   *  why this is a level lever at all rather than a fixed constant. */
+  figureLimbSegments: number
 }
 
 export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
@@ -85,6 +91,7 @@ export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
     weatherIntensity: 0.6,
     waterCalm: true,
     wildlifeDensity: 0.6,
+    figureLimbSegments: 5, // point 479: the frugal floor — a limb still reads, faceted
   },
   // MEDIUM — the default; a good look on the user's RTX-40-class PC. SSAO off
   // (the ~25 % GPU lever kept for high), TRAA + Bloom on, native dpr, normal
@@ -105,6 +112,7 @@ export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
     weatherIntensity: 1,
     waterCalm: false,
     wildlifeDensity: 1,
+    figureLimbSegments: 8, // point 479: smooth enough at conversation range
   },
   // HIGH — the richest. SSAO on, sharper sun shadows (4096, above the default),
   // the softer/higher-res campfire shadow variant, everything else full.
@@ -124,6 +132,7 @@ export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
     weatherIntensity: 1,
     waterCalm: false,
     wildlifeDensity: 1,
+    figureLimbSegments: 12, // point 479: no facet on an arm the player stands beside
   },
 }
 

@@ -15,6 +15,7 @@
 import { launchVerifyBrowser, assertBackend } from './_browser.mjs'
 import { animalShare, readsAsAnimal, waterFloor } from './animalShare.mjs'
 import { frameShutter, captureFrame } from './frameSubject.mjs'
+import { snowFraction } from './snowMetric.mjs'
 import { fileURLToPath } from 'node:url'
 import sharp from 'sharp'
 
@@ -3921,7 +3922,10 @@ const runDrownScenario = async () =>
       }
     }
     if (!calf) return { staged: false, tries }
-    const out = { staged: true, tries, drowned: false, rescued: false, out: false, lionFed: false }
+    // The numbers the §19.8 rule actually decides on at this spot (point 502):
+    // asserted below instead of assuming the forced season arrived.
+    const reading = window.__wildlife.waterDrama(spot[0], spot[1])
+    const out = { staged: true, tries, reading, drowned: false, rescued: false, out: false, lionFed: false }
     // 65 s: the 260-unit park means a dry-season parent arrives ~43 s in, and
     // rescue + walk-back must still fit (the drown branch breaks early).
     await window.__pollSim(65, () => {
@@ -3935,18 +3939,25 @@ const runDrownScenario = async () =>
   })
 // (a) Forced rains: the current holds the calf under until it drowns.
 await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(1))
-await page.waitForTimeout(400)
+// Wait for the wetness to REACH the wildlife system, not for a fixed 400 ms.
+await page.waitForFunction(() => window.__wildlife.waterDrama(29, 31).wetness === 1)
 const drowned = await runDrownScenario()
 check('in the forced rains a calf in a strong current drowns — dead, never rescued (point 122)',
   !drowned.noSpot && drowned.staged && drowned.drowned && !drowned.rescued && drowned.lionFed,
   JSON.stringify(drowned))
+check('the forced rains reach the drowning rule: full wetness and a flow above the drown threshold (point 502)',
+  drowned.reading?.wetness === 1 && drowned.reading.effective >= drowned.reading.drownThreshold,
+  JSON.stringify(drowned.reading))
 // (b) The dry season: the SAME setup still clambers out alive on its own.
 await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(0))
-await page.waitForTimeout(400)
+await page.waitForFunction(() => window.__wildlife.waterDrama(29, 31).wetness === 0)
 const clambered = await runDrownScenario()
 check('in the dry season the same mid-channel calf clambers out alive (point 122)',
   !clambered.noSpot && clambered.staged && clambered.out && !clambered.drowned,
   JSON.stringify(clambered))
+check('the dry season reaches the rule: no wetness and a flow below the drown threshold (point 502)',
+  clambered.reading?.wetness === 0 && clambered.reading.effective < clambered.reading.drownThreshold,
+  JSON.stringify(clambered.reading))
 await page.evaluate(() => window.__ui.getState().setSeasonWetnessOverride(null))
 await page.waitForTimeout(300)
 
@@ -7145,33 +7156,53 @@ const settleScalar = async (read, rel = 0.003) => {
     JSON.stringify(ice),
   )
 
-  // Seasonal Atlas snow, measured as the FRACTION of near-white pixels over the
-  // massif crest (a mean over the whole frame dilutes it into sand).
+  // Seasonal Atlas snow, measured as the FRACTION of the massif crest that
+  // reads as SNOW — bright AND neutral (snowMetric.mjs), the sand beside it
+  // being just as bright but strongly warm. A mean over the whole frame would
+  // dilute it into that sand.
+  //
+  // Point 503: the measure USED to count "near-white" pixels (darkest channel
+  // above 205) and demand 2 % of the crop. That bar was found under it —
+  // 1.2-1.3 %, twice — while the February frame showed an unmistakably
+  // snow-capped range. The picture was right and the MEASURE had drifted: this
+  // scene renders no near-white pixel at all (the whole frame, journal
+  // parchment and HUD included, tops out at a darkest channel of 210), so an
+  // absolute 205 sat inside the snow's own brightness spread and counted its
+  // top sliver instead of its extent. The snow cover is untouched; the bar is
+  // RAISED — 10 % against the ~31 % the February crest now measures, with July
+  // at 0.0 %.
   await page.evaluate(() => window.__game.getState().debugJumpTo(31.06, -7.91)) // Toubkal
-  await page.waitForTimeout(1500)
-  const whiteFrac = async (month) => {
-    await page.evaluate((m) => window.__game.getState().debugJumpToMonth(m), month)
-    await page.waitForTimeout(2500)
+  await page.evaluate(() => window.__sleepSim(1.5))
+  // Sample until the crop stops changing rather than after a fixed pause: on a
+  // cold snow path the first February frames can still be bare for several
+  // seconds, and a fixed wait would measure 0 and accuse the product.
+  const SNOW_SETTLE_LEAD_SIM = 10
+  const SNOW_SETTLE_STEP_SIM = 0.5
+  const snowFrac = async () => {
     const buf = await page.screenshot({ clip: { x: 400, y: 280, width: 560, height: 320 } })
     const { data, info } = await sharp(buf).raw().toBuffer({ resolveWithObject: true })
-    let white = 0
-    const px = info.width * info.height
-    for (let i = 0; i < px; i++) {
-      const r = data[i * info.channels]
-      const g = data[i * info.channels + 1]
-      const b = data[i * info.channels + 2]
-      if (Math.min(r, g, b) > 205) white++
-    }
-    return white / px
+    return snowFraction(data, info)
   }
-  const feb = await whiteFrac(2)
+  const snowCover = async (month) => {
+    await page.evaluate((m) => window.__game.getState().debugJumpToMonth(m), month)
+    await page.evaluate((s) => window.__sleepSim(s), SNOW_SETTLE_LEAD_SIM)
+    let prev = await snowFrac()
+    for (let i = 0; i < 20; i++) {
+      await page.evaluate((s) => window.__sleepSim(s), SNOW_SETTLE_STEP_SIM)
+      const v = await snowFrac()
+      if (Math.abs(v - prev) <= 0.002) return v
+      prev = v
+    }
+    return prev
+  }
+  const feb = await snowCover(2)
   await shot('122-atlas-snow-february', { world: { lat: 31.06, lon: -7.91 }, label: 'Toubkal under February snow' })
   console.log('shot 122-atlas-snow-february.png')
-  const jul = await whiteFrac(7)
+  const jul = await snowCover(7)
   check(
     'the High Atlas whitens in February and bares in July (seasonal snow, point 141)',
-    feb > jul * 3 && feb > 0.02,
-    `white fraction Feb ${(feb * 100).toFixed(1)}% vs Jul ${(jul * 100).toFixed(1)}%`,
+    feb > jul * 3 && feb > 0.1,
+    `snow cover Feb ${(feb * 100).toFixed(1)}% vs Jul ${(jul * 100).toFixed(1)}%`,
   )
   await page.evaluate(() => window.__game.getState().debugJumpToMonth(1))
 }

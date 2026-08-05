@@ -2253,11 +2253,12 @@ it is appended.
   below which the pace never falls while a chase runs — a child frozen mid-game reads as
   a bug, a trotting one reads as winded — and per-child variation in reserve and
   recovery, so the group never tires in unison.
-  HOW IT READS, given the figures the game has: the villagers are cones with sphere
-  heads and NO legs (only the fauna and the §2.5 silhouettes have a stride), so the
-  sprint cannot be shown by leg cadence. It is carried by SPEED and POSTURE — a forward
-  lean while sprinting, upright and near-still while recovering. Giving human figures
-  legs is NOT part of this point.
+  HOW IT READS, given the figures the game has: point 479 gave the running children
+  legs with a distance-driven gait, so the sprint reads through LEG CADENCE as well as
+  through SPEED and POSTURE — a forward lean while sprinting, upright and near-still
+  while recovering. All three carry it together; none of them alone is the signal, and
+  the posture reading stays load-bearing because it survives at any distance the cadence
+  no longer resolves at.
   USE THE WILDLIFE STEERING, NOT THE WALKER SLIDE. The village walkers resolve obstacles
   by sliding along a collider and stopping — which is exactly what reads as bumping into
   things. `deflectedStep` (`src/scenes/travel/wildlifeBehavior.ts`, used by every fleeing
@@ -4028,26 +4029,6 @@ Build order, chosen so no two parallel agents own the same file:
   wave 4  481 (children teach) · 483 (adults teach)
   wave 5  486 (drums) · 487 (digging)
 
-- [ ] 479. VILLAGERS GET ARMS AND GESTURES (user 03.08.2026). The figures are
-  cones with sphere heads today; a gesture needs something to gesture with.
-  FINAL STATE:
-  1. The villager figure gains arms and, where a gesture needs them, hands and
-     legs, in the existing style — the same restraint the other figures show, not
-     a new visual language.
-  2. Four gestures read at conversational distance: BECKON, POINT at a visible
-     spot or person, REFUSE, and INDICATE A DIRECTION.
-  3. A gesture never explains itself. It is one half of a situation whose other
-     half is what actually happens next.
-  4. Driven from the same behaviour layer that speaks, so a figure saying COME
-     also beckons, in step.
-  5. The added geometry carries its `QUALITY_PRESETS` entries on every level.
-  6. Point 351's chase reads by SPEED AND POSTURE because the figures had no legs;
-     that wording is corrected in the same commit, and the chase keeps reading
-     the way it was designed to.
-  VERIFIABLE: pure Vitest on the gesture state machine (bounded duration, no two
-  gestures at once on one figure, the pose returns to rest); browser screenshots
-  on both backends for the four poses.
-
 - [ ] 480. THE CHILDREN'S GAME OF TAG (point 351, pulled forward by the user
   03.08.2026 because the PoC teaches its first concepts through it). Point 351's
   specification is unchanged and binding, with one amendment from point 479: the
@@ -4196,6 +4177,12 @@ Build order, chosen so no two parallel agents own the same file:
   triangles at 5 s to 222 and 745k at 30 s — the world streams roughly five times
   slower here than on the hardware the suites' waits were written for, and a
   screenshot taken meanwhile is green and empty.
+  TWO SUITES ARE MEASURED CASES, not one (05.08.2026): the `world` suite waited on a
+  healthy frame RATE, which an empty scene reaches FASTEST of all — it wrote a 47 kB
+  blank village frame and exited 0 — and `collision` wrote a blank
+  `52-collision-port-wall.png` the same way while reporting every check green. Both
+  are the same race, so the readiness wait belongs in the shared capture path rather
+  than in one suite.
   FINAL STATE:
   1. A frame whose subject is a place, a landmark or anything in the world waits
      for the SCENE to be ready — the renderer's own draw-call and triangle counts
@@ -4366,6 +4353,14 @@ Build order, chosen so no two parallel agents own the same file:
      than from the factor 3.8 extrapolated.
   4. The measured total is carried onto the open decision card, so the user
      decides against a number rather than an estimate.
+  5. THE MACHINE STATE IS PART OF THE NUMBER (user 05.08.2026). The host carried
+     other load through the morning, so a run taken then is a SECURED UPPER BOUND
+     and is labelled as one wherever it is written down. An upper bound settles
+     the question only while it stays BELOW the 30–40 min Windows baseline; above
+     it, the run is repeated on a quiet machine before any verdict is drawn.
+  6. The software-lane premise is gone (point 505): the WebGPU pass now draws on
+     the card at 0.73× the WebGL lane's rate rather than the software lane's 0.26,
+     so the factor 3.8 is history and the measurement records what REPLACED it.
   VERIFIABLE: `docs/host-environment.md` names both pass durations, the total
   and the baseline with its date; the run's own log is quoted for each figure;
   and no figure in that section is an extrapolation — every one is a wall-clock
@@ -4412,44 +4407,6 @@ Build order, chosen so no two parallel agents own the same file:
   when the panorama orientation is deliberately inverted — a check that cannot
   fail proves nothing.
 
-- [ ] 502. FORCED RAIN DOES NOT SWELL THE CURRENT FOR THE DROWNING DRAMA
-  (measured 04.08.2026 during the point-499 triage, 2 of 2 runs identical). The
-  `enrichments` wet-season water drama stages a calf crossing and reads
-  `{drowned:false, rescued:true, out:true}` — the DRY-season outcome — while the
-  paired dry-season check passes. Two candidates the triage could not separate:
-  the 400 ms after `setSeasonWetnessOverride(1)` is too short for
-  `CURRENT_WEATHER.wetness` to reach the wildlife system, or the swollen-current
-  rule itself regressed.
-  FINAL STATE:
-  1. The two are SEPARATED by the discriminator the triage named: read
-     `CURRENT_WEATHER.wetness` at staging time. A timing cause is fixed by
-     waiting on that reading, never by a longer sleep.
-  2. If the rule regressed, the wet-season current is restored so a calf
-     crossing a swollen river can drown per design.md §19.8, and the fix carries
-     a Vitest case at the rule level — the browser check is the picture, not the
-     only proof.
-  VERIFIABLE: the `enrichments` wet-season drama reports a drowning outcome on
-  two consecutive runs, the dry-season pair still passes, and the staged
-  `wetness` reading is asserted rather than assumed.
-
-- [ ] 503. HIGH ATLAS SEASONAL SNOW SITS UNDER ITS BAR
-  (measured 04.08.2026 during the point-499 triage, 2 of 2 runs, stable — not a
-  timing effect). The `enrichments` February High Atlas frame reads 1.2–1.3 %
-  snow against a 2 % bar. The seasonality half of the same check passes
-  trivially (Feb 1.3 % vs Jul 0.0 %), so the contrast is intact and only the
-  absolute amount is short. Either the snow is genuinely thinner than when the
-  bar was set, or the crop/exposure the check measures has moved.
-  FINAL STATE:
-  1. Decided AT THE PICTURE, as the ground micro-detail was: a February High
-     Atlas frame is looked at and judged against design.md §19.9 — does the
-     range read as snow-capped to a human?
-  2. The bar is NOT lowered to close this. If the picture is right and the crop
-     moved, the check is corrected with the reason written down; if the picture
-     is wrong, the snow cover is restored.
-  VERIFIABLE: the `enrichments` snow check passes two consecutive runs, the
-  frame it judges is stored in `verification/`, and the commit says which of the
-  two causes was found.
-
 - [ ] 504. EVERY BATCH OWNER IS DISPOSSESSED AT HALF AN HOUR OF AGE
   (measured 04.08.2026, 18:50Z and root-caused at 19:00Z). The autostart launcher
   logged "owner provably dead (pid-reused) — taking over" and spawned a second
@@ -4486,47 +4443,6 @@ Build order, chosen so no two parallel agents own the same file:
   batch owner older than an hour is still read as alive by
   `node scripts/batch-doctor.mjs` on this host.
 
-- [ ] 505. HARDWARE WEBGPU: WORK THROUGH OTHER BROWSER BUILDS
-  (user decision 04.08.2026, the "Zweite Bahn läuft in Software" card, option 3 —
-  keep investing, open outcome). Today the WebGPU verification lane draws through
-  Chrome's bundled SwiftShader: `verify-host-setup.sh --with-dzn` builds Dozen from
-  the Debian mesa source and `vulkaninfo` enumerates `Microsoft Direct3D12 (NVIDIA
-  GeForce RTX 4070 Ti)`, but Chrome 151 declines it — scoped to dzn alone Dawn
-  answers with its own SwiftShader in one second, and with the full ICD set visible
-  `--enable-features=Vulkan` HANGS at adapter time (>40 s, reproduced).
-  `docs/host-environment.md` records that verdict; this point tests whether it is a
-  limit of this BROWSER BUILD rather than of the host.
-  FINAL STATE:
-  1. Other browser builds are tried against the existing dzn ICD, cheapest first,
-     and each attempt is recorded with build + exact version, ICD scope, flags, and
-     what the adapter answered (own software path / hang / hardware). At minimum:
-     a newer Chrome for Testing or Chromium channel (beyond 151, incl. dev and
-     canary), the WebGPU adapter-selection and unsafe-webgpu flags against dzn, and
-     a Chrome build whose bundled Dawn is newer than the one that declines today.
-  2. The outcome may be either — that is the point's premise. Reached: the WebGPU
-     lane draws through the 4070 Ti, `scripts/verify/backend-lane-check.mjs` NAMES
-     that device on the WebGPU lane (never a software rasteriser reported as if it
-     were the GPU), and that build becomes the lane's browser. Not reached: the
-     point closes on a WRITTEN verdict naming every build tried and its refusal —
-     the software lane stays, and the shortfall stays visible rather than silently
-     accepted.
-  3. The hang path stays contained whichever way it ends: no ICD is installed by
-     default, the dzn build stays opt-in behind `verify-host-setup.sh --with-dzn`,
-     and no default verification run may block at adapter time. A build that hangs
-     is recorded and abandoned, not worked around with a longer timeout.
-  4. `docs/host-environment.md` §"Hardware WebGPU is the open item" states the
-     CURRENT verdict in the same commit as the result — its standing warning
-     ("read this before rebuilding dzn: the verdict is worth more than the build")
-     keeps holding, extended by the browser builds this point ruled out.
-  5. Nothing in the verification's default path changes for a reader who does not
-     opt in: the software WebGPU lane keeps working exactly as it does today while
-     this point runs, so the both-backend picture check is never interrupted by it.
-  VERIFIABLE: `node scripts/verify/backend-lane-check.mjs` on the WebGPU lane
-  prints the device that actually drew the frame, and the picture of one built
-  scene is inspected once; the host-environment section lists every build tried
-  with its outcome; a default (non-opt-in) verification run shows no ICD present
-  and no adapter stall.
-
 - [ ] 506. THE SOFTWARE LANE REDDENS AT CHECKS IT CANNOT DRAW FAST ENOUGH TO
   ANSWER (measured 05.08.2026, 01:50–03:40, on a machine with no second verify
   run — the quiet repeat point 499 asked for). Four checks fail on the software
@@ -4544,6 +4460,20 @@ Build order, chosen so no two parallel agents own the same file:
   second, so "a green run there proves nothing about timing" — but nothing acts
   on it, so every run shows red for it and a real regression would hide in that
   noise.
+  COLLISION CARRIES TWO MORE OF THE SAME (measured 05.08.2026, three runs on the
+  software lane, green on WebGL 2): "inhabitant walked out and re-entered its
+  dwelling through the door — no walk→inside transition observed" and "no inhabitant
+  stays pinned past the unstuck window", the latter reporting `"ok":true` beside
+  `anyMoved:false` — it FAILS while its rule holds, because at roughly one frame per
+  second nothing moves far enough inside the observation window to measure. That is
+  the MEASURED-NOTHING signature, and a check that reports a rule as broken while
+  saying the rule held is the worst kind of red: it reads as a product defect.
+  IT IS NOT ONLY REDS: on 05.08.2026 `VERIFY_GL=webgpu run-all polish` ran 27
+  minutes in a synced branch, printed nothing after "starting dev server", wrote no
+  frame at all and had to be killed, while `world collision` had passed on the same
+  lane minutes earlier. So the lane can also HANG, and while it does, no figure or
+  settlement point has a second backend at all — every such merge then owes a loud
+  deferral instead of a picture.
   FINAL STATE:
   1. The run MEASURES the lane's delivered frame rate once, from the running
      page, and reports it in the run header — every verdict below names the lane
@@ -4594,3 +4524,164 @@ Build order, chosen so no two parallel agents own the same file:
   case proves a suite that loses its device reports the loss as its failure
   rather than a truncated pass; and `VERIFY_GL=webgpu npm test -- invariants`
   either completes on this host or names the device loss as its verdict.
+
+- [ ] 508. EACH NOW-CARD IS JUDGED BY ITS OWN NUMBER (measured 05.08.2026, bundle
+  Chat & Tafel). `parseNowCard` in `scripts/queue-order-guard-core.mjs` cuts the
+  WHOLE "Woran ich gerade arbeite" section out as ONE text and files it under the
+  FIRST card's number. Several now-cards at once are explicitly allowed (one per
+  point in active work), so every word in any of them is charged to the first: today
+  "Fertig ist der Weltteil" in the 482 card blocked the turn end with the message
+  that the 485 card claimed completion, and the topic guard reported 482 for a
+  cross-reference that stood in a different card. A guard that names the wrong card
+  sends the session to edit correct text, which is worse than not firing.
+  FINAL STATE:
+  1. The section is split per `<details class="now">`, and every now-card is judged
+     against its OWN point number — by the done-claim check, the card-topic check
+     and the conciseness check alike.
+  2. A card without a recognisable number is reported as such, never silently
+     merged into its neighbour.
+  3. The guards keep failing open on an unparseable board.
+  VERIFIABLE: pure Vitest on a board with three now-cards where only the SECOND
+  carries a done-claim, a cross-point mention and an over-long paragraph — each
+  finding must name the second card's point, and a single-now-card board must behave
+  exactly as it does today.
+
+- [ ] 509. NO INHABITANT STANDS ON THE SETTLEMENT ORIGIN (observed 05.08.2026 while
+  verifying another point, bundle Dorfleben). In `maasai-village` several
+  `inhabitant` groups report the world position exactly `(0,0,0)`. A ray probe finds
+  a body cone there, so figures ARE being drawn at the origin — either stacked on
+  one another or left at an uninitialised transform. Point 155 closed the
+  stuck-walker case; this is the other failure of the same layer, and an exact zero
+  is the signature of a placement that never happened rather than one that went
+  wrong.
+  FINAL STATE:
+  1. Every inhabitant of every settlement stands at the spot its layout assigns it;
+     none reports the settlement origin unless its layout genuinely places it there.
+  2. Whatever produced the exact zero is fixed at its source, not by nudging the
+     figure away afterwards.
+  3. The dev-mode assert channel reports an inhabitant at an unplaced transform, so
+     the next occurrence is caught by any run rather than by a passing observation.
+  VERIFIABLE: a browser check over every settlement asserts no inhabitant's world
+  position sits within a small radius of the origin while its layout anchor lies
+  elsewhere; a Vitest case pins the placement function against the uninitialised
+  case that produced the zero.
+
+- [ ] 510. THE RENDER-VERIFY CORE COUNTS A RUN THAT NEVER CONFIRMED ITS BACKEND
+  (four-eyes review of point 505's gate change, 05.08.2026 — the reviewer cleared
+  that change and left these three beside it).
+  FINAL STATE:
+  1. `coveringRun` (`scripts/render-verify-core.mjs`) counts a run only when it
+     also CONFIRMED its backend. Today it reads the exit code alone, so a run that
+     never reached `assertBackend` covers — and since that call is what writes the
+     feature level, such a run carries neither signal and still passes. Vitest
+     pins both directions.
+  2. `coveringRun(runs, b, since, null)` no longer throws: the options default
+     catches `null` as well as `undefined`, or the totality test stops claiming
+     more than holds. The outer guard catches it fail-open today, so this is
+     honesty about the core's contract, not a live defect.
+  3. The CLOSING (§9) demands a core-level WebGPU sighting once per release, so a
+     compatibility-level lane never becomes the sole WebGPU evidence for a tag.
+     The turn gate stays level-agnostic — demanding core there would hard-block
+     every render change on a host whose only adapter is compat (point 505).
+  VERIFIABLE: Vitest — an unasserted run never covers, an asserted one does, and
+  the options default survives `null`; `scripts/closing-guard-core.mjs` carries the
+  core-level step and `--status` lists it.
+
+- [ ] 511. THE MEMORY INDEX STILL CARRIES WHAT THIRTY GUARDS NOW ENFORCE
+  (measured 05.08.2026 on the user's question about context cost). The numbers
+  first, so the effort goes where the cost is: the memory INDEX is 13.2 KB / 86
+  lines (~3.3k tokens) per session and the 74 entry files load only on recall,
+  while `CLAUDE.md` is 61.6 KB (~15k tokens) and is paid AGAIN by every subagent —
+  ~82 % of the session floor against the index's ~16 %, and the floor multiplies
+  per agent. Splitting `CLAUDE.md` is the real lever, is the user's call and is
+  published as the decision card "Bauanleitung für Subagenten aufteilen?"; this
+  point does the part that needs no decision.
+  FINAL STATE:
+  1. Every memory entry whose rule is ENFORCED by an armed guard is retired from
+     the index, its content living on wherever the guard documents itself. An
+     entry stays when it carries a JUDGEMENT a guard cannot make (taste, history,
+     a user ruling) — the test is "would a session behave differently without it,
+     given the guard already fires?".
+  2. `docs/rule-corpus-audit.md` records the measurement above and each retirement
+     with its enforcing guard, so the next audit starts from evidence.
+  VERIFIABLE: the index names no entry whose whole content is an armed guard's
+  rule; the audit doc lists each retired entry beside the guard that replaced it.
+
+- [ ] 512. THE BUILD ORDER IS PAID AGAIN BY EVERY SUBAGENT (user decision
+  05.08.2026 on the card "Bauanleitung für Subagenten aufteilen?"). Measured:
+  `CLAUDE.md` is 61.6 KB — §1–5 8.0 KB, §6 13.6 KB, §7 37.5 KB (of which §7.2 is
+  7.4 KB), §9 2.0 KB — and every delegated agent receives all of it, though a
+  building agent never touches the 32 acceptance criteria, the batch handover, the
+  board rules, the model policy or the release mechanics. An agent-facing core is
+  ~19 KB, so ~68 % of the rule document falls away per agent.
+  FINAL STATE:
+  1. `CLAUDE.md` keeps ONE binding text and gains a declared SPLIT: the
+     agent-facing core (goal, scope guardrails, stack, structure, commands, the
+     working rules a builder obeys — commits, branch discipline, language, voice
+     markup, test layers — and §7.2 self-verification) and the session part (batch
+     ownership and handover, board, delegation machinery, model policy, release
+     and closing). Neither is a summary of the other: every rule lives in exactly
+     one of them, and nothing is dropped.
+  2. Delegated agents receive the core only. The mechanism is the one that already
+     exists for this purpose — the point brief (`scripts/point-brief.mjs`) — so a
+     builder gets brief + core and no longer the whole document.
+  3. A rule that moves keeps its enforcement: any guard, hook or test that reads
+     `CLAUDE.md` by section is updated in the same commit, and the doc-budget
+     entries follow the split.
+  4. The session part stays the authority for a session that OWNS the batch, so
+     nothing about the batch, the board or a release becomes less binding.
+  VERIFIABLE: a delegated agent's prompt carries the core and not the session
+  part; `scripts/point-brief.mjs` names which document it assumes; every rule of
+  the old file is findable in exactly one of the two halves (a test sweeps the
+  section headings for coverage and for duplication).
+
+- [ ] 513. A BRANCH CI RUN MUST NOT MAIL THE OWNER (user decision 05.08.2026 on
+  the card "Rote CI-Läufe auf Agenten-Zweigen — welcher Weg?", option 3). Two
+  deliberate rules work against each other: a branch push runs lint and
+  dependencies only (the full gate per intermediate commit costs more than a red
+  branch is worth), while the pipeline runs in full on EVERY branch push. An agent
+  that commits mid-work therefore produces red runs, and each one mails the
+  repository owner.
+  FINAL STATE:
+  1. A CI run on a `feat/**` branch no longer notifies the owner by mail. Red on a
+     branch is expressly normal; the run still executes and its result stays
+     visible in the run list.
+  2. `main` is untouched: a red run there still mails, because that is the branch
+     the deploy builds from.
+  3. The rescue-commit mail path (`[skip ci]` plus the `Rescue:` trailer, which
+     deliberately mails on a red state) keeps working as specified — this point
+     silences the ROUTINE branch run, not the deliberate alarm.
+  4. `docs/` states where notifications now come from, so a silent branch failure
+     is never mistaken for a green one.
+  VERIFIABLE: a deliberately red push to a throwaway `feat/` branch produces a run
+  and no mail; the same failure on `main` still mails; the rescue path still does.
+
+- [ ] 514. THE COMPATIBILITY LANE HAS TWO REDS THE WEBGL LANE DOES NOT (measured
+  05.08.2026 on `main`, both lanes run minutes apart on the same machine, right
+  after the lane moved onto the card in point 505). `enrichments` on the WebGPU
+  compatibility lane died twice for different reasons — run 1 after 157 green
+  checks with `page.evaluate: TypeError: Cannot read properties of undefined
+  (reading 'herdsRef')`, i.e. `window.__wildlife` was gone at the moment of
+  access; run 2 with `frame 72-water-victoria-falls — its subject is not in the
+  rendered picture`. The SAME suite on WebGL 2, twice, showed neither: 244 pass
+  and only the measures-nothing dressing flake point 200 already lists. The lane
+  is now the project's second evidence lane, so its own faults have to be
+  separated from the product's.
+  FINAL STATE:
+  1. Each of the two is CLASSIFIED, on a quiet machine, as either a lane fault or
+     a product defect — the suspicion is recorded so nobody re-derives it: the
+     dev hook is deleted on unmount and the compat lane builds the scene on a
+     different schedule, so the access may fall into a window the suite does not
+     wait through; and the falls frame may sit differently because compat forces
+     MSAA off.
+  2. What turns out to be the suite's own timing is fixed at the READINESS, not
+     with a longer wait: the access waits for the hook the same way the boot
+     sequence does.
+  3. What turns out to be a product difference between the feature levels is
+     stated in `docs/host-environment.md`, so a reader knows which lane can carry
+     which verdict.
+  4. Nothing here weakens the shutter: a frame whose subject is not in the picture
+     stays a failure — the point fixes the cause, never the assertion.
+  VERIFIABLE: `enrichments` runs green twice in a row on the compatibility lane on
+  a quiet machine, or the host-environment section names the difference that makes
+  it structurally impossible there.

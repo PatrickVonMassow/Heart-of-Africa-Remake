@@ -49,3 +49,20 @@ export function lakeDistance(lat: number, lon: number, maxDist = 4, range = 1): 
 export function riverFlow(lat: number, lon: number): { dirLat: number; dirLon: number; strength: number } {
   return riverFlowExact(lat, lon)
 }
+
+/**
+ * The §19.8 water-drama current (design.md §19.8, point 122): the same
+ * downstream flow WITHOUT the point-316 sea-mouth slack.
+ *
+ * The slack exists for the TRAVELLER (§11.2): a river's last reach must not
+ * funnel a swimmer into a coast-locked pocket. The animals' drowning drama
+ * inherited it and lost its swollen current: the wet-season drift carries a
+ * struggling calf ~2.7° downstream inside the 30 s drown window, so on the
+ * last reach of every sea-bound river the current went slack under the calf
+ * before the window closed and it "clambered out exhausted" — the dry-season
+ * ending — in what design.md §19.8 calls a swollen river. The season decides
+ * the water's mercy there, not the distance to the mouth.
+ */
+export function dramaCurrent(lat: number, lon: number): { dirLat: number; dirLon: number; strength: number } {
+  return riverFlowExact(lat, lon, undefined, false)
+}

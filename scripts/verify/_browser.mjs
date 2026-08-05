@@ -9,8 +9,9 @@
 // (the guardrail, the whole point of the lane).
 import { chromium } from 'playwright'
 import { armRunRecorder, markBackendAsserted } from '../render-verify-recorder.mjs'
+import { featureLevelOf } from '../render-verify-core.mjs'
 import { verifyLaunchOptions, webgpuLaneVerdict } from './launch-args-core.mjs'
-import { findSystemChrome } from './system-chrome.mjs'
+import { findSystemChrome, hasHardwareGlChain } from './system-chrome.mjs'
 
 // Which backend the verify run targets. 'webgpu' = system Chrome, headless=new (the
 // player's primary backend); 'webgl' = the bundled Chromium with ANGLE (the WebGL2
@@ -36,8 +37,9 @@ export const VERIFY_GL = (process.env.VERIFY_GL ?? 'webgl').toLowerCase() === 'w
  *  browser", undefined = "probe it"). They exist because the ordering below is
  *  load-bearing — the throw must happen BEFORE armRunRecorder — and proving that on a
  *  machine that HAS a system Chrome would otherwise mean launching a real browser
- *  (scripts/verify/launch-order.test.mjs). */
-export async function launchVerifyBrowser({ platform = process.platform, systemChrome } = {}) {
+ *  (scripts/verify/launch-order.test.mjs). `glChain` short-circuits the GL-chain probe
+ *  the same way. */
+export async function launchVerifyBrowser({ platform = process.platform, systemChrome, glChain } = {}) {
   // The probe runs ONCE and its result is what LAUNCHES: the verdict and the launch
   // options read the same path, so the browser the bring-up reports is the browser the
   // lane opens (point 475 — see webgpuLaunchOptions).
@@ -58,19 +60,48 @@ export async function launchVerifyBrowser({ platform = process.platform, systemC
   armRunRecorder(VERIFY_GL)
   return chromium.launch(
     // process.env is handed over so the lane can pin the Gallium driver in it (point 493:
-    // unpinned, Mesa 25 silently serves llvmpipe and every suite runs on the CPU).
-    verifyLaunchOptions(VERIFY_GL, platform, process.env.VERIFY_ANGLE, chrome, process.env, process.env.VERIFY_GALLIUM),
+    // unpinned, Mesa 25 silently serves llvmpipe and every suite runs on the CPU). The
+    // GL-chain answer decides the Linux WebGPU flags (point 505: Dawn's OpenGLES backend
+    // on the card where the chain is installed, the software rasteriser where it is not).
+    verifyLaunchOptions(
+      VERIFY_GL,
+      platform,
+      process.env.VERIFY_ANGLE,
+      chrome,
+      process.env,
+      process.env.VERIFY_GALLIUM,
+      glChain ?? hasHardwareGlChain(platform),
+    ),
   )
 }
 
 /** Guardrail (point 184): throw if the backend that actually initialised is not the
  *  one requested. A WebGPU run that silently fell back to WebGL2 would give false
  *  confidence — exactly what the lane must prevent. Call once after the game has
- *  loaded (window.__renderer is set in App.tsx after renderer.init()). */
+ *  loaded (window.__renderer is set in App.tsx after renderer.init()).
+ *
+ *  It reads a THIRD signal beside the backend: the WebGPU FEATURE LEVEL (point 505).
+ *  three.js always REQUESTS `compatibility` and then decides by whether the device
+ *  carries `core-features-and-limits`, so "WebGPU" alone names two different code paths
+ *  — the player's core one, and the compat one the GLES lane comes up on, where three's
+ *  compat branches run and MSAA is dropped. Without the level in the record,
+ *  render-verify-guard books a compat run as core coverage, the same confusion class as
+ *  software reported as hardware. So the level is read here and carried into the run
+ *  record (markBackendAsserted → render-verify-recorder.mjs), where a later reader can
+ *  tell the two apart. */
 export async function assertBackend(page) {
   const info = await page.evaluate(() => {
     const r = /** @type {any} */ (window).__renderer
-    return r ? { isWebGPU: r.backend?.isWebGPUBackend === true } : null
+    if (!r) return null
+    const device = r.backend?.device
+    return {
+      isWebGPU: r.backend?.isWebGPUBackend === true,
+      // three.js's own reading of the level it got.
+      compatibilityMode: r.backend?.compatibilityMode === true,
+      // The spec's reading, and the authoritative one: a compat adapter lacks it.
+      // null where there is no WebGPU device to ask (the WebGL 2 lane).
+      coreFeatures: device?.features ? device.features.has('core-features-and-limits') : null,
+    }
   })
   if (!info) throw new Error('assertBackend: window.__renderer not found — the game did not finish loading')
   if (VERIFY_GL === 'webgpu' && !info.isWebGPU) {
@@ -81,8 +112,10 @@ export async function assertBackend(page) {
   if (VERIFY_GL === 'webgl' && info.isWebGPU) {
     throw new Error('assertBackend: VERIFY_GL=webgl but the renderer initialised on WebGPU — the fallback lane is not exercising WebGL2')
   }
-  markBackendAsserted() // render-verify evidence: the backend was CONFIRMED, not assumed
-  return info
+  const featureLevel = featureLevelOf(info)
+  // Render-verify evidence: the backend was CONFIRMED, not assumed — and at which level.
+  markBackendAsserted(featureLevel)
+  return { ...info, featureLevel }
 }
 
 /** Wait until a numeric page reading STOPS changing, then return it (point 200):

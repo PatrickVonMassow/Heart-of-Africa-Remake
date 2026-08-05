@@ -8,12 +8,17 @@ import { webglLaunchOptions, webgpuLaunchOptions, WEBGPU_UNAVAILABLE } from './l
 
 /** The lanes to probe, in report order. A lane with no launch options carries the REASON
  *  in its place, so the check prints why rather than a bare failure. */
-export function laneRenderers(systemChrome, platform = process.platform, baseEnv, galliumOverride) {
+export function laneRenderers(systemChrome, platform = process.platform, baseEnv, galliumOverride, hasGlChain) {
   const webgl = { name: 'webgl2', launchOptions: webglLaunchOptions(platform, undefined, baseEnv, galliumOverride) }
   if (systemChrome) {
     return [
       webgl,
-      { name: 'webgpu', launchOptions: webgpuLaunchOptions(systemChrome, platform, baseEnv, galliumOverride) },
+      {
+        name: 'webgpu',
+        // The same GL-chain answer the suites launch with (point 505), so this check
+        // probes the lane the regression actually opens rather than a second policy.
+        launchOptions: webgpuLaunchOptions(systemChrome, platform, baseEnv, galliumOverride, hasGlChain),
+      },
     ]
   }
   return [

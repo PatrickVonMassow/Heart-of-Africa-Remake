@@ -11,6 +11,7 @@ import { PORT_TALKERS, VILLAGE_SPOTS } from './lifeSpots'
 import { boxCollider, nudgeToFree, WALKER_RADIUS, type Collider } from './collision'
 import { windingPoints, laneSlots, closestOnPolyline, bendAround, type LaneSlot } from './lanePlan'
 import { buildGizaLayout } from './gizaSite'
+import { ROCK_VILLAGE_ID } from '../../world/communicationRock'
 import type { BuildingType } from '../../state/ui'
 
 export const PLACE_RADIUS = 28 // walkable radius in meters; leaving it exits the place
@@ -71,6 +72,15 @@ export interface PlaceLayout {
   flora: Array<{ x: number; z: number; h: number }>
   /** Scattered boulders (solid, part of the collision set). */
   rocks: Array<[number, number, number]>
+  /**
+   * The communication PoC's TEACHING STONE (work-order 482): a single boulder
+   * standing in the open of the PoC village, where the adults teach the word
+   * for a rock by pointing at it. Deliberately a knee-to-waist-high stone a few
+   * steps away — the erratic the chief's message sends the player to is a far
+   * bigger block a day upstream, and the player has to make that transfer
+   * himself. Null in every other settlement.
+   */
+  teachingStone: { x: number; z: number; r: number; scale: number } | null
   /** Livestock pen (kraal layouts). */
   pen: { x: number; z: number; r: number } | null
   /** Points walkers visit on their errands. */
@@ -78,6 +88,16 @@ export interface PlaceLayout {
   /** Solid-object colliders (design.md §2: collision inside settlements). */
   colliders: Collider[]
 }
+
+/**
+ * The teaching stone's instance scale on `buildRock` (base radius 0.5) and the
+ * collider that follows from it: ~2.4 m across and ~1.3 m tall, against the
+ * 0.3-1.0 scale of the scattered rock dressing. Big enough to be pointed at
+ * from across the village, small enough that nobody mistakes it for the
+ * landmark erratic outside.
+ */
+export const TEACHING_STONE_SCALE = 2.4
+export const TEACHING_STONE_RADIUS = 0.5 * TEACHING_STONE_SCALE
 
 /** Interact radius for the elder/villager Space use key (design.md §2.3). */
 export const INTERACT_RADIUS = 4.5
@@ -786,6 +806,26 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     flora.push({ x, z, h: 3 + rand() * 2 })
   }
 
+  // The PoC village's teaching stone (work-order 482): placed BEFORE the loose
+  // rock scatter so the dressing grows around it, in the open at a walkable
+  // distance from the centre where it is visible from the middle of the village
+  // and from the arrival path. Seeded like everything else in the layout.
+  let teachingStone: PlaceLayout['teachingStone'] = null
+  if (placeId === ROCK_VILLAGE_ID) {
+    for (let i = 0; i < 32 && !teachingStone; i++) {
+      // A deterministic golden-angle sweep, so a crowded seed still finds a spot.
+      const a = rand() * Math.PI * 2 + i * 2.399963
+      const r = 9 + (i % 5) * 1.1
+      const x = Math.cos(a) * r
+      const z = Math.sin(a) * r
+      if (!isFree(x, z, 3.2, TEACHING_STONE_RADIUS) || onLane(x, z, TEACHING_STONE_RADIUS + 0.3)) continue
+      teachingStone = { x, z, r: TEACHING_STONE_RADIUS, scale: TEACHING_STONE_SCALE }
+      // Villagers have an errand at it — the adults' pointing situations
+      // (docs/communication-poc-spec.md) need someone standing there.
+      errands.push([x + Math.cos(a) * (TEACHING_STONE_RADIUS + 1.1), z + Math.sin(a) * (TEACHING_STONE_RADIUS + 1.1)])
+    }
+  }
+
   const rocks: PlaceLayout['rocks'] = []
   for (let i = 0; i < 40 && rocks.length < 14; i++) {
     const a = rand() * Math.PI * 2
@@ -843,6 +883,7 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   for (const f of fences) colliders.push(...fenceColliders(f))
   for (const t of flora) colliders.push({ x: t.x, z: t.z, r: 0.45 })
   for (const [x, z, s] of rocks) colliders.push({ x, z, r: 0.35 + s * 0.5 })
+  if (teachingStone) colliders.push({ x: teachingStone.x, z: teachingStone.z, r: teachingStone.r })
   if (place.kind === 'village') {
     colliders.push({ x: -3.5, z: 2.5, r: 1.3 }) // fire pit
     colliders.push({ x: -8.5, z: -7, r: 1.0 }) // weaver's loom
@@ -864,5 +905,5 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     errands[i] = nudgeToFree(colliders, errands[i][0], errands[i][1], WALKER_RADIUS)
   }
 
-  return { radius, spawnZ: radius - SPAWN_INSET, interactives, dwellings, fences, paths, flora, rocks, pen, errands, colliders }
+  return { radius, spawnZ: radius - SPAWN_INSET, interactives, dwellings, fences, paths, flora, rocks, teachingStone, pen, errands, colliders }
 }

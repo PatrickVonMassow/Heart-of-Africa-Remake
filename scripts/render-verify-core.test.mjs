@@ -13,6 +13,7 @@ import { describe, it, expect } from 'vitest'
 import {
   BACKENDS,
   NON_RENDER_VERIFY,
+  featureLevelOf,
   isRenderPath,
   isBackendSensitivePath,
   coveringRun,
@@ -428,6 +429,92 @@ describe('the point-210 commit (9284f05) — the bug the guard exists for', () =
 // shared _browser/_boot helpers). A new suite is therefore covered by default
 // and a new helper fails here until it is listed — the list can go stale, the
 // directory cannot.
+describe('featureLevelOf (point 505 — the third signal beside backend and pixel)', () => {
+  // What assertBackend reads off the running renderer, in the two shapes that matter.
+  const core = { isWebGPU: true, compatibilityMode: false, coreFeatures: true }
+  const compat = { isWebGPU: true, compatibilityMode: true, coreFeatures: false }
+
+  it('names the player\'s adapter core', () => {
+    expect(featureLevelOf(core)).toBe('core')
+  })
+
+  it('names the GLES lane\'s adapter compatibility', () => {
+    expect(featureLevelOf(compat)).toBe('compatibility')
+  })
+
+  it('trusts the DEVICE feature over three\'s own flag when the two disagree', () => {
+    // `core-features-and-limits` is the spec's answer; compatibilityMode is three's
+    // reading of it. If a three version ever set the flag on a core device, the record
+    // must still say core — the guard's question is which adapter the run really had.
+    expect(featureLevelOf({ isWebGPU: true, compatibilityMode: true, coreFeatures: true })).toBe('core')
+    expect(featureLevelOf({ isWebGPU: true, compatibilityMode: false, coreFeatures: false })).toBe('compatibility')
+  })
+
+  it('falls back to three\'s flag only where the device could not be asked', () => {
+    expect(featureLevelOf({ isWebGPU: true, compatibilityMode: true, coreFeatures: null })).toBe('compatibility')
+  })
+
+  it('never CLAIMS core without evidence — an unreadable level is null', () => {
+    expect(featureLevelOf({ isWebGPU: true, compatibilityMode: false, coreFeatures: null })).toBe(null)
+    expect(featureLevelOf({ isWebGPU: true })).toBe(null)
+  })
+
+  it('answers null for the WebGL 2 lane, where the question does not apply', () => {
+    expect(featureLevelOf({ isWebGPU: false, compatibilityMode: false, coreFeatures: null })).toBe(null)
+  })
+
+  it('is total on partial input — the wrapper\'s fail-open depends on it', () => {
+    for (const bad of [null, undefined, 0, '', [], { isWebGPU: 'yes' }]) {
+      expect(() => featureLevelOf(bad)).not.toThrow()
+      expect(featureLevelOf(bad)).toBe(null)
+    }
+  })
+})
+
+describe('coveringRun and the feature level (point 505)', () => {
+  const since = 1000
+  const coreRun = run('webgpu', 2000, { featureLevel: 'core' })
+  const compatRun = run('webgpu', 2100, { featureLevel: 'compatibility' })
+  const legacyRun = run('webgpu', 2200) // recorded before the level was written at all
+
+  it('books a core run as core coverage', () => {
+    expect(coveringRun([coreRun], 'webgpu', since, { featureLevel: 'core' })).toEqual(coreRun)
+  })
+
+  it('books a compat run as compat coverage', () => {
+    expect(coveringRun([compatRun], 'webgpu', since, { featureLevel: 'compatibility' })).toEqual(compatRun)
+  })
+
+  it('NEVER lets a compat run pass as core coverage — the point of the third signal', () => {
+    expect(coveringRun([compatRun], 'webgpu', since, { featureLevel: 'core' })).toBe(null)
+    // …not even when it is the newest run on that backend.
+    expect(coveringRun([coreRun, compatRun], 'webgpu', since, { featureLevel: 'core' })).toEqual(coreRun)
+  })
+
+  it('treats an UNRECORDED level as no evidence of the core path', () => {
+    expect(coveringRun([legacyRun], 'webgpu', since, { featureLevel: 'core' })).toBe(null)
+  })
+
+  it('stays level-agnostic when nothing is asked — the guard keeps working as before', () => {
+    // Deliberate: on a host whose only WebGPU adapter is compat, demanding core here
+    // would block every render change forever with no way to clear it. The level is
+    // RECORDED so a reader can tell; the gate still judges by backend.
+    expect(coveringRun([compatRun], 'webgpu', since)).toEqual(compatRun)
+    expect(coveringRun([legacyRun], 'webgpu', since)).toEqual(legacyRun)
+  })
+
+  it('still refuses a failed run whatever level it claims', () => {
+    const failed = run('webgpu', 2300, { featureLevel: 'core', exit: 1 })
+    expect(coveringRun([failed], 'webgpu', since, { featureLevel: 'core' })).toBe(null)
+    expect(coveringRun([failed], 'webgpu', since)).toBe(null)
+  })
+
+  it('survives a missing options argument and a malformed one', () => {
+    expect(coveringRun([coreRun], 'webgpu', since, {})).toEqual(coreRun)
+    expect(() => coveringRun([coreRun], 'webgpu', since, undefined)).not.toThrow()
+  })
+})
+
 describe('NON_RENDER_VERIFY matches the actual scripts/verify/ tree', () => {
   const scripts = readdirSync(VERIFY_DIR)
     .filter((f) => f.endsWith('.mjs') && !f.endsWith('.test.mjs'))

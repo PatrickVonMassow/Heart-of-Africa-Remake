@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it } from 'vitest'
 import {
   channelDriftStep,
   drinkCatchment,
@@ -116,6 +116,9 @@ import {
 } from './wildlifeBehavior'
 import { balance } from '../../config/balance'
 import { mulberry32 } from '../../world/noise'
+import { dramaCurrent, riverFlow } from '../../world/geoIndex'
+import { sampleTerrain } from '../../world/terrain'
+import { setupGeodata } from '../../test/geodata'
 
 const dir = (h: number): [number, number] => [Math.sin(h), Math.cos(h)]
 
@@ -2682,6 +2685,93 @@ describe('channelDriftStep (point 122 — the current follows the channel, never
   it('stays put when every candidate is dry (still in the water at its old spot)', () => {
     const none = () => false
     expect(channelDriftStep(3, 4, 1, 1, none)).toEqual({ x: 3, z: 4 })
+  })
+})
+
+// The swollen current must survive the DRIFT it drives (design.md §19.8,
+// point 122). The sea-mouth slack (point 316) scales the river flow down over
+// the last 0.6° of a sea-bound course so the TRAVELLER is never funnelled into
+// a coast-locked pocket (§11.2) — and the water drama inherited it. In the
+// rains a struggling calf drifts ~0.108°/s, so on the lower Nile it reaches
+// that slack ~24 s in, five seconds before the 30 s drown window closes: the
+// current went slack under it, the self-rescue fired on the spot (its total
+// water time was already past the 25 s exhaustion window) and the calf walked
+// ashore alive in what §19.8 calls a swollen river. Wildlife.tsx therefore
+// reads dramaCurrent (unslacked), and this replays the shipped drift+fate loop
+// on the real river to prove both season endings.
+describe('the rains drown a calf on a sea-bound river (design.md §19.8, point 122)', () => {
+  beforeAll(async () => {
+    await setupGeodata()
+  })
+
+  const SEED = 1234
+  const UNITS_PER_DEGREE = 10
+  // Mirrors of the two Wildlife.tsx constants the drift loop runs on.
+  const CALF_DRIFT_DEG = 0.06
+  const STRUGGLE_SELF_RESCUE = 25
+  // The staged spot the browser check uses: strong mid-channel flow on the
+  // lower Nile, ~2.4° of course above the mouth, no waterfall in drift reach.
+  const STAGED_LAT = 29
+  const STAGED_LON = 31
+
+  const isWater = (x: number, z: number) => sampleTerrain(-z / 10, x / 10, SEED).type === 'water'
+
+  /** One struggling calf, followed to its fate — the Wildlife.tsx drift loop. */
+  function driftFate(wetness: number): { fate: string; seconds: number } {
+    const bw = balance.waterDrama
+    const season = seasonFlowFactor(wetness, bw.dryFlowFactor, bw.wetFlowFactor)
+    let x = STAGED_LON * UNITS_PER_DEGREE
+    let z = -STAGED_LAT * UNITS_PER_DEGREE
+    let t = 0
+    const dt = 1 / 30
+    for (let i = 0; i < 30 * 60; i++) {
+      t += dt
+      const flow = dramaCurrent(-z / 10, x / 10)
+      if (flow.strength > 0) {
+        const stepDeg = flow.strength * season * CALF_DRIFT_DEG * dt
+        const moved = channelDriftStep(
+          x, z,
+          flow.dirLon * stepDeg * UNITS_PER_DEGREE,
+          -flow.dirLat * stepDeg * UNITS_PER_DEGREE,
+          isWater,
+        )
+        x = moved.x
+        z = moved.z
+      }
+      const fate = waterStruggleFate(
+        flow.strength * season, t, STRUGGLE_SELF_RESCUE, bw.drownSeconds, bw.drownFlowThreshold,
+      )
+      if (fate !== 'struggling') return { fate, seconds: t }
+    }
+    return { fate: 'struggling', seconds: t }
+  }
+
+  it('the staged spot is a strong mid-channel flow (the scenario still stands)', () => {
+    expect(sampleTerrain(STAGED_LAT, STAGED_LON, SEED).type).toBe('water')
+    expect(dramaCurrent(STAGED_LAT, STAGED_LON).strength).toBeGreaterThanOrEqual(0.9)
+  })
+
+  it('in the forced rains the calf drowns inside the drown window', () => {
+    const wet = driftFate(1)
+    expect(wet.fate).toBe('drowned')
+    expect(wet.seconds).toBeCloseTo(balance.waterDrama.drownSeconds, 1)
+  })
+
+  it('the dry season still clambers the same calf out alive', () => {
+    const dry = driftFate(0)
+    expect(dry.fate).toBe('self-rescue')
+    expect(dry.seconds).toBeCloseTo(STRUGGLE_SELF_RESCUE, 0)
+  })
+
+  it('the mouth slack stays intact for the traveller, and only for him', () => {
+    // Where the drift ends (the Nile's last reach, inside the slack band) the
+    // traveller's current is tamed while the drama current still runs full.
+    const lat = 31.4
+    const lon = 30.49
+    const season = seasonFlowFactor(1, balance.waterDrama.dryFlowFactor, balance.waterDrama.wetFlowFactor)
+    expect(riverFlow(lat, lon).strength).toBeLessThan(dramaCurrent(lat, lon).strength)
+    expect(riverFlow(lat, lon).strength * season).toBeLessThan(balance.waterDrama.drownFlowThreshold)
+    expect(dramaCurrent(lat, lon).strength * season).toBeGreaterThanOrEqual(balance.waterDrama.drownFlowThreshold)
   })
 })
 

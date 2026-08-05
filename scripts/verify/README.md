@@ -76,14 +76,36 @@ sets nothing at all). Linux additionally launches with `--no-sandbox`,
 `--ignore-gpu-blocklist` and `--disable-dev-shm-usage`, which container images need;
 Windows and macOS keep their argument list unchanged.
 
-The **WebGPU lane pins the opposite way** on Linux — `--use-angle=swiftshader`
-`--enable-features=Vulkan` `--use-vulkan=swiftshader`, all three. There is no
-hardware Vulkan device Chrome will accept on this host (see `docs/host-environment.md`),
-and with the stacks left to disagree the lane reports an adapter, initialises
-`isWebGPUBackend` and paints NOTHING: the page throws `Instance dropped in
-popErrorScope` and the canvas stays black behind a live HUD. It is the correct
-picture at software speed, and `backend-lane-check.mjs` labels it as software so it
-can never be read as the GPU.
+The **WebGPU lane rides the same GL chain** on Linux, through Dawn's OpenGLES
+backend: `--use-gl=angle --use-angle=gl --use-webgpu-adapter=opengles
+--force-webgpu-compat` (point 505). Vulkan is a dead end here — the only Vulkan
+device is Dozen, whose `fullDrawIndexUint32 = false` Dawn's Vulkan backend
+refuses, so it falls back to its bundled SwiftShader and no flag reaches into
+that (`docs/host-environment.md`). The GLES path bypasses Vulkan entirely and
+draws on the 4070 Ti: 103.7 renderer calls per second against the software
+lane's 15.3, 487 KB frames against 29 KB.
+
+Where the GL chain is absent the lane keeps the SOFTWARE flags —
+`--use-angle=swiftshader --enable-features=Vulkan --use-vulkan=swiftshader`, all
+three — because Dawn's GLES backend would have nothing to open. `hasHardwareGlChain`
+(`system-chrome.mjs`) decides, and the two sets never mix: with the stacks left to
+disagree the lane reports an adapter, initialises `isWebGPUBackend` and paints
+NOTHING (`Instance dropped in popErrorScope`, a black canvas behind a live HUD).
+`backend-lane-check.mjs` prints the GL chain beside the adapter on this lane —
+Chrome hands an unprivileged page an all-empty `GPUAdapterInfo`, so the adapter
+string alone could never label a software rasteriser as one.
+
+**The FEATURE LEVEL is the third signal**, beside backend and drawn pixel. three.js
+always requests `compatibility` and then decides by `core-features-and-limits`: the
+GLES adapter carries none, so three sets `compatibilityMode`, drops MSAA and runs
+compat branches the player never enters. `assertBackend` reads the level and hands it
+to the run recorder (`featureLevel` in each record; `render-verify-guard.mjs status`
+prints it), and `coveringRun(runs, backend, since, {featureLevel:'core'})` refuses a
+compat run — and a record written before the level existed. Without it the gate would
+book compat as coverage of the player's path, the same confusion class as software
+reported as hardware. Unasked, the gate still judges by backend alone: on a host whose
+only WebGPU adapter is compat, demanding core would block every render change with no
+way to clear it.
 
 Without a system Chrome the **WebGPU lane fails LOUD** — `WebGPU backend
 unavailable on this host` — and stops. It is never quietly served by WebGL 2, and
@@ -580,6 +602,16 @@ its own subject never occurred:
   prop, and none inside another goat — sampled over 20 reads of the herd, with
   the deepest penetration and the closest pair reported, plus the frame
   `143-village-goat-separation`.
+- **Villager gestures (point 479).** The four poses — beckon, point, refuse,
+  indicate — are photographed at conversational distance from a standpoint the
+  suite RAY-PROBES clear first (a camera dropped on a fixed bearing lands inside
+  a hut in a dense settlement and would photograph a wall), each forced through
+  the dev hook `__placeForceGesture` and awaited on the GESTURE's own clock, not
+  the wall clock. Then the ambient conversation is sampled over 60 reads: every
+  live gesture is one of the four kinds, none runs past its own duration, the
+  pair takes turns, and a figure between gestures stands exactly at rest. The
+  state machine itself is pure (`src/render/gesture.test.ts`); only the poses the
+  renderer actually DRAWS need the browser.
 - **The hypothesis over the speaker's head (point 485).** The label's lifetime
   and its binding to the note are pure Vitest; the browser owes only the
   ATTACHMENT, which no unit test can see. A named inhabitant is made to speak a
@@ -604,6 +636,9 @@ a run launched with `VERIFY_GL=webgpu` that SILENTLY fell back to WebGL 2 (or a
 `webgl` run that came up on WebGPU) fails LOUD instead of giving false
 confidence. Covered: collision, enrichments, events, flow, gamepad, handwriting,
 health, i18n, invariants, polish, settings, touch, visualsweep, voice, world.
+The same call records the WebGPU **feature level** the run came up at (point 505,
+above): on the container's GLES lane that is `compatibility`, on a core adapter
+`core`, and on the WebGL 2 lane it does not apply.
 
 Two suites carry no assertion, each for a structural reason:
 

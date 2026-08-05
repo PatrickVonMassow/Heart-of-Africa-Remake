@@ -43,6 +43,7 @@ device pixel ratio is kept (no cap).
 | `weatherIntensity` | 0.6 | 1 | 1 |
 | `waterCalm` | on | off | off |
 | `wildlifeDensity` | 0.6 | 1 | 1 |
+| `figureLimbSegments` | 5 | 8 | 12 |
 
 ## What each setting does
 
@@ -81,7 +82,12 @@ post pipeline), geometry last — the cuts that only genuinely weak GPUs feel.
   so the plant instance count falls quadratically (`floraStreaming.ts`). Low
   tightens it to 0.55.
 - **`floraCastShadow`** — Whether ground flora (bush / papyrus / rock) casts sun
-  shadows. Off on low.
+  shadows. Off on low. The communication PoC's erratic boulder (work-order 482)
+  is rock dressing too and rides this same lever rather than inventing a lever
+  of its own — it is one mesh, so a separate geometry knob would move nothing
+  measurable. Its village counterpart, the teaching stone, is drawn inside a
+  settlement and follows the place scene's `sunShadows` like every other prop
+  there.
 - **`weatherIntensity`** — Atmospheric haze/rain intensity factor (`1` = full);
   low thins the pall to 0.6 so fewer full-screen fragments are shaded
   (design.md §19.13).
@@ -91,6 +97,12 @@ post pipeline), geometry last — the cuts that only genuinely weak GPUs feel.
 - **`wildlifeDensity`** *(declared, not yet consumed)* — Ambient wildlife
   spawn-density factor (`1` = full, design.md §19.2). Declared for the §21
   registry; will be read by the spawner once wired. 0.6 on low.
+- **`figureLimbSegments`** — Radial segments of the villager figures' arms,
+  hands and legs (point 479). The limbs are thin and the player stands within a
+  metre of them while a figure gestures, so the count decides whether an arm
+  reads as a limb or as a rod; a settlement carries a couple of dozen figures,
+  which is why the count is a per-level lever rather than a fixed constant.
+  Climbs 5 → 8 → 12.
 
 > **Declared-but-not-yet-consumed keys:** `waterCalm` and `wildlifeDensity` are
 > present in every preset (so the completeness gate passes and future work has a

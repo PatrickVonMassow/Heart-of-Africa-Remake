@@ -18,6 +18,31 @@
 export const BACKENDS = ['webgpu', 'webgl']
 
 /**
+ * The WebGPU FEATURE LEVEL a run came up at (point 505) — 'core', 'compatibility', or
+ * null when the question does not apply or cannot be answered.
+ *
+ * Why a third signal beside the backend: three.js always requests the `compatibility`
+ * feature level and then decides by whether the device carries `core-features-and-limits`.
+ * A core adapter runs the player's path; a COMPAT adapter runs three's compat branches
+ * and loses MSAA, which the player never does. A lane on Dawn's OpenGLES backend reports
+ * hardware-like adapter strings and draws a real picture at the compat level, so "WebGPU
+ * plus a drawn pixel" no longer distinguishes the two — the same confusion class as a
+ * software rasteriser reported as the GPU.
+ *
+ * `info` is what assertBackend reads off the running renderer:
+ *   { isWebGPU, compatibilityMode, coreFeatures }
+ * The device feature is authoritative; three's own `compatibilityMode` answers only where
+ * the device could not be asked. Anything unreadable answers null, never 'core' — the
+ * level is only ever claimed on evidence. Total: never throws on partial input.
+ */
+export function featureLevelOf(info) {
+  if (!info || info.isWebGPU !== true) return null
+  if (info.coreFeatures === true) return 'core'
+  if (info.coreFeatures === false) return 'compatibility'
+  return info.compatibilityMode === true ? 'compatibility' : null
+}
+
+/**
  * The scripts under scripts/verify/ that DRIVE NO BROWSER: the orchestrator,
  * the server plumbing, the pure decision cores and the Node-only checks. The
  * harness RUNS the suites, it does not draw, so a change here cannot move a
@@ -48,6 +73,7 @@ export const NON_RENDER_VERIFY = new Set([
   'machine-load-core.mjs',
   'machine-load.mjs',
   'run-all.mjs',
+  'snowMetric.mjs', // the snow-vs-sand pixel verdict; enrichments.mjs feeds it a crop
   'system-chrome.mjs', // WHERE the lane's browser is on this host; _browser.mjs opens it
   'textureLeak.mjs', // the texture-delta decision layer; settings.mjs runs it
   'tiers.mjs',
@@ -141,12 +167,21 @@ export function isBackendSensitivePath(path) {
 // whose branch the change does not exercise. When a diff touches such a branch,
 // run the backend it describes; the guard cannot tell branches apart.
 
-export function coveringRun(runs, backend, since) {
+/**
+ * `featureLevel` narrows the query to runs recorded AT that level (point 505): asked for
+ * 'core', a compat run — and a record from before the level was written at all — counts
+ * for nothing, because an unrecorded level is not evidence of the player's path. Omitted,
+ * the query is level-agnostic and the answer is exactly what it always was; the guard
+ * itself asks that way, so a compat lane still proves the WebGPU picture rather than
+ * blocking every render change on a host that has no core adapter.
+ */
+export function coveringRun(runs, backend, since, { featureLevel = null } = {}) {
   if (!Array.isArray(runs)) return null
   let best = null
   for (const r of runs) {
     if (!r || r.backend !== backend) continue
     if (Number(r.exit) !== 0) continue
+    if (featureLevel && r.featureLevel !== featureLevel) continue
     const at = Number(r.at ?? 0)
     if (at < since) continue
     if (!best || at > Number(best.at ?? 0)) best = r
