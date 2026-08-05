@@ -2477,6 +2477,319 @@ for (const [placeId, shot] of [
   }
 }
 
+// --- The children's game of tag (design.md §19.10, point 480/351) ------------
+// What needs a real browser is that the RAF-driven chase is a GAME and not a
+// route: the pure round is pinned in src/scenes/place/tagGame.test.ts, but only
+// the live scene can show that the paths are not periodic, that the gap between
+// chaser and quarry breathes, that the role really moves, and that a child is
+// seen running out of steam. Sampled over an interval, and gated on a round
+// actually being in play — the group idles between rounds by design, so a sample
+// window straddling a break would judge the wrong thing.
+{
+  await page.evaluate(() => {
+    const g = window.__game.getState()
+    if (g.placeId) g.leavePlace()
+  })
+  await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
+  await page.evaluate(() => window.__game.getState().enterPlace('maasai-village'))
+  const live = await page
+    .waitForFunction(
+      () => window.__game.getState().placeId === 'maasai-village' && !!window.__placeTag && !!window.__placeLayout,
+      null,
+      { timeout: 40000 },
+    )
+    .then(() => true)
+    .catch(() => false)
+  check('the village children publish their live game of tag', live)
+  if (live) {
+    await page.evaluate(() => window.__game.getState().setJournalOpen(false))
+    const played = await page
+      .waitForFunction(() => window.__placeTag().playing, null, { timeout: 40000 })
+      .then(() => true)
+      .catch(() => false)
+    check('a round of tag is in play', played)
+
+    // The window is an interval of GAME, read off the game's own clock — never a
+    // count of frames. A frame budget buys wildly different amounts of game on an
+    // idle machine and on one running three other suites, and 420 frames bought
+    // barely 20 s here: the measured first catch is 6.6–11.3 s, so that window
+    // could hold ONE catch or none, and "the chaser's identity changes at least
+    // once" went red with no bug behind it. WINDOW_S is sized off that same
+    // measurement to hold several catches on any machine, and the loop is capped
+    // in frames so a scene that has stopped stepping FAILS LOUDLY on the check
+    // below instead of spinning here forever.
+    const WINDOW_S = 90
+    const start = await page.evaluate(() => window.__placeTag().clock)
+    const samples = []
+    let clock = start
+    for (let i = 0; i < 6000 && clock - start < WINDOW_S; i++) {
+      const s = await page.evaluate(() => window.__placeTag())
+      clock = s.clock
+      samples.push(s)
+      await nextFrames(3)
+    }
+    check(
+      'the scene runs a full interval of the game to judge (its own clock, not a frame count)',
+      clock - start >= WINDOW_S,
+      `${(clock - start).toFixed(1)}s of ${WINDOW_S}s over ${samples.length} samples`,
+    )
+    const playing = samples.filter((s) => s.playing)
+    check(
+      'the group spends the interval playing rather than idling',
+      playing.length > samples.length / 2,
+      `${playing.length} of ${samples.length} samples`,
+    )
+
+    // Exactly ONE chaser at every playing sample, and nobody holds the role
+    // during a break.
+    const badChaser = samples.filter((s) =>
+      s.playing ? !(s.chaser >= 0 && s.chaser < s.children.length) : s.chaser !== -1,
+    )
+    check(
+      'exactly one child is IT while a round runs, and none between rounds',
+      badChaser.length === 0,
+      `${badChaser.length} of ${samples.length} samples`,
+    )
+
+    // The role MOVES: a game where one child chases for the whole interval is a
+    // pursuit, not a game of tag.
+    const chasers = new Set(playing.map((s) => s.chaser))
+    check(
+      "the chaser's identity changes at least once",
+      chasers.size >= 2,
+      `held by ${[...chasers].join(', ') || 'nobody'}`,
+    )
+
+    // The chase BREATHES: the gap to the quarry rises and falls repeatedly.
+    const gaps = playing
+      .filter((s) => s.target >= 0)
+      .map((s) =>
+        Math.hypot(
+          s.children[s.chaser].x - s.children[s.target].x,
+          s.children[s.chaser].z - s.children[s.target].z,
+        ),
+      )
+    let turns = 0
+    for (let i = 2; i < gaps.length; i++) {
+      const a = gaps[i - 1] - gaps[i - 2]
+      const b = gaps[i] - gaps[i - 1]
+      if (a * b < 0) turns++
+    }
+    check(
+      'the distance between chaser and quarry rises and falls repeatedly',
+      turns >= 6,
+      `${turns} turning points over ${gaps.length} readings`,
+    )
+
+    // A catch happens for a reason the viewer can SEE.
+    const recovering = playing.some((s) => s.children.some((c) => c.effort === 'recover'))
+    check('at least one child is seen slowing to get its breath back', recovering)
+
+    // NOT A ROUTE: the headings cover a wide spread, and the group does not hold
+    // one radius (a ring around a centre would be a route too).
+    const bins = new Set()
+    const radii = []
+    for (const s of playing) {
+      for (const c of s.children) {
+        bins.add(Math.floor(((c.heading + Math.PI * 3) % (Math.PI * 2)) / (Math.PI / 6)))
+        radii.push(Math.hypot(c.x, c.z))
+      }
+    }
+    check(
+      'their headings cover a wide spread rather than circling one centre',
+      bins.size >= 9,
+      `${bins.size} of 12 heading sectors`,
+    )
+    const mean = radii.reduce((a, b) => a + b, 0) / Math.max(1, radii.length)
+    const sd = Math.sqrt(radii.reduce((a, b) => a + (b - mean) ** 2, 0) / Math.max(1, radii.length))
+    check(
+      'and they do not hold one radius around the settlement centre',
+      sd > 1,
+      `radius spread ${sd.toFixed(2)} m about ${mean.toFixed(1)} m`,
+    )
+
+    // Nobody pinned, nobody standing still, everybody where a walker may stand.
+    const n = samples[0].children.length
+    const travelled = Array.from({ length: n }, () => 0)
+    for (let i = 1; i < samples.length; i++) {
+      for (let k = 0; k < n; k++) {
+        const a = samples[i - 1].children[k]
+        const b = samples[i].children[k]
+        if (a && b) travelled[k] += Math.hypot(b.x - a.x, b.z - a.z)
+      }
+    }
+    check(
+      'no child stands still for the whole interval',
+      travelled.every((d) => d > 2),
+      `travelled ${travelled.map((d) => d.toFixed(1)).join(', ')} m`,
+    )
+    const pinned = samples.filter((s) => s.children.some((c) => c.pinned > 3))
+    check('no child is pinned against geometry', pinned.length === 0, `${pinned.length} samples`)
+    const outside = await page.evaluate(() => {
+      const L = window.__placeLayout
+      return window.__placeTag().children.filter((c) => Math.hypot(c.x, c.z) > L.radius).length
+    })
+    check('every child stays inside the walkable settlement', outside === 0, `${outside} outside`)
+    const reserves = samples.flatMap((s) => s.children.map((c) => c.reserve))
+    check(
+      'every sprint reserve stays within its bounds',
+      reserves.every((r) => r >= 0 && r <= 1),
+      `${Math.min(...reserves).toFixed(2)}..${Math.max(...reserves).toFixed(2)}`,
+    )
+
+    // The armed invariants stayed silent through all of it (point 207(i)).
+    const asserts = await page.evaluate(() =>
+      (window.__assertLog ?? [])
+        .filter((a) => String(a.code).startsWith('tag-'))
+        .map((a) => a.code + ': ' + a.detail),
+    )
+    check('the game fired none of its own invariant asserts', asserts.length === 0, asserts.join(' | '))
+
+    // The picture. The frame must show THE CHASE, so the standpoint is chosen
+    // the way the point-485 speaker shot chooses one rather than by a formula.
+    // Two rules earned by looking at what the earlier tries actually produced:
+    // aim at the CHASER AND ITS QUARRY — the pair IS the game, while the group
+    // centroid drifts to wherever the stragglers are and framed a tree and an
+    // empty paddock — and take the BEST bearing rather than the first passable
+    // one, because the first clear sight line is as often the one looking out
+    // of the village across open ground. Every bearing is ray-probed against
+    // the RENDERED scene for an unobstructed line and scored by PROJECTING the
+    // children through the live camera (§7.2), never by a radius.
+    const standAt = async (bearing, back = 5.5) =>
+      page.evaluate(
+        ({ b, back }) => {
+          const t = window.__placeTag()
+          const p = window.__placePlayer
+          if (!t || !p || !t.children.length) return null
+          // The pair the game is about, falling back to the group's middle
+          // between rounds.
+          const a = t.chaser >= 0 ? t.children[t.chaser] : null
+          const q = t.target >= 0 ? t.children[t.target] : null
+          const cx = a && q ? (a.x + q.x) / 2 : t.children.reduce((s2, c) => s2 + c.x, 0) / t.children.length
+          const cz = a && q ? (a.z + q.z) / 2 : t.children.reduce((s2, c) => s2 + c.z, 0) / t.children.length
+          p.x = cx + Math.sin(b) * back
+          p.z = cz + Math.cos(b) * back
+          // Place-camera yaw 0 looks toward −Z, hence the +PI complement.
+          p.yaw = Math.atan2(cx - p.x, cz - p.z) + Math.PI
+          p.pitch = -0.05
+          return { cx, cz }
+        },
+        { b: bearing, back },
+      )
+    /**
+     * Is the game unobstructed from here, and how much of it is in frame?
+     *
+     * Projection ALONE is not enough, and that lesson cost a picture: a frame in
+     * which the pair projects inside the viewport can still be a frame of the
+     * huts they are standing behind. So each of the two is ray-probed against
+     * the RENDERED scene on its own sight line, the way the point-485 speaker is
+     * — the first surface drawn must be the CHILD ITSELF, which is what its
+     * distance says. The ratio is bounded on both sides: a hut in front reads
+     * far too near, and a ray that sails past a small figure hits the ground far
+     * beyond it.
+     */
+    const readsFromHere = () =>
+      page.evaluate(() => {
+        const t = window.__placeTag()
+        const cam = window.__placeCamera
+        if (!t || !cam || !window.__placeRayHit) return { clear: false, inFrame: 0, pair: 0 }
+        const a = t.chaser >= 0 ? t.children[t.chaser] : null
+        const q = t.target >= 0 ? t.children[t.target] : null
+        const cx = a && q ? (a.x + q.x) / 2 : t.children.reduce((s2, c) => s2 + c.x, 0) / t.children.length
+        const cz = a && q ? (a.z + q.z) / 2 : t.children.reduce((s2, c) => s2 + c.z, 0) / t.children.length
+        const h = window.__placeRayHit(cx, 0.75, cz)
+        const clear = h.hitDistance == null || h.hitDistance >= h.targetDistance * 0.9
+        // The SAME matrix math the frame shutter projects a `local` subject
+        // with (scripts/verify/frameSubject.mjs) — no THREE in the page here.
+        const apply = (e, v) =>
+          [0, 1, 2, 3].map((r) => e[r] * v[0] + e[r + 4] * v[1] + e[r + 8] * v[2] + e[r + 12] * v[3])
+        const shows = (c) => {
+          const eye = apply(cam.matrixWorldInverse.elements, [c.x, 0.5, c.z, 1])
+          const clip = apply(cam.projectionMatrix.elements, eye)
+          const w = clip[3]
+          if (!(w > 0)) return false
+          // Inside 0.85 of the frame rather than 1.0: a child clipped by the
+          // very edge is in the picture by arithmetic and not by eye.
+          if (!(Math.abs(clip[0] / w) <= 0.85 && Math.abs(clip[1] / w) <= 0.85 && clip[2] / w < 1)) return false
+          // And it must actually be DRAWN there: chest height of a child, and
+          // the first surface along that line has to be the child.
+          const hit = window.__placeRayHit(c.x, 0.5, c.z)
+          if (hit.hitDistance == null) return false
+          const ratio = hit.hitDistance / hit.targetDistance
+          // Close enough to read, too: a correctly-framed speck proves nothing.
+          return ratio >= 0.8 && ratio <= 1.2 && hit.targetDistance <= 14
+        }
+        let inFrame = 0
+        for (const c of t.children) if (shows(c)) inFrame++
+        // The pair carries the picture: a frame holding two stragglers while the
+        // chase runs off-screen shows village life, not a game of tag.
+        const pair = (a && shows(a) ? 1 : 0) + (q && shows(q) ? 1 : 0)
+        return { clear, inFrame, pair }
+      })
+    // The sweep is RETRIED as the game runs, and that is not a courtesy to a
+    // slow machine: a chase that is momentarily boxed between two huts offers no
+    // clear line from any bearing, which is a passing state of the game and not
+    // a defect in it. A single sweep made that moment fail the whole suite. Two
+    // ranges are tried before each wait, because a pair that has just sprinted
+    // apart does not fit one frame at close range.
+    //
+    // THE STANDPOINT IS SHOT FROM WHERE IT WAS VALIDATED. Scoring the bearings
+    // and then re-standing on the winner looked tidier and produced a frame of
+    // the inside of a hut: re-standing recomputes the aim against a pair that
+    // has run on, so the camera lands 5.5 m from somewhere nobody validated. The
+    // reading is taken again after the shutter's own delay, too, because the
+    // children keep running through it — and only a standpoint that still holds
+    // both of them opens it.
+    let stood = null
+    let shotProbe = 'no clear standpoint in any sweep'
+    for (let attempt = 0; attempt < 4 && !stood; attempt++) {
+      for (const back of [5.5, 8.5]) {
+        for (let k = 0; k < 16 && !stood; k++) {
+          const at = await standAt((k / 16) * Math.PI * 2, back)
+          if (!at) break
+          await nextFrames(2)
+          const r = await readsFromHere()
+          if (!(r.clear && r.pair === 2)) continue
+          // It reads from here NOW — does it still, once the shutter's settle
+          // delay has passed? Only then is this the frame.
+          await nextFrames(4)
+          const still = await readsFromHere()
+          if (still.pair === 2) {
+            stood = at
+            shotProbe = `attempt ${attempt + 1}, ${back} m, bearing ${k}/16: pair=${still.pair} inFrame=${still.inFrame}`
+          }
+        }
+        if (stood) break
+      }
+      if (!stood) await nextFrames(30)
+    }
+    check(
+      'the game is photographable: a clear standpoint holds the chaser and its quarry in frame',
+      !!stood,
+      shotProbe,
+    )
+    if (stood) {
+      // The subject is read where the pair is NOW, not where it was when the
+      // standpoint was picked: the settle delay above is eight frames of running
+      // children, and the shutter must be told what it is actually looking at.
+      const subject = await page.evaluate(() => {
+        const t = window.__placeTag()
+        if (!t || t.chaser < 0 || t.target < 0) return null
+        const a = t.children[t.chaser]
+        const q = t.children[t.target]
+        return { x: (a.x + q.x) / 2, z: (a.z + q.z) / 2 }
+      })
+      const aim = subject ?? { x: stood.cx, z: stood.cz }
+      await frame('480-village-tag', {
+        local: { x: aim.x, y: 0.6, z: aim.z },
+        label: 'the children playing tag',
+      })
+    }
+  }
+  await page.evaluate(() => window.__game.getState().leavePlace())
+  await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
+}
+
 console.log('console errors:', errors.length)
 for (const e of errors) console.log('ERR:', e.slice(0, 300))
 await browser.close()

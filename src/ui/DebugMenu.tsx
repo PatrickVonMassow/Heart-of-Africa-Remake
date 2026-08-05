@@ -24,6 +24,13 @@ import {
 } from '../world/data/landmarks'
 import { LAKES } from '../world/data/lakes'
 import { DICTIONARIES, LANGUAGES, useLocale, useStrings } from '../i18n'
+import type { Strings } from '../i18n/types'
+
+/** The debug-section keys whose value really is a plain label string (the
+ *  section also holds a few nested groups). */
+type DebugLabelKey = {
+  [K in keyof Strings['debug']]: Strings['debug'][K] extends string ? K : never
+}[keyof Strings['debug']]
 
 const EQUIPMENT_IDS: EquipmentId[] = ['shovel', 'rope', 'machete', 'rifle', 'medicine', 'canteen', 'canoe']
 const MATERIALS: Material[] = ['gold', 'silver', 'emerald', 'copper', 'ivory']
@@ -91,6 +98,48 @@ function GroupedActionSelect({
     </label>
   )
 }
+
+/**
+ * Every calibratable value of the children's game of tag (design.md §19.10,
+ * point 480/351), in the order the mechanic reads: how many play, the paces, the
+ * reserve rates and its two thresholds, the distances the decisions turn on, and
+ * the shaping values. A table rather than twenty hand-written fields — the
+ * completeness is then visible at a glance, which is the point of the rule that
+ * every balance value is debug-editable.
+ */
+const TAG_FIELDS: ReadonlyArray<{
+  key: keyof typeof balance.villageLife.tag
+  label: DebugLabelKey
+  step: number
+  min: number
+  max?: number
+}> = [
+  { key: 'childCount', label: 'tagChildCount', step: 1, min: 0 },
+  { key: 'sprintSpeed', label: 'tagSprintSpeed', step: 0.1, min: 0.1 },
+  { key: 'runnerBoost', label: 'tagRunnerBoost', step: 0.02, min: 1 },
+  { key: 'trotFactor', label: 'tagTrotFactor', step: 0.02, min: 0.01, max: 1 },
+  { key: 'recoverFactor', label: 'tagRecoverFactor', step: 0.02, min: 0.01, max: 1 },
+  { key: 'floorFactor', label: 'tagFloorFactor', step: 0.02, min: 0.01, max: 1 },
+  { key: 'drainPerSecond', label: 'tagDrain', step: 0.02, min: 0 },
+  { key: 'recoverPerSecond', label: 'tagRecover', step: 0.01, min: 0 },
+  { key: 'breakOff', label: 'tagBreakOff', step: 0.05, min: 0, max: 1 },
+  { key: 'resume', label: 'tagResume', step: 0.05, min: 0, max: 1 },
+  { key: 'pressureDistance', label: 'tagPressure', step: 1, min: 0 },
+  { key: 'chaseReach', label: 'tagReach', step: 1, min: 0 },
+  { key: 'commitDistance', label: 'tagCommit', step: 0.5, min: 0 },
+  { key: 'catchDistance', label: 'tagCatch', step: 0.1, min: 0 },
+  { key: 'targetSwitchMargin', label: 'tagSwitchMargin', step: 0.5, min: 0 },
+  { key: 'immunitySeconds', label: 'tagImmunity', step: 0.2, min: 0 },
+  { key: 'resolveCapSeconds', label: 'tagResolveCap', step: 5, min: 1 },
+  { key: 'idleSeconds', label: 'tagIdle', step: 1, min: 0 },
+  { key: 'trendTau', label: 'tagTrendTau', step: 0.1, min: 0.05 },
+  { key: 'trendEnter', label: 'tagTrendEnter', step: 0.02, min: 0 },
+  { key: 'trendLeave', label: 'tagTrendLeave', step: 0.02, min: 0 },
+  { key: 'variation', label: 'tagVariation', step: 0.05, min: 0, max: 0.9 },
+  { key: 'unstuckSeconds', label: 'tagUnstuck', step: 0.5, min: 0.1 },
+  { key: 'leanAtSprint', label: 'tagLean', step: 0.02, min: 0 },
+  { key: 'turnRate', label: 'tagTurnRate', step: 0.2, min: 0.1 },
+]
 
 function NumberField({
   label,
@@ -292,6 +341,21 @@ export function DebugMenu() {
       {/* How long the player's reading stands over the speaker's head (point 485). */}
       <NumberField label={t.debug.speechLabelSeconds} value={balance.communication.labelSeconds} step={0.2}
         onChange={(v) => { balance.communication.labelSeconds = Math.max(0, v); bump() }} />
+      {/* The children's game of tag (design.md §19.10, point 480/351): every
+          pace, rate, distance and threshold of the chase, so the whole mechanic
+          can be tuned by eye while a village runs. */}
+      {TAG_FIELDS.map(({ key, label, step, min, max }) => (
+        <NumberField
+          key={key}
+          label={t.debug[label]}
+          value={balance.villageLife.tag[key]}
+          step={step}
+          onChange={(v) => {
+            balance.villageLife.tag[key] = Math.min(max ?? Infinity, Math.max(min, v))
+            bump()
+          }}
+        />
+      ))}
       <NumberField label={t.debug.foodPerDay} value={balance.foodPerDay}
         onChange={(v) => set('foodPerDay', Math.max(0, v))} />
       <NumberField label={t.debug.canteenDrain} value={balance.health.canteenDrainPerDay} step={0.1}

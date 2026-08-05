@@ -401,6 +401,32 @@ export interface Strings {
     speechHearingRadius: string
     speechHearingFalloff: string
     speechLabelSeconds: string
+    /** The children's game of tag (design.md §19.10, point 480/351). */
+    tagChildCount: string
+    tagSprintSpeed: string
+    tagRunnerBoost: string
+    tagTrotFactor: string
+    tagRecoverFactor: string
+    tagFloorFactor: string
+    tagDrain: string
+    tagRecover: string
+    tagBreakOff: string
+    tagResume: string
+    tagPressure: string
+    tagReach: string
+    tagCommit: string
+    tagCatch: string
+    tagSwitchMargin: string
+    tagImmunity: string
+    tagResolveCap: string
+    tagIdle: string
+    tagTrendTau: string
+    tagTrendEnter: string
+    tagTrendLeave: string
+    tagVariation: string
+    tagUnstuck: string
+    tagLean: string
+    tagTurnRate: string
     foodPerDay: string
     canteenDrain: string
     canteenDesertDrain: string

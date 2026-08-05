@@ -38,6 +38,7 @@ const DEFAULTS = {
   footstepVolume: balance.footstepVolume,
   ambientVolume: balance.ambientVolume,
   walkerUnstuckSeconds: balance.walkerUnstuckSeconds,
+  tag: { ...balance.villageLife.tag },
   startupFreezeBudgetMs: balance.startup.pictureFreezeBudgetMs,
   birdsongVolume: balance.birdsongVolume,
   surfNearRadius: balance.surf.nearRadius,
@@ -113,6 +114,7 @@ afterEach(() => {
   balance.footstepVolume = DEFAULTS.footstepVolume
   balance.ambientVolume = DEFAULTS.ambientVolume
   balance.walkerUnstuckSeconds = DEFAULTS.walkerUnstuckSeconds
+  Object.assign(balance.villageLife.tag, DEFAULTS.tag)
   balance.startup.pictureFreezeBudgetMs = DEFAULTS.startupFreezeBudgetMs
   balance.birdsongVolume = DEFAULTS.birdsongVolume
   balance.surf.nearRadius = DEFAULTS.surfNearRadius
@@ -215,6 +217,11 @@ describe('DebugMenu editable fields write through to balance (settings.mjs fillF
     { label: en.debug.ambientVolume, read: () => balance.ambientVolume, value: 0.3 },
     // The inhabitant unstuck window (point 155).
     { label: en.debug.walkerUnstuck, read: () => balance.walkerUnstuckSeconds, value: 8 },
+    // The children's game of tag (point 480/351): a pace, a threshold and a
+    // distance, one from each family of the chase's calibration.
+    { label: en.debug.tagSprintSpeed, read: () => balance.villageLife.tag.sprintSpeed, value: 4.5 },
+    { label: en.debug.tagBreakOff, read: () => balance.villageLife.tag.breakOff, value: 0.25 },
+    { label: en.debug.tagPressure, read: () => balance.villageLife.tag.pressureDistance, value: 7 },
     // The loading picture's freeze budget the startup gate binds (point 337).
     { label: en.debug.startupFreezeBudget, read: () => balance.startup.pictureFreezeBudgetMs, value: 6000 },
     // Per-source birdsong volume and the coastal surf fade bounds (point 153).
