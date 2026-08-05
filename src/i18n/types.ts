@@ -426,6 +426,7 @@ export interface Strings {
     tagVariation: string
     tagUnstuck: string
     tagLean: string
+    tagTurnRate: string
     foodPerDay: string
     canteenDrain: string
     canteenDesertDrain: string

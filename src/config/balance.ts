@@ -569,6 +569,8 @@ export interface BalanceConfig {
       unstuckSeconds: number
       /** Forward lean (rad) at the full sprint. */
       leanAtSprint: number
+      /** How fast the drawn body may turn, in rad/s. */
+      turnRate: number
     }
   }
   /** Village speech and drums (design.md §13.4, docs/communication-poc-spec.md). */
@@ -917,6 +919,9 @@ export const balance: BalanceConfig = {
       variation: 0.2,
       unstuckSeconds: 1.5,
       leanAtSprint: 0.28,
+      // ~3.6 rad/s: a body turns a half circle in about a second — quick enough
+      // for a chase to read as agile, slow enough that no figure snaps about-face.
+      turnRate: 3.6,
     },
   },
   communication: {

@@ -323,8 +323,16 @@ describe('the catch', () => {
     s.chaser = 0
     s.playing = true
     s.target = 1
+    // The pair is deliberately set down astride the wall, so the placement
+    // invariant is EXPECTED to fire here. It is caught rather than left to
+    // print: a stray [ASSERT] in a green run dulls the channel it is the whole
+    // point of arming.
+    const quiet = vi.spyOn(console, 'error').mockImplementation(() => {})
     stepTagGame(s, 1e-9, CFG, world)
+    const fired = quiet.mock.calls.map((c) => String(c[0]))
+    quiet.mockRestore()
     expect(s.tags).toBe(0)
+    expect(fired.every((c) => c.includes('tag-inside'))).toBe(true)
   })
 
   it('two children on the very same spot resolve without a NaN (unique)', () => {
@@ -443,6 +451,30 @@ describe('stamina is what ends a pursuit — the cap is only the backstop', () =
     expect(Math.abs(at(1 / 60) - at(1 / 30))).toBeLessThan(0.2)
   })
 
+  it("the game's own clock counts SIM seconds, playing and idling alike (unique)", () => {
+    // The live verification samples an INTERVAL OF GAME off this clock rather
+    // than a count of frames — a frame budget buys wildly different amounts of
+    // game on a fast machine and a loaded one. So it must advance by exactly the
+    // dt it is given, at any frame length, and must NOT stall over the idle
+    // break between two rounds.
+    const cfg: TagConfig = { ...CFG, resolveCapSeconds: 4, idleSeconds: 3 }
+    const s = game(FOUR, 3, cfg)
+    expect(s.clock).toBe(0)
+    run(s, 10, OPEN, cfg, 1 / 60)
+    expect(s.clock).toBeCloseTo(10, 5)
+    // Across the break too: the group idles, and the clock keeps counting.
+    let sawIdle = false
+    run(s, 10, OPEN, cfg, 1 / 30, (st) => {
+      if (!st.playing) sawIdle = true
+    })
+    expect(sawIdle).toBe(true)
+    expect(s.clock).toBeCloseTo(20, 5)
+    // A zero or negative frame is not time and must not move it.
+    stepTagGame(s, 0, cfg, OPEN)
+    stepTagGame(s, -1, cfg, OPEN)
+    expect(s.clock).toBeCloseTo(20, 5)
+  })
+
   it('a chase driven into the ground still recovers: nobody stays a hopeless trotter', () => {
     const s = game([
       [0, 0],
@@ -489,6 +521,10 @@ describe('group size (the seasonal thinning of point 142 changes the player coun
   it('a roster that SHRINKS mid-chase leaves exactly one valid chaser (unique)', () => {
     const s = game(FOUR)
     run(s, 6)
+    // Removing the chaser leaves the role pointing past the end of the roster
+    // for one step, so the invariant is EXPECTED to fire once. Caught rather
+    // than printed, for the same reason as above.
+    const quiet = vi.spyOn(console, 'error').mockImplementation(() => {})
     // The chaser itself is removed.
     s.children.splice(s.chaser, 1)
     run(s, 3)
@@ -498,8 +534,74 @@ describe('group size (the seasonal thinning of point 142 changes the player coun
     // Down to one: the game must stop rather than chase a phantom.
     s.children.splice(1)
     run(s, CFG.idleSeconds + 2)
+    const fired = quiet.mock.calls.map((c) => String(c[0]))
+    quiet.mockRestore()
+    expect(fired.every((c) => c.includes('tag-one-chaser'))).toBe(true)
     expect(s.children.length).toBe(1)
     expect(s.playing).toBe(false)
+  })
+
+  it('a lone child STILL HOLDING the role idles at once, not at the backstop (unique)', () => {
+    // The index repair alone misses exactly this: with one child left and the
+    // role on index 0, every index is in range and the round simply ran on —
+    // measured, 43 s of a lone child wandering targetless before the cap idled
+    // it. The shrink test above only ever removed a chaser whose index was left
+    // out of range, so it never reached this state.
+    const s = game(FOUR)
+    run(s, 6)
+    // Put the role on the child that will SURVIVE the shrink, then shrink.
+    s.chaser = 0
+    s.target = 1
+    s.children.splice(1)
+    expect(s.playing).toBe(true)
+    stepTagGame(s, 1 / 60, CFG, OPEN)
+    expect(s.playing).toBe(false)
+    expect(s.chaser).toBe(-1)
+    // And it stays idling rather than restarting a game with itself.
+    run(s, CFG.idleSeconds + 5)
+    expect(s.playing).toBe(false)
+  })
+
+  it('the drawn body TURNS rather than snapping: the facing never jumps (unique)', () => {
+    // The travel heading is free to jump — a deflection round a hut corner is a
+    // real change of direction — but the drawn body may only turn at its rate.
+    // Measured before this held: ~7 one-frame about-faces per child-minute.
+    const s = game(FOUR)
+    const dt = 1 / 60
+    let worst = 0
+    const before = s.children.map((c) => c.facing)
+    run(s, 120, OPEN, CFG, dt, (st, _t) => {
+      st.children.forEach((c, i) => {
+        const d = Math.abs(Math.atan2(Math.sin(c.facing - before[i]), Math.cos(c.facing - before[i])))
+        worst = Math.max(worst, d)
+        before[i] = c.facing
+      })
+    })
+    expect(worst).toBeLessThanOrEqual(CFG.turnRate * dt + 1e-9)
+    // It really does turn, though — a facing frozen at its start would pass the
+    // bound above and be a far worse bug.
+    expect(worst).toBeGreaterThan(0)
+  })
+
+  it('a runner hovering at the pressure distance does not flip its steering (unique)', () => {
+    // Deciding flee-or-return on the bare pressure distance swung a runner 180°
+    // every time it drifted across that one line. The band holds the choice.
+    const s = game(FOUR)
+    run(s, 6)
+    const runner = s.children[(s.chaser + 1) % s.children.length]
+    const chaser = s.children[s.chaser]
+    let flips = 0
+    let prev = runner.evading
+    for (let i = 0; i < 600; i++) {
+      // Park the runner exactly on the boundary, jittering by a hair either way
+      // — the state the sharp rule flapped on.
+      runner.x = chaser.x + CFG.pressureDistance + (i % 2 === 0 ? -1e-3 : 1e-3)
+      runner.z = chaser.z
+      stepTagGame(s, 1 / 60, CFG, OPEN)
+      if (runner.evading !== prev) flips++
+      prev = runner.evading
+    }
+    expect(flips).toBeLessThanOrEqual(1)
   })
 
   it('a roster that GROWS mid-chase leaves the chaser untouched and the newcomer a runner (unique)', () => {

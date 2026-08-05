@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest'
 import {
   advanceReserve,
   blendHeading,
+  turnToward,
   chaserPresses,
   chooseEffort,
   CURVE_MAX_SLOPE,
@@ -340,6 +341,24 @@ describe('headings', () => {
     expect(Math.sin(b)).toBeCloseTo(Math.sin(-3.0), 9)
     expect(blendHeading(0, 1, -1)).toBe(0)
     expect(blendHeading(0, 1, 5)).toBe(1)
+  })
+
+  it('turns toward a heading at a bounded rate, the short way round', () => {
+    // Within reach in one step: it arrives exactly, never overshoots.
+    expect(turnToward(0, 0.3, 1)).toBe(0.3)
+    // Beyond reach: exactly the step, in the right direction.
+    expect(turnToward(0, 3, 0.5)).toBeCloseTo(0.5, 9)
+    expect(turnToward(0, -3, 0.5)).toBeCloseTo(-0.5, 9)
+    // Across the ±π seam the short way from 3.0 to −3.0 is POSITIVE.
+    expect(turnToward(3.0, -3.0, 0.1)).toBeCloseTo(3.1, 9)
+    // A non-positive or non-finite step never teleports the body.
+    expect(turnToward(1.2, -2, 0)).toBe(1.2)
+    expect(turnToward(1.2, -2, -1)).toBe(1.2)
+    expect(turnToward(1.2, -2, NaN)).toBe(1.2)
+    // A half turn is reached in a bounded number of steps and then held.
+    let f = 0
+    for (let i = 0; i < 100; i++) f = turnToward(f, Math.PI, 0.1)
+    expect(Math.abs(Math.atan2(Math.sin(f - Math.PI), Math.cos(f - Math.PI)))).toBeLessThan(1e-9)
   })
 
   it('a runner in the open flees straight away from the chaser', () => {

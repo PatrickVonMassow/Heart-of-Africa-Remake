@@ -36,6 +36,7 @@ import {
   headingToward,
   pressState,
   runnerPresses,
+  turnToward,
   type Effort,
   type Press,
   type StaminaProfile,
@@ -85,6 +86,14 @@ export interface TagConfig extends StaminaProfile {
   /** Forward lean (rad) at the full sprint; the posture eases toward it in
    *  proportion to the pace, and back to upright while recovering. */
   leanAtSprint: number
+  /**
+   * How fast the drawn body may turn, in rad/s. The TRAVEL heading is allowed
+   * to change instantly — a deflection round a hut corner is a real change of
+   * direction — but a body that snapped to it spun about-face inside one frame,
+   * measured ~7 times a minute per child. Real children turn at a rate, and the
+   * goats already do; this is the same easing.
+   */
+  turnRate: number
 }
 
 /** One child in the group. */
@@ -94,6 +103,14 @@ export interface TagChild {
   /** Travel heading, `atan2(dx, dz)` — DERIVED from the deflected step, so a
    *  child can never face away from where it is going. */
   heading: number
+  /** The heading the BODY is drawn on: `heading` eased at `turnRate`, so a
+   *  change of direction is turned into rather than snapped to. */
+  facing: number
+  /** Whether this runner is currently fleeing rather than drifting back to the
+   *  middle. Held across frames: the flee/return choice has its own hysteresis
+   *  band, because deciding it on the bare pressure distance flipped the
+   *  heading by 180° every time a runner drifted across that one line. */
+  evading: boolean
   /** Sprint reserve, 0..1. */
   reserve: number
   press: Press
@@ -136,8 +153,15 @@ export interface TagState {
   playing: boolean
   /** Catches so far — a probe for the tests and the live check. */
   tags: number
-  /** Idle clock, for the gentle look-around of a standing child. */
-  idleClock: number
+  /**
+   * SIM seconds this group has run, playing and idling alike. It is the game's
+   * OWN clock, and the live verification samples against IT rather than against
+   * a count of frames drawn: a frame budget buys wildly different amounts of
+   * game on a fast machine and a loaded one, and a window that happened to be
+   * shorter than one chase is what turns "the chaser's identity changes" red
+   * without a bug behind it.
+   */
+  clock: number
 }
 
 /** The settlement as the chase sees it. `blocked` answers for the FULL set —
@@ -169,21 +193,28 @@ export function createTagGame(
   rand: () => number,
   cfg: TagConfig,
 ): TagState {
-  const children: TagChild[] = spots.map((p) => ({
-    x: p.x,
-    z: p.z,
-    heading: rand() * Math.PI * 2,
-    reserve: 1 - rand() * cfg.variation,
-    press: 'press' as Press,
-    effort: 'cruise' as Effort,
-    sprinting: false,
-    drainScale: spread(rand, cfg.variation),
-    recoverScale: spread(rand, cfg.variation),
-    pace: 0,
-    walked: 0,
-    pinned: 0,
-    lean: 0,
-  }))
+  const children: TagChild[] = spots.map((p) => {
+    // The body STARTS on its travel heading: easing it in from a fixed zero
+    // would spin every child once on the first frames of a visit.
+    const heading = rand() * Math.PI * 2
+    return {
+      x: p.x,
+      z: p.z,
+      heading,
+      facing: heading,
+      evading: false,
+      reserve: 1 - rand() * cfg.variation,
+      press: 'press' as Press,
+      effort: 'cruise' as Effort,
+      sprinting: false,
+      drainScale: spread(rand, cfg.variation),
+      recoverScale: spread(rand, cfg.variation),
+      pace: 0,
+      walked: 0,
+      pinned: 0,
+      lean: 0,
+    }
+  })
   return {
     children,
     chaser: -1,
@@ -196,7 +227,7 @@ export function createTagGame(
     idleFor: 0,
     playing: false,
     tags: 0,
-    idleClock: 0,
+    clock: 0,
   }
 }
 
@@ -366,18 +397,22 @@ export function stepTagGame(s: TagState, dt: number, cfg: TagConfig, world: TagW
   // that quietly mends a broken state and then asserts would report nothing.
   assertRoundSound(s, dt, cfg)
   // The roster is fixed for a visit, but a defensive repair costs three lines
-  // and keeps every index sound if it ever is not.
-  if (s.chaser >= n) s.chaser = -1
+  // and keeps every index sound if it ever is not. A group that has shrunk
+  // below two is the case the index check alone MISSES: with one child left and
+  // the role still on it, every index is in range and the round simply ran on —
+  // measured, 43 s of a lone child wandering targetless before the backstop
+  // finally idled it. A lone child falls back to ordinary idling instead.
+  if (s.chaser >= n || n < 2) s.chaser = -1
   if (s.immune >= n) {
     s.immune = -1
     s.immuneFor = 0
   }
   if (s.target >= n) s.target = -1
   if (!(dt > 0)) return
+  s.clock += dt
 
   if (!s.playing || s.chaser < 0) {
     s.playing = false
-    s.idleClock += dt
     s.idleFor -= dt
     for (const c of s.children) {
       c.pace = 0
@@ -454,8 +489,18 @@ export function stepTagGame(s: TagState, dt: number, cfg: TagConfig, world: TagW
         )
       desired = target ? headingToward(c.x, c.z, target.x, target.z, c.heading) : c.heading
     } else {
-      wants = runnerPresses(dist(c, chaser), cfg.pressureDistance)
-      desired = wants
+      const gapToChaser = dist(c, chaser)
+      wants = runnerPresses(gapToChaser, cfg.pressureDistance)
+      // The FLEE/RETURN choice gets its own hysteresis band, and it is NOT the
+      // sprint decision: deciding the heading on the bare pressure distance made
+      // a runner drifting across that one line swing 180° between fleeing
+      // outward and walking back to the middle, frame after frame. The band
+      // reuses the existing switch margin rather than adding a knob — it starts
+      // fleeing at the pressure distance and only stops once the chaser is
+      // clearly past it.
+      if (gapToChaser <= cfg.pressureDistance) c.evading = true
+      else if (gapToChaser > cfg.pressureDistance + cfg.targetSwitchMargin) c.evading = false
+      desired = c.evading
         ? evadeHeading(c.x, c.z, chaser.x, chaser.z, world.radius)
         : Math.hypot(c.x - cx, c.z - cz) > cfg.pressureDistance
           ? headingToward(c.x, c.z, cx, cz, c.heading)
@@ -466,6 +511,10 @@ export function stepTagGame(s: TagState, dt: number, cfg: TagConfig, world: TagW
     c.effort = chooseEffort(c.press, wants)
     c.pace = Math.max(floor, effortPace(c.effort, c.reserve, cfg, isChaser ? 'chaser' : 'runner'))
     moveChild(c, desired, c.pace * dt, dt, cfg, world)
+    // The BODY turns at a rate toward where it is going. The travel heading may
+    // jump — a deflection round a hut corner is a real change of direction — but
+    // a body that snapped to it spun about-face inside a single frame.
+    c.facing = turnToward(c.facing, c.heading, cfg.turnRate * dt)
     c.reserve = advanceReserve(c.reserve, c.pace, dt, cfg, c.drainScale, c.recoverScale)
     // The posture is a function of the PACE, not of the decision: it changes
     // continuously with the speed, so nothing snaps when a threshold is crossed.
@@ -475,7 +524,12 @@ export function stepTagGame(s: TagState, dt: number, cfg: TagConfig, world: TagW
   }
 
   // ONE catch per step, evaluated after the movement, so two can never resolve
-  // in the same frame.
+  // in the same frame. Only the CURRENT quarry is tested, which is worth a note
+  // for whoever recalibrates next: with the switch margin (1.5 m) well above the
+  // catch distance (0.8 m) a non-target child could in principle sit inside the
+  // catch ring untagged. Measured over 8×600 s with five children that never
+  // once happened — evasion keeps the others out — but a much larger catch ring
+  // or a much larger margin would reopen it.
   if (target && s.target !== s.chaser) {
     const caught =
       !(s.target === s.immune && s.immuneFor > 0) && catchReached(chaser, target, cfg, world)

@@ -459,6 +459,7 @@ export const de: Strings = {
     tagVariation: 'Fangen: Streuung je Kind',
     tagUnstuck: 'Fangen: Entklemm-Fenster Kind (s)',
     tagLean: 'Fangen: Vorlage beim Sprint (rad)',
+    tagTurnRate: 'Fangen: Drehgeschwindigkeit (rad/s)',
     foodPerDay: 'Nahrungsverbrauch/Tag (0 = ewig)',
     canteenDrain: 'Wasserverbrauch/Tag (Land)',
     canteenDesertDrain: 'Wasserverbrauch/Tag (Wüste)',

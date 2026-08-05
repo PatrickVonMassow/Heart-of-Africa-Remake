@@ -458,6 +458,7 @@ export const en: Strings = {
     tagVariation: 'Tag: per-child spread',
     tagUnstuck: 'Tag: child unstuck window (s)',
     tagLean: 'Tag: forward lean at sprint (rad)',
+    tagTurnRate: 'Tag: body turn rate (rad/s)',
     foodPerDay: 'Food use per day (0 = infinite)',
     canteenDrain: 'Water use per day (land)',
     canteenDesertDrain: 'Water use per day (desert)',

@@ -410,7 +410,9 @@ function Kids({
       const phase = gaitPhase(c.walked, cadence)
       gaits.current[i].current = phase
       g.position.set(c.x, gaitBodyLift(phase, legLength), c.z)
-      g.rotation.y = c.heading
+      // The eased FACING, not the raw travel heading: the body turns into a new
+      // direction rather than snapping about-face inside one frame.
+      g.rotation.y = c.facing
       const pose = poses.current[i].current
       if (pose) pose.lean = c.lean
     })
@@ -426,6 +428,9 @@ function Kids({
       target: game.target,
       tags: game.tags,
       chaserFor: game.chaserFor,
+      // The game's OWN clock: the verification samples an interval of GAME,
+      // never a count of frames, which buy different amounts of it per machine.
+      clock: game.clock,
       children: game.children.map((c) => ({
         x: c.x,
         z: c.z,

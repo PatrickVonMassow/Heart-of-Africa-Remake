@@ -256,6 +256,20 @@ export function blendHeading(a: number, b: number, t: number): number {
 }
 
 /**
+ * Turn `from` toward `to` by at most `maxDelta` radians, the short way round.
+ * The rendered body uses this while the TRAVEL heading is free to jump: a
+ * deflection round a corner is a real change of direction, but a figure that
+ * snapped to it spun about-face inside one frame. A non-positive or non-finite
+ * step leaves the facing exactly where it was rather than teleporting it.
+ */
+export function turnToward(from: number, to: number, maxDelta: number): number {
+  const delta = Math.atan2(Math.sin(to - from), Math.cos(to - from))
+  if (!(maxDelta > 0)) return from
+  if (Math.abs(delta) <= maxDelta) return to
+  return from + Math.sign(delta) * maxDelta
+}
+
+/**
  * Where a runner steers: away from the chaser, PREFERRING OPEN GROUND — the
  * further out it already is, the more the heading is pulled back toward the
  * middle, so a cornered child breaks inward along the rim instead of pressing
