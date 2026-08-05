@@ -137,7 +137,9 @@ describe('ferry passages (design.md §10)', () => {
     expect(g().day).toBeGreaterThan(day0) // days passed
     const keys = journalKeys()
     expect(keys).toContain('journal.ferry')
-    expect(keys).toContain('journal.portArrival')
+    // Landing at a port never visited writes ITS arrival vignette (point 394);
+    // the generic checkpoint notice is what a later passage adds.
+    expect(keys).toContain('journal.portFirstVisit')
     expect(g().hasCheckpoint).toBe(true)
   })
 })

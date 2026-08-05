@@ -487,10 +487,11 @@ changes with it in the same commit.
    Evidence: docs/acceptance-evidence.md §7.
 
 8. **Chronicle/journal.** A journal exists, grows automatically on events
-   and stores hints (`design.md` §15); plain text suffices here (the
-   animated handwriting is pt. 29). First village visits are journaled
-   through that people's own ~1890 vignette (§16), never a shared
-   boilerplate.
+   and stores hints (`design.md` §15); plain text suffices (the
+   animated handwriting is pt. 29). EVERY walkable place — port, village,
+   monument — is journaled on its first entry in its own ~1890 voice
+   (§16), never a boilerplate, and again on a changed situation; a
+   `PLACES` sweep fails on a silent place.
    Evidence: docs/acceptance-evidence.md §8.
 
 9. **Status bar.** Date, funds, provisions, gifts and current region are
