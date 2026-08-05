@@ -152,10 +152,10 @@ export interface ChildSituation {
   repliesTo?: ConceptId[]
   /**
    * A MOMENT rather than a turn: a situation whose state is rare and short
-   * (a catch has just happened) is offered ahead of the rotation while it
-   * lasts, and leaves the rotation where it stood. Waiting for its turn to come
-   * round would mean it was never staged at all — measured, the tag immunity
-   * it hangs on lasts 1.4 s against an utterance every six.
+   * (a catch has just happened) is offered ahead of the queue while that state
+   * lasts. Waiting for the queue to reach it would mean it was never staged at
+   * all — measured, the tag immunity it hangs on lasts 1.4 s against an
+   * utterance every six.
    */
   moment?: boolean
   /**
@@ -721,7 +721,7 @@ export function stepChildSpeech(
     state.pendingReply = null
   }
 
-  // A MOMENT beats the rotation while it lasts: a catch has just happened, and
+  // A MOMENT beats the queue while it lasts: a catch has just happened, and
   // the state that situation reads is gone again within seconds.
   for (const situation of CHILD_SITUATIONS) {
     if (!situation.moment || !situation.cast) continue
