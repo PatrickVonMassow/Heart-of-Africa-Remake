@@ -807,9 +807,3 @@ export function childSteer(
     }
   }
 }
-
-/** Whether this child is carrying out something it was told — the scene asks
- *  before it lets the chase steer it. */
-export function hasIntent(state: ChildSpeechState, index: number): boolean {
-  return !!state.intents[index]
-}
