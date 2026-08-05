@@ -4528,43 +4528,39 @@ Build order, chosen so no two parallel agents own the same file:
   5. Nothing in the verification's default path changes for a reader who does not
      opt in: the software WebGPU lane keeps working exactly as it does today while
      this point runs, so the both-backend picture check is never interrupted by it.
-  6. THE FLAG SET COMES FIRST, and it is free. Google's own recipe for hardware
-     WebGPU in headless Chrome on Linux is `--no-sandbox --headless=new
-     --use-angle=vulkan --enable-features=Vulkan --disable-vulkan-surface
-     --enable-unsafe-webgpu`. `--disable-vulkan-surface` turns off the
-     `VK_KHR_surface` instance extension that headless has no display for — the
-     plausible seat of the reproduced >40 s adapter hang — and it appears NOWHERE in
-     this repository (checked 05.08.2026), while the lane pins software outright
-     (`--use-angle=swiftshader --use-vulkan=swiftshader`, `launch-args-core.mjs`).
-     The hardware attempt therefore ran WITHOUT the flag the recipe requires.
-     `--use-vulkan=native` and `--use-webgpu-adapter=default` are unused too. This
-     axis costs no download and is tried before any build is fetched.
-  7. The axes are ranked by what the evidence says, cheapest and likeliest first:
-     the flag set (item 6); then a newer Chrome channel — the host carries only the
-     151 build that declines, while Chrome for Testing (Beta 152, Dev 153, Canary
-     153) and `dl.google.com/linux/chrome/deb` both answer from the container, so
-     the download path is open. That version axis is the WEAKEST, and the point says
-     so rather than spending on it first: the installed dzn ICD declares
-     `api_version 1.1.305` — Vulkan 1.1, measured in the container — and Dawn
-     silently skips a driver whose feature set falls short, which is exactly the
-     observed one-second fall back to SwiftShader with dzn as the only ICD (a
-     pre-emptive refusal, not a failed initialisation). A newer Dawn demands more,
-     not less. There is NO native NVIDIA Vulkan ICD on this host, so Dozen is the
-     only Vulkan path to the card at all.
-  8. A second ENGINE is NOT a way around dzn, and the point does not spend on it:
-     Firefox/wgpu does go through the system Vulkan loader, but that loader serves
-     the same Dozen, so it inherits the same ceiling — and Mozilla expects WebGPU on
-     Linux only in 2026, behind flags. Worth knowing for its own sake, and recorded
-     here so it is not re-derived: the suites themselves are barely Chromium-bound
-     (of 55 verify scripts exactly one uses CDP, and it is already the documented
-     WebGL2-only skip), so the coupling is `launch-args-core.mjs` and
-     `system-chrome.mjs` alone.
-  9. The one axis that bypasses Dozen entirely is named with its price, and is a
-     LAST resort: `chromium.connectOverCDP()` to a Chrome on the WINDOWS host, where
-     WebGPU runs natively on D3D12 with the 4070 Ti. It costs CDP fidelity, needs the
-     dev server reachable from the host, and hangs the lane on a browser OUTSIDE the
-     container — which contradicts the batch's headless autonomy. It is taken only if
-     items 6–7 fail, and the contradiction is stated in the verdict either way.
+  6. THE CAUSE IS MEASURED, so the point no longer searches for it (four-eyes
+     review 05.08.2026, checked against Dawn's source). `vulkaninfo` against the dzn
+     ICD names `Microsoft Direct3D12 (NVIDIA GeForce RTX 4070 Ti)`, driver Dozen,
+     device API 1.2.305 — and reports `fullDrawIndexUint32 = false` with
+     `maxDrawIndexedIndexValue = 16777215` (24 bit). Dawn's Vulkan backend requires
+     that feature HARD in `PhysicalDeviceVk.cpp`'s `InitializeImpl` and errors out
+     when it is missing, so the physical device is DISCARDED and no adapter is ever
+     created. That is exactly the observed one-second SwiftShader answer.
+  7. FLAGS CANNOT FIX A FEATURE REFUSAL, and the point says so rather than spending
+     on them: no launch flag reaches into Dawn's adapter init. `--use-vulkan` steers
+     SKIA's Vulkan, not Dawn's adapter choice, and `--use-webgpu-adapter` takes only
+     `default|swiftshader|compat`. A newer Chrome channel is equally predictable —
+     a newer Dawn demands more, not less. Both are recorded as ruled out by
+     reasoning, not re-tried.
+  8. THE PROMISING PATH is a one-line change to the SELF-BUILT Mesa dzn:
+     `fullDrawIndexUint32 = true` in `src/microsoft/vulkan/dzn_device.c` (precedent
+     documented for WSL2 + Chrome + Dozen). Its price is stated honestly wherever it
+     is used: with `maxDrawIndexedIndexValue = 2^24-1` this is a specification lie,
+     harmless for scenes whose index values stay far below that bound — so the patch
+     stays confined to the verification lane, is never proposed for a player's
+     machine, and is documented as a knowing deviation.
+  9. SUCCESS IS MEASURED AT THE DRAWN PIXEL, never at an adapter string. Google's
+     headless recipe carries the documented limitation that it works "as long as
+     nothing is drawn to canvas" — which is the whole job of a screenshot lane — so
+     `backend-lane-check.mjs` reading real pixels back out of the canvas is the only
+     proof that counts. `VK_LOADER_DEBUG=all` shows whether the ICD loads in the GPU
+     process at all, and Deno (a static binary on wgpu) is the CHEAPER second WebGPU
+     implementation for separating "dzn is inadequate" from "Chrome refuses" —
+     cheaper than Firefox, which Playwright can only drive in its own patched build.
+  10. THE POINT CAN CLOSE AS A NO. If, after the patch, `chrome://gpu` still lists
+     no D3D12/NVIDIA adapter while the loader log proves the ICD enumerated, the
+     matter is settled: the software lane stays and the verdict is written, naming
+     every path tried and why it failed.
   VERIFIABLE: `node scripts/verify/backend-lane-check.mjs` on the WebGPU lane
   prints the device that actually drew the frame, and the picture of one built
   scene is inspected once; the host-environment section lists every build tried
