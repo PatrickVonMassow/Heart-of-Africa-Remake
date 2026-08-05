@@ -21,7 +21,7 @@
  *  container has no GPU, no DRI driver and no system libEGL/libGL". It has all three:
  *  /dev/dxg is passed through, /usr/lib/wsl/lib carries libd3d12/libd3d12core/libdxcore,
  *  and Mesa's d3d12 Gallium driver turns that into hardware GL. With `gl` the lane comes
- *  up as "ANGLE (Microsoft Corporation, D3D12 (NVIDIA GeForce RTX 4070 Ti), OpenGL 4.2)"
+ *  up as "ANGLE (Microsoft Corporation, D3D12 (NVIDIA GeForce RTX 4070 Ti), OpenGL 4.6)"
  *  against SwiftShader's "Vulkan 1.3.0 (SwiftShader Device (Subzero))" — measured on the
  *  identical scene at 170 vs 22.7 renderer calls per second, a 7.5× picture rate. What
  *  the host needs for it is installed by scripts/verify-host-setup.sh (libgl1, libegl1,
@@ -68,6 +68,27 @@ export function galliumDriver(platform, override) {
   const forced = typeof override === 'string' ? override.trim().toLowerCase() : ''
   if (forced) return forced === 'none' ? '' : forced
   return platform === 'linux' ? 'd3d12' : ''
+}
+
+/** The libraries ANGLE's `gl` backend dlopens, i.e. the GL CHAIN both Linux lanes ride.
+ *  Without them ANGLE has no driver to sit on ("Could not dlopen libGL.so.1") and the
+ *  browser drops to its own software rasteriser — the state the container was in before
+ *  point 493 installed libgl1/libegl1.
+ *
+ *  Named here, walked in system-chrome.mjs (hasHardwareGlChain): the pure core says WHAT
+ *  counts as the chain, the impure half says whether this host has it. Each library may
+ *  live in any of the loader directories below; the chain is present when every one of
+ *  them is found somewhere. */
+const LINUX_GL_CHAIN_LIBS = ['libGL.so.1', 'libEGL.so.1']
+const LINUX_LIB_DIRS = ['/usr/lib/x86_64-linux-gnu', '/lib/x86_64-linux-gnu', '/usr/lib64', '/usr/lib']
+
+/** The chain's probe list, one alternatives-group per library: the chain is present when
+ *  EVERY group has at least one existing path. Empty off Linux — no other platform routes
+ *  its lanes through a Mesa GL chain, so there is nothing to probe and nothing to fall
+ *  back from. */
+export function glChainProbePaths(platform) {
+  if (platform !== 'linux') return []
+  return LINUX_GL_CHAIN_LIBS.map((lib) => LINUX_LIB_DIRS.map((dir) => `${dir}/${lib}`))
 }
 
 /** The environment a lane's browser launches with: `baseEnv` plus what the graphics stack
@@ -148,11 +169,52 @@ export function webglLaunchOptions(platform, angleOverride, baseEnv, galliumOver
  *  Windows and macOS keep the argument list byte for byte. */
 const LINUX_WEBGPU_SOFTWARE_ARGS = ['--use-angle=swiftshader', '--enable-features=Vulkan', '--use-vulkan=swiftshader']
 
+/** What puts the WebGPU lane on the CARD instead (measured 05.08.2026, point 505).
+ *
+ *  Vulkan is a dead end on this host and the cause is measured, not suspected: the only
+ *  Vulkan device here is Dozen (Vulkan-on-D3D12), whose physical device reports
+ *  `fullDrawIndexUint32 = false`, and Dawn's Vulkan backend requires that feature
+ *  outright — so it DISCARDS the device and answers with its bundled SwiftShader. No
+ *  launch flag reaches into that decision.
+ *
+ *  Dawn's OpenGLES backend bypasses Vulkan entirely and rides the same Mesa-d3d12 GL
+ *  chain the WebGL 2 lane already runs on the 4070 Ti. Measured against the software
+ *  args above, in the same session: `ANGLE (Microsoft Corporation, D3D12 (NVIDIA GeForce
+ *  RTX 4070 Ti), OpenGL 4.6)`, 103.7 renderer calls per second against 15.3, 487 KB
+ *  frames against 29 KB, and no console error.
+ *
+ *  `--force-webgpu-compat` is not optional decoration: Dawn's GLES backend serves a
+ *  COMPATIBILITY adapter, and the flag is what makes Chrome hand it over instead of
+ *  refusing the request. The lane is therefore a THIRD one, not a replacement — the
+ *  adapter carries no `core-features-and-limits`, three.js sets `compatibilityMode` and
+ *  drops MSAA, and the player never enters that branch. assertBackend RECORDS the level
+ *  for exactly that reason (scripts/verify/_browser.mjs), so a compat run can never be
+ *  read back as core coverage. */
+const LINUX_WEBGPU_GLES_ARGS = [
+  '--use-gl=angle',
+  '--use-angle=gl',
+  '--use-webgpu-adapter=opengles',
+  '--force-webgpu-compat',
+]
+
+/** Which of the two Linux WebGPU paths this host gets. The GLES lane needs the GL chain;
+ *  without it Dawn's OpenGLES backend has nothing to open and the lane would fail where
+ *  the software args still draw, so a host without the chain keeps exactly the flags it
+ *  has today. */
+export function linuxWebgpuArgs(hasGlChain) {
+  return hasGlChain ? LINUX_WEBGPU_GLES_ARGS : LINUX_WEBGPU_SOFTWARE_ARGS
+}
+
 /** Launch options for the WebGPU lane. The
  *  point-184 breakthrough is a SYSTEM browser with --headless=new (Playwright's bundled
  *  Chromium fails requestDevice headless), and the host decides only WHETHER such a
  *  browser exists (see webgpuLaneVerdict) and which driver flags it needs
- *  (LINUX_WEBGPU_SOFTWARE_ARGS above).
+ *  (linuxWebgpuArgs above).
+ *
+ *  `hasGlChain` is that second host question, answered by hasHardwareGlChain in
+ *  system-chrome.mjs. It defaults to FALSE — the software path — so a caller that does
+ *  not ask gets the historical flags rather than a lane silently pointed at a chain
+ *  nobody probed.
  *
  *  `systemChrome` is the executable the caller PROBED (systemChromeCandidates →
  *  findSystemChrome). When there is one it is handed over as `executablePath`, so the
@@ -168,12 +230,18 @@ const LINUX_WEBGPU_SOFTWARE_ARGS = ['--use-angle=swiftshader', '--enable-feature
  *
  *  With nothing probed (Windows, macOS — see systemChromeCandidates) the options are
  *  byte for byte the historical `channel:'chrome'` launch and Playwright resolves it. */
-export function webgpuLaunchOptions(systemChrome = null, platform = process.platform, baseEnv, galliumOverride) {
+export function webgpuLaunchOptions(
+  systemChrome = null,
+  platform = process.platform,
+  baseEnv,
+  galliumOverride,
+  hasGlChain = false,
+) {
   const args = [
     '--headless=new',
     '--enable-unsafe-webgpu',
     '--enable-gpu',
-    ...(platform === 'linux' ? [...LINUX_WEBGPU_SOFTWARE_ARGS, ...platformArgs(platform)] : []),
+    ...(platform === 'linux' ? [...linuxWebgpuArgs(hasGlChain), ...platformArgs(platform)] : []),
   ]
   const executablePath = typeof systemChrome === 'string' ? systemChrome.trim() : ''
   const env = baseEnv ? { env: laneEnv(platform, baseEnv, galliumOverride) } : {}
@@ -181,9 +249,17 @@ export function webgpuLaunchOptions(systemChrome = null, platform = process.plat
 }
 
 /** The options `_browser.mjs` hands chromium.launch for the requested backend. */
-export function verifyLaunchOptions(backend, platform, angleOverride, systemChrome, baseEnv, galliumOverride) {
+export function verifyLaunchOptions(
+  backend,
+  platform,
+  angleOverride,
+  systemChrome,
+  baseEnv,
+  galliumOverride,
+  hasGlChain,
+) {
   return backend === 'webgpu'
-    ? webgpuLaunchOptions(systemChrome, platform, baseEnv, galliumOverride)
+    ? webgpuLaunchOptions(systemChrome, platform, baseEnv, galliumOverride, hasGlChain)
     : webglLaunchOptions(platform, angleOverride, baseEnv, galliumOverride)
 }
 

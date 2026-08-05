@@ -47,6 +47,10 @@ export function armRunRecorder(backend) {
       suite: basename(String(process.argv[1] ?? 'unknown'), '.mjs'),
       startedAt: Date.now(),
       asserted: false,
+      // The WebGPU feature level the run really came up at, filled in by
+      // markBackendAsserted (point 505). null until then — and null it stays for the
+      // WebGL 2 lane, where the question does not apply.
+      featureLevel: null,
     }
     process.on('exit', (code) => {
       try {
@@ -58,6 +62,7 @@ export function armRunRecorder(backend) {
           at: Date.now(),
           exit: code ?? 0,
           asserted: armed.asserted,
+          featureLevel: armed.featureLevel,
           screenshotCount: shots.length,
           screenshots: shots.slice(0, 12),
         })
@@ -70,7 +75,12 @@ export function armRunRecorder(backend) {
   }
 }
 
-/** Called by assertBackend on success — the backend was CONFIRMED, not assumed. */
-export function markBackendAsserted() {
-  if (armed) armed.asserted = true
+/** Called by assertBackend on success — the backend was CONFIRMED, not assumed, and at
+ *  the feature level it names ('core' | 'compatibility' | null; point 505). The level is
+ *  recorded rather than judged here: `coveringRun(runs, backend, since, {featureLevel})`
+ *  is where a reader asks for the player's core path specifically. */
+export function markBackendAsserted(featureLevel = null) {
+  if (!armed) return
+  armed.asserted = true
+  armed.featureLevel = featureLevel === 'core' || featureLevel === 'compatibility' ? featureLevel : null
 }

@@ -76,14 +76,36 @@ sets nothing at all). Linux additionally launches with `--no-sandbox`,
 `--ignore-gpu-blocklist` and `--disable-dev-shm-usage`, which container images need;
 Windows and macOS keep their argument list unchanged.
 
-The **WebGPU lane pins the opposite way** on Linux — `--use-angle=swiftshader`
-`--enable-features=Vulkan` `--use-vulkan=swiftshader`, all three. There is no
-hardware Vulkan device Chrome will accept on this host (see `docs/host-environment.md`),
-and with the stacks left to disagree the lane reports an adapter, initialises
-`isWebGPUBackend` and paints NOTHING: the page throws `Instance dropped in
-popErrorScope` and the canvas stays black behind a live HUD. It is the correct
-picture at software speed, and `backend-lane-check.mjs` labels it as software so it
-can never be read as the GPU.
+The **WebGPU lane rides the same GL chain** on Linux, through Dawn's OpenGLES
+backend: `--use-gl=angle --use-angle=gl --use-webgpu-adapter=opengles
+--force-webgpu-compat` (point 505). Vulkan is a dead end here — the only Vulkan
+device is Dozen, whose `fullDrawIndexUint32 = false` Dawn's Vulkan backend
+refuses, so it falls back to its bundled SwiftShader and no flag reaches into
+that (`docs/host-environment.md`). The GLES path bypasses Vulkan entirely and
+draws on the 4070 Ti: 103.7 renderer calls per second against the software
+lane's 15.3, 487 KB frames against 29 KB.
+
+Where the GL chain is absent the lane keeps the SOFTWARE flags —
+`--use-angle=swiftshader --enable-features=Vulkan --use-vulkan=swiftshader`, all
+three — because Dawn's GLES backend would have nothing to open. `hasHardwareGlChain`
+(`system-chrome.mjs`) decides, and the two sets never mix: with the stacks left to
+disagree the lane reports an adapter, initialises `isWebGPUBackend` and paints
+NOTHING (`Instance dropped in popErrorScope`, a black canvas behind a live HUD).
+`backend-lane-check.mjs` prints the GL chain beside the adapter on this lane —
+Chrome hands an unprivileged page an all-empty `GPUAdapterInfo`, so the adapter
+string alone could never label a software rasteriser as one.
+
+**The FEATURE LEVEL is the third signal**, beside backend and drawn pixel. three.js
+always requests `compatibility` and then decides by `core-features-and-limits`: the
+GLES adapter carries none, so three sets `compatibilityMode`, drops MSAA and runs
+compat branches the player never enters. `assertBackend` reads the level and hands it
+to the run recorder (`featureLevel` in each record; `render-verify-guard.mjs status`
+prints it), and `coveringRun(runs, backend, since, {featureLevel:'core'})` refuses a
+compat run — and a record written before the level existed. Without it the gate would
+book compat as coverage of the player's path, the same confusion class as software
+reported as hardware. Unasked, the gate still judges by backend alone: on a host whose
+only WebGPU adapter is compat, demanding core would block every render change with no
+way to clear it.
 
 Without a system Chrome the **WebGPU lane fails LOUD** — `WebGPU backend
 unavailable on this host` — and stops. It is never quietly served by WebGL 2, and
@@ -606,6 +628,9 @@ a run launched with `VERIFY_GL=webgpu` that SILENTLY fell back to WebGL 2 (or a
 `webgl` run that came up on WebGPU) fails LOUD instead of giving false
 confidence. Covered: collision, enrichments, events, flow, gamepad, handwriting,
 health, i18n, invariants, polish, settings, touch, visualsweep, voice, world.
+The same call records the WebGPU **feature level** the run came up at (point 505,
+above): on the container's GLES lane that is `compatibility`, on a core adapter
+`core`, and on the WebGL 2 lane it does not apply.
 
 Two suites carry no assertion, each for a structural reason:
 

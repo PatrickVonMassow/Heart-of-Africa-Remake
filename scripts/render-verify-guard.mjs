@@ -294,7 +294,8 @@ if (arg === 'status') {
       console.log(
         run
           ? `  ${b.padEnd(6)} covered by ${run.suite} at ${new Date(run.at).toISOString()} ` +
-              `(exit 0, asserted=${run.asserted === true}, ${run.screenshotCount ?? 0} screenshots)`
+              `(exit 0, asserted=${run.asserted === true}, level=${run.featureLevel ?? 'unrecorded'}, ` +
+              `${run.screenshotCount ?? 0} screenshots)`
           : `  ${b.padEnd(6)} NOT covered since the last render edit`,
       )
     }
@@ -305,7 +306,8 @@ if (arg === 'status') {
     for (const r of runs) {
       console.log(
         `  ${new Date(Number(r.at ?? 0)).toISOString()}  ${String(r.backend).padEnd(6)} ` +
-          `${String(r.suite).padEnd(14)} exit ${r.exit} asserted=${r.asserted === true} shots=${r.screenshotCount ?? 0}`,
+          `${String(r.suite).padEnd(14)} exit ${r.exit} asserted=${r.asserted === true} ` +
+          `level=${r.featureLevel ?? '-'} shots=${r.screenshotCount ?? 0}`,
       )
     }
     process.exit(0)

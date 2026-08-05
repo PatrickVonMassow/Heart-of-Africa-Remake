@@ -48,52 +48,61 @@ packages, not hardware:
   process due to errors during initialization`), and without the Gallium pin Mesa 25 serves
   llvmpipe while every interface still looks healthy (Mesa 22.3.6 chose d3d12 by itself;
   the 25.0.7 backport does not).
-- **WebGPU runs, in software.** System Chrome exposes `navigator.gpu` on a secure-context
-  page — the earlier "undefined" reading came from probing `about:blank`/`data:` URLs,
-  which are not secure contexts — and the lane draws the real game once ANGLE *and* Dawn
-  are both pinned to Chrome's bundled SwiftShader. Left to disagree they report an adapter,
-  initialise `isWebGPUBackend`, advance the frame counter and paint nothing: the page throws
-  `Instance dropped in popErrorScope` and the canvas stays black behind a live HUD.
-- **Hardware WebGPU is the open item.** Vulkan on this host means Dozen (dzn,
-  Vulkan-on-D3D12). No distribution ships it — not Debian 12's Mesa 22.3.6, not the 25.0.7
-  backport — but it builds from the Debian mesa source
+- **WebGPU runs on the card too, at the COMPATIBILITY level** (point 505, 05.08.2026).
+  System Chrome exposes `navigator.gpu` on a secure-context page — the earlier "undefined"
+  reading came from probing `about:blank`/`data:` URLs, which are not secure contexts — and
+  the lane now rides Dawn's **OpenGLES** backend over the same Mesa-d3d12 chain WebGL 2
+  uses: `--use-gl=angle --use-angle=gl --use-webgpu-adapter=opengles
+  --force-webgpu-compat`, no Vulkan flag and no ICD in sight. Measured against the software
+  lane in the same session: **103.7 vs 15.3 renderer calls per second**, 487 KB frames
+  against 29 KB, ANGLE reporting `D3D12 (NVIDIA GeForce RTX 4070 Ti), OpenGL 4.6`, no
+  console error. `launch-args-core.mjs` wires it wherever the GL chain is installed and
+  keeps the old software flags (ANGLE *and* Dawn both pinned to Chrome's bundled
+  SwiftShader) as the fallback for a host without it — left to disagree, those two stacks
+  report an adapter, initialise `isWebGPUBackend`, advance the frame counter and paint
+  nothing (`Instance dropped in popErrorScope`, a black canvas behind a live HUD).
+- **The level is a THIRD lane, not core coverage.** three.js always requests the
+  `compatibility` feature level and then decides by `core-features-and-limits`; the GLES
+  adapter carries none, so three sets `compatibilityMode`, drops MSAA and runs compat
+  branches the player never enters. `assertBackend` therefore reads the level and the run
+  record keeps it (`featureLevel`), `backend-lane-check.mjs` prints it, and
+  `coveringRun(…, {featureLevel:'core'})` refuses a compat run — without that third signal
+  the render-verify guard would book compat as the player's path, the same confusion class
+  as software reported as hardware.
+- **Core-level WebGPU is the open item.** It needs a Vulkan device, and Vulkan here means
+  Dozen (dzn, Vulkan-on-D3D12). No distribution ships it — not Debian 12's Mesa 22.3.6, not
+  the 25.0.7 backport — but it builds from the Debian mesa source
   (`sudo bash scripts/verify-host-setup.sh --with-dzn`) and `vulkaninfo` then enumerates
-  `Microsoft Direct3D12 (NVIDIA GeForce RTX 4070 Ti)`. Chrome 151 still declines it: with
-  `VK_ICD_FILENAMES`/`VK_DRIVER_FILES` scoped to dzn ALONE, Dawn answers with its own
-  bundled SwiftShader anyway (in one second), and with the full ICD set visible a browser
-  launched with `--enable-features=Vulkan` HANGS at adapter time (>40 s, reproduced). So
-  the build is OPT-IN and the default install places no ICD — nothing can wander into the
-  hang — and the hardware WebGPU lane waits for a browser that accepts a system Vulkan
-  device. **Read this before rebuilding dzn: the verdict is worth more than the build.**
+  `Microsoft Direct3D12 (NVIDIA GeForce RTX 4070 Ti)`. Chrome 151 still declines it, and the
+  CAUSE is measured: that device reports `fullDrawIndexUint32 = false`, a feature Dawn's
+  Vulkan backend requires outright, so it discards the physical device — which is the
+  one-second SwiftShader answer, and no launch flag reaches into it (`--use-vulkan` steers
+  Skia, `--use-webgpu-adapter` takes only `default|swiftshader|compat|opengles`). With the
+  full ICD set visible a browser launched with `--enable-features=Vulkan` also HANGS at
+  adapter time (>40 s, reproduced). So the build stays OPT-IN, the default install places no
+  ICD — nothing can wander into the hang — and the remaining paths are a one-line
+  `fullDrawIndexUint32` patch to the self-built dzn (a knowing specification lie, lane-only)
+  or a browser that accepts a system Vulkan device. **Read this before rebuilding dzn: the
+  verdict is worth more than the build.**
 
-**What the software WebGPU lane can and cannot answer, measured 05.08.2026** (point 499's
-quiet repeat: the six suites that reddened in the LARGE run, re-run alone with no other
-verify run on the machine). `gamepad` went green — its red was load. Five stayed red, and
-not one of them is a product defect this lane found:
-
-- `polish` and `settings` fail four checks that measure a RATE the lane cannot deliver —
-  the goat's planted foot reports "MEASURED NOTHING, 1 usable stance interval" against 23
-  measured on the WebGL lane, the dry-season reading does not settle inside 60 s, and the
-  walking footstep never fires. All four are green, measured, on WebGL 2 (point 506).
-- `benchmark` dies at `page.waitForFunction: Timeout 300000ms exceeded` — its fixed
-  864-frame route cannot finish at software speed (point 506).
-- `enrichments` dies in a pixel probe on Playwright's undeclared 30 s (point 492).
-- `invariants` loses the WebGPU device mid-run (`Device Lost`, `mapAsync` on a dropped
-  instance) and still reports `2 pass, 0 fail` — the checks after the loss never ran
-  (point 507).
-- The panorama reds (leave capture, compass probe) appear on BOTH lanes and are the real
-  defects of points 500/501.
+**What the SOFTWARE lane could not answer, measured 05.08.2026** — the reason the GLES lane
+above is worth having. Re-run alone on a quiet machine, five suites stayed red on it and not
+one red was a product defect: `polish`/`settings` fail four checks that measure a RATE the
+lane cannot deliver (the goat's planted foot reports "MEASURED NOTHING, 1 usable stance
+interval" against 23 on the WebGL lane; the dry-season reading never settles; the walking
+footstep never fires — all green on WebGL 2, point 506), `benchmark` cannot finish its fixed
+864-frame route inside 300 s (506), `enrichments` dies in a pixel probe on Playwright's
+undeclared 30 s (492), and `invariants` loses the device mid-run and still reports `2 pass,
+0 fail` (507). Its FRAMES carry the same shortfall — `100-cairo-giza-skyline.png` came back
+29 KB against 568 KB from a lane with the GPU, an all-but-empty picture the shutter still
+accepted (point 489). Never record acceptance screenshots from the software fallback lane.
 
 Quiet, the hardware WebGL 2 lane keeps exactly four reds, each twice and each already a
 named point: the leave capture and the two band probes (500/501) in `polish`, the calf that
-does not drown and the High Atlas snow (502/503) in `enrichments`. The dressing-growth check
-reporting `samples [0,0,0,0,0]` failed in one run of two — the measures-nothing flake point
-200 lists. Nothing else on that lane is red.
-
-The frames this lane WRITES carry the same shortfall: on the software pass
-`100-cairo-giza-skyline.png` came back 29 KB against 568 KB from a lane with the GPU — an
-all-but-empty picture the shutter still accepted, which is what point 489 is for. Do not
-record acceptance screenshots from the software lane.
+does not drown and the High Atlas snow (502/503) in `enrichments`. The panorama reds appear
+on both lanes and are those same defects. The dressing-growth check reporting
+`samples [0,0,0,0,0]` failed in one run of two — the measures-nothing flake point 200 lists.
+Nothing else on that lane is red.
 
 `scripts/verify-host-setup.sh` installs all of it (root, once, idempotent) and
 `scripts/verify/backend-lane-check.mjs` proves the result at the PICTURE — it boots the

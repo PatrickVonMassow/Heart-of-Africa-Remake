@@ -11,16 +11,20 @@
 #     up as "ANGLE (Microsoft Corporation, D3D12 (NVIDIA GeForce RTX 4070 Ti), OpenGL 4.2)"
 #     — measured 170 vs 22.7 renderer calls per second on the identical scene, and the
 #     `flow` suite went from red-and-unfinished-in-10-minutes to GREEN IN 58 SECONDS.
-#   - WebGPU is the one that stays SOFTWARE, and not for want of trying. Debian 12 ships
-#     Mesa 22.3.6 and even the 25.0.7 backport is built WITHOUT Dozen (dzn), the
-#     Vulkan-on-D3D12 driver, so the loader offered llvmpipe alone. Dozen builds cleanly
-#     from the Debian mesa source (--with-dzn below) and `vulkaninfo` then enumerates
-#     "Microsoft Direct3D12 (NVIDIA GeForce RTX 4070 Ti)" — but Chrome 151 DECLINES it:
-#     asked for an adapter with the loader scoped to dzn alone, Dawn still answers with
-#     its own bundled SwiftShader, and with the full ICD set visible the browser HANGS at
-#     adapter time. So the WebGPU lane runs on SwiftShader, correct and slow, and is
-#     labelled as such by backend-lane-check.mjs. The dzn build stays here, opt-in, as the
-#     starting point for the next attempt (a Chrome that accepts a system Vulkan device).
+#   - WebGPU reaches the card too, at the COMPATIBILITY level (point 505, 05.08.2026).
+#     Dawn's OpenGLES backend rides the same GL chain, so the same two packages carry both
+#     lanes and nothing else is needed for it — see docs/host-environment.md for the flags
+#     and the measurement (103.7 vs 15.3 renderer calls per second).
+#   - CORE-level WebGPU stays open, and not for want of trying. It needs Vulkan, which here
+#     means Dozen (dzn, Vulkan-on-D3D12): Debian 12 ships Mesa 22.3.6 and even the 25.0.7
+#     backport is built WITHOUT it, so the loader offered llvmpipe alone. Dozen builds
+#     cleanly from the Debian mesa source (--with-dzn below) and `vulkaninfo` then
+#     enumerates "Microsoft Direct3D12 (NVIDIA GeForce RTX 4070 Ti)" — but Chrome 151
+#     DECLINES it, and the cause is measured: that device reports fullDrawIndexUint32 =
+#     false, which Dawn's Vulkan backend requires outright, so it discards the device and
+#     answers with its own bundled SwiftShader. With the full ICD set visible the browser
+#     HANGS at adapter time instead. The dzn build stays here, opt-in, as the starting
+#     point for the next attempt (patching that one feature bit, or a newer Dawn).
 #
 # Everything installs system-wide, so this needs root ONCE. It is idempotent: a second run
 # installs nothing and says so.
