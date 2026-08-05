@@ -43,6 +43,7 @@ device pixel ratio is kept (no cap).
 | `weatherIntensity` | 0.6 | 1 | 1 |
 | `waterCalm` | on | off | off |
 | `wildlifeDensity` | 0.6 | 1 | 1 |
+| `figureLimbSegments` | 5 | 8 | 12 |
 
 ## What each setting does
 
@@ -96,6 +97,12 @@ post pipeline), geometry last — the cuts that only genuinely weak GPUs feel.
 - **`wildlifeDensity`** *(declared, not yet consumed)* — Ambient wildlife
   spawn-density factor (`1` = full, design.md §19.2). Declared for the §21
   registry; will be read by the spawner once wired. 0.6 on low.
+- **`figureLimbSegments`** — Radial segments of the villager figures' arms,
+  hands and legs (point 479). The limbs are thin and the player stands within a
+  metre of them while a figure gestures, so the count decides whether an arm
+  reads as a limb or as a rod; a settlement carries a couple of dozen figures,
+  which is why the count is a per-level lever rather than a fixed constant.
+  Climbs 5 → 8 → 12.
 
 > **Declared-but-not-yet-consumed keys:** `waterCalm` and `wildlifeDensity` are
 > present in every preset (so the completeness gate passes and future work has a

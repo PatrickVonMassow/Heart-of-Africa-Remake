@@ -580,6 +580,16 @@ its own subject never occurred:
   prop, and none inside another goat — sampled over 20 reads of the herd, with
   the deepest penetration and the closest pair reported, plus the frame
   `143-village-goat-separation`.
+- **Villager gestures (point 479).** The four poses — beckon, point, refuse,
+  indicate — are photographed at conversational distance from a standpoint the
+  suite RAY-PROBES clear first (a camera dropped on a fixed bearing lands inside
+  a hut in a dense settlement and would photograph a wall), each forced through
+  the dev hook `__placeForceGesture` and awaited on the GESTURE's own clock, not
+  the wall clock. Then the ambient conversation is sampled over 60 reads: every
+  live gesture is one of the four kinds, none runs past its own duration, the
+  pair takes turns, and a figure between gestures stands exactly at rest. The
+  state machine itself is pure (`src/render/gesture.test.ts`); only the poses the
+  renderer actually DRAWS need the browser.
 
 Kept largely intact (already browser-only): `flow.mjs` (the one E2E core loop +
 buy-price layout geometry), `collision.mjs`, `gamepad.mjs`, `polish.mjs`,

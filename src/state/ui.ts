@@ -297,6 +297,8 @@ export const effectiveFloraFogFactor = (s: UiState): number => currentQuality(s)
 export const effectiveFloraCastShadow = (s: UiState): boolean => currentQuality(s).floraCastShadow
 /** Atmospheric haze/rain intensity factor for the current level (1 = full). */
 export const effectiveWeatherIntensity = (s: UiState): number => currentQuality(s).weatherIntensity
+/** Radial segments of the villager figures' limb primitives (point 479). */
+export const effectiveFigureLimbSegments = (s: UiState): number => currentQuality(s).figureLimbSegments
 
 // Dev hook for the headless verification (CLAUDE.md §7.2).
 if (import.meta.env.DEV && typeof window !== 'undefined') {

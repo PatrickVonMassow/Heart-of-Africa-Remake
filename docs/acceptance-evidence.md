@@ -879,6 +879,34 @@ radius, and with it OFF that contrast stays flat
 toggle default and write-through are pure-tested
 (`src/state/ui.test.ts`, `src/ui/DebugMenu.test.tsx`).
 
+The inhabitants have ARMS, and gesture with them (point 479). The figure
+carries two shoulder-pivoted arms with hands in the existing primitive style,
+and the children — the figures that RUN — carry legs whose swing rides the
+DISTANCE they cover at their own short-legged cadence, the same
+distance-driven gait the fauna and the §2.5 silhouettes walk on. Four gestures
+read at conversational distance: BECKON (the arm scoops toward the speaker),
+POINT (one held aim at a visible spot or person), REFUSE (both arms out, the
+trunk shaking) and INDICATE A DIRECTION (the arm sweeps out onto a bearing and
+holds). None of them explains itself — there is no label and no caption; the
+gesture is the body half of a situation whose other half is what happens next.
+The driving layer owns ONE `GestureState` per figure and the figure advances
+it, so two gestures can never run on one body, and the same ref is what the
+speaking layer takes over when it arrives. The added geometry carries its
+per-level entry (`figureLimbSegments`, 5 / 8 / 12).
+Verifiable: the state machine is pure-tested — every kind's duration bounded,
+one kind per figure at every instant, the pose beginning and ending exactly at
+rest with no frame-to-frame jump, each kind visibly away from rest and
+distinguishable from the other three, and the arm maths cross-checked against a
+real `THREE.Object3D` with `YXZ` Euler order so the module and the renderer
+cannot drift (`src/render/gesture.test.ts`); the limb proportions and the
+scene's use of the shared constants and the quality lever in
+`src/render/figures.test.ts`; and the rendered poses are photographed at
+conversational distance on a ray-probed clear standpoint, with the live gesture
+sampled across frames — every gesture ends by itself, none overruns its own
+duration, the conversing pair takes turns and a figure between gestures stands
+exactly at rest (`scripts/verify/polish.mjs`, screenshots
+479-gesture-beckon / -point / -refuse / -indicate).
+
 ## 16. Collision inside settlements.
 
 Verifiable: an automated

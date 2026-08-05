@@ -1502,6 +1502,169 @@ for (const [placeId, shot] of [
   await page.evaluate(() => window.__game.getState().leavePlace())
   await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
 }
+// --- Villager arms and gestures (point 479) ---------------------------------
+// The figures were cones with sphere heads: nobody could show what he was
+// talking about. What is checked here is what needs a real browser — that the
+// arms the renderer DRAWS actually take the four poses, that a gesture ends on
+// its own while the game runs, and that a figure at rest really stands at rest.
+// The state machine itself (bounded duration, one gesture per figure, the
+// return to rest) is pinned purely in src/render/gesture.test.ts.
+{
+  await page.evaluate(() => {
+    const g = window.__game.getState()
+    if (g.placeId) g.leavePlace()
+  })
+  await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
+  await page.evaluate(() => window.__game.getState().enterPlace('maasai-village'))
+  const gesturesLive = await page
+    .waitForFunction(() => !!window.__placeGestures && !!window.__placeTalkers && !!window.__placeRayHit, null, {
+      timeout: 40000,
+    })
+    .then(() => true)
+    .catch(() => false)
+  check('the conversing pair publishes its live gesture state', gesturesLive)
+  if (gesturesLive) {
+    await page.evaluate(() => window.__game.getState().setJournalOpen(false))
+
+    // Stand the player at conversational distance on a bearing whose line to the
+    // pair is actually CLEAR — the settlement is dense, and a camera dropped on a
+    // fixed bearing can end up inside a hut, which would photograph a wall and
+    // prove nothing about an arm.
+    const stood = await page.evaluate(() => {
+      const p = window.__placePlayer
+      const t = window.__placeTalkers
+      if (!p || !t) return null
+      const cx = (t[0].x + t[1].x) / 2
+      const cz = (t[0].z + t[1].z) / 2
+      const aim = (px, pz) => Math.atan2(-(cx - px), -(cz - pz))
+      for (let i = 0; i < 16; i++) {
+        const a = (i / 16) * Math.PI * 2
+        const px = cx + Math.sin(a) * 3.3
+        const pz = cz + Math.cos(a) * 3.3
+        p.x = px
+        p.z = pz
+        p.yaw = aim(px, pz)
+        p.pitch = -0.06
+        const hit = window.__placeRayHit(cx, 1.05, cz)
+        if (hit.hitDistance == null || hit.hitDistance >= hit.targetDistance - 0.45) {
+          return { x: px, z: pz, cx, cz, bearing: a }
+        }
+      }
+      return null
+    })
+    check('a clear standpoint at conversational distance from the pair exists', stood != null)
+
+    // --- the four poses, one frame each -------------------------------------
+    // Long durations so the pose survives the shutter's own settling; the wait
+    // is on the GESTURE's own clock, never on the wall clock.
+    const HOLD = 12
+    const poseAway = (p) =>
+      Math.abs(p.left.pitch - 0.04) +
+      Math.abs(p.right.pitch - 0.04) +
+      Math.abs(p.left.yaw) +
+      Math.abs(p.right.yaw) +
+      Math.abs(p.lean) +
+      Math.abs(p.turn)
+    for (const kind of ['beckon', 'point', 'refuse', 'indicate']) {
+      const who = 0
+      await page.evaluate(([k, hold, w]) => window.__placeForceGesture(w, k, hold), [kind, HOLD, who])
+      // Wait for the POSE to be open, not for a reading on the gesture's clock.
+      // That clock is the frame delta CLAMPED to 0.1 s, so on a host rendering
+      // at 1 FPS under load it advances ten times slower than the wall clock and
+      // a threshold in gesture-seconds turns into minutes of waiting. The pose
+      // is the thing the frame must show, and it is open after three frames.
+      const opened = await page
+        .waitForFunction(
+          (w) => {
+            const g = window.__placeGestures()[w]
+            if (!g || !g.kind) return false
+            const p = g.pose
+            return (
+              Math.abs(p.left.pitch - 0.04) + Math.abs(p.right.pitch - 0.04) + Math.abs(p.lean) > 0.5
+            )
+          },
+          who,
+          { timeout: 60000 },
+        )
+        .then(() => true)
+        .catch(() => false)
+      check(`the ${kind} gesture opens into a pose that can be seen`, opened)
+      const shown = await page.evaluate((w) => window.__placeGestures()[w], who)
+      check(
+        `${kind}: the figure's arms leave the rest pose`,
+        !!shown && shown.kind === kind && poseAway(shown.pose) > 0.5,
+        shown ? `${shown.kind}, pose distance ${poseAway(shown.pose).toFixed(2)}` : 'no state',
+      )
+      // The partner keeps still: a gesture belongs to ONE figure.
+      const partner = await page.evaluate(() => window.__placeGestures()[1])
+      check(
+        `${kind}: the listener is not gesturing at the same time`,
+        !!partner && partner.kind === null,
+        partner ? String(partner.kind) : 'no state',
+      )
+      if (stood) {
+        await nextFrames(4)
+        await frame(`479-gesture-${kind}`, {
+          local: { x: stood.cx - 0.5, y: 1.15, z: stood.cz },
+          label: `the villager's ${kind} gesture`,
+        })
+      }
+    }
+
+    // --- a gesture ENDS by itself, and rest really is rest -------------------
+    // A SHORT gesture, so the end arrives within a bounded number of FRAMES even
+    // where each frame is a second long.
+    await page.evaluate(() => window.__placeForceGesture(0, 'point', 0.6))
+    // Read the resting state IN the same poll that observes the end: the ambient
+    // scheduler may start the next gesture a second and a half later, and a
+    // separate read afterwards would race it.
+    const restHandle = await page
+      .waitForFunction(
+        () => {
+          const g = window.__placeGestures()[0]
+          if (g.kind !== null) return null
+          return { kind: g.kind, left: g.pose.left, right: g.pose.right, lean: g.pose.lean, turn: g.pose.turn }
+        },
+        null,
+        { timeout: 60000 },
+      )
+      .catch(() => null)
+    check('a gesture ends on its own — no figure is left holding a pose', restHandle != null)
+    const atRest = restHandle ? await restHandle.jsonValue() : { kind: 'never ended', left: {}, right: {} }
+    check(
+      'and the figure stands at rest again: both arms down, no lean, no turn',
+      atRest.kind === null &&
+        atRest.lean === 0 &&
+        atRest.turn === 0 &&
+        atRest.left.yaw === 0 &&
+        atRest.right.yaw === 0,
+      JSON.stringify(atRest),
+    )
+
+    // --- sampled over the ambient conversation ------------------------------
+    // A single instant proves nothing about a scheduler: sample across frames.
+    const samples = []
+    for (let i = 0; i < 30; i++) {
+      samples.push(await page.evaluate(() => window.__placeGestures()))
+      await nextFrames(4)
+    }
+    const kinds = ['beckon', 'point', 'refuse', 'indicate']
+    const bad = samples.filter((s) => s.some((g) => g.kind !== null && !kinds.includes(g.kind)))
+    check('every live gesture is one of the four kinds', bad.length === 0, `${bad.length} of ${samples.length} samples`)
+    const overrun = samples.filter((s) => s.some((g) => g.kind !== null && g.t > g.duration))
+    check('no gesture ever runs past its own duration', overrun.length === 0, `${overrun.length} overruns`)
+    const both = samples.filter((s) => s[0].kind !== null && s[1].kind !== null)
+    check('the pair takes turns — the two never gesture over each other', both.length === 0, `${both.length} overlaps`)
+    const seen = new Set(samples.flatMap((s) => s.map((g) => g.kind)).filter(Boolean))
+    check('the conversation actually gestures while it runs', seen.size >= 1, [...seen].join(', ') || 'none')
+    const restBroken = samples.filter((s) =>
+      s.some((g) => g.kind === null && (g.pose.lean !== 0 || g.pose.turn !== 0 || g.pose.left.yaw !== 0)),
+    )
+    check('a figure between gestures is exactly at rest', restBroken.length === 0, `${restBroken.length} samples`)
+  }
+  await page.evaluate(() => window.__game.getState().leavePlace())
+  await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
+}
 // --- Cold-weather dress (design.md §19.13, point 120g) ---
 // LAST in the file on purpose: it hops between settlements, and each leave
 // remounts the travel scene, which makes the next enter capture a panorama —
