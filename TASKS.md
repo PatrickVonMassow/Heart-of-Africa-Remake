@@ -2253,11 +2253,12 @@ it is appended.
   below which the pace never falls while a chase runs — a child frozen mid-game reads as
   a bug, a trotting one reads as winded — and per-child variation in reserve and
   recovery, so the group never tires in unison.
-  HOW IT READS, given the figures the game has: the villagers are cones with sphere
-  heads and NO legs (only the fauna and the §2.5 silhouettes have a stride), so the
-  sprint cannot be shown by leg cadence. It is carried by SPEED and POSTURE — a forward
-  lean while sprinting, upright and near-still while recovering. Giving human figures
-  legs is NOT part of this point.
+  HOW IT READS, given the figures the game has: point 479 gave the running children
+  legs with a distance-driven gait, so the sprint reads through LEG CADENCE as well as
+  through SPEED and POSTURE — a forward lean while sprinting, upright and near-still
+  while recovering. All three carry it together; none of them alone is the signal, and
+  the posture reading stays load-bearing because it survives at any distance the cadence
+  no longer resolves at.
   USE THE WILDLIFE STEERING, NOT THE WALKER SLIDE. The village walkers resolve obstacles
   by sliding along a collider and stopping — which is exactly what reads as bumping into
   things. `deflectedStep` (`src/scenes/travel/wildlifeBehavior.ts`, used by every fleeing
