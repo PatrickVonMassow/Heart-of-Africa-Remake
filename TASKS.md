@@ -4529,38 +4529,82 @@ Build order, chosen so no two parallel agents own the same file:
      opt in: the software WebGPU lane keeps working exactly as it does today while
      this point runs, so the both-backend picture check is never interrupted by it.
   6. THE CAUSE IS MEASURED, so the point no longer searches for it (four-eyes
-     review 05.08.2026, checked against Dawn's source). `vulkaninfo` against the dzn
-     ICD names `Microsoft Direct3D12 (NVIDIA GeForce RTX 4070 Ti)`, driver Dozen,
-     device API 1.2.305 — and reports `fullDrawIndexUint32 = false` with
-     `maxDrawIndexedIndexValue = 16777215` (24 bit). Dawn's Vulkan backend requires
-     that feature HARD in `PhysicalDeviceVk.cpp`'s `InitializeImpl` and errors out
-     when it is missing, so the physical device is DISCARDED and no adapter is ever
-     created. That is exactly the observed one-second SwiftShader answer.
-  7. FLAGS CANNOT FIX A FEATURE REFUSAL, and the point says so rather than spending
-     on them: no launch flag reaches into Dawn's adapter init. `--use-vulkan` steers
-     SKIA's Vulkan, not Dawn's adapter choice, and `--use-webgpu-adapter` takes only
-     `default|swiftshader|compat`. A newer Chrome channel is equally predictable —
-     a newer Dawn demands more, not less. Both are recorded as ruled out by
-     reasoning, not re-tried.
-  8. THE PROMISING PATH is a one-line change to the SELF-BUILT Mesa dzn:
-     `fullDrawIndexUint32 = true` in `src/microsoft/vulkan/dzn_device.c` (precedent
-     documented for WSL2 + Chrome + Dozen). Its price is stated honestly wherever it
-     is used: with `maxDrawIndexedIndexValue = 2^24-1` this is a specification lie,
-     harmless for scenes whose index values stay far below that bound — so the patch
-     stays confined to the verification lane, is never proposed for a player's
-     machine, and is documented as a knowing deviation.
-  9. SUCCESS IS MEASURED AT THE DRAWN PIXEL, never at an adapter string. Google's
-     headless recipe carries the documented limitation that it works "as long as
-     nothing is drawn to canvas" — which is the whole job of a screenshot lane — so
-     `backend-lane-check.mjs` reading real pixels back out of the canvas is the only
-     proof that counts. `VK_LOADER_DEBUG=all` shows whether the ICD loads in the GPU
-     process at all, and Deno (a static binary on wgpu) is the CHEAPER second WebGPU
-     implementation for separating "dzn is inadequate" from "Chrome refuses" —
-     cheaper than Firefox, which Playwright can only drive in its own patched build.
-  10. THE POINT CAN CLOSE AS A NO. If, after the patch, `chrome://gpu` still lists
-     no D3D12/NVIDIA adapter while the loader log proves the ICD enumerated, the
-     matter is settled: the software lane stays and the verdict is written, naming
-     every path tried and why it failed.
+     review plus a cross-check of four independent research passes, 05.08.2026).
+     `vulkaninfo` against the dzn ICD names `Microsoft Direct3D12 (NVIDIA GeForce
+     RTX 4070 Ti)`, driver Dozen, device API 1.2.305 — and reports
+     `fullDrawIndexUint32 = false` (`maxDrawIndexedIndexValue` 16777215, 24 bit).
+     Dawn's Vulkan backend requires that feature outright and errors out when it is
+     missing, so the physical device is DISCARDED and no adapter is ever created:
+     exactly the observed one-second SwiftShader answer. Two competing explanations
+     were MEASURED AND REFUTED and are not to be re-derived — dzn does offer the
+     external-memory/semaphore-fd extensions Chromium's image gate wants, and there
+     is no native NVIDIA Linux Vulkan ICD to find (`/usr/lib/wsl/drivers` is fully
+     mounted and holds WINDOWS artefacts only), so Dozen is the only Vulkan path
+     here at all.
+  7. FLAGS CANNOT LIFT A FEATURE REFUSAL: no launch flag reaches into Dawn's adapter
+     init. `--use-vulkan` steers SKIA's Vulkan rather than Dawn's adapter choice, and
+     `--use-webgpu-adapter` takes only `default|swiftshader|compat`. A newer Chrome
+     channel is equally predictable — a newer Dawn demands more, not less.
+  8. THE ORDER OF ATTEMPTS is fixed by cost and risk, cheapest and most harmless
+     first, each recorded with what the adapter answered:
+     (a0) The CHEAPEST pre-test of all, before any driver chain is touched:
+         `--force-webgpu-compat` on the SwiftShader lane that runs today. It answers
+         "does our renderer survive compatibility validation at all" with no GLES
+         backend involved.
+     (a) WebGPU COMPATIBILITY through Dawn's OpenGLES backend — `--use-gl=angle
+         --use-angle=gl --use-webgpu-adapter=opengles --force-webgpu-compat` with
+         `GALLIUM_DRIVER=d3d12`, no Vulkan flag and no ICD in sight. It bypasses
+         Dozen ENTIRELY and rides the GL chain this host demonstrably runs on the
+         4070 Ti. It is a PROBE ON AN UNKNOWN CARRIER, not a safe bet: Dawn's GLES
+         backend needs OpenGL ES 3.1 plus `GL_EXT_color_buffer_float` and is
+         compat-only, and WebGPU Compatibility has shipped for ANDROID, with no
+         desktop-Linux announcement. A newer Chrome channel matters HERE — compat
+         rolls out by platform — and nowhere else. Whether the three.js/TSL pipeline
+         survives the reduced profile is decided only at the drawn pixel.
+     (b) A one-line change to the SELF-BUILT Mesa dzn (`fullDrawIndexUint32 = true`
+         in `src/microsoft/vulkan/dzn_device.c`). Its price is stated wherever it is
+         used: against a 24-bit index limit this is a specification lie, harmless for
+         scenes whose index values stay far below it — so it stays confined to the
+         verification lane, is never proposed for a player's machine, and is
+         documented as a knowing deviation.
+     (c) The >40 s HANG is a separate defect from the refusal, and it is isolated in
+         the process it actually happened in: one CHROME start per `VK_DRIVER_FILES`
+         value. A bare `vulkaninfo` per ICD tests the wrong process.
+     (d) Deno (a static binary on wgpu) as the counter-probe that separates "dzn is
+         inadequate" from "Chrome refuses" — cheaper than Firefox, which Playwright
+         drives only in its own patched build.
+     (e) `connectOverCDP` to a browser on the WINDOWS host, as the last resort, with
+         its price openly stated: reduced CDP fidelity, the dev server exposed to the
+         host, and a lane hanging on a browser OUTSIDE the container, which
+         contradicts the batch's headless autonomy. (A newer channel is not a step of
+         its own — it belongs to (a).)
+  9. SUCCESS IS MEASURED AT THE DRAWN PIXEL, never at an adapter string or a
+     `chrome://gpu` row — Chromium's adapter exclusion is SILENT, so a device can be
+     listed as available while `requestAdapter` never takes it. It counts only as
+     `adapter.info` free of SwiftShader/llvmpipe AND a non-empty drawn frame, which
+     is what `backend-lane-check.mjs` reads back out of the canvas. The vendor's own
+     headless recipe carries the limitation that it holds "as long as nothing is
+     drawn to canvas" — this lane's entire purpose — so no recipe substitutes for
+     the pixel. `VK_LOADER_DEBUG=all` shows whether an ICD loads in the GPU process
+     at all.
+  10. COMPATIBILITY IS A THIRD LANE, NOT A SUBSTITUTE, and the verification must be
+     able to tell them apart before any compat attempt counts. Verified in the code:
+     three.js always REQUESTS the `compatibility` feature level and then decides by
+     `core-features-and-limits`, so a player's core adapter runs core as before —
+     but the renderer's compat branches (and its forced loss of MSAA) execute only
+     in compat, which the player never enters. A green compat run is therefore no
+     coverage of the player's path. So `assertBackend`/`backendInfo` READ AND RECORD
+     the feature level (`compatibilityMode` / `core-features-and-limits`) beside the
+     backend: an adapter string plus a drawn pixel is NOT enough, since a GLES
+     adapter reports hardware-like strings at a different feature level, and without
+     the third signal the render-verify guard books compat silently as core coverage
+     — the same confusion class as software-reported-as-hardware. The known
+     RISK-CLEARANCE belongs with it: `src/` makes no compute or storage-texture call
+     and the post stack is purely fragment-based within compat's attachment limit,
+     so the harder compat prohibitions do not touch this project.
+  11. THE POINT MAY CLOSE AS A NO. When the ordered attempts are exhausted, the
+     software lane stays and the verdict is written, naming every path tried and why
+     it failed.
   VERIFIABLE: `node scripts/verify/backend-lane-check.mjs` on the WebGPU lane
   prints the device that actually drew the frame, and the picture of one built
   scene is inspected once; the host-environment section lists every build tried
@@ -4584,6 +4628,12 @@ Build order, chosen so no two parallel agents own the same file:
   second, so "a green run there proves nothing about timing" — but nothing acts
   on it, so every run shows red for it and a real regression would hide in that
   noise.
+  IT IS NOT ONLY REDS: on 05.08.2026 `VERIFY_GL=webgpu run-all polish` ran 27
+  minutes in a synced branch, printed nothing after "starting dev server", wrote no
+  frame at all and had to be killed, while `world collision` had passed on the same
+  lane minutes earlier. So the lane can also HANG, and while it does, no figure or
+  settlement point has a second backend at all — every such merge then owes a loud
+  deferral instead of a picture.
   FINAL STATE:
   1. The run MEASURES the lane's delivered frame rate once, from the running
      page, and reports it in the run header — every verdict below names the lane
