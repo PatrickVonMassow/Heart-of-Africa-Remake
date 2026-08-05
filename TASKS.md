@@ -4196,6 +4196,12 @@ Build order, chosen so no two parallel agents own the same file:
   triangles at 5 s to 222 and 745k at 30 s — the world streams roughly five times
   slower here than on the hardware the suites' waits were written for, and a
   screenshot taken meanwhile is green and empty.
+  TWO SUITES ARE MEASURED CASES, not one (05.08.2026): the `world` suite waited on a
+  healthy frame RATE, which an empty scene reaches FASTEST of all — it wrote a 47 kB
+  blank village frame and exited 0 — and `collision` wrote a blank
+  `52-collision-port-wall.png` the same way while reporting every check green. Both
+  are the same race, so the readiness wait belongs in the shared capture path rather
+  than in one suite.
   FINAL STATE:
   1. A frame whose subject is a place, a landmark or anything in the world waits
      for the SCENE to be ready — the renderer's own draw-call and triangle counts
