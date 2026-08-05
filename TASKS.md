@@ -477,6 +477,17 @@ it is appended.
   for the window), not the global dead-count, so a concurrent drama can't fail it.
   LESSON reinforced (memory `verify-suites-need-a-quiet-machine`): never run a
   verify suite while a worktree agent builds — evaluate a red only on a quiet box.
+  OBSERVED 05.08.2026 (a WebGL enrichments run on the Linux container host, while
+  closing point 489): first try 243 pass / 2 fail at the point-119 trampling and the
+  point-128 scavenger-drama checks, green on retry (245/0) — neither in that diff's
+  touch set, so a THIRD and FOURTH rotating site on this host. The same day, under
+  load, the point-278 dressing-growth check read `{samples:[0,0,0,0,0]}` — the
+  `__sleepSim(6)` settle elapsed with too few frames for the streamer to populate the
+  desert anchor, so `liveInstances()` legitimately read 0; on a quiet machine the same
+  check reads `{samples:[18,18,18,18,18]}` and passes. That is this point's pattern (1)
+  exactly: a streaming behaviour measured against a settle rather than against its own
+  condition. Fix it by polling until the anchor's instance count is non-zero, not by
+  lengthening the settle.
 
 - [ ] 203. EXTEND 184 — a SYSTEMATIC visual + liveness bug-finder (user request
   20.07.2026: "Bugs wie die … sollten leicht für dich zu finden sein … Kannst
