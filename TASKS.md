@@ -1532,16 +1532,6 @@ it is appended.
   both languages, no silent path); settings.mjs live-checks the banner on an unmet
   precondition and a successful stage; both languages.
 
-- [ ] 323. BLOOD STAINS ARE PERFECT CIRCLES (user 25.07.2026: they should have
-  natural, irregular contours). Point 267 made the stain a terrain-following ground
-  TINT, but its footprint is still a circle. Give it an organic outline: a
-  per-stain seeded noise/domain-warp on the tint's radial falloff (the technique
-  the §3.3 biome borders use), so every stain has its own ragged contour and no
-  circle reads anywhere; size and irregularity calibratable. VERIFIABLE: pure test
-  that the mask radius varies with angle by a bounded but clearly non-zero amount
-  and differs between seeds (no two stains alike, none circular); screenshot 137
-  refreshed, judged on BOTH backends.
-
 - [ ] 326. A PARENT DIES WITH NO VISIBLE CAUSE AFTER A CROCODILE KILL (user
   25.07.2026: crocodile took a calf, crocodile gone, the parent stood at the death
   spot and simply fell over dead — reading as suicide). Every §19.8 death must have

@@ -14241,3 +14241,13 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   `docs/acceptance-evidence.md` §8 gains the chain. design.md sits at its measured ceiling,
   so the words are paid for by a measured raise with its justification or by shortening
   elsewhere.
+
+- [x] 323. BLOOD STAINS ARE PERFECT CIRCLES (user 25.07.2026: they should have
+  natural, irregular contours). Point 267 made the stain a terrain-following ground
+  TINT, but its footprint is still a circle. Give it an organic outline: a
+  per-stain seeded noise/domain-warp on the tint's radial falloff (the technique
+  the §3.3 biome borders use), so every stain has its own ragged contour and no
+  circle reads anywhere; size and irregularity calibratable. VERIFIABLE: pure test
+  that the mask radius varies with angle by a bounded but clearly non-zero amount
+  and differs between seeds (no two stains alike, none circular); screenshot 137
+  refreshed, judged on BOTH backends.
