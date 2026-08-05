@@ -4029,26 +4029,6 @@ Build order, chosen so no two parallel agents own the same file:
   wave 4  481 (children teach) · 483 (adults teach)
   wave 5  486 (drums) · 487 (digging)
 
-- [ ] 479. VILLAGERS GET ARMS AND GESTURES (user 03.08.2026). The figures are
-  cones with sphere heads today; a gesture needs something to gesture with.
-  FINAL STATE:
-  1. The villager figure gains arms and, where a gesture needs them, hands and
-     legs, in the existing style — the same restraint the other figures show, not
-     a new visual language.
-  2. Four gestures read at conversational distance: BECKON, POINT at a visible
-     spot or person, REFUSE, and INDICATE A DIRECTION.
-  3. A gesture never explains itself. It is one half of a situation whose other
-     half is what actually happens next.
-  4. Driven from the same behaviour layer that speaks, so a figure saying COME
-     also beckons, in step.
-  5. The added geometry carries its `QUALITY_PRESETS` entries on every level.
-  6. Point 351's chase reads by SPEED AND POSTURE because the figures had no legs;
-     that wording is corrected in the same commit, and the chase keeps reading
-     the way it was designed to.
-  VERIFIABLE: pure Vitest on the gesture state machine (bounded duration, no two
-  gestures at once on one figure, the pose returns to rest); browser screenshots
-  on both backends for the four poses.
-
 - [ ] 480. THE CHILDREN'S GAME OF TAG (point 351, pulled forward by the user
   03.08.2026 because the PoC teaches its first concepts through it). Point 351's
   specification is unchanged and binding, with one amendment from point 479: the
