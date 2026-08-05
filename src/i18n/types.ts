@@ -131,6 +131,17 @@ export interface Strings {
     stopReading: string
     voiceLoading: string
     voiceError: string
+    /** Heading of the observation section (design.md §13.4): the utterances
+     *  the player has heard, kept apart from the written entries. */
+    observations: string
+    /** Line under the heading explaining that the notes are his own. */
+    observationsHint: string
+    /** Label/placeholder of one utterance's free-text hypothesis field. */
+    hypothesis: string
+    /** Accessible label of that field, naming the utterance it belongs to. */
+    hypothesisFor(utterance: string): string
+    /** Day the utterance was first heard, shown beside it. */
+    firstHeard(date: string): string
   }
 
   mapOverlay: {
@@ -384,6 +395,11 @@ export interface Strings {
     birdsongVolume: string
     surfNearRadius: string
     surfCutoff: string
+    /** Village speech: pace, phrase pause and how far an utterance carries (§13.4). */
+    speechSyllable: string
+    speechPhrasePause: string
+    speechHearingRadius: string
+    speechHearingFalloff: string
     foodPerDay: string
     canteenDrain: string
     canteenDesertDrain: string

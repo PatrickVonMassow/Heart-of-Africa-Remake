@@ -55,6 +55,11 @@ and it is on the board as a decision the user may reverse.
 
 ## The lexicon
 
+The table below is the registry in `src/communication/lexicon.ts`, keyed by
+lect so a second region is a new entry there and no consumer changes; what the
+player has heard, and the reading he wrote for it, live in
+`src/communication/heard.ts`.
+
 | Concept | Sequence | Shape |
 |---|---|---|
 | COME | `BA-BA-ba-ba-ba` | falling, toward the speaker |
@@ -103,12 +108,27 @@ Three pairs need a deliberately staged contrast, or they teach nothing:
   no upstream walk — pointing at the rock from the bank, or an errand that starts
   there and comes back.
 
+## How it sounds
+
+A syllable is a sample: a low one for `ba`, a high one for `BA`, differing in
+PITCH alone. An utterance plays its five syllables at a constant pace, and a
+phrase plays its atoms with the constant pause between them and nothing else.
+The plan is pure (`src/communication/speaking.ts`); the ambience engine plays it
+through the same bus as the rest of the soundscape, so the single ambience
+volume still governs it.
+
 ## How close you must stand
 
-The utterances carry a short distance and fall off sharply. Among the children
-the player hears the children; among the adults, the adults; in the middle of
-the village, no permanent babble of both. The two groups are placed far enough
-apart for that to hold.
+The utterances carry a short distance and fall off sharply — the level falls
+with the square of the distance and is cut to silence at the hearing radius, so
+"audible" and "recorded as heard" are one and the same condition: what the
+player could not hear teaches him nothing, however plainly he saw the gesture.
+Among the children the player hears the children; among the adults, the adults;
+in the middle of the village, no permanent babble of both. The two groups are
+placed far enough apart for that to hold.
+
+Pace, pause, radius and the sharpness of the fall are balance values under
+`balance.communication.*`, editable in the debug menu while the game runs.
 
 ## The message
 
@@ -125,12 +145,27 @@ forgets the message is not locked out of the feature.
 
 ## Where the digging happens
 
-The rock stands at the bank a short way upstream, inside the village's walkable
-area, and it is also a real feature of the bird's-eye world — the brief asks for
-both ("in der Vogelperspektive sichtbar", "in kurzer Entfernung flussaufwärts").
-The digging itself uses the shovel mechanic the game already has, at the spot the
-renderer draws. This is a best guess where the brief is silent about the
-perspective, and it is on the board as a decision the user may reverse.
+DECIDED by the user 04.08.2026: the rock stands OUTSIDE the village, at the river,
+and it is reached in the BIRD'S-EYE view — "am begehbaren Ufer" meant walkable
+there, not inside the settlement. The loop the user named:
+
+1. The player learns the language IN the village.
+2. With it he understands the chief's message and what it asks of him.
+3. He travels in the bird's-eye view to the rock at the river outside the village.
+4. He digs there, with the shovel mechanic the game already has, at the spot the
+   renderer draws.
+5. He travels back to the village and hands what he dug up to the chief. That
+   solves the puzzle.
+
+So the rock needs no walkable bank zone inside the settlement and no first-person
+elaboration. The village keeps its own reachable bank, because that is where the
+adults teach RIVER, UPSTREAM and DOWNSTREAM by pointing at real water.
+
+BIG_ROCK is therefore taught on a SMALL boulder visible from the village, and the
+target upstream is a LARGER one further away (user 04.08.2026). The player has to
+make the transfer himself — the concept is learned on a near example and applied
+to a distant instance, which is the mechanic working as intended rather than a
+compromise.
 
 ## What is deliberately NOT decided here
 

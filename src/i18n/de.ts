@@ -217,6 +217,11 @@ export const de: Strings = {
     stopReading: 'Vorlesen stoppen',
     voiceLoading: 'Stimme wird geladen …',
     voiceError: 'Die Vorlesestimme konnte nicht geladen werden.',
+    observations: 'Gehört',
+    observationsHint: 'Was ich sie sagen hörte – und was ich darunter verstehe.',
+    hypothesis: 'Meine Deutung',
+    hypothesisFor: (utterance: string) => `Meine Deutung von ${utterance}`,
+    firstHeard: (date: string) => `Zuerst gehört am ${date}`,
   },
 
   mapOverlay: {
@@ -425,6 +430,10 @@ export const de: Strings = {
     birdsongVolume: 'Vogelgezwitscher-Lautstärke',
     surfNearRadius: 'Brandung voll bis (°)',
     surfCutoff: 'Brandung still ab (°)',
+    speechSyllable: 'Sprache: Silbenlänge (s)',
+    speechPhrasePause: 'Sprache: Pause zwischen Wörtern (s)',
+    speechHearingRadius: 'Sprache: Hörweite',
+    speechHearingFalloff: 'Sprache: Abfallschärfe',
     foodPerDay: 'Nahrungsverbrauch/Tag (0 = ewig)',
     canteenDrain: 'Wasserverbrauch/Tag (Land)',
     canteenDesertDrain: 'Wasserverbrauch/Tag (Wüste)',

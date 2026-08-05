@@ -216,6 +216,11 @@ export const en: Strings = {
     stopReading: 'Stop reading',
     voiceLoading: 'Loading voice …',
     voiceError: 'The narration voice could not be loaded.',
+    observations: 'Overheard',
+    observationsHint: 'What I heard them say, and what I take it to mean.',
+    hypothesis: 'My reading',
+    hypothesisFor: (utterance: string) => `My reading of ${utterance}`,
+    firstHeard: (date: string) => `First heard ${date}`,
   },
 
   mapOverlay: {
@@ -424,6 +429,10 @@ export const en: Strings = {
     birdsongVolume: 'Birdsong volume',
     surfNearRadius: 'Surf full within (°)',
     surfCutoff: 'Surf silent beyond (°)',
+    speechSyllable: 'Speech: syllable length (s)',
+    speechPhrasePause: 'Speech: pause between words (s)',
+    speechHearingRadius: 'Speech: hearing radius',
+    speechHearingFalloff: 'Speech: falloff sharpness',
     foodPerDay: 'Food use per day (0 = infinite)',
     canteenDrain: 'Water use per day (land)',
     canteenDesertDrain: 'Water use per day (desert)',
