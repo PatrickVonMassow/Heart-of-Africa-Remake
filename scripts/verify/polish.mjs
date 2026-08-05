@@ -720,18 +720,24 @@ const stepUntil = async (ready, arg = null, capFrames = 240) => {
       if (s) samples.push(s)
       await nextFrames(1)
     }
-    // Horizontally the label is EXACTLY over its anchor — drei centres it there —
-    // so a few pixels of slack is all a walking figure needs. Vertically the CSS
-    // lifts the box by 8 px, which drei's distanceFactor scales with the label
-    // itself, so the allowance is expressed in the label's OWN height rather than
-    // as a screen constant that would pass at one distance and fail at another.
-    const worstX = samples.length ? Math.max(...samples.map((s) => Math.abs(s.dx))) : Infinity
+    // Both allowances are expressed in the LABEL'S OWN height, which drei's
+    // distanceFactor scales with the distance — a screen constant would pass at
+    // one range and fail at another, and this scene picks its speaker afresh
+    // every run. Horizontally the label is centred on its anchor and typically
+    // lands within a pixel of it; the slack is there because drei's <Html> reads
+    // the world matrix in a frame callback of its OWN, so on a frame where it
+    // runs first the note trails the walking figure by exactly one step (10 px
+    // measured, against a body some 95 px wide at this range). Vertically the
+    // CSS lifts the box by 8 px, scaled the same way. What this rejects is the
+    // bug it exists for: a label left at the scene origin, hundreds of pixels
+    // from its speaker or off the viewport altogether.
+    const worstX = samples.length ? Math.max(...samples.map((s) => Math.abs(s.dx) - 0.5 * s.height)) : Infinity
     const worstY = samples.length ? Math.max(...samples.map((s) => Math.abs(s.dy) - 0.35 * s.height)) : Infinity
     check(
       'the note rides on the figure that speaks, not on a world coordinate (point 485)',
-      samples.length >= 6 && worstX <= 6 && worstY <= 6,
+      samples.length >= 6 && worstX <= 0 && worstY <= 0,
       samples.length >= 6
-        ? `worst sideways offset ${worstX.toFixed(1)} px, worst vertical offset past the scaled lift ${worstY.toFixed(1)} px, over ${samples.length} frames`
+        ? `worst sideways offset past half the label height ${worstX.toFixed(1)} px, worst vertical offset past the scaled lift ${worstY.toFixed(1)} px, over ${samples.length} frames`
         : `MEASURED NOTHING — only ${samples.length} frames carried both a label and its anchor`,
     )
     // And the picture must SHOW that: the speaker's own body stands inside the
