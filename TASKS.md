@@ -4353,6 +4353,14 @@ Build order, chosen so no two parallel agents own the same file:
      than from the factor 3.8 extrapolated.
   4. The measured total is carried onto the open decision card, so the user
      decides against a number rather than an estimate.
+  5. THE MACHINE STATE IS PART OF THE NUMBER (user 05.08.2026). The host carried
+     other load through the morning, so a run taken then is a SECURED UPPER BOUND
+     and is labelled as one wherever it is written down. An upper bound settles
+     the question only while it stays BELOW the 30–40 min Windows baseline; above
+     it, the run is repeated on a quiet machine before any verdict is drawn.
+  6. The software-lane premise is gone (point 505): the WebGPU pass now draws on
+     the card at 0.73× the WebGL lane's rate rather than the software lane's 0.26,
+     so the factor 3.8 is history and the measurement records what REPLACED it.
   VERIFIABLE: `docs/host-environment.md` names both pass durations, the total
   and the baseline with its date; the run's own log is quoted for each figure;
   and no figure in that section is an extrapolation — every one is a wall-clock
