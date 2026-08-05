@@ -168,12 +168,30 @@ export interface TagState {
  *  colliders, the fire ring and the walkable rim alike — so one predicate keeps
  *  the children inside the settlement, out of the fire and clear of every body. */
 export interface TagWorld {
+  /** Radius of the play ground the children keep to. */
   radius: number
+  /** Middle of that ground; the settlement's own middle when left out. The
+   *  children play in a bounded corner of the settlement rather than across all
+   *  of it (point 481.4), so the ground and the settlement are not the same
+   *  circle and the evade must bend back toward the RIGHT one. */
+  centerX?: number
+  centerZ?: number
   /** The mover footprint — the same one the picture draws the child with. */
   childRadius: number
   blocked: (x: number, z: number) => boolean
   nudge: (x: number, z: number) => { x: number; z: number; found: boolean }
 }
+
+/**
+ * An outside behaviour's claim on one child for a moment: the heading and the
+ * pace it should move at because of something that was SAID (the situations of
+ * point 481). It returns null for a child that is simply playing.
+ *
+ * The chase keeps everything else — the collisions, the deflection, the sprint
+ * reserve and the floor pace — so a child carrying out an errand is still a
+ * child in a game of tag. The CHASER is never steered: the round belongs to it.
+ */
+export type TagSteer = (index: number, s: TagState) => { heading: number; pace: number } | null
 
 const dist = (a: TagChild, b: TagChild) => Math.hypot(a.x - b.x, a.z - b.z)
 
@@ -390,8 +408,18 @@ function moveChild(
  * The player is NOT part of `blocked`, deliberately: no inhabitant in this
  * settlement treats the traveller as a wall, and a game of tag that could be
  * blocked by standing in it would be a way to freeze the vignette.
+ *
+ * `steer` is the optional claim an outside behaviour has on a child for a
+ * moment (the situations of point 481): it decides that child's DIRECTION and
+ * pace, everything else stays the chase's.
  */
-export function stepTagGame(s: TagState, dt: number, cfg: TagConfig, world: TagWorld): void {
+export function stepTagGame(
+  s: TagState,
+  dt: number,
+  cfg: TagConfig,
+  world: TagWorld,
+  steer?: TagSteer,
+): void {
   const n = s.children.length
   // Judged on the state as RECEIVED, before anything below repairs it — a step
   // that quietly mends a broken state and then asserts would report nothing.
@@ -414,10 +442,20 @@ export function stepTagGame(s: TagState, dt: number, cfg: TagConfig, world: TagW
   if (!s.playing || s.chaser < 0) {
     s.playing = false
     s.idleFor -= dt
-    for (const c of s.children) {
-      c.pace = 0
+    for (let i = 0; i < n; i++) {
+      const c = s.children[i]
+      // Between rounds the group stands and recovers — unless somebody was told
+      // to do something (point 481): the break is where a call, an errand and a
+      // refusal are actually SEEN, because here a child that stays put stays put
+      // instead of shuffling at the chase's floor pace.
+      const claim = steer?.(i, s) ?? null
+      c.pace = claim ? Math.max(0, claim.pace) : 0
       c.effort = 'recover'
-      c.reserve = advanceReserve(c.reserve, 0, dt, cfg, c.drainScale, c.recoverScale)
+      if (claim && c.pace > 0) {
+        moveChild(c, claim.heading, c.pace * dt, dt, cfg, world)
+        c.facing = turnToward(c.facing, c.heading, cfg.turnRate * dt)
+      }
+      c.reserve = advanceReserve(c.reserve, c.pace, dt, cfg, c.drainScale, c.recoverScale)
       c.lean += (0 - c.lean) * Math.min(1, dt * 4)
     }
     assertPlaced(s, cfg, world)
@@ -501,15 +539,31 @@ export function stepTagGame(s: TagState, dt: number, cfg: TagConfig, world: TagW
       if (gapToChaser <= cfg.pressureDistance) c.evading = true
       else if (gapToChaser > cfg.pressureDistance + cfg.targetSwitchMargin) c.evading = false
       desired = c.evading
-        ? evadeHeading(c.x, c.z, chaser.x, chaser.z, world.radius)
+        ? evadeHeading(
+            c.x,
+            c.z,
+            chaser.x,
+            chaser.z,
+            world.radius,
+            world.centerX ?? 0,
+            world.centerZ ?? 0,
+          )
         : Math.hypot(c.x - cx, c.z - cz) > cfg.pressureDistance
           ? headingToward(c.x, c.z, cx, cz, c.heading)
           : c.heading
     }
+    // What was SAID overrides where the chase would go — for a runner only, and
+    // only for the moment the action lasts (point 481). The pace still cannot
+    // fall below the floor while a round runs: a child standing stock still
+    // mid-game reads as a bug, which is what the floor exists to forbid.
+    const claim = isChaser ? null : (steer?.(i, s) ?? null)
+    if (claim) desired = claim.heading
     c.sprinting = wants
     c.press = pressState(c.press, c.reserve, cfg)
     c.effort = chooseEffort(c.press, wants)
-    c.pace = Math.max(floor, effortPace(c.effort, c.reserve, cfg, isChaser ? 'chaser' : 'runner'))
+    c.pace = claim
+      ? Math.max(floor, claim.pace)
+      : Math.max(floor, effortPace(c.effort, c.reserve, cfg, isChaser ? 'chaser' : 'runner'))
     moveChild(c, desired, c.pace * dt, dt, cfg, world)
     // The BODY turns at a rate toward where it is going. The travel heading may
     // jump — a deflection round a hut corner is a real change of direction — but

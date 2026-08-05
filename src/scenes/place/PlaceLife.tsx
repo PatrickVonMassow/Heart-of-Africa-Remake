@@ -44,9 +44,22 @@ import { useGame } from '../../state/store'
 import { START_YEAR, balance } from '../../config/balance'
 import type { RegionPlaceStyle } from './regionStyles'
 import { nudgeToFree, resolveMove, standingClear, tryNudgeToFree, WALKER_RADIUS, type Collider } from './collision'
-import { createTagGame, stepTagGame, type TagWorld } from './tagGame'
+import { createTagGame, stepTagGame, type TagChild, type TagWorld } from './tagGame'
+import {
+  childSteer,
+  createChildSpeech,
+  stepChildSpeech,
+  type SituationView,
+  type SpokenSituation,
+} from './childSituations'
+import { isWithinHearing } from '../../communication/heard'
+import { utterancePlan } from '../../communication/speaking'
+import { speechLabelSeconds } from '../../communication/speechLabel'
+import { playSpeech } from '../../systems/ambience'
+import { speakOverhead } from './speechChannel'
+import { placePlayerPosition } from './playerPosition'
 import { animalAnchors, animalBodies, animalScene, stepAnimal, turnToward, ANIMAL_TURN_RATE } from './animalSpots'
-import { PORT_TALKERS, VILLAGE_SPOTS } from './lifeSpots'
+import { childPlayGround, PORT_TALKERS, VILLAGE_SPOTS, villageAdultStations } from './lifeSpots'
 
 /** Collision radius of inhabitants (matches the player's). */
 const NPC_RADIUS = WALKER_RADIUS
@@ -319,6 +332,47 @@ function Weaver({ x, z, cloth, weave }: { x: number; z: number; cloth: string; w
 const KID_SCALE = 0.55
 
 /**
+ * Speaks one staged situation (point 481): the atom through the §13.4 hearing
+ * curve, the reading over the speaker's head, and the gesture on its own arms,
+ * aimed at the world point the situation named.
+ *
+ * The DISTANCE decides all three. What the player could not hear teaches him
+ * nothing however plainly he saw the gesture, so the same range gate that
+ * silences the voice keeps the utterance out of his memory and the note off the
+ * speaker's head (docs/communication-poc-spec.md).
+ */
+function speakSituation(
+  said: SpokenSituation,
+  speaker: TagChild | undefined,
+  anchor: THREE.Group | null,
+  gesture: RefObject<GestureState> | undefined,
+): void {
+  if (!speaker || !gesture) return
+  const distance = placePlayerPosition.active
+    ? Math.hypot(speaker.x - placePlayerPosition.x, speaker.z - placePlayerPosition.z)
+    : Infinity
+  playSpeech(utterancePlan(said.utterance, distance))
+  if (isWithinHearing(distance)) {
+    useGame.getState().hearUtterance(said.utterance)
+    if (anchor) {
+      speakOverhead(`kid-${said.speaker}`, [said.utterance], anchor, {
+        seconds: speechLabelSeconds(1),
+      })
+    }
+  }
+  // The aim is taken in the speaker's OWN frame, so a child that turns takes it
+  // with it; the shoulder is the child's, not a grown figure's.
+  gesture.current = startGesture(said.gesture, {
+    ...aimAt(
+      { x: speaker.x, z: speaker.z, yaw: speaker.facing },
+      said.aim,
+      KID_SCALE * FIGURE_LIMBS.shoulderY,
+    ),
+    phase: said.speaker * 1.1, // no two children beat in lockstep
+  })
+}
+
+/**
  * The children's game of tag (design.md §19.10, point 480/351). One of them is
  * IT and chases the others; whoever is caught becomes the new IT. The behaviour
  * itself is the pure `tagGame` module — this component only feeds it the
@@ -332,10 +386,20 @@ const KID_SCALE = 0.55
  * LEG CADENCE, the SPEED, and the POSTURE — a forward lean while running flat
  * out, upright and near-still while recovering, which is the reading that
  * survives at any distance the cadence no longer resolves at.
+ *
+ * They are also the ones who TEACH the six general concepts (point 481): at the
+ * game they call each other, send one another to a spot, ask another along,
+ * name where they stand, point something out and refuse — one atomic utterance
+ * with its gesture and the action that follows. The catalogue and the scheduler
+ * are the pure `childSituations` module; here it is given the live game, and
+ * what comes back is spoken (through the §13.4 hearing curve), shown over the
+ * speaker's head, gestured with the point-479 arms and carried out by steering
+ * the child the chase would otherwise steer itself.
  */
 function Kids({
   x,
   z,
+  playRadius,
   count,
   seed,
   cloth,
@@ -344,6 +408,8 @@ function Kids({
 }: {
   x: number
   z: number
+  /** How far from (x, z) the group may roam — its own play ground (point 481). */
+  playRadius: number
   count: number
   seed: number
   cloth: string[]
@@ -356,34 +422,69 @@ function Kids({
   const cadence = useMemo(() => gaitCadence(legLength), [legLength])
 
   // The settlement as the chase sees it: ONE predicate for the colliders, the
-  // fire ring (a collider like any other) and the walkable rim, so a child can
-  // never end a step where a walker may not stand.
-  const world = useMemo<TagWorld>(
-    () => ({
-      radius: Math.max(1, radius - NPC_RADIUS * 2),
+  // fire ring (a collider like any other), the walkable rim and the PLAY GROUND
+  // — so a child can never end a step where a walker may not stand, and never
+  // wander out of its group into the adults' earshot (point 481.4).
+  const world = useMemo<TagWorld>(() => {
+    const rim = Math.max(1, radius - NPC_RADIUS * 2)
+    return {
+      radius: playRadius,
+      centerX: x,
+      centerZ: z,
       childRadius: NPC_RADIUS,
       blocked: (px, pz) =>
-        Math.hypot(px, pz) > Math.max(1, radius - NPC_RADIUS * 2) ||
+        Math.hypot(px, pz) > rim ||
+        Math.hypot(px - x, pz - z) > playRadius ||
         !standingClear(colliders, px, pz, NPC_RADIUS),
       nudge: (px, pz) => {
         const r = tryNudgeToFree(colliders, px, pz, NPC_RADIUS)
         return { x: r.pos[0], z: r.pos[1], found: r.found }
       },
-    }),
-    [colliders, radius],
-  )
+    }
+  }, [colliders, radius, x, z, playRadius])
 
   // The group, spawned on validated ground (point 155): a play spot covered by a
-  // hut is nudged to the nearest free one before the first frame.
-  const game = useMemo(() => {
+  // hut is nudged to the nearest free one before the first frame — and the
+  // scheduler of what it SAYS (point 481) is built with it, because a new group
+  // is a new scheduler: a second settlement must never inherit the first one's
+  // turn or its half-finished errands.
+  const { game, speech } = useMemo(() => {
     const rand = mulberry32((seed + 5171) >>> 0)
     const spots = Array.from({ length: count }, (_, i) => {
       const a = (i / Math.max(1, count)) * Math.PI * 2
       const [sx, sz] = nudgeToFree(colliders, x + Math.cos(a) * 2.4, z + Math.sin(a) * 2.4, NPC_RADIUS)
       return { x: sx, z: sz }
     })
-    return createTagGame(spots, rand, balance.villageLife.tag)
+    return {
+      game: createTagGame(spots, rand, balance.villageLife.tag),
+      speech: createChildSpeech(count, balance.villageLife.childSpeech),
+    }
   }, [x, z, count, seed, colliders])
+
+  // The view the situations read the live game through: built once and
+  // refreshed each frame rather than allocated per frame.
+  const speechRand = useMemo(() => mulberry32((seed + 7717) >>> 0), [seed])
+  const view = useMemo<SituationView>(
+    () => ({
+      playing: false,
+      chaser: -1,
+      target: -1,
+      immune: -1,
+      children: game.children,
+      ground: { x, z, radius: playRadius },
+      // What THERE points at: the settlement's own middle, well outside the
+      // play ground and plainly not a place anyone is being sent to.
+      farMark: { x: 0, z: 0 },
+    }),
+    [game, x, z, playRadius],
+  )
+  const gestures = useRef<Array<RefObject<GestureState>>>([])
+  if (gestures.current.length !== count) {
+    gestures.current = Array.from(
+      { length: count },
+      (_, i) => gestures.current[i] ?? { current: restGesture() },
+    )
+  }
 
   // One gait phase ref per child, handed to its Figure.
   const gaits = useRef<Array<RefObject<number>>>([])
@@ -403,7 +504,20 @@ function Kids({
 
   useFrame((_, rawDt) => {
     const dt = Math.min(rawDt, 0.1)
-    stepTagGame(game, dt, balance.villageLife.tag, world)
+    const cfg = balance.villageLife.childSpeech
+    // The view the situations read the game through, refreshed in place.
+    view.playing = game.playing
+    view.chaser = game.chaser
+    view.target = game.target
+    view.immune = game.immuneFor > 0 ? game.immune : -1
+    view.ground.x = x
+    view.ground.z = z
+    view.ground.radius = playRadius
+    // What was said last frame steers the children this one: the chase keeps
+    // the collisions, the stamina and the floor pace.
+    stepTagGame(game, dt, balance.villageLife.tag, world, (i) => childSteer(speech, view, i, cfg))
+    const said = stepChildSpeech(speech, view, dt, cfg, speechRand)
+    if (said) speakSituation(said, game.children[said.speaker], refs.current[said.speaker], gestures.current[said.speaker])
     game.children.forEach((c, i) => {
       const g = refs.current[i]
       if (!g) return
@@ -414,7 +528,18 @@ function Kids({
       // direction rather than snapping about-face inside one frame.
       g.rotation.y = c.facing
       const pose = poses.current[i].current
-      if (pose) pose.lean = c.lean
+      if (!pose) return
+      // The chase's posture and the speaker's arms on ONE body: the gesture owns
+      // the arms and the shake, the run owns the lean. Writing the pose (rather
+      // than handing the Figure its gesture ref) is what lets the two combine —
+      // a figure with a pose ignores its gesture, so the pose must carry it.
+      const gesture = gestures.current[i]
+      gesture.current = advanceGesture(gesture.current, dt)
+      const shown = gesturePose(gesture.current)
+      pose.left = shown.left
+      pose.right = shown.right
+      pose.turn = shown.turn
+      pose.lean = c.lean + shown.lean
     })
   })
 
@@ -442,10 +567,18 @@ function Kids({
         pinned: c.pinned,
       })),
     })
+    // What the group has SAID so far this visit (point 481), by situation — a
+    // live check can read the coverage the pure tests pin.
+    w.__placeChildSpeech = () => ({
+      staged: { ...speech.staged },
+      last: speech.last ? { ...speech.last } : null,
+      ground: { x, z, radius: playRadius },
+    })
     return () => {
       delete w.__placeTag
+      delete w.__placeChildSpeech
     }
-  }, [game])
+  }, [game, speech, x, z, playRadius])
 
   return (
     <>
@@ -1411,6 +1544,20 @@ export function PlaceLife({
   // it scales with, and never below one.
   const kidCount = Math.max(1, Math.round(balance.villageLife.tag.childCount * presence))
 
+  // WHERE they play (point 481.4): out on the bearing furthest from every adult
+  // vignette, so the §13.4 hearing range separates the two groups — among the
+  // children the player hears the children, among the adults the adults.
+  const playGround = useMemo(
+    () =>
+      childPlayGround(
+        villageAdultStations(firePos),
+        Math.max(1, radius - NPC_RADIUS * 2),
+        balance.villageLife.tag.playRadius,
+        balance.communication.hearingRadius,
+      ),
+    [firePos, radius],
+  )
+
   if (kind === 'port') {
     return (
       <ColdCloaksContext.Provider value={cloaks}>
@@ -1429,8 +1576,9 @@ export function PlaceLife({
         <Cook x={firePos[0] + 1.2} z={firePos[1] + 1.0} cloth={style.cloth[0]} />
         <Weaver x={-8.5} z={-7} cloth={style.cloth[1 % style.cloth.length]} weave={style.bandColor} />
         <Kids
-          x={7}
-          z={7.5}
+          x={playGround.x}
+          z={playGround.z}
+          playRadius={playGround.radius}
           count={kidCount}
           seed={localSeed}
           cloth={style.cloth}
