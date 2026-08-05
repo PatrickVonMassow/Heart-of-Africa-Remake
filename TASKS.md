@@ -4357,6 +4357,15 @@ Build order, chosen so no two parallel agents own the same file:
   3. A Vitest case feeds a DRIFTING clock base and proves a live owner of any age
      is never read as recycled; a genuinely recycled pid must still be caught, so
      the test covers both directions.
+  REPRODUCED ON A SECOND OWNER (05.08.2026, 20:37): the launcher spawned session
+  e3f5442b against the LIVE owner 7c21e596 (pid 2257916, 30:44 of age, eight
+  running child shells including a browser suite in a worktree). Measured on the
+  spot: the in-flight declaration recorded `pidStartedAt` 1785953215453 while
+  `probePid` returned 1785953218212 for the same pid at that moment — 2759 ms
+  apart, past the same fixed 2000 ms tolerance, on the same drift curve (~1 s at
+  15 min, ~3 s at 30 min). The intruder stood down without touching the batch, so
+  the damage stayed at one duplicated session; the drift is confirmed systematic
+  and owner-independent.
   VERIFIABLE: the unit layer pins both directions against a drifting base, and a
   batch owner older than an hour is still read as alive by
   `node scripts/batch-doctor.mjs` on this host.
@@ -4798,3 +4807,25 @@ Build order, chosen so no two parallel agents own the same file:
   (`document.fonts.check`) and measures a different width from the generic fallback,
   so a silent fallback fails loudly instead of quietly producing plain text.
   Screenshot 81 refreshed on the bundled face.
+
+- [ ] 520. THE BOARD DEMANDS A TIME IT GIVES NO WAY TO WRITE (found 05.08.2026
+  while closing point 394). `dashboard-guard` refuses the turn end when a
+  current-work card's estimate is less than 15 minutes away (`now-eta-soon`) and
+  instructs "give each a realistic new `~HH:MM`" — but `scripts/board.mjs` has no
+  command that writes one: `status`, `title`, `now`, `queue` and `done` all leave
+  the card's `<span class="meta">` untouched, and `promote` takes a times argument
+  only when a card is first raised out of the queue. The only remaining way is to
+  hand-edit `.batch-dashboard.html` — precisely the act that, per the comment on
+  `setCardTitle` in `scripts/board-core.mjs` (point 439), once wrote CRLF into the
+  file and crashed `attest`. A guard that names a remedy the toolchain cannot
+  perform sends every session down that path.
+  FINAL STATE: `node scripts/board.mjs eta <point> "~HH:MM"` rewrites ONLY the
+  estimate half of that card's meta span (the start time stays as it is), refuses
+  a point that has no current-work card and a time that is not in the board's
+  `~HH:MM` shape, and publishes like every other editing command — so the loop
+  stays "one editing command, then `attest`". The guard message names this command
+  instead of describing the edit.
+  VERIFIABLE: pure Vitest on the rewrite (the estimate changes, the start time and
+  the body do not; an unknown point and a malformed time both throw; the file is
+  written with LF endings whatever it held before), plus a case that the
+  `now-eta-soon` remedy text names the new command.
