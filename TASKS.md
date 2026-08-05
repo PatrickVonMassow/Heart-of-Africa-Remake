@@ -4796,6 +4796,12 @@ Build order, chosen so no two parallel agents own the same file:
      stand-still wait as any other scene frame, and only a clipped or locator-bound
      capture keeps the no-wait mode. `scripts/verify/sceneReady.test.mjs` pins the
      current rule (its "its subject is DOM" case) and changes with it.
+     REPRODUCED ON `main` (05.08.2026 21:25, both backends green): a plain `flow`
+     run rewrote `verification/02-port-cairo-trade.png` with the settlement behind
+     the trade dialog BLACK, where the committed frame shows Cairo's alley. So this
+     is not one branch's accident — every element frame in the set is one slow load
+     away from photographing an empty world, and the eight frames that run rewrote
+     were restored rather than committed.
   The re-probe of item 1 applies in the STAND-STILL mode only: the drawn-only wait
   is near zero, and re-probing there would add flake on exactly the fast-moving
   subjects that mode serves. The stale comment in `frameSubject.mjs` claiming
