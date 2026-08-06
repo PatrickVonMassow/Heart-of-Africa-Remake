@@ -4800,3 +4800,19 @@ Build order, chosen so no two parallel agents own the same file:
   VERIFIABLE: pure Vitest on the stale-site comparison (served revision vs
   `main`) and on the two residuals of item 4, plus the one real deploy run of
   item 1 with its run id recorded.
+
+- [ ] 529. A STOP HOOK IN THE USER SCOPE NOW ENFORCES WHAT A PROJECT GUARD
+  ALREADY HARD-BLOCKS (measured 06.08.2026 while taking the turn-cost inventory).
+  `~/.claude/hooks/check-reply-timestamp.cjs` is registered as a Stop hook in the
+  user scope and checks the chat timestamp — the same rule
+  `scripts/timestamp-guard.mjs` blocks the turn end on, hard. It therefore buys
+  nothing and costs one node process at every turn end. ATTENDED ONLY: removing it
+  edits `~/.claude/settings.json`, a protected path that always prompts, so no
+  headless session can do it.
+  FINAL STATE: the `check-reply-timestamp.cjs` Stop-hook registration is gone from
+  the user-scope settings, and the file with it; one turn end is measured before
+  and after to show the saved spawn. `~/.claude/hooks/berlin-timestamp.cjs` STAYS —
+  since the point-440 cut it is the only injected statement of the timestamp rule,
+  and the versioned copy lives at `scripts/hooks/berlin-timestamp.cjs`.
+  VERIFIABLE: a reply written without the stamp is still refused (timestamp-guard
+  blocks it) after the removal, and the Stop chain's process count drops by one.
