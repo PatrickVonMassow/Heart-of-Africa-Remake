@@ -470,6 +470,16 @@ export function formatBaselineReport({
   }
   if (deaths.length) {
     lines.push('      A baseline run that stops early is NOT a baseline: nothing below it is a verdict. Fix the lane first.')
+    if (suiteFileChanged) {
+      // The first place to look, and the one this lane creates itself: the
+      // suite is top-level-await, so a check reaching for a dev hook the OLDER
+      // app does not expose rejects and kills the process — exit 1, no FAIL line.
+      lines.push(
+        `      FIRST SUSPECT: scripts/verify/${suite}.mjs changed since the baseline. The CURRENT check runs against the`,
+      )
+      lines.push('      BASELINE app, so a new check reaching for a dev hook that app has not got throws and takes the run with it.')
+    }
+    lines.push('      Read the kept output below at the last check named above — the throw is the line after it.')
   }
   for (const c of classified) lines.push(`      ${c.check}: ${VERDICT_LABEL[c.verdict]}`)
   if (logs.length) lines.push(`      the baseline run output was kept: ${logs.join(', ')}`)

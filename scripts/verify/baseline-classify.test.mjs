@@ -332,6 +332,25 @@ describe('classifying against the baseline', () => {
       expect(lines.findIndex((l) => l.includes('DIED'))).toBeLessThan(lines.findIndex((l) => l.includes('a calf drowns:')))
       expect(text).toContain('NOT "newer than the baseline"')
     })
+
+    it('names the changed suite file as the first suspect when the lane died', () => {
+      const withChange = formatBaselineReport({
+        suite: 'enrichments',
+        ref: '25e0f0f',
+        classified: [],
+        deaths: [{ run: 1, reached: 55, expected: 243, lastCheck: 'a herd gathers', failures: 0, exitCode: 1 }],
+        suiteFileChanged: true,
+      })
+      expect(withChange.join('\n')).toContain('FIRST SUSPECT: scripts/verify/enrichments.mjs changed since the baseline')
+      const noChange = formatBaselineReport({
+        suite: 'enrichments',
+        ref: '25e0f0f',
+        classified: [],
+        deaths: [{ run: 1, reached: 55, expected: 243, lastCheck: 'a herd gathers', failures: 0, exitCode: 1 }],
+        suiteFileChanged: false,
+      })
+      expect(noChange.join('\n')).not.toContain('FIRST SUSPECT')
+    })
   })
 
   it('accepts plain check names as well as parsed checks', () => {
