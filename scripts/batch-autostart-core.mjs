@@ -49,7 +49,9 @@ export const SPAWN_FALLBACK_MODEL = 'claude-fable-5'
 
 export const RESUME_PROMPT =
   'Autonome Batch-Wiederaufnahme (vom OS-Scheduler gestartet, weil keine Claude-Session aktiv war). ' +
-  'Setze den "Heart of Africa"-Batch fort. Lies ZUERST die Handoff-Memory resume-184-qa-framework. ' +
+  'Setze den "Heart of Africa"-Batch fort. Orientiere dich am Board (scripts/focus.mjs show plus die ' +
+  'Warteschlange in .batch-dashboard.html) — die frueher hier genannte Handoff-Memory ist retiriert und ' +
+  'existiert nicht mehr. ' +
   'Pruefe als erstes den ausgecheckten Git-Branch und ob ein Merge halb fertig ist. Arbeite die offenen ' +
   'TASKS-Punkte in Reihenfolge ab — Feature-Branch-Workflow (CLAUDE.md §6): jeder Punkt auf seinem ' +
   'EIGENEN feat/<punkt>-<slug>-Branch von main, atomare Commits, den BRANCH nach jedem Commit pushen, ' +
