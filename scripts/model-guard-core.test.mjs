@@ -1,7 +1,11 @@
 import { describe, it, expect } from 'vitest'
 import {
+  ALLOWED_TRAILERS,
   backupRefsIn,
   classifyTrailer,
+  coAuthorTrailers,
+  evaluateCommitTrailers,
+  formatCommitTrailerVerdict,
   findForbiddenCommits,
   findUnidentifiedCommits,
   formatForbiddenReason,
@@ -181,5 +185,66 @@ describe('the two block texts', () => {
     expect(text).toContain('git update-ref -d refs/original/refs/heads/feat/392-x')
     // and it stays out of the way when there are none
     expect(formatUnidentifiedReason(hits, { backupRefs: [] })).not.toContain('update-ref')
+  })
+})
+
+// POINT 425: the grip at the source — the commit-msg gate's pure half.
+describe('evaluateCommitTrailers (the commit-msg gate)', () => {
+  const msg = (...trailers) => `Do a thing\n\n${trailers.join('\n')}\n`
+
+  it('accepts each allowed spelling, with and without the context suffix', () => {
+    for (const t of [
+      'Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>',
+      'Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>',
+      'Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>',
+      'Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>',
+      'Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>',
+    ]) expect(evaluateCommitTrailers(msg(t)).block, t).toBe(false)
+    // every spelling the refusal advertises must itself pass the gate
+    for (const t of ALLOWED_TRAILERS) expect(evaluateCommitTrailers(msg(t)).block, t).toBe(false)
+  })
+
+  it('rejects the bare trailer', () => {
+    const v = evaluateCommitTrailers(msg('Co-Authored-By: Claude <noreply@anthropic.com>'))
+    expect(v.block).toBe(true)
+    expect(v.findings[0].rule).toBe('unnamed-model-trailer')
+  })
+
+  it('rejects a named model outside the allowlist', () => {
+    const v = evaluateCommitTrailers(msg('Co-Authored-By: Claude Haiku 4.5 <noreply@anthropic.com>'))
+    expect(v.block).toBe(true)
+    expect(v.findings[0].rule).toBe('forbidden-model-trailer')
+  })
+
+  it('ignores a purely human co-author and a message with no trailer at all', () => {
+    expect(evaluateCommitTrailers(msg('Co-Authored-By: Patrick von Massow <p@example.com>')).block).toBe(false)
+    expect(evaluateCommitTrailers('Merge branch main into feat/x\n').block).toBe(false)
+    expect(evaluateCommitTrailers('').block).toBe(false)
+    expect(evaluateCommitTrailers(null).block).toBe(false)
+  })
+
+  it('flags a bare trailer standing beside a named one', () => {
+    const v = evaluateCommitTrailers(
+      msg('Co-Authored-By: Claude Opus 5 <a@x>', 'Co-Authored-By: Claude <b@x>'),
+    )
+    expect(v.block).toBe(true)
+    expect(v.findings).toHaveLength(1)
+  })
+
+  it('reads trailers case-insensitively and never out of a comment line', () => {
+    expect(coAuthorTrailers('x\n\nco-authored-by: Claude Opus 5 <a@x>\n')).toEqual(['Claude Opus 5 <a@x>'])
+    expect(coAuthorTrailers('x\n\n# Co-Authored-By: Claude <a@x>\n')).toEqual([])
+    expect(evaluateCommitTrailers('x\n\n# Co-Authored-By: Claude <a@x>\n').block).toBe(false)
+  })
+
+  it('the refusal prints the exact trailer to write and where to look it up', () => {
+    const text = formatCommitTrailerVerdict(
+      evaluateCommitTrailers(msg('Co-Authored-By: Claude <noreply@anthropic.com>')),
+    )
+    expect(text).toContain('Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>')
+    expect(text).toContain('Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>')
+    expect(text).toContain('Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>')
+    expect(text).toContain('~/.claude/projects/')
+    expect(formatCommitTrailerVerdict({ block: false, findings: [] })).toBe('')
   })
 })

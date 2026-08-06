@@ -79,6 +79,93 @@ export function isPolicyBreach(trailerField) {
   return classifyTrailer(trailerField) === 'forbidden'
 }
 
+// ---------------------------------------------------------------------------
+// CATCH IT AT THE SOURCE (points 397 b / 425 a). The classification above is the
+// net under the commits already in history; this is the grip that keeps an
+// unnamed trailer out of it. A delegated agent stamping the bare trailer is not
+// a rare accident — it happened on five commits of one branch on 29.07.2026 —
+// and the guard above can only ever report it after the fact, at a cost of a
+// research pass no unattended session would have done.
+//
+// Driven from the versioned `commit-msg` hook via scripts/model-trailer-gate.mjs,
+// so it binds every session, in the main tree and in a worktree. It deliberately
+// does NOT stand down for a paused batch or a session that owns no lock: a
+// subagent is exactly whose commits this is for, and a commit is not batch work.
+
+/** The trailers a commit may carry, printed as the remedy. */
+export const ALLOWED_TRAILERS = Object.freeze([
+  'Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>',
+  'Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>',
+  'Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>',
+])
+
+/** The `Co-Authored-By` values in a commit message, git's comment lines dropped
+ *  so a hint in the commit template is never read as the author's own trailer. */
+export function coAuthorTrailers(message) {
+  const out = []
+  for (const line of String(message ?? '').split(/\r?\n/)) {
+    if (line.startsWith('#')) continue
+    const m = /^[ \t]*co-authored-by:[ \t]*(.+?)[ \t]*$/i.exec(line)
+    if (m) out.push(m[1])
+  }
+  return out
+}
+
+/**
+ * May this commit MESSAGE be committed? Every Claude co-author trailer must name
+ * a model from the allowlist. A human co-author is not model evidence and is
+ * ignored, and a message with no Claude trailer at all is not this gate's
+ * business (a merge, or a commit made outside the agent tooling).
+ *
+ * Returns { block, findings: [{ rule, trailer, detail }] } and NEVER throws.
+ */
+export function evaluateCommitTrailers(message) {
+  const findings = []
+  try {
+    for (const trailer of coAuthorTrailers(message)) {
+      const verdict = classifyTrailer(trailer)
+      if (verdict === 'unidentified') {
+        findings.push({
+          rule: 'unnamed-model-trailer',
+          trailer,
+          detail: 'names no model — it cannot show that an allowed model wrote this commit',
+        })
+      } else if (verdict === 'forbidden') {
+        findings.push({
+          rule: 'forbidden-model-trailer',
+          trailer,
+          detail: 'names a model outside the allowlist (only Opus 5, Opus 4.8 and Fable 5)',
+        })
+      }
+    }
+  } catch {
+    /* fail-open: a broken gate must never make the tree uncommittable */
+  }
+  return { block: findings.length > 0, findings }
+}
+
+/** The refusal, naming every offender and the exact trailer to write instead. */
+export function formatCommitTrailerVerdict(verdict) {
+  if (!verdict?.block) return ''
+  const lines = ['model-trailer-gate: refusing this commit message.', '']
+  for (const f of verdict.findings) lines.push(`  ${f.rule}: "${f.trailer}"`, `      ${f.detail}`)
+  lines.push(
+    '',
+    'Every commit records its AUTHORING MODEL in its co-author trailer — it is the only',
+    'machine-readable evidence the serving-model tripwire has, and an unnamed one reads',
+    'from the outside exactly like the silent degradation the tripwire exists to catch.',
+    '',
+    'Write your own model:',
+    '',
+    ...ALLOWED_TRAILERS.map((t) => `    ${t}`),
+    '',
+    'The `(1M context)` suffix is fine. If you do not know which model you are:',
+    '',
+    ...TRANSCRIPT_HINT,
+  )
+  return lines.join('\n')
+}
+
 /** Parse one log line of the form `sha|isoDate|trailer[,trailer…]`.
  *  Returns null for anything malformed (merge commits print an empty trailer
  *  field but still parse — they carry no model evidence and never flag). */
