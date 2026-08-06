@@ -435,6 +435,7 @@ export const de: Strings = {
     walkSpeed: 'Tempo innerorts',
     strafeFactor: 'Seitwärts/Rückwärts-Faktor',
     walkerUnstuck: 'Bewohner-Entklemmung (s)',
+    placeCollisionFactor: 'Siedlungs-Kollision (Anteil Betretenradius)',
     startupFreezeBudget: 'Ladebild-Stillstand-Budget (ms)',
     mouseSensitivity: 'Maus-Empfindlichkeit (Ego-Sicht)',
     lookPitchLimit: 'Blickgrenze hoch/runter (°)',

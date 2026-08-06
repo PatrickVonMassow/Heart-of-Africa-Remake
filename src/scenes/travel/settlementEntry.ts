@@ -12,6 +12,54 @@ export interface EnterablePlace {
 }
 
 /**
+ * The settlement collision radius (design.md §11): the traveller cannot walk
+ * THROUGH a settlement's footprint. Derived from the enter radius by the
+ * calibratable `balance.placeCollisionFactor` and CLAMPED to the enter radius,
+ * because the two must stay balanced: the "Space to enter" prompt has to arm at
+ * or outside the collision boundary, else the collider stops the traveller
+ * short of the enter radius and the place can never be entered at all.
+ */
+export function settlementCollisionRadius(enterRadius: number, factor: number): number {
+  return Math.max(0, Math.min(enterRadius, enterRadius * factor))
+}
+
+/**
+ * The settlement collider circles `[x, z, radius]` for a move STARTING at
+ * `(fromX, fromZ)`, in the `[x, z, r]` form `resolveTravelMove` takes (the
+ * radius is reduced by the body radius `selfR`, so the traveller's centre comes
+ * to rest exactly `collisionRadius` from the marker).
+ *
+ * The collider is ONE-WAY: a place the traveller is ALREADY inside contributes
+ * no circle, so he can always walk back out. Several paths put him on a place's
+ * exact centre — a debug jump, a resumed snapshot, a successor start, a save
+ * written by an older build — and with entry key-only (point 244) a two-way
+ * collider would leave him standing inside a wall he cannot cross. Blocking
+ * only the way IN is the general invariant that covers every such teleport,
+ * including ones nobody has thought of yet.
+ */
+export function settlementColliders(
+  fromX: number,
+  fromZ: number,
+  places: readonly EnterablePlace[],
+  collisionRadius: number,
+  selfR: number,
+  reach = Infinity,
+): Array<[number, number, number]> {
+  const out: Array<[number, number, number]> = []
+  if (collisionRadius <= 0) return out
+  // A place farther off than the boundary plus this step's reach cannot be
+  // entered by it, so it is skipped instead of re-swept every frame.
+  const cutoff = collisionRadius + selfR + reach
+  for (const p of places) {
+    const d = Math.hypot(fromX - p.x, fromZ - p.z)
+    if (d <= collisionRadius) continue // inside: free to leave (one-way)
+    if (d > cutoff) continue
+    out.push([p.x, p.z, Math.max(0, collisionRadius - selfR)])
+  }
+  return out
+}
+
+/**
  * The id of the settlement whose enter radius the traveller is within, or null.
  * Returns null on a water cell (a river/lake passage never enters a riverside
  * settlement by accident, design.md §2.3) — the caller passes that guard in.

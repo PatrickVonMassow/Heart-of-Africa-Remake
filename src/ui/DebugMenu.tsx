@@ -329,6 +329,11 @@ export function DebugMenu() {
         onChange={(v) => set('placeWalkSpeed', v)} />
       <NumberField label={t.debug.strafeFactor} value={balance.placeStrafeFactor} step={0.05}
         onChange={(v) => set('placeStrafeFactor', Math.max(0, v))} />
+      {/* Settlement collision (design.md §11): a SHARE of the enter radius, so
+          the "Space to enter" prompt can never arm inside the collider — 1 is
+          the ceiling the resolver clamps to anyway. */}
+      <NumberField label={t.debug.placeCollisionFactor} value={balance.placeCollisionFactor} step={0.05}
+        onChange={(v) => set('placeCollisionFactor', Math.max(0, Math.min(1, v)))} />
       <NumberField label={t.debug.walkerUnstuck} value={balance.walkerUnstuckSeconds} step={1}
         onChange={(v) => set('walkerUnstuckSeconds', Math.max(0.5, v))} />
       <NumberField label={t.debug.startupFreezeBudget} value={balance.startup.pictureFreezeBudgetMs} step={250}
