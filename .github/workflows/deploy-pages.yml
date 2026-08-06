@@ -7,12 +7,22 @@ on:
   workflow_dispatch:
 
 # Least-privilege token plus the permissions the Pages deployment needs.
+# `deployments: read` is what lets the deploy job SEE a deployment that is still
+# in progress (the Deployments API listing); cancelling one is covered by
+# `pages: write`.
 permissions:
   contents: read
+  deployments: read
   pages: write
   id-token: write
 
 # Only one Pages deployment at a time; a newer push supersedes an in-flight run.
+# It KEEPS that purpose alongside the unblock steps below: a superseded run is
+# killed where it stands, and the deploy action has no cancellation hook, so it
+# can leave its deployment in progress — which is precisely what the newer run's
+# "clear a stuck Pages deployment" step then cancels before deploying. Because
+# this group admits one live run at a time, and nothing else deploys Pages here,
+# any in-progress Pages deployment seen from inside the deploy job is a leftover.
 concurrency:
   group: pages
   cancel-in-progress: true
@@ -72,13 +82,67 @@ jobs:
         with:
           path: dist
 
+  # Everything below this line talks to the Pages API only — our build is the
+  # `build` job above, and `needs: build` means a failing build never reaches
+  # here. That split is what makes the retry safe: it can only ever repeat the
+  # GitHub-side half, never re-run (and never mask) a build failure.
   deploy:
     needs: build
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.deployment.outputs.page_url || steps.deployment_retry.outputs.page_url }}
     steps:
+      # Only the deploy helpers — no build, no npm install.
+      - name: Check out the deploy helpers
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: scripts
+
+      # BOUNDED on purpose (measured 06.08.2026): the default 10-minute wait
+      # ended as a bare `Timeout reached, aborting!` and left the deployment
+      # in progress, blocking every later one. Five minutes is well past a
+      # healthy deployment, and the steps below turn the wait into a REPORT.
       - name: Deploy to GitHub Pages
         id: deployment
+        continue-on-error: true
         uses: actions/deploy-pages@v4
+        with:
+          timeout: 300000
+
+      # A stall is cleared, not left behind: cancel whatever still holds the
+      # Pages queue and decide (in a pure, tested function) whether a retry is
+      # warranted. A failure that cleared nothing is not a queue stall.
+      - name: Clear a stuck Pages deployment
+        id: unblock
+        if: steps.deployment.outcome == 'failure'
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/pages-deploy-unblock.mjs --cancel
+
+      - name: Deploy to GitHub Pages (retry after clearing)
+        id: deployment_retry
+        if: steps.unblock.outputs.retry == 'true'
+        continue-on-error: true
+        uses: actions/deploy-pages@v4
+        with:
+          timeout: 300000
+
+      # The verdict is explicit, so a stall can never end as a green run and a
+      # red one always NAMES what blocks it.
+      - name: Verdict
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          FIRST: ${{ steps.deployment.outcome }}
+          RETRY: ${{ steps.deployment_retry.outcome }}
+        run: |
+          if [ "$FIRST" = "success" ] || [ "$RETRY" = "success" ]; then
+            echo "Pages deployment succeeded (first attempt: $FIRST, retry: ${RETRY:-skipped})."
+            exit 0
+          fi
+          echo "::error title=Pages deploy failed::first attempt: $FIRST, retry: ${RETRY:-skipped}. The report below names every Pages deployment still holding the queue."
+          node scripts/pages-deploy-unblock.mjs || true
+          exit 1
