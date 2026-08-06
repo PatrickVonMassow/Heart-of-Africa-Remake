@@ -187,10 +187,9 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 - **Der autonome Lauf bleibt stehen — still oder wartend.** Der Fortschritt endet unbemerkt,
   oder er hängt an einer Rückfrage — beides gleich teuer, wenn du weg bist.
   → *Prompt:* „Bei einer autonomen Daueraufgabe sei die **letzte Aktion jedes Schritts** immer
-  ein Schritt an der Aufgabe, und baue einen Mechanismus, der ein stilles Anhalten verhindert.
-  Bleib **nie mit einer Rückfrage an mich stehen**: Triff die vernünftigste Annahme; nur was
-  wirklich meine Entscheidung braucht, hältst du an sichtbarer Stelle fest und **gehst zum
-  nächsten offenen Punkt über**."
+  ein Schritt an der Aufgabe, und baue einen Mechanismus gegen stilles Anhalten. Bleib **nie
+  mit einer Rückfrage an mich stehen**: Triff die vernünftigste Annahme; was meine
+  Entscheidung braucht, hältst du sichtbar fest und **gehst zum nächsten Punkt über**."
 
 - **Kommunikation verfehlt.** Zu technisch, zu lang, an der Zielgruppe vorbei.
   → *Prompt:* „Beschreibe Bugs und Status in der Sprache der Zielgruppe — Symptom zuerst,
@@ -200,9 +199,8 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 - **Der Test hing an seiner Umgebung, nicht am Verhalten.** Zeitgrenzen reißen unter Last;
   oder er ist nur in der Arbeitskopie grün, in der er lief.
-  → *Prompt:* „Jeder Test bekommt seine Pfade **eingespritzt**, statt sie zu suchen, und
-  Zeitgrenzen richten sich nach der gemessenen Last. Die Frage vor dem Abgeben ist nicht ‚ist
-  er grün?', sondern ‚wäre er auch im **Hauptstand** grün?'"
+  → *Prompt:* „Jeder Test bekommt seine Pfade **eingespritzt**, und Zeitgrenzen richten sich
+  nach der gemessenen Last. Die Frage vor dem Abgeben: ‚wäre er auch im **Hauptstand** grün?'"
 
 
 - **Messung und Vorschau verunreinigt.** Halbfertiges wird als ‚fertig' beurteilt.
@@ -214,18 +212,16 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   Warnung in der Ausgabe einer **geglückten** Aktion ist faktisch unsichtbar.
   → *Prompt:* „Etabliere einen Mechanismus, der nach jeder Aktion mit Fernwirkung den
   **Zielzustand** belegt statt der Erfolgsmeldung; eine Abfrage ohne Treffer ist ein Befund.
-  Wo eine Warnung nur im Erfolgsfall steht, braucht sie eine Prüfung, die ihn liest. Jede
-  Formprüfung läuft **vor** dem Schritt nach außen."
+  Jede Formprüfung läuft **vor** dem Schritt nach außen."
 
 - **Regeln und Wächter verrotten — nur merkt es niemand.** Der Bestand wächst an
   Widersprüchen und an Regeln, die eine nie gebaute Absicherung behaupten. Ein Wächter, der
   nie auslöst, ist so kaputt wie einer, der immer auslöst.
   → *Prompt:* „Etabliere einen Mechanismus, der den ganzen Bestand periodisch zur Durchsicht
   zwingt — auf Aktualität, Dopplung, Widerspruch und **Wirkungslosigkeit**. Schreib zu
-  **jeder** Regel, was sie misst; steht dort **nichts**, gibt es nur zwei Ausgänge:
-  Mechanismus bauen oder **mit Begründung** als bewusst nicht erzwungen vermerken. Jeden
-  Wächter prüfst du gegen sich selbst: Hat er je ausgelöst? Kann er überhaupt?"
-  *(Kosten: einmalig hoch)*
+  **jeder** Regel, was sie misst; steht dort nichts, gibt es zwei Ausgänge: Mechanismus bauen
+  oder **mit Begründung** als bewusst nicht erzwungen vermerken. Und jeden Wächter fragst du:
+  Hat er je ausgelöst? Kann er überhaupt?" *(Kosten: einmalig hoch)*
 
 - **Der rote Test klagt den Falschen an.** Er täuscht gefährlicher als ein grüner:
   Prüfungen veralten von selbst und klagen gesunden Code an.
@@ -244,9 +240,8 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 - **„Aufgeräumt" ohne Beweisliste.** Man räumt auf, wo man den Schaden vermutet,
   und übersieht den Rest.
-  → *Prompt:* „Etabliere einen Mechanismus, der nach jedem Zwischenfall eine
-  **Beweisliste** erzwingt: Liegt alles am Zielort? Gibt es Reste (Waisen-Dateien, Tests
-  ohne echte Prüfung)? Passen Dokumente und Code zusammen? Läuft alles grün?"
+  → *Prompt:* „Etabliere einen Mechanismus, der nach jedem Zwischenfall eine **Beweisliste**
+  erzwingt: Liegt alles am Zielort? Gibt es Reste? Passen Dokumente und Code zusammen?"
 
 - **Der Autor sieht seine eigene Annahme nicht.** Wer entwirft und baut, prüft gegen dieselbe
   Vorstellung, aus der der Fehler stammt — teuer bei Dingen, die *immer* laufen müssen.
@@ -257,17 +252,14 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 - **Die teuerste Prüfung großflächig verlangt.** Bildbegutachtung, ein zweiter Lauf, ein
   zweites Modell kosten ein Vielfaches — pauschal gefordert, zahlst du sie auch dort, wo sie
   nichts beweisen kann.
-  → *Prompt:* „Verlange die teuerste Prüfung nur für Änderungen, die dort wirklich abweichen
-  können, und schreib die Grenze samt Begründung in den prüfenden Code, nicht in eine Regel
-  daneben."
+  → *Prompt:* „Verlange die teuerste Prüfung nur, wo eine Änderung wirklich abweichen kann,
+  und schreib die Grenze samt Begründung in den prüfenden Code."
 
-- **Was bei jedem Start mitgelesen wird, wächst — und du bezahlst es jedes Mal.** Jede Ergänzung ist
-  berechtigt; irgendwann ist der größte Teil Geschichte — am teuersten der, der wiederholt,
-  was eine Prüfung ohnehin erzwingt.
+- **Was bei jedem Start mitgelesen wird, wächst — und du bezahlst es jedes Mal.** Jede
+  Ergänzung ist berechtigt; am teuersten die, die wiederholt, was eine Prüfung erzwingt.
   → *Prompt:* „Gib jedem Dokument, das bei jedem Start gelesen wird, eine **gemessene
-  Obergrenze**. Blockiert sie eine Ergänzung, ist die Reihenfolge: kürzen, **zusammenführen**,
-  Detail auslagern — die Grenze anheben ist das **letzte** Mittel und braucht eine Begründung.
-  Ausgelagert wird verschoben, nicht umformuliert; und der Commit, der eine Prüfung einführt,
+  Obergrenze**. Blockiert sie eine Ergänzung: kürzen, **zusammenführen**, auslagern — die
+  Grenze anheben ist das **letzte** Mittel. Und der Commit, der eine Prüfung einführt,
   streicht den Text, den sie ersetzt."
 
 - **Im Präsens behauptet, nie nachgesehen.** „Das Feld wird bereits gesetzt" — im Code steht
@@ -317,10 +309,9 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 - **Der Ausfall kommt nie an der bequemen Stelle.** Am tückischsten bei Abläufen mit **zwei
   Hälften**, deren zweite bei der Gegenseite liegt: fällt sie dazwischen aus, meldet jede
   Seite korrektes Verhalten und alles ist verloren.
-  → *Prompt:* „Behandle jede kritische Aktion als Vorgang mit einem **wiederholbaren
-  Aufräumschritt**, der bei jedem Start läuft. Prüfe die Erholung mit Abbrüchen zu
-  **zufälligen** Zeitpunkten und frag danach nicht ‚läuft es weiter?', sondern ‚läuft es
-  **dort** weiter, wo es sollte, und gilt Unfertiges als unfertig?'"
+  → *Prompt:* „Gib jeder kritischen Aktion einen **wiederholbaren Aufräumschritt** bei jedem
+  Start. Prüfe die Erholung mit Abbrüchen zu **zufälligen** Zeitpunkten und frag danach nicht
+  ‚läuft es weiter?', sondern ‚läuft es **dort** weiter, wo es sollte?'"
 
 - **„Im Zweifel nichts tun" schützt nur gegen fehlende Daten, nicht gegen falsche.** Wird ein
   Fehlschlag weiter innen schon in einen Ersatzwert verwandelt, läuft die Aktion mit einer
@@ -347,6 +338,13 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   gern einen Befehl gereicht — oft einen, der gar nicht funktionieren kann.
   → *Prompt:* „Ein Schritt in deiner Umgebung gehört dir. **Miss** erst, ob der Weg trägt.
   Fehlt wirklich eine Fähigkeit, bitte **einmal um die Fähigkeit** — nie um ihre Ausführung."
+
+- **Nicht jedes Rot ist deins.** Eine Prüfung, die nur „rot" und „grün" kennt, schiebt auch
+  den Ausfall eines fremden Dienstes deinem Code zu — und schickt dich auf eine Suche, die
+  nichts finden kann.
+  → *Prompt:* „Sag bei jedem Rot zuerst, **wo die Ursache liegt** — bei uns oder außerhalb.
+  Liegt sie außerhalb, nenn den **echten Griff** dort. Und was auf einen fremden Dienst
+  wartet, gibt beim Aufgeben das **Angefangene zurück** — sonst sperrt es alle Nachfolger."
 
 - **Die Reparatur nimmt den Reparierenden mit.** Wer die Leitung repariert, auf der er
   sitzt — Netz, Rechte, Umgebung —, verliert mit dem Fehlschlag die nächste Reparatur mit.
@@ -401,4 +399,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 Wenn du diese eine Nachricht an den Anfang stellst, hast du 80 % der Lehren dieses
 Projekts eingebaut, bevor die erste Zeile Code entsteht.
 
-<!-- GUIDE-FINGERPRINT: daafaf93c2edbb9661ad35671a2544180370908fe9380d5610affd556edb59c4 -->
+<!-- GUIDE-FINGERPRINT: b6ec93dc0e9352352fadf710507e84b7eb8ca28b55e752c6a148c93e6012dce6 -->

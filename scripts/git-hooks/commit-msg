@@ -9,8 +9,16 @@
 #
 # The message is only readable here — git writes it after the pre-commit hook.
 #
+# It then asks the model-trailer gate about the same message: every commit records
+# its AUTHORING MODEL in its Co-Authored-By trailer, and a trailer naming no model
+# reads from the outside exactly like the silent degradation the serving-model
+# tripwire exists to catch — so it must not reach history at all.
+#
 # Worktrees share one .git/config, so this hook also runs in a worktree whose
-# branch predates the guard. Skip silently there rather than block a commit over
+# branch predates a guard. Skip silently there rather than block a commit over
 # a script that branch cannot have.
 [ -f scripts/commit-scope-guard.mjs ] || exit 0
-exec node scripts/commit-scope-guard.mjs --message "$1"
+node scripts/commit-scope-guard.mjs --message "$1" || exit 1
+
+[ -f scripts/model-trailer-gate.mjs ] || exit 0
+exec node scripts/model-trailer-gate.mjs --message "$1"

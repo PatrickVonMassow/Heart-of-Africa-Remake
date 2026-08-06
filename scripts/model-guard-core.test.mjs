@@ -1,5 +1,19 @@
 import { describe, it, expect } from 'vitest'
-import { isPolicyBreach, parseLogLine, findForbiddenCommits } from './model-guard-core.mjs'
+import {
+  ALLOWED_TRAILERS,
+  backupRefsIn,
+  classifyTrailer,
+  coAuthorTrailers,
+  evaluateCommitTrailers,
+  formatCommitTrailerVerdict,
+  findForbiddenCommits,
+  findUnidentifiedCommits,
+  formatForbiddenReason,
+  formatUnidentifiedReason,
+  isPolicyBreach,
+  modelNameIn,
+  parseLogLine,
+} from './model-guard-core.mjs'
 
 const T0 = Date.parse('2026-07-24T22:00:00Z')
 const line = (sha, iso, trailer) => `${sha}|${iso}|${trailer}`
@@ -72,5 +86,174 @@ describe('findForbiddenCommits', () => {
   it('is empty on empty/absent input', () => {
     expect(findForbiddenCommits('', T0)).toEqual([])
     expect(findForbiddenCommits(null, T0)).toEqual([])
+  })
+})
+
+// POINT 397: the three-way split. The trailer that cost a round was
+// `Co-Authored-By: Claude <noreply@anthropic.com>` — no model at all.
+describe('classifyTrailer', () => {
+  it('calls an allowlisted model allowed, in every spelling', () => {
+    for (const t of [
+      'Claude Opus 5 <noreply@anthropic.com>',
+      'Claude Opus 5 (1M context) <noreply@anthropic.com>',
+      'Claude Opus 4.8 <noreply@anthropic.com>',
+      'Claude Fable 5 <noreply@anthropic.com>',
+    ]) expect(classifyTrailer(t)).toBe('allowed')
+  })
+
+  it('calls the REAL bare trailer unidentified, not forbidden', () => {
+    expect(classifyTrailer('Claude <noreply@anthropic.com>')).toBe('unidentified')
+    expect(classifyTrailer('Claude Code <noreply@anthropic.com>')).toBe('unidentified')
+    expect(classifyTrailer('Claude (1M context) <noreply@anthropic.com>')).toBe('unidentified')
+    expect(isPolicyBreach('Claude <noreply@anthropic.com>')).toBe(false)
+  })
+
+  it('calls a NAMED model outside the allowlist forbidden', () => {
+    for (const t of [
+      'Claude Haiku 4.5 <noreply@anthropic.com>',
+      'claude sonnet 5 <noreply@anthropic.com>',
+      'Claude Nano 6 <noreply@anthropic.com>',
+    ]) expect(classifyTrailer(t)).toBe('forbidden')
+  })
+
+  it('judges a commit by its WORST trailer', () => {
+    expect(classifyTrailer('Claude Opus 5 <a@x>,Claude <b@x>')).toBe('unidentified')
+    expect(classifyTrailer('Claude <a@x>,Claude Haiku 4.5 <b@x>')).toBe('forbidden')
+    expect(classifyTrailer('Claude Opus 5 <a@x>;Claude Fable 5 <b@x>')).toBe('allowed')
+  })
+
+  it('does not judge what carries no model evidence', () => {
+    expect(classifyTrailer('')).toBe('allowed')
+    expect(classifyTrailer(null)).toBe('allowed')
+    expect(classifyTrailer('Patrick von Massow <patrick@example.com>')).toBe('allowed')
+  })
+
+  it('reads the model name out of a trailer', () => {
+    expect(modelNameIn('Claude Opus 4.8 (1M context) <noreply@anthropic.com>')).toBe('Opus 4.8')
+    expect(modelNameIn('Claude <noreply@anthropic.com>')).toBe('')
+  })
+})
+
+describe('findUnidentifiedCommits', () => {
+  const log = [
+    line('1111111', '2026-07-24T21:00:00Z', 'Claude <noreply@anthropic.com>'), // before baseline
+    line('2222222', '2026-07-24T22:30:00Z', 'Claude <noreply@anthropic.com>'),
+    line('3333333', '2026-07-24T23:00:00Z', 'Claude Haiku 4.5 <noreply@anthropic.com>'),
+    line('4444444', '2026-07-24T23:10:00Z', ''),
+    line('5555555', '2026-07-24T23:20:00Z', 'Claude Opus 5 <noreply@anthropic.com>'),
+    line('6666666', '2026-07-24T23:30:00Z', 'Patrick von Massow <patrick@example.com>'),
+  ].join('\n')
+
+  it('returns the unnamed commits and nothing else', () => {
+    expect(findUnidentifiedCommits(log, T0).map((h) => h.sha)).toEqual(['2222222'])
+  })
+  it('the forbidden finder never returns an unidentified commit', () => {
+    expect(findForbiddenCommits(log, T0).map((h) => h.sha)).toEqual(['3333333'])
+  })
+  it('is empty on empty/absent input', () => {
+    expect(findUnidentifiedCommits('', T0)).toEqual([])
+    expect(findUnidentifiedCommits(null, T0)).toEqual([])
+  })
+})
+
+describe('the two block texts', () => {
+  const hits = [{ sha: '652a8ba1111', trailer: 'Claude <noreply@anthropic.com>' }]
+
+  it('the unnamed one names the commit and where the answer lives', () => {
+    const text = formatUnidentifiedReason(hits)
+    expect(text).toContain('652a8ba')
+    expect(text).toContain('~/.claude/projects/')
+    expect(text).toContain('subagents/agent-')
+    expect(text).toContain('message.model')
+    expect(text).toContain('model-guard-baseline.json')
+    // It must NOT read as the breach ritual: no pause is owed here.
+    expect(text).toContain('do not pause the batch over it')
+  })
+
+  it('the named one keeps demanding the pause', () => {
+    const text = formatForbiddenReason([{ sha: 'a69d1bd', trailer: 'Claude Haiku 4.5 <x@y>' }])
+    expect(text).toContain('SERVING-MODEL TRIPWIRE')
+    expect(text).toContain('a69d1bd')
+    expect(text).toContain('.claude/batch-paused')
+  })
+
+  it('the named one names the unnamed commits standing beside it', () => {
+    // Else advancing the baseline past the breach clears them unseen.
+    const text = formatForbiddenReason([{ sha: 'a69d1bd', trailer: 'Claude Haiku 4.5 <x@y>' }], {
+      alsoUnidentified: hits,
+    })
+    expect(text).toContain('652a8ba')
+    expect(text).toContain('names NO model')
+  })
+
+  it('names a surviving filter-branch backup ref instead of reporting it twice', () => {
+    const refs = backupRefsIn('refs/original/refs/heads/feat/392-x\nrefs/heads/main\n')
+    expect(refs).toEqual(['refs/original/refs/heads/feat/392-x'])
+    const text = formatUnidentifiedReason(hits, { backupRefs: refs })
+    expect(text).toContain('refs/original/refs/heads/feat/392-x')
+    expect(text).toContain('git update-ref -d refs/original/refs/heads/feat/392-x')
+    // and it stays out of the way when there are none
+    expect(formatUnidentifiedReason(hits, { backupRefs: [] })).not.toContain('update-ref')
+  })
+})
+
+// POINT 425: the grip at the source — the commit-msg gate's pure half.
+describe('evaluateCommitTrailers (the commit-msg gate)', () => {
+  const msg = (...trailers) => `Do a thing\n\n${trailers.join('\n')}\n`
+
+  it('accepts each allowed spelling, with and without the context suffix', () => {
+    for (const t of [
+      'Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>',
+      'Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>',
+      'Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>',
+      'Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>',
+      'Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>',
+    ]) expect(evaluateCommitTrailers(msg(t)).block, t).toBe(false)
+    // every spelling the refusal advertises must itself pass the gate
+    for (const t of ALLOWED_TRAILERS) expect(evaluateCommitTrailers(msg(t)).block, t).toBe(false)
+  })
+
+  it('rejects the bare trailer', () => {
+    const v = evaluateCommitTrailers(msg('Co-Authored-By: Claude <noreply@anthropic.com>'))
+    expect(v.block).toBe(true)
+    expect(v.findings[0].rule).toBe('unnamed-model-trailer')
+  })
+
+  it('rejects a named model outside the allowlist', () => {
+    const v = evaluateCommitTrailers(msg('Co-Authored-By: Claude Haiku 4.5 <noreply@anthropic.com>'))
+    expect(v.block).toBe(true)
+    expect(v.findings[0].rule).toBe('forbidden-model-trailer')
+  })
+
+  it('ignores a purely human co-author and a message with no trailer at all', () => {
+    expect(evaluateCommitTrailers(msg('Co-Authored-By: Patrick von Massow <p@example.com>')).block).toBe(false)
+    expect(evaluateCommitTrailers('Merge branch main into feat/x\n').block).toBe(false)
+    expect(evaluateCommitTrailers('').block).toBe(false)
+    expect(evaluateCommitTrailers(null).block).toBe(false)
+  })
+
+  it('flags a bare trailer standing beside a named one', () => {
+    const v = evaluateCommitTrailers(
+      msg('Co-Authored-By: Claude Opus 5 <a@x>', 'Co-Authored-By: Claude <b@x>'),
+    )
+    expect(v.block).toBe(true)
+    expect(v.findings).toHaveLength(1)
+  })
+
+  it('reads trailers case-insensitively and never out of a comment line', () => {
+    expect(coAuthorTrailers('x\n\nco-authored-by: Claude Opus 5 <a@x>\n')).toEqual(['Claude Opus 5 <a@x>'])
+    expect(coAuthorTrailers('x\n\n# Co-Authored-By: Claude <a@x>\n')).toEqual([])
+    expect(evaluateCommitTrailers('x\n\n# Co-Authored-By: Claude <a@x>\n').block).toBe(false)
+  })
+
+  it('the refusal prints the exact trailer to write and where to look it up', () => {
+    const text = formatCommitTrailerVerdict(
+      evaluateCommitTrailers(msg('Co-Authored-By: Claude <noreply@anthropic.com>')),
+    )
+    expect(text).toContain('Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>')
+    expect(text).toContain('Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>')
+    expect(text).toContain('Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>')
+    expect(text).toContain('~/.claude/projects/')
+    expect(formatCommitTrailerVerdict({ block: false, findings: [] })).toBe('')
   })
 })
