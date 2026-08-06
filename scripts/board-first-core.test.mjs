@@ -14,9 +14,13 @@ import {
   isBoardFile,
   isPublished,
   focusStampedAt,
+  isWorktreeCheckout,
   shellSegments,
   evaluate,
 } from './board-first-core.mjs'
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 const TURN = 1_700_000_000_000
 const BEFORE = TURN - 60_000
@@ -560,5 +564,44 @@ describe('the no-work claim binds the turn', () => {
       expect(idle({ toolName: 'Edit', filePath: 'src/example.ts' }).block).toBe(true)
       expect(idle({ toolName: 'NotebookEdit', filePath: 'a.ipynb' }).block).toBe(true)
     })
+  })
+})
+
+describe('a delegated agent has no board duty (point 440)', () => {
+  const SCRIPTS = dirname(fileURLToPath(import.meta.url))
+
+  it('recognises an isolated worktree checkout on either separator', () => {
+    expect(isWorktreeCheckout('/workspace/hoa/.claude/worktrees/agent-a19/scripts')).toBe(true)
+    expect(isWorktreeCheckout('C:\\Users\\Patri\\hoa\\.claude\\worktrees\\agent-a19\\')).toBe(true)
+  })
+
+  it('never mistakes the main tree — where the board duty really lives — for one', () => {
+    expect(isWorktreeCheckout('/workspace/hoa')).toBe(false)
+    expect(isWorktreeCheckout('/workspace/hoa/.claude')).toBe(false)
+    expect(isWorktreeCheckout('/workspace/hoa/scripts')).toBe(false)
+    // A path merely MENTIONING the word is not a worktree checkout.
+    expect(isWorktreeCheckout('/workspace/hoa/docs/worktrees.md')).toBe(false)
+    expect(isWorktreeCheckout(null)).toBe(false)
+    expect(isWorktreeCheckout(undefined)).toBe(false)
+  })
+
+  it('the wrapper stands down on it, and only after the lease/handover/fence work', () => {
+    // The saving is a WRAPPER exit, so the pin is on the wrapper: the stand-down
+    // must sit below the fence chokepoint (which still binds a stale-fenced
+    // session) and above the board decision (the part an agent cannot act on).
+    const guard = readFileSync(join(SCRIPTS, 'board-first-guard.mjs'), 'utf8')
+    const standDown = guard.indexOf('if (isWorktreeCheckout(REPO_ROOT)) process.exit(0)')
+    expect(standDown).toBeGreaterThan(0)
+    expect(standDown).toBeGreaterThan(guard.indexOf('fenceDecision('))
+    expect(standDown).toBeGreaterThan(guard.indexOf('renewLease('))
+    expect(standDown).toBeLessThan(guard.indexOf('const decision = evaluate({'))
+  })
+
+  it('the deny an agent CAN still get keeps telling it what to do', () => {
+    // A subagent that is not worktree-isolated still inherits the session id and
+    // is still judged like the owner; deleting that sentence would leave it
+    // stuck, so the cut may not take it with it.
+    const core = readFileSync(join(SCRIPTS, 'board-first-core.mjs'), 'utf8')
+    expect(core).toContain('IF YOU ARE A SUBAGENT')
   })
 })

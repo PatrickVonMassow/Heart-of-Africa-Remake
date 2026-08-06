@@ -17,10 +17,12 @@
 //
 // Ownership-aware like every guard since the hard singleton: a session that does
 // not own the live batch lock has no board duty, and a paused batch is never
-// gated. NOTE: a subagent is NOT exempt by that rule — its tool calls carry the
-// PARENT session id, so it is judged like the owner (four-eyes review,
-// 27.07.2026). The deny text therefore tells a subagent to simply repeat the
-// call: the gate fires at most once per turn, so the repeat goes through.
+// gated. A subagent is not exempt by that rule — its tool calls carry the PARENT
+// session id, so it is judged like the owner (four-eyes review, 27.07.2026) —
+// but a WORKTREE-ISOLATED one is (point 440): its checkout path says what the
+// session id cannot, and the deny it used to eat was one it could never act on.
+// A subagent running in the main tree still gets the deny, and its text still
+// tells it to repeat the call, which the once-per-turn stand-down lets through.
 import { readFileSync, existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 import {
@@ -35,7 +37,7 @@ import { heldByOtherLiveOwner, withdrawHandover, touchHandover, renewLease, read
 import { fenceDecision } from './batch-lease-core.mjs'
 import { handoverSurvivesCall, describeWithdrawalTrigger, hookCallTimestamp } from './batch-boundary-core.mjs'
 import { publishCapability } from './board-currency-core.mjs'
-import { evaluate } from './board-first-core.mjs'
+import { evaluate, isWorktreeCheckout } from './board-first-core.mjs'
 
 const PAUSE = resolve(REPO_ROOT, '.claude', 'batch-paused')
 
@@ -215,6 +217,15 @@ try {
   }
 
   if (heldByOtherLiveOwner(payload.session_id || '')) process.exit(0)
+
+  // A DELEGATED AGENT HAS NO BOARD DUTY (point 440). It runs from its own
+  // worktree under .claude/worktrees/, which is the one thing the inherited
+  // session id cannot tell the gate — see isWorktreeCheckout. It is placed AFTER
+  // the fence and the piggy-backed lease/handover work above, which must keep
+  // running for every call, and before the board decision, which is the only
+  // part an agent could not act on. Measured: 1058 characters of deny plus a
+  // discarded tool call per agent, for a publish it is forbidden to make.
+  if (isWorktreeCheckout(REPO_ROOT)) process.exit(0)
 
   const input = input0
   const { state, focus, repoHash, boardPaths, boardHtml } = gather()
