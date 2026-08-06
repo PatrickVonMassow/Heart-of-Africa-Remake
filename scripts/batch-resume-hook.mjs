@@ -32,7 +32,7 @@ import {
 } from './batch-singleton.mjs'
 import { readClaim, clearClaim, maxAgeMs } from './batch-claim.mjs'
 import { assessClaim, ownerIsHolding, reservationDecision } from './batch-claim-core.mjs'
-import { standDownMessage } from './batch-resume-hook-core.mjs'
+import { openPointsHeadline, standDownMessage } from './batch-resume-hook-core.mjs'
 import { MANDATE_MAX_AGE_MS, resumeRepairMandate } from './batch-doctor-core.mjs'
 import { consumeMandateMarker } from './batch-doctor-states.mjs'
 import { isPaused, pauseReason } from './batch-lock.mjs'
@@ -200,13 +200,13 @@ try {
     // Nothing actionable — the batch is finished, or every remaining point is
     // user-deferred. Start silently either way.
   } else {
-    const nums = open.map((l) => l.match(/\d+/)[0]).join(', ')
+    const nums = open.map((l) => l.match(/\d+/)[0])
     // Model policy (point 309, user 25.07.2026): the 24.07 session silently
     // degraded to Haiku and wrecked three points — name the ALLOWLIST at every
     // session start; the model-guard Stop hook enforces it at the first
     // forbidden commit.
     const header =
-      `[batch-resume] TASKS.md has ${open.length} open point(s): ${nums}. ` +
+      openPointsHeadline(nums) +
       'MODEL POLICY (25.07.2026): Opus 5 is the WORKER at any difficulty; the fallback chain ' +
       'is Opus 5 -> Fable 5 -> Opus 4.8. Fable is used ONLY for four-eyes review (one model ' +
       'plans/builds, the other checks) or as that fallback — never because a task looks hard. ' +

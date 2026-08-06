@@ -53,6 +53,25 @@ import { parseSegments, segmentInvokesScript, isMutatingSegment, shellSegments }
 // keep one import.
 export { shellSegments, isMutatingSegment }
 
+/**
+ * Is this checkout a delegated agent's isolated worktree? (point 440)
+ *
+ * WHY THE GATE ASKS. A subagent inherits the parent's session id, so the
+ * ownership stand-down cannot tell it apart — the deny used to admit exactly
+ * that and tell the agent to repeat the call. Measured, that is 1058 characters
+ * of block text plus one thrown-away tool call for EVERY delegated agent, spent
+ * on a duty the agent is forbidden to discharge: CLAUDE.md §6 keeps the board
+ * with the main session, and a worktree agent must not publish it.
+ *
+ * The CHECKOUT PATH is the signal the session id cannot give. Worktrees are
+ * created under `.claude/worktrees/<agent>` (scripts/worktree-cleanup.mjs), and
+ * the main session — the only session with a board duty — always works in the
+ * main tree. Separator-agnostic, so a Windows path reads the same.
+ */
+export function isWorktreeCheckout(path) {
+  return /[/\\]\.claude[/\\]worktrees[/\\]/.test(String(path ?? ''))
+}
+
 /** Tools that change state by their nature — no command inspection needed. */
 export const MUTATING_TOOLS = new Set(['Edit', 'Write', 'NotebookEdit', 'Agent'])
 

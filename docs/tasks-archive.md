@@ -13111,6 +13111,49 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   lifecycle, CLAUDE.md §6 where the singleton and the context boundary are described, and the
   ledger row for retrospective §3.61.
 
+- [x] 440. WHAT ELSE IS BILLED ON EVERY TURN FOR NOTHING — A MEASURED INVENTORY (user
+  30.07.2026, reading point 436: "ob du noch mehr Altlasten hast, durch die du redundante
+  Dinge machst, die Token und Zeit verschwenden"; bundle Chat & Tafel). 436 cut ONE injected text by
+  61 %; the question is what else repeats itself, and the answer must be MEASURED, not
+  guessed. ALREADY FOUND while answering, and the clearest instance of the same pattern: the
+  chat-timestamp rule is stated THREE times in EVERY prompt — the user-scope
+  `berlin-timestamp.cjs` hook (~180 chars), the `[timestamp] PFLICHT` block in
+  `dashboard-reminder-hook.mjs` (~1071 chars) and the `WICHTIGSTE REGEL` banner (~318 chars)
+  — while `timestamp-guard.mjs` ALREADY blocks the turn end on a reply that lacks it. Same
+  for the `[focus-guard]` block (~886 chars), whose duty `dashboard-guard-core` refuses to
+  let pass anyway. That is ~2.3k characters of enforced rule per prompt, on top of the 843
+  the reminder still costs.
+  THE INVENTORY, each item with its measured size and its verdict:
+  · every text injected per PROMPT (all UserPromptSubmit hooks, project and user scope);
+  · every text injected per SESSION (SessionStart, the resume hook, CLAUDE.md, the memory
+    index) — measured, not estimated;
+  · every text a guard prints when it BLOCKS, since a block is read in full;
+  · the Stop chain's 21 hooks and the PreToolUse/PostToolUse hooks as TIME: how many node
+    processes a turn end spawns and what they cost in wall-clock, which is the other half of
+    the user's question (point 401 measured 85 spawn sites without window suppression).
+  THE RULE TO APPLY, from 436: a statement that a gate already refuses to break is deleted
+  and replaced by a pointer; a statement no mechanism can check stays, in full. Where a rule
+  is enforced but its remedy is not discoverable, the REMEDY moves into the guard's block
+  text, where it is read exactly when needed, instead of into every prompt.
+  MEASURED 30.07.2026, AND IT MOVES THE VERDICT: the fixed per-turn preamble, not
+  accumulation, is now the dominant token item — `CLAUDE.md` 72014 characters (~18k tokens),
+  `MEMORY.md` 12787 (~3.2k), the global `CLAUDE.md` 5093 (~1.3k), plus the hook texts above:
+  roughly 23k tokens of FIXED load per turn, which no point boundary resets. And every
+  delegated subagent INHERITS it, so the figure is multiplied by the pool width, not paid
+  once. Against that the Stop chain is free while it is green — a block is what costs.
+  TWO THREADS THE INVENTORY MUST CLOSE: (a) the delegation prompt does not fix the RETURN
+  shape, so an agent's report is as long as it chooses; it becomes a short protocol — point,
+  files touched, status, what is still open — mirroring what `point-brief.mjs` already did
+  for the inbound side (~1.8k tokens against ~108k). (b) `CLAUDE.md` is shortened by the
+  method that already worked once: the §7.1 evidence chains moved to
+  `docs/acceptance-evidence.md` and are loaded only when needed. That second one CHANGES THE
+  GOVERNING FILE, so it waits for the user's go (board card).
+  VERIFIABLE: the inventory lands as a table in `docs/batch-autonomy.md` with the measured
+  before/after per item, and each cut is pinned the way 436 pinned its own — a test naming
+  the enforced claims that may not reappear, and the unenforceable duties that may not
+  vanish. The total saving is stated as one number in the commit, and the per-turn fixed load
+  is re-measured after the cuts so the claim is a measurement rather than an intention.
+
 - [x] 442. THE DOCTOR RUNS BEFORE THE SUCCESSOR, NOT AFTER THE DAMAGE (user 30.07.2026: "Ein
   Ausfall eines Elements kann zu jedem beliebigen Zeitpunkt passieren — auch mitten in einer
   kritischen Aktion. Davon musst du dich immer selbstständig erholen können"; bundle

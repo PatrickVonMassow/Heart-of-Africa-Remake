@@ -339,12 +339,12 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Ein Schritt in deiner Umgebung gehört dir. **Miss** erst, ob der Weg trägt.
   Fehlt wirklich eine Fähigkeit, bitte **einmal um die Fähigkeit** — nie um ihre Ausführung."
 
-- **Nicht jedes Rot ist deins.** Eine Prüfung, die nur „rot" und „grün" kennt, schiebt auch
-  den Ausfall eines fremden Dienstes deinem Code zu — und schickt dich auf eine Suche, die
-  nichts finden kann.
-  → *Prompt:* „Sag bei jedem Rot zuerst, **wo die Ursache liegt** — bei uns oder außerhalb.
-  Liegt sie außerhalb, nenn den **echten Griff** dort. Und was auf einen fremden Dienst
-  wartet, gibt beim Aufgeben das **Angefangene zurück** — sonst sperrt es alle Nachfolger."
+- **Nicht jedes Rot ist deins.** Eine Prüfung, die nur „rot" und „grün" kennt, schiebt fremde
+  Ausfälle deinem Code zu und schickt dich auf eine ergebnislose Suche.
+  → *Prompt:* „Sag bei jedem Rot zuerst, **wo die Ursache liegt** — nicht nach **Namensliste**
+  (die veraltet), sondern nach der Beobachtung: **lief überhaupt ein eigener Schritt?** Liegt
+  sie außerhalb, nenn den **echten Griff** dort; und wer auf einen fremden Dienst wartet, gibt
+  beim Aufgeben das **Angefangene zurück**, sonst sperrt er alle Nachfolger."
 
 - **Die Reparatur nimmt den Reparierenden mit.** Wer die Leitung repariert, auf der er
   sitzt — Netz, Rechte, Umgebung —, verliert mit dem Fehlschlag die nächste Reparatur mit.
