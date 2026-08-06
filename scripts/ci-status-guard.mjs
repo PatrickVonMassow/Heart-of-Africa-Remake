@@ -21,7 +21,7 @@ import { request } from 'node:https'
 import { fileURLToPath } from 'node:url'
 import { readJson, writeJsonAtomic } from './dashboard-state.mjs'
 import { classifyRuns, failedRuns, shouldBlock, shouldNotify, blockReason } from './ci-status-guard-core.mjs'
-import { classifyFailureCause } from './ci-failure-cause-core.mjs'
+import { JOBS_PAGE_SIZE, classifyFailureCause, jobsComplete, moreJobPages } from './ci-failure-cause-core.mjs'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
 
 const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url))
@@ -216,7 +216,15 @@ async function fetchLastGreenShas(repo, workflowId) {
 
 /** The jobs of one run, so the failing JOB can say which side the fault sits on
  *  (ci-failure-cause-core). null on any failure — the classifier then reports
- *  `unknown` for the Pages workflow and keeps the old wording elsewhere. */
+ *  `unknown` for the Pages workflow and keeps the old wording elsewhere.
+ *
+ *  PAGINATED, and null on a list that cannot be PROVEN complete (four-eyes
+ *  residual (b), 06.08.2026). The old call read the first 30 jobs of a run and
+ *  handed them over as if they were all of them — and the classifier's central
+ *  rule is "EVERY failed job ran nothing of ours", which a truncated list can
+ *  satisfy while a failed job one page on ran our code. That would WAIVE a red
+ *  that is genuinely ours. A partial list is therefore not a smaller truth but
+ *  no answer, and `null` sends the classifier back to its blocking reading. */
 async function fetchJobs(repo, runId) {
   if (!runId) return null
   const headers = {
@@ -226,16 +234,27 @@ async function fetchJobs(repo, runId) {
   }
   const token = readToken()
   if (token) headers.Authorization = `Bearer ${token}`
-  const res = await httpsRequest(`https://api.github.com/repos/${repo}/actions/runs/${runId}/jobs?per_page=30`, {
-    headers,
-  })
-  if (!res || res.status !== 200) return null
-  try {
-    const data = JSON.parse(res.body)
-    return Array.isArray(data?.jobs) ? data.jobs : null
-  } catch {
-    return null
+  const jobs = []
+  let totalCount = null
+  let page = 1
+  for (;;) {
+    const res = await httpsRequest(
+      `https://api.github.com/repos/${repo}/actions/runs/${runId}/jobs?per_page=${JOBS_PAGE_SIZE}&page=${page}`,
+      { headers },
+    )
+    if (!res || res.status !== 200) return null
+    try {
+      const data = JSON.parse(res.body)
+      if (!Array.isArray(data?.jobs)) return null
+      jobs.push(...data.jobs)
+      totalCount = Number(data.total_count)
+    } catch {
+      return null
+    }
+    if (!moreJobPages({ fetched: jobs.length, totalCount, page, perPage: JOBS_PAGE_SIZE })) break
+    page += 1
   }
+  return jobsComplete({ fetched: jobs.length, totalCount }) ? jobs : null
 }
 
 /** ntfy push, same channel as scripts/notify.mjs but via node:https (see top).
@@ -284,6 +303,13 @@ async function main() {
   // commit. So: block on the first red that has something to do, and stand down
   // only when every single one of them has not.
   const reds = failedRuns(runs, head)
+  const state = readJson(STATE) ?? {}
+  const now = Date.now()
+  // WHEN each workflow was first seen dying the famine way, so the outage waiver
+  // can expire (residual (a)). Kept per workflow name, not per sha: the very
+  // failure mode is one workflow dying identically across commit after commit.
+  const famine = state.famine && typeof state.famine === 'object' ? state.famine : {}
+  const stillFamished = {}
   const judged = []
   for (const red of reds.length > 0 ? reds : [runClassification]) {
     const cause = classifyFailureCause({
@@ -291,7 +317,10 @@ async function main() {
       conclusion: red.conclusion,
       jobs: await fetchJobs(repo, red.runId),
       workflowsUntouched: await workflowsUntouchedSince(repo, runs, red, head),
+      famineSince: Number(famine[red.workflowName]) || 0,
+      now,
     })
+    if (cause.actionable === false) stillFamished[red.workflowName] = Number(famine[red.workflowName]) || now
     judged.push({ ...red, ...cause })
   }
   // The one that decides: the first red something can be done about, else the
@@ -299,7 +328,6 @@ async function main() {
   const classification = judged.find((c) => c.actionable !== false) ?? judged[0]
   const standDown = judged.every((c) => c.actionable === false)
 
-  const state = readJson(STATE) ?? {}
   // A stood-down red gets a REPEATED alert, not one ever (four-eyes review S1):
   // in a runner famine no step runs, so ci.yml's own `if: failure()` alert —
   // the primary detector — never fires either. Dedup per sha alone would leave
@@ -309,14 +337,22 @@ async function main() {
     await notifyCiRed(
       `CI failed for pushed ${head.slice(0, 7)}: "${classification.workflowName}" ` +
         `run ${classification.runId} (${classification.conclusion}, cause: ${classification.cause}` +
-        `${standDown ? ', nothing in the repository can clear it' : ''}). ${classification.url ?? ''}`,
+        `${standDown ? ', nothing in the repository can clear it' : ''}). ${classification.url ?? ''}` +
+        // Once the outage waiver has expired, the alert stops saying "nothing to
+        // do" and NAMES the reading only a push can fix (residual (a)).
+        (classification.escalate ? ` ${classification.detail}. ${classification.remedy}` : ''),
     )
     writeJsonAtomic(STATE, {
       ...state,
+      famine: stillFamished,
       notifiedSha: alertKey,
       notifiedAt: Date.now(),
       runId: classification.runId,
     })
+  } else if (JSON.stringify(stillFamished) !== JSON.stringify(famine)) {
+    // A workflow that recovered forgets its waiver clock, so the NEXT famine
+    // starts a fresh six hours instead of inheriting an expired one.
+    writeJsonAtomic(STATE, { ...state, famine: stillFamished })
   }
 
   // A red with NOTHING to do is reported, not sat on (point 528, 06.08.2026). The

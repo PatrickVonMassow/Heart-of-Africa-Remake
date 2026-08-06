@@ -81,9 +81,29 @@ describe('judgeServedRevision', () => {
     expect(v.reason).toContain(MAIN.slice(0, 7))
   })
 
-  it('says so when no deploy run exists for the commit at all', () => {
+  // MEASURED 06.08.2026, 21:13 Berlin: two pushes to `main` created NO workflow
+  // run at all — earlier in the evening runs were created and died without a
+  // runner, now GitHub does not even create one. A detector that waits for a RED
+  // RUN sees absolutely nothing in that state while the site ages in silence.
+  // Hence: the verdict is anchored on the SERVED REVISION vs `main`, which is an
+  // observation, never on a run outcome, which can simply be absent.
+  it('calls the site stale with NO deploy run in existence — the run list is not the anchor', () => {
     const v = judgeServedRevision({ ...base, fetched: served(OTHER), latestRun: null })
+    expect(v.verdict).toBe('stale')
     expect(v.reason).toContain('no deploy run exists')
+    expect(v.servedSha).toBe(OTHER)
+    expect(v.mainSha).toBe(MAIN)
+  })
+
+  it('and retries that no-run case, because GitHub answering with an empty list IS an answer', () => {
+    const v = judgeServedRevision({ ...base, fetched: served(OTHER), latestRun: null })
+    const d = retryDecision({ verdict: v.verdict, mainSha: v.mainSha, githubAnswering: true, now: NOW })
+    expect(d.dispatch).toBe(true)
+  })
+
+  it('still holds fire on a commit younger than the window even with no run', () => {
+    const v = judgeServedRevision({ ...base, mainCommittedAt: NOW - 60_000, fetched: served(OTHER), latestRun: null })
+    expect(v.verdict).toBe('pending')
   })
 
   it('holds fire while the deploy is still within its window', () => {
