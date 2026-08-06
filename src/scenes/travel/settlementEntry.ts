@@ -1,8 +1,12 @@
-// Bird's-eye settlement entry (design.md §2.3): entering a settlement is
-// movement-based but CONFIRMED with the Space use key — reaching the enter
-// radius no longer enters on its own. These pure helpers decide the candidate
-// and whether a Space press may enter it, so the logic is unit-testable apart
-// from the Three.js travel scene.
+// Bird's-eye settlement entry and collision (design.md §2.3/§11): entering a
+// settlement is movement-based but CONFIRMED with the Space use key — reaching
+// the enter radius no longer enters on its own — and the footprint itself is
+// solid, so the traveller cannot walk through a village or port. These pure
+// helpers decide the candidate, whether a Space press may enter it, and which
+// collider circles the move resolves against, so the logic is unit-testable
+// apart from the Three.js travel scene. The two radii are coupled: the collider
+// stays INSIDE the enter radius, so approaching a place always arms the prompt
+// before the footprint stops the traveller.
 
 export interface EnterablePlace {
   id: string
