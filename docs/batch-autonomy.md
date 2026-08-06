@@ -215,11 +215,25 @@ from advisory claim-and-check to a HARD mutual exclusion in
     script tree (comments and string bodies MASKED, so prose that mentions `spawn`
     cannot match) and `scripts/window-hide-core.test.mjs` FAILS the unit layer on any
     call without the flag — the same shape as the quality-preset completeness gate,
-    so a newly added `execFileSync` is caught at once. Its `ALLOW` map holds the
+    so a newly added `execFileSync` is caught at once. THE OBVIOUS EVASIONS ARE
+    CLOSED rather than trusted: the sweep reads every extension Node runs (`.cjs`
+    included — `scripts/hooks/*.cjs` already exist), it counts `fork`, and it sees the
+    NAMESPACED form `cp.spawnSync(…)`, which the first version's blanket member-access
+    exclusion let through; only bare `exec` keeps that exclusion, and there only a
+    known `child_process` receiver counts, because `RE.exec(line)` is a regex written
+    constantly in this tree. The four-eyes review closed three more: the literal
+    `windowsHide: false` no longer passes as "the flag appears", a quote inside a
+    regex literal (`s.replace(/'/g, '')`) no longer flips the masker's string parity
+    and silences every call below it, and a call inside a template interpolation
+    (`` `${execSync(cmd)}` ``) is seen. What a TEXT audit cannot see stays named:
+    an aliased or `promisify`d call reaches the window through a name the sweep
+    does not know. Its `ALLOW` map holds the
     documented exceptions, each with a written reason, and a stale entry is itself a
     failure: an `awaiting` entry is a debt, and deleting it is how the debt is proven
-    paid. Verified as a negative control against the pre-401 tree: 70 offenders
-    before, none after. Both kinds of entry are now settled: the nine files a parallel
+    paid. Verified as a negative control against the pre-401 tree: 79 offenders
+    before, none after — and the control is RE-RUN each time rather than recorded,
+    by stripping the flag from the live files and asserting the sweep goes red.
+    Both kinds of entry are now settled: the nine files a parallel
     agent held were fixed and their `awaiting` debts DELETED, and every remaining
     exception is scoped by what the call CONTAINS (`matching: 'buildSpawnOptions'` —
     that helper sets the flag itself) rather than by which LINE it sits on. The
