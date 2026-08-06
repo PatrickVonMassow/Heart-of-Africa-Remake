@@ -23,9 +23,12 @@ import {
   buildQueueSection,
   importQueueFromHtml,
   isUntranslatedTitle,
+  mergeQueueImport,
   normaliseQueueData,
   openPointsOf,
   paragraphs,
+  parseQueueDataFile,
+  queueImportOffenders,
   parseSetArgs,
   parseTaskTitles,
   queueEntries,
@@ -218,13 +221,150 @@ describe('the one-time import from a hand-written board', () => {
     )
     const data = importQueueFromHtml(html)
     expect(data.order).toEqual([8, 3])
-    expect(data.points[8]).toEqual({ title: 'Acht', body: 'Text acht.', estimate: '~2 h' })
+    expect(data.points[8]).toEqual({ title: 'Acht', body: ['Text acht.'], estimate: '~2 h' })
     // The stub meta is not an estimate anybody made — it must not be imported
     // as one, or the point would look estimated for ever.
     expect(data.points[3].estimate).toBeNull()
   })
   it('returns an empty projection rather than throwing on a board with no queue', () => {
     expect(importQueueFromHtml('<main></main>')).toEqual({ order: [], points: {} })
+  })
+
+  // POINT 530: the round trip data → board → data is what destroyed 46 cards.
+  it('keeps every rendered <p> as its own paragraph', () => {
+    const body = ['Erster Absatz.', 'Zweiter Absatz.', 'Dritter Absatz.']
+    const html = board(renderQueueCard({ point: 9, title: 'Neun', body, meta: '~2 h' }))
+    expect(importQueueFromHtml(html).points[9].body).toEqual(body)
+  })
+  it('reads a hand-written card that has no <p> at all', () => {
+    const html = board('<details>\n  <summary><span class="num">7</span><span class="t">Sieben</span></summary>\n  <div class="body">Roher Text.</div>\n</details>\n')
+    expect(importQueueFromHtml(html).points[7].body).toEqual(['Roher Text.'])
+  })
+  // FINDING 2: the card renders its title through `esc`, so an entity stored as
+  // read would grow a layer on every round trip and never match the headline.
+  it('stores the title unescaped, so it survives a round trip', () => {
+    const title = 'Krieg & Frieden <1890>'
+    const once = importQueueFromHtml(board(renderQueueCard({ point: 6, title, body: 'Text.', meta: '~1 h' })))
+    expect(once.points[6].title).toBe(title)
+    const twice = importQueueFromHtml(board(renderQueueCard({ point: 6, ...once.points[6], meta: '~1 h' })))
+    expect(twice.points[6].title).toBe(title)
+  })
+
+  it('recognises an entity-carrying fallback title as still the work order’s', () => {
+    const headline = 'BUY & SELL DIALOGS'
+    const html = board(renderQueueCard({ point: 6, title: headline, body: 'Text.', meta: '~1 h' }))
+    expect(boardTitleReport(html, { 6: headline }).untranslated).toEqual([6])
+    expect(boardTitleReport(html, { 6: 'Etwas anderes' }).untranslated).toEqual([])
+  })
+
+  it('does not import the generator’s own stub as prose', () => {
+    const html = board(renderQueueCard({ point: 4, title: 'Vier', body: null, meta: QUEUE_STUB_META }))
+    expect(importQueueFromHtml(html).points[4].body).toBeNull()
+  })
+})
+
+describe('a data file that does not parse stops the command (point 530, finding 1)', () => {
+  it('reads a stored file and treats an absent or empty one as nothing yet', () => {
+    expect(parseQueueDataFile('{"order":[5],"points":{}}')).toEqual({ order: [5], points: {} })
+    expect(parseQueueDataFile(null)).toBeNull()
+    expect(parseQueueDataFile(undefined)).toBeNull()
+    expect(parseQueueDataFile('  \n ')).toBeNull()
+  })
+
+  it('refuses a torn file instead of reporting "nothing stored yet"', () => {
+    // Treating this as null is what lets a rewrite drop every card the board
+    // does not render — a point promoted to the now-section or to VDZK.
+    expect(() => parseQueueDataFile('{"order":[5],"poi')).toThrow(/does not parse/)
+    expect(() => parseQueueDataFile('{"a":1}x', { path: '.claude/board-queue.json' })).toThrow(
+      /\.claude\/board-queue\.json/,
+    )
+  })
+})
+
+describe('import is additive — it may never destroy a stored body (point 530)', () => {
+  const stored = {
+    order: [8],
+    points: { 8: { title: 'Acht', body: ['Erster Absatz.', 'Zweiter Absatz.', 'Dritter Absatz.'], estimate: '~2 h' } },
+  }
+
+  it('keeps the stored paragraphs when the board says the same point differently', () => {
+    const fromBoard = { order: [8], points: { 8: { title: 'Eight', body: ['Alles in einem Block.'], estimate: '~9 h' } } }
+    const { data, added, kept } = mergeQueueImport(stored, fromBoard)
+    expect(data.points[8]).toEqual(stored.points[8])
+    expect(added).toEqual([])
+    expect(kept).toBe(1)
+  })
+
+  it('adds a point the data does not know yet, behind the stored order', () => {
+    const fromBoard = { order: [12, 8], points: { 12: { title: 'Zwölf', body: ['Neu.'], estimate: null } } }
+    const { data, added } = mergeQueueImport(stored, fromBoard)
+    expect(added).toEqual([12])
+    expect(data.order).toEqual([8, 12])
+    expect(data.points[12].body).toEqual(['Neu.'])
+    expect(data.points[8].body).toEqual(stored.points[8].body)
+  })
+
+  it('fills only the fields the stored card has nothing for', () => {
+    const partial = { order: [5], points: { 5: { title: null, body: ['Text.'], estimate: null } } }
+    const { data } = mergeQueueImport(partial, { order: [5], points: { 5: { title: 'Fünf', body: ['Anders.'], estimate: '~3 h' } } })
+    expect(data.points[5]).toEqual({ title: 'Fünf', body: ['Text.'], estimate: '~3 h' })
+  })
+
+  it('keeps a stored point the board no longer shows, and is pure', () => {
+    const before = JSON.parse(JSON.stringify(stored))
+    const { data } = mergeQueueImport(stored, { order: [], points: {} })
+    expect(data.points[8]).toEqual(stored.points[8])
+    expect(stored).toEqual(before)
+  })
+
+  it('imports neither an empty stub card nor a fallback title', () => {
+    const fromBoard = {
+      order: [4, 5, 6],
+      points: {
+        4: { title: 'Punkt 4', body: null, estimate: null },
+        5: { title: 'THE ENGLISH HEADLINE', body: null, estimate: null },
+        6: { title: 'Ein deutscher Titel', body: null, estimate: null },
+      },
+    }
+    const { data, added } = mergeQueueImport(null, fromBoard, { titles: { 5: 'THE ENGLISH HEADLINE' } })
+    expect(added).toEqual([6])
+    expect(Object.keys(data.points)).toEqual(['6'])
+    // The order is still learnt, so a card keeps its judged place in the queue.
+    expect(data.order).toEqual([4, 5, 6])
+  })
+
+  it('degrades to the board alone when there is no data file yet', () => {
+    const { data, added, kept } = mergeQueueImport(null, { order: [3], points: { 3: { body: ['A.'] } } })
+    expect(added).toEqual([3])
+    expect(kept).toBe(0)
+    expect(data.order).toEqual([3])
+  })
+})
+
+describe('the conciseness budget is enforced at the IMPORT, not only at the turn end (point 530)', () => {
+  const words = (n) => Array.from({ length: n }, (_, i) => `Wort${i}`).join(' ')
+
+  it('reports a card that would land as one unbroken over-long paragraph', () => {
+    const [offender, ...rest] = queueImportOffenders({ points: { 8: { body: [words(70)] } } })
+    expect(rest).toEqual([])
+    expect(offender.point).toBe(8)
+    expect(offender.paragraphs).toBe(1)
+    expect(offender.reason).toMatch(/unbroken/)
+  })
+
+  it('passes the same words once they are split into paragraphs', () => {
+    expect(queueImportOffenders({ points: { 8: { body: [words(35), words(35)] } } })).toEqual([])
+  })
+
+  it('reports a body over the word budget however it is split', () => {
+    const offenders = queueImportOffenders({ points: { 8: { body: [words(50), words(50)] } } })
+    expect(offenders).toHaveLength(1)
+    expect(offenders[0].reason).toMatch(/too verbose/)
+  })
+
+  it('says nothing about short cards or a card with no prose yet', () => {
+    expect(queueImportOffenders({ points: { 8: { body: ['Kurz.'] }, 9: { body: null } } })).toEqual([])
+    expect(queueImportOffenders(null)).toEqual([])
   })
 })
 
@@ -485,11 +625,19 @@ describe('the rendered queue — one flat list, no bundle left in the markup', (
     expect(toNow(html, 439, 'Läuft.', { stamp: '16:20' })).toContain('<span class="t">439 — ')
   })
 
-  it('reads its own cards back on import', () => {
-    const { html } = built([439, 465], { points: { 439: { title: 'Ein Titel', body: 'Text.' } } })
+  it('reads its own cards back on import, paragraph split intact', () => {
+    const stored = { points: { 439: { title: 'Ein Titel', body: ['Erster Teil.', 'Zweiter Teil.'] } } }
+    const { html } = built([439, 465], stored)
     const back = importQueueFromHtml(html)
-    expect(back.points[439]).toMatchObject({ title: 'Ein Titel', body: 'Text.' })
+    expect(back.points[439]).toMatchObject({ title: 'Ein Titel', body: ['Erster Teil.', 'Zweiter Teil.'] })
+    // 465 has no prose in the data, so the board shows the stub — which the
+    // import must NOT store as a described card (point 530).
     expect(Object.keys(back.points).map(Number).sort((a, b) => a - b)).toEqual([439, 465])
+    expect(back.points[465].body).toBeNull()
+    // And the round trip is a fixed point: nothing changes, nothing is added.
+    const { data, added } = mergeQueueImport(stored, back)
+    expect(added).toEqual([])
+    expect(data.points[439].body).toEqual(['Erster Teil.', 'Zweiter Teil.'])
   })
 
   it('leaves the board free of audit, conciseness and topic violations', () => {
