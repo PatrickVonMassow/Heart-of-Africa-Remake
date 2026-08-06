@@ -2831,7 +2831,11 @@ for (const [placeId, shot] of [
     // and a verification that waited out the shipped nine seconds per errand
     // would spend minutes measuring what one turn of the queue already shows.
     await page.evaluate(() => {
-      window.__balance.villageLife.adultErrands.intervalSeconds = 2
+      // One second between errands, not the shipped nine: the catalogue is
+      // twelve errands long now that the village has a bank, and the queue is
+      // FAIR — at the old sample rate the window ended before the three ground-
+      // work errands came round at all, and the digging went unphotographed.
+      window.__balance.villageLife.adultErrands.intervalSeconds = 1
       window.__balance.villageLife.adultErrands.dwellSeconds = 2
       window.__balance.villageLife.adultErrands.digSeconds = 3
       // And the walking pace with them: the bank lies past the built ground, so
@@ -2872,7 +2876,7 @@ for (const [placeId, shot] of [
     let riverProgress = 0
     let dug = 0
     let staged = {}
-    for (let i = 0; i < 900; i++) {
+    for (let i = 0; i < 1400; i++) {
       const now = await page.evaluate(() => window.__placeErrands())
       staged = now.staged
       for (const [index, v] of now.villagers.entries()) {
@@ -3022,6 +3026,9 @@ for (const [placeId, shot] of [
   }
   await page.evaluate(() => window.__game.getState().leavePlace())
   await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
+  // Wait for the travel scene's water to be MOUNTED before asking it anything —
+  // the condition, not a wall-clock guess.
+  await page.waitForFunction(() => !!window.__rivers, null, { timeout: 30000 }).catch(() => {})
 
   // --- The same river, the same side, in the OTHER view (work-order 482) ------
   // Asked of the DRAWN course, not of the model both views were built from: the
