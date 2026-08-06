@@ -34,25 +34,80 @@ const PAGES_REMEDY =
   'dispatch "Deploy to GitHub Pages" again and confirm the run goes green.'
 const RERUN_REMEDY =
   'No push in this repository can clear a cancellation — re-run the workflow and confirm it goes green.'
+const FAMINE_REMEDY =
+  'No push in this repository can clear this — not one step of ours ran. Wait for GitHub to answer ' +
+  'again, then re-run the workflow and confirm it goes green.'
+const WORKFLOW_OR_OUTAGE_REMEDY =
+  'Re-run the workflow. If it goes green it was an outage on GitHub\'s side. If it dies the same way, ' +
+  'the fault is in the workflow FILE — check what the recent commits changed under `.github/workflows/` ' +
+  '(a `uses:` reference that resolves nowhere, or a `runs-on` label no runner matches) and fix it there.'
 
-/** The names of the jobs that failed in this run; [] when the list is unusable. */
-export function failedJobNames(jobs) {
+/** The steps the RUNNER contributes to every job. A job that got no further than
+ *  these executed nothing of ours, whatever the job is named. `Post <name>`
+ *  wrappers are the runner's teardown half of an action and count the same. */
+const RUNNER_OWN_STEPS = new Set(['set up job', 'set up runner', 'complete job'])
+
+function isRunnerOwnStep(name) {
+  const n = String(name ?? '').trim().toLowerCase()
+  return RUNNER_OWN_STEPS.has(n) || n.startsWith('post ')
+}
+
+/** The failed jobs themselves; [] when the list is unusable. */
+function failedJobs(jobs) {
   if (!Array.isArray(jobs)) return []
   return jobs
     .filter((j) => j && String(j.status ?? 'completed') === 'completed')
     .filter((j) => FAILED_JOB_CONCLUSIONS.has(String(j.conclusion ?? '')))
+}
+
+/** The names of the jobs that failed in this run; [] when the list is unusable. */
+export function failedJobNames(jobs) {
+  return failedJobs(jobs)
     .map((j) => String(j.name ?? ''))
     .filter(Boolean)
 }
 
 /**
+ * Did this job execute anything of OURS? A job whose step list is empty, or holds
+ * only the runner's own steps, never reached a line this repository wrote — so its
+ * failure cannot be a defect in the repository, whatever the job is called.
+ *
+ * WHY BY OBSERVATION, NOT BY NAME (measured 06.08.2026, point 528): the first cut
+ * of this module told outside from inside by the job's NAME, with the Pages
+ * `deploy` job listed as GitHub-side. Hours later a broad Actions outage killed
+ * every run in `Set up job` with `Failed to resolve action download info` — and
+ * because the failing job was called `build`, the guard read our own outage as a
+ * repository defect and demanded a fixing push that could not exist. A name list
+ * is a guess about the world; "no step of ours ran" is an observation and holds
+ * in outages nobody has seen yet.
+ */
+export function ranNothingOfOurs(job) {
+  const steps = job?.steps
+  if (!Array.isArray(steps)) return false // unknown — never claim an excuse we cannot see
+  if (steps.length === 0) return true // never got a runner at all
+  return steps.every((s) => isRunnerOwnStep(s?.name))
+}
+
+/**
  * Where the cause of a red run lies.
- * @param {{workflowName?:string, conclusion?:string, jobs?:object[]|null}} input
- * @returns {{cause:'repository'|'external'|'unknown', failedJobs:string[], detail:string, remedy:string}}
+ *
+ * `actionable` says whether the remedy is something this machine can DO. Every
+ * cause is actionable except the runner famine above: a Pages stall has its
+ * cancel command, a cancelled run has its re-run, a repository fault has its
+ * fixing push — but an outage that never reached our code leaves nothing to do
+ * but wait, and holding the session there stops the batch over a fault that is
+ * not ours (point 528). Absent (undefined) means actionable, so every existing
+ * caller and every branch below keeps its old behaviour.
+ *
+ * `workflowsUntouched` must be TRUE — proven by the caller — before a run that
+ * executed nothing of ours counts as somebody else's outage; see the branch.
+ *
+ * @param {{workflowName?:string, conclusion?:string, jobs?:object[]|null, workflowsUntouched?:boolean}} input
+ * @returns {{cause:'repository'|'external'|'unknown', actionable?:boolean, failedJobs:string[], detail:string, remedy:string}}
  */
 export function classifyFailureCause(input) {
   try {
-    const { workflowName = '', conclusion = '', jobs = null } = input ?? {}
+    const { workflowName = '', conclusion = '', jobs = null, workflowsUntouched } = input ?? {}
     const workflow = String(workflowName ?? '')
     const isPages = workflow === PAGES_WORKFLOW
     const verdict = String(conclusion ?? '').toLowerCase()
@@ -68,7 +123,38 @@ export function classifyFailureCause(input) {
       }
     }
 
+    const failedList = failedJobs(jobs)
     const failed = failedJobNames(jobs)
+
+    // BEFORE any name is consulted: if NO failed job got past the runner's own
+    // steps, nothing this repository wrote ever executed. That reading holds for
+    // every workflow and every outage, so it comes first (point 528).
+    if (failedList.length > 0 && failedList.every(ranNothingOfOurs)) {
+      const died = `the failing job is "${failed.join('", "')}", and it executed no step of ours — it died in the runner's own set-up`
+      // A BROKEN WORKFLOW FILE DIES IN EXACTLY THIS SHAPE (four-eyes review,
+      // 06.08.2026): a typo'd `uses:` reference or an unknown `runs-on` label
+      // also fails in `Set up job` with no step of ours run — and that red IS
+      // ours, fixable only by a push. The two are indistinguishable from the
+      // step list alone, so the caller must PROVE the workflow files were not
+      // touched before this counts as somebody else's outage. Without that
+      // proof the guard keeps blocking and names both readings.
+      if (workflowsUntouched === true) {
+        return {
+          cause: 'external',
+          actionable: false,
+          failedJobs: failed,
+          detail: `${died}, and no commit since the last green run of this workflow touched \`.github/workflows/\` — so GitHub never got as far as this repository's code`,
+          remedy: FAMINE_REMEDY,
+        }
+      }
+      return {
+        cause: 'unknown',
+        failedJobs: failed,
+        detail: `${died}, which is either an outage on GitHub's side or a broken workflow FILE (a bad \`uses:\` reference or \`runs-on\` label dies here too)`,
+        remedy: WORKFLOW_OR_OUTAGE_REMEDY,
+      }
+    }
+
     const githubSide = GITHUB_SIDE_JOBS.get(workflow) ?? []
     if (failed.length > 0) {
       const outside = failed.filter((n) => !githubSide.includes(n))

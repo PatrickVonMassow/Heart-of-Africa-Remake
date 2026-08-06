@@ -128,6 +128,64 @@ async function fetchRuns(repo, headSha) {
   }
 }
 
+/**
+ * PROOF, not assumption: did anything under `.github/workflows/` change between
+ * the last run of this workflow that GitHub carried to a verdict and HEAD?
+ *
+ * A red that executed no step of ours reads as somebody else's outage — but a
+ * workflow file with a `uses:` reference that resolves nowhere, or a `runs-on`
+ * label no runner matches, dies in exactly the same shape and IS ours (four-eyes
+ * review, 06.08.2026). Only this comparison tells them apart, so the classifier
+ * demands it before it will excuse a red.
+ *
+ * Returns true ONLY when the answer is a proven no. Anything unclear — no
+ * earlier run to compare against, a sha git does not have, a git error — returns
+ * false, and the guard keeps blocking. Undecided must never read as excused.
+ */
+async function workflowsUntouchedSince(repo, runs, runClassification, head) {
+  try {
+    const run = (Array.isArray(runs) ? runs : []).find((r) => String(r?.id) === String(runClassification?.runId))
+    // The workflow's OWN file is the only one that can have broken it. Comparing
+    // the whole directory would call an unrelated workflow edit a suspect and
+    // block on it forever.
+    const path = String(run?.path ?? '')
+    const workflowId = run?.workflow_id
+    if (!path.startsWith('.github/workflows/') || !workflowId) return false
+
+    // The baseline is the last commit GitHub carried this workflow to a GREEN
+    // verdict on: everything since is what could have broken the file. A shallow
+    // HEAD~1 would "prove" nothing — the edit is usually further back.
+    const green = await fetchLastGreenSha(repo, workflowId)
+    if (!green) return false
+    git(['cat-file', '-e', `${green}^{commit}`]) // throws if we do not have it
+    return git(['diff', '--name-only', `${green}..${head}`, '--', path]).length === 0
+  } catch {
+    return false // undecided → keep blocking
+  }
+}
+
+/** The head sha of the newest SUCCESSFUL run of one workflow; null on any doubt. */
+async function fetchLastGreenSha(repo, workflowId) {
+  const headers = {
+    Accept: 'application/vnd.github+json',
+    'User-Agent': 'hoa-ci-status-guard',
+    'X-GitHub-Api-Version': '2022-11-28',
+  }
+  const token = readToken()
+  if (token) headers.Authorization = `Bearer ${token}`
+  const res = await httpsRequest(
+    `https://api.github.com/repos/${repo}/actions/workflows/${workflowId}/runs?status=success&per_page=1`,
+    { headers },
+  )
+  if (!res || res.status !== 200) return null
+  try {
+    const sha = JSON.parse(res.body)?.workflow_runs?.[0]?.head_sha
+    return typeof sha === 'string' && sha ? sha : null
+  } catch {
+    return null
+  }
+}
+
 /** The jobs of one run, so the failing JOB can say which side the fault sits on
  *  (ci-failure-cause-core). null on any failure — the classifier then reports
  *  `unknown` for the Pages workflow and keeps the old wording elsewhere. */
@@ -194,6 +252,7 @@ async function main() {
     workflowName: runClassification.workflowName,
     conclusion: runClassification.conclusion,
     jobs: await fetchJobs(repo, runClassification.runId),
+    workflowsUntouched: await workflowsUntouchedSince(repo, runs, runClassification, head),
   })
   const classification = { ...runClassification, ...cause }
 
@@ -211,6 +270,15 @@ async function main() {
       runId: classification.runId,
     })
   }
+
+  // A red with NOTHING to do is reported, not sat on (point 528, 06.08.2026). The
+  // guard exists to stop a session walking away from a defect IT can clear; when
+  // GitHub's own runners never reached our code, holding the turn end clears
+  // nothing and stops the batch over a foreign outage. The alert above still
+  // went out, and the next session re-reads the same run — so this forgets
+  // nothing, it only declines to stand still.
+  if (classification.actionable === false) return null
+
   return JSON.stringify({ decision: 'block', reason: blockReason(classification, head) })
 }
 
