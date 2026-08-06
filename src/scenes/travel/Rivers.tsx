@@ -558,7 +558,10 @@ export function RiversAndLakes() {
 
   return (
     <>
-      <mesh geometry={geometry} material={riverMat} renderOrder={1} dispose={null} />
+      {/* Named so a verification can ask the DRAWN course where the water is
+          (work-order 482: the settlement's bank must lie on the same side as
+          the ribbon the bird's-eye view actually paints). */}
+      <mesh name="rivers-ribbon" geometry={geometry} material={riverMat} renderOrder={1} dispose={null} />
       {lakes.map((l, i) => (
         <mesh key={i} geometry={l.geometry} material={lakeMat} position={[0, l.y, 0]} renderOrder={1} dispose={null} />
       ))}
