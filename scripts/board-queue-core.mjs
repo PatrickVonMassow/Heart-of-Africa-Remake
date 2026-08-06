@@ -152,7 +152,9 @@ export function boardTitleReport(html, titles = {}) {
   const unestimated = []
   for (const [key, entry] of Object.entries(points)) {
     const n = Number(key)
-    if (isUntranslatedTitle(unesc(entry.title), n, titles)) untranslated.push(n)
+    // The import decodes now, so decoding again here would eat a second layer
+    // from a title that legitimately spells out an entity.
+    if (isUntranslatedTitle(entry.title, n, titles)) untranslated.push(n)
     if (!entry.estimate) unestimated.push(n)
   }
   const asc = (a, b) => a - b
@@ -489,7 +491,11 @@ export function importQueueFromHtml(html) {
     const body = paras.length ? paras : [cardText(bodyHtml)].filter(Boolean)
     if (!order.includes(point)) order.push(point)
     points[point] = {
-      title: title.trim() || null,
+      // UNESCAPED, like the body (four-eyes finding 2): the card renders its
+      // title through `esc`, so storing it as read would put `&amp;amp;` on the
+      // public board one rebuild later — and the escaped form never matches the
+      // work order's plain headline, so the fallback-title report misfires too.
+      title: unesc(title).trim() || null,
       // The generator's stub is not prose anybody wrote: importing it as a body
       // would make the card count as described and silence the "no prose yet"
       // report for ever.
@@ -498,6 +504,34 @@ export function importQueueFromHtml(html) {
     }
   }
   return { order, points }
+}
+
+/**
+ * The stored data, from the file's raw bytes — or a LOUD refusal (point 530,
+ * four-eyes finding 1).
+ *
+ * `readJson` answers `null` for a file that does not exist and for one that no
+ * longer parses, and every command here treats `null` as "nothing stored yet":
+ * `import` would start from the board alone and `set` would write a file holding
+ * its one entry. Either silently discards the prose of every point the board
+ * does not currently render — a card promoted to the now-section or to "Von dir
+ * zu klären" is exactly that. The file is documented as hand-editable and is
+ * written while a batch runs, so a torn or half-typed one is a case, not a
+ * curiosity. An ABSENT file still means "nothing yet"; an unreadable one stops
+ * the command.
+ */
+export function parseQueueDataFile(text, { path = QUEUE_DATA_PATH } = {}) {
+  if (text === null || text === undefined) return null
+  if (!String(text).trim()) return null
+  try {
+    return JSON.parse(text)
+  } catch (e) {
+    throw new Error(
+      `${path} exists but does not parse (${e.message}). Refusing to continue: every command here would ` +
+        'treat it as empty and rewrite it, losing the prose of each point the board does not currently show. ' +
+        'Repair the file (or move it aside deliberately), then run the command again.',
+    )
+  }
 }
 
 /**

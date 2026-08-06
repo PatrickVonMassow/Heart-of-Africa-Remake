@@ -42,9 +42,10 @@ import {
   importQueueFromHtml,
   mergeQueueImport,
   openPointsOf,
-  queueImportOffenders,
+  parseQueueDataFile,
   parseSetArgs,
   parseTaskTitles,
+  queueImportOffenders,
   setQueueEntry,
   unestimatedPoints,
   untranslatedTitlePoints,
@@ -58,7 +59,10 @@ const dataFile = resolve(REPO_ROOT, QUEUE_DATA_PATH)
 const tasksFile = resolve(REPO_ROOT, 'TASKS.md')
 const [cmd, ...rest] = process.argv.slice(2)
 
-const readData = () => (existsSync(dataFile) ? readJson(dataFile) : null)
+// A file that does not PARSE is not an empty one (point 530, four-eyes finding
+// 1): treating it as empty is how a rewrite loses every card the board does not
+// render. It stops the command instead — for `set` no less than for `import`.
+const readData = () => parseQueueDataFile(existsSync(dataFile) ? readFileSync(dataFile, 'utf8') : null, { path: QUEUE_DATA_PATH })
 const writeData = (d) => writeTextAtomic(dataFile, `${JSON.stringify(d, null, 2)}\n`)
 
 // STDIN IS READ ONCE, AND ONLY WHEN ASKED FOR (the rule of point 410): reading
@@ -156,7 +160,7 @@ try {
     writeData(data)
     console.log(
       `import: ${added.length} card(s) added${added.length ? ` (${added.join(', ')})` : ''}, ` +
-        `${kept} kept unchanged → ${QUEUE_DATA_PATH}`,
+        `${kept} already known (stored fields kept, empty ones filled from the board) → ${QUEUE_DATA_PATH}`,
     )
   } else if (cmd === '--check' || cmd === undefined) {
     const { html, open, titles, exclude, requests } = inputs()

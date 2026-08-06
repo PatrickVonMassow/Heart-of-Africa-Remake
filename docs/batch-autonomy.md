@@ -1586,7 +1586,11 @@ budget is applied at the WRITE, not only at the turn end: an import whose result
 would put an over-long unbroken card on the board names those cards and writes
 nothing — replayed against the live board, that gate catches 44 of the flattened
 ones. Restoring a body the old command already destroyed is `set`'s job, since a
-merge that never overwrites cannot do it.
+merge that never overwrites cannot do it. And a data file that EXISTS but no
+longer parses is no longer read as an empty one: every command here would have
+rewritten it from scratch, dropping the prose of each point the board does not
+render — a card promoted to the now-section or to "Von dir zu klären" is exactly
+that — so a torn or half-typed file stops the command by name instead.
 
 `scripts/board.mjs` runs the publish itself, so the one-command board loop keeps
 the live page current without a second step. **The stamp may not lie:** the

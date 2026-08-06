@@ -27,6 +27,7 @@ import {
   normaliseQueueData,
   openPointsOf,
   paragraphs,
+  parseQueueDataFile,
   queueImportOffenders,
   parseSetArgs,
   parseTaskTitles,
@@ -239,9 +240,44 @@ describe('the one-time import from a hand-written board', () => {
     const html = board('<details>\n  <summary><span class="num">7</span><span class="t">Sieben</span></summary>\n  <div class="body">Roher Text.</div>\n</details>\n')
     expect(importQueueFromHtml(html).points[7].body).toEqual(['Roher Text.'])
   })
+  // FINDING 2: the card renders its title through `esc`, so an entity stored as
+  // read would grow a layer on every round trip and never match the headline.
+  it('stores the title unescaped, so it survives a round trip', () => {
+    const title = 'Krieg & Frieden <1890>'
+    const once = importQueueFromHtml(board(renderQueueCard({ point: 6, title, body: 'Text.', meta: '~1 h' })))
+    expect(once.points[6].title).toBe(title)
+    const twice = importQueueFromHtml(board(renderQueueCard({ point: 6, ...once.points[6], meta: '~1 h' })))
+    expect(twice.points[6].title).toBe(title)
+  })
+
+  it('recognises an entity-carrying fallback title as still the work order’s', () => {
+    const headline = 'BUY & SELL DIALOGS'
+    const html = board(renderQueueCard({ point: 6, title: headline, body: 'Text.', meta: '~1 h' }))
+    expect(boardTitleReport(html, { 6: headline }).untranslated).toEqual([6])
+    expect(boardTitleReport(html, { 6: 'Etwas anderes' }).untranslated).toEqual([])
+  })
+
   it('does not import the generator’s own stub as prose', () => {
     const html = board(renderQueueCard({ point: 4, title: 'Vier', body: null, meta: QUEUE_STUB_META }))
     expect(importQueueFromHtml(html).points[4].body).toBeNull()
+  })
+})
+
+describe('a data file that does not parse stops the command (point 530, finding 1)', () => {
+  it('reads a stored file and treats an absent or empty one as nothing yet', () => {
+    expect(parseQueueDataFile('{"order":[5],"points":{}}')).toEqual({ order: [5], points: {} })
+    expect(parseQueueDataFile(null)).toBeNull()
+    expect(parseQueueDataFile(undefined)).toBeNull()
+    expect(parseQueueDataFile('  \n ')).toBeNull()
+  })
+
+  it('refuses a torn file instead of reporting "nothing stored yet"', () => {
+    // Treating this as null is what lets a rewrite drop every card the board
+    // does not render — a point promoted to the now-section or to VDZK.
+    expect(() => parseQueueDataFile('{"order":[5],"poi')).toThrow(/does not parse/)
+    expect(() => parseQueueDataFile('{"a":1}x', { path: '.claude/board-queue.json' })).toThrow(
+      /\.claude\/board-queue\.json/,
+    )
   })
 })
 
