@@ -48,6 +48,11 @@ export interface PlaceNavGrid {
   min: number
   /** 1 where a mover of the grid's radius may stand, 0 elsewhere. */
   free: Uint8Array
+  /** Search scratch, reused across calls: a settlement's grid is tens of
+   *  thousands of cells, and allocating two arrays of it per route would hand
+   *  the render loop a megabyte a second of garbage for nothing. */
+  parent: Int32Array
+  queue: Int32Array
 }
 
 /** Cell index of a world coordinate, clamped into the grid. */
@@ -86,7 +91,14 @@ export function buildPlaceNavGrid(
   const slack = cell * Math.SQRT1_2
   const reach = maxBoundaryRadius(bounds) + cell
   const n = Math.max(1, Math.ceil((2 * reach) / cell) + 1)
-  const grid: PlaceNavGrid = { cell, n, min: -reach, free: new Uint8Array(n * n) }
+  const grid: PlaceNavGrid = {
+    cell,
+    n,
+    min: -reach,
+    free: new Uint8Array(n * n),
+    parent: new Int32Array(n * n),
+    queue: new Int32Array(n * n),
+  }
   for (let i = 0; i < n; i++) {
     const x = worldOf(grid, i)
     for (let j = 0; j < n; j++) {
@@ -171,9 +183,9 @@ export function findPlaceRoute(
   // Breadth-first from the goal over four-neighbourhoods: no diagonal step, so
   // a route can never squeeze through the diagonal gap between two corners the
   // mover's own circle would not fit through.
-  const parent = new Int32Array(n * n).fill(-1)
+  const parent = grid.parent.fill(-1)
   parent[goalCell] = goalCell
-  const queue = new Int32Array(n * n)
+  const queue = grid.queue
   let head = 0
   let tail = 0
   queue[tail++] = goalCell
