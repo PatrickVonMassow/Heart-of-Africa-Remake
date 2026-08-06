@@ -202,6 +202,21 @@ describe('settlement collision in the bird\'s-eye view (design.md §11)', () => 
     }
   })
 
+  it('holds him there FRAME AFTER FRAME (the collider does not evaporate at its own boundary)', () => {
+    // The resolver clamps a blocked step to exactly the boundary. Reading that
+    // rest position as "already inside" would drop the collider on the next
+    // frame — the traveller walked straight through on the second step.
+    for (const p of ENTERABLE.slice(0, 4)) {
+      let x = p.x + CR + 5
+      let z = p.z
+      for (let frame = 0; frame < 40; frame++) {
+        ;[x, z] = resolve(x, z, x - 0.6, z) // a steady walk west into the place
+      }
+      expect(dist(x, z, p)).toBeGreaterThanOrEqual(CR - 1e-6)
+      expect(x - p.x).toBeGreaterThan(0) // never past the marker
+    }
+  })
+
   it('is ONE-WAY: a step from inside the footprint toward the outside is never blocked', () => {
     for (const p of ENTERABLE) {
       for (const angle of [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2]) {

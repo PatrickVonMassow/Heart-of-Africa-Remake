@@ -24,6 +24,13 @@ export function settlementCollisionRadius(enterRadius: number, factor: number): 
 }
 
 /**
+ * How far inside the boundary a position counts as INSIDE the footprint (world
+ * units). Small enough to be physically irrelevant, large enough to absorb the
+ * float noise of a clamp that lands the traveller exactly on the boundary.
+ */
+const INSIDE_MARGIN = 1e-3
+
+/**
  * The settlement collider circles `[x, z, radius]` for a move STARTING at
  * `(fromX, fromZ)`, in the `[x, z, r]` form `resolveTravelMove` takes (the
  * radius is reduced by the body radius `selfR`, so the traveller's centre comes
@@ -52,7 +59,12 @@ export function settlementColliders(
   const cutoff = collisionRadius + selfR + reach
   for (const p of places) {
     const d = Math.hypot(fromX - p.x, fromZ - p.z)
-    if (d <= collisionRadius) continue // inside: free to leave (one-way)
+    // Genuinely INSIDE only — a traveller RESTING ON the boundary is outside.
+    // The resolver clamps a blocked step to exactly `collisionRadius`, so a
+    // `d <= collisionRadius` reading would make the collider evaporate on the
+    // very next frame for the traveller it had just stopped, and he would walk
+    // straight in (caught by the live walk-in check, not by a single-step test).
+    if (d < collisionRadius - INSIDE_MARGIN) continue // one-way: free to leave
     if (d > cutoff) continue
     out.push([p.x, p.z, Math.max(0, collisionRadius - selfR)])
   }
