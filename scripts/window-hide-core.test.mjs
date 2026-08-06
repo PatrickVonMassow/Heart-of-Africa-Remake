@@ -14,8 +14,10 @@ import { join, relative } from 'node:path'
 import { REPO_ROOT } from './repo-paths.mjs'
 import {
   CHILD_PROCESS_APIS,
+  SCANNED_EXTENSIONS,
   ALLOW,
   maskCode,
+  isScannedScriptFile,
   findChildProcessCalls,
   auditWindowHide,
   formatWindowHideVerdict,
@@ -58,8 +60,35 @@ describe('findChildProcessCalls — the call sites, and nothing else', () => {
   })
 
   it('is not fooled by regex.exec or a longer identifier', () => {
-    const src = 'const m = RE.exec(line)\nconst n = myExecSync(cmd)\nconst o = re.exec(x)\n'
+    const src = 'const m = RE.exec(line)\nconst n = myExecSync(cmd)\nconst o = re.exec(x)\nconst p = /a/.exec(s)\n'
     expect(findChildProcessCalls(src)).toEqual([])
+  })
+
+  it('SEES THE NAMESPACED FORM — `cp.spawnSync(…)` is the same call and the same window', () => {
+    // The first version excluded every member access to keep `RE.exec(line)` out, which
+    // also excluded the namespace import. A `child_process.execSync(…)` added tomorrow
+    // would have passed the gate and brought the flashes straight back.
+    const src = [
+      'cp.spawnSync("git", a, { cwd })',
+      'child_process.execSync(c)',
+      'childProcess.execFileSync(e, f, { windowsHide: true })',
+      'cp.exec(cmd)',
+    ].join('\n')
+    expect(findChildProcessCalls(src)).toMatchObject([
+      { api: 'spawnSync', line: 1, hasFlag: false },
+      { api: 'execSync', line: 2, hasFlag: false },
+      { api: 'execFileSync', line: 3, hasFlag: true },
+      { api: 'exec', line: 4, hasFlag: false },
+    ])
+  })
+
+  it('counts a namespaced call ONCE, not once per pattern', () => {
+    expect(findChildProcessCalls('cp.exec(cmd)')).toHaveLength(1)
+  })
+
+  it('sees `fork(…)`, which spawns a Node child and so a console with it', () => {
+    expect(findChildProcessCalls('fork(mod, args)')).toMatchObject([{ api: 'fork', line: 1, hasFlag: false }])
+    expect(findChildProcessCalls('fork(mod, args, { windowsHide: true })')[0].hasFlag).toBe(true)
   })
 
   it('accepts the flag however it arrives — a spread is a legitimate way to set it', () => {
@@ -80,10 +109,35 @@ describe('findChildProcessCalls — the call sites, and nothing else', () => {
   })
 
   it('covers every API that can open a window', () => {
-    expect(CHILD_PROCESS_APIS).toEqual(['execSync', 'exec', 'execFileSync', 'execFile', 'spawnSync', 'spawn'])
+    expect(CHILD_PROCESS_APIS).toEqual([
+      'execSync',
+      'exec',
+      'execFileSync',
+      'execFile',
+      'spawnSync',
+      'spawn',
+      'fork',
+    ])
     for (const api of CHILD_PROCESS_APIS) {
       expect(findChildProcessCalls(`${api}(x)`)[0]?.api).toBe(api)
     }
+  })
+})
+
+describe('isScannedScriptFile — every extension Node will run', () => {
+  it('reads .cjs and the TypeScript forms too, not only .mjs/.js', () => {
+    // `scripts/hooks/*.cjs` already exist. A `.mjs`/`.js`-only sweep would have let one
+    // of them add an unflagged execSync without the gate noticing.
+    for (const ext of SCANNED_EXTENSIONS) expect(isScannedScriptFile(`a${ext}`)).toBe(true)
+    expect(SCANNED_EXTENSIONS).toContain('.cjs')
+    expect(SCANNED_EXTENSIONS).toContain('.mjs')
+  })
+
+  it('ignores what Node does not run, and junk', () => {
+    for (const name of ['README.md', 'run.sh', 'data.json', 'pre-commit', '']) {
+      expect(isScannedScriptFile(name), name).toBe(false)
+    }
+    expect(isScannedScriptFile()).toBe(false)
   })
 })
 
@@ -157,7 +211,7 @@ describe('THE REAL TREE: no window flashes at a turn end', () => {
       const p = join(dir, entry)
       if (statSync(p).isDirectory()) {
         if (entry !== 'node_modules') walk(p)
-      } else if (entry.endsWith('.mjs') || entry.endsWith('.js')) {
+      } else if (isScannedScriptFile(entry)) {
         files.push({ path: relative(REPO_ROOT, p).replace(/\\/g, '/'), text: readFileSync(p, 'utf8') })
       }
     }
@@ -179,5 +233,16 @@ describe('THE REAL TREE: no window flashes at a turn end', () => {
   it('and no documented exception has gone stale', () => {
     const v = auditWindowHide(files)
     expect(v.unusedAllow, formatWindowHideVerdict(v)).toEqual([])
+  })
+
+  it('NEGATIVE CONTROL: strip the flag from the real tree and the gate goes red', () => {
+    // A green sweep proves nothing on its own — a sweep that cannot fail is decoration.
+    // Measured against the actual pre-401 tree the same audit reported 79 offenders;
+    // this reproduces that failure from the CURRENT files, so the control cannot rot
+    // the way a recorded number does.
+    const stripped = files.map((f) => ({ ...f, text: f.text.replace(/windowsHide:\s*true,?/g, '') }))
+    const v = auditWindowHide(stripped)
+    expect(v.offenders.length).toBeGreaterThan(50)
+    expect(formatWindowHideVerdict(v)).toContain('windowsHide')
   })
 })

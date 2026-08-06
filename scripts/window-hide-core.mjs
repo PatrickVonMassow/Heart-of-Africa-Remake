@@ -17,7 +17,21 @@
 // and the offence is exactly a call site written without one option.
 
 /** The child-process APIs that can open a console window. */
-export const CHILD_PROCESS_APIS = ['execSync', 'exec', 'execFileSync', 'execFile', 'spawnSync', 'spawn']
+export const CHILD_PROCESS_APIS = ['execSync', 'exec', 'execFileSync', 'execFile', 'spawnSync', 'spawn', 'fork']
+
+/**
+ * The file extensions the sweep reads. Node runs every one of these, so a call written
+ * in any of them opens the same window — the first version scanned `.mjs`/`.js` only,
+ * which would have let a `.cjs` hook (`scripts/hooks/*.cjs` already exist) add an
+ * unflagged `execSync` unseen.
+ */
+export const SCANNED_EXTENSIONS = ['.mjs', '.js', '.cjs', '.mts', '.cts', '.ts']
+
+/** Whether the sweep reads this file name. PURE. */
+export function isScannedScriptFile(name) {
+  const n = String(name ?? '')
+  return SCANNED_EXTENSIONS.some((ext) => n.endsWith(ext))
+}
 
 /**
  * A copy of `text` with every comment and every string/template BODY blanked (line
@@ -74,6 +88,32 @@ function balancedEnd(masked, openIdx) {
 }
 
 /**
+ * The identifiers a `node:child_process` namespace import is bound to here. A call
+ * written through one of them (`cp.exec(cmd)`) is the same call as the destructured
+ * form and opens the same window.
+ */
+const NAMESPACES = ['cp', 'childProcess', 'child_process', 'proc', 'nodeChildProcess']
+
+/**
+ * The regexes that find one API's call sites, each ending in the opening paren. PURE.
+ *
+ * A longer identifier is never one of these APIs (`myExecSync(`), so `[\w$]` is
+ * excluded before the name throughout. A MEMBER ACCESS is a different matter:
+ * `cp.spawnSync(…)` is the same call as `spawnSync(…)`, and the first version's
+ * blanket `.` exclusion let every namespaced form through. So member access is now
+ * MATCHED — except for bare `exec`, where `RE.exec(line)` is a regex rather than a
+ * process and is written constantly in this tree; there only a known child_process
+ * namespace counts as a receiver.
+ */
+function callPatterns(api) {
+  if (api !== 'exec') return [new RegExp(`(?<![\\w$])${api}\\(`, 'g')]
+  return [
+    /(?<![\w$.])exec\(/g,
+    new RegExp(`(?<![\\w$.])(?:${NAMESPACES.join('|')})\\s*\\.\\s*exec\\(`, 'g'),
+  ]
+}
+
+/**
  * Every child-process call in one file. PURE.
  *
  * Returns [{ api, line, hasFlag }]. `hasFlag` is true when `windowsHide` appears
@@ -85,24 +125,28 @@ export function findChildProcessCalls(text) {
   const src = String(text ?? '')
   const masked = maskCode(src)
   const found = []
+  const seen = new Set()
   for (const api of CHILD_PROCESS_APIS) {
-    // The lookbehind excludes `regex.exec(` and `myExecSync(` — a member access or a
-    // longer identifier is not one of these APIs.
-    const re = new RegExp(`(?<![\\w$.])${api}\\(`, 'g')
-    let m
-    while ((m = re.exec(masked))) {
-      const openIdx = m.index + api.length
-      const end = balancedEnd(masked, openIdx)
-      if (end < 0) continue
-      found.push({
-        api,
-        line: src.slice(0, m.index).split('\n').length,
-        hasFlag: /windowsHide/.test(masked.slice(openIdx, end)),
-        // The call's own argument text, so an exception can be scoped to WHAT the
-        // call does rather than to the line it happens to sit on — a line number
-        // survives no merge, and a stale exception is itself a failure here.
-        args: masked.slice(openIdx, end),
-      })
+    for (const re of callPatterns(api)) {
+      let m
+      while ((m = re.exec(masked))) {
+        // The pattern may swallow a receiver (`cp.exec(`), so the opening paren is
+        // read off the match END rather than off the API name's length.
+        const openIdx = m.index + m[0].length - 1
+        if (seen.has(openIdx)) continue
+        seen.add(openIdx)
+        const end = balancedEnd(masked, openIdx)
+        if (end < 0) continue
+        found.push({
+          api,
+          line: src.slice(0, m.index).split('\n').length,
+          hasFlag: /windowsHide/.test(masked.slice(openIdx, end)),
+          // The call's own argument text, so an exception can be scoped to WHAT the
+          // call does rather than to the line it happens to sit on — a line number
+          // survives no merge, and a stale exception is itself a failure here.
+          args: masked.slice(openIdx, end),
+        })
+      }
     }
   }
   return found.sort((a, b) => a.line - b.line)
