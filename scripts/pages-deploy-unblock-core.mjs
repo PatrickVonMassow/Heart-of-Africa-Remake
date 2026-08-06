@@ -67,26 +67,61 @@ export function candidateDeployments(deployments, { limit = INSPECT_LIMIT, envir
     if (!/^[0-9a-f]{7,40}$/i.test(sha) || seen.has(sha)) continue
     seen.add(sha)
     out.push({ sha, id: d.id ?? null, createdAt: String(d.created_at ?? '') })
-    if (out.length >= limit) break
+  }
+  // NEWEST FIRST is what the blocking rule below reads, so it is established
+  // here rather than trusted: the listing arrives that way, an entry without a
+  // usable timestamp sinks to the end, and ties keep their order.
+  const key = (d) => {
+    const t = Date.parse(d.createdAt)
+    return Number.isFinite(t) ? t : -Infinity
+  }
+  return out
+    .map((d, i) => ({ d, i }))
+    .sort((a, b) => key(b.d) - key(a.d) || a.i - b.i)
+    .slice(0, limit)
+    .map((e) => e.d)
+}
+
+/**
+ * Of the inspected deployments (NEWEST FIRST), the ones that can still be
+ * holding the queue: the unbroken run of unfinished ones at the top of the list.
+ *
+ * MEASURED 06.08.2026, and the reason this is not simply "every unfinished
+ * one": in this repository SIX abandoned deployments report
+ * `deployment_in_progress` forever, all of them older than a deployment that
+ * later reached `succeed`. A deployment older than a COMPLETED one has
+ * demonstrably been superseded — it cannot be what a new deployment waits on —
+ * so the first finished entry ends the chain. A status that says nothing
+ * (`not_found`, an unauthenticated lookup) is skipped rather than treated as
+ * finished: it is no evidence either way.
+ *
+ * @param {{sha:string, status:string, createdAt?:string}[]} inspected
+ * @param {{alsoConsider?:string[]}} options a sha named from the outside (the
+ *   GitHub error names the blocker) counts wherever it sits in the list.
+ */
+export function blockingDeployments(inspected, { alsoConsider = [] } = {}) {
+  const list = (Array.isArray(inspected) ? inspected : []).filter((d) => d && typeof d === 'object')
+  const named = new Set(Array.isArray(alsoConsider) ? alsoConsider : [])
+  const out = []
+  for (const d of list) {
+    const s = String(d.status ?? '')
+      .trim()
+      .toLowerCase()
+    if (TERMINAL_STATUSES.has(s)) break
+    if (isBlockingStatus(s)) out.push(d)
+  }
+  for (const d of list) {
+    if (named.has(d.sha) && isBlockingStatus(d.status) && !out.some((x) => x.sha === d.sha)) out.push(d)
   }
   return out
 }
 
 /**
- * Of the inspected deployments, the ones still holding the queue.
- * @param {{sha:string, status:string, createdAt?:string}[]} inspected
- */
-export function blockingDeployments(inspected) {
-  if (!Array.isArray(inspected)) return []
-  return inspected.filter((d) => d && isBlockingStatus(d.status))
-}
-
-/**
  * Retry the deploy exactly when this run actually CLEARED something.
  * A deploy failure with nothing blocking is not a queue stall — an oversized or
- * missing artifact fails the same way, and retrying it would only lose time and
- * blur the report. There is one retry step in the workflow, so "once" is
- * structural; this decides whether it runs at all.
+ * missing upload from the build job fails the same way, and retrying that would
+ * only lose time and blur the report. There is one retry step in the workflow,
+ * so "once" is structural; this decides whether it runs at all.
  * @returns {{retry:boolean, reason:string}}
  */
 export function shouldRetryDeploy({ deployFailed = false, cancelled = [] } = {}) {

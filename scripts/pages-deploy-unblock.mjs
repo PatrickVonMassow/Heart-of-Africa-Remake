@@ -133,7 +133,9 @@ export async function inspect(call, { extraSha = '' } = {}) {
   const listed = await call(`/deployments?environment=github-pages&per_page=${INSPECT_LIMIT}`)
   if (!listed.ok) return { error: `listing deployments failed: ${listed.error}`, inspected: [], blocking: [] }
   const candidates = candidateDeployments(listed.data)
-  if (extraSha && !candidates.some((c) => c.sha === extraSha)) candidates.unshift({ sha: extraSha, createdAt: '' })
+  // A sha named from the outside (GitHub's own "please cancel <sha> first")
+  // is inspected even when the listing does not show it.
+  if (extraSha && !candidates.some((c) => c.sha === extraSha)) candidates.push({ sha: extraSha, createdAt: '' })
 
   const inspected = []
   for (const c of candidates) {
@@ -141,7 +143,8 @@ export async function inspect(call, { extraSha = '' } = {}) {
     // A 404 means this commit has no Pages deployment record — not a blocker.
     inspected.push({ sha: c.sha, createdAt: c.createdAt, status: res.ok ? (res.data?.status ?? '') : 'not_found' })
   }
-  return { error: null, inspected, blocking: blockingDeployments(inspected) }
+  const blocking = blockingDeployments(inspected, { alsoConsider: extraSha ? [extraSha] : [] })
+  return { error: null, inspected, blocking }
 }
 
 /** Cancel each blocking deployment and read its status back. */
@@ -193,12 +196,15 @@ async function main(argv = process.argv.slice(2)) {
   let failed = []
   if (doCancel && blocking.length > 0) ({ cancelled, failed } = await cancelAll(call, blocking))
 
-  const decision = shouldRetryDeploy({ deployFailed: true, cancelled })
+  // The retry decision only means anything after a failed deploy attempt, which
+  // is when the workflow calls this; a bare manual run just gets the report.
+  const afterFailedDeploy = doCancel || Boolean(process.env.GITHUB_OUTPUT)
+  const decision = shouldRetryDeploy({ deployFailed: afterFailedDeploy, cancelled })
   const report = stallReport({ repo, blocking, cancelled, failed })
   if (asJson) console.log(JSON.stringify({ repo, inspected, blocking, cancelled, failed, decision }, null, 2))
   else {
     console.log(report)
-    console.log(decision.reason)
+    if (afterFailedDeploy) console.log(decision.reason)
   }
   writeGithubOutput({ retry: String(decision.retry), cleared: String(cancelled.length) })
   return failed.length > 0 ? 1 : 0

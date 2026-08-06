@@ -70,6 +70,15 @@ describe('candidateDeployments', () => {
     expect(candidateDeployments([...many, dep({ sha: 'not-a-sha' })])).toHaveLength(INSPECT_LIMIT)
   })
 
+  it('orders newest first even when the listing does not, junk timestamps last', () => {
+    const out = candidateDeployments([
+      dep({ sha: 'a'.repeat(40), created_at: '2026-08-06T13:00:00Z' }),
+      dep({ sha: 'b'.repeat(40), created_at: 'nonsense' }),
+      dep({ sha: 'c'.repeat(40), created_at: '2026-08-06T15:00:00Z' }),
+    ])
+    expect(out.map((d) => d.sha[0])).toEqual(['c', 'a', 'b'])
+  })
+
   it('survives junk input', () => {
     expect(candidateDeployments(null)).toEqual([])
     expect(candidateDeployments([null, 7, 'x'])).toEqual([])
@@ -77,17 +86,52 @@ describe('candidateDeployments', () => {
 })
 
 describe('blockingDeployments', () => {
-  it('returns exactly the ones still holding the queue', () => {
+  it('returns the unfinished run at the top of the list', () => {
+    const out = blockingDeployments([
+      { sha: 'aaa1111', status: 'deployment_in_progress' },
+      { sha: 'bbb2222', status: 'queued' },
+      { sha: 'ccc3333', status: 'succeed' },
+    ])
+    expect(out.map((d) => d.sha)).toEqual(['aaa1111', 'bbb2222'])
+  })
+
+  // Measured on the real repository: six abandoned deployments sit in
+  // `deployment_in_progress` for good, all older than one that succeeded.
+  it('ignores unfinished deployments OLDER than a completed one — they block nothing', () => {
     const out = blockingDeployments([
       { sha: 'aaa1111', status: 'succeed' },
       { sha: 'bbb2222', status: 'deployment_in_progress' },
-      { sha: 'ccc3333', status: 'not_found' },
+      { sha: 'ccc3333', status: 'deployment_in_progress' },
+    ])
+    expect(out).toEqual([])
+  })
+
+  it('skips a status that says nothing instead of reading it as finished', () => {
+    const out = blockingDeployments([
+      { sha: 'aaa1111', status: 'not_found' },
+      { sha: 'bbb2222', status: 'deployment_in_progress' },
+      { sha: 'ccc3333', status: 'succeed' },
     ])
     expect(out.map((d) => d.sha)).toEqual(['bbb2222'])
   })
 
+  it('counts a sha named from the outside wherever it sits', () => {
+    const list = [
+      { sha: 'aaa1111', status: 'succeed' },
+      { sha: 'cde5aee', status: 'deployment_in_progress' },
+    ]
+    expect(blockingDeployments(list)).toEqual([])
+    expect(blockingDeployments(list, { alsoConsider: ['cde5aee'] }).map((d) => d.sha)).toEqual(['cde5aee'])
+    // Named but already finished stays out, and it is never listed twice.
+    expect(blockingDeployments(list, { alsoConsider: ['aaa1111'] })).toEqual([])
+    expect(
+      blockingDeployments([{ sha: 'cde5aee', status: 'queued' }], { alsoConsider: ['cde5aee'] }),
+    ).toHaveLength(1)
+  })
+
   it('survives junk input', () => {
     expect(blockingDeployments(undefined)).toEqual([])
+    expect(blockingDeployments([null, 5], { alsoConsider: null })).toEqual([])
   })
 })
 
