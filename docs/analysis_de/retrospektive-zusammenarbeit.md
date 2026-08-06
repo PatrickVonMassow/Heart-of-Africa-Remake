@@ -797,6 +797,8 @@ Zweimal wäre der Befund an diesem Abend fast als Umgebungsrauschen abgelegt wor
 
 **Lehren:** Ein Verschluss, der nur das Motiv prüft, aber die **Aufnahme** nicht kennt, prüft die falsche Hälfte — was ganzseitig fotografiert wird, muss auch ganzseitig fertig sein. Und die Regel "Last erzeugt falsche Rote, keine falschen Grüne" hat eine Ausnahme, die man kennen muss: Sie gilt für Prüfungen, die etwas *messen*. Eine Prüfung, die nur *auslöst*, liefert unter Last ein grünes Bild von nichts.
 
+Die dritte Spielart derselben Klasse braucht gar keinen Fehler im Verschluss (06.08.2026, Punkt 481/524): Das Motiv IST im Bild, nachgemessen und angestrahlt — und das Bild taugt trotzdem nicht mehr als Nachweis. Eine neue Trennungsregel schob die spielenden Kinder an den Dorfrand hinter die Steinreihe; auf dem Nachweisbild blieb eine fast leere Ebene mit einem kleinen Kind, wo vorher Hüttenkranz, beide Kinder und die Herde standen. Jede Prüfung war grün, denn sie fragt nach **Anwesenheit**, nie nach **Lesbarkeit**. Das ist die Grenze dessen, was ein Verschluss automatisch leisten kann: Ob ein Mensch auf dem Bild wiedererkennt, was es dokumentiert, entscheidet nur der Blick darauf — weshalb der eigene Blick aufs Bild vor jedem Merge kein Ritual ist, sondern die einzige Prüfung dieser Art, die wir haben.
+
 ---
 
 ## 4. Die Guards als Immunsystem
@@ -886,7 +888,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Mittwoch, 05.08.2026, 22:36 · Quellen-Fingerprint: `decebd51a4d1…`
+Zuletzt aktualisiert: Donnerstag, 06.08.2026, 02:51 · Quellen-Fingerprint: `daafaf93c2ed…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -963,10 +965,11 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Standing licence to move, REMOVE or ADD villages when it helps — but every change must be checked against the other requirements first, and the check has already caught a real bug | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Keep the visual QA eye open for functionally-fine but weird-LOOKING oddities, not just functional bugs | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | CORRECTED 19.07.2026 — WebGPU IS testable headless/autonomously via system Chrome (channel:'chrome') + --headless=new; the 'untestable' belief held only for Playwright's BUNDLED Chromium | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
+| A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 71 Feedback-/Projekt-Memories · 42 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 32 Prozess-/Meta-TASKS-Punkte (davon 15 offen).
+Erfasste Quellen: 72 Feedback-/Projekt-Memories · 42 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 32 Prozess-/Meta-TASKS-Punkte (davon 15 offen).
 
-<!-- RETRO-FINGERPRINT: decebd51a4d1689bf1ebe35db12941cf88072d32eba2ec6b173ff7e1c8542add -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-05T20:36:46.933Z -->
+<!-- RETRO-FINGERPRINT: daafaf93c2edbb9661ad35671a2544180370908fe9380d5610affd556edb59c4 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-06T00:51:45.844Z -->
 <!-- AUTO-GENERATED:END -->

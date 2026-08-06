@@ -1203,15 +1203,43 @@ it is appended.
   LARGE regression on a quiet machine (both backends), which also re-validates the
   four Opus points merged before the degradation (262/273/293/305).
 
-- [ ] 310. LOW-PRESET PERFORMANCE PASS FROM THE S25 BENCHMARK (user 25.07.2026). Input:
-  the user's real-device F8 report local/samsung-s25-bench.json (Galaxy S25, Adreno
-  8xx, WebGPU with real GPU timestamps, production build 4f1d6f4). Findings to work
-  from: LOW holds 60 fps vsync-capped, but the GPU median is 6.95-9.83 ms — thin
-  headroom for thermal throttling or 120 Hz; the LOW frame is dominated by
-  travel-dressing (53 % of triangles, ~535k tris in savanna) and a biome-INDEPENDENT
-  unnamed system ("(unnamed) MeshStandardNodeMaterial", constant 425,118 tris / 180
-  meshes in EVERY phase — 78 % of the desert frame); dpr is the strongest lever
-  overall (baseline GPU 18.55→8.39 ms driving at dpr 1) and LOW already caps it at 1.
+- [ ] 310. LOW-PRESET PERFORMANCE PASS FOR TWO OPPOSITE DEVICES (user 25.07.2026,
+  recalibrated 06.08.2026). LOW must run WELL on a weak Windows desktop AND on the
+  Galaxy S25 — one preset, two opposite bottlenecks, which is the whole difficulty
+  of this point.
+  INPUTS — REAL F8 REPORTS. `local/hoa-bench-2026-08-03-webgpu-kohler.json` (WEAK
+  Windows desktop, AMD RDNA-3, WebGPU with real GPU timestamps, production build
+  2b6b417, 2195x1235 at dpr 1.75, deposited by the user 06.08.2026) is what this
+  point is CALIBRATED against, being the slowest machine measured. It is NOT the
+  user's own PC — that one runs MEDIUM acceptably, and its occasional stutter is
+  explicitly not part of this point. `local/samsung-s25-bench.json` (Galaxy S25,
+  Adreno 8xx) is the second target. `local/m1pro-bench.json` is CONTEXT ONLY: it
+  predates the LOW preset and its absolute GPU milliseconds aggregate passes — judge
+  that machine on its FRAME series and on ratios between its own configs.
+  NO SECOND RUN IS AVAILABLE (user 06.08.2026): the weak PC is a third party's and
+  cannot be re-measured, so plan no step that needs a fresh run on a user machine.
+  Everything needed is in the deposited report — real GPU timestamps, eleven
+  ablation configs, per-system triangle and mesh counts per phase.
+  WHAT THE TWO DEVICES SAY.
+  - DESKTOP: the default (medium) preset is unplayable — 17.9 / 12.7 / 13.1 fps at a
+    GPU median of 45.22 / 68.35 / 65.93 ms. LOW holds 60 fps with almost no headroom
+    in the desert: GPU median 14.81 ms of the 16.70 ms budget (89 %), 95th-percentile
+    frame 33.7 ms — every twentieth frame is dropped. Savanna 8.65 ms, driving
+    9.63 ms (p95 frame 33.1 ms); CPU 5.20 / 7.70 / 6.80 ms.
+  - S25: LOW GPU 9.83 / 8.72 / 6.95 ms against a CPU of 8.70 / 7.50 / 7.60 ms. The
+    CPU sits AS HIGH AS the GPU, so a pixel cut alone buys the phone little — this is
+    where the behaviour-throttling and instance-count levers pay.
+  THE DECISIVE READING — THE LOW FRAME IS PIXEL-BOUND, NOT TRIANGLE-BOUND. At LOW the
+  desert draws 542,748 triangles in 55 calls for 14.81 ms while the savanna draws
+  1,008,904 triangles in 58 calls for 8.65 ms: nearly double the geometry at 58 % of
+  the cost. The ablations agree — from dpr 1.75 to dpr 1 the pixel count falls 3.06x
+  and the GPU time 2.77x / 2.91x / 3.10x, almost exactly in step. This governs the
+  ORDER of the delivery: the dpr cap is the primary lever, and the triangle levers
+  below must never be reported as the fix for the desert phase, whose share figures
+  are shares of TRIANGLES, never of milliseconds. The constant 425,118-triangle /
+  180-mesh system is 78 % of the desert frame at LOW on this second device and
+  backend too, and travel-dressing is 53 % of the savanna frame (531,058 tris),
+  matching the S25.
   SALVAGED IDEA (25.07, from the retired `feat/276-wildlife-lod` branch — see point
   329): throttling the BEHAVIOUR updates of off-screen animals cuts the driving
   frame cost. The branch itself was retired unmerged (219 commits behind main, its
@@ -1219,7 +1247,7 @@ it is appended.
   here: update animals outside the rendered frame at a reduced rate (projected via
   the shared `isOnScreen`, never an assumed radius — the point-172 rule), keeping
   every §19 drama deadline in sim time so no drama stalls. Judge it on the CPU
-  series of the F8 report, where the S25 shows 7.6-8.7 ms at LOW.
+  series, where both devices sit at 5-9 ms at LOW.
   DIAGNOSIS DONE (25.07, main session): the unnamed 425k system IS the river/lake
   water geometry — `src/scenes/travel/Rivers.tsx` mounts the ribbon mesh and every
   lake sheet with NO `name` prop (around the `<mesh geometry={geometry}
@@ -1231,17 +1259,25 @@ it is appended.
   instance-count factor on top of the existing floraFogFactor radius cut — the §19.9
   dressing keeps reading as savanna, only thinner), (c) a LOW geometry lever for the
   identified 425k-tris system (e.g. coarser river-ribbon tessellation on LOW if it is
-  the water — every §11.3 continuity/never-buried invariant must keep passing), (d)
-  only if a-c leave the headroom short: a touch-preset-only dpr cut below 1 (the touch
-  preset stays a SUBSET of low). EVERY new lever gets entries in ALL THREE
-  QUALITY_PRESETS levels (the src/config/quality.test.ts completeness gate and the
-  docs/graphics-detail-levels.md sync test enforce this), stays debug-tunable within
-  its level, and reads through the point-276 effective-selector pattern. VERIFIABLE:
-  pure tests for each new preset key; the §11.3/§19 suites stay green at LOW (ribbon
-  continuity, dressing-streaming no-pop projection checks); picture checked on BOTH
-  backends at LOW; and a fresh F8 run (headless as smoke, the user's S25 as the real
-  price check) shows a clearly lower LOW GPU median in the dressing-dominated savanna
-  phases without a visual regression the user rejects.
+  the water — every §11.3 continuity/never-buried invariant must keep passing), (d) a
+  calibratable `dprCap` BELOW 1 on LOW itself (starting value 0.8 = 0.64x the pixels,
+  which projects the desert's 14.81 ms near 9.5 ms) — the primary lever, not a
+  last resort, and the touch preset stays a SUBSET of low. EVERY new lever gets
+  entries in ALL THREE QUALITY_PRESETS levels (the src/config/quality.test.ts
+  completeness gate and the docs/graphics-detail-levels.md sync test enforce this),
+  stays debug-tunable within its level, and reads through the point-276
+  effective-selector pattern. The delivery must move BOTH the pixel cost and the
+  CPU/instance cost: a LOW that only cuts dpr fixes the desktop and leaves the phone
+  where it is. VERIFIABLE: pure tests for each new preset key; the §11.3/§19 suites
+  stay green at LOW (ribbon continuity, dressing-streaming no-pop projection checks);
+  picture checked on BOTH backends at LOW; and the price check in this order —
+  FIRST hardware-independent arithmetic against the deposited numbers (the rendered
+  pixel count and the per-system triangles the new levers remove, with the desert's
+  14.81 ms projected to 10 ms or below by the measured pixel-to-time
+  proportionality), THEN a before/after F8 run of the SAME three phases at LOW on the
+  project's own verification host, whose absolute milliseconds mean nothing but whose
+  RELATIVE drop must confirm the projection rather than contradict it — without a
+  visual regression the user rejects.
 
 - [ ] 312. ANIMALS ARE WATER-SHY, NOT WATER-BARRED (user 25.07.2026, revising the
   point-192 rule; former point 324 is folded in here). The rule was read far too
@@ -3989,24 +4025,6 @@ Build order, chosen so no two parallel agents own the same file:
   wave 4  481 (children teach) · 483 (adults teach)
   wave 5  486 (drums) · 487 (digging)
 
-- [ ] 481. THE CHILDREN TEACH THE GENERAL CONCEPTS (user 03.08.2026).
-  FINAL STATE:
-  1. Each situation carries ONE atomic utterance with its gesture and the action
-     that follows: a child calls the others (COME), sends one to a visible spot
-     (GO_THERE), a fleeing child asks another along (FOLLOW), a child names where
-     it stands (HERE), points at something distant (THERE), refuses (NO).
-  2. Every one of the six recurs in more than one situation, so none can be
-     mistaken for a rule of the game.
-  3. The two look-alikes are staged apart, or they teach nothing. COME is spoken
-     at least once by a child STANDING STILL, against FOLLOW's caller who is
-     running away. THERE is spoken at least once with NOBODY moving afterwards,
-     against GO_THERE, which is always followed by the addressee walking there.
-  4. The children play far enough from the adults for point 478's range rule to
-     separate them.
-  VERIFIABLE: pure Vitest on the situation scheduler — every concept in at least
-  two distinct situations, the two staged contrasts present, an utterance atomic
-  and single, and no situation without its gesture and its following action.
-
 - [ ] 482. A RIVER VILLAGE, A REACHABLE BANK AND A LANDMARK ROCK (user
   03.08.2026). The PoC needs one village in the tonal West/Centre belt that lies
   ON a river the player can walk to. Candidate: the Bambara village, whose Ségou
@@ -4128,7 +4146,6 @@ Build order, chosen so no two parallel agents own the same file:
   VERIFIABLE: pure Vitest — a card written through `board.mjs queue` survives a
   rebuild; a rebuild that would blank an existing card's prose is refused or
   restores it; the report names the cards it emptied.
-
 
 - [ ] 495. A VERSIONED GIT HOOK WITHOUT ITS EXECUTABLE BIT IS SILENTLY INERT
   (found 04.08.2026). `scripts/git-hooks/pre-push` was committed 100644. Git for
@@ -4909,3 +4926,33 @@ Build order, chosen so no two parallel agents own the same file:
   leave-capture's opacity and its west/east pixel counts printed in the run so an
   empty capture can never again read as a threshold miss; plus a pure test that the
   check FAILS on an all-transparent capture instead of reporting a band verdict.
+
+- [ ] 524. THE CHILDREN'S PLAY GROUND IS SQUEEZED INTO A ROCKY CORNER, AND THE
+  FRAME THAT PROVES THEM NO LONGER SHOWS THE VILLAGE (measured 06.08.2026 while
+  closing point 481, on WebGL 2). Point 481 moved the children far enough from
+  the adults for point 478's hearing range to separate the two teaching voices.
+  In the Maasai village that rule leaves only three viable bearings, all in the
+  rocky corner beyond the boulder line: `verification/480-village-tag.png` now
+  shows an almost empty plain with ONE small child beside a lone tree and the
+  edge of a single hut, where the same frame on `main` showed the hut ring, the
+  labels, both children and the herd behind them. The checks stay green — both
+  children are framed and ray-probed within 14 m — which is exactly the
+  looks-wrong-but-passes case: the evidence frame no longer reads as village
+  life to a human.
+  FINAL STATE:
+  1. The children play where the separation rule AND the picture both hold: the
+     ground is chosen so the play spot keeps its distance from the adult
+     vignettes yet still lies against the settlement's built fabric, not on the
+     bare edge behind the rocks.
+  2. If no such spot exists in a village of that size, the SEPARATION is what
+     gives — the two voices may be told apart by another means the mechanic
+     allows (a pause between them, distinct speakers) rather than by pushing the
+     children out of the settlement.
+  3. The tag frame is retaken from a standpoint that shows BOTH children at a
+     readable size WITH the village behind them, and its shutter declaration
+     names the children as its subject so an empty plain can never pass again.
+  4. `balance.villageLife.tag.playRadius` and the derived play ground stay
+     debug-editable, and the derivation is stated in the code where it shrinks.
+  VERIFIABLE: pure Vitest on the play-ground derivation (the spot keeps the
+  separation AND lies within the built fabric for every shipped village), plus
+  the retaken frame checked by a human on both backends.

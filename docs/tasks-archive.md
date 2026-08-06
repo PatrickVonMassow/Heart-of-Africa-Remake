@@ -14279,3 +14279,21 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   probe alike, is handed an explicit timeout above Playwright's default (the
   existing shutter cases extended to the probe path); a `timeout: 0` (which
   DISABLES the deadline) fails the same assertion.
+
+- [x] 481. THE CHILDREN TEACH THE GENERAL CONCEPTS (user 03.08.2026).
+  FINAL STATE:
+  1. Each situation carries ONE atomic utterance with its gesture and the action
+     that follows: a child calls the others (COME), sends one to a visible spot
+     (GO_THERE), a fleeing child asks another along (FOLLOW), a child names where
+     it stands (HERE), points at something distant (THERE), refuses (NO).
+  2. Every one of the six recurs in more than one situation, so none can be
+     mistaken for a rule of the game.
+  3. The two look-alikes are staged apart, or they teach nothing. COME is spoken
+     at least once by a child STANDING STILL, against FOLLOW's caller who is
+     running away. THERE is spoken at least once with NOBODY moving afterwards,
+     against GO_THERE, which is always followed by the addressee walking there.
+  4. The children play far enough from the adults for point 478's range rule to
+     separate them.
+  VERIFIABLE: pure Vitest on the situation scheduler — every concept in at least
+  two distinct situations, the two staged contrasts present, an utterance atomic
+  and single, and no situation without its gesture and its following action.
