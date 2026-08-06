@@ -166,8 +166,11 @@ describe('console errors as pseudo-checks (world and i18n print no FAIL line)', 
     const name = consoleErrorChecks(OUT)[1].name
     expect(checkFromName(name)).toMatchObject({ kind: 'console', key: checkKey(name) })
     expect(checkFromName('the map opens').kind).toBe('check')
-    // A name carrying an em dash keeps it — it is a name, not a printed line.
-    expect(checkFromName('a check — with a dash').name).toBe('a check — with a dash')
+    // A name carrying an em dash is CUT at it, exactly as parseCheckLines cuts
+    // the printed line — the two must key alike or the comparison never matches,
+    // and no check name can survive the dash through parsing anyway.
+    expect(checkFromName('a check — with a dash').name).toBe('a check')
+    expect(checkFromName('a check — with a dash').key).toBe(allChecks('PASS  a check — with a dash')[0].key)
   })
 
   it('classifies a console error handed over as a bare name as a real regression', () => {
@@ -362,6 +365,16 @@ describe('classifying against the baseline', () => {
       })
       expect(noChange.join('\n')).not.toContain('FIRST SUSPECT')
     })
+  })
+
+  it('keys a name pasted WITH its result prefix and detail the same as the parsed line', () => {
+    // What a human actually copies out of a console into --failed.
+    const parsed = allChecks('PASS  a calf in a strong current drowns — {"drowned":true}')[0]
+    const pasted = checkFromName('FAIL  a calf in a strong current drowns — {"drowned":false}')
+    expect(pasted.name).toBe('a calf in a strong current drowns')
+    expect(pasted.key).toBe(parsed.key)
+    // A console pseudo-check keeps its kind through the same trimming.
+    expect(checkFromName('console error: boom — at foo.js').kind).toBe('console')
   })
 
   it('accepts plain check names as well as parsed checks', () => {

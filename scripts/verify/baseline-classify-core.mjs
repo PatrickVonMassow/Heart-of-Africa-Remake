@@ -118,9 +118,17 @@ const CONSOLE_PREFIX = 'console error:'
 
 /** A check rebuilt from its NAME alone, keeping its kind. Used wherever a name
  *  crosses a process boundary — without it a console pseudo-check would come
- *  back as an ordinary check and lose its "absent means it did not happen" rule. */
+ *  back as an ordinary check and lose its "absent means it did not happen" rule.
+ *
+ *  It takes a whole RESULT LINE too, because that is what a human hands it: the
+ *  `--failed` argument is copied straight out of a console, `FAIL  ` prefix,
+ *  ` — detail` and all. parseCheckLines splits those off, so a name carrying
+ *  them keyed differently from the same check in the baseline output and every
+ *  verdict came back "the baseline never ran it" (seen live, 06.08.2026). */
 export function checkFromName(name) {
-  const label = String(name ?? '').trim()
+  let label = String(name ?? '').trim().replace(/^(?:PASS|FAIL)\s{2,}/, '')
+  const dash = label.indexOf(' — ')
+  if (dash !== -1) label = label.slice(0, dash).trim()
   return {
     status: 'FAIL',
     name: label,
