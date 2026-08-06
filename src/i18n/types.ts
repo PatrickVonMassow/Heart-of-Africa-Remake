@@ -142,6 +142,21 @@ export interface Strings {
     hypothesisFor(utterance: string): string
     /** Day the utterance was first heard, shown beside it. */
     firstHeard(date: string): string
+    /** Button that reopens the chief's drum message (point 486). */
+    reopenDrumMessage: string
+  }
+
+  /** The chief's drum message and its reopenable display (design.md §13.4,
+   *  docs/communication-poc-spec.md, point 486). */
+  drumMessage: {
+    title: string
+    /** Line above the concepts: the readings are the player's own, and editable. */
+    hint: string
+    /** Accessible label of one concept's reading field, naming its syllables. */
+    readingFor(utterance: string): string
+    /** Placeholder in a concept's reading field. */
+    notePlaceholder: string
+    close: string
   }
 
   mapOverlay: {
@@ -271,6 +286,8 @@ export interface Strings {
     notEnoughMoney: string
     digNoShovel: string
     villagerNod: string
+    /** The chief has sent for his drummer; the message is being beaten out. */
+    drumsSending: string
     journalDndOn: string
     journalDndOff: string
     /** F9 graphics quality level, named per level (design.md §21, point 276). */
@@ -328,6 +345,10 @@ export interface Strings {
     moodMid: string
     moodLow: string
     chiefDone: string
+    /** Ask the chief to send his message on the drums (point 486). */
+    askDrums: string
+    /** Why the chief will not send it yet — no gift has earned his trust. */
+    askDrumsLocked: string
     give: string
     stock(n: number): string
     endAudience: string
@@ -581,6 +602,8 @@ export interface Strings {
       audience: string
       mistake: string
       chiefHint: string
+      /** The chief's drum message (design.md §13.4, point 486). */
+      drumMessage: string
       decoded: string
       unspecific: string
       giftLore: string
@@ -658,6 +681,8 @@ export interface Strings {
     unspecific(p: TextParams): string
     /** What the region reveres (design.md §8), told by an elder. */
     giftLore(p: TextParams): string
+    /** The chief's drums beat his message out (design.md §13.4, point 486). */
+    drumMessage: string
     digNothing: string
     victory(p: TextParams): string
     foodLow: string

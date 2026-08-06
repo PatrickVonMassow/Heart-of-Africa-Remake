@@ -135,6 +135,32 @@ money.
 Verifiable: `src/state/store.hints.test.ts` covers all five
 regions, the retroactive deciphering (either order) and the gift lore;
 `src/i18n/i18n.test.ts` the in-world words in the language files.
+
+THE CHIEF'S MESSAGE ON THE DRUMS (§13.4, docs/communication-poc-spec.md,
+point 486). Asked for at the audience — in his village alone, and only once a
+culturally correct gift has earned his trust (the §12 condition every hint
+stands under) — the chief has his drummer beat out GO_THERE · RIVER · FOLLOW ·
+UPSTREAM · BIG_ROCK · THERE · DIG on two drums: the large low one for `ba`, the
+small high one for `BA`, the hand falling and the head dipping on the drum that
+sounds. The sequences are never re-authored: the message is a list of CONCEPT
+ids whose atoms come from the lexicon and whose timing is the same phrase plan a
+villager speaks with, so one constant pause separates the concepts and nothing
+else encodes anything. When the last beat has fallen the concepts enter the
+heard memory like any speech and the message stands on paper with the player's
+own reading over each, every one clickable — and edited straight in the memory
+the journal's observation section edits, so the two are one note. It reopens
+from the journal for the rest of the run.
+Verifiable: pure Vitest. `src/communication/drumMessage.test.ts` proves the
+drummed sequence equals the spoken one concept for concept, the pause between
+concepts constant (and following the calibratable pace/pause), and the strike
+the drummer's hands show ordered and silent between beats;
+`src/ui/DrumMessage.test.tsx` that a reading edited at the drums reads back in
+the journal and the journal's reads back at the drums, that the display reopens
+however often it is closed, that the drums teach nothing until their last beat,
+and that no other people's chief sends the message;
+`src/state/store.communication.test.ts` that the message is recorded once, keeps
+the day and note of a concept already heard in the village, and travels with the
+checkpoint.
 ## 8. Chronicle/journal.
 
 Verifiable: `src/i18n/villages.test.ts` asserts one

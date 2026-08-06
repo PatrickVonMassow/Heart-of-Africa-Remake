@@ -175,9 +175,9 @@ describe('template-function callability (de and en behave alike)', () => {
     // the point-293 low-preset dominance line; the +2 the journal observation
     // section's field label and first-heard line; the +7 the point-394 arrival
     // set — the port/monument first-visit and return templates with their four
-    // titles). A drift here means a template was added/removed and this suite
-    // should follow.
-    expect(FUNCTION_PATHS.length).toBe(77)
+    // titles; the +1 the point-486 drum-message reading label). A drift here
+    // means a template was added/removed and this suite should follow.
+    expect(FUNCTION_PATHS.length).toBe(78)
   })
 
   it.each(FUNCTION_PATHS)('%s: renders in both languages (or throws in both)', (path) => {

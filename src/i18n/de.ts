@@ -222,6 +222,15 @@ export const de: Strings = {
     hypothesis: 'Meine Deutung',
     hypothesisFor: (utterance: string) => `Meine Deutung von ${utterance}`,
     firstHeard: (date: string) => `Zuerst gehört am ${date}`,
+    reopenDrumMessage: 'Die Trommelbotschaft noch einmal lesen',
+  },
+
+  drumMessage: {
+    title: 'Die Botschaft des Oberhaupts auf den Trommeln',
+    hint: 'Sieben Wörter, eines nach dem anderen. Über jedem steht meine eigene Deutung – ein Klick darauf ändert sie; es ist dieselbe Notiz, die auch mein Buch führt.',
+    readingFor: (utterance: string) => `Meine Deutung von ${utterance}`,
+    notePlaceholder: 'Meine Deutung',
+    close: 'Botschaft weglegen (Esc)',
   },
 
   mapOverlay: {
@@ -314,6 +323,7 @@ export const de: Strings = {
     notEnoughMoney: 'Nicht genug Geld.',
     digNoShovel: 'Ohne Schaufel in der Hand kann ich nicht graben.',
     villagerNod: 'Der Alte nickt mir freundlich zu.',
+    drumsSending: 'Das Oberhaupt ruft seinen Trommler. Die Botschaft geht über das Dorf hinaus.',
     journalDndOn: 'Tagebuch-Unterbrechungen aus – Einträge erscheinen still.',
     journalDndOff: 'Tagebuch-Unterbrechungen an – neue Einträge öffnen das Tagebuch.',
     graphicsLevel: {
@@ -359,6 +369,8 @@ export const de: Strings = {
     moodMid: 'Das Oberhaupt wirkt dir gegenüber freundlich gesinnt.',
     moodLow: 'Das Oberhaupt mustert dich abwartend.',
     chiefDone: '„Ich habe dir gesagt, was ich weiß. Möge dein Weg gesegnet sein."',
+    askDrums: 'Ihn bitten, seine Botschaft auf den Trommeln zu senden',
+    askDrumsLocked: 'Er habe eine Botschaft zu senden, gibt er mir zu verstehen – aber nicht an einen Fremden, der seinem Volk nichts gebracht hat.',
     give: 'Überreichen',
     stock: (n) => `Vorrat: ${n}`,
     endAudience: 'Audienz beenden (Esc)',
@@ -618,6 +630,7 @@ export const de: Strings = {
       audience: 'Audienz beim Oberhaupt',
       mistake: 'Ein schwerer Fehler',
       chiefHint: 'Die Worte des Oberhaupts',
+      drumMessage: 'Die Trommeln sprechen',
       decoded: 'Entschlüsselt!',
       unspecific: 'Unbestimmtes Gemurmel',
       giftLore: 'Was das Volk verehrt',
@@ -903,6 +916,8 @@ export const de: Strings = {
       `Das Oberhaupt nickte ernst, ruderte mit den Händen und sagte immer wieder nur [emph]„${p.word}"[/emph]. [somber]Was immer es weiß – es kann oder will es nicht in Worten sagen, die ich fasse.[/somber] [pause]Doch es wies beharrlich zu den Dörfern der [emph]${PEOPLES[p.people as string]}[/emph] – [excited]sie sollen mehr wissen.[/excited]`,
     giftLore: (p: TextParams) =>
       `Der Alte sprach von den Schätzen seines Landes: Was sein Volk über alles verehrt, ist [emph]${de.gifts[p.gift as keyof typeof de.gifts]}[/emph]. [pause]Ein damit geehrtes Oberhaupt öffnet sein Herz.`,
+    drumMessage:
+      '[awe]Das Oberhaupt rief seinen Trommler, und zwei Trommeln sprachen an seiner Statt – eine große und eine kleine.[/awe] [pause]Sieben Wörter zu je fünf Schlägen, jedes vom nächsten durch dieselbe kurze Stille getrennt – dumpf für die tiefe Silbe, hell für die hohe. [excited]Ich kenne diese Wörter. Jedes einzelne habe ich in den Gassen und am Wasser gehört.[/excited] [pause]Ich habe sie in der Reihenfolge notiert, in der sie geschlagen wurden; was sie von mir verlangen, muss ich selbst lesen.',
     digNothing: '[weary]Ich grub an dieser Stelle, doch der Sand gab nichts preis als Steine und alte Wurzeln.[/weary]',
     victory: (p: TextParams) =>
       `${de.formatDate(p.day as number, 1890)}. [excited]Meine Schaufel stieß auf Stein –[pause] behauenen Stein![/excited] [breath]Mit zitternden Händen legte ich die Grabkammer frei. [awe]Gold glänzt im Licht der Fackel, und auf dem Sarkophag ruht die Maske des großen Königs.[/awe] [breath][awe]Ich habe es gefunden.[pause] Das Herz von Afrika.[/awe] [pause][somber]Die Reise war jeden Schritt wert.[/somber]`,

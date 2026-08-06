@@ -3,6 +3,7 @@
 
 import { useState } from 'react'
 import {
+  canAskForDrumMessage, DRUM_MESSAGE_VILLAGE,
   EQUIPMENT_IDS, bagItemCount, emptyBag, giftPriceOfGood, priceOfGood, robWouldOrphanGoal, totalGifts,
   useGame, VILLAGE_TRADE_GOODS,
   type EquipmentId, type ItemBag, type ItemKind,
@@ -11,6 +12,9 @@ import { useUi, type TradeBuilding } from '../state/ui'
 import { PLACES, placeById, type Material } from '../world/geo'
 import { ferryCost, ferryDays, treasureBuyPrice, TREASURE_IDS } from '../systems/economy'
 import { balance } from '../config/balance'
+import { drumMessagePlan } from '../communication/drumMessage'
+import { playDrumMessage } from '../systems/ambience'
+import { DrumMessageDialog } from './DrumMessage'
 import { useStrings } from '../i18n'
 import type { Strings } from '../i18n/types'
 
@@ -110,10 +114,25 @@ function AudienceDialog() {
   const hasRifle = useGame((s) => (s.equipment.rifle ?? 0) > 0)
   const robVillage = useGame((s) => s.robVillage)
   const setDialog = useUi((s) => s.setDialog)
+  const reveredGiftGiven = useGame((s) => s.reveredGiftGiven)
+  const setToast = useGame((s) => s.setToast)
   const [confirmingRob, setConfirmingRob] = useState(false)
   if (!placeId) return null
   const place = placeById(placeId)
   const gw = goodwill[placeId] ?? 0
+  const drumMessageReady = canAskForDrumMessage({ reveredGiftGiven, goodwill }, placeId)
+
+  // The chief calls his drummer: the audience ends, the drums beat the message
+  // out over the village, and the display opens when they have finished
+  // (DrumMessageWatcher). The plan is the one the drummer's hands animate from,
+  // so what sounds and what is seen cannot disagree.
+  const sendDrumMessage = () => {
+    const plan = drumMessagePlan()
+    setDialog(null)
+    useUi.getState().startDrumMessage(plan.duration)
+    playDrumMessage(plan)
+    setToast(t.toasts.drumsSending)
+  }
 
   const mood =
     gw >= balance.goodwillForHint ? t.dialogs.moodHigh : gw > 0 ? t.dialogs.moodMid : t.dialogs.moodLow
@@ -126,6 +145,19 @@ function AudienceDialog() {
         <p className="flavor">{t.dialogs.audienceIntro(mood)}</p>
         {(hintsGiven[place.region] === true || unspecificGiven[place.id] === true) && (
           <p className="flavor">{t.dialogs.chiefDone}</p>
+        )}
+        {/* The chief's drum message (design.md §13.4, point 486). Only this
+            village's chief has it to send, and only to a traveller whose gift
+            has earned his trust — the §12 condition every hint stands under. */}
+        {place.id === DRUM_MESSAGE_VILLAGE && (
+          drumMessageReady ? (
+            <div className="row">
+              <span>{t.drumMessage.title}</span>
+              <button className="hud-button" onClick={sendDrumMessage}>{t.dialogs.askDrums}</button>
+            </div>
+          ) : (
+            <p className="flavor">{t.dialogs.askDrumsLocked}</p>
+          )
         )}
         {MATERIALS.map((m) => (
           <div className="row" key={m}>
@@ -336,6 +368,7 @@ export function Dialogs() {
   const dialog = useUi((s) => s.dialog)
   if (!dialog) return null
   if (dialog.kind === 'audience') return <AudienceDialog />
+  if (dialog.kind === 'drumMessage') return <DrumMessageDialog />
   if (dialog.kind === 'bazaar') return <BazaarDialog />
   if (dialog.kind === 'agency') return <AgencyDialog />
   if (dialog.kind === 'camp') {

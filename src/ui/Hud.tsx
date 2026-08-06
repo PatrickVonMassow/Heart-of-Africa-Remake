@@ -14,6 +14,7 @@ import { useUi } from '../state/ui'
 import { StatusBar } from './StatusBar'
 import { JournalPanel } from './JournalPanel'
 import { Dialogs } from './Dialogs'
+import { DrumMessageWatcher } from './DrumMessage'
 import { DebugMenu } from './DebugMenu'
 import { MapOverlay } from './MapOverlay'
 import { StateDump } from './StateDump'
@@ -580,6 +581,8 @@ export function Hud() {
       <JournalPanel />
       <MapOverlay />
       <Dialogs />
+      {/* Waits out the chief's drums and opens his message (point 486). */}
+      <DrumMessageWatcher />
       <DebugMenu />
       {/* After Dialogs/DebugMenu so the state dump stacks above them (§17.4). */}
       <StateDump />

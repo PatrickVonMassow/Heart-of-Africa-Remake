@@ -221,6 +221,15 @@ export const en: Strings = {
     hypothesis: 'My reading',
     hypothesisFor: (utterance: string) => `My reading of ${utterance}`,
     firstHeard: (date: string) => `First heard ${date}`,
+    reopenDrumMessage: "Read the chief's drum message again",
+  },
+
+  drumMessage: {
+    title: "The Chief's Message on the Drums",
+    hint: 'Seven words, one after another. Above each stands my own reading — click one to change it; it is the same note my book holds.',
+    readingFor: (utterance: string) => `My reading of ${utterance}`,
+    notePlaceholder: 'My reading',
+    close: 'Put the message away (Esc)',
   },
 
   mapOverlay: {
@@ -313,6 +322,7 @@ export const en: Strings = {
     notEnoughMoney: 'Not enough money.',
     digNoShovel: 'I cannot dig without a shovel in hand.',
     villagerNod: 'The old man gives me a friendly nod.',
+    drumsSending: 'The chief calls his drummer. The message is going out over the village.',
     journalDndOn: 'Journal interruptions off — entries appear silently.',
     journalDndOff: 'Journal interruptions on — new entries open the journal.',
     graphicsLevel: {
@@ -358,6 +368,8 @@ export const en: Strings = {
     moodMid: 'The chief seems well-disposed toward you.',
     moodLow: 'The chief studies you, giving nothing away.',
     chiefDone: '"I have told you all I know. May your path be blessed."',
+    askDrums: 'Ask him to send his message on the drums',
+    askDrumsLocked: 'He has a message to send, he lets me know — but not to a stranger who has brought his people nothing.',
     give: 'Offer',
     stock: (n) => `you have ${n}`,
     endAudience: 'End audience (Esc)',
@@ -617,6 +629,7 @@ export const en: Strings = {
       audience: 'Audience with the Chief',
       mistake: 'A Grave Mistake',
       chiefHint: "The Chief's Words",
+      drumMessage: 'The Drums Speak',
       decoded: 'Deciphered!',
       unspecific: 'Vague Murmurs',
       giftLore: 'What the People Revere',
@@ -892,6 +905,8 @@ export const en: Strings = {
       `The chief nodded gravely, waved his hands and said again and again only [emph]"${p.word}"[/emph]. [somber]Whatever he knows, he cannot or will not say it in words I grasp.[/somber] [pause]But he pointed insistently toward the villages of the [emph]${PEOPLES[p.people as string]}[/emph] — [excited]they are said to know more.[/excited]`,
     giftLore: (p: TextParams) =>
       `The old man spoke of the treasures of his land: what his people revere above all is [emph]${en.gifts[p.gift as keyof typeof en.gifts]}[/emph]. [pause]A chief honored with it will open his heart.`,
+    drumMessage:
+      '[awe]The chief called his drummer, and two drums spoke for him — a great one and a small one.[/awe] [pause]Seven words, each of five beats, each parted from the next by the same short silence — deep for the low syllable, bright for the high one. [excited]I know these words. I have heard every one of them in the lanes and at the water.[/excited] [pause]I have written them down in the order they were beaten; what they ask of me I must read for myself.',
     digNothing: '[weary]I dug at this spot, but the sand yielded nothing except stones and old roots.[/weary]',
     victory: (p: TextParams) =>
       `${en.formatDate(p.day as number, 1890)}. [excited]My shovel struck stone —[pause] hewn stone![/excited] [breath]With trembling hands I laid the burial chamber bare. [awe]Gold gleams in the torchlight, and upon the sarcophagus rests the mask of the great king.[/awe] [breath][awe]I have found it.[pause] The Heart of Africa.[/awe] [pause][somber]The journey was worth every step.[/somber]`,
