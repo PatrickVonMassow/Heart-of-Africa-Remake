@@ -21,6 +21,7 @@ import { request } from 'node:https'
 import { fileURLToPath } from 'node:url'
 import { readJson, writeJsonAtomic } from './dashboard-state.mjs'
 import { classifyRuns, shouldBlock, shouldNotify, blockReason } from './ci-status-guard-core.mjs'
+import { classifyFailureCause } from './ci-failure-cause-core.mjs'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
 
 const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url))
@@ -127,6 +128,30 @@ async function fetchRuns(repo, headSha) {
   }
 }
 
+/** The jobs of one run, so the failing JOB can say which side the fault sits on
+ *  (ci-failure-cause-core). null on any failure — the classifier then reports
+ *  `unknown` for the Pages workflow and keeps the old wording elsewhere. */
+async function fetchJobs(repo, runId) {
+  if (!runId) return null
+  const headers = {
+    Accept: 'application/vnd.github+json',
+    'User-Agent': 'hoa-ci-status-guard',
+    'X-GitHub-Api-Version': '2022-11-28',
+  }
+  const token = readToken()
+  if (token) headers.Authorization = `Bearer ${token}`
+  const res = await httpsRequest(`https://api.github.com/repos/${repo}/actions/runs/${runId}/jobs?per_page=30`, {
+    headers,
+  })
+  if (!res || res.status !== 200) return null
+  try {
+    const data = JSON.parse(res.body)
+    return Array.isArray(data?.jobs) ? data.jobs : null
+  } catch {
+    return null
+  }
+}
+
 /** ntfy push, same channel as scripts/notify.mjs but via node:https (see top).
  *  Silent no-op without a configured topic; failures never break the guard. */
 async function notifyCiRed(message) {
@@ -160,14 +185,24 @@ async function main() {
   const runs = await fetchRuns(repo, head)
   if (!runs) return null // offline / rate-limited / API error — fail-open
 
-  const classification = classifyRuns(runs, head)
-  if (!shouldBlock(classification.state)) return null
+  const runClassification = classifyRuns(runs, head)
+  if (!shouldBlock(runClassification.state)) return null
+
+  // WHERE the fault lies decides the remedy: a red the repository cannot fix
+  // must not demand a fixing push (point 526).
+  const cause = classifyFailureCause({
+    workflowName: runClassification.workflowName,
+    conclusion: runClassification.conclusion,
+    jobs: await fetchJobs(repo, runClassification.runId),
+  })
+  const classification = { ...runClassification, ...cause }
 
   const state = readJson(STATE) ?? {}
   if (shouldNotify(classification.state, state.notifiedSha, head)) {
     await notifyCiRed(
       `CI failed for pushed ${head.slice(0, 7)}: "${classification.workflowName}" ` +
-        `run ${classification.runId} (${classification.conclusion}). ${classification.url ?? ''}`,
+        `run ${classification.runId} (${classification.conclusion}, cause: ${classification.cause}). ` +
+        `${classification.url ?? ''}`,
     )
     writeJsonAtomic(STATE, {
       ...state,

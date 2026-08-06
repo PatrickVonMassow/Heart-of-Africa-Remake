@@ -1,6 +1,8 @@
 // Pure decision logic for the CI-status Stop hook (ci-status-guard.mjs).
 // Classifies the GitHub Actions runs for the pushed HEAD sha and decides
-// block/notify. No I/O, never throws — Vitest-covered in
+// block/notify. WHERE a red's cause lies — this repository or GitHub's side —
+// is decided next door in ci-failure-cause-core.mjs and shapes the message
+// blockReason writes. No I/O, never throws — Vitest-covered in
 // ci-status-guard-core.test.mjs. Accepts both the `gh run list --json` field
 // names (databaseId/headSha/workflowName/url) and the REST API's
 // (id/head_sha/name/html_url), since the wrapper feeds the REST shape today
@@ -81,16 +83,38 @@ export function shouldNotify(state, alreadyNotifiedSha, headSha) {
   return state === 'failed' && Boolean(headSha) && alreadyNotifiedSha !== headSha
 }
 
-/** The Stop-block reason: name the run, the evidence trail and the way out. */
+/** The Stop-block reason: name the run, WHERE the fault lies, and the way out.
+ *  `classification.cause` comes from ci-failure-cause-core (the wrapper adds it
+ *  once it has read the run's jobs); without it the message reads exactly as
+ *  before — a repository fault, fixed by a push. */
 export function blockReason(classification, headSha) {
   const sha7 = String(headSha ?? '').slice(0, 7)
   const c = classification ?? {}
-  return (
+  const head =
     `GitHub CI is RED for the pushed HEAD ${sha7}: workflow "${c.workflowName ?? '?'}" ` +
-    `run ${c.runId ?? '?'} concluded "${c.conclusion ?? '?'}"${c.url ? ` — ${c.url}` : ''}. ` +
+    `run ${c.runId ?? '?'} concluded "${c.conclusion ?? '?'}"${c.url ? ` — ${c.url}` : ''}. `
+  const trail = `(With gh installed: gh run view ${c.runId ?? '<id>'} --log-failed.) `
+
+  if (c.cause === 'external' || c.cause === 'unknown') {
+    const outside =
+      c.cause === 'external'
+        ? 'THIS RED IS NOT IN THE REPOSITORY — no fixing push exists for it: '
+        : 'The side this red sits on could not be determined: '
+    return (
+      head +
+      outside +
+      `${c.detail ?? ''}. ${c.remedy ?? ''} ${trail}` +
+      `Once that run is green this clears by itself; the user pausing the batch ` +
+      `via .claude/batch-paused also clears it.`
+    )
+  }
+
+  return (
+    head +
+    (c.detail ? `${c.detail}. ` : '') +
     `Reproduce the fast gate locally (npm run build && npm run lint && ` +
     `node scripts/audit-check.mjs && npm run test:unit), fix the cause, commit and push — ` +
-    `CI green is part of done. (With gh installed: gh run view ${c.runId ?? '<id>'} --log-failed.) ` +
+    `CI green is part of done. ${trail}` +
     `Only a fixing push (or the user pausing the batch via .claude/batch-paused) clears this.`
   )
 }
