@@ -19,8 +19,24 @@
 // states have different answers — a forbidden model stops the batch, an
 // unidentified one is LOOKED UP in the local transcripts and then resolved.
 
-/** Claude-model trailers allowed to author batch commits. */
-export const ALLOWED = /\b(opus|fable)\b/i
+// THE ALLOWLIST JUDGES THE PARSED NAME, NEVER THE RAW LINE (point 527, found
+// 06.08.2026 by the four-eyes review of points 397/425, recorded as C9 in
+// docs/rule-corpus-audit.md). `ALLOWED` used to be searched inside the whole
+// trailer, so any line merely CONTAINING "opus" or "fable" passed the guard
+// whose entire purpose is to catch a silently degraded session — a
+// `Claude Haiku 4.5 (opus mode)` or a `Claude Sonnet 5 / Claude Opus 5` walked
+// straight through. The name is therefore parsed out first and matched WHOLE,
+// and a trailer claiming more than one model is a finding rather than a pass on
+// its first allowed name: a commit has exactly one authoring model.
+
+/** Model names allowed to author batch commits, matched against the name PARSED
+ *  out of a trailer (`modelNamesIn`) — anchored, so an allowed name carrying any
+ *  addition is no longer allowed by accident. Everything after the family name
+ *  must be version digits: the policy names the model FAMILIES (Opus, Fable),
+ *  and a pinned version would redden the whole batch the day the harness serves
+ *  a point release or writes the raw model id (`claude-opus-5[1m]`, 14 commits
+ *  on 29.07.2026, which normalises to `opus 5`). */
+export const ALLOWED = /^(opus|fable)[\s.\d]*$/i
 
 /** Any Claude co-author trailer (human co-authors are not model evidence). */
 export const CLAUDE_TRAILER = /\bclaude\b/i
@@ -30,44 +46,98 @@ export const CLAUDE_TRAILER = /\bclaude\b/i
  *  model, so it is unidentified rather than forbidden. */
 const NON_MODEL_WORDS = /\b(code|agent)\b/gi
 
-/** What a single co-author trailer says the model is, with the vendor word, the
- *  address, any parenthesised suffix and the non-model words stripped. Empty
- *  means the trailer names no model. */
-export function modelNameIn(trailer) {
-  return String(trailer ?? '')
+/**
+ * The model names a single co-author trailer CLAIMS, with the address, the
+ * parenthesised/bracketed suffixes and the non-model words stripped, and the
+ * model-id spelling (`claude-opus-5[1m]`) normalised to the written one
+ * (`opus 5`). Each "Claude" token opens one claim, so
+ * `Claude Sonnet 5 / Claude Opus 5` reads as the two names it is rather than as
+ * one string an allowlist search can be fooled by.
+ * Empty means the trailer names no model at all.
+ */
+export function modelNamesIn(trailer) {
+  const cleaned = String(trailer ?? '')
     .replace(/<[^>]*>/g, ' ')
     .replace(/\([^)]*\)/g, ' ')
+    .replace(/\[[^\]]*\]/g, ' ')
     .replace(/\bco-authored-by:/gi, ' ')
-    .replace(/\bclaude\b/gi, ' ')
-    .replace(NON_MODEL_WORDS, ' ')
-    .replace(/[\s,;]+/g, ' ')
-    .trim()
+  if (!CLAUDE_TRAILER.test(cleaned)) return []
+  return cleaned
+    .split(/\bclaude\b/gi)
+    .slice(1)
+    .map((seg) =>
+      seg
+        .replace(NON_MODEL_WORDS, ' ')
+        .replace(/[\s,;/&_-]+/g, ' ')
+        .trim(),
+    )
+    .filter(Boolean)
+}
+
+/** What a trailer says the model is, as one string — the single name in the
+ *  normal case, every claimed name joined when a line names several. Empty
+ *  means the trailer names no model. */
+export function modelNameIn(trailer) {
+  return modelNamesIn(trailer).join(' + ')
 }
 
 /** The three states a commit's co-author field can be in, worst first. */
 export const CLASSES = Object.freeze(['forbidden', 'unidentified', 'allowed'])
 
 /**
- * Classify a commit's `Co-Authored-By` field:
- *   'forbidden'    a Claude trailer NAMES a model outside the allowlist
- *   'unidentified' a Claude trailer names NO model at all
- *   'allowed'      every Claude trailer names an allowed model — or there is no
- *                  Claude trailer at all (a merge commit and a purely human
- *                  co-author carry no model evidence and are not judged)
+ * Judge ONE co-author trailer value. Returns `{ verdict, names }` — the names
+ * are what the wording of a finding is built from, so a refusal can say which
+ * model it read rather than only that it disliked the line.
  *
- * A commit may carry several co-authors; each is judged alone and the WORST
- * verdict wins, so one forbidden co-author flags the commit even next to an
- * allowed one, and one bare trailer beside a named one is still unidentified.
+ * 'forbidden'    a name outside the allowlist stands in the trailer
+ * 'unidentified' the trailer names NO model, or names SEVERAL: neither can show
+ *                which single model authored the commit. The path is the same —
+ *                look the turn up in the transcripts — so they share a verdict.
+ * 'allowed'      exactly one name, and it is on the allowlist (or the trailer
+ *                is not a Claude one at all, which is no model evidence)
+ */
+export function judgeTrailer(trailer) {
+  const names = modelNamesIn(trailer)
+  if (!names.length) {
+    return { verdict: CLAUDE_TRAILER.test(String(trailer ?? '')) ? 'unidentified' : 'allowed', names }
+  }
+  if (names.some((name) => !ALLOWED.test(name))) return { verdict: 'forbidden', names }
+  return { verdict: names.length > 1 ? 'unidentified' : 'allowed', names }
+}
+
+/**
+ * Split a `%(trailers:…,separator=,)` field — or one commit-message trailer
+ * line — into the values judged SEPARATELY. The separator ALWAYS separates,
+ * a bracket notwithstanding.
+ *
+ * A bracket-AWARE split was built and withdrawn in the four-eyes review of
+ * point 527: every version of it let an UNCLOSED bracket swallow the separator
+ * and MERGE the next co-author into an allowed trailer, because the suffix
+ * strip then carried the forbidden name away with it —
+ * `Claude Opus 5 (1M context <a@x>,Claude Haiku 4.5 <b@x>,Claude Opus 5 (1M
+ * context) <c@x>` read as plain `Opus 5`. Splitting unconditionally errs toward
+ * MORE parts, which is the safe direction for a tripwire: every part is judged
+ * on its own, and a half cut out of a suffix that legitimately carried a comma
+ * names no allowed model, so it fails LOUD instead of silently allowing one.
+ * The commit-msg gate splits the same way, so such a trailer is refused AT the
+ * commit rather than pausing the batch from history later.
+ */
+export function splitTrailerField(field) {
+  return String(field ?? '').split(/[,;]/)
+}
+
+/**
+ * Classify a commit's `Co-Authored-By` field (see `judgeTrailer` for the three
+ * states). A commit may carry several co-authors; each is judged alone and the
+ * WORST verdict wins, so one forbidden co-author flags the commit even next to
+ * an allowed one, and one bare trailer beside a named one is still unidentified.
  */
 export function classifyTrailer(trailerField) {
   let worst = 'allowed'
-  for (const part of String(trailerField ?? '').split(/[,;]/)) {
-    if (!CLAUDE_TRAILER.test(part) || ALLOWED.test(part)) continue
-    if (!modelNameIn(part)) {
-      if (worst === 'allowed') worst = 'unidentified'
-      continue
-    }
-    return 'forbidden'
+  for (const part of splitTrailerField(trailerField)) {
+    const { verdict } = judgeTrailer(part)
+    if (verdict === 'forbidden') return 'forbidden'
+    if (verdict === 'unidentified' && worst === 'allowed') worst = 'unidentified'
   }
   return worst
 }
@@ -117,25 +187,37 @@ export function coAuthorTrailers(message) {
  * ignored, and a message with no Claude trailer at all is not this gate's
  * business (a merge, or a commit made outside the agent tooling).
  *
+ * A trailer LINE is split exactly as the Stop hook splits the log field, so the
+ * two can never disagree: what this gate lets through can never turn up as a
+ * breach in history, and one line carrying two co-authors is judged as two.
+ *
  * Returns { block, findings: [{ rule, trailer, detail }] } and NEVER throws.
  */
 export function evaluateCommitTrailers(message) {
   const findings = []
   try {
     for (const trailer of coAuthorTrailers(message)) {
-      const verdict = classifyTrailer(trailer)
-      if (verdict === 'unidentified') {
-        findings.push({
-          rule: 'unnamed-model-trailer',
-          trailer,
-          detail: 'names no model — it cannot show that an allowed model wrote this commit',
-        })
-      } else if (verdict === 'forbidden') {
-        findings.push({
-          rule: 'forbidden-model-trailer',
-          trailer,
-          detail: 'names a model outside the allowlist (only Opus 5, Opus 4.8 and Fable 5)',
-        })
+      for (const part of splitTrailerField(trailer)) {
+        const { verdict, names } = judgeTrailer(part)
+        if (verdict === 'unidentified' && names.length > 1) {
+          findings.push({
+            rule: 'multiple-model-trailer',
+            trailer,
+            detail: `names ${names.length} models (${names.join(', ')}) — a commit has ONE authoring model, so this shows none of them`,
+          })
+        } else if (verdict === 'unidentified') {
+          findings.push({
+            rule: 'unnamed-model-trailer',
+            trailer,
+            detail: 'names no model — it cannot show that an allowed model wrote this commit',
+          })
+        } else if (verdict === 'forbidden') {
+          findings.push({
+            rule: 'forbidden-model-trailer',
+            trailer,
+            detail: `names a model outside the allowlist (read as "${names.join(' + ')}"; only Opus 5, Opus 4.8 and Fable 5 may author here)`,
+          })
+        }
       }
     }
   } catch {
@@ -263,7 +345,7 @@ export function formatForbiddenReason(hits, { backupRefs = [], alsoUnidentified 
     ...(unnamed.length
       ? [
           '',
-          `The same window also holds ${unnamed.length} commit(s) whose trailer names NO model — ` +
+          `The same window also holds ${unnamed.length} commit(s) whose trailer names NO SINGLE model — ` +
             `${shaList(unnamed)}. Resolve those from the transcripts too; advancing the baseline ` +
             'past the breach would otherwise clear them unseen.',
         ]
@@ -277,8 +359,9 @@ export function formatForbiddenReason(hits, { backupRefs = [], alsoUnidentified 
 export function formatUnidentifiedReason(hits, { backupRefs = [] } = {}) {
   return [
     `UNIDENTIFIED AUTHOR: commit(s) ${shaList(hits)} carry a Claude co-author trailer that names NO ` +
-      'model, so they cannot show that an allowed model wrote them. This is NOT a policy breach ' +
-      'yet — do not pause the batch over it. Resolve it FIRST, before any other work:',
+      'SINGLE model — no model at all, or several at once — so they cannot show WHICH model wrote ' +
+      'them. This is NOT a policy breach yet — do not pause the batch over it. Resolve it FIRST, ' +
+      'before any other work:',
     '',
     ...TRANSCRIPT_HINT,
     '',
