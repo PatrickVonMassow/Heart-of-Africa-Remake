@@ -1491,6 +1491,7 @@ unreadable page is **never** called current.
     node scripts/board-queue.mjs set <N> "…" # write one queue card's prose
     node scripts/board-queue.mjs set <N> --title --text-stdin    # …its German title
     node scripts/board-queue.mjs set <N> --estimate "~2 h"       # …its estimate
+    node scripts/board-queue.mjs import      # take over cards the data file lacks
     node scripts/board.mjs title <N> "…"     # retitle a now- OR queue card
     node scripts/board.mjs none "<Grund>"    # the gap card, with NO point to close
 
@@ -1571,6 +1572,25 @@ The comparison is against the PARSED headline, never a language heuristic.
 `parseTaskTitles` normalises line endings first: its `$`-anchored pattern matched
 nothing at all on a CRLF checkout, so the middle rung had been dead there and the
 user read a run of cards saying "444 Punkt 444, 445 Punkt 445 …" on his phone.
+
+**`import` ADDS; it may not overwrite.** It was written as a one-time migration
+off the hand-kept board and behaved like one — it replaced the data file with
+whatever the HTML said, flattening each body to a single sentence run on the way.
+Run again, which filing one new point invites, it took the hand-written paragraph
+split of 46 cards at once (06.08.2026), and the data file is git-ignored, so only
+the last published board still held the structure. Now a stored card keeps every
+field it has and only an empty field is filled from the board; each rendered `<p>`
+comes back as its own paragraph; the generator's own stub body and fallback titles
+are recognised as non-data and never frozen into the file. And the conciseness
+budget is applied at the WRITE, not only at the turn end: an import whose result
+would put an over-long unbroken card on the board names those cards and writes
+nothing — replayed against the live board, that gate catches 44 of the flattened
+ones. Restoring a body the old command already destroyed is `set`'s job, since a
+merge that never overwrites cannot do it. And a data file that EXISTS but no
+longer parses is no longer read as an empty one: every command here would have
+rewritten it from scratch, dropping the prose of each point the board does not
+render — a card promoted to the now-section or to "Von dir zu klären" is exactly
+that — so a torn or half-typed file stops the command by name instead.
 
 `scripts/board.mjs` runs the publish itself, so the one-command board loop keeps
 the live page current without a second step. **The stamp may not lie:** the

@@ -14611,3 +14611,20 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   VERIFIABLE: pure Vitest on the guard's classification of a blocked/stalled
   deploy failure and on the workflow's retry decision, plus one real deploy run
   proving a commit blocked by a stuck deployment still reaches the live site.
+
+- [x] 530. `board-queue.mjs import` SILENTLY FLATTENS EVERY CURATED QUEUE CARD
+  INTO ONE PARAGRAPH (observed 06.08.2026, caused by filing one new point). The
+  import rebuilds `.claude/board-queue.json` from the work order and writes each
+  body as a SINGLE paragraph, overwriting the hand-written paragraph split that
+  the board's own conciseness guard demands. One run cost the paragraph structure
+  of 46 queue cards at once, and the JSON is untracked, so git cannot restore it —
+  only the last published `board.html` on the `board` branch still holds it.
+  FINAL STATE: `import` never destroys an existing body. A card the JSON already
+  knows keeps its stored paragraphs; only a point the JSON does not know yet gets
+  a fresh stub from the work order. The conciseness rule is enforced at the
+  IMPORT, not only at the turn end: an import that would leave a card as one
+  unbroken over-long paragraph fails loudly instead of publishing it.
+  VERIFIABLE: Vitest over the import — a JSON with a three-paragraph body plus a
+  work order that changed the same point keeps the three paragraphs; a point
+  absent from the JSON is added; and a stub that exceeds the conciseness budget is
+  reported rather than written.
