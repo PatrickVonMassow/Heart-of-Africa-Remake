@@ -2902,11 +2902,14 @@ for (const [placeId, shot] of [
     if (spot) {
       await page.evaluate(({ x, z }) => {
         const p = window.__placePlayer
+        // Six metres short of the patch, on the village-centre side of it, and
+        // TURNED TO IT: the yaw convention here is the one the rest of this
+        // suite uses (atan2 of the NEGATED offset), because the camera looks
+        // down its own −Z.
         const bearing = Math.atan2(x, z)
-        // Six metres short of the patch, looking at it.
         p.x = x - Math.sin(bearing) * 6
         p.z = z - Math.cos(bearing) * 6
-        p.yaw = bearing
+        p.yaw = Math.atan2(-(x - p.x), -(z - p.z))
         p.pitch = -0.12
       }, spot)
       await nextFrames(6)
