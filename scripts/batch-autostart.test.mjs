@@ -104,7 +104,10 @@ describe('the launcher uses the pure spawn builders', () => {
     }
     const sweep = lineOf(/reapableSpawns\(/, 'the ledger sweep')
     for (const [re, what] of [
-      [/batch-paused/, 'the user-paused guard'],
+      // `batchParked`, not the file name: since point 445 the `--pause-report`
+      // drill mode names `.claude/batch-paused` further up, and that block is a
+      // report that exits before any side effect — not a guard.
+      [/batchParked/, 'the user-paused guard'],
       [/openPointCount\(\)/, 'the work-order read'],
       [/open === 0/, 'the batch-complete guard'],
       [/reservation\.acquire/, 'the user claim that reserves the batch'],
@@ -165,7 +168,7 @@ describe('the launcher runs the board watchdog', () => {
     // "No successor is needed" is not "the board is fine". A complete, claimed
     // or wedged batch is exactly when a stale board goes unnoticed longest.
     const watch = lineOf(/board-watchdog\.mjs/, 'the board watchdog call')
-    expect(lineOf(/batch-paused/, 'the user pause')).toBeLessThan(watch)
+    expect(lineOf(/batchParked/, 'the user pause')).toBeLessThan(watch)
     for (const [re, what] of [
       [/openPointCount\(\)/, 'the work-order read'],
       [/open === 0/, 'the batch-complete guard'],
@@ -409,6 +412,64 @@ describe('the launcher treats a quota block as a waiting state', () => {
     const drill = codeLines.findIndex((l) => /--quota-report/.test(l))
     const sweep = codeLines.findIndex((l) => /reapableSpawns\(/.test(l))
     expect(drill, 'no --quota-report hook').toBeGreaterThanOrEqual(0)
+    expect(drill, 'the drill must exit before the ledger sweep kills anything').toBeLessThan(sweep)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// THE PARK CARRIES A RESTART CLOCK, AND THE TICK ACTS ON IT (point 445).
+//
+// Everything the record MEANS is pure and pinned in batch-pause-core.test.mjs.
+// What no unit test can see is whether the launcher reads it — the file cannot be
+// imported, by design — so the same source witness the spawn builders and the
+// board watchdog get is used here. A future edit dropping the retry would leave
+// every other test green while an unattended pause cost the whole absence again.
+describe('the launcher acts on the pause record', () => {
+  const source = readFileSync(resolve(process.cwd(), 'scripts', 'batch-autostart.mjs'), 'utf8')
+  const codeLines = source.split('\n').filter((l) => !l.trimStart().startsWith('//'))
+  const code = codeLines.join('\n')
+  const lineOf = (re, what) => {
+    const i = codeLines.findIndex((l) => re.test(l))
+    expect(i, `no line matching ${what}`).toBeGreaterThanOrEqual(0)
+    return i
+  }
+
+  it('classifies the record with the shared core rather than testing for the file', () => {
+    expect(source).toMatch(/from '\.\/batch-pause-core\.mjs'/)
+    expect(code).toMatch(/classifyPause\(\{/)
+    // The bare existence test is what point 445 replaced: it cannot tell a park
+    // with a running clock from one whose clock ran out.
+    expect(code).not.toMatch(/if \(existsSync\(C\('batch-paused'\)\)\)/)
+  })
+
+  it('clears the record and the runaway counter when the clock has run out', () => {
+    const retry = lineOf(/pause\.state === 'retry'/, 'the retry branch')
+    const after = codeLines.slice(retry, retry + 22).join('\n')
+    expect(after, 'an expired park must remove its own record').toMatch(/rmSync\(C\('batch-paused'\)\)/)
+    // Without this the runaway guard re-pauses in the same tick and the clock
+    // bought nothing at all.
+    expect(after, 'a retry must clear the failCount that caused the park').toMatch(/state\.failCount = 0/)
+    expect(after, 'the attempt is noted, so the next park climbs a rung').toMatch(/state\.pauseAttempt/)
+  })
+
+  it('parks a clockless or still-running record exactly as before', () => {
+    expect(code).toMatch(/if \(batchParked\)/)
+    expect(lineOf(/if \(batchParked\)/, 'the pause guard')).toBeLessThan(
+      lineOf(/openPointCount\(\)/, 'the work-order read'),
+    )
+  })
+
+  it('writes its own runaway park with a planned clock, not a bare marker', () => {
+    const brake = lineOf(/state\.failCount\s*>=\s*RUNAWAY_FAIL_LIMIT/, 'the runaway brake')
+    const block = codeLines.slice(brake, brake + 20).join('\n')
+    expect(block).toMatch(/planPause\(\{/)
+    expect(block).toMatch(/formatPauseRecord\(\{/)
+  })
+
+  it('the --pause-report drill exits before the tick’s first side effect', () => {
+    const drill = codeLines.findIndex((l) => /--pause-report/.test(l))
+    const sweep = codeLines.findIndex((l) => /reapableSpawns\(/.test(l))
+    expect(drill, 'no --pause-report hook').toBeGreaterThanOrEqual(0)
     expect(drill, 'the drill must exit before the ledger sweep kills anything').toBeLessThan(sweep)
   })
 })

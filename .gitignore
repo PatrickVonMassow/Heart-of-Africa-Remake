@@ -32,6 +32,7 @@ scripts/.tile-cache
 # Batch coordination state (scripts/batch-lock.mjs): runtime lock + pause marker
 .claude/batch-lock.json
 .claude/batch-paused
+.claude/batch-paused.tmp-*
 # The fence (point 434): runtime state like the lock, and NEVER deleted by any
 # code — but this machine's high-water mark is not the repository's business, and
 # a committed one would hand a clone a fence from somebody else's history.

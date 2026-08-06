@@ -221,7 +221,8 @@ export function escalationPauseReason(title, decision, stamp) {
   return (
     `Eskalation: Die Meldung „${title}“ wurde ${decision.rung + 1} Mal mit steigendem Abstand gesendet und blieb unbeantwortet. ` +
     `Der Batch pausiert deshalb absichtlich — eine Benachrichtigung kann man verschlafen, einen pausierten Batch nicht. ` +
-    `Er läuft weiter, sobald die Pause-Datei .claude/batch-paused gelöscht wird. ` +
+    `Er läuft weiter, sobald die Pause-Datei .claude/batch-paused gelöscht wird — oder von selbst, ` +
+    `sobald die Restart-Uhr in dieser Datei abgelaufen ist (Punkt 445). ` +
     `[${stamp}]`
   )
 }

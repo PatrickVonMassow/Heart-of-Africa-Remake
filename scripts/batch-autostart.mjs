@@ -77,6 +77,8 @@ import {
 } from './batch-autostart-core.mjs'
 import { repoRepairAllowed, repoRepairDecision } from './batch-doctor-core.mjs'
 import { clearMandateMarker, writeMandateMarker } from './batch-doctor-states.mjs'
+import { writeTextAtomic } from './atomic-write.mjs'
+import { classifyPause, describePause, formatPauseRecord, planPause } from './batch-pause-core.mjs'
 import { WATCHER_PID_FILE, watcherSupervision } from './chat-watcher-core.mjs'
 import { SECRET_FAULT } from './chat-secret.mjs'
 import { chatInboxLogLines } from './chat-core.mjs'
@@ -198,6 +200,33 @@ function readRunLogSegment(from) {
   }
 }
 
+// --- THE PAUSE DRILL: the real classification, no side effect (point 445) ------
+// `--pause-report [recordFile]` reads a pause record — the one named, or the live
+// `.claude/batch-paused` — runs the SAME classification the tick below runs, prints
+// what the tick would do as JSON and exits BEFORE the first side effect. It clears
+// nothing, spawns nothing and writes nothing, so scripts/pause-retry-drill.mjs can
+// prove the wiring on a machine whose batch is running.
+{
+  const i = process.argv.indexOf('--pause-report')
+  if (i >= 0) {
+    const arg = process.argv[i + 1]
+    const file = arg && !arg.startsWith('--') ? arg : C('batch-paused')
+    let text = null
+    try { text = readFileSync(file, 'utf8') } catch { text = null }
+    const verdict = classifyPause({ text, now })
+    console.log(JSON.stringify({
+      file,
+      now,
+      ...verdict,
+      // What the tick does with it: park (hold/wait) or resume (retry/none).
+      parksTheTick: verdict.state === 'hold' || verdict.state === 'wait',
+      clearsTheRecord: verdict.state === 'retry',
+      note: describePause(verdict),
+    }))
+    process.exit(0)
+  }
+}
+
 // --- LEAKED SPAWNS: reap what the removed runtime ceiling used to reap --------
 // `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0` means a `claude -p` waits forever for
 // a background task — including one that never exits, which a left-running dev
@@ -285,6 +314,48 @@ try {
   log(`chat inbox skipped (${(e && e.message) || e})`)
 }
 
+// --- THE PAUSE RECORD AND ITS RESTART CLOCK (point 445) ------------------------
+// A park used to end the batch until a human deleted `.claude/batch-paused`. Away
+// for a fortnight, that turned a cause which clears itself in twenty minutes into
+// the rest of the absence. So the record carries a RETRY-AFTER, and this tick is
+// what acts on it: the clock runs out, the record goes, the attempt is noted, and
+// the tick proceeds to its ordinary spawn decision — through the singleton and the
+// claim, exactly as any other tick, so a retry can never double-spawn.
+//
+// A record WITHOUT a clock still parks for ever (`hold`): every marker an older
+// session wrote, every one a human writes by hand, and the short written-down list
+// of genuinely unsafe causes (CLOCKLESS_CAUSES) read the same way. A missing clock
+// is never read as an expired one — that direction is the safe one.
+//
+// THE RUNAWAY COUNTER IS CLEARED WITH IT. `failCount` is what paused the batch in
+// the first place, and it survives in the state file; left standing, the runaway
+// guard below would re-pause this very tick and the clock would have bought
+// nothing. A retry means the next spawn gets a fresh ladder — and if it fails
+// again, the pause returns one rung higher.
+const pause = classifyPause({ text: (() => { try { return readFileSync(C('batch-paused'), 'utf8') } catch { return null } })(), now })
+let batchParked = pause.state === 'hold' || pause.state === 'wait'
+if (pause.state === 'retry') {
+  try { rmSync(C('batch-paused')) } catch { /* already gone — nothing to resume from */ }
+  // A record that SURVIVED its removal keeps the batch parked: resuming while the
+  // marker every other guard reads still lies there would run the batch against
+  // its own stand-down.
+  batchParked = existsSync(C('batch-paused'))
+  if (batchParked) log(`PAUSE CLOCK EXPIRED but ${C('batch-paused')} could not be removed — staying parked`)
+  else {
+    state.pauseAttempt = (pause.attempt || 0) + 1
+    state.pauseRetryAt = now
+    state.failCount = 0
+    log(describePause(pause))
+    await notify(
+      'Batch resumed itself',
+      `The pause clock ran out (attempt ${state.pauseAttempt}) and the launcher resumed the batch. It was parked for: ` +
+        `${(pause.reason || 'no reason recorded').split('\n')[0]}`,
+      'low',
+      { key: 'pause-retry' },
+    )
+  }
+}
+
 // --- THE MESSAGE WATCHER: this tick is its supervisor (point 407) --------------
 // Stage 3 of the chat channel is a long-lived process subscribed to the inbox
 // topic, so a message arriving into an IDLE machine wakes a light responder
@@ -302,7 +373,7 @@ try {
 // batch the user has stopped.
 try {
   const rec = readJson(C(WATCHER_PID_FILE))
-  const sup = watcherSupervision({ paused: existsSync(C('batch-paused')), record: rec, probe: probePid })
+  const sup = watcherSupervision({ paused: batchParked, record: rec, probe: probePid })
   // A WATCHER CANNOT RUN WITHOUT A READABLE SECRET, and one started anyway exits
   // before it writes its pidfile — so the supervision would read "not running"
   // and start another doomed process at every tick, for ever, with nothing
@@ -332,7 +403,12 @@ try {
 }
 
 // --- Guards: never resurrect when it would be wrong ---------------------------
-if (existsSync(C('batch-paused'))) { log('skip: batch is user-paused'); bail() }
+// The verdict was taken above (point 445), before the watcher supervision: a park
+// with a clock still running waits it out, one without a clock waits for a human.
+if (batchParked) {
+  log(pause.state === 'retry' ? 'skip: the pause record outlived its own removal' : describePause(pause))
+  bail()
+}
 
 // --- BOARD WATCHDOG (point 400, delta E) --------------------------------------
 // The BACKSTOP, not the mechanism. Delta D lets every session publish and delta B
@@ -479,6 +555,15 @@ if (state.lastSpawnAt > 0) {
   // rhythm can be measured out of it instead of assumed.
   if (outcome.note) log(outcome.note)
   state.failCount = outcome.failCount
+  // THE RETRY RUNG GOES WITH IT (point 445, four-eyes finding 2). `pauseAttempt`
+  // counts the resumptions of ONE spell of trouble; a counter that survived a
+  // recovery would make every park months later clockless on a ladder spent long
+  // ago, silently retiring the restart clock.
+  if (outcome.state === 'progress' && (state.pauseAttempt || 0) > 0) {
+    log(`previous spawn made progress — clearing the pause retry rung (${state.pauseAttempt})`)
+    delete state.pauseAttempt
+    delete state.pauseRetryAt
+  }
   if (outcome.quota) state.quota = outcome.quota
   else delete state.quota
 }
@@ -529,9 +614,25 @@ if (
 // failure at all, so an unattended fortnight is no longer paused by a budget that
 // comes back on the hour.
 if (state.failCount >= RUNAWAY_FAIL_LIMIT) {
-  log(`RUNAWAY: ${state.failCount} spawns with no git progress — pausing the batch and notifying`)
-  try { writeFileSync(C('batch-paused'), `autostart watchdog: ${state.failCount} resurrections made no progress (auth expired? model flag? failing point? push failing?) — investigate, then delete this file.\n`) } catch { /* ignore */ }
-  await notify('Batch STALLED', `${state.failCount} headless resurrections made no progress since ${state.lastHead.slice(0, 7)}. Auto-paused. Check auth / git push / the current point.`, 'urgent')
+  // IT PARKS WITH A CLOCK (point 445). The causes this watchdog names — expired
+  // auth, a push that fails, a point that keeps dying — include several that come
+  // back on their own, and the ladder climbs (20 min, 1 h, 3 h) before the park
+  // finally becomes a clockless one for a human. `pauseAttempt` is how many retries
+  // this stall has already had.
+  const plan = planPause({ cause: 'runaway', attempt: state.pauseAttempt || 0, now })
+  const when = plan.clockless ? 'no restart clock — a human is needed' : `retry at ${new Date(plan.retryAfter).toISOString()}`
+  log(`RUNAWAY: ${state.failCount} spawns with no git progress — pausing the batch (${when}) and notifying`)
+  // ATOMICALLY (four-eyes finding 4): a torn record is the one corruption that
+  // could flip this mechanism toward resuming — a half-written stamp read as a
+  // past one. tmp + rename makes a half-written file unreachable.
+  try {
+    writeTextAtomic(C('batch-paused'), formatPauseRecord({
+      reason: `autostart watchdog: ${state.failCount} resurrections made no progress (auth expired? model flag? failing point? push failing?) — investigate; the launcher retries when the clock below runs out.`,
+      ...plan,
+      pausedAt: now,
+    }))
+  } catch { /* ignore */ }
+  await notify('Batch STALLED', `${state.failCount} headless resurrections made no progress since ${state.lastHead.slice(0, 7)}. Auto-paused (${when}). Check auth / git push / the current point.`, 'urgent')
   writeJsonAtomic(C('autostart-state.json'), { ...state })
   process.exit(0)
 }

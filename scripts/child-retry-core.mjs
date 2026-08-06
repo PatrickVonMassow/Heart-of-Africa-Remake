@@ -361,7 +361,8 @@ export function outagePauseReason(decision, stamp) {
     `Umgebungsausfall: ${decision.witnesses?.length ?? 2} Agenten sind innerhalb von ` +
     `${Math.round(OUTAGE_WINDOW_MS / 60000)} Minuten am selben Fehler gestorben (${decision.signature}). ` +
     `Der Batch pausiert absichtlich, statt in den Ausfall hinein neu zu starten. ` +
-    `Er läuft weiter, sobald die Pause-Datei .claude/batch-paused gelöscht wird — bitte erst prüfen, ob die API wieder antwortet. ` +
+    `Er läuft weiter, sobald die Pause-Datei .claude/batch-paused gelöscht wird — oder von selbst, sobald die ` +
+    `Restart-Uhr in dieser Datei abgelaufen ist (Punkt 445); bitte trotzdem prüfen, ob die API wieder antwortet. ` +
     `[${stamp}]`
   )
 }
