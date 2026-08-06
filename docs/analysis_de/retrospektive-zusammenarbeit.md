@@ -799,6 +799,14 @@ Zweimal wäre der Befund an diesem Abend fast als Umgebungsrauschen abgelegt wor
 
 Die dritte Spielart derselben Klasse braucht gar keinen Fehler im Verschluss (06.08.2026, Punkt 481/524): Das Motiv IST im Bild, nachgemessen und angestrahlt — und das Bild taugt trotzdem nicht mehr als Nachweis. Eine neue Trennungsregel schob die spielenden Kinder an den Dorfrand hinter die Steinreihe; auf dem Nachweisbild blieb eine fast leere Ebene mit einem kleinen Kind, wo vorher Hüttenkranz, beide Kinder und die Herde standen. Jede Prüfung war grün, denn sie fragt nach **Anwesenheit**, nie nach **Lesbarkeit**. Das ist die Grenze dessen, was ein Verschluss automatisch leisten kann: Ob ein Mensch auf dem Bild wiedererkennt, was es dokumentiert, entscheidet nur der Blick darauf — weshalb der eigene Blick aufs Bild vor jedem Merge kein Ritual ist, sondern die einzige Prüfung dieser Art, die wir haben.
 
+### 3.86 Der Wächter verlangte ein Pflaster, das es nicht geben konnte
+
+Am 06.08.2026 nahm eine Auslieferung an die Spielseite den Stand entgegen und wurde bei GitHub nie fertig — sie stand in deren Warteschlange, bis der Lauf aufgab. Die **Auslieferung selbst blieb dort „in Arbeit"**, und von da an wies GitHub jede weitere ab, auch die für neuere Stände. Die veröffentlichte Seite zeigte zwei Stunden lang alten Stand, während der Nutzer jede Bildänderung genau an dieser Seite beurteilt.
+
+Interessant ist nicht der Ausfall bei GitHub, sondern die Reaktion der eigenen Mechanik. Die CI-Wache sah Rot und sagte, was sie immer sagt: Fehlerursache lokal nachstellen, beheben, committen, pushen — „nur ein reparierender Push räumt das weg". Genau das war unmöglich; im Projekt gab es nichts zu reparieren. Zwei Versuche gingen ins Leere (Neustart des Laufs, Auslösung von Hand), bevor die Meldung des dritten die Ursache preisgab und der Weg hinaus über einen Abbruch der steckengebliebenen Auslieferung führte — ein Griff, den kein Skript, keine Dokumentation und keine Wächtermeldung im Projekt kennt.
+
+**Lehren:** Eine Wache, die nur „rot" und „grün" unterscheidet, schiebt jeden Fremdausfall dem Projekt zu und schickt die Sitzung auf eine Suche, die nichts finden kann. Sie muss die Ursache **außerhalb** von der Ursache **innerhalb** trennen und im ersten Fall den echten Griff nennen, statt einen zu verlangen, den es nicht gibt. Und eine Auslieferung, die auf einen fremden Dienst wartet, braucht eine begrenzte Wartezeit **mit Aufräumen**: Wer aufgibt, ohne das Angefangene zurückzunehmen, hinterlässt eine Sperre für alle Nachfolger.
+
 ---
 
 ## 4. Die Guards als Immunsystem
@@ -888,7 +896,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Donnerstag, 06.08.2026, 02:51 · Quellen-Fingerprint: `daafaf93c2ed…`
+Zuletzt aktualisiert: Donnerstag, 06.08.2026, 15:50 · Quellen-Fingerprint: `b6ec93dc0e93…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -970,6 +978,6 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 72 Feedback-/Projekt-Memories · 42 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 32 Prozess-/Meta-TASKS-Punkte (davon 15 offen).
 
-<!-- RETRO-FINGERPRINT: daafaf93c2edbb9661ad35671a2544180370908fe9380d5610affd556edb59c4 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-06T00:51:45.844Z -->
+<!-- RETRO-FINGERPRINT: b6ec93dc0e9352352fadf710507e84b7eb8ca28b55e752c6a148c93e6012dce6 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-06T13:50:56.709Z -->
 <!-- AUTO-GENERATED:END -->
