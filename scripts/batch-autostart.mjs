@@ -460,6 +460,38 @@ try {
   log(`board watchdog skipped (${(e && e.message) || e})`)
 }
 
+// --- STALE-SITE WATCHDOG (point 528) ------------------------------------------
+// The same shape as the board watchdog above, for the other page this project
+// publishes: the GAME at the site root. Every alarm this project had fired on a
+// RED RUN — and on 06.08.2026 the run history was beside the point, because what
+// hurt was that `main` stood at ee125053 while the site served c728c816 for
+// hours and the user judged every render change against exactly that. A site can
+// also go stale with no red run at all (a push that triggered nothing, a
+// deployment that reported success and did not land), so the check asks the SITE,
+// not the run list: the build emits its revision at `<site>/build-info.json`
+// (scripts/build-info.mjs) and the child compares it with `main`, names both
+// revisions, and re-dispatches the deploy once GitHub answers again.
+//
+// Its own process for the same two reasons: a `fetch` in this file would abort it
+// at any of its fifteen exits, and the resurrection must be unreachable from a
+// site check. Bounded and fail-open on top — a stale site may never be a reason
+// the batch does not come back.
+try {
+  const out = execFileSync(process.execPath, [R('deploy-staleness.mjs')], {
+    windowsHide: true,
+    cwd: REPO,
+    encoding: 'utf8',
+    timeout: 90000,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  })
+  const r = JSON.parse(out.trim().split('\n').filter(Boolean).pop())
+  if (r.verdict !== 'current') log(`deployed site: ${r.verdict} — ${r.reason ?? ''}`)
+  if (r.dispatched) log(`deployed site: re-dispatched the deploy workflow (${r.dispatch})`)
+  if (r.notified) log(`SITE ALERT: ${r.message}`)
+} catch (e) {
+  log(`stale-site watchdog skipped (${(e && e.message) || e})`)
+}
+
 let open
 try { open = openPointCount() } catch { log('skip: cannot read TASKS.md'); bail() }
 if (open === -1) { log('ALERT: TASKS.md format unrecognized — not spawning'); await notify('TASKS.md format', 'The batch parser found checkboxes but no points — halting resurrection to be safe.', 'high'); bail() }

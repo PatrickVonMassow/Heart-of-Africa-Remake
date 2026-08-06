@@ -1,16 +1,45 @@
 import { execSync } from 'node:child_process'
-import { defineConfig } from 'vite'
+import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
+import { BUILD_INFO_FILE, buildInfoJson, buildInfoPayload, resolveBuildCommit } from './scripts/build-info.mjs'
 
-/** Short commit the bundle was built from. The in-game benchmark report
- *  (design.md §21.1, F8) names it, so a measurement sent back from the
- *  deployed build can be tied to the exact build it was taken on. */
-function buildCommit(): string {
-  if (process.env.GITHUB_SHA) return process.env.GITHUB_SHA.slice(0, 7)
+function gitOut(args: string): string {
   try {
-    return execSync('git rev-parse --short HEAD', { encoding: 'utf8' }).trim()
+    return execSync(`git ${args}`, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
   } catch {
-    return 'unknown'
+    return ''
+  }
+}
+
+/** Full commit the bundle is built from — git first, because the workflow builds
+ *  each frozen tag in a worktree where GITHUB_SHA still names main (see
+ *  scripts/build-info.mjs). */
+function buildCommit(): string {
+  return resolveBuildCommit({ gitSha: gitOut('rev-parse HEAD'), env: process.env })
+}
+
+/** Emit the site's revision marker at `<base>/build-info.json` (point 528): the
+ *  one thing on the deployed page that says WHICH commit it was built from, so
+ *  the batch can notice a site that lags `main` without a human looking.
+ *  Build only — the dev server serves the working tree by definition. */
+function buildInfoPlugin(): Plugin {
+  return {
+    name: 'hoa-build-info',
+    apply: 'build',
+    generateBundle() {
+      const commit = buildCommit()
+      this.emitFile({
+        type: 'asset',
+        fileName: BUILD_INFO_FILE,
+        source: buildInfoJson(
+          buildInfoPayload({
+            commit,
+            ref: process.env.GITHUB_REF_NAME || gitOut('rev-parse --abbrev-ref HEAD'),
+            builtAt: new Date().toISOString(),
+          }),
+        ),
+      })
+    },
   }
 }
 
@@ -20,9 +49,11 @@ export default defineConfig({
   // (GITHUB_ACTIONS is set on the runners) needs that base path; locally the
   // dev server and preview run at the root.
   base: process.env.GITHUB_ACTIONS ? '/Heart-of-Africa-Remake/' : '/',
-  plugins: [react()],
+  plugins: [react(), buildInfoPlugin()],
   define: {
-    'import.meta.env.VITE_BUILD_COMMIT': JSON.stringify(buildCommit()),
+    // The in-game benchmark report (design.md §21.1, F8) names the SHORT commit,
+    // so a measurement sent back from the deployed build can be tied to it.
+    'import.meta.env.VITE_BUILD_COMMIT': JSON.stringify(buildCommit().slice(0, 7)),
   },
   // The TTS stack resolves its WASM/worker assets at runtime; esbuild
   // pre-bundling breaks those URLs in dev.
