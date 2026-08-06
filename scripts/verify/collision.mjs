@@ -141,7 +141,12 @@ async function pushForwardUntilStalled(bank, maxMs = 12000) {
     if (stalled >= 3) break
   }
   await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyW' })))
-  await page.waitForTimeout(120)
+  // The release settles on the scene's own clock too — no stopwatch anywhere in
+  // this walk, so the fixed-wait budget of scripts/verify/fixedWaits.test.mjs
+  // stays where it was.
+  await page.evaluate(
+    () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(null)))),
+  )
 }
 
 /**
