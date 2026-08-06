@@ -118,15 +118,32 @@ const CONSOLE_PREFIX = 'console error:'
 
 /** A check rebuilt from its NAME alone, keeping its kind. Used wherever a name
  *  crosses a process boundary — without it a console pseudo-check would come
- *  back as an ordinary check and lose its "absent means it did not happen" rule. */
+ *  back as an ordinary check and lose its "absent means it did not happen" rule.
+ *
+ *  It takes a whole RESULT LINE too, because that is what a human hands it: the
+ *  `--failed` argument is copied straight out of a console, `FAIL  ` prefix,
+ *  ` — detail` and all. parseCheckLines splits those off, so a name carrying
+ *  them keyed differently from the same check in the baseline output and every
+ *  verdict came back "the baseline never ran it" (seen live, 06.08.2026).
+ *
+ *  The cut stops at a CONSOLE pseudo-check, because consoleErrorChecks builds
+ *  its identity from the WHOLE normalised error text and never splits at a dash.
+ *  `src/systems/devAssert.ts` prints `[ASSERT] <code> — <detail>`, so cutting
+ *  here would key every dev-assert error differently from its own baseline form
+ *  — and run-all hands console names through `--failed`, so a PRE-EXISTING
+ *  assert would be reported as a REAL REGRESSION. Each side splits the way its
+ *  own producer does; that is what makes the keys meet. */
 export function checkFromName(name) {
-  const label = String(name ?? '').trim()
+  let label = String(name ?? '').trim().replace(/^(?:PASS|FAIL)\s{2,}/, '')
+  const isConsole = label.toLowerCase().startsWith(CONSOLE_PREFIX)
+  const dash = label.indexOf(' — ')
+  if (!isConsole && dash !== -1) label = label.slice(0, dash).trim()
   return {
     status: 'FAIL',
     name: label,
     key: checkKey(label),
     detail: '',
-    kind: label.toLowerCase().startsWith(CONSOLE_PREFIX) ? 'console' : 'check',
+    kind: isConsole ? 'console' : 'check',
   }
 }
 
@@ -288,8 +305,12 @@ export function changeRelatedness({ checks, changedFiles }) {
  *                     dangerous: a baseline red by flake would exonerate a real
  *                     regression, a baseline green by luck would convict an
  *                     innocent change. So it is named, not resolved.
- *   inconclusive    — the check never appeared in the baseline run: it is newer
- *                     than the baseline, or the baseline run died before it.
+ *   baseline-died   — the check never appeared AND the baseline run ended early
+ *                     (point 418). Distinct from inconclusive on purpose: one
+ *                     says "this check is newer than the baseline", the other
+ *                     says "the lane broke and answered nothing".
+ *   inconclusive    — the check never appeared in a baseline run that reached
+ *                     the end: it is newer than the baseline.
  *
  * `baselineChecks` is every check the baseline run reached (see allChecks); it
  * is what separates "passed there" from "never ran there" — without it a
@@ -297,7 +318,7 @@ export function changeRelatedness({ checks, changedFiles }) {
  * A console-error pseudo-check is different in kind: it cannot be "reached", so
  * its ABSENCE on a baseline that ran at all means the error did not occur there.
  */
-export function classifyAgainstBaseline({ currentFailed, baselineFailed, baselineChecks, baselineFlaky = [] }) {
+export function classifyAgainstBaseline({ currentFailed, baselineFailed, baselineChecks, baselineFlaky = [], baselineDied = false }) {
   const failedNow = (currentFailed ?? []).map((c) => (typeof c === 'string' ? checkFromName(c) : c))
   const keys = (list) => new Set((list ?? []).map((c) => (typeof c === 'string' ? checkKey(c) : c.key)))
   const baseFailKeys = keys(baselineFailed)
@@ -309,10 +330,82 @@ export function classifyAgainstBaseline({ currentFailed, baselineFailed, baselin
     if (flakyKeys.has(c.key)) verdict = 'baseline-flaky'
     else if (baseFailKeys.has(c.key)) verdict = 'pre-existing'
     else if (baseSeenKeys.has(c.key)) verdict = 'real-regression'
-    else if (c.kind === 'console' && baselineRanAtAll) verdict = 'real-regression'
+    else if (c.kind === 'console' && baselineRanAtAll && !baselineDied) verdict = 'real-regression'
+    else if (baselineDied) verdict = 'baseline-died'
     else verdict = 'inconclusive'
     return { check: c.name, key: c.key, verdict }
   })
+}
+
+/**
+ * Did a baseline run DIE rather than fail (point 418)?
+ *
+ * The 29.07.2026 case: two baseline passes of `enrichments` each ended after 55
+ * of the suite's 243 checks — exit 1 with ZERO failing checks. That is not a red
+ * suite, it is a suite that never reached the end, and folding it into
+ * "the check did not run on the baseline" hid it behind the same wording a
+ * genuinely NEWER check gets. A lane that dies at a quarter of the suite costs
+ * the full runtime and answers nothing, so it must be LOUD.
+ *
+ * A death REQUIRES that the run printed NO failing check. That is the whole
+ * distinction: a run with FAIL lines did what it was asked — it reported. A run
+ * with none and a non-zero exit reported nothing, so its exit came from
+ * somewhere else. Two signatures on top of that, either one sufficient:
+ *   short  — it reached FEWER checks than the current run did (needs the current
+ *            count; the runner knows it, so it is handed in).
+ *   silent — it exited non-zero (needs the exit code; available whenever the run
+ *            was spawned here).
+ * A run that printed NOTHING at all is the pre-existing "did not run" case, not
+ * a death — foldBaselineRuns reports that through `ran`.
+ *
+ * A run that exited ZERO is never a death, whatever it counted: the exit is the
+ * suite's last statement, so reaching it means reaching the end. Some checks are
+ * conditional on what the app produced, so a healthy baseline may legitimately
+ * count a few short — and calling that a death would cry wolf on every run.
+ * A killed run (no exit code at all) counts as non-zero.
+ *
+ * The shortfall alone must NOT annul a run that failed properly: the serverless
+ * suites run the BASELINE's own copy of the script, so a change that ADDS checks
+ * leaves a legitimately red baseline permanently shorter, and stamping "nothing
+ * below is a verdict" over that valid triage every time is the same false alarm
+ * in the other direction. `baselineShortfall` names it as a caveat instead.
+ *
+ * Returns null when the run looks healthy, else the evidence to print.
+ */
+export function baselineRunDeath({ checks, failed, exitCode = null, currentCheckCount = 0 }) {
+  const reached = (checks ?? []).length
+  if (reached === 0) return null
+  if (exitCode === 0) return null
+  if ((failed ?? []).length > 0) return null
+  const short = currentCheckCount > 0 && reached < currentCheckCount
+  // A KNOWN non-zero exit only: `null` also means "no exit code was handed in"
+  // (a bare output string), and a healthy green run must not read as silent.
+  const silent = exitCode !== null && exitCode !== 0
+  if (!short && !silent) return null
+  return {
+    reached,
+    expected: currentCheckCount > 0 ? currentCheckCount : null,
+    lastCheck: checks[reached - 1]?.name ?? '',
+    failures: 0,
+    exitCode,
+    signature: short && silent ? 'short-and-silent' : short ? 'short' : 'silent',
+  }
+}
+
+/**
+ * A baseline run that REPORTED (it has FAIL lines) but still reached fewer
+ * checks than the current run. That is not a death — the verdicts it produced
+ * stand — but it is worth naming: either the change added checks, or the run
+ * ended early AFTER reporting something. A caveat, never an annulment.
+ *
+ * Returns null when there is nothing to say.
+ */
+export function baselineShortfall({ checks, failed, currentCheckCount = 0 }) {
+  const reached = (checks ?? []).length
+  const failures = (failed ?? []).length
+  if (reached === 0 || failures === 0) return null
+  if (!(currentCheckCount > 0 && reached < currentCheckCount)) return null
+  return { reached, expected: currentCheckCount, failures, lastCheck: checks[reached - 1]?.name ?? '' }
 }
 
 /**
@@ -321,9 +414,17 @@ export function classifyAgainstBaseline({ currentFailed, baselineFailed, baselin
  * as the run being triaged, and BOTH of its wrong readings are dangerous (see
  * `baseline-flaky`). A check counts as red on the baseline only when it failed in
  * EVERY baseline run; failing in some is instability, not a baseline verdict.
+ *
+ * An entry may be a bare output string or `{ output, exitCode }` — the exit code
+ * is what makes a run that printed no FAIL line yet exited 1 readable as a DEATH
+ * (point 418) rather than as a clean baseline.
  */
-export function foldBaselineRuns(outputs) {
-  const runs = (outputs ?? []).map((o) => ({ failed: failedChecks(o), checks: allChecks(o) }))
+export function foldBaselineRuns(outputs, { currentCheckCount = 0 } = {}) {
+  const runs = (outputs ?? []).map((o) => {
+    const text = typeof o === 'string' || o == null ? o : o.output
+    const exitCode = typeof o === 'string' || o == null ? null : (o.exitCode ?? null)
+    return { failed: failedChecks(text), checks: allChecks(text), exitCode }
+  })
   const checks = []
   const seen = new Set()
   for (const r of runs) {
@@ -345,14 +446,23 @@ export function foldBaselineRuns(outputs) {
   const flaky = []
   for (const [key, n] of counts) (n === runs.length ? failed : flaky).push(label.get(key))
   const ran = runs.length > 0 && runs.every((r) => r.checks.length > 0 || r.failed.length > 0)
-  return { failed, flaky, checks, ran, runs: runs.length }
+  const deaths = []
+  const shortfalls = []
+  runs.forEach((r, i) => {
+    const death = baselineRunDeath({ ...r, currentCheckCount })
+    if (death) deaths.push({ run: i + 1, ...death })
+    const short = baselineShortfall({ ...r, currentCheckCount })
+    if (short) shortfalls.push({ run: i + 1, ...short })
+  })
+  return { failed, flaky, checks, ran, runs: runs.length, deaths, shortfalls, died: deaths.length > 0 }
 }
 
 const VERDICT_LABEL = {
   'real-regression': 'REAL REGRESSION (green on baseline, red now)',
   'pre-existing': 'PRE-EXISTING / STALE ASSUMPTION (already red on baseline)',
   'baseline-flaky': 'UNSTABLE ON BASELINE (it flakes there too — the baseline decides nothing)',
-  inconclusive: 'INCONCLUSIVE (the check did not run on the baseline — newer than it, or the baseline run died first)',
+  'baseline-died': 'NOT CLASSIFIED — the BASELINE RUN DIED before reaching this check (the lane broke; this is NOT "newer than the baseline")',
+  inconclusive: 'INCONCLUSIVE (the check did not run on a baseline that reached the end — it is newer than the baseline)',
 }
 
 /** The repeat-signature verdict as printable lines (deterministic, no colour). */
@@ -393,15 +503,50 @@ export function formatBaselineReport({
   suiteFileChanged = false,
   infraChanged = [],
   baselineRan = true,
+  deaths = [],
+  shortfalls = [],
+  logs = [],
   note = '',
 }) {
   const lines = [`--- baseline classification — ${suite} vs ${ref} (backend ${backend === 'webgpu' ? 'WebGPU' : 'WebGL 2'}) ---`]
   if (!baselineRan) {
     lines.push('      the baseline run did not produce a result — NOT classified (never assume green).')
     if (note) lines.push(`      ${note}`)
+    if (logs.length) lines.push(`      the run output was kept: ${logs.join(', ')}`)
     return lines
   }
+  // point 418: a lane that ends early answers nothing — say so BEFORE the
+  // verdicts, so nobody reads the classification below as a triage.
+  for (const d of deaths) {
+    const of = d.expected ? ` of the current run's ${d.expected}` : ''
+    lines.push(
+      `      *** THE BASELINE LANE DIED: run ${d.run} ended after ${d.reached}${of} checks` +
+        ` (exit ${d.exitCode ?? '?'}, ${d.failures} failing) — last check reached: "${d.lastCheck}".`,
+    )
+  }
+  if (deaths.length) {
+    lines.push('      A baseline run that stops early is NOT a baseline: nothing below it is a verdict. Fix the lane first.')
+    if (suiteFileChanged) {
+      // The first place to look, and the one this lane creates itself: the
+      // suite is top-level-await, so a check reaching for a dev hook the OLDER
+      // app does not expose rejects and kills the process — exit 1, no FAIL line.
+      lines.push(
+        `      FIRST SUSPECT: scripts/verify/${suite}.mjs changed since the baseline. The CURRENT check runs against the`,
+      )
+      lines.push('      BASELINE app, so a new check reaching for a dev hook that app has not got throws and takes the run with it.')
+    }
+    lines.push('      Read the kept output below at the last check named above — the throw is the line after it.')
+  }
   for (const c of classified) lines.push(`      ${c.check}: ${VERDICT_LABEL[c.verdict]}`)
+  // A CAVEAT, printed after the verdicts because they still stand: the run
+  // reported, it just reported over a shorter suite than the current one.
+  for (const s of shortfalls) {
+    lines.push(
+      `      NOTE: baseline run ${s.run} reported ${s.failures} failing check(s) but reached only ${s.reached} of the` +
+        ` current run's ${s.expected} (last: "${s.lastCheck}") — the change may simply have added checks; the verdicts above stand.`,
+    )
+  }
+  if (logs.length) lines.push(`      the baseline run output was kept: ${logs.join(', ')}`)
   if (suiteFileChanged) {
     lines.push(
       `      NOTE: scripts/verify/${suite}.mjs itself differs from ${ref} — the CURRENT check was run against the BASELINE code,`,

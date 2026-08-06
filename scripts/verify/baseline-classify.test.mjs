@@ -5,6 +5,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   allChecks,
+  baselineRunDeath,
+  baselineShortfall,
   changeRelatedness,
   checkFromName,
   checkKey,
@@ -165,8 +167,11 @@ describe('console errors as pseudo-checks (world and i18n print no FAIL line)', 
     const name = consoleErrorChecks(OUT)[1].name
     expect(checkFromName(name)).toMatchObject({ kind: 'console', key: checkKey(name) })
     expect(checkFromName('the map opens').kind).toBe('check')
-    // A name carrying an em dash keeps it — it is a name, not a printed line.
-    expect(checkFromName('a check — with a dash').name).toBe('a check — with a dash')
+    // A name carrying an em dash is CUT at it, exactly as parseCheckLines cuts
+    // the printed line — the two must key alike or the comparison never matches,
+    // and no check name can survive the dash through parsing anyway.
+    expect(checkFromName('a check — with a dash').name).toBe('a check')
+    expect(checkFromName('a check — with a dash').key).toBe(allChecks('PASS  a check — with a dash')[0].key)
   })
 
   it('classifies a console error handed over as a bare name as a real regression', () => {
@@ -245,6 +250,192 @@ describe('classifying against the baseline', () => {
     expect(classified[0].verdict).toBe('baseline-flaky')
   })
 
+  // point 418: the 29.07.2026 case — two baseline passes of `enrichments` each
+  // ended after 55 of 243 checks, exit 1 with ZERO failing checks. That is a
+  // lane that DIED, and it must not read as "the check is newer than the baseline".
+  describe('a baseline run that DIED before the end', () => {
+    const shortRun = 'PASS  the traveller reaches the savanna\nPASS  a herd gathers'
+
+    it('reads fewer checks than the current run with no failure as a death, and names the last check', () => {
+      const death = baselineRunDeath({
+        checks: allChecks(shortRun),
+        failed: failedChecks(shortRun),
+        exitCode: 1,
+        currentCheckCount: 243,
+      })
+      expect(death).toMatchObject({ reached: 2, expected: 243, failures: 0, exitCode: 1, signature: 'short-and-silent' })
+      expect(death.lastCheck).toBe('a herd gathers')
+    })
+
+    it('reads a non-zero exit without a single FAIL line as a death even with no yardstick', () => {
+      expect(baselineRunDeath({ checks: allChecks(shortRun), failed: [], exitCode: 1 })).toMatchObject({ signature: 'silent' })
+    })
+
+    it('leaves a healthy run alone: full length, and a red run that exits 1 WITH failures', () => {
+      expect(baselineRunDeath({ checks: allChecks(shortRun), failed: [], exitCode: 0, currentCheckCount: 2 })).toBeNull()
+      const red = 'PASS  the traveller reaches the savanna\nFAIL  a herd gathers'
+      expect(baselineRunDeath({ checks: allChecks(red), failed: failedChecks(red), exitCode: 1, currentCheckCount: 2 })).toBeNull()
+    })
+
+    it('never calls a run that REPORTED failures a death, however much shorter it is', () => {
+      // The serverless suites run the BASELINE's own script copy, so a change
+      // that adds checks leaves a legitimately red baseline permanently
+      // shorter. Annulling that valid triage is the same false alarm the
+      // died-early verdict exists to prevent, only pointing the other way.
+      const red = 'PASS  a\nPASS  b\nFAIL  c'
+      expect(baselineRunDeath({ checks: allChecks(red), failed: failedChecks(red), exitCode: 1, currentCheckCount: 245 })).toBeNull()
+    })
+
+    it('reports a short run that DID report as a caveat instead, leaving the verdicts standing', () => {
+      const red = 'PASS  a\nPASS  b\nFAIL  c'
+      const folded = foldBaselineRuns([{ output: red, exitCode: 1 }], { currentCheckCount: 245 })
+      expect(folded.died).toBe(false)
+      expect(folded.deaths).toEqual([])
+      expect(folded.shortfalls).toEqual([{ run: 1, reached: 3, expected: 245, failures: 1, lastCheck: 'c' }])
+      // The classification is untouched: a check the short baseline DID fail
+      // still reads pre-existing, not "not classified".
+      const classified = classifyAgainstBaseline({
+        currentFailed: ['c'],
+        baselineFailed: folded.failed,
+        baselineChecks: folded.checks,
+        baselineDied: folded.died,
+      })
+      expect(classified[0].verdict).toBe('pre-existing')
+      const text = formatBaselineReport({ suite: 'docs', ref: 'abc', classified, shortfalls: folded.shortfalls }).join('\n')
+      expect(text).toContain('the verdicts above stand')
+      expect(text).not.toContain('DIED')
+      expect(text).not.toContain('Fix the lane first')
+    })
+
+    it('says nothing about a short run that reported and is NOT short of the current count', () => {
+      const red = 'PASS  a\nFAIL  b'
+      expect(baselineShortfall({ checks: allChecks(red), failed: failedChecks(red), currentCheckCount: 2 })).toBeNull()
+      // …nor about a run with no failures at all — that is the death path.
+      expect(baselineShortfall({ checks: allChecks(red), failed: [], currentCheckCount: 245 })).toBeNull()
+    })
+
+    it('never calls a run that EXITED ZERO a death, however few checks it counted', () => {
+      // Some checks are conditional on what the app produced, so a healthy
+      // baseline may legitimately count a few short. The exit is the suite's
+      // last statement: reaching it means reaching the end.
+      expect(baselineRunDeath({ checks: allChecks(shortRun), failed: [], exitCode: 0, currentCheckCount: 243 })).toBeNull()
+    })
+
+    it('says nothing rather than guessing when no exit code was handed in', () => {
+      expect(baselineRunDeath({ checks: allChecks(shortRun), failed: [], currentCheckCount: 2 })).toBeNull()
+    })
+
+    it('is not confused with a run that produced nothing at all (that is the not-ran case)', () => {
+      expect(baselineRunDeath({ checks: [], failed: [], exitCode: 1, currentCheckCount: 243 })).toBeNull()
+    })
+
+    it('folds the deaths per run, with the exit codes the wrapper hands over', () => {
+      const folded = foldBaselineRuns(
+        [
+          { output: shortRun, exitCode: 1 },
+          { output: shortRun, exitCode: 1 },
+        ],
+        { currentCheckCount: 243 },
+      )
+      expect(folded.died).toBe(true)
+      expect(folded.deaths.map((d) => d.run)).toEqual([1, 2])
+      expect(folded.ran).toBe(true) // it DID produce output — it just stopped early
+    })
+
+    it('still reads bare output strings, and calls a full-length pair healthy', () => {
+      const folded = foldBaselineRuns([shortRun, shortRun], { currentCheckCount: 2 })
+      expect(folded.died).toBe(false)
+      expect(folded.deaths).toEqual([])
+    })
+
+    it('verdicts DIED, not INCONCLUSIVE, for a check the dead baseline never reached', () => {
+      const classified = classifyAgainstBaseline({
+        currentFailed: ['a calf in a strong current drowns', 'a herd gathers'],
+        baselineFailed: [],
+        baselineChecks: allChecks(shortRun),
+        baselineDied: true,
+      })
+      expect(classified.map((c) => c.verdict)).toEqual(['baseline-died', 'real-regression'])
+    })
+
+    it('does not clear a console error on a dead baseline through the absence rule', () => {
+      const classified = classifyAgainstBaseline({
+        currentFailed: [checkFromName('console error: boom')],
+        baselineFailed: [],
+        baselineChecks: allChecks(shortRun),
+        baselineDied: true,
+      })
+      expect(classified[0].verdict).toBe('baseline-died')
+    })
+
+    it('prints the death LOUDLY above the verdicts, with the last check and the kept log', () => {
+      const lines = formatBaselineReport({
+        suite: 'enrichments',
+        ref: '25e0f0f (merge-base with main)',
+        classified: [{ check: 'a calf drowns', key: 'a calf drowns', verdict: 'baseline-died' }],
+        deaths: [{ run: 2, reached: 55, expected: 243, lastCheck: 'a herd gathers', failures: 0, exitCode: 1 }],
+        logs: ['local/verify-baseline-logs/enrichments-baseline-run2.log'],
+      })
+      const text = lines.join('\n')
+      expect(text).toContain('THE BASELINE LANE DIED: run 2 ended after 55 of the current run\'s 243 checks')
+      expect(text).toContain('last check reached: "a herd gathers"')
+      expect(text).toContain('enrichments-baseline-run2.log')
+      // The death is stated BEFORE the per-check verdicts, and no verdict claims a triage.
+      expect(lines.findIndex((l) => l.includes('DIED'))).toBeLessThan(lines.findIndex((l) => l.includes('a calf drowns:')))
+      expect(text).toContain('NOT "newer than the baseline"')
+    })
+
+    it('names the changed suite file as the first suspect when the lane died', () => {
+      const withChange = formatBaselineReport({
+        suite: 'enrichments',
+        ref: '25e0f0f',
+        classified: [],
+        deaths: [{ run: 1, reached: 55, expected: 243, lastCheck: 'a herd gathers', failures: 0, exitCode: 1 }],
+        suiteFileChanged: true,
+      })
+      expect(withChange.join('\n')).toContain('FIRST SUSPECT: scripts/verify/enrichments.mjs changed since the baseline')
+      const noChange = formatBaselineReport({
+        suite: 'enrichments',
+        ref: '25e0f0f',
+        classified: [],
+        deaths: [{ run: 1, reached: 55, expected: 243, lastCheck: 'a herd gathers', failures: 0, exitCode: 1 }],
+        suiteFileChanged: false,
+      })
+      expect(noChange.join('\n')).not.toContain('FIRST SUSPECT')
+    })
+  })
+
+  it('round-trips a DASHED console pseudo-check through --failed without losing its identity', () => {
+    // src/systems/devAssert.ts prints `[ASSERT] <code> — <detail>`, and
+    // consoleErrorChecks keys the WHOLE normalised text. run-all hands console
+    // names to the wrapper through --failed, so cutting at the dash here would
+    // key a pre-existing assert differently from its own baseline form and
+    // report it as a REAL REGRESSION.
+    const produced = consoleErrorChecks('ERR: [ASSERT] calf-without-parent — id 17 at 4.2,-9.1')[0]
+    const round = checkFromName(produced.name)
+    expect(round.kind).toBe('console')
+    expect(round.name).toBe(produced.name)
+    expect(round.key).toBe(produced.key)
+    // …and the verdict it drives is the pre-existing one, not a regression.
+    const baseline = 'PASS  the map draws\nERR: [ASSERT] calf-without-parent — id 4 at 1.0,-2.0'
+    const classified = classifyAgainstBaseline({
+      currentFailed: [checkFromName(produced.name)],
+      baselineFailed: failedChecks(baseline),
+      baselineChecks: allChecks(baseline),
+    })
+    expect(classified[0].verdict).toBe('pre-existing')
+  })
+
+  it('keys a name pasted WITH its result prefix and detail the same as the parsed line', () => {
+    // What a human actually copies out of a console into --failed.
+    const parsed = allChecks('PASS  a calf in a strong current drowns — {"drowned":true}')[0]
+    const pasted = checkFromName('FAIL  a calf in a strong current drowns — {"drowned":false}')
+    expect(pasted.name).toBe('a calf in a strong current drowns')
+    expect(pasted.key).toBe(parsed.key)
+    // A console pseudo-check keeps its kind through the same trimming.
+    expect(checkFromName('console error: boom — at foo.js').kind).toBe('console')
+  })
+
   it('accepts plain check names as well as parsed checks', () => {
     const classified = classifyAgainstBaseline({
       currentFailed: ['the ground edge is dark'],
@@ -269,6 +460,11 @@ describe('the wrapper CLI', () => {
     expect(a.suite).toBe('world')
     expect(a.failed).toEqual(['one', 'two'])
     expect(parseWrapperArgs(['--runs', '0', 'world']).runs).toBe(1)
+  })
+
+  it('takes the current run length run-all hands over, and defaults it to unknown', () => {
+    expect(parseWrapperArgs(['enrichments', '--current-checks', '243']).currentChecks).toBe(243)
+    expect(parseWrapperArgs(['enrichments']).currentChecks).toBe(0)
   })
 })
 

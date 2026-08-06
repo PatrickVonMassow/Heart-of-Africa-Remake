@@ -510,8 +510,35 @@ repo. At most two baselines are kept. Each currently failing check comes back as
 **REAL REGRESSION** (green on the baseline), **PRE-EXISTING / STALE ASSUMPTION**
 (already red there — the 24.07. SSAO ground-edge and proximity-fade cases),
 **UNSTABLE ON BASELINE** (it flaked there too, so the baseline decides nothing —
-which is why the baseline runs twice by default, `--runs n`), or
-**INCONCLUSIVE** (the baseline never ran that check).
+which is why the baseline runs twice by default, `--runs n`),
+**INCONCLUSIVE** (the baseline reached the end and simply never had that check —
+it is newer than the baseline), or **NOT CLASSIFIED — THE BASELINE RUN DIED**.
+
+**The lane's own failure modes (point 418).** A baseline pass can end without
+answering anything, and that must never read as a verdict:
+
+| what happened | how it reads | where the evidence is |
+| --- | --- | --- |
+| the baseline pass produced no output at all (crash, timeout, the server never came up) | `the baseline run did not produce a result — NOT classified` | the kept log |
+| the baseline pass ended EARLY — it printed **no FAIL line at all** and exited non-zero (or was killed), having either reached fewer checks than the current run or simply exited non-zero; an exit code of 0 is never a death, whatever it counted | `*** THE BASELINE LANE DIED: run N ended after X of the current run's Y checks … last check reached: "…"`, and every unreached check verdicts **baseline-died**, not inconclusive | the kept log + the last 12 output lines printed inline |
+| the baseline pass REPORTED failures but still reached fewer checks | a `NOTE:` caveat **after** the verdicts — they stand | the kept log |
+| the baseline pass ran to the end | the ordinary four verdicts above | — |
+
+On 29.07.2026 two baseline passes of `enrichments` each stopped after 55 of 243
+checks with exit 1 and zero failures, and the three reds all came back
+"INCONCLUSIVE — the check did not run on the baseline". A lane that dies at a
+quarter of the suite costs the full runtime and answers nothing, so it is now
+LOUD — but only where the run reported NOTHING. A baseline that printed FAIL
+lines did its job, so a shortfall there is a caveat, never an annulment: the
+serverless suites run the baseline's OWN script copy, and a change that adds
+checks leaves a legitimately red baseline permanently shorter. It KEEPS its
+evidence either way: every run's stdout+stderr is written to
+`local/verify-baseline-logs/<suite>-baseline-<sha>-run<n>.log` (and
+`<suite>-current.log`) before anything is judged — a sibling of the checkouts, so
+the retention prune can never delete it. The yardstick is the current run's check
+count: `run-all` passes it as `--current-checks <n>`, and a direct run measures it
+itself. With `--strict`, a died or resultless baseline exits 1 like a real
+regression — it produced no triage at all.
 
 It runs the CURRENT check against the BASELINE app, so only the product differs
 — and it prints what can bend that reading: a suite file that changed since the
