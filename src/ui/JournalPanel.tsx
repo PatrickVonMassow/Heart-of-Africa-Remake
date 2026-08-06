@@ -95,6 +95,8 @@ function Observations() {
   const t = useStrings()
   const memory = useGame((s) => s.communication)
   const setHypothesis = useGame((s) => s.setUtteranceHypothesis)
+  const drumMessageHeard = useGame((s) => s.drumMessageHeard)
+  const setDialog = useUi((s) => s.setDialog)
   const [drafts, setDrafts] = useState<Record<string, string>>({})
   const heard = heardUtterances(memory)
   if (heard.length === 0) return null
@@ -102,6 +104,16 @@ function Observations() {
     <section className="observations">
       <h3>{t.journalPanel.observations}</h3>
       <p className="observations-hint">{t.journalPanel.observationsHint}</p>
+      {/* The chief's message is never lost (point 486): once his drums have
+          spoken it can be read again from here, wherever the traveller is. */}
+      {drumMessageHeard && (
+        <button
+          className="hud-button reopen-drum-message"
+          onClick={() => setDialog({ kind: 'drumMessage' })}
+        >
+          {t.journalPanel.reopenDrumMessage}
+        </button>
+      )}
       {heard.map((h) => (
         <div className="observation" key={h.utterance}>
           <div className="utterance">{h.utterance}</div>

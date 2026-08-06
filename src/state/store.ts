@@ -28,6 +28,8 @@ import {
   setHypothesis, type CommunicationMemory,
 } from '../communication/heard'
 import type { Phrase, UtteranceId } from '../communication/lexicon'
+import { chiefMessagePhrase } from '../communication/drumMessage'
+import { ROCK_VILLAGE_ID } from '../world/communicationRock'
 import type { SketchId } from '../journal/sketches'
 import { getStrings, type TextRef } from '../i18n'
 import { stripVoiceMarkup } from '../journal/voiceMarkup'
@@ -150,6 +152,10 @@ export interface GameState {
    *  for it (design.md §13.4, docs/communication-poc-spec.md). The journal's
    *  observation section renders it; the game never interprets a note. */
   communication: CommunicationMemory
+  /** True once the chief's drums have beaten his message out in full (design.md
+   *  §13.4, point 486). It never goes back: the message display stays
+   *  reopenable for the rest of the run, so forgetting it locks nobody out. */
+  drumMessageHeard: boolean
   /** Health points (design.md §6); 0 = death of the character. */
   health: number
   afflictions: Afflictions
@@ -293,6 +299,9 @@ export interface GameState {
   hearPhrase: (phrase: Phrase) => void
   /** Write the player's own reading of a heard utterance; '' clears it. */
   setUtteranceHypothesis: (utterance: UtteranceId, text: string) => void
+  /** The chief's drums have finished (point 486): every concept of the message
+   *  enters the heard memory and the chronicle records that it was sent. */
+  receiveDrumMessage: () => void
   setToast: (msg: string | null) => void
   saveCheckpoint: () => void
   /** Load a port-visit snapshot; the latest without an index (design.md §18). */
@@ -467,6 +476,7 @@ function startState(seed: number) {
     ],
     journalOpen: true,
     communication: emptyMemory(),
+    drumMessageHeard: false,
     health: balance.health.max,
     afflictions: { fever: false, dehydration: false, sunblind: false, wounds: 0 as const },
     sunblindRecovery: 0,
@@ -581,6 +591,28 @@ export function robWouldOrphanGoal(s: Pick<GameState, 'hintsGiven'>, region: Reg
   return TOMB_COORDINATE_REGIONS.includes(region) && s.hintsGiven[region] !== true
 }
 
+/**
+ * Whose chief sends the drum message (design.md §13.4, point 486): the village
+ * of the communication slice, the one the landmark boulder stands upstream of.
+ * Another people's chief has no message about that rock and sends none.
+ */
+export const DRUM_MESSAGE_VILLAGE = ROCK_VILLAGE_ID
+
+/**
+ * May this chief be asked to send his message on the drums? Only in his own
+ * village, and only once a culturally correct gift has earned his trust — the
+ * same condition §12 sets for a hint, since the message IS the hint of the
+ * communication slice. Being asked again after the drums have spoken is fine:
+ * a player who wants to hear them once more may.
+ */
+export function canAskForDrumMessage(
+  s: Pick<GameState, 'reveredGiftGiven' | 'goodwill'>,
+  placeId: string | null,
+): boolean {
+  if (placeId !== DRUM_MESSAGE_VILLAGE) return false
+  return s.reveredGiftGiven[placeId] === true && (s.goodwill[placeId] ?? 0) >= balance.goodwillForHint
+}
+
 /** Carried item count against the inventory capacity (design.md §6). */
 export function usedInventory(
   s: Pick<GameState, 'equipment' | 'gifts' | 'treasures'>,
@@ -649,6 +681,23 @@ export const useGame = create<GameState>()((set, get) => ({
       const next = setHypothesis(s.communication, utterance, text)
       return next === s.communication ? {} : { communication: next }
     }),
+
+  // The chief's drum message (point 486). Its concepts are the SPOKEN ones, so
+  // they are recorded exactly like a villager's phrase: each atom on its own,
+  // keeping the day and the note of an earlier hearing. The chronicle entry is
+  // written once — hearing the drums a second time adds no second page.
+  receiveDrumMessage: () => {
+    const s = get()
+    const heard = observePhrase(s.communication, chiefMessagePhrase(), Math.floor(s.day))
+    set({ communication: heard, drumMessageHeard: true })
+    if (s.drumMessageHeard) return
+    get().addEntry(
+      { key: 'journal.titles.drumMessage' },
+      { key: 'journal.drumMessage' },
+      'hint',
+      'face',
+    )
+  },
 
   moveTravel: (dirX, dirZ, dt) => {
     const s = get()
@@ -1972,6 +2021,7 @@ export const useGame = create<GameState>()((set, get) => ({
       hostileUntil: s.hostileUntil, lastFriendAidDay: s.lastFriendAidDay,
       freeCamps: s.freeCamps, villageCamps: s.villageCamps,
       communication: serializeMemory(s.communication),
+      drumMessageHeard: s.drumMessageHeard,
       nextEntryId,
     }
     try {
@@ -2056,6 +2106,8 @@ export const useGame = create<GameState>()((set, get) => ({
         // is tolerant, so a snapshot from before this system yields an empty
         // memory rather than a broken one.
         communication: deserializeMemory(snap.communication),
+        // A snapshot from before the drums existed simply never heard them.
+        drumMessageHeard: snap.drumMessageHeard ?? false,
         defeat: null,
         deathCause: null,
         mode: 'place',

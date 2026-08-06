@@ -6,6 +6,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { hasHeard, heardUtterances, hypothesisFor } from '../communication/heard'
 import { utteranceOf } from '../communication/lexicon'
+import { chiefMessagePhrase } from '../communication/drumMessage'
 import { isSpeechLabelVisible, labelReadings, NO_READING } from '../communication/speechLabel'
 import { g, freshGame, withWorld } from '../test/store'
 
@@ -139,5 +140,65 @@ describe('the overhead label reads the journal note (design.md §13.4)', () => {
     g().hearUtterance(COME)
     expect(isSpeechLabelVisible(g().communication, [COME])).toBe(true)
     expect(isSpeechLabelVisible(g().communication, [DIG])).toBe(false)
+  })
+})
+
+// The chief's drum message in the store (work-order point 486): the drums are
+// HEARD like any speech, the chronicle records them once, and the fact that
+// they were sent travels with the save so the display stays reopenable.
+describe("the chief's drum message (design.md §13.4)", () => {
+  it('a fresh game has not heard the drums', () => {
+    expect(g().drumMessageHeard).toBe(false)
+  })
+
+  it('records every concept of the message as heard, on the current day', () => {
+    g().debugSet({ day: 40.8 })
+    g().receiveDrumMessage()
+    expect(g().drumMessageHeard).toBe(true)
+    const heard = heardUtterances(g().communication).map((h) => h.utterance)
+    for (const atom of chiefMessagePhrase()) {
+      expect(heard).toContain(atom)
+      expect(g().communication.heard[atom].firstHeardDay).toBe(40)
+    }
+  })
+
+  it('keeps the day and the note of a concept already heard in the village', () => {
+    g().debugSet({ day: 5 })
+    g().hearUtterance(DIG)
+    g().setUtteranceHypothesis(DIG, 'dig here')
+    g().debugSet({ day: 41 })
+    g().receiveDrumMessage()
+    expect(g().communication.heard[DIG].firstHeardDay).toBe(5)
+    expect(hypothesisFor(g().communication, DIG)).toBe('dig here')
+  })
+
+  it('writes the chronicle entry once, however often the drums sound', () => {
+    g().receiveDrumMessage()
+    const entries = () => g().journal.filter((e) => e.title.key === 'journal.titles.drumMessage')
+    expect(entries()).toHaveLength(1)
+    expect(entries()[0].text.key).toBe('journal.drumMessage')
+    g().receiveDrumMessage()
+    expect(entries()).toHaveLength(1)
+  })
+
+  it('travels with the checkpoint, so the message stays reopenable', () => {
+    g().receiveDrumMessage()
+    g().saveCheckpoint()
+    g().newGame()
+    expect(g().drumMessageHeard).toBe(false)
+    expect(g().loadCheckpoint()).toBe(true)
+    expect(g().drumMessageHeard).toBe(true)
+    expect(hasHeard(g().communication, chiefMessagePhrase()[0])).toBe(true)
+  })
+
+  it('a snapshot from before the drums existed simply never heard them', () => {
+    g().receiveDrumMessage()
+    g().saveCheckpoint()
+    const key = 'hoa-checkpoints-v1'
+    const snaps = JSON.parse(localStorage.getItem(key) ?? '[]') as Array<Record<string, unknown>>
+    delete snaps[snaps.length - 1].drumMessageHeard
+    localStorage.setItem(key, JSON.stringify(snaps))
+    expect(g().loadCheckpoint()).toBe(true)
+    expect(g().drumMessageHeard).toBe(false)
   })
 })

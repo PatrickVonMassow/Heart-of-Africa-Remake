@@ -7,6 +7,7 @@ import type { PlaceKind, RegionId } from '../world/geo'
 import { balance } from '../config/balance'
 import type { Tone } from '../communication/lexicon'
 import { phrasePlan, utterancePlan, type SpeechPlan } from '../communication/speaking'
+import type { DrumId, DrumMessagePlan } from '../communication/drumMessage'
 
 export interface AmbienceScene {
   region: RegionId
@@ -790,6 +791,42 @@ export function playSpeech(plan: SpeechPlan): void {
   if (speechProbe) {
     speechProbe.syllables += plan.syllables.length
     speechProbe.lastPeak = Math.max(...plan.syllables.map((s) => s.peak))
+  }
+}
+
+/**
+ * The two message drums (design.md §13.4, point 486): the LARGE low one speaks
+ * `ba`, the SMALL high one `BA`, and they differ in pitch alone — exactly as the
+ * two spoken syllables do. A hit is a struck membrane: a fast fall in pitch with
+ * a short body, so a beat is unmistakably a drum and never a voice.
+ */
+const DRUM_TONE: Record<DrumId, { head: number; body: number; ring: number }> = {
+  low: { head: 190, body: 62, ring: 1.35 },
+  high: { head: 430, body: 168, ring: 0.85 },
+}
+
+/**
+ * Beats the chief's message out (src/communication/drumMessage.ts): every strike
+ * of the plan on the AudioContext clock, so a re-render or a scene change cannot
+ * cut the message short once the chief has sent it. Like the voices it runs
+ * through the ambient bus, under the single §21 ambience volume.
+ */
+export function playDrumMessage(plan: DrumMessagePlan): void {
+  if (plan.strikes.length === 0) return
+  if (speechProbe) speechProbe.spoken++ // a sent message, even without an engine
+  if (!ctx || !master) return
+  const dest = ambientBus ?? master
+  const t0 = ctx.currentTime
+  for (const strike of plan.strikes) {
+    const { head, body, ring } = DRUM_TONE[strike.drum]
+    const peak = Math.max(0.0001, strike.peak)
+    envOsc(dest, 'sine', head, body, t0 + strike.at, strike.duration * ring, peak)
+    // A little click of the stick on the skin, so a strike reads as struck.
+    envOsc(dest, 'triangle', head * 3, head, t0 + strike.at, 0.03, peak * 0.2)
+  }
+  if (speechProbe) {
+    speechProbe.syllables += plan.strikes.length
+    speechProbe.lastPeak = Math.max(speechProbe.lastPeak, ...plan.strikes.map((s) => s.peak))
   }
 }
 

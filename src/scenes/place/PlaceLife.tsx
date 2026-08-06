@@ -71,9 +71,15 @@ import {
 } from './adultErrands'
 import { isWithinHearing } from '../../communication/heard'
 import { phrasePlan, utterancePlan } from '../../communication/speaking'
+import {
+  drumMessagePlan,
+  drumStrikeAt,
+  drumStrikeProgress,
+  type DrumMessagePlan,
+} from '../../communication/drumMessage'
 import { speechLabelSeconds } from '../../communication/speechLabel'
 import { playSpeech } from '../../systems/ambience'
-import { speakOverhead } from './speechChannel'
+import { speakOverhead, speechClock } from './speechChannel'
 import { placePlayerPosition } from './playerPosition'
 import { animalAnchors, animalBodies, animalScene, stepAnimal, turnToward, ANIMAL_TURN_RATE } from './animalSpots'
 import { childPlayGround, PORT_TALKERS, VILLAGE_SPOTS, villageAdultStations } from './lifeSpots'
@@ -1027,29 +1033,94 @@ function Pounder({ x, z, cloth }: { x: number; z: number; cloth: string }) {
   )
 }
 
-/** Drummer beating a hide drum — the audible village drums made visible.
- *  Since the figure has arms (point 479) the beat is struck by the drummer's own
- *  hands: the pair of floating hand spheres that stood in for them is gone. */
+/** How deep a struck drum head sinks under the hand, in metres. */
+const DRUM_HEAD_DIP = 0.05
+
+/**
+ * Drummer at his pair of drums — the audible village drums made visible, and
+ * the voice the chief's message goes out on (design.md §13.4, point 486).
+ *
+ * The LARGE low drum speaks `ba` and stands to his left, the SMALL high one
+ * speaks `BA` and stands to his right; the hand over the drum being played is
+ * the one that falls, and that drum's head dips under it, so the strike is
+ * unmistakably ON the drum that sounds. While no message is going out he keeps
+ * the village's own idle beat on the large drum.
+ *
+ * Both the falling hand and the sounding beat come from the ONE plan
+ * (src/communication/drumMessage.ts) the ambience engine plays, so the picture
+ * and the sound can never tell different messages.
+ */
 function Drummer({ x, z, cloth }: { x: number; z: number; cloth: string }) {
   const pose = useRef<FigurePose | null>({ left: { ...REST_POSE.left }, right: { ...REST_POSE.right }, lean: 0.12, turn: 0 })
+  const lowHead = useRef<THREE.Mesh>(null)
+  const highHead = useRef<THREE.Mesh>(null)
+  // The plan of the message currently going out, kept with the start it was
+  // built for, so a re-sent message rebuilds it against the live balance values.
+  const sending = useRef<{ startedAt: number; plan: DrumMessagePlan } | null>(null)
   useFrame(({ clock }) => {
-    const t = clock.elapsedTime * 4.2 // matches the drum-bar tempo roughly
     const p = pose.current
     if (!p) return
-    // Both hands sit over the drum head just in front of the chest; each lifts
-    // and falls half a beat apart, so the drum is struck alternately.
-    const lift = (i: number) => Math.max(0, Math.sin(t + i * Math.PI)) * 0.42
-    Object.assign(p.left, armAim(0.1, -0.2 + lift(0)))
-    Object.assign(p.right, armAim(-0.1, -0.2 + lift(1)))
+    const beating = useUi.getState().drumPerformance
+    let lowLift = 0.42
+    let highLift = 0.42
+    let lowDip = 0
+    let highDip = 0
+    if (beating) {
+      if (sending.current?.startedAt !== beating.startedAt) {
+        sending.current = { startedAt: beating.startedAt, plan: drumMessagePlan() }
+      }
+      // The wall clock, the one the performance and the scheduled audio run on.
+      const elapsed = (speechClock() * 1000 - beating.startedAt) / 1000
+      const strike = drumStrikeAt(sending.current.plan, elapsed)
+      // The hand falls at the beat and rises again through the strike's ring;
+      // between two beats both hands wait raised over their own drum.
+      const swing = strike ? drumStrikeProgress(strike, elapsed) * 0.42 : 0.42
+      if (strike?.drum === 'low') {
+        lowLift = swing
+        lowDip = 1 - swing / 0.42
+      } else if (strike?.drum === 'high') {
+        highLift = swing
+        highDip = 1 - swing / 0.42
+      }
+    } else {
+      sending.current = null
+      // The idle village beat (design.md §19): the two hands half a beat apart
+      // on the large drum, as the ambient drum bar sounds it.
+      const t = clock.elapsedTime * 4.2
+      lowLift = Math.max(0, Math.sin(t)) * 0.42
+      highLift = Math.max(0, Math.sin(t + Math.PI)) * 0.42
+      lowDip = 1 - lowLift / 0.42
+    }
+    Object.assign(p.left, armAim(0.26, -0.2 + lowLift))
+    Object.assign(p.right, armAim(-0.26, -0.2 + highLift))
+    if (lowHead.current) lowHead.current.position.y = 0.66 - lowDip * DRUM_HEAD_DIP
+    if (highHead.current) highHead.current.position.y = 0.5 - highDip * DRUM_HEAD_DIP
   })
   return (
     <group position={[x, 0, z]} rotation={[0, Math.atan2(-x + 3.5, -z + 2.5), 0]}>
       <Figure cloth={cloth} pose={pose} />
-      {/* Drum */}
-      <mesh position={[0, 0.34, 0.48]} castShadow>
-        <cylinderGeometry args={[0.26, 0.2, 0.66, 9]} />
-        <meshStandardMaterial color="#8a5a30" roughness={0.9} />
-      </mesh>
+      {/* The large low drum (`ba`), to the drummer's left. */}
+      <group position={[-0.34, 0, 0.5]}>
+        <mesh position={[0, 0.33, 0]} castShadow>
+          <cylinderGeometry args={[0.27, 0.21, 0.66, 9]} />
+          <meshStandardMaterial color="#8a5a30" roughness={0.9} />
+        </mesh>
+        <mesh ref={lowHead} position={[0, 0.66, 0]} castShadow>
+          <cylinderGeometry args={[0.28, 0.28, 0.04, 9]} />
+          <meshStandardMaterial color="#cbb391" roughness={0.85} />
+        </mesh>
+      </group>
+      {/* The small high drum (`BA`), to his right — the same drum, smaller. */}
+      <group position={[0.3, 0, 0.46]}>
+        <mesh position={[0, 0.25, 0]} castShadow>
+          <cylinderGeometry args={[0.17, 0.13, 0.5, 9]} />
+          <meshStandardMaterial color="#8a5a30" roughness={0.9} />
+        </mesh>
+        <mesh ref={highHead} position={[0, 0.5, 0]} castShadow>
+          <cylinderGeometry args={[0.18, 0.18, 0.035, 9]} />
+          <meshStandardMaterial color="#cbb391" roughness={0.85} />
+        </mesh>
+      </group>
     </group>
   )
 }

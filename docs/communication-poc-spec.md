@@ -148,6 +148,14 @@ hypothesis over each element, editable there — the same note the journal holds
 so the two can never drift apart. The display can be reopened, so a player who
 forgets the message is not locked out of the feature.
 
+Decided by the build (point 486): the message is ASKED FOR at the chief's
+audience, in his village alone and only once a culturally correct gift has
+earned his trust — the §12 condition every hint in the game stands under. The
+village drummer beats it; he keeps his two drums for the ambient beat as well,
+so no second figure and no second collider appear for the message. Its concepts
+are recorded as heard only when the last beat has fallen, and from then on the
+display reopens from the journal's observation section.
+
 ## Where the digging happens
 
 DECIDED by the user 04.08.2026: the rock stands OUTSIDE the village, at the river,

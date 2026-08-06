@@ -891,6 +891,95 @@ textarea {
   background: rgba(255, 255, 255, 0.55);
 }
 
+.journal .reopen-drum-message {
+  display: block;
+  margin: 0 0 10px;
+  font-size: 12px;
+}
+
+/* The chief's drum message (design.md §13.4, point 486): the seven concepts in
+   a row, each with the player's own reading above its syllables. It wraps
+   rather than scrolls sideways, so the whole message stays readable at once. */
+.dialog.drum-message {
+  max-width: 640px;
+}
+
+.dialog.drum-message .drum-concepts {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px 14px;
+  margin: 12px 0 4px;
+  padding: 0;
+  list-style: none;
+}
+
+.dialog.drum-message .drum-concept {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 92px;
+}
+
+/* The reading sits ABOVE its syllables and is the clickable element. */
+.dialog.drum-message .drum-concept .reading {
+  max-width: 130px;
+  padding: 2px 6px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px dashed #b39a6c;
+  border-radius: 3px;
+  color: inherit;
+  font: 14px 'Segoe Script', 'Bradley Hand', 'Comic Sans MS', cursive;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+
+.dialog.drum-message .drum-concept .reading:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+/* A concept the player has not read yet stands out as the open question it is. */
+.dialog.drum-message .drum-concept .reading.unread {
+  opacity: 0.65;
+  letter-spacing: 2px;
+}
+
+.dialog.drum-message .drum-concept .hypothesis {
+  width: 130px;
+  padding: 2px 6px;
+  box-sizing: border-box;
+  background: rgba(255, 255, 255, 0.35);
+  border: 1px solid #b39a6c;
+  border-radius: 3px;
+  color: var(--paper-ink);
+  font: 14px 'Segoe Script', 'Bradley Hand', 'Comic Sans MS', cursive;
+}
+
+.dialog.drum-message .drum-concept .utterance {
+  margin-top: 4px;
+  font-family: 'Courier New', monospace;
+  font-size: 14px;
+  letter-spacing: 1px;
+}
+
+/* Low and high told apart at a glance — the large drum reads heavy, the small
+   one light, exactly as they sound. */
+.dialog.drum-message .drum-concept .utterance .low {
+  opacity: 0.95;
+}
+
+.dialog.drum-message .drum-concept .utterance .high {
+  font-weight: 700;
+  color: #d8b45a;
+}
+
+.dialog.drum-message .drum-concept .utterance span + span::before {
+  content: '-';
+  font-weight: 400;
+  color: inherit;
+  opacity: 0.5;
+}
+
 /* Region name beside the border lines (bird's-eye view, design.md §3). */
 .region-label {
   font: italic 13px Georgia, serif;

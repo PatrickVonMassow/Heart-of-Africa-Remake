@@ -34,6 +34,9 @@ export type Dialog =
   | { kind: 'bazaar' }
   | { kind: 'agency' }
   | { kind: 'audience' }
+  // The chief's drum message, shown after the drums and reopenable at any time
+  // from the journal (design.md §13.4, point 486).
+  | { kind: 'drumMessage' }
   // Camp caches (design.md §6): a free camp by id, or a village cache.
   | { kind: 'camp'; scope: 'free'; campId: number }
   | { kind: 'camp'; scope: 'village'; placeId: string }
@@ -133,9 +136,21 @@ export interface UiState {
   benchReport: BenchReportFile | null
   /** Esc during a run raises this; the runner polls it and unwinds. */
   benchAbort: boolean
+  /**
+   * The chief's drums beating his message out (design.md §13.4, point 486), on
+   * the WALL clock: what the player hears and watches, not in-game days. The
+   * drummer figure animates from `startedAt` and the message display opens at
+   * `endsAt`; null while no message is being sent. Transient scene furniture —
+   * what the message TAUGHT lives in the game state and is saved there.
+   */
+  drumPerformance: { startedAt: number; endsAt: number } | null
   /** Open bazaar bid awaiting accept/decline (design.md §10). */
   bazaarBid: { treasure: TreasureId; amount: number } | null
   setBazaarBid: (bid: { treasure: TreasureId; amount: number } | null) => void
+  /** The chief sends his message: the drums start now and beat for `seconds`. */
+  startDrumMessage: (seconds: number, now?: number) => void
+  /** The drums have finished (or the settlement was left) — clears the beating. */
+  clearDrumMessage: () => void
   setDialog: (d: Dialog) => void
   setPrompt: (p: string | null) => void
   setEnterPlaceId: (id: string | null) => void
@@ -204,7 +219,17 @@ export const useUi = create<UiState>()((set) => ({
   benchReport: null,
   benchAbort: false,
   bazaarBid: null,
+  drumPerformance: null,
   setBazaarBid: (bazaarBid) => set({ bazaarBid }),
+  // A message already being beaten out is never restarted — asking twice while
+  // the drums sound would double the strikes over one another.
+  startDrumMessage: (seconds, now) =>
+    set((s) => {
+      if (s.drumPerformance) return s
+      const startedAt = now ?? (typeof performance === 'undefined' ? Date.now() : performance.now())
+      return { drumPerformance: { startedAt, endsAt: startedAt + Math.max(0, seconds) * 1000 } }
+    }),
+  clearDrumMessage: () => set((s) => (s.drumPerformance ? { drumPerformance: null } : s)),
   // Closing or switching a dialog always discards a pending bazaar bid.
   setDialog: (dialog) => set({ dialog, bazaarBid: null }),
   setPrompt: (prompt) => set({ prompt }),
