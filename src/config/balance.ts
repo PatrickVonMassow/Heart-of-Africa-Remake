@@ -601,6 +601,24 @@ export interface BalanceConfig {
       /** How long after a call a refusal still reads as its answer. */
       replySeconds: number
     }
+    /** The adults' errands, which teach the five landscape and action concepts
+     *  (work-order point 483). */
+    adultErrands: {
+      /** Seconds between two staged errands. */
+      intervalSeconds: number
+      /** Random spread of that interval, 0..1 (0 = a metronome). */
+      intervalSpread: number
+      /** How long a villager stays at the place it was sent to. */
+      dwellSeconds: number
+      /** How long a bout of visible digging lasts. */
+      digSeconds: number
+      /** Backstop: an errand never outlives this, however the walk goes. */
+      errandSeconds: number
+      /** The pace a villager walks at while on an errand (m/s). */
+      pace: number
+      /** How many errand villagers a village keeps out and about. */
+      villagerCount: number
+    }
   }
   /** Village speech and drums (design.md §13.4, docs/communication-poc-spec.md). */
   communication: {
@@ -974,6 +992,21 @@ export const balance: BalanceConfig = {
       actionPace: 1.6, // a brisk errand walk, well under the chase's trot
       refusalChance: 0.35,
       replySeconds: 5,
+    },
+    // The adults' errands (work-order point 483). Calibratable starting values
+    // (educated guess, CLAUDE.md §2): slower than the children's chatter,
+    // because each errand is a WALK the player has to be able to follow with his
+    // eyes — an utterance every nine seconds leaves the walk it explains alone
+    // in the picture, and the dwell is long enough to read as "arrived" without
+    // parking a figure at the water for a minute.
+    adultErrands: {
+      intervalSeconds: 9,
+      intervalSpread: 0.35,
+      dwellSeconds: 6,
+      digSeconds: 9, // several strokes of the digging motion, plainly readable
+      errandSeconds: 70, // backstop only: a blocked walk lets go instead of pinning
+      pace: 1.25, // an unhurried working walk
+      villagerCount: 4,
     },
   },
   communication: {
