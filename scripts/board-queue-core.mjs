@@ -35,6 +35,7 @@
 import { parseTasks, QUEUE_STUB_BODY, QUEUE_STUB_META, TRANSLITERATION_STEMS } from './dashboard-guard-core.mjs'
 import { normaliseLineEndings } from './board-core.mjs'
 import { FINDER_POINTS, RELEASE_TAG_POINT } from './queue-order-guard-core.mjs'
+import { SINGLE_PARAGRAPH_WORD_BUDGET, WORD_BUDGET } from './dashboard-conciseness-guard-core.mjs'
 
 // The stub meta is DEFINED beside the audit rule that exempts it and re-exported
 // here: two copies of that string would be a block loop waiting to happen.
@@ -151,7 +152,9 @@ export function boardTitleReport(html, titles = {}) {
   const unestimated = []
   for (const [key, entry] of Object.entries(points)) {
     const n = Number(key)
-    if (isUntranslatedTitle(unesc(entry.title), n, titles)) untranslated.push(n)
+    // The import decodes now, so decoding again here would eat a second layer
+    // from a title that legitimately spells out an entity.
+    if (isUntranslatedTitle(entry.title, n, titles)) untranslated.push(n)
     if (!entry.estimate) unestimated.push(n)
   }
   const asc = (a, b) => a - b
@@ -442,10 +445,27 @@ export function buildQueueSection(html, { open = [], data = null, exclude = [], 
   return { html: `${doc.slice(0, from)}\n${cards}${doc.slice(end)}`, entries }
 }
 
+/** One HTML fragment as the plain sentence it renders to. */
+const cardText = (html) =>
+  String(html ?? '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/\s+/g, ' ')
+    .trim()
+
 /**
  * Seed the data file from a board that still carries a hand-written queue — the
  * one-time migration, so the transition to the generator does not throw the
  * existing prose away. Reads only the Warteschlange section.
+ *
+ * EACH `<p>` STAYS ITS OWN PARAGRAPH (point 530). The body used to be stripped
+ * to one flat sentence run, so a round trip through the board — which renders
+ * one `<p>` per stored paragraph — silently pressed every card into a single
+ * block, the exact shape the conciseness guard rejects. 46 cards lost their
+ * split in one run on 06.08.2026, and the JSON is git-ignored, so nothing but
+ * the published board still held the structure.
  */
 export function importQueueFromHtml(html) {
   const doc = String(html ?? '')
@@ -465,21 +485,125 @@ export function importQueueFromHtml(html) {
     const point = Number(num[1])
     const title = (summary.match(/class="t">([\s\S]*?)<\/span>/) ?? [])[1] ?? ''
     const metaRaw = (summary.match(/class="meta">([^<]*)</) ?? [])[1] ?? ''
-    const body = ((chunk.match(/<div class="body[^"]*">([\s\S]*)$/) ?? [])[1] ?? '')
-      .replace(/<[^>]+>/g, ' ')
-      .replace(/&amp;/g, '&')
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-      .replace(/\s+/g, ' ')
-      .trim()
+    const bodyHtml = (chunk.match(/<div class="body[^"]*">([\s\S]*)$/) ?? [])[1] ?? ''
+    const paras = [...bodyHtml.matchAll(/<p\b[^>]*>([\s\S]*?)<\/p>/gi)].map((m) => cardText(m[1])).filter(Boolean)
+    // A card with no <p> at all (a hand-written board) still yields its text.
+    const body = paras.length ? paras : [cardText(bodyHtml)].filter(Boolean)
     if (!order.includes(point)) order.push(point)
     points[point] = {
-      title: title.trim() || null,
-      body: body || null,
+      // UNESCAPED, like the body (four-eyes finding 2): the card renders its
+      // title through `esc`, so storing it as read would put `&amp;amp;` on the
+      // public board one rebuild later — and the escaped form never matches the
+      // work order's plain headline, so the fallback-title report misfires too.
+      title: unesc(title).trim() || null,
+      // The generator's stub is not prose anybody wrote: importing it as a body
+      // would make the card count as described and silence the "no prose yet"
+      // report for ever.
+      body: body.length && body.join(' ') !== QUEUE_STUB_BODY ? body : null,
       estimate: metaRaw.trim() && metaRaw.trim() !== QUEUE_STUB_META ? metaRaw.trim() : null,
     }
   }
   return { order, points }
+}
+
+/**
+ * The stored data, from the file's raw bytes — or a LOUD refusal (point 530,
+ * four-eyes finding 1).
+ *
+ * `readJson` answers `null` for a file that does not exist and for one that no
+ * longer parses, and every command here treats `null` as "nothing stored yet":
+ * `import` would start from the board alone and `set` would write a file holding
+ * its one entry. Either silently discards the prose of every point the board
+ * does not currently render — a card promoted to the now-section or to "Von dir
+ * zu klären" is exactly that. The file is documented as hand-editable and is
+ * written while a batch runs, so a torn or half-typed one is a case, not a
+ * curiosity. An ABSENT file still means "nothing yet"; an unreadable one stops
+ * the command.
+ */
+export function parseQueueDataFile(text, { path = QUEUE_DATA_PATH } = {}) {
+  if (text === null || text === undefined) return null
+  if (!String(text).trim()) return null
+  try {
+    return JSON.parse(text)
+  } catch (e) {
+    throw new Error(
+      `${path} exists but does not parse (${e.message}). Refusing to continue: every command here would ` +
+        'treat it as empty and rewrite it, losing the prose of each point the board does not currently show. ' +
+        'Repair the file (or move it aside deliberately), then run the command again.',
+    )
+  }
+}
+
+/**
+ * AN IMPORT ADDS, IT NEVER OVERWRITES (point 530).
+ *
+ * `import` was written as a one-time migration and behaved like one: it replaced
+ * the whole data file with whatever the board's HTML happened to say. Run again
+ * later — which filing a single new point invites — it wrote every card back as
+ * one flat paragraph and took the hand-written split of 46 cards with it. The
+ * file is git-ignored, so nothing could restore it.
+ *
+ * So the merge is strictly additive: a point the data already knows keeps every
+ * field it stores, and only a field it has NOTHING for is filled from the board.
+ * A point the data does not know yet is taken over whole. The stored order wins;
+ * points only the board knows are appended behind it.
+ */
+export function mergeQueueImport(existing, imported, { titles = {} } = {}) {
+  const base = normaliseQueueData(existing)
+  const add = normaliseQueueData(imported)
+  const points = { ...base.points }
+  const added = []
+  for (const [key, raw] of Object.entries(add.points)) {
+    const n = Number(key)
+    const prev = points[n]
+    // A TITLE THE GENERATOR ITSELF FELL BACK TO IS NOT DATA. Importing "Punkt
+    // 465" or the work order's English headline would freeze the fallback into
+    // the file, where it outranks the work order for ever and stops being
+    // reported as still untranslated.
+    const entry = { ...raw, title: isUntranslatedTitle(raw.title, n, titles) ? null : raw.title }
+    // A card the board shows as a bare stub carries nothing to import; storing
+    // the empty record would only make the data file grow one key per rebuild.
+    if (!entry.title && !entry.body && !entry.estimate) continue
+    if (!prev) {
+      points[n] = entry
+      added.push(n)
+      continue
+    }
+    points[n] = {
+      title: prev.title ?? entry.title,
+      body: prev.body ?? entry.body,
+      estimate: prev.estimate ?? entry.estimate,
+    }
+  }
+  const order = [...base.order]
+  for (const n of add.order) if (!order.includes(n)) order.push(n)
+  return { data: { order, points }, added: added.sort((a, b) => a - b), kept: Object.keys(base.points).length }
+}
+
+/**
+ * The cards whose stored body would break the board's conciseness rule — checked
+ * HERE, at the write, not only at the turn end (point 530).
+ *
+ * The turn-end guard reads the published HTML, which is hours downstream of the
+ * data that produced it; by then the paragraphs are already gone and the only
+ * remedy is retyping them. The same two length rules therefore decide whether a
+ * body may be STORED. Technical density is left to the turn-end guard: it judges
+ * prose a human wrote, and an import must not refuse to carry a card over for it.
+ */
+export function queueImportOffenders(data) {
+  const { points } = normaliseQueueData(data)
+  const out = []
+  for (const [key, entry] of Object.entries(points)) {
+    const body = entry.body
+    if (!body) continue
+    const words = body.reduce((n, p) => n + (p.match(/\S+/g) ?? []).length, 0)
+    const reasons = []
+    if (words > WORD_BUDGET) reasons.push(`${words} words (budget ${WORD_BUDGET}) — too verbose`)
+    if (words > SINGLE_PARAGRAPH_WORD_BUDGET && body.length <= 1)
+      reasons.push(`one unbroken paragraph of ${words} words — split it (budget ${SINGLE_PARAGRAPH_WORD_BUDGET})`)
+    if (reasons.length) out.push({ point: Number(key), words, paragraphs: body.length, reason: reasons.join('; ') })
+  }
+  return out.sort((a, b) => a.point - b.point)
 }
 
 /** Write one point's prose into the data (returns a NEW object — pure). */
