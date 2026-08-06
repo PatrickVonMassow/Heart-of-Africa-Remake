@@ -34,12 +34,17 @@ export function isScannedScriptFile(name) {
 }
 
 /**
- * A copy of `text` with every comment and every string/template BODY blanked (line
- * breaks kept, so line numbers survive). PURE.
+ * A copy of `text` with every comment, string/template BODY and regex-literal BODY
+ * blanked (line breaks kept, so line numbers survive) — while the CODE inside a
+ * template's `${…}` interpolations stays visible. PURE.
  *
  * This is load-bearing rather than a nicety: the first attempt at point 401 matched
  * `spawn (it created it…)` inside a prose comment and rewrote the sentence. Prose that
- * happens to contain an API name must be invisible to the audit.
+ * happens to contain an API name must be invisible to the audit. The three refinements
+ * here are each a caught evasion, not polish: a quote inside a regex literal
+ * (`s.replace(/'/g, '')`) used to flip the string parity and SILENTLY blank every call
+ * in the rest of the file; `/fork(s)?/` used to read as a call; and a call written
+ * inside an interpolation (`` `${execSync(cmd)}` ``) used to be invisible.
  */
 export function maskCode(text) {
   const src = String(text ?? '')
@@ -47,10 +52,46 @@ export function maskCode(text) {
   const blank = (from, to) => {
     for (let k = from; k < to && k < out.length; k++) if (out[k] !== '\n') out[k] = ' '
   }
+  // After one of these words a `/` opens a regex, not a division (`return /x/.test(s)`).
+  const REGEX_PREFIX_WORDS = new Set([
+    'return', 'typeof', 'instanceof', 'in', 'of', 'new', 'do', 'else', 'void', 'delete', 'throw', 'yield', 'await', 'case',
+  ])
+  const regexCanStart = (idx) => {
+    let k = idx - 1
+    while (k >= 0 && (src[k] === ' ' || src[k] === '\t')) k--
+    if (k < 0) return true
+    const c = src[k]
+    if (/[\w$]/.test(c)) {
+      let s = k
+      while (s >= 0 && /[\w$]/.test(src[s])) s--
+      return REGEX_PREFIX_WORDS.has(src.slice(s + 1, k + 1))
+    }
+    return c !== ')' && c !== ']'
+  }
+  // Template contexts, innermost last: 'tpl' = scanning a template's TEXT; a number =
+  // the brace depth of the CODE inside an open `${…}` of the template one level down.
+  const stack = []
   let i = 0
   while (i < src.length) {
+    const top = stack[stack.length - 1]
     const c = src[i]
     const next = src[i + 1]
+    if (top === 'tpl') {
+      if (c === '\\') {
+        blank(i, i + 2)
+        i += 2
+      } else if (c === '`') {
+        stack.pop()
+        i++
+      } else if (c === '$' && next === '{') {
+        stack.push(0)
+        i += 2
+      } else {
+        blank(i, i + 1)
+        i++
+      }
+      continue
+    }
     if (c === '/' && next === '/') {
       const end = src.indexOf('\n', i)
       blank(i, end < 0 ? src.length : end)
@@ -59,7 +100,7 @@ export function maskCode(text) {
       const end = src.indexOf('*/', i + 2)
       blank(i, end < 0 ? src.length : end + 2)
       i = end < 0 ? src.length : end + 2
-    } else if (c === '"' || c === "'" || c === '`') {
+    } else if (c === '"' || c === "'") {
       let j = i + 1
       while (j < src.length) {
         if (src[j] === '\\') j += 2
@@ -68,6 +109,36 @@ export function maskCode(text) {
       }
       blank(i + 1, j)
       i = j + 1
+    } else if (c === '`') {
+      stack.push('tpl')
+      i++
+    } else if (c === '/' && regexCanStart(i)) {
+      // Regex literal: blank the body. A regex never spans a line, so a misjudged
+      // division costs at most the rest of its own line.
+      let j = i + 1
+      let inClass = false
+      while (j < src.length) {
+        const r = src[j]
+        if (r === '\\') j += 2
+        else if (r === '\n') break
+        else if (inClass) {
+          if (r === ']') inClass = false
+          j++
+        } else if (r === '[') {
+          inClass = true
+          j++
+        } else if (r === '/') break
+        else j++
+      }
+      blank(i + 1, j)
+      i = j + 1
+    } else if (typeof top === 'number' && c === '{') {
+      stack[stack.length - 1] = top + 1
+      i++
+    } else if (typeof top === 'number' && c === '}') {
+      if (top === 0) stack.pop()
+      else stack[stack.length - 1] = top - 1
+      i++
     } else i++
   }
   return out.join('')
@@ -120,6 +191,8 @@ function callPatterns(api) {
  * anywhere in the call's own argument span — deliberately generous, because
  * `{ ...opts, windowsHide: true }` and a helper spread are both legitimate and a
  * stricter reading would only invite the flag to be written somewhere unreadable.
+ * The one exception to the generosity is the literal `windowsHide: false`, which
+ * NAMES the window it shows and used to pass the gate anyway.
  */
 export function findChildProcessCalls(text) {
   const src = String(text ?? '')
@@ -137,14 +210,15 @@ export function findChildProcessCalls(text) {
         seen.add(openIdx)
         const end = balancedEnd(masked, openIdx)
         if (end < 0) continue
+        const span = masked.slice(openIdx, end)
         found.push({
           api,
           line: src.slice(0, m.index).split('\n').length,
-          hasFlag: /windowsHide/.test(masked.slice(openIdx, end)),
+          hasFlag: /windowsHide/.test(span) && !/windowsHide\s*:\s*false/.test(span),
           // The call's own argument text, so an exception can be scoped to WHAT the
           // call does rather than to the line it happens to sit on — a line number
           // survives no merge, and a stale exception is itself a failure here.
-          args: masked.slice(openIdx, end),
+          args: span,
         })
       }
     }

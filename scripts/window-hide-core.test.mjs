@@ -41,6 +41,29 @@ describe('maskCode — prose that mentions an API must be invisible', () => {
     expect(maskCode('')).toBe('')
     expect(maskCode()).toBe('')
   })
+
+  it('a quote inside a regex literal does not flip the string parity', () => {
+    // `s.replace(/'/g, '')` is an ordinary line; the naive masker read its quote as a
+    // string start and SILENTLY blanked every call in the rest of the file.
+    const src = ["const clean = s.replace(/'/g, '')", 'execSync(cmd, { cwd })'].join('\n')
+    expect(maskCode(src)).toContain('execSync(cmd')
+  })
+
+  it('a regex literal body is blanked, so `/fork(s)?/` is prose, not a call', () => {
+    expect(maskCode('const re = /fork(s)?/')).not.toContain('fork(')
+    // …while a genuine division does not swallow the rest of its line.
+    expect(maskCode('const half = a / b; execSync(cmd)')).toContain('execSync(cmd)')
+  })
+
+  it('the CODE inside a template interpolation stays visible', () => {
+    const masked = maskCode('console.log(`head: ${execSync(cmd)}` )')
+    expect(masked).toContain('execSync(cmd)')
+    expect(masked).not.toContain('head:')
+    // Nested: a template inside the interpolation is text again.
+    const nested = maskCode('const a = `x ${spawnSync(c, `spawn(inner)`)} y`')
+    expect(nested).toContain('spawnSync(c')
+    expect(nested).not.toContain('spawn(inner)')
+  })
 })
 
 describe('findChildProcessCalls — the call sites, and nothing else', () => {
@@ -94,6 +117,25 @@ describe('findChildProcessCalls — the call sites, and nothing else', () => {
   it('accepts the flag however it arrives — a spread is a legitimate way to set it', () => {
     expect(findChildProcessCalls('execSync(c, { ...opts, windowsHide: true })')[0].hasFlag).toBe(true)
     expect(findChildProcessCalls('spawn(e, a, buildOptions({ windowsHide: true }))')[0].hasFlag).toBe(true)
+    // A variable stays within the generosity — text cannot judge it either way…
+    expect(findChildProcessCalls('spawn(e, a, { windowsHide: hide })')[0].hasFlag).toBe(true)
+  })
+
+  it('…but the literal `windowsHide: false` NAMES the window it shows, and is an offender', () => {
+    expect(findChildProcessCalls('spawn(e, a, { windowsHide: false })')[0].hasFlag).toBe(false)
+    expect(findChildProcessCalls('execSync(c, { windowsHide:false, cwd })')[0].hasFlag).toBe(false)
+  })
+
+  it('sees a call written inside a template interpolation', () => {
+    expect(findChildProcessCalls('log(`head: ${execSync(cmd)}`)')).toMatchObject([
+      { api: 'execSync', hasFlag: false },
+    ])
+    expect(findChildProcessCalls('log(`${execSync(cmd, { windowsHide: true })}`)')[0].hasFlag).toBe(true)
+  })
+
+  it('is not silenced by a preceding regex literal containing a quote', () => {
+    const src = ["const clean = s.replace(/'/g, '')", 'spawnSync(cmd, a, { cwd })'].join('\n')
+    expect(findChildProcessCalls(src)).toMatchObject([{ api: 'spawnSync', line: 2, hasFlag: false }])
   })
 
   it('reads a MULTI-LINE call as one call, flag included', () => {

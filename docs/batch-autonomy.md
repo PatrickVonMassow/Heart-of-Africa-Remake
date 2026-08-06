@@ -221,7 +221,13 @@ from advisory claim-and-check to a HARD mutual exclusion in
     NAMESPACED form `cp.spawnSync(…)`, which the first version's blanket member-access
     exclusion let through; only bare `exec` keeps that exclusion, and there only a
     known `child_process` receiver counts, because `RE.exec(line)` is a regex written
-    constantly in this tree. Its `ALLOW` map holds the
+    constantly in this tree. The four-eyes review closed three more: the literal
+    `windowsHide: false` no longer passes as "the flag appears", a quote inside a
+    regex literal (`s.replace(/'/g, '')`) no longer flips the masker's string parity
+    and silences every call below it, and a call inside a template interpolation
+    (`` `${execSync(cmd)}` ``) is seen. What a TEXT audit cannot see stays named:
+    an aliased or `promisify`d call reaches the window through a name the sweep
+    does not know. Its `ALLOW` map holds the
     documented exceptions, each with a written reason, and a stale entry is itself a
     failure: an `awaiting` entry is a debt, and deleting it is how the debt is proven
     paid. Verified as a negative control against the pre-401 tree: 79 offenders
