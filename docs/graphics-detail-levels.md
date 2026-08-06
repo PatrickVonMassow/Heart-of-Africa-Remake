@@ -46,6 +46,7 @@ device pixel ratio is kept (no cap).
 | `figureLimbSegments` | 5 | 8 | 12 |
 | `placeRiverSegments` | 8 | 32 | 64 |
 | `placeRiverFoam` | 6 | 16 | 30 |
+| `waterDetailOctaves` | 1 | 3 | 4 |
 
 ## What each setting does
 
@@ -113,6 +114,13 @@ post pipeline), geometry last — the cuts that only genuinely weak GPUs feel.
   482). Never zero on any level: they carry the reading of WHICH WAY the water
   runs, which the whole upstream/downstream teaching depends on, so a frugal
   level shows fewer (6 → 16 → 30), never none.
+- **`waterDetailOctaves`** — Fractal octaves of the ONE water detail field
+  (work-order 525, `src/render/waterAppearance.ts`): the streaks, the froth and
+  the ripple riding the current. It prices the water's per-pixel shading, and it
+  is a SINGLE lever for BOTH halves of a settlement river — the surface drawn at
+  the bank and the panorama's continuation of it past the ground plate's rim —
+  because a level that thinned only one of them would put back the straight seam
+  the two used to meet along. Climbs 1 → 3 → 4.
 
 > **Declared-but-not-yet-consumed keys:** `waterCalm` and `wildlifeDensity` are
 > present in every preset (so the completeness gate passes and future work has a

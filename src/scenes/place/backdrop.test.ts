@@ -316,7 +316,7 @@ describe('backdrop heightfield (design.md §2.5)', () => {
 
 describe('backdrop material (design.md §2.5 smooth shading)', () => {
   it('shades smooth — never flat per-face facets — and keeps the §2.5 draw state', () => {
-    const m = createBackdropMaterial()
+    const { material: m } = createBackdropMaterial(3)
     // The Cairo facet report: flatShading would replace the heightfield's
     // interpolated vertex normals with per-face normals.
     expect(m.flatShading).toBe(false)
@@ -326,6 +326,22 @@ describe('backdrop material (design.md §2.5 smooth shading)', () => {
     expect(m.vertexColors).toBe(true)
     expect(m.colorNode).toBeTruthy()
     expect(m.normalNode).toBeTruthy()
+  })
+
+  it('carries the bank frame the panorama measures its water in (work-order 525)', () => {
+    const handle = createBackdropMaterial(3)
+    // The frame is a UNIFORM, so walking into another settlement moves the
+    // panorama's water field without re-linking the shader.
+    expect(handle.flow.value).toBeInstanceOf(THREE.Vector4)
+    expect(typeof handle.waterline.value).toBe('number')
+    handle.flow.value.set(0.6, -0.8, 0.8, 0.6)
+    handle.waterline.value = 36
+    expect(handle.flow.value.x).toBeCloseTo(0.6, 10)
+    expect(handle.waterline.value).toBe(36)
+    // Water is shaded, not rocked: the mask drives roughness and metalness too,
+    // so a river in the panorama can never read as a rough rock face.
+    expect(handle.material.roughnessNode).toBeTruthy()
+    expect(handle.material.metalnessNode).toBeTruthy()
   })
 })
 

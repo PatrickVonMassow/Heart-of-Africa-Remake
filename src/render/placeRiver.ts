@@ -6,7 +6,9 @@
 // the §2.5 surroundings backdrop — the player walks to it, stands at it and
 // looks down at it. Where it ends, at the plate's outer rim, the compressed
 // panorama continues the same river out to the horizon, because the bank was
-// derived from the world model at the panorama's own scale (`riverBank.ts`).
+// derived from the world model at the panorama's own scale (`riverBank.ts`) —
+// and it LOOKS like the same river because both halves are shaded from the one
+// description in `waterAppearance.ts` (work-order 525).
 //
 // THE CURRENT HAS TO BE VISIBLE. Everything the whole UPSTREAM/DOWNSTREAM
 // teaching hangs on is the player being able to SEE which way the water runs, so
@@ -16,24 +18,14 @@
 // assuming it.
 
 import * as THREE from 'three/webgpu'
-import {
-  color,
-  float,
-  max,
-  mix,
-  mx_fractal_noise_float,
-  positionLocal,
-  smoothstep,
-  time,
-  uv,
-  vec3,
-} from 'three/tsl'
+import { positionLocal, uv, vec3 } from 'three/tsl'
 import {
   BANK_SHORE_HALF,
   BANK_WATER_DROP,
   type PlaceRiverBank,
 } from '../scenes/place/riverBank'
 import { groundPlateRadius, type PlaceBounds } from '../scenes/place/boundary'
+import { WATER_METALNESS, WATER_ROUGHNESS, riverWaterSurface } from './waterAppearance'
 
 /** How far out from the waterline the drawn water reaches. Enough to pass the
  *  ground plate's rim, where the panorama backdrop takes the river over. */
@@ -45,10 +37,6 @@ export const RIVER_BED_DROP = 0.35
  *  hide whatever of it lies past the bank window. */
 export const RIVER_HALF_LENGTH = 42
 
-/** How fast the foam rides the current, in metres per second. An art constant
- *  like the wave figures of the ocean and river materials: fast enough to read
- *  as a current at a glance, slow enough for a wide river. */
-export const RIVER_DRIFT_SPEED = 0.85
 /** The along-bank span the drifting foam is spread over and recycled in. */
 export const RIVER_DRIFT_SPAN = 40
 
@@ -176,60 +164,43 @@ export function buildRiverSurfaceGeometry(
   return g
 }
 
-// Module singleton (point 96): a remount must reuse the material so the
-// renderer keeps its program instead of re-linking on the first frame back.
-let riverMaterialCache: THREE.MeshStandardNodeMaterial | null = null
+// Module singletons, one per detail level (point 96): a remount must reuse the
+// material so the renderer keeps its program instead of re-linking on the first
+// frame back. The octave count is a shader constant, so a level change builds
+// its own — and each stays cached for the F9 cycle back.
+const riverMaterialCache = new Map<number, THREE.MeshStandardNodeMaterial>()
 
 /**
  * The settlement river's surface: calm water, streaks drawn out along the
  * current and scrolling DOWNSTREAM, foam gathering at the near shore.
  *
- * The scroll direction is the whole point. `u` grows downstream (the geometry
- * puts metres along the bank into it), and the noise is sampled at `u −
- * speed·t`, so the pattern travels toward +u — the convention the travel view's
- * river ribbon uses, where u likewise runs source → mouth.
+ * The appearance itself is NOT stated here — it comes from `waterAppearance.ts`,
+ * the one description the panorama's continuation of this same river reads too
+ * (work-order 525). What this function contributes is the surface's own frame:
+ * the UVs carry metres, `u` growing downstream (the geometry puts metres along
+ * the bank into it) and `v` out from the waterline, which is exactly the frame
+ * the panorama reconstructs from world position — so the field runs on across
+ * the plate's rim instead of restarting at it.
  */
-export function createPlaceRiverMaterial(): THREE.MeshStandardNodeMaterial {
-  if (riverMaterialCache) return riverMaterialCache
-  const m = (riverMaterialCache = new THREE.MeshStandardNodeMaterial())
+export function createPlaceRiverMaterial(octaves: number): THREE.MeshStandardNodeMaterial {
+  const cached = riverMaterialCache.get(octaves)
+  if (cached) return cached
+  const m = new THREE.MeshStandardNodeMaterial()
   m.transparent = true
   m.depthWrite = false
-  m.roughness = 0.13
-  m.metalness = 0.02
+  m.roughness = WATER_ROUGHNESS
+  m.metalness = WATER_METALNESS
   m.side = THREE.DoubleSide
 
   // Metres along the current, and metres out from the waterline.
-  const u = uv().x
-  const v = uv().y
-
-  // Streaks stretched along the flow (long in u, narrow in v) and carried
-  // downstream at the drift speed the foam flecks ride, so shader and props
-  // tell the same story.
-  const streak = mx_fractal_noise_float(
-    vec3(u.mul(0.09).sub(time.mul(RIVER_DRIFT_SPEED * 0.09)), v.mul(0.55), 1.0),
-    3,
-  )
-    .mul(0.5)
-    .add(0.5)
-
-  const base = mix(color('#2b5f7e'), color('#4a90a6'), streak.mul(0.5))
-  // Foam at the near shore, where the current drags over the shallows.
-  const shoreFoam = smoothstep(float(2.4), float(0.3), v).mul(smoothstep(float(0.4), float(0.75), streak))
-  // And a thinner ribbon of it further out, so the movement reads across the
-  // whole surface rather than only at the player's feet.
-  const midFoam = smoothstep(float(0.62), float(0.86), streak).mul(0.45)
-  const foam = max(shoreFoam, midFoam)
-  m.colorNode = mix(base, color('#eaf3f5'), foam.mul(0.85))
-
+  const water = riverWaterSurface({ along: uv().x, across: uv().y, octaves })
+  m.colorNode = water.color
   // Only slight movement on the surface (design.md §11): a ripple riding the
   // same current, no wave field.
-  const ripple = mx_fractal_noise_float(
-    vec3(u.mul(0.22).sub(time.mul(RIVER_DRIFT_SPEED * 0.22)), v.mul(0.9), time.mul(0.12)),
-    2,
-  )
-  m.positionNode = positionLocal.add(vec3(0, ripple.mul(0.03), 0))
-  m.opacityNode = float(0.94)
-  m.roughnessNode = foam.mul(0.55).add(0.11)
+  m.positionNode = positionLocal.add(vec3(0, water.ripple, 0))
+  m.opacityNode = water.opacity
+  m.roughnessNode = water.roughness
+  riverMaterialCache.set(octaves, m)
   return m
 }
 

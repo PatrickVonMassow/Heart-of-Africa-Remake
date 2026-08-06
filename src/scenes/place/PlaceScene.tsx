@@ -29,6 +29,7 @@ import {
   effectiveFireShadowSoft,
   effectivePlaceRiverFoam,
   effectivePlaceRiverSegments,
+  effectiveWaterDetailOctaves,
 } from '../../state/ui'
 import { balance, START_YEAR } from '../../config/balance'
 import { advanceGroundWetness, coldnessAt, effectiveGreenness, effectiveWetness, fireRainFactor, groundWetnessFactor, harmattanAt, karifAt, RAIN_GRAY, rainAmount, skyOvercastParams, strikeSchedulerStep, sunDimFactor, thunderstormAt, type StrikeSchedulerState } from '../../systems/season'
@@ -87,7 +88,6 @@ import { SpeechLabels } from './SpeechLabels'
 import { resolveMove, PLAYER_RADIUS } from './collision'
 import { buildBoundaryLut, isOutsidePlace } from './boundary'
 import {
-  RIVER_DRIFT_SPEED,
   RIVER_HALF_LENGTH,
   buildBankShoreGeometry,
   buildGroundPlateGeometry,
@@ -96,6 +96,7 @@ import {
   createPlaceRiverMaterial,
   fleckPosition,
 } from '../../render/placeRiver'
+import { RIVER_DRIFT_SPEED } from '../../render/waterAppearance'
 import type { PlaceRiverBank } from './riverBank'
 import { clearEdgeBand, setEdgeBandBoundary, setEdgeBandLook } from '../../render/edgeBand'
 import { buildLayout, DIG_SITE_RADIUS, isOnLane, nearestActionable, PLACE_RADIUS, SPAWN_INSET, type Interactive, type PathDef, type DwellingDef, type FenceDef, type PlaceLayout } from './layout'
@@ -1702,12 +1703,25 @@ function TravelPanorama({ placeId }: { placeId: string }) {
   return <mesh name="panorama-band" geometry={geometry} material={material} position={[0, EYE_HEIGHT, 0]} />
 }
 
-function LandscapeBackdrop({ lat, lon, seed, innerRadius }: { lat: number; lon: number; seed: number; innerRadius: number }) {
+function LandscapeBackdrop({
+  lat,
+  lon,
+  seed,
+  innerRadius,
+  bank,
+}: {
+  lat: number
+  lon: number
+  seed: number
+  innerRadius: number
+  bank: PlaceRiverBank | null
+}) {
   const geometry = useMemo(() => {
     const r0 = innerRadius
     const centerH = sampleTerrain(lat, lon, seed).height
     const positions: number[] = []
     const colors: number[] = []
+    const water: number[] = []
     const indices: number[] = []
     for (let ri = 0; ri < BACKDROP_RINGS; ri++) {
       // Logarithmic ring spacing with a ring pinned on the ground-disc edge.
@@ -1725,6 +1739,10 @@ function LandscapeBackdrop({ lat, lon, seed, innerRadius }: { lat: number; lon: 
         const y = backdropSurfaceY(r, r0, (smp.height - centerH) * BACKDROP_HEIGHT)
         positions.push(x, y, z)
         colors.push(smp.color[0], smp.color[1], smp.color[2])
+        // River and lake water carries the ONE water appearance instead of the
+        // rock shading (work-order 525) — the same source the drawn surface at
+        // the bank reads, so the two meet with no seam at the plate's rim.
+        water.push(smp.type === 'water' ? 1 : 0)
       }
     }
     for (let ri = 0; ri < BACKDROP_RINGS - 1; ri++) {
@@ -1739,13 +1757,22 @@ function LandscapeBackdrop({ lat, lon, seed, innerRadius }: { lat: number; lon: 
     const geo = new THREE.BufferGeometry()
     geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(positions), 3))
     geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(colors), 3))
+    geo.setAttribute('waterMask', new THREE.BufferAttribute(new Float32Array(water), 1))
     geo.setIndex(indices)
     // Smooth interpolated vertex normals — the backdrop ridge must never
     // shade as hard flat facets (createBackdropMaterial keeps flat shading off).
     geo.computeVertexNormals()
     return geo
   }, [lat, lon, seed, innerRadius])
-  const material = useMemo(() => createBackdropMaterial(), [])
+  const waterOctaves = useUi(effectiveWaterDetailOctaves)
+  const backdrop = useMemo(() => createBackdropMaterial(waterOctaves), [waterOctaves])
+  const material = backdrop.material
+  // The bank frame the panorama measures its water in — a uniform, not a build
+  // constant, so walking into another settlement never re-links the shader.
+  useEffect(() => {
+    backdrop.flow.value.set(bank?.fx ?? 0, bank?.fz ?? 1, bank?.nx ?? 1, bank?.nz ?? 0)
+    backdrop.waterline.value = bank?.distance ?? 0
+  }, [backdrop, bank])
   useEffect(() => () => geometry.dispose(), [geometry])
   useEffect(() => () => material.dispose(), [material])
 
@@ -1802,7 +1829,8 @@ function PlaceRiver({
 }) {
   const segments = useUi(effectivePlaceRiverSegments)
   const foamCount = useUi(effectivePlaceRiverFoam)
-  const water = useMemo(() => createPlaceRiverMaterial(), [])
+  const waterOctaves = useUi(effectiveWaterDetailOctaves)
+  const water = useMemo(() => createPlaceRiverMaterial(waterOctaves), [waterOctaves])
   const surface = useMemo(
     () => buildRiverSurfaceGeometry(bank, RIVER_HALF_LENGTH, segments),
     [bank, segments],
@@ -2644,7 +2672,7 @@ export function PlaceScene() {
       />
 
       {/* Real-surroundings panorama behind the settlement (design.md §2) */}
-      <LandscapeBackdrop lat={place.lat} lon={place.lon} seed={seed} innerRadius={layout.radius + BACKDROP_INNER_OFFSET} />
+      <LandscapeBackdrop lat={place.lat} lon={place.lon} seed={seed} innerRadius={layout.radius + BACKDROP_INNER_OFFSET} bank={layout.bank ?? null} />
       <TravelPanorama placeId={place.id} />
       <TableMountainSkyline placeId={place.id} />
       <GizaSkyline placeId={place.id} />
