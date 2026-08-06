@@ -6,7 +6,7 @@
 //   node scripts/board-queue.mjs set <N> "<text>"   # write one point's prose
 //   node scripts/board-queue.mjs set <N> --title --text-stdin      # …its German title
 //   node scripts/board-queue.mjs set <N> --estimate "~2 h"         # …its estimate
-//   node scripts/board-queue.mjs import             # seed the data from the board
+//   node scripts/board-queue.mjs import             # add cards the data lacks, from the board
 //
 // GERMAN TEXT GOES IN ON STDIN (point 439, the rule of point 410): `--text-stdin`
 // fills whichever field it follows, so an umlaut never passes through a Windows
@@ -40,7 +40,9 @@ import {
   TITLE_CMD,
   buildQueueSection,
   importQueueFromHtml,
+  mergeQueueImport,
   openPointsOf,
+  queueImportOffenders,
   parseSetArgs,
   parseTaskTitles,
   setQueueEntry,
@@ -136,11 +138,26 @@ try {
     console.log(`${fields.join(' + ')} for point ${parsed.point} stored in ${QUEUE_DATA_PATH}`)
     console.log('Render it into the board: node scripts/board-queue.mjs')
   } else if (cmd === 'import') {
-    // The one-time migration: seed the data from a board that still carries a
-    // hand-written queue, so the switch to the generator throws no prose away.
-    const data = importQueueFromHtml(readFileSync(boardFile, 'utf8'))
+    // Seed the data from cards the board carries but the data does not know yet.
+    // ADDITIVE ONLY (point 530): a stored body is never replaced, and nothing is
+    // written at all while the result would put an over-long card on the board.
+    const { data, added, kept } = mergeQueueImport(readData(), importQueueFromHtml(readFileSync(boardFile, 'utf8')), {
+      titles: parseTaskTitles(readFileSync(tasksFile, 'utf8')),
+    })
+    const offenders = queueImportOffenders(data)
+    if (offenders.length) {
+      throw new Error(
+        `import refused — ${offenders.length} card(s) would go on the board too long or unbroken: ` +
+          `${offenders.map((o) => `${o.point}: ${o.reason}`).join(' | ')}. ` +
+          'Nothing was written. Give each of them its paragraphs back (a blank line splits them): ' +
+          'node scripts/board-queue.mjs set <N> --text-stdin',
+      )
+    }
     writeData(data)
-    console.log(`imported ${Object.keys(data.points).length} queue card(s) into ${QUEUE_DATA_PATH}`)
+    console.log(
+      `import: ${added.length} card(s) added${added.length ? ` (${added.join(', ')})` : ''}, ` +
+        `${kept} kept unchanged → ${QUEUE_DATA_PATH}`,
+    )
   } else if (cmd === '--check' || cmd === undefined) {
     const { html, open, titles, exclude, requests } = inputs()
     const built = buildQueueSection(html, { open, data: readData(), exclude, titles, requests })
