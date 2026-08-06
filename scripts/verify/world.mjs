@@ -146,6 +146,69 @@ if (!poc) {
     label: `the erratic ${poc.upstreamDeg.toFixed(1)}° upstream of the Bambara village`,
   })
   await page.evaluate(() => window.__ui.getState().setTravelZoom(0.5))
+
+  // Point 487, the errand's end, driven in the REAL browser against the
+  // placement the scene drew (window.__communicationRock, not a coordinate this
+  // script computed): digging away from the block finds nothing, digging at it
+  // recovers the artefact, and handing it to the chief in his own village
+  // closes the loop. The store transitions themselves are pinned in
+  // src/state/store.rockArtefact.test.ts — what this adds is the proof that the
+  // spot the picture shows and the spot that yields are the same spot.
+  const reachDeg = await page.evaluate(() => window.__balance.digRadius / 10)
+  const digAt = async (lat, lon) => {
+    await jump(lat, lon, 400)
+    return page.evaluate(() => {
+      const g = window.__game.getState()
+      g.debugAddEquipment('shovel')
+      g.dig()
+      const s = window.__game.getState()
+      return { artefact: s.rockArtefact, keys: s.journal.map((e) => e.text.key) }
+    })
+  }
+  // The procedural caches are cleared for the negative probe so only the
+  // boulder's own branch can answer, then put back.
+  const caches = await page.evaluate(() => {
+    const sites = window.__game.getState().treasureSites
+    window.__game.setState({ treasureSites: [] })
+    return sites
+  })
+  const away = await digAt(poc.lat + reachDeg * 4, poc.lon + reachDeg * 4)
+  const awayOk = away.artefact === 'buried' && !away.keys.includes('journal.rockArtefact')
+  console.log(
+    `${awayOk ? 'PASS' : 'FAIL'}  digging clear of the erratic recovers nothing (state ${away.artefact})`,
+  )
+  if (!awayOk) errors.push(`a dig ${(reachDeg * 4).toFixed(2)}° off the erratic recovered ${away.artefact}`)
+
+  const atRock = await digAt(poc.lat, poc.lon)
+  const atRockOk = atRock.artefact === 'carried' && atRock.keys.includes('journal.rockArtefact')
+  console.log(
+    `${atRockOk ? 'PASS' : 'FAIL'}  digging at the erratic the scene drew recovers the artefact and journals it`,
+  )
+  if (!atRockOk) errors.push(`the dig at the drawn erratic left the artefact ${atRock.artefact}`)
+
+  const handed = await page.evaluate(() => {
+    const g = window.__game.getState()
+    g.enterPlace('bambara-village')
+    window.__game.getState().handArtefactToChief()
+    const s = window.__game.getState()
+    return { artefact: s.rockArtefact, keys: s.journal.map((e) => e.text.key) }
+  })
+  const handedOk = handed.artefact === 'given' && handed.keys.includes('journal.artefactGiven')
+  console.log(
+    `${handedOk ? 'PASS' : 'FAIL'}  the artefact laid in the chief's hands solves the puzzle and is journaled`,
+  )
+  if (!handedOk) errors.push(`the hand-over left the artefact ${handed.artefact}`)
+
+  // Back onto the map for the remaining frames, with the world as it was.
+  await page.evaluate((sites) => {
+    const g = window.__game.getState()
+    if (g.mode === 'place') g.leavePlace()
+    window.__game.setState({ treasureSites: sites })
+    window.__game.getState().setJournalOpen(false)
+  }, caches)
+  // Wait on the STATE, not the wall clock: the map frames below may only be
+  // taken once the traveller is back out of the settlement.
+  await page.waitForFunction(() => window.__game.getState().mode === 'travel', null, { timeout: 20000 })
 }
 
 // The Nile delta is already photographed above, out of the scene switch itself.

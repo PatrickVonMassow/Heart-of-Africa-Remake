@@ -174,6 +174,16 @@ So the rock needs no walkable bank zone inside the settlement and no first-perso
 elaboration. The village keeps its own reachable bank, because that is where the
 adults teach RIVER, UPSTREAM and DOWNSTREAM by pointing at real water.
 
+Decided by the build (point 487): what lies buried is ONE thing, and it is not
+trade goods — it never enters the bazaar, never counts against the pack's
+capacity, and cannot be sold, so a full pack can never strand the errand and no
+player can accidentally trade the solution away. The dig reads the same
+`communicationRockSite` the renderer places the block from, so there is no second
+record of where the rock is. And the chief's answer is a PHRASE, not a text:
+BIG_ROCK · DIG · HERE, spoken in his own tongue with the player's own readings
+over it — the one moment in the slice where understanding is the reward, so
+handing him a translation there would undo the whole thing.
+
 BIG_ROCK is therefore taught on a SMALL boulder visible from the village, and the
 target upstream is a LARGER one further away (user 04.08.2026). The player has to
 make the transfer himself — the concept is learned on a near example and applied
