@@ -14628,3 +14628,56 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   work order that changed the same point keeps the three paragraphs; a point
   absent from the JSON is added; and a stub that exceeds the conciseness budget is
   reported rather than written.
+
+- [x] 299. BIRD'S-EYE SETTLEMENT COLLISION — you must not walk THROUGH a settlement (user
+  24.07.2026, screenshot; for AFTER the v0.2 tag). Now that entry is Space-only (point 244),
+  the bird's-eye traveller walks straight THROUGH a village/settlement footprint, which looks
+  wrong. ADD a bird's-eye COLLISION for settlements (like the existing tree/animal collision,
+  §11/§19): the traveller cannot cross a settlement's footprint — sliding movement at its edge,
+  no tunnelling on a fast step. BALANCE WITH ENTRY (the crux): the Space enter-radius
+  (`settlementEntry`) must stay REACHABLE — the collision must NOT stop the traveller BEFORE he
+  reaches the enter-radius, or he can never enter. So the enter-radius must be >= the collision
+  radius: the "Space to enter" prompt arms at or OUTSIDE the collision boundary, so approaching
+  a settlement you always enter the enter-zone (prompt shown, key armed) before/as the collision
+  halts you, and a Space press there enters. Calibratable relation (collision radius vs enter
+  radius) in balance. NON-OVERLAP INVARIANT: no two places' enter-radii may overlap — Cairo and
+  the future walkable Giza pyramids (point 273), adjacent ports/villages — else entry is
+  ambiguous. Enforce a GLOBAL pure test that every pair of enter-radii is disjoint (place
+  positions / clamp radii so they never intersect); point 273 already proves its Giza disc
+  non-overlapping with Cairo — generalise that to ALL places.
+  THE COLLIDER MUST NEVER TRAP THE TRAVELLER — the failure this point would otherwise
+  CREATE (user 25.07.2026). Several paths put him at a place's exact centre, which is
+  INSIDE the new footprint: the debug jump-to (`debugJumpTo` in `src/state/store.ts`,
+  reached from every named map point in the §21.3 picker) lands on the map point itself,
+  and a resumed snapshot or a successor start restores a position that was recorded at a
+  port. Before Space-only entry, walking out simply re-entered the settlement; with a
+  collider and no automatic entry, he would stand inside a wall he cannot cross. TWO
+  RULES, both required:
+  (1) THE COLLIDER IS ONE-WAY. It blocks CROSSING IN, never getting OUT. A traveller who
+  is already inside the footprint — however he got there — may always move freely to the
+  outside. This is the general invariant and it covers every future teleport nobody has
+  thought of yet, including a save written by an older build.
+  (2) A JUMP TO AN ENTERABLE PLACE ENTERS IT (user 25.07.2026). Jumping to a settlement
+  or the Giza monument site puts the traveller straight INSIDE, in the first-person
+  view — which is what a jump to a place is for, and what the jump effectively did
+  before entry became key-only (landing on the centre triggered the automatic entry).
+  It goes through the ORDINARY entry path, so everything an entry normally does still
+  happens — discovery, the port checkpoint, the orientation markers. A debug jump is
+  meant to reach the real state, not a special one. Jumping to a target that cannot be
+  entered — a mountain, a waterfall, a lake, the graveyard, the tomb, a natural site —
+  is a bird's-eye jump exactly as today. The bird's-eye position is set as well, so
+  LEAVING the place afterwards puts the traveller where he would have been.
+  VERIFIABLE additionally: pure — a step from inside the footprint toward the outside is
+  NOT blocked while a step from outside toward the inside is (the one-way rule, swept
+  over the place roster); the jump target resolver classifies every entry in the §21.3
+  picker as enterable or not. Live — jumping to a village lands in the first-person view
+  inside it, leaving it puts the traveller outside the footprint and free to walk away,
+  and jumping to a mountain still lands in the bird's-eye view. ANCHORS: the bird's-eye collision
+  (`src/systems/movement.ts` / the travel-scene collider set that already handles trees/animals),
+  `src/scenes/travel/settlementEntry.ts` (enter radius + the collision-radius relation), the
+  world/place roster (positions + radii). VERIFIABLE: pure tests that the settlement collision
+  blocks a straight walk through the footprint while a Space press within the enter-radius still
+  enters (the collisionRadius <= enterRadius invariant), and that all place enter-radii are
+  pairwise disjoint (Cairo / villages / ports / pyramids); a live check (`scripts/verify/flow.mjs`
+  or `enrichments.mjs`) that the traveller is stopped at a settlement edge and cannot cross it,
+  yet still enters with Space. No new player-visible text (reuses the existing prompt).
