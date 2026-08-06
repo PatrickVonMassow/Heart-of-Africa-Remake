@@ -14722,3 +14722,44 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   of (a) is recorded in its commit with the reason chosen.
   DOCS in the same commit: `scripts/verify/README.md` (the baseline lane's failure modes)
   and point 387's list, if (a) turns out to be a red main already carries.
+
+- [x] 401. THE CONSOLE WINDOWS THAT STEAL THE USER'S FOCUS (28.07.2026, user
+  report: "es poppen immer wieder Konsolenfenster auf, die mir den Fokus
+  stehlen"). It is NOT unavoidable, and there are exactly two causes, both
+  measured.
+  CAUSE 1 — EVERY GUARD'S GIT CALL. On Windows a child console process gets a
+  NEW console window unless `CREATE_NO_WINDOW` is set, which in Node is
+  `windowsHide: true`. Of the script files that run `execSync`/`spawnSync`/
+  `execFileSync`/`spawn`, only 7 set it; 23 do not — among them EVERY member of
+  the Stop chain that shells out to git: `dashboard-guard`, `model-guard`,
+  `ci-status-guard`, `commit-scope-guard`, `mechanism-review-guard`,
+  `render-verify-guard`, `dashboard-integrity-guard`, `dashboard-sync`,
+  `batch-singleton`, `batch-boundary`, `batch-in-flight`, `batch-resume-hook`,
+  `board.mjs`, `closing-guard`, `audit-check`, plus the verify runners. The Stop
+  chain runs at EVERY turn end and each guard makes several git calls, so a turn
+  ends in dozens of window flashes.
+  FIX: add `windowsHide: true` to every child-process call under `scripts/`.
+  Mechanical and behaviour-neutral — it suppresses a window, not output. Give it
+  a guard of its own so it cannot rot back: a pure test that greps the script
+  tree and FAILS on a child-process call without the flag (the same shape as the
+  quality-preset completeness gate), so a newly added exec is caught at once.
+  CAUSE 2 — THE SCHEDULED TASK ITSELF. `HoA-Batch-Autostart` runs
+  `C:\Program Files\nodejs\node.exe` directly with LogonType `Interactive`, so
+  Task Scheduler opens a visible console for it every 15 minutes — ~96 windows a
+  day on its own. The session it spawns does NOT need that console: the spawn
+  already passes `detached: true`, `stdio` to a log file and `windowsHide: true`
+  (`scripts/batch-autostart.mjs`), so nothing is lost by hiding the launcher.
+  FIX: the task action stops being a bare `node.exe`. Either point it at a
+  hidden-launch wrapper, or set the task to run without a visible window. This
+  touches the USER'S machine, not the repository — it is ATTENDED work and needs
+  the user's go for the specific change, and the task's re-enabled state
+  (user 27.07.2026) must survive it.
+  SEQUENCING: cause 1 touches files point 400 is rewriting (`dashboard-*`,
+  `board*`, `batch-*`). Do it AFTER 400 has landed, or the merge fights itself.
+  VERIFIABLE: the pure grep gate above, red before the change and green after;
+  `npm run test:unit` and `npm run lint` unchanged; and one live check the user
+  can judge — a full turn end with the Stop chain running produces no window.
+  For cause 2, one scheduler tick with no console appearing, with the batch still
+  resuming as before (`.claude/autostart.log` shows the tick).
+  DOCS in the same commit: `docs/batch-autonomy.md`, where the launcher is
+  described, gains the hidden-window requirement.
