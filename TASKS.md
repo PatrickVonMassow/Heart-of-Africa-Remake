@@ -4812,23 +4812,34 @@ Build order, chosen so no two parallel agents own the same file:
   cancel-and-retry inside a run that actually executes — remain unexercised.
   Consequence meanwhile: `main` stands at ee125053 while the site still serves
   c728c816, so the user judges render work against a stale build.
+  The classifier half was BUILT the same evening, on `main`, because the guard was
+  holding the session over a red no push could clear: a failed job that executed
+  no step of ours now reads as external — but only where the failing workflow's
+  OWN file is proven unchanged since its last green run, since a broken `uses:`
+  or `runs-on` dies in the same shape and IS ours; such a red no longer blocks the
+  turn end, it re-alerts hourly instead, and the waiver is judged against EVERY
+  red on the commit so one outage cannot excuse another workflow's real failure.
+  Two-pass Fable review recorded. What that leaves is below.
   FINAL STATE:
   1. The live proof of 526 is taken: one deploy run whose `deploy` job really
      executes, whose `Verdict` step prints its explicit line, and after which the
      served site matches `main`. Recorded in `docs/acceptance-evidence.md` beside
      the criterion it belongs to.
-  2. A `deploy` job that ends with NO step executed is told apart from one that
-     ran and failed — the first is a runner/queue famine, not a Pages stall, and
-     the classifier of 526 says so rather than prescribing the unblock command,
-     which would cancel nothing.
-  3. It is settled by measurement whether the deploy job's own
+  2. It is settled by measurement whether the deploy job's own
      `timeout-minutes: 25` contributed to the cancellation (the 15.5-minute gap
      says it did not, but the value was chosen without this failure in view);
      the value is either justified in a comment or corrected.
-  4. A deploy that never reached the site is NOTICED without a human looking:
+  3. A deploy that never reached the site is NOTICED without a human looking:
      the batch learns that the served build lags `main`, names both revisions,
      and retries once GitHub answers again — the site being stale is the fault
-     that matters, not the run being red.
-  VERIFIABLE: pure Vitest on the no-step-executed classification and on the
-  stale-site comparison (served revision vs `main`), plus the one real deploy run
-  of item 1 with its run id recorded.
+     that matters, not the run being red. This is the item the outage showed to
+     matter most: every alarm the project has fires on a RED RUN, and none on a
+     site that quietly serves yesterday.
+  4. The reviewer's two recorded residuals are closed or written off with a
+     reason: a workflow byte-identical to its last green run can still be broken
+     from outside (a retired `runs-on` image, a yanked action tag), which the
+     "untouched" proof reads as an outage though only a push fixes it; and
+     `fetchJobs` walks only the first 30 jobs of a run.
+  VERIFIABLE: pure Vitest on the stale-site comparison (served revision vs
+  `main`) and on the two residuals of item 4, plus the one real deploy run of
+  item 1 with its run id recorded.
