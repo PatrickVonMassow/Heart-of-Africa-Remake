@@ -185,3 +185,51 @@ export function buildRiverBank(place: PlaceDef, radius: number): PlaceRiverBank 
     downstream: alongBank(frame, stretchAngle, stretchR),
   }
 }
+
+/** How far inland the three bank points may be drawn to find ground a villager
+ *  actually fits on, and in what steps. Three metres is the whole budget: a
+ *  point pulled further than that is no longer at the water. */
+const BANK_SETTLE_STEP = 0.3
+const BANK_SETTLE_MAX = 3
+
+/**
+ * Pulls the three named bank points onto ground a mover of the settlement's
+ * own footprint can STAND on (point 155's rule, which the errand targets and
+ * the dig sites already obey — these three were missed, and a rock dropped at
+ * the water's edge by one seed left the downstream stretch inside a collider,
+ * a place no villager sent there could ever reach).
+ *
+ * They are drawn straight INLAND along their own radius, so each stays on its
+ * own bearing off the bank, and the two stretches move TOGETHER by the same
+ * amount — the mirror between them is what the UPSTREAM/DOWNSTREAM teaching
+ * rests on, and a stretch nudged on its own would break it. `free` decides what
+ * is standable; the layout passes its full collider set.
+ */
+export function settleBankPoints(
+  bank: PlaceRiverBank,
+  free: (x: number, z: number) => boolean,
+): void {
+  const pull = (p: BankPoint, by: number): BankPoint => {
+    const r = Math.hypot(p.x, p.z)
+    if (r <= 1e-6) return p
+    const f = Math.max(0, (r - by) / r)
+    return { x: p.x * f, z: p.z * f }
+  }
+  const steps = Math.round(BANK_SETTLE_MAX / BANK_SETTLE_STEP)
+  for (let s = 0; s <= steps; s++) {
+    const p = pull(bank.bank, s * BANK_SETTLE_STEP)
+    if (free(p.x, p.z)) {
+      bank.bank = p
+      break
+    }
+  }
+  for (let s = 0; s <= steps; s++) {
+    const up = pull(bank.upstream, s * BANK_SETTLE_STEP)
+    const down = pull(bank.downstream, s * BANK_SETTLE_STEP)
+    if (free(up.x, up.z) && free(down.x, down.z)) {
+      bank.upstream = up
+      bank.downstream = down
+      break
+    }
+  }
+}

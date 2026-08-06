@@ -8,12 +8,12 @@ import { placeById } from '../../world/geo'
 import { mulberry32 } from '../../world/noise'
 import { REGION_PLACE_STYLES, VILLAGE_PLANS } from './regionStyles'
 import { PORT_TALKERS, VILLAGE_SPOTS } from './lifeSpots'
-import { boxCollider, nudgeToFree, PLAYER_RADIUS, WALKER_RADIUS, type Collider } from './collision'
+import { boxCollider, nudgeToFree, spawnPointFree, PLAYER_RADIUS, WALKER_RADIUS, type Collider } from './collision'
 import { GROUND_DISC_OVERHANG } from './backdrop'
 import { windingPoints, laneSlots, closestOnPolyline, bendAround, type LaneSlot } from './lanePlan'
 import { buildGizaLayout } from './gizaSite'
 import { ROCK_VILLAGE_ID } from '../../world/communicationRock'
-import { buildRiverBank, BANK_SHORE_HALF, BANK_WALL_INSET, type PlaceRiverBank } from './riverBank'
+import { buildRiverBank, settleBankPoints, BANK_SHORE_HALF, BANK_WALL_INSET, type PlaceRiverBank } from './riverBank'
 import type { BuildingType } from '../../state/ui'
 
 export const PLACE_RADIUS = 28 // walkable radius in meters; leaving it exits the place
@@ -975,6 +975,13 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   // full collider set, so no inhabitant walks into a wedge it cannot escape.
   for (let i = 0; i < errands.length; i++) {
     errands[i] = nudgeToFree(colliders, errands[i][0], errands[i][1], WALKER_RADIUS)
+  }
+
+  // The bank a villager is SENT to obeys the same rule (point 155): it has to
+  // be ground the figure fits on against the full collider set — the water wall
+  // and whatever the dressing dropped near the shore included.
+  if (bank) {
+    settleBankPoints(bank, (x, z) => spawnPointFree(colliders, x, z, WALKER_RADIUS))
   }
 
   // The ground work is a target a villager walks INTO, so it obeys the same
