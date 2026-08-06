@@ -3151,47 +3151,6 @@ it is appended.
   the dwelling row for the Tuareg, per the standing rule that the implementation
   sections move with the rendering.
 
-- [ ] 418. A STAGED DROWNING STAYS RED AND THE BASELINE LANE DIES BEFORE IT CAN SAY WHY
-  (29.07.2026, found while clearing point 316 on a QUIET machine — `machine-load` reported
-  CPU 1 %, GPU 0 %, no competing run, so these verdicts are evidence, not load).
-  TWO DEFECTS, and the second is why the first is still open:
-  (a) THE CHECK. `enrichments` reports "in the forced rains a calf in a strong current
-  drowns — dead, never rescued (point 122)" as FAILED in FIVE consecutive runs — three on WebGL 2,
-  two on WebGPU — every time with `{"staged":true,"tries":1,"drowned":false,"rescued":true,"out":true,
-  "lionFed":false}` — the staging works, the calf enters the water, and it comes OUT alive
-  where design.md §19.8 says a swollen current must not let the self-rescue fire. It is not
-  the point-141 Atlas red already listed in point 387, and not the point-382 eye knob.
-  It is NOT the point-316 mouth slack either, and that is measured rather than assumed: the
-  flow field the staging picks its spot from is bit-identical with and without the slack
-  across the whole search window (lat 29..27, lon 30.4..31.8, probed cell by cell —
-  0.419/0.419, 0.996/0.996, 0.902/0.902 …), because the ramp covers the last 0.6 deg of the
-  course while the window sits 2.4 deg or more upstream. So the cause is either a red that
-  main already carries or a rotating staging flake of the fragile family of point 336.
-  DECIDE WHICH, then fix accordingly: the PRODUCT (the swollen current no longer holds the
-  calf under), the CHECK (it asserts something the staging cannot deliver), or the STAGING
-  (it drifts out of the state it means to create) — per point 387's rule, loosening the
-  assertion to reach green is refused.
-  (b) THE LANE THAT SHOULD HAVE ANSWERED (a). `node scripts/verify/baseline-classify.mjs
-  enrichments` ran the baseline (merge-base 25e0f0f, i.e. main itself) TWICE, and both
-  baseline runs ended after 55 of the suite's 243 checks — exit 1 with ZERO failing checks,
-  which is a run that DIED, not a run that failed. The classifier then labelled all three
-  current reds INCONCLUSIVE ("the check did not run on the baseline"). A lane that dies at a
-  quarter of the suite is worse than no lane: it costs the full runtime and answers nothing,
-  and the classification it refuses is exactly the judgement every branch needs before it
-  merges. FIX: find why the suite aborts in the reused baseline worktree under
-  `local/verify-baseline/` (its stderr is the first evidence and is currently thrown away),
-  KEEP that output, and make the abort LOUD — a baseline run that ends with fewer checks
-  than the current run must be reported as DIED with its last check named, never folded into
-  the same "did not run on the baseline" as a genuinely newer check.
-  VERIFIABLE: `scripts/verify/baseline-classify-core.mjs` gains a pure case for the
-  died-early verdict (fewer baseline checks than current + zero failures => DIED, distinct
-  from INCONCLUSIVE-because-newer), covered in the Vitest layer; a live
-  `baseline-classify.mjs enrichments` run completes the baseline passes over the whole suite
-  and returns a REAL/PRE-EXISTING verdict for the point-122 drowning check; the resolution
-  of (a) is recorded in its commit with the reason chosen.
-  DOCS in the same commit: `scripts/verify/README.md` (the baseline lane's failure modes)
-  and point 387's list, if (a) turns out to be a red main already carries.
-
 - [ ] 422. THE BEGINNER GUIDE IS FULL, AND TODAY'S LESSON HAS NOWHERE TO GO
   (29.07.2026, found while doing the guide review the currency guard demands).
   `docs/analysis_de/vibe-coding-anleitung.md` sits at EXACTLY its budget — 401 lines of
