@@ -1006,7 +1006,12 @@ export const balance: BalanceConfig = {
       intervalSpread: 0.35,
       dwellSeconds: 6,
       digSeconds: 9, // several strokes of the digging motion, plainly readable
-      errandSeconds: 70, // backstop only: a blocked walk lets go instead of pinning
+      // Backstop only: a blocked walk lets go instead of pinning. It has to
+      // OUTLAST the longest errand the catalogue can order, or the villager is
+      // released halfway and the errand teaches nothing — and the longest one is
+      // now the walk out to the river bank, some forty metres of village away,
+      // at an unhurried 1.25 m/s and around whatever stands in the line.
+      errandSeconds: 180,
       pace: 1.25, // an unhurried working walk
       villagerCount: 4,
     },

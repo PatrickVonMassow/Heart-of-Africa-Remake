@@ -47,6 +47,7 @@ import type { RegionPlaceStyle } from './regionStyles'
 import { nudgeToFree, resolveMove, standingClear, tryNudgeToFree, WALKER_RADIUS, type Collider } from './collision'
 import { insidePlace } from './boundary'
 import type { PlaceRiverBank } from './riverBank'
+import { buildPlaceNavGrid, findPlaceRoute, navClearBetween, type NavPoint } from './routing'
 import { createTagGame, stepTagGame, type TagChild, type TagWorld } from './tagGame'
 import {
   childSteer,
@@ -1466,6 +1467,11 @@ function Walkers({
 /** How near a villager must come to count as having arrived where it was sent. */
 const ERRAND_ARRIVE_RADIUS = 1.1
 
+/** How near a waypoint of a route counts as passed. Wider than a stride, so a
+ *  figure sliding along a wall beside the waypoint still ticks it off instead of
+ *  circling it. */
+const WAYPOINT_RADIUS = 1.2
+
 /**
  * The adults at their errands (work-order point 483), and the five concepts they
  * teach at them: RIVER, UPSTREAM, DOWNSTREAM, BIG_ROCK and DIG. The catalogue
@@ -1527,13 +1533,47 @@ function ErrandVillagers({
     }
   }, [seed, count, colliders])
 
+  // The settlement's free ground, sampled once per visit (work-order 482/483).
+  // An errand sends a villager clear across the village — out to the river bank,
+  // which lies past the huts and the compound fences — and a straight-line
+  // seeker presses into the first fence on the way and never arrives. This is
+  // what it walks around them by; it is built from the same boundary and the
+  // same colliders the movement below obeys, so a route can never lead where
+  // the step is then refused.
+  const nav = useMemo(
+    () => buildPlaceNavGrid({ radius, bank }, colliders, NPC_RADIUS),
+    [radius, bank, colliders],
+  )
+
   // Per-villager scene state: where it is strolling on its own, how long it has
-  // been standing, how far it has walked (the bob) and how long it has dug.
-  const idle = useRef<Array<{ target: ErrandPoint | null; pause: number; walked: number; dug: number; stuck: number }>>([])
+  // been standing, how far it has walked (the bob), how long it has dug, and the
+  // waypoints it is following round the building fabric.
+  const idle = useRef<
+    Array<{
+      target: ErrandPoint | null
+      pause: number
+      walked: number
+      dug: number
+      stuck: number
+      route: NavPoint[] | null
+      routeTo: NavPoint | null
+      replan: number
+    }>
+  >([])
   if (idle.current.length !== count) {
     idle.current = Array.from(
       { length: count },
-      (_, i) => idle.current[i] ?? { target: null, pause: 1 + i * 0.7, walked: 0, dug: 0, stuck: 0 },
+      (_, i) =>
+        idle.current[i] ?? {
+          target: null,
+          pause: 1 + i * 0.7,
+          walked: 0,
+          dug: 0,
+          stuck: 0,
+          route: null,
+          routeTo: null,
+          replan: 0,
+        },
     )
   }
   const gestures = useRef<Array<RefObject<GestureState>>>([])
@@ -1592,6 +1632,10 @@ function ErrandVillagers({
         }
       }
 
+      if (!goal) {
+        state.route = null
+        state.routeTo = null
+      }
       if (goal) {
         const dx = goal.x - me.x
         const dz = goal.z - me.z
@@ -1603,11 +1647,46 @@ function ErrandVillagers({
             state.target = null
             state.pause = 3 + rand() * 6
           }
+          state.route = null
+          state.routeTo = null
           state.stuck = 0
         } else {
+          // WHERE THE NEXT STEP GOES: at the goal while the line to it is open,
+          // and otherwise at the next waypoint of a route round whatever stands
+          // in between. Planning is asked for only when the straight line is
+          // actually blocked, and at most once a second per villager, so the
+          // ordinary walk across an open village costs nothing at all.
+          state.replan -= dt
+          if (state.routeTo && (state.routeTo.x !== goal.x || state.routeTo.z !== goal.z)) {
+            state.route = null
+            state.routeTo = null
+          }
+          if (!state.route && state.replan <= 0 && !navClearBetween(nav, me.x, me.z, goal.x, goal.z)) {
+            state.route = findPlaceRoute(nav, me, goal)
+            state.routeTo = { x: goal.x, z: goal.z }
+            state.replan = 1
+          }
+          let aim: ErrandPoint = goal
+          if (state.route) {
+            while (
+              state.route.length > 1 &&
+              Math.hypot(state.route[0].x - me.x, state.route[0].z - me.z) <= WAYPOINT_RADIUS
+            ) {
+              state.route.shift()
+            }
+            // Back on the open line: drop the route and walk at the goal again,
+            // so the figure never trudges a detour it has already got past.
+            if (navClearBetween(nav, me.x, me.z, goal.x, goal.z)) {
+              state.route = null
+              state.routeTo = null
+            } else aim = state.route[0]
+          }
+          const ax = aim.x - me.x
+          const az = aim.z - me.z
+          const ad = Math.hypot(ax, az) || 1
           const step = Math.max(0, cfg.pace) * dt
-          const wantX = me.x + (dx / d) * step
-          const wantZ = me.z + (dz / d) * step
+          const wantX = me.x + (ax / ad) * step
+          const wantZ = me.z + (az / ad) * step
           // The WALKABLE SHAPE, not a circle of its own (work-order 482): the
           // errands send a villager out onto the bank lobe, and a circular rim
           // would have frozen it at the plain radius short of the water.
@@ -1619,12 +1698,17 @@ function ErrandVillagers({
           me.x = nx
           me.z = nz
           state.walked += moved
-          yaws.current[i] = Math.atan2(dx, dz)
+          // Facing where it WALKS, which on a route is the waypoint rather than
+          // the destination behind the huts.
+          yaws.current[i] = Math.atan2(ax, az)
           // Wedged (point 155): nudge free, and if that fails give the errand up
           // rather than let a villager stand pressed against a wall for ever.
           if (moved < step * 0.25) {
             state.stuck += dt
             if (state.stuck > balance.walkerUnstuckSeconds) {
+              // A route planned from where it no longer stands is worthless.
+              state.route = null
+              state.routeTo = null
               const free = tryNudgeToFree(colliders, me.x, me.z, NPC_RADIUS)
               if (free.found) {
                 me.x = free.pos[0]
