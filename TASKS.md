@@ -3078,51 +3078,6 @@ it is appended.
   DOCS in the same commit: `scripts/verify/README.md` where the suite is described, and
   CLAUDE.md §7.2 where the Stop chain lists what `ci-status-guard` watches.
 
-- [ ] 397. AN UNNAMED AUTHOR IS NOT A FORBIDDEN ONE — THE TRAILER THAT COST A ROUND
-  (28.07.2026, observed live). Commit 652a8ba carried `Co-Authored-By: Claude
-  <noreply@anthropic.com>` — the trailer with no model name. `isPolicyBreach` in
-  `scripts/model-guard-core.mjs` tests `ALLOWED = /\b(opus|fable)\b/i` against the
-  trailer, so a trailer naming NOTHING fails exactly as a trailer naming Haiku does, and
-  the Stop hook demanded the full breach ritual: pause the batch, stop, wait for the user.
-  It was Opus 5 — every session live in that window shows `claude-opus-5` and nothing
-  else. The alarm cost a full round and a user interruption, and it will recur, because
-  nothing stops the next agent from stamping the same bare trailer.
-  THE POINT IS NOT TO SOFTEN THE GUARD. A bare trailer is not proof of compliance either,
-  and the 24.07.2026 incident — a session degraded to Haiku merging three defective
-  deliveries in 14 minutes — is what the guard exists for. What is wrong is that the guard
-  collapses two different states into one verdict.
-  THE FIX, both halves in one point:
-  (a) CLASSIFY THREE WAYS, not two. `model-guard-core.mjs` gains `classifyTrailer` →
-  `'allowed' | 'unidentified' | 'forbidden'`: a Claude trailer matching `ALLOWED` is
-  allowed, one naming a model outside it is forbidden, one carrying NO model name at all
-  is unidentified. `findForbiddenCommits` keeps returning only the forbidden ones; a new
-  `findUnidentifiedCommits` returns the rest. The Stop hook stops HARD on a forbidden hit
-  exactly as today (pause file, no batch work), and on an unidentified hit it blocks with a
-  DIFFERENT, resolvable message: name the commit, and instruct the session to resolve it
-  from the local transcripts before anything else — `~/.claude/projects/<repo-slug>/
-  *.jsonl` carries the true `message.model` per turn, so a commit's authoring model is
-  READABLE, not a matter of assumption. Resolves to an allowed model → advance the
-  baseline past it and carry on, no user interruption. Resolves to a forbidden one, or the
-  transcripts do not cover it → the forbidden path, unchanged.
-  (b) CATCH IT AT THE SOURCE. A versioned `commit-msg` hook in `scripts/git-hooks/`
-  (wired by `npm install` like `commit-scope-guard` and `pre-push-gate`) REJECTS a commit
-  whose `Co-Authored-By: Claude …` trailer carries no model name, naming the three allowed
-  spellings in its message. An unnamed trailer then cannot reach history at all, and (a)
-  stays the net under the commits already in it.
-  MECHANISM REVIEW REQUIRED: both halves change a guard and add a git hook, so
-  `scripts/mechanism-review.mjs --record` with the OTHER model's verdict is part of the
-  point (CLAUDE.md §7.2), and the hook file needs the user attended — `.git/hooks` and
-  versioned hook paths always prompt.
-  VERIFIABLE: pure Vitest on `model-guard-core.mjs` — `classifyTrailer` over the three
-  shapes incl. the real `Claude <noreply@anthropic.com>` string, a multi-trailer commit
-  (one named + one bare) classified by its worst trailer, `findForbiddenCommits` NOT
-  returning an unidentified commit, and a non-Claude co-author (a human) ignored by both.
-  A hook test drives the `commit-msg` script over a rejected and an accepted message.
-  Live: a commit attempted with the bare trailer is refused by the hook.
-  DOCS in the same commit: CLAUDE.md §6 (the model-policy paragraph states that the
-  trailer must NAME the model and that the hook enforces it) and §7.2 (the Stop-chain list
-  gains the unidentified/forbidden split).
-
 - [ ] 401. THE CONSOLE WINDOWS THAT STEAL THE USER'S FOCUS (28.07.2026, user
   report: "es poppen immer wieder Konsolenfenster auf, die mir den Fokus
   stehlen"). It is NOT unavoidable, and there are exactly two causes, both
@@ -3314,44 +3269,6 @@ it is appended.
   --guide-reviewed` is re-attested afterwards.
   NOTE: the guide currency was attested on 29.07. against the sources of that day; the
   review found this gap and could not close it, which is what this point exists for.
-
-- [ ] 425. A DELEGATED AGENT'S COMMIT NAMES NO MODEL, SO THE TRIPWIRE FIRES ON CLEAN WORK
-  (29.07.2026, hit live: five commits on the point-392 branch carried
-  `Co-Authored-By: Claude <noreply@anthropic.com>` — no model at all — and `model-guard`
-  blocked the turn end as a policy breach). The guard is right to block: the allowlist is
-  checked against the trailer, and a trailer that names nothing cannot show that an allowed
-  model wrote the code. It is exactly what a silent degradation looks like from the outside,
-  which is the failure the guard exists for (24.07.2026). But the commits were clean — the
-  session transcript and the subagent transcript both record `claude-opus-5` — so the batch
-  was paused over a MISSING WORD, and clearing it needed a research pass no unattended
-  session would have done.
-  FIX, both halves:
-  (a) PREVENT: the versioned `commit-msg` hook (`scripts/git-hooks/`) REFUSES a commit whose
-  Claude co-author trailer does not name a model from the allowlist. The remedy line prints
-  the exact trailer to use. A subagent then cannot create the ambiguous commit in the first
-  place, in the main tree or in a worktree.
-  (b) RESOLVE: `model-guard`'s block text distinguishes a NAMED forbidden model from an
-  UNNAMED one and, for the unnamed case, names where the answer actually lives — the
-  session transcript `~/.claude/projects/<project>/<session>.jsonl` and, for delegated work,
-  `…/<session>/subagents/agent-*.jsonl`, whose `message.model` fields record the serving
-  model per request. The pause stays mandatory; what changes is that the way out is stated
-  instead of rediscovered.
-  THE REMEDY HAS A TRAP OF ITS OWN, measured 30.07.2026: rewriting the trailer with
-  `git filter-branch` leaves the old commits alive under `refs/original/…`, and the guard
-  reads `git log --all`, so it stays RED on a branch that is already fixed — invisibly, because
-  every worktree shares one `.git` and nobody looks there. The remedy line therefore states the
-  cleanup (`git update-ref -d refs/original/refs/heads/<branch>`) as part of the fix, and the
-  Vitest case pins that a rewritten branch with the backup ref still present is reported with
-  that ref NAMED, rather than as a second policy breach.
-  VERIFIABLE: pure Vitest — `commit-msg` core accepts each allowed spelling (Opus 5,
-  Opus 4.8, Fable 5, with and without the `(1M context)` suffix), rejects a bare
-  `Claude <noreply@anthropic.com>`, rejects a named forbidden model, and ignores a purely
-  human co-author; `model-guard-core` classifies named-forbidden vs unnamed and the hook
-  test asserts the transcript path appears in the unnamed remedy. Plus the mechanism review
-  by the other model, since both halves are gates.
-  DOCS in the same commit: CLAUDE.md §6 (the model policy already says every commit records
-  its author model — it gains the fact that the trailer is ENFORCED at commit time) and the
-  memory entry `serving-model-watch`.
 
 - [ ] 428. THE WALKABLE GROUND MEETS THE PANORAMA AT A VISIBLE STEP (29.07.2026, found by
   the picture check of the vertical look, on BOTH backends). Standing at the settlement's
