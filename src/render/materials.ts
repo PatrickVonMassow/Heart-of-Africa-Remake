@@ -193,6 +193,11 @@ export interface SurfaceMaterialOptions {
   bump?: number
   /** Weathering: darkened base course and faint vertical run-off streaks. */
   weathered?: boolean
+  /** Draw both faces. A roof seen from BELOW must be a real surface, not a
+   *  back face one can see through (work-order 349): a thatch dome is an open
+   *  hemisphere and a cone's flank has no inner shell, so a camera under the
+   *  eaves would look straight through a front-side-only material. */
+  twoSided?: boolean
 }
 
 /**
@@ -208,6 +213,7 @@ export function createSurfaceMaterial(
   const m = new THREE.MeshStandardNodeMaterial()
   m.roughness = opts.roughness ?? 0.95
   m.metalness = 0
+  if (opts.twoSided) m.side = THREE.DoubleSide
   const tone = mx_fractal_noise_float(positionWorld.mul(0.5), 3).mul(0.5).add(0.5)
   let col = mix(color(opts.base), color(opts.alt), tone.clamp(0, 1)).mul(surfaceStructure(kind))
   if (opts.weathered) {

@@ -99,7 +99,20 @@ import {
 import { RIVER_DRIFT_SPEED } from '../../render/waterAppearance'
 import type { PlaceRiverBank } from './riverBank'
 import { clearEdgeBand, setEdgeBandBoundary, setEdgeBandLook } from '../../render/edgeBand'
-import { buildLayout, DIG_SITE_RADIUS, isOnLane, nearestActionable, PLACE_RADIUS, SPAWN_INSET, type Interactive, type PathDef, type DwellingDef, type FenceDef, type PlaceLayout } from './layout'
+import { buildLayout, DIG_SITE_RADIUS, isOnLane, nearestActionable, PLACE_RADIUS, SPAWN_INSET, VILLAGE_FIRE, type Interactive, type PathDef, type DwellingDef, type FenceDef, type PlaceLayout } from './layout'
+import {
+  COOK_SHELTER,
+  EYE_HEIGHT,
+  HUT_CONE,
+  HUT_CONE_EAVE,
+  HUT_DOME_RADIUS,
+  HUT_FINIAL_RADIUS,
+  HUT_FINIAL_Y,
+  HUT_FLAT_ROOF,
+  HUT_STILT_BASE,
+  SHED_ROOF,
+  hutWallHeight,
+} from './roofClearance'
 import { getPanoramaCapture } from '../travel/panoramaCapture'
 import {
   silhouetteScale,
@@ -119,8 +132,6 @@ import { emitFootstep } from '../../systems/ambience'
 import { easeSpeed, easeToward, advanceStepPhase, headBob, strafeRollTarget, idleSway } from '../../systems/walkFeel'
 import { PAD_LOOK_RATE, applyPitch, mousePitchDelta, padPitchDelta, placeCameraPose } from '../../systems/lookPitch'
 import { getStrings, useStrings } from '../../i18n'
-
-const EYE_HEIGHT = 1.5 // first-person camera height in meters
 
 /** Sun direction shared by the sky dome disc and the shadow light. */
 const SUN_DIR: [number, number, number] = [0.52, 0.68, 0.34]
@@ -209,7 +220,10 @@ function usePlaceMaterials(
     const plaster = createSurfaceMaterial('plaster', { base: '#e6d9b4', alt: '#c6b488', weathered: true })
     const plasterDark = createSurfaceMaterial('plaster', { base: '#d3c294', alt: '#ab9668', weathered: true })
     const mud = createSurfaceMaterial('mud', { base: style.hutWall.base, alt: style.hutWall.alt, bump: 1.3, weathered: true })
-    const thatch = createSurfaceMaterial('thatch', { base: style.hutThatch.base, alt: style.hutThatch.alt, bump: 1.5 })
+    // Two-sided: the player standing under an eave looks at the roof's INSIDE,
+    // and an open thatch dome or a cone flank has no inner shell (work-order
+    // 349) — front-side-only, the roof would vanish from underneath.
+    const thatch = createSurfaceMaterial('thatch', { base: style.hutThatch.base, alt: style.hutThatch.alt, bump: 1.5, twoSided: true })
     const wood = createSurfaceMaterial('wood', { base: '#7a5a32', alt: '#573e1f', roughness: 0.85 })
     const cloth = createNoisyMaterial({ base: '#d9cdb0', alt: '#b8ab8a', scale: 1.4, roughness: 0.9, bump: 0.7 })
     const pathOpts = pathTex
@@ -344,8 +358,12 @@ function VillageHut({
 }) {
   const facing = rot ?? Math.atan2(x, z) + Math.PI
   // Raised floor in the humid Congo basin (design.md §2 region-typical builds).
-  const base = style.stilts ? 0.55 : 0
-  const wallH = style.roof === 'dome' ? h * 0.55 : h
+  // Every roof number below comes from `roofClearance`, which the collider set
+  // reads too — reshaping a roof there moves the head-clearance stand-off with
+  // it (work-order 349).
+  const base = style.stilts ? HUT_STILT_BASE : 0
+  const wallH = hutWallHeight(style.roof, h)
+  const coneKind = style.roof === 'tallCone' || style.roof === 'cone' ? style.roof : null
   return (
     <group position={[x, 0, z]} rotation={[0, facing, 0]}>
       {style.stilts && (
@@ -374,8 +392,8 @@ function VillageHut({
       {/* Roof per region style */}
       {style.roof === 'flat' ? (
         <>
-          <mesh position={[0, base + wallH + 0.09, 0]} castShadow material={mats.thatch}>
-            <cylinderGeometry args={[r * 1.12, r * 1.12, 0.18, 12]} />
+          <mesh name="hut-roof" position={[0, base + wallH + HUT_FLAT_ROOF.thickness / 2, 0]} castShadow material={mats.thatch}>
+            <cylinderGeometry args={[r * HUT_FLAT_ROOF.radius, r * HUT_FLAT_ROOF.radius, HUT_FLAT_ROOF.thickness, 12]} />
           </mesh>
           {/* Parapet ring */}
           <mesh position={[0, base + wallH + 0.28, 0]} castShadow material={mats.mud}>
@@ -383,19 +401,21 @@ function VillageHut({
           </mesh>
         </>
       ) : style.roof === 'dome' ? (
-        <mesh position={[0, base + wallH, 0]} castShadow material={mats.thatch}>
-          <sphereGeometry args={[r * 1.18, ...TESSELLATION.hutDome, 0, Math.PI * 2, 0, Math.PI / 2]} />
+        // The hemisphere is OPEN at the bottom, so it is only a surface from
+        // below because the thatch material draws both sides (work-order 349).
+        <mesh name="hut-roof" position={[0, base + wallH, 0]} castShadow material={mats.thatch}>
+          <sphereGeometry args={[r * HUT_DOME_RADIUS, ...TESSELLATION.hutDome, 0, Math.PI * 2, 0, Math.PI / 2]} />
         </mesh>
-      ) : (
+      ) : coneKind ? (
         <>
-          <mesh position={[0, base + wallH + r * (style.roof === 'tallCone' ? 0.8 : 0.5), 0]} castShadow material={mats.thatch}>
-            <coneGeometry args={[r * 1.45, r * (style.roof === 'tallCone' ? 1.95 : 1.25), TESSELLATION.hutRoof]} />
+          <mesh name="hut-roof" position={[0, base + wallH + r * HUT_CONE[coneKind].centre, 0]} castShadow material={mats.thatch}>
+            <coneGeometry args={[r * HUT_CONE_EAVE, r * HUT_CONE[coneKind].height, TESSELLATION.hutRoof]} />
           </mesh>
-          <mesh position={[0, base + wallH + r * (style.roof === 'tallCone' ? 1.85 : 1.12), 0]} castShadow material={mats.thatch}>
-            <sphereGeometry args={[r * 0.14, 6, 5]} />
+          <mesh position={[0, base + wallH + r * HUT_FINIAL_Y[coneKind], 0]} castShadow material={mats.thatch}>
+            <sphereGeometry args={[r * HUT_FINIAL_RADIUS, 6, 5]} />
           </mesh>
         </>
-      )}
+      ) : null}
       {/* Door opening */}
       <mesh position={[0, base + wallH * 0.36, r * 0.99]}>
         <boxGeometry args={[r * 0.55, wallH * 0.72, 0.12]} />
@@ -783,8 +803,10 @@ function Shed({ d, mats }: { d: DwellingDef; mats: PlaceMaterials }) {
       <mesh position={[0, d.h / 2, 0]} castShadow receiveShadow material={mats.wood}>
         <boxGeometry args={[d.r * 2, d.h, d.r * 1.6]} />
       </mesh>
-      <mesh position={[0, d.h + 0.1, 0]} rotation={[0.16, 0, 0]} castShadow material={mats.thatch}>
-        <boxGeometry args={[d.r * 2.3, 0.12, d.r * 2]} />
+      {/* Slanted roof; its span and tilt come from `roofClearance`, which sizes
+          the shed's stand-off from exactly these numbers (work-order 349). */}
+      <mesh name="hut-roof" position={[0, d.h + SHED_ROOF.rise, 0]} rotation={[SHED_ROOF.tilt, 0, 0]} castShadow material={mats.thatch}>
+        <boxGeometry args={[d.r * SHED_ROOF.spanX * 2, SHED_ROOF.thickness, d.r * SHED_ROOF.spanZ * 2]} />
       </mesh>
       {/* Wood pile */}
       {[0, 1, 2].map((i) => (
@@ -1063,8 +1085,10 @@ function PlayerShadowProxy({ player }: { player: MutableRefObject<{ x: number; z
  * lets the fire read as sheltered from the rain rather than blazing in the open.
  */
 function CookShelter({ thatchMat }: { thatchMat?: THREE.Material }) {
-  const postR = 1.35 // corner posts a comfortable margin around the 0.9 stone ring
-  const postH = 2.4 // roof eave height, clear of a standing figure and the flame
+  // Corner posts a comfortable margin around the 0.9 stone ring, and an eave
+  // height clear of a standing figure and the flame — the same numbers the
+  // head-clearance sweep reads (work-order 349).
+  const { postR, postH } = COOK_SHELTER
   const posts: Array<[number, number]> = [
     [postR, postR],
     [postR, -postR],
@@ -1080,8 +1104,8 @@ function CookShelter({ thatchMat }: { thatchMat?: THREE.Material }) {
         </mesh>
       ))}
       {/* Low pyramidal thatch roof, eaves overhanging the posts a little. */}
-      <mesh position={[0, postH + 0.42, 0]} rotation={[0, Math.PI / 4, 0]} castShadow material={thatchMat}>
-        <coneGeometry args={[postR * 1.85, 0.95, 4]} />
+      <mesh name="hut-roof" position={[0, postH + COOK_SHELTER.capCentre, 0]} rotation={[0, Math.PI / 4, 0]} castShadow material={thatchMat}>
+        <coneGeometry args={[postR * COOK_SHELTER.capSpread, COOK_SHELTER.capHeight, 4]} />
         {thatchMat ? null : <meshStandardMaterial color="#8a7248" roughness={1} />}
       </mesh>
     </group>
@@ -2740,8 +2764,8 @@ export function PlaceScene() {
 
       {isVillage && (
         <FirePit
-          x={-3.5}
-          z={2.5}
+          x={VILLAGE_FIRE[0]}
+          z={VILLAGE_FIRE[1]}
           blaze={fireBlaze}
           rainRef={placeWetness}
           thatchMat={mats.thatch}

@@ -3210,6 +3210,228 @@ for (const [placeId, shot] of [
   }
 }
 
+// --- Head clearance under the eaves (design.md §2.6, work-order 349) ----------
+// The reported Zulu-village shot: standing under a hut's overhanging roof, the
+// near plane cut into the thatch — its underside filled the frame with a hard
+// horizontal edge and open sky above it. The pure sweep
+// (src/scenes/place/roofClearance.test.ts) proves the arithmetic over every
+// place, building type and seed; this asks the RENDERED scene, after a real
+// walk driven by the game's own collision resolver: what does the frame draw
+// over the player's head, and is the roof a surface when seen from below?
+{
+  // Keep in sync with ROOF_HEADROOM in src/scenes/place/roofClearance.ts.
+  const ROOF_HEADROOM = 1.85
+
+  const enterFor = async (id) => {
+    await page.evaluate((want) => {
+      const g = window.__game.getState()
+      if (g.placeId) g.leavePlace()
+      g.enterPlace(want)
+    }, id)
+    await page.waitForFunction((want) => window.__game.getState().placeId === want && !!window.__placeLayout, id, {
+      timeout: 30000,
+    })
+    await waitForSceneBuilt(page).catch(() => {})
+  }
+
+  /** Stand the player on an open bearing around `target` and aim him at it. */
+  const standOff = (target, startR) =>
+    page.evaluate(
+      ([t, start]) => {
+        const reach = (c) => {
+          if (c.kind === 'box') return Math.hypot(c.hx, c.hz)
+          if (c.kind === 'segment') return c.r + Math.hypot(c.x2 - c.x1, c.z2 - c.z1) / 2
+          return c.r
+        }
+        const others = (window.__placeColliders ?? []).filter(
+          (c) => c.kind === 'segment' || Math.hypot((c.x ?? 0) - t.x, (c.z ?? 0) - t.z) > 0.05,
+        )
+        const busy = (x, z) =>
+          others.some((c) => {
+            const cx = c.kind === 'segment' ? (c.x1 + c.x2) / 2 : c.x
+            const cz = c.kind === 'segment' ? (c.z1 + c.z2) / 2 : c.z
+            return Math.hypot(x - cx, z - cz) < reach(c) + 0.9
+          })
+        const radius = window.__placeLayout?.radius ?? 28
+        for (let i = 0; i < 48; i++) {
+          const b = (i / 48) * Math.PI * 2
+          let clear = true
+          for (let d = start; d >= 1.2 && clear; d -= 0.4) {
+            const x = t.x + Math.cos(b) * d
+            const z = t.z + Math.sin(b) * d
+            if (Math.hypot(x, z) > radius - 1.5 || busy(x, z)) clear = false
+          }
+          if (!clear) continue
+          const p = window.__placePlayer
+          p.x = t.x + Math.cos(b) * start
+          p.z = t.z + Math.sin(b) * start
+          p.pitch = 0
+          p.yaw = Math.atan2(-(t.x - p.x), -(t.z - p.z))
+          return b
+        }
+        return null
+      },
+      [target, startR],
+    )
+
+  /** Hold forward until the walk stops closing on the target — the collider has
+   *  been reached. Every step waits for DRAWN frames, never for wall-clock time. */
+  const walkUntilStalled = async (target, maxMs = 20000) => {
+    const step = () =>
+      page.evaluate(
+        (t) =>
+          new Promise((r) =>
+            requestAnimationFrame(() =>
+              requestAnimationFrame(() => {
+                window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW' }))
+                const p = window.__placePlayer
+                r(Math.hypot(p.x - t.x, p.z - t.z))
+              }),
+            ),
+          ),
+        target,
+      )
+    const t0 = Date.now()
+    let last = await step()
+    let stalled = 0
+    while (Date.now() - t0 < maxMs) {
+      const now = await step()
+      stalled = last - now < 0.02 ? stalled + 1 : 0
+      last = now
+      if (stalled >= 3) break
+    }
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyW' })))
+    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(null)))))
+    return last
+  }
+
+  /** What the frame really draws straight above and straight below the eye. */
+  const probeOverhead = () =>
+    page.evaluate(() => {
+      const cam = window.__placeCamera
+      const p = window.__placePlayer
+      const y = cam.position.y
+      const up = window.__placeRayHit(cam.position.x, y + 6, cam.position.z)
+      const down = window.__placeRayHit(cam.position.x, y - 4, cam.position.z)
+      return {
+        x: p.x,
+        z: p.z,
+        camY: y,
+        roofY: up.hitDistance == null ? null : y + up.hitDistance,
+        roofName: up.hitName,
+        drop: down.hitDistance,
+        below: down.hitName,
+      }
+    })
+
+  const eavesCase = async (placeId, label, pick, startR) => {
+    await enterFor(placeId)
+    const target = await page.evaluate(pick)
+    if (!target) {
+      check(`${label}: a building to walk up to`, false, 'none found in the layout')
+      return null
+    }
+    const bearing = await standOff(target, startR)
+    if (bearing == null) {
+      check(`${label}: an open approach to walk in on`, false, JSON.stringify(target))
+      return null
+    }
+    await walkUntilStalled(target)
+    const probe = await probeOverhead()
+    // The near plane never gets INSIDE the roof: the first surface under the eye
+    // is the ground he stands on, never thatch he has climbed into.
+    check(
+      `${label}: nothing hangs under the eye at the eaves`,
+      probe.below !== 'hut-roof' && probe.drop != null && probe.drop >= probe.camY - 0.5,
+      `${probe.drop == null ? 'nothing' : probe.drop.toFixed(2) + ' m'} down to ${probe.below} from ${probe.camY.toFixed(2)} m`,
+    )
+    // And whatever DOES hang over him clears the eye, the near plane and a margin.
+    check(
+      `${label}: the roof over him clears the head`,
+      probe.roofY == null || probe.roofY >= ROOF_HEADROOM,
+      `${probe.roofY == null ? 'open sky' : probe.roofY.toFixed(2) + ' m of ' + probe.roofName} over an eye at ${probe.camY.toFixed(2)} m`,
+    )
+    return { target, probe }
+  }
+
+  // The reported case: a Zulu rondavel, whose wide cone sits on a low wall.
+  const villageEaves = await eavesCase(
+    'zulu-village',
+    'zulu village hut',
+    () => {
+      const hut = (window.__placeLayout?.dwellings ?? []).find((d) => d.kind === 'hut')
+      return hut ? { x: hut.x, z: hut.z, h: hut.h } : null
+    },
+    6,
+  )
+  if (villageEaves) {
+    await page.evaluate(() => {
+      window.__placePlayer.pitch = 0.35 // look up into the eaves
+    })
+    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(null)))))
+    await frame('349-eaves-village', {
+      local: { x: villageEaves.target.x, z: villageEaves.target.z, y: villageEaves.target.h },
+      label: 'the hut eaves from underneath',
+    })
+  }
+
+  // The same in a port: the trade house with its awning over the door.
+  const portEaves = await eavesCase(
+    'cairo',
+    'cairo trade house',
+    () => {
+      const it = (window.__placeLayout?.interactives ?? []).find((i) => i.type !== 'villager')
+      return it ? { x: it.pos[0], z: it.pos[1], h: 3.2 } : null
+    },
+    8,
+  )
+  if (portEaves) {
+    await page.evaluate(() => {
+      window.__placePlayer.pitch = 0.35
+    })
+    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(null)))))
+    await frame('349-eaves-port', {
+      local: { x: portEaves.target.x, z: portEaves.target.z, y: portEaves.target.h },
+      label: 'the trade house eaves from underneath',
+    })
+  }
+
+  // The eaves were NOT fenced off: the cook-shelter over the village fire is a
+  // roof one may still stand under — and from under it, it must be a SURFACE.
+  await enterFor('zulu-village')
+  const fire = { x: -3.5, z: 2.5 } // VILLAGE_FIRE in src/scenes/place/layout.ts
+  const stoodAtFire = await standOff(fire, 5)
+  if (stoodAtFire == null) {
+    check('cook shelter: an open approach to the fire', false, 'no clear bearing')
+  } else {
+    await walkUntilStalled(fire)
+    const probe = await probeOverhead()
+    check(
+      'the cook-shelter roof is still standable AND reads as a surface from below',
+      probe.roofName === 'hut-roof' && probe.roofY != null && probe.roofY >= ROOF_HEADROOM,
+      `${probe.roofY == null ? 'open sky' : probe.roofY.toFixed(2) + ' m of ' + probe.roofName} over the fire`,
+    )
+  }
+
+  // A roof seen from below must be a real surface, not a back face one can see
+  // through: the open thatch dome has no inner shell of its own.
+  const thatchSides = await page.evaluate(() => {
+    let total = 0
+    let solid = 0
+    window.__placeScene?.traverse((o) => {
+      if (o.name !== 'hut-roof' || !o.material) return
+      total++
+      if (o.material.side === 2) solid++ // THREE.DoubleSide
+    })
+    return { total, solid }
+  })
+  check(
+    'every thatch roof draws both faces (no see-through roof from underneath)',
+    thatchSides.total > 0 && thatchSides.solid === thatchSides.total,
+    `${thatchSides.solid}/${thatchSides.total} roof meshes double-sided`,
+  )
+}
+
 console.log('console errors:', errors.length)
 for (const e of errors) console.log('ERR:', e.slice(0, 300))
 await browser.close()
