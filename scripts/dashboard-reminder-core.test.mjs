@@ -14,13 +14,18 @@ import { fileURLToPath } from 'node:url'
 import {
   CONTRACT_MEMORY,
   ENFORCED_CLAIMS,
+  PROMPT_CHAR_BUDGET,
+  PROMPT_ENFORCED_CLAIMS,
   REMINDER_CHAR_BUDGET,
   REMINDER_COMMANDS,
   UNENFORCEABLE_DUTIES,
   boardReminderText,
+  promptInjectionText,
 } from './dashboard-reminder-core.mjs'
 import { REQUIRED_SECTIONS, structureViolations } from './board-structure-core.mjs'
-import { auditDashboard } from './dashboard-guard-core.mjs'
+import { auditDashboard, evaluate as dashboardEvaluate } from './dashboard-guard-core.mjs'
+import { berlinStamp, evaluate as timestampEvaluate } from './timestamp-guard-core.mjs'
+import { green } from './dashboard-guard-fixtures.mjs'
 
 const SCRIPTS = dirname(fileURLToPath(import.meta.url))
 
@@ -70,7 +75,58 @@ describe('the injected board reminder (point 436)', () => {
 
   it('is what the hook actually injects — no second copy of the prose', () => {
     const hook = readFileSync(join(SCRIPTS, 'dashboard-reminder-hook.mjs'), 'utf8')
-    expect(hook).toContain('console.log(boardReminderText(mtimeNote))')
+    expect(hook).toContain('process.stdout.write(promptInjectionText(mtimeNote))')
     expect(hook).not.toContain('[dashboard-reminder] PFLICHT')
+  })
+})
+
+describe('the WHOLE per-prompt injection (point 440)', () => {
+  it('restates no rule a gate already enforces', () => {
+    const text = promptInjectionText()
+    for (const claim of PROMPT_ENFORCED_CLAIMS) {
+      expect(claim.pattern.test(text), `${claim.id} is enforced by ${claim.by} — do not restate it`).toBe(false)
+    }
+  })
+
+  it('the timestamp gate really blocks, and hands the exact line', () => {
+    // The two timestamp blocks were deleted on the strength of THIS behaviour:
+    // if the guard ever stopped blocking, or stopped handing the line over, the
+    // prompt would have to say it again.
+    const now = new Date('2026-08-06T19:00:00Z')
+    const verdict = timestampEvaluate({ lastText: 'Hier ist das Ergebnis.', now })
+    expect(verdict.decision).toBe('block')
+    expect(verdict.reason).toContain(`**${berlinStamp(now)}**`)
+    // …and it is the LONG form, the one the deleted blocks got wrong.
+    expect(berlinStamp(now)).toMatch(/^[A-Za-zÄÖÜäöüß]+, \d{2}\.\d{2}\.\d{4}, \d{2}:\d{2}$/)
+  })
+
+  it('the focus gate really blocks, and its own text carries the remedy', () => {
+    const verdict = dashboardEvaluate(green({ pending: { sessionId: 'sess-a', at: 1500 } }))
+    expect(verdict.decision).toBe('block')
+    expect(verdict.reason).toMatch(/RECONCILE REQUIRED/)
+    for (const cmd of ['node scripts/focus.mjs confirm', 'node scripts/focus.mjs set', '--synced']) {
+      expect(verdict.reason, cmd).toContain(cmd)
+    }
+  })
+
+  it('holds the whole injection to its measured budget', () => {
+    // MEASURED before the cut: 1771 characters per prompt (139 timestamp line +
+    // 843 board obligation + 427 focus block + 358 banner + newlines).
+    expect(promptInjectionText().length).toBeLessThanOrEqual(PROMPT_CHAR_BUDGET)
+    expect(promptInjectionText(' Letzte Dashboard-Dateiänderung vor ~4 min.')).toContain('vor ~4 min.')
+    expect(PROMPT_CHAR_BUDGET).toBeLessThan(1771)
+  })
+
+  it('still carries the board obligation — the cut removed restatement, not duty', () => {
+    for (const duty of UNENFORCEABLE_DUTIES) expect(promptInjectionText(), duty).toContain(duty)
+    for (const cmd of REMINDER_COMMANDS) expect(promptInjectionText(), cmd).toContain(cmd)
+  })
+
+  it('the hook no longer builds a timestamp of its own', () => {
+    const hook = readFileSync(join(SCRIPTS, 'dashboard-reminder-hook.mjs'), 'utf8')
+    // A short-form stamp is the exact thing TIMESTAMP_RE rejects.
+    expect(hook).not.toContain('dateStyle')
+    expect(hook).not.toContain('[timestamp] PFLICHT')
+    expect(hook).not.toContain('[focus-guard]')
   })
 })

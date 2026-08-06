@@ -25,6 +25,28 @@
 import { CLAIM_BY } from './chat-watcher-core.mjs'
 import { CLAIM_MAX_AGE_MS } from './batch-claim-core.mjs'
 
+/**
+ * How the SessionStart text opens: how much is open, and the one point the
+ * session will actually carry (point 440).
+ *
+ * IT USED TO ENUMERATE EVERY OPEN NUMBER — 118 of them, 588 measured characters
+ * of the hook's 4035, injected at every session start. Since the point boundary
+ * (27.07.2026) a session carries ONE stretch of work and ends, so 117 of those
+ * numbers were never acted on; and a bare number tells nothing anyway — the
+ * spec behind it comes from `point-brief.mjs`, which is the pointer this hands
+ * over instead. The board's Warteschlange, which DOES have to list them all,
+ * builds its own list from the work order (`board-queue.mjs import`).
+ */
+export function openPointsHeadline(openNumbers = []) {
+  const nums = (openNumbers ?? []).map(Number).filter(Number.isFinite)
+  const head = nums[0]
+  return (
+    `[batch-resume] TASKS.md has ${nums.length} open point(s); the first in work-order ` +
+    `order is ${head ?? 'none'}` +
+    (head === undefined ? '. ' : ` (node scripts/point-brief.mjs ${head} for its spec; TASKS.md for the rest). `)
+  )
+}
+
 export const STAND_DOWN_KINDS = Object.freeze({
   /** THIS session is the responder the watcher woke for a chat message. */
   RESPONDER: 'responder',
