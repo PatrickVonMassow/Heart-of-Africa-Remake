@@ -811,6 +811,14 @@ Die Lehre bekam ihre Probe noch am selben Abend — und die gebaute Lösung fiel
 
 **Lehre:** Wer außen von innen trennen will, darf nicht nach der **Zuständigkeit** eines Namens fragen, sondern muss fragen, ob überhaupt **etwas Eigenes ausgeführt** wurde. Eine Namensliste ist eine Vermutung über die Welt und veraltet mit ihr; „kein eigener Schritt ist gelaufen" ist eine Beobachtung und gilt in jedem Ausfall, den man noch nicht kennt. Dieselbe Verwechslung von Stellvertreter und Sache trägt schon §3.85 (Anwesenheit statt Lesbarkeit) und die Zoom-Radius-Lehre in §7.2 — es ist die häufigste Bauart eines grünen Hakens über einem echten Fehler.
 
+### 3.87 Der Alarm, der auf ein Ereignis wartet, das ausbleibt
+
+Am selben Abend vertiefte sich der Ausfall (06.08.2026, 21:05). Bis dahin waren Läufe wenigstens entstanden und nach fünfzehn Minuten ohne zugeteilte Maschine gestorben — danach entstand gar kein Lauf mehr: Zwei Pushes auf den Hauptzweig lösten weder Prüfung noch Auslieferung aus, und die Lauf-Liste stand still. Jede Wache des Projekts hing an diesem Punkt in der Luft, denn **jede von ihnen wartete auf ein rotes Ergebnis**. Ein Ereignis, das nicht eintritt, löst nichts aus; die veröffentlichte Seite alterte vollkommen lautlos weiter, während der Nutzer genau an ihr jede Bildänderung beurteilt.
+
+**Lehre:** Ein Alarm auf ein **Ereignis** ist blind, sobald die Quelle des Ereignisses selbst ausfällt — und das ist kein Randfall, sondern gerade der Fall, in dem er gebraucht wird. Überwacht wird deshalb der **Zustand**: nicht „ist ein Lauf rot geworden?", sondern „stimmt der ausgelieferte Stand noch mit dem Hauptzweig überein?". Der Zustandsvergleich sagt auch dann etwas, wenn nie ein Lauf existierte, und er nennt genau den Schaden, der zählt. Das ist dieselbe Bewegung wie in §3.86, eine Ebene höher: weg vom Stellvertreter, hin zur Sache.
+
+Denselben Abend lieferte ein zweiter, ganz anders gelagerter Fall dieselbe Klasse. Ein Befehl, der die Warteschlangen-Karten des Boards aus der Arbeitsordnung „nachzieht", schrieb dabei jede Karte neu — und zog die von Hand gesetzten Absätze von 46 Karten zu je einem Block zusammen. Der Inhalt überlebte, die Lesbarkeit auf dem Telefon nicht, und weil die Datei nicht versioniert ist, war die Struktur nur noch in der zuletzt veröffentlichten Seite zu finden. **Lehre:** Ein Abgleich, der aus einer Quelle schreibt, darf nur ergänzen, was er selbst erzeugen kann. Was flussabwärts reicher ist als die Quelle — kuratierte Prosa, Gliederung, Reihenfolge —, ist kein Beiwerk, das ein Neuaufbau nebenbei ersetzt, sondern der eigentliche Wert; ein „sync", der es überschreibt, ist ein Datenverlust mit freundlichem Namen.
+
 ---
 
 ## 4. Die Guards als Immunsystem
@@ -900,7 +908,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Donnerstag, 06.08.2026, 18:35 · Quellen-Fingerprint: `f59cd8fb58f8…`
+Zuletzt aktualisiert: Donnerstag, 06.08.2026, 21:45 · Quellen-Fingerprint: `243d5b15bb7b…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -980,8 +988,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 72 Feedback-/Projekt-Memories · 43 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 32 Prozess-/Meta-TASKS-Punkte (davon 15 offen).
+Erfasste Quellen: 72 Feedback-/Projekt-Memories · 43 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 33 Prozess-/Meta-TASKS-Punkte (davon 16 offen).
 
-<!-- RETRO-FINGERPRINT: f59cd8fb58f8832c715ecc642ded3df658440d3d209dc1c1d864571d73819948 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-06T16:35:00.092Z -->
+<!-- RETRO-FINGERPRINT: 243d5b15bb7be3305145d6e69ac14afa1ac14cf6ba9d13f839be90ba51097c7b -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-06T19:45:54.198Z -->
 <!-- AUTO-GENERATED:END -->

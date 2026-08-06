@@ -39,8 +39,13 @@
 // document stood one line under the old ceiling and that slack was absorbed). Two further
 // lessons of that morning were deliberately NOT added here: they are the long-form half and
 // live in the retrospective.
+// Raised again on 06.08.2026 by ONE genuinely new tip — an alarm keyed on an EVENT is blind
+// exactly when the event's own source fails, so what is watched is the STATE (does the served
+// thing still match the source?), plus the same lesson's second half, that a sync writing from
+// a source may only ADD and never overwrite what is richer downstream (+8 lines, +44 words,
+// measured as the audit counts them, and net of two entries tightened to pay part of it).
 export const LIMITS = {
-  maxLines: 409,
+  maxLines: 417,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
@@ -48,7 +53,7 @@ export const LIMITS = {
   // the unearned loosening the rule forbids. So any net growth blocks, and the
   // block message names the honest way out: cut the long telling over into the
   // retrospective, which is where it belongs anyway.
-  maxWords: 3503,
+  maxWords: 3547,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,

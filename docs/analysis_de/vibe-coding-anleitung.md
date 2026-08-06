@@ -320,12 +320,18 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   **mehr**? Nur weniger darf verschluckt werden."
 
 - **Der Umzug nimmt nur mit, was versioniert ist.** Das Projekt kommt an, die Mechanik
-  drumherum nicht: geplante Aufgaben, Geheimnisse, Werkzeuge — und die **Scharfstellung** der
-  Wächter selbst, etwa ein Dateirecht, das der alte Rechner nicht brauchte. Ein stummer
-  Wächter ist schlimmer als keiner: die Regel gilt als durchgesetzt.
+  drumherum nicht: Aufgaben, Geheimnisse, Werkzeuge — und die **Scharfstellung** der Wächter.
+  Ein stummer Wächter ist schlimmer als keiner: die Regel gilt als durchgesetzt.
   → *Prompt:* „Führe eine Liste dessen, was das Projekt braucht und **nicht** im Repository
-  liegt, und prüfe sie bei jedem Start gegen eine **Beobachtung**. Was einen Mechanismus
-  scharf macht, gehört mitversioniert und mitgeprüft. Ein fehlendes Stück ist ein **Befund**, keine Stille."
+  liegt, und prüfe sie bei jedem Start gegen eine **Beobachtung**. Ein fehlendes Stück ist ein
+  **Befund**, keine Stille."
+
+- **Ein Alarm auf ein Ereignis ist blind, wenn das Ereignis ausbleibt.** Fällt die Quelle
+  selbst aus, meldet niemand etwas — und genau dann bräuchtest du ihn.
+  → *Prompt:* „Überwache den **Zustand** statt des Ereignisses: nicht ‚ist etwas rot
+  geworden?', sondern ‚stimmt das Ausgelieferte noch mit der Quelle überein?'. Und ein
+  Abgleich, der aus einer Quelle schreibt, **ergänzt** nur — was flussabwärts reicher ist,
+  überschreibt er nie."
 
 - **Eine Priorität, die nur in Prosa steht, wirkt nicht.** Sie landet getreu in der Aufgabenliste
   — aber die Reihenfolge, aus der gearbeitet wird, steht woanders, und die Nachfolge-Sitzung
@@ -399,4 +405,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 Wenn du diese eine Nachricht an den Anfang stellst, hast du 80 % der Lehren dieses
 Projekts eingebaut, bevor die erste Zeile Code entsteht.
 
-<!-- GUIDE-FINGERPRINT: f59cd8fb58f8832c715ecc642ded3df658440d3d209dc1c1d864571d73819948 -->
+<!-- GUIDE-FINGERPRINT: 243d5b15bb7be3305145d6e69ac14afa1ac14cf6ba9d13f839be90ba51097c7b -->
