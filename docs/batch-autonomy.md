@@ -2050,6 +2050,73 @@ Two rules follow, and neither of them loosens a guard:
    reads the live Stop chain out of `.claude/settings.json` and fails on any
    guard whose message asks for the answer a second time.
 
+## The site that quietly serves yesterday (06.08.2026, point 528)
+
+Every alarm this project had fires on a RED RUN. None fired on the page the user
+actually judges the work against, and on 06.08.2026 that was the whole fault:
+`main` stood at ee125053 while the site served c728c816 for hours. The evening
+then made the gap worse than "a run went red" — by 21:13 Berlin two pushes to
+`main` created **no workflow run at all**. A detector that waits for a red run
+sees literally nothing in that state while the served build ages in silence.
+
+So the check is an OBSERVATION, not a proxy. The build stamps its revision into
+`build-info.json` at the site root (`scripts/build-info.mjs`, emitted by a Vite
+plugin — `VITE_BUILD_COMMIT` is baked into a content-hashed chunk and unreadable
+from outside a browser). `scripts/deploy-staleness.mjs` fetches that file every
+launcher tick and compares it with `main`; run outcomes only ever soften the
+verdict, they never make it.
+
+| what is seen | verdict |
+| --- | --- |
+| the marker names `main` — or a commit that CONTAINS `main` (our clone is behind) | current |
+| a deploy for `main` is in flight, or `main` is younger than 25 min | pending |
+| the marker names an older commit, or the site is up with NO marker at all | **stale** |
+| no answer, an unreadable marker, no local `main` | unknown — never an alarm |
+
+A stale verdict NAMES BOTH REVISIONS in its alert and re-dispatches the deploy
+once GitHub is answering again (an empty run list from a healthy API is such an
+answer): once per 30-minute cooldown, three times per commit. After that it stops
+dispatching and starts insisting — the alert repeats hourly at `high`, so the
+escalation ladder climbs to a paused batch rather than a fourth pointless run.
+Decision logic is pure and Vitest-covered in `scripts/deploy-staleness-core.mjs`;
+the wrapper runs as its own process for the reason `board-watchdog.mjs` does (a
+`fetch` inside the launcher aborts it at any of its exits).
+
+### The deploy job's own timeout, settled by measurement
+
+`timeout-minutes: 25` on the `deploy` job did NOT contribute to the 06.08.
+cancellation. That job ended `cancelled` 15 m 31 s after it was created with ZERO
+steps recorded, and `timeout-minutes` only starts counting once a job runs. The
+decisive counter-evidence is the `build` job, which carries no timeout of ours at
+all: in runs 31123203073, 31120476738 and 31125129661 it died in exactly the same
+shape after 15 m 01 s, 15 m 01 s and 15 m 02 s, annotated *"The job was not
+acquired by Runner of type hosted even after multiple attempts"*. That is
+GitHub's runner-acquisition limit. The value is kept and justified in the
+workflow: healthy deploy jobs take 9-16 s, the slowest that ever succeeded took
+10 m 11 s, and the steps bound the job at ~11 min structurally.
+
+### The two reviewer residuals, closed
+
+**A workflow byte-identical to its last green run can still be broken from
+outside** — a retired `runs-on` image, a yanked action tag — and that dies in the
+same shape the "untouched" proof excuses, though only a push fixes it. The two
+are indistinguishable in one run, but not over TIME: an outage passes, a retired
+dependency does not. The waiver therefore expires after six hours
+(`waiverCredibility`, `OUTAGE_WAIVER_MAX_MS`). What expires with it is the
+SILENCE, not the stand-down: the red still does not block the turn end — an
+unclearable block cost ~30 turns of looping once — but the alert stops reading
+"nothing to do" and names the dependency reading and the push that would fix it.
+The clock is per workflow in `.claude/ci-status-guard-state.json` and is
+forgotten as soon as that workflow stops dying this way.
+
+**`fetchJobs` walked only the first 30 jobs of a run.** The classifier's central
+rule is "EVERY failed job ran nothing of ours" — a rule a truncated list can
+satisfy while a failed job one page on ran our code, which would WAIVE a red that
+is genuinely ours. Pages are now walked to the run's own `total_count` (bounded),
+and a list that cannot be PROVEN complete is handed over as `null`, which sends
+the classifier back to its blocking reading. `jobsComplete` deliberately treats a
+missing count as "cannot prove", not as zero.
+
 ## Render-verify (both backends — enforced, not reminded)
 
 Every GUI/rendering/shader fix must be verified on BOTH renderer backends —
