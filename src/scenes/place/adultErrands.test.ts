@@ -31,6 +31,8 @@ import {
 import { CHILD_CONCEPTS } from './childSituations'
 import { MIRROR_PAIRS, utteranceOf, type ConceptId } from '../../communication/lexicon'
 import { mulberry32 } from '../../world/noise'
+import { buildLayout } from './layout'
+import { ROCK_VILLAGE_ID } from '../../world/communicationRock'
 
 const CFG: AdultErrandConfig = {
   intervalSeconds: 6,
@@ -57,8 +59,8 @@ function fullGeography(overrides: Partial<ErrandGeography> = {}): ErrandGeograph
   }
 }
 
-/** What a village looks like TODAY, before point 482 lands the bank: a teaching
- *  stone and ground work, and no river the player can walk to. */
+/** A village with no river the player can walk to: a teaching stone and ground
+ *  work, and nothing else. Most of the roster looks like this. */
 function bankLessGeography(): ErrandGeography {
   return fullGeography({ bank: null, upstream: null, downstream: null })
 }
@@ -246,6 +248,61 @@ describe('the two directions are taught as mirrors', () => {
     expect(state.staged.sendDownTheBank).toBeGreaterThanOrEqual(1)
     expect(state.staged.haulUpTheBank).toBeGreaterThanOrEqual(1)
     expect(state.staged.haulDownTheBank).toBeGreaterThanOrEqual(1)
+  })
+})
+
+describe('the PoC village’s OWN geography (work-order 482)', () => {
+  // Not a fixture: the very object PlaceLife hands the scheduler, built from the
+  // layout the scene draws. What the errands are about and what the player sees
+  // are then the same thing by construction.
+  const layout = buildLayout(ROCK_VILLAGE_ID, 4711)
+  const geography: ErrandGeography = {
+    bank: layout.bank ? { x: layout.bank.bank.x, z: layout.bank.bank.z } : null,
+    upstream: layout.bank ? { x: layout.bank.upstream.x, z: layout.bank.upstream.z } : null,
+    downstream: layout.bank ? { x: layout.bank.downstream.x, z: layout.bank.downstream.z } : null,
+    stone: layout.teachingStone ? { x: layout.teachingStone.x, z: layout.teachingStone.z } : null,
+    digSites: layout.digSites,
+  }
+
+  it('carries every place the five concepts are taught at', () => {
+    expect(geography.bank).not.toBeNull()
+    expect(geography.upstream).not.toBeNull()
+    expect(geography.downstream).not.toBeNull()
+    expect(geography.stone).not.toBeNull()
+    expect(geography.digSites.length).toBeGreaterThanOrEqual(2)
+  })
+
+  it('keeps the three river places far enough apart to be TOLD APART', () => {
+    // `placeOf` decides which place a villager is standing at by AT_PLACE_RADIUS.
+    // If two of them overlapped, a walk up the bank would also read as a walk to
+    // the bank and the direction could not be learned from the picture.
+    const named = [geography.bank!, geography.upstream!, geography.downstream!, geography.stone!]
+    for (let i = 0; i < named.length; i++) {
+      for (let j = i + 1; j < named.length; j++) {
+        expect(Math.hypot(named[i].x - named[j].x, named[i].z - named[j].z)).toBeGreaterThan(
+          AT_PLACE_RADIUS * 2,
+        )
+      }
+    }
+  })
+
+  it('goes LIVE: every errand in the catalogue is staged, the river ones included', () => {
+    const { state } = simulate(3000, geography)
+    for (const situation of ERRAND_SITUATIONS) {
+      expect(state.staged[situation.id], situation.id).toBeGreaterThanOrEqual(1)
+    }
+  })
+
+  it('teaches the two directions as a mirrored pair on the real bank', () => {
+    const { walkTargets } = simulate(3000, geography)
+    const up = walkTargets.find((w) => w.said.id === 'sendUpTheBank')
+    const down = walkTargets.find((w) => w.said.id === 'sendDownTheBank')
+    expect(up).toBeDefined()
+    expect(down).toBeDefined()
+    const bank = layout.bank!
+    const along = (x: number, z: number) => x * bank.fx + z * bank.fz
+    // The same situation walked the other way along the same water.
+    expect(along(up!.x, up!.z)).toBeLessThan(along(down!.x, down!.z))
   })
 })
 

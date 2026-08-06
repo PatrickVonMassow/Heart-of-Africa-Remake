@@ -45,6 +45,8 @@ import { useGame } from '../../state/store'
 import { START_YEAR, balance } from '../../config/balance'
 import type { RegionPlaceStyle } from './regionStyles'
 import { nudgeToFree, resolveMove, standingClear, tryNudgeToFree, WALKER_RADIUS, type Collider } from './collision'
+import { insidePlace } from './boundary'
+import type { PlaceRiverBank } from './riverBank'
 import { createTagGame, stepTagGame, type TagChild, type TagWorld } from './tagGame'
 import {
   childSteer,
@@ -1484,6 +1486,7 @@ function ErrandVillagers({
   cloth,
   colliders,
   radius,
+  bank,
   geography,
   count,
 }: {
@@ -1491,6 +1494,9 @@ function ErrandVillagers({
   cloth: string[]
   colliders: Collider[]
   radius: number
+  /** The settlement's river bank (work-order 482) — part of the walkable shape
+   *  these villagers keep to, since the errands send them out onto it. */
+  bank: PlaceRiverBank | null
   geography: ErrandGeography
   count: number
 }) {
@@ -1602,7 +1608,10 @@ function ErrandVillagers({
           const step = Math.max(0, cfg.pace) * dt
           const wantX = me.x + (dx / d) * step
           const wantZ = me.z + (dz / d) * step
-          const inside = Math.hypot(wantX, wantZ) <= rim
+          // The WALKABLE SHAPE, not a circle of its own (work-order 482): the
+          // errands send a villager out onto the bank lobe, and a circular rim
+          // would have frozen it at the plain radius short of the water.
+          const inside = insidePlace({ radius, bank }, wantX, wantZ, NPC_RADIUS * 2)
           const [nx, nz] = inside
             ? resolveMove(colliders, wantX, wantZ, NPC_RADIUS, [me.x, me.z])
             : [me.x, me.z]
@@ -1807,6 +1816,7 @@ export function PlaceLife({
   errands,
   teachingStone,
   digSites,
+  bank,
   pen,
   colliders,
   radius,
@@ -1824,6 +1834,9 @@ export function PlaceLife({
   /** The teaching stone and the ground work the adults teach at (point 483). */
   teachingStone: { x: number; z: number } | null
   digSites: DigSite[]
+  /** The walkable river bank, where the settlement stands on a river
+   *  (work-order 482): what the RIVER/UPSTREAM/DOWNSTREAM errands are about. */
+  bank: PlaceRiverBank | null
   pen: PenDef | null
   colliders: Collider[]
   /** The settlement's walkable radius — the children's play area (point 480). */
@@ -1862,22 +1875,21 @@ export function PlaceLife({
   // it scales with, and never below one.
   const kidCount = Math.max(1, Math.round(balance.villageLife.tag.childCount * presence))
 
-  // The places the adults' errands are about (point 483). The stone and the
-  // ground work are the layout's own, so a villager is sent to exactly what the
-  // scene draws.
-  // OPEN (work-order 482): the walkable river bank and its two stretches do not
-  // exist in any settlement yet — that point owns them. Until it lands, this
-  // village stages the errands it CAN show (the stone and the digging) and stays
-  // silent about the river rather than pointing at water that is not there.
+  // The places the adults' errands are about (point 483). Every one of them is
+  // the layout's own — the bank and its two stretches as much as the stone and
+  // the ground work — so a villager is sent to exactly what the scene draws. A
+  // settlement with no river simply carries no bank, and the scheduler then
+  // stages only the errands it CAN show rather than pointing at water that is
+  // not there.
   const errandGeography = useMemo<ErrandGeography>(
     () => ({
-      bank: null,
-      upstream: null,
-      downstream: null,
+      bank: bank ? { x: bank.bank.x, z: bank.bank.z } : null,
+      upstream: bank ? { x: bank.upstream.x, z: bank.upstream.z } : null,
+      downstream: bank ? { x: bank.downstream.x, z: bank.downstream.z } : null,
       stone: teachingStone ? { x: teachingStone.x, z: teachingStone.z } : null,
       digSites,
     }),
-    [teachingStone, digSites],
+    [bank, teachingStone, digSites],
   )
 
   // WHERE they play (point 481.4): out on the bearing furthest from every adult
@@ -1929,6 +1941,7 @@ export function PlaceLife({
           cloth={style.cloth}
           colliders={colliders}
           radius={radius}
+          bank={bank}
           geography={errandGeography}
           count={Math.max(1, Math.round(balance.villageLife.adultErrands.villagerCount * presence))}
         />
