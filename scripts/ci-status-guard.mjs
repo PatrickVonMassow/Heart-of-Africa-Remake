@@ -20,7 +20,7 @@ import { execFileSync } from 'node:child_process'
 import { request } from 'node:https'
 import { fileURLToPath } from 'node:url'
 import { readJson, writeJsonAtomic } from './dashboard-state.mjs'
-import { classifyRuns, shouldBlock, shouldNotify, blockReason } from './ci-status-guard-core.mjs'
+import { classifyRuns, failedRuns, shouldBlock, shouldNotify, blockReason } from './ci-status-guard-core.mjs'
 import { classifyFailureCause } from './ci-failure-cause-core.mjs'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
 
@@ -145,27 +145,54 @@ async function fetchRuns(repo, headSha) {
 async function workflowsUntouchedSince(repo, runs, runClassification, head) {
   try {
     const run = (Array.isArray(runs) ? runs : []).find((r) => String(r?.id) === String(runClassification?.runId))
-    // The workflow's OWN file is the only one that can have broken it. Comparing
-    // the whole directory would call an unrelated workflow edit a suspect and
-    // block on it forever.
+    // The workflow's OWN file is normally the only one that can have broken it,
+    // and scoping to it keeps an unrelated workflow edit from making every other
+    // workflow a suspect. The exception is a REUSABLE workflow: `uses:
+    // ./.github/workflows/x.yml` kills the caller before any step, and the
+    // breakage is in the callee (review S2). None exists here today — so the
+    // scope widens to the directory only if one appears, which cannot go
+    // unnoticed the way a silent hole would.
     const path = String(run?.path ?? '')
     const workflowId = run?.workflow_id
     if (!path.startsWith('.github/workflows/') || !workflowId) return false
+    const scope = callsAReusableWorkflow(path) ? '.github/workflows' : path
 
     // The baseline is the last commit GitHub carried this workflow to a GREEN
     // verdict on: everything since is what could have broken the file. A shallow
     // HEAD~1 would "prove" nothing — the edit is usually further back.
-    const green = await fetchLastGreenSha(repo, workflowId)
+    // The newest green sha we actually HAVE. `ci.yml` also runs on pull_request,
+    // so the newest green can sit on a fork commit this clone never fetched —
+    // taking only the first would throw away a usable baseline (review S3).
+    const green = (await fetchLastGreenShas(repo, workflowId)).find((sha) => {
+      try {
+        git(['cat-file', '-e', `${sha}^{commit}`])
+        return true
+      } catch {
+        return false
+      }
+    })
     if (!green) return false
-    git(['cat-file', '-e', `${green}^{commit}`]) // throws if we do not have it
-    return git(['diff', '--name-only', `${green}..${head}`, '--', path]).length === 0
+    // Two-dot diff: this compares the FILE CONTENT at both commits, so it holds
+    // across rebases and across branches — "byte-identical to a file that ran
+    // green" is the proof, ancestry is not.
+    return git(['diff', '--name-only', `${green}..${head}`, '--', scope]).length === 0
   } catch {
     return false // undecided → keep blocking
   }
 }
 
-/** The head sha of the newest SUCCESSFUL run of one workflow; null on any doubt. */
-async function fetchLastGreenSha(repo, workflowId) {
+/** Does this workflow call another workflow of ours? Unreadable → true, so the
+ *  scope widens rather than narrows on doubt. */
+function callsAReusableWorkflow(path) {
+  try {
+    return /uses:\s*\.\/\.github\/workflows\//.test(readFileSync(new URL(`../${path}`, import.meta.url), 'utf8'))
+  } catch {
+    return true
+  }
+}
+
+/** The head shas of the newest SUCCESSFUL runs of one workflow; [] on any doubt. */
+async function fetchLastGreenShas(repo, workflowId) {
   const headers = {
     Accept: 'application/vnd.github+json',
     'User-Agent': 'hoa-ci-status-guard',
@@ -174,15 +201,16 @@ async function fetchLastGreenSha(repo, workflowId) {
   const token = readToken()
   if (token) headers.Authorization = `Bearer ${token}`
   const res = await httpsRequest(
-    `https://api.github.com/repos/${repo}/actions/workflows/${workflowId}/runs?status=success&per_page=1`,
+    `https://api.github.com/repos/${repo}/actions/workflows/${workflowId}/runs?status=success&per_page=5`,
     { headers },
   )
-  if (!res || res.status !== 200) return null
+  if (!res || res.status !== 200) return []
   try {
-    const sha = JSON.parse(res.body)?.workflow_runs?.[0]?.head_sha
-    return typeof sha === 'string' && sha ? sha : null
+    const list = JSON.parse(res.body)?.workflow_runs
+    if (!Array.isArray(list)) return []
+    return list.map((r) => r?.head_sha).filter((s) => typeof s === 'string' && s)
   } catch {
-    return null
+    return []
   }
 }
 
@@ -248,24 +276,44 @@ async function main() {
 
   // WHERE the fault lies decides the remedy: a red the repository cannot fix
   // must not demand a fixing push (point 526).
-  const cause = classifyFailureCause({
-    workflowName: runClassification.workflowName,
-    conclusion: runClassification.conclusion,
-    jobs: await fetchJobs(repo, runClassification.runId),
-    workflowsUntouched: await workflowsUntouchedSince(repo, runs, runClassification, head),
-  })
-  const classification = { ...runClassification, ...cause }
+  //
+  // EVERY failed run is judged, not just the one classifyRuns names (four-eyes
+  // review, 06.08.2026). Which run that is comes down to API list order, and
+  // once an outside failure may WAIVE the block, letting order decide would let
+  // a famine-shaped watchdog run excuse a genuinely red CI run on the same
+  // commit. So: block on the first red that has something to do, and stand down
+  // only when every single one of them has not.
+  const reds = failedRuns(runs, head)
+  const judged = []
+  for (const red of reds.length > 0 ? reds : [runClassification]) {
+    const cause = classifyFailureCause({
+      workflowName: red.workflowName,
+      conclusion: red.conclusion,
+      jobs: await fetchJobs(repo, red.runId),
+      workflowsUntouched: await workflowsUntouchedSince(repo, runs, red, head),
+    })
+    judged.push({ ...red, ...cause })
+  }
+  // The one that decides: the first red something can be done about, else the
+  // first — which is then, by construction, an unactionable one.
+  const classification = judged.find((c) => c.actionable !== false) ?? judged[0]
+  const standDown = judged.every((c) => c.actionable === false)
 
   const state = readJson(STATE) ?? {}
-  if (shouldNotify(classification.state, state.notifiedSha, head)) {
+  // A stood-down red gets a REPEATED alert, not one ever (four-eyes review S1):
+  // in a runner famine no step runs, so ci.yml's own `if: failure()` alert —
+  // the primary detector — never fires either. Dedup per sha alone would leave
+  // a permanently broken main pinging exactly once and never blocking.
+  const alertKey = standDown ? `${head}:${classification.runId}:${new Date().toISOString().slice(0, 13)}` : head
+  if (shouldNotify(classification.state, state.notifiedSha, alertKey)) {
     await notifyCiRed(
       `CI failed for pushed ${head.slice(0, 7)}: "${classification.workflowName}" ` +
-        `run ${classification.runId} (${classification.conclusion}, cause: ${classification.cause}). ` +
-        `${classification.url ?? ''}`,
+        `run ${classification.runId} (${classification.conclusion}, cause: ${classification.cause}` +
+        `${standDown ? ', nothing in the repository can clear it' : ''}). ${classification.url ?? ''}`,
     )
     writeJsonAtomic(STATE, {
       ...state,
-      notifiedSha: head,
+      notifiedSha: alertKey,
       notifiedAt: Date.now(),
       runId: classification.runId,
     })
@@ -275,9 +323,9 @@ async function main() {
   // guard exists to stop a session walking away from a defect IT can clear; when
   // GitHub's own runners never reached our code, holding the turn end clears
   // nothing and stops the batch over a foreign outage. The alert above still
-  // went out, and the next session re-reads the same run — so this forgets
+  // went out, and the next session re-reads the same runs — so this forgets
   // nothing, it only declines to stand still.
-  if (classification.actionable === false) return null
+  if (standDown) return null
 
   return JSON.stringify({ decision: 'block', reason: blockReason(classification, head) })
 }

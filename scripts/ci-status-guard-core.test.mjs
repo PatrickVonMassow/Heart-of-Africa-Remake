@@ -2,7 +2,7 @@
 // red blocks and notifies once per sha, pending/success/none allow, malformed
 // input fails open, and a green re-run supersedes its red predecessor.
 import { describe, it, expect } from 'vitest'
-import { classifyRuns, shouldBlock, shouldNotify, blockReason } from './ci-status-guard-core.mjs'
+import { classifyRuns, failedRuns, shouldBlock, shouldNotify, blockReason } from './ci-status-guard-core.mjs'
 
 const HEAD = 'abc123def456'
 
@@ -14,6 +14,47 @@ const run = (over = {}) => ({
   workflowName: 'CI',
   url: 'https://github.com/o/r/actions/runs/1',
   ...over,
+})
+
+// The waiver must be judged against EVERY red on the commit, not the one API
+// list order happens to surface (four-eyes review, 06.08.2026): a famine-shaped
+// watchdog run must never excuse a genuinely red CI run on the same sha.
+describe('failedRuns', () => {
+  it('returns every failed workflow on the head, not just the first', () => {
+    const got = failedRuns(
+      [
+        run({ databaseId: 9, workflowName: 'Batch watchdog', conclusion: 'failure' }),
+        run({ databaseId: 8, workflowName: 'CI', conclusion: 'failure' }),
+        run({ databaseId: 7, workflowName: 'Deploy to GitHub Pages', conclusion: 'success' }),
+      ],
+      HEAD,
+    )
+    expect(got.map((r) => r.workflowName).sort()).toEqual(['Batch watchdog', 'CI'])
+    expect(got.every((r) => r.state === 'failed')).toBe(true)
+  })
+
+  it('keeps only the newest run per workflow, so a green re-run drops out', () => {
+    const got = failedRuns(
+      [
+        run({ databaseId: 1, workflowName: 'CI', conclusion: 'failure' }),
+        run({ databaseId: 2, workflowName: 'CI', conclusion: 'success' }),
+      ],
+      HEAD,
+    )
+    expect(got).toEqual([])
+  })
+
+  it('ignores other commits, unfinished runs and junk', () => {
+    expect(failedRuns([run({ headSha: 'other', conclusion: 'failure' })], HEAD)).toEqual([])
+    expect(failedRuns([run({ status: 'in_progress', conclusion: null })], HEAD)).toEqual([])
+    expect(failedRuns(null, HEAD)).toEqual([])
+    expect(failedRuns([run({ conclusion: 'failure' })], '')).toEqual([])
+  })
+
+  it('agrees with classifyRuns on whether the head is red at all', () => {
+    const runs = [run({ conclusion: 'failure', databaseId: 3 })]
+    expect(failedRuns(runs, HEAD).length > 0).toBe(shouldBlock(classifyRuns(runs, HEAD).state))
+  })
 })
 
 describe('classifyRuns', () => {

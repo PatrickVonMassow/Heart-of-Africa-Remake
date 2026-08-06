@@ -216,10 +216,26 @@ describe('classifyFailureCause', () => {
 
       const stillBlocking = [
         died('fast', [{ name: 'Set up job' }, { name: 'Run the suite', conclusion: 'failure' }]),
+        died('fast', [{ name: 'Set up job' }], false), // workflow file unproven
         { workflowName: 'CI', conclusion: 'cancelled', jobs: null },
         { workflowName: PAGES_WORKFLOW, conclusion: 'cancelled', jobs: null },
         { workflowName: PAGES_WORKFLOW, conclusion: 'failure', jobs: null },
         { workflowName: 'CI', conclusion: 'failure', jobs: null },
+        // The Pages stall: it RAN and failed, and its remedy — the cancel
+        // command — is something this machine can do, so it must keep blocking.
+        // Without this input the branch is unreached and the claim is vacuous.
+        {
+          workflowName: PAGES_WORKFLOW,
+          conclusion: 'failure',
+          jobs: [
+            job({ name: 'build', conclusion: 'success', steps: [{ name: 'Build' }] }),
+            job({
+              name: 'deploy',
+              conclusion: 'failure',
+              steps: [{ name: 'Set up job' }, { name: 'Deploy to GitHub Pages', conclusion: 'failure' }],
+            }),
+          ],
+        },
       ]
       for (const input of stillBlocking) {
         expect(classifyFailureCause(input).actionable).not.toBe(false)

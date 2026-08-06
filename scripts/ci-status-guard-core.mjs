@@ -73,6 +73,39 @@ export function classifyRuns(runs, headSha) {
   }
 }
 
+/**
+ * EVERY failed run on this head, newest per workflow, in the same shape
+ * `classifyRuns` returns for the one it picks.
+ *
+ * WHY (four-eyes review, 06.08.2026): `classifyRuns` names ONE red, and which
+ * one is API list order. That was harmless while every red blocked. It stopped
+ * being harmless when a red GitHub caused may waive the block: a famine-shaped
+ * watchdog run created a second later would then excuse a genuinely red CI run
+ * standing on the same commit. The waiver must be judged against ALL of them.
+ */
+export function failedRuns(runs, headSha) {
+  try {
+    if (!Array.isArray(runs) || !headSha) return []
+    const newestPerWorkflow = new Map()
+    for (const r of runs.filter((x) => runSha(x) === headSha)) {
+      const key = runName(r)
+      const prev = newestPerWorkflow.get(key)
+      if (!prev || Number(runId(r) ?? 0) > Number(runId(prev) ?? 0)) newestPerWorkflow.set(key, r)
+    }
+    return [...newestPerWorkflow.values()]
+      .filter((r) => String(r?.status ?? '') === 'completed' && FAILED_CONCLUSIONS.has(String(r?.conclusion ?? '')))
+      .map((r) => ({
+        state: 'failed',
+        runId: runId(r),
+        workflowName: runName(r),
+        conclusion: String(r?.conclusion ?? ''),
+        url: runUrl(r),
+      }))
+  } catch {
+    return []
+  }
+}
+
 /** Only a confirmed red blocks; pending/success/none/unknown all allow. */
 export function shouldBlock(state) {
   return state === 'failed'
