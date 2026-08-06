@@ -4841,24 +4841,3 @@ Build order, chosen so no two parallel agents own the same file:
   VERIFIABLE: pure Vitest on the guard's classification of a blocked/stalled
   deploy failure and on the workflow's retry decision, plus one real deploy run
   proving a commit blocked by a stuck deployment still reaches the live site.
-
-- [ ] 527. THE MODEL ALLOWLIST IS TESTED AGAINST THE RAW TRAILER (found 06.08.2026
-  by the four-eyes review of points 397/425; already recorded as C9 in
-  `docs/rule-corpus-audit.md`). `ALLOWED` in `scripts/model-guard-core.mjs` is
-  matched against the WHOLE trailer line rather than against the model name parsed
-  out of it, so a trailer that carries an allowed name plus anything else —
-  `Claude Haiku 4.5 (opus mode)`, `Claude Sonnet 5 / Claude Opus 5` — passes the
-  guard whose entire purpose is to catch a silently degraded session. The 24.07.2026
-  incident it was built for was exactly a degraded model merging defective work.
-  FINAL STATE:
-  1. The allowlist is tested against the model NAME parsed out of the trailer
-     (`modelNameIn`), not against the raw line, so an allowed name with any addition
-     is no longer allowed by accident.
-  2. A trailer naming more than one model is a FINDING, not a pass on its first
-     allowed name.
-  3. The tightening does not turn today's legitimate trailers red: the exact forms
-     the harness writes stay allowed, and the test names each of them.
-  VERIFIABLE: pure Vitest in `scripts/model-guard-core.test.mjs` — every legitimate
-  trailer form passes, an allowed name with an addition and a two-model line both
-  fail, and the existing forbidden/unnamed classifications are unchanged.
-
