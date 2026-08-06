@@ -29,6 +29,7 @@ import {
 } from '../communication/heard'
 import type { Phrase, UtteranceId } from '../communication/lexicon'
 import { chiefMessagePhrase } from '../communication/drumMessage'
+import { ROCK_VILLAGE_ID } from '../world/communicationRock'
 import type { SketchId } from '../journal/sketches'
 import { getStrings, type TextRef } from '../i18n'
 import { stripVoiceMarkup } from '../journal/voiceMarkup'
@@ -588,6 +589,28 @@ export const TOMB_COORDINATE_REGIONS: RegionId[] = ['north', 'east']
  *  hint is in the journal it deciphers retroactively, so the goal is safe. */
 export function robWouldOrphanGoal(s: Pick<GameState, 'hintsGiven'>, region: RegionId): boolean {
   return TOMB_COORDINATE_REGIONS.includes(region) && s.hintsGiven[region] !== true
+}
+
+/**
+ * Whose chief sends the drum message (design.md §13.4, point 486): the village
+ * of the communication slice, the one the landmark boulder stands upstream of.
+ * Another people's chief has no message about that rock and sends none.
+ */
+export const DRUM_MESSAGE_VILLAGE = ROCK_VILLAGE_ID
+
+/**
+ * May this chief be asked to send his message on the drums? Only in his own
+ * village, and only once a culturally correct gift has earned his trust — the
+ * same condition §12 sets for a hint, since the message IS the hint of the
+ * communication slice. Being asked again after the drums have spoken is fine:
+ * a player who wants to hear them once more may.
+ */
+export function canAskForDrumMessage(
+  s: Pick<GameState, 'reveredGiftGiven' | 'goodwill'>,
+  placeId: string | null,
+): boolean {
+  if (placeId !== DRUM_MESSAGE_VILLAGE) return false
+  return s.reveredGiftGiven[placeId] === true && (s.goodwill[placeId] ?? 0) >= balance.goodwillForHint
 }
 
 /** Carried item count against the inventory capacity (design.md §6). */
