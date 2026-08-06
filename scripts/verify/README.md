@@ -520,7 +520,7 @@ answering anything, and that must never read as a verdict:
 | what happened | how it reads | where the evidence is |
 | --- | --- | --- |
 | the baseline pass produced no output at all (crash, timeout, the server never came up) | `the baseline run did not produce a result — NOT classified` | the kept log |
-| the baseline pass ended EARLY — fewer checks than the current run, or a non-zero exit with zero FAIL lines | `*** THE BASELINE LANE DIED: run N ended after X of the current run's Y checks … last check reached: "…"`, and every unreached check verdicts **baseline-died**, not inconclusive | the kept log + the last 12 output lines printed inline |
+| the baseline pass ended EARLY — it exited non-zero (or was killed) AND either reached fewer checks than the current run or printed no FAIL line at all; an exit code of 0 is never a death, whatever it counted | `*** THE BASELINE LANE DIED: run N ended after X of the current run's Y checks … last check reached: "…"`, and every unreached check verdicts **baseline-died**, not inconclusive | the kept log + the last 12 output lines printed inline |
 | the baseline pass ran to the end | the ordinary four verdicts above | — |
 
 On 29.07.2026 two baseline passes of `enrichments` each stopped after 55 of 243
