@@ -5,7 +5,7 @@
 // decides correctly and exits 0 refuses nothing.
 import { describe, it, expect } from 'vitest'
 import { spawnSync } from 'node:child_process'
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 
@@ -70,5 +70,60 @@ describe('the commit-msg model-trailer gate', () => {
     })
     expect(missing.status).toBe(0)
     expect(spawnSync(process.execPath, [GATE], { windowsHide: true, encoding: 'utf8' }).status).toBe(0)
+  })
+})
+
+// THE LIVE CASE: a real commit through the real hook, in an ISOLATED temp repo.
+// The cases above prove the decision; only this proves that an unnamed trailer
+// cannot REACH history, which is the whole claim of the point.
+describe('a real commit through the commit-msg hook', () => {
+  // The hook exits 0 when the scope guard is absent (a worktree on an older
+  // branch), so the temp repo needs it too — otherwise this case would pass
+  // while the gate never ran.
+  const NEEDED = [
+    'commit-scope-guard.mjs',
+    'commit-scope-guard-core.mjs',
+    'model-trailer-gate.mjs',
+    'model-guard-core.mjs',
+    'is-main.mjs',
+  ]
+
+  const inRepo = (fn) => {
+    const repo = mkdtempSync(resolve(tmpdir(), 'hoa-trailer-repo-'))
+    try {
+      mkdirSync(resolve(repo, 'scripts/git-hooks'), { recursive: true })
+      for (const name of NEEDED) {
+        copyFileSync(resolve(process.cwd(), 'scripts', name), resolve(repo, 'scripts', name))
+      }
+      copyFileSync(HOOK, resolve(repo, 'scripts/git-hooks/commit-msg'))
+      const vcs = (...args) =>
+        spawnSync('git', ['-c', 'commit.gpgsign=false', ...args], {
+          cwd: repo,
+          windowsHide: true,
+          encoding: 'utf8',
+        })
+      vcs('init', '-q')
+      vcs('config', 'user.email', 'gate@test.local')
+      vcs('config', 'user.name', 'gate test')
+      vcs('config', 'core.hooksPath', 'scripts/git-hooks')
+      writeFileSync(resolve(repo, 'README.md'), 'x\n')
+      vcs('add', '-A')
+      return fn(vcs)
+    } finally {
+      rmSync(repo, { recursive: true, force: true })
+    }
+  }
+
+  it('refuses the bare trailer and accepts the named one', () => {
+    inRepo((vcs) => {
+      const refused = vcs('commit', '-m', 'A probe\n\nCo-Authored-By: Claude <noreply@anthropic.com>')
+      expect(refused.status, `the hook let the bare trailer through: ${refused.stdout}`).not.toBe(0)
+      expect(refused.stderr).toContain('unnamed-model-trailer')
+      expect(vcs('log', '--oneline').stdout.trim()).toBe('')
+
+      const ok = vcs('commit', '-q', '-m', 'A probe\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>')
+      expect(ok.status, `the hook refused a named trailer: ${ok.stderr}`).toBe(0)
+      expect(vcs('log', '--oneline').stdout.trim()).not.toBe('')
+    })
   })
 })
