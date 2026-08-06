@@ -2812,6 +2812,19 @@ for (const [placeId, shot] of [
     if (g.placeId) g.leavePlace()
   })
   await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
+  // The sample window's calibration is set BEFORE the settlement mounts: the
+  // group size is read once per visit, and a village of four spends the whole
+  // window walking to the water and back — the queue is fair, so the errands at
+  // the end of the catalogue never come round while everybody is out on the bank.
+  // Every one of these is a balance value the debug menu edits.
+  await page.evaluate(() => {
+    const e = window.__balance.villageLife.adultErrands
+    e.intervalSeconds = 0.8
+    e.dwellSeconds = 1
+    e.digSeconds = 3
+    e.pace = 6
+    e.villagerCount = 10
+  })
   await page.evaluate(() => window.__game.getState().enterPlace('bambara-village'))
   const live = await page
     .waitForFunction(
@@ -2827,22 +2840,6 @@ for (const [placeId, shot] of [
   let river = null
   if (live) {
     await page.evaluate(() => window.__game.getState().setJournalOpen(false))
-    // Speed the scheduler up for the sample window: the rate is a balance value,
-    // and a verification that waited out the shipped nine seconds per errand
-    // would spend minutes measuring what one turn of the queue already shows.
-    await page.evaluate(() => {
-      // One second between errands, not the shipped nine: the catalogue is
-      // twelve errands long now that the village has a bank, and the queue is
-      // FAIR — at the old sample rate the window ended before the three ground-
-      // work errands came round at all, and the digging went unphotographed.
-      window.__balance.villageLife.adultErrands.intervalSeconds = 1
-      window.__balance.villageLife.adultErrands.dwellSeconds = 2
-      window.__balance.villageLife.adultErrands.digSeconds = 3
-      // And the walking pace with them: the bank lies past the built ground, so
-      // at the shipped stroll a single walk out to the water would eat the whole
-      // sample window. The pace is a balance value like the rest of them.
-      window.__balance.villageLife.adultErrands.pace = 5
-    })
     const geography = await page.evaluate(() => window.__placeErrands().geography)
     check(
       'the village draws the ground work the adults teach DIG at',
@@ -2920,7 +2917,8 @@ for (const [placeId, shot] of [
     check(
       'the ground work is worked: a villager is seen digging',
       dug > 0,
-      `${dug} samples with a villager at the digging pose`,
+      `${dug} samples with a villager at the digging pose; ground-work errands staged ` +
+        `${['digWhereIStand', 'sendToThePostHole', 'joinTheDigging'].map((id) => `${id}×${staged[id] ?? 0}`).join(', ')}`,
     )
     check(
       'the adults stage the errands that are about the water (work-order 482)',
