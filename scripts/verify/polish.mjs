@@ -692,7 +692,10 @@ const stepUntil = async (ready, arg = null, capFrames = 240) => {
     const read = () =>
       page.evaluate((idx) => {
         const pt = window.__speech?.anchorScreen('probe-speaker')
-        const el = document.querySelector('.speech-label')
+        // THIS speaker's note, not whichever the DOM lists first: since the
+        // children speak at their game (point 481) a settlement holds several
+        // notes at once, and the unqualified selector measured a child's.
+        const el = document.querySelector('.speech-label[data-speaker="probe-speaker"]')
         const figure = window.__speechProbeFigures?.[idx]
         if (!pt || !el || !figure) return null
         figure.updateWorldMatrix(true, false)

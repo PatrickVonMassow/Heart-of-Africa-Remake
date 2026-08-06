@@ -275,6 +275,11 @@ export function turnToward(from: number, to: number, maxDelta: number): number {
  * middle, so a cornered child breaks inward along the rim instead of pressing
  * itself into the edge. `inner` is the fraction of the radius at which the pull
  * starts.
+ *
+ * The ground is a disc at (`cx`, `cz`) — the origin unless a caller says
+ * otherwise. A play area that sits in a corner of a settlement (point 481.4) is
+ * still a disc; only its middle is somewhere else, and the pull must bend toward
+ * THAT one or it drags every runner out of its own ground.
  */
 export function evadeHeading(
   x: number,
@@ -282,14 +287,16 @@ export function evadeHeading(
   chaserX: number,
   chaserZ: number,
   radius: number,
+  cx = 0,
+  cz = 0,
   inner = 0.55,
   strength = 0.85,
 ): number {
-  const away = headingToward(chaserX, chaserZ, x, z, Math.atan2(x, z))
+  const away = headingToward(chaserX, chaserZ, x, z, Math.atan2(x - cx, z - cz))
   if (!(radius > 0)) return away
-  const d = Math.hypot(x, z)
+  const d = Math.hypot(x - cx, z - cz)
   const start = radius * clamp(inner, 0, 0.99)
   if (d <= start) return away
   const t = clamp((d - start) / (radius - start), 0, 1) * clamp(strength, 0, 1)
-  return blendHeading(away, headingToward(x, z, 0, 0, away), t)
+  return blendHeading(away, headingToward(x, z, cx, cz, away), t)
 }

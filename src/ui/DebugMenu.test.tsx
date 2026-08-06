@@ -39,6 +39,7 @@ const DEFAULTS = {
   ambientVolume: balance.ambientVolume,
   walkerUnstuckSeconds: balance.walkerUnstuckSeconds,
   tag: { ...balance.villageLife.tag },
+  childSpeech: { ...balance.villageLife.childSpeech },
   startupFreezeBudgetMs: balance.startup.pictureFreezeBudgetMs,
   birdsongVolume: balance.birdsongVolume,
   surfNearRadius: balance.surf.nearRadius,
@@ -115,6 +116,7 @@ afterEach(() => {
   balance.ambientVolume = DEFAULTS.ambientVolume
   balance.walkerUnstuckSeconds = DEFAULTS.walkerUnstuckSeconds
   Object.assign(balance.villageLife.tag, DEFAULTS.tag)
+  Object.assign(balance.villageLife.childSpeech, DEFAULTS.childSpeech)
   balance.startup.pictureFreezeBudgetMs = DEFAULTS.startupFreezeBudgetMs
   balance.birdsongVolume = DEFAULTS.birdsongVolume
   balance.surf.nearRadius = DEFAULTS.surfNearRadius
@@ -222,6 +224,12 @@ describe('DebugMenu editable fields write through to balance (settings.mjs fillF
     { label: en.debug.tagSprintSpeed, read: () => balance.villageLife.tag.sprintSpeed, value: 4.5 },
     { label: en.debug.tagBreakOff, read: () => balance.villageLife.tag.breakOff, value: 0.25 },
     { label: en.debug.tagPressure, read: () => balance.villageLife.tag.pressureDistance, value: 7 },
+    { label: en.debug.tagPlayRadius, read: () => balance.villageLife.tag.playRadius, value: 12 },
+    // What the children SAY at that game (point 481): the rate of the staged
+    // situations, the life of the action that follows and the refusal chance.
+    { label: en.debug.childSpeechInterval, read: () => balance.villageLife.childSpeech.intervalSeconds, value: 9 },
+    { label: en.debug.childSpeechAction, read: () => balance.villageLife.childSpeech.actionSeconds, value: 7 },
+    { label: en.debug.childSpeechRefusal, read: () => balance.villageLife.childSpeech.refusalChance, value: 0.5 },
     // The loading picture's freeze budget the startup gate binds (point 337).
     { label: en.debug.startupFreezeBudget, read: () => balance.startup.pictureFreezeBudgetMs, value: 6000 },
     // Per-source birdsong volume and the coastal surf fade bounds (point 153).

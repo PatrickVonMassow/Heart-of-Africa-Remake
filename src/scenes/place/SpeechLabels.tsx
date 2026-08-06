@@ -59,7 +59,11 @@ function SpeechLabelView({ label, memory }: { label: SpeechLabel; memory: Commun
   return (
     <group ref={group}>
       <Html center distanceFactor={14}>
-        <div className="speech-label">
+        {/* The note carries WHOSE it is: since the children speak on their own
+            (point 481) a settlement can hold several notes at once, and a
+            check that grabbed "the" label measured whichever one the DOM
+            listed first. */}
+        <div className="speech-label" data-speaker={label.speakerId}>
           {labelReadings(memory, label.atoms).map((atom, i) => (
             <div className="speech-atom" key={`${atom.utterance}-${i}`}>
               <span className="syllables">{atom.utterance}</span>

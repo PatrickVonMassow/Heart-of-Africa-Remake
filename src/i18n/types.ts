@@ -427,6 +427,13 @@ export interface Strings {
     tagUnstuck: string
     tagLean: string
     tagTurnRate: string
+    tagPlayRadius: string
+    childSpeechInterval: string
+    childSpeechSpread: string
+    childSpeechAction: string
+    childSpeechPace: string
+    childSpeechRefusal: string
+    childSpeechReply: string
     foodPerDay: string
     canteenDrain: string
     canteenDesertDrain: string

@@ -19,6 +19,7 @@ import {
   type TagChild,
   type TagConfig,
   type TagState,
+  type TagSteer,
   type TagWorld,
 } from './tagGame'
 import { boxCollider, standingClear, tryNudgeToFree, type Collider } from './collision'
@@ -69,10 +70,11 @@ function run(
   cfg: TagConfig = CFG,
   dt = 1 / 60,
   watch?: (s: TagState, t: number) => void,
+  steer?: TagSteer,
 ): void {
   const steps = Math.round(seconds / dt)
   for (let i = 0; i < steps; i++) {
-    stepTagGame(s, dt, cfg, world)
+    stepTagGame(s, dt, cfg, world, steer)
     watch?.(s, i * dt)
   }
 }
@@ -1047,5 +1049,137 @@ describe('the paths are a GAME, not a route', () => {
       if (st.chaser >= 0) held.add(st.chaser)
     })
     expect(held.size).toBeGreaterThanOrEqual(2)
+  })
+})
+
+describe('an outside claim on a child: what was SAID steers it (point 481)', () => {
+  /** A claim that walks ONE child due +x at a fixed pace. */
+  const dueEast =
+    (index: number, pace: number): TagSteer =>
+    (i) =>
+      i === index ? { heading: Math.PI / 2, pace } : null
+
+  it('walks a child between rounds, where the chase would leave it standing', () => {
+    const s = game(FOUR)
+    s.playing = false
+    s.chaser = -1
+    s.idleFor = 30 // a long break, so nothing else moves anyone
+    const before = s.children[2].x
+    run(s, 2, OPEN, CFG, 1 / 60, undefined, dueEast(2, 1.6))
+    expect(s.children[2].x).toBeGreaterThan(before + 1)
+    // The legs ride the distance actually walked.
+    expect(s.children[2].walked).toBeGreaterThan(1)
+    // Everybody else stood still: the break is still a break.
+    for (const i of [0, 1, 3]) {
+      expect(Math.hypot(s.children[i].x - FOUR[i][0], s.children[i].z - FOUR[i][1])).toBeLessThan(0.01)
+    }
+  })
+
+  it('holds a child still between rounds when the claim asks for a pace of zero', () => {
+    const s = game(FOUR)
+    s.playing = false
+    s.chaser = -1
+    s.idleFor = 30
+    run(s, 2, OPEN, CFG, 1 / 60, undefined, () => ({ heading: 0, pace: 0 }))
+    for (let i = 0; i < s.children.length; i++) {
+      expect(s.children[i].pace).toBe(0)
+      expect(Math.hypot(s.children[i].x - FOUR[i][0], s.children[i].z - FOUR[i][1])).toBeLessThan(0.01)
+    }
+  })
+
+  it('turns a RUNNER onto the claimed heading while a round runs', () => {
+    const s = game(FOUR)
+    run(s, 1) // let a round open
+    expect(s.playing).toBe(true)
+    const steered = s.children.findIndex((_, i) => i !== s.chaser)
+    run(s, 1.5, OPEN, CFG, 1 / 60, undefined, dueEast(steered, 3))
+    const off = Math.atan2(
+      Math.sin(s.children[steered].heading - Math.PI / 2),
+      Math.cos(s.children[steered].heading - Math.PI / 2),
+    )
+    expect(Math.abs(off)).toBeLessThan(0.9) // the claim's heading, deflection allowed
+  })
+
+  it('never steers the chaser — the round belongs to it', () => {
+    const s = game(FOUR)
+    run(s, 1)
+    const it = s.chaser
+    expect(it).toBeGreaterThanOrEqual(0)
+    let asked = false
+    run(s, 1, OPEN, CFG, 1 / 60, undefined, (i, st) => {
+      if (i === st.chaser) asked = true
+      return { heading: Math.PI / 2, pace: 0 }
+    })
+    expect(asked).toBe(false)
+  })
+
+  it('keeps the floor pace while a round runs, whatever the claim asks for', () => {
+    const s = game(FOUR)
+    run(s, 1)
+    const floor = floorPace(CFG)
+    run(
+      s,
+      3,
+      OPEN,
+      CFG,
+      1 / 60,
+      (st) => {
+        if (!st.playing) return
+        for (const c of st.children) expect(c.pace).toBeGreaterThanOrEqual(floor - 1e-6)
+      },
+      () => ({ heading: 0, pace: 0 }),
+    )
+  })
+
+  it('leaves every child where a walker may stand, claim or no claim', () => {
+    // A hut between the group and where they are being sent: the claim decides
+    // the direction, the chase's own deflection keeps them out of the wall.
+    const colliders = [boxCollider(0, 0, 2, 2, 0)]
+    const world = makeWorld(colliders)
+    const s = game(FOUR)
+    run(
+      s,
+      20,
+      world,
+      CFG,
+      1 / 60,
+      (st) => {
+        for (const c of st.children) expect(world.blocked(c.x, c.z)).toBe(false)
+      },
+      (i, st) =>
+        i % 2 === 0
+          ? { heading: Math.atan2(-st.children[i].x, -st.children[i].z), pace: 3 }
+          : null,
+    )
+  })
+})
+
+describe('the play ground is a disc of its own (point 481.4)', () => {
+  it('keeps the children inside a ground that is NOT the settlement centre', () => {
+    // The ground the shipped village actually derives (lifeSpots.test.ts): a
+    // corner disc well off the settlement's own middle.
+    const centre = { x: 10.9, z: -10.9 }
+    const play = 7
+    const world: TagWorld = {
+      radius: play,
+      centerX: centre.x,
+      centerZ: centre.z,
+      childRadius: CHILD_R,
+      blocked: (x, z) => Math.hypot(x - centre.x, z - centre.z) > play,
+      nudge: (x, z) => ({ x, z, found: false }),
+    }
+    const s = game([
+      [centre.x + 1, centre.z + 1],
+      [centre.x - 2, centre.z + 2],
+      [centre.x + 3, centre.z - 1],
+      [centre.x - 1, centre.z - 3],
+    ])
+    run(s, 90, world, CFG, 1 / 60, (st) => {
+      for (const c of st.children) {
+        expect(Math.hypot(c.x - centre.x, c.z - centre.z)).toBeLessThanOrEqual(play + 1e-6)
+      }
+    })
+    // And it is still a GAME in there: somebody was caught.
+    expect(s.tags).toBeGreaterThan(0)
   })
 })
