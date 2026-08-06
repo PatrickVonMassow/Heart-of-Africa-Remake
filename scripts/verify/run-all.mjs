@@ -14,7 +14,7 @@ import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { killTree, launchServer } from './_server.mjs'
-import { changeRelatedness, failedChecks, formatRepeatReport, repeatSignature } from './baseline-classify-core.mjs'
+import { allChecks, changeRelatedness, failedChecks, formatRepeatReport, repeatSignature } from './baseline-classify-core.mjs'
 import {
   LEVEL, annotateResult, annotateStageFailure, decideRun, formatLoadReport, onLoadMode,
 } from './machine-load-core.mjs'
@@ -184,7 +184,7 @@ function runSuiteWithRetry(name, baseUrl) {
   if (!RETRY_ENABLED) {
     // Strict mode (the closing's flake-free gate): no retry, so no repeat
     // signature exists — say that rather than imply one.
-    redSuites.push({ suite: name, failed: failedChecks(first.out), runs: 1 })
+    redSuites.push({ suite: name, failed: failedChecks(first.out), checks: allChecks(first.out).length, runs: 1 })
     return false
   }
   console.log(`↻ retry ${name} once — a first-try failure may be a rotating staging flake (point 200)`)
@@ -197,7 +197,7 @@ function runSuiteWithRetry(name, baseUrl) {
   const interesting = signature.stable.length ? signature.stable : [...signature.onlyFirst, ...signature.onlySecond]
   const relatedness = changeRelatedness({ checks: interesting, changedFiles: changedFiles() })
   for (const line of formatRepeatReport({ suite: name, signature, relatedness })) console.log(line)
-  redSuites.push({ suite: name, failed: interesting, runs: 2, verdict: signature.verdict })
+  redSuites.push({ suite: name, failed: interesting, checks: Math.max(allChecks(first.out).length, allChecks(second.out).length), runs: 2, verdict: signature.verdict })
   return false
 }
 
@@ -225,7 +225,7 @@ function changedFiles() {
 function classifyAgainstBaselineRuns() {
   if (redSuites.length === 0) return
   console.log(`\n===== baseline classification (point 294) — ${redSuites.length} red suite(s) =====`)
-  for (const { suite, failed } of redSuites) {
+  for (const { suite, failed, checks } of redSuites) {
     if (!DEV_SUITES.includes(suite)) {
       console.log(`SKIP  ${suite} — no baseline lane for it (it is not one of the dev suites).`)
       continue
@@ -239,6 +239,9 @@ function classifyAgainstBaselineRuns() {
     }
     const args = [join(HERE, 'baseline-classify.mjs'), suite]
     for (const c of failed) args.push('--failed', c.name)
+    // How far the CURRENT run got: without it a baseline run that ends early
+    // cannot be told from one that simply predates a newer check (point 418).
+    if (checks > 0) args.push('--current-checks', String(checks))
     spawnSync(process.execPath, args, { windowsHide: true, cwd: join(HERE, '..', '..'), stdio: 'inherit' })
   }
 }
