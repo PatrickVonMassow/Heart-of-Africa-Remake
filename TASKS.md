@@ -3551,19 +3551,6 @@ it is appended.
   vanish. The total saving is stated as one number in the commit, and the per-turn fixed load
   is re-measured after the cuts so the claim is a measurement rather than an intention.
 
-- [ ] 445. EVERY PARK CARRIES A RESTART CLOCK (30.07.2026, out of the fortnight-alone review;
-  bundle Urlaubsfestigkeit). `.claude/batch-paused` stops the batch until someone removes it
-  by hand. Unattended that means: a cause which would have cleared itself in twenty minutes —
-  a red CI run, a guard loop, a transient forbidden serving model — costs the rest of the
-  absence. Every pause therefore records its REASON and a RETRY-AFTER; the launcher retries
-  when the clock runs out and notes the attempt. Only genuinely unsafe states park without a
-  clock, and the list of those is written down and short (today: a serving model outside the
-  allowlist is the candidate — decide per cause, and where a retry is safe, let the fallback
-  chain of CLAUDE.md §6 run rather than parking at all).
-  VERIFIABLE: Vitest on the pause record (reason + retryAfter round-trip, an expired clock
-  yields "retry", a clockless park yields "hold") and a drill that parks with a 60-second
-  clock and asserts the next tick starts a session.
-
 - [ ] 446. THE PICK-UP WINDOW AFTER A RELEASE (30.07.2026, measured on the same day — the
   retrospective's §3.70; bundle Urlaubsfestigkeit). The takeover handshake has two halves: a
   window claims the batch, the owner releases at its next clean turn end, and the window

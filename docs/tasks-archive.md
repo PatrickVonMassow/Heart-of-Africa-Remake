@@ -14523,3 +14523,16 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   VERIFIABLE: pure Vitest in `scripts/model-guard-core.test.mjs` — every legitimate
   trailer form passes, an allowed name with an addition and a two-model line both
   fail, and the existing forbidden/unnamed classifications are unchanged.
+
+- [x] 445. EVERY PARK CARRIES A RESTART CLOCK (30.07.2026, out of the fortnight-alone review;
+  bundle Urlaubsfestigkeit). `.claude/batch-paused` stops the batch until someone removes it
+  by hand. Unattended that means: a cause which would have cleared itself in twenty minutes —
+  a red CI run, a guard loop, a transient forbidden serving model — costs the rest of the
+  absence. Every pause therefore records its REASON and a RETRY-AFTER; the launcher retries
+  when the clock runs out and notes the attempt. Only genuinely unsafe states park without a
+  clock, and the list of those is written down and short (today: a serving model outside the
+  allowlist is the candidate — decide per cause, and where a retry is safe, let the fallback
+  chain of CLAUDE.md §6 run rather than parking at all).
+  VERIFIABLE: Vitest on the pause record (reason + retryAfter round-trip, an expired clock
+  yields "retry", a clockless park yields "hold") and a drill that parks with a 60-second
+  clock and asserts the next tick starts a session.
