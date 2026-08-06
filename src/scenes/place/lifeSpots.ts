@@ -47,6 +47,9 @@ export interface PlayGround {
   /** Distance from the ground's RIM to the nearest adult station. The hearing
    *  rule holds when this is at least the hearing radius. */
   clearance: number
+  /** Fraction of the ground a child can actually stand on, 0..1; 1 when the
+   *  caller gave no collider predicate. */
+  openness: number
 }
 
 /** The smallest ground a game of tag is still a game on. Below this the group
@@ -84,29 +87,69 @@ export function childPlayGround(
   walkRadius: number,
   playRadius: number,
   minClearance = 0,
-  bearings = 64,
+  options: {
+    /** Whether a child may stand at a point — the settlement's own collider
+     *  predicate. Given one, the search prefers OPEN ground among the bearings
+     *  that are far enough away. It is not decoration: the first placement put
+     *  the group behind a boulder line, where the chase read as two heads
+     *  bobbing between rocks (verification/480-village-tag). Watching them is
+     *  the whole teaching, so a ground you cannot see into is a bad ground. */
+    free?: (x: number, z: number) => boolean
+    bearings?: number
+  } = {},
 ): PlayGround {
+  const bearings = options.bearings ?? 64
   const rMax = Math.max(1, Math.min(playRadius, walkRadius))
   const rMin = Math.min(rMax, MIN_PLAY_RADIUS)
-  let best: PlayGround = { x: 0, z: 0, radius: rMax, clearance: -Infinity }
+  /** Fraction of the disc a child could stand on; 1 when nothing is known. */
+  const openness = (x: number, z: number, r: number): number => {
+    const free = options.free
+    if (!free) return 1
+    let open = 0
+    let n = 0
+    for (const ring of [0.35, 0.7, 1]) {
+      for (let k = 0; k < 8; k++) {
+        const a = (k / 8) * Math.PI * 2
+        n++
+        if (free(x + Math.cos(a) * r * ring, z + Math.sin(a) * r * ring)) open++
+      }
+    }
+    n++
+    if (free(x, z)) open++
+    return open / n
+  }
+  const better = (a: PlayGround, b: PlayGround | null): boolean => {
+    if (!b) return true
+    // Openness first, and only among grounds that are far enough — a clear view
+    // is worth a metre of separation, but never the separation rule itself.
+    const far = (g: PlayGround) => g.clearance >= minClearance
+    if (far(a) !== far(b)) return far(a)
+    if (far(a) && Math.abs(a.openness - b.openness) > 0.05) return a.openness > b.openness
+    return a.clearance > b.clearance
+  }
+  let best: PlayGround | null = null
   for (let r = rMax; r >= rMin - 1e-9; r -= 0.5) {
     // Out toward the rim, but not against it: the whole ground stays inside the
     // walkable area with a spectator's margin around it, and its middle is then
     // as far from the village's life as the place allows.
     const centreDistance = Math.max(0, walkRadius - r - SPECTATOR_MARGIN)
-    let atThisSize: PlayGround = { x: 0, z: 0, radius: r, clearance: -Infinity }
+    let atThisSize: PlayGround | null = null
     for (let k = 0; k < bearings; k++) {
       const a = (k / bearings) * Math.PI * 2
       const x = Math.cos(a) * centreDistance
       const z = Math.sin(a) * centreDistance
       let nearest = Infinity
       for (const [sx, sz] of stations) nearest = Math.min(nearest, Math.hypot(x - sx, z - sz))
-      const clearance = nearest - r
-      if (clearance > atThisSize.clearance) atThisSize = { x, z, radius: r, clearance }
+      const here: PlayGround = { x, z, radius: r, clearance: nearest - r, openness: 0 }
+      // Openness is the expensive half, so it is only measured where the cheap
+      // half already qualifies.
+      if (here.clearance >= minClearance || !atThisSize) here.openness = openness(x, z, r)
+      if (better(here, atThisSize)) atThisSize = here
     }
-    if (atThisSize.clearance > best.clearance) best = atThisSize
+    if (!atThisSize) continue
+    if (better(atThisSize, best)) best = atThisSize
     // The biggest ground that is far enough wins; only if none is do we shrink.
     if (atThisSize.clearance >= minClearance) return atThisSize
   }
-  return best
+  return best ?? { x: 0, z: 0, radius: rMax, clearance: -Infinity, openness: 0 }
 }

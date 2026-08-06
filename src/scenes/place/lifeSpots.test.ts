@@ -95,6 +95,36 @@ describe('the children play out of the adults’ earshot (point 481.4)', () => {
     expect(Math.hypot(crowded.x - g.x, crowded.z - g.z)).toBeGreaterThan(HEARING)
   })
 
+  it('prefers OPEN ground among the bearings that are far enough', () => {
+    // One station in the middle, so every bearing is equally far — and half the
+    // settlement a boulder field. The ground must land in the other half,
+    // because a chase behind rocks is a chase nobody can watch.
+    const middle: Array<[number, number]> = [[0, 0]]
+    const open = childPlayGround(middle, WALK, PLAY, HEARING, { free: (x) => x <= 0 })
+    expect(open.clearance).toBeGreaterThanOrEqual(HEARING)
+    expect(open.openness).toBe(1)
+    expect(open.x).toBeLessThanOrEqual(0)
+    // The mirrored obstacle mirrors the choice: it is the ground, not a bias.
+    const mirrored = childPlayGround(middle, WALK, PLAY, HEARING, { free: (x) => x >= 0 })
+    expect(mirrored.x).toBeGreaterThanOrEqual(0)
+  })
+
+  it('never buys openness with the separation rule', () => {
+    // Everything but the adults' own corner is blocked: the ground still keeps
+    // its distance and reports the openness it had to accept, rather than
+    // moving into earshot for a clear view.
+    const g = childPlayGround(villageAdultStations(FIRE), WALK, PLAY, HEARING, {
+      free: (x, z) => Math.hypot(x - 4.6, z - 5.6) < 8,
+    })
+    expect(g.clearance).toBeGreaterThanOrEqual(HEARING)
+    expect(g.openness).toBeLessThan(0.5)
+  })
+
+  it('reports the openness of the ground it picked in the shipped village', () => {
+    // No predicate: nothing is known, and it says so rather than guessing.
+    expect(ground().openness).toBe(1)
+  })
+
   it('is deterministic — the same village puts its children in the same place', () => {
     const a = ground()
     const b = ground()

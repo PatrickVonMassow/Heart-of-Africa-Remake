@@ -1554,8 +1554,9 @@ export function PlaceLife({
         Math.max(1, radius - NPC_RADIUS * 2),
         balance.villageLife.tag.playRadius,
         balance.communication.hearingRadius,
+        { free: (px, pz) => standingClear(colliders, px, pz, NPC_RADIUS) },
       ),
-    [firePos, radius],
+    [firePos, radius, colliders],
   )
 
   if (kind === 'port') {
