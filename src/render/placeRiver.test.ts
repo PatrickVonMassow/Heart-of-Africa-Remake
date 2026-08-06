@@ -5,6 +5,7 @@
 // DOWNSTREAM.
 
 import { describe, it, expect } from 'vitest'
+import * as THREE from 'three/webgpu'
 import {
   RIVER_DRIFT_SPAN,
   RIVER_REACH,
@@ -118,6 +119,46 @@ describe('the water surface', () => {
     const coarse = buildRiverSurfaceGeometry(bank, 30, 4)
     const fine = buildRiverSurfaceGeometry(bank, 30, 48)
     expect(fine.getAttribute('position').count).toBeGreaterThan(coarse.getAttribute('position').count * 4)
+  })
+})
+
+describe('every drawn face looks UP', () => {
+  // The one thing a geometry builder gets silently wrong: a triangle wound the
+  // other way turns its normal into the ground, and the surface renders as an
+  // unlit black band (which is exactly what the first frame at the bank showed).
+  // Judged on the FACE normals the winding produces, not on the attribute.
+  const faceNormalsUp = (g: THREE.BufferGeometry) => {
+    const p = g.getAttribute('position')
+    const index = g.getIndex()!
+    const a = new THREE.Vector3()
+    const b = new THREE.Vector3()
+    const c = new THREE.Vector3()
+    let worst = Infinity
+    for (let i = 0; i < index.count; i += 3) {
+      a.fromBufferAttribute(p, index.getX(i))
+      b.fromBufferAttribute(p, index.getX(i + 1))
+      c.fromBufferAttribute(p, index.getX(i + 2))
+      const n = b.sub(a).cross(c.sub(a)).normalize()
+      worst = Math.min(worst, n.y)
+    }
+    return worst
+  }
+
+  it('the ground plate', () => {
+    expect(faceNormalsUp(buildGroundPlateGeometry(bounds, discEdge, 96))).toBeGreaterThan(0.9)
+  })
+
+  it('the shore', () => {
+    expect(faceNormalsUp(buildBankShoreGeometry(bank, 20))).toBeGreaterThan(0.5)
+  })
+
+  it('the water surface', () => {
+    expect(faceNormalsUp(buildRiverSurfaceGeometry(bank, 30, 12))).toBeGreaterThan(0.9)
+  })
+
+  it('and the shore’s own normal attribute agrees with its faces', () => {
+    const n = buildBankShoreGeometry(bank, 20).getAttribute('normal')
+    for (let i = 0; i < n.count; i++) expect(n.getY(i)).toBeGreaterThan(0.5)
   })
 })
 

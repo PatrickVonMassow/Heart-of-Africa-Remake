@@ -116,10 +116,14 @@ export function buildBankShoreGeometry(bank: PlaceRiverBank, halfLength: number)
       normals.push(0, 1, 0)
     }
   }
+  // Wound so the faces look UP: the row step runs outward along the bank normal
+  // and the column step downstream, and it is `column × row` that has the
+  // positive Y — the other order leaves every normal pointing into the ground
+  // and the whole shore renders as an unlit black band.
   for (let r = 0; r + 1 < rows.length; r++) {
     for (let c = 0; c + 1 < cols; c++) {
       const a = r * cols + c
-      indices.push(a, a + cols, a + 1, a + 1, a + cols, a + cols + 1)
+      indices.push(a, a + 1, a + cols, a + 1, a + cols + 1, a + cols)
     }
   }
   const g = new THREE.BufferGeometry()
@@ -157,10 +161,11 @@ export function buildRiverSurfaceGeometry(
       uvs.push(u, out - bank.distance)
     }
   }
+  // Wound face-up, for the same reason as the shore above.
   for (let r = 0; r < across; r++) {
     for (let c = 0; c < along; c++) {
       const a = r * (along + 1) + c
-      indices.push(a, a + along + 1, a + 1, a + 1, a + along + 1, a + along + 2)
+      indices.push(a, a + 1, a + along + 1, a + 1, a + along + 2, a + along + 1)
     }
   }
   const g = new THREE.BufferGeometry()
