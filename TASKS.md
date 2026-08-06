@@ -4898,35 +4898,35 @@ Build order, chosen so no two parallel agents own the same file:
   separation AND lies within the built fabric for every shipped village), plus
   the retaken frame checked by a human on both backends.
 
-- [ ] 526. A CANCELLED PAGES DEPLOYMENT CAN NEVER BE RE-RUN FOR THAT COMMIT
-  (measured 06.08.2026 on `main` at cde5aee6). The deploy workflow carries
-  `concurrency: group pages, cancel-in-progress: true`, and the Pages action
-  derives the deployment ID from `pages_build_version` — the COMMIT SHA. When
-  the first run for a commit is cancelled (here: GitHub's own deployment queue
-  ran the run into its timeout, `Timeout reached, aborting!`, and the action
-  cancelled the deployment it had created), that ID is burnt: every later
-  attempt for the SAME commit creates the same deployment ID and is answered
-  `Deployment cancelled.` within five seconds. Re-running the failed job and a
-  fresh `workflow_dispatch` both died that way, so the commit could not reach
-  the live site at all — the deployed state stayed two hours behind `main`,
-  while the user judges every render change against exactly that site, and
-  `ci-status-guard` blocks the turn end on a red that no push can clear.
+- [ ] 526. A STUCK PAGES DEPLOYMENT BLOCKS EVERY LATER ONE, AND NOTHING IN THE
+  REPOSITORY CLEARS IT (measured 06.08.2026 on `main`). The deploy for cde5aee6
+  was accepted by GitHub and then sat in its deployment queue until the action
+  gave up (`Timeout reached, aborting!`); the deployment itself stayed IN
+  PROGRESS on GitHub's side. From then on the Pages API refused every further
+  deployment — the re-run and a `workflow_dispatch` of the same commit were
+  answered `Deployment cancelled.`, and the next commit's run failed outright
+  with `Deployment request failed … due to in progress deployment. Please cancel
+  cde5aee6… first`. The site therefore served a two-hour-old `main` while the
+  user judges every render change against exactly that site, and
+  `ci-status-guard` demanded a fixing push that could not exist, since the fault
+  was not in the repository at all. Clearing it took a Pages-API cancel of the
+  stuck deployment followed by a fresh dispatch — a step nothing in the project
+  knows about.
   FINAL STATE:
-  1. The deploy is RETRYABLE for a commit whose deployment was cancelled: the
-     workflow either deploys under a build version that is not exhausted by one
-     cancellation, or it detects the burnt-ID answer and re-creates the
-     deployment, so a transient queue timeout costs a retry, never the deploy.
-  2. A deploy that fails for a GitHub-side reason (queue timeout, cancellation
-     by a newer run) is TOLD APART from one that fails on our build. The first
-     is retried automatically at least once before the run goes red; the second
-     stays red immediately.
-  3. `cancel-in-progress` keeps its purpose — a newer `main` push still
-     supersedes an older in-flight deploy — without leaving the superseded
-     commit unable to deploy on a later manual run.
-  4. `ci-status-guard` names the distinction in its message: a red that only a
-     NEW commit can clear says so, and names the remedy, instead of demanding a
-     fixing push that cannot exist.
-  VERIFIABLE: pure Vitest on the guard's classification of a
-  cancelled-deployment failure, plus one real deploy run proving a commit whose
-  first deployment was cancelled still reaches the live site.
+  1. A deploy run that finds a stuck in-progress deployment CLEARS it and
+     deploys: the run cancels the blocking deployment and retries once, so a
+     GitHub-side queue stall costs a retry rather than the deploy.
+  2. The queue wait is bounded so a stall is reported as a stall — with the
+     blocking deployment named — instead of ending as a bare timeout that
+     leaves the deployment behind.
+  3. A deploy that fails for a GitHub-side reason is TOLD APART from one that
+     fails on our build: the first is retried, the second stays red at once.
+  4. `ci-status-guard` names that distinction. A red that no push in the
+     repository can clear says so and names the remedy, instead of demanding a
+     fixing push.
+  5. `cancel-in-progress` keeps its purpose — a newer `main` push still
+     supersedes an older in-flight deploy.
+  VERIFIABLE: pure Vitest on the guard's classification of a blocked/stalled
+  deploy failure and on the workflow's retry decision, plus one real deploy run
+  proving a commit blocked by a stuck deployment still reaches the live site.
 
