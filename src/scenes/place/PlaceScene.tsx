@@ -27,6 +27,8 @@ import {
   effectiveFireShadows,
   effectiveFireShadowResolution,
   effectiveFireShadowSoft,
+  effectivePlaceRiverFoam,
+  effectivePlaceRiverSegments,
 } from '../../state/ui'
 import { balance, START_YEAR } from '../../config/balance'
 import { advanceGroundWetness, coldnessAt, effectiveGreenness, effectiveWetness, fireRainFactor, groundWetnessFactor, harmattanAt, karifAt, RAIN_GRAY, rainAmount, skyOvercastParams, strikeSchedulerStep, sunDimFactor, thunderstormAt, type StrikeSchedulerState } from '../../systems/season'
@@ -82,8 +84,19 @@ import {
 import { REGION_PLACE_STYLES, type RegionPlaceStyle } from './regionStyles'
 import { PlaceLife } from './PlaceLife'
 import { SpeechLabels } from './SpeechLabels'
-import { resolveMove } from './collision'
+import { resolveMove, PLAYER_RADIUS } from './collision'
 import { buildBoundaryLut, isOutsidePlace } from './boundary'
+import {
+  RIVER_DRIFT_SPEED,
+  RIVER_HALF_LENGTH,
+  buildBankShoreGeometry,
+  buildGroundPlateGeometry,
+  buildRiverFlecks,
+  buildRiverSurfaceGeometry,
+  createPlaceRiverMaterial,
+  fleckPosition,
+} from '../../render/placeRiver'
+import type { PlaceRiverBank } from './riverBank'
 import { clearEdgeBand, setEdgeBandBoundary, setEdgeBandLook } from '../../render/edgeBand'
 import { buildLayout, DIG_SITE_RADIUS, isOnLane, nearestActionable, PLACE_RADIUS, SPAWN_INSET, type Interactive, type PathDef, type DwellingDef, type FenceDef, type PlaceLayout } from './layout'
 import { getPanoramaCapture } from '../travel/panoramaCapture'
@@ -106,7 +119,6 @@ import { easeSpeed, easeToward, advanceStepPhase, headBob, strafeRollTarget, idl
 import { PAD_LOOK_RATE, applyPitch, mousePitchDelta, padPitchDelta, placeCameraPose } from '../../systems/lookPitch'
 import { getStrings, useStrings } from '../../i18n'
 
-const PLAYER_RADIUS = 0.35 // collision radius of player and inhabitants
 const EYE_HEIGHT = 1.5 // first-person camera height in meters
 
 /** Sun direction shared by the sky dome disc and the shadow light. */
@@ -1766,6 +1778,111 @@ function LandscapeBackdrop({ lat, lon, seed, innerRadius }: { lat: number; lon: 
   return <mesh name="landscape-backdrop" geometry={geometry} material={material} receiveShadow />
 }
 
+// --- The river the settlement stands on (work-order 482) ----------------------
+
+/**
+ * The bank, the water and the foam riding it — real geometry on the
+ * settlement's own ground, on the side the bird's-eye view puts the river
+ * (`riverBank.ts` derives both from the one course).
+ *
+ * The foam patches are the reading that makes the current LEGIBLE and, being
+ * real positions rather than a shader effect, the one a verification can
+ * measure: their drift is the phase advanced by the frame time, so what the
+ * player sees moving downstream is exactly what a check can prove moves
+ * downstream.
+ */
+function PlaceRiver({
+  bank,
+  discEdge,
+  groundMaterial,
+}: {
+  bank: PlaceRiverBank
+  discEdge: number
+  groundMaterial: THREE.Material
+}) {
+  const segments = useUi(effectivePlaceRiverSegments)
+  const foamCount = useUi(effectivePlaceRiverFoam)
+  const water = useMemo(() => createPlaceRiverMaterial(), [])
+  const surface = useMemo(
+    () => buildRiverSurfaceGeometry(bank, RIVER_HALF_LENGTH, segments),
+    [bank, segments],
+  )
+  // The shore spans exactly the chord the ground plate's cut makes, so its
+  // inland edge ends where the plate's rim curves away from the waterline.
+  const shore = useMemo(() => {
+    const inland = bank.walkEdge
+    const half = Math.sqrt(Math.max(1, discEdge * discEdge - inland * inland))
+    return buildBankShoreGeometry(bank, half)
+  }, [bank, discEdge])
+  const flecks = useMemo(() => buildRiverFlecks(foamCount), [foamCount])
+  const foamGeometry = useMemo(() => new THREE.CircleGeometry(1, 10).rotateX(-Math.PI / 2), [])
+  const foamMaterial = useMemo(
+    () => new THREE.MeshStandardMaterial({ color: '#e8f1f3', roughness: 0.75, transparent: true, opacity: 0.8 }),
+    [],
+  )
+  useEffect(() => () => surface.dispose(), [surface])
+  useEffect(() => () => shore.dispose(), [shore])
+  useEffect(() => () => foamGeometry.dispose(), [foamGeometry])
+  useEffect(() => () => foamMaterial.dispose(), [foamMaterial])
+
+  const foamRef = useRef<THREE.InstancedMesh>(null)
+  const phase = useRef(0)
+  const dummy = useMemo(() => new THREE.Object3D(), [])
+  const positions = useRef<Array<{ x: number; y: number; z: number }>>([])
+
+  useFrame((_, rawDt) => {
+    phase.current += Math.min(rawDt, 0.1) * RIVER_DRIFT_SPEED
+    const mesh = foamRef.current
+    const now: Array<{ x: number; y: number; z: number }> = []
+    for (let i = 0; i < flecks.length; i++) {
+      const p = fleckPosition(bank, flecks[i], phase.current)
+      now.push(p)
+      if (!mesh) continue
+      dummy.position.set(p.x, p.y, p.z)
+      dummy.scale.setScalar(flecks[i].size)
+      dummy.updateMatrix()
+      mesh.setMatrixAt(i, dummy.matrix)
+    }
+    positions.current = now
+    if (mesh) mesh.instanceMatrix.needsUpdate = true
+  })
+
+  // Dev hook for the headless verification (CLAUDE.md §7.2): where the water
+  // is, which way it runs, and where its foam stands right now.
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    const w = window as unknown as Record<string, unknown>
+    w.__placeRiver = () => ({
+      riverId: bank.riverId,
+      normal: { x: bank.nx, z: bank.nz },
+      downstream: { x: bank.fx, z: bank.fz },
+      distance: bank.distance,
+      walkEdge: bank.walkEdge,
+      bank: bank.bank,
+      upstream: bank.upstream,
+      downstream_point: bank.downstream,
+      flecks: positions.current.map((p) => ({ ...p })),
+    })
+    return () => {
+      delete w.__placeRiver
+    }
+  }, [bank])
+
+  return (
+    <>
+      <mesh name="place-river-shore" geometry={shore} material={groundMaterial} receiveShadow />
+      <mesh name="place-river" geometry={surface} material={water} />
+      <instancedMesh
+        name="place-river-foam"
+        ref={foamRef}
+        args={[foamGeometry, foamMaterial, Math.max(1, flecks.length)]}
+        count={flecks.length}
+        frustumCulled={false}
+      />
+    </>
+  )
+}
+
 // --- Giza monument site (design.md §4.4, point 273) ---------------------------
 
 /**
@@ -2007,6 +2124,19 @@ export function PlaceScene() {
     setEdgeBandBoundary(buildBoundaryLut(layout))
     return () => clearEdgeBand()
   }, [layout])
+  // The drawn ground: the walkable plate, cut off at the top of the river bank
+  // where the settlement has one (work-order 482) — read from the same module
+  // the boundary comes from, so the ground can never end short of where the
+  // player may walk.
+  const groundPlate = useMemo(() => {
+    if (!layout) return null
+    const edge = layout.radius + GROUND_DISC_OVERHANG
+    return buildGroundPlateGeometry(layout, edge, groundDiscSegments(edge))
+  }, [layout])
+  useEffect(() => {
+    if (!groundPlate) return
+    return () => groundPlate.dispose()
+  }, [groundPlate])
   const isPort = place?.kind === 'port'
   const isMonument = place?.kind === 'monument'
   const isVillage = place?.kind === 'village'
@@ -2482,7 +2612,7 @@ export function PlaceScene() {
     if (useUi.getState().prompt !== prompt) setPrompt(prompt)
   })
 
-  if (!place || !layout) return null
+  if (!place || !layout || !groundPlate) return null
   const sky = sandy ? PORT_SKY : VILLAGE_SKY
 
   return (
@@ -2520,15 +2650,25 @@ export function PlaceScene() {
       <GizaSkyline placeId={place.id} />
       <PanoramaWildlife region={place.region} placeId={place.id} seed={seed} innerRadius={layout.radius + BACKDROP_INNER_OFFSET} lat={place.lat} lon={place.lon} skyHorizon={sky.horizon} />
 
-      {/* Ground disc with procedural mottling. Many segments, not 48: a
+      {/* Ground plate with procedural mottling. Many segments, not 48: a
           48-gon around a 74 m plateau puts 9.7 m straight chords on the ground
           line, and from a few metres away that reads as the hard straight edge
           of point 381 — while its 0.16 m inset also uncovered the backdrop's
-          tucked rim ramp as a scalloped hairline. The count follows the disc's
-          own edge (point 390 widened Giza's), so the chord never grows. */}
-      <mesh name="ground-disc" rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow material={mats.ground}>
-        <circleGeometry args={[layout.radius + GROUND_DISC_OVERHANG, groundDiscSegments(layout.radius + GROUND_DISC_OVERHANG)]} />
-      </mesh>
+          tucked rim ramp as a scalloped hairline. The count follows the plate's
+          own edge (point 390 widened Giza's), so the chord never grows. It is a
+          fan rather than a circle because a river bank cuts it straight
+          (work-order 482); with no bank it is the same disc as before. */}
+      <mesh name="ground-disc" geometry={groundPlate} material={mats.ground} receiveShadow />
+
+      {/* The river the settlement stands on (work-order 482): the shore, the
+          water and the foam that shows which way it runs. */}
+      {layout.bank && (
+        <PlaceRiver
+          bank={layout.bank}
+          discEdge={layout.radius + GROUND_DISC_OVERHANG}
+          groundMaterial={mats.ground}
+        />
+      )}
 
       {layout.interactives.map((it, i) => {
         if (it.type === 'villager') return <Villager key={i} item={it} style={style} dress={dress} />
@@ -2615,6 +2755,7 @@ export function PlaceScene() {
           errands={layout.errands}
           teachingStone={layout.teachingStone}
           digSites={layout.digSites}
+          bank={layout.bank}
           pen={layout.pen}
           colliders={layout.colliders}
           radius={layout.radius}

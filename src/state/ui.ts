@@ -299,6 +299,10 @@ export const effectiveFloraCastShadow = (s: UiState): boolean => currentQuality(
 export const effectiveWeatherIntensity = (s: UiState): number => currentQuality(s).weatherIntensity
 /** Radial segments of the villager figures' limb primitives (point 479). */
 export const effectiveFigureLimbSegments = (s: UiState): number => currentQuality(s).figureLimbSegments
+/** Segments along the current of a settlement river's surface (work-order 482). */
+export const effectivePlaceRiverSegments = (s: UiState): number => currentQuality(s).placeRiverSegments
+/** How many patches of foam ride that current (work-order 482). */
+export const effectivePlaceRiverFoam = (s: UiState): number => currentQuality(s).placeRiverFoam
 
 // Dev hook for the headless verification (CLAUDE.md §7.2).
 if (import.meta.env.DEV && typeof window !== 'undefined') {
