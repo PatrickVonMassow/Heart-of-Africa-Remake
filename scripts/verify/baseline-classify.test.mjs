@@ -273,6 +273,17 @@ describe('classifying against the baseline', () => {
       expect(baselineRunDeath({ checks: allChecks(red), failed: failedChecks(red), exitCode: 1, currentCheckCount: 2 })).toBeNull()
     })
 
+    it('never calls a run that EXITED ZERO a death, however few checks it counted', () => {
+      // Some checks are conditional on what the app produced, so a healthy
+      // baseline may legitimately count a few short. The exit is the suite's
+      // last statement: reaching it means reaching the end.
+      expect(baselineRunDeath({ checks: allChecks(shortRun), failed: [], exitCode: 0, currentCheckCount: 243 })).toBeNull()
+    })
+
+    it('says nothing rather than guessing when no exit code was handed in', () => {
+      expect(baselineRunDeath({ checks: allChecks(shortRun), failed: [], currentCheckCount: 2 })).toBeNull()
+    })
+
     it('is not confused with a run that produced nothing at all (that is the not-ran case)', () => {
       expect(baselineRunDeath({ checks: [], failed: [], exitCode: 1, currentCheckCount: 243 })).toBeNull()
     })

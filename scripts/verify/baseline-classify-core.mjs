@@ -338,12 +338,21 @@ export function classifyAgainstBaseline({ currentFailed, baselineFailed, baselin
  * A run that printed NOTHING at all is the pre-existing "did not run" case, not
  * a death — foldBaselineRuns reports that through `ran`.
  *
+ * A run that exited ZERO is never a death, whatever it counted: the exit is the
+ * suite's last statement, so reaching it means reaching the end. Some checks are
+ * conditional on what the app produced, so a healthy baseline may legitimately
+ * count a few short — and calling that a death would cry wolf on every run.
+ * A killed run (no exit code at all) counts as non-zero.
+ *
  * Returns null when the run looks healthy, else the evidence to print.
  */
 export function baselineRunDeath({ checks, failed, exitCode = null, currentCheckCount = 0 }) {
   const reached = (checks ?? []).length
   if (reached === 0) return null
+  if (exitCode === 0) return null
   const short = currentCheckCount > 0 && reached < currentCheckCount
+  // A KNOWN non-zero exit only: `null` also means "no exit code was handed in"
+  // (a bare output string), and a healthy green run must not read as silent.
   const silent = exitCode !== null && exitCode !== 0 && (failed ?? []).length === 0
   if (!short && !silent) return null
   return {
