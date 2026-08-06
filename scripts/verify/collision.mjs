@@ -107,6 +107,43 @@ async function pushUntilClear(maxMs = 15000) {
   await page.waitForTimeout(120)
 }
 
+/** Hold forward until the walk stops making ground along the bank normal — the
+ *  wall has been reached — or a generous window elapses. Same reason as
+ *  pushUntilClear: a fixed frame count measures the host's drawing speed, and
+ *  the software lane draws the four steps to the water far slower than the
+ *  hardware one. Re-affirms the held key each tick. */
+async function pushForwardUntilStalled(bank, maxMs = 12000) {
+  // Each step waits for DRAWN frames, never for wall-clock milliseconds: on the
+  // software lane two 80 ms polls can fall inside a single frame, and a walk that
+  // simply had not been drawn yet would read as a wall.
+  const step = () =>
+    page.evaluate(
+      (b) =>
+        new Promise((r) =>
+          requestAnimationFrame(() =>
+            requestAnimationFrame(() => {
+              window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW' }))
+              r(window.__placePlayer.x * b.nx + window.__placePlayer.z * b.nz)
+            }),
+          ),
+        ),
+      bank,
+    )
+  const t0 = Date.now()
+  await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW' })))
+  let last = await step()
+  let stalled = 0
+  while (Date.now() - t0 < maxMs) {
+    const now = await step()
+    // Three drawn steps without ground gained: the wall is there, not a slow host.
+    stalled = now - last < 0.02 ? stalled + 1 : 0
+    last = now
+    if (stalled >= 3) break
+  }
+  await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyW' })))
+  await page.waitForTimeout(120)
+}
+
 /**
  * Place the player exactly on a collider center, aimed outward, and feed
  * input frames; the resolver must push it out to (near) the surface.
@@ -496,7 +533,13 @@ if (bank) {
     p.yaw = Math.atan2(-b.nx, -b.nz)
     p.pitch = 0
   }, bank)
-  await pushFrames(20)
+  // Hold forward until the walk STOPS advancing, not for a fixed number of
+  // frames: the four steps to the water take ~0.8 s of drawn time, which the
+  // WebGPU lane manages and the software WebGL lane does not — the same fixed
+  // window that reddens the checks of point 506. Polling on the walk's own
+  // progress asks what the check means (does the wall stand at the water?)
+  // instead of how fast the host draws.
+  await pushForwardUntilStalled(bank)
   const at = await page.evaluate(() => ({
     x: window.__placePlayer.x,
     z: window.__placePlayer.z,
