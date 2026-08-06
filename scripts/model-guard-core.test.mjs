@@ -11,12 +11,35 @@ import {
   formatForbiddenReason,
   formatUnidentifiedReason,
   isPolicyBreach,
+  judgeTrailer,
   modelNameIn,
+  modelNamesIn,
   parseLogLine,
 } from './model-guard-core.mjs'
 
 const T0 = Date.parse('2026-07-24T22:00:00Z')
 const line = (sha, iso, trailer) => `${sha}|${iso}|${trailer}`
+
+// Every LEGITIMATE trailer form this repository's history actually carries,
+// counted off `git log --all --format='%(trailers:key=Co-Authored-By,valueonly,
+// separator=;)' | tr ';' '\n' | sort | uniq -c` on 06.08.2026. The tightening
+// below must leave every one of them green — a guard that reddens real history
+// is a regression, not a fix. The raw model-id form is the trap: 14 commits on
+// 29.07.2026 were stamped with it, and it names Opus 5 as plainly as the rest.
+const HISTORIC_TRAILERS = [
+  'Claude Opus 5 <noreply@anthropic.com>', // 655 commits
+  'Claude Opus 4.8 (1M context) <noreply@anthropic.com>', // 648
+  'Claude Opus 5 (1M context) <noreply@anthropic.com>', // 457
+  'Claude Fable 5 <noreply@anthropic.com>', // 450
+  'Claude Opus 4.8 <noreply@anthropic.com>', // 63
+  'Claude claude-opus-5[1m] <noreply@anthropic.com>', // 14 — the raw model id
+]
+// The rest of what history carries, and what it must still be judged as: the
+// 24.07.2026 degradation (7 commits) and the point-397 bare trailer (7).
+const HISTORIC_REJECTS = [
+  ['Claude Haiku 4.5 <noreply@anthropic.com>', 'forbidden'],
+  ['Claude <noreply@anthropic.com>', 'unidentified'],
+]
 
 describe('parseLogLine', () => {
   it('parses sha, date and trailer field', () => {
@@ -134,6 +157,77 @@ describe('classifyTrailer', () => {
   })
 })
 
+// POINT 527: the allowlist judges the NAME PARSED OUT of the trailer, never the
+// raw line. Searching `/\b(opus|fable)\b/` inside the whole trailer let anything
+// that merely CONTAINED an allowed word through the tripwire built to catch a
+// silently degraded session.
+describe('the allowlist is matched against the parsed name', () => {
+  it('leaves every trailer form this history carries green', () => {
+    for (const t of HISTORIC_TRAILERS) {
+      expect(classifyTrailer(t), t).toBe('allowed')
+      expect(isPolicyBreach(t), t).toBe(false)
+    }
+    // and the same forms as the git log hands them over: several per commit,
+    // comma-joined by `%(trailers:…,separator=,)`
+    expect(classifyTrailer(HISTORIC_TRAILERS.join(','))).toBe('allowed')
+  })
+
+  it('keeps judging the rest of history exactly as before', () => {
+    for (const [t, want] of HISTORIC_REJECTS) expect(classifyTrailer(t), t).toBe(want)
+  })
+
+  it('reads the raw model id as the model it names', () => {
+    expect(modelNamesIn('Claude claude-opus-5[1m] <noreply@anthropic.com>')).toEqual(['opus 5'])
+    expect(classifyTrailer('Claude claude-sonnet-5[1m] <noreply@anthropic.com>')).toBe('forbidden')
+    expect(classifyTrailer('Claude claude-haiku-4-5 <noreply@anthropic.com>')).toBe('forbidden')
+  })
+
+  it('parses the claimed model names out of a trailer', () => {
+    expect(modelNamesIn('Claude Opus 5 (1M context) <noreply@anthropic.com>')).toEqual(['Opus 5'])
+    expect(modelNamesIn('Claude <noreply@anthropic.com>')).toEqual([])
+    expect(modelNamesIn('Patrick von Massow <patrick@example.com>')).toEqual([])
+    expect(modelNamesIn('Claude Sonnet 5 / Claude Opus 5 <x@y>')).toEqual(['Sonnet 5', 'Opus 5'])
+    expect(modelNameIn('Claude Sonnet 5 / Claude Opus 5 <x@y>')).toBe('Sonnet 5 + Opus 5')
+  })
+
+  it('no longer passes a forbidden name that merely CARRIES an allowed word', () => {
+    for (const t of [
+      'Claude Haiku 4.5 (opus mode) <noreply@anthropic.com>',
+      'Claude Haiku 4.5, opus-equivalent <noreply@anthropic.com>',
+      'Claude Sonnet 5 (fable fallback) <noreply@anthropic.com>',
+      'Claude Opus-flavoured Sonnet 5 <noreply@anthropic.com>',
+    ]) {
+      expect(classifyTrailer(t), t).toBe('forbidden')
+      expect(isPolicyBreach(t), t).toBe(true)
+    }
+  })
+
+  it('flags a two-model line instead of passing it on its first allowed name', () => {
+    // The smuggling shape: an allowed name standing beside a forbidden one.
+    expect(classifyTrailer('Claude Sonnet 5 / Claude Opus 5 <x@y>')).toBe('forbidden')
+    expect(classifyTrailer('Claude Opus 5 / Claude Haiku 4.5 <x@y>')).toBe('forbidden')
+    // Two ALLOWED names are no breach, but still show no single author.
+    expect(classifyTrailer('Claude Opus 5 / Claude Fable 5 <x@y>')).toBe('unidentified')
+    // One trailer PER co-author stays exactly as legitimate as it was.
+    expect(classifyTrailer('Claude Opus 5 <a@x>,Claude Fable 5 <b@x>')).toBe('allowed')
+  })
+
+  it('accepts the allowed families with and without a version, and nothing else', () => {
+    for (const name of ['Opus 5', 'Opus 4.8', 'Fable 5', 'opus', 'OPUS 5']) {
+      expect(judgeTrailer(`Claude ${name} <x@y>`).verdict, name).toBe('allowed')
+    }
+    for (const name of ['Opusaurus 5', 'Fabled 5', 'Opus 5 turbo', 'Haiku 4.5']) {
+      expect(judgeTrailer(`Claude ${name} <x@y>`).verdict, name).toBe('forbidden')
+    }
+  })
+
+  it('judgeTrailer reports the names it read, so a refusal can name them', () => {
+    expect(judgeTrailer('Claude Haiku 4.5 <x@y>')).toEqual({ verdict: 'forbidden', names: ['Haiku 4.5'] })
+    expect(judgeTrailer('Claude <x@y>')).toEqual({ verdict: 'unidentified', names: [] })
+    expect(judgeTrailer('Patrick <p@x>')).toEqual({ verdict: 'allowed', names: [] })
+  })
+})
+
 describe('findUnidentifiedCommits', () => {
   const log = [
     line('1111111', '2026-07-24T21:00:00Z', 'Claude <noreply@anthropic.com>'), // before baseline
@@ -223,6 +317,30 @@ describe('evaluateCommitTrailers (the commit-msg gate)', () => {
     const v = evaluateCommitTrailers(msg('Co-Authored-By: Claude Haiku 4.5 <noreply@anthropic.com>'))
     expect(v.block).toBe(true)
     expect(v.findings[0].rule).toBe('forbidden-model-trailer')
+  })
+
+  // POINT 527: at the source too — the gate reads the parsed name, not the line.
+  it('lets every trailer form this history carries through', () => {
+    for (const t of HISTORIC_TRAILERS) {
+      expect(evaluateCommitTrailers(msg(`Co-Authored-By: ${t}`)).block, t).toBe(false)
+    }
+  })
+
+  it('rejects a forbidden name that merely carries an allowed word', () => {
+    const v = evaluateCommitTrailers(msg('Co-Authored-By: Claude Haiku 4.5 (opus mode) <x@y>'))
+    expect(v.block).toBe(true)
+    expect(v.findings[0].rule).toBe('forbidden-model-trailer')
+  })
+
+  it('rejects a trailer naming two models and names both', () => {
+    const v = evaluateCommitTrailers(msg('Co-Authored-By: Claude Sonnet 5 / Claude Opus 5 <x@y>'))
+    expect(v.block).toBe(true)
+    expect(v.findings[0].rule).toBe('forbidden-model-trailer')
+    const both = evaluateCommitTrailers(msg('Co-Authored-By: Claude Opus 5 / Claude Fable 5 <x@y>'))
+    expect(both.block).toBe(true)
+    expect(both.findings[0].rule).toBe('multiple-model-trailer')
+    expect(both.findings[0].detail).toContain('Opus 5, Fable 5')
+    expect(formatCommitTrailerVerdict(both)).toContain('multiple-model-trailer')
   })
 
   it('ignores a purely human co-author and a message with no trailer at all', () => {
