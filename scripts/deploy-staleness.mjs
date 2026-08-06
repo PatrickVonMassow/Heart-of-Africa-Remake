@@ -122,10 +122,15 @@ try {
   // dispatch, while a clone and a site that are both behind read as current,
   // which is the miss this whole watchdog exists to prevent. The fetch is
   // bounded and its failure is ignored: the stale refs are then still better
-  // than no answer. FETCH_HEAD is the unambiguous tip when the fetch worked.
-  const fetchedMain = gitOk(['fetch', '--quiet', 'origin', 'main'], 30000)
-  const mainSha =
-    (fetchedMain && git(['rev-parse', 'FETCH_HEAD'])) || git(['rev-parse', 'origin/main']) || git(['rev-parse', 'main'])
+  // than no answer. 20 s of it, with the site GET, the run listing and a
+  // dispatch POST carrying 15 s each behind it inside the launcher's budget.
+  //
+  // The tip is then read from `origin/main`, which the fetch updates, and NOT
+  // from FETCH_HEAD (second review pass): FETCH_HEAD is one shared unversioned
+  // file in a repository three agents work in, and a concurrent fetch between
+  // ours and the read would hand us another branch's tip.
+  gitOk(['fetch', '--quiet', 'origin', 'main'], 20000)
+  const mainSha = git(['rev-parse', 'origin/main']) || git(['rev-parse', 'main'])
   const committedAt = mainSha ? Date.parse(git(['show', '-s', '--format=%cI', mainSha])) : NaN
 
   // --- what the site serves --------------------------------------------------

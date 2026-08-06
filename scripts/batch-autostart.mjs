@@ -481,7 +481,10 @@ try {
     windowsHide: true,
     cwd: REPO,
     encoding: 'utf8',
-    timeout: 90000,
+    // 120 s, with headroom over the child's own bounds (20 s fetch + three 15 s
+    // HTTP calls): an overrun is fail-open, but it also loses that tick's state
+    // write and any alert it had decided, and the sum should not brush the cap.
+    timeout: 120000,
     stdio: ['ignore', 'pipe', 'pipe'],
   })
   const r = JSON.parse(out.trim().split('\n').filter(Boolean).pop())
