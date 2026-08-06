@@ -82,6 +82,38 @@ outside the agent's control.
 | 14 | The launcher is DISABLED while the boundary is in use | the guard reads the launcher's REAL state each time — the task's `State` on Windows, the daemon's own record on Linux, both in one ready/running/disabled/unknown vocabulary — and blocks the stop when it is not armed (`unknown` counts as unarmed), so the session keeps working instead of stranding the batch | Windows: the user must re-arm it (`Enable-ScheduledTask`, elevated). Linux: the session re-arms it itself |
 | 15 | **The RUNTIME kills the session for waiting on a delegated agent** (28.07.2026, four deaths in one afternoon) | the spawn carries `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0`, so a `claude -p` waits indefinitely for its background tasks instead of terminating at 600 s; what bounds a wait instead is PROGRESS — see the section below | none for a healthy wait; a genuinely frozen one is reported and taken over after six launcher ticks (90 min), and only while the declaration is the owner's last word |
 | 16 | The user writes from the phone and NOTHING is running (29.07.2026) | (5) the watcher wakes a light responder within seconds under a bounded claim; if the watcher is itself down, (4) still delivers the message into the next spawn prompt | ≤ 15 min in the watcher-down case — the pre-watcher bound, never worse |
+| 17 | **A pause parks the batch and nobody is there to clear it** (point 445) | the park RECORDS its reason and a RETRY-AFTER; the launcher tick resumes the batch when that clock runs out, notes the attempt and clears the `failCount` that caused the park — see below | only the short written-down list of unsafe causes still waits for a human |
+
+### Every park carries a restart clock (point 445)
+
+`.claude/batch-paused` used to be a marker that stopped the batch until somebody
+deleted it. Away for a fortnight that turns a cause which clears itself in twenty
+minutes — a red CI run, a guard loop, an environment outage — into the rest of the
+absence. So the marker became a RECORD: the reason on its own line(s), then
+`cause:`, `paused-at:`, `retry-after:` and `attempt:`. The format and every decision
+about it are pure in `scripts/batch-pause-core.mjs`; `scripts/batch-lock.mjs` writes
+and reads the file; the launcher tick (`scripts/batch-autostart.mjs`) is what acts:
+
+- **clock still running →** the tick parks exactly as before, and says how long is left;
+- **clock run out →** the record is removed, the attempt is noted, `failCount` is
+  cleared (left standing, the runaway brake would re-pause in the same tick and the
+  clock would have bought nothing) and the tick proceeds to its ordinary spawn
+  decision — through the singleton and the claim, so a retry can never double-spawn;
+- **no clock at all →** it parks until a human clears it. Every marker an older
+  session wrote reads this way: a MISSING clock is never read as an expired one.
+
+Each further park of the same cause climbs the ladder — 20 min, 1 h, 3 h — and after
+the last rung it becomes clockless, because a cause that survived three retries needs
+a person. **Parking without a clock is a short, written-down list**
+(`CLOCKLESS_CAUSES`): a serving model outside the CLAUDE.md §6 allowlist (retrying
+only spawns the same degraded session — where a fallback exists, the §6 chain runs
+instead of parking at all), the user's own stop, a queue in which every open point
+waits on a user decision, and a ladder already spent. Proof: the decision in
+`scripts/batch-pause-core.test.mjs`, the wiring in `scripts/batch-autostart.test.mjs`,
+and `node scripts/pause-retry-drill.mjs` — which parks with a 60-second clock, waits
+it out on the real wall clock and asserts that the next real tick resumes. The drill
+runs against its own record under `local/` through the launcher's side-effect-free
+`--pause-report` mode, so it never spawns a session and never touches the live park.
 
 ## The hard singleton (24.07.2026 — replaces the advisory lock)
 
