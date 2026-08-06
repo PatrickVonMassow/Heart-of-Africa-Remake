@@ -5,6 +5,10 @@
     "lib": ["ES2023"],
     "types": ["node"],
     "skipLibCheck": true,
+    // The config imports one module from the plain-JS tooling layer
+    // (scripts/build-info.mjs, the site's revision marker), so its types are
+    // inferred from that source instead of demanding a hand-written .d.mts.
+    "allowJs": true,
 
     /* Bundler mode */
     "module": "nodenext",

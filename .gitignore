@@ -91,6 +91,8 @@ scripts/.tile-cache
 .claude/batch-launcher.json.tmp-*
 .claude/batch-launcher.log
 .claude/ci-status-guard-state.json
+.claude/deploy-staleness-state.json
+.claude/deploy-staleness-state.json.tmp-*
 .claude/sessions-seen.json
 .claude/session-activity.json
 .claude/parallel-alert.json

@@ -89,6 +89,22 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
+    # MEASURED against the run history, not guessed (06.08.2026). A healthy
+    # deploy job finishes in 9-16 s; the slowest that ever succeeded took
+    # 10 m 11 s (run 31108927749), and the steps below bound it structurally at
+    # ~11 min anyway (300 s first attempt + the cancel + 300 s retry). 25 min is
+    # that worst case with room to spare, and nothing here has ever come close.
+    #
+    # It did NOT contribute to the cancellation of 06.08.2026: the deploy job of
+    # run 31117749040 ended `cancelled` 15 m 31 s after it was created with ZERO
+    # steps recorded — it never got a runner, and `timeout-minutes` only starts
+    # counting once a job actually runs. The decisive counter-evidence is the
+    # `build` job, which carries NO timeout of ours (GitHub's 360-minute
+    # default): in runs 31123203073, 31120476738 and 31125129661 it died in
+    # exactly the same shape after 15 m 01 s, 15 m 01 s and 15 m 02 s, annotated
+    # "The job was not acquired by Runner of type hosted even after multiple
+    # attempts". That is GitHub's own runner-acquisition limit, which no value
+    # here raises or lowers. Kept at 25.
     timeout-minutes: 25
     environment:
       name: github-pages

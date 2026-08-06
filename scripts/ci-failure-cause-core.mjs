@@ -37,6 +37,10 @@ const RERUN_REMEDY =
 const FAMINE_REMEDY =
   'No push in this repository can clear this — not one step of ours ran. Wait for GitHub to answer ' +
   'again, then re-run the workflow and confirm it goes green.'
+const WORKFLOW_DEPENDENCY_REMEDY =
+  'Check the workflow file\'s own dependencies against what GitHub still offers — the `runs-on` label and every ' +
+  '`uses:` tag. A RETIRED runner image or a YANKED action tag kills an unchanged file in exactly this shape, and ' +
+  'only a push pinning a live one fixes it. If they all still resolve, this is an outage and waiting is the remedy.'
 const WORKFLOW_OR_OUTAGE_REMEDY =
   'Re-run the workflow. If it goes green it was an outage on GitHub\'s side. If it dies the same way, ' +
   'the fault is in the workflow FILE — check what the recent commits changed under `.github/workflows/` ' +
@@ -88,6 +92,78 @@ export function ranNothingOfOurs(job) {
   return steps.every((s) => isRunnerOwnStep(s?.name))
 }
 
+/** How long a famine-shaped red on an untouched workflow stays credible as
+ *  somebody else's outage. MEASURED against the longest degradation this project
+ *  has seen (06.08.2026: 15:35 UTC into the evening, ~3.5 h and counting), with
+ *  room over it — the point is not to cut a real outage short, it is that a
+ *  waiver with NO expiry can excuse a fault forever. */
+export const OUTAGE_WAIVER_MAX_MS = 6 * 60 * 60 * 1000
+
+/**
+ * Is the outage waiver still credible? (Reviewer residual (a), 06.08.2026.)
+ *
+ * "The workflow file is byte-identical to its last green run" proves nobody HERE
+ * broke it. It does NOT prove nothing broke it: a `runs-on` image retired by
+ * GitHub, or an action tag yanked by its publisher, kills an unchanged file in
+ * exactly the famine shape — and that red IS fixable, but only by a push. The
+ * two are indistinguishable in a single run. They are NOT indistinguishable over
+ * TIME: an outage passes, a retired dependency does not. So the waiver expires,
+ * and what expires with it is the SILENCE, not the stand-down — see the branch
+ * below for why this does not go back to blocking.
+ *
+ * @param {{famineSince?:number, now?:number, maxMs?:number}} input `famineSince`
+ *   is when this workflow was first seen dying this way (the caller's state file);
+ *   0/absent means "first sighting", which is always credible.
+ * @returns {{credible:boolean, ageMs:number, hours:number}}
+ */
+export function waiverCredibility(input) {
+  try {
+    const { famineSince = 0, now = Date.now(), maxMs = OUTAGE_WAIVER_MAX_MS } = input ?? {}
+    const since = Number(famineSince) || 0
+    if (!since || !Number.isFinite(since)) return { credible: true, ageMs: 0, hours: 0 }
+    const ageMs = Math.max(0, Number(now) - since)
+    return { credible: ageMs < Number(maxMs), ageMs, hours: Math.round(ageMs / 3_600_000) }
+  } catch {
+    return { credible: true, ageMs: 0, hours: 0 } // fail-open: never invent a fault
+  }
+}
+
+/** The page size and page cap the caller uses to read a run's jobs. */
+export const JOBS_PAGE_SIZE = 100
+export const JOBS_MAX_PAGES = 5
+
+/**
+ * Did the caller read ALL of a run's jobs? (Reviewer residual (b), 06.08.2026.)
+ *
+ * The classifier's central rule is "EVERY failed job ran nothing of ours". A
+ * TRUNCATED job list can satisfy that while a failed job on the next page ran
+ * our code — which would waive a red that is genuinely ours. So a partial list
+ * is not a smaller truth, it is no answer: the caller hands `null` instead, and
+ * the classifier falls back to its blocking reading. `total_count` comes from
+ * the API listing itself, so this needs no second call.
+ *
+ * @returns {boolean} true only when the fetched jobs demonstrably cover the run.
+ */
+export function jobsComplete({ fetched = 0, totalCount = null } = {}) {
+  const have = Number(fetched)
+  // `Number(null)` is 0, and a zero total would "prove" any list complete — so
+  // the absence of a count is rejected before the numbers are compared at all.
+  if (totalCount === null || totalCount === undefined || totalCount === '') return false
+  const total = Number(totalCount)
+  if (!Number.isFinite(have) || have < 0) return false
+  if (!Number.isFinite(total) || total < 0) return false // no count → cannot prove completeness
+  return have >= total
+}
+
+/** Should another page be fetched? Bounded, so a pathological run cannot spin. */
+export function moreJobPages({ fetched = 0, totalCount = null, page = 1, perPage = JOBS_PAGE_SIZE, maxPages = JOBS_MAX_PAGES } = {}) {
+  const have = Number(fetched) || 0
+  const total = Number(totalCount)
+  if (!Number.isFinite(total) || have >= total) return false
+  if (Number(page) >= Number(maxPages)) return false
+  return have > 0 && have % Number(perPage) === 0
+}
+
 /**
  * Where the cause of a red run lies.
  *
@@ -101,13 +177,16 @@ export function ranNothingOfOurs(job) {
  *
  * `workflowsUntouched` must be TRUE — proven by the caller — before a run that
  * executed nothing of ours counts as somebody else's outage; see the branch.
+ * `famineSince` is when that waiver started (the caller's state file): past
+ * `OUTAGE_WAIVER_MAX_MS` the waiver stops being credible and `escalate` is set,
+ * so the alert names the retired-image / yanked-tag reading only a push can fix.
  *
- * @param {{workflowName?:string, conclusion?:string, jobs?:object[]|null, workflowsUntouched?:boolean}} input
- * @returns {{cause:'repository'|'external'|'unknown', actionable?:boolean, failedJobs:string[], detail:string, remedy:string}}
+ * @param {{workflowName?:string, conclusion?:string, jobs?:object[]|null, workflowsUntouched?:boolean, famineSince?:number, now?:number}} input
+ * @returns {{cause:'repository'|'external'|'unknown', actionable?:boolean, escalate?:boolean, failedJobs:string[], detail:string, remedy:string}}
  */
 export function classifyFailureCause(input) {
   try {
-    const { workflowName = '', conclusion = '', jobs = null, workflowsUntouched } = input ?? {}
+    const { workflowName = '', conclusion = '', jobs = null, workflowsUntouched, famineSince = 0, now = Date.now() } = input ?? {}
     const workflow = String(workflowName ?? '')
     const isPages = workflow === PAGES_WORKFLOW
     const verdict = String(conclusion ?? '').toLowerCase()
@@ -139,6 +218,23 @@ export function classifyFailureCause(input) {
       // touched before this counts as somebody else's outage. Without that
       // proof the guard keeps blocking and names both readings.
       if (workflowsUntouched === true) {
+        // …AND THE WAIVER EXPIRES (reviewer residual (a)). An outage passes; a
+        // retired `runs-on` image or a yanked action tag does not, and neither
+        // touches our file. Past the window the red is still NOT blocked — a
+        // block nothing in the session can clear cost ~30 turns of looping once
+        // already — but it stops being reported as "nothing to do here": the
+        // alert names the dependency reading and the push that would fix it.
+        const w = waiverCredibility({ famineSince, now })
+        if (!w.credible) {
+          return {
+            cause: 'external',
+            actionable: false,
+            escalate: true,
+            failedJobs: failed,
+            detail: `${died}, and \`.github/workflows/\` is untouched since the last green run — but this has stood for ~${w.hours} h, which is no longer credible as an outage: a RETIRED \`runs-on\` image or a YANKED action tag kills an unchanged file in exactly this shape`,
+            remedy: WORKFLOW_DEPENDENCY_REMEDY,
+          }
+        }
         return {
           cause: 'external',
           actionable: false,

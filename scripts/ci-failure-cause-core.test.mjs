@@ -4,10 +4,15 @@
 // as unknown rather than guessed.
 import { describe, it, expect } from 'vitest'
 import {
+  JOBS_PAGE_SIZE,
+  OUTAGE_WAIVER_MAX_MS,
   PAGES_WORKFLOW,
   classifyFailureCause,
   failedJobNames,
+  jobsComplete,
+  moreJobPages,
   ranNothingOfOurs,
+  waiverCredibility,
 } from './ci-failure-cause-core.mjs'
 
 const job = (over = {}) => ({ name: 'build', status: 'completed', conclusion: 'success', ...over })
@@ -260,5 +265,86 @@ describe('classifyFailureCause', () => {
       expect(r.cause).toBe('external')
       expect(r.remedy).toContain('pages-deploy-unblock.mjs --cancel')
     })
+  })
+})
+
+// ---------------------------------------------------------------------------
+// The two recorded reviewer residuals of point 528, closed.
+// ---------------------------------------------------------------------------
+
+describe('residual (a): the outage waiver EXPIRES', () => {
+  const NOW = Date.parse('2026-08-06T18:00:00Z')
+  const famine = (famineSince) => ({
+    workflowName: 'CI',
+    conclusion: 'failure',
+    workflowsUntouched: true,
+    famineSince,
+    now: NOW,
+    jobs: [job({ name: 'fast', conclusion: 'failure', steps: [{ name: 'Set up job', conclusion: 'failure' }] })],
+  })
+
+  it('is credible on the first sighting and while the window holds', () => {
+    expect(waiverCredibility({ famineSince: 0, now: NOW }).credible).toBe(true)
+    expect(waiverCredibility({ famineSince: NOW - OUTAGE_WAIVER_MAX_MS + 60_000, now: NOW }).credible).toBe(true)
+    expect(waiverCredibility({ famineSince: NOW - OUTAGE_WAIVER_MAX_MS - 60_000, now: NOW }).credible).toBe(false)
+    expect(() => waiverCredibility(null)).not.toThrow()
+    expect(waiverCredibility(null).credible).toBe(true) // fail-open: never invent a fault
+  })
+
+  it('keeps today\'s wording while the outage is still credible', () => {
+    const r = classifyFailureCause(famine(NOW - 60 * 60 * 1000))
+    expect(r.cause).toBe('external')
+    expect(r.actionable).toBe(false)
+    expect(r.escalate).toBeUndefined()
+    expect(r.remedy).toContain('Wait for GitHub to answer')
+  })
+
+  it('names the retired-image / yanked-tag reading once the window is past', () => {
+    // The hole the reviewer found: a workflow byte-identical to its last green
+    // run can still be broken from OUTSIDE, and only a push fixes that.
+    const r = classifyFailureCause(famine(NOW - OUTAGE_WAIVER_MAX_MS - 60 * 60 * 1000))
+    expect(r.cause).toBe('external')
+    expect(r.escalate).toBe(true)
+    expect(r.detail).toContain('no longer credible as an outage')
+    expect(r.remedy).toContain('runs-on')
+    expect(r.remedy).toContain('uses:')
+    expect(r.remedy).toContain('push')
+  })
+
+  it('still does NOT block — an unclearable block cost thirty turns once already', () => {
+    const r = classifyFailureCause(famine(NOW - 48 * 60 * 60 * 1000))
+    expect(r.actionable).toBe(false)
+  })
+
+  it('leaves an UNPROVEN workflow state on its blocking path, expired or not', () => {
+    const r = classifyFailureCause({ ...famine(NOW - 48 * 60 * 60 * 1000), workflowsUntouched: false })
+    expect(r.cause).toBe('unknown')
+    expect(r.escalate).toBeUndefined()
+  })
+})
+
+describe('residual (b): a job list that cannot be proven complete is no answer', () => {
+  it('is complete only when the fetched jobs demonstrably cover the run', () => {
+    expect(jobsComplete({ fetched: 2, totalCount: 2 })).toBe(true)
+    expect(jobsComplete({ fetched: 30, totalCount: 47 })).toBe(false)
+    // No count at all cannot PROVE completeness — the old call assumed it did.
+    expect(jobsComplete({ fetched: 30, totalCount: null })).toBe(false)
+    expect(jobsComplete({})).toBe(false)
+  })
+
+  it('walks on exactly while a full page came back and the run says there is more', () => {
+    expect(moreJobPages({ fetched: JOBS_PAGE_SIZE, totalCount: JOBS_PAGE_SIZE + 1, page: 1 })).toBe(true)
+    expect(moreJobPages({ fetched: JOBS_PAGE_SIZE, totalCount: JOBS_PAGE_SIZE, page: 1 })).toBe(false)
+    expect(moreJobPages({ fetched: 7, totalCount: 40, page: 1 })).toBe(false) // short page: the API is done
+    expect(moreJobPages({ fetched: 0, totalCount: 40, page: 1 })).toBe(false)
+    expect(moreJobPages({ fetched: JOBS_PAGE_SIZE * 5, totalCount: 10_000, page: 5 })).toBe(false) // bounded
+  })
+
+  it('is why a truncated list must reach the classifier as null', () => {
+    // A failed job one page on could be OURS, and the classifier's rule is
+    // "EVERY failed job ran nothing of ours" — satisfiable by a truncated list.
+    const truncated = classifyFailureCause({ workflowName: 'CI', conclusion: 'failure', jobs: null })
+    expect(truncated.cause).toBe('repository')
+    expect(truncated.actionable).not.toBe(false)
   })
 })
