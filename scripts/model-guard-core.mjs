@@ -105,44 +105,25 @@ export function judgeTrailer(trailer) {
   return { verdict: names.length > 1 ? 'unidentified' : 'allowed', names }
 }
 
-/** The suffix brackets a separator may legitimately hide inside. The ADDRESS
- *  is deliberately not one of them: no address may carry a comma, so `<…>`
- *  needs no protection — and honouring it would let an unclosed `<` swallow the
- *  separator and MERGE a forbidden co-author into an allowed trailer. */
-const BRACKETS = Object.freeze({ '(': ')', '[': ']' })
-
 /**
- * Split a `%(trailers:…,separator=,)` field into its individual trailer values.
- * The separator only separates OUTSIDE a suffix: a comma in a `(1M, extended
- * context)` suffix would otherwise cut one legitimate trailer into two halves,
- * and the half reading `Claude Opus 5 (1M` names no allowed model — a false
- * breach that would pause the batch (four-eyes review, point 527). A bracket is
- * only honoured when it actually CLOSES, so an unbalanced one can never swallow
- * the rest of the field: the split then errs toward MORE parts, which is the
- * safe direction — every part is judged, and a stray half fails closed.
+ * Split a `%(trailers:…,separator=,)` field — or one commit-message trailer
+ * line — into the values judged SEPARATELY. The separator ALWAYS separates,
+ * a bracket notwithstanding.
+ *
+ * A bracket-AWARE split was built and withdrawn in the four-eyes review of
+ * point 527: every version of it let an UNCLOSED bracket swallow the separator
+ * and MERGE the next co-author into an allowed trailer, because the suffix
+ * strip then carried the forbidden name away with it —
+ * `Claude Opus 5 (1M context <a@x>,Claude Haiku 4.5 <b@x>,Claude Opus 5 (1M
+ * context) <c@x>` read as plain `Opus 5`. Splitting unconditionally errs toward
+ * MORE parts, which is the safe direction for a tripwire: every part is judged
+ * on its own, and a half cut out of a suffix that legitimately carried a comma
+ * names no allowed model, so it fails LOUD instead of silently allowing one.
+ * The commit-msg gate splits the same way, so such a trailer is refused AT the
+ * commit rather than pausing the batch from history later.
  */
 export function splitTrailerField(field) {
-  const text = String(field ?? '')
-  const parts = []
-  let current = ''
-  let closer = ''
-  for (let i = 0; i < text.length; i++) {
-    const ch = text[i]
-    if (closer) {
-      current += ch
-      if (ch === closer) closer = ''
-    } else if (BRACKETS[ch] && text.indexOf(BRACKETS[ch], i + 1) >= 0) {
-      closer = BRACKETS[ch]
-      current += ch
-    } else if (ch === ',' || ch === ';') {
-      parts.push(current)
-      current = ''
-    } else {
-      current += ch
-    }
-  }
-  parts.push(current)
-  return parts
+  return String(field ?? '').split(/[,;]/)
 }
 
 /**
@@ -206,31 +187,37 @@ export function coAuthorTrailers(message) {
  * ignored, and a message with no Claude trailer at all is not this gate's
  * business (a merge, or a commit made outside the agent tooling).
  *
+ * A trailer LINE is split exactly as the Stop hook splits the log field, so the
+ * two can never disagree: what this gate lets through can never turn up as a
+ * breach in history, and one line carrying two co-authors is judged as two.
+ *
  * Returns { block, findings: [{ rule, trailer, detail }] } and NEVER throws.
  */
 export function evaluateCommitTrailers(message) {
   const findings = []
   try {
     for (const trailer of coAuthorTrailers(message)) {
-      const { verdict, names } = judgeTrailer(trailer)
-      if (verdict === 'unidentified' && names.length > 1) {
-        findings.push({
-          rule: 'multiple-model-trailer',
-          trailer,
-          detail: `names ${names.length} models (${names.join(', ')}) — a commit has ONE authoring model, so this shows none of them`,
-        })
-      } else if (verdict === 'unidentified') {
-        findings.push({
-          rule: 'unnamed-model-trailer',
-          trailer,
-          detail: 'names no model — it cannot show that an allowed model wrote this commit',
-        })
-      } else if (verdict === 'forbidden') {
-        findings.push({
-          rule: 'forbidden-model-trailer',
-          trailer,
-          detail: 'names a model outside the allowlist (only Opus 5, Opus 4.8 and Fable 5)',
-        })
+      for (const part of splitTrailerField(trailer)) {
+        const { verdict, names } = judgeTrailer(part)
+        if (verdict === 'unidentified' && names.length > 1) {
+          findings.push({
+            rule: 'multiple-model-trailer',
+            trailer,
+            detail: `names ${names.length} models (${names.join(', ')}) — a commit has ONE authoring model, so this shows none of them`,
+          })
+        } else if (verdict === 'unidentified') {
+          findings.push({
+            rule: 'unnamed-model-trailer',
+            trailer,
+            detail: 'names no model — it cannot show that an allowed model wrote this commit',
+          })
+        } else if (verdict === 'forbidden') {
+          findings.push({
+            rule: 'forbidden-model-trailer',
+            trailer,
+            detail: `names a model outside the allowlist (read as "${names.join(' + ')}"; only Opus 5, Opus 4.8 and Fable 5 may author here)`,
+          })
+        }
       }
     }
   } catch {

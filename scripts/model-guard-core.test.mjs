@@ -222,33 +222,50 @@ describe('the allowlist is matched against the parsed name', () => {
     }
   })
 
-  it('never cuts a trailer in half at a comma inside its own suffix', () => {
-    // The log field is comma-joined, so the separator must only separate
-    // OUTSIDE the address and the suffixes — else `Claude Opus 5 (1M, ctx)`
-    // splits into a half naming no allowed model and pauses the batch.
-    expect(splitTrailerField('Claude Opus 5 (1M, extended) <a@x>,Claude Fable 5 <b@x>')).toEqual([
-      'Claude Opus 5 (1M, extended) <a@x>',
-      'Claude Fable 5 <b@x>',
-    ])
-    expect(classifyTrailer('Claude Opus 5 (1M, extended) <noreply@anthropic.com>')).toBe('allowed')
-    expect(classifyTrailer('Claude Opus 5 [1m, beta] <noreply@anthropic.com>')).toBe('allowed')
-    // and a separator still separates where it really is one
-    expect(classifyTrailer('Claude Opus 5 (1M, extended) <a@x>,Claude Haiku 4.5 <b@x>')).toBe('forbidden')
+  it('no bracket can swallow the separator and hide a co-author behind it', () => {
+    // The separator ALWAYS separates. A bracket-aware split was withdrawn in the
+    // four-eyes review: an unclosed bracket whose closer sat in a LATER trailer's
+    // suffix merged the whole field into one value, and the suffix strip then
+    // carried the forbidden name away with it.
+    for (const field of [
+      'Claude Opus 5 (1M context <a@x>,Claude Haiku 4.5 <b@x>,Claude Opus 5 (1M context) <c@x>',
+      'Claude Opus 5 [1m <a@x>,Claude Haiku 4.5 <b@x>,Claude Opus 5 [1m] <c@x>',
+      'Claude Opus 5 (x <a@x>;Claude Haiku 4.5 <b@x>;Claude Fable 5 (y) <c@x>',
+      'Claude Opus 5 <a@x(,Claude Haiku 4.5 <b@x>',
+    ]) expect(classifyTrailer(field), field).toBe('forbidden')
   })
 
-  it('an unbalanced bracket can never swallow a separator and hide a co-author', () => {
-    // The safe direction is MORE parts, never fewer: a bracket that does not
-    // close is not honoured, so a forbidden co-author standing behind one is
-    // still judged, and the stray half fails closed on its own.
-    for (const field of [
-      'Claude Opus 5 <a@x(,Claude Haiku 4.5 <b@x>',
-      'Claude Opus 5 (1M,Claude Haiku 4.5 <b@x>',
-      'Claude Opus 5 [1m,Claude Haiku 4.5 <b@x>',
-    ]) expect(classifyTrailer(field), field).toBe('forbidden')
-    expect(splitTrailerField('a(,b')).toEqual(['a(', 'b'])
+  it('errs toward MORE parts, so a stray half fails loud rather than allowing', () => {
+    expect(splitTrailerField('Claude Opus 5 (1M, extended) <a@x>')).toEqual([
+      'Claude Opus 5 (1M',
+      ' extended) <a@x>',
+    ])
+    // Deliberate and documented: a suffix that carries the separator is cut, and
+    // the half naming no allowed model fails CLOSED. The commit-msg gate splits
+    // the same way, so such a trailer never reaches history to pause the batch.
+    expect(classifyTrailer('Claude Opus 5 (1M, extended) <noreply@anthropic.com>')).toBe('forbidden')
+    expect(
+      evaluateCommitTrailers('x\n\nCo-Authored-By: Claude Opus 5 (1M, extended) <a@x>\n').block,
+    ).toBe(true)
     expect(splitTrailerField('')).toEqual([''])
     expect(splitTrailerField(null)).toEqual([''])
     expect(splitTrailerField('a,')).toEqual(['a', ''])
+  })
+
+  it('the gate and the Stop hook agree on every trailer', () => {
+    // What the gate lets through must never read as a breach in history.
+    for (const t of [
+      ...HISTORIC_TRAILERS,
+      'Claude <noreply@anthropic.com>',
+      'Claude Haiku 4.5 (opus mode) <x@y>',
+      'Claude Sonnet 5 / Claude Opus 5 <x@y>',
+      'Claude Opus 5 / Claude Fable 5 <x@y>',
+      'Claude Opus 5 (1M, extended) <a@x>',
+      'Claude Opus 5 (1M context <a@x>,Claude Haiku 4.5 <b@x>,Claude Opus 5 (1M context) <c@x>',
+    ]) {
+      const blocked = evaluateCommitTrailers(`x\n\nCo-Authored-By: ${t}\n`).block
+      expect(blocked, t).toBe(classifyTrailer(t) !== 'allowed')
+    }
   })
 
   it('judgeTrailer reports the names it read, so a refusal can name them', () => {
