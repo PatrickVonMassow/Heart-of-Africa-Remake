@@ -14297,3 +14297,68 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   VERIFIABLE: pure Vitest on the situation scheduler — every concept in at least
   two distinct situations, the two staged contrasts present, an utterance atomic
   and single, and no situation without its gesture and its following action.
+
+- [x] 482. A RIVER VILLAGE, A REACHABLE BANK AND A LANDMARK ROCK (user
+  03.08.2026). The PoC needs one village in the tonal West/Centre belt that lies
+  ON a river the player can walk to. Candidate: the Bambara village, whose Ségou
+  heartland lies on the Niger and whose people carry the balafon tradition;
+  today's course model puts the river about half a degree away, so either the
+  village or that stretch of the Niger moves. Both are permitted (the standing
+  licence to move a village for accuracy, and the river course is stylised) —
+  run the conflict checklist and record which was chosen and why.
+  FINAL STATE:
+  1. The village sits directly on a real river of the world model. Centre and huts
+     stay dry, and the walkable area REACHES a bank the player can stand at.
+  2. The walkable region is no longer a plain circle where the bank demands more.
+     This point OWNS that change: the leave check, the collision resolve and the
+     boundary the settlement edge is painted on all read one shape, and point 488
+     paints THAT shape rather than a radius.
+  3. In the bird's-eye view the river is the actual river; in the first-person
+     view it lies on the SAME side and is genuinely reachable, not a painted
+     panorama. The water is drawn in the scene, not faked in the backdrop.
+  4. The current has a direction a player can SEE from the bank — this is what the
+     whole UPSTREAM/DOWNSTREAM teaching hangs on, so it is verified, not assumed.
+  5. Two short walkable stretches along the bank, upstream and downstream.
+  6. A single conspicuous boulder OUTSIDE the village (user 04.08.2026), at the
+     river a short way upstream, as a real feature of the BIRD'S-EYE world —
+     that is where it is reached, walked to and dug at (point 487). It carries a
+     defined digging spot exactly where the renderer draws it, is
+     seed-deterministic, unmistakable against any other rock nearby, and lies at
+     a travel distance the chief's message (follow the river upstream) actually
+     describes. It needs no walkable bank zone inside the settlement and no
+     first-person elaboration.
+  7. A SMALL boulder stands in the village, visible from it: BIG_ROCK is taught
+     on that one (user 04.08.2026). The target upstream is deliberately LARGER
+     and further away, so the player has to make the transfer himself — the
+     concept is learned on a near example and applied to a distant instance,
+     which is the whole point of the mechanic.
+  8. New water and geometry carry their `QUALITY_PRESETS` entries.
+  VERIFIABLE: pure Vitest — the village keeps the §4.2 river clearance, the bank
+  point is inside the walkable region, the upstream rock lies outside it and on
+  the river, the two stretches run in opposite senses along the flow, and the
+  rock's dig position equals its rendered placement over a sweep of seeds.
+  Browser on both backends: the river is on the same side in both views, a frame
+  at the bank shows the flow direction, and the upstream rock is in the
+  bird's-eye picture.
+
+- [x] 483. THE ADULTS TEACH RIVER, UPSTREAM, DOWNSTREAM, ROCK AND DIGGING (user
+  03.08.2026). Visible errands carry the five landscape and action concepts,
+  mixed with the general ones the children taught.
+  FINAL STATE:
+  1. RIVER appears where it cannot collapse into "fetch water": someone sent to
+     the bank with a known movement concept plus RIVER, someone called back with
+     RIVER plus COME, and a third errand beginning or ending there with the same
+     utterance. The villagers actually walk to the bank.
+  2. UPSTREAM and DOWNSTREAM are taught by mirrored errands along the two
+     stretches — against the visible current and with it.
+  3. BIG_ROCK is a reference point in at least two errands, and at least ONE of
+     them carries no upstream walk at all — otherwise the rock and the direction
+     produce the identical picture and neither is learnable.
+  4. DIG is taught by visible ground work in the village — a pit, a post hole, a
+     patch worked over — in more than one situation, from the existing tools and
+     animations plus only what a recognisable digging motion needs.
+  5. Errand rates and dwell times are balance values, debug-editable.
+  VERIFIABLE: pure Vitest on the errand scheduler (each concept in at least two
+  distinct situations, the mirrored pair genuinely mirrored, the rock's
+  no-upstream situation present, every target reachable); browser for the walk to
+  the bank.
