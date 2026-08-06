@@ -1,7 +1,7 @@
 // Headless verification for CLAUDE.md §7.1.31 (settlement orientation after
 // a gift and distant panorama wildlife, design.md §17/§2). Dev server only.
 import { launchVerifyBrowser, waitForStable, waitForReadingStable, waitForSceneBuilt, assertBackend } from './_browser.mjs'
-import { frameShutter } from './frameSubject.mjs'
+import { frameShutter, capturePixels } from './frameSubject.mjs'
 import { judgeFootingSeries, judgePitchSeries, MIN_SLOPED_SAMPLES } from './footingSeries.mjs'
 import { fileURLToPath } from 'node:url'
 import sharp from 'sharp'
@@ -1257,7 +1257,7 @@ if (mosque) {
   // Magenta-pillar orientation proof: the probe stood due west of the
   // capture point, so its colour must show looking WEST and not EAST.
   const countMagenta = async () => {
-    const buf = await page.screenshot()
+    const buf = await capturePixels(page, 'panorama magenta-pillar orientation')
     const crop = await sharp(buf).extract({ left: 100, top: 250, width: 1240, height: 380 }).raw().toBuffer({ resolveWithObject: true })
     const { data, info } = crop
     let hit = 0
@@ -2153,7 +2153,7 @@ for (const [placeId, shot] of [
     return sum / 9
   }
   const fireContrasts = async () => {
-    const { data, info } = await sharp(await page.screenshot()).raw().toBuffer({ resolveWithObject: true })
+    const { data, info } = await sharp(await capturePixels(page, 'campfire light contrast')).raw().toBuffer({ resolveWithObject: true })
     return firePairs.map((p) => +(lumAt(data, info, p.lit) - lumAt(data, info, p.shadow)).toFixed(1))
   }
 
@@ -2338,7 +2338,7 @@ for (const [placeId, shot] of [
     let prev = null
     for (let i = 0; i < 40; i++) {
       await settleFrames(2)
-      const cur = await groundLuma(await page.screenshot(), ndc, 150, 46)
+      const cur = await groundLuma(await capturePixels(page, 'settled ground luma'), ndc, 150, 46)
       if (cur === null) return null
       if (prev !== null && Math.abs(cur - prev) < 0.3) return cur
       prev = cur
@@ -2356,7 +2356,7 @@ for (const [placeId, shot] of [
     const shot = async (strength) => {
       await page.evaluate((s) => { window.__balance.placeEdgeBand.strength = s }, strength)
       await settleFrames(3)
-      return groundLuma(await page.screenshot(), ndc, 150, 46)
+      return groundLuma(await capturePixels(page, 'edge-band ground luma'), ndc, 150, 46)
     }
     // ON, OFF, ON — and the two ONs averaged. In the rains the ground SOAKS
     // while the shots are taken (the §19.13 wet accumulation keeps darkening

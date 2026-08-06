@@ -14,7 +14,7 @@
 // gate. Dev server only (dev hooks).
 import { launchVerifyBrowser, assertBackend } from './_browser.mjs'
 import { animalShare, readsAsAnimal, waterFloor } from './animalShare.mjs'
-import { frameShutter, captureFrame } from './frameSubject.mjs'
+import { frameShutter, captureFrame, capturePixels } from './frameSubject.mjs'
 import { snowFraction } from './snowMetric.mjs'
 import { fileURLToPath } from 'node:url'
 import sharp from 'sharp'
@@ -358,7 +358,7 @@ for (const c of [
   const deadline = Date.now() + 45000
   let buf
   do {
-    buf = await page.screenshot({ clip: { x: 480, y: 300, width: 320, height: 320 } })
+    buf = await capturePixels(page, 'landmark chunk streamed in', { clip: { x: 480, y: 300, width: 320, height: 320 } })
     if (buf.length > 3000) break
     await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => setTimeout(r, 250))))
   } while (Date.now() < deadline)
@@ -1178,7 +1178,7 @@ const stainPixels = await (async () => {
   }
   if (!clip) return { staged: false, why: 'stain never projected clear of the HUD at a reachable zoom' }
   const sample = async () => {
-    const buf = await page.screenshot({ clip })
+    const buf = await capturePixels(page, 'feeding ground stain', { clip })
     const { data, info } = await sharp(buf).raw().toBuffer({ resolveWithObject: true })
     return { data, w: info.width, h: info.height, n: info.width * info.height, ch: info.channels }
   }
@@ -4984,7 +4984,7 @@ if (
 ) {
   // Sample a clip to raw RGB: its mean, and the pixel array for per-pixel work.
   const sample = async (clip) => {
-    const buf = await page.screenshot({ clip: { x: clip.x, y: clip.y, width: clip.width, height: clip.height } })
+    const buf = await capturePixels(page, 'crocodile body/eye colour', { clip: { x: clip.x, y: clip.y, width: clip.width, height: clip.height } })
     const { data, info } = await sharp(buf).raw().toBuffer({ resolveWithObject: true })
     const n = info.width * info.height, ch = info.channels
     let r = 0, g = 0, b = 0
@@ -7195,7 +7195,7 @@ const settleScalar = async (read, rel = 0.003) => {
   const SNOW_SETTLE_LEAD_SIM = 10
   const SNOW_SETTLE_STEP_SIM = 0.5
   const snowFrac = async () => {
-    const buf = await page.screenshot({ clip: { x: 400, y: 280, width: 560, height: 320 } })
+    const buf = await capturePixels(page, 'Toubkal snow cover fraction', { clip: { x: 400, y: 280, width: 560, height: 320 } })
     const { data, info } = await sharp(buf).raw().toBuffer({ resolveWithObject: true })
     return snowFraction(data, info)
   }
@@ -7247,7 +7247,7 @@ const groundRGB = async (lat, lon, month) => {
     if (a !== null && b !== null && Math.abs(b - a) < 0.002) break
   }
   await page.waitForTimeout(400)
-  const buf = await page.screenshot({ clip: { x: 300, y: 320, width: 680, height: 340 } })
+  const buf = await capturePixels(page, 'season vegetation tint', { clip: { x: 300, y: 320, width: 680, height: 340 } })
   const { channels } = await sharp(buf).stats()
   return channels.slice(0, 3).map((c) => c.mean)
 }
@@ -7294,7 +7294,7 @@ check(
   })
   await page.waitForTimeout(3500)
   await page.evaluate(() => window.__game.getState().setJournalOpen(false))
-  const litBuf = await page.screenshot()
+  const litBuf = await capturePixels(page, 'daylight desert frame')
   const { data: litD, info: litI } = await sharp(litBuf)
     .extract({ left: 360, top: 240, width: 720, height: 420 })
     .raw()
@@ -7755,7 +7755,7 @@ const probe = await page.evaluate(() => window.__regionBorder?.screenProbe())
 let borderLum = null
 if (probe && probe.dist < 12) {
   const clip = { x: Math.max(0, Math.round(probe.sx - 5)), y: Math.max(0, Math.round(probe.sy - 5)), width: 10, height: 10 }
-  const buf = await page.screenshot({ clip })
+  const buf = await capturePixels(page, 'region border luminance', { clip })
   const { data } = await sharp(buf).raw().toBuffer({ resolveWithObject: true })
   let sum = 0
   const px = data.length / 3

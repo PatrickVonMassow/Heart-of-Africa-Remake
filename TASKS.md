@@ -4130,28 +4130,6 @@ Build order, chosen so no two parallel agents own the same file:
   restores it; the report names the cards it emptied.
 
 
-- [ ] 492. THE PIXEL PROBES STILL INHERIT PLAYWRIGHT'S SILENT 30-SECOND DEFAULT
-  (found 04.08.2026 by the four-eyes review of the shutter's capture budget). Only
-  the frame WRITES go through `captureFrame`, and only they now carry an explicit
-  budget. The pathless pixel PROBES — `page.screenshot(...)` with no `path`,
-  returning a buffer so a check can measure luma or colour — deliberately bypass
-  the shutter (the raw-frame gate matches `path:` writes only) and still inherit
-  Playwright's undeclared 30 s. On a host that renders through SwiftShader with no
-  GPU, a probe under suite load exceeds that exactly as the writes did, and the
-  suite dies far from the check it was running: `enrichments.mjs` alone probes at
-  seven sites, `polish.mjs` and `settings.mjs` at more.
-  FINAL STATE:
-  1. ONE named capture budget covers both shapes — the write and the probe — from
-     a single place, so no capture in the harness carries an undeclared deadline.
-  2. A probe that exceeds it fails naming the harness and the site, not as a bare
-     Playwright timeout.
-  3. The budget's value and its reason are written down once, beside the probe
-     budget it sits next to, rather than repeated per call site.
-  VERIFIABLE: pure Vitest — every screenshot call the harness makes, write and
-  probe alike, is handed an explicit timeout above Playwright's default (the
-  existing shutter cases extended to the probe path); a `timeout: 0` (which
-  DISABLES the deadline) fails the same assertion.
-
 - [ ] 495. A VERSIONED GIT HOOK WITHOUT ITS EXECUTABLE BIT IS SILENTLY INERT
   (found 04.08.2026). `scripts/git-hooks/pre-push` was committed 100644. Git for
   Windows runs a hook whichever mode it carries, so the gate worked on the old
@@ -4593,9 +4571,17 @@ Build order, chosen so no two parallel agents own the same file:
      which verdict.
   4. Nothing here weakens the shutter: a frame whose subject is not in the picture
      stays a failure — the point fixes the cause, never the assertion.
-  VERIFIABLE: `enrichments` runs green twice in a row on the compatibility lane on
-  a quiet machine, or the host-environment section names the difference that makes
-  it structurally impossible there.
+  5. `settings` belongs to the same classification (measured 06.08.2026, twice):
+     on the compatibility lane every check that switches TRAA OFF fails, because
+     the MSAA path it falls back to cannot exist there — `RGBA16Float does not
+     support multisampling` arrives as an uncaptured GPUValidationError and the
+     scene then renders black (mean 2.2). WebGL 2 passes the same suite 52/0
+     minutes apart. If that is structural, the host-environment section says so
+     and the lane's verdict for MSAA checks is recorded as unavailable rather
+     than red.
+  VERIFIABLE: `enrichments` and `settings` run green twice in a row on the
+  compatibility lane on a quiet machine, or the host-environment section names the
+  difference that makes it structurally impossible there.
 
 - [ ] 515. THE PARALLEL-SESSION DETECTOR COUNTS A PLACEHOLDER OWNER AS A SECOND
   SESSION (measured 05.08.2026). The batch PAUSED ITSELF at 13:06 because the

@@ -13,8 +13,10 @@ import {
   formatFramePass,
   findRawFrames,
   formatRawFrameFindings,
+  findUnbudgetedCaptures,
+  formatUnbudgetedCaptureFindings,
 } from './frameSubject-core.mjs'
-import { captureFrame, probeFrameSubject, sampleSceneCounts } from './frameSubject.mjs'
+import { CAPTURE_BUDGET_MS, captureFrame, capturePixels, probeFrameSubject, sampleSceneCounts } from './frameSubject.mjs'
 
 const lakeVictoria = () => normaliseDeclaration('12-worldmodel-lake-victoria', { world: { lat: -0.8, lon: 33 }, label: 'Lake Victoria' })
 
@@ -272,6 +274,33 @@ describe('findRawFrames', () => {
   })
 })
 
+describe('findUnbudgetedCaptures', () => {
+  it('finds a pathless probe taken straight off the page, in either shape', () => {
+    expect(findUnbudgetedCaptures('const buf = await page.screenshot()')).toBe(1)
+    expect(findUnbudgetedCaptures('const buf = await page.screenshot({ clip })')).toBe(1)
+    expect(findUnbudgetedCaptures("const buf = await page.locator('.map').screenshot()")).toBe(1)
+  })
+
+  it('reports a frame WRITE only once — through the gate that is about it', () => {
+    // Both gates see the same `.screenshot(` call; a write is the first gate's
+    // finding, and counting it here too would send the reader after a budget
+    // when the real hole is a missing subject.
+    expect(findUnbudgetedCaptures('await page.screenshot({ path: `${OUT}12.png` })')).toBe(0)
+    expect(findUnbudgetedCaptures('await page.screenshot({ path: p, clip: { x: 1, y: 2, width: 3, height: 4 } })')).toBe(0)
+  })
+
+  it('passes a probe that goes through the harness budget', () => {
+    expect(findUnbudgetedCaptures("const buf = await capturePixels(page, 'TRAA mean luma')")).toBe(0)
+    expect(findUnbudgetedCaptures("const buf = await capturePixels(page, 'snow cover', { clip })")).toBe(0)
+  })
+
+  it('is total on missing input', () => {
+    expect(findUnbudgetedCaptures(null)).toBe(0)
+    expect(formatUnbudgetedCaptureFindings([])).toBe('')
+    expect(formatUnbudgetedCaptureFindings([{ file: 'a.mjs', count: 2 }])).toContain('a.mjs: 2')
+  })
+})
+
 // The WRITE carries its own budget. Playwright's silent 30 s default is not
 // enough on a host rendering through SwiftShader with no GPU: the capture that
 // takes 5 s in isolation exceeds it under suite load, and the suite then dies
@@ -417,6 +446,81 @@ describe('captureFrame budgets the picture write', () => {
   })
 })
 
+// The PROBE carries the same budget (point 492). A pathless screenshot writes no
+// file and declares no subject, so it deliberately bypasses the shutter — and it
+// used to bypass the budget with it, inheriting the same silent 30 s that killed
+// the writes. `timeout: 0` is not a budget either: Playwright reads it as "no
+// deadline", which is the hang this exists to bound.
+describe('capturePixels budgets the pixel probe', () => {
+  it('is one named budget, not a second number — and never a disabled deadline', () => {
+    expect(CAPTURE_BUDGET_MS).toBeGreaterThan(30000)
+    expect(CAPTURE_BUDGET_MS).not.toBe(0)
+  })
+
+  it('hands a full-frame probe an explicit timeout instead of inheriting one', async () => {
+    const calls = []
+    const buf = await capturePixels(fakePage(calls), 'TRAA mean luma')
+    expect(Buffer.isBuffer(buf)).toBe(true)
+    expect(calls).toHaveLength(1)
+    expect(calls[0].via).toBe('page')
+    expect(calls[0].options.path).toBeUndefined()
+    expect(calls[0].options.timeout).toBe(CAPTURE_BUDGET_MS)
+    expect(calls[0].options.timeout).toBeGreaterThan(30000)
+  })
+
+  it('budgets a clipped probe and a locator probe the same way', async () => {
+    const clipped = []
+    const clip = { x: 400, y: 280, width: 560, height: 320 }
+    await capturePixels(fakePage(clipped), 'Toubkal snow cover fraction', { clip })
+    expect(clipped[0].options.clip).toEqual(clip)
+    expect(clipped[0].options.timeout).toBeGreaterThan(30000)
+
+    const element = []
+    await capturePixels(fakePage(element), 'map overlay ink', { locator: '.map-overlay' })
+    expect(element[0].via).toBe('locator')
+    expect(element[0].selector).toBe('.map-overlay')
+    expect(element[0].options.timeout).toBeGreaterThan(30000)
+  })
+
+  it('fails naming the harness and the site, not as a bare Playwright timeout', async () => {
+    const page = {
+      screenshot: async () => {
+        throw new Error('page.screenshot: Timeout 30000ms exceeded.\n  at internal')
+      },
+    }
+    await expect(capturePixels(page, 'campfire light contrast')).rejects.toThrow(
+      /pixel probe "campfire light contrast".*verification harness allowed the capture 120 s/s,
+    )
+    await expect(capturePixels(page, 'campfire light contrast')).rejects.toThrow(/Timeout 30000ms exceeded/)
+  })
+
+  // The four-eyes review (06.08.2026) found the pinned constant guarded and the
+  // per-site OVERRIDE not: a call site could still hand in Playwright's "no
+  // deadline", which is the hang the budget exists to bound.
+  it('refuses a per-site override that switches the deadline off', async () => {
+    const calls = []
+    await expect(capturePixels(fakePage(calls), 'TRAA mean luma', { timeout: 0 })).rejects.toThrow(
+      /disables the deadline/,
+    )
+    await expect(capturePixels(fakePage(calls), 'TRAA mean luma', { timeout: -1 })).rejects.toThrow(
+      /disables the deadline/,
+    )
+    expect(calls, 'no capture is taken with a disabled deadline').toHaveLength(0)
+  })
+
+  // A crash is not a slow machine. Retelling it as "the machine, not the product"
+  // would send the reader after the wrong cause, so only a budget failure is retold.
+  it('rethrows a non-timeout failure untouched, call log and all', async () => {
+    const crash = new Error('page.screenshot: Target page, context or browser has been closed\n  call log:\n  - x')
+    const page = {
+      screenshot: async () => {
+        throw crash
+      },
+    }
+    await expect(capturePixels(page, 'campfire light contrast')).rejects.toBe(crash)
+  })
+})
+
 // THE GATE: no verify script may write a frame that declared no subject. Runs in
 // the ordinary unit layer, so every regression run enforces it without any hook
 // wiring — the same shape as the fixed-wait ratchet next door.
@@ -426,13 +530,26 @@ describe('the real verify suites', () => {
   // for — scanning either would count the mechanism as a violation of itself.
   const SELF = new Set(['frameSubject.mjs', 'frameSubject-core.mjs'])
 
+  const suites = () => readdirSync(dir).filter((f) => f.endsWith('.mjs') && !f.endsWith('.test.mjs') && !SELF.has(f))
+
   it('declare a subject for every frame they write', () => {
     const findings = []
-    for (const f of readdirSync(dir).filter((f) => f.endsWith('.mjs') && !f.endsWith('.test.mjs') && !SELF.has(f))) {
+    for (const f of suites()) {
       const count = findRawFrames(readFileSync(resolve(dir, f), 'utf8'))
       if (count) findings.push({ file: f, count })
     }
     expect(findings, `\n${formatRawFrameFindings(findings)}\n`).toEqual([])
+  })
+
+  // The other half of the same rule (point 492): no capture in the harness — a
+  // written frame or a measured one — carries an undeclared deadline.
+  it('take every pixel probe through the harness capture budget', () => {
+    const findings = []
+    for (const f of suites()) {
+      const count = findUnbudgetedCaptures(readFileSync(resolve(dir, f), 'utf8'))
+      if (count) findings.push({ file: f, count })
+    }
+    expect(findings, `\n${formatUnbudgetedCaptureFindings(findings)}\n`).toEqual([])
   })
 })
 

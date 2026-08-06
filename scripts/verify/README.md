@@ -729,8 +729,20 @@ any of them. The judgement, the message and the declaration rules are pure
 settle poll and the write live in `frameSubject.mjs`. The same test file carries
 the GATE: a `page.screenshot({ path })` anywhere in this directory outside the
 shutter fails the unit layer, so a new frame cannot skip its declaration. (A
-screenshot WITHOUT a path is a pixel probe and is left alone; `shot()` returns
-the buffer for the few frames that are both.)
+screenshot WITHOUT a path is a pixel probe and declares no subject — it is a
+measurement, not evidence; `shot()` returns the buffer for the few frames that
+are both.)
+
+**Every capture carries the harness budget (point 492).** The write and the
+pathless pixel probe are one budget from one place — `CAPTURE_BUDGET_MS` in
+`frameSubject.mjs`, 120 s, with the reason written beside it. A probe therefore
+goes through `capturePixels(page, '<site>', { clip?, locator? })` rather than
+`page.screenshot(...)`: on a GPU-less host under suite load Playwright's silent
+30 s default is exceeded exactly as the writes' was, and the suite then dies far
+from the check it was running. An exceeded budget names the harness and the site
+instead of surfacing as a bare Playwright timeout, and the second gate in
+`frameSubject.test.mjs` (`findUnbudgetedCaptures`) fails the unit layer on a raw
+`.screenshot(` left anywhere in this directory.
 
 `FRAME_SUBJECT_SELFTEST=1 node scripts/verify/world.mjs` proves the gate still
 bites — it stands the traveller in Cairo, claims Lake Victoria, and requires the
