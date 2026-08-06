@@ -361,6 +361,14 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   die Ursache **sichtbar**? Führ ihn zuerst aus. Und sag mir, ob schon ein **anderer Weg
   läuft**, der dasselbe trägt — statt den blockierten zu reparieren."
 
+- **Nicht jedes Rot ist deins.** Eine Prüfung, die nur „rot" und „grün" kennt, schiebt auch
+  den Ausfall eines fremden Dienstes deinem Code zu — und schickt die Sitzung auf eine
+  Fehlersuche, die nichts finden kann, weil es nichts zu finden gibt.
+  → *Prompt:* „Wenn etwas rot ist, sag zuerst, **wo die Ursache liegt** — bei uns oder
+  außerhalb. Liegt sie außerhalb, nenn den **echten Griff** dort, statt eine Reparatur bei
+  uns zu verlangen. Und was auf einen fremden Dienst wartet, gibt beim Aufgeben das
+  **Angefangene zurück** — sonst sperrt es alle Nachfolger."
+
 ---
 
 ## Drei Meta-Regeln, die alles zusammenhalten
@@ -401,4 +409,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 Wenn du diese eine Nachricht an den Anfang stellst, hast du 80 % der Lehren dieses
 Projekts eingebaut, bevor die erste Zeile Code entsteht.
 
-<!-- GUIDE-FINGERPRINT: daafaf93c2edbb9661ad35671a2544180370908fe9380d5610affd556edb59c4 -->
+<!-- GUIDE-FINGERPRINT: b6ec93dc0e9352352fadf710507e84b7eb8ca28b55e752c6a148c93e6012dce6 -->
