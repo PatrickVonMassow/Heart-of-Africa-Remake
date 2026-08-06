@@ -8,6 +8,7 @@ import {
   communicationRockSite,
   communicationRockDigSpot,
   communicationRockWorldPos,
+  isAtCommunicationRock,
   ROCK_RIVER_ID,
   ROCK_VILLAGE_ID,
   ROCK_FOOTPRINT_UNITS,
@@ -99,6 +100,36 @@ describe('the communication rock stands at the river, upstream of the village', 
     const sites = SEEDS.map((s) => communicationRockSite(s))
     const unique = new Set(sites.map((s) => `${s.lat.toFixed(4)},${s.lon.toFixed(4)}`))
     expect(unique.size).toBeGreaterThan(1) // placed anew each run, like the caches
+  })
+
+  it.each(SEEDS)('seed %i: the dig reach covers the drawn block and nothing far off', (seed) => {
+    const rock = communicationRockSite(seed)
+    const reach = balance.digRadius / 10 // world units → degrees, as the store digs
+    // Standing on the block the picture shows: reachable.
+    expect(isAtCommunicationRock(rock.lat, rock.lon, seed, reach)).toBe(true)
+    // Anywhere past the reach: nothing, on every bearing.
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2
+      const off = reach * 1.5
+      const lat = rock.lat + Math.cos(a) * off
+      const lon = rock.lon + Math.sin(a) * off
+      expect(isAtCommunicationRock(lat, lon, seed, reach), `bearing ${i}`).toBe(false)
+    }
+    // The reach is generous enough to include the whole drawn footprint.
+    expect(isAtCommunicationRock(rock.lat + rock.radius / 10, rock.lon, seed, reach)).toBe(true)
+  })
+
+  it('another run’s boulder is not this run’s dig spot', () => {
+    const reach = balance.digRadius / 10
+    const a = communicationRockSite(SEEDS[0])
+    // A seed whose site differs from seed[0]'s: digging at one must not answer
+    // for the other, or the site would not be placed anew per run.
+    const other = SEEDS.find((s) => {
+      const b = communicationRockSite(s)
+      return Math.hypot(b.lat - a.lat, b.lon - a.lon) > reach * 2
+    })
+    expect(other).toBeDefined()
+    expect(isAtCommunicationRock(a.lat, a.lon, other as number, reach)).toBe(false)
   })
 
   it('is an upright block, taller than the tallest rock dressing around it', () => {

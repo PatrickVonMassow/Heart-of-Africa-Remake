@@ -14,7 +14,9 @@ import { ferryCost, ferryDays, treasureBuyPrice, TREASURE_IDS } from '../systems
 import { balance } from '../config/balance'
 import { drumMessagePlan } from '../communication/drumMessage'
 import { playDrumMessage } from '../systems/ambience'
-import { DrumMessageDialog } from './DrumMessage'
+import { DrumMessageDialog, Syllables } from './DrumMessage'
+import { chiefAcknowledgePhrase } from '../communication/chiefReply'
+import { labelReadings, NO_READING } from '../communication/speechLabel'
 import { useStrings } from '../i18n'
 import type { Strings } from '../i18n/types'
 
@@ -116,6 +118,9 @@ function AudienceDialog() {
   const setDialog = useUi((s) => s.setDialog)
   const reveredGiftGiven = useGame((s) => s.reveredGiftGiven)
   const setToast = useGame((s) => s.setToast)
+  const rockArtefact = useGame((s) => s.rockArtefact)
+  const handArtefactToChief = useGame((s) => s.handArtefactToChief)
+  const memory = useGame((s) => s.communication)
   const [confirmingRob, setConfirmingRob] = useState(false)
   if (!placeId) return null
   const place = placeById(placeId)
@@ -158,6 +163,29 @@ function AudienceDialog() {
           ) : (
             <p className="flavor">{t.dialogs.askDrumsLocked}</p>
           )
+        )}
+        {/* The end of the drum errand (point 487): what was dug up at the
+            boulder is laid in the chief's hands, and he answers in his OWN
+            tongue — the readings shown over his words are the player's own
+            notes, never a translation the game hands him. */}
+        {place.id === DRUM_MESSAGE_VILLAGE && rockArtefact === 'carried' && (
+          <div className="row">
+            <span>{t.dialogs.artefactCarried}</span>
+            <button className="hud-button" onClick={handArtefactToChief}>{t.dialogs.handArtefact}</button>
+          </div>
+        )}
+        {place.id === DRUM_MESSAGE_VILLAGE && rockArtefact === 'given' && (
+          <div className="chief-acknowledge">
+            <p className="flavor">{t.dialogs.chiefAcknowledges}</p>
+            <ol className="drum-concepts">
+              {labelReadings(memory, chiefAcknowledgePhrase()).map((a) => (
+                <li className="drum-concept" key={a.utterance}>
+                  <span className={a.reading === NO_READING ? 'reading unread' : 'reading'}>{a.reading}</span>
+                  <Syllables utterance={a.utterance} />
+                </li>
+              ))}
+            </ol>
+          </div>
         )}
         {MATERIALS.map((m) => (
           <div className="row" key={m}>

@@ -29,11 +29,18 @@ import {
 } from '../communication/heard'
 import type { Phrase, UtteranceId } from '../communication/lexicon'
 import { chiefMessagePhrase } from '../communication/drumMessage'
-import { ROCK_VILLAGE_ID } from '../world/communicationRock'
+import { chiefAcknowledgePhrase } from '../communication/chiefReply'
+import { ROCK_VILLAGE_ID, isAtCommunicationRock } from '../world/communicationRock'
 import type { SketchId } from '../journal/sketches'
 import { getStrings, type TextRef } from '../i18n'
 import { stripVoiceMarkup } from '../journal/voiceMarkup'
 import { useUi } from './ui'
+
+/**
+ * The three stages of the thing buried at the landmark boulder (point 487).
+ * A one-way sequence: buried → carried → given.
+ */
+export type RockArtefactState = 'buried' | 'carried' | 'given'
 
 export type EquipmentId =
   | 'shovel'
@@ -156,6 +163,11 @@ export interface GameState {
    *  §13.4, point 486). It never goes back: the message display stays
    *  reopenable for the rest of the run, so forgetting it locks nobody out. */
   drumMessageHeard: boolean
+  /** The buried thing at the foot of the landmark boulder (point 487): it lies
+   *  BURIED until the shovel reaches it at the spot the renderer draws, is
+   *  CARRIED from there, and is GIVEN once it lies in the chief's hands — which
+   *  is what solves the communication puzzle. It never goes back a stage. */
+  rockArtefact: RockArtefactState
   /** Health points (design.md §6); 0 = death of the character. */
   health: number
   afflictions: Afflictions
@@ -302,6 +314,10 @@ export interface GameState {
   /** The chief's drums have finished (point 486): every concept of the message
    *  enters the heard memory and the chronicle records that it was sent. */
   receiveDrumMessage: () => void
+  /** Lay the artefact from the boulder in the chief's hands (point 487): the
+   *  hand-over that solves the puzzle. He acknowledges it in his own tongue,
+   *  which enters the heard memory like any other phrase he speaks. */
+  handArtefactToChief: () => void
   setToast: (msg: string | null) => void
   saveCheckpoint: () => void
   /** Load a port-visit snapshot; the latest without an index (design.md §18). */
@@ -477,6 +493,7 @@ function startState(seed: number) {
     journalOpen: true,
     communication: emptyMemory(),
     drumMessageHeard: false,
+    rockArtefact: 'buried' as RockArtefactState,
     health: balance.health.max,
     afflictions: { fever: false, dehydration: false, sunblind: false, wounds: 0 as const },
     sunblindRecovery: 0,
@@ -695,6 +712,25 @@ export const useGame = create<GameState>()((set, get) => ({
       { key: 'journal.titles.drumMessage' },
       { key: 'journal.drumMessage' },
       'hint',
+      'face',
+    )
+  },
+
+  // The hand-over that solves the communication puzzle (point 487). It is
+  // possible only where the errand was set: in the chief's own village, with the
+  // artefact actually carried. The chief's answer is a PHRASE in his own tongue,
+  // recorded exactly like any other speech of his people — untranslated, so it
+  // reads only to a player who learned the words.
+  handArtefactToChief: () => {
+    const s = get()
+    if (s.mode !== 'place' || s.placeId !== DRUM_MESSAGE_VILLAGE) return
+    if (s.rockArtefact !== 'carried') return
+    const heard = observePhrase(s.communication, chiefAcknowledgePhrase(), Math.floor(s.day))
+    set({ communication: heard, rockArtefact: 'given' })
+    get().addEntry(
+      { key: 'journal.titles.artefactGiven' },
+      { key: 'journal.artefactGiven' },
+      'event',
       'face',
     )
   },
@@ -1971,6 +2007,23 @@ export const useGame = create<GameState>()((set, get) => ({
       return
     }
 
+    // The thing buried at the landmark boulder (point 487) — the end of the
+    // chief's drum errand. The spot is read from the SAME function the renderer
+    // draws the block from, so digging where the picture shows the rock is the
+    // only place it can be found. Once it is out of the ground the spot behaves
+    // like any other emptied ground and falls through to "nothing".
+    // It rides outside the inventory capacity on purpose: it is a puzzle token,
+    // not tradeable goods, and a full pack must never strand the errand.
+    if (s.rockArtefact === 'buried' && isAtCommunicationRock(cur.lat, cur.lon, s.seed, digDeg)) {
+      set({ rockArtefact: 'carried' })
+      get().addEntry(
+        { key: 'journal.titles.rockArtefact' },
+        { key: 'journal.rockArtefact' },
+        'event',
+      )
+      return
+    }
+
     // Buried treasure caches (design.md §8/§18).
     const siteIndex = s.treasureSites.findIndex(
       (site) => !site.dug && Math.hypot(cur.lat - site.lat, cur.lon - site.lon) <= digDeg,
@@ -2022,6 +2075,7 @@ export const useGame = create<GameState>()((set, get) => ({
       freeCamps: s.freeCamps, villageCamps: s.villageCamps,
       communication: serializeMemory(s.communication),
       drumMessageHeard: s.drumMessageHeard,
+      rockArtefact: s.rockArtefact,
       nextEntryId,
     }
     try {
@@ -2108,6 +2162,8 @@ export const useGame = create<GameState>()((set, get) => ({
         communication: deserializeMemory(snap.communication),
         // A snapshot from before the drums existed simply never heard them.
         drumMessageHeard: snap.drumMessageHeard ?? false,
+        // A snapshot from before the boulder was dug simply leaves it buried.
+        rockArtefact: snap.rockArtefact ?? 'buried',
         defeat: null,
         deathCause: null,
         mode: 'place',

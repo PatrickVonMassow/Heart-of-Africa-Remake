@@ -897,14 +897,21 @@ textarea {
   font-size: 12px;
 }
 
-/* The chief's drum message (design.md §13.4, point 486): the seven concepts in
-   a row, each with the player's own reading above its syllables. It wraps
-   rather than scrolls sideways, so the whole message stays readable at once. */
+/* Concepts on paper: the player's own reading above its syllables, wrapping
+   rather than scrolling sideways so a whole phrase stays readable at once. Used
+   by the chief's drum message (design.md §13.4, point 486) and by his spoken
+   acknowledgment of the artefact (point 487) — one look for every phrase the
+   game shows in the village's own tongue. */
 .dialog.drum-message {
   max-width: 640px;
 }
 
-.dialog.drum-message .drum-concepts {
+/* The chief's answer inside the audience (point 487). */
+.dialog .chief-acknowledge {
+  margin: 6px 0 2px;
+}
+
+.dialog .drum-concepts {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
@@ -914,15 +921,17 @@ textarea {
   list-style: none;
 }
 
-.dialog.drum-message .drum-concept {
+.dialog .drum-concept {
   display: flex;
   flex-direction: column;
   align-items: center;
   min-width: 92px;
 }
 
-/* The reading sits ABOVE its syllables and is the clickable element. */
-.dialog.drum-message .drum-concept .reading {
+/* The reading sits ABOVE its syllables. On the drum message it is a button and
+   editable; in the chief's spoken answer it is plain text, so only the button
+   form reads as clickable. */
+.dialog .drum-concept .reading {
   max-width: 130px;
   padding: 2px 6px;
   background: rgba(255, 255, 255, 0.12);
@@ -930,21 +939,24 @@ textarea {
   border-radius: 3px;
   color: inherit;
   font: 14px 'Segoe Script', 'Bradley Hand', 'Comic Sans MS', cursive;
-  cursor: pointer;
   overflow-wrap: anywhere;
 }
 
-.dialog.drum-message .drum-concept .reading:hover {
+.dialog .drum-concept button.reading {
+  cursor: pointer;
+}
+
+.dialog .drum-concept button.reading:hover {
   background: rgba(255, 255, 255, 0.22);
 }
 
 /* A concept the player has not read yet stands out as the open question it is. */
-.dialog.drum-message .drum-concept .reading.unread {
+.dialog .drum-concept .reading.unread {
   opacity: 0.65;
   letter-spacing: 2px;
 }
 
-.dialog.drum-message .drum-concept .hypothesis {
+.dialog .drum-concept .hypothesis {
   width: 130px;
   padding: 2px 6px;
   box-sizing: border-box;
@@ -955,7 +967,7 @@ textarea {
   font: 14px 'Segoe Script', 'Bradley Hand', 'Comic Sans MS', cursive;
 }
 
-.dialog.drum-message .drum-concept .utterance {
+.dialog .drum-concept .utterance {
   margin-top: 4px;
   font-family: 'Courier New', monospace;
   font-size: 14px;
@@ -964,16 +976,16 @@ textarea {
 
 /* Low and high told apart at a glance — the large drum reads heavy, the small
    one light, exactly as they sound. */
-.dialog.drum-message .drum-concept .utterance .low {
+.dialog .drum-concept .utterance .low {
   opacity: 0.95;
 }
 
-.dialog.drum-message .drum-concept .utterance .high {
+.dialog .drum-concept .utterance .high {
   font-weight: 700;
   color: #d8b45a;
 }
 
-.dialog.drum-message .drum-concept .utterance span + span::before {
+.dialog .drum-concept .utterance span + span::before {
   content: '-';
   font-weight: 400;
   color: inherit;

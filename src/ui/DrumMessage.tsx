@@ -19,7 +19,7 @@ import { useUi } from '../state/ui'
 import { useStrings } from '../i18n'
 
 /** The syllables of one concept, low and high told apart at a glance. */
-function Syllables({ utterance }: { utterance: string }) {
+export function Syllables({ utterance }: { utterance: string }) {
   return (
     <div className="utterance">
       {utterance.split(SYLLABLE_SEPARATOR).map((syllable, i) => (
