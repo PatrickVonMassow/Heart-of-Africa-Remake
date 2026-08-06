@@ -28,7 +28,12 @@ import {
   formatTasksArchiveVerdict,
 } from './tasks-archive-guard-core.mjs'
 import { evaluateDocBudgets, formatDocBudgetVerdict } from './doc-budget-core.mjs'
-import { findForbiddenCommits } from './model-guard-core.mjs'
+import {
+  findForbiddenCommits,
+  findUnidentifiedCommits,
+  formatForbiddenReason,
+  formatUnidentifiedReason,
+} from './model-guard-core.mjs'
 import { evaluate as renderVerifyEvaluate } from './render-verify-core.mjs'
 import {
   evaluateMechanismReview,
@@ -100,7 +105,17 @@ export const GUARDS = [
     // arm:false — a read-only preflight must not arm a baseline the guard has
     // not armed itself, which would hide exactly the commits it looks for.
     gather: ({ sessionId } = {}) => gatherModelGuardInputs({ sessionId, arm: false }),
-    decide: ({ log, baselineMs }) => findForbiddenCommits(log, baselineMs),
+    // Both halves of the split (point 397), so the preflight predicts which of
+    // the two blocks the session would meet — they have different remedies.
+    decide: ({ log, baselineMs, backupRefs }) => {
+      const forbidden = findForbiddenCommits(log, baselineMs)
+      if (forbidden.length) return { block: true, reason: formatForbiddenReason(forbidden, { backupRefs }) }
+      const unidentified = findUnidentifiedCommits(log, baselineMs)
+      if (unidentified.length) {
+        return { block: true, reason: formatUnidentifiedReason(unidentified, { backupRefs }) }
+      }
+      return { block: false }
+    },
   },
   {
     id: 'dashboard-guard',

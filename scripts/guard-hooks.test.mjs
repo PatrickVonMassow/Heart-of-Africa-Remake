@@ -357,6 +357,22 @@ describe('model-guard', () => {
     commit(`${message}\n\nCo-Authored-By: ${model} <noreply@anthropic.com>`)
   }
 
+  it('BLOCKS DIFFERENTLY on a commit whose trailer names no model at all', () => {
+    // The trailer that cost a round on 28.07.2026 (point 397): it must block —
+    // an unnamed author proves nothing — but with the resolvable remedy, not
+    // the breach ritual.
+    write('.claude/model-guard-baseline.json', JSON.stringify({ since: new Date(Date.now() - 3600_000).toISOString() }))
+    write('marker.txt', `bare ${Date.now()}`)
+    commit('a change from a session that named nothing\n\nCo-Authored-By: Claude <noreply@anthropic.com>')
+    const sha = git('rev-parse', 'HEAD').stdout.trim().slice(0, 7)
+
+    const hook = expectHookAgrees('model-guard.mjs', 'model-guard', { blocks: true })
+    expect(hook.decision.reason).toMatch(/UNIDENTIFIED AUTHOR/)
+    expect(hook.decision.reason).not.toMatch(/SERVING-MODEL TRIPWIRE/)
+    expect(hook.decision.reason).toContain(sha)
+    expect(hook.decision.reason).toContain('~/.claude/projects/')
+  })
+
   it('BLOCKS on a commit authored outside the model allowlist', () => {
     // The baseline must predate the commit, or the tripwire looks straight past it.
     write('.claude/model-guard-baseline.json', JSON.stringify({ since: new Date(Date.now() - 3600_000).toISOString() }))

@@ -310,23 +310,22 @@ old→new coverage map live in `scripts/verify/README.md`.
   responder from the chat inbox — only with no live owner and no honoured claim,
   under a bounded claim; the launcher tick supervises it.
 - **Model policy (user decision 25.07.2026, points 309 + the role revision).**
-  ONLY three models may author work on this project, each with its own role:
-  **Opus 5** is the WORKER at any difficulty; **Fable 5** is used ONLY for the
-  four-eyes principle (one model plans and/or builds, the other reviews) or as
-  the first fallback; **Opus 4.8** is the last fallback. The fallback chain is
-  Opus 5 → Fable 5 → Opus 4.8, and `scripts/batch-autostart.mjs` launches
-  accordingly. DIFFICULTY IS NOT A REASON to hand work to Fable — since version 5
-  Opus is equally capable there, and a second model's value lies in its different
-  blind spots, which only a REVIEW realises. Sonnet and Haiku are NOT acceptable,
-  and a session silently degraded to one is a capability breach: the batch STOPS
-  rather than runs on it. Every commit records its author model in the `Co-Authored-By`
-  trailer, so the rule is machine-checkable; `scripts/model-guard-core.mjs`
-  holds the allowlist (`ALLOWED`) and the Stop hook
-  `scripts/model-guard.mjs` blocks the turn end on any commit after its
-  baseline authored outside it. (History: on 24.07.2026 a session degraded
-  to Haiku 4.5 unnoticed and merged three defective deliveries in 14
-  minutes; no config review could have caught it live, the commit trailers
-  could.)
+  ONLY three models may author work here: **Opus 5** is the WORKER at any
+  difficulty; **Fable 5** serves the four-eyes principle (one model plans and/or
+  builds, the other reviews) or the first fallback; **Opus 4.8** is the last
+  fallback. The chain is Opus 5 → Fable 5 → Opus 4.8, and
+  `scripts/batch-autostart.mjs` launches accordingly. DIFFICULTY IS NOT A REASON
+  to hand work to Fable — Opus 5 is equally capable, and a second model's value
+  is its different blind spots, which only a REVIEW realises. Sonnet and Haiku
+  are NOT acceptable: a session degraded to one is a capability breach and the
+  batch STOPS. Every commit NAMES its author model in the `Co-Authored-By`
+  trailer, and the `commit-msg` hook refuses one that does not.
+  `scripts/model-guard-core.mjs` holds the allowlist (`ALLOWED`) and the Stop
+  hook `scripts/model-guard.mjs` blocks the turn end on any commit after its
+  baseline authored outside it: HARD on a NAMED forbidden model (pause),
+  resolvably on an UNNAMED one, which the transcripts settle. (History: on
+  24.07.2026 a degraded session merged three defective Haiku deliveries in 14
+  minutes — only the trailers could have caught it.)
 - **Language.** All player-visible text (UI, chronicle, messages) is served
   from the language files (`design.md` §17): English is the default game
   language, German is available, and the structure must make further
@@ -890,14 +889,14 @@ After completion and after every major system:
 - **The Stop chain gates the turn end, not only the test run.** Beyond the
   suites, Stop hooks (authoritative list: `.claude/settings.json`) BLOCK a turn
   end while the working state contradicts a standing rule — "enforce, don't
-  remind", each adopted after a reminder failed. **`.claude/settings.json` is the
-  only authoritative list; this paragraph names FAMILIES, because the enumeration
-  that stood here had drifted four wired guards behind it** (rule-corpus review
-  30.07.2026). The families: the BOARD (published, concise, one topic per card,
-  consistent with the real state, and every decision asked of the user standing
-  as a card); the BATCH (no idle wait or idle stop, the model allowlist of §6, a
-  red CI, a branch already contained in `main`, the retrospective's currency,
-  the chat timestamp); the WORK ORDER (queue order, final-state-only specs, the
+  remind", each adopted after a reminder failed. **This paragraph names FAMILIES,
+  not guards: the enumeration that stood here had drifted four wired guards
+  behind** (rule-corpus review 30.07.2026). The families: the BOARD (published,
+  concise, one topic per card, consistent with the real state, and every decision
+  asked of the user standing as a card); the BATCH (no idle wait or idle stop,
+  the §6 model allowlist — a named breach pauses, an unnamed author is looked
+  up — a red CI, a branch already contained in `main`, the retrospective's
+  currency, the chat timestamp); the WORK ORDER (queue order, final-state-only specs, the
   open/archived split, and the measured doc ceilings in
   `scripts/doc-budget-core.mjs`); and the PROOF (`render-verify-guard` for a
   render-set change on both backends where they can differ, and
@@ -908,8 +907,8 @@ After completion and after every major system:
   runs on `main` stayed unseen for three weeks (point 387 widens it to every ref
   the session pushed and raises the demand from noticing red to CONFIRMING
   GREEN), and the versioned git hooks (`scripts/git-hooks/`, wired by `npm
-  install`) refuse a stray file, a rescue commit that would mail the user, and a
-  push CI would reject. Separately, PreToolUse hooks run `closing-guard` (§9),
+  install`) refuse a stray file, a trailer naming no model, a rescue commit that
+  would mail the user, and a push CI would reject. Separately, PreToolUse hooks run `closing-guard` (§9),
   which denies a version tag until every closing step is recorded, and
   `board-first-guard`, which fires BEFORE the work rather than at the turn end (the
   Stop chain lets the board lag an hour): a turn's FIRST state-changing call is
