@@ -185,6 +185,7 @@ export function buildGizaLayout(_seed: number): PlaceLayout {
     rocks: [],
     teachingStone: null, // the PoC teaching stone stands in its village only
     digSites: [], // and the ground work of point 483 is village life, not a monument's
+    bank: null, // the plateau stands well clear of the Nile (work-order 482)
     pen: null,
     errands,
     colliders,

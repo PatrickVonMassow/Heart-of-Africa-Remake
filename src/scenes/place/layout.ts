@@ -8,10 +8,12 @@ import { placeById } from '../../world/geo'
 import { mulberry32 } from '../../world/noise'
 import { REGION_PLACE_STYLES, VILLAGE_PLANS } from './regionStyles'
 import { PORT_TALKERS, VILLAGE_SPOTS } from './lifeSpots'
-import { boxCollider, nudgeToFree, WALKER_RADIUS, type Collider } from './collision'
+import { boxCollider, nudgeToFree, PLAYER_RADIUS, WALKER_RADIUS, type Collider } from './collision'
+import { GROUND_DISC_OVERHANG } from './backdrop'
 import { windingPoints, laneSlots, closestOnPolyline, bendAround, type LaneSlot } from './lanePlan'
 import { buildGizaLayout } from './gizaSite'
 import { ROCK_VILLAGE_ID } from '../../world/communicationRock'
+import { buildRiverBank, BANK_SHORE_HALF, BANK_WALL_INSET, type PlaceRiverBank } from './riverBank'
 import type { BuildingType } from '../../state/ui'
 
 export const PLACE_RADIUS = 28 // walkable radius in meters; leaving it exits the place
@@ -89,6 +91,13 @@ export interface PlaceLayout {
    * no second, drifting position can exist. Empty in ports.
    */
   digSites: Array<{ x: number; z: number; kind: 'pit' | 'postHole' | 'patch' }>
+  /**
+   * The walkable river bank (work-order 482), where the settlement stands on a
+   * river: which way the water lies, which way it runs, and the three points on
+   * the bank a villager can be sent to. Null everywhere else. It is what makes
+   * the walkable region something other than a circle — see `./boundary`.
+   */
+  bank: PlaceRiverBank | null
   /** Livestock pen (kraal layouts). */
   pen: { x: number; z: number; r: number } | null
   /** Points walkers visit on their errands. */
@@ -251,6 +260,9 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   // (design.md §4.1, point 6): a wider walkable area and deeper street grid.
   const ext = place.kind === 'port' ? (size - 1) * 10 : 0
   const radius = place.kind === 'port' ? 30 + size * 6 : PLACE_RADIUS
+  // The river the settlement stands on (work-order 482), derived from the world
+  // model — not seeded, because the geography is the same in every run.
+  const bank = buildRiverBank(place, radius)
 
   const interactives: Interactive[] = []
   if (place.kind === 'village') {
@@ -935,6 +947,28 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     colliders.push({ x: PORT_TALKERS[0], z: PORT_TALKERS[1], r: 0.85 }) // chatting pair
   }
 
+  // THE WATER IS A WALL (work-order 482). The bank lobe carries the walkable
+  // region out to the waterline, so without this the last step at the water
+  // would cross the boundary and LEAVE the settlement — the traveller wading
+  // out of a village into the bird's-eye view, and into the river at that. The
+  // panel runs along the waterline for as far as the drawn ground reaches, and
+  // its stand-off is chosen so the player halts exactly on the boundary: at the
+  // top of the bank, on the painted edge, looking down at the current.
+  if (bank) {
+    const discEdge = radius + GROUND_DISC_OVERHANG
+    const half = Math.sqrt(Math.max(0, discEdge * discEdge - bank.distance * bank.distance))
+    const cx = bank.nx * bank.distance
+    const cz = bank.nz * bank.distance
+    colliders.push({
+      kind: 'segment',
+      x1: cx - bank.fx * half,
+      z1: cz - bank.fz * half,
+      x2: cx + bank.fx * half,
+      z2: cz + bank.fz * half,
+      r: BANK_SHORE_HALF + BANK_WALL_INSET - PLAYER_RADIUS,
+    })
+  }
+
   // Every errand target a walker heads for must sit on free ground it can also
   // LEAVE (point 155): a jitter (or a stall/rock beside it) can drop a point
   // into a pocket. Nudge any such point to the nearest usable spot against the
@@ -952,5 +986,5 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     site.z = z
   }
 
-  return { radius, spawnZ: radius - SPAWN_INSET, interactives, dwellings, fences, paths, flora, rocks, teachingStone, digSites, pen, errands, colliders }
+  return { radius, spawnZ: radius - SPAWN_INSET, interactives, dwellings, fences, paths, flora, rocks, teachingStone, digSites, bank, pen, errands, colliders }
 }

@@ -54,13 +54,22 @@ describe('the band sits where the leave check flips (design.md §2.6 "it must no
   it('matches the bisected leave radius at every angle, for every place in the roster', () => {
     for (const place of PLACES) {
       const layout = buildLayout(place.id, SEED)
-      setEdgeBandBoundary(buildBoundaryLut(layout))
+      const lut = buildBoundaryLut(layout)
+      setEdgeBandBoundary(lut)
       const band = edgeBandState()
+      let step = 0
+      for (let j = 0; j < lut.length; j++) {
+        step = Math.max(step, Math.abs(lut[(j + 1) % lut.length] - lut[j]))
+      }
       for (const angle of ANGLES) {
         const truth = leaveRadiusAt(layout, angle)
-        // Byte-quantised lookup: exact while the boundary is a circle (span 0),
-        // and within one step of the span once it is not.
-        const tol = 1e-6 + band.span / 255
+        // Byte-quantised lookup read at its NEAREST texel, so two errors bound
+        // it and both are derived from the boundary itself rather than guessed:
+        // the byte step, and — once the boundary varies with the angle at all
+        // (work-order 482's bank lobe) — how far it can move between two
+        // neighbouring texels. Both are 0 while the boundary is a circle, so
+        // this stays exactly as strict as it was for every other place.
+        const tol = 1e-6 + band.span / 255 + step
         expect(Math.abs(band.radiusAt(angle) - truth), `${place.id} @ ${angle.toFixed(2)}`).toBeLessThanOrEqual(tol)
       }
     }
