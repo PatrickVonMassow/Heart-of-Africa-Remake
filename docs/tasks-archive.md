@@ -14489,3 +14489,17 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   DOCS in the same commit: CLAUDE.md §6 (the model policy already says every commit records
   its author model — it gains the fact that the trailer is ENFORCED at commit time) and the
   memory entry `serving-model-watch`.
+
+- [x] 487. DIGGING AT THE ROCK, AND WHAT IS BURIED THERE (user 03.08.2026).
+  FINAL STATE:
+  1. Digging with the shovel at the rock's defined spot recovers an artefact;
+     anywhere else recovers nothing. The spot is the one the renderer draws.
+  2. It uses the shovel mechanic the game already has, in the BIRD'S-EYE view, at
+     the rock OUTSIDE the village (user decision 04.08.2026). The loop is: learn
+     the language in the village, understand the chief's message, travel to the
+     rock at the river, dig, travel back.
+  3. The artefact is carried back and HANDED TO THE CHIEF, and that hand-over is
+     what solves the puzzle — acknowledged in the chief's own tongue and in the
+     journal, not merely picked up.
+  4. Both languages, journal entries with voice markup like every other text.
+  VERIFIABLE: pure Vitest on the dig check and the hand-over; browser for the flow.

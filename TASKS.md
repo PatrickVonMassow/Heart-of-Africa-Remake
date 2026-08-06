@@ -3942,20 +3942,6 @@ Build order, chosen so no two parallel agents own the same file:
   wave 4  481 (children teach) · 483 (adults teach)
   wave 5  486 (drums) · 487 (digging)
 
-- [ ] 487. DIGGING AT THE ROCK, AND WHAT IS BURIED THERE (user 03.08.2026).
-  FINAL STATE:
-  1. Digging with the shovel at the rock's defined spot recovers an artefact;
-     anywhere else recovers nothing. The spot is the one the renderer draws.
-  2. It uses the shovel mechanic the game already has, in the BIRD'S-EYE view, at
-     the rock OUTSIDE the village (user decision 04.08.2026). The loop is: learn
-     the language in the village, understand the chief's message, travel to the
-     rock at the river, dig, travel back.
-  3. The artefact is carried back and HANDED TO THE CHIEF, and that hand-over is
-     what solves the puzzle — acknowledged in the chief's own tongue and in the
-     journal, not merely picked up.
-  4. Both languages, journal entries with voice markup like every other text.
-  VERIFIABLE: pure Vitest on the dig check and the hand-over; browser for the flow.
-
 - [ ] 491. QUEUE PROSE WRITTEN ONLY INTO THE HTML IS LOST ON THE NEXT REBUILD
   (measured 04.08.2026, and it cost the German text of thirteen cards). The
   Warteschlange is a PROJECTION: `scripts/board-queue.mjs` renders it from
