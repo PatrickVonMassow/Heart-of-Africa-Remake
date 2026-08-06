@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { STAND_DOWN_KINDS, standDownKind, standDownMessage } from './batch-resume-hook-core.mjs'
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import {
+  STAND_DOWN_KINDS,
+  openPointsHeadline,
+  standDownKind,
+  standDownMessage,
+} from './batch-resume-hook-core.mjs'
 import { CLAIM_BY, responderClaim } from './chat-watcher-core.mjs'
 import { CLAIM_MAX_AGE_MS } from './batch-claim-core.mjs'
 
@@ -213,5 +221,43 @@ describe('the other stand-downs stay honest', () => {
 
   it('recognises the watcher marker by the shared constant, not a literal', () => {
     expect(watcherClaim(1).by).toBe(CLAIM_BY)
+  })
+})
+
+describe('the open-point headline (point 440)', () => {
+  // 118 points, none of them numerically equal to the count itself.
+  const many = Array.from({ length: 118 }, (_, i) => 200 + i)
+
+  it('states how much is open and which point the session will carry', () => {
+    const text = openPointsHeadline([174, 184, 200])
+    expect(text).toContain('3 open point(s)')
+    expect(text).toContain('174')
+    // The pointer replaces the list: the spec, not the bare number.
+    expect(text).toContain('node scripts/point-brief.mjs 174')
+  })
+
+  it('does not enumerate the queue — the measured saving IS the change', () => {
+    const text = openPointsHeadline(many)
+    for (const n of many.slice(1)) expect(text).not.toContain(String(n))
+    // 588 characters of numbers before, on every session start.
+    expect(text.length).toBeLessThan(200)
+  })
+
+  it('does not grow with the queue', () => {
+    expect(openPointsHeadline(many).length).toBeLessThanOrEqual(openPointsHeadline([100, 101]).length + 4)
+  })
+
+  it('survives an empty or junk queue without inventing a point', () => {
+    expect(openPointsHeadline([]).length).toBeGreaterThan(0)
+    expect(openPointsHeadline([])).toContain('0 open point(s)')
+    expect(openPointsHeadline([])).not.toContain('point-brief')
+    expect(openPointsHeadline(undefined)).toContain('0 open point(s)')
+    expect(openPointsHeadline(['x', 7])).toContain('7')
+  })
+
+  it('is what the hook actually prints — no second copy of the enumeration', () => {
+    const hook = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'batch-resume-hook.mjs'), 'utf8')
+    expect(hook).toContain('openPointsHeadline(nums)')
+    expect(hook).not.toContain("open point(s): ${nums}")
   })
 })
