@@ -105,25 +105,33 @@ export function judgeTrailer(trailer) {
   return { verdict: names.length > 1 ? 'unidentified' : 'allowed', names }
 }
 
-/** The bracket pairs a separator may hide inside. */
-const BRACKETS = Object.freeze({ '<': '>', '(': ')', '[': ']' })
+/** The suffix brackets a separator may legitimately hide inside. The ADDRESS
+ *  is deliberately not one of them: no address may carry a comma, so `<…>`
+ *  needs no protection — and honouring it would let an unclosed `<` swallow the
+ *  separator and MERGE a forbidden co-author into an allowed trailer. */
+const BRACKETS = Object.freeze({ '(': ')', '[': ']' })
 
 /**
  * Split a `%(trailers:…,separator=,)` field into its individual trailer values.
- * The separator only separates OUTSIDE the address and the suffixes: a comma in
- * a `(1M, extended context)` suffix would otherwise cut one legitimate trailer
- * into two halves, and the half reading `Claude Opus 5 (1M` names no allowed
- * model — a false breach that would pause the batch (four-eyes review, point 527).
+ * The separator only separates OUTSIDE a suffix: a comma in a `(1M, extended
+ * context)` suffix would otherwise cut one legitimate trailer into two halves,
+ * and the half reading `Claude Opus 5 (1M` names no allowed model — a false
+ * breach that would pause the batch (four-eyes review, point 527). A bracket is
+ * only honoured when it actually CLOSES, so an unbalanced one can never swallow
+ * the rest of the field: the split then errs toward MORE parts, which is the
+ * safe direction — every part is judged, and a stray half fails closed.
  */
 export function splitTrailerField(field) {
+  const text = String(field ?? '')
   const parts = []
   let current = ''
   let closer = ''
-  for (const ch of String(field ?? '')) {
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i]
     if (closer) {
       current += ch
       if (ch === closer) closer = ''
-    } else if (BRACKETS[ch]) {
+    } else if (BRACKETS[ch] && text.indexOf(BRACKETS[ch], i + 1) >= 0) {
       closer = BRACKETS[ch]
       current += ch
     } else if (ch === ',' || ch === ';') {

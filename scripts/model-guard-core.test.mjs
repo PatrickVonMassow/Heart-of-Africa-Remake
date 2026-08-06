@@ -236,6 +236,21 @@ describe('the allowlist is matched against the parsed name', () => {
     expect(classifyTrailer('Claude Opus 5 (1M, extended) <a@x>,Claude Haiku 4.5 <b@x>')).toBe('forbidden')
   })
 
+  it('an unbalanced bracket can never swallow a separator and hide a co-author', () => {
+    // The safe direction is MORE parts, never fewer: a bracket that does not
+    // close is not honoured, so a forbidden co-author standing behind one is
+    // still judged, and the stray half fails closed on its own.
+    for (const field of [
+      'Claude Opus 5 <a@x(,Claude Haiku 4.5 <b@x>',
+      'Claude Opus 5 (1M,Claude Haiku 4.5 <b@x>',
+      'Claude Opus 5 [1m,Claude Haiku 4.5 <b@x>',
+    ]) expect(classifyTrailer(field), field).toBe('forbidden')
+    expect(splitTrailerField('a(,b')).toEqual(['a(', 'b'])
+    expect(splitTrailerField('')).toEqual([''])
+    expect(splitTrailerField(null)).toEqual([''])
+    expect(splitTrailerField('a,')).toEqual(['a', ''])
+  })
+
   it('judgeTrailer reports the names it read, so a refusal can name them', () => {
     expect(judgeTrailer('Claude Haiku 4.5 <x@y>')).toEqual({ verdict: 'forbidden', names: ['Haiku 4.5'] })
     expect(judgeTrailer('Claude <x@y>')).toEqual({ verdict: 'unidentified', names: [] })
