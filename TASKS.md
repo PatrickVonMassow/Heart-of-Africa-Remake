@@ -4713,10 +4713,33 @@ Build order, chosen so no two parallel agents own the same file:
   4. The reservation is bounded: a claiming window that never takes the lock does
      not stall the batch forever, and what the bound is, is stated where the
      reservation is written.
+  MEASURED AGAIN ON A SECOND TRIGGER (06.08.2026, 02:22Z): the same tick took the
+  batch from session 898cbf40 with "LEASE EXPIRED — has not renewed for 55 min", in
+  the same breath as its own reading "declared work advancing — branch
+  refs/heads/feat/483-adults-teach-landscape — tip 2 min old; worktree … active 0 min
+  ago". The owner was alive and stayed alive: two minutes AFTER the takeover it
+  started a `polish` run that rewrote 34 verification frames inside the very worktree
+  the new owner was merging from. The lease renews BEFORE each call, so an owner that
+  legitimately WAITS inside ONE long call — on a delegated agent, on a browser suite —
+  cannot renew at all; the in-flight declaration exists to hold the lock for exactly
+  that case, but it lapses after 45 minutes and nothing extends it while its own
+  evidence is still moving. The lease arithmetic itself is not in question (user
+  30.07.2026) — what is missing is a renewal that runs OUTSIDE the blocked session.
+  FINAL STATE (continued):
+  5. The launcher tick, which already re-reads a declaration's evidence every cycle,
+     EXTENDS the lease while that evidence is provably advancing, and stops the
+     moment it is not. Ownership therefore stays arithmetic — a standstill still
+     loses the batch, because quiet evidence renews nothing — but a wait that is
+     genuinely working keeps it however long the call runs. The 45-minute lapse
+     remains the backstop for a declaration whose evidence went quiet.
+  6. Items 1 and 5 are the same decision and reach it through the shared function of
+     item 2: one place decides what an expired lease means.
   VERIFIABLE: pure Vitest on the launcher's decision (lease expired + honoured claim
   → reserve, never spawn; lease expired + no claim → spawn; lease expired + expired
-  claim → spawn; the bound elapses → spawn), and the boundary path's existing tests
-  stay green unchanged.
+  claim → spawn; the bound elapses → spawn; lease expired + a declaration whose
+  evidence still advances → renew, never spawn; lease expired + a declaration whose
+  evidence has gone quiet → spawn), and the boundary path's existing tests stay green
+  unchanged.
 
 - [ ] 518. THE SHUTTER JUDGES ITS AIM BEFORE THE WAIT AND NEVER RE-JUDGES (found
   05.08.2026 while closing point 489). `captureFrame` checks that the frame's
