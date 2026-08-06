@@ -4505,9 +4505,18 @@ Build order, chosen so no two parallel agents own the same file:
      unresolvable reference.
   4. The reference map names each adopted point as adopted, so the reader sees why the
      full text is there.
+  5. The same gap exists one level out, at the DOCUMENTS a slice is specified in
+     (measured 06.08.2026 while point 487 was built): the brief names design.md
+     sections but knows no other spec document, so the agent found
+     `docs/communication-poc-spec.md` — which pins the five-step loop verbatim and
+     decided the journal wording — only through a code comment. A brief therefore
+     names the spec DOCUMENT its point's slice belongs to, the way it names a
+     design.md section, and an unnamed slice document is a finding, not a search
+     task for the reader.
   VERIFIABLE: pure Vitest on the reference classifier (an adopting phrase yields the
   full text, a mentioning one the single line, an unknown number fails); the brief for
-  488 contains point 352's specification in full, and the brief's size for a point with
+  488 contains point 352's specification in full, the brief for a communication-slice
+  point names `docs/communication-poc-spec.md`, and the brief's size for a point with
   no adopted reference is unchanged.
 
 - [ ] 517. THE LEASE-EXPIRY TAKEOVER IGNORES AN HONOURED CLAIM (measured
@@ -4832,4 +4841,24 @@ Build order, chosen so no two parallel agents own the same file:
   VERIFIABLE: pure Vitest on the guard's classification of a blocked/stalled
   deploy failure and on the workflow's retry decision, plus one real deploy run
   proving a commit blocked by a stuck deployment still reaches the live site.
+
+- [ ] 527. THE MODEL ALLOWLIST IS TESTED AGAINST THE RAW TRAILER (found 06.08.2026
+  by the four-eyes review of points 397/425; already recorded as C9 in
+  `docs/rule-corpus-audit.md`). `ALLOWED` in `scripts/model-guard-core.mjs` is
+  matched against the WHOLE trailer line rather than against the model name parsed
+  out of it, so a trailer that carries an allowed name plus anything else —
+  `Claude Haiku 4.5 (opus mode)`, `Claude Sonnet 5 / Claude Opus 5` — passes the
+  guard whose entire purpose is to catch a silently degraded session. The 24.07.2026
+  incident it was built for was exactly a degraded model merging defective work.
+  FINAL STATE:
+  1. The allowlist is tested against the model NAME parsed out of the trailer
+     (`modelNameIn`), not against the raw line, so an allowed name with any addition
+     is no longer allowed by accident.
+  2. A trailer naming more than one model is a FINDING, not a pass on its first
+     allowed name.
+  3. The tightening does not turn today's legitimate trailers red: the exact forms
+     the harness writes stay allowed, and the test names each of them.
+  VERIFIABLE: pure Vitest in `scripts/model-guard-core.test.mjs` — every legitimate
+  trailer form passes, an allowed name with an addition and a two-model line both
+  fail, and the existing forbidden/unnamed classifications are unchanged.
 
