@@ -13,12 +13,13 @@ import { PENDING_PATH, STATE_PATH, boardFilePath, readJson, writeJsonAtomic, mer
 import { heldByOtherLiveOwner, withdrawHandover } from './batch-singleton.mjs'
 // The injected board obligation, in a pure module so its size is measurable and
 // its content testable (point 436).
-import { boardReminderText } from './dashboard-reminder-core.mjs'
+import { promptInjectionText } from './dashboard-reminder-core.mjs'
 
 // Hard singleton (24.07.2026): a session that does not own the live batch lock
 // has NO dashboard/focus duty — arming the pivot check or issuing the board
-// obligations would conscript it into batch work. It keeps only the timestamp
-// rule (a universal chat rule, not a batch duty).
+// obligations would conscript it into batch work. Since point 440 it is told
+// that and nothing else; the chat-timestamp rule reaches every session through
+// the user-scope hook and timestamp-guard, not through this one.
 let standDown = false
 let sid = ''
 try {
@@ -65,20 +66,14 @@ try {
   // best effort
 }
 
-// Surface the current Europe/Berlin time on EVERY user prompt so the reply can
-// lead with an accurate timestamp (the chat-timestamp rule) without a separate
-// Node call — the missing-timestamp failure mode was skipping that call under
-// flow in long multi-tool turns (user complaint 19.07.2026). This hook script is
-// re-executed each turn, so the time is always current in context.
-const nowBerlin = new Intl.DateTimeFormat('de-DE', {
-  dateStyle: 'short',
-  timeStyle: 'short',
-  timeZone: 'Europe/Berlin',
-}).format(new Date())
-console.log(
-  '[timestamp] PFLICHT: Beginne JEDE an den Nutzer gerichtete Antwort mit diesem ' +
-  `Zeitstempel — aktuelle Zeit (Europe/Berlin): ${nowBerlin}.`,
-)
+// The chat-timestamp rule is NOT stated here (point 440). It used to be stated
+// twice — a tagged obligation line and a shouting banner, 497 of
+// this hook's 1771 characters — while `timestamp-guard` already BLOCKS the turn
+// end on a reply that lacks the stamp and hands the exact line to paste, and the
+// user-scope hook scripts/hooks/berlin-timestamp.cjs delivers the current time
+// on the same prompt. Worse, both blocks formatted the stamp in the SHORT German
+// form ("06.08.26, 21:00"), which is exactly what the guard's TIMESTAMP_RE
+// rejects. See PROMPT_ENFORCED_CLAIMS.
 
 if (standDown) {
   console.log(
@@ -101,25 +96,10 @@ try {
 } catch {
   // best effort — the reminder itself is the payload
 }
-console.log(boardReminderText(mtimeNote))
-
-console.log(
-  '[focus-guard] Diese Nutzer-Nachricht hat den Fokus-Abgleich SCHARFGESCHALTET: bevor dieser ' +
-  'Zug enden kann, musst du prüfen, ob die »Woran ich gerade arbeite«-Karte noch das nennt, was ' +
-  'du WIRKLICH tust — dann `node scripts/focus.mjs confirm` (unverändert) oder `node scripts/' +
-  'focus.mjs set <N> "<was>"` + Karte aktualisieren + `node scripts/board-publish.mjs` + ' +
-  '`--synced` (geändert). Der Stop-Guard blockiert sonst das Zug-Ende.',
-)
+// The armed focus reconcile is no longer ANNOUNCED here (point 440): the marker
+// written above is what binds, and dashboard-guard-core case (7) refuses the turn
+// end while it stands — naming `focus.mjs confirm`, `focus.mjs set`, the now-card
+// update, the republish and `--synced` in its own block text, which is read
+// exactly when it is needed instead of on every prompt.
+process.stdout.write(promptInjectionText(mtimeNote))
 }
-
-// Repeat the timestamp obligation LAST — the final line of hook output sits closest
-// to where the reply is generated, so it is the most salient (the top line alone kept
-// getting drowned by the long dashboard reminder and skipped, user complaint
-// 20.07.2026: "Warum sind die Timestamps schon wieder weg"). Unmissable banner.
-console.log(
-  '\n============================================================\n' +
-  `>>> WICHTIGSTE REGEL — die ERSTE ZEILE deiner Antwort an den Nutzer MUSS dieser\n` +
-  `>>> Zeitstempel sein: "${nowBerlin}".  JEDE Antwort, ausnahmslos.\n` +
-  `>>> Beginnt deine Antwort nicht damit, ist sie falsch formatiert — hol es sofort nach.\n` +
-  '============================================================',
-)

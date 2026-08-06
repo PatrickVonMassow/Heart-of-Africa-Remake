@@ -61,6 +61,55 @@ export const REMINDER_COMMANDS = [`${EDIT_CMD} vdzk-add`, `${EDIT_CMD} <cmd>`, P
 export const REMINDER_CHAR_BUDGET = 950
 
 /**
+ * The claims the PROMPT INJECTION as a whole no longer makes, because a gate
+ * refuses to let them be broken and hands the remedy at the moment it is needed
+ * (point 440, applying 436's rule to the rest of the hook's output). Measured
+ * before the cut: the hook printed 1771 characters per prompt, of which 927
+ * were these three blocks.
+ *
+ *   · the chat-timestamp rule, stated TWICE more (a `[timestamp] PFLICHT` line
+ *     of 139 characters and a 358-character `WICHTIGSTE REGEL` banner). Both
+ *     restated a rule `timestamp-guard` BLOCKS the turn end on, and both handed
+ *     a stamp in `dateStyle: 'short'` ("06.08.26, 21:00") — a format
+ *     `TIMESTAMP_RE` rejects, so the injection was not merely redundant but
+ *     contradicted the gate. The current time itself still arrives every prompt
+ *     from the user-scope hook `scripts/hooks/berlin-timestamp.cjs`, in the
+ *     mandated long form, and the guard's block text hands the exact line to
+ *     paste. Nothing that was only in these blocks was lost.
+ *   · the `[focus-guard]` block (427 characters), whose duty is refused by
+ *     dashboard-guard-core case (7) FOCUS RECONCILE — a block whose own text
+ *     already names `focus.mjs confirm`, `focus.mjs set`, the now-card update,
+ *     the republish and `--synced`. The hook still ARMS that marker; only the
+ *     prose about it is gone.
+ *
+ * The test reads this list, so re-stating one of them means deleting an entry
+ * here — and the same test proves the two gates really do fire.
+ */
+export const PROMPT_ENFORCED_CLAIMS = [
+  { id: 'timestamp-rule', by: 'timestamp-guard (blocks turn-end, hands the exact line)', pattern: /zeitstempel/i },
+  { id: 'timestamp-banner', by: 'timestamp-guard (same block)', pattern: /wichtigste regel/i },
+  { id: 'focus-reconcile', by: 'dashboard-guard-core (7) FOCUS RECONCILE', pattern: /focus\.mjs|fokus-abgleich/i },
+]
+
+/**
+ * A CEILING on EVERYTHING the project-scope UserPromptSubmit hook injects, not
+ * just the board paragraph — the level the user's question was asked at ("what
+ * else is billed every turn for nothing"). It equals REMINDER_CHAR_BUDGET plus
+ * the newline, because after point 440 the board obligation is the only text
+ * left; a new block would have to raise this number and justify it here.
+ */
+export const PROMPT_CHAR_BUDGET = REMINDER_CHAR_BUDGET + 1
+
+/**
+ * Everything the hook writes to stdout for a session that owns the batch — the
+ * measurable unit, so a test can hold the WHOLE per-prompt cost to
+ * PROMPT_CHAR_BUDGET rather than one paragraph of it.
+ */
+export function promptInjectionText(mtimeNote = '') {
+  return boardReminderText(mtimeNote) + '\n'
+}
+
+/**
  * The injected board obligation. `mtimeNote` is appended verbatim (the age of
  * the canonical board file, or '' when it cannot be read).
  */
