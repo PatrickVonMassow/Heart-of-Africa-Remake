@@ -16,6 +16,13 @@
 // running batch. The live pause record is read once, before and after, purely to
 // assert that the drill left it alone.
 //
+// WHAT IT THEREFORE DOES NOT MEASURE (four-eyes review, Fable 5, finding 5): the
+// retry BRANCH — the `rmSync`, the cleared `failCount`, the spawn that follows — does
+// not execute here, because executing it would be the competing session this drill
+// must not start. What the drill proves is the verdict the live tick acts on, in the
+// live tick's own process; that the branch is wired to that verdict is pinned by the
+// source witnesses in scripts/batch-autostart.test.mjs.
+//
 //   node scripts/pause-retry-drill.mjs        (~70 s; --fast skips the real wait)
 import { mkdirSync, writeFileSync, rmSync, existsSync, readFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
@@ -88,8 +95,8 @@ try {
   const resumed = report('clocked')
   console.log(`tick verdict after the clock: ${JSON.stringify(resumed)}`)
   check(resumed.state === 'retry', "the next tick reads the expired clock as 'retry'")
-  check(resumed.parksTheTick === false, 'the tick is no longer parked — it goes on to start a session')
-  check(resumed.clearsTheRecord === true, 'and the pause record is cleared by that tick')
+  check(resumed.parksTheTick === false, 'the tick no longer parks — it goes on to its ordinary spawn decision')
+  check(resumed.clearsTheRecord === true, 'and that verdict is the one that removes the pause record')
 
   // 3. THE CONTROL: a clockless legacy marker is never resumed.
   writeFileSync(
@@ -113,4 +120,4 @@ if (failures.length) {
   console.error(`\nDRILL FAILED (${failures.length}): ${failures.join('; ')}`)
   process.exit(1)
 }
-console.log('\nDRILL PASSED — a park with a clock resumes itself, a park without one does not.')
+console.log('\nDRILL PASSED — the live tick reads a spent clock as a resume and a clockless park as a hold.')

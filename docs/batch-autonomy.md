@@ -102,9 +102,15 @@ and reads the file; the launcher tick (`scripts/batch-autostart.mjs`) is what ac
 - **no clock at all →** it parks until a human clears it. Every marker an older
   session wrote reads this way: a MISSING clock is never read as an expired one.
 
-Each further park of the same cause climbs the ladder — 20 min, 1 h, 3 h — and after
-the last rung it becomes clockless, because a cause that survived three retries needs
-a person. **Parking without a clock is a short, written-down list**
+Each further park climbs the ladder — 20 min, 1 h, 3 h — and after the last rung it
+becomes clockless, because a cause that survived three retries needs a person. The
+rung is counted PER SPELL and shared by every writer: `setPaused` takes it from the
+launcher's `pauseAttempt`, which is cleared together with `failCount` the moment a
+spawn makes progress. Both halves matter — a counter that never reset would make
+every park clockless for ever after three retries in the machine's whole history, and
+a counter only the launcher's own parks carried would leave an unanswered alert or a
+standing outage oscillating at rung 1 all night (four-eyes review, Fable 5).
+**Parking without a clock is a short, written-down list**
 (`CLOCKLESS_CAUSES`): a serving model outside the CLAUDE.md §6 allowlist (retrying
 only spawns the same degraded session — where a fallback exists, the §6 chain runs
 instead of parking at all), the user's own stop, a queue in which every open point

@@ -51,10 +51,20 @@ export const CLOCKLESS_CAUSES = {
   'retries-exhausted': 'the clock already ran out its ladder and the cause is still there — a human is needed',
 }
 
-/** The retry ladder: a first park is short, each further one longer, and after the
- *  last rung the park becomes clockless ('retries-exhausted'). Twenty minutes is
- *  the point's own measure of a self-clearing cause; three hours is long enough
- *  that a genuinely broken batch is not spawning all night. */
+/**
+ * The retry ladder: a first park is short, each further one longer, and after the
+ * last rung the park becomes clockless ('retries-exhausted'). Twenty minutes is the
+ * point's own measure of a self-clearing cause; three hours is long enough that a
+ * genuinely broken batch is not spawning all night.
+ *
+ * THE RUNG IS COUNTED PER SPELL, NOT PER CAUSE AND NOT FOR EVER. `attempt` is how
+ * many times the launcher has resumed the batch SINCE IT LAST MADE PROGRESS — the
+ * counter is cleared with `failCount` the moment a spawn commits something. Two
+ * findings of the four-eyes review meet here: a counter that never resets would
+ * make every park clockless for ever after three retries in the machine's whole
+ * history, and a counter only the launcher's own parks carried would leave an
+ * unanswered alert or a standing outage oscillating at rung 1 all night.
+ */
 export const PAUSE_RETRY_LADDER_MS = [20 * 60 * 1000, 60 * 60 * 1000, 3 * 60 * 60 * 1000]
 
 export function isClocklessCause(cause) {
@@ -67,7 +77,18 @@ const isoOrNull = (v) => {
   return Number.isNaN(d.getTime()) ? null : d.toISOString()
 }
 
-/** Accepts an ISO stamp or epoch milliseconds; anything else is null (no clock). */
+/**
+ * A full ISO stamp — date AND time. `Date.parse` alone would read the TRUNCATED
+ * stamp of a torn write ("retry-after: 2026") as 1 January of that year, which is
+ * in the past, which resumes the batch: the one corruption mode that can flip this
+ * mechanism toward the unsafe direction (four-eyes review, Fable 5, finding 4).
+ */
+const ISO_INSTANT = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?$/
+
+/** No epoch stamp this mechanism writes can predate the mechanism. */
+const EPOCH_FLOOR_MS = Date.UTC(2020, 0, 1)
+
+/** Accepts a full ISO stamp or epoch milliseconds; anything else is null (no clock). */
 export function parseInstant(value) {
   if (value == null) return null
   if (typeof value === 'number') return Number.isFinite(value) ? value : null
@@ -75,8 +96,11 @@ export function parseInstant(value) {
   if (text === '') return null
   if (/^\d+$/.test(text)) {
     const ms = Number(text)
-    return Number.isFinite(ms) ? ms : null
+    // A FLOOR, for the same reason: "2026" is also all digits, and as epoch
+    // milliseconds it is 1970 — a stamp in the past, which would resume the batch.
+    return Number.isFinite(ms) && ms >= EPOCH_FLOOR_MS ? ms : null
   }
+  if (!ISO_INSTANT.test(text)) return null
   const ms = Date.parse(text)
   return Number.isNaN(ms) ? null : ms
 }

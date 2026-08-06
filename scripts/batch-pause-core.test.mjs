@@ -50,6 +50,16 @@ describe('the record round-trips its reason and its clock', () => {
     expect(parseInstant(null)).toBeNull()
   })
 
+  // The one corruption that could flip the mechanism toward resuming: a torn write
+  // leaves a TRUNCATED stamp, and `Date.parse('2026')` is 1 January 2026 — a date in
+  // the past, which would read as an expired clock (four-eyes review, finding 4).
+  it('refuses a truncated stamp instead of reading it as a past instant', () => {
+    for (const torn of ['2026', '2026-08', '2026-08-06', '2026-08-06T']) {
+      expect(parseInstant(torn), `${torn} must not parse`).toBeNull()
+      expect(classifyPause({ text: `torn write\nretry-after: ${torn}\n`, now: NOW }).state).toBe('hold')
+    }
+  })
+
   it('records a clockless park as a decision (`never`), not as an omission', () => {
     const text = formatPauseRecord({ reason: 'serving model outside the allowlist', cause: 'serving-model', retryAfter: null })
     expect(text).toMatch(/retry-after: never/)

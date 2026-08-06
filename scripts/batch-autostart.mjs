@@ -77,6 +77,7 @@ import {
 } from './batch-autostart-core.mjs'
 import { repoRepairAllowed, repoRepairDecision } from './batch-doctor-core.mjs'
 import { clearMandateMarker, writeMandateMarker } from './batch-doctor-states.mjs'
+import { writeTextAtomic } from './atomic-write.mjs'
 import { classifyPause, describePause, formatPauseRecord, planPause } from './batch-pause-core.mjs'
 import { WATCHER_PID_FILE, watcherSupervision } from './chat-watcher-core.mjs'
 import { SECRET_FAULT } from './chat-secret.mjs'
@@ -554,6 +555,15 @@ if (state.lastSpawnAt > 0) {
   // rhythm can be measured out of it instead of assumed.
   if (outcome.note) log(outcome.note)
   state.failCount = outcome.failCount
+  // THE RETRY RUNG GOES WITH IT (point 445, four-eyes finding 2). `pauseAttempt`
+  // counts the resumptions of ONE spell of trouble; a counter that survived a
+  // recovery would make every park months later clockless on a ladder spent long
+  // ago, silently retiring the restart clock.
+  if (outcome.state === 'progress' && (state.pauseAttempt || 0) > 0) {
+    log(`previous spawn made progress — clearing the pause retry rung (${state.pauseAttempt})`)
+    delete state.pauseAttempt
+    delete state.pauseRetryAt
+  }
   if (outcome.quota) state.quota = outcome.quota
   else delete state.quota
 }
@@ -612,8 +622,11 @@ if (state.failCount >= RUNAWAY_FAIL_LIMIT) {
   const plan = planPause({ cause: 'runaway', attempt: state.pauseAttempt || 0, now })
   const when = plan.clockless ? 'no restart clock — a human is needed' : `retry at ${new Date(plan.retryAfter).toISOString()}`
   log(`RUNAWAY: ${state.failCount} spawns with no git progress — pausing the batch (${when}) and notifying`)
+  // ATOMICALLY (four-eyes finding 4): a torn record is the one corruption that
+  // could flip this mechanism toward resuming — a half-written stamp read as a
+  // past one. tmp + rename makes a half-written file unreachable.
   try {
-    writeFileSync(C('batch-paused'), formatPauseRecord({
+    writeTextAtomic(C('batch-paused'), formatPauseRecord({
       reason: `autostart watchdog: ${state.failCount} resurrections made no progress (auth expired? model flag? failing point? push failing?) — investigate; the launcher retries when the clock below runs out.`,
       ...plan,
       pausedAt: now,
