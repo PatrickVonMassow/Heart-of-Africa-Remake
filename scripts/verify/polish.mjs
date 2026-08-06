@@ -3398,7 +3398,9 @@ for (const [placeId, shot] of [
 
   // The eaves were NOT fenced off: the cook-shelter over the village fire is a
   // roof one may still stand under — and from under it, it must be a SURFACE.
-  await enterFor('zulu-village')
+  // A compound people, because only they keep the canopy (the Zulu are
+  // dome-dwellers and cook indoors — `src/systems/cookShelter.ts`).
+  await enterFor('bemba-village')
   const fire = { x: -3.5, z: 2.5 } // VILLAGE_FIRE in src/scenes/place/layout.ts
   const stoodAtFire = await standOff(fire, 5)
   if (stoodAtFire == null) {
