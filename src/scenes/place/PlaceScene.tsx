@@ -110,6 +110,7 @@ import {
   HUT_FINIAL_Y,
   HUT_FLAT_ROOF,
   HUT_STILT_BASE,
+  PLACE_CAMERA_NEAR,
   SHED_ROOF,
   hutWallHeight,
 } from './roofClearance'
@@ -2156,9 +2157,11 @@ export function PlaceScene() {
   // in the debug zoom range (depth precision at continental distances), and a
   // first-person scene inheriting near=4 clips every wall the player
   // approaches. Own the near plane here.
+  // The value is shared with `roofClearance`, which sizes the head clearance
+  // under a roof from exactly this near plane (work-order 349).
   useEffect(() => {
-    if (camera.near !== 0.1) {
-      camera.near = 0.1
+    if (camera.near !== PLACE_CAMERA_NEAR) {
+      camera.near = PLACE_CAMERA_NEAR
       camera.updateProjectionMatrix()
     }
   }, [camera])

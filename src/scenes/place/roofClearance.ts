@@ -29,11 +29,14 @@ import type { DwellingDef, Interactive, PlaceLayout } from './layout'
 /** First-person camera height in metres (design.md §2.2). */
 export const EYE_HEIGHT = 1.5
 
+/** Near plane of the first-person camera, which `PlaceScene` owns and sets. */
+export const PLACE_CAMERA_NEAR = 0.1
+
 /**
- * How far the camera's near plane reaches from the eye, in any direction. The
- * scene runs fov 50 at near 0.1 (`App.tsx`), so the near plane's far corner sits
- * at √(0.1² + (0.1·tan25°)² + (0.1·tan25°·16/9)²) ≈ 0.137 m from the eye —
- * geometry inside that sphere is CUT, whichever way the player looks. Rounded up.
+ * How far that near plane reaches from the eye, in any direction: at the scene's
+ * fov 50 on a wide 16:9 frame its far corner sits at
+ * √(0.1² + (0.1·tan25°)² + (0.1·tan25°·16/9)²) ≈ 0.137 m from the eye — geometry
+ * inside that sphere is CUT, whichever way the player looks. Rounded up.
  */
 export const CAMERA_NEAR_REACH = 0.15
 
