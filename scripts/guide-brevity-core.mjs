@@ -42,10 +42,14 @@
 // Raised again on 06.08.2026 by ONE genuinely new tip — an alarm keyed on an EVENT is blind
 // exactly when the event's own source fails, so what is watched is the STATE (does the served
 // thing still match the source?), plus the same lesson's second half, that a sync writing from
-// a source may only ADD and never overwrite what is richer downstream (+8 lines, +44 words,
-// measured as the audit counts them, and net of two entries tightened to pay part of it).
+// a source may only ADD and never overwrite what is richer downstream. The tip costs +7 lines
+// and +67 words gross; ONE neighbouring entry (the versioned-move one, risk half and prompt)
+// was tightened by −1 line / −20 words to pay part of it, leaving +6 lines and +47 words net.
+// The LINE ceiling is nevertheless LOWERED to the measured fit: the document had drifted 7
+// lines under the old 409 and rides that slack, so 408 is the exact count and 417 would have
+// been room for a whole future entry — the four-eyes review caught precisely that.
 export const LIMITS = {
-  maxLines: 417,
+  maxLines: 408,
   // EXACT FIT, not headroom — corrected 30.07.2026 after the four-eyes review
   // pointed out that this comment had long stopped describing the numbers. The
   // rule above ("raised only by the measured size of genuinely new tips")
