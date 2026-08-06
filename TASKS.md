@@ -4796,3 +4796,39 @@ Build order, chosen so no two parallel agents own the same file:
   VERIFIABLE: pure Vitest on the play-ground derivation (the spot keeps the
   separation AND lies within the built fabric for every shipped village), plus
   the retaken frame checked by a human on both backends.
+
+- [ ] 528. THE DEPLOY THAT NEVER REACHES A RUNNER LEAVES THE SITE STALE, AND POINT
+  526 IS UNPROVEN ON THE LIVE PATH (measured 06.08.2026, immediately after 526
+  merged). Point 526's VERIFIABLE demands, besides its Vitest layer, ONE REAL
+  DEPLOY RUN proving a commit still reaches the live site. That proof could not be
+  taken: from 15:35 UTC GitHub Actions was degraded — two runs died in `Set up
+  job` with `Failed to resolve action download info. Error: Internal Server
+  Error` / `Service Unavailable`, `workflow_dispatch` answered HTTP 500, and the
+  one run whose build succeeded (31117749040) had its `deploy` job cancelled at
+  16:15:56 UTC with ZERO steps recorded, 15.5 minutes after becoming eligible —
+  it never got a runner. What 526 DID prove against a real red run is its
+  classifier: `classifyFailureCause` read run 31116867124 as `external` with the
+  remedy naming the unblock command, so item 4 holds. Items 1, 2 and 5 — the
+  cancel-and-retry inside a run that actually executes — remain unexercised.
+  Consequence meanwhile: `main` stands at ee125053 while the site still serves
+  c728c816, so the user judges render work against a stale build.
+  FINAL STATE:
+  1. The live proof of 526 is taken: one deploy run whose `deploy` job really
+     executes, whose `Verdict` step prints its explicit line, and after which the
+     served site matches `main`. Recorded in `docs/acceptance-evidence.md` beside
+     the criterion it belongs to.
+  2. A `deploy` job that ends with NO step executed is told apart from one that
+     ran and failed — the first is a runner/queue famine, not a Pages stall, and
+     the classifier of 526 says so rather than prescribing the unblock command,
+     which would cancel nothing.
+  3. It is settled by measurement whether the deploy job's own
+     `timeout-minutes: 25` contributed to the cancellation (the 15.5-minute gap
+     says it did not, but the value was chosen without this failure in view);
+     the value is either justified in a comment or corrected.
+  4. A deploy that never reached the site is NOTICED without a human looking:
+     the batch learns that the served build lags `main`, names both revisions,
+     and retries once GitHub answers again — the site being stale is the fault
+     that matters, not the run being red.
+  VERIFIABLE: pure Vitest on the no-step-executed classification and on the
+  stale-site comparison (served revision vs `main`), plus the one real deploy run
+  of item 1 with its run id recorded.
