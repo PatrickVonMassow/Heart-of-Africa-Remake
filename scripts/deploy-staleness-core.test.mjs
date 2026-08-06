@@ -223,6 +223,24 @@ describe('stalenessAlert', () => {
     expect(again.key).toBe(first.key)
   })
 
+  it('keys on the STORED attempt count, so a dispatch and its cooldown are one fault', () => {
+    // The tick that dispatches and the next tick, which finds the cooldown
+    // running, describe the same standing fault — it must be announced once.
+    const dispatched = stalenessAlert({ ...stale, attemptCount: 1, dispatch: { dispatch: true, attempt: 1 } })
+    const cooling = stalenessAlert({ ...stale, attemptCount: 1, dispatch: { dispatch: false, attempt: 0, reason: 'cooldown' }, lastKey: dispatched.key })
+    expect(dispatched.notify).toBe(true)
+    expect(cooling.notify).toBe(false)
+    // …but the NEXT dispatch is news again.
+    const second = stalenessAlert({ ...stale, attemptCount: 2, dispatch: { dispatch: true, attempt: 2 }, lastKey: dispatched.key })
+    expect(second.notify).toBe(true)
+  })
+
+  it('never claims a dispatch that was not made', () => {
+    const a = stalenessAlert({ ...stale, dispatch: { dispatch: false, reason: 'no token to dispatch with' } })
+    expect(a.message).not.toContain('Re-dispatched')
+    expect(a.message).toContain('no token')
+  })
+
   it('re-announces HOURLY once the retries are exhausted — a standing condition must climb the ladder', () => {
     const exhausted = { ...stale, dispatch: { dispatch: false, exhausted: true, reason: 'needs a human' } }
     const first = stalenessAlert(exhausted)

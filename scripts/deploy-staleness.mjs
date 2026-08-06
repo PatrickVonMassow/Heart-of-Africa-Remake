@@ -49,17 +49,27 @@ const now = Date.now()
 
 const say = (o) => process.stdout.write(`${JSON.stringify(o)}\n`)
 
-function git(a) {
+function git(a, timeout = 5000) {
   try {
     return execFileSync('git', a, {
       windowsHide: true,
       cwd: REPO_ROOT,
       encoding: 'utf8',
-      timeout: 5000,
+      timeout,
       stdio: ['ignore', 'pipe', 'ignore'],
     }).trim()
   } catch {
     return ''
+  }
+}
+
+/** Did this git command SUCCEED? (`git()` cannot say — an empty output is normal.) */
+function gitOk(a, timeout = 5000) {
+  try {
+    execFileSync('git', a, { windowsHide: true, cwd: REPO_ROOT, timeout, stdio: 'ignore' })
+    return true
+  } catch {
+    return false
   }
 }
 
@@ -105,9 +115,17 @@ const apiHeaders = (token) => ({
 
 try {
   // --- what `main` stands at -------------------------------------------------
-  // origin/main is the revision the deploy builds from; the local branch is only
-  // a fallback for a clone whose remote ref was never fetched.
-  const mainSha = git(['rev-parse', 'origin/main']) || git(['rev-parse', 'main'])
+  // FETCHED FIRST (four-eyes review, finding 2). The comparison is only as good
+  // as the `main` it is made against, and a stale local ref breaks it BOTH ways:
+  // a site serving a commit this clone never fetched — the user's own web edit
+  // pushed to `main` is exactly that — reads as stale and earns a pointless
+  // dispatch, while a clone and a site that are both behind read as current,
+  // which is the miss this whole watchdog exists to prevent. The fetch is
+  // bounded and its failure is ignored: the stale refs are then still better
+  // than no answer. FETCH_HEAD is the unambiguous tip when the fetch worked.
+  const fetchedMain = gitOk(['fetch', '--quiet', 'origin', 'main'], 30000)
+  const mainSha =
+    (fetchedMain && git(['rev-parse', 'FETCH_HEAD'])) || git(['rev-parse', 'origin/main']) || git(['rev-parse', 'main'])
   const committedAt = mainSha ? Date.parse(git(['show', '-s', '--format=%cI', mainSha])) : NaN
 
   // --- what the site serves --------------------------------------------------
@@ -166,24 +184,44 @@ try {
     attempts: state.attempts ?? null,
     now,
   })
+  // The message may only claim what actually happened (four-eyes review, finding
+  // 4): a dispatch decided but never posted — no token, no remote, --no-dispatch
+  // — used to read as "Re-dispatched". `attempted` is the POST, nothing else.
+  const blocker = noDispatch ? '--no-dispatch was given' : !repo ? 'this is not a GitHub clone' : !token ? 'no token to dispatch with' : ''
+  const attempted = decision.dispatch && !blocker
   let dispatchOutcome = ''
-  let dispatched = false
-  if (decision.dispatch && !noDispatch && repo && token) {
+  let accepted = false
+  if (attempted) {
     const res = await get(`https://api.github.com/repos/${repo}/actions/workflows/${DEPLOY_WORKFLOW_FILE}/dispatches`, {
       method: 'POST',
       headers: { ...apiHeaders(token), 'Content-Type': 'application/json' },
       body: JSON.stringify({ ref: 'main' }),
     })
-    dispatched = res.status === 204
-    dispatchOutcome = dispatched ? 'accepted' : `refused (${res.error ? res.error : `HTTP ${res.status}`})`
-  } else if (decision.dispatch && !noDispatch && !token) {
-    dispatchOutcome = 'no token — cannot dispatch'
+    accepted = res.status === 204
+    dispatchOutcome = accepted ? 'accepted' : `refused (${res.error ? res.error : `HTTP ${res.status}`})`
   }
 
+  // The attempt COUNTS whether GitHub accepted it or not — otherwise a refused
+  // dispatch would be retried at every tick with no cooldown at all.
+  const attempts = nextAttempts({
+    verdict: verdict.verdict,
+    mainSha: verdict.mainSha,
+    attempts: state.attempts ?? null,
+    dispatched: attempted,
+    now,
+  })
   const alert = stalenessAlert({
     ...verdict,
-    dispatch: { ...decision, dispatch: decision.dispatch && !noDispatch },
+    dispatch: {
+      ...decision,
+      dispatch: attempted,
+      reason: decision.dispatch && blocker ? blocker : decision.reason,
+    },
     dispatchOutcome,
+    // Keyed on the STORED count, not on the decision's transient attempt number
+    // (finding 3): the tick after a dispatch falls into the cooldown branch, and
+    // keying on that would re-announce one unchanged fault every cycle.
+    attemptCount: Number(attempts?.count) || 0,
     lastKey: state.lastKey ?? null,
     now,
   })
@@ -195,7 +233,7 @@ try {
     // failed ntfy POST must not silence a standing problem (the lesson
     // board-watchdog records as four-eyes NEW-4).
     lastKey: sent ? alert.key : (verdict.verdict === 'current' ? null : (state.lastKey ?? null)),
-    attempts: nextAttempts({ verdict: verdict.verdict, mainSha: verdict.mainSha, attempts: state.attempts ?? null, dispatched, now }),
+    attempts,
     checkedAt: now,
     verdict: verdict.verdict,
   })
@@ -205,8 +243,9 @@ try {
     reason: verdict.reason,
     served: verdict.servedSha,
     main: verdict.mainSha,
-    dispatched,
-    dispatch: decision.reason,
+    dispatched: attempted,
+    accepted,
+    dispatch: attempted ? dispatchOutcome : decision.dispatch ? blocker : decision.reason,
     exhausted: Boolean(decision.exhausted),
     notified: Boolean(sent),
     message: alert.message,

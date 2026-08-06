@@ -2,7 +2,7 @@
 // red blocks and notifies once per sha, pending/success/none allow, malformed
 // input fails open, and a green re-run supersedes its red predecessor.
 import { describe, it, expect } from 'vitest'
-import { classifyRuns, failedRuns, shouldBlock, shouldNotify, blockReason } from './ci-status-guard-core.mjs'
+import { classifyRuns, failedRuns, recoveredWorkflows, shouldBlock, shouldNotify, blockReason } from './ci-status-guard-core.mjs'
 
 const HEAD = 'abc123def456'
 
@@ -201,5 +201,38 @@ describe('blockReason', () => {
     expect(reason).toContain('the failing job is "gate"')
     expect(reason).toContain('npm run test:unit')
     expect(reason).toContain('Only a fixing push')
+  })
+})
+
+// The outage waiver's clock is per workflow and must not outlive the outage
+// (four-eyes review, 06.08.2026, finding 1): a clock left behind makes the NEXT
+// famine read as an already-expired waiver and escalate on its first sighting.
+describe('recoveredWorkflows', () => {
+  it('names the workflows whose newest run reached a non-failing verdict', () => {
+    expect(
+      recoveredWorkflows(
+        [
+          run({ databaseId: 1, workflowName: 'CI', conclusion: 'failure' }),
+          run({ databaseId: 2, workflowName: 'CI', conclusion: 'success' }), // the re-run
+          run({ databaseId: 3, workflowName: 'Deploy to GitHub Pages', conclusion: 'skipped' }),
+        ],
+        HEAD,
+      ).sort(),
+    ).toEqual(['CI', 'Deploy to GitHub Pages'])
+  })
+
+  it('never calls a workflow recovered while it is still red or still running', () => {
+    expect(recoveredWorkflows([run({ conclusion: 'failure' })], HEAD)).toEqual([])
+    expect(recoveredWorkflows([run({ status: 'in_progress', conclusion: null })], HEAD)).toEqual([])
+    // A green re-run does NOT rescue a workflow whose newest run is the red one.
+    expect(
+      recoveredWorkflows([run({ databaseId: 1, conclusion: 'success' }), run({ databaseId: 2, conclusion: 'failure' })], HEAD),
+    ).toEqual([])
+  })
+
+  it('ignores other commits and survives junk', () => {
+    expect(recoveredWorkflows([run({ headSha: 'other' })], HEAD)).toEqual([])
+    expect(recoveredWorkflows(null, HEAD)).toEqual([])
+    expect(recoveredWorkflows([run()], '')).toEqual([])
   })
 })

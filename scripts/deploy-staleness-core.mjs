@@ -227,6 +227,7 @@ export function stalenessAlert(input) {
       reason = '',
       dispatch = null,
       dispatchOutcome = '',
+      attemptCount = 0,
       lastKey = null,
       siteUrl = SITE_URL,
       now = Date.now(),
@@ -242,10 +243,14 @@ export function stalenessAlert(input) {
 
     // Exhausted is a standing CONDITION (a human must look) and is re-announced
     // hourly so the ladder escalates; everything else is an EVENT keyed by the
-    // pair of revisions, so one unchanged fault is reported once.
+    // pair of revisions plus how many dispatches that pair has HAD, so one
+    // unchanged fault is reported once and each new attempt is news. The count
+    // is the caller's stored one (four-eyes finding 3) — keying on the current
+    // tick's decision would flip between "dispatched" and "in cooldown" and
+    // re-announce the same fault every cycle.
     const key = exhausted
       ? `stale:${servedSha ?? '-'}:${mainSha}:${Math.floor(now / 3_600_000)}`
-      : `stale:${servedSha ?? '-'}:${mainSha}:${dispatch?.attempt ?? 0}`
+      : `stale:${servedSha ?? '-'}:${mainSha}:${Number(attemptCount) || 0}`
     if (lastKey && lastKey === key) return { ...quiet, key }
 
     return {

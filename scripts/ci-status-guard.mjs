@@ -20,7 +20,7 @@ import { execFileSync } from 'node:child_process'
 import { request } from 'node:https'
 import { fileURLToPath } from 'node:url'
 import { readJson, writeJsonAtomic } from './dashboard-state.mjs'
-import { classifyRuns, failedRuns, shouldBlock, shouldNotify, blockReason } from './ci-status-guard-core.mjs'
+import { classifyRuns, failedRuns, recoveredWorkflows, shouldBlock, shouldNotify, blockReason } from './ci-status-guard-core.mjs'
 import { JOBS_PAGE_SIZE, classifyFailureCause, jobsComplete, moreJobPages } from './ci-failure-cause-core.mjs'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
 
@@ -269,6 +269,22 @@ async function notifyCiRed(message) {
   })
 }
 
+/** Drop the outage-waiver clock of every workflow whose newest run on this head
+ *  came back without a failure. Never throws — bookkeeping may not cost a stop. */
+function forgetRecoveredFamine(runs, head) {
+  try {
+    const state = readJson(STATE) ?? {}
+    const famine = state.famine && typeof state.famine === 'object' ? state.famine : {}
+    const names = Object.keys(famine)
+    if (names.length === 0) return
+    const next = { ...famine }
+    for (const name of recoveredWorkflows(runs, head)) delete next[name]
+    if (Object.keys(next).length !== names.length) writeJsonAtomic(STATE, { ...state, famine: next })
+  } catch {
+    /* fail-open */
+  }
+}
+
 /** Returns the block-decision JSON string, or null to allow. */
 async function main() {
   let sid = ''
@@ -291,7 +307,14 @@ async function main() {
   if (!runs) return null // offline / rate-limited / API error — fail-open
 
   const runClassification = classifyRuns(runs, head)
-  if (!shouldBlock(runClassification.state)) return null
+  if (!shouldBlock(runClassification.state)) {
+    // THE WAIVER CLOCK IS CLEARED ON THE WAY OUT (four-eyes review, finding 1).
+    // It is kept per workflow, and this is the path a recovery takes — leaving a
+    // stale timestamp behind would make the NEXT famine for that workflow read
+    // as an already-expired waiver and escalate on its first sighting.
+    forgetRecoveredFamine(runs, head)
+    return null
+  }
 
   // WHERE the fault lies decides the remedy: a red the repository cannot fix
   // must not demand a fixing push (point 526).

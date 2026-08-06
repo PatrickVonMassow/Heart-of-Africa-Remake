@@ -106,6 +106,33 @@ export function failedRuns(runs, headSha) {
   }
 }
 
+/**
+ * The workflows whose NEWEST run on this head reached a verdict that is not a
+ * failure — i.e. the ones that demonstrably recovered.
+ *
+ * WHY (four-eyes review, 06.08.2026, finding 1): the outage waiver's clock is
+ * kept per workflow, and the guard returns early on a head that is not red —
+ * so without this the clock would survive the recovery. The next genuine famine
+ * for that workflow would then read as an already-expired waiver and escalate at
+ * once, with an absurd age, in the FALSE-ALARM direction.
+ */
+export function recoveredWorkflows(runs, headSha) {
+  try {
+    if (!Array.isArray(runs) || !headSha) return []
+    const newestPerWorkflow = new Map()
+    for (const r of runs.filter((x) => runSha(x) === headSha)) {
+      const key = runName(r)
+      const prev = newestPerWorkflow.get(key)
+      if (!prev || Number(runId(r) ?? 0) > Number(runId(prev) ?? 0)) newestPerWorkflow.set(key, r)
+    }
+    return [...newestPerWorkflow.entries()]
+      .filter(([, r]) => String(r?.status ?? '') === 'completed' && !FAILED_CONCLUSIONS.has(String(r?.conclusion ?? '')))
+      .map(([name]) => name)
+  } catch {
+    return []
+  }
+}
+
 /** Only a confirmed red blocks; pending/success/none/unknown all allow. */
 export function shouldBlock(state) {
   return state === 'failed'
