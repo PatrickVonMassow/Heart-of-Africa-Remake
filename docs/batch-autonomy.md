@@ -2056,7 +2056,11 @@ Point 436 cut ONE injected text by 61 %. The user's question was what else does
 that, and the answer had to be MEASURED, not guessed. Everything below was
 measured by running the real hooks and reading the real texts; the method is a
 node child process per hook fed the harness's own stdin payload, timed with
-`process.hrtime`, on an idle machine.
+`process.hrtime`, on an idle machine. CHARACTERS are JavaScript string length,
+and LINES/WORDS are `doc-budget-core`'s own `measure()` — the yardstick the
+budgets are set in, which is not `wc` (`wc -c` counts UTF-8 bytes and `wc -w`
+splits differently; on `CLAUDE.md` that is a ~1 % spread). Per-block figures are
+the text alone; the totals include the newline that separates them.
 
 **The rule applied throughout is 436's.** A statement a gate already refuses to
 break is deleted and replaced by a pointer. A statement no mechanism can check
@@ -2073,7 +2077,7 @@ needed, not in every prompt.
 | 3 | `dashboard-reminder-hook` — focus-reconcile announcement | per prompt | 427 ch | 0 | CUT — dashboard-guard-core (7) refuses it, remedy in its own block text |
 | 4 | `dashboard-reminder-hook` — board obligation | per prompt | 843 ch | 843 ch | KEPT — judgement no gate can make (already cut 61 % by point 436) |
 | 5 | **project UserPromptSubmit total** | per prompt | **1771 ch** | **844 ch** | **−52 %** |
-| 6 | user-scope `berlin-timestamp.cjs` | per prompt | 179 ch | 179 ch | KEPT — it delivers the current TIME, which no gate can; it is now the only statement of the rule |
+| 6 | user-scope `berlin-timestamp.cjs` | per prompt | 179 ch | 179 ch | KEPT — it delivers the current TIME, which no gate can; it is now the only INJECTED statement of the rule (versioned copy: `scripts/hooks/berlin-timestamp.cjs`; without it wired, the first reply costs one `timestamp-guard` block, which hands the line) |
 | 7 | `batch-resume-hook` — the headline enumerating all 118 open point numbers | per session | 637 ch (588 of them numbers) | 156 ch | CUT — a session carries ONE point since the boundary; replaced by the count, the first point and `point-brief.mjs` |
 | 8 | `batch-resume-hook` total | per session | 4035 ch | 3554 ch | −12 % |
 | 9 | `CLAUDE.md` | per turn | 61 169 ch (988 lines / 8991 words) | unchanged | PREPARED, needs the user's go — see below |
@@ -2116,7 +2120,7 @@ block texts stay long: rows 13–15 are where the remedies for rows 1–3 now li
 The method is the one that already worked twice: §7.1's evidence chains moved to
 `docs/acceptance-evidence.md` (point 306) and nos. 20/21's detail to
 `docs/acceptance-criteria-detail.md` (point 459). §7 is 583 of the file's 988
-lines — 5386 of 8991 words, 61 % — and the 32 numbered criteria of §7.1 are 4136
+lines — 5386 of 8991 words, 60 % — and the 32 numbered criteria of §7.1 are 4136
 of those words. Two measured options:
 
 - **Conservative.** Give the ten largest criteria (nos. 2, 3, 4, 7, 12, 15, 16,
