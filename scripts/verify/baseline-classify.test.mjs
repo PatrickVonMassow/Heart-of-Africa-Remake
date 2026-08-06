@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest'
 import {
   allChecks,
   baselineRunDeath,
+  baselineShortfall,
   changeRelatedness,
   checkFromName,
   checkKey,
@@ -274,6 +275,43 @@ describe('classifying against the baseline', () => {
       expect(baselineRunDeath({ checks: allChecks(shortRun), failed: [], exitCode: 0, currentCheckCount: 2 })).toBeNull()
       const red = 'PASS  the traveller reaches the savanna\nFAIL  a herd gathers'
       expect(baselineRunDeath({ checks: allChecks(red), failed: failedChecks(red), exitCode: 1, currentCheckCount: 2 })).toBeNull()
+    })
+
+    it('never calls a run that REPORTED failures a death, however much shorter it is', () => {
+      // The serverless suites run the BASELINE's own script copy, so a change
+      // that adds checks leaves a legitimately red baseline permanently
+      // shorter. Annulling that valid triage is the same false alarm the
+      // died-early verdict exists to prevent, only pointing the other way.
+      const red = 'PASS  a\nPASS  b\nFAIL  c'
+      expect(baselineRunDeath({ checks: allChecks(red), failed: failedChecks(red), exitCode: 1, currentCheckCount: 245 })).toBeNull()
+    })
+
+    it('reports a short run that DID report as a caveat instead, leaving the verdicts standing', () => {
+      const red = 'PASS  a\nPASS  b\nFAIL  c'
+      const folded = foldBaselineRuns([{ output: red, exitCode: 1 }], { currentCheckCount: 245 })
+      expect(folded.died).toBe(false)
+      expect(folded.deaths).toEqual([])
+      expect(folded.shortfalls).toEqual([{ run: 1, reached: 3, expected: 245, failures: 1, lastCheck: 'c' }])
+      // The classification is untouched: a check the short baseline DID fail
+      // still reads pre-existing, not "not classified".
+      const classified = classifyAgainstBaseline({
+        currentFailed: ['c'],
+        baselineFailed: folded.failed,
+        baselineChecks: folded.checks,
+        baselineDied: folded.died,
+      })
+      expect(classified[0].verdict).toBe('pre-existing')
+      const text = formatBaselineReport({ suite: 'docs', ref: 'abc', classified, shortfalls: folded.shortfalls }).join('\n')
+      expect(text).toContain('the verdicts above stand')
+      expect(text).not.toContain('DIED')
+      expect(text).not.toContain('Fix the lane first')
+    })
+
+    it('says nothing about a short run that reported and is NOT short of the current count', () => {
+      const red = 'PASS  a\nFAIL  b'
+      expect(baselineShortfall({ checks: allChecks(red), failed: failedChecks(red), currentCheckCount: 2 })).toBeNull()
+      // …nor about a run with no failures at all — that is the death path.
+      expect(baselineShortfall({ checks: allChecks(red), failed: [], currentCheckCount: 245 })).toBeNull()
     })
 
     it('never calls a run that EXITED ZERO a death, however few checks it counted', () => {

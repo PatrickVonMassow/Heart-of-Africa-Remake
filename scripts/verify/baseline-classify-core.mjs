@@ -338,11 +338,14 @@ export function classifyAgainstBaseline({ currentFailed, baselineFailed, baselin
  * genuinely NEWER check gets. A lane that dies at a quarter of the suite costs
  * the full runtime and answers nothing, so it must be LOUD.
  *
- * Two independent signatures, either one sufficient:
+ * A death REQUIRES that the run printed NO failing check. That is the whole
+ * distinction: a run with FAIL lines did what it was asked — it reported. A run
+ * with none and a non-zero exit reported nothing, so its exit came from
+ * somewhere else. Two signatures on top of that, either one sufficient:
  *   short  — it reached FEWER checks than the current run did (needs the current
  *            count; the runner knows it, so it is handed in).
- *   silent — it exited non-zero without printing a single FAIL line (needs the
- *            exit code; available whenever the run was spawned here).
+ *   silent — it exited non-zero (needs the exit code; available whenever the run
+ *            was spawned here).
  * A run that printed NOTHING at all is the pre-existing "did not run" case, not
  * a death — foldBaselineRuns reports that through `ran`.
  *
@@ -352,25 +355,48 @@ export function classifyAgainstBaseline({ currentFailed, baselineFailed, baselin
  * count a few short — and calling that a death would cry wolf on every run.
  * A killed run (no exit code at all) counts as non-zero.
  *
+ * The shortfall alone must NOT annul a run that failed properly: the serverless
+ * suites run the BASELINE's own copy of the script, so a change that ADDS checks
+ * leaves a legitimately red baseline permanently shorter, and stamping "nothing
+ * below is a verdict" over that valid triage every time is the same false alarm
+ * in the other direction. `baselineShortfall` names it as a caveat instead.
+ *
  * Returns null when the run looks healthy, else the evidence to print.
  */
 export function baselineRunDeath({ checks, failed, exitCode = null, currentCheckCount = 0 }) {
   const reached = (checks ?? []).length
   if (reached === 0) return null
   if (exitCode === 0) return null
+  if ((failed ?? []).length > 0) return null
   const short = currentCheckCount > 0 && reached < currentCheckCount
   // A KNOWN non-zero exit only: `null` also means "no exit code was handed in"
   // (a bare output string), and a healthy green run must not read as silent.
-  const silent = exitCode !== null && exitCode !== 0 && (failed ?? []).length === 0
+  const silent = exitCode !== null && exitCode !== 0
   if (!short && !silent) return null
   return {
     reached,
     expected: currentCheckCount > 0 ? currentCheckCount : null,
     lastCheck: checks[reached - 1]?.name ?? '',
-    failures: (failed ?? []).length,
+    failures: 0,
     exitCode,
     signature: short && silent ? 'short-and-silent' : short ? 'short' : 'silent',
   }
+}
+
+/**
+ * A baseline run that REPORTED (it has FAIL lines) but still reached fewer
+ * checks than the current run. That is not a death — the verdicts it produced
+ * stand — but it is worth naming: either the change added checks, or the run
+ * ended early AFTER reporting something. A caveat, never an annulment.
+ *
+ * Returns null when there is nothing to say.
+ */
+export function baselineShortfall({ checks, failed, currentCheckCount = 0 }) {
+  const reached = (checks ?? []).length
+  const failures = (failed ?? []).length
+  if (reached === 0 || failures === 0) return null
+  if (!(currentCheckCount > 0 && reached < currentCheckCount)) return null
+  return { reached, expected: currentCheckCount, failures, lastCheck: checks[reached - 1]?.name ?? '' }
 }
 
 /**
@@ -412,11 +438,14 @@ export function foldBaselineRuns(outputs, { currentCheckCount = 0 } = {}) {
   for (const [key, n] of counts) (n === runs.length ? failed : flaky).push(label.get(key))
   const ran = runs.length > 0 && runs.every((r) => r.checks.length > 0 || r.failed.length > 0)
   const deaths = []
+  const shortfalls = []
   runs.forEach((r, i) => {
     const death = baselineRunDeath({ ...r, currentCheckCount })
     if (death) deaths.push({ run: i + 1, ...death })
+    const short = baselineShortfall({ ...r, currentCheckCount })
+    if (short) shortfalls.push({ run: i + 1, ...short })
   })
-  return { failed, flaky, checks, ran, runs: runs.length, deaths, died: deaths.length > 0 }
+  return { failed, flaky, checks, ran, runs: runs.length, deaths, shortfalls, died: deaths.length > 0 }
 }
 
 const VERDICT_LABEL = {
@@ -466,6 +495,7 @@ export function formatBaselineReport({
   infraChanged = [],
   baselineRan = true,
   deaths = [],
+  shortfalls = [],
   logs = [],
   note = '',
 }) {
@@ -499,6 +529,14 @@ export function formatBaselineReport({
     lines.push('      Read the kept output below at the last check named above — the throw is the line after it.')
   }
   for (const c of classified) lines.push(`      ${c.check}: ${VERDICT_LABEL[c.verdict]}`)
+  // A CAVEAT, printed after the verdicts because they still stand: the run
+  // reported, it just reported over a shorter suite than the current one.
+  for (const s of shortfalls) {
+    lines.push(
+      `      NOTE: baseline run ${s.run} reported ${s.failures} failing check(s) but reached only ${s.reached} of the` +
+        ` current run's ${s.expected} (last: "${s.lastCheck}") — the change may simply have added checks; the verdicts above stand.`,
+    )
+  }
   if (logs.length) lines.push(`      the baseline run output was kept: ${logs.join(', ')}`)
   if (suiteFileChanged) {
     lines.push(

@@ -313,6 +313,7 @@ async function main() {
     infraChanged,
     baselineRan: folded.ran,
     deaths: folded.deaths,
+    shortfalls: folded.shortfalls,
     logs,
     note: folded.ran ? '' : 'a baseline run produced no result at all (crash, timeout, or the server never came up).',
   })) {
