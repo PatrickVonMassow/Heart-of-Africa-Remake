@@ -18,6 +18,8 @@ import { LAKES } from '../world/data/lakes'
 import { MOUNTAINS, WATERFALLS, CULTURAL_LANDMARKS } from '../world/data/landmarks'
 import { CELL_OCEAN, cellAt } from '../world/geoIndex'
 import { buildLayout, type Interactive } from '../scenes/place/layout'
+import { maxBoundaryRadius, placeBoundaryRadius } from '../scenes/place/boundary'
+import type { PlaceRiverBank } from '../scenes/place/riverBank'
 import { placePlayerPosition } from '../scenes/place/playerPosition'
 import type { BuildingType } from '../state/ui'
 import { LON_MIN, LON_MAX, LAT_MIN, LAT_MAX, REGION_IDS, regionStats } from './mapLayout'
@@ -679,13 +681,48 @@ export function MapOverlay() {
  * worn-paper ink style. Pure SVG over the deterministic layout, so it needs
  * no canvas and is fully assertable in jsdom.
  */
+/**
+ * The water beyond the bank, for the settlement plan (work-order 482): the
+ * half-plane past the waterline, drawn far enough out that the plan's own
+ * square clips it — the atlas convention for a river running off the sheet.
+ */
+function riverPath(bank: PlaceRiverBank, sx: (v: number) => number, S: number): string {
+  const reach = S * 2
+  const cx = sx(bank.distance * bank.nx)
+  const cz = sx(bank.distance * bank.nz)
+  const pts: Array<[number, number]> = [
+    [cx - bank.fx * reach, cz - bank.fz * reach],
+    [cx + bank.fx * reach, cz + bank.fz * reach],
+    [cx + bank.fx * reach + bank.nx * reach, cz + bank.fz * reach + bank.nz * reach],
+    [cx - bank.fx * reach + bank.nx * reach, cz - bank.fz * reach + bank.nz * reach],
+  ]
+  return `M ${pts.map(([x, y]) => `${x.toFixed(1)} ${y.toFixed(1)}`).join(' L ')} Z`
+}
+
 function PlacePlan({ placeId }: { placeId: string }) {
   const t = useStrings()
   const seed = useGame((s) => s.seed)
   const layout = useMemo(() => buildLayout(placeId, seed), [placeId, seed])
   const S = 560 // rendered square size
-  const extent = layout.radius + 6
+  // The plan has to hold the WHOLE walkable region, which is no longer a circle
+  // where a village stands on a river (work-order 482).
+  const extent = maxBoundaryRadius(layout) + 6
   const sx = (x: number) => (x / extent) * (S / 2)
+  // The walkable edge, sampled per bearing from THE boundary module — the same
+  // one the leave check and the painted ground band read. A dashed circle here
+  // would have told the player he may not walk to the water he can plainly walk
+  // to (work-order 352/488/482).
+  const edgePath = useMemo(() => {
+    const steps = 180
+    let d = ''
+    for (let i = 0; i < steps; i++) {
+      const a = (i / steps) * Math.PI * 2
+      const r = (placeBoundaryRadius(layout, a) / extent) * (S / 2)
+      d += `${i === 0 ? 'M' : 'L'} ${(Math.cos(a) * r).toFixed(2)} ${(Math.sin(a) * r).toFixed(2)} `
+    }
+    return `${d}Z`
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [layout, extent])
   // Live "you are here" marker (point 89): the first-person player position is
   // shared from PlaceScene; a RAF loop moves the marker without a React
   // re-render. The initial transform is set in JSX so it is correct at first
@@ -712,7 +749,17 @@ function PlacePlan({ placeId }: { placeId: string }) {
       <svg viewBox={`${-S / 2} ${-S / 2} ${S} ${S}`} width={S} height={S} role="img">
         {/* Paper ground + settlement edge */}
         <rect x={-S / 2} y={-S / 2} width={S} height={S} fill="#eadfc2" />
-        <circle r={sx(layout.radius)} fill="#e2d3ad" stroke={INK} strokeWidth={1.6} strokeDasharray="7 4" />
+        {/* The river the village stands on (work-order 482), in the atlas's own
+            water ink: it is half the reason the walkable edge bulges. */}
+        {layout.bank && (
+          <path
+            className="plan-river"
+            d={riverPath(layout.bank, sx, S)}
+            fill={WATER_INK}
+            opacity={0.55}
+          />
+        )}
+        <path className="plan-edge" d={edgePath} fill="#e2d3ad" stroke={INK} strokeWidth={1.6} strokeDasharray="7 4" />
         {/* Lanes as light strokes */}
         {layout.paths.map((p, i) => (
           <polyline
