@@ -807,6 +807,10 @@ Interessant ist nicht der Ausfall bei GitHub, sondern die Reaktion der eigenen M
 
 **Lehren:** Eine Wache, die nur „rot" und „grün" unterscheidet, schiebt jeden Fremdausfall dem Projekt zu und schickt die Sitzung auf eine Suche, die nichts finden kann. Sie muss die Ursache **außerhalb** von der Ursache **innerhalb** trennen und im ersten Fall den echten Griff nennen, statt einen zu verlangen, den es nicht gibt. Und eine Auslieferung, die auf einen fremden Dienst wartet, braucht eine begrenzte Wartezeit **mit Aufräumen**: Wer aufgibt, ohne das Angefangene zurückzunehmen, hinterlässt eine Sperre für alle Nachfolger.
 
+Die Lehre bekam ihre Probe noch am selben Abend — und die gebaute Lösung fiel durch (06.08.2026, Punkt 528). Kaum war die Trennung gemergt, fiel GitHubs Actions-Dienst breit aus: Läufe starben in der Vorbereitung, noch bevor irgendein eigener Schritt lief. Die neue Trennung urteilte trotzdem „Ursache im Projekt, stell den Fehler lokal nach" — denn sie unterscheidet nach dem **Namen** des gescheiterten Jobs, und der hieß hier „build", also unser Job. Nur war an ihm nichts unser: Die eigenen Schritte hatten nie begonnen. Am Auslieferungs-Job, dessen Name als fremd hinterlegt war, urteilte dieselbe Mechanik im selben Ausfall korrekt — der Unterschied lag allein in der Liste, nicht im Sachverhalt.
+
+**Lehre:** Wer außen von innen trennen will, darf nicht nach der **Zuständigkeit** eines Namens fragen, sondern muss fragen, ob überhaupt **etwas Eigenes ausgeführt** wurde. Eine Namensliste ist eine Vermutung über die Welt und veraltet mit ihr; „kein eigener Schritt ist gelaufen" ist eine Beobachtung und gilt in jedem Ausfall, den man noch nicht kennt. Dieselbe Verwechslung von Stellvertreter und Sache trägt schon §3.85 (Anwesenheit statt Lesbarkeit) und die Zoom-Radius-Lehre in §7.2 — es ist die häufigste Bauart eines grünen Hakens über einem echten Fehler.
+
 ---
 
 ## 4. Die Guards als Immunsystem
@@ -896,7 +900,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Donnerstag, 06.08.2026, 15:50 · Quellen-Fingerprint: `b6ec93dc0e93…`
+Zuletzt aktualisiert: Donnerstag, 06.08.2026, 18:35 · Quellen-Fingerprint: `f59cd8fb58f8…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -976,8 +980,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 72 Feedback-/Projekt-Memories · 42 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 32 Prozess-/Meta-TASKS-Punkte (davon 15 offen).
+Erfasste Quellen: 72 Feedback-/Projekt-Memories · 43 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 32 Prozess-/Meta-TASKS-Punkte (davon 15 offen).
 
-<!-- RETRO-FINGERPRINT: b6ec93dc0e9352352fadf710507e84b7eb8ca28b55e752c6a148c93e6012dce6 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-06T13:50:56.709Z -->
+<!-- RETRO-FINGERPRINT: f59cd8fb58f8832c715ecc642ded3df658440d3d209dc1c1d864571d73819948 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-06T16:35:00.092Z -->
 <!-- AUTO-GENERATED:END -->
