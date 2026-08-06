@@ -906,7 +906,7 @@ export const en: Strings = {
     giftLore: (p: TextParams) =>
       `The old man spoke of the treasures of his land: what his people revere above all is [emph]${en.gifts[p.gift as keyof typeof en.gifts]}[/emph]. [pause]A chief honored with it will open his heart.`,
     drumMessage:
-      '[awe]The chief had two drums brought before his hut, a great one and a small one, and let them speak for him.[/awe] [pause]Seven words, each of five beats, each parted from the next by the same short silence — deep for the low syllable, bright for the high one. [excited]I know these words. I have heard every one of them in the lanes and at the water.[/excited] [pause]I have written them down in the order they were beaten; what they ask of me I must read for myself.',
+      '[awe]The chief called his drummer, and two drums spoke for him — a great one and a small one.[/awe] [pause]Seven words, each of five beats, each parted from the next by the same short silence — deep for the low syllable, bright for the high one. [excited]I know these words. I have heard every one of them in the lanes and at the water.[/excited] [pause]I have written them down in the order they were beaten; what they ask of me I must read for myself.',
     digNothing: '[weary]I dug at this spot, but the sand yielded nothing except stones and old roots.[/weary]',
     victory: (p: TextParams) =>
       `${en.formatDate(p.day as number, 1890)}. [excited]My shovel struck stone —[pause] hewn stone![/excited] [breath]With trembling hands I laid the burial chamber bare. [awe]Gold gleams in the torchlight, and upon the sarcophagus rests the mask of the great king.[/awe] [breath][awe]I have found it.[pause] The Heart of Africa.[/awe] [pause][somber]The journey was worth every step.[/somber]`,
