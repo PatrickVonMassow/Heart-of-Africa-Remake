@@ -15,6 +15,7 @@ import {
   modelNameIn,
   modelNamesIn,
   parseLogLine,
+  splitTrailerField,
 } from './model-guard-core.mjs'
 
 const T0 = Date.parse('2026-07-24T22:00:00Z')
@@ -221,6 +222,20 @@ describe('the allowlist is matched against the parsed name', () => {
     }
   })
 
+  it('never cuts a trailer in half at a comma inside its own suffix', () => {
+    // The log field is comma-joined, so the separator must only separate
+    // OUTSIDE the address and the suffixes — else `Claude Opus 5 (1M, ctx)`
+    // splits into a half naming no allowed model and pauses the batch.
+    expect(splitTrailerField('Claude Opus 5 (1M, extended) <a@x>,Claude Fable 5 <b@x>')).toEqual([
+      'Claude Opus 5 (1M, extended) <a@x>',
+      'Claude Fable 5 <b@x>',
+    ])
+    expect(classifyTrailer('Claude Opus 5 (1M, extended) <noreply@anthropic.com>')).toBe('allowed')
+    expect(classifyTrailer('Claude Opus 5 [1m, beta] <noreply@anthropic.com>')).toBe('allowed')
+    // and a separator still separates where it really is one
+    expect(classifyTrailer('Claude Opus 5 (1M, extended) <a@x>,Claude Haiku 4.5 <b@x>')).toBe('forbidden')
+  })
+
   it('judgeTrailer reports the names it read, so a refusal can name them', () => {
     expect(judgeTrailer('Claude Haiku 4.5 <x@y>')).toEqual({ verdict: 'forbidden', names: ['Haiku 4.5'] })
     expect(judgeTrailer('Claude <x@y>')).toEqual({ verdict: 'unidentified', names: [] })
@@ -277,7 +292,7 @@ describe('the two block texts', () => {
       alsoUnidentified: hits,
     })
     expect(text).toContain('652a8ba')
-    expect(text).toContain('names NO model')
+    expect(text).toContain('names NO SINGLE model')
   })
 
   it('names a surviving filter-branch backup ref instead of reporting it twice', () => {

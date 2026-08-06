@@ -105,6 +105,38 @@ export function judgeTrailer(trailer) {
   return { verdict: names.length > 1 ? 'unidentified' : 'allowed', names }
 }
 
+/** The bracket pairs a separator may hide inside. */
+const BRACKETS = Object.freeze({ '<': '>', '(': ')', '[': ']' })
+
+/**
+ * Split a `%(trailers:…,separator=,)` field into its individual trailer values.
+ * The separator only separates OUTSIDE the address and the suffixes: a comma in
+ * a `(1M, extended context)` suffix would otherwise cut one legitimate trailer
+ * into two halves, and the half reading `Claude Opus 5 (1M` names no allowed
+ * model — a false breach that would pause the batch (four-eyes review, point 527).
+ */
+export function splitTrailerField(field) {
+  const parts = []
+  let current = ''
+  let closer = ''
+  for (const ch of String(field ?? '')) {
+    if (closer) {
+      current += ch
+      if (ch === closer) closer = ''
+    } else if (BRACKETS[ch]) {
+      closer = BRACKETS[ch]
+      current += ch
+    } else if (ch === ',' || ch === ';') {
+      parts.push(current)
+      current = ''
+    } else {
+      current += ch
+    }
+  }
+  parts.push(current)
+  return parts
+}
+
 /**
  * Classify a commit's `Co-Authored-By` field (see `judgeTrailer` for the three
  * states). A commit may carry several co-authors; each is judged alone and the
@@ -113,7 +145,7 @@ export function judgeTrailer(trailer) {
  */
 export function classifyTrailer(trailerField) {
   let worst = 'allowed'
-  for (const part of String(trailerField ?? '').split(/[,;]/)) {
+  for (const part of splitTrailerField(trailerField)) {
     const { verdict } = judgeTrailer(part)
     if (verdict === 'forbidden') return 'forbidden'
     if (verdict === 'unidentified' && worst === 'allowed') worst = 'unidentified'
@@ -318,7 +350,7 @@ export function formatForbiddenReason(hits, { backupRefs = [], alsoUnidentified 
     ...(unnamed.length
       ? [
           '',
-          `The same window also holds ${unnamed.length} commit(s) whose trailer names NO model — ` +
+          `The same window also holds ${unnamed.length} commit(s) whose trailer names NO SINGLE model — ` +
             `${shaList(unnamed)}. Resolve those from the transcripts too; advancing the baseline ` +
             'past the breach would otherwise clear them unseen.',
         ]
@@ -332,8 +364,9 @@ export function formatForbiddenReason(hits, { backupRefs = [], alsoUnidentified 
 export function formatUnidentifiedReason(hits, { backupRefs = [] } = {}) {
   return [
     `UNIDENTIFIED AUTHOR: commit(s) ${shaList(hits)} carry a Claude co-author trailer that names NO ` +
-      'model, so they cannot show that an allowed model wrote them. This is NOT a policy breach ' +
-      'yet — do not pause the batch over it. Resolve it FIRST, before any other work:',
+      'SINGLE model — no model at all, or several at once — so they cannot show WHICH model wrote ' +
+      'them. This is NOT a policy breach yet — do not pause the batch over it. Resolve it FIRST, ' +
+      'before any other work:',
     '',
     ...TRANSCRIPT_HINT,
     '',
