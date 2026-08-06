@@ -537,6 +537,33 @@ describe('the scheduler', () => {
     expect(errandOf(state, follower)?.x).toBeCloseTo(people[haul!.speaker].x)
   })
 
+  it('keeps a follower walking until the one it follows has arrived', () => {
+    const geo = fullGeography()
+    const cfg = CFG
+    const people = villagers(4)
+    const view: ErrandView = { villagers: people, geography: geo }
+    const state = createAdultErrands(4, cfg)
+    const rand = mulberry32(53)
+    let haul: SpokenErrand | null = null
+    for (let t = 0; t < 600 && !haul; t += 0.5) {
+      for (let i = 0; i < people.length; i++) people[i].free = !errandOf(state, i)
+      const said = stepAdultErrands(state, view, 0.5, cfg, rand)
+      if (said && said.action === 'followToTarget') haul = said
+    }
+    expect(haul).not.toBeNull()
+    const leader = haul!.speaker
+    const follower = haul!.addressees[0]
+    // The follower has caught up (it starts beside the leader) — and is still
+    // NOT there, because the walk it was asked along on has not happened yet.
+    noteErrandArrival(state, follower, cfg)
+    expect(errandOf(state, follower)?.arrived).toBe(false)
+    // Once the leader is at the far end of the stretch, the follower is too.
+    noteErrandArrival(state, leader, cfg)
+    noteErrandArrival(state, follower, cfg)
+    expect(errandOf(state, leader)?.arrived).toBe(true)
+    expect(errandOf(state, follower)?.arrived).toBe(true)
+  })
+
   it('survives a group that changed size, an unmounted villager and a bad step', () => {
     const geo = fullGeography()
     const people = villagers(4)

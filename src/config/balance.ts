@@ -616,7 +616,9 @@ export interface BalanceConfig {
       errandSeconds: number
       /** The pace a villager walks at while on an errand (m/s). */
       pace: number
-      /** How many errand villagers a village keeps out and about. */
+      /** How many errand villagers a village keeps out and about. Read when a
+       *  settlement is entered (like the children's count), so an edit takes
+       *  effect on the next visit rather than mid-scene. */
       villagerCount: number
     }
   }

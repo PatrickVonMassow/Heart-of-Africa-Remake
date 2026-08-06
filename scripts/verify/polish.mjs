@@ -2793,6 +2793,133 @@ for (const [placeId, shot] of [
   await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
 }
 
+// --- The adults' errands (work-order point 483) -------------------------------
+// What needs a real browser here is the WALK: the catalogue, the fair queue and
+// every teaching rule are pinned in src/scenes/place/adultErrands.test.ts, but
+// only the live scene can show that a villager told to go somewhere actually
+// crosses the village to it against the collision set and stands there.
+//
+// The village is the PoC's own (the Bambara village), because that is the one
+// with the teaching stone; the ground work is in every village.
+//
+// GAP, deliberately named rather than papered over: the errand to the RIVER BANK
+// cannot be photographed yet, because no settlement has a walkable bank — that
+// is work-order point 482, which owns the bank and its two stretches. The
+// scheduler stages those errands the moment a geography carries them (covered in
+// the unit layer); until then this suite checks the same walk to the places the
+// village DOES have.
+{
+  await page.evaluate(() => {
+    const g = window.__game.getState()
+    if (g.placeId) g.leavePlace()
+  })
+  await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
+  await page.evaluate(() => window.__game.getState().enterPlace('bambara-village'))
+  const live = await page
+    .waitForFunction(
+      () => window.__game.getState().placeId === 'bambara-village' && !!window.__placeErrands,
+      null,
+      { timeout: 40000 },
+    )
+    .then(() => true)
+    .catch(() => false)
+  check('the village adults publish their live errands', live)
+  if (live) {
+    await page.evaluate(() => window.__game.getState().setJournalOpen(false))
+    // Speed the scheduler up for the sample window: the rate is a balance value,
+    // and a verification that waited out the shipped nine seconds per errand
+    // would spend minutes measuring what one turn of the queue already shows.
+    await page.evaluate(() => {
+      window.__balance.villageLife.adultErrands.intervalSeconds = 2
+      window.__balance.villageLife.adultErrands.dwellSeconds = 2
+      window.__balance.villageLife.adultErrands.digSeconds = 3
+    })
+    const geography = await page.evaluate(() => window.__placeErrands().geography)
+    check(
+      'the village draws the ground work the adults teach DIG at',
+      (geography.digSites ?? []).length >= 2 && !!geography.stone,
+      `${(geography.digSites ?? []).length} dig sites, stone ${geography.stone ? 'present' : 'MISSING'}`,
+    )
+
+    // Sample the group over a window of frames: every errand handed out, and how
+    // far its villager still is from where it was sent.
+    const seen = new Map()
+    let arrivals = 0
+    let progressed = 0
+    let dug = 0
+    let staged = {}
+    for (let i = 0; i < 600; i++) {
+      const now = await page.evaluate(() => window.__placeErrands())
+      staged = now.staged
+      for (const [index, v] of now.villagers.entries()) {
+        if (v.digging) dug++
+        if (!v.errand) continue
+        const key = `${index}:${v.errand.situation}:${v.errand.x.toFixed(2)}:${v.errand.z.toFixed(2)}`
+        const gap = Math.hypot(v.x - v.errand.x, v.z - v.errand.z)
+        const first = seen.get(key)
+        if (!first) seen.set(key, { gap, best: gap, arrived: v.errand.arrived })
+        else {
+          first.best = Math.min(first.best, gap)
+          first.arrived = first.arrived || v.errand.arrived
+        }
+      }
+      // Everything this window is here to show has happened: stop sampling
+      // rather than spend minutes proving it again. A scene that never gets
+      // there runs the whole cap and fails on the checks below.
+      arrivals = [...seen.values()].filter((e) => e.arrived).length
+      progressed = [...seen.values()].filter((e) => e.gap - e.best > 0.8).length
+      if (arrivals >= 2 && progressed >= 2 && dug > 0) break
+      await nextFrames(2)
+    }
+    const stagedTotal = Object.values(staged).reduce((a, b) => a + b, 0)
+    check(
+      'the adults stage errands while the player watches',
+      stagedTotal >= 3,
+      `${stagedTotal} staged: ${Object.entries(staged).filter(([, n]) => n > 0).map(([k, n]) => `${k}×${n}`).join(', ')}`,
+    )
+    check(
+      'a villager told to go somewhere WALKS there: it closes the distance to its target',
+      progressed >= 1,
+      `${progressed} of ${seen.size} errands visibly closed the gap`,
+    )
+    check(
+      'and it gets there: the walk ends at the place it was sent to',
+      arrivals >= 1,
+      `${arrivals} of ${seen.size} errands reached their target`,
+    )
+    check(
+      'the ground work is worked: a villager is seen digging',
+      dug > 0,
+      `${dug} samples with a villager at the digging pose`,
+    )
+
+    // The picture: a villager standing at the ground work it was sent to.
+    const spot = await page.evaluate(() => {
+      const s = window.__placeErrands()
+      const site = s.geography.digSites[0]
+      return site ? { x: site.x, z: site.z } : null
+    })
+    if (spot) {
+      await page.evaluate(({ x, z }) => {
+        const p = window.__placePlayer
+        const bearing = Math.atan2(x, z)
+        // Six metres short of the patch, looking at it.
+        p.x = x - Math.sin(bearing) * 6
+        p.z = z - Math.cos(bearing) * 6
+        p.yaw = bearing
+        p.pitch = -0.12
+      }, spot)
+      await nextFrames(6)
+      await frame('483-village-errands', {
+        local: { x: spot.x, y: 0.6, z: spot.z },
+        label: 'the ground work the adults teach digging at',
+      })
+    }
+  }
+  await page.evaluate(() => window.__game.getState().leavePlace())
+  await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
+}
+
 console.log('console errors:', errors.length)
 for (const e of errors) console.log('ERR:', e.slice(0, 300))
 await browser.close()

@@ -645,6 +645,14 @@ export function noteErrandArrival(
 ): void {
   const a = state.assignments[index]
   if (!a || a.arrived) return
+  // A FOLLOWER is not there until the one it follows is. Without this it would
+  // "arrive" the moment it caught up — a step from its own doorway — and stand
+  // watching the leader walk the stretch alone, which is the opposite of the
+  // picture the two direction errands are supposed to teach.
+  if (a.kind === 'follow' && a.follow !== undefined) {
+    const lead = state.assignments[a.follow]
+    if (lead && !lead.arrived) return
+  }
   a.arrived = true
   a.dwell = Math.max(0, a.kind === 'dig' ? cfg.digSeconds : cfg.dwellSeconds)
 }
