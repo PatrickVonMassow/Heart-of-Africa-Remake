@@ -163,7 +163,10 @@ export async function cancelAll(call, blocking) {
   return { cancelled, failed }
 }
 
-function writeGithubOutput(pairs) {
+/** The step-output contract the workflow's retry step reads (`retry`), written
+ *  in GitHub's `key=value` line format. Exported because a typo in a key would
+ *  silently disable the retry — pages-deploy-unblock.test.mjs pins both ends. */
+export function writeGithubOutput(pairs) {
   const file = process.env.GITHUB_OUTPUT
   if (!file) return
   try {

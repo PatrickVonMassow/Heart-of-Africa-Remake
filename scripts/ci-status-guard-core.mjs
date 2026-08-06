@@ -104,7 +104,7 @@ export function blockReason(classification, headSha) {
       head +
       outside +
       `${c.detail ?? ''}. ${c.remedy ?? ''} ${trail}` +
-      `Once the deployment is green again this clears by itself; the user pausing the batch ` +
+      `Once that run is green this clears by itself; the user pausing the batch ` +
       `via .claude/batch-paused also clears it.`
     )
   }

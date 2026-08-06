@@ -51,8 +51,11 @@ export const INSPECT_LIMIT = 10
  * Is this Pages deployment status still holding the queue?
  * Anything neither terminal nor unknown counts — `deployment_in_progress`,
  * `queued`, `building`, `deployment_attempt_error` and whatever GitHub adds
- * next. Erring towards "blocking" is right here: the caller only asks after a
- * deploy already failed, and the answer only ever leads to a cancel + retry.
+ * next. Erring towards "blocking" is right here: in the workflow the question is
+ * only ever asked after a deploy already failed, and the answer only leads to a
+ * cancel + retry. (By hand the same command can be pointed at a healthy
+ * repository — `--cancel` would then cancel a deployment that is genuinely in
+ * flight, which is why the report runs without it by default.)
  */
 export function isBlockingStatus(status) {
   const s = String(status ?? '')
