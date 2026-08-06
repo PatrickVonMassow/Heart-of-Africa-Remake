@@ -3225,6 +3225,7 @@ for (const [placeId, shot] of [
   const enterFor = async (id) => {
     await page.evaluate((want) => {
       const g = window.__game.getState()
+      g.setJournalOpen(false) // an earlier block may have left the panel over the frame
       if (g.placeId) g.leavePlace()
       g.enterPlace(want)
     }, id)
@@ -3234,10 +3235,12 @@ for (const [placeId, shot] of [
     await waitForSceneBuilt(page).catch(() => {})
   }
 
-  /** Stand the player on an open bearing around `target` and aim him at it. */
-  const standOff = (target, startR) =>
+  /** Stand the player on an open bearing around `target` and aim him at it.
+   *  `prefer` (a world bearing) is tried first — a trade house is approached
+   *  from its DOOR side, where the awning it must be judged by hangs. */
+  const standOff = (target, startR, prefer = null) =>
     page.evaluate(
-      ([t, start]) => {
+      ([t, start, preferred]) => {
         const reach = (c) => {
           if (c.kind === 'box') return Math.hypot(c.hx, c.hz)
           if (c.kind === 'segment') return c.r + Math.hypot(c.x2 - c.x1, c.z2 - c.z1) / 2
@@ -3253,8 +3256,10 @@ for (const [placeId, shot] of [
             return Math.hypot(x - cx, z - cz) < reach(c) + 0.9
           })
         const radius = window.__placeLayout?.radius ?? 28
-        for (let i = 0; i < 48; i++) {
-          const b = (i / 48) * Math.PI * 2
+        const bearings = []
+        if (typeof preferred === 'number') bearings.push(preferred)
+        for (let i = 0; i < 48; i++) bearings.push((i / 48) * Math.PI * 2)
+        for (const b of bearings) {
           let clear = true
           for (let d = start; d >= 1.2 && clear; d -= 0.4) {
             const x = t.x + Math.cos(b) * d
@@ -3271,7 +3276,7 @@ for (const [placeId, shot] of [
         }
         return null
       },
-      [target, startR],
+      [target, startR, prefer],
     )
 
   /** Hold forward until the walk stops closing on the target — the collider has
@@ -3331,13 +3336,14 @@ for (const [placeId, shot] of [
       check(`${label}: a building to walk up to`, false, 'none found in the layout')
       return null
     }
-    const bearing = await standOff(target, startR)
+    const bearing = await standOff(target, startR, target.approach ?? null)
     if (bearing == null) {
       check(`${label}: an open approach to walk in on`, false, JSON.stringify(target))
       return null
     }
     await walkUntilStalled(target)
     const probe = await probeOverhead()
+    probe.bearing = bearing
     // The near plane never gets INSIDE the roof: the first surface under the eye
     // is the ground he stands on, never thatch he has climbed into.
     check(
@@ -3354,6 +3360,25 @@ for (const [placeId, shot] of [
     return { target, probe }
   }
 
+  /** The photograph a HUMAN judges: the eave line where roof meets wall, taken
+   *  a stride back from the collider so the junction is in the picture rather
+   *  than a nose-length of dark thatch. The MEASUREMENT above stays where the
+   *  walk ended — this only moves the camera for the frame. */
+  const shootEaves = async (name, spot, label, back, pitch) => {
+    await page.evaluate(
+      ([t, b, step, up]) => {
+        const p = window.__placePlayer
+        p.x = t.x + Math.cos(b) * step
+        p.z = t.z + Math.sin(b) * step
+        p.yaw = Math.atan2(-(t.x - p.x), -(t.z - p.z))
+        p.pitch = up
+      },
+      [spot.target, spot.probe.bearing, back, pitch],
+    )
+    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(null)))))
+    await frame(name, { local: { x: spot.target.x, z: spot.target.z, y: spot.target.h }, label })
+  }
+
   // The reported case: a Zulu rondavel, whose wide cone sits on a low wall.
   const villageEaves = await eavesCase(
     'zulu-village',
@@ -3364,37 +3389,23 @@ for (const [placeId, shot] of [
     },
     6,
   )
-  if (villageEaves) {
-    await page.evaluate(() => {
-      window.__placePlayer.pitch = 0.35 // look up into the eaves
-    })
-    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(null)))))
-    await frame('349-eaves-village', {
-      local: { x: villageEaves.target.x, z: villageEaves.target.z, y: villageEaves.target.h },
-      label: 'the hut eaves from underneath',
-    })
-  }
+  if (villageEaves) await shootEaves('349-eaves-village', villageEaves, 'the hut eaves from underneath', 4.2, 0.18)
 
-  // The same in a port: the trade house with its awning over the door.
+  // The same in a port: the trade house, approached from its DOOR side, where
+  // the awning hangs — the eave a player really walks under there.
   const portEaves = await eavesCase(
     'cairo',
     'cairo trade house',
     () => {
       const it = (window.__placeLayout?.interactives ?? []).find((i) => i.type !== 'villager')
-      return it ? { x: it.pos[0], z: it.pos[1], h: 3.2 } : null
+      if (!it) return null
+      const rot = it.rot ?? 0
+      // The door faces local +Z, so the approach bearing is the door's own.
+      return { x: it.pos[0], z: it.pos[1], h: 3.2, approach: Math.atan2(Math.cos(rot), Math.sin(rot)) }
     },
     8,
   )
-  if (portEaves) {
-    await page.evaluate(() => {
-      window.__placePlayer.pitch = 0.35
-    })
-    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(null)))))
-    await frame('349-eaves-port', {
-      local: { x: portEaves.target.x, z: portEaves.target.z, y: portEaves.target.h },
-      label: 'the trade house eaves from underneath',
-    })
-  }
+  if (portEaves) await shootEaves('349-eaves-port', portEaves, 'the trade house eaves from underneath', 6, 0.14)
 
   // The eaves were NOT fenced off: the cook-shelter over the village fire is a
   // roof one may still stand under — and from under it, it must be a SURFACE.
