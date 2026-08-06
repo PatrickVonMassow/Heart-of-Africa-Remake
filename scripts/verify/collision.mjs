@@ -479,6 +479,42 @@ if (teachingStone) {
   })
 }
 
+// === The village's river bank (work-order 482) ================================
+// The water is a WALL, and that is a collision claim: walking into the river has
+// to stop the traveller at the top of the bank, not carry him out of the
+// settlement. The shape and the stand-off are pinned in the unit layer; what
+// only the live scene can show is that holding forward at the water does not
+// end the visit.
+const bank = await page.evaluate(() => window.__placeLayout?.bank ?? null)
+check('PoC village: the layout carries a walkable river bank', !!bank, JSON.stringify(bank && { riverId: bank.riverId, distance: bank.distance }))
+if (bank) {
+  await page.evaluate((b) => {
+    const p = window.__placePlayer
+    // A few steps short of the water, facing straight at it.
+    p.x = b.nx * (b.walkEdge - 4)
+    p.z = b.nz * (b.walkEdge - 4)
+    p.yaw = Math.atan2(-b.nx, -b.nz)
+    p.pitch = 0
+  }, bank)
+  await pushFrames(20)
+  const at = await page.evaluate(() => ({
+    x: window.__placePlayer.x,
+    z: window.__placePlayer.z,
+    placeId: window.__game.getState().placeId,
+  }))
+  const out = at.x * bank.nx + at.z * bank.nz
+  check(
+    'PoC village: walking into the river stops at the bank and never leaves the settlement',
+    at.placeId === 'bambara-village' && out <= bank.walkEdge + 0.05,
+    `stopped ${out.toFixed(2)} m out against a walkable edge at ${bank.walkEdge.toFixed(2)}, still in ${at.placeId}`,
+  )
+  check(
+    'PoC village: and he got there — the wall is at the water, not at the huts',
+    out > bank.walkEdge - 2.5,
+    `${out.toFixed(2)} m out`,
+  )
+}
+
 console.log('console errors:', errors.length)
 for (const e of errors) console.log('ERR:', e.slice(0, 300))
 await browser.close()

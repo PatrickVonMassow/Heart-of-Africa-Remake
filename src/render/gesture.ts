@@ -344,6 +344,45 @@ export function gesturePose(s: GestureState): FigurePose {
 }
 
 /**
+ * Seconds one stroke of digging takes: raise, strike, and back. Calibratable
+ * shape — slow enough that the raised arms are seen at the top of the stroke,
+ * quick enough that a bout reads as work rather than as a stretch.
+ */
+export const DIG_CYCLE_SECONDS = 1.5
+
+/**
+ * A figure WORKING THE GROUND (work-order point 483): both arms swing a tool up
+ * and drive it down while the trunk folds over the spot, over and over. This is
+ * the one adult action the teaching hangs on — the player has to read "digging"
+ * from the body alone, because nothing ever translates the word for him.
+ *
+ * A pose, not a gesture: it has no duration and no aim, it simply repeats while
+ * the villager is at work, and the caller drops back to `REST_POSE` (or to a
+ * gesture) when the bout ends. Driven by SECONDS OF WORK rather than by a
+ * wall-clock reading, so two villagers digging the same patch are not in
+ * lockstep and a paused bout does not keep swinging.
+ */
+export function digPose(seconds: number, phase = 0): FigurePose {
+  const cycle = ((seconds + phase) / DIG_CYCLE_SECONDS) % 1
+  const p = cycle < 0 ? cycle + 1 : cycle
+  // The lift takes the longer half and the strike the shorter one, which is
+  // what makes the motion read as a blow rather than as a wave.
+  const raise = p < 0.62 ? smoothstep(p / 0.62) : 1 - smoothstep((p - 0.62) / 0.38)
+  // Down and forward at the strike, up and back at the top of the swing.
+  const pitch = -0.7 - raise * 1.0
+  const roll = 0.16 - raise * 0.05
+  return {
+    // Both hands are on the shaft, so the arms move together and roll IN toward
+    // each other rather than hanging out along the cone.
+    left: { pitch, yaw: -0.12, roll },
+    right: { pitch, yaw: 0.12, roll: -roll },
+    // The trunk folds over the ground at the strike and comes up with the lift.
+    lean: 0.34 - raise * 0.2,
+    turn: 0,
+  }
+}
+
+/**
  * How far a pose stands from rest, as a single scalar (rad, summed over the
  * angles that move). The verification and the tests use it to say "this figure
  * is visibly gesturing" without asserting on a hand-picked angle.

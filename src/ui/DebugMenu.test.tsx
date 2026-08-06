@@ -40,6 +40,7 @@ const DEFAULTS = {
   walkerUnstuckSeconds: balance.walkerUnstuckSeconds,
   tag: { ...balance.villageLife.tag },
   childSpeech: { ...balance.villageLife.childSpeech },
+  adultErrands: { ...balance.villageLife.adultErrands },
   startupFreezeBudgetMs: balance.startup.pictureFreezeBudgetMs,
   birdsongVolume: balance.birdsongVolume,
   surfNearRadius: balance.surf.nearRadius,
@@ -117,6 +118,7 @@ afterEach(() => {
   balance.walkerUnstuckSeconds = DEFAULTS.walkerUnstuckSeconds
   Object.assign(balance.villageLife.tag, DEFAULTS.tag)
   Object.assign(balance.villageLife.childSpeech, DEFAULTS.childSpeech)
+  Object.assign(balance.villageLife.adultErrands, DEFAULTS.adultErrands)
   balance.startup.pictureFreezeBudgetMs = DEFAULTS.startupFreezeBudgetMs
   balance.birdsongVolume = DEFAULTS.birdsongVolume
   balance.surf.nearRadius = DEFAULTS.surfNearRadius
@@ -230,6 +232,12 @@ describe('DebugMenu editable fields write through to balance (settings.mjs fillF
     { label: en.debug.childSpeechInterval, read: () => balance.villageLife.childSpeech.intervalSeconds, value: 9 },
     { label: en.debug.childSpeechAction, read: () => balance.villageLife.childSpeech.actionSeconds, value: 7 },
     { label: en.debug.childSpeechRefusal, read: () => balance.villageLife.childSpeech.refusalChance, value: 0.5 },
+    // What the ADULTS do at their errands (point 483): the rate, the two dwell
+    // times and the size of the group that runs them.
+    { label: en.debug.adultErrandInterval, read: () => balance.villageLife.adultErrands.intervalSeconds, value: 12 },
+    { label: en.debug.adultErrandDwell, read: () => balance.villageLife.adultErrands.dwellSeconds, value: 8 },
+    { label: en.debug.adultErrandDig, read: () => balance.villageLife.adultErrands.digSeconds, value: 12 },
+    { label: en.debug.adultErrandCount, read: () => balance.villageLife.adultErrands.villagerCount, value: 6 },
     // The loading picture's freeze budget the startup gate binds (point 337).
     { label: en.debug.startupFreezeBudget, read: () => balance.startup.pictureFreezeBudgetMs, value: 6000 },
     // Per-source birdsong volume and the coastal surf fade bounds (point 153).

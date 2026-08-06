@@ -12,6 +12,8 @@ import { useUi } from '../state/ui'
 import { freshGame, withWorld, g } from '../test/store'
 import { useGame } from '../state/store'
 import { placePlayerPosition } from '../scenes/place/playerPosition'
+import { buildLayout } from '../scenes/place/layout'
+import { maxBoundaryRadius } from '../scenes/place/boundary'
 
 // cellAt/regionAt in the progress computation need the real geodata index.
 withWorld()
@@ -92,6 +94,46 @@ describe('settlement plan (design.md §6.1, point 79)', () => {
     }
     // The dwelling fabric shows as unlabelled context blocks.
     expect(document.querySelectorAll('.plan-dwelling').length).toBeGreaterThan(10)
+  })
+
+  it('the plan draws the WALKABLE EDGE, not a circle of its own (work-order 482)', () => {
+    useGame.setState({ placeId: 'bambara-village' })
+    useUi.getState().toggleMap()
+    render(<MapOverlay />)
+    // The river the village stands on is on the sheet…
+    expect(document.querySelector('.map-place-plan .plan-river')).toBeInTheDocument()
+    // …and the edge is a sampled outline whose reach matches the boundary the
+    // leave check reads, out at the bank as well as round the huts.
+    const edge = document.querySelector('.map-place-plan .plan-edge')
+    expect(edge).toBeInTheDocument()
+    const layout = buildLayout('bambara-village', useGame.getState().seed)
+    const points = (edge?.getAttribute('d') ?? '')
+      .split(/[ML]\s*/)
+      .filter(Boolean)
+      .map((p) => p.trim().split(/\s+/).map(Number))
+      .filter((p) => p.length === 2 && p.every(Number.isFinite))
+    expect(points.length).toBeGreaterThan(100)
+    const radii = points.map(([x, y]) => Math.hypot(x, y))
+    // A plain circle would have one radius; the bank lobe gives it a range.
+    expect(Math.max(...radii) / Math.min(...radii)).toBeCloseTo(
+      maxBoundaryRadius(layout) / layout.radius,
+      1,
+    )
+  })
+
+  it('a village with no river keeps a plain round edge', () => {
+    useGame.setState({ placeId: 'maasai-village' })
+    useUi.getState().toggleMap()
+    render(<MapOverlay />)
+    expect(document.querySelector('.map-place-plan .plan-river')).not.toBeInTheDocument()
+    const d = document.querySelector('.map-place-plan .plan-edge')?.getAttribute('d') ?? ''
+    const radii = d
+      .split(/[ML]\s*/)
+      .filter(Boolean)
+      .map((p) => p.trim().split(/\s+/).map(Number))
+      .filter((p) => p.length === 2 && p.every(Number.isFinite))
+      .map(([x, y]) => Math.hypot(x, y))
+    expect(Math.max(...radii) - Math.min(...radii)).toBeLessThan(0.5)
   })
 
   it('inside a village the plan names the chief hut and the market', () => {

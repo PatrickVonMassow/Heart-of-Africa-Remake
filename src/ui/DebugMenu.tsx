@@ -163,6 +163,28 @@ const CHILD_SPEECH_FIELDS: ReadonlyArray<{
   { key: 'replySeconds', label: 'childSpeechReply', step: 0.5, min: 0 },
 ]
 
+/**
+ * Every calibratable value of what the ADULTS do at their errands (work-order
+ * point 483): how often one is staged, how long a villager stays where it was
+ * sent, how long a bout of digging lasts, and how many villagers are out on
+ * errands at all. Same table shape as the two above, for the same reason.
+ */
+const ADULT_ERRAND_FIELDS: ReadonlyArray<{
+  key: keyof typeof balance.villageLife.adultErrands
+  label: DebugLabelKey
+  step: number
+  min: number
+  max?: number
+}> = [
+  { key: 'intervalSeconds', label: 'adultErrandInterval', step: 0.5, min: 0.5 },
+  { key: 'intervalSpread', label: 'adultErrandSpread', step: 0.05, min: 0, max: 1 },
+  { key: 'dwellSeconds', label: 'adultErrandDwell', step: 0.5, min: 0 },
+  { key: 'digSeconds', label: 'adultErrandDig', step: 0.5, min: 0 },
+  { key: 'errandSeconds', label: 'adultErrandLife', step: 5, min: 1 },
+  { key: 'pace', label: 'adultErrandPace', step: 0.1, min: 0.1 },
+  { key: 'villagerCount', label: 'adultErrandCount', step: 1, min: 0, max: 12 },
+]
+
 function NumberField({
   label,
   value,
@@ -389,6 +411,21 @@ export function DebugMenu() {
           step={step}
           onChange={(v) => {
             balance.villageLife.childSpeech[key] = Math.min(max ?? Infinity, Math.max(min, v))
+            bump()
+          }}
+        />
+      ))}
+      {/* What the ADULTS do at their errands (point 483): the rate of the staged
+          errands, how long a villager stays where it was sent, how long it digs
+          and how many of them are out on errands at all. */}
+      {ADULT_ERRAND_FIELDS.map(({ key, label, step, min, max }) => (
+        <NumberField
+          key={key}
+          label={t.debug[label]}
+          value={balance.villageLife.adultErrands[key]}
+          step={step}
+          onChange={(v) => {
+            balance.villageLife.adultErrands[key] = Math.min(max ?? Infinity, Math.max(min, v))
             bump()
           }}
         />

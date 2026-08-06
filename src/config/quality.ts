@@ -65,6 +65,15 @@ export interface QualityPreset {
    *  rod or as a limb; a settlement holds a couple of dozen figures, which is
    *  why this is a level lever at all rather than a fixed constant. */
   figureLimbSegments: number
+  /** Segments along the current of the settlement river's water surface
+   *  (work-order 482). The ripple is a vertex displacement, so this is what
+   *  decides whether the water undulates or lies as a flat sheet; one surface
+   *  per settlement, hence a modest lever. */
+  placeRiverSegments: number
+  /** How many patches of foam ride the settlement river's current (work-order
+   *  482). Never zero on any level: they are the reading the UPSTREAM/DOWNSTREAM
+   *  teaching depends on, so a frugal level shows fewer, never none. */
+  placeRiverFoam: number
 }
 
 export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
@@ -92,6 +101,8 @@ export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
     waterCalm: true,
     wildlifeDensity: 0.6,
     figureLimbSegments: 5, // point 479: the frugal floor — a limb still reads, faceted
+    placeRiverSegments: 8, // a coarse undulation; the current still reads
+    placeRiverFoam: 6, // fewer patches, never none — the flow must stay visible
   },
   // MEDIUM — the default; a good look on the user's RTX-40-class PC. SSAO off
   // (the ~25 % GPU lever kept for high), TRAA + Bloom on, native dpr, normal
@@ -113,6 +124,8 @@ export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
     waterCalm: false,
     wildlifeDensity: 1,
     figureLimbSegments: 8, // point 479: smooth enough at conversation range
+    placeRiverSegments: 32,
+    placeRiverFoam: 16,
   },
   // HIGH — the richest. SSAO on, sharper sun shadows (4096, above the default),
   // the softer/higher-res campfire shadow variant, everything else full.
@@ -133,6 +146,8 @@ export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
     waterCalm: false,
     wildlifeDensity: 1,
     figureLimbSegments: 12, // point 479: no facet on an arm the player stands beside
+    placeRiverSegments: 64,
+    placeRiverFoam: 30,
   },
 }
 

@@ -18,6 +18,8 @@ import {
   aimAt,
   armAim,
   armDirection,
+  DIG_CYCLE_SECONDS,
+  digPose,
   gestureArm,
   gestureEnvelope,
   gesturePose,
@@ -359,5 +361,53 @@ describe('aiming a gesture at something in the world', () => {
     const a = aimAt({ x: 2, z: 2, yaw: 0 }, { x: 2, y: 0, z: 2 }, 0.8)
     expect(Number.isFinite(a.bearing)).toBe(true)
     expect(Number.isFinite(a.elevation)).toBe(true)
+  })
+})
+
+// The digging pose (work-order point 483): the one adult action the teaching
+// hangs on — a player has to read "digging" from the body alone, so the motion
+// must be a real swing, repeat, and be driven by the seconds actually worked.
+describe('the digging pose', () => {
+  it('is visibly away from rest at every point of the stroke', () => {
+    for (let t = 0; t < DIG_CYCLE_SECONDS * 2; t += DIG_CYCLE_SECONDS / 24) {
+      expect(poseDistanceFromRest(digPose(t)), `t=${t}`).toBeGreaterThan(1)
+    }
+  })
+
+  it('swings: the arms and the trunk travel through the stroke', () => {
+    const samples = []
+    for (let t = 0; t < DIG_CYCLE_SECONDS; t += DIG_CYCLE_SECONDS / 32) samples.push(digPose(t))
+    const pitches = samples.map((p) => p.left.pitch)
+    const leans = samples.map((p) => p.lean)
+    expect(Math.max(...pitches) - Math.min(...pitches)).toBeGreaterThan(0.6)
+    expect(Math.max(...leans) - Math.min(...leans)).toBeGreaterThan(0.1)
+    // The trunk folds over the ground when the arms are DOWN and comes up as
+    // they rise: the blow and the lift are one motion, not two.
+    const low = samples.reduce((a, b) => (a.left.pitch > b.left.pitch ? a : b))
+    const high = samples.reduce((a, b) => (a.left.pitch < b.left.pitch ? a : b))
+    expect(low.lean).toBeGreaterThan(high.lean)
+  })
+
+  it('repeats on its own cycle, and takes both hands to the shaft', () => {
+    for (const t of [0, 0.3, 0.75, 1.1]) {
+      const a = digPose(t)
+      const b = digPose(t + DIG_CYCLE_SECONDS)
+      expect(b.left.pitch).toBeCloseTo(a.left.pitch, 8)
+      expect(b.lean).toBeCloseTo(a.lean, 8)
+      // Both arms swing together, rolled in toward each other rather than out
+      // along the body cone as they hang at rest.
+      expect(a.right.pitch).toBeCloseTo(a.left.pitch, 8)
+      expect(Math.abs(a.left.roll)).toBeLessThan(Math.abs(REST_POSE.left.roll))
+    }
+  })
+
+  it('keeps two villagers on one patch out of lockstep, and never runs backwards', () => {
+    expect(digPose(0.4, 0.6).left.pitch).not.toBeCloseTo(digPose(0.4).left.pitch, 3)
+    // A negative reading (a clock that stepped back) still yields a valid pose.
+    for (const t of [-0.2, -DIG_CYCLE_SECONDS * 1.4]) {
+      const p = digPose(t)
+      expect(Number.isFinite(p.left.pitch)).toBe(true)
+      expect(Number.isFinite(p.lean)).toBe(true)
+    }
   })
 })

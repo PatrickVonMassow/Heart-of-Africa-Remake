@@ -2793,6 +2793,288 @@ for (const [placeId, shot] of [
   await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
 }
 
+// --- The adults' errands (work-order point 483) -------------------------------
+// What needs a real browser here is the WALK: the catalogue, the fair queue and
+// every teaching rule are pinned in src/scenes/place/adultErrands.test.ts, but
+// only the live scene can show that a villager told to go somewhere actually
+// crosses the village to it against the collision set and stands there.
+//
+// The village is the PoC's own (the Bambara village), because that is the one
+// with the teaching stone; the ground work is in every village.
+//
+// The RIVER errands are checked here too (work-order 482 landed the bank): the
+// village now carries a walkable bank and two stretches along it, so a villager
+// told to go to the water has somewhere to go — and this is where that walk, and
+// the current it is walked beside, can be seen.
+{
+  await page.evaluate(() => {
+    const g = window.__game.getState()
+    if (g.placeId) g.leavePlace()
+  })
+  await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
+  // The sample window's calibration is set BEFORE the settlement mounts: the
+  // group size is read once per visit, and a village of four spends the whole
+  // window walking to the water and back — the queue is fair, so the errands at
+  // the end of the catalogue never come round while everybody is out on the bank.
+  // Every one of these is a balance value the debug menu edits.
+  await page.evaluate(() => {
+    const e = window.__balance.villageLife.adultErrands
+    e.intervalSeconds = 0.8
+    e.dwellSeconds = 1
+    e.digSeconds = 3
+    e.pace = 6
+    e.villagerCount = 10
+  })
+  await page.evaluate(() => window.__game.getState().enterPlace('bambara-village'))
+  const live = await page
+    .waitForFunction(
+      () => window.__game.getState().placeId === 'bambara-village' && !!window.__placeErrands,
+      null,
+      { timeout: 40000 },
+    )
+    .then(() => true)
+    .catch(() => false)
+  check('the village adults publish their live errands', live)
+  // Read inside the settlement, used again after leaving it (the cross-view
+  // check at the end of this block).
+  let river = null
+  if (live) {
+    await page.evaluate(() => window.__game.getState().setJournalOpen(false))
+    const geography = await page.evaluate(() => window.__placeErrands().geography)
+    check(
+      'the village draws the ground work the adults teach DIG at',
+      (geography.digSites ?? []).length >= 2 && !!geography.stone,
+      `${(geography.digSites ?? []).length} dig sites, stone ${geography.stone ? 'present' : 'MISSING'}`,
+    )
+    check(
+      'and the river bank the adults teach RIVER, UPSTREAM and DOWNSTREAM at (work-order 482)',
+      !!geography.bank && !!geography.upstream && !!geography.downstream,
+      JSON.stringify({ bank: geography.bank, upstream: geography.upstream, downstream: geography.downstream }),
+    )
+
+    // Sample the group over a window of frames: every errand handed out, and how
+    // far its villager still is from where it was sent.
+    // The seven errands that are ABOUT the water (work-order 482): the three
+    // that name the river and the two mirrored direction pairs.
+    const RIVER_ERRANDS = [
+      'sendToTheBank',
+      'callBackFromTheBank',
+      'gatherAtTheBank',
+      'sendUpTheBank',
+      'sendDownTheBank',
+      'haulUpTheBank',
+      'haulDownTheBank',
+    ]
+    const isRiverErrand = (key) => RIVER_ERRANDS.some((id) => key.includes(`:${id}:`))
+    const seen = new Map()
+    let arrivals = 0
+    let progressed = 0
+    let riverArrivals = 0
+    let riverProgress = 0
+    let dug = 0
+    let staged = {}
+    for (let i = 0; i < 1400; i++) {
+      const now = await page.evaluate(() => window.__placeErrands())
+      staged = now.staged
+      for (const [index, v] of now.villagers.entries()) {
+        if (v.digging) dug++
+        if (!v.errand) continue
+        const key = `${index}:${v.errand.situation}:${v.errand.x.toFixed(2)}:${v.errand.z.toFixed(2)}`
+        const gap = Math.hypot(v.x - v.errand.x, v.z - v.errand.z)
+        const first = seen.get(key)
+        if (!first) seen.set(key, { gap, best: gap, arrived: v.errand.arrived })
+        else {
+          first.best = Math.min(first.best, gap)
+          first.arrived = first.arrived || v.errand.arrived
+        }
+      }
+      // Everything this window is here to show has happened: stop sampling
+      // rather than spend minutes proving it again. A scene that never gets
+      // there runs the whole cap and fails on the checks below.
+      arrivals = [...seen.values()].filter((e) => e.arrived).length
+      progressed = [...seen.values()].filter((e) => e.gap - e.best > 0.8).length
+      riverArrivals = [...seen.entries()].filter(([k, e]) => isRiverErrand(k) && e.arrived).length
+      riverProgress = [...seen.entries()].filter(([k, e]) => isRiverErrand(k) && e.gap - e.best > 0.8).length
+      if (arrivals >= 2 && progressed >= 2 && dug > 0 && riverArrivals >= 1 && riverProgress >= 1) break
+      await nextFrames(2)
+    }
+    const stagedTotal = Object.values(staged).reduce((a, b) => a + b, 0)
+    check(
+      'the adults stage errands while the player watches',
+      stagedTotal >= 3,
+      `${stagedTotal} staged: ${Object.entries(staged).filter(([, n]) => n > 0).map(([k, n]) => `${k}×${n}`).join(', ')}`,
+    )
+    check(
+      'a villager told to go somewhere WALKS there: it closes the distance to its target',
+      progressed >= 1,
+      `${progressed} of ${seen.size} errands visibly closed the gap`,
+    )
+    check(
+      'and it gets there: the walk ends at the place it was sent to',
+      arrivals >= 1,
+      `${arrivals} of ${seen.size} errands reached their target`,
+    )
+    check(
+      'the ground work is worked: a villager is seen digging',
+      dug > 0,
+      `${dug} samples with a villager at the digging pose; ground-work errands staged ` +
+        `${['digWhereIStand', 'sendToThePostHole', 'joinTheDigging'].map((id) => `${id}×${staged[id] ?? 0}`).join(', ')}`,
+    )
+    check(
+      'the adults stage the errands that are about the water (work-order 482)',
+      RIVER_ERRANDS.reduce((n, id) => n + (staged[id] ?? 0), 0) >= 1,
+      RIVER_ERRANDS.map((id) => `${id}×${staged[id] ?? 0}`).join(', '),
+    )
+    check(
+      'a villager sent to the BANK crosses the village to it and arrives',
+      riverProgress >= 1 && riverArrivals >= 1,
+      `${riverProgress} closed the gap, ${riverArrivals} arrived`,
+    )
+
+    // The picture: a villager standing at the ground work it was sent to.
+    const spot = await page.evaluate(() => {
+      const s = window.__placeErrands()
+      const site = s.geography.digSites[0]
+      return site ? { x: site.x, z: site.z } : null
+    })
+    if (spot) {
+      await page.evaluate(({ x, z }) => {
+        const p = window.__placePlayer
+        // Six metres short of the patch, on the village-centre side of it, and
+        // TURNED TO IT: the yaw convention here is the one the rest of this
+        // suite uses (atan2 of the NEGATED offset), because the camera looks
+        // down its own −Z.
+        const bearing = Math.atan2(x, z)
+        p.x = x - Math.sin(bearing) * 6
+        p.z = z - Math.cos(bearing) * 6
+        p.yaw = Math.atan2(-(x - p.x), -(z - p.z))
+        p.pitch = -0.12
+      }, spot)
+      await nextFrames(6)
+      await frame('483-village-errands', {
+        local: { x: spot.x, y: 0.6, z: spot.z },
+        label: 'the ground work the adults teach digging at',
+      })
+    }
+
+    // --- The river itself (work-order 482) ------------------------------------
+    // Two things only the live scene can settle: that the water is DRAWN in the
+    // settlement rather than painted into the surroundings, and that its
+    // direction is legible from the bank. The second is measured, not assumed —
+    // the foam the player watches is real geometry, so the check reads the
+    // positions of the very patches the picture shows and asks which way they
+    // went. The whole UPSTREAM/DOWNSTREAM teaching hangs on that reading.
+    river = await page.evaluate(() => (window.__placeRiver ? window.__placeRiver() : null))
+    check(
+      'the village draws its river in the SCENE, on its own ground',
+      !!river && river.riverId === 'niger' && river.distance > 28,
+      river ? `${river.riverId}, waterline ${river.distance.toFixed(1)} m out` : 'no __placeRiver',
+    )
+    if (river) {
+      const drift = await page.evaluate(() => window.__placeRiver().flecks)
+      await nextFrames(24)
+      const drifted = await page.evaluate(() => window.__placeRiver().flecks)
+      let forward = 0
+      let backward = 0
+      let moved = 0
+      for (let i = 0; i < Math.min(drift.length, drifted.length); i++) {
+        const along =
+          (drifted[i].x - drift[i].x) * river.downstream.x + (drifted[i].z - drift[i].z) * river.downstream.z
+        // A patch that reached the end of the drawn stretch re-enters upstream;
+        // that is a jump of the whole span, not a current running backwards.
+        if (along < -1) continue
+        if (Math.abs(along) < 1e-4) continue
+        moved++
+        if (along > 0) forward++
+        else backward++
+      }
+      check(
+        'the current RUNS: the foam on it travels downstream, none of it back',
+        moved >= 3 && backward === 0 && forward === moved,
+        `${forward} of ${moved} moving patches went downstream, ${backward} against it`,
+      )
+
+      // Stand at the bank looking out over the water, and photograph the patch
+      // of foam nearest the spot — so the frame's subject IS the thing that
+      // showed the direction.
+      const aim = await page.evaluate((r) => {
+        const p = window.__placePlayer
+        p.x = r.bank.x - r.normal.x * 1.4
+        p.z = r.bank.z - r.normal.z * 1.4
+        p.yaw = Math.atan2(-r.normal.x, -r.normal.z)
+        p.pitch = -0.16
+        const flecks = window.__placeRiver().flecks
+        let best = null
+        let bestD = Infinity
+        for (const f of flecks) {
+          const d = Math.hypot(f.x - r.bank.x, f.z - r.bank.z)
+          if (d < bestD) {
+            bestD = d
+            best = f
+          }
+        }
+        return best
+      }, river)
+      await nextFrames(6)
+      await frame('482-village-river-bank', {
+        local: aim ? { x: aim.x, y: aim.y + 0.15, z: aim.z } : { x: river.bank.x, y: 0.4, z: river.bank.z },
+        label: 'the river bank, with the foam riding the current',
+      })
+    }
+  }
+  await page.evaluate(() => window.__game.getState().leavePlace())
+  await page.waitForFunction(() => !window.__game.getState().placeId, null, { timeout: 30000 })
+  // Wait for the travel scene's water to be MOUNTED before asking it anything —
+  // the condition, not a wall-clock guess.
+  await page.waitForFunction(() => !!window.__rivers, null, { timeout: 30000 }).catch(() => {})
+
+  // --- The same river, the same side, in the OTHER view (work-order 482) ------
+  // Asked of the DRAWN course, not of the model both views were built from: the
+  // bird's-eye ribbon's own vertices decide where the water lies from the
+  // village, and that bearing has to be the bearing the settlement's bank is on.
+  if (river) {
+    const overhead = await page.evaluate(() => {
+      const s = window.__game.getState()
+      // leavePlace sets the traveller exactly one exit offset south of the
+      // village, so the village's own world position follows from it.
+      const village = { x: s.pos.x, z: s.pos.z - (window.__balance.placeEnterRadius + 0.5) }
+      const scene = window.__scenePass?.scene
+      if (!scene) return null
+      let ribbon = null
+      scene.traverse((o) => {
+        if (o.name === 'rivers-ribbon') ribbon = o
+      })
+      if (!ribbon) return null
+      const p = ribbon.geometry.getAttribute('position')
+      let best = Infinity
+      let bx = 0
+      let bz = 0
+      for (let i = 0; i < p.count; i++) {
+        const dx = p.getX(i) - village.x
+        const dz = p.getZ(i) - village.z
+        const d = dx * dx + dz * dz
+        if (d < best) {
+          best = d
+          bx = dx
+          bz = dz
+        }
+      }
+      return { bearing: Math.atan2(bz, bx), distance: Math.sqrt(best) }
+    })
+    check('the bird’s-eye view draws the Niger past the village', !!overhead && overhead.distance < 8, JSON.stringify(overhead))
+    if (overhead) {
+      const bankBearing = Math.atan2(river.normal.z, river.normal.x)
+      let delta = Math.abs(overhead.bearing - bankBearing) % (Math.PI * 2)
+      if (delta > Math.PI) delta = Math.PI * 2 - delta
+      check(
+        'and the settlement puts its bank on the SAME side of the village',
+        delta < 0.4,
+        `${((overhead.bearing * 180) / Math.PI).toFixed(0)}° drawn overhead against ${((bankBearing * 180) / Math.PI).toFixed(0)}° at the bank`,
+      )
+    }
+  }
+}
+
 console.log('console errors:', errors.length)
 for (const e of errors) console.log('ERR:', e.slice(0, 300))
 await browser.close()

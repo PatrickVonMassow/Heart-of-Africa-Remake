@@ -226,6 +226,10 @@ export function resolveMove(
 // layout builder and PlaceLife validate spawn/errand points against the SAME
 // footprint the walkers move with.
 export const WALKER_RADIUS = 0.3
+/** The player's own collision radius. Shared for the same reason: the layout
+ *  places colliders whose stand-off has to land the player exactly where the
+ *  boundary says he may stand (work-order 482's water wall). */
+export const PLAYER_RADIUS = 0.35
 /** Directions probed for an escape / spiral samples on the innermost ring. */
 const ESCAPE_DIRECTIONS = 12
 

@@ -44,6 +44,8 @@ device pixel ratio is kept (no cap).
 | `waterCalm` | on | off | off |
 | `wildlifeDensity` | 0.6 | 1 | 1 |
 | `figureLimbSegments` | 5 | 8 | 12 |
+| `placeRiverSegments` | 8 | 32 | 64 |
+| `placeRiverFoam` | 6 | 16 | 30 |
 
 ## What each setting does
 
@@ -103,6 +105,14 @@ post pipeline), geometry last — the cuts that only genuinely weak GPUs feel.
   reads as a limb or as a rod; a settlement carries a couple of dozen figures,
   which is why the count is a per-level lever rather than a fixed constant.
   Climbs 5 → 8 → 12.
+- **`placeRiverSegments`** — Segments along the current of the water surface in
+  a settlement that stands on a river (work-order 482). The ripple is a vertex
+  displacement, so this decides whether the water undulates or lies flat; one
+  surface per settlement, hence a modest climb 8 → 32 → 64.
+- **`placeRiverFoam`** — How many patches of foam ride that current (work-order
+  482). Never zero on any level: they carry the reading of WHICH WAY the water
+  runs, which the whole upstream/downstream teaching depends on, so a frugal
+  level shows fewer (6 → 16 → 30), never none.
 
 > **Declared-but-not-yet-consumed keys:** `waterCalm` and `wildlifeDensity` are
 > present in every preset (so the completeness gate passes and future work has a

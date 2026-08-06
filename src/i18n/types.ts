@@ -434,6 +434,13 @@ export interface Strings {
     childSpeechPace: string
     childSpeechRefusal: string
     childSpeechReply: string
+    adultErrandInterval: string
+    adultErrandSpread: string
+    adultErrandDwell: string
+    adultErrandDig: string
+    adultErrandLife: string
+    adultErrandPace: string
+    adultErrandCount: string
     foodPerDay: string
     canteenDrain: string
     canteenDesertDrain: string

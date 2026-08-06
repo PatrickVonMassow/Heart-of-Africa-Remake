@@ -968,7 +968,11 @@ describe('the armed invariants (point 207(i)) — the channel every session list
     s.chaserFor = CFG.resolveCapSeconds * 10
     s.playing = true
     stepTagGame(s, 0, CFG, OPEN)
-    expect(s.playing === false || codes().join(' ').includes('tag-resolve-cap')).toBe(true)
+    // Written as a negation rather than a comparison with `false`: the
+    // assignment above narrows the field to the literal `true`, and the
+    // compiler then rejects `=== false` as unintentional — while the whole
+    // point is that the STEP may have changed it.
+    expect(!s.playing || codes().join(' ').includes('tag-resolve-cap')).toBe(true)
   })
 
   it('reports a child pinned past its unstuck window', () => {

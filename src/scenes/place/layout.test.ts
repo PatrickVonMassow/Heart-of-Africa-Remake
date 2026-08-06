@@ -473,3 +473,63 @@ describe('the teaching stone in the PoC village (work-order 482)', () => {
     expect(Math.hypot(rock.lat - village.lat, rock.lon - village.lon)).toBeGreaterThan(1)
   })
 })
+
+// The village's ground work (work-order point 483): the patches the adults teach
+// DIG at. A villager is SENT to one and digs there, so a patch that sits under a
+// hut or on a lane teaches nothing — the placement is checked like every other
+// errand target.
+describe('the ground work villagers dig at (work-order 483)', () => {
+  it.each(SEEDS)('seed %i: every village grows the three kinds, each on its own spot', (seed) => {
+    for (const v of VILLAGES) {
+      const layout = buildLayout(v.id, seed)
+      expect(layout.digSites.map((s) => s.kind).sort(), v.id).toEqual(['patch', 'pit', 'postHole'])
+      for (let i = 0; i < layout.digSites.length; i++) {
+        for (let j = i + 1; j < layout.digSites.length; j++) {
+          const a = layout.digSites[i]
+          const b = layout.digSites[j]
+          expect(Math.hypot(a.x - b.x, a.z - b.z), `${v.id} ${a.kind}/${b.kind}`).toBeGreaterThan(2)
+        }
+      }
+    }
+  })
+
+  it.each(SEEDS)('seed %i: a villager can stand in the ground work, and leave it again', (seed) => {
+    for (const v of VILLAGES) {
+      const layout = buildLayout(v.id, seed)
+      for (const site of layout.digSites) {
+        const where = `${v.id} ${site.kind}`
+        // Inside the walkable disc, away from the arrival corridor's edge.
+        expect(Math.hypot(site.x, site.z), where).toBeLessThan(layout.radius - 1)
+        // Free ground against the FULL collider set (point 155), and reachable:
+        // the dig site is a target a walker heads for like any errand point.
+        expect(standingClear(layout.colliders, site.x, site.z, WALKER_RADIUS), where).toBe(true)
+        // No lane runs through it: the ground work never blocks the path net.
+        for (const path of layout.paths) {
+          expect(closestOnPolyline(path.points, site.x, site.z).dist, where).toBeGreaterThan(
+            path.width / 2,
+          )
+        }
+      }
+    }
+  })
+
+  it('leaves the ground passable: turned earth is walked over, not collided with', () => {
+    const layout = buildLayout(ROCK_VILLAGE_ID, 42)
+    for (const site of layout.digSites) {
+      const own = layout.colliders.filter(
+        (c) => 'r' in c && Math.hypot((c as { x: number }).x - site.x, (c as { z: number }).z - site.z) < 0.5,
+      )
+      expect(own, site.kind).toHaveLength(0)
+    }
+  })
+
+  it('gives ports none: the teaching is a village matter', () => {
+    for (const p of PORTS) expect(buildLayout(p.id, 42).digSites, p.id).toEqual([])
+  })
+
+  it('places them deterministically, like everything else in the layout', () => {
+    expect(buildLayout(ROCK_VILLAGE_ID, 42).digSites).toEqual(buildLayout(ROCK_VILLAGE_ID, 42).digSites)
+    expect(buildLayout(ROCK_VILLAGE_ID, 42).digSites).not.toEqual(buildLayout(ROCK_VILLAGE_ID, 7).digSites)
+  })
+})
+

@@ -8,10 +8,12 @@ import { placeById } from '../../world/geo'
 import { mulberry32 } from '../../world/noise'
 import { REGION_PLACE_STYLES, VILLAGE_PLANS } from './regionStyles'
 import { PORT_TALKERS, VILLAGE_SPOTS } from './lifeSpots'
-import { boxCollider, nudgeToFree, WALKER_RADIUS, type Collider } from './collision'
+import { boxCollider, nudgeToFree, spawnPointFree, PLAYER_RADIUS, WALKER_RADIUS, type Collider } from './collision'
+import { GROUND_DISC_OVERHANG } from './backdrop'
 import { windingPoints, laneSlots, closestOnPolyline, bendAround, type LaneSlot } from './lanePlan'
 import { buildGizaLayout } from './gizaSite'
 import { ROCK_VILLAGE_ID } from '../../world/communicationRock'
+import { buildRiverBank, settleBankPoints, BANK_SHORE_HALF, BANK_WALL_INSET, type PlaceRiverBank } from './riverBank'
 import type { BuildingType } from '../../state/ui'
 
 export const PLACE_RADIUS = 28 // walkable radius in meters; leaving it exits the place
@@ -81,6 +83,21 @@ export interface PlaceLayout {
    * himself. Null in every other settlement.
    */
   teachingStone: { x: number; z: number; r: number; scale: number } | null
+  /**
+   * Ground work in the open of a village (work-order point 483): a store pit
+   * being sunk, a post hole beside the lane, a patch of earth turned over. They
+   * are where the adults teach the word for digging, so they are LAYOUT data —
+   * the villager digs at exactly the spot the scene draws the turned earth, and
+   * no second, drifting position can exist. Empty in ports.
+   */
+  digSites: Array<{ x: number; z: number; kind: 'pit' | 'postHole' | 'patch' }>
+  /**
+   * The walkable river bank (work-order 482), where the settlement stands on a
+   * river: which way the water lies, which way it runs, and the three points on
+   * the bank a villager can be sent to. Null everywhere else. It is what makes
+   * the walkable region something other than a circle — see `./boundary`.
+   */
+  bank: PlaceRiverBank | null
   /** Livestock pen (kraal layouts). */
   pen: { x: number; z: number; r: number } | null
   /** Points walkers visit on their errands. */
@@ -98,6 +115,13 @@ export interface PlaceLayout {
  */
 export const TEACHING_STONE_SCALE = 2.4
 export const TEACHING_STONE_RADIUS = 0.5 * TEACHING_STONE_SCALE
+
+/**
+ * Radius of a patch of ground work (work-order point 483), in metres: the pit
+ * or the turned earth the villager stands in. Big enough to read as dug ground
+ * from across the village, small enough to keep out of the lanes.
+ */
+export const DIG_SITE_RADIUS = 0.9
 
 /** Interact radius for the elder/villager Space use key (design.md §2.3). */
 export const INTERACT_RADIUS = 4.5
@@ -236,6 +260,9 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   // (design.md §4.1, point 6): a wider walkable area and deeper street grid.
   const ext = place.kind === 'port' ? (size - 1) * 10 : 0
   const radius = place.kind === 'port' ? 30 + size * 6 : PLACE_RADIUS
+  // The river the settlement stands on (work-order 482), derived from the world
+  // model — not seeded, because the geography is the same in every run.
+  const bank = buildRiverBank(place, radius)
 
   const interactives: Interactive[] = []
   if (place.kind === 'village') {
@@ -826,6 +853,29 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     }
   }
 
+  // The village's ground work (work-order point 483): three patches in the open
+  // where villagers dig — a store pit, a post hole and a patch turned over. They
+  // are placed like every other loose object (free ground, off the lanes, seeded
+  // by the same generator) and they carry NO collider: a shallow pit is walked
+  // over, and the villager working it must be able to stand IN it.
+  const digSites: PlaceLayout['digSites'] = []
+  if (place.kind === 'village') {
+    const kinds: Array<PlaceLayout['digSites'][number]['kind']> = ['pit', 'postHole', 'patch']
+    for (const kind of kinds) {
+      // A deterministic golden-angle sweep over the whole open ground, so even a
+      // ksar — the densest plan there is — still finds room for all three.
+      for (let i = 0; i < 96 && !digSites.some((s) => s.kind === kind); i++) {
+        const a = rand() * Math.PI * 2 + i * 2.399963
+        const r = 5 + (i % 12) * 1.15
+        const x = Math.cos(a) * r
+        const z = Math.sin(a) * r
+        if (!isFree(x, z, 2.4, DIG_SITE_RADIUS) || onLane(x, z, DIG_SITE_RADIUS + 0.4)) continue
+        if (digSites.some((s) => Math.hypot(s.x - x, s.z - z) < 3)) continue
+        digSites.push({ x, z, kind })
+      }
+    }
+  }
+
   const rocks: PlaceLayout['rocks'] = []
   for (let i = 0; i < 40 && rocks.length < 14; i++) {
     const a = rand() * Math.PI * 2
@@ -897,6 +947,28 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     colliders.push({ x: PORT_TALKERS[0], z: PORT_TALKERS[1], r: 0.85 }) // chatting pair
   }
 
+  // THE WATER IS A WALL (work-order 482). The bank lobe carries the walkable
+  // region out to the waterline, so without this the last step at the water
+  // would cross the boundary and LEAVE the settlement — the traveller wading
+  // out of a village into the bird's-eye view, and into the river at that. The
+  // panel runs along the waterline for as far as the drawn ground reaches, and
+  // its stand-off is chosen so the player halts exactly on the boundary: at the
+  // top of the bank, on the painted edge, looking down at the current.
+  if (bank) {
+    const discEdge = radius + GROUND_DISC_OVERHANG
+    const half = Math.sqrt(Math.max(0, discEdge * discEdge - bank.distance * bank.distance))
+    const cx = bank.nx * bank.distance
+    const cz = bank.nz * bank.distance
+    colliders.push({
+      kind: 'segment',
+      x1: cx - bank.fx * half,
+      z1: cz - bank.fz * half,
+      x2: cx + bank.fx * half,
+      z2: cz + bank.fz * half,
+      r: BANK_SHORE_HALF + BANK_WALL_INSET - PLAYER_RADIUS,
+    })
+  }
+
   // Every errand target a walker heads for must sit on free ground it can also
   // LEAVE (point 155): a jitter (or a stall/rock beside it) can drop a point
   // into a pocket. Nudge any such point to the nearest usable spot against the
@@ -905,5 +977,21 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     errands[i] = nudgeToFree(colliders, errands[i][0], errands[i][1], WALKER_RADIUS)
   }
 
-  return { radius, spawnZ: radius - SPAWN_INSET, interactives, dwellings, fences, paths, flora, rocks, teachingStone, pen, errands, colliders }
+  // The bank a villager is SENT to obeys the same rule (point 155): it has to
+  // be ground the figure fits on against the full collider set — the water wall
+  // and whatever the dressing dropped near the shore included.
+  if (bank) {
+    settleBankPoints(bank, (x, z) => spawnPointFree(colliders, x, z, WALKER_RADIUS))
+  }
+
+  // The ground work is a target a villager walks INTO, so it obeys the same
+  // reachability rule as every errand point (point 155): nudged onto free ground
+  // it can also leave, against the full collider set.
+  for (const site of digSites) {
+    const [x, z] = nudgeToFree(colliders, site.x, site.z, WALKER_RADIUS)
+    site.x = x
+    site.z = z
+  }
+
+  return { radius, spawnZ: radius - SPAWN_INSET, interactives, dwellings, fences, paths, flora, rocks, teachingStone, digSites, bank, pen, errands, colliders }
 }

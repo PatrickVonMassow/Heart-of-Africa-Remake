@@ -28,7 +28,9 @@ describe('the walkable boundary', () => {
       expect(lut.length).toBe(BOUNDARY_LUT_SIZE)
       for (let j = 0; j < lut.length; j++) {
         const angle = ((j + 0.5) / lut.length) * Math.PI * 2
-        expect(lut[j]).toBe(placeBoundaryRadius(layout, angle))
+        // The lookup is a Float32Array, so the stored value is the single
+        // precision of the boundary — the same number, not a different one.
+        expect(lut[j]).toBe(Math.fround(placeBoundaryRadius(layout, angle)))
         expect(lut[j]).toBeGreaterThan(0)
       }
     }
