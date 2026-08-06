@@ -2050,6 +2050,88 @@ Two rules follow, and neither of them loosens a guard:
    reads the live Stop chain out of `.claude/settings.json` and fails on any
    guard whose message asks for the answer a second time.
 
+## What every turn is billed for — the measured inventory (30.07.2026, point 440)
+
+Point 436 cut ONE injected text by 61 %. The user's question was what else does
+that, and the answer had to be MEASURED, not guessed. Everything below was
+measured by running the real hooks and reading the real texts; the method is a
+node child process per hook fed the harness's own stdin payload, timed with
+`process.hrtime`, on an idle machine.
+
+**The rule applied throughout is 436's.** A statement a gate already refuses to
+break is deleted and replaced by a pointer. A statement no mechanism can check
+stays, in full. Where a rule is enforced but its remedy is not discoverable, the
+remedy belongs in the guard's BLOCK text, which is read exactly when it is
+needed, not in every prompt.
+
+### The inventory
+
+| # | Item | Billed | Before | After | Verdict |
+|---|------|--------|--------|-------|---------|
+| 1 | `dashboard-reminder-hook` — chat-timestamp obligation line | per prompt | 139 ch | 0 | CUT — `timestamp-guard` blocks the turn end and hands the exact line |
+| 2 | `dashboard-reminder-hook` — `WICHTIGSTE REGEL` banner | per prompt | 358 ch | 0 | CUT — same gate; both blocks even used the SHORT stamp form `TIMESTAMP_RE` rejects |
+| 3 | `dashboard-reminder-hook` — focus-reconcile announcement | per prompt | 427 ch | 0 | CUT — dashboard-guard-core (7) refuses it, remedy in its own block text |
+| 4 | `dashboard-reminder-hook` — board obligation | per prompt | 843 ch | 843 ch | KEPT — judgement no gate can make (already cut 61 % by point 436) |
+| 5 | **project UserPromptSubmit total** | per prompt | **1771 ch** | **844 ch** | **−52 %** |
+| 6 | user-scope `berlin-timestamp.cjs` | per prompt | 179 ch | 179 ch | KEPT — it delivers the current TIME, which no gate can; it is now the only statement of the rule |
+| 7 | `batch-resume-hook` — the headline enumerating all 118 open point numbers | per session | 637 ch (588 of them numbers) | 156 ch | CUT — a session carries ONE point since the boundary; replaced by the count, the first point and `point-brief.mjs` |
+| 8 | `batch-resume-hook` total | per session | 4035 ch | 3554 ch | −12 % |
+| 9 | `CLAUDE.md` | per turn | 61 169 ch (988 lines / 8991 words) | unchanged | PREPARED, needs the user's go — see below |
+| 10 | `MEMORY.md` (user scope) | per turn | 13 223 ch | unchanged | NAMED — outside the repository |
+| 11 | global `CLAUDE.md` (user scope) | per turn | 5069 ch | unchanged | NAMED — outside the repository |
+| 12 | BOARD-FIRST deny to a worktree agent | per delegated agent | 1058 ch + one discarded tool call | 0 | CUT — the checkout path says what the inherited session id cannot |
+| 13 | `dashboard-guard` block (not-registered branch) | per block | 876 ch, of which 588 are the same point enumeration as row 7 | unchanged | KEPT — a block is read in full and this one is the remedy |
+| 14 | `batch-progress-guard` block | per block | 1941 ch | unchanged | KEPT — same reason |
+| 15 | `timestamp-guard` block | per block | 395 ch | unchanged | KEPT — it is the mechanism rows 1–2 rely on |
+| 16 | Stop chain, as TIME | per turn end | 25 node processes, 2498 ms measured serially | unchanged | NAMED — 1592 ms of it is `ci-status-guard`'s GitHub call alone; the other 24 cost 906 ms together |
+| 17 | PreToolUse + PostToolUse, as TIME | per Bash call | 5 node processes, ~158 ms | unchanged | NAMED — the `PowerShell` matcher duplicates never fire on Linux |
+| 18 | delegation RETURN shape | per agent report | unbounded | fixed protocol | ALREADY CLOSED — `returnBlock()` in `point-brief-core.mjs` |
+
+**Total deleted: 2466 measured characters** — 927 per prompt, 481 per session
+start, 1058 per delegated agent. Re-measured after the cuts, the project-scope
+prompt injection is 844 characters and the SessionStart text 3554.
+
+### What the measurement moved
+
+**The fixed documents dominate, and nothing else is close.** The per-turn
+preamble measures 79 461 characters (`CLAUDE.md` 61 169 + `MEMORY.md` 13 223 +
+the global `CLAUDE.md` 5069) against 1023 characters of hook injection after the
+cuts — 99 % against 1 %. Every delegated subagent inherits it, so it is
+multiplied by the pool width rather than paid once. The hook texts were worth
+cutting and are now cut; the lever that remains is `CLAUDE.md`, and it needs the
+user's go because it is the governing file.
+
+**The Stop chain is free while it is green** — 24 of its 25 guards cost 906 ms
+together, less than a second at a turn end. `ci-status-guard` costs 1592 ms on
+its own, because it asks GitHub, and every subagent turn pays it too. That is
+not waste (it is the CI detector) but it IS the whole wall-clock of the chain,
+and point 387 already owns that guard.
+
+**A block, by contrast, is expensive** — it is read in full, and per "the duties
+come before the answer" above it can force a second message. That is why the
+block texts stay long: rows 13–15 are where the remedies for rows 1–3 now live.
+
+### The `CLAUDE.md` half — prepared, not executed
+
+The method is the one that already worked twice: §7.1's evidence chains moved to
+`docs/acceptance-evidence.md` (point 306) and nos. 20/21's detail to
+`docs/acceptance-criteria-detail.md` (point 459). §7 is 583 of the file's 988
+lines — 5386 of 8991 words, 61 % — and the 32 numbered criteria of §7.1 are 4136
+of those words. Two measured options:
+
+- **Conservative.** Give the ten largest criteria (nos. 2, 3, 4, 7, 12, 15, 16,
+  23, 25, 31 — 2101 words together) the 459 treatment: number, title, the
+  acceptance condition in a sentence, and the two pointers stay; the built detail
+  moves verbatim into `docs/acceptance-criteria-detail.md`. Measured saving
+  ≈ 1800 words / ≈ 12 000 characters — 20 % of the file, ~3k tokens off every
+  turn of every session.
+- **Full.** The same for all 32. Measured saving ≈ 3300 words / ≈ 23 000
+  characters — 37 % of the file, ~5.7k tokens per turn.
+
+Either way `doc-budget-core`'s `CLAUDE.md` ceiling is LOWERED to what the move
+achieves, per the standing rule that a compression which leaves headroom is
+simply refilled.
+
 ## Render-verify (both backends — enforced, not reminded)
 
 Every GUI/rendering/shader fix must be verified on BOTH renderer backends —
