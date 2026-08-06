@@ -1,14 +1,78 @@
-// Bird's-eye settlement entry (design.md §2.3): entering a settlement is
-// movement-based but CONFIRMED with the Space use key — reaching the enter
-// radius no longer enters on its own. These pure helpers decide the candidate
-// and whether a Space press may enter it, so the logic is unit-testable apart
-// from the Three.js travel scene.
+// Bird's-eye settlement entry and collision (design.md §2.3/§11): entering a
+// settlement is movement-based but CONFIRMED with the Space use key — reaching
+// the enter radius no longer enters on its own — and the footprint itself is
+// solid, so the traveller cannot walk through a village or port. These pure
+// helpers decide the candidate, whether a Space press may enter it, and which
+// collider circles the move resolves against, so the logic is unit-testable
+// apart from the Three.js travel scene. The two radii are coupled: the collider
+// stays INSIDE the enter radius, so approaching a place always arms the prompt
+// before the footprint stops the traveller.
 
 export interface EnterablePlace {
   id: string
   /** World-space position of the settlement marker. */
   x: number
   z: number
+}
+
+/**
+ * The settlement collision radius (design.md §11): the traveller cannot walk
+ * THROUGH a settlement's footprint. Derived from the enter radius by the
+ * calibratable `balance.placeCollisionFactor` and CLAMPED to the enter radius,
+ * because the two must stay balanced: the "Space to enter" prompt has to arm at
+ * or outside the collision boundary, else the collider stops the traveller
+ * short of the enter radius and the place can never be entered at all.
+ */
+export function settlementCollisionRadius(enterRadius: number, factor: number): number {
+  return Math.max(0, Math.min(enterRadius, enterRadius * factor))
+}
+
+/**
+ * How far inside the boundary a position counts as INSIDE the footprint (world
+ * units). Small enough to be physically irrelevant, large enough to absorb the
+ * float noise of a clamp that lands the traveller exactly on the boundary.
+ */
+const INSIDE_MARGIN = 1e-3
+
+/**
+ * The settlement collider circles `[x, z, radius]` for a move STARTING at
+ * `(fromX, fromZ)`, in the `[x, z, r]` form `resolveTravelMove` takes (the
+ * radius is reduced by the body radius `selfR`, so the traveller's centre comes
+ * to rest exactly `collisionRadius` from the marker).
+ *
+ * The collider is ONE-WAY: a place the traveller is ALREADY inside contributes
+ * no circle, so he can always walk back out. Several paths put him on a place's
+ * exact centre — a debug jump, a resumed snapshot, a successor start, a save
+ * written by an older build — and with entry key-only (point 244) a two-way
+ * collider would leave him standing inside a wall he cannot cross. Blocking
+ * only the way IN is the general invariant that covers every such teleport,
+ * including ones nobody has thought of yet.
+ */
+export function settlementColliders(
+  fromX: number,
+  fromZ: number,
+  places: readonly EnterablePlace[],
+  collisionRadius: number,
+  selfR: number,
+  reach = Infinity,
+): Array<[number, number, number]> {
+  const out: Array<[number, number, number]> = []
+  if (collisionRadius <= 0) return out
+  // A place farther off than the boundary plus this step's reach cannot be
+  // entered by it, so it is skipped instead of re-swept every frame.
+  const cutoff = collisionRadius + selfR + reach
+  for (const p of places) {
+    const d = Math.hypot(fromX - p.x, fromZ - p.z)
+    // Genuinely INSIDE only — a traveller RESTING ON the boundary is outside.
+    // The resolver clamps a blocked step to exactly `collisionRadius`, so a
+    // `d <= collisionRadius` reading would make the collider evaporate on the
+    // very next frame for the traveller it had just stopped, and he would walk
+    // straight in (caught by the live walk-in check, not by a single-step test).
+    if (d < collisionRadius - INSIDE_MARGIN) continue // one-way: free to leave
+    if (d > cutoff) continue
+    out.push([p.x, p.z, Math.max(0, collisionRadius - selfR)])
+  }
+  return out
 }
 
 /**

@@ -40,7 +40,13 @@ import {
   type PlaceDef,
 } from '../../world/geo'
 import { mapPointGlyphHiddenByLandmark } from '../../systems/economy'
-import { enterHintName, settlementEnterCandidate, settlementToEnter } from './settlementEntry'
+import {
+  enterHintName,
+  settlementCollisionRadius,
+  settlementColliders,
+  settlementEnterCandidate,
+  settlementToEnter,
+} from './settlementEntry'
 import { sampleTerrain, type TerrainType } from '../../world/terrain'
 import { REFINE_RING_MAX, chunkNeedsRefine, refinedSegments, setTerrainRefine } from './terrainLod'
 import { drainChunkQueue, orderChunkJobs, planChunkWindow, predictedNextCenter, type ChunkJob } from './terrainQueue'
@@ -2863,15 +2869,29 @@ export function TravelScene() {
       // (design.md §11); moving with it is faster, against it slower.
       s.driftCurrent(dt)
 
-      // Collision with trees and animals (design.md §19): the traveller cannot
-      // walk through the large dressing or the wildlife. The swept resolve
-      // clamps the move at an obstacle it enters (no tunnelling at speed) and
-      // slides along it, so movement never passes through.
+      // Collision with trees, animals and settlements (design.md §11/§19): the
+      // traveller cannot walk through the large dressing, the wildlife or a
+      // settlement's footprint. The swept resolve clamps the move at an
+      // obstacle it enters (no tunnelling at speed) and slides along it, so
+      // movement never passes through. The settlement circles are ONE-WAY
+      // (settlementColliders): a place the traveller already stands inside —
+      // after a debug jump, a resumed snapshot or a successor start — lets him
+      // walk back out, and its radius stays below the enter radius so the
+      // "Space to enter" hint always arms before the collider stops him.
       const p = useGame.getState().pos
       const PLAYER_R = 0.5
       const obstacles = collidableFloraNear(p.x, p.z, s.seed)
       const animals = collidableAnimalsNear(p.x, p.z, PLAYER_R + 1.5)
       for (const o of animals) obstacles.push(o)
+      const places = settlementColliders(
+        beforeX,
+        beforeZ,
+        PLACE_WORLD_POSITIONS,
+        settlementCollisionRadius(balance.placeEnterRadius, balance.placeCollisionFactor),
+        PLAYER_R,
+        Math.hypot(p.x - beforeX, p.z - beforeZ) + 1,
+      )
+      for (const c of places) obstacles.push(c)
       if (obstacles.length > 0) {
         const [nx, nz] = resolveTravelMove(beforeX, beforeZ, p.x, p.z, obstacles, PLAYER_R)
         if (nx !== p.x || nz !== p.z) useGame.setState({ pos: { x: nx, z: nz } })

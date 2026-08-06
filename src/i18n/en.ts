@@ -434,6 +434,7 @@ export const en: Strings = {
     walkSpeed: 'Walk speed (in places)',
     strafeFactor: 'Strafe/backward factor',
     walkerUnstuck: 'Inhabitant unstuck (s)',
+    placeCollisionFactor: 'Settlement collision (share of enter radius)',
     startupFreezeBudget: 'Loading-picture freeze budget (ms)',
     mouseSensitivity: 'Mouse sensitivity (first-person)',
     lookPitchLimit: 'Look up/down limit (°)',

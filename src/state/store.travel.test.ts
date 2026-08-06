@@ -357,6 +357,56 @@ describe('debugJumpTo (design.md §21)', () => {
   })
 })
 
+// A jump to an ENTERABLE target enters it (design.md §21.3): with entry
+// key-only (point 244) a jump to the marker would otherwise strand the
+// traveller inside the settlement collider in the bird's-eye view.
+describe('debugJumpToPlace (design.md §21.3)', () => {
+  it('lands INSIDE the place, in the first-person view', () => {
+    g().debugJumpTo(...COORD.savanna)
+    g().debugJumpToPlace('maasai-village')
+    expect(g().mode).toBe('place')
+    expect(g().placeId).toBe('maasai-village')
+  })
+
+  it('runs the ORDINARY entry: discovery, region, arrival journal', () => {
+    const village = placeById('maasai-village')
+    g().debugJumpTo(...COORD.desert)
+    g().debugJumpToPlace(village.id)
+    expect(g().visitedPlaces).toContain(village.id)
+    expect(g().region).toBe(village.region)
+    expect(journalKeys().some((k) => typeof k === 'string' && k.startsWith('journal.'))).toBe(true)
+    // A first-visited village is a bounty-worthy discovery, like a walked-in one.
+    expect(g().pendingBounties.some((b) => b.id === village.id)).toBe(true)
+  })
+
+  it('takes the port checkpoint a walked-in entry would take', () => {
+    const KEY = 'hoa-checkpoints-v1' // store.ts CHECKPOINTS_KEY
+    localStorage.removeItem(KEY)
+    g().debugJumpTo(...COORD.savanna)
+    g().debugJumpToPlace('capetown')
+    expect(g().placeId).toBe('capetown')
+    const snaps = JSON.parse(localStorage.getItem(KEY) ?? '[]')
+    expect(snaps.at(-1)?.placeId).toBe('capetown')
+  })
+
+  it('sets the bird\'s-eye position too, so leaving puts the traveller outside the place', () => {
+    g().debugJumpTo(...COORD.desert)
+    g().debugJumpToPlace('maasai-village')
+    g().leavePlace()
+    const w = latLonToWorld(placeById('maasai-village').lat, placeById('maasai-village').lon)
+    expect(g().mode).toBe('travel')
+    // Outside the settlement collider (and its enter radius), free to walk away.
+    expect(dist(g().pos, w)).toBeGreaterThan(balance.placeEnterRadius)
+  })
+
+  it('enters the Giza monument site as well (point 273)', () => {
+    g().debugJumpTo(...COORD.desert)
+    g().debugJumpToPlace('giza')
+    expect(g().mode).toBe('place')
+    expect(g().placeId).toBe('giza')
+  })
+})
+
 // design.md §2.5 / CLAUDE.md §7.1 pt. 15 (point 99): the travel panorama band
 // is captured on APPROACH and cached as a module singleton keyed by place+seed,
 // so it outlives its visit. `enteredFromTravel` is the freshness signal the

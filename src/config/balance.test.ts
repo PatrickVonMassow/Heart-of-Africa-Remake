@@ -137,6 +137,10 @@ describe('current, terrain cost & movement (design.md §11)', () => {
     expect(balance.inventoryCapacity).toBe(20)
     expect(balance.digRadius).toBe(3)
     expect(balance.placeEnterRadius).toBe(2.5)
+    // The settlement collider must stay INSIDE the enter radius, else the
+    // "Space to enter" prompt could never arm (design.md §11).
+    expect(balance.placeCollisionFactor).toBe(0.6)
+    expect(balance.placeCollisionFactor).toBeLessThanOrEqual(1)
     expect(balance.goodwillForHint).toBe(2)
     expect(balance.goodwillRevered).toBe(2)
     expect(balance.goodwillNeutral).toBe(1)

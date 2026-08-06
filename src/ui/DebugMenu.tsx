@@ -10,6 +10,7 @@ import { refreshAmbienceVolume } from '../systems/ambience'
 import { totalGifts, useGame, type EquipmentId } from '../state/store'
 import { EVENT_KINDS, type EventKind } from '../systems/events'
 import { debugEventGroups, fireDebugEvent, sortByLabel } from '../systems/debugEvents'
+import { jumpTargetPlaceId } from '../systems/jumpTargets'
 import { TREASURE_IDS, type TreasureId } from '../systems/economy'
 import { useUi } from '../state/ui'
 import type { DetailLevel } from '../config/quality'
@@ -329,6 +330,11 @@ export function DebugMenu() {
         onChange={(v) => set('placeWalkSpeed', v)} />
       <NumberField label={t.debug.strafeFactor} value={balance.placeStrafeFactor} step={0.05}
         onChange={(v) => set('placeStrafeFactor', Math.max(0, v))} />
+      {/* Settlement collision (design.md §11): a SHARE of the enter radius, so
+          the "Space to enter" prompt can never arm inside the collider — 1 is
+          the ceiling the resolver clamps to anyway. */}
+      <NumberField label={t.debug.placeCollisionFactor} value={balance.placeCollisionFactor} step={0.05}
+        onChange={(v) => set('placeCollisionFactor', Math.max(0, Math.min(1, v)))} />
       <NumberField label={t.debug.walkerUnstuck} value={balance.walkerUnstuckSeconds} step={1}
         onChange={(v) => set('walkerUnstuckSeconds', Math.max(0.5, v))} />
       <NumberField label={t.debug.startupFreezeBudget} value={balance.startup.pictureFreezeBudgetMs} step={250}
@@ -652,6 +658,14 @@ export function DebugMenu() {
           onPick={(v) => {
             if (v === '#grave') {
               game.debugJumpTo(game.graveLatLon.lat, game.graveLatLon.lon)
+              return
+            }
+            // An enterable target is ENTERED (design.md §21.3): a settlement or
+            // the Giza monument site lands the traveller inside it in the
+            // first-person view; everything else stays a bird's-eye jump.
+            const placeId = jumpTargetPlaceId(v)
+            if (placeId) {
+              game.debugJumpToPlace(placeId)
               return
             }
             const c = jumpCoords.get(v)

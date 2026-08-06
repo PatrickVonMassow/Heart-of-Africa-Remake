@@ -415,6 +415,7 @@ export interface Strings {
     walkSpeed: string
     strafeFactor: string
     walkerUnstuck: string
+    placeCollisionFactor: string
     startupFreezeBudget: string
     mouseSensitivity: string
     lookPitchLimit: string

@@ -115,6 +115,14 @@ export interface BalanceConfig {
   digRadius: number
   /** Radius (world units) around a place marker in which it can be entered. */
   placeEnterRadius: number
+  /**
+   * Settlement collision radius as a SHARE of `placeEnterRadius` (design.md
+   * §11): the bird's-eye traveller cannot walk through a settlement's
+   * footprint. Must stay <= 1 so the "Space to enter" prompt always arms at or
+   * OUTSIDE the collision boundary — a larger collider would stop the traveller
+   * before the enter radius and no place could ever be entered.
+   */
+  placeCollisionFactor: number
   /** How far (degrees) off the coast the sea stays swimmable (design.md
    *  §11.2); beyond it the open ocean blocks movement even inside bays. */
   oceanSwimMarginDeg: number
@@ -688,6 +696,12 @@ export const balance: BalanceConfig = {
   },
   digRadius: 3,
   placeEnterRadius: 2.5,
+  // 0.6 → a 1.5-unit collider around the marker: it matches the drawn cluster
+  // (the port's main house plus annex reaches ~1.3 units past the anchor, the
+  // village huts ~1.45) and stays inside the river clearance every place keeps
+  // (geo.ts PORT_RIVER_CLEARANCE_DEG = band + 0.15° = 1.5 units), so a canoe
+  // passage down the channel is never deflected by a riverside settlement.
+  placeCollisionFactor: 0.6,
   oceanSwimMarginDeg: 1.0, // calibratable: swimmable coastal band width in degrees (point 221: narrowed from 1.2 so the traveller cannot wade ~1.18 deg out into deep blue while the ~0.89 deg nearshore stays swimmable)
   goodwillForHint: 2,
   goodwillRevered: 2,

@@ -336,6 +336,11 @@ export interface GameState {
   /** Debug (design.md §21, F4): toggle the canoe in and out of the pack. */
   debugToggleCanoe: () => void
   debugJumpTo: (lat: number, lon: number) => void
+  /** Debug (design.md §21.3): jump to an ENTERABLE place and enter it — the
+   *  traveller lands inside it in the first-person view, through the ordinary
+   *  entry path. The bird's-eye position is set too, so leaving puts him where
+   *  he would have been. */
+  debugJumpToPlace: (id: string) => void
   /** Debug: jump the calendar to a month (1..12) of the CURRENT in-game year (design.md §21.1). */
   debugJumpToMonth: (month: number) => void
   /** Debug: jump one year forward (+1) or back (-1) inside 1890..1895 (design.md §21.1). */
@@ -2271,6 +2276,19 @@ export const useGame = create<GameState>()((set, get) => ({
     const p = latLonToWorld(lat, lon)
     const ex = withExplored(get().explored, lat, lon)
     set({ mode: 'travel', placeId: null, enteredFromTravel: false, pos: p, region: regionAt(lat, lon), ...(ex ? { explored: ex } : {}) })
+  },
+  debugJumpToPlace: (id) => {
+    // The bird's-eye position is set FIRST (so leaving the place puts the
+    // traveller where the jump landed him, and the arrival is not read as a
+    // place→place move), then the ordinary entry runs: discovery, the arrival
+    // journal, the port checkpoint and the orientation markers all happen as
+    // they do on a walked-in entry. A jump to the centre would otherwise strand
+    // him inside the settlement collider with no automatic entry left to fire
+    // (point 244) — the one-way collider lets him walk out, entering is what
+    // the jump is FOR.
+    const place = placeById(id)
+    get().debugJumpTo(place.lat, place.lon)
+    get().enterPlace(id)
   },
   debugJumpYear: (delta) => {
     set({ day: dayOfYearJump(get().day, delta, START_YEAR) })

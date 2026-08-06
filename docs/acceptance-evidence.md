@@ -97,7 +97,20 @@ collider inverted both: 0.109 into the drawn body, blocked at 1.200 on the
 empty ground beside it — the user's report in numbers). The swept obstacle
 resolve is pure-tested incl. the no-tunnelling case and the
 away/tangent moves from a resting contact staying free
-(`src/systems/movement.test.ts`). The Red Sea cut and world trim are
+(`src/systems/movement.test.ts`). A settlement's footprint collides the
+same way (point 299): swept over the WHOLE place roster, a walk into any
+place from any side is caught at the near edge with no tunnelling and
+stays there frame after frame, while a step from inside the footprint
+outward is never blocked — the one-way rule that keeps a debug jump, a
+resumed snapshot or an older save from stranding the traveller inside a
+wall; the collider stays inside the enter radius (so the "Space to enter"
+prompt is armed where it stops him) and inside the river clearance every
+place keeps (so a passing canoe is not deflected), and no two places'
+enter radii overlap (`src/scenes/travel/settlementEntry.test.ts`). Live,
+walking into a village stops the traveller at exactly the collision radius
+(1.50 of the 2.5 enter radius, closest approach sampled per frame) with
+the enter prompt still armed, and Space enters from there
+(`scripts/verify/flow.mjs`). The Red Sea cut and world trim are
 pure-tested at the acceptance coordinates: mid Red Sea, Sinai, the
 Arabian peninsula and the Gulf of Aden are blocked ocean (Sinai/Arabia
 trimmed in the DEM, so no land route rounds the Red Sea; shallow sea

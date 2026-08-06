@@ -2195,6 +2195,24 @@ check(
 // spot the body merely "belongs" to is free. Everything is measured against the
 // instance matrix the renderer wrote and the circles the movement loop really
 // collides against — never an assumed radius (§7.2).
+// Re-anchor clear of every settlement first (point 299): the drives above walk
+// the traveller east, and a settlement footprint now collides in the bird's-eye
+// view — staged from the drifted position, the "empty ground" flank ended up
+// inside the Maasai village and was blocked for a perfectly good reason, which
+// would grade the wrong thing. (-2.2, 34.8) is ~20 units from the nearest place.
+await page.evaluate(() => window.__game.getState().debugJumpTo(-2.2, 34.8))
+await page
+  .waitForFunction(
+    () => {
+      const h = window.__wildlife?.herdsRef?.current
+      if (!h) return false
+      for (const sp of Object.keys(h)) if (h[sp].some((a) => a.chunk && !a.dead)) return true
+      return false
+    },
+    null,
+    { timeout: 25000 },
+  )
+  .catch(() => {})
 const drawnCollision = await page.evaluate(async () => {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
   if (!window.__wildlife?.herdsRef?.current) return { notReady: true }

@@ -17,7 +17,7 @@ import { useLocale } from '../i18n'
 import { useUi } from '../state/ui'
 import { freshGame, withWorld, useGame } from '../test/store'
 import { MOUNTAINS } from '../world/data/landmarks'
-import { latLonToWorld } from '../world/geo'
+import { latLonToWorld, placeById } from '../world/geo'
 import { EVENT_KINDS } from '../systems/events'
 import {
   DRAMA_PREFIX,
@@ -571,6 +571,27 @@ describe('DebugMenu jump-to covers every named map point (design.md §21.3, poin
     const pos = useGame.getState().pos
     expect(pos.x).toBeCloseTo(expected.x, 4)
     expect(pos.z).toBeCloseTo(expected.z, 4)
+  })
+
+  it('ENTERS an enterable target: a picked village lands in the first-person view (point 299)', () => {
+    render(<DebugMenu />)
+    fireEvent.change(jumpSelect(), { target: { value: 'maasai-village' } })
+    expect(useGame.getState().mode).toBe('place')
+    expect(useGame.getState().placeId).toBe('maasai-village')
+    // The bird's-eye position is set too, so leaving puts the traveller where
+    // the jump landed him rather than back at the old spot.
+    const v = placeById('maasai-village')
+    const expected = latLonToWorld(v.lat, v.lon)
+    useGame.getState().leavePlace()
+    const pos = useGame.getState().pos
+    expect(Math.hypot(pos.x - expected.x, pos.z - expected.z)).toBeLessThan(balance.placeEnterRadius + 1)
+  })
+
+  it('leaves a non-enterable target a bird\'s-eye jump (a mountain stays in travel)', () => {
+    render(<DebugMenu />)
+    fireEvent.change(jumpSelect(), { target: { value: 'kilimanjaro' } })
+    expect(useGame.getState().mode).toBe('travel')
+    expect(useGame.getState().placeId).toBeNull()
   })
 
   it('jumps to the grave, resolved at pick time from the per-run placeholder (point 173)', () => {

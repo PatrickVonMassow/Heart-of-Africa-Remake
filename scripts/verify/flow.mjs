@@ -274,6 +274,70 @@ check(
   'undiscovered village enter hint hides its name (shows "Unbekanntes Dorf")',
   villagePrompt.includes('Unbekanntes Dorf') && !villagePrompt.includes('?') && !villagePrompt.includes(villageName),
 )
+// Point 299: the settlement COLLIDES in the bird's-eye view — walking on never
+// carries the traveller ACROSS the village footprint. He is pressed against its
+// edge (sliding along it, like the tree/animal collision) and stays outside,
+// while the enter radius still holds him, so the Space press below enters from
+// exactly where the collider stopped him. A per-frame sampler records the
+// CLOSEST approach, so a crossing between two polls cannot go unnoticed.
+const village3D = await page.evaluate(async ([lat, lon]) => {
+  const geo = await import('/src/world/geo.ts')
+  const entry = await import('/src/scenes/travel/settlementEntry.ts')
+  const { balance } = await import('/src/config/balance.ts')
+  return {
+    ...geo.latLonToWorld(lat, lon),
+    collisionRadius: entry.settlementCollisionRadius(balance.placeEnterRadius, balance.placeCollisionFactor),
+    enterRadius: balance.placeEnterRadius,
+  }
+}, [village.lat, village.lon])
+await page.evaluate(([x, z]) => {
+  window.__placeProbe = { min: Infinity, frames: 0 }
+  const sample = () => {
+    const p = window.__game.getState().pos
+    const pr = window.__placeProbe
+    pr.min = Math.min(pr.min, Math.hypot(p.x - x, p.z - z))
+    pr.frames++
+    requestAnimationFrame(sample)
+  }
+  requestAnimationFrame(sample)
+}, [village3D.x, village3D.z])
+await page.keyboard.down('KeyS')
+await page
+  .waitForFunction(
+    ([x, z, r]) => {
+      const p = window.__game.getState().pos
+      return Math.hypot(p.x - x, p.z - z) <= r + 0.35
+    },
+    [village3D.x, village3D.z, village3D.collisionRadius],
+    { timeout: 60000 },
+  )
+  .catch(() => {})
+// Keep pushing against the footprint for another 90 RENDERED frames (the app's
+// own clock, never a wall-clock sleep): a collider that evaporated at its own
+// boundary would let the very next step walk straight in.
+const pushedFrom = await page.evaluate(() => window.__placeProbe.frames)
+await page.waitForFunction((n) => window.__placeProbe.frames >= n, pushedFrom + 90, { timeout: 60000 })
+await page.keyboard.up('KeyS')
+// Let the release settle over a few more frames before reading the rest position.
+const releasedAt = await page.evaluate(() => window.__placeProbe.frames)
+await page.waitForFunction((n) => window.__placeProbe.frames >= n, releasedAt + 5, { timeout: 30000 })
+const pressed = await page.evaluate(([x, z]) => {
+  const p = window.__game.getState().pos
+  return { d: Math.hypot(p.x - x, p.z - z), min: window.__placeProbe.min }
+}, [village3D.x, village3D.z])
+console.log(
+  `      closest approach ${pressed.min.toFixed(2)}, resting at ${pressed.d.toFixed(2)} ` +
+    `(collider ${village3D.collisionRadius}, enter radius ${village3D.enterRadius})`,
+)
+check(
+  "bird's-eye: the settlement footprint is never crossed (walking on does not pass through)",
+  pressed.min >= village3D.collisionRadius - 0.2 && pressed.d >= village3D.collisionRadius - 0.2,
+)
+check(
+  'the enter prompt stays armed where the collider stops him (entry stays reachable)',
+  pressed.d <= village3D.enterRadius &&
+    (await page.evaluate((id) => window.__ui.getState().enterPlaceId === id, village.id)),
+)
 await page.keyboard.press('Space')
 // The mode switch is synchronous on the press, but the FIRST entry into this
 // village then builds the whole first-person place (layout, panorama capture,
