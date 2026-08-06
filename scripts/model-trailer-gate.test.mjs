@@ -28,8 +28,11 @@ const withTrailer = (trailer) => `Tick the drums that carry the message\n\n${tra
 describe('the commit-msg model-trailer gate', () => {
   it('is wired into the hook, after the scope guard', () => {
     const hook = readFileSync(HOOK, 'utf8')
-    expect(hook).toContain('scripts/commit-scope-guard.mjs --message "$1" || exit 1')
-    expect(hook).toContain('scripts/model-trailer-gate.mjs --message "$1"')
+    const scope = hook.indexOf('scripts/commit-scope-guard.mjs --message "$1" || exit 1')
+    const gate = hook.indexOf('scripts/model-trailer-gate.mjs --message "$1"')
+    expect(scope, 'the scope guard is no longer driven by the hook').toBeGreaterThan(-1)
+    expect(gate, 'the trailer gate is not wired into the hook').toBeGreaterThan(-1)
+    expect(gate, 'the trailer gate must run AFTER the scope guard').toBeGreaterThan(scope)
   })
 
   it('accepts every allowed spelling', () => {

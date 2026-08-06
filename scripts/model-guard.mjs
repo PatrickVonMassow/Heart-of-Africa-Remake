@@ -114,7 +114,10 @@ if (isMainModule(import.meta.url)) {
       const list = hits.map((h) => `${h.sha.slice(0, 7)} (${h.trailer})`).join(', ')
       await notify('FORBIDDEN MODEL', `Non-allowlisted model commit(s): ${list} — pausing the batch`, 'high')
       process.stdout.write(
-        JSON.stringify({ decision: 'block', reason: formatForbiddenReason(hits, { backupRefs }) }),
+        JSON.stringify({
+          decision: 'block',
+          reason: formatForbiddenReason(hits, { backupRefs, alsoUnidentified: unidentified }),
+        }),
       )
     } else if (unidentified.length && gathered.applicable) {
       // The UNNAMED case: blocking, but resolvable in-session from the

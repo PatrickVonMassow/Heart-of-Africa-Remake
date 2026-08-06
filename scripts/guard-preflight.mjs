@@ -109,8 +109,13 @@ export const GUARDS = [
     // the two blocks the session would meet — they have different remedies.
     decide: ({ log, baselineMs, backupRefs }) => {
       const forbidden = findForbiddenCommits(log, baselineMs)
-      if (forbidden.length) return { block: true, reason: formatForbiddenReason(forbidden, { backupRefs }) }
       const unidentified = findUnidentifiedCommits(log, baselineMs)
+      if (forbidden.length) {
+        return {
+          block: true,
+          reason: formatForbiddenReason(forbidden, { backupRefs, alsoUnidentified: unidentified }),
+        }
+      }
       if (unidentified.length) {
         return { block: true, reason: formatUnidentifiedReason(unidentified, { backupRefs }) }
       }

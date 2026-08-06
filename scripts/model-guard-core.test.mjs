@@ -177,6 +177,15 @@ describe('the two block texts', () => {
     expect(text).toContain('.claude/batch-paused')
   })
 
+  it('the named one names the unnamed commits standing beside it', () => {
+    // Else advancing the baseline past the breach clears them unseen.
+    const text = formatForbiddenReason([{ sha: 'a69d1bd', trailer: 'Claude Haiku 4.5 <x@y>' }], {
+      alsoUnidentified: hits,
+    })
+    expect(text).toContain('652a8ba')
+    expect(text).toContain('names NO model')
+  })
+
   it('names a surviving filter-branch backup ref instead of reporting it twice', () => {
     const refs = backupRefsIn('refs/original/refs/heads/feat/392-x\nrefs/heads/main\n')
     expect(refs).toEqual(['refs/original/refs/heads/feat/392-x'])

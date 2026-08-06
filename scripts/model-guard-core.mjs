@@ -247,8 +247,12 @@ export function backupRefNotice(backupRefs) {
 const shaList = (hits) => (hits ?? []).map((h) => `${h.sha.slice(0, 7)} (${h.trailer})`).join(', ')
 
 /** The HARD stop: a named model outside the allowlist. Unchanged in substance —
- *  pause the batch and wait for the user (point 309, incident 24.07.2026). */
-export function formatForbiddenReason(hits, { backupRefs = [] } = {}) {
+ *  pause the batch and wait for the user (point 309, incident 24.07.2026).
+ *  `alsoUnidentified` are the unnamed commits found in the same window: they are
+ *  NAMED here rather than dropped, because advancing the baseline past the
+ *  forbidden ones would otherwise clear them unseen (four-eyes review). */
+export function formatForbiddenReason(hits, { backupRefs = [], alsoUnidentified = [] } = {}) {
+  const unnamed = (alsoUnidentified ?? []).filter(Boolean)
   return [
     `SERVING-MODEL TRIPWIRE: commit(s) ${shaList(hits)} carry a co-author trailer NAMING a model ` +
       'outside the allowlist (only Opus 5, Opus 4.8 and Fable 5 may run the batch — Sonnet and ' +
@@ -256,6 +260,14 @@ export function formatForbiddenReason(hits, { backupRefs = [] } = {}) {
       '.claude/batch-paused (reason: forbidden serving model) and stop. Only after the user has ' +
       'confirmed an allowed model may .claude/model-guard-baseline.json be advanced past these ' +
       'commits.',
+    ...(unnamed.length
+      ? [
+          '',
+          `The same window also holds ${unnamed.length} commit(s) whose trailer names NO model — ` +
+            `${shaList(unnamed)}. Resolve those from the transcripts too; advancing the baseline ` +
+            'past the breach would otherwise clear them unseen.',
+        ]
+      : []),
     ...backupRefNotice(backupRefs),
   ].join('\n')
 }
