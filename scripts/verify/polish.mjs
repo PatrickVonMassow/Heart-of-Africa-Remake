@@ -3020,6 +3020,120 @@ for (const [placeId, shot] of [
         local: aim ? { x: aim.x, y: aim.y + 0.15, z: aim.z } : { x: river.bank.x, y: 0.4, z: river.bank.z },
         label: 'the river bank, with the foam riding the current',
       })
+
+      // --- No seam where the drawn water hands over to the panorama (525) ----
+      // From this same spot the two halves of the river meet: the surface drawn
+      // on the settlement's own ground, and — past the ground plate's rim — the
+      // §2.5 panorama continuing the same Niger. They used to meet along a
+      // perfectly straight line across the whole picture, a bright teal band
+      // against a duller, greyer one, because each was shaded by its own
+      // material. They read ONE description now (src/render/waterAppearance.ts),
+      // and this is the reading a human makes of that: sample narrow vertical
+      // strips ACROSS the rim and compare the water just above it with the water
+      // just below.
+      //
+      // Robustness, in the two ways the picture fights back. ACROSS the frame:
+      // each row is the MEDIAN over strips spread over the width, so a foam
+      // patch or a villager takes a strip or two and never the row. ALONG it:
+      // the river's own froth runs in broad horizontal ribbons that can cover
+      // most of a band, and froth only ever BRIGHTENS the water — so a band is
+      // read at a LOW PERCENTILE of its rows, which is the water's own tone on
+      // that side of the rim, the thing a seam moves and a ribbon does not.
+      // (Measured: the pre-fix picture reads a step of 46, the fixed one 3–5,
+      // where the plain median swung 25 on a ribbon alone.) Strips covered by a
+      // HUD element or a floating label are dropped rather than measured.
+      const RIM_STEP_LIMIT = 12
+      const seam = await page.evaluate((r) => {
+        const cam = window.__placeCamera
+        const apply = (e, v) => [0, 1, 2, 3].map((i) => e[i] * v[0] + e[i + 4] * v[1] + e[i + 8] * v[2] + e[i + 12] * v[3])
+        const project = (x, y, z) => {
+          const eye = apply(cam.matrixWorldInverse.elements, [x, y, z, 1])
+          const clip = apply(cam.projectionMatrix.elements, eye)
+          const w = clip[3]
+          if (!(w > 0)) return null
+          return { x: ((clip[0] / w) * 0.5 + 0.5) * window.innerWidth, y: (0.5 - (clip[1] / w) * 0.5) * window.innerHeight }
+        }
+        const out = (dist, y) => project(r.normal.x * dist, y, r.normal.z * dist)
+        // The handover zone, bounded by geometry rather than guessed: from the
+        // ground disc's edge (where the panorama's surface has climbed back to
+        // the ground plane) down to the backdrop's inner rim at the water's own
+        // level (where that surface first breaks the drawn sheet).
+        const radius = window.__placeLayout?.radius
+        if (!(radius > 0)) return null
+        const top = out(radius + 14, 0)
+        const bottom = out(radius + 12, -0.25)
+        // Everything on screen that is NOT the picture.
+        const blockers = []
+        for (const el of document.body.querySelectorAll('*')) {
+          if (el.tagName === 'CANVAS' || el.children.length > 0) continue
+          const b = el.getBoundingClientRect()
+          if (b.width < 2 || b.height < 2) continue
+          if (b.width * b.height > window.innerWidth * window.innerHeight * 0.4) continue
+          const s = getComputedStyle(el)
+          if (s.visibility === 'hidden' || s.display === 'none' || Number(s.opacity) === 0) continue
+          blockers.push({ x0: b.left, x1: b.right, y0: b.top, y1: b.bottom })
+        }
+        return { top, bottom, blockers, w: window.innerWidth, h: window.innerHeight }
+      }, river)
+      if (!seam || !seam.top || !seam.bottom) {
+        check('the river’s rim is in the picture to measure (work-order 525)', false, JSON.stringify(seam))
+      } else {
+        const shot = await capturePixels(page, 'river rim colour step')
+        const { data, info } = await sharp(shot).raw().toBuffer({ resolveWithObject: true })
+        const scale = info.width / seam.w
+        const HALF = 6 // strip half-width in CSS pixels
+        const MARGIN = 6 // clearance kept from the handover zone
+        const DEPTH = 60 // band depth — deeper than the water's own ribbons
+        const yTop = Math.round(seam.top.y * scale)
+        const yBottom = Math.round(seam.bottom.y * scale)
+        const y0 = Math.max(0, yTop - MARGIN - DEPTH)
+        const y1 = Math.min(info.height - 1, yBottom + MARGIN + DEPTH)
+        const strips = []
+        for (let i = 1; i <= 14; i++) {
+          const cx = (i / 15) * seam.w
+          const covered = seam.blockers.some(
+            (b) => b.x1 > cx - HALF && b.x0 < cx + HALF && b.y1 > y0 / scale && b.y0 < y1 / scale,
+          )
+          if (!covered) strips.push(Math.round(cx * scale))
+        }
+        const median = (xs) => xs.slice().sort((a, b) => a - b)[Math.floor(xs.length / 2)]
+        const lowTone = (xs) => xs.slice().sort((a, b) => a - b)[Math.floor(xs.length * 0.2)]
+        const half = Math.max(1, Math.round(HALF * scale))
+        const rows = []
+        for (let y = y0; y <= y1; y++) {
+          const perStrip = strips.map((cx) => {
+            const acc = [0, 0, 0]
+            let n = 0
+            for (let x = Math.max(0, cx - half); x <= Math.min(info.width - 1, cx + half); x++) {
+              const i = (y * info.width + x) * info.channels
+              acc[0] += data[i]
+              acc[1] += data[i + 1]
+              acc[2] += data[i + 2]
+              n++
+            }
+            return acc.map((v) => v / n)
+          })
+          rows.push([0, 1, 2].map((k) => median(perStrip.map((c) => c[k]))))
+        }
+        const bandColour = (a, b) => [0, 1, 2].map((k) => lowTone(rows.slice(a - y0, b - y0 + 1).map((c) => c[k])))
+        const far = bandColour(y0, yTop - MARGIN)
+        const near = bandColour(yBottom + MARGIN, y1)
+        const zone = bandColour(yTop, yBottom)
+        const worst = (a, b) => Math.max(...[0, 1, 2].map((i) => Math.abs(a[i] - b[i])))
+        const step = worst(far, near)
+        const zoneStep = worst(zone, [0, 1, 2].map((i) => (far[i] + near[i]) / 2))
+        const say = (c) => c.map((v) => v.toFixed(0)).join('/')
+        check(
+          `the water beyond the plate’s rim is the SAME water as the water at the bank (≤ ${RIM_STEP_LIMIT}/255 per channel)`,
+          strips.length >= 6 && step <= RIM_STEP_LIMIT,
+          `${strips.length} clear strips · far ${say(far)} against near ${say(near)} — step ${step.toFixed(1)}`,
+        )
+        check(
+          'and the handover zone itself carries neither band’s edge — no line at the rim',
+          strips.length >= 6 && zoneStep <= RIM_STEP_LIMIT,
+          `rim zone ${say(zone)} against the water either side — step ${zoneStep.toFixed(1)}`,
+        )
+      }
     }
   }
   await page.evaluate(() => window.__game.getState().leavePlace())
