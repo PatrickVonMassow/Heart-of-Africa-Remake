@@ -4898,3 +4898,35 @@ Build order, chosen so no two parallel agents own the same file:
   separation AND lies within the built fabric for every shipped village), plus
   the retaken frame checked by a human on both backends.
 
+- [ ] 526. A CANCELLED PAGES DEPLOYMENT CAN NEVER BE RE-RUN FOR THAT COMMIT
+  (measured 06.08.2026 on `main` at cde5aee6). The deploy workflow carries
+  `concurrency: group pages, cancel-in-progress: true`, and the Pages action
+  derives the deployment ID from `pages_build_version` — the COMMIT SHA. When
+  the first run for a commit is cancelled (here: GitHub's own deployment queue
+  ran the run into its timeout, `Timeout reached, aborting!`, and the action
+  cancelled the deployment it had created), that ID is burnt: every later
+  attempt for the SAME commit creates the same deployment ID and is answered
+  `Deployment cancelled.` within five seconds. Re-running the failed job and a
+  fresh `workflow_dispatch` both died that way, so the commit could not reach
+  the live site at all — the deployed state stayed two hours behind `main`,
+  while the user judges every render change against exactly that site, and
+  `ci-status-guard` blocks the turn end on a red that no push can clear.
+  FINAL STATE:
+  1. The deploy is RETRYABLE for a commit whose deployment was cancelled: the
+     workflow either deploys under a build version that is not exhausted by one
+     cancellation, or it detects the burnt-ID answer and re-creates the
+     deployment, so a transient queue timeout costs a retry, never the deploy.
+  2. A deploy that fails for a GitHub-side reason (queue timeout, cancellation
+     by a newer run) is TOLD APART from one that fails on our build. The first
+     is retried automatically at least once before the run goes red; the second
+     stays red immediately.
+  3. `cancel-in-progress` keeps its purpose — a newer `main` push still
+     supersedes an older in-flight deploy — without leaving the superseded
+     commit unable to deploy on a later manual run.
+  4. `ci-status-guard` names the distinction in its message: a red that only a
+     NEW commit can clear says so, and names the remedy, instead of demanding a
+     fixing push that cannot exist.
+  VERIFIABLE: pure Vitest on the guard's classification of a
+  cancelled-deployment failure, plus one real deploy run proving a commit whose
+  first deployment was cancelled still reaches the live site.
+
