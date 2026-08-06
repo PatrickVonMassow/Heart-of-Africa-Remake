@@ -89,6 +89,25 @@ export function communicationRockDigSpot(seed: number): { lat: number; lon: numb
   return { lat: s.lat, lon: s.lon }
 }
 
+/**
+ * Is a coordinate close enough to the boulder for the shovel to reach what lies
+ * buried at its foot (point 487)? The centre it measures against is
+ * `communicationRockSite` — the very coordinate the renderer draws the block at
+ * — so "the spot the picture shows" and "the spot that yields the artefact" are
+ * one value, never two that can drift apart. The radius is the caller's (the
+ * store passes the same dig reach every other dig site uses), so this module
+ * keeps knowing only geometry.
+ */
+export function isAtCommunicationRock(
+  lat: number,
+  lon: number,
+  seed: number,
+  radiusDeg: number,
+): boolean {
+  const s = communicationRockSite(seed)
+  return Math.hypot(lat - s.lat, lon - s.lon) <= radiusDeg
+}
+
 /** The boulder's position in world units, for the scene and the collider. */
 export function communicationRockWorldPos(seed: number): { x: number; z: number } {
   const s = communicationRockSite(seed)

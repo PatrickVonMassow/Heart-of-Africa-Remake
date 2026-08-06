@@ -11,6 +11,10 @@ import { en } from '../i18n/en'
 import { useLocale } from '../i18n'
 import { useUi } from '../state/ui'
 import { freshGame, g, useGame } from '../test/store'
+import { DRUM_MESSAGE_VILLAGE } from '../state/store'
+import { chiefAcknowledgePhrase } from '../communication/chiefReply'
+import { NO_READING } from '../communication/speechLabel'
+import { utteranceOf } from '../communication/lexicon'
 import { PLACES } from '../world/geo'
 import { balance } from '../config/balance'
 
@@ -253,6 +257,70 @@ describe('audience dialog (design.md §8/§12)', () => {
     useGame.setState({ goodwill: { 'nubian-village': balance.goodwillForHint } })
     render(<Dialogs />)
     expect(document.querySelector('.dialog')?.textContent).toContain(en.dialogs.moodHigh)
+  })
+})
+
+describe('handing the artefact to the chief (point 487)', () => {
+  const dialogText = () => document.querySelector('.dialog')?.textContent ?? ''
+  const handButton = () =>
+    [...document.querySelectorAll('.dialog button')].find(
+      (b) => b.textContent === en.dialogs.handArtefact,
+    )
+
+  it('offers the hand-over only where the errand was set, and only when carried', () => {
+    g().enterPlace('nubian-village') // another people's chief has no errand
+    useGame.setState({ rockArtefact: 'carried' })
+    useUi.getState().setDialog({ kind: 'audience' })
+    const wrongVillage = render(<Dialogs />)
+    expect(handButton()).toBeUndefined()
+    wrongVillage.unmount()
+
+    g().enterPlace(DRUM_MESSAGE_VILLAGE)
+    useGame.setState({ rockArtefact: 'buried' }) // nothing dug up yet
+    render(<Dialogs />)
+    expect(handButton()).toBeUndefined()
+  })
+
+  it('lays it in his hands and shows his answer in his OWN tongue', () => {
+    g().enterPlace(DRUM_MESSAGE_VILLAGE)
+    useGame.setState({ rockArtefact: 'carried' })
+    useUi.getState().setDialog({ kind: 'audience' })
+    const { rerender } = render(<Dialogs />)
+    expect(dialogText()).toContain(en.dialogs.artefactCarried)
+    fireEvent.click(handButton() as Element)
+    rerender(<Dialogs />)
+
+    expect(g().rockArtefact).toBe('given')
+    expect(dialogText()).toContain(en.dialogs.chiefAcknowledges)
+    const concepts = document.querySelectorAll('.chief-acknowledge .drum-concept')
+    expect(concepts).toHaveLength(chiefAcknowledgePhrase().length)
+    // The syllables he actually spoke stand there, low and high told apart.
+    const spoken = [...concepts].map((c) =>
+      [...(c.querySelector('.utterance')?.children ?? [])].map((s) => s.textContent).join('-'),
+    )
+    expect(spoken).toEqual([...chiefAcknowledgePhrase()])
+    // The offer is gone once it is given — nothing to hand over twice.
+    expect(handButton()).toBeUndefined()
+  })
+
+  it('shows the player’s OWN reading, and ??? where he wrote none — never a translation', () => {
+    g().enterPlace(DRUM_MESSAGE_VILLAGE)
+    useGame.setState({ rockArtefact: 'carried' })
+    // A note exists only for what he has already HEARD in the village.
+    g().hearUtterance(utteranceOf('DIG'))
+    g().setUtteranceHypothesis(utteranceOf('DIG'), 'to dig')
+    useUi.getState().setDialog({ kind: 'audience' })
+    const { rerender } = render(<Dialogs />)
+    fireEvent.click(handButton() as Element)
+    rerender(<Dialogs />)
+
+    const readings = [...document.querySelectorAll('.chief-acknowledge .reading')].map(
+      (r) => r.textContent,
+    )
+    expect(readings).toContain('to dig')
+    expect(readings).toContain(NO_READING) // BIG_ROCK / HERE carry no note
+    // Nothing here is clickable: the answer is heard, not edited.
+    expect(document.querySelectorAll('.chief-acknowledge button')).toHaveLength(0)
   })
 })
 

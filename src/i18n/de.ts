@@ -371,6 +371,9 @@ export const de: Strings = {
     chiefDone: '„Ich habe dir gesagt, was ich weiß. Möge dein Weg gesegnet sein."',
     askDrums: 'Ihn bitten, seine Botschaft auf den Trommeln zu senden',
     askDrumsLocked: 'Er habe eine Botschaft zu senden, gibt er mir zu verstehen – aber nicht an einen Fremden, der seinem Volk nichts gebracht hat.',
+    artefactCarried: 'Das Ding vom Fuß des großen Felsens, noch im Lehm des Flusses',
+    handArtefact: 'Es ihm in die Hände legen',
+    chiefAcknowledges: 'Er drehte es einmal um und sagte:',
     give: 'Überreichen',
     stock: (n) => `Vorrat: ${n}`,
     endAudience: 'Audienz beenden (Esc)',
@@ -631,6 +634,8 @@ export const de: Strings = {
       mistake: 'Ein schwerer Fehler',
       chiefHint: 'Die Worte des Oberhaupts',
       drumMessage: 'Die Trommeln sprechen',
+      rockArtefact: 'Am Fuß des großen Felsens',
+      artefactGiven: 'In die Hände des Oberhaupts',
       decoded: 'Entschlüsselt!',
       unspecific: 'Unbestimmtes Gemurmel',
       giftLore: 'Was das Volk verehrt',
@@ -918,6 +923,10 @@ export const de: Strings = {
       `Der Alte sprach von den Schätzen seines Landes: Was sein Volk über alles verehrt, ist [emph]${de.gifts[p.gift as keyof typeof de.gifts]}[/emph]. [pause]Ein damit geehrtes Oberhaupt öffnet sein Herz.`,
     drumMessage:
       '[awe]Das Oberhaupt rief seinen Trommler, und zwei Trommeln sprachen an seiner Statt – eine große und eine kleine.[/awe] [pause]Sieben Wörter zu je fünf Schlägen, jedes vom nächsten durch dieselbe kurze Stille getrennt – dumpf für die tiefe Silbe, hell für die hohe. [excited]Ich kenne diese Wörter. Jedes einzelne habe ich in den Gassen und am Wasser gehört.[/excited] [pause]Ich habe sie in der Reihenfolge notiert, in der sie geschlagen wurden; was sie von mir verlangen, muss ich selbst lesen.',
+    rockArtefact:
+      '[excited]Sieben Wörter – und es war doch ein Auftrag.[/excited] Ich bin dem Wasser gegen seinen eigenen Zug gefolgt, bis der Steinblock am Ufer stand, genau so, wie die Trommeln ihn genannt hatten: höher als ein Mann, allein, und weit und breit nichts seinesgleichen. [pause]Drei Spann tief stieß mein Spaten auf etwas, das kein Stein war: gehämmertes Metall auf verwittertem Holz, eingeschlossen im Lehm des Flusses. [awe]Es liegt hier länger, als das Dorf steht.[/awe] [pause]Ich habe es nicht weiter geöffnet. [somber]Es steht mir nicht zu, es zu öffnen.[/somber]',
+    artefactGiven:
+      '[breath]Ich habe es den Fluss hinab zurückgetragen und dem Oberhaupt in die Hände gelegt.[/breath] [pause]Er drehte es einmal um und sprach drei Wörter darüber. [excited]Jedes einzelne hatte ich schon gehört – eines am Stein an der Gasse, eines dort, wo sie graben, eines von den Kindern bei ihrem Spiel.[/excited] [pause][awe]Er hatte mich an einen Ort geschickt, den er in keiner meiner Sprachen benennen kann, und ich war dort gewesen und mit dem zurückgekommen, was daran begraben lag.[/awe] [pause][somber]Wir haben keine gemeinsame Sprache.[pause] Und doch haben wir einander eben verstanden.[/somber]',
     digNothing: '[weary]Ich grub an dieser Stelle, doch der Sand gab nichts preis als Steine und alte Wurzeln.[/weary]',
     victory: (p: TextParams) =>
       `${de.formatDate(p.day as number, 1890)}. [excited]Meine Schaufel stieß auf Stein –[pause] behauenen Stein![/excited] [breath]Mit zitternden Händen legte ich die Grabkammer frei. [awe]Gold glänzt im Licht der Fackel, und auf dem Sarkophag ruht die Maske des großen Königs.[/awe] [breath][awe]Ich habe es gefunden.[pause] Das Herz von Afrika.[/awe] [pause][somber]Die Reise war jeden Schritt wert.[/somber]`,

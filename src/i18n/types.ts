@@ -349,6 +349,15 @@ export interface Strings {
     askDrums: string
     /** Why the chief will not send it yet — no gift has earned his trust. */
     askDrumsLocked: string
+    /** What the traveller carries back from the boulder (point 487). */
+    artefactCarried: string
+    /** Lay it in the chief's hands — the hand-over that solves the puzzle. */
+    handArtefact: string
+    /** Introduces the chief's answer, which stays in HIS tongue: never a
+     *  translation, only the note the player wrote for each utterance. Written
+     *  in the past tense — the answer stays standing in the audience as a
+     *  record, so a re-opened dialog must not read as if he said it again. */
+    chiefAcknowledges: string
     give: string
     stock(n: number): string
     endAudience: string
@@ -604,6 +613,10 @@ export interface Strings {
       chiefHint: string
       /** The chief's drum message (design.md §13.4, point 486). */
       drumMessage: string
+      /** Dug up at the foot of the landmark boulder (point 487). */
+      rockArtefact: string
+      /** The artefact laid in the chief's hands — the puzzle solved (point 487). */
+      artefactGiven: string
       decoded: string
       unspecific: string
       giftLore: string
@@ -683,6 +696,10 @@ export interface Strings {
     giftLore(p: TextParams): string
     /** The chief's drums beat his message out (design.md §13.4, point 486). */
     drumMessage: string
+    /** The dig at the boulder the drum message sends the traveller to (point 487). */
+    rockArtefact: string
+    /** Handing the artefact to the chief — what solves the puzzle (point 487). */
+    artefactGiven: string
     digNothing: string
     victory(p: TextParams): string
     foodLow: string

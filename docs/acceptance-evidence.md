@@ -161,6 +161,33 @@ and that no other people's chief sends the message;
 `src/state/store.communication.test.ts` that the message is recorded once, keeps
 the day and note of a concept already heard in the village, and travels with the
 checkpoint.
+
+THE ERRAND'S END (docs/communication-poc-spec.md, point 487). Understood, the
+message sends the traveller out of the village: in the BIRD'S-EYE view, up the
+Niger, to the erratic on its bank, where the shovel he already carries recovers
+what lies buried at its foot. The dig check reads `communicationRockSite` — the
+one function the renderer places the block from — so the spot the picture shows
+and the spot that yields are the same value, and a dig anywhere else yields the
+ordinary nothing. The find rides OUTSIDE the inventory capacity: it is a puzzle
+token, not trade goods, so a full pack can never strand the errand. Carried back
+into the chief's own village it is laid in his hands, and that hand-over is what
+solves the puzzle — he answers with BIG_ROCK · DIG · HERE, three concepts the
+village has already taught, recorded like any other speech of his people and
+shown with the player's OWN notes over them. Nothing is translated for him,
+here least of all.
+Verifiable: pure Vitest. `src/world/communicationRock.test.ts` sweeps the seeds
+for the dig reach covering the drawn block and nothing off it, and for one run's
+boulder not answering for another's; `src/communication/chiefReply.test.ts` that
+the acknowledgment introduces no concept the village does not teach and speaks
+the lexicon's own atoms; `src/state/store.rockArtefact.test.ts` the dig branch,
+the once-only ground, the full pack, the hand-over guards (wrong place, wrong
+mode, nothing dug up, twice), the chronicle in both languages with its markup,
+and the checkpoint round trip incl. a snapshot from before the boulder was dug.
+In the browser, `scripts/verify/world.mjs` drives the whole loop against the
+placement the SCENE drew (`window.__communicationRock`): a dig clear of the
+erratic recovers nothing, a dig at it recovers the artefact and journals it, and
+the hand-over in the village closes the loop — green on both backends.
+
 ## 8. Chronicle/journal.
 
 Verifiable: `src/i18n/villages.test.ts` asserts one
