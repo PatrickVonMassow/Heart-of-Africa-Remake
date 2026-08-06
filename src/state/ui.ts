@@ -303,6 +303,9 @@ export const effectiveFigureLimbSegments = (s: UiState): number => currentQualit
 export const effectivePlaceRiverSegments = (s: UiState): number => currentQuality(s).placeRiverSegments
 /** How many patches of foam ride that current (work-order 482). */
 export const effectivePlaceRiverFoam = (s: UiState): number => currentQuality(s).placeRiverFoam
+/** Octaves of the one water detail field both halves of a settlement river read
+ *  (work-order 525). */
+export const effectiveWaterDetailOctaves = (s: UiState): number => currentQuality(s).waterDetailOctaves
 
 // Dev hook for the headless verification (CLAUDE.md §7.2).
 if (import.meta.env.DEV && typeof window !== 'undefined') {

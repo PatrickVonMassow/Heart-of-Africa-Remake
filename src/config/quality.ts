@@ -74,6 +74,12 @@ export interface QualityPreset {
    *  482). Never zero on any level: they are the reading the UPSTREAM/DOWNSTREAM
    *  teaching depends on, so a frugal level shows fewer, never none. */
   placeRiverFoam: number
+  /** Fractal octaves of the ONE water detail field (work-order 525,
+   *  render/waterAppearance.ts). It prices the water's moving pattern, and it
+   *  is deliberately a SINGLE lever for BOTH halves of a settlement river — the
+   *  surface drawn at the bank and the panorama's continuation of it — because
+   *  a level that thinned one of them would put the seam back. */
+  waterDetailOctaves: number
 }
 
 export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
@@ -103,6 +109,7 @@ export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
     figureLimbSegments: 5, // point 479: the frugal floor — a limb still reads, faceted
     placeRiverSegments: 8, // a coarse undulation; the current still reads
     placeRiverFoam: 6, // fewer patches, never none — the flow must stay visible
+    waterDetailOctaves: 1, // one octave: the water still moves, at the lowest shading cost
   },
   // MEDIUM — the default; a good look on the user's RTX-40-class PC. SSAO off
   // (the ~25 % GPU lever kept for high), TRAA + Bloom on, native dpr, normal
@@ -126,6 +133,7 @@ export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
     figureLimbSegments: 8, // point 479: smooth enough at conversation range
     placeRiverSegments: 32,
     placeRiverFoam: 16,
+    waterDetailOctaves: 3, // today's field
   },
   // HIGH — the richest. SSAO on, sharper sun shadows (4096, above the default),
   // the softer/higher-res campfire shadow variant, everything else full.
@@ -148,6 +156,7 @@ export const QUALITY_PRESETS: Record<DetailLevel, QualityPreset> = {
     figureLimbSegments: 12, // point 479: no facet on an arm the player stands beside
     placeRiverSegments: 64,
     placeRiverFoam: 30,
+    waterDetailOctaves: 4, // one octave more structure on the water
   },
 }
 
