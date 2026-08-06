@@ -124,17 +124,26 @@ const CONSOLE_PREFIX = 'console error:'
  *  `--failed` argument is copied straight out of a console, `FAIL  ` prefix,
  *  ` — detail` and all. parseCheckLines splits those off, so a name carrying
  *  them keyed differently from the same check in the baseline output and every
- *  verdict came back "the baseline never ran it" (seen live, 06.08.2026). */
+ *  verdict came back "the baseline never ran it" (seen live, 06.08.2026).
+ *
+ *  The cut stops at a CONSOLE pseudo-check, because consoleErrorChecks builds
+ *  its identity from the WHOLE normalised error text and never splits at a dash.
+ *  `src/systems/devAssert.ts` prints `[ASSERT] <code> — <detail>`, so cutting
+ *  here would key every dev-assert error differently from its own baseline form
+ *  — and run-all hands console names through `--failed`, so a PRE-EXISTING
+ *  assert would be reported as a REAL REGRESSION. Each side splits the way its
+ *  own producer does; that is what makes the keys meet. */
 export function checkFromName(name) {
   let label = String(name ?? '').trim().replace(/^(?:PASS|FAIL)\s{2,}/, '')
+  const isConsole = label.toLowerCase().startsWith(CONSOLE_PREFIX)
   const dash = label.indexOf(' — ')
-  if (dash !== -1) label = label.slice(0, dash).trim()
+  if (!isConsole && dash !== -1) label = label.slice(0, dash).trim()
   return {
     status: 'FAIL',
     name: label,
     key: checkKey(label),
     detail: '',
-    kind: label.toLowerCase().startsWith(CONSOLE_PREFIX) ? 'console' : 'check',
+    kind: isConsole ? 'console' : 'check',
   }
 }
 

@@ -405,6 +405,27 @@ describe('classifying against the baseline', () => {
     })
   })
 
+  it('round-trips a DASHED console pseudo-check through --failed without losing its identity', () => {
+    // src/systems/devAssert.ts prints `[ASSERT] <code> — <detail>`, and
+    // consoleErrorChecks keys the WHOLE normalised text. run-all hands console
+    // names to the wrapper through --failed, so cutting at the dash here would
+    // key a pre-existing assert differently from its own baseline form and
+    // report it as a REAL REGRESSION.
+    const produced = consoleErrorChecks('ERR: [ASSERT] calf-without-parent — id 17 at 4.2,-9.1')[0]
+    const round = checkFromName(produced.name)
+    expect(round.kind).toBe('console')
+    expect(round.name).toBe(produced.name)
+    expect(round.key).toBe(produced.key)
+    // …and the verdict it drives is the pre-existing one, not a regression.
+    const baseline = 'PASS  the map draws\nERR: [ASSERT] calf-without-parent — id 4 at 1.0,-2.0'
+    const classified = classifyAgainstBaseline({
+      currentFailed: [checkFromName(produced.name)],
+      baselineFailed: failedChecks(baseline),
+      baselineChecks: allChecks(baseline),
+    })
+    expect(classified[0].verdict).toBe('pre-existing')
+  })
+
   it('keys a name pasted WITH its result prefix and detail the same as the parsed line', () => {
     // What a human actually copies out of a console into --failed.
     const parsed = allChecks('PASS  a calf in a strong current drowns — {"drowned":true}')[0]
