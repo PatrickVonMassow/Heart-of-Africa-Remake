@@ -28,6 +28,17 @@ export const TERMINAL_STATUSES = new Set([
   'deployment_lost',
 ])
 
+/** Of those, the ones that prove GitHub PROCESSED the deployment to an end —
+ *  and therefore that the queue was free at that moment.
+ *
+ *  `deployment_cancelled` is deliberately NOT among them, and the incident is
+ *  why: a re-run against a blocked queue is answered `Deployment cancelled.`,
+ *  so a cancelled record is evidence that something was in the way, never that
+ *  the way was clear. `deployment_lost` says only that the status could not be
+ *  read. Both are finished, so neither is a blocker — but neither ends the
+ *  search for one either. */
+export const COMPLETED_STATUSES = new Set(['succeed', 'deployment_failed', 'deployment_content_failed'])
+
 /** Statuses that say nothing about the deployment; treated as not blocking, so
  *  a lookup that failed can never be reported as a stuck deployment. */
 export const UNKNOWN_STATUSES = new Set(['', 'unknown_status', 'not_found'])
@@ -91,9 +102,12 @@ export function candidateDeployments(deployments, { limit = INSPECT_LIMIT, envir
  * `deployment_in_progress` forever, all of them older than a deployment that
  * later reached `succeed`. A deployment older than a COMPLETED one has
  * demonstrably been superseded — it cannot be what a new deployment waits on —
- * so the first finished entry ends the chain. A status that says nothing
- * (`not_found`, an unauthenticated lookup) is skipped rather than treated as
- * finished: it is no evidence either way.
+ * so the first such entry ends the chain. Anything that is finished without
+ * proving the queue was free (a cancelled deployment, a lost one) and anything
+ * that says nothing at all (`not_found`, an unauthenticated lookup) is SKIPPED
+ * rather than counted or treated as the end: our own attempt is answered
+ * `Deployment cancelled.` precisely when something else holds the queue, and
+ * ending the search there would hide the blocker one line below.
  *
  * @param {{sha:string, status:string, createdAt?:string}[]} inspected
  * @param {{alsoConsider?:string[]}} options a sha named from the outside (the
@@ -107,7 +121,7 @@ export function blockingDeployments(inspected, { alsoConsider = [] } = {}) {
     const s = String(d.status ?? '')
       .trim()
       .toLowerCase()
-    if (TERMINAL_STATUSES.has(s)) break
+    if (COMPLETED_STATUSES.has(s)) break
     if (isBlockingStatus(s)) out.push(d)
   }
   for (const d of list) {

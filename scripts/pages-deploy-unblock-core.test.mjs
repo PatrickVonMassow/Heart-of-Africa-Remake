@@ -106,6 +106,19 @@ describe('blockingDeployments', () => {
     expect(out).toEqual([])
   })
 
+  // The incident's own sequence: our re-run is answered `Deployment cancelled.`
+  // BECAUSE an older one holds the queue. Ending the search at our cancelled
+  // record would hide exactly the blocker we came for.
+  it('looks PAST a cancelled or lost record to the deployment that blocks it', () => {
+    const out = blockingDeployments([
+      { sha: 'aaa1111', status: 'deployment_cancelled' },
+      { sha: 'bbb2222', status: 'deployment_lost' },
+      { sha: 'cde5aee', status: 'deployment_in_progress' },
+      { sha: 'ddd4444', status: 'succeed' },
+    ])
+    expect(out.map((d) => d.sha)).toEqual(['cde5aee'])
+  })
+
   it('skips a status that says nothing instead of reading it as finished', () => {
     const out = blockingDeployments([
       { sha: 'aaa1111', status: 'not_found' },
