@@ -354,7 +354,9 @@ export interface Strings {
     /** Lay it in the chief's hands — the hand-over that solves the puzzle. */
     handArtefact: string
     /** Introduces the chief's answer, which stays in HIS tongue: never a
-     *  translation, only the note the player wrote for each utterance. */
+     *  translation, only the note the player wrote for each utterance. Written
+     *  in the past tense — the answer stays standing in the audience as a
+     *  record, so a re-opened dialog must not read as if he said it again. */
     chiefAcknowledges: string
     give: string
     stock(n: number): string

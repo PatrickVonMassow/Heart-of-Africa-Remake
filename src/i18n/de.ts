@@ -373,7 +373,7 @@ export const de: Strings = {
     askDrumsLocked: 'Er habe eine Botschaft zu senden, gibt er mir zu verstehen – aber nicht an einen Fremden, der seinem Volk nichts gebracht hat.',
     artefactCarried: 'Das Ding vom Fuß des großen Felsens, noch im Lehm des Flusses',
     handArtefact: 'Es ihm in die Hände legen',
-    chiefAcknowledges: 'Er dreht es einmal um und sagt:',
+    chiefAcknowledges: 'Er drehte es einmal um und sagte:',
     give: 'Überreichen',
     stock: (n) => `Vorrat: ${n}`,
     endAudience: 'Audienz beenden (Esc)',

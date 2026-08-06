@@ -372,7 +372,7 @@ export const en: Strings = {
     askDrumsLocked: 'He has a message to send, he lets me know — but not to a stranger who has brought his people nothing.',
     artefactCarried: 'The thing from the foot of the great rock, still wrapped in river clay',
     handArtefact: 'Lay it in his hands',
-    chiefAcknowledges: 'He turns it over once, and says:',
+    chiefAcknowledges: 'He turned it over once, and said:',
     give: 'Offer',
     stock: (n) => `you have ${n}`,
     endAudience: 'End audience (Esc)',
