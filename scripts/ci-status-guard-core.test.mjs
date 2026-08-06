@@ -115,4 +115,50 @@ describe('blockReason', () => {
   it('tolerates a missing classification', () => {
     expect(() => blockReason(undefined, undefined)).not.toThrow()
   })
+
+  // Point 526: a red the repository cannot clear must not demand a fixing push.
+  it('says outright when the red is NOT in the repository, and names the handle', () => {
+    const reason = blockReason(
+      {
+        runId: 7,
+        workflowName: 'Deploy to GitHub Pages',
+        conclusion: 'failure',
+        cause: 'external',
+        detail: 'the failing job is "deploy"',
+        remedy: 'No push in this repository can clear this. Run `node scripts/pages-deploy-unblock.mjs --cancel`.',
+      },
+      HEAD,
+    )
+    expect(reason).toContain('NOT IN THE REPOSITORY')
+    expect(reason).toContain('the failing job is "deploy"')
+    expect(reason).toContain('pages-deploy-unblock.mjs --cancel')
+    expect(reason).not.toContain('npm run test:unit')
+  })
+
+  it('names both paths when the side could not be determined', () => {
+    const reason = blockReason(
+      {
+        runId: 7,
+        workflowName: 'Deploy to GitHub Pages',
+        conclusion: 'failure',
+        cause: 'unknown',
+        detail: 'the job list could not be read',
+        remedy: 'If the deploy job failed: run the unblock. If the build job failed: npm run test:unit.',
+      },
+      HEAD,
+    )
+    expect(reason).toContain('could not be determined')
+    expect(reason).toContain('unblock')
+    expect(reason).toContain('npm run test:unit')
+  })
+
+  it('keeps the fixing-push wording for a red that IS ours', () => {
+    const reason = blockReason(
+      { runId: 7, workflowName: 'CI', conclusion: 'failure', cause: 'repository', detail: 'the failing job is "gate"' },
+      HEAD,
+    )
+    expect(reason).toContain('the failing job is "gate"')
+    expect(reason).toContain('npm run test:unit')
+    expect(reason).toContain('Only a fixing push')
+  })
 })
