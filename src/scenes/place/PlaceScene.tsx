@@ -85,7 +85,7 @@ import { SpeechLabels } from './SpeechLabels'
 import { resolveMove } from './collision'
 import { buildBoundaryLut, isOutsidePlace } from './boundary'
 import { clearEdgeBand, setEdgeBandBoundary, setEdgeBandLook } from '../../render/edgeBand'
-import { buildLayout, isOnLane, nearestActionable, PLACE_RADIUS, SPAWN_INSET, type Interactive, type PathDef, type DwellingDef, type FenceDef, type PlaceLayout } from './layout'
+import { buildLayout, DIG_SITE_RADIUS, isOnLane, nearestActionable, PLACE_RADIUS, SPAWN_INSET, type Interactive, type PathDef, type DwellingDef, type FenceDef, type PlaceLayout } from './layout'
 import { getPanoramaCapture } from '../travel/panoramaCapture'
 import {
   silhouetteScale,
@@ -1174,6 +1174,60 @@ function TeachingStone({ stone }: { stone: PlaceLayout['teachingStone'] }) {
     >
       <meshStandardMaterial vertexColors roughness={0.95} />
     </mesh>
+  )
+}
+
+/**
+ * The village's ground work (work-order point 483): the patches the adults teach
+ * the word for digging at — a store pit being sunk, a post hole beside the lane,
+ * a patch of earth turned over. Small dressing drawn at the layout's own
+ * positions, so a villager digs exactly where the turned earth is (points
+ * 129/378), with a digging stick left standing in the spoil so the spot reads as
+ * WORK rather than as a stain even while nobody is at it.
+ *
+ * No quality lever of its own: three patches of a few small meshes are the same
+ * order as the rock scatter beside them, and they ride the place scene's shadow
+ * settings like every other prop.
+ */
+function DigSites({ sites }: { sites: PlaceLayout['digSites'] }) {
+  if (sites.length === 0) return null
+  return (
+    <>
+      {sites.map((site, i) => {
+        const wide = site.kind === 'patch'
+        const r = wide ? DIG_SITE_RADIUS * 1.35 : DIG_SITE_RADIUS
+        return (
+          <group key={i} position={[site.x, 0, site.z]} rotation={[0, site.x * 2.3 + site.z, 0]}>
+            {/* The worked ground itself: dark, turned earth, sunk a little. */}
+            <mesh position={[0, 0.015, 0]} receiveShadow>
+              <cylinderGeometry args={[r, r * 0.82, 0.03, 14]} />
+              <meshStandardMaterial color={wide ? '#5b4229' : '#3f2d1d'} roughness={1} />
+            </mesh>
+            {/* The spoil heaped on one side — absent on the patch, which is
+                turned over rather than dug out. */}
+            {!wide && (
+              <mesh position={[r * 0.95, 0.11, 0]} castShadow receiveShadow>
+                <sphereGeometry args={[r * 0.55, 8, 6]} />
+                <meshStandardMaterial color="#6b4d2e" roughness={1} />
+              </mesh>
+            )}
+            {/* The post already standing in its hole, or the digging stick left
+                in the earth. */}
+            {site.kind === 'postHole' ? (
+              <mesh position={[0, 0.62, 0]} castShadow receiveShadow>
+                <cylinderGeometry args={[0.075, 0.09, 1.24, 6]} />
+                <meshStandardMaterial color="#6c5330" roughness={0.95} />
+              </mesh>
+            ) : (
+              <mesh position={[r * 0.5, 0.42, r * 0.2]} rotation={[0.34, 0, 0.22]} castShadow>
+                <cylinderGeometry args={[0.035, 0.045, 0.95, 5]} />
+                <meshStandardMaterial color="#7a5c33" roughness={0.95} />
+              </mesh>
+            )}
+          </group>
+        )
+      })}
+    </>
   )
 }
 
@@ -2541,6 +2595,9 @@ export function PlaceScene() {
           layout position its collider comes from. */}
       <TeachingStone stone={layout.teachingStone} />
 
+      {/* The ground work the adults teach DIG at (work-order point 483). */}
+      <DigSites sites={layout.digSites} />
+
       {/* Ambient settlement life — ports and villages only; a monument has its
           own sparse crowd (above) and no bustle/hints. */}
       {(isPort || isVillage) && (
@@ -2556,6 +2613,8 @@ export function PlaceScene() {
             .filter((d) => d.kind === 'hut' || d.kind === 'box')
             .map((d) => ({ x: d.x, z: d.z, door: d.door }))}
           errands={layout.errands}
+          teachingStone={layout.teachingStone}
+          digSites={layout.digSites}
           pen={layout.pen}
           colliders={layout.colliders}
           radius={layout.radius}

@@ -184,6 +184,7 @@ export function buildGizaLayout(_seed: number): PlaceLayout {
     flora: [],
     rocks: [],
     teachingStone: null, // the PoC teaching stone stands in its village only
+    digSites: [], // and the ground work of point 483 is village life, not a monument's
     pen: null,
     errands,
     colliders,

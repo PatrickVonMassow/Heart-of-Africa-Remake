@@ -81,6 +81,14 @@ export interface PlaceLayout {
    * himself. Null in every other settlement.
    */
   teachingStone: { x: number; z: number; r: number; scale: number } | null
+  /**
+   * Ground work in the open of a village (work-order point 483): a store pit
+   * being sunk, a post hole beside the lane, a patch of earth turned over. They
+   * are where the adults teach the word for digging, so they are LAYOUT data —
+   * the villager digs at exactly the spot the scene draws the turned earth, and
+   * no second, drifting position can exist. Empty in ports.
+   */
+  digSites: Array<{ x: number; z: number; kind: 'pit' | 'postHole' | 'patch' }>
   /** Livestock pen (kraal layouts). */
   pen: { x: number; z: number; r: number } | null
   /** Points walkers visit on their errands. */
@@ -98,6 +106,13 @@ export interface PlaceLayout {
  */
 export const TEACHING_STONE_SCALE = 2.4
 export const TEACHING_STONE_RADIUS = 0.5 * TEACHING_STONE_SCALE
+
+/**
+ * Radius of a patch of ground work (work-order point 483), in metres: the pit
+ * or the turned earth the villager stands in. Big enough to read as dug ground
+ * from across the village, small enough to keep out of the lanes.
+ */
+export const DIG_SITE_RADIUS = 0.9
 
 /** Interact radius for the elder/villager Space use key (design.md §2.3). */
 export const INTERACT_RADIUS = 4.5
@@ -826,6 +841,29 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     }
   }
 
+  // The village's ground work (work-order point 483): three patches in the open
+  // where villagers dig — a store pit, a post hole and a patch turned over. They
+  // are placed like every other loose object (free ground, off the lanes, seeded
+  // by the same generator) and they carry NO collider: a shallow pit is walked
+  // over, and the villager working it must be able to stand IN it.
+  const digSites: PlaceLayout['digSites'] = []
+  if (place.kind === 'village') {
+    const kinds: Array<PlaceLayout['digSites'][number]['kind']> = ['pit', 'postHole', 'patch']
+    for (const kind of kinds) {
+      // A deterministic golden-angle sweep over the whole open ground, so even a
+      // ksar — the densest plan there is — still finds room for all three.
+      for (let i = 0; i < 96 && !digSites.some((s) => s.kind === kind); i++) {
+        const a = rand() * Math.PI * 2 + i * 2.399963
+        const r = 5 + (i % 12) * 1.15
+        const x = Math.cos(a) * r
+        const z = Math.sin(a) * r
+        if (!isFree(x, z, 2.4, DIG_SITE_RADIUS) || onLane(x, z, DIG_SITE_RADIUS + 0.4)) continue
+        if (digSites.some((s) => Math.hypot(s.x - x, s.z - z) < 3)) continue
+        digSites.push({ x, z, kind })
+      }
+    }
+  }
+
   const rocks: PlaceLayout['rocks'] = []
   for (let i = 0; i < 40 && rocks.length < 14; i++) {
     const a = rand() * Math.PI * 2
@@ -905,5 +943,14 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     errands[i] = nudgeToFree(colliders, errands[i][0], errands[i][1], WALKER_RADIUS)
   }
 
-  return { radius, spawnZ: radius - SPAWN_INSET, interactives, dwellings, fences, paths, flora, rocks, teachingStone, pen, errands, colliders }
+  // The ground work is a target a villager walks INTO, so it obeys the same
+  // reachability rule as every errand point (point 155): nudged onto free ground
+  // it can also leave, against the full collider set.
+  for (const site of digSites) {
+    const [x, z] = nudgeToFree(colliders, site.x, site.z, WALKER_RADIUS)
+    site.x = x
+    site.z = z
+  }
+
+  return { radius, spawnZ: radius - SPAWN_INSET, interactives, dwellings, fences, paths, flora, rocks, teachingStone, digSites, pen, errands, colliders }
 }
