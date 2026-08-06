@@ -4025,23 +4025,6 @@ Build order, chosen so no two parallel agents own the same file:
   wave 4  481 (children teach) · 483 (adults teach)
   wave 5  486 (drums) · 487 (digging)
 
-- [ ] 486. THE DRUMS AND THE CHIEF'S MESSAGE (user 03.08.2026).
-  FINAL STATE:
-  1. A drummer transmits on two drums: the large low one for `ba`, the small high
-     one for `BA`, with the strike visible on the drum being played.
-  2. The sequences are exactly those spoken in the village, a constant pause
-     separates the concepts, and nothing else encodes anything.
-  3. Afterwards the message is displayed, each concept with the player's
-     hypothesis above it, each element clickable to change it — the SAME note as
-     in the journal, so a change in one place is the change in the other.
-  4. The display can be REOPENED. A player who forgets the message must not be
-     locked out of the feature.
-  5. The message is GO_THERE · RIVER · FOLLOW · UPSTREAM · BIG_ROCK · THERE · DIG,
-     built only from concepts observable beforehand.
-  VERIFIABLE: pure Vitest — the drum sequence equals the spoken one concept for
-  concept, the pause is constant, a hypothesis edited at the drums reads back from
-  the journal store and the other way round, and the display reopens.
-
 - [ ] 487. DIGGING AT THE ROCK, AND WHAT IS BURIED THERE (user 03.08.2026).
   FINAL STATE:
   1. Digging with the shovel at the rock's defined spot recovers an artefact;
