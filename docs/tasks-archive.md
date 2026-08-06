@@ -14379,3 +14379,30 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   VERIFIABLE: pure Vitest — the drum sequence equals the spoken one concept for
   concept, the pause is constant, a hypothesis edited at the drums reads back from
   the journal store and the other way round, and the display reopens.
+
+- [x] 525. THE SETTLEMENT RIVER AND ITS PANORAMA CONTINUATION MEET AT A VISIBLE
+  SEAM (observed 06.08.2026 in the frames of point 482, on BOTH backends —
+  `verification/482-village-river-bank.png`). Standing at the Bambara village's
+  bank, the water reads as two stacked bands: the near, drawn-in-the-scene river
+  in a bright teal, and beyond the ground plate's rim the compressed panorama
+  continuing the same Niger in a duller, greyer tone. The two meet along a
+  perfectly straight horizontal line across the whole picture. Both halves are
+  measured from ONE river course, so the geometry is right and only the SHADING
+  disagrees — but the line is exactly where the eye rests when the player looks
+  at the water he is being taught upstream and downstream on, and it reads as a
+  rendering fault rather than as distance.
+  FINAL STATE:
+  1. The in-scene water and the panorama's continuation of the same river carry
+     ONE water appearance: whatever the near water does with sky colour, depth
+     absorption and haze, the far continuation does the same, resolved by the
+     distance it stands at rather than by a second, independently tuned material.
+  2. No straight seam is left at the plate rim: at the transition the two are
+     indistinguishable to the eye at the player's own eye height, at the default
+     look direction, on both backends.
+  3. Whatever the fix costs in shading is sorted into `QUALITY_PRESETS` like every
+     other water lever, so the low preset keeps its budget.
+  VERIFIABLE: a pure test that both halves derive their colour from the same
+  source (one material description, not two literals), plus a browser check at the
+  bank that samples the picture in a narrow vertical strip across the rim and
+  fails on a colour step above a stated threshold — the same reading a human makes,
+  taken on WebGL 2 and WebGPU, with the frame retaken and looked at.
