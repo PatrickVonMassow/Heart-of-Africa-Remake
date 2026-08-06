@@ -33,6 +33,8 @@ import { REPO_ROOT, repoPath } from './repo-paths.mjs'
 import { writeJsonAtomic } from './atomic-write.mjs'
 import { probePid, LAUNCHER_TICK_MS } from './batch-singleton.mjs'
 import { isMainModule } from './is-main.mjs'
+import { pauseState } from './batch-lock.mjs'
+import { describePause } from './batch-pause-core.mjs'
 import {
   LAUNCHER_DAEMON_NAME,
   LAUNCHER_RECORD_VERSION,
@@ -375,7 +377,11 @@ if (isMainModule(import.meta.url)) {
 
   if (arg === '--status') {
     const s = launcherState()
-    console.log(JSON.stringify({ platform: process.platform, launcher: remedy.name, ...s }, null, 2))
+    // The PARK is half the answer to "will anything happen?" (point 445): an armed
+    // launcher whose every tick bails at a pause record is not a running batch, and
+    // a clocked park says when it will be one again.
+    const park = pauseState()
+    console.log(JSON.stringify({ platform: process.platform, launcher: remedy.name, ...s, pause: park }, null, 2))
     if (process.platform === 'win32') {
       console.log(`\nOn Windows the launcher is the Scheduled Task "${LAUNCHER_TASK_NAME}" — this record is not it.`)
     } else if (s.state === 'ready' || s.state === 'running') {
@@ -383,6 +389,7 @@ if (isMainModule(import.meta.url)) {
     } else {
       console.log(`\nThe launcher is NOT armed (${s.state}). Start it: ${remedy.command}`)
     }
+    if (park.state !== 'none') console.log(describePause(park))
   } else if (arg === '--start') {
     if (process.platform === 'win32') refuseOnWindows()
     if (inWorktree()) refuseWorktree()
