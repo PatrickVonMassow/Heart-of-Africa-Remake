@@ -58,7 +58,8 @@ export function resultName(line) {
   return name.length >= 12 ? name : null
 }
 
-const RESULT = { test: (line) => resultName(line) !== null }
+const isResult = (line) => resultName(line) !== null
+
 /** `# lint (oxlint)…`, `# quiet-machine check (point 296): …` — a stage heading. */
 const HEADING = /^#\s/
 /** `===== LARGE regression — backend 1/2: WebGL 2 (…) =====` */
@@ -80,7 +81,7 @@ const INDENTED = /^\s+\S/
  */
 export function classifyLine(line) {
   const s = String(line ?? '')
-  if (RESULT.test(s)) return 'result'
+  if (isResult(s)) return 'result'
   if (ECHO.test(s)) return 'echo'
   if (HEADING.test(s)) return 'heading'
   if (BANNER.test(s)) return 'banner'
