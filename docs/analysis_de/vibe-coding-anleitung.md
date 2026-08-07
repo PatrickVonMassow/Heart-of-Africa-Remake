@@ -152,10 +152,9 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 - **Grüner Test, falsches Bild.** Der Test ist grün, das Ergebnis trotzdem falsch — er
   prüfte einen Hilfswert, einen unerreichbaren Zustand, einen geratenen Wert. Oder das
   Beweisbild entstand, bevor die Szene fertig geladen war.
-  → *Prompt:* „Etabliere einen Mechanismus, der eine sichtbare Änderung erst als fertig gelten
-  lässt, wenn sie am **echten gerenderten Bild** unter einer Bedingung geprüft wurde, die ein
-  Nutzer wirklich erreicht — und der ein Prüfbild erst schreibt, wenn die Darstellung fertig
-  ist." *(≈ 1,5x.)* *(Zuletzt: Sieht das für einen Menschen richtig aus?)*
+  → *Prompt:* „Eine sichtbare Änderung gilt erst als fertig, wenn sie am **echten gerenderten
+  Bild** unter einer erreichbaren Bedingung geprüft wurde — und ein Prüfbild entsteht erst, wenn
+  die Darstellung fertig ist." *(≈ 1,5x.)* *(Zuletzt: Sieht das für einen Menschen richtig aus?)*
 
 - **Neue Features zerbrechen alte.** Eine Änderung repariert X und bricht das unbeobachtete Y.
   → *Prompt:* „Etabliere einen Mechanismus, der jede Mechanik auch im **Danach-Zustand** prüft
@@ -173,9 +172,11 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   weg UND echte Treffer noch da. Die Fälle dafür erfindet das **andere Modell**, und es
   misst an der Mechanik, nicht an den Testnamen." *(Kosten ≈ 1,3x.)*
 
-- **Zahlen geschätzt statt gemessen.** ‚Das dauert ~2 Minuten', ‚das ist schneller'.
-  → *Prompt:* „Laufzeiten, Performance und Kosten nennst du nur **gemessen** — Performance
-  auf der **Ziel-Hardware**, nicht auf der Build-Maschine."
+- **Zahlen geschätzt statt gemessen — auch die, die dir jemand reicht.** ‚Das dauert ~2 Minuten';
+  oder ein Wert, der einmal stimmte.
+  → *Prompt:* „Laufzeiten, Performance und Kosten nennst du nur **gemessen** — Performance auf der
+  **Ziel-Hardware**, nicht auf der Build-Maschine. Was zwischen Erhebung und Verwendung altern kann,
+  erhebe **am Verwendungsort** neu."
 
 - **Das Kontingent ist die Grenze, nicht die Zeit.** Der Verbrauch hängt an der Größe jedes
   Kontexts, nicht an den Stunden: lange Sitzungen, und Helfer, die ihren Auftrag erst in
@@ -185,10 +186,9 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 - **Der autonome Lauf bleibt stehen — still oder wartend.** Der Fortschritt endet unbemerkt,
   oder er hängt an einer Rückfrage — beides gleich teuer, wenn du weg bist.
-  → *Prompt:* „Bei einer autonomen Daueraufgabe sei die **letzte Aktion jedes Schritts** ein Schritt
-  an der Aufgabe, und baue einen Mechanismus gegen stilles Anhalten. Bleib **nie mit einer Rückfrage
-  stehen**: Triff die vernünftigste Annahme; was mich braucht, hältst du sichtbar fest und **gehst
-  weiter**."
+  → *Prompt:* „Bei einer Daueraufgabe sei die **letzte Aktion jedes Schritts** ein Schritt an der
+  Aufgabe, und baue einen Mechanismus gegen stilles Anhalten. Bleib **nie mit einer Rückfrage
+  stehen**: Triff die vernünftigste Annahme, halte sichtbar fest, was mich braucht, und geh weiter."
 
 - **Kommunikation verfehlt.** Zu technisch, zu lang, an der Zielgruppe vorbei.
   → *Prompt:* „Beschreibe Bugs und Status in der Sprache der Zielgruppe — Symptom zuerst,
@@ -245,8 +245,8 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   Wer baut, prüft gegen dieselbe Vorstellung, aus der der Fehler stammt; und wer eine fertige Liste
   prüft, nennt weit weniger als vor dem leeren Blatt — falsch, wenn der **übersehene** Punkt zählt.
   → *Prompt:* „Etabliere einen Mechanismus, der vor dem Bau **Schwierigkeit × Kritikalität** schätzt und
-  bei Kritischem **ein anderes Modell** hinzuzieht — je nach Schritt anders. Beim **Finden** blind
-  parallel: gleiche Vorgabe, je ein vollständiges Ergebnis, keiner sieht vorher das andere; vereinigt
+  bei Kritischem **ein anderes Modell** hinzuzieht. Beim **Finden** blind
+  parallel: gleiche Vorgabe, je ein vollständiges Ergebnis; vereinigt
   **nach Bedeutung**, Einzelnennungen **markiert statt gestrichen**. Beim **Beurteilen** Gegenlesen,
   aber **erst das Ergebnis, dann die Begründung**; zwei Läufe desselben Modells nur mit **anderer
   Rolle**." *(Kosten ≈ 2x für den Fundschritt)*
@@ -405,4 +405,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 Diese eine Nachricht am Anfang baut 80 % der Lehren dieses Projekts ein, bevor die
 erste Zeile Code entsteht.
 
-<!-- GUIDE-FINGERPRINT: 3f4e444cbe9bea77c423409d1c17a70b5459282445135f2b669b70c3fb22da63 -->
+<!-- GUIDE-FINGERPRINT: 11898a04dc001bea44eacdde9674f5a83402a4478da86c3fb93945e3b3cfd464 -->
