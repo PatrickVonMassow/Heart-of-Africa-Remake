@@ -18,6 +18,7 @@ import {
   shellSegments,
   evaluate,
 } from './board-first-core.mjs'
+import { CLOSING_WORK_TITLE } from './board-core.mjs'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -442,6 +443,51 @@ describe('the no-work claim binds the turn', () => {
     expect(reason).toContain('node scripts/board.mjs none')
     expect(reason).toMatch(/STOP/)
     expect(reason).toContain('scripts/batch-boundary.mjs')
+  })
+
+  // ═══ Point 544 — a remedy must reach the state the session is in ══════════
+  // The two remedies above could not: `now <N>` needs an open point that already
+  // has a queue card, `none` rewrites only the reason. A session owing its
+  // closing duties was left with the claim standing and every call denied — so
+  // it worked AROUND the guard, which is the one thing this chain cannot afford.
+  const closingCard =
+    `<details class="now">\n  <summary><span class="t">${CLOSING_WORK_TITLE}</span>` +
+    '<span class="right"><span class="meta">23:40</span></span></summary>\n' +
+    '  <div class="body">\n    <p>Vier-Augen-Protokoll und Retrospektive stehen noch aus.</p>\n  </div>\n</details>\n'
+
+  /** The calls a session owing its closing duties actually makes. */
+  const closingDutyCalls = [
+    {}, // the Write of a refreshed doc
+    { toolName: 'Bash', command: 'git commit -m "x"', filePath: undefined },
+    { toolName: 'Bash', command: 'git push origin HEAD', filePath: undefined },
+    { toolName: 'Bash', command: 'npm run test:unit', filePath: undefined },
+    { toolName: 'Agent', filePath: undefined },
+  ]
+
+  it('ALLOWS the state-changing call while the closing card stands', () => {
+    for (const call of closingDutyCalls) {
+      expect(evaluate(cleanCall({ boardHtml: board(closingCard), ...call })).block).toBe(false)
+    }
+  })
+
+  it('still DENIES every one of them under the idle card — the bias is unchanged', () => {
+    for (const call of closingDutyCalls) {
+      expect(evaluate(cleanCall({ boardHtml: board(idleCard), ...call })).block).toBe(true)
+    }
+  })
+
+  it('names the closing card as the third way out', () => {
+    const { reason } = evaluate(cleanCall({ boardHtml: board(idleCard) }))
+    expect(reason).toContain('node scripts/board.mjs closing')
+    expect(reason).toMatch(/merged and TICKED/)
+  })
+
+  it('does not let the closing card past the OTHER board-first conditions', () => {
+    // It is not a claim to stop, so it is not this rule's business — but a stale
+    // focus or an unpublished board still denies exactly as before.
+    const d = evaluate(cleanCall({ boardHtml: board(closingCard), focus: focusAt(BEFORE) }))
+    expect(d.block).toBe(true)
+    expect(d.reason).toContain('BOARD FIRST')
   })
 
   it('never blocks the SESSION-ENDING path — that is the case the claim exists for', () => {
