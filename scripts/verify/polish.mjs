@@ -3411,7 +3411,10 @@ for (const [placeId, shot] of [
     },
     8,
   )
-  if (portEaves) await shootEaves('349-eaves-port', portEaves, 'the trade house eaves from underneath', 6, 0.14)
+  // Further back than the village hut: the trade house is a big block, and from
+  // a hut's distance its wall simply fills the frame — a picture of masonry, in
+  // which no human can judge whether the eave clears a head.
+  if (portEaves) await shootEaves('349-eaves-port', portEaves, 'the trade house eaves from underneath', 11, 0.1)
 
   // The eaves were NOT fenced off: the cook-shelter over the village fire is a
   // roof one may still stand under — and from under it, it must be a SURFACE.
