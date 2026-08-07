@@ -7,8 +7,8 @@ import {
   cachedAnswer,
   classifyRuns,
   failedRuns,
-  liveTargets,
-  pruneNoCiRefs,
+  notifiedFromState,
+  pruneNotifiedRefs,
   pruneShaCache,
   pushedRefsFromReflog,
   recoveredWorkflows,
@@ -17,7 +17,6 @@ import {
   shouldBlock,
   shouldNotify,
   sweepTargets,
-  NO_CI_TTL_MS,
   PUSH_WINDOW_MS,
   RECHECK_MS,
   RUN_GRACE_MS,
@@ -345,13 +344,19 @@ describe('refTargets', () => {
   })
 })
 
-describe('liveTargets', () => {
-  const targets = [{ ref: 'origin/board', sha: 'aaa111', at: t(60) }]
+describe('notifiedFromState / pruneNotifiedRefs', () => {
+  it('migrates the single-sha form the file used while only HEAD was watched', () => {
+    expect(notifiedFromState({ notifiedSha: 'aaa111' })).toEqual({ HEAD: 'aaa111' })
+    expect(notifiedFromState({ notifiedRefs: { 'origin/main': 'bbb222' }, notifiedSha: 'aaa111' })).toEqual({
+      'origin/main': 'bbb222',
+    })
+    expect(notifiedFromState(undefined)).toEqual({})
+  })
 
-  it('skips a ref no workflow covers, until the memory expires', () => {
-    expect(liveTargets(targets, { 'origin/board': t(60) }, NOW)).toEqual([])
-    expect(liveTargets(targets, { 'origin/board': NOW - NO_CI_TTL_MS - 1 }, NOW)).toEqual(targets)
-    expect(liveTargets(targets, {}, NOW)).toEqual(targets)
+  it('forgets the bookkeeping of a ref that no longer exists', () => {
+    expect(
+      pruneNotifiedRefs({ 'origin/main': 'a', 'origin/gone': 'b', HEAD: 'c' }, ['origin/main']),
+    ).toEqual({ 'origin/main': 'a', HEAD: 'c' })
   })
 })
 
@@ -392,16 +397,12 @@ describe('refVerdict', () => {
   })
 })
 
-describe('pruneShaCache / pruneNoCiRefs', () => {
+describe('pruneShaCache', () => {
   it('forgets what can no longer be a target', () => {
     expect(
       pruneShaCache({ keep: { state: 'success', firstSeenAt: t(60) }, drop: { state: 'success', firstSeenAt: NOW - PUSH_WINDOW_MS - 1 } }, NOW),
     ).toEqual({ keep: { state: 'success', firstSeenAt: t(60) } })
-    expect(pruneNoCiRefs({ 'origin/board': t(60), 'origin/gone': NOW - NO_CI_TTL_MS - 1 }, NOW)).toEqual({
-      'origin/board': t(60),
-    })
     expect(pruneShaCache(null, NOW)).toEqual({})
-    expect(pruneNoCiRefs(undefined, NOW)).toEqual({})
   })
 })
 
@@ -422,6 +423,7 @@ async function sweep({ targets, runsBySha = {}, standDown = false, ...rest }) {
       classification: { ...classification, cause: 'repository', detail: 'the failing job is "gate"', actionable: !standDown },
       standDown,
       stillFamished: standDown ? { CI: NOW } : {},
+      judgedWorkflows: ['CI'],
     }),
     notify: async (a) => alerts.push(a),
   })
@@ -496,29 +498,52 @@ describe('sweepTargets', () => {
     expect(again.decision).toContain('NOT yet concluded')
   })
 
-  it('the wait has a CEILING — past it the guard fails open and says so', async () => {
-    const got = await sweep({
-      targets: [{ ...branchTarget, at: NOW - WAIT_BUDGET_MS - 1 }],
-      runsBySha: { [BRANCH]: pendingRun(BRANCH) },
-    })
+  it('the wait has a CEILING — past it the guard fails open, says so, and KEEPS asking', async () => {
+    const stalled = { ...branchTarget, at: NOW - WAIT_BUDGET_MS - 1 }
+    const got = await sweep({ targets: [stalled], runsBySha: { [BRANCH]: pendingRun(BRANCH) } })
     expect(got.decision).toBe(null)
     expect(got.failedOpen.join(' ')).toContain('never concluded')
+    // Not written off as final: the run that concludes an hour later is still
+    // judged, and its red still blocks.
+    const later = await sweepTargets({
+      targets: [stalled],
+      cache: got.cache,
+      now: NOW + RECHECK_MS + 1,
+      fetchRuns: async () => redRun(BRANCH),
+      judgeRed: async ({ classification }) => ({
+        classification: { ...classification, cause: 'repository', actionable: true },
+        standDown: false,
+        stillFamished: {},
+        judgedWorkflows: ['CI'],
+      }),
+      notify: async () => {},
+    })
+    expect(later.decision).toContain('origin/feat/x')
   })
 
-  it('writes off a ref no workflow covers, so its next push costs nothing', async () => {
-    const got = await sweep({
-      targets: [{ ref: 'origin/board', sha: 'boa4d00', at: NOW - RUN_GRACE_MS - 1 }],
-      runsBySha: { boa4d00: [] },
-    })
+  it('writes a commit no workflow covers off PER SHA — never per ref', async () => {
+    // The blocking four-eyes finding: a per-ref write-off would silently pass
+    // the next commit's red. A `[skip ci]` RESCUE push is exactly that shape —
+    // GitHub creates no run for it, and the very next commit on that branch is
+    // the one that finishes the work and runs CI for real.
+    const rescue = { ref: 'origin/feat/x', sha: 'rescue0', at: NOW - RUN_GRACE_MS - 1 }
+    const got = await sweep({ targets: [rescue], runsBySha: { rescue0: [] } })
     expect(got.decision).toBe(null)
-    expect(got.noCiRefs['origin/board']).toBe(NOW)
-    expect(liveTargets([{ ref: 'origin/board', sha: 'newsha0', at: NOW }], got.noCiRefs, NOW)).toEqual([])
+    expect(got.cache.rescue0.state).toBe('nocheck')
+    // …and the finishing commit on the SAME ref is still asked about, and its
+    // red still blocks.
+    const next = await sweep({
+      targets: [{ ...rescue, sha: BRANCH, at: NOW }],
+      cache: got.cache,
+      runsBySha: { [BRANCH]: redRun(BRANCH) },
+    })
+    expect(next.asked).toEqual([BRANCH])
+    expect(next.decision).toContain('origin/feat/x')
   })
 
   it('does not write a ref off while the run may still appear', async () => {
     const got = await sweep({ targets: [{ ref: 'origin/feat/x', sha: BRANCH, at: t(5) }], runsBySha: { [BRANCH]: [] } })
     expect(got.decision).toBe(null)
-    expect(got.noCiRefs).toEqual({})
     // Nothing conclusive cached, so the run that appears a second later IS judged.
     expect(cachedAnswer(got.cache[BRANCH], NOW)).toBe(null)
   })
@@ -540,5 +565,13 @@ describe('sweepTargets', () => {
   it('a green run clears the outage waiver of its workflow', async () => {
     const got = await sweep({ targets: [headTarget], famine: { CI: t(9999) }, runsBySha: { [HEAD]: greenRun(HEAD) } })
     expect(got.famine).toEqual({})
+  })
+
+  it('a red that IS ours clears the waiver clock too, instead of leaving it stale', async () => {
+    // A clock left behind makes the NEXT genuine famine read as an
+    // already-expired waiver and escalate at once — the false-alarm direction.
+    const got = await sweep({ targets: [branchTarget], famine: { CI: t(9999) }, runsBySha: { [BRANCH]: redRun(BRANCH) } })
+    expect(got.famine).toEqual({})
+    expect(got.decision).toContain('origin/feat/x')
   })
 })

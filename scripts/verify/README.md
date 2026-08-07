@@ -576,14 +576,17 @@ happens to look at. Concretely (`ci-status-guard-core.mjs`, pure and pinned in
   refs are the parent's responsibility. The ref is named in the block message.
 - **The list comes from the local push reflog** (`update by push` entries only —
   a fetch is somebody else's branch), never from an API sweep over branches.
-  Three local git calls per turn end, ~30 ms measured, none of them growing with
+  Four local git calls per turn end, ~30 ms measured, none of them growing with
   the number of branches or with repository age.
 - **An unfinished run is a WAIT, not a pass** — and the wait has a ceiling
   (`WAIT_BUDGET_MS`), past which the guard fails open and says so, because a wait
   without a ceiling would trap a session behind a queue that never drains.
-- **The common turn costs nothing.** A concluded green (and a ref no workflow
-  covers at all, remembered per ref) is cached per sha and never asked about
-  again; a red or an unfinished run is re-asked at most once a minute.
+- **The common turn costs nothing.** A concluded green — and a commit no
+  workflow covers, such as a `board` push or a `[skip ci]` rescue commit — is
+  cached **per sha** and never asked about again; a red or an unfinished run is
+  re-asked at most once a minute. Never per REF: a ref written off would silently
+  pass the red of the very next commit on it, and the rescue push is the routine
+  way onto that path.
 - **A deleted ref is dropped** rather than reported forever, and the ntfy alert
   goes out once per (ref, sha).
 - **Fail-open, with the reason STATED.** Offline, rate-limited or unreadable →

@@ -170,8 +170,6 @@ export const WAIT_BUDGET_MS = 30 * 60 * 1000
 /** Minimum spacing between two API calls for the same non-terminal sha, so a
  *  blocked or waiting session re-asks about once a minute, not once a turn. */
 export const RECHECK_MS = 60 * 1000
-/** How long "this ref has no CI at all" is believed before it is re-tested. */
-export const NO_CI_TTL_MS = 7 * 24 * 60 * 60 * 1000
 
 /** `%gD` under `--date=unix`: `refs/remotes/origin/x@{1786125241}`. */
 const REFLOG_LINE = /^(.+)@\{(\d+)\}\t([0-9a-f]{7,40})\t(.*)$/
@@ -234,18 +232,6 @@ export function refTargets({ pushed = [], existingRefs = [], headSha = '', headP
   }
 }
 
-/** Targets left after the per-ref "no workflow covers this branch" memory. */
-export function liveTargets(targets, noCiRefs = {}, now = Date.now(), ttlMs = NO_CI_TTL_MS) {
-  try {
-    return (Array.isArray(targets) ? targets : []).filter((t) => {
-      const since = Number(noCiRefs?.[t?.ref] ?? 0)
-      return !(since > 0 && now - since < ttlMs)
-    })
-  } catch {
-    return Array.isArray(targets) ? targets : []
-  }
-}
-
 /**
  * The cached answer for a sha, or null when GitHub must be asked again.
  * `success`/`nocheck` are terminal — the run for a sha concluded once and for
@@ -272,7 +258,8 @@ export function cachedAnswer(entry, now = Date.now(), recheckMs = RECHECK_MS) {
  *   green    — landed; cache it and never ask again.
  *   wait     — the run has not concluded; NOT a pass.
  *   gave-up  — waited past the budget; fail OPEN with a stated reason.
- *   nocheck  — no run appeared within the grace; no workflow covers this ref.
+ *   nocheck  — no run appeared within the grace; no workflow covers this COMMIT
+ *              (a board push, a worktree branch, a `[skip ci]` rescue commit).
  *   pass     — no run yet, still inside the grace: allow, but do NOT cache, so
  *              the run that appears a second later is still judged next turn.
  */
@@ -299,17 +286,32 @@ export function pruneShaCache(cache, now = Date.now(), windowMs = PUSH_WINDOW_MS
   return out
 }
 
-/** Same for the per-ref "no workflow covers this branch" memory. */
-export function pruneNoCiRefs(refs, now = Date.now(), ttlMs = NO_CI_TTL_MS) {
+/** Keep only the alert bookkeeping of refs that still exist, so a deleted branch
+ *  does not sit in the state file forever. */
+export function pruneNotifiedRefs(notified, existingRefs = []) {
   const out = {}
   try {
-    for (const [ref, since] of Object.entries(refs ?? {})) {
-      if (Number(since) > 0 && now - Number(since) <= ttlMs) out[ref] = Number(since)
-    }
+    const keep = new Set([...existingRefs, 'HEAD'])
+    for (const [ref, key] of Object.entries(notified ?? {})) if (keep.has(ref)) out[ref] = key
   } catch {
     /* fail-open */
   }
   return out
+}
+
+/**
+ * The per-ref alert bookkeeping, migrating the single-sha form the file used
+ * while the guard watched HEAD alone. Keyed 'HEAD' on the way in, so a red that
+ * was already alerted may alert once more under its ref's real name — once ever,
+ * at the upgrade, which is cheaper than dropping the dedup entirely.
+ */
+export function notifiedFromState(state) {
+  try {
+    if (state?.notifiedRefs && typeof state.notifiedRefs === 'object') return { ...state.notifiedRefs }
+    return state?.notifiedSha ? { HEAD: String(state.notifiedSha) } : {}
+  } catch {
+    return {}
+  }
 }
 
 /**
@@ -320,12 +322,11 @@ export function pruneNoCiRefs(refs, now = Date.now(), ttlMs = NO_CI_TTL_MS) {
  * and what fails open — is decided here and covered by Vitest without a network
  * or a repository. The wrapper only supplies the GitHub API and ntfy.
  *
- * @returns {{decision: string|null, cache, noCiRefs, notified, famine, failedOpen: string[], dirty: boolean}}
+ * @returns {{decision: string|null, cache, notified, famine, failedOpen: string[], dirty: boolean}}
  */
 export async function sweepTargets({
   targets = [],
   cache = {},
-  noCiRefs = {},
   notified = {},
   famine = {},
   now = Date.now(),
@@ -334,7 +335,6 @@ export async function sweepTargets({
   notify,
 } = {}) {
   const nextCache = { ...cache }
-  const nextNoCi = { ...noCiRefs }
   const nextNotified = { ...notified }
   const nextFamine = { ...famine }
   const failedOpen = []
@@ -378,16 +378,22 @@ export async function sweepTargets({
       nextCache[target.sha] = { state: 'success', firstSeenAt: at, checkedAt: now }
       continue
     }
-    if (verdict === 'nocheck' || verdict === 'gave-up') {
-      if (verdict === 'gave-up') {
-        failedOpen.push(
-          `${target.ref} ${String(target.sha).slice(0, 7)}: its run never concluded — waited past the budget`,
-        )
-      }
+    if (verdict === 'gave-up') {
+      // Waited past the budget: allow the stop and SAY so — but keep asking. The
+      // answer is cached as unfinished, not as final, so the run that concludes
+      // an hour later is still judged (four-eyes finding 3): the runner famine
+      // that motivated this guard is exactly the case that takes that long.
+      failedOpen.push(`${target.ref} ${String(target.sha).slice(0, 7)}: its run never concluded — waited past the budget`)
+      nextCache[target.sha] = { state: 'pending', firstSeenAt: at, checkedAt: now }
+      continue
+    }
+    if (verdict === 'nocheck') {
+      // No run appeared within the grace, so no workflow covers THIS COMMIT —
+      // a `board` push, a worktree branch, or a rescue commit marked `[skip ci]`.
+      // Remembered per SHA and never per ref: a ref written off for a week would
+      // silently pass the red of the very next commit on it, and a `[skip ci]`
+      // rescue push is the routine way onto that path (four-eyes finding 1).
       nextCache[target.sha] = { state: 'nocheck', firstSeenAt: at, checkedAt: now }
-      // No workflow covers this ref at all (the board branch, a worktree
-      // branch): remember it per REF, so its next push costs nothing either.
-      if (verdict === 'nocheck' && target.ref !== 'HEAD') nextNoCi[target.ref] = now
       continue
     }
     if (verdict === 'wait') {
@@ -406,13 +412,19 @@ export async function sweepTargets({
     // RED. WHERE the fault lies decides the remedy: a red the repository cannot
     // fix must not demand a fixing push (point 526), and EVERY failed run on the
     // sha is judged, not just the one classifyRuns names (four-eyes 06.08.2026).
-    const { classification: chosen, standDown, stillFamished } = await judgeRed({
+    const { classification: chosen, standDown, stillFamished, judgedWorkflows } = await judgeRed({
       sha: target.sha,
       runs,
       classification,
       famine: nextFamine,
       now,
     })
+    // The waiver clock follows the verdict in BOTH directions: a workflow judged
+    // unactionable keeps (or starts) its clock, one judged actionable loses it.
+    // Only adding would leave a stale clock behind, so the next genuine famine
+    // would read as an already-expired waiver and escalate at once — the
+    // false-alarm direction (four-eyes finding 4).
+    for (const name of judgedWorkflows ?? []) delete nextFamine[name]
     for (const [name, since] of Object.entries(stillFamished ?? {})) nextFamine[name] = since
 
     // A stood-down red gets a REPEATED alert, not one ever (four-eyes S1): in a
@@ -437,7 +449,6 @@ export async function sweepTargets({
   return {
     decision: block ?? waiting ?? null,
     cache: nextCache,
-    noCiRefs: nextNoCi,
     notified: nextNotified,
     famine: nextFamine,
     failedOpen,

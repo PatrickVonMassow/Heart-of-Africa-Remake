@@ -31,8 +31,8 @@ import { fileURLToPath } from 'node:url'
 import { readJson, writeJsonAtomic } from './dashboard-state.mjs'
 import {
   failedRuns,
-  liveTargets,
-  pruneNoCiRefs,
+  notifiedFromState,
+  pruneNotifiedRefs,
   pruneShaCache,
   pushedRefsFromReflog,
   refTargets,
@@ -302,8 +302,13 @@ function remoteRefNames() {
 
 /** How many reflog entries the push scan reads. BOUNDED BY CONSTRUCTION, which
  *  is point 387's cost rule: the walk may not grow with repository age, and a
- *  raised timeout is not a fix for a check that walks real git history. */
-const REFLOG_ENTRIES = 500
+ *  raised timeout is not a fix for a check that walks real git history.
+ *  Sized so the CAP cannot bite before the 24 h window does: a commit writes
+ *  three or four entries across HEAD, its branch and the remote ref, and the 500
+ *  newest here span about 26 h — barely over the window, and less than that on a
+ *  busy night with three parallel agents. 2000 keeps a roughly four-fold margin,
+ *  at the same one git process (four-eyes finding 2). */
+const REFLOG_ENTRIES = 2000
 
 /** The push reflog, newest first — ONE git process, no network.
  *  WORST CASE per turn end: 4 git processes (rev-parse, branch -r --contains,
@@ -351,6 +356,9 @@ async function judgeRed(repo, { sha, runs, classification, famine, now }) {
     classification: judged.find((c) => c.actionable !== false) ?? judged[0],
     standDown: judged.every((c) => c.actionable === false),
     stillFamished,
+    // Every workflow this call actually judged, so the sweep can CLEAR the
+    // waiver clock of one that is no longer dying the famine way.
+    judgedWorkflows: judged.map((c) => c.workflowName),
   }
 }
 
@@ -377,35 +385,24 @@ async function main() {
   // workflow dying identically across commit after commit.
   const famine = state.famine && typeof state.famine === 'object' ? { ...state.famine } : {}
   const cache = pruneShaCache(state.shas, now)
-  const noCiRefs = pruneNoCiRefs(state.noCiRefs, now)
-  // Migration: the old file remembered one notified sha for HEAD alone.
-  const notified =
-    state.notifiedRefs && typeof state.notifiedRefs === 'object'
-      ? { ...state.notifiedRefs }
-      : state.notifiedSha
-        ? { HEAD: state.notifiedSha }
-        : {}
+  const existingRefs = remoteRefNames()
+  const notified = pruneNotifiedRefs(notifiedFromState(state), existingRefs)
 
   // EVERY REF THIS REPOSITORY PUSHED, not just HEAD (point 387). The list comes
   // from the local push reflog: a delegated agent's branch push lands in the
   // shared reflog, so the owning session sees the work it is responsible for
   // without asking the API about a single branch it did not push.
-  const targets = liveTargets(
-    refTargets({
-      pushed: pushedRefsFromReflog(pushReflog(), { now }),
-      existingRefs: remoteRefNames(),
-      headSha: head,
-      headPushed: isPushed(head),
-    }),
-    noCiRefs,
-    now,
-  )
+  const targets = refTargets({
+    pushed: pushedRefsFromReflog(pushReflog(), { now }),
+    existingRefs,
+    headSha: head,
+    headPushed: isPushed(head),
+  })
   if (targets.length === 0) return null // nothing pushed → no API call at all
 
   const swept = await sweepTargets({
     targets,
     cache,
-    noCiRefs,
     notified,
     famine,
     now,
@@ -426,7 +423,6 @@ async function main() {
     writeJsonAtomic(STATE, {
       famine: swept.famine,
       shas: swept.cache,
-      noCiRefs: swept.noCiRefs,
       notifiedRefs: swept.notified,
       notifiedAt: now,
     })
