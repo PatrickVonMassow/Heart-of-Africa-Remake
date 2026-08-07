@@ -365,6 +365,17 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   die Ursache **sichtbar**? Führ ihn zuerst aus. Und sag mir, ob schon ein **anderer Weg
   läuft**, der dasselbe trägt — statt den blockierten zu reparieren."
 
+- **Deine Regel ist breiter als ihr Mechanismus.** Der gefährlichste Fall ist nicht die
+  Regel *ohne* Absicherung — die fällt auf. Es ist die Regel *mit* einer, die weniger
+  abdeckt, als der Satz behauptet: Sie existiert, ist getestet, feuert und wird geglaubt,
+  greift aber auf einer engeren Menge. Zwischen dem Satz in deiner Regeldatei und dem
+  Muster im Code steht niemand. Solche Lücken *bemerkt* man nicht, man zählt sie auf.
+  → *Prompt:* „Nimm dir die Regel und den Code, der sie durchsetzt, **nebeneinander**:
+  Welche Fälle nennt der Satz, die das Muster nicht trifft? Zieh **den Code auf den Satz**
+  nach, nie umgekehrt. Und bau eine Aufzählung, die beide Seiten **regelmäßig** gegeneinander
+  hält — ein Durchgang **ohne Befund ist ein gescheiterter Durchgang**, denn dann hast du
+  Behauptungen gegen Behauptungen geprüft statt gegen den Code."
+
 ---
 
 ## Drei Meta-Regeln, die alles zusammenhalten
@@ -405,4 +416,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 Wenn du diese eine Nachricht an den Anfang stellst, hast du 80 % der Lehren dieses
 Projekts eingebaut, bevor die erste Zeile Code entsteht.
 
-<!-- GUIDE-FINGERPRINT: 243d5b15bb7be3305145d6e69ac14afa1ac14cf6ba9d13f839be90ba51097c7b -->
+<!-- GUIDE-FINGERPRINT: ab50e3cdfdcb417132adb0fc5e7468e46f0328cac7dbc61a94d0403d59a1c908 -->
