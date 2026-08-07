@@ -72,10 +72,17 @@ try {
 // card added earlier in the same turn — the remedy performed, and the block
 // still reporting that the board says nothing. Best effort: a failure leaves the
 // guard exactly as it was.
-try {
-  seedDecisionCardBaseline(sid)
-} catch {
-  // best effort — the reminder text below is the payload
+//
+// ONLY THE OWNER SEEDS IT. The baseline file is SHARED and keyed by session, so
+// a non-owner's prompt would stamp its own id over the owner's — whose Stop then
+// reads a mismatch, treats the baseline as absent and swallows the very card the
+// turn added, which is the defect this seeding exists to fix.
+if (!standDown) {
+  try {
+    seedDecisionCardBaseline(sid)
+  } catch {
+    // best effort — the reminder text below is the payload
+  }
 }
 
 // The chat-timestamp rule is NOT stated here (point 440). It used to be stated
