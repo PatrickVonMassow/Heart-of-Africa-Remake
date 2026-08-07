@@ -14,6 +14,7 @@ import { heldByOtherLiveOwner, withdrawHandover } from './batch-singleton.mjs'
 // The injected board obligation, in a pure module so its size is measurable and
 // its content testable (point 436).
 import { promptInjectionText } from './dashboard-reminder-core.mjs'
+import { seedDecisionCardBaseline } from './decision-card-guard.mjs'
 
 // Hard singleton (24.07.2026): a session that does not own the live batch lock
 // has NO dashboard/focus duty — arming the pivot check or issuing the board
@@ -64,6 +65,17 @@ try {
   mergeState({ turnStartedAtBySession: { ...((readJson(STATE_PATH) ?? {}).turnStartedAtBySession ?? {}), [sid]: Date.now() } })
 } catch {
   // best effort
+}
+
+// The decision-card guard's baseline belongs HERE, at the turn's start (point
+// 437 E). Taken at that guard's first Stop evaluation instead, it swallowed a
+// card added earlier in the same turn — the remedy performed, and the block
+// still reporting that the board says nothing. Best effort: a failure leaves the
+// guard exactly as it was.
+try {
+  seedDecisionCardBaseline(sid)
+} catch {
+  // best effort — the reminder text below is the payload
 }
 
 // The chat-timestamp rule is NOT stated here (point 440). It used to be stated
