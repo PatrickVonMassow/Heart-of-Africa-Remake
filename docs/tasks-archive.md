@@ -14793,3 +14793,180 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   (`scripts/verify/polish.mjs`, BOTH backends, screenshot): the player walked to the
   eaves of a hut in a village AND in a port sees the roof from below as a solid
   surface, with no sky wedge and no view into the interior; no console errors.
+
+- [x] 351. THE VILLAGE CHILDREN PLAY A GAME OF TAG (user 25.07.2026). They run wild
+  through the settlement, around the huts and past the fire. One of them is IT and
+  chases the others; whoever is caught becomes the new IT and must catch someone else.
+  Any number plays — one chaser and every other child in the group. That is what the
+  §19.10 village life is for: figures visibly doing something, not following a path.
+  A PATH IS NOT A GAME, and this is the design point the build must not undo: any fixed
+  route — a ring around the well, an orbit at a set radius, a tour of waypoints — is
+  periodic, and the eye recognises it within two passes. A chase is not periodic because
+  its target REACTS. Do not implement it as a path with a moving centre.
+  THE CHASE. The chaser continuously targets the NEAREST catchable runner, so it switches
+  opportunistically when someone crosses its path — the way children really play, and the
+  difference between a game and one long pursuit of a distant child. Runners steer away
+  from the chaser, preferring open ground. On a catch, within a small calibratable
+  distance, the caught child becomes the chaser.
+  STAMINA IS WHAT MAKES IT LEGIBLE, and it is the heart of the mechanic rather than a
+  flourish. Every child carries a sprint reserve that drains while running flat out and
+  refills at a trot or standing. A runner who has spent it slows and is run down — so a
+  catch happens for a reason the viewer can SEE, instead of the round being cut short
+  from outside.
+  THE TOP SPEED FADES, IT DOES NOT SNAP. The pace a child can hold is a CONTINUOUS
+  function of what is left in its reserve — full sprint while fresh, tapering as the
+  reserve empties, reaching the floor pace only at empty. A child therefore visibly runs
+  out of steam over seconds, the way a real one does, and the moment of catching up is a
+  gradual closing rather than a step change nobody can miss reading as a switch.
+  KEEP THE TWO MECHANISMS APART, because collapsing them is the obvious mistake: the
+  CURVE governs what a child CAN do, the two thresholds govern what it CHOOSES to do
+  (press on, or break off and recover). By the time the low threshold sends it into
+  recovery it is already visibly slower — the decision confirms what the picture has
+  been showing, instead of announcing it.
+  THE SPRINT IS SPENT DELIBERATELY, NEVER CONTINUOUSLY. A child that always runs at
+  whatever its current maximum is can never recover, and a chaser who empties its
+  reserve once would stay a hopeless trotter for the rest of the round — the game would
+  be over without ending. So both roles PACE themselves: a runner sprints only while the
+  chaser is inside a pressure distance and trots when the gap is comfortable; a chaser
+  sprints only while it is actually closing on a target within reach, and cruises
+  otherwise. Sprinting is a decision, not the default.
+  AND RECOVERY IS ITS OWN INTENTION. Below a low reserve a child BREAKS OFF and moves at
+  a deliberate recovery pace — slow enough to actually refill, which the pressure rule
+  above must not override — until its reserve passes a higher resume threshold. Two
+  thresholds, not one: a single boundary would flicker between pressing and recovering
+  frame by frame, the same hysteresis the animals' dodge and guard states already use.
+  For the chaser this reads as the most human moment of the whole game: it gives up the
+  pursuit, trots and puffs, then picks a fresh victim and bursts again.
+  Speeds, drain and recovery rates, the pressure distance and both thresholds are
+  calibratable (`balance.villageLife.*`, debug-editable). Two shaping rules: a floor
+  below which the pace never falls while a chase runs — a child frozen mid-game reads as
+  a bug, a trotting one reads as winded — and per-child variation in reserve and
+  recovery, so the group never tires in unison.
+  HOW IT READS, given the figures the game has: point 479 gave the running children
+  legs with a distance-driven gait, so the sprint reads through LEG CADENCE as well as
+  through SPEED and POSTURE — a forward lean while sprinting, upright and near-still
+  while recovering. All three carry it together; none of them alone is the signal, and
+  the posture reading stays load-bearing because it survives at any distance the cadence
+  no longer resolves at.
+  USE THE WILDLIFE STEERING, NOT THE WALKER SLIDE. The village walkers resolve obstacles
+  by sliding along a collider and stopping — which is exactly what reads as bumping into
+  things. `deflectedStep` (`src/scenes/travel/wildlifeBehavior.ts`, used by every fleeing
+  animal) probes around the heading and CONTINUES the run past an obstacle. A chase wants
+  that one, and reusing it is why this behaviour is small rather than large.
+  FOUR FAILURE MODES THE BUILD MUST CLOSE, each a lesson this project has already paid
+  for elsewhere:
+  (1) INSTANT RE-TAG. Without a guard the two children swap the role every frame and
+  stand jittering together — and with several players it would keep the game visually a
+  two-child affair while the others idle. The new chaser owes the freshly-tagged child a
+  short calibratable immunity and turns away before resuming: the same hysteresis that
+  keeps the animals' dodge and guard states from flapping.
+  (2) STICKING ON GEOMETRY. A chase pinned on a hut corner is worse than the bumping it
+  replaces; the deflected step plus a nudge keeps them running.
+  (3) LEAVING THE PLAY AREA. Children stay inside the walkable settlement, out of the
+  fire ring, and never inside a collider — playing must not become a way to stand where a
+  walker may not.
+  (4) A GAME THAT NEVER RESOLVES. Stamina is what normally ends a round; a hard cap
+  remains only as the backstop for the §19.8 house rule that nothing runs forever, after
+  which the group breaks off into ordinary idling for a while before starting again.
+  KEEP UNCHANGED: the adults' errands, and the point-155 guarantees (an errand target
+  needs a clear standing circle and an escape direction; a pinned walker is nudged free
+  after its window).
+  A BY-PRODUCT worth noting in the commit: pursue-and-evade with stamina is reusable — a
+  goat bolting from someone, a dog in a port — so keep it a helper rather than burying it
+  in the children.
+  BUILT UNDER FOUR EYES (user 25.07.2026): the PLAN is reviewed by the second model
+  before any code is written, and the IMPLEMENTATION is reviewed after. Several
+  interacting continuous quantities (reserve, curve, two thresholds, pressure distance,
+  immunity window) plus a role that moves between figures is precisely the shape in
+  which rare states hide.
+  THE TEST SCENARIOS ARE DESIGNED TWICE, INDEPENDENTLY, AND THEN UNITED (user
+  25.07.2026) — not written by one model and reviewed by the other. A reviewer handed a
+  finished list checks THAT LIST; it anchors on what it is shown and produces far less
+  than it would have from a blank page. So:
+  (a) Each model designs its OWN complete set of test scenarios from the same inputs —
+  this specification and the code anchors — and each set is written to its author's own
+  standard of completeness, as if it were the only one.
+  (b) Neither sees the other's set, or any hint of it, until both are finished. A set
+  produced after glimpsing the other is not an independent set and must be discarded.
+  (c) The two sets are then merged into a UNION with duplicates removed. Deduplication
+  is by MEANING, not by wording — two scenarios describing the same state in different
+  words are one — and where it is genuinely unclear whether one subsumes the other, BOTH
+  are kept. Erring toward keeping is cheap; erring toward merging loses exactly the rare
+  case this method exists to find.
+  (d) A scenario that only ONE model thought of is the most valuable item in the whole
+  set. Those are marked as such in the merged list rather than buried, and none may be
+  dropped for being unusual — being unusual is the point.
+  (e) The scenarios in the union are then implemented as the tests.
+  THE EDGE CASES BELOW ARE A FLOOR, NOT THE SET. They are already known, so both models
+  start from them — but a set that merely restates them has added nothing, and each set
+  is judged by what it contributes BEYOND this floor: a child caught WHILE
+  recovering; a catch landing exactly on the immunity boundary; two catches resolving in
+  the same frame; the group shrinking to two, and to ONE — the transhumant villages of
+  point 142 thin seasonally, so the player count genuinely changes with the calendar and
+  a lone child must fall back to ordinary idling rather than chase itself; a runner
+  cornered between huts with the chaser closing; the player standing in the path or
+  walking through the game; a chase running while the season, the rain or the day
+  changes underneath it; and the scene being left mid-chase.
+  ARM AN INVARIANT, do not rely on tests alone. The dev assert channel (point 207(i),
+  `devAssert`) turns every session — including the user's own play — into a detector for
+  exactly the rare cases tests miss. Assert continuously: exactly ONE chaser exists in a
+  playing group, no child stands inside a collider or outside the walkable radius, the
+  reserve stays within its bounds, no child holds the chaser role past the resolve cap,
+  and no child is stationary below the floor pace while a chase is running. A violation
+  reports itself in the console with the state that produced it, so a debug report names
+  the situation instead of describing a feeling.
+  VERIFIABLE: pure — the reserve drains only at sprint pace and refills below it, never
+  leaves its bounds, and the pace never drops below the floor while a chase runs; the
+  speed cap is MONOTONE in the reserve and CONTINUOUS — full sprint at full, the floor at
+  empty, and no jump between neighbouring reserve levels larger than a bounded step, so a
+  snap cannot creep back in; a
+  spent runner is strictly slower than a fresh chaser (so a catch is reachable) while a
+  fresh runner is strictly faster (so it is not immediate); a child driven to empty
+  RECOVERS: simulated forward under constant pressure it drops to its recovery pace,
+  its reserve rises past the resume threshold and it sprints again — the exhausted-
+  forever case is the regression witness, and the two thresholds are boundary-tested so
+  no state flickers between them; the role swap grants immunity
+  for its window and cannot re-tag inside it (boundary-exact); the chaser's target is the
+  nearest catchable runner and never the immune one; a child's step never enters a
+  collider or leaves the walkable radius. Live (`scripts/verify/polish.mjs`, BOTH
+  backends, screenshot): over a sampled interval the children's paths are NOT periodic —
+  their headings cover a wide spread rather than circling — the distance between chaser
+  and nearest runner rises and falls repeatedly, the chaser's identity changes at least
+  once, and at least one child is seen slowing to recover; no child is pinned against
+  geometry and none stands still for the whole interval.
+  DELIVERED under point 480, which carried this specification forward unchanged; this
+  entry is its bookkeeping close.
+
+- [x] 352. THE SETTLEMENT EDGE PAINTED ON THE GROUND (user 25.07.2026; design.md §2.6
+  states the target). In the first-person view the boundary is invisible until crossing
+  it swaps the scene. Show it in the ground itself: the swept, trodden earth of the
+  settlement giving way to open land across a soft band.
+  IT MUST NOT LIE. The band sits at the SAME radius the leave check uses — `layout.radius`
+  in `src/scenes/place/PlaceScene.tsx` (`if (Math.hypot(p.x, p.z) > layout.radius)`) —
+  read from that one source, never a second constant that can drift from it. A visible
+  edge in the wrong place is worse than none, because the player will trust it.
+  QUIET, AND OF THE WORLD. A tonal and textural change in the ground — swept earth
+  inside, open ground outside — not a drawn ring, not a glow, nothing a traveller of
+  1890 would not have seen underfoot. The outline WANDERS slightly instead of describing
+  a machined circle: reuse the domain-warp the biome borders already use (§3.3) rather
+  than inventing a second noise. The wander is bounded so the visible band never departs
+  from the true radius by more than a small tolerance — it may look natural, it may not
+  mislead.
+  EVERY PLACE KIND: village, port and the Giza monument site. Keyed on `PLACE_KINDS`
+  totality (point 335) so a fourth kind cannot compile without deciding about it.
+  SEASON-PROOF: the ground bleaches and greens with the season through the baked seasonUV
+  field (§19.13), so the edge must stay readable at BOTH ends of the year rather than
+  vanishing into the dry-season straw.
+  NO QUALITY KEY, and the reason belongs in the commit: this is a term in the ground
+  material that is already drawn, not a pass — it has no measurable cost, like the sun
+  model of point 343 and unlike the effects that earn a `QUALITY_PRESETS` entry.
+  VERIFIABLE: pure — the band's radius derives from `layout.radius` for every place in
+  the roster (change the layout radius and the band follows), the warp stays within its
+  bounded tolerance at every sampled angle, and the kind sweep covers all `PLACE_KINDS`.
+  Live (`scripts/verify/polish.mjs`, BOTH backends, screenshots): standing inside a
+  village near the edge, a ground crop AT the boundary differs measurably in pixels from
+  a crop well inside and from one outside; the same holds in a port and at the monument
+  site, and in both a dry and a wet month; walking straight over the visible band is
+  the frame in which the place is left — the truth check; no console errors.
+  DELIVERED under point 488, which carried this specification forward unchanged; this
+  entry is its bookkeeping close.
