@@ -580,7 +580,10 @@ happens to look at. Concretely (`ci-status-guard-core.mjs`, pure and pinned in
   the number of branches or with repository age.
 - **An unfinished run is a WAIT, not a pass** — and the wait has a ceiling
   (`WAIT_BUDGET_MS`), past which the guard fails open and says so, because a wait
-  without a ceiling would trap a session behind a queue that never drains.
+  without a ceiling would trap a session behind a queue that never drains. It
+  keeps asking after the ceiling, though: a run that concludes red an hour later
+  — the runner-famine shape — is still judged. The ceiling outranks the answer
+  cache, so a wait recorded a minute ago cannot hold the turn past it.
 - **The common turn costs nothing.** A concluded green — and a commit no
   workflow covers, such as a `board` push or a `[skip ci]` rescue commit — is
   cached **per sha** and never asked about again; a red or an unfinished run is
