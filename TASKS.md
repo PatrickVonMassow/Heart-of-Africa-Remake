@@ -2450,18 +2450,23 @@ it is appended.
   delegating the reading-heavy part of a point so the parent never carries the files at all
   (the brief does this for specs, not for source), or (c) an explicit context budget per
   point after which the session hands over mid-point with a written handoff.
-  AND THE MEASURING TOOL MUST FIRST FIND THE TRANSCRIPTS (07.08.2026). `measure-context-cost.mjs`
-  hard-codes its transcript folder to the Windows-derived slug `c--Users-Patri-Documents-Developing-hoa`;
-  a session running in the Linux container writes to `~/.claude/projects/-workspace-hoa` instead,
-  where 76 transcripts sit today. The script does not notice the missing directory — it reports
-  0 turns, `n/a` for every figure, and exits 0, which reads as a measurement rather than as a
-  miss. So it derives its source directory from the repo path (`scripts/repo-paths.mjs` already
-  does that kind of work) or takes a candidate list, and FAILS LOUD when none of them holds a
-  transcript. Vitest on the pure resolver: a candidate list where one directory holds
-  transcripts resolves to it, none holding any throws.
+  THE MEASURING TOOL FINDS ITS OWN TRANSCRIPTS (BUILT 07.08.2026). `measure-context-cost.mjs`
+  derives its source directory from the repo path over a candidate list instead of a
+  hard-coded host slug, and FAILS LOUD when none of the candidates holds a transcript — the
+  silent miss it used to report as `0 turns` and `n/a` for every figure, exiting 0, read as a
+  measurement rather than as a miss. `.claude/boundary.log` resolves the same way, so the tool
+  also runs from a worktree. A pure resolver carries both, swept by Vitest: a candidate list
+  where one directory holds transcripts resolves to it, none holding any throws.
+  THE SCOPE OF THE COUNT IS STILL TOP-LEVEL ONLY, and that must be settled before the closing
+  measurement. `readTurns` reads a folder's top-level `*.jsonl`; on the container host 47 of
+  164 transcripts are top-level and the rest are DELEGATED-AGENT transcripts under
+  `<session>/subagents/`. Their spend bills against the same quota, so today's figure is a
+  FLOOR, not the rate. The measurement therefore reports BOTH scopes side by side — top-level
+  only, which stays comparable with the 30.07.2026 anchor, and the full count including
+  subagents, which is the honest total — and the point's verdict is read off the full count.
   VERIFIABLE: `node scripts/measure-context-cost.mjs` reports the rate for a full day after
-  07.08.2026 from whichever host the batch ran on; the point closes on that figure, not on the
-  mechanisms running.
+  07.08.2026 from whichever host the batch ran on, in both scopes; the point closes on that
+  figure, not on the mechanisms running.
 
 - [ ] 379. ABU SIMBEL BECOMES A WALKABLE SITE (user 27.07.2026; a FEATURE, and the user's
   own instruction is that the open DEFECTS come first — it waits behind them). The world carries
