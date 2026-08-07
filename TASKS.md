@@ -2092,36 +2092,6 @@ it is appended.
   than an uncovered burning fire, and the same village in dry weather is unchanged from
   today.
 
-- [ ] 349. THE ROOF CLIPS THE CAMERA UNDER THE EAVES (user 25.07.2026, screenshot from
-  the Zulu village: standing under a hut's overhanging roof, the near plane cuts into
-  the roof — the underside fills the view with a hard horizontal edge and open sky
-  above it). The §2.6 clearance rule (§7.1 point 16) was written for WALLS: "pressing
-  against a building must never show its inside", and the collider is the wall body.
-  The OVERHANG is the gap — it reaches out over ground the player may legitimately
-  stand on, and at the 1.5 m eye height the roof underside can sit below the camera's
-  near plane.
-  DO NOT FIX IT BY FENCING THE EAVES OFF. Standing under an overhang out of the rain is
-  exactly what an eave is for, and point 348 may well want the inhabitants there.
-  TARGET — the same kind of invariant the walls already have, extended upward: over
-  EVERY spot the player can stand, the lowest roof surface above him clears the eye
-  height plus the camera's near plane plus a margin. Where a roof's outer rim is lower
-  than that, either the rim is raised or the collider is extended so that the low strip
-  is not standable — decided per building type, and the roofs that read right today
-  must not be reshaped for it.
-  CHECK THE SURFACE ITSELF WHILE THERE: a roof seen from below must be a real surface,
-  not a back face one can see through. If any roof is single-sided, give it an inner
-  face or render it double-sided.
-  ANCHORS: the hut/roof builders and the collider set in `src/scenes/place/` (the
-  layout and collision modules that already pin door reachability and window
-  clearance), and the eye height / near plane in the first-person camera setup.
-  VERIFIABLE: pure (`src/scenes/place/layout.test.ts` or the collision test beside it) —
-  for every place, every building type and several seeds, the minimum roof-underside
-  height over the standable area is at least eye height + near plane + margin; a
-  deliberately lowered rim FAILS the test (the regression witness). Live
-  (`scripts/verify/polish.mjs`, BOTH backends, screenshot): the player walked to the
-  eaves of a hut in a village AND in a port sees the roof from below as a solid
-  surface, with no sky wedge and no view into the interior; no console errors.
-
 - [ ] 350. THE KNEELING VILLAGER IS A SQUASHED VILLAGER (user 25.07.2026, deployed
   build: a figure in the Zulu village alternates between normal and visibly FLATTENED).
   ROOT CAUSE, already located: `Figure` in `src/scenes/place/PlaceLife.tsx` fakes
