@@ -217,9 +217,9 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   Widersprüchen, an Regeln ohne Absicherung und an solchen, deren Absicherung enger greift
   als ihr Satz — sie feuert, wird geglaubt und deckt nur einen Teil.
   → *Prompt:* „Etabliere einen Mechanismus, der den Bestand periodisch durchsieht — auf Aktualität,
-  Dopplung, Widerspruch und **Wirkungslosigkeit**. Leg Regelsatz und Code **nebeneinander**: Welche
-  Fälle nennt der Satz, die das Muster nicht trifft? Zieh **den Code auf den Satz** nach, nie
-  umgekehrt. Und jeden Wächter fragst du: Hat er je ausgelöst? Kann er überhaupt?" *(einmalig hoch)*
+  Dopplung, Widerspruch und **Wirkungslosigkeit**. Schreib zu **jeder** Regel, was sie misst, und leg
+  Satz und Code **nebeneinander**: Welche Fälle nennt der Satz, die das Muster nicht trifft? Zieh
+  **den Code auf den Satz**, nie umgekehrt. Und jeden Wächter: Je ausgelöst? Überhaupt möglich?"
 
 - **Der rote Test klagt den Falschen an.** Er täuscht gefährlicher als ein grüner:
   Prüfungen veralten von selbst und klagen gesunden Code an.
