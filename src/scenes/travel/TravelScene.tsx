@@ -119,6 +119,7 @@ import { RegionBorders } from './RegionBorders'
 import { Wildlife } from './Wildlife'
 import { collidableAnimalsNear } from './wildlifeCollision'
 import { CSMShadowNode } from 'three/addons/csm/CSMShadowNode.js'
+import { releaseCascadeShadowMaps, type CascadedShadowNode } from '../../render/shadowRelease'
 
 const CHUNK_SIZE = 24 // world units
 const CHUNK_RADIUS = 6 // chunks kept around the player in each direction (terrain LOD)
@@ -877,7 +878,11 @@ class StableCSMShadowNode extends CSMShadowNode {
 }
 
 const SUN_BASE_INTENSITY = 2.4
-let sunSingleton: { light: THREE.DirectionalLight; target: THREE.Object3D } | null = null
+let sunSingleton: {
+  light: THREE.DirectionalLight
+  target: THREE.Object3D
+  csm: StableCSMShadowNode
+} | null = null
 function getSun() {
   if (sunSingleton) return sunSingleton
   const light = new THREE.DirectionalLight('#fff1da', SUN_BASE_INTENSITY)
@@ -891,12 +896,26 @@ function getSun() {
   const csm = new StableCSMShadowNode(light, { cascades: 3, maxFar: 240, mode: 'practical' })
   csm.fade = true
   ;(light.shadow as unknown as { shadowNode: unknown }).shadowNode = csm
-  sunSingleton = { light, target }
+  sunSingleton = { light, target, csm }
   return sunSingleton
 }
 
 function Sun() {
-  const { light, target } = getSun()
+  const { light, target, csm } = getSun()
+
+  // Give the cascade shadow maps back when the bird's-eye view is left (point
+  // 546). The light and its CSM node are singletons, so three never disposes
+  // them and their three render targets stayed resident for the whole session
+  // — every settlement visit after the first bird's-eye frame then read three
+  // render targets above the same settlement seen before it, which is what the
+  // render-resource-leak invariant reported. Only the targets go; the node
+  // graph is untouched, so the point-96 re-link does not come back, and three
+  // re-creates them on the first bird's-eye frame after the settlement.
+  useEffect(() => {
+    return () => {
+      releaseCascadeShadowMaps(csm as unknown as CascadedShadowNode)
+    }
+  }, [csm])
   // Sun shadow-map resolution follows the graphics level (design.md §21, point
   // 276): low 1024, medium 2048, high 4096 — and the touch/debug half override
   // halves it again. On the low level a very weak GPU can also tune shadows off.
