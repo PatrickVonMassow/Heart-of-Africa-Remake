@@ -156,3 +156,84 @@ export function derivedRate({ ratio, anchorRatePerHour = 1.25, fits = 0.6 } = {}
   const rate = +(anchorRatePerHour * ratio).toFixed(3)
   return { rate, underCeiling: rate <= fits }
 }
+
+// ---------------------------------------------------------------------------
+// WHERE THE TRANSCRIPTS ARE (07.08.2026). The folder used to be a hard-coded
+// Windows-derived slug, and on the Linux container that directory simply does not
+// exist: the script found no file, reported 0 turns and `n/a` for every figure, and
+// exited 0 — a MISS that reads exactly like a measurement. So the folder is derived
+// from the checkout instead, and a run that finds no transcript anywhere FAILS LOUD
+// rather than printing an empty table.
+//
+// Both halves are pure: `transcriptCandidates` is string work, and
+// `resolveTranscriptDir` takes the "does this hold a transcript?" probe as an
+// argument, so the filesystem stays in the wrapper.
+
+/**
+ * Claude Code's per-project folder name: every non-alphanumeric character of the
+ * project path becomes a dash and a leading drive letter is lowercased
+ * (`C:\Users\…\hoa` → `c--Users-…-hoa`, `/workspace/hoa` → `-workspace-hoa`). PURE.
+ */
+export function projectSlug(path = '') {
+  const munged = String(path).replace(/[^A-Za-z0-9]/g, '-')
+  return munged.charAt(0).toLowerCase() + munged.slice(1)
+}
+
+/**
+ * The main checkout behind a path that may be a git worktree of it — a worktree lives
+ * at `<repo>/.claude/worktrees/<name>`, and its session transcripts are written under
+ * the MAIN checkout's project key. Null when the path is not a worktree. PURE.
+ *
+ * The same derivation trap once rewrote the retrospective as empty from a worktree
+ * (scripts/retro-sources.mjs carries that note); here it would silently halve the
+ * measured spend.
+ */
+export function mainCheckoutOf(root = '') {
+  const m = String(root).replace(/\\/g, '/').match(/^(.*?)\/\.claude\/worktrees\/[^/]+\/?$/)
+  return m ? m[1] : null
+}
+
+/** The historical hard-coded folder, kept as a LAST candidate so a run on the Windows
+ *  host from a differently-placed checkout still finds its transcripts. */
+export const LEGACY_TRANSCRIPT_SLUG = 'c--Users-Patri-Documents-Developing-hoa'
+
+/**
+ * Transcript-folder candidates for a checkout, most specific first. PURE — the path
+ * `join` is the caller's, so this needs no path module and no filesystem.
+ *
+ * The slug is offered with AND without a trailing dash because the harness does not
+ * strip one: a repo root carrying a trailing separator produces `-workspace-hoa-`,
+ * and that directory really does exist next to `-workspace-hoa` on this machine.
+ * Which of the two holds transcripts is decided by looking, not by guessing.
+ */
+export function transcriptCandidates({ repoRoot = '', projectsDir = '', join = (a, b) => `${a}/${b}` } = {}) {
+  const slugs = []
+  for (const root of [repoRoot, mainCheckoutOf(repoRoot)]) {
+    if (!root) continue
+    const slug = projectSlug(root)
+    slugs.push(slug)
+    if (slug.endsWith('-')) slugs.push(slug.replace(/-+$/, ''))
+  }
+  slugs.push(LEGACY_TRANSCRIPT_SLUG)
+  const seen = new Set()
+  return slugs.filter((s) => s && !seen.has(s) && seen.add(s)).map((s) => join(projectsDir, s))
+}
+
+/**
+ * The first candidate that actually HOLDS a transcript, or a throw naming every path
+ * tried. PURE: the `hasTranscripts` probe is injected.
+ *
+ * Existence is deliberately NOT the test. An empty, stale project folder exists on
+ * this machine, and accepting it would reproduce the very failure this replaces — a
+ * silent zero presented as a result.
+ */
+export function resolveTranscriptDir(candidates = [], hasTranscripts = () => false) {
+  for (const dir of candidates) {
+    if (dir && hasTranscripts(dir)) return dir
+  }
+  throw new Error(
+    'measure-context-cost: no transcripts found. Tried:\n' +
+      (candidates.length ? candidates.map((d) => `  ${d}`).join('\n') : '  (no candidates)') +
+      '\nPoint the tool at the right folder with MEASURE_TRANSCRIPTS_DIR=<dir>.',
+  )
+}
