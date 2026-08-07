@@ -105,8 +105,22 @@ export const KNOWN_UNTESTED = new Set([
 // input at all.
 // ---------------------------------------------------------------------------
 
-/** A `scripts/<name>.mjs` path token as a hook command spells it, prefix included. */
-const SCRIPT_REF_RE = /[^\s"']*scripts[/\\][A-Za-z0-9._-]+\.mjs/g
+/**
+ * A `scripts/…/<name>.mjs` path token as a hook command spells it, prefix
+ * included. NESTED on purpose: a one-level pattern read `scripts/verify/x.mjs`
+ * as no script reference at all and cleared it — a false clearance is the one
+ * failure this check may not have (four-eyes review 07.08.2026).
+ */
+const SCRIPT_REF_RE = /[^\s"']*scripts[/\\](?:[A-Za-z0-9._-]+[/\\])*[A-Za-z0-9._-]+\.mjs/g
+
+/**
+ * A script path the node bootstrap resolves against the env var itself, i.e. the
+ * one place a relative-LOOKING string is genuinely anchored. Matched narrowly
+ * and per occurrence: a whole-command substring test cleared every other ref on
+ * the line too, so `node -e "<bootstrap>" && node scripts/b-guard.mjs` passed
+ * with its second guard dead.
+ */
+const BOOTSTRAP_REF_RE = /process\.env\.CLAUDE_PROJECT_DIR[^\n]{0,40}?['"]((?:[^\s"']*)scripts[/\\](?:[A-Za-z0-9._-]+[/\\])*[A-Za-z0-9._-]+\.mjs)['"]/g
 
 /** Every script path a hook command names, with the prefix that anchors it (or does not). */
 export function scriptRefsInCommand(command) {
@@ -122,35 +136,48 @@ export function scriptRefsInCommand(command) {
  */
 export function refAnchoring(ref) {
   const text = String(ref ?? '')
-  if (/^(\$\{?CLAUDE_PROJECT_DIR\}?|%CLAUDE_PROJECT_DIR%)[/\\]/.test(text)) return 'project-dir'
+  // The braces must MATCH: `"${CLAUDE_PROJECT_DIR/scripts/x.mjs"` is a bad
+  // substitution at runtime, and an independently optional `{`/`}` cleared it.
+  if (/^(\$CLAUDE_PROJECT_DIR|\$\{CLAUDE_PROJECT_DIR\}|%CLAUDE_PROJECT_DIR%)[/\\]/.test(text)) return 'project-dir'
   if (/^([A-Za-z]:[/\\]|[/\\])/.test(text)) return 'absolute'
   return 'relative'
 }
 
 /**
- * Judge a whole command. A command that resolves the project directory INSIDE
- * node (`process.env.CLAUDE_PROJECT_DIR`) is anchored whatever its literal path
- * looks like — that is the shell-agnostic bootstrap kept in reserve for a shell
- * that does not expand `$VAR`, and it must not be accused for the relative
- * string it necessarily contains.
+ * Judge a whole command, ref by ref. A path the node bootstrap resolves from
+ * `process.env.CLAUDE_PROJECT_DIR` is anchored however relative it looks — that
+ * is the shell-agnostic form kept in reserve for a shell that does not expand
+ * `$VAR`, and it must not be accused for the string it necessarily contains.
+ * Every OTHER ref on the same line is still judged on its own.
  */
 export function commandAnchoring(command) {
   const text = String(command ?? '')
-  const refs = scriptRefsInCommand(text)
-  if (refs.length === 0) return { refs: [], relative: [], anchored: true, kind: 'no-script' }
-  if (text.includes('process.env.CLAUDE_PROJECT_DIR')) {
-    return { refs, relative: [], anchored: true, kind: 'bootstrap' }
-  }
-  const kinds = refs.map((r) => refAnchoring(r))
-  const relative = refs.filter((_, i) => kinds[i] === 'relative')
-  return { refs, relative, anchored: relative.length === 0, kind: kinds[0] }
+  const found = [...text.matchAll(SCRIPT_REF_RE)].map((m) => ({ ref: m[0], at: m.index }))
+  if (found.length === 0) return { refs: [], relative: [], anchored: true, kind: 'no-script' }
+
+  const bootstrapped = new Set()
+  for (const m of text.matchAll(BOOTSTRAP_REF_RE)) bootstrapped.add(m.index + m[0].indexOf(m[1]))
+
+  const kinds = found.map((f) => (bootstrapped.has(f.at) ? 'bootstrap' : refAnchoring(f.ref)))
+  const relative = found.filter((_, i) => kinds[i] === 'relative').map((f) => f.ref)
+  return { refs: found.map((f) => f.ref), relative, anchored: relative.length === 0, kind: kinds[0] }
 }
 
-/** Rewrite a relatively wired command into the anchored form, for the rollout. */
+/**
+ * Rewrite a relatively wired command into the anchored form, for the rollout.
+ * A ref that already sits inside quotes keeps them — wrapping it again produced
+ * `""$CLAUDE_PROJECT_DIR/…""`, an unquoted expansion between two empty strings
+ * that breaks on any path with a space.
+ */
 export function anchorCommand(command) {
-  return String(command ?? '').replace(SCRIPT_REF_RE, (ref) =>
-    refAnchoring(ref) === 'relative' ? `"$CLAUDE_PROJECT_DIR/${ref.replace(/\\/g, '/')}"` : ref,
-  )
+  const text = String(command ?? '')
+  const bootstrapped = new Set()
+  for (const m of text.matchAll(BOOTSTRAP_REF_RE)) bootstrapped.add(m.index + m[0].indexOf(m[1]))
+  return text.replace(SCRIPT_REF_RE, (ref, at) => {
+    if (bootstrapped.has(at) || refAnchoring(ref) !== 'relative') return ref
+    const anchored = `$CLAUDE_PROJECT_DIR/${ref.replace(/\\/g, '/')}`
+    return /['"]/.test(text.charAt(at - 1)) ? anchored : `"${anchored}"`
+  })
 }
 
 /**

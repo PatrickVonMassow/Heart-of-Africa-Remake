@@ -157,10 +157,15 @@ if (isMainModule(import.meta.url)) {
     const { ok, violations, report } = auditGuardHealth(gathered.inputs)
 
     if (status) {
+      // A dimension that could not be MEASURED is named, never folded into the
+      // all-clear: an unparsable settings file leaves the anchoring unjudged,
+      // and an OK line that hides that is the false clean this guard exists to
+      // prevent elsewhere (four-eyes review 07.08.2026).
+      const unmeasured = gathered.inputs.hookCommands === null ? ' — Verdrahtungs-Anker NICHT messbar' : ''
       console.log(
         ok
-          ? `guard-health: OK (${report.length} Durchsetzer, alle verdrahtet und geprüft)`
-          : formatGuardHealth(violations),
+          ? `guard-health: OK (${report.length} Durchsetzer, alle verdrahtet und geprüft)${unmeasured}`
+          : `${formatGuardHealth(violations)}${unmeasured}`,
       )
       process.exit(0)
     }

@@ -199,6 +199,39 @@ describe('auditHookAnchoring — can it fire from ANY working directory', () => 
     expect(auditHookAnchoring({ hookCommands: rows(boot), rollout: noRollout })).toEqual([])
   })
 
+  // Every case below was a FALSE CLEARANCE the four-eyes review (07.08.2026)
+  // found in the first shape of this check: a wiring it called anchored that
+  // dies from a non-root cwd exactly like the measured bug.
+  it('waives the bootstrap PER PATH, not for the whole command line', () => {
+    const compound =
+      "node -e \"const p=require('path').resolve(process.env.CLAUDE_PROJECT_DIR||'.','scripts/a.mjs');" +
+      'import(p)" && node scripts/b-guard.mjs'
+    const v = auditHookAnchoring({ hookCommands: rows(compound), rollout: noRollout })
+    expect(v.map((x) => x.script)).toEqual(['b-guard.mjs'])
+    // …and a mere mention of the env var in a comment waives nothing at all.
+    const pretend = 'node scripts/b-guard.mjs # process.env.CLAUDE_PROJECT_DIR someday'
+    expect(commandAnchoring(pretend).anchored).toBe(false)
+  })
+
+  it('sees a script in a SUBDIRECTORY of scripts/', () => {
+    const v = auditHookAnchoring({ hookCommands: rows('node scripts/verify/frame-guard.mjs'), rollout: noRollout })
+    expect(v.map((x) => x.script)).toEqual(['frame-guard.mjs'])
+    expect(commandAnchoring('node "$CLAUDE_PROJECT_DIR/scripts/verify/frame-guard.mjs"').anchored).toBe(true)
+  })
+
+  it('does not accept a malformed expansion as an anchor', () => {
+    expect(refAnchoring('${CLAUDE_PROJECT_DIR/scripts/a.mjs')).toBe('relative')
+    expect(refAnchoring('$CLAUDE_PROJECT_DIR}/scripts/a.mjs')).toBe('relative')
+  })
+
+  it('does not double-quote a path that already carries quotes', () => {
+    expect(anchorCommand('node "scripts/a.mjs"')).toBe('node "$CLAUDE_PROJECT_DIR/scripts/a.mjs"')
+    expect(anchorCommand('node scripts/a.mjs')).toBe('node "$CLAUDE_PROJECT_DIR/scripts/a.mjs"')
+    // A bootstrap is already anchored and must come back untouched.
+    const boot = "node -e \"require('path').resolve(process.env.CLAUDE_PROJECT_DIR||'.','scripts/a.mjs')\""
+    expect(anchorCommand(boot)).toBe(boot)
+  })
+
   it('stays silent on a hook recorded in the staged rollout', () => {
     const v = auditHookAnchoring({
       hookCommands: rows('node scripts/model-guard.mjs'),
