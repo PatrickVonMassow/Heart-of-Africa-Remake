@@ -7233,6 +7233,18 @@ const settleScalar = async (read, rel = 0.003) => {
   await shot('122-atlas-snow-february', { world: { lat: 31.06, lon: -7.91 }, label: 'Toubkal under February snow' })
   console.log('shot 122-atlas-snow-february.png')
   const jul = await snowCover(7)
+  // Point 387 — this was the fifth of the checks red on `main` itself, reported
+  // at 1.3 % white in February against 0.0 % in July: the contrast existed and
+  // the criterion still refused it. VERDICT: the CHECK's MEASURE, not the
+  // product and not a threshold on noise. Point 503 (the note above) found the
+  // near-white count reading the snow's top sliver rather than its extent, and
+  // replaced it with snowFraction's bright-AND-neutral measure; the bar was
+  // RAISED with it, so the criterion demands MORE than it did when it was red.
+  // MEASURED 07.08.2026, quiet machine, both backends: Feb 28.0 % against Jul
+  // 0.0 % on WebGL 2, Feb 29.6 % against Jul 0.0 % on WebGPU — a spread of 1.6
+  // points between the backends. February sits ~18 points above the 10 % bar
+  // with July at zero on both, so the ratio arm (feb > 3×jul) is never the
+  // deciding one.
   check(
     'the High Atlas whitens in February and bares in July (seasonal snow, point 141)',
     feb > jul * 3 && feb > 0.1,
