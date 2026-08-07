@@ -352,6 +352,9 @@ describe('closingTickClaim — the tick that claims a finished closing', () => {
     // guard denied its own commit that way (four-eyes review 07.08.2026)
     expect(bash("git add -A && git commit -q -F - <<'MSG'\nfix the gate\n\nit denied `- [x] 224.` in TASKS.md and docs/tasks-archive.md\nMSG\ngit push 2>&1 | tail -2")).toEqual([])
     expect(bash('git commit -m "TASKS.md: - [x] 224. is quoted here" 2>&1')).toEqual([])
+    // but a heredoc that IS the write counts — there the body is the new file
+    expect(bash("cat > TASKS.md <<'EOF'\n# Work order\n- [x] 224. DEMO CHECKPOINT\nEOF")).toEqual([224])
+    expect(bash("cat >> docs/tasks-archive.md <<EOF\n- [x] 224. DEMO CHECKPOINT\nEOF")).toEqual([224])
   })
   it('catches the tick whichever edit comes first — the point leaves TASKS.md and lands in the archive', () => {
     // delete-first: by the time the archive is written, the work order no longer

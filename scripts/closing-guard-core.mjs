@@ -78,8 +78,8 @@ const PATH_OPTION = /\s(?:-C|--git-dir|--work-tree)(?:\s+|=)\S+/g
  * arguments (`git tag "v0.3"`, `sed 's/…/- [x] 224./'`), and an apostrophe in a
  * double-quoted string would consume unintended spans ("Don't …").
  */
-function withoutProse(command) {
-  let c = command.replace(/<<-?\s*['"]?(\w+)['"]?[\s\S]*?\n[ \t]*\1\b/g, ' ')
+function withoutProse(command, { keepHeredocBodies = false } = {}) {
+  let c = keepHeredocBodies ? command : command.replace(/<<-?\s*['"]?(\w+)['"]?[\s\S]*?\n[ \t]*\1\b/g, ' ')
   c = c.replace(/(-m|--message)\s+"[^"]*"/g, '$1 MESSAGE')
   c = c.replace(/(-m|--message)\s+'[^']*'/g, '$1 MESSAGE')
   return c
@@ -214,7 +214,8 @@ const SHELL_TOOLS = new Set(['Bash', 'PowerShell'])
 /** A shell command names a work-order file … */
 const WORK_ORDER_NAMED = /TASKS\.md|tasks-archive\.md/
 /** … and WRITES it: an in-place editor, a redirect or a copy ONTO the file, a patch. */
-const WORK_ORDER_WRITE = /(^|\s)-i\b|>>?\s*\S*(TASKS\.md|tasks-archive\.md)|\btee\b|\bpatch\b|\bgit\s+apply\b|\b(mv|cp)\b/
+const REDIRECTS_INTO_WORK_ORDER = />>?\s*\S*(TASKS\.md|tasks-archive\.md)|\btee\b[^|\n]*(TASKS\.md|tasks-archive\.md)/
+const WORK_ORDER_WRITE = new RegExp(`(^|\\s)-i\\b|\\bpatch\\b|\\bgit\\s+apply\\b|\\b(mv|cp|tee)\\b|${REDIRECTS_INTO_WORK_ORDER.source}`)
 
 /** The text a tool call WRITES, and the text it REPLACES, for tick accounting. */
 function tickTexts(toolName, toolInput) {
@@ -234,7 +235,11 @@ function tickTexts(toolName, toolInput) {
     // it — `grep -F '- [x] 224.' docs/tasks-archive.md` reads, and denying a read
     // during a closing is obstruction, not enforcement (four-eyes review
     // 07.08.2026).
-    const c = withoutProse(typeof input.command === 'string' ? input.command : '')
+    const raw = typeof input.command === 'string' ? input.command : ''
+    // A heredoc is prose in `git commit -F - <<MSG`, but it is the CONTENT in
+    // `cat > TASKS.md <<EOF` — so its body survives exactly when the command
+    // redirects into a work-order file, and the tick inside it counts.
+    const c = withoutProse(raw, { keepHeredocBodies: REDIRECTS_INTO_WORK_ORDER.test(raw) })
     if (!WORK_ORDER_NAMED.test(c) || !WORK_ORDER_WRITE.test(c)) return null
     return { added: c, removed: '' }
   }
