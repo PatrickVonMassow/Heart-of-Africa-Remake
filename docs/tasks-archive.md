@@ -15445,3 +15445,102 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   both defects are of the kind that pass a test while being wrong, which is the failure
   the second model exists to catch.
 
+- [x] 387. THE CHECKS THAT ARE RED ON MAIN ITSELF (27.07.2026, established with
+  the baseline lane of point 294 — two runs against the merge-base, all four labelled
+  PRE-EXISTING). The suite therefore cannot exit 0, and because `render-verify-guard`
+  counts only a PASSING run, every backend-sensitive change that picks `polish` has to be
+  cleared by hand. A red that everyone routes around is worse than a missing check: it
+  trains the habit of overriding the gate.
+  THE FOUR, each to be judged on its own — a stale assumption, a threshold on its edge
+  and a real defect look identical from the outside, and this project has mistaken each
+  for the others:
+  · the rains dim the settlement sun and sky light — expected behaviour that does not
+    exist yet; work-order point 385 is where it is built, so this check is asserting a
+    FUTURE state. Decide: does the check wait for 385 (marked as such, not silently
+    passing), or is it wrong about what today promises?
+  · the leave capture bakes the surrounding terrain into the band (point 227).
+  · the band is compass-true: a probe placed due west shows west, not east.
+  · fire shadows ON: the ground behind a ring stone is measurably darker than beside it
+    (design.md §19.10) — reported at 1.6 against a threshold of 2, the same
+    sitting-on-its-own-edge shape as point 382's eye-knob check.
+  · AND IN THE ENRICHMENTS SUITE, measured the same night on a quiet machine and
+    labelled PRE-EXISTING by the baseline lane: the High Atlas whitens in February and
+    bares in July (seasonal snow, point 141) — reported at 1.3 % white in February
+    against 0.0 % in July, i.e. the CONTRAST exists and the check still refuses it, the
+    third instance of a criterion deciding on a figure near its own bar. The crocodile
+    eye-knob red in the same suite has its own point (382) and is not repeated here.
+  FOR EACH: say whether the PRODUCT is wrong, the CHECK asserts something never
+  promised, or the THRESHOLD decides on noise — and fix accordingly. Loosening an
+  assertion to reach green is refused; a check that waits for unbuilt work is marked as
+  waiting, with the point number it waits for, so the suite can exit 0 honestly.
+  FIRST MEASUREMENT, 28.07.2026 11:52, quiet machine (CPU 13 %, GPU 0 %), WebGL 2:
+  `polish` reports 59 pass, 4 fail, 0 console errors, and the four are exactly the four
+  named above. Their figures change what each of them is:
+  · the rains dim the settlement sun and sky light — dry `{sun 2.4, hemi 0.8}` against wet
+    `{sun 1.993, hemi 0.664}`. The dimming EXISTS and is 17 %; the check is not asserting
+    an unbuilt state after all, its BAR is above what today delivers. Decide the bar
+    against what §19.9/§385 actually promise, and record the promise beside it.
+  · the leave capture bakes the surrounding terrain into the band — "bottom-quarter opaque
+    0.000", i.e. NOTHING opaque at the bottom of the band. That is a staging or capture
+    failure, not a bad threshold: the check has nothing to measure.
+  · the band is compass-true — "west 0px, east 0px". BOTH probes read zero, so the check
+    cannot decide east from west; it is not reporting a mirrored band, it is reporting a
+    blank one. Same family as the one above and probably the same cause.
+  · fire shadows ON — per-stone lit-minus-shadow `[1.6, -1.3, 0]`. Not a criterion sitting
+    on its edge: one stone shows a shadow, the next shows the OPPOSITE sign, the third
+    nothing at all. Judge the product here before touching the number.
+  AND THE BASELINE LANE AGREES, same session: the second run reported 55 pass / 8 fail,
+  and its own classifier separated them without help — "the SAME check failed twice … a
+  candidate REAL failure; the other 4 rotated between the runs and read as load". The four
+  that failed twice are the four above. So the list is not stale: it is today's list, and
+  the four extra reds of the second run (the dome graying, the fire glow under overcast,
+  the settlement rain, the ground tint) are the load signature, not new defects.
+  MEASURE BEFORE JUDGING A THRESHOLD: run the staging several times on a quiet machine
+  (`node scripts/verify/machine-load.mjs` confirms) and record the spread beside the
+  criterion, exactly as point 382 requires for the crocodile's eyes.
+  VERIFIABLE: `polish` exits 0 twice in a row on a quiet machine on BOTH backends, with
+  every surviving check unchanged in what it demands; each of the four resolved with its
+  reason recorded in the commit.
+  SECOND HALF, found the hard way on 30.07.2026: A RED BRANCH RUN REACHES NOBODY WHO CAN
+  ACT — only the repository owner's inbox. `ci-status-guard` asks about `git rev-parse HEAD`,
+  the HEAD of the session that runs it (`scripts/ci-status-guard.mjs:155`). Through the
+  night the main session's HEAD was `main` and green, while every push of a delegated
+  agent's branch failed CI: thirteen "Run failed" mails between 21:46 and 06:31, and the
+  session that could have fixed it never learned. The cause was cheap — a containment probe
+  costing one git process per (commit, record) pair, 26 to 38 s past its own budget, fixed
+  in one commit — but nothing surfaced it, and the user had to.
+  TARGET: the guard judges every ref this session has PUSHED and not yet seen green, not
+  just its current HEAD — a delegated agent pushes under the parent's session id, so those
+  refs are the parent's responsibility. It reports the ref by name, it notifies ONCE per
+  (ref, sha) rather than per turn, and a ref that no longer exists is dropped rather than
+  reported forever. Cheapness stays a requirement: the common turn changes nothing and must
+  cost nothing, so the ref list comes from the reflog of pushes rather than from asking the
+  API about every branch.
+  AND THE COST RULE THAT CAUSED IT: a check inside the unit layer that walks REAL git
+  history must be bounded by CONSTRUCTION, not by a raised timeout. The pairwise probe had
+  already had its budget raised once; the second raise would have hidden it again. Any such
+  check states its worst case in a comment and stays inside it.
+  MEASURED 30.07.2026, AND IT IS NOT AN INCIDENT BUT A STATE: of the last 100 runs, 53
+  failed — 26 of them on `main`, spread over 2026-07-09 to 2026-07-30 (9 on the 27th, 9 on
+  the 29th, 13 on the 30th). So the repository owner has been receiving failure mail for
+  three weeks while every local gate was green.
+  WHY THE LOCAL GATE CANNOT SEE IT, which is the load-bearing insight: the pre-push gate
+  runs the SAME unit suite as CI, so it catches everything EXCEPT what differs by platform.
+  The 30.07. cause was exactly that — a negative control that asserted a WINDOWS incident
+  (git's removal following a junction into its target) on every platform, so it failed on
+  every hosted Ubuntu run and passed on the machine that wrote it. A test whose subject is
+  OS behaviour asserts PER PLATFORM, and never by skipping, or the assertion silently means
+  nothing on the platform that actually runs it.
+  THEREFORE THE TARGET IS "CONFIRM GREEN", NOT "NOTICE RED": after a push, the session may
+  not treat the work as landed until the run for that exact sha has CONCLUDED green — which
+  closes the whole class regardless of cause, platform differences included, where merely
+  noticing red closes only the cases someone happens to look at. Blocking must stay cheap
+  and honest: one API call per pushed sha, the answer cached per sha, offline or
+  rate-limited fails OPEN with a stated reason, and a run still in progress is a WAIT rather
+  than a pass.
+  VERIFIABLE: pure Vitest — a session whose HEAD is green but which pushed a ref that is
+  red BLOCKS and names that ref; a second turn on the same (ref, sha) does not notify
+  again; a deleted ref is dropped; no pushed refs means no API call at all. Plus a case
+  pinning the containment probe at one git call per record.
+  DOCS in the same commit: `scripts/verify/README.md` where the suite is described, and
+  CLAUDE.md §7.2 where the Stop chain lists what `ci-status-guard` watches.
