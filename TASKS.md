@@ -4534,3 +4534,20 @@ Build order, chosen so no two parallel agents own the same file:
   BLOCKS; each of the seven live "Von dir zu klären" card questions still BLOCKS when it is
   asked in the chat without its card. Criticality: medium — a false block costs a turn, a
   missed decision costs hours, so the tests pin BOTH directions.
+
+- [ ] 540. AN UNRECOGNISED FLAG IS DROPPED WITHOUT A WORD (measured 07.08.2026). Recording the
+  four-eyes verdict for point 298 with `--point 298` stored NO point: the CLI that ran was the
+  pre-merge `scripts/mechanism-review.mjs` from `main`, which did not yet know the flag. It
+  neither warned nor failed — it ignored it. The consequence surfaced only later, when the
+  criticality gate refused the tick with "no review recorded for this point" while a verdict for
+  the exact commit sat in the ledger, and the fix was to record the same review a second time.
+  This is the same class as the swallowed read that branch had just fixed one layer down: an
+  unrecognised INPUT must not read as an accepted one.
+  FINAL STATE: `mechanism-review.mjs` REFUSES an argument it does not recognise — naming the
+  argument and printing the usage line — instead of dropping it. The check is on the pure
+  argument parser, so the wrapper keeps its single responsibility.
+  VERIFIABLE: pure Vitest — a known flag set parses; an unknown flag exits non-zero and NAMES
+  the flag; a misspelled or abbreviated known flag is reported rather than silently ignored; and
+  a run that omits a REQUIRED flag still prints the existing usage line unchanged.
+  Criticality: medium — it is a recording tool, not a gate, but a dropped flag makes a gate
+  report a truth it does not have.
