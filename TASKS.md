@@ -2519,46 +2519,38 @@ it is appended.
   the 0.6 %/h that fits. The reason is in the same figures: 89 % of the spend still comes
   from turns above 150k, so halving the PEAK barely moves a bill dominated by everything
   under it. Recomputable with `node scripts/measure-context-cost.mjs`.
-  WHAT FOLLOWS, and it is what keeps this point open: the point boundary is too COARSE a
-  lever. The next one has to cut inside a session rather than between sessions — the
-  candidates, to be measured before one is chosen, are (a) a boundary at a bundle MEMBER
-  rather than at the bundle, (b) delegating the reading-heavy part of a point so the
-  parent never carries the files at all (the brief mechanism already does this for specs;
-  the same is missing for source), and (c) an explicit context budget per point after
-  which the session hands over mid-point with a written handoff. Pick by measurement, not
-  by preference, and report the %/h again — the criterion stays the one above.
-  (d) THE HARNESS PRIMITIVES, EVALUATED AGAINST OUR HAND-BUILT LAYER (user question
-  30.07.2026: is there not an established mechanism for token-frugal parallel batch work
-  rather than reinventing it?). Partly there is, and parts are already in use — worktree
-  agent isolation per `docs/batch-autonomy.md`; the OS autostart task is the launcher, held
-  against the cron/wakeup primitives on the reasons in `docs/rule-corpus-audit.md` A31; the
-  Workflow tool stands under the token ceiling of memory `workflows-token-budget`. NOT
-  evaluated: the Workflow tool's BUDGET primitive — a hard output-token ceiling with a
-  remaining() query, precisely the control that was missing on 20.07. — together with its
-  run-resume, which replays the unchanged prefix of agent calls after a crash and is the
-  crash-resume we hand-built; background agents with a monitor instead of the hand-written
-  in-flight declaration and log polling; and REMOTE execution, the one layer that survives
-  a dead machine or a dead line — the residual the user accepted when declining a paid API
-  key for the vacation hardening — whose availability is gated and must be CHECKED, never
-  assumed. What no primitive replaces, and why our layer exists at all: the singleton
-  across OS-started sessions, the work-order and guard discipline, the board, the repo
-  doctor and the chat channel — those are policy, not orchestration.
-  VERIFIABLE for (d): one bounded written evaluation, layer by layer, naming per
-  hand-built piece whether a primitive replaces it, decided by the same %/h measurement
-  rather than by preference; a piece kept is kept with its reason recorded.
-  (e) THE BOUNDARY DOES NOT REACH INSIDE A HEAVY POINT (four-eyes review 30.07.2026, and the
-  one gap both models named). `batch-boundary.mjs` fires at POINT boundaries only; within a
-  single heavy point — long verification runs, a merge fought out over many turns — the
-  context grows unchecked, and that is the one case a mid-session compaction would address
-  and this project does not. The counter-measure is not a compaction: verification output is
-  written to DISK and only its tail is read, so a run that produces thousands of lines costs
-  the tail rather than the transcript. Rejected with it, and recorded so it is not proposed
-  again: "clear the context and re-read the work order" is a WORSENING here — `TASKS.md` is
-  310831 characters (~78k tokens) while `batch-resume-hook.mjs` re-orients a fresh session
-  for about 600.
-  VERIFIABLE for (e): a verify invocation writes its output to a file and the session reads a
-  bounded tail; measured on one long run, the tokens the transcript carries fall by an order
-  of magnitude, and the failure case still names its failing test.
+  WHY THE FIRST LEVER WAS NOT ENOUGH: the point boundary cuts BETWEEN sessions, and the
+  bill is dominated by everything under the peak. The next levers had to cut INSIDE one.
+  (d) AND (e) ARE BUILT (07.08.2026); what keeps this point open is the MEASUREMENT below.
+  (d) THE HARNESS PRIMITIVES, EVALUATED AGAINST OUR HAND-BUILT LAYER — the user's question
+  of 30.07.2026, whether an established mechanism for token-frugal parallel batch work
+  exists rather than a reinvented one. The answer is `docs/harness-primitives-evaluation.md`:
+  eight layers, a verdict and a reason each. Two of its findings rest on PROBES rather than
+  on assumption, which is why they are recorded here — the Workflow tool is NOT exposed in
+  this environment, so its BUDGET primitive and its run-resume cannot be adopted at all; and
+  an agent launched with remote isolation RAN LOCALLY, so remote execution is unavailable
+  here and DEGRADES SILENTLY instead of failing. What no primitive replaces, and why our
+  layer exists: the singleton across OS-started sessions, the work-order and guard
+  discipline, the board, the repo doctor and the chat channel — policy, not orchestration.
+  (e) THE BOUNDARY DID NOT REACH INSIDE A HEAVY POINT — `batch-boundary.mjs` fires at POINT
+  boundaries only, while within one heavy point (long verification runs, a merge fought out
+  over many turns) the context grew unchecked. The counter-measure built is not a
+  compaction: `scripts/verify/run-logged.mjs` wraps the runner, writes the whole run to disk
+  and hands the caller a BOUNDED DIGEST; `npm test`, `test:small` and `test:large` route
+  through it (`test:e2e` stays unwrapped). Measured on a real RED run: 476 lines / 30542
+  characters of raw transcript became 66 lines / 3782 characters, of which only 15 arrive
+  while the run is in flight, and every failing test is still named. Rejected with it, and
+  recorded so it is not proposed again: "clear the context and re-read the work order" is a
+  WORSENING here — `TASKS.md` is ~310k characters while `batch-resume-hook.mjs` re-orients a
+  fresh session for about 600.
+  WHAT REMAINS: the %/h figure for a full day under the built levers, against the 1.11 %/h
+  measured on 30.07.2026 and the 0.6 %/h that fits. If it still misses, pick the next lever
+  BY MEASUREMENT from (a) a boundary at a bundle MEMBER rather than at the bundle, (b)
+  delegating the reading-heavy part of a point so the parent never carries the files at all
+  (the brief does this for specs, not for source), or (c) an explicit context budget per
+  point after which the session hands over mid-point with a written handoff.
+  VERIFIABLE: `node scripts/measure-context-cost.mjs` reports the rate for a full day after
+  07.08.2026; the point closes on that figure, not on the mechanisms running.
 
 - [ ] 379. ABU SIMBEL BECOMES A WALKABLE SITE (user 27.07.2026; a FEATURE, and the user's
   own instruction is that the open DEFECTS come first — it waits behind them). The world carries
