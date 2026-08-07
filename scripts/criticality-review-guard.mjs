@@ -55,7 +55,20 @@ export const TICK_BRANCH = 'main'
 const TASKS_FILE = 'TASKS.md'
 const ARCHIVE_FILE = 'docs/tasks-archive.md'
 
-const git = (cmd) => execSync(`git ${cmd}`, { windowsHide: true, cwd: REPO_ROOT, encoding: 'utf8' }).trim()
+// maxBuffer is NOT a precaution here, it is the difference between a guard that
+// works and one that never once fires: `git show <rev>:docs/tasks-archive.md`
+// returns the WHOLE archive — 1.12 MB on 07.08.2026 and only growing — against
+// execSync's 1 MB default. Past it the child dies with ENOBUFS, the throw reaches
+// the wrapper's fail-open, and the gate allows every turn while looking armed.
+// Found on main the moment the branch merged; the guard's own fixtures build temp
+// repos whose work order is a few hundred bytes and could not see it.
+const git = (cmd) =>
+  execSync(`git ${cmd}`, {
+    windowsHide: true,
+    cwd: REPO_ROOT,
+    encoding: 'utf8',
+    maxBuffer: 64 * 1024 * 1024,
+  }).trim()
 
 function readBaselineState() {
   try {

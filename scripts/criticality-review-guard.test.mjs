@@ -286,3 +286,22 @@ describe('the gate against a real tick', { timeout: 60_000 }, () => {
     expect(runHook().decision?.decision, 'the gate must still be there afterwards').toBe('block')
   })
 })
+
+// THE READ THAT IS BIGGER THAN THE DEFAULT BUFFER (found on main, 07.08.2026).
+//
+// Every fixture above builds a temp repo whose work order is a few hundred bytes,
+// so none of them can see the one thing that made this guard inert on the REAL
+// repository: `git show <rev>:docs/tasks-archive.md` returns the whole archive —
+// 1.12 MB and growing — against execSync's 1 MB default buffer. The child died
+// with ENOBUFS, the throw landed in the wrapper's fail-open, and the guard allowed
+// every turn while looking armed. This pins the read at its real size.
+describe('the archive read at its REAL size', () => {
+  it('reads the whole work-order archive at HEAD without dying on the buffer', () => {
+    const onDisk = readFileSync(resolve(import.meta.dirname, '..', 'docs/tasks-archive.md'), 'utf8')
+    expect(onDisk.length).toBeGreaterThan(1024 * 1024) // the premise: past execSync's default
+
+    const atHead = showAt('HEAD', 'docs/tasks-archive.md')
+    expect(atHead.length).toBeGreaterThan(1024 * 1024)
+    expect(atHead.trimEnd()).toBe(onDisk.trimEnd())
+  })
+})
