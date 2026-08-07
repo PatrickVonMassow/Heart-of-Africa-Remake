@@ -15011,3 +15011,12 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   head of the queue as soon as the answer arrives.
   VERIFIABLE: Vitest — a user-gated point is not chosen while unanswered, the next independent
   point is, the reason is logged, and an answered point is picked up first afterwards.
+
+- [x] 297. PERIODIC GUARD-CHAIN & MEMORY AUDIT (user 24.07.2026, retrospective §7;
+  hygiene/observation). A repeatable consolidation pass over the Stop-hook guard chain (11+
+  hooks run every turn end) and the memory files (contradictory/tempering pairs like
+  deploy-fable-proactively ↔ fable-sparingly): list each guard/memory with last-modified,
+  flag redundancy/contradiction, consolidate — same spirit as the `.md` docs audit. Keeps the
+  guard "immune system" from becoming an autoimmune disease. ANCHORS: a checklist doc + an
+  enumerating script (guards in `scripts/`, memories in the memory dir). VERIFIABLE: the audit
+  produces a report; no runtime invariant. (Lighter point.)
