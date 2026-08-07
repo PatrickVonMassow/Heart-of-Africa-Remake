@@ -4420,3 +4420,26 @@ Build order, chosen so no two parallel agents own the same file:
   the way point 387 recorded its five.
   Criticality: medium — neither hides a known product defect today, but a check that
   rotates is a gate that has stopped gating.
+
+- [ ] 550. THE RENDER GUARD DEMANDS A PASS THAT A FOREIGN-RED SUITE CAN NEVER GIVE
+  (measured 07.08.2026 while closing point 387; bundle Testinfrastruktur).
+  `render-verify-guard` counts only an exit-0 run as coverage, and `polish` cannot exit 0
+  today for reasons that belong to OTHER points: the render-target assert of point 546
+  fires as a console error on both backends, and the goat-stance check reds on the
+  software WebGPU lane (point 506). So every change under `scripts/verify/` — even a
+  pure comment diff, which is what point 387's evidence was — can only be cleared by a
+  hand-written `--defer`. That is the habit point 387 exists to end: a gate routinely
+  overridden by hand stops being a gate, and the deferral text is the only thing standing
+  between an honest exception and a blanket one.
+  FINAL STATE: the guard accepts a run whose reds are each ACCOUNTED FOR — every failing
+  check and every console error in it maps to an open work-order point named in the run's
+  own record — and reports which point each was charged to. A run with even one
+  unaccounted red still fails, and an accounted-for run is reported as such rather than
+  as a clean pass, so the difference stays visible in the record. The hand-written
+  `--defer` stays for what genuinely cannot be judged headless.
+  VERIFIABLE: Vitest on the pure decision — a run with two reds both naming open points
+  clears and names them; the same run with one red naming nothing does not; a run naming
+  a point that is ticked done does not. Plus the record distinguishing "clean" from
+  "accounted for".
+  Criticality: medium — it does not break the picture, but it converts a gate into a
+  formality, and this project has already paid for that once.
