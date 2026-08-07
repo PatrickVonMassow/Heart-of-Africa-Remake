@@ -57,7 +57,17 @@ export const LIMITS = {
   // the unearned loosening the rule forbids. So any net growth blocks, and the
   // block message names the honest way out: cut the long telling over into the
   // retrospective, which is where it belongs anyway.
-  maxWords: 3547,
+  //
+  // Raised 07.08.2026 by the measured NET size of one genuinely new tip (§3.91,
+  // the repair that quiets the check it was meant to sharpen): the entry costs
+  // 108 words gross, and 75 of them were PAID by tightening five neighbouring
+  // entries — the four-eyes prompt, guard rot, the green-test prompt, the
+  // swallowed-failure risk half and the autonomous-run prompt — none of which
+  // lost an argument, only words. The remaining 33 is the honest cost of new
+  // content, and the line budget was met without a raise at all. Recorded as a
+  // decision card, because the standing rule is shorten-before-raise and the
+  // last step of a raise belongs to the user.
+  maxWords: 3580,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
   maxEntryLines: 11,

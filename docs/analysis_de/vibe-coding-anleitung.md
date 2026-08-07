@@ -152,11 +152,10 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 - **Grüner Test, falsches Bild.** Der Test ist grün, das Ergebnis trotzdem falsch — er
   prüfte einen Hilfswert, einen unerreichbaren Zustand, einen geratenen Wert. Oder das
   Beweisbild entstand, bevor die Szene fertig geladen war.
-  → *Prompt:* „Etabliere einen Mechanismus, der eine sichtbare Änderung erst als fertig
-  gelten lässt, wenn sie am **echten gerenderten Bild** unter einer Bedingung geprüft wurde,
-  die ein Nutzer wirklich erreicht — und der ein Prüfbild erst schreibt, wenn die
-  Darstellung fertig ist." *(Kosten ≈ 1,5x.)* *(Zuletzt: Sieht das für einen Menschen
-  richtig aus?)*
+  → *Prompt:* „Etabliere einen Mechanismus, der eine sichtbare Änderung erst als fertig gelten
+  lässt, wenn sie am **echten gerenderten Bild** unter einer Bedingung geprüft wurde, die ein
+  Nutzer wirklich erreicht — und der ein Prüfbild erst schreibt, wenn die Darstellung fertig
+  ist." *(≈ 1,5x.)* *(Zuletzt: Sieht das für einen Menschen richtig aus?)*
 
 - **Neue Features zerbrechen alte.** Eine Änderung repariert X und bricht das unbeobachtete Y.
   → *Prompt:* „Etabliere einen Mechanismus, der jede Mechanik auch im **Danach-Zustand** prüft
@@ -167,16 +166,12 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Ein Fix zählt erst als fertig, wenn das **Symptom am Ort des Symptoms** als
   behoben gezeigt wurde. Beißt du dich zweimal fest, wechsle das Modell."
 
-- **Der Fehlalarm ist behoben — und der echte Alarm gleich mit.** Eine Prüfung schlägt zu
-  oft an, du lässt sie verschärfen, alles wird grün. Was du nicht siehst: Sie schlägt jetzt
-  auch dann nicht mehr an, wenn sie sollte. Ein Fehlalarm meldet sich selbst, ein
-  ausgefallener meldet gar nichts — Reparaturen an Prüfungen gehen also von sich aus in die
-  gefährliche Richtung, und die Tests fangen es nicht, weil dieselbe Person sie schreibt,
-  die auch die neue Bedingung formuliert hat.
-  → *Prompt:* „Wenn du eine Prüfung entschärfst, weise **beide Richtungen** nach: dass die
-  Fehlalarme weg sind UND dass die echten Treffer noch anschlagen. Die Fälle für die zweite
-  Richtung lässt du vom **anderen Modell** erfinden, und es misst an der Mechanik, nicht an
-  den Testnamen." *(Kosten ≈ 1,3x.)*
+- **Fehlalarm behoben — echter Alarm gleich mit.** Du lässt eine zu oft anschlagende
+  Prüfung verschärfen, alles wird grün. Nur schlägt sie jetzt auch dann nicht mehr an,
+  wenn sie sollte: Ein Fehlalarm meldet sich selbst, ein ausgefallener nie.
+  → *Prompt:* „Entschärfst du eine Prüfung, weise **beide** Richtungen nach — Fehlalarme
+  weg UND echte Treffer noch da. Die Fälle dafür erfindet das **andere Modell**, und es
+  misst an der Mechanik, nicht an den Testnamen." *(Kosten ≈ 1,3x.)*
 
 - **Zahlen geschätzt statt gemessen.** ‚Das dauert ~2 Minuten', ‚das ist schneller'.
   → *Prompt:* „Laufzeiten, Performance und Kosten nennst du nur **gemessen** — Performance
@@ -190,10 +185,10 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 - **Der autonome Lauf bleibt stehen — still oder wartend.** Der Fortschritt endet unbemerkt,
   oder er hängt an einer Rückfrage — beides gleich teuer, wenn du weg bist.
-  → *Prompt:* „Bei einer autonomen Daueraufgabe sei die **letzte Aktion jedes Schritts** immer
-  ein Schritt an der Aufgabe, und baue einen Mechanismus gegen stilles Anhalten. Bleib **nie
-  mit einer Rückfrage an mich stehen**: Triff die vernünftigste Annahme; was meine
-  Entscheidung braucht, hältst du sichtbar fest und **gehst zum nächsten Punkt über**."
+  → *Prompt:* „Bei einer autonomen Daueraufgabe sei die **letzte Aktion jedes Schritts** ein Schritt
+  an der Aufgabe, und baue einen Mechanismus gegen stilles Anhalten. Bleib **nie mit einer Rückfrage
+  stehen**: Triff die vernünftigste Annahme; was mich braucht, hältst du sichtbar fest und **gehst
+  weiter**."
 
 - **Kommunikation verfehlt.** Zu technisch, zu lang, an der Zielgruppe vorbei.
   → *Prompt:* „Beschreibe Bugs und Status in der Sprache der Zielgruppe — Symptom zuerst,
@@ -221,11 +216,10 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 - **Regeln und Wächter verrotten — nur merkt es niemand.** Der Bestand wächst an
   Widersprüchen, an Regeln ohne Absicherung und an solchen, deren Absicherung enger greift
   als ihr Satz — sie feuert, wird geglaubt und deckt nur einen Teil.
-  → *Prompt:* „Etabliere einen Mechanismus, der den Bestand periodisch durchsehen lässt — auf
-  Aktualität, Dopplung, Widerspruch und **Wirkungslosigkeit**. Schreib zu **jeder** Regel, was
-  sie misst, und leg Regelsatz und Code **nebeneinander**: Welche Fälle nennt der Satz, die
-  das Muster nicht trifft? Zieh **den Code auf den Satz** nach, nie umgekehrt. Und jeden
-  Wächter fragst du: Hat er je ausgelöst? Kann er überhaupt?" *(Kosten: einmalig hoch)*
+  → *Prompt:* „Etabliere einen Mechanismus, der den Bestand periodisch durchsieht — auf Aktualität,
+  Dopplung, Widerspruch und **Wirkungslosigkeit**. Leg Regelsatz und Code **nebeneinander**: Welche
+  Fälle nennt der Satz, die das Muster nicht trifft? Zieh **den Code auf den Satz** nach, nie
+  umgekehrt. Und jeden Wächter fragst du: Hat er je ausgelöst? Kann er überhaupt?" *(einmalig hoch)*
 
 - **Der rote Test klagt den Falschen an.** Er täuscht gefährlicher als ein grüner:
   Prüfungen veralten von selbst und klagen gesunden Code an.
@@ -248,16 +242,14 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   erzwingt: Liegt alles am Zielort? Gibt es Reste? Passen Dokumente und Code zusammen?"
 
 - **Der Autor sieht seine eigene Annahme nicht — und wer eine fertige Liste prüft, hakt sie ab.**
-  Wer entwirft und baut, prüft gegen dieselbe Vorstellung, aus der der Fehler stammt. Und wer eine
-  fertige Liste prüft, nennt weit weniger als vor dem leeren Blatt — falsch also, wenn der
-  **übersehene** Punkt zählt.
-  → *Prompt:* „Etabliere einen Mechanismus, der vor dem Bau **Schwierigkeit × Kritikalität** einschätzt
-  und bei Kritischem **ein anderes Modell** hinzuzieht — je nach Schritt anders. Beim **Finden**
-  (was kann schiefgehen, welche Fälle prüfen) arbeitet ihr **blind parallel**: gleiche Vorgabe, je ein
-  vollständiges Ergebnis, keiner sieht vorher das andere; vereinigt wird **nach Bedeutung**,
-  Einzelnennungen **markiert statt gestrichen**. Beim **Beurteilen eines fertigen Ergebnisses** bleibt
-  es beim Gegenlesen, aber **erst das Ergebnis, dann die Begründung**; zwei Läufe desselben Modells
-  nur mit **anderer Rolle**." *(Kosten ≈ 2x für den Fundschritt)*
+  Wer baut, prüft gegen dieselbe Vorstellung, aus der der Fehler stammt; und wer eine fertige Liste
+  prüft, nennt weit weniger als vor dem leeren Blatt — falsch, wenn der **übersehene** Punkt zählt.
+  → *Prompt:* „Etabliere einen Mechanismus, der vor dem Bau **Schwierigkeit × Kritikalität** schätzt und
+  bei Kritischem **ein anderes Modell** hinzuzieht — je nach Schritt anders. Beim **Finden** blind
+  parallel: gleiche Vorgabe, je ein vollständiges Ergebnis, keiner sieht vorher das andere; vereinigt
+  **nach Bedeutung**, Einzelnennungen **markiert statt gestrichen**. Beim **Beurteilen** Gegenlesen,
+  aber **erst das Ergebnis, dann die Begründung**; zwei Läufe desselben Modells nur mit **anderer
+  Rolle**." *(Kosten ≈ 2x für den Fundschritt)*
 
 - **Die teuerste Prüfung großflächig verlangt.** Bildbegutachtung, ein zweiter Lauf, ein
   zweites Modell kosten ein Vielfaches — pauschal gefordert, zahlst du sie auch dort, wo sie
@@ -348,10 +340,10 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 - **Nicht jedes Rot ist deins.** Eine Prüfung, die nur „rot" und „grün" kennt, schiebt fremde
   Ausfälle deinem Code zu und schickt dich auf eine ergebnislose Suche.
-  → *Prompt:* „Sag bei jedem Rot zuerst, **wo die Ursache liegt** — nicht nach **Namensliste**
-  (die veraltet), sondern nach der Beobachtung: **lief überhaupt ein eigener Schritt?** Liegt
-  sie außerhalb, nenn den **echten Griff** dort; und wer auf einen fremden Dienst wartet, gibt
-  beim Aufgeben das **Angefangene zurück**, sonst sperrt er alle Nachfolger."
+  → *Prompt:* „Sag bei jedem Rot zuerst, **wo die Ursache liegt** — nicht nach Namensliste, sondern
+  nach der Beobachtung: **lief überhaupt ein eigener Schritt?** Liegt sie außerhalb, nenn den
+  **echten Griff** dort; und wer auf einen fremden Dienst wartet, gibt beim Aufgeben das
+  **Angefangene zurück**, sonst sperrt er alle Nachfolger."
 
 - **Die Reparatur nimmt den Reparierenden mit.** Wer die Leitung repariert, auf der er
   sitzt — Netz, Rechte, Umgebung —, verliert mit dem Fehlschlag die nächste Reparatur mit.
@@ -361,9 +353,8 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   ein zu offener Stand ist reparierbar, ein zugesperrter nicht."
 
 - **Verschlucken sieht aus wie Erfolg — und die Attrappe zeigt es nie.** Ein Fehlschlag, der
-  innen zum Ersatzwert wird, läuft als Lüge weiter: kein Absturz, nur Schweigen. Am besten
-  verborgen bei Fehlern, die von der **Menge** echter Daten abhängen — Puffer, Zeitlimit,
-  Speicher —, denn die fallen aus jeder Mini-Testdatei heraus.
+  innen zum Ersatzwert wird, läuft als Lüge weiter: kein Absturz, nur Schweigen. Am besten verborgen
+  bei Fehlern, die von der **Menge** echter Daten abhängen — die fallen aus jeder Mini-Testdatei.
   → *Prompt:* „Prüfe jedes `catch` mit Ersatzwert: Führt er zu **weniger** Aktion oder zu
   **mehr**? Nur weniger darf verschluckt werden. Und lass **eine** Prüfung gegen den **echten
   Bestand** laufen: zeig nicht, dass nichts blockiert hat, sondern dass **gelesen** wurde."
