@@ -510,7 +510,8 @@ export function evaluate(input) {
     decision: 'block',
     reason:
       `RENDER CHANGE NOT VERIFIED ON ${label}: commits since ${String(clearedHead).slice(0, 7)} ` +
-      `touch render path(s) [${shown}], but no PASSING verify-suite run on ` +
+      `touch render path(s) [${shown}], but no COVERING verify-suite run — clean, or red with ` +
+      'EVERY red charged to an open work-order point — on ' +
       missing.join(' or ') +
       ' is recorded since the last render-file edit. Standing rule (enforced — the point-210 ' +
       'coast fix read "done" on WebGL2 while the WebGPU picture was still stepped): every ' +
