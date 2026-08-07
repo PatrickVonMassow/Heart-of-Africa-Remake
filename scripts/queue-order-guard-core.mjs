@@ -16,6 +16,7 @@
 // Fail-open is the WRAPPER's job; this core must never throw on partial input.
 // The remedies' publish steps come from scripts/board-remedy.mjs — one copy.
 import { REPUBLISH } from './board-remedy.mjs'
+import { gatedPoints } from './user-gate-core.mjs'
 
 /** The bug-FINDING / QA-framework point numbers; every other open point is a fix. */
 // The big bug-FINDING / QA-framework block (worked after the known-bug fixes).
@@ -59,6 +60,21 @@ export function parseOpenPoints(text) {
     if (m && !/\bDEFERRED\b/.test(l)) open.add(Number(m[1]))
   }
   return open
+}
+
+/**
+ * The open points that can actually be WORKED — open minus the ones waiting on
+ * the user (point 450).
+ *
+ * The order rule asks whether a finder was queued ahead of open FIX work, and a
+ * point nobody may start is not work: with the gated cards demoted to the back
+ * of the queue by construction, reading them as fixes would report every finder
+ * as misordered and block the turn end for the whole of the user's absence —
+ * the exact jam the gate exists to prevent, moved from the queue into the guard.
+ */
+export function parseWorkablePoints(text) {
+  const gated = gatedPoints(text)
+  return new Set([...parseOpenPoints(text)].filter((n) => !gated.has(n)))
 }
 
 const stripTags = (html) => html.replace(/<[^>]*>/g, ' ')
@@ -170,7 +186,10 @@ export function evaluate({ dashboardHtml, tasksMd } = {}) {
 
     const problems = []
 
-    const misordered = finderBeforeOpenFix(cards.map((c) => c.point), open)
+    // The ORDER rule judges workable points only (point 450); the DONE-CLAIM rule
+    // below judges every open one — a card claiming a gated point is finished is
+    // just as false as any other.
+    const misordered = finderBeforeOpenFix(cards.map((c) => c.point), parseWorkablePoints(tasksMd))
     if (misordered.length) {
       problems.push(
         `QUEUE ORDER WRONG: finder/QA point(s) ${misordered.join(', ')} are queued AHEAD of open fix ` +
