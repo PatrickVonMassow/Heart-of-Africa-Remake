@@ -1083,6 +1083,18 @@ if (mosque) {
     dry.sky.grayMix === 0 && dry.sky.cloudBoost === 0,
     JSON.stringify(dry.sky),
   )
+  // Point 387 — one of the four checks that were red on `main` itself
+  // (27./28.07.2026): dry {sun 2.4, hemi 0.8} against wet {sun 1.993, hemi
+  // 0.664}, a 17 % dimming under a bar of 0.5. VERDICT: the CHECK's STAGING was
+  // wrong — neither the product nor the bar. It read the settlement light
+  // HALF-LERPED, and point 499's `settle()` above (the WHOLE reading, not `sun`
+  // alone) now waits for the state the rains actually reach. The bar is
+  // UNCHANGED at 0.5 and stays what §19.9's overcast promises: a dimming a
+  // player can see, not a nudge.
+  // MEASURED 07.08.2026, quiet machine, both backends (spread across runs
+  // < 0.01 on sun): WebGL 2 sun 2.386 -> 1.440 / hemi 0.795 -> 0.480, WebGPU sun
+  // 2.377 -> 1.440 / hemi 0.792 -> 0.480. The drop is ~0.94 against the bar of
+  // 0.5 — the criterion no longer sits on its own edge.
   check(
     'the rains dim the settlement sun and sky light',
     wet.sun < dry.sun - 0.5 && wet.hemi < dry.hemi,
@@ -1201,6 +1213,17 @@ if (mosque) {
       for (let i = 0; i < total; i++) if (data[i * 4 + 3] > 200) opaque++
       return { frac: opaque / total }
     })
+    // Point 387 — red on `main` at "bottom-quarter opaque 0.000", i.e. NOTHING
+    // opaque in the band at all. VERDICT: the PRODUCT was wrong, and neither the
+    // bar nor the staging. The band really was empty: point 545 found the shot
+    // compiling its pipelines asynchronously (0 of 92 objects ready at the
+    // shutter, 0 draw calls) and all four sectors covering the whole band
+    // because a per-sector renderer viewport is ignored when drawing into a
+    // render target. Both are fixed in panoramaCapture.ts; the bar of 0.7 is
+    // UNCHANGED.
+    // MEASURED 07.08.2026, quiet machine: 1.000 on WebGL 2 and 1.000 on WebGPU —
+    // the near ground fills the band's bottom quarter completely, so this
+    // criterion is nowhere near its own edge either.
     check(
       'the leave capture bakes the surrounding terrain into the band (point 227)',
       !!leaveBand && leaveBand.frac > 0.7,
@@ -1285,6 +1308,16 @@ if (mosque) {
   const westProbe = await magentaPx(Math.PI / 2, 20000)
   const eastProbe = await magentaPx(-Math.PI / 2, 2500)
   await page.evaluate(() => { delete window.__panoProbeOffset })
+  // Point 387 — red on `main` at "west 0px, east 0px". BOTH probes read zero, so
+  // the check was never reporting a MIRRORED band; it was reporting a BLANK one.
+  // VERDICT: the PRODUCT was wrong — the same empty-capture defect as the leave
+  // check above, fixed in panoramaCapture.ts by point 545 (synchronous pipeline
+  // compile at the shutter, one square shot per sector copied into its own
+  // column). The bar of 200 px, and the 10:1 west-over-east ratio, are UNCHANGED.
+  // MEASURED 07.08.2026, quiet machine: west 34418 px / east 0 px on WebGL 2 and
+  // west 54236 px / east 0 px on WebGPU. The west readings differ by backend
+  // (different pillar coverage at the same aim), but both are two orders of
+  // magnitude above the bar with the east side at exactly zero.
   check(
     'the band is compass-true: a probe placed due west shows west, not east',
     westProbe > 200 && eastProbe < westProbe / 10,
@@ -2185,6 +2218,19 @@ for (const [placeId, shot] of [
   })
 
   // Measured on both backends: OFF contrast 3-12, ON contrast 42-57.
+  //
+  // Point 387 — the ON check was red on `main` at per-stone [1.6, -1.3, 0]:
+  // three readings of three different signs, all sitting on zero. VERDICT: the
+  // CHECK's STAGING, not the product and not the bar. The pairs were read off
+  // pixels 1.5 s after entering the village, before the scene was drawn, so both
+  // probe points landed on the same unrendered ground — a blind probe reads no
+  // shadow whether or not one is cast. The scene is waited for and the cube-map
+  // rebuild polled out above (`settledContrasts`), and the bar stays 25 with the
+  // 2-of-3 majority: nothing here was loosened to reach green.
+  // MEASURED 07.08.2026, quiet machine: ON [54.1, 42.1, 48.1] on WebGL 2 and
+  // [47.5, 34.3, 42.2] on WebGPU (OFF [7.8, -0.5, 1.7] and [8.4, -1.3, 4.0]).
+  // Per-stone spread across the two backends is ~7 units, and the weakest stone
+  // sits 9 above the bar — this is not a criterion deciding on noise.
   const majority = (xs, ok) => xs.filter(ok).length >= 2
   check(
     'fire shadows OFF (forced): the ground behind a ring stone is as lit as beside it',
