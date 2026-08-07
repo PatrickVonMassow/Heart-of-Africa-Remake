@@ -1,8 +1,16 @@
 // The record half of the four-eyes gate on mechanisms (point 377).
 //
 //   node scripts/mechanism-review.mjs --record <sha> --model <name> \
-//       --verdict <merge|merge-with-fixes|do-not-merge> --evidence "<one line>"
+//       --verdict <merge|merge-with-fixes|do-not-merge> --evidence "<one line>" \
+//       [--point <N>]
 //   node scripts/mechanism-review.mjs --list
+//
+// `--point <N>` names the work-order point the review settles. It is what the
+// CRITICALITY gate (point 298, criticality-review-guard.mjs) looks for: that gate
+// judges a change by its DECLARED criticality rather than by its file path, so a
+// high-criticality point with no mechanism file in its diff is covered too. One
+// ledger and one command serve both gates — a guard change that closes a high
+// point is recorded ONCE, with the point named.
 //
 // The record is the hard part of this rule, so it is kept cheap and honest: one
 // appended line naming which model reviewed, how it ended, one line of evidence,
@@ -80,7 +88,7 @@ export function flag(args, name) {
  * Build the record for `sha`, reading the authoring model from the commit itself.
  * Returns { ok, record, errors } — the caller prints and exits.
  */
-export function buildRecord({ sha, model, verdict, evidence, now = Date.now(), resolve = resolveCommit }) {
+export function buildRecord({ sha, model, verdict, evidence, point = '', now = Date.now(), resolve = resolveCommit }) {
   const commit = resolve(sha)
   const check = validateRecord({
     sha: commit.sha,
@@ -89,7 +97,15 @@ export function buildRecord({ sha, model, verdict, evidence, now = Date.now(), r
     evidence,
     authoredBy: commit.authoredBy,
   })
-  if (!check.ok) return { ok: false, errors: check.errors }
+  const errors = [...check.errors]
+  // Optional, but never sloppy: a mistyped point number would record a review
+  // for a point nobody is closing, and the criticality gate would still block
+  // the real one while the ledger LOOKED like it held the answer.
+  const wanted = String(point ?? '').trim()
+  if (wanted && !/^\d+$/.test(wanted)) {
+    errors.push('--point <N>: the work-order point this review settles, as a plain number')
+  }
+  if (errors.length) return { ok: false, errors }
   return {
     ok: true,
     record: {
@@ -99,6 +115,7 @@ export function buildRecord({ sha, model, verdict, evidence, now = Date.now(), r
       model: String(model).trim(),
       verdict: String(verdict).trim(),
       evidence: String(evidence).trim(),
+      ...(wanted ? { point: Number(wanted) } : {}),
       at: now,
       atIso: new Date(now).toISOString(),
     },
@@ -130,7 +147,8 @@ if (isMainModule(import.meta.url)) {
       for (const r of records) {
         console.log(
           `${String(r.sha).slice(0, 7)}  ${String(r.verdict).padEnd(16)} by ${String(r.model).padEnd(12)} ` +
-            `(authored by ${r.authoredBy || 'unknown'})  ${r.atIso ?? ''}\n      ${r.evidence ?? ''}`,
+            `(authored by ${r.authoredBy || 'unknown'})${r.point ? `  point ${r.point}` : ''}  ${r.atIso ?? ''}` +
+            `\n      ${r.evidence ?? ''}`,
         )
       }
       process.exit(0)
@@ -142,13 +160,14 @@ if (isMainModule(import.meta.url)) {
       model: flag(args, '--model'),
       verdict: flag(args, '--verdict'),
       evidence: flag(args, '--evidence'),
+      point: flag(args, '--point'),
     })
     if (!built.ok) {
       console.error('mechanism-review: refusing to record this review.\n')
       for (const e of built.errors) console.error(`  · ${e}`)
       console.error(
         `\nusage: node scripts/mechanism-review.mjs --record <sha> --model <name> ` +
-          `--verdict <${VERDICTS.join('|')}> --evidence "<one line>"`,
+          `--verdict <${VERDICTS.join('|')}> --evidence "<one line>" [--point <N>]`,
       )
       process.exit(1)
     }
