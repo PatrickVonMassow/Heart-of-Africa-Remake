@@ -251,6 +251,7 @@ describe('node really fires uncaughtExceptionMonitor where the tap cannot see (F
     try {
       execFileSync(process.execPath, ['--input-type=module', '-e', fixture], {
         encoding: 'utf8',
+        windowsHide: true,
         // Captured, not forwarded: the fixture's crash trace belongs in the
         // assertion, not in the run log.
         stdio: ['ignore', 'pipe', 'pipe'],
