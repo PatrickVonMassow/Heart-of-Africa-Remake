@@ -191,10 +191,11 @@ export function promoteToNow(html, point, { title, times, status, stamp = berlin
     `<details class="now">\n  <summary><span class="t">${point} — ${title}</span>` +
     `<span class="right"><span class="meta">${times ?? stamp}</span></span></summary>\n` +
     `  <div class="body">\n${renderCardBody(status, { stamp })}\n  </div>\n</details>\n`
-  // The idle card goes with it (point 470): the moment a point is current work,
-  // "nothing is running" is false, and leaving it standing is how the board came
-  // to say both at once.
-  return insertAsFirstNowCard(stripNoCurrentWork(html.replace(card, '')), now)
+  // Both state cards go with it (points 470/544): the moment a point is current
+  // work, "nothing is running" is false and "only closing duties are left" is
+  // false, and leaving one standing is how the board came to say two things at
+  // once.
+  return insertAsFirstNowCard(stripStateCards(html.replace(card, '')), now)
 }
 
 /**
@@ -375,23 +376,83 @@ export function hasCurrentWork(html) {
 export const NO_CURRENT_WORK_TITLE = 'Gerade keine laufende Arbeit'
 
 /**
- * The idle card's markup, matched globally. Built from the title so the two can
- * never drift apart.
+ * The title of the card a session stands behind while it still owes the CLOSING
+ * DUTIES of a point it has already merged and ticked (point 544).
+ *
+ * WHY A THIRD KIND. The board could say two things — "idle" or "a numbered
+ * point" — and a session finishing its closing duties is NEITHER. The point-470
+ * deny then fires on every state-changing call, and neither remedy it names
+ * reaches the state: `now <N>` needs an open point that already has a queue
+ * card, and `none` rewrites only the REASON, never the title. Measured
+ * 07.08.2026: a finished retrospective refresh could not be committed, and
+ * filing the point about it was itself blocked. The deny is right and its bias
+ * stays — what was missing is a third thing a session can truthfully say.
  */
-const noWorkCardPattern = () =>
-  new RegExp(
-    `<details class="now">\\s*<summary><span class="t">${NO_CURRENT_WORK_TITLE}</span>[\\s\\S]*?</details>\\s*`,
-    'g',
-  )
+export const CLOSING_WORK_TITLE = 'Abschlussarbeiten zum gerade beendeten Punkt'
+
+/**
+ * The unnumbered STATE cards of the current-work section. They own no point
+ * number by design, so every rule written for a numbered card — the topic
+ * guard's foreign-point complaint above all — has to know them by name.
+ */
+export const STATE_CARD_TITLES = [NO_CURRENT_WORK_TITLE, CLOSING_WORK_TITLE]
+
+/** Is this now-card title one of the unnumbered state cards? */
+export function isStateCardTitle(title) {
+  return STATE_CARD_TITLES.includes(String(title ?? '').trim())
+}
+
+/**
+ * A state card's markup, matched globally. Built from the title so the card and
+ * the pattern that finds it can never drift apart. A fresh regex per call —
+ * a shared global one carries `lastIndex` between callers.
+ */
+const stateCardPattern = (title) =>
+  new RegExp(`<details class="now">\\s*<summary><span class="t">${title}</span>[\\s\\S]*?</details>\\s*`, 'g')
+
+const noWorkCardPattern = () => stateCardPattern(NO_CURRENT_WORK_TITLE)
+const closingCardPattern = () => stateCardPattern(CLOSING_WORK_TITLE)
 
 /** Every idle card standing in the document — normally none or one. */
 export function noCurrentWorkCards(html) {
   return String(html ?? '').match(noWorkCardPattern()) ?? []
 }
 
+/** Every closing card standing in the document — normally none or one. */
+export function closingWorkCards(html) {
+  return String(html ?? '').match(closingCardPattern()) ?? []
+}
+
 /** The document without any idle card. The state is REPLACED, never appended. */
 export function stripNoCurrentWork(html) {
   return String(html ?? '').replace(noWorkCardPattern(), '')
+}
+
+/** The document without any closing card. Same rule: a state replaces. */
+export function stripClosingWork(html) {
+  return String(html ?? '').replace(closingCardPattern(), '')
+}
+
+/**
+ * The document without ANY unnumbered state card. The three kinds are mutually
+ * exclusive (`board-structure-core` refuses a board carrying two), so whatever
+ * writes one kind clears the others in the same edit.
+ */
+export function stripStateCards(html) {
+  return stripClosingWork(stripNoCurrentWork(html))
+}
+
+/** Test a pattern against the current-work SECTION alone, not the whole board. */
+function testInNowSection(html, pattern) {
+  const text = String(html ?? '')
+  let scope = text
+  try {
+    const { from, end } = sectionBounds(text, 'now')
+    scope = text.slice(from, end)
+  } catch {
+    /* no section — judge the fragment as it stands */
+  }
+  return pattern.test(scope)
 }
 
 /**
@@ -402,17 +463,19 @@ export function stripNoCurrentWork(html) {
  *
  * A document without the section is answered from the whole text: a fragment is
  * all the caller has, and reading it is closer to the truth than saying "no".
+ *
+ * THE CLOSING CARD IS NOT THIS CLAIM (point 544). It says the opposite — work is
+ * still owed on the point that just ended — so the deny must not fire under it.
+ * That falls out of the title match; the tests pin it so no future widening of
+ * this predicate can quietly take the third card with it.
  */
 export function claimsNoCurrentWork(html) {
-  const text = String(html ?? '')
-  let scope = text
-  try {
-    const { from, end } = sectionBounds(text, 'now')
-    scope = text.slice(from, end)
-  } catch {
-    /* no section — judge the fragment as it stands */
-  }
-  return noWorkCardPattern().test(scope)
+  return testInNowSection(html, noWorkCardPattern())
+}
+
+/** Does the current-work section say that only closing duties are left? */
+export function claimsClosingWork(html) {
+  return testInNowSection(html, closingCardPattern())
 }
 
 /**
@@ -435,21 +498,53 @@ export function claimsNoCurrentWork(html) {
  * both sanctioned ways out named.
  */
 export function toNoCurrentWork(html, reason, { stamp = berlinStamp() } = {}) {
+  return writeStateCard(html, NO_CURRENT_WORK_TITLE, reason, {
+    stamp,
+    emptyReason: 'board: --none needs a reason — the reader must learn WHY nothing is running',
+    claim: 'that nothing is running',
+  })
+}
+
+/**
+ * The current-work card for a session that has MERGED AND TICKED its point and
+ * still owes its closing duties — the four-eyes record on the tick commit, the
+ * retrospective's new problem class (point 544). Unnumbered like the idle card,
+ * so it adds no point-per-section conflict; the reason says which duties are
+ * still owed.
+ *
+ * IT IS A STATE, like the idle card, and the two are mutually exclusive: writing
+ * this one clears any idle card standing, and the boundary's `none` clears this
+ * one. Refused while a NUMBERED card stands, for the same reason the idle card
+ * is: the board would contradict itself in one screen.
+ *
+ * IT IS NOT A CLAIM TO STOP. That is the whole point of it — `board-first-guard`
+ * denies under the idle card and lets the work through under this one.
+ */
+export function toClosingWork(html, reason, { stamp = berlinStamp() } = {}) {
+  return writeStateCard(html, CLOSING_WORK_TITLE, reason, {
+    stamp,
+    emptyReason: 'board: closing needs a reason — the reader must learn WHICH duties are still owed',
+    claim: 'that only closing duties are left',
+  })
+}
+
+/** Write one unnumbered state card, replacing whichever one stands. */
+function writeStateCard(html, title, reason, { stamp, emptyReason, claim }) {
   const text = String(reason ?? '').trim()
-  if (!text) throw new Error('board: --none needs a reason — the reader must learn WHY nothing is running')
+  if (!text) throw new Error(emptyReason)
   const standing = [...parseNowCardPoints(html)]
   if (standing.length) {
     throw new Error(
-      `board: refusing to claim that nothing is running while ${standing.join(', ')} still stands as current ` +
+      `board: refusing to claim ${claim} while ${standing.join(', ')} still stands as current ` +
         'work — the board would contradict itself in one screen. Close that card in the same edit ' +
         `(done ${standing[0]} --none "<reason>") or send it back (queue ${standing[0]}).`,
     )
   }
   const card =
-    `<details class="now">\n  <summary><span class="t">${NO_CURRENT_WORK_TITLE}</span>` +
+    `<details class="now">\n  <summary><span class="t">${title}</span>` +
     `<span class="right"><span class="meta">${stamp}</span></span></summary>\n` +
     `  <div class="body">\n${renderCardBody(text, { stamp })}\n  </div>\n</details>\n`
-  return insertAsFirstNowCard(stripNoCurrentWork(html), card)
+  return insertAsFirstNowCard(stripStateCards(html), card)
 }
 
 /**
