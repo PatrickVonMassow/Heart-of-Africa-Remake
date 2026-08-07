@@ -2206,6 +2206,67 @@ Two rules follow, and neither of them loosens a guard:
    reads the live Stop chain out of `.claude/settings.json` and fails on any
    guard whose message asks for the answer a second time.
 
+### The chain only fires from the repo root (07.08.2026, point 438)
+
+Every project hook is wired `node scripts/x.mjs` — a path resolved against the
+CURRENT WORKING DIRECTORY. A session whose cwd is not the repo root therefore
+loses the whole chain to a `Cannot find module`, and loses it in silence: a hook
+error is not a block. Measured over 46 transcripts (06.–29.07.2026), one session
+ran 99 hook failures against 11 hits, three more between 44/51 and 12/81; the
+failing cwds were the memory directory, `hoa/local`, `~/.claude` and a second
+checkout. The proof of cause is next door: the two USER-scope hooks are wired
+absolutely and never failed once.
+
+It is worse than an unwired guard. A guard blocks through stdout JSON with EXIT
+0, so a crash (exit 1) reads to the harness as "no objection" — the veto is not
+delayed, it is LOST. A `closing-guard` that never started would have let a
+version tag through.
+
+The repair is a path that does not depend on where the session stands:
+
+    node "$CLAUDE_PROJECT_DIR/scripts/x.mjs"          # POSIX shell, the default form
+    node -e "const p=require('path').resolve(process.env.CLAUDE_PROJECT_DIR||'.','scripts/x.mjs');process.argv.splice(1,0,p);import(require('url').pathToFileURL(p).href)"
+
+The second form is the fallback for a shell that does not expand `$VAR` the
+POSIX way — `cmd.exe` leaves it literal and PowerShell expands its own (unset)
+variable to nothing, and both failures are silent. It resolves the directory
+inside node, so no shell touches it, it contains no `$`, and with the env var
+missing it degrades to today's behaviour rather than to something worse. TWO
+traps, both measured on 07.08.2026 rather than reasoned about: `process.argv
+.splice(1,0,p)` is load-bearing, because `isMainModule` compares against
+`argv[1]` and a bootstrap without it imports the guard and runs NOTHING (exit 0,
+no output — indistinguishable from a clean turn); and an argument after `node -e`
+needs a `--` separator or node claims it as its own option. A hardcoded absolute
+path is the last resort only: `.claude/settings.json` is committed, and it would
+bind every checkout to one machine.
+
+THE ROLLOUT IS STAGED, and the staging is the point: one harmless
+high-frequency line first (`lock-heartbeat-hook`), verified in a NEW session
+started from a non-root cwd — settings are read at session start — and only then
+the other 34. Never all at once, because a failed expansion would disable all 35
+as silently as the bug it replaces. `.claude/settings.json` is a protected path,
+so every one of those edits is attended work; a headless session cannot make it.
+
+The check lives in `guard-health-core.mjs`, beside "can this enforcer fire at
+all", and it needs STRUCTURED input to be fair: it judges the settings' hook rows
+one at a time, never the concatenated wiring blob, because
+`scripts/git-hooks/pre-push` and `commit-msg` are relative ON PURPOSE — git runs
+a hook from the repo root — and a blob-wide grep would accuse two correct files.
+While the rollout runs, the still-relative lines are recorded in
+`RELATIVE_WIRING_ROLLOUT`, the same idiom as the dormancy map above and with the
+same ratchet: a hook outside the record must be anchored, and an entry whose line
+is already anchored is itself a finding, so the record cannot outlive the
+building site. `node scripts/guard-health-guard.mjs --wiring` prints the table
+with the replacement line for each row.
+
+One deliberate side effect, recorded because it changes what a delegated agent's
+turn is judged against: with `$CLAUDE_PROJECT_DIR` pointing at the session's
+project directory, a WORKTREE agent runs the MAIN tree's guards. That is better
+than today — its own checkout's copies act on a tree the merge never sees — but
+it is a decision, not an accident. The removed-worktree class is NOT fixed by
+any of this: a cwd that no longer exists kills the spawn itself, and that stays
+with the worktree-hygiene work.
+
 ## The site that quietly serves yesterday (06.08.2026, point 528)
 
 Every alarm this project had fires on a RED RUN. None fired on the page the user

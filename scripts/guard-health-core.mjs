@@ -80,6 +80,194 @@ export const KNOWN_UNTESTED = new Set([
   // one — prep-guard-core.mjs, with a test. The list only ever shrinks.
 ])
 
+// ---------------------------------------------------------------------------
+// CAN IT FIRE FROM ANY WORKING DIRECTORY? (point 438)
+//
+// The second way a wired guard turns out to be no guard: every project hook was
+// wired RELATIVELY (`node scripts/x.mjs`), so a session whose cwd is not the
+// repo root lost the WHOLE chain to a non-blocking `Cannot find module` —
+// silently, because a hook error produces no notice. Measured over 46
+// transcripts (06.–29.07.2026): one session 99 failures against 11 hits, three
+// more between 44/51 and 12/81. The failing cwds were the memory directory,
+// `hoa/local`, `~/.claude` and a second checkout. THE PROOF OF CAUSE: the two
+// user-scope hooks are wired absolutely and never failed once.
+//
+// It is worse than a missing hook, because a guard signals a block through
+// stdout JSON with EXIT 0 — a crashed guard exits 1, which the harness reads as
+// "no objection". The veto is not delayed, it is LOST: a crashed closing-guard
+// would have let a version tag through.
+//
+// The check is deliberately structural, not textual: it judges the hook COMMANDS
+// out of `.claude/settings.json`, one row each, never the concatenated wiring
+// blob. `scripts/git-hooks/pre-push` and `commit-msg` are relative ON PURPOSE
+// (git always runs a hook from the repo root), so a blob-wide grep would accuse
+// two correct files. They are excluded by construction: they are not in this
+// input at all.
+// ---------------------------------------------------------------------------
+
+/** A `scripts/<name>.mjs` path token as a hook command spells it, prefix included. */
+const SCRIPT_REF_RE = /[^\s"']*scripts[/\\][A-Za-z0-9._-]+\.mjs/g
+
+/** Every script path a hook command names, with the prefix that anchors it (or does not). */
+export function scriptRefsInCommand(command) {
+  return String(command ?? '').match(SCRIPT_REF_RE) ?? []
+}
+
+/**
+ * How a single path token resolves:
+ *   'project-dir'  anchored on $CLAUDE_PROJECT_DIR (POSIX, braced, or %VAR% for cmd)
+ *   'absolute'     a full path — it fires, but binds this committed file to one
+ *                  checkout, so it is the last resort, never the goal
+ *   'relative'     resolved against the cwd, i.e. against luck
+ */
+export function refAnchoring(ref) {
+  const text = String(ref ?? '')
+  if (/^(\$\{?CLAUDE_PROJECT_DIR\}?|%CLAUDE_PROJECT_DIR%)[/\\]/.test(text)) return 'project-dir'
+  if (/^([A-Za-z]:[/\\]|[/\\])/.test(text)) return 'absolute'
+  return 'relative'
+}
+
+/**
+ * Judge a whole command. A command that resolves the project directory INSIDE
+ * node (`process.env.CLAUDE_PROJECT_DIR`) is anchored whatever its literal path
+ * looks like — that is the shell-agnostic bootstrap kept in reserve for a shell
+ * that does not expand `$VAR`, and it must not be accused for the relative
+ * string it necessarily contains.
+ */
+export function commandAnchoring(command) {
+  const text = String(command ?? '')
+  const refs = scriptRefsInCommand(text)
+  if (refs.length === 0) return { refs: [], relative: [], anchored: true, kind: 'no-script' }
+  if (text.includes('process.env.CLAUDE_PROJECT_DIR')) {
+    return { refs, relative: [], anchored: true, kind: 'bootstrap' }
+  }
+  const kinds = refs.map((r) => refAnchoring(r))
+  const relative = refs.filter((_, i) => kinds[i] === 'relative')
+  return { refs, relative, anchored: relative.length === 0, kind: kinds[0] }
+}
+
+/** Rewrite a relatively wired command into the anchored form, for the rollout. */
+export function anchorCommand(command) {
+  return String(command ?? '').replace(SCRIPT_REF_RE, (ref) =>
+    refAnchoring(ref) === 'relative' ? `"$CLAUDE_PROJECT_DIR/${ref.replace(/\\/g, '/')}"` : ref,
+  )
+}
+
+/**
+ * The hooks still wired relatively, as a RECORDED, SHRINKING list.
+ *
+ * Why a list at all: rewiring lives in `.claude/settings.json`, a protected path
+ * that only an attended session may edit, and the rollout is staged on purpose —
+ * ONE harmless high-frequency hook first (`lock-heartbeat-hook`), verified in a
+ * NEW session from a non-root cwd, and only then the rest. Never all at once: a
+ * failed expansion would disable all 35 silently, which is the very failure this
+ * point exists to end. A guard that blocked the whole chain the moment the check
+ * landed would have trapped the headless batch on an edit it is not allowed to
+ * make.
+ *
+ * So this is the same idiom as INTENTIONALLY_DORMANT above, and it carries the
+ * same ratchet: a hook NOT in this list must be anchored, and an entry that is
+ * no longer relative is itself a finding — it must be removed in the commit that
+ * rewires it, so the record can never outlive the state it describes.
+ */
+export const RELATIVE_WIRING_ROLLOUT = {
+  reason:
+    'Staged rollout of point 438: `.claude/settings.json` is a protected path, so each line is rewired by an ' +
+    'attended session — the pilot (lock-heartbeat-hook) first, verified in a new session started outside the ' +
+    'repo root, then the rest. Remove a name here in the SAME commit that anchors its hook line.',
+  scripts: [
+    'batch-progress-guard.mjs',
+    'batch-resume-hook.mjs',
+    'board-first-guard.mjs',
+    'branch-hygiene-guard.mjs',
+    'ci-status-guard.mjs',
+    'closing-guard.mjs',
+    'container-ask-guard.mjs',
+    'criticality-review-guard.mjs',
+    'dashboard-card-topic-guard.mjs',
+    'dashboard-conciseness-guard.mjs',
+    'dashboard-guard.mjs',
+    'dashboard-integrity-guard.mjs',
+    'dashboard-reminder-hook.mjs',
+    'dashboard-sync.mjs',
+    'decision-card-guard.mjs',
+    'doc-budget-guard.mjs',
+    'findings-guard.mjs',
+    'firewall-guard.mjs',
+    'guard-health-guard.mjs',
+    'guide-brevity-guard.mjs',
+    'lock-heartbeat-hook.mjs',
+    'lock-release-hook.mjs',
+    'mechanism-review-guard.mjs',
+    'model-guard.mjs',
+    'prep-arm-hook.mjs',
+    'prep-guard.mjs',
+    'push-arrival-guard.mjs',
+    'queue-order-guard.mjs',
+    'render-verify-guard.mjs',
+    'retro-currency-guard.mjs',
+    'rule-review-guard.mjs',
+    'tasks-archive-guard.mjs',
+    'tasks-spec-guard.mjs',
+    'timestamp-guard.mjs',
+    'worktree-reminder.mjs',
+  ],
+}
+
+/** The script a hook command runs, for naming it in a finding. */
+function scriptOf(ref) {
+  const m = /([A-Za-z0-9._-]+\.mjs)$/.exec(String(ref ?? ''))
+  return m ? m[1] : String(ref ?? '')
+}
+
+/**
+ * Judge the ANCHORING of the wired project hooks.
+ *
+ *   hookCommands  [{ event, matcher, command }] out of `.claude/settings.json`.
+ *                 null/undefined means "not measured" — an unreadable settings
+ *                 file is a measurement failure, never a finding (fail-open).
+ *   rollout       override for RELATIVE_WIRING_ROLLOUT (tests inject their own)
+ */
+export function auditHookAnchoring({ hookCommands = null, rollout = RELATIVE_WIRING_ROLLOUT } = {}) {
+  const violations = []
+  if (!Array.isArray(hookCommands) || hookCommands.length === 0) return violations
+  const recorded = new Set(Array.isArray(rollout?.scripts) ? rollout.scripts : [])
+  const stillRelative = new Set()
+
+  for (const row of hookCommands) {
+    const command = String(row?.command ?? '')
+    const where = row?.event ? `${row.event}${row.matcher ? `(${row.matcher})` : ''}` : 'hook'
+    const { relative } = commandAnchoring(command)
+    for (const ref of relative) {
+      const script = scriptOf(ref)
+      stillRelative.add(script)
+      if (recorded.has(script)) continue
+      violations.push({
+        kind: 'relative-hook-wiring',
+        script,
+        detail:
+          `${where} ruft \`${command}\` mit einem cwd-relativen Pfad auf. Eine Sitzung, deren Arbeitsverzeichnis ` +
+          'nicht die Repo-Wurzel ist, bekommt dafür ein nicht-blockierendes `Cannot find module` — der Hook ist ' +
+          `still tot und die Regel gilt trotzdem als abgesichert. Anker setzen: \`${anchorCommand(command)}\`.`,
+      })
+    }
+  }
+
+  for (const script of recorded) {
+    if (stillRelative.has(script)) continue
+    violations.push({
+      kind: 'stale-relative-record',
+      script,
+      detail:
+        `${script} steht in RELATIVE_WIRING_ROLLOUT, ist aber nicht mehr relativ verdrahtet — der Eintrag ` +
+        'gehört in denselben Commit wie die Anker-Zeile entfernt, sonst behauptet die Liste weiter eine ' +
+        'Baustelle, die es nicht gibt.',
+    })
+  }
+
+  return violations
+}
+
 /**
  * Judge the health of the enforcer set.
  *
@@ -89,6 +277,8 @@ export const KNOWN_UNTESTED = new Set([
  *                actually IMPORTS can be read rather than guessed from its name
  *   wiredText    concatenated text of everything that can INVOKE an enforcer —
  *                the hook settings plus any git hooks that are actually active
+ *   hookCommands the settings' hook rows, structured — the ANCHORING check needs
+ *                to know which line came from where, which the blob cannot say
  *   dormant      override for INTENTIONALLY_DORMANT (tests inject their own)
  *
  * Returns { ok, violations: [{ kind, script, detail }], report }.
@@ -97,8 +287,10 @@ export function auditGuardHealth({
   files = [],
   sources = {},
   wiredText = '',
+  hookCommands = null,
   dormant = INTENTIONALLY_DORMANT,
   knownUntested = KNOWN_UNTESTED,
+  rollout = RELATIVE_WIRING_ROLLOUT,
 } = {}) {
   const all = Array.isArray(files) ? files : []
   const names = all.filter((f) => ENFORCER_RE.test(f))
@@ -180,6 +372,8 @@ export function auditGuardHealth({
     }
   }
 
+  violations.push(...auditHookAnchoring({ hookCommands, rollout }))
+
   return { ok: violations.length === 0, violations, report }
 }
 
@@ -210,5 +404,8 @@ export function formatGuardHealth(violations) {
     'Ein Wächter, der nie auslösen kann, ist so kaputt wie einer, der immer auslöst —',
     'nur schlimmer, weil die Regel als abgesichert gilt und niemand mehr nachsieht.',
     'Prüfen mit: node scripts/guard-health-guard.mjs --status',
+    ...(violations.some((v) => v.kind === 'relative-hook-wiring' || v.kind === 'stale-relative-record')
+      ? ['Verdrahtung im Detail:  node scripts/guard-health-guard.mjs --wiring']
+      : []),
   ].join('\n')
 }
