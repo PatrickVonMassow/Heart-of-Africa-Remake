@@ -890,7 +890,13 @@ await page.evaluate((z) => window.__ui.getState().setTravelZoom(z), zoomBefore)
 // is checked here is the invariant itself: that a normal run of scene switches,
 // detail-level changes and effect toggles leaves it silent, and that a REAL
 // leak — render targets allocated and never disposed — makes it scream.
-{
+// Everything here needs the watch's dev hook, and one build reaches this suite
+// without it: the baseline classifier runs THIS script against an OLDER tree's
+// server. That must cost one honest failed check, not an exception that aborts
+// the suite seven checks early and makes the comparison unreadable.
+if ((await page.evaluate(() => window.__renderLeak != null)) === false) {
+  check('the render-resource leak watch is armed', false, 'window.__renderLeak missing (older build?)')
+} else {
   const errsBeforeLeak = errors.length
   const leakState = () => page.evaluate(() => window.__renderLeak?.state() ?? null)
   check('the render-resource leak watch is armed', (await leakState()) !== null)
