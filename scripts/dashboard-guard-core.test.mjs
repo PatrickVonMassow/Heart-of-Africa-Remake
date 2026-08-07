@@ -18,6 +18,7 @@ import {
   findTransliterations,
   sliceSections,
   parseCards,
+  footerOpenCount,
   auditDashboard,
   evaluate,
   ERLEDIGT_ON_BOARD,
@@ -628,6 +629,84 @@ describe('auditDashboard — the 25.07 witnesses', () => {
   it('is total on missing/malformed input', () => {
     expect(auditDashboard(null, base)).toEqual([])
     expect(() => auditDashboard(boardHtml(), { open: 'x', done: null, doneSeen: 'nope' })).not.toThrow()
+  })
+})
+
+// THE FOOTER CHECK BINDS TO THE FOOTER (measured 07.08.2026).
+// It used to search the WHOLE document for the first "NN offene Punkte", so a
+// queue card whose prose legitimately said "29 offene Punkte" made it report
+// "the footer claims 29 open points, TASKS.md has 114" while the real footer
+// read the correct 114 — and it refused the attest until the card was reworded,
+// enforcing a rule nothing states. Both directions are pinned here: card prose
+// never triggers it, a genuinely stale footer still does.
+describe('footer currency reads the footer element, not a card', () => {
+  const base = { open: [210, 211, 204], done: [209], doneSeen: [209] }
+  const codes = (html, o = {}) => auditDashboard(html, { ...base, ...o }).map((v) => v.code)
+  const stale = (html, o = {}) => auditDashboard(html, { ...base, ...o }).find((v) => v.code === 'footer-stale')
+  const footer = (text) => `<footer>${text}</footer>`
+  /** The 07.08 shape: a QUEUE card whose prose names an open-point count. */
+  const cardSaying = (text) => boardHtml().replace('<p>Kurzstand.</p>', `<p>${text}</p>`)
+
+  describe('footerOpenCount', () => {
+    it('reads the figure out of the footer, in both German forms', () => {
+      expect(footerOpenCount(footer('Stand: 07.08.2026, 09:12 (Europe/Berlin) · 114 offene Punkte · lädt neu.'))).toBe(114)
+      expect(footerOpenCount(footer('Stand: 07.08.2026 · 1 offener Punkt · lädt neu.'))).toBe(1)
+      expect(footerOpenCount(footer('Stand: 07.08.2026 · 7 offenen Punkten'))).toBe(7)
+    })
+    it('reads through markup inside the footer and through its attributes', () => {
+      expect(footerOpenCount('<footer class="foot" id="f"><span class="n">42</span> offene Punkte</footer>')).toBe(42)
+    })
+    it('is null where nothing states a count: no footer, a countless footer, non-strings', () => {
+      expect(footerOpenCount(boardHtml())).toBe(null)
+      expect(footerOpenCount(footer('Stand: 07.08.2026 · lädt sich alle 30 s selbst neu.'))).toBe(null)
+      expect(footerOpenCount(null)).toBe(null)
+      expect(footerOpenCount(undefined)).toBe(null)
+      expect(footerOpenCount(123)).toBe(null)
+    })
+    it('never reads a count out of a card, a heading or a script', () => {
+      expect(footerOpenCount(cardSaying('Damals waren es 29 offene Punkte.'))).toBe(null)
+      expect(footerOpenCount('<h2>29 offene Punkte</h2><script>const t = "8 offene Punkte"</script>')).toBe(null)
+      expect(footerOpenCount(cardSaying('29 offene Punkte') + footer('3 offene Punkte'))).toBe(3)
+    })
+  })
+
+  it('passes a card that names a DIFFERENT count while the footer agrees with the work order', () => {
+    const html = cardSaying('Der Rückstand betrug 29 offene Punkte.') + footer('Stand: 07.08.2026 · 3 offene Punkte')
+    expect(codes(html)).not.toContain('footer-stale')
+    expect(auditDashboard(html, base)).toEqual([])
+  })
+
+  it('blocks a genuinely stale footer and names BOTH numbers', () => {
+    const v = stale(boardHtml() + footer('Stand: 07.08.2026 · 15 offene Punkte'))
+    expect(v).toBeTruthy()
+    expect(v.msg).toMatch(/claims 15 open points/)
+    expect(v.msg).toMatch(/TASKS\.md has 3/)
+    // …and the remedy names the publish that derives the figure.
+    expect(v.msg).toContain('node scripts/board-publish.mjs')
+  })
+
+  it('still blocks the stale footer when a card happens to state the RIGHT count', () => {
+    expect(codes(cardSaying('3 offene Punkte offen.') + footer('15 offene Punkte'))).toContain('footer-stale')
+  })
+
+  it('fails OPEN on a document with no footer — even one whose card names a count', () => {
+    expect(codes(boardHtml())).not.toContain('footer-stale')
+    expect(codes(cardSaying('29 offene Punkte'))).not.toContain('footer-stale')
+    expect(codes(cardSaying('29 offene Punkte'), { open: [1] })).not.toContain('footer-stale')
+  })
+
+  it('fails OPEN on a footer that states no count at all', () => {
+    expect(codes(boardHtml() + footer('Stand: 07.08.2026 · lädt sich alle 30 s selbst neu.'))).not.toContain('footer-stale')
+  })
+
+  it('holds for the singular the publish writes', () => {
+    expect(codes(boardHtml() + footer('Stand: 07.08.2026 · 1 offener Punkt'), { open: [210] })).not.toContain('footer-stale')
+    expect(stale(boardHtml() + footer('Stand: 07.08.2026 · 1 offener Punkt')).msg).toMatch(/claims 1 open points/)
+  })
+
+  it('says nothing while the work order lists no open point, and never throws', () => {
+    expect(codes(boardHtml() + footer('15 offene Punkte'), { open: [] })).not.toContain('footer-stale')
+    expect(() => auditDashboard(boardHtml() + footer('15 offene Punkte'), { open: null })).not.toThrow()
   })
 })
 
