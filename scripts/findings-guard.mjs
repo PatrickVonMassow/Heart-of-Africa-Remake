@@ -7,17 +7,27 @@
 // deliberate and differs from timestamp-guard: this guard asks for judgement
 // ("was there something worth keeping?"), and a guard that blocks on its own
 // blindness would train the reader to route around it.
-import { readFileSync } from 'node:fs'
+import { readFileSync, statSync } from 'node:fs'
 import { auditFindings, formatFindings, parseCarrier, tallyTurn, turnCalls, turnTakesBoundary } from './findings-core.mjs'
 import { carrierPath, ownsBatch } from './findings-paths.mjs'
 import { repoPath } from './repo-paths.mjs'
 import { isMainModule } from './is-main.mjs'
 
 const STATE_PATH = repoPath('.claude/dashboard-state.json')
+const IN_FLIGHT_PATH = repoPath('.claude/batch-in-flight.json')
 
 function readJson(path) {
   try {
     return JSON.parse(readFileSync(path, 'utf8'))
+  } catch {
+    return null
+  }
+}
+
+/** When a file was last written, or null. Null judges nothing. */
+function mtimeMs(path) {
+  try {
+    return statSync(path).mtimeMs
   } catch {
     return null
   }
@@ -93,6 +103,12 @@ export function gatherFindingsInputs({ sessionId = '', transcriptPath = null } =
       carrierPending: carrier.pending.length,
       carrierRequests: carrier.requests.length,
       atBoundary,
+      // WHEN the declaration was last WRITTEN, so the delegation exemption can
+      // be earned rather than claimed (point 437 G): a turn that ran the command
+      // and had it REFUSED — no lock, no evidence, dead evidence — leaves this
+      // file untouched, and the exemption then does not apply to it.
+      declarationWrittenAt: mtimeMs(IN_FLIGHT_PATH),
+      turnStartedAt: resolved.turnStartedAt,
     },
   }
 }
