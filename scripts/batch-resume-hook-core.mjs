@@ -37,13 +37,26 @@ import { CLAIM_MAX_AGE_MS } from './batch-claim-core.mjs'
  * over instead. The board's Warteschlange, which DOES have to list them all,
  * builds its own list from the work order (`board-queue.mjs import`).
  */
-export function openPointsHeadline(openNumbers = []) {
+/** At most a handful of numbers, then a count — the headline may not grow with the queue. */
+const namedFew = (nums, max = 6) =>
+  nums.length > max ? `${nums.slice(0, max).join(', ')} and ${nums.length - max} more` : nums.join(', ')
+
+export function openPointsHeadline(openNumbers = [], { gated = [] } = {}) {
   const nums = (openNumbers ?? []).map(Number).filter(Number.isFinite)
+  const waiting = (gated ?? []).map(Number).filter(Number.isFinite)
   const head = nums[0]
   return (
     `[batch-resume] TASKS.md has ${nums.length} open point(s); the first in work-order ` +
     `order is ${head ?? 'none'}` +
-    (head === undefined ? '. ' : ` (node scripts/point-brief.mjs ${head} for its spec; TASKS.md for the rest). `)
+    (head === undefined ? '. ' : ` (node scripts/point-brief.mjs ${head} for its spec; TASKS.md for the rest). `) +
+    // THE GATED POINTS ARE NAMED, NOT OFFERED (point 450). A fresh session must
+    // not pick up a point that cannot proceed without an answer — but it must
+    // know one is waiting, or it would read the shorter queue as progress.
+    (waiting.length
+      ? `${waiting.length} further point(s) WAIT ON THE USER and are skipped: ${namedFew(waiting)} — ` +
+        'do not start them (node scripts/defer-for-user.mjs --list for the recorded reasons; ' +
+        '--clear <N> when the answer arrives, which puts the point back at the head of the queue). '
+      : '')
   )
 }
 
