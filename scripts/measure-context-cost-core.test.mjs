@@ -16,6 +16,11 @@ import {
   measureCost,
   sessionProfile,
   derivedRate,
+  projectSlug,
+  mainCheckoutOf,
+  transcriptCandidates,
+  resolveTranscriptDir,
+  LEGACY_TRANSCRIPT_SLUG,
 } from './measure-context-cost-core.mjs'
 
 const usage = (over = {}) => ({
@@ -180,5 +185,82 @@ describe('derivedRate — the anchor is carried, never re-invented', () => {
     expect(derivedRate({ ratio: 1.02, anchorRatePerHour: 0.6, fits: 0.6 }).underCeiling).toBe(false)
     // The measured reality on 30.07.2026: the boundary works, and it is not enough.
     expect(derivedRate({ ratio: 0.888 })).toEqual({ rate: 1.11, underCeiling: false })
+  })
+})
+
+// THE MISS THAT READ AS A MEASUREMENT (07.08.2026): the folder was a hard-coded
+// Windows slug, so on the Linux container the tool found nothing, printed `n/a`
+// everywhere and exited 0. What is pinned here is that the folder is DERIVED and that
+// finding none is a THROW.
+describe('projectSlug — the harness key for a checkout path', () => {
+  it('dashes every non-alphanumeric character and lowercases the drive letter', () => {
+    expect(projectSlug('C:\\Users\\Patri\\Documents\\Developing\\hoa')).toBe(LEGACY_TRANSCRIPT_SLUG)
+    expect(projectSlug('/workspace/hoa')).toBe('-workspace-hoa')
+  })
+
+  it('keeps a trailing separator as the trailing dash the harness would write', () => {
+    expect(projectSlug('/workspace/hoa/')).toBe('-workspace-hoa-')
+  })
+})
+
+describe('mainCheckoutOf — a worktree writes under the main checkout key', () => {
+  it('strips the worktree suffix, with or without a trailing slash', () => {
+    expect(mainCheckoutOf('/workspace/hoa/.claude/worktrees/agent-abc')).toBe('/workspace/hoa')
+    expect(mainCheckoutOf('/workspace/hoa/.claude/worktrees/agent-abc/')).toBe('/workspace/hoa')
+    expect(mainCheckoutOf('C:\\repo\\.claude\\worktrees\\agent-abc')).toBe('C:/repo')
+  })
+
+  it('is null for a plain checkout — there is nothing above it', () => {
+    expect(mainCheckoutOf('/workspace/hoa')).toBe(null)
+    expect(mainCheckoutOf('')).toBe(null)
+  })
+})
+
+describe('transcriptCandidates — derived, most specific first', () => {
+  const join = (a, b) => `${a}/${b}`
+
+  it('offers the checkout slug, then the legacy folder', () => {
+    expect(transcriptCandidates({ repoRoot: '/workspace/hoa', projectsDir: '/p', join })).toEqual([
+      '/p/-workspace-hoa',
+      `/p/${LEGACY_TRANSCRIPT_SLUG}`,
+    ])
+  })
+
+  it('offers a trailing-dash slug AND its stripped form — both directories exist for real', () => {
+    const got = transcriptCandidates({ repoRoot: '/workspace/hoa/', projectsDir: '/p', join })
+    expect(got.slice(0, 2)).toEqual(['/p/-workspace-hoa-', '/p/-workspace-hoa'])
+  })
+
+  it('adds the main checkout behind a worktree, and repeats no candidate', () => {
+    const got = transcriptCandidates({
+      repoRoot: '/workspace/hoa/.claude/worktrees/agent-abc/',
+      projectsDir: '/p',
+      join,
+    })
+    expect(got).toContain('/p/-workspace-hoa')
+    expect(new Set(got).size).toBe(got.length)
+  })
+})
+
+describe('resolveTranscriptDir — looks, and refuses to guess', () => {
+  it('resolves to the one candidate that HOLDS transcripts', () => {
+    const candidates = ['/p/empty', '/p/real', '/p/also-real']
+    expect(resolveTranscriptDir(candidates, (d) => d === '/p/real' || d === '/p/also-real')).toBe('/p/real')
+  })
+
+  it('THROWS when no candidate holds one, naming every path tried', () => {
+    const candidates = ['/p/a', '/p/b']
+    expect(() => resolveTranscriptDir(candidates, () => false)).toThrow(/\/p\/a[\s\S]*\/p\/b/)
+    expect(() => resolveTranscriptDir(candidates, () => false)).toThrow(/MEASURE_TRANSCRIPTS_DIR/)
+  })
+
+  it('skips a candidate that exists but holds nothing — that was the old silent zero', () => {
+    // `/p/stale` is a real directory to the probe's caller; only "holds a transcript"
+    // may decide, so the resolver walks past it to the folder that does.
+    expect(resolveTranscriptDir(['/p/stale', '/p/real'], (d) => d === '/p/real')).toBe('/p/real')
+  })
+
+  it('throws on an empty candidate list rather than returning nothing', () => {
+    expect(() => resolveTranscriptDir([], () => true)).toThrow(/no candidates/)
   })
 })

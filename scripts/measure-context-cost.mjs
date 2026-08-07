@@ -12,29 +12,67 @@
 // The transcripts live OUTSIDE the repository (~/.claude/projects/…), which is why this
 // reads them rather than shipping their numbers: a figure in a document cannot be
 // re-derived, and this project has already been bitten by an estimated number presented
-// as a measured one.
+// as a measured one. WHICH folder that is, is DERIVED from the checkout (the harness
+// keys it by project path, so it differs per host) and a run that finds none FAILS —
+// the hard-coded slug used to make an empty container run look like a measurement.
 import { createReadStream, existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { createInterface } from 'node:readline'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { REPO_ROOT } from './repo-paths.mjs'
-import { measureCost, derivedRate, sessionProfile, LARGE_CONTEXT_TOKENS } from './measure-context-cost-core.mjs'
+import {
+  measureCost,
+  derivedRate,
+  sessionProfile,
+  mainCheckoutOf,
+  resolveTranscriptDir,
+  transcriptCandidates,
+  LARGE_CONTEXT_TOKENS,
+} from './measure-context-cost-core.mjs'
 
-const TRANSCRIPTS = join(homedir(), '.claude', 'projects', 'c--Users-Patri-Documents-Developing-hoa')
-const BOUNDARY_LOG = join(REPO_ROOT, '.claude', 'boundary.log')
+/** Does this folder hold at least one usable transcript? The size floor is the same
+ *  one `readTurns` applies — a folder of stubs is not a transcript folder. */
+function hasTranscripts(dir) {
+  try {
+    return readdirSync(dir).some((f) => f.endsWith('.jsonl') && statSync(join(dir, f)).size >= 1000)
+  } catch {
+    return false
+  }
+}
+
+/**
+ * The transcript folder for THIS machine and checkout, or a throw naming what was
+ * tried (see the core module for why the old hard-coded slug had to go).
+ * `MEASURE_TRANSCRIPTS_DIR` overrides everything, for a copied-off archive.
+ */
+export function transcriptDir({ repoRoot = REPO_ROOT, home = homedir(), env = process.env } = {}) {
+  if (env.MEASURE_TRANSCRIPTS_DIR) {
+    return resolveTranscriptDir([env.MEASURE_TRANSCRIPTS_DIR], hasTranscripts)
+  }
+  const projectsDir = join(home, '.claude', 'projects')
+  return resolveTranscriptDir(transcriptCandidates({ repoRoot, projectsDir, join }), hasTranscripts)
+}
+
+/** The boundary log, which lives in the MAIN checkout — a worktree has its own
+ *  `.claude/` and none of the batch's history in it. */
+const BOUNDARY_LOGS = [REPO_ROOT, mainCheckoutOf(REPO_ROOT)]
+  .filter(Boolean)
+  .map((root) => join(root, '.claude', 'boundary.log'))
 
 /** WHEN the boundary mechanism first fired, read from the log that records it. Falls
  *  back to null, in which case the caller must name a moment — guessing a calendar day
  *  would make the whole comparison a coincidence. */
-export function firstHandoverAt(logPath = BOUNDARY_LOG) {
-  try {
-    for (const line of readFileSync(logPath, 'utf8').split('\n')) {
-      if (!line.includes('HANDOVER')) continue
-      const at = Date.parse(line.slice(1, line.indexOf(']')))
-      if (Number.isFinite(at)) return at
+export function firstHandoverAt(logPaths = BOUNDARY_LOGS) {
+  for (const logPath of [logPaths].flat()) {
+    try {
+      for (const line of readFileSync(logPath, 'utf8').split('\n')) {
+        if (!line.includes('HANDOVER')) continue
+        const at = Date.parse(line.slice(1, line.indexOf(']')))
+        if (Number.isFinite(at)) return at
+      }
+    } catch {
+      /* no log here — try the next, else the caller decides */
     }
-  } catch {
-    /* no log — the caller decides */
   }
   return null
 }
@@ -43,7 +81,7 @@ export function firstHandoverAt(logPath = BOUNDARY_LOG) {
  * Every assistant turn with usage, deduplicated. A transcript repeats one turn's usage
  * across its streamed lines, so counting lines would multiply the spend by three.
  */
-export async function readTurns(dir = TRANSCRIPTS) {
+export async function readTurns(dir = transcriptDir()) {
   const turns = []
   const seen = new Set()
   if (!existsSync(dir)) return turns
@@ -89,11 +127,20 @@ if (isMain) {
     )
     process.exit(1)
   }
-  const turns = await readTurns()
+  const dir = transcriptDir()
+  const turns = await readTurns(dir)
+  // A folder that holds files but yields no usable turn is the same miss one step
+  // later — say so instead of printing a table of `n/a`.
+  if (turns.length === 0) {
+    console.error(`no assistant turns with usage in ${dir} — nothing to measure.`)
+    process.exit(1)
+  }
   const result = measureCost({ turns, boundaryAt })
   const rate = derivedRate({ ratio: result.ratio })
   const profile = sessionProfile({ turns, boundaryAt })
   const out = {
+    transcriptDir: dir,
+    turnsRead: turns.length,
     boundaryAt: new Date(boundaryAt).toISOString(),
     largeContextTokens: LARGE_CONTEXT_TOKENS,
     ...result,
@@ -107,6 +154,7 @@ if (isMain) {
     const row = (name, s) =>
       `  ${name.padEnd(7)} ${String(s.turns).padStart(6)} turns  ${String(s.activeHours).padStart(7)} active h  ` +
       `${String(s.weightedPerHour ?? 'n/a').padStart(9)} weighted/h  large-context share ${pct(s.largeShare)}`
+    console.log(`read ${turns.length} turns from ${dir}`)
     console.log(`boundary first fired ${out.boundaryAt}; "large" context is ≥ ${LARGE_CONTEXT_TOKENS.toLocaleString('en-US')} tokens`)
     console.log(row('BEFORE', result.before))
     console.log(row('AFTER', result.after))
