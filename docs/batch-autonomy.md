@@ -1623,6 +1623,7 @@ unreadable page is **never** called current.
     node scripts/board-queue.mjs import      # take over cards the data file lacks
     node scripts/board.mjs title <N> "…"     # retitle a now- OR queue card
     node scripts/board.mjs none "<Grund>"    # the gap card, with NO point to close
+    node scripts/board.mjs closing "<Grund>" # …still owed: the closing duties
 
 **Every text goes in on stdin, and a flag is never prose.** `--text-stdin` now
 fills whichever field it follows in both commands, `--none`'s reason included —
@@ -1655,6 +1656,25 @@ focus/publish deny it does NOT stand down after firing once — its remedy is a
 single never-blocked command, and standing down would leave the lie on the board
 for the rest of a turn that demonstrably kept working. `batch-boundary.mjs` reads
 the board and prints whichever of the two commands actually works.
+
+**A THIRD THING A SESSION CAN SAY (point 544).** The section could say "a
+numbered point" or "nothing is running", and a session that has merged and TICKED
+its point while still owing its closing duties — the four-eyes record on the tick
+commit, the retrospective's new problem class — is neither. Under the idle card
+the deny above then stopped every one of those calls, and neither remedy it names
+reaches that state: `now <N>` needs an open point that already has a queue card,
+and `none` rewrites only the reason, never the title. Measured 07.08.2026: a
+finished retrospective refresh could not be committed, filing the point about it
+was itself blocked, and the session raised the next queue point early just to get
+a card it could stand behind — working AROUND the guard, the one thing this chain
+cannot afford. `board.mjs closing "<Grund>"` writes an unnumbered third state
+card ("Abschlussarbeiten zum gerade beendeten Punkt"). It is not the claim to
+stop, so the duties go through; it replaces whichever state card stands and a
+promotion sweeps it away, like the other two; the card guards read it as the
+unnumbered card it is, so naming the point it closes is no cross-reference; the
+publish-time structure gate refuses a section that mixes two kinds or stacks one;
+and `batch-boundary.mjs` still prints `board.mjs none`, so the claim to stop is
+made exactly once, at the end.
 
 **A READ IS JUDGED AS ONE (point 473).** The first classifier matched regexes over
 the whole command STRING, and within minutes it denied two pure reads: a `grep` of

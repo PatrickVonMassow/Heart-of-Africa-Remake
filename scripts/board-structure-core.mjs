@@ -19,6 +19,13 @@
 // It deliberately checks STRUCTURE only — nothing about content, freshness or
 // wording, which the consistency audit already owns. Pure and total: it never
 // throws, so a publish can never be blocked by this module misbehaving.
+//
+// The one import is the board's OWN names for its two unnumbered state cards
+// (point 544): which KIND a current-work card is cannot be judged from markup
+// alone, and spelling those titles a second time here is how the writer and the
+// gate would drift apart. board-core does not import this module, so the
+// direction cannot become a cycle.
+import { CLOSING_WORK_TITLE, NO_CURRENT_WORK_TITLE } from './board-core.mjs'
 
 /** The four sections, in the order the user's mandate fixes them. */
 export const REQUIRED_SECTIONS = [
@@ -124,5 +131,52 @@ export function structureViolations(html) {
     })
   }
 
+  // (6) ONE KIND OF CURRENT-WORK CARD (point 544). The section speaks in one of
+  // three voices — numbered point cards, the idle card, or the closing card —
+  // and any two of them at once make the board contradict itself in one screen:
+  // "470 läuft" over "Gerade keine laufende Arbeit" is exactly what the user
+  // read on 30.07.2026. Every sanctioned writer already clears the others, so a
+  // mixture can only come from a hand edit — which is also how three idle cards
+  // came to stand stacked. Both shapes are caught here, before the bytes leave.
+  const kinds = nowCardKinds(m)
+  const present = [...new Set(kinds)]
+  if (present.length > 1) {
+    out.push({
+      code: 'now-card-kinds',
+      msg: `the current-work section mixes ${present.join(' + ')} cards — it may carry only ONE of the three kinds`,
+    })
+  }
+  for (const kind of ['idle', 'closing']) {
+    const n = kinds.filter((k) => k === kind).length
+    if (n > 1) {
+      out.push({
+        code: 'now-state-card-stacked',
+        msg: `${n} ${kind} cards stand stacked — that card is a STATE, so exactly one may stand`,
+      })
+    }
+  }
+
   return out
+}
+
+/**
+ * The KIND of every current-work card, in document order: 'point' for a
+ * numbered card, 'idle' for "Gerade keine laufende Arbeit", 'closing' for the
+ * card that names the closing duties still owed (point 544).
+ *
+ * Scoped to the current-work section, so the same words quoted in the archive
+ * are a report and not a card. Total: anything unreadable yields [].
+ */
+export function nowCardKinds(html) {
+  const m = markupOnly(typeof html === 'string' ? html : '')
+  const from = m.indexOf(REQUIRED_SECTIONS[0])
+  if (from < 0) return []
+  const to = m.indexOf(REQUIRED_SECTIONS[1], from + 1)
+  const section = m.slice(from, to > from ? to : undefined)
+  const kinds = []
+  for (const hit of section.matchAll(/<details class="now">\s*<summary><span class="t">([^<]*)<\/span>/g)) {
+    const title = hit[1].trim()
+    kinds.push(title === NO_CURRENT_WORK_TITLE ? 'idle' : title === CLOSING_WORK_TITLE ? 'closing' : 'point')
+  }
+  return kinds
 }

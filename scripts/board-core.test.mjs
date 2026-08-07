@@ -17,9 +17,15 @@ import {
 import { concisenessOffenders } from './dashboard-conciseness-guard-core.mjs'
 import { structureViolations } from './board-structure-core.mjs'
 import {
+  CLOSING_WORK_TITLE,
   ERLEDIGT_ANCHOR,
   NO_CURRENT_WORK_TITLE,
+  STATE_CARD_TITLES,
   TEXT_STDIN_FLAG,
+  claimsClosingWork,
+  closingWorkCards,
+  isStateCardTitle,
+  toClosingWork,
   addHours,
   addVdzk,
   berlinStamp,
@@ -794,6 +800,109 @@ describe('the no-work card replaces rather than appends', () => {
       expect(() => claimsNoCurrentWork(junk)).not.toThrow()
       expect(claimsNoCurrentWork(junk)).toBe(false)
       expect(noCurrentWorkCards(junk)).toEqual([])
+    }
+  })
+})
+
+// ═══ Point 544 — the third thing a session can truthfully say ════════════════
+// Measured 07.08.2026: a session that had merged and ticked its point still owed
+// its closing duties — the four-eyes record on the tick commit, the
+// retrospective's new problem class — and the board could only say "idle" or "a
+// numbered point". Under the idle card the point-470 deny stopped every one of
+// those calls, and neither remedy it names reaches the state. The deny is right;
+// what was missing is this card.
+describe('the closing card — a state that is NOT a claim to stop', () => {
+  const emptyBoard = () => fullBoard({ queue: queueEntry(544, 'Die dritte Kartenart', '~2 h') })
+  const REASON = 'Der Punkt ist gemergt und abgehakt; das Vier-Augen-Protokoll und die Retrospektive fehlen noch.'
+
+  it('stands unnumbered under its own title, with the reason the reader needs', () => {
+    const out = toClosingWork(emptyBoard(), REASON, { stamp: '23:40' })
+    expect(out).toContain(`<span class="t">${CLOSING_WORK_TITLE}</span>`)
+    expect(out).toContain(`<span class="stamp">Stand 23:40</span> ${REASON}`)
+    expect(hasCurrentWork(out)).toBe(true)
+    expect(parseNowCardPoints(out).size).toBe(0)
+    expect(closingWorkCards(out)).toHaveLength(1)
+  })
+
+  it('is NOT the idle claim — that is the whole reason it exists', () => {
+    const out = toClosingWork(emptyBoard(), REASON, { stamp: '23:40' })
+    expect(claimsNoCurrentWork(out)).toBe(false)
+    expect(claimsClosingWork(out)).toBe(true)
+  })
+
+  it('leaves exactly ONE card however often it is written, like the idle card', () => {
+    let html = emptyBoard()
+    for (const reason of ['Vier-Augen-Protokoll fehlt.', 'Retrospektive fehlt.', 'Nur noch der Nachtrag.']) {
+      html = toClosingWork(html, reason, { stamp: '23:40' })
+      expect(closingWorkCards(html)).toHaveLength(1)
+    }
+    expect(html).toContain('Nur noch der Nachtrag.')
+    expect(html).not.toContain('Retrospektive fehlt.')
+  })
+
+  it('REPLACES a standing idle card rather than joining it', () => {
+    const idle = toNoCurrentWork(emptyBoard(), 'Sitzungsgrenze.', { stamp: '23:30' })
+    const out = toClosingWork(idle, REASON, { stamp: '23:40' })
+    expect(noCurrentWorkCards(out)).toHaveLength(0)
+    expect(closingWorkCards(out)).toHaveLength(1)
+    expect(claimsNoCurrentWork(out)).toBe(false)
+  })
+
+  it('is swept away the moment a numbered point is promoted', () => {
+    const closing = toClosingWork(emptyBoard(), REASON, { stamp: '23:40' })
+    const out = toNow(closing, 544, 'Angefangen.', { stamp: '23:45' })
+    expect(closingWorkCards(out)).toHaveLength(0)
+    expect(out).toContain('<span class="t">544 — Die dritte Kartenart</span>')
+  })
+
+  // THE BOUNDARY STILL ENDS THE SAME WAY: `batch-boundary.mjs` prints
+  // `board.mjs none`, and the claim to stop is made exactly once, at the end.
+  it('gives way to the idle card at the boundary, which then stands ALONE', () => {
+    const closing = toClosingWork(emptyBoard(), REASON, { stamp: '23:40' })
+    const out = toNoCurrentWork(closing, 'Der Punkt ist abgeschlossen.', { stamp: '23:55' })
+    expect(closingWorkCards(out)).toHaveLength(0)
+    expect(noCurrentWorkCards(out)).toHaveLength(1)
+    expect(claimsNoCurrentWork(out)).toBe(true)
+    expect(claimsClosingWork(out)).toBe(false)
+  })
+
+  it('refuses to claim it while a numbered card stands, naming both ways out', () => {
+    const busy = fullBoard({ now: nowEntry(544, 'Läuft', '22:30 · ~23:00') })
+    expect(() => toClosingWork(busy, REASON)).toThrow(/refusing to claim that only closing duties are left/)
+    expect(() => toClosingWork(busy, REASON)).toThrow(/done 544 --none[\s\S]*queue 544/)
+  })
+
+  it('demands a reason — a bare card would say nothing the reader can act on', () => {
+    expect(() => toClosingWork(emptyBoard(), '   ')).toThrow(/WHICH duties are still owed/)
+  })
+
+  it('produces markup the board guards accept — structurally and by audit', () => {
+    const out = toClosingWork(emptyBoard(), REASON, { stamp: '23:40' })
+    const before = new Set(structureViolations(emptyBoard()).map((v) => v.code))
+    expect(structureViolations(out).map((v) => v.code).filter((c) => !before.has(c))).toEqual([])
+    const auditBefore = new Set(auditDashboard(emptyBoard(), { open: [544], done: [] }).map((v) => v.code))
+    const added = auditDashboard(out, { open: [544], done: [] })
+      .map((v) => v.code)
+      .filter((c) => !auditBefore.has(c))
+    expect(added).toEqual([])
+    // …and the conciseness guard passes over it: one short, glanceable paragraph.
+    expect(concisenessOffenders(out)).toEqual([])
+  })
+
+  it('is total on junk input rather than throwing into a guard', () => {
+    for (const junk of [null, undefined, 42, {}, '']) {
+      expect(() => claimsClosingWork(junk)).not.toThrow()
+      expect(claimsClosingWork(junk)).toBe(false)
+      expect(closingWorkCards(junk)).toEqual([])
+    }
+  })
+
+  it('names both unnumbered state cards for the guards that must know them', () => {
+    expect(STATE_CARD_TITLES).toEqual([NO_CURRENT_WORK_TITLE, CLOSING_WORK_TITLE])
+    expect(isStateCardTitle(CLOSING_WORK_TITLE)).toBe(true)
+    expect(isStateCardTitle(` ${NO_CURRENT_WORK_TITLE} `)).toBe(true)
+    for (const other of ['544 — Die dritte Kartenart', '', null, undefined, 42]) {
+      expect(isStateCardTitle(other)).toBe(false)
     }
   })
 })

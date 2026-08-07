@@ -42,7 +42,7 @@
 // SCRIPT, the answer is yes for every session, headless included.
 
 import { isPublishDue } from './board-currency-core.mjs'
-import { NONE_CARD_CMD, NOW_CARD_CMD, PUBLISH_CMD, SYNCED_CMD } from './board-remedy.mjs'
+import { CLOSING_CARD_CMD, NONE_CARD_CMD, NOW_CARD_CMD, PUBLISH_CMD, SYNCED_CMD } from './board-remedy.mjs'
 import { claimsNoCurrentWork } from './board-core.mjs'
 import { handoverSurvivesCall } from './batch-boundary-core.mjs'
 import { parseSegments, segmentInvokesScript, isMutatingSegment, shellSegments } from './command-classify-core.mjs'
@@ -198,6 +198,17 @@ export function isPublished(state, repoHash) {
 // change; this one is a sentence the session itself wrote, its remedy is one
 // command, and that command is never blocked. A stand-down here would leave the
 // lie on the board for the rest of the turn — which is the whole defect.
+//
+// A REMEDY MUST REACH THE STATE THE SESSION IS IN (point 544, 07.08.2026). The
+// deny named two ways out, and a session finishing its CLOSING DUTIES could take
+// neither: `now <N>` needs an open point that already has a queue card, and
+// `none` rewrites only the reason, never the title, so the claim and the deny
+// stood. A finished retrospective refresh could not be committed, filing the
+// point about it was itself blocked, and the session had to raise the next queue
+// point early just to get a card it could stand behind — which is working AROUND
+// the guard, the one thing this chain cannot afford. The third card says that
+// state truthfully, `claimsNoCurrentWork` is false under it, and the deny names
+// it as the third way out.
 
 /** Is this call part of ENDING the session rather than carrying it on? */
 export function isSessionEndingCall({ toolName, command, filePath } = {}) {
@@ -225,6 +236,10 @@ export function noWorkClaimReason(segment = '') {
     'Do ONE of these:\n' +
     `  - ${NOW_CARD_CMD} <N> "<was gerade läuft>"   → puts a card up for the work; it REPLACES the ` +
     'claim, and this call goes through.\n' +
+    `  - ${CLOSING_CARD_CMD} "<welche Abschlussarbeiten noch offen sind>"   → for the state between ` +
+    'the two: the point is merged and TICKED, and its closing duties (the four-eyes record, the ' +
+    'retrospective) are still owed. That is neither idle nor a numbered point, and it is what this ' +
+    'card is for.\n' +
     '  - STOP: end the turn. The session-ending path (node scripts/batch-boundary.mjs <point>, the ' +
     'focus stamp, the board publish, the work-order tick) is never blocked by this rule.\n' +
     `If the claim itself is wrong, rewrite it — ${NONE_CARD_CMD} "<Grund>" replaces the standing card ` +

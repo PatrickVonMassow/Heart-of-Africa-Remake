@@ -13,6 +13,7 @@
 //                                                     # archive + promote in ONE write
 //   node scripts/board.mjs done   <point> --none "<reason>"   # …or name the gap
 //   node scripts/board.mjs none   "<reason>"           # the gap card, no point to close
+//   node scripts/board.mjs closing "<reason>"          # …still owed: the closing duties
 //   node scripts/board.mjs vdzk-add "<title>" "<question>"  # ask the user a decision
 //   node scripts/board.mjs vdzk-remove "<title>"      # drop an answered question
 //   node scripts/board.mjs focus  <point> "<note>"    # declare focus + stamp
@@ -57,6 +58,7 @@ import {
   resolveCardText,
   setCardStatus,
   setCardTitle,
+  toClosingWork,
   toNoCurrentWork,
   toNow,
   toQueue,
@@ -215,6 +217,25 @@ try {
       `the board now names why nothing is running (Stand ${at}) — this is a claim to STOP: the ` +
         'board gate denies the next state-changing call while it stands.',
     )
+  } else if (cmd === 'closing') {
+    // THE THIRD THING A SESSION CAN SAY (point 544). Between "a numbered point"
+    // and "nothing is running" sat a real state with no card: the point is merged
+    // and ticked, and its closing duties — the four-eyes record on the tick
+    // commit, the retrospective's new problem class — are still owed. Under the
+    // idle card the point-470 deny stopped every one of those calls, and its two
+    // remedies could not reach the state: `now <N>` needs an open point with a
+    // queue card, `none` rewrites only the reason. So the work stalled and the
+    // session had to raise the next queue point early just to get a card it could
+    // stand behind. This card says it truthfully, and the deny lets the duties
+    // through; `board.mjs none` at the boundary replaces it with the idle card.
+    const reason = textOf(rest)
+    if (!reason) throw new Error(`usage: board.mjs closing "<reason>"|${TEXT_STDIN_FLAG}`)
+    const at = berlinStamp()
+    edit(
+      (html) => toClosingWork(html, reason, { stamp: at }),
+      `the board now names the closing duties still owed (Stand ${at}) — this is NOT a claim to stop: ` +
+        'the board gate lets those duties through. End with node scripts/board.mjs none "<Grund>".',
+    )
   } else if (cmd === 'vdzk-add') {
     // EVERY decision asked of the user belongs here (point 421): the chat is an
     // inbox he writes into, not a board he reads. `decision-card-guard` blocks a
@@ -252,7 +273,7 @@ try {
     console.error(
       'usage: board.mjs now|status|title|queue <point> "<text>" | ' +
         'done <point> ["<text>"] [--next <m> "<status>" | --none "<reason>"] | ' +
-        'none "<reason>" | ' +
+        'none "<reason>" | closing "<reason>" | ' +
         'vdzk-add "<title>" "<question>" | vdzk-remove "<title>" | ' +
         'promote <point> "<times>" "<title>" "<status>" | focus <point> "<note>" | attest\n' +
         `Any "<text>" may be replaced by ${TEXT_STDIN_FLAG} and piped in — use that for German prose.`,
