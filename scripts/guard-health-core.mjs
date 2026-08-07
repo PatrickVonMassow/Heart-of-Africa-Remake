@@ -50,6 +50,16 @@ export const INTENTIONALLY_DORMANT = {
   'criticality-review-guard.mjs':
     'built without its Stop-hook line: .claude/settings.json is attended-only, so the arming ' +
     'belongs to the main session. Remove this entry in the commit that wires it.',
+  'path-scope-guard.mjs':
+    'Built 07.08.2026 by a worktree agent, which may not touch .claude/settings.json — the PreToolUse line ' +
+    'is a protected-path edit and needs an attended session. Its core is measured against the real command ' +
+    'corpus (1 deny in 5751 transcript commands, and that one deliberate). REMOVE THIS ENTRY IN THE SAME ' +
+    'COMMIT THAT ADDS THE HOOK LINE.',
+  'bundle-first-guard.mjs':
+    'Built 07.08.2026 by a worktree agent — same protected-path reason as above. It ALSO needs its finding ' +
+    'cleared before it is armed: it reports 29 open points in no bundle of docs/work-packages.md, which is ' +
+    'the drift it exists to catch, and a worktree agent may not edit that file either. Reconcile the scheme ' +
+    '(`node scripts/bundle-first-guard.mjs --status`), THEN wire it and REMOVE THIS ENTRY IN THE SAME COMMIT.',
 }
 
 /**

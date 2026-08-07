@@ -61,6 +61,38 @@ outside the agent's control.
    the same pause and format-alarm stops as (4). It gets no scheduler of its own —
    (4) is its supervisor and starts, restarts and stops it. See "The board also
    runs BACK" below.
+6. **PreToolUse guard `scripts/path-scope-guard.mjs`** (agreed 29.07.2026, built
+   07.08.2026). The project's filesystem ALLOW-list, stated in the repository
+   rather than in the permission layer, because the two shapes that matter cannot
+   be written as deny-rules: `~/Documents` **minus** the project, and the worktree
+   agents, whose rules lived in the untracked `.claude/settings.local.json` and so
+   travelled with no clone. Every spelling this machine produces —
+   `C:\Users\…`, `c:/users/…`, `/c/…`, `/mnt/c/…`, `~/…` — is folded onto one
+   canonical form BEFORE the verdict, so the rule has no spelling-shaped holes; in
+   scope are `/workspace` and the Windows project directory, the scratchpads, the
+   Claude config, the browser cache and the toolchain, and anything else is denied
+   **with its reason and the way on** (extend `ALLOW_ROOTS` on the record). It
+   fails open three times over: a command carrying a `$`, a backtick or an
+   unbalanced quote is unparseable and allows; a QUOTED word is prose, not access
+   (the point-473 lesson — a gate that judged the command STRING refused a
+   read-only search for naming a script); and a bare posix token whose top-level
+   directory does not exist is a regex, not a path. Measured over the 5751 distinct
+   Bash calls of the transcripts, it denies ONE, and that one deliberately
+   (`~/.git-credentials`).
+7. **Stop hook `scripts/bundle-first-guard.mjs`** (agreed 29.07.2026, built
+   07.08.2026). The BUNDLE-FIRST rule, until now memory only
+   (`bundle-first-not-new-point`): a new finding JOINS an existing bundle point,
+   and a standalone point is the exception. `docs/work-packages.md` states the
+   property — "every open point in TASKS.md appears in exactly one bundle here,
+   or in the unbundled list below" — and this guard is what makes it true. It
+   reconciles the **full open set**, not only the newest point, so a point that
+   silently LEFT a bundle is caught by the same comparison as one that never
+   joined; that is the second half of the same evening's finding, because the
+   scheme had drifted within an hour of being written (53 of 91 points covered,
+   one already-closed point listed) and nothing compared the two. Listing in the
+   "Not bundled" section IS the exemption. Fail-open throughout: an unreadable or
+   RESTRUCTURED work-packages file allows — a parse miss is not a drift finding.
+   `node scripts/bundle-first-guard.mjs --status` prints what is unplaced.
 
 ## Failure-mode table
 
