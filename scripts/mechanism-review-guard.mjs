@@ -21,7 +21,8 @@
 //
 // How the gate clears:
 //   node scripts/mechanism-review.mjs --record <sha> --model <name> \
-//       --verdict <merge|merge-with-fixes|do-not-merge> --evidence "<one line>"
+//       --verdict <merge|merge-with-fixes|do-not-merge> --evidence "<one line>" \
+//       --mode <review|blind-parallel>
 // CLI:
 //   node scripts/mechanism-review-guard.mjs --status
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'

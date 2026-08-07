@@ -4362,52 +4362,6 @@ Build order, chosen so no two parallel agents own the same file:
   VERIFIABLE: a reply written without the stamp is still refused (timestamp-guard
   blocks it) after the removal, and the Stop chain's process count drops by one.
 
-- [ ] 540. AN UNRECOGNISED FLAG IS DROPPED WITHOUT A WORD (measured 07.08.2026). Recording the
-  four-eyes verdict for point 298 with `--point 298` stored NO point: the CLI that ran was the
-  pre-merge `scripts/mechanism-review.mjs` from `main`, which did not yet know the flag. It
-  neither warned nor failed — it ignored it. The consequence surfaced only later, when the
-  criticality gate refused the tick with "no review recorded for this point" while a verdict for
-  the exact commit sat in the ledger, and the fix was to record the same review a second time.
-  This is the same class as the swallowed read that branch had just fixed one layer down: an
-  unrecognised INPUT must not read as an accepted one.
-  FINAL STATE: `mechanism-review.mjs` REFUSES an argument it does not recognise — naming the
-  argument and printing the usage line — instead of dropping it. The check is on the pure
-  argument parser, so the wrapper keeps its single responsibility.
-  VERIFIABLE: pure Vitest — a known flag set parses; an unknown flag exits non-zero and NAMES
-  the flag; a misspelled or abbreviated known flag is reported rather than silently ignored; and
-  a run that omits a REQUIRED flag still prints the existing usage line unchanged.
-  Criticality: medium — it is a recording tool, not a gate, but a dropped flag makes a gate
-  report a truth it does not have.
-
-- [ ] 541. THE DIVERGENT HALF OF THE FOUR-EYES RULE IS ENFORCED BY NOTHING (decided
-  07.08.2026 with point 355; ledger row 3.90 in `docs/analysis_de/lesson-mechanisms.md`
-  names the gap and the answer). CLAUDE.md §6 now defines the four-eyes principle in two
-  modes, and only the CONVERGENT one has an enforcer: `mechanism-review-guard` lets no new
-  or changed mechanism through without the OTHER model's recorded verdict. Nothing records
-  whether a DIVERGENT step — what could go wrong, which cases to test, which designs are
-  possible — ran BLIND PARALLEL or as a review of an already-finished list, which is the
-  anchoring failure the rule exists to prevent. No guard can DETECT that either: whether a
-  step was divergent stands in no file.
-  FINAL STATE, chosen because it widens an EXISTING enforcer instead of standing a new one
-  beside it: `scripts/mechanism-review.mjs --record` carries the MODE (`--mode review` or
-  `--mode blind-parallel`, and for the weaker same-model fallback the framing used to
-  decorrelate the second run), so a verdict meant to cover a finding step must NAME its
-  form and a missing mode is refused rather than defaulted. `scripts/guard-preflight.mjs`
-  asks the question ADVISORILY before such a step, in the shape its other reports already
-  use — it reports, it never blocks, because a false block on a judgement call costs a turn
-  and the guard cannot know the answer.
-  LANDS WITH POINT 540 ON ONE BRANCH, sequentially: both change the same argument parser in
-  `scripts/mechanism-review.mjs`, and 540's refusal of an unrecognised flag is the mechanism
-  that makes a missing or misspelled `--mode` visible instead of silent. Do 540 first.
-  VERIFIABLE: pure Vitest on the argument parser and on the preflight's report — a recorded
-  verdict with a mode round-trips it into the ledger; a record without a mode is refused,
-  naming the choice; the blind-parallel mode accepts the fallback framing and the review
-  mode rejects it as meaningless there; the preflight names the divergent-step question
-  without changing its verdict. Until this lands, the divergent half rests on CLAUDE.md §6
-  alone, and row 3.90 says so.
-  Criticality: medium — it is a recording and advisory layer, not a gate, but an unrecorded
-  mode lets a review of a finished list pass as the blind-parallel work the rule demands.
-
 - [ ] 542. THREE BUILT GUARDS ARE STILL ASLEEP, AND THE ARMING NEEDS AN ATTENDED
   SESSION (07.08.2026). `path-scope-guard`, `bundle-first-guard` and
   `point-proof-guard` are built, tested and recorded in `INTENTIONALLY_DORMANT`
