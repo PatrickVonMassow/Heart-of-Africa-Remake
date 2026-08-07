@@ -830,6 +830,16 @@ Der schärfste Fall: CLAUDE.md §7.2 sagt, der Vier-Augen-Wächter lasse „kein
 
 Ein zweiter Befund desselben Passes zeigt, was das kostet, wenn niemand aufzählt: Zwei Stellen leiten aus demselben Projektpfad zwei verschiedene Speicherordner ab, und die Ablage für nebenbei aufgefallene Befunde landete im leeren der beiden. Ein Befund, den ein Agent aus seinem eigenen Arbeitsordner meldet, ist damit verloren — bei maximaler Delegation ist genau dieser Agent der Hauptfinder. Der Mechanismus lief, protokollierte Erfolg und erreichte sein Ziel nie.
 
+### 3.89 Die Attrappe war kleiner als die Wirklichkeit
+
+Ein neuer Wächter kam durch alle Tore: Bau grün, Linter grün, 7716 Unit-Tests grün, 38 eigene Fälle, dazu zwei Runden Gegenlesung durch das zweite Modell, das einen echten Fehler fand und dessen Behebung nachprüfte. Beim Merge auf den Hauptzweig fiel er sofort um. Er liest die Arbeitsordnung aus einem Git-Stand; das Archiv ist 1,12 MB groß, der Standardpuffer des Aufrufs 1 MB. Das Kind starb an der Puffergrenze, der Fehler landete in der Fail-open-Hülle — der Wächter hätte, scharf geschaltet, **jeden Zug durchgewinkt und dabei bewaffnet ausgesehen**.
+
+Die Ursache ist nicht Nachlässigkeit, sondern die Bauweise der Prüfung selbst. Jeder der 38 Fälle baut sich ein isoliertes Wegwerf-Repository mit einer Arbeitsordnung von ein paar hundert Byte — genau richtig, um die Entscheidungslogik zu prüfen, und prinzipiell blind für eine Grenze, die erst bei einem Megabyte liegt. Die Attrappe war um drei Zehnerpotenzen kleiner als das, wogegen der Wächter laufen sollte. Auch der Gegenleser konnte es nicht sehen: Er las den Code und ließ die Tests laufen, und beide sagten dasselbe Falsche. Gefunden hat es eine einzige Prüfung, die keine Attrappe benutzt — die, die jeden verdrahteten Wächter einmal gegen das **echte** Repository laufen lässt.
+
+Das ist verwandt mit §3.34 (die Attrappe, die den Fehler verdeckt) und mit §3.43 (der Fehler, den die Fail-open-Hülle verschluckt), aber die Verbindung der beiden ist neu und schärfer als jede Hälfte für sich: Eine Größengrenze ist der einzige Fehlertyp, der von der **Menge** der echten Daten abhängt und deshalb systematisch aus jeder Attrappe herausfällt — und weil ein Wächter fail-open gebaut ist, äußert er sich nicht als Absturz, sondern als Schweigen. Ein Wächter, der schweigt, gilt als „nichts zu beanstanden".
+
+**Lehre:** Ein Mechanismus, der gegen einen echten, wachsenden Bestand läuft, braucht mindestens eine Prüfung, die diesen Bestand in **voller Größe** anfasst — nicht seine Attrappe. Für dieses Projekt ist das der Lauf gegen das eigene Repository, und er verdient denselben Rang wie die Logikprüfung, nicht den einer Zugabe. Und wo Fail-open und Größengrenze zusammentreffen, ist die Prüfung, die den Erfolgsfall misst, die einzige, die etwas beweist: Dass der Wächter nicht blockiert hat, sagt nichts, solange nicht gezeigt ist, dass er überhaupt gelesen hat.
+
 ---
 
 ## 4. Die Guards als Immunsystem
@@ -919,7 +929,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Freitag, 07.08.2026, 07:45 · Quellen-Fingerprint: `c48acede9192…`
+Zuletzt aktualisiert: Freitag, 07.08.2026, 08:50 · Quellen-Fingerprint: `cc7d7699d0ab…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -936,8 +946,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Take the session boundary as the LAST action and with bare commands — a pipe makes the call count as work and silently deletes the marker | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Delegate via `node scripts/point-brief.mjs <N>` — the AGENT generates its own brief; board changes go through `scripts/board.mjs`; expect 529 agent deaths and commit-per-step | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | F6 bug-report zips the user hands over are saved into the repo's git-ignored local/ folder — search there first, not only Downloads | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
-| A newly found problem goes into an EXISTING bundle point first; a new standalone point is the exception, and may instead re-cut the bundles | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
-| Work packages are SPOKEN by name, never by letter — the user cannot read \"bundle H\"; the letter stays only as an internal ID | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
+| A newly found problem goes into an EXISTING bundle point first; a new standalone point is the exception, and may instead re-cut the bundles | 1 | niedrig | bundle-first-guard.mjs | ✔ Mechanismus |
+| Work packages are SPOKEN by name, never by letter — the user cannot read \"bundle H\"; the letter stays only as an internal ID | 1 | niedrig | bundle-first-guard.mjs | ✔ Mechanismus |
 | Jede Chat-Antwort mit einem Zeitstempel nach deutscher Zeit (Europe/Berlin, DST-korrekt) beginnen | 11 | hoch | timestamp-guard.mjs | ✔ Mechanismus |
 | CLAUDE.md §7.1 references design.md instead of retelling it; future doc edits must preserve the verifiable conditions, script mappings, numbering and checked numbers | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Autonomously insert a full CLOSING cycle (regression + dead-code/stale-doc cleanup + .md audit) when warranted — after extensive rework or many small completed tasks — without waiting for the user to ask | 1 | niedrig | closing-guard.mjs | ✔ Mechanismus |
@@ -959,7 +969,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | After every change, npm run lint (oxlint) and npm audit must be clean — zero lint errors/warnings, zero CVEs. Standing user directive. | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | hoa PERMANENT process — delegate as much implementation as possible to worktree-isolated subagents; keep only picture-verify + merge at the main session; run a pool of parallel agents on non-overlapping files | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | The \"Maximum QA\" QA process and the \"new demo\" trigger (append it + closing + increment tag + publish) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
-| Before building, triage difficulty × criticality; for HIGH/critical work bring in a second, different model (Fable) to review plan + result — proactively, not only for audits or when stuck | 2 | mittel | model-guard.mjs | ✔ Mechanismus |
+| Before building, triage difficulty × criticality; for HIGH/critical work bring in a second, different model (Fable) to review plan + result — proactively, not only for audits or when stuck | 2 | mittel | criticality-review-guard.mjs, model-guard.mjs | ✔ Mechanismus |
 | A user question is an INTERRUPT, not a new task — after answering, the last action of the turn must resume the batch; only an explicit stop or a genuine block on user input ends it | 3 | mittel | batch-autostart.mjs, batch-doctor-states.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs | ✔ Mechanismus |
 | EVERY user change request is a TASKS.md point appended at the END, done only after the current work finishes — never interleaved or mass-committed | 5 | hoch | tasks-archive-guard.mjs, tasks-spec-guard.mjs | ✔ Mechanismus |
 | The batch-owning session is a headless successor the launcher spawned — the user cannot see, reach or close it; never ask them to | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -999,8 +1009,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 72 Feedback-/Projekt-Memories · 44 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 36 Prozess-/Meta-TASKS-Punkte (davon 17 offen).
+Erfasste Quellen: 72 Feedback-/Projekt-Memories · 47 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 37 Prozess-/Meta-TASKS-Punkte (davon 18 offen).
 
-<!-- RETRO-FINGERPRINT: c48acede919242c9aef7e52f0458f11bb16876eb33472da9b90ed0981568dc07 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-07T05:45:51.689Z -->
+<!-- RETRO-FINGERPRINT: cc7d7699d0ab63d29065cc28899c5362399f2c7528fcc3ff744c7f829df8e686 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-07T06:50:36.610Z -->
 <!-- AUTO-GENERATED:END -->
