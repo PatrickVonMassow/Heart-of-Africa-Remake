@@ -355,6 +355,16 @@ describe('closingTickClaim — the tick that claims a finished closing', () => {
     // but a heredoc that IS the write counts — there the body is the new file
     expect(bash("cat > TASKS.md <<'EOF'\n# Work order\n- [x] 224. DEMO CHECKPOINT\nEOF")).toEqual([224])
     expect(bash("cat >> docs/tasks-archive.md <<EOF\n- [x] 224. DEMO CHECKPOINT\nEOF")).toEqual([224])
+    // an in-place EDITOR writes; grep's -i is a read (four-eyes re-check 07.08.2026)
+    expect(bash("grep -i '- [x] 224.' docs/tasks-archive.md")).toEqual([])
+    expect(bash("perl -pi -e 's/- \\[ \\] 224\\./- [x] 224./' TASKS.md")).toEqual([224])
+  })
+  it('has no slow shape: a long run of redirect characters answers at once', () => {
+    const started = Date.now()
+    for (const n of [5_000, 20_000, 40_000]) {
+      expect(closingTickClaim({ toolName: 'Bash', toolInput: { command: `echo ${'>'.repeat(n)} TASKS.md - [x] 224.` }, tasksText: WORK_ORDER })).toBeInstanceOf(Array)
+    }
+    expect(Date.now() - started).toBeLessThan(250)
   })
   it('catches the tick whichever edit comes first — the point leaves TASKS.md and lands in the archive', () => {
     // delete-first: by the time the archive is written, the work order no longer

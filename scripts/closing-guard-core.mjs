@@ -214,8 +214,15 @@ const SHELL_TOOLS = new Set(['Bash', 'PowerShell'])
 /** A shell command names a work-order file … */
 const WORK_ORDER_NAMED = /TASKS\.md|tasks-archive\.md/
 /** … and WRITES it: an in-place editor, a redirect or a copy ONTO the file, a patch. */
-const REDIRECTS_INTO_WORK_ORDER = />>?\s*\S*(TASKS\.md|tasks-archive\.md)|\btee\b[^|\n]*(TASKS\.md|tasks-archive\.md)/
-const WORK_ORDER_WRITE = new RegExp(`(^|\\s)-i\\b|\\bpatch\\b|\\bgit\\s+apply\\b|\\b(mv|cp|tee)\\b|${REDIRECTS_INTO_WORK_ORDER.source}`)
+// `[^\s>]*` rather than `\S*`: a run of `>` characters made the redirect probe
+// quadratic (4 s at 40k chars) — no realistic command, but a hook may not have
+// a slow shape at all.
+const REDIRECTS_INTO_WORK_ORDER = />>?\s*[^\s>]*(TASKS\.md|tasks-archive\.md)|\btee\b[^|\n]*(TASKS\.md|tasks-archive\.md)/
+// `-i` counts only for the in-place EDITORS — grep's `-i` is a read, and denying
+// `grep -i '- [x] 224.' <file>` during a closing would be obstruction.
+const WORK_ORDER_WRITE = new RegExp(
+  `\\b(sed|perl|ruby|gawk)\\b[^|\\n]*(\\s-[A-Za-z]*i\\b|--in-place)|\\bpatch\\b|\\bgit\\s+apply\\b|\\b(mv|cp|tee)\\b|${REDIRECTS_INTO_WORK_ORDER.source}`,
+)
 
 /** The text a tool call WRITES, and the text it REPLACES, for tick accounting. */
 function tickTexts(toolName, toolInput) {
