@@ -31,6 +31,7 @@ import {
   parseWatchArgs,
   peerVerdict,
   remedyCommand,
+  shouldApply,
   taskNameFor,
   taskProbeCommand,
   triggerKind,
@@ -238,6 +239,24 @@ describe('remedyCommand', () => {
     expect(remedyCommand({ action: 'register' }, { taskName: PRIMARY_TASK_NAME })).toContain(
       definitionPathFor(PRIMARY_TASK_NAME),
     )
+  })
+})
+
+describe('shouldApply — the paused batch stands the repair down', () => {
+  it('repairs when the batch is running and repairs were asked for', () => {
+    expect(shouldApply({ requested: true, paused: false })).toBe(true)
+  })
+
+  it('repairs NOTHING while .claude/batch-paused exists', () => {
+    // Otherwise the documented way to stop the batch on Windows — disabling or
+    // deleting the primary task — would be undone by the watchdog on its next
+    // tick, and the pause file would be the last handle that still worked.
+    expect(shouldApply({ requested: true, paused: true })).toBe(false)
+  })
+
+  it('still withholds a repair under --dry-run', () => {
+    expect(shouldApply({ requested: false, paused: false })).toBe(false)
+    expect(shouldApply()).toBe(true)
   })
 })
 

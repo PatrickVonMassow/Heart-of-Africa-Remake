@@ -258,6 +258,20 @@ export function remedyCommand(verdict, { taskName, definitionPath = null } = {})
   }
 }
 
+/**
+ * MAY THIS RUN REPAIR ANYTHING? PURE.
+ *
+ * The house rule every mechanism here obeys: a PAUSED batch
+ * (`.claude/batch-paused`) stands every automatism down. Without it, deleting or
+ * disabling the primary task — the documented way to stop the batch on Windows —
+ * would simply be undone by the watchdog on its next tick, and the pause file
+ * would be the only handle left that still worked. Paused, the watch still
+ * REPORTS: the readiness check wants the state either way.
+ */
+export function shouldApply({ requested = true, paused = false } = {}) {
+  return Boolean(requested) && !paused
+}
+
 /** One line per run, for the log and for a human reading `--json` output. */
 export function formatVerdict({ taskName, verdict, applied = null } = {}) {
   const head = `${taskName}: ${verdict?.status ?? 'unknown'} — ${verdict?.reason ?? ''}`.trim()

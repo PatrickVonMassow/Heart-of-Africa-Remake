@@ -33,6 +33,7 @@ import {
   parseWatchArgs,
   peerVerdict,
   remedyCommand,
+  shouldApply,
   taskNameFor,
   taskProbeCommand,
 } from './windows-task-core.mjs'
@@ -100,12 +101,16 @@ export function logLine(line, { path = repoPath(LOG_PATH), now = () => new Date(
  * the readiness check (point 448) reads, which is why it is a return value and
  * not only printed.
  */
-export function watchPeer(role, { apply = true, exec = execFileSync, now = Date.now() } = {}) {
+export function watchPeer(
+  role,
+  { apply = true, exec = execFileSync, now = Date.now(), paused = existsSync(repoPath('.claude', 'batch-paused')) } = {},
+) {
   const taskName = taskNameFor(role)
   const report = readTaskReport(taskName, { exec })
   const verdict = peerVerdict({ report, now })
-  const applied = apply ? applyRemedy(verdict, { taskName, exec }) : null
-  return { taskName, report, verdict, applied }
+  const mayRepair = shouldApply({ requested: apply, paused })
+  const applied = mayRepair ? applyRemedy(verdict, { taskName, exec }) : null
+  return { taskName, report, verdict, applied, paused }
 }
 
 const USAGE = [
@@ -135,7 +140,9 @@ if (isMainModule(import.meta.url)) {
     process.exit(0)
   }
   const result = watchPeer(args.role, { apply: args.apply })
-  const line = formatVerdict({ taskName: result.taskName, verdict: result.verdict, applied: result.applied })
+  const line =
+    formatVerdict({ taskName: result.taskName, verdict: result.verdict, applied: result.applied }) +
+    (result.paused ? ' [batch paused — reporting only]' : '')
   if (args.json) process.stdout.write(`${JSON.stringify(result)}\n`)
   else process.stdout.write(`${line}\n`)
   // Only a repair that was ATTEMPTED and FAILED is an error: everything else —
