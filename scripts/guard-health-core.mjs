@@ -40,7 +40,13 @@ export const ENFORCER_RE = /^(?!.*-core\.)([a-z0-9-]+-(?:guard|gate|hook))\.mjs$
 // The map stays: an enforcer may be dormant on the record, never quietly. An entry
 // without a written reason is refused, so "park it" is not available as an escape,
 // and the entry must be removed in the same commit that adds the hook line.
-export const INTENTIONALLY_DORMANT = {}
+export const INTENTIONALLY_DORMANT = {
+  'path-scope-guard.mjs':
+    'Built 07.08.2026 by a worktree agent, which may not touch .claude/settings.json — the PreToolUse line ' +
+    'is a protected-path edit and needs an attended session. Its core is measured against the real command ' +
+    'corpus (1 deny in 5751 transcript commands, and that one deliberate). REMOVE THIS ENTRY IN THE SAME ' +
+    'COMMIT THAT ADDS THE HOOK LINE.',
+}
 
 /**
  * Enforcers known to lack a tested decision core, recorded 25.07.2026. This is
