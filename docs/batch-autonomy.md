@@ -2219,6 +2219,13 @@ missing count as "cannot prove", not as zero.
 
 ## What every turn is billed for — the measured inventory (30.07.2026, point 440)
 
+> Which of the layers described in this document a HARNESS PRIMITIVE could
+> replace — and which two the point-373 probes found unavailable here — is
+> answered layer by layer in `docs/harness-primitives-evaluation.md`. The
+> largest single item inside one point, a verify run's transcript, is cut there
+> too (`scripts/verify/run-logged.mjs`).
+
+
 Point 436 cut ONE injected text by 61 %. The user's question was what else does
 that, and the answer had to be MEASURED, not guessed. Everything below was
 measured by running the real hooks and reading the real texts; the method is a
