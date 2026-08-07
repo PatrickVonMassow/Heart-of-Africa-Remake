@@ -4388,6 +4388,12 @@ Build order, chosen so no two parallel agents own the same file:
   VERIFIABLE: `polish` runs three times in a row per backend without either check
   changing its verdict, and the measured spread of both is recorded beside the criterion
   the way point 387 recorded its five.
+  A THIRD CHECK OF THE SAME SHAPE (added 08.08.2026, found while verifying point 546 on a
+  loaded machine): `a clear standpoint at conversational distance from the pair exists`
+  rotated red once and passed on the quiet re-run. It is the same `standOff` search as (b)
+  — one bearing found or not found on an unchanged layout — so it is fixed by the SAME
+  work, and its spread is recorded beside the other two. Three of one shape means the fix
+  belongs in `standOff` itself, not in three call sites.
   Criticality: medium — neither hides a known product defect today, but a check that
   rotates is a gate that has stopped gating.
 
