@@ -154,9 +154,9 @@ export function shouldBlock(state) {
 //
 // CHEAPNESS IS PART OF THE SPEC: the overwhelmingly common turn pushes nothing
 // and must cost nothing. The ref list therefore comes from the local reflog of
-// pushes (two git calls, no network, no per-branch API sweep), and every answer
-// that can never change again is cached per sha, so a repeat turn asks GitHub
-// nothing at all.
+// pushes (four local git calls in the wrapper, no network, no per-branch API
+// sweep), and every answer that can never change again is cached per sha, so a
+// repeat turn asks GitHub nothing at all.
 // ---------------------------------------------------------------------------
 
 /** How far back a push still counts as this session's outstanding work. */
