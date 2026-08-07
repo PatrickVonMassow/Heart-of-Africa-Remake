@@ -163,14 +163,16 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 - **Angeblich behoben, aber nicht.** Der Fix wird als fertig gemeldet, das Symptom bleibt.
   → *Prompt:* „Ein Fix zählt erst als fertig, wenn das **Symptom am Ort des Symptoms** als
-  behoben gezeigt wurde. Beißt du dich zweimal fest, wechsle das Modell."
+  behoben gezeigt wurde **und** derselbe Versuch am **alten Stand** noch hindurchgeht. Beißt du
+  dich zweimal fest, wechsle das Modell."
 
 - **Fehlalarm behoben — echter Alarm gleich mit.** Du lässt eine zu oft anschlagende
   Prüfung verschärfen, alles wird grün. Nur schlägt sie jetzt auch nicht mehr an,
   wenn sie sollte: Ein Fehlalarm meldet sich selbst, ein ausgefallener nie.
   → *Prompt:* „Entschärfst du eine Prüfung, weise **beide** Richtungen nach — Fehlalarme
-  weg UND echte Treffer noch da. Die Fälle dafür erfindet das **andere Modell**, und es
-  misst an der Mechanik, nicht an den Testnamen." *(Kosten ≈ 1,3x.)*
+  weg UND echte Treffer noch da. Die Fälle erfindet das **andere Modell**; es misst an der
+  Mechanik statt an Testnamen und prüft die **eingeräumten** Grenzen zuerst — eine zugegebene
+  Lücke wird geglaubt, eine verschwiegene gesucht." *(Kosten ≈ 1,3x.)*
 
 - **Zahlen geschätzt statt gemessen — auch die, die dir jemand reicht.** ‚Das dauert ~2 Minuten';
   oder ein Wert, der einmal stimmte.
@@ -209,37 +211,33 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 - **„Erfolgreich" heißt nicht „angekommen".** Ein Befehl meldet Erfolg, das Gewollte ist
   trotzdem nicht passiert — etwa ein Upload, der den falschen Zweig überträgt; eine Warnung
   in der Ausgabe einer **geglückten** Aktion ist faktisch unsichtbar.
-  → *Prompt:* „Etabliere einen Mechanismus, der nach jeder Aktion mit Fernwirkung den
-  **Zielzustand** belegt statt der Erfolgsmeldung; eine Abfrage ohne Treffer ist ein Befund.
+  → *Prompt:* „Beleg nach jeder Aktion mit Fernwirkung den **Zielzustand** statt der Erfolgsmeldung; eine Abfrage ohne Treffer ist ein Befund.
   Jede Formprüfung läuft **vor** dem Schritt nach außen."
 
 - **Regeln und Wächter verrotten — nur merkt es niemand.** Der Bestand wächst an
-  Widersprüchen, an Regeln ohne Absicherung und an solchen, deren Absicherung enger greift
-  als ihr Satz — sie feuert, wird geglaubt und deckt nur einen Teil.
-  → *Prompt:* „Etabliere einen Mechanismus, der den Bestand periodisch durchsieht — auf Aktualität,
-  Dopplung, Widerspruch und **Wirkungslosigkeit**. Schreib zu **jeder** Regel, was sie misst, und leg
-  Satz und Code **nebeneinander**: Welche Fälle nennt der Satz, die das Muster nicht trifft? Zieh
-  **den Code auf den Satz**, nie umgekehrt. Und jeden Wächter: Je ausgelöst? Möglich?" *(einmalig hoch)*
+  Widersprüchen, an Regeln ohne Absicherung und an solchen, deren Absicherung enger greift als
+  ihr Satz — sie feuert, wird geglaubt, deckt aber nur einen Teil.
+  → *Prompt:* „Sieh den Bestand periodisch durch — auf Aktualität, Dopplung, Widerspruch und
+  **Wirkungslosigkeit**. Schreib zu **jeder** Regel, was sie misst, und leg Satz und Code
+  **nebeneinander**: Welche Fälle nennt der Satz, die das Muster nicht trifft? Zieh **den Code auf
+  den Satz**, nie umgekehrt. Und jeden Wächter: je ausgelöst? möglich?" *(einmalig hoch)*
 
 - **Der rote Test klagt den Falschen an.** Er täuscht gefährlicher als ein grüner:
   Prüfungen veralten von selbst und klagen gesunden Code an.
-  → *Prompt:* „Etabliere einen Mechanismus, der auf einen roten Test hin erst ein
-  **Experiment** verlangt: Belastet der Befund das Produkt oder die Messung? Gemessen wird
+  → *Prompt:* „Verlang auf einen roten Test hin erst ein **Experiment**: Belastet der Befund das Produkt oder die Messung? Gemessen wird
   nur an einem eingeschwungenen Zustand, dessen Bereitschaft der gemessene **Gegenstand**
   meldet — nie eine Uhr. Eine Prüfung schlägt auch dann fehl, wenn ihr Messwert in die
   *unerwartete* Richtung ausschlägt."
 
 - **Derselbe Fakt steht an fünf Stellen — und veraltet an vier.** Wer baut, aktualisiert die
   Stelle, an der er gerade schreibt; die übrigen Kopien rotten unbemerkt.
-  → *Prompt:* „Etabliere einen Mechanismus, der jedem Fakt genau **einen** verbindlichen Ort
-  zuweist; alle anderen verweisen darauf. Wo sich eine Wiederholung nicht vermeiden lässt,
+  → *Prompt:* „Gib jedem Fakt genau **einen** verbindlichen Ort; alle anderen verweisen darauf. Wo sich eine Wiederholung nicht vermeiden lässt,
   prüft ein Test sie gegen den **Code**, dem der Fakt gehört, nie gegen die Nachbarprosa.
   Berührt eine Änderung das Design, aktualisiere Design-Doc und Code im **selben** Commit."
 
 - **„Aufgeräumt" ohne Beweisliste.** Man räumt auf, wo man den Schaden vermutet,
   und übersieht den Rest.
-  → *Prompt:* „Etabliere einen Mechanismus, der nach jedem Zwischenfall eine **Beweisliste**
-  erzwingt: Liegt alles am Zielort? Gibt es Reste? Passen Dokumente und Code zusammen?"
+  → *Prompt:* „Erzwing nach jedem Zwischenfall eine **Beweisliste**: Liegt alles am Zielort? Gibt es Reste? Passen Dokumente und Code zusammen?"
 
 - **Der Autor sieht seine eigene Annahme nicht — und wer eine fertige Liste prüft, hakt sie ab.**
   Wer baut, prüft gegen dieselbe Vorstellung, aus der der Fehler stammt; und wer eine fertige Liste
@@ -405,4 +403,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 Diese eine Nachricht am Anfang baut 80 % der Lehren dieses Projekts ein, bevor die
 erste Zeile Code entsteht.
 
-<!-- GUIDE-FINGERPRINT: 11898a04dc001bea44eacdde9674f5a83402a4478da86c3fb93945e3b3cfd464 -->
+<!-- GUIDE-FINGERPRINT: edd04fae21ac0c4ed02ebe605377a5a00f876fba26eca6b3d55b344dfd83bf95 -->
