@@ -3618,6 +3618,39 @@ it is appended.
   with both passages present; `scripts/verify/docs.mjs` green; a grep for "trees and
   animals" finds no bird's-eye collision passage that omits the settlement.
 
+- [ ] 532. THE COLLISION SUITE COUNTS A DIFFERENT NUMBER OF CHECKS EVERY RUN
+  (found 07.08.2026 while merging point 349). Three runs of `collision` against the
+  SAME tree (`main` 72fe646a) reported 19, 24 and 25 checks: the 24-check run failed
+  `PoC village: the teaching stone is in the layout — null` on both its try and its
+  retry, the 19-check run never ran that check at all and went green, and WebGPU
+  reported 25 green. So a green `collision` run does not prove the coverage the
+  previous green run had, and a real teaching-stone defect disappears by itself on
+  the next run. This is the class of the closed point 404 — a passing count over a
+  set that silently shrank — one suite further on, and it defeats the flake policy
+  too: "the same check failed twice" cannot be judged when the check is not always
+  asked.
+  FINAL STATE:
+  1. The suite's check SET is deterministic: the same tree asks the same questions
+     every run, on both backends. Whatever the suite currently picks procedurally —
+     the evidence points at WHICH settlement it reaches for, and whether that one
+     happens to carry a teaching stone — is chosen from a pinned seed or iterated in
+     full, not sampled.
+  2. A check that cannot run REPORTS that it did not run, as a named skip with its
+     reason. A silently absent check is the defect here; a loud skip is not.
+  3. The run's summary states the expected check count beside the actual one and
+     FAILS when they differ, so a shrunken set is a red rather than a smaller green.
+     Where the count is legitimately variable, the pinned expectation says so with
+     its range and its reason.
+  4. SETTLE THE TEACHING STONE FIRST, because the answer decides (1): is the stone
+     optional in the PoC village by design, or was it missing when the 24-check run
+     read `null`? If it is genuinely sometimes absent, the check states the
+     precondition and skips loudly per (2); if it must always be there, the null is
+     a product bug and is fixed here.
+  VERIFIABLE: pure Vitest over the suite's check registry where the choice is
+  derivable, plus three consecutive `collision` runs on a quiet machine — WebGL 2 and
+  WebGPU — reporting the SAME check count, and a deliberately removed check turning
+  the run red instead of shrinking it.
+
 ## Closing (only after all points)
 
 New points are appended BEFORE this section — it stays last in the file.
