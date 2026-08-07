@@ -160,7 +160,9 @@ describe('the captured lines charge the way the guard reads them', () => {
     const pointOf = (needle) => reds.find((r) => r.name.includes(needle))?.point
     expect(reds.length).toBe(3)
     expect(pointOf('settlement walker (goat)')).toBe(506)
-    expect(pointOf('render-resource-leak')).toBe(546)
+    // The leak was point 546's until it was fixed; with the point ticked its
+    // ledger entry expired, so the same line now charges to nobody.
+    expect(pointOf('render-resource-leak')).toBeNull()
     expect(pointOf('a NEW check nobody has filed')).toBeNull()
   })
 
@@ -170,21 +172,25 @@ describe('the captured lines charge the way the guard reads them', () => {
     expect(reds.map((r) => r.point)).toEqual([null])
   })
 
-  it('charges a leak at ANOTHER place to nothing — 546 is the maasai-village one (F2)', () => {
-    const line = 'ERR: [ASSERT] render-resource-leak — renderTargets grew back at place:cairo: 5 -> 9 (+4, allowed +2)'
-    expect(chargeReds(failedChecks(line), { suite: 'polish', backend: 'webgl' }).map((r) => r.point)).toEqual([null])
+  it('charges a render-target leak to nothing, at maasai-village or anywhere else', () => {
+    // Point 546 fixed the maasai-village leak and its entry left the ledger
+    // with the tick, so no leak line is excused any more — wherever it appears,
+    // it is a red the change under review has to answer for.
+    for (const place of ['maasai-village|medium', 'cairo']) {
+      const line = `ERR: [ASSERT] render-resource-leak — renderTargets grew back at place:${place}: 19 -> 22 (+3, allowed +2)`
+      expect(chargeReds(failedChecks(line), { suite: 'polish', backend: 'webgl' }).map((r) => r.point)).toEqual([null])
+    }
   })
 
-  it('charges the maasai leak to nothing outside `polish` — the evidence was taken there (F2)', () => {
-    const line =
-      'ERR: [ASSERT] render-resource-leak — renderTargets grew back at place:maasai-village|medium: 19 -> 22 (+3, allowed +2)'
-    expect(chargeReds(failedChecks(line), { suite: 'flow', backend: 'webgl' }).map((r) => r.point)).toEqual([null])
-    expect(chargeReds(failedChecks(line), { suite: 'polish', backend: 'webgl' }).map((r) => r.point)).toEqual([546])
+  it('charges a red to nothing outside the suite its evidence was taken in (F2)', () => {
+    const line = 'FAIL  settlement walker (goat): the planted foot holds its ground spot — 0.967'
+    expect(chargeReds(failedChecks(line), { suite: 'flow', backend: 'webgpu' }).map((r) => r.point)).toEqual([null])
+    expect(chargeReds(failedChecks(line), { suite: 'polish', backend: 'webgpu' }).map((r) => r.point)).toEqual([506])
   })
 })
 
 describe('the armed recorder — the REAL wiring, not a stand-in', () => {
-  const openPoints = [506, 546]
+  const openPoints = [506]
 
   it('records a red run with its charged reds, and the run then accounts', async () => {
     const run = await armed('polish')

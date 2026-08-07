@@ -759,16 +759,23 @@ describe('the shipped charge ledger', () => {
     expect(RED_CHARGES.filter((c) => !open.has(c.point)).map((c) => c.point)).toEqual([])
   })
 
-  it('charges the two reds that motivated the mechanism, each in its own lane', () => {
+  it('charges the goat-stance red on the software lane only', () => {
+    const goat = red('settlement walker (goat): the planted foot holds its ground spot')
+    expect(chargeFor(goat, { suite: 'polish', backend: 'webgpu' }).point).toBe(506)
+    expect(chargeFor(goat, { suite: 'polish', backend: 'webgl' })).toBeNull()
+  })
+
+  it('charges the fixed render-target leak to NOBODY — a mended red is a red again', () => {
+    // Point 546 released the bird's-eye cascade shadow maps and its entry left
+    // the ledger with the tick. Should the leak ever come back, it must count
+    // against whatever change brought it, not be waved through by a dead
+    // exception — that expiry is the whole reason the ledger names points.
     const leak = red(
       'console error: [ASSERT] render-resource-leak — renderTargets grew back at place:maasai-village',
       null,
       'console',
     )
-    expect(chargeFor(leak, { suite: 'polish', backend: 'webgl' }).point).toBe(546)
-    expect(chargeFor(leak, { suite: 'polish', backend: 'webgpu' }).point).toBe(546)
-    const goat = red('settlement walker (goat): the planted foot holds its ground spot')
-    expect(chargeFor(goat, { suite: 'polish', backend: 'webgpu' }).point).toBe(506)
-    expect(chargeFor(goat, { suite: 'polish', backend: 'webgl' })).toBeNull()
+    expect(chargeFor(leak, { suite: 'polish', backend: 'webgl' })).toBeNull()
+    expect(chargeFor(leak, { suite: 'polish', backend: 'webgpu' })).toBeNull()
   })
 })

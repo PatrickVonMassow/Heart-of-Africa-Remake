@@ -824,8 +824,10 @@ npm test -- large polish                                  # the same suite on BO
 
 The gate used to count an exit-0 run and nothing else, and on 07.08.2026
 `polish` could not exit 0 for reasons belonging to OTHER points: the
-render-target assert of point 546 fires as a console error on both backends, and
-the goat-stance check reds on the software WebGPU lane (point 506). Every change
+render-target assert of point 546 fired as a console error on both backends
+(fixed and ticked 08.08.2026 — its entry left the ledger with the tick, which is
+the expiry working as designed), and the goat-stance check reds on the software
+WebGPU lane (point 506). Every change
 under `scripts/verify/` — a pure comment diff included — could then be cleared
 only by a hand-written `--defer`, and a gate overridden by hand routinely stops
 being a gate.

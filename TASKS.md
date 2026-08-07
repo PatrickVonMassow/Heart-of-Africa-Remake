@@ -4296,41 +4296,6 @@ Build order, chosen so no two parallel agents own the same file:
   Criticality: medium — the guards themselves are reviewed and tested; what is at
   stake is that a wrongly placed hook line disables a chain silently.
 
-
-- [ ] 546. A SETTLEMENT VISIT STILL GROWS THE RESIDENT RENDER TARGETS BY THREE
-  (measured 07.08.2026, both backends). The dev invariant channel reports
-  `render-resource-leak — renderTargets grew back at
-  place:maasai-village|medium|traa/-/bloom/sun/fire/-: 19 -> 22 (+3, allowed +2)` on a
-  maasai-village visit in `polish`, on WebGL 2 and on WebGPU alike. It is the REMAINDER
-  of the leak point 545 worked on, not a regression from it: `baseline-classify.mjs
-  polish` against the pre-545 merge-base fires the SAME 19 -> 22 twice with identical
-  texture counts, plus two further 19 -> 23 readings (textures 44 -> 78/90) that 545's
-  once-per-session capture targets removed. The trailing `/-` in the signature is 545's
-  new lever saying no capture target exists at that reading, so the capture is proven
-  not to be the source. Probed and RULED OUT already: five maasai visits with no capture
-  hold 19 render targets flat; the map toggle, the wet season and rain move nothing. The
-  untested suspect the probes point at is the fire-shadow / quality-preset toggling
-  later in the polish scenario.
-  FINAL STATE: a settlement visit leaves the resident render-target set where it found
-  it (within the channel's existing +2 allowance), so the assert is silent across the
-  whole `polish` scenario on both backends. Whatever the source turns out to be, it is
-  FIXED rather than accommodated — the allowance is not raised, and the signature's
-  levers are not blunted to hide it.
-  VERIFIABLE: `polish` runs to the end with ZERO console errors on both backends (today
-  it passes 150/0 on WebGPU with exactly this one assert as its single console error),
-  and a Vitest case pinning the release path the fix rests on.
-  WHAT ELSE HOLDS THE SUITE SHORT OF EXIT 0 (measured 07.08.2026, four runs — two per
-  backend — with the standing reds of point 387 closed): this assert is the ONLY console
-  error left in all four, so on WebGL 2 the suite ends green the moment it stops. The
-  WebGPU exit needs one more: the goat-stance check reds there in BOTH runs (20 stance
-  intervals, worst foot travel 0.967) and passes on WebGL 2 (0.337) — the software lane's
-  own signature, point 506. Two further checks rotate their verdict between runs and are
-  point 549. None of the three is this leak; they are named here so the next reader knows
-  what a green run still waits on.
-  Criticality: medium — three render targets per settlement visit is a slow drift, not a
-  crash, but the channel is the detector that catches the fast ones, and an assert that
-  fires on every run is one the next reader learns to wave off.
-
 - [ ] 548. THE PANORAMA BAND'S TWO REVIEW OBSERVATIONS (second model, 07.08.2026; it
   judged BOTH as non-blocking and asked for them as their own point rather than as
   argument). (a) THE ONCE-PER-SESSION CAPTURE TARGETS DO NOT SURVIVE A RENDERER
