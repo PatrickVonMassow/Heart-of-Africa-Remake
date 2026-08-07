@@ -8,8 +8,14 @@
 // CLOSING from a plain regression, §7.2 / Maximum-QA Phase 8) were SKIPPED,
 // because the closing steps were tracked by fallible MEMORY, not enforced. This
 // guard makes a version release IMPOSSIBLE while any closing step is unchecked:
-// a PreToolUse(Bash) hook blocks the tag/poc creation-or-push (and --tags)
-// unless EVERY step below is recorded done FOR THE EXACT COMMIT being tagged.
+// a PreToolUse hook on the shell tools blocks the tag/poc creation-or-push (and
+// --tags) unless EVERY step below is recorded done FOR THE EXACT COMMIT tagged.
+//
+// The SECOND release act the checklist gates is the CLAIM that a closing is
+// finished — in this repo's machine-readable form, the `[ ]`→`[x]` TICK of a
+// work-order point whose own spec delivers a closing (the point-224 shape). The
+// v0.2 miss was exactly that: the point was ticked while the cleanup steps had
+// never run. So the same checklist decides the tick, on the work-order EDIT.
 //
 // The enforcement is PRE-tag (a PreToolUse deny), not a post-hoc Stop block, so
 // the bad state can never reach the remote. Fail-open is the WRAPPER's job; this
@@ -87,6 +93,143 @@ export function isVersionTagCommand(command) {
   return false
 }
 
+/** The work-order files a tick is written into (the split of 26.07.2026). */
+export const WORK_ORDER_FILES = ['TASKS.md', 'docs/tasks-archive.md']
+
+/** Does this path (any separator, any prefix) name one of the work-order files? */
+export function isWorkOrderPath(path) {
+  if (typeof path !== 'string' || !path) return false
+  const p = path.replace(/\\/g, '/')
+  return p.endsWith('/TASKS.md') || p === 'TASKS.md' || p.endsWith('/docs/tasks-archive.md') || p === 'docs/tasks-archive.md'
+}
+
+// A point whose OWN delivery is a closing run says so: either its headline names
+// a closing run/cycle/pass (points 148/150/173/224), or its body DEMANDS a full/
+// complete/final one (174/184/330). A point that merely REFERS to some other
+// closing ("found in the point-173 closing run", "before the final closing run
+// and the tag") is not one — that reference shape is stripped before the demand
+// is read. Measured over the whole corpus (536 points): 7 match, all of them
+// points that genuinely deliver a closing, and no incidental mention.
+// The headline word stands on its own — `pre-closing pass` is a preparation FOR
+// a closing, not a closing, so the hyphenated compound must not match.
+const CLOSING_HEADLINE = /(^|[\s(—])closing\s+(run|cycle|pass)\b/i
+const CLOSING_DEMAND = /\b(full|complete|final)\s+closing\s+(run|cycle|pass)\b/i
+const CLOSING_REFERENCE = /\b(before|after|during|since|from|in)\s+the\s+(full|complete|final)\s+closing\s+(run|cycle|pass)\b/gi
+
+/**
+ * Split a work-order text into its points: { n, open, headline, text }.
+ * Total: a non-string (or an unparseable file) yields an empty list.
+ */
+export function parsePoints(tasksText) {
+  const out = []
+  if (typeof tasksText !== 'string' || !tasksText) return out
+  let cur = null
+  let buf = []
+  const flush = () => {
+    if (cur) out.push({ ...cur, text: buf.join('\n') })
+  }
+  for (const line of tasksText.split('\n')) {
+    const m = /^- \[( |x)\] (\d+)\./.exec(line)
+    if (m) {
+      flush()
+      cur = { n: Number(m[2]), open: m[1] === ' ', headline: line }
+      buf = [line]
+    } else if (cur) {
+      buf.push(line)
+    }
+  }
+  flush()
+  return out
+}
+
+/**
+ * The point numbers whose SPEC delivers a closing cycle — the ticks this guard
+ * gates. Total: bad input → empty set (nothing gated, i.e. fail-open).
+ */
+export function closingPointNumbers(tasksText) {
+  const found = new Set()
+  for (const p of parsePoints(tasksText)) {
+    if (CLOSING_HEADLINE.test(p.headline)) {
+      found.add(p.n)
+      continue
+    }
+    for (const line of p.text.split('\n')) {
+      if (!CLOSING_DEMAND.test(line)) continue
+      if (CLOSING_DEMAND.test(line.replace(CLOSING_REFERENCE, ' '))) {
+        found.add(p.n)
+        break
+      }
+    }
+  }
+  return found
+}
+
+/** The point numbers a text TICKS (`- [x] N.`). Total: bad input → empty set. */
+export function tickedPointNumbers(text) {
+  const out = new Set()
+  if (typeof text !== 'string') return out
+  for (const m of text.matchAll(/- \[x\] (\d+)\./g)) out.add(Number(m[1]))
+  return out
+}
+
+/** The tool names whose payload can carry a tick. */
+const EDIT_TOOLS = new Set(['Edit', 'Write', 'MultiEdit', 'NotebookEdit'])
+const SHELL_TOOLS = new Set(['Bash', 'PowerShell'])
+
+/** The text a tool call WRITES, and the text it REPLACES, for tick accounting. */
+function tickTexts(toolName, toolInput) {
+  const input = toolInput && typeof toolInput === 'object' ? toolInput : {}
+  if (EDIT_TOOLS.has(toolName)) {
+    if (!isWorkOrderPath(input.file_path)) return null
+    const edits = Array.isArray(input.edits) ? input.edits : []
+    const added = [input.new_string, input.content, input.new_source, ...edits.map((e) => e && e.new_string)]
+    const removed = [input.old_string, ...edits.map((e) => e && e.old_string)]
+    return { added: added.filter((s) => typeof s === 'string').join('\n'), removed: removed.filter((s) => typeof s === 'string').join('\n') }
+  }
+  if (SHELL_TOOLS.has(toolName)) {
+    const c = typeof input.command === 'string' ? input.command : ''
+    // A shell tick has to name the file it rewrites — that keeps every ordinary
+    // command (and every commit message quoting a tick) out of the accounting.
+    if (!/TASKS\.md|tasks-archive\.md/.test(c)) return null
+    return { added: c, removed: '' }
+  }
+  return null
+}
+
+/**
+ * Cheap structural pre-check: could this tool call possibly tick a point? The
+ * wrapper asks FIRST so it reads the work order only when it might matter.
+ */
+export function mayTickPoint(toolName, toolInput) {
+  try {
+    const t = tickTexts(toolName, toolInput)
+    return !!t && /- \[x\] \d+\./.test(t.added)
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Which CLOSING points this tool call ticks. A point counts only when the tick
+ * is NEW (not already present in the text being replaced) and the point is
+ * still OPEN in the current work order — so re-writing an already-archived tick
+ * can never re-fire. Total: anything unreadable → [] (fail-open).
+ */
+export function closingTickClaim({ toolName, toolInput, tasksText } = {}) {
+  try {
+    const t = tickTexts(toolName, toolInput)
+    if (!t) return []
+    const ticked = tickedPointNumbers(t.added)
+    if (ticked.size === 0) return []
+    const already = tickedPointNumbers(t.removed)
+    const closing = closingPointNumbers(tasksText)
+    const stillOpen = new Set(parsePoints(tasksText).filter((p) => p.open).map((p) => p.n))
+    return [...ticked].filter((n) => !already.has(n) && closing.has(n) && stillOpen.has(n)).sort((a, b) => a - b)
+  } catch {
+    return []
+  }
+}
+
 /**
  * Which closing steps are NOT satisfied for `headSha`, given the recorded state.
  * A step is satisfied ONLY when the state is FOR this exact commit and the step
@@ -109,31 +252,55 @@ export function missingSteps(state, headSha) {
   return CLOSING_STEPS.filter((s) => !done.has(s.id))
 }
 
+/** The shared tail of every block reason: what is missing and how to record it. */
+function remedy(missing, retry) {
+  const list = missing.map((s) => `  - ${s.id}: ${s.title}`).join('\n')
+  return (
+    `A closing runs the FULL cycle (§7.2 / Maximum-QA Phase 8), not just the LARGE ` +
+    `regression — the dead-code/stale-doc/stale-comment cleanup and the .md audit are ` +
+    `what distinguish a closing from a regression (the v0.2 miss).\nMissing:\n${list}\n` +
+    `Do each step, record it with evidence:\n` +
+    `  node scripts/closing-guard.mjs --step <id> --evidence "<what you did / the proof>"\n` +
+    `${retry} Inspect anytime: node scripts/closing-guard.mjs --status`
+  )
+}
+
 /**
- * Top-level PreToolUse decision. Blocks a version-tag/poc create-or-push while
- * any closing step is unsatisfied for the commit being tagged (headSha).
+ * Top-level PreToolUse decision. Blocks, while any closing step is unsatisfied
+ * for the commit at hand (headSha), BOTH release acts:
+ *   - a version-tag/poc create-or-push (shell tools), and
+ *   - the `[ ]`→`[x]` tick of a point whose spec delivers a closing (the
+ *     work-order edit that CLAIMS the closing is done).
  * Returns { block: boolean, reason: string }. Total by contract: any thrown
  * error is the wrapper's to swallow — this function never throws on partial
  * input (returns {block:false} on anything it cannot evaluate).
  */
-export function evaluate({ command, state, headSha } = {}) {
+export function evaluate({ command, state, headSha, toolName, toolInput, tasksText } = {}) {
   try {
-    if (!isVersionTagCommand(command)) return { block: false, reason: '' }
+    const tagAct = isVersionTagCommand(command)
+    const tickedPoints = tagAct ? [] : closingTickClaim({ toolName, toolInput, tasksText })
+    if (!tagAct && tickedPoints.length === 0) return { block: false, reason: '' }
     const missing = missingSteps(state, headSha)
     if (missing.length === 0) return { block: false, reason: '' }
-    const list = missing.map((s) => `  - ${s.id}: ${s.title}`).join('\n')
     const forCommit = headSha ? ` for commit ${String(headSha).slice(0, 12)}` : ''
+    if (tagAct) {
+      return {
+        block: true,
+        reason:
+          `CLOSING INCOMPLETE — refusing to create/push a version tag${forCommit}: ` +
+          `${missing.length} of ${CLOSING_STEPS.length} closing steps are NOT recorded done. ` +
+          remedy(missing, 'Then re-run the tag command.'),
+      }
+    }
+    const which = tickedPoints.map((n) => `point ${n}`).join(', ')
     return {
       block: true,
       reason:
-        `CLOSING INCOMPLETE — refusing to create/push a version tag${forCommit}: ` +
-        `${missing.length} of ${CLOSING_STEPS.length} closing steps are NOT recorded done. ` +
-        `A version release runs the FULL closing cycle (§7.2 / Maximum-QA Phase 8), not just the ` +
-        `LARGE regression — the dead-code/stale-doc/stale-comment cleanup and the .md audit are ` +
-        `what distinguish a closing from a regression (the v0.2 miss).\nMissing:\n${list}\n` +
-        `Do each step, record it with evidence:\n` +
-        `  node scripts/closing-guard.mjs --step <id> --evidence "<what you did / the proof>"\n` +
-        `Then re-run the tag command. Inspect anytime: node scripts/closing-guard.mjs --status`,
+        `CLOSING INCOMPLETE — refusing to tick ${which} as done${forCommit}: that point's own ` +
+        `delivery IS a closing cycle, and ${missing.length} of ${CLOSING_STEPS.length} closing ` +
+        `steps are NOT recorded done. Ticking it now would repeat the v0.2 miss — the point ` +
+        `declared finished while the cleanup steps had never run. ` +
+        remedy(missing, 'Then re-run the tick. A step the user has expressly waived is recorded AS the waiver, naming his decision.'),
     }
   } catch {
     return { block: false, reason: '' } // total by contract — the wrapper's fail-open must not depend on luck

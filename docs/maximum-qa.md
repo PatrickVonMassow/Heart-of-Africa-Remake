@@ -194,6 +194,12 @@ Cheap automated classes first, then the visual sweep:
   cleanup + `.md` audit) is recorded done for the commit
   (`node scripts/closing-guard.mjs --status` / `--step <id> --evidence "…"`). A
   closing can no longer silently skip a step, which is what happened at v0.2.
+  The same checklist gates the OTHER release act: the `[ ]`→`[x]` TICK of a point
+  whose own spec delivers a closing (the point-224 shape) is denied on the
+  work-order edit while a step is unrecorded — the tick IS the machine-readable
+  "the closing is done" claim, and at v0.2 it was made while the cleanup had
+  never run. A step the user expressly waives is recorded AS the waiver, naming
+  his decision, so the waiver leaves a trace instead of a gap.
 - Increment the trailing version digit (v0.1 → v0.2 → v0.3, …).
 - Tag the release, and **MOVE the `poc` tag to the SAME commit** — `poc` always
   mirrors the NEWEST version tag (user decision 24.07.2026), playable at

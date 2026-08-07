@@ -2,11 +2,14 @@
 // Closing-completeness guard — thin fail-OPEN I/O wrapper + CLI around the pure
 // core (closing-guard-core.mjs). Two modes:
 //
-//  1. PreToolUse(Bash) HOOK (wired in .claude/settings.json): reads the tool
-//     call on stdin; if the command creates or pushes a version tag (vX.Y) or
-//     the `poc` tag and the closing for the current HEAD is INCOMPLETE, it
-//     DENIES the tool call with the list of missing steps. Any internal error →
-//     ALLOW (fail-open: a guard bug must never trap a release).
+//  1. PreToolUse HOOK (wired in .claude/settings.json for the shell tools AND
+//     the editing tools): reads the tool call on stdin and DENIES it while the
+//     closing for the current HEAD is INCOMPLETE, if the call is either
+//       - a command creating or pushing a version tag (vX.Y) or the `poc` tag, or
+//       - a work-order edit TICKING a point whose spec delivers a closing (the
+//         point-224 shape) — the machine-readable "the closing is done" claim.
+//     Any internal error → ALLOW (fail-open: a guard bug must never trap a
+//     release, and it must never trap the work order either).
 //
 //  2. CLI, to drive the checklist as you complete a closing:
 //       node scripts/closing-guard.mjs --status
@@ -19,10 +22,23 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { execSync } from 'node:child_process'
 import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { CLOSING_STEPS, STEP_IDS, evaluate, missingSteps } from './closing-guard-core.mjs'
+import { CLOSING_STEPS, STEP_IDS, evaluate, missingSteps, mayTickPoint } from './closing-guard-core.mjs'
+import { readTasksAll } from './tasks-source.mjs'
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const STATE_PATH = resolve(REPO_ROOT, '.claude', 'closing-state.json')
+
+/** The tools whose calls can be a release act: the shells tag, the editors tick. */
+const GUARDED_TOOLS = new Set(['Bash', 'PowerShell', 'Edit', 'Write', 'MultiEdit', 'NotebookEdit'])
+
+/** The whole work order (open + archive). Unreadable → '' , which gates nothing. */
+function readTasks() {
+  try {
+    return readTasksAll()
+  } catch {
+    return ''
+  }
+}
 
 function headSha() {
   try {
@@ -112,9 +128,13 @@ try {
   } catch {
     process.exit(0)
   }
-  if (!payload || (payload.tool_name !== 'Bash' && payload.tool_name !== 'PowerShell')) process.exit(0)
-  const command = payload.tool_input && payload.tool_input.command
-  const decision = evaluate({ command, state: readState(), headSha: headSha() })
+  if (!payload || !GUARDED_TOOLS.has(payload.tool_name)) process.exit(0)
+  const toolInput = payload.tool_input
+  const command = toolInput && toolInput.command
+  // The work order is read ONLY when the payload could carry a tick — every
+  // other call (the overwhelming majority) costs no file read at all.
+  const tasksText = mayTickPoint(payload.tool_name, toolInput) ? readTasks() : ''
+  const decision = evaluate({ command, state: readState(), headSha: headSha(), toolName: payload.tool_name, toolInput, tasksText })
   if (decision.block) {
     process.stdout.write(
       JSON.stringify({
