@@ -17,7 +17,9 @@
 // against an earlier reading of that same signature.
 //
 // STRICT ON RENDER TARGETS, COARSE ON TEXTURES. Render targets are allocated by
-// the post pipeline (src/render/Effects.tsx), the shadow maps and the panorama
+// the post pipeline (src/render/Effects.tsx), the shadow maps (each scene's own,
+// freed when it is left — the bird's-eye sun is a singleton and needs
+// src/render/shadowRelease.ts to do it, point 546) and the panorama
 // capture's two targets (src/scenes/travel/panoramaCapture.ts, allocated on the
 // first capture and kept for the session, so a settlement visit adds none) —
 // a bounded set that content never inflates, so a rise of more than
