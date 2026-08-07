@@ -870,6 +870,17 @@ Ein Nachtrag aus der Abnahme selbst, zweimal am selben Tag: Ein neuer Eintrag un
 
 **Lehre:** Eine Reparatur an einem Wächter wird **in beide Richtungen** abgenommen, und die zweite Richtung gehört nicht dem Autor. Wer die Falsch-Positiven beseitigt, muss nachweisen, dass die Richtig-Positiven noch anschlagen — mit Fällen, die **nicht aus derselben Feder** stammen wie die Bedingung. Und für den Prüfer: an der Mechanik messen, nicht an den Testnamen. Ein Test, der das Richtige behauptet, und eine Mechanik, die es tut, sind zwei verschiedene Aussagen.
 
+
+### 3.92 Der Wert, der beim Ausliefern schon abgelaufen war
+
+Die Zeitstempel-Regel ist das Musterbeispiel des Berichts: neun Eskalationen, acht weiche Maßnahmen, gelöst erst vom blockierenden Wächter. Heute Nacht kostete sie erneut drei Züge — und diesmal hat der Wächter alles richtig gemacht. Er hat jede falsche Minute erkannt und geblockt. Falsch war die **Quelle**, aus der ich den Wert nahm.
+
+Der Einspeise-Haken schreibt die Uhrzeit an den Anfang des Zuges. Ein Zug, der aus zwanzig Werkzeugaufrufen besteht, ist am Ende aber nicht mehr am Anfang: Der Banner trug 23:14, die Antwort entstand um 23:28, und ich habe die Differenz nicht gemessen, sondern aus der gefühlten Dauer meiner eigenen Arbeitsschritte hochgerechnet — auf 23:52. Die Memory-Zeile „messen, nie schätzen" stand seit dem 16.07. wörtlich da. Sie hat nicht geholfen, weil ich gar nicht schätzen wollte: Ich hielt den Banner für eine Messung.
+
+Das ist die verallgemeinerbare Form. Ein Mechanismus, der einen **verderblichen Wert** ausliefert, muss sein Verfallsdatum mitliefern, sonst wird er als Tatsache weiterverwendet. Der Banner sagt „aktuelle Zeit", und das stimmt in der Sekunde, in der er geschrieben wird; eine halbe Stunde später sagt derselbe Satz dasselbe und ist falsch. Dieselbe Falle steckt im Zwischenspeicher des CI-Wächters, der in derselben Nacht dreimal einen Lauf als „läuft noch" meldete, der längst grün durch war — der zitierte Grund war eingefroren, während der Zustand weitergelaufen war.
+
+**Lehre:** Ein Wert, der zwischen Erhebung und Verwendung altern kann, wird am **Verwendungsort** erhoben, nicht am Erhebungsort weitergereicht. Wo ein Mechanismus ihn dennoch vorhält, gehört die Erhebungszeit sichtbar daneben — ein Wert ohne Zeitstempel wird als zeitlos gelesen, und genau das ist er nicht.
+
 ---
 
 ## 4. Die Guards als Immunsystem
@@ -959,7 +970,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Freitag, 07.08.2026, 22:52 · Quellen-Fingerprint: `3f4e444cbe9b…`
+Zuletzt aktualisiert: Freitag, 07.08.2026, 23:29 · Quellen-Fingerprint: `43e578564641…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -978,7 +989,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | F6 bug-report zips the user hands over are saved into the repo's git-ignored local/ folder — search there first, not only Downloads | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | A newly found problem goes into an EXISTING bundle point first; a new standalone point is the exception, and may instead re-cut the bundles | 1 | niedrig | bundle-first-guard.mjs, point-proof-guard.mjs | ✔ Mechanismus |
 | Work packages are SPOKEN by name, never by letter — the user cannot read \"bundle H\"; the letter stays only as an internal ID | 1 | niedrig | bundle-first-guard.mjs | ✔ Mechanismus |
-| Jede Chat-Antwort mit einem Zeitstempel nach deutscher Zeit (Europe/Berlin, DST-korrekt) beginnen | 11 | hoch | timestamp-guard.mjs | ✔ Mechanismus |
+| Jede Chat-Antwort mit einem Zeitstempel nach deutscher Zeit (Europe/Berlin, DST-korrekt) beginnen | 12 | hoch | timestamp-guard.mjs | ✔ Mechanismus |
 | CLAUDE.md §7.1 references design.md instead of retelling it; future doc edits must preserve the verifiable conditions, script mappings, numbering and checked numbers | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | Autonomously insert a full CLOSING cycle (regression + dead-code/stale-doc cleanup + .md audit) when warranted — after extensive rework or many small completed tasks — without waiting for the user to ask | 1 | niedrig | closing-guard.mjs | ✔ Mechanismus |
 | hoa commit messages must not reference the TASKS point (\"Point N\") | 1 | niedrig | commit-scope-guard.mjs, point-proof-guard.mjs | ✔ Mechanismus |
@@ -1041,6 +1052,6 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 72 Feedback-/Projekt-Memories · 48 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 38 Prozess-/Meta-TASKS-Punkte (davon 15 offen).
 
-<!-- RETRO-FINGERPRINT: 3f4e444cbe9bea77c423409d1c17a70b5459282445135f2b669b70c3fb22da63 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-07T20:52:18.438Z -->
+<!-- RETRO-FINGERPRINT: 43e578564641c01817ce8ff756e0f8d783c7e9e76169f53174096d001a6d7ac5 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-07T21:29:18.660Z -->
 <!-- AUTO-GENERATED:END -->
