@@ -9,23 +9,22 @@ die Fallstricke dahinter. Ausführlich in `retrospektive-zusammenarbeit.md`.
 ## Die eine Kernlehre
 
 **Gute Vorsätze halten nicht — Prüfungen halten.** Jedes Problem, das nur
-„gemerkt" war, kam wieder; sobald etwas es maschinell verhinderte (ein Test, ein
-Hook, ein Check), war es weg. Verlange deshalb bei allem, was dir wichtig ist, im
-Prompt einen **Mechanismus** — keine Regel:
+„gemerkt" war, kam wieder; sobald ein Test oder ein Hook es maschinell verhinderte,
+war es weg. Verlange deshalb bei allem, was dir wichtig ist, im Prompt einen
+**Mechanismus** — keine Regel:
 
 > *Prompt-Zusatz:* „Sichere das mit einem Mechanismus zu, der die Verletzung
 > unmöglich macht, und zeig mir, wo er blockiert."
 
 Der Aufwand richtet sich nach der Wichtigkeit — ein leichter Check für eine leichte
-Regel —, die Haltung ist **erzwingen statt erinnern**, ab der ersten Formulierung
-und nicht erst beim zweiten Schaden.
+Regel —, und zwar ab der ersten Formulierung, nicht erst beim zweiten Schaden.
 
 ### Wie die Prompts in dieser Anleitung formuliert sind
 
-Die Prompts unten sind **Aufträge, einen Mechanismus zu bauen** — keine Merksätze.
-„Jedes neue Feature bekommt einen Test" ist eine *Regel*, die vergessen wird;
-„Etabliere einen Mechanismus, der das garantiert" ist ein *Auftrag*. Wo einer prinzipiell
-**nicht** möglich ist (etwa „sieht das für einen Menschen richtig aus?"), steht das dabei.
+Die Prompts unten sind **Aufträge, einen Mechanismus zu bauen** — keine Merksätze: „Jedes
+neue Feature bekommt einen Test" wird vergessen, „Etabliere einen Mechanismus, der das
+garantiert" nicht. Wo einer prinzipiell **nicht** möglich ist (etwa „sieht das für einen
+Menschen richtig aus?"), steht das dabei.
 
 Eine **Schätzung** wie *(Kosten ≈ 2x)* meint den Mehrverbrauch der betroffenen Arbeit,
 nicht des Projekts.
@@ -36,10 +35,9 @@ Lege **zwei** Modelle fest und gib ihnen klare Rollen:
 
 - Ein **primäres Modell** macht die Arbeit — bei *jeder* Schwierigkeit. Nimm die
   jeweils stärkste verfügbare Version.
-- Ein **sekundäres, anderes Modell** ist für das **Vier-Augen-Prinzip** da (es
-  prüft Plan und Ergebnis des primären, oder baut selbst und lässt prüfen) und
-  springt als **Ausweichstufe** ein, wenn das primäre nicht in seiner höchsten
-  Version verfügbar ist.
+- Ein **sekundäres, anderes Modell** ist für das **Vier-Augen-Prinzip** da (in welcher
+  Form, sagt der Fallstrick weiter unten) und springt als **Ausweichstufe** ein, wenn
+  das primäre nicht in seiner höchsten Version verfügbar ist.
 
 > *Prompt:* „Arbeite grundsätzlich mit **\<primäres Modell\>**, unabhängig von der
 > Schwierigkeit. **\<sekundäres Modell\>** setzt du nur für das Vier-Augen-Prinzip ein
@@ -48,11 +46,9 @@ Lege **zwei** Modelle fest und gib ihnen klare Rollen:
 > übernehmen."
 
 Ein zweites Modell nützt nicht, weil es *besser* wäre, sondern weil es **andere blinde
-Flecken** hat — diesen Wert hebt nur eine Prüfung.
-
-Die **Obergrenze** zieht die **Sichtbarkeit des Fehlers**: Was den Ablauf steuert oder
-Arbeit vernichten kann (Wächter, Sperren, Speichern/Laden, Veröffentlichungen), wird
-immer gegengeprüft; was ein schneller Test sofort zeigt, nie.
+Flecken** hat. Die **Obergrenze** zieht die **Sichtbarkeit des Fehlers**: Was den Ablauf
+steuert oder Arbeit vernichten kann, wird immer gegengeprüft; was ein schneller Test
+sofort zeigt, nie.
 
 ---
 
@@ -98,17 +94,16 @@ immer gegengeprüft; was ein schneller Test sofort zeigt, nie.
    zweiten Schaden.
    > „Für **jede** Regel, die wirklich gelten soll, baue von Anfang an einen **Mechanismus**,
    > der ihre Verletzung unmöglich macht — einen Test, einen Git-Hook oder einen Stop-/
-   > PreToolUse-Hook, der die Aktion verweigert, wenn die Regel gebrochen würde. Der Aufwand
-   > soll zur Wichtigkeit passen, aber die Grundhaltung ist: **erzwingen statt erinnern**.
+   > PreToolUse-Hook, der die Aktion verweigert, wenn die Regel gebrochen würde.
    > Ein Vorsatz — auch ein ausführlich niedergeschriebener — reicht nicht."
 
-   Ein Mechanismus kann selbst falsch gebaut sein; Gegenprüfungen finden darin mehr
-   Fehler als in gewöhnlichem Code:
+   Ein Mechanismus kann selbst falsch gebaut sein; Gegenprüfungen finden darin
+   besonders viel:
    > „Etabliere einen Mechanismus, der beim Hinzufügen oder Ändern eines
    > Mechanismus **immer das Vier-Augen-Prinzip** erzwingt: Plan und Ergebnis
-   > werden vom sekundären Modell gegengeprüft, bevor der neue Mechanismus scharf
-   > geschaltet wird — und ohne festgehaltenen Prüf-Eintrag (wer, mit welchem
-   > Ergebnis, welcher Stand) darf der Zug nicht enden."
+   > werden vom sekundären Modell gegengeprüft, bevor er scharf geschaltet wird —
+   > und ohne festgehaltenen Prüf-Eintrag (wer, welches Ergebnis, welcher Stand)
+   > darf der Zug nicht enden."
 
    Ein „passt schon" des Autors zählt nicht. *(Kosten ≈ 2x)*
 
@@ -181,7 +176,6 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   großen Dokumenten *suchen*.
   → *Prompt:* „Nenne mir die **gemessenen** Treiber. Schicke jedem Helfer seinen Auftrag als
   fertigen Kurzbrief mit, und fang für jede Aufgabe einen **frischen Kontext** an."
-  *(Ein billigeres Modell für ‚einfache' Aufgaben ist der falsche Hebel — die Nacharbeit kostet mehr.)*
 
 - **Der autonome Lauf bleibt stehen — still oder wartend.** Der Fortschritt endet unbemerkt,
   oder er hängt an einer Rückfrage — beides gleich teuer, wenn du weg bist.
@@ -242,11 +236,17 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Etabliere einen Mechanismus, der nach jedem Zwischenfall eine **Beweisliste**
   erzwingt: Liegt alles am Zielort? Gibt es Reste? Passen Dokumente und Code zusammen?"
 
-- **Der Autor sieht seine eigene Annahme nicht.** Wer entwirft und baut, prüft gegen dieselbe
-  Vorstellung, aus der der Fehler stammt — teuer bei Dingen, die *immer* laufen müssen.
-  → *Prompt:* „Etabliere einen Mechanismus, der vor dem Bau **Schwierigkeit × Kritikalität**
-  einschätzt und bei Kritischem **ein anderes Modell** erst den Plan und dann das Ergebnis
-  gegenprüfen lässt — gegen die echten Daten, und vor dem Zusammenführen." *(Kosten ≈ 2x)*
+- **Der Autor sieht seine eigene Annahme nicht — und wer eine fertige Liste prüft, hakt sie ab.**
+  Wer entwirft und baut, prüft gegen dieselbe Vorstellung, aus der der Fehler stammt. Und wer eine
+  fertige Liste prüft, nennt weit weniger als vor dem leeren Blatt — falsch also, wenn der
+  **übersehene** Punkt zählt.
+  → *Prompt:* „Etabliere einen Mechanismus, der vor dem Bau **Schwierigkeit × Kritikalität** einschätzt
+  und bei Kritischem **ein anderes Modell** hinzuzieht — je nach Schritt anders. Beim **Finden**
+  (was kann schiefgehen, welche Fälle prüfen) arbeitet ihr **blind parallel**: gleiche Vorgabe, je ein
+  vollständiges Ergebnis, keiner sieht vorher das andere; vereinigt wird **nach Bedeutung**,
+  Einzelnennungen **markiert statt gestrichen**. Beim **Beurteilen eines fertigen Ergebnisses** bleibt
+  es beim Gegenlesen, aber **erst das Ergebnis, dann die Begründung**; zwei Läufe desselben Modells
+  nur mit **anderer Rolle**." *(Kosten ≈ 2x für den Fundschritt)*
 
 - **Die teuerste Prüfung großflächig verlangt.** Bildbegutachtung, ein zweiter Lauf, ein
   zweites Modell kosten ein Vielfaches — pauschal gefordert, zahlst du sie auch dort, wo sie
@@ -373,7 +373,7 @@ Zwei Mechanismen, die das Netz ehrlich halten:
    > **mechanische** Ursache — was genau war die Annahme, die brach?"
 
 2. **Nutzer-Artefakte sind Verträge.** Ein Dashboard, ein Ausgabeformat, eine Board-
-   Struktur, die du festgelegt hast: nicht eigenmächtig umbauen. Änderungen nur als
+   Struktur, die du festgelegt hast: nicht eigenmächtig umbauen, Änderungen nur als
    Vorschlag.
    > *Prompt:* „Struktur von Dingen, die ich festgelegt habe, friert ein. Schlag
    > Änderungen vor, setz sie nicht ungefragt um."
@@ -400,7 +400,7 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 > hol ein zweites Modell als Gegenprüfer. Frag nach, wenn das Zielbild unklar ist — rate
 > nicht."
 
-Wenn du diese eine Nachricht an den Anfang stellst, hast du 80 % der Lehren dieses
-Projekts eingebaut, bevor die erste Zeile Code entsteht.
+Diese eine Nachricht am Anfang baut 80 % der Lehren dieses Projekts ein, bevor die
+erste Zeile Code entsteht.
 
 <!-- GUIDE-FINGERPRINT: 18e0488bc5ee394682043bd2257ba25ba4f1fe6e97b4df3626f54b0cef1aaa23 -->
