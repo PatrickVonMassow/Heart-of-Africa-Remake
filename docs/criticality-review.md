@@ -89,11 +89,20 @@ also closes a high point is recorded **once**:
 
 ```sh
 node scripts/mechanism-review.mjs --record <sha> --point <N> --model "Fable 5" \
-    --verdict <merge|merge-with-fixes|do-not-merge> --evidence "<one line>"
+    --verdict <merge|merge-with-fixes|do-not-merge> --evidence "<one line>" \
+    --mode <review|blind-parallel> [--framing "<one line>"]
 ```
 
 - `--point <N>` is what this gate looks for; without it the record still serves
   the mechanism gate, which selects by file path.
+- `--mode` names which half of the four-eyes principle the verdict covers
+  (CLAUDE.md §6) and has **no default**: a convergent `review` judges one
+  artefact, `blind-parallel` covers a divergent step both models worked
+  through without seeing each other's result. `--framing` records how a second
+  blind run by the *same* model was decorrelated and belongs to
+  `blind-parallel` alone.
+- Rows written before the mode flag existed carry none. They stay valid — the
+  gates never required it of a record they read, only of one they write.
 - The ledger `.claude/mechanism-reviews.jsonl` is **tracked in git**: the review
   happens on a branch and the gate bites in the session that ticks it, so the
   record must make that journey. Commit it with the change it judges.

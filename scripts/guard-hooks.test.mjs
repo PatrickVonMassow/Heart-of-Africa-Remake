@@ -508,6 +508,7 @@ describe('mechanism-review-guard: the four-eyes gate on mechanisms', { timeout: 
       '--model', 'Fable 5',
       '--verdict', 'merge',
       '--evidence', 'read the core and the wrapper against the spec, ran the pure cases',
+      '--mode', 'review',
     ])
     expect(r.status, r.stderr).toBe(0)
     baselineAt(base)
@@ -520,6 +521,7 @@ describe('mechanism-review-guard: the four-eyes gate on mechanisms', { timeout: 
       '--model', 'Claude Opus 5',
       '--verdict', 'merge',
       '--evidence', 'I have read my own work again and it still looks right',
+      '--mode', 'review',
     ])
     expect(r.status).toBe(1)
     expect(r.stderr).toMatch(/SELF-REVIEW is refused/)
@@ -531,6 +533,7 @@ describe('mechanism-review-guard: the four-eyes gate on mechanisms', { timeout: 
       '--model', 'Fable 5',
       '--verdict', 'do-not-merge',
       '--evidence', 'the fast path waves through the files the unit layer measures',
+      '--mode', 'review',
     ])
     expect(r.status, r.stderr).toBe(0)
     baselineAt(base)
@@ -564,6 +567,7 @@ describe('mechanism-review-guard: the four-eyes gate on mechanisms', { timeout: 
       '--model', 'Fable 5',
       '--verdict', 'merge-with-fixes',
       '--evidence', 'reviewed both commits of the branch at its head',
+      '--mode', 'review',
     ])
     expect(r.status, r.stderr).toBe(0)
     baselineAt(from)
@@ -629,6 +633,7 @@ describe('mechanism-review-guard: the four-eyes gate on mechanisms', { timeout: 
       '--model', 'Fable 5',
       '--verdict', 'merge',
       '--evidence', 'reviewed the fourth demo guard on its branch before the merge',
+      '--mode', 'review',
     ])
     expect(r.status, r.stderr).toBe(0)
     const merge = git('merge', '--no-ff', '-m', `merge the clean side branch\n\n${AUTHOR}`, 'clean-side')

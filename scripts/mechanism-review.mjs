@@ -2,8 +2,15 @@
 //
 //   node scripts/mechanism-review.mjs --record <sha> --model <name> \
 //       --verdict <merge|merge-with-fixes|do-not-merge> --evidence "<one line>" \
-//       [--point <N>]
+//       --mode <review|blind-parallel> [--framing "<one line>"] [--point <N>]
 //   node scripts/mechanism-review.mjs --list
+//
+// `--mode` names which half of the four-eyes principle the verdict covers
+// (CLAUDE.md §6, point 541). Only the CONVERGENT half had an enforcer; nothing
+// recorded whether a DIVERGENT step ran blind parallel or as a review of an
+// already-finished list — the anchoring failure the rule exists to prevent — and
+// no guard can detect that, because it stands in no file. So the recorder asks,
+// and refuses to default the answer.
 //
 // `--point <N>` names the work-order point the review settles. It is what the
 // CRITICALITY gate (point 298, criticality-review-guard.mjs) looks for: that gate
@@ -36,6 +43,7 @@ import {
   formatArgErrors,
   KNOWN_FLAGS,
   modelFromTrailers,
+  MODES,
   parseArgs,
   validateRecord,
   VERDICTS,
@@ -97,6 +105,8 @@ export function buildRecord({
   verdict = '',
   evidence = '',
   point = '',
+  mode = '',
+  framing = '',
   now = Date.now(),
   resolve = resolveCommit,
 } = {}) {
@@ -105,7 +115,7 @@ export function buildRecord({
   // deep inside git, so the one refusal that names what the command wants — the
   // usage block below — was the one the caller never saw.
   if (!String(sha).trim()) {
-    return { ok: false, errors: validateRecord({ sha: '', model, verdict, evidence }).errors }
+    return { ok: false, errors: validateRecord({ sha: '', model, verdict, evidence, mode, framing }).errors }
   }
   const commit = resolve(sha)
   const check = validateRecord({
@@ -114,6 +124,8 @@ export function buildRecord({
     verdict,
     evidence,
     authoredBy: commit.authoredBy,
+    mode,
+    framing,
   })
   const errors = [...check.errors]
   // Optional, but never sloppy: a mistyped point number would record a review
@@ -133,6 +145,12 @@ export function buildRecord({
       model: String(model).trim(),
       verdict: String(verdict).trim(),
       evidence: String(evidence).trim(),
+      // The four-eyes MODE travels with the verdict (point 541). Rows written
+      // before this flag existed carry none, and every reader here treats a
+      // missing mode as unknown rather than invalid — the ledger is tracked and
+      // outlives the CLI that wrote it.
+      mode: String(mode).trim(),
+      ...(String(framing).trim() ? { framing: String(framing).trim() } : {}),
       ...(wanted ? { point: Number(wanted) } : {}),
       at: now,
       atIso: new Date(now).toISOString(),
@@ -157,8 +175,17 @@ export function resolveCommit(sha) {
 /** The one description of what this command takes — printed by both refusals. */
 export const usage = () =>
   `usage: node scripts/mechanism-review.mjs --record <sha> --model <name> ` +
-  `--verdict <${VERDICTS.join('|')}> --evidence "<one line>" [--point <N>]\n` +
+  `--verdict <${VERDICTS.join('|')}> --evidence "<one line>" \\\n` +
+  `           --mode <${MODES.join('|')}> [--framing "<one line>"] [--point <N>]\n` +
   `       node scripts/mechanism-review.mjs --list        (the recorded reviews)\n` +
+  `\n--mode names which half of the four-eyes principle this verdict covers ` +
+  `(CLAUDE.md §6):\n` +
+  `       review          one artefact judged — a diff, an implementation, a measurement\n` +
+  `       blind-parallel  a DIVERGENT step (what could go wrong, which cases to test,\n` +
+  `                       which designs are possible) where both models worked from the\n` +
+  `                       same inputs without seeing each other's result\n` +
+  `--framing records how a second blind run by the SAME model was decorrelated, and\n` +
+  `       belongs to blind-parallel alone.\n` +
   `\nThe GATES are separate commands and answer --status themselves:\n` +
   `       node scripts/mechanism-review-guard.mjs --status\n` +
   `       node scripts/criticality-review-guard.mjs --status`
@@ -185,8 +212,11 @@ if (isMainModule(import.meta.url)) {
       for (const r of records) {
         console.log(
           `${String(r.sha).slice(0, 7)}  ${String(r.verdict).padEnd(16)} by ${String(r.model).padEnd(12)} ` +
-            `(authored by ${r.authoredBy || 'unknown'})${r.point ? `  point ${r.point}` : ''}  ${r.atIso ?? ''}` +
-            `\n      ${r.evidence ?? ''}`,
+            `(authored by ${r.authoredBy || 'unknown'})${r.point ? `  point ${r.point}` : ''}  ` +
+            // A row from before --mode existed has none; it reads as unrecorded,
+            // never as one of the two modes.
+            `[${r.mode || 'mode not recorded'}]  ${r.atIso ?? ''}` +
+            `\n      ${r.evidence ?? ''}${r.framing ? `\n      framing: ${r.framing}` : ''}`,
         )
       }
       process.exit(0)
@@ -202,7 +232,7 @@ if (isMainModule(import.meta.url)) {
     appendRecord(built.record)
     console.log(
       `recorded: ${built.record.sha.slice(0, 7)} "${built.record.subject}" reviewed by ` +
-        `${built.record.model} → ${built.record.verdict}\n  ${built.record.evidence}\n` +
+        `${built.record.model} → ${built.record.verdict} (${built.record.mode})\n  ${built.record.evidence}\n` +
         `  ledger: ${RECORDS_PATH} (tracked — commit it with the change it judges)`,
     )
     process.exit(0)

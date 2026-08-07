@@ -7,6 +7,7 @@
 // odd guards that predate the gate and owe nothing.
 import { describe, it, expect } from 'vitest'
 import {
+  BLIND_PARALLEL,
   BLOCKING_VERDICT,
   evaluateMechanismReview,
   formatArgErrors,
@@ -15,10 +16,12 @@ import {
   KNOWN_FLAGS,
   mechanismPathsIn,
   modelFromTrailers,
+  MODES,
   nearestFlag,
   parseArgs,
   parseModel,
   sameModel,
+  validateMode,
   validateRecord,
   VERDICTS,
 } from './mechanism-review-core.mjs'
@@ -152,6 +155,7 @@ describe('validateRecord', () => {
     verdict: 'merge',
     evidence: 'read the core and the wrapper, ran the spawned-hook cases',
     authoredBy: 'Claude Opus 5',
+    mode: 'review',
   }
 
   it('accepts a complete record by a different model', () => {
@@ -483,5 +487,167 @@ describe('the flag surface itself', () => {
     expect(text).toContain('--a')
     expect(text).toContain('--b')
     expect(text.split('\n').length).toBeGreaterThan(2)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// THE FOUR-EYES MODE (point 541). Only the convergent half had an enforcer;
+// nothing recorded whether a DIVERGENT step ran blind parallel or as a review of
+// an already-finished list. No guard can detect that, so the recorder asks.
+// ---------------------------------------------------------------------------
+describe('validateMode', () => {
+  it('names both modes of CLAUDE.md §6 and nothing else', () => {
+    expect(MODES).toEqual(['review', 'blind-parallel'])
+    expect(BLIND_PARALLEL).toBe('blind-parallel')
+    for (const mode of MODES) expect(validateMode({ mode }).ok).toBe(true)
+  })
+
+  it('REFUSES a missing mode instead of defaulting one, and names the choice', () => {
+    for (const mode of [undefined, '', '   ', null]) {
+      const v = validateMode({ mode })
+      expect(v.ok).toBe(false)
+      const text = v.errors.join('\n')
+      expect(text).toContain('--mode')
+      // The refusal has to state WHICH two, or it only says "you forgot
+      // something" — the reader then guesses, which is what 540 is about.
+      for (const m of MODES) expect(text).toContain(m)
+      expect(text).toMatch(/no default/i)
+    }
+  })
+
+  it('refuses a mode that is neither, naming what was given', () => {
+    const v = validateMode({ mode: 'four-eyes' })
+    expect(v.ok).toBe(false)
+    expect(v.errors.join('\n')).toContain('four-eyes')
+  })
+
+  it('accepts the same-model fallback framing under blind-parallel', () => {
+    const v = validateMode({
+      mode: 'blind-parallel',
+      framing: 'second run framed as a maintainer inheriting the code',
+    })
+    expect(v.ok, v.errors.join('\n')).toBe(true)
+  })
+
+  it('REJECTS that framing under a review, where it would describe nothing', () => {
+    const v = validateMode({ mode: 'review', framing: 'second run framed as a hostile tester' })
+    expect(v.ok).toBe(false)
+    const text = v.errors.join('\n')
+    expect(text).toContain('--framing')
+    expect(text).toMatch(/meaningless/)
+    expect(text).toContain('blind-parallel')
+  })
+
+  it('refuses a token framing — a stance, not a word', () => {
+    expect(validateMode({ mode: 'blind-parallel', framing: 'x' }).ok).toBe(false)
+  })
+
+  it('does not blame the framing when the mode itself is missing', () => {
+    // Two errors for one mistake sends the reader to fix the wrong flag.
+    const v = validateMode({ framing: 'framed as a player trying to break it' })
+    expect(v.errors.filter((e) => e.includes('meaningless'))).toHaveLength(0)
+  })
+})
+
+describe('validateRecord carries the mode', () => {
+  const good = {
+    sha: 'a'.repeat(40),
+    model: 'Fable 5',
+    verdict: 'merge',
+    evidence: 'read the core and the wrapper against the spec',
+    authoredBy: 'Claude Opus 5',
+  }
+
+  it('refuses an otherwise complete record that names no mode', () => {
+    const v = validateRecord(good)
+    expect(v.ok).toBe(false)
+    expect(v.errors.join('\n')).toContain('--mode')
+  })
+
+  it('accepts it once the mode is named', () => {
+    expect(validateRecord({ ...good, mode: 'review' })).toEqual({ ok: true, errors: [] })
+    expect(validateRecord({ ...good, mode: 'blind-parallel' }).ok).toBe(true)
+  })
+
+  it('still refuses a self-review, whichever mode is claimed', () => {
+    for (const mode of MODES) {
+      const v = validateRecord({ ...good, model: 'Claude Opus 5', mode })
+      expect(v.ok).toBe(false)
+      expect(v.errors.join(' ')).toMatch(/SELF-REVIEW is refused/)
+    }
+  })
+})
+
+describe('the mode is required to WRITE a record, never to READ one', () => {
+  // The ledger is tracked in git and outlives the CLI that wrote it: 129 rows
+  // predate this flag. A gate that suddenly discounted them would report "no
+  // review recorded" for reviews that were performed and recorded.
+  const legacy = (over = {}) => ({
+    sha: 'r'.repeat(40),
+    model: 'Fable 5',
+    verdict: 'merge',
+    evidence: 'a verdict recorded before --mode existed',
+    at: 1,
+    ...over,
+  })
+  const commit = (over = {}) => ({
+    sha: '1'.repeat(40),
+    subject: 'change a guard',
+    authorModel: 'Claude Opus 5',
+    files: ['scripts/demo-guard.mjs'],
+    coveringRecordShas: ['r'.repeat(40)],
+    ...over,
+  })
+
+  it('clears the gate on a row that carries no mode at all', () => {
+    const v = evaluateMechanismReview({
+      baseline: 'b',
+      head: 'h',
+      pendingCommits: [commit()],
+      records: [legacy()],
+    })
+    expect(v.block, formatMechanismReviewVerdict(v)).toBe(false)
+  })
+
+  it('clears it just the same on a row that carries one', () => {
+    const v = evaluateMechanismReview({
+      baseline: 'b',
+      head: 'h',
+      pendingCommits: [commit()],
+      records: [legacy({ mode: 'review' })],
+    })
+    expect(v.block).toBe(false)
+  })
+
+  it('does not let an unknown mode on a row turn a recorded review into none', () => {
+    const v = evaluateMechanismReview({
+      baseline: 'b',
+      head: 'h',
+      pendingCommits: [commit()],
+      records: [legacy({ mode: 'nonsense-from-a-hand-edit' })],
+    })
+    expect(v.block).toBe(false)
+  })
+})
+
+describe('the refusal teaches the command that actually works', () => {
+  it('names --mode in the record command it prints', () => {
+    const v = evaluateMechanismReview({
+      baseline: 'b',
+      head: 'h',
+      pendingCommits: [
+        {
+          sha: '1'.repeat(40),
+          subject: 'change a guard',
+          authorModel: 'Claude Opus 5',
+          files: ['scripts/demo-guard.mjs'],
+          coveringRecordShas: [],
+        },
+      ],
+      records: [],
+    })
+    const text = formatMechanismReviewVerdict(v)
+    expect(text).toContain('--mode')
+    for (const m of MODES) expect(text).toContain(m)
   })
 })

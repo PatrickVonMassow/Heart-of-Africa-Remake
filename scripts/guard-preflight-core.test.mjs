@@ -10,6 +10,7 @@ import { resolve } from 'node:path'
 import {
   ACTIONS,
   CAUSE,
+  DIVERGENT_STEP_QUESTION,
   STATUS,
   formatPreflightReport,
   isKnownAction,
@@ -243,6 +244,59 @@ describe('formatPreflightReport', () => {
       unregistered: [],
     })
     expect(text).toContain('No registered guard would block right now.')
+  })
+})
+
+// THE DIVERGENT HALF OF THE FOUR-EYES RULE (point 541). `mechanism-review-guard`
+// enforces the convergent half; whether an ENUMERATING step ran blind parallel
+// or as a review of a finished list stands in no file, so no guard can detect
+// it. The preflight asks — and only asks.
+describe('the divergent-step question', () => {
+  const clean = [{ id: 'b-guard', status: STATUS.clean, reason: '' }]
+
+  it('NAMES the question, in the words the rule uses', () => {
+    const text = formatPreflightReport(clean)
+    expect(text).toMatch(/BLIND PARALLEL/)
+    expect(text).toMatch(/CLAUDE\.md §6/)
+    expect(text).toContain('--mode')
+    expect(text).toContain('review|blind-parallel')
+  })
+
+  it('marks itself advisory, so it is not read as a guard verdict', () => {
+    const text = formatPreflightReport(clean)
+    const line = text.split('\n').find((l) => l.includes('FOUR-EYES, DIVERGENT HALF'))
+    expect(line).toBeTruthy()
+    expect(line).toMatch(/advisory/i)
+    expect(line).toMatch(/none blocks on it/)
+  })
+
+  it('changes NO verdict: a clean report still reads clean', () => {
+    const text = formatPreflightReport(clean)
+    expect(text).toContain('No registered guard would block right now.')
+    expect(text).not.toMatch(/WOULD BLOCK/)
+    expect(text).not.toMatch(/not an all-clear/)
+  })
+
+  it('adds itself to no guard count and to no guard line', () => {
+    const text = formatPreflightReport([
+      { id: 'a-guard', status: STATUS.block, reason: 'the board is stale' },
+      ...clean,
+    ])
+    expect(text).toContain('1 guard(s) WOULD BLOCK: a-guard')
+    expect(text).toMatch(/BLIND PARALLEL/)
+    // It sits after the verdict, not among the per-guard lines.
+    expect(text.indexOf('FOUR-EYES, DIVERGENT HALF')).toBeGreaterThan(text.indexOf('WOULD BLOCK'))
+  })
+
+  it('is asked whichever action was preflighted', () => {
+    for (const action of Object.keys(ACTIONS)) {
+      expect(formatPreflightReport(clean, { action })).toMatch(/BLIND PARALLEL/)
+    }
+  })
+
+  it('is a frozen constant, so the wording cannot drift per call', () => {
+    expect(Object.isFrozen(DIVERGENT_STEP_QUESTION)).toBe(true)
+    expect(DIVERGENT_STEP_QUESTION.length).toBeGreaterThan(1)
   })
 })
 

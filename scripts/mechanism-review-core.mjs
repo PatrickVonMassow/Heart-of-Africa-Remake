@@ -20,6 +20,27 @@
 /** The verdicts a review may end in, weakest refusal last. */
 export const VERDICTS = Object.freeze(['merge', 'merge-with-fixes', 'do-not-merge'])
 
+/**
+ * THE TWO MODES OF THE FOUR-EYES PRINCIPLE (CLAUDE.md §6, point 541).
+ *
+ * Only the CONVERGENT half had an enforcer: this gate lets no changed mechanism
+ * through without the other model's recorded verdict. Nothing recorded whether a
+ * DIVERGENT step — what could go wrong, which cases to test, which designs are
+ * possible — ran blind parallel or as a review of an already-finished list,
+ * which is the anchoring failure the rule exists to prevent. No guard can DETECT
+ * that: whether a step was divergent stands in no file. So the recorder simply
+ * ASKS, and refuses to default the answer.
+ *
+ *   review          one artefact judged — is this diff correct, does this
+ *                   implementation match its spec, is this measurement sound
+ *   blind-parallel  both models work from the same inputs to their own complete
+ *                   result, neither seeing the other's until both are done
+ */
+export const MODES = Object.freeze(['review', 'blind-parallel'])
+
+/** The mode whose weaker same-model fallback is decorrelated by a framing. */
+export const BLIND_PARALLEL = 'blind-parallel'
+
 /** The verdict that blocks as loudly as a missing record. */
 export const BLOCKING_VERDICT = 'do-not-merge'
 
@@ -169,6 +190,8 @@ export const FLAG_SPEC = Object.freeze({
   '--verdict': true,
   '--evidence': true,
   '--point': true,
+  '--mode': true,
+  '--framing': true,
   '--list': false,
 })
 
@@ -182,6 +205,8 @@ const VALUE_KEY = Object.freeze({
   '--verdict': 'verdict',
   '--evidence': 'evidence',
   '--point': 'point',
+  '--mode': 'mode',
+  '--framing': 'framing',
 })
 
 /** Levenshtein distance — small inputs only, so the simple two-row form. */
@@ -298,14 +323,55 @@ export function formatArgErrors(errors = []) {
 const short = (sha) => String(sha ?? '').slice(0, 7)
 
 /**
+ * Is the four-eyes MODE this verdict claims a usable one? (point 541)
+ *
+ * A missing mode is REFUSED, never defaulted: the whole gap this closes is that
+ * a review of an already-finished list passed as the blind-parallel work the
+ * rule demands, and a default would re-open it in the quietest possible way.
+ *
+ * `framing` is the decorrelation used when no second model was available and two
+ * blind runs of ONE model had to stand in — "a hostile tester", "a maintainer
+ * inheriting the code" (CLAUDE.md §6). It belongs to the BLIND-PARALLEL mode
+ * alone: under a review there is no second independent run to decorrelate, so a
+ * framing recorded there would describe nothing.
+ */
+export function validateMode({ mode, framing } = {}) {
+  const errors = []
+  const m = String(mode ?? '').trim()
+  const f = String(framing ?? '').trim()
+  if (!m) {
+    errors.push(
+      `--mode <${MODES.join('|')}>: which form of the four-eyes principle this verdict covers ` +
+        '(CLAUDE.md §6) — a CONVERGENT review of one artefact, or a DIVERGENT step run BLIND ' +
+        'PARALLEL. There is no default: the two are not interchangeable, and a verdict that ' +
+        'covers a finding step must name its form.',
+    )
+  } else if (!MODES.includes(m)) {
+    errors.push(`--mode <v>: one of ${MODES.join(' | ')} — "${m}" is neither`)
+  }
+  if (f && m && m !== BLIND_PARALLEL) {
+    errors.push(
+      `--framing is meaningless under --mode ${m}: it records how the SECOND independent run was ` +
+        'decorrelated, and a review has no second run. Drop it, or record the step as ' +
+        `--mode ${BLIND_PARALLEL}.`,
+    )
+  }
+  if (f && f.length < 8) {
+    errors.push('--framing "<one line>": the stance the second blind run was given, not a word')
+  }
+  return { ok: errors.length === 0, errors }
+}
+
+/**
  * Is this a well-formed review record, and may it be WRITTEN?
  *
  * `authoredBy` is the model that authored the reviewed commit, read from its own
  * trailer. A match is REFUSED here rather than warned about: a self-review that
  * lands in the ledger is worse than none, because the gate then reads green.
  */
-export function validateRecord({ sha, model, verdict, evidence, authoredBy } = {}) {
+export function validateRecord({ sha, model, verdict, evidence, authoredBy, mode, framing } = {}) {
   const errors = []
+  errors.push(...validateMode({ mode, framing }).errors)
   if (!/^[0-9a-f]{7,40}$/i.test(String(sha ?? '').trim())) {
     errors.push('--record <sha>: the commit that was judged, as a resolvable sha')
   }
@@ -424,7 +490,7 @@ export function formatMechanismReviewVerdict(verdict) {
     'record what it said:',
     '',
     '  node scripts/mechanism-review.mjs --record <sha> --model <name> \\',
-    `      --verdict <${VERDICTS.join('|')}> --evidence "<one line>"`,
+    `      --verdict <${VERDICTS.join('|')}> --evidence "<one line>" --mode <${MODES.join('|')}>`,
     '',
     'One record covers every mechanism commit it contains, so reviewing the branch head is',
     'enough. Inspect the gate with: node scripts/mechanism-review-guard.mjs --status',

@@ -28,7 +28,7 @@
 // Side-effect free — the git work, the state file and the block belong to
 // scripts/criticality-review-guard.mjs (fail-open). Pinned by
 // criticality-review-guard-core.test.mjs.
-import { VERDICTS, sameModel } from './mechanism-review-core.mjs'
+import { MODES, VERDICTS, sameModel } from './mechanism-review-core.mjs'
 
 /** The ONE verdict that lets a high-criticality point be declared finished. */
 export const CLEARING_VERDICT = 'merge'
@@ -253,7 +253,7 @@ export function formatCriticalityReviewVerdict(verdict) {
     'DIFFERENT blind spots, and it is only realised when its findings are answered:',
     '',
     '  node scripts/mechanism-review.mjs --record <sha> --point <N> --model <name> \\',
-    `      --verdict <${VERDICTS.join('|')}> --evidence "<one line>"`,
+    `      --verdict <${VERDICTS.join('|')}> --evidence "<one line>" --mode <${MODES.join('|')}>`,
     '',
     'Inspect the gate with: node scripts/criticality-review-guard.mjs --status',
     'If the tag is wrong, correct the point rather than the ledger — the tag is the spec.',
