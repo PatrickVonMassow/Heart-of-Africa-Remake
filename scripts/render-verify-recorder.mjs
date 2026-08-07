@@ -7,18 +7,107 @@
 // actually wrote — to .claude/render-verify-state.json. The Stop-hook
 // render-verify-guard.mjs judges dual-backend coverage from these records, so
 // "I ran it" can never be a hollow claim: the record only exists when the suite
-// process itself wrote it, and only an exit-0 record counts as coverage.
+// process itself wrote it.
+//
+// A RED run is recorded with its REDS (point 550): every failing check and
+// console error it printed, each charged to the open work-order point that owns
+// it (scripts/render-verify-charges.mjs) or to nothing. That is what lets the
+// guard accept a run whose reds all belong to other points while still recording
+// it as ACCOUNTED FOR rather than as a pass — see runVerdict in
+// render-verify-core.mjs. Charging happens HERE, at record time, so the record
+// says what was charged and no later ledger edit can bless a finished run.
 //
 // Observe-only and total: every step is wrapped so the bookkeeping can NEVER
 // fail a verify suite.
-import { basename, join } from 'node:path'
+import { basename, join, resolve } from 'node:path'
 import { readdirSync, statSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { recordRun } from './render-verify-state.mjs'
+import { failedChecks } from './verify/baseline-classify-core.mjs'
+import { chargeReds } from './render-verify-core.mjs'
 
-const SCREENSHOT_DIR = fileURLToPath(new URL('../verification', import.meta.url))
+// Resolved from this module's own location where that is possible, with a
+// working-directory fallback: under the test runner `import.meta.url` is not
+// always a file: URL, and a module that throws at IMPORT time takes its whole
+// consumer down (tasks-source.mjs carries the same guard for the same reason).
+const SCREENSHOT_DIR = (() => {
+  try {
+    return fileURLToPath(new URL('../verification', import.meta.url))
+  } catch {
+    return resolve(process.cwd(), 'verification')
+  }
+})()
+
+/** Result lines worth keeping for the red accounting (point 550): a suite's own
+ *  `FAIL  <name> — <detail>`, the `ERR: <text>` console-error lines, and the
+ *  `console errors: <texts>` summary where it carries texts rather than a count.
+ *  PASS lines are dropped — nothing downstream reads them, and a suite prints
+ *  thousands. baseline-classify-core.mjs then parses exactly what it parses in
+ *  the triage lane, so the two can never drift into different readings of a red. */
+const KEPT_LINE = /^(?:FAIL\s{2,}|ERR:|console errors:|CONSOLE ERRORS:)/
+
+/** A cap, because the buffer lives for the whole run: 400 result lines is far
+ *  more than any suite's failing half and bounds the memory either way. */
+const MAX_KEPT_LINES = 400
+
+/** How many charged reds one record keeps — a bound on the state file, which
+ *  holds 40 runs. See the sort below: only a CHARGED red is ever dropped. */
+const MAX_RECORDED_REDS = 60
+
+/** Stderr that says the process did not end on its own terms — a stack frame or
+ *  a bare `…Error:` headline. A run that CRASHED explains nothing about the
+ *  picture, however many of its reds are charged, so it never counts as
+ *  accounted for. A false positive only makes the gate stricter. */
+const CRASH_LINE = /^\s+at .+:\d+:\d+|^(?:Uncaught\s+)?\w*Error(?::|\b)/
 
 let armed = null
+
+/**
+ * Tap the run's OWN output for its result lines. The stream is tapped rather
+ * than `console`, because a crash is printed by NODE ITSELF straight to stderr
+ * and never passes through console.error — and that is the case the accounting
+ * must not mistake for a reported failure.
+ *
+ * Observe-only and total: the original write is ALWAYS called with the original
+ * arguments and its return value passed straight back, and a throw in the
+ * collector can never reach the suite. Installed at browser launch, so a red
+ * printed before that (there is none today) would not be seen — which errs
+ * toward blocking, not toward clearing.
+ */
+export function tapOutput(state, streams = [[process.stdout, false], [process.stderr, true]]) {
+  const pending = new Map()
+  const take = (stream, isErr, text) => {
+    const lines = ((pending.get(stream) ?? '') + text).split('\n')
+    pending.set(stream, lines.pop() ?? '')
+    for (const line of lines) {
+      if (isErr && CRASH_LINE.test(line)) state.crashed = true
+      if (!KEPT_LINE.test(line)) continue
+      if (state.lines.length < MAX_KEPT_LINES) state.lines.push(line)
+    }
+  }
+  const isErrOf = new Map(streams)
+  for (const [stream, isErr] of streams) {
+    const original = stream.write.bind(stream)
+    stream.write = (chunk, ...rest) => {
+      try {
+        take(stream, isErr, typeof chunk === 'string' ? chunk : (chunk?.toString?.('utf8') ?? ''))
+      } catch {
+        /* never let the bookkeeping disturb the suite's own output */
+      }
+      return original(chunk, ...rest)
+    }
+  }
+  /** The last line of a stream carries no newline when a process dies mid-write;
+   *  flushing at exit is what makes that line readable at all. */
+  return () => {
+    for (const stream of [...pending.keys()]) {
+      if (!pending.get(stream)) continue
+      // The appended newline turns the remainder into a whole line for `take`,
+      // which then clears it.
+      take(stream, isErrOf.get(stream) === true, '\n')
+    }
+  }
+}
 
 /** Screenshot files written since the run started — the "it rendered" evidence. */
 function screenshotsSince(startedAt) {
@@ -51,20 +140,48 @@ export function armRunRecorder(backend) {
       // markBackendAsserted (point 505). null until then — and null it stays for the
       // WebGL 2 lane, where the question does not apply.
       featureLevel: null,
+      // The run's own result lines and whether it died rather than reported
+      // (point 550) — the raw material of the red accounting below.
+      lines: [],
+      crashed: false,
     }
+    const flush = tapOutput(armed)
     process.on('exit', (code) => {
       try {
         const shots = screenshotsSince(armed.startedAt)
+        const exit = code ?? 0
+        // A green run has nothing to account for; only a RED one is charged, and
+        // it is charged HERE, at record time, against the ledger as it stood
+        // when the run happened. A later ledger edit therefore cannot bless a
+        // run after the fact — it takes a fresh run, which is the point.
+        let reds = []
+        if (exit !== 0) {
+          try {
+            flush()
+            reds = chargeReds(failedChecks(armed.lines.join('\n')), {
+              suite: armed.suite,
+              backend: armed.backend,
+            })
+            // UNACCOUNTED reds first, so the cap below can only ever drop a
+            // charged one. Truncation must never be able to turn a red run into
+            // an accounted-for one; losing a charge only costs detail in the
+            // report (a stable sort keeps each group's own order).
+            reds.sort((a, b) => (a.point === null ? 0 : 1) - (b.point === null ? 0 : 1))
+          } catch {
+            /* unparseable output — no red is charged, so the run stays red */
+          }
+        }
         recordRun({
           backend: armed.backend,
           suite: armed.suite,
           startedAt: armed.startedAt,
           at: Date.now(),
-          exit: code ?? 0,
+          exit,
           asserted: armed.asserted,
           featureLevel: armed.featureLevel,
           screenshotCount: shots.length,
           screenshots: shots.slice(0, 12),
+          ...(exit !== 0 ? { reds: reds.slice(0, MAX_RECORDED_REDS), crashed: armed.crashed } : {}),
         })
       } catch {
         /* never fail a suite over the bookkeeping */
