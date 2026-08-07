@@ -1411,16 +1411,66 @@ Pure layer: `scripts/findings-request-core.mjs` (with the head/kind parsing in
 Mitigation, and why it is small in practice: the moment the user logs in, the task
 resurrects the batch (promptly, thanks to `StartWhenAvailable` + the boot-time
 check). A forced update reboots and then waits at the login screen for the user
-anyway; the batch simply resumes when they next log in. To make that resume
-**instant on login** (instead of within ~15 min) on the WINDOWS host, add an
-at-logon trigger once, from an **elevated** PowerShell (modifying the task needs
-admin rights, which the agent does not have):
+anyway; the batch simply resumes when they next log in. Making that resume
+**instant on login** (instead of within ~15 min) on the WINDOWS host is one of
+the three things the setup script below arms — see *The boot path, and a second
+task that watches the first*.
 
-```powershell
-$t = New-ScheduledTaskTrigger -AtLogOn
-$existing = (Get-ScheduledTask -TaskName "HoA-Batch-Autostart").Triggers
-Set-ScheduledTask -TaskName "HoA-Batch-Autostart" -Trigger (@($existing) + $t)
-```
+### The boot path, and a second task that watches the first (30.07.2026, point 447)
+
+Measured state of `HoA-Batch-Autostart` on the Windows host: ONE time trigger
+every 15 minutes, `StartWhenAvailable` on, no battery or idle limit,
+`MultipleInstances: IgnoreNew`, principal `Interactive` — so it runs only while
+the user is logged on, and only within a quarter of an hour of becoming able to.
+`AutoAdminLogon` IS set there, so a reboot signs itself back in, but that path is
+UNPROVEN: the machine had been up since 24.07.2026 and an update restart can still
+stop at the lock screen. And the one task that resurrects everything was itself
+unwatched — disabled, deleted or silently failing, nothing noticed.
+
+`scripts/windows/setup-boot-path.ps1` is the whole hand-over: ONE idempotent
+script the user runs ONCE from an **elevated** shell (registering and modifying
+scheduled tasks needs admin rights no agent here has). It prints what it changed,
+and a second run changes nothing and says so. `-DryRun` reports without touching
+the machine; `-PauseUpdatesDays <1..35>` is the pre-departure pause. What it arms:
+
+- an **at-logon trigger** on the primary task, so the resume is instant;
+- a second **action** on the primary, `windows-task-watch.mjs --check watchdog`;
+- the second task **`HoA-Batch-Watchdog`**: at STARTUP, delayed 7 minutes and then
+  repeating every 15, running as **SYSTEM** so it works with nobody logged on. It
+  runs `windows-task-watch.mjs --check primary`. The 7-minute offset is what keeps
+  the two from ticking in the same second, where each would read a peer that has
+  not yet recorded the run it is starting;
+- an export of both task definitions to the git-ignored `local/windows-tasks/`,
+  which is what a re-registration reads;
+- the restart behaviour: no forced restart while a user is signed in, and
+  automatic restart sign-on ENABLED — that signed-in (if locked) session is what
+  the Interactive primary task needs to exist at all.
+
+So neither task is a single point of failure: each checks that the other exists,
+is enabled and ran recently, and applies the SMALLEST repair — re-register from
+the exported XML, enable, or start. A peer that RAN and returned non-zero is
+reported, never restarted: the scheduling works and the payload failed, and
+restarting a failing payload every quarter of an hour turns one broken run into a
+loop. An unreadable probe judges nothing, so "PowerShell did not answer" can never
+be mistaken for "the task is gone".
+
+**Stopping it now goes through the pause file, not through the task.** With a
+watchdog standing, deleting or disabling the primary task no longer stops the
+batch — it is re-registered or re-enabled within a tick. `.claude/batch-paused`
+is the handle: the watch stands every repair down while it exists (and still
+REPORTS, because the readiness check wants the state either way), exactly as
+every other mechanism here does.
+
+The decisions live in `scripts/windows-task-core.mjs` (pure, Vitest-covered in
+`windows-task-core.test.mjs`, which also holds the setup script to the same task
+names, cadence and dry-run contract by reading it). What no test in this
+repository can prove is the elevated run itself — the project builds in a Linux
+container with no Task Scheduler and no PowerShell at all, and
+`windows-task-watch.mjs` is a no-op that exits 0 there. **The first elevated run
+on the Windows host, and its printed change list, are the acceptance evidence.**
+Check it any time with `node scripts/windows-task-watch.mjs --check primary
+--dry-run`; the readiness command (point 448) reports both tasks with their
+triggers and last result.
 
 ## Dashboard currency (enforced, not reminded)
 
@@ -2313,9 +2363,11 @@ impossible, not skipping the inspection.
   Resume: delete it.
 - **Stop the launcher**: on Linux `node scripts/batch-launcher.mjs --stop` (start
   it again with `--start`, read it with `--status`); on Windows
-  `schtasks /delete /tn HoA-Batch-Autostart /f`. Either way the batch stops being
-  resurrected and the point boundary is refused — which is correct: nothing would
-  restart it.
+  `schtasks /delete /tn HoA-Batch-Autostart /f` AND the same for
+  `HoA-Batch-Watchdog`, which otherwise re-registers the primary within a tick
+  (point 447) — or simply pause, which stands the watchdog down too. Either way
+  the batch stops being resurrected and the point boundary is refused — which is
+  correct: nothing would restart it.
 - **Logs**: `.claude/autostart.log` (gitignored) records every launcher decision.
 - **Chat**: pair a phone with `node scripts/chat-secret.mjs --init`; the launcher
   polls it on every tick. `--rotate` un-pairs every device. Turning it off is
