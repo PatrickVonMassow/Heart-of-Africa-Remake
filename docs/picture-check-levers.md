@@ -4,7 +4,7 @@ Second phase of work-order point 361. The *before* figures live in
 [`picture-check-cost.md`](picture-check-cost.md); this document does not repeat
 them, it spends them.
 
-The method is the divergent/convergent four-eyes of work-order point 355. Listing
+The method is the divergent/convergent four-eyes of CLAUDE.md §6. Listing
 the candidate levers is a **divergent** question, so two models list them
 independently and blind and the union is evaluated. The replay is
 **convergent**, so one model runs it and the evidence is readable before the
