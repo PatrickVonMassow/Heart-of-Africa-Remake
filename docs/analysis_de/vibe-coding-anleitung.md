@@ -167,6 +167,17 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Ein Fix zählt erst als fertig, wenn das **Symptom am Ort des Symptoms** als
   behoben gezeigt wurde. Beißt du dich zweimal fest, wechsle das Modell."
 
+- **Der Fehlalarm ist behoben — und der echte Alarm gleich mit.** Eine Prüfung schlägt zu
+  oft an, du lässt sie verschärfen, alles wird grün. Was du nicht siehst: Sie schlägt jetzt
+  auch dann nicht mehr an, wenn sie sollte. Ein Fehlalarm meldet sich selbst, ein
+  ausgefallener meldet gar nichts — Reparaturen an Prüfungen gehen also von sich aus in die
+  gefährliche Richtung, und die Tests fangen es nicht, weil dieselbe Person sie schreibt,
+  die auch die neue Bedingung formuliert hat.
+  → *Prompt:* „Wenn du eine Prüfung entschärfst, weise **beide Richtungen** nach: dass die
+  Fehlalarme weg sind UND dass die echten Treffer noch anschlagen. Die Fälle für die zweite
+  Richtung lässt du vom **anderen Modell** erfinden, und es misst an der Mechanik, nicht an
+  den Testnamen." *(Kosten ≈ 1,3x.)*
+
 - **Zahlen geschätzt statt gemessen.** ‚Das dauert ~2 Minuten', ‚das ist schneller'.
   → *Prompt:* „Laufzeiten, Performance und Kosten nennst du nur **gemessen** — Performance
   auf der **Ziel-Hardware**, nicht auf der Build-Maschine."
@@ -403,4 +414,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 Diese eine Nachricht am Anfang baut 80 % der Lehren dieses Projekts ein, bevor die
 erste Zeile Code entsteht.
 
-<!-- GUIDE-FINGERPRINT: 857d06a6df98420b1f010bb9ad43c9742cfb86aac0fc83a26ade02deffa4ee62 -->
+<!-- GUIDE-FINGERPRINT: 8b9a9a46e3e3070e63e50fc3930ca8995be2e012bbc8c343cb744b029ae62fe1 -->
