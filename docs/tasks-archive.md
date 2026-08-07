@@ -15299,3 +15299,22 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   blocks and names both numbers; a document with no footer fails open.
   Criticality: low — it blocks a turn rather than letting a wrong state through, but a
   guard that invents an unstated rule costs exactly the trust the chain runs on.
+
+- [x] 539. THE DECISION-CARD GUARD READS A COMMON GERMAN VERB AS A QUESTION (measured
+  07.08.2026, twice in one session). `decision-card-guard` blocks the turn end when a reply
+  asks the user to decide something without a matching "Von dir zu klären" card. The bias
+  toward blocking is RIGHT and stays — a missed decision costs the user hours, a false block
+  costs one turn. What is wrong is the matcher: it hits the bare substring `entscheide`
+  anywhere in the reply. Both false positives were ordinary prose with no question in them —
+  "den Punkt, den er entscheidet" (a review record naming the point it settles) and the quoted
+  defect name "Prosa entscheidet". Two turns lost to one verb.
+  FINAL STATE: the phrase match additionally requires the SENTENCE carrying it to be a
+  question (ends in `?`) or to address the user in the second person (`du`/`dir`/`dich`/
+  `dein…`) — otherwise it does not fire. Sentence splitting is the guard's own, not a
+  whole-reply scan. Every phrase in the list is re-judged against that rule, not only this
+  one, and the phrase list keeps its written reason per entry.
+  VERIFIABLE: pure Vitest on the core — the two measured false positives ALLOW; a real
+  decision sentence ("Sag mir, ob du den kleinen oder den großen Zuschnitt willst") still
+  BLOCKS; each of the seven live "Von dir zu klären" card questions still BLOCKS when it is
+  asked in the chat without its card. Criticality: medium — a false block costs a turn, a
+  missed decision costs hours, so the tests pin BOTH directions.

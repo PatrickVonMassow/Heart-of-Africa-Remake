@@ -4362,25 +4362,6 @@ Build order, chosen so no two parallel agents own the same file:
   VERIFIABLE: a reply written without the stamp is still refused (timestamp-guard
   blocks it) after the removal, and the Stop chain's process count drops by one.
 
-- [ ] 539. THE DECISION-CARD GUARD READS A COMMON GERMAN VERB AS A QUESTION (measured
-  07.08.2026, twice in one session). `decision-card-guard` blocks the turn end when a reply
-  asks the user to decide something without a matching "Von dir zu klären" card. The bias
-  toward blocking is RIGHT and stays — a missed decision costs the user hours, a false block
-  costs one turn. What is wrong is the matcher: it hits the bare substring `entscheide`
-  anywhere in the reply. Both false positives were ordinary prose with no question in them —
-  "den Punkt, den er entscheidet" (a review record naming the point it settles) and the quoted
-  defect name "Prosa entscheidet". Two turns lost to one verb.
-  FINAL STATE: the phrase match additionally requires the SENTENCE carrying it to be a
-  question (ends in `?`) or to address the user in the second person (`du`/`dir`/`dich`/
-  `dein…`) — otherwise it does not fire. Sentence splitting is the guard's own, not a
-  whole-reply scan. Every phrase in the list is re-judged against that rule, not only this
-  one, and the phrase list keeps its written reason per entry.
-  VERIFIABLE: pure Vitest on the core — the two measured false positives ALLOW; a real
-  decision sentence ("Sag mir, ob du den kleinen oder den großen Zuschnitt willst") still
-  BLOCKS; each of the seven live "Von dir zu klären" card questions still BLOCKS when it is
-  asked in the chat without its card. Criticality: medium — a false block costs a turn, a
-  missed decision costs hours, so the tests pin BOTH directions.
-
 - [ ] 540. AN UNRECOGNISED FLAG IS DROPPED WITHOUT A WORD (measured 07.08.2026). Recording the
   four-eyes verdict for point 298 with `--point 298` stored NO point: the CLI that ran was the
   pre-merge `scripts/mechanism-review.mjs` from `main`, which did not yet know the flag. It
