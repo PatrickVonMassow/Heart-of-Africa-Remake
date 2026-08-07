@@ -33,7 +33,9 @@ async function main() {
   // launched the usual way never armed it, so the rule counted as enforced while
   // firing at almost nothing (found by the 25.07 rule/guard audit).
   if ((name === 'Bash' || name === 'PowerShell') && bg && WAIT_CMD.test(cmd) && !NOT_WAIT.test(cmd)) {
-    const label = (cmd.match(/run-all\.mjs\s+([\w-]+)/)?.[1]) ?? (cmd.match(/npm\s+(run\s+)?(test\S*)/)?.[2]) ?? 'a background validation'
+    // run-logged.mjs is the logging wrapper around run-all (point 373 e) and
+    // carries the same tier/suite argument — so the label reads the same either way.
+    const label = (cmd.match(/run-(?:all|logged)\.mjs\s+([\w-]+)/)?.[1]) ?? (cmd.match(/npm\s+(run\s+)?(test\S*)/)?.[2]) ?? 'a background validation'
     try {
       writeFileSync(MARKER, JSON.stringify({ task: label, prepped: false, at: Date.now(), auto: true }, null, 2))
     } catch {
