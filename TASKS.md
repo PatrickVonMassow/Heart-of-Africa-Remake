@@ -4297,36 +4297,6 @@ Build order, chosen so no two parallel agents own the same file:
   stake is that a wrongly placed hook line disables a chain silently.
 
 
-- [ ] 544. THE BOARD CAN ONLY SAY "IDLE" OR "A NUMBERED POINT", AND A SESSION FINISHING
-  ITS CLOSING DUTIES IS NEITHER (measured 07.08.2026). Point 470's guard denies every
-  state-changing call while the unnumbered "Gerade keine laufende Arbeit" card stands,
-  and it names two remedies, neither of which reaches this state: `board.mjs now <N>`
-  needs an OPEN point that already HAS a queue card, and `board.mjs none` rewrites only
-  the REASON — the TITLE is the constant `NO_CURRENT_WORK_TITLE`, so the claim, and the
-  deny, stand. A session that has merged and ticked its last point but still owes
-  closing duties — the four-eyes record on its own tick commit, the retrospective's new
-  problem class — can therefore neither describe itself honestly nor commit its work.
-  Measured today: the retro refresh landed on disk and could not be committed; filing
-  THIS point was itself blocked (`cat >> TASKS.md` is not in the closing set), and the
-  session had to raise the next queue point early to get a card it could stand behind.
-  The guard is RIGHT to fire and its bias stays — what is missing is a third thing a
-  session can truthfully say.
-  FINAL STATE: the now-section carries a third card kind, an UNNUMBERED CLOSING card
-  ("Abschlussarbeiten zum gerade beendeten Punkt", carrying its reason), written by
-  `board.mjs closing "<text>"`. The point-470 check reads it as a RUNNING claim, so the
-  deny does not fire; the card guards treat it like the existing gap card (no point
-  reference demanded, no foreign-point complaint, exempt from the numbered-card
-  demands); and the structure gate accepts exactly one of the three kinds, never two.
-  `batch-boundary.mjs` replaces it with the idle card as it does today, so the claim to
-  stop is still made exactly once, at the end.
-  VERIFIABLE: pure Vitest — a state-changing call is ALLOWED while the closing card
-  stands and still DENIED under the idle card; the card-topic and conciseness guards
-  pass over it; the structure gate refuses a board carrying both an idle and a closing
-  card; `batch-boundary.mjs` still ends with the idle card standing alone.
-  Criticality: medium — a workflow gate, not a product path, but a guard whose only
-  honest remedy is unavailable teaches working AROUND the guard, which is the one thing
-  the chain cannot afford.
-
 - [ ] 546. A SETTLEMENT VISIT STILL GROWS THE RESIDENT RENDER TARGETS BY THREE
   (measured 07.08.2026, both backends). The dev invariant channel reports
   `render-resource-leak — renderTargets grew back at
@@ -4420,29 +4390,6 @@ Build order, chosen so no two parallel agents own the same file:
   the way point 387 recorded its five.
   Criticality: medium — neither hides a known product defect today, but a check that
   rotates is a gate that has stopped gating.
-
-- [ ] 550. THE RENDER GUARD DEMANDS A PASS THAT A FOREIGN-RED SUITE CAN NEVER GIVE
-  (measured 07.08.2026 while closing point 387; bundle Testinfrastruktur).
-  `render-verify-guard` counts only an exit-0 run as coverage, and `polish` cannot exit 0
-  today for reasons that belong to OTHER points: the render-target assert of point 546
-  fires as a console error on both backends, and the goat-stance check reds on the
-  software WebGPU lane (point 506). So every change under `scripts/verify/` — even a
-  pure comment diff, which is what point 387's evidence was — can only be cleared by a
-  hand-written `--defer`. That is the habit point 387 exists to end: a gate routinely
-  overridden by hand stops being a gate, and the deferral text is the only thing standing
-  between an honest exception and a blanket one.
-  FINAL STATE: the guard accepts a run whose reds are each ACCOUNTED FOR — every failing
-  check and every console error in it maps to an open work-order point named in the run's
-  own record — and reports which point each was charged to. A run with even one
-  unaccounted red still fails, and an accounted-for run is reported as such rather than
-  as a clean pass, so the difference stays visible in the record. The hand-written
-  `--defer` stays for what genuinely cannot be judged headless.
-  VERIFIABLE: Vitest on the pure decision — a run with two reds both naming open points
-  clears and names them; the same run with one red naming nothing does not; a run naming
-  a point that is ticked done does not. Plus the record distinguishing "clean" from
-  "accounted for".
-  Criticality: medium — it does not break the picture, but it converts a gate into a
-  formality, and this project has already paid for that once.
 
 - [ ] 551. THE TRANSIENT STATUS HINT IS DRAWN ON TOP OF THE REGION NAME (seen
   07.08.2026 in the verification frames `121-harmattan-pall-january.png` and

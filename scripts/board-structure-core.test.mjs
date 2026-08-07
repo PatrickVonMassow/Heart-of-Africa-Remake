@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { markupOnly, REQUIRED_SECTIONS, structureViolations } from './board-structure-core.mjs'
+import { markupOnly, nowCardKinds, REQUIRED_SECTIONS, structureViolations } from './board-structure-core.mjs'
+import { CLOSING_WORK_TITLE, NO_CURRENT_WORK_TITLE } from './board-core.mjs'
 
 /** A minimal but structurally faithful board. */
 const sect = (title, body = '') =>
@@ -129,5 +130,83 @@ describe('the board carries its own viewport', () => {
   it('is not satisfied by the word appearing in a card', () => {
     const decoy = board().replace(/<meta name="viewport"[^>]*>\n/, '<p>viewport</p>\n')
     expect(codes(decoy)).toContain('viewport-missing')
+  })
+})
+
+// ═══ Point 544 — the section speaks in exactly ONE voice ═════════════════════
+// Three kinds of current-work card exist: numbered point cards, the idle card,
+// and the closing card that names the duties still owed on a point just ended.
+// Any two at once is the contradiction the user read on his phone ("470 läuft"
+// over "Gerade keine laufende Arbeit"). Every sanctioned writer clears the
+// others, so a mixture means a hand edit — and this gate runs before the bytes
+// leave, which is where a hand edit is still cheap to catch.
+describe('one kind of current-work card', () => {
+  const stateCard = (title) =>
+    `<details class="now">\n  <summary><span class="t">${title}</span>` +
+    `<span class="right"><span class="meta">23:40</span></span></summary>\n` +
+    `  <div class="body"><p>Text</p></div>\n</details>`
+  const IDLE = stateCard(NO_CURRENT_WORK_TITLE)
+  const CLOSING = stateCard(CLOSING_WORK_TITLE)
+  const withNow = (body) =>
+    VIEWPORT +
+    '<div class="wrap">\n' +
+    sect(REQUIRED_SECTIONS[0], body) +
+    '\n' +
+    sect(REQUIRED_SECTIONS[1], queueCard(1)) +
+    '\n' +
+    sect(REQUIRED_SECTIONS[2], queueCard(401)) +
+    '\n' +
+    sect(REQUIRED_SECTIONS[3], queueCard(2)) +
+    '\n</div>'
+
+  it('accepts each kind standing alone', () => {
+    for (const body of [nowCard(544), IDLE, CLOSING]) {
+      expect(structureViolations(withNow(body))).toEqual([])
+    }
+    // …and any number of NUMBERED cards, which is one kind with parallel work.
+    expect(structureViolations(withNow([544, 546, 550].map(nowCard).join('\n')))).toEqual([])
+  })
+
+  it('REFUSES a board carrying both an idle and a closing card', () => {
+    const mixed = withNow(`${IDLE}\n${CLOSING}`)
+    expect(codes(mixed)).toContain('now-card-kinds')
+    expect(structureViolations(mixed)[0].msg).toMatch(/idle \+ closing|closing \+ idle/)
+  })
+
+  it('refuses either state card beside a numbered one', () => {
+    expect(codes(withNow(`${nowCard(544)}\n${IDLE}`))).toContain('now-card-kinds')
+    expect(codes(withNow(`${CLOSING}\n${nowCard(544)}`))).toContain('now-card-kinds')
+  })
+
+  it('refuses the same state card stacked — it is a STATE, not an entry', () => {
+    expect(codes(withNow(`${IDLE}\n${IDLE}\n${IDLE}`))).toContain('now-state-card-stacked')
+    expect(codes(withNow(`${CLOSING}\n${CLOSING}`))).toContain('now-state-card-stacked')
+  })
+
+  it('reads the SECTION, so the same words quoted in Erledigt are a report', () => {
+    const archived =
+      VIEWPORT +
+      '<div class="wrap">\n' +
+      sect(REQUIRED_SECTIONS[0], IDLE) +
+      '\n' +
+      sect(REQUIRED_SECTIONS[1], queueCard(1)) +
+      '\n' +
+      sect(REQUIRED_SECTIONS[2], queueCard(401)) +
+      '\n' +
+      sect(
+        REQUIRED_SECTIONS[3],
+        `<details>\n  <summary><span class="num">543</span><span class="t">${CLOSING_WORK_TITLE}</span>` +
+          `</summary>\n  <div class="body"><p>Text</p></div>\n</details>`,
+      ) +
+      '\n</div>'
+    expect(structureViolations(archived)).toEqual([])
+  })
+
+  it('nowCardKinds is total and names the kinds in document order', () => {
+    expect(nowCardKinds(withNow(`${nowCard(544)}\n${IDLE}`))).toEqual(['point', 'idle'])
+    for (const junk of [null, undefined, 42, {}, '', '<main>nichts</main>']) {
+      expect(() => nowCardKinds(junk)).not.toThrow()
+      expect(nowCardKinds(junk)).toEqual([])
+    }
   })
 })

@@ -16,7 +16,14 @@
 // A run only counts if it finished AFTER the last edit of any changed render
 // file (an earlier run cannot have seen the final code). When both backends are
 // covered the guard advances the verified baseline (clearedHead) by itself —
-// no manual ritual. CLI:
+// no manual ritual.
+//
+// A run counts as covering when it is CLEAN (exit 0) or ACCOUNTED FOR (point
+// 550): every red in it charged to an OPEN work-order point. The clearance is
+// recorded as `clearedVia: 'accounted-for'` with the charges, and said out loud
+// — a suite that cannot exit 0 for another point's reasons must not force a
+// hand-written --defer on every change, and it must not read as a pass either.
+// CLI:
 //   node scripts/render-verify-guard.mjs status            # inspect the gate
 //   node scripts/render-verify-guard.mjs --defer "<why>"   # loud escape valve
 //   node scripts/render-verify-guard.mjs --clear "<why>"   # manual baseline advance
@@ -29,7 +36,17 @@ import {
   readRenderState,
   mergeRenderState,
 } from './render-verify-state.mjs'
-import { isRenderPath, evaluate, BACKENDS, coveringRun, baselineFor } from './render-verify-core.mjs'
+import {
+  isRenderPath,
+  evaluate,
+  BACKENDS,
+  coveringRun,
+  baselineFor,
+  chargeablePoints,
+  runVerdict,
+  latestRun,
+} from './render-verify-core.mjs'
+import { readTasksAll } from './tasks-source.mjs'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
 import { isMainModule } from './is-main.mjs'
 
@@ -181,6 +198,7 @@ export function gatherRenderVerifyInputs({ sessionId = '', deps = {} } = {}) {
     diffRenderPaths = changedRenderPaths,
     changeTimeOf = latestChangeAt,
     baselineGone = commitMissing,
+    workOrder = readTasksAll,
   } = deps
   // Hard singleton: a session that does not own the live batch lock stands down.
   if (heldByOther(sessionId)) {
@@ -207,12 +225,24 @@ export function gatherRenderVerifyInputs({ sessionId = '', deps = {} } = {}) {
     if (baselineGone(cleared)) throw new BaselineDiffError(cleared, e)
     throw e
   }
+  // WHICH POINTS A RED MAY BE CHARGED TO (point 550). Read here, so the Stop
+  // hook and the preflight judge an accounted-for run against the SAME work
+  // order. An unreadable work order yields an empty set, which charges nothing
+  // and leaves the gate exactly as strict as it was before the accounting
+  // existed — the safe direction.
+  let openPoints = []
+  try {
+    openPoints = chargeablePoints(workOrder())
+  } catch {
+    /* unreadable work order — nothing is chargeable */
+  }
   return {
     applicable: true,
     head,
     branch,
     state,
     cleared,
+    openPoints,
     inputs: {
       head,
       clearedHead: cleared,
@@ -220,6 +250,7 @@ export function gatherRenderVerifyInputs({ sessionId = '', deps = {} } = {}) {
       latestChangeAt: paths.length ? changeTimeOf(paths, head, base) : 0,
       runs: state.runs,
       deferral: state.deferral,
+      openPoints,
     },
   }
 }
@@ -289,25 +320,43 @@ if (arg === 'status') {
     const { paths, base } = cleared ? changedRenderPaths(cleared, head) : { paths: [], base: cleared }
     console.log(`pending render paths: ${paths.length ? paths.join(', ') : '(none)'}`)
     const since = paths.length ? latestChangeAt(paths, head, base) : 0
+    const openPoints = chargeablePoints(readTasksAll())
     for (const b of BACKENDS) {
-      const run = coveringRun(state.runs, b, since)
+      const run = coveringRun(state.runs, b, since, { openPoints })
+      const verdict = run ? runVerdict(run, { openPoints }) : null
       console.log(
         run
           ? `  ${b.padEnd(6)} covered by ${run.suite} at ${new Date(run.at).toISOString()} ` +
-              `(exit 0, asserted=${run.asserted === true}, level=${run.featureLevel ?? 'unrecorded'}, ` +
+              `(${
+                verdict.status === 'accounted'
+                  ? `ACCOUNTED FOR, not clean: exit ${run.exit}, ` +
+                    verdict.charges.map((c) => `"${c.name}" → point ${c.point}`).join('; ')
+                  : 'exit 0'
+              }, asserted=${run.asserted === true}, level=${run.featureLevel ?? 'unrecorded'}, ` +
               `${run.screenshotCount ?? 0} screenshots)`
           : `  ${b.padEnd(6)} NOT covered since the last render edit`,
       )
+      if (run) continue
+      const last = latestRun(state.runs, b, since)
+      const why = last ? runVerdict(last, { openPoints }) : null
+      for (const u of why?.unaccounted ?? []) {
+        console.log(
+          `         unaccounted red in the last ${last.suite} run: "${u.name}"` +
+            (u.point === null ? ' (charged to nothing)' : ` (point ${u.point} is not open)`),
+        )
+      }
     }
     if (state.deferral) console.log(`⚠ active deferral @${String(state.deferral.head).slice(0, 7)}: "${state.deferral.reason}"`)
     if (state.lastDeferral) console.log(`(last consumed deferral: "${state.lastDeferral.reason}")`)
     const runs = Array.isArray(state.runs) ? state.runs.slice(-8) : []
     console.log(`recent runs (${runs.length} of ${Array.isArray(state.runs) ? state.runs.length : 0}):`)
     for (const r of runs) {
+      const v = runVerdict(r, { openPoints })
       console.log(
         `  ${new Date(Number(r.at ?? 0)).toISOString()}  ${String(r.backend).padEnd(6)} ` +
           `${String(r.suite).padEnd(14)} exit ${r.exit} asserted=${r.asserted === true} ` +
-          `level=${r.featureLevel ?? '-'} shots=${r.screenshotCount ?? 0}`,
+          `level=${r.featureLevel ?? '-'} shots=${r.screenshotCount ?? 0} ` +
+          `${v.status}${v.charges.length ? ` (${v.charges.map((c) => `→${c.point}`).join(' ')})` : ''}`,
       )
     }
     process.exit(0)
@@ -365,6 +414,23 @@ if (isMainModule(import.meta.url)) {
     }
     if (result.clear && head !== cleared) {
       const extra = { clearedAt: Date.now(), clearedBy: sessionId || 'stop-hook' }
+      // An ACCOUNTED-FOR clearance is written as such and never as a clean pass
+      // (point 550): the record keeps which red was charged to which point, and
+      // the console says it out loud, because a run that is red for someone
+      // else's reasons is an exception — a quiet one is how a gate becomes a
+      // formality. `clearedVia` is set on EVERY clearance, so a stale
+      // accounted-for entry can never linger behind a later clean one.
+      const accounted = Array.isArray(result.accounted) ? result.accounted : []
+      extra.clearedVia = accounted.length > 0 ? 'accounted-for' : 'clean'
+      extra.accountedFor = accounted.length > 0 ? accounted : undefined
+      for (const a of accounted) {
+        console.error(
+          `⚠ RENDER-VERIFY CLEARED ON ACCOUNTED-FOR REDS (${a.backend}, ${a.suite}): ` +
+            a.charges.map((c) => `"${c.name}" → point ${c.point}`).join('; ') +
+            '. This is NOT a clean pass — the picture was judged with those reds standing, ' +
+            'each owned by an open point. Say so in any report.',
+        )
+      }
       if (result.deferred) {
         // Consume the deferral but keep it visible (status shows lastDeferral).
         extra.lastDeferral = state.deferral

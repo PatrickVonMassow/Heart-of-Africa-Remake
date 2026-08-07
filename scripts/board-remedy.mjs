@@ -36,6 +36,17 @@ export const NOW_CARD_CMD = `${EDIT_CMD} now`
  */
 export const NONE_CARD_CMD = `${EDIT_CMD} none`
 
+/**
+ * Write the "only the closing duties are left" card (point 544).
+ *
+ * The third thing a session can truthfully say. A session that has merged and
+ * ticked its point but still owes its closing duties is neither idle nor working
+ * a numbered point, so under the idle card the point-470 deny fired on every
+ * call while neither of its two remedies could reach the state. This one can,
+ * and the deny names it.
+ */
+export const CLOSING_CARD_CMD = `${EDIT_CMD} closing`
+
 /** The tail every board remedy ends with. */
 export const REPUBLISH = `republish (${PUBLISH_CMD}) and re-run ${SYNCED_CMD}`
 

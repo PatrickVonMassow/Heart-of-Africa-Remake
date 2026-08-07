@@ -881,6 +881,17 @@ Das ist die verallgemeinerbare Form. Ein Mechanismus, der einen **verderblichen 
 
 **Lehre:** Ein Wert, der zwischen Erhebung und Verwendung altern kann, wird am **Verwendungsort** erhoben, nicht am Erhebungsort weitergereicht. Wo ein Mechanismus ihn dennoch vorhält, gehört die Erhebungszeit sichtbar daneben — ein Wert ohne Zeitstempel wird als zeitlos gelesen, und genau das ist er nicht.
 
+
+### 3.93 Die eingestandene Grenze, die niemand nachprüft
+
+Ein Wächter sollte einen Prüflauf nur noch dann durchwinken, wenn jede rote Stelle darin einem offenen Punkt zugeschrieben ist. Der Autor lieferte ihn sauber ab — und tat etwas Vorbildliches: Er schrieb die Grenzen seiner Lösung selbst dazu. Eine davon lautete, ein Lauf, der nach einer zugeschriebenen roten Stelle stirbt, werde von seiner Absturz-Erkennung gefangen.
+
+Diese Zeile war die gefährlichste im ganzen Bericht, denn sie liest sich wie eine Prüfung und war eine **Annahme**. Das andere Modell nahm sie nicht als gegeben, sondern stellte sie nach: Node schreibt eine unbehandelte Ausnahme — genau die Form, die ein abgelaufener Browsertest erzeugt — am abgefangenen Kanal vorbei direkt hinaus, und zwar erst, nachdem die Aufräumhandler gelaufen sind. Die Erkennung sah davon nichts. Ein Lauf, der auf halber Strecke stirbt, hätte als vollständig geprüftes Bild gegolten.
+
+Das Muster ist allgemeiner als dieser Fall. Ein eingestandenes Defizit **entwaffnet den Prüfer**: Es klingt nach Offenheit, es steht schon im Bericht, es ist scheinbar bereits bedacht — und genau deshalb hakt man es ab, statt es anzufassen. Eine verschwiegene Lücke wird gesucht; eine zugegebene wird geglaubt. Die zweite Runde bestätigte den Wert der Haltung noch einmal: Der Prüfer verließ sich auch dann nicht auf den Nachweis des Autors, sondern baute sein eigenes Fixture, ließ den echten Rekorder daran sterben und fuhr zusätzlich die **Gegenprobe gegen den alten Stand**, die den Fehler noch einmal zeigt. Erst damit steht fest, dass die Lücke bestand *und* dass sie zu ist — ein grüner Test allein hätte beides nur behauptet.
+
+**Lehre:** Was ein Autor als bekannte Grenze **einräumt**, ist eine Behauptung wie jede andere und gehört auf die Prüfliste ganz nach oben — nicht ans Ende. Und ein Beweis, dass ein Loch geschlossen ist, ist erst vollständig, wenn derselbe Versuch am **alten Stand** noch hindurchgeht.
+
 ---
 
 ## 4. Die Guards als Immunsystem
@@ -970,7 +981,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Freitag, 07.08.2026, 23:29 · Quellen-Fingerprint: `43e578564641…`
+Zuletzt aktualisiert: Samstag, 08.08.2026, 00:15 · Quellen-Fingerprint: `edd04fae21ac…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1050,8 +1061,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 72 Feedback-/Projekt-Memories · 48 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 38 Prozess-/Meta-TASKS-Punkte (davon 15 offen).
+Erfasste Quellen: 72 Feedback-/Projekt-Memories · 48 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 39 Prozess-/Meta-TASKS-Punkte (davon 15 offen).
 
-<!-- RETRO-FINGERPRINT: 43e578564641c01817ce8ff756e0f8d783c7e9e76169f53174096d001a6d7ac5 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-07T21:29:18.660Z -->
+<!-- RETRO-FINGERPRINT: edd04fae21ac0c4ed02ebe605377a5a00f876fba26eca6b3d55b344dfd83bf95 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-07T22:15:44.319Z -->
 <!-- AUTO-GENERATED:END -->
