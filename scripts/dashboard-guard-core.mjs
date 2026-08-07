@@ -444,6 +444,33 @@ export function etaRevisionPatch({ state = {}, sessionId = '', cards = [] } = {}
   return { etaRevisions: { session: sessionId, byPoint, etas } }
 }
 
+/**
+ * THE OPEN-POINT COUNT THE BOARD'S FOOTER STATES — or null when the document
+ * carries no footer, or its footer states no count.
+ *
+ * It reads the `<footer>` ELEMENT and nothing else. Until 07.08.2026 the
+ * currency check below scanned the WHOLE document for the first
+ * "NN offene Punkte", so a queue card whose prose legitimately said "29 offene
+ * Punkte" made it report "the footer claims 29 open points, TASKS.md has 114"
+ * while the real footer read the correct 114 — and it refused the attest until
+ * the card was reworded, enforcing a rule nothing states. Same class as the
+ * guards that judged a command string instead of the action: a check binds to
+ * the thing it judges, not to a pattern that happens to appear near it.
+ *
+ * Both German forms count, because `refreshFooter` (scripts/board-core.mjs)
+ * writes the singular as "1 offener Punkt". Tags inside the footer become
+ * whitespace first, so a figure wrapped in a `<span>` is still read.
+ */
+export function footerOpenCount(html) {
+  if (typeof html !== 'string') return null
+  for (const m of html.matchAll(/<footer\b[^>]*>([\s\S]*?)<\/footer>/gi)) {
+    const text = m[1].replace(/<[^>]*>/g, ' ')
+    const count = text.match(/(\d+)\s+offene[rn]?\s+Punkt(?:e|en)?\b/i)
+    if (count) return Number(count[1])
+  }
+  return null
+}
+
 export function auditDashboard(html, input = {}) {
   const v = []
   if (typeof html !== 'string' || !html) return v
@@ -714,10 +741,17 @@ export function auditDashboard(html, input = {}) {
     })
   }
 
-  // FOOTER CURRENCY — the "N offene Punkte" figure must match TASKS.md.
-  const foot = html.match(/(\d+)\s+offene Punkte/)
-  if (foot && open.length && Number(foot[1]) !== open.length) {
-    v.push({ code: 'footer-stale', msg: `the footer claims ${foot[1]} open points, TASKS.md has ${open.length}` })
+  // FOOTER CURRENCY — the FOOTER's "N offene Punkte" figure must match
+  // TASKS.md. Card prose may say any number it likes (see footerOpenCount); a
+  // document without a footer states nothing to be stale, so it passes.
+  const footCount = footerOpenCount(html)
+  if (footCount !== null && open.length && footCount !== open.length) {
+    v.push({
+      code: 'footer-stale',
+      msg:
+        `the footer claims ${footCount} open points, TASKS.md has ${open.length} — ` +
+        `${REPUBLISH}; the publish derives the figure, so it needs no hand-edit`,
+    })
   }
 
   return v
