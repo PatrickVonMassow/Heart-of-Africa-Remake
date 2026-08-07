@@ -293,14 +293,22 @@ export function pruneShaCache(cache, now = Date.now(), windowMs = PUSH_WINDOW_MS
  *  failed, not that every branch is gone — pruning on it would drop the dedup
  *  and re-alert a red already reported, so it prunes nothing. */
 export function pruneNotifiedRefs(notified, existingRefs = []) {
+  let all = {}
   try {
-    if (!Array.isArray(existingRefs) || existingRefs.length === 0) return { ...(notified ?? {}) }
-    const out = {}
+    all = { ...(notified ?? {}) }
+  } catch {
+    return {} // an unreadable state file is an empty one — nothing to keep
+  }
+  try {
+    if (!Array.isArray(existingRefs) || existingRefs.length === 0) return all
     const keep = new Set([...existingRefs, 'HEAD'])
-    for (const [ref, key] of Object.entries(notified ?? {})) if (keep.has(ref)) out[ref] = key
+    const out = {}
+    for (const [ref, key] of Object.entries(all)) if (keep.has(ref)) out[ref] = key
     return out
   } catch {
-    return {} // fail-open
+    // Fail-open here means KEEPING the bookkeeping: dropping it would re-alert a
+    // red already reported, which is what the empty-list branch above refuses.
+    return all
   }
 }
 

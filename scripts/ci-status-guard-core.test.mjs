@@ -365,6 +365,18 @@ describe('notifiedFromState / pruneNotifiedRefs', () => {
     const kept = { 'origin/main': 'a', 'origin/feat/x': 'b' }
     expect(pruneNotifiedRefs(kept, [])).toEqual(kept)
     expect(pruneNotifiedRefs(kept, undefined)).toEqual(kept)
+    // …and a ref list that IS readable prunes as normal, while an unreadable
+    // state degrades to empty instead of throwing.
+    expect(
+      pruneNotifiedRefs(
+        {
+          get 'origin/main'() {
+            throw new Error('unreadable')
+          },
+        },
+        ['origin/main'],
+      ),
+    ).toEqual({})
   })
 })
 
