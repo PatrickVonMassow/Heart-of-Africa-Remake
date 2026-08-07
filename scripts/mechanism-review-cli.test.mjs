@@ -84,3 +84,49 @@ describe('the paths that must stay untouched', () => {
     expect(r.stderr).not.toContain('unknown flag')
   })
 })
+
+// THE FLAG THAT WAS DROPPED (point 540). `--point 298` was handed to a CLI that
+// did not know it; nothing warned, and the criticality gate later refused the
+// tick for a point whose verdict was in the ledger all along.
+describe('a misspelled or abbreviated flag', () => {
+  it('is REPORTED with the flag it was meant to be, never silently ignored', () => {
+    const r = run('--record', 'HEAD', '--poin', '298')
+    expect(r.status).not.toBe(0)
+    expect(r.stderr).toContain('unknown flag --poin')
+    expect(r.stderr).toContain('did you mean --point')
+  })
+
+  it('refuses the --flag=value form rather than reading it as a different flag', () => {
+    const r = run('--record', 'HEAD', '--point=298')
+    expect(r.status).not.toBe(0)
+    expect(r.stderr).toContain('--point <value>')
+  })
+
+  it('refuses a stray argument, and writes nothing while doing so', () => {
+    const r = run('--record', 'HEAD', 'leftover')
+    expect(r.status).not.toBe(0)
+    expect(r.stderr).toContain('leftover')
+    expect(r.stdout.trim()).toBe('')
+  })
+})
+
+describe('a run that omits a REQUIRED flag', () => {
+  // The one path that must read exactly as it always did: the usage block, not
+  // a git error from deep inside resolveCommit.
+  it('prints the existing usage line unchanged, and never a git error', () => {
+    const r = run('--record', 'HEAD', '--model', 'Fable 5')
+    expect(r.status).not.toBe(0)
+    expect(r.stderr).toContain(usage())
+    expect(r.stderr).toContain('--verdict')
+    expect(r.stderr).toContain('--evidence')
+    expect(r.stderr).not.toMatch(/ambiguous argument|fatal:/)
+  })
+
+  it('answers a missing --record with the usage too, not with a git failure', () => {
+    const r = run('--model', 'Fable 5', '--verdict', 'merge', '--evidence', 'a whole honest line here')
+    expect(r.status).not.toBe(0)
+    expect(r.stderr).toContain(usage())
+    expect(r.stderr).toContain('--record <sha>')
+    expect(r.stderr).not.toMatch(/ambiguous argument|fatal:/)
+  })
+})

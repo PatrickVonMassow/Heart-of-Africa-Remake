@@ -32,7 +32,18 @@ import { dirname } from 'node:path'
 import { execSync } from 'node:child_process'
 import { REPO_ROOT, repoPath } from './repo-paths.mjs'
 import { isMainModule } from './is-main.mjs'
-import { modelFromTrailers, validateRecord, VERDICTS } from './mechanism-review-core.mjs'
+import {
+  formatArgErrors,
+  KNOWN_FLAGS,
+  modelFromTrailers,
+  parseArgs,
+  validateRecord,
+  VERDICTS,
+} from './mechanism-review-core.mjs'
+
+// Re-exported so the flag surface has ONE definition (the pure parser's) and one
+// import path for its callers.
+export { KNOWN_FLAGS }
 
 /** The tracked ledger of recorded mechanism reviews (JSON Lines). */
 export const RECORDS_PATH = repoPath('.claude/mechanism-reviews.jsonl')
@@ -76,19 +87,26 @@ export function appendRecord(record, path = RECORDS_PATH) {
   return record
 }
 
-/** Read `--flag value` out of an argv slice. */
-export function flag(args, name) {
-  const i = args.indexOf(name)
-  if (i < 0) return ''
-  const v = args[i + 1]
-  return v && !v.startsWith('--') ? v : ''
-}
-
 /**
  * Build the record for `sha`, reading the authoring model from the commit itself.
  * Returns { ok, record, errors } — the caller prints and exits.
  */
-export function buildRecord({ sha, model, verdict, evidence, point = '', now = Date.now(), resolve = resolveCommit }) {
+export function buildRecord({
+  sha = '',
+  model = '',
+  verdict = '',
+  evidence = '',
+  point = '',
+  now = Date.now(),
+  resolve = resolveCommit,
+} = {}) {
+  // A MISSING --record NEVER REACHES GIT (point 540). With an empty sha the
+  // resolve step used to answer `fatal: ambiguous argument '^{commit}'` from
+  // deep inside git, so the one refusal that names what the command wants — the
+  // usage block below — was the one the caller never saw.
+  if (!String(sha).trim()) {
+    return { ok: false, errors: validateRecord({ sha: '', model, verdict, evidence }).errors }
+  }
   const commit = resolve(sha)
   const check = validateRecord({
     sha: commit.sha,
@@ -136,9 +154,6 @@ export function resolveCommit(sha) {
   }
 }
 
-/** Every flag this command accepts. Anything else gets the usage block. */
-export const KNOWN_FLAGS = new Set(['--record', '--model', '--verdict', '--evidence', '--point', '--list'])
-
 /** The one description of what this command takes — printed by both refusals. */
 export const usage = () =>
   `usage: node scripts/mechanism-review.mjs --record <sha> --model <name> ` +
@@ -151,7 +166,18 @@ export const usage = () =>
 if (isMainModule(import.meta.url)) {
   const args = process.argv.slice(2)
   try {
-    if (args.includes('--list') || args.length === 0) {
+    // AN UNRECOGNISED ARGUMENT IS A QUESTION, NOT A RECORD (points 437 H / 540).
+    // The parse is pure and lives in the core; this half only prints it. Note the
+    // order: the refusal comes BEFORE --list, because `--list --wibble` is as
+    // unrecognised a command line as any other.
+    const parsed = parseArgs(args)
+    if (!parsed.ok) {
+      console.error(formatArgErrors(parsed.errors))
+      console.error(`\n${usage()}`)
+      process.exit(2)
+    }
+
+    if (parsed.mode === 'list') {
       const records = readRecords()
       if (!records.length) {
         console.log('no mechanism reviews recorded yet')
@@ -166,28 +192,7 @@ if (isMainModule(import.meta.url)) {
       process.exit(0)
     }
 
-    // AN UNRECOGNISED FLAG IS A QUESTION, NOT A RECORD (point 437 H, hit while
-    // preparing a merge on 31.07.2026). Every unknown flag used to fall through
-    // to the record path with an empty sha, so `--status` — which this tool does
-    // not have, but three of its siblings do — answered
-    // `fatal: ambiguous argument '^{commit}'` from deep inside git instead of
-    // naming what it wants. A tool that cannot say what it accepts teaches the
-    // reader to guess again.
-    const unknown = args.filter((a) => a.startsWith('--') && !KNOWN_FLAGS.has(a))
-    if (unknown.length) {
-      console.error(`mechanism-review: unknown flag${unknown.length > 1 ? 's' : ''} ${unknown.join(', ')}.\n`)
-      console.error(usage())
-      process.exit(2)
-    }
-
-    const sha = flag(args, '--record')
-    const built = buildRecord({
-      sha,
-      model: flag(args, '--model'),
-      verdict: flag(args, '--verdict'),
-      evidence: flag(args, '--evidence'),
-      point: flag(args, '--point'),
-    })
+    const built = buildRecord(parsed.values)
     if (!built.ok) {
       console.error('mechanism-review: refusing to record this review.\n')
       for (const e of built.errors) console.error(`  · ${e}`)

@@ -9,10 +9,14 @@ import { describe, it, expect } from 'vitest'
 import {
   BLOCKING_VERDICT,
   evaluateMechanismReview,
+  formatArgErrors,
   formatMechanismReviewVerdict,
   isMechanismPath,
+  KNOWN_FLAGS,
   mechanismPathsIn,
   modelFromTrailers,
+  nearestFlag,
+  parseArgs,
   parseModel,
   sameModel,
   validateRecord,
@@ -309,5 +313,175 @@ describe('evaluateMechanismReview', () => {
       records: [record({ sha: 'f'.repeat(40) })],
     })
     expect(v.block).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// THE ARGUMENT PARSER (point 540). The case that cost the work: `--point 298`
+// handed to a CLI that did not know the flag, dropped without a word, so the
+// criticality gate reported "no review recorded for this point" while the
+// verdict for that commit sat in the ledger.
+// ---------------------------------------------------------------------------
+describe('parseArgs — a known command line', () => {
+  const full = [
+    '--record', 'abc1234',
+    '--model', 'Fable 5',
+    '--verdict', 'merge',
+    '--evidence', 'read the core against its spec',
+    '--point', '298',
+  ]
+
+  it("parses the full record form into the record builder's own field names", () => {
+    const p = parseArgs(full)
+    expect(p.ok, p.errors.join('\n')).toBe(true)
+    expect(p.mode).toBe('record')
+    expect(p.values).toEqual({
+      sha: 'abc1234',
+      model: 'Fable 5',
+      verdict: 'merge',
+      evidence: 'read the core against its spec',
+      point: '298',
+    })
+  })
+
+  it('does not care in which order the flags arrive', () => {
+    const p = parseArgs(['--point', '298', '--verdict', 'merge', '--record', 'abc1234'])
+    expect(p.ok, p.errors.join('\n')).toBe(true)
+    expect(p.values.point).toBe('298')
+    expect(p.values.sha).toBe('abc1234')
+  })
+
+  it('reads --list and the bare invocation as the same ledger read', () => {
+    for (const argv of [['--list'], []]) {
+      const p = parseArgs(argv)
+      expect(p.ok, p.errors.join('\n')).toBe(true)
+      expect(p.mode).toBe('list')
+    }
+  })
+
+  it('takes a value that merely LOOKS odd — a lone dash, a number, spaces', () => {
+    const p = parseArgs(['--record', 'abc1234', '--model', '-x 4.8', '--evidence', '  spaced  '])
+    expect(p.ok, p.errors.join('\n')).toBe(true)
+    expect(p.values.model).toBe('-x 4.8')
+    expect(p.values.evidence).toBe('  spaced  ')
+  })
+
+  it('leaves the REQUIRED-flag question to validateRecord, whose usage is unchanged', () => {
+    // Omitting --verdict is not a PARSE error: the parser judges only what it
+    // was given, so the one message naming the required set stays in one place.
+    const p = parseArgs(['--record', 'abc1234'])
+    expect(p.ok, p.errors.join('\n')).toBe(true)
+    expect(p.values.verdict).toBeUndefined()
+    const v = validateRecord({ sha: 'abc1234' })
+    expect(v.ok).toBe(false)
+    expect(v.errors.join('\n')).toContain('--verdict')
+  })
+})
+
+describe('parseArgs — an argument it does not recognise', () => {
+  it('refuses an unknown flag and NAMES it, rather than dropping it', () => {
+    const p = parseArgs(['--record', 'abc1234', '--status'])
+    expect(p.ok).toBe(false)
+    expect(p.errors.join('\n')).toContain('unknown flag --status')
+  })
+
+  it('names EVERY unknown flag, not only the first', () => {
+    const p = parseArgs(['--frobnicate', '--wibble'])
+    expect(p.ok).toBe(false)
+    const text = p.errors.join('\n')
+    expect(text).toContain('--frobnicate')
+    expect(text).toContain('--wibble')
+  })
+
+  it('reports a MISSPELLED known flag and points at the one that was meant', () => {
+    // The exact shape of the failure this point exists for: one letter off, and
+    // the value behind it disappears.
+    const p = parseArgs(['--record', 'abc1234', '--poin', '298'])
+    expect(p.ok).toBe(false)
+    expect(p.errors.join('\n')).toContain('unknown flag --poin')
+    expect(p.errors.join('\n')).toContain('did you mean --point')
+    expect(p.values.point).toBeUndefined()
+  })
+
+  it('reports an ABBREVIATED known flag the same way', () => {
+    const p = parseArgs(['--mod', 'Fable 5'])
+    expect(p.ok).toBe(false)
+    expect(p.errors.join('\n')).toContain('unknown flag --mod')
+    expect(p.errors.join('\n')).toContain('did you mean --model')
+  })
+
+  it('does not report the swallowed value of an unknown flag a SECOND time', () => {
+    const p = parseArgs(['--poin', '298'])
+    expect(p.errors).toHaveLength(1)
+  })
+
+  it('suggests nothing when nothing is close — a wrong guess is worse than none', () => {
+    const p = parseArgs(['--status'])
+    expect(p.errors.join('\n')).toContain('unknown flag --status')
+    expect(p.errors.join('\n')).not.toContain('did you mean')
+  })
+
+  it('refuses a stray argument that belongs to no flag', () => {
+    const p = parseArgs(['--record', 'abc1234', 'leftover'])
+    expect(p.ok).toBe(false)
+    expect(p.errors.join('\n')).toContain('leftover')
+  })
+
+  it('refuses the --flag=value form instead of reading it as an unknown flag', () => {
+    const p = parseArgs(['--point=298'])
+    expect(p.ok).toBe(false)
+    expect(p.errors.join('\n')).toContain('--point <value>')
+  })
+
+  it('refuses a flag given twice, where one value would vanish silently', () => {
+    const p = parseArgs(['--point', '298', '--point', '540'])
+    expect(p.ok).toBe(false)
+    expect(p.errors.join('\n')).toContain('--point given more than once')
+  })
+
+  it('refuses a flag whose value is missing at the end of the line', () => {
+    const p = parseArgs(['--record'])
+    expect(p.ok).toBe(false)
+    expect(p.errors.join('\n')).toContain('--record expects a value')
+  })
+
+  it('refuses a flag whose value is swallowed by the NEXT flag', () => {
+    const p = parseArgs(['--evidence', '--verdict', 'merge'])
+    expect(p.ok).toBe(false)
+    expect(p.errors.join('\n')).toContain('--evidence expects a value')
+  })
+
+  it('refuses --list mixed with the record flags — they are different commands', () => {
+    const p = parseArgs(['--list', '--record', 'abc1234'])
+    expect(p.ok).toBe(false)
+    expect(p.errors.join('\n')).toMatch(/one or the other/)
+  })
+
+  it('refuses an unknown flag even beside --list, which used to short-circuit', () => {
+    const p = parseArgs(['--list', '--wibble'])
+    expect(p.ok).toBe(false)
+    expect(p.errors.join('\n')).toContain('--wibble')
+  })
+
+  it('never throws on rubbish input', () => {
+    for (const argv of [null, undefined, ['--'], ['---'], ['', ' '], [42]]) {
+      expect(() => parseArgs(argv)).not.toThrow()
+    }
+  })
+})
+
+describe('the flag surface itself', () => {
+  it('nearestFlag returns a KNOWN flag or nothing at all', () => {
+    for (const token of ['--poin', '--mod', '--reccord', '--zzzzzzzzzz', '']) {
+      const near = nearestFlag(token)
+      if (near) expect(KNOWN_FLAGS.has(near)).toBe(true)
+    }
+  })
+
+  it('formatArgErrors names every refusal on its own line', () => {
+    const text = formatArgErrors(['unknown flag --a', 'unknown flag --b'])
+    expect(text).toContain('--a')
+    expect(text).toContain('--b')
+    expect(text.split('\n').length).toBeGreaterThan(2)
   })
 })
