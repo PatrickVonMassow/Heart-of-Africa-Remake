@@ -13,6 +13,12 @@
 // render-path changes and the mechanically recorded verify runs, whether the
 // turn may end. Fail-open is the WRAPPER's job; this core only decides on the
 // inputs it is handed and must never throw on partial ones.
+//
+// A run covers a backend when it is CLEAN (exit 0) or ACCOUNTED FOR (point 550):
+// every failing check and console error in it charged to an OPEN work-order
+// point. The two are never conflated — see runVerdict.
+
+import { RED_CHARGES } from './render-verify-charges.mjs'
 
 /** Both renderer backends the game ships; each needs a passing verify run. */
 export const BACKENDS = ['webgpu', 'webgl']
@@ -128,9 +134,138 @@ export function isRenderPath(path) {
 }
 
 /**
- * The most recent PASSING run of `backend` recorded at/after `since` (the last
- * render-file edit) — or null. Only exit-0 runs count: a crashed/failed suite
- * proves nothing about the picture.
+ * WHICH WORK-ORDER POINTS MAY CARRY A CHARGE (point 550). Parsed from the whole
+ * work order — TASKS.md plus docs/tasks-archive.md, handed in as one text — into
+ * `{ number → 'open' | 'deferred' | 'done' }`.
+ *
+ * Only an OPEN point is chargeable. A ticked one is not: a red that outlives the
+ * point that owned it is a red nobody is working on, which is precisely the
+ * blanket exception this mechanism must not become. A DEFERRED point is not
+ * chargeable either — deferred means nobody is working on it, so charging to it
+ * would park a red indefinitely.
+ *
+ * `done` WINS over any other reading of the same number, whichever file it came
+ * from: the split is guarded elsewhere, and if it ever breaks, the conservative
+ * answer (this point is finished, its exceptions have expired) is the safe one.
+ * Total: never throws on partial input.
+ */
+export function pointStatusesFrom(text) {
+  const statuses = new Map()
+  for (const line of String(text ?? '').split('\n')) {
+    const m = /^- \[([ x*~])\] (\d+)\./.exec(line)
+    if (!m) continue
+    const point = Number(m[2])
+    const status = m[1] === 'x' ? 'done' : /\bDEFERRED\b/.test(line) ? 'deferred' : 'open'
+    if (statuses.get(point) === 'done') continue
+    statuses.set(point, status)
+  }
+  return statuses
+}
+
+/** The chargeable (open, non-deferred) point numbers of a work-order text. */
+export function chargeablePoints(text) {
+  const out = []
+  for (const [point, status] of pointStatusesFrom(text)) if (status === 'open') out.push(point)
+  return out
+}
+
+/**
+ * The ledger entry that owns this red, or null. `red` is one entry of the run
+ * record's `reds` — `{ name, kind }` as the recorder wrote it — and `suite` /
+ * `backend` are the run's own, so a charge scoped to one lane cannot excuse the
+ * other. Total: a malformed entry matches nothing rather than throwing.
+ */
+export function chargeFor(red, { suite = '', backend = '', ledger = RED_CHARGES } = {}) {
+  const name = String(red?.name ?? '')
+  if (!name) return null
+  for (const charge of Array.isArray(ledger) ? ledger : []) {
+    try {
+      if (!charge || !Number.isInteger(charge.point)) continue
+      if (charge.suite && charge.suite !== suite) continue
+      if (charge.backend && charge.backend !== backend) continue
+      if (charge.kind && red?.kind && charge.kind !== red.kind) continue
+      if (!charge.match?.test?.(name)) continue
+      return charge
+    } catch {
+      /* a broken ledger entry charges nothing — the red stays unaccounted */
+    }
+  }
+  return null
+}
+
+/** Every red of a run, each with the point it is charged to (null: nothing owns
+ *  it). Written into the run record at record time, so the record itself names
+ *  what was charged and a later ledger edit cannot bless a run after the fact. */
+export function chargeReds(reds, { suite = '', backend = '', ledger = RED_CHARGES } = {}) {
+  return (Array.isArray(reds) ? reds : []).map((red) => {
+    const charge = chargeFor(red, { suite, backend, ledger })
+    return {
+      name: String(red?.name ?? '').slice(0, 200),
+      key: red?.key ?? '',
+      kind: red?.kind === 'console' ? 'console' : 'check',
+      point: charge ? charge.point : null,
+    }
+  })
+}
+
+/**
+ * WHAT ONE RECORDED RUN IS WORTH (point 550). Three verdicts, and the difference
+ * between the first two must stay visible everywhere it is reported:
+ *
+ *   clean     — exit 0. The picture was judged and nothing was red.
+ *   accounted — the run failed, but EVERY red in it (failing check and console
+ *               error alike) is charged to an OPEN work-order point named in the
+ *               record. It proves the picture on that backend as far as this
+ *               change is concerned, and it is never called a pass.
+ *   red       — anything else: a red charged to nothing, a red charged to a point
+ *               that is finished or deferred, a failure the run never reported
+ *               (a crash prints no FAIL line), or a run that ended in a crash.
+ *
+ * `openPoints` is the chargeable set (chargeablePoints); omitted, NOTHING is
+ * chargeable and only a clean run covers — the strict default, so a caller that
+ * has not read the work order can never widen the gate by accident.
+ */
+export function runVerdict(run, { openPoints = null } = {}) {
+  if (!run || typeof run !== 'object') {
+    return { status: 'red', covers: false, charges: [], unaccounted: [] }
+  }
+  if (Number(run.exit) === 0) return { status: 'clean', covers: true, charges: [], unaccounted: [] }
+  if (run.crashed === true) {
+    return {
+      status: 'red',
+      covers: false,
+      charges: [],
+      unaccounted: [{ name: 'the run ended in a crash, not in its own report', point: null }],
+    }
+  }
+  const reds = Array.isArray(run.reds) ? run.reds : []
+  if (reds.length === 0) {
+    return {
+      status: 'red',
+      covers: false,
+      charges: [],
+      unaccounted: [{ name: 'the run failed without reporting a single red', point: null }],
+    }
+  }
+  const open = new Set(Array.isArray(openPoints) ? openPoints : openPoints ? [...openPoints] : [])
+  const charges = []
+  const unaccounted = []
+  for (const red of reds) {
+    const name = String(red?.name ?? '(unnamed red)')
+    const point = Number.isInteger(red?.point) ? red.point : null
+    if (point === null) unaccounted.push({ name, point: null })
+    else if (!open.has(point)) unaccounted.push({ name, point })
+    else charges.push({ name, point })
+  }
+  if (unaccounted.length > 0) return { status: 'red', covers: false, charges, unaccounted }
+  return { status: 'accounted', covers: true, charges, unaccounted: [] }
+}
+
+/**
+ * The most recent COVERING run of `backend` recorded at/after `since` (the last
+ * render-file edit) — or null. Covering means clean (exit 0) or, with
+ * `openPoints` handed in, ACCOUNTED FOR: every red charged to an open point
+ * (runVerdict). A crashed/unexplained failure proves nothing about the picture.
  */
 /**
  * Can a change to this path render DIFFERENTLY on the two backends? Only such a
@@ -178,13 +313,27 @@ export function isBackendSensitivePath(path) {
  * itself asks that way, so a compat lane still proves the WebGPU picture rather than
  * blocking every render change on a host that has no core adapter.
  */
-export function coveringRun(runs, backend, since, { featureLevel = null } = {}) {
+export function coveringRun(runs, backend, since, { featureLevel = null, openPoints = null } = {}) {
   if (!Array.isArray(runs)) return null
   let best = null
   for (const r of runs) {
     if (!r || r.backend !== backend) continue
-    if (Number(r.exit) !== 0) continue
+    if (!runVerdict(r, { openPoints }).covers) continue
     if (featureLevel && r.featureLevel !== featureLevel) continue
+    const at = Number(r.at ?? 0)
+    if (at < since) continue
+    if (!best || at > Number(best.at ?? 0)) best = r
+  }
+  return best
+}
+
+/** The most recent run of `backend` since `since`, covering or not — what the
+ *  block message reads to say WHY the last attempt did not count. */
+export function latestRun(runs, backend, since) {
+  if (!Array.isArray(runs)) return null
+  let best = null
+  for (const r of runs) {
+    if (!r || r.backend !== backend) continue
     const at = Number(r.at ?? 0)
     if (at < since) continue
     if (!best || at > Number(best.at ?? 0)) best = r
@@ -267,9 +416,14 @@ const ALLOW = { decision: 'allow' }
  *                      edit cannot have seen the final code
  *   runs               recorded verify runs (render-verify-recorder.mjs)
  *   deferral           { head, reason, at } — the loud escape valve, current HEAD only
+ *   openPoints         the chargeable work-order points (chargeablePoints); without
+ *                      them only a clean exit-0 run covers (point 550)
  *
- * Returns { decision:'allow', clear?, deferred? } or { decision:'block', reason }.
- * `clear` tells the wrapper to advance the verified baseline to `head`.
+ * Returns { decision:'allow', clear?, deferred?, accounted? } or
+ * { decision:'block', reason }. `clear` tells the wrapper to advance the verified
+ * baseline to `head`; `accounted` lists the runs that covered a backend on
+ * ACCOUNTED-FOR reds rather than on a clean pass, so the wrapper can record and
+ * report the difference.
  */
 export function evaluate(input) {
   const {
@@ -279,6 +433,7 @@ export function evaluate(input) {
     latestChangeAt = 0,
     runs = [],
     deferral = null,
+    openPoints = null,
   } = input ?? {}
 
   // Garbage where the path list should be: fail open, but do NOT advance the
@@ -298,16 +453,51 @@ export function evaluate(input) {
   }
 
   const since = Number.isFinite(latestChangeAt) ? latestChangeAt : 0
+  const opts = { openPoints }
   // Two backends only where the two backends can DIFFER; otherwise one passing
   // run is the whole proof, and the second is a picture inspection bought for
   // nothing (user 26.07.2026).
   const dual = changedRenderPaths.some(isBackendSensitivePath)
+  const covering = new Map(BACKENDS.map((b) => [b, coveringRun(runs, b, since, opts)]))
   const missing = dual
-    ? BACKENDS.filter((b) => !coveringRun(runs, b, since))
-    : BACKENDS.some((b) => coveringRun(runs, b, since))
+    ? BACKENDS.filter((b) => !covering.get(b))
+    : BACKENDS.some((b) => covering.get(b))
       ? []
       : [BACKENDS[0]]
-  if (missing.length === 0) return { decision: 'allow', clear: true }
+  if (missing.length === 0) {
+    // An ACCOUNTED-FOR run is never reported as a clean pass: name every red it
+    // carried and the point it was charged to, so the record keeps the difference.
+    const accounted = []
+    for (const b of BACKENDS) {
+      const run = covering.get(b)
+      if (!run) continue
+      const verdict = runVerdict(run, opts)
+      if (verdict.status !== 'accounted') continue
+      accounted.push({ backend: b, suite: run.suite ?? 'unknown', at: run.at ?? 0, charges: verdict.charges })
+    }
+    return accounted.length > 0
+      ? { decision: 'allow', clear: true, accounted }
+      : { decision: 'allow', clear: true }
+  }
+
+  // WHY the last attempt on a missing backend did not count — the actionable
+  // half of the block message: an unaccounted red is either a real finding, or a
+  // known one whose point is missing from the charge ledger.
+  const whyNot = []
+  for (const b of missing) {
+    const run = latestRun(runs, b, since)
+    if (!run) continue
+    const verdict = runVerdict(run, opts)
+    if (verdict.unaccounted.length === 0) continue
+    const named = verdict.unaccounted
+      .slice(0, 3)
+      .map((u) => (u.point === null ? `"${u.name}" (charged to nothing)` : `"${u.name}" (point ${u.point} is not open)`))
+      .join('; ')
+    whyNot.push(
+      `${b}: the last run (${run.suite ?? 'unknown'}) failed with ${verdict.unaccounted.length} ` +
+        `UNACCOUNTED red(s) — ${named}${verdict.unaccounted.length > 3 ? ', …' : ''}`,
+    )
+  }
 
   const shown =
     changedRenderPaths.slice(0, 6).join(', ') + (changedRenderPaths.length > 6 ? ', …' : '')
@@ -320,7 +510,8 @@ export function evaluate(input) {
     decision: 'block',
     reason:
       `RENDER CHANGE NOT VERIFIED ON ${label}: commits since ${String(clearedHead).slice(0, 7)} ` +
-      `touch render path(s) [${shown}], but no PASSING verify-suite run on ` +
+      `touch render path(s) [${shown}], but no COVERING verify-suite run — clean, or red with ` +
+      'EVERY red charged to an open work-order point — on ' +
       missing.join(' or ') +
       ' is recorded since the last render-file edit. Standing rule (enforced — the point-210 ' +
       'coast fix read "done" on WebGL2 while the WebGPU picture was still stepped): every ' +
@@ -331,7 +522,14 @@ export function evaluate(input) {
           'identically whichever renderer holds the canvas. ') +
       `Run: ${cmds} (pick the suite whose screenshots show the changed view — ` +
       'passing runs are recorded automatically by the suite itself), then INSPECT the frames of ' +
-      'both backends. ONLY if one backend genuinely cannot be judged headless (e.g. a washed-out ' +
+      'both backends. ' +
+      (whyNot.length
+        ? `WHY THE LAST ATTEMPT DID NOT COUNT — ${whyNot.join(' | ')}. A red that a KNOWN open ` +
+          'point already owns is charged to it in scripts/render-verify-charges.mjs and the run ' +
+          'then counts as ACCOUNTED FOR (never as a pass); a red nobody has filed is a FINDING, ' +
+          'not a ledger entry. '
+        : '') +
+      'ONLY if one backend genuinely cannot be judged headless (e.g. a washed-out ' +
       'WebGPU frame — that is a FINDING, not a pass), record a loud deferral: ' +
       'node scripts/render-verify-guard.mjs --defer "<reason>".',
   }

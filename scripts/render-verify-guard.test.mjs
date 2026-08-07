@@ -28,6 +28,8 @@ const okDeps = () => ({
   // Default: the baseline really is gone, so a diff failure re-baselines. The
   // transient case sets this false — see the pair of tests below.
   baselineGone: () => true,
+  // The work order, from which the chargeable points come (point 550).
+  workOrder: () => '- [ ] 506. an open point\n- [x] 387. a finished one',
 })
 
 const gatherWith = (broken) =>
@@ -44,7 +46,18 @@ describe('gatherRenderVerifyInputs — the happy path it must keep', () => {
       latestChangeAt: 1000,
       runs: [],
       deferral: undefined,
+      openPoints: [506],
     })
+  })
+
+  it('hands evaluate() the OPEN points only — a ticked one can charge nothing (point 550)', () => {
+    expect(gatherWith({}).openPoints).toEqual([506])
+  })
+
+  it('charges nothing when the work order cannot be read, rather than widening the gate', () => {
+    const g = gatherWith({ workOrder: boom('readTasksAll') })
+    expect(g.applicable).toBe(true)
+    expect(g.inputs.openPoints).toEqual([])
   })
 
   it('stands down for a non-owner session — and says WHY, without a head to write', () => {
