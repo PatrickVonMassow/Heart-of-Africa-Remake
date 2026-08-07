@@ -32,7 +32,7 @@ import {
 } from './batch-singleton.mjs'
 import { readClaim, clearClaim, maxAgeMs } from './batch-claim.mjs'
 import { assessClaim, ownerIsHolding, reservationDecision } from './batch-claim-core.mjs'
-import { openPointsHeadline, standDownMessage } from './batch-resume-hook-core.mjs'
+import { allGatedMessage, openPointsHeadline, standDownMessage } from './batch-resume-hook-core.mjs'
 import { gatedPoints } from './user-gate-core.mjs'
 import { MANDATE_MAX_AGE_MS, resumeRepairMandate } from './batch-doctor-core.mjs'
 import { consumeMandateMarker } from './batch-doctor-states.mjs'
@@ -205,7 +205,10 @@ try {
   const open = undeferred.filter((l) => !gatedNums.includes(Number(l.match(/\d+/)[0])))
   if (open.length === 0) {
     // Nothing actionable — the batch is finished, or every remaining point is
-    // user-deferred. Start silently either way.
+    // user-deferred. Start silently either way — EXCEPT when points wait on the
+    // user (point 450, four-eyes review): that is the one state in which the
+    // empty queue is the whole story, and silence would read as "finished".
+    if (gatedNums.length) console.log(allGatedMessage(gatedNums))
   } else {
     const nums = open.map((l) => l.match(/\d+/)[0])
     // Model policy (point 309, user 25.07.2026): the 24.07 session silently

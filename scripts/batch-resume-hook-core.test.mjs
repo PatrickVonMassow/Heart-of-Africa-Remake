@@ -4,6 +4,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
   STAND_DOWN_KINDS,
+  allGatedMessage,
   openPointsHeadline,
   standDownKind,
   standDownMessage,
@@ -267,6 +268,19 @@ describe('the open-point headline (point 440)', () => {
     expect(text).toContain('40 further point(s)')
     expect(text).toContain('and 34 more')
     expect(text.length).toBeLessThan(500)
+  })
+
+  it('speaks when EVERYTHING waits on the user — silence would read as finished', () => {
+    const text = allGatedMessage([462, 463])
+    expect(text).toContain('WAITS ON THE USER')
+    expect(text).toContain('462, 463')
+    expect(text).toContain('do NOT begin one')
+    expect(text).toContain('--clear')
+    expect(allGatedMessage([])).toContain('0')
+    expect(() => allGatedMessage()).not.toThrow()
+    // …and the hook actually prints it in the branch that used to stay silent.
+    const hook = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'batch-resume-hook.mjs'), 'utf8')
+    expect(hook).toContain('allGatedMessage(gatedNums)')
   })
 
   it('survives an empty or junk queue without inventing a point', () => {

@@ -8,6 +8,7 @@
 //
 //   node scripts/defer-for-user.mjs <point> "<why the user is needed>"
 //   node scripts/defer-for-user.mjs --clear <point>     # the answer arrived
+//   node scripts/defer-for-user.mjs --forget <point>    # remove a leftover marker
 //   node scripts/defer-for-user.mjs --list              # what is waiting, and why
 //
 // THE REASON IS MANDATORY. The queue skips a gated point *after recording why*,
@@ -29,7 +30,7 @@ import { readFileSync, statSync } from 'node:fs'
 import { writeTextAtomic } from './atomic-write.mjs'
 import { repoPath } from './repo-paths.mjs'
 import { notify } from './notify.mjs'
-import { gateReport, markAnswered, markGated, parseUserGates } from './user-gate-core.mjs'
+import { clearMarkers, gateReport, markAnswered, markGated, parseUserGates } from './user-gate-core.mjs'
 import { parseWorkablePoints } from './queue-order-guard-core.mjs'
 
 const TASKS = repoPath('TASKS.md')
@@ -39,6 +40,7 @@ const USAGE = [
   'usage:',
   '  node scripts/defer-for-user.mjs <point> "<why the user is needed>"',
   '  node scripts/defer-for-user.mjs --clear <point>',
+  '  node scripts/defer-for-user.mjs --forget <point>',
   '  node scripts/defer-for-user.mjs --list',
 ].join('\n')
 
@@ -75,6 +77,25 @@ if (a === '--help' || a === '-h' || a === undefined) {
 if (a === '--list') {
   const lines = gateReport(read())
   console.log(lines.length ? `user gates in the work order:\n${lines.join('\n')}` : 'no point is waiting on the user')
+  process.exit(0)
+}
+
+if (a === '--forget') {
+  // The leftover case `gateReport` names: a marker still standing on a point
+  // that has since been ticked, or a gate that should never have been written.
+  refuseInWorktree()
+  const n = Number(b)
+  if (!Number.isFinite(n)) {
+    console.error(USAGE)
+    process.exit(1)
+  }
+  const r = clearMarkers(read(), n)
+  if (!r.ok) {
+    console.error(`defer-for-user: ${r.error}`)
+    process.exit(1)
+  }
+  write(r.text)
+  console.log(`point ${n}: the user-gate markers are removed.`)
   process.exit(0)
 }
 

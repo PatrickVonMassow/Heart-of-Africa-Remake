@@ -17,10 +17,18 @@
 //   - [ ] 462. SOME POINT … AWAITING-USER(2026-07-30; needs the user's ruling on X)
 //   - [ ] 462. SOME POINT … USER-ANSWERED(2026-08-07)
 //
-// * Both markers live on the point's OWN head line — the `- [ ] N.` line —
-//   exactly where `defer-for-user.mjs` writes them, and nowhere else. Every
-//   other work-order consumer here reads that line too, and a marker parsed out
-//   of a point's prose would fire on a spec that merely QUOTES the syntax.
+// * Both markers live at the END of the point's OWN head line — the `- [ ] N.`
+//   line — exactly where `defer-for-user.mjs` appends them, and nowhere else.
+//   BOTH halves of that are load-bearing (four-eyes review, Fable 5, 07.08.2026):
+//   the head line keeps a marker out of a point's prose, and the END anchor
+//   keeps it out of the head line's own prose. Without the anchor, a HEADLINE
+//   that merely names the mechanism ("HARDEN THE AWAITING-USER PARSER") gated
+//   its own point, and — worse — a gate whose REASON mentioned `USER-ANSWERED`
+//   parsed as answered, sending the unanswered point to the head of the queue.
+//   In a repository whose reasons discuss this very mechanism, both were
+//   reachable through the shipped command.
+// * The LAST marker on the line is the state. That is what "the answer came
+//   after the gate" means mechanically, and it needs no precedence rule.
 // * `AWAITING-USER(<since>; <why>)` — `<since>` is an ISO date (or timestamp),
 //   `<why>` is one line of English prose (the work order is English by rule).
 //   The `;` separates them; everything after the first `;` is the reason.
@@ -35,7 +43,6 @@
 //   It is not cosmetic: it is what puts the point back at the HEAD of the queue
 //   (`queueOrder` ranks it ahead of everything else), and it stays on the line
 //   until the point is ticked, so the priority survives a session boundary.
-//   Both markers on one line means the answer came after the gate: ANSWERED wins.
 // * A `DEFERRED` line is ignored wholesale, as everywhere else in this codebase:
 //   a deferred point is not commissionable and therefore not gateable either.
 // * A marker on a TICKED (`- [x]`) line is never a gate — a closed point must not
@@ -57,9 +64,16 @@ export const ANSWERED_MARKER = 'USER-ANSWERED'
 /** How long a recorded reason may be before it is cut (a work-order line, not an essay). */
 export const REASON_MAX = 160
 
-const GATE_RE = new RegExp(`\\b${GATE_MARKER}(?:\\(([^)]*)\\))?`)
-const ANSWERED_RE = new RegExp(`\\b${ANSWERED_MARKER}(?:\\(([^)]*)\\))?`)
+/**
+ * The LAST marker on a line, and only when it ENDS the line. See the header:
+ * anchoring is what keeps the marker out of the prose that surrounds it — the
+ * head line's own headline text as much as a reason that names the mechanism.
+ * Written against a line whose trailing `\r` has already been peeled.
+ */
+const MARKER_TAIL_RE = new RegExp(`(?:^|\\s)(${GATE_MARKER}|${ANSWERED_MARKER})(?:\\(([^)]*)\\))?[ \\t]*$`)
 const HEAD_RE = /^- \[( |x)\] (\d+)\./
+/** CRLF checkouts are real on this repository (point 439) — peel, never assume. */
+const peelCr = (line) => String(line ?? '').replace(/\r+$/, '')
 
 /** An ISO date or timestamp at the start of a marker's payload, or ''. */
 const leadingStamp = (text) => (String(text ?? '').trim().match(/^\d{4}-\d{2}-\d{2}(?:[T ][\d:.]+Z?)?/) ?? [''])[0]
@@ -87,21 +101,20 @@ export function sanitiseReason(reason, { max = REASON_MAX } = {}) {
  * sitting on a ticked point.
  */
 export function parseGateLine(line) {
-  const text = String(line ?? '')
+  const text = peelCr(line)
   const head = text.match(HEAD_RE)
   if (!head) return null
   const point = Number(head[2])
   const open = head[1] === ' '
   const deferred = /\bDEFERRED\b/.test(text)
-  const gateHit = text.match(GATE_RE)
-  const answeredHit = text.match(ANSWERED_RE)
-  if (!gateHit && !answeredHit) {
+  const hit = text.match(MARKER_TAIL_RE)
+  if (!hit) {
     return { point, open, gated: false, answered: false, since: '', at: '', reason: '', reasonMissing: false, stale: false }
   }
-  // ANSWERED WINS over a gate left standing beside it: the answer is the later
-  // event, and reading such a line as still gated would strand the point.
-  const answered = Boolean(answeredHit)
-  const payload = String((answered ? answeredHit[1] : gateHit[1]) ?? '')
+  // The LAST marker on the line is the state — a gate written after an answer
+  // gates again, an answer written after a gate answers. No precedence rule.
+  const answered = hit[1] === ANSWERED_MARKER
+  const payload = String(hit[2] ?? '')
   const stamp = leadingStamp(payload)
   const rest = answered ? '' : payload.slice(stamp.length).replace(/^\s*;\s*/, '').trim()
   const reason = answered ? '' : sanitiseReason(rest || (stamp ? '' : payload))
@@ -144,10 +157,9 @@ export function parseUserGates(tasksText) {
   return { gated, answered, stale, reasonless: gated.filter((g) => g.reasonMissing).map((g) => g.point) }
 }
 
-/** Does this line carry either marker at all? */
+/** Does this line END in either marker? */
 export function hasMarker(line) {
-  const t = String(line ?? '')
-  return GATE_RE.test(t) || ANSWERED_RE.test(t)
+  return MARKER_TAIL_RE.test(peelCr(line))
 }
 
 /** The gated point numbers as a Set — what the queue and the pool skip. */
@@ -179,26 +191,40 @@ export function gateSets(source) {
 // path is testable against a fixture rather than against the live work order.
 // ---------------------------------------------------------------------------
 
-/** Replace the head line of `point`, or report that there is none. */
-function rewriteHead(tasksText, point, transform) {
+/**
+ * Replace the head line of `point`, or report that there is none.
+ *
+ * THE LINE ENDING SURVIVES (four-eyes review, Fable 5). On a CRLF checkout —
+ * which this repository has met before (point 439) — appending to the raw line
+ * put the marker AFTER the `\r`, so the next reader that normalises line
+ * endings saw the marker on a line of its own and the gate silently evaporated.
+ * The `\r` is peeled before the transform and put back after it.
+ */
+function rewriteHead(tasksText, point, transform, { includeTicked = false } = {}) {
   const n = Number(point)
   let hit = null
   const out = String(tasksText ?? '')
     .split('\n')
-    .map((line) => {
+    .map((raw) => {
+      const line = peelCr(raw)
+      const cr = raw.slice(line.length)
       const head = line.match(HEAD_RE)
-      if (!head || Number(head[2]) !== n) return line
+      if (!head || Number(head[2]) !== n) return raw
       hit = head[1] === ' ' ? 'open' : 'ticked'
-      return hit === 'open' ? transform(line) : line
+      return hit === 'open' || includeTicked ? `${transform(line)}${cr}` : raw
     })
   return { text: out.join('\n'), hit }
 }
 
-const stripMarkers = (line) =>
-  line
-    .replace(new RegExp(`\\s*\\b${GATE_MARKER}(?:\\([^)]*\\))?`, 'g'), '')
-    .replace(new RegExp(`\\s*\\b${ANSWERED_MARKER}(?:\\([^)]*\\))?`, 'g'), '')
-    .replace(/[ \t]+$/, '')
+/** Every trailing marker, however many were appended in a row. */
+const stripMarkers = (line) => {
+  let out = String(line)
+  for (;;) {
+    const next = out.replace(MARKER_TAIL_RE, '').replace(/[ \t]+$/, '')
+    if (next === out) return out
+    out = next
+  }
+}
 
 /**
  * Mark a point as waiting on the user. Returns { text, ok, error }.
@@ -212,7 +238,10 @@ export function markGated(tasksText, point, { since = '', reason = '' } = {}) {
   if (!clean) {
     return { text: String(tasksText ?? ''), ok: false, error: 'a gate needs a reason — record WHY the point waits on the user' }
   }
-  const stamp = leadingStamp(since) || String(since ?? '').trim()
+  // ONLY a real ISO stamp goes in (four-eyes review, Fable 5): a raw fallback
+  // let a bracket in `since` close the marker early and strand the rest of the
+  // line as junk no re-stamp could remove. The format already tolerates none.
+  const stamp = leadingStamp(since)
   const marker = `${GATE_MARKER}(${stamp ? `${stamp}; ` : ''}${clean})`
   const { text, hit } = rewriteHead(tasksText, point, (line) => `${stripMarkers(line)} ${marker}`)
   if (hit === null) return { text, ok: false, error: `point ${Number(point)} has no line in the work order` }
@@ -230,11 +259,11 @@ export function markAnswered(tasksText, point, { at = '' } = {}) {
     String(tasksText ?? '')
       .split('\n')
       .find((l) => {
-        const h = l.match(HEAD_RE)
+        const h = peelCr(l).match(HEAD_RE)
         return h && Number(h[2]) === Number(point)
       }) ?? '',
   )
-  const stamp = leadingStamp(at) || String(at ?? '').trim()
+  const stamp = leadingStamp(at)
   const marker = `${ANSWERED_MARKER}(${stamp})`
   const { text, hit } = rewriteHead(tasksText, point, (line) => `${stripMarkers(line)} ${marker}`)
   if (hit === null) return { text, ok: false, error: `point ${Number(point)} has no line in the work order`, wasGated: false }
@@ -244,10 +273,18 @@ export function markAnswered(tasksText, point, { at = '' } = {}) {
   return { text, ok: true, error: '', wasGated: Boolean(before?.gated) }
 }
 
-/** Remove both markers from a point's line (the answer was worked, or the gate was wrong). */
+/**
+ * Remove the markers from a point's line — the answer was worked, the gate was
+ * wrong, or a leftover sits on a point that has since been ticked.
+ *
+ * TICKED LINES INCLUDED (four-eyes review, Fable 5): `gateReport` tells the
+ * operator to clear exactly those, and the only API that could refused them,
+ * silently. Removing a marker can never resurrect a closed point — nothing
+ * reads a marker off a ticked line as live — so there is nothing to protect.
+ */
 export function clearMarkers(tasksText, point) {
-  const { text, hit } = rewriteHead(tasksText, point, stripMarkers)
-  return { text, ok: hit === 'open', error: hit === null ? `point ${Number(point)} has no line in the work order` : '' }
+  const { text, hit } = rewriteHead(tasksText, point, stripMarkers, { includeTicked: true })
+  return { text, ok: hit !== null, error: hit === null ? `point ${Number(point)} has no line in the work order` : '' }
 }
 
 /**
@@ -262,6 +299,8 @@ export function gateReport(tasksText) {
     lines.push(`  ${g.point} waits on the user${g.since ? ` since ${g.since}` : ''}: ${g.reason || '— NO REASON RECORDED (repair it)'}`)
   }
   for (const a of answered) lines.push(`  ${a.point} answered${a.at ? ` ${a.at}` : ''} — back at the head of the queue`)
-  for (const s of stale) lines.push(`  ${s.point} carries a leftover marker on a ${s.kind} point — clear it`)
+  for (const s of stale) {
+    lines.push(`  ${s.point} carries a leftover marker on a ${s.kind} point — node scripts/defer-for-user.mjs --forget ${s.point}`)
+  }
   return lines
 }

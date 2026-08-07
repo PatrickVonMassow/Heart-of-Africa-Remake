@@ -55,6 +55,37 @@ describe('parseGateLine — one work-order line', () => {
     expect(p).toMatchObject({ gated: true, since: '', reasonMissing: true })
   })
 
+  // ---- the four-eyes findings of 07.08.2026 (Fable 5), each a real inversion --
+  it('does NOT gate a point whose own headline merely NAMES the marker', () => {
+    expect(parseGateLine('- [ ] 470. HARDEN THE AWAITING-USER MARKER PARSER against prose.')).toMatchObject({
+      gated: false,
+      answered: false,
+    })
+    expect(parseGateLine('- [ ] 471. DECIDE WHETHER USER-ANSWERED SHOULD AUTO-TICK.')).toMatchObject({
+      gated: false,
+      answered: false,
+    })
+  })
+
+  it('does NOT read a gate whose REASON names the answer marker as answered', () => {
+    const line = '- [ ] 5. X AWAITING-USER(2026-08-07; clarify whether the USER-ANSWERED flow may auto-tick)'
+    expect(parseGateLine(line)).toMatchObject({ gated: true, answered: false })
+    // …and the same through the writer the CLI uses.
+    const written = markGated('- [ ] 5. X.', 5, { since: '2026-08-07', reason: 'does USER-ANSWERED auto-tick?' })
+    expect(written.ok).toBe(true)
+    expect(gatedPoints(written.text).has(5)).toBe(true)
+    expect(answeredPoints(written.text).has(5)).toBe(false)
+  })
+
+  it('reads a marker on a CRLF line, ignoring the carriage return', () => {
+    expect(parseGateLine('- [ ] 5. X AWAITING-USER(2026-08-07; why)\r')).toMatchObject({ gated: true, since: '2026-08-07' })
+    expect(gatedPoints('- [ ] 5. X AWAITING-USER(2026-08-07; why)\r\n- [ ] 6. Y\r\n').has(5)).toBe(true)
+  })
+
+  it('does not read a marker that no longer ends the line', () => {
+    expect(parseGateLine('- [ ] 5. X AWAITING-USER(2026-08-07; why) and more prose')).toMatchObject({ gated: false })
+  })
+
   it('takes a bracket payload that is only prose as the reason', () => {
     expect(parseGateLine('- [ ] 9. X AWAITING-USER(waiting for the colour decision)')).toMatchObject({
       gated: true,
@@ -64,9 +95,18 @@ describe('parseGateLine — one work-order line', () => {
     })
   })
 
-  it('lets ANSWERED win when both markers stand on one line', () => {
-    const p = parseGateLine('- [ ] 5. X AWAITING-USER(2026-07-30; why) USER-ANSWERED(2026-08-07)')
-    expect(p).toMatchObject({ gated: false, answered: true, at: '2026-08-07' })
+  it('takes the LAST marker on the line as the state', () => {
+    expect(parseGateLine('- [ ] 5. X AWAITING-USER(2026-07-30; why) USER-ANSWERED(2026-08-07)')).toMatchObject({
+      gated: false,
+      answered: true,
+      at: '2026-08-07',
+    })
+    // …and a gate written after an answer gates again.
+    expect(parseGateLine('- [ ] 5. X USER-ANSWERED(2026-08-07) AWAITING-USER(2026-08-08; a new question)')).toMatchObject({
+      gated: true,
+      answered: false,
+      since: '2026-08-08',
+    })
   })
 
   it('never gates a ticked point, but reports the leftover as stale', () => {
@@ -208,6 +248,35 @@ describe('markGated / markAnswered / clearMarkers — the pure rewrites', () => 
   it('answers a point that was never gated without pretending it was', () => {
     const r = markAnswered(base, 21, { at: '2026-08-07' })
     expect(r).toMatchObject({ ok: true, wasGated: false })
+  })
+
+  it('keeps a CRLF line ending intact, so the marker never detaches (four-eyes finding 2)', () => {
+    const crlf = ['- [ ] 20. A POINT.', '  detail', ''].join('\r\n')
+    const r = markGated(crlf, 20, { since: '2026-08-07', reason: 'why' })
+    expect(r.ok).toBe(true)
+    expect(r.text.split('\n')[0]).toBe('- [ ] 20. A POINT. AWAITING-USER(2026-08-07; why)\r')
+    expect(gatedPoints(r.text).has(20)).toBe(true)
+    // …and after the line endings are normalised, as every board consumer does.
+    expect(gatedPoints(r.text.replace(/\r\n/g, '\n')).has(20)).toBe(true)
+    const back = markAnswered(r.text, 20, { at: '2026-08-08' })
+    expect(back.text.split('\n')[0]).toBe('- [ ] 20. A POINT. USER-ANSWERED(2026-08-08)\r')
+  })
+
+  it('never lets a junk since-stamp break the marker (four-eyes finding 5)', () => {
+    const r = markGated('- [ ] 20. A POINT.', 20, { since: 'later)', reason: 'pick a colour' })
+    expect(r.text.split('\n')[0]).toBe('- [ ] 20. A POINT. AWAITING-USER(pick a colour)')
+    expect(gateSets(r.text).reasons.get(20)).toBe('pick a colour')
+  })
+
+  it('forgets a leftover marker on a TICKED point (four-eyes finding 4)', () => {
+    const ticked = '- [x] 9. A DONE POINT. AWAITING-USER(2026-06-01; long answered)'
+    expect(parseUserGates(ticked).stale).toEqual([{ point: 9, kind: 'ticked' }])
+    const r = clearMarkers(ticked, 9)
+    expect(r).toMatchObject({ ok: true, error: '' })
+    expect(r.text).toBe('- [x] 9. A DONE POINT.')
+    expect(parseUserGates(r.text).stale).toEqual([])
+    // …and the report points at the command that can actually do it.
+    expect(gateReport(ticked).join('\n')).toContain('--forget 9')
   })
 
   it('clears both markers again when the answered point is picked up', () => {

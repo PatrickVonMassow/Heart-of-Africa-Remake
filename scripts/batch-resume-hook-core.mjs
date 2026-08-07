@@ -41,6 +41,21 @@ import { CLAIM_MAX_AGE_MS } from './batch-claim-core.mjs'
 const namedFew = (nums, max = 6) =>
   nums.length > max ? `${nums.slice(0, max).join(', ')} and ${nums.length - max} more` : nums.join(', ')
 
+/**
+ * What a session is told when NOTHING is workable because every remaining point
+ * waits on the user (point 450). The batch is not finished and it is not idle —
+ * it is blocked on one person, and a silent start would read as "done".
+ */
+export function allGatedMessage(gated = []) {
+  const waiting = (gated ?? []).map(Number).filter(Number.isFinite)
+  return (
+    `[batch-resume] Every remaining work-order point WAITS ON THE USER (${waiting.length}: ${namedFew(waiting)}). ` +
+    'There is no next point to start — do NOT begin one. Check that each has its "Von dir zu klären" card on the ' +
+    'board (node scripts/defer-for-user.mjs --list for the recorded reasons); when an answer arrives, ' +
+    'node scripts/defer-for-user.mjs --clear <N> puts that point back at the head of the queue.'
+  )
+}
+
 export function openPointsHeadline(openNumbers = [], { gated = [] } = {}) {
   const nums = (openNumbers ?? []).map(Number).filter(Number.isFinite)
   const waiting = (gated ?? []).map(Number).filter(Number.isFinite)

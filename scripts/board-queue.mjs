@@ -89,9 +89,13 @@ function reportEntries(entries, tasksText = '') {
   // opening the work order, or the skip is indistinguishable from a point
   // quietly falling off the board.
   const gated = gatedEntryPoints(entries)
+  if (gated.length) console.log(`  waiting on the user (skipped, card says so): ${gated.join(', ')}`)
+  // The report is NOT nested inside that condition (four-eyes review, Fable 5):
+  // an ANSWERED point — back at the head of the queue — and a leftover marker
+  // are exactly the states with no gated card to trigger the report.
+  const report = gateReport(tasksText)
+  for (const line of report) console.log(`  ${line.trim()}`)
   if (gated.length) {
-    console.log(`  waiting on the user (skipped, card says so): ${gated.join(', ')}`)
-    for (const line of gateReport(tasksText)) console.log(`  ${line.trim()}`)
     console.log('  give each one a "Von dir zu klären" card, and clear it with: node scripts/defer-for-user.mjs --clear <N>')
   }
   say(entries.filter((e) => e.stub).map((e) => e.point), 'no prose yet', 'node scripts/board-queue.mjs set <N> "<text>"')
