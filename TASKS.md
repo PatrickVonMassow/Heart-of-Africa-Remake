@@ -4452,3 +4452,33 @@ Build order, chosen so no two parallel agents own the same file:
   Criticality: medium — three render targets per settlement visit is a slow drift, not a
   crash, but the channel is the detector that catches the fast ones, and an assert that
   fires on every run is one the next reader learns to wave off.
+
+- [ ] 548. THE PANORAMA BAND'S TWO REVIEW OBSERVATIONS (second model, 07.08.2026; it
+  judged BOTH as non-blocking and asked for them as their own point rather than as
+  argument). (a) THE ONCE-PER-SESSION CAPTURE TARGETS DO NOT SURVIVE A RENDERER
+  RECREATION. `src/scenes/travel/panoramaCapture.ts` holds `targets` module-global, and
+  the band is GPU-initialised by one clearing pass on whichever renderer was live at the
+  FIRST capture. `WebGLTextureUtils.copyTextureToTexture` destructures the destination's
+  `textureGPU` with no lazy init, so a NEW renderer — a context loss, a canvas remount —
+  would copy into an uninitialised texture and the empty band of point 545 returns
+  SILENTLY, with every check green. Unreachable today (one renderer per app lifetime,
+  context loss unhandled app-wide), which is why it is low: the capture is no worse off
+  than the rest of the game. Remedy: re-run the band's init clear when the renderer
+  identity changes, and pin the identity check in the pure layer.
+  (b) THE ENTER-SIDE FIRST-CAPTURE STALL HAS NO BUDGET GATE. `withSynchronousPipelineCompile`
+  costs a measured ~3.4 s in ONE frame for the first capture on the slow WebGL 2 lane
+  (~0.2–0.4 s warm, none on WebGPU), and it lands on the APPROACH into a settlement —
+  a path every player on the fallback backend takes. Point 96's fluidity check bounds
+  the LEAVE only (`scripts/verify/polish.mjs`), and the capture fires outside its
+  measured window, so nothing today would notice that cost growing. It is bounded,
+  once per session and honestly documented — a hitch, not a hole — but this project
+  enforces rather than remembers. Remedy: a measured budget on the enter transition
+  the way `balance.startup.pictureFreezeBudgetMs` bounds the startup standstill,
+  calibratable and debug-editable like its sibling.
+  FINAL STATE: a renderer recreated mid-session gets a correctly initialised band rather
+  than a silently empty one, and the enter-side capture stall is bounded by a check that
+  fails when it grows.
+  VERIFIABLE: a Vitest case for the renderer-identity re-init, and a browser check that
+  measures the ENTER transition the way point 96 measures the leave.
+  Criticality: low — neither is reachable or harmful today; both are the kind of thing
+  that stays invisible until the day it is not.
