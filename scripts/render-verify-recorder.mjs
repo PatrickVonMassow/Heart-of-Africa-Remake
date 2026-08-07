@@ -83,6 +83,7 @@ export function tapOutput(state, streams = [[process.stdout, false], [process.st
       if (isErr && CRASH_LINE.test(line)) state.crashed = true
       if (!KEPT_LINE.test(line)) continue
       if (state.lines.length < MAX_KEPT_LINES) state.lines.push(line)
+      else state.dropped = (state.dropped ?? 0) + 1
     }
   }
   const isErrOf = new Map(streams)
@@ -144,8 +145,25 @@ export function armRunRecorder(backend) {
       // (point 550) — the raw material of the red accounting below.
       lines: [],
       crashed: false,
+      // Result lines the capture cap refused. They become one synthetic
+      // UNACCOUNTED red below: a dropped line may have been the one red nobody
+      // has filed, and a cap that can silently delete it turns the flood into a
+      // way to clear the gate.
+      dropped: 0,
     }
     const flush = tapOutput(armed)
+    // THE REAL CRASH PATH (four-eyes finding F1). Node prints an uncaught
+    // exception — an unhandled rejection at a top-level await included, i.e.
+    // exactly a Playwright timeout in a suite that does not catch it — from C++
+    // straight to fd 2, AFTER the exit handlers have run. It never passes
+    // through the tapped process.stderr.write, so the stderr probe alone left
+    // `crashed` false and a half-judged run accounted for. `uncaughtExceptionMonitor`
+    // is the observe-only hook for exactly this: it fires before the process
+    // dies and changes no behaviour (unlike an 'uncaughtException' or
+    // 'unhandledRejection' listener, which would SUPPRESS the crash).
+    process.on('uncaughtExceptionMonitor', () => {
+      armed.crashed = true
+    })
     process.on('exit', (code) => {
       try {
         const shots = screenshotsSince(armed.startedAt)
@@ -169,6 +187,17 @@ export function armRunRecorder(backend) {
             reds.sort((a, b) => (a.point === null ? 0 : 1) - (b.point === null ? 0 : 1))
           } catch {
             /* unparseable output — no red is charged, so the run stays red */
+          }
+          // A capture that lost lines cannot claim to have read the run's reds:
+          // one synthetic UNACCOUNTED red, first in the list so no truncation
+          // can drop it either.
+          if (armed.dropped > 0) {
+            reds.unshift({
+              name: `${armed.dropped} further result line(s) exceeded the capture cap — this run's reds were NOT all read`,
+              key: 'capture-truncated',
+              kind: 'check',
+              point: null,
+            })
           }
         }
         recordRun({

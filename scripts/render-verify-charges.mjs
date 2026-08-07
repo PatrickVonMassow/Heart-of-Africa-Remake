@@ -45,8 +45,13 @@
 export const RED_CHARGES = [
   {
     point: 546,
+    suite: 'polish',
     kind: 'console',
-    match: /render-resource-leak\b.*renderTargets grew back/i,
+    // Pinned to the PLACE, not just the assert code (four-eyes finding F2): the
+    // channel reports every render-target leak in the same words, so an
+    // unpinned pattern would charge a NEW leak at another place — one the change
+    // under review had just introduced — to this point and bless it.
+    match: /render-resource-leak\b.*renderTargets grew back at place:maasai-village/i,
     why:
       'Measured 07.08.2026 on both backends: a maasai-village visit in `polish` leaves +3 ' +
       'resident render targets and the dev invariant channel says so. Point 546 owns the ' +

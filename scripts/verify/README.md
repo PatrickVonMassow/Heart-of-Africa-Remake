@@ -847,8 +847,12 @@ point. The mechanics:
 What still does **not** clear: a red charged to nothing (that is a FINDING, file
 it — a ledger entry is not where an unfiled red goes), a red charged to a point
 that is ticked or deferred (the exception expires with the point that owned it),
-a run that failed without reporting a single red, and a run that CRASHED rather
-than reported. `--defer` stays for what genuinely cannot be judged headless.
+a run that failed without reporting a single red, a run whose output flooded past
+the capture cap (the dropped line may have been the unfiled red, so the cap
+itself becomes an unaccounted red), and a run that CRASHED rather than reported —
+`uncaughtExceptionMonitor` catches that, because node prints an uncaught
+exception straight to fd 2 where no tapped stream write can see it. `--defer`
+stays for what genuinely cannot be judged headless.
 
 ## Screenshots are NOT comparable between runs (point 361)
 

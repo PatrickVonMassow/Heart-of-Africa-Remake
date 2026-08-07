@@ -7,10 +7,52 @@
 // called, with the original arguments and its return value), and a run that DIED
 // rather than reported is recognised as such, because a crash prints no FAIL line
 // yet exits non-zero exactly like a reported failure.
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { execFileSync } from 'node:child_process'
 import { tapOutput } from './render-verify-recorder.mjs'
 import { failedChecks } from './verify/baseline-classify-core.mjs'
-import { chargeReds } from './render-verify-core.mjs'
+import { chargeReds, runVerdict } from './render-verify-core.mjs'
+
+// The record is stubbed, not written: these cases exercise the REAL arming and
+// the REAL exit handler, and a test must never append to the checkout's own
+// render-verify state.
+const { recorded } = vi.hoisted(() => ({ recorded: [] }))
+vi.mock('./render-verify-state.mjs', () => ({
+  recordRun: (run) => recorded.push(run),
+}))
+
+// The armed cases drive the REAL tap on process.stdout, so the pre-test write is
+// saved and restored: a test must neither print a suite's fake output into the
+// run log nor leave a wrapper behind for the next one.
+let stdoutWrite = null
+beforeEach(() => {
+  stdoutWrite = process.stdout.write
+})
+afterEach(() => {
+  process.stdout.write = stdoutWrite
+})
+
+/** Arm a FRESH recorder instance (the module keeps one armed run per process)
+ *  under a chosen suite name, and return the record its exit handler writes. */
+async function armed(suite = 'polish') {
+  vi.resetModules()
+  const mod = await import('./render-verify-recorder.mjs')
+  const argv = process.argv[1]
+  process.argv[1] = `/x/${suite}.mjs`
+  // A sink UNDER the tap: the tap wraps this, so the test's lines are captured
+  // exactly as in a real run but never reach the terminal.
+  process.stdout.write = () => true
+  mod.armRunRecorder('webgpu')
+  process.argv[1] = argv
+  return {
+    /** Fire the real exit handler and read what THIS instance recorded. */
+    exit(code) {
+      const before = recorded.length
+      process.emit('exit', code)
+      return recorded.slice(before).at(-1)
+    },
+  }
+}
 
 /** A stand-in for process.stdout/stderr that records what it was handed. */
 function fakeStream() {
@@ -87,6 +129,11 @@ describe('tapOutput — observe-only', () => {
 })
 
 describe('tapOutput — a run that DIED rather than reported', () => {
+  // WHAT THIS FAKE CANNOT PROVE (four-eyes finding F4): node prints an UNCAUGHT
+  // exception from C++ straight to fd 2, so it never reaches a patched
+  // stream.write at all. This case pins the probe for the stderr a suite writes
+  // ITSELF; the real crash path is the uncaughtExceptionMonitor wiring below,
+  // and the child-process case after it proves node really fires it.
   it('flags a stack trace on stderr as a crash', () => {
     const { state, err } = tapped()
     err.write('TimeoutError: page.waitForFunction: Timeout 300000ms exceeded\n    at run (/x/benchmark.mjs:89:7)\n')
@@ -121,5 +168,98 @@ describe('the captured lines charge the way the guard reads them', () => {
     const lines = 'FAIL  settlement walker (goat): the planted foot holds its ground spot — 0.967'
     const reds = chargeReds(failedChecks(lines), { suite: 'polish', backend: 'webgl' })
     expect(reds.map((r) => r.point)).toEqual([null])
+  })
+
+  it('charges a leak at ANOTHER place to nothing — 546 is the maasai-village one (F2)', () => {
+    const line = 'ERR: [ASSERT] render-resource-leak — renderTargets grew back at place:cairo: 5 -> 9 (+4, allowed +2)'
+    expect(chargeReds(failedChecks(line), { suite: 'polish', backend: 'webgl' }).map((r) => r.point)).toEqual([null])
+  })
+
+  it('charges the maasai leak to nothing outside `polish` — the evidence was taken there (F2)', () => {
+    const line =
+      'ERR: [ASSERT] render-resource-leak — renderTargets grew back at place:maasai-village|medium: 19 -> 22 (+3, allowed +2)'
+    expect(chargeReds(failedChecks(line), { suite: 'flow', backend: 'webgl' }).map((r) => r.point)).toEqual([null])
+    expect(chargeReds(failedChecks(line), { suite: 'polish', backend: 'webgl' }).map((r) => r.point)).toEqual([546])
+  })
+})
+
+describe('the armed recorder — the REAL wiring, not a stand-in', () => {
+  const openPoints = [506, 546]
+
+  it('records a red run with its charged reds, and the run then accounts', async () => {
+    const run = await armed('polish')
+    process.stdout.write('FAIL  settlement walker (goat): the planted foot holds its ground spot — 0.967\n')
+    const record = run.exit(1)
+    expect(record.exit).toBe(1)
+    expect(record.crashed).toBe(false)
+    expect(record.reds.map((r) => r.point)).toEqual([506])
+    expect(runVerdict(record, { openPoints }).status).toBe('accounted')
+  })
+
+  it('marks a run whose process raised an uncaught exception, and that run never accounts (F1)', async () => {
+    const run = await armed('polish')
+    process.stdout.write('FAIL  settlement walker (goat): the planted foot holds its ground spot — 0.967\n')
+    // What node does to a suite that dies at a top-level await: the monitor
+    // fires, the exit handler runs afterwards. Emitted here rather than thrown,
+    // because a real throw would take the test runner with it — the child
+    // process below proves node really fires it.
+    process.emit('uncaughtExceptionMonitor', new Error('page.waitForFunction: Timeout 300000ms exceeded'))
+    const record = run.exit(1)
+    expect(record.crashed).toBe(true)
+    expect(runVerdict(record, { openPoints }).status).toBe('red')
+  })
+
+  it('turns a capture that hit its cap into an UNACCOUNTED red (F3)', async () => {
+    const run = await armed('polish')
+    // A per-frame assert flood, then the one new red that must not vanish.
+    for (let i = 0; i < 420; i++) {
+      process.stdout.write(
+        'ERR: [ASSERT] render-resource-leak — renderTargets grew back at place:maasai-village: 19 -> 22\n',
+      )
+    }
+    process.stdout.write('FAIL  a brand-new check nobody has filed — 3 of 4\n')
+    const record = run.exit(1)
+    expect(record.reds[0].point).toBeNull()
+    expect(record.reds[0].name).toMatch(/exceeded the capture cap/)
+    expect(runVerdict(record, { openPoints }).status).toBe('red')
+  })
+
+  it('leaves a green run with no accounting at all', async () => {
+    const run = await armed('polish')
+    const record = run.exit(0)
+    expect(record.exit).toBe(0)
+    expect(record.reds).toBeUndefined()
+    expect(runVerdict(record, { openPoints }).status).toBe('clean')
+  })
+})
+
+describe('node really fires uncaughtExceptionMonitor where the tap cannot see (F1)', () => {
+  it('fires it for a top-level-await rejection, whose trace bypasses a patched stderr.write', () => {
+    const fixture = [
+      "import { writeSync } from 'node:fs'",
+      // The tap, as the recorder installs it.
+      'let tapped = 0',
+      'process.stderr.write = () => { tapped++; return true }',
+      'let sawMonitor = false',
+      "process.on('uncaughtExceptionMonitor', () => { sawMonitor = true })",
+      // writeSync goes to fd 2 directly, so the patched write cannot hide it.
+      "process.on('exit', () => writeSync(2, `MONITOR:${sawMonitor} TAPPED:${tapped}\\n`))",
+      // Exactly the shape of an uncaught Playwright timeout in a suite.
+      "await Promise.reject(new Error('page.waitForFunction: Timeout 300000ms exceeded'))",
+    ].join('\n')
+    let stderr = ''
+    try {
+      execFileSync(process.execPath, ['--input-type=module', '-e', fixture], {
+        encoding: 'utf8',
+        // Captured, not forwarded: the fixture's crash trace belongs in the
+        // assertion, not in the run log.
+        stdio: ['ignore', 'pipe', 'pipe'],
+      })
+    } catch (e) {
+      stderr = String(e.stderr ?? '')
+    }
+    expect(stderr).toMatch(/MONITOR:true/)
+    // The tap saw NOTHING of the crash — the finding this fix answers.
+    expect(stderr).toMatch(/TAPPED:0/)
   })
 })
