@@ -820,6 +820,36 @@ VERIFY_GL=webgpu node scripts/verify/run-all.mjs polish   # WebGPU pass of one s
 npm test -- large polish                                  # the same suite on BOTH, preflighted
 ```
 
+### A run whose reds are ACCOUNTED FOR still counts (point 550)
+
+The gate used to count an exit-0 run and nothing else, and on 07.08.2026
+`polish` could not exit 0 for reasons belonging to OTHER points: the
+render-target assert of point 546 fires as a console error on both backends, and
+the goat-stance check reds on the software WebGPU lane (point 506). Every change
+under `scripts/verify/` — a pure comment diff included — could then be cleared
+only by a hand-written `--defer`, and a gate overridden by hand routinely stops
+being a gate.
+
+So a run covers a backend when it is **clean** (exit 0) **or accounted for**:
+every failing check and console error in it charged to an **open** work-order
+point. The mechanics:
+
+- the recorder taps the run's own `FAIL  …` / `ERR: …` lines, parses them with
+  `baseline-classify-core.mjs` (the same reading the triage lane uses) and writes
+  them into the run record, each with the point it was charged to;
+- the ledger is `scripts/render-verify-charges.mjs` — data only, one entry per
+  known red, scoped by suite/backend/kind and carrying a dated reason;
+- `runVerdict` in `render-verify-core.mjs` decides, and keeps `clean` and
+  `accounted` apart everywhere they are reported: the clearance is recorded as
+  `clearedVia: 'accounted-for'` with its charges, `status` prints them, and the
+  Stop hook says so out loud.
+
+What still does **not** clear: a red charged to nothing (that is a FINDING, file
+it — a ledger entry is not where an unfiled red goes), a red charged to a point
+that is ticked or deferred (the exception expires with the point that owned it),
+a run that failed without reporting a single red, and a run that CRASHED rather
+than reported. `--defer` stays for what genuinely cannot be judged headless.
+
 ## Screenshots are NOT comparable between runs (point 361)
 
 The frames these suites write cannot be diffed against a stored baseline, and
