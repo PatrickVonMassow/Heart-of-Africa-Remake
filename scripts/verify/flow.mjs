@@ -277,9 +277,16 @@ check(
 // Point 299: the settlement COLLIDES in the bird's-eye view — walking on never
 // carries the traveller ACROSS the village footprint. He is pressed against its
 // edge (sliding along it, like the tree/animal collision) and stays outside,
-// while the enter radius still holds him, so the Space press below enters from
-// exactly where the collider stopped him. A per-frame sampler records the
-// CLOSEST approach, so a crossing between two polls cannot go unnoticed.
+// while the enter radius still holds him wherever the footprint stops him, so
+// entry is reachable from every point the collider blocks. A per-frame sampler
+// records the CLOSEST approach, so a crossing between two polls cannot go
+// unnoticed, AND — for every frame the collider was HOLDING him — whether the
+// enter prompt was armed there. Where he comes to REST is no such invariant: a
+// ROUND footprint deflects a held key, so an off-centre approach slides around
+// it and walks on past the village, which is correct movement and depends on
+// the run seed (the approach angle, and which of the region's villages this run
+// made the knowing one). Frames on a water cell are exempt — the §2.3 water
+// guard disarms the prompt there by design.
 const village3D = await page.evaluate(async ([lat, lon]) => {
   const geo = await import('/src/world/geo.ts')
   const entry = await import('/src/scenes/travel/settlementEntry.ts')
@@ -290,17 +297,34 @@ const village3D = await page.evaluate(async ([lat, lon]) => {
     enterRadius: balance.placeEnterRadius,
   }
 }, [village.lat, village.lon])
-await page.evaluate(([x, z]) => {
-  window.__placeProbe = { min: Infinity, frames: 0 }
-  const sample = () => {
-    const p = window.__game.getState().pos
-    const pr = window.__placeProbe
-    pr.min = Math.min(pr.min, Math.hypot(p.x - x, p.z - z))
-    pr.frames++
+await page.evaluate(
+  async ([x, z, id, collisionRadius]) => {
+    const geo = await import('/src/world/geo.ts')
+    const terrain = await import('/src/world/terrain.ts')
+    window.__placeProbe = { min: Infinity, frames: 0, held: 0, heldUnarmed: 0 }
+    const sample = () => {
+      const g = window.__game.getState()
+      const p = g.pos
+      const pr = window.__placeProbe
+      const d = Math.hypot(p.x - x, p.z - z)
+      pr.min = Math.min(pr.min, d)
+      pr.frames++
+      // "Held by the collider": the resolver clamps a blocked step to exactly
+      // the collision radius, so a frame at that distance is one the footprint
+      // stopped. The margin only absorbs the clamp's float noise.
+      if (d <= collisionRadius + 0.05) {
+        const ll = geo.worldToLatLon(p.x, p.z)
+        if (terrain.sampleTerrain(ll.lat, ll.lon, g.seed).type !== 'water') {
+          pr.held++
+          if (window.__ui.getState().enterPlaceId !== id) pr.heldUnarmed++
+        }
+      }
+      requestAnimationFrame(sample)
+    }
     requestAnimationFrame(sample)
-  }
-  requestAnimationFrame(sample)
-}, [village3D.x, village3D.z])
+  },
+  [village3D.x, village3D.z, village.id, village3D.collisionRadius],
+)
 await page.keyboard.down('KeyS')
 await page
   .waitForFunction(
@@ -323,21 +347,48 @@ const releasedAt = await page.evaluate(() => window.__placeProbe.frames)
 await page.waitForFunction((n) => window.__placeProbe.frames >= n, releasedAt + 5, { timeout: 30000 })
 const pressed = await page.evaluate(([x, z]) => {
   const p = window.__game.getState().pos
-  return { d: Math.hypot(p.x - x, p.z - z), min: window.__placeProbe.min }
+  const pr = window.__placeProbe
+  return { d: Math.hypot(p.x - x, p.z - z), min: pr.min, held: pr.held, heldUnarmed: pr.heldUnarmed }
 }, [village3D.x, village3D.z])
 console.log(
   `      closest approach ${pressed.min.toFixed(2)}, resting at ${pressed.d.toFixed(2)} ` +
-    `(collider ${village3D.collisionRadius}, enter radius ${village3D.enterRadius})`,
+    `(collider ${village3D.collisionRadius}, enter radius ${village3D.enterRadius}), ` +
+    `held on the footprint for ${pressed.held} frames`,
 )
 check(
   "bird's-eye: the settlement footprint is never crossed (walking on does not pass through)",
   pressed.min >= village3D.collisionRadius - 0.2 && pressed.d >= village3D.collisionRadius - 0.2,
 )
 check(
-  'the enter prompt stays armed where the collider stops him (entry stays reachable)',
-  pressed.d <= village3D.enterRadius &&
-    (await page.evaluate((id) => window.__ui.getState().enterPlaceId === id, village.id)),
+  'the enter prompt stays armed wherever the collider holds him (entry stays reachable)',
+  pressed.held > 0 && pressed.heldUnarmed === 0,
+  `held for ${pressed.held} frames, prompt unarmed in ${pressed.heldUnarmed} of them`,
 )
+// The round footprint deflects a held key, so the push above may have carried
+// him around the village and on past it — correct movement, but it leaves the
+// prompt out of range. Re-approach the way the first approach did, so the Space
+// press below happens where the hint is actually armed.
+if (!(await page.evaluate((id) => window.__ui.getState().enterPlaceId === id, village.id))) {
+  const approach = await page.evaluate(
+    async ([lat, lon]) => (await import('/src/world/geo.ts')).latLonToWorld(lat, lon),
+    [village.lat + 0.5, village.lon],
+  )
+  await page.evaluate(([lat, lon]) => window.__game.getState().debugJumpTo(lat, lon), [village.lat + 0.5, village.lon])
+  // Poll the jump home instead of sleeping on it: the walk below only makes
+  // sense once the traveller actually stands north of the village again.
+  await page.waitForFunction(
+    ([x, z]) => {
+      const p = window.__game.getState().pos
+      return Math.hypot(p.x - x, p.z - z) <= 1
+    },
+    [approach.x, approach.z],
+    { timeout: 30000 },
+  )
+  await page.keyboard.down('KeyS')
+  await page
+    .waitForFunction((id) => window.__ui.getState().enterPlaceId === id, village.id, { timeout: 60000 })
+    .finally(() => page.keyboard.up('KeyS'))
+}
 await page.keyboard.press('Space')
 // The mode switch is synchronous on the press, but the FIRST entry into this
 // village then builds the whole first-person place (layout, panorama capture,
