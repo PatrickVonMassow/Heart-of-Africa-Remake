@@ -39,6 +39,7 @@ import {
   SET_STDIN_FLAG,
   TITLE_CMD,
   buildQueueSection,
+  gatedEntryPoints,
   importQueueFromHtml,
   mergeQueueImport,
   openPointsOf,
@@ -52,6 +53,7 @@ import {
 } from './board-queue-core.mjs'
 import { carrierPath } from './findings-paths.mjs'
 import { pendingRequests, requestRoute } from './findings-request-core.mjs'
+import { gateReport, gateSets } from './user-gate-core.mjs'
 
 const state = readJson(STATE_PATH) ?? {}
 const boardFile = resolve(REPO_ROOT, state.dashboardPath ?? '.batch-dashboard.html')
@@ -78,9 +80,19 @@ const stdinText = process.argv.includes(SET_STDIN_FLAG)
   : ''
 
 /** Everything the generator has to SAY about the cards it just rendered. */
-function reportEntries(entries) {
+function reportEntries(entries, tasksText = '') {
   const say = (points, what, cmd) => {
     if (points.length) console.log(`  ${what}: ${points.join(', ')} — ${cmd}`)
+  }
+  // THE RECORDED "WHY" IS SURFACED HERE (point 450). The queue skips a gated
+  // point after recording why it waits; that record must be readable without
+  // opening the work order, or the skip is indistinguishable from a point
+  // quietly falling off the board.
+  const gated = gatedEntryPoints(entries)
+  if (gated.length) {
+    console.log(`  waiting on the user (skipped, card says so): ${gated.join(', ')}`)
+    for (const line of gateReport(tasksText)) console.log(`  ${line.trim()}`)
+    console.log('  give each one a "Von dir zu klären" card, and clear it with: node scripts/defer-for-user.mjs --clear <N>')
   }
   say(entries.filter((e) => e.stub).map((e) => e.point), 'no prose yet', 'node scripts/board-queue.mjs set <N> "<text>"')
   // THE FALLBACK IS REPORTED (point 439): these cards carry the ENGLISH,
@@ -114,8 +126,12 @@ function inputs() {
   const tasks = readFileSync(tasksFile, 'utf8')
   return {
     html,
+    tasks,
     open: openPointsOf(tasks),
     titles: parseTaskTitles(tasks),
+    // The user gate (point 450): which points wait on the user, which he has
+    // answered, and since when.
+    gates: gateSets(tasks),
     requests: carrierRequests(),
     // Erledigt is NOT excluded: a point there is closed, so it is not open, and
     // the open set already leaves it out. Excluding it too would hide a point
@@ -163,8 +179,8 @@ try {
         `${kept} already known (stored fields kept, empty ones filled from the board) → ${QUEUE_DATA_PATH}`,
     )
   } else if (cmd === '--check' || cmd === undefined) {
-    const { html, open, titles, exclude, requests } = inputs()
-    const built = buildQueueSection(html, { open, data: readData(), exclude, titles, requests })
+    const { html, tasks, open, titles, exclude, requests, gates } = inputs()
+    const built = buildQueueSection(html, { open, data: readData(), exclude, titles, requests, gates })
     const saySoIfRequests = () => {
       if (requests.length) {
         console.log(`  ${requests.length} deposited request(s) named under the queue — node scripts/finding.mjs --requests`)
@@ -172,7 +188,7 @@ try {
     }
     if (cmd === '--check') {
       console.log(`${built.entries.length} queue card(s) would be rendered${built.html === html ? ' (no change)' : ''}`)
-      reportEntries(built.entries)
+      reportEntries(built.entries, tasks)
       saySoIfRequests()
       process.exitCode = built.html === html ? 0 : 1
     } else {
@@ -182,7 +198,7 @@ try {
       const out = normaliseLineEndings(built.html)
       if (out !== html) writeTextAtomic(boardFile, out)
       console.log(`queue rebuilt from the work order: ${built.entries.length} card(s)${out === html ? ' (unchanged)' : ''}`)
-      reportEntries(built.entries)
+      reportEntries(built.entries, tasks)
       saySoIfRequests()
       console.log('Publish it: node scripts/board-publish.mjs')
     }

@@ -32,14 +32,22 @@
 // block `--synced` and create the very block loop this design exists to
 // prevent.
 
-import { parseTasks, QUEUE_STUB_BODY, QUEUE_STUB_META, TRANSLITERATION_STEMS } from './dashboard-guard-core.mjs'
+import {
+  parseTasks,
+  QUEUE_GATED_META,
+  QUEUE_STUB_BODY,
+  QUEUE_STUB_META,
+  TRANSLITERATION_STEMS,
+} from './dashboard-guard-core.mjs'
 import { normaliseLineEndings } from './board-core.mjs'
 import { FINDER_POINTS, RELEASE_TAG_POINT } from './queue-order-guard-core.mjs'
 import { SINGLE_PARAGRAPH_WORD_BUDGET, WORD_BUDGET } from './dashboard-conciseness-guard-core.mjs'
+import { gateSets } from './user-gate-core.mjs'
 
 // The stub meta is DEFINED beside the audit rule that exempts it and re-exported
-// here: two copies of that string would be a block loop waiting to happen.
-export { QUEUE_STUB_BODY, QUEUE_STUB_META }
+// here: two copies of that string would be a block loop waiting to happen. The
+// gated meta (point 450) travels the same way.
+export { QUEUE_GATED_META, QUEUE_STUB_BODY, QUEUE_STUB_META }
 
 /** Where the queue's prose and order live (git-ignored, like the board itself). */
 export const QUEUE_DATA_PATH = '.claude/board-queue.json'
@@ -134,6 +142,11 @@ export function unestimatedPoints(entries) {
     .map((e) => e.point)
 }
 
+/** The points whose card says it waits on the USER, not on work (point 450). */
+export function gatedEntryPoints(entries) {
+  return (Array.isArray(entries) ? entries : []).filter((e) => e?.gated).map((e) => e.point)
+}
+
 /** Undo the escaping `renderQueueCard` applied, so a title read back compares. */
 const unesc = (text) =>
   String(text ?? '')
@@ -155,7 +168,10 @@ export function boardTitleReport(html, titles = {}) {
     // The import decodes now, so decoding again here would eat a second layer
     // from a title that legitimately spells out an entity.
     if (isUntranslatedTitle(entry.title, n, titles)) untranslated.push(n)
-    if (!entry.estimate) unestimated.push(n)
+    // A GATED card carries no estimate BY DESIGN (point 450) — reporting it as
+    // unestimated would nag for a duration the rule itself forbids, every turn,
+    // for as long as the user is away.
+    if (!entry.estimate && !entry.gated) unestimated.push(n)
   }
   const asc = (a, b) => a - b
   return { untranslated: untranslated.sort(asc), unestimated: unestimated.sort(asc) }
@@ -239,19 +255,54 @@ export function normaliseQueueData(raw) {
  *      to the BACK. That rule (memory queue-order-fixes-before-finders) is
  *      enforced by queue-order-guard at turn end; satisfying it by CONSTRUCTION
  *      means a newly appended fix can never trip it.
+ *   4. the USER GATE (point 450), at both ends: a point ANSWERED by the user
+ *      goes to the very HEAD — it waited on him, so it does not queue behind
+ *      work appended while it waited — and a point still WAITING on him goes
+ *      behind everything, because it cannot be worked at all. That is the whole
+ *      "vacation mode": a fortnight of silence moves the gated cards out of the
+ *      way instead of jamming the queue at its head.
  */
-export function queueOrder(open, data) {
+export function queueOrder(open, data, gates) {
   const { order } = normaliseQueueData(data)
+  const { gated, answered } = normaliseGates(gates)
   const wanted = (Array.isArray(open) ? open : []).map(Number).filter((n) => Number.isInteger(n) && n > 0)
   const set = new Set(wanted)
   const listed = order.filter((n) => set.has(n))
   const unlisted = wanted.filter((n) => !listed.includes(n)).sort((a, b) => a - b)
   const all = [...new Set([...listed, ...unlisted])]
-  const rank = (n) => (n === RELEASE_TAG_POINT ? 2 : FINDER_POINTS.has(n) ? 1 : 0)
+  const rank = (n) => {
+    if (gated.has(n)) return 3
+    if (answered.has(n)) return -1
+    return n === RELEASE_TAG_POINT ? 2 : FINDER_POINTS.has(n) ? 1 : 0
+  }
   return all
     .map((n, i) => ({ n, i, rank: rank(n) }))
     .sort((a, b) => a.rank - b.rank || a.i - b.i)
     .map((x) => x.n)
+}
+
+/**
+ * The gates in the shape this module works with: two Sets and the since-stamps.
+ * Accepts the raw work-order text, a `parseUserGates` result, or an already
+ * normalised object — a caller that has one must not have to re-read the file.
+ */
+export function normaliseGates(gates) {
+  if (gates && gates.gated instanceof Set) {
+    return { gated: gates.gated, answered: gates.answered instanceof Set ? gates.answered : new Set(), since: gates.since instanceof Map ? gates.since : new Map() }
+  }
+  if (gates === null || gates === undefined) return { gated: new Set(), answered: new Set(), since: new Map() }
+  return gateSets(gates)
+}
+
+/**
+ * The card meta of a point waiting on the user (point 450) — German, because it
+ * is what the user reads on his phone, and the ONE thing a collapsed card shows
+ * beside its title. The waiting-since date is appended in day.month form, the
+ * board's own convention; a gate with no stamp simply omits it.
+ */
+export function gatedMeta(since) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(since ?? ''))
+  return m ? `${QUEUE_GATED_META} (seit ${m[3]}.${m[2]}.)` : QUEUE_GATED_META
 }
 
 /**
@@ -260,22 +311,33 @@ export function queueOrder(open, data) {
  *
  * `exclude` is the double-listing guard (invariant 4b): the caller passes the
  * points the now-cards, "Von dir zu klären" and Erledigt already hold.
+ *
+ * `gates` is the user gate (point 450). A gated point keeps its card — dropping
+ * it would break the completeness rule, and hiding what waits is the opposite of
+ * what the user needs — but the card says WAITING ON YOU where a duration would
+ * otherwise stand, so nothing on the board reads as work about to start. (A
+ * gated point that already has its "Von dir zu klären" card is excluded by the
+ * caller anyway; this is the honest state of the window before that card exists,
+ * or after somebody forgot it.)
  */
-export function queueEntries({ open = [], data = null, exclude = [], titles = {} } = {}) {
+export function queueEntries({ open = [], data = null, exclude = [], titles = {}, gates = null } = {}) {
   const { points } = normaliseQueueData(data)
+  const g = normaliseGates(gates)
   const skip = new Set((Array.isArray(exclude) ? exclude : [...exclude]).map(Number))
   const out = []
-  for (const point of queueOrder(open, data)) {
+  for (const point of queueOrder(open, data, g)) {
     if (skip.has(point)) continue
     const entry = points[point] ?? { title: null, body: null, estimate: null }
     const stub = !entry.body
     const title = entry.title || titles[point] || `Punkt ${point}`
+    const gated = g.gated.has(point)
     out.push({
       point,
       title,
       body: entry.body ?? [QUEUE_STUB_BODY],
-      meta: entry.estimate || QUEUE_STUB_META,
+      meta: gated ? gatedMeta(g.since.get(point)) : entry.estimate || QUEUE_STUB_META,
       stub,
+      gated,
       // The fallback is still TAKEN — it is no longer taken SILENTLY.
       untranslated: isUntranslatedTitle(title, point, titles),
     })
@@ -437,10 +499,10 @@ export function queueSectionBounds(html) {
  * a request that has since been queued disappears from the board on the next
  * rebuild without anything having to remember it.
  */
-export function buildQueueSection(html, { open = [], data = null, exclude = [], titles = {}, requests = [] } = {}) {
+export function buildQueueSection(html, { open = [], data = null, exclude = [], titles = {}, requests = [], gates = null } = {}) {
   const doc = String(html ?? '')
   const { from, end } = queueSectionBounds(doc)
-  const entries = queueEntries({ open, data, exclude, titles })
+  const entries = queueEntries({ open, data, exclude, titles, gates })
   const cards = `${renderQueueCards(entries)}${renderRequestsCard(requests)}`
   return { html: `${doc.slice(0, from)}\n${cards}${doc.slice(end)}`, entries }
 }
@@ -490,7 +552,12 @@ export function importQueueFromHtml(html) {
     // A card with no <p> at all (a hand-written board) still yields its text.
     const body = paras.length ? paras : [cardText(bodyHtml)].filter(Boolean)
     if (!order.includes(point)) order.push(point)
+    // THE GATED META IS NOT AN ESTIMATE (point 450). Importing it would store
+    // "wartet auf deine Entscheidung" as the point's duration, and one rebuild
+    // later the card would carry that string for ever — even after the answer.
+    const isGated = metaRaw.trim().startsWith(QUEUE_GATED_META)
     points[point] = {
+      gated: isGated || undefined,
       // UNESCAPED, like the body (four-eyes finding 2): the card renders its
       // title through `esc`, so storing it as read would put `&amp;amp;` on the
       // public board one rebuild later — and the escaped form never matches the
@@ -500,7 +567,7 @@ export function importQueueFromHtml(html) {
       // would make the card count as described and silence the "no prose yet"
       // report for ever.
       body: body.length && body.join(' ') !== QUEUE_STUB_BODY ? body : null,
-      estimate: metaRaw.trim() && metaRaw.trim() !== QUEUE_STUB_META ? metaRaw.trim() : null,
+      estimate: metaRaw.trim() && metaRaw.trim() !== QUEUE_STUB_META && !isGated ? metaRaw.trim() : null,
     }
   }
   return { order, points }

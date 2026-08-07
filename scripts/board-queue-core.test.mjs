@@ -40,7 +40,12 @@ import {
   setQueueEntry,
   unestimatedPoints,
   untranslatedTitlePoints,
+  QUEUE_GATED_META,
+  gatedEntryPoints,
+  gatedMeta,
+  normaliseGates,
 } from './board-queue-core.mjs'
+import { gateSets } from './user-gate-core.mjs'
 
 const board = (queue) => `<title>B</title>
 <main><h1>Dashboard</h1>
@@ -115,6 +120,93 @@ describe('queueEntries — every open point gets a card, and never two', () => {
     // back as a queue card, or invariant 4b blocks the very turn that published.
     expect(queueEntries({ open: [210, 412], exclude: [210] }).map((e) => e.point)).toEqual([412])
     expect(queueEntries({ open: [210], exclude: new Set([210]) })).toEqual([])
+  })
+})
+
+describe('the user gate (point 450) — a point waiting on the user never jams the queue', () => {
+  const gates = (...lines) => gateSets(lines.join('\n'))
+
+  it('moves a gated point behind every workable one, whatever the stored order says', () => {
+    const g = gates('- [ ] 7. GATED AWAITING-USER(2026-07-29; needs a ruling)')
+    expect(queueOrder([7, 8, 9], { order: [7, 8, 9] }, g)).toEqual([8, 9, 7])
+  })
+
+  it('keeps several gated points out of the way at once, in their listed order', () => {
+    const g = gates(
+      '- [ ] 7. A AWAITING-USER(2026-07-29; a)',
+      '- [ ] 8. B AWAITING-USER(2026-07-30; b)',
+    )
+    expect(queueOrder([7, 8, 9], { order: [7, 8, 9] }, g)).toEqual([9, 7, 8])
+  })
+
+  it('puts an ANSWERED point back at the very HEAD, ahead of work appended while it waited', () => {
+    const g = gates('- [ ] 9. ANSWERED USER-ANSWERED(2026-08-07)')
+    expect(queueOrder([7, 8, 9], { order: [7, 8, 9] }, g)).toEqual([9, 7, 8])
+  })
+
+  it('lets an answered point outrank even the head of the stored order', () => {
+    const g = gates('- [ ] 9. ANSWERED USER-ANSWERED(2026-08-07)', '- [ ] 7. GATED AWAITING-USER(2026-01-01; why)')
+    expect(queueOrder([7, 8, 9], { order: [7, 8, 9] }, g)).toEqual([9, 8, 7])
+  })
+
+  it('orders exactly as before when nothing is gated', () => {
+    expect(queueOrder([9, 4, 7, 2], { order: [7, 4] }, null)).toEqual(queueOrder([9, 4, 7, 2], { order: [7, 4] }))
+    expect(queueOrder([9, 4], { order: [4] }, gates('- [ ] 4. PLAIN POINT.'))).toEqual([4, 9])
+  })
+
+  it('marks the card as waiting on the USER instead of promising a duration', () => {
+    const g = gates('- [ ] 7. GATED AWAITING-USER(2026-07-29; needs a ruling)')
+    const data = { points: { 7: { title: 'Gattertitel', body: 'Der Text.', estimate: '~3 h' } } }
+    const [e] = queueEntries({ open: [7], data, gates: g })
+    expect(e.gated).toBe(true)
+    expect(e.meta).toBe(`${QUEUE_GATED_META} (seit 29.07.)`)
+    expect(e.body).toEqual(['Der Text.'])
+    expect(gatedEntryPoints([e])).toEqual([7])
+  })
+
+  it('omits the date when the gate carries none, and says nothing about a normal card', () => {
+    expect(gatedMeta('')).toBe(QUEUE_GATED_META)
+    expect(gatedMeta('nonsense')).toBe(QUEUE_GATED_META)
+    const [plain] = queueEntries({ open: [7], data: { points: { 7: { body: 'X', estimate: '~1 h' } } } })
+    expect(plain.gated).toBe(false)
+    expect(plain.meta).toBe('~1 h')
+    expect(gatedEntryPoints([plain])).toEqual([])
+  })
+
+  it('KEEPS the gated point on the board — a skipped point is never a dropped one', () => {
+    const g = gates('- [ ] 7. GATED AWAITING-USER(2026-07-29; why)')
+    expect(queueEntries({ open: [7, 8], gates: g }).map((e) => e.point)).toEqual([8, 7])
+  })
+
+  it('does not nag for an estimate the gate itself forbids', () => {
+    const g = gates('- [ ] 7. GATED AWAITING-USER(2026-07-29; why)')
+    const entries = queueEntries({ open: [7], gates: g })
+    expect(unestimatedPoints(entries)).toEqual([])
+  })
+
+  it('passes the board audit with the gated meta — no block loop while the user is away', () => {
+    const g = gates('- [ ] 412. GATED AWAITING-USER(2026-07-29; why)')
+    const { html } = buildQueueSection(board(''), { open: [210, 412], exclude: [210], titles: { 412: 'Neu' }, gates: g })
+    expect(html).toContain(QUEUE_GATED_META)
+    expect(auditDashboard(html, { open: [210, 412], done: [], nowMinutes: 9 * 60 }).map((x) => x.code)).not.toContain('queue-meta')
+  })
+
+  it('never imports the gated meta back as the point’s estimate', () => {
+    const g = gates('- [ ] 412. GATED AWAITING-USER(2026-07-29; why)')
+    const { html } = buildQueueSection(board(''), { open: [412], titles: { 412: 'Neu' }, gates: g })
+    const imported = importQueueFromHtml(html)
+    expect(imported.points[412].estimate).toBeNull()
+    expect(imported.points[412].gated).toBe(true)
+    expect(boardTitleReport(html, { 412: 'Neu' }).unestimated).not.toContain(412)
+    // …and the flag never reaches the stored data file.
+    expect(normaliseQueueData(imported).points[412]).not.toHaveProperty('gated')
+  })
+
+  it('normaliseGates takes text, a parsed result or nothing at all', () => {
+    expect(normaliseGates(null).gated.size).toBe(0)
+    expect(normaliseGates(undefined).answered.size).toBe(0)
+    expect([...normaliseGates('- [ ] 3. X AWAITING-USER(2026-01-01; y)').gated]).toEqual([3])
+    expect([...normaliseGates(gates('- [ ] 3. X AWAITING-USER(2026-01-01; y)')).gated]).toEqual([3])
   })
 })
 
