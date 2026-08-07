@@ -1034,15 +1034,6 @@ it is appended.
   player-visible text. PROCESS: Fable-5 plan-review BEFORE, Fable-5 safety-review AFTER
   (safe / all cases / no side effects), merge to main ONLY when all green (user 24.07.2026).
 
-- [ ] 297. PERIODIC GUARD-CHAIN & MEMORY AUDIT (user 24.07.2026, retrospective §7;
-  hygiene/observation). A repeatable consolidation pass over the Stop-hook guard chain (11+
-  hooks run every turn end) and the memory files (contradictory/tempering pairs like
-  deploy-fable-proactively ↔ fable-sparingly): list each guard/memory with last-modified,
-  flag redundancy/contradiction, consolidate — same spirit as the `.md` docs audit. Keeps the
-  guard "immune system" from becoming an autoimmune disease. ANCHORS: a checklist doc + an
-  enumerating script (guards in `scripts/`, memories in the memory dir). VERIFIABLE: the audit
-  produces a report; no runtime invariant. (Lighter point.)
-
 - [ ] 298. MODEL-DIVERSITY FOR HARD/CRITICAL CHANGES — criticality triage + an ENFORCED
   diverse review (user 24.07.2026; retrospective lesson). STANDING RULE: before building any
   feature/point, assess its DIFFICULTY × CRITICALITY — a "must-always-work" change (a guard,
@@ -2528,46 +2519,38 @@ it is appended.
   the 0.6 %/h that fits. The reason is in the same figures: 89 % of the spend still comes
   from turns above 150k, so halving the PEAK barely moves a bill dominated by everything
   under it. Recomputable with `node scripts/measure-context-cost.mjs`.
-  WHAT FOLLOWS, and it is what keeps this point open: the point boundary is too COARSE a
-  lever. The next one has to cut inside a session rather than between sessions — the
-  candidates, to be measured before one is chosen, are (a) a boundary at a bundle MEMBER
-  rather than at the bundle, (b) delegating the reading-heavy part of a point so the
-  parent never carries the files at all (the brief mechanism already does this for specs;
-  the same is missing for source), and (c) an explicit context budget per point after
-  which the session hands over mid-point with a written handoff. Pick by measurement, not
-  by preference, and report the %/h again — the criterion stays the one above.
-  (d) THE HARNESS PRIMITIVES, EVALUATED AGAINST OUR HAND-BUILT LAYER (user question
-  30.07.2026: is there not an established mechanism for token-frugal parallel batch work
-  rather than reinventing it?). Partly there is, and parts are already in use — worktree
-  agent isolation per `docs/batch-autonomy.md`; the OS autostart task is the launcher, held
-  against the cron/wakeup primitives on the reasons in `docs/rule-corpus-audit.md` A31; the
-  Workflow tool stands under the token ceiling of memory `workflows-token-budget`. NOT
-  evaluated: the Workflow tool's BUDGET primitive — a hard output-token ceiling with a
-  remaining() query, precisely the control that was missing on 20.07. — together with its
-  run-resume, which replays the unchanged prefix of agent calls after a crash and is the
-  crash-resume we hand-built; background agents with a monitor instead of the hand-written
-  in-flight declaration and log polling; and REMOTE execution, the one layer that survives
-  a dead machine or a dead line — the residual the user accepted when declining a paid API
-  key for the vacation hardening — whose availability is gated and must be CHECKED, never
-  assumed. What no primitive replaces, and why our layer exists at all: the singleton
-  across OS-started sessions, the work-order and guard discipline, the board, the repo
-  doctor and the chat channel — those are policy, not orchestration.
-  VERIFIABLE for (d): one bounded written evaluation, layer by layer, naming per
-  hand-built piece whether a primitive replaces it, decided by the same %/h measurement
-  rather than by preference; a piece kept is kept with its reason recorded.
-  (e) THE BOUNDARY DOES NOT REACH INSIDE A HEAVY POINT (four-eyes review 30.07.2026, and the
-  one gap both models named). `batch-boundary.mjs` fires at POINT boundaries only; within a
-  single heavy point — long verification runs, a merge fought out over many turns — the
-  context grows unchecked, and that is the one case a mid-session compaction would address
-  and this project does not. The counter-measure is not a compaction: verification output is
-  written to DISK and only its tail is read, so a run that produces thousands of lines costs
-  the tail rather than the transcript. Rejected with it, and recorded so it is not proposed
-  again: "clear the context and re-read the work order" is a WORSENING here — `TASKS.md` is
-  310831 characters (~78k tokens) while `batch-resume-hook.mjs` re-orients a fresh session
-  for about 600.
-  VERIFIABLE for (e): a verify invocation writes its output to a file and the session reads a
-  bounded tail; measured on one long run, the tokens the transcript carries fall by an order
-  of magnitude, and the failure case still names its failing test.
+  WHY THE FIRST LEVER WAS NOT ENOUGH: the point boundary cuts BETWEEN sessions, and the
+  bill is dominated by everything under the peak. The next levers had to cut INSIDE one.
+  (d) AND (e) ARE BUILT (07.08.2026); what keeps this point open is the MEASUREMENT below.
+  (d) THE HARNESS PRIMITIVES, EVALUATED AGAINST OUR HAND-BUILT LAYER — the user's question
+  of 30.07.2026, whether an established mechanism for token-frugal parallel batch work
+  exists rather than a reinvented one. The answer is `docs/harness-primitives-evaluation.md`:
+  eight layers, a verdict and a reason each. Two of its findings rest on PROBES rather than
+  on assumption, which is why they are recorded here — the Workflow tool is NOT exposed in
+  this environment, so its BUDGET primitive and its run-resume cannot be adopted at all; and
+  an agent launched with remote isolation RAN LOCALLY, so remote execution is unavailable
+  here and DEGRADES SILENTLY instead of failing. What no primitive replaces, and why our
+  layer exists: the singleton across OS-started sessions, the work-order and guard
+  discipline, the board, the repo doctor and the chat channel — policy, not orchestration.
+  (e) THE BOUNDARY DID NOT REACH INSIDE A HEAVY POINT — `batch-boundary.mjs` fires at POINT
+  boundaries only, while within one heavy point (long verification runs, a merge fought out
+  over many turns) the context grew unchecked. The counter-measure built is not a
+  compaction: `scripts/verify/run-logged.mjs` wraps the runner, writes the whole run to disk
+  and hands the caller a BOUNDED DIGEST; `npm test`, `test:small` and `test:large` route
+  through it (`test:e2e` stays unwrapped). Measured on a real RED run: 476 lines / 30542
+  characters of raw transcript became 66 lines / 3782 characters, of which only 15 arrive
+  while the run is in flight, and every failing test is still named. Rejected with it, and
+  recorded so it is not proposed again: "clear the context and re-read the work order" is a
+  WORSENING here — `TASKS.md` is ~310k characters while `batch-resume-hook.mjs` re-orients a
+  fresh session for about 600.
+  WHAT REMAINS: the %/h figure for a full day under the built levers, against the 1.11 %/h
+  measured on 30.07.2026 and the 0.6 %/h that fits. If it still misses, pick the next lever
+  BY MEASUREMENT from (a) a boundary at a bundle MEMBER rather than at the bundle, (b)
+  delegating the reading-heavy part of a point so the parent never carries the files at all
+  (the brief does this for specs, not for source), or (c) an explicit context budget per
+  point after which the session hands over mid-point with a written handoff.
+  VERIFIABLE: `node scripts/measure-context-cost.mjs` reports the rate for a full day after
+  07.08.2026; the point closes on that figure, not on the mechanisms running.
 
 - [ ] 379. ABU SIMBEL BECOMES A WALKABLE SITE (user 27.07.2026; a FEATURE, and the user's
   own instruction is that the open DEFECTS come first — it waits behind them). The world carries
@@ -3461,6 +3444,106 @@ it is appended.
   green-over-dead case failing). The live acceptance is one elevated run on the Windows host
   and one real reboot, recorded as evidence — the container path cannot be proven from
   inside the container, and point 449's drill is where it is exercised afterwards.
+
+- [ ] 534. ONE PROJECT-SLUG RESOLVER, AND A FINDING RECORDED FROM A WORKTREE SURVIVES
+  (guard/memory audit 07.08.2026, findings 1/3/6 — `docs/guard-memory-audit.md`).
+  MEASURED: `findings-paths.projectSlug` maps the repo path to the memory directory with a
+  bare `replace(/[^A-Za-z0-9]/g,'-')` while `retro-sources.defaultMemoryDir` strips the
+  trailing dash and lowercases a drive letter. `REPO_ROOT` ends in a separator, so the two
+  answer DIFFERENTLY — `-workspace-hoa-` against `-workspace-hoa` — and both directories
+  exist on disk: 74 memories plus `MEMORY.md` in one, the findings carrier ALONE in the
+  other. `memoryIndexPath()` therefore points at a `MEMORY.md` that is not there, so
+  `ensureIndexed()` in `finding.mjs` takes its catch branch on EVERY call and has never
+  linked the carrier; the index line that reaches it was written by hand. On Windows the
+  same split reads `C--…` against `c--…`.
+  SECOND HALF, same resolver: `carrierPath()` derives from the CHECKOUT path, so a finding
+  recorded from `…/.claude/worktrees/agent-XXXX/` writes a carrier of that worktree's own,
+  which the owner's `--drain` never reads and which dies with the worktree. Worktree agents
+  are the project's principal finders under maximal delegation, so this is the common case,
+  not the edge one. `retro-sources` already refuses LOUDLY on this defect class.
+  DELIVER: (a) ONE resolver — `retro-sources`' form is the correct one (it matches the
+  directory the harness really writes) and `findings-paths` imports it instead of restating
+  it; (b) `carrierPath()` NORMALISES a worktree checkout to its main one (the shape
+  `memoryDirVariants` already uses) and REFUSES loudly rather than writing when it still
+  cannot resolve; (c) the existing carrier file is moved to the resolved directory and
+  `ensureIndexed()` links it for real; (d) `MEMORY.md`'s carrier pointer stops naming a
+  literal Windows path — which no longer exists on this Linux host — and names the COMMAND
+  that prints the path instead, so it cannot go stale on the next host.
+  VERIFIABLE: pure Vitest — the two resolvers answer identically for a path with and without
+  a trailing separator and for a Windows drive letter; a worktree path normalises to its main
+  checkout; an unresolvable path throws rather than writing; `ensureIndexed()` links into a
+  real index. Live: a finding recorded from a worktree is read by `--drain` in the main tree.
+  Criticality: high (the carrier is the only thing that outlives a finding session).
+
+- [ ] 535. ONE DEFINITION OF WHAT COUNTS AS A MECHANISM, AND IT REACHES THE HOOKS
+  (guard/memory audit 07.08.2026, findings 2/5). CLAUDE.md §7.2 states that
+  `mechanism-review-guard` "lets no new or changed guard, gate or HOOK end a turn without
+  the OTHER model's recorded review". `isMechanismPath` matches `-guard`/`-gate` and
+  `scripts/git-hooks/*` only, so EIGHT wired enforcers stand outside it — `batch-resume-hook`,
+  `dashboard-reminder-hook`, `lock-heartbeat-hook`, `lock-release-hook`, `prep-arm-hook`,
+  `dashboard-sync`, `worktree-reminder` and their cores. `dashboard-reminder-hook` is the file
+  `HIGH_FREQUENCY_FIRST` names FIRST, its text replayed at every prompt, and it can be
+  rewritten today with no second pair of eyes.
+  The same disagreement runs one layer down: `rule-review-state.countCorpusEntries` counts
+  `/-(guard|hook)\.mjs$/` while `guard-health-core.ENFORCER_RE` includes `-gate`, so
+  `model-trailer-gate.mjs` and `pre-push-gate.mjs` are outside the corpus the review SCHEDULE
+  watches — its growth trigger cannot see that class grow at all.
+  DELIVER: (a) WIDEN `isMechanismPath` to `-hook` — the file's own comment already argues the
+  name-based reach, so this is a one-line, reviewable edit; CLAUDE.md is NOT weakened to match
+  the code; (b) `countCorpusEntries` imports `ENFORCER_RE` instead of restating it, as
+  `guard-inventory-core` already does. The count moves 107 → 109, so the review attestation is
+  RE-RECORDED in the same commit or the schedule reads the change as growth.
+  VERIFIABLE: pure Vitest — a `-hook` path is a mechanism path and a `-hook` change with no
+  review record BLOCKS; the corpus count matches `guard-inventory`'s enforcer count on the real
+  tree. Criticality: high (it decides what the four-eyes gate sees at all).
+
+- [ ] 536. THE TWO WIRED ENFORCERS NO SELECTOR REACHES GET CONVENTIONAL NAMES
+  (guard/memory audit 07.08.2026, finding 4). `dashboard-sync.mjs` (Stop) and
+  `worktree-reminder.mjs` (PreToolUse/Agent) enforce real rules with pure cores, but their
+  names end in none of `-guard`/`-gate`/`-hook`. So `guard-health` never asks whether they are
+  still wired or tested, `countCorpusEntries` never counts them, and the four-eyes gate passes
+  over them. Nothing is broken TODAY — which is the finding: were either unwired tomorrow, no
+  check would say so.
+  DELIVER: rename to `dashboard-sync-guard.mjs` and `worktree-reminder-hook.mjs` (cores and
+  tests with them) in ONE commit together with their `.claude/settings.json` lines, so the
+  chain is never half-renamed. ATTENDED: the settings file always prompts, so this point is
+  worked in an attended session, not by a delegated agent.
+  VERIFIABLE: `node scripts/guard-inventory.mjs` reports `unconventional 0`, `guard-health`
+  lists both, and the corpus count rises by two — with the attestation re-recorded in the same
+  commit as in point 535. Criticality: medium.
+
+- [ ] 537. THE UNTESTED-GUARD RATCHET IS RATCHETED, AND THE REAL DEBT NAMED
+  (guard/memory audit 07.08.2026, finding 8). `KNOWN_UNTESTED` records seven enforcers as
+  lacking a tested core and states the list "can only shrink — remove a name the moment its
+  core gains a test". Judged by the module's OWN `tested` rule, four now pass:
+  `batch-progress-guard`, `batch-resume-hook`, `dashboard-reminder-hook`, `lock-heartbeat-hook`.
+  The list overstates the debt by more than half, and a standing amnesty nobody re-reads is
+  how the real debt hides.
+  DELIVER: delete those four names; keep `lock-release-hook`, `prep-guard` and `prep-arm-hook`
+  — which has no local import at all — each with its debt named in one line. Add the ratchet's
+  own check: a name whose core IS tested fails the gate instead of sitting there.
+  VERIFIABLE: pure Vitest — a tested core still listed in `KNOWN_UNTESTED` FAILS; the three
+  remaining names pass; the list cannot grow without a written reason. Criticality: medium.
+
+- [ ] 538. TWO MEMORIES THAT DESCRIBE MECHANISMS THAT ARE GONE
+  (guard/memory audit 07.08.2026, findings 7/10). `chat-timestamp` — 7.7 KB, the project's
+  third-largest memory, loaded every session — states that `dashboard-reminder-hook.mjs` emits
+  the timestamp obligation as its first and last line, "(Zeilen 66 und 131)". Point 440 took
+  that out, and the hook now says the OPPOSITE in its own header: the rule is not stated there,
+  `timestamp-guard` blocks the turn. The RULE is live; only its stated mechanism is wrong.
+  And the memory index calls `pending-queue-work-29-07` a "CARRIER for findings not yet in
+  TASKS.md" with the instruction "delete the file once they are filed" — the file has been
+  marked DRAINED since 30.07.2026 and deliberately survives, because it holds the one thing a
+  work-order point cannot: what a `/doctor` run rejected ON PURPOSE. The index line orders the
+  deletion of exactly that record.
+  DELIVER: (a) `chat-timestamp` corrected to the layers that are live (the user-scope hook plus
+  `timestamp-guard`) and its nine-escalation history cut to the surviving rule — a memory that
+  cites LINE NUMBERS drifts by construction, so it cites the file's statement instead; (b) the
+  index line for `pending-queue-work-29-07` rewritten to what the file now is, a record of
+  rejected options that is not to be re-analysed, with the deletion instruction removed.
+  VERIFIABLE: no runtime invariant — this is corpus hygiene. The proof is that neither memory
+  names a mechanism the tree does not have; check each claim against the code that owns it.
+  Criticality: low, frequency HIGH (both texts load every session).
 
 ## Closing (only after all points)
 

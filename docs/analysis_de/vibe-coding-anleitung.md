@@ -2,8 +2,7 @@
 
 Für den Einstieg, destilliert aus einem mehrwöchigen, weitgehend autonom gebauten
 Projekt: keine Klick-für-Klick-Schritte, sondern **Prompts, die du Claude gibst**, und
-die Fallstricke dahinter. Ausführlich steht das alles in
-`retrospektive-zusammenarbeit.md`.
+die Fallstricke dahinter. Ausführlich in `retrospektive-zusammenarbeit.md`.
 
 ---
 
@@ -19,7 +18,7 @@ Prompt einen **Mechanismus** — keine Regel:
 
 Der Aufwand richtet sich nach der Wichtigkeit — ein leichter Check für eine leichte
 Regel —, die Haltung ist **erzwingen statt erinnern**, ab der ersten Formulierung
-und nicht erst beim zweiten Schaden. Fast alles Folgende wendet das an.
+und nicht erst beim zweiten Schaden.
 
 ### Wie die Prompts in dieser Anleitung formuliert sind
 
@@ -49,7 +48,7 @@ Lege **zwei** Modelle fest und gib ihnen klare Rollen:
 > übernehmen."
 
 Ein zweites Modell nützt nicht, weil es *besser* wäre, sondern weil es **andere blinde
-Flecken** hat — diesen Wert hebt nur eine Prüfung, keine Übergabe.
+Flecken** hat — diesen Wert hebt nur eine Prüfung.
 
 Die **Obergrenze** zieht die **Sichtbarkeit des Fehlers**: Was den Ablauf steuert oder
 Arbeit vernichten kann (Wächter, Sperren, Speichern/Laden, Veröffentlichungen), wird
@@ -125,7 +124,7 @@ immer gegengeprüft; was ein schneller Test sofort zeigt, nie.
 ## Automatische Tests — und ihre Tiefe abstufen
 
 Automatische Tests sind das Rückgrat; ohne sie ist „Vibe Coding" ein Blindflug. Aber nicht
-jede Änderung braucht die volle Batterie — sonst wird Testen umgangen. Bewährt haben sich
+jede Änderung braucht die volle Batterie — sonst wird Testen umgangen. Bewährt sind
 **abgestufte Umfänge**:
 
 - **Schnell (nach JEDER Änderung):** die Unit-Schicht ohne Browser — Logik, Zustand, reine
@@ -204,24 +203,24 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 
 - **Messung und Vorschau verunreinigt.** Halbfertiges wird als ‚fertig' beurteilt.
-  → *Prompt:* „Hol mein Urteil immer am **veröffentlichten** Stand ein, nie an einem
-  Zwischen-Zweig, und halte Messläufe von störenden Fenstern frei."
+  → *Prompt:* „Hol mein Urteil am **veröffentlichten** Stand ein, nie an einem Zwischenzweig,
+  und halte Messläufe von störenden Fenstern frei."
 
 - **„Erfolgreich" heißt nicht „angekommen".** Ein Befehl meldet Erfolg, das Gewollte ist
-  trotzdem nicht passiert — etwa ein Upload, der den falschen Zweig überträgt. Und eine
-  Warnung in der Ausgabe einer **geglückten** Aktion ist faktisch unsichtbar.
+  trotzdem nicht passiert — etwa ein Upload, der den falschen Zweig überträgt; eine Warnung
+  in der Ausgabe einer **geglückten** Aktion ist faktisch unsichtbar.
   → *Prompt:* „Etabliere einen Mechanismus, der nach jeder Aktion mit Fernwirkung den
   **Zielzustand** belegt statt der Erfolgsmeldung; eine Abfrage ohne Treffer ist ein Befund.
   Jede Formprüfung läuft **vor** dem Schritt nach außen."
 
 - **Regeln und Wächter verrotten — nur merkt es niemand.** Der Bestand wächst an
-  Widersprüchen und an Regeln, die eine nie gebaute Absicherung behaupten. Ein Wächter, der
-  nie auslöst, ist so kaputt wie einer, der immer auslöst.
-  → *Prompt:* „Etabliere einen Mechanismus, der den ganzen Bestand periodisch zur Durchsicht
-  zwingt — auf Aktualität, Dopplung, Widerspruch und **Wirkungslosigkeit**. Schreib zu
-  **jeder** Regel, was sie misst; steht dort nichts, gibt es zwei Ausgänge: Mechanismus bauen
-  oder **mit Begründung** als bewusst nicht erzwungen vermerken. Und jeden Wächter fragst du:
-  Hat er je ausgelöst? Kann er überhaupt?" *(Kosten: einmalig hoch)*
+  Widersprüchen, an Regeln ohne Absicherung und an solchen, deren Absicherung enger greift
+  als ihr Satz — sie feuert, wird geglaubt und deckt nur einen Teil.
+  → *Prompt:* „Etabliere einen Mechanismus, der den Bestand periodisch durchsehen lässt — auf
+  Aktualität, Dopplung, Widerspruch und **Wirkungslosigkeit**. Schreib zu **jeder** Regel, was
+  sie misst, und leg Regelsatz und Code **nebeneinander**: Welche Fälle nennt der Satz, die
+  das Muster nicht trifft? Zieh **den Code auf den Satz** nach, nie umgekehrt. Und jeden
+  Wächter fragst du: Hat er je ausgelöst? Kann er überhaupt?" *(Kosten: einmalig hoch)*
 
 - **Der rote Test klagt den Falschen an.** Er täuscht gefährlicher als ein grüner:
   Prüfungen veralten von selbst und klagen gesunden Code an.
@@ -405,4 +404,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 Wenn du diese eine Nachricht an den Anfang stellst, hast du 80 % der Lehren dieses
 Projekts eingebaut, bevor die erste Zeile Code entsteht.
 
-<!-- GUIDE-FINGERPRINT: 243d5b15bb7be3305145d6e69ac14afa1ac14cf6ba9d13f839be90ba51097c7b -->
+<!-- GUIDE-FINGERPRINT: ab50e3cdfdcb417132adb0fc5e7468e46f0328cac7dbc61a94d0403d59a1c908 -->
