@@ -75,29 +75,27 @@ WebGPU. Requirements:
   the run.
 
 **Journal read-aloud: kokoro-js.** The journal's speech output (design.md
-§15) uses the Kokoro TTS model via the `kokoro-js` package, fully
-in-browser. The model runs in a Web Worker (`src/journal/ttsWorker.ts`) so
-synthesis never blocks the game loop — the main thread only posts a text
-segment and plays back the returned PCM. The engine runs the onnxruntime
-WebGPU compute path (fp32, distinct from the three.js renderer's WebGPU) on
-Chromium and the WASM path (q8) everywhere else — the device is decided on
-the main thread and passed to the worker. WebGPU is chosen because it
-synthesizes FASTER THAN REALTIME, giving a fast, gapless read-aloud (user
-decision, point 117). Its one cost is the cold model load, whose onnxruntime
-init briefly saturates the GPU process (~15 s, no frames): the game
-therefore PRE-WARMS the model at start (`warmupSpeech`, ~1.2 s after mount)
-so that one stall happens up front rather than at the first narration. The
-WASM fallback never touches the GPU process and keeps the game rendering
-through its cold load; the headless verification forces WASM (no WebGPU
-adapter) via the `window.__ttsForceWasm` dev hook, and `scripts/verify/
-voice.mjs` gates that fallback path's liveness with an rAF probe. (Point
-100's WASM-only engine was reversed by 117 — do not revert it.) The model weights are
-streamed from the Hugging Face CDN on first use and cached by the browser;
-they are not part of the repository or the bundle. The TTS stack (worker
-included) is loaded lazily and must never enter the eagerly loaded startup
-chunks. Kokoro has no German voice, so read-aloud is English-only for now
-(open item for German); the voice markup is written for both languages
-regardless.
+§15) uses the Kokoro TTS model via the `kokoro-js` package, fully in-browser,
+in a Web Worker (`src/journal/ttsWorker.ts`) so synthesis never blocks the
+game loop — the main thread only posts a text segment and plays back the
+returned PCM. The engine runs the onnxruntime WebGPU compute path (fp32,
+distinct from the three.js renderer's WebGPU) on Chromium and the WASM path
+(q8) everywhere else; the device is decided on the main thread and passed to
+the worker. WebGPU is chosen because it synthesizes FASTER THAN REALTIME,
+giving a fast, gapless read-aloud (user decision, point 117 — it reversed
+point 100's WASM-only engine, do not revert it). Its one cost is the cold
+load, whose onnxruntime init saturates the GPU process (~15 s, no frames), so
+the game PRE-WARMS the model at start (`warmupSpeech`, ~1.2 s after mount)
+and that stall happens up front rather than at the first narration. The WASM
+fallback never touches the GPU process and keeps the game rendering through
+its cold load; the headless verification forces it via the
+`window.__ttsForceWasm` dev hook, and `scripts/verify/voice.mjs` gates that
+path's liveness with an rAF probe. The weights stream from the Hugging Face
+CDN on first use and are browser-cached — not part of the repository or the
+bundle. The TTS stack (worker included) loads lazily and must never enter the
+eagerly loaded startup chunks. Kokoro has no German voice, so read-aloud is
+English-only for now (open item for German); the voice markup is written for
+both languages regardless.
 
 No additional runtime dependencies without necessity. Every added dependency
 must be justified in its commit.
@@ -150,10 +148,7 @@ SMALL everyday gate (`npm run test:small` — the fast, low-flake core suites) a
 the LARGE set (`npm test` / `npm run test:large` — every suite plus the prod
 preview). Per change, pick Vitest-only / Vitest+SMALL / Vitest+LARGE at your
 discretion; the **closing cycle (§7.2) always runs Vitest+LARGE**. The suite→tier
-map lives in `scripts/verify/run-all.mjs` and `scripts/verify/README.md`.
-
-The TypeScript build must pass without errors. `npm run build` is part of
-acceptance (§7).
+map is `scripts/verify/tiers.mjs` (§7.2).
 
 **Test architecture (hybrid).** The regression is split so the bulk runs in
 seconds and cannot flicker on browser timing: a fast, deterministic **Vitest**
@@ -162,19 +157,17 @@ transitions and HTML-HUD component classes/text; the **Playwright** scripts in
 `scripts/verify/*.mjs` keep only what genuinely needs a real browser (the
 three.js scene + RAF wildlife, real layout geometry, canvas/WebGL init,
 pointer-lock, TTS audio, the §7.2 acceptance screenshots and one end-to-end core
-flow). **Every future feature must add a test on the appropriate layer(s)** —
-prefer Vitest for anything assertable without a browser; use Playwright only for
-the scene/geometry/CSS/audio/screenshot cases. The full strategy and the
-old→new coverage map live in `scripts/verify/README.md`.
+flow). **Every future feature must add a test on the appropriate layer(s)**:
+Vitest for anything assertable without a browser, Playwright only for the
+scene/geometry/CSS/audio/screenshot cases. The full strategy and the old→new
+coverage map live in `scripts/verify/README.md`.
 
 ---
 
 ## 6. Working Method
 
 - Work incrementally: small, topically well-scoped commits, one self-contained
-  unit each. Prerequisite is an initialized git repository with an initial
-  commit of the scaffold, `design.md` and `CLAUDE.md`; if none exists, run
-  `git init` first and create that initial commit.
+  unit each.
 - **Feature-branch workflow (user decision 22.07.2026).** Each TASKS point is
   developed on its OWN feature branch (`feat/<point>-<slug>`), branched from
   `main`. Commit atomically AND immediately push the BRANCH after every commit
@@ -184,8 +177,8 @@ old→new coverage map live in `scripts/verify/README.md`.
   `[skip ci]` in its SUBJECT plus a `Rescue: <what was interrupted>` trailer
   (user 28.07.2026): it is no claim of completeness, and a red CI run on such a
   branch state MAILS the repository owner. Durability is untouched — the commit
-  still exists and still pushes; only the run is skipped, and the NEXT commit,
-  the one that finishes the work, runs CI normally. The `commit-msg` hook
+  still pushes; only that run is skipped, and the NEXT commit, the one that
+  finishes the work, runs CI normally. The `commit-msg` hook
   refuses each half without the other. Merge to `main` ONLY when
   the point is COMPLETE and verified — tests green on both layers AND, for a
   render/GUI change, the rendered picture checked: on BOTH backends where the
@@ -207,8 +200,8 @@ old→new coverage map live in `scripts/verify/README.md`.
   process files — are committed directly to `main` while they stay SMALL (a
   feature branch for each would be needless ceremony). BEYOND a small commit —
   a new mechanism, a multi-file guard rebuild — such a change is DELEGATED to a
-  worktree agent like any point (measured 30.07.2026: of the last 60 first-parent
-  commits on `main`, 42 were main-only bookkeeping and the 9 delegable ones were
+  worktree agent like any point (measured 30.07.2026 over the last 60 first-parent
+  commits on `main`: 42 were main-only bookkeeping, and the 9 delegable ones were
   all small). What genuinely stays here is the ARMING in `.claude/settings.json`
   or the git hooks, which needs an attended session, and the bookkeeping. Use
   worktree isolation for parallel file-mutating agents so their branches never
@@ -279,16 +272,15 @@ old→new coverage map live in `scripts/verify/README.md`.
   agent receives its point as a BRIEF: `node scripts/point-brief.mjs <N>` prints
   the spec verbatim, the design.md sections it cites, one identifying line per
   cross-referenced point, and a REFERENCE MAP naming where every `§` resolved.
-  Measured, that is ~1.8k tokens median against ~108k for reading TASKS.md and
-  design.md whole — and it does not grow with the queue, because the parsing
-  happens in a subprocess. The prompt carries the brief and forbids wholesale
+  Measured: ~1.8k tokens median against ~108k for reading TASKS.md and design.md
+  whole, and it does not grow with the queue. The prompt carries the brief and forbids wholesale
   reads; a NAMED section may be read on demand, and an insufficient brief is
   ESCALATED, not guessed around. The brief FAILS LOUDLY on a reference that
   resolves nowhere, and where one section number exists in two documents it
   prints BOTH — no resolver can decide that, so the reader is told. Every brief
   carries the revision it was cut from; regenerate rather than reuse an old one.
 - **Context boundary at a point boundary (users 27./28.07.2026).** 87–94 % of
-  the spend sat above 150k context — one session carried point after
+  the spend sat above 150k context, one session carrying point after
   point. A batch session ENDS at its boundary, and the boundary is
   TAKEN: after merge and tick run `node scripts/batch-boundary.mjs
   <point>` and stop. `batch-progress-guard` BLOCKS a stop that closed a point
@@ -298,8 +290,7 @@ old→new coverage map live in `scripts/verify/README.md`.
   the successor — five hours were lost to a session that stopped holding it.
   Attended, ask for `/clear`. OWNERSHIP IS A LEASE (30.07.2026): `leaseUntil` on
   the lock, renewed BEFORE each call; an owner that stops renewing stops owning
-  the batch — arithmetic, nothing killed, and the three verdicts that read a
-  seven-hour standstill as alive are gone. A PreToolUse fence then refuses it
+  the batch — arithmetic, nothing killed. A PreToolUse fence then refuses it
   merge/push, the tick, the board publish and `dashboard-state.json`.
   THE WAY BACK (28.07.2026): a returning window runs `node
   scripts/batch-claim.mjs --session <id>`; the owner sees it at its next hook,
@@ -311,8 +302,8 @@ old→new coverage map live in `scripts/verify/README.md`.
   under a bounded claim; the launcher tick supervises it.
 - **Model policy (user decision 25.07.2026, points 309 + the role revision).**
   ONLY three models may author work here: **Opus 5** is the WORKER at any
-  difficulty; **Fable 5** serves the four-eyes principle (one model plans and/or
-  builds, the other reviews) or the first fallback; **Opus 4.8** is the last
+  difficulty; **Fable 5** serves the four-eyes principle (the two-mode rule
+  below) or the first fallback; **Opus 4.8** is the last
   fallback. The chain is Opus 5 → Fable 5 → Opus 4.8, and
   `scripts/batch-autostart.mjs` launches accordingly. DIFFICULTY IS NOT A REASON
   to hand work to Fable — Opus 5 is equally capable, and a second model's value
@@ -326,6 +317,30 @@ old→new coverage map live in `scripts/verify/README.md`.
   resolvably on an UNNAMED one, which the transcripts settle. (History: on
   24.07.2026 a degraded session merged three defective Haiku deliveries in 14
   minutes — only the trailers could have caught it.)
+- **The four-eyes principle has TWO MODES, chosen by the STAGE (user
+  25.07.2026). This is its normative wording; everywhere else refers here.** A
+  DIVERGENT stage — what could go wrong, which scenarios to test, which designs
+  are possible, where a system might break — runs BLIND PARALLEL: both models
+  work from the same inputs to their own complete result, neither seeing the
+  other's until both are done; the two are then merged into a union
+  deduplicated BY MEANING, keeping both wherever it is unclear that one subsumes
+  the other, MARKING what only one produced and dropping none for being
+  unusual. The reason is anchoring: a reviewer handed a finished
+  list CHECKS THAT LIST and produces far less than it would have from a blank
+  page, so review is the wrong instrument wherever the risk is the item nobody
+  thought of. A CONVERGENT stage — is this diff correct, does this implementation
+  match its spec, is this measurement sound — judges ONE artefact, which cannot
+  be produced twice independently; it keeps the ORDINARY REVIEW, refined only in
+  that the reviewer reads the ARTEFACT before the author's rationale, so the
+  justification cannot anchor it either. Two sets are worth what their errors
+  are UNCORRELATED, so CROSS-MODEL is the default pairing (the allowlist above);
+  two blind runs of ONE model are independent in what they saw but not in how
+  they think — the WEAKER fallback when no second model is available, recorded
+  as such and DECORRELATED BY FRAMING (a hostile tester, a maintainer inheriting
+  the code, a player trying to break it), since a re-run varies least where the
+  model is confidently blind. The generative stage runs twice, so it costs
+  roughly 2× there and applies where four-eyes already applies by the
+  criticality triage, not everywhere.
 - **Language.** All player-visible text (UI, chronicle, messages) is served
   from the language files (`design.md` §17): English is the default game
   language, German is available, and the structure must make further
@@ -420,9 +435,7 @@ changes with it in the same commit.
    §4.2 exemption but their rendered cluster clears the band by its own
    smaller footprint margin, and every landmark (cultural fields, natural
    sites except the flooding Okavango, the elephant graveyard) auto-clears
-   at build time by its field radius — Khartoum at the widened confluence
-   and the Sudd were the reported cases (`src/world/world.test.ts` sweeps
-   all of them; screenshots 126/127).
+   at build time by its field radius.
    Evidence: docs/acceptance-evidence.md §3.
 
 4. **Movement and time.** The character moves in the bird's-eye view; date
@@ -441,9 +454,8 @@ changes with it in the same commit.
    edge with no tunnelling; small dressing and carcasses stay passable —
    only the large solid dressing collides. EVERY collider here is DERIVED
    from the placement the renderer DRAWS — the plant's `placedFloraAt`, the
-   animal's own instance matrix, never its behaviour spot, which the render
-   offsets leave a body-width or more away — so nothing unrendered leaves a
-   phantom collider, points 129/378).
+   animal's own instance matrix, never its behaviour spot — so nothing
+   unrendered leaves a phantom collider, points 129/378).
    A blocked boundary never PINS the traveller (§11.2, point 316): a
    blocked step resolves by SLIDING along it (`slideAlongBlocked`, the
    shape the settlement and tree/animal resolves already use), only a
@@ -525,8 +537,7 @@ changes with it in the same commit.
     elephant-graveyard dressing (readable at a glance).
    SUPERSEDED AS A TARGET (user 25.07.2026, design.md §19.5): water is for
    crossing, not for lingering — a FLIGHT is never restricted by river or lake at
-   all, and the §19.5 revision states it. What the evidence section pins is what
-   is BUILT today, per the §7.1 convention.
+   all, and the §19.5 revision states it. The evidence section pins what is BUILT today.
    OPEN: tree-climbing-to-flee (§9 open item), and the one seasonal-dress reading
    the research allows but the figures cannot yet show — a wrap worn DIFFERENTLY
    in the cold rather than in greater number (§19.13).
@@ -793,47 +804,36 @@ changes with it in the same commit.
     The footing is the higher of the backdrop relief at the silhouette's own
     spot and the settlement's visible ground line — the sight line over the
     walkable ground disc's edge from the live camera (`panoramaStandY` /
-    `discHorizonY`, point 181). The former EYE_HEIGHT anchor put NOTHING
-    under the feet and, where relief rose, buried them. The gap it worked
-    around is CLOSED (point 381): outside the disc the backdrop may rise but
+    `discHorizonY`, point 181). Outside the disc the backdrop may rise but
     never sink below the ground plane, and a ring is pinned on the disc edge,
     so at any place the walkable ground meets the panorama with no edge, no
-    unlit face and no hole.
+    unlit face and no hole (point 381).
     The silhouettes WALK rather than glide (point 255): built
     with pivoted legs, they swing them on the shared distance-driven gait phase
     (`gaitPhase`/`legSwingAngle`) fed by the arc they drift along their ring, so
     a faster one steps faster and a stalled one stands still — a wall-clock bob
-    is never the driver, and at horizon range a body-level bob alone would move
-    barely a pixel. They only ever walk FORWARD (point 286): the facing is
+    is never the driver. They only ever walk FORWARD (point 286): the facing is
     DERIVED from the ring velocity tangent (`panoramaDriftYaw`, the codebase's
-    atan2(vx,vz) convention the settlement goats face on), so a silhouette can
-    never reverse — the former hand-written `−a + (drift>0 ? π : 0)` sat exactly
-    π off the tangent and moonwalked every one — and the stride phase rides the
+    atan2(vx,vz) convention), so a silhouette can
+    never reverse, and the stride phase rides the
     arc expressed in the silhouette's OWN rendered frame (`panoramaGaitDistance`,
     the world arc ÷ its enlargement `scale`), so the leg cadence stays consistent
-    with the rendered body's slow horizon crawl instead of flailing at the raw
-    world-arc rate.
+    with the rendered body's slow horizon crawl.
    Evidence: docs/acceptance-evidence.md §31.
 
 32. **Render pipeline upgrades.** TRAA, screen-space reflections and true
     water refraction (`design.md` §2.7) were rebuilt in small
-    backend-neutral steps with a supervised manual test loop: the headless
-    verification runs on the WebGL 2 fallback only (Chromium gets no WebGPU
-    without a display), so each step was confirmed on real hardware — the
-    lesson from the reverted first attempt, whose WebGPU-only TRAA/SSR
-    branch went untested and rendered a black scene. Step 1 is done and
-    accepted: TRAA runs backend-neutrally (upstream `TRAANode`, velocity
-    MRT, MSAA off), passed its manual WebGPU check (stable across repeated
-    toggles after the pipeline-rebuild disposal fix, visually on par with
-    4× MSAA) and is on by default; the debug checkbox (`design.md` §21.3)
-    switches back to the render pass' MSAA. Step 2 (SSR: upstream
-    `SSRNode`, metalness/roughness MRT, additive composite before the
-    temporal resolve, WebGPU backend only) was delivered and went through
-    its manual WebGPU check on 14.07.2026 — verdict: with the bird's-eye
-    camera never at grazing angles and the first-person scenes having no
-    water or gloss, no in-game situation makes SSR read, so by user
-    decision it was REMOVED again (the pipeline reads exactly as after
-    step 1). True water refraction remains OPEN.
+    backend-neutral steps, each confirmed on real hardware — the lesson
+    from the reverted first attempt, whose untested WebGPU-only TRAA/SSR
+    branch rendered a black scene. Step 1 is done and accepted: TRAA runs
+    backend-neutrally (upstream `TRAANode`, velocity MRT, MSAA off), passed
+    its manual WebGPU check (stable across repeated toggles, visually on par
+    with 4× MSAA) and is on by default; the debug checkbox (`design.md`
+    §21.3) switches back to the render pass' MSAA. Step 2 (SSR) was
+    delivered, then REMOVED by user decision: with the bird's-eye camera
+    never at grazing angles and the first-person scenes having no water or
+    gloss, no in-game situation makes it read — so the pipeline reads
+    exactly as after step 1. True water refraction remains OPEN.
    Evidence: docs/acceptance-evidence.md §32.
 
 ### 7.2 Self-Verification (mandatory)
@@ -854,12 +854,12 @@ After completion and after every major system:
 - **Test at in-game-achievable conditions (point 172).** A verification must
   exercise a feature at a state the player can actually reach — for the
   bird's-eye zoom that is the NON-DEBUG range 0.125–0.5 (default 0.5), never a
-  debug-only wide zoom, unless the check specifically tests the debug wide-zoom
-  feature. Judge "is it in view" by PROJECTING the point to the rendered frame
+  debug-only wide zoom unless the check tests that feature itself. Judge "is it
+  in view" by PROJECTING the point to the rendered frame
   (`__camera.onScreen`/`ndc`), never by an assumed radius (100×zoom, fog.far, a
   hard-coded distance) — clearView pushes the fog to the horizon at a wide zoom,
-  so no radius stands in for the picture. A green assertion against a computed
-  radius can hide a real bug the player sees (points 164/171/172).
+  so no radius stands in for the picture, and a green assertion against one can
+  hide a real bug the player sees (points 164/171).
 - **A frame must show what its name claims (point 375).** The same projection
   decides at the SHUTTER: every frame a verify script writes declares its
   subject — a place/landmark (`world`), something inside a settlement (`local`/
@@ -890,8 +890,8 @@ After completion and after every major system:
   suites, Stop hooks (authoritative list: `.claude/settings.json`) BLOCK a turn
   end while the working state contradicts a standing rule — "enforce, don't
   remind", each adopted after a reminder failed. **This paragraph names FAMILIES,
-  not guards: the enumeration that stood here had drifted four wired guards
-  behind** (rule-corpus review 30.07.2026). The families: the BOARD (published,
+  not guards** — the enumeration that stood here had drifted four wired guards
+  behind (rule-corpus review 30.07.2026). The families: the BOARD (published,
   concise, one topic per card, consistent with the real state, and every decision
   asked of the user standing as a card); the BATCH (no idle wait or idle stop,
   the §6 model allowlist — a named breach pauses, an unnamed author is looked
@@ -902,9 +902,9 @@ After completion and after every major system:
   render-set change on both backends where they can differ, and
   `mechanism-review-guard`, which lets no new or changed guard, gate or hook end
   a turn without the OTHER model's recorded review —
-  `scripts/mechanism-review.mjs --record`). Two carry a caveat worth knowing
-  here: `ci-status-guard` sees only the session's OWN HEAD, which is how 26 red
-  runs on `main` stayed unseen for three weeks (point 387 widens it to every ref
+  `scripts/mechanism-review.mjs --record`). Two carry a caveat: `ci-status-guard`
+  sees only the session's OWN HEAD, which let 26 red runs on `main` stand unseen
+  for three weeks (point 387 widens it to every ref
   the session pushed and raises the demand from noticing red to CONFIRMING
   GREEN), and the versioned git hooks (`scripts/git-hooks/`, wired by `npm
   install`) refuse a stray file, a trailer naming no model, a rescue commit that
@@ -917,10 +917,9 @@ After completion and after every major system:
   — never a read, its remedy commands or a board-file edit, and at most ONCE per
   turn. It binds EVERY session (point 400): `scripts/board-publish.mjs` publishes
   from a SCRIPT, so the headless successor can too; the check reads that PAGE, and
-  `batch-autostart.mjs` alerts when it is behind — the one layer still speaking
-  while a session is wedged. It runs BACK too (`scripts/chat-core.mjs`,
-  `docs/batch-autonomy.md`): the launcher polls the chat each tick and hands what
-  VERIFIES on as untrusted input, never as authorization.
+  `batch-autostart.mjs` alerts when it is behind. It runs BACK too
+  (`scripts/chat-core.mjs`, `docs/batch-autonomy.md`): the launcher polls the chat
+  each tick and hands what VERIFIES on as untrusted input, never as authorization.
   Every one is fail-OPEN (an internal error allows the stop, so a guard bug
   cannot trap the session) with a pure, Vitest-covered decision core.
 - **Ask the guards BEFORE the action, and answer LAST (points 365/403).** Before
@@ -976,9 +975,8 @@ At the end:
 - **Graphics detail-level doc current (user 24.07.2026).** Explicitly confirm
   `docs/graphics-detail-levels.md` still matches `QUALITY_PRESETS`
   (`src/config/quality.ts`). The `src/config/qualityDoc.test.ts` sync test
-  enforces this on every `npm run test:unit` run — so a green regression already
-  proves it — but the closing names it as a deliberate check so a doc drift can
-  never slip past. If the presets changed, the doc must have changed with them.
+  enforces it on every `npm run test:unit` run, so a green regression already
+  proves it; the closing names it anyway, as a deliberate check.
 
 **Closing freeze (user decision 22.07.2026).** During a closing run the code
 is FROZEN: no parallel agent work may land or merge while the closing runs,
