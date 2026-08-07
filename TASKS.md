@@ -1052,6 +1052,10 @@ it is appended.
   `do-not-merge` record blocks; the same record followed by a `merge` record on a descendant
   commit allows; a review recorded against a commit that is not an ancestor of the merge does
   not count.
+  Criticality: high — it is a must-work Stop guard, and the four-eyes review of its own branch
+  (07.08.2026) showed the point would otherwise tick UNGATED: its only match for the tag was
+  the quoted convention above, which the parser correctly skips, so without this line the guard
+  would let its own point through.
 
 - [ ] 303. CODE REVIEW OF ALL CHANGES SINCE v0.1 — validate every test is still VALID (user
   24.07.2026). QUEUE POSITION: the NEXT task after 224. Stale tests keep surfacing only as
