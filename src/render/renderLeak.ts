@@ -112,6 +112,11 @@ export interface LeakEvaluation {
 export interface Baseline extends LeakCounts {
   /** Settled readings filed under this signature so far. */
   visits: number
+  /** The texture count the WARM-UP left behind, before any ratcheting. The
+   *  ratchet would otherwise make a steady texture leak invisible — every
+   *  step small enough to pass raises the bar for the next one — so the total
+   *  drift away from this mark is bounded too. */
+  textureMark: number
 }
 
 export type Baselines = Readonly<Record<string, Baseline>>
@@ -126,6 +131,14 @@ export type Baselines = Readonly<Record<string, Baseline>>
  *  bound on the first judged reading. */
 const WARMUP_VISITS = 2
 
+/** How far the ratcheting texture baseline may drift from the warm-up mark in
+ *  total, as a multiple of the per-transition bound. Without this the ratchet
+ *  is a blind spot: a leak that adds fewer textures per transition than the
+ *  bound would raise its own baseline for ever. Measured resident sets are
+ *  ~40-70 textures, so three bounds of drift is far above any legitimate
+ *  streaming and far below a leak that would starve the device. */
+const TEXTURE_DRIFT_FACTOR = 3
+
 /**
  * The decision layer, pure: judge one settled reading against the recorded
  * baselines and return the evaluation together with the NEXT baseline set.
@@ -133,12 +146,15 @@ const WARMUP_VISITS = 2
  * - while a signature is still forming its baseline → 'baseline' (record the
  *   high-water mark, judge nothing);
  * - render targets above `baseline + bounds.renderTargets` → 'leak' (strict);
- * - textures above `baseline + bounds.textures` → 'leak' (coarse runaway net);
+ * - textures above `baseline + bounds.textures` in ONE step, or more than
+ *   `TEXTURE_DRIFT_FACTOR` bounds above the warm-up mark in TOTAL → 'leak';
  * - otherwise 'ok'. The render-target baseline then STAYS where the warm-up put
  *   it — neither raised (a leak must not re-baseline itself away) nor lowered (a
  *   momentary dip must not tighten the bar for good) — while the texture
  *   baseline ratchets UP to the current reading, so legitimately streamed
- *   content does not accumulate into a false alarm on the next visit.
+ *   content does not accumulate into a false alarm on the next visit. The
+ *   ratchet is what the total-drift bound above closes: it must not let a leak
+ *   too small for one step raise its own bar for ever.
  *
  * A 'leak' leaves the baselines untouched, so the condition keeps reporting for
  * as long as it holds instead of silently re-baselining itself away.
@@ -153,10 +169,12 @@ export function evaluateReading(
   const base = baselines[signature]
   const visits = (base?.visits ?? 0) + 1
   if (!base || visits <= warmupVisits) {
+    const textures = Math.max(base?.textures ?? 0, counts.textures)
     const mark: Baseline = {
       renderTargets: Math.max(base?.renderTargets ?? 0, counts.renderTargets),
-      textures: Math.max(base?.textures ?? 0, counts.textures),
+      textures,
       visits,
+      textureMark: textures,
     }
     return {
       evaluation: {
@@ -176,13 +194,16 @@ export function evaluateReading(
     renderTargets: counts.renderTargets - base.renderTargets,
     textures: counts.textures - base.textures,
   }
+  const driftLimit = bounds.textures * TEXTURE_DRIFT_FACTOR
+  const drift = counts.textures - base.textureMark
   const counter: keyof LeakCounts | undefined =
     delta.renderTargets > bounds.renderTargets
       ? 'renderTargets'
-      : delta.textures > bounds.textures
+      : delta.textures > bounds.textures || drift > driftLimit
         ? 'textures'
         : undefined
   if (counter) {
+    const overStep = counter === 'renderTargets' || delta.textures > bounds.textures
     return {
       evaluation: {
         verdict: 'leak',
@@ -192,8 +213,11 @@ export function evaluateReading(
         delta,
         counter,
         detail:
-          `${counter} grew back at ${signature}: ${base[counter]} -> ${counts[counter]} ` +
-          `(+${delta[counter]}, allowed +${bounds[counter]}); ` +
+          (overStep
+            ? `${counter} grew back at ${signature}: ${base[counter]} -> ${counts[counter]} ` +
+              `(+${delta[counter]}, allowed +${bounds[counter]}); `
+            : `textures drifted at ${signature}: ${base.textureMark} -> ${counts.textures} ` +
+              `(+${drift} since the baseline was formed, allowed +${driftLimit}); `) +
           `render targets ${base.renderTargets}->${counts.renderTargets}, textures ${base.textures}->${counts.textures}`,
       },
       baselines: { ...baselines, [signature]: { ...base, visits } },
@@ -216,6 +240,7 @@ export function evaluateReading(
         renderTargets: base.renderTargets,
         textures: Math.max(base.textures, counts.textures),
         visits,
+        textureMark: base.textureMark,
       },
     },
   }

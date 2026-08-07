@@ -74,12 +74,12 @@ describe('currentRenderSignature', () => {
 describe('evaluateReading', () => {
   const sig = 'travel|medium|traa/-/bloom/sun/-'
   /** A signature that has finished forming its baseline. */
-  const warm = (c: LeakCounts): Baselines => ({ [sig]: { ...c, visits: 2 } })
+  const warm = (c: LeakCounts): Baselines => ({ [sig]: { ...c, visits: 2, textureMark: c.textures } })
 
   it('records the first visit and judges nothing', () => {
     const r = evaluateReading({}, sig, counts(44, 300))
     expect(r.evaluation.verdict).toBe('baseline')
-    expect(r.baselines[sig]).toEqual({ ...counts(44, 300), visits: 1 })
+    expect(r.baselines[sig]).toEqual({ ...counts(44, 300), visits: 1, textureMark: 300 })
     expect(r.evaluation.delta).toEqual(counts(0, 0))
   })
 
@@ -164,6 +164,23 @@ describe('evaluateReading', () => {
     const runaway = evaluateReading(baselines, sig, counts(44, 420 + LEAK_BOUNDS.textures + 1))
     expect(runaway.evaluation.verdict).toBe('leak')
     expect(runaway.evaluation.counter).toBe('textures')
+  })
+
+  it('bounds the total texture drift, so the ratchet cannot hide a slow leak', () => {
+    // A leak too small for the per-step bound would otherwise raise its own bar
+    // on every visit and never report.
+    let baselines: Baselines = warm(counts(44, 300))
+    const verdicts: string[] = []
+    for (let step = 1; step <= 7; step++) {
+      const r = evaluateReading(baselines, sig, counts(44, 300 + step * (LEAK_BOUNDS.textures / 2)))
+      baselines = r.baselines
+      verdicts.push(r.evaluation.verdict)
+    }
+    expect(verdicts.slice(0, 6)).toEqual(['ok', 'ok', 'ok', 'ok', 'ok', 'ok'])
+    expect(verdicts[6]).toBe('leak')
+    // The drift is measured from where the WARM-UP left the baseline, not from
+    // the ratcheted value it kept raising.
+    expect(baselines[sig].textureMark).toBe(300)
   })
 
   it('reports the render targets before the textures when both are over', () => {

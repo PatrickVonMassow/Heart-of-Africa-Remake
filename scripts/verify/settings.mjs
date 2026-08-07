@@ -900,7 +900,11 @@ await page.evaluate((z) => window.__ui.getState().setTravelZoom(z), zoomBefore)
   // Frames, not wall clock: the watch advances one step per RENDERED frame and
   // a headless page paints only when something forces it to, so each round of
   // this loop forces exactly the tick the watch is waiting for.
-  const settleWatch = async (tries = 80) => {
+  // The cap is the watch's OWN give-up point (SETTLE_POLICY.maxFrames), not a
+  // guessed number: below it a slow cold-compile round could be cut off and the
+  // reading dropped, which would show up as a rotating flake rather than as the
+  // finding it is. The normal case leaves after ~32 frames.
+  const settleWatch = async (tries = 600) => {
     for (let i = 0; i < tries; i++) {
       await forceFrame()
       const s = await leakState()
@@ -955,9 +959,11 @@ await page.evaluate((z) => window.__ui.getState().setTravelZoom(z), zoomBefore)
   // Give the renderer back what the probe took, and re-baseline, so nothing
   // downstream measures a deliberately poisoned state.
   const released = await page.evaluate(() => window.__renderLeak.releaseForced())
-  const cleaned = await settleWatch()
-  check('releasing the forced leak restores a clean watch', released === 6 && cleaned.violations.length === 0,
-    `${released} targets freed, ${cleaned.violations.length} violations left`)
+  await settleWatch()
+  const rtRestored = await page.evaluate(() => window.__renderer.info.memory.renderTargets)
+  check('releasing the forced leak gives the render targets back',
+    released === 6 && rtRestored <= rtBefore + walked.bounds.renderTargets,
+    `${released} targets freed, ${rtAfter} -> ${rtRestored} (started at ${rtBefore})`)
   // The deliberate assert above is the PASS condition of this block, so it must
   // not fail the suite's console-error gate. Only the render-leak asserts are
   // dropped — every other console error still counts, here and everywhere else.

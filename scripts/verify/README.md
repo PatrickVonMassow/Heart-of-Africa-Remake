@@ -192,7 +192,11 @@ a ratcheting baseline, because terrain, flora and settlement materials keep
 streaming in — the render-target half carries the strictness. The bound and
 settle logic is pure (`src/render/renderLeak.test.ts`); the live half is in
 `settings.mjs`, which walks the transitions three times, asserts nothing trips,
-then leaks six real render targets and asserts that it does.
+then leaks six real render targets and asserts that it does. One thing to know
+while WORKING on the pipeline: editing `src/render/Effects.tsx` to add or drop a
+pass legitimately changes the resident set under an unchanged signature, so the
+next transition reports a leak until the page is reloaded — `window
+.__renderLeak.reset()` in the console clears the recorded baselines without one.
 
 `scripts/verify/liveness.mjs` is the third: the main-thread block attribution
 behind `voice.mjs`'s TTS cold-load gate, pinned by
