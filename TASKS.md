@@ -4452,3 +4452,20 @@ Build order, chosen so no two parallel agents own the same file:
   `node scripts/guard-health.mjs` reports no dormant record for a wired enforcer.
   Criticality: medium — the guards themselves are reviewed and tested; what is at
   stake is that a wrongly placed hook line disables a chain silently.
+
+- [ ] 543. THE BOARD'S FOOTER CHECK READS A NUMBER OUT OF A CARD (measured 07.08.2026).
+  `dashboard-guard`'s footer-consistency check searched the WHOLE published document for
+  the first "NN offene Punkte" instead of reading the footer element. A queue card whose
+  prose legitimately said "29 offene Punkte" therefore made it report "the footer claims
+  29 open points, TASKS.md has 114" while the real footer read 114 — and it REFUSED the
+  attest until the card was reworded. The rule it enforced is one nothing states: a card
+  may not contain that phrase.
+  FINAL STATE: the check reads the value from the `<footer>` element it is about (or from
+  the derived count the refresh writes), so card prose can say anything. Same class as the
+  guards that judged a command string instead of the action — a check must bind to the
+  thing it judges, not to a pattern that happens to appear near it.
+  VERIFIABLE: pure Vitest on the check — a document whose CARD text contains a different
+  count passes while the footer agrees with the work order; a genuinely stale FOOTER still
+  blocks and names both numbers; a document with no footer fails open.
+  Criticality: low — it blocks a turn rather than letting a wrong state through, but a
+  guard that invents an unstated rule costs exactly the trust the chain runs on.
