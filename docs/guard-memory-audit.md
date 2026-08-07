@@ -21,6 +21,7 @@ node scripts/guard-inventory.mjs --all          # every enforcer with its wiring
 node scripts/guard-inventory.mjs --memories     # every memory with age and size
 node scripts/guard-inventory.mjs --json         # the same, machine-readable
 node scripts/guard-health-guard.mjs --status    # can every enforcer still FIRE?
+node scripts/guard-health-guard.mjs --wiring    # …and from a cwd other than the repo root?
 node scripts/rule-review-guard.mjs --status     # is a review owed?
 ```
 

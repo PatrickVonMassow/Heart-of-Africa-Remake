@@ -1,5 +1,17 @@
 import { describe, it, expect } from 'vitest'
-import { auditGuardHealth, formatGuardHealth, ENFORCER_RE } from './guard-health-core.mjs'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+import {
+  anchorCommand,
+  auditGuardHealth,
+  auditHookAnchoring,
+  commandAnchoring,
+  formatGuardHealth,
+  refAnchoring,
+  ENFORCER_RE,
+  RELATIVE_WIRING_ROLLOUT,
+} from './guard-health-core.mjs'
+import { parseHookTable } from './guard-inventory-core.mjs'
 
 // A minimal healthy world: one wired enforcer with a tested core.
 const healthy = {
@@ -147,6 +159,177 @@ describe('auditGuardHealth — is its decision tested', () => {
     }
     const kinds = auditGuardHealth(world).violations.map((v) => `${v.script}:${v.kind}`)
     expect(kinds).toEqual(['new-guard.mjs:untested-core'])
+  })
+})
+
+// Point 438: a hook wired `node scripts/x.mjs` cannot start from a cwd other
+// than the repo root, and its failure is non-blocking — so the guard is silently
+// gone while the rule counts as enforced.
+describe('auditHookAnchoring — can it fire from ANY working directory', () => {
+  const rows = (...commands) => commands.map((command) => ({ event: 'Stop', matcher: '', command }))
+  const noRollout = { scripts: [] }
+
+  it('reports a relatively wired project hook', () => {
+    const v = auditHookAnchoring({ hookCommands: rows('node scripts/model-guard.mjs'), rollout: noRollout })
+    expect(v.map((x) => x.kind)).toEqual(['relative-hook-wiring'])
+    expect(v[0].script).toBe('model-guard.mjs')
+    // The finding hands over the replacement, so the fix is not a second lookup.
+    expect(v[0].detail).toContain('node "$CLAUDE_PROJECT_DIR/scripts/model-guard.mjs"')
+  })
+
+  it('leaves an anchored hook alone, in every form a shell may need', () => {
+    const anchored = rows(
+      'node "$CLAUDE_PROJECT_DIR/scripts/model-guard.mjs"',
+      'node "${CLAUDE_PROJECT_DIR}/scripts/model-guard.mjs"',
+      'node "%CLAUDE_PROJECT_DIR%\\scripts\\model-guard.mjs"',
+      'node /srv/hoa/scripts/model-guard.mjs',
+      'node C:\\hoa\\scripts\\model-guard.mjs',
+    )
+    expect(auditHookAnchoring({ hookCommands: anchored, rollout: noRollout })).toEqual([])
+  })
+
+  // The shell-agnostic fallback resolves the project directory INSIDE node, so
+  // its literal path is relative by necessity. Accusing it would push the
+  // rollout back onto shell expansion, which is the part that can differ.
+  it('accepts the node -e bootstrap that reads process.env.CLAUDE_PROJECT_DIR', () => {
+    const boot =
+      "node -e \"const p=require('path').resolve(process.env.CLAUDE_PROJECT_DIR||'.','scripts/model-guard.mjs');" +
+      "process.argv.splice(1,0,p);import(require('url').pathToFileURL(p).href)\""
+    expect(commandAnchoring(boot).anchored).toBe(true)
+    expect(auditHookAnchoring({ hookCommands: rows(boot), rollout: noRollout })).toEqual([])
+  })
+
+  // Every case below was a FALSE CLEARANCE the four-eyes review (07.08.2026)
+  // found in the first shape of this check: a wiring it called anchored that
+  // dies from a non-root cwd exactly like the measured bug.
+  it('waives the bootstrap PER PATH, not for the whole command line', () => {
+    const compound =
+      "node -e \"const p=require('path').resolve(process.env.CLAUDE_PROJECT_DIR||'.','scripts/a.mjs');" +
+      'import(p)" && node scripts/b-guard.mjs'
+    const v = auditHookAnchoring({ hookCommands: rows(compound), rollout: noRollout })
+    expect(v.map((x) => x.script)).toEqual(['b-guard.mjs'])
+    // …and a mere mention of the env var in a comment waives nothing at all.
+    const pretend = 'node scripts/b-guard.mjs # process.env.CLAUDE_PROJECT_DIR someday'
+    expect(commandAnchoring(pretend).anchored).toBe(false)
+  })
+
+  it('sees a script in a SUBDIRECTORY of scripts/', () => {
+    const v = auditHookAnchoring({ hookCommands: rows('node scripts/verify/frame-guard.mjs'), rollout: noRollout })
+    expect(v.map((x) => x.script)).toEqual(['frame-guard.mjs'])
+    expect(commandAnchoring('node "$CLAUDE_PROJECT_DIR/scripts/verify/frame-guard.mjs"').anchored).toBe(true)
+  })
+
+  it('does not accept a malformed expansion as an anchor', () => {
+    expect(refAnchoring('${CLAUDE_PROJECT_DIR/scripts/a.mjs')).toBe('relative')
+    expect(refAnchoring('$CLAUDE_PROJECT_DIR}/scripts/a.mjs')).toBe('relative')
+  })
+
+  it('hands over a runnable replacement whatever quoting the line had', () => {
+    expect(anchorCommand('node "scripts/a.mjs"')).toBe('node "$CLAUDE_PROJECT_DIR/scripts/a.mjs"')
+    expect(anchorCommand('node scripts/a.mjs')).toBe('node "$CLAUDE_PROJECT_DIR/scripts/a.mjs"')
+    // Single quotes suppress the expansion: keeping them would hand over a hook
+    // that fires from NO directory at all.
+    expect(anchorCommand("node 'scripts/a.mjs'")).toBe('node "$CLAUDE_PROJECT_DIR/scripts/a.mjs"')
+    // A bootstrap is already anchored and must come back untouched.
+    const boot = "node -e \"require('path').resolve(process.env.CLAUDE_PROJECT_DIR||'.','scripts/a.mjs')\""
+    expect(anchorCommand(boot)).toBe(boot)
+  })
+
+  it('does not mistake a single-quoted expansion for an anchor', () => {
+    // `node '$CLAUDE_PROJECT_DIR/scripts/a.mjs'` reaches node as that literal
+    // string — the form that looks most anchored fires nowhere.
+    const single = "node '$CLAUDE_PROJECT_DIR/scripts/a-guard.mjs'"
+    expect(commandAnchoring(single).anchored).toBe(false)
+    expect(auditHookAnchoring({ hookCommands: rows(single), rollout: noRollout }).map((v) => v.kind)).toEqual([
+      'relative-hook-wiring',
+    ])
+    expect(commandAnchoring('node "$CLAUDE_PROJECT_DIR/scripts/a-guard.mjs"').anchored).toBe(true)
+  })
+
+  it('waives only the bootstrap SHAPE, never a mere mention nearby', () => {
+    const nearby = 'node -e "console.log(process.env.CLAUDE_PROJECT_DIR)" && node "scripts/b-guard.mjs"'
+    expect(auditHookAnchoring({ hookCommands: rows(nearby), rollout: noRollout }).map((v) => v.script)).toEqual([
+      'b-guard.mjs',
+    ])
+  })
+
+  it('stays silent on a hook recorded in the staged rollout', () => {
+    const v = auditHookAnchoring({
+      hookCommands: rows('node scripts/model-guard.mjs'),
+      rollout: { scripts: ['model-guard.mjs'] },
+    })
+    expect(v).toEqual([])
+  })
+
+  // The same ratchet the dormancy map carries: the record must not outlive the
+  // state it describes, or the next reader is told the opposite of the truth.
+  it('flags a rollout entry whose hook is already anchored', () => {
+    const v = auditHookAnchoring({
+      hookCommands: rows('node "$CLAUDE_PROJECT_DIR/scripts/model-guard.mjs"'),
+      rollout: { scripts: ['model-guard.mjs'] },
+    })
+    expect(v.map((x) => x.kind)).toEqual(['stale-relative-record'])
+  })
+
+  it('never judges a command that runs no project script', () => {
+    expect(auditHookAnchoring({ hookCommands: rows('echo hi'), rollout: noRollout })).toEqual([])
+    expect(commandAnchoring('echo hi').kind).toBe('no-script')
+  })
+
+  it('says nothing when the settings could not be read (fail-open)', () => {
+    expect(auditHookAnchoring({ hookCommands: null })).toEqual([])
+    expect(auditHookAnchoring({ hookCommands: [] })).toEqual([])
+    expect(auditHookAnchoring()).toEqual([])
+    expect(auditGuardHealth({ ...healthy, hookCommands: null }).ok).toBe(true)
+  })
+
+  it('classifies a single path token and rewrites only the relative one', () => {
+    expect(refAnchoring('scripts/a.mjs')).toBe('relative')
+    expect(refAnchoring('$CLAUDE_PROJECT_DIR/scripts/a.mjs')).toBe('project-dir')
+    expect(refAnchoring('/srv/hoa/scripts/a.mjs')).toBe('absolute')
+    expect(anchorCommand('node /srv/hoa/scripts/a.mjs')).toBe('node /srv/hoa/scripts/a.mjs')
+    expect(anchorCommand('node scripts/a.mjs')).toBe('node "$CLAUDE_PROJECT_DIR/scripts/a.mjs"')
+  })
+
+  it('reaches the block message through auditGuardHealth', () => {
+    const r = auditGuardHealth({ ...healthy, hookCommands: rows('node scripts/a-guard.mjs'), rollout: noRollout })
+    expect(r.ok).toBe(false)
+    expect(formatGuardHealth(r.violations)).toMatch(/--wiring/)
+  })
+
+  // The two git hooks are relative ON PURPOSE — git always runs a hook from the
+  // repo root. They are excluded by CONSTRUCTION (they are not in this input),
+  // and this pins that: the same text as part of the wiring blob accuses nobody.
+  it('never accuses the versioned git hooks, which are relative on purpose', () => {
+    const gitHookText = '#!/bin/sh\nnode scripts/pre-push-gate.mjs "$@"\nnode scripts/a-guard.mjs\n'
+    const r = auditGuardHealth({
+      ...healthy,
+      wiredText: `${healthy.wiredText}\n${gitHookText}`,
+      hookCommands: rows('node "$CLAUDE_PROJECT_DIR/scripts/a-guard.mjs"'),
+      rollout: noRollout,
+    })
+    expect(r.violations).toEqual([])
+  })
+})
+
+// The live wiring, so this cannot regress in silence: a hook added relatively
+// after the rollout has no record and fails here, and a record left behind after
+// its line was anchored fails here too.
+describe('the repository’s own hook wiring', () => {
+  const settings = JSON.parse(readFileSync(resolve(process.cwd(), '.claude', 'settings.json'), 'utf8'))
+  const hookCommands = parseHookTable(settings)
+
+  it('reads a plausible chain', () => {
+    expect(hookCommands.length).toBeGreaterThan(10)
+  })
+
+  it('is either anchored or recorded in the staged rollout — nothing else', () => {
+    expect(auditHookAnchoring({ hookCommands })).toEqual([])
+  })
+
+  it('records no script the settings do not wire at all', () => {
+    const wired = new Set(hookCommands.map((r) => /([A-Za-z0-9._-]+\.mjs)/.exec(r.command)?.[1]).filter(Boolean))
+    expect(RELATIVE_WIRING_ROLLOUT.scripts.filter((s) => !wired.has(s))).toEqual([])
   })
 })
 

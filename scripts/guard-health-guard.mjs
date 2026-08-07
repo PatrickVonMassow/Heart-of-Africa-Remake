@@ -9,7 +9,8 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { execSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
-import { auditGuardHealth, formatGuardHealth } from './guard-health-core.mjs'
+import { anchorCommand, auditGuardHealth, commandAnchoring, formatGuardHealth } from './guard-health-core.mjs'
+import { parseHookTable } from './guard-inventory-core.mjs'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
 import { isMainModule } from './is-main.mjs'
 import { CAUSE } from './guard-preflight-core.mjs'
@@ -21,17 +22,26 @@ const SETTINGS = R('../.claude/settings.json')
 const PAUSE = R('../.claude/batch-paused')
 
 /**
- * Everything that could invoke an enforcer, as one blob: the hook settings plus
- * the contents of an ACTIVE git hooks directory. An inactive hooks path
- * contributes nothing — which is the point, since that is exactly how a gate
- * script ends up dead.
+ * Everything that could invoke an enforcer: the hook settings plus the contents
+ * of an ACTIVE git hooks directory. An inactive hooks path contributes nothing —
+ * which is the point, since that is exactly how a gate script ends up dead.
+ *
+ * TWO shapes, on purpose (point 438). The BLOB answers "is this enforcer named
+ * anywhere at all", where a git hook counts exactly like a settings line. The
+ * ANCHORING check may not read that blob: `scripts/git-hooks/pre-push` and
+ * `commit-msg` are relative on purpose — git runs a hook from the repo root — so
+ * it gets the settings' hook rows STRUCTURED and never sees the git hooks. A
+ * settings file that will not parse yields `hooks: null`, i.e. "not measured".
  */
 function wiringText() {
   let text = ''
+  let hooks = null
   try {
-    text += readFileSync(SETTINGS, 'utf8')
+    const raw = readFileSync(SETTINGS, 'utf8')
+    text += raw
+    hooks = parseHookTable(JSON.parse(raw))
   } catch {
-    /* no settings — everything reads as unwired, so fail open below */
+    /* no settings, or unparsable — everything reads as unwired, so fail open below */
   }
   try {
     const hooksPath = execSync('git config core.hooksPath', {
@@ -52,7 +62,7 @@ function wiringText() {
   } catch {
     /* no hooksPath configured — nothing to add */
   }
-  return text
+  return { text, hooks }
 }
 
 /**
@@ -71,7 +81,7 @@ export function gatherGuardHealthInputs({ sessionId = '', ignoreOwnership = fals
     if (existsSync(PAUSE)) return { applicable: false, why: 'the batch is paused' }
   }
 
-  const wiredText = wiringText()
+  const { text: wiredText, hooks: hookCommands } = wiringText()
   // No wiring source readable at all: every enforcer would look dead. That is a
   // measurement failure, not a finding — say so instead of blocking on it.
   if (!wiredText.trim()) {
@@ -88,12 +98,42 @@ export function gatherGuardHealthInputs({ sessionId = '', ignoreOwnership = fals
       /* unreadable: left undefined so its testedness is not judged */
     }
   }
-  return { applicable: true, inputs: { files, sources, wiredText } }
+  return { applicable: true, inputs: { files, sources, wiredText, hookCommands } }
+}
+
+/**
+ * The wiring table for the staged rollout: every hook line, how its path
+ * resolves, and — for a relative one — the anchored command to put in its place.
+ * A report, not a verdict: the blocking judgement is the core's.
+ */
+function formatWiring(hookCommands) {
+  const rows = Array.isArray(hookCommands) ? hookCommands : []
+  if (rows.length === 0) return 'guard-health --wiring: keine Hook-Zeilen lesbar.'
+  const out = ['HOOK-VERDRAHTUNG (Punkt 438) — kann jeder Hook aus JEDEM Arbeitsverzeichnis starten?', '']
+  let relative = 0
+  for (const row of rows) {
+    const { kind, anchored } = commandAnchoring(row.command)
+    if (!anchored) relative += 1
+    const where = `${row.event}${row.matcher ? `(${row.matcher})` : ''}`
+    out.push(`${anchored ? 'OK ' : '!! '} ${where.padEnd(26)} ${row.command}`)
+    if (!anchored) out.push(`${' '.repeat(31)}→ ${anchorCommand(row.command)}`)
+    else if (kind === 'no-script') out.push(`${' '.repeat(31)}  (kein scripts/*.mjs — nicht beurteilt)`)
+  }
+  out.push('', `${rows.length} Hook-Zeilen, davon ${relative} cwd-relativ.`)
+  if (relative > 0) {
+    out.push(
+      'Rollout: EINE harmlose Zeile zuerst (lock-heartbeat-hook), in einer NEUEN Sitzung aus einem',
+      'Nicht-Wurzel-Verzeichnis prüfen, dann der Rest — und den Namen in RELATIVE_WIRING_ROLLOUT',
+      'im selben Commit streichen. `.claude/settings.json` ist ein geschützter Pfad: betreut, nie headless.',
+    )
+  }
+  return out.join('\n')
 }
 
 if (isMainModule(import.meta.url)) {
   try {
-    const status = process.argv[2] === '--status'
+    const wiring = process.argv[2] === '--wiring'
+    const status = process.argv[2] === '--status' || wiring
     let sid = ''
     if (!status) {
       try {
@@ -109,13 +149,23 @@ if (isMainModule(import.meta.url)) {
       process.exit(0)
     }
 
+    if (wiring) {
+      console.log(formatWiring(gathered.inputs.hookCommands))
+      process.exit(0)
+    }
+
     const { ok, violations, report } = auditGuardHealth(gathered.inputs)
 
     if (status) {
+      // A dimension that could not be MEASURED is named, never folded into the
+      // all-clear: an unparsable settings file leaves the anchoring unjudged,
+      // and an OK line that hides that is the false clean this guard exists to
+      // prevent elsewhere (four-eyes review 07.08.2026).
+      const unmeasured = gathered.inputs.hookCommands === null ? ' — Verdrahtungs-Anker NICHT messbar' : ''
       console.log(
         ok
-          ? `guard-health: OK (${report.length} Durchsetzer, alle verdrahtet und geprüft)`
-          : formatGuardHealth(violations),
+          ? `guard-health: OK (${report.length} Durchsetzer, alle verdrahtet und geprüft)${unmeasured}`
+          : `${formatGuardHealth(violations)}${unmeasured}`,
       )
       process.exit(0)
     }
