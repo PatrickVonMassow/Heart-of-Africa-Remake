@@ -12,10 +12,10 @@
 // carries no high tag must never have blocked in the first place.
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { spawnSync } from 'node:child_process'
-import { cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
-import { baselineFor, bootstrapBase, showAt } from './criticality-review-guard.mjs'
+import { baselineFor, bootstrapBase, readWorkOrder, showAt } from './criticality-review-guard.mjs'
 
 describe('baselineFor', () => {
   it('prefers the branch’s own confirmed baseline, then main’s, then nothing', () => {
@@ -38,6 +38,31 @@ describe('bootstrapBase', () => {
     ).toBe('headsha')
     expect(asked[0]).toContain('"main^{commit}"')
     expect(asked[1]).toContain('"origin/main^{commit}"')
+  })
+})
+
+describe('readWorkOrder', () => {
+  it('reads an absent file as empty', () => {
+    const enoent = Object.assign(new Error('ENOENT'), { code: 'ENOENT' })
+    expect(
+      readWorkOrder('TASKS.md', () => {
+        throw enoent
+      }),
+    ).toBe('')
+  })
+
+  it('RETHROWS any other read failure — a swallowed one forgave a tick FOREVER', () => {
+    // The blocker the four-eyes review of this branch reproduced: read as empty,
+    // the pending high tick vanishes, the gate reports clear, and a clear run
+    // ADVANCES THE BASELINE — so the tick stays forgiven after the file is
+    // readable again. Rethrowing lands it in the per-turn fail-open, which
+    // writes no state at all.
+    const eacces = Object.assign(new Error('EACCES: permission denied'), { code: 'EACCES' })
+    expect(() =>
+      readWorkOrder('docs/tasks-archive.md', () => {
+        throw eacces
+      }),
+    ).toThrow(/EACCES/)
   })
 })
 
@@ -121,6 +146,18 @@ describe('the gate against a real tick', { timeout: 60_000 }, () => {
     return { ...r, decision }
   }
 
+  /**
+   * A clean allow: nothing on stdout AND nothing on stderr. The stderr half is
+   * load-bearing — the wrapper's fail-open path also prints nothing to stdout,
+   * so `stdout === ''` alone lets a crashing guard masquerade as a clear gate.
+   */
+  const expectAllow = () => {
+    const hook = runHook()
+    expect(hook.stdout.trim(), 'a clear gate must print no decision').toBe('')
+    expect(hook.stderr.trim(), 'a clear gate must not have fallen open on an error').toBe('')
+    return hook
+  }
+
   const HIGH = (n, done) =>
     `- [${done ? 'x' : ' '}] ${n}. A MUST-WORK THING\n  spec prose.\n  Criticality: high (it gates every merge).\n`
   const PLAIN = (n, done) => `- [${done ? 'x' : ' '}] ${n}. AN ORDINARY THING\n  spec prose.\n`
@@ -150,14 +187,14 @@ describe('the gate against a real tick', { timeout: 60_000 }, () => {
   })
 
   it('is clear before anything is ticked, and arms its baseline there', () => {
-    expect(runHook().stdout.trim()).toBe('')
+    expectAllow()
   })
 
   it('stays clear when an UNTAGGED point is ticked', () => {
     write('TASKS.md', `# TASKS\n\n## Checklist\n\n${HIGH(900)}\n`)
     write('docs/tasks-archive.md', `# Archive\n\n${PLAIN(901, true)}\n`)
     commit('archive the ordinary point')
-    expect(runHook().stdout.trim()).toBe('')
+    expectAllow()
   })
 
   it('BLOCKS the moment the HIGH point is ticked with no review on record', () => {
@@ -205,7 +242,7 @@ describe('the gate against a real tick', { timeout: 60_000 }, () => {
     )
     expect(r.status, `record failed: ${r.stderr}`).toBe(0)
     commit('record the diverse review')
-    expect(runHook().stdout.trim()).toBe('')
+    expectAllow()
   })
 
   it('stands down on a feature branch — ticks are main-only', () => {
@@ -218,7 +255,34 @@ describe('the gate against a real tick', { timeout: 60_000 }, () => {
     // Not a licence to tick on a branch — the work order forbids it and
     // tasks-archive-guard reads it there. This gate simply refuses to judge a
     // work order that is not the one main ships.
-    expect(runHook().stdout.trim()).toBe('')
+    expectAllow()
     git('checkout', '-q', 'main')
+  })
+
+  it('a read failure of the work order NEVER advances the baseline', () => {
+    // The blocker from this branch's own four-eyes review, end to end. The
+    // archive is replaced by a DIRECTORY (EISDIR — a non-ENOENT failure that
+    // reproduces as any user, unlike chmod under root), which is the shape of
+    // the Windows sharing violation this guard will meet in practice.
+    write('TASKS.md', '# TASKS\n\n## Checklist\n')
+    write('docs/tasks-archive.md', `# Archive\n\n${PLAIN(901, true)}\n\n${HIGH(900, true)}\n\n${HIGH(903, true)}\n`)
+    commit('tick a second must-work point with no review on record')
+    expect(runHook().decision?.decision, 'the pending tick must block first').toBe('block')
+
+    const before = readFileSync(resolve(repo, '.claude/criticality-review-baseline.json'), 'utf8')
+    rmSync(resolve(repo, 'docs/tasks-archive.md'))
+    mkdirSync(resolve(repo, 'docs/tasks-archive.md'))
+    const hook = runHook()
+    // Fail-OPEN: the turn is allowed, loudly, and the state is left alone.
+    expect(hook.stdout.trim(), 'an unreadable work order must not produce a verdict').toBe('')
+    expect(hook.stderr).toMatch(/allowing stop/)
+    expect(
+      readFileSync(resolve(repo, '.claude/criticality-review-baseline.json'), 'utf8'),
+      'the baseline moved — the tick is now forgiven forever',
+    ).toBe(before)
+
+    rmSync(resolve(repo, 'docs/tasks-archive.md'), { recursive: true })
+    write('docs/tasks-archive.md', `# Archive\n\n${PLAIN(901, true)}\n\n${HIGH(900, true)}\n\n${HIGH(903, true)}\n`)
+    expect(runHook().decision?.decision, 'the gate must still be there afterwards').toBe('block')
   })
 })

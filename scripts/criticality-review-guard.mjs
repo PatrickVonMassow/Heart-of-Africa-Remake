@@ -99,6 +99,31 @@ export function showAt(rev, path, run = (cmd) => git(cmd)) {
 }
 
 /**
+ * The work order as it stands NOW, from the working tree — or '' when the file
+ * is genuinely absent.
+ *
+ * ENOENT is the ONLY empty answer, and the distinction is the whole point (found
+ * by the four-eyes review of this branch): a swallowed read error made the
+ * PENDING TICK VANISH, the gate report clear, and — because a clear run advances
+ * the baseline — the forgiveness PERMANENT. Reproduced: arm, tick a high point,
+ * `chmod 000` the archive, and the gate stayed clear after the mode was
+ * restored. On the Windows host a sharing-violation read failure is a documented
+ * recurring event, so this is not a hypothetical.
+ *
+ * Anything else therefore rethrows into the wrapper's per-turn fail-open, which
+ * allows the stop and writes NO state — the same rule `showAt` follows one call
+ * down: an empty answer is for a missing path, never for a failure to ask.
+ */
+export function readWorkOrder(path, read = (p) => readFileSync(p, 'utf8')) {
+  try {
+    return read(path)
+  } catch (e) {
+    if (e?.code === 'ENOENT') return ''
+    throw e
+  }
+}
+
+/**
  * True when `sha` names no reachable commit — the one condition under which an
  * undiffable baseline may be re-armed. A probe that could not answer counts as
  * PRESENT, so a transient git failure never forgives a pending tick.
@@ -177,19 +202,17 @@ export function gatherCriticalityReviewInputs({ sessionId = '' } = {}) {
   // NOW is read from the WORKING TREE, not from HEAD: the tick is a file edit,
   // and the gate should bite while it is still being made rather than one turn
   // after it is committed.
-  const readNow = (p) => {
-    try {
-      return readFileSync(repoPath(p), 'utf8')
-    } catch {
-      return ''
-    }
+  const headTasks = readWorkOrder(repoPath(TASKS_FILE))
+  const headArchive = readWorkOrder(repoPath(ARCHIVE_FILE))
+  // No work order at all: stand down rather than clear. Clearing would ADVANCE
+  // the baseline past a tick this checkout simply could not see.
+  if (!headTasks && !headArchive) {
+    return { applicable: false, why: 'no work order in this checkout' }
   }
-  const headTasks = readNow(TASKS_FILE)
-  const headArchive = readNow(ARCHIVE_FILE)
 
   let effective = baseline
   let ticks = []
-  if (headTasks || headArchive) {
+  {
     try {
       ticks = highTicks({
         baseTasks: showAt(base, TASKS_FILE),
