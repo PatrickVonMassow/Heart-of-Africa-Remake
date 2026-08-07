@@ -2884,6 +2884,14 @@ there exactly once; a new point joins a bundle when appended.
   never failed. The four-eyes review confirmed the damage — a guard blocks via stdout JSON
   with EXIT 0, so a crash (exit 1) is non-blocking and THE VETO IS LOST: a crashed
   `closing-guard` would have let a version tag through.
+  STATE 07.08.2026: the DETECTOR is built, reviewed over three rounds and on `main` —
+  `guard-health-core.mjs` judges each hook row's anchoring, `--wiring` prints every
+  replacement line, and `RELATIVE_WIRING_ROLLOUT` ratchets in both directions (a new
+  relative hook is a finding, and so is a record whose line is already anchored). What is
+  OWED is the rewiring itself: all 39 hook lines are still relative, and editing
+  `.claude/settings.json` needs an ATTENDED session. Measured from a foreign cwd with real
+  spawns: the relative form dies with `Cannot find module`, the anchored form fires, and the
+  `node -e` bootstrap fires only when it splices the path into `argv[1]`.
   THE ROLLOUT, in the shape that review left it, and in this order:
   (a) PILOT ONE harmless high-frequency hook (`lock-heartbeat-hook`) on
   `node "$CLAUDE_PROJECT_DIR/scripts/…"` and verify it in a NEW session from a non-root cwd
