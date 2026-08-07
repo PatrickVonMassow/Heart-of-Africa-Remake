@@ -39,6 +39,10 @@ import {
   evaluateMechanismReview,
   formatMechanismReviewVerdict,
 } from './mechanism-review-core.mjs'
+import {
+  evaluateCriticalityReview,
+  formatCriticalityReviewVerdict,
+} from './criticality-review-guard-core.mjs'
 
 import { gatherDashboardInputs } from './dashboard-guard.mjs'
 import { gatherTasksSpecInputs } from './tasks-spec-guard.mjs'
@@ -48,6 +52,7 @@ import { gatherDocBudgetInputs } from './doc-budget-guard.mjs'
 import { gatherModelGuardInputs } from './model-guard.mjs'
 import { gatherRenderVerifyInputs } from './render-verify-guard.mjs'
 import { gatherMechanismReviewInputs } from './mechanism-review-guard.mjs'
+import { gatherCriticalityReviewInputs } from './criticality-review-guard.mjs'
 import { gatherBranchHygiene } from './branch-hygiene-guard.mjs'
 import { gatherContainerAskInputs } from './container-ask-guard.mjs'
 import { evaluate as containerAskEvaluate } from './container-ask-guard-core.mjs'
@@ -138,6 +143,14 @@ export const GUARDS = [
     decide: (inputs) => {
       const verdict = evaluateMechanismReview(inputs)
       return { block: verdict.block, reason: formatMechanismReviewVerdict(verdict) }
+    },
+  },
+  {
+    id: 'criticality-review-guard',
+    gather: gatherCriticalityReviewInputs,
+    decide: (inputs) => {
+      const verdict = evaluateCriticalityReview(inputs)
+      return { block: verdict.block, reason: formatCriticalityReviewVerdict(verdict) }
     },
   },
   {

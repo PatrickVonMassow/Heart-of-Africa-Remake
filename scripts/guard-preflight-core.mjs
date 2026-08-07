@@ -57,15 +57,26 @@ export const ACTIONS = {
     'model-guard',
     'render-verify-guard',
     'mechanism-review-guard',
+    'criticality-review-guard',
     'tasks-archive-guard',
     'doc-budget-guard',
   ],
-  tick: ['tasks-archive-guard', 'tasks-spec-guard', 'queue-order-guard', 'dashboard-guard'],
+  // The criticality gate belongs on BOTH: the tick is where it bites, and the
+  // merge is the last moment where recording the second model's review is still
+  // cheap — asked only at the tick, the answer arrives after the branch is gone.
+  tick: [
+    'tasks-archive-guard',
+    'tasks-spec-guard',
+    'queue-order-guard',
+    'dashboard-guard',
+    'criticality-review-guard',
+  ],
   commit: ['model-guard', 'mechanism-review-guard', 'doc-budget-guard', 'tasks-spec-guard'],
   tag: [
     'model-guard',
     'render-verify-guard',
     'mechanism-review-guard',
+    'criticality-review-guard',
     'tasks-archive-guard',
     'dashboard-guard',
     'doc-budget-guard',
