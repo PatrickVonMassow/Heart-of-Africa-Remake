@@ -4482,3 +4482,33 @@ Build order, chosen so no two parallel agents own the same file:
   measures the ENTER transition the way point 96 measures the leave.
   Criticality: low — neither is reachable or harmful today; both are the kind of thing
   that stays invisible until the day it is not.
+
+- [ ] 549. TWO `polish` CHECKS THAT ROTATE THEIR VERDICT BETWEEN RUNS (measured
+  07.08.2026 across five runs on this host — three WebGL 2, two WebGPU; bundle
+  Testinfrastruktur). Point 387 closed the five checks that stood red on `main`
+  permanently; these two are the other shape, and the more corrosive one: each fails in
+  one run and passes in the next, which is exactly what teaches a reader to wave a red
+  off. Both were seen while taking 387's evidence and neither belongs to it.
+  (a) `capetown (wet): the swept ground inside is measurably darkened` demands
+  `1 - inside > 0.04`, and the same scene MEASURED inside ×0.899, ×0.900, ×0.900, ×0.946
+  and ×0.964 — a spread of 6.5 points straddling its own bar, one run over it. The two
+  sibling readings in the same check (`maasai-village`, `giza`) hold within a point of
+  each other across all five, so the instability is the PORT's wet reading, not the
+  measure: capetown's sweep is read before the wetness the season lerps toward is
+  actually reached, the same shape point 499 fixed for the settlement light.
+  (b) `zulu village hut: an open approach to walk in on` reported `false` with the hut at
+  `{x 15.16, z 1.75, h 1.79}` in ONE of the five runs and passed in the other four, on
+  the same seed and the same layout: `standOff` found no free bearing onto a building it
+  reaches every other run.
+  FINAL STATE: each of the two decides on a reading that has SETTLED — (a) waits for the
+  wet ground state the way `settle()` waits for the rains' light, (b) reports what
+  `standOff` actually searched (bearings tried, what blocked each) so a miss is
+  diagnosable rather than a bare `false`, and retries the search from the settled state
+  before it fails. NO bar is lowered to reach green: (a) keeps `> 0.04`, and if the
+  settled reading genuinely sits under it, that is a PRODUCT verdict on capetown's wet
+  sweep and is fixed there.
+  VERIFIABLE: `polish` runs three times in a row per backend without either check
+  changing its verdict, and the measured spread of both is recorded beside the criterion
+  the way point 387 recorded its five.
+  Criticality: medium — neither hides a known product defect today, but a check that
+  rotates is a gate that has stopped gating.
