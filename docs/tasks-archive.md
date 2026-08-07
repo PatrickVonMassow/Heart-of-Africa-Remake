@@ -15020,3 +15020,19 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   guard "immune system" from becoming an autoimmune disease. ANCHORS: a checklist doc + an
   enumerating script (guards in `scripts/`, memories in the memory dir). VERIFIABLE: the audit
   produces a report; no runtime invariant. (Lighter point.)
+
+- [x] 295. DEV-BUILD RENDER-RESOURCE LEAK INVARIANT (user 24.07.2026, from the retrospective
+  §3.12/§8 — the in-game-assert principle applied to GPU resources). A `import.meta.env.DEV`
+  invariant that asserts the renderer's render-target / texture counts (`renderer.info`)
+  stay BOUNDED across scene transitions and effect-toggle rebuilds — `console.error` + a
+  probe log when the count grows beyond a threshold across a transition. So a GPU-resource
+  leak like the point-276 WebGPU TRAA render-target leak (47→50 across toggle cycles, caught
+  only because one settings.mjs check happened to run) SCREAMS in EVERY dev session and every
+  test run, not just that one check. Generalize the existing "TRAA toggle stress: no
+  render-target leak" settings.mjs check to more transitions (scene switch travel↔place,
+  detail-level changes, effect toggles). ANCHORS: `src/render/Effects.tsx` / the renderer
+  setup, a new dev-assert module (arm early, extend as systems change); `scripts/verify/
+  settings.mjs`. VERIFIABLE: a pure test of the bound/threshold logic; a live check that a
+  forced leak trips the assert and a normal session/toggle does not (both backends). No
+  player-visible text. PROCESS: Fable-5 plan-review BEFORE, Fable-5 safety-review AFTER
+  (safe / all cases / no side effects), merge to main ONLY when all green (user 24.07.2026).
