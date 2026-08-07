@@ -217,7 +217,7 @@ foreach ($name in @($PrimaryTaskName, $WatchdogTaskName)) {
     $target = Join-Path $definitionRoot "$name.xml"
     $task = Get-ScheduledTask -TaskName $name -ErrorAction SilentlyContinue
     if (-not $task) { Write-Fail "$name — no such task, nothing to export"; continue }
-    $xml = Export-ScheduledTask -TaskName $name
+    $xml = (Export-ScheduledTask -TaskName $name) -join "`n"
     $current = $null
     if (Test-Path $target) { $current = Get-Content -Raw -Path $target }
     # Compared NORMALIZED: Set-Content appends a newline Export-ScheduledTask does
