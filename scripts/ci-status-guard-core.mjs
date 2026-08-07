@@ -170,6 +170,8 @@ export const WAIT_BUDGET_MS = 30 * 60 * 1000
 /** Minimum spacing between two API calls for the same non-terminal sha, so a
  *  blocked or waiting session re-asks about once a minute, not once a turn. */
 export const RECHECK_MS = 60 * 1000
+/** How long an outage-waiver clock may sit unrefreshed before it is forgotten. */
+export const FAMINE_TTL_MS = 7 * 24 * 60 * 60 * 1000
 
 /** `%gD` under `--date=unix`: `refs/remotes/origin/x@{1786125241}`. */
 const REFLOG_LINE = /^(.+)@\{(\d+)\}\t([0-9a-f]{7,40})\t(.*)$/
@@ -287,12 +289,31 @@ export function pruneShaCache(cache, now = Date.now(), windowMs = PUSH_WINDOW_MS
 }
 
 /** Keep only the alert bookkeeping of refs that still exist, so a deleted branch
- *  does not sit in the state file forever. */
+ *  does not sit in the state file forever. An EMPTY ref list means the git call
+ *  failed, not that every branch is gone — pruning on it would drop the dedup
+ *  and re-alert a red already reported, so it prunes nothing. */
 export function pruneNotifiedRefs(notified, existingRefs = []) {
-  const out = {}
   try {
+    if (!Array.isArray(existingRefs) || existingRefs.length === 0) return { ...(notified ?? {}) }
+    const out = {}
     const keep = new Set([...existingRefs, 'HEAD'])
     for (const [ref, key] of Object.entries(notified ?? {})) if (keep.has(ref)) out[ref] = key
+    return out
+  } catch {
+    return {} // fail-open
+  }
+}
+
+/** Drop outage-waiver clocks older than the window. A workflow whose ref was
+ *  deleted before it ever recovered would otherwise keep its clock forever, and
+ *  the next genuine famine would inherit it as already expired — the
+ *  false-alarm direction (four-eyes residual (c)). */
+export function pruneFamine(famine, now = Date.now(), ttlMs = FAMINE_TTL_MS) {
+  const out = {}
+  try {
+    for (const [name, since] of Object.entries(famine ?? {})) {
+      if (Number(since) > 0 && now - Number(since) <= ttlMs) out[name] = Number(since)
+    }
   } catch {
     /* fail-open */
   }
@@ -338,6 +359,10 @@ export async function sweepTargets({
   const nextNotified = { ...notified }
   const nextFamine = { ...famine }
   const failedOpen = []
+  // The waiver clocks this sweep touched, applied once at the end so the order
+  // of the targets cannot decide them.
+  const judgedNames = new Set()
+  const famishedNames = new Map()
   let block = null // the first red something can be done about
   let waiting = null // the first run that has not concluded
   let dirty = false
@@ -353,7 +378,13 @@ export async function sweepTargets({
       continue
     }
     if (cached === 'pending') {
-      waiting ??= entry.reason
+      // The BUDGET outranks the cache: a wait recorded a minute ago must not
+      // keep blocking once the ceiling has passed in the meantime (four-eyes
+      // residual (b)). Past it the entry still mutes the API, it just no longer
+      // holds the turn.
+      if (refVerdict({ state: 'pending', at: Number(entry.firstSeenAt) || now, now }) === 'wait') {
+        waiting ??= entry.reason
+      }
       continue
     }
 
@@ -415,17 +446,21 @@ export async function sweepTargets({
     const { classification: chosen, standDown, stillFamished, judgedWorkflows } = await judgeRed({
       sha: target.sha,
       runs,
+      // What this sweep has learned so far included, so a second red target on
+      // the same workflow still sees the EARLIEST famine timestamp.
+      famine: { ...nextFamine, ...Object.fromEntries(famishedNames) },
       classification,
-      famine: nextFamine,
       now,
     })
     // The waiver clock follows the verdict in BOTH directions: a workflow judged
     // unactionable keeps (or starts) its clock, one judged actionable loses it.
     // Only adding would leave a stale clock behind, so the next genuine famine
     // would read as an already-expired waiver and escalate at once — the
-    // false-alarm direction (four-eyes finding 4).
-    for (const name of judgedWorkflows ?? []) delete nextFamine[name]
-    for (const [name, since] of Object.entries(stillFamished ?? {})) nextFamine[name] = since
+    // false-alarm direction (four-eyes finding 4). Collected across the WHOLE
+    // sweep and applied at the end, so which target ran first cannot decide the
+    // clock of a workflow that is red on two of them (residual (c)).
+    for (const name of judgedWorkflows ?? []) judgedNames.add(name)
+    for (const [name, since] of Object.entries(stillFamished ?? {})) famishedNames.set(name, since)
 
     // A stood-down red gets a REPEATED alert, not one ever (four-eyes S1): in a
     // runner famine no step runs, so ci.yml's own `if: failure()` alert never
@@ -445,6 +480,11 @@ export async function sweepTargets({
     nextCache[target.sha] = { state: 'failed', firstSeenAt: at, checkedAt: now, reason }
     if (reason) block ??= reason
   }
+
+  // A workflow still dying the famine way KEEPS its clock; one this sweep judged
+  // and did not find famished loses it. Applied here, not per target.
+  for (const name of judgedNames) if (!famishedNames.has(name)) delete nextFamine[name]
+  for (const [name, since] of famishedNames) nextFamine[name] = since
 
   return {
     decision: block ?? waiting ?? null,

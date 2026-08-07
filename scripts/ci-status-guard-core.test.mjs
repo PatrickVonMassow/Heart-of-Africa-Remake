@@ -8,6 +8,7 @@ import {
   classifyRuns,
   failedRuns,
   notifiedFromState,
+  pruneFamine,
   pruneNotifiedRefs,
   pruneShaCache,
   pushedRefsFromReflog,
@@ -17,6 +18,7 @@ import {
   shouldBlock,
   shouldNotify,
   sweepTargets,
+  FAMINE_TTL_MS,
   PUSH_WINDOW_MS,
   RECHECK_MS,
   RUN_GRACE_MS,
@@ -358,6 +360,22 @@ describe('notifiedFromState / pruneNotifiedRefs', () => {
       pruneNotifiedRefs({ 'origin/main': 'a', 'origin/gone': 'b', HEAD: 'c' }, ['origin/main']),
     ).toEqual({ 'origin/main': 'a', HEAD: 'c' })
   })
+
+  it('prunes NOTHING on an empty ref list — that means git failed, not that every branch is gone', () => {
+    const kept = { 'origin/main': 'a', 'origin/feat/x': 'b' }
+    expect(pruneNotifiedRefs(kept, [])).toEqual(kept)
+    expect(pruneNotifiedRefs(kept, undefined)).toEqual(kept)
+  })
+})
+
+describe('pruneFamine', () => {
+  it('forgets a waiver clock no sweep ever refreshed', () => {
+    // A workflow whose ref was deleted before it recovered would otherwise keep
+    // its clock forever, and the next genuine famine would inherit it as
+    // already expired — the false-alarm direction.
+    expect(pruneFamine({ CI: t(60), Gone: NOW - FAMINE_TTL_MS - 1 }, NOW)).toEqual({ CI: t(60) })
+    expect(pruneFamine(null, NOW)).toEqual({})
+  })
 })
 
 describe('cachedAnswer', () => {
@@ -565,6 +583,57 @@ describe('sweepTargets', () => {
   it('a green run clears the outage waiver of its workflow', async () => {
     const got = await sweep({ targets: [headTarget], famine: { CI: t(9999) }, runsBySha: { [HEAD]: greenRun(HEAD) } })
     expect(got.famine).toEqual({})
+  })
+
+  it('a CACHED wait stops blocking the moment the ceiling passes, not a minute later', async () => {
+    // Recorded with ten seconds of budget left, so the entry is a real wait…
+    const nearlyDone = { ...branchTarget, at: NOW - WAIT_BUDGET_MS + 10_000 }
+    const got = await sweep({ targets: [nearlyDone], runsBySha: { [BRANCH]: pendingRun(BRANCH) } })
+    expect(got.decision).toContain('NOT yet concluded')
+    // …and half a minute later the cache is still fresh (no API call) but the
+    // budget has passed: the mute may outlive the wait, the BLOCK may not.
+    const later = await sweep({
+      targets: [nearlyDone],
+      cache: got.cache,
+      now: NOW + 30_000,
+      runsBySha: { [BRANCH]: pendingRun(BRANCH) },
+    })
+    expect(later.asked).toEqual([])
+    expect(later.decision).toBe(null)
+  })
+
+  it('the waiver clock does not depend on which red target ran first', async () => {
+    // Two refs, both red on the same workflow, one judged an outage and one
+    // ours. Whichever order the sweep walks them in, the outage clock survives.
+    const runsBySha = { [HEAD]: redRun(HEAD), [BRANCH]: redRun(BRANCH) }
+    const judgeRed = async ({ sha, classification }) =>
+      sha === HEAD
+        ? {
+            classification: { ...classification, cause: 'external', actionable: false },
+            standDown: true,
+            stillFamished: { CI: t(9999) },
+            judgedWorkflows: ['CI'],
+          }
+        : {
+            classification: { ...classification, cause: 'repository', actionable: true },
+            standDown: false,
+            stillFamished: {},
+            judgedWorkflows: ['CI'],
+          }
+    for (const targets of [
+      [headTarget, branchTarget],
+      [branchTarget, headTarget],
+    ]) {
+      const got = await sweepTargets({
+        targets,
+        now: NOW,
+        fetchRuns: async (sha) => runsBySha[sha],
+        judgeRed,
+        notify: async () => {},
+      })
+      expect(got.famine).toEqual({ CI: t(9999) })
+      expect(got.decision).toContain('origin/feat/x')
+    }
   })
 
   it('a red that IS ours clears the waiver clock too, instead of leaving it stale', async () => {
