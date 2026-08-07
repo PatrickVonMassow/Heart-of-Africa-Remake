@@ -31,7 +31,16 @@
 // versions ("v0.2"), §-refs ("§19.8"), slashed screenshot pairs ("129/130"),
 // bare numbers and commit hashes — stays untouched by construction: no extra
 // exemption list, the two match forms are simply that tight.
-// Fail-open is the WRAPPER's job; this core must never throw on partial input.
+// THE UNNUMBERED STATE CARDS ARE EXEMPT (point 544). "Gerade keine laufende
+// Arbeit" and "Abschlussarbeiten zum gerade beendeten Punkt" own no point number
+// BY DESIGN, and the rule above reads a card without one as owning nothing — so
+// every point they name counted as a foreign reference. That already cost the
+// boundary once: the card's prescribed text had to be rewritten to name no point
+// at all, and a block there costs a whole turn, because every remedy command
+// counts as work and deletes the boundary marker. The closing card cannot be
+// written that way — saying WHICH duties are owed is its entire content — so the
+// two are exempted by name instead, from board-core, where the titles live.
+import { isStateCardTitle } from './board-core.mjs'
 import { REPUBLISH } from './board-remedy.mjs'
 
 const stripTags = (html) => html.replace(/<[^>]*>/g, ' ')
@@ -121,6 +130,9 @@ export function topicViolations(html, known) {
   ]
   const violations = []
   for (const card of cards) {
+    // The two unnumbered state cards speak ABOUT the point that just ended; that
+    // is what they are for, so a point they name is never a cross-reference.
+    if (isStateCardTitle(card.title)) continue
     for (const ref of foreignRefs(card.bodyHtml, card.point, known)) {
       violations.push({ where: card.where, point: card.point, title: card.title, ref })
     }

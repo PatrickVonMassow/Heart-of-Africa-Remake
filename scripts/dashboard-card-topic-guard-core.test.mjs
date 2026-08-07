@@ -12,6 +12,7 @@ import {
   topicViolations,
   evaluate,
 } from './dashboard-card-topic-guard-core.mjs'
+import { CLOSING_WORK_TITLE, NO_CURRENT_WORK_TITLE } from './board-core.mjs'
 
 /** Known-point set covering the numbers the cases below reference. */
 const KNOWN = new Set([1, 13, 92, 188, 244, 246, 266, 272])
@@ -201,5 +202,43 @@ describe('evaluate', () => {
     expect(evaluate({ dashboardHtml: clean, tasksText: TASKS_SAMPLE }).block).toBe(false)
     expect(evaluate({}).block).toBe(false)
     expect(evaluate().block).toBe(false)
+  })
+})
+
+// ═══ Point 544 — the unnumbered state cards speak about a point on purpose ═══
+// A card with no own number owns nothing, so every point it names counted as a
+// cross-reference. The boundary paid that once already: its prescribed gap-card
+// text had to be rewritten to name no point at all, and a block there costs a
+// whole turn, because every remedy command counts as work and deletes the
+// boundary marker. The closing card cannot dodge it the same way — saying WHICH
+// duties are owed on WHICH point is its entire content.
+describe('the idle and closing cards are exempt', () => {
+  const stateCard = (t, body) => ({ t, body })
+
+  it('passes over a closing card that names the point it closes', () => {
+    const html = boardHtml({
+      now: [
+        stateCard(
+          CLOSING_WORK_TITLE,
+          '<p>Punkt 246 ist gemergt und abgehakt; das Vier-Augen-Protokoll (246) fehlt noch.</p>',
+        ),
+      ],
+    })
+    expect(topicViolations(html, KNOWN)).toEqual([])
+    expect(evaluate({ dashboardHtml: html, tasksText: TASKS_SAMPLE }).block).toBe(false)
+  })
+
+  it('passes over the idle card just the same', () => {
+    const html = boardHtml({
+      now: [stateCard(NO_CURRENT_WORK_TITLE, '<p>Punkt 266 ist abgeschlossen, der Stapel wartet.</p>')],
+    })
+    expect(topicViolations(html, KNOWN)).toEqual([])
+  })
+
+  it('exempts the two by NAME, not every card without a number', () => {
+    const html = boardHtml({
+      now: [stateCard('Abschlusslauf', '<p>Der Krokodil-Fix (246) steht noch aus.</p>')],
+    })
+    expect(topicViolations(html, KNOWN)).toMatchObject([{ where: 'now', point: null, ref: 246 }])
   })
 })
