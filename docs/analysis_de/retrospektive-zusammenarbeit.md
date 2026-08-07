@@ -856,6 +856,20 @@ Und die Paarung entscheidet, was das Ganze wert ist: Zwei Ergebnisse sind so vie
 
 ---
 
+### 3.91 Die Reparatur, die in die stille Richtung überschießt
+
+Ein Wächter meldete zweimal an einem Tag falschen Alarm: Er hielt ein gewöhnliches Verb mitten in einem Aussagesatz für eine Rückfrage an den Nutzer. Die Reparatur war naheliegend und wurde sauber gebaut — ein Treffer zählt nur noch, wenn sein eigener Satz wirklich fragt oder den Nutzer anspricht. Alle Gates grün, die Prüffälle des Punktes erfüllt, beide gemessenen Fehlalarme still. Der Stand sah fertig aus.
+
+Das andere Modell prüfte ihn dann nicht an den Testnamen, sondern an der Mechanik: Es schrieb einundzwanzig deutsche Sätze, die der Autor nicht geschrieben hatte, und ließ sie gegen den alten und den neuen Stand laufen. **Zwölf echte Rückfragen, die vorher blockiert hätten, kamen jetzt durch** — darunter die geläufigste Form überhaupt, die Aufforderung im Befehlston, denn die trägt weder Fragezeichen noch die geprüfte Anrede. Der Wächter war nicht kaputt; er war **zu leise** geworden, und zwar genau in der Richtung, in der Stille wie Erfolg aussieht.
+
+Das ist die Tücke dieser Fehlerklasse. Ein Fehlalarm meldet sich selbst — er kostet einen Zug und steht danach im Protokoll. Ein ausgefallener Alarm meldet gar nichts: Die Suite bleibt grün, das Board bleibt ruhig, und der Ausfall zeigt sich erst, wenn eine übersehene Rückfrage den Nutzer Stunden gekostet hat. Wer einen Fehlalarm behebt, arbeitet deshalb strukturell **in die gefährliche Richtung** — jede Verschärfung der Bedingung macht den Wächter stiller, und der Erfolg der Reparatur misst sich ausgerechnet am Verschwinden von Meldungen.
+
+Die Tests fingen es nicht, und das ist kein Versäumnis des Autors, sondern eine Eigenschaft der Anordnung: Er schrieb sie aus demselben Verständnis, aus dem er die Bedingung formuliert hatte. Eine Prüfliste kann nur enthalten, woran ihr Verfasser gedacht hat — dieselbe Anker-Grenze, die §3.90 für den aufzählenden Schritt beschreibt, hier am eigenen Werk statt an fremdem.
+
+**Lehre:** Eine Reparatur an einem Wächter wird **in beide Richtungen** abgenommen, und die zweite Richtung gehört nicht dem Autor. Wer die Falsch-Positiven beseitigt, muss nachweisen, dass die Richtig-Positiven noch anschlagen — mit Fällen, die **nicht aus derselben Feder** stammen wie die Bedingung. Und für den Prüfer: an der Mechanik messen, nicht an den Testnamen. Ein Test, der das Richtige behauptet, und eine Mechanik, die es tut, sind zwei verschiedene Aussagen.
+
+---
+
 ## 4. Die Guards als Immunsystem
 
 Jedes Guard-Skript ist die geronnene Lösung eines real aufgetretenen, wiederholten Problems.
@@ -943,7 +957,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Freitag, 07.08.2026, 10:17 · Quellen-Fingerprint: `857d06a6df98…`
+Zuletzt aktualisiert: Freitag, 07.08.2026, 11:14 · Quellen-Fingerprint: `8b9a9a46e3e3…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1023,8 +1037,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 72 Feedback-/Projekt-Memories · 48 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 37 Prozess-/Meta-TASKS-Punkte (davon 15 offen).
+Erfasste Quellen: 72 Feedback-/Projekt-Memories · 48 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 37 Prozess-/Meta-TASKS-Punkte (davon 14 offen).
 
-<!-- RETRO-FINGERPRINT: 857d06a6df98420b1f010bb9ad43c9742cfb86aac0fc83a26ade02deffa4ee62 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-07T08:17:00.831Z -->
+<!-- RETRO-FINGERPRINT: 8b9a9a46e3e3070e63e50fc3930ca8995be2e012bbc8c343cb744b029ae62fe1 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-07T09:14:02.705Z -->
 <!-- AUTO-GENERATED:END -->
