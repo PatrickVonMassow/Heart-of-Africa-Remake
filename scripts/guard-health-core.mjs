@@ -124,6 +124,25 @@ export function auditGuardHealth({
 
     report.push({ script: file, wired, core, tested, imports: imported, dormant: reason !== null })
 
+    // THE RECORD MUST NOT OUTLIVE THE DORMANCY (four-eyes review 30.07.2026).
+    // Until now a dormant entry was read ONLY while the guard was unwired, so a
+    // guard that got its hook line and kept its entry produced no violation at
+    // all: the map went on claiming an enforcer was inert while it enforced, and
+    // a reader who checks the map before trusting a rule is told the opposite of
+    // the truth. Every entry already ENDS with "remove this entry in the same
+    // commit that adds the hook line" — that convention is now the mechanism it
+    // describes rather than a sentence somebody has to obey.
+    if (wired && reason !== null) {
+      violations.push({
+        kind: 'dormant-but-wired',
+        script: file,
+        detail:
+          `${file} ist VERDRAHTET, steht aber weiterhin in INTENTIONALLY_DORMANT ("${firstSentence(reason)}") — ` +
+          'die Karte behauptet, der Durchsetzer schlafe, während er durchsetzt. Den Eintrag entfernen ' +
+          '(er gehört in denselben Commit wie die Hook-Zeile), oder die Hook-Zeile zurücknehmen.',
+      })
+    }
+
     if (!wired) {
       if (reason === null) {
         violations.push({
@@ -160,6 +179,14 @@ export function auditGuardHealth({
   }
 
   return { ok: violations.length === 0, violations, report }
+}
+
+/** The head of a dormancy reason, so the finding quotes it without reprinting it. */
+function firstSentence(reason, maxChars = 90) {
+  const text = String(reason ?? '').trim()
+  const stop = text.search(/[.:—]\s/)
+  const head = stop > 0 ? text.slice(0, stop) : text
+  return head.length > maxChars ? `${head.slice(0, maxChars - 1)}…` : head
 }
 
 /** Local `./x.mjs` modules a source imports (never its own core-less builtins). */
