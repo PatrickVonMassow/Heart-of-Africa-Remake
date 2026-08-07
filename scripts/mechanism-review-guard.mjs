@@ -249,54 +249,18 @@ export function gatherMechanismReviewInputs({ sessionId = '' } = {}) {
     }
   }
 
-  // Which recorded reviews CONTAIN each pending commit. A record only counts when
-  // it is reachable from HEAD — a review recorded on an abandoned branch judged a
-  // state that is not the one being shipped.
-  // Nothing pending means nothing to cover, and the ancestry work below costs git
-  // processes: the overwhelmingly common turn changes no mechanism at all, and a
-  // hook that costs a process per ledger line on every turn end is a hook people
-  // switch off.
-  //
-  // ONE git spawn for the whole LEDGER, not two per record (point 474, measured
-  // 03.08.2026 on the Linux host). This loop had already been cut from one spawn
-  // per (commit, record) PAIR to one per record after the night of 30.07.2026;
-  // per record was still 83 × 2 = 166 processes here, 139 seconds, which put the
-  // fast gate over its budget on EVERY feature branch that touches a mechanism
-  // file. A shell spawn is simply dearer in this container than it was on the
-  // Windows host, so a per-record cost no longer fits.
-  //
-  // The narrowing is EXACT, not an approximation. A record can only cover a
-  // pending commit when that commit is reachable from the record's sha and NOT
-  // from `effective` — so the record's own sha must itself lie in
-  // `effective..head`. A record at or before `effective` has everything it
-  // reaches already reachable from `effective`, so its `containedShas` is empty
-  // by construction and it could never have covered anything. That set is also
-  // reachable from head by definition, which is exactly what the old
-  // per-record ancestry filter asked, so both spawn loops collapse into the one
-  // `rev-list` below (the `isAncestor` helper that served the old filter went
-  // with it — nothing else called it).
-  const branchRange = pendingCommits.length
-    ? new Set(
-        git(`rev-list ${head} --not ${effective}`)
-          .split(/\r?\n/)
-          .map((l) => l.trim())
-          .filter(Boolean),
-      )
-    : new Set()
-  const records = pendingCommits.length ? readRecords().filter((r) => branchRange.has(r.sha)) : []
-  // One spawn per SURVIVING record — in practice the reviews recorded on this
-  // branch, which is a handful, never the whole ledger.
-  for (const r of records) {
-    r.containedShas = new Set(
-      git(`rev-list ${r.sha} --not ${effective}`)
-        .split(/\r?\n/)
-        .map((l) => l.trim())
-        .filter(Boolean),
-    )
-  }
-  for (const c of pendingCommits) {
-    c.coveringRecordShas = records.filter((r) => r.containedShas?.has(c.sha)).map((r) => r.sha)
-  }
+  // Which recorded reviews CONTAIN each pending commit (see attachCoverage for
+  // the cost rule this obeys). Nothing pending means nothing to cover, and the
+  // ledger is not even read then: the overwhelmingly common turn changes no
+  // mechanism at all, and a hook that costs a process per ledger line on every
+  // turn end is a hook people switch off.
+  const records = attachCoverage({
+    pendingCommits,
+    allRecords: pendingCommits.length ? readRecords() : [],
+    effective,
+    head,
+    revList: (rev) => git(`rev-list ${rev} --not ${effective}`),
+  })
 
   return {
     applicable: true,
@@ -305,6 +269,51 @@ export function gatherMechanismReviewInputs({ sessionId = '' } = {}) {
     baseline: effective,
     inputs: { baseline: effective, head, pendingCommits, records },
   }
+}
+
+/**
+ * Attach, to every pending commit, the shas of the recorded reviews that CONTAIN
+ * it — and do it in a number of git calls BOUNDED BY CONSTRUCTION.
+ *
+ * THE COST RULE (point 387). A check inside the unit layer that walks REAL git
+ * history is bounded by construction, not by a raised timeout. This probe is the
+ * reason the rule exists: it began as one git process per (pending commit,
+ * record) PAIR — 13 × 52 ≈ 700 processes, 26 to 38 s past the check's own budget
+ * — so CI failed on every push of a long-lived guard branch and mailed the
+ * repository owner thirteen times through the night of 30.07.2026 while the tree
+ * was green locally. Its budget had already been raised once; a second raise
+ * would have hidden it again.
+ *
+ * WORST CASE, and it does not depend on the ledger's size: 1 + R calls, where R
+ * is the number of records that lie on THIS branch (in practice a handful, and
+ * zero on the overwhelmingly common turn, which has no pending mechanism commit
+ * at all). Never 1 per pair, never 1 per ledger line. `revList(rev)` answers
+ * "everything `rev` reaches that `effective` does not".
+ *
+ * The narrowing to branch records is EXACT, not an approximation: a record can
+ * only cover a pending commit when that commit is reachable from the record's
+ * sha and NOT from `effective`, so the record's own sha must itself lie in
+ * `effective..head`. A record at or before `effective` reaches nothing that
+ * `effective` does not, so its contained set is empty by construction.
+ */
+export function attachCoverage({ pendingCommits = [], allRecords = [], head, revList }) {
+  const lines = (rev) =>
+    new Set(
+      String(revList(rev) ?? '')
+        .split(/\r?\n/)
+        .map((l) => l.trim())
+        .filter(Boolean),
+    )
+  // Call 1 of 1 + R: the whole branch range, which selects the records at all.
+  const branchRange = pendingCommits.length ? lines(head) : new Set()
+  const records = (pendingCommits.length ? allRecords : []).filter((r) => branchRange.has(r.sha))
+  // Calls 2..1+R: one per SURVIVING record — the reviews recorded on this
+  // branch, never the whole ledger.
+  for (const r of records) r.containedShas = lines(r.sha)
+  for (const c of pendingCommits) {
+    c.coveringRecordShas = records.filter((r) => r.containedShas?.has(c.sha)).map((r) => r.sha)
+  }
+  return records
 }
 
 if (isMainModule(import.meta.url)) {
