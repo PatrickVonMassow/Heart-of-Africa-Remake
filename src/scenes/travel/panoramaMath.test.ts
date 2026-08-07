@@ -4,7 +4,6 @@
 import { describe, it, expect } from 'vitest'
 import {
   CAPTURE_SECTORS,
-  bufferU,
   SECTOR_COMPASS,
   SECTOR_H_FOV_DEG,
   BAND_V_FOV_DEG,
@@ -229,21 +228,30 @@ describe('panorama band gate over EVERY place kind (point 335)', () => {
   })
 })
 
-describe('bufferU (the empirically pinned mirrored band, point 90)', () => {
-  it('stores content at the negated bearing: E and W swap, N and S stay', () => {
-    expect(bufferU(0, -1)).toBeCloseTo(0.125) // north stays in slice 0
-    expect(bufferU(0, 1)).toBeCloseTo(0.625) // south stays in slice 2
-    expect(bufferU(1, 0)).toBeCloseTo(0.875) // EAST content sits in slice 3
-    expect(bufferU(-1, 0)).toBeCloseTo(0.375) // WEST content sits in slice 1
+// The band is DIRECTION-TRUE, not mirrored (point 545). The mirror that stood
+// here was inferred while the capture wrote nothing at all, so it was measured
+// in a buffer that never held the landmark it was calibrated against; with the
+// capture drawing, a magenta pillar due west of the capture point lands dead
+// centre of the slice whose camera looks west.
+describe('the buffer stores each direction where its own camera looked', () => {
+  it('a direction lands in the slice its sector camera photographed', () => {
+    expect(directionToU(0, -1)).toBeCloseTo(0.125) // north → slice 0 centre
+    expect(directionToU(1, 0)).toBeCloseTo(0.375) // east → slice 1 centre
+    expect(directionToU(0, 1)).toBeCloseTo(0.625) // south → slice 2 centre
+    expect(directionToU(-1, 0)).toBeCloseTo(0.875) // WEST → slice 3 centre
   })
 
-  it('reproduces the measured Giza column', () => {
-    // True bearing 259.3° (WSW of Cairo at capture time) → measured u ≈ 0.405.
-    const a = (259.3 * Math.PI) / 180
-    expect(bufferU(Math.sin(a), -Math.cos(a))).toBeCloseTo(0.399, 2)
+  it('matches the measured magenta pillar (due west, u 0.875 of a 3072 px band)', () => {
+    // Point 545, WebGL 2: the probe pillar occupied x 2633-2742, centred 2688.
+    expect(directionToU(-1, 0) * bandWidth(768)).toBeCloseTo(2688, 0)
   })
 
-  it('labels the slices N, W, S, E', () => {
-    expect([...SECTOR_COMPASS]).toEqual(['N', 'W', 'S', 'E'])
+  it('labels the slices N, E, S, W — the sweep order of the cameras', () => {
+    expect([...SECTOR_COMPASS]).toEqual(['N', 'E', 'S', 'W'])
+    for (let k = 0; k < CAPTURE_SECTORS; k++) {
+      const yaw = sectorYaw(k)
+      const u = directionToU(-Math.sin(yaw), -Math.cos(yaw))
+      expect(u).toBeCloseTo((k + 0.5) / CAPTURE_SECTORS)
+    }
   })
 })

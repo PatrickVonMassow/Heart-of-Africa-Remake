@@ -851,13 +851,17 @@ stands sunken below the settlement ground plane — the clamp and the
 backdrop heightfield bounds pure-tested in
 `src/scenes/place/backdrop.test.ts`, the live standing heights via
 the dev hook (`scripts/verify/polish.mjs`); the §2.5 travel-scene panorama holds — entering from the bird's-eye
-view shows the captured, direction-true surroundings: the band stores
-content at the NEGATED bearing (empirical convention, pinned via the
-Giza measurement and pure-tested as bufferU/SECTOR_COMPASS in
+view shows the captured, direction-true surroundings: each sector is
+shot square and copied to its own band column (`sectorRect`), the
+buffer therefore holds every direction where its own camera looked
+(`directionToU`/SECTOR_COMPASS, pure-tested in
 `src/scenes/travel/panoramaMath.test.ts`), the horizon cylinder
-samples the mirrored column, and a magenta probe injected due west
+samples that column unmirrored, and a magenta probe injected due west
 of the capture point proves the rendered horizon compass-true
-seed-independently; a direct place-to-place enter falls back to the
+seed-independently — the measurement that also settled the mirror
+which had been inferred from an empty band (point 545, WebGL 2: the
+pillar lands at u 0.875, dead centre of the west-looking slice); a
+direct place-to-place enter falls back to the
 geometry backdrop (`scripts/verify/polish.mjs`, screenshot 99). THREE
 gates keep that band honest, and every one of them applies to EVERY
 place kind: the band/no-band decision runs through one rule

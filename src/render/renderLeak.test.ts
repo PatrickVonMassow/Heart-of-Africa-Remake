@@ -26,6 +26,7 @@ const SIG: SignatureInput = {
   bloom: true,
   shadows: true,
   fireShadows: false,
+  panoramaCaptured: false,
 }
 
 const counts = (renderTargets: number, textures: number): LeakCounts => ({ renderTargets, textures })
@@ -45,9 +46,20 @@ describe('renderSignature', () => {
       { ...SIG, bloom: false },
       { ...SIG, shadows: false },
       { ...SIG, fireShadows: true },
+      { ...SIG, panoramaCaptured: true },
     ]
     for (const v of variants) expect(renderSignature(v)).not.toBe(base)
     expect(new Set(variants.map(renderSignature)).size).toBe(variants.length)
+  })
+
+  it('separates a settlement seen before any capture from the same one seen after (point 545)', () => {
+    // The capture takes its two targets on the FIRST shot and keeps them, so a
+    // settlement entered directly (no capture yet) legitimately holds fewer
+    // render targets than the same settlement entered from the travel scene.
+    // Sharing one baseline made every later visit read as a permanent leak.
+    const before = renderSignature({ ...SIG, mode: 'place', placeId: 'maasai-village' })
+    const after = renderSignature({ ...SIG, mode: 'place', placeId: 'maasai-village', panoramaCaptured: true })
+    expect(before).not.toBe(after)
   })
 
   it('separates two settlements but ignores the place id while travelling', () => {

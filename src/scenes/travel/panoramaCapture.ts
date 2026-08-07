@@ -68,6 +68,12 @@ function captureTargets(renderer: THREE.WebGPURenderer): NonNullable<typeof targ
   return targets
 }
 
+/** Whether the capture's targets are resident — a lever of the render-leak
+ *  signature (src/render/renderLeak.ts), since they are taken once and kept. */
+export function panoramaCaptureTargetsAllocated(): boolean {
+  return targets !== null
+}
+
 export function getPanoramaCapture(placeId: string, seed: number): PanoramaCapture | null {
   return current && current.placeId === placeId && current.seed === seed ? current : null
 }

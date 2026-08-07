@@ -68,21 +68,24 @@ export function directionToU(dx: number, dz: number): number {
 }
 
 /**
- * EMPIRICAL BAND CONVENTION (point 90, pinned 14.07.2026 on the WebGL2
- * path): the captured band stores content at the NEGATED compass angle —
- * a landmark at true bearing a appears at the buffer column of -a (slice k
- * therefore holds compass [N, W, S, E][k]). Verified against the Giza field
- * (true 259.3°, measured u 0.405 = mirrored 256.5°) and the Nubian Nile
- * water fractions. Consumers sample the buffer via bufferU (the mirror of
- * directionToU); the WebGPU path needs its own manual confirmation.
+ * BAND CONVENTION: the buffer is DIRECTION-TRUE. `directionToU` gives the
+ * column that photographed a world direction, and slice k holds the compass
+ * point its own camera looked at (`sectorYaw(k)`), so a consumer samples the
+ * band with `directionToU` and nothing else.
+ *
+ * It was read as MIRRORED between 14.07.2026 and point 545 — content at the
+ * negated bearing, slice k as [N, W, S, E][k], and the horizon cylinder
+ * sampling the mirrored column to match. That convention was inferred while the
+ * capture wrote no content at all (point 545: not one of its draws reached the
+ * band), so the landmark it was calibrated against was never in the buffer it
+ * was measured in. With the capture drawing again, a magenta pillar injected
+ * DUE WEST of the capture point lands at u 0.875 — dead centre of slice 3,
+ * whose camera looks west — measured on the WebGL 2 path, and the rendered
+ * horizon shows it in the west.
  */
-export function bufferU(dx: number, dz: number): number {
-  // The mirror of directionToU: negate the east component.
-  return directionToU(-dx, dz)
-}
 
-/** Compass meaning of readback slice k under the mirrored convention. */
-export const SECTOR_COMPASS = ['N', 'W', 'S', 'E'] as const
+/** Compass point slice k holds, straight from `sectorYaw`. */
+export const SECTOR_COMPASS = ['N', 'E', 'S', 'W'] as const
 
 /**
  * Height of the horizon cylinder that shows the band at radius r: the band
