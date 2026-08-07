@@ -3363,8 +3363,14 @@ for (const [placeId, shot] of [
   /** The photograph a HUMAN judges: the eave line where roof meets wall, taken
    *  a stride back from the collider so the junction is in the picture rather
    *  than a nose-length of dark thatch. The MEASUREMENT above stays where the
-   *  walk ended — this only moves the camera for the frame. */
+   *  walk ended — this only moves the camera for the frame.
+   *
+   *  The journal is closed HERE, not only at entry: arriving in a port writes
+   *  its own entries and the panel re-opens itself behind the walk, so the
+   *  port frame came out a third covered by an open journal. Closing it at the
+   *  shutter is the only place that holds. */
   const shootEaves = async (name, spot, label, back, pitch) => {
+    await page.evaluate(() => window.__game.getState().setJournalOpen(false))
     await page.evaluate(
       ([t, b, step, up]) => {
         const p = window.__placePlayer
