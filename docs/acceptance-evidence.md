@@ -859,7 +859,8 @@ buffer therefore holds every direction where its own camera looked
 samples that column unmirrored, and a magenta probe injected due west
 of the capture point proves the rendered horizon compass-true
 seed-independently — the measurement that also settled the mirror
-which had been inferred from an empty band (point 545, WebGL 2: the
+which had been calibrated against a band drawn but wrongly cut, every
+sector covering the full width (point 545, WebGL 2: the
 pillar lands at u 0.875, dead centre of the west-looking slice); a
 direct place-to-place enter falls back to the
 geometry backdrop (`scripts/verify/polish.mjs`, screenshot 99). THREE

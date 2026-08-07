@@ -5,6 +5,7 @@ import { describe, it, expect } from 'vitest'
 import {
   CAPTURE_SECTORS,
   SECTOR_COMPASS,
+  compassFractions,
   SECTOR_H_FOV_DEG,
   BAND_V_FOV_DEG,
   sectorYaw,
@@ -252,6 +253,26 @@ describe('the buffer stores each direction where its own camera looked', () => {
       const yaw = sectorYaw(k)
       const u = directionToU(-Math.sin(yaw), -Math.cos(yaw))
       expect(u).toBeCloseTo((k + 0.5) / CAPTURE_SECTORS)
+    }
+  })
+
+  it('keys the readback fractions by the compass point each slice HOLDS', () => {
+    // The dev hook once carried its own [N, W, S, E] list, which stayed put
+    // when the sweep order changed to N/E/S/W: it reported east under `w` and
+    // west under `e` while every test stayed green. This asserts against
+    // SECTOR_COMPASS itself, so the two cannot drift apart again.
+    const fractions = [0.1, 0.2, 0.3, 0.4]
+    const compass = compassFractions(fractions)
+    for (let k = 0; k < CAPTURE_SECTORS; k++) {
+      const dir = SECTOR_COMPASS[k].toLowerCase() as 'n' | 'e' | 's' | 'w'
+      expect(compass[dir]).toBe(fractions[k])
+    }
+    // And each key names the direction that slice's own camera looked at.
+    for (const [k, dir] of SECTOR_COMPASS.entries()) {
+      const yaw = sectorYaw(k)
+      const u = directionToU(-Math.sin(yaw), -Math.cos(yaw))
+      expect(u).toBeCloseTo((k + 0.5) / CAPTURE_SECTORS)
+      expect(compass[dir.toLowerCase() as 'n' | 'e' | 's' | 'w']).toBe(fractions[k])
     }
   })
 })

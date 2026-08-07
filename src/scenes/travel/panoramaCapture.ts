@@ -12,6 +12,7 @@ import * as THREE from 'three/webgpu'
 import {
   CAPTURE_SECTORS,
   SECTOR_H_FOV_DEG,
+  compassFractions,
   BAND_V_FOV_DEG,
   bandWidth,
   sectorRect,
@@ -208,11 +209,13 @@ export function capturePanorama(
         if (current && current.placeId === placeId) {
           current.waterFractions = fractions
           const w = window as unknown as Record<string, unknown>
-          // Slice k holds compass [N, W, S, E][k] (panoramaMath, point 90).
+          // Keyed by the compass point each slice actually holds — derived, not
+          // restated here (see compassFractions: this hook's own hand-written
+          // list is what drifted once).
           w.__placePanorama = {
             placeId,
             waterFractions: fractions,
-            compass: { n: fractions[0], w: fractions[1], s: fractions[2], e: fractions[3] },
+            compass: compassFractions(fractions),
           }
         }
       } catch {
