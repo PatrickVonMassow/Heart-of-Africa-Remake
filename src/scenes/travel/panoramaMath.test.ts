@@ -4,11 +4,12 @@
 import { describe, it, expect } from 'vitest'
 import {
   CAPTURE_SECTORS,
-  bufferU,
   SECTOR_COMPASS,
   SECTOR_H_FOV_DEG,
   BAND_V_FOV_DEG,
   sectorYaw,
+  sectorRect,
+  bandWidth,
   directionToU,
   bandHeightAt,
   chunkIdAt,
@@ -33,6 +34,50 @@ describe('sector sweep (N → E → S → W)', () => {
     expect(dir(sectorYaw(1))[0]).toBeCloseTo(1) // east (+x)
     expect(dir(sectorYaw(2))[1]).toBeCloseTo(1) // south (+z)
     expect(dir(sectorYaw(3))[0]).toBeCloseTo(-1) // west (-x)
+  })
+})
+
+// Point 545: the sector shots have to LAND somewhere in the band, and where
+// used to be a renderer viewport three.js ignores for a render-target draw —
+// all four sectors covered the whole band and the last one won. The layout is
+// a rule of its own now, so a shot can never silently miss its column again.
+describe('sector rectangles tile the band (point 545)', () => {
+  it('each sector owns its own square column, left to right in sweep order', () => {
+    for (let k = 0; k < CAPTURE_SECTORS; k++) {
+      expect(sectorRect(k, 768)).toEqual({ x: k * 768, y: 0, width: 768, height: 768 })
+    }
+  })
+
+  it('the columns cover the band with no gap and no overlap', () => {
+    const px = 512
+    const rects = Array.from({ length: CAPTURE_SECTORS }, (_, k) => sectorRect(k, px))
+    for (let k = 1; k < rects.length; k++) {
+      expect(rects[k].x).toBe(rects[k - 1].x + rects[k - 1].width) // butt-jointed
+    }
+    const last = rects[rects.length - 1]
+    expect(last.x + last.width).toBe(bandWidth(px))
+    expect(rects[0].x).toBe(0)
+    expect(new Set(rects.map((r) => r.x)).size).toBe(CAPTURE_SECTORS) // no two share a column
+  })
+
+  it('the band is exactly as wide as the sectors it stitches, and one sector high', () => {
+    expect(bandWidth(768)).toBe(768 * CAPTURE_SECTORS)
+    for (let k = 0; k < CAPTURE_SECTORS; k++) expect(sectorRect(k, 768).height).toBe(768)
+  })
+
+  it("a direction's texture column falls inside the sector that photographed it", () => {
+    // The layout and the sampling must agree: sector k's camera looks at
+    // sectorYaw(k), so a direction in its 90° wedge must map into its column.
+    const width = bandWidth(768)
+    for (let k = 0; k < CAPTURE_SECTORS; k++) {
+      const yaw = sectorYaw(k)
+      const dx = -Math.sin(yaw)
+      const dz = -Math.cos(yaw)
+      const x = directionToU(dx, dz) * width
+      const rect = sectorRect(k, 768)
+      expect(x).toBeGreaterThanOrEqual(rect.x)
+      expect(x).toBeLessThan(rect.x + rect.width)
+    }
   })
 })
 
@@ -183,21 +228,30 @@ describe('panorama band gate over EVERY place kind (point 335)', () => {
   })
 })
 
-describe('bufferU (the empirically pinned mirrored band, point 90)', () => {
-  it('stores content at the negated bearing: E and W swap, N and S stay', () => {
-    expect(bufferU(0, -1)).toBeCloseTo(0.125) // north stays in slice 0
-    expect(bufferU(0, 1)).toBeCloseTo(0.625) // south stays in slice 2
-    expect(bufferU(1, 0)).toBeCloseTo(0.875) // EAST content sits in slice 3
-    expect(bufferU(-1, 0)).toBeCloseTo(0.375) // WEST content sits in slice 1
+// The band is DIRECTION-TRUE, not mirrored (point 545). The mirror that stood
+// here was inferred while the capture wrote nothing at all, so it was measured
+// in a buffer that never held the landmark it was calibrated against; with the
+// capture drawing, a magenta pillar due west of the capture point lands dead
+// centre of the slice whose camera looks west.
+describe('the buffer stores each direction where its own camera looked', () => {
+  it('a direction lands in the slice its sector camera photographed', () => {
+    expect(directionToU(0, -1)).toBeCloseTo(0.125) // north → slice 0 centre
+    expect(directionToU(1, 0)).toBeCloseTo(0.375) // east → slice 1 centre
+    expect(directionToU(0, 1)).toBeCloseTo(0.625) // south → slice 2 centre
+    expect(directionToU(-1, 0)).toBeCloseTo(0.875) // WEST → slice 3 centre
   })
 
-  it('reproduces the measured Giza column', () => {
-    // True bearing 259.3° (WSW of Cairo at capture time) → measured u ≈ 0.405.
-    const a = (259.3 * Math.PI) / 180
-    expect(bufferU(Math.sin(a), -Math.cos(a))).toBeCloseTo(0.399, 2)
+  it('matches the measured magenta pillar (due west, u 0.875 of a 3072 px band)', () => {
+    // Point 545, WebGL 2: the probe pillar occupied x 2633-2742, centred 2688.
+    expect(directionToU(-1, 0) * bandWidth(768)).toBeCloseTo(2688, 0)
   })
 
-  it('labels the slices N, W, S, E', () => {
-    expect([...SECTOR_COMPASS]).toEqual(['N', 'W', 'S', 'E'])
+  it('labels the slices N, E, S, W — the sweep order of the cameras', () => {
+    expect([...SECTOR_COMPASS]).toEqual(['N', 'E', 'S', 'W'])
+    for (let k = 0; k < CAPTURE_SECTORS; k++) {
+      const yaw = sectorYaw(k)
+      const u = directionToU(-Math.sin(yaw), -Math.cos(yaw))
+      expect(u).toBeCloseTo((k + 0.5) / CAPTURE_SECTORS)
+    }
   })
 })

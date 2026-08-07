@@ -5,7 +5,12 @@
 // compileAsync is left alone, the throttled first-use release and its
 // bookkeeping.
 import { describe, expect, it, vi } from 'vitest'
-import { asyncPipelineHandle, enableAsyncPipelineCompile, type PipelineBackend } from './asyncPipelines'
+import {
+  asyncPipelineHandle,
+  enableAsyncPipelineCompile,
+  withSynchronousPipelineCompile,
+  type PipelineBackend,
+} from './asyncPipelines'
 
 /** A stand-in for three.js's WebGL 2 backend: `createRenderPipeline` pushes a
  *  compile promise when it is handed an array (the KHR_parallel_shader_compile
@@ -219,5 +224,85 @@ describe('enableAsyncPipelineCompile (point 337)', () => {
     expect(enableAsyncPipelineCompile(undefined)).toBeNull()
     expect(enableAsyncPipelineCompile({} as unknown as PipelineBackend)).toBeNull()
     expect(asyncPipelineHandle(null)).toBeNull()
+  })
+})
+
+// The one-shot escape hatch (point 545). The panorama capture renders the travel
+// scene into an offscreen target ONCE and keeps those pixels: an object whose
+// pipeline is not ready is skipped for good, not "a frame later", so the shot
+// must compile synchronously. These pin that the scope really switches BOTH
+// halves — the diversion and the throttled first-use release — and hands them
+// back afterwards.
+describe('withSynchronousPipelineCompile (point 545)', () => {
+  it('hands the backend the null it reads as "compile now"', () => {
+    const backend = fakeWebglBackend()
+    enableAsyncPipelineCompile(backend, { schedule: fakeFrames().schedule })
+    withSynchronousPipelineCompile(backend, () => {
+      backend.createRenderPipeline(renderObject(1), null)
+    })
+    expect(backend.calls[0].promises).toBeNull()
+  })
+
+  it('completes the program inside the scope instead of queueing it for a later frame', () => {
+    const backend = fakeWebglBackend()
+    const frames = fakeFrames()
+    const handle = enableAsyncPipelineCompile(backend, { schedule: frames.schedule })!
+    withSynchronousPipelineCompile(backend, () => {
+      for (let i = 0; i < 3; i++) backend.createRenderPipeline(renderObject(i), null)
+      // Drawable the moment the render returns — no frame tick in between.
+      expect(backend.completed).toHaveLength(3)
+    })
+    expect(handle.state()).toMatchObject({ started: 0, pending: 0, queued: 0 })
+  })
+
+  it('restores the asynchronous path after the scope, including after a throw', () => {
+    const backend = fakeWebglBackend()
+    const frames = fakeFrames()
+    const handle = enableAsyncPipelineCompile(backend, { schedule: frames.schedule })!
+    expect(() =>
+      withSynchronousPipelineCompile(backend, () => {
+        throw new Error('capture blew up')
+      }),
+    ).toThrow('capture blew up')
+    backend.createRenderPipeline(renderObject(1), null)
+    expect(backend.calls[0].promises).not.toBeNull()
+    expect(backend.completed).toHaveLength(0) // queued again, not immediate
+    expect(handle.state()).toMatchObject({ started: 1, queued: 0 })
+    backend.settleAll()
+    frames.tick()
+    expect(backend.completed).toHaveLength(1)
+  })
+
+  it('stays synchronous through a nested scope until the outer one ends', () => {
+    const backend = fakeWebglBackend()
+    enableAsyncPipelineCompile(backend, { schedule: fakeFrames().schedule })
+    withSynchronousPipelineCompile(backend, () => {
+      withSynchronousPipelineCompile(backend, () => {
+        backend.createRenderPipeline(renderObject(1), null)
+      })
+      backend.createRenderPipeline(renderObject(2), null)
+    })
+    expect(backend.calls.map((c) => c.promises)).toEqual([null, null])
+  })
+
+  it("leaves three.js's own compileAsync array alone even inside the scope", () => {
+    const backend = fakeWebglBackend()
+    enableAsyncPipelineCompile(backend, { schedule: fakeFrames().schedule })
+    const own: unknown[] = []
+    withSynchronousPipelineCompile(backend, () => {
+      backend.createRenderPipeline(renderObject(1), own)
+    })
+    expect(backend.calls[0].promises).toBe(own)
+  })
+
+  it('returns the callback result and runs on an unarmed backend unchanged', () => {
+    const backend = fakeWebglBackend() // never armed: already synchronous
+    const value = withSynchronousPipelineCompile(backend, () => {
+      backend.createRenderPipeline(renderObject(1), null)
+      return 'shot'
+    })
+    expect(value).toBe('shot')
+    expect(backend.calls[0].promises).toBeNull()
+    expect(withSynchronousPipelineCompile(null, () => 7)).toBe(7)
   })
 })

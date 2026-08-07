@@ -17,10 +17,11 @@
 // against an earlier reading of that same signature.
 //
 // STRICT ON RENDER TARGETS, COARSE ON TEXTURES. Render targets are allocated by
-// the post pipeline (src/render/Effects.tsx), the shadow maps and the single
-// panorama-capture target (src/scenes/travel/panoramaCapture.ts, which disposes
-// the previous before allocating the next) — a bounded set that content never
-// inflates, so a rise of more than LEAK_BOUNDS.renderTargets is a real leak.
+// the post pipeline (src/render/Effects.tsx), the shadow maps and the panorama
+// capture's two targets (src/scenes/travel/panoramaCapture.ts, allocated on the
+// first capture and kept for the session, so a settlement visit adds none) —
+// a bounded set that content never inflates, so a rise of more than
+// LEAK_BOUNDS.renderTargets is a real leak.
 // Plain TEXTURES stream in with terrain, flora and settlement materials for as
 // long as the player explores, so a strict bound there would be a false-positive
 // machine; the texture half is a coarse RUNAWAY net (one transition may not add
@@ -42,6 +43,7 @@
 import * as THREE from 'three/webgpu'
 import { devAssert } from '../systems/devAssert'
 import { getRenderContext } from './renderContext'
+import { panoramaCaptureTargetsAllocated } from '../scenes/travel/panoramaCapture'
 import { useGame } from '../state/store'
 import {
   useUi,
@@ -61,7 +63,8 @@ export interface LeakCounts {
 /** How much a counter may grow across a return to the SAME signature.
  *  Calibratable dev-only thresholds (not gameplay balance values):
  *  - renderTargets: the post chain rebuild is deterministic, and the panorama
- *    capture swaps exactly one target, so anything above a couple is a leak.
+ *    capture keeps its two targets rather than allocating per shot, so anything
+ *    above a couple is a leak.
  *  - textures: one transition may legitimately bring a whole settlement's
  *    material set with it; measured worst legitimate step is far below this. */
 export const LEAK_BOUNDS: LeakCounts = { renderTargets: 2, textures: 96 }
@@ -79,6 +82,15 @@ export interface SignatureInput {
   bloom: boolean
   shadows: boolean
   fireShadows: boolean
+  /** Whether the panorama capture has allocated its two targets yet (point
+   *  545). They are taken on the FIRST capture and then kept for the session,
+   *  so a settlement entered before any capture and the same settlement
+   *  entered after one legitimately hold different sets — without this lever
+   *  the first, capture-less visits set the baseline and every later visit
+   *  read as a permanent leak. It stays a leak DETECTOR either way: the flag
+   *  only ever goes false→true once, so a capture that allocated per shot
+   *  (which is what point 545 found) still grows inside the true state. */
+  panoramaCaptured: boolean
 }
 
 /** Stable key for one render state. */
@@ -89,6 +101,7 @@ export function renderSignature(i: SignatureInput): string {
     i.bloom ? 'bloom' : '-',
     i.shadows ? 'sun' : '-',
     i.fireShadows ? 'fire' : '-',
+    i.panoramaCaptured ? 'band' : '-',
   ].join('/')
   const place = i.mode === 'place' ? `:${i.placeId ?? 'unknown'}` : ''
   return `${i.mode}${place}|${i.detailLevel}|${flags}`
@@ -366,6 +379,7 @@ export function currentRenderSignature(): string {
     bloom: effectiveBloom(u),
     shadows: effectiveShadows(u),
     fireShadows: effectiveFireShadows(u),
+    panoramaCaptured: panoramaCaptureTargetsAllocated(),
   })
 }
 

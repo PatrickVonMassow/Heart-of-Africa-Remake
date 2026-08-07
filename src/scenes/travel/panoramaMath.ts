@@ -21,6 +21,35 @@ export function sectorYaw(k: number): number {
   return -k * (SECTOR_H_FOV_DEG * Math.PI) / 180
 }
 
+/** Pixel rectangle of one sector inside the band texture. */
+export interface SectorRect {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+/** Width of the whole band texture for a square sector shot of `sectorPx`. */
+export function bandWidth(sectorPx: number): number {
+  return sectorPx * CAPTURE_SECTORS
+}
+
+/**
+ * Where sector k's square shot belongs in the band texture: the sectors tile it
+ * left to right, in the `sectorYaw` sweep order, with no gap and no overlap.
+ *
+ * Point 545: this used to be expressed as a per-sector RENDERER viewport, which
+ * three.js ignores when rendering into a render target — it reads the viewport
+ * and scissor off the TARGET instead, so all four sectors landed on top of each
+ * other across the full band. Each sector is now shot at its own square size
+ * and copied to this rectangle, which is one rule instead of two pieces of
+ * renderer state and reads the same on both backends (a WebGPU pass clears the
+ * whole attachment regardless of the scissor, a WebGL clear does not).
+ */
+export function sectorRect(k: number, sectorPx: number): SectorRect {
+  return { x: k * sectorPx, y: 0, width: sectorPx, height: sectorPx }
+}
+
 /**
  * Texture U for a world direction (dx, dz) from the capture point. Sector k
  * covers u ∈ [k/4, (k+1)/4]; its camera looks along k·90° (N, E, S, W), and
@@ -39,21 +68,24 @@ export function directionToU(dx: number, dz: number): number {
 }
 
 /**
- * EMPIRICAL BAND CONVENTION (point 90, pinned 14.07.2026 on the WebGL2
- * path): the captured band stores content at the NEGATED compass angle —
- * a landmark at true bearing a appears at the buffer column of -a (slice k
- * therefore holds compass [N, W, S, E][k]). Verified against the Giza field
- * (true 259.3°, measured u 0.405 = mirrored 256.5°) and the Nubian Nile
- * water fractions. Consumers sample the buffer via bufferU (the mirror of
- * directionToU); the WebGPU path needs its own manual confirmation.
+ * BAND CONVENTION: the buffer is DIRECTION-TRUE. `directionToU` gives the
+ * column that photographed a world direction, and slice k holds the compass
+ * point its own camera looked at (`sectorYaw(k)`), so a consumer samples the
+ * band with `directionToU` and nothing else.
+ *
+ * It was read as MIRRORED between 14.07.2026 and point 545 — content at the
+ * negated bearing, slice k as [N, W, S, E][k], and the horizon cylinder
+ * sampling the mirrored column to match. That convention was inferred while the
+ * capture wrote no content at all (point 545: not one of its draws reached the
+ * band), so the landmark it was calibrated against was never in the buffer it
+ * was measured in. With the capture drawing again, a magenta pillar injected
+ * DUE WEST of the capture point lands at u 0.875 — dead centre of slice 3,
+ * whose camera looks west — measured on the WebGL 2 path, and the rendered
+ * horizon shows it in the west.
  */
-export function bufferU(dx: number, dz: number): number {
-  // The mirror of directionToU: negate the east component.
-  return directionToU(-dx, dz)
-}
 
-/** Compass meaning of readback slice k under the mirrored convention. */
-export const SECTOR_COMPASS = ['N', 'W', 'S', 'E'] as const
+/** Compass point slice k holds, straight from `sectorYaw`. */
+export const SECTOR_COMPASS = ['N', 'E', 'S', 'W'] as const
 
 /**
  * Height of the horizon cylinder that shows the band at radius r: the band
