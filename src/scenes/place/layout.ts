@@ -6,9 +6,10 @@
 
 import { placeById } from '../../world/geo'
 import { mulberry32 } from '../../world/noise'
-import { REGION_PLACE_STYLES, VILLAGE_PLANS } from './regionStyles'
+import { REGION_PLACE_STYLES, VILLAGE_PLANS, type RegionPlaceStyle } from './regionStyles'
 import { PORT_TALKERS, VILLAGE_SPOTS } from './lifeSpots'
 import { boxCollider, nudgeToFree, spawnPointFree, PLAYER_RADIUS, WALKER_RADIUS, type Collider } from './collision'
+import { CHIEF_HUT, MARKET_HUT, dwellingRoofProfile, hutRoofProfile, roofStandOff } from './roofClearance'
 import { GROUND_DISC_OVERHANG } from './backdrop'
 import { windingPoints, laneSlots, closestOnPolyline, bendAround, type LaneSlot } from './lanePlan'
 import { buildGizaLayout } from './gizaSite'
@@ -122,6 +123,44 @@ export const TEACHING_STONE_RADIUS = 0.5 * TEACHING_STONE_SCALE
  * from across the village, small enough to keep out of the lanes.
  */
 export const DIG_SITE_RADIUS = 0.9
+
+/** Where a village's cooking fire burns (design.md §19.10) — the collider here
+ *  and the `FirePit` the scene draws read the same spot. */
+export const VILLAGE_FIRE: [number, number] = [-3.5, 2.5]
+
+/**
+ * Circular collider radius of a dwelling — the wall body it is drawn with,
+ * WIDENED where the building's own roof overhang would otherwise let the camera
+ * into it (work-order 349). `null` for the rectangular kinds, which collide as
+ * oriented boxes and carry no low overhang.
+ */
+const DWELLING_BODY: Partial<Record<DwellingKind, (d: DwellingDef) => number>> = {
+  hut: (d) => d.r + 0.3,
+  granary: () => 1.2,
+  tent: (d) => d.r * 1.3,
+  stall: () => 1.35,
+  shed: (d) => d.r + 0.35,
+  tower: (d) => d.r + 0.4,
+}
+
+export function dwellingCircleRadius(d: DwellingDef, style: RegionPlaceStyle): number | null {
+  const body = DWELLING_BODY[d.kind]
+  if (!body) return null
+  return Math.max(body(d), dwellingRoofStandOff(d, style))
+}
+
+/** Stand-off this dwelling's own ROOF demands, 0 where its rim hangs clear. */
+export function dwellingRoofStandOff(d: DwellingDef, style: RegionPlaceStyle): number {
+  return roofStandOff(dwellingRoofProfile(d, style))
+}
+
+/** The same rule for the two enterable round huts (design.md §9): the collider
+ *  is the hut body unless its roof rim hangs into the camera's reach. */
+export function interactiveCircleRadius(type: BuildingType | 'villager', style: RegionPlaceStyle): number {
+  if (type === 'villager') return 0.45
+  const hut = type === 'market' ? MARKET_HUT : CHIEF_HUT
+  return Math.max(type === 'market' ? 2.9 : 3.35, roofStandOff(hutRoofProfile(style.roof, hut.r, hut.h, style.stilts)))
+}
 
 /** Interact radius for the elder/villager Space use key (design.md §2.3). */
 export const INTERACT_RADIUS = 4.5
@@ -392,7 +431,16 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     const cornerR =
       kind === 'warehouse' ? Math.hypot(r, 2.3) : kind === 'box' ? r * 1.33 : kind === 'mosque' ? r * 1.29 : r
     if (Math.hypot(x, z) > radius - cornerR - 1.0) return null
-    const facing = pickDoorRot(x, z, r, rot)
+    // The door approach keeps its historical 0.2 m of air outside the collider
+    // (work-order 349): where a LOW ROOF pushed that collider out past the wall,
+    // the door point travels with it, so the resident still steps out onto free
+    // ground instead of into its own hut's stand-off. A roof that hangs clear
+    // demands nothing and leaves the door exactly where it always sat.
+    const standOff = dwellingRoofStandOff({ kind, x, z, rot, r, h, floors, door: [x, z] }, style)
+    // `doorAt` adds the 0.5 m approach itself, so the seat radius carries only
+    // the body: the wall, or the roof's stand-off less that same 0.2 m of air.
+    const doorSeat = Math.max(r, standOff - 0.3)
+    const facing = pickDoorRot(x, z, doorSeat, rot)
     const d: DwellingDef = {
       kind,
       x,
@@ -401,7 +449,7 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
       r,
       h,
       floors,
-      door: doorAt(x, z, r, facing),
+      door: doorAt(x, z, doorSeat, facing),
     }
     dwellings.push(d)
     return d
@@ -897,7 +945,7 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
       colliders.push(boxCollider(it.pos[0], it.pos[1], 2.5, 2.0, it.rot ?? 0))
     } else {
       // Chief hut and the smaller trading post (both round village huts).
-      colliders.push({ x: it.pos[0], z: it.pos[1], r: it.type === 'market' ? 2.9 : 3.35 })
+      colliders.push({ x: it.pos[0], z: it.pos[1], r: interactiveCircleRadius(it.type, style) })
     }
   })
   for (const d of dwellings) {
@@ -908,26 +956,12 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
       case 'warehouse':
         colliders.push(boxCollider(d.x, d.z, d.r, 2.3, d.rot))
         break
-      case 'granary':
-        colliders.push({ x: d.x, z: d.z, r: 1.2 })
-        break
-      case 'tent':
-        colliders.push({ x: d.x, z: d.z, r: d.r * 1.3 })
-        break
-      case 'stall':
-        colliders.push({ x: d.x, z: d.z, r: 1.35 })
-        break
-      case 'shed':
-        colliders.push({ x: d.x, z: d.z, r: d.r + 0.35 })
-        break
-      case 'tower':
-        colliders.push({ x: d.x, z: d.z, r: d.r + 0.4 })
-        break
       case 'mosque':
         colliders.push(boxCollider(d.x, d.z, d.r, d.r * 0.8, d.rot))
         break
       default:
-        colliders.push({ x: d.x, z: d.z, r: d.r + 0.3 }) // round hut
+        // Round bodies: the wall, widened where the roof overhangs low (349).
+        colliders.push({ x: d.x, z: d.z, r: dwellingCircleRadius(d, style) ?? d.r + 0.3 })
     }
   }
   for (const f of fences) colliders.push(...fenceColliders(f))
@@ -935,9 +969,9 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
   for (const [x, z, s] of rocks) colliders.push({ x, z, r: 0.35 + s * 0.5 })
   if (teachingStone) colliders.push({ x: teachingStone.x, z: teachingStone.z, r: teachingStone.r })
   if (place.kind === 'village') {
-    colliders.push({ x: -3.5, z: 2.5, r: 1.3 }) // fire pit
+    colliders.push({ x: VILLAGE_FIRE[0], z: VILLAGE_FIRE[1], r: 1.3 }) // fire pit
     colliders.push({ x: -8.5, z: -7, r: 1.0 }) // weaver's loom
-    colliders.push({ x: -3.5 + 1.2, z: 2.5 + 1.0, r: 0.45 }) // cook
+    colliders.push({ x: VILLAGE_FIRE[0] + 1.2, z: VILLAGE_FIRE[1] + 1.0, r: 0.45 }) // cook
     // Village-life props (design.md §19; positions from PlaceLife).
     colliders.push({ x: VILLAGE_SPOTS.talkers[0], z: VILLAGE_SPOTS.talkers[1], r: 0.85 })
     colliders.push({ x: VILLAGE_SPOTS.pounder[0], z: VILLAGE_SPOTS.pounder[1], r: 0.55 })

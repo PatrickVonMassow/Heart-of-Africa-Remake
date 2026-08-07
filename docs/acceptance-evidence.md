@@ -1150,6 +1150,25 @@ never ends up on the far side; the pre-fix code ends 1.5 m inside in hausa-,
 maasai- and tuareg-village, which is what makes that test a witness rather than
 a restatement. Live: the goats in `scripts/verify/polish.mjs`.
 
+The clearance holds UPWARD too (point 349): the rule kept the camera out of a
+building's side, but a roof overhangs ground the player may stand on, and a
+rondavel's thatch cone hangs its flat underside at ~1.3 m — under the 1.5 m eye,
+so the near plane cut into it. `src/scenes/place/roofClearance.ts` carries the
+roof geometry the renderer draws with (PlaceScene builds hut, shed and
+cook-shelter meshes from those same constants) and derives each building's
+stand-off from it. `src/scenes/place/roofClearance.test.ts` sweeps every place,
+every building type and three seeds: no spot the player can stand on has less
+than eye height + near-plane reach + margin overhead — and the witness replays
+the same sweep against the pre-349 wall-only colliders, which finds the low
+eaves again (48 973 sample points, worst 1.27 m), plus a deliberately lowered
+rim on a roof that clears today. Live in `scripts/verify/polish.mjs`: the player
+walks into the eaves of a hut in zulu-village and of a Cairo trade house under
+the game's own resolver, and the rendered scene is asked what hangs over the eye
+(`349-eaves-village`, `349-eaves-port`); the cook-shelter over the village fire
+proves the eaves were not simply fenced off — it is still standable and still a
+solid surface from below — and every thatch roof mesh draws both faces, so an
+open dome hemisphere is no longer a back face one can see through.
+
 ## 17. Localization.
 
 Verifiable: screenshots of the status bar, journal, a trade
