@@ -1,11 +1,20 @@
 // Stop hook (user mandate 22.07.2026): GUARANTEE the batch assistant notices
 // when GitHub CI turns red for a commit it pushed — a red "fast" run went
-// unnoticed until the user pointed it out, and that must not recur. When HEAD
-// is pushed, this checks the latest Actions runs for HEAD via the GitHub REST
-// API (`gh` is NOT installed on this machine — the API is the working path),
-// BLOCKS turn-end on a confirmed red, and pushes an ntfy alert once per
-// failing sha (dedup via .claude/ci-status-guard-state.json). The decision
-// logic lives in ci-status-guard-core.mjs (pure, Vitest-covered).
+// unnoticed until the user pointed it out, and that must not recur.
+//
+// THE UNIT OF JUDGEMENT IS THE PUSHED REF, AND THE DEMAND IS "CONFIRM GREEN"
+// (point 387, 30.07.2026). Asking about HEAD alone let 26 red runs on `main`
+// and thirteen red branch runs stand unseen for three weeks: the owning
+// session's HEAD was green while every push of a delegated agent's branch
+// failed, and a delegated agent pushes under the parent's session id. So this
+// sweeps every ref the repository pushed inside the window — named from the
+// local push reflog, never from an API sweep over branches — and a push does not
+// count as landed until the run for that exact sha has CONCLUDED green. An
+// unfinished run is a WAIT, not a pass; a ref that no longer exists is dropped;
+// the alert goes out once per (ref, sha). Answers that can never change are
+// cached per sha in .claude/ci-status-guard-state.json, so the common turn — the
+// one that pushed nothing new — costs no API call at all. The decision logic
+// lives in ci-status-guard-core.mjs (pure, Vitest-covered).
 //
 // Fail-OPEN above all: CI pending, no run yet, token missing, offline, non-200,
 // any internal error → allow, so the guard can never freeze a session. All
@@ -20,7 +29,16 @@ import { execFileSync } from 'node:child_process'
 import { request } from 'node:https'
 import { fileURLToPath } from 'node:url'
 import { readJson, writeJsonAtomic } from './dashboard-state.mjs'
-import { classifyRuns, failedRuns, recoveredWorkflows, shouldBlock, shouldNotify, blockReason } from './ci-status-guard-core.mjs'
+import {
+  failedRuns,
+  notifiedFromState,
+  pruneFamine,
+  pruneNotifiedRefs,
+  pruneShaCache,
+  pushedRefsFromReflog,
+  refTargets,
+  sweepTargets,
+} from './ci-status-guard-core.mjs'
 import { JOBS_PAGE_SIZE, classifyFailureCause, jobsComplete, moreJobPages } from './ci-failure-cause-core.mjs'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
 
@@ -269,19 +287,79 @@ async function notifyCiRed(message) {
   })
 }
 
-/** Drop the outage-waiver clock of every workflow whose newest run on this head
- *  came back without a failure. Never throws — bookkeeping may not cost a stop. */
-function forgetRecoveredFamine(runs, head) {
+/** Every remote-tracking ref that still EXISTS, short form ("origin/main").
+ *  A ref that has been deleted is thereby dropped from the sweep instead of
+ *  being reported forever (point 387). */
+function remoteRefNames() {
   try {
-    const state = readJson(STATE) ?? {}
-    const famine = state.famine && typeof state.famine === 'object' ? state.famine : {}
-    const names = Object.keys(famine)
-    if (names.length === 0) return
-    const next = { ...famine }
-    for (const name of recoveredWorkflows(runs, head)) delete next[name]
-    if (Object.keys(next).length !== names.length) writeJsonAtomic(STATE, { ...state, famine: next })
+    return git(['for-each-ref', '--format=%(refname:short)', 'refs/remotes/'])
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter(Boolean)
   } catch {
-    /* fail-open */
+    return []
+  }
+}
+
+/** How many reflog entries the push scan reads. BOUNDED BY CONSTRUCTION, which
+ *  is point 387's cost rule: the walk may not grow with repository age, and a
+ *  raised timeout is not a fix for a check that walks real git history.
+ *  Sized so the CAP cannot bite before the 24 h window does: a commit writes
+ *  three or four entries across HEAD, its branch and the remote ref, and the 500
+ *  newest here span about 26 h — barely over the window, and less than that on a
+ *  busy night with three parallel agents. 2000 keeps a roughly four-fold margin,
+ *  at the same one git process (four-eyes finding 2). */
+const REFLOG_ENTRIES = 2000
+
+/** The push reflog, newest first — ONE git process, no network.
+ *  WORST CASE per turn end: 4 git processes (rev-parse, branch -r --contains,
+ *  this reflog read, for-each-ref), each on local refs, measured at 31 ms
+ *  together. Nothing here scales with the number of branches, with the size of
+ *  the ledger, or with repository age. */
+function pushReflog() {
+  try {
+    return git([
+      'reflog',
+      '--date=unix',
+      '--format=%gD%x09%H%x09%gs',
+      '--all',
+      '-n',
+      String(REFLOG_ENTRIES),
+    ])
+  } catch {
+    return '' // no reflog (fresh clone) — HEAD alone is then the sweep
+  }
+}
+
+/** Judge ONE red sha the way the HEAD path always did: every failed run on it,
+ *  each classified for WHERE its fault lies, so an outage cannot be mistaken for
+ *  our own breakage (points 526/528). Returns the chosen classification, whether
+ *  every red is unactionable, and the famine clocks to keep. */
+async function judgeRed(repo, { sha, runs, classification, famine, now }) {
+  const reds = failedRuns(runs, sha)
+  const judged = []
+  const stillFamished = {}
+  for (const red of reds.length > 0 ? reds : [classification]) {
+    const cause = classifyFailureCause({
+      workflowName: red.workflowName,
+      conclusion: red.conclusion,
+      jobs: await fetchJobs(repo, red.runId),
+      workflowsUntouched: await workflowsUntouchedSince(repo, runs, red, sha),
+      famineSince: Number(famine[red.workflowName]) || 0,
+      now,
+    })
+    if (cause.actionable === false) stillFamished[red.workflowName] = Number(famine[red.workflowName]) || now
+    judged.push({ ...red, ...cause })
+  }
+  return {
+    // The one that decides: the first red something can be done about, else the
+    // first — which is then, by construction, an unactionable one.
+    classification: judged.find((c) => c.actionable !== false) ?? judged[0],
+    standDown: judged.every((c) => c.actionable === false),
+    stillFamished,
+    // Every workflow this call actually judged, so the sweep can CLEAR the
+    // waiver clock of one that is no longer dying the famine way.
+    judgedWorkflows: judged.map((c) => c.workflowName),
   }
 }
 
@@ -297,96 +375,66 @@ async function main() {
   if (existsSync(PAUSE)) return null // user-paused: no batch duty in flight
   if (heldByOtherLiveOwner(sid)) return null // hard singleton: a non-owner session stands down — no batch duty
 
-  const head = git(['rev-parse', 'HEAD'])
-  if (!isPushed(head)) return null
-
   const repo = githubRepo()
   if (!repo) return null
 
-  const runs = await fetchRuns(repo, head)
-  if (!runs) return null // offline / rate-limited / API error — fail-open
-
-  const runClassification = classifyRuns(runs, head)
-  if (!shouldBlock(runClassification.state)) {
-    // THE WAIVER CLOCK IS CLEARED ON THE WAY OUT (four-eyes review, finding 1).
-    // It is kept per workflow, and this is the path a recovery takes — leaving a
-    // stale timestamp behind would make the NEXT famine for that workflow read
-    // as an already-expired waiver and escalate on its first sighting.
-    forgetRecoveredFamine(runs, head)
-    return null
-  }
-
-  // WHERE the fault lies decides the remedy: a red the repository cannot fix
-  // must not demand a fixing push (point 526).
-  //
-  // EVERY failed run is judged, not just the one classifyRuns names (four-eyes
-  // review, 06.08.2026). Which run that is comes down to API list order, and
-  // once an outside failure may WAIVE the block, letting order decide would let
-  // a famine-shaped watchdog run excuse a genuinely red CI run on the same
-  // commit. So: block on the first red that has something to do, and stand down
-  // only when every single one of them has not.
-  const reds = failedRuns(runs, head)
-  const state = readJson(STATE) ?? {}
   const now = Date.now()
+  const head = git(['rev-parse', 'HEAD'])
+  const state = readJson(STATE) ?? {}
   // WHEN each workflow was first seen dying the famine way, so the outage waiver
-  // can expire (residual (a)). Kept per workflow name, not per sha: the very
-  // failure mode is one workflow dying identically across commit after commit.
-  const famine = state.famine && typeof state.famine === 'object' ? state.famine : {}
-  const stillFamished = {}
-  const judged = []
-  for (const red of reds.length > 0 ? reds : [runClassification]) {
-    const cause = classifyFailureCause({
-      workflowName: red.workflowName,
-      conclusion: red.conclusion,
-      jobs: await fetchJobs(repo, red.runId),
-      workflowsUntouched: await workflowsUntouchedSince(repo, runs, red, head),
-      famineSince: Number(famine[red.workflowName]) || 0,
-      now,
-    })
-    if (cause.actionable === false) stillFamished[red.workflowName] = Number(famine[red.workflowName]) || now
-    judged.push({ ...red, ...cause })
-  }
-  // The one that decides: the first red something can be done about, else the
-  // first — which is then, by construction, an unactionable one.
-  const classification = judged.find((c) => c.actionable !== false) ?? judged[0]
-  const standDown = judged.every((c) => c.actionable === false)
+  // can expire. Kept per workflow name, not per sha: the very failure mode is one
+  // workflow dying identically across commit after commit.
+  const famine = pruneFamine(state.famine, now)
+  const cache = pruneShaCache(state.shas, now)
+  const existingRefs = remoteRefNames()
+  const notified = pruneNotifiedRefs(notifiedFromState(state), existingRefs)
 
-  // A stood-down red gets a REPEATED alert, not one ever (four-eyes review S1):
-  // in a runner famine no step runs, so ci.yml's own `if: failure()` alert —
-  // the primary detector — never fires either. Dedup per sha alone would leave
-  // a permanently broken main pinging exactly once and never blocking.
-  const alertKey = standDown ? `${head}:${classification.runId}:${new Date().toISOString().slice(0, 13)}` : head
-  if (shouldNotify(classification.state, state.notifiedSha, alertKey)) {
-    await notifyCiRed(
-      `CI failed for pushed ${head.slice(0, 7)}: "${classification.workflowName}" ` +
-        `run ${classification.runId} (${classification.conclusion}, cause: ${classification.cause}` +
-        `${standDown ? ', nothing in the repository can clear it' : ''}). ${classification.url ?? ''}` +
-        // Once the outage waiver has expired, the alert stops saying "nothing to
-        // do" and NAMES the reading only a push can fix (residual (a)).
-        (classification.escalate ? ` ${classification.detail}. ${classification.remedy}` : ''),
-    )
+  // EVERY REF THIS REPOSITORY PUSHED, not just HEAD (point 387). The list comes
+  // from the local push reflog: a delegated agent's branch push lands in the
+  // shared reflog, so the owning session sees the work it is responsible for
+  // without asking the API about a single branch it did not push.
+  const targets = refTargets({
+    pushed: pushedRefsFromReflog(pushReflog(), { now }),
+    existingRefs,
+    headSha: head,
+    headPushed: isPushed(head),
+  })
+  if (targets.length === 0) return null // nothing pushed → no API call at all
+
+  const swept = await sweepTargets({
+    targets,
+    cache,
+    notified,
+    famine,
+    now,
+    fetchRuns: (sha) => fetchRuns(repo, sha),
+    judgeRed: (args) => judgeRed(repo, args),
+    notify: ({ target, classification, standDown }) =>
+      notifyCiRed(
+        `CI failed for pushed ${target.ref} ${String(target.sha).slice(0, 7)}: "${classification.workflowName}" ` +
+          `run ${classification.runId} (${classification.conclusion}, cause: ${classification.cause}` +
+          `${standDown ? ', nothing in the repository can clear it' : ''}). ${classification.url ?? ''}` +
+          // Once the outage waiver has expired, the alert stops saying "nothing
+          // to do" and NAMES the reading only a push can fix.
+          (classification.escalate ? ` ${classification.detail}. ${classification.remedy}` : ''),
+      ),
+  })
+
+  if (swept.dirty || JSON.stringify(state.notifiedRefs ?? {}) !== JSON.stringify(swept.notified)) {
     writeJsonAtomic(STATE, {
-      ...state,
-      famine: stillFamished,
-      notifiedSha: alertKey,
-      notifiedAt: Date.now(),
-      runId: classification.runId,
+      famine: swept.famine,
+      shas: swept.cache,
+      notifiedRefs: swept.notified,
+      notifiedAt: now,
     })
-  } else if (JSON.stringify(stillFamished) !== JSON.stringify(famine)) {
-    // A workflow that recovered forgets its waiver clock, so the NEXT famine
-    // starts a fresh six hours instead of inheriting an expired one.
-    writeJsonAtomic(STATE, { ...state, famine: stillFamished })
   }
 
-  // A red with NOTHING to do is reported, not sat on (point 528, 06.08.2026). The
-  // guard exists to stop a session walking away from a defect IT can clear; when
-  // GitHub's own runners never reached our code, holding the turn end clears
-  // nothing and stops the batch over a foreign outage. The alert above still
-  // went out, and the next session re-reads the same runs — so this forgets
-  // nothing, it only declines to stand still.
-  if (standDown) return null
-
-  return JSON.stringify({ decision: 'block', reason: blockReason(classification, head) })
+  // A fail-open SAYS why (point 387): a silently swallowed API error is
+  // indistinguishable from a green, which is the confusion this point ends.
+  if (swept.failedOpen.length > 0) {
+    console.error(`ci-status-guard allowed the stop without a verdict for: ${swept.failedOpen.join('; ')}`)
+  }
+  return swept.decision ? JSON.stringify({ decision: 'block', reason: swept.decision }) : null
 }
 
 // No process.exit after awaits (libuv teardown race on Windows) — print the

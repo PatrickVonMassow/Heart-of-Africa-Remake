@@ -534,6 +534,68 @@ the session. Only the run is skipped — and the NEXT commit on that branch, the
 one that finishes the work, carries neither marker nor trailer and runs CI
 normally.
 
+### CONFIRM GREEN, not "notice red" (`ci-status-guard`, point 387)
+
+The pre-push gate runs the same unit suite CI runs, so it catches everything
+**except what differs by platform** — and that is exactly what went wrong on
+30.07.2026. A negative control reproduced a Windows incident (git's removal
+following a junction into its target) and asserted it on every platform, so it
+failed every hosted Ubuntu run and passed on the machine that wrote it. A second
+cause the same night was cost: the mechanism gate's containment probe spawned one
+git process per (pending commit, ledger record) **pair**, 26–38 s past its own
+budget. Both mailed the repository owner and nobody in the session learned:
+`ci-status-guard` asked GitHub about `git rev-parse HEAD` alone, the owning
+session's HEAD was `main` and green, and thirteen red branch runs stood unseen.
+Measured across the last 100 runs that night: 53 red, 26 of them on `main`,
+spread over three weeks.
+
+Two rules came out of it, and both are enforced rather than remembered:
+
+**A test whose subject is OS behaviour asserts PER PLATFORM, never by skipping.**
+A skip would mean the assertion silently says nothing on the platform that
+actually runs it; the fix asserts the damage where the damage exists and the
+platform's own behaviour elsewhere.
+
+**A check inside the unit layer that walks REAL git history is bounded by
+CONSTRUCTION, not by a raised timeout,** states its worst case in a comment and
+stays inside it. The containment probe's budget had already been raised once; the
+second raise would have hidden it again. It is now `attachCoverage` in
+`mechanism-review-guard.mjs` — `1 + R` git calls, R being the records on this
+branch, and zero when nothing mechanism-shaped is pending — pinned by call COUNT,
+not wall clock, in `mechanism-review-guard.test.mjs`.
+
+And the guard itself changed target. The unit of judgement is now the **pushed
+ref**, and a push does not count as landed until the run for that exact sha has
+**concluded green** — which closes the whole class regardless of cause, platform
+differences included, where merely noticing red closes only the cases someone
+happens to look at. Concretely (`ci-status-guard-core.mjs`, pure and pinned in
+`ci-status-guard-core.test.mjs`):
+
+- **Every ref this repository pushed** is judged, not just HEAD. A delegated
+  agent pushes under the parent's session id and into the shared reflog, so those
+  refs are the parent's responsibility. The ref is named in the block message.
+- **The list comes from the local push reflog** (`update by push` entries only —
+  a fetch is somebody else's branch), never from an API sweep over branches.
+  Four local git calls per turn end, ~30 ms measured, none of them growing with
+  the number of branches or with repository age.
+- **An unfinished run is a WAIT, not a pass** — and the wait has a ceiling
+  (`WAIT_BUDGET_MS`), past which the guard fails open and says so, because a wait
+  without a ceiling would trap a session behind a queue that never drains. It
+  keeps asking after the ceiling, though: a run that concludes red an hour later
+  — the runner-famine shape — is still judged. The ceiling outranks the answer
+  cache, so a wait recorded a minute ago cannot hold the turn past it.
+- **The common turn costs nothing.** A concluded green — and a commit no
+  workflow covers, such as a `board` push or a `[skip ci]` rescue commit — is
+  cached **per sha** and never asked about again; a red or an unfinished run is
+  re-asked at most once a minute. Never per REF: a ref written off would silently
+  pass the red of the very next commit on it, and the rescue push is the routine
+  way onto that path.
+- **A deleted ref is dropped** rather than reported forever, and the ntfy alert
+  goes out once per (ref, sha).
+- **Fail-open, with the reason STATED.** Offline, rate-limited or unreadable →
+  the stop is allowed and the guard writes which ref it could not judge, because
+  a silently swallowed API error is indistinguishable from a green.
+
 ## Triaging a RED run (point 294)
 
 A red is now read, not asserted. Two signals, both decided in the pure module

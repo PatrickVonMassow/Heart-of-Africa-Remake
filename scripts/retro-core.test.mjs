@@ -362,17 +362,23 @@ describe('collectSources / collectMemories (fs-level, temp fixtures)', () => {
     expect(computeFingerprint({ ...partsA, memories: collectMemories(mem) })).not.toBe(a)
   })
 
-  // Windows-only: the harness path munging this pins is the Windows form
-  // (`c--Users-Patri-…`), and `resolve()` of a Windows literal on a POSIX CI
-  // runner prepends the runner cwd, so the assertion only holds on win32 — which
-  // is the only platform the retrospective mechanism actually runs on.
-  it.skipIf(process.platform !== 'win32')(
-    'defaultMemoryDir munges the repo path like the harness (drive lowered, separators to dashes)',
-    () => {
-      const dir = defaultMemoryDir('C:\\Users\\Patri\\Documents\\Developing\\hoa').replace(/\\/g, '/')
+  // ASSERT PER PLATFORM, NEVER BY SKIPPING (point 387). This case used to
+  // `skipIf(platform !== 'win32')`, so on every machine that actually runs the
+  // suite — the Linux host, the hosted CI runner — it silently meant nothing.
+  // That is the same blindness that made a negative control assert a Windows
+  // incident everywhere and turn every Ubuntu run red on 30.07.2026, read from
+  // the other side. What is platform-dependent here is only the DRIVE LETTER:
+  // `resolve()` of a Windows literal on POSIX prepends the runner cwd, so the
+  // lowercased first character is the cwd's. The munging rule itself — every
+  // ':' '\' '/' becomes '-' — is the point of the test and holds on both.
+  it('defaultMemoryDir munges the repo path like the harness (drive lowered, separators to dashes)', () => {
+    const dir = defaultMemoryDir('C:\\Users\\Patri\\Documents\\Developing\\hoa').replace(/\\/g, '/')
+    if (process.platform === 'win32') {
       expect(dir).toMatch(/\/\.claude\/projects\/c--Users-Patri-Documents-Developing-hoa\/memory$/)
-    },
-  )
+    } else {
+      expect(dir).toMatch(/\/\.claude\/projects\/.+-C--Users-Patri-Documents-Developing-hoa\/memory$/)
+    }
+  })
 })
 
 // A source directory that resolves to NOTHING is never a real state: it means

@@ -301,8 +301,16 @@ describe('the watch CLI, run for real', () => {
       windowsHide: true,
     })
 
-  it('is a no-op that EXITS 0 on a host with no Task Scheduler', () => {
-    if (process.platform === 'win32') return
+  // ASSERT PER PLATFORM, NEVER BY SKIPPING (point 387): a bare `return` on
+  // win32 made this case silently mean nothing on the one platform the script
+  // exists for. Both readings are pinned instead — off Windows it is the no-op,
+  // on Windows it is emphatically not. The win32 branch runs --dry-run, so the
+  // probe reads the Task Scheduler without repairing or starting anything.
+  it('is a no-op that EXITS 0 off Windows, and a real probe on it', () => {
+    if (process.platform === 'win32') {
+      expect(run(['--check', 'primary', '--dry-run']).stdout).not.toMatch(/no Task Scheduler/)
+      return
+    }
     const r = run(['--check', 'primary'])
     expect(r.status).toBe(0)
     expect(r.stdout).toMatch(/no Task Scheduler/)
