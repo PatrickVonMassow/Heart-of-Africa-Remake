@@ -26,36 +26,190 @@
 // itself, and it never tries to judge whether a question is "important enough".
 // Both would need intent, the guard has text, and a guard that guesses intent is
 // the guard that lets the important one through.
+//
+// THE PHRASE MATCH IS A SENTENCE MATCH (point 539, measured 07.08.2026, twice in
+// one session). The bias toward blocking is right and stays; the MATCHER was
+// wrong. It hit the bare substring `entscheide` anywhere in the reply, so "den
+// Punkt, den er entscheidet" (a review record naming the point it settles) and the
+// quoted defect name "Prosa entscheidet" each cost a turn — ordinary prose with no
+// question in it. Two corrections, both applied to EVERY phrase, not only the
+// measured one:
+//   1. A phrase matches as a WHOLE WORD (the guard's own boundaries, German
+//      letters included), so `entscheide` no longer sits inside "entscheidet" and
+//      `wähle` no longer sits inside "wählen"/"auswählen".
+//   2. A phrase only FIRES when the SENTENCE carrying it asks: it is a question
+//      (`?`) or it addresses the user in the second person (du/dir/dich/dein…).
+//      The German imperative IS that address, so a phrase that is itself an
+//      unambiguous imperative ("bitte entscheide", "sag mir") satisfies the gate
+//      by being in the sentence — that is what `address: 'self'` records. Every
+//      other phrase is ambiguous between asking and reporting ("Das entscheide ich
+//      selbst.", "Welche Variante gewinnt, zeigt die Messung.") and carries
+//      `address: 'sentence'`, so the sentence has to supply the ask.
+// The judgement per phrase is written down in `why`, and `probe`/`quiet` are the
+// sentences that pin it in both directions.
 
 /**
- * The phrasings this project's own replies use to put something to the user.
- * Lowercased, matched as substrings — German, because the replies are German
- * (CLAUDE.md: code English, chat German). A phrase without a question mark is
- * exactly the case a `?` test misses: "Sag mir, welche Variante du willst."
+ * The phrasings this project's own replies use to put something to the user —
+ * German, because the replies are German (CLAUDE.md: code English, chat German).
+ * A phrase without a question mark is exactly the case a `?` test misses: "Sag
+ * mir, welche Variante du willst."
+ *
+ * Per entry:
+ *   phrase  — matched lowercased, as a whole word (see `containsPhrase`)
+ *   address — 'self': the phrase itself is the second-person address, so it fires
+ *             wherever it stands. 'sentence': the sentence must ask (`?`) or carry
+ *             a second-person pronoun.
+ *   why     — the written reason for that judgement (point 539: kept per entry)
+ *   probe   — a sentence that MUST fire on this entry
+ *   quiet   — ordinary prose carrying the same words that must NOT fire; required
+ *             for every 'sentence' entry, which is where the false positives live
  */
-export const DECISION_PHRASES = Object.freeze([
-  'sag mir',
-  'sage mir',
-  'welche variante',
-  'deine entscheidung',
-  'soll ich',
-  'sollen wir',
-  'willst du',
-  'möchtest du',
-  'wie möchtest du',
-  'entscheide',
-  'brauche deine',
-  'bitte entscheide',
-  'deine wahl',
-  'gib mir bescheid',
-  // Imperatives put a decision without ever asking a question (four-eyes review
-  // 30.07.2026, finding 3): "Bitte wähle die enge oder die weite Variante."
-  'wähle',
-  'waehle',
-  'welche option',
-  'welche der',
-  'sag bescheid',
-])
+export const DECISION_PHRASES = Object.freeze(
+  [
+    // ---- the phrase IS the address: a second-person imperative, or it carries
+    // the pronoun itself. Listed first so the block names the specific wording.
+    {
+      phrase: 'bitte entscheide',
+      address: 'self',
+      why: 'An imperative with "bitte" cannot be the first-person "das entscheide ich" — it can only be spoken to the reader, so it asks wherever it stands.',
+      probe: 'Bitte entscheide zwischen dem engen und dem weiten Zuschnitt.',
+    },
+    {
+      phrase: 'bitte wähle',
+      address: 'self',
+      why: 'Same shape as "bitte entscheide": the "bitte" pins the imperative reading, which the bare "wähle" does not have.',
+      probe: 'Bitte wähle die enge oder die weite Variante.',
+    },
+    {
+      phrase: 'bitte waehle',
+      address: 'self',
+      why: 'The umlaut-less spelling of the entry above; a reply typed without umlauts must not slip past.',
+      probe: 'Bitte waehle die enge oder die weite Variante.',
+    },
+    {
+      phrase: 'sag mir',
+      address: 'self',
+      why: 'Second-person imperative. The word boundary keeps it off "sagst mir" and "gesagt", which report rather than ask.',
+      probe: 'Sag mir, ob der kleine oder der große Zuschnitt kommt.',
+    },
+    {
+      phrase: 'sage mir',
+      address: 'self',
+      why: 'The long imperative form. It is also the first-person reflexive ("ich sage mir immer …"), and it fires anyway: that wording is rare in a reply, while missing "Sage mir, welche Variante bleibt." costs the decision.',
+      probe: 'Sage mir kurz, welcher Zuschnitt kommt.',
+    },
+    {
+      phrase: 'sag bescheid',
+      address: 'self',
+      why: 'Imperative that puts a decision without ever asking a question (four-eyes review 30.07.2026, finding 3).',
+      probe: 'Sag bescheid, welcher Zuschnitt bleiben soll.',
+    },
+    {
+      phrase: 'gib mir bescheid',
+      address: 'self',
+      why: 'Imperative; no first-person reading exists for it.',
+      probe: 'Gib mir bescheid, sobald der Zuschnitt feststeht.',
+    },
+    {
+      phrase: 'deine entscheidung',
+      address: 'self',
+      why: 'Carries the second-person possessive itself — the sentence cannot be about anybody else\'s decision.',
+      probe: 'Deine Entscheidung: der enge oder der weite Zuschnitt.',
+    },
+    {
+      phrase: 'deine wahl',
+      address: 'self',
+      why: 'As above, and the wording the live "Von dir zu klären" cards actually use.',
+      probe: 'Deine Wahl: jetzt einrichten oder auf die zweite Hälfte warten.',
+    },
+    {
+      phrase: 'brauche deine',
+      address: 'self',
+      why: 'Carries the possessive; "ich brauche deine Freigabe" is a request whatever follows it.',
+      probe: 'Ich brauche deine Freigabe für den weiten Zuschnitt.',
+    },
+    {
+      phrase: 'willst du',
+      address: 'self',
+      why: 'Carries the pronoun; the question mark is often missing exactly here ("Zum Zuschnitt: willst du den engen oder den weiten.").',
+      probe: 'Zum Zuschnitt: willst du den engen oder den weiten.',
+    },
+    {
+      phrase: 'möchtest du',
+      address: 'self',
+      why: 'Carries the pronoun. The former separate entry "wie möchtest du" was dropped 07.08.2026 — this one already matches every sentence that one did.',
+      probe: 'Zum Zuschnitt: möchtest du den engen oder den weiten.',
+    },
+
+    // ---- ambiguous wording: the sentence has to supply the ask.
+    {
+      phrase: 'entscheide',
+      address: 'sentence',
+      why: 'THE MEASURED FALSE POSITIVE (07.08.2026, twice in one session): as a substring it hit "entscheidet" in "den Punkt, den er entscheidet" and in the quoted defect name "Prosa entscheidet". Whole-word now, and still gated: bare "entscheide" is also the first person ("Das entscheide ich selbst."), which reports a decision instead of asking for one.',
+      probe: 'Entscheide bitte, welchen Zuschnitt du willst.',
+      quiet: 'Der Bericht nennt den Punkt, den er entscheidet.',
+    },
+    {
+      phrase: 'wähle',
+      address: 'sentence',
+      why: 'As a substring it sat inside "wählen" and "auswählen"; as a word it is still the first person ("Ich wähle die enge Variante."). The asking form has its own entry, "bitte wähle".',
+      probe: 'Wähle den Zuschnitt, der dir lieber ist.',
+      quiet: 'Wir wählen für den Zuschnitt die enge Variante.',
+    },
+    {
+      phrase: 'waehle',
+      address: 'sentence',
+      why: 'The umlaut-less spelling, judged exactly like the entry above.',
+      probe: 'Waehle den Zuschnitt, der dir lieber ist.',
+      quiet: 'Wir waehlen die enge Variante.',
+    },
+    {
+      phrase: 'welche variante',
+      address: 'sentence',
+      why: 'An interrogative pronoun opens a question and an indirect clause alike: "Welche Variante gewinnt, zeigt die Messung." states a result and asks nothing.',
+      probe: 'Welche Variante du willst, ist noch offen.',
+      quiet: 'Welche Variante gewinnt, zeigt die Messung.',
+    },
+    {
+      phrase: 'welche option',
+      address: 'sentence',
+      why: 'Same shape as "welche variante": the indirect clause "welche Option billiger ist" reports a measurement, and only the question or an address turns it into an ask.',
+      probe: 'Welche Option du nimmst, ist noch offen.',
+      quiet: 'Welche Option billiger ist, steht in der Messung.',
+    },
+    {
+      phrase: 'welche der',
+      address: 'sentence',
+      why: 'The broadest phrase in the list — "welche der drei Suiten rot war" is an ordinary enumeration. Ungated it would fire on half the status replies this project writes.',
+      probe: 'Welche der beiden Varianten du nimmst, ist noch offen.',
+      quiet: 'Welche der drei Suiten rot war, steht im Protokoll.',
+    },
+    {
+      phrase: 'soll ich',
+      address: 'sentence',
+      why: 'First person, not an address: it asks only in its question form ("Soll ich mergen?"), while "soll ich laut Arbeitsordnung zusammenführen" merely names a duty.',
+      probe: 'Soll ich dir den engen oder den weiten Zuschnitt bauen.',
+      quiet: 'Wenn der Lauf grün ist, soll ich laut Arbeitsordnung sofort zusammenführen.',
+    },
+    {
+      phrase: 'sollen wir',
+      address: 'sentence',
+      why: 'Judged exactly like "soll ich" — the plural changes who acts, not who is asked.',
+      probe: 'Sollen wir dir den engen Zuschnitt bauen.',
+      quiet: 'Laut Regel sollen wir nach jedem Merge das schnelle Tor laufen lassen.',
+    },
+  ].map((e) => Object.freeze(e)),
+)
+
+/**
+ * The second-person pronouns that make a sentence an address to the user. Matched
+ * as whole words — "durch" is not "du". The plural forms (euch/euer) are left out
+ * deliberately: this project speaks to ONE user, and every live card uses the
+ * singular.
+ */
+export const SECOND_PERSON = Object.freeze(
+  new Set(['du', 'dir', 'dich', 'dein', 'deine', 'deinem', 'deinen', 'deiner', 'deines', 'deins']),
+)
 
 /**
  * Words that carry no topic. Kept SMALL on purpose: a stopword list is the one
@@ -96,11 +250,61 @@ export const MIN_WORD_LENGTH = 4
  *  TWO shared words are required (four-eyes review 30.07.2026, finding 2). */
 export const STRONG_WORD_LENGTH = 8
 
+/** The letters a German word is made of — the guard's OWN word boundary, because
+ *  JavaScript's `\b` treats "ä" as a boundary and would split "wähle" in two. */
+const WORD_CHARS = '0-9a-zäöüß'
+const TOKEN_SPLIT = new RegExp(`[^${WORD_CHARS}]+`)
+
+/** Lowercased word tokens of a text — the one tokenizer the whole module uses. */
+const tokens = (text) => (typeof text === 'string' ? text.toLowerCase().split(TOKEN_SPLIT) : [])
+
+const PHRASE_MATCHERS = new Map()
+const phraseMatcher = (phrase) => {
+  let re = PHRASE_MATCHERS.get(phrase)
+  if (!re) {
+    const literal = phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    re = new RegExp(`(?<![${WORD_CHARS}])${literal}(?![${WORD_CHARS}])`)
+    PHRASE_MATCHERS.set(phrase, re)
+  }
+  return re
+}
+
+/** Does a sentence carry a phrase as a WHOLE WORD? "entscheidet" is not
+ *  "entscheide", and "auswählen" is not "wähle" (point 539). */
+export const containsPhrase = (sentence, phrase) =>
+  typeof sentence === 'string' && phraseMatcher(phrase).test(sentence.toLowerCase())
+
+/** A sentence that asks. The split below ends a sentence at `.!?`, so a `?` in it
+ *  is its own — code, quoted commands and URLs are cut out before the split. */
+export const isQuestion = (sentence) => typeof sentence === 'string' && sentence.includes('?')
+
+/** Does a sentence address the user in the second person? */
+export function addressesUser(sentence) {
+  for (const w of tokens(sentence)) if (SECOND_PERSON.has(w)) return true
+  return false
+}
+
+/**
+ * The phrase entry a sentence FIRES on, or null (point 539).
+ *
+ * A phrase alone is not enough: the sentence must ask — by its question mark, by
+ * addressing the user, or by the phrase itself being that address (`self`). The
+ * list is walked in order, so the specific wording ("bitte entscheide") names the
+ * trigger before the general one ("entscheide").
+ */
+export function firingPhrase(sentence) {
+  for (const entry of DECISION_PHRASES) {
+    if (!containsPhrase(sentence, entry.phrase)) continue
+    if (entry.address === 'self' || isQuestion(sentence) || addressesUser(sentence)) return entry
+  }
+  return null
+}
+
 /** Topic words of a text, lowercased: letters only, stopwords and numbers out. */
 export function contentWords(text) {
   if (typeof text !== 'string') return new Set()
   const out = new Set()
-  for (const raw of text.toLowerCase().split(/[^0-9a-zäöüß]+/)) {
+  for (const raw of tokens(text)) {
     if (raw.length < MIN_WORD_LENGTH || STOPWORDS.has(raw)) continue
     // A PURE NUMBER is never a topic. A point number, a year or a time shared
     // between a reply and some card matched two unrelated things — and the
@@ -118,6 +322,11 @@ export function contentWords(text) {
  * carried the trigger, which is what a card has to be about. A code block is cut
  * out first: a `?` inside a regex or a URL in a quoted command is not a question
  * to the user, and blocking on it would be a false block with no fix available.
+ *
+ * The judgement is per SENTENCE, never over the whole reply (point 539): a phrase
+ * fires only where the sentence around it asks, so a decision in one paragraph and
+ * an "entscheidet" in another are two different sentences and only one of them is
+ * a question.
  */
 export function asksForDecision(text) {
   if (typeof text !== 'string' || text.trim() === '') return { asks: false, trigger: null, questions: [] }
@@ -137,16 +346,15 @@ export function asksForDecision(text) {
   const questions = []
   let trigger = null
   for (const s of sentences) {
-    const low = s.toLowerCase()
-    if (s.includes('?')) {
+    if (isQuestion(s)) {
       questions.push(s)
       trigger = trigger ?? 'question-mark'
       continue
     }
-    const phrase = DECISION_PHRASES.find((p) => low.includes(p))
-    if (phrase) {
+    const entry = firingPhrase(s)
+    if (entry) {
       questions.push(s)
-      trigger = trigger ?? `phrase:${phrase}`
+      trigger = trigger ?? `phrase:${entry.phrase}`
     }
   }
   return { asks: questions.length > 0, trigger, questions }

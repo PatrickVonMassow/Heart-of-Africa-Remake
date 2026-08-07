@@ -10,9 +10,12 @@ import {
   DECISION_PHRASES,
   MIN_WORD_LENGTH,
   REMEDY,
+  addressesUser,
   asksForDecision,
+  containsPhrase,
   contentWords,
   evaluate,
+  firingPhrase,
   matchingCard,
   topicWords,
 } from './decision-card-guard-core.mjs'
@@ -135,9 +138,12 @@ describe('the false passes the four-eyes review found', () => {
 })
 
 describe('the parts', () => {
-  it('detects every documented decision phrasing', () => {
-    for (const p of DECISION_PHRASES) {
-      expect(asksForDecision(`Kurzstand. ${p} bitte.`).asks, p).toBe(true)
+  it('detects every documented decision phrasing on its own probe sentence', () => {
+    for (const e of DECISION_PHRASES) {
+      const ask = asksForDecision(`Kurzstand, alles grün. ${e.probe}`)
+      expect(ask.asks, e.phrase).toBe(true)
+      // The probe must fire on ITS entry, so no entry is proved by another's words.
+      expect(ask.trigger, e.phrase).toBe(`phrase:${e.phrase}`)
     }
   })
 
@@ -197,5 +203,148 @@ describe('the block reason names the words a matching title must share', () => {
   it('is total on rubbish', () => {
     expect(topicWords()).toEqual([])
     expect(topicWords('not a list')).toEqual([])
+  })
+})
+
+// POINT 539 — the matcher reads a sentence, not a substring anywhere in the reply.
+// The bias toward blocking stays; what is pinned here is BOTH directions, because
+// a false block costs one turn and a missed decision costs the user hours.
+const HEADER = '**Freitag, 07.08.2026, 09:14** '
+
+describe('the measured false positives of 07.08.2026 ALLOW the stop', () => {
+  it('lets a review record naming the point it settles through', () => {
+    const reply = `${HEADER}Die Vier-Augen-Prüfung ist eingetragen: der Bericht nennt den Punkt, den er entscheidet, und die Belegzeile steht.`
+    expect(evaluate({ replyText: reply, vdzkTitles: [] })).toEqual({ block: false, reason: null })
+  })
+
+  it('lets the quoted defect name "Prosa entscheidet" through', () => {
+    const reply = `${HEADER}Der neue Punkt heißt „Prosa entscheidet" und liegt als 538 in der Arbeitsordnung.`
+    expect(evaluate({ replyText: reply, vdzkTitles: [] })).toEqual({ block: false, reason: null })
+  })
+
+  it('keeps them quiet even in a sentence that happens to address the user', () => {
+    // The word boundary carries this one on its own: "entscheidet" is not the
+    // phrase, whatever else the sentence contains.
+    const reply = `${HEADER}Du siehst im Protokoll den Punkt, den er entscheidet.`
+    expect(evaluate({ replyText: reply, vdzkTitles: [] }).block).toBe(false)
+  })
+
+  it('still BLOCKS the real decision sentence', () => {
+    const reply = `${HEADER}Sag mir, ob du den kleinen oder den großen Zuschnitt willst.`
+    const v = evaluate({ replyText: reply, vdzkTitles: [] })
+    expect(v.block).toBe(true)
+    expect(v.reason).toContain(REMEDY)
+  })
+})
+
+describe('a phrase fires only where the SENTENCE asks', () => {
+  it('takes the ask from the sentence, not from a question elsewhere in the reply', () => {
+    // Sentence 1 asks nothing; sentence 2 is a question about something else.
+    const ask = asksForDecision('Der Bericht nennt den Punkt, den er entscheidet. Wie lange lief die Suite?')
+    expect(ask.questions).toEqual(['Wie lange lief die Suite?'])
+  })
+
+  it('fires a gated phrase on a second-person sentence with no question mark', () => {
+    const ask = asksForDecision('Entscheide bitte, welchen Zuschnitt du willst.')
+    expect(ask.asks).toBe(true)
+    expect(ask.trigger).toBe('phrase:entscheide')
+  })
+
+  it('keeps the same phrase quiet in a first-person statement', () => {
+    expect(asksForDecision('Das entscheide ich selbst.').asks).toBe(false)
+    expect(asksForDecision('Ich wähle für den Zuschnitt die enge Variante.').asks).toBe(false)
+  })
+
+  it('matches phrases as whole words, so no longer form is swept in', () => {
+    for (const quiet of [
+      'Die Prosa entscheidet über den Zuschnitt.',
+      'Wir wählen die weite Variante.',
+      'Ich muss noch eine Variante auswählen.',
+      'Die Entscheidung ist gefallen.',
+      'Er entscheidet über den Zuschnitt, du bekommst den Bericht.',
+    ]) {
+      expect(asksForDecision(quiet).asks, quiet).toBe(false)
+    }
+    expect(containsPhrase('Er entscheidet.', 'entscheide')).toBe(false)
+    expect(containsPhrase('Entscheide das.', 'entscheide')).toBe(true)
+    expect(containsPhrase('Wir wählen.', 'wähle')).toBe(false)
+    expect(containsPhrase('Bitte auswählen.', 'wähle')).toBe(false)
+  })
+
+  it('reads the second person as a word, never as a substring', () => {
+    for (const yes of ['Du willst das.', 'Sag es dir selbst.', 'Das ist deine Sache.', 'Ich sehe dich.']) {
+      expect(addressesUser(yes), yes).toBe(true)
+    }
+    for (const no of ['Durch den Zuschnitt.', 'Die Suite ist dumm gelaufen.', 'Ihr Bericht liegt vor.', '', null]) {
+      expect(addressesUser(no), String(no)).toBe(false)
+    }
+  })
+
+  it('names the specific wording before the general one', () => {
+    expect(firingPhrase('Bitte entscheide zwischen eng und weit.').phrase).toBe('bitte entscheide')
+    expect(firingPhrase('Alles grün.')).toBeNull()
+  })
+})
+
+describe('every phrase is judged, and the judgement is written down', () => {
+  it('carries a reason and a firing probe per entry', () => {
+    for (const e of DECISION_PHRASES) {
+      expect(['self', 'sentence'], e.phrase).toContain(e.address)
+      expect(e.why.length, e.phrase).toBeGreaterThan(40)
+      expect(containsPhrase(e.probe, e.phrase), e.phrase).toBe(true)
+    }
+  })
+
+  it('carries a QUIET example for every gated phrase, and it stays quiet', () => {
+    const gated = DECISION_PHRASES.filter((e) => e.address === 'sentence')
+    expect(gated.length).toBeGreaterThan(0)
+    for (const e of gated) {
+      expect(typeof e.quiet, e.phrase).toBe('string')
+      expect(asksForDecision(e.quiet).asks, `${e.phrase}: ${e.quiet}`).toBe(false)
+    }
+  })
+
+  it('holds no duplicate and no phrase subsumed by a shorter one of the same kind', () => {
+    const seen = new Set()
+    for (const e of DECISION_PHRASES) {
+      expect(seen.has(e.phrase), e.phrase).toBe(false)
+      seen.add(e.phrase)
+    }
+    for (const e of DECISION_PHRASES) {
+      for (const other of DECISION_PHRASES) {
+        if (other === e || other.address !== e.address) continue
+        expect(containsPhrase(e.phrase, other.phrase), `${e.phrase} contains ${other.phrase}`).toBe(false)
+      }
+    }
+  })
+})
+
+// The seven cards standing in "Von dir zu klären" on 07.08.2026, read out of
+// .batch-dashboard.html. Each is the sentence a reply would carry if the question
+// were put in the chat instead — the title where it IS the question, the card's
+// own decision sentence where the title only names the topic.
+const LIVE_CARD_QUESTIONS = Object.freeze([
+  'Zeiterfassung in der Arbeitsordnung: abschaffen oder wiederbeleben?',
+  'Windows-Startweg: soll ich ihn jetzt von dir einrichten lassen?',
+  'CLAUDE.md kürzen: Beweisketten auslagern?',
+  'Kairo zum Start: eigener Ankunftstext oder nicht?',
+  'Deine Entscheidung: beim workspaceMount "consistency=delegated" durch "readonly" ersetzen und einmal neu bauen.',
+  'Tonfolgen: fünf Silben (unverwechselbar) oder vier (kürzer)?',
+  'Deine Entscheidung; die Recherche gibt drei Leitplanken für das Kommunikationssystem.',
+])
+
+describe('every live "Von dir zu klären" question still BLOCKS without its card', () => {
+  it('blocks all seven when the board holds nothing', () => {
+    for (const q of LIVE_CARD_QUESTIONS) {
+      expect(evaluate({ replyText: `${HEADER}${q}`, vdzkTitles: [] }).block, q).toBe(true)
+    }
+  })
+
+  it('blocks them against an unrelated board too', () => {
+    for (const q of LIVE_CARD_QUESTIONS) {
+      const v = evaluate({ replyText: `${HEADER}${q}`, vdzkTitles: ['Ganz anderes Thema: Wasserbrechung'] })
+      expect(v.block, q).toBe(true)
+      expect(v.reason).toContain(REMEDY)
+    }
   })
 })
