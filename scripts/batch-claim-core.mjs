@@ -53,7 +53,15 @@ import { resolveOwnership, PID_START_TOLERANCE_MS, LAUNCHER_TICK_MS } from './ba
  *  measures that risk: how many ticks may pass before the launcher is allowed to
  *  take a freed lock for itself. Two is the smallest count that survives a tick
  *  falling immediately after the release, and a slower launcher lengthens the
- *  window with itself rather than losing it. */
+ *  window with itself rather than losing it.
+ *
+ *  IT COUPLES IN BOTH DIRECTIONS (four-eyes review, Fable 5, finding 2). The same
+ *  product is `CLAIM_MAX_AGE_MS`, which also bounds a claim NOBODY has released to
+ *  yet and feeds the resume hook's stand-down text and the claim CLI — doors that
+ *  have nothing to do with the tick. So a future SPEED-UP of `LAUNCHER_TICK_MS`
+ *  shortens all of them: whoever changes the tick raises this count (or
+ *  HOA_CLAIM_MAX_MIN) to keep the claim window where it belongs. The equality is
+ *  pinned in scripts/batch-claim-core.test.mjs, so the change surfaces there. */
 export const PICKUP_WINDOW_TICKS = 2
 
 /**
@@ -406,9 +414,18 @@ export function takeoverDecision({
   const ageMs = Number.isFinite(assessment?.ageMs) ? assessment.ageMs : null
   if (acquire) return { spawn: true, reason, claimantSid, ageMs, message: null }
 
-  const minutes = (ms) => (Number.isFinite(ms) ? `${Math.max(0, Math.round(ms / 60000))} min` : null)
+  // FLOOR, never round: an age rounded UP reads at the log as though the window
+  // had already run out while the lock was in fact still being held, and the line
+  // exists to be trusted at 03:00 (four-eyes review, Fable 5, finding 4).
+  const minutes = (ms) => (Number.isFinite(ms) ? `${Math.max(0, Math.floor(ms / 60000))} min` : null)
   const claimedAgo = minutes(ageMs)
-  const windowMin = minutes(maxAgeMs) ?? `${PICKUP_WINDOW_TICKS} ticks`
+  // The tick equivalence is only true for the DEFAULT window. Calibrated down via
+  // HOA_CLAIM_MAX_MIN it would print "10 min = 2 launcher ticks", which is false —
+  // and a false diagnosis line is worse than a short one (finding 1).
+  const windowText =
+    maxAgeMs === CLAIM_MAX_AGE_MS
+      ? `${minutes(maxAgeMs) ?? `${PICKUP_WINDOW_TICKS} ticks`} = ${PICKUP_WINDOW_TICKS} launcher ticks`
+      : `${minutes(maxAgeMs) ?? 'unreadable'} (calibrated, HOA_CLAIM_MAX_MIN)`
   const releasedAgo = minutes(
     Number.isFinite(assessment?.releasedAt) && Number.isFinite(now) ? now - assessment.releasedAt : NaN,
   )
@@ -416,7 +433,7 @@ export function takeoverDecision({
     reason === 'reserved-released'
       ? `skip: the batch was already RELEASED to session ${claimantSid}` +
         `${releasedAgo === null ? '' : ` ${releasedAgo} ago`} and that window is ALIVE — the free lock is held ` +
-        `for its PICK-UP (window: ${windowMin} = ${PICKUP_WINDOW_TICKS} launcher ticks). ` +
+        `for its PICK-UP (window: ${windowText}). ` +
         'Taking it here would be the 30.07.2026 handover the user lost.'
       : `skip: session ${claimantSid} has CLAIMED the batch` +
         `${claimedAgo === null ? '' : ` ${claimedAgo} ago`} (${reason}) — the user is working in that window`

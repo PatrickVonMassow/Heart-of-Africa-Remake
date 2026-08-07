@@ -627,6 +627,21 @@ describe('takeoverDecision — the launcher does not grab a lock that was freed 
     expect(d).toMatchObject({ spawn: true, reason: 'released' })
   })
 
+  it('…and never claims a calibrated window equals two ticks when it does not', () => {
+    // A false diagnosis line is worse than a short one: with the window cut to
+    // ten minutes, "10 min = 2 launcher ticks" would be a lie in the one place a
+    // human looks first (four-eyes review, Fable 5, finding 1).
+    const d = takeoverDecision({
+      claim: releasedTo({ releasedAt: NOW - 60_000 }),
+      now: NOW,
+      maxAgeMs: 10 * 60 * 1000,
+      probePid: aliveClaimant,
+    })
+    expect(d.spawn).toBe(false)
+    expect(d.message).toContain('10 min (calibrated, HOA_CLAIM_MAX_MIN)')
+    expect(d.message).not.toContain('launcher ticks')
+  })
+
   it('holds off just as firmly BEFORE the release — the claim nobody answered yet', () => {
     const d = takeoverDecision({ claim: claimOf(), now: NOW, probePid: aliveClaimant })
     expect(d).toMatchObject({ spawn: false, reason: 'reserved', claimantSid: CLAIMANT })
@@ -651,6 +666,12 @@ describe('takeoverDecision — the launcher does not grab a lock that was freed 
       ['clock-skew', claimOf({ at: NOW + 60_000 })],
       ['claimant-unidentified', claimOf({ pid: 0 })],
       ['claimant-no-start-time', claimOf({ pidStartedAt: undefined })],
+      // The two RELEASE-shaped degenerates: a hand-over that left a name but no
+      // stamp, and one stamped in the future. Neither describes a window anybody
+      // can measure, so neither may hold the lock (four-eyes review, Fable 5,
+      // finding 3 — both were pinned one layer down but not at this verdict).
+      ['released-without-a-stamp', claimOf({ releasedBy: OWNER })],
+      ['released-in-the-future', claimOf({ releasedBy: OWNER, releasedAt: NOW + 60_000 })],
     ]
     for (const [reason, claim] of cases) {
       expect(takeoverDecision({ claim, now: NOW, probePid: aliveClaimant }), reason).toMatchObject({

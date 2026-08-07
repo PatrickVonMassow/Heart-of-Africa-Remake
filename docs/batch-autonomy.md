@@ -1241,7 +1241,11 @@ session — the failure the whole singleton exists to prevent.
    gate, `takeoverDecision` (`scripts/batch-claim-core.mjs`), which composes the
    reading above and returns the line it logs, and the window it respects is
    `PICKUP_WINDOW_TICKS` (2) × the launcher tick rather than a flat half hour a
-   slower launcher could shrink below one tick. Every way for the claiming window
+   slower launcher could shrink below one tick. The coupling runs both ways —
+   the same product is `CLAIM_MAX_AGE_MS`, which also bounds an unreleased claim
+   and feeds the resume hook's and the claim CLI's texts — so whoever SPEEDS the
+   tick up raises the tick count (or `HOA_CLAIM_MAX_MIN`) with it; the equality is
+   pinned in `scripts/batch-claim-core.test.mjs`. Every way for the claiming window
    to fail its half — the process is gone, the pid was recycled, the pick-up never
    comes — ends in a spawn, and an unclaimed free lock is still taken at once.
 2. **The claimant must be ALIVE, by IDENTITY.** The recorded pid must exist AND
