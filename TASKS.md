@@ -5,14 +5,20 @@ The OPEN work order. A ticked point moves, verbatim and with its number, into
 States are `[ ]` open and `[x]` done — nothing in between.
 
 **Where the rules live.** The build, the test tiers, the branch/merge workflow
-and the closing cycle are in CLAUDE.md (§5, §6, §7.2, §9) and are NOT repeated
-here. The WORKING ORDER lives in the dashboard's Warteschlange — one place, and
-`queue-order-guard` holds it. Do not write ordering prose into this file: the
-overrides that used to stand here described points long since finished, and a
-second place for the same fact is the drift this project keeps paying for.
+and the closing cycle are in CLAUDE.md (§5, §6, §7.2, §9), not here. The WORKING
+ORDER is the dashboard's Warteschlange, held by `queue-order-guard`; ordering prose
+here went stale describing finished points, and a second place for one fact is
+the drift this project keeps paying for.
 
 This file and every entry in it are written in English. Commit messages never
 reference the point number.
+
+**A point may state its acceptance condition machine-readably**, because prose
+alone let a point be ticked for feeling finished. A body line beginning `PROOF:`
+names a command; the tick is refused until it has run at the CURRENT HEAD
+(`node scripts/point-proof-guard.mjs --ran <N> --evidence "<result>"`; `--status`
+lists what is outstanding). Opt-in, EVERY such line demanded, and one inside a
+code span or quotes — as here — is prose, not a demand.
 
 ## Regression command
 
@@ -22,11 +28,10 @@ npm run test:small  # + the everyday browser gate
 npm test            # LARGE: build → lint → vitest → every suite → preview
 ```
 
-Per point: build + lint + audit + the whole Vitest layer, plus the browser
-suites the diff touches. The LARGE run is mandatory when a point touches a scene
-core (TravelScene/Wildlife/PlaceScene, the renderer/post pipeline, store.ts), at
-every ~4th point as a collective gate, before every closing, and whenever a
-flake retry failed twice.
+Per point: build + lint + audit + the whole Vitest layer, plus the browser suites
+the diff touches. LARGE is mandatory on a scene core (TravelScene/Wildlife/
+PlaceScene, the renderer/post pipeline, store.ts), at every ~4th point as a
+collective gate, before every closing, and whenever a flake retry failed twice.
 
 Diff → browser-suite mapping: `src/i18n/` → i18n · store/systems logic → Vitest
 only (flow if the core loop is touched) · `src/scenes/place/` → collision,
@@ -36,36 +41,32 @@ settings, flow · journal/TTS → voice, handwriting · `src/world/` → world,
 enrichments · `scripts/verify/X.mjs` → X itself · `*.md` → docs. When unsure,
 include the suite.
 
-Flake policy: if exactly ONE suite fails on a check from the flake list below,
-rerun that suite standalone once — green counts as green and is noted in the
-tick; red twice is a real investigation. The list (this is its only home): the
-movement 0.00 m read, the bathe probability, TTS timing, the calf-sacrifice
-behaviour window, frame-starved screenshot probes, and the spawn body-spacing
-settle window. WATCHDOG: if this scoping ever lets a bug through that a full run
-would have caught, report it to the user at once and the policy is reconsidered.
+Flake policy: if exactly ONE suite fails on a check from this list — its only
+home — rerun that suite standalone once; green counts and is noted in the tick,
+red twice is a real investigation. The list: the movement 0.00 m read, the bathe
+probability, TTS timing, the calf-sacrifice behaviour window, frame-starved
+screenshot probes, the spawn body-spacing settle window. WATCHDOG: if this
+scoping ever lets through a bug a full run would have caught, report it to the
+user at once and the policy is reconsidered.
 
 **Every point adds a test on the appropriate layer** — Vitest for anything
 assertable without a browser, a browser suite only for the
 scene/RAF/geometry/CSS/audio/screenshot cases (`scripts/verify/README.md`).
 
-On failure after correction attempts: STOP, report, and do not build further on
-a broken base. Tests are never weakened; a red run is fixed in the production
-code.
+On failure after correction attempts: STOP, report, do not build on a broken base.
+Tests are never weakened; a red run is fixed in the production code.
 
-**Where doc updates go (user 26.07.2026):** a criterion in CLAUDE.md §7.1 states
-WHAT must hold; its chain of proof lives in `docs/acceptance-evidence.md` under the
-same number. A point that adds or changes a verifiable behaviour updates the criterion
-AND its evidence section in the same commit; a point that only adds a test touches the
-evidence section alone. Older specs below still say "CLAUDE.md §7.1" for both halves —
-read that as "the criterion and its evidence section".
+**Where doc updates go (user 26.07.2026):** CLAUDE.md §7.1 states WHAT must hold,
+`docs/acceptance-evidence.md` proves it under the same number. A changed or added
+behaviour updates BOTH in one commit; a point that only adds a test touches the
+evidence alone. Older specs saying "CLAUDE.md §7.1" mean both halves.
 
 ## Work packages (bundles)
 
 Open points are worked in BUNDLES: one branch, one verification, one regression
-round, a commit per member point. The table — which point sits in which bundle,
-what stays unbundled and in what order they are worked — is `docs/work-packages.md`.
-Every open point below appears there exactly once; a new point joins a bundle when
-it is appended.
+round, a commit per member point. `docs/work-packages.md` is the table — which
+point sits where, what stays unbundled, in what order. Every open point appears
+there exactly once; a new point joins a bundle when appended.
 
 ## Checklist
 
@@ -2870,109 +2871,6 @@ it is appended.
   corpus's 235 agent-spawning turns carried no record, so the delegation pattern pays a
   `--none` per turn unless the trigger is softened.
 
-- [ ] 437. THE TWO GUARD MECHANISMS THE WORK ORDER NEVER RECEIVED (30.07.2026; bundle Modell & Wächter).
-  Both were agreed with the user on 29.07.2026 and both survived only in a memory carrier
-  (`pending-queue-work-29-07.md`) because the batch lock was held elsewhere that evening —
-  the exact failure point 432 exists to end. They are collected here so the carrier can be
-  deleted.
-  (A) `scripts/path-scope-guard.mjs` — the real ALLOW-list for filesystem access, in the
-  shape the second model's review left it: FAIL-OPEN on an unparseable command; normalise
-  every path spelling this machine produces (`C:\`, `c:/`, `/c/`, `~`); allow the repo, the
-  agent worktrees, the hashed Temp scratchpad, `/tmp`, `~/.claude`, `~/.claude.json`, the
-  claude.exe Packages base, ms-playwright and the toolchain; DENY with the reason stated,
-  never silently. It closes the two gaps the deny-rules cannot express — `~/Documents`
-  minus the project, and worktree agents, whose rules live in the untracked
-  `.claude/settings.local.json`. Fixtures are seeded from the REAL command corpus of the
-  transcripts, not invented, so the allow-list is measured against what actually runs.
-  (B) The BUNDLE-FIRST rule becomes a guard. Today it is memory only
-  (`bundle-first-not-new-point`): a new finding joins an existing bundle point, and a
-  standalone point is the exception. The gate is cheap — a point appended to `TASKS.md`
-  that appears in NO bundle of `docs/work-packages.md` and in no "not bundled" entry blocks
-  the turn end until it is placed or explicitly exempted with a reason. That single check
-  also fixes the second half of the same evening's finding: the bundle scheme drifted out
-  of sync with the open set within an hour of being written, because nothing compared them.
-  VERIFIABLE: pure Vitest per guard — (A) a table of real commands from the corpus, each
-  with its expected allow/deny and, on deny, the stated reason; every path spelling
-  normalised to the same verdict; an unparseable command ALLOWS. (B) an appended point in a
-  bundle passes; one in none blocks; one in the "not bundled" list passes; an unreadable
-  work-packages file ALLOWS (fail-open); the bundle membership reconciles against the full
-  open set, so a point that silently left a bundle is caught too.
-  (C) A POINT'S OWN ACCEPTANCE CRITERION IS ENFORCED BY NOTHING (30.07.2026). Points carry
-  their acceptance condition as PROSE — "counts as delivered when the rate is MEASURED, not
-  when the mechanism runs" is the clearest case, with `scripts/measure-context-cost.mjs`
-  sitting there unused by any gate — and nothing compares a tick against it: `closing-guard`
-  gates a VERSION TAG only, and no guard reads a point's own condition. So a point can be
-  ticked because it FEELS finished, the very class this project's core lesson forbids: a rule
-  that exists only as prose. A point may therefore carry a machine-readable PROOF line naming
-  the command whose run must be recorded, in the grammar `closing-guard --step --evidence`
-  already uses, and the tick path refuses `[ ]`→`[x]` for such a point without a recorded run
-  at the CURRENT HEAD. A point WITHOUT a proof line ticks as before — the line is opt-in, so
-  adding the gate never blocks the existing corpus.
-  (D) A DORMANT RECORD THAT OUTLIVES ITS DORMANCY (four-eyes review 30.07.2026). The
-  guard-health audit reads a guard's dormant entry ONLY while that guard is unwired, so a
-  guard that is wired AND still carries a dormant entry produces no violation and the stale
-  record stands unnoticed — the map goes on claiming an enforcer is inert while it enforces.
-  The audit gains the inverse check: a WIRED enforcer with a dormant entry is a violation
-  naming both sides, so the entry must be removed in the same commit that adds the hook
-  line. The convention the arming commit states thereby becomes the mechanism it describes.
-  (E) THE PREFLIGHT MUST NAME WHAT IT CANNOT JUDGE (30.07.2026). `guard-preflight`'s registry
-  covers only the guards someone remembered to add, so a wired Stop hook outside it reports
-  nothing while it would block — and CLAUDE.md §7.2 tells the session to preflight and answer
-  LAST, so a false clean reproduces the answer-twice loop the preflight exists to prevent
-  (one such loop was measured at ~30 turns). Every wired Stop hook gets a gather/decide pair
-  in the registry — `findings-guard` and `decision-card-guard` need a small extraction, and
-  the branch sweep is registered already — AND the preflight PRINTS any wired-but-
-  unregistered Stop hook by name, so the next omission is visible instead of silent. Second,
-  smaller half: `decision-card-guard` swallows a card added before the session's FIRST Stop
-  evaluation into its baseline, so its own remedy can read as unperformed; the block reason
-  names the extracted topic words, so a matching title can actually be written.
-  (F) THE FENCE JUDGES THE COMMAND STRING, NOT THE ACTION (observed three times on
-  30.07.2026 while a fenced-out session worked). A read-only search was refused for merely
-  NAMING a script; a local commit was refused because its MESSAGE carried a forbidden verb,
-  and since the whole invocation is judged the commit went with it; recording the finding
-  about it was refused because its text named a script. A quoted argument or a here-document
-  body decides the verdict. It never lets a forbidden write through — it errs safe — but it
-  costs turns and teaches a session to avoid naming things in a search. The fence judges per
-  SEGMENT and by the command HEAD, the way the findings core already does, and quoted text
-  never decides.
-  (G) TWO CARVE-OUTS THAT EXEMPT MORE THAN THEY ARGUE FOR (four-eyes review 30.07.2026).
-  The findings guard grants its delegation exemption from the COMMAND STRING alone: a turn
-  that merely RUNS the in-flight declaration is exempt even when the CLI REFUSED it (no lock,
-  no evidence, dead evidence), and nothing checks that work was handed out at all — so the
-  one path the exemption exists for is also the path a turn can take without investigating.
-  It is honoured only when the turn actually spawned an agent, or when the declaration file
-  proves it was written inside this turn. And the branch sweep reads the in-flight file RAW —
-  no age, no liveness — while the expiry lives in a consumer it never calls, so a dead
-  session's declaration shields its branch and worktree from the sweep for ever; the sweep
-  applies the same expiry the progress guard applies.
-  All six stand down for a session that does not own the batch lock and for a paused batch,
-  like every guard here. MECHANISM REVIEW REQUIRED (CLAUDE.md §7.2); the
-  `.claude/settings.json` wiring is attended-only and must be ABSOLUTE, not cwd-relative.
-  DOCS in the same commit: `docs/batch-autonomy.md` (the guard chain), for (B)
-  `docs/work-packages.md` states that its membership is now checked rather than remembered,
-  and for (C) the work order's own preamble states the proof-line grammar.
-  VERIFIABLE for (C): pure Vitest — a point with a proof line and no recorded run BLOCKS the
-  tick; the same point with a run recorded at the current HEAD passes; a run recorded at an
-  OLDER head does not count; a point without a proof line is untouched; an unreadable ledger
-  ALLOWS (fail-open). For (D): a wired enforcer with a dormant entry BLOCKS and the message
-  names both the enforcer and its stale entry; a wired enforcer without one passes; an
-  unwired-and-recorded one keeps passing as today. For (E): the registry covers every wired
-  Stop hook (the same drift test that already pins the list), an unregistered one is NAMED in
-  the report rather than implied clean, and a non-applicable gather reads as "not judged",
-  never as clean. For (F): a table of real invocations from the transcript corpus — a search
-  naming a script ALLOWS, a commit whose message carries a forbidden verb ALLOWS, the
-  forbidden write itself still DENIES, and a chained invocation is judged segment by segment.
-  For (G): a turn that ran the declaration but recorded nothing is NOT exempt while one that
-  spawned an agent is; a branch named by an EXPIRED declaration is swept again while a live
-  one stays exempt.
-  (H) ONE SMALL CLI WART IN THE SAME FAMILY (31.07.2026, hit while preparing a merge):
-  `scripts/mechanism-review.mjs` treats every unrecognised flag as `--record` with an empty
-  sha, so `--status` answers with `fatal: ambiguous argument '^{commit}'` instead of naming
-  what the tool wants. An unrecognised flag prints the usage block the record path already
-  has and exits non-zero. VERIFIABLE: pure Vitest — an unknown flag yields the usage and a
-  non-zero exit, `--list` and a bare invocation still list the ledger, and a well-formed
-  `--record` is untouched.
-
 - [ ] 438. THE PROJECT HOOKS CANNOT FIRE OUTSIDE THE REPO ROOT (29.07.2026, measured in a
   `/doctor` run and reviewed by the second model; bundle Modell & Wächter). All 31 project hooks in
   `.claude/settings.json` are wired RELATIVELY (`node scripts/x.mjs`), so a session whose cwd
@@ -4529,3 +4427,28 @@ Build order, chosen so no two parallel agents own the same file:
   alone, and row 3.90 says so.
   Criticality: medium — it is a recording and advisory layer, not a gate, but an unrecorded
   mode lets a review of a finished list pass as the blind-parallel work the rule demands.
+
+- [ ] 542. THREE BUILT GUARDS ARE STILL ASLEEP, AND THE ARMING NEEDS AN ATTENDED
+  SESSION (07.08.2026). `path-scope-guard`, `bundle-first-guard` and
+  `point-proof-guard` are built, tested and recorded in `INTENTIONALLY_DORMANT`
+  (`scripts/guard-health-core.mjs`). None of them enforces anything, because arming
+  one means editing `.claude/settings.json`, which always raises a permission prompt
+  and can therefore not be done by a worktree agent or a headless batch session. A
+  guard that exists and does not fire is worse than no guard: the map claims an
+  enforcer where there is none.
+  FINAL STATE: all three wired, each in its own commit, each REMOVING its
+  `INTENTIONALLY_DORMANT` entry in the SAME commit — the inverse check added with
+  point 437 now BLOCKS on a wired enforcer that still carries a dormant record, so
+  the two halves cannot drift apart. `point-proof-guard` goes into PreToolUse with
+  the matcher `Edit|Write|MultiEdit|NotebookEdit|Bash|PowerShell`, the shape
+  `closing-guard` uses; the other two take the placement their own headers state.
+  ONE PRECONDITION, and it is real work rather than a formality:
+  `bundle-first-guard` reports 29 open points in no bundle of
+  `docs/work-packages.md` — the drift it exists to catch. Reconcile the scheme
+  against the full open set (`node scripts/bundle-first-guard.mjs --status`) BEFORE
+  wiring it, or its first turn blocks on a backlog it did not cause.
+  VERIFIABLE: after each arming, a fresh session's `node scripts/guard-preflight.mjs
+  --for answer --session <id>` lists the guard rather than passing over it, and
+  `node scripts/guard-health.mjs` reports no dormant record for a wired enforcer.
+  Criticality: medium — the guards themselves are reviewed and tested; what is at
+  stake is that a wrongly placed hook line disables a chain silently.
