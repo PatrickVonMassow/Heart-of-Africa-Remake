@@ -167,7 +167,7 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   behoben gezeigt wurde. Beißt du dich zweimal fest, wechsle das Modell."
 
 - **Fehlalarm behoben — echter Alarm gleich mit.** Du lässt eine zu oft anschlagende
-  Prüfung verschärfen, alles wird grün. Nur schlägt sie jetzt auch dann nicht mehr an,
+  Prüfung verschärfen, alles wird grün. Nur schlägt sie jetzt auch nicht mehr an,
   wenn sie sollte: Ein Fehlalarm meldet sich selbst, ein ausgefallener nie.
   → *Prompt:* „Entschärfst du eine Prüfung, weise **beide** Richtungen nach — Fehlalarme
   weg UND echte Treffer noch da. Die Fälle dafür erfindet das **andere Modell**, und es
@@ -219,7 +219,7 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Etabliere einen Mechanismus, der den Bestand periodisch durchsieht — auf Aktualität,
   Dopplung, Widerspruch und **Wirkungslosigkeit**. Schreib zu **jeder** Regel, was sie misst, und leg
   Satz und Code **nebeneinander**: Welche Fälle nennt der Satz, die das Muster nicht trifft? Zieh
-  **den Code auf den Satz**, nie umgekehrt. Und jeden Wächter: Je ausgelöst? Überhaupt möglich?"
+  **den Code auf den Satz**, nie umgekehrt. Und jeden Wächter: Je ausgelöst? Möglich?" *(einmalig hoch)*
 
 - **Der rote Test klagt den Falschen an.** Er täuscht gefährlicher als ein grüner:
   Prüfungen veralten von selbst und klagen gesunden Code an.

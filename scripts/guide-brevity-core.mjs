@@ -63,10 +63,10 @@ export const LIMITS = {
   // as the four-eyes review RE-MEASURED it with this counter — the first record
   // here was wrong in its components and is corrected rather than defended:
   // the tip cost 129 words as first written; 96 were PAID, of which 52 came
-  // from trimming the TIP ITSELF down to 77 (the largest single payer), 42 from
-  // six neighbouring entries — four-eyes 18, guard rot 10, autonomous run 7,
-  // swallowed failure 6, "nicht jedes Rot" 2, green test 1 — and the rest from
-  // rewrapping. Only prose was cut: the one tightening that had dropped a claim
+  // from trimming the TIP ITSELF down to 77 (the largest single payer) and 44
+  // from six neighbouring entries — four-eyes 18, guard rot 10, autonomous run
+  // 7, swallowed failure 6, "nicht jedes Rot" 2, green test 1.
+  // Only prose was cut: the one tightening that had dropped a claim
   // ("schreib zu jeder Regel, was sie misst") was restored, and its words repaid
   // in the same entry. The remaining 33 is the honest cost of new content; the
   // LINE budget was met with no raise at all. Recorded as a decision card,
