@@ -298,39 +298,30 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   und scheitert **sichtbar**, statt einen plausiblen Ersatz einzusetzen; jeder Rückfall wird
   **gemeldet**, mit dem Befehl, der ihn behebt."
 
-- **Die Gegenprüfung wurde angestoßen, nie abgeschlossen.** Der Helfer startet das Review und ist
-  fertig, bevor das Urteil kommt — es landet bei niemandem. Der Zweig sieht geprüft aus, und
-  ein aufgezeichnetes „nicht zusammenführen" wirkt wie ein Haken.
+- **Die Gegenprüfung wurde angestoßen, nie abgeschlossen.** Der Helfer startet das Review und
+  ist fertig, bevor das Urteil kommt — der Zweig sieht geprüft aus.
   → *Prompt:* „Wer eine Gegenprüfung beauftragt, bleibt dran, bis sie da ist. Ein Urteil
   öffnet das Tor nur, wenn es **zustimmt** — ein ‚nicht zusammenführen' ist erst durch ein
   **späteres** Urteil über den korrigierten Stand erledigt."
 
 - **Der Ausfall kommt nie an der bequemen Stelle.** Am tückischsten bei Abläufen mit **zwei
   Hälften**, deren zweite bei der Gegenseite liegt: fällt sie dazwischen aus, meldet jede
-  Seite korrektes Verhalten und alles ist verloren.
+  Seite korrektes Verhalten.
   → *Prompt:* „Gib jeder kritischen Aktion einen **wiederholbaren Aufräumschritt** bei jedem
   Start. Prüfe die Erholung mit Abbrüchen zu **zufälligen** Zeitpunkten und frag danach nicht
   ‚läuft es weiter?', sondern ‚läuft es **dort** weiter, wo es sollte?'"
 
-- **„Im Zweifel nichts tun" schützt nur gegen fehlende Daten, nicht gegen falsche.** Wird ein
-  Fehlschlag weiter innen schon in einen Ersatzwert verwandelt, läuft die Aktion mit einer
-  Lüge weiter.
-  → *Prompt:* „Prüfe jedes `catch` mit Ersatzwert: Führt er zu **weniger** Aktion oder zu
-  **mehr**? Nur weniger darf verschluckt werden."
-
-- **Der Umzug nimmt nur mit, was versioniert ist.** Das Projekt kommt an, die Mechanik
-  drumherum nicht: Aufgaben, Geheimnisse, Werkzeuge — und die **Scharfstellung** der Wächter.
-  Ein stummer Wächter ist schlimmer als keiner: die Regel gilt als durchgesetzt.
+- **Der Umzug nimmt nur mit, was versioniert ist.** Das Projekt kommt an, die Mechanik nicht:
+  Aufgaben, Geheimnisse, Werkzeuge — und die **Scharfstellung** der Wächter. Ein stummer
+  Wächter ist schlimmer als keiner: die Regel gilt als durchgesetzt.
   → *Prompt:* „Führe eine Liste dessen, was das Projekt braucht und **nicht** im Repository
-  liegt, und prüfe sie bei jedem Start gegen eine **Beobachtung**. Ein fehlendes Stück ist ein
-  **Befund**, keine Stille."
+  liegt, und prüfe sie bei jedem Start gegen eine **Beobachtung**."
 
 - **Ein Alarm auf ein Ereignis ist blind, wenn das Ereignis ausbleibt.** Fällt die Quelle
   selbst aus, meldet niemand etwas — und genau dann bräuchtest du ihn.
   → *Prompt:* „Überwache den **Zustand** statt des Ereignisses: nicht ‚ist etwas rot
-  geworden?', sondern ‚stimmt das Ausgelieferte noch mit der Quelle überein?'. Und ein
-  Abgleich, der aus einer Quelle schreibt, **ergänzt** nur — was flussabwärts reicher ist,
-  überschreibt er nie."
+  geworden?', sondern ‚stimmt das Ausgelieferte noch mit der Quelle überein?'. Ein Abgleich,
+  der aus einer Quelle schreibt, **ergänzt** nur."
 
 - **Eine Priorität, die nur in Prosa steht, wirkt nicht.** Sie landet getreu in der Aufgabenliste
   — aber die Reihenfolge, aus der gearbeitet wird, steht woanders, und die Nachfolge-Sitzung
@@ -357,6 +348,14 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Bevor du deine eigene Umgebung änderst: Gibt es eine **kleinere Handlung**,
   die nur **ergänzt**? Sonst bau sie. Und lass jeden Neuaufbau nach **offen** scheitern —
   ein zu offener Stand ist reparierbar, ein zugesperrter nicht."
+
+- **Verschlucken sieht aus wie Erfolg — und die Attrappe zeigt es nie.** Ein Fehlschlag, der
+  innen zum Ersatzwert wird, läuft als Lüge weiter: kein Absturz, nur Schweigen. Am besten
+  verborgen bei Fehlern, die von der **Menge** echter Daten abhängen — Puffer, Zeitlimit,
+  Speicher —, denn die fallen aus jeder Mini-Testdatei heraus.
+  → *Prompt:* „Prüfe jedes `catch` mit Ersatzwert: Führt er zu **weniger** Aktion oder zu
+  **mehr**? Nur weniger darf verschluckt werden. Und lass **eine** Prüfung gegen den **echten
+  Bestand** laufen: zeig nicht, dass nichts blockiert hat, sondern dass **gelesen** wurde."
 
 - **Einigkeit ist keine Evidenz.** Mehrere Modelle können sich über eine Ursache einig
   sein und gemeinsam danebenliegen; die Einigkeit fühlt sich dann an wie ein Beweis.
@@ -404,4 +403,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 Wenn du diese eine Nachricht an den Anfang stellst, hast du 80 % der Lehren dieses
 Projekts eingebaut, bevor die erste Zeile Code entsteht.
 
-<!-- GUIDE-FINGERPRINT: c48acede919242c9aef7e52f0458f11bb16876eb33472da9b90ed0981568dc07 -->
+<!-- GUIDE-FINGERPRINT: 18e0488bc5ee394682043bd2257ba25ba4f1fe6e97b4df3626f54b0cef1aaa23 -->
