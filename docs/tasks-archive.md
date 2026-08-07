@@ -15123,3 +15123,59 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   covers the wrapper's `tool_name === 'PowerShell'` branch — add one. VERIFIABLE:
   the existing 30-case sweep stays green and gains cases for (a)-(c) and (e); the
   documented contract matches the code.
+
+- [x] 355. BLIND PARALLEL WORK AS THE GENERAL FOUR-EYES MECHANISM (user 25.07.2026).
+  Establish what point 351 tries in one place as the project's standard way of running
+  the four-eyes principle, and write it into the German analysis documents.
+  THE METHOD: for a GENERATIVE stage, both models work from the same inputs to their own
+  complete result, neither seeing the other's until both are done; the two results are
+  then merged into a union with duplicates removed BY MEANING, keeping both wherever it
+  is unclear that one subsumes the other; an item only one model produced is marked
+  rather than buried, and none is dropped for being unusual.
+  THE REASON, and it belongs in the documents because it is what makes the method worth
+  its cost: a reviewer handed a finished list CHECKS THAT LIST. It anchors on what it is
+  shown and produces far less than it would have from a blank page — so review is the
+  wrong instrument whenever the risk is the item nobody thought of.
+  THE SCOPE LIMIT IS PART OF THE RULE, or it will be applied where it cannot work.
+  Blind-parallel fits DIVERGENT stages — what could go wrong, which scenarios to test,
+  which designs are possible, where a system might break. It does NOT fit CONVERGENT
+  ones: "is this diff correct", "does this implementation match its spec", "is this
+  measurement sound" all judge a specific artefact, which cannot be produced twice
+  independently. Those keep the ordinary review — with one borrowed refinement: the
+  reviewer reads the ARTEFACT before the author's rationale, so it is not anchored by
+  the justification either.
+  WHO THE SECOND AUTHOR IS MATTERS, and the rule says so: the two sets are worth what
+  their errors are UNCORRELATED. Two runs of the SAME model, kept blind from each other,
+  are independent in what they saw but not in how they think — they sample different
+  paths through the same prior, which is a genuine second look and no more. Two
+  DIFFERENT models are independent in both, and that is where the method earns its
+  cost. So cross-model is the default pairing (§6 allowlist); same-model blind parallel
+  is the acceptable fallback when the second model is unavailable, recorded as the
+  weaker variant rather than passed off as the full method. WHEN THAT FALLBACK IS USED,
+  DECORRELATE BY FRAMING rather than trusting sampling noise: give the second run a
+  deliberately different vantage — a hostile tester, a maintainer inheriting the code, a
+  player trying to break it — because a re-run of the same prompt varies most where the
+  model is unsure and least where it is confidently blind, which is the wrong way round.
+  COST AND WHEN IT APPLIES: the generative stage runs twice, so roughly double for that
+  stage. It therefore applies where four-eyes already applies by the criticality triage
+  (point 298), not everywhere.
+  ONE AUTHORITATIVE PLACE, and this point must not repeat the mistake its own
+  retrospective records — the model rule once stood in six places and retracting it cost
+  more than establishing it had. The NORMATIVE text goes in CLAUDE.md §6 beside the
+  existing four-eyes definition (which currently reads "one model plans and/or builds,
+  the other reviews" and needs to become the two-mode rule); everything else REFERS to
+  it:
+  - `docs/analysis_de/vibe-coding-anleitung.md`: extend the EXISTING four-eyes tip
+    rather than adding a second one, in the reader's register, and carry the cost marker
+    convention already used there (this is a roughly 2x tip for the affected stage).
+    Respect the document's word budget — make room by tightening, not by raising it.
+  - `docs/analysis_de/retrospektive-zusammenarbeit.md`: record the LESSON (anchoring,
+    and why divergent and convergent stages need different instruments) in the register
+    of the surrounding entries.
+  - The working memory that carries the four-eyes rule is updated to point at the
+    normative text instead of restating it.
+  VERIFIABLE: the rule's normative wording exists exactly ONCE across CLAUDE.md and the
+  docs (a grep for the defining sentence finds one hit, the others being references);
+  the guide stays within its word budget; the retrospective-currency guard is satisfied
+  after the edit; `npm run test:unit` and the docs suite stay green. No code changes, so
+  no browser regression.

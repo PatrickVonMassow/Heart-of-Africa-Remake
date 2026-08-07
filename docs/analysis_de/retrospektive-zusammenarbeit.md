@@ -943,7 +943,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Freitag, 07.08.2026, 09:02 · Quellen-Fingerprint: `18e0488bc5ee…`
+Zuletzt aktualisiert: Freitag, 07.08.2026, 09:44 · Quellen-Fingerprint: `2e4f739be9c1…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -983,7 +983,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | After every change, npm run lint (oxlint) and npm audit must be clean — zero lint errors/warnings, zero CVEs. Standing user directive. | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
 | hoa PERMANENT process — delegate as much implementation as possible to worktree-isolated subagents; keep only picture-verify + merge at the main session; run a pool of parallel agents on non-overlapping files | 4 | hoch | — (Regel/Memory) | ◐ Regel |
 | The \"Maximum QA\" QA process and the \"new demo\" trigger (append it + closing + increment tag + publish) | 2 | mittel | — (Regel/Memory) | ◐ Regel |
-| Before building, triage difficulty × criticality; for HIGH/critical work bring in a second, different model (Fable) to review plan + result — proactively, not only for audits or when stuck | 2 | mittel | criticality-review-guard.mjs, model-guard.mjs | ✔ Mechanismus |
+| Before building, triage difficulty × criticality; HIGH/critical work gets a second, different model — in which FORM (blind-parallel vs. review) is normative in CLAUDE.md §6, not here | 2 | mittel | criticality-review-guard.mjs, model-guard.mjs | ✔ Mechanismus |
 | A user question is an INTERRUPT, not a new task — after answering, the last action of the turn must resume the batch; only an explicit stop or a genuine block on user input ends it | 3 | mittel | batch-autostart.mjs, batch-doctor-states.mjs, batch-doctor.mjs, batch-lock.mjs, batch-progress-guard.mjs, batch-resume-hook.mjs, batch-singleton.mjs | ✔ Mechanismus |
 | EVERY user change request is a TASKS.md point appended at the END, done only after the current work finishes — never interleaved or mass-committed | 5 | hoch | tasks-archive-guard.mjs, tasks-spec-guard.mjs | ✔ Mechanismus |
 | The batch-owning session is a headless successor the launcher spawned — the user cannot see, reach or close it; never ask them to | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -1025,6 +1025,6 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 72 Feedback-/Projekt-Memories · 47 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 37 Prozess-/Meta-TASKS-Punkte (davon 16 offen).
 
-<!-- RETRO-FINGERPRINT: 18e0488bc5ee394682043bd2257ba25ba4f1fe6e97b4df3626f54b0cef1aaa23 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-07T07:02:52.140Z -->
+<!-- RETRO-FINGERPRINT: 2e4f739be9c1d2da696c5c37d8a135cb1b2773ac81e8a87117b7b0d035b3ec17 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-07T07:44:17.798Z -->
 <!-- AUTO-GENERATED:END -->

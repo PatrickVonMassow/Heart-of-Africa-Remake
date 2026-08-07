@@ -2082,62 +2082,6 @@ it is appended.
   than in its dry month, and the difference is large enough that a person would call it
   overcast; the existing dry-month picture is unchanged.
 
-- [ ] 355. BLIND PARALLEL WORK AS THE GENERAL FOUR-EYES MECHANISM (user 25.07.2026).
-  Establish what point 351 tries in one place as the project's standard way of running
-  the four-eyes principle, and write it into the German analysis documents.
-  THE METHOD: for a GENERATIVE stage, both models work from the same inputs to their own
-  complete result, neither seeing the other's until both are done; the two results are
-  then merged into a union with duplicates removed BY MEANING, keeping both wherever it
-  is unclear that one subsumes the other; an item only one model produced is marked
-  rather than buried, and none is dropped for being unusual.
-  THE REASON, and it belongs in the documents because it is what makes the method worth
-  its cost: a reviewer handed a finished list CHECKS THAT LIST. It anchors on what it is
-  shown and produces far less than it would have from a blank page — so review is the
-  wrong instrument whenever the risk is the item nobody thought of.
-  THE SCOPE LIMIT IS PART OF THE RULE, or it will be applied where it cannot work.
-  Blind-parallel fits DIVERGENT stages — what could go wrong, which scenarios to test,
-  which designs are possible, where a system might break. It does NOT fit CONVERGENT
-  ones: "is this diff correct", "does this implementation match its spec", "is this
-  measurement sound" all judge a specific artefact, which cannot be produced twice
-  independently. Those keep the ordinary review — with one borrowed refinement: the
-  reviewer reads the ARTEFACT before the author's rationale, so it is not anchored by
-  the justification either.
-  WHO THE SECOND AUTHOR IS MATTERS, and the rule says so: the two sets are worth what
-  their errors are UNCORRELATED. Two runs of the SAME model, kept blind from each other,
-  are independent in what they saw but not in how they think — they sample different
-  paths through the same prior, which is a genuine second look and no more. Two
-  DIFFERENT models are independent in both, and that is where the method earns its
-  cost. So cross-model is the default pairing (§6 allowlist); same-model blind parallel
-  is the acceptable fallback when the second model is unavailable, recorded as the
-  weaker variant rather than passed off as the full method. WHEN THAT FALLBACK IS USED,
-  DECORRELATE BY FRAMING rather than trusting sampling noise: give the second run a
-  deliberately different vantage — a hostile tester, a maintainer inheriting the code, a
-  player trying to break it — because a re-run of the same prompt varies most where the
-  model is unsure and least where it is confidently blind, which is the wrong way round.
-  COST AND WHEN IT APPLIES: the generative stage runs twice, so roughly double for that
-  stage. It therefore applies where four-eyes already applies by the criticality triage
-  (point 298), not everywhere.
-  ONE AUTHORITATIVE PLACE, and this point must not repeat the mistake its own
-  retrospective records — the model rule once stood in six places and retracting it cost
-  more than establishing it had. The NORMATIVE text goes in CLAUDE.md §6 beside the
-  existing four-eyes definition (which currently reads "one model plans and/or builds,
-  the other reviews" and needs to become the two-mode rule); everything else REFERS to
-  it:
-  - `docs/analysis_de/vibe-coding-anleitung.md`: extend the EXISTING four-eyes tip
-    rather than adding a second one, in the reader's register, and carry the cost marker
-    convention already used there (this is a roughly 2x tip for the affected stage).
-    Respect the document's word budget — make room by tightening, not by raising it.
-  - `docs/analysis_de/retrospektive-zusammenarbeit.md`: record the LESSON (anchoring,
-    and why divergent and convergent stages need different instruments) in the register
-    of the surrounding entries.
-  - The working memory that carries the four-eyes rule is updated to point at the
-    normative text instead of restating it.
-  VERIFIABLE: the rule's normative wording exists exactly ONCE across CLAUDE.md and the
-  docs (a grep for the defining sentence finds one hit, the others being references);
-  the guide stays within its word budget; the retrospective-currency guard is satisfied
-  after the edit; `npm run test:unit` and the docs suite stay green. No code changes, so
-  no browser regression.
-
 - [ ] 356. THE INHABITANTS NOTICE THE TRAVELLER (user 25.07.2026). Today they do not:
   in `src/scenes/place/PlaceLife.tsx` the player appears ONLY as a collision radius, so
   a settlement is a diorama that happens to be occupied. Being SEEN is the strongest
@@ -4556,3 +4500,32 @@ Build order, chosen so no two parallel agents own the same file:
   a run that omits a REQUIRED flag still prints the existing usage line unchanged.
   Criticality: medium — it is a recording tool, not a gate, but a dropped flag makes a gate
   report a truth it does not have.
+
+- [ ] 541. THE DIVERGENT HALF OF THE FOUR-EYES RULE IS ENFORCED BY NOTHING (decided
+  07.08.2026 with point 355; ledger row 3.90 in `docs/analysis_de/lesson-mechanisms.md`
+  names the gap and the answer). CLAUDE.md §6 now defines the four-eyes principle in two
+  modes, and only the CONVERGENT one has an enforcer: `mechanism-review-guard` lets no new
+  or changed mechanism through without the OTHER model's recorded verdict. Nothing records
+  whether a DIVERGENT step — what could go wrong, which cases to test, which designs are
+  possible — ran BLIND PARALLEL or as a review of an already-finished list, which is the
+  anchoring failure the rule exists to prevent. No guard can DETECT that either: whether a
+  step was divergent stands in no file.
+  FINAL STATE, chosen because it widens an EXISTING enforcer instead of standing a new one
+  beside it: `scripts/mechanism-review.mjs --record` carries the MODE (`--mode review` or
+  `--mode blind-parallel`, and for the weaker same-model fallback the framing used to
+  decorrelate the second run), so a verdict meant to cover a finding step must NAME its
+  form and a missing mode is refused rather than defaulted. `scripts/guard-preflight.mjs`
+  asks the question ADVISORILY before such a step, in the shape its other reports already
+  use — it reports, it never blocks, because a false block on a judgement call costs a turn
+  and the guard cannot know the answer.
+  LANDS WITH POINT 540 ON ONE BRANCH, sequentially: both change the same argument parser in
+  `scripts/mechanism-review.mjs`, and 540's refusal of an unrecognised flag is the mechanism
+  that makes a missing or misspelled `--mode` visible instead of silent. Do 540 first.
+  VERIFIABLE: pure Vitest on the argument parser and on the preflight's report — a recorded
+  verdict with a mode round-trips it into the ledger; a record without a mode is refused,
+  naming the choice; the blind-parallel mode accepts the fallback framing and the review
+  mode rejects it as meaningless there; the preflight names the divergent-step question
+  without changing its verdict. Until this lands, the divergent half rests on CLAUDE.md §6
+  alone, and row 3.90 says so.
+  Criticality: medium — it is a recording and advisory layer, not a gate, but an unrecorded
+  mode lets a review of a finished list pass as the blind-parallel work the rule demands.
