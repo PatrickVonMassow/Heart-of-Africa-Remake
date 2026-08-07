@@ -17,6 +17,7 @@ import {
   evaluate,
   firingPhrase,
   matchingCard,
+  startsWithPhrase,
   topicWords,
 } from './decision-card-guard-core.mjs'
 
@@ -292,6 +293,9 @@ describe('every phrase is judged, and the judgement is written down', () => {
       expect(['self', 'sentence'], e.phrase).toContain(e.address)
       expect(e.why.length, e.phrase).toBeGreaterThan(40)
       expect(containsPhrase(e.probe, e.phrase), e.phrase).toBe(true)
+      // Verb-first is a reading only a verb has; an interrogative pronoun opens a
+      // statement as readily as a question and must never carry the flag.
+      if (e.verbFirst) expect(e.address, e.phrase).toBe('sentence')
     }
   })
 
@@ -300,6 +304,8 @@ describe('every phrase is judged, and the judgement is written down', () => {
     expect(gated.length).toBeGreaterThan(0)
     for (const e of gated) {
       expect(typeof e.quiet, e.phrase).toBe('string')
+      // The quiet must really carry the phrase, or it proves nothing about it.
+      expect(containsPhrase(e.quiet, e.phrase), e.phrase).toBe(true)
       expect(asksForDecision(e.quiet).asks, `${e.phrase}: ${e.quiet}`).toBe(false)
     }
   })
@@ -316,6 +322,71 @@ describe('every phrase is judged, and the judgement is written down', () => {
         expect(containsPhrase(e.phrase, other.phrase), `${e.phrase} contains ${other.phrase}`).toBe(false)
       }
     }
+  })
+})
+
+// THE QUIET DIRECTION IS THE COSTLIER ONE. The four-eyes review of the sentence
+// gate probed 21 German sentences the author had not written and found 12 real
+// decision requests escaping — worse, by this point's own weighting, than the
+// false positive the gate fixes. Every one of them is pinned here.
+describe('the decision requests the four-eyes review found escaping still BLOCK', () => {
+  const MUST_BLOCK = Object.freeze([
+    // MUST-FIX 1 — a German imperative carries neither a question mark nor a
+    // pronoun, so only the literal "bitte wähle" word order had survived.
+    'Wähle die enge oder die weite Variante.',
+    'Wähle bitte die enge oder die weite Variante.',
+    'Entscheide bitte, ob eng oder weit.',
+    'Entscheide: eng oder weit.',
+    'Entscheide zwischen eng und weit.',
+    'Entscheide:\n- eng\n- weit',
+    'Eng oder weit — entscheide bitte.',
+    // The splitter severs "z. B." mid-sentence; the fragment keeping the verb
+    // still fires, so no separate rule is needed for it.
+    'Entscheide z. B. zwischen dem engen und dem weiten Zuschnitt.',
+    // Cosmetic, same mechanism: a double space breaks the two-word phrase.
+    'Bitte  entscheide zwischen eng und weit.',
+    // MUST-FIX 2 — whole-word matching dropped the inflections, and with them the
+    // commonest German way of putting a decision to someone.
+    'Das musst du entscheiden.',
+    'Das kannst nur du entscheiden.',
+    'Gut wäre, wenn du das entscheidest.',
+    'Du kannst zwischen eng und weit wählen.',
+  ])
+
+  it('blocks each of them with no card on the board', () => {
+    for (const reply of MUST_BLOCK) {
+      expect(evaluate({ replyText: `${HEADER}${reply}`, vdzkTitles: [] }).block, reply).toBe(true)
+    }
+  })
+
+  it('blocks them bare too, without the timestamp header', () => {
+    for (const reply of MUST_BLOCK) {
+      expect(evaluate({ replyText: reply, vdzkTitles: [] }).block, reply).toBe(true)
+    }
+  })
+
+  it('keeps the loud reading OFF the prose that carries the same words', () => {
+    for (const quiet of [
+      'Der Bericht nennt den Punkt, den er entscheidet.',
+      'Der neue Punkt heißt „Prosa entscheidet".',
+      'Das entscheide ich selbst.',
+      'Wir müssen noch entscheiden, welche Suite zuerst läuft.',
+      'Die beiden Modelle wählen unterschiedlich.',
+      'Ich wähle für den Zuschnitt die enge Variante.',
+      'Die Vier-Augen-Prüfung entscheidet den Punkt, nicht die Prosa.',
+    ]) {
+      expect(evaluate({ replyText: `${HEADER}${quiet}`, vdzkTitles: [] }).block, quiet).toBe(false)
+    }
+  })
+
+  it('reads verb-first as first position, past a list marker or a leading dash', () => {
+    expect(startsWithPhrase('Entscheide: eng oder weit.', 'entscheide')).toBe(true)
+    expect(startsWithPhrase('- Entscheide: eng oder weit.', 'entscheide')).toBe(true)
+    expect(startsWithPhrase('**Entscheide** bitte.', 'entscheide')).toBe(true)
+    // Not first position, and not the imperative reading.
+    expect(startsWithPhrase('Das entscheide ich selbst.', 'entscheide')).toBe(false)
+    // And it is a whole word there too.
+    expect(startsWithPhrase('Entscheidet der Test das?', 'entscheide')).toBe(false)
   })
 })
 

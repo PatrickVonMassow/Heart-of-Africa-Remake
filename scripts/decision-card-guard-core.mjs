@@ -47,6 +47,24 @@
 //      `address: 'sentence'`, so the sentence has to supply the ask.
 // The judgement per phrase is written down in `why`, and `probe`/`quiet` are the
 // sentences that pin it in both directions.
+//
+// AND THE GATE MUST NOT OVERSHOOT (four-eyes review of that change, 07.08.2026).
+// Probed against 21 sentences nobody had written for it, the first version let 12
+// real decision requests escape — and by this point's own weighting that is the
+// worse defect: a false block costs a turn, a missed decision costs hours. Two
+// additions, both in the loud direction:
+//   3. A VERB-FIRST sentence is an imperative even without "bitte" and without a
+//      pronoun ("Wähle die enge oder die weite Variante.", "Entscheide: eng oder
+//      weit."), and so is any sentence carrying "bitte" ("Eng oder weit —
+//      entscheide bitte."). Only entries flagged `verbFirst` take that reading:
+//      "Welche Variante gewinnt, zeigt die Messung." also begins with its phrase
+//      and asks nothing. It covers a splitter artefact for free — "z. B." severs
+//      a sentence, and the fragment that keeps the verb still fires.
+//   4. Whole-word matching (correction 1) also dropped the INFLECTIONS, and with
+//      them the commonest German way of putting a decision to someone: "Das musst
+//      du entscheiden.", "Du kannst zwischen eng und weit wählen." They are
+//      listed as their own gated entries rather than by loosening the boundary,
+//      which is what keeps "den er entscheidet" quiet.
 
 /**
  * The phrasings this project's own replies use to put something to the user —
@@ -59,6 +77,10 @@
  *   address — 'self': the phrase itself is the second-person address, so it fires
  *             wherever it stands. 'sentence': the sentence must ask (`?`) or carry
  *             a second-person pronoun.
+ *   verbFirst — 'sentence' entries only: the phrase is a VERB, so it also asks
+ *             when it opens the sentence (German imperative) or when the sentence
+ *             carries "bitte". Never set on an interrogative pronoun, which opens
+ *             a statement just as readily ("Welche Variante gewinnt, …").
  *   why     — the written reason for that judgement (point 539: kept per entry)
  *   probe   — a sentence that MUST fire on this entry
  *   quiet   — ordinary prose carrying the same words that must NOT fire; required
@@ -140,28 +162,70 @@ export const DECISION_PHRASES = Object.freeze(
       why: 'Carries the pronoun. The former separate entry "wie möchtest du" was dropped 07.08.2026 — this one already matches every sentence that one did.',
       probe: 'Zum Zuschnitt: möchtest du den engen oder den weiten.',
     },
+    {
+      phrase: 'entscheidest',
+      address: 'self',
+      why: 'The -st ending IS the second person singular: no reading of "entscheidest" addresses anybody but the reader. Added 07.08.2026 because whole-word matching had dropped the inflection, and with it "Gut wäre, wenn du das entscheidest."',
+      probe: 'Gut wäre, wenn du das entscheidest.',
+    },
+    {
+      phrase: 'wählst',
+      address: 'self',
+      why: 'Second person singular like "entscheidest"; the same inflection gap ("Du wählst zwischen eng und weit.").',
+      probe: 'Du wählst zwischen dem engen und dem weiten Zuschnitt.',
+    },
+    {
+      phrase: 'waehlst',
+      address: 'self',
+      why: 'The umlaut-less spelling of the entry above.',
+      probe: 'Du waehlst zwischen eng und weit.',
+    },
 
     // ---- ambiguous wording: the sentence has to supply the ask.
     {
       phrase: 'entscheide',
       address: 'sentence',
-      why: 'THE MEASURED FALSE POSITIVE (07.08.2026, twice in one session): as a substring it hit "entscheidet" in "den Punkt, den er entscheidet" and in the quoted defect name "Prosa entscheidet". Whole-word now, and still gated: bare "entscheide" is also the first person ("Das entscheide ich selbst."), which reports a decision instead of asking for one.',
+      verbFirst: true,
+      why: 'THE MEASURED FALSE POSITIVE (07.08.2026, twice in one session): as a substring it hit "entscheidet" in "den Punkt, den er entscheidet" and in the quoted defect name "Prosa entscheidet". Whole-word now, and gated — bare "entscheide" is also the first person ("Das entscheide ich selbst.") — but verb-first it is the imperative and asks: "Entscheide: eng oder weit."',
       probe: 'Entscheide bitte, welchen Zuschnitt du willst.',
-      quiet: 'Der Bericht nennt den Punkt, den er entscheidet.',
+      quiet: 'Das entscheide ich selbst.',
+    },
+    {
+      phrase: 'entscheiden',
+      address: 'sentence',
+      why: 'The infinitive carries the commonest German way of putting a decision to someone — "Das musst du entscheiden." Its own entry rather than a looser boundary, because the boundary is what keeps "den er entscheidet" quiet. Not verb-first: "Entscheiden wir das morgen." proposes rather than asks.',
+      probe: 'Das musst du entscheiden.',
+      quiet: 'Wir müssen noch entscheiden, welche Suite zuerst läuft.',
     },
     {
       phrase: 'wähle',
       address: 'sentence',
-      why: 'As a substring it sat inside "wählen" and "auswählen"; as a word it is still the first person ("Ich wähle die enge Variante."). The asking form has its own entry, "bitte wähle".',
+      verbFirst: true,
+      why: 'As a substring it sat inside "wählen" and "auswählen"; as a word it is still the first person ("Ich wähle die enge Variante.") — but verb-first it is the imperative the 30.07.2026 four-eyes finding added it for: "Wähle die enge oder die weite Variante."',
       probe: 'Wähle den Zuschnitt, der dir lieber ist.',
-      quiet: 'Wir wählen für den Zuschnitt die enge Variante.',
+      quiet: 'Ich wähle für den Zuschnitt die enge Variante.',
     },
     {
       phrase: 'waehle',
       address: 'sentence',
+      verbFirst: true,
       why: 'The umlaut-less spelling, judged exactly like the entry above.',
       probe: 'Waehle den Zuschnitt, der dir lieber ist.',
-      quiet: 'Wir waehlen die enge Variante.',
+      quiet: 'Ich waehle für den Zuschnitt die enge Variante.',
+    },
+    {
+      phrase: 'wählen',
+      address: 'sentence',
+      why: 'The infinitive, the counterpart of "entscheiden": "Du kannst zwischen eng und weit wählen." Not verb-first — "Wählen wir die enge Variante." is a first-person plural statement.',
+      probe: 'Du kannst zwischen eng und weit wählen.',
+      quiet: 'Wir wählen für den Zuschnitt die enge Variante.',
+    },
+    {
+      phrase: 'waehlen',
+      address: 'sentence',
+      why: 'The umlaut-less spelling of the entry above.',
+      probe: 'Du kannst zwischen eng und weit waehlen.',
+      quiet: 'Wir waehlen für den Zuschnitt die enge Variante.',
     },
     {
       phrase: 'welche variante',
@@ -187,13 +251,15 @@ export const DECISION_PHRASES = Object.freeze(
     {
       phrase: 'soll ich',
       address: 'sentence',
-      why: 'First person, not an address: it asks only in its question form ("Soll ich mergen?"), while "soll ich laut Arbeitsordnung zusammenführen" merely names a duty.',
+      verbFirst: true,
+      why: 'First person, not an address: mid-sentence it names a duty ("weil ich laut Arbeitsordnung mergen soll"). Verb-first it is the deliberative question, which asks whether or not its question mark survived the typing.',
       probe: 'Soll ich dir den engen oder den weiten Zuschnitt bauen.',
       quiet: 'Wenn der Lauf grün ist, soll ich laut Arbeitsordnung sofort zusammenführen.',
     },
     {
       phrase: 'sollen wir',
       address: 'sentence',
+      verbFirst: true,
       why: 'Judged exactly like "soll ich" — the plural changes who acts, not who is asked.',
       probe: 'Sollen wir dir den engen Zuschnitt bauen.',
       quiet: 'Laut Regel sollen wir nach jedem Merge das schnelle Tor laufen lassen.',
@@ -259,20 +325,30 @@ const TOKEN_SPLIT = new RegExp(`[^${WORD_CHARS}]+`)
 const tokens = (text) => (typeof text === 'string' ? text.toLowerCase().split(TOKEN_SPLIT) : [])
 
 const PHRASE_MATCHERS = new Map()
-const phraseMatcher = (phrase) => {
-  let re = PHRASE_MATCHERS.get(phrase)
+const phraseMatcher = (phrase, anchored) => {
+  const key = `${anchored ? '^' : ''}${phrase}`
+  let re = PHRASE_MATCHERS.get(key)
   if (!re) {
     const literal = phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-    re = new RegExp(`(?<![${WORD_CHARS}])${literal}(?![${WORD_CHARS}])`)
-    PHRASE_MATCHERS.set(phrase, re)
+    const before = anchored ? '^' : `(?<![${WORD_CHARS}])`
+    re = new RegExp(`${before}${literal}(?![${WORD_CHARS}])`)
+    PHRASE_MATCHERS.set(key, re)
   }
   return re
 }
 
+/** A sentence as the matchers see it: lowercased, runs of whitespace collapsed to
+ *  one space so a stray double space cannot break a two-word phrase. */
+const normalize = (sentence) => (typeof sentence === 'string' ? sentence.toLowerCase().replace(/\s+/g, ' ').trim() : '')
+
 /** Does a sentence carry a phrase as a WHOLE WORD? "entscheidet" is not
  *  "entscheide", and "auswählen" is not "wähle" (point 539). */
-export const containsPhrase = (sentence, phrase) =>
-  typeof sentence === 'string' && phraseMatcher(phrase).test(sentence.toLowerCase())
+export const containsPhrase = (sentence, phrase) => phraseMatcher(phrase, false).test(normalize(sentence))
+
+/** Does the phrase OPEN the sentence? Verb-first is the German imperative, and a
+ *  list head ("- Entscheide:") or a leading marker is still first position. */
+export const startsWithPhrase = (sentence, phrase) =>
+  phraseMatcher(phrase, true).test(normalize(sentence).replace(new RegExp(`^[^${WORD_CHARS}]+`), ''))
 
 /** A sentence that asks. The split below ends a sentence at `.!?`, so a `?` in it
  *  is its own — code, quoted commands and URLs are cut out before the split. */
@@ -288,14 +364,17 @@ export function addressesUser(sentence) {
  * The phrase entry a sentence FIRES on, or null (point 539).
  *
  * A phrase alone is not enough: the sentence must ask — by its question mark, by
- * addressing the user, or by the phrase itself being that address (`self`). The
- * list is walked in order, so the specific wording ("bitte entscheide") names the
- * trigger before the general one ("entscheide").
+ * addressing the user, by the phrase itself being that address (`self`), or, for a
+ * VERB, by standing in first position or beside a "bitte" (both mark the German
+ * imperative, which carries neither a question mark nor a pronoun). The list is
+ * walked in order, so the specific wording ("bitte entscheide") names the trigger
+ * before the general one ("entscheide").
  */
 export function firingPhrase(sentence) {
   for (const entry of DECISION_PHRASES) {
     if (!containsPhrase(sentence, entry.phrase)) continue
     if (entry.address === 'self' || isQuestion(sentence) || addressesUser(sentence)) return entry
+    if (entry.verbFirst && (startsWithPhrase(sentence, entry.phrase) || containsPhrase(sentence, 'bitte'))) return entry
   }
   return null
 }
