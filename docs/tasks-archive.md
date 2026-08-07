@@ -14984,3 +14984,20 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   VERIFIABLE: Vitest on the takeover decision — released-for-X + X alive + within the window →
   no spawn, and the log says why; X dead, or the window elapsed → spawn. Plus the reverse case
   that an unclaimed free lock is still taken at once.
+
+- [x] 447. THE BOOT PATH, AND A SECOND TASK THAT WATCHES THE FIRST (30.07.2026; bundle
+  Urlaubsfestigkeit). Measured state of `HoA-Batch-Autostart`: ONE time trigger every 15 min,
+  `StartWhenAvailable` on, no battery/idle limit, `MultipleInstances: IgnoreNew`, principal
+  `Interactive` — i.e. it runs only while the user is logged on. `AutoAdminLogon` IS set on
+  this machine, so a reboot logs itself back in, but the path is unproven: the machine has been
+  up since 24.07.2026 and an update restart can still stop at the lock screen. Deliver, as ONE
+  documented and idempotent script the user runs once from an ELEVATED shell (the agent has no
+  admin rights): (a) an at-logon trigger on the existing task, so the resume is instant instead
+  of within 15 minutes; (b) a SECOND scheduled task under its own name with an at-startup
+  trigger and an offset 15-minute repeat, which checks that the primary task exists, is enabled
+  and ran recently, and re-registers or starts it — and the primary checks the same for the
+  second, so neither is a single point of failure; (c) the pre-departure setting that keeps
+  Windows Update from restarting into a locked screen during the absence.
+  The script is idempotent (running it twice changes nothing) and prints what it changed.
+  VERIFIABLE: the readiness command of 448 reports both tasks with their triggers and last
+  result; the drill of 449 disables the primary task and asserts the second one revives it.

@@ -3170,23 +3170,6 @@ it is appended.
   DOCS in the same commit: `docs/batch-autonomy.md` where the guard chain is described, and
   CLAUDE.md §7.2 only if the families it names change.
 
-- [ ] 447. THE BOOT PATH, AND A SECOND TASK THAT WATCHES THE FIRST (30.07.2026; bundle
-  Urlaubsfestigkeit). Measured state of `HoA-Batch-Autostart`: ONE time trigger every 15 min,
-  `StartWhenAvailable` on, no battery/idle limit, `MultipleInstances: IgnoreNew`, principal
-  `Interactive` — i.e. it runs only while the user is logged on. `AutoAdminLogon` IS set on
-  this machine, so a reboot logs itself back in, but the path is unproven: the machine has been
-  up since 24.07.2026 and an update restart can still stop at the lock screen. Deliver, as ONE
-  documented and idempotent script the user runs once from an ELEVATED shell (the agent has no
-  admin rights): (a) an at-logon trigger on the existing task, so the resume is instant instead
-  of within 15 minutes; (b) a SECOND scheduled task under its own name with an at-startup
-  trigger and an offset 15-minute repeat, which checks that the primary task exists, is enabled
-  and ran recently, and re-registers or starts it — and the primary checks the same for the
-  second, so neither is a single point of failure; (c) the pre-departure setting that keeps
-  Windows Update from restarting into a locked screen during the absence.
-  The script is idempotent (running it twice changes nothing) and prints what it changed.
-  VERIFIABLE: the readiness command of 448 reports both tasks with their triggers and last
-  result; the drill of 449 disables the primary task and asserts the second one revives it.
-
 - [ ] 448. ONE COMMAND THAT SAYS "READY FOR A FORTNIGHT ALONE" (30.07.2026; bundle
   Urlaubsfestigkeit). Before an absence, nothing today reports whether the chain is intact —
   and the failures that hurt most are the silent ones. `scripts/vacation-ready.mjs` answers it
@@ -3463,6 +3446,31 @@ it is appended.
   derivable, plus three consecutive `collision` runs on a quiet machine — WebGL 2 and
   WebGPU — reporting the SAME check count, and a deliberately removed check turning
   the run red instead of shrinking it.
+
+- [ ] 533. WHAT BRINGS THE CONTAINER BACK AFTER A HOST REBOOT (found 07.08.2026 while
+  merging point 447; bundle Urlaubsfestigkeit). Point 447 hardened the WINDOWS boot path —
+  `HoA-Batch-Autostart` with an at-logon trigger, plus `HoA-Batch-Watchdog` watching it —
+  and its measurements date from 30.07.2026, when the batch still ran on that host. Since
+  03.08.2026 it runs inside the LINUX container (`docs/host-environment.md`), where the
+  launcher is the daemon `scripts/batch-launcher.mjs`, which lives and dies with the
+  container. A Windows reboot therefore takes the batch down, and the hardened task then
+  starts a launcher on a host the work no longer runs on: a GREEN boot path over a dead
+  batch, which is exactly the silent failure the bundle exists to remove.
+  ESTABLISH FIRST, DO NOT ASSUME: what starts the container today (Docker Desktop autostart,
+  a WSL distro, the devcontainer CLI, a task) and whether the launcher daemon comes up with
+  it. The answer is RECORDED in `docs/host-environment.md` under the launcher row, which
+  today names the two launchers side by side without saying which one is live.
+  DELIVER: (a) the Windows setup script of point 447 gains an idempotent, dry-runnable step
+  that brings the CONTAINER up at logon/boot and starts the launcher daemon inside it —
+  same conventions as `scripts/windows/setup-boot-path.ps1` (elevated once, "Nothing
+  changed" on a second run, definitions exported to `local/`); (b) `windows-task-watch.mjs`
+  checks the CONTAINER and the daemon, not only the two tasks, because a task that runs and
+  starts nothing must not report green; (c) the readiness command of point 448 gains that
+  line with its remedy.
+  VERIFIABLE: Vitest on the pure parts (the probe verdicts, the idempotency decision, the
+  green-over-dead case failing). The live acceptance is one elevated run on the Windows host
+  and one real reboot, recorded as evidence — the container path cannot be proven from
+  inside the container, and point 449's drill is where it is exercised afterwards.
 
 ## Closing (only after all points)
 
