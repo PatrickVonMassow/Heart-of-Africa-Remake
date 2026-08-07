@@ -15412,4 +15412,36 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   target lifetime, or the hidden set) so the empty band cannot come back unnoticed.
   Criticality: HIGH — it is a visible hole in two acceptance criteria on the path every
   player takes, entering a settlement from the map.
+- [x] 547. THE PANORAMA FIX'S TWO REVIEW FIXES (second model, 07.08.2026, verdict
+  `merge-with-fixes` on merge f75186b — the fix itself was verified correct and stays).
+  (a) THE DEV COMPASS HOOK LIES. `src/scenes/travel/panoramaCapture.ts` publishes
+  `compass: { n: fractions[0], w: fractions[1], s: fractions[2], e: fractions[3] }` under
+  a comment reading "slice k holds compass [N, W, S, E][k] (panoramaMath, point 90)".
+  Commit 027fef14 changed `SECTOR_COMPASS` to `['N', 'E', 'S', 'W']`, so slice 1 is now
+  EAST and slice 3 WEST: the hook labels east as `w` and west as `e`, and cites a
+  convention that same commit deleted. Nothing is red today — the only live consumer
+  (`scripts/verify/polish.mjs`) reads the raw `waterFractions` — but this is exactly the
+  verification API a future direction check would reach for, and it would assert the
+  wrong sector while PASSING. Swap the two keys and rewrite the comment to the
+  convention that actually holds.
+  (b) THE RECORDED HISTORY IS FALSE. `src/scenes/travel/panoramaMath.ts` and the §31
+  update in `docs/acceptance-evidence.md` both say the old mirror was inferred while the
+  capture "wrote no content at all". The dates refute it: the mirror landed 14.07
+  (7773490d), the asynchronous pipelines that emptied the band only on 25.07 (9c62ae21).
+  What the July calibration actually saw was a band drawn with the viewport read off the
+  render target — every sector covering the whole width, so the LAST camera (west)
+  survived stretched 4:1, which predicts the recorded "Giza u 0.405" more closely
+  ((1 − tan 10.7°)/2 = 0.4055) than the mirrored convention's own 0.399. The
+  CONCLUSION stands — that calibration basis was invalid either way and the new
+  convention is right — only the stated reason is wrong. Correct both texts to the
+  measured history.
+  FINAL STATE: the hook names each sector by the compass direction it actually holds,
+  and neither the code comment nor the evidence document asserts a history the commit
+  dates contradict.
+  VERIFIABLE: a Vitest case pinning the hook's key→sector mapping against
+  `SECTOR_COMPASS`, so the two can never drift apart again silently; the doc change
+  needs no test beyond the closing's `.md` audit.
+  Criticality: low — nothing a player sees, and nothing red today. It is filed because
+  both defects are of the kind that pass a test while being wrong, which is the failure
+  the second model exists to catch.
 

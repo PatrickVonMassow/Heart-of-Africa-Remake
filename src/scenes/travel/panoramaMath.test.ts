@@ -230,10 +230,11 @@ describe('panorama band gate over EVERY place kind (point 335)', () => {
 })
 
 // The band is DIRECTION-TRUE, not mirrored (point 545). The mirror that stood
-// here was inferred while the capture wrote nothing at all, so it was measured
-// in a buffer that never held the landmark it was calibrated against; with the
-// capture drawing, a magenta pillar due west of the capture point lands dead
-// centre of the slice whose camera looks west.
+// here was calibrated against a band that DID draw but was cut wrong — every
+// sector covering the full width, so only the last camera survived, stretched —
+// which is why the landmark it was measured against sat where it did; with the
+// capture cut per sector, a magenta pillar due west of the capture point lands
+// dead centre of the slice whose camera looks west.
 describe('the buffer stores each direction where its own camera looked', () => {
   it('a direction lands in the slice its sector camera photographed', () => {
     expect(directionToU(0, -1)).toBeCloseTo(0.125) // north → slice 0 centre

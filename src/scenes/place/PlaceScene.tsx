@@ -1691,8 +1691,9 @@ function TravelPanorama({ placeId }: { placeId: string }) {
     const H = bandHeightAt(PANORAMA_RADIUS)
     // The band is DIRECTION-TRUE (panoramaMath): the fragment's own bearing
     // picks its column. It used to sample the MIRRORED column, for a mirror
-    // that was only ever inferred from an empty band (point 545) — with the
-    // capture drawing again the mirror is what flips the horizon east-west.
+    // that was calibrated against a band drawn but wrongly cut, every sector
+    // covering the full width (point 545) — with the capture cut per sector
+    // again, the mirror is what flips the horizon east-west.
     const alpha = atan(positionWorld.x, positionWorld.z.negate())
     const kSector = alpha.div(Math.PI / 2).round()
     const localT = tan(alpha.sub(kSector.mul(Math.PI / 2)))
