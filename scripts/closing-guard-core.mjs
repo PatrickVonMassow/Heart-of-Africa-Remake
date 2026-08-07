@@ -44,17 +44,31 @@ export const CLOSING_STEPS = [
 /** The set of valid step ids, for validating CLI input. */
 export const STEP_IDS = new Set(CLOSING_STEPS.map((s) => s.id))
 
+/** `git [options] <verb>` — at most ten options, each with at most one non-dash argument. */
+const gitVerb = (verb) => new RegExp(String.raw`\bgit(?:\s+-{1,2}\S+(?:\s+[^-\s]\S*)?){0,10}\s+${verb}\b`)
+const GIT_TAG = gitVerb('tag')
+const GIT_PUSH = gitVerb('push')
+/** The git options whose argument is a filesystem path, not a ref. */
+const PATH_OPTION = /\s(?:-C|--git-dir|--work-tree)(?:\s+|=)\S+/g
+
 /**
  * Does this shell command CREATE or PUSH a version tag (vX.Y) or the `poc` tag?
  * Those are the release acts the closing gates. Matches:
- *   git tag [..] vX.Y            (create/move a version tag)
+ *   git tag [..] vX.Y             (create/move a version tag)
  *   git tag [..] -f? poc          (move poc — it mirrors the newest version tag)
  *   git push <remote> vX.Y        (push a version tag)
  *   git push <remote> poc         (push poc)
+ *   git push <remote> +v0.3       (force-update a version tag)
+ *   git push <remote> :v0.3       (delete a version tag — a published one, too)
  *   git push .. --tags / --follow-tags   (bulk tag push)
+ *   gh release create vX.Y|poc    (a release published straight from the CLI)
+ *   any of the above with the tag QUOTED ("v0.3", 'poc') or with git options
+ *   before the verb (git -C <path>, git -c key=val, git --no-pager)
  * Deliberately NOT matched: ordinary `git push origin main`, non-version
- * lightweight tags, branch pushes — the gate is only for a version RELEASE.
- * Total: any non-string → false.
+ * lightweight tags, branch pushes, a version/poc token that only appears in a
+ * COMMIT MESSAGE, and a REPOSITORY PATH that happens to end in a tag name
+ * (`git -C /build/poc push origin main`) — the gate is only for a version
+ * RELEASE. Total: any non-string → false.
  */
 export function isVersionTagCommand(command) {
   if (typeof command !== 'string') return false
@@ -75,23 +89,33 @@ export function isVersionTagCommand(command) {
   const segments = c.split(/&&|\|\||;|\||\n/)
   // A version tag as a bare ARGUMENT (v0.1, v1.0, v12.34), or the poc tag, or a
   // bulk tag push. Matches quoted or unquoted. Word-bounded so `poctest`/`v0.2-rc`
-  // refspecs don't false-hit.
-  const versionArg = /(^|[\s=/])['"]?v\d+\.\d+['"]?($|[\s^~:])/
-  const pocArg = /(^|[\s=/])['"]?poc['"]?($|[\s^~:])/
+  // refspecs don't false-hit. The prefix class carries `+` (force refspec) and
+  // `:` (delete refspec): `git push origin +v0.3` and `git push origin :v0.3`
+  // are release acts the gate used to wave through (25.07 review, finding c).
+  const versionArg = /(^|[\s=/+:])['"]?v\d+\.\d+['"]?($|[\s^~:])/
+  const pocArg = /(^|[\s=/+:])['"]?poc['"]?($|[\s^~:])/
   for (const seg of segments) {
     const s = ` ${seg.trim()} `
-    // git may have options before the verb: git -C <path> tag, git -c user=x tag, git --no-pager push.
-    // Match git followed by options (with their args), then the verb.
-    // Options: -C <path>, -c key=val, --no-pager, etc.
-    const isTag = /\bgit(?:\s+(?:-[cC](?:\s+\S+)?|-{1,2}\S+(?:\s+\S+)?))*\s+tag\b/.test(s)
-    const isPush = /\bgit(?:\s+(?:-[cC](?:\s+\S+)?|-{1,2}\S+(?:\s+\S+)?))*\s+push\b/.test(s)
+    // git may have options before the verb: git -C <path> tag, git -c user=x tag,
+    // git --no-pager push. The run of options is BOUNDED and an option's argument
+    // may not itself start with a dash — the former unbounded, doubly ambiguous
+    // shape backtracked exponentially over a run of dash-tokens (measured 736 ms
+    // on 34 synthetic flags, doubling per two). A PreToolUse that HANGS is not
+    // covered by the wrapper's fail-open, which only catches throws.
+    const isTag = GIT_TAG.test(s)
+    const isPush = GIT_PUSH.test(s)
     const isGhRelease = /\bgh\s+release\s+create\b/.test(s)
     if (!isTag && !isPush && !isGhRelease) continue
     if (/\s--(tags|follow-tags)\b/.test(s)) return true
-    if (versionArg.test(s) || pocArg.test(s)) return true
+    // A path handed to -C/--git-dir/--work-tree is a LOCATION, never a tag, so it
+    // is dropped before the tag matching: a repository at /build/poc must not
+    // read as the poc tag (25.07 review, finding b).
+    const args = s.replace(PATH_OPTION, ' ')
+    if (versionArg.test(args) || pocArg.test(args)) return true
   }
   return false
 }
+
 
 /** The work-order files a tick is written into (the split of 26.07.2026). */
 export const WORK_ORDER_FILES = ['TASKS.md', 'docs/tasks-archive.md']

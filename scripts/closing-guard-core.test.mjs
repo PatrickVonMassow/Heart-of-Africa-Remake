@@ -115,6 +115,50 @@ describe('isVersionTagCommand', () => {
       expect(isVersionTagCommand('git commit -m "moving poc to main"')).toBe(false)
     })
   })
+  // --- the 25.07 review's remaining findings (a)-(c) ------------------------
+  describe('a repository PATH is a location, never a tag', () => {
+    it('does NOT match an ordinary push out of a checkout whose path ends in a tag name', () => {
+      expect(isVersionTagCommand('git -C /build/poc push origin main')).toBe(false)
+      expect(isVersionTagCommand('git -C /srv/releases/v0.3 push origin main')).toBe(false)
+      expect(isVersionTagCommand('git --git-dir=/build/poc/.git push origin main')).toBe(false)
+      expect(isVersionTagCommand('git --work-tree /build/poc --git-dir /build/poc/.git push origin main')).toBe(false)
+    })
+    it('still matches the real act from such a checkout', () => {
+      expect(isVersionTagCommand('git -C /build/poc push origin poc')).toBe(true)
+      expect(isVersionTagCommand('git -C /build/poc tag -f poc')).toBe(true)
+      expect(isVersionTagCommand('git --git-dir=/build/poc/.git push origin v0.3')).toBe(true)
+    })
+  })
+  describe('force and delete refspecs are release acts too', () => {
+    it('matches a forced tag update and a tag deletion', () => {
+      expect(isVersionTagCommand('git push origin +v0.3')).toBe(true)
+      expect(isVersionTagCommand('git push origin :v0.3')).toBe(true)
+      expect(isVersionTagCommand('git push origin +poc')).toBe(true)
+      expect(isVersionTagCommand('git push origin :poc')).toBe(true)
+      expect(isVersionTagCommand('git push origin :refs/tags/v0.3')).toBe(true)
+    })
+    it('still ignores an ordinary forced branch push', () => {
+      expect(isVersionTagCommand('git push origin +main')).toBe(false)
+      expect(isVersionTagCommand('git push origin :feature/old-branch')).toBe(false)
+    })
+  })
+  describe('adversarial input cannot HANG the PreToolUse hook', () => {
+    it('answers a long run of dash-tokens in milliseconds', () => {
+      // The former unbounded, doubly ambiguous option run took 736 ms here and
+      // doubled per two flags; a hook that hangs is not covered by fail-open.
+      const started = Date.now()
+      for (const n of [20, 34, 60]) {
+        expect(isVersionTagCommand(`git ${'--flag '.repeat(n)}log`)).toBe(false)
+        expect(isVersionTagCommand(`git ${'-x '.repeat(n)}status`)).toBe(false)
+        expect(isVersionTagCommand(`git ${'--opt val '.repeat(n)}rev-parse HEAD`)).toBe(false)
+      }
+      expect(Date.now() - started).toBeLessThan(250)
+    })
+    it('still answers a realistic option run correctly', () => {
+      expect(isVersionTagCommand('git -c user.name=X -c user.email=y@z --no-pager tag v0.3')).toBe(true)
+      expect(isVersionTagCommand('git -c a=1 -c b=2 -c c=3 -c d=4 log --oneline -5')).toBe(false)
+    })
+  })
   describe('FN-5: gh release create detection', () => {
     it('matches gh release create with version tag', () => {
       expect(isVersionTagCommand('gh release create v0.3')).toBe(true)

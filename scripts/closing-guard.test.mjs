@@ -88,6 +88,17 @@ describe('closing-guard (spawned)', () => {
     expect(out.permissionDecisionReason).toContain('dead-code')
   })
 
+  it('denies the same act through the PowerShell tool — the primary shell on the host', () => {
+    const r = callGuard('PowerShell', { command: 'git push origin poc --force' })
+    expect(r.status, r.stderr).toBe(0)
+    expect(r.decision, `printed ${JSON.stringify(r.stdout)}`).toBeTruthy()
+    expect(r.decision.hookSpecificOutput.permissionDecision).toBe('deny')
+    expect(reasonOf(r)).toContain('CLOSING INCOMPLETE')
+    // and it is the SAME gate: complete the closing and PowerShell passes too
+    writeState(completeState(head))
+    expect(callGuard('PowerShell', { command: 'git push origin poc --force' }).stdout.trim()).toBe('')
+  })
+
   it('denies the TICK of a closing point — the claim that the closing is done', () => {
     const r = callGuard('Edit', { file_path: resolve(repo, 'docs', 'tasks-archive.md'), old_string: '# Archive', new_string: '# Archive\n- [x] 224. DEMO CHECKPOINT' })
     expect(r.status, r.stderr).toBe(0)
