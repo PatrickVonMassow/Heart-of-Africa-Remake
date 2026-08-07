@@ -108,6 +108,9 @@ export interface AsyncPipelineHandle {
   state(): AsyncPipelineState
   /** Restores the backend's original method (used by the tests and on unmount). */
   restore(): void
+  /** Runs `fn` with pipeline creation SYNCHRONOUS — see
+   *  {@link withSynchronousPipelineCompile}, which is the way to call this. */
+  runSynchronously<T>(fn: () => T): T
 }
 
 const MARK = Symbol.for('hoa.asyncPipelines')
@@ -147,6 +150,8 @@ export function enableAsyncPipelineCompile(
   let started = 0
   let done = 0
   let dropped = 0
+  /** Nesting depth of `runSynchronously` — see withSynchronousPipelineCompile. */
+  let synchronous = 0
 
   // --- The throttled first-use release (WebGL 2 only) ------------------------
   const completeOriginal = backend._completeCompile
@@ -173,6 +178,12 @@ export function enableAsyncPipelineCompile(
       else pumping = false
     }
     const throttled = function (this: PipelineBackend, renderObject: unknown, pipeline: unknown): void {
+      // Inside a synchronous scope the caller needs the program DRAWABLE when
+      // its render returns, so the throttle is bypassed rather than queued.
+      if (synchronous > 0) {
+        completeOriginal.call(backend, renderObject, pipeline)
+        return
+      }
       queue.push([renderObject, pipeline])
       if (!pumping) {
         pumping = true
@@ -189,6 +200,12 @@ export function enableAsyncPipelineCompile(
     if (promises != null) {
       // three.js's own compileAsync — it owns and awaits this array.
       original.call(this, renderObject, promises)
+      return
+    }
+    if (synchronous > 0) {
+      // A ONE-SHOT render (the panorama capture) has no later frame to finish
+      // in: hand the backend the null it reads as "compile now".
+      original.call(this, renderObject, null)
       return
     }
     const sink: unknown[] = []
@@ -222,6 +239,14 @@ export function enableAsyncPipelineCompile(
       restoreComplete?.()
       delete marked[MARK]
     },
+    runSynchronously: (fn) => {
+      synchronous++
+      try {
+        return fn()
+      } finally {
+        synchronous--
+      }
+    },
   }
   marked[MARK] = handle
   return handle
@@ -231,4 +256,38 @@ export function enableAsyncPipelineCompile(
 export function asyncPipelineHandle(backend: PipelineBackend | null | undefined): AsyncPipelineHandle | null {
   if (!backend) return null
   return (backend as Marked)[MARK] ?? null
+}
+
+/**
+ * Run `fn` with pipeline creation SYNCHRONOUS on this backend, then restore the
+ * asynchronous path.
+ *
+ * WHY THIS EXISTS (point 545). Asynchronous creation rests on an assumption the
+ * ordinary render loop satisfies and a ONE-SHOT render does not: that the same
+ * scene is drawn again next frame, so an object whose pipeline is not ready yet
+ * — `Renderer._renderObjectDirect` silently SKIPS it — simply appears a frame
+ * later. The panorama capture (src/scenes/travel/panoramaCapture.ts) renders the
+ * travel scene into an offscreen target ONCE and keeps the pixels forever. Its
+ * render target is its own render context, so every object in it needs a NEW
+ * pipeline, none of which is ready in the frame the shot is taken: measured
+ * 0 of 92 objects ready, 0 draw calls, a fully transparent band — the whole
+ * defect of point 545.
+ *
+ * So the shot compiles synchronously and is complete when it returns. The cost
+ * is paid ONCE per session, because the capture keeps its targets: measured on
+ * the headless WebGL 2 lane (a machine painting 3-16 fps), 3.4 s for the first
+ * capture's ~35 pipelines and ~0.2-0.4 s for every later one, which is the
+ * render itself. On WebGPU `createRenderPipeline` returns at once and the
+ * compile happens off the main thread, so no comparable stall exists there.
+ *
+ * Use it around a render that has no next frame — never around the render loop,
+ * which is exactly what point 337 moved off the critical path.
+ */
+export function withSynchronousPipelineCompile<T>(
+  backend: PipelineBackend | null | undefined,
+  fn: () => T,
+): T {
+  const handle = asyncPipelineHandle(backend)
+  // An unarmed backend already compiles synchronously — nothing to switch.
+  return handle ? handle.runSynchronously(fn) : fn()
 }

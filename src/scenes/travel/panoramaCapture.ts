@@ -9,7 +9,15 @@
 // place scene falls back to the geometry backdrop.
 
 import * as THREE from 'three/webgpu'
-import { CAPTURE_SECTORS, SECTOR_H_FOV_DEG, BAND_V_FOV_DEG, sectorYaw } from './panoramaMath'
+import {
+  CAPTURE_SECTORS,
+  SECTOR_H_FOV_DEG,
+  BAND_V_FOV_DEG,
+  bandWidth,
+  sectorRect,
+  sectorYaw,
+} from './panoramaMath'
+import { withSynchronousPipelineCompile, type PipelineBackend } from '../../render/asyncPipelines'
 
 export interface PanoramaCapture {
   placeId: string
@@ -22,6 +30,43 @@ export interface PanoramaCapture {
 
 const SECTOR_PX = 768
 let current: PanoramaCapture | null = null
+
+/** The two targets the capture works with, allocated ONCE per session.
+ *
+ *  They used to be a fresh band target per capture, which cost twice: the
+ *  render-target count grew with every settlement visit (the point-295 leak
+ *  invariant saw +4 per maasai visit), and a fresh target is a fresh RENDER
+ *  CONTEXT, so every shot needed a fresh set of pipelines that could never be
+ *  warm — see withSynchronousPipelineCompile. Kept for the session, the second
+ *  capture and every later one draw from the warm set. */
+let targets: { band: THREE.RenderTarget; sector: THREE.RenderTarget; width: number } | null = null
+
+function captureTargets(renderer: THREE.WebGPURenderer): NonNullable<typeof targets> {
+  if (targets) return targets
+  const width = bandWidth(SECTOR_PX)
+  // The band is only ever copied INTO (never rendered into), so it needs no
+  // depth buffer; it is sampled as a plain color texture on the horizon
+  // cylinder. One clearing pass allocates it, so the first copy has a texture.
+  const band = new THREE.RenderTarget(width, SECTOR_PX, {
+    depthBuffer: false,
+    minFilter: THREE.LinearFilter,
+    magFilter: THREE.LinearFilter,
+  })
+  const prevTarget = renderer.getRenderTarget()
+  const prevClearAlpha = renderer.getClearAlpha()
+  renderer.setClearAlpha(0)
+  renderer.setRenderTarget(band)
+  renderer.clear()
+  renderer.setRenderTarget(prevTarget)
+  renderer.setClearAlpha(prevClearAlpha)
+  // The square shot each sector is rendered into before it is copied across.
+  const sector = new THREE.RenderTarget(SECTOR_PX, SECTOR_PX, {
+    minFilter: THREE.LinearFilter,
+    magFilter: THREE.LinearFilter,
+  })
+  targets = { band, sector, width }
+  return targets
+}
 
 export function getPanoramaCapture(placeId: string, seed: number): PanoramaCapture | null {
   return current && current.placeId === placeId && current.seed === seed ? current : null
@@ -65,16 +110,8 @@ export function capturePanorama(
       hidden.push(o)
     }
   })
-  if (current) {
-    current.target.dispose()
-    current = null
-  }
-  const width = SECTOR_PX * CAPTURE_SECTORS
-  const target = new THREE.RenderTarget(width, SECTOR_PX, {
-    // The band is sampled as a plain color texture on the horizon cylinder.
-    minFilter: THREE.LinearFilter,
-    magFilter: THREE.LinearFilter,
-  })
+  current = null
+  const { band: target, sector, width } = captureTargets(renderer)
   // Near plane 3: close terrain belongs to the settlement's own scene, but
   // nearby landmarks must stay in (Giza stands ~4 units west of Cairo); the
   // oversized symbolic dressing is hidden anyway. The FAR plane is bounded by
@@ -90,28 +127,33 @@ export function capturePanorama(
   scene.background = null
   const prevClearAlpha = renderer.getClearAlpha()
   renderer.setClearAlpha(0)
-  // Viewport/scissor are renderer state, not target state: capture leaves
-  // them on the last sector unless restored, blacking out the main frame.
-  const prevViewport = new THREE.Vector4()
-  const prevScissor = new THREE.Vector4()
-  renderer.getViewport(prevViewport)
-  renderer.getScissor(prevScissor)
-  const prevScissorTest = renderer.getScissorTest()
-  for (let k = 0; k < CAPTURE_SECTORS; k++) {
-    cam.rotation.set(0, sectorYaw(k), 0)
-    cam.updateMatrixWorld()
-    renderer.setRenderTarget(target)
-    renderer.setViewport(k * SECTOR_PX, 0, SECTOR_PX, SECTOR_PX)
-    renderer.setScissor(k * SECTOR_PX, 0, SECTOR_PX, SECTOR_PX)
-    renderer.setScissorTest(true)
-    renderer.render(scene, cam)
-  }
+  // The shot compiles its pipelines SYNCHRONOUSLY (point 545): a capture has no
+  // next frame in which a not-yet-ready object could appear, and the renderer
+  // silently skips such objects — asynchronously it drew nothing at all.
+  withSynchronousPipelineCompile(
+    (renderer as unknown as { backend?: PipelineBackend }).backend,
+    () => {
+      for (let k = 0; k < CAPTURE_SECTORS; k++) {
+        cam.rotation.set(0, sectorYaw(k), 0)
+        cam.updateMatrixWorld()
+        // One square shot per sector, then copied into its band column: the
+        // per-sector renderer viewport this used to use is ignored when the
+        // renderer draws into a target (sectorRect).
+        renderer.setRenderTarget(sector)
+        renderer.render(scene, cam)
+        const rect = sectorRect(k, SECTOR_PX)
+        renderer.copyTextureToTexture(
+          sector.texture,
+          target.texture,
+          new THREE.Box2(new THREE.Vector2(0, 0), new THREE.Vector2(rect.width, rect.height)),
+          new THREE.Vector2(rect.x, rect.y),
+        )
+      }
+    },
+  )
   renderer.setRenderTarget(prevTarget)
   scene.background = prevBackground
   renderer.setClearAlpha(prevClearAlpha)
-  renderer.setViewport(prevViewport)
-  renderer.setScissor(prevScissor)
-  renderer.setScissorTest(prevScissorTest)
   for (const o of hidden) o.visible = true
 
   current = { placeId, seed, texture: target.texture, target }

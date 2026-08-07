@@ -21,6 +21,35 @@ export function sectorYaw(k: number): number {
   return -k * (SECTOR_H_FOV_DEG * Math.PI) / 180
 }
 
+/** Pixel rectangle of one sector inside the band texture. */
+export interface SectorRect {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+/** Width of the whole band texture for a square sector shot of `sectorPx`. */
+export function bandWidth(sectorPx: number): number {
+  return sectorPx * CAPTURE_SECTORS
+}
+
+/**
+ * Where sector k's square shot belongs in the band texture: the sectors tile it
+ * left to right, in the `sectorYaw` sweep order, with no gap and no overlap.
+ *
+ * Point 545: this used to be expressed as a per-sector RENDERER viewport, which
+ * three.js ignores when rendering into a render target — it reads the viewport
+ * and scissor off the TARGET instead, so all four sectors landed on top of each
+ * other across the full band. Each sector is now shot at its own square size
+ * and copied to this rectangle, which is one rule instead of two pieces of
+ * renderer state and reads the same on both backends (a WebGPU pass clears the
+ * whole attachment regardless of the scissor, a WebGL clear does not).
+ */
+export function sectorRect(k: number, sectorPx: number): SectorRect {
+  return { x: k * sectorPx, y: 0, width: sectorPx, height: sectorPx }
+}
+
 /**
  * Texture U for a world direction (dx, dz) from the capture point. Sector k
  * covers u ∈ [k/4, (k+1)/4]; its camera looks along k·90° (N, E, S, W), and
