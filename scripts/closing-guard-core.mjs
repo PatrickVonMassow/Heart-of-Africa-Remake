@@ -70,20 +70,31 @@ const PATH_OPTION = /\s(?:-C|--git-dir|--work-tree)(?:\s+|=)\S+/g
  * (`git -C /build/poc push origin main`) — the gate is only for a version
  * RELEASE. Total: any non-string → false.
  */
-export function isVersionTagCommand(command) {
-  if (typeof command !== 'string') return false
-  // A version/poc token inside a COMMIT MESSAGE (or any quoted string / heredoc
-  // body) is not a tag argument — strip those first, so
-  // `git commit -m "… the v0.2 / poc release …" && git push origin main` is NOT
-  // mistaken for a release (the real false-positive that blocked this very
-  // commit). Order: heredoc bodies, then single/double-quoted strings.
+/**
+ * A command with its PROSE removed: heredoc bodies and -m/--message values.
+ * What a command SAYS is not what it DOES — a commit message quoting `v0.2`,
+ * `poc` or a ticked point line is talk, and blocking talk is obstruction. Only
+ * those two forms are stripped: a blanket quote-strip would swallow the real
+ * arguments (`git tag "v0.3"`, `sed 's/…/- [x] 224./'`), and an apostrophe in a
+ * double-quoted string would consume unintended spans ("Don't …").
+ */
+function withoutProse(command) {
   let c = command.replace(/<<-?\s*['"]?(\w+)['"]?[\s\S]*?\n[ \t]*\1\b/g, ' ')
-  // Only strip quotes from -m/--message values, which cannot be version tags.
-  // DO NOT blanket-strip quotes — version tokens may be wrapped (git tag "v0.3").
-  // Apostrophes in double-quoted strings would match with ' regex, consuming
-  // unintended spans ("Don't ..." matches 't' to another quote).
   c = c.replace(/(-m|--message)\s+"[^"]*"/g, '$1 MESSAGE')
   c = c.replace(/(-m|--message)\s+'[^']*'/g, '$1 MESSAGE')
+  return c
+}
+
+export function isVersionTagCommand(command) {
+  if (typeof command !== 'string') return false
+  // `git commit -m "… the v0.2 / poc release …" && git push origin main` is NOT
+  // a release — the real false positive that once blocked this guard's own commit.
+  let c = withoutProse(command)
+  // A backslash-newline is a CONTINUATION, not a command break — joining it back
+  // keeps `git tag \⏎  v0.3` one segment. Without this the newline split severed
+  // the verb from its tag argument and the whole release act read as harmless
+  // (four-eyes review 07.08.2026).
+  c = c.replace(/\\\r?\n/g, ' ')
   // Evaluate each command SEGMENT on its own — a `git push origin main` segment
   // must not inherit a `poc`/`vX.Y` token from a sibling segment.
   const segments = c.split(/&&|\|\||;|\||\n/)
@@ -200,6 +211,11 @@ export function tickedPointNumbers(text) {
 const EDIT_TOOLS = new Set(['Edit', 'Write', 'MultiEdit', 'NotebookEdit'])
 const SHELL_TOOLS = new Set(['Bash', 'PowerShell'])
 
+/** A shell command names a work-order file … */
+const WORK_ORDER_NAMED = /TASKS\.md|tasks-archive\.md/
+/** … and WRITES it: an in-place editor, a redirect or a copy ONTO the file, a patch. */
+const WORK_ORDER_WRITE = /(^|\s)-i\b|>>?\s*\S*(TASKS\.md|tasks-archive\.md)|\btee\b|\bpatch\b|\bgit\s+apply\b|\b(mv|cp)\b/
+
 /** The text a tool call WRITES, and the text it REPLACES, for tick accounting. */
 function tickTexts(toolName, toolInput) {
   const input = toolInput && typeof toolInput === 'object' ? toolInput : {}
@@ -211,10 +227,15 @@ function tickTexts(toolName, toolInput) {
     return { added: added.filter((s) => typeof s === 'string').join('\n'), removed: removed.filter((s) => typeof s === 'string').join('\n') }
   }
   if (SHELL_TOOLS.has(toolName)) {
-    const c = typeof input.command === 'string' ? input.command : ''
-    // A shell tick has to name the file it rewrites — that keeps every ordinary
-    // command (and every commit message quoting a tick) out of the accounting.
-    if (!/TASKS\.md|tasks-archive\.md/.test(c)) return null
+    // The shell branch is a BACKSTOP — the honest tick goes through the editing
+    // tools, which the branch above decides exactly. So it demands all three:
+    // prose removed (a commit message quoting a tick is talk, and it denied this
+    // guard's own commit), the work-order file NAMED, and an actual WRITE onto
+    // it — `grep -F '- [x] 224.' docs/tasks-archive.md` reads, and denying a read
+    // during a closing is obstruction, not enforcement (four-eyes review
+    // 07.08.2026).
+    const c = withoutProse(typeof input.command === 'string' ? input.command : '')
+    if (!WORK_ORDER_NAMED.test(c) || !WORK_ORDER_WRITE.test(c)) return null
     return { added: c, removed: '' }
   }
   return null
@@ -234,10 +255,17 @@ export function mayTickPoint(toolName, toolInput) {
 }
 
 /**
- * Which CLOSING points this tool call ticks. A point counts only when the tick
- * is NEW (not already present in the text being replaced) and the point is
- * still OPEN in the current work order — so re-writing an already-archived tick
- * can never re-fire. Total: anything unreadable → [] (fail-open).
+ * Which CLOSING points this tool call ticks. A point counts when the tick is NEW
+ * — neither in the text being replaced nor already recorded in the work order,
+ * so re-writing an already-archived tick can never re-fire.
+ *
+ * THE TICK IS TWO EDITS, IN EITHER ORDER (four-eyes review 07.08.2026): the
+ * point leaves TASKS.md and lands, ticked, in the archive. Delete-first left the
+ * point in NEITHER file at the moment the archive was written, so a membership
+ * test against the work order alone let the whole claim through. The point's
+ * spec travels WITH it, so the written text is read as a work order too, and a
+ * point the work order no longer knows counts as open rather than as done.
+ * Total: anything unreadable → [] (fail-open).
  */
 export function closingTickClaim({ toolName, toolInput, tasksText } = {}) {
   try {
@@ -245,10 +273,13 @@ export function closingTickClaim({ toolName, toolInput, tasksText } = {}) {
     if (!t) return []
     const ticked = tickedPointNumbers(t.added)
     if (ticked.size === 0) return []
+    const points = parsePoints(tasksText)
+    if (points.length === 0) return [] // no readable work order → nothing to judge against
     const already = tickedPointNumbers(t.removed)
     const closing = closingPointNumbers(tasksText)
-    const stillOpen = new Set(parsePoints(tasksText).filter((p) => p.open).map((p) => p.n))
-    return [...ticked].filter((n) => !already.has(n) && closing.has(n) && stillOpen.has(n)).sort((a, b) => a - b)
+    for (const n of closingPointNumbers(t.added)) closing.add(n)
+    const recorded = new Set(points.filter((p) => !p.open).map((p) => p.n))
+    return [...ticked].filter((n) => !already.has(n) && !recorded.has(n) && closing.has(n)).sort((a, b) => a - b)
   } catch {
     return []
   }

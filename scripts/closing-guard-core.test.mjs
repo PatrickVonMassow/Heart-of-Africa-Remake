@@ -142,6 +142,17 @@ describe('isVersionTagCommand', () => {
       expect(isVersionTagCommand('git push origin :feature/old-branch')).toBe(false)
     })
   })
+  describe('a line continuation is not a command break (four-eyes review 07.08.2026)', () => {
+    it('matches a release act written across continued lines', () => {
+      expect(isVersionTagCommand('git tag \\\n  v0.3')).toBe(true)
+      expect(isVersionTagCommand('git push origin \\\n  v0.3')).toBe(true)
+      expect(isVersionTagCommand('git push \\\n  origin \\\n  poc')).toBe(true)
+      expect(isVersionTagCommand('git tag \\\r\n  -f poc')).toBe(true)
+    })
+    it('still keeps a real newline a segment break', () => {
+      expect(isVersionTagCommand('git tag\ngit push origin main')).toBe(false)
+    })
+  })
   describe('adversarial input cannot HANG the PreToolUse hook', () => {
     it('answers a long run of dash-tokens in milliseconds', () => {
       // The former unbounded, doubly ambiguous option run took 736 ms here and
@@ -326,12 +337,33 @@ describe('closingTickClaim — the tick that claims a finished closing', () => {
     expect(closingTickClaim(edit('docs/maximum-qa.md', '- [x] 224. done'))).toEqual([])
     expect(closingTickClaim(edit('.batch-dashboard.html', '- [x] 224. done'))).toEqual([])
   })
-  it('catches a SHELL tick that names the work-order file, and nothing else', () => {
+  it('catches a SHELL tick that names the work-order file AND writes it, and nothing else', () => {
     const bash = (command) => closingTickClaim({ toolName: 'Bash', toolInput: { command }, tasksText: WORK_ORDER })
     expect(bash("sed -i 's/- \\[ \\] 224\\./- [x] 224./' TASKS.md")).toEqual([224])
+    expect(bash("printf '%s' '- [x] 224. done' >> docs/tasks-archive.md")).toEqual([224])
     expect(bash('git commit -m "- [x] 224. quoted in a message"')).toEqual([]) // names no work-order file
     expect(bash('git status --short')).toEqual([])
     expect(bash('node scripts/point-brief.mjs 224')).toEqual([])
+    // a READ that merely quotes a tick line is not a claim — denying it would be
+    // pure obstruction during a closing (four-eyes review 07.08.2026)
+    expect(bash("grep -F '- [x] 224.' docs/tasks-archive.md")).toEqual([])
+    expect(bash("rg --fixed-strings '- [x] 224.' TASKS.md docs/tasks-archive.md")).toEqual([])
+    // nor is a commit whose MESSAGE quotes a tick line and the file names — the
+    // guard denied its own commit that way (four-eyes review 07.08.2026)
+    expect(bash("git add -A && git commit -q -F - <<'MSG'\nfix the gate\n\nit denied `- [x] 224.` in TASKS.md and docs/tasks-archive.md\nMSG\ngit push 2>&1 | tail -2")).toEqual([])
+    expect(bash('git commit -m "TASKS.md: - [x] 224. is quoted here" 2>&1')).toEqual([])
+  })
+  it('catches the tick whichever edit comes first — the point leaves TASKS.md and lands in the archive', () => {
+    // delete-first: by the time the archive is written, the work order no longer
+    // knows point 224 at all. Its spec travels WITH it, so the claim still lands.
+    const afterDelete = WORK_ORDER.split('\n').filter((l) => !/224/.test(l)).join('\n')
+    const archiveAppend = '- [x] 224. DEMO CHECKPOINT — full closing run → publish the checkpoint as `v0.2`.'
+    expect(closingTickClaim({ toolName: 'Edit', toolInput: { file_path: 'docs/tasks-archive.md', new_string: archiveAppend }, tasksText: afterDelete })).toEqual([224])
+    // a full REWRITE of the archive in that same state: the already-archived
+    // closing point stays silent, only the new claim counts
+    const rewrite = `- [x] 173. Post-162 quality push: closing run, then a thorough code analysis.\n${archiveAppend}`
+    expect(closingTickClaim({ toolName: 'Write', toolInput: { file_path: 'docs/tasks-archive.md', content: rewrite }, tasksText: afterDelete })).toEqual([224])
+    expect(closingTickClaim({ toolName: 'Write', toolInput: { file_path: 'docs/tasks-archive.md', content: rewrite }, tasksText: WORK_ORDER })).toEqual([224])
   })
   it('is total: missing pieces and malformed input yield no claim', () => {
     expect(closingTickClaim()).toEqual([])
