@@ -218,6 +218,7 @@ describe('the gate against a real tick', { timeout: 60_000 }, () => {
         '--model', 'Claude Opus 5',
         '--verdict', 'merge',
         '--evidence', 'read my own work and liked it very much',
+        '--mode', 'review',
       ],
       { windowsHide: true, cwd: repo, encoding: 'utf8' },
     )
@@ -237,6 +238,7 @@ describe('the gate against a real tick', { timeout: 60_000 }, () => {
         '--model', 'Fable 5',
         '--verdict', 'merge',
         '--evidence', 'read the core, ran the gate against a synthetic tick, no side effects found',
+        '--mode', 'review',
       ],
       { windowsHide: true, cwd: repo, encoding: 'utf8' },
     )

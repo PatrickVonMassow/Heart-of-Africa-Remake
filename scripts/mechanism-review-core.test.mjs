@@ -7,14 +7,21 @@
 // odd guards that predate the gate and owe nothing.
 import { describe, it, expect } from 'vitest'
 import {
+  BLIND_PARALLEL,
   BLOCKING_VERDICT,
   evaluateMechanismReview,
+  formatArgErrors,
   formatMechanismReviewVerdict,
   isMechanismPath,
+  KNOWN_FLAGS,
   mechanismPathsIn,
   modelFromTrailers,
+  MODES,
+  nearestFlag,
+  parseArgs,
   parseModel,
   sameModel,
+  validateMode,
   validateRecord,
   VERDICTS,
 } from './mechanism-review-core.mjs'
@@ -148,6 +155,7 @@ describe('validateRecord', () => {
     verdict: 'merge',
     evidence: 'read the core and the wrapper, ran the spawned-hook cases',
     authoredBy: 'Claude Opus 5',
+    mode: 'review',
   }
 
   it('accepts a complete record by a different model', () => {
@@ -309,5 +317,337 @@ describe('evaluateMechanismReview', () => {
       records: [record({ sha: 'f'.repeat(40) })],
     })
     expect(v.block).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// THE ARGUMENT PARSER (point 540). The case that cost the work: `--point 298`
+// handed to a CLI that did not know the flag, dropped without a word, so the
+// criticality gate reported "no review recorded for this point" while the
+// verdict for that commit sat in the ledger.
+// ---------------------------------------------------------------------------
+describe('parseArgs — a known command line', () => {
+  const full = [
+    '--record', 'abc1234',
+    '--model', 'Fable 5',
+    '--verdict', 'merge',
+    '--evidence', 'read the core against its spec',
+    '--point', '298',
+  ]
+
+  it("parses the full record form into the record builder's own field names", () => {
+    const p = parseArgs(full)
+    expect(p.ok, p.errors.join('\n')).toBe(true)
+    expect(p.mode).toBe('record')
+    expect(p.values).toEqual({
+      sha: 'abc1234',
+      model: 'Fable 5',
+      verdict: 'merge',
+      evidence: 'read the core against its spec',
+      point: '298',
+    })
+  })
+
+  it('does not care in which order the flags arrive', () => {
+    const p = parseArgs(['--point', '298', '--verdict', 'merge', '--record', 'abc1234'])
+    expect(p.ok, p.errors.join('\n')).toBe(true)
+    expect(p.values.point).toBe('298')
+    expect(p.values.sha).toBe('abc1234')
+  })
+
+  it('reads --list and the bare invocation as the same ledger read', () => {
+    for (const argv of [['--list'], []]) {
+      const p = parseArgs(argv)
+      expect(p.ok, p.errors.join('\n')).toBe(true)
+      expect(p.mode).toBe('list')
+    }
+  })
+
+  it('takes a value that merely LOOKS odd — a lone dash, a number, spaces', () => {
+    const p = parseArgs(['--record', 'abc1234', '--model', '-x 4.8', '--evidence', '  spaced  '])
+    expect(p.ok, p.errors.join('\n')).toBe(true)
+    expect(p.values.model).toBe('-x 4.8')
+    expect(p.values.evidence).toBe('  spaced  ')
+  })
+
+  it('leaves the REQUIRED-flag question to validateRecord, whose usage is unchanged', () => {
+    // Omitting --verdict is not a PARSE error: the parser judges only what it
+    // was given, so the one message naming the required set stays in one place.
+    const p = parseArgs(['--record', 'abc1234'])
+    expect(p.ok, p.errors.join('\n')).toBe(true)
+    expect(p.values.verdict).toBeUndefined()
+    const v = validateRecord({ sha: 'abc1234' })
+    expect(v.ok).toBe(false)
+    expect(v.errors.join('\n')).toContain('--verdict')
+  })
+})
+
+describe('parseArgs — an argument it does not recognise', () => {
+  it('refuses an unknown flag and NAMES it, rather than dropping it', () => {
+    const p = parseArgs(['--record', 'abc1234', '--status'])
+    expect(p.ok).toBe(false)
+    expect(p.errors.join('\n')).toContain('unknown flag --status')
+  })
+
+  it('names EVERY unknown flag, not only the first', () => {
+    const p = parseArgs(['--frobnicate', '--wibble'])
+    expect(p.ok).toBe(false)
+    const text = p.errors.join('\n')
+    expect(text).toContain('--frobnicate')
+    expect(text).toContain('--wibble')
+  })
+
+  it('reports a MISSPELLED known flag and points at the one that was meant', () => {
+    // The exact shape of the failure this point exists for: one letter off, and
+    // the value behind it disappears.
+    const p = parseArgs(['--record', 'abc1234', '--poin', '298'])
+    expect(p.ok).toBe(false)
+    expect(p.errors.join('\n')).toContain('unknown flag --poin')
+    expect(p.errors.join('\n')).toContain('did you mean --point')
+    expect(p.values.point).toBeUndefined()
+  })
+
+  it('reports an ABBREVIATED known flag the same way', () => {
+    const p = parseArgs(['--mod', 'Fable 5'])
+    expect(p.ok).toBe(false)
+    expect(p.errors.join('\n')).toContain('unknown flag --mod')
+    expect(p.errors.join('\n')).toContain('did you mean --model')
+  })
+
+  it('does not report the swallowed value of an unknown flag a SECOND time', () => {
+    const p = parseArgs(['--poin', '298'])
+    expect(p.errors).toHaveLength(1)
+  })
+
+  it('suggests nothing when nothing is close — a wrong guess is worse than none', () => {
+    const p = parseArgs(['--status'])
+    expect(p.errors.join('\n')).toContain('unknown flag --status')
+    expect(p.errors.join('\n')).not.toContain('did you mean')
+  })
+
+  it('refuses a stray argument that belongs to no flag', () => {
+    const p = parseArgs(['--record', 'abc1234', 'leftover'])
+    expect(p.ok).toBe(false)
+    expect(p.errors.join('\n')).toContain('leftover')
+  })
+
+  it('refuses the --flag=value form instead of reading it as an unknown flag', () => {
+    const p = parseArgs(['--point=298'])
+    expect(p.ok).toBe(false)
+    expect(p.errors.join('\n')).toContain('--point <value>')
+  })
+
+  it('refuses a flag given twice, where one value would vanish silently', () => {
+    const p = parseArgs(['--point', '298', '--point', '540'])
+    expect(p.ok).toBe(false)
+    expect(p.errors.join('\n')).toContain('--point given more than once')
+  })
+
+  it('refuses a flag whose value is missing at the end of the line', () => {
+    const p = parseArgs(['--record'])
+    expect(p.ok).toBe(false)
+    expect(p.errors.join('\n')).toContain('--record expects a value')
+  })
+
+  it('refuses a flag whose value is swallowed by the NEXT flag', () => {
+    const p = parseArgs(['--evidence', '--verdict', 'merge'])
+    expect(p.ok).toBe(false)
+    expect(p.errors.join('\n')).toContain('--evidence expects a value')
+  })
+
+  it('refuses --list mixed with the record flags — they are different commands', () => {
+    const p = parseArgs(['--list', '--record', 'abc1234'])
+    expect(p.ok).toBe(false)
+    expect(p.errors.join('\n')).toMatch(/one or the other/)
+  })
+
+  it('refuses an unknown flag even beside --list, which used to short-circuit', () => {
+    const p = parseArgs(['--list', '--wibble'])
+    expect(p.ok).toBe(false)
+    expect(p.errors.join('\n')).toContain('--wibble')
+  })
+
+  it('never throws on rubbish input', () => {
+    for (const argv of [null, undefined, ['--'], ['---'], ['', ' '], [42]]) {
+      expect(() => parseArgs(argv)).not.toThrow()
+    }
+  })
+})
+
+describe('the flag surface itself', () => {
+  it('nearestFlag returns a KNOWN flag or nothing at all', () => {
+    for (const token of ['--poin', '--mod', '--reccord', '--zzzzzzzzzz', '']) {
+      const near = nearestFlag(token)
+      if (near) expect(KNOWN_FLAGS.has(near)).toBe(true)
+    }
+  })
+
+  it('formatArgErrors names every refusal on its own line', () => {
+    const text = formatArgErrors(['unknown flag --a', 'unknown flag --b'])
+    expect(text).toContain('--a')
+    expect(text).toContain('--b')
+    expect(text.split('\n').length).toBeGreaterThan(2)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// THE FOUR-EYES MODE (point 541). Only the convergent half had an enforcer;
+// nothing recorded whether a DIVERGENT step ran blind parallel or as a review of
+// an already-finished list. No guard can detect that, so the recorder asks.
+// ---------------------------------------------------------------------------
+describe('validateMode', () => {
+  it('names both modes of CLAUDE.md §6 and nothing else', () => {
+    expect(MODES).toEqual(['review', 'blind-parallel'])
+    expect(BLIND_PARALLEL).toBe('blind-parallel')
+    for (const mode of MODES) expect(validateMode({ mode }).ok).toBe(true)
+  })
+
+  it('REFUSES a missing mode instead of defaulting one, and names the choice', () => {
+    for (const mode of [undefined, '', '   ', null]) {
+      const v = validateMode({ mode })
+      expect(v.ok).toBe(false)
+      const text = v.errors.join('\n')
+      expect(text).toContain('--mode')
+      // The refusal has to state WHICH two, or it only says "you forgot
+      // something" — the reader then guesses, which is what 540 is about.
+      for (const m of MODES) expect(text).toContain(m)
+      expect(text).toMatch(/no default/i)
+    }
+  })
+
+  it('refuses a mode that is neither, naming what was given', () => {
+    const v = validateMode({ mode: 'four-eyes' })
+    expect(v.ok).toBe(false)
+    expect(v.errors.join('\n')).toContain('four-eyes')
+  })
+
+  it('accepts the same-model fallback framing under blind-parallel', () => {
+    const v = validateMode({
+      mode: 'blind-parallel',
+      framing: 'second run framed as a maintainer inheriting the code',
+    })
+    expect(v.ok, v.errors.join('\n')).toBe(true)
+  })
+
+  it('REJECTS that framing under a review, where it would describe nothing', () => {
+    const v = validateMode({ mode: 'review', framing: 'second run framed as a hostile tester' })
+    expect(v.ok).toBe(false)
+    const text = v.errors.join('\n')
+    expect(text).toContain('--framing')
+    expect(text).toMatch(/meaningless/)
+    expect(text).toContain('blind-parallel')
+  })
+
+  it('refuses a token framing — a stance, not a word', () => {
+    expect(validateMode({ mode: 'blind-parallel', framing: 'x' }).ok).toBe(false)
+  })
+
+  it('does not blame the framing when the mode itself is missing', () => {
+    // Two errors for one mistake sends the reader to fix the wrong flag.
+    const v = validateMode({ framing: 'framed as a player trying to break it' })
+    expect(v.errors.filter((e) => e.includes('meaningless'))).toHaveLength(0)
+  })
+})
+
+describe('validateRecord carries the mode', () => {
+  const good = {
+    sha: 'a'.repeat(40),
+    model: 'Fable 5',
+    verdict: 'merge',
+    evidence: 'read the core and the wrapper against the spec',
+    authoredBy: 'Claude Opus 5',
+  }
+
+  it('refuses an otherwise complete record that names no mode', () => {
+    const v = validateRecord(good)
+    expect(v.ok).toBe(false)
+    expect(v.errors.join('\n')).toContain('--mode')
+  })
+
+  it('accepts it once the mode is named', () => {
+    expect(validateRecord({ ...good, mode: 'review' })).toEqual({ ok: true, errors: [] })
+    expect(validateRecord({ ...good, mode: 'blind-parallel' }).ok).toBe(true)
+  })
+
+  it('still refuses a self-review, whichever mode is claimed', () => {
+    for (const mode of MODES) {
+      const v = validateRecord({ ...good, model: 'Claude Opus 5', mode })
+      expect(v.ok).toBe(false)
+      expect(v.errors.join(' ')).toMatch(/SELF-REVIEW is refused/)
+    }
+  })
+})
+
+describe('the mode is required to WRITE a record, never to READ one', () => {
+  // The ledger is tracked in git and outlives the CLI that wrote it: 129 rows
+  // predate this flag. A gate that suddenly discounted them would report "no
+  // review recorded" for reviews that were performed and recorded.
+  const legacy = (over = {}) => ({
+    sha: 'r'.repeat(40),
+    model: 'Fable 5',
+    verdict: 'merge',
+    evidence: 'a verdict recorded before --mode existed',
+    at: 1,
+    ...over,
+  })
+  const commit = (over = {}) => ({
+    sha: '1'.repeat(40),
+    subject: 'change a guard',
+    authorModel: 'Claude Opus 5',
+    files: ['scripts/demo-guard.mjs'],
+    coveringRecordShas: ['r'.repeat(40)],
+    ...over,
+  })
+
+  it('clears the gate on a row that carries no mode at all', () => {
+    const v = evaluateMechanismReview({
+      baseline: 'b',
+      head: 'h',
+      pendingCommits: [commit()],
+      records: [legacy()],
+    })
+    expect(v.block, formatMechanismReviewVerdict(v)).toBe(false)
+  })
+
+  it('clears it just the same on a row that carries one', () => {
+    const v = evaluateMechanismReview({
+      baseline: 'b',
+      head: 'h',
+      pendingCommits: [commit()],
+      records: [legacy({ mode: 'review' })],
+    })
+    expect(v.block).toBe(false)
+  })
+
+  it('does not let an unknown mode on a row turn a recorded review into none', () => {
+    const v = evaluateMechanismReview({
+      baseline: 'b',
+      head: 'h',
+      pendingCommits: [commit()],
+      records: [legacy({ mode: 'nonsense-from-a-hand-edit' })],
+    })
+    expect(v.block).toBe(false)
+  })
+})
+
+describe('the refusal teaches the command that actually works', () => {
+  it('names --mode in the record command it prints', () => {
+    const v = evaluateMechanismReview({
+      baseline: 'b',
+      head: 'h',
+      pendingCommits: [
+        {
+          sha: '1'.repeat(40),
+          subject: 'change a guard',
+          authorModel: 'Claude Opus 5',
+          files: ['scripts/demo-guard.mjs'],
+          coveringRecordShas: [],
+        },
+      ],
+      records: [],
+    })
+    const text = formatMechanismReviewVerdict(v)
+    expect(text).toContain('--mode')
+    for (const m of MODES) expect(text).toContain(m)
   })
 })

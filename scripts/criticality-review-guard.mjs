@@ -26,7 +26,8 @@
 //
 // How the gate clears:
 //   node scripts/mechanism-review.mjs --record <sha> --point <N> --model <name> \
-//       --verdict <merge|merge-with-fixes|do-not-merge> --evidence "<one line>"
+//       --verdict <merge|merge-with-fixes|do-not-merge> --evidence "<one line>" \
+//       --mode <review|blind-parallel>
 // CLI:
 //   node scripts/criticality-review-guard.mjs --status
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'

@@ -191,6 +191,30 @@ export function runPreflight(guards, { sessionId = '', sessionKnown = true } = {
   return results
 }
 
+/**
+ * THE DIVERGENT-STEP QUESTION (point 541).
+ *
+ * `mechanism-review-guard` enforces the CONVERGENT half of the four-eyes
+ * principle. The DIVERGENT half — a step that ENUMERATES (what could go wrong,
+ * which cases to test, which designs are possible) must run BLIND PARALLEL, not
+ * as a review of an already-finished list — can be enforced by nothing: whether
+ * a step was divergent stands in no file, so no guard can even detect it.
+ *
+ * So the preflight ASKS. It is a question, never a verdict: a false block on a
+ * judgement call costs a whole turn, and this report cannot know the answer. It
+ * is printed apart from the guard lines for exactly that reason.
+ */
+export const DIVERGENT_STEP_QUESTION = Object.freeze([
+  'FOUR-EYES, DIVERGENT HALF (advisory — no guard can check this, and none blocks on it):',
+  '  Does this turn contain an ENUMERATING step — what could go wrong, which cases to test,',
+  '  which designs are possible, where a system might break? Then it runs BLIND PARALLEL:',
+  '  both models from the same inputs to their own complete result, neither seeing the',
+  '  other\'s, then merged by MEANING (CLAUDE.md §6). A reviewer handed a finished list',
+  '  checks THAT LIST — which is the failure the rule exists to prevent.',
+  '  Record which form the verdict covers: mechanism-review.mjs --record … --mode',
+  '  <review|blind-parallel>.',
+])
+
 /** First line of a reason, shortened — the report is a scan, not a transcript. */
 export function summarise(reason, maxChars = 220) {
   const first = String(reason ?? '')
@@ -275,6 +299,9 @@ export function formatPreflightReport(results, { action = 'turn-end', unregister
       'Register each in guard-preflight.mjs (GUARDS) — a gather that honestly reports "not judged" counts.',
     )
   }
+  // Asked AFTER the verdict and outside the guard lines, so it can never be read
+  // as one of them: it changes no status, no summary and no exit code.
+  lines.push('', ...DIVERGENT_STEP_QUESTION)
   lines.push(
     '',
     'ADVISORY: the state can change between this report and the action, so each guard itself',

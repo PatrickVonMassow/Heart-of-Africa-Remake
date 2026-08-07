@@ -20,6 +20,27 @@
 /** The verdicts a review may end in, weakest refusal last. */
 export const VERDICTS = Object.freeze(['merge', 'merge-with-fixes', 'do-not-merge'])
 
+/**
+ * THE TWO MODES OF THE FOUR-EYES PRINCIPLE (CLAUDE.md §6, point 541).
+ *
+ * Only the CONVERGENT half had an enforcer: this gate lets no changed mechanism
+ * through without the other model's recorded verdict. Nothing recorded whether a
+ * DIVERGENT step — what could go wrong, which cases to test, which designs are
+ * possible — ran blind parallel or as a review of an already-finished list,
+ * which is the anchoring failure the rule exists to prevent. No guard can DETECT
+ * that: whether a step was divergent stands in no file. So the recorder simply
+ * ASKS, and refuses to default the answer.
+ *
+ *   review          one artefact judged — is this diff correct, does this
+ *                   implementation match its spec, is this measurement sound
+ *   blind-parallel  both models work from the same inputs to their own complete
+ *                   result, neither seeing the other's until both are done
+ */
+export const MODES = Object.freeze(['review', 'blind-parallel'])
+
+/** The mode whose weaker same-model fallback is decorrelated by a framing. */
+export const BLIND_PARALLEL = 'blind-parallel'
+
 /** The verdict that blocks as loudly as a missing record. */
 export const BLOCKING_VERDICT = 'do-not-merge'
 
@@ -142,8 +163,204 @@ export function modelFromTrailers(field) {
   return ''
 }
 
+// ---------------------------------------------------------------------------
+// THE ARGUMENT PARSER (point 540).
+//
+// Recording the four-eyes verdict for point 298 with `--point 298` stored NO
+// point: the CLI that ran did not yet know the flag, and it neither warned nor
+// failed — it dropped it. The consequence surfaced only later, when the
+// criticality gate refused the tick with "no review recorded for this point"
+// while a verdict for that exact commit sat in the ledger. An unrecognised INPUT
+// must not read as an accepted one.
+//
+// So the parse is a PURE function that refuses everything it cannot account for
+// — an unknown, misspelled or abbreviated flag, a flag written twice, a flag
+// whose value is missing, an argument belonging to no flag — and the wrapper
+// keeps its single responsibility: print what this says and exit.
+//
+// What it deliberately does NOT do is check whether the REQUIRED flags are
+// there: that answer belongs to validateRecord(), whose usage block predates
+// this parser and stays unchanged.
+// ---------------------------------------------------------------------------
+
+/** Every argument the record command accepts, and whether it takes a value. */
+export const FLAG_SPEC = Object.freeze({
+  '--record': true,
+  '--model': true,
+  '--verdict': true,
+  '--evidence': true,
+  '--point': true,
+  '--mode': true,
+  '--framing': true,
+  '--list': false,
+})
+
+/** The flag names, for callers that only ask "is this one of ours?". */
+export const KNOWN_FLAGS = new Set(Object.keys(FLAG_SPEC))
+
+/** Where each value-taking flag's value lands in the parsed values. */
+const VALUE_KEY = Object.freeze({
+  '--record': 'sha',
+  '--model': 'model',
+  '--verdict': 'verdict',
+  '--evidence': 'evidence',
+  '--point': 'point',
+  '--mode': 'mode',
+  '--framing': 'framing',
+})
+
+/** Levenshtein distance — small inputs only, so the simple two-row form. */
+function editDistance(a, b) {
+  let prev = Array.from({ length: b.length + 1 }, (_, i) => i)
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i]
+    for (let j = 1; j <= b.length; j++) {
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1))
+    }
+    prev = cur
+  }
+  return prev[b.length]
+}
+
+/**
+ * The known flag a mistyped or abbreviated one most likely meant, or ''.
+ *
+ * An ABBREVIATION is treated as the likelier intent than a typo of the same
+ * length: `--po` is four edits from `--point` but nobody types it by accident.
+ * Beyond two edits nothing is suggested — a guess that names the wrong flag is
+ * worse than none, because the reader then tries it.
+ */
+export function nearestFlag(token, known = KNOWN_FLAGS) {
+  const raw = String(token ?? '')
+  let best = ''
+  let bestScore = Infinity
+  for (const flag of known) {
+    const score = raw.length >= 3 && flag.startsWith(raw) ? 0.5 : editDistance(raw, flag)
+    if (score < bestScore) {
+      bestScore = score
+      best = flag
+    }
+  }
+  return bestScore <= 2 ? best : ''
+}
+
+/**
+ * Parse the argv slice into { ok, mode, values, errors }.
+ *   mode    'list' (the ledger read, and the bare invocation) or 'record'
+ *   values  { sha, model, verdict, evidence, point } — only what was given
+ *   errors  one line per refusal, each NAMING the argument it is about
+ */
+export function parseArgs(argv = []) {
+  const args = (Array.isArray(argv) ? argv : []).map((a) => String(a))
+  const errors = []
+  const values = {}
+  const seen = new Set()
+  let list = false
+
+  const isFlagLike = (t) => typeof t === 'string' && t.startsWith('--')
+
+  for (let i = 0; i < args.length; i++) {
+    const token = args[i]
+    if (!isFlagLike(token)) {
+      errors.push(`stray argument "${token}": it belongs to no flag, so it would be dropped without a word`)
+      continue
+    }
+    const eq = token.indexOf('=')
+    const name = eq >= 0 ? token.slice(0, eq) : token
+
+    if (!KNOWN_FLAGS.has(name)) {
+      const near = nearestFlag(name)
+      errors.push(`unknown flag ${name}${near ? ` — did you mean ${near}?` : ''}`)
+      // Swallow its value, so the same mistake is not reported twice.
+      if (eq < 0 && !isFlagLike(args[i + 1]) && args[i + 1] !== undefined) i++
+      continue
+    }
+    if (eq >= 0) {
+      errors.push(`${token}: write "${name} <value>" with a space — this command does not read ${name}=<value>`)
+      continue
+    }
+    if (seen.has(name)) {
+      errors.push(`${name} given more than once: one of the two values would be dropped silently`)
+      if (FLAG_SPEC[name] && !isFlagLike(args[i + 1]) && args[i + 1] !== undefined) i++
+      continue
+    }
+    seen.add(name)
+    if (!FLAG_SPEC[name]) {
+      list = true
+      continue
+    }
+    const value = args[i + 1]
+    if (value === undefined || isFlagLike(value)) {
+      errors.push(
+        `${name} expects a value, but ${
+          value === undefined ? 'the command line ends there' : `the next argument is the flag ${value}`
+        }`,
+      )
+      continue
+    }
+    values[VALUE_KEY[name]] = value
+    i++
+  }
+
+  if (list && Object.keys(values).length) {
+    errors.push('--list reads the ledger and --record writes to it: run one or the other, not both')
+  }
+
+  return {
+    ok: errors.length === 0,
+    mode: list || args.length === 0 ? 'list' : 'record',
+    values,
+    errors,
+  }
+}
+
+/** The parse refusal, as the command prints it (the usage follows separately). */
+export function formatArgErrors(errors = []) {
+  return ['mechanism-review: refusing this command line.', '', ...errors.map((e) => `  · ${e}`)].join('\n')
+}
+
 /** Shortest form a message should print a sha in. */
 const short = (sha) => String(sha ?? '').slice(0, 7)
+
+/**
+ * Is the four-eyes MODE this verdict claims a usable one? (point 541)
+ *
+ * A missing mode is REFUSED, never defaulted: the whole gap this closes is that
+ * a review of an already-finished list passed as the blind-parallel work the
+ * rule demands, and a default would re-open it in the quietest possible way.
+ *
+ * `framing` is the decorrelation used when no second model was available and two
+ * blind runs of ONE model had to stand in — "a hostile tester", "a maintainer
+ * inheriting the code" (CLAUDE.md §6). It belongs to the BLIND-PARALLEL mode
+ * alone: under a review there is no second independent run to decorrelate, so a
+ * framing recorded there would describe nothing.
+ */
+export function validateMode({ mode, framing } = {}) {
+  const errors = []
+  const m = String(mode ?? '').trim()
+  const f = String(framing ?? '').trim()
+  if (!m) {
+    errors.push(
+      `--mode <${MODES.join('|')}>: which form of the four-eyes principle this verdict covers ` +
+        '(CLAUDE.md §6) — a CONVERGENT review of one artefact, or a DIVERGENT step run BLIND ' +
+        'PARALLEL. There is no default: the two are not interchangeable, and a verdict that ' +
+        'covers a finding step must name its form.',
+    )
+  } else if (!MODES.includes(m)) {
+    errors.push(`--mode <v>: one of ${MODES.join(' | ')} — "${m}" is neither`)
+  }
+  if (f && m && m !== BLIND_PARALLEL) {
+    errors.push(
+      `--framing is meaningless under --mode ${m}: it records how the SECOND independent run was ` +
+        'decorrelated, and a review has no second run. Drop it, or record the step as ' +
+        `--mode ${BLIND_PARALLEL}.`,
+    )
+  }
+  if (f && f.length < 8) {
+    errors.push('--framing "<one line>": the stance the second blind run was given, not a word')
+  }
+  return { ok: errors.length === 0, errors }
+}
 
 /**
  * Is this a well-formed review record, and may it be WRITTEN?
@@ -152,8 +369,9 @@ const short = (sha) => String(sha ?? '').slice(0, 7)
  * trailer. A match is REFUSED here rather than warned about: a self-review that
  * lands in the ledger is worse than none, because the gate then reads green.
  */
-export function validateRecord({ sha, model, verdict, evidence, authoredBy } = {}) {
+export function validateRecord({ sha, model, verdict, evidence, authoredBy, mode, framing } = {}) {
   const errors = []
+  errors.push(...validateMode({ mode, framing }).errors)
   if (!/^[0-9a-f]{7,40}$/i.test(String(sha ?? '').trim())) {
     errors.push('--record <sha>: the commit that was judged, as a resolvable sha')
   }
@@ -272,7 +490,7 @@ export function formatMechanismReviewVerdict(verdict) {
     'record what it said:',
     '',
     '  node scripts/mechanism-review.mjs --record <sha> --model <name> \\',
-    `      --verdict <${VERDICTS.join('|')}> --evidence "<one line>"`,
+    `      --verdict <${VERDICTS.join('|')}> --evidence "<one line>" --mode <${MODES.join('|')}>`,
     '',
     'One record covers every mechanism commit it contains, so reviewing the branch head is',
     'enough. Inspect the gate with: node scripts/mechanism-review-guard.mjs --status',
