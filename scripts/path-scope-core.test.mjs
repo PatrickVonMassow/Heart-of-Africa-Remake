@@ -20,6 +20,8 @@ import {
   pathVerdict,
   isUnparseable,
   pathsInCommand,
+  heredocDelimitersIn,
+  stripHeredocBodies,
   evaluate,
 } from './path-scope-core.mjs'
 
@@ -162,6 +164,61 @@ describe('the real command corpus — noise that is not a path', () => {
     expect(judge('git commit -m "moved the dump out of ~/Downloads"').block).toBe(false)
     expect(judge('node scripts/finding.mjs --detail "the zip in ~/Downloads/report.zip"').block).toBe(false)
     expect(judge('grep -rn "/home/other/secret" scripts/').block).toBe(false)
+  })
+})
+
+describe('a heredoc body is prose, never access', () => {
+  const doc = (op, delim, body) => `cat > /workspace/hoa/local/note.md ${op}${delim}\n${body}\n${delim}\n`
+
+  it('reads the delimiter in every spelling, and never a herestring', () => {
+    expect(heredocDelimitersIn('cat <<EOF')).toEqual([{ delim: 'EOF', dashed: false }])
+    expect(heredocDelimitersIn("cat <<'EOF'")).toEqual([{ delim: 'EOF', dashed: false }])
+    expect(heredocDelimitersIn('cat <<"EOF"')).toEqual([{ delim: 'EOF', dashed: false }])
+    expect(heredocDelimitersIn('cat <<-EOF')).toEqual([{ delim: 'EOF', dashed: true }])
+    expect(heredocDelimitersIn('cat <<< ~/Downloads/x')).toEqual([])
+    expect(heredocDelimitersIn('grep -n "a << b" f')).toEqual([])
+  })
+
+  for (const [op, delim] of [
+    ['<<', 'EOF'],
+    ['<<', "'EOF'"],
+    ['<<', '"EOF"'],
+    ['<<-', 'EOF'],
+  ]) {
+    it(`allows a body mentioning an out-of-scope path: ${op}${delim}`, () => {
+      const command = doc(op, delim, 'See ~/Downloads/report.zip for the dump')
+      expect(judge(command).block).toBe(false)
+    })
+  }
+
+  it('still judges the rest of the command around the heredoc', () => {
+    expect(judge(doc('<<', 'EOF', 'a note')).block).toBe(false)
+    const outside = 'cat > ~/Downloads/note.md <<EOF\nharmless body\nEOF\n'
+    const v = judge(outside)
+    expect(v.block).toBe(true)
+    expect(v.offenders.map((o) => o.canonical)).toEqual(['~/Downloads/note.md'])
+  })
+
+  it('does not end the body on a line that merely CONTAINS the delimiter', () => {
+    const command = 'cat > /tmp/x <<EOF\nEOF is the marker word\n~/Downloads/report.zip\nEOF\n'
+    expect(judge(command).block).toBe(false)
+  })
+
+  it('handles two heredocs in one command', () => {
+    const command =
+      'cat > /tmp/a <<A\n~/Downloads/one.zip\nA\ncat > /tmp/b <<B\n~/Documents/two.txt\nB\ncat /workspace/hoa/TASKS.md\n'
+    expect(judge(command).block).toBe(false)
+    expect(stripHeredocBodies(command)).not.toMatch(/Downloads|Documents/)
+  })
+
+  it('swallows an unterminated heredoc — the allow direction', () => {
+    expect(judge('cat > /tmp/x <<EOF\n~/Downloads/report.zip\n').block).toBe(false)
+  })
+
+  it('leaves a command without a heredoc untouched', () => {
+    expect(stripHeredocBodies('ls /workspace/hoa')).toBe('ls /workspace/hoa')
+    expect(stripHeredocBodies('')).toBe('')
+    expect(stripHeredocBodies(null)).toBe('')
   })
 })
 

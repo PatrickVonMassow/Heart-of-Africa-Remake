@@ -77,12 +77,21 @@ export function parseUnbundled(md) {
   const points = new Set()
   const bullets = []
   for (const line of section.split('\n')) {
-    const m = line.match(/^[-*]\s+\*\*([^*]+)\*\*(.*)$/)
+    const m = line.match(/^[-*]\s+(.+)$/)
     if (!m) continue
-    const nums = numbersIn(m[1])
+    // Both spellings the section uses: the bold `- **285** — reason` and the
+    // plain `- 285 — reason`. Reading only the bold one would leave a plainly
+    // written exemption unread, and its point would report as drift — a false
+    // block, which is the one thing this guard may not do.
+    const rest = m[1].trim()
+    const bold = rest.match(/^\*\*([^*]+)\*\*([\s\S]*)$/)
+    const plain = bold ? null : rest.match(/^([0-9][0-9,\s]*)([\s\S]*)$/)
+    const shape = bold || plain
+    if (!shape) continue
+    const nums = numbersIn(shape[1])
     if (!nums.length) continue
     for (const n of nums) points.add(n)
-    bullets.push({ points: nums, reason: m[2].replace(/^[\s—–-]+/, '').trim() })
+    bullets.push({ points: nums, reason: shape[2].replace(/^[\s—–.-]+/, '').trim() })
   }
   return { points, bullets }
 }

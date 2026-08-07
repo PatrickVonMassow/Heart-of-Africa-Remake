@@ -93,6 +93,25 @@ describe('parseUnbundled', () => {
     expect([...points]).toEqual([285])
   })
 
+  it('reads the PLAIN bullet spelling too, so a plainly written exemption is not drift', () => {
+    const { points, bullets } = parseUnbundled(
+      workPackages({ unbundled: ['- 285 — the leak hunt.', '- 174, 224 — releases.', '- 393.'] }),
+    )
+    expect([...points].sort((a, b) => a - b)).toEqual([174, 224, 285, 393])
+    expect(bullets[0].reason).toBe('the leak hunt.')
+    expect(bullets[2].reason).toBe('')
+  })
+
+  it('passes a point exempted in the plain spelling', () => {
+    const wp = workPackages({ bundles: [['Dorfleben', 'A', '350']], unbundled: ['- 285 — the leak hunt.'] })
+    expect(evaluate({ tasksMd: tasks([350, 285]), workPackagesMd: wp }).block).toBe(false)
+  })
+
+  it('ignores a prose bullet that starts with no number', () => {
+    const { points } = parseUnbundled(workPackages({ unbundled: ['- **Urlaubsfestigkeit** was cut later.'] }))
+    expect(points.size).toBe(0)
+  })
+
   it('is empty when the marker is absent', () => {
     expect(parseUnbundled('nothing here').points.size).toBe(0)
   })

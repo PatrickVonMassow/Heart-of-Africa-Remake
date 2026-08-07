@@ -271,6 +271,63 @@ export function candidatesOf(text) {
   return out.filter((v) => v && PATH_SHAPE.test(v))
 }
 
+/**
+ * Heredoc operators declared on one line, in the order the shell consumes their
+ * bodies. `<<<` is a HERESTRING, not a heredoc, and is excluded on both sides.
+ */
+export function heredocDelimitersIn(line) {
+  const src = String(line ?? '')
+  const out = []
+  const re = /(?<!<)<<(-?)\s*(?:'([^']*)'|"([^"]*)"|([A-Za-z_][\w.-]*))(?!<)/g
+  for (const m of src.matchAll(re)) {
+    // A `<<` inside a quoted argument — `grep -n "a << b"` — is text, not an
+    // operator. Reading it as one would drop the following lines, which errs
+    // toward allow, but the hole is free to close: count the quotes in front.
+    const before = src.slice(0, m.index)
+    if ((before.match(/'/g) || []).length % 2 !== 0) continue
+    if ((before.match(/"/g) || []).length % 2 !== 0) continue
+    const delim = m[2] ?? m[3] ?? m[4]
+    if (delim) out.push({ delim, dashed: m[1] === '-' })
+  }
+  return out
+}
+
+/**
+ * Remove every heredoc BODY from a command, delimiter line included.
+ *
+ * A heredoc body is prose — a note, a commit message, a board card — and this
+ * project writes them daily. `lexCommand` has no heredoc mode, so without this
+ * the body's lines arrive as UNQUOTED words and a note mentioning an
+ * out-of-scope path would be denied with advice ("add the root to ALLOW_ROOTS")
+ * that is simply wrong for it: the point-473 defect in a rarer shape, and
+ * block-loop material. The rest of the command is still judged, so the
+ * redirection `cat > /workspace/hoa/local/note.md <<EOF` keeps its target.
+ *
+ * The delimiter ends the body only ALONE ON ITS LINE, as a shell requires (with
+ * leading tabs stripped for `<<-`), so a body line merely CONTAINING the word
+ * does not end it. An unterminated heredoc swallows the rest of the command —
+ * the allow direction.
+ */
+export function stripHeredocBodies(command) {
+  const lines = String(command ?? '').split('\n')
+  const out = []
+  let i = 0
+  while (i < lines.length) {
+    const line = lines[i]
+    out.push(line)
+    const delims = heredocDelimitersIn(line)
+    i++
+    for (const d of delims) {
+      while (i < lines.length) {
+        const raw = lines[i].replace(/\r$/, '')
+        i++
+        if ((d.dashed ? raw.replace(/^\t+/, '') : raw) === d.delim) break
+      }
+    }
+  }
+  return out.join('\n')
+}
+
 /** Is this bare posix token a real path, or the fragment of a regex/sentence? */
 function looksLikePosixPath(cand, c) {
   const top = `/${cand.slice(1).split('/')[0]}`
@@ -283,15 +340,17 @@ function looksLikePosixPath(cand, c) {
 /**
  * Every absolute path a command demonstrably NAMES, canonicalised and deduped.
  *
- * QUOTED WORDS ARE NOT JUDGED. A quoted argument is prose far more often than
- * access — a commit message, a finding's detail text, a `node -e` body, a sed
- * range — and point 473 measured what happens when a gate reads the string
- * instead of the action: a read-only search was refused for naming a script and
- * a local commit for the verb in its message. The first-class `file_path` of a
- * Read/Edit/Write is judged regardless, which is where the real access is.
+ * QUOTED WORDS ARE NOT JUDGED, and neither is a HEREDOC BODY. Both are prose far
+ * more often than access — a commit message, a finding's detail text, a `node -e`
+ * body, a sed range, a note written with `<<EOF` — and point 473 measured what
+ * happens when a gate reads the string instead of the action: a read-only search
+ * was refused for naming a script and a local commit for the verb in its message.
+ * The first-class `file_path` of a Read/Edit/Write is judged regardless, which is
+ * where the real access is.
  */
 export function pathsInCommand(command, ctx, parseSegments) {
   const c = withContext(ctx)
+  command = stripHeredocBodies(command)
   const seen = new Map()
   const add = (raw) => {
     for (const cand of candidatesOf(raw)) {
