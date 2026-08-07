@@ -4334,11 +4334,13 @@ Build order, chosen so no two parallel agents own the same file:
   off. Both were seen while taking 387's evidence and neither belongs to it.
   (a) `capetown (wet): the swept ground inside is measurably darkened` demands
   `1 - inside > 0.04`, and the same scene MEASURED inside ×0.899, ×0.900, ×0.900, ×0.946
-  and ×0.964 — a spread of 6.5 points straddling its own bar, one run over it. The two
-  sibling readings in the same check (`maasai-village`, `giza`) hold within a point of
-  each other across all five, so the instability is the PORT's wet reading, not the
-  measure: capetown's sweep is read before the wetness the season lerps toward is
-  actually reached, the same shape point 499 fixed for the settlement light.
+  and ×0.964 — a spread of 6.5 points straddling its own bar, one run over it. Its
+  siblings are NOT steady either (measured 08.08.2026 on WebGPU, while verifying point
+  546): the `giza (wet)` reading of the SAME check failed one attempt at inside ×0.910 ·
+  boundary ×0.969 · outside ×1.057 and passed the retry on unchanged code — there it is
+  the OUTSIDE half, the open land that must read untouched, that moved. So the fix is
+  the check's, not one scene's: every place it reads must be read from a wet state that
+  has settled, the same shape point 499 fixed for the settlement light.
   (b) `zulu village hut: an open approach to walk in on` reported `false` with the hut at
   `{x 15.16, z 1.75, h 1.79}` in ONE of the five runs and passed in the other four, on
   the same seed and the same layout: `standOff` found no free bearing onto a building it
@@ -4347,9 +4349,10 @@ Build order, chosen so no two parallel agents own the same file:
   wet ground state the way `settle()` waits for the rains' light, (b) reports what
   `standOff` actually searched (bearings tried, what blocked each) so a miss is
   diagnosable rather than a bare `false`, and retries the search from the settled state
-  before it fails. NO bar is lowered to reach green: (a) keeps `> 0.04`, and if the
-  settled reading genuinely sits under it, that is a PRODUCT verdict on capetown's wet
-  sweep and is fixed there.
+  before it fails. (a) settles EVERY place the check reads and BOTH of its halves — the
+  swept ground inside and the open land outside — not capetown alone. NO bar is lowered
+  to reach green: (a) keeps `> 0.04`, and if a settled reading genuinely sits outside its
+  bar, that is a PRODUCT verdict on that place's wet sweep and is fixed there.
   VERIFIABLE: `polish` runs three times in a row per backend without either check
   changing its verdict, and the measured spread of both is recorded beside the criterion
   the way point 387 recorded its five.
