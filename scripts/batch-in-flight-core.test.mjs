@@ -1350,6 +1350,21 @@ describe('filesNamedIn / openPointSpecs — what a queued point says it touches'
     expect(openPointSpecs('')).toEqual([])
     expect(openPointSpecs()).toEqual([])
   })
+
+  it('carries a point waiting on the user, but FLAGGED (point 450)', () => {
+    const tasks = [
+      '- [ ] 500. FIRST POINT touching scripts/a.mjs AWAITING-USER(2026-07-29; needs a ruling)',
+      '  and also src/ui/B.tsx',
+      '- [ ] 503. THIRD POINT touching docs/d.md',
+      '- [ ] 504. ANSWERED POINT touching docs/e.md USER-ANSWERED(2026-08-07)',
+    ].join('\n')
+    const specs = openPointSpecs(tasks)
+    expect(specs.map((s) => s.point)).toEqual([500, 503, 504])
+    expect(specs.map((s) => s.gated)).toEqual([true, false, false])
+    // …and the gated one is never a candidate for a free pool slot, while the
+    // answered one is workable again.
+    expect(independentOpenPoints({ points: specs, runningFiles: [] }).map((s) => s.point)).toEqual([503, 504])
+  })
 })
 
 describe('independentOpenPoints — a candidate must be provably independent', () => {
@@ -1429,6 +1444,45 @@ describe('slotReasonDecision — the cap is a target, and the demand is narrow',
       needsReason: false,
       why: 'queue-overlaps',
     })
+  })
+
+  it('a queue whose remaining points ALL wait on the user passes, and says so (point 450)', () => {
+    expect(
+      slotReasonDecision({
+        agents: 1,
+        openPoints: [
+          { point: 500, files: ['src/world/world.ts'], gated: true },
+          { point: 501, files: ['docs/x.md'], gated: true },
+        ],
+        runningFiles: running,
+      }),
+    ).toMatchObject({ needsReason: false, why: 'queue-user-gated', candidates: [] })
+  })
+
+  it('but a MIXED queue still reports the overlap it really has', () => {
+    expect(
+      slotReasonDecision({
+        agents: 1,
+        openPoints: [
+          { point: 500, files: ['scripts/batch-singleton.mjs'] },
+          { point: 501, files: ['docs/x.md'], gated: true },
+        ],
+        runningFiles: running,
+      }),
+    ).toMatchObject({ needsReason: false, why: 'queue-overlaps' })
+  })
+
+  it('and ONE workable point beside the gated ones still demands a reason', () => {
+    expect(
+      slotReasonDecision({
+        agents: 1,
+        openPoints: [
+          { point: 500, files: ['src/world/world.ts'], gated: true },
+          { point: 501, files: ['src/ui/Hud.tsx'] },
+        ],
+        runningFiles: running,
+      }),
+    ).toMatchObject({ needsReason: true, why: 'idle-slots', candidates: [{ point: 501 }] })
   })
 
   it('a PAUSED batch and a recorded CLOSING FREEZE both pass', () => {

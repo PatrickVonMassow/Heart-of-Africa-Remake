@@ -4,6 +4,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
   STAND_DOWN_KINDS,
+  allGatedMessage,
   openPointsHeadline,
   standDownKind,
   standDownMessage,
@@ -247,6 +248,41 @@ describe('the open-point headline (point 440)', () => {
     expect(openPointsHeadline(many).length).toBeLessThanOrEqual(openPointsHeadline([100, 101]).length + 4)
   })
 
+  it('NAMES the points waiting on the user, and never offers one as the next (point 450)', () => {
+    const text = openPointsHeadline([174, 184], { gated: [462, 463] })
+    expect(text).toContain('2 open point(s)')
+    expect(text).toContain('WAIT ON THE USER')
+    expect(text).toContain('462, 463')
+    expect(text).toContain('point-brief.mjs 174') // the next point is still a workable one
+    expect(text).toContain('--clear')
+  })
+
+  it('says nothing about gates when none exist — the headline is unchanged', () => {
+    expect(openPointsHeadline([174, 184])).not.toContain('WAIT ON THE USER')
+    expect(openPointsHeadline([174, 184], { gated: [] })).toBe(openPointsHeadline([174, 184]))
+  })
+
+  it('does not grow with the number of gated points either', () => {
+    const many = Array.from({ length: 40 }, (_, i) => 400 + i)
+    const text = openPointsHeadline([174], { gated: many })
+    expect(text).toContain('40 further point(s)')
+    expect(text).toContain('and 34 more')
+    expect(text.length).toBeLessThan(500)
+  })
+
+  it('speaks when EVERYTHING waits on the user — silence would read as finished', () => {
+    const text = allGatedMessage([462, 463])
+    expect(text).toContain('WAITS ON THE USER')
+    expect(text).toContain('462, 463')
+    expect(text).toContain('do NOT begin one')
+    expect(text).toContain('--clear')
+    expect(allGatedMessage([])).toContain('0')
+    expect(() => allGatedMessage()).not.toThrow()
+    // …and the hook actually prints it in the branch that used to stay silent.
+    const hook = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'batch-resume-hook.mjs'), 'utf8')
+    expect(hook).toContain('allGatedMessage(gatedNums)')
+  })
+
   it('survives an empty or junk queue without inventing a point', () => {
     expect(openPointsHeadline([]).length).toBeGreaterThan(0)
     expect(openPointsHeadline([])).toContain('0 open point(s)')
@@ -257,7 +293,7 @@ describe('the open-point headline (point 440)', () => {
 
   it('is what the hook actually prints — no second copy of the enumeration', () => {
     const hook = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'batch-resume-hook.mjs'), 'utf8')
-    expect(hook).toContain('openPointsHeadline(nums)')
+    expect(hook).toContain('openPointsHeadline(nums, { gated: gatedNums })')
     expect(hook).not.toContain("open point(s): ${nums}")
   })
 })

@@ -12,6 +12,7 @@ import {
   parseNowCard,
   finderBeforeOpenFix,
   falseDoneClaims,
+  parseWorkablePoints,
   evaluate,
 } from './queue-order-guard-core.mjs'
 
@@ -60,6 +61,23 @@ describe('parseOpenPoints', () => {
   })
   it('is total on non-string input', () => {
     expect(parseOpenPoints(null).size).toBe(0)
+  })
+})
+
+describe('parseWorkablePoints — open minus what waits on the user (point 450)', () => {
+  const text = [
+    '- [ ] 210. Fix',
+    '- [ ] 211. Fix AWAITING-USER(2026-07-29; needs a ruling)',
+    '- [ ] 212. Fix USER-ANSWERED(2026-08-07)',
+    '- [x] 209. Done AWAITING-USER(2026-01-01; leftover)',
+  ].join('\n')
+  it('drops the gated point but keeps the answered one and the plain one', () => {
+    expect([...parseWorkablePoints(text)].sort((a, b) => a - b)).toEqual([210, 212])
+    // The full open set is unchanged — the done-claim rule still judges 211.
+    expect([...parseOpenPoints(text)].sort((a, b) => a - b)).toEqual([210, 211, 212])
+  })
+  it('is total on non-string input', () => {
+    expect(parseWorkablePoints(null).size).toBe(0)
   })
 })
 
@@ -169,6 +187,40 @@ describe('evaluate — end to end on the two raw files', () => {
     })
     expect(r.block).toBe(false)
   })
+  it('does NOT call a finder misordered when the only fix behind it waits on the user (point 450)', () => {
+    // The gated card sits at the BACK by construction; without the workable-set
+    // rule the guard would read it as a fix the finder jumped, and block every
+    // turn end for as long as the user is away.
+    const tasks = [
+      '- [ ] 203. Open point 203.',
+      '- [ ] 211. Open point 211. AWAITING-USER(2026-07-29; needs a ruling)',
+      '- [x] 209. Done point 209.',
+    ].join('\n')
+    const r = evaluate({ dashboardHtml: boardHtml({ queue: [{ n: 203 }, { n: 211 }] }), tasksMd: tasks })
+    expect(r.block).toBe(false)
+  })
+
+  it('still blocks once that same point is answered and workable again', () => {
+    const tasks = [
+      '- [ ] 203. Open point 203.',
+      '- [ ] 211. Open point 211. USER-ANSWERED(2026-08-07)',
+      '- [x] 209. Done point 209.',
+    ].join('\n')
+    const r = evaluate({ dashboardHtml: boardHtml({ queue: [{ n: 203 }, { n: 211 }] }), tasksMd: tasks })
+    expect(r.block).toBe(true)
+    expect(r.reason).toMatch(/QUEUE ORDER WRONG.*203/)
+  })
+
+  it('a done-claim on a GATED point is still a false claim', () => {
+    const tasks = ['- [ ] 211. Open point 211. AWAITING-USER(2026-07-29; needs a ruling)'].join('\n')
+    const r = evaluate({
+      dashboardHtml: boardHtml({ queue: [{ n: 211, body: 'Behoben und verifiziert.' }] }),
+      tasksMd: tasks,
+    })
+    expect(r.block).toBe(true)
+    expect(r.reason).toMatch(/CLAIMS DONE.*211/)
+  })
+
   it('blocks a queue card claiming an open point done', () => {
     const r = evaluate({
       dashboardHtml: boardHtml({ queue: [{ n: 211, body: 'Behoben, beide Backends bildverifiziert.' }] }),

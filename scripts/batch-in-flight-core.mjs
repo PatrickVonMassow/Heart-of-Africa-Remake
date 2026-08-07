@@ -47,6 +47,7 @@
 // costs one command, a wrong allow cost five and a half hours.
 import { resolveOwnership, PID_START_TOLERANCE_MS } from './batch-singleton.mjs'
 import { CLOSING_STEPS, missingSteps } from './closing-guard-core.mjs'
+import { parseGateLine } from './user-gate-core.mjs'
 
 /** How old a declaration may be before the guard stops honouring it — where
  *  nothing in it is producing OUTPUT (point 434 (6b); a declaration whose branch
@@ -661,6 +662,12 @@ export function filesNamedIn(text) {
  * A point's block runs from its `- [ ] N.` line to the next checkbox line, which is
  * how the work order is written; DEFERRED points are excluded exactly as
  * `openPointStatus` excludes them, since a deferred point is not commissionable.
+ *
+ * A point WAITING ON THE USER (point 450) is carried but FLAGGED, not dropped:
+ * `independentOpenPoints` filters it out, so an idle pool slot never owes a
+ * reason for work nobody may start — and the flag survives so the decision can
+ * say WHY the queue held nothing, instead of reporting a file overlap that is
+ * not there.
  */
 export function openPointSpecs(tasksText = '') {
   const out = []
@@ -670,13 +677,15 @@ export function openPointSpecs(tasksText = '') {
     if (head) {
       if (current) out.push(current)
       current =
-        head[1] === ' ' && !/\bDEFERRED\b/.test(line) ? { point: Number(head[2]), text: line } : null
+        head[1] === ' ' && !/\bDEFERRED\b/.test(line)
+          ? { point: Number(head[2]), text: line, gated: Boolean(parseGateLine(line)?.gated) }
+          : null
       continue
     }
     if (current) current.text += `\n${line}`
   }
   if (current) out.push(current)
-  return out.map((p) => ({ point: p.point, files: filesNamedIn(p.text) }))
+  return out.map((p) => ({ point: p.point, files: filesNamedIn(p.text), gated: p.gated }))
 }
 
 /**
@@ -690,6 +699,8 @@ export function openPointSpecs(tasksText = '') {
 export function independentOpenPoints({ points = [], runningFiles = [] } = {}) {
   const running = new Set((Array.isArray(runningFiles) ? runningFiles : []).map(normPath).filter(Boolean))
   return (Array.isArray(points) ? points : []).filter((p) => {
+    // Waiting on the user is not commissionable work (point 450).
+    if (p?.gated) return false
     const files = (Array.isArray(p?.files) ? p.files : []).map(normPath).filter(Boolean)
     if (files.length === 0) return false
     return !files.some((f) => running.has(f) || [...running].some((r) => r.startsWith(`${f}/`) || f.startsWith(`${r}/`)))
@@ -746,7 +757,15 @@ export function slotReasonDecision({
   if (paused === true) return no('paused')
   if (closingFreeze === true) return no('closing-freeze')
   if (slotsFree === 0) return no('at-cap')
-  if (candidates.length === 0) return no('queue-overlaps')
+  if (candidates.length === 0) {
+    // WHY the queue offered nothing matters (point 450). "Everything left waits
+    // on the user" is a different state from "everything left touches the
+    // running branch", and reporting the second for the first is how a fortnight
+    // of the user's absence would read as a tooling fault.
+    const list = Array.isArray(openPoints) ? openPoints : []
+    const gatedOnly = list.length > 0 && list.every((p) => p?.gated)
+    return no(gatedOnly ? 'queue-user-gated' : 'queue-overlaps')
+  }
   if (String(reason ?? '').trim()) return no('reason-given')
   return { needsReason: true, slotsFree, agents: running, candidates, why: 'idle-slots' }
 }

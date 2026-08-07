@@ -29,6 +29,7 @@ import {
   etaRevisionPatch,
   etaStatus,
   QUEUE_STUB_BODY,
+  QUEUE_GATED_META,
   QUEUE_STUB_META,
 } from './dashboard-guard-core.mjs'
 
@@ -523,6 +524,18 @@ describe('auditDashboard — the 25.07 witnesses', () => {
         'queue-meta',
       )
     }
+  })
+
+  it('accepts the WAITING-ON-THE-USER meta by name, with or without its date (point 450)', () => {
+    for (const meta of [QUEUE_GATED_META, `${QUEUE_GATED_META} (seit 29.07.)`]) {
+      expect(codes(boardHtml().replace('<span class="meta">~2 h</span>', `<span class="meta">${meta}</span>`))).not.toContain(
+        'queue-meta',
+      )
+    }
+    // …and a meta that merely mentions the user is still no duration.
+    expect(codes(boardHtml().replace('<span class="meta">~2 h</span>', '<span class="meta">irgendwas mit dir</span>'))).toContain(
+      'queue-meta',
+    )
   })
 
   it('WITNESS mojibake: a double-encoded board blocks', () => {

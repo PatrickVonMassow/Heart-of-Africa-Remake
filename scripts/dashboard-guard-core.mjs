@@ -153,6 +153,15 @@ export const ERLEDIGT_ON_BOARD = 20
  *  board-queue-core re-exports it rather than keeping a second copy. */
 export const QUEUE_STUB_META = 'Schätzung offen'
 
+/** The meta a queue card carries while its point waits on the USER rather than on
+ *  work (point 450). It lives here for the same reason as the stub meta: the
+ *  `queue-meta` rule below must recognise the exact wording the generator emits,
+ *  or a gated card would block every turn end for a duration nobody can give.
+ *  It is matched as a PREFIX, because the card appends the waiting-since date —
+ *  "wartet auf deine Entscheidung (seit 30.07.)" — and that date is the one thing
+ *  a reader glancing at the collapsed card actually wants. */
+export const QUEUE_GATED_META = 'wartet auf deine Entscheidung'
+
 /** The body that same generated card carries while nobody has written prose for
  *  the point. Defined here for the same reason as the meta above: the rule that
  *  COUNTS these cards must recognise the exact string the generator emits. */
@@ -540,8 +549,16 @@ export function auditDashboard(html, input = {}) {
   // end, and blocking on it would deadlock `--synced` against a card only the
   // generator can produce. The exemption is a NAMED value, not a shape, so an
   // estimate that merely failed to parse is still a violation.
+  // A point WAITING ON THE USER (point 450) is the second named exemption: it is
+  // not being worked, so a duration would be a promise nobody can keep, and
+  // demanding one would deadlock the board against a card only the generator
+  // emits — the same trap the stub exemption exists to avoid.
   const badQueue = queueCards.filter(
-    (c) => !c.meta || (c.meta.trim() !== QUEUE_STUB_META && !/~\s*\d+([.,]\d+)?\s*h/.test(c.meta)),
+    (c) =>
+      !c.meta ||
+      (c.meta.trim() !== QUEUE_STUB_META &&
+        !c.meta.trim().startsWith(QUEUE_GATED_META) &&
+        !/~\s*\d+([.,]\d+)?\s*h/.test(c.meta)),
   )
   if (badQueue.length) {
     v.push({

@@ -32,7 +32,8 @@ import {
 } from './batch-singleton.mjs'
 import { readClaim, clearClaim, maxAgeMs } from './batch-claim.mjs'
 import { assessClaim, ownerIsHolding, reservationDecision } from './batch-claim-core.mjs'
-import { openPointsHeadline, standDownMessage } from './batch-resume-hook-core.mjs'
+import { allGatedMessage, openPointsHeadline, standDownMessage } from './batch-resume-hook-core.mjs'
+import { gatedPoints } from './user-gate-core.mjs'
 import { MANDATE_MAX_AGE_MS, resumeRepairMandate } from './batch-doctor-core.mjs'
 import { consumeMandateMarker } from './batch-doctor-states.mjs'
 import { isPaused, pauseReason } from './batch-lock.mjs'
@@ -195,10 +196,19 @@ try {
   // line carrying a `DEFERRED` marker is excluded from the batch and must never
   // auto-resume (2026-07-15 fix — the exclusion travels in TASKS.md itself).
   const openLines = tasks.split('\n').filter((l) => /^- \[ \] \d+\./.test(l))
-  const open = openLines.filter((l) => !/\bDEFERRED\b/.test(l))
+  // …and MINUS the ones waiting on the user (point 450): a point that cannot
+  // proceed without an answer is not the next point to start, so the session is
+  // never pointed at it — but it is NAMED in the headline below, so a shorter
+  // queue is not mistaken for progress.
+  const undeferred = openLines.filter((l) => !/\bDEFERRED\b/.test(l))
+  const gatedNums = [...gatedPoints(tasks)]
+  const open = undeferred.filter((l) => !gatedNums.includes(Number(l.match(/\d+/)[0])))
   if (open.length === 0) {
     // Nothing actionable — the batch is finished, or every remaining point is
-    // user-deferred. Start silently either way.
+    // user-deferred. Start silently either way — EXCEPT when points wait on the
+    // user (point 450, four-eyes review): that is the one state in which the
+    // empty queue is the whole story, and silence would read as "finished".
+    if (gatedNums.length) console.log(allGatedMessage(gatedNums))
   } else {
     const nums = open.map((l) => l.match(/\d+/)[0])
     // Model policy (point 309, user 25.07.2026): the 24.07 session silently
@@ -206,7 +216,7 @@ try {
     // session start; the model-guard Stop hook enforces it at the first
     // forbidden commit.
     const header =
-      openPointsHeadline(nums) +
+      openPointsHeadline(nums, { gated: gatedNums }) +
       'MODEL POLICY (25.07.2026): Opus 5 is the WORKER at any difficulty; the fallback chain ' +
       'is Opus 5 -> Fable 5 -> Opus 4.8. Fable is used ONLY for four-eyes review (one model ' +
       'plans/builds, the other checks) or as that fallback — never because a task looks hard. ' +
