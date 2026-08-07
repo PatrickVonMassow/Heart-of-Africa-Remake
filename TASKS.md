@@ -1018,45 +1018,6 @@ it is appended.
   workflows-token-budget rule) — scope Prong A inline first, then run Prong B's
   harness. Implementation-ready.
 
-- [ ] 298. MODEL-DIVERSITY FOR HARD/CRITICAL CHANGES — criticality triage + an ENFORCED
-  diverse review (user 24.07.2026; retrospective lesson). STANDING RULE: before building any
-  feature/point, assess its DIFFICULTY × CRITICALITY — a "must-always-work" change (a guard,
-  the batch singleton, save/load, anything hard to reverse or load-bearing for the whole
-  system) is HIGH-criticality. For a HIGH item, apply MODEL-DIVERSE review: either (a) the
-  primary model (Opus) builds and a Fable-5 subagent reviews the PLAN before and the RESULT
-  after (truly safe / works in ALL cases / no negative side effects), or (b) Fable builds and
-  Opus cross-checks — a second, DIFFERENT pair of eyes on the risky work. Merge only when the
-  diverse review is green. Generalizes the ad-hoc Fable sandwich on points 294/295 into a
-  standing practice; extends the audit-with-model-diversity and switch-to-fable-when-stuck
-  memories from "audits" / "when stuck" to "proactively, by criticality". MECHANISM (enforced,
-  not remembered): (1) a CRITICALITY tag convention on TASKS points ("Criticality:
-  low|med|high" + a one-line rationale); (2) a Stop-hook guard (pure core + Vitest + fail-open,
-  the project's guard schema) that, when a HIGH-criticality point is ticked/merged on main,
-  requires a recorded model-diverse-review marker (HEAD-bound, like render-verify-guard) — a
-  high tick without that record BLOCKS. ANCHORS: a new `scripts/criticality-review-guard.mjs`
-  + `-core.mjs` + Vitest, `.claude/settings.json` (Stop hook), a review-record marker file,
-  docs (the rule in CLAUDE.md working-method + the retrospective). VERIFIABLE: pure test of
-  the guard core (high + no review → block; high + review → allow; low/med → allow; malformed
-  → fail-open) and a synthetic high-criticality tick that fires the guard. This point IS itself
-  high-criticality (a must-work guard) → build it under its OWN rule: Fable-5 plan-review
-  BEFORE, Fable-5 safety-review AFTER, merge to main ONLY when all green. No player-visible text.
-  THE REVIEW CAN OUTLIVE ITS AUTHOR, and then nobody applies it (measured 30.07.2026). A
-  delegated agent spawned its Fable-5 reviewer in the background and then STOPPED; the review
-  landed in the PARENT session minutes later with verdict `do-not-merge` and two blockers —
-  one of which would have reddened `main`'s unit gate the moment the branch merged, because a
-  test passed only in a worktree that lacks a git-ignored file the main tree has. The branch
-  looked reviewed and was not. So the marker this point defines counts a review only where its
-  FINDINGS were acted on: a recorded `do-not-merge`/`merge-with-fixes` verdict does not satisfy
-  the gate until a LATER record for a LATER commit says so, and an author that ends its turn
-  with a review still in flight is reported rather than accepted. Vitest: a lone
-  `do-not-merge` record blocks; the same record followed by a `merge` record on a descendant
-  commit allows; a review recorded against a commit that is not an ancestor of the merge does
-  not count.
-  Criticality: high — it is a must-work Stop guard, and the four-eyes review of its own branch
-  (07.08.2026) showed the point would otherwise tick UNGATED: its only match for the tag was
-  the quoted convention above, which the parser correctly skips, so without this line the guard
-  would let its own point through.
-
 - [ ] 303. CODE REVIEW OF ALL CHANGES SINCE v0.1 — validate every test is still VALID (user
   24.07.2026). QUEUE POSITION: the NEXT task after 224. Stale tests keep surfacing only as
   incidental findings (today alone: a strict type-check, heavy fuzz timeouts, and checks that
@@ -1073,30 +1034,6 @@ it is appended.
   (so it runs on Opus 5). ANCHORS: `git diff v0.1..HEAD`, all `src/**/*.test.ts[x]` and
   `scripts/verify/*.mjs`. VERIFIABLE: a written report per reviewed area with a verdict
   (valid / stale→fixed), each stale test fixed with its correction. No player-visible text.
-
-- [ ] 306. CLOSING-COMPLETENESS ENFORCEMENT — a closing must not be able to SKIP a step (user
-  24.07.2026, after the v0.2 closing skipped the dead-code / stale-doc / stale-comment cleanup —
-  the very thing that distinguishes a closing from a plain LARGE regression). ROOT CAUSE: the
-  closing cycle's steps (§7.2 / Maximum-QA Phase 8 / this file) were tracked only by fallible
-  MEMORY; under the pressure of getting the regression green through many stale checks, the
-  regression got done but the cleanup + the .md audit were skipped, and nothing blocked it.
-  MECHANISM (enforced, not remembered): (1) an explicit machine-readable CLOSING CHECKLIST
-  enumerating EVERY closing step (from §7.2 + Maximum-QA Phase 8): full LARGE both-backends
-  flake-free, dead-code cleanup, stale-doc audit, stale-comment audit, `.md` cruft audit (section
-  numbers preserved), implementation-sections current, graphics-detail-doc current, cross-browser/
-  mobile smoke, open-items list, simplifications named. (2) a HEAD-bound CLOSING-STATE record
-  (like `render-verify-guard`) where each step is checked off WITH evidence for the specific
-  closing commit. (3) a Stop-hook guard (pure core + Vitest + fail-open, the project schema) that
-  BLOCKS creating/moving a version tag AND any "closing complete" claim / 224-style tick unless
-  EVERY checklist item is recorded done for the current HEAD — so a version release is impossible
-  with an incomplete closing. Wire it into the version-release process (the `version-release`
-  memory + CLAUDE.md §9 + docs/maximum-qa.md Phase 8/9). ANCHORS: `scripts/closing-guard.mjs` +
-  `-core.mjs` + Vitest, a closing-checklist definition module, `.claude/settings.json` (Stop hook),
-  `.claude/closing-state.json`. VERIFIABLE: pure tests (block on any unchecked step, allow when all
-  checked, fail-open on malformed) and a synthetic version-tag attempt with an incomplete checklist
-  blocked. MUST-WORK guard → build under the point-298 criticality rule, and per the user's explicit
-  instruction have Fable-5 verify the mechanism is 100 % RELIABLE (it cannot let an incomplete
-  closing through) before it counts as done. No player-visible text.
 
 - [ ] 309. SERVING-MODEL DEGRADATION: REPAIR + TRIPWIRE (user 25.07.2026). REPAIR: the
   late-evening session of 24.07 ran silently on Haiku 4.5 (proven by the Co-Authored-By
@@ -1602,30 +1539,6 @@ it is appended.
   are absent, no merge artefacts remain, and the retained closing-state cannot
   pre-satisfy the tag gate (it is keyed to a different commit; `--status` reports
   0/11 at HEAD). That review's own findings are queued as point 331.
-
-- [ ] 331. CLOSING-GUARD HARDENING FROM THE 25.07 REVIEW (findings of the
-  model-diverse review that cleared the merged guard commits; all low severity, none
-  blocking, hence one small bundled point). (a) The option-swallowing quantifier in
-  `isVersionTagCommand` (scripts/closing-guard-core.mjs) is exponentially ambiguous
-  over runs of dash-tokens — measured 736 ms on a synthetic 34-flag input, doubling
-  per two flags; unreachable by real git usage (a real subcommand fails the star in
-  O(1), a 20-flag `git log` measured 0 ms) but a PreToolUse HANG is not covered by
-  the wrapper's fail-open, which only catches throws. Fix: drop the redundant
-  `-[cC]` alternative, bound the star (e.g. `{0,10}`), restrict the swallowed
-  argument to `[^-\s]\S*`; add a timing assertion to the test sweep. (b) A `-C
-  <path>` whose PATH ends in a tag name now false-positives (`git -C /build/poc push
-  origin main` blocks) — exclude the `-C`/`--git-dir`/`--work-tree` argument from the
-  segment before the version/poc matching. (c) Real release acts still MISSED
-  (pre-existing, not introduced): `git push origin +v0.3` (force refspec) and `git
-  push origin :v0.3` (tag delete) — add `+` and `:` to the version/poc prefix class;
-  keep the remaining FN-6…FN-12 items recorded as future hardening. (d) DOC DRIFT:
-  three places still say the guard is a PreToolUse(**Bash**) hook although PowerShell
-  — the primary shell here — is matched too (scripts/closing-guard-core.mjs:11,
-  scripts/closing-guard.mjs:5, CLAUDE.md §9); and the `isVersionTagCommand` JSDoc
-  "Matches:" list never gained `gh release create` or the quoted forms. (e) No test
-  covers the wrapper's `tool_name === 'PowerShell'` branch — add one. VERIFIABLE:
-  the existing 30-case sweep stays green and gains cases for (a)-(c) and (e); the
-  documented contract matches the code.
 
 - [ ] 333. WHY THE DOCS DRIFT — AND A MECHANISM AGAINST IT (root-cause analysis
   25.07.2026, user question "where does all this drift come from — were there
