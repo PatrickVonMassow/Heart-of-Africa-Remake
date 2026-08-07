@@ -14,6 +14,7 @@ const WRAPPER = join(dirname(fileURLToPath(import.meta.url)), 'run-logged.mjs')
 
 function runShow(args, logDir) {
   return spawnSync(process.execPath, [WRAPPER, ...args], {
+    windowsHide: true,
     encoding: 'utf8',
     timeout: 20_000,
     env: { ...process.env, VERIFY_LOG_DIR: logDir },
