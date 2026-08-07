@@ -4449,7 +4449,8 @@ Build order, chosen so no two parallel agents own the same file:
   wiring it, or its first turn blocks on a backlog it did not cause.
   VERIFIABLE: after each arming, a fresh session's `node scripts/guard-preflight.mjs
   --for answer --session <id>` lists the guard rather than passing over it, and
-  `node scripts/guard-health.mjs` reports no dormant record for a wired enforcer.
+  `node scripts/guard-health-guard.mjs` reports no dormant record for a wired
+  enforcer (that IS the CLI — there is no `scripts/guard-health.mjs`).
   Criticality: medium — the guards themselves are reviewed and tested; what is at
   stake is that a wrongly placed hook line disables a chain silently.
 
