@@ -176,6 +176,24 @@ disposed-and-rebuilt pipeline look like a +14 leak on WebGPU only. Any check
 that samples a lazily allocated resource must force a frame and poll until the
 reading repeats.
 
+That reading is now a STANDING invariant, not one gate (point 295):
+`src/render/renderLeak.ts` is armed in every DEV session before the first frame
+and files each settled `renderer.info.memory` reading under a signature of the
+levers that legitimately change the resident set — scene mode and settlement,
+detail level, TRAA/SSAO/bloom, sun and fire shadows. A RETURN to a signature that
+costs more render targets than before is a `console.error` through `devAssert`
+(so every suite's console-error gate fails on it) plus an entry in
+`window.__renderLeak.state()`. Two calibrations from the measurement, both worth
+knowing before touching it: the first settled reading after entering a
+settlement lands while the place is still building (Cairo: 18 render targets
+where its steady state is 22), so a signature spends its first TWO readings
+forming a high-water baseline; and the texture half is deliberately coarse with
+a ratcheting baseline, because terrain, flora and settlement materials keep
+streaming in — the render-target half carries the strictness. The bound and
+settle logic is pure (`src/render/renderLeak.test.ts`); the live half is in
+`settings.mjs`, which walks the transitions three times, asserts nothing trips,
+then leaks six real render targets and asserts that it does.
+
 `scripts/verify/liveness.mjs` is the third: the main-thread block attribution
 behind `voice.mjs`'s TTS cold-load gate, pinned by
 `scripts/verify/liveness.test.mjs`. Its lesson is the point-334 one from the
@@ -599,7 +617,7 @@ ported asserts now live in Vitest:
 | `i18n.mjs` | 5 localization screenshots + console gate | `src/i18n/i18n.test.ts`, `src/ui/{StatusBar,JournalPanel,Dialogs,DebugMenu}.test.tsx` |
 | `health.mjs` | vultures at poor condition (RAF) + console gate | `src/state/store.health.test.ts`, `src/ui/Hud.test.tsx` (veil, defeat) |
 | `events.mjs` | touch-a-lion / touch-a-hyena contact (RAF scene) | `src/systems/events.test.ts`, `src/state/store.events.test.ts` |
-| `settings.mjs` | eye-height, in-scene walk measures, `user-select` CSS, lion-feed, ambience/proximity audio, village speech really scheduling audio (§13.4: near vs. out of earshot vs. phrase), Tab focus, TRAA pipeline toggle (rebuild + non-black frame + leak gate, WebGL 2 path) | `src/config/balance.test.ts`, `src/systems/movement.test.ts`, `src/systems/ambience.test.ts` (the speech scheduling), `src/communication/speaking.test.ts` (pace, pause, attenuation, hearing), `src/state/store.debug.test.ts`, `src/ui/DebugMenu.test.tsx` (incl. the TRAA checkbox) |
+| `settings.mjs` | eye-height, in-scene walk measures, `user-select` CSS, lion-feed, ambience/proximity audio, village speech really scheduling audio (§13.4: near vs. out of earshot vs. phrase), Tab focus, TRAA pipeline toggle (rebuild + non-black frame + leak gate, WebGL 2 path), the DEV render-resource leak invariant across scene switches / detail levels / effect toggles incl. a forced real leak (point 295) | `src/config/balance.test.ts`, `src/systems/movement.test.ts`, `src/systems/ambience.test.ts` (the speech scheduling), `src/communication/speaking.test.ts` (pace, pause, attenuation, hearing), `src/state/store.debug.test.ts`, `src/ui/DebugMenu.test.tsx` (incl. the TRAA checkbox) |
 | `enrichments.mjs` | all wildlife/RAF, drei map/region labels, river/graveyard scene, layout geometry, real WheelEvent, screenshots | `src/systems/movement.test.ts`, `src/state/store.*.test.ts`, `src/ui/{StatusBar,Hud,DebugMenu}.test.tsx` |
 | `voice.mjs` | movement-while-journal-open (scene), TTS read-aloud (assets from the local `.cache/tts/` record-and-replay cache — first run records from the CDNs, later runs are strictly offline; delete the dir to re-prime), the cold-load main-thread liveness gate (see `liveness.mjs`), screenshots | `src/journal/voiceMarkup.test.ts`, `src/i18n/i18n.test.ts`, `src/ui/JournalPanel.test.tsx`, `scripts/verify/liveness.test.mjs` |
 | `touch.mjs` | touch/tablet layer (`hasTouch` context, real CDP touch): guard mounts the overlay on first touch + mobile quality preset, virtual-stick walk, right-half look drag, tappable prompt, two-finger pinch zoom | `src/systems/touchInput.test.ts`, `src/state/ui.test.ts`, `src/ui/Hud.test.tsx` (touch absence/presence), `src/ui/DebugMenu.test.tsx` (SSAO/shadow checkboxes) |

@@ -73,21 +73,38 @@ describe('currentRenderSignature', () => {
 
 describe('evaluateReading', () => {
   const sig = 'travel|medium|traa/-/bloom/sun/-'
+  /** A signature that has finished forming its baseline. */
+  const warm = (c: LeakCounts): Baselines => ({ [sig]: { ...c, visits: 2 } })
 
   it('records the first visit and judges nothing', () => {
     const r = evaluateReading({}, sig, counts(44, 300))
     expect(r.evaluation.verdict).toBe('baseline')
-    expect(r.baselines[sig]).toEqual(counts(44, 300))
+    expect(r.baselines[sig]).toEqual({ ...counts(44, 300), visits: 1 })
     expect(r.evaluation.delta).toEqual(counts(0, 0))
   })
 
+  it('forms the baseline from the high-water mark of the warm-up visits', () => {
+    // The measured false positive: the first settled reading after entering a
+    // settlement lands while the place is still building (Cairo 18/39 against a
+    // steady 22/58), so the SECOND reading must be able to raise the bar — and
+    // only after that is anything judged.
+    let baselines: Baselines = {}
+    const seen: string[] = []
+    for (const c of [counts(18, 39), counts(22, 58), counts(22, 59), counts(22, 59)]) {
+      const r = evaluateReading(baselines, sig, c)
+      baselines = r.baselines
+      seen.push(r.evaluation.verdict)
+    }
+    expect(seen).toEqual(['baseline', 'baseline', 'ok', 'ok'])
+    expect(baselines[sig].renderTargets).toBe(22)
+  })
+
   it('passes a return to the same state', () => {
-    const base: Baselines = { [sig]: counts(44, 300) }
-    expect(evaluateReading(base, sig, counts(44, 300)).evaluation.verdict).toBe('ok')
+    expect(evaluateReading(warm(counts(44, 300)), sig, counts(44, 300)).evaluation.verdict).toBe('ok')
   })
 
   it('tolerates growth up to the render-target bound and fires one above it', () => {
-    const base: Baselines = { [sig]: counts(44, 300) }
+    const base = warm(counts(44, 300))
     const atBound = evaluateReading(base, sig, counts(44 + LEAK_BOUNDS.renderTargets, 300))
     expect(atBound.evaluation.verdict).toBe('ok')
     const over = evaluateReading(base, sig, counts(44 + LEAK_BOUNDS.renderTargets + 1, 300))
@@ -99,31 +116,31 @@ describe('evaluateReading', () => {
 
   it('catches the point-276 class: three render targets per toggle cycle', () => {
     // The leak that hid behind one lucky settings.mjs check — 47 -> 50 across
-    // toggle cycles. Three per cycle is already over the bound, so it reports
-    // on the first return to the signature and keeps reporting after.
+    // toggle cycles. The warm-up swallows the first growth step; from the first
+    // JUDGED reading on it screams and never stops.
     let baselines: Baselines = {}
     let rt = 47
     const verdicts: string[] = []
-    for (let cycle = 0; cycle < 3; cycle++) {
+    for (let cycle = 0; cycle < 5; cycle++) {
       const r = evaluateReading(baselines, sig, counts(rt, 300))
       baselines = r.baselines
       verdicts.push(r.evaluation.verdict)
       rt += 3
     }
-    expect(verdicts).toEqual(['baseline', 'leak', 'leak'])
+    expect(verdicts).toEqual(['baseline', 'baseline', 'leak', 'leak', 'leak'])
   })
 
   it('never lets a leak re-baseline itself away', () => {
-    const base: Baselines = { [sig]: counts(44, 300) }
-    const r = evaluateReading(base, sig, counts(60, 300))
+    const r = evaluateReading(warm(counts(44, 300)), sig, counts(60, 300))
     expect(r.evaluation.verdict).toBe('leak')
-    expect(r.baselines[sig]).toEqual(counts(44, 300))
+    expect(r.baselines[sig].renderTargets).toBe(44)
+    expect(r.baselines[sig].textures).toBe(300)
     // Still leaking on the next visit — the condition holds, so it keeps reporting.
     expect(evaluateReading(r.baselines, sig, counts(60, 300)).evaluation.verdict).toBe('leak')
   })
 
   it('keeps the render-target baseline where it started, up and down', () => {
-    const base: Baselines = { [sig]: counts(44, 300) }
+    const base = warm(counts(44, 300))
     // A momentary dip must not tighten the bar for good ...
     const dip = evaluateReading(base, sig, counts(42, 300))
     expect(dip.evaluation.verdict).toBe('ok')
@@ -136,7 +153,7 @@ describe('evaluateReading', () => {
   it('ratchets the texture baseline so streamed content is not a leak', () => {
     // Terrain, flora and settlement materials keep arriving on later visits to
     // the same state, so the texture baseline follows them upward ...
-    let baselines: Baselines = { [sig]: counts(44, 300) }
+    let baselines: Baselines = warm(counts(44, 300))
     for (const t of [340, 380, 420]) {
       const r = evaluateReading(baselines, sig, counts(44, t))
       expect(r.evaluation.verdict).toBe('ok')
@@ -150,8 +167,7 @@ describe('evaluateReading', () => {
   })
 
   it('reports the render targets before the textures when both are over', () => {
-    const base: Baselines = { [sig]: counts(44, 300) }
-    const r = evaluateReading(base, sig, counts(80, 900))
+    const r = evaluateReading(warm(counts(44, 300)), sig, counts(80, 900))
     expect(r.evaluation.counter).toBe('renderTargets')
   })
 
@@ -159,18 +175,23 @@ describe('evaluateReading', () => {
     const a = 'travel|medium|traa/-/bloom/sun/-'
     const b = 'place:cairo|medium|traa/-/bloom/sun/fire'
     let baselines: Baselines = {}
-    baselines = evaluateReading(baselines, a, counts(44, 300)).baselines
-    baselines = evaluateReading(baselines, b, counts(70, 900)).baselines
+    for (let i = 0; i < 2; i++) {
+      baselines = evaluateReading(baselines, a, counts(44, 300)).baselines
+      baselines = evaluateReading(baselines, b, counts(70, 900)).baselines
+    }
     expect(evaluateReading(baselines, a, counts(44, 300)).evaluation.verdict).toBe('ok')
     expect(evaluateReading(baselines, b, counts(70, 900)).evaluation.verdict).toBe('ok')
     // The place reading must not be judged against the travel baseline.
     expect(evaluateReading(baselines, a, counts(70, 900)).evaluation.verdict).toBe('leak')
   })
 
-  it('honours custom bounds', () => {
-    const base: Baselines = { [sig]: counts(44, 300) }
-    const r = evaluateReading(base, sig, counts(45, 300), { renderTargets: 0, textures: 0 })
+  it('honours custom bounds and warm-up length', () => {
+    const r = evaluateReading(warm(counts(44, 300)), sig, counts(45, 300), { renderTargets: 0, textures: 0 })
     expect(r.evaluation.verdict).toBe('leak')
+    // A longer warm-up keeps recording instead of judging.
+    const later = evaluateReading(warm(counts(44, 300)), sig, counts(99, 300), LEAK_BOUNDS, 5)
+    expect(later.evaluation.verdict).toBe('baseline')
+    expect(later.baselines[sig].renderTargets).toBe(99)
   })
 })
 
@@ -198,11 +219,11 @@ describe('stepWatch', () => {
     // chain allocates only on the next rendered frame, so a moving count must
     // never be read as settled.
     const dip = [
-      ...Array.from({ length: 8 }, () => counts(33, 300)),
-      ...Array.from({ length: 3 }, () => counts(47, 300)),
+      ...Array.from({ length: policy.stableFrames - 1 }, () => counts(33, 300)),
+      ...Array.from({ length: policy.stableFrames - 1 }, () => counts(47, 300)),
     ]
     expect(run(dip).settled).toBeUndefined()
-    const settled = run([...dip, ...Array.from({ length: 4 }, () => counts(47, 300))])
+    const settled = run([...dip, counts(47, 300), counts(47, 300)])
     expect(settled.settled).toEqual(counts(47, 300))
   })
 

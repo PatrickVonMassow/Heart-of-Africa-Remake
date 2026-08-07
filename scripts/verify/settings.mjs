@@ -884,6 +884,87 @@ check(
 )
 await page.evaluate((z) => window.__ui.getState().setTravelZoom(z), zoomBefore)
 
+// --- DEV render-resource leak invariant (point 295) --------------------------
+// The TRAA block above gates ONE transition kind at ONE moment. The invariant
+// (src/render/renderLeak.ts) watches every transition of every session, so what
+// is checked here is the invariant itself: that a normal run of scene switches,
+// detail-level changes and effect toggles leaves it silent, and that a REAL
+// leak — render targets allocated and never disposed — makes it scream.
+{
+  const errsBeforeLeak = errors.length
+  const leakState = () => page.evaluate(() => window.__renderLeak?.state() ?? null)
+  check('the render-resource leak watch is armed', (await leakState()) !== null)
+  // The watch samples on rendered frames; a headless page renders only when
+  // something forces it to, so drive frames until it has judged its reading
+  // (see settledReading above for the same reason).
+  const settleWatch = async (tries = 60) => {
+    for (let i = 0; i < tries; i++) {
+      await forceFrame()
+      await page.waitForTimeout(50)
+      const s = await leakState()
+      if (s && !s.watching) return s
+    }
+    return leakState()
+  }
+  const transition = async (fn, arg) => {
+    await page.evaluate(fn, arg)
+    await page.waitForTimeout(250)
+    return settleWatch()
+  }
+  // Every transition kind the point names, walked THREE times: the first two
+  // settled readings of a signature form its baseline (a settlement is still
+  // building when the first one lands), so only a third pass is JUDGED.
+  for (let round = 0; round < 3; round++) {
+    await transition(() => window.__game.getState().enterPlace('cairo'))
+    await transition(() => window.__game.getState().leavePlace())
+    await transition((l) => window.__ui.getState().setDetailLevel(l), 'low')
+    await transition((l) => window.__ui.getState().setDetailLevel(l), 'medium')
+    await transition((v) => window.__ui.getState().setTraaEnabled(v), false)
+    await transition((v) => window.__ui.getState().setTraaEnabled(v), true)
+  }
+  const walked = await leakState()
+  const judged = walked.history.filter((h) => h.outcome === 'ok' || h.outcome === 'leak')
+  const kinds = new Set(walked.history.map((h) => h.signature.split('|')[0]))
+  check('the leak watch judged repeat visits to travel AND to the settlement',
+    judged.length >= 4 && kinds.has('travel') && kinds.has('place:cairo'),
+    `${judged.length} judged readings over ${walked.history.length} transitions, states: ${[...kinds].join(', ')}`)
+  check('a normal session of switches, detail levels and toggles trips nothing',
+    walked.violations.length === 0,
+    walked.violations.map((v) => v.detail).join(' | ').slice(0, 300) || 'no violations')
+
+  // The other half: a REAL leak must be caught. forceLeak() allocates render
+  // targets and initialises them (which is what three counts) without ever
+  // disposing them — exactly the shape of the point-276 pipeline-rebuild leak.
+  const rtBefore = await page.evaluate(() => window.__renderer.info.memory.renderTargets)
+  const rtAfter = await page.evaluate(() => window.__renderLeak.forceLeak(6))
+  check('the forced leak really raises the render-target count', rtAfter >= rtBefore + 6,
+    `${rtBefore} -> ${rtAfter}`)
+  await transition((v) => window.__ui.getState().setTraaEnabled(v), false)
+  const leaked = await transition((v) => window.__ui.getState().setTraaEnabled(v), true)
+  const asserted = await page.evaluate(() =>
+    (window.__assertLog ?? []).filter((a) => a.code === 'render-resource-leak').length)
+  check('a forced render-target leak trips the invariant', leaked.violations.length > 0,
+    leaked.violations.map((v) => v.detail).join(' | ').slice(0, 300) || 'NOT DETECTED')
+  check('the leak reports through the dev-assert channel (console.error + probe log)',
+    asserted > 0 && errors.slice(errsBeforeLeak).some((e) => e.includes('[ASSERT] render-resource-leak')),
+    `${asserted} assert-log entries`)
+
+  // Give the renderer back what the probe took, and re-baseline, so nothing
+  // downstream measures a deliberately poisoned state.
+  const released = await page.evaluate(() => window.__renderLeak.releaseForced())
+  const cleaned = await settleWatch()
+  check('releasing the forced leak restores a clean watch', released === 6 && cleaned.violations.length === 0,
+    `${released} targets freed, ${cleaned.violations.length} violations left`)
+  // The deliberate assert above is the PASS condition of this block, so it must
+  // not fail the suite's console-error gate. Only the render-leak asserts are
+  // dropped — every other console error still counts, here and everywhere else.
+  for (let i = errors.length - 1; i >= errsBeforeLeak; i--) {
+    if (errors[i].includes('[ASSERT] render-resource-leak')) errors.splice(i, 1)
+  }
+  check('the leak block produced no OTHER console errors', errors.length === errsBeforeLeak,
+    errors.slice(errsBeforeLeak).join(' | ').slice(0, 300))
+}
+
 console.log('console errors:', errors.length)
 for (const e of errors) console.log('ERR:', e.slice(0, 300))
 await browser.close()

@@ -109,20 +109,36 @@ export interface LeakEvaluation {
   detail: string
 }
 
-export type Baselines = Readonly<Record<string, LeakCounts>>
+export interface Baseline extends LeakCounts {
+  /** Settled readings filed under this signature so far. */
+  visits: number
+}
+
+export type Baselines = Readonly<Record<string, Baseline>>
+
+/** Settled readings a signature spends FORMING its baseline before it is judged
+ *  against one. Measured (probe, 07.08.2026): the first settled reading after
+ *  entering a settlement lands while the place is still building — Cairo read
+ *  18 render targets / 39 textures where its steady state is 22 / 58, and every
+ *  later visit would have been reported as a +4 leak. The baseline is therefore
+ *  the HIGH-WATER MARK over the first visits, not the first reading. The cost is
+ *  one transition of delay: a leak that grows per transition is still over the
+ *  bound on the first judged reading. */
+const WARMUP_VISITS = 2
 
 /**
  * The decision layer, pure: judge one settled reading against the recorded
  * baselines and return the evaluation together with the NEXT baseline set.
  *
- * - first visit to a signature → 'baseline' (record it, judge nothing);
+ * - while a signature is still forming its baseline → 'baseline' (record the
+ *   high-water mark, judge nothing);
  * - render targets above `baseline + bounds.renderTargets` → 'leak' (strict);
  * - textures above `baseline + bounds.textures` → 'leak' (coarse runaway net);
- * - otherwise 'ok'. The render-target baseline then STAYS the first settled
- *   reading — neither raised (a leak must not re-baseline itself away) nor
- *   lowered (a momentary dip must not tighten the bar for good) — while the
- *   texture baseline ratchets UP to the current reading, so legitimately
- *   streamed content does not accumulate into a false alarm on the next visit.
+ * - otherwise 'ok'. The render-target baseline then STAYS where the warm-up put
+ *   it — neither raised (a leak must not re-baseline itself away) nor lowered (a
+ *   momentary dip must not tighten the bar for good) — while the texture
+ *   baseline ratchets UP to the current reading, so legitimately streamed
+ *   content does not accumulate into a false alarm on the next visit.
  *
  * A 'leak' leaves the baselines untouched, so the condition keeps reporting for
  * as long as it holds instead of silently re-baselining itself away.
@@ -132,19 +148,28 @@ export function evaluateReading(
   signature: string,
   counts: LeakCounts,
   bounds: LeakCounts = LEAK_BOUNDS,
+  warmupVisits: number = WARMUP_VISITS,
 ): { evaluation: LeakEvaluation; baselines: Baselines } {
   const base = baselines[signature]
-  if (!base) {
+  const visits = (base?.visits ?? 0) + 1
+  if (!base || visits <= warmupVisits) {
+    const mark: Baseline = {
+      renderTargets: Math.max(base?.renderTargets ?? 0, counts.renderTargets),
+      textures: Math.max(base?.textures ?? 0, counts.textures),
+      visits,
+    }
     return {
       evaluation: {
         verdict: 'baseline',
         signature,
         counts,
-        baseline: counts,
+        baseline: mark,
         delta: { renderTargets: 0, textures: 0 },
-        detail: `baseline for ${signature}: ${counts.renderTargets} render targets, ${counts.textures} textures`,
+        detail:
+          `baseline ${visits}/${warmupVisits} for ${signature}: ` +
+          `${mark.renderTargets} render targets, ${mark.textures} textures`,
       },
-      baselines: { ...baselines, [signature]: counts },
+      baselines: { ...baselines, [signature]: mark },
     }
   }
   const delta: LeakCounts = {
@@ -171,7 +196,7 @@ export function evaluateReading(
           `(+${delta[counter]}, allowed +${bounds[counter]}); ` +
           `render targets ${base.renderTargets}->${counts.renderTargets}, textures ${base.textures}->${counts.textures}`,
       },
-      baselines,
+      baselines: { ...baselines, [signature]: { ...base, visits } },
     }
   }
   return {
@@ -190,6 +215,7 @@ export function evaluateReading(
       [signature]: {
         renderTargets: base.renderTargets,
         textures: Math.max(base.textures, counts.textures),
+        visits,
       },
     },
   }
@@ -221,7 +247,11 @@ export interface SettlePolicy {
   maxFrames: number
 }
 
-export const SETTLE_POLICY: SettlePolicy = { minFrames: 10, stableFrames: 6, maxFrames: 300 }
+/** Measured (probe, 07.08.2026): six stable frames is a tenth of a second at
+ *  60 Hz and read a settlement that was still building. The window is wide
+ *  enough that a scene has visibly stopped allocating, and the WARM-UP visits
+ *  above cover what a wider window still cannot. */
+export const SETTLE_POLICY: SettlePolicy = { minFrames: 20, stableFrames: 12, maxFrames: 600 }
 
 /** Cap on the retained probe log. */
 const HISTORY_CAP = 60
