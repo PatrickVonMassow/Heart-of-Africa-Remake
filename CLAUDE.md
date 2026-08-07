@@ -964,14 +964,15 @@ At the end:
 - No silent extensions beyond §7.1.
 - **Closing completeness is ENFORCED, not remembered (user decision 24.07.2026, point
   306).** A closing is more than the LARGE regression — the dead-code / stale-doc /
-  stale-comment cleanup and the `.md` audit are what distinguish it (the v0.2 release
-  skipped exactly these because they were tracked only by memory). The full closing
-  checklist is machine-readable in `scripts/closing-guard-core.mjs` (`CLOSING_STEPS`),
-  and a PreToolUse(Bash) guard (`scripts/closing-guard.mjs`) DENIES creating or pushing a
-  version tag (or moving `poc`) until EVERY step is recorded done for the tagged commit.
-  Drive it as you close: `node scripts/closing-guard.mjs --status`, then
-  `--step <id> --evidence "<proof>"` per step. Adding an optical/systemic feature that
-  needs a closing step adds it to `CLOSING_STEPS` (the gate tightens automatically).
+  stale-comment cleanup and the `.md` audit distinguish it (v0.2 skipped these, being
+  memory-tracked). The checklist is machine-readable in
+  `scripts/closing-guard-core.mjs` (`CLOSING_STEPS`), and a PreToolUse guard on the shell
+  AND the editing tools (`scripts/closing-guard.mjs`) DENIES a version tag (created,
+  pushed, or `poc` moved) AND the tick of a point that itself delivers a closing, until
+  EVERY step is recorded done for that commit.
+  Drive it as you close: that script's `--status`, then
+  `--step <id> --evidence "<proof>"` per step. A feature needing a closing step adds it
+  to `CLOSING_STEPS` (the gate tightens automatically).
 - **Graphics detail-level doc current (user 24.07.2026).** Explicitly confirm
   `docs/graphics-detail-levels.md` still matches `QUALITY_PRESETS`
   (`src/config/quality.ts`). The `src/config/qualityDoc.test.ts` sync test

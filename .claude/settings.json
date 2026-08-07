@@ -63,6 +63,10 @@
           },
           {
             "type": "command",
+            "command": "node scripts/criticality-review-guard.mjs"
+          },
+          {
+            "type": "command",
             "command": "node scripts/queue-order-guard.mjs"
           },
           {
@@ -166,6 +170,15 @@
       },
       {
         "matcher": "PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/closing-guard.mjs"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit",
         "hooks": [
           {
             "type": "command",

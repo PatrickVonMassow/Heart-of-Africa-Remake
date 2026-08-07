@@ -41,15 +41,6 @@ export const ENFORCER_RE = /^(?!.*-core\.)([a-z0-9-]+-(?:guard|gate|hook))\.mjs$
 // without a written reason is refused, so "park it" is not available as an escape,
 // and the entry must be removed in the same commit that adds the hook line.
 export const INTENTIONALLY_DORMANT = {
-  // Point 298, built 07.08.2026 by a delegated worktree agent, which may not edit
-  // `.claude/settings.json` — the protected path always prompts, so the Stop-hook
-  // line needs an attended session. Recorded here rather than left silent, and
-  // for exactly as long as that takes: REMOVE THIS ENTRY in the same commit that
-  // adds the hook line. Until then the rule is NOT enforced, only written down —
-  // which is the state this whole map exists to keep visible.
-  'criticality-review-guard.mjs':
-    'built without its Stop-hook line: .claude/settings.json is attended-only, so the arming ' +
-    'belongs to the main session. Remove this entry in the commit that wires it.',
   'path-scope-guard.mjs':
     'Built 07.08.2026 by a worktree agent, which may not touch .claude/settings.json — the PreToolUse line ' +
     'is a protected-path edit and needs an attended session. Its core is measured against the real command ' +
