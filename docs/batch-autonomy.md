@@ -79,6 +79,20 @@ outside the agent's control.
    directory does not exist is a regex, not a path. Measured over the 5751 distinct
    Bash calls of the transcripts, it denies ONE, and that one deliberately
    (`~/.git-credentials`).
+7. **Stop hook `scripts/bundle-first-guard.mjs`** (agreed 29.07.2026, built
+   07.08.2026). The BUNDLE-FIRST rule, until now memory only
+   (`bundle-first-not-new-point`): a new finding JOINS an existing bundle point,
+   and a standalone point is the exception. `docs/work-packages.md` states the
+   property — "every open point in TASKS.md appears in exactly one bundle here,
+   or in the unbundled list below" — and this guard is what makes it true. It
+   reconciles the **full open set**, not only the newest point, so a point that
+   silently LEFT a bundle is caught by the same comparison as one that never
+   joined; that is the second half of the same evening's finding, because the
+   scheme had drifted within an hour of being written (53 of 91 points covered,
+   one already-closed point listed) and nothing compared the two. Listing in the
+   "Not bundled" section IS the exemption. Fail-open throughout: an unreadable or
+   RESTRUCTURED work-packages file allows — a parse miss is not a drift finding.
+   `node scripts/bundle-first-guard.mjs --status` prints what is unplaced.
 
 ## Failure-mode table
 
