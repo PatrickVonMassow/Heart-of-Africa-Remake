@@ -15001,3 +15001,13 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   The script is idempotent (running it twice changes nothing) and prints what it changed.
   VERIFIABLE: the readiness command of 448 reports both tasks with their triggers and last
   result; the drill of 449 disables the primary task and asserts the second one revives it.
+
+- [x] 450. VACATION MODE: A USER-GATED POINT NEVER JAMS THE QUEUE (30.07.2026; bundle
+  Urlaubsfestigkeit). Two decisions have been waiting on the user since 29.07.2026 (the
+  communication-system cards). Over a fortnight alone, a point that cannot proceed without an
+  answer must not hold the queue: the work order marks such a point explicitly as
+  user-gated, the queue skips it after recording WHY, and the board card says it is waiting on
+  the user rather than on work. A skipped point is never silently dropped — it returns to the
+  head of the queue as soon as the answer arrives.
+  VERIFIABLE: Vitest — a user-gated point is not chosen while unanswered, the next independent
+  point is, the reason is logged, and an answered point is picked up first afterwards.

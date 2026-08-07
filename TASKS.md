@@ -3201,16 +3201,6 @@ it is appended.
   Vitest for its pure parts (the kill-moment plan, the verdict assembly). A drill that cannot
   produce a verdict FAILS rather than passing quietly.
 
-- [ ] 450. VACATION MODE: A USER-GATED POINT NEVER JAMS THE QUEUE (30.07.2026; bundle
-  Urlaubsfestigkeit). Two decisions have been waiting on the user since 29.07.2026 (the
-  communication-system cards). Over a fortnight alone, a point that cannot proceed without an
-  answer must not hold the queue: the work order marks such a point explicitly as
-  user-gated, the queue skips it after recording WHY, and the board card says it is waiting on
-  the user rather than on work. A skipped point is never silently dropped — it returns to the
-  head of the queue as soon as the answer arrives.
-  VERIFIABLE: Vitest — a user-gated point is not chosen while unanswered, the next independent
-  point is, the reason is logged, and an answered point is picked up first afterwards.
-
 - [ ] 451. THE REPLY THAT SENT ITS OWN FLAG (user 30.07.2026: "Was ist mit dem Chat los?" —
   two agent messages on the board read literally `--text-stdin`; bundle Chat & Tafel).
   `scripts/board.mjs` accepts `--text-stdin` for German prose; `scripts/chat-reply.mjs` does

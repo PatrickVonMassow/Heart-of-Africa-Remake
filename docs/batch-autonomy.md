@@ -2366,8 +2366,19 @@ impossible, not skipping the inspection.
   `AWAITING-USER`, pings the phone), and MOVE ON to the next workable point.
   `AWAITING-USER` points still count as open (the batch is not done) but are
   SKIPPED when picking the next item; the user's answer clears them
-  (`defer-for-user.mjs --clear <N>`). Only if EVERY open point is `AWAITING-USER`
-  does the batch pause (`setPaused`) and notify — a legitimate wait, not a stall.
+  (`defer-for-user.mjs --clear <N>`), which marks them `USER-ANSWERED` and
+  returns them to the HEAD of the queue rather than to their old rank.
+  THE SYNTAX OF RECORD is `scripts/user-gate-core.mjs` (point 450): the marker
+  sits at the END of the point's `- [ ] N.` head line, carries a date and a
+  reason, and is written only through `defer-for-user.mjs` — which refuses a gate
+  with no reason and refuses to run in a linked worktree at all, because TASKS.md
+  is main-only. Every reader that picks work goes through that core: the queue
+  generator, the queue-order guard, the pool's workable set and the session-start
+  headline, so none of them can offer a gated point.
+  RESIDUAL, stated rather than implied: the "pause when EVERY open point is
+  gated" half is NOT built. `setPaused` lives in the lock, and what happens today
+  is a high-priority notification plus a session-start line saying it out loud —
+  where the old behaviour was silence.
 - **Tool permission prompts** don't fire for the batch: `defaultMode: dontAsk` +
   a trusted workspace (`hasTrustDialogAccepted`) + an allow-list covering every
   tool the batch uses. Avoid editing `.claude/settings.json` mid-batch (the one
