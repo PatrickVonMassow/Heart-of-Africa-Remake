@@ -43,6 +43,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 04.08. | Zweimal am eigenen Netz ausgesperrt — der Firewall-Neubau reißt zuerst ein → additives Werkzeug, fail-offener Neubau, Wächter (§3.80); die Sprachregel hatte nie einen Mechanismus, und die Bestandsprüfung sah es nicht (§3.81) |
 | 04.08. abends | Sechs rote Suiten eingeordnet: vier waren der Prüfstand — gesperrtes Auslieferungsnetz und feste Wartezeiten von einer schnelleren Maschine (§3.83); der Starter enteignet jeden Besitzer nach einer halben Stunde (Punkt 504) |
 | 05.08. | Vier Recherchen ohne eine Messung: die fehlende Treiberfähigkeit stand hinter einem Befehl, die Lösung dann in einer längst laufenden Kette (§3.84) — die zweite Bahn zeichnet seither auf der Grafikkarte |
+| 07.08. | Erster vollständiger Aufräumpass über Wächterkette und Merkposten: kein verwaister Wächter, aber zehn Befunde — die Regel behauptet eine Reichweite, die der Mechanismus nicht hat (§3.88) |
 
 Muster: Ab dem 22.07. explodiert die Commit-Rate (Delegation) — und genau dann häufen sich die Infrastruktur-Vorfälle. **Skalierung der Autonomie erzeugt eine eigene Problemklasse, die die Feature-Arbeit zeitweise überholt.**
 
@@ -819,6 +820,16 @@ Am selben Abend vertiefte sich der Ausfall (06.08.2026, 21:05). Bis dahin waren 
 
 Denselben Abend lieferte ein zweiter, ganz anders gelagerter Fall dieselbe Klasse. Ein Befehl, der die Warteschlangen-Karten des Boards aus der Arbeitsordnung „nachzieht", schrieb dabei jede Karte neu — und zog die von Hand gesetzten Absätze von 46 Karten zu je einem Block zusammen. Der Inhalt überlebte, die Lesbarkeit auf dem Telefon nicht, und weil die Datei nicht versioniert ist, war die Struktur nur noch in der zuletzt veröffentlichten Seite zu finden. **Lehre:** Ein Abgleich, der aus einer Quelle schreibt, darf nur ergänzen, was er selbst erzeugen kann. Was flussabwärts reicher ist als die Quelle — kuratierte Prosa, Gliederung, Reihenfolge —, ist kein Beiwerk, das ein Neuaufbau nebenbei ersetzt, sondern der eigentliche Wert; ein „sync", der es überschreibt, ist ein Datenverlust mit freundlichem Namen.
 
+### 3.88 Die Regel behauptet eine Reichweite, die der Mechanismus nicht hat
+
+Der erste vollständige Aufräumpass über die Wächterkette und den Merkposten-Bestand (07.08.2026, Punkt 297) fand zehn Befunde in einem Bestand, den nie jemand am Stück gelesen hatte: 37 verdrahtete Haken, 35 Wächter-Skripte, 74 Merkposten. Verwaist war keiner — die Kette ist gesund. Was sie nicht ist, ist so weit, wie die Regeln über sie behaupten.
+
+Der schärfste Fall: CLAUDE.md §7.2 sagt, der Vier-Augen-Wächter lasse „keinen neuen oder geänderten Wächter, kein Tor und keinen **Haken**" ohne das Gegenlesen des anderen Modells durchgehen. Sein Erkennungsmuster kennt aber nur `-guard` und `-gate`. Acht verdrahtete Haken stehen damit außerhalb — darunter ausgerechnet der Text, der bei **jeder** Eingabe mitläuft und den die Frequenzordnung des Regel-Reviews an erster Stelle nennt. Er ließe sich heute ohne ein zweites Augenpaar umschreiben. Dieselbe Form eine Ebene tiefer: Zwei Zählungen desselben Bestands verwenden zwei verschiedene Definitionen von „Wächter", weshalb der Wachstums-Auslöser des Review-Zeitplans eine ganze Klasse gar nicht wachsen sieht.
+
+**Lehre:** Zwischen einer Regel und dem Mechanismus, der sie durchsetzt, gibt es keinen Wächter — die Regel steht in Prosa, das Muster in Code, und niemand vergleicht sie. Das ist nicht dasselbe wie §3.81 (eine Regel *ohne* Mechanismus, die die Bestandsprüfung nicht sah): hier existiert der Mechanismus, ist getestet, feuert und wird geglaubt — nur greift er auf einer engeren Menge als der Satz, der ihn beschreibt. Solche Lücken werden nicht bemerkt, sondern nur **aufgezählt**. Deshalb ist der Aufzähler das eigentliche Ergebnis dieses Punktes und nicht die Befundliste: Er liest die verdrahteten Haken, die Skripte und die Merkposten aus den echten Quellen, statt aus dem, woran sich jemand erinnert. Und deshalb gilt für den Pass die Regel, die im Dokument selbst steht — **ein Durchgang ohne Befund ist ein gescheiterter Durchgang**, denn dann wurden die Behauptungen gegeneinander geprüft statt gegen den Code.
+
+Ein zweiter Befund desselben Passes zeigt, was das kostet, wenn niemand aufzählt: Zwei Stellen leiten aus demselben Projektpfad zwei verschiedene Speicherordner ab, und die Ablage für nebenbei aufgefallene Befunde landete im leeren der beiden. Ein Befund, den ein Agent aus seinem eigenen Arbeitsordner meldet, ist damit verloren — bei maximaler Delegation ist genau dieser Agent der Hauptfinder. Der Mechanismus lief, protokollierte Erfolg und erreichte sein Ziel nie.
+
 ---
 
 ## 4. Die Guards als Immunsystem
@@ -908,7 +919,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Donnerstag, 06.08.2026, 21:45 · Quellen-Fingerprint: `243d5b15bb7b…`
+Zuletzt aktualisiert: Freitag, 07.08.2026, 05:39 · Quellen-Fingerprint: `ab50e3cdfdcb…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -988,8 +999,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 72 Feedback-/Projekt-Memories · 43 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 33 Prozess-/Meta-TASKS-Punkte (davon 16 offen).
+Erfasste Quellen: 72 Feedback-/Projekt-Memories · 44 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 36 Prozess-/Meta-TASKS-Punkte (davon 18 offen).
 
-<!-- RETRO-FINGERPRINT: 243d5b15bb7be3305145d6e69ac14afa1ac14cf6ba9d13f839be90ba51097c7b -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-06T19:45:54.198Z -->
+<!-- RETRO-FINGERPRINT: ab50e3cdfdcb417132adb0fc5e7468e46f0328cac7dbc61a94d0403d59a1c908 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-07T03:39:59.535Z -->
 <!-- AUTO-GENERATED:END -->
