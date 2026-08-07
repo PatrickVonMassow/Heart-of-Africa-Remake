@@ -20,7 +20,13 @@ import {
   suggestSuite,
   baselineFor,
   evaluate,
+  pointStatusesFrom,
+  chargeablePoints,
+  chargeFor,
+  runVerdict,
 } from './render-verify-core.mjs'
+import { RED_CHARGES } from './render-verify-charges.mjs'
+import { readTasksAll } from './tasks-source.mjs'
 
 const VERIFY_DIR = join(dirname(fileURLToPath(import.meta.url)), 'verify')
 
@@ -540,5 +546,229 @@ describe('NON_RENDER_VERIFY matches the actual scripts/verify/ tree', () => {
   it('lists no script that no longer exists', () => {
     const present = new Set(scripts.map((s) => s.file))
     expect([...NON_RENDER_VERIFY].filter((f) => !present.has(f))).toEqual([])
+  })
+})
+
+// ---------------------------------------------------------------------------
+// POINT 550 — a run whose reds are each ACCOUNTED FOR
+//
+// The gate counted only an exit-0 run, and `polish` could not exit 0 for reasons
+// belonging to OTHER points (the 546 render-target assert, the 506 goat stance on
+// the software lane), so every change under scripts/verify/ could be cleared only
+// by a hand-written --defer. A gate routinely overridden by hand stops being a
+// gate. These cases pin the replacement AND its limits: nothing clears on a red
+// charged to nothing, on a red charged to a finished point, or on a run that never
+// said why it failed.
+// ---------------------------------------------------------------------------
+
+/** A red as the recorder writes it into the run record. */
+const red = (name, point = null, kind = 'check') => ({ name, key: name.toLowerCase(), kind, point })
+
+/** A RED run carrying reds — the shape evaluate()/coveringRun() judge. */
+const redRun = (backend, at, reds, overrides = {}) => ({
+  backend,
+  suite: 'polish',
+  startedAt: at - 60_000,
+  at,
+  exit: 1,
+  asserted: true,
+  reds,
+  crashed: false,
+  ...overrides,
+})
+
+describe('pointStatusesFrom / chargeablePoints — which points may carry a charge', () => {
+  const work = [
+    '- [ ] 506. THE SOFTWARE LANE REDDENS AT CHECKS',
+    '- [ ] 546. A SETTLEMENT VISIT STILL GROWS THE RESIDENT RENDER TARGETS',
+    '- [ ] 999. SOMETHING DEFERRED — DEFERRED until the mechanic is settled',
+    '- [x] 387. THE CHECKS THAT ARE RED ON MAIN ITSELF',
+  ].join('\n')
+
+  it('reads open, deferred and ticked points apart', () => {
+    const s = pointStatusesFrom(work)
+    expect(s.get(506)).toBe('open')
+    expect(s.get(546)).toBe('open')
+    expect(s.get(999)).toBe('deferred')
+    expect(s.get(387)).toBe('done')
+  })
+
+  it('charges only OPEN points — a deferred one is nobody working on it either', () => {
+    expect(chargeablePoints(work).sort((a, b) => a - b)).toEqual([506, 546])
+  })
+
+  it('lets a tick win over any other reading of the same number, in either order', () => {
+    expect(pointStatusesFrom('- [x] 42. done\n- [ ] 42. stale open copy').get(42)).toBe('done')
+    expect(pointStatusesFrom('- [ ] 42. stale open copy\n- [x] 42. done').get(42)).toBe('done')
+  })
+
+  it('is total on garbage', () => {
+    expect(pointStatusesFrom(null).size).toBe(0)
+    expect(chargeablePoints(undefined)).toEqual([])
+  })
+})
+
+describe('chargeFor — the ledger charges NARROWLY', () => {
+  const ledger = [
+    { point: 506, suite: 'polish', backend: 'webgpu', kind: 'check', match: /goat/i, why: 'x' },
+    { point: 546, kind: 'console', match: /render-resource-leak/i, why: 'y' },
+  ]
+
+  it('charges a matching red to its point', () => {
+    const hit = chargeFor(red('settlement walker (goat): the planted foot holds'), {
+      suite: 'polish',
+      backend: 'webgpu',
+      ledger,
+    })
+    expect(hit.point).toBe(506)
+  })
+
+  it('does not charge across the backend the evidence was taken on', () => {
+    expect(
+      chargeFor(red('settlement walker (goat): the planted foot holds'), { suite: 'polish', backend: 'webgl', ledger }),
+    ).toBeNull()
+  })
+
+  it('does not charge across suites, or across check/console kinds', () => {
+    expect(chargeFor(red('settlement walker (goat)'), { suite: 'flow', backend: 'webgpu', ledger })).toBeNull()
+    expect(chargeFor(red('console error: render-resource-leak — renderTargets grew', null, 'check'), { ledger })).toBeNull()
+  })
+
+  it('survives a broken ledger entry rather than throwing', () => {
+    const broken = [{ point: 1, match: null }, { point: 2, match: /x/ }, null]
+    expect(() => chargeFor(red('x'), { ledger: broken })).not.toThrow()
+    expect(chargeFor(red('x'), { ledger: broken }).point).toBe(2)
+  })
+})
+
+describe('runVerdict — clean, accounted for, or red', () => {
+  const openPoints = [506, 546]
+
+  it('calls an exit-0 run CLEAN and never accounted for', () => {
+    const v = runVerdict(run('webgpu', 2000), { openPoints })
+    expect(v.status).toBe('clean')
+    expect(v.covers).toBe(true)
+    expect(v.charges).toEqual([])
+  })
+
+  it('accounts for a run whose TWO reds both name open points, and names them', () => {
+    const v = runVerdict(
+      redRun('webgpu', 2000, [red('goat stance', 506), red('console error: leak', 546, 'console')]),
+      { openPoints },
+    )
+    expect(v.status).toBe('accounted')
+    expect(v.covers).toBe(true)
+    expect(v.charges.map((c) => c.point)).toEqual([506, 546])
+  })
+
+  it('does NOT account for the same run when one red names nothing', () => {
+    const v = runVerdict(redRun('webgpu', 2000, [red('goat stance', 506), red('a NEW check nobody filed')]), {
+      openPoints,
+    })
+    expect(v.status).toBe('red')
+    expect(v.covers).toBe(false)
+    expect(v.unaccounted).toEqual([{ name: 'a NEW check nobody filed', point: null }])
+  })
+
+  it('does NOT account for a red naming a point that is ticked done', () => {
+    const v = runVerdict(redRun('webgpu', 2000, [red('a stale exception', 387)]), { openPoints })
+    expect(v.status).toBe('red')
+    expect(v.unaccounted).toEqual([{ name: 'a stale exception', point: 387 }])
+  })
+
+  it('does NOT account for a failure the run never reported', () => {
+    expect(runVerdict(redRun('webgpu', 2000, []), { openPoints }).status).toBe('red')
+  })
+
+  it('does NOT account for a run that crashed, however well charged its reds are', () => {
+    const v = runVerdict(redRun('webgpu', 2000, [red('goat stance', 506)], { crashed: true }), { openPoints })
+    expect(v.status).toBe('red')
+    expect(v.unaccounted[0].name).toMatch(/crash/)
+  })
+
+  it('charges nothing when no work order was handed in — the strict default', () => {
+    expect(runVerdict(redRun('webgpu', 2000, [red('goat stance', 506)])).status).toBe('red')
+  })
+
+  it('is total on garbage', () => {
+    expect(runVerdict(null).covers).toBe(false)
+    expect(runVerdict({ exit: 1, reds: 'nonsense' }, { openPoints }).covers).toBe(false)
+    expect(() => runVerdict({ exit: 1, reds: [null, 7] }, { openPoints })).not.toThrow()
+  })
+})
+
+describe('coveringRun / evaluate — the accounted-for run clears the gate', () => {
+  const openPoints = [506, 546]
+  const accountedRun = (backend) => redRun(backend, 2000, [red('goat stance', 506)])
+
+  it('counts an accounted-for run as coverage — but only with the open points in hand', () => {
+    expect(coveringRun([accountedRun('webgpu')], 'webgpu', 1000, { openPoints })).not.toBeNull()
+    expect(coveringRun([accountedRun('webgpu')], 'webgpu', 1000)).toBeNull()
+  })
+
+  it('clears a dual-backend change on two accounted-for runs and REPORTS the charges', () => {
+    const result = evaluate(renderChange({ runs: [accountedRun('webgpu'), accountedRun('webgl')], openPoints }))
+    expect(result.decision).toBe('allow')
+    expect(result.clear).toBe(true)
+    expect(result.accounted.map((a) => [a.backend, a.charges[0].point])).toEqual([
+      ['webgpu', 506],
+      ['webgl', 506],
+    ])
+  })
+
+  it('reports NO accounting for a clean pass — the record keeps the two apart', () => {
+    const result = evaluate(renderChange({ runs: [run('webgpu', 2000), run('webgl', 2000)], openPoints }))
+    expect(result).toEqual({ decision: 'allow', clear: true })
+  })
+
+  it('still blocks when one backend carries an unaccounted red, and says which', () => {
+    const result = evaluate(
+      renderChange({
+        runs: [accountedRun('webgpu'), redRun('webgl', 2000, [red('a NEW check nobody filed')])],
+        openPoints,
+      }),
+    )
+    expect(result.decision).toBe('block')
+    expect(result.reason).toMatch(/UNACCOUNTED red/)
+    expect(result.reason).toMatch(/a NEW check nobody filed/)
+    expect(result.reason).toMatch(/render-verify-charges\.mjs/)
+  })
+
+  it('blocks a red charged to a point that is no longer open (the exception expired)', () => {
+    const stale = redRun('webgpu', 2000, [red('a stale exception', 387)])
+    const result = evaluate(renderChange({ runs: [stale, redRun('webgl', 2000, [red('x', 506)])], openPoints }))
+    expect(result.decision).toBe('block')
+    expect(result.reason).toMatch(/point 387 is not open/)
+  })
+})
+
+describe('the shipped charge ledger', () => {
+  it('carries a well-formed entry for every known red', () => {
+    expect(RED_CHARGES.length).toBeGreaterThan(0)
+    for (const c of RED_CHARGES) {
+      expect(Number.isInteger(c.point)).toBe(true)
+      expect(c.match).toBeInstanceOf(RegExp)
+      expect(String(c.why).length).toBeGreaterThan(40)
+      if (c.backend) expect(BACKENDS).toContain(c.backend)
+      if (c.kind) expect(['check', 'console']).toContain(c.kind)
+    }
+  })
+
+  it('charges only points the work order still holds OPEN (a ticked point expires its entries)', () => {
+    const open = new Set(chargeablePoints(readTasksAll()))
+    expect(RED_CHARGES.filter((c) => !open.has(c.point)).map((c) => c.point)).toEqual([])
+  })
+
+  it('charges the two reds that motivated the mechanism, each in its own lane', () => {
+    const leak = red(
+      'console error: [ASSERT] render-resource-leak — renderTargets grew back at place:maasai-village',
+      null,
+      'console',
+    )
+    expect(chargeFor(leak, { suite: 'polish', backend: 'webgl' }).point).toBe(546)
+    expect(chargeFor(leak, { suite: 'polish', backend: 'webgpu' }).point).toBe(546)
+    const goat = red('settlement walker (goat): the planted foot holds its ground spot')
+    expect(chargeFor(goat, { suite: 'polish', backend: 'webgpu' }).point).toBe(506)
+    expect(chargeFor(goat, { suite: 'polish', backend: 'webgl' })).toBeNull()
   })
 })
