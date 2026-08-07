@@ -897,18 +897,21 @@ await page.evaluate((z) => window.__ui.getState().setTravelZoom(z), zoomBefore)
   // The watch samples on rendered frames; a headless page renders only when
   // something forces it to, so drive frames until it has judged its reading
   // (see settledReading above for the same reason).
-  const settleWatch = async (tries = 60) => {
+  // Frames, not wall clock: the watch advances one step per RENDERED frame and
+  // a headless page paints only when something forces it to, so each round of
+  // this loop forces exactly the tick the watch is waiting for.
+  const settleWatch = async (tries = 80) => {
     for (let i = 0; i < tries; i++) {
       await forceFrame()
-      await page.waitForTimeout(50)
       const s = await leakState()
       if (s && !s.watching) return s
     }
     return leakState()
   }
+  // The store subscription runs inside the evaluate, so the watch has already
+  // started when it returns — there is nothing to wait for before pumping.
   const transition = async (fn, arg) => {
     await page.evaluate(fn, arg)
-    await page.waitForTimeout(250)
     return settleWatch()
   }
   // Every transition kind the point names, walked THREE times: the first two
