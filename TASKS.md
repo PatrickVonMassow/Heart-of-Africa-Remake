@@ -3170,20 +3170,6 @@ it is appended.
   DOCS in the same commit: `docs/batch-autonomy.md` where the guard chain is described, and
   CLAUDE.md §7.2 only if the families it names change.
 
-- [ ] 446. THE PICK-UP WINDOW AFTER A RELEASE (30.07.2026, measured on the same day — the
-  retrospective's §3.70; bundle Urlaubsfestigkeit). The takeover handshake has two halves: a
-  window claims the batch, the owner releases at its next clean turn end, and the window
-  PICKS IT UP. On 30.07.2026 the release came at 10:16 into a session the Claude outage had
-  just killed; twenty minutes later the launcher took the free lock for itself — correct by
-  its rules and against the user's intent. Point 434 made the claim non-lapsing BEFORE the
-  release; afterwards it is spent and the first to grab wins. Fix: a pick-up window of two
-  ticks in which the launcher does NOT take a free lock for itself while the claimant's window
-  is alive, using the same liveness check 434 already has; once the window dies or the frist
-  expires, the ordinary handover proceeds, so the batch can never end up ownerless.
-  VERIFIABLE: Vitest on the takeover decision — released-for-X + X alive + within the window →
-  no spawn, and the log says why; X dead, or the window elapsed → spawn. Plus the reverse case
-  that an unclaimed free lock is still taken at once.
-
 - [ ] 447. THE BOOT PATH, AND A SECOND TASK THAT WATCHES THE FIRST (30.07.2026; bundle
   Urlaubsfestigkeit). Measured state of `HoA-Batch-Autostart`: ONE time trigger every 15 min,
   `StartWhenAvailable` on, no battery/idle limit, `MultipleInstances: IgnoreNew`, principal
