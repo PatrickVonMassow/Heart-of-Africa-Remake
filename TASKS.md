@@ -4443,3 +4443,28 @@ Build order, chosen so no two parallel agents own the same file:
   "accounted for".
   Criticality: medium — it does not break the picture, but it converts a gate into a
   formality, and this project has already paid for that once.
+
+- [ ] 551. THE TRANSIENT STATUS HINT IS DRAWN ON TOP OF THE REGION NAME (seen
+  07.08.2026 in the verification frames `121-harmattan-pall-january.png` and
+  `122-atlas-snow-february.png`, WebGL 2, and reproducible in every frame the
+  enrichments suite writes while the canoe hint stands). The centred hint "The canoe is
+  dead weight on land and slows me — better left in a camp for long overland stretches."
+  and the region name occupy the SAME strip of the status bar, and both are drawn: the
+  frames read "Westcanoe is dead weight …" and "Northanoe is dead weight …", the region
+  word running into the hint's first word. It is not a clipping artefact — the hint's
+  own bordered box sits over an unhidden label.
+  Acceptance criterion 9 (`CLAUDE.md` §7.1) puts BOTH there on purpose: the region is a
+  permanent stat and the hint renders "CENTRED inside the status bar itself, not in a
+  separate floating panel". So the collision is by construction, and the fix belongs on
+  the hint's side, not by moving it back out into a panel.
+  FINAL STATE: while a transient hint stands, the status bar YIELDS the strip it needs —
+  whatever permanent element the hint would overlap is hidden for its lifetime (not
+  faded, not shifted under it) and comes back unchanged when the hint expires. The hint
+  keeps its centred position and its box. Which elements can be yielded is decided by
+  measured overlap, not by a hard-coded guess about which stat sits where.
+  VERIFIABLE: a Vitest case on the HUD component — with a hint active, the overlapped
+  permanent element is not rendered, and after the hint expires it is back; plus a
+  browser frame showing the hint over a status bar with no text behind it. Both
+  languages, since the German hint has a different width.
+  Criticality: medium — nothing breaks, but it is the first thing in the picture a reader
+  sees as sloppy, and it is in every screenshot the suites write.
