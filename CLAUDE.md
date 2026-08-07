@@ -902,11 +902,12 @@ After completion and after every major system:
   render-set change on both backends where they can differ, and
   `mechanism-review-guard`, which lets no new or changed guard, gate or hook end
   a turn without the OTHER model's recorded review —
-  `scripts/mechanism-review.mjs --record`). Two carry a caveat: `ci-status-guard`
-  sees only the session's OWN HEAD, which let 26 red runs on `main` stand unseen
-  for three weeks (point 387 widens it to every ref
-  the session pushed and raises the demand from noticing red to CONFIRMING
-  GREEN), and the versioned git hooks (`scripts/git-hooks/`, wired by `npm
+  `scripts/mechanism-review.mjs --record`). Two are worth naming exactly:
+  `ci-status-guard` watches EVERY ref the repository PUSHED, not just the
+  session's HEAD (that blindness left 26 red runs on `main` unseen for three
+  weeks), and demands a run CONCLUDED green for that sha — an unfinished one
+  WAITS. Cheapness: the push reflog, a per-sha cache. The versioned
+  git hooks (`scripts/git-hooks/`, wired by `npm
   install`) refuse a stray file, a trailer naming no model, a rescue commit that
   would mail the user, and a push CI would reject. Separately, PreToolUse hooks run `closing-guard` (§9),
   which denies a version tag until every closing step is recorded, and

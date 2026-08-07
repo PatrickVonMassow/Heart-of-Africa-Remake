@@ -2,7 +2,27 @@
 // red blocks and notifies once per sha, pending/success/none allow, malformed
 // input fails open, and a green re-run supersedes its red predecessor.
 import { describe, it, expect } from 'vitest'
-import { classifyRuns, failedRuns, recoveredWorkflows, shouldBlock, shouldNotify, blockReason } from './ci-status-guard-core.mjs'
+import {
+  blockReason,
+  cachedAnswer,
+  classifyRuns,
+  failedRuns,
+  liveTargets,
+  pruneNoCiRefs,
+  pruneShaCache,
+  pushedRefsFromReflog,
+  recoveredWorkflows,
+  refTargets,
+  refVerdict,
+  shouldBlock,
+  shouldNotify,
+  sweepTargets,
+  NO_CI_TTL_MS,
+  PUSH_WINDOW_MS,
+  RECHECK_MS,
+  RUN_GRACE_MS,
+  WAIT_BUDGET_MS,
+} from './ci-status-guard-core.mjs'
 
 const HEAD = 'abc123def456'
 
@@ -234,5 +254,291 @@ describe('recoveredWorkflows', () => {
     expect(recoveredWorkflows([run({ headSha: 'other' })], HEAD)).toEqual([])
     expect(recoveredWorkflows(null, HEAD)).toEqual([])
     expect(recoveredWorkflows([run()], '')).toEqual([])
+  })
+})
+
+// ---------------------------------------------------------------------------
+// CONFIRM GREEN ON EVERY PUSHED REF (point 387). The guard asked about HEAD
+// alone, so the owning session's green `main` hid thirteen red branch runs
+// through the night of 30.07.2026 — only the repository owner's inbox learned.
+// ---------------------------------------------------------------------------
+
+const BRANCH = 'feed0011223344'
+const NOW = 1_800_000_000_000
+const t = (s) => NOW - s * 1000
+
+const reflog = (lines) => lines.join('\n')
+const pushLine = (ref, sha, at, msg = 'update by push') =>
+  `refs/remotes/${ref}@{${Math.floor(at / 1000)}}\t${sha}\t${msg}`
+
+describe('pushedRefsFromReflog', () => {
+  it('takes the refs THIS repository pushed, newest push per ref', () => {
+    const got = pushedRefsFromReflog(
+      reflog([
+        pushLine('origin/feat/x', BRANCH, t(60)),
+        pushLine('origin/feat/x', 'older00', t(600)),
+        pushLine('origin/main', HEAD, t(300)),
+      ]),
+      { now: NOW },
+    )
+    expect(got).toEqual([
+      { ref: 'origin/feat/x', sha: BRANCH, at: t(60) },
+      { ref: 'origin/main', sha: HEAD, at: t(300) },
+    ])
+  })
+
+  it('ignores a FETCH — someone else’s branch is not this session’s duty', () => {
+    expect(
+      pushedRefsFromReflog(
+        reflog([
+          pushLine('origin/other', 'aaa111', t(60), 'fetch: fast-forward'),
+          `refs/heads/main@{${Math.floor(t(60) / 1000)}}\tbbb222\tcommit: local work`,
+          `HEAD@{${Math.floor(t(60) / 1000)}}\tbbb222\tcheckout: moving`,
+        ]),
+        { now: NOW },
+      ),
+    ).toEqual([])
+  })
+
+  it('drops pushes older than the window, and survives junk', () => {
+    expect(pushedRefsFromReflog(reflog([pushLine('origin/old', 'aaa111', NOW - PUSH_WINDOW_MS - 1)]), { now: NOW })).toEqual([])
+    expect(pushedRefsFromReflog(null, { now: NOW })).toEqual([])
+    expect(pushedRefsFromReflog('garbage\n\n', { now: NOW })).toEqual([])
+  })
+})
+
+describe('refTargets', () => {
+  const pushed = [
+    { ref: 'origin/feat/x', sha: BRANCH, at: t(60) },
+    { ref: 'origin/main', sha: HEAD, at: t(300) },
+  ]
+
+  it('leads with HEAD’s own sha, then the rest newest first', () => {
+    expect(refTargets({ pushed, existingRefs: ['origin/main', 'origin/feat/x'], headSha: HEAD }).map((x) => x.ref)).toEqual([
+      'origin/main',
+      'origin/feat/x',
+    ])
+  })
+
+  it('DROPS a ref that no longer exists — a merged branch is not reported forever', () => {
+    const got = refTargets({ pushed, existingRefs: ['origin/main'], headSha: HEAD })
+    expect(got.map((x) => x.ref)).toEqual(['origin/main'])
+  })
+
+  it('asks about a sha ONCE even when two refs carry it', () => {
+    const got = refTargets({
+      pushed: [
+        { ref: 'origin/main', sha: HEAD, at: t(60) },
+        { ref: 'origin/release', sha: HEAD, at: t(90) },
+      ],
+      existingRefs: ['origin/main', 'origin/release'],
+      headSha: HEAD,
+    })
+    expect(got).toHaveLength(1)
+  })
+
+  it('keeps the old guarantee: a HEAD pushed from another clone is still judged', () => {
+    const got = refTargets({ pushed: [], existingRefs: [], headSha: HEAD, headPushed: true })
+    expect(got).toEqual([{ ref: 'HEAD', sha: HEAD, at: 0 }])
+    // …and nothing is claimed when HEAD was never pushed at all.
+    expect(refTargets({ pushed: [], existingRefs: [], headSha: HEAD, headPushed: false })).toEqual([])
+  })
+})
+
+describe('liveTargets', () => {
+  const targets = [{ ref: 'origin/board', sha: 'aaa111', at: t(60) }]
+
+  it('skips a ref no workflow covers, until the memory expires', () => {
+    expect(liveTargets(targets, { 'origin/board': t(60) }, NOW)).toEqual([])
+    expect(liveTargets(targets, { 'origin/board': NOW - NO_CI_TTL_MS - 1 }, NOW)).toEqual(targets)
+    expect(liveTargets(targets, {}, NOW)).toEqual(targets)
+  })
+})
+
+describe('cachedAnswer', () => {
+  it('never re-asks about a CONCLUDED answer', () => {
+    expect(cachedAnswer({ state: 'success', checkedAt: 0 }, NOW)).toBe('success')
+    expect(cachedAnswer({ state: 'nocheck', checkedAt: 0 }, NOW)).toBe('nocheck')
+  })
+
+  it('re-asks about a red or an unfinished run once the recheck window passes', () => {
+    expect(cachedAnswer({ state: 'failed', checkedAt: NOW - 1 }, NOW)).toBe('failed')
+    expect(cachedAnswer({ state: 'pending', checkedAt: NOW - 1 }, NOW)).toBe('pending')
+    // A re-run turns a red green, and a running run finishes — neither is final.
+    expect(cachedAnswer({ state: 'failed', checkedAt: NOW - RECHECK_MS - 1 }, NOW)).toBe(null)
+    expect(cachedAnswer({ state: 'pending', checkedAt: NOW - RECHECK_MS - 1 }, NOW)).toBe(null)
+  })
+
+  it('fails open on junk', () => {
+    expect(cachedAnswer(undefined, NOW)).toBe(null)
+    expect(cachedAnswer({ state: 'seen', checkedAt: NOW }, NOW)).toBe(null)
+  })
+})
+
+describe('refVerdict', () => {
+  it('an unfinished run is a WAIT, not a pass — until the wait budget runs out', () => {
+    expect(refVerdict({ state: 'pending', at: t(60), now: NOW })).toBe('wait')
+    expect(refVerdict({ state: 'pending', at: NOW - WAIT_BUDGET_MS - 1, now: NOW })).toBe('gave-up')
+  })
+
+  it('no run yet passes inside the grace and is written off after it', () => {
+    expect(refVerdict({ state: 'none', at: t(5), now: NOW })).toBe('pass')
+    expect(refVerdict({ state: 'none', at: NOW - RUN_GRACE_MS - 1, now: NOW })).toBe('nocheck')
+  })
+
+  it('names the two conclusive verdicts', () => {
+    expect(refVerdict({ state: 'failed', at: t(60), now: NOW })).toBe('red')
+    expect(refVerdict({ state: 'success', at: t(60), now: NOW })).toBe('green')
+  })
+})
+
+describe('pruneShaCache / pruneNoCiRefs', () => {
+  it('forgets what can no longer be a target', () => {
+    expect(
+      pruneShaCache({ keep: { state: 'success', firstSeenAt: t(60) }, drop: { state: 'success', firstSeenAt: NOW - PUSH_WINDOW_MS - 1 } }, NOW),
+    ).toEqual({ keep: { state: 'success', firstSeenAt: t(60) } })
+    expect(pruneNoCiRefs({ 'origin/board': t(60), 'origin/gone': NOW - NO_CI_TTL_MS - 1 }, NOW)).toEqual({
+      'origin/board': t(60),
+    })
+    expect(pruneShaCache(null, NOW)).toEqual({})
+    expect(pruneNoCiRefs(undefined, NOW)).toEqual({})
+  })
+})
+
+// The sweep itself: all I/O injected, so what is asked, what is cached, what
+// blocks and what alerts is decided here and pinned without a network.
+async function sweep({ targets, runsBySha = {}, standDown = false, ...rest }) {
+  const asked = []
+  const alerts = []
+  const result = await sweepTargets({
+    targets,
+    now: NOW,
+    ...rest,
+    fetchRuns: async (sha) => {
+      asked.push(sha)
+      return Object.prototype.hasOwnProperty.call(runsBySha, sha) ? runsBySha[sha] : null
+    },
+    judgeRed: async ({ classification }) => ({
+      classification: { ...classification, cause: 'repository', detail: 'the failing job is "gate"', actionable: !standDown },
+      standDown,
+      stillFamished: standDown ? { CI: NOW } : {},
+    }),
+    notify: async (a) => alerts.push(a),
+  })
+  return { ...result, asked, alerts }
+}
+
+const redRun = (sha) => [run({ headSha: sha, conclusion: 'failure', databaseId: 42 })]
+const greenRun = (sha) => [run({ headSha: sha })]
+const pendingRun = (sha) => [run({ headSha: sha, status: 'in_progress', conclusion: null })]
+
+describe('sweepTargets', () => {
+  const headTarget = { ref: 'origin/main', sha: HEAD, at: t(120) }
+  const branchTarget = { ref: 'origin/feat/x', sha: BRANCH, at: t(120) }
+
+  it('BLOCKS on a red pushed ref while HEAD is green, and NAMES that ref', async () => {
+    // Exactly the night of 30.07.2026: main green, the delegated agent's branch
+    // red, and the session that could have fixed it never learned.
+    const got = await sweep({
+      targets: [headTarget, branchTarget],
+      runsBySha: { [HEAD]: greenRun(HEAD), [BRANCH]: redRun(BRANCH) },
+    })
+    expect(got.decision).toContain('origin/feat/x')
+    expect(got.decision).toContain('RED')
+    expect(got.decision).toContain(BRANCH.slice(0, 7))
+    expect(got.alerts).toHaveLength(1)
+    expect(got.alerts[0].target.ref).toBe('origin/feat/x')
+  })
+
+  it('alerts ONCE per (ref, sha) — the next turn on the same pair stays silent', async () => {
+    const first = await sweep({ targets: [branchTarget], runsBySha: { [BRANCH]: redRun(BRANCH) } })
+    expect(first.alerts).toHaveLength(1)
+    const second = await sweepTargets({
+      targets: [branchTarget],
+      cache: {}, // cache expired → GitHub IS asked again, and it is still red
+      notified: first.notified,
+      now: NOW + RECHECK_MS + 1,
+      fetchRuns: async () => redRun(BRANCH),
+      judgeRed: async ({ classification }) => ({
+        classification: { ...classification, cause: 'repository', actionable: true },
+        standDown: false,
+        stillFamished: {},
+      }),
+      notify: async () => {
+        throw new Error('alerted twice for the same (ref, sha)')
+      },
+    })
+    expect(second.decision).toContain('origin/feat/x') // still blocking…
+  })
+
+  it('asks GitHub NOTHING when nothing is pushed, and nothing when every answer is green', async () => {
+    const none = await sweep({ targets: [] })
+    expect(none.asked).toEqual([])
+    expect(none.decision).toBe(null)
+
+    const first = await sweep({ targets: [headTarget], runsBySha: { [HEAD]: greenRun(HEAD) } })
+    expect(first.asked).toEqual([HEAD])
+    expect(first.decision).toBe(null)
+    // The common turn: same sha, a day later — a concluded green is never re-asked.
+    const again = await sweep({ targets: [headTarget], cache: first.cache, runsBySha: { [HEAD]: greenRun(HEAD) } })
+    expect(again.asked).toEqual([])
+    expect(again.decision).toBe(null)
+  })
+
+  it('WAITS on an unfinished run instead of passing it', async () => {
+    const got = await sweep({ targets: [branchTarget], runsBySha: { [BRANCH]: pendingRun(BRANCH) } })
+    expect(got.decision).toContain('NOT yet concluded')
+    expect(got.decision).toContain('origin/feat/x')
+    expect(got.failedOpen).toEqual([])
+    // …and the wait is re-read from the cache without a second API call.
+    const again = await sweep({ targets: [branchTarget], cache: got.cache, runsBySha: { [BRANCH]: pendingRun(BRANCH) } })
+    expect(again.asked).toEqual([])
+    expect(again.decision).toContain('NOT yet concluded')
+  })
+
+  it('the wait has a CEILING — past it the guard fails open and says so', async () => {
+    const got = await sweep({
+      targets: [{ ...branchTarget, at: NOW - WAIT_BUDGET_MS - 1 }],
+      runsBySha: { [BRANCH]: pendingRun(BRANCH) },
+    })
+    expect(got.decision).toBe(null)
+    expect(got.failedOpen.join(' ')).toContain('never concluded')
+  })
+
+  it('writes off a ref no workflow covers, so its next push costs nothing', async () => {
+    const got = await sweep({
+      targets: [{ ref: 'origin/board', sha: 'boa4d00', at: NOW - RUN_GRACE_MS - 1 }],
+      runsBySha: { boa4d00: [] },
+    })
+    expect(got.decision).toBe(null)
+    expect(got.noCiRefs['origin/board']).toBe(NOW)
+    expect(liveTargets([{ ref: 'origin/board', sha: 'newsha0', at: NOW }], got.noCiRefs, NOW)).toEqual([])
+  })
+
+  it('does not write a ref off while the run may still appear', async () => {
+    const got = await sweep({ targets: [{ ref: 'origin/feat/x', sha: BRANCH, at: t(5) }], runsBySha: { [BRANCH]: [] } })
+    expect(got.decision).toBe(null)
+    expect(got.noCiRefs).toEqual({})
+    // Nothing conclusive cached, so the run that appears a second later IS judged.
+    expect(cachedAnswer(got.cache[BRANCH], NOW)).toBe(null)
+  })
+
+  it('fails OPEN with a stated reason when GitHub cannot be read', async () => {
+    const got = await sweep({ targets: [branchTarget], runsBySha: {} })
+    expect(got.decision).toBe(null)
+    expect(got.failedOpen.join(' ')).toContain('could not be read')
+    expect(got.failedOpen.join(' ')).toContain('origin/feat/x')
+  })
+
+  it('a red GitHub itself caused alerts but does not hold the turn (point 528)', async () => {
+    const got = await sweep({ targets: [branchTarget], runsBySha: { [BRANCH]: redRun(BRANCH) }, standDown: true })
+    expect(got.decision).toBe(null)
+    expect(got.alerts).toHaveLength(1)
+    expect(got.famine.CI).toBe(NOW)
+  })
+
+  it('a green run clears the outage waiver of its workflow', async () => {
+    const got = await sweep({ targets: [headTarget], famine: { CI: t(9999) }, runsBySha: { [HEAD]: greenRun(HEAD) } })
+    expect(got.famine).toEqual({})
   })
 })
