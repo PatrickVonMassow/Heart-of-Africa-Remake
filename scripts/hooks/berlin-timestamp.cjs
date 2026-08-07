@@ -22,7 +22,14 @@ process.stdout.write(JSON.stringify({
   hookSpecificOutput: {
     hookEventName: 'UserPromptSubmit',
     additionalContext:
-      `Current time: ${stamp} (Europe/Berlin). BEGIN your reply with this exact ` +
-      `timestamp in bold ("**${stamp}**"), per the chat-timestamp rule.`,
+      `Turn START time: ${stamp} (Europe/Berlin) — this is a reading taken NOW, ` +
+      `at the top of the turn, and it AGES while the turn runs. BEGIN your reply ` +
+      `with the timestamp in bold ("**${stamp}**") per the chat-timestamp rule; ` +
+      `if tool calls have run since, MEASURE the time again immediately before ` +
+      `writing the reply instead of using this value or extrapolating from it ` +
+      `(the guard compares exactly, and step durations are systematically ` +
+      `over-estimated): node -e "console.log(new Intl.DateTimeFormat('de-DE',` +
+      `{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',` +
+      `minute:'2-digit',timeZone:'Europe/Berlin'}).format(new Date()))"`,
   },
 }) + '\n');

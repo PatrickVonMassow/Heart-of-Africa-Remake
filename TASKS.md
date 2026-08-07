@@ -4468,3 +4468,28 @@ Build order, chosen so no two parallel agents own the same file:
   languages, since the German hint has a different width.
   Criticality: medium — nothing breaks, but it is the first thing in the picture a reader
   sees as sloppy, and it is in every screenshot the suites write.
+- [ ] 552. THE CI GUARD REPLAYS A FROZEN REASON AND SENDS THE READER AT A GREEN RUN
+  (measured 07.08.2026, cost two turns of false search; bundle Testinfrastruktur).
+  `ci-status-guard` caches its verdict per sha in `.claude/ci-status-guard-state.json`
+  and re-asks GitHub every `RECHECK_MS`. The VERDICT is re-derived correctly — a sha
+  whose runs are still pending stays `pending`. The REASON TEXT is not: it is written
+  once, when the sha first goes pending, and replayed on every later block. Tonight it
+  named `Deploy to GitHub Pages` run 31219906237 three times in a row as "still
+  running" while that run had already concluded `success` minutes earlier and the only
+  unfinished run was `CI`. Both statements the guard made were individually true —
+  something was still running, and that run had once been running — but together they
+  point the reader at a green run and hide the red one. Two turns went into querying the
+  named run and confirming it was fine.
+  FINAL STATE: the reason travels with the verdict. When a cached entry is re-checked,
+  the text is re-derived from the runs that are pending AT THAT MOMENT, so it names a
+  run that is genuinely unfinished; a cached reason is never re-emitted after its own
+  re-check. Where several runs are pending, the message says how many and names them
+  rather than picking one silently. The caching itself stays as it is — this is not a
+  reason to ask GitHub more often.
+  VERIFIABLE: Vitest on the pure core — an entry cached as pending against run A, then
+  re-checked in a world where A concluded green and B is still running, reports B and
+  not A; an entry re-checked with nothing pending stops blocking; the message for two
+  pending runs names both. Plus a case pinning that no API call is added by the change.
+  Criticality: low-medium — the gate's decision was right every time, so nothing unsafe
+  landed. What it cost is trust and turns: a guard whose stated reason does not survive
+  a check is one the next reader starts arguing with instead of obeying.
