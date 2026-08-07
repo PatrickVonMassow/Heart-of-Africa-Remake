@@ -26,9 +26,53 @@ npm test -- unit      # just the vitest stage, via the full runner
 npm test -- flow      # just the named browser suite(s) (dev server managed for you)
 ```
 
-`npm test` (`scripts/verify/run-all.mjs`) runs, in order: type-check + build →
-lint → **vitest (fail-fast)** → the Playwright browser suites against the dev
-server → the production-preview smoke test.
+`npm test` runs, in order: type-check + build → lint → **vitest (fail-fast)** →
+the Playwright browser suites against the dev server → the production-preview
+smoke test. The runner itself is `scripts/verify/run-all.mjs`; the three npm
+commands above reach it through the LOGGED wrapper described next.
+
+### The run's output goes to a FILE, the caller reads a digest (point 373 e)
+
+`npm test`, `npm run test:small` and `npm run test:large` run through
+`scripts/verify/run-logged.mjs`, which spawns the runner, writes its WHOLE
+output to `local/verify-logs/<stamp>-<label>.log` (git-ignored) and lets the
+caller read a bounded selection instead of the transcript. The reason is context
+cost, not tidiness: a green run prints one line per suite, but a red one echoes
+the entire vitest dump or build error — and a background run pays for that again
+on **every poll**. Measured on a red unit run (07.08.2026): **476 lines / 30 542
+chars → 66 lines / 3 782 chars**, of which only 15 lines arrive while the run
+goes (what a poll sees). The digest is BOUNDED — at most `--keep` structured
+lines plus a `--tail`-line raw tail — so the factor grows with the size of the
+run, and a LARGE regression's transcript is many times a unit run's.
+
+What the caller still sees — the constraint the selection is built around is
+that a **failing run stays fully diagnosable**:
+
+- LIVE, while it runs: the runner's own structured lines only — the per-suite
+  `PASS/FAIL/SKIP` verdicts, the stage headings, the retry/flake notices, the
+  indented `FAIL …` / `ERR: …` echoes (vitest's own ` FAIL  file > case` lines
+  wear that shape too). About one line per suite, so a background poll shows
+  progress and a red suite names itself the moment it goes red.
+- AT THE END: exit code, duration, how much was captured, the log path, the
+  FAILING units by name with their first failing checks, and — only on a
+  failure — the last ~40 raw lines, which catch a crash stack no pattern names.
+- ON DEMAND, never `cat`:
+
+```
+node scripts/verify/run-logged.mjs --show <log> --tail 120
+node scripts/verify/run-logged.mjs --show <log> --grep "FAIL|ERR:|Error" --max 60
+```
+
+Flags the wrapper consumes (everything else is forwarded to `run-all.mjs`
+verbatim): `--stream` echoes every raw line (the pre-373 behaviour), `--quiet`
+drops the live echo and puts the structured lines in the end digest instead,
+`--keep N` / `--tail N` set the two budgets, `--log-file P` picks the log path.
+`npm run test:e2e` is the unwrapped runner for when the raw stream is wanted.
+
+Which lines survive is the pure module `scripts/verify/run-digest-core.mjs`,
+pinned by `run-digest-core.test.mjs` in the Vitest layer — including the
+asymmetry that matters: an indented block continuing a `#` heading is kept (the
+quiet-machine report), an indented failure dump following a verdict line is not.
 
 ### Host bring-up — once per machine (point 475)
 

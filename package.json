@@ -14,9 +14,9 @@
     "typecheck:test": "tsc -p tsconfig.vitest.json --noEmit",
     "verify:bringup": "node scripts/verify-bringup.mjs",
     "test:e2e": "node scripts/verify/run-all.mjs",
-    "test:small": "node scripts/verify/run-all.mjs small",
-    "test:large": "node scripts/verify/run-all.mjs large",
-    "test": "node scripts/verify/run-all.mjs"
+    "test:small": "node scripts/verify/run-logged.mjs small",
+    "test:large": "node scripts/verify/run-logged.mjs large",
+    "test": "node scripts/verify/run-logged.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.7",

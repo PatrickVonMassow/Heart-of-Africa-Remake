@@ -73,6 +73,8 @@ export const NON_RENDER_VERIFY = new Set([
   'machine-load-core.mjs',
   'machine-load.mjs',
   'run-all.mjs',
+  'run-digest-core.mjs', // which of a run's OUTPUT lines the caller reads; it draws nothing
+  'run-logged.mjs', // the logging wrapper around run-all; it spawns the runner, it does not render
   'sceneReady-core.mjs', // the scene-readiness verdict; frameSubject.mjs polls the page for it
   'snowMetric.mjs', // the snow-vs-sand pixel verdict; enrichments.mjs feeds it a crop
   'system-chrome.mjs', // WHERE the lane's browser is on this host; _browser.mjs opens it
