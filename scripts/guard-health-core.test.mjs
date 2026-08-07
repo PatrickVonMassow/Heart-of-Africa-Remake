@@ -224,12 +224,33 @@ describe('auditHookAnchoring — can it fire from ANY working directory', () => 
     expect(refAnchoring('$CLAUDE_PROJECT_DIR}/scripts/a.mjs')).toBe('relative')
   })
 
-  it('does not double-quote a path that already carries quotes', () => {
+  it('hands over a runnable replacement whatever quoting the line had', () => {
     expect(anchorCommand('node "scripts/a.mjs"')).toBe('node "$CLAUDE_PROJECT_DIR/scripts/a.mjs"')
     expect(anchorCommand('node scripts/a.mjs')).toBe('node "$CLAUDE_PROJECT_DIR/scripts/a.mjs"')
+    // Single quotes suppress the expansion: keeping them would hand over a hook
+    // that fires from NO directory at all.
+    expect(anchorCommand("node 'scripts/a.mjs'")).toBe('node "$CLAUDE_PROJECT_DIR/scripts/a.mjs"')
     // A bootstrap is already anchored and must come back untouched.
     const boot = "node -e \"require('path').resolve(process.env.CLAUDE_PROJECT_DIR||'.','scripts/a.mjs')\""
     expect(anchorCommand(boot)).toBe(boot)
+  })
+
+  it('does not mistake a single-quoted expansion for an anchor', () => {
+    // `node '$CLAUDE_PROJECT_DIR/scripts/a.mjs'` reaches node as that literal
+    // string — the form that looks most anchored fires nowhere.
+    const single = "node '$CLAUDE_PROJECT_DIR/scripts/a-guard.mjs'"
+    expect(commandAnchoring(single).anchored).toBe(false)
+    expect(auditHookAnchoring({ hookCommands: rows(single), rollout: noRollout }).map((v) => v.kind)).toEqual([
+      'relative-hook-wiring',
+    ])
+    expect(commandAnchoring('node "$CLAUDE_PROJECT_DIR/scripts/a-guard.mjs"').anchored).toBe(true)
+  })
+
+  it('waives only the bootstrap SHAPE, never a mere mention nearby', () => {
+    const nearby = 'node -e "console.log(process.env.CLAUDE_PROJECT_DIR)" && node "scripts/b-guard.mjs"'
+    expect(auditHookAnchoring({ hookCommands: rows(nearby), rollout: noRollout }).map((v) => v.script)).toEqual([
+      'b-guard.mjs',
+    ])
   })
 
   it('stays silent on a hook recorded in the staged rollout', () => {

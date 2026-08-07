@@ -111,16 +111,27 @@ export const KNOWN_UNTESTED = new Set([
  * as no script reference at all and cleared it — a false clearance is the one
  * failure this check may not have (four-eyes review 07.08.2026).
  */
-const SCRIPT_REF_RE = /[^\s"']*scripts[/\\](?:[A-Za-z0-9._-]+[/\\])*[A-Za-z0-9._-]+\.mjs/g
+const SCRIPT_REF_SRC = String.raw`[^\s"']*scripts[/\\](?:[A-Za-z0-9._-]+[/\\])*[A-Za-z0-9._-]+\.mjs`
+const SCRIPT_REF_RE = new RegExp(SCRIPT_REF_SRC, 'g')
+/** The same token WITH the quotes around it, so a rewrite can replace them. */
+const QUOTED_SCRIPT_REF_RE = new RegExp(String.raw`(['"]?)(${SCRIPT_REF_SRC})\1`, 'g')
 
 /**
  * A script path the node bootstrap resolves against the env var itself, i.e. the
- * one place a relative-LOOKING string is genuinely anchored. Matched narrowly
- * and per occurrence: a whole-command substring test cleared every other ref on
- * the line too, so `node -e "<bootstrap>" && node scripts/b-guard.mjs` passed
- * with its second guard dead.
+ * one place a relative-LOOKING string is genuinely anchored. Matched per
+ * occurrence and by SHAPE — the env var, its optional `|| '.'` default, then the
+ * path as the next argument. Both loosenings were measured false clearances: a
+ * whole-command substring test cleared every other ref on the line, so
+ * `node -e "<bootstrap>" && node scripts/b-guard.mjs` passed with its second
+ * guard dead, and a mere proximity window still cleared a quoted ref a few
+ * characters after any mention of the variable. A bootstrap written in some
+ * other shape is ACCUSED — that is deliberate: a false accusation is visible and
+ * costs a rewrite, a false clearance is invisible and costs the guard.
  */
-const BOOTSTRAP_REF_RE = /process\.env\.CLAUDE_PROJECT_DIR[^\n]{0,40}?['"]((?:[^\s"']*)scripts[/\\](?:[A-Za-z0-9._-]+[/\\])*[A-Za-z0-9._-]+\.mjs)['"]/g
+const BOOTSTRAP_REF_RE = new RegExp(
+  String.raw`process\.env\.CLAUDE_PROJECT_DIR\s*(?:\|\|\s*(?:'[^']*'|"[^"]*"))?\s*,\s*['"](${SCRIPT_REF_SRC})['"]`,
+  'g',
+)
 
 /** Every script path a hook command names, with the prefix that anchors it (or does not). */
 export function scriptRefsInCommand(command) {
@@ -158,25 +169,32 @@ export function commandAnchoring(command) {
   const bootstrapped = new Set()
   for (const m of text.matchAll(BOOTSTRAP_REF_RE)) bootstrapped.add(m.index + m[0].indexOf(m[1]))
 
-  const kinds = found.map((f) => (bootstrapped.has(f.at) ? 'bootstrap' : refAnchoring(f.ref)))
+  // SINGLE QUOTES SUPPRESS THE EXPANSION. `node '$CLAUDE_PROJECT_DIR/scripts/x.mjs'`
+  // reaches node as that literal string and dies from every cwd, so the form
+  // that LOOKS most anchored is the one that fires nowhere.
+  const quotedLiteral = (f) => text.charAt(f.at - 1) === "'" && f.ref.startsWith('$')
+  const kinds = found.map((f) =>
+    bootstrapped.has(f.at) ? 'bootstrap' : quotedLiteral(f) ? 'relative' : refAnchoring(f.ref),
+  )
   const relative = found.filter((_, i) => kinds[i] === 'relative').map((f) => f.ref)
   return { refs: found.map((f) => f.ref), relative, anchored: relative.length === 0, kind: kinds[0] }
 }
 
 /**
  * Rewrite a relatively wired command into the anchored form, for the rollout.
- * A ref that already sits inside quotes keeps them — wrapping it again produced
- * `""$CLAUDE_PROJECT_DIR/…""`, an unquoted expansion between two empty strings
- * that breaks on any path with a space.
+ * The replacement REPLACES whatever quoting was there rather than nesting inside
+ * it: wrapping a double-quoted ref again produced `""$CLAUDE_PROJECT_DIR/…""`,
+ * an unquoted expansion between two empty strings, and keeping SINGLE quotes
+ * produced a line no shell expands at all — a handed-over dead hook, which is
+ * the worst thing a repair suggestion can be.
  */
 export function anchorCommand(command) {
   const text = String(command ?? '')
   const bootstrapped = new Set()
   for (const m of text.matchAll(BOOTSTRAP_REF_RE)) bootstrapped.add(m.index + m[0].indexOf(m[1]))
-  return text.replace(SCRIPT_REF_RE, (ref, at) => {
-    if (bootstrapped.has(at) || refAnchoring(ref) !== 'relative') return ref
-    const anchored = `$CLAUDE_PROJECT_DIR/${ref.replace(/\\/g, '/')}`
-    return /['"]/.test(text.charAt(at - 1)) ? anchored : `"${anchored}"`
+  return text.replace(QUOTED_SCRIPT_REF_RE, (whole, quote, ref, at) => {
+    if (bootstrapped.has(at + quote.length) || refAnchoring(ref) !== 'relative') return whole
+    return `"$CLAUDE_PROJECT_DIR/${ref.replace(/\\/g, '/')}"`
   })
 }
 
