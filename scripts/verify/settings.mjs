@@ -894,12 +894,9 @@ await page.evaluate((z) => window.__ui.getState().setTravelZoom(z), zoomBefore)
   const errsBeforeLeak = errors.length
   const leakState = () => page.evaluate(() => window.__renderLeak?.state() ?? null)
   check('the render-resource leak watch is armed', (await leakState()) !== null)
-  // The watch samples on rendered frames; a headless page renders only when
-  // something forces it to, so drive frames until it has judged its reading
-  // (see settledReading above for the same reason).
   // Frames, not wall clock: the watch advances one step per RENDERED frame and
-  // a headless page paints only when something forces it to, so each round of
-  // this loop forces exactly the tick the watch is waiting for.
+  // a headless page paints only when something forces it to (see settledReading
+  // above), so each round of this loop forces exactly the tick it waits for.
   // The cap is the watch's OWN give-up point (SETTLE_POLICY.maxFrames), not a
   // guessed number: below it a slow cold-compile round could be cut off and the
   // reading dropped, which would show up as a rotating flake rather than as the
