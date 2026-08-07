@@ -10,26 +10,44 @@
 // unit-test layer audits the same document, so a violation also fails the
 // ordinary regression — the hook is the fast feedback, the test is the gate.
 import { existsSync, readFileSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
+import { repoPath } from './repo-paths.mjs'
+import { isMainModule } from './is-main.mjs'
 import { auditGuide, formatViolations } from './guide-brevity-core.mjs'
 
-const GUIDE = fileURLToPath(new URL('../docs/analysis_de/vibe-coding-anleitung.md', import.meta.url))
-const PAUSE = fileURLToPath(new URL('../.claude/batch-paused', import.meta.url))
+const GUIDE = repoPath('docs/analysis_de/vibe-coding-anleitung.md')
+const PAUSE = repoPath('.claude/batch-paused')
 
-try {
-  const status = process.argv[2] === '--status'
-  if (!status && existsSync(PAUSE)) process.exit(0)
-  if (!existsSync(GUIDE)) process.exit(0)
+/** Everything the core needs — shared with the guard preflight, which must never
+ *  gather its own (a second copy would drift and hand back a false "clean"). */
+export function gatherGuideBrevityInputs() {
+  if (existsSync(PAUSE)) return { applicable: false, why: 'the batch is paused' }
+  if (!existsSync(GUIDE)) return { applicable: false, why: 'the guide is not in this checkout' }
+  return { applicable: true, inputs: { guideText: readFileSync(GUIDE, 'utf8') } }
+}
 
-  const { ok, violations } = auditGuide(readFileSync(GUIDE, 'utf8'))
+if (isMainModule(import.meta.url)) {
+  try {
+    const status = process.argv[2] === '--status'
+    const gathered = status
+      ? existsSync(GUIDE)
+        ? { applicable: true, inputs: { guideText: readFileSync(GUIDE, 'utf8') } }
+        : { applicable: false, why: 'the guide is not in this checkout' }
+      : gatherGuideBrevityInputs()
+    if (!gathered.applicable) {
+      if (status) console.log(`guide-brevity stands down: ${gathered.why}`)
+      process.exit(0)
+    }
 
-  if (status) {
-    console.log(ok ? 'guide-brevity: OK' : formatViolations(violations))
+    const { ok, violations } = auditGuide(gathered.inputs.guideText)
+
+    if (status) {
+      console.log(ok ? 'guide-brevity: OK' : formatViolations(violations))
+      process.exit(0)
+    }
+    if (!ok) process.stdout.write(JSON.stringify({ decision: 'block', reason: formatViolations(violations) }))
+    process.exit(0)
+  } catch (e) {
+    console.error(`guide-brevity-guard error (allowing stop): ${e && e.message}`)
     process.exit(0)
   }
-  if (!ok) process.stdout.write(JSON.stringify({ decision: 'block', reason: formatViolations(violations) }))
-  process.exit(0)
-} catch (e) {
-  console.error(`guide-brevity-guard error (allowing stop): ${e && e.message}`)
-  process.exit(0)
 }

@@ -75,7 +75,9 @@ export const KNOWN_UNTESTED = new Set([
   'lock-heartbeat-hook.mjs',
   'lock-release-hook.mjs',
   'prep-arm-hook.mjs',
-  'prep-guard.mjs',
+  // prep-guard.mjs left the list on 07.08.2026: registering it with the guard
+  // preflight (point 437 E) required its decision to be a pure core, so it got
+  // one — prep-guard-core.mjs, with a test. The list only ever shrinks.
 ])
 
 /**

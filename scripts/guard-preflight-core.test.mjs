@@ -17,8 +17,10 @@ import {
   runPreflight,
   selectGuards,
   summarise,
+  unregisteredStopHooks,
+  wiredStopHookIds,
 } from './guard-preflight-core.mjs'
-import { GUARDS, resolveSessionId } from './guard-preflight.mjs'
+import { GUARDS, resolveSessionId, unregisteredHooks } from './guard-preflight.mjs'
 import { readOwnerLock } from './batch-singleton.mjs'
 import { isMainModule } from './is-main.mjs'
 
@@ -213,6 +215,101 @@ describe('formatPreflightReport', () => {
     // "nothing would block" must not read as an all-clear next to an unknown.
     expect(text).toMatch(/does not clear them/)
   })
+
+  // A summary that reads clean while the report judged nothing is the defect,
+  // not the wording: it is the sentence a session acts on (point 437 E).
+  it('refuses to read as an all-clear while a guard went NOT JUDGED', () => {
+    const text = formatPreflightReport([
+      { id: 'b-guard', status: STATUS.clean, reason: '' },
+      { id: 'net-guard', status: STATUS.notJudged, reason: 'its verdict needs the network' },
+    ])
+    expect(text).not.toContain('No registered guard would block right now.')
+    expect(text).toMatch(/not an all-clear/)
+    expect(text).toMatch(/NOT JUDGED here/)
+    expect(text).toContain('net-guard')
+  })
+
+  it('refuses to read as an all-clear while a wired hook is unregistered', () => {
+    const text = formatPreflightReport([{ id: 'b-guard', status: STATUS.clean, reason: '' }], {
+      unregistered: ['forgotten-guard'],
+    })
+    expect(text).not.toContain('No registered guard would block right now.')
+    expect(text).toMatch(/DRIFT:/)
+    expect(text).toContain('forgotten-guard')
+  })
+
+  it('still says so plainly when the whole chain was judged and is clean', () => {
+    const text = formatPreflightReport([{ id: 'b-guard', status: STATUS.clean, reason: '' }], {
+      unregistered: [],
+    })
+    expect(text).toContain('No registered guard would block right now.')
+  })
+})
+
+describe('the wired Stop chain, read from the settings', () => {
+  const settings = {
+    hooks: {
+      Stop: [
+        { hooks: [{ type: 'command', command: 'node scripts/a-guard.mjs' }, { command: 'node scripts/b-guard.mjs' }] },
+        { hooks: [{ command: 'node scripts\\c-guard.mjs' }] },
+      ],
+      PreToolUse: [{ hooks: [{ command: 'node scripts/pre-guard.mjs' }] }],
+    },
+  }
+
+  it('lists the Stop hooks as preflight ids, and only those', () => {
+    expect(wiredStopHookIds(settings)).toEqual(['a-guard', 'b-guard', 'c-guard'])
+  })
+
+  it('de-duplicates a hook wired twice', () => {
+    const twice = { hooks: { Stop: [{ hooks: [{ command: 'node scripts/a-guard.mjs' }, { command: 'node scripts/a-guard.mjs' }] }] } }
+    expect(wiredStopHookIds(twice)).toEqual(['a-guard'])
+  })
+
+  it('is total on rubbish — it must never invent a drift finding', () => {
+    expect(wiredStopHookIds(undefined)).toEqual([])
+    expect(wiredStopHookIds({})).toEqual([])
+    expect(wiredStopHookIds({ hooks: { Stop: 'nonsense' } })).toEqual([])
+    expect(wiredStopHookIds({ hooks: { Stop: [{ hooks: [{ command: 'echo hi' }] }] } })).toEqual([])
+  })
+
+  it('names the wired hooks no registered guard covers', () => {
+    const guards = [{ id: 'a-guard' }, { id: 'c-guard' }]
+    expect(unregisteredStopHooks(wiredStopHookIds(settings), guards)).toEqual(['b-guard'])
+  })
+
+  it('reports nothing when the registry is complete', () => {
+    const guards = [{ id: 'a-guard' }, { id: 'b-guard' }, { id: 'c-guard' }]
+    expect(unregisteredStopHooks(wiredStopHookIds(settings), guards)).toEqual([])
+  })
+
+  it('is total on rubbish', () => {
+    expect(unregisteredStopHooks()).toEqual([])
+    expect(unregisteredStopHooks('nonsense', null)).toEqual([])
+  })
+})
+
+describe('a gather that cannot judge', () => {
+  it('reads as NOT JUDGED, never as clean', () => {
+    const guard = {
+      id: 'net-guard',
+      gather: () => ({ applicable: false, cause: CAUSE.notJudged, why: 'needs the network' }),
+      decide: () => ({ block: false }),
+    }
+    const [r] = runPreflight([guard], { sessionId: 's' })
+    expect(r.status).toBe(STATUS.notJudged)
+    expect(r.status).not.toBe(STATUS.clean)
+    expect(r.reason).toBe('needs the network')
+  })
+
+  it('leaves an ordinary stand-down reading not-applicable', () => {
+    const guard = {
+      id: 'paused-guard',
+      gather: () => ({ applicable: false, why: 'the batch is paused' }),
+      decide: () => ({ block: false }),
+    }
+    expect(runPreflight([guard], { sessionId: 's' })[0].status).toBe(STATUS.skip)
+  })
 })
 
 describe('resolveSessionId (F4)', () => {
@@ -251,19 +348,56 @@ describe('GATHER-STEP REUSE (the drift guard)', () => {
   it('registers every guard whose wrapper exports a gather step', () => {
     expect(Object.keys(byId).sort()).toEqual(
       [
+        'batch-progress-guard',
         'branch-hygiene-guard',
+        'ci-status-guard',
         'container-ask-guard',
         'criticality-review-guard',
+        'dashboard-card-topic-guard',
+        'dashboard-conciseness-guard',
         'dashboard-guard',
+        'dashboard-integrity-guard',
+        'dashboard-sync',
+        'decision-card-guard',
         'doc-budget-guard',
+        'findings-guard',
+        'guard-health-guard',
+        'guide-brevity-guard',
         'mechanism-review-guard',
         'model-guard',
+        'prep-guard',
+        'push-arrival-guard',
         'queue-order-guard',
         'render-verify-guard',
+        'retro-currency-guard',
+        'rule-review-guard',
         'tasks-archive-guard',
         'tasks-spec-guard',
+        'timestamp-guard',
       ].sort(),
     )
+  })
+
+  // THE DRIFT ITSELF (point 437 E). The list above is a second copy of the truth;
+  // this reads the AUTHORITATIVE chain. Until 07.08.2026 fourteen wired Stop
+  // hooks sat outside the registry, so the preflight said nothing about them
+  // while they would block — and §7.2 tells the session to preflight and answer
+  // LAST, which turns a false clean into the answer-twice loop the tool exists
+  // to prevent.
+  it('covers EVERY Stop hook wired in .claude/settings.json', () => {
+    const settings = JSON.parse(readFileSync(resolve(process.cwd(), '.claude/settings.json'), 'utf8'))
+    const wired = wiredStopHookIds(settings)
+    expect(wired.length, 'no Stop hooks found in .claude/settings.json').toBeGreaterThan(5)
+    expect(
+      unregisteredStopHooks(wired, GUARDS),
+      'these Stop hooks are wired but registered with no gather/decide pair — the preflight would ' +
+        'report nothing about them. Register each in guard-preflight.mjs (a gather that honestly ' +
+        'reports "not judged" counts).',
+    ).toEqual([])
+  })
+
+  it('finds no drift through the wrapper the CLI uses either', () => {
+    expect(unregisteredHooks(GUARDS)).toEqual([])
   })
 
   it('uses the wrappers’ OWN gather functions, not a copy', () => {

@@ -2189,7 +2189,14 @@ Two rules follow, and neither of them loosens a guard:
    — `focus.mjs confirm`, the publish/`--synced` cycle above, the boundary — are
    done FIRST; `node scripts/guard-preflight.mjs --for answer --session <id>`
    reports read-only what would still block. The closing reply is the LAST thing
-   written (CLAUDE.md §7.2).
+   written (CLAUDE.md §7.2). Since 07.08.2026 that report covers the WHOLE wired
+   Stop chain rather than the guards someone remembered to register: a test reads
+   `.claude/settings.json` and fails on any wired hook without a gather/decide
+   pair, and the report NAMES what it could not judge — a guard whose verdict
+   needs the network, the reply that is not written yet, or the batch lock a
+   read-only run may not take, reads `not-judged`, and the summary then refuses
+   to call the chain clear. A false clean is what reproduced the answer-twice
+   loop this rule exists to end.
 2. **A blocked turn is acknowledged, not repeated.** When a guard blocks anyway,
    the next message states in a sentence or two what was fixed and does not give
    the previous answer over again. The guards say so themselves now: every one
