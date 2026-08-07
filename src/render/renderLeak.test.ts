@@ -265,15 +265,18 @@ describe('stepWatch', () => {
   })
 
   it('a missing reading ages the watch but never settles it', () => {
-    const readings = [
-      ...Array.from({ length: policy.minFrames + policy.stableFrames }, () => counts(44, 300)),
-    ]
-    readings[readings.length - 1] = null
-    const end = run(readings)
-    // The frame before the null already settled it; drop that one to be sure a
-    // null on its own cannot.
-    const nulls = run(Array.from({ length: policy.minFrames + policy.stableFrames }, () => null))
-    expect(nulls.settled).toBeUndefined()
-    expect(end.settled).toBeDefined()
+    // A torn-down canvas hands back nothing; the watch may age towards its
+    // give-up point on that, but it must never call a missing reading settled.
+    const blind: Array<LeakCounts | null> = Array.from(
+      { length: policy.minFrames + policy.stableFrames },
+      () => null,
+    )
+    expect(run(blind).settled).toBeUndefined()
+    // Only real readings can settle it, and a gap does not throw away the
+    // stability already earned: once the renderer answers again, the watch
+    // finishes on the readings it actually got.
+    const afterGap = [...blind, ...Array.from({ length: policy.stableFrames + 1 }, () => counts(44, 300))]
+    expect(run(afterGap).settled).toEqual(counts(44, 300))
+    expect(run(afterGap.slice(0, -1)).settled).toBeUndefined()
   })
 })
