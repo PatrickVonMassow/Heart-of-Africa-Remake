@@ -866,6 +866,8 @@ Das ist die Tücke dieser Fehlerklasse. Ein Fehlalarm meldet sich selbst — er 
 
 Die Tests fingen es nicht, und das ist kein Versäumnis des Autors, sondern eine Eigenschaft der Anordnung: Er schrieb sie aus demselben Verständnis, aus dem er die Bedingung formuliert hatte. Eine Prüfliste kann nur enthalten, woran ihr Verfasser gedacht hat — dieselbe Anker-Grenze, die §3.90 für den aufzählenden Schritt beschreibt, hier am eigenen Werk statt an fremdem.
 
+Ein Nachtrag aus der Abnahme selbst, zweimal am selben Tag: Ein neuer Eintrag und die Anhebung des Budgets, das ihn ablehnt, gehören in **einen** Commit — getrennt gebaut, war der Zwischenstand rot. Und eine Aufstellung, die pro Eintrag festhält, wer wie viel bezahlt hat, veraltet bei jeder Nachzahlung: Solche Zahlen gehören ins datierte Prüfbuch, nicht in einen Kommentar, der mitwandern müsste.
+
 **Lehre:** Eine Reparatur an einem Wächter wird **in beide Richtungen** abgenommen, und die zweite Richtung gehört nicht dem Autor. Wer die Falsch-Positiven beseitigt, muss nachweisen, dass die Richtig-Positiven noch anschlagen — mit Fällen, die **nicht aus derselben Feder** stammen wie die Bedingung. Und für den Prüfer: an der Mechanik messen, nicht an den Testnamen. Ein Test, der das Richtige behauptet, und eine Mechanik, die es tut, sind zwei verschiedene Aussagen.
 
 ---

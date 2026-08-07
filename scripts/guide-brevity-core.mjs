@@ -59,19 +59,19 @@ export const LIMITS = {
   // retrospective, which is where it belongs anyway.
   //
   // Raised 07.08.2026 by the measured NET size of one genuinely new tip (§3.91,
-  // the repair that quiets the check it was meant to sharpen). The arithmetic,
-  // as the four-eyes review RE-MEASURED it with this counter — the first record
-  // here was wrong in its components and is corrected rather than defended:
-  // the tip cost 129 words as first written; 96 were PAID, of which 52 came
-  // from trimming the TIP ITSELF down to 77 (the largest single payer) and 44
-  // from six neighbouring entries — four-eyes 18, guard rot 10, autonomous run
-  // 7, swallowed failure 6, "nicht jedes Rot" 2, green test 1.
-  // Only prose was cut: the one tightening that had dropped a claim
-  // ("schreib zu jeder Regel, was sie misst") was restored, and its words repaid
-  // in the same entry. The remaining 33 is the honest cost of new content; the
-  // LINE budget was met with no raise at all. Recorded as a decision card,
-  // because the standing rule is shorten-before-raise and the last step of a
-  // raise belongs to the user.
+  // the repair that quiets the check it was meant to sharpen). The INVARIANTS,
+  // re-measured with this counter by the four-eyes review: the tip cost 129
+  // words as first written, 96 were PAID BACK, 33 is the net raise, and the LINE
+  // budget was met with no raise at all. The largest single payer was trimming
+  // the TIP ITSELF; the rest came from six neighbouring entries, of which only
+  // prose was cut — the one tightening that had dropped a claim ("schreib zu
+  // jeder Regel, was sie misst") was restored and repaid inside its own entry.
+  // NO per-entry split is recorded here ON PURPOSE: two review rounds each
+  // invalidated the previous breakdown, because every internal repayment moves
+  // it while the totals stay put. The split lives in the review ledger, which is
+  // dated and never rewritten. Recorded as a decision card besides, because the
+  // standing rule is shorten-before-raise and the last step of a raise belongs
+  // to the user.
   maxWords: 3580,
   // A pitfall entry = the risk lines plus its prompt. Anything longer is a
   // story, not a tip.
