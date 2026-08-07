@@ -136,6 +136,18 @@ export function resolveCommit(sha) {
   }
 }
 
+/** Every flag this command accepts. Anything else gets the usage block. */
+export const KNOWN_FLAGS = new Set(['--record', '--model', '--verdict', '--evidence', '--point', '--list'])
+
+/** The one description of what this command takes — printed by both refusals. */
+export const usage = () =>
+  `usage: node scripts/mechanism-review.mjs --record <sha> --model <name> ` +
+  `--verdict <${VERDICTS.join('|')}> --evidence "<one line>" [--point <N>]\n` +
+  `       node scripts/mechanism-review.mjs --list        (the recorded reviews)\n` +
+  `\nThe GATES are separate commands and answer --status themselves:\n` +
+  `       node scripts/mechanism-review-guard.mjs --status\n` +
+  `       node scripts/criticality-review-guard.mjs --status`
+
 if (isMainModule(import.meta.url)) {
   const args = process.argv.slice(2)
   try {
@@ -154,6 +166,20 @@ if (isMainModule(import.meta.url)) {
       process.exit(0)
     }
 
+    // AN UNRECOGNISED FLAG IS A QUESTION, NOT A RECORD (point 437 H, hit while
+    // preparing a merge on 31.07.2026). Every unknown flag used to fall through
+    // to the record path with an empty sha, so `--status` — which this tool does
+    // not have, but three of its siblings do — answered
+    // `fatal: ambiguous argument '^{commit}'` from deep inside git instead of
+    // naming what it wants. A tool that cannot say what it accepts teaches the
+    // reader to guess again.
+    const unknown = args.filter((a) => a.startsWith('--') && !KNOWN_FLAGS.has(a))
+    if (unknown.length) {
+      console.error(`mechanism-review: unknown flag${unknown.length > 1 ? 's' : ''} ${unknown.join(', ')}.\n`)
+      console.error(usage())
+      process.exit(2)
+    }
+
     const sha = flag(args, '--record')
     const built = buildRecord({
       sha,
@@ -165,10 +191,7 @@ if (isMainModule(import.meta.url)) {
     if (!built.ok) {
       console.error('mechanism-review: refusing to record this review.\n')
       for (const e of built.errors) console.error(`  · ${e}`)
-      console.error(
-        `\nusage: node scripts/mechanism-review.mjs --record <sha> --model <name> ` +
-          `--verdict <${VERDICTS.join('|')}> --evidence "<one line>" [--point <N>]`,
-      )
+      console.error(`\n${usage()}`)
       process.exit(1)
     }
     appendRecord(built.record)
