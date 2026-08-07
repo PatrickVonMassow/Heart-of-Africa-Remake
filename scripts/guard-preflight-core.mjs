@@ -28,6 +28,16 @@ export const STATUS = {
   block: 'would-block',
   clean: 'clean',
   skip: 'not-applicable',
+  /**
+   * The guard is registered and WIRED, and this report cannot say what it would
+   * do — its verdict needs something a read-only preflight does not have (a
+   * network round trip, the reply that is not written yet) or must not do
+   * (acquire the batch lock). Deliberately distinct from `not-applicable`, which
+   * means the guard genuinely does not govern this state: a reader who cannot
+   * tell those apart reads silence as a clean bill, which is the whole defect
+   * this report exists to end (point 437 E).
+   */
+  notJudged: 'not-judged',
   unknown: 'session-unknown',
   error: 'error',
 }
@@ -39,7 +49,43 @@ export const STATUS = {
  * stranger — four guards then report "not-applicable" for the very session that
  * owns the batch. That is a false all-clear, so it is reported as UNKNOWN.
  */
-export const CAUSE = { notLockOwner: 'not-lock-owner' }
+export const CAUSE = { notLockOwner: 'not-lock-owner', notJudged: 'not-judged' }
+
+/**
+ * The Stop hooks a settings object wires, as preflight ids (the script base name
+ * without `.mjs`, which is the id convention the registry uses).
+ *
+ * `.claude/settings.json` is the AUTHORITATIVE chain; the registry below is a
+ * second list, and until point 437 nothing compared them. A hook outside the
+ * registry reported nothing at all while it would block — and CLAUDE.md §7.2
+ * tells the session to preflight and answer LAST, so a false clean reproduces
+ * exactly the answer-twice loop the preflight exists to prevent.
+ *
+ * Total: anything unparseable yields an empty list, which reports no drift
+ * rather than inventing one.
+ */
+export function wiredStopHookIds(settings) {
+  try {
+    const entries = settings?.hooks?.Stop
+    if (!Array.isArray(entries)) return []
+    const ids = []
+    for (const entry of entries) {
+      for (const hook of entry?.hooks ?? []) {
+        const m = /scripts[\\/]([\w.-]+)\.mjs/.exec(String(hook?.command ?? ''))
+        if (m && !ids.includes(m[1])) ids.push(m[1])
+      }
+    }
+    return ids
+  } catch {
+    return []
+  }
+}
+
+/** Wired Stop hooks that no registered guard covers — the drift, by name. */
+export function unregisteredStopHooks(wiredIds = [], guards = []) {
+  const known = new Set((guards ?? []).map((g) => g?.id))
+  return (Array.isArray(wiredIds) ? wiredIds : []).filter((id) => !known.has(id))
+}
 
 /**
  * Which guards govern which action. `turn-end` is every guard (the Stop chain
@@ -125,9 +171,10 @@ export function runPreflight(guards, { sessionId = '', sessionKnown = true } = {
       const gathered = guard.gather({ sessionId }) ?? {}
       if (gathered.applicable === false) {
         const blind = !sessionKnown && gathered.cause === CAUSE.notLockOwner
+        const unjudgeable = gathered.cause === CAUSE.notJudged
         results.push({
           id: guard.id,
-          status: blind ? STATUS.unknown : STATUS.skip,
+          status: blind ? STATUS.unknown : unjudgeable ? STATUS.notJudged : STATUS.skip,
           reason: blind
             ? 'no session id available, so the batch lock cannot say whether THIS session owns it — ' +
               'the guard was not judged. Pass --session <id> to get a real answer.'
@@ -155,7 +202,8 @@ export function summarise(reason, maxChars = 220) {
 }
 
 /** One line per guard, plus the verdict and the advisory. */
-export function formatPreflightReport(results, { action = 'turn-end' } = {}) {
+export function formatPreflightReport(results, { action = 'turn-end', unregistered = [] } = {}) {
+  const drift = Array.isArray(unregistered) ? unregistered : []
   const width = Math.max(0, ...results.map((r) => r.id.length))
   const lines = [`guard preflight — would a guard block "${action}" right now?`, '']
   for (const r of results) {
@@ -163,6 +211,7 @@ export function formatPreflightReport(results, { action = 'turn-end' } = {}) {
       [STATUS.block]: '✗',
       [STATUS.clean]: '✓',
       [STATUS.skip]: '–',
+      [STATUS.notJudged]: '?',
       [STATUS.unknown]: '?',
       [STATUS.error]: '!',
     }[r.status]
@@ -171,18 +220,41 @@ export function formatPreflightReport(results, { action = 'turn-end' } = {}) {
     )
   }
   const blocking = results.filter((r) => r.status === STATUS.block)
-  lines.push('')
-  lines.push(
-    blocking.length
-      ? `${blocking.length} guard(s) WOULD BLOCK: ${blocking.map((b) => b.id).join(', ')} — fix these first.`
-      : 'No registered guard would block right now.',
+  const unjudged = results.filter(
+    (r) => r.status === STATUS.notJudged || r.status === STATUS.unknown || r.status === STATUS.error,
   )
+  lines.push('')
+  // THE SUMMARY MAY NOT READ CLEAN WHILE SOMETHING WENT UNJUDGED (point 437 E).
+  // "No registered guard would block right now" was the sentence a session acted
+  // on, and it was true of the guards this report could judge — which is not the
+  // claim the reader took from it.
+  if (blocking.length) {
+    lines.push(`${blocking.length} guard(s) WOULD BLOCK: ${blocking.map((b) => b.id).join(', ')} — fix these first.`)
+  } else if (unjudged.length || drift.length) {
+    const parts = []
+    if (unjudged.length) parts.push(`${unjudged.length} was/were NOT judged`)
+    if (drift.length) parts.push(`${drift.length} wired Stop hook(s) are not registered here`)
+    lines.push(
+      `No guard this report could judge would block right now — but ${parts.join(' and ')}, ` +
+        'so this is not an all-clear.',
+    )
+  } else {
+    lines.push('No registered guard would block right now.')
+  }
   for (const b of blocking) {
     lines.push('', `--- ${b.id} ---`, b.reason)
   }
   const errors = results.filter((r) => r.status === STATUS.error)
   if (errors.length) {
     lines.push('', `NOTE: ${errors.map((e) => e.id).join(', ')} could not be evaluated — treat as unknown.`)
+  }
+  const notJudged = results.filter((r) => r.status === STATUS.notJudged)
+  if (notJudged.length) {
+    lines.push(
+      '',
+      `NOTE: ${notJudged.map((r) => r.id).join(', ')} are wired and were NOT JUDGED here — their verdict ` +
+        'needs something this read-only report does not have. They can still block.',
+    )
   }
   const blind = results.filter((r) => r.status === STATUS.unknown)
   if (blind.length) {
@@ -192,10 +264,21 @@ export function formatPreflightReport(results, { action = 'turn-end' } = {}) {
         'this report does not clear them. Re-run with --session <id>.',
     )
   }
+  // The DRIFT, by name. A registry that covers only the guards someone
+  // remembered to add reports nothing about the rest, and the next omission
+  // would be as silent as the last one.
+  if (drift.length) {
+    lines.push(
+      '',
+      `DRIFT: these Stop hooks are wired in .claude/settings.json but registered with NO gather/decide ` +
+        `pair here, so this report says nothing about them: ${drift.join(', ')}.`,
+      'Register each in guard-preflight.mjs (GUARDS) — a gather that honestly reports "not judged" counts.',
+    )
+  }
   lines.push(
     '',
     'ADVISORY: the state can change between this report and the action, so each guard itself',
-    'stays the authority. Guards not listed here have no importable gather step yet.',
+    'stays the authority.',
   )
   return lines.join('\n')
 }

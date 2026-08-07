@@ -11,6 +11,8 @@ import { execSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { auditGuardHealth, formatGuardHealth } from './guard-health-core.mjs'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
+import { isMainModule } from './is-main.mjs'
+import { CAUSE } from './guard-preflight-core.mjs'
 
 const R = (p) => fileURLToPath(new URL(p, import.meta.url))
 const REPO_ROOT = R('..')
@@ -53,25 +55,27 @@ function wiringText() {
   return text
 }
 
-try {
-  const status = process.argv[2] === '--status'
-  if (!status) {
-    let sid = ''
-    try {
-      sid = JSON.parse(readFileSync(0, 'utf8')).session_id || ''
-    } catch {
-      /* manual run — the rule binds regardless */
+/**
+ * Everything the core needs — exported so the guard preflight predicts this gate
+ * from the SAME gathering the Stop hook uses rather than a second copy of it.
+ *
+ * `ignoreOwnership` is for the --status probe alone: a probe that stays silent
+ * under another owner is indistinguishable from "nothing wrong", which is the
+ * very defect this guard looks for.
+ */
+export function gatherGuardHealthInputs({ sessionId = '', ignoreOwnership = false } = {}) {
+  if (!ignoreOwnership) {
+    if (heldByOtherLiveOwner(sessionId)) {
+      return { applicable: false, why: 'another live session owns the batch lock', cause: CAUSE.notLockOwner }
     }
-    if (heldByOtherLiveOwner(sid)) process.exit(0)
-    if (existsSync(PAUSE)) process.exit(0)
+    if (existsSync(PAUSE)) return { applicable: false, why: 'the batch is paused' }
   }
 
-  const text = wiringText()
+  const wiredText = wiringText()
   // No wiring source readable at all: every enforcer would look dead. That is a
   // measurement failure, not a finding — say so instead of blocking on it.
-  if (!text.trim()) {
-    if (status) console.log('guard-health: Verdrahtungsquelle nicht lesbar — keine Aussage möglich')
-    process.exit(0)
+  if (!wiredText.trim()) {
+    return { applicable: false, why: 'Verdrahtungsquelle nicht lesbar — keine Aussage möglich' }
   }
 
   const files = readdirSync(SCRIPTS)
@@ -84,19 +88,41 @@ try {
       /* unreadable: left undefined so its testedness is not judged */
     }
   }
-  const { ok, violations, report } = auditGuardHealth({ files, sources, wiredText: text })
+  return { applicable: true, inputs: { files, sources, wiredText } }
+}
 
-  if (status) {
-    console.log(
-      ok
-        ? `guard-health: OK (${report.length} Durchsetzer, alle verdrahtet und geprüft)`
-        : formatGuardHealth(violations),
-    )
+if (isMainModule(import.meta.url)) {
+  try {
+    const status = process.argv[2] === '--status'
+    let sid = ''
+    if (!status) {
+      try {
+        sid = JSON.parse(readFileSync(0, 'utf8')).session_id || ''
+      } catch {
+        /* manual run — the rule binds regardless */
+      }
+    }
+
+    const gathered = gatherGuardHealthInputs({ sessionId: sid, ignoreOwnership: status })
+    if (!gathered.applicable) {
+      if (status) console.log(`guard-health: ${gathered.why}`)
+      process.exit(0)
+    }
+
+    const { ok, violations, report } = auditGuardHealth(gathered.inputs)
+
+    if (status) {
+      console.log(
+        ok
+          ? `guard-health: OK (${report.length} Durchsetzer, alle verdrahtet und geprüft)`
+          : formatGuardHealth(violations),
+      )
+      process.exit(0)
+    }
+    if (!ok) process.stdout.write(JSON.stringify({ decision: 'block', reason: formatGuardHealth(violations) }))
+    process.exit(0)
+  } catch (e) {
+    console.error(`guard-health-guard error (allowing stop): ${e && e.message}`)
     process.exit(0)
   }
-  if (!ok) process.stdout.write(JSON.stringify({ decision: 'block', reason: formatGuardHealth(violations) }))
-  process.exit(0)
-} catch (e) {
-  console.error(`guard-health-guard error (allowing stop): ${e && e.message}`)
-  process.exit(0)
 }

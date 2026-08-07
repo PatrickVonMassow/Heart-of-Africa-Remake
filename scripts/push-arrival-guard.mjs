@@ -13,6 +13,8 @@ import { execSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { evaluatePushArrival } from './push-arrival-core.mjs'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
+import { isMainModule } from './is-main.mjs'
+import { CAUSE } from './guard-preflight-core.mjs'
 
 const R = (p) => fileURLToPath(new URL(p, import.meta.url))
 const REPO_ROOT = R('..')
@@ -26,40 +28,54 @@ function git(args) {
   }
 }
 
-try {
-  // --status answers regardless of who owns the lock: a probe that stays silent
-  // under another owner is indistinguishable from "nothing unpushed".
-  const status = process.argv[2] === '--status'
-  if (!status) {
-    let sid = ''
-    try {
-      sid = JSON.parse(readFileSync(0, 'utf8')).session_id || ''
-    } catch {
-      /* manual run — the rule binds regardless */
-    }
-    if (heldByOtherLiveOwner(sid)) process.exit(0)
+/**
+ * Everything the core needs — exported so the guard preflight predicts this gate
+ * from the SAME gathering the Stop hook uses rather than a second copy of it,
+ * which would drift and hand back a false "clean".
+ *
+ * `ignoreOwnership` is for the --status probe alone: a probe that stays silent
+ * under another owner is indistinguishable from "nothing unpushed".
+ */
+export function gatherPushArrivalInputs({ sessionId = '', ignoreOwnership = false } = {}) {
+  if (!ignoreOwnership && heldByOtherLiveOwner(sessionId)) {
+    return { applicable: false, why: 'another live session owns the batch lock', cause: CAUSE.notLockOwner }
   }
-
   const branch = git('symbolic-ref --short -q HEAD') ?? ''
   // Commits reachable from HEAD but from NO remote ref: the real question is
   // "does this work exist anywhere but here", not "is my upstream behind".
   const raw = git('rev-list --count HEAD --not --remotes')
   const ahead = raw === null ? null : Number(raw)
   const hasUpstream = git('rev-parse --abbrev-ref --symbolic-full-name @{u}') !== null
+  return {
+    applicable: true,
+    inputs: { branch, ahead, hasUpstream, paused: existsSync(PAUSE) },
+  }
+}
 
-  const verdict = evaluatePushArrival({
-    branch,
-    ahead,
-    hasUpstream,
-    paused: existsSync(PAUSE),
-  })
-  if (status) {
-    console.log(JSON.stringify({ branch, ahead, hasUpstream, verdict }, null, 2))
+if (isMainModule(import.meta.url)) {
+  try {
+    const status = process.argv[2] === '--status'
+    let sid = ''
+    if (!status) {
+      try {
+        sid = JSON.parse(readFileSync(0, 'utf8')).session_id || ''
+      } catch {
+        /* manual run — the rule binds regardless */
+      }
+    }
+
+    const gathered = gatherPushArrivalInputs({ sessionId: sid, ignoreOwnership: status })
+    if (!gathered.applicable) process.exit(0)
+
+    const verdict = evaluatePushArrival(gathered.inputs)
+    if (status) {
+      console.log(JSON.stringify({ ...gathered.inputs, verdict }, null, 2))
+      process.exit(0)
+    }
+    if (verdict) process.stdout.write(JSON.stringify(verdict))
+    process.exit(0)
+  } catch (e) {
+    console.error(`push-arrival-guard error (allowing stop): ${e && e.message}`)
     process.exit(0)
   }
-  if (verdict) process.stdout.write(JSON.stringify(verdict))
-  process.exit(0)
-} catch (e) {
-  console.error(`push-arrival-guard error (allowing stop): ${e && e.message}`)
-  process.exit(0)
 }

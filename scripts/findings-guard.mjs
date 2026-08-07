@@ -7,16 +7,27 @@
 // deliberate and differs from timestamp-guard: this guard asks for judgement
 // ("was there something worth keeping?"), and a guard that blocks on its own
 // blindness would train the reader to route around it.
-import { readFileSync } from 'node:fs'
+import { readFileSync, statSync } from 'node:fs'
 import { auditFindings, formatFindings, parseCarrier, tallyTurn, turnCalls, turnTakesBoundary } from './findings-core.mjs'
 import { carrierPath, ownsBatch } from './findings-paths.mjs'
 import { repoPath } from './repo-paths.mjs'
+import { isMainModule } from './is-main.mjs'
 
 const STATE_PATH = repoPath('.claude/dashboard-state.json')
+const IN_FLIGHT_PATH = repoPath('.claude/batch-in-flight.json')
 
 function readJson(path) {
   try {
     return JSON.parse(readFileSync(path, 'utf8'))
+  } catch {
+    return null
+  }
+}
+
+/** When a file was last written, or null. Null judges nothing. */
+function mtimeMs(path) {
+  try {
+    return statSync(path).mtimeMs
   } catch {
     return null
   }
@@ -42,22 +53,18 @@ function gather(input) {
   return { turnStartedAt, sessionId, transcriptPath }
 }
 
-function main() {
-  // --status must NOT read stdin first: on an interactive console that blocks
-  // on the TTY forever, which is why board-first-guard orders it this way too.
-  const status = process.argv.includes('--status')
-  let input = {}
-  if (!status) {
-    try {
-      const raw = readFileSync(0, 'utf8')
-      if (raw.trim()) input = JSON.parse(raw)
-    } catch {
-      /* no stdin — fail open, judge what can be judged without it */
-    }
-  }
-
-  const { turnStartedAt, sessionId, transcriptPath } = gather(input)
-  const owner = ownsBatch(sessionId)
+/**
+ * Everything the core needs — exported so the guard preflight predicts this gate
+ * from the SAME gathering the Stop hook uses rather than a second copy of it,
+ * which would drift and hand back a false "clean" (point 437 E).
+ *
+ * It never reports "not applicable": every stand-down this guard has is a
+ * VERDICT of `auditFindings` (not the batch owner → nothing owed), not a refusal
+ * to look — so the preflight sees the same allow the Stop hook would give.
+ */
+export function gatherFindingsInputs({ sessionId = '', transcriptPath = null } = {}) {
+  const resolved = gather({ session_id: sessionId, transcript_path: transcriptPath })
+  const owner = ownsBatch(resolved.sessionId)
   const carrier = parseCarrier((() => {
     try {
       return readFileSync(carrierPath(), 'utf8')
@@ -75,9 +82,9 @@ function main() {
   // 462) — the request gate fires there and nowhere else. No stamp, no calls,
   // no boundary: the gate then simply stands down, like condition 1.
   let atBoundary = false
-  if (Number.isFinite(turnStartedAt) && turnStartedAt > 0 && transcriptPath) {
+  if (Number.isFinite(resolved.turnStartedAt) && resolved.turnStartedAt > 0 && resolved.transcriptPath) {
     try {
-      const calls = turnCalls(readFileSync(transcriptPath, 'utf8'), turnStartedAt)
+      const calls = turnCalls(readFileSync(resolved.transcriptPath, 'utf8'), resolved.turnStartedAt)
       tally = tallyTurn(calls)
       atBoundary = turnTakesBoundary(calls)
     } catch {
@@ -85,13 +92,48 @@ function main() {
     }
   }
 
-  const verdict = auditFindings({
-    tally,
-    ownsBatch: owner,
-    carrierPending: carrier.pending.length,
-    carrierRequests: carrier.requests.length,
-    atBoundary,
+  return {
+    applicable: true,
+    sessionId: resolved.sessionId,
+    owner,
+    carrier,
+    inputs: {
+      tally,
+      ownsBatch: owner,
+      carrierPending: carrier.pending.length,
+      carrierRequests: carrier.requests.length,
+      atBoundary,
+      // WHEN the declaration was last WRITTEN, so the delegation exemption can
+      // be earned rather than claimed (point 437 G): a turn that ran the command
+      // and had it REFUSED — no lock, no evidence, dead evidence — leaves this
+      // file untouched, and the exemption then does not apply to it.
+      declarationWrittenAt: mtimeMs(IN_FLIGHT_PATH),
+      turnStartedAt: resolved.turnStartedAt,
+    },
+  }
+}
+
+function main() {
+  // --status must NOT read stdin first: on an interactive console that blocks
+  // on the TTY forever, which is why board-first-guard orders it this way too.
+  const status = process.argv.includes('--status')
+  let input = {}
+  if (!status) {
+    try {
+      const raw = readFileSync(0, 'utf8')
+      if (raw.trim()) input = JSON.parse(raw)
+    } catch {
+      /* no stdin — fail open, judge what can be judged without it */
+    }
+  }
+
+  const gathered = gatherFindingsInputs({
+    sessionId: (input && (input.session_id || input.sessionId)) || '',
+    transcriptPath: (input && (input.transcript_path || input.transcriptPath)) || null,
   })
+  const { sessionId, owner, carrier } = gathered
+  const { tally, atBoundary } = gathered.inputs
+  const verdict = auditFindings(gathered.inputs)
 
   if (status) {
     console.log(`turn calls     : ${tally.investigative} investigative, ${tally.agents} agent(s)`)
@@ -113,9 +155,14 @@ function main() {
   }
 }
 
-try {
-  main()
-} catch (e) {
-  // Fail-open, loudly: the session keeps working, the reason reaches stderr.
-  console.error(`findings-guard: internal error, allowing the stop — ${e && e.message}`)
+// Gated on isMainModule since point 437 E: the guard preflight IMPORTS this
+// module for its gather step, and an ungated `main()` would read fd 0 — on an
+// interactive console, forever.
+if (isMainModule(import.meta.url)) {
+  try {
+    main()
+  } catch (e) {
+    // Fail-open, loudly: the session keeps working, the reason reaches stderr.
+    console.error(`findings-guard: internal error, allowing the stop — ${e && e.message}`)
+  }
 }

@@ -14,6 +14,7 @@ import { REPO_ROOT, repoPath } from './repo-paths.mjs'
 import { isMainModule } from './is-main.mjs'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
 import { assessBranchHygiene, formatBranchHygiene, DEFAULT_GRACE_MS, normBranch } from './branch-hygiene-core.mjs'
+import { declarationShields } from './batch-in-flight-core.mjs'
 
 const PAUSE = repoPath('.claude/batch-paused')
 const IN_FLIGHT = repoPath('.claude/batch-in-flight.json')
@@ -120,9 +121,10 @@ export function gatherBranchHygiene({ sessionId = '', now = Date.now() } = {}) {
     return { applicable: true, inputs: { readable: false } }
   }
 
-  const declared = readInFlight()
+  const declared = readInFlight(now)
   return {
     applicable: true,
+    inFlightExpired: declared.expired,
     inputs: {
       now,
       repoRoot: worktrees[0]?.path ?? REPO_ROOT,
@@ -159,19 +161,31 @@ function isAncestorOfMain(sha) {
   }
 }
 
-/** Branch/worktree evidence a session has declared it is still working on.
- *  Read leniently: this only ever WIDENS the carve-out, and merge-time deletion
- *  is the primary path anyway. */
-function readInFlight() {
+/**
+ * Branch/worktree evidence a session has declared it is still working on.
+ *
+ * Read leniently in SHAPE — a malformed field only ever widens the carve-out,
+ * and merge-time deletion is the primary path anyway — but NOT in AGE (point
+ * 437 G). This used to read the file raw, so a dead session's declaration
+ * shielded its branch and its worktree from the sweep for ever, while the expiry
+ * sat in a consumer this never called. `declarationShields` applies the same
+ * `IN_FLIGHT_MAX_AGE_MS` the wait side applies; work that is genuinely still
+ * moving stays protected by the sweep's own grace window on the branch tip.
+ */
+function readInFlight(now = Date.now()) {
   try {
     const d = JSON.parse(readFileSync(IN_FLIGHT, 'utf8'))
+    const verdict = declarationShields({ declaration: d, now })
+    if (!verdict.shields) return { branches: [], paths: [], expired: true, ageMs: verdict.ageMs }
     const evidence = Array.isArray(d?.evidence) ? d.evidence : []
     return {
       branches: evidence.filter((e) => e?.kind === 'branch').map((e) => String(e.ref ?? '')),
       paths: evidence.filter((e) => e?.kind === 'worktree').map((e) => String(e.path ?? '')),
+      expired: false,
+      ageMs: verdict.ageMs,
     }
   } catch {
-    return { branches: [], paths: [] }
+    return { branches: [], paths: [], expired: false, ageMs: null }
   }
 }
 
@@ -191,6 +205,12 @@ if (isMainModule(import.meta.url)) {
     }
     const result = assessBranchHygiene(gathered.inputs)
     if (status) {
+      if (gathered.inFlightExpired) {
+        console.log(
+          'branch-hygiene: die In-Flight-Erklärung ist ABGELAUFEN — sie schirmt nichts mehr ab. ' +
+            'Wer noch arbeitet, erklärt neu: node scripts/batch-in-flight.mjs --waiting-on "<…>"',
+        )
+      }
       console.log(result.block ? formatBranchHygiene(result.findings) : `branch-hygiene: sauber (${result.reason})`)
       process.exit(0)
     }

@@ -43,6 +43,7 @@ import {
   slotsRemedy,
   statusVerdict,
   closingFreezeActive,
+  declarationShields,
   POOL_CAP,
 } from './batch-in-flight-core.mjs'
 import {
@@ -1711,5 +1712,48 @@ describe('statusVerdict — `--status` must not promise a stop the hook then blo
       const allowed = guard(true, needsReason).startsWith('allow')
       expect(status.verdict === 'allowed', `needsReason=${needsReason}`).toBe(allowed)
     }
+  })
+})
+
+// The branch sweep read the declaration RAW — no age, no liveness — while the
+// expiry lived in a consumer it never called, so a dead session's declaration
+// shielded its branch and worktree from the sweep for ever (point 437 G).
+describe('declarationShields — the expiry the branch sweep now applies too', () => {
+  const NOW = 1_800_000_000_000
+  const decl = (ageMs) => ({ at: NOW - ageMs, evidence: [{ kind: 'branch', ref: 'feat/x' }] })
+
+  it('shields a fresh declaration', () => {
+    const v = declarationShields({ declaration: decl(60_000), now: NOW })
+    expect(v).toMatchObject({ shields: true, reason: 'live' })
+    expect(v.ageMs).toBe(60_000)
+  })
+
+  it('stops shielding once it is older than the wait side would accept', () => {
+    expect(declarationShields({ declaration: decl(IN_FLIGHT_MAX_AGE_MS + 1), now: NOW })).toMatchObject({
+      shields: false,
+      reason: 'expired',
+    })
+  })
+
+  it('uses the SAME bound as the wait side, exactly on the boundary', () => {
+    expect(declarationShields({ declaration: decl(IN_FLIGHT_MAX_AGE_MS), now: NOW }).shields).toBe(true)
+  })
+
+  it('honours a calibrated bound', () => {
+    expect(declarationShields({ declaration: decl(120_000), now: NOW, maxAgeMs: 60_000 }).shields).toBe(false)
+  })
+
+  it('shields on a stamp from the future rather than reasoning about a broken clock', () => {
+    expect(declarationShields({ declaration: decl(-60_000), now: NOW })).toMatchObject({
+      shields: true,
+      reason: 'clock-skew',
+    })
+  })
+
+  it('shields whatever it cannot read — an unreadable file is not proof the work ended', () => {
+    expect(declarationShields({ declaration: null, now: NOW }).shields).toBe(true)
+    expect(declarationShields({ declaration: {}, now: NOW })).toMatchObject({ shields: true, reason: 'no-timestamp' })
+    expect(declarationShields({ declaration: { at: 'soon' }, now: NOW }).shields).toBe(true)
+    expect(declarationShields().shields).toBe(true)
   })
 })

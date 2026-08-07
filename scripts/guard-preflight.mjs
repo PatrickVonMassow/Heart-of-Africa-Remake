@@ -58,15 +58,57 @@ import { gatherContainerAskInputs } from './container-ask-guard.mjs'
 import { evaluate as containerAskEvaluate } from './container-ask-guard-core.mjs'
 import { assessBranchHygiene, formatBranchHygiene } from './branch-hygiene-core.mjs'
 
+import { gatherPushArrivalInputs } from './push-arrival-guard.mjs'
+import { evaluatePushArrival } from './push-arrival-core.mjs'
+import { gatherPrepInputs } from './prep-guard.mjs'
+import { evaluatePrep } from './prep-guard-core.mjs'
+import { gatherDashboardConcisenessInputs } from './dashboard-conciseness-guard.mjs'
+import { evaluate as concisenessEvaluate } from './dashboard-conciseness-guard-core.mjs'
+import { gatherDashboardCardTopicInputs } from './dashboard-card-topic-guard.mjs'
+import { evaluate as cardTopicEvaluate } from './dashboard-card-topic-guard-core.mjs'
+import { gatherDashboardIntegrityInputs } from './dashboard-integrity-guard.mjs'
+import { evaluate as integrityEvaluate } from './dashboard-integrity-guard-core.mjs'
+import { gatherRetroCurrencyInputs, decideRetroCurrency } from './retro-currency-guard.mjs'
+import { gatherGuideBrevityInputs } from './guide-brevity-guard.mjs'
+import { auditGuide, formatViolations as formatGuideViolations } from './guide-brevity-core.mjs'
+import { gatherRuleReviewInputs } from './rule-review-guard.mjs'
+import { evaluateRuleReview } from './rule-review-core.mjs'
+import { gatherFindingsInputs } from './findings-guard.mjs'
+import { auditFindings, formatFindings } from './findings-core.mjs'
+import { gatherGuardHealthInputs } from './guard-health-guard.mjs'
+import { auditGuardHealth, formatGuardHealth } from './guard-health-core.mjs'
+import { gatherDashboardSyncInputs } from './dashboard-sync.mjs'
+import { evaluate as dashboardSyncEvaluate } from './dashboard-sync-core.mjs'
+
+import { readFileSync } from 'node:fs'
 import {
   ACTIONS,
+  CAUSE,
   formatPreflightReport,
   isKnownAction,
   runPreflight,
   selectGuards,
+  unregisteredStopHooks,
+  wiredStopHookIds,
 } from './guard-preflight-core.mjs'
 import { isMainModule } from './is-main.mjs'
 import { readOwnerLock } from './batch-singleton.mjs'
+import { repoPath } from './repo-paths.mjs'
+
+/**
+ * A guard that IS wired and that this read-only report cannot judge, registered
+ * so it is named rather than silently absent (point 437 E).
+ *
+ * The gather is a constant on purpose: there is nothing to gather, and importing
+ * the wrapper to say so would run its hook body. The report renders these as
+ * `not-judged`, never as clean, and the summary refuses to call the chain clear
+ * while one of them is in it.
+ */
+const notJudged = (id, why) => ({
+  id,
+  gather: () => ({ applicable: false, cause: CAUSE.notJudged, why }),
+  decide: () => ({ block: false }),
+})
 
 /**
  * Whose session is asking. Four of the guards stand down for a session that does
@@ -197,7 +239,122 @@ export const GUARDS = [
       return { block: verdict.block, reason: formatBranchHygiene(verdict.findings) }
     },
   },
+
+  // ── The rest of the wired Stop chain (point 437 E) ────────────────────────
+  // Until 07.08.2026 the registry held only the guards someone had remembered to
+  // add, and fourteen wired Stop hooks were outside it — reporting nothing while
+  // they would block. Since CLAUDE.md §7.2 tells the session to preflight and
+  // answer LAST, a false clean reproduced exactly the answer-twice loop this tool
+  // exists to prevent. The registry now covers the whole chain, and the drift is
+  // checked rather than remembered (guard-preflight-core.test.mjs).
+  {
+    id: 'push-arrival-guard',
+    gather: gatherPushArrivalInputs,
+    decide: (inputs) => {
+      const verdict = evaluatePushArrival(inputs)
+      return { block: Boolean(verdict), reason: verdict ? verdict.reason : '' }
+    },
+  },
+  {
+    id: 'prep-guard',
+    gather: gatherPrepInputs,
+    decide: evaluatePrep,
+  },
+  {
+    id: 'dashboard-conciseness-guard',
+    gather: gatherDashboardConcisenessInputs,
+    decide: concisenessEvaluate,
+  },
+  {
+    id: 'dashboard-card-topic-guard',
+    gather: gatherDashboardCardTopicInputs,
+    decide: cardTopicEvaluate,
+  },
+  {
+    id: 'dashboard-integrity-guard',
+    gather: gatherDashboardIntegrityInputs,
+    decide: integrityEvaluate,
+  },
+  {
+    id: 'retro-currency-guard',
+    gather: gatherRetroCurrencyInputs,
+    // Both halves, exactly as the hook joins them — a preflight that predicted
+    // only the currency check would clear a turn the ledger check blocks.
+    decide: (inputs) => decideRetroCurrency(inputs),
+  },
+  {
+    id: 'guide-brevity-guard',
+    gather: gatherGuideBrevityInputs,
+    decide: ({ guideText }) => {
+      const { ok, violations } = auditGuide(guideText)
+      return { block: !ok, reason: ok ? '' : formatGuideViolations(violations) }
+    },
+  },
+  {
+    id: 'rule-review-guard',
+    gather: gatherRuleReviewInputs,
+    decide: (inputs) => {
+      const verdict = evaluateRuleReview(inputs)
+      return { block: Boolean(verdict), reason: verdict ? verdict.reason : '' }
+    },
+  },
+  {
+    id: 'findings-guard',
+    gather: gatherFindingsInputs,
+    decide: (inputs) => {
+      const verdict = auditFindings(inputs)
+      return { block: !verdict.ok, reason: verdict.ok ? '' : formatFindings(verdict.violations) }
+    },
+  },
+  {
+    id: 'guard-health-guard',
+    gather: gatherGuardHealthInputs,
+    decide: (inputs) => {
+      const { ok, violations } = auditGuardHealth(inputs)
+      return { block: !ok, reason: ok ? '' : formatGuardHealth(violations) }
+    },
+  },
+  {
+    id: 'dashboard-sync',
+    gather: gatherDashboardSyncInputs,
+    decide: dashboardSyncEvaluate,
+  },
+
+  // ── Wired, and honestly NOT judged here ───────────────────────────────────
+  notJudged(
+    'ci-status-guard',
+    'its verdict comes from the GitHub API — a network round trip this read-only report does not make. ' +
+      'Ask it directly if a push just landed.',
+  ),
+  notJudged(
+    'timestamp-guard',
+    'it judges the reply being composed, which does not exist while a preflight runs. Begin the reply ' +
+      'with the current bold Berlin timestamp and it passes.',
+  ),
+  notJudged(
+    'decision-card-guard',
+    'it judges the reply being composed against the board — and at preflight time the transcript still ' +
+      'holds the PREVIOUS turn, so any verdict here would be about the wrong text.',
+  ),
+  notJudged(
+    'batch-progress-guard',
+    'evaluating it ACQUIRES and can hand over the batch lock, which a read-only report must not do. ' +
+      'Drive it with node scripts/batch-boundary.mjs --status.',
+  ),
 ]
+
+/**
+ * Wired Stop hooks with no registry entry — the drift, read from the
+ * authoritative chain rather than remembered. An unreadable settings file
+ * reports NO drift: this is a report about the guards, not about itself.
+ */
+export function unregisteredHooks(guards = GUARDS, settingsPath = repoPath('.claude/settings.json')) {
+  try {
+    return unregisteredStopHooks(wiredStopHookIds(JSON.parse(readFileSync(settingsPath, 'utf8'))), guards)
+  } catch {
+    return []
+  }
+}
 
 if (isMainModule(import.meta.url)) {
   const args = process.argv.slice(2)
@@ -208,9 +365,18 @@ if (isMainModule(import.meta.url)) {
   const guards = selectGuards(GUARDS, action)
   const { sessionId, source, sessionKnown } = resolveSessionId(args)
   const results = runPreflight(guards, { sessionId, sessionKnown })
+  // Only the WHOLE-CHAIN actions can report drift: a narrowed `--for merge` was
+  // never claiming to cover the chain, so listing the rest there would be noise.
+  const unregistered = ACTIONS[action] ? [] : unregisteredHooks(GUARDS)
 
   if (asJson) {
-    console.log(JSON.stringify({ action, known: isKnownAction(action), session: { known: sessionKnown, source }, results }, null, 2))
+    console.log(
+      JSON.stringify(
+        { action, known: isKnownAction(action), session: { known: sessionKnown, source }, results, unregistered },
+        null,
+        2,
+      ),
+    )
   } else {
     console.log(
       sessionKnown
@@ -226,7 +392,7 @@ if (isMainModule(import.meta.url)) {
           'reporting every registered guard instead.\n',
       )
     }
-    console.log(formatPreflightReport(results, { action }))
+    console.log(formatPreflightReport(results, { action, unregistered }))
   }
   // Always 0, even with a would-block or an error in the report: a report must
   // never be mistaken for the gate itself.

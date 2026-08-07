@@ -90,6 +90,38 @@ export const IN_FLIGHT_MAX_AGE_MS = 45 * 60 * 1000
  */
 export const LAUNCHER_WORK_MAX_AGE_MS = 4 * 60 * 60 * 1000
 
+/**
+ * MAY A DECLARATION STILL SHIELD SOMETHING FROM A SWEEP? PURE (point 437 G).
+ *
+ * The branch sweep read the in-flight file RAW — every branch and worktree it
+ * named was exempt, with no age and no liveness asked — while the expiry lived
+ * in a consumer the sweep never called. A dead session's declaration therefore
+ * shielded its branch and its worktree from the sweep FOR EVER, which is the one
+ * thing the sweep exists to prevent.
+ *
+ * This is the cheap half of `assessInFlight`: the same `at` field and the same
+ * `IN_FLIGHT_MAX_AGE_MS`, without the evidence probes. That is the right depth
+ * HERE and nowhere else — a branch whose work is genuinely still moving is
+ * already protected by the sweep's own grace window on its tip date, so this
+ * only has to stop a declaration that has simply been left behind. The costlier
+ * output probing stays where a WAIT is judged, because there a false "dead"
+ * kills a running agent, while here it costs one turn.
+ *
+ * Returns { shields, reason, ageMs }. Anything unreadable SHIELDS: a declaration
+ * this cannot parse is not evidence that the work is over.
+ */
+export function declarationShields({ declaration, now = Date.now(), maxAgeMs = IN_FLIGHT_MAX_AGE_MS } = {}) {
+  if (!declaration || typeof declaration !== 'object') return { shields: true, reason: 'unreadable', ageMs: null }
+  const at = Number(declaration.at)
+  if (!Number.isFinite(at)) return { shields: true, reason: 'no-timestamp', ageMs: null }
+  const ageMs = Number(now) - at
+  // A stamp from the future is a clock nothing here can reason about — shield,
+  // and let the wait-side assessment, which blocks on skew, be the strict one.
+  if (!(ageMs >= 0)) return { shields: true, reason: 'clock-skew', ageMs }
+  if (ageMs > maxAgeMs) return { shields: false, reason: 'expired', ageMs }
+  return { shields: true, reason: 'live', ageMs }
+}
+
 /** How recently a declared LOG file must have been written to count as proof that
  *  the run behind it is alive. A suite that has not appended a line in this long
  *  is not something to keep waiting on without saying so again. */

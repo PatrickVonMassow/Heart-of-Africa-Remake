@@ -167,6 +167,36 @@ export function classifyCall({ name, command, filePath } = {}) {
   return { kind: 'ignore' }
 }
 
+/** The record kind a DECLARED WAIT leaves — the one that is an exemption rather
+ *  than a durable trace, and therefore the one that has to be earned. */
+export const DELEGATION_RECORD = 'wait-declared'
+
+/**
+ * MAY THE DECLARED WAIT STAND IN FOR A RECORD? PURE (point 437 G).
+ *
+ * Returns { claimed, honoured, why }:
+ *   claimed   the turn ran the declaration command at all
+ *   honoured  and it is allowed to count — an Agent really was spawned this
+ *             turn, or the declaration FILE was written inside this turn (which
+ *             a successful CLI run leaves behind and a refused one does not)
+ *
+ * With no turn boundary to measure against, the file half cannot be judged; the
+ * agent half still can, and it is the one that matters most.
+ */
+export function delegationExemption({ tally, declarationWrittenAt = null, turnStartedAt = null } = {}) {
+  const t = tally ?? {}
+  const records = Array.isArray(t.records) ? t.records : []
+  const claimed = records.includes(DELEGATION_RECORD)
+  if (!claimed) return { claimed: false, honoured: false, why: 'not-claimed' }
+  if (Number(t.agents) > 0) return { claimed: true, honoured: true, why: 'agent-spawned' }
+  const written = Number(declarationWrittenAt)
+  const started = Number(turnStartedAt)
+  if (Number.isFinite(written) && Number.isFinite(started) && started > 0 && written >= started) {
+    return { claimed: true, honoured: true, why: 'declaration-written-this-turn' }
+  }
+  return { claimed: true, honoured: false, why: 'declaration-not-written-this-turn' }
+}
+
 /**
  * Tally one turn's calls.
  * `calls` is plain data ([{ name, command, filePath }]) so the whole decision
@@ -265,22 +295,44 @@ export function auditFindings({
   carrierPending = 0,
   carrierRequests = 0,
   atBoundary = false,
+  declarationWrittenAt = null,
+  turnStartedAt = null,
   threshold = DEFAULT_THRESHOLD,
 } = {}) {
   const t = tally ?? { investigative: 0, agents: 0, records: [] }
   const records = Array.isArray(t.records) ? t.records : []
   const violations = []
 
+  // THE DELEGATION EXEMPTION IS EARNED, NOT CLAIMED (point 437 G, four-eyes
+  // review 30.07.2026). `wait-declared` is granted from the COMMAND STRING
+  // alone, so a turn that merely RAN the in-flight declaration was exempt even
+  // when the CLI REFUSED it — no lock, no evidence, dead evidence — and nothing
+  // checked that work had been handed out at all. The one path the exemption
+  // exists for was therefore also a path a turn could take WITHOUT
+  // investigating, which is the opposite of what it is for.
+  //
+  // It is honoured on either proof, both of which the guard already has:
+  //   - the turn actually SPAWNED an agent (an Agent call in this turn), or
+  //   - the declaration FILE was written inside this turn, which is what a CLI
+  //     run that succeeded leaves behind and a refused one does not.
+  const delegation = delegationExemption({ tally: t, declarationWrittenAt, turnStartedAt })
+  const durable = records.filter((r) => r !== DELEGATION_RECORD)
+
   // Spawning an agent is investigation on its own: it is the most expensive
   // way this project looks at something, and its result reaches nobody unless
   // the parent records it.
   const investigated = Number(t.agents) > 0 || Number(t.investigative) >= threshold
-  if (investigated && records.length === 0) {
+  if (investigated && durable.length === 0 && !delegation.honoured) {
     violations.push({
       kind: 'unrecorded-investigation',
       detail:
         `Dieser Zug hat untersucht (${t.investigative} Lese-/Suchaufrufe` +
         `${Number(t.agents) > 0 ? `, ${t.agents} Agent(en)` : ''}), aber nichts Dauerhaftes hinterlassen. ` +
+        (delegation.claimed
+          ? 'Die erklärte Wartezeit zählt hier NICHT: es wurde kein Agent gestartet, und die ' +
+            'Erklärungsdatei wurde in diesem Zug nicht geschrieben — die Ausnahme gilt der ' +
+            'tatsächlich ausgegebenen Arbeit, nicht dem Aufruf. '
+          : '') +
         'Ein Befund, der nur im Gespräch steht, stirbt mit der Sitzung. Halte ihn fest: ' +
         'node scripts/finding.mjs --record "<Titel>" --detail "<…>" — oder erkläre den Zug ' +
         'ausdrücklich für befundlos: node scripts/finding.mjs --none "<Grund>".',

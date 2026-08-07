@@ -49,6 +49,42 @@ describe('auditGuardHealth — can it fire at all', () => {
     const blank = auditGuardHealth({ ...unwired, dormant: { 'a-guard.mjs': '  ' } })
     expect(blank.violations.map((v) => v.kind)).toContain('dormant-without-reason')
   })
+
+  // The inverse of the case above, and the one the audit was blind to: the
+  // dormant entry was read ONLY while the guard was unwired, so an entry that
+  // survived its own arming produced no finding at all — the map went on
+  // claiming an enforcer was inert while it enforced.
+  it('flags a WIRED enforcer that still carries a dormant entry, naming both sides', () => {
+    const r = auditGuardHealth({
+      ...healthy,
+      dormant: { 'a-guard.mjs': 'Wartet auf eine betreute Sitzung. REMOVE THIS ENTRY WITH THE HOOK LINE.' },
+    })
+    expect(r.ok).toBe(false)
+    const v = r.violations.find((x) => x.kind === 'dormant-but-wired')
+    expect(v).toBeTruthy()
+    expect(v.script).toBe('a-guard.mjs')
+    expect(v.detail).toContain('a-guard.mjs')
+    expect(v.detail).toContain('Wartet auf eine betreute Sitzung')
+  })
+
+  it('leaves a wired enforcer WITHOUT a dormant entry alone', () => {
+    expect(auditGuardHealth({ ...healthy, dormant: {} }).ok).toBe(true)
+  })
+
+  it('keeps the unwired-and-recorded case passing exactly as before', () => {
+    const r = auditGuardHealth({
+      ...healthy,
+      wiredText: '',
+      dormant: { 'a-guard.mjs': 'protected-path arming needs an attended session' },
+    })
+    expect(r.ok).toBe(true)
+    expect(r.violations).toEqual([])
+  })
+
+  it('reports the dormant-but-wired finding through the block message', () => {
+    const r = auditGuardHealth({ ...healthy, dormant: { 'a-guard.mjs': 'noch nicht scharf' } })
+    expect(formatGuardHealth(r.violations)).toMatch(/dormant-but-wired/)
+  })
 })
 
 describe('auditGuardHealth — is its decision tested', () => {

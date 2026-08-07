@@ -21,6 +21,8 @@ import { REPO_ROOT, STATE_PATH, FOCUS_PATH, readJson } from './dashboard-state.m
 import { evaluate, RECENT_COMMIT_COUNT } from './dashboard-integrity-guard-core.mjs'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
 import { readTasksAll } from './tasks-source.mjs'
+import { isMainModule } from './is-main.mjs'
+import { CAUSE } from './guard-preflight-core.mjs'
 
 const TASKS = resolve(REPO_ROOT, 'TASKS.md')
 const DASHBOARD = resolve(REPO_ROOT, '.batch-dashboard.html')
@@ -57,17 +59,15 @@ function touchedFiles() {
   return files
 }
 
-try {
-  let sid = ''
-  try {
-    sid = JSON.parse(readFileSync(0, 'utf8')).session_id || ''
-  } catch {
-    /* no/non-JSON stdin (manual run) */
+/** Everything the core needs — shared with the guard preflight, which must never
+ *  gather its own (a second copy would drift and hand back a false "clean"). */
+export function gatherDashboardIntegrityInputs({ sessionId = '' } = {}) {
+  if (existsSync(PAUSE)) return { applicable: false, why: 'the batch is paused' }
+  if (heldByOtherLiveOwner(sessionId)) {
+    return { applicable: false, why: 'another live session owns the batch lock', cause: CAUSE.notLockOwner }
   }
-
-  if (existsSync(PAUSE)) process.exit(0) // user-paused: no batch duty in flight
-  if (heldByOtherLiveOwner(sid)) process.exit(0) // hard singleton: a non-owner session stands down — no batch duty
-  if (!existsSync(DASHBOARD)) process.exit(0) // no board yet — dashboard-guard owns that case
+  // No board yet — dashboard-guard owns that case.
+  if (!existsSync(DASHBOARD)) return { applicable: false, why: 'no dashboard file in this checkout' }
 
   const focus = readJson(FOCUS_PATH)
   const state = readJson(STATE_PATH)
@@ -82,17 +82,36 @@ try {
     ? git(`log -n ${RECENT_COMMIT_COUNT} --format=%s ${reviewedHead}..HEAD`).split('\n').filter(Boolean)
     : []
 
-  const result = evaluate({
-    dashboardHtml: readFileSync(DASHBOARD, 'utf8'),
-    tasksMd: readTasksAll(TASKS),
-    focusPoint: focus && Number.isInteger(focus.point) ? focus.point : null,
-    commitSubjects,
-    touchedFiles: touchedFiles(),
-    snapshots: state && state.integritySnapshots ? state.integritySnapshots : null,
-  })
-  if (result.block) process.stdout.write(JSON.stringify({ decision: 'block', reason: result.reason }))
-  process.exit(0)
-} catch (e) {
-  console.error(`dashboard-integrity-guard error (allowing stop): ${e && e.message}`)
-  process.exit(0)
+  return {
+    applicable: true,
+    inputs: {
+      dashboardHtml: readFileSync(DASHBOARD, 'utf8'),
+      tasksMd: readTasksAll(TASKS),
+      focusPoint: focus && Number.isInteger(focus.point) ? focus.point : null,
+      commitSubjects,
+      touchedFiles: touchedFiles(),
+      snapshots: state && state.integritySnapshots ? state.integritySnapshots : null,
+    },
+  }
+}
+
+if (isMainModule(import.meta.url)) {
+  try {
+    let sid = ''
+    try {
+      sid = JSON.parse(readFileSync(0, 'utf8')).session_id || ''
+    } catch {
+      /* no/non-JSON stdin (manual run) */
+    }
+
+    const gathered = gatherDashboardIntegrityInputs({ sessionId: sid })
+    if (!gathered.applicable) process.exit(0)
+
+    const result = evaluate(gathered.inputs)
+    if (result.block) process.stdout.write(JSON.stringify({ decision: 'block', reason: result.reason }))
+    process.exit(0)
+  } catch (e) {
+    console.error(`dashboard-integrity-guard error (allowing stop): ${e && e.message}`)
+    process.exit(0)
+  }
 }

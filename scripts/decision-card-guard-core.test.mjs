@@ -14,6 +14,7 @@ import {
   contentWords,
   evaluate,
   matchingCard,
+  topicWords,
 } from './decision-card-guard-core.mjs'
 
 // The observed case: a typography decision put to the user with three options.
@@ -163,5 +164,38 @@ describe('the parts', () => {
     expect(matchingCard(['Welche Kartenschrift?'], ['Deploy-Zeitpunkt'])).toBeNull()
     expect(matchingCard([], ['Kartenschrift'])).toBeNull()
     expect(matchingCard(null, null)).toBeNull()
+  })
+})
+
+// The block demanded a card whose TITLE matches, then described the matching
+// rule in prose the writer had to reverse-engineer — so a title written blind
+// matched by luck and a second miss cost a second turn (point 437 E).
+describe('the block reason names the words a matching title must share', () => {
+  it('names the strong words that carry a match on their own', () => {
+    const v = evaluate({
+      replyText: 'Welche Kartenschrift soll die Karte tragen?',
+      vdzkTitles: ['Deploy-Zeitpunkt'],
+    })
+    expect(v.block).toBe(true)
+    expect(v.reason).toContain('kartenschrift')
+    expect(v.reason).toMatch(/SHARE the question's topic/)
+  })
+
+  it('demands TWO words when the question carries no strong one', () => {
+    const v = evaluate({ replyText: 'Willst du Rot oder Blau als Farbe?', vdzkTitles: ['Deploy'] })
+    expect(v.block).toBe(true)
+    expect(v.reason).toMatch(/at least TWO of them/)
+    expect(v.reason).toContain('farbe')
+  })
+
+  it('extracts the topic words longest first, function words dropped', () => {
+    const words = topicWords(['Welche Kartenschrift willst du für die Karte?'])
+    expect(words[0]).toBe('kartenschrift')
+    expect(words).not.toContain('welche')
+  })
+
+  it('is total on rubbish', () => {
+    expect(topicWords()).toEqual([])
+    expect(topicWords('not a list')).toEqual([])
   })
 })

@@ -6,29 +6,47 @@
 // only reads the dashboard file and is fail-OPEN: any internal error → allow,
 // so a guard bug never traps the session.
 import { readFileSync, existsSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
+import { repoPath } from './repo-paths.mjs'
+import { isMainModule } from './is-main.mjs'
 import { evaluate } from './dashboard-conciseness-guard-core.mjs'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
+import { CAUSE } from './guard-preflight-core.mjs'
 
-const DASHBOARD = fileURLToPath(new URL('../.batch-dashboard.html', import.meta.url))
-const PAUSE = fileURLToPath(new URL('../.claude/batch-paused', import.meta.url))
+const DASHBOARD = repoPath('.batch-dashboard.html')
+const PAUSE = repoPath('.claude/batch-paused')
 
-try {
-  let sid = ''
-  try {
-    sid = JSON.parse(readFileSync(0, 'utf8')).session_id || ''
-  } catch {
-    /* no/non-JSON stdin (manual run) — the rule is global truth, not session-local */
+/**
+ * Everything the core needs — exported so the guard preflight predicts this gate
+ * from the SAME gathering the Stop hook uses rather than a second copy of it,
+ * which would drift and hand back a false "clean".
+ */
+export function gatherDashboardConcisenessInputs({ sessionId = '' } = {}) {
+  if (existsSync(PAUSE)) return { applicable: false, why: 'the batch is paused' }
+  if (heldByOtherLiveOwner(sessionId)) {
+    return { applicable: false, why: 'another live session owns the batch lock', cause: CAUSE.notLockOwner }
   }
+  // No board yet — dashboard-guard owns that case.
+  if (!existsSync(DASHBOARD)) return { applicable: false, why: 'no dashboard file in this checkout' }
+  return { applicable: true, inputs: { dashboardHtml: readFileSync(DASHBOARD, 'utf8') } }
+}
 
-  if (existsSync(PAUSE)) process.exit(0) // user-paused: no batch duty in flight
-  if (heldByOtherLiveOwner(sid)) process.exit(0) // hard singleton: a non-owner session stands down — no batch duty
-  if (!existsSync(DASHBOARD)) process.exit(0) // no board yet — dashboard-guard owns that case
+if (isMainModule(import.meta.url)) {
+  try {
+    let sid = ''
+    try {
+      sid = JSON.parse(readFileSync(0, 'utf8')).session_id || ''
+    } catch {
+      /* no/non-JSON stdin (manual run) — the rule is global truth, not session-local */
+    }
 
-  const result = evaluate({ dashboardHtml: readFileSync(DASHBOARD, 'utf8') })
-  if (result.block) process.stdout.write(JSON.stringify({ decision: 'block', reason: result.reason }))
-  process.exit(0)
-} catch (e) {
-  console.error(`dashboard-conciseness-guard error (allowing stop): ${e && e.message}`)
-  process.exit(0)
+    const gathered = gatherDashboardConcisenessInputs({ sessionId: sid })
+    if (!gathered.applicable) process.exit(0)
+
+    const result = evaluate(gathered.inputs)
+    if (result.block) process.stdout.write(JSON.stringify({ decision: 'block', reason: result.reason }))
+    process.exit(0)
+  } catch (e) {
+    console.error(`dashboard-conciseness-guard error (allowing stop): ${e && e.message}`)
+    process.exit(0)
+  }
 }

@@ -31,6 +31,8 @@ import {
 } from './dashboard-sync-core.mjs'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
 import { readTasksAll } from './tasks-source.mjs'
+import { isMainModule } from './is-main.mjs'
+import { CAUSE } from './guard-preflight-core.mjs'
 
 const R = (p) => fileURLToPath(new URL(p, import.meta.url))
 const REPO_ROOT = R('..')
@@ -78,40 +80,53 @@ function readCards() {
   }
 }
 
-// --drifts: the catalogue of what this guard blocks on (point 308's report
-// deliverable). Generated from the DRIFTS table the verdicts are stamped from,
-// so it cannot describe a check the code no longer has.
-if (process.argv[2] === '--drifts') {
-  console.log(formatDriftReport())
-  process.exit(0)
+/** Everything the core needs — shared with the guard preflight, which must never
+ *  gather its own (a second copy would drift and hand back a false "clean"). */
+export function gatherDashboardSyncInputs({ sessionId = '' } = {}) {
+  if (existsSync(PAUSE)) return { applicable: false, why: 'the batch is paused' }
+  if (heldByOtherLiveOwner(sessionId)) {
+    return { applicable: false, why: 'another live session owns the batch lock', cause: CAUSE.notLockOwner }
+  }
+  // No board yet — dashboard-guard owns that case.
+  if (!existsSync(DASHBOARD)) return { applicable: false, why: 'no dashboard file in this checkout' }
+  return { applicable: true, inputs: { cards: readCards(), state: currentState(), paused: false } }
 }
 
-// --status: print the gathered state and the verdict (manual inspection).
-if (process.argv[2] === '--status') {
-  const state = currentState()
-  const cards = readCards()
-  const result = evaluate({ cards, state, paused: existsSync(PAUSE) })
-  console.log(JSON.stringify({ cards, state, result }, null, 2))
-  process.exit(0)
-}
-
-// Stop-hook mode.
-try {
-  let sid = ''
-  try {
-    sid = JSON.parse(readFileSync(0, 'utf8')).session_id || ''
-  } catch {
-    /* no/non-JSON stdin (manual run) — the sync rule is global truth */
+if (isMainModule(import.meta.url)) {
+  // --drifts: the catalogue of what this guard blocks on (point 308's report
+  // deliverable). Generated from the DRIFTS table the verdicts are stamped from,
+  // so it cannot describe a check the code no longer has.
+  if (process.argv[2] === '--drifts') {
+    console.log(formatDriftReport())
+    process.exit(0)
   }
 
-  if (existsSync(PAUSE)) process.exit(0) // user-paused: no batch duty in flight
-  if (heldByOtherLiveOwner(sid)) process.exit(0) // hard singleton: non-owner sessions stand down
-  if (!existsSync(DASHBOARD)) process.exit(0) // no board yet — dashboard-guard owns that case
+  // --status: print the gathered state and the verdict (manual inspection).
+  if (process.argv[2] === '--status') {
+    const state = currentState()
+    const cards = readCards()
+    const result = evaluate({ cards, state, paused: existsSync(PAUSE) })
+    console.log(JSON.stringify({ cards, state, result }, null, 2))
+    process.exit(0)
+  }
 
-  const result = evaluate({ cards: readCards(), state: currentState(), paused: false })
-  if (result.block) process.stdout.write(JSON.stringify({ decision: 'block', reason: result.reason }))
-  process.exit(0)
-} catch (e) {
-  console.error(`dashboard-sync error (allowing stop): ${e && e.message}`)
-  process.exit(0)
+  // Stop-hook mode.
+  try {
+    let sid = ''
+    try {
+      sid = JSON.parse(readFileSync(0, 'utf8')).session_id || ''
+    } catch {
+      /* no/non-JSON stdin (manual run) — the sync rule is global truth */
+    }
+
+    const gathered = gatherDashboardSyncInputs({ sessionId: sid })
+    if (!gathered.applicable) process.exit(0)
+
+    const result = evaluate(gathered.inputs)
+    if (result.block) process.stdout.write(JSON.stringify({ decision: 'block', reason: result.reason }))
+    process.exit(0)
+  } catch (e) {
+    console.error(`dashboard-sync error (allowing stop): ${e && e.message}`)
+    process.exit(0)
+  }
 }

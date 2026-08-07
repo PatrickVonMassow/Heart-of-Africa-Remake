@@ -12,61 +12,78 @@
 //   node scripts/prep-guard.mjs --clear      # optional: on consuming the result
 //   node scripts/prep-guard.mjs --await "x"  # manual arm (rarely needed)
 // Stop-hook mode (no args): BLOCK while the marker exists and prepped == false.
+//
+// The decision lives in prep-guard-core.mjs (pure, Vitest-covered) since point
+// 437 E — it was inline here, which made it unpredictable by the preflight and
+// untestable by anything.
 import { readFileSync, writeFileSync, existsSync, rmSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
+import { repoPath } from './repo-paths.mjs'
+import { isMainModule } from './is-main.mjs'
 import { heldByOtherLiveOwner } from './batch-singleton.mjs'
+import { evaluatePrep } from './prep-guard-core.mjs'
+import { CAUSE } from './guard-preflight-core.mjs'
 
-const R = (p) => fileURLToPath(new URL(p, import.meta.url))
-const MARKER = R('../.claude/wait-prep.json')
-const PAUSE = R('../.claude/batch-paused')
+const MARKER = repoPath('.claude/wait-prep.json')
+const PAUSE = repoPath('.claude/batch-paused')
 
-const arg = process.argv[2]
-
-if (arg === '--await') {
-  const task = process.argv[3] ?? 'a background validation'
-  writeFileSync(MARKER, JSON.stringify({ task, prepped: false, at: Date.now() }, null, 2))
-  console.log(`prep-guard armed for "${task}": do prep before yielding, then --prepped`)
-  process.exit(0)
-}
-if (arg === '--prepped') {
-  if (existsSync(MARKER)) {
-    const m = JSON.parse(readFileSync(MARKER, 'utf8'))
-    m.prepped = true
-    writeFileSync(MARKER, JSON.stringify(m, null, 2))
-    console.log('prep-guard: prep recorded — yielding is now allowed')
-  } else {
-    console.log('prep-guard: no active wait marker (nothing to record)')
+/** Everything the core needs — shared with the guard preflight, which must never
+ *  gather its own (a second copy would drift and hand back a false "clean"). */
+export function gatherPrepInputs({ sessionId = '' } = {}) {
+  if (existsSync(PAUSE)) return { applicable: false, why: 'the batch is paused' }
+  if (heldByOtherLiveOwner(sessionId)) {
+    return { applicable: false, why: 'another live session owns the batch lock', cause: CAUSE.notLockOwner }
   }
-  process.exit(0)
-}
-if (arg === '--clear') {
-  if (existsSync(MARKER)) rmSync(MARKER)
-  console.log('prep-guard: wait marker cleared')
-  process.exit(0)
-}
-
-// Stop-hook mode.
-try {
-  let sid = ''
+  if (!existsSync(MARKER)) return { applicable: true, inputs: { marker: null } }
+  let marker = null
   try {
-    sid = JSON.parse(readFileSync(0, 'utf8')).session_id || ''
+    marker = JSON.parse(readFileSync(MARKER, 'utf8'))
   } catch {
-    /* no/non-JSON stdin (manual run) */
+    /* an unreadable marker judges nothing — evaluatePrep allows on null */
   }
-  if (existsSync(PAUSE)) process.exit(0) // batch user-paused: no work in flight
-  if (heldByOtherLiveOwner(sid)) process.exit(0) // hard singleton: a non-owner session stands down — no batch duty
-  if (!existsSync(MARKER)) process.exit(0) // no wait armed
-  const m = JSON.parse(readFileSync(MARKER, 'utf8'))
-  if (m.prepped) process.exit(0) // prep already recorded for this wait
-  const reason =
-    `WAITING-TIME PREP REQUIRED. A background task ("${m.task}") is in flight and you are about ` +
-    `to yield without having done prep. Standing rule (enforced, not reminded): use the wait to ` +
-    `do READ-ONLY prep for the NEXT queue ticket — investigate the relevant code, sharpen the ` +
-    `plan/estimate, update the dashboard queue card. Then record it: node scripts/prep-guard.mjs ` +
-    `--prepped (or --clear once you have consumed the task result). If there is genuinely nothing ` +
-    `to prep, run --prepped to acknowledge.`
-  process.stdout.write(JSON.stringify({ decision: 'block', reason }))
-  process.exit(0)
-} catch {
-  process.exit(0) // never hard-block on a guard error
+  return { applicable: true, inputs: { marker } }
+}
+
+if (isMainModule(import.meta.url)) {
+  const arg = process.argv[2]
+
+  if (arg === '--await') {
+    const task = process.argv[3] ?? 'a background validation'
+    writeFileSync(MARKER, JSON.stringify({ task, prepped: false, at: Date.now() }, null, 2))
+    console.log(`prep-guard armed for "${task}": do prep before yielding, then --prepped`)
+    process.exit(0)
+  }
+  if (arg === '--prepped') {
+    if (existsSync(MARKER)) {
+      const m = JSON.parse(readFileSync(MARKER, 'utf8'))
+      m.prepped = true
+      writeFileSync(MARKER, JSON.stringify(m, null, 2))
+      console.log('prep-guard: prep recorded — yielding is now allowed')
+    } else {
+      console.log('prep-guard: no active wait marker (nothing to record)')
+    }
+    process.exit(0)
+  }
+  if (arg === '--clear') {
+    if (existsSync(MARKER)) rmSync(MARKER)
+    console.log('prep-guard: wait marker cleared')
+    process.exit(0)
+  }
+
+  // Stop-hook mode.
+  try {
+    let sid = ''
+    try {
+      sid = JSON.parse(readFileSync(0, 'utf8')).session_id || ''
+    } catch {
+      /* no/non-JSON stdin (manual run) */
+    }
+    const gathered = gatherPrepInputs({ sessionId: sid })
+    if (!gathered.applicable) process.exit(0)
+
+    const verdict = evaluatePrep(gathered.inputs)
+    if (verdict.block) process.stdout.write(JSON.stringify({ decision: 'block', reason: verdict.reason }))
+    process.exit(0)
+  } catch {
+    process.exit(0) // never hard-block on a guard error
+  }
 }

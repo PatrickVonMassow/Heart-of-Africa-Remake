@@ -176,6 +176,21 @@ export function matchingCard(questions, vdzkTitles) {
   return null
 }
 
+/**
+ * The topic words the asking sentences carry, longest first — what a card title
+ * has to share for `matchingCard` to connect the two.
+ *
+ * Exported because the BLOCK REASON has to name them (four-eyes review
+ * 30.07.2026): the guard demands a card whose title matches, then described the
+ * matching rule in prose the writer had to reverse-engineer. A title written
+ * blind matches by luck, and a second miss costs a second turn.
+ */
+export function topicWords(questions) {
+  const out = new Set()
+  for (const q of Array.isArray(questions) ? questions : []) for (const w of contentWords(q)) out.add(w)
+  return [...out].sort((a, b) => b.length - a.length || a.localeCompare(b))
+}
+
 /** The one command that fixes a block — named, not described. */
 export const REMEDY = 'node scripts/board.mjs vdzk-add "<Titel der Frage>" --text-stdin'
 
@@ -198,6 +213,12 @@ export function evaluate({ replyText = null, vdzkTitles = null, cardAddedThisTur
   if (hit) return { block: false, reason: null }
   const asked = ask.questions[0].slice(0, 160)
   const held = vdzkTitles.length ? vdzkTitles.map((t) => `"${t}"`).join(', ') : 'nothing'
+  const words = topicWords(ask.questions)
+  const strong = words.filter((w) => w.length >= STRONG_WORD_LENGTH)
+  const naming = words.length
+    ? `The title must SHARE the question's topic — one of ${strong.length ? `these on its own: ${strong.slice(0, 8).join(', ')}` : `these, and at least TWO of them: ${words.slice(0, 10).join(', ')}`}` +
+      `${strong.length && words.length > strong.length ? `, or any two of ${words.slice(0, 10).join(', ')}` : ''}.\n`
+    : ''
   return {
     block: true,
     reason:
@@ -207,7 +228,7 @@ export function evaluate({ replyText = null, vdzkTitles = null, cardAddedThisTur
       'so nothing on the board says a decision is pending. The chat may carry the question as well, ' +
       `never instead. Add the card, then close the turn with a SHORT acknowledgement — one or ` +
       `two sentences naming the card you added, never a second copy of what the user has ` +
-      `already read:\n  ${REMEDY}\n` +
+      `already read:\n  ${REMEDY}\n${naming}` +
       'Is it NOT a decision for the user (a rhetorical question, a question you answer yourself)? ' +
       'Then rewrite the sentence without the question — this guard errs toward blocking on purpose, ' +
       'because a missed decision costs the user hours and a false block costs one turn.',

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   DEFAULT_THRESHOLD,
   auditFindings,
+  delegationExemption,
   carrierEntry,
   classifyCall,
   formatFindings,
@@ -336,5 +337,85 @@ describe('classifyCall — the declared wait', () => {
   it('a bare in-flight call without --waiting-on is not a record (a --clear leaves nothing behind)', () => {
     const c = classifyCall({ name: 'Bash', command: 'node scripts/batch-in-flight.mjs --clear' })
     expect(c.record).toBeUndefined()
+  })
+})
+
+// The exemption was granted from the COMMAND STRING alone, so a turn that merely
+// RAN the declaration was exempt even where the CLI refused it — and the one
+// path the exemption exists for was also a path a turn could take without
+// investigating (point 437 G, four-eyes review 30.07.2026).
+describe('the declared wait must be EARNED, not claimed', () => {
+  const TURN = 1_800_000_000_000
+  const investigated = (records) => ({ investigative: 9, agents: 0, records })
+
+  it('is honoured when the turn really spawned an agent', () => {
+    const v = delegationExemption({ tally: { agents: 1, records: ['wait-declared'] } })
+    expect(v).toMatchObject({ claimed: true, honoured: true, why: 'agent-spawned' })
+  })
+
+  it('is honoured when the declaration FILE was written inside this turn', () => {
+    const v = delegationExemption({
+      tally: { agents: 0, records: ['wait-declared'] },
+      declarationWrittenAt: TURN + 5_000,
+      turnStartedAt: TURN,
+    })
+    expect(v).toMatchObject({ honoured: true, why: 'declaration-written-this-turn' })
+  })
+
+  it('is REFUSED when the command ran but the file predates the turn — the CLI refused it', () => {
+    const v = delegationExemption({
+      tally: { agents: 0, records: ['wait-declared'] },
+      declarationWrittenAt: TURN - 60_000,
+      turnStartedAt: TURN,
+    })
+    expect(v).toMatchObject({ claimed: true, honoured: false, why: 'declaration-not-written-this-turn' })
+  })
+
+  it('says nothing at all about a turn that never claimed it', () => {
+    expect(delegationExemption({ tally: { agents: 0, records: [] } })).toMatchObject({ claimed: false, honoured: false })
+    expect(delegationExemption()).toMatchObject({ claimed: false })
+  })
+
+  it('BLOCKS an investigating turn whose only record is a refused declaration', () => {
+    const v = auditFindings({
+      tally: investigated(['wait-declared']),
+      declarationWrittenAt: TURN - 60_000,
+      turnStartedAt: TURN,
+    })
+    expect(v.ok).toBe(false)
+    expect(v.violations[0].kind).toBe('unrecorded-investigation')
+    // The refusal has to SAY which carve-out it declined, or the session cannot
+    // tell this block from an ordinary one.
+    expect(v.violations[0].detail).toMatch(/erklärte Wartezeit zählt hier NICHT/)
+  })
+
+  it('ALLOWS the same turn once the declaration was written inside it', () => {
+    expect(
+      auditFindings({
+        tally: investigated(['wait-declared']),
+        declarationWrittenAt: TURN + 1,
+        turnStartedAt: TURN,
+      }).ok,
+    ).toBe(true)
+  })
+
+  it('ALLOWS a turn that spawned an agent, whatever the file says', () => {
+    expect(
+      auditFindings({
+        tally: { investigative: 9, agents: 2, records: ['wait-declared'] },
+        declarationWrittenAt: TURN - 60_000,
+        turnStartedAt: TURN,
+      }).ok,
+    ).toBe(true)
+  })
+
+  it('leaves a REAL record untouched — it never needed the carve-out', () => {
+    expect(auditFindings({ tally: investigated(['finding-record']) }).ok).toBe(true)
+    expect(auditFindings({ tally: investigated(['wait-declared', 'finding-none']) }).ok).toBe(true)
+  })
+
+  it('with no turn boundary to measure against, the agent half still decides', () => {
+    expect(auditFindings({ tally: { investigative: 9, agents: 1, records: ['wait-declared'] } }).ok).toBe(true)
+    expect(auditFindings({ tally: investigated(['wait-declared']) }).ok).toBe(false)
   })
 })

@@ -46,6 +46,11 @@ export const INTENTIONALLY_DORMANT = {
     'is a protected-path edit and needs an attended session. Its core is measured against the real command ' +
     'corpus (1 deny in 5751 transcript commands, and that one deliberate). REMOVE THIS ENTRY IN THE SAME ' +
     'COMMIT THAT ADDS THE HOOK LINE.',
+  'point-proof-guard.mjs':
+    'Built 07.08.2026 by a worktree agent, which may not touch .claude/settings.json — the PreToolUse line ' +
+    'is a protected-path edit and needs an attended session. It is inert until then in a second sense too: ' +
+    'no point in the corpus carries a PROOF line yet, so the gate has nothing to judge. REMOVE THIS ENTRY ' +
+    'IN THE SAME COMMIT THAT ADDS THE HOOK LINE.',
   'bundle-first-guard.mjs':
     'Built 07.08.2026 by a worktree agent — same protected-path reason as above. It ALSO needs its finding ' +
     'cleared before it is armed: it reports 29 open points in no bundle of docs/work-packages.md, which is ' +
@@ -70,7 +75,9 @@ export const KNOWN_UNTESTED = new Set([
   'lock-heartbeat-hook.mjs',
   'lock-release-hook.mjs',
   'prep-arm-hook.mjs',
-  'prep-guard.mjs',
+  // prep-guard.mjs left the list on 07.08.2026: registering it with the guard
+  // preflight (point 437 E) required its decision to be a pure core, so it got
+  // one — prep-guard-core.mjs, with a test. The list only ever shrinks.
 ])
 
 /**
@@ -119,6 +126,25 @@ export function auditGuardHealth({
 
     report.push({ script: file, wired, core, tested, imports: imported, dormant: reason !== null })
 
+    // THE RECORD MUST NOT OUTLIVE THE DORMANCY (four-eyes review 30.07.2026).
+    // Until now a dormant entry was read ONLY while the guard was unwired, so a
+    // guard that got its hook line and kept its entry produced no violation at
+    // all: the map went on claiming an enforcer was inert while it enforced, and
+    // a reader who checks the map before trusting a rule is told the opposite of
+    // the truth. Every entry already ENDS with "remove this entry in the same
+    // commit that adds the hook line" — that convention is now the mechanism it
+    // describes rather than a sentence somebody has to obey.
+    if (wired && reason !== null) {
+      violations.push({
+        kind: 'dormant-but-wired',
+        script: file,
+        detail:
+          `${file} ist VERDRAHTET, steht aber weiterhin in INTENTIONALLY_DORMANT ("${firstSentence(reason)}") — ` +
+          'die Karte behauptet, der Durchsetzer schlafe, während er durchsetzt. Den Eintrag entfernen ' +
+          '(er gehört in denselben Commit wie die Hook-Zeile), oder die Hook-Zeile zurücknehmen.',
+      })
+    }
+
     if (!wired) {
       if (reason === null) {
         violations.push({
@@ -155,6 +181,14 @@ export function auditGuardHealth({
   }
 
   return { ok: violations.length === 0, violations, report }
+}
+
+/** The head of a dormancy reason, so the finding quotes it without reprinting it. */
+function firstSentence(reason, maxChars = 90) {
+  const text = String(reason ?? '').trim()
+  const stop = text.search(/[.:—]\s/)
+  const head = stop > 0 ? text.slice(0, stop) : text
+  return head.length > maxChars ? `${head.slice(0, maxChars - 1)}…` : head
 }
 
 /** Local `./x.mjs` modules a source imports (never its own core-less builtins). */
