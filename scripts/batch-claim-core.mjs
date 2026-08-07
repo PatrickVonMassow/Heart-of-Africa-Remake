@@ -45,7 +45,24 @@
 // Where two verdicts are close this file chooses NOT to release: the owner
 // keeping the batch for another turn is a nuisance, a half-finished merge is a
 // repair job.
-import { resolveOwnership, PID_START_TOLERANCE_MS } from './batch-singleton.mjs'
+import { resolveOwnership, PID_START_TOLERANCE_MS, LAUNCHER_TICK_MS } from './batch-singleton.mjs'
+
+/** THE PICK-UP WINDOW, counted in LAUNCHER TICKS (point 446). The half of the
+ *  handshake that lies with the other side is the pick-up, and the acquirer that
+ *  can steal it is the launcher — so the window is expressed in the unit that
+ *  measures that risk: how many ticks may pass before the launcher is allowed to
+ *  take a freed lock for itself. Two is the smallest count that survives a tick
+ *  falling immediately after the release, and a slower launcher lengthens the
+ *  window with itself rather than losing it.
+ *
+ *  IT COUPLES IN BOTH DIRECTIONS (four-eyes review, Fable 5, finding 2). The same
+ *  product is `CLAIM_MAX_AGE_MS`, which also bounds a claim NOBODY has released to
+ *  yet and feeds the resume hook's stand-down text and the claim CLI — doors that
+ *  have nothing to do with the tick. So a future SPEED-UP of `LAUNCHER_TICK_MS`
+ *  shortens all of them: whoever changes the tick raises this count (or
+ *  HOA_CLAIM_MAX_MIN) to keep the claim window where it belongs. The equality is
+ *  pinned in scripts/batch-claim-core.test.mjs, so the change surfaces there. */
+export const PICKUP_WINDOW_TICKS = 2
 
 /**
  * THE TAKE-UP WINDOW: how long a claim stays honourable once there is nobody
@@ -68,9 +85,15 @@ import { resolveOwnership, PID_START_TOLERANCE_MS } from './batch-singleton.mjs'
  * age: it is honoured for as long as the window that wrote it is alive, which is
  * a fact a probe reads rather than a deadline anybody feeds.
  *
+ * IT IS TWO LAUNCHER TICKS (point 446, 30.07.2026). The number was a flat half
+ * hour that happened to equal them; the incident it is measured against is a
+ * launcher tick landing in the gap between a release and the claiming window's
+ * next command, so the window is now DERIVED from the tick — a launcher slowed
+ * down must not silently shrink the pick-up window to less than one tick.
+ *
  * Calibratable via HOA_CLAIM_MAX_MIN (scripts/batch-claim.mjs).
  */
-export const CLAIM_MAX_AGE_MS = 30 * 60 * 1000
+export const CLAIM_MAX_AGE_MS = PICKUP_WINDOW_TICKS * LAUNCHER_TICK_MS
 
 /**
  * A claim that carries its own ISSUER is a machine errand with a lifetime of its
@@ -340,6 +363,81 @@ export function reservationDecision({ assessment } = {}) {
     return { acquire: false, reason: 'reserved-released', claimantSid: a.claimantSid ?? null }
   }
   return { acquire: true, reason: a?.mine === true ? 'own-claim' : (a?.reason ?? 'no-claim'), claimantSid: a?.claimantSid ?? null }
+}
+
+/**
+ * MAY THE LAUNCHER TAKE A FREE LOCK FOR ITSELF RIGHT NOW? PURE — the probe is
+ * injected, the claim is passed in, nothing here reads a file.
+ *
+ * THE SECOND HALF OF A HANDSHAKE LIES WITH THE OTHER SIDE (point 446, measured
+ * 30.07.2026). The takeover is two steps: a window claims the batch, the owner
+ * releases at its next clean turn end, and the window PICKS IT UP. On 30.07.2026
+ * the release landed at 10:16 into a session the Claude outage had just killed,
+ * and twenty minutes later the launcher took the free lock for itself — correct
+ * by its rules and against the user's intent. Point 434 had made the claim
+ * non-lapsing BEFORE the release; afterwards it was spent and the first to grab
+ * won, and the launcher is by far the most reliable grabber: it ticks whether
+ * anybody is at a keyboard or not.
+ *
+ * So the launcher asks ONE question, and it is this one. The verdicts are the
+ * claim vocabulary the other doors already share (`assessClaim` →
+ * `reservationDecision`) — no second reading of liveness, no second calendar:
+ *   spawn=false 'reserved'          — a claim nobody has released to yet stands
+ *   spawn=false 'reserved-released' — the release HAPPENED and the claimant's
+ *                                     window is provably alive: the free lock is
+ *                                     held for its pick-up, for the window of
+ *                                     `PICKUP_WINDOW_TICKS` ticks counted from
+ *                                     the release
+ *   spawn=true  everything else     — no claim, a dead or closed claimant, a
+ *                                     recycled pid, an elapsed window, a
+ *                                     malformed record or a clock nobody can
+ *                                     reason about
+ * The batch can therefore never end up ownerless: every way for the window to
+ * fail its half — the process is gone, the pick-up never comes — ends in a
+ * spawn, and an unclaimed free lock is taken at once, exactly as before.
+ *
+ * `message` is the line the launcher LOGS, built here so the reason a tick did
+ * not spawn is provable in the fast layer rather than read out of a log by hand.
+ * It is null whenever the launcher may proceed.
+ *
+ * Returns { spawn, reason, claimantSid, ageMs, message }.
+ */
+export function takeoverDecision({
+  claim = null,
+  now,
+  maxAgeMs = CLAIM_MAX_AGE_MS,
+  probePid = null,
+  tolerance = PID_START_TOLERANCE_MS,
+} = {}) {
+  const assessment = claim ? assessClaim({ claim, now, maxAgeMs, probePid, tolerance }) : null
+  const { acquire, reason, claimantSid } = reservationDecision({ assessment })
+  const ageMs = Number.isFinite(assessment?.ageMs) ? assessment.ageMs : null
+  if (acquire) return { spawn: true, reason, claimantSid, ageMs, message: null }
+
+  // FLOOR, never round: an age rounded UP reads at the log as though the window
+  // had already run out while the lock was in fact still being held, and the line
+  // exists to be trusted at 03:00 (four-eyes review, Fable 5, finding 4).
+  const minutes = (ms) => (Number.isFinite(ms) ? `${Math.max(0, Math.floor(ms / 60000))} min` : null)
+  const claimedAgo = minutes(ageMs)
+  // The tick equivalence is only true for the DEFAULT window. Calibrated down via
+  // HOA_CLAIM_MAX_MIN it would print "10 min = 2 launcher ticks", which is false —
+  // and a false diagnosis line is worse than a short one (finding 1).
+  const windowText =
+    maxAgeMs === CLAIM_MAX_AGE_MS
+      ? `${minutes(maxAgeMs) ?? `${PICKUP_WINDOW_TICKS} ticks`} = ${PICKUP_WINDOW_TICKS} launcher ticks`
+      : `${minutes(maxAgeMs) ?? 'unreadable'} (calibrated, HOA_CLAIM_MAX_MIN)`
+  const releasedAgo = minutes(
+    Number.isFinite(assessment?.releasedAt) && Number.isFinite(now) ? now - assessment.releasedAt : NaN,
+  )
+  const message =
+    reason === 'reserved-released'
+      ? `skip: the batch was already RELEASED to session ${claimantSid}` +
+        `${releasedAgo === null ? '' : ` ${releasedAgo} ago`} and that window is ALIVE — the free lock is held ` +
+        `for its PICK-UP (window: ${windowText}). ` +
+        'Taking it here would be the 30.07.2026 handover the user lost.'
+      : `skip: session ${claimantSid} has CLAIMED the batch` +
+        `${claimedAgo === null ? '' : ` ${claimedAgo} ago`} (${reason}) — the user is working in that window`
+  return { spawn: false, reason, claimantSid, ageMs, message }
 }
 
 /**

@@ -23,6 +23,7 @@ import { REPO_ROOT } from './repo-paths.mjs'
 import {
   CLAIM_MAX_AGE_MS,
   GIT_STATE_UNVERIFIABLE,
+  PICKUP_WINDOW_TICKS,
   assessClaim,
   claimIsBounded,
   claimWriteDecision,
@@ -30,6 +31,7 @@ import {
   ownerIsHolding,
   releaseDecision,
   reservationDecision,
+  takeoverDecision,
 } from './batch-claim-core.mjs'
 import {
   acquire,
@@ -39,6 +41,7 @@ import {
   statePathsFor,
   LOCK_PATH,
   CLAIM_PATH,
+  LAUNCHER_TICK_MS,
   PID_START_TOLERANCE_MS,
 } from './batch-singleton.mjs'
 import {
@@ -502,17 +505,19 @@ describe('reservationDecision — a free lock still belongs to the window that c
   // the launcher's spawn gate and the chat watcher's wake gate (point 461). A
   // decision nobody asks is no gate, so the call is pinned where it is made.
   it('the launcher and the watcher ask the DECISION, not the raw honour flag', () => {
-    for (const file of [
-      'batch-autostart.mjs',
-      'chat-watcher.mjs',
-      'batch-boundary.mjs',
-      'batch-resume-hook.mjs',
+    for (const [file, call] of [
+      // The launcher asks the whole takeover verdict, which composes this
+      // decision and adds the pick-up window's own log line (point 446).
+      ['batch-autostart.mjs', 'takeoverDecision('],
+      ['chat-watcher.mjs', 'reservationDecision('],
+      ['batch-boundary.mjs', 'reservationDecision('],
+      ['batch-resume-hook.mjs', 'reservationDecision('],
       // The door whose 17:11 re-acquire IS the incident: it was already wired
       // correctly, and nothing pinned it against drift (four-eyes finding 2).
-      'batch-progress-guard.mjs',
+      ['batch-progress-guard.mjs', 'reservationDecision('],
     ]) {
       const text = readFileSync(resolve(REPO_ROOT, 'scripts', file), 'utf8')
-      expect(text).toContain('reservationDecision(')
+      expect(text, `${file} asks no claim decision`).toContain(call)
       // …and none of them decides on `assessClaim(…).honour` any more.
       expect(text).not.toMatch(/assessClaim\([^)]*\)[\s\S]{0,40}\.honour/)
     }
@@ -562,6 +567,140 @@ describe('reservationDecision — a free lock still belongs to the window that c
       rmSync(dir, { recursive: true, force: true })
     }
   }
+})
+
+// ---------------------------------------------------------------------------
+// THE PICK-UP WINDOW AFTER A RELEASE (point 446). The launcher is the acquirer
+// that never sleeps, so the handshake's second half — the claiming window taking
+// what was freed for it — is measured against ITS tick. Every case is written
+// from a failure side: TOO EAGER is the 30.07.2026 incident, where the release
+// landed at 10:16 and twenty minutes later the launcher took the free lock for
+// itself; TOO TIMID is a reservation that outlives the window it was made for and
+// leaves the batch ownerless, which is why a dead claimant and an elapsed window
+// both spawn at once.
+describe('takeoverDecision — the launcher does not grab a lock that was freed for somebody', () => {
+  const releasedTo = (over = {}) =>
+    claimOf({ releasedAt: NOW - 5 * 60 * 1000, releasedBy: OWNER, ...over })
+
+  it('does NOT spawn while the batch is RELEASED to a window that is alive — and says why', () => {
+    const d = takeoverDecision({ claim: releasedTo(), now: NOW, probePid: aliveClaimant })
+    expect(d).toMatchObject({ spawn: false, reason: 'reserved-released', claimantSid: CLAIMANT })
+    // The log line is the evidence a human reads at 03:00; it names the window,
+    // that the release already happened, and the window it is being held for.
+    expect(d.message).toContain(CLAIMANT)
+    expect(d.message).toContain('RELEASED')
+    expect(d.message).toContain('PICK-UP')
+    expect(d.message).toContain(`${PICKUP_WINDOW_TICKS} launcher ticks`)
+  })
+
+  it('SPAWNS the moment the claimant is gone — a reservation never strands the batch', () => {
+    const d = takeoverDecision({ claim: releasedTo(), now: NOW, probePid: deadClaimant })
+    expect(d).toMatchObject({ spawn: true, reason: 'released', message: null })
+  })
+
+  it('…and a pid the OS has handed to somebody else is just as gone', () => {
+    const stranger = () => ({ exists: true, startedAt: CLAIMANT_STARTED + 10 * 60 * 1000 })
+    expect(takeoverDecision({ claim: releasedTo(), now: NOW, probePid: stranger }).spawn).toBe(true)
+  })
+
+  it('SPAWNS once the pick-up window has elapsed, counted FROM THE RELEASE', () => {
+    const inside = releasedTo({ releasedAt: NOW - (CLAIM_MAX_AGE_MS - 60_000) })
+    const past = releasedTo({ releasedAt: NOW - (CLAIM_MAX_AGE_MS + 1) })
+    expect(takeoverDecision({ claim: inside, now: NOW, probePid: aliveClaimant }).spawn).toBe(false)
+    expect(takeoverDecision({ claim: past, now: NOW, probePid: aliveClaimant })).toMatchObject({
+      spawn: true,
+      reason: 'released',
+    })
+  })
+
+  it('measures that window in LAUNCHER TICKS, not in a hard-coded half hour', () => {
+    // The incident is a TICK landing in the gap after a release, so the bound is
+    // the tick. A launcher slowed down must lengthen the window with itself.
+    expect(CLAIM_MAX_AGE_MS).toBe(PICKUP_WINDOW_TICKS * LAUNCHER_TICK_MS)
+    expect(PICKUP_WINDOW_TICKS).toBeGreaterThanOrEqual(2)
+    const oneTickAgo = releasedTo({ releasedAt: NOW - LAUNCHER_TICK_MS })
+    expect(takeoverDecision({ claim: oneTickAgo, now: NOW, probePid: aliveClaimant }).spawn).toBe(false)
+  })
+
+  it('honours a shorter calibrated window (HOA_CLAIM_MAX_MIN reaches this far)', () => {
+    const d = takeoverDecision({ claim: releasedTo(), now: NOW, maxAgeMs: 60_000, probePid: aliveClaimant })
+    expect(d).toMatchObject({ spawn: true, reason: 'released' })
+  })
+
+  it('…and never claims a calibrated window equals two ticks when it does not', () => {
+    // A false diagnosis line is worse than a short one: with the window cut to
+    // ten minutes, "10 min = 2 launcher ticks" would be a lie in the one place a
+    // human looks first (four-eyes review, Fable 5, finding 1).
+    const d = takeoverDecision({
+      claim: releasedTo({ releasedAt: NOW - 60_000 }),
+      now: NOW,
+      maxAgeMs: 10 * 60 * 1000,
+      probePid: aliveClaimant,
+    })
+    expect(d.spawn).toBe(false)
+    expect(d.message).toContain('10 min (calibrated, HOA_CLAIM_MAX_MIN)')
+    expect(d.message).not.toContain('launcher ticks')
+  })
+
+  it('holds off just as firmly BEFORE the release — the claim nobody answered yet', () => {
+    const d = takeoverDecision({ claim: claimOf(), now: NOW, probePid: aliveClaimant })
+    expect(d).toMatchObject({ spawn: false, reason: 'reserved', claimantSid: CLAIMANT })
+    expect(d.message).toContain('CLAIMED')
+    expect(d.message).toContain('2 min ago')
+  })
+
+  it('takes an UNCLAIMED free lock at once — the ordinary handover is untouched', () => {
+    for (const claim of [null, undefined]) {
+      expect(takeoverDecision({ claim, now: NOW, probePid: aliveClaimant })).toMatchObject({
+        spawn: true,
+        reason: 'no-claim',
+        claimantSid: null,
+        message: null,
+      })
+    }
+  })
+
+  it('spawns on a record nobody can reason about rather than waiting on it', () => {
+    const cases = [
+      ['malformed', { sessionId: '', at: NOW }],
+      ['clock-skew', claimOf({ at: NOW + 60_000 })],
+      ['claimant-unidentified', claimOf({ pid: 0 })],
+      ['claimant-no-start-time', claimOf({ pidStartedAt: undefined })],
+      // The two RELEASE-shaped degenerates: a hand-over that left a name but no
+      // stamp, and one stamped in the future. Neither describes a window anybody
+      // can measure, so neither may hold the lock (four-eyes review, Fable 5,
+      // finding 3 — both were pinned one layer down but not at this verdict).
+      ['released-without-a-stamp', claimOf({ releasedBy: OWNER })],
+      ['released-in-the-future', claimOf({ releasedBy: OWNER, releasedAt: NOW + 60_000 })],
+    ]
+    for (const [reason, claim] of cases) {
+      expect(takeoverDecision({ claim, now: NOW, probePid: aliveClaimant }), reason).toMatchObject({
+        spawn: true,
+        message: null,
+      })
+    }
+    // A caller that cannot even name the time gets the same safe direction.
+    expect(takeoverDecision({ claim: releasedTo(), probePid: aliveClaimant }).spawn).toBe(true)
+  })
+
+  it('reserves NOTHING for an ERRAND claim — its pid names the issuer, not a taker', () => {
+    const errand = releasedTo({ by: 'chat-watcher' })
+    expect(takeoverDecision({ claim: errand, now: NOW, probePid: aliveClaimant })).toMatchObject({
+      spawn: true,
+      reason: 'released',
+    })
+  })
+
+  it('never lets a stray value hold the batch: the verdict is the shared reading', () => {
+    // The composition, pinned: whatever `reservationDecision` grants, the
+    // launcher grants — one reading of a claim, four doors.
+    for (const claim of [releasedTo(), claimOf(), claimOf({ pid: 0 }), null]) {
+      const assessment = claim ? assessClaim({ claim, now: NOW, probePid: aliveClaimant }) : null
+      expect(takeoverDecision({ claim, now: NOW, probePid: aliveClaimant }).spawn).toBe(
+        reservationDecision({ assessment }).acquire,
+      )
+    }
+  })
 })
 
 // ---------------------------------------------------------------------------

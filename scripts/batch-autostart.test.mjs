@@ -110,7 +110,7 @@ describe('the launcher uses the pure spawn builders', () => {
       [/batchParked/, 'the user-paused guard'],
       [/openPointCount\(\)/, 'the work-order read'],
       [/open === 0/, 'the batch-complete guard'],
-      [/reservation\.acquire/, 'the user claim that reserves the batch'],
+      [/takeover\.spawn/, 'the user claim that reserves the batch'],
     ]) {
       expect(sweep, `the sweep must run before ${what}`).toBeLessThan(lineOf(re, what))
     }
@@ -119,7 +119,7 @@ describe('the launcher uses the pure spawn builders', () => {
   it('…and every one of those exits persists the state the sweep just changed', () => {
     // A pruned ledger that is never written back is a sweep that half happened.
     const first = codeLines.findIndex((l) => /reapableSpawns\(/.test(l))
-    const claimEnd = codeLines.findIndex((l) => /reservation\.acquire/.test(l))
+    const claimEnd = codeLines.findIndex((l) => /takeover\.spawn/.test(l))
     const early = codeLines.slice(first, claimEnd + 12)
     expect(early.some((l) => /\bbail\(/.test(l)), 'the early guards must exit through bail()').toBe(true)
     for (const l of early) {
@@ -172,7 +172,7 @@ describe('the launcher runs the board watchdog', () => {
     for (const [re, what] of [
       [/openPointCount\(\)/, 'the work-order read'],
       [/open === 0/, 'the batch-complete guard'],
-      [/reservation\.acquire/, 'the user claim that reserves the batch'],
+      [/takeover\.spawn/, 'the user claim that reserves the batch'],
     ]) {
       expect(watch, `the watchdog must run before ${what}`).toBeLessThan(lineOf(re, what))
     }
