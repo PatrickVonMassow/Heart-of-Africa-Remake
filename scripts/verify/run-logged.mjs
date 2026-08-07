@@ -98,93 +98,94 @@ function showLog(path) {
   return 0
 }
 
-const { own, forward } = parseOwnArgs(process.argv.slice(2))
-if (own.show) {
-  process.exitCode = showLog(own.show)
-} else {
-// ── the run ────────────────────────────────────────────────────────────────
-const logPath = logPathFor(forward, own)
-mkdirSync(dirname(logPath), { recursive: true })
-const log = createWriteStream(logPath, { flags: 'a' })
-const shown = forDisplay(logPath)
-const command = `verify ${forward.join(' ') || '(default: LARGE)'}`
+/** Run the regression, log all of it, print the bounded digest. */
+function runVerify() {
+  const logPath = logPathFor(forward, own)
+  mkdirSync(dirname(logPath), { recursive: true })
+  const log = createWriteStream(logPath, { flags: 'a' })
+  const shown = forDisplay(logPath)
+  const command = `verify ${forward.join(' ') || '(default: LARGE)'}`
 
-console.log(`# ${command} — full output → ${shown}`)
+  console.log(`# ${command} — full output → ${shown}`)
 
-const started = Date.now()
-const child = spawn(process.execPath, [join(HERE, 'run-all.mjs'), ...forward], {
-  windowsHide: true,
-  cwd: ROOT,
-  // stdin inherited so nothing can silently block on input; stdout/stderr piped
-  // through us into the log.
-  stdio: ['inherit', 'pipe', 'pipe'],
-  env: process.env,
-})
+  const started = Date.now()
+  const child = spawn(process.execPath, [join(HERE, 'run-all.mjs'), ...forward], {
+    windowsHide: true,
+    cwd: ROOT,
+    // stdin inherited so nothing can silently block on input; stdout/stderr piped
+    // through us into the log.
+    stdio: ['inherit', 'pipe', 'pipe'],
+    env: process.env,
+  })
 
-const lines = []
-const select = createSelector()
-let rawChars = 0
-let pending = ''
+  const lines = []
+  const select = createSelector()
+  let rawChars = 0
+  let pending = ''
 
-function consume(chunk) {
-  const text = String(chunk)
-  rawChars += text.length
-  log.write(text)
-  pending += text
-  const parts = pending.split(/\r?\n/)
-  pending = parts.pop() ?? ''
-  for (const line of parts) {
-    lines.push(line)
-    const kind = select(line)
-    if (own.stream) console.log(line)
-    else if (!own.quiet && kind) console.log(line)
-  }
-}
-
-child.stdout.on('data', consume)
-child.stderr.on('data', consume)
-
-for (const sig of ['SIGINT', 'SIGTERM']) {
-  process.on(sig, () => {
-    try {
-      child.kill(sig)
-    } catch {
-      /* already gone */
+  function consume(chunk) {
+    const text = String(chunk)
+    rawChars += text.length
+    log.write(text)
+    pending += text
+    const parts = pending.split(/\r?\n/)
+    pending = parts.pop() ?? ''
+    for (const line of parts) {
+      lines.push(line)
+      const kind = select(line)
+      if (own.stream) console.log(line)
+      else if (!own.quiet && kind) console.log(line)
     }
-  })
-}
-
-child.on('close', (code, signal) => {
-  if (pending !== '') {
-    lines.push(pending)
-    if (own.stream || (!own.quiet && select(pending))) console.log(pending)
-    pending = ''
   }
-  log.end()
-  const exitCode = code === null ? 1 : code
-  const digest = buildDigest({
-    lines,
-    command: signal ? `${command} (killed by ${signal})` : command,
-    exitCode,
-    durationMs: Date.now() - started,
-    logPath: shown,
-    rawChars,
-    // The structured lines already went out live; repeating them would pay for
-    // them twice. `--quiet` trades the live view for a single end block.
-    includeKept: own.quiet,
-    maxKeptLines: own.keep,
-    tailLines: own.tail,
-  })
-  console.log(digest.text)
-  // NOT process.exit(): stdout may be a pipe, and an explicit exit can drop
-  // what is still buffered in it — which is the digest itself. Setting the code
-  // and letting the loop drain keeps the caller's copy complete.
-  process.exitCode = exitCode
-})
 
-child.on('error', (err) => {
-  console.log(`FAIL  run-logged   could not start the runner: ${err.message}`)
-  log.end()
-  process.exitCode = 1
-})
+  child.stdout.on('data', consume)
+  child.stderr.on('data', consume)
+
+  for (const sig of ['SIGINT', 'SIGTERM']) {
+    process.on(sig, () => {
+      try {
+        child.kill(sig)
+      } catch {
+        /* already gone */
+      }
+    })
+  }
+
+  child.on('close', (code, signal) => {
+    if (pending !== '') {
+      lines.push(pending)
+      if (own.stream || (!own.quiet && select(pending))) console.log(pending)
+      pending = ''
+    }
+    log.end()
+    const exitCode = code === null ? 1 : code
+    const digest = buildDigest({
+      lines,
+      command: signal ? `${command} (killed by ${signal})` : command,
+      exitCode,
+      durationMs: Date.now() - started,
+      logPath: shown,
+      rawChars,
+      // The structured lines already went out live; repeating them would pay for
+      // them twice. `--quiet` trades the live view for a single end block.
+      includeKept: own.quiet,
+      maxKeptLines: own.keep,
+      tailLines: own.tail,
+    })
+    console.log(digest.text)
+    // NOT process.exit(): stdout may be a pipe, and an explicit exit can drop
+    // what is still buffered in it — which is the digest itself. Setting the code
+    // and letting the loop drain keeps the caller's copy complete.
+    process.exitCode = exitCode
+  })
+
+  child.on('error', (err) => {
+    console.log(`FAIL  run-logged   could not start the runner: ${err.message}`)
+    log.end()
+    process.exitCode = 1
+  })
 }
+
+const { own, forward } = parseOwnArgs(process.argv.slice(2))
+if (own.show) process.exitCode = showLog(own.show)
+else runVerify()
