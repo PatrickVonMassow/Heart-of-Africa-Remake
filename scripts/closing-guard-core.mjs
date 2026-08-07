@@ -280,20 +280,40 @@ export function mayTickPoint(toolName, toolInput) {
  * Total: anything unreadable → [] (fail-open).
  */
 export function closingTickClaim({ toolName, toolInput, tasksText } = {}) {
+  const { points, addedText } = tickClaim({ toolName, toolInput, tasksText })
+  if (points.length === 0) return []
+  const closing = closingPointNumbers(tasksText)
+  for (const n of closingPointNumbers(addedText)) closing.add(n)
+  return points.filter((n) => closing.has(n))
+}
+
+/**
+ * Which points this tool call ticks, WHATEVER their subject — the generic half
+ * of `closingTickClaim`, shared so a second tick gate cannot re-derive the
+ * accounting and drift from it (point 437 C). `addedText` is handed back with
+ * the numbers because the point's SPEC travels with the tick: the block that
+ * lands in the archive is often the only copy of it the call can be judged
+ * against.
+ *
+ * Total by contract: anything unreadable → { points: [], addedText: '' }.
+ */
+export function tickClaim({ toolName, toolInput, tasksText } = {}) {
+  const none = { points: [], addedText: '' }
   try {
     const t = tickTexts(toolName, toolInput)
-    if (!t) return []
+    if (!t) return none
     const ticked = tickedPointNumbers(t.added)
-    if (ticked.size === 0) return []
+    if (ticked.size === 0) return none
     const points = parsePoints(tasksText)
-    if (points.length === 0) return [] // no readable work order → nothing to judge against
+    if (points.length === 0) return none // no readable work order → nothing to judge against
     const already = tickedPointNumbers(t.removed)
-    const closing = closingPointNumbers(tasksText)
-    for (const n of closingPointNumbers(t.added)) closing.add(n)
     const recorded = new Set(points.filter((p) => !p.open).map((p) => p.n))
-    return [...ticked].filter((n) => !already.has(n) && !recorded.has(n) && closing.has(n)).sort((a, b) => a - b)
+    return {
+      points: [...ticked].filter((n) => !already.has(n) && !recorded.has(n)).sort((a, b) => a - b),
+      addedText: t.added,
+    }
   } catch {
-    return []
+    return none
   }
 }
 

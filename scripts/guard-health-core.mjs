@@ -46,6 +46,11 @@ export const INTENTIONALLY_DORMANT = {
     'is a protected-path edit and needs an attended session. Its core is measured against the real command ' +
     'corpus (1 deny in 5751 transcript commands, and that one deliberate). REMOVE THIS ENTRY IN THE SAME ' +
     'COMMIT THAT ADDS THE HOOK LINE.',
+  'point-proof-guard.mjs':
+    'Built 07.08.2026 by a worktree agent, which may not touch .claude/settings.json — the PreToolUse line ' +
+    'is a protected-path edit and needs an attended session. It is inert until then in a second sense too: ' +
+    'no point in the corpus carries a PROOF line yet, so the gate has nothing to judge. REMOVE THIS ENTRY ' +
+    'IN THE SAME COMMIT THAT ADDS THE HOOK LINE.',
   'bundle-first-guard.mjs':
     'Built 07.08.2026 by a worktree agent — same protected-path reason as above. It ALSO needs its finding ' +
     'cleared before it is armed: it reports 29 open points in no bundle of docs/work-packages.md, which is ' +

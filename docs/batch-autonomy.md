@@ -93,6 +93,23 @@ outside the agent's control.
    "Not bundled" section IS the exemption. Fail-open throughout: an unreadable or
    RESTRUCTURED work-packages file allows — a parse miss is not a drift finding.
    `node scripts/bundle-first-guard.mjs --status` prints what is unplaced.
+8. **PreToolUse guard `scripts/point-proof-guard.mjs`** (built 07.08.2026). A
+   point's OWN acceptance condition was enforced by nothing: `closing-guard`
+   gates a version tag and the single tick that claims a closing, and no guard
+   ever read a point's "counts as delivered when the rate is MEASURED, not when
+   the mechanism runs" — with `scripts/measure-context-cost.mjs` sitting in the
+   tree, used by no gate. So a point could be ticked because it FELT finished,
+   the class this project's core lesson forbids. A point that wants better writes
+   one machine-readable line — `PROOF:` followed by the command whose run must be
+   recorded — and its `[ ]`→`[x]` tick is refused until that run is recorded FOR
+   THE CURRENT HEAD (`node scripts/point-proof-guard.mjs --ran <N> --evidence
+   "<result>"`, the evidence grammar `closing-guard --step` already uses;
+   `--status` reports). Per-commit, because a measurement says something about
+   the code it ran against. The line is OPT-IN, so the existing corpus ticks
+   exactly as before, and a record whose command no longer matches what the point
+   demands stops counting rather than being inherited. Fail-open throughout: an
+   UNREADABLE ledger judges nothing, while a merely absent one is "nothing
+   recorded yet" and blocks.
 
 ## Failure-mode table
 
