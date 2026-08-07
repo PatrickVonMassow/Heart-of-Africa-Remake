@@ -1175,8 +1175,8 @@ session — the failure the whole singleton exists to prevent.
    bounds the wait — an ERRAND claim carrying its own issuer (`claim.by`, e.g. the
    chat watcher's responder claim, whose recorded pid is the WATCHER's and
    therefore no bound on the errand at all; `claimIsBounded`), and a claim with
-   **nobody left to wait for**. In that second case `CLAIM_MAX_AGE_MS` (30 min,
-   `HOA_CLAIM_MAX_MIN`) bounds it — counted, like every age here, **from when the
+   **nobody left to wait for**. In that second case `CLAIM_MAX_AGE_MS`
+   (`PICKUP_WINDOW_TICKS` × the launcher tick = 30 min, `HOA_CLAIM_MAX_MIN`) bounds it — counted, like every age here, **from when the
    claim was recorded**, never from the moment the lock fell free — and after it the
    ordinary handover takes over so the batch is never left ownerless. `assessClaim`'s
    `ownerHolding` defaults to FALSE, so a caller that cannot answer gets the bounded
@@ -1232,6 +1232,18 @@ session — the failure the whole singleton exists to prevent.
    the reservation on the lock). Every text that mentions a release says what is
    reserved and what ends it: the stand-down's way back, the claim CLI's `--status`
    and the German boundary card.
+1c. **The PICK-UP WINDOW is measured in launcher ticks** (point 446, measured
+   30.07.2026). The half of the handshake that lies with the other side is the
+   pick-up, and the acquirer that can steal it is the launcher: on 30.07.2026 the
+   release landed at 10:16 into a session the outage had just killed, and twenty
+   minutes later the launcher took the free lock for itself — correct by its rules
+   and against the user's intent. So the launcher asks ONE question at its spawn
+   gate, `takeoverDecision` (`scripts/batch-claim-core.mjs`), which composes the
+   reading above and returns the line it logs, and the window it respects is
+   `PICKUP_WINDOW_TICKS` (2) × the launcher tick rather than a flat half hour a
+   slower launcher could shrink below one tick. Every way for the claiming window
+   to fail its half — the process is gone, the pid was recycled, the pick-up never
+   comes — ends in a spawn, and an unclaimed free lock is still taken at once.
 2. **The claimant must be ALIVE, by IDENTITY.** The recorded pid must exist AND
    have started when the claim says — a reused pid is a stranger. Same rule
    `checkEvidence` applies to a declared background run; `resolveOwnership`

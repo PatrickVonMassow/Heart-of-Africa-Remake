@@ -48,7 +48,7 @@ import {
   PENDING_STALE_MS,
 } from './batch-singleton.mjs'
 import { readClaim, maxAgeMs as claimMaxAgeMs } from './batch-claim.mjs'
-import { assessClaim, reservationDecision } from './batch-claim-core.mjs'
+import { takeoverDecision } from './batch-claim-core.mjs'
 import { readDeclaration, refTipAt, worktreeActiveAt, mtimeOf } from './batch-in-flight.mjs'
 import { assessOwnerWork, describeInFlight, LAUNCHER_WORK_MAX_AGE_MS } from './batch-in-flight-core.mjs'
 import {
@@ -507,21 +507,18 @@ if (open === 0) { log('skip: batch complete (0 open points)'); bail() }
 // easily fall in between. The reservation OUTLIVES the release (point 461): a
 // released record is never honoured again, but the freed lock stays that window's
 // while its process lives, and this tick is exactly one of the automated
-// acquirers the user's window used to have to race. `reservationDecision` is the
-// one reading of that, shared with the resume hook and the owner's Stop guard, so
-// the four doors cannot drift apart. Same bounds as everywhere else: a claim from
-// a closed window is ignored and the take-up window caps an untaken one, so this
-// can never strand the batch.
+// acquirers the user's window used to have to race. The whole verdict — including
+// the PICK-UP WINDOW after a release (point 446) and the line that says why — is
+// `takeoverDecision`, which composes the one reading of a claim
+// (`assessClaim` → `reservationDecision`) the resume hook, the boundary and the
+// owner's Stop guard share, so the doors cannot drift apart and the launcher's
+// own gate is provable in the fast layer. Same bounds as everywhere else: a claim
+// from a closed window is ignored and the window caps an untaken one, so this can
+// never strand the batch.
 {
-  const claim = readClaim()
-  const assessment = claim ? assessClaim({ claim, now, maxAgeMs: claimMaxAgeMs(), probePid }) : null
-  const reservation = reservationDecision({ assessment })
-  if (!reservation.acquire) {
-    const mins = Number.isFinite(assessment?.ageMs) ? Math.round(assessment.ageMs / 60000) : null
-    log(
-      `skip: session ${reservation.claimantSid} has CLAIMED the batch${mins === null ? '' : ` ${mins} min ago`} ` +
-        `(${reservation.reason}) — the user is working in that window`,
-    )
+  const takeover = takeoverDecision({ claim: readClaim(), now, maxAgeMs: claimMaxAgeMs(), probePid })
+  if (!takeover.spawn) {
+    log(takeover.message)
     bail()
   }
 }
