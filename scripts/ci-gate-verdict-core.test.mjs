@@ -191,6 +191,31 @@ describe('the workflow that arms it', () => {
     expect(WORKFLOW).toContain('GATE_OUTCOMES: install=${{ steps.install.outcome }}')
   })
 
+  it('EVERY gate step is announced to the verdict, and only real steps are', () => {
+    // The load-bearing pairing, and the one the rest of this suite cannot see:
+    // `steps.<id>.outcome` for a step that has no id — or a step nobody added to
+    // `GATE_OUTCOMES` — evaluates to the empty string, the core reads it as
+    // NOT_RUN (which is deliberately not a failure), and a genuinely red gate
+    // comes out green, green-statused and unalerted with every test still
+    // passing. So the two sets are compared in BOTH directions: a dropped `id:`
+    // and an unannounced step must each fail here.
+    const lines = WORKFLOW.split('\n')
+    const verdictAt = lines.findIndex((l) => l.trim() === '- id: verdict')
+    expect(verdictAt).toBeGreaterThan(0)
+    const ids = lines.slice(0, verdictAt).flatMap((l) => {
+      const m = /^ {6}- id: (\S+)$/.exec(l)
+      return m ? [m[1]] : []
+    })
+    const value = /^\s*GATE_OUTCOMES: (.*)$/m.exec(WORKFLOW)?.[1] ?? ''
+    const announced = [...value.matchAll(/(\S+)=\$\{\{ steps\.(\S+)\.outcome \}\}/g)].map(([, label, step]) => {
+      // A label pointing at another step's outcome would report the wrong one.
+      expect(label).toBe(step)
+      return label
+    })
+    expect(ids.length).toBeGreaterThan(3)
+    expect(announced.slice().sort()).toEqual(ids.slice().sort())
+  })
+
   it('the ntfy alert keys off the verdict, which a soft run alone reaches', () => {
     expect(WORKFLOW).toContain("steps.verdict.outputs.failed == 'true'")
   })
