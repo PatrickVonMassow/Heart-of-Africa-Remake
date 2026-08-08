@@ -23,14 +23,26 @@
 
 /** Investigative calls needed before a recordless turn is judged.
  *
- *  Calibrated against the whole transcript corpus (2709 turns, 43 sessions,
- *  measured by the second model on 29.07.2026), NOT against an impression:
- *  counting every shell call as investigation blocked 10.6 % of all turns and
- *  73 % of those blocks were build/verify turns, not analysis. With shell
- *  calls classified read-only-or-not (below) the rate lands near 5 % — about
- *  one turn in twenty, and the samples there are genuinely analysis. A guard
- *  that fires on an ordinary turn trains the reader to skip it, which is the
- *  argument guard-health-core.mjs makes about enforcers in general. */
+ *  Calibrated against the whole transcript corpus, NOT against an impression.
+ *  First measured by the second model on 29.07.2026 (2709 turns, 43 sessions,
+ *  on the Windows host): counting every shell call as investigation blocked
+ *  10.6 % of all turns and 73 % of those blocks were build/verify turns, not
+ *  analysis. With shell calls classified read-only-or-not (below) the rate fell
+ *  to roughly a twentieth of the turns, and the samples there were genuinely
+ *  analysis. A guard that fires on an ordinary turn trains the reader to skip
+ *  it, which is the argument guard-health-core.mjs makes about enforcers in
+ *  general.
+ *
+ *  THE CLAIM IS NOW REPLAYABLE (08.08.2026). A measurement that lives in a
+ *  review message is a memory, so the cases it cites are cut into
+ *  `findings-fixtures.json` — real turns, one family per case, replayed by
+ *  `findings-fixtures.test.mjs` on every unit run. Re-measured there on the
+ *  Linux corpus (747 turns, 56 sessions): this rule blocks 7 turns (0.9 %),
+ *  the shell-counts-as-looking rule would block 41 (5.5 %), and the 349
+ *  answer-only turns block under neither. The direction reproduces on a corpus
+ *  the first measurement never saw; the absolute rates do not transfer between
+ *  corpora and are not asserted as if they did.
+ *  Re-measure with: node scripts/findings-fixtures.mjs --measure */
 export const DEFAULT_THRESHOLD = 6
 
 /** Tools whose every use is investigation. */
