@@ -333,6 +333,21 @@ export function auditFindings({
   // Spawning an agent is investigation on its own: it is the most expensive
   // way this project looks at something, and its result reaches nobody unless
   // the parent records it.
+  //
+  // THE AGENT TRIGGER STAYS AS IT IS — decided 08.08.2026, against the corpus.
+  // The second model's review predicted the opposite: 96 of 235 agent-spawning
+  // turns carried no record, so on a project whose working method is maximal
+  // delegation the trigger looked like a `--none` tax on the most ordinary turn
+  // there is, and the review asked for it to be softened.
+  // What that measurement could not see is the exemption built after it. Re-run
+  // on the current corpus (`node scripts/findings-fixtures.mjs --measure`,
+  // 747 turns): of 70 agent-spawning turns, 40 leave a durable record anyway,
+  // 27 are carried by the DECLARED WAIT, and 3 block — turns that handed work
+  // out and neither recorded nor declared it, which is exactly the shape the
+  // rule exists for. The tax the review feared is already paid by a mechanism
+  // that says something true about the turn, so softening the trigger would
+  // only buy back those 3 and cost the one signal that catches a delegation
+  // nobody can find again. The `delegated-wait` fixture family pins this.
   const investigated = Number(t.agents) > 0 || Number(t.investigative) >= threshold
   if (investigated && durable.length === 0 && !delegation.honoured) {
     violations.push({
