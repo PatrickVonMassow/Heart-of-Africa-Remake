@@ -3,6 +3,7 @@
 import { launchVerifyBrowser, waitForStable, waitForReadingStable, waitForSceneBuilt, assertBackend } from './_browser.mjs'
 import { frameShutter, capturePixels } from './frameSubject.mjs'
 import { judgeFootingSeries, judgePitchSeries, MIN_SLOPED_SAMPLES } from './footingSeries.mjs'
+import { judgeStanceSlip } from './stanceSlip.mjs'
 import { withVerifySeed } from './verify-seed.mjs'
 import { fileURLToPath } from 'node:url'
 import sharp from 'sharp'
@@ -345,122 +346,73 @@ const stepUntil = async (ready, arg = null, capFrames = 240) => {
 // Point 300: the feet must be PLANTED, not skating. Sample a tracked foot's
 // WORLD position across a series of frames and compare its travel with the
 // body's over the same intervals, counting only the intervals in which that leg
-// stayed in stance. A planted foot barely moves while the body walks on; the old
-// over-driven cadence dragged it along at a large fraction of the body's speed.
+// never left the ground. A planted foot holds its spot while the body walks on;
+// the old over-driven cadence dragged it along at a large fraction of the
+// body's speed.
+//
+// Point 549 — THE SERIES IS RECORDED IN THE PAGE, ONE SAMPLE PER DRAWN FRAME.
+// The old sampler stepped the scene from Node, one `page.evaluate` per frame,
+// until some animal had covered 5 % of its stride. The scene keeps drawing
+// through those round trips, so the interval was as long as the host was slow —
+// and on this container it grew long enough for the tracked leg to lift, swing
+// and be planted a whole cycle on between two reads. Asking only whether the
+// leg was down at each END then read that replanting as one huge slip: the same
+// unchanged scene reported 0.278, 0.603, 0.727, 0.972 and 1.549 across eight
+// attempts on an idle host, against a bar of 0.25. Recording every frame inside
+// the page makes the sample window the frame it actually is, and lets the
+// judgment demand an UNBROKEN stance across the whole interval, so a wrap is
+// not filtered out — it cannot occur. The judgment itself is the pure,
+// Vitest-covered `judgeStanceSlip` (scripts/verify/stanceSlip.mjs), which also
+// removes the turning body's rigid leg swing through the interval's MEAN
+// heading rather than the heading at its start (measured: a 0.4 rad turn cost
+// 0.200 of spurious slip the old way and 0.006 this way).
 {
-  /**
-   * Step the scene until SOME tracked animal has covered `want` of its own
-   * stride, so the interval is sized in the animal's units and not in frames.
-   *
-   * A FIXED frame count cannot do this: a pen goat walks ~0.12 world units a
-   * second and its stride is 0.82, so three frames of a fast headless run move
-   * it 0.008 — under any usable floor, which is exactly why this check first
-   * measured NOTHING and reported a vacuous "0 stance intervals". The same three
-   * frames on a stalled run cover a whole cycle. Sizing the step by the stride
-   * makes the measurement independent of the frame rate.
-   */
-  const stepUntilWalked = async (read, want, capFrames = 150) => {
-    const from = await page.evaluate(read)
-    for (let f = 0; f < capFrames; f++) {
-      await nextFrames(1)
-      const now = await page.evaluate(read)
-      let far = 0
-      for (const id of Object.keys(from)) {
-        const p0 = from[id]
-        const p1 = now[id]
-        if (!p1 || !(p0.stride > 0)) continue
-        far = Math.max(far, Math.hypot(p1.x - p0.x, p1.z - p0.z) / p0.stride)
-      }
-      if (far >= want) return
-    }
-  }
-  const trackFeet = async (read, label) => {
-    const samples = []
-    for (let k = 0; k < 14; k++) {
-      samples.push(await page.evaluate(read))
-      // 5 % of a stride per interval: far above any measurement floor, far below
-      // the half-stride a stance lasts.
-      await stepUntilWalked(read, 0.05)
-    }
-    const slips = []
-    let turned = 0
-    for (let k = 1; k < samples.length; k++) {
-      const a = samples[k - 1]
-      const b = samples[k]
-      for (const id of Object.keys(a)) {
-        const p0 = a[id]
-        const p1 = b[id]
-        if (!p1 || !p0.stance || !p1.stance || !p0.foot || !p1.foot) continue
-        const body = Math.hypot(p1.x - p0.x, p1.z - p0.z)
-        // A standing animal proves nothing. The floor is a fraction of the
-        // animal's OWN stride, not a world constant — a goat and an elephant do
-        // not walk in the same units.
-        if (!(p0.stride > 0) || body < 0.02 * p0.stride) continue
-        // Within one stance the body covers at most half a stride, so a longer
-        // interval found the SAME leg planted again a cycle on: a wrap, not a
-        // skate — it proves nothing either.
-        if (body > 0.4 * p0.stride) continue
-        // The foot's travel is measured in the walker's own HEADING frame: the
-        // promise under test is that one stride carries the body exactly as far
-        // as the stance foot sweeps back through it, which is a statement about
-        // the walking direction. A body that also TURNS swings its rigid legs
-        // about its centre, and because a trot plants a DIAGONAL pair — the two
-        // stance feet sit symmetrically about that centre — no rigid rotation
-        // can hold both; only full foot-IK could, which this point explicitly
-        // leaves out of scope. So the pivot is measured and REPORTED (`turn`
-        // below) but not charged to the cadence, which is what the fix controls
-        // and what a wrong cadence would blow up here on any path, straight or
-        // curved.
-        // Forward is (sin yaw, cos yaw) throughout this codebase, so local→world
-        // is (lx·cos + lz·sin, −lx·sin + lz·cos) and world→local its transpose.
-        const toLocal = (dx, dz, yaw) => ({
-          x: dx * Math.cos(yaw) - dz * Math.sin(yaw),
-          z: dx * Math.sin(yaw) + dz * Math.cos(yaw),
-        })
-        const y0 = p0.yaw ?? 0
-        const y1 = p1.yaw ?? 0
-        const f0 = toLocal(p0.foot.x - p0.x, p0.foot.z - p0.z, y0)
-        const f1 = toLocal(p1.foot.x - p1.x, p1.foot.z - p1.z, y1)
-        // The foot's world displacement with the rigid yaw change removed: the
-        // body's own travel plus the foot's sweep through the body frame, the
-        // latter carried back to world in the heading held at interval start.
-        const lx = f1.x - f0.x
-        const lz = f1.z - f0.z
-        const sx = lx * Math.cos(y0) + lz * Math.sin(y0)
-        const sz = -lx * Math.sin(y0) + lz * Math.cos(y0)
-        slips.push(Math.hypot(p1.x - p0.x + sx, p1.z - p0.z + sz) / body)
-        turned = Math.max(turned, Math.abs(Math.atan2(Math.sin((p1.yaw ?? 0) - (p0.yaw ?? 0)), Math.cos((p1.yaw ?? 0) - (p0.yaw ?? 0)))))
-      }
-    }
-    // A check that measured nothing must never be able to pass, and must say so
-    // rather than print the empty set's Infinity as if it were a huge slip.
-    check(
-      `${label}: the planted foot holds its ground spot while the body walks over it (point 300)`,
-      slips.length >= 3 && Math.max(...slips) < 0.25,
-      slips.length >= 3
-        ? `${slips.length} stance intervals, worst foot/body travel ${Math.max(...slips).toFixed(3)}, turn up to ${turned.toFixed(3)} rad`
-        : `MEASURED NOTHING — only ${slips.length} usable stance intervals (needs 3): no tracked walker was both in stance and moving`,
+  /** Record the tracked walkers frame by frame, inside the page: one round trip
+   *  for the whole series, so no sample window can be stretched by the host.
+   *  The reader is named rather than passed as a function — a page-side `new
+   *  Function` would be both a lint finding and an indirection for nothing. */
+  const recordGait = (kind, frames, maxMs) =>
+    page.evaluate(
+      ([which, n, cap]) =>
+        new Promise((res) => {
+          const read = () => {
+            const out = {}
+            const info = (which === 'panorama' ? window.__placePanoramaWildlifeInfo : window.__placeGoatGait) ?? {}
+            for (const k of Object.keys(info)) {
+              const w = info[k]
+              if (w.visible === false) continue
+              out[k] = { x: w.x, z: w.z, yaw: w.yaw, foot: w.foot, stance: w.stance, stride: w.stride }
+            }
+            return out
+          }
+          const samples = []
+          const t0 = performance.now()
+          const step = () => {
+            samples.push(read())
+            if (samples.length >= n || performance.now() - t0 >= cap) return res(samples)
+            requestAnimationFrame(step)
+          }
+          requestAnimationFrame(step)
+        }),
+      [kind, frames, maxMs],
     )
+
+  const trackFeet = async (kind, label) => {
+    // In chunks, so a fast host stops as soon as it has a verdict's worth of
+    // intervals and a slow one still gets its walking time. The stop condition
+    // is the MEASUREMENT, never a frame count: a goat crosses its pen at
+    // ~0.12 units a second, so how many frames one stance lasts is the host's
+    // business, not the check's.
+    let samples = []
+    let judged = judgeStanceSlip(samples)
+    for (let chunk = 0; chunk < 4 && judged.intervals < 8; chunk++) {
+      samples = samples.concat(await recordGait(kind, 300, 12000))
+      judged = judgeStanceSlip(samples)
+    }
+    check(`${label}: the planted foot holds its ground spot while the body walks over it (point 300)`, judged.enough && judged.worst < 0.25, judged.detail)
   }
-  await trackFeet(() => {
-    const out = {}
-    const info = window.__placePanoramaWildlifeInfo ?? {}
-    for (const k of Object.keys(info)) {
-      const w = info[k]
-      if (w.visible === false) continue
-      out[k] = { x: w.x, z: w.z, yaw: w.yaw, foot: w.foot, stance: w.stance, stride: w.stride }
-    }
-    return out
-  }, 'panorama silhouette')
-  await trackFeet(() => {
-    const out = {}
-    const info = window.__placeGoatGait ?? {}
-    for (const k of Object.keys(info)) {
-      const g = info[k]
-      out[k] = { x: g.x, z: g.z, yaw: g.yaw, foot: g.foot, stance: g.stance, stride: g.stride }
-    }
-    return out
-  }, 'settlement walker (goat)')
+  await trackFeet('panorama', 'panorama silhouette')
+  await trackFeet('goat', 'settlement walker (goat)')
 }
 // Point 413: the settlement animals must stay OUT of the settlement's solids and
 // out of one another. The report was a goat crossing a compound fence and, the
