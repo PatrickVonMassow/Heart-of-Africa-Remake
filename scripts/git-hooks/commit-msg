@@ -4,8 +4,8 @@
 # unversioned .git/hooks.
 #
 # Asks the commit-scope guard about the MESSAGE: a rescue commit must carry
-# [skip ci] (else its red CI run mails the repository owner for a state nobody
-# claimed was finished), and a commit that skips CI must say why.
+# [skip ci] (else its red CI run alerts on a state nobody claimed was finished),
+# and a commit that skips CI must say why.
 #
 # The message is only readable here — git writes it after the pre-commit hook.
 #
