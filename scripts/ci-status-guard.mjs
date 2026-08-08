@@ -22,8 +22,10 @@
 // uses node:https with agent:false — global fetch (undici) plus process.exit
 // crashes libuv on Windows (UV_HANDLE_CLOSING assert), and its keep-alive
 // would stall the natural exit. This is the turn-end SECONDARY detector; the
-// PRIMARY guaranteed push is the `if: failure()` ntfy step inside
-// .github/workflows/ci.yml (Layer B), which fires even with no session running.
+// PRIMARY guaranteed push is the ntfy step inside .github/workflows/ci.yml
+// (Layer B), which fires on the gate verdict even with no session running — and
+// on a `feat/**` branch it fires where this guard cannot, since that run
+// concludes green by design (point 513) and only its verdict knows better.
 import { readFileSync, existsSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { request } from 'node:https'

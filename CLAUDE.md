@@ -175,8 +175,8 @@ coverage map live in `scripts/verify/README.md`.
   a failed push is reported, never skipped silently). A RESCUE commit — work
   committed because a session or agent was killed mid-build — carries
   `[skip ci]` in its SUBJECT plus a `Rescue: <what was interrupted>` trailer
-  (user 28.07.2026): it is no claim of completeness, and a red CI run on such a
-  branch state MAILS the repository owner. Durability is untouched — the commit
+  (user 28.07.2026): it is no claim of completeness, and its red CI run would
+  alert on a state nobody claims is done. Durability is untouched — the commit
   still pushes; only that run is skipped, and the NEXT commit, the one that
   finishes the work, runs CI normally. The `commit-msg` hook
   refuses each half without the other. Merge to `main` ONLY when

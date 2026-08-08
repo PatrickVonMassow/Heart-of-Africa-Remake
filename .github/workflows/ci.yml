@@ -9,6 +9,26 @@
 # hardware (see scripts/verify/README.md); it would only return to CI with a
 # self-hosted GPU runner. (Removed 2026-07-15 after the nightly job proved
 # unwinnable on the hosted runners.)
+#
+# A BRANCH RUN MUST NOT MAIL THE OWNER (user decision 05.08.2026). Two rules of
+# this project worked against each other: a branch push runs the LIGHT local
+# gate (lint + audit — a full gate per intermediate commit costs more than a red
+# branch is worth), while CI runs the FULL gate on every branch push. An agent
+# that commits mid-work therefore produced red runs, and GitHub mails the
+# repository owner for every failed run he triggered — there is no repository-
+# side switch for that mail, only the run's own conclusion.
+#
+# So a routine `feat/**` PUSH cannot conclude in failure any more: every step of
+# the job carries `continue-on-error` for exactly that case, and the verdict step
+# writes what failed into the run summary, into `::error` annotations and into a
+# COMMIT STATUS on the pushed sha (a red ✗ beside the commit, which mails
+# nobody). `main` is untouched — its steps stay hard, a red run there still mails,
+# and so does a manual `workflow_dispatch` or a pull request on any branch. The
+# rescue convention (`[skip ci]` + `Rescue:` trailer) is untouched as well: that
+# commit produces no run at all.
+#
+# Where a branch failure is announced instead: scripts/verify/README.md,
+# "Where a CI failure is announced".
 name: CI
 
 on:
@@ -24,42 +44,90 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+  # The branch verdict posts the gate's real result as a commit status. Without
+  # the scope the POST is refused and the step says so — it never fails the run.
+  statuses: write
+
 jobs:
   fast:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # The one condition under which no step may fail the job. Repeated verbatim
+    # on every step (`env` is not available to `continue-on-error`), and pinned
+    # step by step in scripts/ci-gate-verdict-core.test.mjs.
     steps:
       - uses: actions/checkout@v4
+        continue-on-error: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/feat/') }}
       - uses: actions/setup-node@v4
+        continue-on-error: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/feat/') }}
         with:
           node-version: 20
           cache: npm
       # Retry npm ci against transient native-dep (sharp/onnxruntime-node)
       # binary-fetch flakes; a genuine failure still exits non-zero.
-      - run: |
+      - id: install
+        name: install
+        continue-on-error: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/feat/') }}
+        run: |
           n=0; until npm ci; do n=$((n+1)); [ "$n" -ge 3 ] && exit 1; echo "npm ci failed, retry $n after 15s"; sleep 15; done
-      - run: npm run build
-      - run: npm run lint
+      - id: build
+        name: build
+        continue-on-error: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/feat/') }}
+        run: npm run build
+      - id: lint
+        name: lint
+        continue-on-error: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/feat/') }}
+        run: npm run lint
       # Fails on any NEW advisory; tolerates recorded, unfixable ones
       # (CLAUDE.md §7.1 pt.18). See the ALLOW list in scripts/audit-check.mjs.
-      - run: node scripts/audit-check.mjs
-      - run: npm run test:unit
+      - id: audit
+        name: audit
+        continue-on-error: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/feat/') }}
+        run: node scripts/audit-check.mjs
+      - id: unit
+        name: unit
+        continue-on-error: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/feat/') }}
+        run: npm run test:unit
+      # The verdict. On `main` the job has already failed by itself and this only
+      # reports; on a `feat/**` push it is the ONLY place the true result is
+      # written, so it must run whatever happened before it.
+      - id: verdict
+        name: gate verdict
+        if: always()
+        continue-on-error: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/feat/') }}
+        env:
+          GATE_EVENT: ${{ github.event_name }}
+          GATE_REF: ${{ github.ref }}
+          GATE_OUTCOMES: install=${{ steps.install.outcome }} build=${{ steps.build.outcome }} lint=${{ steps.lint.outcome }} audit=${{ steps.audit.outcome }} unit=${{ steps.unit.outcome }}
+          GATE_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/ci-gate-verdict.mjs
       # Layer B of the CI-red detection (the PRIMARY guaranteed push): a red run
       # pings the user's/assistant's ntfy topic directly from the runner, so a
       # failure is announced even when no local session is looking. Requires the
       # repo secret NTFY_TOPIC (same value as the local .claude/ntfy-topic);
       # without it the step logs and no-ops — it must NEVER fail the build.
+      # On a `feat/**` push this is the notification that REPLACES the mail, so
+      # it keys off the verdict rather than off `failure()`, which a soft run
+      # never reaches.
       - name: Alert ntfy on failure
-        if: failure()
+        if: ${{ always() && (failure() || steps.verdict.outputs.failed == 'true') }}
+        continue-on-error: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/heads/feat/') }}
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          FAILED_STEPS: ${{ steps.verdict.outputs.failedSteps }}
+          MAILS: ${{ steps.verdict.outputs.mails }}
         run: |
           if [ -n "$NTFY_TOPIC" ]; then
+            note="no mail is sent for this branch run — this alert is the notification"
+            [ "$MAILS" = "true" ] && note="a failure mail goes out as well"
             curl -fsS -m 10 \
               -H "Title: HoA batch: CI red" \
               -H "Priority: high" \
               -H "Tags: rotating_light" \
-              -d "CI '${{ github.workflow }}' FAILED for ${GITHUB_SHA::7} on ${{ github.ref_name }}: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+              -d "CI '${{ github.workflow }}' FAILED (${FAILED_STEPS:-unknown}) for ${GITHUB_SHA::7} on ${{ github.ref_name }} — ${note}: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
               "https://ntfy.sh/${NTFY_TOPIC}" || echo "ntfy alert failed (non-fatal)"
           else
             echo "NTFY_TOPIC secret not set — skipping the failure alert"

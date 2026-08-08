@@ -113,12 +113,12 @@ export function evaluateStagedFiles(entries) {
 }
 
 // ---------------------------------------------------------------------------
-// THE MESSAGE CHECK (user 28.07.2026): a rescue commit must not mail the user.
+// THE MESSAGE CHECK (user 28.07.2026): a rescue commit must not raise an alarm.
 //
 // WHY IT EXISTS: when a delegated agent is killed mid-build its uncommitted
 // work is committed and pushed AT ONCE — durability first, nothing may stay
-// only local. But the branch push starts CI, CI fails on the half-finished
-// state, and GitHub mails the repository owner. That happened on
+// only local. But the branch push starts CI and CI fails on the half-finished
+// state, which back then mailed the repository owner. That happened on
 // `feat/300-gait-matches-speed`: the rescue push went red, the follow-up commit
 // went green, and in between the user got a failure mail for a state nobody
 // claimed was finished. `main` was green throughout — the noise is entirely
@@ -127,12 +127,12 @@ export function evaluateStagedFiles(entries) {
 // The fix is a commit-message convention, not a workflow change: a rescue
 // commit carries `[skip ci]` in its SUBJECT, which GitHub Actions honours for
 // push events. The commit still exists, still pushes, still survives the
-// session — only the run (and the mail) is skipped for a state that is
-// explicitly not a claim of completeness.
+// session — only the run (and with it every announcement of its red) is skipped
+// for a state that is explicitly not a claim of completeness.
 //
-// BOTH HALVES OR NEITHER. An unmarked rescue mails the user; a bare `[skip ci]`
-// on ordinary work silently skips a real gate. So the trailer demands the
-// marker and the marker demands the trailer.
+// BOTH HALVES OR NEITHER. An unmarked rescue alerts on a state nobody claims is
+// done; a bare `[skip ci]` on ordinary work silently skips a real gate. So the
+// trailer demands the marker and the marker demands the trailer.
 
 /** The machine-readable declaration: a `Rescue:` trailer with a reason after
  *  it. A bare `Rescue:` says nothing, so it does not count as a declaration. */
@@ -213,9 +213,9 @@ export function formatMessageVerdict(verdict) {
     '',
     'A RESCUE commit — work committed because a session or agent was killed ' +
       'mid-build —',
-    'is not a claim of completeness, so it must not start CI: a red run on a ' +
-      'half-finished',
-    'state mails the repository owner. It looks like this:',
+    'is not a claim of completeness, so it must not start CI: a red run there ' +
+      'alerts on a',
+    'state nobody claims is done. It looks like this:',
     '',
     '    Keep the interrupted gait work [skip ci]',
     '',
