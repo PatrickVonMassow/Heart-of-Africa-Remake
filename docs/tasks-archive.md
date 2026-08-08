@@ -15949,3 +15949,33 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   CLAUDE.md §7.1 pt 20 keeps naming what the menu must offer. Both sit at measured
   ceilings, so any added words are paid for by a measured raise with its justification or
   by shortening elsewhere.
+
+- [x] 524. THE CHILDREN'S PLAY GROUND IS SQUEEZED INTO A ROCKY CORNER, AND THE
+  FRAME THAT PROVES THEM NO LONGER SHOWS THE VILLAGE (measured 06.08.2026 while
+  closing point 481, on WebGL 2). Point 481 moved the children far enough from
+  the adults for point 478's hearing range to separate the two teaching voices.
+  In the Maasai village that rule leaves only three viable bearings, all in the
+  rocky corner beyond the boulder line: `verification/480-village-tag.png` now
+  shows an almost empty plain with ONE small child beside a lone tree and the
+  edge of a single hut, where the same frame on `main` showed the hut ring, the
+  labels, both children and the herd behind them. The checks stay green — both
+  children are framed and ray-probed within 14 m — which is exactly the
+  looks-wrong-but-passes case: the evidence frame no longer reads as village
+  life to a human.
+  FINAL STATE:
+  1. The children play where the separation rule AND the picture both hold: the
+     ground is chosen so the play spot keeps its distance from the adult
+     vignettes yet still lies against the settlement's built fabric, not on the
+     bare edge behind the rocks.
+  2. If no such spot exists in a village of that size, the SEPARATION is what
+     gives — the two voices may be told apart by another means the mechanic
+     allows (a pause between them, distinct speakers) rather than by pushing the
+     children out of the settlement.
+  3. The tag frame is retaken from a standpoint that shows BOTH children at a
+     readable size WITH the village behind them, and its shutter declaration
+     names the children as its subject so an empty plain can never pass again.
+  4. `balance.villageLife.tag.playRadius` and the derived play ground stay
+     debug-editable, and the derivation is stated in the code where it shrinks.
+  VERIFIABLE: pure Vitest on the play-ground derivation (the spot keeps the
+  separation AND lies within the built fabric for every shipped village), plus
+  the retaken frame checked by a human on both backends.
