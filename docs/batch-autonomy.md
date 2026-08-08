@@ -380,6 +380,59 @@ everything below that peak. So the criterion as written — get under the ceilin
 its own. Recorded here rather than smoothed over: a mechanism that runs is not a
 mechanism that delivered.
 
+### The closing measurement under the built levers — 08.08.2026
+
+The levers of point 373 (d) and (e) landed on `main` on **07.08.2026 03:48 Z** (the
+harness-primitives evaluation and the bounded verify digest, `scripts/verify/run-logged.mjs`).
+The figures below split the transcripts at that moment and are re-derivable with
+
+```
+node scripts/measure-context-cost.mjs --boundary 2026-08-07T03:48:17Z --anchor 1.11
+```
+
+**The scope of the count changed with this measurement, and that is the larger news.**
+Until now the tool read only the project folder's own `*.jsonl`. On the container host
+those are 56 files against **142 delegated-agent transcripts** under
+`<session>/subagents/` — 14 264 of 22 882 counted turns. Their spend bills against the
+same weekly quota, so every earlier figure was a **floor, not a rate**. The tool now
+reports both scopes side by side: *top-level only*, which stays comparable with the
+30.07.2026 anchor, and *full (incl. subagents)*, off which the verdict is read.
+
+| scope | side | turns | active h | weighted/h | spend ≥ 150k context |
+| --- | --- | --- | --- | --- | --- |
+| top-level only | before | 6 508 | 68.3 | 2 300 949 | 75.2 % |
+| top-level only | after | 2 107 | 20.9 | 2 262 640 | 73.9 % |
+| full (incl. subagents) | before | 18 098 | 80.0 | 5 841 329 | 78.6 % |
+| full (incl. subagents) | after | 4 778 | 21.8 | 5 200 365 | 71.4 % |
+
+Carried through the 1.11 %/h anchor the 30.07.2026 state was measured at:
+**top-level only 1.091 %/h** (ratio 0.983), **full 0.988 %/h** (ratio 0.890). Against
+the ~0.6 %/h that fits the quota, **the criterion is NOT met in either scope** — the
+honest number is the full one, 0.988 %/h, still about 1.6× the ceiling. Nor is the
+1.11 %/h anchor itself safe any more: measured in the full scope, the top-level count
+captures only **42 % of the weighted spend**, so the historical anchors understate the
+real rate by roughly the same factor.
+
+**The window is 21.8 hours, not a full day** — from the moment the levers landed
+(07.08 03:48 Z) to the last recorded turn (08.08 01:37 Z) — and it is essentially
+gapless, so wall-clock and active hours coincide. It is a day's worth of work but one
+short of 24 hours, stated rather than rounded up. A second caveat belongs with it: this
+host's transcripts begin only on 03.08.2026, so the "before" side is 03.–07.08, the
+post-boundary/pre-lever regime, and carrying the 1.11 %/h anchor through it assumes
+that regime equals the state measured on 30.07.
+
+What the levers did buy is visible per session: the median peak context in the full
+scope fell from 180k to 153k and the share of sessions ever crossing 150k from 57.9 %
+to 54.9 %, while the large-context share of the spend fell from 78.6 % to 71.4 %. The
+shape of the finding is unchanged from 30.07 — the bill is roughly linear in the live
+context, and trimming the peak moves it only a little. **The next lever must therefore
+be chosen by measurement, and the scope figure points at which one:** with 62 % of the
+turns and 58 % of the spend coming from delegated agents, option (b) — moving the
+reading-heavy part of a point into an agent so the parent never carries the files —
+only relocates the cost unless the AGENT's context is bounded too. Option (c), an
+explicit per-point context budget with a written handoff, is the one that cuts inside
+both.
+
 **A TAKEN BOUNDARY IS WITHDRAWN BY WORK — AND A PAGER IS NOT WORK (point 426).** The
 marker is withdrawn by any tool call that reads as continuing the batch, which is
 correct (working is proof the session is not finished) and is judged by

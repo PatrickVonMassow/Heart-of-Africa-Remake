@@ -237,3 +237,83 @@ export function resolveTranscriptDir(candidates = [], hasTranscripts = () => fal
       '\nPoint the tool at the right folder with MEASURE_TRANSCRIPTS_DIR=<dir>.',
   )
 }
+
+// ---------------------------------------------------------------------------
+// THE SCOPE OF THE COUNT (08.08.2026). The tool used to read only the TOP-LEVEL
+// `*.jsonl` of the project folder, and on this host that is a minority of the
+// transcripts: the rest are DELEGATED-AGENT transcripts under `<session>/subagents/`.
+// Their spend bills against the same weekly quota, so the top-level figure is a FLOOR,
+// not the rate.
+//
+// Both are reported, side by side, because they answer different questions:
+//   topLevel — what the 30.07.2026 anchor (1.11 %/h) was measured on, so the two stay
+//              comparable across the change;
+//   full     — the honest total, and the scope the point's verdict is read off.
+// Neither replaces the other, and the report has to make plain which is which.
+
+/** The two scopes, in reporting order, with the words the report uses for them. */
+export const SCOPE_ORDER = ['topLevel', 'full']
+export const SCOPE_LABELS = {
+  topLevel: 'top-level only',
+  full: 'full (incl. subagents)',
+}
+export const SCOPE_NOTES = {
+  topLevel: 'comparable with the 30.07.2026 anchor — this is what that figure was measured on',
+  full: "the honest total — the point's verdict is read off THIS scope",
+}
+
+/**
+ * Which scope a transcript belongs to, from its path RELATIVE to the project folder.
+ * PURE — no filesystem, so the walk stays in the wrapper.
+ *
+ * A file directly in the folder is a session transcript (`top-level`); anything nested
+ * — in practice `<session>/subagents/agent-*.jsonl` — is a delegated agent's.
+ */
+export function transcriptScope(relPath = '') {
+  const norm = String(relPath).replace(/\\/g, '/').replace(/^\.?\//, '')
+  return norm.includes('/') ? 'subagent' : 'top-level'
+}
+
+/**
+ * The turn list per scope. PURE. `turns` is [{ at, usage, session, scope }] where
+ * `scope` is what `transcriptScope` returned for the file the turn was read from.
+ *
+ * `full` is every turn and `topLevel` the subset from the folder's own transcripts, so
+ * `full` is a SUPERSET by construction — the full count can never come out below the
+ * top-level one, whatever the input.
+ */
+export function scopedTurns(turns = []) {
+  const all = (Array.isArray(turns) ? turns : []).filter(Boolean)
+  return { topLevel: all.filter((t) => t.scope !== 'subagent'), full: all }
+}
+
+/**
+ * THE VERDICT in BOTH scopes. PURE — `measureCost`, `derivedRate` and `sessionProfile`
+ * applied once per scope, so a scope is never a differently-computed number.
+ *
+ * Returns { topLevel, full }, each { turnsRead, subagentTurns, before, after, ratio,
+ * rate, underCeiling, sessions }.
+ */
+export function measureScopes({
+  turns = [],
+  boundaryAt = 0,
+  anchorRatePerHour,
+  fits,
+  largeContext = LARGE_CONTEXT_TOKENS,
+  idleGapMs,
+} = {}) {
+  const sets = scopedTurns(turns)
+  const out = {}
+  for (const scope of SCOPE_ORDER) {
+    const set = sets[scope]
+    const cost = measureCost({ turns: set, boundaryAt, largeContext, idleGapMs })
+    out[scope] = {
+      turnsRead: set.length,
+      subagentTurns: set.filter((t) => t.scope === 'subagent').length,
+      ...cost,
+      ...derivedRate({ ratio: cost.ratio, anchorRatePerHour, fits }),
+      sessions: sessionProfile({ turns: set, boundaryAt, largeContext }),
+    }
+  }
+  return out
+}
