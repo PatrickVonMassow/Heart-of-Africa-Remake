@@ -7988,19 +7988,48 @@ check(
     .then(() => true)
     .catch(() => false)
 
-  const held = await page.evaluate(() => {
-    const labels = window.__actorLabels ? window.__actorLabels() : null
-    if (labels === null) return null
-    const rendered = [...document.querySelectorAll('.actor-label')].map((el) => el.textContent ?? '')
-    return {
-      labels,
-      rendered,
-      // Judged by PROJECTION through the live camera (point 172), never by a
-      // radius: every label must sit on a subject that is really in the frame.
-      offScreen: labels.filter((l) => !window.__camera.onScreen(l.x, l.z, l.y)).length,
-      max: window.__balance.labelOverlay.maxLabels,
-    }
-  })
+  // BOTH readings must describe the SAME moment. The probe reports the list the
+  // layer last rendered from, while a newly added label reaches the DOM through
+  // drei's portal a frame later — so a herd that gained an animal between the
+  // two makes the counts differ by one for a frame, and under load that window
+  // is wide (measured 08.08.2026: 6 rendered against 7 labels, on a run whose
+  // other 250 checks passed). Poll on the app's own frames until the two agree
+  // and snapshot them in that same tick; if they never converge the snapshot
+  // still comes back and the check below fails on it, which is the real defect
+  // this assertion is for.
+  const held = await page.evaluate(
+    () =>
+      new Promise((res) => {
+        let frames = 0
+        const read = () => {
+          const labels = window.__actorLabels ? window.__actorLabels() : null
+          if (labels === null) return null
+          const rendered = [...document.querySelectorAll('.actor-label')].map((el) => el.textContent ?? '')
+          return {
+            labels,
+            rendered,
+            // Judged by PROJECTION through the live camera (point 172), never by
+            // a radius: every label must sit on a subject really in the frame.
+            offScreen: labels.filter((l) => !window.__camera.onScreen(l.x, l.z, l.y)).length,
+            max: window.__balance.labelOverlay.maxLabels,
+            settledAfterFrames: frames,
+          }
+        }
+        const step = () => {
+          const snap = read()
+          if (snap === null) {
+            res(null)
+            return
+          }
+          if (snap.rendered.length === snap.labels.length || ++frames > 240) {
+            res(snap)
+            return
+          }
+          requestAnimationFrame(step)
+        }
+        requestAnimationFrame(step)
+      }),
+  )
   // What must be named is something ALIVE. The traveller's canoe and a pitched
   // camp are usable objects and qualify too, so they are excluded here: a check
   // that counted them would go green on an empty plain.
@@ -8009,7 +8038,8 @@ check(
     'holding Ctrl names the animals in view (point 342)',
     !!held && alive.length > 0 && held.rendered.length === held.labels.length,
     held
-      ? `${alive.length} animals of ${held.labels.length} labels [${held.labels.map((l) => l.kind).join(', ')}]${staged ? ' (staged)' : ''}`
+      ? `${alive.length} animals of ${held.labels.length} labels, ${held.rendered.length} drawn after ` +
+        `${held.settledAfterFrames} frame(s) [${held.labels.map((l) => l.kind).join(', ')}]${staged ? ' (staged)' : ''}`
       : `no layer (herds streamed: ${herds}, appeared: ${appeared}, staged: ${staged})`,
   )
   check(
