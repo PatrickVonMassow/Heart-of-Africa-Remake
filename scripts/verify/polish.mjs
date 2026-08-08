@@ -1,7 +1,7 @@
 // Headless verification for CLAUDE.md §7.1.31 (settlement orientation after
 // a gift and distant panorama wildlife, design.md §17/§2). Dev server only.
 import { launchVerifyBrowser, waitForStable, waitForReadingStable, waitForSceneBuilt, assertBackend } from './_browser.mjs'
-import { frameShutter, capturePixels } from './frameSubject.mjs'
+import { frameShutter, capturePixels, waitForSceneReady } from './frameSubject.mjs'
 import { judgeFootingSeries, judgePitchSeries, MIN_SLOPED_SAMPLES } from './footingSeries.mjs'
 import { judgeStanceSlip } from './stanceSlip.mjs'
 import {
@@ -2960,6 +2960,14 @@ for (const [placeId, shot] of [
     // one with the most village behind the pair, not merely the first with a
     // clear line — and it is still shot from where it was validated.
     const OFFSETS = [0, 1, -1, 2, -2, 3, -3, 4, -4, 5, -5, 6, -6, 7, -7, 8].map((n) => (n / 16) * Math.PI * 2)
+    // THE PICTURE IS WAITED FOR ONCE, HERE — before the sweep, not between the
+    // reading and the shutter. The shutter opens only on a scene that has been
+    // quiet for five seconds, and the children run through those five seconds:
+    // the first retaken frame was JUDGED with the pair 251 px apart and WRITTEN
+    // with them almost touching, which is the same green-check-wrong-picture
+    // shape this point is about. Taking the wait up front and shooting the
+    // validated instant (`sceneReady: false` below) keeps the two together.
+    await waitForSceneReady(page).catch(() => {})
     let stood = null
     let shotProbe = 'no readable standpoint in any sweep'
     let bestSeen = 'nothing read from any bearing'
@@ -2980,8 +2988,8 @@ for (const [placeId, shot] of [
             bestSeen = `best read: ${describeReading(r)} — ${verdict.reason}`
             continue
           }
-          // It reads from here NOW — does it still, once the shutter's settle
-          // delay has passed? Only then is this the frame.
+          // It reads from here NOW — does it still, a few frames on? Only then
+          // is this the frame.
           await nextFrames(4)
           const still = await readsFromHere()
           const settled = judgeTagStandpoint(still)
@@ -3018,6 +3026,15 @@ for (const [placeId, shot] of [
       await frame('480-village-tag', {
         local: { x: aim.x, y: 0.6, z: aim.z },
         label: 'the child who is IT, with the village behind the chase',
+        // The scene was waited for BEFORE the sweep (see above) and this
+        // standpoint's picture has just been ray-probed and projected — which is
+        // a stronger proof that the picture is there than a triangle count that
+        // has stopped moving. The shutter's own five-second settle would only
+        // buy the children time to run out of the frame it validated, and a
+        // reading taken on the far side of the shutter is no remedy: measured
+        // here, it reports a moment LATER than the pixels and called an occluder
+        // on a frame that shows both children whole.
+        sceneReady: false,
       })
     }
   }
