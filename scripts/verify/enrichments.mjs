@@ -7898,6 +7898,196 @@ check(
   JSON.stringify(wrap163),
 )
 
+// --- Hold Ctrl: naming what acts on screen (design.md §17.8, point 342) ------
+// The bird's-eye half. The settlement half is in polish.mjs.
+{
+  /** Let the scene draw N frames — the app's own clock, never the wall clock. */
+  const frames = (n) =>
+    page.evaluate(
+      (count) =>
+        new Promise((res) => {
+          let i = 0
+          const step = () => (++i >= count ? res() : requestAnimationFrame(step))
+          requestAnimationFrame(step)
+        }),
+      n,
+    )
+
+  // Onto open savanna and wait for real streamed herds, so there IS something
+  // alive to name (the check is about the layer, not about spawning). The HUD is
+  // put back the way a player would have it — an earlier check may have left the
+  // map open over the picture — and the zoom to the in-game DEFAULT (point 172).
+  await page.evaluate(() => {
+    const ui = window.__ui.getState()
+    if (ui.mapOpen) ui.toggleMap()
+    ui.setTravelZoom(0.5)
+    window.__game.getState().setJournalOpen(false)
+    window.__game.getState().debugJumpTo(-2.6, 35.2)
+  })
+  const herds = await waitForHerds(6)
+  // The camera eases to its target; scan only once it has caught up (point 177).
+  await page.waitForFunction(() => window.__camera?.settled?.() === true, null, { timeout: 30000 }).catch(() => {})
+  // There must be a LIVING subject in the frame: the traveller's own canoe is on
+  // screen at every spot, so a label count alone would pass over an empty plain
+  // and prove nothing about the animals (the first run's frame showed exactly
+  // that). Streaming alone cannot be relied on to put one in view within a
+  // bounded wait — on the slower backend it did not — so if none has arrived, a
+  // pair is STAGED beside the traveller, the way the drama checks stage theirs.
+  // What is under test is the LAYER, never the spawner.
+  const onScreenAnimal = () =>
+    page.evaluate(() => {
+      const h = window.__wildlife?.herdsRef?.current
+      if (!h || !window.__camera) return false
+      for (const sp of Object.keys(h)) {
+        for (const a of h[sp]) if (!a.dead && window.__camera.onScreen(a.x, a.z)) return true
+      }
+      return false
+    })
+  await page
+    .waitForFunction(
+      () => {
+        const h = window.__wildlife?.herdsRef?.current
+        if (!h || !window.__camera) return false
+        for (const sp of Object.keys(h)) {
+          for (const a of h[sp]) if (!a.dead && window.__camera.onScreen(a.x, a.z)) return true
+        }
+        return false
+      },
+      null,
+      { timeout: 20000 },
+    )
+    .catch(() => {})
+  const staged = !(await onScreenAnimal())
+  if (staged) {
+    await page.evaluate(() => {
+      const h = window.__wildlife.herdsRef.current
+      const p = window.__game.getState().pos
+      // A grown zebra and its foal, a few metres in front of the traveller.
+      h.zebra.push({ x: p.x + 3, z: p.z + 3, y: 0.2, rot: 0, scale: 1, phase: 0.3 })
+      h.zebra.push({ x: p.x - 3, z: p.z + 3, y: 0.2, rot: 0, scale: 0.6, phase: 0.7, young: true })
+    })
+    // The layer reads the transform the RENDER PASS wrote, so let it draw them.
+    await page.evaluate(
+      () =>
+        new Promise((res) => {
+          let i = 0
+          const step = () => (++i >= 6 ? res() : requestAnimationFrame(step))
+          requestAnimationFrame(step)
+        }),
+    )
+  }
+
+  const before = await page.evaluate(() => document.querySelectorAll('.actor-label').length)
+  check('no label stands while Ctrl is up (point 342)', before === 0, `${before} labels`)
+
+  await page.keyboard.down('Control')
+  // Poll for the layer's own state rather than sleeping: it refreshes on its
+  // own interval and this machine may be loaded.
+  const appeared = await page
+    .waitForFunction(() => (window.__actorLabels?.() ?? []).length > 0, null, { timeout: 20000 })
+    .then(() => true)
+    .catch(() => false)
+
+  // BOTH readings must describe the SAME moment. The probe reports the list the
+  // layer last rendered from, while a newly added label reaches the DOM through
+  // drei's portal a frame later — so a herd that gained an animal between the
+  // two makes the counts differ by one for a frame, and under load that window
+  // is wide (measured 08.08.2026: 6 rendered against 7 labels, on a run whose
+  // other 250 checks passed). Poll on the app's own frames until the two agree
+  // and snapshot them in that same tick; if they never converge the snapshot
+  // still comes back and the check below fails on it, which is the real defect
+  // this assertion is for.
+  const held = await page.evaluate(
+    () =>
+      new Promise((res) => {
+        let frames = 0
+        const read = () => {
+          const labels = window.__actorLabels ? window.__actorLabels() : null
+          if (labels === null) return null
+          const rendered = [...document.querySelectorAll('.actor-label')].map((el) => el.textContent ?? '')
+          return {
+            labels,
+            rendered,
+            // Judged by PROJECTION through the live camera (point 172), never by
+            // a radius: every label must sit on a subject really in the frame.
+            offScreen: labels.filter((l) => !window.__camera.onScreen(l.x, l.z, l.y)).length,
+            max: window.__balance.labelOverlay.maxLabels,
+            settledAfterFrames: frames,
+          }
+        }
+        const step = () => {
+          const snap = read()
+          if (snap === null) {
+            res(null)
+            return
+          }
+          if (snap.rendered.length === snap.labels.length || ++frames > 240) {
+            res(snap)
+            return
+          }
+          requestAnimationFrame(step)
+        }
+        requestAnimationFrame(step)
+      }),
+  )
+  // What must be named is something ALIVE. The traveller's canoe and a pitched
+  // camp are usable objects and qualify too, so they are excluded here: a check
+  // that counted them would go green on an empty plain.
+  const alive = held ? held.labels.filter((l) => l.kind !== 'canoe' && l.kind !== 'camp') : []
+  check(
+    'holding Ctrl names the animals in view (point 342)',
+    !!held && alive.length > 0 && held.rendered.length === held.labels.length,
+    held
+      ? `${alive.length} animals of ${held.labels.length} labels, ${held.rendered.length} drawn after ` +
+        `${held.settledAfterFrames} frame(s) [${held.labels.map((l) => l.kind).join(', ')}]${staged ? ' (staged)' : ''}`
+      : `no layer (herds streamed: ${herds}, appeared: ${appeared}, staged: ${staged})`,
+  )
+  check(
+    'every Ctrl label sits on an ON-SCREEN subject (points 172/342)',
+    !!held && held.offScreen === 0,
+    held ? `${held.offScreen} of ${held.labels.length} off screen` : 'no layer',
+  )
+  check(
+    'the label count stays under the calibratable cap (point 342)',
+    !!held && held.labels.length <= held.max,
+    held ? `${held.labels.length} <= ${held.max}` : 'no layer',
+  )
+  // Scenery answers nothing: no plant, rock or dressing may be named. The flora
+  // roster is the one TravelScene draws (src/scenes/travel/floraSpecies.ts).
+  const FLORA_WORDS = [
+    'acacia', 'akazie', 'jungle', 'dschungel', 'palm', 'palme', 'bush', 'busch',
+    'rock', 'fels', 'baobab', 'termite', 'termiten', 'deadtree', 'papyrus', 'kopje',
+    'tree', 'baum', 'grass', 'gras',
+  ]
+  const plantNamed = held ? held.rendered.filter((t) => FLORA_WORDS.some((w) => t.toLowerCase().includes(w))) : null
+  check(
+    'no plant, rock or dressing is named (point 342)',
+    !!held && plantNamed.length === 0,
+    held ? `${plantNamed.length} scenery labels` : 'no layer',
+  )
+
+  await shot('147-ctrl-actor-labels', {
+    world: { lat: -2.6, lon: 35.2 },
+    label: 'the savanna with the Ctrl labels over its animals',
+  })
+
+  await page.keyboard.up('Control')
+  const cleared = await page
+    .waitForFunction(
+      () => document.querySelectorAll('.actor-label').length === 0 && window.__actorLabels === undefined,
+      null,
+      { timeout: 15000 },
+    )
+    .then(() => true)
+    .catch(() => false)
+  await frames(2)
+  const after = await page.evaluate(() => ({
+    dom: document.querySelectorAll('.actor-label').length,
+    hook: window.__actorLabels === undefined,
+  }))
+  check('releasing Ctrl clears every label (point 342)', cleared && after.dom === 0 && after.hook, JSON.stringify(after))
+}
+
 console.log('console errors:', errors.length)
 for (const e of errors) console.log('ERR:', e.slice(0, 300))
 await browser.close()

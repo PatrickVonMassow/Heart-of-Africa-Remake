@@ -85,6 +85,8 @@ import {
 import { REGION_PLACE_STYLES, type RegionPlaceStyle } from './regionStyles'
 import { PlaceLife } from './PlaceLife'
 import { SpeechLabels } from './SpeechLabels'
+import { ActorLabels } from '../ActorLabels'
+import { markActor } from '../actorLabelSource'
 import { resolveMove, PLAYER_RADIUS } from './collision'
 import { buildBoundaryLut, isOutsidePlace } from './boundary'
 import {
@@ -497,6 +499,9 @@ function Villager({
     ? cloakForCloth(dress.cloaks, dress.palette, style.cloth[1 % style.cloth.length])
     : style.cloth[1 % style.cloth.length]
   return (
+    // NOT marked for the §17.8 Ctrl layer: this figure already carries his own
+    // standing label below, so the layer would print the same word twice over
+    // one man (measured — two "Elder" boxes stacked in the frame).
     <group position={[item.pos[0], 0, item.pos[1]]}>
       {/* Robe */}
       <mesh position={[0, 0.62, 0]} castShadow>
@@ -2135,6 +2140,9 @@ function GizaAmbient({ anchors }: { anchors: Array<{ x: number; z: number; role:
           ref={(el) => {
             refs.current[i] = el
           }}
+          // The Giza crowd names itself under Ctrl like any other inhabitant
+          // (design.md §17.8): its roles ARE the kinds, mounts included.
+          userData={markActor({ kind: a.role, height: a.role === 'camel' ? 2.4 : 2.0 })}
         >
           {figureFor(a.role)}
         </group>
@@ -2826,6 +2834,10 @@ export function PlaceScene() {
       {/* The hypothesis over a speaker's head (design.md §13.4): mounted once,
           empty until a figure speaks. */}
       <SpeechLabels />
+
+      {/* Names the inhabitants, their animals and the usable objects while Ctrl
+          is held (design.md §17.8). */}
+      <ActorLabels />
     </>
   )
 }

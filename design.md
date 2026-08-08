@@ -577,7 +577,7 @@ English (default) and German. The language can be switched at runtime (POC: via 
 
 While the Ctrl key is held down, everything on screen that ACTS names itself with a small floating label — and only that. Every animal, every person, every object the player can use or interact with. Scenery does not answer: no tree, rock, grass tuft or house wall, because the layer exists to tell the living and the usable APART from the backdrop, and a label over every plant would tell nothing. The test is "can it move, or can I do something with it?" — the crocodile in the river yes, the reeds it lies in no. It works in both perspectives.
 
-The label says WHAT a thing is, never who: its kind, its age where the game distinguishes one, and its state where that state changes what the player is looking at — a dead animal is named as dead. Hence "Adult giraffe" and "Dead giraffe calf". People read by their role (elder, trader, villager), objects by their kind (a pitched camp, a canoe set down).
+The label says WHAT a thing is, never who: its kind, its age where the game distinguishes one, and its state where that state changes what the player is looking at — a dead animal is named as dead. Hence "Adult giraffe" and "Dead giraffe calf". People read by their role (elder, trader, villager), objects by their kind (a pitched camp, the canoe).
 
 Four rules keep it honest:
 

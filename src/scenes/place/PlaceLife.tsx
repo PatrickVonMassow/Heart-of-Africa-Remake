@@ -41,6 +41,8 @@ import { cloakForCloth, wearsByRank } from '../../systems/dress'
 import { useColdCloaks, type ColdDress } from './useColdCloaks'
 import { presenceAt } from '../../systems/seasonalLife'
 import { devAssert } from '../../systems/devAssert'
+import type { ActorRoleKind } from '../../systems/actorLabels'
+import { markActor } from '../actorLabelSource'
 import { placeById } from '../../world/geo'
 import { useGame } from '../../state/store'
 import { START_YEAR, balance } from '../../config/balance'
@@ -139,6 +141,7 @@ function Figure({
   scale = 1,
   kneel = false,
   legs = false,
+  role = 'villager',
   gesture,
   pose,
   gait,
@@ -147,6 +150,9 @@ function Figure({
   skin?: string
   scale?: number
   kneel?: boolean
+  /** What this inhabitant IS, for the hold-Ctrl layer (design.md §17.8): it
+   *  names people by their role, and every figure in a settlement is one. */
+  role?: ActorRoleKind
   /** Draw legs and let `gait` swing them (ignored while kneeling). */
   legs?: boolean
   /** The figure's own gesture state; this figure advances and applies it. */
@@ -212,7 +218,11 @@ function Figure({
   return (
     // Named so a speaking figure can be found in the scene graph — the overhead
     // speech label rides on this object (design.md §13.4).
-    <group name="inhabitant" scale={[scale, scale * (kneel ? 0.75 : 1), scale]}>
+    <group
+      name="inhabitant"
+      scale={[scale, scale * (kneel ? 0.75 : 1), scale]}
+      userData={markActor({ kind: role, height: bodyH + 0.45 })}
+    >
       {/* The trunk pivots at the hip so a lean or a shake carries the arms and
           the head with it, and the legs (below) stay planted. */}
       <group ref={trunk} position={[0, hipY, 0]}>
@@ -630,6 +640,7 @@ function Kids({
             cloth={cloth[i % cloth.length]}
             scale={KID_SCALE}
             legs
+            role="child"
             gait={gaits.current[i]}
             pose={poses.current[i]}
           />
@@ -766,6 +777,7 @@ function Goats({ seed, count, pen, colliders }: { seed: number; count: number; p
           ref={(el) => {
             refs.current[i] = el
           }}
+          userData={markActor({ kind: 'goat', height: 0.9 })}
         >
           <mesh geometry={parts.body} material={material} castShadow />
           {parts.legs.map((leg, li) => (
@@ -851,7 +863,7 @@ function Porters({
             refs.current[i] = el
           }}
         >
-          <Figure cloth={cloth[i % cloth.length]} pose={carry} />
+          <Figure cloth={cloth[i % cloth.length]} pose={carry} role="porter" />
           {/* Carried crate */}
           <mesh position={[0, 1.05, 0.3]} castShadow>
             <boxGeometry args={[0.45, 0.35, 0.35]} />
@@ -1966,7 +1978,7 @@ function Traders({ seed, cloth }: { seed: number; cloth: string[] }) {
             refs.current[i] = el
           }}
         >
-          <Figure cloth={cloth[(i + 1) % cloth.length]} />
+          <Figure cloth={cloth[(i + 1) % cloth.length]} role="trader" />
         </group>
       ))}
     </>

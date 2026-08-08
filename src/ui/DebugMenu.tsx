@@ -613,6 +613,8 @@ export function DebugMenu() {
       check(t.debug.flatGround, groundDebugFlat, (v) => useUi.getState().setGroundDebugFlat(v)),
       num(t.debug.startupFreezeBudget, balance.startup.pictureFreezeBudgetMs,
         (v) => { balance.startup.pictureFreezeBudgetMs = Math.max(100, v); bump() }, 250),
+      num(t.debug.labelOverlayMax, balance.labelOverlay.maxLabels,
+        (v) => { balance.labelOverlay.maxLabels = Math.max(0, Math.round(v)); bump() }, 4),
       num(t.debug.ambienceVolume, balance.ambienceVolume, (v) => {
         set('ambienceVolume', Math.max(0, v))
         refreshAmbienceVolume()
