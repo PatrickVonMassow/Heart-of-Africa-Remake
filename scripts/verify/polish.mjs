@@ -3508,8 +3508,13 @@ for (const [placeId, shot] of [
       ([n, cap]) =>
         new Promise((res) => {
           const out = []
-          const t0 = performance.now()
-          const tick = () => {
+          let done = false
+          const finish = () => {
+            if (done) return
+            done = true
+            res(out)
+          }
+          const sample = () => {
             const cam = window.__placeCamera
             const y = cam.position.y
             const up = window.__placeRayHit(cam.position.x, y + 6, cam.position.z)
@@ -3521,8 +3526,22 @@ for (const [placeId, shot] of [
               drop: down.hitDistance,
               below: down.hitName,
             })
-            if (out.length >= n || performance.now() - t0 > cap) res(out)
-            else requestAnimationFrame(tick)
+          }
+          // The first sample is taken WITHOUT waiting for a frame, so a lane that
+          // draws nothing still yields the single reading the old probe took —
+          // the window can only ever add to it, never leave the caller with less.
+          sample()
+          // And the wall clock, not rAF, ends the window: a page that stops
+          // ticking must not hang `page.evaluate`, which has no timeout of its own.
+          const timer = setTimeout(finish, cap + 500)
+          const t0 = performance.now()
+          const tick = () => {
+            if (done) return
+            sample()
+            if (out.length >= n || performance.now() - t0 > cap) {
+              clearTimeout(timer)
+              finish()
+            } else requestAnimationFrame(tick)
           }
           requestAnimationFrame(tick)
         }),
