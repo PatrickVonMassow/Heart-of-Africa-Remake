@@ -429,6 +429,22 @@ export const de: Strings = {
 
   debug: {
     title: 'Debug-Menü (F1)',
+    filter: 'Filter',
+    filterHint: 'eingrenzen …',
+    filterEmpty: 'Kein Regler passt.',
+    groups: {
+      movement: 'Bewegung und Steuerung',
+      travel: 'Zeit und Reise',
+      survival: 'Gesundheit, Wasser und Vorräte',
+      wildlife: 'Tierwelt und ihre Dramen',
+      settlement: 'Siedlungsleben',
+      weather: 'Wetter und Jahreszeit',
+      economy: 'Wirtschaft und Handel',
+      events: 'Zufallsereignisse und Auslöser',
+      graphics: 'Grafik und Ton',
+      jump: 'Sprungziele',
+      tools: 'Werkzeuge',
+    },
     renderer: 'Renderer',
     language: 'Sprache',
     travelSpeed: 'Tempo außerorts',

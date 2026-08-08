@@ -38,6 +38,14 @@ view back), and the unlocked range reaches a whole-continent view.
 The camera near plane snaps back to the first-person
 default the moment another scene takes the shared camera — entering a
 settlement straight out of the debug zoom must never clip hut walls.
+The menu itself is STRUCTURED (§21, point 393): its ~130 controls sit
+in eleven named, collapsible groups — grouped by what a person is
+doing when he opens the menu, not by the balance object a value lives
+in — all collapsed at first, an opened one remembered for the session,
+under a filter field that narrows the whole menu to the controls whose
+localized label matches what is typed. The regrouping loses nothing: a
+completeness pin in `src/ui/DebugMenu.test.tsx` names every control
+and its group and fails on a dropped or an unannounced one.
 The debug menu offers the §21.3 dropdown selectors
 (jump-to: every named map point — ports, villages, monuments (point
 273), mountains, waterfalls, lakes, cultural landmarks, natural sites,

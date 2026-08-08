@@ -8,6 +8,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { DebugMenu } from './DebugMenu'
+import { DEBUG_GROUP_ORDER, matchesDebugFilter, type DebugGroupId } from './debugMenuGroups'
 import { balance } from '../config/balance'
 import { EDGE_BAND_MAX_WANDER_M } from '../render/edgeBand'
 import { STAIN_MAX_IRREGULARITY } from '../render/groundStains'
@@ -32,6 +33,7 @@ withWorld()
 // The debug menu edits mutate the shared balance singleton; capture the
 // defaults so each test restores them (deterministic, no cross-test bleed).
 const DEFAULTS = {
+  travelSpeed: balance.travelSpeed,
   mouseSensitivity: balance.mouseSensitivity,
   lookPitchLimitDeg: balance.lookPitchLimitDeg,
   ambienceVolume: balance.ambienceVolume,
@@ -110,6 +112,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  balance.travelSpeed = DEFAULTS.travelSpeed
   balance.mouseSensitivity = DEFAULTS.mouseSensitivity
   balance.lookPitchLimitDeg = DEFAULTS.lookPitchLimitDeg
   balance.ambienceVolume = DEFAULTS.ambienceVolume
@@ -151,6 +154,7 @@ afterEach(() => {
   balance.inventoryCapacity = DEFAULTS.inventoryCapacity
   balance.randomEventsEnabled = DEFAULTS.randomEventsEnabled
   balance.showHiddenObjects = DEFAULTS.showHiddenObjects
+  useUi.setState({ debugGroupsOpen: [] })
   useLocale.getState().setLang('en')
   useUi.getState().setTraaEnabled(true)
   useUi.getState().setWebglFallback(false)
@@ -711,5 +715,294 @@ describe('DebugMenu event-trigger dropdown (design.md §21.3, point 258)', () =>
     const before = useGame.getState().journal.length
     fireEvent.change(stageSelect(), { target: { value: `${HAZARD_PREFIX}mountainFall` } })
     expect(useGame.getState().journal.length).toBeGreaterThan(before)
+  })
+})
+
+// --- The menu's STRUCTURE (design.md §21.3, point 393) ----------------------
+// The ~130 controls sit in named, collapsible groups under a filter field. The
+// risk the restructuring carries is a control silently going missing, so the
+// completeness test below is a PIN: it names every control and the group it
+// belongs to, and compares that against what the menu actually renders — in
+// both directions, so neither a dropped nor an unannounced control passes. It
+// is the same shape as the QUALITY_PRESETS completeness gate.
+
+/** Every control the menu owes, by group, as a dotted path into a dictionary. */
+const EXPECTED_CONTROLS: Record<DebugGroupId, readonly string[]> = {
+  movement: [
+    'debug.walkSpeed', 'debug.strafeFactor', 'debug.placeCollisionFactor',
+    'debug.mouseSensitivity', 'debug.lookPitchLimit', 'debug.invertLook', 'debug.wheelZoom',
+  ],
+  travel: [
+    'debug.travelSpeed', 'debug.daysPerUnit', 'debug.canoeSpeedup', 'debug.junglePenalty',
+    'debug.mountainPenalty', 'debug.oceanSwimMargin', 'debug.riverWidthFactor', 'debug.riverMouthSlackDeg',
+  ],
+  survival: [
+    'debug.foodPerDay', 'debug.foodUnitDays', 'debug.foodDays', 'debug.canteenDrain',
+    'debug.canteenDesertDrain', 'debug.canteenCapacity', 'debug.woundHealLight', 'debug.woundHealSevere',
+    'debug.health', 'health.fever', 'health.sunblind', 'health.woundsSevere',
+  ],
+  wildlife: [
+    'debug.stageEvent', 'debug.drownSeconds', 'debug.wetFlowFactor', 'debug.vigilPredatorDelay',
+    'debug.rescueBurst', 'debug.calfFraction', 'debug.calfFollowRadius', 'debug.calfGambolRange',
+    'debug.calfGambolBout', 'debug.juvenilePreyBias', 'debug.juvenileDrinkCrocBias',
+    'debug.calfAdoptionRadius', 'debug.calfEscapeSeconds', 'debug.calfReunionSeconds',
+    'debug.calfMourningSeconds', 'debug.crocStrikeRadius', 'debug.crocAmbushBankBand',
+    'debug.crocMouthOffset', 'debug.crocDragSpeed', 'debug.crocDragSeconds', 'debug.crocGripSeconds',
+    'debug.crocDriveOffRest', 'debug.huntLeaveOvertime', 'debug.waterCrossMax', 'debug.waterCrossChance',
+    'debug.bloodStainSize', 'debug.bloodStainIrregularity',
+  ],
+  settlement: [
+    'debug.walkerUnstuck', 'debug.edgeBandWidth', 'debug.edgeBandWander', 'debug.edgeBandStrength',
+    'debug.speechSyllable', 'debug.speechPhrasePause', 'debug.speechHearingRadius',
+    'debug.speechHearingFalloff', 'debug.speechLabelSeconds',
+    'debug.tagChildCount', 'debug.tagSprintSpeed', 'debug.tagRunnerBoost', 'debug.tagTrotFactor',
+    'debug.tagRecoverFactor', 'debug.tagFloorFactor', 'debug.tagDrain', 'debug.tagRecover',
+    'debug.tagBreakOff', 'debug.tagResume', 'debug.tagPressure', 'debug.tagReach', 'debug.tagCommit',
+    'debug.tagCatch', 'debug.tagSwitchMargin', 'debug.tagImmunity', 'debug.tagResolveCap',
+    'debug.tagIdle', 'debug.tagTrendTau', 'debug.tagTrendEnter', 'debug.tagTrendLeave',
+    'debug.tagVariation', 'debug.tagUnstuck', 'debug.tagLean', 'debug.tagTurnRate', 'debug.tagPlayRadius',
+    'debug.childSpeechInterval', 'debug.childSpeechSpread', 'debug.childSpeechAction',
+    'debug.childSpeechPace', 'debug.childSpeechRefusal', 'debug.childSpeechReply',
+    'debug.adultErrandInterval', 'debug.adultErrandSpread', 'debug.adultErrandDwell',
+    'debug.adultErrandDig', 'debug.adultErrandLife', 'debug.adultErrandPace', 'debug.adultErrandCount',
+  ],
+  weather: ['debug.season', 'debug.seasonStrength', 'debug.wetGroundStrength', 'debug.foliageCollapse'],
+  economy: [
+    'debug.cash', 'debug.giftsTotal', 'debug.inventoryCapacity', 'debug.digRadius',
+    'debug.goodwillForHint', 'debug.addEquipment', 'debug.addGift', 'debug.addTreasure',
+  ],
+  events: ['debug.randomEvents', 'debug.triggerEvent'],
+  graphics: [
+    'debug.detailLevel', 'debug.flatGround', 'debug.startupFreezeBudget', 'debug.ambienceVolume',
+    'debug.footstepVolume', 'debug.ambientVolume', 'debug.birdsongVolume', 'debug.surfNearRadius',
+    'debug.surfCutoff',
+  ],
+  jump: ['debug.jumpTo'],
+  tools: [
+    'debug.renderer', 'debug.benchmarkStart', 'debug.language', 'debug.fpsCounter',
+    'debug.showHidden', 'debug.journalDnd',
+  ],
+}
+
+/** Resolve a dotted label path against a language dictionary. */
+function labelOf(dict: typeof en, path: string): string {
+  const value = path.split('.').reduce<unknown>((o, k) => (o as Record<string, unknown>)[k], dict)
+  if (typeof value !== 'string') throw new Error(`no label string at "${path}"`)
+  return value
+}
+
+/** The group boxes the menu rendered, in order, with their row labels. */
+function renderedGroups(): Array<{ title: string; open: boolean; labels: string[] }> {
+  return [...document.querySelectorAll('.debug-menu .debug-group')].map((box) => {
+    const head = box.querySelector('.debug-group-head') as HTMLButtonElement
+    const body = box.querySelector('.debug-group-body') as HTMLElement
+    const labels = [...body.children]
+      .filter((el) => el.tagName === 'LABEL')
+      .map((el) => el.querySelector('span')?.textContent ?? '')
+    return {
+      title: box.querySelector('.debug-group-title')?.textContent ?? '',
+      open: head.getAttribute('aria-expanded') === 'true',
+      labels,
+    }
+  })
+}
+
+/** Every control row currently in the menu (the filter row is not one). */
+function renderedRowLabels(): string[] {
+  return renderedGroups().flatMap((g) => g.labels)
+}
+
+/** The header button of the group with the given localized title. */
+function groupHead(title: string): HTMLButtonElement {
+  const head = [...document.querySelectorAll('.debug-menu .debug-group-head')].find(
+    (b) => b.querySelector('.debug-group-title')?.textContent === title,
+  )
+  if (!head) throw new Error(`no group header "${title}"`)
+  return head as HTMLButtonElement
+}
+
+function typeFilter(text: string): void {
+  const input = document.querySelector('.debug-filter input') as HTMLInputElement
+  fireEvent.change(input, { target: { value: text } })
+}
+
+describe('DebugMenu completeness: every control is present, in its group (point 393)', () => {
+  const dicts = [['English', en], ['German', de]] as const
+
+  it.each(dicts)('renders the groups in the fixed order — %s', (_name, dict) => {
+    useLocale.getState().setLang(dict === de ? 'de' : 'en')
+    render(<DebugMenu />)
+    expect(renderedGroups().map((g) => g.title)).toEqual(
+      DEBUG_GROUP_ORDER.map((id) => dict.debug.groups[id]),
+    )
+  })
+
+  it.each(dicts)('renders EXACTLY the expected control set, group by group — %s', (_name, dict) => {
+    useLocale.getState().setLang(dict === de ? 'de' : 'en')
+    render(<DebugMenu />)
+    const groups = renderedGroups()
+    DEBUG_GROUP_ORDER.forEach((id, i) => {
+      const expected = EXPECTED_CONTROLS[id].map((p) => labelOf(dict, p))
+      // Set equality in BOTH directions: a dropped control fails, and so does
+      // one added without being named here.
+      expect(new Set(groups[i].labels), id).toEqual(new Set(expected))
+      expect(groups[i].labels.length, id).toBe(expected.length)
+    })
+  })
+
+  it('carries all 132 controls in total, and none twice', () => {
+    render(<DebugMenu />)
+    const labels = renderedRowLabels()
+    const expected = DEBUG_GROUP_ORDER.flatMap((id) => EXPECTED_CONTROLS[id])
+    expect(labels.length).toBe(expected.length)
+    expect(labels.length).toBe(132)
+    expect(new Set(labels).size).toBe(labels.length)
+  })
+
+  it('gives every control a real input, select or button — no label without a control', () => {
+    render(<DebugMenu />)
+    const rows = [...document.querySelectorAll('.debug-menu .debug-group-body > label')]
+    expect(rows.length).toBe(132)
+    for (const row of rows) {
+      const label = row.querySelector('span')?.textContent ?? '(none)'
+      // The renderer row is the one deliberate read-only display (design.md §21.3).
+      if (label === en.debug.renderer) continue
+      expect(row.querySelector('input, select, button'), label).not.toBeNull()
+    }
+  })
+})
+
+describe('DebugMenu groups collapse and remember their state (point 393)', () => {
+  it('starts with every group collapsed', () => {
+    render(<DebugMenu />)
+    const groups = renderedGroups()
+    expect(groups.length).toBe(DEBUG_GROUP_ORDER.length)
+    expect(groups.every((g) => !g.open)).toBe(true)
+    for (const body of document.querySelectorAll('.debug-menu .debug-group-body')) {
+      expect((body as HTMLElement).hidden).toBe(true)
+    }
+  })
+
+  it('opens one group on its header click and leaves the others collapsed', () => {
+    render(<DebugMenu />)
+    fireEvent.click(groupHead(en.debug.groups.wildlife))
+    expect(useUi.getState().debugGroupsOpen).toEqual(['wildlife'])
+    const groups = renderedGroups()
+    expect(groups.filter((g) => g.open).map((g) => g.title)).toEqual([en.debug.groups.wildlife])
+  })
+
+  it('closes an open group again on a second click', () => {
+    render(<DebugMenu />)
+    fireEvent.click(groupHead(en.debug.groups.economy))
+    fireEvent.click(groupHead(en.debug.groups.economy))
+    expect(useUi.getState().debugGroupsOpen).toEqual([])
+    expect(renderedGroups().some((g) => g.open)).toBe(false)
+  })
+
+  it('remembers the opened group across a close/reopen of the whole menu', () => {
+    const first = render(<DebugMenu />)
+    fireEvent.click(groupHead(en.debug.groups.settlement))
+    // F1 closes the menu (the component renders nothing), then opens it again.
+    useUi.getState().toggleDebug()
+    first.rerender(<DebugMenu />)
+    expect(document.querySelector('.debug-menu')).toBeNull()
+    useUi.getState().toggleDebug()
+    first.rerender(<DebugMenu />)
+    expect(renderedGroups().filter((g) => g.open).map((g) => g.title))
+      .toEqual([en.debug.groups.settlement])
+  })
+
+  it('keeps a collapsed group\'s controls in the DOM, so nothing is unreachable', () => {
+    render(<DebugMenu />)
+    // Nothing opened: the whole set is still there (hidden), and a value still
+    // writes through — the verify suites drive the controls this way.
+    expect(renderedRowLabels().length).toBe(132)
+    fireEvent.change(numberField(en.debug.travelSpeed), { target: { value: '9' } })
+    expect(balance.travelSpeed).toBe(9)
+    balance.travelSpeed = DEFAULTS.travelSpeed
+  })
+
+  it('names every group in German too', () => {
+    useLocale.getState().setLang('de')
+    render(<DebugMenu />)
+    for (const id of DEBUG_GROUP_ORDER) {
+      expect(screen.getByText(de.debug.groups[id]), id).toBeInTheDocument()
+      expect(screen.queryByText(en.debug.groups[id]), id).toBeNull()
+    }
+  })
+})
+
+describe('DebugMenu filter narrows the whole menu (point 393)', () => {
+  it('shows a labelled filter field above the groups', () => {
+    render(<DebugMenu />)
+    expect(screen.getByText(en.debug.filter)).toBeInTheDocument()
+    const input = document.querySelector('.debug-filter input') as HTMLInputElement
+    expect(input.placeholder).toBe(en.debug.filterHint)
+  })
+
+  it('narrows to the matching controls, across groups, regardless of collapse', () => {
+    render(<DebugMenu />)
+    typeFilter('canteen')
+    const labels = renderedRowLabels()
+    expect(labels.length).toBeGreaterThan(0)
+    expect(labels.every((l) => l.toLowerCase().includes('canteen'))).toBe(true)
+    expect(labels).toContain(en.debug.canteenCapacity)
+    // Only the groups that still hold a match are rendered, and they are open.
+    expect(renderedGroups().every((g) => g.open && g.labels.length > 0)).toBe(true)
+  })
+
+  it('matches case-insensitively and leaves the remembered collapse alone', () => {
+    render(<DebugMenu />)
+    typeFilter('SURF')
+    expect(renderedRowLabels()).toContain(en.debug.surfCutoff)
+    expect(useUi.getState().debugGroupsOpen).toEqual([])
+  })
+
+  it('restores the full set — and the remembered collapse — when cleared', () => {
+    render(<DebugMenu />)
+    fireEvent.click(groupHead(en.debug.groups.tools))
+    typeFilter('croc')
+    expect(renderedRowLabels().length).toBeLessThan(132)
+    typeFilter('')
+    expect(renderedRowLabels().length).toBe(132)
+    expect(renderedGroups().filter((g) => g.open).map((g) => g.title)).toEqual([en.debug.groups.tools])
+  })
+
+  it('says so when nothing matches instead of showing an empty menu', () => {
+    render(<DebugMenu />)
+    typeFilter('zzzz-no-such-control')
+    expect(renderedGroups()).toEqual([])
+    expect(screen.getByText(en.debug.filterEmpty)).toBeInTheDocument()
+  })
+
+  it('filters on the GERMAN labels once German is active', () => {
+    useLocale.getState().setLang('de')
+    render(<DebugMenu />)
+    typeFilter('Fang')
+    const labels = renderedRowLabels()
+    expect(labels.length).toBeGreaterThan(0)
+    expect(labels.every((l) => l.toLowerCase().includes('fang'))).toBe(true)
+    typeFilter('zzzz')
+    expect(screen.getByText(de.debug.filterEmpty)).toBeInTheDocument()
+  })
+
+  it('a filtered control still writes through to balance', () => {
+    render(<DebugMenu />)
+    typeFilter('mouse')
+    fireEvent.change(numberField(en.debug.mouseSensitivity), { target: { value: '0.004' } })
+    expect(balance.mouseSensitivity).toBe(0.004)
+  })
+})
+
+describe('matchesDebugFilter (pure)', () => {
+  it('matches everything on an empty or blank query', () => {
+    expect(matchesDebugFilter('Walk speed', '')).toBe(true)
+    expect(matchesDebugFilter('Walk speed', '   ')).toBe(true)
+  })
+
+  it('matches a case-insensitive substring and rejects a non-match', () => {
+    expect(matchesDebugFilter('Walk speed (in places)', 'SPEED')).toBe(true)
+    expect(matchesDebugFilter('Walk speed (in places)', 'walk')).toBe(true)
+    expect(matchesDebugFilter('Walk speed (in places)', 'crocodile')).toBe(false)
   })
 })

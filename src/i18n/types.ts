@@ -408,6 +408,25 @@ export interface Strings {
 
   debug: {
     title: string
+    /** Filter row at the top of the menu (design.md §21.3): its label, the
+     *  field's hint and the note shown when nothing matches. */
+    filter: string
+    filterHint: string
+    filterEmpty: string
+    /** Names of the collapsible control groups (design.md §21.3). */
+    groups: {
+      movement: string
+      travel: string
+      survival: string
+      wildlife: string
+      settlement: string
+      weather: string
+      economy: string
+      events: string
+      graphics: string
+      jump: string
+      tools: string
+    }
     /** Read-only display of the active render backend (WebGPU/WebGL 2). */
     renderer: string
     language: string
