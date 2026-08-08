@@ -3904,8 +3904,18 @@ for (const [placeId, shot] of [
   )
   check(
     "holding Ctrl names the settlement's people and animals (point 342)",
-    !!held && held.length > 0 && rendered.length > 0,
-    held ? `${held.length} labels: ${rendered.slice(0, 4).join(' | ')}` : `no layer (appeared: ${appeared})`,
+    !!held && held.length > 0 && rendered.length === held.length,
+    held
+      ? `${held.length} labels [${held.map((l) => l.kind).join(', ')}]: ${rendered.slice(0, 4).join(' | ')}`
+      : `no layer (appeared: ${appeared})`,
+  )
+  // A settlement's actors are its INHABITANTS and their animals — nothing else
+  // is drawn here that could pass for one.
+  const INHABITANTS = ['villager', 'child', 'trader', 'porter', 'elder', 'goat']
+  check(
+    'the named subjects are inhabitants or their animals (point 342)',
+    !!held && held.length > 0 && held.every((l) => INHABITANTS.includes(l.kind)),
+    held ? [...new Set(held.map((l) => l.kind))].join(', ') : 'no layer',
   )
   check(
     'no label is empty or an internal id (point 342)',

@@ -25,6 +25,8 @@ const REFRESH_SECONDS = 0.1
 
 interface DrawnLabel {
   key: string
+  /** What it is, for the dev hook — the picture shows only the text. */
+  kind: string
   text: string
   x: number
   y: number
@@ -64,6 +66,7 @@ function ActorLabelLayer({ distanceFactor }: { distanceFactor: number }) {
     setLabels(
       kept.map((actor, i) => ({
         key: `${actor.kind}-${i}`,
+        kind: actor.kind,
         text: actorLabelText(strings, actor),
         x: actor.x,
         y: actor.y,
@@ -81,7 +84,7 @@ function ActorLabelLayer({ distanceFactor }: { distanceFactor: number }) {
   useEffect(() => {
     if (!import.meta.env.DEV) return
     const w = window as unknown as Record<string, unknown>
-    w.__actorLabels = () => drawn.current.map((l) => ({ text: l.text, x: l.x, y: l.y, z: l.z }))
+    w.__actorLabels = () => drawn.current.map((l) => ({ kind: l.kind, text: l.text, x: l.x, y: l.y, z: l.z }))
     return () => {
       delete w.__actorLabels
     }
