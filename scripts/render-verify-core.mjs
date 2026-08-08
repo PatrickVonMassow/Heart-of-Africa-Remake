@@ -83,6 +83,7 @@ export const NON_RENDER_VERIFY = new Set([
   'run-digest-core.mjs', // which of a run's OUTPUT lines the caller reads; it draws nothing
   'run-logged.mjs', // the logging wrapper around run-all; it spawns the runner, it does not render
   'sceneReady-core.mjs', // the scene-readiness verdict; frameSubject.mjs polls the page for it
+  'sections.mjs', // WHICH block of a suite a --section run selects; the suite does the driving
   'snowMetric.mjs', // the snow-vs-sand pixel verdict; enrichments.mjs feeds it a crop
   'stanceSlip.mjs', // the planted-foot verdict over a sample series; polish.mjs records the samples
   'system-chrome.mjs', // WHERE the lane's browser is on this host; _browser.mjs opens it
@@ -213,7 +214,7 @@ export function chargeReds(reds, { suite = '', backend = '', ledger = RED_CHARGE
 }
 
 /**
- * WHAT ONE RECORDED RUN IS WORTH (point 550). Three verdicts, and the difference
+ * WHAT ONE RECORDED RUN IS WORTH (point 550). Four verdicts, and the difference
  * between the first two must stay visible everywhere it is reported:
  *
  *   clean     — exit 0. The picture was judged and nothing was red.
@@ -224,6 +225,10 @@ export function chargeReds(reds, { suite = '', backend = '', ledger = RED_CHARGE
  *   red       — anything else: a red charged to nothing, a red charged to a point
  *               that is finished or deferred, a failure the run never reported
  *               (a crash prints no FAIL line), or a run that ended in a crash.
+ *   partial   — a `--section` run (point 566): one named block of the suite ran,
+ *               so the record says nothing about the rest. Judged FIRST, before
+ *               the exit code, because its exit code is exactly what must not
+ *               clear the gate.
  *
  * `openPoints` is the chargeable set (chargeablePoints); omitted, NOTHING is
  * chargeable and only a clean run covers — the strict default, so a caller that
@@ -232,6 +237,18 @@ export function chargeReds(reds, { suite = '', backend = '', ledger = RED_CHARGE
 export function runVerdict(run, { openPoints = null } = {}) {
   if (!run || typeof run !== 'object') {
     return { status: 'red', covers: false, charges: [], unaccounted: [] }
+  }
+  // A `--section` run (point 566) exercised ONE named block of the suite. It is
+  // the repair loop's instrument, not evidence about the picture the rest of the
+  // suite draws — so it never covers a backend, however clean it exited.
+  if (run.partial === true) {
+    const which = typeof run.section === 'string' && run.section ? `"${run.section}"` : 'one section'
+    return {
+      status: 'partial',
+      covers: false,
+      charges: [],
+      unaccounted: [{ name: `the run covered only section ${which} of the suite (--section)`, point: null }],
+    }
   }
   if (Number(run.exit) === 0) return { status: 'clean', covers: true, charges: [], unaccounted: [] }
   if (run.crashed === true) {

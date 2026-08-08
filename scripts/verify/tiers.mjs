@@ -64,15 +64,22 @@ export function selectBackend(verifyGl) {
  *                      `--flag <value>` pair would leave the value looking like
  *                      a suite filter and silently turn a LARGE run into a
  *                      single-suite, single-backend one.
+ *   section          — `--section=<name>`: run ONE declared section of the named
+ *                      suite (point 566). It carries a value, so it is written
+ *                      ATTACHED for exactly the reason above; `--section` bare
+ *                      parses as '' and the runner refuses it with the right
+ *                      form rather than running the whole suite.
  */
 export function parseArgs(argv) {
   const tier = argv.includes('small') ? 'small' : argv.includes('large') ? 'large' : null
   const flags = argv.filter((a) => a.startsWith('-'))
   const filter = argv.filter((a) => a !== 'small' && a !== 'large' && !a.startsWith('-'))
+  const sectionFlag = flags.find((f) => f === '--section' || f.startsWith('--section='))
   return {
     tier,
     filter,
     flags,
+    section: sectionFlag === undefined ? null : sectionFlag.slice('--section='.length),
     baseline: flags.includes('--baseline'),
     fullRun: tier !== null || filter.length === 0,
     isLargeEquivalent: tier === 'large' || (tier === null && filter.length === 0),

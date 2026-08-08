@@ -32,22 +32,22 @@ describe('tier sets (point 173)', () => {
 
 describe('argument parsing', () => {
   it('reads the bare default as a full LARGE-equivalent run', () => {
-    expect(parseArgs([])).toEqual({ tier: null, filter: [], flags: [], baseline: false, fullRun: true, isLargeEquivalent: true })
+    expect(parseArgs([])).toEqual({ tier: null, filter: [], flags: [], section: null, baseline: false, fullRun: true, isLargeEquivalent: true })
   })
 
   it('reads an explicit tier token, leaving no filter behind', () => {
-    expect(parseArgs(['small'])).toEqual({ tier: 'small', filter: [], flags: [], baseline: false, fullRun: true, isLargeEquivalent: false })
-    expect(parseArgs(['large'])).toEqual({ tier: 'large', filter: [], flags: [], baseline: false, fullRun: true, isLargeEquivalent: true })
+    expect(parseArgs(['small'])).toEqual({ tier: 'small', filter: [], flags: [], section: null, baseline: false, fullRun: true, isLargeEquivalent: false })
+    expect(parseArgs(['large'])).toEqual({ tier: 'large', filter: [], flags: [], section: null, baseline: false, fullRun: true, isLargeEquivalent: true })
   })
 
   it('reads a bare suite filter as a quick single run (no preflight, not LARGE)', () => {
     const a = parseArgs(['flow', 'polish'])
-    expect(a).toEqual({ tier: null, filter: ['flow', 'polish'], flags: [], baseline: false, fullRun: false, isLargeEquivalent: false })
+    expect(a).toEqual({ tier: null, filter: ['flow', 'polish'], flags: [], section: null, baseline: false, fullRun: false, isLargeEquivalent: false })
   })
 
   it('reads an explicit `large` WITH a filter as a preflighted both-backends run of that suite', () => {
     const a = parseArgs(['large', 'polish'])
-    expect(a).toEqual({ tier: 'large', filter: ['polish'], flags: [], baseline: false, fullRun: true, isLargeEquivalent: true })
+    expect(a).toEqual({ tier: 'large', filter: ['polish'], flags: [], section: null, baseline: false, fullRun: true, isLargeEquivalent: true })
   })
 
   it('reads --baseline as a flag, never as a suite filter (point 294)', () => {
@@ -60,6 +60,17 @@ describe('argument parsing', () => {
     expect(a.isLargeEquivalent).toBe(true)
     expect(parseArgs(['large', '--baseline', 'polish']).filter).toEqual(['polish'])
     expect(parseArgs(['polish']).baseline).toBe(false)
+  })
+
+  it('reads --section=<name> as a value flag, never as a suite filter (point 566)', () => {
+    const a = parseArgs(['enrichments', '--section=crocodile'])
+    expect(a.section).toBe('crocodile')
+    expect(a.filter).toEqual(['enrichments'])
+    // Bare `--section` parses as an EMPTY request, which the runner refuses with
+    // the attached form — the value would otherwise have landed in `filter` and
+    // silently run a second suite instead.
+    expect(parseArgs(['enrichments', '--section']).section).toBe('')
+    expect(parseArgs(['enrichments']).section).toBe(null)
   })
 })
 
