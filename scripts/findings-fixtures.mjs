@@ -23,9 +23,9 @@
 import { readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { auditFindings, classifyCall, DEFAULT_THRESHOLD, tallyTurn } from './findings-core.mjs'
+import { auditFindings, classifyCall, tallyTurn } from './findings-core.mjs'
 import { REPO_ROOT, repoPath } from './repo-paths.mjs'
-import { resolveTranscriptDir, transcriptCandidates } from './measure-context-cost-core.mjs'
+import { mainCheckoutOf, resolveTranscriptDir, transcriptCandidates } from './measure-context-cost-core.mjs'
 import { isMainModule } from './is-main.mjs'
 
 export const FIXTURE_PATH = repoPath('scripts/findings-fixtures.json')
@@ -48,12 +48,24 @@ function transcriptDir(env = process.env, home = homedir()) {
 /**
  * The turns of one transcript, as the plain call data the core takes.
  *
- * A turn starts at a real user prompt (a string message that is not a tool result)
- * and ends at the next one — the same boundary the Stop hook measures against, read
- * from the transcript rather than from the shared clock, because a historical turn
- * has no live stamp. Sidechain entries (a subagent's own transcript) are skipped:
- * they are the AGENT's turns, not the parent's.
+ * A turn starts at a real user prompt and ends at the next one — the same boundary
+ * the Stop hook measures against, read from the transcript rather than from the
+ * shared clock, because a historical turn has no live stamp. Sidechain entries (a
+ * subagent's own transcript) are skipped: they are the AGENT's turns, not the
+ * parent's.
+ *
+ * A prompt is a user entry whose content is text — either a plain string or, when
+ * the user attached an image, an array with a text part and no tool_result (Fable 5,
+ * four-eyes finding 6: taking only the string form merged every attachment-carrying
+ * prompt into the turn before it).
  */
+export function isUserPrompt(content) {
+  if (typeof content === 'string') return content.trim().length > 0
+  if (!Array.isArray(content)) return false
+  if (content.some((p) => p && p.type === 'tool_result')) return false
+  return content.some((p) => p && p.type === 'text' && String(p.text ?? '').trim())
+}
+
 export function turnsOfTranscript(text, source = '') {
   const turns = []
   let current = null
@@ -67,7 +79,7 @@ export function turnsOfTranscript(text, source = '') {
     }
     if (entry.isSidechain) continue
     const content = entry.message && entry.message.content
-    if (entry.type === 'user' && typeof content === 'string' && content.trim()) {
+    if (entry.type === 'user' && isUserPrompt(content)) {
       current = { source, at: entry.timestamp ?? '', calls: [] }
       turns.push(current)
       continue
@@ -90,14 +102,31 @@ export function turnsOfTranscript(text, source = '') {
 // ---- redaction ------------------------------------------------------------
 
 const SECRET = /\b(?:gh[pousr]_[A-Za-z0-9]{16,}|[A-Za-z0-9_-]{40,}\.[A-Za-z0-9_-]{20,})\b/g
+/** A session id wherever it appears in a path — scratchpad roots carry the full
+ *  UUID, which would undo the 8-character `source` the entry deliberately keeps. */
+const SESSION_UUID = /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi
+/** Any home directory, not just THIS host's: the corpus was written on a Windows
+ *  machine before this container, so a WSL path still carries the user's name. */
+const ANY_HOME = /(?:\/mnt\/[a-z])?\/(?:home|Users)\/[^/\s"']+|[A-Za-z]:\\Users\\[^\\\s"']+/g
 
-/** Fold machine-specific paths away and drop anything token-shaped. */
-function scrubPaths(text, home = homedir(), root = REPO_ROOT) {
-  return String(text ?? '')
-    .split(root)
-    .join('<repo>')
+/**
+ * Fold machine- and person-specific paths away and drop anything token-shaped
+ * (four-eyes finding 2, Fable 5, 08.08.2026 — the first cut committed
+ * `/mnt/c/Users/<name>`, full session UUIDs and the worktree-local repo path,
+ * while claiming all three were folded).
+ *
+ * The repo root is folded for the MAIN checkout as well as the worktree the cutter
+ * happens to run in, since a worktree's own root matches nothing a session outside
+ * it ever wrote.
+ */
+export function scrubPaths(text, home = homedir(), root = REPO_ROOT) {
+  let out = String(text ?? '')
+  for (const r of [root, mainCheckoutOf(root)].filter(Boolean)) out = out.split(r).join('<repo>')
+  return out
     .split(home)
     .join('~')
+    .replace(SESSION_UUID, '<session>')
+    .replace(ANY_HOME, '~')
     .replace(SECRET, '<redacted>')
 }
 
@@ -142,16 +171,43 @@ export function redactTurn(turn, { shorten = true } = {}) {
 
 // ---- families -------------------------------------------------------------
 //
-// A fixture's expectation comes from its FAMILY — what KIND of turn it is — never
-// from what the core happened to answer when it was cut. That is the whole point:
-// an expectation copied from the current behaviour would pass any refactor,
-// including a broken one. `--cut` REFUSES a turn whose verdict contradicts its
-// family, so a mismatch surfaces here rather than as a silently useless fixture.
+// A fixture's expectation comes from its FAMILY — what KIND of turn it is — and the
+// membership test is deliberately NOT the core's own verdict, so the two can
+// disagree and the cut can refuse.
+//
+// HOW INDEPENDENT IT REALLY IS (four-eyes finding 1, Fable 5, 08.08.2026). The
+// first version computed membership from the core's tally against the core's own
+// threshold, which made every predicate imply its family's verdict by construction:
+// the refusal below could not fire, and the claim that an expectation "can never be
+// copied from current behaviour" was false as written. What is independent now:
+//   - the RECORD, the AGENT and the DECLARED WAIT are read structurally from the
+//     calls themselves (below), not from `tallyTurn`'s record kinds;
+//   - the threshold is a FROZEN COPY (`PINNED_THRESHOLD`), not the core's constant,
+//     so re-tuning the core makes family and verdict disagree and `--cut` refuses.
+// What is NOT independent: the COUNTING RULE — which calls are investigation at all
+// — is still the core's, because re-implementing it here would be a second decision
+// to keep in step. So the honest statement of the protection is: the committed
+// fixtures are FROZEN turns with frozen expectations, and a re-cut is reviewed as a
+// DIFF. A re-tune plus a re-cut can still relabel a turn; what it cannot do is do so
+// silently.
 
 /** Does this turn run something that ACTS — a build, a test suite, a verify run? */
 function looksLikeBuildOrVerify(calls) {
   return calls.some((c) => /\b(?:npm (?:run )?(?:test|build|lint)|vitest|playwright|node scripts\/verify)/.test(c.command ?? ''))
 }
+
+/** The calibrated threshold as it stood when these families were written. A frozen
+ *  copy on purpose — see the note above. */
+export const PINNED_THRESHOLD = 6
+
+const isAgentCall = (c) => c.name === 'Agent'
+/** A durable record, read from the call rather than from the core's record kinds. */
+const leavesARecord = (c) =>
+  (c.name === 'Bash' && /(?:^|[;&|]\s*)(?:\S*\/)?git\s+(?:-\S+\s+)*(?:commit|merge|cherry-pick|revert)\b/.test(c.command ?? '')) ||
+  (c.name === 'Bash' && /finding\.mjs\b[^;&|]*--(?:record|none|drained|request|queued|blocked)\b/.test(c.command ?? '')) ||
+  (['Edit', 'Write', 'NotebookEdit'].includes(c.name) && /(?:^|\/)TASKS\.md$|\/memory\//.test(c.filePath ?? ''))
+/** The declared wait, likewise read from the call. */
+const declaresAWait = (c) => c.name === 'Bash' && /batch-in-flight\.mjs\b[^;&|]*--waiting-on\b/.test(c.command ?? '')
 
 export const FAMILIES = [
   {
@@ -164,7 +220,7 @@ export const FAMILIES = [
     id: 'looked-and-recorded',
     expect: 'allow',
     why: 'Investigated AND left a durable trace (commit, TASKS.md, memory, finding.mjs). The duty is discharged.',
-    match: (t, tally) => tally.investigative >= DEFAULT_THRESHOLD && tally.records.some((r) => r !== 'wait-declared'),
+    match: (t, tally) => tally.investigative >= PINNED_THRESHOLD && t.calls.some(leavesARecord),
   },
   {
     id: 'build-verify',
@@ -174,9 +230,10 @@ export const FAMILIES = [
       'fires exactly here, which is what the shell classification exists to prevent.',
     match: (t, tally) =>
       looksLikeBuildOrVerify(t.calls) &&
-      tally.records.length === 0 &&
-      tally.agents === 0 &&
-      tally.investigative < DEFAULT_THRESHOLD,
+      !t.calls.some(leavesARecord) &&
+      !t.calls.some(declaresAWait) &&
+      !t.calls.some(isAgentCall) &&
+      tally.investigative < PINNED_THRESHOLD,
   },
   {
     id: 'delegated-wait',
@@ -184,16 +241,29 @@ export const FAMILIES = [
     why:
       'Delegation: an agent was spawned and the wait declared. The result arrives turns later, where the merge ' +
       'is the record — this is the family that decides the Agent trigger (see the core header).',
-    match: (t, tally) => tally.agents > 0 && tally.records.includes('wait-declared'),
+    match: (t) => t.calls.some(isAgentCall) && t.calls.some(declaresAWait),
+  },
+  {
+    id: 'claimed-wait-dishonoured',
+    expect: 'block',
+    why:
+      'The wait was DECLARED but not earned: no agent was spawned in this turn. The exemption covers work that ' +
+      'really was handed out, so this shape blocks — the subtlest rule in the core, and until now pinned only by ' +
+      'constructed cases. Replayed without the declaration file, so this fixture covers the AGENT half alone.',
+    match: (t, tally) =>
+      t.calls.some(declaresAWait) &&
+      !t.calls.some(isAgentCall) &&
+      !t.calls.some(leavesARecord) &&
+      tally.investigative >= PINNED_THRESHOLD,
   },
   {
     id: 'unrecorded-investigation',
     expect: 'block',
     why: 'Read/searched at length (or spawned an agent) and left nothing durable — the turn this check exists for.',
     match: (t, tally) =>
-      (tally.agents > 0 || tally.investigative >= DEFAULT_THRESHOLD) &&
-      !tally.records.some((r) => r !== 'wait-declared') &&
-      !tally.records.includes('wait-declared'),
+      (t.calls.some(isAgentCall) || tally.investigative >= PINNED_THRESHOLD) &&
+      !t.calls.some(leavesARecord) &&
+      !t.calls.some(declaresAWait),
   },
 ]
 
@@ -307,7 +377,10 @@ function main() {
 
   console.log(`corpus                : ${dir}`)
   console.log(`turns                 : ${counts.turns}`)
-  console.log(`blocks (this core)    : ${counts.blocks} (${pct(counts.blocks)})`)
+  // An UPPER BOUND, and said so (four-eyes finding 3, Fable 5): a historical turn
+  // has no `.claude/batch-in-flight.json` mtime to check, so a declared wait that
+  // the LIVE guard would have honoured on the file half counts as a block here.
+  console.log(`blocks (this core)    : ${counts.blocks} (${pct(counts.blocks)}, upper bound)`)
   console.log(
     `blocks (shell=looking): ${counts.naiveBlocks} (${pct(counts.naiveBlocks)}), of them build/verify ${counts.naiveBuildVerify}`,
   )

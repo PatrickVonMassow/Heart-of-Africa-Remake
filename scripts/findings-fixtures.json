@@ -1,14 +1,14 @@
 {
   "note": "Cut from the real transcript corpus by scripts/findings-fixtures.mjs --cut. Redacted to the fields the decision reads.",
-  "cutAt": "2026-08-08T01:40:22.188Z",
-  "corpusTurns": 747,
+  "cutAt": "2026-08-08T01:54:01.167Z",
+  "corpusTurns": 806,
   "measured": {
-    "blocks": 7,
-    "naiveBlocks": 41,
-    "naiveBuildVerify": 9,
-    "agentTurns": 70,
+    "blocks": 9,
+    "naiveBlocks": 45,
+    "naiveBuildVerify": 10,
+    "agentTurns": 73,
     "agentExemptByDeclaredWait": 27,
-    "agentBlocks": 3
+    "agentBlocks": 4
   },
   "families": [
     {
@@ -32,6 +32,11 @@
       "why": "Delegation: an agent was spawned and the wait declared. The result arrives turns later, where the merge is the record — this is the family that decides the Agent trigger (see the core header)."
     },
     {
+      "id": "claimed-wait-dishonoured",
+      "expect": "block",
+      "why": "The wait was DECLARED but not earned: no agent was spawned in this turn. The exemption covers work that really was handed out, so this shape blocks — the subtlest rule in the core, and until now pinned only by constructed cases. Replayed without the declaration file, so this fixture covers the AGENT half alone."
+    },
+    {
       "id": "unrecorded-investigation",
       "expect": "block",
       "why": "Read/searched at length (or spawned an agent) and left nothing durable — the turn this check exists for."
@@ -41,101 +46,68 @@
     {
       "family": "answer-only",
       "expect": "allow",
-      "source": "73d9db78",
-      "at": "2026-08-03T11:28:08.143Z",
+      "source": "7b4a6caf",
+      "at": "2026-08-03T10:39:49.553Z",
+      "calls": []
+    },
+    {
+      "family": "answer-only",
+      "expect": "allow",
+      "source": "7b4a6caf",
+      "at": "2026-08-03T10:59:15.824Z",
       "calls": []
     },
     {
       "family": "answer-only",
       "expect": "allow",
       "source": "73d9db78",
-      "at": "2026-08-03T11:28:08.227Z",
-      "calls": []
-    },
-    {
-      "family": "answer-only",
-      "expect": "allow",
-      "source": "73d9db78",
-      "at": "2026-08-03T11:28:08.624Z",
+      "at": "2026-08-03T10:59:55.433Z",
       "calls": []
     },
     {
       "family": "looked-and-recorded",
       "expect": "allow",
-      "source": "7c21e596",
-      "at": "2026-08-05T19:21:28.095Z",
+      "source": "45289138",
+      "at": "2026-08-05T04:17:31.189Z",
       "calls": [
         {
-          "name": "Bash",
-          "command": "git branch -d feat/394-arrival-journal-entries worktree-agent-a1889a18529cf3111 worktree-a … ; tail -5 ; node scripts/branch-hygiene-guard.mjs --status 2>&1 ; tail -3"
+          "name": "ToolSearch"
+        },
+        {
+          "name": "WebSearch"
+        },
+        {
+          "name": "WebSearch"
+        },
+        {
+          "name": "WebFetch"
+        },
+        {
+          "name": "WebSearch"
+        },
+        {
+          "name": "WebFetch"
+        },
+        {
+          "name": "WebFetch"
         },
         {
           "name": "Bash",
-          "command": "node -e \"const l=require('./.claude/batch-lock.json') ; console.log('sessionId:',l.sessionId,'pid:',l.pid)\" ; echo \"$CLAUDE_SESSION_ID\""
+          "command": "grep -rn \"disable-vulkan-surface\\ ; use-vulkan\\ ; use-webgpu-adapter\\ ; angle=vulkan\" --include=\"*.mjs\" --include=\"*.md\" --include=\"*.sh\" . 2>/dev/null ; grep -v node_modules ; head -20"
         },
         {
           "name": "Bash",
-          "command": "VERIFY_GL=webgl node scripts/verify/run-all.mjs flow > /tmp/claude-1000/-workspace-hoa/7c2 … ; echo \"exit=$?\" ; tail -6 /tmp/claude-1000/-workspace-hoa/7c21e596-1671-413b-befe-f126b93b3a1c/scratchpad/fl …"
+          "command": "grep -rn \"HANGS\\ ; hang\\ ; 40 s\\ ; VK_ICD\\ ; VK_DRIVER_FILES\" docs/host-environment.md ; head -20"
+        },
+        {
+          "name": "WebSearch"
+        },
+        {
+          "name": "WebSearch"
         },
         {
           "name": "Bash",
-          "command": "VERIFY_GL=webgpu node scripts/verify/run-all.mjs flow > /tmp/claude-1000/-workspace-hoa/7c … ; echo \"exit=$?\" ; tail -6 /tmp/claude-1000/-workspace-hoa/7c21e596-1671-413b-befe-f126b93b3a1c/scratchpad/fl …"
-        },
-        {
-          "name": "Bash",
-          "command": "node scripts/render-verify-guard.mjs --status 2>&1 ; tail -6 ; git status --short ; head -5"
-        },
-        {
-          "name": "Bash",
-          "command": "git status --short verification/ ; wc -l ; git status --short verification/ ; head -20"
-        },
-        {
-          "name": "Read",
-          "filePath": "/workspace/hoa/verification/05-journal-hint.png"
-        },
-        {
-          "name": "Bash",
-          "command": "S=/tmp/claude-1000/-workspace-hoa/7c21e596-1671-413b-befe-f126b93b3a1c/scratchpad ; git show HEAD:verification/05-journal-hint.png > $S/main-05.png ; git show HEAD:verification/01-birdseye-view.png > $S/main-01.png ; ls -la $S/main-05.png verification/05-journal-hint.png $S/main-01.png verification/01-bird …"
-        },
-        {
-          "name": "Read",
-          "filePath": "/tmp/claude-1000/-workspace-hoa/7c21e596-1671-413b-befe-f126b93b3a1c/scratchpad/main-05.png"
-        },
-        {
-          "name": "Read",
-          "filePath": "/workspace/hoa/verification/02-port-cairo-trade.png"
-        },
-        {
-          "name": "Bash",
-          "command": "S=/tmp/claude-1000/-workspace-hoa/7c21e596-1671-413b-befe-f126b93b3a1c/scratchpad ; git show HEAD:verification/02-port-cairo-trade.png > $S/main-02.png ; ls -la $S/main-02.png verification/02-port-cairo-trade.png"
-        },
-        {
-          "name": "Read",
-          "filePath": "/tmp/claude-1000/-workspace-hoa/7c21e596-1671-413b-befe-f126b93b3a1c/scratchpad/main-02.png"
-        },
-        {
-          "name": "Bash",
-          "command": "git checkout -- verification/ ; git status --short ; head -3 ; echo \"restored\" ; node scripts/render-verify-guard.mjs --status 2>&1 ; tail -4"
-        },
-        {
-          "name": "Edit",
-          "filePath": "/workspace/hoa/TASKS.md"
-        },
-        {
-          "name": "Bash",
-          "command": "git add TASKS.md ; git commit -q -m \"Record that the unwaited element frame empties the world on main too ; Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>\" ; git push origin main 2>&1 ; tail -2"
-        },
-        {
-          "name": "Bash",
-          "command": "node scripts/guard-preflight.mjs --for answer --session 7c21e596-1671-413b-befe-f126b93b3a … ; grep -E \"would-block ; WOULD BLOCK ; guard\\(s\\)\" ; head -6"
-        },
-        {
-          "name": "Bash",
-          "command": "node scripts/board-queue.mjs set 518 --text-stdin <<'EOF' ; Der Verschluss prüft, ob das Motiv im Bild ist — aber nur vor der Wartezeit, nie danach. D … ; Heute Abend kam ein größerer Bruder dazu und wurde auf dem Hauptzweig nachgestellt: Ein Bi … ; EOF ; node scripts/board-queue.mjs 2>&1 ; tail -1 ; node scripts/board-publish.mjs 2>&1 ; tail -1 ; node scripts/board.mjs attest 2>&1 ; tail -2"
-        },
-        {
-          "name": "Bash",
-          "command": "node scripts/guard-preflight.mjs --for answer --session 7c21e596-1671-413b-befe-f126b93b3a … ; grep -E \"would-block ; WOULD BLOCK ; no guard\" ; head -4 ; node scripts/batch-in-flight.mjs --waiting-on \"Zwei Agenten schliessen die Zweige 323 und  … ; ein jetzt beauftragter dritter Agent waere dann noch mitten in der Arbeit.\" 2>&1 ; head -1"
+          "command": "node scripts/finding.mjs --record \"Online-Recherche zu 505: der offizielle Headless-Flagsa … ; gleiche Liste in chromium docs/gpu/using-gpu-hardware-in-headless-chrome.md). --disable-vu …"
         }
       ]
     },
@@ -151,23 +123,23 @@
         },
         {
           "name": "Bash",
-          "command": "pgrep -f \"git push origin main\" >/dev/null && echo \"push alive\" || echo \"push gone\"; tail -2 /tmp/claude-1000/-workspace-hoa/73d9db78-152c-41b9-a218-5fac9e8b569e/scratchpad/push10.log 2>/dev/null; git log --oneline -1"
+          "command": "pgrep -f \"git push origin main\" >/dev/null && echo \"push alive\" || echo \"push gone\"; tail -2 /tmp/claude-1000/-workspace-hoa/<session>/scratchpad/push10.log 2>/dev/null; git log --oneline -1"
         },
         {
           "name": "Bash",
-          "command": "PID=$(pgrep -f \"git push origin main\" | head -1); [ -n \"$PID\" ] && tail --pid=\"$PID\" -f /dev/null; echo \"push ended\"; git rev-list --count @{u}..HEAD; tail -3 /tmp/claude-1000/-workspace-hoa/73d9db78-152c-41b9-a218-5fac9e8b569e/scratchpad/push10.log"
+          "command": "PID=$(pgrep -f \"git push origin main\" | head -1); [ -n \"$PID\" ] && tail --pid=\"$PID\" -f /dev/null; echo \"push ended\"; git rev-list --count @{u}..HEAD; tail -3 /tmp/claude-1000/-workspace-hoa/<session>/scratchpad/push10.log"
         },
         {
           "name": "Bash",
-          "command": "git rev-list --count @{u}..HEAD; pgrep -f \"git push origin main\" >/dev/null && echo \"push alive\" || echo \"push gone\"; tail -2 /tmp/claude-1000/-workspace-hoa/73d9db78-152c-41b9-a218-5fac9e8b569e/scratchpad/push10.log"
+          "command": "git rev-list --count @{u}..HEAD; pgrep -f \"git push origin main\" >/dev/null && echo \"push alive\" || echo \"push gone\"; tail -2 /tmp/claude-1000/-workspace-hoa/<session>/scratchpad/push10.log"
         },
         {
           "name": "Bash",
-          "command": "PID=$(pgrep -f \"git push origin main\" | head -1); [ -n \"$PID\" ] && tail --pid=\"$PID\" -f /dev/null; echo \"push ended\"; git rev-list --count @{u}..HEAD; tail -4 /tmp/claude-1000/-workspace-hoa/73d9db78-152c-41b9-a218-5fac9e8b569e/scratchpad/push10.log"
+          "command": "PID=$(pgrep -f \"git push origin main\" | head -1); [ -n \"$PID\" ] && tail --pid=\"$PID\" -f /dev/null; echo \"push ended\"; git rev-list --count @{u}..HEAD; tail -4 /tmp/claude-1000/-workspace-hoa/<session>/scratchpad/push10.log"
         },
         {
           "name": "Bash",
-          "command": "git branch -d feat/475-browser-bringup 2>&1|tail -1; git push origin --delete feat/475-browser-bringup 2>&1|tail -1; node scripts/worktree-cleanup.mjs /workspace/hoa/.claude/worktrees/agent-a4abb1434da8fd7d3 2>&1|tail -1; git worktree list; git branch -a | grep -c feat/ || echo \"no feat branches left\""
+          "command": "git branch -d feat/475-browser-bringup 2>&1|tail -1; git push origin --delete feat/475-browser-bringup 2>&1|tail -1; node scripts/worktree-cleanup.mjs <repo>/.claude/worktrees/agent-a4abb1434da8fd7d3 2>&1|tail -1; git worktree list; git branch -a | grep -c feat/ || echo \"no feat branches left\""
         },
         {
           "name": "Bash",
@@ -194,7 +166,7 @@
         },
         {
           "name": "Bash",
-          "command": "git rev-list --count @{u}..HEAD ; tail -4 /tmp/claude-1000/-workspace-hoa/73d9db78-152c-41b9-a218-5fac9e8b569e/scratchpad/pu … ; pgrep -f \"git push origin main\" >/dev/null ; echo \"push alive\" ; echo \"push gone\""
+          "command": "git rev-list --count @{u}..HEAD ; tail -4 /tmp/claude-1000/-workspace-hoa/<session>/scratchpad/push4.log 2>/dev/null ; pgrep -f \"git push origin main\" >/dev/null ; echo \"push alive\" ; echo \"push gone\""
         },
         {
           "name": "Agent"
@@ -205,11 +177,11 @@
         },
         {
           "name": "Bash",
-          "command": "git rev-list --count @{u}..HEAD ; pgrep -f \"git push origin main\" >/dev/null ; echo \"push alive\" ; echo \"push gone\" ; tail -2 /tmp/claude-1000/-workspace-hoa/73d9db78-152c-41b9-a218-5fac9e8b569e/scratchpad/pu …"
+          "command": "git rev-list --count @{u}..HEAD ; pgrep -f \"git push origin main\" >/dev/null ; echo \"push alive\" ; echo \"push gone\" ; tail -2 /tmp/claude-1000/-workspace-hoa/<session>/scratchpad/push4.log"
         },
         {
           "name": "Bash",
-          "command": "PID=$(pgrep -f \"git push origin main\" ; head -1) ; [ -n \"$PID\" ] ; tail --pid=\"$PID\" -f /dev/null ; echo \"push ended\" ; git rev-list --count @{u}..HEAD ; tail -5 /tmp/claude-1000/-workspace-hoa/73d9db78-152c-41b9-a218-5fac9e8b569e/scratchpad/pu …"
+          "command": "PID=$(pgrep -f \"git push origin main\" ; head -1) ; [ -n \"$PID\" ] ; tail --pid=\"$PID\" -f /dev/null ; echo \"push ended\" ; git rev-list --count @{u}..HEAD ; tail -5 /tmp/claude-1000/-workspace-hoa/<session>/scratchpad/push4.log"
         },
         {
           "name": "Agent"
@@ -222,15 +194,15 @@
         },
         {
           "name": "Bash",
-          "command": "node scripts/batch-in-flight.mjs --waiting-on \"Fable-Reviews zu 474 und zur 462-Nachbesser … ; 475 wartet auf sein Review\" --branch feat/474-linux-launcher --worktree /workspace/hoa/.cl … ; tail -1"
+          "command": "node scripts/batch-in-flight.mjs --waiting-on \"Fable-Reviews zu 474 und zur 462-Nachbesser … ; 475 wartet auf sein Review\" --branch feat/474-linux-launcher --worktree <repo>/.claude/wor … ; tail -1"
         },
         {
           "name": "Bash",
-          "command": "node scripts/batch-in-flight.mjs --waiting-on \"Fable-Reviews zu 474 und zur 462-Nachbesser … ; 475 wartet auf sein Review\" --branch feat/462-request-carrier --worktree /workspace/hoa/.c … ; tail -1"
+          "command": "node scripts/batch-in-flight.mjs --waiting-on \"Fable-Reviews zu 474 und zur 462-Nachbesser … ; 475 wartet auf sein Review\" --branch feat/462-request-carrier --worktree <repo>/.claude/wo … ; tail -1"
         },
         {
           "name": "Bash",
-          "command": "node scripts/batch-in-flight.mjs --waiting-on \"Fable-Reviews zu 474 und zur 462-Nachbesser … ; 475 wartet auf sein Review\" --log /tmp/claude-1000/-workspace-hoa/73d9db78-152c-41b9-a218- … ; tail -1"
+          "command": "node scripts/batch-in-flight.mjs --waiting-on \"Fable-Reviews zu 474 und zur 462-Nachbesser … ; 475 wartet auf sein Review\" --log /tmp/claude-1000/-workspace-hoa/<session>/tasks/ab53cde5 … ; tail -1"
         }
       ]
     },
@@ -246,7 +218,7 @@
         },
         {
           "name": "Bash",
-          "command": "node scripts/worktree-cleanup.mjs /workspace/hoa/.claude/worktrees/agent-a15ac5c3c5950a1dc … ; tail -2 ; git fetch -q origin 2>&1 ; tail -1 ; git branch -f feat/474-linux-launcher origin/feat/474-linux-launcher 2>&1 ; tail -1 ; git log --format='%h %s' -1 feat/474-linux-launcher"
+          "command": "node scripts/worktree-cleanup.mjs <repo>/.claude/worktrees/agent-a15ac5c3c5950a1dc 2>&1 ; tail -2 ; git fetch -q origin 2>&1 ; tail -1 ; git branch -f feat/474-linux-launcher origin/feat/474-linux-launcher 2>&1 ; tail -1 ; git log --format='%h %s' -1 feat/474-linux-launcher"
         },
         {
           "name": "Agent"
@@ -272,7 +244,7 @@
         },
         {
           "name": "Bash",
-          "command": "node scripts/worktree-cleanup.mjs /workspace/hoa/.claude/worktrees/agent-ac9566982db6ed6be … ; tail -1 ; git fetch -q origin ; git branch -f feat/475-browser-bringup origin/feat/475-browser-bringup 2>&1 ; tail -1 ; git log --format='%h %s' -1 feat/475-browser-bringup ; git branch --show-current"
+          "command": "node scripts/worktree-cleanup.mjs <repo>/.claude/worktrees/agent-ac9566982db6ed6be 2>&1 ; tail -1 ; git fetch -q origin ; git branch -f feat/475-browser-bringup origin/feat/475-browser-bringup 2>&1 ; tail -1 ; git log --format='%h %s' -1 feat/475-browser-bringup ; git branch --show-current"
         },
         {
           "name": "Agent"
@@ -284,22 +256,133 @@
       ]
     },
     {
-      "family": "unrecorded-investigation",
+      "family": "claimed-wait-dishonoured",
       "expect": "block",
-      "source": "73d9db78",
-      "at": "2026-08-03T12:08:31.500Z",
+      "source": "c6987804",
+      "at": "2026-08-07T10:15:57.647Z",
       "calls": [
         {
           "name": "Bash",
-          "command": "node scripts/board.mjs vdzk-remove \"Rote CI-Läufe auf Agenten-Zweigen\" 2>&1 ; tail -1 ; node scripts/board.mjs vdzk-add \"Rote CI-Läufe auf Agenten-Zweigen — welcher Weg?\" --text- … ; Zwei Regeln arbeiten gegeneinander, beide absichtlich so gebaut: Vor dem Push prüft ein Zw … ; Drei Wege, deine Wahl: (1) Agenten prüfen künftig voll vor jedem Push — sicher, aber deutl … ; EOF ; node scripts/board-publish.mjs 2>&1 ; tail -1 ; node scripts/dashboard-guard.mjs --synced .batch-dashboard.html 2>&1 ; tail -1 ; node scripts/board.mjs attest 2>&1 ; tail -1"
+          "command": "git status --short ; echo \"--- branch ---\" ; git branch --show-current ; echo \"--- merge in progress? ---\" ; ls -1 .git/MERGE_HEAD 2>/dev/null ; echo \"no merge in progress\""
         },
         {
           "name": "Bash",
-          "command": "node scripts/dashboard-card-topic-guard.mjs .batch-dashboard.html 2>&1 ; tail -3 ; node scripts/dashboard-guard.mjs --synced .batch-dashboard.html 2>&1 ; tail -2"
+          "command": "node scripts/focus.mjs show 2>&1 ; head -50"
         },
         {
           "name": "Bash",
-          "command": "ls /mnt 2>/dev/null ; ls /mnt/c/Users/Patri/.claude/projects/ 2>/dev/null ; head -3 ; echo \"=== gitignore ===\" ; grep -n \"secret\" .gitignore"
+          "command": "node scripts/batch-in-flight.mjs --status 2>&1 ; head -30 ; echo \"=== agents ===\" ; ls -1 .claude/ 2>/dev/null ; head -40"
+        },
+        {
+          "name": "Bash",
+          "command": "node scripts/point-brief.mjs 174 2>&1 ; head -80"
+        },
+        {
+          "name": "Bash",
+          "command": "node scripts/board.mjs --help 2>&1 ; head -40"
+        },
+        {
+          "name": "Bash",
+          "command": "grep -n '^\\- \\[ \\]\\ ; ^## ' TASKS.md ; head -60"
+        },
+        {
+          "name": "Bash",
+          "command": "node -e \"const q=require('./.claude/board-queue.json') ; console.log(JSON.stringify(q).slice(0,3000))\" 2>&1 ; head -20"
+        },
+        {
+          "name": "Bash",
+          "command": "grep -n 'Warteschlange\\ ; <h2\\ ; <section' .batch-dashboard.html ; head -30"
+        },
+        {
+          "name": "Bash",
+          "command": "node -e \" ; const fs=require('fs') ; const t=fs.readFileSync('TASKS.md','utf8') ; const open=new Set([...t.matchAll(/^- \\[ \\] (\\d+)\\./gm)].map(m=>+m[1])) ; const q=JSON.parse(fs.readFileSync('.claude/board-queue.json','utf8')) ; const inQ=q.order.filter(p=>open.has(p)) ; console.log('open count',open.size) ; console.log('first 15 open in queue order:',inQ.slice(0,15).join(', ')) ; const missing=[...open].filter(p=>!q.order.includes(p)) ; console.log('open but not in queue:',missing.join(', ')) ; \""
+        },
+        {
+          "name": "Bash",
+          "command": "node -e \" ; const fs=require('fs') ; const t=fs.readFileSync('TASKS.md','utf8') ; for (const n of [373,309,432,438,330]) { ; const re=new RegExp('^- \\\\\\\\[ \\\\\\\\] '+n+'\\\\\\\\.[\\\\\\\\s\\\\\\\\S]*?(?=^- \\\\\\\\[[ x]\\\\\\\\] \\\\\\\\d+\\\\\\ … ; ^## )','m') ; const m=t.match(re) ; console.log('=========== '+n+' ===========') ; console.log(m? m[0].split('\\n').slice(0,14).join('\\n') : 'NOT FOUND') ; } ; \""
+        },
+        {
+          "name": "Bash",
+          "command": "git log --first-parent --format='%h %s' -30 main"
+        },
+        {
+          "name": "Bash",
+          "command": "sed -n '100,200p' .batch-dashboard.html"
+        },
+        {
+          "name": "Bash",
+          "command": "node -e \" ; const fs=require('fs') ; const t=fs.readFileSync('TASKS.md','utf8') ; const re=/^- \\[ \\] 309\\.[\\s\\S]*?(?=^- \\[[ x]\\] \\d+\\. ; ^## )/m ; console.log(t.match(re)[0]) ; \" ; tail -40"
+        },
+        {
+          "name": "Bash",
+          "command": "node scripts/guard-preflight.mjs --for answer --session <session> 2>&1 ; head -30"
+        },
+        {
+          "name": "Bash",
+          "command": "sed -n '1,60p' scripts/board.mjs"
+        },
+        {
+          "name": "Bash",
+          "command": "node -e \" ; const fs=require('fs') ; const t=fs.readFileSync('TASKS.md','utf8') ; const re=/^- \\[ \\] 373\\.[\\s\\S]*?(?=^- \\[[ x]\\] \\d+\\. ; ^## )/m ; console.log(t.match(re)[0]) ; \" ; tail -30"
+        },
+        {
+          "name": "Bash",
+          "command": "node scripts/board.mjs now 309 --text-stdin <<'EOF' ; Stand 12:20: Die Maschine ist ruhig — kein Agent baut mehr —, und genau darauf hat der let … ; Alles andere des Punktes steht seit Tagen auf main: die Rücknahme der degradierten Lieferu … ; EOF"
+        },
+        {
+          "name": "Bash",
+          "command": "node scripts/board.mjs focus 309 \"LARGE-Regression auf beiden Backends auf ruhiger Maschin … ; node scripts/board.mjs attest 2>&1 ; tail -20"
+        },
+        {
+          "name": "Bash",
+          "command": "npm test > /tmp/claude-1000/-workspace-hoa/<session>/scratchpad/large-309.log 2>&1 ; echo \"EXIT=$?\" >> /tmp/claude-1000/-workspace-hoa/<session>/scratchpad/large-309.log"
+        },
+        {
+          "name": "Bash",
+          "command": "node scripts/batch-in-flight.mjs --waiting-on \"LARGE-Regression (npm test, beide Backends) … ; parallele Agenten wuerden ihn als Last verfaelschen (309 wartet genau darauf).\" 2>&1 ; tail -5"
+        },
+        {
+          "name": "Bash",
+          "command": "sleep 120 ; tail -25 /tmp/claude-1000/-workspace-hoa/<session>/scratchpad/large-309.log"
+        },
+        {
+          "name": "ToolSearch"
+        },
+        {
+          "name": "Bash",
+          "command": "tail -20 /tmp/claude-1000/-workspace-hoa/<session>/scratchpad/large-309.log"
+        },
+        {
+          "name": "Bash",
+          "command": "node scripts/finding.mjs --list 2>&1 ; head -30"
+        },
+        {
+          "name": "Bash",
+          "command": "tail -12 /tmp/claude-1000/-workspace-hoa/<session>/scratchpad/large-309.log"
+        },
+        {
+          "name": "Bash",
+          "command": "node -e \" ; const fs=require('fs') ; const t=fs.readFileSync('TASKS.md','utf8') ; const re=/^- \\[ \\] 432\\.[\\s\\S]*?(?=^- \\[[ x]\\] \\d+\\. ; ^## )/m ; console.log(t.match(re)[0]) ; \" ; tail -25"
+        },
+        {
+          "name": "Bash",
+          "command": "until grep -qE 'FAIL ; EXIT= ; ===== LARGE regression — backend 2' /tmp/claude-1000/-workspace-hoa/<session>/scratchpad/l … ; do sleep 20 ; done ; tail -30 /tmp/claude-1000/-workspace-hoa/<session>/scratchpad/large-309.log"
+        },
+        {
+          "name": "Bash",
+          "command": "tail -14 /tmp/claude-1000/-workspace-hoa/<session>/scratchpad/large-309.log"
+        }
+      ]
+    },
+    {
+      "family": "unrecorded-investigation",
+      "expect": "block",
+      "source": "73d9db78",
+      "at": "2026-08-03T12:11:27.190Z",
+      "calls": [
+        {
+          "name": "Bash",
+          "command": "ls /mnt 2>/dev/null ; ls ~/.claude/projects/ 2>/dev/null ; head -3 ; echo \"=== gitignore ===\" ; grep -n \"secret\" .gitignore"
         },
         {
           "name": "Bash",
@@ -349,7 +432,7 @@
       "family": "unrecorded-investigation",
       "expect": "block",
       "source": "45289138",
-      "at": "2026-08-05T04:03:15.551Z",
+      "at": "2026-08-05T04:03:38.875Z",
       "calls": [
         {
           "name": "Bash",

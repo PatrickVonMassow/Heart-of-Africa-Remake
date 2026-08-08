@@ -1201,26 +1201,38 @@ or a `--none` all discharge it.
 **Calibration is replayable, not remembered.** A threshold is a claim about a
 corpus, so the cases it rests on are cut out of the real transcripts into
 `scripts/findings-fixtures.json` — one family per case, redacted to the three
-fields the decision reads — and replayed by `scripts/findings-fixtures.test.mjs`
-on every unit run. `node scripts/findings-fixtures.mjs --measure` re-measures;
-`--cut` re-cuts, and it REFUSES a turn whose verdict contradicts its family, so
-an expectation can never be copied from whatever the code currently does. On the
-Linux corpus (747 turns, 56 sessions) the rule blocks 0.9 % of turns, a rule that
-counted every shell call as looking would block 5.5 %, and no answer-only turn
-blocks under either. The rate matters as much as the rule: a guard that fires on
-an ordinary turn trains the reader to skip it.
+fields the decision reads, with home directories, user names and session ids
+folded away — and replayed by `scripts/findings-fixtures.test.mjs` on every unit
+run. `node scripts/findings-fixtures.mjs --measure` re-measures; `--cut` re-cuts.
+At the cut recorded in that file (806 turns, 56 sessions) the rule blocks 1.1 %
+of turns — an upper bound, since a historical turn has no in-flight file to prove
+a declared wait by — while a rule that counted every shell call as looking would
+block 5.6 %, and no answer-only turn blocks under either. The rate matters as
+much as the rule: a guard that fires on an ordinary turn trains the reader to
+skip it.
+
+**What the fixtures do and do not protect** (four-eyes finding, Fable 5). A
+family's EXPECTATION is written a priori, and membership is read structurally
+from the calls — the record, the agent, the declared wait — against a FROZEN copy
+of the threshold, so re-tuning the core makes family and verdict disagree and
+`--cut` refuses. What stays shared is the counting rule itself, so the honest
+statement is: the committed fixtures are frozen turns with frozen expectations,
+and a re-cut is reviewed as a DIFF. A re-tune plus a re-cut can still relabel a
+turn; what it cannot do is relabel one silently.
 
 **The Agent trigger stays (decided 08.08.2026).** Spawning an agent counts as
 investigation on its own, and the corpus review objected: 96 of 235 agent-spawning
 turns carried no record, which on a project built around maximal delegation reads
 as a `--none` per delegation turn. The objection predates the exemption that
-answers it. Of the current corpus's 70 agent-spawning turns, 40 leave a durable
+answers it. Of the current corpus's 73 agent-spawning turns, 42 leave a durable
 record anyway, 27 are carried by the DECLARED WAIT
 (`batch-in-flight.mjs --waiting-on`, honoured only when an agent really was
-spawned or the declaration file really was written this turn), and 3 block —
+spawned or the declaration file really was written this turn), and 4 block —
 turns that handed work out and neither recorded nor declared it. Softening the
-trigger would buy back those three and give up the only signal that catches a
-delegation nobody can find again, so it is left alone.
+trigger would buy back those four and give up the only signal that catches a
+delegation nobody can find again, so it is left alone. The claimed-but-not-earned
+shape now has its own fixture family, so the distinction is pinned by a real turn
+rather than by constructed cases alone.
 
 ## The way back — claiming the batch into the window you are sitting at (28.07.2026, point 395)
 

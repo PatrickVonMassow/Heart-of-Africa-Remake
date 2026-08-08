@@ -28,12 +28,20 @@ describe('the calibration fixtures are real, whole and usable', () => {
   it('carries no raw transcript — only the three fields the decision reads', () => {
     for (const turn of fixtures.turns) {
       for (const call of turn.calls) {
-        expect(Object.keys(call).sort()).toEqual(
-          expect.arrayContaining(Object.keys(call).filter((k) => ['name', 'command', 'filePath'].includes(k))),
-        )
         for (const key of Object.keys(call)) expect(['name', 'command', 'filePath']).toContain(key)
       }
     }
+  })
+
+  // Names the VALUES, not only the field names (four-eyes finding 5, Fable 5): the
+  // first cut passed the field check while committing a Windows username and full
+  // session UUIDs, which a check on shapes alone can never see.
+  it('carries no home directory, user name or session id', () => {
+    const text = JSON.stringify(fixtures.turns)
+    expect(text).not.toMatch(/\/(?:home|Users)\/[^/"\\]+/)
+    expect(text).not.toMatch(/[A-Za-z]:\\\\Users\\\\/)
+    expect(text).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i)
+    expect(text).not.toMatch(/gh[pousr]_[A-Za-z0-9]{16,}/)
   })
 })
 

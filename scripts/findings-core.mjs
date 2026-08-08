@@ -37,11 +37,14 @@
  *  review message is a memory, so the cases it cites are cut into
  *  `findings-fixtures.json` — real turns, one family per case, replayed by
  *  `findings-fixtures.test.mjs` on every unit run. Re-measured there on the
- *  Linux corpus (747 turns, 56 sessions): this rule blocks 7 turns (0.9 %),
- *  the shell-counts-as-looking rule would block 41 (5.5 %), and the 349
- *  answer-only turns block under neither. The direction reproduces on a corpus
- *  the first measurement never saw; the absolute rates do not transfer between
- *  corpora and are not asserted as if they did.
+ *  Linux corpus: at the cut recorded in that file (806 turns, 56 sessions) this
+ *  rule blocks 1.1 % of turns and the shell-counts-as-looking rule 5.6 %, while
+ *  the 376 answer-only turns block under neither. The direction reproduces on a
+ *  corpus the first measurement never saw; the absolute rates do not transfer
+ *  between corpora, and the corpus keeps growing, so the figures are the CUT's,
+ *  not constants. The block rate is an UPPER bound: a historical turn has no
+ *  in-flight file mtime, so a declared wait the live guard would honour on that
+ *  half counts as a block in the replay.
  *  Re-measure with: node scripts/findings-fixtures.mjs --measure */
 export const DEFAULT_THRESHOLD = 6
 
@@ -340,14 +343,14 @@ export function auditFindings({
   // delegation the trigger looked like a `--none` tax on the most ordinary turn
   // there is, and the review asked for it to be softened.
   // What that measurement could not see is the exemption built after it. Re-run
-  // on the current corpus (`node scripts/findings-fixtures.mjs --measure`,
-  // 747 turns): of 70 agent-spawning turns, 40 leave a durable record anyway,
-  // 27 are carried by the DECLARED WAIT, and 3 block — turns that handed work
-  // out and neither recorded nor declared it, which is exactly the shape the
-  // rule exists for. The tax the review feared is already paid by a mechanism
-  // that says something true about the turn, so softening the trigger would
-  // only buy back those 3 and cost the one signal that catches a delegation
-  // nobody can find again. The `delegated-wait` fixture family pins this.
+  // on the current corpus (`node scripts/findings-fixtures.mjs --measure`, 806
+  // turns): of 73 agent-spawning turns, 42 leave a durable record anyway, 27 are
+  // carried by the DECLARED WAIT, and 4 block — turns that handed work out and
+  // neither recorded nor declared it, which is exactly the shape the rule exists
+  // for. The tax the review feared is already paid by a mechanism that says
+  // something true about the turn, so softening the trigger would only buy back
+  // those four and cost the one signal that catches a delegation nobody can find
+  // again. The `delegated-wait` fixture family pins this.
   const investigated = Number(t.agents) > 0 || Number(t.investigative) >= threshold
   if (investigated && durable.length === 0 && !delegation.honoured) {
     violations.push({
