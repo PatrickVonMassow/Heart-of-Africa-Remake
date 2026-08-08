@@ -4538,3 +4538,43 @@ Build order, chosen so no two parallel agents own the same file:
   carries a branch failure.
   Criticality: medium — it is the difference between a silent failure and a noticed one,
   and it only became live with 513.
+
+- [ ] 561. THE SILENCED BRANCH GATE HAS THREE BLIND SPOTS (four-eyes review of point 513
+  by Fable 5, 08.08.2026; bundle Modell & Wächter). Point 513 deliberately makes a red
+  `feat/**` run conclude `success` so it stops mailing the owner. The consequence was
+  measured, not guessed: the GitHub jobs API reports the failed step's conclusion as
+  `success` too, so NO reader of a run's conclusion can recover the truth — only the
+  commit status `ci/gate (branch)` carries it. Three holes follow, and none of them is a
+  defect of 513's decision.
+  FINAL STATE, three parts:
+  (a) THE MERGE READS THE BRANCH GATE. `scripts/ci-status-guard.mjs` judges run
+      conclusions, so it no longer blocks a turn end on a red branch gate — which is what
+      the user chose ("red on a branch is expressly normal"). The residual risk is
+      specific: a failure that only the CI host reproduces — the Ubuntu-only class the
+      30.07.2026 lesson was written about — now rides a branch to the merge unseen and
+      surfaces afterwards as a MAILING red on `main`. So the branch gate is read where it
+      still matters: before a merge to `main`, the branch head's `ci/gate (branch)` commit
+      status must be green, and a red one blocks the merge with the failing step named.
+      Turn ends on a branch stay unblocked.
+  (b) A FAILURE BEFORE THE VERDICT STEP IS NOT A GREEN. `checkout` and `setup-node` carry
+      no `id`, so if one fails soft on a branch, every later step — including
+      `node scripts/ci-gate-verdict.mjs`, whose file was never checked out — fails soft,
+      every output stays empty and the run reports a clean green with no status, no summary
+      and no alert. Rare (GitHub-infra transients only) and therefore cheap to close: the
+      verdict invocation gets a shell fallback that emits `failed=true` plus a
+      `verdict-unavailable` step name when the script cannot run at all.
+  (c) THE UNUSED FIELD GOES. `ci-gate-verdict-core.mjs` computes `protectedRef` from the
+      imported `PROTECTED_REF` and pins it in tests, but nothing consumes it — the mail
+      decision is `!isSoftRun(…)`, which is correctly BROADER (tags, dispatch, PRs). An
+      unread field that looks authoritative is what a later reader will reach for. Drop it
+      with its pins, or consume it and say where.
+  ALSO RECORDED, no work: a job-level failure (the 15-minute `timeout-minutes`, a dead
+  runner) fails past every `continue-on-error`, concludes `failure` and still mails. That
+  is the safer direction for a hang and stays as it is — the docs simply do not claim
+  otherwise.
+  VERIFIABLE: (a) a merge attempt with a red `ci/gate (branch)` on the branch head is
+  refused and names the failed step, a green one passes, and a turn end on that same red
+  branch is NOT blocked; (b) a workflow run whose verdict script is unavailable reports
+  `failed=true` with `verdict-unavailable`; (c) a repository-wide search finds no reader of
+  `protectedRef`. Pure Vitest for each.
+  Criticality: medium — (a) is the one that can let a real regression reach `main`.
