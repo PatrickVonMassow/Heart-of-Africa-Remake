@@ -115,6 +115,7 @@ import { mulberry32, hashChunk } from '../../world/noise'
 import { PERF, maxFrameMs, recordBurst, recordFrame, resetPerf } from './perfProbe'
 import { Climate } from './Climate'
 import { setFrameVisibilityTest } from './frameVisibility'
+import { FLORA_SPECIES, type FloraSpecies } from './floraSpecies'
 import { RegionBorders } from './RegionBorders'
 import { Wildlife } from './Wildlife'
 import { collidableAnimalsNear } from './wildlifeCollision'
@@ -963,21 +964,10 @@ function Sun() {
 
 // --- Instanced biome vegetation ---------------------------------------------
 
-type Species =
-  | 'acacia'
-  | 'jungle'
-  | 'palm'
-  | 'bush'
-  | 'rock'
-  | 'baobab'
-  | 'termite'
-  | 'deadtree'
-  | 'papyrus'
-  | 'kopje'
-const SPECIES: Species[] = [
-  'acacia', 'jungle', 'palm', 'bush', 'rock',
-  'baobab', 'termite', 'deadtree', 'papyrus', 'kopje',
-]
+// The roster itself lives in floraSpecies.ts so the label layer's test can
+// sweep the real list (point 342); the names stay local here.
+type Species = FloraSpecies
+const SPECIES = FLORA_SPECIES
 const MAX_INSTANCES: Record<Species, number> = {
   acacia: 1600,
   jungle: 2600,

@@ -478,6 +478,13 @@ export interface BalanceConfig {
     /** How much full rain damps an UNSHELTERED open flame (0..1, large: rain drowns it toward embers). */
     openRainDamp: number
   }
+  /** The hold-Ctrl label layer (design.md §17.8). */
+  labelOverlay: {
+    /** How many labels may stand at once while Ctrl is held — the nearest ones
+     *  win, the rest are dropped. It is a READABILITY limit first (a crowded
+     *  savanna otherwise turns into a wall of text) and a frame budget second. */
+    maxLabels: number
+  }
   /** Startup picture liveness (point 337). */
   startup: {
     /** How long the loading picture may stand still, in milliseconds — the
@@ -919,6 +926,11 @@ export const balance: BalanceConfig = {
     // only dips a touch (steamier), the unsheltered flame is drowned toward embers.
     shelteredRainDamp: 0.25, // calibratable, debug-editable
     openRainDamp: 0.7, // calibratable, debug-editable
+  },
+  labelOverlay: {
+    // Educated guess: a herd in the near view holds a dozen-odd animals, and
+    // two dozen labels still read as annotation rather than as a page of text.
+    maxLabels: 24, // calibratable, debug-editable
   },
   startup: {
     // Measured post-fix on the headless verify lanes (point 337): the worst

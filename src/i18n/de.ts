@@ -120,6 +120,39 @@ export const de: Strings = {
 
   regions: { north: 'Norden', west: 'Westen', central: 'Zentral', east: 'Osten', south: 'Süden' },
   animals: { lion: 'Löwen', cheetah: 'ein Gepard', leopard: 'ein Leopard', hyena: 'Hyänen', snake: 'eine Schlange', crocodile: 'ein Krokodil' },
+  // Naming what ACTS on screen (design.md §17.8). Every noun carries its gender
+  // so the qualifier can be declined ("Toter Elefant", "Tote Giraffe", "Totes
+  // Zebra"), and the young carries its own compound rather than being pasted
+  // together from "jung" plus the species.
+  actors: {
+    kinds: {
+      elephant: { noun: 'Elefant', gender: 'm', young: 'Elefanten-Jungtier' },
+      giraffe: { noun: 'Giraffe', gender: 'f', young: 'Giraffen-Jungtier' },
+      zebra: { noun: 'Zebra', gender: 'n', young: 'Zebra-Jungtier' },
+      wildebeest: { noun: 'Gnu', gender: 'n', young: 'Gnu-Jungtier' },
+      antelope: { noun: 'Antilope', gender: 'f', young: 'Antilopen-Jungtier' },
+      warthog: { noun: 'Warzenschwein', gender: 'n', young: 'Warzenschwein-Jungtier' },
+      flamingo: { noun: 'Flamingo', gender: 'm' },
+      crocodile: { noun: 'Krokodil', gender: 'n' },
+      plover: { noun: 'Regenpfeifer', gender: 'm', young: 'Regenpfeifer-Jungtier' },
+      lion: { noun: 'Löwe', gender: 'm', young: 'Löwen-Jungtier' },
+      cheetah: { noun: 'Gepard', gender: 'm' },
+      leopard: { noun: 'Leopard', gender: 'm' },
+      hyena: { noun: 'Hyäne', gender: 'f' },
+      vulture: { noun: 'Geier', gender: 'm' },
+      elder: { noun: 'Ältester', gender: 'm' },
+      trader: { noun: 'Händler', gender: 'm' },
+      porter: { noun: 'Träger', gender: 'm' },
+      villager: { noun: 'Dorfbewohner', gender: 'm' },
+      child: { noun: 'Kind', gender: 'n' },
+      goat: { noun: 'Ziege', gender: 'f' },
+      camp: { noun: 'Lager', gender: 'n' },
+      canoe: { noun: 'Kanu', gender: 'n' },
+    },
+    adult: { m: 'Erwachsener', f: 'Erwachsene', n: 'Erwachsenes' },
+    dead: { m: 'Toter', f: 'Tote', n: 'Totes' },
+    youngGender: 'n', // das Jungtier
+  },
   places: PLACES,
   peoples: PEOPLES,
   landmarks: LANDMARKS,
@@ -453,6 +486,7 @@ export const de: Strings = {
     walkerUnstuck: 'Bewohner-Entklemmung (s)',
     placeCollisionFactor: 'Siedlungs-Kollision (Anteil Betretenradius)',
     startupFreezeBudget: 'Ladebild-Stillstand-Budget (ms)',
+    labelOverlayMax: 'Strg-Beschriftungen (max.)',
     mouseSensitivity: 'Maus-Empfindlichkeit (Ego-Sicht)',
     lookPitchLimit: 'Blickgrenze hoch/runter (°)',
     invertLook: 'Mausblick invertieren',

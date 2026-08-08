@@ -8,6 +8,25 @@ import type { TreasureId } from '../systems/economy'
 import type { Material, RegionId } from '../world/geo'
 import type { BuildingType } from '../state/ui'
 import type { SketchId } from '../journal/sketches'
+import type { ActorKind } from '../systems/actorLabels'
+
+/**
+ * Grammatical gender of a noun. German inflects the Ctrl layer's qualifier by
+ * it — "Toter Elefant", "Tote Giraffe", "Totes Zebra" — which is why every
+ * actor noun carries its gender instead of the label being pasted together at
+ * the render site (design.md §17.8). English ignores it.
+ */
+export type Gender = 'm' | 'f' | 'n'
+
+/** One actor noun with what its language needs in order to inflect it. */
+export interface ActorNoun {
+  /** Nominative singular, as the label shows it alone. */
+  noun: string
+  gender: Gender
+  /** The young's OWN word, where the game distinguishes an age at all —
+   *  German compounds it ("Giraffen-Jungtier"), English names the calf. */
+  young?: string
+}
 
 /** Params for journal text templates (values are ids or numbers). */
 export type TextParams = Record<string, string | number>
@@ -43,6 +62,20 @@ export interface Strings {
   regions: Record<RegionId, string>
   /** Animal names used in event entries (design.md §14). */
   animals: { lion: string; cheetah: string; leopard: string; hyena: string; snake: string; crocodile: string }
+  /**
+   * The "hold Ctrl and see what acts" layer (design.md §17.8). The composition
+   * is a pure function of (kind, age, state, language) in
+   * `systems/actorLabels.ts` — these are its parts, never a finished string.
+   */
+  actors: {
+    kinds: Record<ActorKind, ActorNoun>
+    /** Qualifier for a grown animal of a kind that also has young. */
+    adult: Record<Gender, string>
+    /** Qualifier for a carcass. */
+    dead: Record<Gender, string>
+    /** Gender of the young form's head noun (German "das Jungtier"). */
+    youngGender: Gender
+  }
   places: Record<string, string>
   peoples: Record<string, string>
   landmarks: Record<string, string>
@@ -436,6 +469,8 @@ export interface Strings {
     walkerUnstuck: string
     placeCollisionFactor: string
     startupFreezeBudget: string
+    /** Cap on the hold-Ctrl labels (design.md §17.8). */
+    labelOverlayMax: string
     mouseSensitivity: string
     lookPitchLimit: string
     invertLook: string
