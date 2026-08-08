@@ -7898,6 +7898,105 @@ check(
   JSON.stringify(wrap163),
 )
 
+// --- Hold Ctrl: naming what acts on screen (design.md §17.8, point 342) ------
+// The bird's-eye half. The settlement half is in polish.mjs.
+{
+  /** Let the scene draw N frames — the app's own clock, never the wall clock. */
+  const frames = (n) =>
+    page.evaluate(
+      (count) =>
+        new Promise((res) => {
+          let i = 0
+          const step = () => (++i >= count ? res() : requestAnimationFrame(step))
+          requestAnimationFrame(step)
+        }),
+      n,
+    )
+
+  // Onto open savanna and wait for real streamed herds, so there IS something
+  // alive to name (the check is about the layer, not about spawning).
+  await page.evaluate(() => window.__game.getState().debugJumpTo(-2.6, 35.2))
+  const herds = await waitForHerds(6)
+  // The camera eases to its target; scan only once it has caught up (point 177).
+  await page.waitForFunction(() => window.__camera?.settled?.() === true, null, { timeout: 30000 }).catch(() => {})
+
+  const before = await page.evaluate(() => document.querySelectorAll('.actor-label').length)
+  check('no label stands while Ctrl is up (point 342)', before === 0, `${before} labels`)
+
+  await page.keyboard.down('Control')
+  // Poll for the layer's own state rather than sleeping: it refreshes on its
+  // own interval and this machine may be loaded.
+  const appeared = await page
+    .waitForFunction(() => (window.__actorLabels?.() ?? []).length > 0, null, { timeout: 20000 })
+    .then(() => true)
+    .catch(() => false)
+
+  const held = await page.evaluate(() => {
+    const labels = window.__actorLabels ? window.__actorLabels() : null
+    if (labels === null) return null
+    const rendered = [...document.querySelectorAll('.actor-label')].map((el) => el.textContent ?? '')
+    return {
+      labels,
+      rendered,
+      // Judged by PROJECTION through the live camera (point 172), never by a
+      // radius: every label must sit on a subject that is really in the frame.
+      offScreen: labels.filter((l) => !window.__camera.onScreen(l.x, l.z, l.y)).length,
+      max: window.__balance.labelOverlay.maxLabels,
+    }
+  })
+  check(
+    'holding Ctrl names the animals in view (point 342)',
+    !!held && held.labels.length > 0 && held.rendered.length === held.labels.length,
+    held
+      ? `${held.labels.length} labels: ${held.rendered.slice(0, 4).join(' | ')}`
+      : `no layer (herds streamed: ${herds}, appeared: ${appeared})`,
+  )
+  check(
+    'every Ctrl label sits on an ON-SCREEN subject (points 172/342)',
+    !!held && held.offScreen === 0,
+    held ? `${held.offScreen} of ${held.labels.length} off screen` : 'no layer',
+  )
+  check(
+    'the label count stays under the calibratable cap (point 342)',
+    !!held && held.labels.length <= held.max,
+    held ? `${held.labels.length} <= ${held.max}` : 'no layer',
+  )
+  // Scenery answers nothing: no plant, rock or dressing may be named. The flora
+  // roster is the one TravelScene draws (src/scenes/travel/floraSpecies.ts).
+  const FLORA_WORDS = [
+    'acacia', 'akazie', 'jungle', 'dschungel', 'palm', 'palme', 'bush', 'busch',
+    'rock', 'fels', 'baobab', 'termite', 'termiten', 'deadtree', 'papyrus', 'kopje',
+    'tree', 'baum', 'grass', 'gras',
+  ]
+  const plantNamed = held ? held.rendered.filter((t) => FLORA_WORDS.some((w) => t.toLowerCase().includes(w))) : null
+  check(
+    'no plant, rock or dressing is named (point 342)',
+    !!held && plantNamed.length === 0,
+    held ? `${plantNamed.length} scenery labels` : 'no layer',
+  )
+
+  await shot('147-ctrl-actor-labels', {
+    world: { lat: -2.6, lon: 35.2 },
+    label: 'the savanna with the Ctrl labels over its animals',
+  })
+
+  await page.keyboard.up('Control')
+  const cleared = await page
+    .waitForFunction(
+      () => document.querySelectorAll('.actor-label').length === 0 && window.__actorLabels === undefined,
+      null,
+      { timeout: 15000 },
+    )
+    .then(() => true)
+    .catch(() => false)
+  await frames(2)
+  const after = await page.evaluate(() => ({
+    dom: document.querySelectorAll('.actor-label').length,
+    hook: window.__actorLabels === undefined,
+  }))
+  check('releasing Ctrl clears every label (point 342)', cleared && after.dom === 0 && after.hook, JSON.stringify(after))
+}
+
 console.log('console errors:', errors.length)
 for (const e of errors) console.log('ERR:', e.slice(0, 300))
 await browser.close()

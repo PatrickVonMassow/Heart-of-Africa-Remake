@@ -507,13 +507,13 @@ changes with it in the same commit.
 
 9. **Status bar.** Date, funds, provisions, gifts and current region are
    displayed per `design.md` §17.1 — no hand-item slot, no permanent
-   coordinates (removed on user request); transient status hints (e.g.
-   the movement-penalty reason, pt. 4) render CENTRED inside the status
-   bar itself, not in a separate floating panel; each stat is led by its
+   coordinates; transient status hints (e.g. the movement-penalty reason,
+   pt. 4) render CENTRED inside the status bar; each stat is led by its
    symbol with the localized word as tooltip and the date reads
    DD.MM.YYYY; the inventory item currently in use glows, and the health
    bar with its affliction badges sits inside the bar's right end per
-   §17.1 (never covered by the journal).
+   §17.1 (never covered by the journal). Holding Ctrl names animals,
+   people and usable objects on screen (§17.8).
    Evidence: docs/acceptance-evidence.md §9.
 
 10. **Goal scaffolding.** A procedurally placed goal (the tomb) exists;

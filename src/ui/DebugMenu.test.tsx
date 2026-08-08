@@ -44,6 +44,7 @@ const DEFAULTS = {
   childSpeech: { ...balance.villageLife.childSpeech },
   adultErrands: { ...balance.villageLife.adultErrands },
   startupFreezeBudgetMs: balance.startup.pictureFreezeBudgetMs,
+  labelOverlayMax: balance.labelOverlay.maxLabels,
   birdsongVolume: balance.birdsongVolume,
   surfNearRadius: balance.surf.nearRadius,
   surfCutoff: balance.surf.cutoff,
@@ -123,6 +124,7 @@ afterEach(() => {
   Object.assign(balance.villageLife.childSpeech, DEFAULTS.childSpeech)
   Object.assign(balance.villageLife.adultErrands, DEFAULTS.adultErrands)
   balance.startup.pictureFreezeBudgetMs = DEFAULTS.startupFreezeBudgetMs
+  balance.labelOverlay.maxLabels = DEFAULTS.labelOverlayMax
   balance.birdsongVolume = DEFAULTS.birdsongVolume
   balance.surf.nearRadius = DEFAULTS.surfNearRadius
   balance.surf.cutoff = DEFAULTS.surfCutoff
@@ -244,6 +246,8 @@ describe('DebugMenu editable fields write through to balance (settings.mjs fillF
     { label: en.debug.adultErrandCount, read: () => balance.villageLife.adultErrands.villagerCount, value: 6 },
     // The loading picture's freeze budget the startup gate binds (point 337).
     { label: en.debug.startupFreezeBudget, read: () => balance.startup.pictureFreezeBudgetMs, value: 6000 },
+    // How many hold-Ctrl labels may stand at once (point 342).
+    { label: en.debug.labelOverlayMax, read: () => balance.labelOverlay.maxLabels, value: 12 },
     // Per-source birdsong volume and the coastal surf fade bounds (point 153).
     { label: en.debug.birdsongVolume, read: () => balance.birdsongVolume, value: 0.5 },
     { label: en.debug.surfNearRadius, read: () => balance.surf.nearRadius, value: 0.8 },
@@ -773,7 +777,8 @@ const EXPECTED_CONTROLS: Record<DebugGroupId, readonly string[]> = {
   ],
   events: ['debug.randomEvents', 'debug.triggerEvent'],
   graphics: [
-    'debug.detailLevel', 'debug.flatGround', 'debug.startupFreezeBudget', 'debug.ambienceVolume',
+    'debug.detailLevel', 'debug.flatGround', 'debug.startupFreezeBudget', 'debug.labelOverlayMax',
+    'debug.ambienceVolume',
     'debug.footstepVolume', 'debug.ambientVolume', 'debug.birdsongVolume', 'debug.surfNearRadius',
     'debug.surfCutoff',
   ],
@@ -850,19 +855,19 @@ describe('DebugMenu completeness: every control is present, in its group (point 
     })
   })
 
-  it('carries all 132 controls in total, and none twice', () => {
+  it('carries all 133 controls in total, and none twice', () => {
     render(<DebugMenu />)
     const labels = renderedRowLabels()
     const expected = DEBUG_GROUP_ORDER.flatMap((id) => EXPECTED_CONTROLS[id])
     expect(labels.length).toBe(expected.length)
-    expect(labels.length).toBe(132)
+    expect(labels.length).toBe(133)
     expect(new Set(labels).size).toBe(labels.length)
   })
 
   it('gives every control a real input, select or button — no label without a control', () => {
     render(<DebugMenu />)
     const rows = [...document.querySelectorAll('.debug-menu .debug-group-body > label')]
-    expect(rows.length).toBe(132)
+    expect(rows.length).toBe(133)
     for (const row of rows) {
       const label = row.querySelector('span')?.textContent ?? '(none)'
       // The renderer row is the one deliberate read-only display (design.md §21.3).
@@ -916,7 +921,7 @@ describe('DebugMenu groups collapse and remember their state (point 393)', () =>
     render(<DebugMenu />)
     // Nothing opened: the whole set is still there (hidden), and a value still
     // writes through — the verify suites drive the controls this way.
-    expect(renderedRowLabels().length).toBe(132)
+    expect(renderedRowLabels().length).toBe(133)
     fireEvent.change(numberField(en.debug.travelSpeed), { target: { value: '9' } })
     expect(balance.travelSpeed).toBe(9)
     balance.travelSpeed = DEFAULTS.travelSpeed
@@ -962,9 +967,9 @@ describe('DebugMenu filter narrows the whole menu (point 393)', () => {
     render(<DebugMenu />)
     fireEvent.click(groupHead(en.debug.groups.tools))
     typeFilter('croc')
-    expect(renderedRowLabels().length).toBeLessThan(132)
+    expect(renderedRowLabels().length).toBeLessThan(133)
     typeFilter('')
-    expect(renderedRowLabels().length).toBe(132)
+    expect(renderedRowLabels().length).toBe(133)
     expect(renderedGroups().filter((g) => g.open).map((g) => g.title)).toEqual([en.debug.groups.tools])
   })
 

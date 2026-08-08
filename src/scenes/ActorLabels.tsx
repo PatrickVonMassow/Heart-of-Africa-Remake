@@ -10,7 +10,7 @@
 // class) rather than inventing a second one, so the labels layer with the rest
 // of the in-scene text under §17.4.
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import { balance } from '../config/balance'
@@ -71,6 +71,21 @@ function ActorLabelLayer({ distanceFactor }: { distanceFactor: number }) {
       })),
     )
   })
+
+  // Dev hook for the headless verification (CLAUDE.md §7.2): what stands right
+  // now, WITH the world point each label claims — so a check can project it
+  // through the live camera instead of trusting the picture's word for it. It
+  // exists only while the layer does, which is itself the release assertion.
+  const drawn = useRef(labels)
+  drawn.current = labels
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    const w = window as unknown as Record<string, unknown>
+    w.__actorLabels = () => drawn.current.map((l) => ({ text: l.text, x: l.x, y: l.y, z: l.z }))
+    return () => {
+      delete w.__actorLabels
+    }
+  }, [])
 
   return (
     <>

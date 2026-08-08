@@ -3850,6 +3850,90 @@ for (const [placeId, shot] of [
   )
 }
 
+// --- Hold Ctrl inside a settlement (design.md §17.8, point 342) -------------
+// The first-person half; the bird's-eye half is in enrichments.mjs. What is
+// checked here is that the SAME layer answers in this perspective, over the
+// inhabitants and their animals, and that it leaves nothing behind.
+{
+  const frames = (n) =>
+    page.evaluate(
+      (count) =>
+        new Promise((res) => {
+          let i = 0
+          const step = () => (++i >= count ? res() : requestAnimationFrame(step))
+          requestAnimationFrame(step)
+        }),
+      n,
+    )
+
+  await page.evaluate(() => {
+    const g = window.__game.getState()
+    g.setJournalOpen(false)
+    if (g.placeId) g.leavePlace()
+    g.enterPlace('maasai-village')
+  })
+  await page.waitForFunction(
+    () => window.__game.getState().placeId === 'maasai-village' && !!window.__placeLayout,
+    null,
+    { timeout: 40000 },
+  )
+  await waitForSceneBuilt(page).catch(() => {})
+  // Stand back from the middle and look at it: that is where the village lives.
+  await page.evaluate(() => {
+    const p = window.__placePlayer
+    p.x = 0
+    p.z = 14
+    p.pitch = 0
+    p.yaw = Math.atan2(-(0 - p.x), -(0 - p.z))
+  })
+  await frames(4)
+
+  const idle = await page.evaluate(() => document.querySelectorAll('.actor-label').length)
+  check('a settlement stands unlabelled while Ctrl is up (point 342)', idle === 0, `${idle} labels`)
+
+  await page.keyboard.down('Control')
+  // Poll for the layer instead of sleeping: it refreshes on its own interval
+  // and this machine may be loaded.
+  const appeared = await page
+    .waitForFunction(() => (window.__actorLabels?.() ?? []).length > 0, null, { timeout: 20000 })
+    .then(() => true)
+    .catch(() => false)
+  const held = await page.evaluate(() => (window.__actorLabels ? window.__actorLabels() : null))
+  const rendered = await page.evaluate(() =>
+    [...document.querySelectorAll('.actor-label')].map((el) => el.textContent ?? ''),
+  )
+  check(
+    "holding Ctrl names the settlement's people and animals (point 342)",
+    !!held && held.length > 0 && rendered.length > 0,
+    held ? `${held.length} labels: ${rendered.slice(0, 4).join(' | ')}` : `no layer (appeared: ${appeared})`,
+  )
+  check(
+    'no label is empty or an internal id (point 342)',
+    rendered.length > 0 && rendered.every((t) => t.trim().length > 1 && t[0] === t[0].toUpperCase()),
+    rendered.slice(0, 6).join(' | '),
+  )
+  // Nothing built or grown answers: no hut, wall, fence or plant.
+  const SCENERY_WORDS = ['hut', 'wall', 'mauer', 'fence', 'zaun', 'roof', 'dach', 'tree', 'baum', 'rock', 'fels', 'grass', 'gras']
+  const scenery = rendered.filter((t) => SCENERY_WORDS.some((w) => t.toLowerCase().includes(w)))
+  check('no building, fence or plant is named (point 342)', scenery.length === 0, scenery.join(' | '))
+
+  await frame('148-ctrl-actor-labels-village', {
+    place: 'maasai-village',
+    label: 'the Maasai village with the Ctrl labels over its inhabitants',
+  })
+
+  await page.keyboard.up('Control')
+  const cleared = await page
+    .waitForFunction(
+      () => document.querySelectorAll('.actor-label').length === 0 && window.__actorLabels === undefined,
+      null,
+      { timeout: 15000 },
+    )
+    .then(() => true)
+    .catch(() => false)
+  check('releasing Ctrl clears the settlement labels too (point 342)', cleared, `cleared=${cleared}`)
+}
+
 console.log('console errors:', errors.length)
 for (const e of errors) console.log('ERR:', e.slice(0, 300))
 await browser.close()

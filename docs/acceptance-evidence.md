@@ -259,6 +259,31 @@ journal, camp shown/hidden per mode, `canCampHere` pure);
 `src/state/store.saveload.test.ts` (legacy map-item strip);
 `scripts/verify/enrichments.mjs` (button-row order + non-overlap).
 
+Hold-Ctrl naming (§17.8, point 342). Verifiable, pure: the qualifies
+predicate sweeps the FULL rosters — every fauna species in
+(`src/scenes/travel/animalBodies.ts`), every flora/dressing species out
+(`src/scenes/travel/floraSpecies.ts`), every map point out, a concealed
+crocodile out while hidden and in once it lunges; the text composition
+sweeps every (kind x age x state) in both languages and pins "Adult
+giraffe" / "Dead giraffe calf" / "Erwachsene Giraffe" / "Totes
+Giraffen-Jungtier" plus the feminine/neuter/masculine trio that proves
+the gender is applied; the nearest-N cap keeps the nearest and drops the
+farthest (`src/systems/actorLabels.test.ts`). The subjects and the
+frustum: registered sources and marked scene objects report only what is
+drawn (`src/scenes/actorLabelSource.test.ts`), and the shared projection
+rejects a point behind the camera as well as one outside the frame
+(`src/scenes/travel/frameVisibility.test.ts`). Component: the layer
+mounts on Ctrl down, is gone on keyup, is cleared by a blur or a hidden
+tab with no keyup at all, re-syncs from the next input event, speaks the
+selected language and honours `balance.labelOverlay.maxLabels`
+(`src/scenes/ActorLabels.test.tsx`). Live, both backends: holding Ctrl
+labels the animals in view with every label on an ON-SCREEN subject
+(projected through the live camera) and no plant named, and the release
+clears every one — `scripts/verify/enrichments.mjs`
+(`147-ctrl-actor-labels.png`) for the bird's-eye view and
+`scripts/verify/polish.mjs` (`148-ctrl-actor-labels-village.png`) for
+the settlement.
+
 ## 10. Goal scaffolding.
 
 Verifiable:
