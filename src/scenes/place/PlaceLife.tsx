@@ -45,7 +45,7 @@ import { placeById } from '../../world/geo'
 import { useGame } from '../../state/store'
 import { START_YEAR, balance } from '../../config/balance'
 import type { RegionPlaceStyle } from './regionStyles'
-import { nudgeToFree, resolveMove, standingClear, tryNudgeToFree, WALKER_RADIUS, type Collider } from './collision'
+import { nudgeToFree, nudgeWhere, resolveMove, spawnPointFree, standingClear, tryNudgeToFree, WALKER_RADIUS, type Collider } from './collision'
 import { insidePlace } from './boundary'
 import type { PlaceRiverBank } from './riverBank'
 import { buildPlaceNavGrid, findPlaceRoute, navClearBetween, type NavPoint } from './routing'
@@ -451,39 +451,52 @@ function Kids({
   // wander out of its group into the adults' earshot (point 481.4).
   const world = useMemo<TagWorld>(() => {
     const rim = Math.max(1, radius - NPC_RADIUS * 2)
+    const blocked = (px: number, pz: number) =>
+      Math.hypot(px, pz) > rim ||
+      Math.hypot(px - x, pz - z) > playRadius ||
+      !standingClear(colliders, px, pz, NPC_RADIUS)
     return {
       radius: playRadius,
       centerX: x,
       centerZ: z,
       childRadius: NPC_RADIUS,
-      blocked: (px, pz) =>
-        Math.hypot(px, pz) > rim ||
-        Math.hypot(px - x, pz - z) > playRadius ||
-        !standingClear(colliders, px, pz, NPC_RADIUS),
+      blocked,
+      // The escape lands on ground the GAME calls free, not merely out of the
+      // huts: a collider-only nudge teleported a child clean out of its own play
+      // ground once the ground moved in among the buildings (point 524), and the
+      // `tag-inside` invariant then fired every frame. Roomy ground first (an
+      // escape direction, not a slot), any free spot inside the ground second.
       nudge: (px, pz) => {
-        const r = tryNudgeToFree(colliders, px, pz, NPC_RADIUS)
+        const roomy = nudgeWhere(
+          px,
+          pz,
+          (ax, az) => !blocked(ax, az) && spawnPointFree(colliders, ax, az, NPC_RADIUS),
+        )
+        const r = roomy.found ? roomy : nudgeWhere(px, pz, (ax, az) => !blocked(ax, az))
         return { x: r.pos[0], z: r.pos[1], found: r.found }
       },
     }
   }, [colliders, radius, x, z, playRadius])
 
   // The group, spawned on validated ground (point 155): a play spot covered by a
-  // hut is nudged to the nearest free one before the first frame — and the
-  // scheduler of what it SAYS (point 481) is built with it, because a new group
-  // is a new scheduler: a second settlement must never inherit the first one's
-  // turn or its half-finished errands.
+  // hut is nudged to the nearest free one before the first frame — INSIDE the
+  // play ground, by the game's own predicate, for the same reason the escape is
+  // — and the scheduler of what it SAYS (point 481) is built with it, because a
+  // new group is a new scheduler: a second settlement must never inherit the
+  // first one's turn or its half-finished errands.
   const { game, speech } = useMemo(() => {
     const rand = mulberry32((seed + 5171) >>> 0)
     const spots = Array.from({ length: count }, (_, i) => {
       const a = (i / Math.max(1, count)) * Math.PI * 2
-      const [sx, sz] = nudgeToFree(colliders, x + Math.cos(a) * 2.4, z + Math.sin(a) * 2.4, NPC_RADIUS)
-      return { x: sx, z: sz }
+      const spot = world.nudge(x + Math.cos(a) * 2.4, z + Math.sin(a) * 2.4)
+      return { x: spot.x, z: spot.z }
     })
     return {
       game: createTagGame(spots, rand, balance.villageLife.tag),
       speech: createChildSpeech(count, balance.villageLife.childSpeech),
     }
-  }, [x, z, count, seed, colliders])
+    // `world` carries the collider set, so it is the only dependency needed for it.
+  }, [x, z, count, seed, world])
 
   // The view the situations read the live game through: built once and
   // refreshed each frame rather than allocated per frame.
