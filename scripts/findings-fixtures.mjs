@@ -201,11 +201,21 @@ function looksLikeBuildOrVerify(calls) {
 export const PINNED_THRESHOLD = 6
 
 const isAgentCall = (c) => c.name === 'Agent'
-/** A durable record, read from the call rather than from the core's record kinds. */
-const leavesARecord = (c) =>
-  (c.name === 'Bash' && /(?:^|[;&|]\s*)(?:\S*\/)?git\s+(?:-\S+\s+)*(?:commit|merge|cherry-pick|revert)\b/.test(c.command ?? '')) ||
-  (c.name === 'Bash' && /finding\.mjs\b[^;&|]*--(?:record|none|drained|request|queued|blocked)\b/.test(c.command ?? '')) ||
-  (['Edit', 'Write', 'NotebookEdit'].includes(c.name) && /(?:^|\/)TASKS\.md$|\/memory\//.test(c.filePath ?? ''))
+/** A durable record, read from the call rather than from the core's record kinds.
+ *  The dry run is excluded and the memory path is the project's own, so the mirror
+ *  does not disagree with the core over a case both already agree on (four-eyes
+ *  re-review advisory 1, Fable 5). */
+const leavesARecord = (c) => {
+  const command = c.command ?? ''
+  if (c.name === 'Bash' && /--dry-run\b/.test(command)) return false
+  return (
+    (c.name === 'Bash' &&
+      /(?:^|[;&|]\s*)(?:\S*\/)?git\s+(?:-[Cc]\s+\S+\s+|-\S+\s+|\S+=\S+\s+)*(?:commit|merge|cherry-pick|revert)\b/.test(command)) ||
+    (c.name === 'Bash' && /finding\.mjs\b[^;&|]*--(?:record|none|drained|request|queued|blocked)\b/.test(command)) ||
+    (['Edit', 'Write', 'NotebookEdit'].includes(c.name) &&
+      /(?:^|\/)TASKS\.md$|\/\.claude\/projects\/[^/]+\/memory\//.test(c.filePath ?? ''))
+  )
+}
 /** The declared wait, likewise read from the call. */
 const declaresAWait = (c) => c.name === 'Bash' && /batch-in-flight\.mjs\b[^;&|]*--waiting-on\b/.test(c.command ?? '')
 
@@ -323,13 +333,24 @@ export function measureCorpus(turns) {
   return counts
 }
 
-/** Pick up to `limit` turns per family, oldest first, so a re-cut is deterministic. */
+/**
+ * Pick up to `limit` turns per family, oldest first, so a re-cut is deterministic.
+ * Returns { picked, contradictions }.
+ *
+ * A turn whose verdict contradicts its family is SKIPPED and REPORTED, not thrown on
+ * (four-eyes re-review advisory 1, Fable 5): the throw made one odd turn brick the
+ * whole re-cut until it was resolved by hand, and a tool that cannot be run is a
+ * tool nobody runs. The contradictions are carried into the committed JSON and
+ * asserted empty by the test, so skipping is not a way to lose one quietly.
+ */
 export function pickFixtures(turns, limit = 3, maxCalls = 14) {
   const perFamily = new Map()
+  const contradictions = []
   const take = (turn, family) => {
     const verdict = auditFindings({ tally: tallyTurn(turn.calls) })
     if (verdict.ok === (family.expect === 'block')) {
-      throw new Error(`findings-fixtures: ${family.id} turn ${turn.at} contradicts its family (expected ${family.expect})`)
+      contradictions.push({ family: family.id, at: turn.at, expected: family.expect })
+      return
     }
     // THE REDACTED TURN MUST STILL BE THE SAME TURN. The head cut is verified per
     // CALL, which keeps every verdict intact but can still hide the `npm test` that
@@ -361,7 +382,7 @@ export function pickFixtures(turns, limit = 3, maxCalls = 14) {
     const candidates = [...(byFamily.get(family.id) ?? [])].sort((a, b) => a.calls.length - b.calls.length)
     if (candidates.length) take(candidates[0], family)
   }
-  return FAMILIES.flatMap((f) => perFamily.get(f.id) ?? [])
+  return { picked: FAMILIES.flatMap((f) => perFamily.get(f.id) ?? []), contradictions }
 }
 
 function main() {
@@ -390,7 +411,7 @@ function main() {
   console.log(`families              : ${JSON.stringify(counts.byFamily)}`)
 
   if (argv.includes('--cut')) {
-    const fixtures = pickFixtures(turns, Number(arg('--limit', '3')))
+    const { picked, contradictions } = pickFixtures(turns, Number(arg('--limit', '3')))
     const payload = {
       note: 'Cut from the real transcript corpus by scripts/findings-fixtures.mjs --cut. Redacted to the fields the decision reads.',
       cutAt: new Date().toISOString(),
@@ -402,12 +423,22 @@ function main() {
         agentTurns: counts.agents,
         agentExemptByDeclaredWait: counts.agentWait,
         agentBlocks: counts.agentBlocks,
+        // Persisted so the family figures stay replayable after the corpus grows
+        // past this cut (four-eyes re-review advisory 2, Fable 5).
+        byFamily: counts.byFamily,
       },
+      // Turns whose verdict contradicted their family, skipped rather than cut. The
+      // test asserts this is empty: a disagreement between the two is the tripwire.
+      contradictions,
       families: FAMILIES.map((f) => ({ id: f.id, expect: f.expect, why: f.why })),
-      turns: fixtures,
+      turns: picked,
     }
     writeFileSync(FIXTURE_PATH, `${JSON.stringify(payload, null, 2)}\n`)
-    console.log(`\nwrote ${fixtures.length} fixture turns to ${FIXTURE_PATH}`)
+    console.log(`\nwrote ${picked.length} fixture turns to ${FIXTURE_PATH}`)
+    if (contradictions.length) {
+      console.log(`SKIPPED ${contradictions.length} turn(s) whose verdict contradicts their family:`)
+      for (const c of contradictions) console.log(`  ${c.family} @ ${c.at} (expected ${c.expected})`)
+    }
   }
 }
 

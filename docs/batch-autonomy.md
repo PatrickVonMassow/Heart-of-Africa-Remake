@@ -1204,7 +1204,7 @@ corpus, so the cases it rests on are cut out of the real transcripts into
 fields the decision reads, with home directories, user names and session ids
 folded away — and replayed by `scripts/findings-fixtures.test.mjs` on every unit
 run. `node scripts/findings-fixtures.mjs --measure` re-measures; `--cut` re-cuts.
-At the cut recorded in that file (806 turns, 56 sessions) the rule blocks 1.1 %
+At the cut recorded in that file (809 turns, 56 sessions) the rule blocks 1.1 %
 of turns — an upper bound, since a historical turn has no in-flight file to prove
 a declared wait by — while a rule that counted every shell call as looking would
 block 5.6 %, and no answer-only turn blocks under either. The rate matters as

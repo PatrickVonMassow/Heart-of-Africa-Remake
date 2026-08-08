@@ -1,15 +1,24 @@
 {
   "note": "Cut from the real transcript corpus by scripts/findings-fixtures.mjs --cut. Redacted to the fields the decision reads.",
-  "cutAt": "2026-08-08T01:54:01.167Z",
-  "corpusTurns": 806,
+  "cutAt": "2026-08-08T01:59:00.701Z",
+  "corpusTurns": 809,
   "measured": {
     "blocks": 9,
     "naiveBlocks": 45,
     "naiveBuildVerify": 10,
     "agentTurns": 73,
     "agentExemptByDeclaredWait": 27,
-    "agentBlocks": 4
+    "agentBlocks": 4,
+    "byFamily": {
+      "looked-and-recorded": 68,
+      "answer-only": 377,
+      "delegated-wait": 39,
+      "unrecorded-investigation": 6,
+      "build-verify": 2,
+      "claimed-wait-dishonoured": 3
+    }
   },
+  "contradictions": [],
   "families": [
     {
       "id": "answer-only",

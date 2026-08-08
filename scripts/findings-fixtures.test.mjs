@@ -25,6 +25,17 @@ describe('the calibration fixtures are real, whole and usable', () => {
     for (const family of FAMILIES) expect(present.has(family.id)).toBe(true)
   })
 
+  it('records no turn whose verdict contradicted its family', () => {
+    // The cut skips such a turn instead of dying on it, so the skip must be visible
+    // here or the tripwire would be a silent one.
+    expect(fixtures.contradictions).toEqual([])
+  })
+
+  it('keeps the family counts replayable after the corpus grows', () => {
+    expect(Object.keys(fixtures.measured.byFamily ?? {}).length).toBeGreaterThan(3)
+    expect(fixtures.measured.byFamily['answer-only']).toBeGreaterThan(0)
+  })
+
   it('carries no raw transcript — only the three fields the decision reads', () => {
     for (const turn of fixtures.turns) {
       for (const call of turn.calls) {

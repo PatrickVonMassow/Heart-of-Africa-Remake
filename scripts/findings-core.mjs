@@ -37,9 +37,9 @@
  *  review message is a memory, so the cases it cites are cut into
  *  `findings-fixtures.json` — real turns, one family per case, replayed by
  *  `findings-fixtures.test.mjs` on every unit run. Re-measured there on the
- *  Linux corpus: at the cut recorded in that file (806 turns, 56 sessions) this
+ *  Linux corpus: at the cut recorded in that file (809 turns, 56 sessions) this
  *  rule blocks 1.1 % of turns and the shell-counts-as-looking rule 5.6 %, while
- *  the 376 answer-only turns block under neither. The direction reproduces on a
+ *  the 377 answer-only turns block under neither. The direction reproduces on a
  *  corpus the first measurement never saw; the absolute rates do not transfer
  *  between corpora, and the corpus keeps growing, so the figures are the CUT's,
  *  not constants. The block rate is an UPPER bound: a historical turn has no
