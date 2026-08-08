@@ -566,25 +566,48 @@ Three changes, and none of them loosens the singleton:
      project's 43 transcripts / 32 440 tool calls (27.8 min; p99 8.9, p99.9 10.0).
      A wait that needs longer says so IN ADVANCE by writing a longer lease
      (`extendLease`); nothing is inferred from evidence any more.
-   - **Expiry is arithmetic.** `assessOwner` compares two numbers and answers
-     `lease-expired`; the ordinary takeover path — the one a dead owner has always
-     opened — does the rest. There is no flag to pass, no wedge to prove and no
-     own-spawn condition to satisfy. That condition is precisely what fell through
-     to a log line on the lost night, because the owner had been started by hand.
-   - **Nothing is killed.** The dispossessed process keeps running, stops owning
-     the batch, and learns it at its next hook when the guards stand it down. The
-     new lock records `takenFromExpiredLease`, and the launcher logs `LEASE
-     EXPIRED: …` naming who, how long they were silent and what they had declared
-     — there is no silent recovery. `verdictRepeat` still escalates once if the
-     same expiry stands for two ticks: a takeover that does not resolve the
-     standstill is the finding worth a person's attention.
+   - **Expiry is arithmetic — but expiry alone no longer TAKES the batch**
+     (point 556, measured 08.08.2026). `assessOwner` still compares two numbers and
+     answers `lease-expired`; what the takeover then additionally requires is that a
+     corroborating signal the tick ALREADY reads comes back negative — the owner's
+     pid dead or unidentifiable, or its declared work not advancing
+     (`leaseTakeoverDecision`). With a live pid AND advancing declared work the tick
+     SKIPS and logs the lease age it overrode. The reason it must: the house rule
+     tells a session waiting on an agent or a long verification to stay inside ONE
+     long-blocking call, and from in there it can renew nothing — so obeying the
+     rule ages its own lease to expiry precisely while it is most productive. On
+     08.08.2026 the launcher logged `has not renewed for 63 min — taking the batch`
+     beside its own line saying the pid was alive and the declared work was `active
+     2 min ago`, and two sessions then shared one repository. A silent owner with
+     nothing declared is still dispossessed exactly as before.
+   - **A DECLARED wait extends the lease** (point 556, and the piece
+     `docs/batch-resilience.md` §3 left unbuilt). `batch-in-flight.mjs --waiting-on`
+     now calls `extendLease` for `DECLARED_WAIT_LEASE_MS` (4 h, pinned to
+     `LAUNCHER_WORK_MAX_AGE_MS`), which is the ONLY one of the two mechanisms the
+     point offered that can hold for a call blocking for HOURS: a renewal buys
+     exactly one window however often it fires, and the call at issue is one that
+     never completes. It is no blank cheque — the extension records itself on the
+     lock as `declaredWait: { at, until }`, and `declaredWaitStale` lets the
+     launcher end it early the moment the declaration's own evidence stops moving.
+   - **Nothing is killed, and the dispossessed session is TOLD.** The old process
+     keeps running and stops owning the batch. Since point 556 it also learns so at
+     its very next hook: a takeover records `lastTakeover: { from, reason }` in the
+     fence file, and the PostToolUse hook injects the notice once per fence number
+     (`dispossessionNotice`) — it had a verification worth handing over, and
+     discovering the loss at a denied merge is too late. The launcher logs `LEASE
+     EXPIRED: …` naming who, how long they were silent, what they had declared and
+     which corroborating signal came back negative — there is no silent recovery.
+     `verdictRepeat` still escalates once if the same expiry stands for two ticks: a
+     takeover that does not resolve the standstill is the finding worth a person's
+     attention.
    - **A fence backs it** (`.claude/batch-fence.json`, monotonic, never deleted):
      one PreToolUse chokepoint refuses a session whose fence has been superseded
      the four paths that have no guard of their own — the TASKS.md tick and archive
      move, `git merge`/`push`, the board publish and `dashboard-state.json`. Only a
      session that demonstrably HELD a fence can be refused, so a window that never
      drove the batch is never blocked, and a missing fence file blocks nobody.
-   A declaration no longer extends ownership at all: it is read for the REPORT, and
+   A declaration still never extends ownership ON ITS OWN — it CORROBORATES, and
+   only where the reader holds the evidence (the launcher tick, nowhere else);
    `LAUNCHER_WORK_MAX_AGE_MS` bounds how long it stays readable as one.
 4. **The threshold that preceded it (point 433, superseded).** Before the lease,
    the launcher's own wedge verdict was brought down from four hours to 45 minutes

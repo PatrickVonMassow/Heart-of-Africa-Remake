@@ -33,9 +33,12 @@ import {
   probePid,
   ourClaudeProcess,
   statePathsFor,
+  extendLease,
+  clearDeclaredWait,
   LOCK_PATH,
   IN_FLIGHT_PATH,
 } from './batch-singleton.mjs'
+import { DECLARED_WAIT_LEASE_MS } from './batch-lease-core.mjs'
 import {
   agentOutputVerdict,
   assessInFlight,
@@ -519,6 +522,12 @@ if (isMain) {
     process.exit(1)
   } else if (argv[0] === '--clear') {
     clearDeclaration()
+    // …and the lease extension the declaration bought (point 556). The lock must
+    // not go on carrying a `declaredWait` whose declaration is gone: the marker is
+    // what makes the window conditional, and a conditional window with nothing left
+    // to condition it on is just a stale field. The lease ITSELF is left where it
+    // stands — pulling it back would shorten a window the owner is entitled to.
+    clearDeclaredWait(sid)
     console.log('in-flight declaration cleared — the ordinary "do not stop the batch" rule applies again.')
   } else if (argv[0] === '--status' || argv.length === 0) {
     const g = gatherInFlight(sid)
@@ -646,7 +655,28 @@ if (isMain) {
     const slots = gatherSlots(declaration)
     if (slots.needsReason) fail(`${slotsRemedy({ slots, cap: POOL_CAP })}\nNothing recorded.`)
     writeDeclaration(declaration)
+    // THE DECLARATION EXTENDS THE LEASE (point 556, and the piece
+    // docs/batch-resilience.md §3 left explicitly unbuilt: "nothing yet WRITES a
+    // longer lease when work is declared"). This is the answer to the incident of
+    // 08.08.2026: the house rule tells a session waiting on an agent or a long
+    // verification to stay inside ONE long-blocking call, and from in there it can
+    // renew nothing — its own lease ages to expiry precisely while it is most
+    // productive. A renewal at call start cannot fix that, because it buys one
+    // window whatever it does; only saying IN ADVANCE that the wait will be long
+    // can. It is honest, not a blank cheque: the extension records itself on the
+    // lock, and the launcher ends it early the moment this declaration's own
+    // evidence stops advancing (`declaredWaitStale`).
+    const leaseHours = Math.round(DECLARED_WAIT_LEASE_MS / 3600_000)
+    const extended = extendLease(sid, now + DECLARED_WAIT_LEASE_MS, { declaredWait: true, now })
     const mins = Math.round(maxAgeMs() / 60000)
+    console.log(
+      extended
+        ? `the batch lease is extended to cover this wait (${leaseHours} h), so one blocking call may run past ` +
+            'the ordinary window without the launcher taking the batch. The extension lasts exactly as long as ' +
+            'the evidence below keeps advancing.'
+        : 'NOTE: the batch lease could NOT be extended for this wait — a blocking call longer than the ordinary ' +
+            'window may lose the batch. Check `node scripts/batch-doctor.mjs`.',
+    )
     console.log(
       `waiting on ${waitingOn} — recorded: ${check.summary}. The turn may now end while this holds. It ` +
         `expires in ${mins} min and stops holding the MOMENT any of it stops checking out (a dead or replaced ` +

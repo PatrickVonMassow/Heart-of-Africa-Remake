@@ -547,7 +547,14 @@ const work = assessOwnerWork({
   worktreeActiveAt,
   mtimeOf,
 })
-const assessment = assessOwner(lock, { now, bootTime: bootTimeMs(), probe })
+// …AND FOR THE VERDICT TOO, SINCE POINT 556. An expired lease is necessary but no
+// longer sufficient: the tick hands `work` in, and `leaseTakeoverDecision` inside
+// `assessOwner` refuses to dispossess an owner whose pid is alive AND whose
+// declared work is still moving. On 08.08.2026 this very tick printed both signals
+// in the same line it used to take the batch anyway, producing the double session.
+// The launcher is the ONLY caller that passes `work` — it is the only one that has
+// it — so every other door keeps comparing numbers.
+const assessment = assessOwner(lock, { now, bootTime: bootTimeMs(), probe, work })
 
 // --- Verify the previous spawn ------------------------------------------------
 // LIVING IS NOT WORKING (point 433, §4 of docs/batch-resilience.md). This used to
@@ -679,6 +686,38 @@ const verdict = lock ? spawnDecision(assessment) : 'spawn'
 if (verdict === 'skip-alive') {
   const why = work.advancing ? `; declared work advancing — ${work.summary}` : ''
   log(`skip: owner alive (${assessment.reason}; heartbeat ${Math.round((now - lock.claimedAt) / 60000)} min old, pid ${lock.pid ?? 'unknown'}${why})`)
+  // AND IT SAYS WHAT IT OVERRODE (point 556). A skip that silently swallowed an
+  // expired lease would be the same blindness in the other direction: the morning
+  // reader must be able to see that the arithmetic said "take it" and what
+  // outvoted it, or the next incident is invisible in this log too.
+  if (assessment.detail) log(`  ${assessment.detail}`)
+  // A SKIP THAT OVERRODE AN EXPIRED LEASE IS NOT A HEALTHY TICK (four-eyes review
+  // of point 556, confirmed finding 1). It must keep ESCALATING, or the one state
+  // where the launcher deliberately declines to act would also be the one state
+  // nobody is ever told about — an owner silent past its lease with something
+  // still moving in the background would skip in silence tick after tick. The
+  // override is time-capped in the core; this is what makes the run-up audible.
+  if (assessment.reason === 'lease-expired-owner-working') {
+    const rep = verdictRepeat({
+      key: `${assessment.reason}#${ownerStateKey(lock)}`,
+      lastKey: state.wedgeVerdictKey,
+      repeats: state.wedgeVerdictRepeats,
+    })
+    state.wedgeVerdictKey = rep.key
+    state.wedgeVerdictRepeats = rep.repeats
+    if (rep.escalate) {
+      log(`ESCALATING: the same owner has outvoted its expired lease for ${rep.repeats} launcher ticks`)
+      await notify(
+        'Batch owner silent past its lease',
+        `${lock.sessionId} (pid ${lock.pid ?? 'unknown'}) has been silent past its lease for ${rep.repeats} ticks ` +
+          'running. It is NOT being taken over because its declared work keeps producing output — but if that is a ' +
+          'runaway rather than a long verification, only a person can tell. Please look.',
+        'high',
+      )
+    }
+    writeJsonAtomic(C('autostart-state.json'), state)
+    process.exit(0)
+  }
   // A healthy tick ENDS the repetition count (four-eyes nit on point 433 (c)):
   // without this a later, identically-worded episode of the same owner would
   // escalate on its second tick instead of its own count, because the key never
@@ -693,7 +732,7 @@ if (verdict === 'skip-alive') {
 // recovery). The take itself happens through the ordinary atomic acquire further
 // down; this says WHO lost the batch, for how long it had been quiet and what it
 // had declared, so the morning reader finds the reason rather than a gap.
-const dispossessed = !!lock && assessment.reason === 'lease-expired'
+const dispossessed = !!lock && (assessment.reason === 'lease-expired' || assessment.reason === 'declared-wait-stale')
 if (dispossessed) {
   const mins = Math.round((now - lock.claimedAt) / 60000)
   const what = declaration ? describeInFlight(work, declaration) : 'nothing declared'
@@ -711,6 +750,11 @@ if (dispossessed) {
     `LEASE EXPIRED: ${lock.sessionId} (pid ${lock.pid ?? 'unknown'}) has not renewed for ${mins} min — taking the ` +
       `batch. It keeps running and merely stops owning the batch; it was waiting on: ${what}`,
   )
+  // WHICH CORROBORATING SIGNAL CAME BACK NEGATIVE (point 556). The lease alone no
+  // longer takes anything, so the line above is only half the reason; this is the
+  // other half, and it is what distinguishes a genuine recovery from the takeover
+  // of 08.08.2026 that should never have happened.
+  if (assessment.detail) log(`  ${assessment.detail}`)
   if (rep.escalate) {
     log(`ESCALATING: the same expired lease has stood for ${rep.repeats} launcher ticks — the takeover is not resolving it`)
     await notify(

@@ -135,3 +135,60 @@ describe('the user message at the next tool call', () => {
     expect(r.stdout).toBe('')
   })
 })
+
+// ---------------------------------------------------------------------------
+// THE DISPOSSESSION NOTICE, ON THE SPAWNED HOOK (point 556). Same argument as
+// the delivery above: what only a process can show is that the fenced-out
+// session actually RECEIVES the `hookSpecificOutput` envelope — a hook's plain
+// stdout never reaches the model — and that it receives it exactly ONCE.
+describe('lock-heartbeat-hook — the dispossession notice', () => {
+  const FENCED = 'fenced-out-session'
+  const fencePath = () => resolve(claudeDir(), 'batch-fence.json')
+
+  const dispossess = () =>
+    writeFileSync(
+      fencePath(),
+      JSON.stringify({
+        v: 1,
+        fence: 12,
+        holder: 'the-successor',
+        holders: [
+          { sessionId: FENCED, fence: 11, at: 1 },
+          { sessionId: 'the-successor', fence: 12, at: 2 },
+        ],
+        lastTakeover: { from: FENCED, fence: 12, reason: 'a lease 63 min out and pid 4048953 is gone', at: 2 },
+      }),
+    )
+
+  beforeAll(() => {
+    // The successor owns the lock; the fenced session owns nothing.
+    ownedBy('the-successor')
+    dispossess()
+    rmSync(resolve(claudeDir(), 'fence-notice.json'), { force: true })
+  })
+
+  it('tells the dispossessed session at its very next hook, with the recorded reason', () => {
+    const r = runHook(FENCED)
+    expect(r.status).toBe(0)
+    const out = JSON.parse(r.stdout)
+    expect(out.hookSpecificOutput.hookEventName).toBe('PostToolUse')
+    expect(out.hookSpecificOutput.additionalContext).toContain('NO LONGER YOURS')
+    expect(out.hookSpecificOutput.additionalContext).toContain('pid 4048953 is gone')
+  })
+
+  it('says it ONCE — injected context is paid for on every later request', () => {
+    expect(runHook(FENCED).stdout).toBe('')
+  })
+
+  it('says nothing at all to the current owner or to a session that never held a fence', () => {
+    expect(runHook('the-successor').stdout).toBe('')
+    expect(runHook('some-attended-window').stdout).toBe('')
+  })
+
+  it('stands down for a PAUSED batch', () => {
+    writeFileSync(resolve(claudeDir(), 'fence-notice.json'), JSON.stringify({ v: 1, sessionId: FENCED, fence: 0 }))
+    writeFileSync(resolve(claudeDir(), 'batch-paused'), 'paused for a human')
+    expect(runHook(FENCED).stdout).toBe('')
+    rmSync(resolve(claudeDir(), 'batch-paused'), { force: true })
+  })
+})

@@ -11,7 +11,7 @@
 // arithmetic, at a moment both sides can compute from the same numbers, with no
 // probe, no judgement and no condition in between.
 //
-// THREE RULES THIS MODULE ENCODES
+// FOUR RULES THIS MODULE ENCODES
 //
 // 1. RENEWAL IS PRE-, NEVER POST-ToolUse. The existing heartbeat fires AFTER a
 //    call returns, so a lease renewed by it would have to outlive the longest
@@ -26,7 +26,19 @@
 //    file; the lock carries only a COPY of its holder's number, which lets a
 //    deleted fence file be re-seeded upward rather than downward.
 //
-// 3. A SESSION IS ONLY EVER FENCED OUT BY ITS OWN RECORD. Staleness is
+// 3. AN EXPIRED LEASE IS NECESSARY BUT NOT SUFFICIENT (point 556, 08.08.2026).
+//    Arithmetic decides when ownership ENDS; it does not decide alone that the
+//    batch may be TAKEN. A session obeying the waiting rule sits inside ONE
+//    long-blocking call and cannot renew from in there, so its lease runs out
+//    precisely while it is most productive — measured at the 63rd minute, against
+//    a live pid and declared work that had moved two minutes earlier, both of
+//    which the tick had already read and printed. `leaseTakeoverDecision` makes
+//    the takeover ask them, and `DECLARED_WAIT_LEASE_MS` is how such a wait says
+//    in advance that it will be long. This is NOT the probing rule 1 refuses: the
+//    acquire door still compares numbers, and the corroboration lives in the one
+//    reader that already holds the signals.
+//
+// 4. A SESSION IS ONLY EVER FENCED OUT BY ITS OWN RECORD. Staleness is
 //    `heldFence < currentFence` for a session that DEMONSTRABLY held a fence.
 //    A session that never held one is never blocked — an attended window, a
 //    fresh clone, a session that never drove the batch. Being wrong toward
@@ -78,6 +90,51 @@ export const LEASE_MS = 60 * 60 * 1000
  * LESS; a renewal on every call would undo it.
  */
 export const LEASE_RENEW_INTERVAL_MS = 5 * 60 * 1000
+
+/**
+ * HOW LONG A DECLARED WAIT KEEPS THE BATCH — and WHY THIS AND NOT A START-OF-CALL
+ * RENEWAL (point 556, the second half of its final state).
+ *
+ * Point 556 offered two mechanisms and demanded that the chosen one be written
+ * down with its reason: refresh the lease at call START as well as at completion,
+ * or let a DECLARED in-flight wait extend it. THE DECLARED WAIT IS CHOSEN, because
+ * only it can hold for a call that blocks for HOURS. A renewal — wherever it is
+ * written — buys exactly one `LEASE_MS`, so a call that blocks longer than the
+ * window ages its own lease to expiry however often the renewal fires; that is the
+ * arithmetic that dispossessed a live owner on 08.08.2026 at the 63rd minute of one
+ * blocking poll. (The renewal already IS at call start: `board-first-guard.mjs`
+ * runs `renewLease` in PreToolUse. Adding a second one at completion would change
+ * nothing about a call that never completes, which is precisely the case at issue.)
+ *
+ * FOUR HOURS, pinned to `LAUNCHER_WORK_MAX_AGE_MS` in batch-in-flight-core.mjs —
+ * the window in which the launcher still treats a declaration as CURRENT. Longer
+ * would keep the batch on paperwork the launcher no longer reads; shorter would
+ * expire a wait the launcher still believes in. The two are asserted equal in the
+ * test suite rather than imported across, because the dependency would run
+ * backwards (batch-in-flight-core → batch-singleton → this module).
+ *
+ * IT IS NOT AN UNCONDITIONAL FOUR HOURS. The spec says the wait extends the lease
+ * "for as long as its own evidence keeps advancing", so the extension is recorded
+ * on the lock as `declaredWait: { at, until }` and `declaredWaitStale` lets the one
+ * reader that HAS the evidence — the launcher — end it early when the declared work
+ * stops moving. Every other reader compares numbers, exactly as before.
+ */
+export const DECLARED_WAIT_LEASE_MS = 4 * 60 * 60 * 1000
+
+/**
+ * HOW LONG ADVANCING WORK MAY OUTVOTE THE LEASE ARITHMETIC (four-eyes review of
+ * point 556, confirmed finding 1).
+ *
+ * The corroboration of `leaseTakeoverDecision` is a safety net for an UNDECLARED
+ * long call — a declared wait extends the lease outright and never reaches it. A
+ * net with no bound is a hole: an owner wedged with something still producing in
+ * the background would skip every tick for ever, and since the skip also ends the
+ * launcher's repetition count nobody would be told either. ONE FURTHER WINDOW is
+ * the bound, so total silence stays inside two hours — the point at which the
+ * external repository-output watcher acts regardless, which keeps the ladder
+ * monotone (renew 5 < lease 60 < override +60 ≤ watcher 120).
+ */
+export const TAKEOVER_OVERRIDE_MAX_MS = LEASE_MS
 
 /** How many past fence holders the fence file remembers. Bounded on purpose: the
  *  file is never deleted, so an unbounded list would grow for the life of the
@@ -154,6 +211,167 @@ export function renewedLock(lock, { now, leaseMs = LEASE_MS } = {}) {
   return { ...lock, leaseUntil: t + leaseMs }
 }
 
+/**
+ * DOES A DECLARED WAIT STILL CARRY THIS LOCK? PURE.
+ *
+ * True only inside the stretch a declared wait BOUGHT: past the moment an ordinary
+ * lease taken at the declaration would have run out (`at + leaseMs`) and still
+ * inside what the declaration asked for (`until`). Judged on the two numbers the
+ * extension recorded, never on `claimedAt` — that one moves with every heartbeat,
+ * so an arithmetic hung on it would drift with the owner's own tool calls.
+ *
+ * Outside that stretch there is nothing conditional about the lease and the
+ * ordinary expiry is the whole story.
+ */
+export function inDeclaredWaitWindow(lock, { now, leaseMs = LEASE_MS } = {}) {
+  if (!lock || typeof lock !== 'object') return false
+  const dw = lock.declaredWait
+  if (!dw || typeof dw !== 'object') return false
+  const at = num(dw.at)
+  const until = num(dw.until)
+  const t = num(now)
+  if (at === null || until === null || t === null) return false
+  return t > at + leaseMs && t <= until
+}
+
+/**
+ * THE LAUNCHER'S TAKEOVER VERDICT. PURE, TOTAL, AND THE WHOLE OF POINT 556's
+ * FIRST CLAUSE.
+ *
+ * MEASURED 08.08.2026, 05:45Z: the launcher logged `LEASE EXPIRED: 5551713b…
+ * (pid 4048953) has not renewed for 63 min — taking the batch` and spawned a
+ * second session while that owner was ALIVE, mid-verification, with its delegated
+ * agent's worktree active. The tick HAD both corroborating signals and printed
+ * them itself in the same breath — the pid was alive and the declared work had
+ * moved two minutes earlier — and took the batch anyway, because the lease branch
+ * asked nothing else. Two sessions then shared one repository.
+ *
+ * So an expired lease alone no longer dispossesses. It is a NECESSARY condition;
+ * the takeover additionally requires that a corroborating signal come back
+ * NEGATIVE:
+ *   - the pid is dead, or its identity cannot be established at all, OR
+ *   - the declared work is not advancing (which includes: nothing was declared).
+ * With a live pid AND advancing declared work the tick SKIPS and says so, naming
+ * the lease age it overrode.
+ *
+ * WHY NOT "live pid alone": a wedged process breathes. The whole reason the lease
+ * exists is that a pid probe cannot tell working from wedged, so the pid may only
+ * ever CORROBORATE evidence of work, never stand in for it. And why the pair is
+ * safe: an owner that wants this protection must have DECLARED its wait
+ * (`batch-in-flight.mjs --waiting-on`), which is the house rule for any wait long
+ * enough to matter, and that declaration is only honoured while a probe confirms
+ * the work is still moving. A silent owner with nothing declared is dispossessed
+ * exactly as before — the recovery this mechanism exists for is untouched.
+ *
+ * Inputs (all already read by the tick before it reaches this door):
+ *   leaseAgeMs      — how long the lease has been out, for the message
+ *   pidIdentifiable — could the lock's process be identified at all
+ *   pidLive         — that same process exists and is not a reused number
+ *   workAdvancing   — `assessOwnerWork(...).advancing`
+ *   pid, workSummary — for the sentence only, never for the verdict
+ *
+ * Returns { take, reason, why }. `why` is prose for the log; `reason` is the key.
+ */
+export function leaseTakeoverDecision({
+  leaseAgeMs = null,
+  pid = null,
+  pidIdentifiable = false,
+  pidLive = false,
+  workAdvancing = false,
+  workJudgedOn = 'none',
+  workSummary = '',
+  overrideMaxMs = TAKEOVER_OVERRIDE_MAX_MS,
+} = {}) {
+  const ageMin = num(leaseAgeMs) === null ? null : Math.round(leaseAgeMs / 60000)
+  const age = ageMin === null ? 'an expired lease' : `a lease ${ageMin} min out`
+  const who = num(pid) === null ? 'the owner' : `pid ${pid}`
+  if (pidIdentifiable !== true) {
+    return { take: true, reason: 'pid-unidentifiable', why: `${age} and no identifiable owner process — taking the batch` }
+  }
+  if (pidLive !== true) {
+    return { take: true, reason: 'pid-dead', why: `${age} and ${who} is gone — taking the batch` }
+  }
+  if (workAdvancing !== true) {
+    return {
+      take: true,
+      reason: 'work-not-advancing',
+      why: `${age} and nothing the owner declared is still moving — taking the batch`,
+    }
+  }
+  // A BREATHING PROCESS IS NOT PRODUCED WORK (four-eyes review of point 556,
+  // confirmed finding 1). `assessOwnerWork.advancing` is true if ANY answerable
+  // item checks out, and a declared `--pid` item checks out for merely EXISTING —
+  // which this repository's own vocabulary calls "a live process (nothing
+  // produced) — the weakest". Corroborating an expired lease with that would let a
+  // wedged owner whose declared child hangs alive-but-idle hold the batch on every
+  // tick forever: the exact mirror of the failure point 556 fixes, and one that
+  // used to resolve within the hour. Only work that PRODUCED something may outvote
+  // the arithmetic — a commit, a written file (`git`), or a log still being
+  // written (`log`, weak but genuinely output).
+  if (workJudgedOn === 'process' || workJudgedOn === 'none') {
+    return {
+      take: true,
+      reason: 'work-breathing-only',
+      why:
+        `${age} and the declared work is judged on a live process alone — nothing produced. ` +
+        'A breathing pid corroborates nothing; taking the batch.',
+    }
+  }
+  // …AND THE OVERRIDE IS BOUNDED (same finding). Even produced output must not
+  // outvote the arithmetic without end, or "the batch must not be able to stand
+  // still" becomes "unless something in the repository is still moving", and the
+  // launcher's own escalation would be the only remaining alarm. One further whole
+  // window: total silence stays inside two hours, which is where the external
+  // repository-output watcher acts anyway, so the ladder stays monotone and the
+  // local layer never becomes the last thing between a stall and a human.
+  const cap = num(overrideMaxMs)
+  if (cap !== null && num(leaseAgeMs) !== null && leaseAgeMs > cap) {
+    return {
+      take: true,
+      reason: 'override-expired',
+      why:
+        `${age} — past the ${Math.round(cap / 60000)} min for which advancing work may outvote the lease. ` +
+        `The work still moves (${workSummary || 'no summary'}), but an owner silent this long is taken over anyway.`,
+    }
+  }
+  return {
+    take: false,
+    reason: 'live-owner-working',
+    why:
+      `NOT taking the batch despite ${age}: ${who} is alive AND the declared work has PRODUCED something` +
+      `${workSummary ? ` — ${workSummary}` : ''}. An expired lease alone does not dispossess a live owner ` +
+      '(point 556): the owner is inside one long-blocking call, which is what the waiting rule prescribes.',
+  }
+}
+
+/**
+ * HAS A DECLARED WAIT STOPPED EARNING ITS EXTENSION? PURE.
+ *
+ * The other half of the same honesty: a declared wait extends the lease only "for
+ * as long as its own evidence keeps advancing", so a reader that HAS the evidence
+ * ends the extension the moment the work stops moving, instead of letting four
+ * hours of paperwork hold a batch nobody is driving. A reader WITHOUT the evidence
+ * (`workAdvancing` undefined) never ends it — being wrong toward "the owner keeps
+ * it" costs a delayed recovery, being wrong the other way costs the incident.
+ *
+ * IT NEEDS A DECLARATION STILL ON FILE (`workDeclared`), and that clause is not a
+ * detail — without it this function reintroduces the very bug point 556 fixes, one
+ * step later. Consider a session that declares a wait, sees its agent finish, and
+ * then starts a 40-minute regression inside one call: its lease is still the
+ * four-hour extension, so the PreToolUse renewal has nothing to write, and with no
+ * declaration left `workAdvancing` is false — the launcher would take the batch
+ * mid-regression on the strength of a wait that was over. So a wait that is over
+ * simply stops being conditional; what bounds the owner from there is the ordinary
+ * arithmetic, and being over-generous by the remainder of one declared window is
+ * the direction this whole point argues for.
+ */
+export function declaredWaitStale(lock, { now, leaseMs = LEASE_MS, workAdvancing, workDeclared } = {}) {
+  if (workAdvancing === undefined || workAdvancing === null) return false
+  if (workDeclared !== true) return false
+  if (!inDeclaredWaitWindow(lock, { now, leaseMs })) return false
+  return workAdvancing !== true
+}
+
 // --- The fence -----------------------------------------------------------------
 //
 // (`renewalDecision`, which needs both halves, sits below the fence section.)
@@ -164,12 +382,26 @@ export function normaliseFence(state) {
   const s = state && typeof state === 'object' ? state : {}
   const fence = num(s.fence)
   const holders = Array.isArray(s.holders) ? s.holders : []
+  const t = s.lastTakeover
   return {
     fence: fence !== null && fence > 0 ? Math.floor(fence) : 0,
     holder: typeof s.holder === 'string' ? s.holder : '',
     holders: holders
       .filter((h) => h && typeof h.sessionId === 'string' && num(h.fence) !== null)
       .map((h) => ({ sessionId: h.sessionId, fence: Math.floor(h.fence), at: num(h.at) ?? 0 })),
+    // WHO WAS DISPOSSESSED, AND WHY (point 556, third clause). The fence file
+    // already recorded THAT the mark moved; it never recorded the reason, so a
+    // fenced-out session could learn it only from a denied merge. An unreadable or
+    // absent record normalises to null and tells nobody anything.
+    lastTakeover:
+      t && typeof t === 'object' && typeof t.from === 'string' && t.from
+        ? {
+            from: t.from,
+            fence: num(t.fence) === null ? 0 : Math.floor(t.fence),
+            reason: typeof t.reason === 'string' ? t.reason : '',
+            at: num(t.at) ?? 0,
+          }
+        : null,
   }
 }
 
@@ -197,6 +429,7 @@ export function grantedFenceState({
   sessionId,
   fence,
   now,
+  takeover = null,
   historyLimit = FENCE_HOLDER_HISTORY,
 } = {}) {
   const cur = normaliseFence(fenceState)
@@ -204,12 +437,22 @@ export function grantedFenceState({
   const n = Math.max(cur.fence, num(fence) ?? 0)
   const at = num(now) ?? 0
   const holders = [...cur.holders.filter((h) => h.sessionId !== sid), ...(sid ? [{ sessionId: sid, fence: n, at }] : [])]
+  // A grant that took the batch FROM somebody records that, so the dispossessed
+  // session can be told at its next hook rather than at a denied merge. A grant
+  // that took it from nobody (a free lock) leaves the previous record standing —
+  // it belongs to whoever was last dispossessed and is dropped when that session
+  // has been told.
+  const took =
+    takeover && typeof takeover === 'object' && typeof takeover.from === 'string' && takeover.from && takeover.from !== sid
+      ? { from: takeover.from, fence: n, reason: typeof takeover.reason === 'string' ? takeover.reason : '', at }
+      : cur.lastTakeover
   return {
     v: 1,
     fence: n,
     holder: sid || cur.holder,
     at,
     holders: holders.slice(-Math.max(1, historyLimit)),
+    ...(took ? { lastTakeover: took } : {}),
   }
 }
 
@@ -242,7 +485,58 @@ export function fenceHeldBy(fenceState, sessionId) {
 export function fenceStatus({ fenceState, sessionId } = {}) {
   const cur = normaliseFence(fenceState)
   const held = fenceHeldBy(fenceState, sessionId)
-  return { current: cur.fence, held, stale: held !== null && cur.fence > held }
+  const stale = held !== null && cur.fence > held
+  // The recorded reason is surfaced ONLY to the session it names: it is the one
+  // fact a dispossessed owner cannot work out for itself, and it is nobody else's.
+  const takeover = stale && cur.lastTakeover && cur.lastTakeover.from === sessionId ? cur.lastTakeover : null
+  return { current: cur.fence, held, stale, takeover }
+}
+
+/**
+ * TELL A DISPOSSESSED SESSION THAT IT LOST THE BATCH, AND WHY. PURE, TOTAL.
+ *
+ * Point 556, third clause: "a takeover that DOES happen against a live owner tells
+ * that owner — the fenced session must learn at its next hook that it no longer
+ * owns the batch and why, rather than discovering it at the merge; it had a
+ * verification worth handing over." Until now the fence spoke only when the
+ * session tried one of four guarded calls, so an owner mid-regression learned
+ * nothing until it went to merge what it had just proven.
+ *
+ * It speaks ONCE per fence number (`announcedFence` is what this session was last
+ * told), because the carrier is `additionalContext` on a PostToolUse hook and that
+ * is re-sent with every later request — a line repeated per tool call would be paid
+ * for all session. It stands down for a paused batch and for any session that never
+ * held a fence, like every guard in this repository.
+ *
+ * Returns { notify, fence, context }.
+ */
+export function dispossessionNotice({ fenceState, sessionId, announcedFence = 0, paused = false } = {}) {
+  try {
+    if (paused === true) return { notify: false, fence: 0, context: '' }
+    const status = fenceStatus({ fenceState, sessionId })
+    if (!status.stale) return { notify: false, fence: 0, context: '' }
+    const already = num(announcedFence) ?? 0
+    if (already >= status.current) return { notify: false, fence: status.current, context: '' }
+    const why = status.takeover?.reason ? ` The reason recorded by the takeover: ${status.takeover.reason}.` : ''
+    return {
+      notify: true,
+      fence: status.current,
+      context: [
+        `THE BATCH IS NO LONGER YOURS. This session held fence ${status.held}; the batch has since been taken ` +
+          `over and stands at fence ${status.current}.${why}`,
+        'Nothing was killed — you are still running, and everything you have in flight is still yours to finish ' +
+          'and to COMMIT. What you may no longer do is merge, push, tick the work order or publish the board; ' +
+          'the current owner does that, and the PreToolUse fence refuses those four families outright.',
+        'You are told here, at your next hook, rather than at the merge, because work worth handing over is ' +
+          'worth handing over while it is still fresh: commit and push what you have on its branch, and say in ' +
+          'your last message what was verified and what is left.',
+        'To take the batch back through the sanctioned channel: `node scripts/batch-claim.mjs --session <this ' +
+          'session id>`. `node scripts/batch-doctor.mjs` reports who owns it now.',
+      ].join('\n'),
+    }
+  } catch {
+    return { notify: false, fence: 0, context: '' }
+  }
 }
 
 /**
@@ -374,6 +668,7 @@ export function fenceDecision({ fenceState, sessionId, toolName, command, filePa
       reason:
         'FENCED OUT — this session no longer owns the batch. It held fence ' +
         `${status.held}; the batch has since been taken over and stands at fence ${status.current}. ` +
+        `${status.takeover?.reason ? `The takeover recorded: ${status.takeover.reason}\n` : ''}` +
         `The call refused is ${action.what}.\n` +
         'This is not a permission problem and not a bug: the batch lease expired while this session was ' +
         'silent, another session took over, and two sessions writing the work order, the shared git ' +
