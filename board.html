@@ -1,0 +1,1132 @@
+﻿<title>HoA Batch-Dashboard</title>
+<meta name="hoa-board-open" content="sha256:45ae28f97af4120d">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root{--paper:#f0e8d2;--paper2:#e6dbbc;--ink:#3a2e1c;--soft:#7c6c4d;--rule:#cdbf9c;--ok:#4a7c3f;--warn:#a85f28;--run:#8a6a1f;--water:#41628a;}
+  @media (prefers-color-scheme:dark){:root{--paper:#221c10;--paper2:#2c2517;--ink:#e9dfc2;--soft:#a4956f;--rule:#4a3f28;--ok:#8fbd7f;--warn:#d98f52;--run:#d4b04a;--water:#7fa3cf;}}
+  :root[data-theme="dark"]{--paper:#221c10;--paper2:#2c2517;--ink:#e9dfc2;--soft:#a4956f;--rule:#4a3f28;--ok:#8fbd7f;--warn:#d98f52;--run:#d4b04a;--water:#7fa3cf;}
+  :root[data-theme="light"]{--paper:#f0e8d2;--paper2:#e6dbbc;--ink:#3a2e1c;--soft:#7c6c4d;--rule:#cdbf9c;--ok:#4a7c3f;--warn:#a85f28;--run:#8a6a1f;--water:#41628a;}
+  *{box-sizing:border-box;}
+  body{background:var(--paper);color:var(--ink);font-family:ui-sans-serif,system-ui,"Segoe UI",sans-serif;line-height:1.5;margin:0;padding:16px 12px 40px;overflow-wrap:anywhere;}
+  main{max-width:680px;margin:0 auto;}
+  h1{font-family:Georgia,serif;font-size:1.35rem;margin:0 0 2px;}
+  .sub{color:var(--soft);font-size:0.82rem;margin-bottom:6px;}
+  h2{font-size:0.72rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--soft);margin:26px 0 8px;border-bottom:1px solid var(--rule);padding-bottom:5px;}
+  details{background:var(--paper2);border:1px solid var(--rule);border-radius:8px;margin:8px 0;overflow:hidden;}
+  details.now{border-color:var(--run);border-left:4px solid var(--run);}
+  summary{cursor:pointer;list-style:none;padding:11px 13px;display:flex;flex-wrap:nowrap;align-items:baseline;gap:2px 9px;}
+  summary::-webkit-details-marker{display:none;}
+  summary::after{content:"▸";color:var(--soft);margin-left:auto;font-size:0.9em;}
+  details[open]>summary::after{content:"▾";}
+  /* A collapsible SECTION (Erledigt): the heading itself is the toggle, so the
+     wrapper must not read as a card — no panel, no border, no chevron of its
+     own; the marker rides the <h2> so it lines up with the section rule. */
+  details.sect{background:none;border:0;border-radius:0;margin:0;overflow:visible;}
+  details.sect>summary{padding:0;display:block;}
+  details.sect>summary::after{content:none;}
+  details.sect>summary h2{display:flex;align-items:baseline;gap:8px;}
+  details.sect>summary h2::after{content:"▸";margin-left:auto;font-size:1.1em;}
+  details.sect[open]>summary h2::after{content:"▾";}
+  .num{color:var(--soft);font-variant-numeric:tabular-nums;font-weight:600;font-size:0.86rem;flex-shrink:0;white-space:nowrap;}
+  .t{font-weight:600;font-size:0.96rem;flex:1 1 auto;min-width:0;overflow-wrap:break-word;}
+  .right{margin-left:auto;flex-shrink:0;white-space:nowrap;display:inline-flex;align-items:baseline;gap:8px;padding-left:8px;}
+  .meta{color:var(--soft);font-size:0.76rem;font-variant-numeric:tabular-nums;white-space:nowrap;}
+  .pill{font-size:0.68rem;font-weight:600;letter-spacing:0.04em;padding:2px 8px;border-radius:999px;white-space:nowrap;border:1px solid var(--ok);color:var(--ok);background:color-mix(in srgb,var(--ok) 14%,transparent);}
+  .stamp{color:var(--soft);font-size:0.78rem;font-variant-numeric:tabular-nums;margin-right:4px;}
+  .archive-link{padding:2px 13px 13px;font-size:0.86rem;}
+  .body{padding:0 13px 13px;font-size:0.9rem;color:var(--ink);}
+  .body .commit{font-family:ui-monospace,Consolas,monospace;font-size:0.85em;color:var(--water);}
+  .kv{display:flex;flex-wrap:wrap;gap:2px 16px;margin:0 0 8px;font-size:0.82rem;color:var(--soft);}
+  .kv b{color:var(--ink);font-weight:600;}
+  footer{margin-top:26px;color:var(--soft);font-size:0.78rem;border-top:1px solid var(--rule);padding-top:9px;}
+  footer .commit{font-family:ui-monospace,Consolas,monospace;color:var(--water);}
+  @media(max-width:460px){.meta{font-size:0.72rem}.right{gap:6px;padding-left:6px}summary{padding:10px 11px;gap:2px 7px}.t{font-size:0.9rem}}
+</style>
+<script>
+  (function(){
+    // Card open/closed state, persisted so a refresh never shuts a card the
+    // reader opened. Keyed by the card title (stable across republishes).
+    var KEY='hoa-dash-open';
+    function keyFor(d){var s=d.querySelector('summary');return s?s.textContent.replace(/\s+/g,' ').trim():'';}
+    function load(){try{return JSON.parse(localStorage.getItem(KEY)||'{}');}catch(e){return {};}}
+    function save(o){try{localStorage.setItem(KEY,JSON.stringify(o));}catch(e){}}
+    function restore(){var o=load();document.querySelectorAll('details').forEach(function(d){var k=keyFor(d);if(Object.prototype.hasOwnProperty.call(o,k)){d.open=o[k];}else if(d.classList.contains('sect')&&!/Erledigt/.test(k)){d.open=true;}});}
+    document.addEventListener('toggle',function(e){if(e.target.tagName!=='DETAILS')return;var o=load();o[keyFor(e.target)]=e.target.open;save(o);},true);
+    if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',restore);else restore();
+    // Der Auffrischer tauscht die Karten aus und muss danach genau das hier wieder aufrufen.
+    window.__hoaBoardRestore=restore;
+
+    // Restore the reading position after a fallback/manual reload (see below).
+    try{var y0=sessionStorage.getItem('hoa-dash-y');if(y0!==null){window.scrollTo(0,parseInt(y0,10));sessionStorage.removeItem('hoa-dash-y');}}catch(e){}
+
+    // In-place refresh — NO full reload (which jerked the page and lost the
+    // reader's scroll position every 30 s, worst over an opened card). Fetch the
+    // latest published HTML and swap ONLY the <main> content when it actually
+    // CHANGED; unchanged polls do nothing (no flicker), and a change updates in
+    // place so scroll position and open cards are preserved.
+    // FALLBACK: if same-origin fetch is blocked by the artifact CSP, degrade to a
+    // reload that preserves the scroll position — still auto-updates, far calmer
+    // than the old top-jumping reload.
+  })();
+</script>
+<script>
+function createBoardRefresher(env) {
+  var doc = env.document, win = env.window, source = env.source, fetchImpl = env.fetch;
+  var canFetch = true;
+  function scrollSafeReload() {
+    try { win.sessionStorage.setItem('hoa-dash-y', String(win.scrollY)); } catch (e) {}
+    win.location.reload();
+  }
+  function refresh() {
+    if (doc.visibilityState !== 'visible') return Promise.resolve('hidden');
+    if (!canFetch) { scrollSafeReload(); return Promise.resolve('reload'); }
+    // THE CONTENT, NOT THE LOCATION: under the Pages shell the location is the
+    // shell, which has no <main> — the swap then never happens and nothing says so.
+    return fetchImpl(source + '?t=' + Date.now(), { cache: 'no-store' })
+      .then(function (r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.text();
+      })
+      .then(function (html) {
+        var parsed = new win.DOMParser().parseFromString(html, 'text/html');
+        var fresh = parsed.querySelector('main'), cur = doc.querySelector('main');
+        // NEVER SIT STILL: with nothing to swap into, this poll cannot do its job.
+        // Returning quietly is what hid the breakage for a whole transport change.
+        if (!fresh || !cur) { scrollSafeReload(); return 'reload'; }
+        if (fresh.innerHTML === cur.innerHTML) return 'unchanged';
+        cur.innerHTML = fresh.innerHTML;
+        if (typeof env.onSwap === 'function') env.onSwap();
+        return 'swapped';
+      })
+      .catch(function () { canFetch = false; return 'error'; });
+  }
+  return refresh;
+}
+(function(){
+  var refresh = createBoardRefresher({ document: document, window: window, fetch: fetch,
+    source: "https://raw.githubusercontent.com/PatrickVonMassow/Heart-of-Africa-Remake/board/board.html",
+    onSwap: function(){ if (typeof window.__hoaBoardRestore === "function") window.__hoaBoardRestore(); } });
+  setInterval(refresh, 30000);
+  document.addEventListener('visibilitychange', function(){ if (document.visibilityState === 'visible') refresh(); });
+})();
+</script>
+
+<main>
+<h1>Heart of Africa — Batch-Dashboard</h1>
+<div class="sub">Autonomer TASKS.md-Batch</div>
+<details class="sect"><summary><h2>Woran ich gerade arbeite</h2></summary>
+<details class="now">
+  <summary><span class="t">556 — Die Pacht enteignet den lebenden Besitzer, der die Warteregel befolgt</span><span class="right"><span class="meta">17:57 · ~20:57</span></span></summary>
+  <div class="body">
+    <p><span class="stamp">Stand 18:34</span> Der Bau steht, und die Prüfung durch das ZWEITE Modell hat zwei echte Lücken gefunden — beide gehen zurück an den Bau-Agenten, bevor irgendetwas eingebaut wird.</p>
+    <p>Die erste ist das Spiegelbild des Fehlers selbst: Ein Besitzer, der zwar noch atmet, aber festhängt, hätte den Stapel künftig unbegrenzt halten können, ohne dass ein Alarm ausgelöst wird. Die zweite: Die neue Schonung gilt bisher nur an der Tür des Starters — eine eintreffende Nachricht oder ein frisch geöffnetes Fenster hätte den lebenden Besitzer weiterhin verdrängt.</p>
+  </div>
+</details>
+<details class="now">
+  <summary><span class="t">342 — Strg gedrückt halten benennt alles, was handelt</span><span class="right"><span class="meta">17:56 · ~21:56</span></span></summary>
+  <div class="body">
+    <p><span class="stamp">Stand 17:56</span> Ich habe den Punkt an einen isolierten Bau-Agenten übergeben: Solange Strg gehalten wird, benennt sich alles auf dem Bildschirm, was handelt — jedes Tier, jede Person, jedes benutzbare Objekt — in beiden Ansichten.</p>
+    <p>Landschaft bleibt stumm, Kartenpunkte werden nie benannt (sonst verriete die Anzeige unentdeckte Orte), und ein getauchtes Krokodil schweigt, bis es zuschlägt.</p>
+    <p>Die Tiernamen gibt es im Spiel bisher in keiner Sprache; sie kommen mit diesem Punkt dazu, im Deutschen richtig gebeugt ("Totes Giraffen-Jungtier", nicht zusammengeklebt).</p>
+  </div>
+</details>
+</details>
+<details class="sect"><summary><h2>Von dir zu klären</h2></summary>
+<details>
+  <summary><span class="t">Zeiterfassung in der Arbeitsordnung: abschaffen oder wiederbeleben?</span></summary>
+  <div class="body">
+    <p>Eine Regel, die in jeder Sitzung mitgeladen wird, schreibt vier Zustände je Punkt vor — offen, in Arbeit, wartend, fertig — und unter jedem fertigen Punkt eine Zeile mit der tatsächlich gebrauchten Zeit.</p>
+    <p>Nachgemessen: In der offenen Arbeitsordnung steht diese Zeile null Mal, im Archiv 32 Mal, zuletzt Mitte Juli. Die beiden Zwischenzustände kommen nirgends vor. Die Regel gilt formal und wird seit drei Wochen nicht befolgt.</p>
+    <p>Deine Entscheidung: abschaffen — dann streiche ich den vorschreibenden Teil und behalte nur den nützlichen Rest, nämlich Schätzungen am Median der Kategorie und Lernen aus den Ist-Zeiten? Oder soll sie wieder gelten, dann baue ich sie so, dass ein Wächter sie durchsetzt statt sie nur zu erinnern.</p>
+    <p>Mein Rat: abschaffen. Was du auf der Tafel wirklich liest, ist die Schätzung je Karte, und die bleibt.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="t">Windows-Startweg: soll ich ihn jetzt von dir einrichten lassen?</span></summary>
+  <div class="body">
+    <p>Der abgesicherte Startweg liegt fertig im Projekt, aber einrichten kann ihn nur du: Das Skript muss einmal aus einer PowerShell mit Administratorrechten laufen (scripts\windows\setup-boot-path.ps1 — erst mit -DryRun, dann echt, ein dritter Lauf muss "nichts geändert" melden). Ich habe im Container keinen Zugriff auf die Windows-Aufgabenplanung.</p>
+    <p>Was das Skript absichert, ist die Windows-Hälfte deines Startwegs. Die Container-Hälfte ist noch nicht fertig, und wer beides in einem Durchgang einrichtet, spart sich den zweiten Gang zur erhöhten Konsole.</p>
+    <p>Deine Wahl: jetzt einrichten — dann ist die Windows-Hälfte erledigt und am lebenden Objekt geprüft — oder auf die zweite Hälfte warten und alles zusammen einrichten. Ich empfehle Warten, es sei denn, du gehst vorher für längere Zeit weg.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="t">Kairo zum Start: eigener Ankunftstext oder nicht?</span></summary>
+  <div class="body">
+    <p>Seit heute schreibt jeder erste Eintritt in eine begehbare Szene seinen eigenen Tagebucheintrag. Eine Szene fällt bewusst heraus: Kairo, wo die Expedition beginnt — dort steht die Spielfigur schon zu Beginn, ohne anzukommen, und der vorhandene Eintrag „Aufbruch" deckt den Moment ab. Kairos eigene Ankunftsvignette wird deshalb erst geschrieben, wenn du später zum ersten Mal wirklich hineinläufst. Deine Entscheidung: So lassen — oder soll auch der Spielstart sofort Kairos Ortsvignette schreiben, sodass die allererste Ich-Perspektive nicht ohne Ortstext dasteht?</p>
+  </div>
+</details>
+<details>
+  <summary><span class="t">Letzter Schreibweg nach Windows: eine Zeile schließt ihn</span></summary>
+  <div class="body">
+    <p>Der Arbeitsordner /workspace ist noch als BESCHREIBBARE Einbindung deines Windows-Ordners C:\Users\Patri\Documents\Developing\claude-code im Container. Das Projekt selbst liegt auf einem Container-Laufwerk, dein hoa-Ordner ist nur lesbar — dieser eine Pfad ist der Rest. Neue Einbindungen anlegen oder bestehende auf Schreiben erweitern kann ich nicht (dem Container fehlt das Recht dazu, auch als Root), und die Container-Definition ist schreibgeschützt eingeblendet. Deine Entscheidung: In der Container-Definition beim workspaceMount 'consistency=delegated' durch 'readonly' ersetzen und einmal neu bauen — dann ist kein Schreibweg mehr nach Windows offen. Oder es bleibt, weil du dort gelegentlich Ablage brauchst.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="t">Tonfolgen: fünf Silben (unverwechselbar) oder vier (kürzer)?</span></summary>
+  <div class="body">
+    <p>Elf Konzepte brauchen elf Tonfolgen. Bei VIER Silben passen sie zwar hinein, aber dann unterscheiden sich manche Paare zwangsläufig in nur EINER Silbe — wer sich einmal verhört, hört ein anderes gültiges Wort und liegt selbstbewusst falsch. Bei FÜNF Silben lässt sich das Inventar so wählen, dass je zwei Folgen sich in mindestens ZWEI Silben unterscheiden: ein verhörter Ton ergibt dann gar kein Wort mehr, was auffällt. Preis: Die Häuptlingsbotschaft läuft 35 statt 28 Silben. GEBAUT WIRD FÜNF. Wenn dir die Botschaft beim Ausprobieren zu lang vorkommt, lasse ich auf vier umbauen — dann mit bewusst weit auseinanderliegenden Folgen für die Konzepte, die im selben Bereich gelehrt werden.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="t">Kommunikationssystem — die Mechanik selbst</span></summary>
+  <div class="body">
+    <p>Deine Entscheidung; die Recherche gibt drei Leitplanken:</p>
+    <p>(a) das beste Modell ist das Sambla-Balafon (vier Tonstufen, nachweislich generativ, öffentlich bei Festen gespielt → durch Beobachtung erlernbar); (b) Trommelsprache setzt die gesprochene Sprache voraus (die Trommel ist der Beweis des Verstehens, nicht der Einstieg); (c) echte Systeme wie Nsibidi nie transkribieren, nur erfundene Systeme nach ihren Mechaniken bauen (die ethische wie historische Linie).</p>
+    <p>Mein Rat: an einer Zone prototypisieren.</p>
+  </div>
+</details>
+</details>
+<details class="sect"><summary><h2>Warteschlange</h2></summary>
+<details>
+  <summary><span class="num">555</span><span class="t">Der große Zuschnitt: die Abnahmekriterien verlassen die Dauer-Ladung</span><span class="right"><span class="meta">~2 h</span></span></summary>
+  <div class="body">
+    <p>Von dir entschieden: der große Zuschnitt. Alle 32 Abnahmekriterien wandern aus der verbindlichen Regeldatei in ein Detail-Dokument — rund 23.000 Zeichen, die bisher jede Sitzung in jedem Zug mitträgt.</p>
+    <p>In der Regeldatei bleibt je Kriterium Nummer, Titel, ein Satz Bedingung und die beiden Verweise; alles darüber hinaus zieht wortgleich um.</p>
+    <p>Der Umzug wird maschinell auf Verlustfreiheit geprüft, und die Obergrenze der Datei sinkt mit.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">557</span><span class="t">Die Saat der Prüfstrecke ist nur für eine Suite gesetzt — und in einer anderen tot</span><span class="right"><span class="meta">~3 h</span></span></summary>
+  <div class="body">
+    <p>Die festgelegte Weltsaat sorgt dafür, dass eine Prüfung zweimal dasselbe misst. Sie erreicht bislang aber nur eine einzige Suite.</p>
+    <p>Schlimmer: Eine weitere Suite meldet eine Saat, die gar nicht ankommt. Wer dort ein Rot untersucht, schließt die Weltform als Ursache aus — weil das Protokoll sagt, sie liege fest.</p>
+    <p>Außerdem festzulegen: Eine auf eine Saat fixierte Bahn fotografiert immer nur eine Welt. Wie das abgedeckt wird, soll dastehen statt stillschweigend zu gelten.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">309</span><span class="t">Degradations-Reparatur + Modell-Tripwire — Rest: grüner LARGE-Abschluss</span><span class="right"><span class="meta">~1 h · ruhige Maschine</span></span></summary>
+  <div class="body">
+    <p>Die Reparatur und der Modell-Melder stehen und sind geprüft. Offen ist allein der Beleg: ein großer Gesamtdurchlauf, der auf beiden Grafik-Bahnen grün durchkommt.</p>
+    <p>Der ist auf dieser Maschine derzeit nicht zu bekommen — der Durchlauf bricht nach der ersten roten Bahn ab, und die zweite kam heute Nacht gar nicht an die Reihe.</p>
+    <p>Der Punkt wartet damit nicht auf Arbeit, sondern auf eine Prüfstrecke, die wieder ein verlässliches Urteil gibt. Danach genügt ein einziger Durchlauf.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">438</span><span class="t">Die Projekt-Hooks feuern außerhalb des Projektordners nicht</span><span class="right"><span class="meta">~2 h</span></span></summary>
+  <div class="body">
+    <p>Der Melder steht und ist gemergt: Er beurteilt jede Wächter-Zeile darauf, ob sie aus einem beliebigen Ordner starten kann, und rastet in beide Richtungen ein. Das zweite Modell hat ihn über drei Runden geprüft.</p>
+    <p>Offen bleibt die Umverdrahtung selbst — alle 39 Zeilen sind noch relativ, und die Datei lässt sich nur in einer begleiteten Sitzung ändern.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">330</span><span class="t">Absicherungs-Durchlauf — offen bleibt der Closing-Lauf</span><span class="right"><span class="meta">~3 h</span></span></summary>
+  <div class="body">
+    <p>Vollständigkeit, Rückstände, Features und Dokumenten-Kohärenz sind geprüft und in Ordnung.</p>
+    <p>Offen ist der abschließende Closing-Durchlauf mit allen elf Schritten — er kann erst starten, wenn die beiden roten Prüfungen geklärt sind und kein Agent mehr läuft.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">380</span><span class="t">Der Nachbar am Horizont, den es wirklich gibt</span><span class="right"><span class="meta">~5 h</span></span></summary>
+  <div class="body">
+    <p>Von dir gemeldet: Von den Pyramiden aus ist Kairo nicht zu sehen, umgekehrt schon — bei fünfzehn Kilometern flacher Wüste dazwischen. Vermutlich zwei verschiedene Ursachen; deshalb wird zuerst festgestellt, was welche Seite überhaupt zeichnet.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">415</span><span class="t">Das Tuareg-Zelt sieht aus wie ein Sandhaufen</span><span class="right"><span class="meta">~3 h</span></span></summary>
+  <div class="body">
+    <p>Von dir gemeldet: Die hellen Kegel im Tuareg-Dorf sind tatsächlich Zelte — ein glatter Kegel in Stofffarbe auf hellem Sand, mit einer viel zu kleinen Eingangsklappe. Nichts an der Form sagt, dass dort jemand wohnt.</p>
+    <p>Die echte Form ist fast das Gegenteil: niedrig und breit statt hoch und spitz, Matten über einem gebogenen Gestell, dunkel gegen den Sand, eine offene Seite. Zuerst wird die Quellenlage geprüft, dann gebaut.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">428</span><span class="t">Der begehbare Boden trifft die Fernsicht mit einer sichtbaren Stufe</span><span class="right"><span class="meta">~2 h</span></span></summary>
+  <div class="body">
+    <p>Sieht man vom Rand des begehbaren Bodens nach unten — ein Blick, den es vor heute gar nicht gab —, treffen begehbarer Boden und die Landschaft dahinter mit einer sichtbaren Helligkeitskante aufeinander, statt als ein durchgehender Boden zu lesen. Kein Loch, keine Lücke: die beiden Flächen werden nur unterschiedlich beleuchtet. Auf beiden Grafik-Backends festgehalten.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">315</span><span class="t">Die Sphinx wird neu gebaut</span><span class="right"><span class="meta">~5 h</span></span></summary>
+  <div class="body">
+    <p>Sie ist als Sphinx nicht zu erkennen — ein Stapel Kästen mit einer Platte darauf, an einem Denkmal, das jeder auf den ersten Blick kennt.</p>
+    <p>Statt drei Einzelkorrekturen ein neues Modell: liegender Löwenleib mit vorgestreckten Pranken, Kopf mit Nemes-Kopftuch, gebrochene Nase. Der Sandstand von 1890 bleibt — die Erkennbarkeit kommt aus dem Detail des Herausragenden und aus einem Sandhügel, der die Form des Körpers durchscheinen lässt.</p>
+    <p>Alle drei Ansichten aus einer Definition, damit sie nicht auseinanderlaufen; die Bildkosten werden gemessen und in die Qualitätsstufen einsortiert.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">379</span><span class="t">Abu Simbel wird ein begehbarer Ort</span><span class="right"><span class="meta">~6 h · Feature</span></span></summary>
+  <div class="body">
+    <p>Die Felsentempel fehlen ganz, obwohl sie 1890 freigelegt und fester Punkt jeder Nilreise waren. Sie kommen an ihren historischen Platz am Fluss — und man kann sie betreten wie die Pyramiden, mit demselben Betretungs-Radius und derselben Entdeckungs-Logik.</p>
+    <p>Ausdrücklich nur EINE Eintragung in der Welt: Bei den Pyramiden hat das Begehbarmachen eine zweite Definition hinterlassen, weshalb dort zwei Namen übereinanderliegen. Das wird vorher behoben, nicht wiederholt.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">391</span><span class="t">Pyramiden und Sphinx werden in der Ich-Perspektive gewaltig</span><span class="right"><span class="meta">~3 h</span></span></summary>
+  <div class="body">
+    <p>Vom Fuß aus sollen die Bauten weit über den Bildrand hinausragen — ein Mensch davor ist ein Punkt.</p>
+    <p>Der Grund steht im Auftrag: später soll ein geheimer Eingang hineinführen, gefunden über Hinweise, die man entschlüsseln muss. Das ist nur glaubhaft, wenn das Äußere ein Inneres fassen kann. Gebaut wird hier nur die Größe, nicht die Funktion.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">350</span><span class="t">Die kniende Dorfbewohnerin ist eine plattgedrückte Dorfbewohnerin</span><span class="right"><span class="meta">~2 h</span></span></summary>
+  <div class="body">
+    <p>Die Ursache steht schon fest: Knien wird durch vertikales Zusammenstauchen der ganzen Figur vorgetäuscht — Kopf inbegriffen, weshalb er als flaches Ei liest. Knien verkürzt die Beine, es staucht nicht den Schädel. Das Hin- und Herspringen ist der Wechsel am Brunnen: Dort wird eine stehende Gruppe gegen eine kniende getauscht, was in einem Bild passiert.</p>
+    <p>Künftig entsteht die Haltung aus Proportionen statt aus einer Skalierung, und das Absenken läuft als Bewegung ab — kein Bild, in dem eine Figur durch eine andere ersetzt wird.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">356</span><span class="t">Die Bewohner bemerken den Reisenden</span><span class="right"><span class="meta">~3 h · Feature</span></span></summary>
+  <div class="body">
+    <p>Der Spieler kommt im Dorfleben nur als Kollisionsradius vor — niemand nimmt ihn wahr. Künftig wendet sich jemand für ein paar Sekunden zu dir und geht dann seiner Arbeit nach; Kinder starren länger, Ziegen weichen einen Schritt aus. Für einen Fremden im Afrika von 1890 wäre das das Naheliegendste.</p>
+    <p>Zwei Bremsen gehören dazu: eine Abklingzeit je Bewohner und eine Obergrenze, wie viele gleichzeitig hinsehen — ein Dorf, das sich gleichzeitig umdreht, wirkt wie ein Horrorfilm.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">357</span><span class="t">Das Dorf klingt bewohnt</span><span class="right"><span class="meta">~3 h · Feature</span></span></summary>
+  <div class="body">
+    <p>Nachgesehen: Für ein Dorf läuft genau eine Klangschicht — Trommeln. Keine Stimmen, kein Mörser, keine Ziegen, kein Feuer. Ton trägt „bewohnt“ weiter als jedes Bild, und sein Fehlen merkt man erst, wenn er da ist.</p>
+    <p>Dazu kommen Gemurmel auf Gesprächsdistanz, der Stampfschlag zum ohnehin animierten Stößel, Ziegen und ein Feuerknistern, das mit der Nähe wächst. Die Stimmen bleiben bewusst wortlos: Die Sprachmechanik ist ausdrücklich noch unentschieden, und ein Murmeln legt sich auf nichts fest.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">359</span><span class="t">Das Kraal der Rinderleute steht leer</span><span class="right"><span class="meta">~4 h · Feature</span></span></summary>
+  <div class="body">
+    <p>Auf deinem Bild steht ein Gehege — und nichts darin. Ziegen gibt es, Rinder nicht. Beim Zulu-Gehöft ist das Kraal aber nicht Dekoration, sondern der Mittelpunkt.</p>
+    <p>Erst wird belegt, welche Völker um 1890 Rinder hielten und in welcher Anordnung — die rinderlosen bekommen keine, die Kamelvölker Kamele. Dann der Haken, der es über Deko hinaushebt: Die Rinderpest von 1888–97 ist bereits modelliert und wird in den Tagebuch-Vignetten erzählt. Das Kraal muss dazu passen — 1890 voll, ab 1892 verheert —, sonst widerspricht das Dorf seinem eigenen Eintrag.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">360</span><span class="t">Die Bewohner beachten einander</span><span class="right"><span class="meta">~4 h · Feature</span></span></summary>
+  <div class="body">
+    <p>Jeder geht seinen Botengang allein — sie ziehen im Meterabstand aneinander vorbei, und nichts passiert. Ein Ort, an dem niemand jemanden grüßt, wirkt wie eine Ansammlung unabhängiger Maschinen.</p>
+    <p>Drei Begegnungen: ein kurzes Zuwenden und Verneigen, eine Übergabe, bei der das Bündel sichtbar den Besitzer wechselt, und mehr als eine Gestalt am Feuer.</p>
+    <p>Mit klaren Bremsen: Jede Begegnung endet, niemand grüßt in Schleife, niemand stellt sich in eine Tür — und die Botengänge kommen weiterhin an.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">314</span><span class="t">Wandernde helle Flecken auf Gewässern (Küste/Mündung)</span><span class="right"><span class="meta">~3 h</span></span></summary>
+  <div class="body">
+    <p>Helle, längliche Flecken auf der Wasserfläche nahe dem Ufer, die sich beim Herumlaufen bewegen/verändern. Erst Bild-Diagnose (Screenshot-Serie im gemeldeten Gebiet, beide Backends), dann Ursache: Kandidaten sind nicht welt-verankerter Schaum, die Fern-/Nahwasser-Überlappung an der Küste oder die chunk-abhängige Bandanhebung. Fix mit Frame-Diff-Check über der Wasserregion (Pixel stabil beim Laufen).</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">320</span><span class="t">Quellen: echtes 3D-Sprudeln statt animiertem Symbol</span><span class="right"><span class="meta">~3 h</span></span></summary>
+  <div class="body">
+    <p>Die Quellen sollen als kleines dreidimensionales Wasserspiel lesen: sprudelnde Aufwölbung (TSL-Animation, backend-neutral), Wellenringe, kleiner Auslauf, sauber aufs Gelände gesetzt — sichtbar beim Standard-Zoom, kalibrierbar, mit Einträgen in allen drei Grafikstufen. Verifiziert über 3D-Form, animierte Oberfläche und Screenshots auf beiden Backends.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">321</span><span class="t">Grasbrand: keine Feuerfront, sinnlose Wellen, unkenntliche Spuren</span><span class="right"><span class="meta">~4 h</span></span></summary>
+  <div class="body">
+    <p>Statt orangener Blockstapel soll eine gebogene, vorrückende Feuerfront mit hellem Saum und aufsteigendem Rauch lesen; das Wellen-Artefakt wird identifiziert und entfernt; die Brandspuren werden als verbrannte Erde eingefärbt (dunkel, rußig, dem Gelände folgend wie der Bluttint, weiche unregelmäßige Ränder). Screenshot 131 neu, beide Backends.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">348</span><span class="t">Das Dorffeuer brennt unbeirrt im Regen</span><span class="right"><span class="meta">~4 h</span></span></summary>
+  <div class="body">
+    <p>Ein offenes Feuer brennt derzeit durch jeden Guss, als fände das Wetter nicht statt. Wohin das Kochfeuer eines Volkes bei Regen gehört, klärt zuerst die Recherche — das ist eine Frage der Lebensweise, nicht der Grafik.</p>
+    <p>Zwei weitere Fehler am selben Objekt kommen dazu: Die Flamme schwebt über ihrer Feuerstelle, statt darauf zu stehen, und die Bewohner laufen mitten hindurch. Beides gehört in denselben Arbeitsgang wie das Regenverhalten — eine kleiner werdende Flamme würde den Schwebe-Abstand sonst nur mitverkleinern.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">353</span><span class="t">Boden unter Dach und Baumkrone bleibt weniger nass</span><span class="right"><span class="meta">~4 h · Feature</span></span></summary>
+  <div class="body">
+    <p>Im Regen dunkelt heute der ganze Boden gleichmäßig nach — die Erde unter einem Dachüberstand saugt sich genauso voll wie der offene Hof. Künftig ist die Nässe örtlich: unter Schutz weniger, aber nie ganz trocken.</p>
+    <p>Billig wird es, weil Dächer und Bäume sich nicht bewegen: Die Verdeckung wird einmal beim Bau des Ortes berechnet, nicht pro Bild. Dieselbe Karte beantwortet nebenbei, ob eine Stelle unter Dach steht.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">354</span><span class="t">Es regnet aus blauem Himmel</span><span class="right"><span class="meta">~3 h</span></span></summary>
+  <div class="body">
+    <p>Im Zulu-Dorf fallen im Januar deutliche Regenschlieren vor einen fast wolkenlosen Himmel. Der Mechanismus ist vorhanden und rechnet kräftige Werte — dieselbe Nässe, die den Regen erzeugt. Die Zahlen sagen „bedeckt", das Bild sagt „blau".</p>
+    <p>Die zweite Hälfte wiegt schwerer: Die vorhandene Prüfung vergleicht Zahlen statt Pixel — sie ist grün, während du blauen Himmel siehst. Künftig wird der Himmel in einem trockenen und einem nassen Monat in Pixeln verglichen.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">358</span><span class="t">Rauch über dem Feuer, Staub unter den Füßen</span><span class="right"><span class="meta">~2,5 h · Feature</span></span></summary>
+  <div class="body">
+    <p>Eine dünne Rauchfahne liest sich schon aus der Ferne als „hier wohnt jemand“ — weiter, als jede Figur trägt. Und kleine Staubwölkchen dort, wo jemand über trockenen Boden geht, machen aus Boden begangenen Boden.</p>
+    <p>Beides hängt am Wetter, das schon vorhanden ist: Der Rauch flackert und dünnt im Regen aus, der Staub bleibt aus, sobald der Boden nass ist.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">384</span><span class="t">Regen, der die Welt berührt: nasser Boden, Aufschläge, beleuchtete Tropfen</span><span class="right"><span class="meta">~5 h · Feature</span></span></summary>
+  <div class="body">
+    <p>Nachgesehen: Der Regen sind 700 unbeleuchtete Rechtecke einer festen Farbe in einer Säule um den Kopf — nichts sonst in der Szene weiß, dass es regnet. Die drei billigsten Schritte dagegen: nasse Oberflächen, Tropfen, die den Boden erreichen und dort aufschlagen, und Streifen, die vom Himmel beleuchtet werden.</p>
+    <p>Die Einordnung in die drei Detailstufen gehört zur Arbeit: Regen, der auf der niedrigen Stufe Bildrate kostet, wäre ein Rückschritt.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">385</span><span class="t">Regen mit Tiefe und Wetter: Ebenen, Streifenform, gedämpfte Sonne</span><span class="right"><span class="meta">~5 h · Feature</span></span></summary>
+  <div class="body">
+    <p>Die zweite Hälfte, bewusst ganz am Ende: mehrere Ebenen in verschiedener Tiefe und Geschwindigkeit, Streifenlänge nach Relativgeschwindigkeit, weiche Enden — und ein Wetter, das das Licht ändert. Erst damit hört der Regen auf, eine Überlagerung zu sein: Die Szene wird dunkler und flacher, und das Dorffeuer ist plötzlich das Hellste weit und breit.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">319</span><span class="t">Krokodil-Riss: Beute löst sich ohne Versinken/Geier auf</span><span class="right"><span class="meta">~2,5 h</span></span></summary>
+  <div class="body">
+    <p>Ein Krokodil riss ein Tier, verschwand später — die Beute löste sich danach langsam auf, ohne dass Geier zu sehen waren. Laut Spezifikation muss ein Krokodil-Riss versinken (der Fluss behält den Körper); ein unsichtbares Auflösen passt zu keinem legitimen Pfad. Jeder Krokodil-Ausstiegspfad (Riss → versinken; Griff-Deadline → Opfer lebt; Ausstreamen) wird geprüft und getestet, plus ein Dev-Assert „schrumpfender Kadaver ohne Fresser"; beide Backends.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">322</span><span class="t">Debug-Ereignisse: Fehlschläge sind zu leicht zu übersehen</span><span class="right"><span class="meta">~2 h</span></span></summary>
+  <div class="body">
+    <p>Jedes gestagte Ereignis meldet künftig unübersehbar, was passiert ist — bei Erfolg was und wo, bei Fehlschlag die fehlende Voraussetzung im Klartext, bleibend statt verblassend, in beiden Sprachen. Zusätzlich wird „Kalb im Schlamm am Wasserfall" gegen eine realistische Debug-Sitzung nachgeprüft (Suchradius ggf. zu klein).</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">326</span><span class="t">Elterntier stirbt nach Krokodil-Riss ohne sichtbare Ursache</span><span class="right"><span class="meta">~3 h</span></span></summary>
+  <div class="body">
+    <p>Jeder Tod im Familiendrama braucht eine sichtbare Ursache. Die Totenwache nach einem Krokodil-Riss endet künftig entweder mit einem sichtbar anrückenden Räuber oder damit, dass das Elterntier zur Herde zurückkehrt — nie mit einem Umfallen ohne Akteur. Dazu ein Dev-Alarm „Tod ohne sichtbare Ursache" für jede Sitzung.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">327</span><span class="t">Zwei nahe Kadaver dürfen nur einen Geierschwarm anziehen</span><span class="right"><span class="meta">~2 h</span></span></summary>
+  <div class="body">
+    <p>Ein neuer Kadaver innerhalb eines kalibrierbaren Radius reiht sich beim vorhandenen Schwarm ein, statt einen zweiten zu rufen; der Schwarm arbeitet beide nacheinander ab. Zwei Schwärme im selben Umkreis sind ausgeschlossen. Live-Check mit zwei gestagten Kadavern.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">328</span><span class="t">Geier landen ohne sichtbaren Anflug</span><span class="right"><span class="meta">~2,5 h</span></span></summary>
+  <div class="body">
+    <p>Statt eines Sprungs von Flug zu Stand bekommen Schwarm und Einzelgeier einen echten Anflug: sinkender Gleitflug mit abnehmendem Tempo, Aufrichten der Flügel kurz vorm Aufsetzen, dann Standpose — ebenso ein sichtbarer Start. Höhenverlauf und Flügelpose werden pur und live geprüft.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">336</span><span class="t">Krokodil-Prüffamilie wird überarbeitet</span><span class="right"><span class="meta">~1 h</span></span></summary>
+  <div class="body">
+    <p>Angefangen und als Zweig gesichert. Die Inszenierungen prüfen künftig ihre Vorbedingung selbst, damit ein Fehlschlag nicht das Spiel anklagt. Offen: die geforderten drei fehlerfreien Läufe. Der Zweig steht inzwischen 893 Commits hinter dem Hauptzweig und sein Arbeitsverzeichnis läuft noch — wer ihn aufnimmt, holt zuerst den Hauptzweig hinein und verifiziert auf dem zusammengeführten Stand.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">224</span><span class="t">Closing-Durchlauf — wartet auf die flackerfreie Tier-Suite</span><span class="right"><span class="meta">~1 h · nach 336</span></span></summary>
+  <div class="body">
+    <p>Zehn der elf Schritte liegen inhaltlich vor: Lint und Abhängigkeits-Audit sauber, toter Code entfernt, Kommentare und Dokumente geprüft, offene Punkte und Vereinfachungen aufgelistet.</p>
+    <p>Es fehlt allein der Nachweis einer flackerfreien Regression auf beiden Backends; er hängt an der Überarbeitung der Krokodil-Prüfungen.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">264</span><span class="t">Innerartliche Kämpfe — nach Neustart neu delegieren</span><span class="right"><span class="meta">~2 h</span></span></summary>
+  <div class="body">
+    <p>Tiere derselben Art kämpfen (Recherche liegt vor). War im Bau, als der Neustart kam — auf Opus 5 neu delegieren.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">265</span><span class="t">Greisen-Tiervarianten — alt aussehend, altes Verhalten, Alterstod</span><span class="right"><span class="meta">~3,5 h · vor 203 · Feature</span></span></summary>
+  <div class="body">
+    <p>Alte Tiere sollen sichtbar und im Verhalten altern und eines natürlichen Todes sterben.</p>
+    <p>Die Recherche dazu ist durch — und hat eine frühere Empfehlung widerlegt: Giraffenbullen dunkeln mit dem Alter nach, statt zu ergrauen. Der klarste Alterungshinweis wäre der ungleich abgenutzte Stoßzahn beim Elefanten; die Bauteile für Jungtiere lassen sich dafür direkt weiterverwenden.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">269</span><span class="t">Vögel fliehen fliegend + fliegende Prädatoren</span><span class="right"><span class="meta">~4 h · Feature</span></span></summary>
+  <div class="body">
+    <p>Fliegende Vögel sollen bei Gefahr auffliegen und so außer Reichweite von Boden-Jägern und Elefanten sein — fangbar nur, wenn ein Jäger sie noch am Boden überrascht.</p>
+    <p>Dazu regionale Greifvögel, die Beutevögel in der Luft schlagen. Die Recherche ist durch; der Bau folgt in v0.3.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">312</span><span class="t">Tiere sind wasserscheu, nicht wassergesperrt</span><span class="right"><span class="meta">~3 h</span></span></summary>
+  <div class="body">
+    <p>Die Regel „Tiere sollen nicht im Wasser herumstehen" — damit deine Kanufahrt frei bleibt — war zu „Wasser ist tabu" verhärtet. Sichtbar wird das, wenn ein fliehendes Tier an der Kante drückt statt hinüberzuschwimmen, oder ein hineingerissenes Kalb am Rand klebt.</p>
+    <p>Künftig gilt: nie im Wasser erscheinen, nie darin verweilen — Durchqueren ist normal, und auf der Flucht gibt es überhaupt keine Wasserschranke mehr. Nur das offene Meer bleibt Weltgrenze.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">362</span><span class="t">Das Krokodil holt ein Kalb mitten im Fluss</span><span class="right"><span class="meta">~4 h</span></span></summary>
+  <div class="body">
+    <p>Zwei gebaute Systeme, die sich nie begegnet sind: die absichtliche Wasserquerung und der Krokodilangriff, der bisher nur am Ufer zuschlägt. Künftig nimmt ein Elter sein Kalb mit ins Wasser, und der Hinterhalt trifft es schwimmend.</p>
+    <p>Das Bild, für das die Szene existiert, ist die Umkehr: Die Herde steigt am anderen Ufer heraus, während ein Tier gegen ihre Richtung zurückdreht. Die Ausgänge sind die bekannten — Vertreiben, an seiner Statt genommen werden, zu spät kommen. Keine Totenwache, denn das Wasser nimmt den Körper; jeder Ausgang endet an einem Ufer.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">363</span><span class="t">Der Nachzügler — ein lahmes Kalb, das die Herde zurücklässt</span><span class="right"><span class="meta">~4 h</span></span></summary>
+  <div class="body">
+    <p>Die einzige langsame Szene des Spiels und die einzige, in der nichts zum Töten geschickt wird. Eine überstandene Jagd kann ein Kalb selten lahm zurücklassen; es hält das Tempo der Herde nicht, und sein Elter bleibt bei ihm.</p>
+    <p>Die Spannung ist das Warten: kein Angriff, keine Inszenierung, nur eine Herde, die am Horizont kleiner wird, und ein Paar, das im Offenen steht. Findet eine Jagd es, läuft die gewohnte Verteidigung. Die Lahmheit heilt auf ihr Fenster, das Paar schließt wieder auf.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">364</span><span class="t">Die Flut lässt die Strömung der Dramen anschwellen</span><span class="right"><span class="meta">~3,5 h</span></span></summary>
+  <div class="body">
+    <p>Erst eine echte Unstimmigkeit: Die jahreszeitliche Strömung der Wasser-Dramen liest allein die örtliche Nässe. Das Flutmodell ist aber fernversorgt — der Nil steht im Oktober bei Kairo auf dem Scheitel, unter einem Himmel, der nie regnet. Heute laufen die Dramen dort am zahmsten, wo der Fluss am gefährlichsten ist.</p>
+    <p>Danach das Drama darauf: Auf dem Scheitel kann eine Querung das Kalb an die Strömung verlieren statt an ein Krokodil. Die Flut bleibt rein vertikal.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">414</span><span class="t">Der neue Gang auch für die Tiere in der Vogelperspektive</span><span class="right"><span class="meta">~4 h · Feature</span></span></summary>
+  <div class="body">
+    <p>Die Rechnung dafür liegt bereits im geteilten Modul und ist dort getestet — die Reise-Tiere lesen sie als einzige nicht und gleiten deshalb. Es fehlt ihnen der bewegliche Beinbau, nicht die Herleitung.</p>
+    <p>Der Haken ist der Preis: In der Vogelperspektive stehen viel mehr Tiere im Bild. Deine Vorgabe: hohe Stufe immer, niedrige nie — ob die mittlere sie bekommt, entscheidet die Messung auf deiner Hardware. Innerhalb einer Stufe kann zusätzlich nach Entfernung abgestuft werden.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">343</span><span class="t">Die Sonne steht dort, wo sie wirklich stand</span><span class="right"><span class="meta">~3,5 h · Feature</span></span></summary>
+  <div class="body">
+    <p>Die Sonne steht bis heute fest — ein Winkel für den ganzen Kontinent und alle fünf Jahre; deshalb wirkt das Land flach. Beide Ansichten halten sogar zwei verschiedene Konstanten. Künftig eine Herleitung aus Datum und Breitengrad, die beide lesen.</p>
+    <p>In der Siedlung ist es am strengsten, weil die Blendung darauf aufbaut. Und beim Zug über den Kontinent muss der Wandel sichtbar werden — geprüft wird deshalb eine Strecke über mehrere Breiten.</p>
+    <p>Die eigentliche Arbeit ist der Himmel: Er ist für eine hochstehende Sonne gemalt.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">344</span><span class="t">Von der Sonne geblendet werden — Augenanpassung und Blendstern</span><span class="right"><span class="meta">~6 h · Feature</span></span></summary>
+  <div class="body">
+    <p>Sobald die Sonne nachmittags tief steht, liegt sie beim Blick nach Westen im Bild. Dann folgt die Belichtung dem, was du ansiehst: zur Sonne gedreht dunkelt das Bild ab, im Schatten einer Gasse hellt es langsam nach.</p>
+    <p>Dazu blendet die Sonnenscheibe selbst — mit einer Verdeckungsprüfung, die den Blendstern abschneidet, sobald eine Hüttenwand davorschiebt. Bewusst nur in der Egoperspektive und nur in der höchsten Stufe.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">345</span><span class="t">Sonnenstrahlen durch das, was im Weg steht</span><span class="right"><span class="meta">~4 h · Feature</span></span></summary>
+  <div class="body">
+    <p>Palmenkrone, Dachkante, das Minarett von Timbuktu, die Pyramiden — bei tiefer Nachmittagssonne werfen sie endlich Strahlenfächer. Der fertige Baustein liegt in der Grafikbibliothek bei.</p>
+    <p>Nur in der Egoperspektive, denn die Vogelkamera blickt 60° nach unten und hat die Sonne nie im Bild; dort zu rechnen kostete Millisekunden für nichts.</p>
+    <p>Der einzige Effekt dieser Familie mit echtem Preis. Er wird vor und nach dem Einbau auf deiner Hardware gemessen — und darf auf Grundlage dieser Messung auch wieder entfernt werden, ohne die billigere Hälfte mitzunehmen.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">346</span><span class="t">Das Land beschattet sich selbst — Horizontkarten aus den Höhendaten</span><span class="right"><span class="meta">~8 h · Feature</span></span></summary>
+  <div class="body">
+    <p>Ein Vorberechnungsschritt misst einmalig, wie hoch sich das Land um jeden Punkt herum erhebt. Daraus folgen zwei Dinge zum Preis einer Texturabfrage: Ein Massiv legt seinen Schatten kilometerweit in die Ebene — weiter, als jede Schattenkarte reicht —, und jede Senke sieht weniger Himmel und wird dunkler.</p>
+    <p>Bezahlbar, weil das Verfahren linear ist und die feste Uhrzeit nur sechs Sonnenrichtungen verlangt. Nur in der Vogelperspektive, nicht in der sparsamen Stufe.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">310</span><span class="t">Low-Preset-Performance aus deinem S25-Benchmark</span><span class="right"><span class="meta">~3 h</span></span></summary>
+  <div class="body">
+    <p>Dein S25-Report (echte GPU-Timestamps): LOW hält 60 fps, aber mit dünner Reserve (GPU 6,95–9,83 ms). Dominiert von der Reise-Vegetation (53 % der Dreiecke) und einem biome-unabhängigen unbenannten 425k-Dreieck-System (mutmaßlich Fluss-/Seegeometrie — zu verifizieren). Geplante Regler: Vegetations-Dichtefaktor für LOW, Geometrie-Regler für das identifizierte System, Benennung aller F8-Report-Systeme; jeder Regler in allen drei Stufen samt Doc-Sync. Preisbeweis: frischer F8-Lauf auf deinem S25.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">347</span><span class="t">Startet mit der Detailstufe, die in der Adresse steht</span><span class="right"><span class="meta">~1,5 h · Feature</span></span></summary>
+  <div class="body">
+    <p>Ein Zusatz an der Adresse öffnet das Spiel gleich in einer Grafikstufe. So bekommt jemand mit schwacher oder starker Hardware den passenden Link, ohne dass du erst erklären musst, welche Taste die Grafik umschaltet; Taste und Menü ändern sie danach weiterhin.</p>
+    <p>Wichtig ist der Zeitpunkt: Die Stufe wird vor dem ersten Bild gesetzt — sonst baut sich die ganze Renderkette neu auf und stolpert sichtbar auf genau der schwachen Hardware.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">303</span><span class="t">Code-Review aller Änderungen seit v0.1 — sind alle Tests noch valide?</span><span class="right"><span class="meta">~4 h</span></span></summary>
+  <div class="body">
+    <p>Systematischer Review des gesamten Diffs seit v0.1: prüft jeden Test, ob er noch das Richtige am erreichbaren Zustand misst — oder durch spätere Änderungen veraltet/immer-grün geworden ist (mehrere solche Fälle sind schon aufgefallen). Kombiniert Opus 5 + Fable 5.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">333</span><span class="t">Warum die Dokumente driften — und ein Mechanismus dagegen</span><span class="right"><span class="meta">~3 h</span></span></summary>
+  <div class="body">
+    <p>Die Messung zeigt ein klares Muster: Dokumente werden dort nachgezogen, wo ein Test es erzwingt oder wo gerade jemand schreibt. Ein Fakt, der an mehreren Stellen steht, veraltet in allen Kopien, an denen niemand gearbeitet hat.</p>
+    <p>Auf deinen Wunsch wird daraus ein dauerhaftes Regime: jeder Fakt bekommt einen einzigen verbindlichen Ort, die übrigen verweisen darauf; eine Prüfung hält die verbleibenden Angaben gegen den Code und schlägt Alarm, wenn eine neue Dopplung entsteht.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">422</span><span class="t">Die Einsteiger-Anleitung ist voll</span><span class="right"><span class="meta">~1,5 h</span></span></summary>
+  <div class="body">
+    <p>Die Anleitung steht exakt auf ihrer Längenschranke — und die ist richtig so, eine Anleitung, die unbegrenzt wächst, wird nicht mehr gelesen.</p>
+    <p>Nur fordert ein zweiter Wächter laufend neue Lehren ein. Beide ziehen gegeneinander. Zu entscheiden ist, welcher vorhandene Eintrag dem heutigen weicht — oder ob die Schranke bewusst steigt.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">448</span><span class="t">Ein Befehl, der sagt: bereit für zwei Wochen allein</span><span class="right"><span class="meta">~3 h</span></span></summary>
+  <div class="body">
+    <p>Vor einer Abwesenheit sagt dir heute nichts, ob die Kette wirklich hält — und gerade die stillen Ausfälle tun am meisten weh: ein Zugangsschlüssel, der mitten in den zwei Wochen abläuft, und ab da schlägt jede Übertragung lautlos fehl.</p>
+    <p>Ein einziger, nur lesender Befehl geht künftig alles durch — geplante Aufgaben, Anmeldung, Plattenplatz, Restlaufzeit der Schlüssel, Wächterkette — und meldet je Zeile bestanden, Warnung oder Fehler samt Abhilfe.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">449</span><span class="t">Die Chaos-Probe: Abschüsse zu zufälligen Zeitpunkten</span><span class="right"><span class="meta">~5 h</span></span></summary>
+  <div class="body">
+    <p>Alles an der Ausfallsicherheit ist eine Behauptung, solange kein Abschuss unter Beobachtung überstanden wurde — und zuletzt ist eine sorgfältig entworfene Übergabe in der Praxis trotzdem gescheitert.</p>
+    <p>Eine Probe unterbricht den Besitzer an zufälligen Stellen kritischer Aktionen — beim Zusammenführen, beim Hochladen, mitten in einer Prüfung — und stellt danach ohne Zutun fest: Baum wieder sauber, Nachfolger gestartet, Arbeit läuft, der unterbrochene Punkt korrekt noch offen.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">451</span><span class="t">Die Antwort, die ihr eigenes Befehlsflag verschickt hat</span><span class="right"><span class="meta">~1 h</span></span></summary>
+  <div class="body">
+    <p>Du hast zwei Antworten auf der Tafel gefunden, die wörtlich aus einem Befehlsflag bestanden — deine echten Antworten kamen nie an. Der Sendebefehl kannte die Option nicht und hat sie einfach als Text verschickt.</p>
+    <p>Er lernt sie, und jede unbekannte Option führt künftig zum lautstarken Abbruch statt zum Versand. Ein Text, der mit einem Strich beginnt, bleibt trotzdem sendbar.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">453</span><span class="t">Was frisst der Löwe?</span><span class="right"><span class="meta">~3 h</span></span></summary>
+  <div class="body">
+    <p>Aus deinem Fehlerbericht: Der Löwe steht in der Fresshaltung, die Geier kreisen — und es liegt keine Beute da. Entweder ist der Kadaver längst aufgezehrt, während Haltung und Geier weiterlaufen, oder übrig ist nur ein winziger weißer Rest, den ein Mensch schlicht nicht als Beute erkennt.</p>
+    <p>Der Fall wird aus deinem Saatwert nachgestellt und so gerichtet, dass das Bild die Frage immer beantwortet.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">455</span><span class="t">Ein Rot, das sich nicht mit Maschinenlast erklären ließ</span><span class="right"><span class="meta">~2 h</span></span></summary>
+  <div class="body">
+    <p>Die Lastausrede ist im Grundsatz richtig und war hier falsch: Ein echtes rotes Testergebnis wurde als „nicht aussagekräftig" abgetan, weil angeblich ein Agent parallel lief — dessen Arbeitsbaum aber seit dem Vorabend nicht angefasst worden war. Unbeaufsichtigt läuft der Batch so stundenlang auf einem roten Stand weiter.</p>
+    <p>Künftig zählt ein Arbeitsbaum nur als Last, wenn darin kürzlich wirklich geschrieben wurde, und das Urteil nennt seinen Beleg.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">456</span><span class="t">Der Test, der nur im Nebenbaum grün ist</span><span class="right"><span class="meta">~3 h</span></span></summary>
+  <div class="body">
+    <p>Zwei Blockaden eines Tages hatten dieselbe Ursache: Ein Test war grün, weil eine Datei im Nebenbaum des Agenten fehlt, die im Hauptbaum existiert. Er hat damit seine Umgebung gemessen, nicht das Verhalten — und wäre beim Zusammenführen rot geworden.</p>
+    <p>Eine Prüfung sorgt künftig dafür, dass Tests ihre Pfade übergeben bekommen und keine echten Ablagen des Projekts lesen. Bestehende Ausnahmen stehen begründet in einer Liste, die nicht still wachsen kann.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">457</span><span class="t">Ein festgehaltenes „nicht zusammenführen" darf kein Tor öffnen</span><span class="right"><span class="meta">~2 h</span></span></summary>
+  <div class="body">
+    <p>Das Tor fragt bisher nur, OB die Zweitmeinung eingetragen ist — nicht, was sie sagt. An einem Morgen ging das dreimal daneben: Ein Agent startete die Durchsicht nebenher und war durch, bevor das Urteil zurück war; der Zweig sah geprüft aus. Einer der drei hätte den Hauptstand rot gemacht.</p>
+    <p>Künftig zählt nur ein zustimmendes Urteil, und nur eines, das jünger ist als der geprüfte Stand.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">460</span><span class="t">Eine rote Suite ist nur durch einen zweiten Lauf zu verstehen</span><span class="right"><span class="meta">~2 h</span></span></summary>
+  <div class="body">
+    <p>Fällt eine Prüfsuite um, zeigt der Läufer die Urteilszeile und zwölf Zeilen Ende — den Rest wirft er weg. Die Ursache zu finden heißt deshalb: noch einmal laufen lassen, und eine Browser-Suite auf zwei Backends ist der teuerste Posten nach Wanduhr, den wir haben.</p>
+    <p>Künftig legt jeder Lauf seine vollständige Ausgabe als Datei ab und nennt den Pfad neben dem Urteil; die Länge des gezeigten Endes wird einstellbar.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">463</span><span class="t">Ein gestoppter Besitzer gilt fünf Minuten lang als lebendig</span><span class="right"><span class="meta">~2 h</span></span></summary>
+  <div class="body">
+    <p>Zwei Fehlurteile, beide beim erzwungenen Übernehmen beobachtet. Beim ersten zählte nur der Herzschlag im Sperrvermerk, nicht ob der Prozess überhaupt noch existiert — ein längst beendeter Besitzer hielt die Arbeit deshalb minutenlang weiter fest, und der Übernehmende bekam die falsche Auskunft.</p>
+    <p>Beim zweiten blockierte ein Wächter das Zugende einer Sitzung, die den Batch gar nicht hält, wegen Schulden des Besitzers. Beides wird korrigiert und die übrigen Wächter einmal auf dieselbe Auslassung durchgesehen.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">464</span><span class="t">Ein rotes Testergebnis kam trotz Pre-Push-Gate auf main</span><span class="right"><span class="meta">~2 h</span></span></summary>
+  <div class="body">
+    <p>Der Hauptstand war rot, und du hast dafür eine Mail bekommen — der zweite solche Bericht an einem Tag. Vier Minuten später war es geheilt, aber genau das sollte ein Tor vor dem Hochladen unmöglich machen.</p>
+    <p>Zuerst wird aus den Protokollen rekonstruiert, welche Entscheidung den Stand durchgelassen hat; ein geratener Grund brächte einen Wächter, der nichts bewacht. Danach hält das Tor sein Urteil fest, und ohne passendes Urteil wird nicht mehr hochgeladen.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">465</span><span class="t">Eine Jetzt-Karte überlebt die Sitzung, die sie geschrieben hat</span><span class="right"><span class="meta">~1 h</span></span></summary>
+  <div class="body">
+    <p>Nach der erzwungenen Übernahme stand die Karte „Gerade keine laufende Arbeit" der gestoppten Sitzung noch neben der Karte der neuen — die Tafel behauptete Arbeit und keine Arbeit zugleich. Weggeräumt wurde sie von Hand, und genau das ist der Fehler: Niemand räumt sie auf, wenn ihre Sitzung stirbt.</p>
+    <p>Künftig trägt jede Jetzt-Karte ihre Sitzung; verwaiste werden beim Veröffentlichen entfernt, und die Tafel verweigert sich lieber, als Falsches zu zeigen.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">466</span><span class="t">Die Doku-Prüfung sucht einen Satz, den es nicht mehr gibt</span><span class="right"><span class="meta">~1 h</span></span></summary>
+  <div class="body">
+    <p>Eine Prüfung, die dauerhaft rot ist und die niemand repariert, erzieht alle dazu, sie zu übersehen — genau so blieb hier schon einmal wochenlang ein echter Fehlschlag unbemerkt. Zwei Prüfungen der Dokumentation stehen seit längerem in diesem Zustand, weil sie im README nach einer Angabe greifen, die dort nicht mehr steht.</p>
+    <p>Es wird entschieden statt stillgelegt: Entweder trägt das README die Angabe wieder, oder die beiden Prüfungen fallen mit schriftlicher Begründung weg.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">467</span><span class="t">Die Tafel-Aktualisierung liegt dreifach vor und nichts vergleicht sie</span><span class="right"><span class="meta">~2 h</span></span></summary>
+  <div class="body">
+    <p>Das Skript, das die Tafel alle halbe Minute nachlädt, liegt dreifach vor: einmal versioniert im Projekt, einmal fest in der Tafel-Datei, einmal als abgewichene Handkopie. Gelesen wird nur eine Kopie — eine Korrektur an der versionierten Fassung erreicht dich also nie, und nichts vergleicht die drei miteinander.</p>
+    <p>Es bleibt eine Quelle, beim Veröffentlichen eingesetzt, und eine Prüfung weist eine Tafel mit fremdem Skript ab.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">468</span><span class="t">Zwei weitere Leser der Arbeitsliste sind auf dieselbe Weise blind</span><span class="right"><span class="meta">~2 h</span></span></summary>
+  <div class="body">
+    <p>Derselbe Lesefehler, der die Kartentitel verstümmelt hat, steckt in zwei weiteren Stellen, die die Arbeitsliste auswerten: Bei bestimmten Zeilenenden findet ihr Muster gar nichts — und ein leeres Ergebnis wird als Antwort genommen. Live gemeldete Folge: 96 Karten galten als „Punkt existiert nicht".</p>
+    <p>Beide lernen beide Zeilenenden, und ein leeres Ergebnis über einer nicht leeren Datei gilt künftig als Befund, nicht als Auskunft.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">471</span><span class="t">Die Reihenfolge hungert die drei Plätze aus, die sie füttern soll</span><span class="right"><span class="meta">~3 h</span></span></summary>
+  <div class="body">
+    <p>Die Warteschlange liest sich als Reihenfolge, ist aber nicht die, in der gearbeitet wird: Die gespeicherte Liste folgt nicht der Rangfolge aus dem Arbeitspaket-Dokument. Die erste Karte nennt 440, angefangen wird bei Urlaubsfestigkeit.</p>
+    <p>Dazu: Ein Bündel ist nach gemeinsamen Dateien geschnitten, seine Punkte dürfen also nicht nebeneinander laufen — streng nacheinander abgearbeitet beschäftigt das oberste Bündel nur einen Agenten. Künftig wird aus jedem der obersten Bündel gezogen.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">491</span><span class="t">Text der Warteschlange geht beim Neuaufbau verloren</span><span class="right"><span class="meta">~2 h</span></span></summary>
+  <div class="body">
+    <p>Heute Nacht sind die deutschen Texte von dreizehn Warteschlangen-Karten verschwunden: Der Kartentext wurde nur in die Board-Datei geschrieben, und der Neuaufbau baut die Warteschlange aus einer separaten Datenablage. Ich konnte alles aus der letzten Veröffentlichung zurückholen — beim nächsten Mal wäre es weg. Der Kartentext muss dorthin, wo der Neuaufbau ihn liest.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">495</span><span class="t">Ein Haken ohne Ausführungsrecht schweigt</span><span class="right"><span class="meta">~1 h</span></span></summary>
+  <div class="body">
+    <p>Ein mitgeliefertes Git-Häkchen ohne Ausführungsrecht wird von Git wortlos übergangen — auf Windows lief es, seit dem Umzug nach Linux schwieg es. Das Recht ist wiederhergestellt; der Punkt baut die Mechanik, die es beim nächsten Haken gar nicht erst passieren lässt.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">497</span><span class="t">Die Sprachregel hat gar keinen Wächter</span><span class="right"><span class="meta">~1,5 h</span></span></summary>
+  <div class="body">
+    <p>Dass Antworten auf Deutsch gehören, steht nur in einer Notiz — anders als beim Zeitstempel prüft es niemand, deshalb ist es heute eine ganze Sitzung lang durchgerutscht. Der Punkt baut den fehlenden Wächter und schließt die Lücke in der Regel-Prüfung, die genau das übersehen hat.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">498</span><span class="t">Was die Software-Bahn die Gesamtprüfung kostet</span><span class="right"><span class="meta">~1 h</span></span></summary>
+  <div class="body">
+    <p>Die zweite Bahn rechnet in Software und ist damit langsamer. Wie viel das die vollständige Regression wirklich kostet, ist bisher aus einer einzigen Suite hochgerechnet — dieser Punkt misst den ganzen Lauf und trägt die Zahl auf die offene Entscheidung.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">500</span><span class="t">Der schwarze Streifen unter dem Fernbild</span><span class="right"><span class="meta">~3 h</span></span></summary>
+  <div class="body">
+    <p>Beim Verlassen eines Dorfes wird das Fernbild der Umgebung aufgenommen — und auf dieser langsameren Maschine fehlt im unteren Viertel schlicht das Gelände. Die Aufnahme startet, sobald die Reiseszene erscheint; sie wartet darauf, dass die Geländestücke ANGELEGT sind, nicht darauf, dass sie auch GEZEICHNET werden. Auf deinem schnellen Rechner fällt beides zusammen, hier nicht.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">501</span><span class="t">Die Himmelsrichtungs-Probe erreicht ihr Bild nicht</span><span class="right"><span class="meta">~2 h</span></span></summary>
+  <div class="body">
+    <p>Eine Prüfung stellt eine Markierungssäule auf, um zu belegen, dass das Fernbild in die richtige Himmelsrichtung zeigt — und findet sie nie wieder. Der Verdacht: Die Aufnahme wird zwischengespeichert und gar nicht neu gemacht, die Säule landet also in einem Bild, das niemand mehr fotografiert. Erst wird der Verdacht bestätigt oder verworfen, dann repariert.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">504</span><span class="t">Der Batch verliert seinen Besitzer nach einer halben Stunde</span><span class="right"><span class="meta">~3 h</span></span></summary>
+  <div class="body">
+    <p>Der Starter erklärt eine arbeitende Sitzung für tot und startet eine zweite daneben — systematisch, sobald die erste etwa eine halbe Stunde alt ist. Ursache ist gemessen: Die beiden Uhren, aus denen die Prozess-Identität berechnet wird, laufen in diesem Container auseinander, und der Abstand wächst mit dem Alter. Genau die Doppelsitzung, die der harte Einzelgänger verhindern soll.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">506</span><span class="t">Was die Software-Bahn gar nicht messen kann</span><span class="right"><span class="meta">~3 h</span></span></summary>
+  <div class="body">
+    <p>Auf der Software-Bahn scheitern vier Prüfungen an einer Geschwindigkeit, die diese Bahn nicht liefern kann — auf der schnellen Bahn sind alle vier grün. Rot heißt dort also nichts.</p>
+    <p>Schlimmer noch: Die Bahn kann auch hängen. Eine Prüfung lief 27 Minuten ohne ein einziges Bild.</p>
+    <p>Künftig misst der Lauf die Bildrate einmal und überspringt, was sie braucht — sichtbar gezählt, damit eine halb übersprungene Bahn nie als geprüft durchgeht.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">507</span><span class="t">Wenn das Grafikgerät stirbt, sagt es keiner</span><span class="right"><span class="meta">~3 h</span></span></summary>
+  <div class="body">
+    <p>Zweimal ist mitten im langen Wildtier-Lauf das Grafikgerät der Software-Bahn gestorben — danach lief keine Prüfung mehr, und der Bericht las sich trotzdem wie ein Teilerfolg. Der Verlust soll laut werden: im Testkanal als Fehler, in der Suite als ihr Urteil, und im Spiel als der übersetzte Hinweis, den es für den WebGL-Rückfall schon gibt — statt eines schwarzen Bildes hinter lebendiger Anzeige.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">508</span><span class="t">Jede Jetzt-Karte wird an ihrer eigenen Nummer gemessen</span><span class="right"><span class="meta">~1,5 h</span></span></summary>
+  <div class="body">
+    <p>Ein Wächter, der die falsche Karte nennt, schickt einen zum Ändern von korrektem Text.</p>
+    <p>Die Tafel-Prüfungen lesen die ganze Sektion »Woran ich gerade arbeite« als eine einzige Karte und legen jedes Wort der ersten Nummer zur Last — obwohl mehrere gleichzeitige Karten der Normalfall sind.</p>
+    <p>Jede Karte wird künftig an ihrer eigenen Nummer gemessen.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">509</span><span class="t">Kein Bewohner steht auf dem Dorfmittelpunkt</span><span class="right"><span class="meta">~2 h</span></span></summary>
+  <div class="body">
+    <p>Im Maasai-Dorf melden mehrere Bewohner die Position exakt null — und dort wird auch etwas gezeichnet. Figuren stapeln sich auf dem Ortsmittelpunkt.</p>
+    <p>Eine exakte Null ist keine verlaufene Figur, sondern eine Platzierung, die nie stattgefunden hat. Behoben wird die Ursache, nicht die Figur.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">510</span><span class="t">Ein Nachweis, der nichts bestätigt hat, gilt trotzdem</span><span class="right"><span class="meta">~2 h</span></span></summary>
+  <div class="body">
+    <p>Der Nachweis, dass eine Bild-Änderung auf beiden Bahnen geprüft wurde, zählt heute auch einen Lauf, der seine Bahn nie bestätigt hat.</p>
+    <p>Genau diese Bestätigung schreibt seit Neuestem auch die Stufe mit — so ein Lauf trägt also keines der beiden Signale und geht trotzdem durch.</p>
+    <p>Dazu zwei kleinere Ehrlichkeiten am Kern und die Vorgabe, vor einer Veröffentlichung einmal auf der vollwertigen Stufe hinzusehen.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">511</span><span class="t">Merkzettel: was Wächter längst erzwingen</span><span class="right"><span class="meta">~1 h</span></span></summary>
+  <div class="body">
+    <p>Der Merkzettel führt noch Regeln, die inzwischen dreißig scharfe Wächter selbst erzwingen.</p>
+    <p>Gemessen ist auch, dass das der kleinere Hebel ist: Der Merkzettel-Index kostet je Sitzung rund 3.000 Token, die Bauanleitung das Fünffache — und die zahlt jeder Agent erneut.</p>
+    <p>Aufgeräumt wird hier nur, was ohne deine Entscheidung geht; der große Schnitt steht als Frage bei dir.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">512</span><span class="t">Bauanleitung: zwei Drittel für Agenten unnötig</span><span class="right"><span class="meta">~2 h</span></span></summary>
+  <div class="body">
+    <p>Jeder ausgelagerte Agent bekommt heute die komplette Bauanleitung — auch die 32 Abnahmekriterien, die Stapel-Übergabe, die Tafel-Regeln und die Release-Mechanik, die er nie anfasst.</p>
+    <p>Gemessen fallen für einen bauenden Agenten rund zwei Drittel des Dokuments weg. Die Anleitung bleibt EIN verbindlicher Text, bekommt aber eine erklärte Teilung: der Kern für Bauende, der Sitzungsteil für die Sitzung, die den Stapel führt.</p>
+    <p>Keine Regel verschwindet dabei, jede steht danach in genau einer der beiden Hälften.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">514</span><span class="t">Zwei Rote nur auf der neuen Bahn</span><span class="right"><span class="meta">~2 h</span></span></summary>
+  <div class="body">
+    <p>Die neue zweite Prüfbahn ist rot an zwei Stellen, an denen die schnelle Bahn grün ist.</p>
+    <p>Einmal fehlte der Entwickler-Haken der Tierwelt zum Zugriffszeitpunkt, einmal lag ein Wasserfall nicht im Bild, das ihn zeigen sollte.</p>
+    <p>Beides muss auf ruhiger Maschine eingeordnet werden: Fehler der Bahn oder Unterschied des Spiels — die Bahn ist jetzt Beweismittel und muss verlässlich sein.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">515</span><span class="t">Die falsche Meldung, die den Stapel pausiert hat</span><span class="right"><span class="meta">~2 h</span></span></summary>
+  <div class="body">
+    <p>Ein Platzhaltername in der Batch-Sperre ließ jede lebende Sitzung als zusätzliche gelten und hat den Batch grundlos angehalten.</p>
+    <p>Heute Abend kam der Beleg, woher der Platzhalter stammt: Unser eigener Besitz-Test benennt die Sperre auf die Kennung um, mit der man ihn fragt — eine Wegwerf-Kennung reicht. Zusammen mit der Zeitdrift aus 504 sperrte das diese Sitzung aus ihrem eigenen Batch aus, während zwei Agenten bauten; der Rückweg musste von Hand gelegt werden. Beides gehört jetzt zum Punkt.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">516</span><span class="t">Der Auftragszettel trägt, was er für bindend erklärt</span><span class="right"><span class="meta">~2 h</span></span></summary>
+  <div class="body">
+    <p>Erklärt ein Punkt die Spezifikation eines anderen für bindend, muss der Auftragszettel diesen anderen Punkt wörtlich mitbringen — nicht nur seine Überschrift.</p>
+    <p>Beim Bau der Dorfgrenze fehlte genau der bindende Teil; der Agent musste ihn selbst nachholen.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">517</span><span class="t">Der Batch wandert am wartenden Fenster vorbei</span><span class="right"><span class="meta">~2 h</span></span></summary>
+  <div class="body">
+    <p>Lässt eine Sitzung ihre Pacht verfallen, startet der Starter sofort eine frische — auch wenn dein Fenster längst angemeldet hat, dass es übernehmen will.</p>
+    <p>Am Punkt-Ende wird dieselbe Anmeldung beachtet, nur der Verfalls-Weg kennt sie nicht. Wer ohne Zwang übernehmen will, wartet dadurch beliebig lange. Künftig entscheiden beide Wege an derselben Stelle.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">518</span><span class="t">Der Auslöser prüft das Ziel, bevor er wartet — und danach nie wieder</span><span class="right"><span class="meta">~3 h</span></span></summary>
+  <div class="body">
+    <p>Der Verschluss prüft nur VOR der Wartezeit, ob das Motiv im Bild ist. Driftet die Kamera danach weg, entsteht ein Bild ohne sein Motiv.</p>
+    <p>Heute kam ein größerer Bruder dazu: Ist das Motiv ein Bedienelement, wartet der Verschluss gar nicht auf die fertige Szene — fotografiert sie aber mit. In einem frischen Lauf stand hinter dem Handelsdialog eine schwarze Welt statt der Gasse von Kairo. 21 Bilder hängen daran.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">519</span><span class="t">Die Handschrift, die nur auf deinem Rechner existiert</span><span class="right"><span class="meta">~2 h</span></span></summary>
+  <div class="body">
+    <p>Die Handschrift des Tagebuchs gibt es nur auf Windows und macOS: Sie wird bei den Systemschriften bestellt statt mitgeliefert. Wer unter Linux oder Android spielt, liest die Chronik in einer nüchternen Standardschrift. Künftig bringt das Spiel seine Schreibschrift selbst mit.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">520</span><span class="t">Die Tafel verlangt eine Zeit, die sie nicht schreiben lässt</span><span class="right"><span class="meta">~1 h</span></span></summary>
+  <div class="body">
+    <p>Läuft die Restzeit einer laufenden Arbeit ab, blockiert der Wächter das Zug-Ende und verlangt eine neue Zeit — nur kennt die Board-Werkzeugkiste keinen Befehl dafür. Bleibt das Hand-Editieren der Tafel, genau die Handlung, die schon einmal die Datei beschädigt hat. Der Punkt liefert den fehlenden Befehl nach.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">521</span><span class="t">Die Prüfrunde zielt mit der Stoppuhr und bricht vor ihrem eigenen Beleg ab</span><span class="right"><span class="meta">~1 h</span></span></summary>
+  <div class="body">
+    <p>Nach einem Sprung an einen Ort wartet die Prüfung starr anderthalb Sekunden, statt darauf zu warten, dass die Kamera wirklich angekommen ist. Auf einer belasteten Maschine ist sie es nicht — die Runde bricht ab, noch bevor sie das Bild aufnimmt, das den Blutfleck belegt.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">522</span><span class="t">Das brennende Gras brennt nicht</span><span class="right"><span class="meta">~2 h</span></span></summary>
+  <div class="body">
+    <p>Das Bild, das den Buschbrand belegen soll, zeigt trockenes Gras und kein Feuer — die Prüfung ist trotzdem grün. Entweder zeichnet der Effekt im Moment der Aufnahme nicht, oder er ist zu schwach, um gesehen zu werden. Was man nicht sieht, ist nicht geliefert.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">523</span><span class="t">Die leere Aufnahme, an der zwei Prüfungen seit Längerem rot sind</span><span class="right"><span class="meta">~2 h</span></span></summary>
+  <div class="body">
+    <p>Zwei Prüfungen der Siedlungskante scheitern auf beiden Backends — und zwar auf dem Hauptzweig, nicht erst durch eine neue Arbeit. Die Aufnahme, die sie beurteilen sollen, ist schlicht leer: null sichtbare Pixel. Beide Prüfungen bewerten also ein Bild von nichts.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">529</span><span class="t">Eine Wache, die nur noch einen Programmstart kostet</span><span class="right"><span class="meta">~0,5 h</span></span></summary>
+  <div class="body">
+    <p>Die Messung zum Zug-Kosten-Inventar hat sie nebenbei gefunden: Eine Prüfung im Nutzerbereich wacht über die Zeitstempel-Regel, die im Projekt längst hart erzwungen wird. Sie bringt nichts mehr und kostet bei jedem Zugende einen Programmstart. Das Entfernen fasst die geschützten Einstellungen an und geht deshalb nur in einer betreuten Sitzung.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">528</span><span class="t">Die Seite hinkt dem Hauptzweig hinterher, und keiner merkt es</span><span class="right"><span class="meta">~1 h</span></span></summary>
+  <div class="body">
+    <p>Gebaut, geprüft und im Hauptzweig: Die Auslieferung stempelt jetzt ihren Stand auf die Seite, und der Starter vergleicht bei jedem Takt den ausgelieferten Stand mit dem Hauptzweig — auch dann, wenn gar kein Lauf existiert.</p>
+    <p>Offen bleibt allein der Nachweis an einer echten Auslieferung. GitHub erzeugt für dieses Projekt seit 21:05 überhaupt keine Läufe mehr.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">531</span><span class="t">Die Spezifikation beschreibt noch die alte Kollision</span><span class="right"><span class="meta">~1 h</span></span></summary>
+  <div class="body">
+    <p>Zwei Stellen in den Spezifikationsdokumenten beschreiben noch den Stand vor der Siedlungs-Kollision — dort kollidieren im Vogelflug nur Bäume und Tiere, und ein Sprung landet immer im Vogelflug.</p>
+    <p>Die Korrektur passt nicht hinein: Beide Dateien stehen exakt an ihrer gemessenen Wortgrenze. Die rund 70 Wörter müssen anderswo eingespart werden.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">532</span><span class="t">Die Kollisionsprüfung zählt jeden Lauf anders</span><span class="right"><span class="meta">~3 h</span></span></summary>
+  <div class="body">
+    <p>Eine Prüfsuite zählte über demselben Stand mal 19, mal 24, mal 25 Prüfungen.</p>
+    <p>Ein grüner Lauf beweist damit nicht dieselbe Abdeckung wie der grüne davor — und ein echter Fehler verschwindet beim nächsten Lauf von selbst.</p>
+    <p>Die Suite muss bei gleichem Stand immer dieselben Fragen stellen und eine geschrumpfte Menge rot melden statt kleiner grün.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">533</span><span class="t">Was den Container nach einem Neustart zurückholt</span><span class="right"><span class="meta">~3 h</span></span></summary>
+  <div class="body">
+    <p>Der eben abgesicherte Start-Pfad gilt für Windows — dort lief der Stapel, als er gemessen wurde. Seit dem 03.08. arbeitet er im Linux-Container, dessen Starter mit dem Container stirbt. Ein Neustart deines Rechners nimmt den Stapel also mit, während der abgesicherte Zeitplan brav grün meldet. Dieser Punkt stellt zuerst fest, was den Container heute überhaupt hochbringt, und schließt die Lücke dann an derselben Stelle.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">534</span><span class="t">Ein Befund aus einem Arbeitsordner geht verloren</span><span class="right"><span class="meta">~2 h</span></span></summary>
+  <div class="body">
+    <p>Zwei Stellen im Code leiten aus demselben Projektpfad zwei verschiedene Speicherordner ab. Die Ablage für nebenbei aufgefallene Befunde landet im einen, das Verzeichnis aller Merkposten im anderen — sie wurde deshalb nie eingehängt.</p>
+    <p>Schwerer wiegt die zweite Hälfte: Ein Befund, den ein Agent aus seinem eigenen Arbeitsordner meldet, geht verloren. Genau diese Agenten sind unsere Hauptfinder.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">535</span><span class="t">Der Vier-Augen-Wächter sieht acht Haken gar nicht</span><span class="right"><span class="meta">~1,5 h</span></span></summary>
+  <div class="body">
+    <p>Die Regel verlangt, dass jeder neue oder geänderte Wächter vom anderen Modell gegengelesen wird. Der Wächter, der das durchsetzt, erkennt acht verdrahtete Haken nicht — darunter den Text, der bei jeder Eingabe mitläuft.</p>
+    <p>Eine Ebene tiefer streiten zwei Zählungen darüber, was überhaupt ein Wächter ist. Beide bekommen dieselbe Definition.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">536</span><span class="t">Zwei verdrahtete Wächter, die keine Prüfung erreicht</span><span class="right"><span class="meta">~1 h · begleitet</span></span></summary>
+  <div class="body">
+    <p>Zwei Wächter setzen echte Regeln durch, heißen aber nicht nach der Namenskonvention. Deshalb fragt keine Prüfung, ob sie überhaupt noch verdrahtet und getestet sind. Heute ist nichts kaputt — das ist der Befund: Würde morgen einer stillgelegt, sagte es niemand.
+Die Umbenennung fasst die Einstellungsdatei an und braucht darum eine begleitete Sitzung.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">537</span><span class="t">Die Liste der ungetesteten Wächter schrumpft nicht</span><span class="right"><span class="meta">~1 h</span></span></summary>
+  <div class="body">
+    <p>Sieben Wächter stehen als „noch ohne Test" unter Amnestie, mit der Regel, dass die Liste nur schrumpfen darf. Vier davon sind längst getestet.</p>
+    <p>Eine Amnestie, die niemand nachliest, ist die Stelle, an der die echte Schuld sich versteckt. Künftig fällt die Prüfung selbst durch, wenn ein getesteter Name noch darinsteht.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">538</span><span class="t">Zwei Merkposten beschreiben Mechanismen, die es nicht mehr gibt</span><span class="right"><span class="meta">~1 h</span></span></summary>
+  <div class="body">
+    <p>Der drittgrößte Merkposten des Projekts, geladen in jeder Sitzung, erklärt die Zeitstempel-Regel über einen Mechanismus, den es nicht mehr gibt. Die Regel gilt, ihre Begründung zeigt ins Leere.</p>
+    <p>Dazu weist das Verzeichnis an, eine Ablage nach dem Leeren zu löschen — dabei hält genau sie fest, was ein Prüflauf bewusst verworfen hat.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">542</span><span class="t">Drei fertige Wächter schlafen noch</span><span class="right"><span class="meta">~1 h · begleitet</span></span></summary>
+  <div class="body">
+    <p>Drei gebaute und geprüfte Wächter setzen nichts durch, weil ihr Scharfschalten eine geschützte Datei ändert — das kann nur eine begleitete Sitzung. Ein Wächter, der existiert und nicht auslöst, ist schlechter als keiner: Die Übersicht behauptet dann einen Durchsetzer, wo keiner ist.</p>
+    <p>Einer davon bringt Vorarbeit mit: Er meldet 29 Punkte, die in keinem Arbeitspaket stehen — genau die Abweichung, für die er gebaut wurde. Die will vorher geordnet sein, sonst blockiert er im ersten Zug auf einem Rückstand, den er nicht verursacht hat.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">548</span><span class="t">Zwei Beobachtungen aus dem Zweitmodell-Review</span><span class="right"><span class="meta">~2 h</span></span></summary>
+  <div class="body">
+    <p>Das Zweitmodell hat die Rundumbild-Arbeit durchgesehen und zwei Beobachtungen als eigenen Punkt gewünscht, nicht als Einwand.</p>
+    <p>Erstens überlebt die einmal je Sitzung angelegte Aufnahmefläche keinen Neuaufbau des Renderers. Heute unerreichbar — aber dann käme das leere Band lautlos zurück.</p>
+    <p>Zweitens hat der Kaltstart der Aufnahme beim Betreten einer Siedlung keine Budget-Schranke. Er kostet auf der langsamen Bahn einmalig gut drei Sekunden in einem Bild, und nichts würde bemerken, wenn dieser Preis wächst.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">551</span><span class="t">Der Hinweis steht mitten im Regionsnamen</span><span class="right"><span class="meta">~2 h</span></span></summary>
+  <div class="body">
+    <p>In den Prüfbildern von heute Abend stehen der Kanu-Hinweis und der Regionsname übereinander in derselben Zeile der Statusleiste — beide gezeichnet, sodass "Westcanoe is dead weight" zu lesen ist.</p>
+    <p>Beide gehören laut Abnahmekriterium dorthin, der Zusammenstoß ist also gewollt angelegt. Die Leiste soll künftig den Platz freigeben, solange ein Hinweis steht, und ihn danach unverändert zurückgeben.</p>
+    <p>Nichts geht kaputt — aber es ist das Erste, was im Bild schludrig wirkt, und es steht in jedem Bild, das die Suiten schreiben.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">552</span><span class="t">Der Prüf-Wächter zeigt auf einen längst grünen Lauf</span><span class="right"><span class="meta">~2 h</span></span></summary>
+  <div class="body">
+    <p>&lt;p&gt;Der Wächter, der vor jedem Zugende den Testlauf auf GitHub prüft, urteilt richtig — nur seine Begründung ist eingefroren.&lt;/p&gt;&lt;p&gt;Heute Nacht nannte er dreimal denselben Lauf als „läuft noch", der längst grün durch war, während in Wahrheit ein anderer lief. Zwei Züge gingen für die Suche am falschen Ort drauf.&lt;/p&gt;&lt;p&gt;Der Grundtext soll künftig mit dem Urteil mitwandern.&lt;/p&gt;</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">553</span><span class="t">Ein Kontextbudget je Punkt — und eine schriftliche Übergabe, wenn es aufgebraucht ist</span><span class="right"><span class="meta">~4 h</span></span></summary>
+  <div class="body">
+    <p>Ein ausdrückliches Kontextbudget je Punkt, mit schriftlicher Übergabe, wenn es aufgebraucht ist. Durch Messung ausgewählt: Sitzungsgrenze und gekürzter Prüfbericht drücken die Rate auf 0,99 %/h, während 0,6 %/h ins Kontingent passen. Wer nur die Hauptsitzung begrenzt, verschiebt die Kosten bloß zu den Agenten — 58 Prozent des Verbrauchs entstehen dort. Das Budget gilt deshalb für beide, und die Messung gehört zur Lieferung.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">554</span><span class="t">Der Chat-Watcher hinterlässt Waisen, die die Aufsicht nicht sieht</span><span class="right"><span class="meta">~2 h</span></span></summary>
+  <div class="body">
+    <p>Zehn lebende Chat-Watcher-Prozesse, der älteste seit drei Tagen — die Pidfile kennt einen davon.</p>
+    <p>Die Aufsicht urteilt nur über diese eine Prozessnummer; jeder Watcher daneben ist für sie unsichtbar und wird nie beendet. Die Drift-Erklärung ist gemessen und ausgeschieden.</p>
+    <p>Heikel, weil jeder Waise auf eine Nachricht hin einen Antwortenden starten kann — die Mehrfachantwort, gegen die die Singleton-Arbeit gebaut wurde.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">559</span><span class="t">Zeiterfassung abschaffen, Schätzkalibrierung behalten</span><span class="right"><span class="meta">~0,5 h</span></span></summary>
+  <div class="body">
+    <p>Der vorschreibende Teil der Zeiterfassung fällt weg: die vier Punktzustände und die (track: …)-Zeile. Was bleibt, ist die Schätzkalibrierung nach Kategorie-Median.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">558</span><span class="t">Ein Prüflauf im Arbeitsbaum stirbt mit dem Arbeitsbaum</span><span class="right"><span class="meta">~2 h</span></span></summary>
+  <div class="body">
+    <p>Jeder delegierte Agent arbeitet in einem eigenen Arbeitsbaum. Der Nachweis, dass eine Render-Suite auf einem Backend grün lief, wird dort abgelegt — und mit dem Arbeitsbaum wieder gelöscht. Dadurch fordert der Wächter dieselbe Viertelstunde Bildprüfung ein zweites Mal ein. Der Nachweis soll künftig im Haupt-Repository landen, nicht im Arbeitsbaum.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">560</span><span class="t">Der Rettungs-Alarm der CI ist gar nicht scharf</span><span class="right"><span class="meta">~1 h</span></span></summary>
+  <div class="body">
+    <p>Die CI hat seit jeher einen Schritt, der bei einem Fehlschlag eine Push-Nachricht senden soll. Der hat noch nie gefeuert — das nötige Repository-Geheimnis wurde nie gesetzt.</p>
+    <p>Solange ein roter Zweig-Lauf dir noch eine Mail schickte, fiel das nicht auf. Jetzt bleibt nur der Commit-Status, den man aktiv nachsehen muss.</p>
+    <p>Das Geheimnis zu setzen ist eine Änderung an deinem GitHub-Konto — die frage ich vorher ab.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">561</span><span class="t">Die stillgelegte Zweig-Prüfung hat drei blinde Flecken</span><span class="right"><span class="meta">~2 h</span></span></summary>
+  <div class="body">
+    <p>Die neue Regel macht rote Zweig-Läufe absichtlich still. Die Gegenprobe hat gezeigt: GitHub meldet auch den fehlgeschlagenen Schritt selbst als erfolgreich — die Wahrheit steht nur noch im Commit-Status.</p>
+    <p>Daraus folgen drei Lücken. Die wichtigste: ein Fehler, den nur der CI-Rechner reproduziert, kann jetzt unbemerkt bis zum Merge mitfahren und erst auf main auffallen.</p>
+    <p>Deshalb soll der Merge selbst den Zweig-Status lesen, bevor er zulässt.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">562</span><span class="t">Ein flackernder Netz-Test hält den ganzen Batch an</span><span class="right"><span class="meta">~2 h</span></span></summary>
+  <div class="body">
+    <p>Der Launcher prüft jede Runde, ob die Tafel abrufbar ist. Schlägt das mehrmals fehl, alarmiert er dich und pausiert schließlich absichtlich den ganzen Batch.</p>
+    <p>Heute um 13:39 ist genau das passiert — die Tafel war aber nie weg: erfolgreiche und fehlgeschlagene Abrufe derselben Adresse wechselten sich ab, und eine Gegenprobe lieferte sofort ein sauberes Ergebnis.</p>
+    <p>Künftig soll ein Fehlschlag erst zählen, wenn er sich wiederholt, und ein Netzaussetzer nicht mehr wie eine veraltete Tafel aussehen.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">563</span><span class="t">Drei Schwachstellen im neuen Bild-Prüfrichter</span><span class="right"><span class="meta">~2 h</span></span></summary>
+  <div class="body">
+    <p>Das zweite Modell hat den neuen Bild-Prüfrichter gegengelesen und für gut befunden — mit drei kleineren Schwachstellen, die den aktuellen Punkt nicht aufhalten.
+Die wichtigste: Ein Felsen, der sich dicht vor die Kinder schiebt, könnte weiterhin als das Kind selbst durchgehen. Dazu fehlt eine Absicherung, die die Maßzahl an die tatsächliche Figur bindet, und eine Fehlermeldung schickt den Leser an den falschen Standort.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">184</span><span class="t">Pre-Tag-Härtung (QA-Rahmen-Dach)</span><span class="right"><span class="meta">~2 h</span></span></summary>
+  <div class="body">
+    <p>Der Dach-Punkt der systematischen Vor-Tag-Qualitätsoffensive, aus dem 203/204/205/207 als Methoden hervorgingen. Bündelt die verbleibende systematische Härtung vor dem v0.2-Tag.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">200</span><span class="t">Seltene Wildlife-Test-Flakes deterministisch machen (Umbrella)</span><span class="right"><span class="meta">~3 h · Closing</span></span></summary>
+  <div class="body">
+    <p>Seltene Testflackerer sollen deterministisch werden, damit ein rotes Ergebnis wieder etwas bedeutet.</p>
+    <p>Heute Nacht abgestellt: die mit Abstand häufigste Ausfallstelle wartete als einzige im ganzen Skript nur 6 statt 20 Sekunden auf eine einrastende Bedingung — sie meldete Fehler, wo nur Geduld fehlte.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">203</span><span class="t">Bug-Finder ausbauen: Lebendigkeit, Querbezüge, Sichtbarkeits-Checks + visueller Rundgang</span><span class="right"><span class="meta">~4 h</span></span></summary>
+  <div class="body">
+    <p>Die Verankerungs-Prüfung (A) läuft bereits scharf.</p>
+    <p>Es fehlen: (B) Lebendigkeit — hängt/pendelt ein Akteur in einem aktiven Zustand?; (D) Querbezüge — reagiert das richtige Tier auf den richtigen Auslöser?; (E) sichtbarer Effekt in Pixeln statt nur in Zahlen, plus die günstigen Zusatzklassen; und (C) der große gefahrene Filmstreifen-Rundgang (beide Render-Backends, Monate/Jahre, Zoomstufen, Siedlungen), den ich selbst Bild für Bild absuche.</p>
+    <p>Läuft vollständig vor dem finalen Abschluss.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">205</span><span class="t">Welt-Plausibilitäts-Audit als wiederholbare Methode</span><span class="right"><span class="meta">~2 h</span></span></summary>
+  <div class="body">
+    <p>Die dritte Audit-Art (Sinn/Kohärenz der Welt, nicht Code-Bugs) als wiederholbare Methode ausbauen. Ein Fable-5-Lauf ist erfolgt (→ die sechs 208-Fixes); der Punkt bleibt offen für die weitere Systematisierung.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">207</span><span class="t">Weitere Suchmethoden (i In-Game-Asserts + iii Fuzzing + v Metamorphik DURCH; ii/iv/vi/vii offen)</span><span class="right"><span class="meta">~2 h</span></span></summary>
+  <div class="body">
+    <p>Umbrella der ergänzenden QS-Methoden. Auf main: (i) In-Game-Invarianten-Asserts (devAssert.ts), (iii) Property-Fuzzing + Verteilungs-Checks (25 Tests, ~23k Zustände — eeb554d), (v) Metamorphik + Daten-Integrität: Koordinaten-Inverse/Skala/Sign (eeb554d) + i18n-Namens-Vollständigkeit des ganzen Rosters (21af056). Offen: (ii) Golden-Image-Vergleich (visuell → GPU), (iv) Dauerlauf/Soak, (vi) Spielerreise-Matrix, (vii) Konsolen-Mining. Umbrella bleibt offen bis alle Methoden stehen.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">285</span><span class="t">Proaktive Jagd auf Anwachs-Bugs und Speicherlecks (Fable)</span><span class="right"><span class="meta">~4 h · Lehre aus 278</span></span></summary>
+  <div class="body">
+    <p>Der 278-Bug (unbegrenztes Anwachsen) rutschte durch, weil Tests einen Moment prüfen, keinen Trend. Ein wiederholbares Fable-Verfahren soll diese Klasse künftig vorab finden.</p>
+    <p>Zwei Prongs: ein Code-Review auf Aufräum-/Wachstums-Muster und ein Laufzeit-Test, der über die Zeit misst, ob Szenen- und Speicherzahlen konvergieren statt zu wachsen. In „maximale QS" eingeordnet.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">174</span><span class="t">Demo-Build v0.3 taggen + /v0.3/ veröffentlichen</span><span class="right"><span class="meta">~1 h</span></span></summary>
+  <div class="body">
+    <p>Tag v0.3 am closing-verifizierten HEAD, veröffentlicht unter /v0.3/; Deploy-Tag-Loop for tag in v0.1 v0.2 v0.3 poc. Tag eingefroren, gehalten für deine Freigabe.</p>
+    <p>Gate: das Taggen samt dem direkt davor stattfindenden finalen Closing-Lauf passiert erst, wenn ALLE offenen Bugfixes abgeschlossen sind — auch die, die in der Zwischenzeit noch reinkommen.</p>
+    <p>Der finale Closing (Vitest + große Regression auf beiden Backends, Dead-Code/.md-Audit, Lint/CVE clean) muss sauber sein, dann v0.2 taggen (wie /v0.1/ und /poc/ verdrahtet), danach eingefroren. Ich darf ihn autonom setzen.</p>
+  </div>
+</details>
+
+</details>
+<details class="sect">
+<summary><h2>Erledigt</h2></summary>
+<details>
+  <summary><span class="num">524</span><span class="t">Die Kinder spielen am kahlen Rand</span><span class="right"><span class="meta">12:46 · 16:53</span></span></summary>
+  <div class="body">
+    <p>Die Kinder spielen jetzt an der bebauten Substanz des Dorfes, und der Nachweis zeigt sie auch: beide Kinder unverdeckt und in lesbarer Größe, das Dorf hinter ihnen. Auf beiden Grafik-Backends geprüft, jeweils 158 Prüfungen ohne Fehler, und ich habe beide Bilder angesehen. Neu ist ein Richter, der ein Bild künftig selbst zurückweist, in dem eine Figur zu klein, verdeckt oder aus dem Rand gerutscht ist. Das zweite Modell hat ihn gegengelesen; drei kleinere Schwachstellen stehen als eigener Punkt in der Warteschlange.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">393</span><span class="t">Das Debug-Menü wird aufgeräumt</span><span class="right"><span class="meta">12:45 · 14:03</span></span></summary>
+  <div class="body">
+    <p>Gemergt und abgehakt: Die 132 Regler des Debug-Menüs stehen jetzt in elf klappbaren Gruppen unter einem Suchfeld, in beiden Sprachen; geöffnete Gruppen merkt sich die Sitzung.</p>
+    <p>Das zweite Modell hat gegengeprüft und bestätigt: kein Regler ging verloren, und die zwei gekürzten Doku-Stellen haben keine Regel eingebüßt. Beide Backends am Bild geprüft.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">513</span><span class="t">Keine Mail mehr für rote Zweig-Läufe</span><span class="right"><span class="meta">12:40 · 13:51</span></span></summary>
+  <div class="body">
+    <p>Gemergt und abgehakt: Rote CI-Läufe auf Arbeits-Zweigen schicken dir keine Mail mehr; der Fehlschlag steht im Commit-Status. Auf main bleibt die Mail, der Rettungs-Alarm bleibt.</p>
+    <p>Das zweite Modell hat gegengeprüft, seine zwei Nachbesserungen sind drin und nachweislich wirksam.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">549</span><span class="t">Die Polier-Prüfung kann kein verlässliches Urteil mehr geben</span><span class="right"><span class="meta">06:38 · 11:03</span></span></summary>
+  <div class="body">
+    <p>Die Polier-Prüfung gibt wieder ein verlässliches Urteil. Alle vier wackelnden Prüfungen entscheiden jetzt auf einem eingeschwungenen Bild, und jeder Lauf misst dieselbe Welt: Drei Läufe hintereinander auf der ersten Grafik-Bahn sind ohne Wiederholung grün. Auf der zweiten Bahn bleibt genau eine Prüfung rot — die Ziege —, und die gehört zu einem eigenen, längst offenen Punkt: diese Bahn zeichnet dort rund ein Bild pro Sekunde und kann eine Frage nach Bewegung gar nicht beantworten.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">432</span><span class="t">Ein Befund überlebt nur so lange wie die Sitzung, die ihn fand</span><span class="right"><span class="meta">03:44 · 04:08</span></span></summary>
+  <div class="body">
+    <p>Der Befund-Träger steht jetzt auf gemessenem Boden statt auf einer Erinnerung. Die Schwelle, ab der ein Zug ohne Eintrag blockiert, war mit einer Zahl aus einer Prüfnachricht begründet — die Fälle, die sie belegen, sind jetzt als echte Züge aus dem Korpus geschnitten und werden bei jedem Testlauf nachgespielt. Am geschnittenen Stand blockiert die Regel 1,1 Prozent der Züge; die naive Variante hätte 5,6 Prozent getroffen.</p>
+    <p>Die offene Frage zum Agenten-Auslöser ist entschieden, und zwar gegen die Empfehlung der Prüfung: Er bleibt. Die Vorhersage, dass er bei unserer Delegations-Arbeitsweise eine Abgabe auf jeden zweiten Zug wäre, stammte aus der Zeit vor der erklärten Wartestellung. Nachgemessen tragen sich 42 von 73 Agenten-Zügen ohnehin ein, 27 deckt die Wartestellung, und übrig bleiben vier — genau die Züge, die Arbeit aus der Hand gaben und weder etwas festhielten noch die Wartestellung erklärten.</p>
+    <p>Zweitmodell-Prüfung in drei Runden: erst „merge mit Auflagen", dann zweimal „merge". CLAUDE.md wurde für den neuen Absatz gestrafft, keine Obergrenze angehoben.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">373</span><span class="t">Die Sitzungsgrenze wird autonom</span><span class="right"><span class="meta">03:31 · 03:44</span></span></summary>
+  <div class="body">
+    <p>Gemessen und ehrlich berichtet: Das Werkzeug weist jetzt beide Zählbereiche aus, und der größere ist der ernüchternde. Von 22.900 gezählten Zügen stammen 14.300 von delegierten Agenten — die bisherigen Zahlen erfassten nur 42 Prozent des Verbrauchs.</p>
+    <p>Die Rate unter den gebauten Hebeln: 0,99 %/h im vollen Zählbereich (1,09 %/h im alten), gegen die 0,6 %/h, die ins Kontingent passen. Das Kriterium ist damit NICHT erfüllt, rund das 1,6-fache der Obergrenze. Fenster: 21,8 Stunden, nicht ganz ein Tag — auch das steht so in der Doku statt aufgerundet.</p>
+    <p>Der nächste Hebel ist damit durch Messung entschieden und als Punkt 553 in der Warteschlange: ein ausdrückliches Kontextbudget je Punkt mit schriftlicher Übergabe. Wer nur die Hauptsitzung begrenzt, verschiebt die Kosten bloß zu den Agenten.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">546</span><span class="t">Ein Dorfbesuch lässt drei Renderziele zurück</span><span class="right"><span class="meta">23:17 · 01:44</span></span></summary>
+  <div class="body">
+    <p><p>Behoben und auf beiden Backends am Bild geprüft: Ein Ortsbesuch lässt keine Renderziele mehr zurück.</p><p>Die Ursache saß bei den Schattenkarten der Vogelperspektive. Sie hängen an einer Sonne, die es absichtlich nur einmal gibt — das verhindert ein Ruckeln beim Betreten —, und weil sie niemand abbaut, gab auch niemand ihre drei Karten zurück. Jetzt gibt der Zug sie beim Verlassen der Ansicht frei; das Knotengerüst bleibt unangetastet, die Karten entstehen beim nächsten Vogelperspektiv-Bild neu.</p><p>Beleg: Die Prüfsuite <em>polish</em> läuft auf WebGL 2 und auf WebGPU mit null Konsolenfehlern durch — vorher schlug der Melder bei jedem Dorfbesuch an. Der Freigabepfad ist zusätzlich mit sieben schnellen Testfällen abgesichert.</p></p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">550</span><span class="t">Der Wächter verlangt einen Beleg, den es nicht geben kann</span><span class="right"><span class="meta">23:17 · 00:11</span></span></summary>
+  <div class="body">
+    <p><p>Der Render-Wächter nimmt jetzt einen Lauf an, dessen rote Stellen jede einzeln einem noch offenen Punkt zugeschrieben sind — und schreibt ins Protokoll, welchem. „Sauber" und „zugeordnet" bleiben überall unterscheidbar.</p><p>Damit endet das gewohnheitsmäßige Übergehen von Hand, das aus dem Tor eine Formalie gemacht hatte.</p><p>Die Prüfung durch das zweite Modell lief zwei Runden: Sie fand drei Lücken in die gefährliche Richtung und stellte die schwerste danach selbst am lebenden Objekt nach, statt dem Nachweis des Autors zu glauben.</p></p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">544</span><span class="t">Abschlussarbeiten haben keine Karte</span><span class="right"><span class="meta">23:20 · 23:49</span></span></summary>
+  <div class="body">
+    <p><p>Die dritte Kartenart steht und ist gemergt: Eine Sitzung, die ihren Punkt beendet hat und noch Abschlussarbeiten schuldet, kann das jetzt sagen — und wird dabei nicht mehr am Arbeiten gehindert.</p><p>Das zweite Modell hat achtzehn selbst gebaute Tafel-Zustände durchprobiert, darunter beide Karten nebeneinander und eine umbenannte Karte. Die Sperre gegen die Untätig-Behauptung feuerte in jedem davon weiter.</p></p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">387</span><span class="t">Prüfungen, die im Hauptzweig selbst rot sind</span><span class="right"><span class="meta">19:50 · 22:59</span></span></summary>
+  <div class="body">
+    <p>Alle fünf Prüfungen, die im Hauptzweig dauerhaft rot standen, sind einzeln beurteilt und geschlossen — in vier Läufen, zwei je Backend, jede mit klarem Abstand zur eigenen Latte.</p>
+    <p>Zwei waren echte Spielfehler, zwei maßen zu früh, die fünfte zählte nur die oberste Schneekante statt der Fläche. Keine Latte wurde gesenkt, die des Schnees wurde angehoben.</p>
+    <p>Dazu der Wächter: Er verlangt jetzt für jeden gepushten Zweig ein bestätigt grünes Ergebnis — die Lücke, durch die rote Läufe nur in deinem Postfach landeten.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">545</span><span class="t">545 — Das Rundum-Panorama einer Siedlung ist leer</span><span class="right"><span class="meta">15:05 · 18:16</span></span></summary>
+  <div class="body">
+    <p>Drei Fehler lagen übereinander, jeder für sich hätte gereicht. Die Aufnahme des Bandes ist ein einziger Schuss — und sie ließ jedes Objekt aus, dessen Zeichenprogramm noch nicht übersetzt war. Im laufenden Bild ist das harmlos, dort kommt es einen Frame später; einen zweiten Frame hat diese Aufnahme nicht. Gemessen: null von 92 Objekten bereit, null Zeichenaufrufe.</p>
+    <p>Dazu landeten alle vier Blickrichtungen übereinander auf der ganzen Breite, und ein frisches Ziel je Besuch hielt den Weg kalt. Zuletzt las der Horizont die gespiegelte Spalte — eine Spiegelung, die im Juli gegen ein falsch ausgeschnittenes Band eingestellt worden war.</p>
+    <p>Auf beiden Backends geprüft: Die Band-Prüfungen bestehen in jedem Versuch, und im Bild stehen Nil und Ufer am Horizont, wo vorher Himmel war. Das zweite Modell hat den Fix bestätigt und zwei Nachbesserungen gefunden, die gleich mit eingeflossen sind.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">547</span><span class="t">547 — Zwei Nachbesserungen aus dem Zweitmodell-Review</span><span class="right"><span class="meta">18:55 · 19:15</span></span></summary>
+  <div class="body">
+    <p>Ein Entwickler-Hook benannte seit der Umstellung Osten als Westen — heute liest ihn niemand, aber genau danach greift die nächste Richtungsprüfung, und sie hätte falsch gemessen und dabei bestanden. Die Zuordnung wird jetzt an einer Stelle abgeleitet und von einem Test festgehalten, der gegen die alte Handliste fällt.</p>
+    <p>Und die festgehaltene Vorgeschichte stimmte nicht: Die alte Spiegelung war nicht gegen ein leeres Band eingestellt, sondern gegen ein falsch ausgeschnittenes — die Datumsfolge belegt es. Der Schluss blieb richtig, die Begründung nicht; sie steht jetzt an allen vier Stellen so, wie die Daten sie tragen.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">541</span><span class="t">Die blinde Hälfte der Vier-Augen-Regel hat keinen Durchsetzer</span><span class="right"><span class="meta">11:10 · 11:10</span></span></summary>
+  <div class="body">
+    <p>Ein aufgezeichnetes Vier-Augen-Urteil muss jetzt sagen, in welcher Form es entstanden ist: als Gegenlesung eines fertigen Ergebnisses oder blind parallel, also aus zwei unabhängigen Anläufen. Fehlt die Angabe, wird das Urteil abgelehnt statt stillschweigend eingeordnet.</p>
+    <p>Der Grund ist der Anker-Effekt: Wer eine fertige Liste vorgelegt bekommt, prüft diese Liste — und findet deutlich weniger als jemand, der vom leeren Blatt anfängt. Genau dort, wo das Risiko der übersehene Punkt ist, war die Gegenlesung also das falsche Werkzeug, und nichts hielt fest, welches benutzt wurde.</p>
+    <p>Was das Werkzeug nicht leisten kann und auch nicht vorgibt: Ob wirklich blind parallel gearbeitet wurde, bleibt eine Selbstauskunft. Erzwungen ist, dass sie abgegeben wird.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">540</span><span class="t">Ein unbekannter Schalter wird stillschweigend verworfen</span><span class="right"><span class="meta">10:33 · 11:10</span></span></summary>
+  <div class="body">
+    <p>Eine unbekannte, verschriebene oder abgekürzte Angabe wird jetzt zurückgewiesen und beim Namen genannt — mit einem Vorschlag, was gemeint war. Vorher verschwand sie wortlos, und ein Urteil landete unvollständig im Buch.</p>
+    <p>Aufgefallen war das, als eine Abnahme den Haken verweigerte, obwohl das Urteil dastand: aufgezeichnet, aber ohne die Punktnummer, die man mitgegeben hatte.</p>
+    <p>Das zweite Modell hat die teuerste Sorge eigens nachgeprüft — die 129 bestehenden Einträge bleiben lesbar und gültig; die neue Pflichtangabe gilt nur fürs Schreiben.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">539</span><span class="t">Ein gewöhnliches Verb hält den Wächter für eine Frage an dich</span><span class="right"><span class="meta">10:32 · 11:03</span></span></summary>
+  <div class="body">
+    <p>Ein Wort schlägt nur noch an, wenn sein eigener Satz wirklich fragt oder dich anspricht — und die Aufforderung im Befehlston sowie die gebeugten Verbformen zählen ausdrücklich dazu.</p>
+    <p>Die erste Fassung war zu leise geraten: Das zweite Modell fand zwölf echte Rückfragen an dich, die durchgerutscht wären. Nach der Nacharbeit schlagen elf davon wieder an, die zwölfte ist ein seltener Sonderfall und als solcher festgehalten. Alle sind als Prüffälle festgenagelt, mit Gegenproben, die stumm bleiben müssen.</p>
+    <p>Jeder Eintrag der Liste trägt jetzt seinen Grund und seine beiden Proben. Zwei Runden Prüfung durch das zweite Modell, dann die Freigabe.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">543</span><span class="t">Der Tafel-Prüfer liest eine Zahl aus dem Kartentext</span><span class="right"><span class="meta">10:32 · 10:48</span></span></summary>
+  <div class="body">
+    <p>Der Fußzeilen-Prüfer der Tafel liest die Zahl offener Punkte jetzt aus der Fußzeile selbst statt irgendwo im Dokument. Er hatte zuvor den Text einer Karte dafür gehalten und die Abnahme verweigert, bis die Karte umformuliert war — eine Regel, die nirgends steht.</p>
+    <p>Nebenbei gefunden: die alte Suche kannte nur die Mehrzahl. Eine veraltete Fußzeile mit genau einem offenen Punkt wäre stillschweigend durchgegangen; das ist jetzt auch zu.</p>
+    <p>Das zweite Modell hat den Stand geprüft und zum Zusammenführen freigegeben.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">437</span><span class="t">Wächter-Punkt: Abschluss-Buchhaltung</span><span class="right"><span class="meta">10:10 · 10:13</span></span></summary>
+  <div class="body">
+    <p>Der Punkt selbst ist gemergt und geprüft. Was noch läuft, ist die Buchhaltung dazu: der Nachtrag für die drei Wächter, die auf das Scharfschalten warten, dann Commit, Push und das Aufräumen des Zweigs.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">355</span><span class="t">Blindes Parallelarbeiten als allgemeiner Vier-Augen-Mechanismus</span><span class="right"><span class="meta">09:18 · 09:47</span></span></summary>
+  <div class="body">
+    <p>Die Vier-Augen-Regel hat jetzt zwei Betriebsarten, und sie steht an genau einer Stelle: Bei erzeugenden Schritten arbeiten beide Modelle blind zu je einem vollständigen Ergebnis, bei urteilenden bleibt es beim Gegenlesen — dort liest der Prüfer allerdings erst das Werkstück, dann die Begründung des Autors.</p>
+    <p>Platz dafür entstand durch Kürzen, nicht durch Anheben der Grenzen. Eine Hälfte bleibt offen und ist als eigener Punkt erfasst: Für die urteilende Art gibt es einen Durchsetzer, für die erzeugende noch nicht.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">331</span><span class="t">Closing-Guard härten (Funde des Zweitmodell-Reviews)</span><span class="right"><span class="meta">08:06 · 09:00</span></span></summary>
+  <div class="body">
+    <p>Die fünf Schwächen aus dem Zweitmodell-Review des Abschluss-Wächters sind ausgeräumt: ein Suchmuster, das bei bösartigen Eingaben entgleiste — gemessen von 93 Sekunden auf eine Millisekunde —, ein Fehlalarm bei Pfaden mit Tag-Namen, zwei echte Freigabe-Befehle, die noch durchrutschten, veraltete Beschreibungen und ein ungeprüfter Zweig.</p>
+  </div>
+</details>
+<details>
+  <summary><span class="num">306</span><span class="t">Closing-Completeness Guard — Pre-Push-Hook blockiert Tags mit unvollständigem Closing</span><span class="right"><span class="meta">08:06 · 09:00</span></span></summary>
+  <div class="body">
+    <p>Ein Abschluss kann keinen seiner elf Schritte mehr überspringen. Der Wächter verweigert nicht nur den Versions-Tag, sondern auch das Abhaken eines Punktes, dessen eigene Lieferung ein Abschluss ist — genau die Lücke, durch die beim letzten Mal das Aufräumen und die Dokumentenprüfung gefallen sind.</p>
+    <p>Der Gegenleser fand zwei Wege, den Wächter zu umgehen: einen über zwei Zeilen umgebrochenen Tag-Befehl und die Reihenfolge „erst aus der Liste löschen, dann als erledigt eintragen“. Beide sind zu.</p>
+  </div>
+</details>
+<p class="archive-link">Die älteren 194 erledigten Punkte stehen im <a href="https://claude.ai/code/artifact/f50b4a77-f16d-4820-8c46-68e56c142460">Archiv der erledigten Punkte</a>.</p>
+</details>
+<footer>Stand: 08.08.2026, 18:34 (Europe/Berlin) · 119 offene Punkte · Tags v0.2/poc unverändert · lädt sich alle 30 s selbst neu.</footer>
+</main>
