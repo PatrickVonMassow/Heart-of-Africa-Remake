@@ -70,6 +70,41 @@ there exactly once; a new point joins a bundle when appended.
 
 ## Checklist
 
+- [ ] 566. REPAIRING ONE CHECK COSTS A WHOLE SUITE PASS (measured 08.08.2026 on point
+  342, and answering the user's question that day about where the hours go). The feature
+  code took 22 minutes — three commits, 17:56 to 18:18. The remaining four and a half
+  hours were verification, and TWO of the three repair commits in them repaired the
+  CHECK, not the game: one had to STAGE an animal instead of hoping one streamed into
+  view, one read the label list a frame before the drawn labels. Each such repair costs a
+  full `enrichments` pass — one browser session, 251 checks, measured at over 17 minutes
+  on the WebGL 2 lane — and then the same round again on the second backend.
+  IT IS NOT THE MACHINE: the container reaches the real GPU (`hasHardwareGlChain` is
+  true, the WSL D3D12 chain on the 4070 Ti, ~7× the software path when that lane was
+  built), and the Vitest layer runs 8386 tests in 88 s. The cost is the REPLAY.
+  WHY A NAME FILTER ON `check()` WOULD BUY NOTHING: the suites are linear scripts — boot,
+  jump, wait for herds, assert, jump on — and the expensive part is the navigation, the
+  waits and the screenshots, not the assertion. Skipping an assertion still replays every
+  jump before it.
+  FINAL STATE: each browser suite is divided into declared SECTIONS — a named block that
+  owns the setup it needs (its jumps and waits) plus its checks. The boundaries already
+  exist as `// --- … ---` comments; they become a declaration the runner reads.
+  `node scripts/verify/run-all.mjs <suite> --section <name>` runs that section's setup and
+  its checks and nothing else; without `--section` the suite runs whole, exactly as today.
+  An unknown section name FAILS LOUD, naming the sections that exist. Every PASS/FAIL line
+  carries the section its check sits in, so a failing check names the argument that
+  re-runs it alone. A `--section` run is marked PARTIAL in its output and can never be
+  recorded as suite coverage — the acceptance and closing runs stay whole-suite, and the
+  render-verify recorder rejects a partial run as proof.
+  Scope: `enrichments` first (7904 lines, the largest), then the other render suites; a
+  suite not yet sectioned keeps working unchanged.
+  VERIFIABLE: pure Vitest over the section resolver — a known name selects exactly its
+  setup and its checks, an unknown one fails naming the candidates, no argument selects
+  everything, a partial run is flagged partial and is refused as recorded coverage; plus
+  one real `--section` run of `enrichments` that finishes in a fraction of the full pass
+  and reports only that section's checks.
+  Criticality: medium — no product defect, but it is the batch's largest measured time
+  sink, and it lengthens every iteration on every render point.
+
 - [ ] 174. Tag the demo build `v0.3` and publish it at
   https://patrickvonmassow.github.io/Heart-of-Africa-Remake/v0.3/.
   GATE (user, 19.07.2026): tag v0.3 only after ALL of these are green — 175 (the
@@ -3385,6 +3420,25 @@ Build order, chosen so no two parallel agents own the same file:
   15 min, ~3 s at 30 min). The intruder stood down without touching the batch, so
   the damage stayed at one duplicated session; the drift is confirmed systematic
   and owner-independent.
+  REPRODUCED A THIRD TIME, AND THIS ONE COST WORK (08.08.2026, 19:55:22Z): the
+  launcher logged the same "owner provably dead (pid-reused)" against pid 1055612,
+  which was ALIVE and mid-verification — the second-backend `polish` run for point
+  342, started 86 s earlier, with its dev server serving. The dispossessed session
+  took its point-556 notice and stood down correctly, so the stand-down half works;
+  the run it was in the middle of died with it and had to be repeated.
+  AND IT PROVES POINT 556 DOES NOT COVER THIS DOOR: `leaseTakeoverDecision` — the
+  corroboration that refuses to dispossess a live owner whose declared work is
+  advancing — was never reached, because "pid-reused" resolves to `provably dead`,
+  which the tick ranks AHEAD of the lease branch. The owner had a valid declared
+  wait on its worktree at that moment and it changed nothing. Clause 2 below is
+  therefore about the DEAD door specifically: its corroboration must sit on the
+  pid-identity verdict itself, not only on the lease path 556 hardened.
+  The drift-free handle of clause 1 has a concrete candidate on this host: identity
+  as (`/proc/sys/kernel/random/boot_id`, `starttime` jiffies from `/proc/<pid>/stat`)
+  — both boot-domain, so the wall clock never enters the comparison. Measured while
+  writing this: `processStartTime` computes `Date.now() - (uptime - starttime/HZ)`,
+  and the uptime-derived boot instant stood 0.9 s from the `btime`-derived one on a
+  quiet machine — under the 2000 ms tolerance at that moment, but on the same curve.
   VERIFIABLE: the unit layer pins both directions against a drifting base, and a
   batch owner older than an hour is still read as alive by
   `node scripts/batch-doctor.mjs` on this host.
@@ -4372,7 +4426,8 @@ Build order, chosen so no two parallel agents own the same file:
   user's ruling, not as an open question. The 32 historical `(track: …)` lines in
   `docs/tasks-archive.md` STAY untouched — they record what happened, and rewriting
   history buys nothing. Nothing is added in exchange: no guard, no hook, no substitute
-  field. The answered board card in "Von dir zu klären" is removed in the same pass.
+  field. (The answered board card was already taken off "Von dir zu klären" on
+  08.08.2026 — a decided question does not wait there for its point to land.)
   VERIFIABLE: a repository-wide search for `(track:` finds hits ONLY in
   `docs/tasks-archive.md` and in the audit documents that count them — never in
   `TASKS.md`, and nowhere as an instruction; a search for the `[*]`/`[~]` states finds
@@ -4508,3 +4563,65 @@ Build order, chosen so no two parallel agents own the same file:
   is rejected (1); the sync test fails on a deliberately altered figure constant (2);
   the diagnostic picks the best of a series of failing readings, not the last (3).
   No browser run is needed for any of the three.
+
+- [ ] 564. "CANDIDATE REAL FAILURE" IS ASSERTED WITH CONFIDENCE THE RUN DID NOT EARN
+  (measured 08.08.2026, 18:22Z). The retry classifier calls a check that fails in BOTH
+  runs a "CANDIDATE REAL FAILURE" and names the diff words it touches — here `polish`
+  "settlement walker (goat): the planted foot holds its ground spot (point 300)", twice,
+  with the note "[touches the diff: goat, foot, hold, point]" against a change that only
+  attached a metadata field to that group. Re-run on a quiet machine 100 minutes later,
+  same code: `polish` 164 pass, 0 fail, FIRST try. The failure was machine load, and the
+  classifier had already said so in its own log — the point-296 quiet-machine check ran
+  at the top of that same run and reported "MACHINE STATE UNKNOWN: GPU load NOT measured
+  (no GPU busy counter on this host)". The two verdicts never meet.
+  WHY THE HEURISTIC IS WRONG HERE, precisely: it reads a repeated failure as evidence of
+  a real defect because a FLAKE is assumed to rotate. Load does not rotate — a check that
+  measures a RATE (frames, stance intervals, settling) fails deterministically for as long
+  as the machine is busy, so the very checks most likely to be load-victims are the ones
+  the heuristic is most confident about. The diff-word match compounds it: matching on
+  "goat, foot, hold, point" against a spec that contains those words is a coincidence
+  detector, not evidence.
+  FINAL STATE:
+  1. The classifier's verdict CARRIES the machine reading it was made under. Where the
+     quiet-machine check reported UNKNOWN or LOADED, a twice-failing check is reported as
+     UNDECIDED — "failed twice, but the machine could not be shown to be quiet; re-run on
+     a quiet machine before believing this" — never as a candidate real failure.
+  2. The rate-sensitive checks are MARKED as such where they are defined (the same set
+     point 506 already names for the software lane), and the classifier says so when one
+     of them is the twice-failing check.
+  3. The diff-word match is reported as what it is: a word overlap, not a causal link. It
+     may not appear at all in an UNDECIDED verdict, where it reads as corroboration.
+  VERIFIABLE: pure Vitest over the classifier — the same twice-failed input yields
+  CANDIDATE REAL FAILURE under a measured-quiet machine and UNDECIDED under an unknown or
+  loaded one; a rate-marked check is named as rate-sensitive in the verdict; and the
+  diff-word list is absent from an UNDECIDED verdict.
+
+- [ ] 565. A DRINKING WILDEBEEST CALF STANDS BURIED IN THE GROUND
+  (caught 08.08.2026, 19:xx, by the in-game anchoring tripwire on the `enrichments`
+  WebGL 2 lane). The dev-mode assert fired: `animal-buried — wildebeest bodyY=1.09
+  ground=1.82 y=1.82 young=false bathe=false drink=true dodge=false hop=false
+  chunk=14,1 shoreSeed=false parent=false child=true dPlayer=14`. The body sits 0.73
+  BELOW the terrain the same frame samples under it, and it is not a one-frame
+  transient: the assert only speaks on the SECOND consecutive violating visit
+  (`floatStrike >= 2`, ~13 frames apart), so this animal stood buried for at least two
+  assert visits while the player was 14 units away — in view.
+  IT IS NOT THE LABEL LAYER'S DOING: the run that caught it carried point 342's change
+  to `Wildlife.tsx`, but that change only READS `a.drawn` and pushes to an array; the
+  assert dates from 21.07.2026 and the anchoring code it watches is untouched. Treat it
+  as a pre-existing defect the tripwire surfaced, not a regression — but CONFIRM that on
+  `main` before fixing, because a confirmation is one run and a wrong assumption is a
+  rebuild.
+  THE LEAD THE DUMP GIVES: `drink=true` and `child=true` with `bathe=false`. The drink
+  cycle lowers the body toward the water, and a CALF carries a smaller `scale`, which
+  shrinks the assert's own tolerance (`ground - 0.75 * a.scale`) at the same time as the
+  drink pose lowers the body — so the pair is the suspect, not either alone. `y` equals
+  `ground` exactly (1.82), so the ANCHOR is right and it is the body offset below it
+  that is wrong.
+  FINAL STATE: a drinking animal of any age keeps its body above its own ground sample
+  for the whole drink cycle, at every scale the herds spawn; the tripwire stays armed and
+  unchanged (it is the detector, not the thing to tune away); and if the drink pose
+  legitimately needs to dip lower than the current tolerance, the tolerance is derived
+  from the pose rather than widened flat.
+  VERIFIABLE: a Vitest case over the drink-pose body offset sweeps the full scale range
+  the herds use, at both ages, and asserts the offset never falls below the ground
+  sample; `enrichments` runs on both backends without the `animal-buried` assert firing.
