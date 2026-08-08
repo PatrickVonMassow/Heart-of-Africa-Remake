@@ -3068,6 +3068,43 @@ there exactly once; a new point joins a bundle when appended.
   names a mechanism the tree does not have; check each claim against the code that owns it.
   Criticality: low, frequency HIGH (both texts load every session).
 
+- [ ] 567. A KILLED SESSION LEAVES ITS VERIFY RUN BEHIND, AND NOTHING STOPS IT
+  (measured 09.08.2026, 00:12–00:14, on the resumption after the point-342 session died;
+  bundle Testinfrastruktur). The dead session's `run-all polish enrichments` (pid 1641328)
+  was still running nine minutes later, together with its Vite dev server and its headless
+  Chrome, and it competed for the machine with the run the successor had just started.
+  That is precisely the load that makes the software WebGPU lane report rate checks as
+  product defects (points 506/564), so the successor's first evidence was worthless before
+  it was read.
+  TWO MECHANISMS LOOKED AND BOTH LET IT PASS:
+  (a) `batch-doctor` ran first and reported `strayProcesses=0`. Its stray probe judges the
+      MAIN checkout, and every one of these processes was launched from an agent WORKTREE
+      (`.claude/worktrees/…`), so the one mechanism whose whole job is to mend a torn tree
+      before work resumes did not see the loudest torn thing in it.
+  (b) The point-296 quiet-machine check DID see them — it named all three by pid with
+      "FROM THIS CHECKOUT" and the sentence "a forgotten dev server has already cost a whole
+      unit run" — but only as a WARNING, after the run had already started, and its remedy
+      (`--on-load=defer`) has to be passed BEFORE the run by someone who already knows. So
+      the check that found the problem also let the tainted run proceed.
+  FINAL STATE:
+  1. `batch-doctor`'s stray probe covers EVERY checkout of this repository — the main tree
+     and every registered worktree — so a verify run, dev server or automation browser from
+     any of them is a stray. `--repair` ends them, logged by pid and command like every
+     other repair, because an owner that is provably dead cannot own a process either.
+  2. The quiet-machine check ACTS on its own finding: leftovers belonging to this project
+     (a verify suite, a Vite server, an automation browser) are not a warning but a HALT —
+     the run stops before its first frame, naming the pids and the one command that clears
+     them. A run started against known self-inflicted load produces evidence nobody may use,
+     which is worse than no run.
+  3. The halt is overridable for the case where the leftovers are deliberate
+     (`--on-load=proceed`), and an overridden run is marked in its output as taken under
+     known load, so its timing verdicts are never later read as clean.
+  VERIFIABLE: pure Vitest — the stray probe returns a worktree-launched verify process for a
+  repository whose worktree list contains it, and `--repair` plans its termination; the
+  quiet-machine verdict is HALT for a self-owned leftover, PROCEED for an unrelated busy
+  machine, and PROCEED-MARKED under the override, with the pids named in every case.
+  Criticality: medium, frequency HIGH (every killed session can leave one behind).
+
 ## Closing (only after all points)
 
 New points are appended BEFORE this section — it stays last in the file.
