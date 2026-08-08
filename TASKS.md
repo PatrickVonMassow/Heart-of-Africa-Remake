@@ -4362,8 +4362,24 @@ Build order, chosen so no two parallel agents own the same file:
   — one bearing found or not found on an unchanged layout — so it is fixed by the SAME
   work, and its spread is recorded beside the other two. Three of one shape means the fix
   belongs in `standOff` itself, not in three call sites.
-  Criticality: medium — neither hides a known product defect today, but a check that
-  rotates is a gate that has stopped gating.
+  THE ROTATION IS WIDER THAN THESE THREE, AND THAT IS THE REAL SIZE OF THIS POINT
+  (measured 08.08.2026, four WebGL 2 attempts of `polish` on `main` — two of them on a
+  machine with nothing else running). NOT ONE attempt was clean, NO attempt reddened at
+  the same check as another, and every one reported ZERO console errors. The reds were:
+  `settlement walker (goat)` (twice, at 0.603 and 0.972 — and this check is charged to
+  point 506 on the WebGPU lane ALONE, so on WebGL 2 it is one of these rotators),
+  `capetown (wet)`, `the village draws the ground work the adults teach DIG at` (stone
+  MISSING), `fire shadows ON` (per-stone [1.5, -1.3, 0.1] — the point-387 unrendered-probe
+  signature), `the settlement offers a figure in clear view to speak over`, and `zulu
+  village hut: an open approach to walk in on`. The suite's own retry logic calls this
+  what it is ("both runs failed but at DIFFERENT checks — the signature of machine LOAD,
+  not of a defect"), but two of the four attempts had NO competing load, so "load" no
+  longer explains it. So this point does not fix three checks: it makes `polish` able to
+  give a stable WebGL 2 verdict at all. Until it does, a WebGL 2 render clearance on this
+  host rests on a deferral, which is the gate not gating.
+  Criticality: medium — none of them hides a known product defect today, but a suite that
+  cannot produce the same verdict twice is a gate that has stopped gating, and the
+  render-verify clearance depends on it.
 
 - [ ] 551. THE TRANSIENT STATUS HINT IS DRAWN ON TOP OF THE REGION NAME (seen
   07.08.2026 in the verification frames `121-harmattan-pall-january.png` and
