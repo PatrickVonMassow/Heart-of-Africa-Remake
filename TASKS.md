@@ -4391,7 +4391,8 @@ Build order, chosen so no two parallel agents own the same file:
   user's ruling, not as an open question. The 32 historical `(track: …)` lines in
   `docs/tasks-archive.md` STAY untouched — they record what happened, and rewriting
   history buys nothing. Nothing is added in exchange: no guard, no hook, no substitute
-  field. The answered board card in "Von dir zu klären" is removed in the same pass.
+  field. (The answered board card was already taken off "Von dir zu klären" on
+  08.08.2026 — a decided question does not wait there for its point to land.)
   VERIFIABLE: a repository-wide search for `(track:` finds hits ONLY in
   `docs/tasks-archive.md` and in the audit documents that count them — never in
   `TASKS.md`, and nowhere as an instruction; a search for the `[*]`/`[~]` states finds
