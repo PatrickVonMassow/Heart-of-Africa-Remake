@@ -572,10 +572,14 @@ const stepUntil = async (ready, arg = null, capFrames = 240) => {
   // the spot one was standing on when the list was built misses it entirely
   // once a loaded machine lets a second pass between. That stale target is what
   // made this selection find nobody at all on a busy run.
-  const STAND_BACK = 5
-  /** Stand `STAND_BACK` in front of figure `i`, on the outward bearing, and
-   *  report what the frame draws at its chest. */
-  const aimAt = async (i) => {
+  // Two ranges, because standing 5 m INWARD of a figure can land the camera in a
+  // hut — the probe then reads that wall, and a figure the player could plainly
+  // walk up to is rejected for the geometry behind the lens. The nearer range is
+  // tried before the candidate is given up on.
+  const STAND_BACKS = [5, 3.5]
+  /** Stand `back` in front of figure `i`, on the outward bearing, and report what
+   *  the frame draws at its chest. */
+  const aimAt = async (i, STAND_BACK) => {
     await page.evaluate(
       ({ idx, back }) => {
         const figure = window.__speechProbeFigures?.[idx]
@@ -606,9 +610,14 @@ const stepUntil = async (ready, arg = null, capFrames = 240) => {
       if (!figure || !window.__placeRayHit) return null
       figure.updateWorldMatrix(true, false)
       const e = figure.matrixWorld.elements
-      // Chest height, and against the figure's position NOW — it may have
-      // walked on since the pose was set.
-      const h = window.__placeRayHit(e[12], e[13] + 1, e[14])
+      // THIS figure's chest, and against its position NOW — it may have walked on
+      // since the pose was set. The height is taken from the group's own scale
+      // rather than a flat metre: the children are barely 0.9 m tall (point 481),
+      // so a metre above the feet sailed clean over every one of them and reported
+      // the ground beyond as the obstruction — half the candidate list could never
+      // qualify, whatever the picture showed.
+      const scaleY = Math.hypot(e[4], e[5], e[6])
+      const h = window.__placeRayHit(e[12], e[13] + Math.max(0.4, scaleY), e[14])
       return { ratio: h.hitDistance == null ? null : h.hitDistance / h.targetDistance, name: h.hitName }
     }, i)
   }
@@ -616,11 +625,16 @@ const stepUntil = async (ready, arg = null, capFrames = 240) => {
   let speakerIndex = -1
   const probes = []
   for (let i = 0; i < candidates.length && speakerIndex < 0; i++) {
-    const hit = await aimAt(i)
-    probes.push(hit ? `${hit.ratio == null ? 'sky' : hit.ratio.toFixed(2)}@${hit.name}` : 'none')
-    if (hit && hit.ratio !== null && hit.ratio >= 0.85 && hit.ratio <= 1.15) {
-      speaker = candidates[i]
-      speakerIndex = i
+    for (const back of STAND_BACKS) {
+      const hit = await aimAt(i, back)
+      probes.push(hit ? `${hit.ratio == null ? 'sky' : hit.ratio.toFixed(2)}@${hit.name}` : 'none')
+      if (hit && hit.ratio !== null && hit.ratio >= 0.85 && hit.ratio <= 1.15) {
+        // The pose that VALIDATED it is the pose the block goes on to measure
+        // from, so the accepting aim is deliberately the last one performed.
+        speaker = candidates[i]
+        speakerIndex = i
+        break
+      }
     }
   }
   check(
