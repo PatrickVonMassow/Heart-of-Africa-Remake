@@ -4476,3 +4476,41 @@ Build order, chosen so no two parallel agents own the same file:
   Criticality: medium — no product defect, but it voids the evidence of every
   delegated render point silently, which pushes the session toward re-running or
   deferring what was already proven.
+
+- [ ] 559. THE TIME-TRACKING MANDATE IS ABOLISHED, ITS USEFUL HALF KEPT (user decision
+  08.08.2026, answering the board card "Zeiterfassung in der Arbeitsordnung: abschaffen
+  oder wiederbeleben?"; bundle Arbeitsordnung). The rule mandated 14.07.2026 prescribes
+  four point states — `[ ]` untouched, `[*]` in progress, `[~]` implemented but
+  regression pending, `[x]` done — and under every ticked point a `(track: start →
+  finish, minutes, ~tokens, model, effort)` line. Measured 27.07.2026 and again on
+  08.08.2026: the two intermediate states appear NOWHERE in the work order, and the
+  tracking line stands 0 times among the open points and 32 times in the archive, the
+  last of them mid-July. The rule is loaded into every session as the memory entry
+  `tasks-time-tracking` and has not been followed for three weeks; no guard enforces
+  it. The user chose the recommended option — ABOLISH the prescriptive half rather than
+  revive it with a mechanism, because what is actually read is the per-card ESTIMATE on
+  the board, and that survives without the bookkeeping.
+  FINAL STATE: the memory entry prescribes nothing any more. Deleted from it: the four
+  checkbox states with every instruction to set `[*]`/`[~]`, and the `(track: …)` line
+  with its start/finish/minutes/token/model fields and the 85/15 input-output token
+  heuristic. KEPT, as the entry's whole remaining content: ETA calibration — dashboard
+  finish estimates are stated at the CATEGORY MEDIAN (small/logic 25–50 min,
+  scene/behaviour 60–100 min, minus ~10–15 min under the scoped regression process),
+  they LEARN from what points actually took, and an ETA refresh rides on a publish that
+  happens anyway instead of causing one. The entry is renamed and re-described to match
+  what it now says — it is no longer about tracking — its `MEMORY.md` index line
+  rewritten with it, and any `[[tasks-time-tracking]]` link updated.
+  `docs/rule-corpus-audit.md` records it as DECIDED-ABOLISHED with this date and the
+  user's ruling, not as an open question. The 32 historical `(track: …)` lines in
+  `docs/tasks-archive.md` STAY untouched — they record what happened, and rewriting
+  history buys nothing. Nothing is added in exchange: no guard, no hook, no substitute
+  field. The answered board card in "Von dir zu klären" is removed in the same pass.
+  VERIFIABLE: a repository-wide search for `(track:` finds hits ONLY in
+  `docs/tasks-archive.md` and in the audit documents that count them — never in
+  `TASKS.md`, and nowhere as an instruction; a search for the `[*]`/`[~]` states finds
+  no rule text demanding them; the rewritten memory entry names no obligation, and
+  `MEMORY.md` holds exactly one line for it under its new name. `npm run test:unit` and
+  the doc-budget guard stay green (the change only shortens).
+  Criticality: low — process hygiene. A rule that formally binds every session while
+  nobody follows it teaches that the rule corpus may be ignored, and that cost is
+  charged to every other rule.
