@@ -1066,11 +1066,15 @@ there exactly once; a new point joins a bundle when appended.
   ignored, baseline cutoff boundary, empty log); the repaired state passes the full
   LARGE regression on a quiet machine (both backends), which also re-validates the
   four Opus points merged before the degradation (262/273/293/305).
-  BLOCKED ON POINT 549 (measured 08.08.2026). The repair and the tripwire are complete and
-  in `main`; only that regression proof is outstanding, and it is not obtainable on this
-  host today: every LARGE attempt reddens at `polish`, whose WebGL 2 verdict rotates
-  between runs, and the run then never reaches the WebGPU half. Take this point up again
-  when 549 has landed — not before, and not with another LARGE in the meantime.
+  WHAT THE PROOF STILL COSTS (measured 08.08.2026, after point 549 landed). The repair and
+  the tripwire are complete and in `main`; only the regression proof is outstanding. 549
+  settled the WebGL 2 half — three consecutive `polish` runs came out clean with no retry —
+  so a LARGE now REACHES the WebGPU half, which it never did before. There it will report
+  one red: `settlement walker (goat)` passed one of three runs, needed the retry in the
+  second and failed both attempts of the third at worst foot/body travel 1.929–2.318. That
+  is the software lane's throughput, charged to point 506 in `render-verify-charges.mjs`,
+  not a product defect. So take this proof either after 506 lands, or with that one red
+  recorded as the charge it is — never as a clean both-backend LARGE.
 
 - [ ] 310. LOW-PRESET PERFORMANCE PASS FOR TWO OPPOSITE DEVICES (user 25.07.2026,
   recalibrated 06.08.2026). LOW must run WELL on a weak Windows desktop AND on the
@@ -3453,6 +3457,15 @@ Build order, chosen so no two parallel agents own the same file:
   lane minutes earlier. So the lane can also HANG, and while it does, no figure or
   settlement point has a second backend at all — every such merge then owes a loud
   deferral instead of a picture.
+  THE GOAT CHECK NOW ROTATES ON THAT LANE INSTEAD OF STANDING RED (measured 08.08.2026,
+  three WebGPU `polish` runs after point 549 rebuilt its sampling): it passed one run,
+  needed the retry in the second, and failed BOTH attempts of the third — worst foot/body
+  travel 2.016, 2.318 and 1.929 against an unchanged bar of 0.25, over 19–27 stance
+  intervals with unbroken stances of 103–117 frames. At roughly one frame per second such
+  a stance spans a minute and a half of world time, in which the goat plainly walks: the
+  figure measures the lane, not the foot. The same check reads 0.047–0.059 on WebGL 2. A
+  rotating red is worse than a standing one — it is the shape that teaches a reader to
+  wave the lane's reds off — and only the skip of FINAL STATE 2 removes it.
   FINAL STATE:
   1. The run MEASURES the lane's delivered frame rate once, from the running
      page, and reports it in the run header — every verdict below names the lane
