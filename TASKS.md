@@ -4444,3 +4444,35 @@ Build order, chosen so no two parallel agents own the same file:
   of a seeded layout suite reporting the same layout.
   Criticality: medium — it does not hide a product defect, but it is a gate reporting a
   determinism it does not have, which is the shape of failure point 549 exists to end.
+
+- [ ] 558. A VERIFY RUN TAKEN IN A WORKTREE IS DESTROYED WITH THE WORKTREE (measured
+  08.08.2026 at the merge of point 549; bundle Testinfrastruktur). The render-verify
+  ledger lives at `.claude/render-verify-state.json`, and `scripts/repo-paths.mjs`
+  resolves `REPO_ROOT` from the SCRIPT's own location — so a suite run inside a git
+  worktree writes its record into THAT worktree, never into the main tree, and
+  `scripts/worktree-cleanup.mjs` deletes it with the directory. The cost is exact: the
+  three WebGPU `polish` runs that proved point 549 on its branch were gone the moment
+  the branch's worktree was cleaned, and `render-verify-guard` — correctly, by what it
+  can see — demanded the WebGPU suite again on `main`, ~15 minutes more for a picture
+  already taken. CLAUDE.md §6 delegates every point to a WORKTREE-isolated agent, so
+  this hits EVERY delegated render point: the agent's own backend evidence never
+  reaches the guard that asks for it, and the session either re-runs it or writes a
+  deferral for a run that actually happened.
+  FINAL STATE: a verify run records where the guard reads it — one ledger per
+  REPOSITORY, not per working tree. The ledger path resolves against the git COMMON
+  directory (`git rev-parse --git-common-dir`, whose parent is the main tree) instead
+  of the script's own path, so a run inside a worktree lands in the main tree's
+  `.claude/render-verify-state.json` and survives the cleanup. Each record NAMES the
+  tree and the commit it was taken on, so a branch run is distinguishable from a main
+  run, and the guard's coverage question is unchanged — was this backend proven since
+  the last render-file edit — with no new exemption. Every other `.claude/` state a
+  worktree agent WRITES and the main session later READS is checked in the same pass
+  and either moved to the common directory or documented as deliberately per-tree.
+  VERIFIABLE: a Vitest case pins the resolution in both directions — with a `.git`
+  FILE pointing at a worktree gitdir the ledger path comes out in the MAIN tree, with
+  an ordinary `.git` directory it is unchanged (the case must fail against today's
+  code, or it proves nothing); and a run recorded from a worktree is found by
+  `coveringRun` in the main tree after that worktree is removed.
+  Criticality: medium — no product defect, but it voids the evidence of every
+  delegated render point silently, which pushes the session toward re-running or
+  deferring what was already proven.
