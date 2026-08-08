@@ -46,6 +46,7 @@ import {
   sinceParam,
   streamUrl,
 } from './chat-core.mjs'
+import { gatherOwnerWork } from './batch-owner-work.mjs'
 import { knownMessages, claimMessage, readPending, spoolMessage } from './chat-spool.mjs'
 import { readReplyReceipt } from './chat-reply.mjs'
 import { assessOwner, bootTimeMs, probePid, readOwnerLock } from './batch-singleton.mjs'
@@ -157,14 +158,19 @@ function formatAlarm() {
  * Everything `wakeDecision` needs, gathered from disk. The owner assessment is
  * the launcher's own (`assessOwner`) with the same probes — nothing about
  * liveness is re-invented here. It is deliberately asked WITHOUT the in-flight
- * work declaration: omitting it can only make an owner read MORE alive, and
- * "there is a session, do not wake a second one" is the safe direction.
+ * work declaration — CORRECTED by point 556's four-eyes review (finding 2): since
+ * an expired lease may now be OUTVOTED by the owner's advancing work, omitting the
+ * declaration makes an owner read LESS alive, not more, and this watcher would
+ * wake a responder into a live working session. It is gathered here, through the
+ * one shared gatherer, and costs a single file read unless the lock is actually in
+ * a state where it could change the answer.
  */
 function gatherState(sessionId, responderLive) {
   const now = Date.now()
   const lock = readOwnerLock()
   const probe = lock && lock.pid ? probePid(lock.pid) : null
-  const ownerAlive = lock ? assessOwner(lock, { now, bootTime: bootTimeMs(), probe }).alive === true : false
+  const work = lock ? gatherOwnerWork(lock, { now }) : null
+  const ownerAlive = lock ? assessOwner(lock, { now, bootTime: bootTimeMs(), probe, work }).alive === true : false
   const claim = readClaim()
   // Our OWN claim is not a reason to stand down — `responderLive` already covers
   // the responder it belongs to, and it says so in a more useful word.

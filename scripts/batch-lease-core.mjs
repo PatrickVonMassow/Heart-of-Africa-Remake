@@ -121,6 +121,21 @@ export const LEASE_RENEW_INTERVAL_MS = 5 * 60 * 1000
  */
 export const DECLARED_WAIT_LEASE_MS = 4 * 60 * 60 * 1000
 
+/**
+ * HOW LONG ADVANCING WORK MAY OUTVOTE THE LEASE ARITHMETIC (four-eyes review of
+ * point 556, confirmed finding 1).
+ *
+ * The corroboration of `leaseTakeoverDecision` is a safety net for an UNDECLARED
+ * long call — a declared wait extends the lease outright and never reaches it. A
+ * net with no bound is a hole: an owner wedged with something still producing in
+ * the background would skip every tick for ever, and since the skip also ends the
+ * launcher's repetition count nobody would be told either. ONE FURTHER WINDOW is
+ * the bound, so total silence stays inside two hours — the point at which the
+ * external repository-output watcher acts regardless, which keeps the ladder
+ * monotone (renew 5 < lease 60 < override +60 ≤ watcher 120).
+ */
+export const TAKEOVER_OVERRIDE_MAX_MS = LEASE_MS
+
 /** How many past fence holders the fence file remembers. Bounded on purpose: the
  *  file is never deleted, so an unbounded list would grow for the life of the
  *  repository. Twenty-four covers days of takeovers; beyond it a session reads as
@@ -263,7 +278,9 @@ export function leaseTakeoverDecision({
   pidIdentifiable = false,
   pidLive = false,
   workAdvancing = false,
+  workJudgedOn = 'none',
   workSummary = '',
+  overrideMaxMs = TAKEOVER_OVERRIDE_MAX_MS,
 } = {}) {
   const ageMin = num(leaseAgeMs) === null ? null : Math.round(leaseAgeMs / 60000)
   const age = ageMin === null ? 'an expired lease' : `a lease ${ageMin} min out`
@@ -281,11 +298,47 @@ export function leaseTakeoverDecision({
       why: `${age} and nothing the owner declared is still moving — taking the batch`,
     }
   }
+  // A BREATHING PROCESS IS NOT PRODUCED WORK (four-eyes review of point 556,
+  // confirmed finding 1). `assessOwnerWork.advancing` is true if ANY answerable
+  // item checks out, and a declared `--pid` item checks out for merely EXISTING —
+  // which this repository's own vocabulary calls "a live process (nothing
+  // produced) — the weakest". Corroborating an expired lease with that would let a
+  // wedged owner whose declared child hangs alive-but-idle hold the batch on every
+  // tick forever: the exact mirror of the failure point 556 fixes, and one that
+  // used to resolve within the hour. Only work that PRODUCED something may outvote
+  // the arithmetic — a commit, a written file (`git`), or a log still being
+  // written (`log`, weak but genuinely output).
+  if (workJudgedOn === 'process' || workJudgedOn === 'none') {
+    return {
+      take: true,
+      reason: 'work-breathing-only',
+      why:
+        `${age} and the declared work is judged on a live process alone — nothing produced. ` +
+        'A breathing pid corroborates nothing; taking the batch.',
+    }
+  }
+  // …AND THE OVERRIDE IS BOUNDED (same finding). Even produced output must not
+  // outvote the arithmetic without end, or "the batch must not be able to stand
+  // still" becomes "unless something in the repository is still moving", and the
+  // launcher's own escalation would be the only remaining alarm. One further whole
+  // window: total silence stays inside two hours, which is where the external
+  // repository-output watcher acts anyway, so the ladder stays monotone and the
+  // local layer never becomes the last thing between a stall and a human.
+  const cap = num(overrideMaxMs)
+  if (cap !== null && num(leaseAgeMs) !== null && leaseAgeMs > cap) {
+    return {
+      take: true,
+      reason: 'override-expired',
+      why:
+        `${age} — past the ${Math.round(cap / 60000)} min for which advancing work may outvote the lease. ` +
+        `The work still moves (${workSummary || 'no summary'}), but an owner silent this long is taken over anyway.`,
+    }
+  }
   return {
     take: false,
     reason: 'live-owner-working',
     why:
-      `NOT taking the batch despite ${age}: ${who} is alive AND the declared work is advancing` +
+      `NOT taking the batch despite ${age}: ${who} is alive AND the declared work has PRODUCED something` +
       `${workSummary ? ` — ${workSummary}` : ''}. An expired lease alone does not dispossess a live owner ` +
       '(point 556): the owner is inside one long-blocking call, which is what the waiting rule prescribes.',
   }

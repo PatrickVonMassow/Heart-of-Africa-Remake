@@ -68,7 +68,13 @@ import {
   LAUNCHER_TICK_MS,
   SPAWN_IDENTITY_TOLERANCE_MS,
 } from './batch-singleton.mjs'
-import { LEASE_MS, LEASE_RENEW_INTERVAL_MS, DECLARED_WAIT_LEASE_MS, dispossessionNotice } from './batch-lease-core.mjs'
+import {
+  LEASE_MS,
+  LEASE_RENEW_INTERVAL_MS,
+  DECLARED_WAIT_LEASE_MS,
+  TAKEOVER_OVERRIDE_MAX_MS,
+  dispossessionNotice,
+} from './batch-lease-core.mjs'
 
 const NOW = 1_784_900_000_000
 const BOOT = NOW - 12 * 3600 * 1000 // machine booted 12 h ago
@@ -199,7 +205,7 @@ describe('assessOwner (liveness = heartbeat AND real pid, never age alone)', () 
       now: NOW,
       bootTime: BOOT,
       probe: aliveProbe,
-      work: { advancing: true, declared: true, summary: 'active 2 min ago (working files)' },
+      work: { advancing: true, declared: true, judgedOn: 'git', summary: 'active 2 min ago (working files)' },
     })
     expect(a).toMatchObject({ alive: true, reason: 'lease-expired-owner-working' })
     expect(spawnDecision(a)).toBe('skip-alive')
@@ -211,7 +217,7 @@ describe('assessOwner (liveness = heartbeat AND real pid, never age alone)', () 
 
   it('POINT 556: the same lease still takes the batch from a DEAD pid or from STALE work', () => {
     const silent = lock({ claimedAt: NOW - 63 * 60_000, leaseUntil: NOW - 3 * 60_000 })
-    const dead = assessOwner(silent, { now: NOW, bootTime: BOOT, probe: deadProbe, work: { advancing: true } })
+    const dead = assessOwner(silent, { now: NOW, bootTime: BOOT, probe: deadProbe, work: { advancing: true, judgedOn: 'git' } })
     expect(dead).toMatchObject({ alive: false, reason: 'lease-expired' })
     expect(dead.detail).toContain('gone')
     const stalled = assessOwner(silent, { now: NOW, bootTime: BOOT, probe: aliveProbe, work: { advancing: false } })
@@ -221,12 +227,49 @@ describe('assessOwner (liveness = heartbeat AND real pid, never age alone)', () 
     expect(assessOwner(silent, { now: NOW, bootTime: BOOT, probe: aliveProbe }).alive).toBe(false)
   })
 
+  // The four-eyes review of point 556 (confirmed finding 1): the fix must not
+  // create the mirror failure — a wedged owner holding the batch for ever.
+  it('POINT 556: a BREATHING declared pid does not save a wedged owner, and the override is capped', () => {
+    const silent = lock({ claimedAt: NOW - 63 * 60_000, leaseUntil: NOW - 3 * 60_000 })
+    // Something declared is alive, nothing has been produced → still taken over.
+    expect(
+      assessOwner(silent, { now: NOW, bootTime: BOOT, probe: aliveProbe, work: { advancing: true, judgedOn: 'process' } }),
+    ).toMatchObject({ alive: false, reason: 'lease-expired' })
+    // Even produced output stops outvoting the arithmetic past the cap: an owner
+    // this silent is taken over whatever is moving in the background.
+    const veryOld = lock({ claimedAt: NOW - 5 * 3600_000, leaseUntil: NOW - TAKEOVER_OVERRIDE_MAX_MS - 60_000 })
+    expect(
+      assessOwner(veryOld, { now: NOW, bootTime: BOOT, probe: aliveProbe, work: { advancing: true, judgedOn: 'git' } }),
+    ).toMatchObject({ alive: false, reason: 'lease-expired' })
+  })
+
+  // Confirmed finding 3: the owner who forgot `--clear` and walked straight into
+  // a NEW long call must not be shot for the paperwork of a finished one.
+  it('POINT 556: a dead declared wait withdraws the extension — it does not dispossess on the spot', () => {
+    const declaredAt = NOW - 3 * 3600_000
+    const until = declaredAt + 4 * 3600_000
+    const stale = { declared: true, advancing: false }
+    // The owner completed a tool call 10 minutes ago and is now inside a new one.
+    const working = lock({ claimedAt: NOW - 10 * 60_000, leaseUntil: until, declaredWait: { at: declaredAt, until } })
+    expect(assessOwner(working, { now: NOW, bootTime: BOOT, probe: aliveProbe, work: stale })).toMatchObject({
+      alive: true,
+      reason: 'pid-alive',
+    })
+    // Genuinely silent for a full ordinary window as well → now it is takeable,
+    // and the reported age is POSITIVE (finding 5), not the future leaseUntil.
+    const quiet = lock({ claimedAt: NOW - 90 * 60_000, leaseUntil: until, declaredWait: { at: declaredAt, until } })
+    const v = assessOwner(quiet, { now: NOW, bootTime: BOOT, probe: aliveProbe, work: stale })
+    expect(v).toMatchObject({ alive: false, reason: 'declared-wait-stale' })
+    expect(v.detail).not.toContain('-')
+    expect(v.detail).toContain('30 min out')
+  })
+
   it('POINT 556: a DECLARED WAIT covers a call blocking for hours, but only while its evidence moves', () => {
     const until = NOW + 3 * 3600_000
     const declared = lock({ claimedAt: NOW - 90 * 60_000, leaseUntil: until, declaredWait: { at: NOW - 90 * 60_000, until } })
     // 90 minutes inside ONE blocking call — past the ordinary window, still owned.
     expect(
-      assessOwner(declared, { now: NOW, bootTime: BOOT, probe: aliveProbe, work: { declared: true, advancing: true } }),
+      assessOwner(declared, { now: NOW, bootTime: BOOT, probe: aliveProbe, work: { declared: true, advancing: true, judgedOn: 'git' } }),
     ).toMatchObject({ alive: true, reason: 'pid-alive' })
     // The evidence stops moving → the extension ends early, and the batch is takeable.
     expect(
@@ -364,7 +407,7 @@ describe('assessOwner (liveness = heartbeat AND real pid, never age alone)', () 
   // extend ownership ON ITS OWN; what it may now do is CORROBORATE, together with a
   // live pid, and only where the caller actually holds that evidence.
   it('a declaration alone still extends nothing — the pid must corroborate it', () => {
-    const eternallyFresh = { declared: true, advancing: true, declaredAt: NOW, summary: 'an agent, allegedly' }
+    const eternallyFresh = { declared: true, advancing: true, judgedOn: 'git', declaredAt: NOW, summary: 'an agent, allegedly' }
     const silent = lock({ claimedAt: NOW - LEASE_MS - 60_000 })
     // Paperwork plus a DEAD process: taken, exactly as before.
     expect(
@@ -714,6 +757,16 @@ describe('renewLease / grantFence (the I/O half)', () => {
     expect(dispossessionNotice({ fenceState: fence, sessionId: 's1', announcedFence: readFenceNotice('s1', { lockPath }) }).notify).toBe(false)
     // The notice file is derived from the lock path — it never reaches the repo.
     expect(resolve(fenceNoticePath(lockPath)).startsWith(resolve(REPO_ROOT))).toBe(false)
+  })
+
+  it('POINT 556: the notice ledger is PER SESSION — two fenced sessions do not erase each other', () => {
+    // Four-eyes finding 4: a single-record file let two dispossessed sessions
+    // overwrite each other's mark and re-inject the notice on every tool call.
+    expect(recordFenceNotice('s-a', 3, { lockPath })).toBe(true)
+    expect(recordFenceNotice('s-b', 4, { lockPath })).toBe(true)
+    expect(readFenceNotice('s-a', { lockPath })).toBe(3)
+    expect(readFenceNotice('s-b', { lockPath })).toBe(4)
+    expect(readFenceNotice('s-never', { lockPath })).toBe(0)
   })
 
   it('INDEPENDENCE + fail-open: no fence file, no lock, junk input — nothing throws, nothing blocks', () => {

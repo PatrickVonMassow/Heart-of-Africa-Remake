@@ -28,6 +28,7 @@ import {
   fenceGuardedAction,
   fenceDecision,
   DECLARED_WAIT_LEASE_MS,
+  TAKEOVER_OVERRIDE_MAX_MS,
   leaseTakeoverDecision,
   inDeclaredWaitWindow,
   declaredWaitStale,
@@ -394,33 +395,37 @@ describe('the chokepoint — the four paths with no guard of their own', () => {
 // only the lease branch overrode them. Two sessions then shared one repository.
 describe('the takeover — an expired lease is necessary, not sufficient (point 556)', () => {
 
+  // NOTE ON THE NUMBERS: `leaseAgeMs` is time past the lease's OWN end, not the
+  // heartbeat age the launcher logs. The incident's owner was silent 63 min but
+  // its lease — renewed at the start of the blocking call — was only 3 min out.
   it('expired lease + LIVE pid + ADVANCING work → SKIP, naming the lease age it overrode', () => {
     const d = leaseTakeoverDecision({
-      leaseAgeMs: at(63),
+      leaseAgeMs: at(3),
       pid: 4048953,
       pidIdentifiable: true,
       pidLive: true,
       workAdvancing: true,
+      workJudgedOn: 'git',
       workSummary: 'active 2 min ago (working files)',
     })
     expect(d.take).toBe(false)
     expect(d.reason).toBe('live-owner-working')
     // The skip must SAY what the arithmetic wanted, or the next incident is as
     // invisible in the log as this one was.
-    expect(d.why).toContain('63 min')
+    expect(d.why).toContain('3 min out')
     expect(d.why).toContain('4048953')
     expect(d.why).toContain('active 2 min ago (working files)')
   })
 
   it('expired lease + DEAD pid → TAKEOVER (the recovery the lease exists for is untouched)', () => {
-    const d = leaseTakeoverDecision({ leaseAgeMs: at(63), pid: 4048953, pidIdentifiable: true, pidLive: false, workAdvancing: true })
+    const d = leaseTakeoverDecision({ leaseAgeMs: at(63), pid: 4048953, pidIdentifiable: true, pidLive: false, workAdvancing: true, workJudgedOn: 'git' })
     expect(d).toMatchObject({ take: true, reason: 'pid-dead' })
   })
 
   it('expired lease + UNIDENTIFIABLE owner process → TAKEOVER', () => {
     // A lock with no pid at all: nothing can be asked about the process, and
     // "we could not ask" is never a reason to leave the batch stranded.
-    const d = leaseTakeoverDecision({ leaseAgeMs: at(90), pid: null, pidIdentifiable: false, pidLive: false, workAdvancing: true })
+    const d = leaseTakeoverDecision({ leaseAgeMs: at(90), pid: null, pidIdentifiable: false, pidLive: false, workAdvancing: true, workJudgedOn: 'git' })
     expect(d).toMatchObject({ take: true, reason: 'pid-unidentifiable' })
   })
 
@@ -558,5 +563,41 @@ describe('the dispossession notice — the fenced session is told, and why', () 
     expect(dispossessionNotice()).toEqual({ notify: false, fence: 0, context: '' })
     expect(dispossessionNotice({ fenceState: 'x', sessionId: 4 }).notify).toBe(false)
     expect(normaliseFence({ lastTakeover: { from: 5 } }).lastTakeover).toBe(null)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// THE MIRROR-IMAGE FAILURE, closed by the four-eyes review of point 556
+// (confirmed finding 1): the fix must not hand a WEDGED-but-alive owner the
+// batch for ever. Before 556 that state resolved inside the hour.
+describe('the takeover — the override is corroborated by OUTPUT and it is bounded', () => {
+  const base = { leaseAgeMs: at(3), pid: 4048953, pidIdentifiable: true, pidLive: true, workAdvancing: true }
+
+  it('a BREATHING declared pid corroborates nothing — a wedged owner is still taken over', () => {
+    // `assessOwnerWork.advancing` is true if ANY answerable item checks out, and a
+    // `--pid` item checks out for merely EXISTING. That is this module's own "a
+    // live process (nothing produced) — the weakest".
+    const d = leaseTakeoverDecision({ ...base, workJudgedOn: 'process' })
+    expect(d).toMatchObject({ take: true, reason: 'work-breathing-only' })
+    expect(leaseTakeoverDecision({ ...base, workJudgedOn: 'none' }).take).toBe(true)
+    // …and the default, when nobody said what the advance rested on.
+    expect(leaseTakeoverDecision({ ...base }).take).toBe(true)
+  })
+
+  it('PRODUCED output does corroborate — a commit, a written file, or a log still being written', () => {
+    expect(leaseTakeoverDecision({ ...base, workJudgedOn: 'git' }).take).toBe(false)
+    // `log` is the weakest of the three but it IS output: it is what a background
+    // `npm test` declares, and refusing it would break the honest long run.
+    expect(leaseTakeoverDecision({ ...base, workJudgedOn: 'log' }).take).toBe(false)
+  })
+
+  it('BOUNDS the override — advancing work may not outvote the arithmetic for ever', () => {
+    const within = leaseTakeoverDecision({ ...base, leaseAgeMs: TAKEOVER_OVERRIDE_MAX_MS, workJudgedOn: 'git' })
+    expect(within.take).toBe(false)
+    const past = leaseTakeoverDecision({ ...base, leaseAgeMs: TAKEOVER_OVERRIDE_MAX_MS + 1, workJudgedOn: 'git' })
+    expect(past).toMatchObject({ take: true, reason: 'override-expired' })
+    // The ladder stays monotone: renew < lease < the override cap's total.
+    expect(LEASE_RENEW_INTERVAL_MS).toBeLessThan(LEASE_MS)
+    expect(TAKEOVER_OVERRIDE_MAX_MS).toBeLessThanOrEqual(LEASE_MS)
   })
 })

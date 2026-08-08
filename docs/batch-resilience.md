@@ -174,10 +174,32 @@ Two changes, both in the pure core:
 - **The takeover asks the corroborating signals** (`leaseTakeoverDecision`). It
   takes the batch only where the pid is dead or unidentifiable, or the declared work
   is not advancing; a live pid AND advancing declared work make the tick SKIP and
-  say which lease age it overrode. This is not the probing this section refuses: the
-  ACQUIRE door still compares two numbers, and only the launcher tick — which
-  already reads both signals a few lines earlier — passes them in. A live pid alone
-  is never enough, because a wedged process breathes.
+  say which lease age it overrode. A live pid alone is never enough, because a
+  wedged process breathes. TWO BOUNDS keep that override from becoming the mirror
+  failure — a wedged-but-alive owner holding the batch for ever, which before this
+  resolved inside the hour (four-eyes review, confirmed finding 1):
+  - it must rest on PRODUCED output. `assessOwnerWork.advancing` is true if any
+    answerable item checks out, and a declared `--pid` checks out for merely
+    EXISTING — this file's own "a live process (nothing produced), the weakest".
+    `judgedOn === 'process'` (or nothing at all) therefore corroborates nothing;
+    `git` and `log` do, `log` being what an honest background run declares.
+  - it EXPIRES. `TAKEOVER_OVERRIDE_MAX_MS` is one further window, so total silence
+    stays inside two hours and the ladder stays monotone (renew 5 < lease 60 <
+    override +60 ≤ the external watcher's 120). And the launcher keeps ESCALATING
+    while it skips, so the one state where it deliberately declines to act is not
+    also the one state nobody is ever told about.
+- **Every door reads the corroborated verdict, not just the launcher** (confirmed
+  finding 2). Leaving it launcher-deep was its own incident one layer out: in
+  exactly the state the launcher protects, `chat-watcher`, `batch-resume-hook` and
+  a non-owner's `batch-progress-guard` still read that owner as dead and took the
+  batch off it. One gatherer — `scripts/batch-owner-work.mjs` — now fills
+  `assessOwner`'s and `acquire`'s `work` at all of them. It lives in its own module
+  because the dependency runs the other way (`assessOwnerWork` and the probes sit
+  above batch-singleton), and it gathers NOTHING unless the lock is in a state
+  where corroboration could change the answer, so the git probes stay off the hook
+  path. `batch-claim` is deliberately left out: that is a person taking the batch
+  into the window they are sitting at, the manual override the whole mechanism
+  serves — and it is the way back a dispossessed session is told to use.
 - **A declared wait extends the lease**, which is what this paragraph used to say
   was unbuilt. `batch-in-flight.mjs --waiting-on` now calls `extendLease` for
   `DECLARED_WAIT_LEASE_MS` (4 h, pinned to `LAUNCHER_WORK_MAX_AGE_MS`). Point 556
@@ -192,7 +214,11 @@ Two changes, both in the pure core:
   finished starts a 40-minute regression inside one call, has no renewal to write
   (its lease is still the extension) and no declaration left to advance. A wait
   that is over simply stops being conditional; `--clear` drops the marker and
-  deliberately leaves the lease where it stands.
+  deliberately leaves the lease where it stands. A wait whose evidence HAS died
+  does not dispossess on the spot either (confirmed finding 3): it withdraws the
+  extension, and the ordinary lease then runs from the owner's last heartbeat — so
+  the session that forgot `--clear` and walked into a NEW long call is judged on
+  its own silence, not on the paperwork of a finished wait.
 
 **And the dispossessed owner is TOLD.** A takeover writes `lastTakeover:
 { from, reason }` into the fence file, and the PostToolUse hook injects

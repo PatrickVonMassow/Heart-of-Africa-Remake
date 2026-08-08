@@ -263,12 +263,24 @@ export function assessOwner(lock, { now, bootTime, probe, work, leaseMs = LEASE_
   // owner its batch on 08.08.2026, so the widening is deliberate and narrow.
   // Nothing is killed here or anywhere else.
   const expired = leaseExpired(lock, { now, leaseMs })
+  // A DEAD DECLARED WAIT DOES NOT DISPOSSESS ON THE SPOT — it merely withdraws the
+  // extension, and the ORDINARY lease applies again from the owner's last
+  // heartbeat (four-eyes review, finding 3). Without that step the owner who
+  // forgot `--clear` and walked straight into a NEW long call is shot for the
+  // paperwork of a finished one; `claimedAt` is stamped by every completed tool
+  // call, so "silent for a full ordinary window" is the honest test, and it is the
+  // same one that applied before the extension existed. It also keeps the reported
+  // age positive (finding 5): `leaseUntil` is still in the future here, so the
+  // extension's own number would read as a negative lease age.
   const waitDied =
-    !expired && declaredWaitStale(lock, { now, leaseMs, workAdvancing: work?.advancing, workDeclared: work?.declared })
+    !expired &&
+    declaredWaitStale(lock, { now, leaseMs, workAdvancing: work?.advancing, workDeclared: work?.declared }) &&
+    now > lock.claimedAt + leaseMs
   if (expired || waitDied) {
     const corroboration = pidCorroboration(lock, probe)
     const verdict = leaseTakeoverDecision({
       leaseAgeMs: (() => {
+        if (waitDied) return now - (lock.claimedAt + leaseMs)
         const until = leaseUntilOf(lock, { leaseMs })
         return typeof until === 'number' ? now - until : null
       })(),
@@ -279,6 +291,8 @@ export function assessOwner(lock, { now, bootTime, probe, work, leaseMs = LEASE_
       // window on the promise that its evidence keeps advancing), so that branch
       // never asks the work question a second time.
       workAdvancing: waitDied ? false : work?.advancing === true,
+      // WHAT the advance rests on: a breathing pid corroborates nothing.
+      workJudgedOn: waitDied ? 'none' : (work?.judgedOn ?? 'none'),
       workSummary: work?.summary ?? '',
     })
     if (verdict.take) return { alive: false, reason: waitDied ? 'declared-wait-stale' : 'lease-expired', detail: verdict.why }
@@ -980,7 +994,13 @@ export function acquire(sessionId, opts = {}) {
   }
   if (lock) {
     const probe = lock.pid ? deps.probePid(lock.pid) : null
-    if (assessOwner(lock, { now, bootTime: deps.bootTime, probe, leaseMs: opts.leaseMs }).alive) return 'held'
+    // `opts.work` is the owner's corroboration (point 556's four-eyes finding 2).
+    // WITHOUT IT this door reads an expired lease as death, which is what let a
+    // chat message or a newly opened window seize the batch from a live, working
+    // owner the launcher had just decided to leave alone. Callers fill it in with
+    // `gatherOwnerWork` (scripts/batch-owner-work.mjs) — it cannot be imported
+    // here, because that module depends on this one.
+    if (assessOwner(lock, { now, bootTime: deps.bootTime, probe, work: opts.work, leaseMs: opts.leaseMs }).alive) return 'held'
   } else {
     // Unreadable/corrupt lock file: reap only if it has settled (not mid-write).
     try {
@@ -1007,7 +1027,7 @@ export function acquire(sessionId, opts = {}) {
         return 'mine'
       }
       const probe = recheck.pid ? deps.probePid(recheck.pid) : null
-      const verdict = assessOwner(recheck, { now, bootTime: deps.bootTime, probe, leaseMs: opts.leaseMs })
+      const verdict = assessOwner(recheck, { now, bootTime: deps.bootTime, probe, work: opts.work, leaseMs: opts.leaseMs })
       if (verdict.alive) return 'held'
       if (typeof recheck.fence === 'number') priorFence = recheck.fence
       // The record the dispossessed session is told from (point 556). Written
@@ -1051,12 +1071,24 @@ export function fenceNoticePath(lockPath = LOCK_PATH) {
   return join(dirname(lockPath), 'fence-notice.json')
 }
 
-/** Which fence number this session was last told about. 0 = never told. */
+/** How many sessions the notice ledger remembers. Bounded because the file is
+ *  never deleted; past it the oldest reads as "never told", which costs one
+ *  repeated notice and nothing else. */
+export const FENCE_NOTICE_HISTORY = 8
+
+/** Which fence number this session was last told about. 0 = never told.
+ *  A MAP, NOT ONE RECORD (four-eyes review, finding 4): two fenced-out sessions
+ *  sharing a single-record file each overwrote the other's mark and re-injected
+ *  the notice on every tool call between them. */
 export function readFenceNotice(sessionId, opts = {}) {
   try {
     const rec = readJson(opts.noticePath ?? fenceNoticePath(opts.lockPath ?? LOCK_PATH))
-    if (!rec || rec.sessionId !== sessionId) return 0
-    return typeof rec.fence === 'number' && rec.fence > 0 ? Math.floor(rec.fence) : 0
+    if (!rec || typeof rec !== 'object') return 0
+    // The pre-map shape, so a ledger written by the older build still counts.
+    if (rec.sessionId === sessionId && typeof rec.fence === 'number') return Math.max(0, Math.floor(rec.fence))
+    const seen = rec.seen && typeof rec.seen === 'object' ? rec.seen : {}
+    const n = seen[sessionId]
+    return typeof n === 'number' && n > 0 ? Math.floor(n) : 0
   } catch {
     return 0
   }
@@ -1066,11 +1098,14 @@ export function readFenceNotice(sessionId, opts = {}) {
  *  cannot record is repeated at worst, never lost. */
 export function recordFenceNotice(sessionId, fence, opts = {}) {
   try {
-    writeJsonAtomic(
-      opts.noticePath ?? fenceNoticePath(opts.lockPath ?? LOCK_PATH),
-      { v: 1, sessionId, fence, at: opts.now ?? Date.now() },
-      opts,
-    )
+    const path = opts.noticePath ?? fenceNoticePath(opts.lockPath ?? LOCK_PATH)
+    const prev = readJson(path)
+    const seen = prev && typeof prev === 'object' && prev.seen && typeof prev.seen === 'object' ? { ...prev.seen } : {}
+    // Carry the pre-map record forward rather than dropping it on the floor.
+    if (prev && typeof prev.sessionId === 'string' && typeof prev.fence === 'number') seen[prev.sessionId] = prev.fence
+    seen[sessionId] = fence
+    const kept = Object.entries(seen).slice(-Math.max(1, opts.historyLimit ?? FENCE_NOTICE_HISTORY))
+    writeJsonAtomic(path, { v: 2, seen: Object.fromEntries(kept), at: opts.now ?? Date.now() }, opts)
     return true
   } catch {
     return false

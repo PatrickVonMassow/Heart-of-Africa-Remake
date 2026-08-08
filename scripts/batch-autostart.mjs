@@ -691,6 +691,33 @@ if (verdict === 'skip-alive') {
   // reader must be able to see that the arithmetic said "take it" and what
   // outvoted it, or the next incident is invisible in this log too.
   if (assessment.detail) log(`  ${assessment.detail}`)
+  // A SKIP THAT OVERRODE AN EXPIRED LEASE IS NOT A HEALTHY TICK (four-eyes review
+  // of point 556, confirmed finding 1). It must keep ESCALATING, or the one state
+  // where the launcher deliberately declines to act would also be the one state
+  // nobody is ever told about — an owner silent past its lease with something
+  // still moving in the background would skip in silence tick after tick. The
+  // override is time-capped in the core; this is what makes the run-up audible.
+  if (assessment.reason === 'lease-expired-owner-working') {
+    const rep = verdictRepeat({
+      key: `${assessment.reason}#${ownerStateKey(lock)}`,
+      lastKey: state.wedgeVerdictKey,
+      repeats: state.wedgeVerdictRepeats,
+    })
+    state.wedgeVerdictKey = rep.key
+    state.wedgeVerdictRepeats = rep.repeats
+    if (rep.escalate) {
+      log(`ESCALATING: the same owner has outvoted its expired lease for ${rep.repeats} launcher ticks`)
+      await notify(
+        'Batch owner silent past its lease',
+        `${lock.sessionId} (pid ${lock.pid ?? 'unknown'}) has been silent past its lease for ${rep.repeats} ticks ` +
+          'running. It is NOT being taken over because its declared work keeps producing output — but if that is a ' +
+          'runaway rather than a long verification, only a person can tell. Please look.',
+        'high',
+      )
+    }
+    writeJsonAtomic(C('autostart-state.json'), state)
+    process.exit(0)
+  }
   // A healthy tick ENDS the repetition count (four-eyes nit on point 433 (c)):
   // without this a later, identically-worded episode of the same owner would
   // escalate on its second tick instead of its own count, because the key never
