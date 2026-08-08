@@ -633,16 +633,15 @@ changes with it in the same commit.
 20. **Comfort and audio settings.** The control and audio calibration of
     `design.md` §2.2/§21 holds — look sensitivity, walk and strafe speed,
     eye height, pitch limit, the single ambience volume with its coastal
-    surf and its per-source sliders, the overland travel speed and the
-    terrain relief factors — and every one of those values is editable
-    while the game runs, from the debug menu (§21), in English and in
-    German. That menu is STRUCTURED per §21: named collapsible groups
-    under one filter field, and no control is lost to a regrouping.
+    surf and per-source sliders, the overland travel speed and the
+    terrain relief factors — and every one is editable while the game
+    runs, in English and German, from the §21 debug menu, which is
+    STRUCTURED: collapsible groups under a filter, losing no control.
     The §21.4 zoom behavior, the §21.3 selectors and the §21.1
-    debug shortcuts hold as specified, F6 producing the complete bug
-    report, F8 the shipped render benchmark and F9 the graphics detail
-    level, whose `QUALITY_PRESETS` registry must carry every quality lever
-    on every level. Modals and full-screen overlays always draw above the
+    debug shortcuts hold, F6 producing the complete bug
+    report, F8 the render benchmark and F9 the graphics detail
+    level, whose `QUALITY_PRESETS` registry must carry every lever
+    on every level. Modals and overlays always draw above the
     in-scene floating labels (§17.4).
    Detail: docs/acceptance-criteria-detail.md §20.
    Evidence: docs/acceptance-evidence.md §20.

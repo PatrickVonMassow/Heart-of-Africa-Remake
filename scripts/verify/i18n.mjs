@@ -74,7 +74,11 @@ await page.waitForTimeout(600)
 // language selector sits in "tools" — open that group, else the frame would be
 // filed as evidence of a selector it does not show.
 await page.evaluate(() => window.__ui.getState().toggleDebugGroup('tools'))
-await page.waitForTimeout(300)
+await page.waitForFunction(
+  () => !!document.querySelector('.debug-menu .debug-group-body:not([hidden])'),
+  null,
+  { timeout: 10000 },
+)
 await shot('58-i18n-debug-language', { element: '.debug-menu', label: 'the debug menu language selector' })
 // Click the "English" button to switch back (drives the live UI control).
 await page.evaluate(() => {
