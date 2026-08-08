@@ -902,6 +902,26 @@ Der Fehler steckt nicht in der Isolierung und nicht im Aufräumen, sondern in de
 
 ---
 
+### 3.95 Wer ein Signal abschaltet, erbt die Pflicht, das Ersatzsignal zu prüfen
+
+Rote Läufe auf Arbeitszweigen sollten den Eigentümer nicht mehr per Mail behelligen — eine gute Entscheidung, denn ein Agent, der mitten in der Arbeit committet, erzeugt sie zwangsläufig. Der Umbau gelang und wurde am lebenden Objekt belegt. Erst die Gegenprüfung fand, was daneben lag: Die Werkstatt hatte seit jeher einen zweiten Meldeweg, eine Push-Nachricht, und der hatte **noch nie** gefeuert, weil sein Zugangsschlüssel nie gesetzt wurde. Solange die Mail ging, war das folgenlos; in dem Moment, in dem die Mail bewusst verstummte, war es der Unterschied zwischen einem stillen und einem unbemerkten Fehlschlag. Übrig blieb nur eine passive Markierung, die jemand aktiv nachsehen muss.
+
+Verschärft wird das durch eine zweite Messung derselben Prüfung: Die Schnittstelle, über die unsere Wächter Läufe beurteilen, meldet nach dem Umbau **auch den fehlgeschlagenen Einzelschritt** als erfolgreich. Kein Leser des Laufergebnisses kann die Wahrheit noch rekonstruieren — sie steht ausschließlich an der einen Stelle, die niemand von sich aus aufruft.
+
+**Lehre:** Ein Signal abzuschalten ist nie eine lokale Änderung. Wer Lärm dämpft, übernimmt die Beweislast, dass der verbleibende Kanal **lebt** — nicht, dass er existiert. Und wo die Dämpfung eine Auskunft mit-verfälscht, die andere Mechanismen bereits lesen, ist die Frage nicht „stört das?", sondern „welcher Wächter urteilt ab jetzt über eine Auskunft, die es so nicht mehr gibt?".
+
+---
+
+### 3.96 Die Fieberprobe, die den Patienten anhält
+
+Der Starter prüft jede Runde, ob die Tafel erreichbar ist, und eskaliert: fünf Alarme, dann pausiert er den ganzen Stapel — bewusst, denn eine Benachrichtigung kann man verschlafen, eine Pause nicht. Am 08.08.2026 hat diese Kette gefeuert und die Arbeit angehalten; sie lief nur weiter, weil die Wiederanlauf-Uhr ablief. Die Tafel war dabei zu keinem Zeitpunkt weg: Im Protokoll wechseln sich fehlgeschlagene und erfolgreiche Abrufe **derselben** Adresse ab, und eine Gegenprobe aus demselben Container antwortete sofort sauber.
+
+Zwei Denkfehler stecken darin, und beide sind allgemein. Erstens wird ein **Transportfehler** als Aussage über den **Inhalt** gelesen — „ich konnte nicht abrufen" ist aber keine Behauptung über die Aktualität der Tafel, sondern über die Leitung. Zweitens zählt die Eskalation Fehlschläge, ohne dass ein Erfolg dazwischen sie zurücksetzt; bei einem flackernden Netz erreicht sie ihre Schwelle mit Sicherheit, nur eben später.
+
+**Lehre:** Eine Gesundheitsprobe, die den Betrieb anhalten darf, braucht dieselbe Sorgfalt wie ein Wächter, der eine Freigabe blockiert: sofortiger Wiederholversuch, bevor ein Fehlschlag zählt, Eskalation nur auf **aufeinanderfolgende** Fehlschläge, und eine Meldung, die Leitung und Inhalt auseinanderhält. Sonst ist die schärfste Stufe des Alarms — der Stillstand — genau die, die am leichtesten falsch auslöst.
+
+---
+
 ## 4. Die Guards als Immunsystem
 
 Jedes Guard-Skript ist die geronnene Lösung eines real aufgetretenen, wiederholten Problems.
@@ -989,7 +1009,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Samstag, 08.08.2026, 11:28 · Quellen-Fingerprint: `3d0d44361459…`
+Zuletzt aktualisiert: Samstag, 08.08.2026, 15:00 · Quellen-Fingerprint: `63dbaa1457fb…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1069,8 +1089,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 72 Feedback-/Projekt-Memories · 48 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 40 Prozess-/Meta-TASKS-Punkte (davon 16 offen).
+Erfasste Quellen: 72 Feedback-/Projekt-Memories · 48 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 41 Prozess-/Meta-TASKS-Punkte (davon 17 offen).
 
-<!-- RETRO-FINGERPRINT: 3d0d443614599f877763b9f5a83a1d8ccb3d28a3fcdb36d16f36aeed3020bf7d -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-08T09:28:15.310Z -->
+<!-- RETRO-FINGERPRINT: 63dbaa1457fb691f821021e1bf74095f8709ff054b0dfdd553b1fe735b3bb7ca -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-08T13:00:25.045Z -->
 <!-- AUTO-GENERATED:END -->
