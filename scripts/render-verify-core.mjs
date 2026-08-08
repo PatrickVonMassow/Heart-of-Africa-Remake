@@ -86,6 +86,7 @@ export const NON_RENDER_VERIFY = new Set([
   'snowMetric.mjs', // the snow-vs-sand pixel verdict; enrichments.mjs feeds it a crop
   'stanceSlip.mjs', // the planted-foot verdict over a sample series; polish.mjs records the samples
   'system-chrome.mjs', // WHERE the lane's browser is on this host; _browser.mjs opens it
+  'tagFrameReading.mjs', // the tag frame's readability verdict; polish.mjs takes the reading
   'textureLeak.mjs', // the texture-delta decision layer; settings.mjs runs it
   'tiers.mjs',
   'ttsCache.mjs',
