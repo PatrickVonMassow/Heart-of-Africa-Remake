@@ -7927,10 +7927,22 @@ check(
   const herds = await waitForHerds(6)
   // The camera eases to its target; scan only once it has caught up (point 177).
   await page.waitForFunction(() => window.__camera?.settled?.() === true, null, { timeout: 30000 }).catch(() => {})
-  // And wait until a LIVING subject is actually in the frame: the traveller's own
-  // canoe is on screen at every spot, so a label count alone would pass over an
-  // empty plain and prove nothing about the animals (the frame of the first run
-  // showed exactly that).
+  // There must be a LIVING subject in the frame: the traveller's own canoe is on
+  // screen at every spot, so a label count alone would pass over an empty plain
+  // and prove nothing about the animals (the first run's frame showed exactly
+  // that). Streaming alone cannot be relied on to put one in view within a
+  // bounded wait — on the slower backend it did not — so if none has arrived, a
+  // pair is STAGED beside the traveller, the way the drama checks stage theirs.
+  // What is under test is the LAYER, never the spawner.
+  const onScreenAnimal = () =>
+    page.evaluate(() => {
+      const h = window.__wildlife?.herdsRef?.current
+      if (!h || !window.__camera) return false
+      for (const sp of Object.keys(h)) {
+        for (const a of h[sp]) if (!a.dead && window.__camera.onScreen(a.x, a.z)) return true
+      }
+      return false
+    })
   await page
     .waitForFunction(
       () => {
@@ -7942,9 +7954,28 @@ check(
         return false
       },
       null,
-      { timeout: 30000 },
+      { timeout: 20000 },
     )
     .catch(() => {})
+  const staged = !(await onScreenAnimal())
+  if (staged) {
+    await page.evaluate(() => {
+      const h = window.__wildlife.herdsRef.current
+      const p = window.__game.getState().pos
+      // A grown zebra and its foal, a few metres in front of the traveller.
+      h.zebra.push({ x: p.x + 3, z: p.z + 3, y: 0.2, rot: 0, scale: 1, phase: 0.3 })
+      h.zebra.push({ x: p.x - 3, z: p.z + 3, y: 0.2, rot: 0, scale: 0.6, phase: 0.7, young: true })
+    })
+    // The layer reads the transform the RENDER PASS wrote, so let it draw them.
+    await page.evaluate(
+      () =>
+        new Promise((res) => {
+          let i = 0
+          const step = () => (++i >= 6 ? res() : requestAnimationFrame(step))
+          requestAnimationFrame(step)
+        }),
+    )
+  }
 
   const before = await page.evaluate(() => document.querySelectorAll('.actor-label').length)
   check('no label stands while Ctrl is up (point 342)', before === 0, `${before} labels`)
@@ -7978,8 +8009,8 @@ check(
     'holding Ctrl names the animals in view (point 342)',
     !!held && alive.length > 0 && held.rendered.length === held.labels.length,
     held
-      ? `${alive.length} animals of ${held.labels.length} labels [${held.labels.map((l) => l.kind).join(', ')}]`
-      : `no layer (herds streamed: ${herds}, appeared: ${appeared})`,
+      ? `${alive.length} animals of ${held.labels.length} labels [${held.labels.map((l) => l.kind).join(', ')}]${staged ? ' (staged)' : ''}`
+      : `no layer (herds streamed: ${herds}, appeared: ${appeared}, staged: ${staged})`,
   )
   check(
     'every Ctrl label sits on an ON-SCREEN subject (points 172/342)',
