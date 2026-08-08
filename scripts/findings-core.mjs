@@ -23,14 +23,29 @@
 
 /** Investigative calls needed before a recordless turn is judged.
  *
- *  Calibrated against the whole transcript corpus (2709 turns, 43 sessions,
- *  measured by the second model on 29.07.2026), NOT against an impression:
- *  counting every shell call as investigation blocked 10.6 % of all turns and
- *  73 % of those blocks were build/verify turns, not analysis. With shell
- *  calls classified read-only-or-not (below) the rate lands near 5 % — about
- *  one turn in twenty, and the samples there are genuinely analysis. A guard
- *  that fires on an ordinary turn trains the reader to skip it, which is the
- *  argument guard-health-core.mjs makes about enforcers in general. */
+ *  Calibrated against the whole transcript corpus, NOT against an impression.
+ *  First measured by the second model on 29.07.2026 (2709 turns, 43 sessions,
+ *  on the Windows host): counting every shell call as investigation blocked
+ *  10.6 % of all turns and 73 % of those blocks were build/verify turns, not
+ *  analysis. With shell calls classified read-only-or-not (below) the rate fell
+ *  to roughly a twentieth of the turns, and the samples there were genuinely
+ *  analysis. A guard that fires on an ordinary turn trains the reader to skip
+ *  it, which is the argument guard-health-core.mjs makes about enforcers in
+ *  general.
+ *
+ *  THE CLAIM IS NOW REPLAYABLE (08.08.2026). A measurement that lives in a
+ *  review message is a memory, so the cases it cites are cut into
+ *  `findings-fixtures.json` — real turns, one family per case, replayed by
+ *  `findings-fixtures.test.mjs` on every unit run. Re-measured there on the
+ *  Linux corpus: at the cut recorded in that file (809 turns, 56 sessions) this
+ *  rule blocks 1.1 % of turns and the shell-counts-as-looking rule 5.6 %, while
+ *  the 377 answer-only turns block under neither. The direction reproduces on a
+ *  corpus the first measurement never saw; the absolute rates do not transfer
+ *  between corpora, and the corpus keeps growing, so the figures are the CUT's,
+ *  not constants. The block rate is an UPPER bound: a historical turn has no
+ *  in-flight file mtime, so a declared wait the live guard would honour on that
+ *  half counts as a block in the replay.
+ *  Re-measure with: node scripts/findings-fixtures.mjs --measure */
 export const DEFAULT_THRESHOLD = 6
 
 /** Tools whose every use is investigation. */
@@ -321,6 +336,21 @@ export function auditFindings({
   // Spawning an agent is investigation on its own: it is the most expensive
   // way this project looks at something, and its result reaches nobody unless
   // the parent records it.
+  //
+  // THE AGENT TRIGGER STAYS AS IT IS — decided 08.08.2026, against the corpus.
+  // The second model's review predicted the opposite: 96 of 235 agent-spawning
+  // turns carried no record, so on a project whose working method is maximal
+  // delegation the trigger looked like a `--none` tax on the most ordinary turn
+  // there is, and the review asked for it to be softened.
+  // What that measurement could not see is the exemption built after it. Re-run
+  // on the current corpus (`node scripts/findings-fixtures.mjs --measure`, 806
+  // turns): of 73 agent-spawning turns, 42 leave a durable record anyway, 27 are
+  // carried by the DECLARED WAIT, and 4 block — turns that handed work out and
+  // neither recorded nor declared it, which is exactly the shape the rule exists
+  // for. The tax the review feared is already paid by a mechanism that says
+  // something true about the turn, so softening the trigger would only buy back
+  // those four and cost the one signal that catches a delegation nobody can find
+  // again. The `delegated-wait` fixture family pins this.
   const investigated = Number(t.agents) > 0 || Number(t.investigative) >= threshold
   if (investigated && durable.length === 0 && !delegation.honoured) {
     violations.push({

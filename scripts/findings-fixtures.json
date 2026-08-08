@@ -1,0 +1,481 @@
+{
+  "note": "Cut from the real transcript corpus by scripts/findings-fixtures.mjs --cut. Redacted to the fields the decision reads.",
+  "cutAt": "2026-08-08T01:59:00.701Z",
+  "corpusTurns": 809,
+  "measured": {
+    "blocks": 9,
+    "naiveBlocks": 45,
+    "naiveBuildVerify": 10,
+    "agentTurns": 73,
+    "agentExemptByDeclaredWait": 27,
+    "agentBlocks": 4,
+    "byFamily": {
+      "looked-and-recorded": 68,
+      "answer-only": 377,
+      "delegated-wait": 39,
+      "unrecorded-investigation": 6,
+      "build-verify": 2,
+      "claimed-wait-dishonoured": 3
+    }
+  },
+  "contradictions": [],
+  "families": [
+    {
+      "id": "answer-only",
+      "expect": "allow",
+      "why": "A turn that only answers investigated nothing. It must never block — this is the desensitisation case."
+    },
+    {
+      "id": "looked-and-recorded",
+      "expect": "allow",
+      "why": "Investigated AND left a durable trace (commit, TASKS.md, memory, finding.mjs). The duty is discharged."
+    },
+    {
+      "id": "build-verify",
+      "expect": "allow",
+      "why": "The calibration case: a build/test turn is work, not analysis. Counting every shell call as investigation fires exactly here, which is what the shell classification exists to prevent."
+    },
+    {
+      "id": "delegated-wait",
+      "expect": "allow",
+      "why": "Delegation: an agent was spawned and the wait declared. The result arrives turns later, where the merge is the record — this is the family that decides the Agent trigger (see the core header)."
+    },
+    {
+      "id": "claimed-wait-dishonoured",
+      "expect": "block",
+      "why": "The wait was DECLARED but not earned: no agent was spawned in this turn. The exemption covers work that really was handed out, so this shape blocks — the subtlest rule in the core, and until now pinned only by constructed cases. Replayed without the declaration file, so this fixture covers the AGENT half alone."
+    },
+    {
+      "id": "unrecorded-investigation",
+      "expect": "block",
+      "why": "Read/searched at length (or spawned an agent) and left nothing durable — the turn this check exists for."
+    }
+  ],
+  "turns": [
+    {
+      "family": "answer-only",
+      "expect": "allow",
+      "source": "7b4a6caf",
+      "at": "2026-08-03T10:39:49.553Z",
+      "calls": []
+    },
+    {
+      "family": "answer-only",
+      "expect": "allow",
+      "source": "7b4a6caf",
+      "at": "2026-08-03T10:59:15.824Z",
+      "calls": []
+    },
+    {
+      "family": "answer-only",
+      "expect": "allow",
+      "source": "73d9db78",
+      "at": "2026-08-03T10:59:55.433Z",
+      "calls": []
+    },
+    {
+      "family": "looked-and-recorded",
+      "expect": "allow",
+      "source": "45289138",
+      "at": "2026-08-05T04:17:31.189Z",
+      "calls": [
+        {
+          "name": "ToolSearch"
+        },
+        {
+          "name": "WebSearch"
+        },
+        {
+          "name": "WebSearch"
+        },
+        {
+          "name": "WebFetch"
+        },
+        {
+          "name": "WebSearch"
+        },
+        {
+          "name": "WebFetch"
+        },
+        {
+          "name": "WebFetch"
+        },
+        {
+          "name": "Bash",
+          "command": "grep -rn \"disable-vulkan-surface\\ ; use-vulkan\\ ; use-webgpu-adapter\\ ; angle=vulkan\" --include=\"*.mjs\" --include=\"*.md\" --include=\"*.sh\" . 2>/dev/null ; grep -v node_modules ; head -20"
+        },
+        {
+          "name": "Bash",
+          "command": "grep -rn \"HANGS\\ ; hang\\ ; 40 s\\ ; VK_ICD\\ ; VK_DRIVER_FILES\" docs/host-environment.md ; head -20"
+        },
+        {
+          "name": "WebSearch"
+        },
+        {
+          "name": "WebSearch"
+        },
+        {
+          "name": "Bash",
+          "command": "node scripts/finding.mjs --record \"Online-Recherche zu 505: der offizielle Headless-Flagsa … ; gleiche Liste in chromium docs/gpu/using-gpu-hardware-in-headless-chrome.md). --disable-vu …"
+        }
+      ]
+    },
+    {
+      "family": "build-verify",
+      "expect": "allow",
+      "source": "73d9db78",
+      "at": "2026-08-03T16:34:56.935Z",
+      "calls": [
+        {
+          "name": "Bash",
+          "command": "node scripts/render-verify-guard.mjs --defer \"Kein Browser auf diesem Host installierbar: cdn.playwright.dev leitet auf storage.googleapis.com um, das die Container-Firewall blockt (20 Versuche gemessen 03.08.2026), und es gibt keine GPU. Die geaenderten Dateien sind die Startparameter der Verify-Suiten selbst (Punkt 475) — genau das Werkzeug, das die Bildpruefung ueberhaupt erst wieder moeglich macht. Der Live-Beweis (eine SMALL-Suite auf beiden Backends) ist ausdruecklich offen und ist der Grund, warum Punkt 475 NICHT abgehakt ist; er wird nach dem Container-Neubau nachgeholt, fuer den Netzfreigabe und GPU-Durchgriff bereits eingetragen sind.\" 2>&1|tail -3; git rev-list --count @{u}..HEAD"
+        },
+        {
+          "name": "Bash",
+          "command": "pgrep -f \"git push origin main\" >/dev/null && echo \"push alive\" || echo \"push gone\"; tail -2 /tmp/claude-1000/-workspace-hoa/<session>/scratchpad/push10.log 2>/dev/null; git log --oneline -1"
+        },
+        {
+          "name": "Bash",
+          "command": "PID=$(pgrep -f \"git push origin main\" | head -1); [ -n \"$PID\" ] && tail --pid=\"$PID\" -f /dev/null; echo \"push ended\"; git rev-list --count @{u}..HEAD; tail -3 /tmp/claude-1000/-workspace-hoa/<session>/scratchpad/push10.log"
+        },
+        {
+          "name": "Bash",
+          "command": "git rev-list --count @{u}..HEAD; pgrep -f \"git push origin main\" >/dev/null && echo \"push alive\" || echo \"push gone\"; tail -2 /tmp/claude-1000/-workspace-hoa/<session>/scratchpad/push10.log"
+        },
+        {
+          "name": "Bash",
+          "command": "PID=$(pgrep -f \"git push origin main\" | head -1); [ -n \"$PID\" ] && tail --pid=\"$PID\" -f /dev/null; echo \"push ended\"; git rev-list --count @{u}..HEAD; tail -4 /tmp/claude-1000/-workspace-hoa/<session>/scratchpad/push10.log"
+        },
+        {
+          "name": "Bash",
+          "command": "git branch -d feat/475-browser-bringup 2>&1|tail -1; git push origin --delete feat/475-browser-bringup 2>&1|tail -1; node scripts/worktree-cleanup.mjs <repo>/.claude/worktrees/agent-a4abb1434da8fd7d3 2>&1|tail -1; git worktree list; git branch -a | grep -c feat/ || echo \"no feat branches left\""
+        },
+        {
+          "name": "Bash",
+          "command": "git branch -a | grep feat/; echo \"=== hygiene ===\"; node scripts/branch-hygiene-guard.mjs --status 2>&1|tail -2; echo \"=== state ===\"; git status --short | head -3; git rev-list --count @{u}..HEAD"
+        },
+        {
+          "name": "Bash",
+          "command": "printf '%s' 'Der Browser-Bring-up liegt im Hauptzweig, freigegeben vom zweiten Modell. Abgehakt ist der Punkt nicht: Seine Bedingung ist ein echter Browser-Lauf, und dafür fehlt hier bis zum Neubau der Browser.\n\nAlle Zweige der Migration sind abgearbeitet, nichts läuft mehr, der Hauptzweig ist vollständig hochgeladen.\n\nDer Container kann jetzt neu gebaut werden — danach messe ich das Dateisystem neu, prüfe den Grafikdurchgriff, installiere Chromium und fahre die kleine Browser-Suite.' | node scripts/board.mjs status 475 --text-stdin 2>&1|tail -1; node scripts/focus.mjs confirm 2>&1|tail -1; node scripts/board-publish.mjs 2>&1|tail -1; node scripts/dashboard-guard.mjs --synced .batch-dashboard.html 2>&1|tail -1; node scripts/board.mjs attest 2>&1|tail -1"
+        },
+        {
+          "name": "TodoWrite"
+        }
+      ]
+    },
+    {
+      "family": "delegated-wait",
+      "expect": "allow",
+      "source": "73d9db78",
+      "at": "2026-08-03T13:02:58.494Z",
+      "calls": [
+        {
+          "name": "Bash",
+          "command": "PID=$(pgrep -f \"git push origin main\" ; head -1) ; echo \"waiting on push pid $PID\" ; [ -n \"$PID\" ] ; tail --pid=\"$PID\" -f /dev/null ; echo \"push process ended\" ; git rev-list --count @{u}..HEAD"
+        },
+        {
+          "name": "Bash",
+          "command": "git rev-list --count @{u}..HEAD ; tail -4 /tmp/claude-1000/-workspace-hoa/<session>/scratchpad/push4.log 2>/dev/null ; pgrep -f \"git push origin main\" >/dev/null ; echo \"push alive\" ; echo \"push gone\""
+        },
+        {
+          "name": "Agent"
+        },
+        {
+          "name": "Bash",
+          "command": "node scripts/board.mjs vdzk-add \"Bildprüfung im Container — geht sie hier überhaupt?\" --te … ; Der Bring-up ist gebaut, aber der Beweis fehlt, und zwar aus zwei Gründen, die beide am Re … ; Damit steht die Bildprüfung, die jede sichtbare Änderung freigeben muss, hier auf der Kipp … ; EOF ; node scripts/board-publish.mjs 2>&1 ; tail -1 ; node scripts/dashboard-guard.mjs --synced .batch-dashboard.html 2>&1 ; tail -1 ; node scripts/board.mjs attest 2>&1 ; tail -1"
+        },
+        {
+          "name": "Bash",
+          "command": "git rev-list --count @{u}..HEAD ; pgrep -f \"git push origin main\" >/dev/null ; echo \"push alive\" ; echo \"push gone\" ; tail -2 /tmp/claude-1000/-workspace-hoa/<session>/scratchpad/push4.log"
+        },
+        {
+          "name": "Bash",
+          "command": "PID=$(pgrep -f \"git push origin main\" ; head -1) ; [ -n \"$PID\" ] ; tail --pid=\"$PID\" -f /dev/null ; echo \"push ended\" ; git rev-list --count @{u}..HEAD ; tail -5 /tmp/claude-1000/-workspace-hoa/<session>/scratchpad/push4.log"
+        },
+        {
+          "name": "Agent"
+        },
+        {
+          "name": "Agent"
+        },
+        {
+          "name": "TodoWrite"
+        },
+        {
+          "name": "Bash",
+          "command": "node scripts/batch-in-flight.mjs --waiting-on \"Fable-Reviews zu 474 und zur 462-Nachbesser … ; 475 wartet auf sein Review\" --branch feat/474-linux-launcher --worktree <repo>/.claude/wor … ; tail -1"
+        },
+        {
+          "name": "Bash",
+          "command": "node scripts/batch-in-flight.mjs --waiting-on \"Fable-Reviews zu 474 und zur 462-Nachbesser … ; 475 wartet auf sein Review\" --branch feat/462-request-carrier --worktree <repo>/.claude/wo … ; tail -1"
+        },
+        {
+          "name": "Bash",
+          "command": "node scripts/batch-in-flight.mjs --waiting-on \"Fable-Reviews zu 474 und zur 462-Nachbesser … ; 475 wartet auf sein Review\" --log /tmp/claude-1000/-workspace-hoa/<session>/tasks/ab53cde5 … ; tail -1"
+        }
+      ]
+    },
+    {
+      "family": "delegated-wait",
+      "expect": "allow",
+      "source": "73d9db78",
+      "at": "2026-08-03T14:40:29.413Z",
+      "calls": [
+        {
+          "name": "Bash",
+          "command": "node scripts/focus.mjs set 474 \"474-Funde behoben ; Re-Review und 475-Review anstossen\" 2>&1 ; tail -1 ; printf '%s' 'Die zwei Schwächen am Linux-Starter sind behoben: Der Anspruch auf den Eintra … ; Die Testschicht ist auf diesem Zweig vollständig grün, samt eines Tests, der sechs echte P … ; Jetzt liest das zweite Modell den geänderten Stand noch einmal gegen ; parallel bekommt der Browser-Zweig sein Review.' ; node scripts/board.mjs status 474 --text-stdin 2>&1 ; tail -1 ; node scripts/board-publish.mjs 2>&1 ; tail -1 ; node scripts/dashboard-guard.mjs --synced .batch-dashboard.html 2>&1 ; tail -1"
+        },
+        {
+          "name": "Bash",
+          "command": "node scripts/worktree-cleanup.mjs <repo>/.claude/worktrees/agent-a15ac5c3c5950a1dc 2>&1 ; tail -2 ; git fetch -q origin 2>&1 ; tail -1 ; git branch -f feat/474-linux-launcher origin/feat/474-linux-launcher 2>&1 ; tail -1 ; git log --format='%h %s' -1 feat/474-linux-launcher"
+        },
+        {
+          "name": "Agent"
+        },
+        {
+          "name": "Agent"
+        },
+        {
+          "name": "Bash",
+          "command": "node scripts/board.mjs attest 2>&1 ; tail -1 ; node scripts/batch-in-flight.mjs --waiting-on \"Fable prueft den nachgebesserten Linux-Star … ; tail -1"
+        }
+      ]
+    },
+    {
+      "family": "delegated-wait",
+      "expect": "allow",
+      "source": "73d9db78",
+      "at": "2026-08-03T16:15:41.864Z",
+      "calls": [
+        {
+          "name": "Bash",
+          "command": "node scripts/focus.mjs set 475 \"475-Nachbesserung liegt vor ; Re-Review anstossen\" 2>&1 ; tail -1 ; printf '%s' 'Der Bring-up meldete einen Browser als vorhanden, den die Prüfung gar nicht s … ; Dazu ein Test in einem eigenen Prozess, der beweist, dass eine nicht verfügbare Grafik-Sch … ; er schlägt fehl, sobald man die Reihenfolge vertauscht. ; Das zweite Modell liest den geänderten Stand jetzt gegen.' ; node scripts/board.mjs status 475 --text-stdin 2>&1 ; tail -1 ; node scripts/board-publish.mjs 2>&1 ; tail -1 ; node scripts/dashboard-guard.mjs --synced .batch-dashboard.html 2>&1 ; tail -1"
+        },
+        {
+          "name": "Bash",
+          "command": "node scripts/worktree-cleanup.mjs <repo>/.claude/worktrees/agent-ac9566982db6ed6be 2>&1 ; tail -1 ; git fetch -q origin ; git branch -f feat/475-browser-bringup origin/feat/475-browser-bringup 2>&1 ; tail -1 ; git log --format='%h %s' -1 feat/475-browser-bringup ; git branch --show-current"
+        },
+        {
+          "name": "Agent"
+        },
+        {
+          "name": "Bash",
+          "command": "node scripts/board.mjs attest 2>&1 ; tail -1 ; node scripts/batch-in-flight.mjs --waiting-on \"Fable prueft die 475-Nachbesserung\" --log / … ; tail -1"
+        }
+      ]
+    },
+    {
+      "family": "claimed-wait-dishonoured",
+      "expect": "block",
+      "source": "c6987804",
+      "at": "2026-08-07T10:15:57.647Z",
+      "calls": [
+        {
+          "name": "Bash",
+          "command": "git status --short ; echo \"--- branch ---\" ; git branch --show-current ; echo \"--- merge in progress? ---\" ; ls -1 .git/MERGE_HEAD 2>/dev/null ; echo \"no merge in progress\""
+        },
+        {
+          "name": "Bash",
+          "command": "node scripts/focus.mjs show 2>&1 ; head -50"
+        },
+        {
+          "name": "Bash",
+          "command": "node scripts/batch-in-flight.mjs --status 2>&1 ; head -30 ; echo \"=== agents ===\" ; ls -1 .claude/ 2>/dev/null ; head -40"
+        },
+        {
+          "name": "Bash",
+          "command": "node scripts/point-brief.mjs 174 2>&1 ; head -80"
+        },
+        {
+          "name": "Bash",
+          "command": "node scripts/board.mjs --help 2>&1 ; head -40"
+        },
+        {
+          "name": "Bash",
+          "command": "grep -n '^\\- \\[ \\]\\ ; ^## ' TASKS.md ; head -60"
+        },
+        {
+          "name": "Bash",
+          "command": "node -e \"const q=require('./.claude/board-queue.json') ; console.log(JSON.stringify(q).slice(0,3000))\" 2>&1 ; head -20"
+        },
+        {
+          "name": "Bash",
+          "command": "grep -n 'Warteschlange\\ ; <h2\\ ; <section' .batch-dashboard.html ; head -30"
+        },
+        {
+          "name": "Bash",
+          "command": "node -e \" ; const fs=require('fs') ; const t=fs.readFileSync('TASKS.md','utf8') ; const open=new Set([...t.matchAll(/^- \\[ \\] (\\d+)\\./gm)].map(m=>+m[1])) ; const q=JSON.parse(fs.readFileSync('.claude/board-queue.json','utf8')) ; const inQ=q.order.filter(p=>open.has(p)) ; console.log('open count',open.size) ; console.log('first 15 open in queue order:',inQ.slice(0,15).join(', ')) ; const missing=[...open].filter(p=>!q.order.includes(p)) ; console.log('open but not in queue:',missing.join(', ')) ; \""
+        },
+        {
+          "name": "Bash",
+          "command": "node -e \" ; const fs=require('fs') ; const t=fs.readFileSync('TASKS.md','utf8') ; for (const n of [373,309,432,438,330]) { ; const re=new RegExp('^- \\\\\\\\[ \\\\\\\\] '+n+'\\\\\\\\.[\\\\\\\\s\\\\\\\\S]*?(?=^- \\\\\\\\[[ x]\\\\\\\\] \\\\\\\\d+\\\\\\ … ; ^## )','m') ; const m=t.match(re) ; console.log('=========== '+n+' ===========') ; console.log(m? m[0].split('\\n').slice(0,14).join('\\n') : 'NOT FOUND') ; } ; \""
+        },
+        {
+          "name": "Bash",
+          "command": "git log --first-parent --format='%h %s' -30 main"
+        },
+        {
+          "name": "Bash",
+          "command": "sed -n '100,200p' .batch-dashboard.html"
+        },
+        {
+          "name": "Bash",
+          "command": "node -e \" ; const fs=require('fs') ; const t=fs.readFileSync('TASKS.md','utf8') ; const re=/^- \\[ \\] 309\\.[\\s\\S]*?(?=^- \\[[ x]\\] \\d+\\. ; ^## )/m ; console.log(t.match(re)[0]) ; \" ; tail -40"
+        },
+        {
+          "name": "Bash",
+          "command": "node scripts/guard-preflight.mjs --for answer --session <session> 2>&1 ; head -30"
+        },
+        {
+          "name": "Bash",
+          "command": "sed -n '1,60p' scripts/board.mjs"
+        },
+        {
+          "name": "Bash",
+          "command": "node -e \" ; const fs=require('fs') ; const t=fs.readFileSync('TASKS.md','utf8') ; const re=/^- \\[ \\] 373\\.[\\s\\S]*?(?=^- \\[[ x]\\] \\d+\\. ; ^## )/m ; console.log(t.match(re)[0]) ; \" ; tail -30"
+        },
+        {
+          "name": "Bash",
+          "command": "node scripts/board.mjs now 309 --text-stdin <<'EOF' ; Stand 12:20: Die Maschine ist ruhig — kein Agent baut mehr —, und genau darauf hat der let … ; Alles andere des Punktes steht seit Tagen auf main: die Rücknahme der degradierten Lieferu … ; EOF"
+        },
+        {
+          "name": "Bash",
+          "command": "node scripts/board.mjs focus 309 \"LARGE-Regression auf beiden Backends auf ruhiger Maschin … ; node scripts/board.mjs attest 2>&1 ; tail -20"
+        },
+        {
+          "name": "Bash",
+          "command": "npm test > /tmp/claude-1000/-workspace-hoa/<session>/scratchpad/large-309.log 2>&1 ; echo \"EXIT=$?\" >> /tmp/claude-1000/-workspace-hoa/<session>/scratchpad/large-309.log"
+        },
+        {
+          "name": "Bash",
+          "command": "node scripts/batch-in-flight.mjs --waiting-on \"LARGE-Regression (npm test, beide Backends) … ; parallele Agenten wuerden ihn als Last verfaelschen (309 wartet genau darauf).\" 2>&1 ; tail -5"
+        },
+        {
+          "name": "Bash",
+          "command": "sleep 120 ; tail -25 /tmp/claude-1000/-workspace-hoa/<session>/scratchpad/large-309.log"
+        },
+        {
+          "name": "ToolSearch"
+        },
+        {
+          "name": "Bash",
+          "command": "tail -20 /tmp/claude-1000/-workspace-hoa/<session>/scratchpad/large-309.log"
+        },
+        {
+          "name": "Bash",
+          "command": "node scripts/finding.mjs --list 2>&1 ; head -30"
+        },
+        {
+          "name": "Bash",
+          "command": "tail -12 /tmp/claude-1000/-workspace-hoa/<session>/scratchpad/large-309.log"
+        },
+        {
+          "name": "Bash",
+          "command": "node -e \" ; const fs=require('fs') ; const t=fs.readFileSync('TASKS.md','utf8') ; const re=/^- \\[ \\] 432\\.[\\s\\S]*?(?=^- \\[[ x]\\] \\d+\\. ; ^## )/m ; console.log(t.match(re)[0]) ; \" ; tail -25"
+        },
+        {
+          "name": "Bash",
+          "command": "until grep -qE 'FAIL ; EXIT= ; ===== LARGE regression — backend 2' /tmp/claude-1000/-workspace-hoa/<session>/scratchpad/l … ; do sleep 20 ; done ; tail -30 /tmp/claude-1000/-workspace-hoa/<session>/scratchpad/large-309.log"
+        },
+        {
+          "name": "Bash",
+          "command": "tail -14 /tmp/claude-1000/-workspace-hoa/<session>/scratchpad/large-309.log"
+        }
+      ]
+    },
+    {
+      "family": "unrecorded-investigation",
+      "expect": "block",
+      "source": "73d9db78",
+      "at": "2026-08-03T12:11:27.190Z",
+      "calls": [
+        {
+          "name": "Bash",
+          "command": "ls /mnt 2>/dev/null ; ls ~/.claude/projects/ 2>/dev/null ; head -3 ; echo \"=== gitignore ===\" ; grep -n \"secret\" .gitignore"
+        },
+        {
+          "name": "Bash",
+          "command": "sed -n '60,110p' scripts/ci-status-guard.mjs ; grep -n \"readToken\" -A 12"
+        },
+        {
+          "name": "Agent"
+        },
+        {
+          "name": "Bash",
+          "command": "printf '%s' 'Der Umzug nach Linux hat das Spiel selbst nicht beschädigt: 6034 Tests laufen … ; Zwei Lücken werden gerade geschlossen — der Starter für neue Sitzungen (unter Windows eine … ; Dazu bekommt der liegengebliebene Zweig vom 31.07. seine Nachbesserung: Das zweite Modell  … ; node scripts/board.mjs status 474 --text-stdin 2>&1 ; tail -1 ; node scripts/focus.mjs confirm 2>&1 ; tail -1 ; node scripts/board-publish.mjs 2>&1 ; tail -1 ; node scripts/dashboard-guard.mjs --synced .batch-dashboard.html 2>&1 ; tail -1 ; node scripts/board.mjs attest 2>&1 ; tail -1"
+        },
+        {
+          "name": "Agent"
+        },
+        {
+          "name": "TodoWrite"
+        }
+      ]
+    },
+    {
+      "family": "unrecorded-investigation",
+      "expect": "block",
+      "source": "22d80981",
+      "at": "2026-08-04T09:59:15.399Z",
+      "calls": [
+        {
+          "name": "Agent"
+        },
+        {
+          "name": "Bash",
+          "command": "printf '%s' 'Gebaut und auf seinem Zweig: Der Wächter liest die ausgehende Antwort und blo … ; Jetzt in der Gegenprüfung durch das zweite Modell ; danach verdrahte ich ihn scharf.' ; node scripts/board.mjs now 494 --text-stdin >/dev/null 2>&1 ; node scripts/focus.mjs set 494 \"Container-Aufforderungs-Wächter: Vier-Augen-Prüfung, dann  … ; tail -1 ; node scripts/board-publish.mjs 2>&1 ; grep -E \"PUBLISHED ; REFUSED\" ; tail -1 ; node scripts/dashboard-guard.mjs --synced .batch-dashboard.html 2>&1 ; tail -1"
+        },
+        {
+          "name": "Agent"
+        },
+        {
+          "name": "Bash",
+          "command": "grep -c \"NOPASSWD: ALL\" /workspace/.devcontainer/Dockerfile ; grep -c \"mesa-vulkan-drivers\" /workspace/.devcontainer/Dockerfile ; grep -c \"playwright@latest install chromium\" /workspace/.devcontainer/Dockerfile ; grep -c \"deb.debian.org\" /workspace/.devcontainer/init-firewall.sh ; ls -l /workspace/.devcontainer/Dockerfile ; awk '{print $6,$7,$8}'"
+        },
+        {
+          "name": "SendMessage"
+        }
+      ]
+    },
+    {
+      "family": "unrecorded-investigation",
+      "expect": "block",
+      "source": "45289138",
+      "at": "2026-08-05T04:03:38.875Z",
+      "calls": [
+        {
+          "name": "Bash",
+          "command": "grep -rniE \"swiftshader ; lavapipe ; llvmpipe ; software.?(adapter ; renderer ; rasteriz) ; warp\" --include=*.md --include=*.mjs --include=*.json --include=*.ts -l . --exclude-dir=no … ; head -40"
+        },
+        {
+          "name": "Bash",
+          "command": "git log --oneline -25"
+        },
+        {
+          "name": "Bash",
+          "command": "grep -rn \"software\" TASKS.md ; head -30"
+        },
+        {
+          "name": "Bash",
+          "command": "git show --stat a7f15f53 ; head -20"
+        },
+        {
+          "name": "Bash",
+          "command": "sed -n '4480,4545p' TASKS.md"
+        },
+        {
+          "name": "Bash",
+          "command": "grep -n \"Hardware WebGPU is the open item\" -A 40 docs/host-environment.md ; head -60"
+        },
+        {
+          "name": "Bash",
+          "command": "node scripts/board.mjs --status 2>/dev/null ; head -40 ; cat .claude/dashboard-state.json 2>/dev/null ; head -40"
+        },
+        {
+          "name": "Bash",
+          "command": "git branch -a --sort=-committerdate ; head -15 ; echo --- ; ls .claude/worktrees/ 2>/dev/null"
+        }
+      ]
+    }
+  ]
+}

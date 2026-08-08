@@ -1225,6 +1225,68 @@ the next point that closes — merge, tick, run `node scripts/batch-boundary.mjs
 the batch to be stopped for the observation; the chain is exactly the ordinary
 path through a point boundary.
 
+## A finding must outlive the session that made it (29.07.2026, point 432)
+
+Ending a session cleanly is the section above. This one is about what the session
+KNEW. In one evening a window found three defects — the project hooks that cannot
+fire outside the repo root, a bundling scheme covering 53 of 91 open points, and
+point 409 repeating within 24 hours — and all three lived in the chat until the
+user asked, twice, whether they were being kept. The cause is structural: a
+session that does not own the batch lock may not write `TASKS.md` at all, so the
+state in which a finding is MOST likely is the state with no durable path.
+
+The carrier therefore lives in the MEMORY directory, which every session may
+write, and the recording is deliberately cheap:
+
+    node scripts/finding.mjs --record "<title>" --detail "<…>" [--target <point|bundle>]
+    node scripts/finding.mjs --none "<reason>"      # the turn was deliberately empty
+    node scripts/finding.mjs --drain                # what still waits
+    node scripts/finding.mjs --drained "<title>"    # it reached the work order
+
+`findings-guard` (pure core in `scripts/findings-core.mjs`, fail-open like every
+guard here) blocks on two conditions: a turn that INVESTIGATED and left nothing
+durable, and an OWNING session whose carrier is not empty — memory is transport,
+never the resting place. Investigation is COUNTED from the turn's tool calls,
+never inferred from meaning, and a shell call counts only when every one of its
+segments merely looks; a commit, a `TASKS.md` edit, a memory write, a `--record`
+or a `--none` all discharge it.
+
+**Calibration is replayable, not remembered.** A threshold is a claim about a
+corpus, so the cases it rests on are cut out of the real transcripts into
+`scripts/findings-fixtures.json` — one family per case, redacted to the three
+fields the decision reads, with home directories, user names and session ids
+folded away — and replayed by `scripts/findings-fixtures.test.mjs` on every unit
+run. `node scripts/findings-fixtures.mjs --measure` re-measures; `--cut` re-cuts.
+At the cut recorded in that file (809 turns, 56 sessions) the rule blocks 1.1 %
+of turns — an upper bound, since a historical turn has no in-flight file to prove
+a declared wait by — while a rule that counted every shell call as looking would
+block 5.6 %, and no answer-only turn blocks under either. The rate matters as
+much as the rule: a guard that fires on an ordinary turn trains the reader to
+skip it.
+
+**What the fixtures do and do not protect** (four-eyes finding, Fable 5). A
+family's EXPECTATION is written a priori, and membership is read structurally
+from the calls — the record, the agent, the declared wait — against a FROZEN copy
+of the threshold, so re-tuning the core makes family and verdict disagree and
+`--cut` refuses. What stays shared is the counting rule itself, so the honest
+statement is: the committed fixtures are frozen turns with frozen expectations,
+and a re-cut is reviewed as a DIFF. A re-tune plus a re-cut can still relabel a
+turn; what it cannot do is relabel one silently.
+
+**The Agent trigger stays (decided 08.08.2026).** Spawning an agent counts as
+investigation on its own, and the corpus review objected: 96 of 235 agent-spawning
+turns carried no record, which on a project built around maximal delegation reads
+as a `--none` per delegation turn. The objection predates the exemption that
+answers it. Of the current corpus's 73 agent-spawning turns, 42 leave a durable
+record anyway, 27 are carried by the DECLARED WAIT
+(`batch-in-flight.mjs --waiting-on`, honoured only when an agent really was
+spawned or the declaration file really was written this turn), and 4 block —
+turns that handed work out and neither recorded nor declared it. Softening the
+trigger would buy back those four and give up the only signal that catches a
+delegation nobody can find again, so it is left alone. The claimed-but-not-earned
+shape now has its own fixture family, so the distinction is pinned by a real turn
+rather than by constructed cases alone.
+
 ## The way back — claiming the batch into the window you are sitting at (28.07.2026, point 395)
 
 Everything above is a way OUT: a session ends and something else picks the batch

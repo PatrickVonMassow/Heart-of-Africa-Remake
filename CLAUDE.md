@@ -890,28 +890,29 @@ After completion and after every major system:
   suites, Stop hooks (authoritative list: `.claude/settings.json`) BLOCK a turn
   end while the working state contradicts a standing rule — "enforce, don't
   remind", each adopted after a reminder failed. **This paragraph names FAMILIES,
-  not guards** — the enumeration that stood here had drifted four wired guards
-  behind (rule-corpus review 30.07.2026). The families: the BOARD (published,
-  concise, one topic per card, consistent with the real state, and every decision
+  not guards**: the enumeration that stood here had drifted four wired guards
+  behind (30.07.2026). The families: the BOARD (published,
+  concise, one topic per card, consistent with the real state, every decision
   asked of the user standing as a card); the BATCH (no idle wait or idle stop,
   the §6 model allowlist — a named breach pauses, an unnamed author is looked
   up — a red CI, a branch already contained in `main`, the retrospective's
-  currency, the chat timestamp); the WORK ORDER (queue order, final-state-only specs, the
-  open/archived split, and the measured doc ceilings in
-  `scripts/doc-budget-core.mjs`); and the PROOF (`render-verify-guard` for a
+  currency, the chat timestamp); the WORK ORDER (queue order, final-state-only specs,
+  the open/archived split, the measured doc ceilings in
+  `scripts/doc-budget-core.mjs`); the FINDING (a turn that investigated and left
+  nothing durable, and a carrier the owner has not drained); and the
+  PROOF (`render-verify-guard` for a
   render-set change on both backends where they can differ, and
   `mechanism-review-guard`, which lets no new or changed guard, gate or hook end
   a turn without the OTHER model's recorded review —
-  `scripts/mechanism-review.mjs --record`). Two are worth naming exactly:
+  `scripts/mechanism-review.mjs --record`). One is worth naming exactly:
   `ci-status-guard` watches EVERY ref the repository PUSHED, not just the
   session's HEAD (that blindness left 26 red runs on `main` unseen for three
-  weeks), and demands a run CONCLUDED green for that sha — an unfinished one
-  WAITS. Cheapness: the push reflog, a per-sha cache. The versioned
-  git hooks (`scripts/git-hooks/`, wired by `npm
+  weeks), and demands a run CONCLUDED green for that sha; an unfinished one
+  WAITS. Versioned git hooks (`scripts/git-hooks/`, wired by `npm
   install`) refuse a stray file, a trailer naming no model, a rescue commit that
   would mail the user, and a push CI would reject. Separately, PreToolUse hooks run `closing-guard` (§9),
   which denies a version tag until every closing step is recorded, and
-  `board-first-guard`, which fires BEFORE the work rather than at the turn end (the
+  `board-first-guard`, which fires BEFORE the work, not at the turn end (the
   Stop chain lets the board lag an hour): a turn's FIRST state-changing call is
   denied while no `focus set|confirm` postdates the turn stamp, the board is
   unpublished, or the OPEN-POINT SET changed without a publish since (`publishDue`)
@@ -919,10 +920,10 @@ After completion and after every major system:
   turn. It binds EVERY session (point 400): `scripts/board-publish.mjs` publishes
   from a SCRIPT, so the headless successor can too; the check reads that PAGE, and
   `batch-autostart.mjs` alerts when it is behind. It runs BACK too
-  (`scripts/chat-core.mjs`, `docs/batch-autonomy.md`): the launcher polls the chat
-  each tick and hands what VERIFIES on as untrusted input, never as authorization.
+  (`scripts/chat-core.mjs`): the launcher polls the chat each tick and hands what
+  VERIFIES on as untrusted input, not authorization.
   Every one is fail-OPEN (an internal error allows the stop, so a guard bug
-  cannot trap the session) with a pure, Vitest-covered decision core.
+  cannot trap the session) with a pure, Vitest-covered core.
 - **Ask the guards BEFORE the action, and answer LAST (points 365/403).** Before
   an action a guard governs, `node scripts/guard-preflight.mjs --for <action>
   --session <id>` reports read-only whether one would block — advisory; the guard
