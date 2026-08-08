@@ -222,21 +222,21 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   **nebeneinander**: Welche Fälle nennt der Satz, die das Muster nicht trifft? Zieh **den Code auf
   den Satz**, nie umgekehrt. Und jeden Wächter: je ausgelöst? möglich?" *(einmalig hoch)*
 
-- **Der rote Test klagt den Falschen an.** Er täuscht gefährlicher als ein grüner:
-  Prüfungen veralten von selbst und klagen gesunden Code an.
-  → *Prompt:* „Verlang auf einen roten Test hin erst ein **Experiment**: Belastet der Befund das Produkt oder die Messung? Gemessen wird
-  nur an einem eingeschwungenen Zustand, dessen Bereitschaft der gemessene **Gegenstand**
-  meldet — nie eine Uhr. Eine Prüfung schlägt auch dann fehl, wenn ihr Messwert in die
+- **Der rote Test klagt den Falschen an.** Prüfungen veralten; ein Rot täuscht
+  gefährlicher als ein Grün.
+  → *Prompt:* „Verlang auf ein Rot hin erst ein **Experiment**: Belastet es das Produkt oder die
+  Messung? Gemessen wird nur an einem eingeschwungenen Zustand, dessen Bereitschaft der
+  **Gegenstand** meldet — nie eine Uhr. Und schlag auch fehl, wenn der Messwert in die
   *unerwartete* Richtung ausschlägt."
 
-- **Derselbe Fakt steht an fünf Stellen — und veraltet an vier.** Wer baut, aktualisiert die
-  Stelle, an der er gerade schreibt; die übrigen Kopien rotten unbemerkt.
-  → *Prompt:* „Gib jedem Fakt genau **einen** verbindlichen Ort; alle anderen verweisen darauf. Wo sich eine Wiederholung nicht vermeiden lässt,
-  prüft ein Test sie gegen den **Code**, dem der Fakt gehört, nie gegen die Nachbarprosa.
-  Berührt eine Änderung das Design, aktualisiere Design-Doc und Code im **selben** Commit."
+- **Derselbe Fakt steht an fünf Stellen — und veraltet an vier.** Wer baut, pflegt die
+  Stelle, an der er schreibt; die übrigen Kopien rotten unbemerkt.
+  → *Prompt:* „Gib jedem Fakt genau **einen** verbindlichen Ort; alle anderen verweisen darauf.
+  Unvermeidbare Wiederholung prüft ein Test gegen den **Code**, dem der Fakt gehört, nie gegen
+  die Nachbarprosa. Berührt eine Änderung das Design, aktualisiere Doc und Code im **selben**
+  Commit."
 
-- **„Aufgeräumt" ohne Beweisliste.** Man räumt auf, wo man den Schaden vermutet,
-  und übersieht den Rest.
+- **„Aufgeräumt" ohne Beweisliste.** Man räumt dort auf, wo man den Schaden vermutet.
   → *Prompt:* „Erzwing nach jedem Zwischenfall eine **Beweisliste**: Liegt alles am Zielort? Gibt es Reste? Passen Dokumente und Code zusammen?"
 
 - **Der Autor sieht seine eigene Annahme nicht — und wer eine fertige Liste prüft, hakt sie ab.**
@@ -318,11 +318,12 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Führe eine Liste dessen, was das Projekt braucht und **nicht** im Repository
   liegt, und prüfe sie bei jedem Start gegen eine **Beobachtung**."
 
-- **Ein Alarm auf ein Ereignis ist blind, wenn das Ereignis ausbleibt.** Fällt die Quelle
-  selbst aus, meldet niemand etwas — und genau dann bräuchtest du ihn.
-  → *Prompt:* „Überwache den **Zustand** statt des Ereignisses: nicht ‚ist etwas rot
-  geworden?', sondern ‚stimmt das Ausgelieferte noch mit der Quelle überein?'. Ein Abgleich,
-  der aus einer Quelle schreibt, **ergänzt** nur."
+- **Der Alarm, der nie spricht.** Fällt die Quelle aus, meldet ein Alarm auf ein *Ereignis*
+  nichts; und ein Ersatzkanal, den du für scharf hältst, hat oft nie gefeuert. Wer anhalten
+  darf, addiert zudem auf — eine flackernde Leitung erreicht jede Schwelle, nur später.
+  → *Prompt:* „Überwache den **Zustand** statt des Ereignisses. Bevor du eine Meldung dämpfst,
+  **löse den verbleibenden Kanal einmal echt aus**. Und was den Betrieb anhalten darf,
+  wiederholt erst und eskaliert nur auf **aufeinanderfolgende** Fehlschläge."
 
 - **Eine Priorität, die nur in Prosa steht, wirkt nicht.** Sie landet getreu in der Aufgabenliste
   — aber die Reihenfolge, aus der gearbeitet wird, steht woanders, und die Nachfolge-Sitzung
@@ -403,4 +404,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 Diese eine Nachricht am Anfang baut 80 % der Lehren dieses Projekts ein, bevor die
 erste Zeile Code entsteht.
 
-<!-- GUIDE-FINGERPRINT: 3d0d443614599f877763b9f5a83a1d8ccb3d28a3fcdb36d16f36aeed3020bf7d -->
+<!-- GUIDE-FINGERPRINT: 63dbaa1457fb691f821021e1bf74095f8709ff054b0dfdd553b1fe735b3bb7ca -->
