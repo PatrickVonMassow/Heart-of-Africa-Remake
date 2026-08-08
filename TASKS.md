@@ -4514,3 +4514,27 @@ Build order, chosen so no two parallel agents own the same file:
   Criticality: low — process hygiene. A rule that formally binds every session while
   nobody follows it teaches that the rule corpus may be ignored, and that cost is
   charged to every other rule.
+
+- [ ] 560. THE ONLY ACTIVE CHANNEL FOR A RED BRANCH RUN IS NOT CONFIGURED (measured
+  08.08.2026 during the live proof of point 513; bundle Modell & Wächter). The CI
+  workflow has always carried an ntfy alert step for a failed run, and that step has
+  never fired: the probe run reported `NTFY_TOPIC secret not set — skipping the failure
+  alert`. While a red `feat/**` run still mailed the owner, the dead step cost nothing —
+  the mail was the signal. Point 513 deliberately removed that mail, and what remains for
+  a red branch run is the commit status: a PASSIVE mark somebody must go and look at. So
+  today a branch gate can fail and nothing at all leaves the repository.
+  FINAL STATE: a failed CI gate reaches the owner over ntfy on EVERY ref where it is not
+  the mail's job — that is, on `feat/**`, where 513 silenced the mail — and stays silent
+  where a green run makes it noise. The repository secret `NTFY_TOPIC` is set from the
+  topic the repository already uses (`.claude/ntfy-topic`, the same topic
+  `scripts/notify.mjs` posts to, so the owner's existing subscription receives it), and
+  the workflow step that reads it is confirmed to fire. Setting a repository SECRET is a
+  configuration change on the user's GitHub account, so it is done with his go, not
+  silently; if he declines, the point closes by RECORDING that a red branch run has no
+  active channel — never by leaving the doc claiming one.
+  VERIFIABLE: a deliberately red push to a throwaway `feat/` branch delivers an ntfy
+  message naming the ref and the failed step, and the same push on a green state delivers
+  none; `scripts/verify/README.md`'s notification section names the channel that actually
+  carries a branch failure.
+  Criticality: medium — it is the difference between a silent failure and a noticed one,
+  and it only became live with 513.
