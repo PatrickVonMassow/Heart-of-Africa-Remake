@@ -42,6 +42,7 @@ import {
   isOwnSpawn,
   renewLease,
   extendLease,
+  clearDeclaredWait,
   readFence,
   grantFence,
   readFenceNotice,
@@ -224,15 +225,19 @@ describe('assessOwner (liveness = heartbeat AND real pid, never age alone)', () 
     const until = NOW + 3 * 3600_000
     const declared = lock({ claimedAt: NOW - 90 * 60_000, leaseUntil: until, declaredWait: { at: NOW - 90 * 60_000, until } })
     // 90 minutes inside ONE blocking call — past the ordinary window, still owned.
-    expect(assessOwner(declared, { now: NOW, bootTime: BOOT, probe: aliveProbe, work: { advancing: true } })).toMatchObject({
-      alive: true,
-      reason: 'pid-alive',
-    })
+    expect(
+      assessOwner(declared, { now: NOW, bootTime: BOOT, probe: aliveProbe, work: { declared: true, advancing: true } }),
+    ).toMatchObject({ alive: true, reason: 'pid-alive' })
     // The evidence stops moving → the extension ends early, and the batch is takeable.
-    expect(assessOwner(declared, { now: NOW, bootTime: BOOT, probe: aliveProbe, work: { advancing: false } })).toMatchObject({
-      alive: false,
-      reason: 'declared-wait-stale',
-    })
+    expect(
+      assessOwner(declared, { now: NOW, bootTime: BOOT, probe: aliveProbe, work: { declared: true, advancing: false } }),
+    ).toMatchObject({ alive: false, reason: 'declared-wait-stale' })
+    // …but a wait that is simply OVER (declaration cleared or aged out) stops being
+    // conditional rather than turning against its owner: the session may now be
+    // inside a 40-minute regression, and taking the batch there is the bug again.
+    expect(
+      assessOwner(declared, { now: NOW, bootTime: BOOT, probe: aliveProbe, work: { declared: false, advancing: false } }),
+    ).toMatchObject({ alive: true, reason: 'pid-alive' })
   })
 
   it('a RENEWED lease keeps the owner through a call far longer than the heartbeat cadence', () => {
@@ -681,6 +686,17 @@ describe('renewLease / grantFence (the I/O half)', () => {
     expect(readOwnerLock(lockPath).sessionId).toBe('s1')
     // And past the declared window the arithmetic resumes: nothing is eternal.
     expect(acquire('s-launcher', opts({ now: t0 + DECLARED_WAIT_LEASE_MS + 60_000 }))).toBe('acquired')
+  })
+
+  it('POINT 556: clearing the wait drops the marker but never shortens the window', () => {
+    const t0 = Date.now()
+    acquire('s1', opts({ now: t0 }))
+    extendLease('s1', t0 + DECLARED_WAIT_LEASE_MS, { lockPath, declaredWait: true, now: t0 })
+    expect(clearDeclaredWait('s1', { lockPath })).toBe(true)
+    expect(lockOf().declaredWait).toBeUndefined()
+    expect(lockOf().leaseUntil).toBe(t0 + DECLARED_WAIT_LEASE_MS) // the lease is the owner's
+    expect(clearDeclaredWait('s1', { lockPath })).toBe(false) // idempotent
+    expect(clearDeclaredWait('s2', { lockPath })).toBe(false) // never a stranger
   })
 
   it('POINT 556: a real takeover RECORDS whom it dispossessed and why', () => {

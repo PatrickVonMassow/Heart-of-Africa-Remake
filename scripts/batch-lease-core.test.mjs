@@ -475,13 +475,25 @@ describe('the declared wait — how a call blocking for HOURS renews (point 556)
     const lock = declared(T0, T0 + DECLARED_WAIT_LEASE_MS)
     const beyondOrdinary = T0 + LEASE_MS + at(30)
     expect(inDeclaredWaitWindow(lock, { now: beyondOrdinary })).toBe(true)
-    expect(declaredWaitStale(lock, { now: beyondOrdinary, workAdvancing: true })).toBe(false)
-    expect(declaredWaitStale(lock, { now: beyondOrdinary, workAdvancing: false })).toBe(true)
+    expect(declaredWaitStale(lock, { now: beyondOrdinary, workDeclared: true, workAdvancing: true })).toBe(false)
+    expect(declaredWaitStale(lock, { now: beyondOrdinary, workDeclared: true, workAdvancing: false })).toBe(true)
     // A reader WITHOUT the evidence never ends it — only the launcher has it.
-    expect(declaredWaitStale(lock, { now: beyondOrdinary })).toBe(false)
+    expect(declaredWaitStale(lock, { now: beyondOrdinary, workDeclared: true })).toBe(false)
     // Inside the stretch an ordinary lease would have covered anyway, there is
     // nothing conditional to end.
-    expect(declaredWaitStale(lock, { now: T0 + at(30), workAdvancing: false })).toBe(false)
+    expect(declaredWaitStale(lock, { now: T0 + at(30), workDeclared: true, workAdvancing: false })).toBe(false)
+  })
+
+  it('a wait that is OVER stops being conditional — the trap this clause avoids', () => {
+    // Without the `workDeclared` requirement this function reintroduces point
+    // 556's own bug one step later: the agent finishes, the session starts a
+    // 40-minute regression inside ONE call, its lease is still the four-hour
+    // extension so no renewal is due, and with no declaration left the work reads
+    // "not advancing" — the launcher would take the batch mid-regression.
+    const lock = declared(T0, T0 + DECLARED_WAIT_LEASE_MS)
+    const beyondOrdinary = T0 + LEASE_MS + at(30)
+    expect(declaredWaitStale(lock, { now: beyondOrdinary, workDeclared: false, workAdvancing: false })).toBe(false)
+    expect(leaseExpired(lock, { now: beyondOrdinary })).toBe(false)
   })
 
   it('is total on a lock with no extension, junk or none at all', () => {

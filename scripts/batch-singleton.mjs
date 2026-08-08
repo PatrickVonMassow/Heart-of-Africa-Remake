@@ -263,7 +263,8 @@ export function assessOwner(lock, { now, bootTime, probe, work, leaseMs = LEASE_
   // owner its batch on 08.08.2026, so the widening is deliberate and narrow.
   // Nothing is killed here or anywhere else.
   const expired = leaseExpired(lock, { now, leaseMs })
-  const waitDied = !expired && declaredWaitStale(lock, { now, leaseMs, workAdvancing: work?.advancing })
+  const waitDied =
+    !expired && declaredWaitStale(lock, { now, leaseMs, workAdvancing: work?.advancing, workDeclared: work?.declared })
   if (expired || waitDied) {
     const corroboration = pidCorroboration(lock, probe)
     const verdict = leaseTakeoverDecision({
@@ -1181,6 +1182,24 @@ export function extendLease(sessionId, untilMs, opts = {}) {
     if (untilMs <= current) return false
     const next = { ...lock, leaseUntil: untilMs }
     if (opts.declaredWait === true) next.declaredWait = { at: opts.now ?? Date.now(), until: untilMs }
+    writeJsonAtomic(lockPath, next, opts)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** Drop the `declaredWait` marker a finished wait left on the lock (point 556).
+ *  Owner-guarded; the lease itself is untouched, because shortening a window the
+ *  owner is entitled to is the failure this point exists to end. Returns whether
+ *  anything was written. */
+export function clearDeclaredWait(sessionId, opts = {}) {
+  try {
+    const lockPath = opts.lockPath ?? LOCK_PATH
+    const lock = readOwnerLock(lockPath)
+    if (!lock || lock.sessionId !== sessionId || lock.declaredWait === undefined) return false
+    const next = { ...lock }
+    delete next.declaredWait
     writeJsonAtomic(lockPath, next, opts)
     return true
   } catch {

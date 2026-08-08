@@ -186,7 +186,13 @@ Two changes, both in the pure core:
   however often it fires, and the case at issue is a call that never completes. The
   extension records itself on the lock (`declaredWait: { at, until }`) so
   `declaredWaitStale` can end it early when the declaration's own evidence stops
-  advancing — the window is bought in advance, not granted unconditionally.
+  advancing — the window is bought in advance, not granted unconditionally. That
+  early end requires a declaration STILL ON FILE, and the clause is load-bearing:
+  without it the same bug returns one step later, when a session whose agent has
+  finished starts a 40-minute regression inside one call, has no renewal to write
+  (its lease is still the extension) and no declaration left to advance. A wait
+  that is over simply stops being conditional; `--clear` drops the marker and
+  deliberately leaves the lease where it stands.
 
 **And the dispossessed owner is TOLD.** A takeover writes `lastTakeover:
 { from, reason }` into the fence file, and the PostToolUse hook injects

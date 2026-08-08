@@ -300,9 +300,21 @@ export function leaseTakeoverDecision({
  * hours of paperwork hold a batch nobody is driving. A reader WITHOUT the evidence
  * (`workAdvancing` undefined) never ends it — being wrong toward "the owner keeps
  * it" costs a delayed recovery, being wrong the other way costs the incident.
+ *
+ * IT NEEDS A DECLARATION STILL ON FILE (`workDeclared`), and that clause is not a
+ * detail — without it this function reintroduces the very bug point 556 fixes, one
+ * step later. Consider a session that declares a wait, sees its agent finish, and
+ * then starts a 40-minute regression inside one call: its lease is still the
+ * four-hour extension, so the PreToolUse renewal has nothing to write, and with no
+ * declaration left `workAdvancing` is false — the launcher would take the batch
+ * mid-regression on the strength of a wait that was over. So a wait that is over
+ * simply stops being conditional; what bounds the owner from there is the ordinary
+ * arithmetic, and being over-generous by the remainder of one declared window is
+ * the direction this whole point argues for.
  */
-export function declaredWaitStale(lock, { now, leaseMs = LEASE_MS, workAdvancing } = {}) {
+export function declaredWaitStale(lock, { now, leaseMs = LEASE_MS, workAdvancing, workDeclared } = {}) {
   if (workAdvancing === undefined || workAdvancing === null) return false
+  if (workDeclared !== true) return false
   if (!inDeclaredWaitWindow(lock, { now, leaseMs })) return false
   return workAdvancing !== true
 }

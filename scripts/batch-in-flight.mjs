@@ -34,6 +34,7 @@ import {
   ourClaudeProcess,
   statePathsFor,
   extendLease,
+  clearDeclaredWait,
   LOCK_PATH,
   IN_FLIGHT_PATH,
 } from './batch-singleton.mjs'
@@ -521,6 +522,12 @@ if (isMain) {
     process.exit(1)
   } else if (argv[0] === '--clear') {
     clearDeclaration()
+    // …and the lease extension the declaration bought (point 556). The lock must
+    // not go on carrying a `declaredWait` whose declaration is gone: the marker is
+    // what makes the window conditional, and a conditional window with nothing left
+    // to condition it on is just a stale field. The lease ITSELF is left where it
+    // stands — pulling it back would shorten a window the owner is entitled to.
+    clearDeclaredWait(sid)
     console.log('in-flight declaration cleared — the ordinary "do not stop the batch" rule applies again.')
   } else if (argv[0] === '--status' || argv.length === 0) {
     const g = gatherInFlight(sid)
