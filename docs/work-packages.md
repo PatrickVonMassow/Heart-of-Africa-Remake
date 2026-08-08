@@ -87,7 +87,7 @@ the one the user reads (memory `bundle-names`, retrospective §3.66).
 | **Tierverhalten** | F | Animal behaviour | 264, 265, 269, 312, 362, 363, 364, 414 |
 | **Kadaver & Geier** | G | Carrion, vultures, staging | 319, 322, 326, 327, 328, 336, 453 |
 | **Chat & Tafel** | H | Chat and board | 440, 451, 465, 467, 473, 539 — the rest landed 30.07.2026 (308, 410, 411, 416, 421, 423, 424, 430, 435, 436, 441, 439, 452, 472, 470) |
-| **Session- & Repo-Hygiene** | I | Session, pool and repo hygiene | 373, 401, 434, 461, 462, 463, 471 — the rest landed 30.07.2026 (329, 396, 399, 409, 426, 427, 429, 431, 433, 458) |
+| **Session- & Repo-Hygiene** | I | Session, pool and repo hygiene | 401, 434, 461, 462, 463, 471, 553 (553 is 373's measured successor lever) — the rest landed 30.07.2026 (329, 396, 399, 409, 426, 427, 429, 431, 433, 458) and 08.08.2026 (373) |
 | **Modell & Wächter** | J | Model and guard chain | 309, 355, 397, 425, 432, 437, 438, 457, 468, 534, 535, 536, 537, 538, 540 (534–538 are the audit findings of point 297 — worked BEFORE the rest of the bundle, because they decide what the four-eyes gate and the review schedule see at all) |
 | **Testinfrastruktur** | K | Test and verification infrastructure | 295, 330, 387, 418, 455, 456, 460, 464, 466, 532 |
 | **Dokumentation** | L | Docs and knowledge transfer | 303, 333, 422 — the rest landed 30.07.2026 (459) |

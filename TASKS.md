@@ -2324,95 +2324,6 @@ there exactly once; a new point joins a bundle when appended.
   DOCS: design.md §19.8 + §21.2 already state it; balance comments and the
   acceptance-evidence line under §12.
 
-- [ ] 373. THE SESSION BOUNDARY BECOMES AUTONOMOUS (user 27.07.2026: "implement it the
-  way you recommend", against the plan to run the batch 24/7). Measured: 80 % of the
-  token spend sits above 150k context, because one session carries point after point.
-  At 24/7 that is the dominant cost — 1.25 %/h of the weekly quota, which is 210 % of it
-  over a full week, where 0.6 %/h is the ceiling that fits.
-  THE MECHANISM IS THE ONE THAT EXISTS: the batch session ENDS at a point boundary and
-  the OS task `HoA-Batch-Autostart` brings up a fresh one, which `batch-resume-hook`
-  re-orients from TASKS.md and the batch state. Nothing new is built; what changes is
-  that the launcher is armed again.
-  WHY THAT IS NOW SAFE, and it is the whole question — the task was disabled after the
-  e9407cae double-session incident. Since then the hard singleton was built AND is
-  verified live (27.07.2026): with this session holding the lock, `node
-  scripts/batch-autostart.mjs` answered `skip: owner alive (fresh-heartbeat, heartbeat
-  0 min old, pid 18492)` and spawned nothing. The launcher wins a `pending-spawn` lock
-  before spawning, a losing session stands down through `heldByOtherLiveOwner`, the
-  detector runs at every turn end AND every launcher tick, and `batch-doctor` remediates
-  a damaged repo. The alternative — a live session spawning its own successor —
-  GUARANTEES a window with two live sessions and is therefore rejected.
-  THE ONE STEP THE ASSISTANT CANNOT DO: enabling the OS task is a system change the
-  harness blocks. The user runs it once, in an elevated PowerShell:
-  `Enable-ScheduledTask -TaskName 'HoA-Batch-Autostart'`. Until then the boundary stays
-  attended (ask for `/clear`), and this point stays open.
-  THEN, AND ONLY THEN, the loop changes: after a point is merged and ticked, the session
-  ends deliberately instead of pulling the next point into the same context. That end is
-  NOT an idle stop — `batch-progress-guard` must learn the difference, or it will block
-  exactly the behaviour this point wants. Extend it: ending is legal when the current
-  point is CLOSED and the launcher is armed; it stays illegal otherwise.
-  VERIFIABLE: pure Vitest on the guard's core — a boundary stop with a closed point and
-  an armed launcher ALLOWS, the same stop with work still open BLOCKS, and an unarmed
-  launcher BLOCKS (so a disabled task can never strand the batch). Live: after the first
-  autonomous boundary, `.claude/autostart.log` shows the spawn and the new session's
-  first turn picks the next point.
-  MEASURE THE RESULT: report the %/h rate for the first full day after the change
-  against today's 1.25 %/h. The point counts as delivered when the rate is measured, not
-  when the mechanism runs.
-  MEASURED 30.07.2026, AND THE CRITERION IS NOT MET — the honest outcome, reported rather
-  than rounded. Per session the boundary works: median peak context 650k → 284k, p90
-  1000k → 590k. Per ACTIVE HOUR the spend fell only 11 %, from 1.25 to 1.11 %/h against
-  the 0.6 %/h that fits. The reason is in the same figures: 89 % of the spend still comes
-  from turns above 150k, so halving the PEAK barely moves a bill dominated by everything
-  under it. Recomputable with `node scripts/measure-context-cost.mjs`.
-  WHY THE FIRST LEVER WAS NOT ENOUGH: the point boundary cuts BETWEEN sessions, and the
-  bill is dominated by everything under the peak. The next levers had to cut INSIDE one.
-  (d) AND (e) ARE BUILT (07.08.2026); what keeps this point open is the MEASUREMENT below.
-  (d) THE HARNESS PRIMITIVES, EVALUATED AGAINST OUR HAND-BUILT LAYER — the user's question
-  of 30.07.2026, whether an established mechanism for token-frugal parallel batch work
-  exists rather than a reinvented one. The answer is `docs/harness-primitives-evaluation.md`:
-  eight layers, a verdict and a reason each. Two of its findings rest on PROBES rather than
-  on assumption, which is why they are recorded here — the Workflow tool is NOT exposed in
-  this environment, so its BUDGET primitive and its run-resume cannot be adopted at all; and
-  an agent launched with remote isolation RAN LOCALLY, so remote execution is unavailable
-  here and DEGRADES SILENTLY instead of failing. What no primitive replaces, and why our
-  layer exists: the singleton across OS-started sessions, the work-order and guard
-  discipline, the board, the repo doctor and the chat channel — policy, not orchestration.
-  (e) THE BOUNDARY DID NOT REACH INSIDE A HEAVY POINT — `batch-boundary.mjs` fires at POINT
-  boundaries only, while within one heavy point (long verification runs, a merge fought out
-  over many turns) the context grew unchecked. The counter-measure built is not a
-  compaction: `scripts/verify/run-logged.mjs` wraps the runner, writes the whole run to disk
-  and hands the caller a BOUNDED DIGEST; `npm test`, `test:small` and `test:large` route
-  through it (`test:e2e` stays unwrapped). Measured on a real RED run: 476 lines / 30542
-  characters of raw transcript became 66 lines / 3782 characters, of which only 15 arrive
-  while the run is in flight, and every failing test is still named. Rejected with it, and
-  recorded so it is not proposed again: "clear the context and re-read the work order" is a
-  WORSENING here — `TASKS.md` is ~310k characters while `batch-resume-hook.mjs` re-orients a
-  fresh session for about 600.
-  WHAT REMAINS: the %/h figure for a full day under the built levers, against the 1.11 %/h
-  measured on 30.07.2026 and the 0.6 %/h that fits. If it still misses, pick the next lever
-  BY MEASUREMENT from (a) a boundary at a bundle MEMBER rather than at the bundle, (b)
-  delegating the reading-heavy part of a point so the parent never carries the files at all
-  (the brief does this for specs, not for source), or (c) an explicit context budget per
-  point after which the session hands over mid-point with a written handoff.
-  THE MEASURING TOOL FINDS ITS OWN TRANSCRIPTS (BUILT 07.08.2026). `measure-context-cost.mjs`
-  derives its source directory from the repo path over a candidate list instead of a
-  hard-coded host slug, and FAILS LOUD when none of the candidates holds a transcript — the
-  silent miss it used to report as `0 turns` and `n/a` for every figure, exiting 0, read as a
-  measurement rather than as a miss. `.claude/boundary.log` resolves the same way, so the tool
-  also runs from a worktree. A pure resolver carries both, swept by Vitest: a candidate list
-  where one directory holds transcripts resolves to it, none holding any throws.
-  THE SCOPE OF THE COUNT IS STILL TOP-LEVEL ONLY, and that must be settled before the closing
-  measurement. `readTurns` reads a folder's top-level `*.jsonl`; on the container host 47 of
-  164 transcripts are top-level and the rest are DELEGATED-AGENT transcripts under
-  `<session>/subagents/`. Their spend bills against the same quota, so today's figure is a
-  FLOOR, not the rate. The measurement therefore reports BOTH scopes side by side — top-level
-  only, which stays comparable with the 30.07.2026 anchor, and the full count including
-  subagents, which is the honest total — and the point's verdict is read off the full count.
-  VERIFIABLE: `node scripts/measure-context-cost.mjs` reports the rate for a full day after
-  07.08.2026 from whichever host the batch ran on, in both scopes; the point closes on that
-  figure, not on the mechanisms running.
-
 - [ ] 379. ABU SIMBEL BECOMES A WALKABLE SITE (user 27.07.2026; a FEATURE, and the user's
   own instruction is that the open DEFECTS come first — it waits behind them). The world carries
   eight built cultural landmarks (Meroë, Giza, Great Zimbabwe, Lalibela, Kilwa, Aksum,
@@ -4430,3 +4341,52 @@ Build order, chosen so no two parallel agents own the same file:
   Criticality: low-medium — the gate's decision was right every time, so nothing unsafe
   landed. What it cost is trust and turns: a guard whose stated reason does not survive
   a check is one the next reader starts arguing with instead of obeying.
+
+- [ ] 553. AN EXPLICIT CONTEXT BUDGET PER POINT, AND A WRITTEN HANDOFF WHEN IT IS SPENT
+  (08.08.2026, chosen BY MEASUREMENT as point 373 requires — the closing measurement is
+  recorded in `docs/batch-autonomy.md`, "The closing measurement under the built levers").
+  THE STATE THE MEASUREMENT LEAVES: under the boundary and the bounded verify digest the
+  rate is 0.988 %/h in the honest full scope (1.091 %/h top-level only), against the
+  ~0.6 %/h that fits the weekly quota — about 1.6× the ceiling, so a further lever is owed.
+  WHY THIS LEVER AND NOT THE OTHERS, from the same figures: 62 % of the counted turns and
+  58 % of the weighted spend come from DELEGATED-AGENT transcripts, so option (b) — moving
+  the reading-heavy part of a point into an agent — only RELOCATES the cost unless the
+  agent's own context is bounded too, and option (a), a boundary at a bundle member, cuts
+  where the bundle scheme no longer claims a saving (`docs/work-packages.md`). Option (c)
+  cuts inside both, which is why it is the one built here.
+  WHAT IS BUILT: a context budget that is MEASURED, not estimated, and that applies to the
+  main session AND to a delegated agent.
+  (a) THE BUDGET IS READ FROM THE SAME PLACE THE MEASUREMENT IS — the turn's context size,
+  derived by the pure core `scripts/measure-context-cost-core.mjs` already uses, so a
+  second accounting is never invented. A calibratable ceiling per point sits with the other
+  batch constants, and the shipped starting value is justified against the measured
+  distribution (median peak 153k, p90 307k in the full scope), not guessed.
+  (b) THE HANDOFF IS WRITTEN, NOT IMPLIED. On crossing the ceiling mid-point the session
+  writes a handoff — what the point is, what is done, what the next session must do first,
+  the branch and the last commit — through a command (`scripts/point-handoff.mjs`) that
+  owns the file's shape, and ENDS. `batch-resume-hook` hands the successor that handoff the
+  way it hands a fresh session the work order, so the successor resumes the POINT rather
+  than re-deriving it. A handoff that names no branch or no next action is refused at the
+  writing, not discovered at the reading.
+  (c) A DELEGATED AGENT OBEYS THE SAME CEILING. Its brief carries the budget, and an agent
+  that spends it returns its handoff as its report instead of building on; the parent
+  re-delegates from that handoff. An agent silently continuing past the ceiling is the case
+  that makes the whole lever cosmetic, so the parent CHECKS the returned report against the
+  agent's own transcript size rather than trusting the claim.
+  (d) `batch-progress-guard` LEARNS THE THIRD LEGAL STOP. Ending is already legal at a
+  closed point with an armed launcher; a spent budget with a written handoff and an armed
+  launcher joins it. Every other stop stays illegal, so the guard can never be talked into
+  an idle stop by writing a handoff for work that was never started.
+  MEASURE THE RESULT, as 373 did and on the same tool: `node scripts/measure-context-cost.mjs`
+  for a full day after the lever lands, in BOTH scopes, against the 0.988 %/h this point
+  starts from and the 0.6 %/h that fits. The point counts as delivered when the rate is
+  measured and reported honestly — met or not — never when the mechanism merely runs.
+  VERIFIABLE: pure Vitest on the decision core — a session under the ceiling continues; one
+  over it with a written handoff and an armed launcher may stop; one over it with NO handoff
+  blocks; a handoff missing its branch or its next action is refused; an unreadable
+  transcript ALLOWS the stop (fail-open, as every guard here). Live: one point actually
+  handed over mid-way and finished by the successor from the handoff alone.
+  MECHANISM REVIEW REQUIRED (CLAUDE.md §7.2): this changes a guard.
+  Criticality: high — this is the batch's dominant running cost, and a lever that reports
+  a saving it did not make is worse than none: it retires the question. The measurement is
+  therefore part of the delivery, not a follow-up.
