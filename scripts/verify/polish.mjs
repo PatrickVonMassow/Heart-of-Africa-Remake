@@ -623,6 +623,7 @@ const stepUntil = async (ready, arg = null, capFrames = 240) => {
   }
   let speaker = null
   let speakerIndex = -1
+  let speakerBack = STAND_BACKS[0]
   const probes = []
   for (let i = 0; i < candidates.length && speakerIndex < 0; i++) {
     for (const back of STAND_BACKS) {
@@ -630,9 +631,11 @@ const stepUntil = async (ready, arg = null, capFrames = 240) => {
       probes.push(hit ? `${hit.ratio == null ? 'sky' : hit.ratio.toFixed(2)}@${hit.name}` : 'none')
       if (hit && hit.ratio !== null && hit.ratio >= 0.85 && hit.ratio <= 1.15) {
         // The pose that VALIDATED it is the pose the block goes on to measure
-        // from, so the accepting aim is deliberately the last one performed.
+        // from, so the accepting aim is deliberately the last one performed —
+        // and the range it was validated at is the one the shutter re-aims with.
         speaker = candidates[i]
         speakerIndex = i
+        speakerBack = back
         break
       }
     }
@@ -756,7 +759,7 @@ const stepUntil = async (ready, arg = null, capFrames = 240) => {
     // Re-aim before the shutter: the speaker has kept walking through the
     // measurement, and the frame is the evidence that its note stands over ITS
     // head — so the camera is put back in front of it, wherever it is now.
-    await aimAt(speakerIndex)
+    await aimAt(speakerIndex, speakerBack)
     // The subject is where the figure stands NOW — it may have walked on since
     // it was chosen — so the shutter judges the frame against the live anchor.
     const at = await page.evaluate((idx) => {
