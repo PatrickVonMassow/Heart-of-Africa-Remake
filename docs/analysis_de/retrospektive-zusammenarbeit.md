@@ -69,6 +69,10 @@ Gelöst durch den harten Singleton: Liveness am **OS-PID + Prozessstartzeit**, *
 
 **Lehren:** Liveness nie aus dem Alter herleiten, immer aus einem OS-Fakt. Check-then-Set ist keine Exklusivität. Wer Redundanz für Autonomie baut, baut die **Exklusivität zuerst** — hier geschah es umgekehrt, und genau in dieser Lücke passierten die Vorfälle.
 
+**Nachtrag 08.08.2026 — der OS-Fakt, der keiner war.** Die Lehre „Liveness immer aus einem OS-Fakt" stimmt, aber sie schützt nur, wenn der Fakt auch unverrechnet bleibt. Die Prozess-Startzeit wird hier als `Date.now() − (Uptime − Startzeit-Ticks)` gebildet — zwei Uhren, die in diesem Container auseinanderlaufen —, und sobald der Abstand die feste 2-Sekunden-Toleranz übersteigt, liest der Starter jeden lebenden Besitzer als „Prozess wiederverwendet", also als nachweislich tot. Heute Abend zum dritten Mal, diesmal mitten in einer Zweit-Backend-Prüfung, deren Lauf mit der enteigneten Sitzung starb. Ein aus zwei Größen berechneter Wert ist kein OS-Fakt mehr, sondern eine Heuristik mit einem OS-Fakt darin.
+
+Der zweite Teil ist die eigentlich teure Lehre: Am selben Tag war eine Absicherung genau gegen „lebender Besitzer wird enteignet" gebaut worden — sie greift nur, wenn die Pacht abläuft, und dieser Fall kam durch die Tür „nachweislich tot", die davor rangiert. Die Absicherung war korrekt gebaut und wurde nie gefragt. **Wer gegen eine Fehlerart absichert, muss die Absicherung an jeder Tür anbringen, durch die diese Fehlerart hereinkommt** — sonst prüft man den Weg, den man sich vorgestellt hat, statt den, den der Fehler nimmt. Der Stand-down-Teil derselben Absicherung hat dagegen funktioniert: Die enteignete Sitzung erfuhr es beim nächsten Hook und trat sauber ab.
+
 Die Eindämmung ist am **27.07.2026** wieder aufgehoben: Der Scheduled Task ist auf Nutzerbefehl erneut scharf (`Enable-ScheduledTask`, State *Ready*), nachdem der Singleton live gegengeprüft war — während eine Sitzung die Sperre hielt, spawnte der Starter nichts, sondern meldete „owner alive". Das ist die Vorbedingung der autonomen Sitzungsgrenze, und es zeigt die Reihenfolge, die vorher fehlte: erst die Exklusivität am OS-Fakt beweisen, dann die Redundanz wieder einschalten. Eine spontan auftauchende zweite Sitzung ist seitdem **erwartetes Verhalten**, kein Vorfall — solange sie für den Lock-Owner zurücktritt.
 
 ### 3.3 Berechtigungs-Rückfragen
@@ -1009,7 +1013,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Samstag, 08.08.2026, 15:00 · Quellen-Fingerprint: `63dbaa1457fb…`
+Zuletzt aktualisiert: Samstag, 08.08.2026, 22:14 · Quellen-Fingerprint: `88c45d67777e…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1080,7 +1084,7 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | Run the both-backend browser verify on the feat BRANCH before merging to main — merging an unverified render change first triggers a render-verify Stop-guard block-loop | 1 | niedrig | render-verify-guard.mjs | ✔ Mechanismus |
 | Headless probes must screenshot the DEFAULT zoom too (zoom-gated dressing like haze only shows there); headless WebGPU is impossible, so WebGPU-only branches stay user-checked | 2 | mittel | render-verify-guard.mjs | ✔ Mechanismus |
 | Every GUI/rendering fix must be verified on BOTH WebGPU and WebGL2 before it counts as done — never mark a render fix done on one path | 2 | mittel | render-verify-guard.mjs | ✔ Mechanismus |
-| A resumed batch session must check the previous owner's PROCESS before working — the launcher's \"provably dead\" verdict was wrong and double-spawned | 1 | niedrig | render-verify-guard.mjs | ✔ Mechanismus |
+| A resumed batch session must check the previous owner's PROCESS before working — the launcher's \"provably dead\" verdict was wrong and double-spawned | 2 | mittel | render-verify-guard.mjs | ✔ Mechanismus |
 | Rotating verify AND unit failures under a running agent pool are LOAD, not bugs — 8 of 12 unit runs red from load alone; judge a red only on a quiet machine | 2 | mittel | render-verify-guard.mjs | ✔ Mechanismus |
 | The named \"version release\" process and its trigger — queue/run a version release for a version the user names (full closing → user approval → tag → mirror poc → publish /TAG/ and /poc/) | 1 | niedrig | lock-release-hook.mjs | ✔ Mechanismus |
 | Standing licence to move, REMOVE or ADD villages when it helps — but every change must be checked against the other requirements first, and the check has already caught a real bug | 1 | niedrig | — (Regel/Memory) | ◐ Regel |
@@ -1091,6 +1095,6 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 
 Erfasste Quellen: 72 Feedback-/Projekt-Memories · 48 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 41 Prozess-/Meta-TASKS-Punkte (davon 17 offen).
 
-<!-- RETRO-FINGERPRINT: 63dbaa1457fb691f821021e1bf74095f8709ff054b0dfdd553b1fe735b3bb7ca -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-08T13:00:25.045Z -->
+<!-- RETRO-FINGERPRINT: 88c45d67777e2d4f41b4249c4437ae39d3d7b961a5d011ef616c88e8bbd9d3ea -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-08T20:14:49.461Z -->
 <!-- AUTO-GENERATED:END -->
