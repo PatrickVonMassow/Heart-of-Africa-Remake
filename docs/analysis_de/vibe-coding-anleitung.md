@@ -176,9 +176,8 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 - **Zahlen geschätzt statt gemessen — auch die, die dir jemand reicht.** ‚Das dauert ~2 Minuten';
   oder ein Wert, der einmal stimmte.
-  → *Prompt:* „Laufzeiten, Performance und Kosten nennst du nur **gemessen** — Performance auf der
-  **Ziel-Hardware**, nicht auf der Build-Maschine. Was zwischen Erhebung und Verwendung altern kann,
-  erhebe **am Verwendungsort** neu."
+  → *Prompt:* „Laufzeiten, Performance und Kosten nennst du nur **gemessen**, Performance auf der
+  **Ziel-Hardware**. Was altern kann, erhebe **am Verwendungsort** neu."
 
 - **Das Kontingent ist die Grenze, nicht die Zeit.** Der Verbrauch hängt an der Größe jedes
   Kontexts, nicht an den Stunden: lange Sitzungen, und Helfer, die ihren Auftrag erst in
@@ -199,9 +198,10 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 
 - **Der Test hing an seiner Umgebung, nicht am Verhalten.** Zeitgrenzen reißen unter Last;
-  oder er ist nur in der Arbeitskopie grün, in der er lief.
-  → *Prompt:* „Jeder Test bekommt seine Pfade **eingespritzt**, und Zeitgrenzen richten sich
-  nach der gemessenen Last. Die Frage vor dem Abgeben: ‚wäre er auch im **Hauptstand** grün?'"
+  oder er ist nur dort grün, wo er lief.
+  → *Prompt:* „Jeder Test bekommt seine Pfade **eingespritzt**, Zeitgrenzen richten sich nach
+  der gemessenen Last, und sein **Nachweis** landet dort, wo der Hauptstand ihn liest — die
+  Arbeitskopie wird gelöscht. Vor dem Abgeben: ‚wäre er auch im **Hauptstand** grün?'"
 
 
 - **Messung und Vorschau verunreinigt.** Halbfertiges wird als ‚fertig' beurteilt.
@@ -403,4 +403,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 Diese eine Nachricht am Anfang baut 80 % der Lehren dieses Projekts ein, bevor die
 erste Zeile Code entsteht.
 
-<!-- GUIDE-FINGERPRINT: edd04fae21ac0c4ed02ebe605377a5a00f876fba26eca6b3d55b344dfd83bf95 -->
+<!-- GUIDE-FINGERPRINT: 3d0d443614599f877763b9f5a83a1d8ccb3d28a3fcdb36d16f36aeed3020bf7d -->
