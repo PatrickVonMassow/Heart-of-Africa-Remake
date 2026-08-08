@@ -4250,6 +4250,32 @@ Build order, chosen so no two parallel agents own the same file:
   `polish` has kept the WebGPU half from being reached at all. Until this point lands that
   proof is not obtainable, and a session that starts another LARGE for it spends an hour
   to learn the same thing.
+  A FOURTH ROTATOR, AND THIS POINT'S OWN COMMIT DID NOT CLOSE IT (measured
+  08.08.2026, 07:19–08:12, four consecutive WebGL 2 runs on the branch, the last two
+  after the eaves commit). `cairo trade house: nothing hangs under the eye at the
+  eaves` FAILED runs 1 and 4 and PASSED runs 2 and 3. The three checks named above
+  are steady across all four; this one took their place.
+  WHAT THE READINGS SAY, and they say it precisely: the standpoint is the SAME to
+  within seven centimetres every run — {x -16.23, z -0.88}, {x -16.22, z -0.95},
+  {x -16.23, z -0.90} — and the downward probe from it answers either `1.51 m down
+  to ground-disc` or `0.26 m down to BoxGeometry`. So it is not the standpoint that
+  rotates any more (the closest-approach fix did that much) but WHAT THE PROBE
+  DECIDES TO HIT: an object whose top sits ~1.25 m above the ground, i.e. a
+  table-or-crate-height prop beside the trade house door, is inside the ray on some
+  runs and outside it on others at a few centimetres of difference.
+  DECIDE WHICH IT IS BEFORE CHANGING ANYTHING, because the two readings demand
+  opposite fixes: either a prop genuinely stands where the player walks in — then it
+  is a PRODUCT defect at that door and is fixed there, and the check is right to say
+  so — or the check's downward probe is answering a question it was not asked (an
+  eave hanging into head height is not a table standing next to your feet), and then
+  the probe must judge what is OVER the walking line rather than whatever the ray
+  first meets. Establish which by looking at the picture at that spot, not by
+  reasoning from the numbers.
+  FINAL STATE for this half: whichever it is, the check gives the same verdict on
+  the same seed every run, and its own spread is recorded beside it like the other
+  three. It also names what it hit and where the hit was, so the next rotation is
+  diagnosable from the log alone.
+
   Criticality: medium — none of them hides a known product defect today, but a suite that
   cannot produce the same verdict twice is a gate that has stopped gating, and the
   render-verify clearance depends on it.
