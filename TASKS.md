@@ -4549,3 +4549,36 @@ Build order, chosen so no two parallel agents own the same file:
   check still answers is reported as a transport failure, not as a stale board.
   Criticality: high for unattended operation — this is the one failure mode that stops
   every other point, and it fired on a false positive.
+
+- [ ] 563. THE TAG FRAME'S NEW READABILITY JUDGE HAS THREE SOFT SPOTS (four-eyes
+  review of point 524 by the second model, 08.08.2026, verdict merge; bundle
+  Testinfrastruktur). `scripts/verify/tagFrameReading.mjs` decides whether the
+  village-tag evidence frame readably shows both children, and it was accepted as
+  correct — its 67 px floor is genuinely derived from the figure's own geometry and
+  its Vitest pin goes red without a browser. Three findings are recorded rather than
+  fixed in that merge, because none of them is the failure the point closed and each
+  needs its own measurement.
+  FINAL STATE:
+  1. THE OCCLUSION BAND STILL ADMITS A HUGGING OCCLUDER. A hit is counted as the
+     child itself while it lies within ±15 % of the child's distance, so a surface
+     roughly 0.8 m in front of the pair at a 5.5 m stand reads as the child at every
+     sample: `occluded` stays 0 and `confirmed` reaches 5 while a human sees a rock.
+     The probe names what it hit (`hitName`), and the verdict uses that name — a
+     sample confirms the child only when the thing hit IS the child — so the distance
+     band stops being the sole evidence of identity.
+  2. THE FLOOR IS TIED TO A GEOMETRY NOTHING PINS. `KID_HEIGHT` and `KID_BODY_WIDTH`
+     mirror the rendered figure (`src/scenes/place/PlaceLife.tsx`, `src/render/
+     figures.ts`) by hand; a future change to the figure silently invalidates the
+     derived 67 px without any test noticing. A Vitest sync test derives both from
+     the figure source and fails when they drift apart — the same shape as the
+     existing quality-doc sync test.
+  3. A RED RUN NAMES THE WRONG STANDPOINT. In `scripts/verify/polish.mjs` the
+     diagnostic calls its report the "best read" while the variable it prints is
+     overwritten by every failing bearing, so a red run hands the reader the LAST
+     bearing tried instead of the best one seen — the reader then investigates a
+     standpoint that was never the near miss. The reported reading is the best one
+     by the judge's own ranking, or the message says plainly that it is the last.
+  VERIFIABLE: pure Vitest — a reading whose confirming hits are all a foreign object
+  is rejected (1); the sync test fails on a deliberately altered figure constant (2);
+  the diagnostic picks the best of a series of failing readings, not the last (3).
+  No browser run is needed for any of the three.
