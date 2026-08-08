@@ -192,22 +192,24 @@ export function childPlayGround(
    * the CHEAP half — it needs no colliders — so the ranks below filter on it
    * before anything is sampled.
    */
-  const candidates: Array<{ x: number; z: number; r: number; clearance: number }> = []
-  for (let r = rMax; r >= rMin - 1e-9; r -= SEARCH_STEP) {
-    // The whole ground stays inside the walkable area with a spectator's margin
-    // around it: walking past the rim LEAVES the settlement, so a ground pushed
-    // against it would put the watcher outside on half the bearings.
-    const rimDistance = Math.max(0, walkRadius - r - SPECTATOR_MARGIN)
-    for (let d = rimDistance; d >= -1e-9; d -= SEARCH_STEP) {
-      // At the centre every bearing is the same point.
-      const fan = d < 1e-9 ? 1 : bearings
-      for (let k = 0; k < fan; k++) {
-        const a = (k / bearings) * Math.PI * 2
-        const x = Math.cos(a) * d
-        const z = Math.sin(a) * d
-        let nearest = Infinity
-        for (const [sx, sz] of stations) nearest = Math.min(nearest, Math.hypot(x - sx, z - sz))
-        candidates.push({ x, z, r, clearance: nearest - r })
+  const eachCandidate = (visit: (x: number, z: number, r: number, clearance: number) => void): void => {
+    for (let r = rMax; r >= rMin - 1e-9; r -= SEARCH_STEP) {
+      // The whole ground stays inside the walkable area with a spectator's
+      // margin around it: walking past the rim LEAVES the settlement, so a
+      // ground pushed against it would put the watcher outside on half the
+      // bearings.
+      const rimDistance = Math.max(0, walkRadius - r - SPECTATOR_MARGIN)
+      for (let d = rimDistance; d >= -1e-9; d -= SEARCH_STEP) {
+        // At the centre every bearing is the same point.
+        const fan = d < 1e-9 ? 1 : bearings
+        for (let k = 0; k < fan; k++) {
+          const a = (k / bearings) * Math.PI * 2
+          const x = Math.cos(a) * d
+          const z = Math.sin(a) * d
+          let nearest = Infinity
+          for (const [sx, sz] of stations) nearest = Math.min(nearest, Math.hypot(x - sx, z - sz))
+          visit(x, z, r, nearest - r)
+        }
       }
     }
   }
@@ -215,20 +217,25 @@ export function childPlayGround(
   // Rank 1: far enough from the adults AND standing against the village. Only
   // the candidates that already clear the cheap half are ever sampled.
   let best: PlayGround | null = null
-  for (const c of candidates) {
-    if (c.clearance < minClearance) continue
-    const here = measure(c.x, c.z, c.r, c.clearance)
+  eachCandidate((x, z, r, clearance) => {
+    if (clearance < minClearance) return
+    const here = measure(x, z, r, clearance)
     if (!best || score(here) > score(best)) best = here
-  }
-  if (best && best.fabric >= MIN_FABRIC) return best
+  })
+  const separated: PlayGround | null = best
+  if (separated && separated.fabric >= MIN_FABRIC) return separated
 
   // Rank 2: no separated ground stands against the village, so the SEPARATION
   // gives (point 524.2) — and gives as little as it must. Walked in order of
   // clearance, the first ground that stands against the fabric is the one that
-  // loses the least, and only the equally-clear ones after it are weighed.
+  // loses the least, and only the equally-clear ones after it are weighed. The
+  // whole set is only laid out HERE, on the path that needs it sorted.
+  const candidates: Array<{ x: number; z: number; r: number; clearance: number }> = []
+  eachCandidate((x, z, r, clearance) => void candidates.push({ x, z, r, clearance }))
+  candidates.sort((a, b) => b.clearance - a.clearance)
   let fallback: PlayGround | null = null
   let lastResort: PlayGround | null = null
-  for (const c of [...candidates].sort((a, b) => b.clearance - a.clearance)) {
+  for (const c of candidates) {
     if (fallback && c.clearance < fallback.clearance - 1e-9) break
     const here = measure(c.x, c.z, c.r, c.clearance)
     lastResort ??= here
@@ -240,7 +247,7 @@ export function childPlayGround(
   // Rank 3: nothing here stands against the fabric at all — take the separation
   // if the place allows one, else the clearest ground there is, and REPORT it.
   return (
-    best ??
+    separated ??
     lastResort ?? { x: 0, z: 0, radius: rMax, clearance: -Infinity, openness: 0, fabric: 0 }
   )
 }
