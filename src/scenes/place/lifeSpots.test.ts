@@ -7,6 +7,8 @@
 
 import { describe, expect, it } from 'vitest'
 import {
+  FABRIC_REACH,
+  MIN_FABRIC,
   MIN_PLAY_RADIUS,
   SPECTATOR_MARGIN,
   PORT_TALKERS,
@@ -15,7 +17,9 @@ import {
   villageAdultStations,
 } from './lifeSpots'
 import { balance } from '../../config/balance'
-import { PLACE_RADIUS } from './layout'
+import { PLACE_RADIUS, buildLayout, builtFabric } from './layout'
+import { standingClear, WALKER_RADIUS } from './collision'
+import { PLACES } from '../../world/geo'
 import { isWithinHearing } from '../../communication/heard'
 
 /** The village fire of the shipped settlement scene (PlaceScene). */
@@ -137,5 +141,107 @@ describe('the children play out of the adults’ earshot (point 481.4)', () => {
     const g = childPlayGround([[0, 0]], 6, PLAY, HEARING)
     expect(g.clearance).toBeLessThan(HEARING)
     expect(g.radius).toBeGreaterThanOrEqual(MIN_PLAY_RADIUS)
+  })
+})
+
+describe('the children play against the village, not behind it (point 524)', () => {
+  it('says nothing is known when no fabric is named', () => {
+    expect(ground().fabric).toBe(1)
+  })
+
+  it('stays among the huts rather than out on the bare edge', () => {
+    // A ring of huts at 12 m and nothing beyond it: the far rim is emptier and
+    // quieter, and the earlier placement went there — which is how the evidence
+    // frame came to show one child on an empty plain. The ground must stay on
+    // the ring.
+    const huts: Array<[number, number]> = Array.from({ length: 10 }, (_, i) => {
+      const a = (i / 10) * Math.PI * 2
+      return [Math.cos(a) * 12, Math.sin(a) * 12]
+    })
+    const g = childPlayGround(villageAdultStations(FIRE), WALK, PLAY, HEARING, { fabric: huts })
+    expect(g.clearance).toBeGreaterThanOrEqual(HEARING)
+    expect(g.fabric).toBeGreaterThanOrEqual(MIN_FABRIC)
+    // Its far edge does not reach out past the built ring by more than the reach
+    // that still counts as standing against it.
+    expect(Math.hypot(g.x, g.z) + g.radius).toBeLessThanOrEqual(12 + FABRIC_REACH)
+  })
+
+  it('gives up SIZE for the picture, never the walkable rim', () => {
+    const huts: Array<[number, number]> = Array.from({ length: 10 }, (_, i) => {
+      const a = (i / 10) * Math.PI * 2
+      return [Math.cos(a) * 12, Math.sin(a) * 12]
+    })
+    const g = childPlayGround(villageAdultStations(FIRE), WALK, PLAY, HEARING, { fabric: huts })
+    // Smaller than the ground the rim would have allowed, because it had to come
+    // in to the huts — and still a game of tag.
+    expect(g.radius).toBeGreaterThanOrEqual(MIN_PLAY_RADIUS)
+    expect(g.radius).toBeLessThanOrEqual(PLAY)
+    expect(Math.hypot(g.x, g.z) + g.radius + SPECTATOR_MARGIN).toBeLessThanOrEqual(WALK + 1e-6)
+  })
+
+  it('lets the SEPARATION give when nothing separated stands against the village', () => {
+    // Every hut in one corner, and an adult station standing in it: no ground can
+    // be both far enough and against the fabric. Point 524.2 says which one gives
+    // — and it gives as little as it must.
+    const corner: Array<[number, number]> = [
+      [-14, -14],
+      [-12, -16],
+      [-16, -12],
+      [-10, -13],
+      [-13, -10],
+    ]
+    const g = childPlayGround([[-13, -13]], WALK, PLAY, HEARING, { fabric: corner })
+    expect(g.fabric).toBeGreaterThanOrEqual(MIN_FABRIC)
+    expect(g.clearance).toBeLessThan(HEARING)
+    // As little as it must: it works its way to the far side of the huts and
+    // spends its SIZE getting there, rather than settling on top of the adult.
+    expect(g.clearance).toBeGreaterThan(2)
+    expect(g.radius).toBeLessThan(PLAY)
+  })
+
+  it('reports an empty answer rather than inventing one when a place has no fabric at all', () => {
+    const g = childPlayGround([[0, 0]], 6, PLAY, HEARING, { fabric: [[40, 40]] })
+    expect(g.fabric).toBeLessThan(MIN_FABRIC)
+    expect(g.clearance).toBeLessThan(HEARING)
+    expect(g.radius).toBeGreaterThanOrEqual(MIN_PLAY_RADIUS)
+  })
+})
+
+describe('every shipped village can seat its children (point 524)', () => {
+  const VILLAGES = PLACES.filter((p) => p.kind === 'village')
+
+  it('has villages to check at all', () => {
+    expect(VILLAGES.length).toBeGreaterThan(10)
+  })
+
+  it.each(VILLAGES.map((p) => p.id))('%s: separated AND against the built fabric', (id) => {
+    const layout = buildLayout(id, 7)
+    const walk = Math.max(1, layout.radius - WALKER_RADIUS * 2)
+    const g = childPlayGround(villageAdultStations(FIRE), walk, PLAY, HEARING, {
+      free: (x, z) => standingClear(layout.colliders, x, z, WALKER_RADIUS),
+      fabric: builtFabric(layout),
+    })
+    // The separation rule of point 481.4 still holds …
+    expect(g.clearance).toBeGreaterThanOrEqual(HEARING)
+    // … and the ground stands against the village, so the chase is watched with
+    // the settlement behind it rather than against an empty plain.
+    expect(g.fabric).toBeGreaterThanOrEqual(MIN_FABRIC)
+    // Still a game of tag, still inside the settlement, still on ground a child
+    // can stand on.
+    expect(g.radius).toBeGreaterThanOrEqual(MIN_PLAY_RADIUS)
+    expect(Math.hypot(g.x, g.z) + g.radius + SPECTATOR_MARGIN).toBeLessThanOrEqual(walk + 1e-6)
+    expect(g.openness).toBeGreaterThan(0.4)
+  })
+
+  it('counts the buildings as fabric and the villager markers not', () => {
+    const layout = buildLayout('maasai-village', 7)
+    const fabric = builtFabric(layout)
+    expect(fabric.length).toBe(
+      layout.dwellings.length + layout.interactives.filter((it) => it.type !== 'villager').length,
+    )
+    expect(layout.interactives.some((it) => it.type === 'villager')).toBe(true)
+    for (const it of layout.interactives) {
+      if (it.type === 'villager') expect(fabric).not.toContainEqual(it.pos)
+    }
   })
 })

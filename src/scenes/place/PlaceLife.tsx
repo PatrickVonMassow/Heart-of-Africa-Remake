@@ -40,6 +40,7 @@ import { effectiveFigureLimbSegments, useUi } from '../../state/ui'
 import { cloakForCloth, wearsByRank } from '../../systems/dress'
 import { useColdCloaks, type ColdDress } from './useColdCloaks'
 import { presenceAt } from '../../systems/seasonalLife'
+import { devAssert } from '../../systems/devAssert'
 import { placeById } from '../../world/geo'
 import { useGame } from '../../state/store'
 import { START_YEAR, balance } from '../../config/balance'
@@ -1966,6 +1967,7 @@ export function PlaceLife({
   placeId,
   style,
   buildings,
+  fabric,
   firePos,
   homes,
   errands,
@@ -1983,6 +1985,9 @@ export function PlaceLife({
   placeId: string
   style: RegionPlaceStyle
   buildings: Array<[number, number]>
+  /** The BUILT FABRIC: every dwelling and functional building of the settlement.
+   *  What the children's play ground is kept against (point 524). */
+  fabric: Array<[number, number]>
   firePos: [number, number]
   homes: HomeDef[]
   errands: Array<[number, number]>
@@ -2047,19 +2052,34 @@ export function PlaceLife({
     [bank, teachingStone, digSites],
   )
 
-  // WHERE they play (point 481.4): out on the bearing furthest from every adult
-  // vignette, so the §13.4 hearing range separates the two groups — among the
-  // children the player hears the children, among the adults the adults.
+  // WHERE they play: far enough from every adult vignette that the §13.4
+  // hearing range separates the two groups (point 481.4) and against the
+  // village's own walls, so the chase is watched with the settlement behind it
+  // (point 524). The play radius is read here rather than inside the memo, so a
+  // debug edit of it (§21) re-derives the ground while the game runs — the
+  // balanceVersion subscription is what brings the edit here at all.
+  useGame((s) => s.balanceVersion)
+  const wantPlayRadius = balance.villageLife.tag.playRadius
   const playGround = useMemo(
     () =>
       childPlayGround(
         villageAdultStations(firePos),
         Math.max(1, radius - NPC_RADIUS * 2),
-        balance.villageLife.tag.playRadius,
+        wantPlayRadius,
         balance.communication.hearingRadius,
-        { free: (px, pz) => standingClear(colliders, px, pz, NPC_RADIUS) },
+        { free: (px, pz) => standingClear(colliders, px, pz, NPC_RADIUS), fabric },
       ),
-    [firePos, radius, colliders],
+    [firePos, radius, colliders, fabric, wantPlayRadius],
+  )
+  // Point 524.2: a ground that had to give up its separation leaves two teaching
+  // voices inside one earshot. Nothing in the shipped villages reaches this, so
+  // it is armed as an assert rather than answered by a second mechanism.
+  devAssert(
+    kind !== 'village' || playGround.clearance >= balance.communication.hearingRadius,
+    'tag-play-ground-unseparated',
+    () =>
+      `${placeId}: the play ground clears the adults by only ${playGround.clearance.toFixed(1)} m ` +
+      `(fabric ${playGround.fabric.toFixed(2)}) — the two teaching voices need another means of being told apart`,
   )
 
   if (kind === 'port') {

@@ -50,6 +50,10 @@ export interface PlayGround {
   /** Fraction of the ground a child can actually stand on, 0..1; 1 when the
    *  caller gave no collider predicate. */
   openness: number
+  /** Fraction of the ground with a built wall within `FABRIC_REACH`, 0..1 — how
+   *  much of the play spot stands AGAINST the settlement rather than out on the
+   *  bare edge behind it (point 524). 1 when the caller named no fabric. */
+  fabric: number
 }
 
 /** The smallest ground a game of tag is still a game on. Below this the group
@@ -67,20 +71,61 @@ export const MIN_PLAY_RADIUS = 4
 export const SPECTATOR_MARGIN = 5
 
 /**
- * Places the children's play ground (point 481.4): the LARGEST disc, on the
- * bearing furthest from every adult station, whose whole area still clears them
- * by `minClearance` — the §13.4 hearing radius, so a player standing anywhere
- * among the children is out of earshot of every adult vignette and the other
- * way round. It sits out near the walkable rim, where a settlement has the room
- * a chase needs.
+ * How near a built wall must stand for that patch of ground to count as being
+ * AGAINST the settlement (point 524). Six metres is a village yard: at that
+ * distance a hut fills a good part of the frame behind a child, while eight or
+ * more let the outer half of a ground drift onto the bare plain and still score
+ * full marks — measured against `verification/480-village-tag`, the frame that
+ * showed one child on empty ground with the village out of shot.
+ */
+export const FABRIC_REACH = 6
+
+/**
+ * How much of the ground must stand against the fabric before it counts as a
+ * play spot at all. Half is the bar the sparsest shipped villages (the
+ * scattered forest plans of design.md §4.5) can still clear; the ring and
+ * compound plans reach 0.9 and above.
+ */
+export const MIN_FABRIC = 0.5
+
+/**
+ * What the search is trading off among the grounds that keep their distance.
+ * Standing against the village outweighs everything — a chase nobody can place
+ * in a settlement teaches nothing — a clear ground outweighs a big one, and
+ * SIZE is the lever that gives, because a smaller ground pulled in among the
+ * huts reads as village life where a large one pushed out to the rim does not.
+ */
+const WEIGHT_FABRIC = 10
+const WEIGHT_OPENNESS = 6
+const WEIGHT_SIZE = 4
+
+/** Metres between two candidate grounds along a radius and along a bearing. */
+const SEARCH_STEP = 0.5
+
+/**
+ * Places the children's play ground: a disc that keeps the §13.4 hearing radius
+ * (`minClearance`) between the children and every adult vignette — so a player
+ * among the children is out of earshot of the adults and the other way round
+ * (point 481.4) — and that STANDS AGAINST the settlement's built fabric, so the
+ * chase is watched with the village behind it (point 524).
  *
  * Derived rather than hand-placed on purpose — a village's vignettes move with
  * its people's layout (design.md §4.5), and a hard-coded corner would silently
- * stop being the far one. It SHRINKS rather than gives up: a fire near the far
- * side leaves no 10 m ground at the full radius, and a slightly smaller one is
- * a better answer than children in the cook's earshot. The returned `clearance`
- * reports what was actually achieved, so a layout that cannot be separated at
- * all fails a test instead of quietly failing the player.
+ * stop being the far one.
+ *
+ * WHAT GIVES, AND IN WHICH ORDER. The disc always stays inside the walkable rim
+ * with a spectator's margin around it; beyond that the search ranks candidates:
+ *  1. separated AND against the fabric — every shipped village has such a spot;
+ *  2. against the fabric alone: the SEPARATION gives before the picture does
+ *     (point 524.2), because children pushed out behind the rocks stop being
+ *     village life at all. A caller that gets one of these back has two teaching
+ *     voices inside one earshot and must tell them apart by other means;
+ *  3. separated alone, then whatever the place allows.
+ * Within a rank the score below decides, and SIZE is what it spends: the ground
+ * SHRINKS (down to MIN_PLAY_RADIUS) to sit among the huts rather than reaching
+ * out past the last of them. `clearance`, `openness` and `fabric` report what
+ * was actually achieved, so a layout that cannot manage one of them fails a
+ * test instead of quietly failing the player.
  */
 export function childPlayGround(
   stations: ReadonlyArray<readonly [number, number]>,
@@ -95,61 +140,107 @@ export function childPlayGround(
      *  bobbing between rocks (verification/480-village-tag). Watching them is
      *  the whole teaching, so a ground you cannot see into is a bad ground. */
     free?: (x: number, z: number) => boolean
+    /** The settlement's BUILT FABRIC: the ground positions of its dwellings and
+     *  functional buildings. Given it, the search keeps the play ground against
+     *  them (point 524). Left out, nothing is known and every ground counts as
+     *  standing against the village. */
+    fabric?: ReadonlyArray<readonly [number, number]>
     bearings?: number
   } = {},
 ): PlayGround {
   const bearings = options.bearings ?? 64
   const rMax = Math.max(1, Math.min(playRadius, walkRadius))
   const rMin = Math.min(rMax, MIN_PLAY_RADIUS)
-  /** Fraction of the disc a child could stand on; 1 when nothing is known. */
-  const openness = (x: number, z: number, r: number): number => {
-    const free = options.free
-    if (!free) return 1
-    let open = 0
-    let n = 0
+  const fabric = options.fabric
+  /** The disc sampled the same way for both measures: middle, and three rings. */
+  const sample = (x: number, z: number, r: number, hit: (sx: number, sz: number) => boolean): number => {
+    let ok = hit(x, z) ? 1 : 0
+    let n = 1
     for (const ring of [0.35, 0.7, 1]) {
       for (let k = 0; k < 8; k++) {
         const a = (k / 8) * Math.PI * 2
         n++
-        if (free(x + Math.cos(a) * r * ring, z + Math.sin(a) * r * ring)) open++
+        if (hit(x + Math.cos(a) * r * ring, z + Math.sin(a) * r * ring)) ok++
       }
     }
-    n++
-    if (free(x, z)) open++
-    return open / n
+    return ok / n
   }
-  const better = (a: PlayGround, b: PlayGround | null): boolean => {
-    if (!b) return true
-    // Openness first, and only among grounds that are far enough — a clear view
-    // is worth a metre of separation, but never the separation rule itself.
-    const far = (g: PlayGround) => g.clearance >= minClearance
-    if (far(a) !== far(b)) return far(a)
-    if (far(a) && Math.abs(a.openness - b.openness) > 0.05) return a.openness > b.openness
-    return a.clearance > b.clearance
+  /** Fraction of the disc a child could stand on; 1 when nothing is known. */
+  const openness = (x: number, z: number, r: number): number => {
+    const free = options.free
+    return free ? sample(x, z, r, free) : 1
   }
-  let best: PlayGround | null = null
-  for (let r = rMax; r >= rMin - 1e-9; r -= 0.5) {
-    // Out toward the rim, but not against it: the whole ground stays inside the
-    // walkable area with a spectator's margin around it, and its middle is then
-    // as far from the village's life as the place allows.
-    const centreDistance = Math.max(0, walkRadius - r - SPECTATOR_MARGIN)
-    let atThisSize: PlayGround | null = null
-    for (let k = 0; k < bearings; k++) {
-      const a = (k / bearings) * Math.PI * 2
-      const x = Math.cos(a) * centreDistance
-      const z = Math.sin(a) * centreDistance
-      let nearest = Infinity
-      for (const [sx, sz] of stations) nearest = Math.min(nearest, Math.hypot(x - sx, z - sz))
-      const here: PlayGround = { x, z, radius: r, clearance: nearest - r, openness: 0 }
-      // Openness is the expensive half, so it is only measured where the cheap
-      // half already qualifies.
-      if (here.clearance >= minClearance || !atThisSize) here.openness = openness(x, z, r)
-      if (better(here, atThisSize)) atThisSize = here
+  /** Fraction of the disc with a wall within reach; 1 when nothing is known. */
+  const fabricAt = (x: number, z: number, r: number): number =>
+    fabric
+      ? sample(x, z, r, (sx, sz) => fabric.some(([bx, bz]) => Math.hypot(bx - sx, bz - sz) <= FABRIC_REACH))
+      : 1
+  const measure = (x: number, z: number, r: number, clearance: number): PlayGround => ({
+    x,
+    z,
+    radius: r,
+    clearance,
+    openness: openness(x, z, r),
+    fabric: fabricAt(x, z, r),
+  })
+  const score = (g: PlayGround): number =>
+    g.fabric * WEIGHT_FABRIC + g.openness * WEIGHT_OPENNESS + (g.radius / rMax) * WEIGHT_SIZE
+
+  /**
+   * Every candidate disc, largest first and out at the rim first, with the
+   * distance to the nearest adult station already worked out. The clearance is
+   * the CHEAP half — it needs no colliders — so the ranks below filter on it
+   * before anything is sampled.
+   */
+  const candidates: Array<{ x: number; z: number; r: number; clearance: number }> = []
+  for (let r = rMax; r >= rMin - 1e-9; r -= SEARCH_STEP) {
+    // The whole ground stays inside the walkable area with a spectator's margin
+    // around it: walking past the rim LEAVES the settlement, so a ground pushed
+    // against it would put the watcher outside on half the bearings.
+    const rimDistance = Math.max(0, walkRadius - r - SPECTATOR_MARGIN)
+    for (let d = rimDistance; d >= -1e-9; d -= SEARCH_STEP) {
+      // At the centre every bearing is the same point.
+      const fan = d < 1e-9 ? 1 : bearings
+      for (let k = 0; k < fan; k++) {
+        const a = (k / bearings) * Math.PI * 2
+        const x = Math.cos(a) * d
+        const z = Math.sin(a) * d
+        let nearest = Infinity
+        for (const [sx, sz] of stations) nearest = Math.min(nearest, Math.hypot(x - sx, z - sz))
+        candidates.push({ x, z, r, clearance: nearest - r })
+      }
     }
-    if (!atThisSize) continue
-    if (better(atThisSize, best)) best = atThisSize
-    // The biggest ground that is far enough wins; only if none is do we shrink.
-    if (atThisSize.clearance >= minClearance) return atThisSize
   }
-  return best ?? { x: 0, z: 0, radius: rMax, clearance: -Infinity, openness: 0 }
+
+  // Rank 1: far enough from the adults AND standing against the village. Only
+  // the candidates that already clear the cheap half are ever sampled.
+  let best: PlayGround | null = null
+  for (const c of candidates) {
+    if (c.clearance < minClearance) continue
+    const here = measure(c.x, c.z, c.r, c.clearance)
+    if (!best || score(here) > score(best)) best = here
+  }
+  if (best && best.fabric >= MIN_FABRIC) return best
+
+  // Rank 2: no separated ground stands against the village, so the SEPARATION
+  // gives (point 524.2) — and gives as little as it must. Walked in order of
+  // clearance, the first ground that stands against the fabric is the one that
+  // loses the least, and only the equally-clear ones after it are weighed.
+  let fallback: PlayGround | null = null
+  let lastResort: PlayGround | null = null
+  for (const c of [...candidates].sort((a, b) => b.clearance - a.clearance)) {
+    if (fallback && c.clearance < fallback.clearance - 1e-9) break
+    const here = measure(c.x, c.z, c.r, c.clearance)
+    lastResort ??= here
+    if (here.fabric < MIN_FABRIC) continue
+    if (!fallback || score(here) > score(fallback)) fallback = here
+  }
+  if (fallback) return fallback
+
+  // Rank 3: nothing here stands against the fabric at all — take the separation
+  // if the place allows one, else the clearest ground there is, and REPORT it.
+  return (
+    best ??
+    lastResort ?? { x: 0, z: 0, radius: rMax, clearance: -Infinity, openness: 0, fabric: 0 }
+  )
 }
