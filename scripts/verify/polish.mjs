@@ -4,6 +4,15 @@ import { launchVerifyBrowser, waitForStable, waitForReadingStable, waitForSceneB
 import { frameShutter, capturePixels } from './frameSubject.mjs'
 import { judgeFootingSeries, judgePitchSeries, MIN_SLOPED_SAMPLES } from './footingSeries.mjs'
 import { judgeStanceSlip } from './stanceSlip.mjs'
+import {
+  AXIS_SAMPLES,
+  CONFIRMED_RATIO,
+  KID_HEIGHT,
+  MIN_CHILD_PIXELS,
+  OCCLUDED_RATIO,
+  describeReading,
+  judgeTagStandpoint,
+} from './tagFrameReading.mjs'
 import { judgeEavesColumn, judgeShelterRoof } from './eavesColumn.mjs'
 import { withVerifySeed } from './verify-seed.mjs'
 import { fileURLToPath } from 'node:url'
@@ -2810,95 +2819,133 @@ for (const [placeId, shot] of [
         { b: offset, back },
       )
     /**
-     * Is the game unobstructed from here, and how much of it is in frame?
+     * MEASURE the picture this standpoint would write, and let
+     * scripts/verify/tagFrameReading.mjs judge the numbers.
      *
-     * Projection ALONE is not enough, and that lesson cost a picture: a frame in
-     * which the pair projects inside the viewport can still be a frame of the
-     * huts they are standing behind. So each of the two is ray-probed against
-     * the RENDERED scene on its own sight line, the way the point-485 speaker is
-     * — the first surface drawn must be the CHILD ITSELF, which is what its
-     * distance says. The ratio is bounded on both sides: a hut in front reads
-     * far too near, and a ray that sails past a small figure hits the ground far
-     * beyond it.
+     * Projection ALONE is not enough, and that lesson cost two pictures. The
+     * first: a frame in which the pair projects inside the viewport can still be
+     * a frame of the huts they are standing behind — so each of the two is
+     * ray-probed against the RENDERED scene, and the first surface drawn must be
+     * the CHILD ITSELF, which is what its distance says. The second: the probe
+     * was ONE ray at chest height, and the settlement's boulder line hid the
+     * children to the shoulders while leaving exactly that ray clear. Forty
+     * pixels of head over the rocks passed every check and was rejected by eye.
+     *
+     * So the reading is taken along the child's WHOLE axis (AXIS_SAMPLES) and
+     * its on-screen EXTENT is measured — feet and crown projected through the
+     * live camera, the pixel height read off the real viewport (§7.2: project to
+     * the rendered frame, never assume a radius or a distance).
      *
      * And it counts the VILLAGE BEHIND THEM (point 524): the buildings the
      * layout draws, projected the same way, that stand FURTHER from the camera
      * than the pair does. That is the difference between a game of tag in a
      * settlement and two figures on a plain, and no check saw it before.
      */
+    const view = page.viewportSize()
     const readsFromHere = () =>
-      page.evaluate(() => {
-        const t = window.__placeTag()
-        const cam = window.__placeCamera
-        if (!t || !cam || !window.__placeRayHit) return { clear: false, inFrame: 0, pair: 0, behind: 0 }
-        const a = t.chaser >= 0 ? t.children[t.chaser] : null
-        const q = t.target >= 0 ? t.children[t.target] : null
-        const cx = a && q ? (a.x + q.x) / 2 : t.children.reduce((s2, c) => s2 + c.x, 0) / t.children.length
-        const cz = a && q ? (a.z + q.z) / 2 : t.children.reduce((s2, c) => s2 + c.z, 0) / t.children.length
-        const h = window.__placeRayHit(cx, 0.75, cz)
-        const clear = h.hitDistance == null || h.hitDistance >= h.targetDistance * 0.9
-        // The SAME matrix math the frame shutter projects a `local` subject
-        // with (scripts/verify/frameSubject.mjs) — no THREE in the page here.
-        const apply = (e, v) =>
-          [0, 1, 2, 3].map((r) => e[r] * v[0] + e[r + 4] * v[1] + e[r + 8] * v[2] + e[r + 12] * v[3])
-        const shows = (c) => {
-          const eyeAt = apply(cam.matrixWorldInverse.elements, [c.x, 0.5, c.z, 1])
-          const clip = apply(cam.projectionMatrix.elements, eyeAt)
-          const w = clip[3]
-          if (!(w > 0)) return false
-          // Inside 0.7 of the frame rather than all of it: a child clipped by the
-          // very edge is in the picture by arithmetic and not by eye, and the
-          // shutter's own settle is several frames of running children after this
-          // reading — one sitting on the 0.85 line it used to allow walks out of
-          // the written picture in them.
-          if (!(Math.abs(clip[0] / w) <= 0.7 && Math.abs(clip[1] / w) <= 0.7 && clip[2] / w < 1)) return false
-          // And it must actually be DRAWN there: chest height of a child, and
-          // the first surface along that line has to be the child.
-          const hit = window.__placeRayHit(c.x, 0.5, c.z)
-          if (hit.hitDistance == null) return false
-          const ratio = hit.hitDistance / hit.targetDistance
-          // Close enough to read, too: a correctly-framed speck proves nothing.
-          return ratio >= 0.8 && ratio <= 1.2 && hit.targetDistance <= 14
-        }
-        let inFrame = 0
-        for (const c of t.children) if (shows(c)) inFrame++
-        // The pair carries the picture: a frame holding two stragglers while the
-        // chase runs off-screen shows village life, not a game of tag.
-        const pair = (a && shows(a) ? 1 : 0) + (q && shows(q) ? 1 : 0)
-        // What stands BEHIND them: the settlement's own buildings, in frame and
-        // further away than the children are.
-        const L = window.__placeLayout
-        const eye = cam.position
-        const pairDistance = Math.hypot(cx - eye.x, cz - eye.z)
-        const fabric = L
-          ? L.dwellings
-              .map((d) => [d.x, d.z])
-              .concat(L.interactives.filter((it) => it.type !== 'villager').map((it) => it.pos))
-          : []
-        let behind = 0
-        let nearestWall = Infinity
-        for (const [bx, bz] of fabric) {
-          const away = Math.hypot(bx - eye.x, bz - eye.z)
-          nearestWall = Math.min(nearestWall, away)
-          if (away <= pairDistance) continue
-          const be = apply(cam.matrixWorldInverse.elements, [bx, 1.2, bz, 1])
-          const bc = apply(cam.projectionMatrix.elements, be)
-          const bw = bc[3]
-          if (!(bw > 0)) continue
-          if (Math.abs(bc[0] / bw) <= 1 && Math.abs(bc[1] / bw) <= 1 && bc[2] / bw < 1) behind++
-        }
-        // How far apart the two are: a pair that has just sprinted apart fills
-        // the frame with the ground between them, and one of the two is out of it
-        // again by the time the shutter opens.
-        const gap = a && q ? Math.hypot(a.x - q.x, a.z - q.z) : Infinity
-        return { clear, inFrame, pair, behind, gap, nearestWall }
-      })
+      page.evaluate(
+        ({ KID_HEIGHT, AXIS_SAMPLES, OCCLUDED_RATIO, CONFIRMED_RATIO, width, height }) => {
+          const t = window.__placeTag()
+          const cam = window.__placeCamera
+          if (!t || !cam || !window.__placeRayHit) return { clear: false, inFrame: 0, behind: 0, children: [] }
+          const a = t.chaser >= 0 ? t.children[t.chaser] : null
+          const q = t.target >= 0 ? t.children[t.target] : null
+          const cx = a && q ? (a.x + q.x) / 2 : t.children.reduce((s2, c) => s2 + c.x, 0) / t.children.length
+          const cz = a && q ? (a.z + q.z) / 2 : t.children.reduce((s2, c) => s2 + c.z, 0) / t.children.length
+          const h = window.__placeRayHit(cx, 0.75, cz)
+          const clear = h.hitDistance == null || h.hitDistance >= h.targetDistance * 0.9
+          // The SAME matrix math the frame shutter projects a `local` subject
+          // with (scripts/verify/frameSubject.mjs) — no THREE in the page here.
+          const apply = (e, v) =>
+            [0, 1, 2, 3].map((r) => e[r] * v[0] + e[r + 4] * v[1] + e[r + 8] * v[2] + e[r + 12] * v[3])
+          const ndc = (x, y, z) => {
+            const eyeAt = apply(cam.matrixWorldInverse.elements, [x, y, z, 1])
+            const clip = apply(cam.projectionMatrix.elements, eyeAt)
+            const w = clip[3]
+            if (!(w > 0) || clip[2] / w >= 1) return null
+            return [clip[0] / w, clip[1] / w]
+          }
+          /** One child as the frame would show it: where, how tall, how much of
+           *  it something else is standing in front of. */
+          const reads = (c) => {
+            if (!c) return null
+            const ndcFeet = ndc(c.x, 0, c.z)
+            const ndcHead = ndc(c.x, KID_HEIGHT, c.z)
+            if (!ndcFeet || !ndcHead) return { pixels: 0, occluded: 0, confirmed: 0, ndcFeet: null, ndcHead: null }
+            let occluded = 0
+            let confirmed = 0
+            for (const f of AXIS_SAMPLES) {
+              const hit = window.__placeRayHit(c.x, KID_HEIGHT * f, c.z)
+              // Nothing drawn at all on that line is not an occluder — it is a
+              // ray that sailed past a thin figure into the sky.
+              if (hit.hitDistance == null) continue
+              const ratio = hit.hitDistance / hit.targetDistance
+              if (ratio < OCCLUDED_RATIO) occluded++
+              else if (ratio <= CONFIRMED_RATIO) confirmed++
+            }
+            // NDC spans 2 over the viewport's height, so half of it is the frame.
+            return { pixels: (Math.abs(ndcHead[1] - ndcFeet[1]) / 2) * height, occluded, confirmed, ndcFeet, ndcHead }
+          }
+          // The pair carries the picture: a frame holding two stragglers while
+          // the chase runs off-screen shows village life, not a game of tag.
+          const children = [reads(a), reads(q)]
+          // How many of the whole group the frame holds — projection only, no
+          // rays: it is reported, never judged, and a ray probe per child per
+          // bearing would multiply the sweep's cost for a detail string.
+          const inFrame = t.children.filter((c) => {
+            const p = ndc(c.x, KID_HEIGHT / 2, c.z)
+            return p && Math.abs(p[0]) <= 1 && Math.abs(p[1]) <= 1
+          }).length
+          // What stands BEHIND them: the settlement's own buildings, in frame and
+          // further away than the children are.
+          const L = window.__placeLayout
+          const eye = cam.position
+          const pairDistance = Math.hypot(cx - eye.x, cz - eye.z)
+          const fabric = L
+            ? L.dwellings
+                .map((d) => [d.x, d.z])
+                .concat(L.interactives.filter((it) => it.type !== 'villager').map((it) => it.pos))
+            : []
+          let behind = 0
+          let nearestWall = Infinity
+          for (const [bx, bz] of fabric) {
+            const away = Math.hypot(bx - eye.x, bz - eye.z)
+            nearestWall = Math.min(nearestWall, away)
+            if (away <= pairDistance) continue
+            const p = ndc(bx, 1.2, bz)
+            if (p && Math.abs(p[0]) <= 1 && Math.abs(p[1]) <= 1) behind++
+          }
+          // How far apart the two are: a pair that has just sprinted apart fills
+          // the frame with the ground between them, and one of the two is out of
+          // it again by the time the shutter opens.
+          const gap = a && q ? Math.hypot(a.x - q.x, a.z - q.z) : Infinity
+          // How far apart the two stand ACROSS the frame. NDC x spans 2 over the
+          // viewport's WIDTH — this is the one measurement taken against the
+          // width rather than the height.
+          const separation =
+            children[0]?.ndcFeet && children[1]?.ndcFeet
+              ? (Math.abs(children[0].ndcFeet[0] - children[1].ndcFeet[0]) / 2) * width
+              : 0
+          return { clear, inFrame, behind, gap, nearestWall, separation, children }
+        },
+        {
+          KID_HEIGHT,
+          AXIS_SAMPLES,
+          OCCLUDED_RATIO,
+          CONFIRMED_RATIO,
+          width: view?.width ?? 1440,
+          height: view?.height ?? 900,
+        },
+      )
     // The sweep is RETRIED as the game runs, and that is not a courtesy to a
     // slow machine: a chase that is momentarily boxed between two huts offers no
     // clear line from any bearing, which is a passing state of the game and not
-    // a defect in it. A single sweep made that moment fail the whole suite. Two
-    // ranges are tried before each wait, because a pair that has just sprinted
-    // apart does not fit one frame at close range.
+    // a defect in it. A single sweep made that moment fail the whole suite.
+    // Three ranges are tried before each wait: 5.5 m is the composition that was
+    // accepted, 4.5 m is the way PAST an occluder — the boulder line stands
+    // between the play ground and the settlement's rim, so a lens on the village
+    // side of it sees the children whole where one behind it saw two heads —
+    // and 8.5 m the fallback for a pair that has just sprinted apart.
     //
     // THE STANDPOINT IS SHOT FROM WHERE IT WAS VALIDATED. Scoring the bearings
     // and then re-standing on the winner looked tidier and produced a frame of
@@ -2913,55 +2960,44 @@ for (const [placeId, shot] of [
     // one with the most village behind the pair, not merely the first with a
     // clear line — and it is still shot from where it was validated.
     const OFFSETS = [0, 1, -1, 2, -2, 3, -3, 4, -4, 5, -5, 6, -6, 7, -7, 8].map((n) => (n / 16) * Math.PI * 2)
-    // How much village a frame must hold behind the children. Two buildings is
-    // what tells a chase in a settlement from two figures on a plain; asking for
-    // more would fail the scattered forest villages, which have no more to show.
-    const VILLAGE_BEHIND = 2
-    // The chase is photographed at a TIGHT moment: the gap between chaser and
-    // quarry breathes by design, and at full stretch the two do not both stay in
-    // one frame through the shutter's settle — the first retaken frame held the
-    // chaser and lost the quarry behind a hut. The game closes to this within
-    // seconds, so waiting for it costs a few frames and nothing else.
-    const TIGHT_GAP = 6
-    // And the camera is not pressed against a wall: a hut two metres in front of
-    // the lens is not "the village behind them", it is a wall.
-    const WALL_CLEARANCE = 3.5
     let stood = null
-    let shotProbe = 'no clear standpoint in any sweep'
+    let shotProbe = 'no readable standpoint in any sweep'
     let bestSeen = 'nothing read from any bearing'
-    for (let attempt = 0; attempt < 4 && !stood; attempt++) {
-      for (const back of [5.5, 8.5]) {
+    // Six attempts, not four: the pair must now also stand APART on screen, and
+    // that is a state of the game the sweep waits for rather than one it can
+    // choose — a sweep landing entirely inside the seconds after a catch finds
+    // nothing however many bearings it tries.
+    for (let attempt = 0; attempt < 6 && !stood; attempt++) {
+      for (const back of [5.5, 4.5, 8.5]) {
         for (let k = 0; k < OFFSETS.length && !stood; k++) {
           const at = await standAt(OFFSETS[k], back)
           if (!at) break
           if (at.tooFar) continue
           await nextFrames(2)
           const r = await readsFromHere()
-          if (r.pair === 2) {
-            bestSeen =
-              `best read: pair=${r.pair} behind=${r.behind} clear=${r.clear} ` +
-              `gap=${r.gap.toFixed(1)}m wall=${r.nearestWall.toFixed(1)}m`
+          const verdict = judgeTagStandpoint(r)
+          if (!verdict.ok) {
+            bestSeen = `best read: ${describeReading(r)} — ${verdict.reason}`
+            continue
           }
-          if (!(r.clear && r.pair === 2 && r.behind >= VILLAGE_BEHIND)) continue
-          if (!(r.gap <= TIGHT_GAP && r.nearestWall >= WALL_CLEARANCE)) continue
           // It reads from here NOW — does it still, once the shutter's settle
           // delay has passed? Only then is this the frame.
           await nextFrames(4)
           const still = await readsFromHere()
-          if (still.pair === 2 && still.behind >= VILLAGE_BEHIND) {
+          const settled = judgeTagStandpoint(still)
+          if (settled.ok) {
             stood = at
             shotProbe =
               `attempt ${attempt + 1}, ${at.back.toFixed(1)} m, offset ${k}/${OFFSETS.length}: ` +
-              `pair=${still.pair} inFrame=${still.inFrame} village behind=${still.behind} ` +
-              `gap=${still.gap.toFixed(1)}m wall=${still.nearestWall.toFixed(1)}m`
+              `${describeReading(still)} inFrame=${still.inFrame}`
           }
         }
         if (stood) break
       }
-      if (!stood) await nextFrames(30)
+      if (!stood) await nextFrames(60)
     }
     check(
-      'the game is photographable: a clear standpoint holds the chaser and its quarry in frame WITH the village behind them (point 524)',
+      `the game is photographable: both children read whole, apart and at least ${MIN_CHILD_PIXELS} px tall, unoccluded, WITH the village behind them (point 524)`,
       !!stood,
       stood ? shotProbe : `${shotProbe}; ${bestSeen}`,
     )

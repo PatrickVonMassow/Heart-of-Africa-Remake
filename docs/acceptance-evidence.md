@@ -1083,9 +1083,17 @@ per machine — and must show the chaser's identity changing, the gap to the qua
 rising and falling repeatedly, at least one child slowing to recover, headings
 covering a wide spread rather than circling one centre, no child pinned, still
 or outside the rim, and no tag assert fired; the frame is then taken from a
-swept, ray-probed standpoint that has a clear sight line, holds two children
-inside the projected picture AND counts at least two of the settlement's own
-buildings behind them (point 524 — the standpoints fan out from the bearing that
+swept standpoint whose picture is MEASURED before the shutter opens
+(`scripts/verify/tagFrameReading.mjs`, pinned by `tagFrameReading.test.mjs`):
+each of the two children is projected feet-to-crown through the live camera and
+must read at least 67 px tall — the height at which its 24 % head spans a
+readable 16 px — must sit whole inside the inner 0.7 of the frame, and must be
+ray-probed CLEAR at five heights up its own axis, with at least two samples
+confirming the figure is drawn there; and at least two of the settlement's own
+buildings must stand behind them (point 524 — a single chest-height ray had
+passed a standpoint behind the boulder line where the rocks hid both children to
+the shoulders, and the standpoint sweep now also tries 4.5 m, on the village side
+of such an occluder; the standpoints fan out from the bearing that
 looks INTO the village, and the shutter's subject is the child who is IT, never
 the empty midpoint between the two), while the play ground itself is derived
 against the built fabric (`src/scenes/place/lifeSpots.test.ts` pins that for
