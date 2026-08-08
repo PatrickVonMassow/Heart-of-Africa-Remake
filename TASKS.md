@@ -4520,3 +4520,32 @@ Build order, chosen so no two parallel agents own the same file:
   `failed=true` with `verdict-unavailable`; (c) a repository-wide search finds no reader of
   `protectedRef`. Pure Vitest for each.
   Criticality: medium — (a) is the one that can let a real regression reach `main`.
+
+- [ ] 562. A FLICKERING REACHABILITY PROBE STOPS THE WHOLE BATCH (measured 08.08.2026;
+  bundle Urlaubsfestigkeit). The launcher probes the published board each tick and
+  escalates when it cannot read it: five alerts with growing spacing, then a deliberate
+  pause of the batch (`.claude/batch-paused`, the point-445 escalation). On 08.08.2026 at
+  13:39 that chain fired and stopped the work; it only resumed because the restart clock
+  ran out. The board was never gone. `.claude/batch-launcher.log` shows
+  `board: unreachable — fetch failed` INTERLEAVED with successful probes of the same URL
+  (lines 1114 and 1136 sit after already-green ones), and a counter-probe from the same
+  container at the same time returns HTTP 200 — with and without `--dns-result-order=
+  ipv4first` — while `board-publish.mjs --check` reports CURRENT. So a sporadic network
+  hiccup halts every point in the queue, and the alert that fetches the user out of his
+  weekend reports something untrue.
+  FINAL STATE: a transport failure and a STALE board are told apart, because they are not
+  the same claim — a failed fetch says nothing about the board's currency, and only
+  staleness is worth waking anybody for. A probe that fails is RETRIED at once (a second
+  attempt, briefly spaced) before it counts as anything, and the escalation counts only
+  CONSECUTIVE failures: one success anywhere in the chain resets it. The pause stays the
+  last stage for a genuinely unreachable board — it is the right instrument for a real
+  outage — but a transport failure alone never reaches it while the currency check still
+  answers over its own transport (`--check` reads raw.githubusercontent.com, a different
+  host from the Pages viewer, and the two failing together is what an outage looks like).
+  The alert text names WHICH of the two happened.
+  VERIFIABLE: pure Vitest over the probe's decision function — an alternating
+  failure/success sequence never escalates; N consecutive failures do; a single failure
+  followed by a successful retry is not counted; and a fetch failure while the currency
+  check still answers is reported as a transport failure, not as a stale board.
+  Criticality: high for unattended operation — this is the one failure mode that stops
+  every other point, and it fired on a false positive.

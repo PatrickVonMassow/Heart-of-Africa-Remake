@@ -92,7 +92,7 @@ the one the user reads (memory `bundle-names`, retrospective §3.66).
 | **Testinfrastruktur** | K | Test and verification infrastructure | 295, 330, 387, 418, 455, 456, 460, 464, 466, 532, 549, 557 |
 | **Dokumentation** | L | Docs and knowledge transfer | 303, 333, 422, 555 — the rest landed 30.07.2026 (459) |
 | **Steuerung & Performance** | M | Controls and performance | 310, 342, 347 |
-| **Urlaubsfestigkeit** | N | Unattended operation for a fortnight — recovery from a failure at ANY moment, quota waiting, the boot path, the readiness check and the chaos drill that proves it | 442, 443, 444, 445, 446, 447, 448, 449, 450, 533 |
+| **Urlaubsfestigkeit** | N | Unattended operation for a fortnight — recovery from a failure at ANY moment, quota waiting, the boot path, the readiness check and the chaos drill that proves it | 442, 443, 444, 445, 446, 447, 448, 449, 450, 533, 562 |
 | **Kommunikation** | O | The communication PoC: the tonal language, who speaks it, where it is spoken, what the player may write down | 477, 478, 479, 480, 481, 482, 483, 484, 485, 486, 487, 488 (480 IS point 351 and 488 IS point 352, pulled forward — they close together) |
 
 **Urlaubsfestigkeit** was cut on 30.07.2026 on the user's demand that the batch be
