@@ -366,6 +366,14 @@ const stepUntil = async (ready, arg = null, capFrames = 240) => {
 // removes the turning body's rigid leg swing through the interval's MEAN
 // heading rather than the heading at its start (measured: a 0.4 rad turn cost
 // 0.200 of spurious slip the old way and 0.006 this way).
+//
+// THE SPREAD, RECORDED (point 549, the way point 387 recorded its five). Four
+// consecutive WebGL 2 runs on this host after the fix reported worst foot/body
+// travel 0.049, 0.047, 0.049 and 0.059 against the unchanged bar of 0.25 — a
+// spread of 0.012 where the eight runs before it spanned 0.278–1.549 and
+// straddled the bar. The interval count came out 37, 43, 43 and 42, so the
+// verdict rests on a comparable population each time rather than on whatever
+// the host managed to draw.
 {
   /** Record the tracked walkers frame by frame, inside the page: one round trip
    *  for the whole series, so no sample window can be stretched by the host.
@@ -2496,6 +2504,17 @@ for (const [placeId, shot] of [
     return out
   }
 
+  // THE SPREAD, RECORDED (point 549). Both halves of this criterion used to move
+  // between runs on unchanged code: the INSIDE reading at capetown measured
+  // ×0.899, ×0.900, ×0.900, ×0.946 and ×0.964 against `1 - inside > 0.04`, one
+  // run over its own bar, and at giza it was the OUTSIDE half — the open land
+  // that must read untouched — that drifted (×1.057 on the attempt that failed).
+  // Both were reading a wet state still on its way in. With the soak and the
+  // light on it polled until they stop, four consecutive WebGL 2 runs reported
+  // capetown inside ×0.946, ×0.944, ×0.944, ×0.946 (spread 0.002) and giza
+  // inside ×0.905, ×0.906, ×0.906. The outside half is steady but not yet
+  // perfectly still: giza read ×1.000, ×1.000, ×0.980 — inside the ±0.025 bar,
+  // and the one reading worth watching if this check ever rotates again.
   const kinds = [
     { id: 'maasai-village', shoot: { name: '488-village-edge-band', label: 'the swept village ground giving way at the edge' } },
     { id: 'capetown', shoot: { name: '488-port-edge-band', label: 'the port ground giving way at the edge' } },
@@ -3383,6 +3402,17 @@ for (const [placeId, shot] of [
   /** The same search, but never reporting a miss off a scene that may still be
    *  streaming in: a first miss is retried once from a settled state (point
    *  549 — the settled-reading shape point 499 established). */
+  // THE SPREAD, RECORDED (point 549). Three checks rode on this one search and
+  // each of them rotated: the zulu hut approach reported a bare `false` in one
+  // of five runs and passed the other four, the cairo trade house did the same,
+  // and the conversational standpoint reddened once on a loaded machine. With
+  // the world seed pinned, the search reporting what it tried, and one retry
+  // from a settled scene, four consecutive WebGL 2 runs picked the IDENTICAL
+  // standpoint every time — the zulu hut at {x 15.79, z 2.20} on bearing 2.487
+  // of 48 tried, the cairo trade house at {x -19.22, z -1.18} on bearing 0.000
+  // of 49, the conversational standpoint on bearing 0.00, the first of 16. A
+  // search over a world that does not change no longer produces a verdict that
+  // does.
   const standOff = async (target, startR, prefer = null) => {
     const first = await searchStandOff(target, startR, prefer)
     if (first.bearing != null) return first
