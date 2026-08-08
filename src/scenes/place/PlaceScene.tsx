@@ -499,7 +499,10 @@ function Villager({
     ? cloakForCloth(dress.cloaks, dress.palette, style.cloth[1 % style.cloth.length])
     : style.cloth[1 % style.cloth.length]
   return (
-    <group position={[item.pos[0], 0, item.pos[1]]} userData={markActor({ kind: 'elder', height: 2.6 })}>
+    // NOT marked for the §17.8 Ctrl layer: this figure already carries his own
+    // standing label below, so the layer would print the same word twice over
+    // one man (measured — two "Elder" boxes stacked in the frame).
+    <group position={[item.pos[0], 0, item.pos[1]]}>
       {/* Robe */}
       <mesh position={[0, 0.62, 0]} castShadow>
         <coneGeometry args={[0.42, 1.25, TESSELLATION.figureBody]} />
@@ -2833,9 +2836,8 @@ export function PlaceScene() {
       <SpeechLabels />
 
       {/* Names the inhabitants, their animals and the usable objects while Ctrl
-          is held (design.md §17.8). The eye is metres from them here, so the
-          labels ride the settlement's own distance scale, not the map's. */}
-      <ActorLabels distanceFactor={14} />
+          is held (design.md §17.8). */}
+      <ActorLabels />
     </>
   )
 }

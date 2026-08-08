@@ -8,7 +8,10 @@
 //
 // It reuses the map/region label machinery (drei's <Html> and the `map-label`
 // class) rather than inventing a second one, so the labels layer with the rest
-// of the in-scene text under §17.4.
+// of the in-scene text under §17.4. What it does NOT take from them is their
+// distance scaling: a place name may swell as the camera nears it, but a
+// reading aid that did so filled half the bird's-eye frame with one word (the
+// first probe frame). These stay one small size, whatever the distance.
 
 import { useEffect, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
@@ -33,7 +36,7 @@ interface DrawnLabel {
   z: number
 }
 
-function ActorLabelLayer({ distanceFactor }: { distanceFactor: number }) {
+function ActorLabelLayer() {
   const strings = useStrings()
   const camera = useThree((s) => s.camera)
   const scene = useThree((s) => s.scene)
@@ -65,7 +68,11 @@ function ActorLabelLayer({ distanceFactor }: { distanceFactor: number }) {
     const kept = nearestActors(visible, camera.position, balance.labelOverlay.maxLabels)
     setLabels(
       kept.map((actor, i) => ({
-        key: `${actor.kind}-${i}`,
+        // Keyed by SLOT, not by what fills it: the list is re-sorted by distance
+        // every refresh, and a key that moved with the subject unmounted and
+        // remounted drei's portals — two labels for one elder stood in the same
+        // frame while the old one was still being torn down.
+        key: String(i),
         kind: actor.kind,
         text: actorLabelText(strings, actor),
         x: actor.x,
@@ -93,7 +100,7 @@ function ActorLabelLayer({ distanceFactor }: { distanceFactor: number }) {
   return (
     <>
       {labels.map((label) => (
-        <Html key={label.key} center position={[label.x, label.y, label.z]} distanceFactor={distanceFactor}>
+        <Html key={label.key} center position={[label.x, label.y, label.z]}>
           <div className="map-label actor-label">{label.text}</div>
         </Html>
       ))}
@@ -105,6 +112,6 @@ function ActorLabelLayer({ distanceFactor }: { distanceFactor: number }) {
  * Mounts the layer while Ctrl is held and unmounts it on release — including
  * the release that never arrived because the window went away (see ctrlHold).
  */
-export function ActorLabels({ distanceFactor }: { distanceFactor: number }) {
-  return useCtrlHeld() ? <ActorLabelLayer distanceFactor={distanceFactor} /> : null
+export function ActorLabels() {
+  return useCtrlHeld() ? <ActorLabelLayer /> : null
 }

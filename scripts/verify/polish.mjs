@@ -3911,7 +3911,9 @@ for (const [placeId, shot] of [
   )
   // A settlement's actors are its INHABITANTS and their animals — nothing else
   // is drawn here that could pass for one.
-  const INHABITANTS = ['villager', 'child', 'trader', 'porter', 'elder', 'goat']
+  // The elder is not in this list on purpose: he carries his own standing label,
+  // so the Ctrl layer leaves him to it (see PlaceScene's Villager).
+  const INHABITANTS = ['villager', 'child', 'trader', 'porter', 'goat']
   check(
     'the named subjects are inhabitants or their animals (point 342)',
     !!held && held.length > 0 && held.every((l) => INHABITANTS.includes(l.kind)),

@@ -77,13 +77,13 @@ afterEach(() => {
 
 describe('ActorLabels (design.md §17.8)', () => {
   it('shows nothing — and asks the scene for nothing — while Ctrl is up', () => {
-    render(<ActorLabels distanceFactor={60} />)
+    render(<ActorLabels />)
     expect(frameCallback, 'the layer must not even run a frame callback').toBeNull()
     expect(screen.queryByText('Adult giraffe')).toBeNull()
   })
 
   it('names what acts once Ctrl goes down', () => {
-    render(<ActorLabels distanceFactor={60} />)
+    render(<ActorLabels />)
     holdCtrl()
     tick()
     expect(screen.getByText('Adult giraffe')).toBeTruthy()
@@ -92,7 +92,7 @@ describe('ActorLabels (design.md §17.8)', () => {
 
   it('speaks the selected language', () => {
     act(() => useLocale.getState().setLang('de'))
-    render(<ActorLabels distanceFactor={60} />)
+    render(<ActorLabels />)
     holdCtrl()
     tick()
     expect(screen.getByText('Erwachsene Giraffe')).toBeTruthy()
@@ -100,7 +100,7 @@ describe('ActorLabels (design.md §17.8)', () => {
   })
 
   it('disappears on the release', () => {
-    render(<ActorLabels distanceFactor={60} />)
+    render(<ActorLabels />)
     holdCtrl()
     tick()
     expect(screen.getByText('Adult giraffe')).toBeTruthy()
@@ -109,7 +109,7 @@ describe('ActorLabels (design.md §17.8)', () => {
   })
 
   it('is cleared by losing the window, with no keyup at all', () => {
-    render(<ActorLabels distanceFactor={60} />)
+    render(<ActorLabels />)
     holdCtrl()
     tick()
     expect(screen.getByText('Adult giraffe')).toBeTruthy()
@@ -120,7 +120,7 @@ describe('ActorLabels (design.md §17.8)', () => {
   })
 
   it('is cleared when the tab is hidden', () => {
-    render(<ActorLabels distanceFactor={60} />)
+    render(<ActorLabels />)
     holdCtrl()
     tick()
     act(() => {
@@ -130,7 +130,7 @@ describe('ActorLabels (design.md §17.8)', () => {
   })
 
   it('re-syncs from the next input event when the release was missed', () => {
-    render(<ActorLabels distanceFactor={60} />)
+    render(<ActorLabels />)
     holdCtrl()
     tick()
     // The player alt-tabbed, released the key elsewhere and clicked back in:
@@ -145,7 +145,7 @@ describe('ActorLabels (design.md §17.8)', () => {
     const previous = balance.labelOverlay.maxLabels
     balance.labelOverlay.maxLabels = 1
     try {
-      render(<ActorLabels distanceFactor={60} />)
+      render(<ActorLabels />)
       holdCtrl()
       tick()
       // The nearest one survives; the farther one is dropped.

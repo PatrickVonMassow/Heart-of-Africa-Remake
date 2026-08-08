@@ -3022,7 +3022,7 @@ export function TravelScene() {
       <Player />
       {/* Names the animals, people and usable objects on screen while Ctrl is
           held (design.md §17.8); mounts nothing at all while it is not. */}
-      <ActorLabels distanceFactor={60} />
+      <ActorLabels />
     </group>
   )
 }
