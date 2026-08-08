@@ -3,10 +3,16 @@
 import { launchVerifyBrowser, waitForStable, waitForReadingStable, waitForSceneBuilt, assertBackend } from './_browser.mjs'
 import { frameShutter, capturePixels } from './frameSubject.mjs'
 import { judgeFootingSeries, judgePitchSeries, MIN_SLOPED_SAMPLES } from './footingSeries.mjs'
+import { judgeStanceSlip } from './stanceSlip.mjs'
+import { judgeEavesColumn, judgeShelterRoof } from './eavesColumn.mjs'
+import { withVerifySeed } from './verify-seed.mjs'
 import { fileURLToPath } from 'node:url'
 import sharp from 'sharp'
 
-const BASE = process.env.BASE_URL ?? 'http://localhost:5173/'
+// Point 549: the same world every run. Unseeded, this suite built a new
+// settlement layout per attempt and half its checks were a draw — see
+// verify-seed.mjs for the measurement.
+const BASE = withVerifySeed(process.env.BASE_URL ?? 'http://localhost:5173/')
 const OUT = fileURLToPath(new URL('../../verification/', import.meta.url))
 let failures = 0
 const check = (name, ok, detail) => {
@@ -341,122 +347,81 @@ const stepUntil = async (ready, arg = null, capFrames = 240) => {
 // Point 300: the feet must be PLANTED, not skating. Sample a tracked foot's
 // WORLD position across a series of frames and compare its travel with the
 // body's over the same intervals, counting only the intervals in which that leg
-// stayed in stance. A planted foot barely moves while the body walks on; the old
-// over-driven cadence dragged it along at a large fraction of the body's speed.
+// never left the ground. A planted foot holds its spot while the body walks on;
+// the old over-driven cadence dragged it along at a large fraction of the
+// body's speed.
+//
+// Point 549 — THE SERIES IS RECORDED IN THE PAGE, ONE SAMPLE PER DRAWN FRAME.
+// The old sampler stepped the scene from Node, one `page.evaluate` per frame,
+// until some animal had covered 5 % of its stride. The scene keeps drawing
+// through those round trips, so the interval was as long as the host was slow —
+// and on this container it grew long enough for the tracked leg to lift, swing
+// and be planted a whole cycle on between two reads. Asking only whether the
+// leg was down at each END then read that replanting as one huge slip: the same
+// unchanged scene reported 0.278, 0.603, 0.727, 0.972 and 1.549 across eight
+// attempts on an idle host, against a bar of 0.25. Recording every frame inside
+// the page makes the sample window the frame it actually is, and lets the
+// judgment demand an UNBROKEN stance across the whole interval, so a wrap is
+// not filtered out — it cannot occur. The judgment itself is the pure,
+// Vitest-covered `judgeStanceSlip` (scripts/verify/stanceSlip.mjs), which also
+// removes the turning body's rigid leg swing through the interval's MEAN
+// heading rather than the heading at its start (measured: a 0.4 rad turn cost
+// 0.200 of spurious slip the old way and 0.006 this way).
+//
+// THE SPREAD, RECORDED (point 549, the way point 387 recorded its five). Four
+// consecutive WebGL 2 runs on this host after the fix reported worst foot/body
+// travel 0.049, 0.047, 0.049 and 0.059 against the unchanged bar of 0.25 — a
+// spread of 0.012 where the eight runs before it spanned 0.278–1.549 and
+// straddled the bar. The interval count came out 37, 43, 43 and 42, so the
+// verdict rests on a comparable population each time rather than on whatever
+// the host managed to draw.
 {
-  /**
-   * Step the scene until SOME tracked animal has covered `want` of its own
-   * stride, so the interval is sized in the animal's units and not in frames.
-   *
-   * A FIXED frame count cannot do this: a pen goat walks ~0.12 world units a
-   * second and its stride is 0.82, so three frames of a fast headless run move
-   * it 0.008 — under any usable floor, which is exactly why this check first
-   * measured NOTHING and reported a vacuous "0 stance intervals". The same three
-   * frames on a stalled run cover a whole cycle. Sizing the step by the stride
-   * makes the measurement independent of the frame rate.
-   */
-  const stepUntilWalked = async (read, want, capFrames = 150) => {
-    const from = await page.evaluate(read)
-    for (let f = 0; f < capFrames; f++) {
-      await nextFrames(1)
-      const now = await page.evaluate(read)
-      let far = 0
-      for (const id of Object.keys(from)) {
-        const p0 = from[id]
-        const p1 = now[id]
-        if (!p1 || !(p0.stride > 0)) continue
-        far = Math.max(far, Math.hypot(p1.x - p0.x, p1.z - p0.z) / p0.stride)
-      }
-      if (far >= want) return
-    }
-  }
-  const trackFeet = async (read, label) => {
-    const samples = []
-    for (let k = 0; k < 14; k++) {
-      samples.push(await page.evaluate(read))
-      // 5 % of a stride per interval: far above any measurement floor, far below
-      // the half-stride a stance lasts.
-      await stepUntilWalked(read, 0.05)
-    }
-    const slips = []
-    let turned = 0
-    for (let k = 1; k < samples.length; k++) {
-      const a = samples[k - 1]
-      const b = samples[k]
-      for (const id of Object.keys(a)) {
-        const p0 = a[id]
-        const p1 = b[id]
-        if (!p1 || !p0.stance || !p1.stance || !p0.foot || !p1.foot) continue
-        const body = Math.hypot(p1.x - p0.x, p1.z - p0.z)
-        // A standing animal proves nothing. The floor is a fraction of the
-        // animal's OWN stride, not a world constant — a goat and an elephant do
-        // not walk in the same units.
-        if (!(p0.stride > 0) || body < 0.02 * p0.stride) continue
-        // Within one stance the body covers at most half a stride, so a longer
-        // interval found the SAME leg planted again a cycle on: a wrap, not a
-        // skate — it proves nothing either.
-        if (body > 0.4 * p0.stride) continue
-        // The foot's travel is measured in the walker's own HEADING frame: the
-        // promise under test is that one stride carries the body exactly as far
-        // as the stance foot sweeps back through it, which is a statement about
-        // the walking direction. A body that also TURNS swings its rigid legs
-        // about its centre, and because a trot plants a DIAGONAL pair — the two
-        // stance feet sit symmetrically about that centre — no rigid rotation
-        // can hold both; only full foot-IK could, which this point explicitly
-        // leaves out of scope. So the pivot is measured and REPORTED (`turn`
-        // below) but not charged to the cadence, which is what the fix controls
-        // and what a wrong cadence would blow up here on any path, straight or
-        // curved.
-        // Forward is (sin yaw, cos yaw) throughout this codebase, so local→world
-        // is (lx·cos + lz·sin, −lx·sin + lz·cos) and world→local its transpose.
-        const toLocal = (dx, dz, yaw) => ({
-          x: dx * Math.cos(yaw) - dz * Math.sin(yaw),
-          z: dx * Math.sin(yaw) + dz * Math.cos(yaw),
-        })
-        const y0 = p0.yaw ?? 0
-        const y1 = p1.yaw ?? 0
-        const f0 = toLocal(p0.foot.x - p0.x, p0.foot.z - p0.z, y0)
-        const f1 = toLocal(p1.foot.x - p1.x, p1.foot.z - p1.z, y1)
-        // The foot's world displacement with the rigid yaw change removed: the
-        // body's own travel plus the foot's sweep through the body frame, the
-        // latter carried back to world in the heading held at interval start.
-        const lx = f1.x - f0.x
-        const lz = f1.z - f0.z
-        const sx = lx * Math.cos(y0) + lz * Math.sin(y0)
-        const sz = -lx * Math.sin(y0) + lz * Math.cos(y0)
-        slips.push(Math.hypot(p1.x - p0.x + sx, p1.z - p0.z + sz) / body)
-        turned = Math.max(turned, Math.abs(Math.atan2(Math.sin((p1.yaw ?? 0) - (p0.yaw ?? 0)), Math.cos((p1.yaw ?? 0) - (p0.yaw ?? 0)))))
-      }
-    }
-    // A check that measured nothing must never be able to pass, and must say so
-    // rather than print the empty set's Infinity as if it were a huge slip.
-    check(
-      `${label}: the planted foot holds its ground spot while the body walks over it (point 300)`,
-      slips.length >= 3 && Math.max(...slips) < 0.25,
-      slips.length >= 3
-        ? `${slips.length} stance intervals, worst foot/body travel ${Math.max(...slips).toFixed(3)}, turn up to ${turned.toFixed(3)} rad`
-        : `MEASURED NOTHING — only ${slips.length} usable stance intervals (needs 3): no tracked walker was both in stance and moving`,
+  /** Record the tracked walkers frame by frame, inside the page: one round trip
+   *  for the whole series, so no sample window can be stretched by the host.
+   *  The reader is named rather than passed as a function — a page-side `new
+   *  Function` would be both a lint finding and an indirection for nothing. */
+  const recordGait = (kind, frames, maxMs) =>
+    page.evaluate(
+      ([which, n, cap]) =>
+        new Promise((res) => {
+          const read = () => {
+            const out = {}
+            const info = (which === 'panorama' ? window.__placePanoramaWildlifeInfo : window.__placeGoatGait) ?? {}
+            for (const k of Object.keys(info)) {
+              const w = info[k]
+              if (w.visible === false) continue
+              out[k] = { x: w.x, z: w.z, yaw: w.yaw, foot: w.foot, stance: w.stance, stride: w.stride }
+            }
+            return out
+          }
+          const samples = []
+          const t0 = performance.now()
+          const step = () => {
+            samples.push(read())
+            if (samples.length >= n || performance.now() - t0 >= cap) return res(samples)
+            requestAnimationFrame(step)
+          }
+          requestAnimationFrame(step)
+        }),
+      [kind, frames, maxMs],
     )
+
+  const trackFeet = async (kind, label) => {
+    // In chunks, so a fast host stops as soon as it has a verdict's worth of
+    // intervals and a slow one still gets its walking time. The stop condition
+    // is the MEASUREMENT, never a frame count: a goat crosses its pen at
+    // ~0.12 units a second, so how many frames one stance lasts is the host's
+    // business, not the check's.
+    let samples = []
+    let judged = judgeStanceSlip(samples)
+    for (let chunk = 0; chunk < 4 && judged.intervals < 8; chunk++) {
+      samples = samples.concat(await recordGait(kind, 300, 12000))
+      judged = judgeStanceSlip(samples)
+    }
+    check(`${label}: the planted foot holds its ground spot while the body walks over it (point 300)`, judged.enough && judged.worst < 0.25, judged.detail)
   }
-  await trackFeet(() => {
-    const out = {}
-    const info = window.__placePanoramaWildlifeInfo ?? {}
-    for (const k of Object.keys(info)) {
-      const w = info[k]
-      if (w.visible === false) continue
-      out[k] = { x: w.x, z: w.z, yaw: w.yaw, foot: w.foot, stance: w.stance, stride: w.stride }
-    }
-    return out
-  }, 'panorama silhouette')
-  await trackFeet(() => {
-    const out = {}
-    const info = window.__placeGoatGait ?? {}
-    for (const k of Object.keys(info)) {
-      const g = info[k]
-      out[k] = { x: g.x, z: g.z, yaw: g.yaw, foot: g.foot, stance: g.stance, stride: g.stride }
-    }
-    return out
-  }, 'settlement walker (goat)')
+  await trackFeet('panorama', 'panorama silhouette')
+  await trackFeet('goat', 'settlement walker (goat)')
 }
 // Point 413: the settlement animals must stay OUT of the settlement's solids and
 // out of one another. The report was a goat crossing a compound fence and, the
@@ -1807,29 +1772,64 @@ for (const [placeId, shot] of [
     // pair is actually CLEAR — the settlement is dense, and a camera dropped on a
     // fixed bearing can end up inside a hut, which would photograph a wall and
     // prove nothing about an arm.
-    const stood = await page.evaluate(() => {
-      const p = window.__placePlayer
-      const t = window.__placeTalkers
-      if (!p || !t) return null
-      const cx = (t[0].x + t[1].x) / 2
-      const cz = (t[0].z + t[1].z) / 2
-      const aim = (px, pz) => Math.atan2(-(cx - px), -(cz - pz))
+    //
+    // Point 549 — WHY THIS COULD ROTATE ITS VERDICT on an unchanged layout. The
+    // search teleported the player and ray-probed inside ONE page call, and
+    // `__placeRayHit` casts from the CAMERA, which only follows the player on the
+    // next drawn frame. So all sixteen bearings were probed from wherever the
+    // camera still stood — one answer, sixteen times, and which answer depended
+    // on where the block before had left it. Each bearing is now DRAWN before it
+    // is judged (the shape `probeSilhouetteFooting` and the speech probe already
+    // use), a first miss is retried from a settled scene, and a real miss names
+    // what stood in every line instead of reporting a bare `false`.
+    const standAtPair = async () => {
+      const centre = await page.evaluate(() => {
+        const t = window.__placeTalkers
+        return t ? { cx: (t[0].x + t[1].x) / 2, cz: (t[0].z + t[1].z) / 2 } : null
+      })
+      if (!centre) return { stood: null, tried: 0, blocked: ['the pair publishes no position'] }
+      const blocked = []
       for (let i = 0; i < 16; i++) {
         const a = (i / 16) * Math.PI * 2
-        const px = cx + Math.sin(a) * 3.3
-        const pz = cz + Math.cos(a) * 3.3
-        p.x = px
-        p.z = pz
-        p.yaw = aim(px, pz)
-        p.pitch = -0.06
-        const hit = window.__placeRayHit(cx, 1.05, cz)
-        if (hit.hitDistance == null || hit.hitDistance >= hit.targetDistance - 0.45) {
-          return { x: px, z: pz, cx, cz, bearing: a }
+        const hit = await page.evaluate(
+          ([bearing, c]) =>
+            new Promise((res) => {
+              const p = window.__placePlayer
+              p.x = c.cx + Math.sin(bearing) * 3.3
+              p.z = c.cz + Math.cos(bearing) * 3.3
+              p.yaw = Math.atan2(-(c.cx - p.x), -(c.cz - p.z))
+              p.pitch = -0.06
+              requestAnimationFrame(() =>
+                requestAnimationFrame(() => {
+                  const h = window.__placeRayHit(c.cx, 1.05, c.cz)
+                  res({ x: p.x, z: p.z, hit: h.hitDistance, target: h.targetDistance, name: h.hitName })
+                }),
+              )
+            }),
+          [a, centre],
+        )
+        if (hit.hit == null || hit.hit >= hit.target - 0.45) {
+          return { stood: { x: hit.x, z: hit.z, cx: centre.cx, cz: centre.cz, bearing: a }, tried: i + 1, blocked }
         }
+        blocked.push(`${a.toFixed(2)}→${hit.name} at ${hit.hit.toFixed(2)} of ${hit.target.toFixed(2)}`)
       }
-      return null
-    })
-    check('a clear standpoint at conversational distance from the pair exists', stood != null)
+      return { stood: null, tried: 16, blocked }
+    }
+    let search = await standAtPair()
+    if (!search.stood) {
+      // The pair WALKS: a hut that stood in every line a moment ago need not
+      // still. Retried once from a settled scene before the miss is believed.
+      await waitForSceneBuilt(page).catch(() => {})
+      search = await standAtPair()
+    }
+    const stood = search.stood
+    check(
+      'a clear standpoint at conversational distance from the pair exists',
+      stood != null,
+      stood
+        ? `bearing ${stood.bearing.toFixed(2)} rad, the ${search.tried}. of 16 tried`
+        : `all ${search.tried} bearings blocked: ${search.blocked.join(', ')}`,
+    )
 
     // --- the four poses, one frame each -------------------------------------
     // Long durations so the pose survives the shutter's own settling; the wait
@@ -2380,13 +2380,13 @@ for (const [placeId, shot] of [
    *  entry and the wet ground keeps SOAKING through a storm (§19.13), so the
    *  measurement waits on the picture rather than on a guessed number of
    *  milliseconds. Returns the settled reading (or the last one taken). */
-  const settledLuma = async (ndc) => {
+  const settledLuma = async (ndc, eps = 0.3) => {
     let prev = null
     for (let i = 0; i < 40; i++) {
       await settleFrames(2)
       const cur = await groundLuma(await capturePixels(page, 'settled ground luma'), ndc, 150, 46)
       if (cur === null) return null
-      if (prev !== null && Math.abs(cur - prev) < 0.3) return cur
+      if (prev !== null && Math.abs(cur - prev) < eps) return cur
       prev = cur
     }
     return prev
@@ -2399,10 +2399,24 @@ for (const [placeId, shot] of [
    *  inside-vs-outside difference could not tell the two apart. It doubles as
    *  the live proof that the calibratable strength lands without a reload. */
   const bandRatio = async (ndc) => {
+    // Point 549: three frames were not the band arriving, they were three frames.
+    // Each shot now waits for the crop to STOP MOVING on the new strength and
+    // then averages three reads of it — the rains draw over the ground and TRAA
+    // jitters it, so a single frame samples that noise instead of measuring the
+    // band. The measured spread of `capetown (wet)` across five runs was 6.5
+    // luminance points on an unchanged scene, straddling its own 0.04 bar.
     const shot = async (strength) => {
       await page.evaluate((s) => { window.__balance.placeEdgeBand.strength = s }, strength)
-      await settleFrames(3)
-      return groundLuma(await capturePixels(page, 'edge-band ground luma'), ndc, 150, 46)
+      const first = await settledLuma(ndc, 0.2)
+      if (first === null) return null
+      const reads = [first]
+      for (let i = 0; i < 2; i++) {
+        await settleFrames(2)
+        const cur = await groundLuma(await capturePixels(page, 'edge-band ground luma'), ndc, 150, 46)
+        if (cur === null) return null
+        reads.push(cur)
+      }
+      return reads.reduce((a, b) => a + b, 0) / reads.length
     }
     // ON, OFF, ON — and the two ONs averaged. In the rains the ground SOAKS
     // while the shots are taken (the §19.13 wet accumulation keeps darkening
@@ -2418,6 +2432,28 @@ for (const [placeId, shot] of [
   const readGround = async (id, wetness, seasonName, shoot) => {
     await enterFor(id)
     await page.evaluate((w) => window.__ui.getState().setSeasonWetnessOverride(w), wetness)
+    // Point 549: the wet state is WAITED OUT before anything is read, at EVERY
+    // place and for BOTH halves of the criterion — the swept ground inside and
+    // the open land outside. The rains keep soaking the ground (§19.13) and the
+    // settlement light lerps with them, so the crops used to be taken off a
+    // moving picture: the same capetown scene read inside ×0.899, ×0.900,
+    // ×0.900, ×0.946 and ×0.964 across five runs of unchanged code, and the
+    // giza reading moved on its OUTSIDE half instead. This is point 499's
+    // `settle()` applied to the ground: the fields the measurement depends on —
+    // the soak itself and the light falling on it — polled until they stop.
+    const wet = await waitForReadingStable(
+      page,
+      () => {
+        const s = window.__placeSeason()
+        return { wetness: s.wetness, groundWet: s.groundWet, sun: s.sun, hemi: s.hemi }
+      },
+      { settleMs: 400, samples: 3, timeout: 60000 },
+    )
+    check(
+      `${id} (${seasonName}): the ground's wet state settles before the band is measured`,
+      wet.settled,
+      `after ${wet.waitedMs} ms — ${JSON.stringify(wet.value)}`,
+    )
     const bearing = await clearBearing()
     if (bearing === null) {
       check(`${id} (${seasonName}): a clear ground corridor across the edge exists`, false, 'every bearing blocked')
@@ -2469,6 +2505,17 @@ for (const [placeId, shot] of [
     return out
   }
 
+  // THE SPREAD, RECORDED (point 549). Both halves of this criterion used to move
+  // between runs on unchanged code: the INSIDE reading at capetown measured
+  // ×0.899, ×0.900, ×0.900, ×0.946 and ×0.964 against `1 - inside > 0.04`, one
+  // run over its own bar, and at giza it was the OUTSIDE half — the open land
+  // that must read untouched — that drifted (×1.057 on the attempt that failed).
+  // Both were reading a wet state still on its way in. With the soak and the
+  // light on it polled until they stop, four consecutive WebGL 2 runs reported
+  // capetown inside ×0.946, ×0.944, ×0.944, ×0.946 (spread 0.002) and giza
+  // inside ×0.905, ×0.906, ×0.906. The outside half is steady but not yet
+  // perfectly still: giza read ×1.000, ×1.000, ×0.980 — inside the ±0.025 bar,
+  // and the one reading worth watching if this check ever rotates again.
   const kinds = [
     { id: 'maasai-village', shoot: { name: '488-village-edge-band', label: 'the swept village ground giving way at the edge' } },
     { id: 'capetown', shoot: { name: '488-port-edge-band', label: 'the port ground giving way at the edge' } },
@@ -3264,6 +3311,24 @@ for (const [placeId, shot] of [
 // place, building type and seed; this asks the RENDERED scene, after a real
 // walk driven by the game's own collision resolver: what does the frame draw
 // over the player's head, and is the roof a surface when seen from below?
+//
+// THE SPREAD, RECORDED (point 549, the way point 387 recorded its five).
+// `cairo trade house: nothing hangs under the eye at the eaves` was the fourth
+// rotator: it FAILED runs 1 and 4 of four consecutive WebGL 2 runs and PASSED
+// runs 2 and 3, from standpoints identical to within seven centimetres, its
+// downward probe answering either `1.51 m down to ground-disc` or `0.26 m down
+// to BoxGeometry`. Measured at the standpoint's own coordinates over 2842
+// consecutive frames, the column reads the ground in 2655 of them, a box 0.23–
+// 0.28 m under the eye in 115 and a cone at 1.17–1.47 m in 72. The box is the
+// CRATE A PORTER CARRIES and the cone his robe (`Porters`,
+// src/scenes/place/PlaceLife.tsx): a porter route runs through the standpoint,
+// so a single-frame probe was deciding the verdict on a passer-by — a ~4 %
+// coin-flip per run, which is what two reds in four runs looks like. Neither the
+// eave nor the door was ever at fault; the facade is clean and the crate and
+// barrel in `verification/349-eaves-port.png` stand against the wall, out of the
+// column. With the window recorded and judged by `judgeEavesColumn`
+// (scripts/verify/eavesColumn.mjs), the standing reading is 1.50 m to
+// ground-disc every run, and what crossed is named in the line.
 {
   // Keep in sync with ROOF_HEADROOM in src/scenes/place/roofClearance.ts.
   const ROOF_HEADROOM = 1.85
@@ -3283,8 +3348,15 @@ for (const [placeId, shot] of [
 
   /** Stand the player on an open bearing around `target` and aim him at it.
    *  `prefer` (a world bearing) is tried first — a trade house is approached
-   *  from its DOOR side, where the awning it must be judged by hangs. */
-  const standOff = (target, startR, prefer = null) =>
+   *  from its DOOR side, where the awning it must be judged by hangs.
+   *
+   *  Point 549: it reports WHAT IT SEARCHED, never a bare `null`. Three checks
+   *  ride on this one search — the village eaves, the port eaves and the cook
+   *  shelter — and each of them used to fail as `false` beside the target's
+   *  coordinates, which says nothing about why 49 bearings were all rejected.
+   *  Now the miss names how many bearings the disc edge closed, how many each
+   *  collider closed, and which colliders those were. */
+  const searchStandOff = (target, startR, prefer = null) =>
     page.evaluate(
       ([t, start, preferred]) => {
         const reach = (c) => {
@@ -3295,38 +3367,93 @@ for (const [placeId, shot] of [
         const others = (window.__placeColliders ?? []).filter(
           (c) => c.kind === 'segment' || Math.hypot((c.x ?? 0) - t.x, (c.z ?? 0) - t.z) > 0.05,
         )
-        const busy = (x, z) =>
-          others.some((c) => {
-            const cx = c.kind === 'segment' ? (c.x1 + c.x2) / 2 : c.x
-            const cz = c.kind === 'segment' ? (c.z1 + c.z2) / 2 : c.z
-            return Math.hypot(x - cx, z - cz) < reach(c) + 0.9
+        const centre = (c) => ({
+          x: c.kind === 'segment' ? (c.x1 + c.x2) / 2 : c.x,
+          z: c.kind === 'segment' ? (c.z1 + c.z2) / 2 : c.z,
+        })
+        const blocker = (x, z) =>
+          others.find((c) => {
+            const m = centre(c)
+            return Math.hypot(x - m.x, z - m.z) < reach(c) + 0.9
           })
         const radius = window.__placeLayout?.radius ?? 28
         const bearings = []
         if (typeof preferred === 'number') bearings.push(preferred)
         for (let i = 0; i < 48; i++) bearings.push((i / 48) * Math.PI * 2)
+        let byDisc = 0
+        const byCollider = new Map()
         for (const b of bearings) {
-          let clear = true
-          for (let d = start; d >= 1.2 && clear; d -= 0.4) {
+          let blocked = null
+          for (let d = start; d >= 1.2 && !blocked; d -= 0.4) {
             const x = t.x + Math.cos(b) * d
             const z = t.z + Math.sin(b) * d
-            if (Math.hypot(x, z) > radius - 1.5 || busy(x, z)) clear = false
+            if (Math.hypot(x, z) > radius - 1.5) {
+              blocked = 'disc'
+              break
+            }
+            const c = blocker(x, z)
+            if (c) {
+              const m = centre(c)
+              blocked = `${c.kind}@${m.x.toFixed(1)},${m.z.toFixed(1)}`
+            }
           }
-          if (!clear) continue
+          if (blocked === 'disc') byDisc++
+          else if (blocked) byCollider.set(blocked, (byCollider.get(blocked) ?? 0) + 1)
+          if (blocked) continue
           const p = window.__placePlayer
           p.x = t.x + Math.cos(b) * start
           p.z = t.z + Math.sin(b) * start
           p.pitch = 0
           p.yaw = Math.atan2(-(t.x - p.x), -(t.z - p.z))
-          return b
+          return { bearing: b, tried: bearings.length, colliders: others.length }
         }
-        return null
+        const worst = [...byCollider.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4)
+        return {
+          bearing: null,
+          tried: bearings.length,
+          colliders: others.length,
+          detail: `${bearings.length} bearings from r=${start} to r=1.2, all blocked: ${byDisc} by the disc edge (radius ${radius}), the rest by [${worst.map(([k, n]) => `${k}×${n}`).join(', ')}] of ${others.length} colliders`,
+        }
       },
       [target, startR, prefer],
     )
 
+  /** The same search, but never reporting a miss off a scene that may still be
+   *  streaming in: a first miss is retried once from a settled state (point
+   *  549 — the settled-reading shape point 499 established). */
+  // THE SPREAD, RECORDED (point 549). Three checks rode on this one search and
+  // each of them rotated: the zulu hut approach reported a bare `false` in one
+  // of five runs and passed the other four, the cairo trade house did the same,
+  // and the conversational standpoint reddened once on a loaded machine. With
+  // the world seed pinned, the search reporting what it tried, and one retry
+  // from a settled scene, four consecutive WebGL 2 runs picked the IDENTICAL
+  // standpoint every time — the zulu hut at {x 15.79, z 2.20} on bearing 2.487
+  // of 48 tried, the cairo trade house at {x -19.22, z -1.18} on bearing 0.000
+  // of 49, the conversational standpoint on bearing 0.00, the first of 16. A
+  // search over a world that does not change no longer produces a verdict that
+  // does.
+  const standOff = async (target, startR, prefer = null) => {
+    const first = await searchStandOff(target, startR, prefer)
+    if (first.bearing != null) return first
+    await waitForSceneBuilt(page).catch(() => {})
+    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(null)))))
+    const again = await searchStandOff(target, startR, prefer)
+    if (again.bearing == null) again.detail = `${again.detail} (unchanged on a retry from the settled scene)`
+    return again
+  }
+
   /** Hold forward until the walk stops closing on the target — the collider has
-   *  been reached. Every step waits for DRAWN frames, never for wall-clock time. */
+   *  been reached. Every step waits for DRAWN frames, never for wall-clock time.
+   *
+   *  Point 549: the probe is taken at the CLOSEST APPROACH the walk reached, not
+   *  at wherever it came to rest. A blocked step SLIDES along the collider, so
+   *  the last frames of a stalled walk drift sideways along the wall by however
+   *  much the host drew in them — and the eaves probe then reads whatever
+   *  happens to stand at that drifted spot. Measured: the same trade house, same
+   *  seed, same approach bearing, once read `1.52 m down to ground-disc` and
+   *  once `0.24 m down to BoxGeometry`. Standing him back on the nearest point
+   *  the walk actually reached is a position he really walked to, and it is the
+   *  one the check means: at the eaves. */
   const walkUntilStalled = async (target, maxMs = 20000) => {
     const step = () =>
       page.evaluate(
@@ -3336,7 +3463,7 @@ for (const [placeId, shot] of [
               requestAnimationFrame(() => {
                 window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW' }))
                 const p = window.__placePlayer
-                r(Math.hypot(p.x - t.x, p.z - t.z))
+                r({ d: Math.hypot(p.x - t.x, p.z - t.z), x: p.x, z: p.z })
               }),
             ),
           ),
@@ -3344,66 +3471,134 @@ for (const [placeId, shot] of [
       )
     const t0 = Date.now()
     let last = await step()
+    let best = last
     let stalled = 0
     while (Date.now() - t0 < maxMs) {
       const now = await step()
-      stalled = last - now < 0.02 ? stalled + 1 : 0
+      if (now.d < best.d) best = now
+      stalled = last.d - now.d < 0.02 ? stalled + 1 : 0
       last = now
       if (stalled >= 3) break
     }
     await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyW' })))
+    await page.evaluate(
+      (b) => {
+        const p = window.__placePlayer
+        p.x = b.x
+        p.z = b.z
+      },
+      best,
+    )
     await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(null)))))
-    return last
+    return best.d
   }
 
-  /** What the frame really draws straight above and straight below the eye. */
-  const probeOverhead = () =>
+  /** What the frame really draws straight above and straight below the eye, over
+   *  a WINDOW of frames rather than in one (point 549).
+   *
+   *  The player stands still here, so the building fabric — the only thing this
+   *  criterion is about — reads identically in every frame of the window. What
+   *  varies is the settlement's TRAFFIC: measured at the cairo standpoint over
+   *  2842 consecutive frames, 115 of them had a porter's carried crate 0.26 m
+   *  under the eye and 72 his robe, and a single-frame probe therefore decided
+   *  the verdict by whether a porter happened to be passing. The window is
+   *  recorded in ONE round trip and judged by the pure `judgeEavesColumn`. */
+  const recordColumn = (frames = 150, maxMs = 6000) =>
+    page.evaluate(
+      ([n, cap]) =>
+        new Promise((res) => {
+          const out = []
+          let done = false
+          const finish = () => {
+            if (done) return
+            done = true
+            res(out)
+          }
+          const sample = () => {
+            const cam = window.__placeCamera
+            const y = cam.position.y
+            const up = window.__placeRayHit(cam.position.x, y + 6, cam.position.z)
+            const down = window.__placeRayHit(cam.position.x, y - 4, cam.position.z)
+            out.push({
+              camY: y,
+              roofY: up.hitDistance == null ? null : y + up.hitDistance,
+              roofName: up.hitName,
+              drop: down.hitDistance,
+              below: down.hitName,
+            })
+          }
+          // The first sample is taken WITHOUT waiting for a frame, so a lane that
+          // draws nothing still yields the single reading the old probe took —
+          // the window can only ever add to it, never leave the caller with less.
+          sample()
+          // And the wall clock, not rAF, ends the window: a page that stops
+          // ticking must not hang `page.evaluate`, which has no timeout of its own.
+          const timer = setTimeout(finish, cap + 500)
+          const t0 = performance.now()
+          const tick = () => {
+            if (done) return
+            sample()
+            if (out.length >= n || performance.now() - t0 > cap) {
+              clearTimeout(timer)
+              finish()
+            } else requestAnimationFrame(tick)
+          }
+          requestAnimationFrame(tick)
+        }),
+      [frames, maxMs],
+    )
+
+  /** Where the player ended up — the standpoint every reading above belongs to. */
+  const standpoint = () =>
     page.evaluate(() => {
-      const cam = window.__placeCamera
       const p = window.__placePlayer
-      const y = cam.position.y
-      const up = window.__placeRayHit(cam.position.x, y + 6, cam.position.z)
-      const down = window.__placeRayHit(cam.position.x, y - 4, cam.position.z)
-      return {
-        x: p.x,
-        z: p.z,
-        camY: y,
-        roofY: up.hitDistance == null ? null : y + up.hitDistance,
-        roofName: up.hitName,
-        drop: down.hitDistance,
-        below: down.hitName,
-      }
+      return { x: p.x, z: p.z }
     })
 
   const eavesCase = async (placeId, label, pick, startR) => {
     await enterFor(placeId)
-    const target = await page.evaluate(pick)
-    if (!target) {
+    // Point 549: `pick` names EVERY building of the kind under test, not the
+    // first one the layout happens to list. The eave line is a property of the
+    // building type — any hut of it proves the criterion — so a single crowded
+    // neighbour is no reason for the check to have nothing to say. It fails
+    // only when NO building of the kind can be walked up to, and then it says
+    // what blocked each of them.
+    const picked = await page.evaluate(pick)
+    const targets = (Array.isArray(picked) ? picked : picked ? [picked] : []).filter(Boolean)
+    if (!targets.length) {
       check(`${label}: a building to walk up to`, false, 'none found in the layout')
       return null
     }
-    const bearing = await standOff(target, startR, target.approach ?? null)
-    if (bearing == null) {
-      check(`${label}: an open approach to walk in on`, false, JSON.stringify(target))
-      return null
+    let target = null
+    let stood = null
+    const misses = []
+    for (const t of targets) {
+      const r = await standOff(t, startR, t.approach ?? null)
+      if (r.bearing != null) {
+        target = t
+        stood = r
+        break
+      }
+      misses.push(`{x ${t.x.toFixed(2)}, z ${t.z.toFixed(2)}}: ${r.detail}`)
     }
+    check(
+      `${label}: an open approach to walk in on`,
+      !!stood,
+      stood
+        ? `candidate ${misses.length + 1} of ${targets.length} at {x ${target.x.toFixed(2)}, z ${target.z.toFixed(2)}}, bearing ${stood.bearing.toFixed(3)} rad of ${stood.tried} tried`
+        : `no clear approach to any of ${targets.length} — ${misses.join(' || ')}`,
+    )
+    if (!stood) return null
     await walkUntilStalled(target)
-    const probe = await probeOverhead()
-    probe.bearing = bearing
+    const at = await standpoint()
+    const verdict = judgeEavesColumn(await recordColumn(), { headroom: ROOF_HEADROOM })
+    const where = `standing at {x ${at.x.toFixed(2)}, z ${at.z.toFixed(2)}}`
     // The near plane never gets INSIDE the roof: the first surface under the eye
     // is the ground he stands on, never thatch he has climbed into.
-    check(
-      `${label}: nothing hangs under the eye at the eaves`,
-      probe.below !== 'hut-roof' && probe.drop != null && probe.drop >= probe.camY - 0.5,
-      `${probe.drop == null ? 'nothing' : probe.drop.toFixed(2) + ' m'} down to ${probe.below} from ${probe.camY.toFixed(2)} m`,
-    )
+    check(`${label}: nothing hangs under the eye at the eaves`, verdict.belowClear, `${verdict.belowDetail}, ${where}`)
     // And whatever DOES hang over him clears the eye, the near plane and a margin.
-    check(
-      `${label}: the roof over him clears the head`,
-      probe.roofY == null || probe.roofY >= ROOF_HEADROOM,
-      `${probe.roofY == null ? 'open sky' : probe.roofY.toFixed(2) + ' m of ' + probe.roofName} over an eye at ${probe.camY.toFixed(2)} m`,
-    )
-    return { target, probe }
+    check(`${label}: the roof over him clears the head`, verdict.roofClears, `${verdict.roofDetail}, ${where}`)
+    return { target, probe: { bearing: stood.bearing, x: at.x, z: at.z } }
   }
 
   /** The photograph a HUMAN judges: the eave line where roof meets wall, taken
@@ -3436,8 +3631,9 @@ for (const [placeId, shot] of [
     'zulu-village',
     'zulu village hut',
     () => {
-      const hut = (window.__placeLayout?.dwellings ?? []).find((d) => d.kind === 'hut')
-      return hut ? { x: hut.x, z: hut.z, h: hut.h } : null
+      return (window.__placeLayout?.dwellings ?? [])
+        .filter((d) => d.kind === 'hut')
+        .map((d) => ({ x: d.x, z: d.z, h: d.h }))
     },
     6,
   )
@@ -3449,11 +3645,10 @@ for (const [placeId, shot] of [
     'cairo',
     'cairo trade house',
     () => {
-      const it = (window.__placeLayout?.interactives ?? []).find((i) => i.type !== 'villager')
-      if (!it) return null
-      const rot = it.rot ?? 0
-      // The door faces local +Z, so the approach bearing is the door's own.
-      return { x: it.pos[0], z: it.pos[1], h: 3.2, approach: Math.atan2(Math.cos(rot), Math.sin(rot)) }
+      return (window.__placeLayout?.interactives ?? [])
+        .filter((i) => i.type !== 'villager')
+        // The door faces local +Z, so the approach bearing is the door's own.
+        .map((i) => ({ x: i.pos[0], z: i.pos[1], h: 3.2, approach: Math.atan2(Math.cos(i.rot ?? 0), Math.sin(i.rot ?? 0)) }))
     },
     8,
   )
@@ -3469,16 +3664,15 @@ for (const [placeId, shot] of [
   await enterFor('bemba-village')
   const fire = { x: -3.5, z: 2.5 } // VILLAGE_FIRE in src/scenes/place/layout.ts
   const stoodAtFire = await standOff(fire, 5)
-  if (stoodAtFire == null) {
-    check('cook shelter: an open approach to the fire', false, 'no clear bearing')
+  if (stoodAtFire.bearing == null) {
+    check('cook shelter: an open approach to the fire', false, stoodAtFire.detail)
   } else {
     await walkUntilStalled(fire)
-    const probe = await probeOverhead()
-    check(
-      'the cook-shelter roof is still standable AND reads as a surface from below',
-      probe.roofName === 'hut-roof' && probe.roofY != null && probe.roofY >= ROOF_HEADROOM,
-      `${probe.roofY == null ? 'open sky' : probe.roofY.toFixed(2) + ' m of ' + probe.roofName} over the fire`,
-    )
+    // The same settled window (point 549): the fire is where the village GATHERS,
+    // so a villager stepping between the eye and the canopy is the likeliest
+    // thing in the whole suite to intercept an upward ray.
+    const shelter = judgeShelterRoof(await recordColumn(), { headroom: ROOF_HEADROOM })
+    check('the cook-shelter roof is still standable AND reads as a surface from below', shelter.ok, shelter.detail)
   }
 
   // A roof seen from below must be a real surface, not a back face one can see
