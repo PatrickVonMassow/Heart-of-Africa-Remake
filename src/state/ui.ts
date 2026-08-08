@@ -51,6 +51,12 @@ export interface UiState {
    *  marker's name-label is hidden while set. null when clear of every settlement. */
   enterPlaceId: string | null
   debugOpen: boolean
+  /**
+   * The ids of the OPEN debug-menu groups (design.md §21.3). Every group starts
+   * collapsed; an opened one stays open for the rest of the session, so a
+   * calibration pass does not re-open the same group after every F1.
+   */
+  debugGroupsOpen: string[]
   /** Self-drawing exploration map (design.md §19). */
   mapOpen: boolean
   /** True when the renderer fell back from WebGPU to WebGL 2 (CLAUDE.md §3). */
@@ -155,6 +161,8 @@ export interface UiState {
   setPrompt: (p: string | null) => void
   setEnterPlaceId: (id: string | null) => void
   toggleDebug: () => void
+  /** Open/close one debug-menu group by id (design.md §21.3). */
+  toggleDebugGroup: (id: string) => void
   toggleMap: () => void
   setWebglFallback: (fallback: boolean) => void
   dismissWebglWarning: () => void
@@ -196,6 +204,7 @@ export const useUi = create<UiState>()((set) => ({
   prompt: null,
   enterPlaceId: null,
   debugOpen: false,
+  debugGroupsOpen: [],
   mapOpen: false,
   webglFallback: false,
   webglWarningDismissed: false,
@@ -235,6 +244,12 @@ export const useUi = create<UiState>()((set) => ({
   setPrompt: (prompt) => set({ prompt }),
   setEnterPlaceId: (enterPlaceId) => set({ enterPlaceId }),
   toggleDebug: () => set((s) => ({ debugOpen: !s.debugOpen })),
+  toggleDebugGroup: (id) =>
+    set((s) => ({
+      debugGroupsOpen: s.debugGroupsOpen.includes(id)
+        ? s.debugGroupsOpen.filter((g) => g !== id)
+        : [...s.debugGroupsOpen, id],
+    })),
   toggleMap: () => set((s) => ({ mapOpen: !s.mapOpen })),
   setWebglFallback: (webglFallback) => set({ webglFallback }),
   dismissWebglWarning: () => set({ webglWarningDismissed: true }),

@@ -428,6 +428,22 @@ export const en: Strings = {
 
   debug: {
     title: 'Debug Menu (F1)',
+    filter: 'Filter',
+    filterHint: 'type to narrow …',
+    filterEmpty: 'No control matches.',
+    groups: {
+      movement: 'Movement and controls',
+      travel: 'Time and travel',
+      survival: 'Health, water and provisions',
+      wildlife: 'Wildlife and its dramas',
+      settlement: 'Settlement life',
+      weather: 'Weather and season',
+      economy: 'Economy and trade',
+      events: 'Random events and triggers',
+      graphics: 'Graphics and sound',
+      jump: 'Jump targets',
+      tools: 'Tools',
+    },
     renderer: 'Renderer',
     language: 'Language',
     travelSpeed: 'Travel speed (overland)',

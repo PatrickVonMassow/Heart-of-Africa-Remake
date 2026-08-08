@@ -1260,6 +1260,18 @@ Verifiable, by suite:
   and an inhabitant re-entering its dwelling (pt. 16).
 - `scripts/verify/voice.mjs`: the automatic narration of a new entry
   (pt. 19).
+- The menu's STRUCTURE (`design.md` §21, point 393) is proved in
+  `src/ui/DebugMenu.test.tsx`: a COMPLETENESS pin names all 132
+  controls and the group each belongs to and compares that against the
+  rendered menu in BOTH directions and in both languages — a dropped
+  control fails, and so does one added without being named — plus every
+  row carrying a real input/select/button, the eleven groups rendered
+  in the order `src/ui/debugMenuGroups.ts` fixes, all collapsed at
+  first, one opening on its header click and staying open across a
+  close/reopen of the menu, and the filter narrowing across groups,
+  restoring the full set and the remembered collapse when cleared,
+  saying so when nothing matches, and matching the German labels once
+  German is active. `matchesDebugFilter` is pure-tested beside them.
 
 ## 21. Water realism.
 

@@ -636,7 +636,9 @@ changes with it in the same commit.
     surf and its per-source sliders, the overland travel speed and the
     terrain relief factors — and every one of those values is editable
     while the game runs, from the debug menu (§21), in English and in
-    German. The §21.4 zoom behavior, the §21.3 selectors and the §21.1
+    German. That menu is STRUCTURED per §21: named collapsible groups
+    under one filter field, and no control is lost to a regrouping.
+    The §21.4 zoom behavior, the §21.3 selectors and the §21.1
     debug shortcuts hold as specified, F6 producing the complete bug
     report, F8 the shipped render benchmark and F9 the graphics detail
     level, whose `QUALITY_PRESETS` registry must carry every quality lever

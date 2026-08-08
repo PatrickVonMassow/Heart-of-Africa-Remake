@@ -1345,10 +1345,49 @@ textarea {
   margin: 2px 2px 2px 0;
 }
 
-.debug-menu .section {
-  border-top: 1px solid #2d3748;
-  margin-top: 8px;
-  padding-top: 8px;
+/* Filter row and collapsible groups (design.md §21.3, point 393). */
+.debug-menu input[type='text'] {
+  width: 150px;
+  background: #1a202c;
+  border: 1px solid #4a5568;
+  color: #e2e8f0;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font: inherit;
+}
+
+.debug-menu .debug-filter {
+  border-bottom: 1px solid #2d3748;
+  padding-bottom: 8px;
+  margin-bottom: 4px;
+}
+
+.debug-menu .debug-empty {
+  margin: 8px 0 0;
+  color: #a0aec0;
+  font-style: italic;
+}
+
+.debug-menu .debug-group-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  margin: 6px 0 0;
+  padding: 4px 6px;
+  text-align: left;
+  color: #90cdf4;
+  background: #1a202c;
+}
+
+.debug-menu .debug-group-caret {
+  color: #718096;
+}
+
+.debug-menu .debug-group-body {
+  border-left: 1px solid #2d3748;
+  margin-left: 4px;
+  padding-left: 8px;
 }
 
 /* --- 3D map labels (drei Html) -------------------------------------------- */

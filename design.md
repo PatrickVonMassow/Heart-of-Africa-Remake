@@ -792,6 +792,8 @@ of §19.14 applies to it too.
 
 A debug menu opened with F1. All settings take effect immediately on the running game; no restart needed.
 
+Its roughly 130 controls are STRUCTURED, never one flat list: each sits in a named, collapsible group chosen by what a person is doing when he opens the menu, not by which balance object the value happens to live in — movement and controls; time and travel; health, water and provisions; wildlife and its dramas; settlement life; weather and season; economy and trade; random events and triggers; graphics and sound; jump targets; tools. Every group starts collapsed, and an opened one stays open for the session. Above them stands a FILTER field that narrows the whole menu — across all groups at once — to the controls whose localized label matches what is typed; clearing it restores the full menu and the remembered collapse state, and a query nothing matches says so rather than showing an empty panel.
+
 ### 21.1 Shortcut keys
 
 - **F1** opens/closes the debug menu.
