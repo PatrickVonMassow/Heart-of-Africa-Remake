@@ -89,6 +89,152 @@ there exactly once; a new point joins a bundle when appended.
   memory). The v0.3 content is the 175/177/176/178-183/184-closed, closing-verified
   HEAD; 182 and 163/166/170 come AFTER the tag.
 
+- [ ] 513. A BRANCH CI RUN MUST NOT MAIL THE OWNER (user decision 05.08.2026 on
+  the card "Rote CI-Läufe auf Agenten-Zweigen — welcher Weg?", option 3). Two
+  deliberate rules work against each other: a branch push runs lint and
+  dependencies only (the full gate per intermediate commit costs more than a red
+  branch is worth), while the pipeline runs in full on EVERY branch push. An agent
+  that commits mid-work therefore produces red runs, and each one mails the
+  repository owner.
+  FINAL STATE:
+  1. A CI run on a `feat/**` branch no longer notifies the owner by mail. Red on a
+     branch is expressly normal; the run still executes and its result stays
+     visible in the run list.
+  2. `main` is untouched: a red run there still mails, because that is the branch
+     the deploy builds from.
+  3. The rescue-commit mail path (`[skip ci]` plus the `Rescue:` trailer, which
+     deliberately mails on a red state) keeps working as specified — this point
+     silences the ROUTINE branch run, not the deliberate alarm.
+  4. `docs/` states where notifications now come from, so a silent branch failure
+     is never mistaken for a green one.
+  VERIFIABLE: a deliberately red push to a throwaway `feat/` branch produces a run
+  and no mail; the same failure on `main` still mails; the rescue path still does.
+
+- [ ] 393. THE DEBUG MENU IS TIDIED INTO A STRUCTURE (user 28.07.2026: "völlig ausgeartet
+  und eine riesige, unstrukturierte Liste"). MEASURED: `src/ui/DebugMenu.tsx` is 523 lines
+  and renders about 130 controls, nearly all of them in ONE flat run — two `div.section`
+  wrappers near the end are the only grouping there is. It is the fine-tuning tool of §21
+  and the one debug surface that ships, so finding a value must not be a scroll hunt.
+  TARGET: named, COLLAPSIBLE groups, each holding the controls that belong together, plus
+  a FILTER field at the top that narrows the whole menu to the controls whose label
+  matches what is typed — with 130 values, search is what turns a list into a tool. All
+  groups start collapsed except the filter; opening one is remembered for the session so a
+  calibration pass does not re-open the same group every time.
+  THE GROUPS, by what a person is doing when they open the menu — not by which balance
+  object a value happens to live in: movement and controls; time and travel; health,
+  water and provisions; wildlife and its dramas; weather and season; economy and trade;
+  random events; graphics and sound; jump-to (the §21.3 selectors, which already have
+  their own category/alphabetical order — keep it); tools (benchmark, bug report, the
+  read-only renderer row). Where a value plausibly belongs to two groups, put it where a
+  player TUNING it would look, and say why in the commit.
+  NOTHING MAY BE LOST — this is the risk that matters. Every control that exists today
+  still exists, still writes through to the same field, and still carries the same
+  localized label in BOTH languages; the group names are new text and exist in both too.
+  `src/ui/DebugMenu.test.tsx` already pins several of these individually (the jump-to
+  grouping and its sort, the rescue-burst write-through, the single graphics dropdown);
+  extend it with a COMPLETENESS test that walks the rendered menu and asserts the full set
+  of controls against a list derived from the source of truth, so a future edit cannot
+  drop one silently — the same shape as the `QUALITY_PRESETS` completeness gate (§21).
+  KEEP IT A DEBUG TOOL: no new values, no renamed fields, no behaviour changes behind the
+  controls. This point moves and groups what is there and adds the filter, nothing else.
+  VERIFIABLE: Vitest on the menu — every control present and writing through (the
+  completeness test above), the filter narrowing to the matching controls and restoring
+  the full set when cleared, groups collapsing and their state surviving a re-render, and
+  both languages carrying every group name. Live: `scripts/verify/settings.mjs` still
+  drives the values it drives today through the new structure. No picture check is owed
+  beyond one frame of the opened menu per backend, since it is DOM.
+  DOCS in the same commit: design.md §21.3 states the grouped, filterable menu, and
+  CLAUDE.md §7.1 pt 20 keeps naming what the menu must offer. Both sit at measured
+  ceilings, so any added words are paid for by a measured raise with its justification or
+  by shortening elsewhere.
+- [ ] 524. THE CHILDREN'S PLAY GROUND IS SQUEEZED INTO A ROCKY CORNER, AND THE
+  FRAME THAT PROVES THEM NO LONGER SHOWS THE VILLAGE (measured 06.08.2026 while
+  closing point 481, on WebGL 2). Point 481 moved the children far enough from
+  the adults for point 478's hearing range to separate the two teaching voices.
+  In the Maasai village that rule leaves only three viable bearings, all in the
+  rocky corner beyond the boulder line: `verification/480-village-tag.png` now
+  shows an almost empty plain with ONE small child beside a lone tree and the
+  edge of a single hut, where the same frame on `main` showed the hut ring, the
+  labels, both children and the herd behind them. The checks stay green — both
+  children are framed and ray-probed within 14 m — which is exactly the
+  looks-wrong-but-passes case: the evidence frame no longer reads as village
+  life to a human.
+  FINAL STATE:
+  1. The children play where the separation rule AND the picture both hold: the
+     ground is chosen so the play spot keeps its distance from the adult
+     vignettes yet still lies against the settlement's built fabric, not on the
+     bare edge behind the rocks.
+  2. If no such spot exists in a village of that size, the SEPARATION is what
+     gives — the two voices may be told apart by another means the mechanic
+     allows (a pause between them, distinct speakers) rather than by pushing the
+     children out of the settlement.
+  3. The tag frame is retaken from a standpoint that shows BOTH children at a
+     readable size WITH the village behind them, and its shutter declaration
+     names the children as its subject so an empty plain can never pass again.
+  4. `balance.villageLife.tag.playRadius` and the derived play ground stay
+     debug-editable, and the derivation is stated in the code where it shrinks.
+  VERIFIABLE: pure Vitest on the play-ground derivation (the spot keeps the
+  separation AND lies within the built fabric for every shipped village), plus
+  the retaken frame checked by a human on both backends.
+
+- [ ] 342. HOLD CTRL TO NAME WHAT ACTS ON SCREEN (user 25.07.2026; design.md §17.8
+  states the target). While Ctrl is held, every animal, person and usable object on
+  screen carries a small floating label naming WHAT it is — "Adult giraffe", "Dead
+  giraffe calf" — in both perspectives. Scenery does not: no tree, rock, grass tuft or
+  wall. Ctrl is currently unbound (no `ctrlKey` handler exists in `src/`), so nothing
+  is being taken away from another control.
+  (a) WHAT QUALIFIES — one pure predicate, not a scatter of checks at each call site:
+  a thing is named when it can MOVE or the player can DO something with it. In: the
+  bird's-eye fauna (the 13 species of `Species` in Wildlife.tsx — elephant, giraffe,
+  zebra, wildebeest, antelope, warthog, flamingo, crocodile, plover and the four
+  predators — plus vultures and carcasses), the settlement inhabitants and their
+  animals, and the usable objects (a pitched camp, a set-down canoe). Out: the flora
+  and dressing instances of `SPECIES` in TravelScene.tsx (acacia … kopje), terrain,
+  buildings that are not enterable, and the §2.5 horizon silhouettes — those are
+  backdrop, not actors. Two exclusions carry design weight and must be pure-tested as
+  such: a MAP POINT is never named by this layer (settlements and landmarks keep their
+  own labels under the §17.2 discovery gate, so the layer can never leak an
+  undiscovered name), and a CONCEALED animal is not named while concealed — the
+  submerged crocodile of §19.16 stays silent until it lunges, or the ambush is dead.
+  (b) THE TEXT — kind, then age where the game distinguishes one, then state where it
+  changes what is seen (dead). The fauna roster is NOT yet localized: `src/i18n/de.ts`
+  and `en.ts` carry no species names at all today (`nameCompleteness.test.ts` covers
+  places and landmarks only), so this point ADDS them for the whole roster, plus the
+  inhabitant roles (elder, trader, villager) and the object kinds.
+  GERMAN GRAMMAR IS PART OF THE FEATURE, not a translation afterthought: "Totes
+  Giraffen-Jungtier" is not "tot" + "Giraffen-Jungtier" pasted together, and "Tote
+  Giraffe" inflects differently. Each entry therefore carries what its language needs
+  to inflect — for German the noun's GENDER beside the noun — and the composition is a
+  pure function of (kind, age, state, language). Never build the string by
+  concatenation at the render site.
+  (c) RENDERING AND COST. Project through the live camera with the existing shared
+  `isOnScreen` (the point-172 rule: the true frustum, never an assumed radius) and
+  label only what is really drawn; cap the count at a calibratable nearest-N
+  (`balance.labelOverlay.maxLabels`, debug-editable) so a crowded savanna stays
+  readable and the frame does not fall over. Reuse the existing floating-label
+  machinery of the map/region labels rather than inventing a second one, and mount the
+  layer only while Ctrl is down — an idle hold-free frame must cost nothing.
+  (d) THE KEY. Hold-to-show on keydown/keyup of Control. Do NOT preventDefault: the
+  browser's own Ctrl combinations stay the browser's. Clear the layer on `blur` and on
+  `visibilitychange`, and re-sync from the `ctrlKey` flag of the next input event —
+  a release missed while the player alt-tabbed must never leave labels standing (the
+  bug this rule exists to prevent). Holding Ctrl changes nothing else: no pause, no
+  movement change, no focus shift. Touch and gamepad get no equivalent in this point.
+  DOCS: design.md §17.8 and the §17.5 control line already state it; CLAUDE.md §7.1
+  point 9 (status bar / HUD) gains the built behaviour when this lands.
+  VERIFIABLE: pure — the qualifies predicate sweeps the FULL rosters (every fauna
+  species in, every flora/dressing species out, map points out, a concealed crocodile
+  out while hidden and in once it lunges); the text composition sweeps every (kind ×
+  age × state) in BOTH languages for a non-empty, non-id string, and pins the four
+  reported forms exactly ("Adult giraffe", "Dead giraffe calf", "Erwachsene Giraffe",
+  "Totes Giraffen-Jungtier") plus a feminine/neuter pair proving the gender is really
+  applied; the nearest-N cap keeps the nearest and drops the farthest. Component
+  (`src/ui/`) — the layer renders on Ctrl down, disappears on keyup, and is cleared by
+  a blur without a keyup. Live (`scripts/verify/enrichments.mjs` bird's-eye and
+  `scripts/verify/polish.mjs` settlement, BOTH backends, with screenshots): holding
+  Ctrl labels the animals in view and no plant, every label sits on an on-screen
+  subject, and releasing clears every one.
+
 - [ ] 184. PRE-TAG HARDENING — a MUCH stronger, systematic quality pass to reach a
   high-confidence bug-free state before the final closing run and the v0.2 tag.
   User decision 19.07.2026, after a cluster of elementary-functionality bugs kept
@@ -1334,43 +1480,6 @@ there exactly once; a new point joins a bundle when appended.
   measured ceiling, so the sentence is paid for by a measured raise with its justification
   in `scripts/doc-budget-core.mjs`, or by shortening elsewhere — the guard decides, not a
   round number.
-- [ ] 393. THE DEBUG MENU IS TIDIED INTO A STRUCTURE (user 28.07.2026: "völlig ausgeartet
-  und eine riesige, unstrukturierte Liste"). MEASURED: `src/ui/DebugMenu.tsx` is 523 lines
-  and renders about 130 controls, nearly all of them in ONE flat run — two `div.section`
-  wrappers near the end are the only grouping there is. It is the fine-tuning tool of §21
-  and the one debug surface that ships, so finding a value must not be a scroll hunt.
-  TARGET: named, COLLAPSIBLE groups, each holding the controls that belong together, plus
-  a FILTER field at the top that narrows the whole menu to the controls whose label
-  matches what is typed — with 130 values, search is what turns a list into a tool. All
-  groups start collapsed except the filter; opening one is remembered for the session so a
-  calibration pass does not re-open the same group every time.
-  THE GROUPS, by what a person is doing when they open the menu — not by which balance
-  object a value happens to live in: movement and controls; time and travel; health,
-  water and provisions; wildlife and its dramas; weather and season; economy and trade;
-  random events; graphics and sound; jump-to (the §21.3 selectors, which already have
-  their own category/alphabetical order — keep it); tools (benchmark, bug report, the
-  read-only renderer row). Where a value plausibly belongs to two groups, put it where a
-  player TUNING it would look, and say why in the commit.
-  NOTHING MAY BE LOST — this is the risk that matters. Every control that exists today
-  still exists, still writes through to the same field, and still carries the same
-  localized label in BOTH languages; the group names are new text and exist in both too.
-  `src/ui/DebugMenu.test.tsx` already pins several of these individually (the jump-to
-  grouping and its sort, the rescue-burst write-through, the single graphics dropdown);
-  extend it with a COMPLETENESS test that walks the rendered menu and asserts the full set
-  of controls against a list derived from the source of truth, so a future edit cannot
-  drop one silently — the same shape as the `QUALITY_PRESETS` completeness gate (§21).
-  KEEP IT A DEBUG TOOL: no new values, no renamed fields, no behaviour changes behind the
-  controls. This point moves and groups what is there and adds the filter, nothing else.
-  VERIFIABLE: Vitest on the menu — every control present and writing through (the
-  completeness test above), the filter narrowing to the matching controls and restoring
-  the full set when cleared, groups collapsing and their state surviving a re-render, and
-  both languages carrying every group name. Live: `scripts/verify/settings.mjs` still
-  drives the values it drives today through the new structure. No picture check is owed
-  beyond one frame of the opened menu per backend, since it is DOM.
-  DOCS in the same commit: design.md §21.3 states the grouped, filterable menu, and
-  CLAUDE.md §7.1 pt 20 keeps naming what the menu must offer. Both sit at measured
-  ceilings, so any added words are paid for by a measured raise with its justification or
-  by shortening elsewhere.
 - [ ] 319. CROCODILE KILL AFTERMATH: PREY DISSOLVES WITHOUT SINK OR VISIBLE SCAVENGER
   (user 25.07.2026: a crocodile seized an animal, the crocodile disappeared at some
   point, and the prey then kept slowly dissolving — possibly "eaten" with no vulture
@@ -1646,64 +1755,6 @@ there exactly once; a new point joins a bundle when appended.
   their real outcome (no masking). RELATED: this is the concrete first slice of point
   200's flake work, and point 294's auto-classification would have labelled all four
   reds "staging, not product" without a manual repeat each time.
-
-- [ ] 342. HOLD CTRL TO NAME WHAT ACTS ON SCREEN (user 25.07.2026; design.md §17.8
-  states the target). While Ctrl is held, every animal, person and usable object on
-  screen carries a small floating label naming WHAT it is — "Adult giraffe", "Dead
-  giraffe calf" — in both perspectives. Scenery does not: no tree, rock, grass tuft or
-  wall. Ctrl is currently unbound (no `ctrlKey` handler exists in `src/`), so nothing
-  is being taken away from another control.
-  (a) WHAT QUALIFIES — one pure predicate, not a scatter of checks at each call site:
-  a thing is named when it can MOVE or the player can DO something with it. In: the
-  bird's-eye fauna (the 13 species of `Species` in Wildlife.tsx — elephant, giraffe,
-  zebra, wildebeest, antelope, warthog, flamingo, crocodile, plover and the four
-  predators — plus vultures and carcasses), the settlement inhabitants and their
-  animals, and the usable objects (a pitched camp, a set-down canoe). Out: the flora
-  and dressing instances of `SPECIES` in TravelScene.tsx (acacia … kopje), terrain,
-  buildings that are not enterable, and the §2.5 horizon silhouettes — those are
-  backdrop, not actors. Two exclusions carry design weight and must be pure-tested as
-  such: a MAP POINT is never named by this layer (settlements and landmarks keep their
-  own labels under the §17.2 discovery gate, so the layer can never leak an
-  undiscovered name), and a CONCEALED animal is not named while concealed — the
-  submerged crocodile of §19.16 stays silent until it lunges, or the ambush is dead.
-  (b) THE TEXT — kind, then age where the game distinguishes one, then state where it
-  changes what is seen (dead). The fauna roster is NOT yet localized: `src/i18n/de.ts`
-  and `en.ts` carry no species names at all today (`nameCompleteness.test.ts` covers
-  places and landmarks only), so this point ADDS them for the whole roster, plus the
-  inhabitant roles (elder, trader, villager) and the object kinds.
-  GERMAN GRAMMAR IS PART OF THE FEATURE, not a translation afterthought: "Totes
-  Giraffen-Jungtier" is not "tot" + "Giraffen-Jungtier" pasted together, and "Tote
-  Giraffe" inflects differently. Each entry therefore carries what its language needs
-  to inflect — for German the noun's GENDER beside the noun — and the composition is a
-  pure function of (kind, age, state, language). Never build the string by
-  concatenation at the render site.
-  (c) RENDERING AND COST. Project through the live camera with the existing shared
-  `isOnScreen` (the point-172 rule: the true frustum, never an assumed radius) and
-  label only what is really drawn; cap the count at a calibratable nearest-N
-  (`balance.labelOverlay.maxLabels`, debug-editable) so a crowded savanna stays
-  readable and the frame does not fall over. Reuse the existing floating-label
-  machinery of the map/region labels rather than inventing a second one, and mount the
-  layer only while Ctrl is down — an idle hold-free frame must cost nothing.
-  (d) THE KEY. Hold-to-show on keydown/keyup of Control. Do NOT preventDefault: the
-  browser's own Ctrl combinations stay the browser's. Clear the layer on `blur` and on
-  `visibilitychange`, and re-sync from the `ctrlKey` flag of the next input event —
-  a release missed while the player alt-tabbed must never leave labels standing (the
-  bug this rule exists to prevent). Holding Ctrl changes nothing else: no pause, no
-  movement change, no focus shift. Touch and gamepad get no equivalent in this point.
-  DOCS: design.md §17.8 and the §17.5 control line already state it; CLAUDE.md §7.1
-  point 9 (status bar / HUD) gains the built behaviour when this lands.
-  VERIFIABLE: pure — the qualifies predicate sweeps the FULL rosters (every fauna
-  species in, every flora/dressing species out, map points out, a concealed crocodile
-  out while hidden and in once it lunges); the text composition sweeps every (kind ×
-  age × state) in BOTH languages for a non-empty, non-id string, and pins the four
-  reported forms exactly ("Adult giraffe", "Dead giraffe calf", "Erwachsene Giraffe",
-  "Totes Giraffen-Jungtier") plus a feminine/neuter pair proving the gender is really
-  applied; the nearest-N cap keeps the nearest and drops the farthest. Component
-  (`src/ui/`) — the layer renders on Ctrl down, disappears on keyup, and is cleared by
-  a blur without a keyup. Live (`scripts/verify/enrichments.mjs` bird's-eye and
-  `scripts/verify/polish.mjs` settlement, BOTH backends, with screenshots): holding
-  Ctrl labels the animals in view and no plant, every label sits on an on-screen
-  subject, and releasing clears every one.
 
 - [ ] 343. THE SUN STANDS WHERE IT REALLY STOOD — ELEVATION FROM DATE AND LATITUDE
   (user 25.07.2026; design.md §2.7 states the target). Today `SUN_DIR` is a hard
@@ -3627,27 +3678,6 @@ Build order, chosen so no two parallel agents own the same file:
   the old file is findable in exactly one of the two halves (a test sweeps the
   section headings for coverage and for duplication).
 
-- [ ] 513. A BRANCH CI RUN MUST NOT MAIL THE OWNER (user decision 05.08.2026 on
-  the card "Rote CI-Läufe auf Agenten-Zweigen — welcher Weg?", option 3). Two
-  deliberate rules work against each other: a branch push runs lint and
-  dependencies only (the full gate per intermediate commit costs more than a red
-  branch is worth), while the pipeline runs in full on EVERY branch push. An agent
-  that commits mid-work therefore produces red runs, and each one mails the
-  repository owner.
-  FINAL STATE:
-  1. A CI run on a `feat/**` branch no longer notifies the owner by mail. Red on a
-     branch is expressly normal; the run still executes and its result stays
-     visible in the run list.
-  2. `main` is untouched: a red run there still mails, because that is the branch
-     the deploy builds from.
-  3. The rescue-commit mail path (`[skip ci]` plus the `Rescue:` trailer, which
-     deliberately mails on a red state) keeps working as specified — this point
-     silences the ROUTINE branch run, not the deliberate alarm.
-  4. `docs/` states where notifications now come from, so a silent branch failure
-     is never mistaken for a green one.
-  VERIFIABLE: a deliberately red push to a throwaway `feat/` branch produces a run
-  and no mail; the same failure on `main` still mails; the rescue path still does.
-
 - [ ] 514. THE COMPATIBILITY LANE HAS TWO REDS THE WEBGL LANE DOES NOT (measured
   05.08.2026 on `main`, both lanes run minutes apart on the same machine, right
   after the lane moved onto the card in point 505). `enrichments` on the WebGPU
@@ -4044,36 +4074,6 @@ Build order, chosen so no two parallel agents own the same file:
   leave-capture's opacity and its west/east pixel counts printed in the run so an
   empty capture can never again read as a threshold miss; plus a pure test that the
   check FAILS on an all-transparent capture instead of reporting a band verdict.
-
-- [ ] 524. THE CHILDREN'S PLAY GROUND IS SQUEEZED INTO A ROCKY CORNER, AND THE
-  FRAME THAT PROVES THEM NO LONGER SHOWS THE VILLAGE (measured 06.08.2026 while
-  closing point 481, on WebGL 2). Point 481 moved the children far enough from
-  the adults for point 478's hearing range to separate the two teaching voices.
-  In the Maasai village that rule leaves only three viable bearings, all in the
-  rocky corner beyond the boulder line: `verification/480-village-tag.png` now
-  shows an almost empty plain with ONE small child beside a lone tree and the
-  edge of a single hut, where the same frame on `main` showed the hut ring, the
-  labels, both children and the herd behind them. The checks stay green — both
-  children are framed and ray-probed within 14 m — which is exactly the
-  looks-wrong-but-passes case: the evidence frame no longer reads as village
-  life to a human.
-  FINAL STATE:
-  1. The children play where the separation rule AND the picture both hold: the
-     ground is chosen so the play spot keeps its distance from the adult
-     vignettes yet still lies against the settlement's built fabric, not on the
-     bare edge behind the rocks.
-  2. If no such spot exists in a village of that size, the SEPARATION is what
-     gives — the two voices may be told apart by another means the mechanic
-     allows (a pause between them, distinct speakers) rather than by pushing the
-     children out of the settlement.
-  3. The tag frame is retaken from a standpoint that shows BOTH children at a
-     readable size WITH the village behind them, and its shutter declaration
-     names the children as its subject so an empty plain can never pass again.
-  4. `balance.villageLife.tag.playRadius` and the derived play ground stay
-     debug-editable, and the derivation is stated in the code where it shrinks.
-  VERIFIABLE: pure Vitest on the play-ground derivation (the spot keeps the
-  separation AND lies within the built fabric for every shipped village), plus
-  the retaken frame checked by a human on both backends.
 
 - [ ] 528. THE DEPLOY THAT NEVER REACHES A RUNNER LEAVES THE SITE STALE, AND POINT
   526 IS UNPROVEN ON THE LIVE PATH (measured 06.08.2026, immediately after 526
