@@ -215,14 +215,16 @@ export function childPlayGround(
   }
 
   // Rank 1: far enough from the adults AND standing against the village. Only
-  // the candidates that already clear the cheap half are ever sampled.
-  let best: PlayGround | null = null
+  // the candidates that already clear the cheap half are ever sampled. The pick
+  // is held in an object rather than a `let`, because the assignment happens
+  // inside the visitor and a captured `let` keeps its initial narrowing.
+  const picked: { best: PlayGround | null } = { best: null }
   eachCandidate((x, z, r, clearance) => {
     if (clearance < minClearance) return
     const here = measure(x, z, r, clearance)
-    if (!best || score(here) > score(best)) best = here
+    if (!picked.best || score(here) > score(picked.best)) picked.best = here
   })
-  const separated: PlayGround | null = best
+  const separated = picked.best
   if (separated && separated.fabric >= MIN_FABRIC) return separated
 
   // Rank 2: no separated ground stands against the village, so the SEPARATION

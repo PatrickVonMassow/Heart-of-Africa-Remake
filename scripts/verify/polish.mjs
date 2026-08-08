@@ -2825,13 +2825,16 @@ for (const [placeId, shot] of [
         const apply = (e, v) =>
           [0, 1, 2, 3].map((r) => e[r] * v[0] + e[r + 4] * v[1] + e[r + 8] * v[2] + e[r + 12] * v[3])
         const shows = (c) => {
-          const eye = apply(cam.matrixWorldInverse.elements, [c.x, 0.5, c.z, 1])
-          const clip = apply(cam.projectionMatrix.elements, eye)
+          const eyeAt = apply(cam.matrixWorldInverse.elements, [c.x, 0.5, c.z, 1])
+          const clip = apply(cam.projectionMatrix.elements, eyeAt)
           const w = clip[3]
           if (!(w > 0)) return false
           // Inside 0.85 of the frame rather than 1.0: a child clipped by the
           // very edge is in the picture by arithmetic and not by eye.
-          if (!(Math.abs(clip[0] / w) <= 0.85 && Math.abs(clip[1] / w) <= 0.85 && clip[2] / w < 1)) return false
+          // Inside 0.7 of the frame rather than 0.85: the shutter's own settle is
+          // several frames of running children after this reading, and a child
+          // sitting on the 0.85 line walks out of the written picture in them.
+          if (!(Math.abs(clip[0] / w) <= 0.7 && Math.abs(clip[1] / w) <= 0.7 && clip[2] / w < 1)) return false
           // And it must actually be DRAWN there: chest height of a child, and
           // the first surface along that line has to be the child.
           const hit = window.__placeRayHit(c.x, 0.5, c.z)
@@ -2856,15 +2859,22 @@ for (const [placeId, shot] of [
               .concat(L.interactives.filter((it) => it.type !== 'villager').map((it) => it.pos))
           : []
         let behind = 0
+        let nearestWall = Infinity
         for (const [bx, bz] of fabric) {
-          if (Math.hypot(bx - eye.x, bz - eye.z) <= pairDistance) continue
+          const away = Math.hypot(bx - eye.x, bz - eye.z)
+          nearestWall = Math.min(nearestWall, away)
+          if (away <= pairDistance) continue
           const be = apply(cam.matrixWorldInverse.elements, [bx, 1.2, bz, 1])
           const bc = apply(cam.projectionMatrix.elements, be)
           const bw = bc[3]
           if (!(bw > 0)) continue
           if (Math.abs(bc[0] / bw) <= 1 && Math.abs(bc[1] / bw) <= 1 && bc[2] / bw < 1) behind++
         }
-        return { clear, inFrame, pair, behind }
+        // How far apart the two are: a pair that has just sprinted apart fills
+        // the frame with the ground between them, and one of the two is out of it
+        // again by the time the shutter opens.
+        const gap = a && q ? Math.hypot(a.x - q.x, a.z - q.z) : Infinity
+        return { clear, inFrame, pair, behind, gap, nearestWall }
       })
     // The sweep is RETRIED as the game runs, and that is not a courtesy to a
     // slow machine: a chase that is momentarily boxed between two huts offers no
@@ -2890,6 +2900,15 @@ for (const [placeId, shot] of [
     // what tells a chase in a settlement from two figures on a plain; asking for
     // more would fail the scattered forest villages, which have no more to show.
     const VILLAGE_BEHIND = 2
+    // The chase is photographed at a TIGHT moment: the gap between chaser and
+    // quarry breathes by design, and at full stretch the two do not both stay in
+    // one frame through the shutter's settle — the first retaken frame held the
+    // chaser and lost the quarry behind a hut. The game closes to this within
+    // seconds, so waiting for it costs a few frames and nothing else.
+    const TIGHT_GAP = 6
+    // And the camera is not pressed against a wall: a hut two metres in front of
+    // the lens is not "the village behind them", it is a wall.
+    const WALL_CLEARANCE = 3.5
     let stood = null
     let shotProbe = 'no clear standpoint in any sweep'
     let bestSeen = 'nothing read from any bearing'
@@ -2901,8 +2920,13 @@ for (const [placeId, shot] of [
           if (at.tooFar) continue
           await nextFrames(2)
           const r = await readsFromHere()
-          if (r.pair === 2) bestSeen = `best read: pair=${r.pair} behind=${r.behind} clear=${r.clear}`
+          if (r.pair === 2) {
+            bestSeen =
+              `best read: pair=${r.pair} behind=${r.behind} clear=${r.clear} ` +
+              `gap=${r.gap.toFixed(1)}m wall=${r.nearestWall.toFixed(1)}m`
+          }
           if (!(r.clear && r.pair === 2 && r.behind >= VILLAGE_BEHIND)) continue
+          if (!(r.gap <= TIGHT_GAP && r.nearestWall >= WALL_CLEARANCE)) continue
           // It reads from here NOW — does it still, once the shutter's settle
           // delay has passed? Only then is this the frame.
           await nextFrames(4)
@@ -2911,7 +2935,8 @@ for (const [placeId, shot] of [
             stood = at
             shotProbe =
               `attempt ${attempt + 1}, ${at.back.toFixed(1)} m, offset ${k}/${OFFSETS.length}: ` +
-              `pair=${still.pair} inFrame=${still.inFrame} village behind=${still.behind}`
+              `pair=${still.pair} inFrame=${still.inFrame} village behind=${still.behind} ` +
+              `gap=${still.gap.toFixed(1)}m wall=${still.nearestWall.toFixed(1)}m`
           }
         }
         if (stood) break
