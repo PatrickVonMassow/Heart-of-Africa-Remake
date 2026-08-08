@@ -2829,11 +2829,11 @@ for (const [placeId, shot] of [
           const clip = apply(cam.projectionMatrix.elements, eyeAt)
           const w = clip[3]
           if (!(w > 0)) return false
-          // Inside 0.85 of the frame rather than 1.0: a child clipped by the
-          // very edge is in the picture by arithmetic and not by eye.
-          // Inside 0.7 of the frame rather than 0.85: the shutter's own settle is
-          // several frames of running children after this reading, and a child
-          // sitting on the 0.85 line walks out of the written picture in them.
+          // Inside 0.7 of the frame rather than all of it: a child clipped by the
+          // very edge is in the picture by arithmetic and not by eye, and the
+          // shutter's own settle is several frames of running children after this
+          // reading — one sitting on the 0.85 line it used to allow walks out of
+          // the written picture in them.
           if (!(Math.abs(clip[0] / w) <= 0.7 && Math.abs(clip[1] / w) <= 0.7 && clip[2] / w < 1)) return false
           // And it must actually be DRAWN there: chest height of a child, and
           // the first surface along that line has to be the child.
