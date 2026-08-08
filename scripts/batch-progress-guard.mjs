@@ -65,6 +65,7 @@ import {
 import { otherSessionsIn, gateDemandSatisfied } from './batch-doctor-core.mjs'
 import { gatherBoundary } from './batch-boundary.mjs'
 import { launcherRemedy } from './batch-launcher-core.mjs'
+import { gatherOwnerWork } from './batch-owner-work.mjs'
 import { gatherInFlight } from './batch-in-flight.mjs'
 import { POOL_CAP, slotsRemedy, describeInFlight } from './batch-in-flight-core.mjs'
 import { clearClaim, gatherClaim, gitOperationInProgress, handBackToClaimant } from './batch-claim.mjs'
@@ -173,7 +174,10 @@ try {
         /* an unreadable claim reserves nothing */
       }
     }
-    if (!reserved) ownership = acquire(sid) // 'acquired' | 'mine' | 'held' | 'lost-race'
+    // WITH the owner's corroboration (point 556, four-eyes finding 2): a NON-owner
+    // session's Stop guard must not take the batch from an owner whose expired
+    // lease its advancing work outvotes.
+    if (!reserved) ownership = acquire(sid, { work: gatherOwnerWork(readOwnerLock(), { now: Date.now() }) })
   }
 
   // A pending CLAIM (point 395) — gathered before the parallel detector, because

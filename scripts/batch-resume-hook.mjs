@@ -30,6 +30,7 @@ import {
   findClaudeAncestor,
   probePid,
 } from './batch-singleton.mjs'
+import { gatherOwnerWork } from './batch-owner-work.mjs'
 import { readClaim, clearClaim, maxAgeMs } from './batch-claim.mjs'
 import { assessClaim, ownerIsHolding, reservationDecision } from './batch-claim-core.mjs'
 import { allGatedMessage, openPointsHeadline, standDownMessage } from './batch-resume-hook-core.mjs'
@@ -265,9 +266,17 @@ try {
             ownerHolding: ownerIsHolding({
               lock,
               claimantSid: claim.sessionId,
+              // WITH the owner's corroboration (point 556, four-eyes finding 2):
+              // an expired lease that advancing work outvotes must read alive at
+              // THIS door too, or a window opening during that state takes the
+              // batch off a session that is mid-verification.
               alive: lock
-                ? assessOwner(lock, { now, bootTime: bootTimeMs(), probe: lock.pid ? probePid(lock.pid) : null })
-                    .alive === true
+                ? assessOwner(lock, {
+                    now,
+                    bootTime: bootTimeMs(),
+                    probe: lock.pid ? probePid(lock.pid) : null,
+                    work: gatherOwnerWork(lock, { now }),
+                  }).alive === true
                 : false,
             }),
             now,
@@ -287,7 +296,7 @@ try {
           if (convertPendingSpawn(sessionId, { authorized: !!auth })) ownership = 'acquired-spawn'
         }
         if (ownership === 'none') {
-          const r = acquire(sessionId)
+          const r = acquire(sessionId, { work: gatherOwnerWork(readOwnerLock(), { now: Date.now() }) })
           if (r === 'acquired' || r === 'mine') ownership = r
         }
       }
