@@ -83,10 +83,12 @@ export const NON_RENDER_VERIFY = new Set([
   'run-logged.mjs', // the logging wrapper around run-all; it spawns the runner, it does not render
   'sceneReady-core.mjs', // the scene-readiness verdict; frameSubject.mjs polls the page for it
   'snowMetric.mjs', // the snow-vs-sand pixel verdict; enrichments.mjs feeds it a crop
+  'stanceSlip.mjs', // the planted-foot verdict over a sample series; polish.mjs records the samples
   'system-chrome.mjs', // WHERE the lane's browser is on this host; _browser.mjs opens it
   'textureLeak.mjs', // the texture-delta decision layer; settings.mjs runs it
   'tiers.mjs',
   'ttsCache.mjs',
+  'verify-seed.mjs', // builds the seeded URL a suite opens; it never opens one itself
 ])
 
 /**
