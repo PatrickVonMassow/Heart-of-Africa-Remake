@@ -8,6 +8,11 @@
 //   node scripts/measure-context-cost.mjs            # before/after the first handover
 //   node scripts/measure-context-cost.mjs --json
 //   node scripts/measure-context-cost.mjs --boundary 2026-07-28T08:56:12Z
+//   node scripts/measure-context-cost.mjs --boundary 2026-08-07T03:48:17Z --anchor 1.11
+//
+// It reports BOTH scopes side by side (08.08.2026) — the folder's own session
+// transcripts, which the 30.07.2026 anchor was measured on, and the full count
+// including the delegated agents under <session>/subagents/, which is the honest total.
 //
 // The transcripts live OUTSIDE the repository (~/.claude/projects/…), which is why this
 // reads them rather than shipping their numbers: a figure in a document cannot be
@@ -21,23 +26,63 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { REPO_ROOT } from './repo-paths.mjs'
 import {
-  measureCost,
-  derivedRate,
-  sessionProfile,
+  measureScopes,
   mainCheckoutOf,
   resolveTranscriptDir,
   transcriptCandidates,
+  transcriptScope,
   LARGE_CONTEXT_TOKENS,
+  SCOPE_ORDER,
+  SCOPE_LABELS,
+  SCOPE_NOTES,
 } from './measure-context-cost-core.mjs'
 
-/** Does this folder hold at least one usable transcript? The size floor is the same
- *  one `readTurns` applies — a folder of stubs is not a transcript folder. */
-function hasTranscripts(dir) {
-  try {
-    return readdirSync(dir).some((f) => f.endsWith('.jsonl') && statSync(join(dir, f)).size >= 1000)
-  } catch {
-    return false
+/** The smallest file that can hold a real turn; anything under it is a stub. */
+const MIN_TRANSCRIPT_BYTES = 1000
+
+/**
+ * Every transcript under a project folder, as { path, rel, scope }. The folder's own
+ * `*.jsonl` are the session transcripts; `<session>/subagents/agent-*.jsonl` are the
+ * DELEGATED AGENTS', which bill against the same quota and were invisible to this tool
+ * until 08.08.2026.
+ *
+ * Top-level files come FIRST, so if a turn ever appeared in both places the dedup in
+ * `readTurns` keeps the top-level one — that direction cannot inflate the difference
+ * between the two scopes.
+ */
+export function listTranscripts(dir, { maxDepth = 3 } = {}) {
+  const found = []
+  const walk = (abs, rel, depth) => {
+    let entries
+    try {
+      entries = readdirSync(abs, { withFileTypes: true })
+    } catch {
+      return
+    }
+    const files = entries.filter((e) => e.isFile() && e.name.endsWith('.jsonl'))
+    for (const f of files) {
+      const path = join(abs, f.name)
+      try {
+        if (statSync(path).size < MIN_TRANSCRIPT_BYTES) continue
+      } catch {
+        continue
+      }
+      const r = rel ? `${rel}/${f.name}` : f.name
+      found.push({ path, rel: r, scope: transcriptScope(r) })
+    }
+    if (depth >= maxDepth) return
+    for (const d of entries.filter((e) => e.isDirectory())) {
+      walk(join(abs, d.name), rel ? `${rel}/${d.name}` : d.name, depth + 1)
+    }
   }
+  walk(dir, '', 0)
+  return found
+}
+
+/** Does this folder hold at least one usable transcript — in EITHER scope? A folder
+ *  holding only subagent transcripts is still the right folder. */
+function hasTranscripts(dir) {
+  return listTranscripts(dir).length > 0
 }
 
 /**
@@ -85,9 +130,7 @@ export async function readTurns(dir = transcriptDir()) {
   const turns = []
   const seen = new Set()
   if (!existsSync(dir)) return turns
-  for (const file of readdirSync(dir).filter((f) => f.endsWith('.jsonl'))) {
-    const path = join(dir, file)
-    if (statSync(path).size < 1000) continue
+  for (const { path, rel, scope } of listTranscripts(dir)) {
     const stream = createReadStream(path, { encoding: 'utf8' })
     const lines = createInterface({ input: stream, crlfDelay: Infinity })
     for await (const line of lines) {
@@ -103,11 +146,17 @@ export async function readTurns(dir = transcriptDir()) {
       if (!usage || !Number.isFinite(at)) continue
       // The message id is the turn's identity; requestId is the fallback for a record
       // that carries no id.
-      const id = rec.message?.id ?? rec.requestId ?? `${file}:${rec.uuid ?? at}`
+      const id = rec.message?.id ?? rec.requestId ?? `${rel}:${rec.uuid ?? at}`
       if (seen.has(id)) continue
       seen.add(id)
-      // The transcript file IS the session — one file per session id.
-      turns.push({ at, usage, session: rec.sessionId ?? file.replace(/\.jsonl$/, '') })
+      // The transcript file IS the session — one file per session id. A DELEGATED
+      // agent's records carry the PARENT's sessionId, so its own agentId is what
+      // separates it; without that, every subagent's context would be folded into its
+      // parent's peak and the per-session profile would read as one huge session.
+      const session = rec.agentId
+        ? `${rec.sessionId ?? rel}/agent-${rec.agentId}`
+        : (rec.sessionId ?? rel.replace(/\.jsonl$/, ''))
+      turns.push({ at, usage, session, scope })
     }
   }
   return turns.sort((a, b) => a.at - b.at)
@@ -135,17 +184,29 @@ if (isMain) {
     console.error(`no assistant turns with usage in ${dir} — nothing to measure.`)
     process.exit(1)
   }
-  const result = measureCost({ turns, boundaryAt })
-  const rate = derivedRate({ ratio: result.ratio })
-  const profile = sessionProfile({ turns, boundaryAt })
+  // The anchor the derived %/h is carried through. It DEFAULTS to the point's own
+  // 1.25 %/h, which belongs to the pre-boundary loop; a run that splits at a LATER
+  // moment must name the anchor of the regime it is comparing against (1.11 %/h for
+  // the state measured on 30.07.2026), or the derived figure means nothing.
+  const an = argv.indexOf('--anchor')
+  const anchorRatePerHour = an >= 0 ? Number(argv[an + 1]) : 1.25
+  if (!Number.isFinite(anchorRatePerHour) || anchorRatePerHour <= 0) {
+    console.error(`--anchor needs a positive %/h figure, got "${argv[an + 1]}".`)
+    process.exit(1)
+  }
+  const scopes = measureScopes({ turns, boundaryAt, anchorRatePerHour })
+  const files = listTranscripts(dir)
   const out = {
     transcriptDir: dir,
+    transcripts: {
+      topLevel: files.filter((f) => f.scope === 'top-level').length,
+      subagent: files.filter((f) => f.scope === 'subagent').length,
+    },
     turnsRead: turns.length,
     boundaryAt: new Date(boundaryAt).toISOString(),
     largeContextTokens: LARGE_CONTEXT_TOKENS,
-    ...result,
-    ...rate,
-    sessions: profile,
+    anchorRatePerHour,
+    scopes,
   }
   if (asJson) {
     console.log(JSON.stringify(out, null, 2))
@@ -154,23 +215,35 @@ if (isMain) {
     const row = (name, s) =>
       `  ${name.padEnd(7)} ${String(s.turns).padStart(6)} turns  ${String(s.activeHours).padStart(7)} active h  ` +
       `${String(s.weightedPerHour ?? 'n/a').padStart(9)} weighted/h  large-context share ${pct(s.largeShare)}`
-    console.log(`read ${turns.length} turns from ${dir}`)
-    console.log(`boundary first fired ${out.boundaryAt}; "large" context is ≥ ${LARGE_CONTEXT_TOKENS.toLocaleString('en-US')} tokens`)
-    console.log(row('BEFORE', result.before))
-    console.log(row('AFTER', result.after))
-    console.log(`  ratio after/before: ${result.ratio ?? 'n/a'}`)
-    console.log(
-      `  carried through the point's own 1.25 %/h anchor: ${rate.rate ?? 'n/a'} %/h ` +
-        `(${rate.underCeiling == null ? 'n/a' : rate.underCeiling ? 'UNDER' : 'OVER'} the ~0.6 %/h that fits)`,
-    )
     const k = (v) => (v == null ? 'n/a' : `${Math.round(v / 1000)}k`)
     const srow = (name, s) =>
       `  ${name.padEnd(7)} ${String(s.sessions).padStart(4)} sessions  median peak ${k(s.medianPeak).padStart(6)}  ` +
       `p90 peak ${k(s.p90Peak).padStart(6)}  median ${String(s.medianTurns ?? 'n/a').padStart(4)} turns  ` +
       `crossed the threshold: ${pct(s.overLarge)}`
-    console.log('per SESSION — how far the context climbed before the session ended:')
-    console.log(srow('BEFORE', profile.before))
-    console.log(srow('AFTER', profile.after))
+    console.log(`read ${turns.length} turns from ${dir}`)
+    console.log(
+      `  ${out.transcripts.topLevel} session transcripts + ${out.transcripts.subagent} delegated-agent ` +
+        'transcripts under <session>/subagents/ — both bill against the same quota',
+    )
+    console.log(`boundary first fired ${out.boundaryAt}; "large" context is ≥ ${LARGE_CONTEXT_TOKENS.toLocaleString('en-US')} tokens`)
+    for (const scope of SCOPE_ORDER) {
+      const s = scopes[scope]
+      console.log('')
+      console.log(`SCOPE ${SCOPE_LABELS[scope]} — ${SCOPE_NOTES[scope]}`)
+      console.log(`  ${s.turnsRead} turns counted, of which ${s.subagentTurns} from delegated agents`)
+      console.log(row('BEFORE', s.before))
+      console.log(row('AFTER', s.after))
+      console.log(`  ratio after/before: ${s.ratio ?? 'n/a'}`)
+      console.log(
+        `  carried through the ${anchorRatePerHour} %/h anchor: ${s.rate ?? 'n/a'} %/h ` +
+          `(${s.underCeiling == null ? 'n/a' : s.underCeiling ? 'UNDER' : 'OVER'} the ~0.6 %/h that fits)`,
+      )
+      console.log('  per SESSION — how far the context climbed before the session ended:')
+      console.log(srow('BEFORE', s.sessions.before))
+      console.log(srow('AFTER', s.sessions.after))
+    }
+    console.log('')
     console.log('  the weighted number is a PROXY (COST_WEIGHTS in the core), not a bill.')
+    console.log(`  the verdict is read off the ${SCOPE_LABELS.full} scope; ${SCOPE_LABELS.topLevel} is the older, comparable one.`)
   }
 }

@@ -21,6 +21,11 @@ import {
   transcriptCandidates,
   resolveTranscriptDir,
   LEGACY_TRANSCRIPT_SLUG,
+  transcriptScope,
+  scopedTurns,
+  measureScopes,
+  SCOPE_ORDER,
+  SCOPE_LABELS,
 } from './measure-context-cost-core.mjs'
 
 const usage = (over = {}) => ({
@@ -262,5 +267,112 @@ describe('resolveTranscriptDir — looks, and refuses to guess', () => {
 
   it('throws on an empty candidate list rather than returning nothing', () => {
     expect(() => resolveTranscriptDir([], () => true)).toThrow(/no candidates/)
+  })
+})
+
+// THE SCOPE OF THE COUNT (08.08.2026). The tool read only the folder's own `*.jsonl`,
+// while on this host most transcripts are DELEGATED AGENTS' under
+// `<session>/subagents/` — spend on the same quota. A figure that leaves them out is a
+// FLOOR presented as a rate, so both scopes are reported and neither may quietly stand
+// in for the other.
+describe('transcriptScope — a delegated agent is not a session', () => {
+  it('calls a file directly in the project folder top-level', () => {
+    expect(transcriptScope('0f4d81c4.jsonl')).toBe('top-level')
+    expect(transcriptScope('./0f4d81c4.jsonl')).toBe('top-level')
+  })
+
+  it('calls anything nested a subagent transcript, on either separator', () => {
+    expect(transcriptScope('0f4d81c4/subagents/agent-a0ca9692.jsonl')).toBe('subagent')
+    expect(transcriptScope('0f4d81c4\\subagents\\agent-a0ca9692.jsonl')).toBe('subagent')
+  })
+})
+
+describe('scopedTurns — full is a SUPERSET, never a different count', () => {
+  const t = (scope) => ({ at: NOW, usage: usage(), scope })
+
+  it('keeps every turn in full and only the session ones in top-level', () => {
+    const sets = scopedTurns([t('top-level'), t('subagent'), t('subagent')])
+    expect(sets.topLevel).toHaveLength(1)
+    expect(sets.full).toHaveLength(3)
+  })
+
+  it('treats an untagged turn as top-level, so an old caller loses nothing', () => {
+    const sets = scopedTurns([{ at: NOW, usage: usage() }])
+    expect(sets.topLevel).toHaveLength(1)
+    expect(sets.full).toHaveLength(1)
+    expect(() => scopedTurns()).not.toThrow()
+    expect(scopedTurns(null).full).toEqual([])
+  })
+})
+
+describe('measureScopes — both scopes side by side, plainly labelled', () => {
+  // Two sessions' worth of turns a minute apart on each side of the boundary, plus a
+  // delegated agent working alongside the "after" session.
+  const t = (at, session, scope, context = 40_000) => ({
+    at,
+    session,
+    scope,
+    usage: usage({ cache_read_input_tokens: context }),
+  })
+  const turns = [
+    t(NOW - 10 * MIN, 'old', 'top-level', 400_000),
+    t(NOW - 9 * MIN, 'old', 'top-level', 400_000),
+    t(NOW + MIN, 'new', 'top-level'),
+    t(NOW + 2 * MIN, 'new', 'top-level'),
+    t(NOW + MIN, 'new/agent-a', 'subagent', 120_000),
+    t(NOW + 2 * MIN, 'new/agent-a', 'subagent', 160_000),
+  ]
+
+  it('reports exactly the two scopes the report names', () => {
+    const s = measureScopes({ turns, boundaryAt: NOW })
+    expect(Object.keys(s)).toEqual(SCOPE_ORDER)
+    expect(SCOPE_LABELS.topLevel).toMatch(/top-level/)
+    expect(SCOPE_LABELS.full).toMatch(/subagent/)
+  })
+
+  it('counts the delegated agents into the full scope and out of the top-level one', () => {
+    const s = measureScopes({ turns, boundaryAt: NOW })
+    expect(s.topLevel.turnsRead).toBe(4)
+    expect(s.topLevel.subagentTurns).toBe(0)
+    expect(s.full.turnsRead).toBe(6)
+    expect(s.full.subagentTurns).toBe(2)
+    // The whole reason for the second scope: the old figure is a FLOOR.
+    expect(s.full.after.weighted).toBeGreaterThan(s.topLevel.after.weighted)
+    expect(s.full.after.weightedPerHour).toBeGreaterThanOrEqual(s.topLevel.after.weightedPerHour)
+    expect(s.full.turnsRead).toBeGreaterThanOrEqual(s.topLevel.turnsRead)
+  })
+
+  it('gives each scope its own rate, sessions profile and ceiling verdict', () => {
+    const s = measureScopes({ turns, boundaryAt: NOW })
+    for (const scope of SCOPE_ORDER) {
+      expect(s[scope].rate).toBeCloseTo(1.25 * s[scope].ratio, 2)
+      expect(s[scope].underCeiling).toBe(s[scope].rate <= 0.6)
+    }
+    // A delegated agent carries the PARENT's session id in its records, so it must be
+    // its own session here — otherwise its context folds into the parent's peak.
+    expect(s.topLevel.sessions.after.sessions).toBe(1)
+    expect(s.full.sessions.after.sessions).toBe(2)
+  })
+
+  it('carries a caller-named anchor instead of re-inventing one', () => {
+    const s = measureScopes({ turns, boundaryAt: NOW, anchorRatePerHour: 1.11 })
+    expect(s.full.rate).toBeCloseTo(1.11 * s.full.ratio, 2)
+  })
+
+  it('still reports BOTH scopes when nothing was delegated — full EQUALS top-level', () => {
+    const only = turns.filter((x) => x.scope === 'top-level')
+    const s = measureScopes({ turns: only, boundaryAt: NOW })
+    expect(Object.keys(s)).toEqual(SCOPE_ORDER)
+    expect(s.full.turnsRead).toBe(s.topLevel.turnsRead)
+    expect(s.full.subagentTurns).toBe(0)
+    expect(s.full.after).toEqual(s.topLevel.after)
+    expect(s.full.rate).toBe(s.topLevel.rate)
+  })
+
+  it('reports both scopes as empty rather than throwing on no turns at all', () => {
+    const s = measureScopes({ turns: [], boundaryAt: NOW })
+    expect(s.topLevel.turnsRead).toBe(0)
+    expect(s.full.rate).toBe(null)
+    expect(() => measureScopes()).not.toThrow()
   })
 })
