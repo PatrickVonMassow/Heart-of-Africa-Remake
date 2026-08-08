@@ -4559,3 +4559,33 @@ Build order, chosen so no two parallel agents own the same file:
   CANDIDATE REAL FAILURE under a measured-quiet machine and UNDECIDED under an unknown or
   loaded one; a rate-marked check is named as rate-sensitive in the verdict; and the
   diff-word list is absent from an UNDECIDED verdict.
+
+- [ ] 565. A DRINKING WILDEBEEST CALF STANDS BURIED IN THE GROUND
+  (caught 08.08.2026, 19:xx, by the in-game anchoring tripwire on the `enrichments`
+  WebGL 2 lane). The dev-mode assert fired: `animal-buried — wildebeest bodyY=1.09
+  ground=1.82 y=1.82 young=false bathe=false drink=true dodge=false hop=false
+  chunk=14,1 shoreSeed=false parent=false child=true dPlayer=14`. The body sits 0.73
+  BELOW the terrain the same frame samples under it, and it is not a one-frame
+  transient: the assert only speaks on the SECOND consecutive violating visit
+  (`floatStrike >= 2`, ~13 frames apart), so this animal stood buried for at least two
+  assert visits while the player was 14 units away — in view.
+  IT IS NOT THE LABEL LAYER'S DOING: the run that caught it carried point 342's change
+  to `Wildlife.tsx`, but that change only READS `a.drawn` and pushes to an array; the
+  assert dates from 21.07.2026 and the anchoring code it watches is untouched. Treat it
+  as a pre-existing defect the tripwire surfaced, not a regression — but CONFIRM that on
+  `main` before fixing, because a confirmation is one run and a wrong assumption is a
+  rebuild.
+  THE LEAD THE DUMP GIVES: `drink=true` and `child=true` with `bathe=false`. The drink
+  cycle lowers the body toward the water, and a CALF carries a smaller `scale`, which
+  shrinks the assert's own tolerance (`ground - 0.75 * a.scale`) at the same time as the
+  drink pose lowers the body — so the pair is the suspect, not either alone. `y` equals
+  `ground` exactly (1.82), so the ANCHOR is right and it is the body offset below it
+  that is wrong.
+  FINAL STATE: a drinking animal of any age keeps its body above its own ground sample
+  for the whole drink cycle, at every scale the herds spawn; the tripwire stays armed and
+  unchanged (it is the detector, not the thing to tune away); and if the drink pose
+  legitimately needs to dip lower than the current tolerance, the tolerance is derived
+  from the pose rather than widened flat.
+  VERIFIABLE: a Vitest case over the drink-pose body offset sweeps the full scale range
+  the herds use, at both ages, and asserts the offset never falls below the ground
+  sample; `enrichments` runs on both backends without the `animal-buried` assert firing.
