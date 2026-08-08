@@ -892,6 +892,14 @@ Das Muster ist allgemeiner als dieser Fall. Ein eingestandenes Defizit **entwaff
 
 **Lehre:** Was ein Autor als bekannte Grenze **einräumt**, ist eine Behauptung wie jede andere und gehört auf die Prüfliste ganz nach oben — nicht ans Ende. Und ein Beweis, dass ein Loch geschlossen ist, ist erst vollständig, wenn derselbe Versuch am **alten Stand** noch hindurchgeht.
 
+### 3.94 Die Isolierung trennt auch das ab, was ankommen sollte
+
+Ein delegierter Agent prüft in seiner eigenen Arbeitskopie — genau so ist es gewollt (§3.36). Sein Nachweis, dass das Bild auf beiden Grafik-Bahnen geprüft wurde, landet aber ebenfalls dort: Das Buch, in das ein Prüflauf sich einträgt, wird aus dem Skriptpfad hergeleitet und existiert damit einmal je Arbeitskopie. Das Aufräumen des Zweigs — dieselbe Regel, die die Zweigleichen vom Juli verhindert — löscht es mit. Beim Zusammenführen von Punkt 549 waren drei fertige WebGPU-Läufe deshalb verschwunden; der Wächter verlangte sie, nach allem was er sehen konnte zu Recht, ein zweites Mal, und eine Viertelstunde Rechenzeit ging für ein Bild drauf, das längst aufgenommen war.
+
+Der Fehler steckt nicht in der Isolierung und nicht im Aufräumen, sondern in der fehlenden **Naht** zwischen beiden. Beides ist einzeln richtig; zusammen ergeben sie einen Nachweis, der nur so lange existiert wie das Wegwerf-Verzeichnis, in dem er entstand — und der ausgerechnet in dem Moment stirbt, in dem er gebraucht wird, nämlich nach dem Merge.
+
+**Lehre:** Wo ein isolierter Vorgang etwas **erzeugt**, das der Hauptbaum später **lesen** muss — Nachweise, Messungen, Buchhaltung —, gehört der Ablageort an den gemeinsamen Ort und wird beim Bau der Isolierung mitentschieden; sonst entscheidet ihn das Aufräumen. Ergänzt §3.11: Ein Nachweis hängt nicht nur am Zustand, gegen den er lief, sondern auch am Ort, an dem er notiert wurde.
+
 ---
 
 ## 4. Die Guards als Immunsystem
@@ -981,7 +989,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Samstag, 08.08.2026, 00:15 · Quellen-Fingerprint: `edd04fae21ac…`
+Zuletzt aktualisiert: Samstag, 08.08.2026, 11:28 · Quellen-Fingerprint: `3d0d44361459…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1061,8 +1069,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 72 Feedback-/Projekt-Memories · 48 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 39 Prozess-/Meta-TASKS-Punkte (davon 15 offen).
+Erfasste Quellen: 72 Feedback-/Projekt-Memories · 48 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 40 Prozess-/Meta-TASKS-Punkte (davon 16 offen).
 
-<!-- RETRO-FINGERPRINT: edd04fae21ac0c4ed02ebe605377a5a00f876fba26eca6b3d55b344dfd83bf95 -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-07T22:15:44.319Z -->
+<!-- RETRO-FINGERPRINT: 3d0d443614599f877763b9f5a83a1d8ccb3d28a3fcdb36d16f36aeed3020bf7d -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-08T09:28:15.310Z -->
 <!-- AUTO-GENERATED:END -->
