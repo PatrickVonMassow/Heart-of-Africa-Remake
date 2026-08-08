@@ -114,8 +114,10 @@ import { buildMeroePyramids, buildGizaPyramids, buildStoneCity, buildRockChurche
 import { mulberry32, hashChunk } from '../../world/noise'
 import { PERF, maxFrameMs, recordBurst, recordFrame, resetPerf } from './perfProbe'
 import { Climate } from './Climate'
-import { setFrameVisibilityTest } from './frameVisibility'
+import { FRAME_EDGE_MARGIN, pointOnScreen, setFrameVisibilityTest } from './frameVisibility'
 import { FLORA_SPECIES, type FloraSpecies } from './floraSpecies'
+import { ActorLabels } from '../ActorLabels'
+import { markActor } from '../actorLabelSource'
 import { RegionBorders } from './RegionBorders'
 import { Wildlife } from './Wildlife'
 import { collidableAnimalsNear } from './wildlifeCollision'
@@ -1934,7 +1936,7 @@ function CampMarkers() {
         const p = latLonToWorld(c.lat, c.lon)
         const y = Math.max(0.2, sampleTerrain(c.lat, c.lon, seed).height)
         return (
-          <group key={c.id} position={[p.x, y + 0.4, p.z]}>
+          <group key={c.id} position={[p.x, y + 0.4, p.z]} userData={markActor({ kind: 'camp', height: 2.2 })}>
             <mesh rotation={[0, 0, Math.PI / 4]} castShadow>
               <cylinderGeometry args={[0.09, 0.09, 2.0, 6]} />
               <meshStandardMaterial color="#7c5a34" roughness={0.95} />
@@ -2567,7 +2569,7 @@ function Player() {
   return (
     <group ref={ref} name="traveller-root">
       {/* Ridden dugout, shown only while travelling water (toggled in useFrame). */}
-      <group ref={boat} visible={false}>
+      <group ref={boat} visible={false} userData={markActor({ kind: 'canoe', height: 0.9 })}>
         <CanoeHull />
         {/* Paddle held to the right, dipping with the stroke. */}
         <group ref={paddle} position={[0.34, 0.16, 0.05]}>
@@ -2584,7 +2586,7 @@ function Player() {
       {/* Dragged canoe on land: a trailer following the walked path around
           obstacles, lying on the terrain behind the figure (posed per frame
           from canoeDrag.ts — child of the root, not of the yawing figure). */}
-      <group ref={carry} visible={false}>
+      <group ref={carry} visible={false} userData={markActor({ kind: 'canoe', height: 0.7 })}>
         <CanoeHull />
         {/* Paddle stowed lengthwise inside the hull. */}
         <group position={[0.09, 0.0, 0.1]} rotation={[Math.PI / 2, 0, 0.05]}>
@@ -2704,12 +2706,7 @@ export function TravelScene() {
   // with an edge margin so a borderline placement that camera jitter would flip
   // into view counts as on-screen too. Production, not a dev hook.
   useEffect(() => {
-    const v = new THREE.Vector3()
-    const MARGIN = 0.18 // NDC edge band also treated as on-screen
-    setFrameVisibilityTest((x, z) => {
-      v.set(x, 0, z).project(camera)
-      return v.z < 1 && Math.abs(v.x) <= 1 + MARGIN && Math.abs(v.y) <= 1 + MARGIN
-    })
+    setFrameVisibilityTest((x, z) => pointOnScreen(camera, x, 0, z, FRAME_EDGE_MARGIN))
     return () => setFrameVisibilityTest(null)
   }, [camera])
 
@@ -3023,6 +3020,9 @@ export function TravelScene() {
         <GraveMarker />
       </group>
       <Player />
+      {/* Names the animals, people and usable objects on screen while Ctrl is
+          held (design.md §17.8); mounts nothing at all while it is not. */}
+      <ActorLabels distanceFactor={60} />
     </group>
   )
 }

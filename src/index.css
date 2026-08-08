@@ -1411,6 +1411,15 @@ textarea {
   transform: translateY(-8px);
 }
 
+/* The hold-Ctrl labels (design.md §17.8): they say WHAT a thing is while the key
+   is down, so they annotate more lightly than a map point's standing name. */
+.map-label.actor-label {
+  background: rgba(24, 18, 10, 0.62);
+  border-color: transparent;
+  font-size: 12px;
+  pointer-events: none;
+}
+
 /* Natural landmarks (lakes, mountains, waterfalls): subtler atlas-style label. */
 .map-label.landmark {
   background: rgba(24, 18, 10, 0.45);
