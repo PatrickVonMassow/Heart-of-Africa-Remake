@@ -15979,3 +15979,47 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   VERIFIABLE: pure Vitest on the play-ground derivation (the spot keeps the
   separation AND lies within the built fabric for every shipped village), plus
   the retaken frame checked by a human on both backends.
+
+- [x] 556. THE LEASE DISPOSSESSES A LIVE OWNER FOR OBEYING THE WAITING RULE (measured
+  08.08.2026, 05:45Z, on the running batch; it is what produced the double session of that
+  morning). The autostart launcher logged `LEASE EXPIRED: 5551713b… (pid 4048953) has not
+  renewed for 63 min — taking the batch` and spawned a second session, while that owner was
+  ALIVE, mid-verification of point 549, with its delegated agent's worktree active. The
+  launcher had BOTH corroborating signals in hand at that very tick and printed them itself:
+  the pid was alive, and the declared work was `active 2 min ago (working files) — judged on
+  the work's own output`. The four preceding ticks had skipped on exactly those signals with
+  the heartbeat already 5, 9, 18 and 33 minutes old; only the 63-minute lease branch
+  overrode them.
+  ROOT CAUSE: the lease is renewed by the PostToolUse heartbeat, i.e. only when a tool call
+  COMPLETES — while the house rule for waiting on a delegated agent or a long verification
+  prescribes staying inside ONE long-blocking poll call. A session that follows that rule
+  therefore ages its own lease to expiry precisely while it is most productive, and the
+  longer the verification, the surer the dispossession. This is not the pid-start-time drift
+  of point 504: nothing was misjudged about the process, the lease arithmetic simply ignored
+  what the tick already knew.
+  THE DAMAGE IS NOT THEORETICAL: the dispossessed session kept running (a lease takeover
+  kills nothing, by design), so two sessions then shared one repository — the intruder
+  holding the lock and fenced-out owner still launching browser suites. Both halves of that
+  are bad: the owner cannot merge what it verified, and a second session on the machine
+  invalidates exactly the timing measurements point 549 exists to stabilise.
+  FINAL STATE:
+  1. An expired lease alone no longer dispossesses. The takeover additionally requires that
+     the corroborating signals the tick ALREADY reads come back negative — the pid dead or
+     unidentifiable, or the declared work not advancing. With a live pid AND advancing
+     declared work, the tick skips and says so, naming the lease age it overrode.
+  2. A long-blocking call renews. Either the lease is refreshed at call START as well as at
+     completion, or a declared in-flight wait (`batch-in-flight.mjs --waiting-on`) extends
+     the lease for as long as its own evidence keeps advancing. Whichever is chosen is
+     written down with its reason, and it must hold for a call that blocks for hours.
+  3. A takeover that DOES happen against a live owner tells that owner: the fenced session
+     must learn at its next hook that it no longer owns the batch and why, rather than
+     discovering it at the merge — it had a verification worth handing over.
+  VERIFIABLE: pure Vitest on the decision core — an expired lease with a live pid and
+  advancing work yields skip; expired plus a dead pid yields takeover; expired plus a live
+  pid whose declared work has gone stale yields takeover; a call blocking past the lease
+  renews it. Plus the live proof: an owner inside a single blocking call longer than the
+  lease is still the owner afterwards.
+  Criticality: high — this is the double session the hard singleton of 24.07.2026 exists to
+  prevent, it fires on every long verification, and it corrupts the measurements taken while
+  it fires. This is a guard/lock mechanism, so it gets the other model's recorded review
+  (`mechanism-review-guard`) and the criticality triage's second pair of eyes.
