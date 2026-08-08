@@ -622,7 +622,11 @@ The verdict is therefore carried by four other things, and a branch failure is
 found in them:
 
 - the **ntfy topic** — the alert names the failed gate steps and says that no mail
-  follows. On a branch run this alert IS the notification.
+  follows. On a branch run this alert IS the notification, and it needs the repo
+  secret `NTFY_TOPIC` (the value of the local `.claude/ntfy-topic`). Measured
+  08.08.2026: the secret is NOT set, so the step logs "NTFY_TOPIC secret not set"
+  and no alert goes anywhere — until it is set, the commit status below is the
+  only signal that leaves the run page.
 - the **commit status** on the pushed sha (`ci/gate (branch)`): a red ✗ beside the
   commit, and one API field for anything that asks later. Commit statuses notify
   nobody, which is why they are usable here.
