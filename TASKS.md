@@ -3385,6 +3385,25 @@ Build order, chosen so no two parallel agents own the same file:
   15 min, ~3 s at 30 min). The intruder stood down without touching the batch, so
   the damage stayed at one duplicated session; the drift is confirmed systematic
   and owner-independent.
+  REPRODUCED A THIRD TIME, AND THIS ONE COST WORK (08.08.2026, 19:55:22Z): the
+  launcher logged the same "owner provably dead (pid-reused)" against pid 1055612,
+  which was ALIVE and mid-verification — the second-backend `polish` run for point
+  342, started 86 s earlier, with its dev server serving. The dispossessed session
+  took its point-556 notice and stood down correctly, so the stand-down half works;
+  the run it was in the middle of died with it and had to be repeated.
+  AND IT PROVES POINT 556 DOES NOT COVER THIS DOOR: `leaseTakeoverDecision` — the
+  corroboration that refuses to dispossess a live owner whose declared work is
+  advancing — was never reached, because "pid-reused" resolves to `provably dead`,
+  which the tick ranks AHEAD of the lease branch. The owner had a valid declared
+  wait on its worktree at that moment and it changed nothing. Clause 2 below is
+  therefore about the DEAD door specifically: its corroboration must sit on the
+  pid-identity verdict itself, not only on the lease path 556 hardened.
+  The drift-free handle of clause 1 has a concrete candidate on this host: identity
+  as (`/proc/sys/kernel/random/boot_id`, `starttime` jiffies from `/proc/<pid>/stat`)
+  — both boot-domain, so the wall clock never enters the comparison. Measured while
+  writing this: `processStartTime` computes `Date.now() - (uptime - starttime/HZ)`,
+  and the uptime-derived boot instant stood 0.9 s from the `btime`-derived one on a
+  quiet machine — under the 2000 ms tolerance at that moment, but on the same curve.
   VERIFIABLE: the unit layer pins both directions against a drifting base, and a
   batch owner older than an hour is still read as alive by
   `node scripts/batch-doctor.mjs` on this host.
