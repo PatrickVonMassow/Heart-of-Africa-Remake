@@ -99,7 +99,7 @@ import {
 import { RIVER_DRIFT_SPEED } from '../../render/waterAppearance'
 import type { PlaceRiverBank } from './riverBank'
 import { clearEdgeBand, setEdgeBandBoundary, setEdgeBandLook } from '../../render/edgeBand'
-import { buildLayout, DIG_SITE_RADIUS, isOnLane, nearestActionable, PLACE_RADIUS, SPAWN_INSET, VILLAGE_FIRE, type Interactive, type PathDef, type DwellingDef, type FenceDef, type PlaceLayout } from './layout'
+import { buildLayout, builtFabric, DIG_SITE_RADIUS, isOnLane, nearestActionable, PLACE_RADIUS, SPAWN_INSET, VILLAGE_FIRE, type Interactive, type PathDef, type DwellingDef, type FenceDef, type PlaceLayout } from './layout'
 import {
   COOK_SHELTER,
   EYE_HEIGHT,
@@ -2194,6 +2194,9 @@ export function PlaceScene() {
     if (!groundPlate) return
     return () => groundPlate.dispose()
   }, [groundPlate])
+  // Where the settlement's walls stand (point 524) — the children's play ground
+  // is kept against them.
+  const fabric = useMemo(() => (layout ? builtFabric(layout) : []), [layout])
   const isPort = place?.kind === 'port'
   const isMonument = place?.kind === 'monument'
   const isVillage = place?.kind === 'village'
@@ -2805,6 +2808,7 @@ export function PlaceScene() {
           placeId={place.id}
           style={style}
           buildings={layout.interactives.filter((it) => it.type !== 'villager').map((it) => it.pos)}
+          fabric={fabric}
           firePos={[-3.5, 2.5]}
           homes={layout.dwellings
             .filter((d) => d.kind === 'hut' || d.kind === 'box')

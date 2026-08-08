@@ -7,6 +7,7 @@ import {
   boxCollider,
   hasEscapeDirection,
   nudgeToFree,
+  nudgeWhere,
   resolveMove,
   spawnPointFree,
   standingClear,
@@ -230,5 +231,40 @@ describe('resolveMove swept from the previous position (point 413)', () => {
     const [x, z] = resolveMove([left, right], 0, 2, R, [0, -2])
     expect(z).toBeCloseTo(2, 6)
     expect(x).toBeCloseTo(0, 6)
+  })
+})
+
+// The caller's OWN free ground (point 524): the children's play ground is a
+// disc, and a nudge that only escaped the huts teleported a child out of it.
+describe('nudgeWhere — the nearest spot the CALLER calls free', () => {
+  const disc = (x: number, z: number) => Math.hypot(x, z) <= 5
+
+  it('keeps a point the caller already accepts', () => {
+    expect(nudgeWhere(1, 1, disc)).toEqual({ pos: [1, 1], found: true })
+  })
+
+  it('finds the nearest accepted point and never returns one outside the rule', () => {
+    // Standing 2 m outside the disc: the answer is back inside it, and close.
+    const r = nudgeWhere(7, 0, disc)
+    expect(r.found).toBe(true)
+    expect(disc(r.pos[0], r.pos[1])).toBe(true)
+    expect(Math.hypot(r.pos[0] - 7, r.pos[1])).toBeLessThan(3)
+  })
+
+  it('honours a rule made of two conditions at once', () => {
+    const rock: Collider = { x: 4, z: 0, r: 1.2 }
+    const accept = (x: number, z: number) => disc(x, z) && standingClear([rock], x, z, R)
+    const r = nudgeWhere(4, 0, accept)
+    expect(r.found).toBe(true)
+    expect(accept(r.pos[0], r.pos[1])).toBe(true)
+  })
+
+  it('reports a rule nothing satisfies instead of inventing a spot', () => {
+    const r = nudgeWhere(0, 0, () => false, 0.6, 3)
+    expect(r).toEqual({ pos: [0, 0], found: false })
+  })
+
+  it('is deterministic — the same pinned child is freed to the same spot', () => {
+    expect(nudgeWhere(7, 0, disc)).toEqual(nudgeWhere(7, 0, disc))
   })
 })

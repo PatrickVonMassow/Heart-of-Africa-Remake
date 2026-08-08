@@ -304,6 +304,38 @@ export function tryNudgeToFree(
   return { pos: [x, z], found: false }
 }
 
+/**
+ * Nearest point to (x, z) that `accept` allows, over the same widening rings and
+ * the same deterministic ring/angle order as `tryNudgeToFree` — for a caller
+ * whose free ground is more than the collider set (point 524).
+ *
+ * It exists because the collider-only nudge above cannot see those other bounds:
+ * the children's play ground is a DISC, and a nudge that escaped the huts by
+ * teleporting a child clean out of its own ground left the game's `tag-inside`
+ * invariant firing every frame. `accept` is the caller's whole rule, so the spot
+ * it returns is one the caller itself calls free.
+ */
+export function nudgeWhere(
+  x: number,
+  z: number,
+  accept: (x: number, z: number) => boolean,
+  step = 0.6,
+  maxRings = 12,
+): { pos: [number, number]; found: boolean } {
+  if (accept(x, z)) return { pos: [x, z], found: true }
+  for (let ring = 1; ring <= maxRings; ring++) {
+    const rr = ring * step
+    const n = ESCAPE_DIRECTIONS * ring // denser sampling on the larger rings
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2
+      const px = x + Math.cos(a) * rr
+      const pz = z + Math.sin(a) * rr
+      if (accept(px, pz)) return { pos: [px, pz], found: true }
+    }
+  }
+  return { pos: [x, z], found: false }
+}
+
 /** Nearest usable spawn point to (x,z), position only (point 155). Thin wrapper
  *  over `tryNudgeToFree` for callers that only need the point (the layout
  *  builder). Falls back to the original point if none is found. */

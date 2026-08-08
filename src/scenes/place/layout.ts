@@ -280,6 +280,20 @@ export function isOnLane(x: number, z: number, paths: PathDef[]): boolean {
   return paths.some((p) => closestOnPolyline(p.points, x, z).dist < p.width / 2)
 }
 
+/**
+ * The settlement's BUILT FABRIC: where its dwellings and its functional
+ * buildings stand (point 524). One list rather than two, because the children's
+ * play ground is kept against the BUILDINGS and does not care which of them a
+ * player may enter — a chief's hut is as much a wall behind a chase as a
+ * granary. The villager markers are not buildings and stay out.
+ */
+export function builtFabric(layout: PlaceLayout): Array<[number, number]> {
+  return [
+    ...layout.dwellings.map((d) => [d.x, d.z] as [number, number]),
+    ...layout.interactives.filter((it) => it.type !== 'villager').map((it) => it.pos),
+  ]
+}
+
 export function buildLayout(placeId: string, seed: number): PlaceLayout {
   const place = placeById(placeId)
   // Monument sites (design.md §4.4, point 273) are a bare walkable disc with the

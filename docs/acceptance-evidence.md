@@ -1083,8 +1083,13 @@ per machine — and must show the chaser's identity changing, the gap to the qua
 rising and falling repeatedly, at least one child slowing to recover, headings
 covering a wide spread rather than circling one centre, no child pinned, still
 or outside the rim, and no tag assert fired; the frame is then taken from a
-swept, ray-probed standpoint that both has a clear sight line and holds two
-children inside the projected picture (`scripts/verify/polish.mjs`, screenshot
+swept, ray-probed standpoint that has a clear sight line, holds two children
+inside the projected picture AND counts at least two of the settlement's own
+buildings behind them (point 524 — the standpoints fan out from the bearing that
+looks INTO the village, and the shutter's subject is the child who is IT, never
+the empty midpoint between the two), while the play ground itself is derived
+against the built fabric (`src/scenes/place/lifeSpots.test.ts` pins that for
+every shipped village) (`scripts/verify/polish.mjs`, screenshot
 480-village-tag).
 
 AT THAT GAME THE CHILDREN TEACH THE SIX GENERAL CONCEPTS (§13.4,
