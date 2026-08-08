@@ -292,7 +292,10 @@ export function assessOwner(lock, { now, bootTime, probe, work, leaseMs = LEASE_
       // never asks the work question a second time.
       workAdvancing: waitDied ? false : work?.advancing === true,
       // WHAT the advance rests on: a breathing pid corroborates nothing.
-      workJudgedOn: waitDied ? 'none' : (work?.judgedOn ?? 'none'),
+      // `corroboratedBy`, NOT `judgedOn` — the latter ranks a live pid above a
+      // fresh log, so a `--pid` + `--log` verification would read breathing-only
+      // while its output was demonstrably still being written.
+      workJudgedOn: waitDied ? 'none' : (work?.corroboratedBy ?? work?.judgedOn ?? 'none'),
       workSummary: work?.summary ?? '',
     })
     if (verdict.take) return { alive: false, reason: waitDied ? 'declared-wait-stale' : 'lease-expired', detail: verdict.why }

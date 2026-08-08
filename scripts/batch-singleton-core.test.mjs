@@ -68,6 +68,7 @@ import {
   LAUNCHER_TICK_MS,
   SPAWN_IDENTITY_TOLERANCE_MS,
 } from './batch-singleton.mjs'
+import { assessOwnerWork } from './batch-in-flight-core.mjs'
 import {
   LEASE_MS,
   LEASE_RENEW_INTERVAL_MS,
@@ -241,6 +242,64 @@ describe('assessOwner (liveness = heartbeat AND real pid, never age alone)', () 
     expect(
       assessOwner(veryOld, { now: NOW, bootTime: BOOT, probe: aliveProbe, work: { advancing: true, judgedOn: 'git' } }),
     ).toMatchObject({ alive: false, reason: 'lease-expired' })
+  })
+
+  // THE RULE, PROVEN END TO END (four-eyes re-review of point 556). The earlier
+  // case injected `judgedOn: 'log'` and so never reached `evidenceVerdict`, which
+  // ranks a live pid ABOVE a fresh log — so the ordinary shape for a long
+  // background verification, `--pid` + `--log` with no worktree, came out
+  // breathing-only and was taken over while its log was still being written.
+  it('POINT 556: a --pid + --log declaration corroborates through the REAL evidence verdict', () => {
+    const runnerStartedAt = NOW - 20 * 60_000
+    const work = assessOwnerWork({
+      declaration: {
+        sessionId: 'owner-1',
+        at: NOW - 30 * 60_000,
+        evidence: [
+          { kind: 'pid', pid: 999, startedAt: runnerStartedAt },
+          { kind: 'log', path: '/tmp/large-regression.log' },
+        ],
+      },
+      lock: lock(),
+      now: NOW,
+      probePid: () => ({ exists: true, startedAt: runnerStartedAt }),
+      refTipAt: () => null,
+      worktreeActiveAt: () => null,
+      mtimeOf: () => NOW - 5_000, // the log was written five seconds ago
+    })
+    expect(work.advancing).toBe(true)
+    // The MESSAGE still names the strongest thing present, and that ordering is
+    // exactly the trap: it says 'process' while the log is demonstrably fresh.
+    expect(work.judgedOn).toBe('process')
+    expect(work.corroboratedBy).toBe('log')
+    // …and the owner therefore keeps its batch, which is the rule this branch states.
+    const silent = lock({ claimedAt: NOW - 63 * 60_000, leaseUntil: NOW - 3 * 60_000 })
+    expect(assessOwner(silent, { now: NOW, bootTime: BOOT, probe: aliveProbe, work })).toMatchObject({
+      alive: true,
+      reason: 'lease-expired-owner-working',
+    })
+    // A log that has gone SILENT leaves only the breathing pid — taken over.
+    const quiet = assessOwnerWork({
+      declaration: {
+        sessionId: 'owner-1',
+        at: NOW - 30 * 60_000,
+        evidence: [
+          { kind: 'pid', pid: 999, startedAt: runnerStartedAt },
+          { kind: 'log', path: '/tmp/large-regression.log' },
+        ],
+      },
+      lock: lock(),
+      now: NOW,
+      probePid: () => ({ exists: true, startedAt: runnerStartedAt }),
+      refTipAt: () => null,
+      worktreeActiveAt: () => null,
+      mtimeOf: () => NOW - 60 * 60_000,
+    })
+    expect(quiet.corroboratedBy).toBe('process')
+    expect(assessOwner(silent, { now: NOW, bootTime: BOOT, probe: aliveProbe, work: quiet })).toMatchObject({
+      alive: false,
+      reason: 'lease-expired',
+    })
   })
 
   // Confirmed finding 3: the owner who forgot `--clear` and walked straight into

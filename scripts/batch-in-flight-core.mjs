@@ -899,6 +899,29 @@ export const UNANSWERABLE_DETAILS = new Set([
  *                session go on working after writing it? A heartbeat newer than
  *                `declaredAt` answers that without any new notion of liveness.
  */
+/**
+ * WHAT MAY CORROBORATE AN EXPIRED LEASE. PURE, and deliberately NOT `judgedOn`.
+ *
+ * `evidenceVerdict` ranks a live pid ABOVE a fresh log, so a declaration of
+ * `--pid` + `--log` — the ordinary shape for a long background verification with
+ * no worktree — comes out `'process'` even while the log is being written. For a
+ * MESSAGE that ordering is fine (it names the strongest thing present). For the
+ * takeover it is wrong, and silently so: `leaseTakeoverDecision` reads
+ * breathing-only and dispossesses an owner whose output is demonstrably fresh,
+ * contradicting this branch's own rule that `git` and `log` corroborate
+ * (four-eyes re-review of point 556). Ranked here instead of in `evidenceVerdict`,
+ * because the two questions are genuinely different and the message's ordering is
+ * relied on elsewhere.
+ *
+ * PRODUCED output wins over a bare pid: 'git' > 'log' > 'process' > 'none'.
+ */
+export function corroborationJudgedOn(items = []) {
+  const ok = (Array.isArray(items) ? items : []).filter((i) => i?.ok === true)
+  if (ok.some((i) => OUTPUT_KINDS.has(i.kind))) return 'git'
+  if (ok.some((i) => i.kind === 'log')) return 'log'
+  return ok.some((i) => i.kind === 'pid') ? 'process' : 'none'
+}
+
 export function assessOwnerWork({ declaration, lock, now, maxAgeMs = LAUNCHER_WORK_MAX_AGE_MS, ...probes } = {}) {
   const out = (o) => ({
     declared: false,
@@ -908,6 +931,7 @@ export function assessOwnerWork({ declaration, lock, now, maxAgeMs = LAUNCHER_WO
     summary: '',
     items: [],
     judgedOn: 'none',
+    corroboratedBy: 'none',
     ...o,
   })
   if (!declaration || typeof declaration !== 'object' || typeof declaration.at !== 'number') return out({})
@@ -933,8 +957,9 @@ export function assessOwnerWork({ declaration, lock, now, maxAgeMs = LAUNCHER_WO
   const summary = items.map((i) => `${i.describe} — ${i.detail}`).join('; ')
   const answerable = items.filter((i) => !UNANSWERABLE_DETAILS.has(i.detail))
   const judgedOn = evidenceVerdict(items).judgedOn
+  const corroboratedBy = corroborationJudgedOn(items)
   if (answerable.length === 0) {
-    return out({ declared: current, declaredAt, reason: 'unanswerable', summary, items, judgedOn })
+    return out({ declared: current, declaredAt, reason: 'unanswerable', summary, items, judgedOn, corroboratedBy })
   }
 
   const advancing = answerable.some((i) => i.ok)
@@ -946,6 +971,7 @@ export function assessOwnerWork({ declaration, lock, now, maxAgeMs = LAUNCHER_WO
     summary,
     items,
     judgedOn,
+    corroboratedBy,
   })
 }
 
