@@ -89,43 +89,6 @@ there exactly once; a new point joins a bundle when appended.
   memory). The v0.3 content is the 175/177/176/178-183/184-closed, closing-verified
   HEAD; 182 and 163/166/170 come AFTER the tag.
 
-- [ ] 393. THE DEBUG MENU IS TIDIED INTO A STRUCTURE (user 28.07.2026: "völlig ausgeartet
-  und eine riesige, unstrukturierte Liste"). MEASURED: `src/ui/DebugMenu.tsx` is 523 lines
-  and renders about 130 controls, nearly all of them in ONE flat run — two `div.section`
-  wrappers near the end are the only grouping there is. It is the fine-tuning tool of §21
-  and the one debug surface that ships, so finding a value must not be a scroll hunt.
-  TARGET: named, COLLAPSIBLE groups, each holding the controls that belong together, plus
-  a FILTER field at the top that narrows the whole menu to the controls whose label
-  matches what is typed — with 130 values, search is what turns a list into a tool. All
-  groups start collapsed except the filter; opening one is remembered for the session so a
-  calibration pass does not re-open the same group every time.
-  THE GROUPS, by what a person is doing when they open the menu — not by which balance
-  object a value happens to live in: movement and controls; time and travel; health,
-  water and provisions; wildlife and its dramas; weather and season; economy and trade;
-  random events; graphics and sound; jump-to (the §21.3 selectors, which already have
-  their own category/alphabetical order — keep it); tools (benchmark, bug report, the
-  read-only renderer row). Where a value plausibly belongs to two groups, put it where a
-  player TUNING it would look, and say why in the commit.
-  NOTHING MAY BE LOST — this is the risk that matters. Every control that exists today
-  still exists, still writes through to the same field, and still carries the same
-  localized label in BOTH languages; the group names are new text and exist in both too.
-  `src/ui/DebugMenu.test.tsx` already pins several of these individually (the jump-to
-  grouping and its sort, the rescue-burst write-through, the single graphics dropdown);
-  extend it with a COMPLETENESS test that walks the rendered menu and asserts the full set
-  of controls against a list derived from the source of truth, so a future edit cannot
-  drop one silently — the same shape as the `QUALITY_PRESETS` completeness gate (§21).
-  KEEP IT A DEBUG TOOL: no new values, no renamed fields, no behaviour changes behind the
-  controls. This point moves and groups what is there and adds the filter, nothing else.
-  VERIFIABLE: Vitest on the menu — every control present and writing through (the
-  completeness test above), the filter narrowing to the matching controls and restoring
-  the full set when cleared, groups collapsing and their state surviving a re-render, and
-  both languages carrying every group name. Live: `scripts/verify/settings.mjs` still
-  drives the values it drives today through the new structure. No picture check is owed
-  beyond one frame of the opened menu per backend, since it is DOM.
-  DOCS in the same commit: design.md §21.3 states the grouped, filterable menu, and
-  CLAUDE.md §7.1 pt 20 keeps naming what the menu must offer. Both sit at measured
-  ceilings, so any added words are paid for by a measured raise with its justification or
-  by shortening elsewhere.
 - [ ] 524. THE CHILDREN'S PLAY GROUND IS SQUEEZED INTO A ROCKY CORNER, AND THE
   FRAME THAT PROVES THEM NO LONGER SHOWS THE VILLAGE (measured 06.08.2026 while
   closing point 481, on WebGL 2). Point 481 moved the children far enough from
