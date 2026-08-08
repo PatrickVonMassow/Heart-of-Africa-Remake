@@ -59,6 +59,9 @@ import { writeJsonAtomic, tryWriteJsonAtomic } from './atomic-write.mjs'
 import {
   LEASE_MS,
   leaseExpired,
+  leaseUntilOf,
+  leaseTakeoverDecision,
+  declaredWaitStale,
   renewedLock,
   renewalDecision,
   nextFence,
@@ -230,7 +233,7 @@ const readJson = (p) => {
  *   - while the pid is still alive the successor waits HANDOVER_GRACE_MS, so a
  *     session mid-shutdown is never raced.
  */
-export function assessOwner(lock, { now, bootTime, probe, leaseMs = LEASE_MS } = {}) {
+export function assessOwner(lock, { now, bootTime, probe, work, leaseMs = LEASE_MS } = {}) {
   if (!lock || typeof lock.claimedAt !== 'number') {
     return { alive: false, reason: 'no-lock' }
   }
@@ -251,11 +254,35 @@ export function assessOwner(lock, { now, bootTime, probe, leaseMs = LEASE_MS } =
   if (typeof bootTime === 'number' && lock.claimedAt < bootTime) {
     return { alive: false, reason: 'heartbeat-predates-boot' }
   }
-  // THE LEASE, and it outranks the pid: a live process whose lease ran out no
-  // longer owns the batch. This is the whole of point 434's layer 1 — nothing is
-  // inferred from the silence, the owner simply stopped saying it was still
-  // there. Nothing is killed here or anywhere else.
-  if (leaseExpired(lock, { now, leaseMs })) return { alive: false, reason: 'lease-expired' }
+  // THE LEASE — and since point 556 it is NECESSARY, not sufficient. A lease that
+  // ran out ends ownership by arithmetic exactly as before; what it no longer does
+  // ALONE is license the takeover. `work` is the corroboration the caller already
+  // holds (`assessOwnerWork`), and it is passed only by the launcher tick, which
+  // reads it a few lines before this call. Every other caller passes nothing and
+  // gets the pre-556 verdict — being wrong toward "take it" is what cost a live
+  // owner its batch on 08.08.2026, so the widening is deliberate and narrow.
+  // Nothing is killed here or anywhere else.
+  const expired = leaseExpired(lock, { now, leaseMs })
+  const waitDied = !expired && declaredWaitStale(lock, { now, leaseMs, workAdvancing: work?.advancing })
+  if (expired || waitDied) {
+    const corroboration = pidCorroboration(lock, probe)
+    const verdict = leaseTakeoverDecision({
+      leaseAgeMs: (() => {
+        const until = leaseUntilOf(lock, { leaseMs })
+        return typeof until === 'number' ? now - until : null
+      })(),
+      pid: corroboration.pid,
+      pidIdentifiable: corroboration.identifiable,
+      pidLive: corroboration.live,
+      // A declared wait that stopped moving is over BY DEFINITION (it bought its
+      // window on the promise that its evidence keeps advancing), so that branch
+      // never asks the work question a second time.
+      workAdvancing: waitDied ? false : work?.advancing === true,
+      workSummary: work?.summary ?? '',
+    })
+    if (verdict.take) return { alive: false, reason: waitDied ? 'declared-wait-stale' : 'lease-expired', detail: verdict.why }
+    return { alive: true, reason: 'lease-expired-owner-working', detail: verdict.why }
+  }
   const kind = lock.kind === 'pending-spawn' ? 'pending-spawn' : 'session'
   const pid = typeof lock.pid === 'number' && lock.pid > 0 ? lock.pid : null
   if (pid === null) {
@@ -377,6 +404,35 @@ export function sweepableTmpFiles({ entries, lockName, now, probe, staleMs = REA
  */
 export function spawnDecision(assessment) {
   return assessment.alive ? 'skip-alive' : 'spawn'
+}
+
+/**
+ * WHAT THE PID PROBE SAYS ABOUT THE LOCK'S OWNER. PURE (the probe is passed in).
+ *
+ * The same three readings `assessOwner` has always made further down, lifted out
+ * so the lease branch can corroborate with them (point 556) instead of taking the
+ * batch before they are ever consulted:
+ *   - `identifiable` false — the lock records no pid at all, so nothing can be
+ *     asked about the process. That is the "unidentifiable" of the spec.
+ *   - `live` false — the process is gone, or the number now belongs to a
+ *     DIFFERENT process (`pidStartedAt` disagrees). Pid reuse is death here.
+ *   - A missing start time on either side leaves `live` true, exactly as the older
+ *     branch below does: it is a weaker answer, but the takeover it feeds also
+ *     requires the declared work to be advancing, so leniency here cannot on its
+ *     own keep a wedged owner alive.
+ */
+export function pidCorroboration(lock, probe) {
+  const pid = lock && typeof lock.pid === 'number' && lock.pid > 0 ? lock.pid : null
+  if (pid === null) return { pid: null, identifiable: false, live: false }
+  if (!probe || probe.exists !== true) return { pid, identifiable: true, live: false }
+  if (
+    typeof lock.pidStartedAt === 'number' &&
+    typeof probe.startedAt === 'number' &&
+    Math.abs(probe.startedAt - lock.pidStartedAt) > PID_START_TOLERANCE_MS
+  ) {
+    return { pid, identifiable: true, live: false }
+  }
+  return { pid, identifiable: true, live: true }
 }
 
 /**
@@ -851,6 +907,10 @@ export function acquire(sessionId, opts = {}) {
   // falling if the fence file was lost (see `nextFence`). Read before the create,
   // because the create is what replaces the lock it comes from.
   let priorFence = null
+  // WHOM THIS ACQUISITION TOOK THE BATCH FROM, and why (point 556). Set only on
+  // the takeover paths below — an acquisition of a FREE lock dispossesses nobody
+  // and must not overwrite the record of whoever was last dispossessed.
+  let takenFrom = null
   const identity = (fence) => {
     // Resolve the owning claude process once, at acquisition.
     const anc = opts.pid ? { pid: opts.pid, startedAt: opts.pidStartedAt ?? null } : deps.findAncestor()
@@ -886,7 +946,7 @@ export function acquire(sessionId, opts = {}) {
   const claim = () => {
     if (!tryExclusiveCreate(lockPath, identity(null))) return false
     try {
-      const fence = grantFence(sessionId, { fencePath, priorFence, now })
+      const fence = grantFence(sessionId, { fencePath, priorFence, now, takeover: takenFrom })
       const fresh = readOwnerLock(lockPath)
       if (fence !== null && fresh && fresh.sessionId === sessionId) {
         writeJsonAtomic(lockPath, { ...fresh, fence }, opts)
@@ -946,8 +1006,17 @@ export function acquire(sessionId, opts = {}) {
         return 'mine'
       }
       const probe = recheck.pid ? deps.probePid(recheck.pid) : null
-      if (assessOwner(recheck, { now, bootTime: deps.bootTime, probe, leaseMs: opts.leaseMs }).alive) return 'held'
+      const verdict = assessOwner(recheck, { now, bootTime: deps.bootTime, probe, leaseMs: opts.leaseMs })
+      if (verdict.alive) return 'held'
       if (typeof recheck.fence === 'number') priorFence = recheck.fence
+      // The record the dispossessed session is told from (point 556). Written
+      // here, inside the mutex, from the lock actually being replaced — so it can
+      // never name a session that kept the batch. A HANDOVER is not a
+      // dispossession: that owner gave the batch away at its own boundary and
+      // needs no notice, so it is left out.
+      if (verdict.reason !== 'handed-over') {
+        takenFrom = { from: recheck.sessionId, reason: verdict.detail || verdict.reason }
+      }
     }
     try {
       rmSync(lockPath, { force: true })
@@ -973,6 +1042,40 @@ export function readFence(opts = {}) {
   return normaliseFence(readJson(opts.fencePath ?? FENCE_PATH))
 }
 
+/** Where a session records that it has already been TOLD it lost the batch
+ *  (point 556). Its own bookkeeping, not the batch's — it is written by a session
+ *  that no longer owns anything, so it may not live in the lock or the fence file,
+ *  and it is not one of the four fence-guarded families. */
+export function fenceNoticePath(lockPath = LOCK_PATH) {
+  return join(dirname(lockPath), 'fence-notice.json')
+}
+
+/** Which fence number this session was last told about. 0 = never told. */
+export function readFenceNotice(sessionId, opts = {}) {
+  try {
+    const rec = readJson(opts.noticePath ?? fenceNoticePath(opts.lockPath ?? LOCK_PATH))
+    if (!rec || rec.sessionId !== sessionId) return 0
+    return typeof rec.fence === 'number' && rec.fence > 0 ? Math.floor(rec.fence) : 0
+  } catch {
+    return 0
+  }
+}
+
+/** Record that this session has been told about `fence`. Best effort: a notice we
+ *  cannot record is repeated at worst, never lost. */
+export function recordFenceNotice(sessionId, fence, opts = {}) {
+  try {
+    writeJsonAtomic(
+      opts.noticePath ?? fenceNoticePath(opts.lockPath ?? LOCK_PATH),
+      { v: 1, sessionId, fence, at: opts.now ?? Date.now() },
+      opts,
+    )
+    return true
+  } catch {
+    return false
+  }
+}
+
 /**
  * Grant the next fence number to `sessionId`. Returns the number, or null when it
  * could not be recorded.
@@ -993,7 +1096,13 @@ export function grantFence(sessionId, opts = {}) {
     const now = opts.now ?? Date.now()
     const state = normaliseFence(readJson(fencePath))
     const fence = nextFence({ fenceState: state, priorFence: opts.priorFence })
-    writeJsonAtomic(fencePath, grantedFenceState({ fenceState: state, sessionId, fence, now }), opts)
+    writeJsonAtomic(
+      fencePath,
+      // `takeover` names WHO lost the batch and WHY, so the dispossessed session
+      // can be told at its next hook instead of at a denied merge (point 556).
+      grantedFenceState({ fenceState: state, sessionId, fence, now, takeover: opts.takeover ?? null }),
+      opts,
+    )
     return fence
   } catch {
     return null
@@ -1053,6 +1162,14 @@ export function renewLease(sessionId, opts = {}) {
  * declared, and the acquirer only compares numbers").
  *
  * Owner-guarded, and it only ever moves the lease FORWARD.
+ *
+ * WIRED TO THE DECLARATION SINCE POINT 556. `batch-in-flight.mjs --waiting-on` is
+ * now this function's caller, which is what docs/batch-resilience.md §3 left as
+ * "not built here, and deliberately". With `declaredWait: true` the extension also
+ * RECORDS itself on the lock as `{ at, until }`, and that record is what keeps the
+ * window honest: `declaredWaitStale` lets the launcher — the one reader holding the
+ * evidence — end the extension early when the declared work stops moving, so a
+ * four-hour lease can never be bought by paperwork alone.
  */
 export function extendLease(sessionId, untilMs, opts = {}) {
   try {
@@ -1062,7 +1179,9 @@ export function extendLease(sessionId, untilMs, opts = {}) {
     if (!(typeof untilMs === 'number' && Number.isFinite(untilMs))) return false
     const current = typeof lock.leaseUntil === 'number' ? lock.leaseUntil : 0
     if (untilMs <= current) return false
-    writeJsonAtomic(lockPath, { ...lock, leaseUntil: untilMs }, opts)
+    const next = { ...lock, leaseUntil: untilMs }
+    if (opts.declaredWait === true) next.declaredWait = { at: opts.now ?? Date.now(), until: untilMs }
+    writeJsonAtomic(lockPath, next, opts)
     return true
   } catch {
     return false

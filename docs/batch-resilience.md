@@ -156,11 +156,43 @@ of them free choices:
   and every other guard still stands down for it, so the Stop chain cannot demand
   of it the publish this refuses.
 
-**Not built here, and deliberately:** nothing yet WRITES a longer lease when work
-is declared. `extendLease` is the sanctioned door and is tested; wiring it to the
-in-flight declaration belongs with part (6), which owns that file. Until then a
-declared wait is carried by the ordinary renewals of the session's own tool calls
-— which is what the blind spot above already describes.
+**REVISED 08.08.2026 (point 556) — an expired lease is NECESSARY, NOT SUFFICIENT.**
+The paragraph above ("Consequently there is no probing at the acquire door") held
+for the door and was wrong for the TICK. Measured 05:45Z: `LEASE EXPIRED: 5551713b…
+(pid 4048953) has not renewed for 63 min — taking the batch`, logged while that
+owner was alive, mid-verification, with its delegated agent's worktree active — and
+the tick printed BOTH corroborating signals in the same breath (`the pid was alive`,
+`active 2 min ago (working files)`). Four earlier ticks had skipped on exactly those
+signals at 5, 9, 18 and 33 minutes; only the lease branch overrode them. The root
+cause is structural, not a threshold: the waiting rule prescribes staying inside ONE
+long-blocking call, and a session inside one renews nothing, so obeying the rule
+ages its own lease to expiry precisely while it is most productive — the longer the
+verification, the surer the dispossession.
+
+Two changes, both in the pure core:
+
+- **The takeover asks the corroborating signals** (`leaseTakeoverDecision`). It
+  takes the batch only where the pid is dead or unidentifiable, or the declared work
+  is not advancing; a live pid AND advancing declared work make the tick SKIP and
+  say which lease age it overrode. This is not the probing this section refuses: the
+  ACQUIRE door still compares two numbers, and only the launcher tick — which
+  already reads both signals a few lines earlier — passes them in. A live pid alone
+  is never enough, because a wedged process breathes.
+- **A declared wait extends the lease**, which is what this paragraph used to say
+  was unbuilt. `batch-in-flight.mjs --waiting-on` now calls `extendLease` for
+  `DECLARED_WAIT_LEASE_MS` (4 h, pinned to `LAUNCHER_WORK_MAX_AGE_MS`). Point 556
+  offered the alternative of renewing at call START as well as at completion; it was
+  REJECTED, and the reason is arithmetic: a renewal buys exactly one `LEASE_MS`
+  however often it fires, and the case at issue is a call that never completes. The
+  extension records itself on the lock (`declaredWait: { at, until }`) so
+  `declaredWaitStale` can end it early when the declaration's own evidence stops
+  advancing — the window is bought in advance, not granted unconditionally.
+
+**And the dispossessed owner is TOLD.** A takeover writes `lastTakeover:
+{ from, reason }` into the fence file, and the PostToolUse hook injects
+`dispossessionNotice` once per fence number, so a session that lost the batch
+mid-verification learns it at its very next hook — not at the merge it can no
+longer make.
 
 ### Layer 2 — the launcher may act (point 433)
 
@@ -454,6 +486,16 @@ layer still acts while the other layers' inputs are missing or stale.
   30.07.2026: a call longer than the WINDOW does lose the lease, which is the deal
   §3 writes down, not a defect a test could assert away); a fence file that was
   deleted does not lower the high-water mark.
+- Takeover (point 556): an expired lease with a LIVE pid and ADVANCING declared work
+  yields SKIP, naming the lease age it overrode; expired plus a dead or
+  unidentifiable pid yields TAKEOVER; expired plus a live pid whose declared work has
+  gone stale yields TAKEOVER; a declared wait covers a call blocking past the lease
+  and ends early when its own evidence stops moving. The live proof is on the real
+  lock and fence files: a session inside one blocking call 100 minutes long is still
+  the owner afterwards (`scripts/batch-singleton-core.test.mjs`).
+- Notice (point 556): a takeover records whom it dispossessed and why, and the
+  spawned PostToolUse hook delivers that to the fenced session exactly once
+  (`scripts/chat-delivery-hook.test.mjs`).
 - Chokepoint: a stale-fence session is refused a push, a tick, a board publish and a
   dashboard-state merge; a current-fence session is not.
 - External watcher: no push movement plus open points yields the alert; movement

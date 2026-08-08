@@ -38,9 +38,18 @@
 //     while the spool is empty: injected context is re-sent with every later
 //     request, so even a "no new messages" line would cost tokens at tool-call
 //     rate. Owner-only and silent under a user pause, like every guard here.
+// (7) THE DISPOSSESSION NOTICE (point 556): a session whose fence has been
+//     superseded is TOLD so here, at its very next hook, instead of discovering
+//     it at a denied merge. On 08.08.2026 an owner mid-verification lost the
+//     batch to an expired lease and went on running browser suites it could no
+//     longer merge. It speaks ONCE per fence number, stands down for a paused
+//     batch and for every session that never held a fence, and shares duty (6)'s
+//     channel — the two can never collide, since a fenced-out session is by
+//     definition not the owner duty (6) speaks for.
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import { basename } from 'node:path'
-import { heartbeat, noteActivity } from './batch-singleton.mjs'
+import { heartbeat, noteActivity, readFence, readFenceNotice, recordFenceNotice } from './batch-singleton.mjs'
+import { dispossessionNotice } from './batch-lease-core.mjs'
 import { deliverPendingMessages } from './chat-spool.mjs'
 import { handoverSurvivesCall, hookCallTimestamp } from './batch-boundary-core.mjs'
 import { classifyPublishResponse, publishStatePatch } from './publish-outcome-core.mjs'
@@ -159,13 +168,48 @@ try {
 // claims each message before it renders it and returns '' for every reason not
 // to speak (not the owner, batch paused, empty spool, any error at all), and ''
 // is written as nothing whatsoever.
+const paused = (() => {
+  try {
+    return existsSync(repoPath('.claude', 'batch-paused'))
+  } catch {
+    return false
+  }
+})()
+let spoke = false
 try {
-  const out = deliverPendingMessages({
-    ownsBatch,
-    paused: existsSync(repoPath('.claude', 'batch-paused')),
-  })
-  if (out) process.stdout.write(out)
+  const out = deliverPendingMessages({ ownsBatch, paused })
+  if (out) {
+    process.stdout.write(out)
+    spoke = true
+  }
 } catch {
   /* the channel may never break a tool call */
+}
+
+// (7) the dispossession notice — see the header. It rides the same stdout, so it
+// only speaks when duty (6) did not; the two are mutually exclusive in practice
+// (duty 6 is owner-only, this one fires only for a session that lost the batch),
+// and where they ever were not, the user's own words go first and this repeats on
+// the next call because nothing was recorded.
+try {
+  if (!spoke && sid) {
+    const notice = dispossessionNotice({
+      fenceState: readFence(),
+      sessionId: sid,
+      announcedFence: readFenceNotice(sid),
+      paused,
+    })
+    // RECORDED BEFORE IT IS EMITTED, exactly like a claimed chat message: a notice
+    // written to stdout but not recorded would be re-injected on every tool call
+    // for the rest of the session, and injected context is re-sent with every
+    // later request. Unrecordable → say nothing rather than say it forever.
+    if (notice.notify && recordFenceNotice(sid, notice.fence)) {
+      process.stdout.write(
+        `${JSON.stringify({ hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: notice.context } })}\n`,
+      )
+    }
+  }
+} catch {
+  /* a notice we cannot compute may never break a tool call */
 }
 process.exit(0)

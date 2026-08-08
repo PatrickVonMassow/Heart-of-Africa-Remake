@@ -27,10 +27,17 @@ import {
   fenceStatus,
   fenceGuardedAction,
   fenceDecision,
+  DECLARED_WAIT_LEASE_MS,
+  leaseTakeoverDecision,
+  inDeclaredWaitWindow,
+  declaredWaitStale,
+  dispossessionNotice,
 } from './batch-lease-core.mjs'
+import { LAUNCHER_WORK_MAX_AGE_MS } from './batch-in-flight-core.mjs'
 
 const T0 = 1_800_000_000_000
 const lockAt = (t, extra = {}) => ({ sessionId: 's-owner', claimedAt: t, pid: 4242, ...extra })
+const at = (mins) => mins * 60_000
 
 describe('the lease — ownership ends by arithmetic', () => {
   it('§8 lease: an EXPIRED lease is takeable by a stranger', () => {
@@ -151,8 +158,8 @@ describe('the fence — monotonic, max-wins, in its own file', () => {
     const b = grantedFenceState({ fenceState: a, sessionId: 's2', fence: 2, now: T0 + 1 })
     const c = grantedFenceState({ fenceState: b, sessionId: 's1', fence: 3, now: T0 + 2 })
     expect(c.holders.filter((h) => h.sessionId === 's1').length).toBe(1)
-    expect(fenceStatus({ fenceState: c, sessionId: 's1' })).toEqual({ current: 3, held: 3, stale: false })
-    expect(fenceStatus({ fenceState: c, sessionId: 's2' })).toEqual({ current: 3, held: 2, stale: true })
+    expect(fenceStatus({ fenceState: c, sessionId: 's1' })).toEqual({ current: 3, held: 3, stale: false, takeover: null })
+    expect(fenceStatus({ fenceState: c, sessionId: 's2' })).toEqual({ current: 3, held: 2, stale: true, takeover: null })
   })
 
   it('a session that never held a fence is NEVER stale', () => {
@@ -163,6 +170,7 @@ describe('the fence — monotonic, max-wins, in its own file', () => {
       current: 4,
       held: null,
       stale: false,
+      takeover: null,
     })
     expect(fenceStatus({ fenceState: null, sessionId: 's-owner' }).stale).toBe(false)
     expect(fenceStatus({ fenceState: { fence: 'x', holders: 'y' }, sessionId: 's-owner' }).stale).toBe(false)
@@ -170,7 +178,7 @@ describe('the fence — monotonic, max-wins, in its own file', () => {
 
   it('normalises a torn file instead of trusting it', () => {
     const n = normaliseFence({ fence: -3, holder: 7, holders: [{ sessionId: 'a' }, { fence: 2 }, null, { sessionId: 'b', fence: 2 }] })
-    expect(n).toEqual({ fence: 0, holder: '', holders: [{ sessionId: 'b', fence: 2, at: 0 }] })
+    expect(n).toEqual({ fence: 0, holder: '', holders: [{ sessionId: 'b', fence: 2, at: 0 }], lastTakeover: null })
   })
 })
 
@@ -372,5 +380,171 @@ describe('the chokepoint — the four paths with no guard of their own', () => {
     expect(fenceDecision({ fenceState: 'x', sessionId: 3, toolName: null }).block).toBe(false)
     expect(fenceGuardedAction()).toBe(null)
     expect(fenceGuardedAction({ toolName: 'Bash', command: null })).toBe(null)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// POINT 556 — an expired lease alone no longer dispossesses a LIVE owner.
+//
+// MEASURED 08.08.2026, 05:45Z: `LEASE EXPIRED: 5551713b… (pid 4048953) has not
+// renewed for 63 min — taking the batch` was logged while that owner was alive,
+// mid-verification, with its delegated agent's worktree active — and the tick
+// printed BOTH corroborating signals in the same breath. Four earlier ticks had
+// skipped on exactly those signals at 5, 9, 18 and 33 minutes of heartbeat age;
+// only the lease branch overrode them. Two sessions then shared one repository.
+describe('the takeover — an expired lease is necessary, not sufficient (point 556)', () => {
+
+  it('expired lease + LIVE pid + ADVANCING work → SKIP, naming the lease age it overrode', () => {
+    const d = leaseTakeoverDecision({
+      leaseAgeMs: at(63),
+      pid: 4048953,
+      pidIdentifiable: true,
+      pidLive: true,
+      workAdvancing: true,
+      workSummary: 'active 2 min ago (working files)',
+    })
+    expect(d.take).toBe(false)
+    expect(d.reason).toBe('live-owner-working')
+    // The skip must SAY what the arithmetic wanted, or the next incident is as
+    // invisible in the log as this one was.
+    expect(d.why).toContain('63 min')
+    expect(d.why).toContain('4048953')
+    expect(d.why).toContain('active 2 min ago (working files)')
+  })
+
+  it('expired lease + DEAD pid → TAKEOVER (the recovery the lease exists for is untouched)', () => {
+    const d = leaseTakeoverDecision({ leaseAgeMs: at(63), pid: 4048953, pidIdentifiable: true, pidLive: false, workAdvancing: true })
+    expect(d).toMatchObject({ take: true, reason: 'pid-dead' })
+  })
+
+  it('expired lease + UNIDENTIFIABLE owner process → TAKEOVER', () => {
+    // A lock with no pid at all: nothing can be asked about the process, and
+    // "we could not ask" is never a reason to leave the batch stranded.
+    const d = leaseTakeoverDecision({ leaseAgeMs: at(90), pid: null, pidIdentifiable: false, pidLive: false, workAdvancing: true })
+    expect(d).toMatchObject({ take: true, reason: 'pid-unidentifiable' })
+  })
+
+  it('expired lease + live pid + STALE declared work → TAKEOVER', () => {
+    // A wedged process breathes. The pid may corroborate evidence of work; it may
+    // never stand in for it.
+    const d = leaseTakeoverDecision({ leaseAgeMs: at(63), pid: 77, pidIdentifiable: true, pidLive: true, workAdvancing: false })
+    expect(d).toMatchObject({ take: true, reason: 'work-not-advancing' })
+  })
+
+  it('expired lease + live pid + NOTHING declared → TAKEOVER (silence is not a claim)', () => {
+    expect(leaseTakeoverDecision({ leaseAgeMs: at(120), pid: 77, pidIdentifiable: true, pidLive: true }).take).toBe(true)
+  })
+
+  it('is total on junk input and defaults toward taking a batch nobody can vouch for', () => {
+    expect(leaseTakeoverDecision().take).toBe(true)
+    expect(leaseTakeoverDecision({ leaseAgeMs: 'soon' }).why).toContain('an expired lease')
+  })
+})
+
+// POINT 556, second clause — a call that blocks past the lease keeps the batch,
+// because the declared wait bought the window IN ADVANCE. The alternative on
+// offer (renew at call start as well as at completion) cannot do this: a renewal
+// buys exactly one LEASE_MS however often it fires, and the call at issue is one
+// that never completes.
+describe('the declared wait — how a call blocking for HOURS renews (point 556)', () => {
+  const declared = (t0, until) => ({ sessionId: 's-owner', claimedAt: t0, pid: 42, leaseUntil: until, declaredWait: { at: t0, until } })
+
+  it('the extension window is pinned to the launcher’s own declaration window', () => {
+    // Longer would keep the batch on paperwork the launcher no longer reads;
+    // shorter would expire a wait the launcher still believes in.
+    expect(DECLARED_WAIT_LEASE_MS).toBe(LAUNCHER_WORK_MAX_AGE_MS)
+    expect(DECLARED_WAIT_LEASE_MS).toBeGreaterThan(LEASE_MS)
+  })
+
+  it('a call blocking PAST the ordinary lease is still covered — three hours in', () => {
+    const lock = declared(T0, T0 + DECLARED_WAIT_LEASE_MS)
+    expect(leaseExpired(lock, { now: T0 + LEASE_MS + 1 })).toBe(false)
+    expect(leaseExpired(lock, { now: T0 + 3 * 60 * 60_000 })).toBe(false)
+    // …and it is NOT eternal: past the declared window the arithmetic resumes.
+    expect(leaseExpired(lock, { now: T0 + DECLARED_WAIT_LEASE_MS + 1 })).toBe(true)
+  })
+
+  it('a renewal never CLOBBERS the extension backwards', () => {
+    // renewedLock writes now + LEASE_MS unconditionally, so the rate limit is what
+    // keeps a 4-hour extension from being shortened to 60 minutes by a tool call.
+    const lock = declared(T0, T0 + DECLARED_WAIT_LEASE_MS)
+    expect(shouldRenewLease({ lock, now: T0 + at(10) })).toBe(false)
+  })
+
+  it('the extension lasts only while its OWN evidence advances', () => {
+    const lock = declared(T0, T0 + DECLARED_WAIT_LEASE_MS)
+    const beyondOrdinary = T0 + LEASE_MS + at(30)
+    expect(inDeclaredWaitWindow(lock, { now: beyondOrdinary })).toBe(true)
+    expect(declaredWaitStale(lock, { now: beyondOrdinary, workAdvancing: true })).toBe(false)
+    expect(declaredWaitStale(lock, { now: beyondOrdinary, workAdvancing: false })).toBe(true)
+    // A reader WITHOUT the evidence never ends it — only the launcher has it.
+    expect(declaredWaitStale(lock, { now: beyondOrdinary })).toBe(false)
+    // Inside the stretch an ordinary lease would have covered anyway, there is
+    // nothing conditional to end.
+    expect(declaredWaitStale(lock, { now: T0 + at(30), workAdvancing: false })).toBe(false)
+  })
+
+  it('is total on a lock with no extension, junk or none at all', () => {
+    expect(inDeclaredWaitWindow(null, { now: T0 })).toBe(false)
+    expect(inDeclaredWaitWindow({ declaredWait: 'soon' }, { now: T0 })).toBe(false)
+    expect(inDeclaredWaitWindow(lockAt(T0), { now: T0 + LEASE_MS * 5 })).toBe(false)
+    expect(declaredWaitStale(lockAt(T0), { now: T0, workAdvancing: false })).toBe(false)
+  })
+})
+
+// POINT 556, third clause — the fenced-out owner LEARNS, at its next hook.
+describe('the dispossession notice — the fenced session is told, and why', () => {
+  const taken = {
+    fence: 8,
+    holder: 's-new',
+    holders: [{ sessionId: 's-owner', fence: 7 }, { sessionId: 's-new', fence: 8 }],
+    lastTakeover: { from: 's-owner', fence: 8, reason: 'a lease 63 min out and pid 4048953 is gone', at: T0 },
+  }
+
+  it('tells the dispossessed session what happened and what it may still do', () => {
+    const n = dispossessionNotice({ fenceState: taken, sessionId: 's-owner' })
+    expect(n.notify).toBe(true)
+    expect(n.fence).toBe(8)
+    expect(n.context).toContain('pid 4048953 is gone')
+    // It had a verification worth handing over — so it is told to commit and say so.
+    expect(n.context).toContain('COMMIT')
+    expect(n.context).toContain('batch-claim.mjs')
+  })
+
+  it('a grant records the takeover, and a grant that took the batch from NOBODY does not', () => {
+    const after = grantedFenceState({ fenceState: { fence: 7, holders: [{ sessionId: 's-owner', fence: 7 }] }, sessionId: 's-new', fence: 8, now: T0, takeover: { from: 's-owner', reason: 'pid dead' } })
+    expect(after.lastTakeover).toMatchObject({ from: 's-owner', fence: 8, reason: 'pid dead' })
+    // A free-lock acquisition leaves the standing record alone rather than
+    // erasing it before its owner was ever told.
+    const free = grantedFenceState({ fenceState: after, sessionId: 's-third', fence: 9, now: T0 + 1 })
+    expect(free.lastTakeover).toMatchObject({ from: 's-owner' })
+    // …and a session never records a takeover FROM ITSELF.
+    expect(grantedFenceState({ fenceState: {}, sessionId: 's-a', fence: 1, now: T0, takeover: { from: 's-a' } }).lastTakeover).toBeUndefined()
+  })
+
+  it('speaks ONCE per fence number — injected context is paid for on every later request', () => {
+    expect(dispossessionNotice({ fenceState: taken, sessionId: 's-owner', announcedFence: 8 }).notify).toBe(false)
+    // A LATER takeover of the same session speaks again.
+    expect(dispossessionNotice({ fenceState: { ...taken, fence: 9 }, sessionId: 's-owner', announcedFence: 8 }).notify).toBe(true)
+  })
+
+  it('stands down for a paused batch, the current owner and a session that never held a fence', () => {
+    expect(dispossessionNotice({ fenceState: taken, sessionId: 's-owner', paused: true }).notify).toBe(false)
+    expect(dispossessionNotice({ fenceState: taken, sessionId: 's-new' }).notify).toBe(false)
+    expect(dispossessionNotice({ fenceState: taken, sessionId: 's-stranger' }).notify).toBe(false)
+  })
+
+  it('the reason is surfaced only to the session it names, and only while stale', () => {
+    expect(fenceStatus({ fenceState: taken, sessionId: 's-owner' }).takeover).toMatchObject({ from: 's-owner' })
+    expect(fenceStatus({ fenceState: taken, sessionId: 's-new' }).takeover).toBe(null)
+    // The refusal at the chokepoint carries it too, so a denied merge says why.
+    const denied = fenceDecision({ fenceState: taken, sessionId: 's-owner', toolName: 'Bash', command: 'git push' })
+    expect(denied.reason).toContain('pid 4048953 is gone')
+  })
+
+  it('is total on junk input — it fails silent, never loud', () => {
+    expect(dispossessionNotice()).toEqual({ notify: false, fence: 0, context: '' })
+    expect(dispossessionNotice({ fenceState: 'x', sessionId: 4 }).notify).toBe(false)
+    expect(normaliseFence({ lastTakeover: { from: 5 } }).lastTakeover).toBe(null)
   })
 })
