@@ -1763,29 +1763,64 @@ for (const [placeId, shot] of [
     // pair is actually CLEAR — the settlement is dense, and a camera dropped on a
     // fixed bearing can end up inside a hut, which would photograph a wall and
     // prove nothing about an arm.
-    const stood = await page.evaluate(() => {
-      const p = window.__placePlayer
-      const t = window.__placeTalkers
-      if (!p || !t) return null
-      const cx = (t[0].x + t[1].x) / 2
-      const cz = (t[0].z + t[1].z) / 2
-      const aim = (px, pz) => Math.atan2(-(cx - px), -(cz - pz))
+    //
+    // Point 549 — WHY THIS COULD ROTATE ITS VERDICT on an unchanged layout. The
+    // search teleported the player and ray-probed inside ONE page call, and
+    // `__placeRayHit` casts from the CAMERA, which only follows the player on the
+    // next drawn frame. So all sixteen bearings were probed from wherever the
+    // camera still stood — one answer, sixteen times, and which answer depended
+    // on where the block before had left it. Each bearing is now DRAWN before it
+    // is judged (the shape `probeSilhouetteFooting` and the speech probe already
+    // use), a first miss is retried from a settled scene, and a real miss names
+    // what stood in every line instead of reporting a bare `false`.
+    const standAtPair = async () => {
+      const centre = await page.evaluate(() => {
+        const t = window.__placeTalkers
+        return t ? { cx: (t[0].x + t[1].x) / 2, cz: (t[0].z + t[1].z) / 2 } : null
+      })
+      if (!centre) return { stood: null, tried: 0, blocked: ['the pair publishes no position'] }
+      const blocked = []
       for (let i = 0; i < 16; i++) {
         const a = (i / 16) * Math.PI * 2
-        const px = cx + Math.sin(a) * 3.3
-        const pz = cz + Math.cos(a) * 3.3
-        p.x = px
-        p.z = pz
-        p.yaw = aim(px, pz)
-        p.pitch = -0.06
-        const hit = window.__placeRayHit(cx, 1.05, cz)
-        if (hit.hitDistance == null || hit.hitDistance >= hit.targetDistance - 0.45) {
-          return { x: px, z: pz, cx, cz, bearing: a }
+        const hit = await page.evaluate(
+          ([bearing, c]) =>
+            new Promise((res) => {
+              const p = window.__placePlayer
+              p.x = c.cx + Math.sin(bearing) * 3.3
+              p.z = c.cz + Math.cos(bearing) * 3.3
+              p.yaw = Math.atan2(-(c.cx - p.x), -(c.cz - p.z))
+              p.pitch = -0.06
+              requestAnimationFrame(() =>
+                requestAnimationFrame(() => {
+                  const h = window.__placeRayHit(c.cx, 1.05, c.cz)
+                  res({ x: p.x, z: p.z, hit: h.hitDistance, target: h.targetDistance, name: h.hitName })
+                }),
+              )
+            }),
+          [a, centre],
+        )
+        if (hit.hit == null || hit.hit >= hit.target - 0.45) {
+          return { stood: { x: hit.x, z: hit.z, cx: centre.cx, cz: centre.cz, bearing: a }, tried: i + 1, blocked }
         }
+        blocked.push(`${a.toFixed(2)}→${hit.name} at ${hit.hit.toFixed(2)} of ${hit.target.toFixed(2)}`)
       }
-      return null
-    })
-    check('a clear standpoint at conversational distance from the pair exists', stood != null)
+      return { stood: null, tried: 16, blocked }
+    }
+    let search = await standAtPair()
+    if (!search.stood) {
+      // The pair WALKS: a hut that stood in every line a moment ago need not
+      // still. Retried once from a settled scene before the miss is believed.
+      await waitForSceneBuilt(page).catch(() => {})
+      search = await standAtPair()
+    }
+    const stood = search.stood
+    check(
+      'a clear standpoint at conversational distance from the pair exists',
+      stood != null,
+      stood
+        ? `bearing ${stood.bearing.toFixed(2)} rad, the ${search.tried}. of 16 tried`
+        : `all ${search.tried} bearings blocked: ${search.blocked.join(', ')}`,
+    )
 
     // --- the four poses, one frame each -------------------------------------
     // Long durations so the pose survives the shutter's own settling; the wait
@@ -2336,13 +2371,13 @@ for (const [placeId, shot] of [
    *  entry and the wet ground keeps SOAKING through a storm (§19.13), so the
    *  measurement waits on the picture rather than on a guessed number of
    *  milliseconds. Returns the settled reading (or the last one taken). */
-  const settledLuma = async (ndc) => {
+  const settledLuma = async (ndc, eps = 0.3) => {
     let prev = null
     for (let i = 0; i < 40; i++) {
       await settleFrames(2)
       const cur = await groundLuma(await capturePixels(page, 'settled ground luma'), ndc, 150, 46)
       if (cur === null) return null
-      if (prev !== null && Math.abs(cur - prev) < 0.3) return cur
+      if (prev !== null && Math.abs(cur - prev) < eps) return cur
       prev = cur
     }
     return prev
@@ -2355,10 +2390,24 @@ for (const [placeId, shot] of [
    *  inside-vs-outside difference could not tell the two apart. It doubles as
    *  the live proof that the calibratable strength lands without a reload. */
   const bandRatio = async (ndc) => {
+    // Point 549: three frames were not the band arriving, they were three frames.
+    // Each shot now waits for the crop to STOP MOVING on the new strength and
+    // then averages three reads of it — the rains draw over the ground and TRAA
+    // jitters it, so a single frame samples that noise instead of measuring the
+    // band. The measured spread of `capetown (wet)` across five runs was 6.5
+    // luminance points on an unchanged scene, straddling its own 0.04 bar.
     const shot = async (strength) => {
       await page.evaluate((s) => { window.__balance.placeEdgeBand.strength = s }, strength)
-      await settleFrames(3)
-      return groundLuma(await capturePixels(page, 'edge-band ground luma'), ndc, 150, 46)
+      const first = await settledLuma(ndc, 0.2)
+      if (first === null) return null
+      const reads = [first]
+      for (let i = 0; i < 2; i++) {
+        await settleFrames(2)
+        const cur = await groundLuma(await capturePixels(page, 'edge-band ground luma'), ndc, 150, 46)
+        if (cur === null) return null
+        reads.push(cur)
+      }
+      return reads.reduce((a, b) => a + b, 0) / reads.length
     }
     // ON, OFF, ON — and the two ONs averaged. In the rains the ground SOAKS
     // while the shots are taken (the §19.13 wet accumulation keeps darkening
@@ -2374,6 +2423,28 @@ for (const [placeId, shot] of [
   const readGround = async (id, wetness, seasonName, shoot) => {
     await enterFor(id)
     await page.evaluate((w) => window.__ui.getState().setSeasonWetnessOverride(w), wetness)
+    // Point 549: the wet state is WAITED OUT before anything is read, at EVERY
+    // place and for BOTH halves of the criterion — the swept ground inside and
+    // the open land outside. The rains keep soaking the ground (§19.13) and the
+    // settlement light lerps with them, so the crops used to be taken off a
+    // moving picture: the same capetown scene read inside ×0.899, ×0.900,
+    // ×0.900, ×0.946 and ×0.964 across five runs of unchanged code, and the
+    // giza reading moved on its OUTSIDE half instead. This is point 499's
+    // `settle()` applied to the ground: the fields the measurement depends on —
+    // the soak itself and the light falling on it — polled until they stop.
+    const wet = await waitForReadingStable(
+      page,
+      () => {
+        const s = window.__placeSeason()
+        return { wetness: s.wetness, groundWet: s.groundWet, sun: s.sun, hemi: s.hemi }
+      },
+      { settleMs: 400, samples: 3, timeout: 60000 },
+    )
+    check(
+      `${id} (${seasonName}): the ground's wet state settles before the band is measured`,
+      wet.settled,
+      `after ${wet.waitedMs} ms — ${JSON.stringify(wet.value)}`,
+    )
     const bearing = await clearBearing()
     if (bearing === null) {
       check(`${id} (${seasonName}): a clear ground corridor across the edge exists`, false, 'every bearing blocked')
@@ -3239,8 +3310,15 @@ for (const [placeId, shot] of [
 
   /** Stand the player on an open bearing around `target` and aim him at it.
    *  `prefer` (a world bearing) is tried first — a trade house is approached
-   *  from its DOOR side, where the awning it must be judged by hangs. */
-  const standOff = (target, startR, prefer = null) =>
+   *  from its DOOR side, where the awning it must be judged by hangs.
+   *
+   *  Point 549: it reports WHAT IT SEARCHED, never a bare `null`. Three checks
+   *  ride on this one search — the village eaves, the port eaves and the cook
+   *  shelter — and each of them used to fail as `false` beside the target's
+   *  coordinates, which says nothing about why 49 bearings were all rejected.
+   *  Now the miss names how many bearings the disc edge closed, how many each
+   *  collider closed, and which colliders those were. */
+  const searchStandOff = (target, startR, prefer = null) =>
     page.evaluate(
       ([t, start, preferred]) => {
         const reach = (c) => {
@@ -3251,35 +3329,69 @@ for (const [placeId, shot] of [
         const others = (window.__placeColliders ?? []).filter(
           (c) => c.kind === 'segment' || Math.hypot((c.x ?? 0) - t.x, (c.z ?? 0) - t.z) > 0.05,
         )
-        const busy = (x, z) =>
-          others.some((c) => {
-            const cx = c.kind === 'segment' ? (c.x1 + c.x2) / 2 : c.x
-            const cz = c.kind === 'segment' ? (c.z1 + c.z2) / 2 : c.z
-            return Math.hypot(x - cx, z - cz) < reach(c) + 0.9
+        const centre = (c) => ({
+          x: c.kind === 'segment' ? (c.x1 + c.x2) / 2 : c.x,
+          z: c.kind === 'segment' ? (c.z1 + c.z2) / 2 : c.z,
+        })
+        const blocker = (x, z) =>
+          others.find((c) => {
+            const m = centre(c)
+            return Math.hypot(x - m.x, z - m.z) < reach(c) + 0.9
           })
         const radius = window.__placeLayout?.radius ?? 28
         const bearings = []
         if (typeof preferred === 'number') bearings.push(preferred)
         for (let i = 0; i < 48; i++) bearings.push((i / 48) * Math.PI * 2)
+        let byDisc = 0
+        const byCollider = new Map()
         for (const b of bearings) {
-          let clear = true
-          for (let d = start; d >= 1.2 && clear; d -= 0.4) {
+          let blocked = null
+          for (let d = start; d >= 1.2 && !blocked; d -= 0.4) {
             const x = t.x + Math.cos(b) * d
             const z = t.z + Math.sin(b) * d
-            if (Math.hypot(x, z) > radius - 1.5 || busy(x, z)) clear = false
+            if (Math.hypot(x, z) > radius - 1.5) {
+              blocked = 'disc'
+              break
+            }
+            const c = blocker(x, z)
+            if (c) {
+              const m = centre(c)
+              blocked = `${c.kind}@${m.x.toFixed(1)},${m.z.toFixed(1)}`
+            }
           }
-          if (!clear) continue
+          if (blocked === 'disc') byDisc++
+          else if (blocked) byCollider.set(blocked, (byCollider.get(blocked) ?? 0) + 1)
+          if (blocked) continue
           const p = window.__placePlayer
           p.x = t.x + Math.cos(b) * start
           p.z = t.z + Math.sin(b) * start
           p.pitch = 0
           p.yaw = Math.atan2(-(t.x - p.x), -(t.z - p.z))
-          return b
+          return { bearing: b, tried: bearings.length, colliders: others.length }
         }
-        return null
+        const worst = [...byCollider.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4)
+        return {
+          bearing: null,
+          tried: bearings.length,
+          colliders: others.length,
+          detail: `${bearings.length} bearings from r=${start} to r=1.2, all blocked: ${byDisc} by the disc edge (radius ${radius}), the rest by [${worst.map(([k, n]) => `${k}×${n}`).join(', ')}] of ${others.length} colliders`,
+        }
       },
       [target, startR, prefer],
     )
+
+  /** The same search, but never reporting a miss off a scene that may still be
+   *  streaming in: a first miss is retried once from a settled state (point
+   *  549 — the settled-reading shape point 499 established). */
+  const standOff = async (target, startR, prefer = null) => {
+    const first = await searchStandOff(target, startR, prefer)
+    if (first.bearing != null) return first
+    await waitForSceneBuilt(page).catch(() => {})
+    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(null)))))
+    const again = await searchStandOff(target, startR, prefer)
+    if (again.bearing == null) again.detail = `${again.detail} (unchanged on a retry from the settled scene)`
+    return again
+  }
 
   /** Hold forward until the walk stops closing on the target — the collider has
    *  been reached. Every step waits for DRAWN frames, never for wall-clock time. */
@@ -3333,19 +3445,41 @@ for (const [placeId, shot] of [
 
   const eavesCase = async (placeId, label, pick, startR) => {
     await enterFor(placeId)
-    const target = await page.evaluate(pick)
-    if (!target) {
+    // Point 549: `pick` names EVERY building of the kind under test, not the
+    // first one the layout happens to list. The eave line is a property of the
+    // building type — any hut of it proves the criterion — so a single crowded
+    // neighbour is no reason for the check to have nothing to say. It fails
+    // only when NO building of the kind can be walked up to, and then it says
+    // what blocked each of them.
+    const picked = await page.evaluate(pick)
+    const targets = (Array.isArray(picked) ? picked : picked ? [picked] : []).filter(Boolean)
+    if (!targets.length) {
       check(`${label}: a building to walk up to`, false, 'none found in the layout')
       return null
     }
-    const bearing = await standOff(target, startR, target.approach ?? null)
-    if (bearing == null) {
-      check(`${label}: an open approach to walk in on`, false, JSON.stringify(target))
-      return null
+    let target = null
+    let stood = null
+    const misses = []
+    for (const t of targets) {
+      const r = await standOff(t, startR, t.approach ?? null)
+      if (r.bearing != null) {
+        target = t
+        stood = r
+        break
+      }
+      misses.push(`{x ${t.x.toFixed(2)}, z ${t.z.toFixed(2)}}: ${r.detail}`)
     }
+    check(
+      `${label}: an open approach to walk in on`,
+      !!stood,
+      stood
+        ? `candidate ${misses.length + 1} of ${targets.length} at {x ${target.x.toFixed(2)}, z ${target.z.toFixed(2)}}, bearing ${stood.bearing.toFixed(3)} rad of ${stood.tried} tried`
+        : `no clear approach to any of ${targets.length} — ${misses.join(' || ')}`,
+    )
+    if (!stood) return null
     await walkUntilStalled(target)
     const probe = await probeOverhead()
-    probe.bearing = bearing
+    probe.bearing = stood.bearing
     // The near plane never gets INSIDE the roof: the first surface under the eye
     // is the ground he stands on, never thatch he has climbed into.
     check(
@@ -3392,8 +3526,9 @@ for (const [placeId, shot] of [
     'zulu-village',
     'zulu village hut',
     () => {
-      const hut = (window.__placeLayout?.dwellings ?? []).find((d) => d.kind === 'hut')
-      return hut ? { x: hut.x, z: hut.z, h: hut.h } : null
+      return (window.__placeLayout?.dwellings ?? [])
+        .filter((d) => d.kind === 'hut')
+        .map((d) => ({ x: d.x, z: d.z, h: d.h }))
     },
     6,
   )
@@ -3405,11 +3540,10 @@ for (const [placeId, shot] of [
     'cairo',
     'cairo trade house',
     () => {
-      const it = (window.__placeLayout?.interactives ?? []).find((i) => i.type !== 'villager')
-      if (!it) return null
-      const rot = it.rot ?? 0
-      // The door faces local +Z, so the approach bearing is the door's own.
-      return { x: it.pos[0], z: it.pos[1], h: 3.2, approach: Math.atan2(Math.cos(rot), Math.sin(rot)) }
+      return (window.__placeLayout?.interactives ?? [])
+        .filter((i) => i.type !== 'villager')
+        // The door faces local +Z, so the approach bearing is the door's own.
+        .map((i) => ({ x: i.pos[0], z: i.pos[1], h: 3.2, approach: Math.atan2(Math.cos(i.rot ?? 0), Math.sin(i.rot ?? 0)) }))
     },
     8,
   )
@@ -3425,8 +3559,8 @@ for (const [placeId, shot] of [
   await enterFor('bemba-village')
   const fire = { x: -3.5, z: 2.5 } // VILLAGE_FIRE in src/scenes/place/layout.ts
   const stoodAtFire = await standOff(fire, 5)
-  if (stoodAtFire == null) {
-    check('cook shelter: an open approach to the fire', false, 'no clear bearing')
+  if (stoodAtFire.bearing == null) {
+    check('cook shelter: an open approach to the fire', false, stoodAtFire.detail)
   } else {
     await walkUntilStalled(fire)
     const probe = await probeOverhead()
