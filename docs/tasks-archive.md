@@ -15890,3 +15890,24 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   Criticality: medium — none of them hides a known product defect today, but a suite that
   cannot produce the same verdict twice is a gate that has stopped gating, and the
   render-verify clearance depends on it.
+
+- [x] 513. A BRANCH CI RUN MUST NOT MAIL THE OWNER (user decision 05.08.2026 on
+  the card "Rote CI-Läufe auf Agenten-Zweigen — welcher Weg?", option 3). Two
+  deliberate rules work against each other: a branch push runs lint and
+  dependencies only (the full gate per intermediate commit costs more than a red
+  branch is worth), while the pipeline runs in full on EVERY branch push. An agent
+  that commits mid-work therefore produces red runs, and each one mails the
+  repository owner.
+  FINAL STATE:
+  1. A CI run on a `feat/**` branch no longer notifies the owner by mail. Red on a
+     branch is expressly normal; the run still executes and its result stays
+     visible in the run list.
+  2. `main` is untouched: a red run there still mails, because that is the branch
+     the deploy builds from.
+  3. The rescue-commit mail path (`[skip ci]` plus the `Rescue:` trailer, which
+     deliberately mails on a red state) keeps working as specified — this point
+     silences the ROUTINE branch run, not the deliberate alarm.
+  4. `docs/` states where notifications now come from, so a silent branch failure
+     is never mistaken for a green one.
+  VERIFIABLE: a deliberately red push to a throwaway `feat/` branch produces a run
+  and no mail; the same failure on `main` still mails; the rescue path still does.

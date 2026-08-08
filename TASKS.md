@@ -89,27 +89,6 @@ there exactly once; a new point joins a bundle when appended.
   memory). The v0.3 content is the 175/177/176/178-183/184-closed, closing-verified
   HEAD; 182 and 163/166/170 come AFTER the tag.
 
-- [ ] 513. A BRANCH CI RUN MUST NOT MAIL THE OWNER (user decision 05.08.2026 on
-  the card "Rote CI-Läufe auf Agenten-Zweigen — welcher Weg?", option 3). Two
-  deliberate rules work against each other: a branch push runs lint and
-  dependencies only (the full gate per intermediate commit costs more than a red
-  branch is worth), while the pipeline runs in full on EVERY branch push. An agent
-  that commits mid-work therefore produces red runs, and each one mails the
-  repository owner.
-  FINAL STATE:
-  1. A CI run on a `feat/**` branch no longer notifies the owner by mail. Red on a
-     branch is expressly normal; the run still executes and its result stays
-     visible in the run list.
-  2. `main` is untouched: a red run there still mails, because that is the branch
-     the deploy builds from.
-  3. The rescue-commit mail path (`[skip ci]` plus the `Rescue:` trailer, which
-     deliberately mails on a red state) keeps working as specified — this point
-     silences the ROUTINE branch run, not the deliberate alarm.
-  4. `docs/` states where notifications now come from, so a silent branch failure
-     is never mistaken for a green one.
-  VERIFIABLE: a deliberately red push to a throwaway `feat/` branch produces a run
-  and no mail; the same failure on `main` still mails; the rescue path still does.
-
 - [ ] 393. THE DEBUG MENU IS TIDIED INTO A STRUCTURE (user 28.07.2026: "völlig ausgeartet
   und eine riesige, unstrukturierte Liste"). MEASURED: `src/ui/DebugMenu.tsx` is 523 lines
   and renders about 130 controls, nearly all of them in ONE flat run — two `div.section`
