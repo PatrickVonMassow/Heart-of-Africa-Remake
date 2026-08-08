@@ -4329,3 +4329,40 @@ Build order, chosen so no two parallel agents own the same file:
   Criticality: high — this is the batch's dominant running cost, and a lever that reports
   a saving it did not make is worse than none: it retires the question. The measurement is
   therefore part of the delivery, not a follow-up.
+
+- [ ] 554. THE CHAT WATCHER LEAKS ORPHANS THE SUPERVISION CANNOT SEE (measured
+  08.08.2026 on a quiet machine, while point 309's regression ran). `pgrep -f
+  chat-watcher.mjs` returns TEN live processes — the oldest running since 04.08.,
+  three days — while `.claude/chat-watcher.json` names exactly one (pid 2861724).
+  `watcherSupervision()` (scripts/chat-watcher-core.mjs) decides purely from that
+  ONE recorded pid: alive → `none`, otherwise → `start`. A watcher that is not (or
+  no longer) the one in the pidfile is therefore INVISIBLE to it and is never
+  stopped, and every start that overwrites the pidfile orphans its predecessor for
+  good. The drift hypothesis from `verify-owner-really-dead` was MEASURED and
+  RULED OUT: `probePid(2861724).startedAt` deviates 231 ms from the recorded
+  `pidStartedAt` against a 2000 ms `WATCHER_PID_TOLERANCE_MS`, so the supervision
+  reads its own pidfile process as live and correctly starts no second one — the
+  orphans are residue of earlier runs, not of the running tick.
+  WHY IT MATTERS: each orphan holds its own ntfy subscription and can spawn a
+  responder on one chat message — the multiple-answer failure the singleton work
+  exists to prevent. It is latent, not cosmetic.
+  FINAL STATE: the supervision judges the process POPULATION, not one recorded pid.
+  It enumerates the live watchers by their command line (the `pgrep`-shaped probe
+  the singleton family already uses), keeps the pidfile's process when that one is
+  genuinely alive, elects exactly one survivor when it is not, and STOPS every
+  other. Liveness stays by IDENTITY, never by bare existence, so a recycled pid is
+  never killed for inheriting a number. A paused batch still stops all of them.
+  SEPARATE AND COSMETIC, same file, fix it in passing: every line in
+  `.claude/chat-watcher.log` is written TWICE, with identical millisecond and
+  identical sessionId — one process writing twice, because stdout and stderr share
+  one fd (`stdio: ['ignore', out, out]`, scripts/batch-autostart.mjs:390) and the
+  logger emits on both. One line per event.
+  VERIFIABLE: pure Vitest on the decision core with the enumeration injected — two
+  live watchers plus a pidfile naming one yields `stop` for the other and `none`
+  for the recorded one; a pidfile naming a DEAD pid beside two live ones elects one
+  and stops the rest; a recycled pid (existence yes, start time outside tolerance)
+  is never stopped as if it were ours; `paused` stops all; an empty population
+  yields `start`. Plus a live check: after one launcher tick, `pgrep -fc
+  chat-watcher.mjs` is 1, and the log carries each event once.
+  Criticality: medium — latent duplicate responders, and it has been accumulating
+  unnoticed for days, which is the part no test would have caught.
