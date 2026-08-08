@@ -4271,6 +4271,16 @@ Build order, chosen so no two parallel agents own the same file:
   the probe must judge what is OVER the walking line rather than whatever the ray
   first meets. Establish which by looking at the picture at that spot, not by
   reasoning from the numbers.
+  THE PICTURE WAS LOOKED AT (08.08.2026, `verification/349-eaves-port.png` from the
+  failing run): a wooden CRATE and a barrel stand on the ground against the General
+  Store's front wall, and nothing hangs from its eaves at all — the facade is clean.
+  So the ray is finding the crate UNDERFOOT, not an eave overhead: it is dressing the
+  player walks through (small dressing is passable by design, §7.1 point 4), and a
+  standpoint a few centimetres either side of its footprint decides whether the
+  downward ray ends on the crate lid or on the ground. That makes the check's own
+  probe the defect rather than the door — but confirm it at the standpoint's own
+  coordinates before building on it, because this reading comes from the frame the
+  check composes, which looks AT the building rather than DOWN at the feet.
   FINAL STATE for this half: whichever it is, the check gives the same verdict on
   the same seed every run, and its own spread is recorded beside it like the other
   three. It also names what it hit and where the hit was, so the next rotation is
@@ -4413,8 +4423,14 @@ Build order, chosen so no two parallel agents own the same file:
   is never stopped as if it were ours; `paused` stops all; an empty population
   yields `start`. Plus a live check: after one launcher tick, `pgrep -fc
   chat-watcher.mjs` is 1, and the log carries each event once.
-  Criticality: medium — latent duplicate responders, and it has been accumulating
-  unnoticed for days, which is the part no test would have caught.
+  IT STOPPED BEING LATENT (08.08.2026, 08:05): the user reported receiving the SAME
+  answer seven times in a row for a reply this session sent exactly once. Eleven
+  watchers were live at that moment. Ten were stopped by hand to end the user-visible
+  spam, which is remediation and not the fix — the supervision that let them
+  accumulate is unchanged, and a fresh tick spawns another whenever the pidfile's
+  process is not the one it finds.
+  Criticality: raised to HIGH — no longer a latent risk but a fault the user sees,
+  and it reaches him directly rather than through the build.
 
 - [ ] 555. THE BIG CUT: THE ACCEPTANCE CRITERIA LEAVE THE ALWAYS-LOADED FILE (user
   decision 08.08.2026, board chat — "mache den großen Zuschnitt, ziehe das in der
