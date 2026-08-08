@@ -23,7 +23,14 @@ describe('qualifiesAsActor — what can move, or be used', () => {
   })
 
   it('vultures, inhabitants, their animals and the usable objects are named', () => {
-    for (const kind of ['vulture', 'elder', 'trader', 'porter', 'villager', 'child', 'goat', 'camp', 'canoe']) {
+    const kinds = [
+      'vulture',
+      'elder', 'trader', 'porter', 'villager', 'child',
+      'guide', 'cameleer', 'donkeyboy', 'tourist',
+      'goat', 'camel', 'donkey',
+      'camp', 'canoe',
+    ]
+    for (const kind of kinds) {
       expect(qualifiesAsActor({ kind }), kind).toBe(true)
     }
   })

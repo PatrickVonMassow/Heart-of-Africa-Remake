@@ -13,10 +13,20 @@ import { SPECIES, type Species } from '../scenes/travel/animalBodies'
 
 /** The bird's-eye fauna: the herd species plus the scavenging vultures. */
 export type ActorFaunaKind = Species | 'vulture'
-/** Settlement people, read by their ROLE — never by a name (§17.8). */
-export type ActorRoleKind = 'elder' | 'trader' | 'porter' | 'villager' | 'child'
-/** Animals kept in a settlement. */
-export type ActorTameKind = 'goat'
+/** Settlement people, read by their ROLE — never by a name (§17.8). The last
+ *  four are the Giza site's own ~1890 crowd (design.md §4.4). */
+export type ActorRoleKind =
+  | 'elder'
+  | 'trader'
+  | 'porter'
+  | 'villager'
+  | 'child'
+  | 'guide'
+  | 'cameleer'
+  | 'donkeyboy'
+  | 'tourist'
+/** Animals kept by people: the village stock and the Giza mounts. */
+export type ActorTameKind = 'goat' | 'camel' | 'donkey'
 /** Objects the player can use where they stand. */
 export type ActorObjectKind = 'camp' | 'canoe'
 
@@ -35,7 +45,13 @@ export const ACTOR_KINDS: readonly ActorKind[] = [
   'porter',
   'villager',
   'child',
+  'guide',
+  'cameleer',
+  'donkeyboy',
+  'tourist',
   'goat',
+  'camel',
+  'donkey',
   'camp',
   'canoe',
 ]
