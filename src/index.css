@@ -1362,6 +1362,14 @@ textarea {
   margin-bottom: 4px;
 }
 
+/* The filter takes the row's whole remaining width: its hint must not be cut
+   off, and the German one is the longer of the two. */
+.debug-menu .debug-filter input {
+  flex: 1;
+  min-width: 0;
+  width: auto;
+}
+
 .debug-menu .debug-empty {
   margin: 8px 0 0;
   color: #a0aec0;

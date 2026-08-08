@@ -430,7 +430,7 @@ export const de: Strings = {
   debug: {
     title: 'Debug-Menü (F1)',
     filter: 'Filter',
-    filterHint: 'tippen zum Eingrenzen …',
+    filterHint: 'eingrenzen …',
     filterEmpty: 'Kein Regler passt.',
     groups: {
       movement: 'Bewegung und Steuerung',

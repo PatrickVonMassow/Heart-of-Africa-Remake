@@ -70,6 +70,11 @@ await page.waitForTimeout(300)
 // --- Debug menu language selector + switch back to English --------------------
 await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'F1' })))
 await page.waitForTimeout(600)
+// The menu's groups start collapsed (design.md §21.3, point 393), and the
+// language selector sits in "tools" — open that group, else the frame would be
+// filed as evidence of a selector it does not show.
+await page.evaluate(() => window.__ui.getState().toggleDebugGroup('tools'))
+await page.waitForTimeout(300)
 await shot('58-i18n-debug-language', { element: '.debug-menu', label: 'the debug menu language selector' })
 // Click the "English" button to switch back (drives the live UI control).
 await page.evaluate(() => {

@@ -429,7 +429,7 @@ export const en: Strings = {
   debug: {
     title: 'Debug Menu (F1)',
     filter: 'Filter',
-    filterHint: 'type to narrow …',
+    filterHint: 'narrow …',
     filterEmpty: 'No control matches.',
     groups: {
       movement: 'Movement and controls',
