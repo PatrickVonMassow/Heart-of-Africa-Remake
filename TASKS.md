@@ -4527,3 +4527,35 @@ Build order, chosen so no two parallel agents own the same file:
   is rejected (1); the sync test fails on a deliberately altered figure constant (2);
   the diagnostic picks the best of a series of failing readings, not the last (3).
   No browser run is needed for any of the three.
+
+- [ ] 564. "CANDIDATE REAL FAILURE" IS ASSERTED WITH CONFIDENCE THE RUN DID NOT EARN
+  (measured 08.08.2026, 18:22Z). The retry classifier calls a check that fails in BOTH
+  runs a "CANDIDATE REAL FAILURE" and names the diff words it touches — here `polish`
+  "settlement walker (goat): the planted foot holds its ground spot (point 300)", twice,
+  with the note "[touches the diff: goat, foot, hold, point]" against a change that only
+  attached a metadata field to that group. Re-run on a quiet machine 100 minutes later,
+  same code: `polish` 164 pass, 0 fail, FIRST try. The failure was machine load, and the
+  classifier had already said so in its own log — the point-296 quiet-machine check ran
+  at the top of that same run and reported "MACHINE STATE UNKNOWN: GPU load NOT measured
+  (no GPU busy counter on this host)". The two verdicts never meet.
+  WHY THE HEURISTIC IS WRONG HERE, precisely: it reads a repeated failure as evidence of
+  a real defect because a FLAKE is assumed to rotate. Load does not rotate — a check that
+  measures a RATE (frames, stance intervals, settling) fails deterministically for as long
+  as the machine is busy, so the very checks most likely to be load-victims are the ones
+  the heuristic is most confident about. The diff-word match compounds it: matching on
+  "goat, foot, hold, point" against a spec that contains those words is a coincidence
+  detector, not evidence.
+  FINAL STATE:
+  1. The classifier's verdict CARRIES the machine reading it was made under. Where the
+     quiet-machine check reported UNKNOWN or LOADED, a twice-failing check is reported as
+     UNDECIDED — "failed twice, but the machine could not be shown to be quiet; re-run on
+     a quiet machine before believing this" — never as a candidate real failure.
+  2. The rate-sensitive checks are MARKED as such where they are defined (the same set
+     point 506 already names for the software lane), and the classifier says so when one
+     of them is the twice-failing check.
+  3. The diff-word match is reported as what it is: a word overlap, not a causal link. It
+     may not appear at all in an UNDECIDED verdict, where it reads as corroboration.
+  VERIFIABLE: pure Vitest over the classifier — the same twice-failed input yields
+  CANDIDATE REAL FAILURE under a measured-quiet machine and UNDECIDED under an unknown or
+  loaded one; a rate-marked check is named as rate-sensitive in the verdict; and the
+  diff-word list is absent from an UNDECIDED verdict.
