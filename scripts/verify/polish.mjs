@@ -3394,7 +3394,17 @@ for (const [placeId, shot] of [
   }
 
   /** Hold forward until the walk stops closing on the target — the collider has
-   *  been reached. Every step waits for DRAWN frames, never for wall-clock time. */
+   *  been reached. Every step waits for DRAWN frames, never for wall-clock time.
+   *
+   *  Point 549: the probe is taken at the CLOSEST APPROACH the walk reached, not
+   *  at wherever it came to rest. A blocked step SLIDES along the collider, so
+   *  the last frames of a stalled walk drift sideways along the wall by however
+   *  much the host drew in them — and the eaves probe then reads whatever
+   *  happens to stand at that drifted spot. Measured: the same trade house, same
+   *  seed, same approach bearing, once read `1.52 m down to ground-disc` and
+   *  once `0.24 m down to BoxGeometry`. Standing him back on the nearest point
+   *  the walk actually reached is a position he really walked to, and it is the
+   *  one the check means: at the eaves. */
   const walkUntilStalled = async (target, maxMs = 20000) => {
     const step = () =>
       page.evaluate(
@@ -3404,7 +3414,7 @@ for (const [placeId, shot] of [
               requestAnimationFrame(() => {
                 window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW' }))
                 const p = window.__placePlayer
-                r(Math.hypot(p.x - t.x, p.z - t.z))
+                r({ d: Math.hypot(p.x - t.x, p.z - t.z), x: p.x, z: p.z })
               }),
             ),
           ),
@@ -3412,16 +3422,26 @@ for (const [placeId, shot] of [
       )
     const t0 = Date.now()
     let last = await step()
+    let best = last
     let stalled = 0
     while (Date.now() - t0 < maxMs) {
       const now = await step()
-      stalled = last - now < 0.02 ? stalled + 1 : 0
+      if (now.d < best.d) best = now
+      stalled = last.d - now.d < 0.02 ? stalled + 1 : 0
       last = now
       if (stalled >= 3) break
     }
     await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyW' })))
+    await page.evaluate(
+      (b) => {
+        const p = window.__placePlayer
+        p.x = b.x
+        p.z = b.z
+      },
+      best,
+    )
     await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(null)))))
-    return last
+    return best.d
   }
 
   /** What the frame really draws straight above and straight below the eye. */
@@ -3485,7 +3505,7 @@ for (const [placeId, shot] of [
     check(
       `${label}: nothing hangs under the eye at the eaves`,
       probe.below !== 'hut-roof' && probe.drop != null && probe.drop >= probe.camY - 0.5,
-      `${probe.drop == null ? 'nothing' : probe.drop.toFixed(2) + ' m'} down to ${probe.below} from ${probe.camY.toFixed(2)} m`,
+      `${probe.drop == null ? 'nothing' : probe.drop.toFixed(2) + ' m'} down to ${probe.below} from ${probe.camY.toFixed(2)} m, standing at {x ${probe.x.toFixed(2)}, z ${probe.z.toFixed(2)}}`,
     )
     // And whatever DOES hang over him clears the eye, the near plane and a margin.
     check(
