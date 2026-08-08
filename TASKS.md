@@ -1066,6 +1066,11 @@ there exactly once; a new point joins a bundle when appended.
   ignored, baseline cutoff boundary, empty log); the repaired state passes the full
   LARGE regression on a quiet machine (both backends), which also re-validates the
   four Opus points merged before the degradation (262/273/293/305).
+  BLOCKED ON POINT 549 (measured 08.08.2026). The repair and the tripwire are complete and
+  in `main`; only that regression proof is outstanding, and it is not obtainable on this
+  host today: every LARGE attempt reddens at `polish`, whose WebGL 2 verdict rotates
+  between runs, and the run then never reaches the WebGPU half. Take this point up again
+  when 549 has landed — not before, and not with another LARGE in the meantime.
 
 - [ ] 310. LOW-PRESET PERFORMANCE PASS FOR TWO OPPOSITE DEVICES (user 25.07.2026,
   recalibrated 06.08.2026). LOW must run WELL on a weak Windows desktop AND on the
@@ -4227,6 +4232,24 @@ Build order, chosen so no two parallel agents own the same file:
   longer explains it. So this point does not fix three checks: it makes `polish` able to
   give a stable WebGL 2 verdict at all. Until it does, a WebGL 2 render clearance on this
   host rests on a deferral, which is the gate not gating.
+  FOUR MORE ATTEMPTS, AND THE FIRST REPEAT AT ONE CHECK (measured 08.08.2026, 05:16–06:40,
+  on an idle host — load average 0.00 at the start, no agent and no second run anywhere).
+  The LARGE run's two attempts BOTH reddened at `settlement walker (goat)`, at 0.727 and
+  1.549 against its 0.25 bar — the first time two attempts in a row named the same check,
+  and 1.549 means the tracked foot travelled half again as far as the body it was planted
+  under. The standalone repeat the house rule prescribes then reddened at `zulu village
+  hut` on its first attempt and at the goat check at 0.278 on its second, so the suite's
+  own retry logic classified that pair as the LOAD signature — on a host with nothing to
+  load it. Across today's eight attempts the goat check alone has reported 0.278, 0.603,
+  0.727, 0.972 and 1.549 for one unchanged scene, and NOT ONE attempt of `polish` has been
+  clean. The spread is the finding: a bar at 0.25 cannot separate a defect from a sample
+  window on this host, so the check's sampling is as much in scope as `standOff` and the
+  wet-ground settle.
+  IT BLOCKS POINT 309 (08.08.2026). 309's remaining proof is a LARGE regression green on
+  BOTH backends, and the run abandons the remaining backends after the first red one — so
+  `polish` has kept the WebGPU half from being reached at all. Until this point lands that
+  proof is not obtainable, and a session that starts another LARGE for it spends an hour
+  to learn the same thing.
   Criticality: medium — none of them hides a known product defect today, but a suite that
   cannot produce the same verdict twice is a gate that has stopped gating, and the
   render-verify clearance depends on it.
