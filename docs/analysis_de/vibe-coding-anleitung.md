@@ -404,4 +404,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 Diese eine Nachricht am Anfang baut 80 % der Lehren dieses Projekts ein, bevor die
 erste Zeile Code entsteht.
 
-<!-- GUIDE-FINGERPRINT: 63dbaa1457fb691f821021e1bf74095f8709ff054b0dfdd553b1fe735b3bb7ca -->
+<!-- GUIDE-FINGERPRINT: 88c45d67777e2d4f41b4249c4437ae39d3d7b961a5d011ef616c88e8bbd9d3ea -->
