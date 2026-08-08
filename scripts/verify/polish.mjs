@@ -4,6 +4,7 @@ import { launchVerifyBrowser, waitForStable, waitForReadingStable, waitForSceneB
 import { frameShutter, capturePixels } from './frameSubject.mjs'
 import { judgeFootingSeries, judgePitchSeries, MIN_SLOPED_SAMPLES } from './footingSeries.mjs'
 import { judgeStanceSlip } from './stanceSlip.mjs'
+import { judgeEavesColumn, judgeShelterRoof } from './eavesColumn.mjs'
 import { withVerifySeed } from './verify-seed.mjs'
 import { fileURLToPath } from 'node:url'
 import sharp from 'sharp'
@@ -3310,6 +3311,24 @@ for (const [placeId, shot] of [
 // place, building type and seed; this asks the RENDERED scene, after a real
 // walk driven by the game's own collision resolver: what does the frame draw
 // over the player's head, and is the roof a surface when seen from below?
+//
+// THE SPREAD, RECORDED (point 549, the way point 387 recorded its five).
+// `cairo trade house: nothing hangs under the eye at the eaves` was the fourth
+// rotator: it FAILED runs 1 and 4 of four consecutive WebGL 2 runs and PASSED
+// runs 2 and 3, from standpoints identical to within seven centimetres, its
+// downward probe answering either `1.51 m down to ground-disc` or `0.26 m down
+// to BoxGeometry`. Measured at the standpoint's own coordinates over 2842
+// consecutive frames, the column reads the ground in 2655 of them, a box 0.23–
+// 0.28 m under the eye in 115 and a cone at 1.17–1.47 m in 72. The box is the
+// CRATE A PORTER CARRIES and the cone his robe (`Porters`,
+// src/scenes/place/PlaceLife.tsx): a porter route runs through the standpoint,
+// so a single-frame probe was deciding the verdict on a passer-by — a ~4 %
+// coin-flip per run, which is what two reds in four runs looks like. Neither the
+// eave nor the door was ever at fault; the facade is clean and the crate and
+// barrel in `verification/349-eaves-port.png` stand against the wall, out of the
+// column. With the window recorded and judged by `judgeEavesColumn`
+// (scripts/verify/eavesColumn.mjs), the standing reading is 1.50 m to
+// ground-disc every run, and what crossed is named in the line.
 {
   // Keep in sync with ROOF_HEADROOM in src/scenes/place/roofClearance.ts.
   const ROOF_HEADROOM = 1.85
@@ -3474,23 +3493,47 @@ for (const [placeId, shot] of [
     return best.d
   }
 
-  /** What the frame really draws straight above and straight below the eye. */
-  const probeOverhead = () =>
+  /** What the frame really draws straight above and straight below the eye, over
+   *  a WINDOW of frames rather than in one (point 549).
+   *
+   *  The player stands still here, so the building fabric — the only thing this
+   *  criterion is about — reads identically in every frame of the window. What
+   *  varies is the settlement's TRAFFIC: measured at the cairo standpoint over
+   *  2842 consecutive frames, 115 of them had a porter's carried crate 0.26 m
+   *  under the eye and 72 his robe, and a single-frame probe therefore decided
+   *  the verdict by whether a porter happened to be passing. The window is
+   *  recorded in ONE round trip and judged by the pure `judgeEavesColumn`. */
+  const recordColumn = (frames = 150, maxMs = 6000) =>
+    page.evaluate(
+      ([n, cap]) =>
+        new Promise((res) => {
+          const out = []
+          const t0 = performance.now()
+          const tick = () => {
+            const cam = window.__placeCamera
+            const y = cam.position.y
+            const up = window.__placeRayHit(cam.position.x, y + 6, cam.position.z)
+            const down = window.__placeRayHit(cam.position.x, y - 4, cam.position.z)
+            out.push({
+              camY: y,
+              roofY: up.hitDistance == null ? null : y + up.hitDistance,
+              roofName: up.hitName,
+              drop: down.hitDistance,
+              below: down.hitName,
+            })
+            if (out.length >= n || performance.now() - t0 > cap) res(out)
+            else requestAnimationFrame(tick)
+          }
+          requestAnimationFrame(tick)
+        }),
+      [frames, maxMs],
+    )
+
+  /** Where the player ended up — the standpoint every reading above belongs to. */
+  const standpoint = () =>
     page.evaluate(() => {
-      const cam = window.__placeCamera
       const p = window.__placePlayer
-      const y = cam.position.y
-      const up = window.__placeRayHit(cam.position.x, y + 6, cam.position.z)
-      const down = window.__placeRayHit(cam.position.x, y - 4, cam.position.z)
-      return {
-        x: p.x,
-        z: p.z,
-        camY: y,
-        roofY: up.hitDistance == null ? null : y + up.hitDistance,
-        roofName: up.hitName,
-        drop: down.hitDistance,
-        below: down.hitName,
-      }
+      return { x: p.x, z: p.z }
     })
 
   const eavesCase = async (placeId, label, pick, startR) => {
@@ -3528,22 +3571,15 @@ for (const [placeId, shot] of [
     )
     if (!stood) return null
     await walkUntilStalled(target)
-    const probe = await probeOverhead()
-    probe.bearing = stood.bearing
+    const at = await standpoint()
+    const verdict = judgeEavesColumn(await recordColumn(), { headroom: ROOF_HEADROOM })
+    const where = `standing at {x ${at.x.toFixed(2)}, z ${at.z.toFixed(2)}}`
     // The near plane never gets INSIDE the roof: the first surface under the eye
     // is the ground he stands on, never thatch he has climbed into.
-    check(
-      `${label}: nothing hangs under the eye at the eaves`,
-      probe.below !== 'hut-roof' && probe.drop != null && probe.drop >= probe.camY - 0.5,
-      `${probe.drop == null ? 'nothing' : probe.drop.toFixed(2) + ' m'} down to ${probe.below} from ${probe.camY.toFixed(2)} m, standing at {x ${probe.x.toFixed(2)}, z ${probe.z.toFixed(2)}}`,
-    )
+    check(`${label}: nothing hangs under the eye at the eaves`, verdict.belowClear, `${verdict.belowDetail}, ${where}`)
     // And whatever DOES hang over him clears the eye, the near plane and a margin.
-    check(
-      `${label}: the roof over him clears the head`,
-      probe.roofY == null || probe.roofY >= ROOF_HEADROOM,
-      `${probe.roofY == null ? 'open sky' : probe.roofY.toFixed(2) + ' m of ' + probe.roofName} over an eye at ${probe.camY.toFixed(2)} m`,
-    )
-    return { target, probe }
+    check(`${label}: the roof over him clears the head`, verdict.roofClears, `${verdict.roofDetail}, ${where}`)
+    return { target, probe: { bearing: stood.bearing, x: at.x, z: at.z } }
   }
 
   /** The photograph a HUMAN judges: the eave line where roof meets wall, taken
@@ -3613,12 +3649,11 @@ for (const [placeId, shot] of [
     check('cook shelter: an open approach to the fire', false, stoodAtFire.detail)
   } else {
     await walkUntilStalled(fire)
-    const probe = await probeOverhead()
-    check(
-      'the cook-shelter roof is still standable AND reads as a surface from below',
-      probe.roofName === 'hut-roof' && probe.roofY != null && probe.roofY >= ROOF_HEADROOM,
-      `${probe.roofY == null ? 'open sky' : probe.roofY.toFixed(2) + ' m of ' + probe.roofName} over the fire`,
-    )
+    // The same settled window (point 549): the fire is where the village GATHERS,
+    // so a villager stepping between the eye and the canopy is the likeliest
+    // thing in the whole suite to intercept an upward ray.
+    const shelter = judgeShelterRoof(await recordColumn(), { headroom: ROOF_HEADROOM })
+    check('the cook-shelter roof is still standable AND reads as a surface from below', shelter.ok, shelter.detail)
   }
 
   // A roof seen from below must be a real surface, not a back face one can see

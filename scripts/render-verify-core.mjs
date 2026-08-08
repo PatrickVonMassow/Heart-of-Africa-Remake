@@ -70,6 +70,7 @@ export const NON_RENDER_VERIFY = new Set([
   'baseline-classify-core.mjs',
   'baseline-classify.mjs',
   'docs.mjs',
+  'eavesColumn.mjs', // the head-clearance verdict over a recorded window; polish.mjs records it
   'fixedWaits.mjs',
   'footingSeries.mjs', // the slope-footing verdict; polish.mjs hands it the samples
   'frameSubject-core.mjs',
