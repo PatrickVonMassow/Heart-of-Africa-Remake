@@ -3,10 +3,14 @@
 import { launchVerifyBrowser, waitForStable, waitForReadingStable, waitForSceneBuilt, assertBackend } from './_browser.mjs'
 import { frameShutter, capturePixels } from './frameSubject.mjs'
 import { judgeFootingSeries, judgePitchSeries, MIN_SLOPED_SAMPLES } from './footingSeries.mjs'
+import { withVerifySeed } from './verify-seed.mjs'
 import { fileURLToPath } from 'node:url'
 import sharp from 'sharp'
 
-const BASE = process.env.BASE_URL ?? 'http://localhost:5173/'
+// Point 549: the same world every run. Unseeded, this suite built a new
+// settlement layout per attempt and half its checks were a draw — see
+// verify-seed.mjs for the measurement.
+const BASE = withVerifySeed(process.env.BASE_URL ?? 'http://localhost:5173/')
 const OUT = fileURLToPath(new URL('../../verification/', import.meta.url))
 let failures = 0
 const check = (name, ok, detail) => {
