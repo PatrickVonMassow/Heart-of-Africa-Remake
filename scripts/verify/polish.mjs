@@ -2743,19 +2743,28 @@ for (const [placeId, shot] of [
 
     // The picture. The frame must show THE CHASE, so the standpoint is chosen
     // the way the point-485 speaker shot chooses one rather than by a formula.
-    // Two rules earned by looking at what the earlier tries actually produced:
+    // Three rules earned by looking at what the earlier tries actually produced:
     // aim at the CHASER AND ITS QUARRY — the pair IS the game, while the group
     // centroid drifts to wherever the stragglers are and framed a tree and an
-    // empty paddock — and take the BEST bearing rather than the first passable
-    // one, because the first clear sight line is as often the one looking out
-    // of the village across open ground. Every bearing is ray-probed against
+    // empty paddock; keep the VILLAGE BEHIND THEM (point 524) — the first clear
+    // sight line is as often the one looking OUT of the village across open
+    // ground, which is the frame that passed every check and showed one child on
+    // an empty plain; and stand on the bearing that does it, rather than at the
+    // first one that is merely unobstructed. Every bearing is ray-probed against
     // the RENDERED scene for an unobstructed line and scored by PROJECTING the
-    // children through the live camera (§7.2), never by a radius.
-    const standAt = async (bearing, back = 5.5) =>
+    // children and the buildings through the live camera (§7.2), never by a
+    // radius.
+    //
+    // The bearing is given as an OFFSET from the one that looks inward: the
+    // camera stands outside the pair on the settlement's own radius, so what
+    // lies beyond them is the village. The offset fans out from there, and every
+    // candidate is validated where it stands (see the standpoint note below).
+    const standAt = async (offset, back = 5.5) =>
       page.evaluate(
         ({ b, back }) => {
           const t = window.__placeTag()
           const p = window.__placePlayer
+          const L = window.__placeLayout
           if (!t || !p || !t.children.length) return null
           // The pair the game is about, falling back to the group's middle
           // between rounds.
@@ -2763,14 +2772,25 @@ for (const [placeId, shot] of [
           const q = t.target >= 0 ? t.children[t.target] : null
           const cx = a && q ? (a.x + q.x) / 2 : t.children.reduce((s2, c) => s2 + c.x, 0) / t.children.length
           const cz = a && q ? (a.z + q.z) / 2 : t.children.reduce((s2, c) => s2 + c.z, 0) / t.children.length
-          p.x = cx + Math.sin(b) * back
-          p.z = cz + Math.cos(b) * back
+          // Outward from the settlement centre through the pair: standing there
+          // and looking back puts the village behind them.
+          const bearing = Math.atan2(cx, cz) + b
+          let step = back
+          // Never past the walkable rim — stepping over it LEAVES the place, and
+          // the shot would be taken from outside the village or not at all.
+          const rim = (L ? L.radius : 28) - 1.5
+          while (step > 2.5 && Math.hypot(cx + Math.sin(bearing) * step, cz + Math.cos(bearing) * step) > rim) {
+            step -= 0.5
+          }
+          if (step <= 2.5) return { cx, cz, tooFar: true }
+          p.x = cx + Math.sin(bearing) * step
+          p.z = cz + Math.cos(bearing) * step
           // Place-camera yaw 0 looks toward −Z, hence the +PI complement.
           p.yaw = Math.atan2(cx - p.x, cz - p.z) + Math.PI
           p.pitch = -0.05
-          return { cx, cz }
+          return { cx, cz, back: step }
         },
-        { b: bearing, back },
+        { b: offset, back },
       )
     /**
      * Is the game unobstructed from here, and how much of it is in frame?
@@ -2783,12 +2803,17 @@ for (const [placeId, shot] of [
      * distance says. The ratio is bounded on both sides: a hut in front reads
      * far too near, and a ray that sails past a small figure hits the ground far
      * beyond it.
+     *
+     * And it counts the VILLAGE BEHIND THEM (point 524): the buildings the
+     * layout draws, projected the same way, that stand FURTHER from the camera
+     * than the pair does. That is the difference between a game of tag in a
+     * settlement and two figures on a plain, and no check saw it before.
      */
     const readsFromHere = () =>
       page.evaluate(() => {
         const t = window.__placeTag()
         const cam = window.__placeCamera
-        if (!t || !cam || !window.__placeRayHit) return { clear: false, inFrame: 0, pair: 0 }
+        if (!t || !cam || !window.__placeRayHit) return { clear: false, inFrame: 0, pair: 0, behind: 0 }
         const a = t.chaser >= 0 ? t.children[t.chaser] : null
         const q = t.target >= 0 ? t.children[t.target] : null
         const cx = a && q ? (a.x + q.x) / 2 : t.children.reduce((s2, c) => s2 + c.x, 0) / t.children.length
@@ -2820,7 +2845,26 @@ for (const [placeId, shot] of [
         // The pair carries the picture: a frame holding two stragglers while the
         // chase runs off-screen shows village life, not a game of tag.
         const pair = (a && shows(a) ? 1 : 0) + (q && shows(q) ? 1 : 0)
-        return { clear, inFrame, pair }
+        // What stands BEHIND them: the settlement's own buildings, in frame and
+        // further away than the children are.
+        const L = window.__placeLayout
+        const eye = cam.position
+        const pairDistance = Math.hypot(cx - eye.x, cz - eye.z)
+        const fabric = L
+          ? L.dwellings
+              .map((d) => [d.x, d.z])
+              .concat(L.interactives.filter((it) => it.type !== 'villager').map((it) => it.pos))
+          : []
+        let behind = 0
+        for (const [bx, bz] of fabric) {
+          if (Math.hypot(bx - eye.x, bz - eye.z) <= pairDistance) continue
+          const be = apply(cam.matrixWorldInverse.elements, [bx, 1.2, bz, 1])
+          const bc = apply(cam.projectionMatrix.elements, be)
+          const bw = bc[3]
+          if (!(bw > 0)) continue
+          if (Math.abs(bc[0] / bw) <= 1 && Math.abs(bc[1] / bw) <= 1 && bc[2] / bw < 1) behind++
+        }
+        return { clear, inFrame, pair, behind }
       })
     // The sweep is RETRIED as the game runs, and that is not a courtesy to a
     // slow machine: a chase that is momentarily boxed between two huts offers no
@@ -2836,23 +2880,38 @@ for (const [placeId, shot] of [
     // reading is taken again after the shutter's own delay, too, because the
     // children keep running through it — and only a standpoint that still holds
     // both of them opens it.
+    //
+    // The offsets fan out from the inward-looking bearing rather than sweeping
+    // the circle from due north, so the first standpoint that qualifies is the
+    // one with the most village behind the pair, not merely the first with a
+    // clear line — and it is still shot from where it was validated.
+    const OFFSETS = [0, 1, -1, 2, -2, 3, -3, 4, -4, 5, -5, 6, -6, 7, -7, 8].map((n) => (n / 16) * Math.PI * 2)
+    // How much village a frame must hold behind the children. Two buildings is
+    // what tells a chase in a settlement from two figures on a plain; asking for
+    // more would fail the scattered forest villages, which have no more to show.
+    const VILLAGE_BEHIND = 2
     let stood = null
     let shotProbe = 'no clear standpoint in any sweep'
+    let bestSeen = 'nothing read from any bearing'
     for (let attempt = 0; attempt < 4 && !stood; attempt++) {
       for (const back of [5.5, 8.5]) {
-        for (let k = 0; k < 16 && !stood; k++) {
-          const at = await standAt((k / 16) * Math.PI * 2, back)
+        for (let k = 0; k < OFFSETS.length && !stood; k++) {
+          const at = await standAt(OFFSETS[k], back)
           if (!at) break
+          if (at.tooFar) continue
           await nextFrames(2)
           const r = await readsFromHere()
-          if (!(r.clear && r.pair === 2)) continue
+          if (r.pair === 2) bestSeen = `best read: pair=${r.pair} behind=${r.behind} clear=${r.clear}`
+          if (!(r.clear && r.pair === 2 && r.behind >= VILLAGE_BEHIND)) continue
           // It reads from here NOW — does it still, once the shutter's settle
           // delay has passed? Only then is this the frame.
           await nextFrames(4)
           const still = await readsFromHere()
-          if (still.pair === 2) {
+          if (still.pair === 2 && still.behind >= VILLAGE_BEHIND) {
             stood = at
-            shotProbe = `attempt ${attempt + 1}, ${back} m, bearing ${k}/16: pair=${still.pair} inFrame=${still.inFrame}`
+            shotProbe =
+              `attempt ${attempt + 1}, ${at.back.toFixed(1)} m, offset ${k}/${OFFSETS.length}: ` +
+              `pair=${still.pair} inFrame=${still.inFrame} village behind=${still.behind}`
           }
         }
         if (stood) break
@@ -2860,25 +2919,27 @@ for (const [placeId, shot] of [
       if (!stood) await nextFrames(30)
     }
     check(
-      'the game is photographable: a clear standpoint holds the chaser and its quarry in frame',
+      'the game is photographable: a clear standpoint holds the chaser and its quarry in frame WITH the village behind them (point 524)',
       !!stood,
-      shotProbe,
+      stood ? shotProbe : `${shotProbe}; ${bestSeen}`,
     )
     if (stood) {
-      // The subject is read where the pair is NOW, not where it was when the
-      // standpoint was picked: the settle delay above is eight frames of running
-      // children, and the shutter must be told what it is actually looking at.
+      // The subject is A CHILD (point 524), read where it is NOW rather than
+      // where the pair was when the standpoint was picked: the settle delay
+      // above is eight frames of running children, and the shutter must be told
+      // what it is actually looking at. The midpoint between the two used to
+      // stand here, and a midpoint is a patch of ground — it projects into an
+      // empty plain as happily as into a game of tag.
       const subject = await page.evaluate(() => {
         const t = window.__placeTag()
-        if (!t || t.chaser < 0 || t.target < 0) return null
+        if (!t || t.chaser < 0) return null
         const a = t.children[t.chaser]
-        const q = t.children[t.target]
-        return { x: (a.x + q.x) / 2, z: (a.z + q.z) / 2 }
+        return { x: a.x, z: a.z }
       })
       const aim = subject ?? { x: stood.cx, z: stood.cz }
       await frame('480-village-tag', {
         local: { x: aim.x, y: 0.6, z: aim.z },
-        label: 'the children playing tag',
+        label: 'the child who is IT, with the village behind the chase',
       })
     }
   }
