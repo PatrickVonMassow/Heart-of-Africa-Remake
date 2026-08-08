@@ -534,6 +534,11 @@ the session. Only the run is skipped — and the NEXT commit on that branch, the
 one that finishes the work, carries neither marker nor trailer and runs CI
 normally.
 
+The convention is unchanged by point 513, only its reason has narrowed: a branch
+run mails nobody now, so what the marker still buys is that a half-finished state
+raises no alert, no red commit status and no entry to triage at all. Both halves
+are still refused without each other.
+
 ### CONFIRM GREEN, not "notice red" (`ci-status-guard`, point 387)
 
 The pre-push gate runs the same unit suite CI runs, so it catches everything
@@ -595,6 +600,45 @@ happens to look at. Concretely (`ci-status-guard-core.mjs`, pure and pinned in
 - **Fail-open, with the reason STATED.** Offline, rate-limited or unreadable →
   the stop is allowed and the guard writes which ref it could not judge, because
   a silently swallowed API error is indistinguishable from a green.
+
+### Where a CI failure is announced (point 513)
+
+A red run on `main` mails the repository owner, as it always did. A red run on a
+`feat/**` branch does **not** — and the absence of that mail says nothing about
+the branch. Read this before concluding a branch is green.
+
+Two deliberate rules collided here. A branch push runs the LIGHT local gate
+(lint + audit; the full gate per intermediate commit costs more than a red branch
+is worth), while CI runs the FULL gate on every branch push — so an agent
+committing mid-work produced red runs, and each one mailed the owner. There is no
+repository-side switch for that mail: GitHub sends it for the run's failure
+CONCLUSION. So the routine `feat/**` push has no such conclusion any more. Every
+step of the job carries `continue-on-error` for that one case, and the run ends
+green whatever the gate found (`.github/workflows/ci.yml`; the decision is pure
+in `ci-gate-verdict-core.mjs`, the writing in `ci-gate-verdict.mjs`, both pinned
+step by step in `ci-gate-verdict-core.test.mjs`).
+
+The verdict is therefore carried by four other things, and a branch failure is
+found in them:
+
+- the **ntfy topic** — the alert names the failed gate steps and says that no mail
+  follows. On a branch run this alert IS the notification.
+- the **commit status** on the pushed sha (`ci/gate (branch)`): a red ✗ beside the
+  commit, and one API field for anything that asks later. Commit statuses notify
+  nobody, which is why they are usable here.
+- the **run summary**, which states in words that the green tick is not a green
+  gate, and lists every step's outcome.
+- the `::error` **annotations** on the run page.
+
+What stays exactly as it was: `main` (hard steps, red run, mail — it is the branch
+the deploy builds from), a manual `workflow_dispatch` and a pull request on any
+branch (a deliberate ask keeps its honest red), and the rescue convention below —
+a `[skip ci]` commit still produces no run at all.
+
+One consequence to know: `ci-status-guard` judges the run CONCLUSION, so it no
+longer blocks a turn on a branch gate failure — a red branch is expressly normal
+now. The gate that still stands in front of a branch push is the local pre-push
+gate.
 
 ## Triaging a RED run (point 294)
 
