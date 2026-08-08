@@ -26,6 +26,7 @@ import {
   runVerdict,
 } from './render-verify-core.mjs'
 import { RED_CHARGES } from './render-verify-charges.mjs'
+import { failedChecks } from './verify/baseline-classify-core.mjs'
 import { readTasksAll } from './tasks-source.mjs'
 
 const VERIFY_DIR = join(dirname(fileURLToPath(import.meta.url)), 'verify')
@@ -632,6 +633,16 @@ describe('chargeFor — the ledger charges NARROWLY', () => {
   it('does not charge across suites, or across check/console kinds', () => {
     expect(chargeFor(red('settlement walker (goat)'), { suite: 'flow', backend: 'webgpu', ledger })).toBeNull()
     expect(chargeFor(red('console error: render-resource-leak — renderTargets grew', null, 'check'), { ledger })).toBeNull()
+  })
+
+  it('charges a CONSOLE red through a console entry — the positive half of that kind', () => {
+    // The mismatch above proves the kind is READ; on its own it would also pass
+    // if console reds stopped charging altogether (second-model finding 2c —
+    // the shipped ledger no longer holds a console entry to demonstrate it on).
+    const line = 'ERR: [ASSERT] render-resource-leak — renderTargets grew back at place:maasai-village: 19 -> 22'
+    const [console_] = failedChecks(line)
+    expect(console_.kind).toBe('console')
+    expect(chargeFor(console_, { ledger }).point).toBe(546)
   })
 
   it('survives a broken ledger entry rather than throwing', () => {
