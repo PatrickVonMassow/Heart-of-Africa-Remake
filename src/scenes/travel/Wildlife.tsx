@@ -137,6 +137,13 @@ import {
   waterStruggleFate,
   groundedBodyY,
   groundFollowY,
+  FIGHTING_SPECIES,
+  wantsToFight,
+  pickFightOpponent,
+  fightApproach,
+  fightApproachOutcome,
+  fightResolve,
+  clashOver,
 } from './wildlifeBehavior'
 import { ELEPHANT_GRAVEYARD, WATERFALLS } from '../../world/data/landmarks'
 import { rinderpestCarrionActive, rinderpestPhaseAtDay } from '../../systems/rinderpest'
@@ -427,6 +434,34 @@ interface Animal {
    *  weapon — the parent rears and strikes out at the departing predator,
    *  then settles. The field keeps its 124 name. */
   kick?: number
+  /** The running intraspecies fight (design.md §19.17, point 264): set on BOTH
+   *  animals of a pair the moment one takes the other on, cleared on every
+   *  ending — the clash's resolution, the drive-off, or the hard deadline — so
+   *  a fighter is never left engaged with nobody (invariant I4). `aggressor`
+   *  marks the one that WANTED it; the quarry of a one-sided fight carries the
+   *  same record with `aggressor: false` and flees. */
+  fight?: {
+    foe: Animal
+    /** 'converge' — both want it and run at each other; 'hunt' — the aggressor
+     *  chases and the other flees; 'clash' — in contact, fighting. */
+    mode: 'converge' | 'hunt' | 'clash'
+    aggressor: boolean
+    /** Where the bout began — the aggressor's patch. The drive-off measures the
+     *  quarry's distance from HERE, not from the shrinking gap, so both the
+     *  catch and the break-off are genuinely reachable endings. */
+    ox: number
+    oz: number
+    /** Sim-seconds since the bout began (the approach deadline's clock). */
+    time: number
+    /** Sim-seconds spent in the clash itself. */
+    clash: number
+  }
+  /** Sim-seconds until this animal may seek (or be sought for) a fight again:
+   *  counted down every frame, so a settled pair does not re-engage at once. */
+  fightCooldown?: number
+  /** Sim-seconds until this animal's next "wants to fight" roll — the
+   *  disposition's cadence, so the rate is per interval and not per frame. */
+  fightRollAt?: number
   /** DEV-ONLY (point 268): the last rendered world (x,z) of a crocodile's
    *  seized victim — its jaws anchor — so the enrichments check can read the
    *  jaws placement back without a render-matrix probe. Set only in the
@@ -502,6 +537,7 @@ function dramaStateOf(a: Animal, isHunted: boolean): DramaState {
       a.child !== undefined && !a.child.dead &&
       (a.child.caught !== undefined || a.child.inWater !== undefined || a.child.mired !== undefined ||
         LION_STATE.victim === a.child),
+    fighting: a.fight !== undefined,
     isLionVictim: a === LION_STATE.victim,
     isHunted,
   }
@@ -571,6 +607,12 @@ const FLEES_LION: Record<Species, boolean> = {
   // predator lists hold only revenge carcasses (point 146) — nothing to flee.
   lion: false, cheetah: false, leopard: false, hyena: false,
 }
+// The clash pose (design.md §19.17, point 264): how far the shoving lunge
+// carries the body toward its opponent, and how far the head rears/dips with
+// it. Render offsets only — small enough that the two bodies read as pressed
+// together, never as passing through one another.
+const CLASH_SHOVE = 0.3
+const CLASH_REAR = 0.3
 const TRAMPLE_RADIUS = 1.5
 const FLEE_RADIUS = 14
 /** Base swim speed of a purposeful crossing (point 192) — slower than the walk,
@@ -2042,6 +2084,50 @@ function Herds() {
           }
           return null
         }
+        case 'intraspeciesFight': {
+          // Two free ADULTS of one fighting species, nearest pair to the
+          // traveller (design.md §19.17, point 264). The pair is only PAIRED
+          // here — every step after this is the ordinary drive: they converge,
+          // clash and resolve through the same pre-pass an unstaged fight runs.
+          let best: [Animal, Animal] | null = null
+          let bd = Infinity
+          for (const sp of FIGHTING_SPECIES) {
+            const list = h[sp as Species] ?? []
+            const free = list.filter(
+              (c) =>
+                !c.dead && c.young !== true && c.fight === undefined && c.vigil === undefined &&
+                (c.child === undefined || c.child.dead === true) &&
+                !claimedByAnotherDrama({ ...c, isLionVictim: c === LION_STATE.victim }),
+            )
+            for (let i = 0; i < free.length; i++) {
+              for (let j = i + 1; j < free.length; j++) {
+                // Both must be near the traveller AND near each other, or the
+                // staged clash would happen off-screen.
+                const d = Math.max(
+                  Math.hypot(free[i].x - p.x, free[i].z - p.z),
+                  Math.hypot(free[j].x - p.x, free[j].z - p.z),
+                )
+                if (d < bd && Math.hypot(free[i].x - free[j].x, free[i].z - free[j].z) <= balance.fight.seekRadius) {
+                  bd = d
+                  best = [free[i], free[j]]
+                }
+              }
+            }
+          }
+          if (!best) return 'noFightPair'
+          const [one, two] = best
+          one.drink = undefined
+          two.drink = undefined
+          one.fightCooldown = undefined
+          two.fightCooldown = undefined
+          // BOTH want it: the staged bout takes path (a), the converge — the
+          // picture the point exists for, and the one that always reaches the
+          // clash rather than possibly ending in a drive-off.
+          const bout = { mode: 'converge' as const, ox: one.x, oz: one.z, time: 0, clash: 0 }
+          one.fight = { foe: two, aggressor: true, ...bout }
+          two.fight = { foe: one, aggressor: false, ...bout }
+          return null
+        }
         case 'vultureFlock': {
           const carrion = pickAnimal({ young: false, radius: 60 })
           if (!carrion) return 'noPrey'
@@ -2871,6 +2957,204 @@ function Herds() {
       }
     }
 
+    // Intraspecies combat (design.md §19.17, point 264), over the FULL herd
+    // lists like the dramas above so a bout that straddles the instance cap
+    // still resolves. A NEW drama state on the shared core, not a second
+    // chase: it reuses the same claim-from-idle rule, the same water-refusing
+    // deflected steps, the same carcass system and the same hard-deadline
+    // discipline as the §19.8 dramas and the §19.16 ambush.
+    //
+    // WHICH species fight is the research's answer, not the code's
+    // (docs/intraspecies-combat-1890.md): FIGHT_PROFILES carries a row per
+    // rendered animal, and only its `live` fighters are seeded here. The
+    // research's "adult MALES" cue has no sex model to key on, so the low
+    // disposition rate stands in for the male fraction; juveniles are excluded
+    // outright (they are the protected young of §19.8) and so is a parent with
+    // a living calf — a bull that ran off to fight would drag its calf's leash
+    // across the plain, and §19.8 owns that actor.
+    {
+      const fb = balance.fight
+      const fightSpeed = PREY_WALK_SPEED * fb.approachBurst
+      const wetOrSea = (x: number, z: number) => {
+        const ll = worldToLatLon(x, z)
+        const ty = sampleTerrain(ll.lat, ll.lon, seed).type
+        return ty === 'ocean' || ty === 'water'
+      }
+      // Move an animal one fight step and carry its standing height with it
+      // (point 203(A)) — never onto water (point 312: an animal neither spawns
+      // in it nor lingers in it, and a fight must not park two bodies in a river).
+      const fightStep = (sp: string, a: Animal, x: number, z: number) => {
+        a.x = x
+        a.z = z
+        const ll = worldToLatLon(a.x, a.z)
+        const gt = sampleTerrain(ll.lat, ll.lon, seed)
+        // deflectedStep/calfFleeStep refuse a wet step by construction; the
+        // assert is the tripwire that keeps it so, judged on the step actually
+        // taken rather than on a body that may have been streamed in at a bank.
+        devAssert(
+          gt.type !== 'water' && gt.type !== 'ocean',
+          'fight-in-water',
+          () => `${sp} fighter stepped onto ${gt.type} at ${a.x.toFixed(1)},${a.z.toFixed(1)}`,
+        )
+        if (gt.type !== 'water' && gt.type !== 'ocean') a.y = groundedBodyY(gt.height)
+      }
+      /** Every ending of a bout runs through here: both sides are released and
+       *  put on cooldown, so no animal is ever left engaged with nobody. */
+      const endFight = (a: Animal) => {
+        const foe = a.fight?.foe
+        a.fight = undefined
+        a.fightCooldown = fb.cooldownSeconds
+        a.fightRollAt = fb.dispositionInterval
+        if (foe && foe.fight?.foe === a) {
+          foe.fight = undefined
+          foe.fightCooldown = fb.cooldownSeconds
+          foe.fightRollAt = fb.dispositionInterval
+        }
+      }
+      /** Free to be pulled into a fight this frame? The §19.8/§19.16 claim rule
+       *  (research §4.1): an animal any other drama owns is spoken for. */
+      const fightEligible = (a: Animal) =>
+        !a.dead &&
+        a.young !== true &&
+        a.fight === undefined &&
+        (a.fightCooldown ?? 0) <= 0 &&
+        a.drink === undefined &&
+        (a.child === undefined || a.child.dead === true) &&
+        a.vigil === undefined &&
+        a.kick === undefined &&
+        a.plungeTo === undefined &&
+        a.trampleTo === undefined &&
+        a.lure === undefined &&
+        !claimedByAnotherDrama({ ...a, isLionVictim: a === LION_STATE.victim })
+      for (const sp of FIGHTING_SPECIES) {
+        const list = herds[sp as Species]
+        if (!list) continue
+        for (const a of list) {
+          if (a.fightCooldown !== undefined) {
+            a.fightCooldown -= dt
+            if (a.fightCooldown <= 0) a.fightCooldown = undefined
+          }
+          const bout = a.fight
+          if (bout === undefined) continue
+          // Own only the AGGRESSOR's side of the pair here — the quarry's flight
+          // is driven from the same block, so the bout is stepped exactly once.
+          if (!bout.aggressor) continue
+          const foe = bout.foe
+          bout.time += dt
+          // The foe left the world (streamed out, taken by a predator, killed
+          // by an elephant) or was pulled into another drama: the bout ends
+          // rather than pinning the survivor on a body that is gone (point 341).
+          if (foe.dead || foe.gone || foe.fight?.foe !== a) {
+            endFight(a)
+            continue
+          }
+          if (bout.mode === 'clash') {
+            bout.clash += dt
+            if (!clashOver(bout.clash, fb.clashSeconds)) continue
+            // The resolution (point 264): one size-weighted roll picks the
+            // loser, the species' researched lethality decides whether the loss
+            // is fatal. A fatal one drops an ORDINARY carcass — lionFed stays
+            // false, so the ground scavengers and the §19.6 vultures work it
+            // exactly like a trampled grazer; no bespoke body path. A dead
+            // parent is picked up by the orphan pass above on the next frame.
+            const res = fightResolve(sp, a.scale, foe.scale, Math.random(), Math.random(), fb)
+            const loser = res.loser === 'a' ? a : foe
+            const winner = loser === a ? foe : a
+            endFight(a)
+            if (res.lethal) {
+              loser.dead = true
+              loser.lionFed = false
+              loser.dissolve = CARCASS_DISSOLVE_SECONDS
+              loser.drink = undefined
+              pushStain(loser.x, loser.z)
+            } else {
+              // Submission: the loser yields and withdraws, unhurt — the
+              // ritualised Tier B ending the research insists on.
+              loser.dodgeHeading = Math.atan2(loser.x - winner.x, loser.z - winner.z)
+            }
+            continue
+          }
+          const gap = Math.hypot(foe.x - a.x, foe.z - a.z)
+          const fromOrigin = Math.hypot(foe.x - bout.ox, foe.z - bout.oz)
+          const outcome = fightApproachOutcome(bout.mode, gap, fromOrigin, bout.time, fb)
+          if (outcome === 'driveOff') {
+            // The aggressor is satisfied (or the deadline expired): it breaks
+            // off, nobody dies. The quarry keeps the heading it fled on.
+            endFight(a)
+            continue
+          }
+          if (outcome === 'clash') {
+            bout.mode = 'clash'
+            bout.clash = 0
+            if (foe.fight) {
+              foe.fight.mode = 'clash'
+              foe.fight.clash = 0
+            }
+            continue
+          }
+          // Still approaching: the aggressor charges its opponent, deflecting
+          // around water like every other mover.
+          const toFoe = Math.atan2(foe.x - a.x, foe.z - a.z)
+          const step = deflectedStep(a.x, a.z, toFoe, fightSpeed * dt, wetOrSea, 0.9)
+          if (step.moved) fightStep(sp, a, step.x, step.z)
+          a.face = toFoe
+          if (bout.mode === 'converge') {
+            // Both want it: the opponent runs at the aggressor in turn.
+            const toSelf = Math.atan2(a.x - foe.x, a.z - foe.z)
+            const fs = deflectedStep(foe.x, foe.z, toSelf, fightSpeed * dt, wetOrSea, 0.9)
+            if (fs.moved) fightStep(sp, foe, fs.x, fs.z)
+            foe.face = toSelf
+          } else {
+            // One-sided: the quarry flees, slower, on the same water-refusing
+            // corridor flight a hunted calf uses (point 226).
+            const fl = calfFleeStep(
+              foe.x, foe.z, a.x, a.z,
+              fightSpeed * fb.quarryFleeFactor * dt, wetOrSea, 0.8, foe.fleeCorridor,
+            )
+            foe.fleeCorridor = fl.corridor
+            if (fl.moved) fightStep(sp, foe, fl.x, fl.z)
+            foe.face = fl.heading
+          }
+          // Invariant I4 (point 186): no bout outlives its own deadlines. The
+          // slack covers one frame of overshoot on each clock.
+          devAssert(
+            bout.time <= fb.approachSeconds + fb.clashSeconds + 2,
+            'fight-bout-bounded',
+            () => `${sp} bout=${bout.time.toFixed(1)}s mode=${bout.mode} gap=${gap.toFixed(1)}`,
+          )
+          // A bout is always MUTUAL (point 264): both sides hold the same pair,
+          // so no animal can be left engaged with an opponent that has moved on.
+          devAssert(
+            foe.fight?.foe === a && foe.fight.aggressor !== bout.aggressor,
+            'fight-pair-symmetric',
+            () => `${sp} half-engaged: foe.fight=${foe.fight ? 'set' : 'none'}`,
+          )
+        }
+        // Seed fresh bouts LAST, so an animal released this frame does not
+        // re-engage in the same one. The roll runs on its own cadence, not per
+        // frame, so the rate reads as "per dispositionInterval seconds".
+        for (const a of list) {
+          a.fightRollAt = (a.fightRollAt ?? fb.dispositionInterval) - dt
+          if ((a.fightRollAt ?? 0) > 0) continue
+          a.fightRollAt = fb.dispositionInterval
+          if (!fightEligible(a)) continue
+          if (!wantsToFight(sp, Math.random(), fb.dispositionRate)) continue
+          const foe = pickFightOpponent(
+            a.x, a.z,
+            list.filter((c) => c !== a && fightEligible(c)),
+            fb.seekRadius,
+          )
+          if (!foe) continue
+          // Path (a) vs (b) (point 264): the opponent's own disposition decides
+          // whether the two run AT each other or one chases the other.
+          const mode = fightApproach(true, wantsToFight(sp, Math.random(), fb.dispositionRate))
+          const bout = { ox: a.x, oz: a.z, time: 0, clash: 0 }
+          a.fight = { foe, mode, aggressor: true, ...bout }
+          foe.fight = { foe: a, mode, aggressor: false, ...bout }
+        }
+      }
+    }
+
     // Animal-animal collision (design.md §19): live animals never stand in or
     // walk through one another — each frame every overlapping pair parts, each
     // member resolving its own half of the overlap (a spatial grid keeps the
@@ -2889,6 +3173,9 @@ function Herds() {
         b.vigil !== undefined ||
         b.crossing !== undefined ||
         b.fireTrapped !== undefined ||
+        // A fight NEEDS contact (point 264): the separation push would shove
+        // the two apart every frame and the clash could never close.
+        b.fight !== undefined ||
         // A parent wading to a calf in the water is mid-drama too (point 197):
         // the backstop already exempts a child-inWater/mired parent, so the
         // collision push must match — the old list dropped the inWater case.
@@ -4282,6 +4569,37 @@ function Herds() {
             bodyY = a.y // resync off any drink slide (see the kick branch)
             yaw = Math.atan2(a.trampleTo.x - a.x, a.trampleTo.z - a.z)
             pitch = 0
+            familyHeld = true
+          } else if (a.fight) {
+            // Intraspecies combat (design.md §19.17, point 264): movement is the
+            // pre-pass's; this only POSES the bout. Approaching or fleeing, the
+            // body faces its line of travel; in the CLASH the two stand nose to
+            // nose and shove — a rhythmic lunge into the opponent with the head
+            // rearing and dipping, which from the bird's-eye view reads as two
+            // animals going at each other rather than two standing still.
+            // familyHeld is load-bearing exactly as in the branches above: a
+            // fighter neither shies from the traveller nor darts aside (its
+            // drama outranks both, §19), and `isInDrama` says the same.
+            const foe = a.fight.foe
+            const toFoe = Math.atan2(foe.x - a.x, foe.z - a.z)
+            px = a.x
+            pz = a.z
+            bodyY = a.y // resync off any drink slide (see the kick branch)
+            if (a.fight.mode === 'clash') {
+              const beat = Math.sin(t * 6 + a.phase * 6.283)
+              yaw = toFoe
+              a.face = toFoe
+              // The shove is a RENDER offset only — never written back to a.x/a.z,
+              // so the lunges cannot accumulate into a drift (the point-383 lesson).
+              px += Math.sin(toFoe) * beat * CLASH_SHOVE
+              pz += Math.cos(toFoe) * beat * CLASH_SHOVE
+              pitch = beat * CLASH_REAR
+              bodyY = a.y + Math.abs(beat) * 0.05
+            } else {
+              yaw = a.face ?? (a.fight.aggressor ? toFoe : Math.atan2(a.x - foe.x, a.z - foe.z))
+              pitch = 0
+            }
+            wobTarget = 0
             familyHeld = true
           } else if (a.vigil) {
             // The vigil (point 121): stand over the fallen calf, facing it
