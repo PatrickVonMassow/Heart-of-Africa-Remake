@@ -6,6 +6,7 @@
 // language-neutral keys (design.md §17).
 import { launchVerifyBrowser, assertBackend } from './_browser.mjs'
 import { frameShutter } from './frameSubject.mjs'
+import { sectionGate } from './sections.mjs'
 import { fileURLToPath } from 'node:url'
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:5173/'
@@ -17,9 +18,25 @@ const errors = []
 page.on('console', (m) => m.type() === 'error' && errors.push(m.text()))
 page.on('pageerror', (e) => errors.push('PAGEERROR: ' + e.message))
 
+// SECTIONS (point 566). This suite is ONE story — trade, travel, audience, hint,
+// grave — and a step of it cannot be replayed without the steps before it, so it
+// is NOT cut into per-step blocks: that would be the silent-dependency shape the
+// mechanism exists to avoid. What IS separable is the pair of checks that run in
+// a SECOND, freshly started window, which own their whole state; they are the
+// second section, and the story is the first. Without a request both run, in
+// file order, exactly as before; `--section=fresh-start-window` repairs those
+// two without replaying the core loop. The names are read out of THIS FILE by
+// scripts/verify/sections.mjs, so an unknown one is refused with the list of the
+// real ones — and the run is stamped PARTIAL, never counted as suite coverage.
+const sections = sectionGate()
+const { section } = sections
+if (sections.banner()) console.log(sections.banner())
+
 let failCount = 0
 function check(name, cond) {
-  console.log((cond ? 'PASS' : 'FAIL') + '  ' + name)
+  // The section tag goes after the name: the check's NAME is its identity for
+  // the red ledger and the baseline classifier and must not change.
+  console.log((cond ? 'PASS' : 'FAIL') + '  ' + name + sections.tag())
   if (!cond) failCount++
 }
 // Point 375: a frame states what it must show and the shutter proves it is in
@@ -114,522 +131,538 @@ await page.evaluate(() => {
 })
 
 // --- 1. Start state (criteria 1, 5, 9) ---
-let s = await state()
-check('Start in Cairo (first-person)', s.mode === 'place' && s.placeId === 'cairo')
-check('Journal open with departure entry', s.journalOpen &&
-  s.journal.some((e) => titleKey(e) === 'journal.titles.departure'))
-check('Starting money $250', s.money === 250)
-check('Provisions 35 days', s.foodDays === 35)
-check('2 starting gifts', Object.values(s.gifts).reduce((a, b) => a + b, 0) === 2)
-await shot('06-start-journal', { element: '.journal', label: 'the departure journal' })
-await page.evaluate(() => window.__game.getState().setJournalOpen(false))
-await page.waitForTimeout(300)
+if (section('core-loop')) {
+  let s = await state()
+  check('Start in Cairo (first-person)', s.mode === 'place' && s.placeId === 'cairo')
+  check('Journal open with departure entry', s.journalOpen &&
+    s.journal.some((e) => titleKey(e) === 'journal.titles.departure'))
+  check('Starting money $250', s.money === 250)
+  check('Provisions 35 days', s.foodDays === 35)
+  check('2 starting gifts', Object.values(s.gifts).reduce((a, b) => a + b, 0) === 2)
+  await shot('06-start-journal', { element: '.journal', label: 'the departure journal' })
+  await page.evaluate(() => window.__game.getState().setJournalOpen(false))
+  await page.waitForTimeout(300)
 
-// --- 2. Trade in Cairo (criterion 5): enter a building with Space at its door ---
-await enterBuilding('tools')
-await shot('02-port-cairo-trade', { element: '.dialog', label: 'the Cairo trade dialog' })
-// Buy prices are laid out as a table: the price cells share a column, so their
-// left edges line up (design.md §9).
-const priceAligned = await page.evaluate(() => {
-  const lefts = [...document.querySelectorAll('.buy-grid .price')].map((p) => Math.round(p.getBoundingClientRect().left))
-  return lefts.length >= 2 && lefts.every((l) => Math.abs(l - lefts[0]) <= 1)
-})
-check('Buy prices are aligned in a column (table layout)', priceAligned)
-// Scope to the BUY grid: with the start kit (point 104) the sell-back list
-// also carries a 'Schaufel' row, so the unscoped locator matched twice.
-await page.locator('.buy-grid .trade-row', { hasText: 'Schaufel' }).locator('button').click()
-await page.waitForTimeout(300)
-s = await state()
-// The demo start kit (point 104) already holds one shovel; the buy adds a second.
-check('Shovel bought (−$20)', (s.equipment.shovel ?? 0) === 2 && s.money === 230)
-await closeDialog()
+  // --- 2. Trade in Cairo (criterion 5): enter a building with Space at its door ---
+  await enterBuilding('tools')
+  await shot('02-port-cairo-trade', { element: '.dialog', label: 'the Cairo trade dialog' })
+  // Buy prices are laid out as a table: the price cells share a column, so their
+  // left edges line up (design.md §9).
+  const priceAligned = await page.evaluate(() => {
+    const lefts = [...document.querySelectorAll('.buy-grid .price')].map((p) => Math.round(p.getBoundingClientRect().left))
+    return lefts.length >= 2 && lefts.every((l) => Math.abs(l - lefts[0]) <= 1)
+  })
+  check('Buy prices are aligned in a column (table layout)', priceAligned)
+  // Scope to the BUY grid: with the start kit (point 104) the sell-back list
+  // also carries a 'Schaufel' row, so the unscoped locator matched twice.
+  await page.locator('.buy-grid .trade-row', { hasText: 'Schaufel' }).locator('button').click()
+  await page.waitForTimeout(300)
+  s = await state()
+  // The demo start kit (point 104) already holds one shovel; the buy adds a second.
+  check('Shovel bought (−$20)', (s.equipment.shovel ?? 0) === 2 && s.money === 230)
+  await closeDialog()
 
-await enterBuilding('shop')
-await page.locator('.trade-row', { hasText: 'Goldschmuck' }).locator('button').click()
-await page.waitForTimeout(300)
-s = await state()
-check('Gold-jewelry gift bought (−$30)', s.gifts.gold === 1 && s.money === 200)
-await closeDialog()
+  await enterBuilding('shop')
+  await page.locator('.trade-row', { hasText: 'Goldschmuck' }).locator('button').click()
+  await page.waitForTimeout(300)
+  s = await state()
+  check('Gold-jewelry gift bought (−$30)', s.gifts.gold === 1 && s.money === 200)
+  await closeDialog()
 
-// The SELL/treasure lists use the same aligned column grid as the buy list
-// (point 95): open the bazaar with a couple of treasures and assert the buy
-// prices share a left edge and the offer (sell) names share a left edge.
-await page.evaluate(() => {
-  window.__game.getState().debugAddTreasure('gold')
-  window.__game.getState().debugAddTreasure('ivory')
-  window.__ui.getState().setDialog({ kind: 'bazaar' })
-})
-await page.waitForTimeout(250)
-const bazaarAligned = await page.evaluate(() => {
-  const lefts = (sel) => [...document.querySelectorAll(sel)].map((e) => Math.round(e.getBoundingClientRect().left))
-  const aligned = (xs) => xs.length >= 2 && xs.every((l) => Math.abs(l - xs[0]) <= 1)
-  return aligned(lefts('.buy-grid .price')) && aligned(lefts('.offer-grid .trade-name'))
-})
-check('Bazaar buy prices and sell names align in columns (table layout)', bazaarAligned)
-await closeDialog()
+  // The SELL/treasure lists use the same aligned column grid as the buy list
+  // (point 95): open the bazaar with a couple of treasures and assert the buy
+  // prices share a left edge and the offer (sell) names share a left edge.
+  await page.evaluate(() => {
+    window.__game.getState().debugAddTreasure('gold')
+    window.__game.getState().debugAddTreasure('ivory')
+    window.__ui.getState().setDialog({ kind: 'bazaar' })
+  })
+  await page.waitForTimeout(250)
+  const bazaarAligned = await page.evaluate(() => {
+    const lefts = (sel) => [...document.querySelectorAll(sel)].map((e) => Math.round(e.getBoundingClientRect().left))
+    const aligned = (xs) => xs.length >= 2 && xs.every((l) => Math.abs(l - xs[0]) <= 1)
+    return aligned(lefts('.buy-grid .price')) && aligned(lefts('.offer-grid .trade-name'))
+  })
+  check('Bazaar buy prices and sell names align in columns (table layout)', bazaarAligned)
+  await closeDialog()
 
-// --- 3. Leave place by walking out → travel mode (criterion 2) ---
-await leaveByWalking()
-s = await state()
-check('Left the place → bird\'s-eye view', s.mode === 'travel')
-await page.waitForTimeout(600)
-await shot('01-birdseye-view', {
-  general: 'the bird\'s-eye view itself is the subject — this frame shows the mode, not one place',
-  scene: 'travel',
-})
+  // --- 3. Leave place by walking out → travel mode (criterion 2) ---
+  await leaveByWalking()
+  s = await state()
+  check('Left the place → bird\'s-eye view', s.mode === 'travel')
+  await page.waitForTimeout(600)
+  await shot('01-birdseye-view', {
+    general: 'the bird\'s-eye view itself is the subject — this frame shows the mode, not one place',
+    scene: 'travel',
+  })
 
-// --- 4. Re-enter Cairo with the Space use key → checkpoint (criteria 2/5). ---
-// Entry is a deliberate Space press now (design.md §2.3): standing on the marker
-// shows the "Space to enter" hint but does NOT enter until Space is pressed.
-const cairoW = await page.evaluate(async () => {
-  const geo = await import('/src/world/geo.ts')
-  const c = geo.PLACES.find((p) => p.id === 'cairo')
-  return geo.latLonToWorld(c.lat, c.lon)
-})
-// Stand on the marker: the enter hint arms, but the view stays bird's-eye.
-await page.evaluate((w) => window.__game.setState({ pos: { x: w.x, z: w.z } }), cairoW)
-await page.waitForFunction(() => window.__ui.getState().enterPlaceId === 'cairo', null, { timeout: 15000 })
-await page.waitForTimeout(400)
-check('standing on the marker does not auto-enter (Space required)', (await state()).mode === 'travel')
-// Point 287: Cairo is a known-from-start port, so its enter hint names it —
-// never a kind placeholder. The prompt is localized (German): "Space — Kairo betreten".
-await page.waitForFunction(() => (window.__ui.getState().prompt ?? '').includes('Kairo'), null, { timeout: 5000 })
-const cairoPrompt = await page.evaluate(() => window.__ui.getState().prompt ?? '')
-check('discovered port enter hint names it (no placeholder)', cairoPrompt.includes('Kairo') && !cairoPrompt.includes('?'))
-// Point 317: the enter hint sits a little BELOW the screen centre — close to
-// the action, but clear of the centre so it never covers the traveller — and
-// still clear of the status bar and the inventory bar. Measured on the RENDERED
-// boxes, not on the CSS rule.
-const hintBox = await page.evaluate(() => {
-  const r = (sel) => {
-    const el = document.querySelector(sel)
-    if (!el) return null
-    const b = el.getBoundingClientRect()
-    return { top: b.top, bottom: b.bottom, left: b.left, right: b.right }
-  }
-  return { hint: r('.prompt'), bar: r('.status-bar'), inv: r('.inventory-bar'), vh: window.innerHeight }
-})
-const overlaps = (a, b) =>
-  a !== null && b !== null && a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom
-const hintFrac = hintBox.hint ? (hintBox.hint.top + hintBox.hint.bottom) / 2 / hintBox.vh : -1
-check(
-  'enter hint sits just below the screen centre (55-65 % of the viewport height)',
-  hintFrac >= 0.55 && hintFrac <= 0.65,
-  `${(hintFrac * 100).toFixed(1)} %`,
-)
-check(
-  'enter hint clears the status bar and the inventory bar',
-  hintBox.hint !== null && !overlaps(hintBox.hint, hintBox.bar) && !overlaps(hintBox.hint, hintBox.inv),
-  JSON.stringify(hintBox),
-)
-await shot('140-enter-hint-position', { element: '.prompt', label: 'the enter hint' })
-// Re-anchor on the marker immediately before the press: the river current's idle
-// drift (design.md §11) sweeps the traveller a little every frame, and Cairo sits
-// on the Nile, so over the wait above it could drift off the marker or onto a
-// water cell (the enter guard) and the Space press would find no candidate. The
-// Space handler reads the live position, so re-set it right before the keypress.
-await page.evaluate((w) => window.__game.setState({ pos: { x: w.x, z: w.z } }), cairoW)
-// Press Space to enter — the movement-based approach, confirmed with the use key.
-await page.keyboard.press('Space')
-await page.waitForFunction(() => window.__game.getState().mode === 'place', null, { timeout: 15000 })
-await page.waitForTimeout(400)
-s = await state()
-const hasCp = await page.evaluate(() => localStorage.getItem('hoa-checkpoints-v1') !== null)
-check('Re-entered Cairo (Space use key)', s.mode === 'place' && s.placeId === 'cairo')
-check('Checkpoint saved (localStorage)', hasCp)
-check('Arrival journal entry', s.journal.some((e) =>
-  titleKey(e) === 'journal.titles.arrival' && e.title.params?.place === 'cairo'))
-await page.evaluate(() => window.__game.getState().setJournalOpen(false))
-await page.waitForTimeout(200)
-
-// --- 5. Travel to village (criteria 4, 6) ---
-await leaveByWalking()
-// Jump slightly north of the North's knowing village (design.md §13.3), then
-// walk south into it so the journey itself (movement, time) is exercised.
-const village = await page.evaluate(async () => {
-  const geo = await import('/src/world/geo.ts')
-  const id = window.__game.getState().knowingVillages.north
-  const v = geo.PLACES.find((p) => p.id === id)
-  return { id, lat: v.lat, lon: v.lon }
-})
-// Points 287/318: the localized German name of this village, to prove the enter
-// hint hides it behind the kind placeholder while the place is undiscovered.
-const villageName = await page.evaluate(async (id) => (await import('/src/i18n/de.ts')).de.places[id], village.id)
-// 0.5° ≈ 5 world units: outside the enter radius (2.5), so real walking
-// (movement, time, provisions) is required to get in.
-await page.evaluate(([lat, lon]) => window.__game.getState().debugJumpTo(lat, lon), [village.lat + 0.5, village.lon])
-await page.waitForTimeout(400)
-const dayBefore = (await state()).day
-// Walk south into the village until within its enter radius (the approach is the
-// movement — time and provisions), then press Space to confirm entry (design.md
-// §2.3): reaching the radius no longer switches views on its own.
-await page.keyboard.down('KeyS')
-await page
-  .waitForFunction((id) => window.__ui.getState().enterPlaceId === id, village.id, { timeout: 60000 })
-  .finally(() => page.keyboard.up('KeyS'))
-// Points 287/318: this village is not yet discovered, so its enter hint must
-// read "Unbekanntes Dorf" (matching its §17.2 map label) — never the real name.
-const villagePrompt = await page.evaluate(() => window.__ui.getState().prompt ?? '')
-check(
-  'undiscovered village enter hint hides its name (shows "Unbekanntes Dorf")',
-  villagePrompt.includes('Unbekanntes Dorf') && !villagePrompt.includes('?') && !villagePrompt.includes(villageName),
-)
-// Point 299: the settlement COLLIDES in the bird's-eye view — walking on never
-// carries the traveller ACROSS the village footprint. He is pressed against its
-// edge (sliding along it, like the tree/animal collision) and stays outside,
-// while the enter radius still holds him wherever the footprint stops him, so
-// entry is reachable from every point the collider blocks. A per-frame sampler
-// records the CLOSEST approach, so a crossing between two polls cannot go
-// unnoticed, AND — for every frame the collider was HOLDING him — whether the
-// enter prompt was armed there. Where he comes to REST is no such invariant: a
-// ROUND footprint deflects a held key, so an off-centre approach slides around
-// it and walks on past the village, which is correct movement and depends on
-// the run seed (the approach angle, and which of the region's villages this run
-// made the knowing one). Frames on a water cell are exempt — the §2.3 water
-// guard disarms the prompt there by design.
-const village3D = await page.evaluate(async ([lat, lon]) => {
-  const geo = await import('/src/world/geo.ts')
-  const entry = await import('/src/scenes/travel/settlementEntry.ts')
-  const { balance } = await import('/src/config/balance.ts')
-  return {
-    ...geo.latLonToWorld(lat, lon),
-    collisionRadius: entry.settlementCollisionRadius(balance.placeEnterRadius, balance.placeCollisionFactor),
-    enterRadius: balance.placeEnterRadius,
-  }
-}, [village.lat, village.lon])
-await page.evaluate(
-  async ([x, z, id, collisionRadius]) => {
+  // --- 4. Re-enter Cairo with the Space use key → checkpoint (criteria 2/5). ---
+  // Entry is a deliberate Space press now (design.md §2.3): standing on the marker
+  // shows the "Space to enter" hint but does NOT enter until Space is pressed.
+  const cairoW = await page.evaluate(async () => {
     const geo = await import('/src/world/geo.ts')
-    const terrain = await import('/src/world/terrain.ts')
-    window.__placeProbe = { min: Infinity, frames: 0, held: 0, heldUnarmed: 0 }
-    const sample = () => {
-      const g = window.__game.getState()
-      const p = g.pos
-      const pr = window.__placeProbe
-      const d = Math.hypot(p.x - x, p.z - z)
-      pr.min = Math.min(pr.min, d)
-      pr.frames++
-      // "Held by the collider": the resolver clamps a blocked step to exactly
-      // the collision radius, so a frame at that distance is one the footprint
-      // stopped. The margin only absorbs the clamp's float noise.
-      if (d <= collisionRadius + 0.05) {
-        const ll = geo.worldToLatLon(p.x, p.z)
-        if (terrain.sampleTerrain(ll.lat, ll.lon, g.seed).type !== 'water') {
-          pr.held++
-          if (window.__ui.getState().enterPlaceId !== id) pr.heldUnarmed++
-        }
-      }
-      requestAnimationFrame(sample)
+    const c = geo.PLACES.find((p) => p.id === 'cairo')
+    return geo.latLonToWorld(c.lat, c.lon)
+  })
+  // Stand on the marker: the enter hint arms, but the view stays bird's-eye.
+  await page.evaluate((w) => window.__game.setState({ pos: { x: w.x, z: w.z } }), cairoW)
+  await page.waitForFunction(() => window.__ui.getState().enterPlaceId === 'cairo', null, { timeout: 15000 })
+  await page.waitForTimeout(400)
+  check('standing on the marker does not auto-enter (Space required)', (await state()).mode === 'travel')
+  // Point 287: Cairo is a known-from-start port, so its enter hint names it —
+  // never a kind placeholder. The prompt is localized (German): "Space — Kairo betreten".
+  await page.waitForFunction(() => (window.__ui.getState().prompt ?? '').includes('Kairo'), null, { timeout: 5000 })
+  const cairoPrompt = await page.evaluate(() => window.__ui.getState().prompt ?? '')
+  check('discovered port enter hint names it (no placeholder)', cairoPrompt.includes('Kairo') && !cairoPrompt.includes('?'))
+  // Point 317: the enter hint sits a little BELOW the screen centre — close to
+  // the action, but clear of the centre so it never covers the traveller — and
+  // still clear of the status bar and the inventory bar. Measured on the RENDERED
+  // boxes, not on the CSS rule.
+  const hintBox = await page.evaluate(() => {
+    const r = (sel) => {
+      const el = document.querySelector(sel)
+      if (!el) return null
+      const b = el.getBoundingClientRect()
+      return { top: b.top, bottom: b.bottom, left: b.left, right: b.right }
     }
-    requestAnimationFrame(sample)
-  },
-  [village3D.x, village3D.z, village.id, village3D.collisionRadius],
-)
-await page.keyboard.down('KeyS')
-await page
-  .waitForFunction(
-    ([x, z, r]) => {
-      const p = window.__game.getState().pos
-      return Math.hypot(p.x - x, p.z - z) <= r + 0.35
-    },
-    [village3D.x, village3D.z, village3D.collisionRadius],
-    { timeout: 60000 },
+    return { hint: r('.prompt'), bar: r('.status-bar'), inv: r('.inventory-bar'), vh: window.innerHeight }
+  })
+  const overlaps = (a, b) =>
+    a !== null && b !== null && a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom
+  const hintFrac = hintBox.hint ? (hintBox.hint.top + hintBox.hint.bottom) / 2 / hintBox.vh : -1
+  check(
+    'enter hint sits just below the screen centre (55-65 % of the viewport height)',
+    hintFrac >= 0.55 && hintFrac <= 0.65,
+    `${(hintFrac * 100).toFixed(1)} %`,
   )
-  .catch(() => {})
-// Keep pushing against the footprint for another 90 RENDERED frames (the app's
-// own clock, never a wall-clock sleep): a collider that evaporated at its own
-// boundary would let the very next step walk straight in.
-const pushedFrom = await page.evaluate(() => window.__placeProbe.frames)
-await page.waitForFunction((n) => window.__placeProbe.frames >= n, pushedFrom + 90, { timeout: 60000 })
-await page.keyboard.up('KeyS')
-// Let the release settle over a few more frames before reading the rest position.
-const releasedAt = await page.evaluate(() => window.__placeProbe.frames)
-await page.waitForFunction((n) => window.__placeProbe.frames >= n, releasedAt + 5, { timeout: 30000 })
-const pressed = await page.evaluate(([x, z]) => {
-  const p = window.__game.getState().pos
-  const pr = window.__placeProbe
-  return { d: Math.hypot(p.x - x, p.z - z), min: pr.min, held: pr.held, heldUnarmed: pr.heldUnarmed }
-}, [village3D.x, village3D.z])
-console.log(
-  `      closest approach ${pressed.min.toFixed(2)}, resting at ${pressed.d.toFixed(2)} ` +
-    `(collider ${village3D.collisionRadius}, enter radius ${village3D.enterRadius}), ` +
-    `held on the footprint for ${pressed.held} frames`,
-)
-check(
-  "bird's-eye: the settlement footprint is never crossed (walking on does not pass through)",
-  pressed.min >= village3D.collisionRadius - 0.2 && pressed.d >= village3D.collisionRadius - 0.2,
-)
-check(
-  'the enter prompt stays armed wherever the collider holds him (entry stays reachable)',
-  pressed.held > 0 && pressed.heldUnarmed === 0,
-  `held for ${pressed.held} frames, prompt unarmed in ${pressed.heldUnarmed} of them`,
-)
-// The round footprint deflects a held key, so the push above may have carried
-// him around the village and on past it — correct movement, but it leaves the
-// prompt out of range. Re-approach the way the first approach did, so the Space
-// press below happens where the hint is actually armed.
-if (!(await page.evaluate((id) => window.__ui.getState().enterPlaceId === id, village.id))) {
-  const approach = await page.evaluate(
-    async ([lat, lon]) => (await import('/src/world/geo.ts')).latLonToWorld(lat, lon),
-    [village.lat + 0.5, village.lon],
+  check(
+    'enter hint clears the status bar and the inventory bar',
+    hintBox.hint !== null && !overlaps(hintBox.hint, hintBox.bar) && !overlaps(hintBox.hint, hintBox.inv),
+    JSON.stringify(hintBox),
   )
+  await shot('140-enter-hint-position', { element: '.prompt', label: 'the enter hint' })
+  // Re-anchor on the marker immediately before the press: the river current's idle
+  // drift (design.md §11) sweeps the traveller a little every frame, and Cairo sits
+  // on the Nile, so over the wait above it could drift off the marker or onto a
+  // water cell (the enter guard) and the Space press would find no candidate. The
+  // Space handler reads the live position, so re-set it right before the keypress.
+  await page.evaluate((w) => window.__game.setState({ pos: { x: w.x, z: w.z } }), cairoW)
+  // Press Space to enter — the movement-based approach, confirmed with the use key.
+  await page.keyboard.press('Space')
+  await page.waitForFunction(() => window.__game.getState().mode === 'place', null, { timeout: 15000 })
+  await page.waitForTimeout(400)
+  s = await state()
+  const hasCp = await page.evaluate(() => localStorage.getItem('hoa-checkpoints-v1') !== null)
+  check('Re-entered Cairo (Space use key)', s.mode === 'place' && s.placeId === 'cairo')
+  check('Checkpoint saved (localStorage)', hasCp)
+  check('Arrival journal entry', s.journal.some((e) =>
+    titleKey(e) === 'journal.titles.arrival' && e.title.params?.place === 'cairo'))
+  await page.evaluate(() => window.__game.getState().setJournalOpen(false))
+  await page.waitForTimeout(200)
+
+  // --- 5. Travel to village (criteria 4, 6) ---
+  await leaveByWalking()
+  // Jump slightly north of the North's knowing village (design.md §13.3), then
+  // walk south into it so the journey itself (movement, time) is exercised.
+  const village = await page.evaluate(async () => {
+    const geo = await import('/src/world/geo.ts')
+    const id = window.__game.getState().knowingVillages.north
+    const v = geo.PLACES.find((p) => p.id === id)
+    return { id, lat: v.lat, lon: v.lon }
+  })
+  // Points 287/318: the localized German name of this village, to prove the enter
+  // hint hides it behind the kind placeholder while the place is undiscovered.
+  const villageName = await page.evaluate(async (id) => (await import('/src/i18n/de.ts')).de.places[id], village.id)
+  // 0.5° ≈ 5 world units: outside the enter radius (2.5), so real walking
+  // (movement, time, provisions) is required to get in.
   await page.evaluate(([lat, lon]) => window.__game.getState().debugJumpTo(lat, lon), [village.lat + 0.5, village.lon])
-  // Poll the jump home instead of sleeping on it: the walk below only makes
-  // sense once the traveller actually stands north of the village again.
-  await page.waitForFunction(
-    ([x, z]) => {
-      const p = window.__game.getState().pos
-      return Math.hypot(p.x - x, p.z - z) <= 1
-    },
-    [approach.x, approach.z],
-    { timeout: 30000 },
-  )
+  await page.waitForTimeout(400)
+  const dayBefore = (await state()).day
+  // Walk south into the village until within its enter radius (the approach is the
+  // movement — time and provisions), then press Space to confirm entry (design.md
+  // §2.3): reaching the radius no longer switches views on its own.
   await page.keyboard.down('KeyS')
   await page
     .waitForFunction((id) => window.__ui.getState().enterPlaceId === id, village.id, { timeout: 60000 })
     .finally(() => page.keyboard.up('KeyS'))
-}
-await page.keyboard.press('Space')
-// The mode switch is synchronous on the press, but the FIRST entry into this
-// village then builds the whole first-person place (layout, panorama capture,
-// texture bake, shader compile) in one long main-thread block — measured ~19 s
-// on a loaded dev server — during which no rAF poll can fire. Budget what the
-// pre-use-key flow gave this same transition (60 s); 15 s starves in the stall.
-await page.waitForFunction(() => window.__game.getState().mode === 'place', null, { timeout: 60000 })
-await page.waitForTimeout(500)
-s = await state()
-check('Entered the village (Space at the enter radius)', s.mode === 'place' && s.placeId === village.id)
-// Point 11: entering a settlement puts the focus on the controls — no lingering
-// HUD button keeps focus, so keyboard works without an extra click (and the
-// canvas is not made a focus/click target, so it never blocks HUD clicks).
-check(
-  'entering leaves no HUD control focused (controls ready, no extra click)',
-  await page.evaluate(() => !['BUTTON', 'INPUT', 'SELECT'].includes(document.activeElement?.tagName ?? '')),
-  await page.evaluate(() => document.activeElement?.tagName ?? 'none'),
-)
-check('Time advances with the journey', s.day > dayBefore)
-check('Village journal entry', s.journal.some((e) =>
-  titleKey(e) === 'journal.titles.village' && e.title.params?.place === village.id))
-await page.evaluate(() => window.__game.getState().setJournalOpen(false))
-await page.waitForTimeout(200)
-await shot('03-village-nubians', { place: village.id, label: 'the village interior' })
-
-// --- 5b. Regression guard (design.md §16): the open, non-modal journal must
-// not block entering a hut with Space at its door. A fresh village-discovered
-// entry auto-opens the journal; Space must still enter (and close the book). ---
-await page.evaluate(() => window.__game.getState().setJournalOpen(true))
-const marketDoor = await page.evaluate(() => {
-  const it = window.__placeLayout.interactives.find((i) => i.type === 'market')
-  return it?.door ?? null
-})
-if (marketDoor) {
-  await moveTo(marketDoor[0], marketDoor[1])
-  // Arm the Space prompt at the door, then press it (design.md §2.3). Poll until
-  // the dialog opens (point 200); the assert below judges the final state.
-  await page.waitForFunction(() => !!document.querySelector('.prompt'), null, { timeout: 5000 }).catch(() => {})
-  await page.keyboard.press('Space')
-  await page
-    .waitForFunction(() => !!document.querySelector('.dialog') && !window.__game.getState().journalOpen, null, { timeout: 5000 })
-    .catch(() => {})
+  // Points 287/318: this village is not yet discovered, so its enter hint must
+  // read "Unbekanntes Dorf" (matching its §17.2 map label) — never the real name.
+  const villagePrompt = await page.evaluate(() => window.__ui.getState().prompt ?? '')
   check(
-    'Space at a hut door enters even with the journal open (design.md §16)',
-    await page.evaluate(() => !!document.querySelector('.dialog') && !window.__game.getState().journalOpen),
+    'undiscovered village enter hint hides its name (shows "Unbekanntes Dorf")',
+    villagePrompt.includes('Unbekanntes Dorf') && !villagePrompt.includes('?') && !villagePrompt.includes(villageName),
   )
-  await page.evaluate(() => window.__ui.getState().setDialog(null))
-  await moveTo(0, 0) // step back to the center, clear of the door prompt
+  // Point 299: the settlement COLLIDES in the bird's-eye view — walking on never
+  // carries the traveller ACROSS the village footprint. He is pressed against its
+  // edge (sliding along it, like the tree/animal collision) and stays outside,
+  // while the enter radius still holds him wherever the footprint stops him, so
+  // entry is reachable from every point the collider blocks. A per-frame sampler
+  // records the CLOSEST approach, so a crossing between two polls cannot go
+  // unnoticed, AND — for every frame the collider was HOLDING him — whether the
+  // enter prompt was armed there. Where he comes to REST is no such invariant: a
+  // ROUND footprint deflects a held key, so an off-centre approach slides around
+  // it and walks on past the village, which is correct movement and depends on
+  // the run seed (the approach angle, and which of the region's villages this run
+  // made the knowing one). Frames on a water cell are exempt — the §2.3 water
+  // guard disarms the prompt there by design.
+  const village3D = await page.evaluate(async ([lat, lon]) => {
+    const geo = await import('/src/world/geo.ts')
+    const entry = await import('/src/scenes/travel/settlementEntry.ts')
+    const { balance } = await import('/src/config/balance.ts')
+    return {
+      ...geo.latLonToWorld(lat, lon),
+      collisionRadius: entry.settlementCollisionRadius(balance.placeEnterRadius, balance.placeCollisionFactor),
+      enterRadius: balance.placeEnterRadius,
+    }
+  }, [village.lat, village.lon])
+  await page.evaluate(
+    async ([x, z, id, collisionRadius]) => {
+      const geo = await import('/src/world/geo.ts')
+      const terrain = await import('/src/world/terrain.ts')
+      window.__placeProbe = { min: Infinity, frames: 0, held: 0, heldUnarmed: 0 }
+      const sample = () => {
+        const g = window.__game.getState()
+        const p = g.pos
+        const pr = window.__placeProbe
+        const d = Math.hypot(p.x - x, p.z - z)
+        pr.min = Math.min(pr.min, d)
+        pr.frames++
+        // "Held by the collider": the resolver clamps a blocked step to exactly
+        // the collision radius, so a frame at that distance is one the footprint
+        // stopped. The margin only absorbs the clamp's float noise.
+        if (d <= collisionRadius + 0.05) {
+          const ll = geo.worldToLatLon(p.x, p.z)
+          if (terrain.sampleTerrain(ll.lat, ll.lon, g.seed).type !== 'water') {
+            pr.held++
+            if (window.__ui.getState().enterPlaceId !== id) pr.heldUnarmed++
+          }
+        }
+        requestAnimationFrame(sample)
+      }
+      requestAnimationFrame(sample)
+    },
+    [village3D.x, village3D.z, village.id, village3D.collisionRadius],
+  )
+  await page.keyboard.down('KeyS')
+  await page
+    .waitForFunction(
+      ([x, z, r]) => {
+        const p = window.__game.getState().pos
+        return Math.hypot(p.x - x, p.z - z) <= r + 0.35
+      },
+      [village3D.x, village3D.z, village3D.collisionRadius],
+      { timeout: 60000 },
+    )
+    .catch(() => {})
+  // Keep pushing against the footprint for another 90 RENDERED frames (the app's
+  // own clock, never a wall-clock sleep): a collider that evaporated at its own
+  // boundary would let the very next step walk straight in.
+  const pushedFrom = await page.evaluate(() => window.__placeProbe.frames)
+  await page.waitForFunction((n) => window.__placeProbe.frames >= n, pushedFrom + 90, { timeout: 60000 })
+  await page.keyboard.up('KeyS')
+  // Let the release settle over a few more frames before reading the rest position.
+  const releasedAt = await page.evaluate(() => window.__placeProbe.frames)
+  await page.waitForFunction((n) => window.__placeProbe.frames >= n, releasedAt + 5, { timeout: 30000 })
+  const pressed = await page.evaluate(([x, z]) => {
+    const p = window.__game.getState().pos
+    const pr = window.__placeProbe
+    return { d: Math.hypot(p.x - x, p.z - z), min: pr.min, held: pr.held, heldUnarmed: pr.heldUnarmed }
+  }, [village3D.x, village3D.z])
+  console.log(
+    `      closest approach ${pressed.min.toFixed(2)}, resting at ${pressed.d.toFixed(2)} ` +
+      `(collider ${village3D.collisionRadius}, enter radius ${village3D.enterRadius}), ` +
+      `held on the footprint for ${pressed.held} frames`,
+  )
+  check(
+    "bird's-eye: the settlement footprint is never crossed (walking on does not pass through)",
+    pressed.min >= village3D.collisionRadius - 0.2 && pressed.d >= village3D.collisionRadius - 0.2,
+  )
+  check(
+    'the enter prompt stays armed wherever the collider holds him (entry stays reachable)',
+    pressed.held > 0 && pressed.heldUnarmed === 0,
+    `held for ${pressed.held} frames, prompt unarmed in ${pressed.heldUnarmed} of them`,
+  )
+  // The round footprint deflects a held key, so the push above may have carried
+  // him around the village and on past it — correct movement, but it leaves the
+  // prompt out of range. Re-approach the way the first approach did, so the Space
+  // press below happens where the hint is actually armed.
+  if (!(await page.evaluate((id) => window.__ui.getState().enterPlaceId === id, village.id))) {
+    const approach = await page.evaluate(
+      async ([lat, lon]) => (await import('/src/world/geo.ts')).latLonToWorld(lat, lon),
+      [village.lat + 0.5, village.lon],
+    )
+    await page.evaluate(([lat, lon]) => window.__game.getState().debugJumpTo(lat, lon), [village.lat + 0.5, village.lon])
+    // Poll the jump home instead of sleeping on it: the walk below only makes
+    // sense once the traveller actually stands north of the village again.
+    await page.waitForFunction(
+      ([x, z]) => {
+        const p = window.__game.getState().pos
+        return Math.hypot(p.x - x, p.z - z) <= 1
+      },
+      [approach.x, approach.z],
+      { timeout: 30000 },
+    )
+    await page.keyboard.down('KeyS')
+    await page
+      .waitForFunction((id) => window.__ui.getState().enterPlaceId === id, village.id, { timeout: 60000 })
+      .finally(() => page.keyboard.up('KeyS'))
+  }
+  await page.keyboard.press('Space')
+  // The mode switch is synchronous on the press, but the FIRST entry into this
+  // village then builds the whole first-person place (layout, panorama capture,
+  // texture bake, shader compile) in one long main-thread block — measured ~19 s
+  // on a loaded dev server — during which no rAF poll can fire. Budget what the
+  // pre-use-key flow gave this same transition (60 s); 15 s starves in the stall.
+  await page.waitForFunction(() => window.__game.getState().mode === 'place', null, { timeout: 60000 })
+  await page.waitForTimeout(500)
+  s = await state()
+  check('Entered the village (Space at the enter radius)', s.mode === 'place' && s.placeId === village.id)
+  // Point 11: entering a settlement puts the focus on the controls — no lingering
+  // HUD button keeps focus, so keyboard works without an extra click (and the
+  // canvas is not made a focus/click target, so it never blocks HUD clicks).
+  check(
+    'entering leaves no HUD control focused (controls ready, no extra click)',
+    await page.evaluate(() => !['BUTTON', 'INPUT', 'SELECT'].includes(document.activeElement?.tagName ?? '')),
+    await page.evaluate(() => document.activeElement?.tagName ?? 'none'),
+  )
+  check('Time advances with the journey', s.day > dayBefore)
+  check('Village journal entry', s.journal.some((e) =>
+    titleKey(e) === 'journal.titles.village' && e.title.params?.place === village.id))
+  await page.evaluate(() => window.__game.getState().setJournalOpen(false))
+  await page.waitForTimeout(200)
+  await shot('03-village-nubians', { place: village.id, label: 'the village interior' })
+
+  // --- 5b. Regression guard (design.md §16): the open, non-modal journal must
+  // not block entering a hut with Space at its door. A fresh village-discovered
+  // entry auto-opens the journal; Space must still enter (and close the book). ---
+  await page.evaluate(() => window.__game.getState().setJournalOpen(true))
+  const marketDoor = await page.evaluate(() => {
+    const it = window.__placeLayout.interactives.find((i) => i.type === 'market')
+    return it?.door ?? null
+  })
+  if (marketDoor) {
+    await moveTo(marketDoor[0], marketDoor[1])
+    // Arm the Space prompt at the door, then press it (design.md §2.3). Poll until
+    // the dialog opens (point 200); the assert below judges the final state.
+    await page.waitForFunction(() => !!document.querySelector('.prompt'), null, { timeout: 5000 }).catch(() => {})
+    await page.keyboard.press('Space')
+    await page
+      .waitForFunction(() => !!document.querySelector('.dialog') && !window.__game.getState().journalOpen, null, { timeout: 5000 })
+      .catch(() => {})
+    check(
+      'Space at a hut door enters even with the journal open (design.md §16)',
+      await page.evaluate(() => !!document.querySelector('.dialog') && !window.__game.getState().journalOpen),
+    )
+    await page.evaluate(() => window.__ui.getState().setDialog(null))
+    await moveTo(0, 0) // step back to the center, clear of the door prompt
+    await page.waitForTimeout(300)
+  } else {
+    check('a hut door opens even with the journal open (design.md §16)', true, 'no market hut in this village — skipped')
+  }
+
+  // --- 6. Villager: the elder teaches the North's direction system (§13.2) ---
+  await enterBuilding('villager')
+  s = await state()
+  check('Language lesson (Nivera = north) in the journal', s.languagesLearned.north === true &&
+    s.journal.some((e) => titleKey(e) === 'journal.titles.language'))
+  await page.evaluate(() => window.__game.getState().setJournalOpen(false))
+  await page.waitForTimeout(200)
+
+  // --- 7. Chief audience: culturally correct gift → hint (criteria 6, 7) ---
+  await enterBuilding('chief')
   await page.waitForTimeout(300)
-} else {
-  check('a hut door opens even with the journal open (design.md §16)', true, 'no market hut in this village — skipped')
+  await shot('04-chief-hut-audience', { element: '.dialog', label: 'the audience with the chief' })
+  await page.locator('.dialog .row', { hasText: 'Goldschmuck' }).locator('button').click()
+  await page.waitForTimeout(400)
+  s = await state()
+  check('Culturally correct gift → hint unlocked', s.hintsGiven.north === true)
+  const hint = s.journal.find((e) => titleKey(e) === 'journal.titles.chiefHint')
+  check('Hint stores grave coordinates (language-neutral)',
+    !!hint && typeof hint.text === 'object' && typeof hint.text.params?.lat === 'number')
+  check('Learned language deciphers the hint (latitude)', s.decodedGiven.north === true &&
+    s.journal.some((e) => titleKey(e) === 'journal.titles.decoded'))
+  // Do-not-disturb is on for this run (line ~110, so the long walks are not
+  // interrupted), and DND is exactly the setting that stops a new entry from
+  // opening the book. The player's own way to read it is to open it — so open it,
+  // rather than photograph a panel this suite has arranged not to appear.
+  await page.evaluate(() => window.__game.getState().setJournalOpen(true))
+  await page.waitForFunction(() => !!document.querySelector('.journal'), null, { timeout: 5000 })
+  await shot('05-journal-hint', { element: '.journal', label: 'the journal holding the hint' })
+  await closeDialog()
+  await page.evaluate(() => window.__game.getState().setJournalOpen(false))
+  await page.waitForTimeout(200)
+
+  // --- 8. Triangulation: the East's knowing people contributes the longitude ---
+  await leaveByWalking()
+  await page.evaluate(() => {
+    const g = window.__game.getState()
+    g.enterPlace(g.knowingVillages.east)
+  })
+  await page.waitForTimeout(1200)
+  await page.evaluate(() => {
+    const g = () => window.__game.getState()
+    g().setJournalOpen(false)
+    g().debugAddGift('emerald') // the East reveres emeralds (design.md §8)
+    g().giveGift('emerald')
+    g().talkToVillager()
+  })
+  await page.waitForTimeout(400)
+  s = await state()
+  check('Second hint: longitude from the East, deciphered (triangulation)',
+    s.hintsGiven.east === true && s.decodedGiven.east === true)
+  await page.evaluate(() => window.__game.getState().leavePlace())
+  await page.waitForTimeout(800)
+
+  // --- 9. Grave: dig with shovel → victory (criterion 10) ---
+  s = await state()
+  const grave = s.graveLatLon
+  check('Grave lies north of the village (Nivera matches)', grave.lat > 21.8)
+  await page.evaluate(([lat, lon]) => window.__game.getState().debugJumpTo(lat, lon), [grave.lat, grave.lon])
+  await page.waitForTimeout(400)
+  // Dig with no shovel in the pack → must fail politely (effects are possession-
+  // based now, design.md §11/§17).
+  await page.evaluate(() => {
+    const g = window.__game.getState()
+    window.__game.setState({ equipment: { ...g.equipment, shovel: 0 } })
+  })
+  await page.keyboard.press('KeyG')
+  await page.waitForTimeout(200)
+  s = await state()
+  check('Digging without a shovel in the pack fails', !s.victory)
+  // Acquire a shovel, then dig by clicking it in the inventory bar (design.md §17).
+  await page.evaluate(() => window.__game.getState().debugAddEquipment('shovel'))
+  await page.waitForTimeout(150)
+  await page.locator('.inventory-bar button', { hasText: 'Schaufel' }).click()
+  await page.waitForTimeout(400)
+  s = await state()
+  check('Victory state after digging at the site (shovel clicked)', s.victory === true)
+  await shot('07-victory', { element: '.overlay', label: 'the victory overlay' })
 }
-
-// --- 6. Villager: the elder teaches the North's direction system (§13.2) ---
-await enterBuilding('villager')
-s = await state()
-check('Language lesson (Nivera = north) in the journal', s.languagesLearned.north === true &&
-  s.journal.some((e) => titleKey(e) === 'journal.titles.language'))
-await page.evaluate(() => window.__game.getState().setJournalOpen(false))
-await page.waitForTimeout(200)
-
-// --- 7. Chief audience: culturally correct gift → hint (criteria 6, 7) ---
-await enterBuilding('chief')
-await page.waitForTimeout(300)
-await shot('04-chief-hut-audience', { element: '.dialog', label: 'the audience with the chief' })
-await page.locator('.dialog .row', { hasText: 'Goldschmuck' }).locator('button').click()
-await page.waitForTimeout(400)
-s = await state()
-check('Culturally correct gift → hint unlocked', s.hintsGiven.north === true)
-const hint = s.journal.find((e) => titleKey(e) === 'journal.titles.chiefHint')
-check('Hint stores grave coordinates (language-neutral)',
-  !!hint && typeof hint.text === 'object' && typeof hint.text.params?.lat === 'number')
-check('Learned language deciphers the hint (latitude)', s.decodedGiven.north === true &&
-  s.journal.some((e) => titleKey(e) === 'journal.titles.decoded'))
-// Do-not-disturb is on for this run (line ~110, so the long walks are not
-// interrupted), and DND is exactly the setting that stops a new entry from
-// opening the book. The player's own way to read it is to open it — so open it,
-// rather than photograph a panel this suite has arranged not to appear.
-await page.evaluate(() => window.__game.getState().setJournalOpen(true))
-await page.waitForFunction(() => !!document.querySelector('.journal'), null, { timeout: 5000 })
-await shot('05-journal-hint', { element: '.journal', label: 'the journal holding the hint' })
-await closeDialog()
-await page.evaluate(() => window.__game.getState().setJournalOpen(false))
-await page.waitForTimeout(200)
-
-// --- 8. Triangulation: the East's knowing people contributes the longitude ---
-await leaveByWalking()
-await page.evaluate(() => {
-  const g = window.__game.getState()
-  g.enterPlace(g.knowingVillages.east)
-})
-await page.waitForTimeout(1200)
-await page.evaluate(() => {
-  const g = () => window.__game.getState()
-  g().setJournalOpen(false)
-  g().debugAddGift('emerald') // the East reveres emeralds (design.md §8)
-  g().giveGift('emerald')
-  g().talkToVillager()
-})
-await page.waitForTimeout(400)
-s = await state()
-check('Second hint: longitude from the East, deciphered (triangulation)',
-  s.hintsGiven.east === true && s.decodedGiven.east === true)
-await page.evaluate(() => window.__game.getState().leavePlace())
-await page.waitForTimeout(800)
-
-// --- 9. Grave: dig with shovel → victory (criterion 10) ---
-s = await state()
-const grave = s.graveLatLon
-check('Grave lies north of the village (Nivera matches)', grave.lat > 21.8)
-await page.evaluate(([lat, lon]) => window.__game.getState().debugJumpTo(lat, lon), [grave.lat, grave.lon])
-await page.waitForTimeout(400)
-// Dig with no shovel in the pack → must fail politely (effects are possession-
-// based now, design.md §11/§17).
-await page.evaluate(() => {
-  const g = window.__game.getState()
-  window.__game.setState({ equipment: { ...g.equipment, shovel: 0 } })
-})
-await page.keyboard.press('KeyG')
-await page.waitForTimeout(200)
-s = await state()
-check('Digging without a shovel in the pack fails', !s.victory)
-// Acquire a shovel, then dig by clicking it in the inventory bar (design.md §17).
-await page.evaluate(() => window.__game.getState().debugAddEquipment('shovel'))
-await page.waitForTimeout(150)
-await page.locator('.inventory-bar button', { hasText: 'Schaufel' }).click()
-await page.waitForTimeout(400)
-s = await state()
-check('Victory state after digging at the site (shovel clicked)', s.victory === true)
-await shot('07-victory', { element: '.overlay', label: 'the victory overlay' })
 
 // --- Point 59: mouse-look is not grabbed while the start-choice overlay is up -
 // (design.md §17.5) A checkpoint at startup shows the StartOverlay; the pointer
 // must not be grabbed then, or the load choice is unclickable. Spy on
 // requestPointerLock across two loads: fresh (no overlay) grabs, with a
 // checkpoint (overlay up) does not.
-const page2 = await browser.newPage({ viewport: { width: 1280, height: 800 } })
-// The first page stays open, so this one opens as a BACKGROUND tab — and Chromium
-// throttles a background tab's requestAnimationFrame, which is the frame clock the
-// settlement scene mounts on. On the GPU lane it got there before the throttle mattered;
-// on the software WebGPU lane the scene never mounted at all and the run died waiting for
-// __placePlayer, three minutes in, on the first attempt of every run. One line of focus.
-await page2.bringToFront()
-page2.on('console', (m) => m.type() === 'error' && errors.push('page2: ' + m.text()))
-page2.on('pageerror', (e) => errors.push('page2 PAGEERROR: ' + e.message))
-await page2.addInitScript(() => {
-  window.__plCalls = 0
-  const orig = HTMLCanvasElement.prototype.requestPointerLock
-  HTMLCanvasElement.prototype.requestPointerLock = function (...a) {
-    window.__plCalls++
-    try {
-      return orig.apply(this, a)
-    } catch {
-      return undefined
+//
+// Both halves below run on THIS second window and nothing else does, so they are
+// one section: the monument entry reads the very page the pointer-lock half
+// booted, and a whole run opens that window exactly once, as it always did.
+if (section('fresh-start-window')) {
+  const page2 = await browser.newPage({ viewport: { width: 1280, height: 800 } })
+  // The first page stays open, so this one opens as a BACKGROUND tab — and Chromium
+  // throttles a background tab's requestAnimationFrame, which is the frame clock the
+  // settlement scene mounts on. On the GPU lane it got there before the throttle mattered;
+  // on the software WebGPU lane the scene never mounted at all and the run died waiting for
+  // __placePlayer, three minutes in, on the first attempt of every run. One line of focus.
+  await page2.bringToFront()
+  page2.on('console', (m) => m.type() === 'error' && errors.push('page2: ' + m.text()))
+  page2.on('pageerror', (e) => errors.push('page2 PAGEERROR: ' + e.message))
+  await page2.addInitScript(() => {
+    window.__plCalls = 0
+    const orig = HTMLCanvasElement.prototype.requestPointerLock
+    HTMLCanvasElement.prototype.requestPointerLock = function (...a) {
+      window.__plCalls++
+      try {
+        return orig.apply(this, a)
+      } catch {
+        return undefined
+      }
     }
-  }
-})
-await page2.goto(BASE)
-await page2.evaluate(() => localStorage.clear())
-await page2.reload()
-await page2.waitForFunction(() => window.__game && window.__ui, null, { timeout: 60000 })
-// The mouse-look check reads the PLACE player's yaw, so wait for that player rather
-// than for a wall-clock 700 ms: the settlement scene mounts in a fraction of a second
-// on the GPU lane and takes several on a software one, and the fixed wait read a yaw
-// of `null` there and failed a check about mouse-look for a reason that was not it.
-// 180 s, not 60: measured, the settlement mounts in 5 s on a quiet software-WebGPU lane
-// and blew past 60 s under load, so the generous budget is what stops a flake — it costs
-// nothing on the run that resolves in five seconds.
-await page2.waitForFunction(() => window.__placePlayer, null, { timeout: 180000 })
-// Under browser automation the game deliberately SKIPS the real pointer lock
-// (it would grab the OS cursor under system-Chrome --headless=new) and instead
-// applies mouse-look from raw movement — so assert the behaviour (the view turns
-// on a mouse move at a fresh, overlay-free start) rather than the grab call.
-const yawBefore = await page2.evaluate(() => window.__placePlayer?.yaw ?? null)
-await page2.mouse.move(640, 400)
-await page2.mouse.move(760, 400)
-await page2.waitForFunction((was) => (window.__placePlayer?.yaw ?? was) !== was, yawBefore, { timeout: 15000 })
-  .catch(() => {})
-const fresh = await page2.evaluate(() => ({ overlay: !!document.querySelector('.overlay'), yaw: window.__placePlayer?.yaw ?? null }))
-check(
-  'a fresh start (no overlay) engages mouse-look (the view turns on a mouse move)',
-  !fresh.overlay && fresh.yaw !== null && fresh.yaw !== yawBefore,
-)
-// Save-load is DISABLED for the PoC (user decision 24.07.2026): even with a
-// checkpoint seeded (entering a port saves one), NO start-choice overlay appears
-// on reload — the game begins directly, so there is no blocking popup to grab
-// against. Assert the overlay stays absent and the game is live.
-await page2.evaluate(() => window.__game.getState().enterPlace('cairo'))
-await page2.waitForTimeout(200)
-await page2.reload()
-await page2.waitForFunction(() => window.__game && window.__ui, null, { timeout: 60000 })
-await page2.waitForTimeout(700)
-const withCp = await page2.evaluate(() => ({
-  overlay: !!document.querySelector('.overlay'),
-  mode: window.__game?.getState().mode ?? null,
-}))
-check(
-  'with a checkpoint present, no start overlay appears (save-load disabled for the PoC) and the game runs',
-  !withCp.overlay && withCp.mode !== null,
-)
+  })
+  await page2.goto(BASE)
+  await page2.evaluate(() => localStorage.clear())
+  await page2.reload()
+  await page2.waitForFunction(() => window.__game && window.__ui, null, { timeout: 60000 })
+  // The mouse-look check reads the PLACE player's yaw, so wait for that player rather
+  // than for a wall-clock 700 ms: the settlement scene mounts in a fraction of a second
+  // on the GPU lane and takes several on a software one, and the fixed wait read a yaw
+  // of `null` there and failed a check about mouse-look for a reason that was not it.
+  // 180 s, not 60: measured, the settlement mounts in 5 s on a quiet software-WebGPU lane
+  // and blew past 60 s under load, so the generous budget is what stops a flake — it costs
+  // nothing on the run that resolves in five seconds.
+  await page2.waitForFunction(() => window.__placePlayer, null, { timeout: 180000 })
+  // Under browser automation the game deliberately SKIPS the real pointer lock
+  // (it would grab the OS cursor under system-Chrome --headless=new) and instead
+  // applies mouse-look from raw movement — so assert the behaviour (the view turns
+  // on a mouse move at a fresh, overlay-free start) rather than the grab call.
+  const yawBefore = await page2.evaluate(() => window.__placePlayer?.yaw ?? null)
+  await page2.mouse.move(640, 400)
+  await page2.mouse.move(760, 400)
+  await page2.waitForFunction((was) => (window.__placePlayer?.yaw ?? was) !== was, yawBefore, { timeout: 15000 })
+    .catch(() => {})
+  const fresh = await page2.evaluate(() => ({ overlay: !!document.querySelector('.overlay'), yaw: window.__placePlayer?.yaw ?? null }))
+  check(
+    'a fresh start (no overlay) engages mouse-look (the view turns on a mouse move)',
+    !fresh.overlay && fresh.yaw !== null && fresh.yaw !== yawBefore,
+  )
+  // Save-load is DISABLED for the PoC (user decision 24.07.2026): even with a
+  // checkpoint seeded (entering a port saves one), NO start-choice overlay appears
+  // on reload — the game begins directly, so there is no blocking popup to grab
+  // against. Assert the overlay stays absent and the game is live.
+  await page2.evaluate(() => window.__game.getState().enterPlace('cairo'))
+  await page2.waitForTimeout(200)
+  await page2.reload()
+  await page2.waitForFunction(() => window.__game && window.__ui, null, { timeout: 60000 })
+  await page2.waitForTimeout(700)
+  const withCp = await page2.evaluate(() => ({
+    overlay: !!document.querySelector('.overlay'),
+    mode: window.__game?.getState().mode ?? null,
+  }))
+  check(
+    'with a checkpoint present, no start overlay appears (save-load disabled for the PoC) and the game runs',
+    !withCp.overlay && withCp.mode !== null,
+  )
 
-// --- Every walkable place is journaled on its first entry (design.md §16, point 394) ---
-// The unit layer sweeps the TEXTS (src/i18n/arrival.test.ts) and the store rule
-// (src/state/store.arrival.test.ts). What only the live game can show is that
-// walking into the monument site really produces an entry the journal RENDERS —
-// Giza was the reported case, and a monument is the kind that had no text at all.
-await page2.evaluate(() => {
-  window.__game.getState().enterPlace('giza')
-  window.__game.getState().setJournalOpen(true)
-})
-const gizaKey = 'journal.monumentFirstVisit'
-await page2
-  .waitForFunction((k) => window.__game.getState().journal.at(-1)?.text?.key === k, gizaKey, { timeout: 15000 })
-  .catch(() => {})
-// The entry is revealed stroke by stroke (pt. 29), so wait for the writing to end
-// before reading the rendered text — a mid-animation read is a short string, not
-// a missing entry. Condition-based; a real failure exhausts the window.
-await page2
-  .waitForFunction(() => document.querySelectorAll('.journal .entry.writing').length === 0, null, { timeout: 25000 })
-  .catch(() => {})
-const giza = await page2.evaluate(() => {
-  const last = [...document.querySelectorAll('.journal .entry')].at(-1)
-  return {
-    storedKey: window.__game.getState().journal.at(-1)?.text?.key ?? '',
-    title: last?.querySelector('h4')?.textContent ?? '',
-    text: last?.querySelector('p')?.textContent ?? '',
-  }
-})
-check(
-  'entering the Giza monument site writes its own arrival entry the journal shows',
-  giza.storedKey === gizaKey &&
-    giza.text.length > 80 &&
-    !giza.text.includes('[') && // the voice markup is stripped before display (§15.2)
-    !giza.text.includes('journal.'), // a raw key would mean the text is missing
-  `"${giza.title}" — ${giza.text.length} chars`,
-)
-await page2.close()
+  // --- Every walkable place is journaled on its first entry (design.md §16, point 394) ---
+  // The unit layer sweeps the TEXTS (src/i18n/arrival.test.ts) and the store rule
+  // (src/state/store.arrival.test.ts). What only the live game can show is that
+  // walking into the monument site really produces an entry the journal RENDERS —
+  // Giza was the reported case, and a monument is the kind that had no text at all.
+  await page2.evaluate(() => {
+    window.__game.getState().enterPlace('giza')
+    window.__game.getState().setJournalOpen(true)
+  })
+  const gizaKey = 'journal.monumentFirstVisit'
+  await page2
+    .waitForFunction((k) => window.__game.getState().journal.at(-1)?.text?.key === k, gizaKey, { timeout: 15000 })
+    .catch(() => {})
+  // The entry is revealed stroke by stroke (pt. 29), so wait for the writing to end
+  // before reading the rendered text — a mid-animation read is a short string, not
+  // a missing entry. Condition-based; a real failure exhausts the window.
+  await page2
+    .waitForFunction(() => document.querySelectorAll('.journal .entry.writing').length === 0, null, { timeout: 25000 })
+    .catch(() => {})
+  const giza = await page2.evaluate(() => {
+    const last = [...document.querySelectorAll('.journal .entry')].at(-1)
+    return {
+      storedKey: window.__game.getState().journal.at(-1)?.text?.key ?? '',
+      title: last?.querySelector('h4')?.textContent ?? '',
+      text: last?.querySelector('p')?.textContent ?? '',
+    }
+  })
+  check(
+    'entering the Giza monument site writes its own arrival entry the journal shows',
+    giza.storedKey === gizaKey &&
+      giza.text.length > 80 &&
+      !giza.text.includes('[') && // the voice markup is stripped before display (§15.2)
+      !giza.text.includes('journal.'), // a raw key would mean the text is missing
+    `"${giza.title}" — ${giza.text.length} chars`,
+  )
+  await page2.close()
+}
+
+// A selected section that never executed is a FAILURE, not a quiet pass: it is
+// the one way a --section run could report green having verified nothing.
+const unrun = sections.unrun()
+if (unrun) check('the selected section actually ran — ' + unrun, false)
 
 console.log('---')
 console.log('CONSOLE ERRORS:', errors.length === 0 ? 'none' : errors.length)
 for (const e of errors.slice(0, 10)) console.log('  -', e)
 console.log(failCount === 0 && errors.length === 0 ? 'ALL CHECKS PASSED' : `FAILURES: ${failCount}`)
+// Said again where the verdict is read: a green one-section run is not a green
+// suite, and nothing downstream may quote it as one.
+if (sections.banner()) console.log(sections.banner())
 await browser.close()
 process.exit(failCount === 0 && errors.length === 0 ? 0 : 1)
