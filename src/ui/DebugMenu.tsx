@@ -203,6 +203,25 @@ const ADULT_ERRAND_FIELDS: ReadonlyArray<{
   { key: 'villagerCount', label: 'adultErrandCount', step: 1, min: 0, max: 12 },
 ]
 
+/**
+ * The body every inhabitant presents to every other (work-order point 578), and
+ * the damping that keeps a separated pair from trembling. Same table shape as
+ * the three above: the completeness is visible at a glance.
+ */
+const SEPARATION_FIELDS: ReadonlyArray<{
+  key: keyof typeof balance.villageLife.separation
+  label: DebugLabelKey
+  step: number
+  min: number
+  max?: number
+}> = [
+  { key: 'bodyRadius', label: 'separationRadius', step: 0.02, min: 0 },
+  { key: 'slop', label: 'separationSlop', step: 0.01, min: 0 },
+  { key: 'stiffness', label: 'separationStiffness', step: 0.05, min: 0.05, max: 1 },
+  { key: 'maxSpeed', label: 'separationSpeed', step: 0.1, min: 0.1 },
+  { key: 'wedgeSeconds', label: 'separationWedge', step: 0.5, min: 0.1 },
+]
+
 function NumberField({
   label,
   value,
@@ -551,6 +570,9 @@ export function DebugMenu() {
       // What the ADULTS do at their errands (point 483).
       ...tableRows(ADULT_ERRAND_FIELDS, (f) => balance.villageLife.adultErrands[f.key],
         (f, v) => { balance.villageLife.adultErrands[f.key] = v }),
+      // The body every inhabitant presents to every other (point 578).
+      ...tableRows(SEPARATION_FIELDS, (f) => balance.villageLife.separation[f.key],
+        (f, v) => { balance.villageLife.separation[f.key] = v }),
     ],
     weather: [
       custom(t.debug.season, (

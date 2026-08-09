@@ -527,6 +527,11 @@ export interface Strings {
     adultErrandLife: string
     adultErrandPace: string
     adultErrandCount: string
+    separationRadius: string
+    separationSlop: string
+    separationStiffness: string
+    separationSpeed: string
+    separationWedge: string
     foodPerDay: string
     canteenDrain: string
     canteenDesertDrain: string

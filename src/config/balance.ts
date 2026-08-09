@@ -687,6 +687,20 @@ export interface BalanceConfig {
        *  effect on the next visit rather than mid-scene. */
       villagerCount: number
     }
+    /** The body every inhabitant presents to every other (work-order 578). */
+    separation: {
+      /** Body radius of a figure drawn at scale 1; a child's is this times its
+       *  own scale. Smaller than the mover footprint, like the animals'. */
+      bodyRadius: number
+      /** Overlap tolerated before anything is corrected (the anti-jitter band). */
+      slop: number
+      /** Fraction of the remaining overlap taken out per frame (0..1). */
+      stiffness: number
+      /** Cap on the push speed (m/s). */
+      maxSpeed: number
+      /** Seconds wedged before the escape nudge is asked for. */
+      wedgeSeconds: number
+    }
   }
   /** Village speech and drums (design.md §13.4, docs/communication-poc-spec.md). */
   communication: {
@@ -1111,6 +1125,26 @@ export const balance: BalanceConfig = {
       errandSeconds: 180,
       pace: 1.25, // an unhurried working walk
       villagerCount: 4,
+    },
+    // The body every inhabitant presents to every other (work-order 578).
+    // Calibratable starting values (educated guess, CLAUDE.md §2), stated
+    // against the values they have to live with:
+    //  - 0.24 is 0.8 of the mover footprint (WALKER_RADIUS 0.3), so two adults
+    //    stand 0.48 m apart — clear of one another at the torso without the
+    //    village shouldering itself all day (the animals' 0.18 for the same
+    //    reason). A child is drawn at 0.55, so its pair separates at 0.264 m.
+    //  - THE CATCH WINS (point 578.4): the children's catch distance is 0.8 m,
+    //    three times the separation two children settle at, so a chaser is
+    //    always well inside its tag before the bodies ever touch.
+    //  - the slop and the stiffness are the anti-jitter half: nothing is
+    //    corrected inside a centimetre, and a correction never takes more than
+    //    half of what is left, so it settles instead of ringing.
+    separation: {
+      bodyRadius: 0.24,
+      slop: 0.01,
+      stiffness: 0.5,
+      maxSpeed: 1.2,
+      wedgeSeconds: 1.5,
     },
   },
   communication: {
