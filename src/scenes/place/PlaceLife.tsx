@@ -94,6 +94,15 @@ import {
   type InhabitantBody,
   type InhabitantSet,
 } from './inhabitantBodies'
+import {
+  drumHandPose,
+  drumHeadY,
+  drumStroke,
+  DRUMMER_LEAN,
+  HIGH_DRUM,
+  LOW_DRUM,
+  type DrumGeometry,
+} from './drummerPose'
 import { childPlayGround, PORT_TALKERS, VILLAGE_SPOTS, villageAdultStations } from './lifeSpots'
 
 /** Collision radius of inhabitants (matches the player's). */
@@ -1169,18 +1178,41 @@ function Pounder({ x, z, cloth }: { x: number; z: number; cloth: string }) {
   )
 }
 
-/** How deep a struck drum head sinks under the hand, in metres. */
-const DRUM_HEAD_DIP = 0.05
+/** One of the drummer's drums, drawn from its own geometry so the stroke the
+ *  hand beats and the drum the picture shows can never describe different
+ *  drums (work-order point 576). */
+function Drum({ drum, headRef }: { drum: DrumGeometry; headRef: RefObject<THREE.Mesh | null> }) {
+  return (
+    <group position={[drum.x, 0, drum.z]}>
+      <mesh position={[0, drum.shellHeight / 2, 0]} castShadow>
+        <cylinderGeometry args={[drum.shellRadius[0], drum.shellRadius[1], drum.shellHeight, 9]} />
+        <meshStandardMaterial color="#8a5a30" roughness={0.9} />
+      </mesh>
+      <mesh ref={headRef} position={[0, drum.headY, 0]} castShadow>
+        <cylinderGeometry args={[drum.headRadius, drum.headRadius, drum.headThickness, 9]} />
+        <meshStandardMaterial color="#cbb391" roughness={0.85} />
+      </mesh>
+    </group>
+  )
+}
+
+/** The stroke each drum is beaten with, solved once from its own dimensions
+ *  (`drummerPose.ts`): which hand, aimed where, between which elevations. */
+const LOW_STROKE = drumStroke(LOW_DRUM)
+const HIGH_STROKE = drumStroke(HIGH_DRUM)
 
 /**
  * Drummer at his pair of drums — the audible village drums made visible, and
  * the voice the chief's message goes out on (design.md §13.4, point 486).
  *
- * The LARGE low drum speaks `ba` and stands to his left, the SMALL high one
- * speaks `BA` and stands to his right; the hand over the drum being played is
- * the one that falls, and that drum's head dips under it, so the strike is
- * unmistakably ON the drum that sounds. While no message is going out he keeps
- * the village's own idle beat on the large drum.
+ * The LARGE low drum speaks `ba` and stands to his RIGHT, the SMALL high one
+ * speaks `BA` and stands to his LEFT — and neither side is stated twice: each
+ * drum's stroke reads its hand off the drum's OWN placement (`drummerPose.ts`),
+ * so the hand that falls is always the one standing over the drum that sounds,
+ * and that drum's head dips under it. While no message is going out the two
+ * hands keep the village's own idle beat half a beat apart, the large drum on
+ * the strong beat and the small one on the lighter off-beat, as the ambient drum
+ * bar sounds them.
  *
  * Both the falling hand and the sounding beat come from the ONE plan
  * (src/communication/drumMessage.ts) the ambience engine plays, so the picture
@@ -1189,7 +1221,7 @@ const DRUM_HEAD_DIP = 0.05
 function Drummer({ x, z, cloth }: { x: number; z: number; cloth: string }) {
   // A body the passers-by go round (point 578).
   useStandingBody(x, z)
-  const pose = useRef<FigurePose | null>({ left: { ...REST_POSE.left }, right: { ...REST_POSE.right }, lean: 0.12, turn: 0 })
+  const pose = useRef<FigurePose | null>({ left: { ...REST_POSE.left }, right: { ...REST_POSE.right }, lean: DRUMMER_LEAN, turn: 0 })
   const lowHead = useRef<THREE.Mesh>(null)
   const highHead = useRef<THREE.Mesh>(null)
   // The plan of the message currently going out, kept with the start it was
@@ -1199,10 +1231,9 @@ function Drummer({ x, z, cloth }: { x: number; z: number; cloth: string }) {
     const p = pose.current
     if (!p) return
     const beating = useUi.getState().drumPerformance
-    let lowLift = 0.42
-    let highLift = 0.42
-    let lowDip = 0
-    let highDip = 0
+    // Each hand's swing on its OWN drum: 0 is on the head, 1 the top of the lift.
+    let lowSwing = 1
+    let highSwing = 1
     if (beating) {
       if (sending.current?.startedAt !== beating.startedAt) {
         sending.current = { startedAt: beating.startedAt, plan: drumMessagePlan() }
@@ -1212,53 +1243,31 @@ function Drummer({ x, z, cloth }: { x: number; z: number; cloth: string }) {
       const strike = drumStrikeAt(sending.current.plan, elapsed)
       // The hand falls at the beat and rises again through the strike's ring;
       // between two beats both hands wait raised over their own drum.
-      const swing = strike ? drumStrikeProgress(strike, elapsed) * 0.42 : 0.42
-      if (strike?.drum === 'low') {
-        lowLift = swing
-        lowDip = 1 - swing / 0.42
-      } else if (strike?.drum === 'high') {
-        highLift = swing
-        highDip = 1 - swing / 0.42
-      }
+      const swing = strike ? drumStrikeProgress(strike, elapsed) : 1
+      if (strike?.drum === 'low') lowSwing = swing
+      else if (strike?.drum === 'high') highSwing = swing
     } else {
       sending.current = null
-      // The idle village beat (design.md §19): the two hands half a beat apart
-      // on the large drum, as the ambient drum bar sounds it.
+      // The idle village beat (design.md §19): the two hands half a beat apart,
+      // each on its OWN drum and each dipping the head it strikes — the large
+      // drum on the strong beat, the small one on the lighter off-beat, as the
+      // ambient drum bar sounds them.
       const t = clock.elapsedTime * 4.2
-      lowLift = Math.max(0, Math.sin(t)) * 0.42
-      highLift = Math.max(0, Math.sin(t + Math.PI)) * 0.42
-      lowDip = 1 - lowLift / 0.42
+      lowSwing = Math.abs(Math.sin(t))
+      highSwing = Math.abs(Math.cos(t))
     }
-    Object.assign(p.left, armAim(0.26, -0.2 + lowLift))
-    Object.assign(p.right, armAim(-0.26, -0.2 + highLift))
-    if (lowHead.current) lowHead.current.position.y = 0.66 - lowDip * DRUM_HEAD_DIP
-    if (highHead.current) highHead.current.position.y = 0.5 - highDip * DRUM_HEAD_DIP
+    Object.assign(p[LOW_STROKE.side], drumHandPose(LOW_STROKE, lowSwing))
+    Object.assign(p[HIGH_STROKE.side], drumHandPose(HIGH_STROKE, highSwing))
+    if (lowHead.current) lowHead.current.position.y = drumHeadY(LOW_DRUM, lowSwing)
+    if (highHead.current) highHead.current.position.y = drumHeadY(HIGH_DRUM, highSwing)
   })
   return (
     <group position={[x, 0, z]} rotation={[0, Math.atan2(-x + 3.5, -z + 2.5), 0]}>
       <Figure cloth={cloth} pose={pose} />
-      {/* The large low drum (`ba`), to the drummer's left. */}
-      <group position={[-0.34, 0, 0.5]}>
-        <mesh position={[0, 0.33, 0]} castShadow>
-          <cylinderGeometry args={[0.27, 0.21, 0.66, 9]} />
-          <meshStandardMaterial color="#8a5a30" roughness={0.9} />
-        </mesh>
-        <mesh ref={lowHead} position={[0, 0.66, 0]} castShadow>
-          <cylinderGeometry args={[0.28, 0.28, 0.04, 9]} />
-          <meshStandardMaterial color="#cbb391" roughness={0.85} />
-        </mesh>
-      </group>
-      {/* The small high drum (`BA`), to his right — the same drum, smaller. */}
-      <group position={[0.3, 0, 0.46]}>
-        <mesh position={[0, 0.25, 0]} castShadow>
-          <cylinderGeometry args={[0.17, 0.13, 0.5, 9]} />
-          <meshStandardMaterial color="#8a5a30" roughness={0.9} />
-        </mesh>
-        <mesh ref={highHead} position={[0, 0.5, 0]} castShadow>
-          <cylinderGeometry args={[0.18, 0.18, 0.035, 9]} />
-          <meshStandardMaterial color="#cbb391" roughness={0.85} />
-        </mesh>
-      </group>
+      {/* The large low drum (`ba`) and the small high one (`BA`) — each on the
+          side its own x puts it, which is the side its hand is read from. */}
+      <Drum drum={LOW_DRUM} headRef={lowHead} />
+      <Drum drum={HIGH_DRUM} headRef={highHead} />
     </group>
   )
 }
