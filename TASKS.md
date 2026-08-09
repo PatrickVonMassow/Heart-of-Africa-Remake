@@ -256,10 +256,12 @@ there exactly once; a new point joins a bundle when appended.
   pose lies about what the body is doing" in the same component, and pairing them saves a
   verification round.
 
-- [ ] 578. THE CHILDREN PILE UP INSIDE ONE ANOTHER (user 09.08.2026, F6 report
-  `local/bugreports/keineBaBAs.zip`: "die Kinder hängen immer wieder ineinander fest";
-  the frame shows one body with a fan of limbs radiating out of it — several child
-  figures on the same spot). The fix for exactly this defect already exists ONE class
+- [ ] 578. THE INHABITANTS PILE UP INSIDE ONE ANOTHER (user 09.08.2026, TWO F6 reports
+  — `local/bugreports/keineBaBAs.zip`: "die Kinder hängen immer wieder ineinander fest",
+  its frame showing one body with a fan of limbs radiating out of it; and
+  `local/bugreports/DorfbewohnerIneinander.zip`: "Die Beiden hängen ineinander", the same
+  defect between two ADULTS. It is therefore not the tag game but the inhabitant set as a
+  whole: no villager, child or adult, presents a body to any other). The fix for exactly this defect already exists ONE class
   over: `src/scenes/place/animalSpots.ts` records that "no animal was part of the
   collider set, so nothing could ever separate two of them — several goats stood inside
   one another", and answers it with `ANIMAL_BODY_RADIUS` (0.18 m, deliberately smaller
@@ -267,21 +269,22 @@ there exactly once; a new point joins a bundle when appended.
   game (`stepTagGame`, driven from `src/scenes/place/PlaceLife.tsx` ~line 565) never got
   that treatment: the children collide with the village fabric but not with each other,
   so a chase that converges leaves them interpenetrating and, once stacked, steering
-  toward the same target keeps them there.
+  toward the same target keeps them there. The adults' errand walkers have the same hole:
+  two of them routed to neighbouring spots end up in one body.
   FINAL STATE:
-  1. A child presents a body radius to the other children, in the same shape as the
-     animals' — calibratable, smaller than the mover footprint, scaled by `KID_SCALE`
-     so a child is not given an adult's girth.
-  2. Two children never share a spot: the separation resolves every frame, and a pair
+  1. EVERY inhabitant — child and adult — presents a body radius to every other, in the
+     same shape as the animals' — calibratable, smaller than the mover footprint, and
+     scaled by the figure's own scale so a child is not given an adult's girth.
+  2. Two inhabitants never share a spot: the separation resolves every frame, and a pair
      that ends up overlapping (a spawn, a catch, a corner) pushes apart rather than
      staying merged.
   3. The tag game still WORKS — a catch must remain reachable, so the separation must not
      hold the chaser off its runner. The catch distance and the body radius are stated
      against each other, and the catch wins.
   VERIFIABLE: pure Vitest beside `src/scenes/place/animalSpots.test.ts` — from a stacked
-  start every pair separates within a bounded time; over a long simulated chase no two
-  children are ever closer than the body separation except within the catch distance; and
-  a catch still happens (the game does not deadlock). Then a picture in the Bambara
+  start every pair separates within a bounded time; over a long simulated visit no two
+  inhabitants of ANY kind are ever closer than the body separation except within the tag
+  catch distance; and a catch still happens (the game does not deadlock). Then a picture in the Bambara
   village on one backend — this is figure placement, not a shader.
   Criticality: medium — it is in the one village the PoC is taught in, and it is the
   first thing the eye lands on.
