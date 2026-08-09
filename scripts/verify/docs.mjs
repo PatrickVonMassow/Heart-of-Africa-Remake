@@ -48,11 +48,16 @@ export function pointerRe(keyword, doc) {
  * strings/numbers, all empty when the family is sound:
  *   misdirected — a pointer standing under a criterion it does not name,
  *   unresolved  — a pointer naming a section the target document lacks,
- *   orphans     — a section in the target document that no criterion carries.
+ *   orphans     — a section in the target document that NO POINTER names.
+ *
+ * `orphans` is deliberately judged against the pointers, not merely against the
+ * criterion numbers (four-eyes review, point 555): a pointer that is DELETED or
+ * whose document path is misspelled leaves its section standing, and a check
+ * that only asked "is there a criterion with that number" would call that
+ * sound — the one direction in which a moved criterion rots silently.
  */
 export function checkPointers(section, target, keyword, doc) {
   const re = pointerRe(keyword, doc)
-  const nums = criterionNumbers(section)
   const sections = sectionNumbers(target)
   const misdirected = []
   const pointers = []
@@ -69,7 +74,7 @@ export function checkPointers(section, target, keyword, doc) {
   return {
     misdirected,
     unresolved: pointers.filter((n) => !sections.includes(n)),
-    orphans: sections.filter((n) => !nums.includes(n)),
+    orphans: sections.filter((n) => !pointers.includes(n)),
   }
 }
 
@@ -117,7 +122,11 @@ function main() {
       v.unresolved.length === 0,
       v.unresolved.join(', ') || 'all present',
     )
-    check(`no orphaned ${f.kind} section without a criterion`, v.orphans.length === 0, v.orphans.join(', ') || 'none')
+    check(
+      `no orphaned ${f.kind} section that no criterion points at`,
+      v.orphans.length === 0,
+      v.orphans.join(', ') || 'none',
+    )
   }
 
   console.log('console errors: 0')

@@ -78,9 +78,15 @@ describe('checkPointers — a pointer into a section that IS there', () => {
   })
 
   it('leaves a criterion without a pointer alone — no dangling pointer is demanded', () => {
-    const v = checkPointers(section, detailDoc, 'Evidence', 'docs/acceptance-evidence.md')
-    expect(v.unresolved).toEqual([])
-    expect(v.misdirected).toEqual([])
+    // Criteria 1 and 3 carry no `Evidence:` line, and the evidence document has
+    // no section for them: a criterion whose condition is already one short
+    // statement needs neither (CLAUDE.md §7.1 nos. 1, 11, 18).
+    const evidenceDoc = ['# evidence', '', '## 2. Two perspectives.', '', 'the proof chain', ''].join('\n')
+    expect(checkPointers(section, evidenceDoc, 'Evidence', 'docs/acceptance-evidence.md')).toEqual({
+      misdirected: [],
+      unresolved: [],
+      orphans: [],
+    })
   })
 })
 
@@ -96,23 +102,32 @@ describe('checkPointers — a pointer into a section that is MISSING', () => {
 })
 
 describe('checkPointers — a MISSPELLED pointer', () => {
-  it('does not resolve a mistyped document path at all, so the section reads orphaned', () => {
+  // The direction a moved criterion rots most quietly: the section is still
+  // there and the criterion is still numbered, so a check that only asked "does
+  // a criterion with that number exist" would call this sound. The pointer is
+  // what is gone, and the section it named is what goes unreferenced.
+  it('leaves the section unreferenced, and says so', () => {
     const typo = section.replace(`Detail: ${DETAIL} §3.`, 'Detail: docs/acceptance-criteria-details.md §3.')
     const v = checkPointers(typo, detailDoc, 'Detail', DETAIL)
-    // the pointer is no longer seen, so nothing is unresolved — but §3 of the
-    // detail document is now carried by no criterion the checker can see.
-    expect(v.unresolved).toEqual([])
-    expect(sectionNumbers(detailDoc)).toContain(3)
+    expect(v.unresolved).toEqual([]) // the mistyped line is no pointer at all
+    expect(v.orphans).toEqual([3])
+  })
+
+  it('reports a DELETED pointer the same way', () => {
+    const gone = section.replace(`   Detail: ${DETAIL} §3.\n`, '')
+    expect(checkPointers(gone, detailDoc, 'Detail', DETAIL).orphans).toEqual([3])
   })
 
   it('catches a pointer that names the WRONG criterion', () => {
     const wrong = section.replace(`Detail: ${DETAIL} §3.`, `Detail: ${DETAIL} §2.`)
-    expect(checkPointers(wrong, detailDoc, 'Detail', DETAIL).misdirected).toEqual(['§2 under criterion 3'])
+    const v = checkPointers(wrong, detailDoc, 'Detail', DETAIL)
+    expect(v.misdirected).toEqual(['§2 under criterion 3'])
+    expect(v.orphans).toEqual([3]) // and nobody points at §3 any more
   })
 })
 
 describe('checkPointers — an ORPHANED section', () => {
-  it('names a section number that no criterion has', () => {
+  it('names a section number that no criterion points at', () => {
     const extra = detailDoc + '\n## 99. Invented.\n\nnobody asked for this\n'
     expect(checkPointers(section, extra, 'Detail', DETAIL).orphans).toEqual([99])
   })
