@@ -935,6 +935,16 @@ Verstärkt wird das dadurch, dass der Schaden **still** ist. Ein nicht gefütter
 
 **Lehre:** Wer eine Zuordnung trifft, trägt sie in demselben Zug dort ein, wo der Mechanismus sie liest — sonst ist sie Prosa. Und ein Punkt, der „wartet", verdient dieselbe Frage wie ein roter Test: *worauf genau*, und ist das noch wahr? Am selben Vormittag hat der Mechanismus dann gezeigt, dass er trägt: Zwei herrenlose Fehlschläge bekamen erst ihre Punkte (568, 570) und danach ihre Einträge — Punkt zuerst, Eintrag danach, denn ein Eintrag ohne Punkt wäre nur ein leiserer Weg, einen Fehler verschwinden zu lassen.
 
+### 3.98 „Nicht gelaufen" sieht aus wie „korrekt abgelehnt"
+
+Am 09.08.2026 fiel beim Vermessen des Durchsatzes eine Prüffamilie auf, die ihr Werkzeug über das aktuelle Arbeitsverzeichnis auflöst. In einem Git-Arbeitsverzeichnis — genau dem, in dem **jeder** delegierte Agent baut — liegen die Abhängigkeiten aber gar nicht; der Aufruf startet nie und endet mit einem Fehlercode. Die eine Hälfte der Prüfungen wird dadurch rot: laut, teuer, aber ehrlich. Die andere Hälfte erwartet, dass das Werkzeug den fehlerhaften Code **ablehnt** — und ein Werkzeug, das nie startete, liefert denselben Fehlercode wie eines, das korrekt ablehnt. Diese Hälfte ist seitdem grün, ohne je etwas geprüft zu haben.
+
+Das ist die Umkehrung von §3.22. Dort klagt ein roter Test den Unschuldigen an, und das fällt auf, weil Rot Arbeit auslöst. Hier ist es Grün, und Grün löst nichts aus. Der Schaden ist deshalb nicht der verlorene Nachmittag, sondern die Regel, die unter dieser grünen Decke verrotten kann — in genau der Umgebung, in der der größte Teil unserer Arbeit stattfindet.
+
+Bemerkenswert ist, wie es gefunden wurde: nicht von einem Prüfer, sondern **beiläufig beim Messen**. Der Agent musste seinen roten Gate-Bericht erklären, ging der Ursache nach und stieß dabei auf die stille Hälfte. Ein Befund, den keine unserer Kontrollen je hätte melden können, weil alle Kontrollen genau die Prüfung fragen, die hier lügt.
+
+**Lehre:** Eine negative Zusicherung („das Werkzeug lehnt das ab") ist nur so viel wert wie der Nachweis, dass das Werkzeug überhaupt lief. Wo ein Test einen Fremdprozess startet, muss „nicht gestartet" ein **eigener, benannter Fehlschlag** sein und darf nie in denselben Rückgabewert fallen wie das erwartete Ablehnen. Und: Eine Umgebung, in der fast alle Arbeit stattfindet, gehört selbst einmal geprüft — unsere Prüfungen liefen bis dahin nie dort, wo sie im Alltag laufen.
+
 ---
 
 ## 4. Die Guards als Immunsystem
@@ -1024,7 +1034,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Sonntag, 09.08.2026, 11:49 · Quellen-Fingerprint: `30014f5c9322…`
+Zuletzt aktualisiert: Sonntag, 09.08.2026, 12:53 · Quellen-Fingerprint: `cca7bc7f6fd1…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1104,8 +1114,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 72 Feedback-/Projekt-Memories · 48 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 42 Prozess-/Meta-TASKS-Punkte (davon 17 offen).
+Erfasste Quellen: 72 Feedback-/Projekt-Memories · 48 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 43 Prozess-/Meta-TASKS-Punkte (davon 18 offen).
 
-<!-- RETRO-FINGERPRINT: 30014f5c932295705f78ad7114dfe382839325a647c919ef5e0b4505206a616c -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-09T09:49:54.569Z -->
+<!-- RETRO-FINGERPRINT: cca7bc7f6fd1fcb7e264811257832a8bfc8321049bbbfed9fd5ff7776dd0a19e -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-09T10:53:19.325Z -->
 <!-- AUTO-GENERATED:END -->
