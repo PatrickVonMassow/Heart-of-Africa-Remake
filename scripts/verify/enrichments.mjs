@@ -308,7 +308,19 @@ if (section('settlement-sizes')) {
   await page.evaluate(() => window.__game.getState().leavePlace())
   await page.waitForTimeout(800)
   await page.evaluate(() => window.__game.getState().enterPlace('berber-village'))
+  // Wait for the SETTLEMENT, not only for the backdrop info: the backdrop hook
+  // is filled while the village itself is still building, and standalone — no
+  // earlier section having warmed the shaders — the frame then photographed a
+  // bare sand plane at 1 fps. Closing the journal is part of the staging too:
+  // arriving at a place opens it, and the panel covers half of what the frame
+  // is named after (the other entries in this section already do both).
+  await page.waitForFunction(
+    (want) => window.__game.getState().placeId === want && !!window.__placeLayout,
+    'berber-village',
+    { timeout: 30000 },
+  )
   await page.waitForFunction(() => window.__placeBackdropInfo, null, { timeout: 30000 })
+  await page.evaluate(() => window.__game.getState().setJournalOpen(false))
   await page.waitForTimeout(1200)
   const berber = await page.evaluate(() => window.__placeBackdropInfo)
   check(
