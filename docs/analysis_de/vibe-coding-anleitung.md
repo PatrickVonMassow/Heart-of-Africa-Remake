@@ -174,15 +174,10 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   Mechanik statt an Testnamen und prüft die **eingeräumten** Grenzen zuerst — eine zugegebene
   Lücke wird geglaubt, eine verschwiegene gesucht." *(Kosten ≈ 1,3x.)*
 
-- **Der Mechanismus ist gebaut — und wird nie gefüttert.** Ihr richtet eine Liste ein, in
-  der bekannte Fehlschläge ihrem jeweiligen offenen Punkt zugeschrieben werden. Die Regeln
-  stehen sauber da, die Zuordnung wird sogar getroffen — aber sie landet in einem Fließtext
-  statt in der Datei, die das Werkzeug liest. Für das Werkzeug existiert sie damit nicht,
-  und ein Arbeitspaket wartet monatelang auf ein Tor, das gar nicht aufgehen kann. Der
-  Schaden ist still: Nichts bricht, es geht nur nie weiter.
-  → *Prompt:* „Triffst du eine Zuordnung oder eine Ausnahme, trage sie **im selben Zug**
-  dort ein, wo der Mechanismus sie liest — sonst ist sie Prosa. Und wenn etwas ‚wartet',
-  sag mir **worauf genau** und ob das noch stimmt; ein Wartegrund altert wie ein Kommentar."
+- **Der Mechanismus ist gebaut — und wird nie gefüttert.** Die Ausnahme ist entschieden, steht
+  aber im Fließtext statt in der Datei, die das Werkzeug liest. Nichts bricht — es geht nur nie weiter.
+  → *Prompt:* „Eine Zuordnung oder Ausnahme trägst du **im selben Zug** dort ein, wo der
+  Mechanismus sie liest. Und wenn etwas ‚wartet': **worauf genau**, und stimmt das noch?"
 
 - **Zahlen geschätzt statt gemessen — auch die, die dir jemand reicht.** ‚Das dauert ~2 Minuten';
   oder ein Wert, der einmal stimmte.
@@ -195,52 +190,47 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   → *Prompt:* „Nenne mir die **gemessenen** Treiber. Schicke jedem Helfer seinen Auftrag als
   fertigen Kurzbrief mit, und fang für jede Aufgabe einen **frischen Kontext** an."
 
-- **Der autonome Lauf bleibt stehen — still oder wartend.** Der Fortschritt endet unbemerkt,
-  oder er hängt an einer Rückfrage — beides gleich teuer, wenn du weg bist.
+- **Der autonome Lauf bleibt stehen — still oder wartend.** Der Fortschritt endet unbemerkt
+  oder hängt an einer Rückfrage — beides gleich teuer, wenn du weg bist.
   → *Prompt:* „Bei einer Daueraufgabe sei die **letzte Aktion jedes Schritts** ein Schritt an der
-  Aufgabe, und baue einen Mechanismus gegen stilles Anhalten. Bleib **nie mit einer Rückfrage
-  stehen**: Triff die vernünftigste Annahme, halte sichtbar fest, was mich braucht, und geh weiter."
+  Aufgabe. Bleib **nie mit einer Rückfrage stehen**: vernünftigste Annahme treffen, sichtbar
+  festhalten, was mich braucht, weitergehen."
 
 - **Kommunikation verfehlt.** Zu technisch, zu lang, an der Zielgruppe vorbei.
-  → *Prompt:* „Beschreibe Bugs und Status in der Sprache der Zielgruppe — Symptom zuerst,
-  kurz, fürs Handy lesbar — und halte meine Format- und Sprachvorgaben auf **allen** Ausgaben
-  ein."
-
+  → *Prompt:* „Beschreibe Bugs und Status in der Sprache der Zielgruppe — Symptom zuerst, kurz,
+  fürs Handy lesbar — und halte Format- und Sprachvorgaben auf **allen** Ausgaben ein."
 
 - **Der Test hing an seiner Umgebung, nicht am Verhalten.** Zeitgrenzen reißen unter Last;
   oder er ist nur dort grün, wo er lief.
-  → *Prompt:* „Jeder Test bekommt seine Pfade **eingespritzt**, Zeitgrenzen richten sich nach
-  der gemessenen Last, und sein **Nachweis** landet dort, wo der Hauptstand ihn liest — die
-  Arbeitskopie wird gelöscht. Vor dem Abgeben: ‚wäre er auch im **Hauptstand** grün?'"
-
+  → *Prompt:* „Jeder Test bekommt seine Pfade **eingespritzt**, Zeitgrenzen richten sich nach der
+  gemessenen Last, und sein **Nachweis** landet dort, wo der Hauptstand ihn liest — die
+  Arbeitskopie wird gelöscht. Vor dem Abgeben: ‚auch im **Hauptstand** grün?'"
 
 - **Messung und Vorschau verunreinigt.** Halbfertiges wird als ‚fertig' beurteilt.
-  → *Prompt:* „Hol mein Urteil am **veröffentlichten** Stand ein, nie an einem Zwischenzweig,
-  und halte Messläufe von störenden Fenstern frei."
+  → *Prompt:* „Hol mein Urteil am **veröffentlichten** Stand ein, nie an einem Zwischenzweig, und
+  halte Messläufe frei von störenden Fenstern."
 
 - **„Erfolgreich" heißt nicht „angekommen".** Ein Befehl meldet Erfolg, das Gewollte ist
-  trotzdem nicht passiert — etwa ein Upload, der den falschen Zweig überträgt; eine Warnung
-  in der Ausgabe einer **geglückten** Aktion ist faktisch unsichtbar.
-  → *Prompt:* „Beleg nach jeder Aktion mit Fernwirkung den **Zielzustand** statt der Erfolgsmeldung; eine Abfrage ohne Treffer ist ein Befund.
-  Jede Formprüfung läuft **vor** dem Schritt nach außen."
+  trotzdem nicht passiert; eine Warnung in der Ausgabe einer **geglückten** Aktion ist
+  faktisch unsichtbar.
+  → *Prompt:* „Beleg nach jeder Aktion mit Fernwirkung den **Zielzustand** statt der
+  Erfolgsmeldung; eine Abfrage ohne Treffer ist ein Befund."
 
 - **Regeln und Wächter verrotten — nur merkt es niemand.** Der Bestand wächst an
-  Widersprüchen, an Regeln ohne Absicherung und an solchen, deren Absicherung enger greift als
-  ihr Satz — sie feuert, wird geglaubt, deckt aber nur einen Teil.
-  → *Prompt:* „Sieh den Bestand periodisch durch — auf Aktualität, Dopplung, Widerspruch und
-  **Wirkungslosigkeit**. Schreib zu **jeder** Regel, was sie misst, und leg Satz und Code
-  **nebeneinander**: Welche Fälle nennt der Satz, die das Muster nicht trifft? Zieh **den Code auf
-  den Satz**, nie umgekehrt. Und jeden Wächter: je ausgelöst? möglich?" *(einmalig hoch)*
+  Widersprüchen und an Regeln, deren Absicherung enger greift als ihr Satz: Sie feuert, wird
+  geglaubt, deckt aber nur einen Teil.
+  → *Prompt:* „Sieh den Bestand periodisch durch — Aktualität, Dopplung, Widerspruch,
+  **Wirkungslosigkeit**. Leg Satz und Code **nebeneinander**: Welche Fälle nennt der Satz, die
+  das Muster nicht trifft? Zieh **den Code auf den Satz**." *(einmalig hoch)*
 
 - **Der rote Test klagt den Falschen an.** Prüfungen veralten; ein Rot täuscht
   gefährlicher als ein Grün.
-  → *Prompt:* „Verlang auf ein Rot hin erst ein **Experiment**: Belastet es das Produkt oder die
-  Messung? Gemessen wird nur an einem eingeschwungenen Zustand, dessen Bereitschaft der
-  **Gegenstand** meldet — nie eine Uhr. Und schlag auch fehl, wenn der Messwert in die
-  *unerwartete* Richtung ausschlägt."
+  → *Prompt:* „Verlang auf ein Rot hin erst ein **Experiment**: Produkt oder Messung? Gemessen
+  wird nur an einem eingeschwungenen Zustand, dessen Bereitschaft der **Gegenstand** meldet —
+  nie eine Uhr. Schlag auch fehl, wenn der Wert *unerwartet* ausschlägt."
 
-- **Derselbe Fakt steht an fünf Stellen — und veraltet an vier.** Wer baut, pflegt die
-  Stelle, an der er schreibt; die übrigen Kopien rotten unbemerkt.
+- **Derselbe Fakt steht an fünf Stellen — und veraltet an vier.** Wer baut, pflegt nur die
+  Stelle, an der er schreibt; die Kopien rotten unbemerkt.
   → *Prompt:* „Gib jedem Fakt genau **einen** verbindlichen Ort; alle anderen verweisen darauf.
   Unvermeidbare Wiederholung prüft ein Test gegen den **Code**, dem der Fakt gehört, nie gegen
   die Nachbarprosa. Berührt eine Änderung das Design, aktualisiere Doc und Code im **selben**
