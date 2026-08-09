@@ -87,6 +87,10 @@ Fensterwachstum:
 | Output je Antwort, Median | 119 | **197** |
 | Anteil der Subagenten an der Gesamtausgabe | 69,1 % | **70,2 %** |
 
+Diese Tabelle steht deshalb um Kleinigkeiten neben §1.2 (dort 884,8 M gegen
+883,9 M hier): §1.2 ist der Fenster-Schnappschuss, diese Spalten sind der
+A/B-Vergleich der beiden Faltungen auf **einem** Bestand.
+
 **Wo Fehler 2 saß, ist selbst ein Befund:** der wachsende Zwischenstand steht
 **ausschließlich** in den Transkripten der delegierten Agenten. Von 5.676
 mehrzeiligen Antworten der Hauptsitzungen differiert **keine einzige** in
