@@ -6,22 +6,29 @@
 
 import { describe, it, expect } from 'vitest'
 import {
+  BANK_BED_REACH,
   BANK_MAX_GAP,
   BANK_MIN_GAP,
+  BANK_SHALLOWS_SPAN,
   BANK_SHORE_HALF,
-  BANK_WALL_INSET,
+  bankWaterDepth,
   buildRiverBank,
   type PlaceRiverBank,
 } from './riverBank'
+import { balance } from '../../config/balance'
 import { BACKDROP_SCALE, GROUND_DISC_OVERHANG } from './backdrop'
 import { insidePlace, isOutsidePlace, maxBoundaryRadius, groundPlateRadius, placeBoundaryRadius } from './boundary'
 import { buildLayout, PLACE_RADIUS } from './layout'
 import { resolveMove, PLAYER_RADIUS, WALKER_RADIUS, standingClear } from './collision'
+import { buildPlaceNavGrid, findPlaceRoute } from './routing'
 import { PLACES, RIVERS, VILLAGE_RIVER_CLEARANCE_DEG, placeById, latLonToWorld } from '../../world/geo'
 import { RIVER_WIDTH_DEG } from '../../world/riverWidth'
 import { communicationRockSite, ROCK_VILLAGE_ID } from '../../world/communicationRock'
 
 const SEED = 4711
+/** The verify lane's world, and the one the F6 reports of work-order 583/584
+ *  were taken in — the bank rules have to hold in both. */
+const BANK_SEEDS = [SEED, 1425108822]
 const village = placeById(ROCK_VILLAGE_ID)
 const bank = buildRiverBank(village, PLACE_RADIUS) as PlaceRiverBank
 
@@ -125,7 +132,8 @@ describe('the bank is REACHABLE, and the village stays dry', () => {
     expect(up).toBeCloseTo(-down, 6)
   })
 
-  it('the centre and every built thing stay dry', () => {
+  it.each(BANK_SEEDS)('at seed %d the centre and every built thing stay dry', (seed) => {
+    const layout = buildLayout(ROCK_VILLAGE_ID, seed)
     const wet = (x: number, z: number, r: number) => dot({ x, z }, bank.nx, bank.nz) + r >= bank.distance
     expect(wet(0, 0, 0)).toBe(false)
     for (const d of layout.dwellings) expect(wet(d.x, d.z, d.r), `dwelling at ${d.x},${d.z}`).toBe(false)
@@ -136,40 +144,108 @@ describe('the bank is REACHABLE, and the village stays dry', () => {
     if (layout.teachingStone) expect(wet(layout.teachingStone.x, layout.teachingStone.z, layout.teachingStone.r)).toBe(false)
   })
 
-  it('the water is a wall: the player is stopped at the boundary, never wades out', () => {
-    for (const a of [-0.3, -0.1, 0, 0.12, 0.3]) {
-      const c = Math.cos(a)
-      const s = Math.sin(a)
-      const dx = bank.nx * c + bank.fx * s
-      const dz = bank.nz * c + bank.fz * s
-      // A stride that would carry him well past the waterline.
-      const [x, z] = resolveMove(layout.colliders, dx * (bank.distance + 6), dz * (bank.distance + 6), PLAYER_RADIUS, [
-        dx * (bank.distance - 6),
-        dz * (bank.distance - 6),
-      ])
-      expect(dot({ x, z }, bank.nx, bank.nz)).toBeLessThanOrEqual(bank.walkEdge - BANK_WALL_INSET + 1e-6)
-      // And being stopped there, he has NOT left the settlement.
-      expect(isOutsidePlace(layout, x, z)).toBe(false)
+  it.each(BANK_SEEDS)('THE WATER IS NOT A WALL at seed %d: nothing invisible stands at the waterline', (seed) => {
+    const layout = buildLayout(ROCK_VILLAGE_ID, seed)
+    // Work-order 584, from the F6 report "Ich laufe hier gegen das Wasser wie
+    // gegen eine Wand": a collider ran along the waterline and stopped the
+    // player a metre short of the bank his village exists to let him reach.
+    // Swept in the bank's own frame: from the top of the bank out to the wade
+    // limit, along the whole stretch the walkable lobe covers, nothing solid may
+    // stand. Every collider belongs to something the renderer draws, and past
+    // the top of the bank the renderer draws only shore and water.
+    for (let along = -12; along <= 12; along += 1) {
+      for (let out = bank.walkEdge; out <= bank.wadeEdge; out += 0.25) {
+        const x = bank.nx * out + bank.fx * along
+        const z = bank.nz * out + bank.fz * along
+        expect(
+          standingClear(layout.colliders, x, z, PLAYER_RADIUS),
+          `collider ${out.toFixed(2)} m out, ${along} m along the bank`,
+        ).toBe(true)
+      }
     }
   })
 
-  it('the drawn ground reaches every walkable point, and stops at the bank', () => {
+  it.each(BANK_SEEDS)('at seed %d a walk from the village centre into the river WADES, and is handed on to the map', (seed) => {
+    const layout = buildLayout(ROCK_VILLAGE_ID, seed)
+    // The state the decision names (work-order 584): he crosses the waterline,
+    // walks on until the water is at his wading depth, and there — out of his
+    // depth, where the river is swum — the settlement ends. Never a dead stop
+    // inside it.
+    // The route is the settlement's own — he walks round the huts and the fence
+    // the way anyone crossing a village does, and the only thing under test is
+    // what happens where the ground meets the water.
+    const grid = buildPlaceNavGrid(layout, layout.colliders, PLAYER_RADIUS)
+    const target = { x: bank.nx * bank.wadeEdge, z: bank.nz * bank.wadeEdge }
+    const route = findPlaceRoute(grid, { x: 0, z: 0 }, target)
+    expect(route, 'no way from the village centre to the water').not.toBeNull()
+    // One step past the wade limit, so the walk ends by LEAVING rather than by
+    // arriving — the traveller does not stop at the water, he goes on into it.
+    const legs = [...route!, { x: bank.nx * (bank.wadeEdge + 2), z: bank.nz * (bank.wadeEdge + 2) }]
+
+    const STEP = 0.1
+    let x = 0
+    let z = 0
+    let left = false
+    let wettest = -Infinity
+    for (const leg of legs) {
+      for (let i = 0; i < 4000 && !left; i++) {
+        const dxl = leg.x - x
+        const dzl = leg.z - z
+        const d = Math.hypot(dxl, dzl)
+        if (d < STEP) break
+        const [px, pz] = resolveMove(layout.colliders, x + (dxl / d) * STEP, z + (dzl / d) * STEP, PLAYER_RADIUS, [x, z])
+        const out = dot({ x, z }, bank.nx, bank.nz)
+        // Past the top of the bank there is nothing left to slide along: a step
+        // that gains nothing there is the dead stop the report described.
+        if (out > bank.walkEdge - 1) {
+          expect(Math.hypot(px - x, pz - z), `dead stop ${out.toFixed(2)} m out`).toBeGreaterThan(STEP * 0.9)
+        }
+        x = px
+        z = pz
+        const now = dot({ x, z }, bank.nx, bank.nz)
+        if (now > bank.walkEdge) wettest = Math.max(wettest, bankWaterDepth(bank, now))
+        left = isOutsidePlace(layout, x, z)
+      }
+      if (left) break
+    }
+    expect(left, 'the walk into the river never left the settlement').toBe(true)
+    // He got PAST the waterline, and stood in water up to the stated depth.
+    expect(dot({ x, z }, bank.nx, bank.nz)).toBeGreaterThan(bank.distance)
+    expect(wettest).toBeCloseTo(balance.bankWadeDepth, 1)
+  })
+
+  it('the wade limit is solved on the drawn shore, not stated beside it', () => {
+    expect(bankWaterDepth(bank, bank.wadeEdge)).toBeCloseTo(balance.bankWadeDepth, 9)
+    expect(bank.wadeEdge).toBeGreaterThan(bank.distance)
+    expect(bank.wadeEdge).toBeLessThan(bank.distance + BANK_SHALLOWS_SPAN + 1e-9)
+  })
+
+  it('the drawn ground reaches every walkable point — plate inland, shore at the water', () => {
     const discEdge = layout.radius + GROUND_DISC_OVERHANG
+    // Half-length of the drawn shore strip, as PlaceScene builds it.
+    const shoreHalf = Math.sqrt(Math.max(1, discEdge * discEdge - bank.walkEdge * bank.walkEdge))
     for (let j = 0; j < 720; j++) {
       const angle = (j / 720) * Math.PI * 2
       const plate = groundPlateRadius(layout, angle, discEdge)
-      // Never short of the boundary at that bearing — the player can never
-      // stand on ground the scene does not draw...
-      expect(plate + 1e-9, `plate at ${angle.toFixed(3)}`).toBeGreaterThanOrEqual(
-        placeBoundaryRadius(layout, angle),
-      )
-      // ... and never past the top of the bank, where the shore takes over.
+      // ... never past the top of the bank, where the shore takes over.
       const rim = { x: Math.cos(angle) * plate, z: Math.sin(angle) * plate }
       expect(dot(rim, bank.nx, bank.nz)).toBeLessThanOrEqual(bank.walkEdge + 1e-6)
+      // The player can never stand on ground the scene does not draw: out to the
+      // boundary the plate carries him, and past the top of the bank the shore
+      // strip does — along its whole length, and no further out than the bed.
+      const edge = placeBoundaryRadius(layout, angle)
+      const p = { x: Math.cos(angle) * edge, z: Math.sin(angle) * edge }
+      const out = dot(p, bank.nx, bank.nz)
+      if (out <= bank.walkEdge + 1e-9) {
+        expect(plate + 1e-9, `plate at ${angle.toFixed(3)}`).toBeGreaterThanOrEqual(edge)
+      } else {
+        expect(out, `shore at ${angle.toFixed(3)}`).toBeLessThanOrEqual(bank.distance + BANK_BED_REACH)
+        expect(Math.abs(dot(p, bank.fx, bank.fz)), `shore at ${angle.toFixed(3)}`).toBeLessThanOrEqual(shoreHalf)
+      }
     }
   })
 
-  it('leaves the shore strip room between the walkable edge and the water', () => {
+  it('leaves the shore strip room between the top of the bank and the water', () => {
     expect(bank.walkEdge).toBeCloseTo(bank.distance - BANK_SHORE_HALF, 9)
   })
 })

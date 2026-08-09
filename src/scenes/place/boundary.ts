@@ -53,11 +53,17 @@ function bearingDelta(a: number, b: number): number {
  * The walkable radius at a bearing, in metres from the place centre. `angle` is
  * the world bearing `atan2(z, x)`, the same convention the band's shader uses.
  *
- * Where a bank lies on that bearing the boundary follows the WATERLINE — a
- * straight line, whose radius therefore grows as 1/cos away from the bank's own
- * bearing — across a plateau, and tapers back to the plain radius over the
- * fade. The taper is what keeps a walk along the bank from ending at a corner:
- * the edge curves inland ahead of the player instead of vanishing under him.
+ * Where a bank lies on that bearing the boundary follows the WADE LIMIT — a
+ * straight line out in the shallows, whose radius therefore grows as 1/cos away
+ * from the bank's own bearing — across a plateau, and tapers back to the plain
+ * radius over the fade. The taper is what keeps a walk along the bank from
+ * ending at a corner: the edge curves inland ahead of the player instead of
+ * vanishing under him.
+ *
+ * It runs PAST the waterline on purpose (work-order 584): the traveller walks
+ * down the drawn shore and wades until he is out of his depth, and only there
+ * does the settlement end — no plane at the water's edge holds him, and the
+ * river he wades into is the one the bird's-eye view lets him swim.
  */
 export function placeBoundaryRadius(bounds: PlaceBounds, angle = 0): number {
   const bank = bounds.bank
@@ -66,9 +72,9 @@ export function placeBoundaryRadius(bounds: PlaceBounds, angle = 0): number {
   if (delta >= BANK_FADE_ANGLE) return bounds.radius
   const cos = Math.cos(delta)
   if (cos <= 1e-6) return bounds.radius
-  // The waterline at this bearing, and how much of the way out to it the lobe
+  // The wade limit at this bearing, and how much of the way out to it the lobe
   // reaches here (all of it across the plateau, none of it past the fade).
-  const water = bank.walkEdge / cos
+  const water = bank.wadeEdge / cos
   const reach =
     bounds.radius + (water - bounds.radius) * ramp(BANK_FADE_ANGLE, BANK_PLATEAU_ANGLE, delta)
   return Math.max(bounds.radius, Math.min(water, reach))
@@ -90,14 +96,15 @@ export function insidePlace(bounds: PlaceBounds, x: number, z: number, margin = 
  *  cover, so the player never walks off the plate he is standing on. */
 export function maxBoundaryRadius(bounds: PlaceBounds): number {
   if (!bounds.bank) return bounds.radius
-  return Math.max(bounds.radius, bounds.bank.walkEdge / Math.cos(BANK_PLATEAU_ANGLE))
+  return Math.max(bounds.radius, bounds.bank.wadeEdge / Math.cos(BANK_PLATEAU_ANGLE))
 }
 
 /**
  * The radius of the DRAWN ground plate at a bearing: the disc, cut off along the
  * straight top of the river bank where there is one. Past that cut the shore
  * strip slopes down and the water takes over, so the plate has to end exactly
- * there — over the lobe's plateau this line IS the boundary.
+ * there — and the shore, not the plate, is what the last stretch of the
+ * walkable region is drawn on (work-order 584).
  */
 export function groundPlateRadius(bounds: PlaceBounds, angle: number, discEdge: number): number {
   const bank = bounds.bank

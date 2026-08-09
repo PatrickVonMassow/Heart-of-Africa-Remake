@@ -99,7 +99,7 @@ import {
   fleckPosition,
 } from '../../render/placeRiver'
 import { RIVER_DRIFT_SPEED } from '../../render/waterAppearance'
-import type { PlaceRiverBank } from './riverBank'
+import { bankGroundHeight, type PlaceRiverBank } from './riverBank'
 import { clearEdgeBand, setEdgeBandBoundary, setEdgeBandLook } from '../../render/edgeBand'
 import { buildLayout, builtFabric, DIG_SITE_RADIUS, isOnLane, nearestActionable, PLACE_RADIUS, SPAWN_INSET, VILLAGE_FIRE, type Interactive, type PathDef, type DwellingDef, type FenceDef, type PlaceLayout } from './layout'
 import {
@@ -2177,10 +2177,16 @@ export function PlaceScene() {
   }, [camera])
 
   const place = placeId ? placeById(placeId) : null
-  const layout = useMemo(
-    () => (placeId ? buildLayout(placeId, seed) : null),
-    [placeId, seed],
-  )
+  // Rebuilt when a balance value changes too: the river bank's wade limit is
+  // calibratable (`balance.bankWadeDepth`, work-order 584), and the debug menu is
+  // the tool it is calibrated with — so the walkable region has to follow it
+  // while the game runs. The build is pure in (placeId, seed) otherwise, so a
+  // rebuild returns the same settlement.
+  const balanceVersion = useGame((s) => s.balanceVersion)
+  const layout = useMemo(() => {
+    void balanceVersion // read so the rebuild is the dependency it looks like
+    return placeId ? buildLayout(placeId, seed) : null
+  }, [placeId, seed, balanceVersion])
   // The settlement edge on the ground (design.md §2.6, point 352/488): the band
   // is pointed at the boundary the leave check reads, sampled over the full
   // turn — it never carries a radius of its own.
@@ -2651,7 +2657,13 @@ export function PlaceScene() {
     // One fixed composition order (point 392): the bob stays a POSITION offset
     // on the yaw's right axis, the look a YXZ rotation — so pitching the view
     // never swings the head and the horizon never tilts with it.
-    const pose = placeCameraPose(p.x, p.z, EYE_HEIGHT, p.yaw, p.pitch, w.roll, bob.dy, bob.dx + idle)
+    // The ground he stands on: flat everywhere but on the river bank, where he
+    // walks DOWN the drawn shore into the shallows (work-order 584). Reading the
+    // footing from the same profile the shore is built from is what makes the
+    // wade visible — the head sinks toward the water instead of gliding out over
+    // it — and it is the only way the picture and the walk can agree.
+    const footing = bankGroundHeight(layout.bank, p.x, p.z)
+    const pose = placeCameraPose(p.x, p.z, EYE_HEIGHT + footing, p.yaw, p.pitch, w.roll, bob.dy, bob.dx + idle)
     camera.position.set(pose.position[0], pose.position[1], pose.position[2])
     camera.rotation.set(pose.rotation[0], pose.rotation[1], pose.rotation[2], 'YXZ')
     // Share the live LOGICAL position so the town-plan map marker can track it.
@@ -2665,7 +2677,8 @@ export function PlaceScene() {
       wfh.bobY = bob.dy
       wfh.roll = w.roll
       wfh.speed = speed
-      wfh.cameraY = EYE_HEIGHT + bob.dy
+      wfh.cameraY = EYE_HEIGHT + footing + bob.dy
+      wfh.footing = footing
       if (lastSurface) wfh.lastFootstepSurface = lastSurface
     }
 

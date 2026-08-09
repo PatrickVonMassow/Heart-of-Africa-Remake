@@ -20,19 +20,19 @@
 import * as THREE from 'three/webgpu'
 import { positionLocal, uv, vec3 } from 'three/tsl'
 import {
+  BANK_BED_REACH,
   BANK_SHORE_HALF,
   BANK_WATER_DROP,
+  bankShoreRows,
   type PlaceRiverBank,
 } from '../scenes/place/riverBank'
 import { groundPlateRadius, type PlaceBounds } from '../scenes/place/boundary'
 import { WATER_METALNESS, WATER_ROUGHNESS, riverWaterSurface } from './waterAppearance'
 
 /** How far out from the waterline the drawn water reaches. Enough to pass the
- *  ground plate's rim, where the panorama backdrop takes the river over. */
-export const RIVER_REACH = 10
-/** How far below the water surface the bed lies — the shallows the water is
- *  seen through at the bank. */
-export const RIVER_BED_DROP = 0.35
+ *  ground plate's rim, where the panorama backdrop takes the river over. It is
+ *  the bank profile's own reach (`riverBank.ts`), so water and bed end together. */
+export const RIVER_REACH = BANK_BED_REACH
 /** Half-length of the drawn water along the bank; the plate and the backdrop
  *  hide whatever of it lies past the bank window. */
 export const RIVER_HALF_LENGTH = 42
@@ -73,26 +73,18 @@ export function buildGroundPlateGeometry(
   return g
 }
 
-/** Rows of the shore, as (distance from the centre along the bank normal, height). */
-function shoreRows(bank: PlaceRiverBank): Array<[number, number]> {
-  return [
-    // The walkable top of the bank — where the ground plate ends.
-    [bank.distance - BANK_SHORE_HALF, 0],
-    // The foot of the slope, just under the waterline: the water plane lies at
-    // −BANK_WATER_DROP, so it meets this slope exactly at `bank.distance`.
-    [bank.distance + BANK_SHORE_HALF, -BANK_WATER_DROP * 2],
-    // The bed, carrying on under the water so the shallows have a bottom.
-    [bank.distance + RIVER_REACH, -BANK_WATER_DROP * 2 - RIVER_BED_DROP],
-  ]
-}
-
 /**
- * The shore: the strip of ground between the walkable edge and the bed,
- * sloping down into the water. Drawn with the settlement's own ground material,
- * so the bank is the village's earth rather than a separate surface.
+ * The shore: the strip of ground between the top of the bank and the bed,
+ * sloping down through the waterline into the water. Drawn with the settlement's
+ * own ground material, so the bank is the village's earth rather than a separate
+ * surface.
+ *
+ * Its profile is NOT stated here — it is `bankShoreRows`, the same description
+ * the walk reads (work-order 584): the player wades down THIS ground, so a
+ * second, drifting shape would be a bank that is not where it is drawn.
  */
 export function buildBankShoreGeometry(bank: PlaceRiverBank, halfLength: number): THREE.BufferGeometry {
-  const rows = shoreRows(bank)
+  const rows = bankShoreRows(bank)
   const cols = 2
   const positions: number[] = []
   const normals: number[] = []

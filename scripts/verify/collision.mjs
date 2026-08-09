@@ -110,12 +110,13 @@ async function pushUntilClear(maxMs = 15000) {
   await page.waitForTimeout(120)
 }
 
-/** Hold forward until the walk stops making ground along the bank normal — the
- *  wall has been reached — or a generous window elapses. Same reason as
- *  pushUntilClear: a fixed frame count measures the host's drawing speed, and
- *  the software lane draws the four steps to the water far slower than the
- *  hardware one. Re-affirms the held key each tick. */
-async function pushForwardUntilStalled(bank, maxMs = 12000) {
+/** Hold forward at the river until the settlement hands the traveller back to
+ *  the bird's-eye view — or a generous window elapses (work-order 584). Reports
+ *  how far out he got, how far his footing sank on the way, and which mode the
+ *  walk ended in. Same reason as pushUntilClear for polling rather than counting:
+ *  a fixed frame count measures the host's drawing speed, and the software lane
+ *  draws the steps to the water far slower than the hardware one. */
+async function pushIntoTheRiver(bank, maxMs = 20000) {
   // Each step waits for DRAWN frames, never for wall-clock milliseconds: on the
   // software lane two 80 ms polls can fall inside a single frame, and a walk that
   // simply had not been drawn yet would read as a wall.
@@ -126,7 +127,12 @@ async function pushForwardUntilStalled(bank, maxMs = 12000) {
           requestAnimationFrame(() =>
             requestAnimationFrame(() => {
               window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW' }))
-              r(window.__placePlayer.x * b.nx + window.__placePlayer.z * b.nz)
+              const p = window.__placePlayer
+              r({
+                mode: window.__game.getState().mode,
+                out: p ? p.x * b.nx + p.z * b.nz : null,
+                footing: (window.__walkFeel && window.__walkFeel.footing) ?? 0,
+              })
             }),
           ),
         ),
@@ -134,22 +140,19 @@ async function pushForwardUntilStalled(bank, maxMs = 12000) {
     )
   const t0 = Date.now()
   await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW' })))
-  let last = await step()
-  let stalled = 0
-  while (Date.now() - t0 < maxMs) {
-    const now = await step()
-    // Three drawn steps without ground gained: the wall is there, not a slow host.
-    stalled = now - last < 0.02 ? stalled + 1 : 0
-    last = now
-    if (stalled >= 3) break
+  let deepest = -Infinity
+  let footing = 0
+  let mode = 'place'
+  let steps = 0
+  while (Date.now() - t0 < maxMs && mode === 'place') {
+    const s = await step()
+    steps++
+    mode = s.mode
+    if (s.out != null) deepest = Math.max(deepest, s.out)
+    footing = Math.min(footing, s.footing)
   }
   await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyW' })))
-  // The release settles on the scene's own clock too — no stopwatch anywhere in
-  // this walk, so the fixed-wait budget of scripts/verify/fixedWaits.test.mjs
-  // stays where it was.
-  await page.evaluate(
-    () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(null)))),
-  )
+  return { deepest, footing, mode, steps }
 }
 
 /**
@@ -524,12 +527,13 @@ if (teachingStone) {
   })
 }
 
-// === The village's river bank (work-order 482) ================================
-// The water is a WALL, and that is a collision claim: walking into the river has
-// to stop the traveller at the top of the bank, not carry him out of the
-// settlement. The shape and the stand-off are pinned in the unit layer; what
-// only the live scene can show is that holding forward at the water does not
-// end the visit.
+// === The village's river bank (work-order 482/584) ============================
+// The water is NOT a wall, and that is a collision claim: walking into the river
+// has to carry the traveller down the drawn shore and into the shallows, and
+// then — out of his depth, where the river is swum — hand him back to the
+// bird's-eye view. The shape, the wade limit and the empty collider set at the
+// water are pinned in the unit layer; what only the live scene can show is that
+// holding forward at the water is never REFUSED.
 const bank = await page.evaluate(() => window.__placeLayout?.bank ?? null)
 check('PoC village: the layout carries a walkable river bank', !!bank, JSON.stringify(bank && { riverId: bank.riverId, distance: bank.distance }))
 if (bank) {
@@ -541,28 +545,28 @@ if (bank) {
     p.yaw = Math.atan2(-b.nx, -b.nz)
     p.pitch = 0
   }, bank)
-  // Hold forward until the walk STOPS advancing, not for a fixed number of
-  // frames: the four steps to the water take ~0.8 s of drawn time, which the
-  // WebGPU lane manages and the software WebGL lane does not — the same fixed
-  // window that reddens the checks of point 506. Polling on the walk's own
-  // progress asks what the check means (does the wall stand at the water?)
-  // instead of how fast the host draws.
-  await pushForwardUntilStalled(bank)
-  const at = await page.evaluate(() => ({
-    x: window.__placePlayer.x,
-    z: window.__placePlayer.z,
-    placeId: window.__game.getState().placeId,
-  }))
-  const out = at.x * bank.nx + at.z * bank.nz
+  // Hold forward until the walk into the river ENDS the visit, not for a fixed
+  // number of frames: the steps to the water take ~0.8 s of drawn time, which
+  // the WebGPU lane manages and the software WebGL lane does not — the same
+  // fixed window that reddens the checks of point 506. Polling on the walk's own
+  // progress asks what the check means (is he ever held at the water?) instead
+  // of how fast the host draws. The camera's footing is read at every step: it
+  // is what proves he walked DOWN the drawn shore rather than out over it.
+  const wade = await pushIntoTheRiver(bank)
   check(
-    'PoC village: walking into the river stops at the bank and never leaves the settlement',
-    at.placeId === 'bambara-village' && out <= bank.walkEdge + 0.05,
-    `stopped ${out.toFixed(2)} m out against a walkable edge at ${bank.walkEdge.toFixed(2)}, still in ${at.placeId}`,
+    'PoC village: walking into the river is never REFUSED — no wall at the water',
+    wade.deepest > bank.distance,
+    `reached ${wade.deepest.toFixed(2)} m out, past a waterline at ${bank.distance.toFixed(2)}`,
   )
   check(
-    'PoC village: and he got there — the wall is at the water, not at the huts',
-    out > bank.walkEdge - 2.5,
-    `${out.toFixed(2)} m out`,
+    'PoC village: he WADES — the camera sinks with the drawn shore',
+    wade.footing <= -0.2,
+    `footing dropped to ${wade.footing.toFixed(2)} m`,
+  )
+  check(
+    'PoC village: and out of his depth the settlement hands him back to the map',
+    wade.mode === 'travel',
+    `ended in ${wade.mode} mode after ${wade.steps} drawn steps`,
   )
 }
 

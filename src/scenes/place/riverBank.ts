@@ -18,6 +18,7 @@
 // Ports sit AT their river by design (the §4.2 exemption) and their much wider
 // walkable disc would swallow the waterline, so they never grow one.
 
+import { balance } from '../../config/balance'
 import { RIVERS, type PlaceDef } from '../../world/geo'
 import { densifyRiverAxis } from '../../world/riverProfile'
 import { RIVER_WIDTH_DEG } from '../../world/riverWidth'
@@ -41,11 +42,44 @@ export const BANK_SHORE_HALF = 1.2
 /** How far the water surface drops below the settlement's ground plane. */
 export const BANK_WATER_DROP = 0.25
 
-/** How far INSIDE the walkable edge the water wall halts a mover. Without it
- *  the wall would stop the player exactly ON the boundary, where a rounding
- *  step decides whether the leave check has fired — and a village you fall out
- *  of by leaning on the water is not a bank. */
-export const BANK_WALL_INSET = 0.05
+// --- The shore profile, and what the player may do with it (work-order 584) ---
+//
+// THE WATER IS NOT A WALL. Work-order 482 had fenced the waterline with an
+// invisible collider so the last step at the water could not carry the traveller
+// out of the settlement; the play session of 09.08.2026 hit that fence and read
+// it for what it is — running into the river as into a wall, a metre short of a
+// bank the village exists to let him stand at. Two rules were in conflict: the
+// bird's-eye view lets him walk INTO the Niger and be carried downstream
+// (criterion 21, "without ever HOLDING him"), while the settlement made the same
+// river solid. One river may not behave as two.
+//
+// So the settlement's walkable region now reaches THROUGH the waterline and out
+// across the shallows to the depth a man wades to (`balance.bankWadeDepth`).
+// Past that he is out of his depth, which is where the river is SWUM — and
+// swimming is what the bird's-eye view does, so the boundary simply ends there
+// and the ordinary leave check hands him back to it. Nothing invisible stops
+// him anywhere; the last thing he walks over is drawn ground sloping under
+// drawn water.
+//
+// The profile below is the ONE description of that ground: the shore mesh is
+// built from it (`render/placeRiver.ts`), the camera's footing is read from it,
+// and the wade limit is solved on it. A second, drifting definition is exactly
+// what points 129/378 forbid.
+
+/** How far out from the waterline the shallows run before the bed falls away. */
+export const BANK_SHALLOWS_SPAN = 4
+/** How deep the water is at the end of the shallows. */
+export const BANK_SHALLOWS_DEPTH = 0.9
+/** How far out the drawn bed reaches, and how deep it lies there. Beyond the
+ *  shallows the channel deepens to this — the water the traveller would have to
+ *  swim, which the bird's-eye view is where he does. */
+export const BANK_BED_REACH = 10
+export const BANK_BED_DEPTH = 1.6
+
+/** The tallest vertical step the shore profile may ever contain. The bank is
+ *  ground the player walks down, so it is a slope with a waterline, never a
+ *  face: `bankShoreRows` is pinned against this. */
+export const BANK_MAX_STEP = 0.05
 
 /** Angular half-width of the bank lobe's plateau: inside it the walkable
  *  region reaches all the way to the water. ~22°, which at a waterline ~35 m
@@ -83,9 +117,14 @@ export interface PlaceRiverBank {
   fz: number
   /** Distance from the centre to the waterline, in place units (metres). */
   distance: number
-  /** Distance to the walkable edge — the top of the bank, where the boundary
-   *  runs and the ground plate ends. */
+  /** Distance to the top of the bank, where the flat ground plate ends and the
+   *  shore begins to slope. The player walks ON past it, down the shore. */
   walkEdge: number
+  /** Distance out at which the water has reached wading depth — the far edge of
+   *  the settlement's walkable region on this bearing. One step further is out
+   *  of his depth, and there the boundary hands him back to the bird's-eye view,
+   *  where the river is swum (work-order 584). */
+  wadeEdge: number
   /** Distance from the centre to the nearest river axis, in degrees — the
    *  world figure the rest is derived from. */
   axisDeg: number
@@ -95,6 +134,61 @@ export interface PlaceRiverBank {
   upstream: BankPoint
   /** The far end of the walkable stretch WITH the current. */
   downstream: BankPoint
+}
+
+/**
+ * The shore's profile, as (distance out along the bank normal, ground height).
+ * Read outward: the top of the bank at village level, the waterline where the
+ * ground has dropped to the water surface, the far edge of the shallows, and
+ * the bed. Every consumer — the drawn mesh, the camera's footing, the wade
+ * limit — reads THIS, so the ground the player walks down is the ground the
+ * scene draws.
+ */
+export function bankShoreRows(bank: Pick<PlaceRiverBank, 'distance' | 'walkEdge'>): Array<[number, number]> {
+  return [
+    [bank.walkEdge, 0],
+    [bank.distance, -BANK_WATER_DROP],
+    [bank.distance + BANK_SHALLOWS_SPAN, -BANK_WATER_DROP - BANK_SHALLOWS_DEPTH],
+    [bank.distance + BANK_BED_REACH, -BANK_WATER_DROP - BANK_BED_DEPTH],
+  ]
+}
+
+/** The ground height at `out` metres from the centre along the bank normal:
+ *  flat village ground up to the top of the bank, then the profile above. */
+export function bankShoreHeight(bank: Pick<PlaceRiverBank, 'distance' | 'walkEdge'>, out: number): number {
+  const rows = bankShoreRows(bank)
+  if (out <= rows[0][0]) return 0
+  for (let i = 0; i + 1 < rows.length; i++) {
+    const [x0, y0] = rows[i]
+    const [x1, y1] = rows[i + 1]
+    if (out <= x1) return y0 + ((out - x0) / (x1 - x0)) * (y1 - y0)
+  }
+  return rows[rows.length - 1][1]
+}
+
+/** How deep the water stands over the shore at `out` — negative on dry ground. */
+export function bankWaterDepth(bank: Pick<PlaceRiverBank, 'distance' | 'walkEdge'>, out: number): number {
+  return -BANK_WATER_DROP - bankShoreHeight(bank, out)
+}
+
+/** The ground the player stands on at (x, z): the shore where he has walked out
+ *  onto it, the settlement's flat plate everywhere else. */
+export function bankGroundHeight(bank: PlaceRiverBank | null | undefined, x: number, z: number): number {
+  if (!bank) return 0
+  return bankShoreHeight(bank, x * bank.nx + z * bank.nz)
+}
+
+/** Where the water reaches `depth` — solved on the profile above, so it can
+ *  never name a spot the drawn shore does not have. */
+function outAtDepth(bank: Pick<PlaceRiverBank, 'distance' | 'walkEdge'>, depth: number): number {
+  const rows = bankShoreRows(bank)
+  const want = -BANK_WATER_DROP - depth
+  for (let i = 0; i + 1 < rows.length; i++) {
+    const [x0, y0] = rows[i]
+    const [x1, y1] = rows[i + 1]
+    if (want >= y1 && y0 > y1) return x0 + ((y0 - want) / (y0 - y1)) * (x1 - x0)
+  }
+  return rows[rows.length - 1][0]
 }
 
 /** A point at bearing `a` off the bank normal, `r` from the centre. */
@@ -171,6 +265,10 @@ export function buildRiverBank(place: PlaceDef, radius: number): PlaceRiverBank 
   fz /= fLen
 
   const walkEdge = distance - BANK_SHORE_HALF
+  // The wade limit is solved on the profile, so a recalibrated depth moves it
+  // and the drawn shore together; clamped so it can never fall behind the top
+  // of the bank however the depth is set.
+  const wadeEdge = Math.max(walkEdge, outAtDepth({ distance, walkEdge }, balance.bankWadeDepth))
   const frame = { nx, nz, fx, fz }
   const stretchAngle = BANK_PLATEAU_ANGLE * BANK_STRETCH_ANGLE_FRAC
   const stretchR = walkEdge / Math.cos(stretchAngle) - BANK_STAND_INSET
@@ -179,6 +277,7 @@ export function buildRiverBank(place: PlaceDef, radius: number): PlaceRiverBank 
     ...frame,
     distance,
     walkEdge,
+    wadeEdge,
     axisDeg: bestD,
     bank: alongBank(frame, 0, walkEdge - BANK_STAND_INSET),
     upstream: alongBank(frame, -stretchAngle, stretchR),
