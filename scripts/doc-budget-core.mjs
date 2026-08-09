@@ -132,7 +132,10 @@ export const DOC_BUDGETS = [
     // and from 7 lines to 6, so the LINE ceiling is untouched), and the research
     // record it summarises lives in docs/intraspecies-combat-1890.md while its
     // eleven tunable values went to docs/design-reference.md §21.2 — both
-    // unbudgeted, so only the design decision itself is priced here.
+    // unbudgeted, so only the design decision itself is priced here. The user
+    // APPROVED this raise on 09.08.2026 — the board asked him to confirm it or
+    // have 215 words found elsewhere, and he chose to confirm. That yes is what
+    // the rule above demands for a raise; it is settled, not open.
     maxWords: 28386,
     why: 'read on demand, but every point that cites a section pays for the bulk around it',
   },
