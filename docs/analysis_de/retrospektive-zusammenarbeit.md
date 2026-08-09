@@ -45,6 +45,7 @@ Das Musterbeispiel sind die Chat-Zeitstempel: neun Eskalationsstufen, acht weich
 | 05.08. | Vier Recherchen ohne eine Messung: die fehlende Treiberfähigkeit stand hinter einem Befehl, die Lösung dann in einer längst laufenden Kette (§3.84) — die zweite Bahn zeichnet seither auf der Grafikkarte |
 | 07.08. | Erster vollständiger Aufräumpass über Wächterkette und Merkposten: kein verwaister Wächter, aber zehn Befunde — die Regel behauptet eine Reichweite, die der Mechanismus nicht hat (§3.88) |
 | 09.08. | Ein Punkt wartete auf ein Tor, das nicht aufgehen konnte: die Zuordnung der Fehlschläge war getroffen, aber nie in das Register eingetragen, das der Wächter liest (§3.97) |
+| 09.08. abends | Spielsitzung: zwölf Defekte in einer Mechanik, deren zwölf Punkte alle abgenommen waren — grün gegen einen Stellvertreter (Punkt 589); die veröffentlichte Reihenfolge zweimal falsch, weil sie eine zweite Heimat hat (Punkt 590, Rückfall in §3.77); ein abgehakter Punkt mit unerfülltem drittem Liefergegenstand, gefunden durch eine Nutzerfrage (§3.99) |
 
 Muster: Ab dem 22.07. explodiert die Commit-Rate (Delegation) — und genau dann häufen sich die Infrastruktur-Vorfälle. **Skalierung der Autonomie erzeugt eine eigene Problemklasse, die die Feature-Arbeit zeitweise überholt.**
 
@@ -945,6 +946,16 @@ Bemerkenswert ist, wie es gefunden wurde: nicht von einem Prüfer, sondern **bei
 
 **Lehre:** Eine negative Zusicherung („das Werkzeug lehnt das ab") ist nur so viel wert wie der Nachweis, dass das Werkzeug überhaupt lief. Wo ein Test einen Fremdprozess startet, muss „nicht gestartet" ein **eigener, benannter Fehlschlag** sein und darf nie in denselben Rückgabewert fallen wie das erwartete Ablehnen. Und: Eine Umgebung, in der fast alle Arbeit stattfindet, gehört selbst einmal geprüft — unsere Prüfungen liefen bis dahin nie dort, wo sie im Alltag laufen.
 
+### 3.99 Der Haken misst den Punkt an seinem Gefühl, nicht an seiner eigenen Liste
+
+Am Abend des 09.08.2026 fragte der Nutzer nach einem abgehakten Punkt: ob dort wirklich etwas angepasst worden sei. Der Punkt war eine Durchsatz-Analyse und hatte drei Liefergegenstände: die gemessene Analyse, einen Übergabe-Prompt für andere Modelle — und, als dritten, jede lohnende Maßnahme als eigenen Arbeitsauftrags-Punkt. Die ersten beiden lagen vor, 1425 Zeilen und fünf Commits. Vom dritten war **keine einzige** der elf Maßnahmen je eingetragen worden; das Dokument sagte sogar ausdrücklich, das Anhängen sei Sache der Hauptsitzung, und genau dort brach die Kette ab.
+
+Dass es niemandem auffiel, ist die eigentliche Beobachtung. Der Haken ist eine **Einschätzung**, kein Nachweis: Er wird gesetzt, wenn der Punkt sich fertig anfühlt. Das Werkzeug dagegen gibt es längst — eine `PROOF:`-Zeile bindet den Haken an einen Befehl, der gelaufen sein muss. Sie ist nur **freiwillig**, und wer eine Spezifikation schreibt, denkt an das, was er bauen will, nicht an das, woran man ihn später messen wird. Ein Punkt mit drei Liefergegenständen und ohne Proof-Zeile wird deshalb an dem gemessen, was zuletzt sichtbar war — hier ein großes, gutes Dokument, das die beiden anderen Drittel überstrahlte.
+
+Der Fund kam nicht aus einer Kontrolle, sondern aus einer **Nutzerfrage**. Das ist innerhalb einer Woche das zweite Mal (§3.97: ein Mechanismus war gebaut, dokumentiert und wurde nie gefüttert) und dieselbe Familie: gebaute Absicherung, deren letzter Handgriff dem Ermessen überlassen bleibt.
+
+**Lehre:** Ein Punkt, dessen Spezifikation mehrere Liefergegenstände aufzählt, gehört an sie gebunden — die Aufzählung ist die Prüfliste, sie steht bereits da, und sie erst beim Haken zu lesen kostet nichts. Und allgemeiner: Wo eine Absicherung freiwillig ist, wird sie dort fehlen, wo sie am nötigsten wäre, denn ihr Fehlen fällt genau dann nicht auf, wenn ohnehin niemand hinsieht.
+
 ---
 
 ## 4. Die Guards als Immunsystem
@@ -1034,7 +1045,7 @@ Der rote Faden: **Ich habe Zuverlässigkeit zu lange als Verhaltensfrage behande
 
 ## Anhang A — Maschinell gepflegte Quellen-Übersicht
 
-Zuletzt aktualisiert: Sonntag, 09.08.2026, 12:53 · Quellen-Fingerprint: `cca7bc7f6fd1…`
+Zuletzt aktualisiert: Sonntag, 09.08.2026, 21:21 · Quellen-Fingerprint: `4ddbf3ebf259…`
 
 Spalten heuristisch aus den Quellen abgeleitet (Anläufe = distinkte Datumsnennungen im Memory;
 Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört der Prosa oben.
@@ -1114,8 +1125,8 @@ Maßnahme = Guard-Skripte mit Namens-Treffer). Die inhaltliche Bewertung gehört
 | A pending batch claim HOLDS THE LAUNCHER BACK — withdraw it whenever the claiming window is left unattended | 2 | mittel | — (Regel/Memory) | ◐ Regel |
 | Multi-agent workflows eat the session/weekly limit fast — verify findings INLINE, keep fan-outs small, warn the user with a cost estimate before any big workflow | 3 | mittel | doc-budget-guard.mjs | ✔ Mechanismus |
 
-Erfasste Quellen: 72 Feedback-/Projekt-Memories · 48 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 43 Prozess-/Meta-TASKS-Punkte (davon 18 offen).
+Erfasste Quellen: 72 Feedback-/Projekt-Memories · 48 Guard-/Hook-Skripte · 4 Revert-/Reapply-Commits · 44 Prozess-/Meta-TASKS-Punkte (davon 19 offen).
 
-<!-- RETRO-FINGERPRINT: cca7bc7f6fd1fcb7e264811257832a8bfc8321049bbbfed9fd5ff7776dd0a19e -->
-<!-- RETRO-LAST-REFRESHED: 2026-08-09T10:53:19.325Z -->
+<!-- RETRO-FINGERPRINT: 4ddbf3ebf25991b0b56aea2a850d6b9bb9300c0fc12e393df1a3b86192571cb0 -->
+<!-- RETRO-LAST-REFRESHED: 2026-08-09T19:21:09.499Z -->
 <!-- AUTO-GENERATED:END -->
