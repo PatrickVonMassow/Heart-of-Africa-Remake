@@ -3076,7 +3076,12 @@ there exactly once; a new point joins a bundle when appended.
   same resolution is applied wherever else a test spawns a tool from
   `node_modules/.bin` — this suite is the one that was caught, not necessarily the only
   one, so the sweep is part of the point and its result is reported even if it is "no
-  other place".
+  other place"; (d) a PURE GATE in the fast layer keeps the pattern from coming back:
+  it reads the test files, finds a negative assertion about a spawned process that
+  concludes "it rejected" from a non-zero exit WITHOUT establishing that the process ran
+  at all, and goes red — the same build as the frame-subject gate, not another Stop hook.
+  Repairing the one find without catching the pattern would only mean waiting for the
+  next place, and this defect's silent half never announces itself.
   VERIFIABLE: pure Vitest for the not-run detection (a helper pointed at a
   deliberately absent binary must fail with the not-run message, not pass as a
   rejection), plus the real proof that the bug is gone — `npm run test:unit` run FROM A
