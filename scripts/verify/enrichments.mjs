@@ -6052,10 +6052,16 @@ if (section('intraspecies-fight')) {
     JSON.stringify(dropdown),
   )
 
-  // THE PICTURE. Everything above measures the drive; none of it says the clash
-  // READS as two animals fighting. So one bout is held open at the clash — a
-  // long clashSeconds freezes the pose rather than the clock, so the scene keeps
-  // animating — photographed, and taken down again.
+  // THE PICTURE, and its CONTROL. Everything above measures the drive; none of
+  // it says the clash READS as two animals fighting. So one bout is held open at
+  // the clash — a long clashSeconds freezes the pose rather than the clock, so
+  // the scene keeps animating — and photographed TWICE at the same camera, the
+  // same zoom and with the same two animals: once with the clash pose switched
+  // OFF (clashIntensity 0), which leaves the pair merely standing nose to nose,
+  // and once with it on. The pair is the variable and nothing else, so the two
+  // frames decide whether the FIGHT reads — and, read together, whether the
+  // ANIMAL reads at this zoom at all. Both go through the shutter, so the
+  // evidence is reproducible rather than a one-off screenshot.
   const posed = await page.evaluate(async () => {
     const herds = window.__wildlife.herdsRef.current
     const fb = window.__balance.fight
@@ -6086,9 +6092,10 @@ if (section('intraspecies-fight')) {
     const one = mk(-3)
     const two = mk(3)
     herds.zebra.push(one, two)
-    const kept = { clash: fb.clashSeconds, force: fb.forceOutcome }
+    const kept = { clash: fb.clashSeconds, force: fb.forceOutcome, intensity: fb.clashIntensity }
     fb.clashSeconds = 60
     fb.forceOutcome = 'submit'
+    fb.clashIntensity = 0 // the CONTROL frame first: the pose off, the pair merely standing
     const bout = { mode: 'converge', ox: one.x, oz: one.z, time: 0, clash: 0 }
     one.fight = { foe: two, aggressor: true, ...bout }
     two.fight = { foe: one, aggressor: false, ...bout }
@@ -6098,6 +6105,15 @@ if (section('intraspecies-fight')) {
   })
   check('a bout can be held at the clash for the picture (point 264)', posed.posed && posed.clashing, JSON.stringify(posed))
   if (posed.clashing) {
+    await shot('148a-intraspecies-clash-pose-off', {
+      world: { lat: -2.5, lon: 34.0 },
+      label: 'CONTROL: the same two zebras at the same camera with the clash pose disabled — a standing pair',
+    })
+    // Same animals, same spot, same camera: only the pose comes on.
+    await page.evaluate(async () => {
+      window.__balance.fight.clashIntensity = 1
+      await window.__sleepSim(0.6) // let the wedge, the wheel and the rear settle into the pose
+    })
     await shot('148-intraspecies-fight-clash', {
       world: { lat: -2.5, lon: 34.0 },
       label: 'two zebras locked in a rank fight on the Serengeti savanna',
@@ -6110,6 +6126,7 @@ if (section('intraspecies-fight')) {
     const fb = window.__balance.fight
     fb.clashSeconds = pose.kept.clash
     fb.forceOutcome = pose.kept.force
+    fb.clashIntensity = pose.kept.intensity
     pose.one.fight = undefined
     pose.two.fight = undefined
     herds.zebra = herds.zebra.filter((a) => a !== pose.one && a !== pose.two)

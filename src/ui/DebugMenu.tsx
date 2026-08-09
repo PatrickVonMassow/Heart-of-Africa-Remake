@@ -473,6 +473,8 @@ export function DebugMenu() {
         (v) => { balance.fight.approachSeconds = Math.max(1, v); bump() }, 1),
       num(t.debug.fightClashSeconds, balance.fight.clashSeconds,
         (v) => { balance.fight.clashSeconds = Math.max(0.5, v); bump() }, 0.5),
+      num(t.debug.fightClashIntensity, balance.fight.clashIntensity,
+        (v) => { balance.fight.clashIntensity = Math.max(0, v); bump() }, 0.1),
       num(t.debug.fightApproachBurst, balance.fight.approachBurst,
         (v) => { balance.fight.approachBurst = Math.max(1, v); bump() }, 0.1),
       num(t.debug.fightQuarryFleeFactor, balance.fight.quarryFleeFactor,

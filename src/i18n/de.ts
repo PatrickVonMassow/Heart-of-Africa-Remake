@@ -581,6 +581,7 @@ export const de: Strings = {
     fightDriveOffDistance: 'Kampf: Vertreibungsdistanz',
     fightApproachSeconds: 'Kampf: Frist für den Anlauf (s)',
     fightClashSeconds: 'Kampf: Dauer des Zusammenstoßes (s)',
+    fightClashIntensity: 'Kampf: Intensität der Kampfpose',
     fightApproachBurst: 'Kampf: Tempofaktor des Anlaufs',
     fightQuarryFleeFactor: 'Kampf: Fluchttempo des Verfolgten',
     fightLethalityScale: 'Kampf: Skalierung der Tödlichkeit',

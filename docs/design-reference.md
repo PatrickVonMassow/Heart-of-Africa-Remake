@@ -206,6 +206,7 @@ are adjustable at runtime). The complete set, grouped as the menu presents it:
 
 - The fight disposition: the base rate at which a free adult of a fighting species picks a quarrel and the interval that rate is measured over, the radius within which it looks for a rival of its own kind, and the cooldown after a settled bout.
 - The bout itself: the contact radius at which the two meet and clash, the distance a chased rival must be driven before the aggressor is satisfied, the approach deadline that resolves a bout which can never meet, the clash duration, the approach speed factor and the fleeing rival's share of it (together they decide catch vs drive-off).
+- The clash pose intensity: one scale over how violently the clash READS from the bird's-eye — the wedge the two bodies splay into, the wheel about their contact point, the shove and the alternating rear. It touches the picture only, never an outcome, and 0 leaves the two standing nose to nose.
 - The lethality scale over the researched per-species rates (`docs/intraspecies-combat-1890.md`), so every fight can be made bloodless — or the fatal branch calibrated — without touching the species table.
 
 **The crocodile** (§19.16)

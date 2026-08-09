@@ -145,6 +145,7 @@ import {
   fightResolve,
   fightPairBroken,
   clashOver,
+  clashPose,
 } from './wildlifeBehavior'
 import { ELEPHANT_GRAVEYARD, WATERFALLS } from '../../world/data/landmarks'
 import { rinderpestCarrionActive, rinderpestPhaseAtDay } from '../../systems/rinderpest'
@@ -608,12 +609,8 @@ const FLEES_LION: Record<Species, boolean> = {
   // predator lists hold only revenge carcasses (point 146) — nothing to flee.
   lion: false, cheetah: false, leopard: false, hyena: false,
 }
-// The clash pose (design.md §19.17, point 264): how far the shoving lunge
-// carries the body toward its opponent, and how far the head rears/dips with
-// it. Render offsets only — small enough that the two bodies read as pressed
-// together, never as passing through one another.
-const CLASH_SHOVE = 0.3
-const CLASH_REAR = 0.3
+// The clash pose lives in wildlifeBehavior.ts (`clashPose`/`CLASH_POSE`) — the
+// geometry the picture depends on is pure and unit-tested there.
 const TRAMPLE_RADIUS = 1.5
 const FLEE_RADIUS = 14
 /** Base swim speed of a purposeful crossing (point 192) — slower than the walk,
@@ -4592,15 +4589,25 @@ function Herds() {
             pz = a.z
             bodyY = a.y // resync off any drink slide (see the kick branch)
             if (a.fight.mode === 'clash') {
-              const beat = Math.sin(t * 6 + a.phase * 6.283)
-              yaw = toFoe
-              a.face = toFoe
-              // The shove is a RENDER offset only — never written back to a.x/a.z,
-              // so the lunges cannot accumulate into a drift (the point-383 lesson).
-              px += Math.sin(toFoe) * beat * CLASH_SHOVE
-              pz += Math.cos(toFoe) * beat * CLASH_SHOVE
-              pitch = beat * CLASH_REAR
-              bodyY = a.y + Math.abs(beat) * 0.05
+              // The pose geometry is pure (clashPose, wildlifeBehavior.ts) and
+              // unit-tested. BOTH sides read the AGGRESSOR's phase, so the two
+              // interlock — one rears while the other drives — instead of
+              // drifting into the same posture by accident.
+              const cp = clashPose(
+                t, a.fight.aggressor ? a.phase : foe.phase, a.fight.aggressor === true,
+                toFoe, balance.fight.clashIntensity,
+              )
+              yaw = cp.yaw
+              a.face = cp.yaw
+              // A RENDER offset only — never written back to a.x/a.z, so the
+              // lunges cannot accumulate into a drift (the point-383 lesson).
+              px += cp.dx
+              pz += cp.dz
+              pitch = cp.pitch
+              // Rise with the pitch so the down-tilted end keeps its feet on the
+              // ground: a rearing animal stands on its hind legs, it does not
+              // drive them through the turf.
+              bodyY = a.y + cp.lift
             } else {
               yaw = a.face ?? (a.fight.aggressor ? toFoe : Math.atan2(a.x - foe.x, a.z - foe.z))
               pitch = 0

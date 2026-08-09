@@ -471,6 +471,12 @@ export interface BalanceConfig {
     approachSeconds: number
     /** Seconds the visible clash itself lasts before it resolves. */
     clashSeconds: number
+    /** Scales the whole clash POSE — the wedge the two bodies splay into, the
+     *  wheel about their contact point, the shove and the alternating rear.
+     *  One knob rather than five: it decides how violently the bout reads at
+     *  the bird's-eye zoom, and 0 collapses it back to two animals standing
+     *  nose to nose. Affects the picture only, never an outcome. */
+    clashIntensity: number
     /** Speed factor over the ordinary walking pace for the converge run and
      *  the chase — a fight is approached at a charge, not a stroll. */
     approachBurst: number
@@ -952,6 +958,7 @@ export const balance: BalanceConfig = {
     driveOffDistance: 24, // the quarry is "far enough" — off the aggressor's patch, still on screen
     approachSeconds: 25, // hard deadline (I4): a converge that cannot meet breaks off here
     clashSeconds: 5, // the visible clash — long enough to read as a fight, short enough not to freeze two animals
+    clashIntensity: 1, // calibratable: full strength of the clash pose — at the default zoom 0.5 the wedge, the wheel and the rear are what make the bout READ as a fight
     approachBurst: 1.5, // over PREY_WALK_SPEED (3): a charge at 4.5, still under the hunt's 4.6 so a real predator outruns a fighter
     quarryFleeFactor: 0.75, // with the 24-unit drive-off: a chase begun inside ~7.5 units is caught, a wider one ends in the drive-off
     lethalityScale: 1, // ships the researched per-species rates unchanged

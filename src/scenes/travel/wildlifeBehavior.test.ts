@@ -106,6 +106,7 @@ import {
   fightResolve,
   fightPairBroken,
   clashOver,
+  clashPose,
   parentAttackOutcome,
   parentDefends,
   findAdopter,
@@ -4425,6 +4426,116 @@ describe('clashOver — the clash always ends (invariant I4, point 264)', () => 
   it('a zero or negative duration resolves at once — never an endless clash', () => {
     expect(clashOver(0, 0)).toBe(true)
     expect(clashOver(0, -3)).toBe(true)
+  })
+})
+
+describe('clashPose — the clash READS as a fight from the bird\'s-eye (point 264)', () => {
+  // The staged bout the verification photographs: the pair on the x axis,
+  // aggressor at -g/2 facing +x, defender at +g/2 facing -x.
+  const GAP = 2.2
+  const TO_FOE_A = Math.PI / 2
+  const TO_FOE_B = -Math.PI / 2
+  const PHASE = 0.3
+  /** Both sides at one instant, at their rendered spots. */
+  const bout = (t, intensity = 1) => {
+    const a = clashPose(t, PHASE, true, TO_FOE_A, intensity)
+    const b = clashPose(t, PHASE, false, TO_FOE_B, intensity)
+    return {
+      a, b,
+      ax: -GAP / 2 + a.dx, az: a.dz,
+      bx: GAP / 2 + b.dx, bz: b.dz,
+    }
+  }
+  /** Smallest angle between two headings, folded to [0, pi/2] — a body and its
+   *  opposite lie on the SAME line, which is exactly what must not happen. */
+  const offLine = (u, v) => {
+    let d = Math.abs(((u - v) % Math.PI) + Math.PI) % Math.PI
+    return Math.min(d, Math.PI - d)
+  }
+  const SAMPLES = Array.from({ length: 240 }, (_, i) => i * 0.05)
+
+  it('at intensity 0 it collapses to two animals standing nose to nose', () => {
+    for (const t of SAMPLES) {
+      const { a, b } = bout(t, 0)
+      expect(a.yaw).toBeCloseTo(TO_FOE_A, 10)
+      expect(b.yaw).toBeCloseTo(TO_FOE_B, 10)
+      expect(a.dx).toBeCloseTo(0, 10)
+      expect(a.dz).toBeCloseTo(0, 10)
+      expect(a.pitch).toBeCloseTo(0, 10)
+      expect(a.lift).toBeCloseTo(0, 10)
+    }
+  })
+
+  it('the two bodies NEVER lie on one line — the wedge is the whole point', () => {
+    // The failure the picture caught: both aimed straight at each other is a
+    // single straight shape from above. Every sampled instant must be a wedge.
+    let worst = Math.PI
+    for (const t of SAMPLES) {
+      const { a, b } = bout(t)
+      worst = Math.min(worst, offLine(a.yaw, b.yaw))
+    }
+    expect(worst).toBeGreaterThan(0.5) // ~29 deg of wedge at the tightest moment
+  })
+
+  it('the pair WHEELS: the contact axis is not frozen on one bearing', () => {
+    const yaws = SAMPLES.map((t) => bout(t).a.yaw)
+    expect(Math.max(...yaws) - Math.min(...yaws)).toBeGreaterThan(0.5)
+  })
+
+  it('the two are in DIFFERENT postures — one rears while the other bores in low', () => {
+    // Two identical bodies read as scenery; the asymmetry is what reads as a
+    // fight. Somewhere in the cycle one must be nose-UP while the other is
+    // nose-DOWN, and they must swap.
+    const opposed = SAMPLES.filter((t) => {
+      const { a, b } = bout(t)
+      return a.pitch < -0.3 && b.pitch > 0.1
+    })
+    const swapped = SAMPLES.filter((t) => {
+      const { a, b } = bout(t)
+      return b.pitch < -0.3 && a.pitch > 0.1
+    })
+    expect(opposed.length).toBeGreaterThan(0)
+    expect(swapped.length).toBeGreaterThan(0)
+  })
+
+  it('a rearing body rises, so it stands on its hind legs instead of through the turf', () => {
+    const reared = SAMPLES.map((t) => bout(t).a).filter((p) => p.pitch < -0.5)
+    expect(reared.length).toBeGreaterThan(0)
+    for (const p of reared) expect(p.lift).toBeGreaterThan(0.25)
+    // A body that is level does not float.
+    for (const t of SAMPLES) {
+      const p = bout(t).a
+      if (Math.abs(p.pitch) < 0.02) expect(p.lift).toBeLessThan(0.02)
+    }
+  })
+
+  it('the shove travels through the pair: the two never gap open or pass through each other', () => {
+    for (const t of SAMPLES) {
+      const s = bout(t)
+      const gap = Math.hypot(s.ax - s.bx, s.az - s.bz)
+      // Bounded both ways — the contact holds without the bodies merging.
+      expect(gap).toBeGreaterThan(GAP * 0.6)
+      expect(gap).toBeLessThan(GAP * 1.6)
+    }
+  })
+
+  it('the offsets are BOUNDED — a render overlay cannot accumulate into a drift', () => {
+    for (const t of Array.from({ length: 4000 }, (_, i) => i * 0.37)) {
+      const { a } = bout(t)
+      expect(Math.hypot(a.dx, a.dz)).toBeLessThan(2)
+    }
+  })
+
+  it('is deterministic: the same instant always poses the same way', () => {
+    for (const t of [0, 1.7, 33.25]) {
+      expect(clashPose(t, PHASE, true, TO_FOE_A, 1)).toEqual(clashPose(t, PHASE, true, TO_FOE_A, 1))
+    }
+  })
+
+  it('a negative intensity is clamped to the standing pose, never inverted', () => {
+    const { a } = bout(3.3, -5)
+    expect(a.yaw).toBeCloseTo(TO_FOE_A, 10)
+    expect(a.pitch).toBeCloseTo(0, 10)
   })
 })
 

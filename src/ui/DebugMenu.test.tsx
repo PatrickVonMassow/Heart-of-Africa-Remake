@@ -65,6 +65,7 @@ const DEFAULTS = {
   calfReunionSeconds: balance.family.reunionSeconds,
   fightDispositionRate: balance.fight.dispositionRate,
   fightClashSeconds: balance.fight.clashSeconds,
+  fightClashIntensity: balance.fight.clashIntensity,
   fightLethalityScale: balance.fight.lethalityScale,
   crocStrikeRadius: balance.crocodile.strikeRadius,
   crocAmbushBankBand: balance.crocodile.ambushBankBand,
@@ -148,6 +149,7 @@ afterEach(() => {
   balance.family.reunionSeconds = DEFAULTS.calfReunionSeconds
   balance.fight.dispositionRate = DEFAULTS.fightDispositionRate
   balance.fight.clashSeconds = DEFAULTS.fightClashSeconds
+  balance.fight.clashIntensity = DEFAULTS.fightClashIntensity
   balance.fight.lethalityScale = DEFAULTS.fightLethalityScale
   balance.crocodile.strikeRadius = DEFAULTS.crocStrikeRadius
   balance.crocodile.ambushBankBand = DEFAULTS.crocAmbushBankBand
@@ -293,9 +295,10 @@ describe('DebugMenu editable fields write through to balance (settings.mjs fillF
     // The separation window after which a juvenile's bond resolves (design.md §19.8/§21.2, point 341).
     { label: en.debug.calfReunionSeconds, read: () => balance.family.reunionSeconds, value: 60 },
     // Intraspecies combat (design.md §19.17, point 264): the calibratable
-    // rate, the clash window and the lethality scale all edit while the game runs.
+    // rate, the clash window, the clash pose intensity and the lethality scale all edit while the game runs.
     { label: en.debug.fightDispositionRate, read: () => balance.fight.dispositionRate, value: 0.05 },
     { label: en.debug.fightClashSeconds, read: () => balance.fight.clashSeconds, value: 8 },
+    { label: en.debug.fightClashIntensity, read: () => balance.fight.clashIntensity, value: 0 },
     { label: en.debug.fightLethalityScale, read: () => balance.fight.lethalityScale, value: 0 },
     // The crocodile's bank strike radius (design.md §19.16, point 130).
     { label: en.debug.crocStrikeRadius, read: () => balance.crocodile.strikeRadius, value: 8 },
@@ -765,7 +768,7 @@ const EXPECTED_CONTROLS: Record<DebugGroupId, readonly string[]> = {
     // Intraspecies combat (point 264).
     'debug.fightDispositionRate', 'debug.fightDispositionInterval', 'debug.fightSeekRadius',
     'debug.fightContactRadius', 'debug.fightDriveOffDistance', 'debug.fightApproachSeconds',
-    'debug.fightClashSeconds', 'debug.fightApproachBurst', 'debug.fightQuarryFleeFactor',
+    'debug.fightClashSeconds', 'debug.fightClashIntensity', 'debug.fightApproachBurst', 'debug.fightQuarryFleeFactor',
     'debug.fightLethalityScale', 'debug.fightCooldownSeconds',
     'debug.crocStrikeRadius', 'debug.crocAmbushBankBand',
     'debug.crocMouthOffset', 'debug.crocDragSpeed', 'debug.crocDragSeconds', 'debug.crocGripSeconds',
@@ -872,19 +875,19 @@ describe('DebugMenu completeness: every control is present, in its group (point 
     })
   })
 
-  it('carries all 144 controls in total, and none twice', () => {
+  it('carries all 145 controls in total, and none twice', () => {
     render(<DebugMenu />)
     const labels = renderedRowLabels()
     const expected = DEBUG_GROUP_ORDER.flatMap((id) => EXPECTED_CONTROLS[id])
     expect(labels.length).toBe(expected.length)
-    expect(labels.length).toBe(144)
+    expect(labels.length).toBe(145)
     expect(new Set(labels).size).toBe(labels.length)
   })
 
   it('gives every control a real input, select or button — no label without a control', () => {
     render(<DebugMenu />)
     const rows = [...document.querySelectorAll('.debug-menu .debug-group-body > label')]
-    expect(rows.length).toBe(144)
+    expect(rows.length).toBe(145)
     for (const row of rows) {
       const label = row.querySelector('span')?.textContent ?? '(none)'
       // The renderer row is the one deliberate read-only display (design.md §21.3).
@@ -938,7 +941,7 @@ describe('DebugMenu groups collapse and remember their state (point 393)', () =>
     render(<DebugMenu />)
     // Nothing opened: the whole set is still there (hidden), and a value still
     // writes through — the verify suites drive the controls this way.
-    expect(renderedRowLabels().length).toBe(144)
+    expect(renderedRowLabels().length).toBe(145)
     fireEvent.change(numberField(en.debug.travelSpeed), { target: { value: '9' } })
     expect(balance.travelSpeed).toBe(9)
     balance.travelSpeed = DEFAULTS.travelSpeed
@@ -984,9 +987,9 @@ describe('DebugMenu filter narrows the whole menu (point 393)', () => {
     render(<DebugMenu />)
     fireEvent.click(groupHead(en.debug.groups.tools))
     typeFilter('croc')
-    expect(renderedRowLabels().length).toBeLessThan(144)
+    expect(renderedRowLabels().length).toBeLessThan(145)
     typeFilter('')
-    expect(renderedRowLabels().length).toBe(144)
+    expect(renderedRowLabels().length).toBe(145)
     expect(renderedGroups().filter((g) => g.open).map((g) => g.title)).toEqual([en.debug.groups.tools])
   })
 

@@ -579,6 +579,7 @@ export const en: Strings = {
     fightDriveOffDistance: 'Fight: drive-off distance',
     fightApproachSeconds: 'Fight: approach deadline (s)',
     fightClashSeconds: 'Fight: clash duration (s)',
+    fightClashIntensity: 'Fight: clash pose intensity',
     fightApproachBurst: 'Fight: approach speed factor',
     fightQuarryFleeFactor: 'Fight: quarry flee speed share',
     fightLethalityScale: 'Fight: lethality scale',

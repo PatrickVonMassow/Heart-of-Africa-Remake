@@ -2731,6 +2731,97 @@ export function clashOver(clashSeconds: number, duration: number): boolean {
   return clashSeconds >= Math.max(0, duration)
 }
 
+/** Where one fighter's body sits and points this frame, relative to its sim
+ *  spot: a RENDER overlay only — `dx`/`dz` are never written back to the
+ *  animal's position, so the shove cannot accumulate into a drift (the
+ *  point-383 lesson). */
+export interface ClashPose {
+  /** Heading of the body. Off the contact bearing by the splay, so the pair
+   *  makes a wedge from above instead of one straight line. */
+  yaw: number
+  /** Render offset from the sim spot (world units). */
+  dx: number
+  dz: number
+  /** Nose-down positive, reared nose-up negative. */
+  pitch: number
+  /** How far the body rises so the pitched-down end keeps its feet down. */
+  lift: number
+}
+
+/** Geometry of the clash pose (design.md §19.17, point 264) — pure, so the
+ *  thing the picture depends on is assertable without a browser.
+ *
+ *  The bird's-eye looks down from ~60° at the achievable zooms, where an
+ *  animal is a few dozen pixels: only the ground-plane arrangement and the
+ *  height off it carry. Two bodies aimed straight at each other are one
+ *  straight line from up there, which is why the first build photographed
+ *  what looked like two animals standing. So this returns a SPLAY (each body
+ *  turned off the contact bearing about its own head, so the muzzles stay
+ *  locked while the rumps open into a wedge), a WHEEL of the locked pair about
+ *  that contact point, a SHOVE that travels through the pair (one drives, the
+ *  other gives ground, so the contact neither gaps nor interpenetrates), and
+ *  an alternating REAR — one up on its hind legs while the other bores in low.
+ *  That standing asymmetry is what reads as interaction; two identical bodies
+ *  read as scenery.
+ *
+ *  Both sides must be called with the SAME `phase` (the aggressor's) so the
+ *  two interlock rather than drifting into the same posture, and `intensity`
+ *  (balance.fight.clashIntensity) scales the whole thing — 0 collapses it back
+ *  to two animals standing nose to nose. */
+export function clashPose(
+  t: number,
+  phase: number,
+  aggressor: boolean,
+  toFoe: number,
+  intensity: number,
+  g: ClashPoseGeometry = CLASH_POSE,
+): ClashPose {
+  const k = Math.max(0, intensity)
+  const ph = phase * Math.PI * 2
+  const side = aggressor ? 1 : -1
+  const drive = Math.sin(t * g.rate + ph)
+  const wheel = Math.sin(t * g.rate * 0.37 + ph) * g.wheel * k
+  const rear = Math.max(0, Math.sin(t * g.rate * 0.5 + ph + (aggressor ? 0 : Math.PI)))
+  const yaw = toFoe + side * g.splay * k + wheel
+  // Turning about the HEAD, not the body centre: translate back by what the
+  // turn moved the muzzle, so the contact point holds and only the rump swings.
+  let dx = g.headPivot * (Math.sin(toFoe) - Math.sin(yaw))
+  let dz = g.headPivot * (Math.cos(toFoe) - Math.cos(yaw))
+  const along = drive * g.shove * k * side + Math.sin(t * g.rate * 1.3 + ph) * g.gap * k
+  dx += Math.sin(toFoe) * along
+  dz += Math.cos(toFoe) * along
+  const pitch = (g.drive * (1 - rear) - g.rear * rear) * k
+  return { yaw, dx, dz, pitch, lift: Math.abs(Math.sin(pitch)) * g.stance }
+}
+
+/** Amplitudes of the clash pose above. Radians for the angles, world units for
+ *  the distances; `rate` is the shove cycle in rad/s. */
+export interface ClashPoseGeometry {
+  splay: number
+  headPivot: number
+  wheel: number
+  shove: number
+  gap: number
+  rear: number
+  drive: number
+  stance: number
+  rate: number
+}
+
+/** The shipped amplitudes. Tuned against the rendered frame at the player's
+ *  default zoom 0.5, where the pair spans a few dozen pixels. */
+export const CLASH_POSE: ClashPoseGeometry = {
+  splay: 0.62, // half-angle of the wedge the two bodies open into
+  headPivot: 1.05, // local forward distance to the head — the pivot the splay turns about
+  wheel: 0.45, // how far the locked pair swings about its contact point
+  shove: 0.5, // how far the drive carries the pair along the contact line
+  gap: 0.16, // how far the contact gap itself works open and shut
+  rear: 0.85, // the front lifted on the rearing beat
+  drive: 0.38, // the head dropped on the driving beat
+  stance: 0.62, // half the stance length: the rise that keeps the low end's feet down
+  rate: 2.6, // a fast, worrying rhythm
+}
+
 /** A minimal structural view of one side of a bout, so the pair check below is
  *  testable without the render `Animal`. */
 export interface FightSide {

@@ -563,6 +563,7 @@ export interface Strings {
     fightDriveOffDistance: string
     fightApproachSeconds: string
     fightClashSeconds: string
+    fightClashIntensity: string
     fightApproachBurst: string
     fightQuarryFleeFactor: string
     fightLethalityScale: string
