@@ -17,7 +17,7 @@
 //
 // Pure text in / findings out; the suite files are read by the caller
 // (scripts/verify/scope.test.mjs).
-import { maskCode } from '../window-hide-core.mjs'
+import { maskCode, balancedEnd } from '../window-hide-core.mjs'
 
 /** A section declaration up to the opening quote, matched in MASKED source (so
  *  prose cannot declare one); the NAME is then read from the original text,
@@ -28,12 +28,53 @@ const DECL_NAME = /(?<![\w.$])section\(\s*(['"])([a-z0-9][a-z0-9-]*)\1\s*\)/g
 const GLOBAL = /\bwindow\.(__[A-Za-z0-9_$]+)/g
 
 /**
+ * The `(` of the `if`-head whose condition contains the call starting at
+ * `declStart`, or -1. Scanned backwards over MASKED text, so a paren in prose or
+ * in a string cannot be mistaken for one; a `{`, `}` or `;` at depth 0 ends the
+ * search, because none of them can stand inside an `if` condition.
+ */
+function conditionOpen(masked, declStart) {
+  let depth = 0
+  for (let i = declStart - 1; i >= 0; i--) {
+    const c = masked[i]
+    if (c === ')') depth++
+    else if (c === '(') {
+      if (depth === 0) return i
+      depth--
+    } else if (c === '{' || c === '}' || c === ';') return -1
+  }
+  return -1
+}
+
+/**
+ * The index of the block's opening `{` for a declaration spanning
+ * [declStart, declEnd), or -1 when the declaration owns no block.
+ *
+ * THE ANCHOR IS THE CONDITION'S CLOSING PAREN, not the next `{` in the file.
+ * Taking the next `{` mis-scoped any head that carries braces of its own —
+ * `if (section('a') && stage({ x: 1 })) { … }` recorded `{ x: 1 }` as the whole
+ * section, which left the real block counting as SHARED code and silently
+ * disabled every finding for a helper installed there. A gate that reports
+ * nothing is worse than no gate, so the head is measured, not guessed.
+ */
+function blockOpen(masked, declStart, declEnd) {
+  const cond = conditionOpen(masked, declStart)
+  const after = cond < 0 ? declEnd : balancedEnd(masked, cond)
+  if (after < 0) return -1
+  let i = after
+  while (i < masked.length && /\s/.test(masked[i])) i++
+  // Only whitespace may stand between the condition and its block: a
+  // single-statement `if` opens no block scope, so there is no range to record.
+  return masked[i] === '{' ? i : -1
+}
+
+/**
  * The `if (section('name')) { … }` blocks of a suite, as half-open index ranges
  * over the ORIGINAL source (the masked copy preserves every index).
  *
- * The end is found by counting braces from the block's opening `{` in the masked
- * text, where a brace inside a comment or a string cannot mislead the count. A
- * declaration whose block never closes is dropped rather than guessed at.
+ * The end is found by counting brackets from the block's opening `{` in the
+ * masked text, where a brace inside a comment or a string cannot mislead the
+ * count. A declaration whose block never closes is dropped rather than guessed at.
  */
 export function sectionRanges(source) {
   const src = String(source ?? '')
@@ -43,18 +84,9 @@ export function sectionRanges(source) {
     DECL_NAME.lastIndex = head.index
     const m = DECL_NAME.exec(src)
     if (!m || m.index !== head.index) continue
-    const open = masked.indexOf('{', m.index + m[0].length)
+    const open = blockOpen(masked, m.index, m.index + m[0].length)
     if (open < 0) continue
-    let depth = 0
-    let end = -1
-    for (let i = open; i < masked.length; i++) {
-      const c = masked[i]
-      if (c === '{') depth++
-      else if (c === '}') {
-        depth--
-        if (depth === 0) { end = i + 1; break }
-      }
-    }
+    const end = balancedEnd(masked, open)
     if (end < 0) continue
     out.push({ name: m[2], start: m.index, end })
   }

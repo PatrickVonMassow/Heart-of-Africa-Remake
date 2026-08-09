@@ -144,8 +144,11 @@ export function maskCode(text) {
   return out.join('')
 }
 
-/** Index just past the balanced closer opening at `openIdx`, or -1. PURE. */
-function balancedEnd(masked, openIdx) {
+/** Index just past the balanced closer opening at `openIdx`, or -1. PURE.
+ *  Exported because the section-scope audit (scripts/verify/sectionScope.mjs) needs
+ *  exactly this reading of a bracket span — a second copy of it would be a second
+ *  thing to get wrong. */
+export function balancedEnd(masked, openIdx) {
   let depth = 0
   for (let i = openIdx; i < masked.length; i++) {
     const c = masked[i]

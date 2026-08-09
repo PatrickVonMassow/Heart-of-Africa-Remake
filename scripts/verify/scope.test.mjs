@@ -172,6 +172,22 @@ if (section('borrows')) {
     expect(sectionAt(ranges, src.indexOf('__after'))).toBe(null)
   })
 
+  it('anchors the block on the CONDITION, so braces in the if-head cannot shrink it', () => {
+    // `{ x: 1 }` used to be recorded as the whole of section 'a', which left the
+    // real body counting as shared code — the install then looked legitimate and
+    // EVERY finding for that helper disappeared. Silent disarmament, the worst
+    // failure a gate has.
+    const src = "if (section('a') && stage({ x: 1 })) {\n  window.__h = () => 1\n}\nif (section('b')) {\n  window.__h()\n}\n"
+    const ranges = sectionRanges(src)
+    expect(ranges.map((r) => r.name)).toEqual(['a', 'b'])
+    expect(sectionAt(ranges, src.indexOf('window.__h ='))).toBe('a')
+    expect(crossSectionGlobals(src)).toEqual([{ name: '__h', installedIn: ['a'], usedIn: 'b', line: 5 }])
+  })
+
+  it('records no range for a section whose `if` opens no block', () => {
+    expect(sectionRanges("if (section('a')) report()\n").map((r) => r.name)).toEqual([])
+  })
+
   it('is total on junk', () => {
     expect(crossSectionGlobals(null)).toEqual([])
     expect(sectionRanges(undefined)).toEqual([])
