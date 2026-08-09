@@ -35,7 +35,12 @@ const OXLINT = resolve(ROOT, 'node_modules/.bin/oxlint')
  *  lint failure — a non-zero exit is the RESULT here, not an error. */
 function lint(paths, cwd = ROOT) {
   try {
-    const out = execFileSync(OXLINT, paths, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
+    const out = execFileSync(OXLINT, paths, {
+      cwd,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      windowsHide: true, // point 401: no console window flashing at a turn end
+    })
     return { code: 0, out }
   } catch (e) {
     return { code: e.status ?? 1, out: `${e.stdout ?? ''}${e.stderr ?? ''}` }
