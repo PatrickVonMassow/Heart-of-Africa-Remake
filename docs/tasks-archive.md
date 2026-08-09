@@ -16152,3 +16152,30 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   comparison recorded in the commit message.
   Criticality: medium — it touches the binding rules file itself, so a botched move
   misinforms every future session; the change is mechanical, the risk is in the diff.
+- [x] 557. THE SUITE SEED IS PINNED FOR ONE SUITE AND DEAD IN ANOTHER (found 08.08.2026
+  by the second model reviewing the seed helper, and confirmed against its own source
+  comment; bundle Testinfrastruktur). Point 549 pinned the world seed so a verdict could
+  repeat over a world that repeats, and it did — the bearing searches now pick the
+  identical standpoint every run. But the pin reaches `polish` alone. Every other browser
+  suite still builds a fresh world per attempt, and `scripts/verify/verify-seed.mjs`
+  records in its own comment that `collision.mjs`'s seeding is DEAD under `run-all` — the
+  seed never reaches the page there. So the rotation 549 measured can still occur in any
+  suite that judges a layout, and one of them believes it is seeded when it is not.
+  A DEAD PIN IS WORSE THAN NO PIN: a suite that reports a seed it did not apply invites
+  exactly the wrong diagnosis when it rotates — the reader rules out the layout first,
+  because the log says the layout was fixed.
+  FINAL STATE: the seed reaches every suite that judges a layout, by ONE route rather
+  than per-suite plumbing that can rot silently — the helper is applied where the browser
+  is opened (`_browser.mjs`/`_boot.mjs`), not at each call site. A suite that is
+  deliberately unseeded says so in its own output. `collision.mjs`'s dead path is either
+  repaired or removed; it does not stay as a claim the code does not keep.
+  AND THE COST OF PINNING IS NAMED (the same review): a lane pinned to one seed only ever
+  photographs one world, so a layout defect that needs another seed goes unseen. Decide
+  and write down how that is covered — an occasional unseeded sweep, a rotating seed set
+  recorded per run, or an accepted residual with its reason. Do not leave it implicit.
+  VERIFIABLE: a Vitest case proves the seed reaches the URL for every suite the map says
+  is seeded, and FAILS when a suite is wired the way `collision.mjs` is today (the case
+  must fail against the current code, or it proves nothing); a live check shows two runs
+  of a seeded layout suite reporting the same layout.
+  Criticality: medium — it does not hide a product defect, but it is a gate reporting a
+  determinism it does not have, which is the shape of failure point 549 exists to end.

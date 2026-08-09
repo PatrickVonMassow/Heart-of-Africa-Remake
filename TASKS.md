@@ -4301,34 +4301,6 @@ Build order, chosen so no two parallel agents own the same file:
   Criticality: raised to HIGH — no longer a latent risk but a fault the user sees,
   and it reaches him directly rather than through the build.
 
-- [ ] 557. THE SUITE SEED IS PINNED FOR ONE SUITE AND DEAD IN ANOTHER (found 08.08.2026
-  by the second model reviewing the seed helper, and confirmed against its own source
-  comment; bundle Testinfrastruktur). Point 549 pinned the world seed so a verdict could
-  repeat over a world that repeats, and it did — the bearing searches now pick the
-  identical standpoint every run. But the pin reaches `polish` alone. Every other browser
-  suite still builds a fresh world per attempt, and `scripts/verify/verify-seed.mjs`
-  records in its own comment that `collision.mjs`'s seeding is DEAD under `run-all` — the
-  seed never reaches the page there. So the rotation 549 measured can still occur in any
-  suite that judges a layout, and one of them believes it is seeded when it is not.
-  A DEAD PIN IS WORSE THAN NO PIN: a suite that reports a seed it did not apply invites
-  exactly the wrong diagnosis when it rotates — the reader rules out the layout first,
-  because the log says the layout was fixed.
-  FINAL STATE: the seed reaches every suite that judges a layout, by ONE route rather
-  than per-suite plumbing that can rot silently — the helper is applied where the browser
-  is opened (`_browser.mjs`/`_boot.mjs`), not at each call site. A suite that is
-  deliberately unseeded says so in its own output. `collision.mjs`'s dead path is either
-  repaired or removed; it does not stay as a claim the code does not keep.
-  AND THE COST OF PINNING IS NAMED (the same review): a lane pinned to one seed only ever
-  photographs one world, so a layout defect that needs another seed goes unseen. Decide
-  and write down how that is covered — an occasional unseeded sweep, a rotating seed set
-  recorded per run, or an accepted residual with its reason. Do not leave it implicit.
-  VERIFIABLE: a Vitest case proves the seed reaches the URL for every suite the map says
-  is seeded, and FAILS when a suite is wired the way `collision.mjs` is today (the case
-  must fail against the current code, or it proves nothing); a live check shows two runs
-  of a seeded layout suite reporting the same layout.
-  Criticality: medium — it does not hide a product defect, but it is a gate reporting a
-  determinism it does not have, which is the shape of failure point 549 exists to end.
-
 - [ ] 558. A VERIFY RUN TAKEN IN A WORKTREE IS DESTROYED WITH THE WORKTREE (measured
   08.08.2026 at the merge of point 549; bundle Testinfrastruktur). The render-verify
   ledger lives at `.claude/render-verify-state.json`, and `scripts/repo-paths.mjs`
@@ -4587,3 +4559,50 @@ Build order, chosen so no two parallel agents own the same file:
   VERIFIABLE: a Vitest case over the drink-pose body offset sweeps the full scale range
   the herds use, at both ages, and asserts the offset never falls below the ground
   sample; `enrichments` runs on both backends without the `animal-buried` assert firing.
+
+- [ ] 568. THE POLISH WATER-SAMENESS CHECK ROTATES ITS VERDICT (measured 09.08.2026 by
+  the agent delivering point 557, on WebGL 2, with the world seed pinned to 42 at the
+  launcher; bundle Testinfrastruktur). Step 13.8 of `polish` — "the water beyond the
+  plate's rim is the SAME water as the water at the bank (≤ 12/255)" — went RED on the
+  first run with samples 13.8, 12.1 and 19.3 straddling the limit, and fully GREEN on a
+  second run at the IDENTICAL commit and the IDENTICAL seed (164 PASS, 0 FAIL). The seed
+  work is not the cause: `polish` was seeded 42 before and after, so the world it walked
+  was the same both times. What rotates therefore sits BELOW the layout — the water
+  shading itself, or the moment the sample is taken.
+  WHY IT MATTERS BEYOND THE FLAKE: point 549 pinned the seed precisely so a red could be
+  believed. A check that still rotates on a fixed world is the next layer of the same
+  problem, and it sits on the everyday gate where it costs a rerun every time.
+  FINAL STATE: the cause is IDENTIFIED before anything is tuned — the two candidates are
+  a genuine frame-timing dependence (the sample taken before the water material has
+  settled, in which case the check polls on the app's own clock rather than a fixed
+  wait) and a real shading seam at the plate rim that only sometimes exceeds the
+  tolerance (in which case it is a PRODUCT defect and the check is right to fire). The
+  tolerance is NOT widened to make the red go away until it is established which of the
+  two it is; if it is the product, the water fix comes first and the check stays.
+  VERIFIABLE: the check runs ten times on the pinned seed with the same verdict every
+  time, and whichever cause was found is named in the commit message with its evidence.
+  Criticality: medium — it does not itself hide a product defect, but it may BE one, and
+  it erodes the trust in a red that point 549 was built to restore.
+
+- [ ] 569. THE FAST LAYER SHOWS FIVE REDS TO EVERY DELEGATED AGENT (measured 09.08.2026
+  by the agent delivering point 557, confirmed against the base commit with its own diff
+  stashed — the same five reds; bundle Testinfrastruktur). `scripts/verify/scope.test.mjs`
+  resolves `node_modules/.bin/oxlint` under `process.cwd()`. In a git WORKTREE that path
+  does not exist: Node resolves the parent tree's `node_modules` for imports, but `.bin`
+  is not linked there. So `npm run test:unit` — the one gate every point runs — is green
+  on `main` and five-red in every worktree.
+  WHY IT MATTERS: CLAUDE.md §6 delegates every point to a worktree-isolated agent, so
+  EVERY delegated agent meets these five reds, must investigate them, and must satisfy
+  itself they are pre-existing before it may report its gate green. Two agents have now
+  paid that cost. Worse is what it teaches: an agent that learns the fast layer is
+  "normally a bit red" is an agent that will wave through a real red.
+  FINAL STATE: the test resolves the binary the way the rest of the scripts do — from the
+  repository root the project already derives (`scripts/repo-paths.mjs`'s `REPO_ROOT`),
+  not from `process.cwd()` — so it passes in a worktree and on `main` alike. If the
+  binary genuinely cannot be found in a worktree, the case SKIPS with its reason printed
+  rather than failing, because a red must mean a defect.
+  VERIFIABLE: `npm run test:unit` green in a freshly created worktree AND on `main`, both
+  proven by running it in both; a Vitest case pins the resolution so it cannot silently
+  return to `process.cwd()`.
+  Criticality: medium — it hides no product defect, but it degrades the signal of the one
+  gate every delegated point runs, which is how a real red gets waved through.
