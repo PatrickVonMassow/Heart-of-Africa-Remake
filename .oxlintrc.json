@@ -4,5 +4,19 @@
   "rules": {
     "react/rules-of-hooks": "error",
     "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
+  },
+  // SCOPE NET for the Node-side scripts (point 566): a verify suite is one long
+  // module of `if (section('x')) { … }` BLOCKS, so a helper declared inside one
+  // is invisible to the next — and that failure otherwise surfaces only when the
+  // browser run reaches the line, 176 checks and 17 minutes in. The env pair is
+  // what keeps this MEANINGFUL instead of noisy: these are Node scripts that also
+  // carry `page.evaluate` callbacks running in the BROWSER, so both global sets
+  // are legitimate in one file. Pinned by scripts/verify/scope.test.mjs.
+  "overrides": [
+    {
+      "files": ["scripts/**/*.mjs"],
+      "env": { "browser": true, "node": true, "es2024": true },
+      "rules": { "no-undef": "error" }
+    }
+  ]
 }

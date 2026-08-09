@@ -361,6 +361,16 @@ front of each turns one into a declaration.
   `if (section('<slug>')) { … }` and give each block the jump/wait it inherited
   from the one before. A suite that declares none keeps working unchanged and
   refuses `--section` with that reason.
+- **A section is a BLOCK SCOPE, so anything two of them share lives ABOVE
+  them.** A helper declared inside one block is invisible to the next, and
+  nothing says so until the browser run reaches the call: `pinFamily`, declared
+  in `calf-predation-drama` and used from `coastal-walk-off`, aborted the whole
+  `enrichments` pass after 176 of 251 checks — 27 minutes to find. That class is
+  now caught in the FAST layer: `.oxlintrc.json` arms `no-undef` over
+  `scripts/**/*.mjs` (with the browser AND node global sets, since these files
+  carry `page.evaluate` callbacks), so `npm run lint` refuses it in a tenth of a
+  second, and `scope.test.mjs` keeps the rule armed by running the real config
+  over a fixture of exactly that shape.
 - **The one recurring defect is a section that does NOT own its setup**: it
   reads a scene the block before it staged, so it passes in the whole run and
   fails standalone. Where blocks genuinely share one staging they belong in ONE

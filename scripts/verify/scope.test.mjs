@@ -1,0 +1,119 @@
+// THE STATIC NET under the sectioned verify suites (point 566).
+//
+// WHY IT EXISTS. A suite is one long module whose blocks are
+// `if (section('x')) { … }` — and that `{ … }` is a BLOCK SCOPE. A helper
+// declared inside one section is invisible to the next, but nothing says so
+// until the browser run reaches the call: on 08.08.2026 `pinFamily`, declared in
+// `calf-predation-drama` and called from `coastal-walk-off`, aborted the whole
+// `enrichments` pass with `pinFamily is not defined` after 176 of its 251 checks
+// — 27 minutes to find, both on the first run and on the automatic retry.
+// `no-undef` over the same file finds it in a tenth of a second. The point
+// exists because repairing a CHECK costs a suite pass; discovering a scope error
+// by browser run is that cost paid for nothing.
+//
+// HOW IT IS WIRED. `.oxlintrc.json` carries an override for `scripts/**/*.mjs`
+// that turns `no-undef` on with the browser AND node global sets — both are
+// legitimate in one file, because these are Node scripts carrying
+// `page.evaluate` callbacks that run in the browser. So the gate is `npm run
+// lint` itself: no hook, no extra command, and every existing caller of the lint
+// gate (the fast gate, CI, the pre-push hook) inherits it.
+//
+// WHAT THIS FILE ADDS. Lint being green proves nothing about whether the rule is
+// still ARMED. These cases run the REAL config — copied byte for byte — over a
+// fixture that reproduces the pinFamily shape, and assert it is refused; a
+// future edit that drops the rule, the env or the file glob turns them red.
+import { describe, it, expect, beforeAll, afterAll } from 'vitest'
+import { execFileSync } from 'node:child_process'
+import { mkdtempSync, mkdirSync, writeFileSync, copyFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { resolve, join } from 'node:path'
+
+const ROOT = process.cwd()
+const OXLINT = resolve(ROOT, 'node_modules/.bin/oxlint')
+
+/** Run oxlint over `paths` in `cwd` and return { code, out }. Never throws on a
+ *  lint failure — a non-zero exit is the RESULT here, not an error. */
+function lint(paths, cwd = ROOT) {
+  try {
+    const out = execFileSync(OXLINT, paths, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
+    return { code: 0, out }
+  } catch (e) {
+    return { code: e.status ?? 1, out: `${e.stdout ?? ''}${e.stderr ?? ''}` }
+  }
+}
+
+// A section block in miniature: `pinFamily` declared inside one, called from the
+// next. This is the exact defect, reduced to what the linter needs to see it.
+const CROSS_BLOCK = `const page = { evaluate: async () => {} }
+if (Math.random() > 2) {
+  const pinFamily = async () => { await page.evaluate() }
+  await pinFamily()
+}
+if (Math.random() > 2) {
+  await pinFamily()
+  console.log(window.location.href, process.cwd())
+}
+`
+
+// The same file with the helper HOISTED above the blocks — the honest fix, and
+// the shape the real suite now has. It must lint clean, browser globals and all.
+const HOISTED = `const page = { evaluate: async () => {} }
+const pinFamily = async () => { await page.evaluate() }
+if (Math.random() > 2) {
+  await pinFamily()
+}
+if (Math.random() > 2) {
+  await pinFamily()
+  console.log(window.location.href, process.cwd())
+}
+`
+
+describe('the scope net over the verify suites', () => {
+  // A throwaway tree that mirrors the repo layout — `scripts/verify/…` under a
+  // copy of the real `.oxlintrc.json` — so the override's own file glob decides,
+  // and the fixtures never touch the repository's working tree.
+  let dir
+  beforeAll(() => {
+    dir = mkdtempSync(join(tmpdir(), 'hoa-scope-'))
+    mkdirSync(join(dir, 'scripts/verify'), { recursive: true })
+    copyFileSync(resolve(ROOT, '.oxlintrc.json'), join(dir, '.oxlintrc.json'))
+    writeFileSync(join(dir, 'scripts/verify/cross-block.mjs'), CROSS_BLOCK)
+    writeFileSync(join(dir, 'scripts/verify/hoisted.mjs'), HOISTED)
+  })
+  afterAll(() => rmSync(dir, { recursive: true, force: true }))
+
+  it('REFUSES a helper used across two section blocks, naming it', () => {
+    const { code, out } = lint(['scripts/verify/cross-block.mjs'], dir)
+    expect(code, `oxlint accepted the cross-block reference:\n${out}`).not.toBe(0)
+    expect(out).toContain('no-undef')
+    expect(out).toContain('pinFamily')
+  })
+
+  it('accepts the same helper hoisted above the blocks — the honest fix', () => {
+    const { code, out } = lint(['scripts/verify/hoisted.mjs'], dir)
+    expect(code, out).toBe(0)
+  })
+
+  it('treats the browser globals of page.evaluate as defined, so the check stays readable', () => {
+    // A net that reported `window`/`document` on every suite would be ignored
+    // within a day. This is what the browser env in the override buys.
+    writeFileSync(
+      join(dir, 'scripts/verify/globals.mjs'),
+      'export const probe = () => [window, document, navigator, requestAnimationFrame, ' +
+        'localStorage, performance, getComputedStyle, KeyboardEvent, WheelEvent, MouseEvent, ' +
+        'Event, Image, HTMLCanvasElement, fetch, URL, TextDecoder, console, ' +
+        'process, Buffer, setTimeout, clearTimeout, setInterval, clearInterval]\n',
+    )
+    const { code, out } = lint(['scripts/verify/globals.mjs'], dir)
+    expect(code, out).toBe(0)
+  })
+
+  // THE LIVE GATE. Everything above proves the rule works; this proves the
+  // repository is clean under it right now — the assertion that would have
+  // failed on 08.08.2026 in 0.1 s instead of 27 minutes.
+  it('finds no undefined identifier anywhere under scripts/', () => {
+    const { code, out } = lint(['scripts/'])
+    expect(out).not.toContain('no-undef')
+    expect(code, out).toBe(0)
+  })
+})
