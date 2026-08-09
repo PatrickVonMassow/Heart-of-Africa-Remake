@@ -3882,6 +3882,25 @@ Build order, chosen so no two parallel agents own the same file:
      is not one branch's accident — every element frame in the set is one slow load
      away from photographing an empty world, and the eight frames that run rewrote
      were restored rather than committed.
+  8. NOTHING EVER ASKS WHETHER THE CANVAS DREW (found 09.08.2026 by the four-eyes
+     review of point 566). A `place` or `local` frame proves its subject through the
+     DOM labels, and those labels sit in the HUD layer — they are on screen whether
+     or not the scene behind them rendered. Measured: that branch rewrote
+     `verification/77-enrich-village-life.png` from a Maasai village (huts, fire,
+     inhabitants, 669 KB) to a BLACK canvas carrying only the HUD and the Market
+     Hut / Chief's Hut / Elder labels (31 KB), and the shutter opened on it and
+     exited 0. Item 7 closes the no-wait path that produces such a frame; this item
+     closes the ACCEPTANCE of one, which is the half that makes it evidence.
+     FINAL STATE: any capture that includes the canvas additionally requires the
+     canvas to have DRAWN — the written frame is sampled and REFUSED when one colour
+     occupies more than a calibratable share of it (start at 98 %: a rendered
+     African scene never approaches that, while a black or single-wash canvas
+     exceeds it immediately). The refusal names the dominant colour and its share,
+     in the same voice as the subject refusal. A frame that legitimately photographs
+     a near-uniform picture declares that intent explicitly rather than being
+     exempted by kind, so the exemption is visible in the declaration and not a
+     silent property of the mode. A clipped or locator-bound capture that never
+     includes the canvas is out of scope.
   The re-probe of item 1 applies in the STAND-STILL mode only: the drawn-only wait
   is near zero, and re-probing there would add flake on exactly the fast-moving
   subjects that mode serves. The stale comment in `frameSubject.mjs` claiming
@@ -3892,6 +3911,8 @@ Build order, chosen so no two parallel agents own the same file:
   VERIFIABLE: pure Vitest on the shutter's decision (subject in view before AND
   after → written; in view before, gone after → refused with the second reading in
   the message; a frame that needs no readiness wait behaves exactly as today; a
+  canvas-bearing frame whose picture is one colour past the share is refused naming
+  that colour, while a rendered frame and a declared near-uniform one pass; a
   full-page element frame serves the stand-still wait while a clipped or
   locator-bound one does not), and live the two Aswan frames stay green.
 
