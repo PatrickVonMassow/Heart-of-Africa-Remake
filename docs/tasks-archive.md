@@ -16219,3 +16219,49 @@ Nummerierung bleiben deshalb identisch — hier wird nur verschoben, nie umgesch
   one real SMALL run comes up on WebGPU with `assertBackend` confirming it.
   Criticality: medium — it changes which backend the daily verdict comes from, so a
   mistake here silently narrows every gate that follows.
+
+- [x] 572. WHAT ELSE WOULD MAKE A TASK FASTER AND CHEAPER — A THOROUGH ANALYSIS (user
+  09.08.2026, board chat, to be worked directly after point 571: "eine ausführliche
+  Analyse, welche Maßnahmen man noch ergreifen könnte, um zum einen die Bearbeitungszeit
+  und zum anderen den Token-Verbrauch pro Task zu reduzieren. Recherchiere dazu auch
+  online und mache alles mit vier Augen. Gib mir auch einen Prompt, den ich — zusammen
+  mit dem Repository-Inhalt — anderen LLMs geben kann, um noch mehr Ideen zu bekommen.").
+  TWO SEPARATE AXES, never merged into one number: WALL-CLOCK per task (how long a point
+  takes from brief to merge) and TOKENS per task. They trade against each other — a
+  bigger fan-out buys time with tokens, a tighter brief buys both — so every proposal
+  states which axis it moves, by how much, and what it costs on the other.
+  START FROM MEASUREMENT, NOT FROM IDEAS. The repository already holds the numbers: the
+  brief mechanism measured ~1.8k tokens against ~108k for reading the documents whole
+  (CLAUDE.md §6), point 555 measured the always-loaded file at 61.117 characters and cut
+  it to 44.995, 87–94 % of the spend was measured above 150k context (the reason the
+  point boundary exists), and the workflow fan-outs measured ~3M tokens. Establish where
+  the time and the tokens ACTUALLY go today — per phase (brief, implementation, gates,
+  verification, merge, bookkeeping) — before proposing anything. A proposal without a
+  measured baseline is an opinion.
+  FOUR EYES, AND IN THE RIGHT MODE (CLAUDE.md §6 is normative). "Which measures could one
+  take" is a DIVERGENT, ENUMERATING stage, so it runs BLIND PARALLEL — both models work
+  from the same inputs to their own complete list, neither seeing the other's, and the
+  two are merged into a union deduplicated BY MEANING, marking what only one produced and
+  dropping nothing for being unusual. It is explicitly NOT a review: a reviewer handed a
+  finished list checks THAT list, which is the failure this rule exists to prevent. The
+  later CONVERGENT stages — is this measurement sound, does this proposal survive its own
+  numbers — take the ordinary review.
+  ONLINE RESEARCH IS PART OF IT (the user asked for it): what the field has published on
+  agent-loop cost — context management, caching, retrieval instead of wholesale reads,
+  model routing by stage, batching, speculative or parallel execution. Every external
+  claim is recorded WITH ITS SOURCE and judged against THIS repository's measurements
+  before it becomes a proposal; a benchmark from another setup is a hypothesis here, not
+  a finding.
+  DELIVERABLES: (1) `docs/analysis_de/durchsatz-analyse.md` — German, the measured
+  baseline per phase, then the proposals ranked by measured effect per axis, each with
+  its cost on the other axis and its risk; the ones we should NOT do belong in it too,
+  with the reason. (2) A HANDOVER PROMPT for the user, so he can put this repository in
+  front of other models and get further ideas — it must carry the two axes, the measured
+  baseline, the constraints that are NOT negotiable (the verification discipline, the
+  four-eyes rule, the both-backend picture proof) and what has already been tried, so an
+  outside model does not return what we did last month. It goes in the same document and
+  is quoted verbatim in the chat reply to the user.
+  (3) Whatever the analysis finds worth DOING becomes its own work-order point, appended
+  and ordered — this point produces the analysis and the prompt, not the rebuild.
+  Criticality: medium — it steers where the project's effort goes next, so a wrong
+  measurement here misdirects weeks; nothing it does is itself hard to reverse.
