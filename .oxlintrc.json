@@ -11,12 +11,22 @@
   // browser run reaches the line, 176 checks and 17 minutes in. The env pair is
   // what keeps this MEANINGFUL instead of noisy: these are Node scripts that also
   // carry `page.evaluate` callbacks running in the BROWSER, so both global sets
-  // are legitimate in one file. Pinned by scripts/verify/scope.test.mjs.
+  // are legitimate in one file. `no-var` belongs with it: a `var` HOISTS, so the
+  // same cross-block borrow slips past `no-undef` while a partial run of the
+  // borrowing block still dies on it. Pinned by scripts/verify/scope.test.mjs.
+  //
+  // ACCEPTED TRADE-OFF of the merged env: a pure-Node script that references
+  // `document` or `navigator` lints clean here, because the browser globals are
+  // granted file-wide rather than inside the `page.evaluate` callbacks alone. The
+  // breadth is deliberate — `page.evaluate` users live outside scripts/verify/
+  // too (scripts/perf-breakdown.mjs) — and a per-callback env is not something
+  // the config can express. Such a reference fails at runtime on the first run,
+  // which is a tenth of the cost this net exists to save.
   "overrides": [
     {
       "files": ["scripts/**/*.mjs"],
       "env": { "browser": true, "node": true, "es2024": true },
-      "rules": { "no-undef": "error" }
+      "rules": { "no-undef": "error", "no-var": "error" }
     }
   ]
 }

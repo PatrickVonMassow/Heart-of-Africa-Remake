@@ -81,6 +81,19 @@ if (Math.random() > 2) {
 }
 `
 
+// The same borrow written with `var`. `var` HOISTS to the enclosing function or
+// module, so `no-undef` sees a perfectly defined name — while a run of the
+// borrowing block alone still calls `undefined`. `no-var` is what closes it.
+const VAR_BLOCK = `const page = { evaluate: async () => {} }
+var pinFamily
+if (Math.random() > 2) {
+  pinFamily = async () => { await page.evaluate() }
+}
+if (Math.random() > 2) {
+  await pinFamily()
+}
+`
+
 describe('the scope net over the verify suites', () => {
   // A throwaway tree that mirrors the repo layout — `scripts/verify/…` under a
   // copy of the real `.oxlintrc.json` — so the override's own file glob decides,
@@ -92,6 +105,7 @@ describe('the scope net over the verify suites', () => {
     copyFileSync(resolve(ROOT, '.oxlintrc.json'), join(dir, '.oxlintrc.json'))
     writeFileSync(join(dir, 'scripts/verify/cross-block.mjs'), CROSS_BLOCK)
     writeFileSync(join(dir, 'scripts/verify/hoisted.mjs'), HOISTED)
+    writeFileSync(join(dir, 'scripts/verify/var-block.mjs'), VAR_BLOCK)
   })
   afterAll(() => rmSync(dir, { recursive: true, force: true }))
 
@@ -100,6 +114,15 @@ describe('the scope net over the verify suites', () => {
     expect(code, `oxlint accepted the cross-block reference:\n${out}`).not.toBe(0)
     expect(out).toContain('no-undef')
     expect(out).toContain('pinFamily')
+  })
+
+  it('REFUSES a `var`, which hoists straight past no-undef', () => {
+    const { code, out } = lint(['scripts/verify/var-block.mjs'], dir)
+    expect(code, `oxlint accepted the hoisting var:\n${out}`).not.toBe(0)
+    expect(out).toContain('no-var')
+    // …and it is exactly no-undef that does NOT see it, which is why the rule pair
+    // is one override rather than one rule.
+    expect(out).not.toContain('no-undef')
   })
 
   it('accepts the same helper hoisted above the blocks — the honest fix', () => {
