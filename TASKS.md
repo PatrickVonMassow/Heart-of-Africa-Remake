@@ -70,6 +70,52 @@ there exactly once; a new point joins a bundle when appended.
 
 ## Checklist
 
+- [ ] 587. THE SPOKEN SYLLABLES ARE A SQUAWK, AND THE PITCH — THE ONLY THING THAT MEANS
+  ANYTHING — IS THE WEAKEST PART OF THEM (user 09.08.2026, listening on the deployed
+  build: "nur Gequäke, das kein Bisschen nach Stimmen klingt und nicht als ba oder BA
+  erkennbar ist"). The synthesis is `speakSyllable` in `src/systems/ambience.ts`
+  (~line 749): a sawtooth carrier at 138 Hz (`ba`) or 226 Hz (`BA`) through ONE bandpass
+  at 820 Hz resp. 1240 Hz, Q 3.2. Three things follow from those numbers, and together
+  they are exactly what the user describes:
+  (a) IT CANNOT SOUND LIKE A VOWEL. A vowel needs at least two formants; `a` sits near
+      F1 730 Hz and F2 1090 Hz. One resonance identifies no vowel, and a lone narrow peak
+      on a sawtooth is the classic nasal buzz.
+  (b) THE PITCH IS FILTERED AWAY. A bandpass at 820 Hz with Q 3.2 passes a band about
+      256 Hz wide — the 138 Hz FUNDAMENTAL lies some 2.5 octaves below it and is heavily
+      attenuated, while the harmonic that happens to fall in the passband dominates. The
+      ear is then given a timbre instead of a pitch, and PITCH IS THE ENTIRE LANGUAGE.
+  (c) THE FORMANT MOVES WITH THE TONE, WHICH THE SPEC FORBIDS.
+      `docs/communication-poc-spec.md` states it plainly: "A syllable is a sample: a low
+      one for `ba`, a high one for `BA`, differing in PITCH alone." The code shifts the
+      formant from 820 to 1240 Hz with the tone, so the two are not one syllable at two
+      pitches but two different sounds — and the function's own comment claims the
+      opposite ("Only the PITCH distinguishes them"). A player therefore learns two
+      noises rather than one syllable spoken high and low, which is what the drums must
+      later reproduce.
+  FINAL STATE:
+  1. A syllable READS AS A VOICED `ba` — a voiced source with its fundamental INTACT,
+     shaped by at least two vowel resonances, plus the brief plosive onset a `b` has.
+     Resonances ADD to the spectrum rather than replacing it (a peaking/parallel
+     resonator, not a lone bandpass that discards everything else).
+  2. The vowel is IDENTICAL in both tones — the formants stay put and ONLY the pitch
+     changes, as the spec requires. The comment and the code then say the same thing.
+  3. The two pitches are unmistakable side by side at the pace they are spoken, and they
+     survive the drums beside them: the interval is chosen to be heard, not merely to be
+     different, and it is calibratable.
+  4. Still fully procedural — no audio asset is downloaded, and it stays cheap enough for
+     a village speaking continuously.
+  VERIFIABLE: an OFFLINE render of both syllables through `OfflineAudioContext` in the
+  Vitest layer, analysed rather than eyeballed — the fundamental of each tone is present
+  in the spectrum at a stated level, the formant peaks sit at the SAME frequencies for
+  both tones, and a pitch estimate over the rendered buffer returns the two carriers.
+  Then the ear: the user is the judge of whether it sounds like a voice, so this is a card
+  for him once it is built.
+  Criticality: HIGH — the player must tell `ba` from `BA` by ear or the language cannot
+  be learned at all, and the drum message at the end repeats the same distinction. Build
+  with point 577: both are "the syllables do not reach the ear", one listening session
+  settles them.
+
+
 - [ ] 586. THE ADULTS FALL PERMANENTLY SILENT AFTER A WHILE (user 09.08.2026, observed
   live: "Nach einem Neustart erscheinen wieder die Texte der Erwachsenen — aber nur für
   eine gewisse Zeit. Dann verstummen alle Erwachsenen dauerhaft"). The overhead texts
