@@ -3767,6 +3767,67 @@ second owner for one defect is how two half-fixes get built.
   Criticality: low — pure measurement; it changes no behaviour, and it is the precondition
   for judging the remaining structural levers.
 
+- [ ] 600. THE CTRL LABEL DOES NOT NAME AN ATTACKING LION — AND THE ROSTER IS RE-TESTED
+  WHOLE (user 09.08.2026, first play test of the feature: "STRG einmal getestet und direkt
+  einen Fehler gefunden: funktioniert nicht für angreifenden Löwen. Nochmal alles
+  durchtesten — ist vielleicht nicht der einzige Fehler"). Point 342 shipped the hold-Ctrl
+  overlay and its own §7.2 evidence was green; the very first hold in real play found a
+  gap. THE SPECIFIC DEFECT: a lion in its ATTACK state carries no label, while the roster
+  and point 342's predicate ("a thing is named when it can MOVE or the player can DO
+  something with it") plainly include it. Establish the cause before fixing — the two
+  candidates the code makes plausible are that the attack run swaps the actor into a
+  different entity list the overlay does not walk, and that §19.16's CONCEALED rule (a
+  submerged crocodile stays silent until it lunges) is being applied to a predator that is
+  not concealed at all. Do not guess between them: dump the overlay's actor set during a
+  staged lion attack and see which one it is.
+  THE POINT IS NOT ONE FIX. The user asked for the whole thing to be re-tested, and one
+  miss on the first hold means the roster was never exercised in its STATES. FINAL STATE:
+  every actor of point 342's roster is named in EVERY state it can be in — idle, walking,
+  fleeing, attacking, drinking, dead, and mid-staged-event — in both perspectives; the
+  §17.2 discovery gate and the §19.16 concealment exclusion still hold exactly where they
+  are meant to and nowhere else.
+  VERIFIABLE, AND AT THE LEVEL THE PLAYER EXPERIENCES IT (point 589's rule): a Vitest
+  matrix over the pure predicate covering the full cross product of kind × state, which is
+  what would have caught this one; plus a browser check that STAGES a predator attack and
+  asserts the label is drawn at the attacker while it runs — not that the predicate would
+  have returned true.
+  Criticality: medium — no crash, but the feature's promise is that holding Ctrl tells you
+  what you are looking at, and it fails hardest at the moment the player most wants it.
+
+- [ ] 601. HOLDING CTRL WHILE WALKING CLOSES THE BROWSER (user 09.08.2026: "Wenn ich STRG
+  gedrückt halte und dabei WASD benutze, passieren fatale Dinge — z. B. schließt STRG-W
+  Chrome ohne Rückfrage"). The label overlay is a HOLD, and W is the forward key, so the
+  feature's normal use IS the browser's close-tab chord. Point 342 decided this
+  deliberately — "Do NOT preventDefault: the browser's own Ctrl combinations stay the
+  browser's" — and that decision is what the user has now hit; it is SUPERSEDED here.
+  ESTABLISHED ABOUT THE PLATFORM, so nobody re-researches it: `preventDefault` on keydown
+  does NOT stop Ctrl+W, Ctrl+T or Ctrl+N — those are reserved. The ONE mechanism that
+  captures them is the Keyboard Lock API (`navigator.keyboard.lock([...])`), which works
+  only while the document is in FULLSCREEN and only on Chromium.
+  FINAL STATE:
+  1. While the game holds the pointer (the first-person view) AND the document is
+     fullscreen, the game holds a keyboard lock for the codes the controls actually use,
+     so no Ctrl chord reaches the browser. The lock is released with the pointer lock and
+     on `visibilitychange`, and its absence is never an error — a browser without the API
+     simply does not get this protection.
+  2. WHERE THE LOCK IS UNAVAILABLE the danger must not simply remain. The label modifier
+     becomes REBINDABLE in the settings (§21, in both languages), with at least one
+     default-safe alternative that no browser claims, so a player in a window can take the
+     trap out of his own hands. Ctrl stays the shipped default — it is what design.md
+     §17.8 states and what the player already knows.
+  3. Every Ctrl combination that IS preventable and collides with a game control is
+     prevented while the game has the pointer, so the set of dangerous chords shrinks to
+     the three reserved ones the lock covers.
+  DOCS: design.md §17.8 and §17.5 gain the fullscreen note and the rebind in the same
+  commit, and CLAUDE.md §7.1 criterion 20 is where the setting is proved.
+  VERIFIABLE: Vitest for the rebinding and for the preventable-chord set (a bound game key
+  under Ctrl is prevented, an unbound one is not); a Playwright check that the lock is
+  requested exactly when fullscreen + pointer lock hold and released with either — the
+  reserved chords themselves cannot be asserted from a test, so the request is what is
+  proved, and the user's own play is the acceptance.
+  Criticality: HIGH — it destroys the player's session without a prompt, and it is
+  triggered by the feature's ordinary use, not by an unusual one.
+
 ## Closing (only after all points)
 
 New points are appended BEFORE this section — it stays last in the file.
