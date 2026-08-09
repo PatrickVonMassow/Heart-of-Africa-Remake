@@ -70,6 +70,42 @@ there exactly once; a new point joins a bundle when appended.
 
 ## Checklist
 
+- [ ] 586. THE ADULTS FALL PERMANENTLY SILENT AFTER A WHILE (user 09.08.2026, observed
+  live: "Nach einem Neustart erscheinen wieder die Texte der Erwachsenen — aber nur für
+  eine gewisse Zeit. Dann verstummen alle Erwachsenen dauerhaft"). The overhead texts
+  return on a RESTART and stop again after some minutes; from then on no adult speaks at
+  all for the rest of the session. A restart being the only cure makes this accumulating
+  state, not a random miss.
+  PRIME SUSPECT, to be confirmed before anything is built: the errand rotation in
+  `src/scenes/place/adultErrands.ts` holds one assignment per villager
+  (`state.assignments[index]`) and frees it through `clearErrand`, which
+  `noteErrandArrival` drives. A villager that is given an errand but never registers its
+  ARRIVAL keeps its assignment for ever; once every villager is stuck that way there is
+  nobody left to stage an errand for, and the village goes quiet permanently. Blocked
+  paths, a target inside a collider (see point 583, an invisible wall in this very
+  village) and an errand place that is unreachable are all ways to never arrive. CONFIRM
+  by instrumenting the state over a long session — how many assignments are live, how many
+  arrivals fire, how many are cleared — rather than by reading alone; the measurement IS
+  the deliverable of the first step.
+  FINAL STATE:
+  1. The village never runs out of speakers. Whatever the cause, an errand that cannot
+     complete is released after a bounded time instead of holding its villager for ever,
+     and staging continues.
+  2. A dev-mode assert fires the moment no adult has spoken for longer than a stated
+     window while adults are present — this class of defect is invisible in a screenshot
+     and must announce itself in every future session (the in-app invariant channel).
+  3. The rotation's fairness is unchanged: this frees stuck assignments, it does not
+     change which concept is taught next.
+  VERIFIABLE: pure Vitest over a LONG simulated visit (well past the point the user
+  reports, and with some errand targets deliberately unreachable) — the rate of staged
+  errands never falls to zero, no assignment outlives its bound, and the assert fires in
+  the deliberately-broken case and stays silent in the healthy one.
+  Criticality: HIGH — the adults are where the five landscape/action concepts are taught,
+  so a village that goes quiet ends the language mechanic for that session. Build
+  together with points 580 and 582: all three are "the teaching text never reaches the
+  player", and one live session in the Bambara village checks all of them.
+
+
 - [ ] 585. THE LEARNING BOULDER FLOATS IN THE RIVER (user 09.08.2026, F6 report
   `local/bugreports/SchwebenderFindling.zip`: "Ist das der Findling zum Lernen? Der
   schwebt in der Luft über der Wasseroberfläche"; seed 1425108822, Bambara village,
