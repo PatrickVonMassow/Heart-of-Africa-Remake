@@ -852,52 +852,6 @@ there exactly once; a new point joins a bundle when appended.
   section. Do NOT touch the v0.1 tag; 174 (v0.3, at /v0.3/) is a separate later
   release.
 
-- [ ] 264. INTRASPECIES COMBAT — TERRITORIAL/DOMINANCE FIGHTS WITHIN A SPECIES (user
-  23.07.2026; queue position: directly AFTER point 224). Animals of the SAME species
-  fight each other. RESEARCH FIRST (Fable-5 pass, recorded in a new
-  `docs/intraspecies-combat-1890.md`, cited): which of the game's ~1890 African
-  species realistically engage in intraspecific fighting (territorial disputes,
-  dominance/rut, resource/mate competition) and how — e.g. male antelope/wildebeest
-  horn-clashes in the rut, hippo territorial battles (often lethal), male lion
-  dominance fights, crocodile territorial combat, elephant musth clashes — so the
-  mechanic applies to the species it truly fits and not to those that do not (map
-  each of the game's species to fights / does-not-fight, with the driver and lethality
-  from the research). BUILD the mechanic on the researched species: some individuals
-  carry a "wants to fight" disposition. Two interaction paths — (a) BOTH want to
-  fight: they RUN TOWARD each other (converge to contact); (b) ONE wants to fight and
-  targets another: it HUNTS/chases the other — the chase resolves either as a DRIVE-OFF
-  (the aggressor is satisfied once the other flees far enough, breaks off, no kill) or
-  a CATCH (it runs the other down). When two same-species animals COLLIDE and at least
-  one wants to fight, a FIGHT happens: it lasts a few (calibratable) seconds — a visible
-  clash — and ENDS with ONE of the two DYING (the loser dies; its body enters the
-  ordinary carcass system so scavengers/vultures work it like any death). The
-  loser/winner outcome is a calibratable roll (may weight by species/size). All timings
-  and chances (fight duration, drive-off distance/chance, per-species fight
-  disposition rate, catch vs drive-off) are balance values, debug-editable (§21.2).
-  Reuse the existing chase/flee + collision + carcass machinery (the §19 hunt/flee
-  steps, `deflectAroundCircle`/collision, the caught/stain/carcass system) — do NOT
-  build a parallel path; the intraspecies fight is a new state layered on the shared
-  drama/hunt core (like the §19.8 dramas resolving through one core). Every started
-  fight/chase RESOLVES (a hard deadline backstop, like the other dramas — invariant
-  I4). Anchors: `src/scenes/travel/wildlifeBehavior.ts` (the fight/chase state, a pure
-  outcome/drive-off resolver + the per-species fight table), `src/scenes/travel/
-  Wildlife.tsx` (the converge/chase/fight drives + the clash pose + the loser death →
-  carcass), `src/render/fauna.ts` (a fight/clash pose if needed), `src/config/
-  balance.ts` + `src/ui/DebugMenu.tsx` (the calibratable values), `docs/intraspecies-
-  combat-1890.md` (the research). VERIFIABLE: pure tests — the per-species fight table
-  (a fighting species fights, a non-fighting one never does), the converge-vs-hunt
-  decision, the drive-off-vs-catch resolver (bounded, deterministic per roll), the
-  fight outcome (exactly one of two dies, loser → carcass), and every fight resolves by
-  the deadline; a live check in `scripts/verify/enrichments.mjs` that a staged pair of
-  a fighting species clashes and one dies (body scavenged). DOCS: `docs/intraspecies-
-  combat-1890.md` (research, same branch as the build or a preceding research commit),
-  design.md §19 (the intraspecies-combat behaviour), §21.2 (the new balance values).
-  No player-visible text unless a journal/debug label is added (then both languages).
-  NOTE: `wildlifeBehavior.ts`/`Wildlife.tsx`/`fauna`/`balance` — the wildlife-behaviour
-  cluster; do NOT delegate the BUILD concurrently with another Wildlife.tsx point. The
-  RESEARCH half (the docs file + the species table) is a standalone Fable pass with no
-  code, safe to run in parallel; the build follows on the researched species.
-
 - [ ] 265. ELDERLY (GERIATRIC) ANIMAL VARIANTS — an OLD version of each suitable
   species, visibly aged AND behaviourally distinct, plus natural death of old age
   (user 23.07.2026). PRIORITY/POSITION: queued BEFORE point 203 (do this content
@@ -4693,3 +4647,52 @@ Build order, chosen so no two parallel agents own the same file:
   cause named in the commit message with its evidence.
   Criticality: medium — it may be a real regression against a closed criterion, and until
   it is owned it blocks every render-set change from ever recording a covering run.
+
+- [ ] 574. A BARE VERIFY SCRIPT PHOTOGRAPHS WHATEVER SERVER HOLDS PORT 5173 (found
+  09.08.2026 during the point-264 picture check; it had already invalidated one accepted
+  picture acceptance before anyone noticed).
+  `scripts/verify/enrichments.mjs` — and every suite that reads it — falls back to
+  `BASE_URL ?? 'http://localhost:5173/'`. Run standalone, as the repair loop and every
+  delegation brief tell an agent to do, the suite attaches to whatever dev server happens
+  to be listening on that port. On 09.08.2026 that was a leftover server from an abandoned
+  worktree, serving code from BEFORE the fix under test: every check passed, every frame
+  looked plausible, and the picture that was accepted showed the OLD build. `run-all.mjs`
+  cannot hit this — it starts its own server on a free port in its own working directory —
+  so the trap sits exactly on the path taken when someone is iterating fast.
+  FINAL STATE: a suite started without a server of its own REFUSES to run rather than
+  guessing a port. The fallback to a hard-coded 5173 is removed; with no `BASE_URL` the
+  suite either starts its own dev server (preferred — the repair loop stays one command)
+  or exits naming the command that does. Where a server IS supplied, the suite asserts
+  before its first screenshot that the server it reached serves THIS working tree — a
+  build stamp the dev server exposes and the suite compares against the checkout it runs
+  from — so an attached-to-the-wrong-server run dies loudly instead of photographing a
+  stranger.
+  VERIFIABLE: pure Vitest for the refusal (no BASE_URL and no own server → a non-zero exit
+  naming the remedy, never a run) and for the stamp comparison (a mismatched stamp fails);
+  plus the real proof — a suite pointed at a server from a DIFFERENT checkout must fail,
+  where today it passes green.
+  Criticality: high — it does not break the game, but it silently voids the picture
+  proof, which is the one check this project cannot replace with a test.
+
+- [ ] 575. THE ANIMALS CARRY NO PELT PATTERN AND NO FACE (found 09.08.2026 by the
+  point-264 control frame, which photographed two zebras at the player's own zoom).
+  `ZEBRA_SPEC` paints the body `#d8d4cc` and the head `#9a958c`, flat and untextured —
+  a zebra with NO STRIPES. At the reachable bird's-eye zoom (0.125–0.5, default 0.5) the
+  animal reads as a uniform light capsule; nothing identifies the species, and two of them
+  side by side read as one pale bar. The point-264 control frame
+  (`verification/148a-intraspecies-clash-pose-off.png`) is the evidence. By inspection the
+  same holds for the other `buildQuadruped` species — this is the shared model, not one
+  animal.
+  FINAL STATE: every ambient species is IDENTIFIABLE at the zoom the player uses. The
+  zebra carries stripes, and each other species the audit finds unmarked carries the
+  marking that identifies it (giraffe patches, the darker mane and cape where the species
+  has one). The pattern is applied so it survives being small — the silhouette and the
+  large-scale bands do the work, fine texture does not — and it is procedural/TSL rather
+  than an added texture asset, so it costs no download and stays backend-neutral. Faces
+  get whatever minimum reads at distance and no more. The cost is measured before and
+  after, and the feature is sorted into the three detail levels with its
+  `QUALITY_PRESETS` entries and the matching row in `docs/graphics-detail-levels.md`.
+  VERIFIABLE: a frame per treated species at zoom 0.5, judged by looking — the species is
+  recognisable — plus the before/after cost measurement, on both backends.
+  Criticality: medium — it is the visual identity of every animal in the bird's-eye view,
+  and acceptance criterion 11 (no schematic look) speaks to exactly this.
