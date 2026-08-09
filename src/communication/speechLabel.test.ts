@@ -6,8 +6,8 @@ import { balance } from '../config/balance'
 import { emptyMemory, observeUtterance, setHypothesis } from './heard'
 import { phraseOf, utteranceOf } from './lexicon'
 import {
+  GROWN_FIGURE_HEIGHT,
   NO_READING,
-  SPEECH_LABEL_HEIGHT,
   dropSpeechLabel,
   expireSpeechLabels,
   isSpeechLabelVisible,
@@ -15,6 +15,7 @@ import {
   noSpeechLabels,
   readingOf,
   showSpeechLabel,
+  speechLabelHeight,
   speechLabelSeconds,
 } from './speechLabel'
 
@@ -98,7 +99,7 @@ describe('how long a label stands (design.md §13.4)', () => {
   it('shows a label from now until its time is up', () => {
     const state = showSpeechLabel(noSpeechLabels(), 'kid-1', [COME], 10)
     expect(state.labels).toHaveLength(1)
-    expect(state.labels[0]).toMatchObject({ speakerId: 'kid-1', shownAt: 10, height: SPEECH_LABEL_HEIGHT })
+    expect(state.labels[0]).toMatchObject({ speakerId: 'kid-1', shownAt: 10, height: speechLabelHeight() })
     expect(state.labels[0].hideAt).toBeCloseTo(10 + speechLabelSeconds(1))
   })
 
@@ -157,5 +158,77 @@ describe('how long a label stands (design.md §13.4)', () => {
     const state = showSpeechLabel(noSpeechLabels(), 'kid-1', [COME], 0, { seconds: 10 })
     expect(expireSpeechLabels(state, 1)).toBe(state)
     expect(dropSpeechLabel(state, 'kid-9')).toBe(state)
+  })
+})
+
+/**
+ * WHERE THE NOTE FLOATS (work-order point 582). The old flat height was 2.3 m
+ * over the speaker's FEET whoever spoke, which put a child's note about twice
+ * the child's own height above it — the user reported missing utterances
+ * because of it. The rule is now the SPEAKER's own height plus one small gap,
+ * so these cases are stated in the only terms that matter: how far the note
+ * ends up above THAT figure's crown, in world units.
+ */
+describe('the note rides on the speaker’s own height', () => {
+  /** The crown of a figure whose actor record says `rise` (the record sits a
+   *  little above the head sphere, exactly as the Ctrl label reads it). */
+  const CROWN_UNDER_RECORD = 0.11
+  const grown = GROWN_FIGURE_HEIGHT
+  const kid = GROWN_FIGURE_HEIGHT * 0.55
+
+  it('leaves the same small gap over a grown villager and over a child', () => {
+    for (const rise of [grown, kid]) {
+      const gap = speechLabelHeight(rise) - rise
+      expect(gap).toBeCloseTo(balance.communication.labelHeadroom)
+    }
+  })
+
+  it('sits a hand’s breadth over the head at BOTH scales, and never below it', () => {
+    for (const [what, rise, scale] of [
+      ['a grown villager', grown, 1],
+      ['a child', kid, 0.55],
+    ] as const) {
+      const crown = rise - CROWN_UNDER_RECORD * scale
+      const over = speechLabelHeight(rise) - crown
+      expect(over, `${what}: the note must clear the head`).toBeGreaterThan(0)
+      expect(over, `${what}: the note must stay close over it`).toBeLessThanOrEqual(0.5)
+    }
+  })
+
+  it('is the defect it fixes: the old flat height stood far higher over both', () => {
+    // The shipped constant, for the contrast this case exists to state.
+    const FLAT = 2.3
+    expect(FLAT - (grown - CROWN_UNDER_RECORD)).toBeGreaterThan(0.8)
+    expect(FLAT - (kid - CROWN_UNDER_RECORD * 0.55)).toBeGreaterThan(kid)
+    expect(speechLabelHeight(kid)).toBeLessThan(FLAT - 1)
+  })
+
+  it('moves with the figure: half the scale, roughly half the height', () => {
+    const half = speechLabelHeight(kid)
+    const full = speechLabelHeight(grown)
+    expect(half).toBeLessThan(full)
+    expect(half - balance.communication.labelHeadroom).toBeCloseTo(
+      (full - balance.communication.labelHeadroom) * 0.55,
+    )
+  })
+
+  it('falls back to a grown figure for a speaker that carries no height', () => {
+    for (const missing of [undefined, null, 0, -1]) {
+      expect(speechLabelHeight(missing)).toBeCloseTo(
+        GROWN_FIGURE_HEIGHT + balance.communication.labelHeadroom,
+      )
+    }
+  })
+
+  it('follows the calibrated gap when it is tuned in the debug menu', () => {
+    const before = balance.communication.labelHeadroom
+    try {
+      balance.communication.labelHeadroom = 0.6
+      expect(speechLabelHeight(grown)).toBeCloseTo(grown + 0.6)
+      balance.communication.labelHeadroom = -5
+      expect(speechLabelHeight(grown)).toBeCloseTo(grown)
+    } finally {
+      balance.communication.labelHeadroom = before
+    }
   })
 })

@@ -706,6 +706,8 @@ export interface BalanceConfig {
     hearingFalloff: number
     /** How long the hypothesis stands over a speaker's head, for one atom. */
     labelSeconds: number
+    /** The gap between a speaker's own crown and its note, in settlement units. */
+    labelHeadroom: number
   }
 }
 
@@ -1147,6 +1149,14 @@ export const balance: BalanceConfig = {
     // enough that the scene never carries standing text; a phrase adds one
     // pause per further atom (speechLabelSeconds).
     labelSeconds: 2.6,
+    // A hand's breadth over the head, no more (point 582). The note used to
+    // hang at a flat 2.3 m over the speaker's FEET — 0.85 m over a grown
+    // villager's head and about twice a child's own height over a child's — so
+    // a player looking at the figures never saw it. It rides the SPEAKER's own
+    // height now, and this is the whole gap left above it: enough for the box
+    // to clear the head, little enough that the note plainly belongs to the
+    // figure under it.
+    labelHeadroom: 0.25,
   },
 }
 

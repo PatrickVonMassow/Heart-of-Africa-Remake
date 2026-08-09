@@ -540,6 +540,9 @@ export function DebugMenu() {
       // How long the player's reading stands over the speaker's head (point 485).
       num(t.debug.speechLabelSeconds, balance.communication.labelSeconds,
         (v) => { balance.communication.labelSeconds = Math.max(0, v); bump() }, 0.2),
+      // How close over that speaker's own head it floats (point 582).
+      num(t.debug.speechLabelHeadroom, balance.communication.labelHeadroom,
+        (v) => { balance.communication.labelHeadroom = Math.max(0, v); bump() }, 0.05),
       // DEBUG VIEW (user 09.08.2026): the concept behind each utterance instead
       // of its syllables and the player's guess — and every speaker labelled,
       // not only the ones already heard. It answers "did that situation stage

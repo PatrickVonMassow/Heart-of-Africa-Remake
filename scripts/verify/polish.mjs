@@ -692,7 +692,11 @@ const stepUntil = async (ready, arg = null, capFrames = 240) => {
         figure.updateWorldMatrix(true, false)
         const e = figure.matrixWorld.elements
         const cam = window.__placeCamera
-        const v = new (Object.getPrototypeOf(cam.position).constructor)(e[12], e[13] + 1, e[14])
+        // The chest at THIS figure's own scale, not a flat metre: a metre above
+        // a child's feet is over its head, and once the note rides close over
+        // that head (point 582) the two would read as one point.
+        const chest = Math.max(0.4, Math.hypot(e[4], e[5], e[6]))
+        const v = new (Object.getPrototypeOf(cam.position).constructor)(e[12], e[13] + chest, e[14])
         v.project(cam)
         const r = el.getBoundingClientRect()
         return {
@@ -776,10 +780,34 @@ const stepUntil = async (ready, arg = null, capFrames = 240) => {
       if (!figure) return null
       figure.updateWorldMatrix(true, false)
       const e = figure.matrixWorld.elements
-      return { x: e[12], y: e[13], z: e[14] }
+      const label = window.__speech?.labels().find((l) => l.speakerId === 'probe-speaker')
+      return {
+        x: e[12],
+        y: e[13],
+        z: e[14],
+        // The note's OWN rise, so the shutter aims where the label actually is
+        // rather than at a height written down here (point 582 moved it).
+        rise: label?.height ?? null,
+        mark: figure.userData?.actor?.height ?? null,
+        scale: Math.hypot(e[0], e[1], e[2]),
+      }
     }, speakerIndex)
+    // Point 582: the note floats a hand's breadth over THAT figure's head, at
+    // the scale it is drawn — measured in WORLD units against the figure's own
+    // record, the same one the Ctrl labels read. A label that fell back to a
+    // grown figure's height over a child would stand out here at once.
+    check(
+      'the note floats close over the speaker’s own head, at its own scale (point 582)',
+      !!at && at.rise !== null && at.mark !== null &&
+        at.rise > at.mark * at.scale && at.rise - at.mark * at.scale <= 0.5,
+      at ? JSON.stringify(at) : 'no speaker',
+    )
     await frame('146-speech-hypothesis-label', {
-      local: { x: (at ?? speaker).x, y: (at ?? speaker).y + 2.3, z: (at ?? speaker).z },
+      local: {
+        x: (at ?? speaker).x,
+        y: (at ?? speaker).y + (at?.rise ?? 1.7),
+        z: (at ?? speaker).z,
+      },
       label: 'the reading over the speaking figure',
     })
     await page.evaluate((u) => {

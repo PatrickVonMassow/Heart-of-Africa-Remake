@@ -23,8 +23,10 @@ import {
   expireSpeechLabels,
   noSpeechLabels,
   showSpeechLabel,
+  speechLabelHeight,
   type SpeechLabelState,
 } from '../../communication/speechLabel'
+import { markedActorRise, type MarkedNode } from '../actorLabelSource'
 
 let state: SpeechLabelState = noSpeechLabels()
 
@@ -74,7 +76,13 @@ export function speakOverhead(
 ): void {
   const now = options.now ?? speechClock()
   anchors.set(speakerId, anchor)
-  publish(showSpeechLabel(expireSpeechLabels(state, now), speakerId, atoms, now, options))
+  // The height is read from the SPEAKER, here rather than at each call site, so
+  // every speaker — the villagers, the children, the dev hook — gets its note
+  // over its own head without computing anything (work-order point 582). The
+  // figure's own actor record says how tall it is drawn; a speaker that carries
+  // none falls back to a grown figure's height.
+  const height = options.height ?? speechLabelHeight(markedActorRise(anchor as MarkedNode))
+  publish(showSpeechLabel(expireSpeechLabels(state, now), speakerId, atoms, now, { ...options, height }))
 }
 
 /** The object a speaker is drawn as, or null once it is gone. */

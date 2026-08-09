@@ -505,6 +505,7 @@ export const en: Strings = {
     speechHearingRadius: 'Speech: hearing radius',
     speechHearingFalloff: 'Speech: falloff sharpness',
     speechLabelSeconds: 'Speech: note above the head (s)',
+    speechLabelHeadroom: 'Speech: gap above the head (m)',
     speechConceptLabels: 'Speech: show concepts instead of syllables',
     tagChildCount: 'Tag: children playing',
     tagSprintSpeed: 'Tag: chaser sprint (m/s)',

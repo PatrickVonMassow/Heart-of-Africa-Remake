@@ -91,3 +91,40 @@ export function pushMarkedActors(root: MarkedNode | null | undefined, out: Label
   if (children === undefined) return
   for (const child of children) pushMarkedActors(child, out)
 }
+
+/**
+ * How high the marked figure drawn under `root` reaches ABOVE root's own
+ * origin, in world units — its own recorded height, taken at the scale it is
+ * actually drawn at. Null when nothing under it is a marked actor.
+ *
+ * The same record the hold-Ctrl labels read, so whatever floats over a head
+ * floats over the SAME point whichever layer put it there: a child drawn at
+ * half size gets half the rise, and a figure that changes scale takes its
+ * labels with it. The speech label (work-order point 582) is the second reader
+ * — it hung at a flat height over the speaker's FEET, which put a child's note
+ * about twice the child's own height above it.
+ */
+export function markedActorRise(root: MarkedNode | null | undefined): number | null {
+  const base = root?.matrixWorld?.elements
+  if (!root || base === undefined) return null
+  const found = firstMarked(root)
+  if (!found) return null
+  const scale = Math.hypot(found.m[0], found.m[1], found.m[2])
+  return found.m[13] + found.mark.height * scale - base[13]
+}
+
+/** The nearest marked node at or under `root`, depth first — an invisible node
+ *  takes its subtree with it, exactly as the label collection does. */
+function firstMarked(
+  root: MarkedNode,
+): { mark: ActorMark; m: ArrayLike<number> } | null {
+  if (root.visible === false) return null
+  const mark = root.userData?.actor
+  const m = root.matrixWorld?.elements
+  if (mark !== undefined && m !== undefined) return { mark, m }
+  for (const child of root.children ?? []) {
+    const hit = firstMarked(child)
+    if (hit) return hit
+  }
+  return null
+}
