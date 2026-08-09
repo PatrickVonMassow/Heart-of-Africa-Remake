@@ -339,10 +339,10 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 
 - **Nicht jedes Rot ist deins.** Eine Prüfung, die nur „rot" und „grün" kennt, schiebt fremde
   Ausfälle deinem Code zu und schickt dich auf eine ergebnislose Suche.
-  → *Prompt:* „Sag bei jedem Rot zuerst, **wo die Ursache liegt** — nicht nach Namensliste, sondern
-  nach der Beobachtung: **lief überhaupt ein eigener Schritt?** Liegt sie außerhalb, nenn den
-  **echten Griff** dort; und wer auf einen fremden Dienst wartet, gibt beim Aufgeben das
-  **Angefangene zurück**, sonst sperrt er alle Nachfolger."
+  → *Prompt:* „Sag bei jedem Rot zuerst, **wo die Ursache liegt** — nach der Beobachtung, nicht nach
+  Namensliste: **lief überhaupt ein eigener Schritt?** Liegt sie außerhalb, nenn den **echten Griff**
+  dort; und wer auf einen fremden Dienst wartet, gibt beim Aufgeben das **Angefangene zurück**, sonst
+  sperrt er alle Nachfolger."
 
 - **Die Reparatur nimmt den Reparierenden mit.** Wer die Leitung repariert, auf der er
   sitzt — Netz, Rechte, Umgebung —, verliert mit dem Fehlschlag die nächste Reparatur mit.
@@ -351,12 +351,13 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   die nur **ergänzt**? Sonst bau sie. Und lass jeden Neuaufbau nach **offen** scheitern —
   ein zu offener Stand ist reparierbar, ein zugesperrter nicht."
 
-- **Verschlucken sieht aus wie Erfolg — und die Attrappe zeigt es nie.** Ein Fehlschlag, der
-  innen zum Ersatzwert wird, läuft als Lüge weiter: kein Absturz, nur Schweigen. Am besten verborgen
-  bei Fehlern, die von der **Menge** echter Daten abhängen — die fallen aus jeder Mini-Testdatei.
-  → *Prompt:* „Prüfe jedes `catch` mit Ersatzwert: Führt er zu **weniger** Aktion oder zu
-  **mehr**? Nur weniger darf verschluckt werden. Und lass **eine** Prüfung gegen den **echten
-  Bestand** laufen: zeig nicht, dass nichts blockiert hat, sondern dass **gelesen** wurde."
+- **Verschlucken sieht aus wie Erfolg — und ein Werkzeug, das nie startete, wie ein strenges.**
+  Ein Fehlschlag, der innen zum Ersatzwert wird, läuft als Lüge weiter — am besten verborgen bei
+  Fehlern, die von der **Menge** echter Daten abhängen. Und ein nie gestarteter Prozess liefert den
+  Fehlercode eines korrekten Ablehnens.
+  → *Prompt:* „Ein Ersatzwert im `catch` darf nur verschluckt werden, wenn er zu **weniger** Aktion
+  führt. Lass **eine** Prüfung gegen den **echten Bestand** laufen — zeig, dass **gelesen** wurde.
+  ‚Nicht gestartet' ist ein eigener Fehlschlag, nie ein Ablehnen."
 
 - **Einigkeit ist keine Evidenz.** Mehrere Modelle können sich über eine Ursache einig
   sein und gemeinsam danebenliegen; die Einigkeit fühlt sich dann an wie ein Beweis.
@@ -404,4 +405,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 Diese eine Nachricht am Anfang baut 80 % der Lehren dieses Projekts ein, bevor die
 erste Zeile Code entsteht.
 
-<!-- GUIDE-FINGERPRINT: 30014f5c932295705f78ad7114dfe382839325a647c919ef5e0b4505206a616c -->
+<!-- GUIDE-FINGERPRINT: cca7bc7f6fd1fcb7e264811257832a8bfc8321049bbbfed9fd5ff7776dd0a19e -->
