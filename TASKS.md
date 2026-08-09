@@ -4655,46 +4655,6 @@ Build order, chosen so no two parallel agents own the same file:
   Criticality: medium — it may be a real regression against a closed criterion, and until
   it is owned it blocks every render-set change from ever recording a covering run.
 
-- [ ] 571. WEBGPU BECOMES THE EVERYDAY LANE, WEBGL 2 THE REGRESSION LANE (user decision
-  09.08.2026, board chat — he asked whether a bug was ever visible on the WebGL lane
-  ALONE, and on the evidence below chose to pull the swap forward; bundle
-  Testinfrastruktur). THE EVIDENCE: the work order records no defect that showed on
-  WebGL 2 only. Every one-backend defect runs the other way — point 334 (the TRAA
-  render-target leak, "WebGPU only, FAILS TWICE", while the same suite was 39/39 green on
-  WebGL 2), point 506 (the goat-stance check, red in both WebGPU runs and green on WebGL
-  2), and point 210, the case this whole rule was written for, where the coast fix read
-  "done" on WebGL 2 while the WebGPU picture was still stepped. WebGPU is also the
-  PLAYER's backend; WebGL 2 is the fallback.
-  AND THE COST OBJECTION DOES NOT HOLD — measured 09.08.2026 on this host, `polish` per
-  attempt: WebGL 2 14.5 min and 14.2 min, WebGPU 13.1 min and 14.4 min. The software
-  WebGPU lane is NOT the slower one, so the swap costs no run time.
-  FINAL STATE: the everyday gate (the SMALL tier and the per-point suite picks of §7.2)
-  runs on WEBGPU by default; WebGL 2 runs in the LARGE regression, which is not rare —
-  it is mandatory on a scene core, at every ~4th point as a collective gate and before
-  every closing. The map is `scripts/verify/tiers.mjs`, pinned by
-  `scripts/verify/tiers.test.mjs`; it changes together with `scripts/verify/README.md`
-  and CLAUDE.md §7.2 in ONE commit, and `docs/acceptance-criteria-detail.md` if a
-  criterion names a backend.
-  THE TWO THINGS THAT MUST NOT BE LOST IN THE SWAP:
-  (a) `touch` and `voice` are WEBGL2-ONLY (`WEBGL_ONLY_SUITES`): headless WebGPU drives
-  neither the CDP touch events nor the TTS speak state. Making WebGPU the daily lane
-  would silently drop them from the daily gate. Decide and WRITE DOWN where they run —
-  on WebGL inside the daily gate as a named exception, or only in LARGE with the gap
-  stated. They may not simply fall out.
-  (b) `render-verify-guard` still demands BOTH backends for a backend-sensitive path
-  before a merge (`isBackendSensitivePath`). That demand is NOT relaxed by this point —
-  a render change is still judged on both pictures. What changes is which lane runs
-  WITHOUT being asked, not what a render merge must prove.
-  NAME THE RESIDUAL, as point 557 did for its seed: a WebGL-2-only regression would now
-  surface only at the next LARGE run instead of the next point. That is the accepted
-  price, and the evidence above is why it is acceptable — but it is written down, not
-  assumed away.
-  VERIFIABLE: `tiers.test.mjs` proves the everyday tier resolves to webgpu and the LARGE
-  tier still covers both; a case fails if `touch`/`voice` resolve to no lane at all; and
-  one real SMALL run comes up on WebGPU with `assertBackend` confirming it.
-  Criticality: medium — it changes which backend the daily verdict comes from, so a
-  mistake here silently narrows every gate that follows.
-
 - [ ] 572. WHAT ELSE WOULD MAKE A TASK FASTER AND CHEAPER — A THOROUGH ANALYSIS (user
   09.08.2026, board chat, to be worked directly after point 571: "eine ausführliche
   Analyse, welche Maßnahmen man noch ergreifen könnte, um zum einen die Bearbeitungszeit
