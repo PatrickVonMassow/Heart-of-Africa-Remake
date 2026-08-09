@@ -104,6 +104,7 @@ import {
   fightApproach,
   fightApproachOutcome,
   fightResolve,
+  fightPairBroken,
   clashOver,
   parentAttackOutcome,
   parentDefends,
@@ -4424,6 +4425,50 @@ describe('clashOver — the clash always ends (invariant I4, point 264)', () => 
   it('a zero or negative duration resolves at once — never an endless clash', () => {
     expect(clashOver(0, 0)).toBe(true)
     expect(clashOver(0, -3)).toBe(true)
+  })
+})
+
+describe('fightPairBroken — nobody is left engaged with a body that is gone (point 264)', () => {
+  /** A live, mutually engaged pair. */
+  const pair = () => {
+    const one = {}
+    const two = {}
+    one.fight = { foe: two }
+    two.fight = { foe: one }
+    return [one, two]
+  }
+
+  it('a live, mutual pair keeps fighting', () => {
+    const [one, two] = pair()
+    expect(fightPairBroken(one, two)).toBe(false)
+    expect(fightPairBroken(two, one)).toBe(false)
+  })
+
+  it('EITHER side dying breaks it — checked from BOTH sides', () => {
+    // The hole this exists to close: an aggressor trampled mid-bout stops being
+    // driven, and its quarry would have kept the drama flag, the fight pose and
+    // the no-flight for good.
+    const [one, two] = pair()
+    one.dead = true
+    expect(fightPairBroken(one, two)).toBe(true)
+    expect(fightPairBroken(two, one)).toBe(true)
+  })
+
+  it('a CULLED opponent breaks it too — a streamed-out body is not a rival', () => {
+    const [one, two] = pair()
+    two.gone = true
+    expect(fightPairBroken(one, two)).toBe(true)
+    expect(fightPairBroken(two, one)).toBe(true)
+  })
+
+  it('a HALF-engaged pair breaks it: the other side moved on', () => {
+    const [one, two] = pair()
+    two.fight = undefined // released by its own ending
+    expect(fightPairBroken(one, two)).toBe(true)
+    // …and re-aimed at a third animal, which is not this bout either.
+    const third = {}
+    two.fight = { foe: third }
+    expect(fightPairBroken(one, two)).toBe(true)
   })
 })
 

@@ -2730,3 +2730,30 @@ export function fightResolve(
 export function clashOver(clashSeconds: number, duration: number): boolean {
   return clashSeconds >= Math.max(0, duration)
 }
+
+/** A minimal structural view of one side of a bout, so the pair check below is
+ *  testable without the render `Animal`. */
+export interface FightSide {
+  dead?: boolean
+  /** Removed from the herd arrays (culled or consumed). */
+  gone?: boolean
+  fight?: { foe: FightSide }
+}
+
+/**
+ * Must this bout be broken off before anything is driven (point 264, the point-341
+ * lesson applied to the fight)? A bout is only alive while BOTH sides are alive,
+ * present, and still hold EACH OTHER. Checked from either side every frame, so a
+ * fighter whose opponent died, was culled or was claimed by another drama is
+ * released rather than left engaged with a body that is gone — which would keep
+ * its drama flag, its fight pose and its no-flight standing forever.
+ */
+export function fightPairBroken(self: FightSide, foe: FightSide): boolean {
+  return (
+    self.dead === true ||
+    self.gone === true ||
+    foe.dead === true ||
+    foe.gone === true ||
+    foe.fight?.foe !== self
+  )
+}

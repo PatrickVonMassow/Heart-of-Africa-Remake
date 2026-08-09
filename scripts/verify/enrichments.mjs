@@ -5912,7 +5912,13 @@ if (section('crocodile-ambush')) {
 // Both outcomes are pinned through balance.fight.forceOutcome (the point-177
 // precedent), so neither run needs a retry-until-the-roll-lands loop.
 if (section('intraspecies-fight')) {
+  // The run starts INSIDE Cairo, where no travel scene — and so no
+  // `window.__wildlife` — exists. Step out to the bird's-eye first, or a
+  // standalone `--section` run of this block dies on the missing hook.
+  await page.evaluate(() => { if (window.__game.getState().placeId) window.__game.getState().leavePlace() })
+  await page.waitForFunction(() => !!window.__wildlife?.herdsRef?.current, null, { timeout: 30000 }).catch(() => {})
   await page.evaluate(() => window.__game.getState().debugJumpTo(-2.5, 34.0)) // Serengeti savanna
+  await page.evaluate(() => window.__wildlife.restock())
   await waitForHerds()
   /** Stage one bout of the given outcome and report how it resolved. */
   const stageFight = async (forced) =>

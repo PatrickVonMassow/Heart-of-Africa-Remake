@@ -143,6 +143,7 @@ import {
   fightApproach,
   fightApproachOutcome,
   fightResolve,
+  fightPairBroken,
   clashOver,
 } from './wildlifeBehavior'
 import { ELEPHANT_GRAVEYARD, WATERFALLS } from '../../world/data/landmarks'
@@ -3036,18 +3037,23 @@ function Herds() {
           }
           const bout = a.fight
           if (bout === undefined) continue
-          // Own only the AGGRESSOR's side of the pair here — the quarry's flight
-          // is driven from the same block, so the bout is stepped exactly once.
-          if (!bout.aggressor) continue
           const foe = bout.foe
-          bout.time += dt
-          // The foe left the world (streamed out, taken by a predator, killed
-          // by an elephant) or was pulled into another drama: the bout ends
-          // rather than pinning the survivor on a body that is gone (point 341).
-          if (foe.dead || foe.gone || foe.fight?.foe !== a) {
+          // THE PAIR IS CHECKED FROM BOTH SIDES, before anything is driven
+          // (point 341's lesson): this animal itself may have died or been
+          // claimed since the bout began — an elephant trampled it, a hunt took
+          // it — and its opponent may have left the world (culled, killed,
+          // streamed out). Either way the bout ENDS and BOTH are released; a
+          // quarry left holding a body that is gone would keep the drama flag,
+          // and with it the fight pose and the no-flight, for good.
+          if (fightPairBroken(a, foe)) {
             endFight(a)
+            if (foe.fight?.foe === a) endFight(foe)
             continue
           }
+          // Only the AGGRESSOR drives the pair from here — the quarry's flight is
+          // stepped from this same branch, so the bout advances exactly once.
+          if (!bout.aggressor) continue
+          bout.time += dt
           if (bout.mode === 'clash') {
             bout.clash += dt
             if (!clashOver(bout.clash, fb.clashSeconds)) continue
