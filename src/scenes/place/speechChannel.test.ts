@@ -6,6 +6,8 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import type { Object3D } from 'three/webgpu'
 import { utteranceOf } from '../../communication/lexicon'
+import { speechLabelHeight } from '../../communication/speechLabel'
+import { markActor } from '../actorLabelSource'
 import {
   clearSpeechLabels,
   pruneSpeechLabels,
@@ -121,5 +123,41 @@ describe('the scene never accumulates standing text (design.md §13.4)', () => {
     clearSpeechLabels()
     expect(speechLabelState().labels).toHaveLength(0)
     expect(speechAnchor('kid-1')).toBeNull()
+  })
+})
+
+/**
+ * The height the channel gives a note (work-order point 582): it is taken from
+ * the SPEAKER, here, so no call site has to compute it and none can forget to.
+ */
+describe('the height comes from the speaker itself', () => {
+  /** A figure drawn at `scale` whose actor record says how tall it stands. */
+  function drawn(scale: number, height = 1.45): Object3D {
+    const m = { elements: [scale, 0, 0, 0, 0, scale, 0, 0, 0, 0, scale, 0, 0, 0, 0, 1] }
+    return {
+      parent: {},
+      matrixWorld: m,
+      userData: markActor({ kind: 'villager', height }),
+      children: [],
+    } as unknown as Object3D
+  }
+
+  it('gives a child a lower note than a grown villager, each over its own head', () => {
+    speakOverhead('villager-1', [COME], drawn(1), { now: 0 })
+    speakOverhead('kid-1', [COME], drawn(0.55), { now: 0 })
+    const at = (id: string) => speechLabelState().labels.find((l) => l.speakerId === id)!.height
+    expect(at('villager-1')).toBeCloseTo(speechLabelHeight(1.45))
+    expect(at('kid-1')).toBeCloseTo(speechLabelHeight(1.45 * 0.55))
+    expect(at('kid-1')).toBeLessThan(at('villager-1'))
+  })
+
+  it('falls back to a grown figure for an object that is no marked actor', () => {
+    speakOverhead('probe', [COME], figure(), { now: 0 })
+    expect(speechLabelState().labels[0].height).toBeCloseTo(speechLabelHeight())
+  })
+
+  it('lets an explicit height win — the dev hook and the tests set their own', () => {
+    speakOverhead('probe', [COME], drawn(1), { now: 0, height: 9 })
+    expect(speechLabelState().labels[0].height).toBe(9)
   })
 })

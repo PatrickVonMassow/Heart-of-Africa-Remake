@@ -686,6 +686,12 @@ export interface BalanceConfig {
       digSeconds: number
       /** Backstop: an errand never outlives this, however the walk goes. */
       errandSeconds: number
+      /** Seconds of NO headway toward the target after which the errand is let
+       *  go, so a walk that cannot finish stops holding its villager. */
+      stallSeconds: number
+      /** Dev-mode alarm: no errand staged for this long in a village that could
+       *  stage one raises the `errands-silent` assert. */
+      silenceSeconds: number
       /** The pace a villager walks at while on an errand (m/s). */
       pace: number
       /** How many errand villagers a village keeps out and about. Read when a
@@ -729,6 +735,8 @@ export interface BalanceConfig {
      *  syllables are the one sound the player must hear, so `ambientVolume`
      *  ("everything else") no longer touches them. */
     speechVolume: number
+    /** The gap between a speaker's own crown and its note, in settlement units. */
+    labelHeadroom: number
   }
 }
 
@@ -1142,6 +1150,16 @@ export const balance: BalanceConfig = {
       // now the walk out to the river bank, some forty metres of village away,
       // at an unhurried 1.25 m/s and around whatever stands in the line.
       errandSeconds: 180,
+      // A walk that gets NOWHERE for this long is let go — twenty seconds is
+      // many times the longest stretch a legitimate detour round a hut spends
+      // without shortening the straight line, and a twentieth of the backstop
+      // above, which on its own held a blocked villager for twenty staged
+      // errands and left the village silent for minutes (point 586).
+      stallSeconds: 20,
+      // The alarm window. Measured on a healthy village, the longest quiet
+      // spell between two errands is ~25 s; the user watched them stay silent
+      // for minutes, so anything past a minute is a defect, not a lull.
+      silenceSeconds: 60,
       pace: 1.25, // an unhurried working walk
       villagerCount: 4,
     },
@@ -1197,6 +1215,14 @@ export const balance: BalanceConfig = {
     // over the drums — what the player was reaching for when he turned
     // "everything else" down to nothing (point 577).
     speechVolume: 0.5,
+    // A hand's breadth over the head, no more (point 582). The note used to
+    // hang at a flat 2.3 m over the speaker's FEET — 0.85 m over a grown
+    // villager's head and about twice a child's own height over a child's — so
+    // a player looking at the figures never saw it. It rides the SPEAKER's own
+    // height now, and this is the whole gap left above it: enough for the box
+    // to clear the head, little enough that the note plainly belongs to the
+    // figure under it.
+    labelHeadroom: 0.25,
   },
 }
 

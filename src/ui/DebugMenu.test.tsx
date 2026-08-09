@@ -796,8 +796,8 @@ const EXPECTED_CONTROLS: Record<DebugGroupId, readonly string[]> = {
   settlement: [
     'debug.walkerUnstuck', 'debug.edgeBandWidth', 'debug.edgeBandWander', 'debug.edgeBandStrength', 'debug.bankWadeDepth',
     'debug.speechSyllable', 'debug.speechPhrasePause', 'debug.speechHearingRadius',
-    'debug.speechHearingFalloff', 'debug.speechLabelSeconds', 'debug.speechPitch',
-    'debug.speechPitchInterval', 'debug.speechVolume', 'debug.speechConceptLabels',
+    'debug.speechHearingFalloff', 'debug.speechLabelSeconds', 'debug.speechLabelHeadroom',
+    'debug.speechConceptLabels',
     'debug.tagChildCount', 'debug.tagSprintSpeed', 'debug.tagRunnerBoost', 'debug.tagTrotFactor',
     'debug.tagRecoverFactor', 'debug.tagFloorFactor', 'debug.tagDrain', 'debug.tagRecover',
     'debug.tagBreakOff', 'debug.tagResume', 'debug.tagPressure', 'debug.tagReach', 'debug.tagCommit',
@@ -807,9 +807,8 @@ const EXPECTED_CONTROLS: Record<DebugGroupId, readonly string[]> = {
     'debug.childSpeechInterval', 'debug.childSpeechSpread', 'debug.childSpeechAction',
     'debug.childSpeechPace', 'debug.childSpeechRefusal', 'debug.childSpeechReply',
     'debug.adultErrandInterval', 'debug.adultErrandSpread', 'debug.adultErrandDwell',
-    'debug.adultErrandDig', 'debug.adultErrandLife', 'debug.adultErrandPace', 'debug.adultErrandCount',
-    'debug.separationRadius', 'debug.separationSlop', 'debug.separationStiffness',
-    'debug.separationSpeed', 'debug.separationWedge',
+    'debug.adultErrandDig', 'debug.adultErrandLife', 'debug.adultErrandStall',
+    'debug.adultErrandSilence', 'debug.adultErrandPace', 'debug.adultErrandCount',
   ],
   weather: ['debug.season', 'debug.seasonStrength', 'debug.wetGroundStrength', 'debug.foliageCollapse'],
   economy: [
@@ -896,19 +895,19 @@ describe('DebugMenu completeness: every control is present, in its group (point 
     })
   })
 
-  it('carries all 155 controls in total, and none twice', () => {
+  it('carries all 149 controls in total, and none twice', () => {
     render(<DebugMenu />)
     const labels = renderedRowLabels()
     const expected = DEBUG_GROUP_ORDER.flatMap((id) => EXPECTED_CONTROLS[id])
     expect(labels.length).toBe(expected.length)
-    expect(labels.length).toBe(155)
+    expect(labels.length).toBe(149)
     expect(new Set(labels).size).toBe(labels.length)
   })
 
   it('gives every control a real input, select or button — no label without a control', () => {
     render(<DebugMenu />)
     const rows = [...document.querySelectorAll('.debug-menu .debug-group-body > label')]
-    expect(rows.length).toBe(155)
+    expect(rows.length).toBe(149)
     for (const row of rows) {
       const label = row.querySelector('span')?.textContent ?? '(none)'
       // The renderer row is the one deliberate read-only display (design.md §21.3).
@@ -962,7 +961,7 @@ describe('DebugMenu groups collapse and remember their state (point 393)', () =>
     render(<DebugMenu />)
     // Nothing opened: the whole set is still there (hidden), and a value still
     // writes through — the verify suites drive the controls this way.
-    expect(renderedRowLabels().length).toBe(155)
+    expect(renderedRowLabels().length).toBe(149)
     fireEvent.change(numberField(en.debug.travelSpeed), { target: { value: '9' } })
     expect(balance.travelSpeed).toBe(9)
     balance.travelSpeed = DEFAULTS.travelSpeed
@@ -1008,9 +1007,9 @@ describe('DebugMenu filter narrows the whole menu (point 393)', () => {
     render(<DebugMenu />)
     fireEvent.click(groupHead(en.debug.groups.tools))
     typeFilter('croc')
-    expect(renderedRowLabels().length).toBeLessThan(147)
+    expect(renderedRowLabels().length).toBeLessThan(149)
     typeFilter('')
-    expect(renderedRowLabels().length).toBe(155)
+    expect(renderedRowLabels().length).toBe(149)
     expect(renderedGroups().filter((g) => g.open).map((g) => g.title)).toEqual([en.debug.groups.tools])
   })
 

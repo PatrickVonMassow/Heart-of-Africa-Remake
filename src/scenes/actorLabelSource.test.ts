@@ -4,6 +4,7 @@ import { describe, it, expect } from 'vitest'
 import {
   collectActors,
   markActor,
+  markedActorRise,
   pushMarkedActors,
   registerActorSource,
   type LabelledActor,
@@ -89,5 +90,58 @@ describe('marked scene objects', () => {
     pushMarkedActors(node(0, 0, 0, { children: [node(1, 1, 1)] }), out)
     pushMarkedActors(null, out)
     expect(out).toHaveLength(0)
+  })
+})
+
+/**
+ * The rise the SPEECH label reads (work-order point 582): how high the figure
+ * under an anchor reaches above that anchor's own origin, at the scale it is
+ * drawn. One record, two readers — whatever floats over a head floats over the
+ * same point whether the Ctrl layer or the speech channel put it there.
+ */
+describe('the marked figure’s rise above its anchor', () => {
+  const villager = markActor({ kind: 'villager', height: 1.45 })
+
+  it('reports a grown figure’s own height under an anchor at its feet', () => {
+    const anchor = node(4, 0, -2, { children: [node(4, 0, -2, { userData: villager })] })
+    expect(markedActorRise(anchor)).toBeCloseTo(1.45)
+  })
+
+  it('scales with the figure: a child drawn at 0.55 rises 0.55 as high', () => {
+    const anchor = node(0, 0, 0, {
+      children: [node(0, 0, 0, { scale: 0.55, userData: markActor({ kind: 'child', height: 1.45 }) })],
+    })
+    expect(markedActorRise(anchor)).toBeCloseTo(1.45 * 0.55)
+  })
+
+  it('is measured against the ANCHOR, so a figure lifted off it counts from there', () => {
+    // The anchor bobs with the walk; the rise must not bob with it.
+    const anchor = node(0, 1.2, 0, { children: [node(0, 1.2, 0, { userData: villager })] })
+    expect(markedActorRise(anchor)).toBeCloseTo(1.45)
+  })
+
+  it('reads the mark on the anchor itself', () => {
+    expect(markedActorRise(node(0, 0, 0, { scale: 0.5, userData: villager }))).toBeCloseTo(0.725)
+  })
+
+  it('finds the figure deep under the anchor', () => {
+    const deep = node(0, 0, 0, {
+      children: [node(0, 0, 0, { children: [node(0, 0, 0, { userData: villager })] })],
+    })
+    expect(markedActorRise(deep)).toBeCloseTo(1.45)
+  })
+
+  it('says nothing for an anchor that carries no figure at all', () => {
+    expect(markedActorRise(node(0, 0, 0))).toBeNull()
+    expect(markedActorRise(null)).toBeNull()
+    expect(markedActorRise(undefined)).toBeNull()
+    expect(markedActorRise({ userData: { actor: villager.actor } })).toBeNull()
+  })
+
+  it('ignores a figure that is not being drawn', () => {
+    const anchor = node(0, 0, 0, {
+      children: [node(0, 0, 0, { visible: false, userData: villager })],
+    })
+    expect(markedActorRise(anchor)).toBeNull()
   })
 })

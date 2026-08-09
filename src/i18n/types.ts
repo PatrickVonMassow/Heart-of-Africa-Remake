@@ -494,6 +494,7 @@ export interface Strings {
     speechPitch: string
     speechPitchInterval: string
     speechVolume: string
+    speechLabelHeadroom: string
     speechConceptLabels: string
     /** The children's game of tag (design.md §19.10, point 480/351). */
     tagChildCount: string
@@ -533,6 +534,8 @@ export interface Strings {
     adultErrandDwell: string
     adultErrandDig: string
     adultErrandLife: string
+    adultErrandStall: string
+    adultErrandSilence: string
     adultErrandPace: string
     adultErrandCount: string
     separationRadius: string

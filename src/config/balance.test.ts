@@ -191,6 +191,7 @@ describe('village speech (design.md §13.4)', () => {
       speechPitchHz: 140,
       speechPitchInterval: 1.68,
       speechVolume: 0.5,
+      labelHeadroom: 0.25,
     })
     // A five-syllable atom stays well under two seconds, so a seven-atom
     // message is heard in one go rather than sat through.
@@ -200,6 +201,11 @@ describe('village speech (design.md §13.4)', () => {
     expect(balance.communication.labelSeconds).toBeGreaterThan(
       balance.communication.syllableSeconds * 5,
     )
+    // And it floats a hand's breadth over the speaker's own head, not a metre
+    // over it: the flat 2.3 m the note used to hang at was most of a grown
+    // figure's height above the head, and about twice a child's (point 582).
+    expect(balance.communication.labelHeadroom).toBeGreaterThan(0)
+    expect(balance.communication.labelHeadroom).toBeLessThan(0.5)
   })
 
   it('pitches both syllables inside one human voice, an interval apart that the ear cannot miss', () => {

@@ -199,6 +199,8 @@ const ADULT_ERRAND_FIELDS: ReadonlyArray<{
   { key: 'dwellSeconds', label: 'adultErrandDwell', step: 0.5, min: 0 },
   { key: 'digSeconds', label: 'adultErrandDig', step: 0.5, min: 0 },
   { key: 'errandSeconds', label: 'adultErrandLife', step: 5, min: 1 },
+  { key: 'stallSeconds', label: 'adultErrandStall', step: 1, min: 1 },
+  { key: 'silenceSeconds', label: 'adultErrandSilence', step: 5, min: 1 },
   { key: 'pace', label: 'adultErrandPace', step: 0.1, min: 0.1 },
   { key: 'villagerCount', label: 'adultErrandCount', step: 1, min: 0, max: 12 },
 ]
@@ -572,6 +574,9 @@ export function DebugMenu() {
       // so this raises the syllables over the drums without touching them.
       num(t.debug.speechVolume, balance.communication.speechVolume,
         (v) => { balance.communication.speechVolume = Math.max(0, v); refreshAmbienceVolume(); bump() }, 0.1),
+      // How close over that speaker's own head it floats (point 582).
+      num(t.debug.speechLabelHeadroom, balance.communication.labelHeadroom,
+        (v) => { balance.communication.labelHeadroom = Math.max(0, v); bump() }, 0.05),
       // DEBUG VIEW (user 09.08.2026): the concept behind each utterance instead
       // of its syllables and the player's guess — and every speaker labelled,
       // not only the ones already heard. It answers "did that situation stage
