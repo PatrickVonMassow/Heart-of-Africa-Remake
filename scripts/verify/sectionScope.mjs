@@ -144,6 +144,99 @@ export function crossSectionGlobals(source) {
   return findings
 }
 
+/** A module-level `let`/`var` declarator, up to and including its FIRST name. */
+const BINDING_DECL = /(?<![\w$.])(let|var)\s+([A-Za-z_$][\w$]*)/g
+/** What makes an identifier occurrence a WRITE rather than a read: assignment,
+ *  compound assignment or an increment. `==`, `===` and `=>` are reads. */
+const WRITE_AFTER = /^\s*(?:\*\*=|<<=|>>>?=|&&=|\|\|=|\?\?=|[+\-*/%&|^]=(?!=)|=(?![=>])|\+\+|--)/
+const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+/** Brace depth AT each index of masked text (the `{` and its `}` both read as
+ *  the OUTER depth), so "module level" is depth 0 and nothing else. PURE. */
+function braceDepths(masked) {
+  const out = new Int32Array(masked.length)
+  let d = 0
+  for (let i = 0; i < masked.length; i++) {
+    const c = masked[i]
+    if (c === '}') d--
+    out[i] = d
+    if (c === '{') d++
+  }
+  return out
+}
+
+/**
+ * THE RECURRENCE PATH. Every module-level `let`/`var` whose only assignments sit
+ * inside section blocks, while another section READS it.
+ *
+ * This is the shape the OTHER two nets both wave through, and it is the single
+ * most plausible way the pinFamily class comes back: an author whose cross-block
+ * `const` `no-undef` refuses hoists the DECLARATION and leaves the
+ * INITIALISATION where it was —
+ *
+ *     let herd                        // module level: `no-undef` is satisfied
+ *     if (section('a')) { herd = … }  // …but only this run ever assigns it
+ *     if (section('b')) { use(herd) } // and a --section=b run reads undefined
+ *
+ * — which no linter objects to (the name IS declared) and `crossSectionGlobals`
+ * never sees (it is not a `window.__` helper).
+ *
+ * AN INITIALISER AT THE DECLARATION COUNTS AS A SHARED ASSIGNMENT, and that is
+ * what keeps this quiet enough to be worth having: `let failures = 0` at the top
+ * of every suite, counted up inside the blocks and read at the end, is
+ * legitimate module-level state and is not reported. The price is the known
+ * limit in the header — `let herd = null` initialised only inside a section is
+ * the same defect and is NOT caught.
+ */
+export function crossSectionBindings(source) {
+  const src = String(source ?? '')
+  const masked = maskCode(src)
+  const ranges = sectionRanges(src)
+  if (!ranges.length) return []
+  const depth = braceDepths(masked)
+  const lineAt = (i) => src.slice(0, i).split('\n').length
+  const findings = []
+  const seen = new Set()
+  for (const d of masked.matchAll(BINDING_DECL)) {
+    if (depth[d.index] !== 0 || sectionAt(ranges, d.index) !== null) continue
+    const name = d[2]
+    if (seen.has(name)) continue
+    seen.add(name)
+    const declEnd = d.index + d[0].length
+    const writes = new Set()
+    const reads = new Map() // section | null → line
+    if (WRITE_AFTER.test(masked.slice(declEnd))) writes.add(null)
+    const use = new RegExp(`(?<![\\w$.])${escapeRe(name)}(?![\\w$])`, 'g')
+    for (const u of masked.matchAll(use)) {
+      if (u.index === declEnd - name.length) continue // the declaration itself
+      const where = sectionAt(ranges, u.index)
+      if (WRITE_AFTER.test(masked.slice(u.index + name.length))) writes.add(where)
+      else if (!reads.has(where)) reads.set(where, lineAt(u.index))
+    }
+    if (!writes.size || writes.has(null)) continue
+    for (const [usedIn, line] of reads) {
+      if (usedIn === null || writes.has(usedIn)) continue
+      findings.push({ name, kind: d[1], assignedIn: [...writes].sort(), usedIn, line })
+    }
+  }
+  return findings.sort((a, b) => a.line - b.line)
+}
+
+/** The findings as the message a failing gate prints. */
+export function formatCrossSectionBindings(findings, file = 'the suite') {
+  if (!findings?.length) return ''
+  const lines = findings.map(
+    (f) => `  · ${f.kind} ${f.name} is assigned only in [${f.assignedIn.join(', ')}] but read from ` +
+      `"${f.usedIn}" (${file}:${f.line}) — that block reads it undefined`,
+  )
+  return (
+    `A module-level binding is initialised inside one section and read from another (point 566):\n` +
+    `${lines.join('\n')}\n` +
+    'Hoisting the DECLARATION is not the fix — that only silences `no-undef`. Move the ' +
+    'INITIALISATION above the section blocks as well, with the rest of the shared staging.'
+  )
+}
+
 /** The findings as the message a failing gate prints. */
 export function formatCrossSectionGlobals(findings, file = 'the suite') {
   if (!findings?.length) return ''

@@ -27,7 +27,14 @@ import { execFileSync } from 'node:child_process'
 import { mkdtempSync, mkdirSync, writeFileSync, copyFileSync, readFileSync, readdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { resolve, join } from 'node:path'
-import { crossSectionGlobals, formatCrossSectionGlobals, sectionRanges, sectionAt } from './sectionScope.mjs'
+import {
+  crossSectionGlobals,
+  formatCrossSectionGlobals,
+  crossSectionBindings,
+  formatCrossSectionBindings,
+  sectionRanges,
+  sectionAt,
+} from './sectionScope.mjs'
 
 const ROOT = process.cwd()
 const OXLINT = resolve(ROOT, 'node_modules/.bin/oxlint')
@@ -204,8 +211,68 @@ if (section('borrows')) {
       sectioned++
       const found = crossSectionGlobals(src)
       expect(found, `\n${formatCrossSectionGlobals(found, f)}\n`).toEqual([])
+      const bindings = crossSectionBindings(src)
+      expect(bindings, `\n${formatCrossSectionBindings(bindings, f)}\n`).toEqual([])
     }
     // A gate over nothing would pass forever: at least one suite IS sectioned.
     expect(sectioned).toBeGreaterThan(0)
+  })
+})
+
+// THE RECURRENCE PATH. `no-undef` refuses a cross-block `const`; the smallest
+// edit that satisfies it is to hoist the DECLARATION and leave the
+// INITIALISATION behind — which passes every other net here and reproduces the
+// original bug exactly. This is the net that sees it.
+describe('a module-level binding may not be initialised inside one section only', () => {
+  const HOISTED_DECL = `let herd
+if (section('a')) {
+  herd = await stage()
+  await use(herd)
+}
+if (section('b')) {
+  await use(herd)
+}
+`
+
+  it('names the binding, where it is assigned and where it is read undefined', () => {
+    const found = crossSectionBindings(HOISTED_DECL)
+    expect(found).toEqual([{ name: 'herd', kind: 'let', assignedIn: ['a'], usedIn: 'b', line: 7 }])
+    const msg = formatCrossSectionBindings(found, 'x.mjs')
+    expect(msg).toContain('herd')
+    expect(msg).toContain('"b"')
+    expect(msg).toContain('INITIALISATION')
+  })
+
+  it('sees a `var` the same way — hoisting fools the linter, not a --section run', () => {
+    expect(crossSectionBindings(HOISTED_DECL.replace('let herd', 'var herd')).map((f) => f.kind)).toEqual(['var'])
+  })
+
+  it('is content once the initialisation moves above the blocks — the honest fix', () => {
+    expect(crossSectionBindings(HOISTED_DECL.replace('let herd\n', 'let herd = await stage()\n'))).toEqual([])
+  })
+
+  it('leaves the suites\' own counters alone: an initialiser IS shared staging', () => {
+    // `let failures = 0` at the top, counted up inside the blocks, read at the
+    // end. Reporting this shape would make the gate noise within a day.
+    const src = "let failures = 0\nif (section('a')) { failures++ }\nif (section('b')) { if (failures) report(failures) }\n"
+    expect(crossSectionBindings(src)).toEqual([])
+  })
+
+  it('reads a compound assignment as a write, not a borrow', () => {
+    const src = "let tally\nif (section('a')) { tally = 0 }\nif (section('b')) { tally += 1 }\nif (section('c')) { report(tally) }\n"
+    expect(crossSectionBindings(src).map((f) => f.usedIn)).toEqual(['c'])
+  })
+
+  it('ignores a binding declared inside a block, and a comparison is a read', () => {
+    // `let inner` lives in a function, so no --section run can miss it; and
+    // `herd === null` must not be mistaken for an assignment.
+    const src = "function f() { let inner\n  inner = 1\n  return inner }\nlet herd\nif (section('a')) { herd = 1 }\nif (section('b')) { if (herd === 1) f() }\n"
+    expect(crossSectionBindings(src).map((f) => f.name)).toEqual(['herd'])
+  })
+
+  it('says nothing about a file with no sections at all, and is total on junk', () => {
+    expect(crossSectionBindings('let herd\nherd = 1\nuse(herd)\n')).toEqual([])
+    expect(crossSectionBindings(null)).toEqual([])
+    expect(formatCrossSectionBindings([])).toBe('')
   })
 })
