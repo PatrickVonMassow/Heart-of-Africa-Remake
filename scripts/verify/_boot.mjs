@@ -3,6 +3,7 @@
 // clear / wait-for-game block — this is the single home for it.
 import { chromium } from 'playwright'
 import { webglLaunchOptions } from './launch-args-core.mjs'
+import { applySeedRoute } from './verify-seed.mjs'
 
 export const BASE = process.env.BASE_URL ?? 'http://localhost:5173/'
 
@@ -13,7 +14,9 @@ export async function bootGame({ viewport = { width: 1440, height: 900 } } = {})
   // --use-angle=d3d11 is Direct3D and exists only on Windows, where this yields the
   // identical list it always did). bootGame stays a plain launch: it is also used by
   // scratch probes, which must not arm the render-verify run recorder.
-  const browser = await chromium.launch(webglLaunchOptions(process.platform, process.env.VERIFY_ANGLE))
+  // Same world seed as launchVerifyBrowser, by the same route (point 557): a scratch
+  // probe that reproduces a suite's finding must meet the suite's world.
+  const browser = applySeedRoute(await chromium.launch(webglLaunchOptions(process.platform, process.env.VERIFY_ANGLE)))
   const page = await browser.newPage({ viewport })
   const errors = []
   page.on('console', (m) => {

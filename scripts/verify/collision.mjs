@@ -10,8 +10,11 @@ import { frameShutter } from './frameSubject.mjs'
 import { fileURLToPath } from 'node:url'
 
 // A fixed dev seed makes the procedural settlement layout deterministic so the
-// collision/reachability checks are reproducible (?seed=<n>, DEV only).
-const BASE = process.env.BASE_URL ?? 'http://localhost:5173/?seed=42'
+// collision/reachability checks are reproducible. It is applied by the LAUNCHER
+// (verify-seed.mjs via _browser.mjs, point 557) — written here it lived in a default
+// URL that `process.env.BASE_URL` discarded on every run-all run, so the suite
+// claimed a fixed layout it did not have.
+const BASE = process.env.BASE_URL ?? 'http://localhost:5173/'
 const OUT = fileURLToPath(new URL('../../verification/', import.meta.url))
 let failures = 0
 const check = (name, ok, detail) => {

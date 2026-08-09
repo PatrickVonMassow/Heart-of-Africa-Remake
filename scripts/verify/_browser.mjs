@@ -12,6 +12,7 @@ import { armRunRecorder, markBackendAsserted } from '../render-verify-recorder.m
 import { featureLevelOf } from '../render-verify-core.mjs'
 import { verifyLaunchOptions, webgpuLaneVerdict } from './launch-args-core.mjs'
 import { findSystemChrome, hasHardwareGlChain } from './system-chrome.mjs'
+import { applySeedRoute } from './verify-seed.mjs'
 
 // Which backend the verify run targets. 'webgpu' = system Chrome, headless=new (the
 // player's primary backend); 'webgl' = the bundled Chromium with ANGLE (the WebGL2
@@ -58,7 +59,7 @@ export async function launchVerifyBrowser({ platform = process.platform, systemC
   // guard (scripts/render-verify-guard.mjs) can enforce that every render change
   // was verified on BOTH backends. Observe-only; can never fail the suite.
   armRunRecorder(VERIFY_GL)
-  return chromium.launch(
+  const browser = await chromium.launch(
     // process.env is handed over so the lane can pin the Gallium driver in it (point 493:
     // unpinned, Mesa 25 silently serves llvmpipe and every suite runs on the CPU). The
     // GL-chain answer decides the Linux WebGPU flags (point 505: Dawn's OpenGLES backend
@@ -73,6 +74,11 @@ export async function launchVerifyBrowser({ platform = process.platform, systemC
       glChain ?? hasHardwareGlChain(platform),
     ),
   )
+  // The WORLD SEED, applied where the browser is opened rather than at each call site
+  // (point 557): every page this launcher hands out navigates to the seeded URL, so no
+  // suite can silently fall out of the pin the way collision.mjs had. A suite that
+  // cannot be seeded (verify-seed.mjs `UNSEEDED_SUITES`) says so in its own output.
+  return applySeedRoute(browser)
 }
 
 /** Guardrail (point 184): throw if the backend that actually initialised is not the

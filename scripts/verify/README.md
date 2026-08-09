@@ -965,6 +965,61 @@ itself becomes an unaccounted red), and a run that CRASHED rather than reported 
 exception straight to fd 2 where no tapped stream write can see it. `--defer`
 stays for what genuinely cannot be judged headless.
 
+## The world seed is pinned AT THE LAUNCHER (points 549/557)
+
+The game draws its settlement layouts from one run seed, random unless the
+DEV-only `?seed=<n>` pins it. Unseeded, a suite walks a different world every
+attempt: `polish` gave eight attempts and no two the same verdict, its two reds
+on `zulu village hut` naming two DIFFERENT huts through the same picker. So the
+lane pins the seed — every check still decides on the picture the game draws, on
+the SAME world each time, which is what makes a verdict repeatable at all.
+
+**One route, no per-suite plumbing.** `applySeedRoute` (`verify-seed.mjs`) is
+applied where the browser is OPENED — `_browser.mjs` (`launchVerifyBrowser`),
+`_boot.mjs` (`bootGame`) and `crossbrowser.mjs`'s per-engine launch — and wraps
+`page.goto`, so whatever URL the runner hands a suite arrives seeded. A suite
+therefore inherits the pin by opening a browser and cannot fall out of it.
+
+That shape is the point-557 repair: the pin used to sit at a call site.
+`collision.mjs` wrote `?seed=42` into its DEFAULT url, which
+`process.env.BASE_URL ?? …` discards the moment `run-all` passes a port — so it
+had been running unseeded for years while its comment claimed determinism. **A
+dead pin is worse than no pin**: when such a suite rotates, the log says the
+layout was fixed and the reader rules the layout out first. `verify-seed.test.mjs`
+now fails on that wiring — on a `seed=` literal in a suite, on a suite that opens
+a browser outside the route, and on a launcher that stops applying it.
+
+**Every run says which world it walks**, in the suite's own output:
+
+```
+# world seed 42 — pinned at the launcher (point 549); VERIFY_SEED=random sweeps another world
+# world seed NOT APPLIED — preview: the production build reads no ?seed …
+```
+
+`UNSEEDED_SUITES` in `verify-seed.mjs` names the deliberate exemptions with their
+reason; `preview` is the only one (the prod build carries no dev hook, so it
+cannot be pinned at all). Being listed there is a claim that PRINTS.
+
+**The cost, and how it is covered (decided with point 557).** A lane pinned to
+one seed only ever photographs ONE world, so a layout defect that needs a
+different seed goes unseen. The everyday gate keeps the pin — a repeatable
+verdict is what a gate is for — and the other worlds are covered by an occasional
+SWEEP:
+
+```
+VERIFY_SEED=random npm run test:large     # draws a seed, prints it, runs on it
+VERIFY_SEED=1234567 npm run test:large    # reproduce exactly what the sweep found
+```
+
+The seed is drawn in Node, not left to the game, precisely so the run can name
+it: a red from a sweep is reproduced by pinning the number it printed. Run the
+sweep at each closing cycle (§7.2) and whenever settlement layout code changes;
+an unrecognised `VERIFY_SEED` value throws rather than quietly running pinned.
+**Accepted residual:** between two sweeps a seed-specific layout defect can sit
+unnoticed. That is deliberate — the alternative, a rotating seed on the daily
+gate, buys breadth by giving up the repeatable verdict point 549 was created to
+restore.
+
 ## Screenshots are NOT comparable between runs (point 361)
 
 The frames these suites write cannot be diffed against a stored baseline, and
