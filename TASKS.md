@@ -4301,43 +4301,6 @@ Build order, chosen so no two parallel agents own the same file:
   Criticality: raised to HIGH — no longer a latent risk but a fault the user sees,
   and it reaches him directly rather than through the build.
 
-- [ ] 555. THE BIG CUT: THE ACCEPTANCE CRITERIA LEAVE THE ALWAYS-LOADED FILE (user
-  decision 08.08.2026, board chat — "mache den großen Zuschnitt, ziehe das in der
-  Warteschlange vor"; the measurement behind it was taken 08.08.2026). 99 % of the fixed
-  per-turn load is the documents every session and every delegated agent carries whether
-  or not it needs them, and CLAUDE.md is ~61.600 characters of it. The lever is the grip
-  that already worked twice: the evidence chains went to `docs/acceptance-evidence.md`
-  (26.07.2026) and criteria 20/21's detail to `docs/acceptance-criteria-detail.md`, which
-  is therefore the established shape, not a new invention. The user chose the LARGE cut of
-  the two that were measured: ALL 32 criteria, ~23.000 characters saved per turn, against
-  ~12.000 for the ten largest.
-  FINAL STATE: every §7.1 criterion keeps, in CLAUDE.md, exactly its number, its bold
-  title, ONE short acceptance condition sentence, its `Detail:` pointer and its `Evidence:`
-  line; everything beyond that moves VERBATIM into `docs/acceptance-criteria-detail.md`
-  under the SAME number, the way 20 and 21 already read. Nothing is rewritten, summarised
-  or dropped in the move — a criterion that loses content in it has been silently changed,
-  which is the one failure this must not have. The temporary/superseded/open notices that
-  hang off single criteria (points 12, 24, 28, 32 carry them) travel WITH the detail; a
-  criterion whose condition is genuinely one line already (18) needs no detail section and
-  gets no dangling pointer.
-  IN THE SAME COMMIT: `scripts/doc-budget-core.mjs` gets CLAUDE.md's new, measured ceiling
-  — cutting 23k characters and leaving the old limit standing would silently re-open the
-  room the cut just bought — and `docs/acceptance-criteria-detail.md` gains its own, since
-  it becomes the file that grows instead. Both numbers are the measured post-cut sizes plus
-  the same headroom fraction the existing ceilings use, and the commit message states the
-  arithmetic.
-  DEPENDS ON POINT 466, which adds `docs.mjs`'s `Detail:` pointer check — after this cut
-  32 pointers must resolve instead of 2, so the check that keeps them honest is worth
-  having BEFORE the pointers multiply. If 466 has not landed when this is worked, build
-  that check here rather than leaving 32 unchecked pointers behind.
-  VERIFIABLE: `node scripts/verify/docs.mjs` green (every `Detail:` and `Evidence:` pointer
-  resolves); the Vitest doc-budget case green against the new ceilings; and the move proven
-  LOSSLESS by a mechanical comparison — the concatenated moved text equals what was removed
-  from CLAUDE.md, byte for byte modulo the heading and the kept condition line, with the
-  comparison recorded in the commit message.
-  Criticality: medium — it touches the binding rules file itself, so a botched move
-  misinforms every future session; the change is mechanical, the risk is in the diff.
-
 - [ ] 557. THE SUITE SEED IS PINNED FOR ONE SUITE AND DEAD IN ANOTHER (found 08.08.2026
   by the second model reviewing the seed helper, and confirmed against its own source
   comment; bundle Testinfrastruktur). Point 549 pinned the world seed so a verdict could
