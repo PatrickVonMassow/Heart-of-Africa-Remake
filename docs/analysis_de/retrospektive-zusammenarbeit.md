@@ -956,6 +956,16 @@ Der Fund kam nicht aus einer Kontrolle, sondern aus einer **Nutzerfrage**. Das i
 
 **Lehre:** Ein Punkt, dessen Spezifikation mehrere Liefergegenstände aufzählt, gehört an sie gebunden — die Aufzählung ist die Prüfliste, sie steht bereits da, und sie erst beim Haken zu lesen kostet nichts. Und allgemeiner: Wo eine Absicherung freiwillig ist, wird sie dort fehlen, wo sie am nötigsten wäre, denn ihr Fehlen fällt genau dann nicht auf, wenn ohnehin niemand hinsieht.
 
+### 3.100 Gebaut, getestet, dokumentiert — und in den Weg gelegt hat es niemand
+
+Am selben Abend fragte der Nutzer, ob die differenzierten Prüfläufe, die einen Monat zuvor gebaut worden waren, inzwischen benutzt würden — „nicht, dass diese Möglichkeit nur eingebaut, aber nie genutzt wurde". Die Antwort war nein, und zwar vollständig: Der Abschnittslauf funktioniert, die größte Suite erklärt neun Abschnitte, der Auflöser ist testabgedeckt, die Teillauf-Markierung greift. Erwähnt wird er in der Prüf-Anleitung und in einem Hilfsmodul. In keinem Auftragszettel, in keiner Regel, in keiner Agentenanweisung — und kein einziger aufgezeichneter Lauf ist je ein Teillauf gewesen. Drei Agenten, die noch in derselben Stunde losgeschickt wurden, erfuhren ebenfalls nichts davon.
+
+Das ist keine vergessene Regel und deshalb auch von keinem unserer Wächter zu fangen. **Eine Fähigkeit, von der niemand erfährt, verletzt nichts.** Sie liegt da, alle Prüfungen bleiben grün, und die Ersparnis, für die sie gebaut wurde, fällt weiter jeden Tag an. Bezahlt wird sie zweimal: einmal beim Bauen und danach in jeder Stunde, die sie gespart hätte.
+
+Die Ursache ist eine Lücke im Begriff von „fertig". Ein Punkt gilt als geliefert, wenn das Ding existiert, geprüft ist und dokumentiert wurde. Der Schritt, der fehlt, ist der billigste von allen: die Stelle zu benennen, an der jemand danach greift — den Baustein im Auftragszettel, die Regelzeile, den Vorgabewert des Läufers, den gedruckten Hinweis genau dort, wo sonst die teure Alternative gewählt wird. Wer eben noch gebaut hat, weiß diese Stelle; einen Monat später weiß sie niemand mehr.
+
+**Lehre:** *Gebaut* ist nicht *geliefert* — dazwischen steht *in den Weg gelegt*. Und weil man die Frage „wird das eigentlich benutzt?" sonst nur durch Lesen des ganzen Bestandes beantworten kann, gehört zu jeder gelieferten Fähigkeit die Angabe, **woran** man ihre Benutzung erkennen würde. Ein Ding ohne beobachtbare Benutzung ist nicht fertig, sondern unsichtbar.
+
 ---
 
 ## 4. Die Guards als Immunsystem

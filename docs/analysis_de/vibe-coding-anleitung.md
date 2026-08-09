@@ -359,6 +359,15 @@ Zwei Mechanismen, die das Netz ehrlich halten:
   führt. Lass **eine** Prüfung gegen den **echten Bestand** laufen — zeig, dass **gelesen** wurde.
   ‚Nicht gestartet' ist ein eigener Fehlschlag, nie ein Ablehnen."
 
+- **Gebaut, aber niemandem in den Weg gelegt.** Eine Verbesserung existiert, ist getestet
+  und steht in einer Anleitung — und wird trotzdem nie benutzt, weil keine Aufgabenstellung,
+  keine Regel und kein Vorgabewert jemanden dorthin führt. Kein Test schlägt an: Eine
+  Fähigkeit, von der niemand erfährt, verletzt nichts.
+  → *Prompt:* „Wenn du eine Fähigkeit baust, benenne im **selben Commit** die Stelle, an der
+  jemand danach greift — Aufgabenstellung, Regelzeile, Vorgabewert oder ein Hinweis genau dort,
+  wo sonst der teure Weg gewählt wird. Und sag mir, **woran** ich später erkennen würde, dass
+  sie benutzt wird. Ohne beides ist sie nicht fertig, sondern unsichtbar."
+
 - **Einigkeit ist keine Evidenz.** Mehrere Modelle können sich über eine Ursache einig
   sein und gemeinsam danebenliegen; die Einigkeit fühlt sich dann an wie ein Beweis.
   → *Prompt:* „Bevor du eine Liste von Versuchen vorschlägst: Welcher **eine Test** macht
@@ -405,4 +414,4 @@ Zwei Mechanismen, die das Netz ehrlich halten:
 Diese eine Nachricht am Anfang baut 80 % der Lehren dieses Projekts ein, bevor die
 erste Zeile Code entsteht.
 
-<!-- GUIDE-FINGERPRINT: cca7bc7f6fd1fcb7e264811257832a8bfc8321049bbbfed9fd5ff7776dd0a19e -->
+<!-- GUIDE-FINGERPRINT: 4ddbf3ebf25991b0b56aea2a850d6b9bb9300c0fc12e393df1a3b86192571cb0 -->

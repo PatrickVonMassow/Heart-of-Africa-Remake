@@ -3828,6 +3828,59 @@ second owner for one defect is how two half-fixes get built.
   Criticality: HIGH — it destroys the player's session without a prompt, and it is
   triggered by the feature's ordinary use, not by an unusual one.
 
+- [ ] 602. WHAT ELSE DID WE BUILD AND NEVER USE? (user 09.08.2026, on learning that the
+  section runner of point 566 has never been used once: "Dass du 566 nicht eingesetzt
+  hast, ist aber fatal und legt eine grundsätzliche Lücke auf. Lege einen weiteren Punkt
+  an, um zu prüfen, ob es noch weitere Mechanismen gibt, die du gebaut hast, um Dinge zu
+  verbessern, aber dann nie eingesetzt. Und überlege, ob es eine Möglichkeit gibt, sowas in
+  Zukunft zu verhindern."). THE KNOWN CASE: 566 built `--section=<name>`, `enrichments`
+  declares nine sections, the resolver and the PARTIAL marking work — and it appears in the
+  verify README and in `tiers.mjs` and NOWHERE ELSE. No delegation brief, no agent prompt,
+  no rule text names it; no recorded run is partial; the three agents commissioned the
+  evening this was found were not told about it either. It was BUILT but never ROUTED, and
+  nothing noticed for a day.
+  THIS IS A DIFFERENT AXIS FROM POINT 591. That audit asks whether the practice obeys the
+  written rules. This one asks a question no rule covers: which delivered CAPABILITIES are
+  never exercised? A capability nobody was told about breaks no rule — it simply sits
+  there, and every guard in the house stays green.
+  PART ONE — THE SWEEP. Enumerate what was delivered as an improvement and ask, per entry,
+  for EVIDENCE OF USE: the CLI flags and options of `scripts/**`, the debug-menu levers,
+  the dev hooks (`window.__*`), the verify runner's modes and tiers, the recorded
+  registers, and every helper a rule or brief was supposed to route work through. Evidence
+  means a recorded run, a log line, a register entry, a commit that invoked it, or a
+  document that puts it in someone's path — NOT the fact that it exists and is tested. Its
+  own tests do not count: 566's resolver is Vitest-covered and was still never used.
+  Each finding is classified: USE IT (route it, and say where), RETIRE IT (delete the
+  capability and its tests — an unused mechanism is carrying cost), or KEEP UNUSED with a
+  written reason (a fallback for a case that has not occurred is legitimately idle).
+  PART TWO — THE PREVENTION, which is the half the user asked for. Three parts, in
+  ascending cost:
+  1. ROUTED IS PART OF DELIVERED. A point that builds a capability names, in the same
+     commit, the place that makes someone reach for it — the delegation-brief building
+     block, a rule line, a runner default, a printed hint at the moment of the expensive
+     alternative. Building without routing is half a delivery, and this is the cheapest of
+     the three because it costs one sentence at the time the author still knows where the
+     capability belongs.
+  2. EVERY CAPABILITY DECLARES ITS USAGE SIGNAL. At delivery, the point states what would
+     PROVE the capability is being used — a counter, a recorded run, a log line, a register
+     entry. A capability whose use cannot be observed is not finished, because nobody can
+     ever answer the question the user just asked without reading the whole repository.
+  3. A PERIODIC UNUSED REPORT, and deliberately a REPORT, not a block: a command lists the
+     declared capabilities whose usage signal has not fired since delivery, past a grace
+     period. It runs in the closing cycle, where a slow question belongs. It does not block
+     a turn — an idle fallback is not a defect, and a gate that fired on one would teach
+     everyone to declare no signal at all.
+  DELIVERABLE: `docs/unused-mechanisms-audit.md` — the sweep with its evidence per entry
+  and the three classes, plus what was routed on the spot; everything larger becomes its
+  own appended point, ranked deliberately. The prevention's three parts land as rule text
+  and as the report command, and the rule text is the part that must not be skipped.
+  METHOD: the sweep is a DIVERGENT, ENUMERATING stage — "what did we build that nobody
+  uses" is exactly the question where a reviewer handed a list checks that list — so it
+  runs BLIND PARALLEL across both models and the two results are merged by MEANING
+  (CLAUDE.md §6). The prevention's design is convergent and takes the ordinary review.
+  Criticality: HIGH — every unused mechanism was paid for twice: once when it was built,
+  and again in every hour it would have saved and did not.
+
 ## Closing (only after all points)
 
 New points are appended BEFORE this section — it stays last in the file.
