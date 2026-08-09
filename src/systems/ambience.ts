@@ -42,12 +42,20 @@ const SURF_BASE = 0.26
 
 let ctx: AudioContext | null = null
 let master: GainNode | null = null
-// Two sub-buses under the master so footsteps and every other ambient sound can
-// be balanced against each other (design.md §20; user request): footsteps ×2,
-// all else ×0.5. Every layer/emitter routes through ambientBus, footsteps
-// through footstepBus, so the split needs no per-emit change.
+// THREE sub-buses under the master so footsteps, the village speech and every
+// other ambient sound can be balanced against each other (design.md §19.1/§20;
+// user request): footsteps ×2, all else ×0.5. Every layer/emitter routes through
+// ambientBus, footsteps through footstepBus, so the split needs no per-emit
+// change.
 let footstepBus: GainNode | null = null
 let ambientBus: GainNode | null = null
+// The speech bus is the third (point 577). The syllables are the one sound the
+// player MUST hear — the whole communication PoC is learned from them — so they
+// may not hang on the slider labelled "everything ELSE", which the game's own
+// advice (turn the bed down to hear the voices over the drums) leads the player
+// to set to zero. It carries the SAME level the speech had on the ambient bus,
+// so the split moved the routing and left the mix where it was.
+let speechBus: GainNode | null = null
 const layers: Record<string, Layer> = {}
 let scene: AmbienceScene = { region: 'north', mode: 'place', placeKind: 'port', nearVillage: false }
 let started = false
@@ -311,14 +319,18 @@ function buildGraph() {
   master = ctx.createGain()
   master.gain.value = 0.5
   master.connect(ctx.destination)
-  // Footstep and ambient sub-buses (design.md §20): footsteps twice as loud,
-  // every other ambient sound half as loud, both under the master volume.
+  // Footstep, ambient and speech sub-buses (design.md §19.1/§20): footsteps
+  // twice as loud, every other ambient sound half as loud, the village speech on
+  // its own level, all three under the master volume.
   ambientBus = ctx.createGain()
   ambientBus.gain.value = balance.ambientVolume
   ambientBus.connect(master)
   footstepBus = ctx.createGain()
   footstepBus.gain.value = balance.footstepVolume
   footstepBus.connect(master)
+  speechBus = ctx.createGain()
+  speechBus.gain.value = Math.max(0, balance.communication.speechVolume)
+  speechBus.connect(master)
 
   noiseBed('wind', 'lowpass', 420)
   wobble('wind', 0.13, 0.35)
@@ -816,17 +828,17 @@ export function speakSyllable(ac: AudioContext, dest: AudioNode, t0: number, ton
  * Speaks a pure SpeechPlan (src/communication/speaking.ts): its syllables at the
  * constant pace, a phrase's atoms with the constant pause between them, all on
  * the AudioContext clock — so a re-render or a scene change mid-phrase can never
- * cancel what is already scheduled. Every voice goes through the SAME ambient
- * bus as the rest of the soundscape, so the single §21 ambience volume still
- * governs it. A plan that carries no audible syllable (out of range, muted)
- * schedules nothing at all.
+ * cancel what is already scheduled. Every voice goes through the SPEECH bus
+ * (point 577): under the master §21 ambience volume, but beside — never behind —
+ * the ambient bus that carries the drums and the rest of the village bed. A plan
+ * that carries no audible syllable (out of range, muted) schedules nothing.
  */
 export function playSpeech(plan: SpeechPlan): void {
   if (plan.syllables.length === 0) return
   if (speechProbe) speechProbe.spoken++ // an audible plan, even without a started engine
   if (!ctx || !master) return
   const ac = ctx
-  const dest = ambientBus ?? master
+  const dest = speechBus ?? master
   const t0 = ac.currentTime
   for (const s of plan.syllables) {
     speakSyllable(ac, dest, t0 + s.startOffset, s.tone, s.duration, Math.max(0.0001, s.peak))
@@ -921,6 +933,7 @@ export function refreshAmbienceVolume() {
   for (const w of wobbles) w.gain.gain.value = w.baseDepth * balance.ambienceVolume * wobbleExtra(w.name)
   if (ambientBus) ambientBus.gain.value = balance.ambientVolume
   if (footstepBus) footstepBus.gain.value = balance.footstepVolume
+  if (speechBus) speechBus.gain.value = Math.max(0, balance.communication.speechVolume)
 }
 
 /** Update the ambience to the current game situation. */
@@ -944,6 +957,10 @@ if (import.meta.env.DEV && typeof window !== 'undefined') {
     setCoast: (prox: number) => setAmbienceCoast(prox),
     coastProx: () => coastProx,
     setScene: (next: AmbienceScene) => setAmbienceScene(next),
+    // The live gain of one sub-bus (point 577): the browser gate reads them to
+    // prove `ambientVolume` moves the bed WITHOUT touching the speech.
+    busGain: (name: 'master' | 'ambient' | 'footstep' | 'speech') =>
+      ({ master, ambient: ambientBus, footstep: footstepBus, speech: speechBus })[name]?.gain.value ?? 0,
     refresh: () => refreshAmbienceVolume(),
     surfWobble: () => wobbles.find((w) => w.name === 'surf')?.gain.gain.value ?? 0,
     // Village speech (design.md §13.4): speak an utterance/phrase from a given

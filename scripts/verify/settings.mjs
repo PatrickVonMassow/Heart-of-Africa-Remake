@@ -619,6 +619,44 @@ check('an utterance from beyond the hearing radius schedules nothing',
 check('a phrase plays every atom (two five-syllable atoms)',
   speech.phrase.syllables === speech.spokenFar.syllables + 10, JSON.stringify(speech))
 
+// --- Point 577: the speech is NOT on the "everything else" bus ---------------
+// The reported bug (F6 `keineBaBAs.zip`, ambientVolume 0) was invisible to the
+// check above: the plan still reported a positive peak, and only the bus behind
+// it was zero. So this reads the live GAIN of the buses in the running engine.
+const speechBus = await page.evaluate(() => {
+  const a = window.__ambience
+  const b = window.__balance
+  const ambientWas = b.ambientVolume
+  const speechWas = b.communication.speechVolume
+  a.start()
+  // The player's own state: "everything else" silenced to hear the voices.
+  b.ambientVolume = 0
+  a.refresh()
+  const before = { ...a.speechProbe() }
+  a.speak('BA-BA-ba-ba-ba', 0)
+  const muted = {
+    probe: { ...a.speechProbe() },
+    speech: a.busGain('speech'),
+    ambient: a.busGain('ambient'),
+  }
+  // …and the speech's own slider, which must be the one thing that silences it.
+  b.ambientVolume = ambientWas
+  b.communication.speechVolume = 0
+  a.refresh()
+  const off = { speech: a.busGain('speech'), ambient: a.busGain('ambient') }
+  b.communication.speechVolume = speechWas
+  a.refresh()
+  const restored = a.busGain('speech')
+  return { before, muted, off, restored }
+})
+check('the syllables still play with "everything else" at zero (point 577)',
+  speechBus.muted.probe.syllables === speechBus.before.syllables + 5 &&
+    speechBus.muted.probe.lastPeak > 0 && speechBus.muted.speech > 0 && speechBus.muted.ambient === 0,
+  JSON.stringify(speechBus))
+check('the speech slider is the only one that silences it, and the bed stays up',
+  speechBus.off.speech === 0 && speechBus.off.ambient > 0 && speechBus.restored > 0,
+  JSON.stringify(speechBus))
+
 check('the birdsong slider scales that source gain (point 153)',
   surf153.birdsFull > 0 && surf153.birdsHalf > 0 && surf153.birdsHalf < surf153.birdsFull && surf153.birdsOff === 0,
   JSON.stringify(surf153))

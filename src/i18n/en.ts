@@ -507,6 +507,7 @@ export const en: Strings = {
     speechLabelSeconds: 'Speech: note above the head (s)',
     speechPitch: 'Speech: pitch of the low tone (Hz)',
     speechPitchInterval: 'Speech: high tone above the low one (×)',
+    speechVolume: 'Speech: volume of the spoken syllables',
     speechConceptLabels: 'Speech: show concepts instead of syllables',
     tagChildCount: 'Tag: children playing',
     tagSprintSpeed: 'Tag: chaser sprint (m/s)',

@@ -705,6 +705,10 @@ export interface BalanceConfig {
     /** The HIGH syllable `BA` as a multiple of the low pitch — the interval that
      *  carries the entire language, so it is calibratable on its own. */
     speechPitchInterval: number
+    /** Relative level of the village speech on its OWN bus (point 577): the
+     *  syllables are the one sound the player must hear, so `ambientVolume`
+     *  ("everything else") no longer touches them. */
+    speechVolume: number
   }
 }
 
@@ -1142,6 +1146,13 @@ export const balance: BalanceConfig = {
     // stay in one human speaking range, so the two read as one voice.
     speechPitchHz: 140,
     speechPitchInterval: 1.68,
+    // 0.5 is exactly the level the speech had while it still rode the ambient
+    // bus, so the fix changes the ROUTING and not the loudness — and SPEECH_PEAK
+    // (src/communication/speaking.ts), which compensates bus 0.5 × master 0.5,
+    // stays correct. Raising this is now the one slider that lifts the speech
+    // over the drums — what the player was reaching for when he turned
+    // "everything else" down to nothing (point 577).
+    speechVolume: 0.5,
   },
 }
 

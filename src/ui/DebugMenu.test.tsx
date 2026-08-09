@@ -46,6 +46,7 @@ const DEFAULTS = {
   startupFreezeBudgetMs: balance.startup.pictureFreezeBudgetMs,
   labelOverlayMax: balance.labelOverlay.maxLabels,
   birdsongVolume: balance.birdsongVolume,
+  speechVolume: balance.communication.speechVolume,
   surfNearRadius: balance.surf.nearRadius,
   surfCutoff: balance.surf.cutoff,
   canoeSpeedup: balance.canoeSpeedup,
@@ -130,6 +131,7 @@ afterEach(() => {
   balance.startup.pictureFreezeBudgetMs = DEFAULTS.startupFreezeBudgetMs
   balance.labelOverlay.maxLabels = DEFAULTS.labelOverlayMax
   balance.birdsongVolume = DEFAULTS.birdsongVolume
+  balance.communication.speechVolume = DEFAULTS.speechVolume
   balance.surf.nearRadius = DEFAULTS.surfNearRadius
   balance.surf.cutoff = DEFAULTS.surfCutoff
   balance.canoeSpeedup = DEFAULTS.canoeSpeedup
@@ -268,6 +270,9 @@ describe('DebugMenu editable fields write through to balance (settings.mjs fillF
     { label: en.debug.speechHearingFalloff, read: () => balance.communication.hearingFalloff, value: 12 },
     // How long the player's reading stands over the speaker's head (point 485).
     { label: en.debug.speechLabelSeconds, read: () => balance.communication.labelSeconds, value: 4 },
+    // The speech's own level (point 577) — the slider the player lacked when he
+    // silenced the syllables trying to lift them over the drums.
+    { label: en.debug.speechVolume, read: () => balance.communication.speechVolume, value: 0.8 },
     { label: en.debug.canoeSpeedup, read: () => balance.canoeSpeedup, value: 5 },
     // Nested balance field (balance.health.canteenCapacity).
     { label: en.debug.canteenCapacity, read: () => balance.health.canteenCapacity, value: 600 },
@@ -779,7 +784,7 @@ const EXPECTED_CONTROLS: Record<DebugGroupId, readonly string[]> = {
     'debug.walkerUnstuck', 'debug.edgeBandWidth', 'debug.edgeBandWander', 'debug.edgeBandStrength',
     'debug.speechSyllable', 'debug.speechPhrasePause', 'debug.speechHearingRadius',
     'debug.speechHearingFalloff', 'debug.speechLabelSeconds', 'debug.speechPitch',
-    'debug.speechPitchInterval', 'debug.speechConceptLabels',
+    'debug.speechPitchInterval', 'debug.speechVolume', 'debug.speechConceptLabels',
     'debug.tagChildCount', 'debug.tagSprintSpeed', 'debug.tagRunnerBoost', 'debug.tagTrotFactor',
     'debug.tagRecoverFactor', 'debug.tagFloorFactor', 'debug.tagDrain', 'debug.tagRecover',
     'debug.tagBreakOff', 'debug.tagResume', 'debug.tagPressure', 'debug.tagReach', 'debug.tagCommit',
@@ -876,19 +881,19 @@ describe('DebugMenu completeness: every control is present, in its group (point 
     })
   })
 
-  it('carries all 148 controls in total, and none twice', () => {
+  it('carries all 149 controls in total, and none twice', () => {
     render(<DebugMenu />)
     const labels = renderedRowLabels()
     const expected = DEBUG_GROUP_ORDER.flatMap((id) => EXPECTED_CONTROLS[id])
     expect(labels.length).toBe(expected.length)
-    expect(labels.length).toBe(148)
+    expect(labels.length).toBe(149)
     expect(new Set(labels).size).toBe(labels.length)
   })
 
   it('gives every control a real input, select or button — no label without a control', () => {
     render(<DebugMenu />)
     const rows = [...document.querySelectorAll('.debug-menu .debug-group-body > label')]
-    expect(rows.length).toBe(148)
+    expect(rows.length).toBe(149)
     for (const row of rows) {
       const label = row.querySelector('span')?.textContent ?? '(none)'
       // The renderer row is the one deliberate read-only display (design.md §21.3).
@@ -942,7 +947,7 @@ describe('DebugMenu groups collapse and remember their state (point 393)', () =>
     render(<DebugMenu />)
     // Nothing opened: the whole set is still there (hidden), and a value still
     // writes through — the verify suites drive the controls this way.
-    expect(renderedRowLabels().length).toBe(148)
+    expect(renderedRowLabels().length).toBe(149)
     fireEvent.change(numberField(en.debug.travelSpeed), { target: { value: '9' } })
     expect(balance.travelSpeed).toBe(9)
     balance.travelSpeed = DEFAULTS.travelSpeed
@@ -988,9 +993,9 @@ describe('DebugMenu filter narrows the whole menu (point 393)', () => {
     render(<DebugMenu />)
     fireEvent.click(groupHead(en.debug.groups.tools))
     typeFilter('croc')
-    expect(renderedRowLabels().length).toBeLessThan(148)
+    expect(renderedRowLabels().length).toBeLessThan(149)
     typeFilter('')
-    expect(renderedRowLabels().length).toBe(148)
+    expect(renderedRowLabels().length).toBe(149)
     expect(renderedGroups().filter((g) => g.open).map((g) => g.title)).toEqual([en.debug.groups.tools])
   })
 

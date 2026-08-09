@@ -190,6 +190,7 @@ describe('village speech (design.md §13.4)', () => {
       labelSeconds: 2.6,
       speechPitchHz: 140,
       speechPitchInterval: 1.68,
+      speechVolume: 0.5,
     })
     // A five-syllable atom stays well under two seconds, so a seven-atom
     // message is heard in one go rather than sat through.
@@ -213,5 +214,19 @@ describe('village speech (design.md §13.4)', () => {
     // hears the same note again (point 587).
     expect(speechPitchInterval).toBeGreaterThanOrEqual(1.6)
     expect(speechPitchInterval).toBeLessThan(2)
+  })
+
+  it('gives the speech its own audible level, and the three older sliders keep theirs (point 577)', () => {
+    // The syllables must be audible with NOTHING else configured — the whole
+    // communication PoC is learned from them.
+    expect(balance.communication.speechVolume).toBeGreaterThan(0)
+    // It is exactly the level the speech had while it still rode the ambient
+    // bus: the fix moved the ROUTING, not the mix. Pinned so a future edit that
+    // makes the speech louder has to say so.
+    expect(balance.communication.speechVolume).toBe(0.5)
+    // …and the three sliders that existed before are untouched (point 577 §3).
+    expect(balance.ambienceVolume).toBe(0.1)
+    expect(balance.ambientVolume).toBe(0.5)
+    expect(balance.footstepVolume).toBe(2)
   })
 })
