@@ -6051,6 +6051,70 @@ if (section('intraspecies-fight')) {
       (dropdown.paired === 2 || (typeof dropdown.toast === 'string' && dropdown.toast.length > 0)),
     JSON.stringify(dropdown),
   )
+
+  // THE PICTURE. Everything above measures the drive; none of it says the clash
+  // READS as two animals fighting. So one bout is held open at the clash — a
+  // long clashSeconds freezes the pose rather than the clock, so the scene keeps
+  // animating — photographed, and taken down again.
+  const posed = await page.evaluate(async () => {
+    const herds = window.__wildlife.herdsRef.current
+    const fb = window.__balance.fight
+    const p = window.__game.getState().pos
+    const seed = window.__game.getState().seed
+    const U = 10
+    const lion = window.__lionHunt.state
+    lion.mode = 'idle'; lion.timer = 9999; lion.victim = null; lion.victimHunt = false
+    const land = (x, z) => {
+      const ty = window.__terrainType(-z / U, x / U, seed)
+      return ty !== 'water' && ty !== 'ocean'
+    }
+    // Close to the camera, so the pair is not two specks: the bird's-eye looks
+    // down at the traveller, so a few units out is the readable distance.
+    let spot = null
+    for (let r = 4; r <= 24 && !spot; r += 2) {
+      for (let k = 0; k < 16; k++) {
+        const a = (k / 16) * Math.PI * 2
+        const x = p.x + Math.sin(a) * r
+        const z = p.z + Math.cos(a) * r
+        if (land(x, z) && land(x + 3, z) && land(x - 3, z)) { spot = { x, z }; break }
+      }
+    }
+    if (!spot) return { posed: false, noLand: true }
+    const mk = (dx) => ({
+      x: spot.x + dx, z: spot.z, y: 0.2, rot: 0, scale: 1, phase: 0.3, chunk: undefined, grounded: true,
+    })
+    const one = mk(-3)
+    const two = mk(3)
+    herds.zebra.push(one, two)
+    const kept = { clash: fb.clashSeconds, force: fb.forceOutcome }
+    fb.clashSeconds = 60
+    fb.forceOutcome = 'submit'
+    const bout = { mode: 'converge', ox: one.x, oz: one.z, time: 0, clash: 0 }
+    one.fight = { foe: two, aggressor: true, ...bout }
+    two.fight = { foe: one, aggressor: false, ...bout }
+    const held = await window.__pollSim(40, () => one.fight?.mode === 'clash' || two.fight?.mode === 'clash')
+    window.__fightPose = { one, two, kept }
+    return { posed: true, held: !!held, clashing: one.fight?.mode === 'clash' || two.fight?.mode === 'clash' }
+  })
+  check('a bout can be held at the clash for the picture (point 264)', posed.posed && posed.clashing, JSON.stringify(posed))
+  if (posed.clashing) {
+    await shot('148-intraspecies-fight-clash', {
+      world: { lat: -2.5, lon: 34.0 },
+      label: 'two zebras locked in a rank fight on the Serengeti savanna',
+    })
+  }
+  await page.evaluate(() => {
+    const pose = window.__fightPose
+    if (!pose) return
+    const herds = window.__wildlife.herdsRef.current
+    const fb = window.__balance.fight
+    fb.clashSeconds = pose.kept.clash
+    fb.forceOutcome = pose.kept.force
+    pose.one.fight = undefined
+    pose.two.fight = undefined
+    herds.zebra = herds.zebra.filter((a) => a !== pose.one && a !== pose.two)
+    window.__fightPose = undefined
+  })
 }
 
 // --- Point 188: the coastal walk-off resolves --------------------------------
