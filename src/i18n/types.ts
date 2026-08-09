@@ -555,6 +555,18 @@ export interface Strings {
     calfEscapeSeconds: string
     calfReunionSeconds: string
     calfMourningSeconds: string
+    /** Intraspecies combat (design.md §19.17, point 264). */
+    fightDispositionRate: string
+    fightDispositionInterval: string
+    fightSeekRadius: string
+    fightContactRadius: string
+    fightDriveOffDistance: string
+    fightApproachSeconds: string
+    fightClashSeconds: string
+    fightApproachBurst: string
+    fightQuarryFleeFactor: string
+    fightLethalityScale: string
+    fightCooldownSeconds: string
     benchmarkStart: string
     crocDragSpeed: string
     crocDragSeconds: string
