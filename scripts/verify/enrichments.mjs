@@ -14,7 +14,7 @@
 // gate. Dev server only (dev hooks).
 import { launchVerifyBrowser, assertBackend } from './_browser.mjs'
 import { animalShare, readsAsAnimal, waterFloor } from './animalShare.mjs'
-import { frameShutter, captureFrame, capturePixels } from './frameSubject.mjs'
+import { frameShutter, captureFrame, capturePixels, waitForSceneReady } from './frameSubject.mjs'
 import { snowFraction } from './snowMetric.mjs'
 import { sectionGate } from './sections.mjs'
 import { fileURLToPath } from 'node:url'
@@ -181,6 +181,34 @@ const installSimHelpers = () =>
       return safeDone()
     }
     window.__sleepSim = (simSecs, wallCapMs) => window.__pollSim(simSecs, () => false, wallCapMs)
+    // The block-scope rule holds for a helper installed on the PAGE too, where
+    // no linter can see it (point 566): `__makeTestFamily` was installed inside
+    // `calf-jitter` and called from four later blocks, so each of those died
+    // standalone on `window.__makeTestFamily is not a function`. It belongs with
+    // the other window helpers, which the crash-reload path also re-installs.
+    //
+    // Synthetic test family (point 135): the drama scenarios used to compete for
+    // the scarce pool of naturally spawned free families and staged into nothing
+    // (or into a family something else had relocated). An injected pair — built
+    // like the collision check's zebra, with the young/parent/child links the
+    // drama passes key on — is deterministic and pool-independent. Returns a
+    // disposer that removes the pair again.
+    window.__makeTestFamily = (x, z) => {
+      const herds = window.__wildlife.herdsRef.current
+      let liveChunk
+      for (const sp of Object.keys(herds)) {
+        for (const a of herds[sp]) if (a.chunk && !a.dead) { liveChunk = a.chunk; break }
+        if (liveChunk) break
+      }
+      const parent = { x: x - 1.5, z, y: 0.2, rot: 0, scale: 1, phase: 0.31, chunk: liveChunk ?? 'fam-test' }
+      const calf = { x, z, y: 0.2, rot: 0, scale: 0.55, phase: 0.72, chunk: liveChunk ?? 'fam-test', young: true, parent }
+      parent.child = calf
+      herds.zebra.push(parent, calf)
+      const dispose = () => {
+        herds.zebra = herds.zebra.filter((a) => a !== parent && a !== calf)
+      }
+      return { parent, calf, dispose }
+    }
   })
 const rawEvaluate = page.evaluate.bind(page)
 page.evaluate = async (...args) => {
@@ -1270,6 +1298,14 @@ if (section('elephant-trampling')) {
         herds[sp].length = 0
       }
     })
+    // The pair of samples measures the ground, so the ground has to BE there.
+    // `capturePixels` takes pixels the moment it is asked, without the shutter's
+    // readiness wait — and run on its own, with no earlier section having drawn
+    // this stretch of the Nile, both samples came back as the same flat haze:
+    // soaked 0, blobs 0, and a 1 kB crop of uniform grey where the picture
+    // belongs. Waiting for the renderer's own counters to stand still is what
+    // this block was silently inheriting from the sections before it.
+    await waitForSceneReady(page)
     // (a) the bare ground, no stain anywhere
     await sweepHerds()
     await page.evaluate(() => { window.__wildlife.stains.current.length = 0 })
@@ -3243,31 +3279,6 @@ if (section('calf-jitter')) {
   check('some shore visitors wade in and bathe', bathe.bathers > 0 && bathe.bathers <= bathe.drinkers, `${JSON.stringify(bathe)} spots=${shoreSpots.length}`)
   // Back to the game defaults (disabling the unlock clamps the zoom to 0.5).
   await page.evaluate(() => window.__ui.getState().setWheelZoomEnabled(false))
-
-  await page.evaluate(() => {
-    // Synthetic test family (point 135): the drama scenarios used to compete
-    // for the scarce pool of naturally spawned free families and staged into
-    // nothing (or into a family something else had relocated). An injected
-    // pair — built like the collision check's zebra, with the young/parent/
-    // child links the drama passes key on — is deterministic and
-    // pool-independent. Returns a disposer that removes the pair again.
-    window.__makeTestFamily = (x, z) => {
-      const herds = window.__wildlife.herdsRef.current
-      let liveChunk
-      for (const sp of Object.keys(herds)) {
-        for (const a of herds[sp]) if (a.chunk && !a.dead) { liveChunk = a.chunk; break }
-        if (liveChunk) break
-      }
-      const parent = { x: x - 1.5, z, y: 0.2, rot: 0, scale: 1, phase: 0.31, chunk: liveChunk ?? 'fam-test' }
-      const calf = { x, z, y: 0.2, rot: 0, scale: 0.55, phase: 0.72, chunk: liveChunk ?? 'fam-test', young: true, parent }
-      parent.child = calf
-      herds.zebra.push(parent, calf)
-      const dispose = () => {
-        herds.zebra = herds.zebra.filter((a) => a !== parent && a !== calf)
-      }
-      return { parent, calf, dispose }
-    }
-  })
 
   // Return to the herd-dense plains for the predator-guard check below.
   await page.evaluate(() => window.__game.getState().debugJumpTo(-2.2, 34.8))

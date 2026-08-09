@@ -24,9 +24,10 @@
 // future edit that drops the rule, the env or the file glob turns them red.
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, mkdirSync, writeFileSync, copyFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, writeFileSync, copyFileSync, readFileSync, readdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { resolve, join } from 'node:path'
+import { crossSectionGlobals, formatCrossSectionGlobals, sectionRanges, sectionAt } from './sectionScope.mjs'
 
 const ROOT = process.cwd()
 const OXLINT = resolve(ROOT, 'node_modules/.bin/oxlint')
@@ -120,5 +121,75 @@ describe('the scope net over the verify suites', () => {
     const { code, out } = lint(['scripts/'])
     expect(out).not.toContain('no-undef')
     expect(code, out).toBe(0)
+  })
+})
+
+// The half a linter cannot see: a helper installed on the PAGE. To oxlint,
+// `window.__makeTestFamily = …` in one block and `window.__makeTestFamily(…)` in
+// the next are a property write and a property read, both perfectly defined —
+// while standalone the second block dies on "is not a function". Found on
+// 09.08.2026 by a 100-second browser run; this finds it in milliseconds.
+describe('a page helper may not cross a section boundary', () => {
+  const dir = resolve(ROOT, 'scripts/verify')
+
+  const SUITE = `
+if (section('installs')) {
+  await page.evaluate(() => { window.__helper = () => 1 })
+  await page.evaluate(() => window.__helper())
+}
+if (section('borrows')) {
+  await page.evaluate(() => window.__helper())
+}
+`
+
+  it('names the helper, where it is installed and where it is borrowed', () => {
+    const found = crossSectionGlobals(SUITE)
+    expect(found).toEqual([{ name: '__helper', installedIn: ['installs'], usedIn: 'borrows', line: 7 }])
+    const msg = formatCrossSectionGlobals(found, 'x.mjs')
+    expect(msg).toContain('__helper')
+    expect(msg).toContain('borrows')
+    expect(msg).toContain('above the section blocks')
+  })
+
+  it('is content once the install sits above the blocks — the honest fix', () => {
+    const fixed = "await page.evaluate(() => { window.__helper = () => 1 })\n" + SUITE
+    expect(crossSectionGlobals(fixed)).toEqual([])
+  })
+
+  it("leaves the application's own dev hooks alone — the suite never installs them", () => {
+    expect(crossSectionGlobals("if (section('a')) { window.__game.getState() }\nif (section('b')) { window.__game.getState() }")).toEqual([])
+  })
+
+  it('reads a comparison and a property write as READS of the helper, not installs', () => {
+    const src = "if (section('a')) { window.__h = 1 }\nif (section('b')) { window.__h.k = 2 }\nif (section('c')) { if (window.__h === 1) {} }"
+    expect(crossSectionGlobals(src).map((f) => f.usedIn)).toEqual(['b', 'c'])
+  })
+
+  it('measures the block boundaries over braces the mask cleaned first', () => {
+    const src = "if (section('a')) {\n  // a } in prose\n  const s = '}'\n}\nwindow.__after = 1\n"
+    const ranges = sectionRanges(src)
+    expect(ranges.map((r) => r.name)).toEqual(['a'])
+    expect(sectionAt(ranges, src.indexOf('__after'))).toBe(null)
+  })
+
+  it('is total on junk', () => {
+    expect(crossSectionGlobals(null)).toEqual([])
+    expect(sectionRanges(undefined)).toEqual([])
+    expect(formatCrossSectionGlobals([])).toBe('')
+  })
+
+  // THE LIVE GATE over every sectioned suite in the tree.
+  it('holds for every suite that declares sections', () => {
+    const suites = readdirSync(dir).filter((f) => f.endsWith('.mjs') && !f.endsWith('.test.mjs'))
+    let sectioned = 0
+    for (const f of suites) {
+      const src = readFileSync(join(dir, f), 'utf8')
+      if (sectionRanges(src).length === 0) continue
+      sectioned++
+      const found = crossSectionGlobals(src)
+      expect(found, `\n${formatCrossSectionGlobals(found, f)}\n`).toEqual([])
+    }
+    // A gate over nothing would pass forever: at least one suite IS sectioned.
+    expect(sectioned).toBeGreaterThan(0)
   })
 })
