@@ -4696,3 +4696,56 @@ Build order, chosen so no two parallel agents own the same file:
   recognisable — plus the before/after cost measurement, on both backends.
   Criticality: medium — it is the visual identity of every animal in the bird's-eye view,
   and acceptance criterion 11 (no schematic look) speaks to exactly this.
+
+- [ ] 576. THE DRUMMER'S HANDS BEAT INSIDE HIS DRUMS, AND EACH ONE OVER THE WRONG DRUM
+  (user 09.08.2026, F6 bug report `local/bugreports/hoa-state-2026-08-09-4047534009.zip`,
+  Bambara village, production 7b7f54d, WebGPU, medium: "Die Arme hängen in den Trommeln
+  drin"). TWO defects at one figure, `Drummer` in `src/scenes/place/PlaceLife.tsx`
+  (~line 1079), both measured against the geometry rather than guessed:
+  (a) VERTICAL — the swing arc lies BELOW the drum heads. The hand rides
+  `armAim(±0.26, -0.2 + lift)` with `lift` in 0..0.42, so from a shoulder at y 0.62 with
+  a 0.44 arm the hand centre travels y 0.533 (bottom) to 0.716 (top) and its underside
+  y 0.475 to 0.658. The LARGE drum's head top is y 0.680 and the SMALL drum's y 0.517.
+  The hand over the large drum is therefore inside it through the WHOLE stroke — even at
+  the top of the swing — and the hand over the small one sinks 0.042 m into the head at
+  the bottom. Horizontally both hands sit well within their drum's radius (0.115 m from
+  the large drum's axis against radius 0.27; 0.058 m against 0.17), so the arm passes
+  through the shell, which is exactly what the report shows.
+  (b) SIDES SWAPPED — the falling hand is over the other drum. `FigurePose.left` is local
+  +X (`src/render/gesture.ts`), and the code drives `p.left` from `lowLift`, the LARGE
+  drum's stroke; but the large drum is placed at x −0.34 and the small one at x +0.30, so
+  the left hand hovers over the SMALL drum and the right hand over the LARGE one. The
+  function's own comment states the opposite ("The LARGE low drum ... stands to his
+  left"), so the placement and the comment disagree and the hand mapping follows the
+  comment. This breaks the rule the same comment states — "the hand over the drum being
+  played is the one that falls ... so the strike is unmistakably ON the drum that
+  sounds" — and it breaks it for the message the whole communication PoC hangs on: the
+  player is meant to LEARN `ba` from the low drum and `BA` from the high one by watching
+  which hand strikes which drum.
+  FINAL STATE:
+  1. The hand's lowest point RESTS ON its drum's head, and its highest point clears it.
+     The stroke is derived FROM the drum head's height and the arm's reach, not from a
+     hand-set elevation range — one drum's dimensions change and the stroke follows.
+     Because the two drums differ in height (heads at 0.680 and 0.517), the two arms get
+     their OWN stroke ranges; a single shared range cannot rest on both.
+  2. Each hand plays the drum it stands over. Whichever way the pair is finally
+     arranged, the drum's x placement, the `p.left`/`p.right` assignment and the comment
+     state the SAME side, and the head that dips is the head under the hand that fell.
+  3. The idle beat obeys 1 and 2 as well — it keeps both hands on the large drum today
+     while only `lowDip` is written, so the second hand beats an undipping drum.
+  4. Nothing else about the figure moves: the shoulder height, arm length and hand
+     radius stay the shared `FIGURE_LIMBS` values, because every other villager reads
+     from them.
+  VERIFIABLE: pure Vitest beside `src/render/figures.test.ts` — for BOTH drums and across
+  the whole stroke, the hand's underside stays at or above that drum's head top (contact
+  at the bottom of the stroke, clearance at the top), and the hand's horizontal distance
+  from the drum axis stays inside that drum's radius; plus an assertion that the arm
+  driven by each drum's stroke is the one on that drum's side. Then the PICTURE, since
+  this is what the report is about: a first-person frame at the drummer in the Bambara
+  village on BOTH backends, at rest and mid-message, judged by looking — the hands beat
+  ON the skins.
+  Criticality: medium — it is a permanent, always-visible figure in the one village the
+  communication PoC is taught in, and (b) actively teaches the player the wrong drum.
+  BUNDLE: build together with point 350 where possible. Both are "the villager figure's
+  pose lies about what the body is doing" in the same component, and pairing them saves a
+  verification round.
