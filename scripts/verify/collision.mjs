@@ -7,6 +7,7 @@
 // geometrically. Dev server only (dev hooks).
 import { launchVerifyBrowser, assertBackend } from './_browser.mjs'
 import { frameShutter } from './frameSubject.mjs'
+import { sectionGate } from './sections.mjs'
 import { fileURLToPath } from 'node:url'
 
 // A fixed dev seed makes the procedural settlement layout deterministic so the
@@ -16,9 +17,25 @@ import { fileURLToPath } from 'node:url'
 // claimed a fixed layout it did not have.
 const BASE = process.env.BASE_URL ?? 'http://localhost:5173/'
 const OUT = fileURLToPath(new URL('../../verification/', import.meta.url))
+
+// SECTIONS (point 566). Each settlement this suite walks through is a named
+// block that owns the entry it needs: `if (section('<slug>')) { … }`. Without a
+// request every one runs, in file order, exactly as before; `--section=<slug>`
+// runs ONE of them, so repairing a single collision check no longer replays the
+// port, both villages and the walk into the river. The names are read out of
+// THIS FILE by scripts/verify/sections.mjs, so an unknown one is refused with
+// the list of the real ones — and the run is stamped PARTIAL, never counted as
+// suite coverage.
+const sections = sectionGate()
+const { section } = sections
+if (sections.banner()) console.log(sections.banner())
+
 let failures = 0
 const check = (name, ok, detail) => {
-  console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? ' — ' + detail : ''}`)
+  // The section tag goes AFTER the ' — ' separator: the check's NAME is its
+  // identity for the red ledger and the baseline classifier and must not change.
+  const tail = [detail, sections.tag().trim()].filter(Boolean).join('  ')
+  console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${tail ? ' — ' + tail : ''}`)
   if (!ok) failures++
 }
 
@@ -52,6 +69,11 @@ await page.addInitScript(() => {
   }
   window.__colliderSize = (c) => (c.kind === 'box' ? Math.max(c.hx, c.hz) : c.r)
 })
+// Point 375: every frame declares what it must show and the shutter projects
+// that subject before the file is written. It lives ABOVE the section blocks
+// because three of them photograph — a helper declared inside one section is
+// invisible to the next (scripts/verify/scope.test.mjs).
+const shot = frameShutter(page, OUT)
 const errors = []
 page.on('console', (m) => {
   if (m.type() === 'error') errors.push(m.text())
@@ -297,231 +319,250 @@ async function accessPointsFree(sceneLabel) {
     blocked.length ? `blocked: ${blocked.join(',')}` : 'free')
 }
 
+/**
+ * SHARED STAGING (point 566). Enter a settlement and wait until its layout and
+ * the closed journal are actually there — the setup the PoC-village sections own
+ * rather than inherit from the section above them. It is a no-op when the place
+ * is already the one asked for, so a whole run walks exactly the path it always
+ * did: the first section to want the village enters it, the next finds it open.
+ */
+async function enterSettlement(id) {
+  if ((await page.evaluate(() => window.__game.getState().placeId)) === id) return
+  await page.evaluate((want) => window.__game.getState().enterPlace(want), id)
+  await page
+    .waitForFunction((want) => window.__game.getState().placeId === want && !!window.__placeLayout, id, { timeout: 30000 })
+    .catch(() => {})
+  await page.evaluate(() => window.__game.getState().setJournalOpen(false))
+  // Wait on the CONDITION the pause stood for — the journal actually gone from the
+  // DOM — and then on the app's own clock for the frame that redraws without it
+  // (CLAUDE.md §7.2: never a wall-clock guess, which is too short on a loaded host
+  // and wasted time on a quiet one).
+  await page
+    .waitForFunction(() => !window.__game.getState().journalOpen && !document.querySelector('.journal'), null, { timeout: 8000 })
+    .catch(() => {})
+  await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(null)))))
+}
+
 // === Port (Cairo) ============================================================
-// Eject from: biggest building (box collider), and a mid-size circle collider.
-await ejectTest('Port', '(cs)=>cs.reduce((b,c,i,a)=>window.__colliderSize(c)>window.__colliderSize(a[b])?i:b,0)')
-// Biggest circle prop. A fence panel has an `r` too but no centre to eject
-// from, so segments are skipped here (point 413).
-await ejectTest('Port', '(cs)=>cs.reduce((b,c,i,a)=>(c.kind!=="box"&&c.kind!=="segment"&&(b<0||c.r>a[b].r))?i:b,-1)')
-const funcTypes = await page.evaluate(() =>
-  window.__placeLayout.interactives.filter((b) => b.type !== 'villager').map((b) => b.type),
-)
-// Since the trade-economy batch, ports carry six functional buildings
-// (design.md §9: incl. bazaar and travel agency).
-check("Port: all 6 functional buildings present", funcTypes.length === 6, funcTypes.join(","))
-await reachableBuildings('Port')
-await accessPointsFree('Port')
-await dwellingDoorsReachable('Port')
+// The boot prologue above already stands in Cairo, so this section needs no
+// entry of its own.
+if (section('port')) {
+  // Eject from: biggest building (box collider), and a mid-size circle collider.
+  await ejectTest('Port', '(cs)=>cs.reduce((b,c,i,a)=>window.__colliderSize(c)>window.__colliderSize(a[b])?i:b,0)')
+  // Biggest circle prop. A fence panel has an `r` too but no centre to eject
+  // from, so segments are skipped here (point 413).
+  await ejectTest('Port', '(cs)=>cs.reduce((b,c,i,a)=>(c.kind!=="box"&&c.kind!=="segment"&&(b<0||c.r>a[b].r))?i:b,-1)')
+  const funcTypes = await page.evaluate(() =>
+    window.__placeLayout.interactives.filter((b) => b.type !== 'villager').map((b) => b.type),
+  )
+  // Since the trade-economy batch, ports carry six functional buildings
+  // (design.md §9: incl. bazaar and travel agency).
+  check("Port: all 6 functional buildings present", funcTypes.length === 6, funcTypes.join(","))
+  await reachableBuildings('Port')
+  await accessPointsFree('Port')
+  await dwellingDoorsReachable('Port')
 
-// Ram screenshot: teleport in front of the biggest wall and nudge into it.
-const shot = frameShutter(page, OUT)
-const rammedWall = await page.evaluate(() => {
-  const c = [...window.__placeColliders].sort((a, b) => window.__colliderSize(b) - window.__colliderSize(a))[0]
-  const p = window.__placePlayer
-  const len = Math.hypot(c.x, c.z) || 1
-  p.x = c.x - (c.x / len) * (window.__colliderSize(c) + 2)
-  p.z = c.z - (c.z / len) * (window.__colliderSize(c) + 2)
-  p.yaw = Math.atan2(-(c.x - p.x), -(c.z - p.z))
-  return { x: c.x, z: c.z }
-})
-await pushFrames(16)
-check('Port: no penetration at the wall', (await clearance()) >= -0.03, `clearance ${(await clearance()).toFixed(3)}`)
-// Point 375: the wall the player is pressed against must be the thing in the
-// picture — projected through the place camera, not assumed from the teleport.
-await shot('52-collision-port-wall', { local: { x: rammedWall.x, z: rammedWall.z }, label: 'the rammed wall' })
-
-// Corner clipping (§7.1.16): drop the player exactly onto each corner of the
-// biggest box building; the resolver must eject it with positive clearance —
-// the former circle approximation left gaps here.
-for (let corner = 0; corner < 4; corner++) {
-  await page.evaluate((k) => {
-    const boxes = window.__placeColliders.filter((c) => c.kind === 'box')
-    const c = boxes.reduce((b, x) => (Math.max(x.hx, x.hz) > Math.max(b.hx, b.hz) ? x : b), boxes[0])
-    const sx = k % 2 ? 1 : -1
-    const sz = k < 2 ? 1 : -1
-    const sin = Math.sin(c.rot)
-    const cos = Math.cos(c.rot)
-    const lx = sx * c.hx
-    const lz = sz * c.hz
+  // Ram screenshot: teleport in front of the biggest wall and nudge into it.
+  const rammedWall = await page.evaluate(() => {
+    const c = [...window.__placeColliders].sort((a, b) => window.__colliderSize(b) - window.__colliderSize(a))[0]
     const p = window.__placePlayer
-    p.x = c.x + cos * lx + sin * lz
-    p.z = c.z - sin * lx + cos * lz
-    p.yaw = 0
-  }, corner)
-  await pushUntilClear()
-  const cl = await clearance()
-  check(`Port: ejected from building corner ${corner + 1}/4`, cl >= -0.03, `clearance ${cl.toFixed(3)}`)
+    const len = Math.hypot(c.x, c.z) || 1
+    p.x = c.x - (c.x / len) * (window.__colliderSize(c) + 2)
+    p.z = c.z - (c.z / len) * (window.__colliderSize(c) + 2)
+    p.yaw = Math.atan2(-(c.x - p.x), -(c.z - p.z))
+    return { x: c.x, z: c.z }
+  })
+  await pushFrames(16)
+  check('Port: no penetration at the wall', (await clearance()) >= -0.03, `clearance ${(await clearance()).toFixed(3)}`)
+  // Point 375: the wall the player is pressed against must be the thing in the
+  // picture — projected through the place camera, not assumed from the teleport.
+  await shot('52-collision-port-wall', { local: { x: rammedWall.x, z: rammedWall.z }, label: 'the rammed wall' })
+
+  // Corner clipping (§7.1.16): drop the player exactly onto each corner of the
+  // biggest box building; the resolver must eject it with positive clearance —
+  // the former circle approximation left gaps here.
+  for (let corner = 0; corner < 4; corner++) {
+    await page.evaluate((k) => {
+      const boxes = window.__placeColliders.filter((c) => c.kind === 'box')
+      const c = boxes.reduce((b, x) => (Math.max(x.hx, x.hz) > Math.max(b.hx, b.hz) ? x : b), boxes[0])
+      const sx = k % 2 ? 1 : -1
+      const sz = k < 2 ? 1 : -1
+      const sin = Math.sin(c.rot)
+      const cos = Math.cos(c.rot)
+      const lx = sx * c.hx
+      const lz = sz * c.hz
+      const p = window.__placePlayer
+      p.x = c.x + cos * lx + sin * lz
+      p.z = c.z - sin * lx + cos * lz
+      p.yaw = 0
+    }, corner)
+    await pushUntilClear()
+    const cl = await clearance()
+    check(`Port: ejected from building corner ${corner + 1}/4`, cl >= -0.03, `clearance ${cl.toFixed(3)}`)
+  }
 }
 
 // === Village (Masai) =========================================================
-await page.evaluate(() => window.__game.getState().enterPlace('maasai-village'))
-await page
-  .waitForFunction((want) => window.__game.getState().placeId === want && !!window.__placeLayout, "maasai-village", { timeout: 30000 })
-  .catch(() => {})
-await page.waitForTimeout(500)
-await page.evaluate(() => window.__game.getState().setJournalOpen(false))
-await page.waitForTimeout(400)
+if (section('village')) {
+  await page.evaluate(() => window.__game.getState().enterPlace('maasai-village'))
+  await page
+    .waitForFunction((want) => window.__game.getState().placeId === want && !!window.__placeLayout, "maasai-village", { timeout: 30000 })
+    .catch(() => {})
+  await page.waitForTimeout(500)
+  await page.evaluate(() => window.__game.getState().setJournalOpen(false))
+  await page.waitForTimeout(400)
 
-await ejectTest('Village', '(cs)=>cs.reduce((b,c,i,a)=>window.__colliderSize(c)>window.__colliderSize(a[b])?i:b,0)') // chief hut
-await ejectTest('Village', '(cs)=>cs.reduce((b,c,i,a)=>(c.kind!=="box"&&c.kind!=="segment"&&c.r>=1.5&&c.r<=2.2&&(b<0||c.r<a[b].r))?i:b,-1)') // dwelling hut
-// The fence is now a run of panels, not a chain of posts (point 413): eject
-// from the MIDDLE of a panel, where the old post-circle chain had its thinnest,
-// most sideways-pushing spot.
-await ejectTest('Village', '(cs)=>cs.reduce((b,c,i)=>(c.kind==="segment"&&b<0)?i:b,-1)') // fence panel
+  await ejectTest('Village', '(cs)=>cs.reduce((b,c,i,a)=>window.__colliderSize(c)>window.__colliderSize(a[b])?i:b,0)') // chief hut
+  await ejectTest('Village', '(cs)=>cs.reduce((b,c,i,a)=>(c.kind!=="box"&&c.kind!=="segment"&&c.r>=1.5&&c.r<=2.2&&(b<0||c.r<a[b].r))?i:b,-1)') // dwelling hut
+  // The fence is now a run of panels, not a chain of posts (point 413): eject
+  // from the MIDDLE of a panel, where the old post-circle chain had its thinnest,
+  // most sideways-pushing spot.
+  await ejectTest('Village', '(cs)=>cs.reduce((b,c,i)=>(c.kind==="segment"&&b<0)?i:b,-1)') // fence panel
 
-// Chief hut operable despite collision: standing at its door and pressing the
-// Space use key opens the audience dialog (design.md §2.3).
-await page.evaluate(() => {
-  const it = window.__placeLayout.interactives.find((i) => i.type === 'chief')
-  const p = window.__placePlayer
-  p.x = it.door[0]
-  p.z = it.door[1]
-  p.yaw = 0
-})
-// Wait for the door prompt that NAMES the chief's hut (default language English,
-// src/i18n/en.ts) before pressing Space — waiting on "any prompt" could fire on
-// a neighbouring candidate; the swallowed .catch is dropped so a real arming
-// failure surfaces instead of a silent no-op (point 244).
-await page.waitForFunction(
-  (label) => (document.querySelector('.prompt')?.textContent ?? '').includes(label),
-  "Chief's Hut",
-  { timeout: 8000 },
-)
-await page.keyboard.press('Space')
-const audienceOpened = await page
-  .waitForFunction(() => !!document.querySelector('.dialog'), null, { timeout: 8000 })
-  .then(() => true)
-  .catch(() => false)
-check('Village: chief hut opens with Space at its door', audienceOpened)
-await page.evaluate(() => window.__ui?.getState?.().setDialog(null))
-await page.waitForTimeout(200)
-await dwellingDoorsReachable('Village')
-await shot('53-collision-village-chief-hut', { place: 'maasai-village', label: "the chief's hut and its door" })
-await page.keyboard.press('Escape')
-await page.evaluate(() => { const p = window.__placePlayer; p.x = 0; p.z = 0 })
-await page.waitForFunction(() => !document.querySelector('.dialog'), null, { timeout: 8000 }).catch(() => {})
-await page.waitForTimeout(150)
+  // Chief hut operable despite collision: standing at its door and pressing the
+  // Space use key opens the audience dialog (design.md §2.3).
+  await page.evaluate(() => {
+    const it = window.__placeLayout.interactives.find((i) => i.type === 'chief')
+    const p = window.__placePlayer
+    p.x = it.door[0]
+    p.z = it.door[1]
+    p.yaw = 0
+  })
+  // Wait for the door prompt that NAMES the chief's hut (default language English,
+  // src/i18n/en.ts) before pressing Space — waiting on "any prompt" could fire on
+  // a neighbouring candidate; the swallowed .catch is dropped so a real arming
+  // failure surfaces instead of a silent no-op (point 244).
+  await page.waitForFunction(
+    (label) => (document.querySelector('.prompt')?.textContent ?? '').includes(label),
+    "Chief's Hut",
+    { timeout: 8000 },
+  )
+  await page.keyboard.press('Space')
+  const audienceOpened = await page
+    .waitForFunction(() => !!document.querySelector('.dialog'), null, { timeout: 8000 })
+    .then(() => true)
+    .catch(() => false)
+  check('Village: chief hut opens with Space at its door', audienceOpened)
+  await page.evaluate(() => window.__ui?.getState?.().setDialog(null))
+  await page.waitForTimeout(200)
+  await dwellingDoorsReachable('Village')
+  await shot('53-collision-village-chief-hut', { place: 'maasai-village', label: "the chief's hut and its door" })
+  await page.keyboard.press('Escape')
+  await page.evaluate(() => { const p = window.__placePlayer; p.x = 0; p.z = 0 })
+  await page.waitForFunction(() => !document.querySelector('.dialog'), null, { timeout: 8000 }).catch(() => {})
+  await page.waitForTimeout(150)
 
-await reachableBuildings('Village')
-await accessPointsFree('Village')
+  await reachableBuildings('Village')
+  await accessPointsFree('Village')
 
-// Inhabitants enter their dwellings (§7.1.16 / design.md §2): observe the
-// walkers until one that has been out walking disappears inside — at that
-// moment it must stand at its home center (it slipped in through the door).
-const walkerResult = await page.evaluate(async () => {
-  // A TIMEOUT on a polled condition, not a fixed wait: it costs nothing when the
-  // transition happens promptly, and the errand it waits for is paced by the
-  // frame clock — a host rendering in software takes several times as long to
-  // walk a villager home as the hardware this bound was written on.
-  const deadline = Date.now() + 420000
-  const wasOut = new Set()
-  return await new Promise((resolve) => {
-    const iv = setInterval(() => {
-      const w = window.__placeWalkers
-      if (!w) return
+  // Inhabitants enter their dwellings (§7.1.16 / design.md §2): observe the
+  // walkers until one that has been out walking disappears inside — at that
+  // moment it must stand at its home center (it slipped in through the door).
+  const walkerResult = await page.evaluate(async () => {
+    // A TIMEOUT on a polled condition, not a fixed wait: it costs nothing when the
+    // transition happens promptly, and the errand it waits for is paced by the
+    // frame clock — a host rendering in software takes several times as long to
+    // walk a villager home as the hardware this bound was written on.
+    const deadline = Date.now() + 420000
+    const wasOut = new Set()
+    return await new Promise((resolve) => {
+      const iv = setInterval(() => {
+        const w = window.__placeWalkers
+        if (!w) return
+        for (let i = 0; i < w.states.length; i++) {
+          const s = w.states[i]
+          if (s.mode === 'walk') wasOut.add(i)
+          else if (wasOut.has(i)) {
+            const h = w.homes[i]
+            clearInterval(iv)
+            resolve({ ok: true, dist: Math.hypot(s.x - h.x, s.z - h.z) })
+            return
+          }
+        }
+        if (Date.now() > deadline) {
+          clearInterval(iv)
+          resolve({ ok: false, dist: -1 })
+        }
+      }, 150)
+    })
+  })
+  check(
+    'Village: inhabitant walked out and re-entered its dwelling through the door',
+    walkerResult.ok && walkerResult.dist < 0.8,
+    walkerResult.ok ? `entered at ${walkerResult.dist.toFixed(2)} from home center` : 'no walk→inside transition observed',
+  )
+
+  // No inhabitant stays pinned (point 155): observe every walker over a window
+  // longer than the unstuck deadline. A walker in 'walk' mode (not lingering)
+  // that stops moving is teleport-nudged free before its pinned timer passes the
+  // calibratable window — so no walker's pinned time ever exceeds it, and the
+  // walkers do actually move (the check is not vacuous).
+  const pinResult = await page.evaluate(async () => {
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+    const win = window.__balance.walkerUnstuckSeconds
+    const w = window.__placeWalkers
+    if (!w) return { ok: false, reason: 'no __placeWalkers' }
+    let maxPinned = 0
+    let anyMoved = false
+    // Movement is measured against the START position, not against the previous
+    // sample. A per-sample delta asks "did a walker cover 0.2 m in the last 150 ms",
+    // which is a question about the SAMPLING RATE and the frame rate rather than
+    // about the walkers: on a software-rendered host at ~12 fps every walker moves,
+    // and the check still read "nothing moved". Cumulative displacement asks what
+    // the check means to ask — did anyone get anywhere.
+    const start = w.states.map((s) => ({ x: s.x, z: s.z }))
+    const t0 = Date.now()
+    // Watch for the window + a generous margin so a would-be pin has time to pass it.
+    while (Date.now() - t0 < (win + 5) * 1000) {
       for (let i = 0; i < w.states.length; i++) {
         const s = w.states[i]
-        if (s.mode === 'walk') wasOut.add(i)
-        else if (wasOut.has(i)) {
-          const h = w.homes[i]
-          clearInterval(iv)
-          resolve({ ok: true, dist: Math.hypot(s.x - h.x, s.z - h.z) })
-          return
-        }
+        if (s.pinned > maxPinned) maxPinned = s.pinned
+        if (Math.hypot(s.x - start[i].x, s.z - start[i].z) > 0.2) anyMoved = true
       }
-      if (Date.now() > deadline) {
-        clearInterval(iv)
-        resolve({ ok: false, dist: -1 })
-      }
-    }, 150)
-  })
-})
-check(
-  'Village: inhabitant walked out and re-entered its dwelling through the door',
-  walkerResult.ok && walkerResult.dist < 0.8,
-  walkerResult.ok ? `entered at ${walkerResult.dist.toFixed(2)} from home center` : 'no walk→inside transition observed',
-)
-
-// No inhabitant stays pinned (point 155): observe every walker over a window
-// longer than the unstuck deadline. A walker in 'walk' mode (not lingering)
-// that stops moving is teleport-nudged free before its pinned timer passes the
-// calibratable window — so no walker's pinned time ever exceeds it, and the
-// walkers do actually move (the check is not vacuous).
-const pinResult = await page.evaluate(async () => {
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
-  const win = window.__balance.walkerUnstuckSeconds
-  const w = window.__placeWalkers
-  if (!w) return { ok: false, reason: 'no __placeWalkers' }
-  let maxPinned = 0
-  let anyMoved = false
-  // Movement is measured against the START position, not against the previous
-  // sample. A per-sample delta asks "did a walker cover 0.2 m in the last 150 ms",
-  // which is a question about the SAMPLING RATE and the frame rate rather than
-  // about the walkers: on a software-rendered host at ~12 fps every walker moves,
-  // and the check still read "nothing moved". Cumulative displacement asks what
-  // the check means to ask — did anyone get anywhere.
-  const start = w.states.map((s) => ({ x: s.x, z: s.z }))
-  const t0 = Date.now()
-  // Watch for the window + a generous margin so a would-be pin has time to pass it.
-  while (Date.now() - t0 < (win + 5) * 1000) {
-    for (let i = 0; i < w.states.length; i++) {
-      const s = w.states[i]
-      if (s.pinned > maxPinned) maxPinned = s.pinned
-      if (Math.hypot(s.x - start[i].x, s.z - start[i].z) > 0.2) anyMoved = true
+      await sleep(150)
     }
-    await sleep(150)
-  }
-  return { ok: true, maxPinned, anyMoved, win, n: w.states.length }
-})
-check(
-  'Village: no inhabitant stays pinned past the unstuck window (point 155)',
-  pinResult.ok && pinResult.anyMoved && pinResult.maxPinned <= pinResult.win + 0.6,
-  JSON.stringify(pinResult),
-)
+    return { ok: true, maxPinned, anyMoved, win, n: w.states.length }
+  })
+  check(
+    'Village: no inhabitant stays pinned past the unstuck window (point 155)',
+    pinResult.ok && pinResult.anyMoved && pinResult.maxPinned <= pinResult.win + 0.6,
+    JSON.stringify(pinResult),
+  )
+}
 
 // === The PoC village's teaching stone (work-order 482) ========================
 // The adults teach the word for a rock at a stone in the open (docs/
 // communication-poc-spec.md), so it has to BE there: a solid the player walks up
 // to and not through, standing where the layout says — and in the picture, which
 // is the only place a "visible from the village" claim can be judged.
-await page.evaluate(() => window.__game.getState().enterPlace('bambara-village'))
-await page
-  .waitForFunction((want) => window.__game.getState().placeId === want && !!window.__placeLayout, 'bambara-village', { timeout: 30000 })
-  .catch(() => {})
-await page.evaluate(() => window.__game.getState().setJournalOpen(false))
-// Wait on the CONDITION the pause stood for — the journal actually gone from the
-// DOM — and then on the app's own clock for the frame that redraws without it
-// (CLAUDE.md §7.2: never a wall-clock guess, which is too short on a loaded host
-// and wasted time on a quiet one).
-await page
-  .waitForFunction(() => !window.__game.getState().journalOpen && !document.querySelector('.journal'), null, { timeout: 8000 })
-  .catch(() => {})
-await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(null)))))
-const teachingStone = await page.evaluate(() => window.__placeLayout.teachingStone ?? null)
-check('PoC village: the teaching stone is in the layout', !!teachingStone, JSON.stringify(teachingStone))
-if (teachingStone) {
-  await ejectTest(
-    'Teaching stone',
-    `(cs)=>cs.findIndex((c)=>!c.kind&&Math.hypot(c.x-(${teachingStone.x}),c.z-(${teachingStone.z}))<0.01)`,
-  )
-  // Stand a couple of steps off it, looking at it, so the frame shows the stone
-  // the way a player walking up to it sees it.
-  await page.evaluate((s) => {
-    const p = window.__placePlayer
-    const len = Math.hypot(s.x, s.z) || 1
-    p.x = s.x - (s.x / len) * (s.r + 2.6)
-    p.z = s.z - (s.z / len) * (s.r + 2.6)
-    p.yaw = Math.atan2(-(s.x - p.x), -(s.z - p.z))
-  }, teachingStone)
-  // Let the scene consume the teleport on ITS clock before the shutter judges:
-  // two animation frames, not a wall-clock guess (CLAUDE.md §7.2). On a loaded
-  // host a frame can take a second, and the camera would still be easing toward
-  // the stone when the picture is taken.
-  await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(null)))))
-  await shot('54-collision-teaching-stone', {
-    local: { x: teachingStone.x, z: teachingStone.z },
-    label: 'the teaching stone in the PoC village',
-  })
+if (section('teaching-stone')) {
+  await enterSettlement('bambara-village')
+  const teachingStone = await page.evaluate(() => window.__placeLayout.teachingStone ?? null)
+  check('PoC village: the teaching stone is in the layout', !!teachingStone, JSON.stringify(teachingStone))
+  if (teachingStone) {
+    await ejectTest(
+      'Teaching stone',
+      `(cs)=>cs.findIndex((c)=>!c.kind&&Math.hypot(c.x-(${teachingStone.x}),c.z-(${teachingStone.z}))<0.01)`,
+    )
+    // Stand a couple of steps off it, looking at it, so the frame shows the stone
+    // the way a player walking up to it sees it.
+    await page.evaluate((s) => {
+      const p = window.__placePlayer
+      const len = Math.hypot(s.x, s.z) || 1
+      p.x = s.x - (s.x / len) * (s.r + 2.6)
+      p.z = s.z - (s.z / len) * (s.r + 2.6)
+      p.yaw = Math.atan2(-(s.x - p.x), -(s.z - p.z))
+    }, teachingStone)
+    // Let the scene consume the teleport on ITS clock before the shutter judges:
+    // two animation frames, not a wall-clock guess (CLAUDE.md §7.2). On a loaded
+    // host a frame can take a second, and the camera would still be easing toward
+    // the stone when the picture is taken.
+    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(null)))))
+    await shot('54-collision-teaching-stone', {
+      local: { x: teachingStone.x, z: teachingStone.z },
+      label: 'the teaching stone in the PoC village',
+    })
+  }
 }
 
 // === The village's river bank (work-order 482) ================================
@@ -530,43 +571,54 @@ if (teachingStone) {
 // settlement. The shape and the stand-off are pinned in the unit layer; what
 // only the live scene can show is that holding forward at the water does not
 // end the visit.
-const bank = await page.evaluate(() => window.__placeLayout?.bank ?? null)
-check('PoC village: the layout carries a walkable river bank', !!bank, JSON.stringify(bank && { riverId: bank.riverId, distance: bank.distance }))
-if (bank) {
-  await page.evaluate((b) => {
-    const p = window.__placePlayer
-    // A few steps short of the water, facing straight at it.
-    p.x = b.nx * (b.walkEdge - 4)
-    p.z = b.nz * (b.walkEdge - 4)
-    p.yaw = Math.atan2(-b.nx, -b.nz)
-    p.pitch = 0
-  }, bank)
-  // Hold forward until the walk STOPS advancing, not for a fixed number of
-  // frames: the four steps to the water take ~0.8 s of drawn time, which the
-  // WebGPU lane manages and the software WebGL lane does not — the same fixed
-  // window that reddens the checks of point 506. Polling on the walk's own
-  // progress asks what the check means (does the wall stand at the water?)
-  // instead of how fast the host draws.
-  await pushForwardUntilStalled(bank)
-  const at = await page.evaluate(() => ({
-    x: window.__placePlayer.x,
-    z: window.__placePlayer.z,
-    placeId: window.__game.getState().placeId,
-  }))
-  const out = at.x * bank.nx + at.z * bank.nz
-  check(
-    'PoC village: walking into the river stops at the bank and never leaves the settlement',
-    at.placeId === 'bambara-village' && out <= bank.walkEdge + 0.05,
-    `stopped ${out.toFixed(2)} m out against a walkable edge at ${bank.walkEdge.toFixed(2)}, still in ${at.placeId}`,
-  )
-  check(
-    'PoC village: and he got there — the wall is at the water, not at the huts',
-    out > bank.walkEdge - 2.5,
-    `${out.toFixed(2)} m out`,
-  )
+if (section('river-bank')) {
+  await enterSettlement('bambara-village')
+  const bank = await page.evaluate(() => window.__placeLayout?.bank ?? null)
+  check('PoC village: the layout carries a walkable river bank', !!bank, JSON.stringify(bank && { riverId: bank.riverId, distance: bank.distance }))
+  if (bank) {
+    await page.evaluate((b) => {
+      const p = window.__placePlayer
+      // A few steps short of the water, facing straight at it.
+      p.x = b.nx * (b.walkEdge - 4)
+      p.z = b.nz * (b.walkEdge - 4)
+      p.yaw = Math.atan2(-b.nx, -b.nz)
+      p.pitch = 0
+    }, bank)
+    // Hold forward until the walk STOPS advancing, not for a fixed number of
+    // frames: the four steps to the water take ~0.8 s of drawn time, which the
+    // WebGPU lane manages and the software WebGL lane does not — the same fixed
+    // window that reddens the checks of point 506. Polling on the walk's own
+    // progress asks what the check means (does the wall stand at the water?)
+    // instead of how fast the host draws.
+    await pushForwardUntilStalled(bank)
+    const at = await page.evaluate(() => ({
+      x: window.__placePlayer.x,
+      z: window.__placePlayer.z,
+      placeId: window.__game.getState().placeId,
+    }))
+    const out = at.x * bank.nx + at.z * bank.nz
+    check(
+      'PoC village: walking into the river stops at the bank and never leaves the settlement',
+      at.placeId === 'bambara-village' && out <= bank.walkEdge + 0.05,
+      `stopped ${out.toFixed(2)} m out against a walkable edge at ${bank.walkEdge.toFixed(2)}, still in ${at.placeId}`,
+    )
+    check(
+      'PoC village: and he got there — the wall is at the water, not at the huts',
+      out > bank.walkEdge - 2.5,
+      `${out.toFixed(2)} m out`,
+    )
+  }
 }
+
+// A selected section that never executed is a FAILURE, not a quiet pass: it is
+// the one way a --section run could report green having verified nothing.
+const unrun = sections.unrun()
+if (unrun) check('the selected section actually ran', false, unrun)
 
 console.log('console errors:', errors.length)
 for (const e of errors) console.log('ERR:', e.slice(0, 300))
+// Said again where the verdict is read: a green one-section run is not a green
+// suite, and nothing downstream may quote it as one.
+if (sections.banner()) console.log(sections.banner())
 await browser.close()
 process.exit(failures > 0 || errors.length > 0 ? 1 : 0)
