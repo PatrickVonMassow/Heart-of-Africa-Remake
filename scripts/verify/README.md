@@ -317,6 +317,67 @@ waterfall" map label as its water. **A check that stages a scene must pin what
 the scene depends on before anything can move it** — the drift freeze moved to
 the jump, and three separate sessions then staged the identical cell and rect.
 
+### Running ONE section of a suite (point 566)
+
+```
+npm test -- enrichments --section=crocodile-hidden   # one block, not the pass
+node scripts/verify/run-all.mjs enrichments --section=nope   # names every section
+```
+
+Repairing a single check used to cost a whole suite pass. Measured 08.08.2026 on
+point 342: the feature took 22 minutes, the remaining four and a half hours were
+verification — and two of the three repair commits repaired the CHECK, not the
+game. Each replayed `enrichments` whole (251 checks, >17 min on the WebGL 2
+lane), then again on the second backend.
+
+A name filter on `check()` buys nothing here: the suites are linear scripts —
+boot, jump, wait for herds, assert, jump on — and the cost is the navigation, the
+waits and the screenshots, not the assertion. So the skippable unit is a
+**section**: a named block that owns the setup it needs plus its checks. The
+`// --- … ---` comments were already those boundaries; `section('<slug>')` in
+front of each turns one into a declaration.
+
+- `scripts/verify/sections.mjs` is the pure module (pinned by `sections.test.mjs`):
+  `listSections` reads the declarations out of the suite SOURCE — no hand-kept
+  list to drift — and `resolveSelection` decides what a request means.
+- The runner validates the name **before** it builds or boots anything and
+  refuses an unknown one naming every section that exists. A typo must never boot
+  a browser, assert nothing and exit 0.
+- Every `PASS`/`FAIL` line carries `[--section=<slug>]`, appended after the
+  detail so the check's NAME (and with it the red ledger and the baseline
+  classifier) is unchanged — a failing check thus prints the argument that
+  re-runs it alone.
+- **A `--section` run is PARTIAL and is never coverage.** The run recorder stamps
+  `partial` on the record from `VERIFY_SECTION`, and `runVerdict` refuses it
+  whatever the exit code, so `render-verify-guard` cannot be cleared by one. This
+  is the repair loop; acceptance and closing runs stay whole-suite.
+- **A selected section that never EXECUTED fails the run.** `listSections` reads
+  the source as text, so a name surviving only inside a comment (or behind a
+  branch nothing reaches) would otherwise boot a browser, assert nothing and
+  exit 0. The suite checks `sections.unrun()` at its end and fails on it: a green
+  that proves nothing is the one outcome that would make this mechanism
+  dangerous.
+- Sectioning a further suite is additive: wrap each block in
+  `if (section('<slug>')) { … }` and give each block the jump/wait it inherited
+  from the one before. A suite that declares none keeps working unchanged and
+  refuses `--section` with that reason.
+- **A section is a BLOCK SCOPE, so anything two of them share lives ABOVE
+  them.** A helper declared inside one block is invisible to the next, and
+  nothing says so until the browser run reaches the call: `pinFamily`, declared
+  in `calf-predation-drama` and used from `coastal-walk-off`, aborted the whole
+  `enrichments` pass after 176 of 251 checks — 27 minutes to find. That class is
+  now caught in the FAST layer: `.oxlintrc.json` arms `no-undef` over
+  `scripts/**/*.mjs` (with the browser AND node global sets, since these files
+  carry `page.evaluate` callbacks), so `npm run lint` refuses it in a tenth of a
+  second, and `scope.test.mjs` keeps the rule armed by running the real config
+  over a fixture of exactly that shape.
+- **The one recurring defect is a section that does NOT own its setup**: it
+  reads a scene the block before it staged, so it passes in the whole run and
+  fails standalone. Where blocks genuinely share one staging they belong in ONE
+  section; where they do not, the section repeats the jump itself. Prove it by
+  running every section alone once and diffing its checks against the whole
+  run's — that sweep is how `calf-jitter` and `elephant-trampling` were caught.
+
 ## Is the machine QUIET? — before the run (point 296)
 
 A timing verdict taken under load is not evidence. On 27.07.2026 that cost three

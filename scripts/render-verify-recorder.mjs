@@ -9,6 +9,11 @@
 // "I ran it" can never be a hollow claim: the record only exists when the suite
 // process itself wrote it.
 //
+// A `--section` run is recorded PARTIAL (point 566): it exercised one named
+// block of the suite, so runVerdict refuses the record as coverage whatever its
+// exit code. The flag comes from the env the runner set, never from the suite —
+// a suite cannot forget to declare its own partiality.
+//
 // A RED run is recorded with its REDS (point 550): every failing check and
 // console error it printed, each charged to the open work-order point that owns
 // it (scripts/render-verify-charges.mjs) or to nothing. That is what lets the
@@ -24,6 +29,7 @@ import { readdirSync, statSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { recordRun } from './render-verify-state.mjs'
 import { failedChecks } from './verify/baseline-classify-core.mjs'
+import { SECTION_ENV, sectionGateWasBuilt } from './verify/sections.mjs'
 import { chargeReds } from './render-verify-core.mjs'
 
 // Resolved from this module's own location where that is possible, with a
@@ -135,6 +141,11 @@ export function armRunRecorder(backend) {
     armed = {
       backend,
       suite: basename(String(process.argv[1] ?? 'unknown'), '.mjs'),
+      // The ONE section this run was narrowed to (point 566), read from the env
+      // the runner sets rather than from the suite: a suite cannot forget to
+      // declare its own partiality, and the flag is what makes runVerdict refuse
+      // the record as coverage. Empty/unset means the suite ran whole.
+      section: String(process.env[SECTION_ENV] ?? '').trim() || null,
       startedAt: Date.now(),
       asserted: false,
       // The WebGPU feature level the run really came up at, filled in by
@@ -168,6 +179,16 @@ export function armRunRecorder(backend) {
       try {
         const shots = screenshotsSince(armed.startedAt)
         const exit = code ?? 0
+        // A suite that consulted NO section gate ran WHOLE, whatever the
+        // environment said — a stale exported VERIFY_SECTION, or a suite not
+        // sectioned yet. The record still says partial, which errs toward
+        // refusing coverage rather than granting it, but the mismatch is said
+        // out loud so nobody hunts a suite that "only ran one section".
+        if (armed.section && !sectionGateWasBuilt()) {
+          console.log(
+            `NOTE  ${armed.suite} consulted no section gate, so it ran WHOLE — but ${SECTION_ENV}=${armed.section} is set, so this run is recorded PARTIAL and proves no coverage. Unset it.`,
+          )
+        }
         // A green run has nothing to account for; only a RED one is charged, and
         // it is charged HERE, at record time, against the ledger as it stood
         // when the run happened. A later ledger edit therefore cannot bless a
@@ -210,6 +231,7 @@ export function armRunRecorder(backend) {
           featureLevel: armed.featureLevel,
           screenshotCount: shots.length,
           screenshots: shots.slice(0, 12),
+          ...(armed.section ? { partial: true, section: armed.section } : {}),
           ...(exit !== 0 ? { reds: reds.slice(0, MAX_RECORDED_REDS), crashed: armed.crashed } : {}),
         })
       } catch {

@@ -106,6 +106,9 @@ describe('classifyLine', () => {
     expect(classifyLine('===== LARGE regression — backend 1/2: WebGL 2 =====')).toBe('banner')
     expect(classifyLine('ALL GREEN — 18 suites run')).toBe('final')
     expect(classifyLine('3 SUITE(S) FAILED — 18 suites run')).toBe('final')
+    // Point 566: the line that says the green headline above it covers ONE
+    // section must survive the digest's budget, like any other conclusion.
+    expect(classifyLine('PARTIAL — only section "rivers" of enrichments ran; the suite is NOT covered by this run')).toBe('final')
     expect(classifyLine('↻ retry world once')).toBe('flake')
     expect(classifyLine('⚠ PASSED ON RETRY  world')).toBe('flake')
     expect(classifyLine('      FAIL  hunt staging reaches the feeding phase')).toBe('echo')

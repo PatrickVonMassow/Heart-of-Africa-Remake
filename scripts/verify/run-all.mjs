@@ -6,6 +6,7 @@
 //   npm run test:small  # Vitest + the SMALL everyday browser gate (no preview)
 //   npm run test:large  # Vitest + every browser suite + preview (== npm test)
 //   npm test -- flow    # only the named suite(s), dev server managed for you
+//   npm test -- enrichments --section=<name>   # ONE declared section (point 566)
 // The tier split (point 173) and the backend map (points 184/204) live in
 // ./tiers.mjs; see the note below and scripts/verify/README.md.
 //
@@ -20,6 +21,8 @@ import {
 } from './machine-load-core.mjs'
 import { readMachine } from './machine-load.mjs'
 import { DEV_SUITES, needsDevServer, parseArgs, planBackends, selectBackend, skippedSuites, suitesFor } from './tiers.mjs'
+import { SECTION_ENV, listSections, planSectionRun, resolveSelection } from './sections.mjs'
+import { readFileSync } from 'node:fs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 
@@ -49,8 +52,39 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const VERIFY_GL = selectBackend(process.env.VERIFY_GL)
 
 const args = process.argv.slice(2)
-const { tier, filter, flags, fullRun, isLargeEquivalent, baseline } = parseArgs(args)
+const { tier, filter, flags, fullRun, isLargeEquivalent, baseline, section } = parseArgs(args)
 const wantBaseline = baseline || process.env.VERIFY_BASELINE === '1'
+
+// Run ONE declared section of ONE suite (point 566) — the repair loop, where a
+// check that needed fixing used to cost the whole 17-minute pass. Validated HERE,
+// before anything is built or booted, from the suite's own source: an unknown
+// name must cost a tenth of a second and name the sections that exist, never a
+// browser boot that then asserts nothing and exits 0.
+if (section !== null) {
+  const die = (msg) => {
+    console.log(msg)
+    process.exit(1)
+  }
+  const plan = planSectionRun({ tier, filter, section, knownSuites: DEV_SUITES })
+  if (!plan.ok) die(plan.message)
+  const suite = plan.suite
+  let source = ''
+  try {
+    source = readFileSync(join(HERE, `${suite}.mjs`), 'utf8')
+  } catch {
+    die(`--section: cannot read scripts/verify/${suite}.mjs`)
+  }
+  const verdict = resolveSelection({ sections: listSections(source), requested: section, suite })
+  if (!verdict.ok) die(verdict.message)
+  // The suites read it from the env; the run recorder stamps the record PARTIAL
+  // from the same variable, which is what stops it counting as backend coverage.
+  process.env[SECTION_ENV] = section
+  console.log(`# PARTIAL: only section "${section}" of ${suite} — NOT suite coverage (point 566)`)
+} else {
+  // A leftover from an earlier partial run in this shell would silently narrow a
+  // full regression to one section. A run that did not ASK for one runs whole.
+  delete process.env[SECTION_ENV]
+}
 
 // point 204(b): a bare LARGE run (`npm test` / `npm run test:large`) covers BOTH
 // renderer backends in one command — it re-invokes itself once per planned pass.
@@ -395,6 +429,9 @@ else if (redSuites.length > 0) {
 
 const failed = results.filter((r) => !r).length
 console.log(`\n${failed === 0 ? 'ALL GREEN' : failed + ' SUITE(S) FAILED'} — ${results.length} suites run`)
+// Say it again at the END, where the verdict is read (point 566): a green
+// headline from a one-section run must never be quoted as the suite's.
+if (section) console.log(`PARTIAL — only section "${section}" of ${filter[0]} ran; the suite is NOT covered by this run`)
 // What the machine's state means for THIS result (point 296). The asymmetry is
 // the content: a green under load still counts — load produces false REDS, not
 // false greens — while a red from a timing-sensitive suite under load is not
