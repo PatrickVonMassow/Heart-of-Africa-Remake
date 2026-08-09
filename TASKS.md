@@ -4621,3 +4621,29 @@ Build order, chosen so no two parallel agents own the same file:
   return to `process.cwd()`.
   Criticality: medium — it hides no product defect, but it degrades the signal of the one
   gate every delegated point runs, which is how a real red gets waved through.
+
+- [ ] 570. THE CHILDREN-PHOTOGRAPHABLE CHECK REDS ON THE PINNED WORLD (measured
+  09.08.2026 on `main` at 3e33ff83, WebGL 2, immediately after point 557 pinned the world
+  seed at the launcher; bundle Testinfrastruktur). `polish`'s check "the game is
+  photographable: both children read whole, apart and at least 67 px tall, unoccluded,
+  WITH the village behind them (point 524)" went RED. Point 524 is CLOSED, so this red
+  belongs to nobody: it is either a regression against a criterion the project already
+  accepted, or a check that was never stable and only looked stable because every run
+  walked a different world.
+  WHAT THE EVIDENCE SAYS SO FAR: the point-557 agent ran `polish` twice on the same
+  change and this check passed BOTH times; the first run on `main` failed it. So it is
+  not simply "the pinned world puts the children out of view" — that would fail every
+  time. Two candidates remain: a genuine intermittency in where the children are placed
+  or when the frame is taken, and a load sensitivity (the failing run shared the machine
+  with a finishing agent).
+  FINAL STATE: the cause is ESTABLISHED before anything is tuned — run the check ten
+  times on the pinned seed on a QUIET machine and record how many pass. If it fails
+  consistently, the children's placement regressed against point 524 and the PRODUCT is
+  fixed; if it rotates, it joins the staging-settle family of point 200 and is fixed the
+  same way (poll on the app's own clock, never a fixed wait). The threshold (67 px,
+  unoccluded, village behind) is NOT relaxed to make the red go away — it is the wording
+  point 524 was accepted against.
+  VERIFIABLE: ten consecutive runs on the pinned seed with the same verdict, and the
+  cause named in the commit message with its evidence.
+  Criticality: medium — it may be a real regression against a closed criterion, and until
+  it is owned it blocks every render-set change from ever recording a covering run.

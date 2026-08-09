@@ -56,4 +56,28 @@ export const RED_CHARGES = [
       'fast enough to answer a rate question, which is point 506. Backend-scoped on purpose: ' +
       'on the WebGL 2 lane this check stays a real red.',
   },
+  {
+    point: 568,
+    suite: 'polish',
+    backend: 'webgl',
+    kind: 'check',
+    match: /water beyond the plate.s rim is the SAME water/i,
+    why:
+      'Measured 09.08.2026 twice on WebGL 2 with the world seed pinned to 42: red on one run ' +
+      '(samples 13.8/12.1/19.3 against a limit of 12) and fully green on the next at the same ' +
+      'commit and the same seed, so the world is not what moves. That rotation IS point 568, ' +
+      'which must establish whether the sample is taken too early or the rim seam is real.',
+  },
+  {
+    point: 570,
+    suite: 'polish',
+    backend: 'webgl',
+    kind: 'check',
+    match: /both children read whole, apart and at least/i,
+    why:
+      'Measured 09.08.2026 on main at 3e33ff83, WebGL 2: red once, while the point-557 agent ' +
+      'passed the same check twice on the same change. Point 524, which the check names, is ' +
+      'CLOSED, so the red is owned by point 570 until that point establishes whether the ' +
+      'children genuinely regressed or the check rotates.',
+  },
 ]
