@@ -8,13 +8,12 @@ import { placeById } from '../../world/geo'
 import { mulberry32 } from '../../world/noise'
 import { REGION_PLACE_STYLES, VILLAGE_PLANS, type RegionPlaceStyle } from './regionStyles'
 import { PORT_TALKERS, VILLAGE_SPOTS } from './lifeSpots'
-import { boxCollider, nudgeToFree, spawnPointFree, PLAYER_RADIUS, WALKER_RADIUS, type Collider } from './collision'
+import { boxCollider, nudgeToFree, spawnPointFree, WALKER_RADIUS, type Collider } from './collision'
 import { CHIEF_HUT, MARKET_HUT, dwellingRoofProfile, hutRoofProfile, roofStandOff } from './roofClearance'
-import { GROUND_DISC_OVERHANG } from './backdrop'
 import { windingPoints, laneSlots, closestOnPolyline, bendAround, type LaneSlot } from './lanePlan'
 import { buildGizaLayout } from './gizaSite'
 import { ROCK_VILLAGE_ID } from '../../world/communicationRock'
-import { buildRiverBank, settleBankPoints, BANK_SHORE_HALF, BANK_WALL_INSET, type PlaceRiverBank } from './riverBank'
+import { buildRiverBank, settleBankPoints, type PlaceRiverBank } from './riverBank'
 import type { BuildingType } from '../../state/ui'
 
 export const PLACE_RADIUS = 28 // walkable radius in meters; leaving it exits the place
@@ -214,6 +213,38 @@ const FENCE_PANEL_RADIUS: Record<FenceDef['kind'], number> = { thorn: 0.6, stone
  *  itself and a gate always skips at least one post (≥ 2× the spacing). */
 const FENCE_PANEL_SPAN_FACTOR = 1.5
 
+/** One DRAWN fence panel: where it stands and which way it faces. */
+export interface FencePanel {
+  kind: FenceDef['kind']
+  x: number
+  z: number
+  /** Yaw, oriented toward the next post along the run. */
+  rot: number
+}
+
+/**
+ * The fence panels the renderer INSTANCES, as pure data (work-order 583).
+ *
+ * It lives here, beside `fenceColliders`, because the two are one run seen
+ * twice: one panel per post, one collider per post. They drifted once — the
+ * scene's instance buffer carried a FIXED capacity (160) while the Bambara
+ * compound's five woven rings ask for 167, so the last seven panels were never
+ * drawn while their colliders stood, and the player met a wall in open sand
+ * seven panels long. A buffer sized from THIS list cannot truncate, and a test
+ * can count both without a browser.
+ */
+export function fencePanels(fences: FenceDef[]): FencePanel[] {
+  const out: FencePanel[] = []
+  for (const f of fences) {
+    for (let i = 0; i < f.posts.length; i++) {
+      const [x, z] = f.posts[i]
+      const [nx, nz] = f.posts[(i + 1) % f.posts.length]
+      out.push({ kind: f.kind, x, z, rot: Math.atan2(nx - x, nz - z) + Math.PI / 2 })
+    }
+  }
+  return out
+}
+
 /**
  * The collider run of one fence, DERIVED from the posts the renderer draws
  * (points 129/378/413): a capsule per drawn panel, i.e. per pair of neighbouring
@@ -394,6 +425,13 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     // Keep every dwelling's entrance-door approach clear too, so a later object
     // never seals an earlier hut's door (design.md §2, point 6 reachability).
     if (!dwellings.every((d) => Math.hypot(x - d.door[0], z - d.door[1]) > 1.7)) return false
+    // NOTHING STANDS ON THE SHORE (work-order 584). Past the top of the bank the
+    // ground slopes away under the water, and the dressing is placed and drawn on
+    // the flat plate — so a boulder that lands there stands in the river, hovering
+    // over the shore it does not follow, and it is a collider in the one stretch
+    // the traveller wades through. Seed 1425108822 dropped one 1.8 m past the
+    // Bambara waterline, which is how it was found.
+    if (bank && x * bank.nx + z * bank.nz + Math.max(ownR, 0.9) > bank.walkEdge) return false
     // Window clearance (design.md §2.6): no wall pressed against a neighbour —
     // every pair of building bodies keeps at least a 0.9 m free gap.
     return dwellings.every((d) => Math.hypot(x - d.x, z - d.z) > Math.max(margin * 0.55, ownR + 0.9) + d.r)
@@ -997,27 +1035,13 @@ export function buildLayout(placeId: string, seed: number): PlaceLayout {
     colliders.push({ x: PORT_TALKERS[0], z: PORT_TALKERS[1], r: 0.85 }) // chatting pair
   }
 
-  // THE WATER IS A WALL (work-order 482). The bank lobe carries the walkable
-  // region out to the waterline, so without this the last step at the water
-  // would cross the boundary and LEAVE the settlement — the traveller wading
-  // out of a village into the bird's-eye view, and into the river at that. The
-  // panel runs along the waterline for as far as the drawn ground reaches, and
-  // its stand-off is chosen so the player halts exactly on the boundary: at the
-  // top of the bank, on the painted edge, looking down at the current.
-  if (bank) {
-    const discEdge = radius + GROUND_DISC_OVERHANG
-    const half = Math.sqrt(Math.max(0, discEdge * discEdge - bank.distance * bank.distance))
-    const cx = bank.nx * bank.distance
-    const cz = bank.nz * bank.distance
-    colliders.push({
-      kind: 'segment',
-      x1: cx - bank.fx * half,
-      z1: cz - bank.fz * half,
-      x2: cx + bank.fx * half,
-      z2: cz + bank.fz * half,
-      r: BANK_SHORE_HALF + BANK_WALL_INSET - PLAYER_RADIUS,
-    })
-  }
+  // NO COLLIDER STANDS AT THE WATER (work-order 584). Work-order 482 had fenced
+  // the waterline with an invisible panel so the last step could not carry the
+  // traveller out of the settlement; what the player met was a wall in the
+  // river, a metre short of the bank the village exists to let him stand at.
+  // The rule now lives where the walkable region is defined (`boundary.ts`): he
+  // walks down the drawn shore and wades to the depth `riverBank.ts` names, and
+  // past it the boundary simply ends, exactly as it does on every other bearing.
 
   // Every errand target a walker heads for must sit on free ground it can also
   // LEAVE (point 155): a jitter (or a stall/rock beside it) can drop a point

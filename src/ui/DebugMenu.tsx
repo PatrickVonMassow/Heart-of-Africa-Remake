@@ -543,6 +543,11 @@ export function DebugMenu() {
         (v) => { balance.placeEdgeBand.wanderM = clampWander(v, balance.placeEdgeBand.widthM); bump() }, 0.1),
       num(t.debug.edgeBandStrength, balance.placeEdgeBand.strength,
         (v) => { balance.placeEdgeBand.strength = Math.max(0, Math.min(1, v)); bump() }, 0.1),
+      // How far into a settlement's river the traveller wades before the
+      // bird's-eye view takes the river over (work-order 584). It moves the
+      // walkable region on the water, so the layout is rebuilt with it.
+      num(t.debug.bankWadeDepth, balance.bankWadeDepth,
+        (v) => { balance.bankWadeDepth = Math.max(0, v); bump() }, 0.1),
       // Village speech (design.md §13.4/§21.2): the pace of the syllables, the
       // pause between the atoms of a phrase and the short, sharply falling
       // hearing range.

@@ -17,6 +17,12 @@ export interface BalanceConfig {
    *  has a walk target) before it is teleport-nudged to the nearest free spot
    *  (point 155) — a small invisible correction, inhabitants only. */
   walkerUnstuckSeconds: number
+  /** How deep the traveller wades into a settlement's river before he is out of
+   *  his depth, in metres (work-order 584). It is the settlement's walkable
+   *  region ON the water: he walks down the drawn shore this far, and past it
+   *  the boundary ends and the bird's-eye view — where the river is swum and the
+   *  current carries him — takes over. Nothing ever HOLDS him at the water. */
+  bankWadeDepth: number
   /** The settlement edge painted on the ground (design.md §2.6, point 352/488):
    *  where the swept, trodden ground gives way to open land. The band's PLACE is
    *  never configured — it sits at the boundary the leave check reads
@@ -731,6 +737,10 @@ export const balance: BalanceConfig = {
   placeWalkSpeed: 10,
   placeStrafeFactor: 0.8,
   walkerUnstuckSeconds: 4, // an inhabitant wedged this long is teleport-nudged free (point 155)
+  // Calibratable: 0.7 m is about mid-thigh on a grown man — the depth at which
+  // wading stops being walking. It lands the far edge of the walkable region
+  // roughly three metres past the waterline, well inside the drawn shallows.
+  bankWadeDepth: 0.7,
   placeEdgeBand: {
     // Calibratable: ~3 m of give-way reads as a soft change underfoot at walking
     // pace without turning into a stripe, and 0.9 m of wander bows the outline

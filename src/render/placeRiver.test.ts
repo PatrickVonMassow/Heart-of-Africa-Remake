@@ -15,7 +15,15 @@ import {
   buildRiverSurfaceGeometry,
   fleckPosition,
 } from './placeRiver'
-import { BANK_SHORE_HALF, BANK_WATER_DROP, buildRiverBank, type PlaceRiverBank } from '../scenes/place/riverBank'
+import {
+  BANK_BED_REACH,
+  BANK_MAX_STEP,
+  BANK_SHORE_HALF,
+  BANK_WATER_DROP,
+  bankShoreHeight,
+  buildRiverBank,
+  type PlaceRiverBank,
+} from '../scenes/place/riverBank'
 import { GROUND_DISC_OVERHANG } from '../scenes/place/backdrop'
 import { placeBoundaryRadius } from '../scenes/place/boundary'
 import { PLACE_RADIUS } from '../scenes/place/layout'
@@ -47,12 +55,16 @@ describe('the ground plate is cut at the top of the bank', () => {
     }
   })
 
-  it('still carries every bearing of the walkable boundary', () => {
-    // Each rim vertex has to be at least as far out as the boundary there,
-    // or the player would walk off the drawn ground.
+  it('still carries every bearing the walkable region does not hand to the shore', () => {
+    // Each rim vertex has to be at least as far out as the boundary there, or
+    // the player would walk off the drawn ground — EXCEPT on the bank bearings,
+    // where the plate stops at the top of the bank on purpose and the shore
+    // carries the last stretch down into the shallows (work-order 584).
     for (const v of vertices(plate).slice(1)) {
       const angle = Math.atan2(v.z, v.x)
-      expect(Math.hypot(v.x, v.z) + 1e-6).toBeGreaterThanOrEqual(placeBoundaryRadius(bounds, angle))
+      const r = Math.hypot(v.x, v.z)
+      if (outward(v.x, v.z) > bank.walkEdge - 1e-4) continue
+      expect(r + 1e-6).toBeGreaterThanOrEqual(placeBoundaryRadius(bounds, angle))
     }
   })
 
@@ -75,14 +87,25 @@ describe('the shore carries the ground down into the water', () => {
     for (const v of top) expect(outward(v.x, v.z)).toBeCloseTo(bank.walkEdge, 4)
   })
 
-  it('drops past the water surface, so the drawn waterline lands ON the waterline', () => {
-    // The slope runs from y = 0 at `walkEdge` to y = −2·drop at `walkEdge +
-    // 2·shoreHalf`; the water plane sits at −drop, which is exactly half way.
-    const foot = rows.filter((v) => Math.abs(v.y + BANK_WATER_DROP * 2) < 1e-6)
-    expect(foot.length).toBeGreaterThan(0)
-    for (const v of foot) expect(outward(v.x, v.z)).toBeCloseTo(bank.distance + BANK_SHORE_HALF, 4)
-    const cross = bank.walkEdge + (BANK_SHORE_HALF * 2) / 2
-    expect(cross).toBeCloseTo(bank.distance, 6)
+  it('meets the water surface EXACTLY at the waterline', () => {
+    // The beach falls from y = 0 at the top of the bank to the water plane's own
+    // height, and it does so at `bank.distance` — so the line the player sees
+    // where sand becomes water is the waterline the rest of the module names.
+    const line = rows.filter((v) => Math.abs(v.y + BANK_WATER_DROP) < 1e-6)
+    expect(line.length).toBeGreaterThan(0)
+    for (const v of line) expect(outward(v.x, v.z)).toBeCloseTo(bank.distance, 4)
+    expect(bank.distance - bank.walkEdge).toBeCloseTo(BANK_SHORE_HALF, 6)
+  })
+
+  it('is a SLOPE, never a face: no step taller than the stated limit', () => {
+    // The defect this replaces (work-order 584): the sand ended in a straight
+    // edge and the water met it like the wall of a swimming pool. Sampled along
+    // the whole profile, no rise between neighbouring footings may exceed
+    // BANK_MAX_STEP — which is what makes it a bank a man walks down.
+    for (let out = bank.walkEdge - 1; out < bank.distance + BANK_BED_REACH; out += 0.1) {
+      const drop = bankShoreHeight(bank, out) - bankShoreHeight(bank, out + 0.1)
+      expect(Math.abs(drop), `step at ${out.toFixed(2)} m out`).toBeLessThanOrEqual(BANK_MAX_STEP)
+    }
   })
 
   it('carries a bed on under the water, so the shallows are not a hole', () => {
@@ -90,6 +113,12 @@ describe('the shore carries the ground down into the water', () => {
     expect(deepest).toBeLessThan(-BANK_WATER_DROP * 2)
     const bed = rows.filter((v) => v.y === deepest)
     for (const v of bed) expect(outward(v.x, v.z)).toBeCloseTo(bank.distance + RIVER_REACH, 4)
+  })
+
+  it('is the SAME ground the walk reads — the mesh IS the profile', () => {
+    // One description, not two (points 129/378): every drawn vertex has to sit
+    // on the profile the camera's footing and the wade limit are solved on.
+    for (const v of rows) expect(v.y).toBeCloseTo(bankShoreHeight(bank, outward(v.x, v.z)), 4)
   })
 })
 

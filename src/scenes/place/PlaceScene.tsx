@@ -99,9 +99,10 @@ import {
   fleckPosition,
 } from '../../render/placeRiver'
 import { RIVER_DRIFT_SPEED } from '../../render/waterAppearance'
-import type { PlaceRiverBank } from './riverBank'
+import { bankGroundHeight, type PlaceRiverBank } from './riverBank'
 import { clearEdgeBand, setEdgeBandBoundary, setEdgeBandLook } from '../../render/edgeBand'
-import { buildLayout, builtFabric, DIG_SITE_RADIUS, isOnLane, nearestActionable, PLACE_RADIUS, SPAWN_INSET, VILLAGE_FIRE, type Interactive, type PathDef, type DwellingDef, type FenceDef, type PlaceLayout } from './layout'
+import { devAssert } from '../../systems/devAssert'
+import { buildLayout, builtFabric, DIG_SITE_RADIUS, fencePanels, isOnLane, nearestActionable, PLACE_RADIUS, SPAWN_INSET, VILLAGE_FIRE, type Interactive, type PathDef, type DwellingDef, type FenceDef, type PlaceLayout } from './layout'
 import {
   COOK_SHELTER,
   EYE_HEIGHT,
@@ -865,16 +866,11 @@ function Fences({ fences, mats }: { fences: FenceDef[]; mats: PlaceMaterials }) 
   )
   const stoneMat = useMemo(() => new THREE.MeshStandardMaterial({ color: '#8d8478', roughness: 1 }), [])
 
+  // The panels come from `fencePanels` — the same run `fenceColliders` reads, so
+  // the drawn wall and the blocked band are one description, not two.
   const { thorn, woven, stone } = useMemo(() => {
     const out = { thorn: [] as Array<[number, number, number]>, woven: [] as Array<[number, number, number]>, stone: [] as Array<[number, number, number]> }
-    for (const f of fences) {
-      for (let i = 0; i < f.posts.length; i++) {
-        const [x, z] = f.posts[i]
-        const [nx, nz] = f.posts[(i + 1) % f.posts.length]
-        const rot = Math.atan2(nx - x, nz - z) + Math.PI / 2
-        out[f.kind].push([x, z, rot])
-      }
-    }
+    for (const p of fencePanels(fences)) out[p.kind].push([p.x, p.z, p.rot])
     return out
   }, [fences])
 
@@ -888,6 +884,15 @@ function Fences({ fences, mats }: { fences: FenceDef[]; mats: PlaceMaterials }) 
     const up = new THREE.Vector3(0, 1, 0)
     const fill = (mesh: THREE.InstancedMesh | null, list: Array<[number, number, number]>, y: number, scale: (i: number) => THREE.Vector3) => {
       if (!mesh) return
+      // A buffer smaller than its run draws NOTHING for the overflow while the
+      // collider set stays complete — an invisible wall (work-order 583). The
+      // capacities below are sized from these very lists, so this can only fire
+      // if that wiring is broken again.
+      devAssert(
+        list.length <= mesh.instanceMatrix.count,
+        'place-instances-truncated',
+        () => `${list.length} instances into a buffer of ${mesh.instanceMatrix.count} — the overflow is drawn nowhere`,
+      )
       list.forEach(([x, z, rot], i) => {
         quat.setFromAxisAngle(up, rot)
         mtx.compose(new THREE.Vector3(x, y, z), quat, scale(i))
@@ -903,9 +908,13 @@ function Fences({ fences, mats }: { fences: FenceDef[]; mats: PlaceMaterials }) 
 
   return (
     <>
-      <instancedMesh ref={thornRef} args={[bushGeo, thornMat, 220]} castShadow receiveShadow frustumCulled={false} />
-      <instancedMesh ref={wovenRef} args={[panelGeo, mats.thatch, 160]} castShadow receiveShadow frustumCulled={false} />
-      <instancedMesh ref={stoneRef} args={[stoneGeo, stoneMat, 160]} castShadow receiveShadow frustumCulled={false} />
+      {/* Each buffer is sized from its OWN run, never from a guessed ceiling
+          (work-order 583): 160 woven slots against the 167 panels the Bambara
+          compound asks for left the last seven undrawn and their colliders
+          standing in open sand. */}
+      <instancedMesh ref={thornRef} args={[bushGeo, thornMat, Math.max(1, thorn.length)]} castShadow receiveShadow frustumCulled={false} />
+      <instancedMesh ref={wovenRef} args={[panelGeo, mats.thatch, Math.max(1, woven.length)]} castShadow receiveShadow frustumCulled={false} />
+      <instancedMesh ref={stoneRef} args={[stoneGeo, stoneMat, Math.max(1, stone.length)]} castShadow receiveShadow frustumCulled={false} />
     </>
   )
 }
@@ -1178,10 +1187,20 @@ function GroundScatter({
       rockMesh.current?.setMatrixAt(i, mtx)
     })
     if (tuftMesh.current) {
+      devAssert(
+        tufts.length <= tuftMesh.current.instanceMatrix.count,
+        'place-instances-truncated',
+        () => `${tufts.length} grass tufts into a buffer of ${tuftMesh.current?.instanceMatrix.count}`,
+      )
       tuftMesh.current.count = tufts.length
       tuftMesh.current.instanceMatrix.needsUpdate = true
     }
     if (rockMesh.current) {
+      devAssert(
+        rocks.length <= rockMesh.current.instanceMatrix.count,
+        'place-instances-truncated',
+        () => `${rocks.length} boulders into a buffer of ${rockMesh.current?.instanceMatrix.count}`,
+      )
       rockMesh.current.count = rocks.length
       rockMesh.current.instanceMatrix.needsUpdate = true
     }
@@ -1189,8 +1208,10 @@ function GroundScatter({
 
   return (
     <>
-      <instancedMesh ref={tuftMesh} args={[tuftGeo, material, 96]} receiveShadow frustumCulled={false} />
-      <instancedMesh ref={rockMesh} args={[rockGeo, material, 20]} castShadow receiveShadow frustumCulled={false} />
+      {/* Sized from the runs themselves, for the reason work-order 583 found in
+          the fences: a fixed ceiling below the run draws the overflow nowhere. */}
+      <instancedMesh ref={tuftMesh} args={[tuftGeo, material, Math.max(1, tufts.length)]} receiveShadow frustumCulled={false} />
+      <instancedMesh ref={rockMesh} args={[rockGeo, material, Math.max(1, rocks.length)]} castShadow receiveShadow frustumCulled={false} />
     </>
   )
 }
@@ -2177,10 +2198,16 @@ export function PlaceScene() {
   }, [camera])
 
   const place = placeId ? placeById(placeId) : null
-  const layout = useMemo(
-    () => (placeId ? buildLayout(placeId, seed) : null),
-    [placeId, seed],
-  )
+  // Rebuilt when a balance value changes too: the river bank's wade limit is
+  // calibratable (`balance.bankWadeDepth`, work-order 584), and the debug menu is
+  // the tool it is calibrated with — so the walkable region has to follow it
+  // while the game runs. The build is pure in (placeId, seed) otherwise, so a
+  // rebuild returns the same settlement.
+  const balanceVersion = useGame((s) => s.balanceVersion)
+  const layout = useMemo(() => {
+    void balanceVersion // read so the rebuild is the dependency it looks like
+    return placeId ? buildLayout(placeId, seed) : null
+  }, [placeId, seed, balanceVersion])
   // The settlement edge on the ground (design.md §2.6, point 352/488): the band
   // is pointed at the boundary the leave check reads, sampled over the full
   // turn — it never carries a radius of its own.
@@ -2651,7 +2678,13 @@ export function PlaceScene() {
     // One fixed composition order (point 392): the bob stays a POSITION offset
     // on the yaw's right axis, the look a YXZ rotation — so pitching the view
     // never swings the head and the horizon never tilts with it.
-    const pose = placeCameraPose(p.x, p.z, EYE_HEIGHT, p.yaw, p.pitch, w.roll, bob.dy, bob.dx + idle)
+    // The ground he stands on: flat everywhere but on the river bank, where he
+    // walks DOWN the drawn shore into the shallows (work-order 584). Reading the
+    // footing from the same profile the shore is built from is what makes the
+    // wade visible — the head sinks toward the water instead of gliding out over
+    // it — and it is the only way the picture and the walk can agree.
+    const footing = bankGroundHeight(layout.bank, p.x, p.z)
+    const pose = placeCameraPose(p.x, p.z, EYE_HEIGHT + footing, p.yaw, p.pitch, w.roll, bob.dy, bob.dx + idle)
     camera.position.set(pose.position[0], pose.position[1], pose.position[2])
     camera.rotation.set(pose.rotation[0], pose.rotation[1], pose.rotation[2], 'YXZ')
     // Share the live LOGICAL position so the town-plan map marker can track it.
@@ -2665,7 +2698,8 @@ export function PlaceScene() {
       wfh.bobY = bob.dy
       wfh.roll = w.roll
       wfh.speed = speed
-      wfh.cameraY = EYE_HEIGHT + bob.dy
+      wfh.cameraY = EYE_HEIGHT + footing + bob.dy
+      wfh.footing = footing
       if (lastSurface) wfh.lastFootstepSurface = lastSurface
     }
 

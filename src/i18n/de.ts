@@ -610,6 +610,7 @@ export const de: Strings = {
     edgeBandWidth: 'Ortsrand: Breite (m)',
     edgeBandWander: 'Ortsrand: Mäander (m)',
     edgeBandStrength: 'Ortsrand: Stärke',
+    bankWadeDepth: 'Flussufer: Tiefe zum Waten (m)',
     bloodStainSize: 'Blutfleck: Größe',
     bloodStainIrregularity: 'Blutfleck: ausgefranster Rand',
     season: 'Jahreszeit (Wetter)',
