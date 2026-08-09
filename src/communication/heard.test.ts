@@ -68,6 +68,23 @@ describe('observing an utterance', () => {
     const memory = emptyMemory()
     expect(observeUtterance(memory, '', 1)).toBe(memory)
   })
+
+  it('records the settlement of the first hearing, and none when there was none', () => {
+    const inVillage = observeUtterance(emptyMemory(), COME, 12, 'bambara-village')
+    expect(inVillage.heard[COME].firstHeardPlace).toBe('bambara-village')
+    // Out on the map the entry carries no place at all — not an empty one, so
+    // nothing downstream can render a placeholder village (point 579).
+    const onTheMap = observeUtterance(emptyMemory(), COME, 12)
+    expect(onTheMap.heard[COME]).toEqual({ utterance: COME, firstHeardDay: 12, hypothesis: '' })
+    expect('firstHeardPlace' in onTheMap.heard[COME]).toBe(false)
+  })
+
+  it('keeps the place of the FIRST hearing when the same word is heard elsewhere', () => {
+    const first = observeUtterance(emptyMemory(), COME, 12, 'bambara-village')
+    const again = observeUtterance(first, COME, 40, 'masai-village')
+    expect(again).toBe(first)
+    expect(again.heard[COME].firstHeardPlace).toBe('bambara-village')
+  })
 })
 
 describe('observing a phrase', () => {
@@ -76,6 +93,12 @@ describe('observing a phrase', () => {
     expect(Object.keys(memory.heard).sort()).toEqual([DIG, HERE].sort())
     expect(memory.heard[DIG].firstHeardDay).toBe(5)
     expect(memory.heard[HERE].firstHeardDay).toBe(5)
+  })
+
+  it('gives every atom of the phrase the settlement it was heard in', () => {
+    const memory = observePhrase(emptyMemory(), phraseOf(['DIG', 'HERE']), 5, 'bambara-village')
+    expect(memory.heard[DIG].firstHeardPlace).toBe('bambara-village')
+    expect(memory.heard[HERE].firstHeardPlace).toBe('bambara-village')
   })
 
   it('records a repeated atom once', () => {
@@ -140,6 +163,22 @@ describe('the save round trip', () => {
     memory = setHypothesis(memory, DIG, 'dig?')
     const restored = deserializeMemory(JSON.parse(JSON.stringify(serializeMemory(memory))))
     expect(restored).toEqual(memory)
+  })
+
+  it('carries the settlement through the save, and invents none where the save has none', () => {
+    const memory = observePhrase(emptyMemory(), phraseOf(['DIG', 'HERE']), 7, 'bambara-village')
+    const restored = deserializeMemory(JSON.parse(JSON.stringify(serializeMemory(memory))))
+    expect(restored.heard[DIG].firstHeardPlace).toBe('bambara-village')
+    // A snapshot written before the place was tracked, or with an empty one:
+    // the entry reads without a village rather than with a wrong name.
+    const older = deserializeMemory({
+      heard: {
+        [COME]: { firstHeardDay: 3, hypothesis: '' },
+        [DIG]: { firstHeardDay: 3, hypothesis: '', firstHeardPlace: '' },
+        [HERE]: { firstHeardDay: 3, hypothesis: '', firstHeardPlace: 7 },
+      },
+    })
+    for (const u of [COME, DIG, HERE]) expect('firstHeardPlace' in older.heard[u]).toBe(false)
   })
 
   it('reads a save that predates the system, or a broken one, as an empty memory', () => {
