@@ -223,6 +223,31 @@ await page.waitForTimeout(300)
 await page.evaluate(() => { window.__balance.randomEventsEnabled = false })
 await installSimHelpers()
 
+// SHARED STAGING (point 566). A section is `if (section('x')) { … }` — a BLOCK
+// SCOPE — so anything two sections both use lives HERE, above them, never inside
+// one of them. `pinFamily` was declared inside `calf-predation-drama` and called
+// from `coastal-walk-off`: a whole-suite run died on `pinFamily is not defined`
+// after 176 of 251 checks. `scripts/verify/scope.test.mjs` now fails that class
+// in the fast layer instead of after a 17-minute browser pass.
+//
+// Jump to a spot and stage a live parent+calf family there: restock (earlier
+// sections may have emptied herd arrays while the chunk keys stayed registered,
+// leaving the area barren), wait for the herds and the family, let the calves
+// settle, then pin the live hunt idle and clear the elephants so a stray
+// trampling cannot pre-empt what the caller stages.
+const pinFamily = async (lat, lon) => {
+  await page.evaluate((c) => window.__game.getState().debugJumpTo(c[0], c[1]), [lat, lon])
+  await page.evaluate(() => window.__wildlife.restock())
+  await waitForHerds()
+  await waitForFamily()
+  await page.evaluate(() => window.__sleepSim(2.2)) // let calves settle (point 200: sim-clock)
+  await page.evaluate(() => {
+    const s = window.__lionHunt.state
+    s.mode = 'idle'; s.timer = 99999; s.victim = null; s.victimHunt = false
+    window.__wildlife.herdsRef.current.elephant.length = 0
+  })
+}
+
 // === Settlement sizes + village life + backdrop (§7.1.15) ====================
 if (section('settlement-sizes')) {
   const cairo = await page.evaluate(() => ({
@@ -3596,23 +3621,6 @@ if (section('predator-food-web')) {
 // hand (the live LionHunt is pinned idle first). Each scenario re-finds a live
 // family (the inline finder skips animals a prior scenario killed).
 if (section('calf-predation-drama')) {
-  const pinFamily = async (lat, lon) => {
-    await page.evaluate((c) => window.__game.getState().debugJumpTo(c[0], c[1]), [lat, lon])
-    // Restock: earlier tests may have emptied herd arrays while the chunk keys
-    // stayed registered, leaving the area barren — re-stream it deterministically
-    // so every family scenario is self-contained.
-    await page.evaluate(() => window.__wildlife.restock())
-    await waitForHerds()
-    await waitForFamily()
-    await page.evaluate(() => window.__sleepSim(2.2)) // let calves settle (point 200: sim-clock)
-    await page.evaluate(() => {
-      const s = window.__lionHunt.state
-      s.mode = 'idle'; s.timer = 99999; s.victim = null; s.victimHunt = false
-      // Remove elephants so a stray trampling can't pre-empt the predation path.
-      window.__wildlife.herdsRef.current.elephant.length = 0
-    })
-  }
-
   // (1) The caught calf struggles unharmed for the first seconds, then is killed.
   await pinFamily(-2.2, 34.8)
   const struggle = await page.evaluate(async () => {
