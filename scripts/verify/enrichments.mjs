@@ -7917,6 +7917,11 @@ if (section('region-border-at-river')) {
     !!borderMat && /Standard/.test(borderMat.matType) && borderMat.opaque === true,
     JSON.stringify(borderMat),
   )
+  // The luminance below is read off the PICTURE, so the picture has to be
+  // finished. The park loop above is a fixed 14×120 ms, which is only ever
+  // enough because the sections before it had already drawn this stretch of the
+  // Nile; run on its own, the probe read a scene that had not come up yet.
+  await waitForSceneReady(page)
   const probe = await page.evaluate(() => window.__regionBorder?.screenProbe())
   let borderLum = null
   if (probe && probe.dist < 12) {
