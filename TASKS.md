@@ -4626,9 +4626,28 @@ Build order, chosen so no two parallel agents own the same file:
      minutes apart. If that is structural, the host-environment section says so
      and the lane's verdict for MSAA checks is recorded as unavailable rather
      than red.
+  6. IT IS NO LONGER ONE SUITE'S PROBLEM (09.08.2026, two delegated agents
+     independently, on different branches and on the merge-base): the same
+     `RGBA16Float does not support multisampling` and the same black frames now
+     stand between every RENDER point and its merge, because CLAUDE.md §6 demands
+     the picture proof on BOTH backends where they can differ. `baseline-classify`
+     labels 16 of 17 `settings` failures pre-existing, WebGL 2 passes the same tree
+     59/1 with no console error — so the product is not what is red, the lane is.
+     Until this point closes, a render package can be verified on WebGL 2 and its
+     WebGPU half is OWED, and that owing is stated at the merge rather than passed
+     over in silence. This is what raises the point's urgency; it changes nothing
+     about what it must deliver.
+  7. A SECOND, CHEAPER DEFECT OF THE SAME FAMILY, found while chasing the first:
+     `bootGame` in `scripts/verify/_boot.mjs` calls `webglLaunchOptions` WITHOUT the
+     environment, so the Gallium pin never lands and any probe built on that boot
+     renders a BLACK canvas while the real suites render the game. It cost one agent
+     two probe runs and it is exactly the shape that gets misread as a product
+     defect. Fixed here, with a pure test that the boot's launch options carry the
+     pin.
   VERIFIABLE: `enrichments` and `settings` run green twice in a row on the
   compatibility lane on a quiet machine, or the host-environment section names the
-  difference that makes it structurally impossible there.
+  difference that makes it structurally impossible there. Plus: a probe built on
+  `bootGame` renders the scene, not a black canvas.
 
 - [ ] 515. THE PARALLEL-SESSION DETECTOR COUNTS A PLACEHOLDER OWNER AS A SECOND
   SESSION (measured 05.08.2026). The batch PAUSED ITSELF at 13:06 because the
