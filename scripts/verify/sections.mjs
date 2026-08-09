@@ -26,6 +26,7 @@
 // the running suite's own source at the bottom.
 import { readFileSync } from 'node:fs'
 import { basename } from 'node:path'
+import { maskCode } from '../window-hide-core.mjs'
 
 /** The env var a runner sets to select one section; the suites read it. */
 export const SECTION_ENV = 'VERIFY_SECTION'
@@ -34,20 +35,35 @@ export const SECTION_ENV = 'VERIFY_SECTION'
  *  position (never `foo.section(`), with a lowercase slug so the CLI argument is
  *  typeable and stable. */
 const DECL_RE = /(?<![\w.$])section\(\s*(['"])([a-z0-9][a-z0-9-]*)\1/g
+/** The same call, up to the opening quote — matched against the MASKED source,
+ *  where a string's body is blanked but its quotes and every index survive. */
+const DECL_HEAD = /(?<![\w.$])section\(\s*['"]/g
 
 /**
  * The sections a suite DECLARES, in run order, de-duplicated. Read from the
  * source rather than from a hand-kept list, so a list can never drift from the
  * code it names — and read WITHOUT executing, so an unknown name can be refused
  * in a tenth of a second instead of after a browser boot.
+ *
+ * A declaration is CODE. `maskCode` blanks comments (and string/regex bodies)
+ * while preserving every index, so the name is taken from the ORIGINAL source at
+ * a position the masked one proved is code. Without that, a suite explaining its
+ * own shape in a comment DECLARES a phantom: `section('x')` written in prose
+ * became a 40th section of `enrichments` that a sweep dutifully ran, that a
+ * typo's candidate list named, and that nothing in the file could execute.
  */
 export function listSections(source) {
+  const src = String(source ?? '')
+  const masked = maskCode(src)
   const out = []
   const seen = new Set()
-  for (const m of String(source ?? '').matchAll(DECL_RE)) {
-    if (seen.has(m[2])) continue
-    seen.add(m[2])
-    out.push(m[2])
+  for (const head of masked.matchAll(DECL_HEAD)) {
+    DECL_RE.lastIndex = head.index
+    const decl = DECL_RE.exec(src)
+    if (!decl || decl.index !== head.index) continue // not a valid slug at that spot
+    if (seen.has(decl[2])) continue
+    seen.add(decl[2])
+    out.push(decl[2])
   }
   return out
 }
@@ -162,12 +178,11 @@ export function makeSectionGate({ sections = [], requested = null, suite = 'the 
     /**
      * THE DEBT A PARTIAL RUN OWES AT ITS END: the requested section must have
      * actually EXECUTED. `listSections` reads the declarations out of source
-     * TEXT, so a name that only survives inside a comment — or behind a block an
-     * earlier `return`/throw never reached — passes the up-front check, and the
-     * run would then boot, assert nothing and exit 0. A green that proves
-     * nothing is the one outcome that would make this mechanism dangerous, so it
-     * is a FAILURE, checked where the suite counts its failures. Null when the
-     * run owes nothing.
+     * TEXT, so a name behind a block an earlier `return`/throw never reached
+     * passes the up-front check, and the run would then boot, assert nothing and
+     * exit 0. A green that proves nothing is the one outcome that would make
+     * this mechanism dangerous, so it is a FAILURE, checked where the suite
+     * counts its failures. Null when the run owes nothing.
      */
     unrun: () =>
       verdict.partial && !ran.includes(verdict.requested)

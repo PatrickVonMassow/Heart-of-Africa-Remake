@@ -223,9 +223,9 @@ await page.waitForTimeout(300)
 await page.evaluate(() => { window.__balance.randomEventsEnabled = false })
 await installSimHelpers()
 
-// SHARED STAGING (point 566). A section is `if (section('x')) { … }` — a BLOCK
-// SCOPE — so anything two sections both use lives HERE, above them, never inside
-// one of them. `pinFamily` was declared inside `calf-predation-drama` and called
+// SHARED STAGING (point 566). A section is a BLOCK SCOPE, so anything two
+// sections both use lives HERE, above them, never inside one of them.
+// `pinFamily` was declared inside `calf-predation-drama` and called
 // from `coastal-walk-off`: a whole-suite run died on `pinFamily is not defined`
 // after 176 of 251 checks. `scripts/verify/scope.test.mjs` now fails that class
 // in the fast layer instead of after a 17-minute browser pass.

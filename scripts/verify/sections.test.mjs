@@ -54,6 +54,30 @@ describe('listSections — the declarations are read from the source', () => {
     expect(listSections('')).toEqual([])
     expect(listSections(null)).toEqual([])
   })
+
+  // A suite explains its own shape in prose, and that prose names the call. Read
+  // as text, `enrichments` therefore declared a 40th section 'x' that no block
+  // could execute: a sweep ran it, the candidate list on a typo named it, and
+  // only the unrun() debt at the end of the run made it fail rather than pass
+  // green having asserted nothing.
+  it('does not read a declaration out of a COMMENT', () => {
+    const source = [
+      "// the shape is `if (section('x')) { … }`",
+      '/* a block comment mentioning',
+      '   section("nope") too */',
+      "if (section('real')) {}",
+    ].join('\n')
+    expect(listSections(source)).toEqual(['real'])
+  })
+
+  it('does not read one out of a STRING or a regex either', () => {
+    expect(listSections("const help = \"try section('ghost')\"\nif (section('real')) {}")).toEqual(['real'])
+    expect(listSections("const RE = /section\\('spook'\\)/\nif (section('real')) {}")).toEqual(['real'])
+  })
+
+  it('still finds a declaration on the same line as a trailing comment', () => {
+    expect(listSections("if (section('real')) { // like section('ghost')\n}")).toEqual(['real'])
+  })
 })
 
 describe('resolveSelection — what a --section request means', () => {
