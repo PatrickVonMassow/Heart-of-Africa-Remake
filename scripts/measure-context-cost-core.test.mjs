@@ -24,6 +24,8 @@ import {
   transcriptScope,
   scopedTurns,
   measureScopes,
+  foldUsage,
+  USAGE_FIELDS,
   SCOPE_ORDER,
   SCOPE_LABELS,
 } from './measure-context-cost-core.mjs'
@@ -37,6 +39,68 @@ const usage = (over = {}) => ({
 })
 const NOW = 1_785_000_000_000
 const MIN = 60_000
+
+describe('foldUsage — the lines of ONE response do not repeat the same usage', () => {
+  // THE DEFECT THIS PINS (four-eyes review, 09.08.2026): `output_tokens` is a streamed
+  // snapshot that GROWS across the lines of one response. Taking the first line — what
+  // both measuring tools did — undercounted the measured output by 1,84×.
+  it('takes the MAXIMUM of a rising output snapshot, never the first line', () => {
+    const folded = foldUsage([usage({ output_tokens: 5 }), usage({ output_tokens: 234 }), usage({ output_tokens: 234 })])
+    expect(folded.output_tokens).toBe(234)
+  })
+
+  it('folds each counter INDEPENDENTLY, so a later-appearing one is not lost', () => {
+    const folded = foldUsage([
+      usage({ cache_read_input_tokens: 72_521, output_tokens: 5 }),
+      usage({ cache_read_input_tokens: 0, output_tokens: 900 }),
+    ])
+    expect(folded.cache_read_input_tokens).toBe(72_521)
+    expect(folded.output_tokens).toBe(900)
+  })
+
+  it('does not SUM the lines — a repeated counter is billed once', () => {
+    const folded = foldUsage([usage({ cache_read_input_tokens: 90_000 }), usage({ cache_read_input_tokens: 90_000 })])
+    expect(folded.cache_read_input_tokens).toBe(90_000)
+    expect(folded.input_tokens).toBe(1000)
+  })
+
+  it('sums the ITERATIONS of a model fallback — two billed calls under one message id', () => {
+    // The one measured case where a counter FALLS: a second API call restarts the count,
+    // and the top-level usage then shows only that call. Both were billed.
+    const folded = foldUsage([
+      usage({ cache_creation_input_tokens: 18_478, cache_read_input_tokens: 72_521, output_tokens: 3 }),
+      usage({
+        cache_creation_input_tokens: 1_820,
+        cache_read_input_tokens: 81_064,
+        output_tokens: 6_339,
+        iterations: [
+          { input_tokens: 2, cache_creation_input_tokens: 18_478, cache_read_input_tokens: 72_521, output_tokens: 1_459 },
+          { input_tokens: 2, cache_creation_input_tokens: 1_820, cache_read_input_tokens: 81_064, output_tokens: 6_339 },
+        ],
+      }),
+    ])
+    expect(folded.output_tokens).toBe(7_798)
+    expect(folded.cache_creation_input_tokens).toBe(20_298)
+    expect(folded.cache_read_input_tokens).toBe(153_585)
+  })
+
+  it('leaves a SINGLE-iteration line at its plain counters', () => {
+    const folded = foldUsage([usage({ output_tokens: 40, iterations: [{ output_tokens: 40 }] })])
+    expect(folded.output_tokens).toBe(40)
+  })
+
+  it('carries the non-counter fields of the first line and survives an empty list', () => {
+    expect(foldUsage([usage({ service_tier: 'standard' })]).service_tier).toBe('standard')
+    expect(foldUsage([])).toEqual({})
+    expect(USAGE_FIELDS).toContain('output_tokens')
+  })
+
+  it('treats a missing or negative counter as zero rather than NaN', () => {
+    const folded = foldUsage([{ output_tokens: -3 }, { input_tokens: 7 }])
+    expect(folded.output_tokens).toBe(0)
+    expect(folded.input_tokens).toBe(7)
+  })
+})
 
 describe('turnCost — the context a turn ran in, and what it weighs', () => {
   it('adds every input kind into the CONTEXT, output excluded', () => {

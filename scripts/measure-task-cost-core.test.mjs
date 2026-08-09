@@ -202,6 +202,31 @@ describe('foldResponseLines', () => {
     expect(folded[0].at).toBe(NOW)
   })
 
+  // THE SECOND HALF OF THE DEFECT (four-eyes review, 09.08.2026): the lines do NOT all
+  // repeat the same usage — `output_tokens` is a rising streamed snapshot, and taking the
+  // first line halved the measured output. The fold must take the per-counter MAXIMUM.
+  it('takes the MAXIMUM output of a response whose output_tokens RISES across its lines', () => {
+    const folded = foldResponseLines([
+      line({ usage: usage({ output_tokens: 5 }) }),
+      line({ usage: usage({ output_tokens: 234 }), tools: [{ id: 'a', name: 'Bash', input: { command: 'npm run build' } }] }),
+      line({ usage: usage({ output_tokens: 234 }) }),
+    ])
+    expect(folded).toHaveLength(1)
+    expect(folded[0].usage.output_tokens).toBe(234)
+    // and the counters that DO repeat are still counted once, not summed
+    expect(folded[0].usage.cache_read_input_tokens).toBe(100_000)
+  })
+
+  it('carries the corrected output into the weighted attribution, not the first line', () => {
+    const rows = [
+      { id: 'msg_1', at: NOW, usage: usage({ cache_read_input_tokens: 0, output_tokens: 10 }), session: 's', scope: 'subagent', branch: 'feat/572-x', file: 'a.jsonl', tools: [] },
+      { id: 'msg_1', at: NOW + 400, usage: usage({ cache_read_input_tokens: 0, output_tokens: 1000 }), session: 's', scope: 'subagent', branch: 'feat/572-x', file: 'a.jsonl', tools: [{ id: 'a', name: 'Bash', input: { command: 'npm run build' } }] },
+    ]
+    const { phases } = attribute({ turns: foldResponseLines(rows) })
+    expect(phases.gates.output).toBe(1000)
+    expect(phases.gates.weighted).toBe(5000) // 1000 output × 5, not 10 × 5
+  })
+
   it('unions SEVERAL tool calls of one response, so a batched turn is visible as batched', () => {
     const folded = foldResponseLines([
       line({ tools: [] }),
