@@ -2781,7 +2781,12 @@ export function clashPose(
   const side = aggressor ? 1 : -1
   const drive = Math.sin(t * g.rate + ph)
   const wheel = Math.sin(t * g.rate * 0.37 + ph) * g.wheel * k
-  const rear = Math.max(0, Math.sin(t * g.rate * 0.5 + ph + (aggressor ? 0 : Math.PI)))
+  // Saturated, not a plain sine: the rear is HELD near its top for most of its
+  // half-cycle and swaps quickly, so at ~4 instants in 5 one animal is plainly
+  // up while the other bores in low. A sine spends most of its time near zero,
+  // which left both bodies level at whatever moment the eye (or the shutter)
+  // happened to catch them.
+  const rear = Math.min(1, Math.max(0, Math.sin(t * g.rate * 0.5 + ph + (aggressor ? 0 : Math.PI)) * 3))
   const yaw = toFoe + side * g.splay * k + wheel
   // Turning about the HEAD, not the body centre: translate back by what the
   // turn moved the muzzle, so the contact point holds and only the rump swings.
@@ -2816,9 +2821,9 @@ export const CLASH_POSE: ClashPoseGeometry = {
   wheel: 0.45, // how far the locked pair swings about its contact point
   shove: 0.5, // how far the drive carries the pair along the contact line
   gap: 0.16, // how far the contact gap itself works open and shut
-  rear: 0.85, // the front lifted on the rearing beat
-  drive: 0.38, // the head dropped on the driving beat
-  stance: 0.62, // half the stance length: the rise that keeps the low end's feet down
+  rear: 0.95, // the front lifted on the rearing beat
+  drive: 0.45, // the head dropped on the driving beat — heads low and forward, boring in
+  stance: 0.66, // half the stance length: the rise that keeps the low end's feet down
   rate: 2.6, // a fast, worrying rhythm
 }
 

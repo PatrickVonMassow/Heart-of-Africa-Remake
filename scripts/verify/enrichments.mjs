@@ -6109,11 +6109,24 @@ if (section('intraspecies-fight')) {
       world: { lat: -2.5, lon: 34.0 },
       label: 'CONTROL: the same two zebras at the same camera with the clash pose disabled — a standing pair',
     })
-    // Same animals, same spot, same camera: only the pose comes on.
-    await page.evaluate(async () => {
+    // Same animals, same spot, same camera: only the pose comes on. Hold the
+    // shutter until the two are in OPPOSITE postures — one reared, the other
+    // boring in low — so the frame shows the fight at its most legible rather
+    // than whichever instant it happened to catch (the rear alternates).
+    const opposed = await page.evaluate(async () => {
       window.__balance.fight.clashIntensity = 1
-      await window.__sleepSim(0.6) // let the wedge, the wheel and the rear settle into the pose
+      const { one, two } = window.__fightPose
+      const seen = []
+      const ok = !!(await window.__pollSim(12, () => {
+        seen.push([one.clashPitch, two.clashPitch])
+        return (one.clashPitch < -0.5 && two.clashPitch > 0.1) || (two.clashPitch < -0.5 && one.clashPitch > 0.1)
+      }))
+      // The pitches are reported either way: a null pair means the pose never
+      // ran on THESE bodies, which is a different fault from a pose that ran
+      // and stayed level, and the two are indistinguishable from a bare false.
+      return { ok, samples: seen.length, pitches: seen[seen.length - 1] }
     })
+    check('the clash reaches the opposed posture the frame is taken at (point 264)', opposed.ok, JSON.stringify(opposed))
     await shot('148-intraspecies-fight-clash', {
       world: { lat: -2.5, lon: 34.0 },
       label: 'two zebras locked in a rank fight on the Serengeti savanna',

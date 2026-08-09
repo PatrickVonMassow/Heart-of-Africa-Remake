@@ -107,6 +107,7 @@ import {
   fightPairBroken,
   clashOver,
   clashPose,
+  type FightSide,
   parentAttackOutcome,
   parentDefends,
   findAdopter,
@@ -4437,7 +4438,7 @@ describe('clashPose — the clash READS as a fight from the bird\'s-eye (point 2
   const TO_FOE_B = -Math.PI / 2
   const PHASE = 0.3
   /** Both sides at one instant, at their rendered spots. */
-  const bout = (t, intensity = 1) => {
+  const bout = (t: number, intensity = 1) => {
     const a = clashPose(t, PHASE, true, TO_FOE_A, intensity)
     const b = clashPose(t, PHASE, false, TO_FOE_B, intensity)
     return {
@@ -4448,7 +4449,7 @@ describe('clashPose — the clash READS as a fight from the bird\'s-eye (point 2
   }
   /** Smallest angle between two headings, folded to [0, pi/2] — a body and its
    *  opposite lie on the SAME line, which is exactly what must not happen. */
-  const offLine = (u, v) => {
+  const offLine = (u: number, v: number) => {
     let d = Math.abs(((u - v) % Math.PI) + Math.PI) % Math.PI
     return Math.min(d, Math.PI - d)
   }
@@ -4498,6 +4499,23 @@ describe('clashPose — the clash READS as a fight from the bird\'s-eye (point 2
     expect(swapped.length).toBeGreaterThan(0)
   })
 
+  it('the rear is HELD, so most instants catch the two in opposite postures', () => {
+    // A plain sine sits near zero most of the time, which left both bodies
+    // level at whatever moment the eye — or the shutter — caught them. The
+    // saturated rear must be at its top for the bulk of its half-cycle.
+    const opposed = SAMPLES.filter((t) => {
+      const { a, b } = bout(t)
+      return (a.pitch < -0.5 && b.pitch > 0.1) || (b.pitch < -0.5 && a.pitch > 0.1)
+    })
+    expect(opposed.length / SAMPLES.length).toBeGreaterThan(0.6)
+    // And no instant catches the pair merely STANDING: at every moment at
+    // least one body is well off level — reared, or head-down and boring in.
+    for (const t of SAMPLES) {
+      const { a, b } = bout(t)
+      expect(Math.max(Math.abs(a.pitch), Math.abs(b.pitch))).toBeGreaterThan(0.3)
+    }
+  })
+
   it('a rearing body rises, so it stands on its hind legs instead of through the turf', () => {
     const reared = SAMPLES.map((t) => bout(t).a).filter((p) => p.pitch < -0.5)
     expect(reared.length).toBeGreaterThan(0)
@@ -4541,9 +4559,9 @@ describe('clashPose — the clash READS as a fight from the bird\'s-eye (point 2
 
 describe('fightPairBroken — nobody is left engaged with a body that is gone (point 264)', () => {
   /** A live, mutually engaged pair. */
-  const pair = () => {
-    const one = {}
-    const two = {}
+  const pair = (): FightSide[] => {
+    const one: FightSide = {}
+    const two: FightSide = {}
     one.fight = { foe: two }
     two.fight = { foe: one }
     return [one, two]

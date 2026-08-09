@@ -464,6 +464,13 @@ interface Animal {
   /** Sim-seconds until this animal's next "wants to fight" roll — the
    *  disposition's cadence, so the rate is per interval and not per frame. */
   fightRollAt?: number
+  /** The pitch the clash pose rendered this frame (negative = reared, positive
+   *  = head down and boring in). Written only in the clash render branch and
+   *  never read by the sim: it lets the verification hold its shutter for the
+   *  moment the two are in OPPOSITE postures, so the evidence frame shows the
+   *  fight at its most legible instead of whichever instant it happened to
+   *  catch. */
+  clashPitch?: number
   /** DEV-ONLY (point 268): the last rendered world (x,z) of a crocodile's
    *  seized victim — its jaws anchor — so the enrichments check can read the
    *  jaws placement back without a render-matrix probe. Set only in the
@@ -4604,6 +4611,7 @@ function Herds() {
               px += cp.dx
               pz += cp.dz
               pitch = cp.pitch
+              a.clashPitch = cp.pitch
               // Rise with the pitch so the down-tilted end keeps its feet on the
               // ground: a rearing animal stands on its hind legs, it does not
               // drive them through the turf.
