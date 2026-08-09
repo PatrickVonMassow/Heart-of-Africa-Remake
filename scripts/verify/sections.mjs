@@ -87,6 +87,39 @@ export function resolveSelection({ sections = [], requested = null, suite = 'the
 }
 
 /**
+ * Is this COMMAND LINE a legitimate one-section run? The name is checked later,
+ * against the suite's source; what is decided here is the shape of the request:
+ *
+ *   - the value must be ATTACHED (`--section=x`). A space would leave `x` looking
+ *     like a suite filter, which is why every other flag here is value-less.
+ *   - exactly ONE known suite is named beside it — the section names are a
+ *     suite's own, so two suites cannot share a request.
+ *   - no TIER. A tier is a coverage claim (preflight, the whole suite set, both
+ *     backends) and one section is the opposite of one, so the combination is
+ *     refused rather than quietly narrowed.
+ *
+ * Returns { ok, suite, message }. Total: never throws.
+ */
+export function planSectionRun({ tier = null, filter = [], section = null, knownSuites = [] } = {}) {
+  if (section === null) return { ok: true, suite: null, message: null }
+  const named = Array.isArray(filter) ? filter : []
+  if (section === '') {
+    return { ok: false, suite: null, message: '--section needs its value ATTACHED: `--section=<name>` (a space would read as a suite filter)' }
+  }
+  if (tier !== null) {
+    return { ok: false, suite: null, message: `--section=${section} is a one-block repair run — it cannot be combined with the ${tier} tier` }
+  }
+  if (named.length !== 1 || !knownSuites.includes(named[0])) {
+    return {
+      ok: false,
+      suite: null,
+      message: `--section=${section} needs exactly ONE suite named beside it, e.g. \`npm test -- enrichments --section=${section}\``,
+    }
+  }
+  return { ok: true, suite: named[0], message: null }
+}
+
+/**
  * The gate a suite drives. `section(name)` is BOTH the declaration the parser
  * above reads and the runtime switch: it returns whether this block's setup and
  * checks should run, and records the block as the one a following `check()`

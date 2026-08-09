@@ -5,7 +5,7 @@
 // and refused as recorded coverage (that half lives with the recorder's reader,
 // scripts/render-verify-core.test.mjs).
 import { describe, it, expect } from 'vitest'
-import { listSections, makeSectionGate, resolveSelection, SECTION_ENV } from './sections.mjs'
+import { listSections, makeSectionGate, planSectionRun, resolveSelection, SECTION_ENV } from './sections.mjs'
 import { runVerdict } from '../render-verify-core.mjs'
 
 /** A linear suite in miniature: each section does its own expensive setup and
@@ -83,6 +83,44 @@ describe('resolveSelection — what a --section request means', () => {
     expect(v.ok).toBe(false)
     expect(v.message).toContain('gamepad')
     expect(v.message).toContain('no sections')
+  })
+})
+
+describe('planSectionRun — the shape of the command line', () => {
+  const SUITES = ['flow', 'enrichments', 'polish']
+
+  it('passes a command line that is not asking for a section at all', () => {
+    expect(planSectionRun({ tier: 'large', filter: [], section: null, knownSuites: SUITES })).toMatchObject({
+      ok: true, suite: null,
+    })
+  })
+
+  it('accepts one suite plus an attached value', () => {
+    expect(planSectionRun({ filter: ['enrichments'], section: 'rivers', knownSuites: SUITES })).toMatchObject({
+      ok: true, suite: 'enrichments',
+    })
+  })
+
+  it('refuses a detached value — it would have read as a second suite', () => {
+    const v = planSectionRun({ filter: ['enrichments'], section: '', knownSuites: SUITES })
+    expect(v.ok).toBe(false)
+    expect(v.message).toContain('ATTACHED')
+  })
+
+  it('refuses a tier: a tier is a coverage claim, one section is the opposite', () => {
+    for (const tier of ['small', 'large']) {
+      const v = planSectionRun({ tier, filter: ['enrichments'], section: 'rivers', knownSuites: SUITES })
+      expect(v.ok).toBe(false)
+      expect(v.message).toContain(tier)
+    }
+  })
+
+  it('refuses none, two, or an unknown suite beside it', () => {
+    for (const filter of [[], ['enrichments', 'polish'], ['nosuch']]) {
+      const v = planSectionRun({ filter, section: 'rivers', knownSuites: SUITES })
+      expect(v.ok).toBe(false)
+      expect(v.message).toContain('exactly ONE suite')
+    }
   })
 })
 

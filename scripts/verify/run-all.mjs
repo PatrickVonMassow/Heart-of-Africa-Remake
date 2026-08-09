@@ -21,7 +21,7 @@ import {
 } from './machine-load-core.mjs'
 import { readMachine } from './machine-load.mjs'
 import { DEV_SUITES, needsDevServer, parseArgs, planBackends, selectBackend, skippedSuites, suitesFor } from './tiers.mjs'
-import { SECTION_ENV, listSections, resolveSelection } from './sections.mjs'
+import { SECTION_ENV, listSections, planSectionRun, resolveSelection } from './sections.mjs'
 import { readFileSync } from 'node:fs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -65,11 +65,9 @@ if (section !== null) {
     console.log(msg)
     process.exit(1)
   }
-  if (section === '') die('--section needs its value ATTACHED: `--section=<name>` (a space would read as a suite filter)')
-  if (filter.length !== 1 || !DEV_SUITES.includes(filter[0])) {
-    die(`--section=${section} needs exactly ONE suite named beside it, e.g. \`npm test -- enrichments --section=${section}\``)
-  }
-  const suite = filter[0]
+  const plan = planSectionRun({ tier, filter, section, knownSuites: DEV_SUITES })
+  if (!plan.ok) die(plan.message)
+  const suite = plan.suite
   let source = ''
   try {
     source = readFileSync(join(HERE, `${suite}.mjs`), 'utf8')
