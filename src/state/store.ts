@@ -649,6 +649,15 @@ export function canAskForDrumMessage(
   return s.reveredGiftGiven[placeId] === true && (s.goodwill[placeId] ?? 0) >= balance.goodwillForHint
 }
 
+/**
+ * The settlement an utterance heard right now belongs to: the place the player
+ * stands in, and nothing while he is out on the map. The journal names it
+ * beside the day it was first heard (design.md §13.4).
+ */
+function heardIn(s: Pick<GameState, 'mode' | 'placeId'>): string | undefined {
+  return s.mode === 'place' && s.placeId ? s.placeId : undefined
+}
+
 /** Carried item count against the inventory capacity (design.md §6). */
 export function usedInventory(
   s: Pick<GameState, 'equipment' | 'gifts' | 'treasures'>,
@@ -702,13 +711,13 @@ export const useGame = create<GameState>()((set, get) => ({
   // render and the journal list stays stable.
   hearUtterance: (utterance) =>
     set((s) => {
-      const next = observeUtterance(s.communication, utterance, Math.floor(s.day))
+      const next = observeUtterance(s.communication, utterance, Math.floor(s.day), heardIn(s))
       return next === s.communication ? {} : { communication: next }
     }),
 
   hearPhrase: (phrase) =>
     set((s) => {
-      const next = observePhrase(s.communication, phrase, Math.floor(s.day))
+      const next = observePhrase(s.communication, phrase, Math.floor(s.day), heardIn(s))
       return next === s.communication ? {} : { communication: next }
     }),
 
@@ -724,7 +733,7 @@ export const useGame = create<GameState>()((set, get) => ({
   // written once — hearing the drums a second time adds no second page.
   receiveDrumMessage: () => {
     const s = get()
-    const heard = observePhrase(s.communication, chiefMessagePhrase(), Math.floor(s.day))
+    const heard = observePhrase(s.communication, chiefMessagePhrase(), Math.floor(s.day), heardIn(s))
     set({ communication: heard, drumMessageHeard: true })
     if (s.drumMessageHeard) return
     get().addEntry(
@@ -744,7 +753,7 @@ export const useGame = create<GameState>()((set, get) => ({
     const s = get()
     if (s.mode !== 'place' || s.placeId !== DRUM_MESSAGE_VILLAGE) return
     if (s.rockArtefact !== 'carried') return
-    const heard = observePhrase(s.communication, chiefAcknowledgePhrase(), Math.floor(s.day))
+    const heard = observePhrase(s.communication, chiefAcknowledgePhrase(), Math.floor(s.day), heardIn(s))
     set({ communication: heard, rockArtefact: 'given' })
     get().addEntry(
       { key: 'journal.titles.artefactGiven' },

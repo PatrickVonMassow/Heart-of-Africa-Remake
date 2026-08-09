@@ -16,6 +16,14 @@ export interface HeardUtterance {
   utterance: UtteranceId
   /** In-game day of the FIRST hearing (later hearings change nothing). */
   firstHeardDay: number
+  /**
+   * Place the utterance was FIRST heard in — the settlement id, rendered
+   * through the language files exactly as the status bar names it. Absent when
+   * it was heard outside a settlement, and absent for everything recorded
+   * before this was tracked: such an entry reads WITHOUT a village rather than
+   * with an invented one.
+   */
+  firstHeardPlace?: string
   /** The player's own reading, free text. The game never checks it. '' = none. */
   hypothesis: string
 }
@@ -56,12 +64,12 @@ export function observeUtterance(
   memory: CommunicationMemory,
   utterance: UtteranceId,
   day: number,
+  place?: string,
 ): CommunicationMemory {
   if (utterance === '' || hasHeard(memory, utterance)) return memory
-  return {
-    ...memory,
-    heard: { ...memory.heard, [utterance]: { utterance, firstHeardDay: day, hypothesis: '' } },
-  }
+  const entry: HeardUtterance = { utterance, firstHeardDay: day, hypothesis: '' }
+  if (place) entry.firstHeardPlace = place
+  return { ...memory, heard: { ...memory.heard, [utterance]: entry } }
 }
 
 /**
@@ -73,9 +81,10 @@ export function observePhrase(
   memory: CommunicationMemory,
   phrase: Phrase,
   day: number,
+  place?: string,
 ): CommunicationMemory {
   let next = memory
-  for (const atom of phrase) next = observeUtterance(next, atom, day)
+  for (const atom of phrase) next = observeUtterance(next, atom, day, place)
   return next
 }
 
@@ -122,11 +131,16 @@ export function deserializeMemory(raw: unknown): CommunicationMemory {
     if (!utterance || !value || typeof value !== 'object') continue
     const entry = value as Partial<HeardUtterance>
     const day = Number(entry.firstHeardDay)
-    heard[utterance] = {
+    const restored: HeardUtterance = {
       utterance,
       firstHeardDay: Number.isFinite(day) ? day : 0,
       hypothesis: typeof entry.hypothesis === 'string' ? entry.hypothesis : '',
     }
+    // A snapshot written before the place was tracked simply carries none.
+    if (typeof entry.firstHeardPlace === 'string' && entry.firstHeardPlace) {
+      restored.firstHeardPlace = entry.firstHeardPlace
+    }
+    heard[utterance] = restored
   }
   return { heard }
 }

@@ -674,6 +674,36 @@ textarea {
   flex: 1;
 }
 
+/* The journal's two tabs (point 579): the diary and the overheard utterances,
+   so reading either needs no scrolling past the other. The emphasis is carried
+   by weight and the raised paper of the active tab, never by capitals. */
+.journal .journal-tabs {
+  display: flex;
+  gap: 6px;
+  padding: 8px 16px 0;
+  border-bottom: 1px solid #c9b488;
+}
+
+.journal .journal-tabs .journal-tab {
+  padding: 3px 12px;
+  font-size: 13px;
+  letter-spacing: 0.4px;
+  border-bottom-color: transparent;
+  border-radius: 4px 4px 0 0;
+  margin-bottom: -1px;
+  opacity: 0.65;
+}
+
+.journal .journal-tabs .journal-tab:hover {
+  opacity: 0.85;
+}
+
+.journal .journal-tabs .journal-tab.active {
+  background: rgba(160, 120, 40, 0.16);
+  font-weight: 600;
+  opacity: 1;
+}
+
 .journal .entry {
   margin-bottom: 18px;
   /* Anchor for the blood traces of design.md §16. */
@@ -829,24 +859,14 @@ textarea {
   margin-bottom: 2px;
 }
 
-/* Speech observations (design.md §13.4): a section of its own under the
-   entries — a ruled-off appendix of the book, scrolling independently so a long
-   chronicle never pushes the heard utterances out of reach. */
+/* Speech observations (design.md §13.4): the journal's second tab (point 579)
+   — a ruled-off appendix of the book, filling the panel while it is in front so
+   a long chronicle never pushes the heard utterances out of reach. */
 .journal .observations {
-  border-top: 2px solid #8a6f45;
   padding: 10px 18px 12px;
-  max-height: 38%;
   overflow-y: auto;
-  flex: 0 0 auto;
+  flex: 1;
   background: rgba(160, 120, 40, 0.07);
-}
-
-.journal .observations h3 {
-  margin: 0;
-  font-size: 15px;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-  opacity: 0.8;
 }
 
 .journal .observations-hint {
@@ -866,10 +886,11 @@ textarea {
   letter-spacing: 1px;
 }
 
+/* Day and village of the first hearing (point 579): set quietly, not in
+   capitals — the styling carries the emphasis. */
 .journal .observation .first-heard {
   font-size: 11px;
   letter-spacing: 0.4px;
-  text-transform: uppercase;
   opacity: 0.6;
 }
 
