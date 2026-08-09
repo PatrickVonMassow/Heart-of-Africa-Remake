@@ -413,6 +413,22 @@ honest number is the full one, 0.988 %/h, still about 1.6× the ceiling. Nor is 
 captures only **42 % of the weighted spend**, so the historical anchors understate the
 real rate by roughly the same factor.
 
+**RESTATED 09.08.2026 after a measurement fix, and it barely moves.** The fold
+that turns a response's several transcript lines into one turn used to keep the
+FIRST line, and `output_tokens` is a rising streamed snapshot — so output was
+undercounted by 1.84×. Both tools now fold each counter to its MAXIMUM
+(`foldUsage`). Re-measured over the SAME window with both folds, the first-line
+figures above reproduce exactly, and the corrected ones are: full scope
+**6 081 997 weighted/h before** and **5 463 840 after** (+4.1 % / +5.1 %), large-context
+share **77.2 % → 69.8 %** instead of 78.6 % → 71.4 %, ratio 0.890 → **0.898**,
+derived rate **0.988 → 0.997 %/h**. The *top-level only* rows do not move at
+all — the rising snapshot appears exclusively in the delegated agents'
+transcripts. The verdict is unchanged in both scopes: still about 1.6× the
+~0.6 %/h that fits, so the criterion is still NOT met. The 30.07.2026 table above
+cannot be re-derived (those transcripts are gone), and it does not need to be:
+the derived rate is a RATIO, and the undercount hit both sides in nearly the same
+proportion — which is exactly why 0.988 moved only to 0.997.
+
 **The window is 21.8 hours, not a full day** — from the moment the levers landed
 (07.08 03:48 Z) to the last recorded turn (08.08 01:37 Z) — and it is essentially
 gapless, so wall-clock and active hours coincide. It is a day's worth of work but one

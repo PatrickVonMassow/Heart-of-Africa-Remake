@@ -26,6 +26,7 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { REPO_ROOT } from './repo-paths.mjs'
 import {
+  foldUsage,
   measureScopes,
   mainCheckoutOf,
   resolveTranscriptDir,
@@ -123,13 +124,19 @@ export function firstHandoverAt(logPaths = BOUNDARY_LOGS) {
 }
 
 /**
- * Every assistant turn with usage, deduplicated. A transcript repeats one turn's usage
- * across its streamed lines, so counting lines would multiply the spend by three.
+ * Every assistant turn with usage, one turn per API RESPONSE. A transcript writes one
+ * response onto several lines, so counting lines would multiply the spend by three.
+ *
+ * The lines of a response are FOLDED by `foldUsage`, not deduplicated down to the first
+ * of them: they do not all repeat the same usage — `output_tokens` grows across them —
+ * and keeping the first undercounted output by 1,84× (four-eyes review, 09.08.2026). It
+ * is the same fold `measure-task-cost.mjs` uses, so the two tools cannot disagree about
+ * what a token is.
  */
 export async function readTurns(dir = transcriptDir()) {
-  const turns = []
-  const seen = new Set()
-  if (!existsSync(dir)) return turns
+  const byId = new Map()
+  const order = []
+  if (!existsSync(dir)) return []
   for (const { path, rel, scope } of listTranscripts(dir)) {
     const stream = createReadStream(path, { encoding: 'utf8' })
     const lines = createInterface({ input: stream, crlfDelay: Infinity })
@@ -144,11 +151,15 @@ export async function readTurns(dir = transcriptDir()) {
       const usage = rec?.message?.usage
       const at = Date.parse(rec?.timestamp ?? '')
       if (!usage || !Number.isFinite(at)) continue
-      // The message id is the turn's identity; requestId is the fallback for a record
+      // The message id is the response's identity; requestId is the fallback for a record
       // that carries no id.
       const id = rec.message?.id ?? rec.requestId ?? `${rel}:${rec.uuid ?? at}`
-      if (seen.has(id)) continue
-      seen.add(id)
+      const known = byId.get(id)
+      if (known) {
+        known.usages.push(usage)
+        if (at < known.turn.at) known.turn.at = at
+        continue
+      }
       // The transcript file IS the session — one file per session id. A DELEGATED
       // agent's records carry the PARENT's sessionId, so its own agentId is what
       // separates it; without that, every subagent's context would be folded into its
@@ -156,9 +167,15 @@ export async function readTurns(dir = transcriptDir()) {
       const session = rec.agentId
         ? `${rec.sessionId ?? rel}/agent-${rec.agentId}`
         : (rec.sessionId ?? rel.replace(/\.jsonl$/, ''))
-      turns.push({ at, usage, session, scope })
+      const turn = { at, usage, session, scope }
+      byId.set(id, { turn, usages: [usage] })
+      order.push(id)
     }
   }
+  const turns = order.map((id) => {
+    const { turn, usages } = byId.get(id)
+    return { ...turn, usage: foldUsage(usages) }
+  })
   return turns.sort((a, b) => a.at - b.at)
 }
 

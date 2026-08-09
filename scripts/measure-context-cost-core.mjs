@@ -29,6 +29,57 @@ export const LARGE_CONTEXT_TOKENS = 150_000
  *  so an idle night cannot dilute a per-hour rate into meaninglessness. */
 export const IDLE_GAP_MS = 30 * 60 * 1000
 
+/** The four billed counters, under the field names the transcript writes them with. */
+export const USAGE_FIELDS = ['input_tokens', 'cache_creation_input_tokens', 'cache_read_input_tokens', 'output_tokens']
+
+const num = (v) => (Number.isFinite(v) && v > 0 ? v : 0)
+
+/**
+ * What ONE transcript line reports for one counter. PURE.
+ *
+ * Normally that is the counter itself. The exception is a MODEL FALLBACK: when a
+ * response was answered by a second API call under the SAME `message.id`, the final line
+ * carries an `iterations` array with one entry per call, and BOTH were billed — while the
+ * top-level counter shows only the last of them. Summing the iterations is then the whole
+ * bill, and it is what this returns. Measured over this repository's transcripts: 36.764
+ * of 49.509 usage lines carry `iterations`, and exactly ONE carries more than one entry.
+ */
+function lineUsage(usage, field) {
+  const iterations = Array.isArray(usage?.iterations) ? usage.iterations : []
+  if (iterations.length > 1) return iterations.reduce((a, it) => a + num(it?.[field]), 0)
+  return num(usage?.[field])
+}
+
+/**
+ * The billed usage of ONE API response, folded from the SEVERAL transcript lines the
+ * harness wrote it to (one per content block: `thinking`, `text`, `tool_use`, …). PURE.
+ *
+ * WHY PER-COUNTER MAXIMUM, and not the first line. The lines of one response do NOT all
+ * repeat the same usage. `output_tokens` is a STREAMED SNAPSHOT that grows as the
+ * response is written (5 → 234 → 234), so taking the first line counts a fraction of what
+ * was billed. Measured over 32.697 responses in this repository's transcripts: 13.630 are
+ * multi-line and 6.708 of those differ, ALL of them in `output_tokens` alone, and the
+ * sequence NEVER falls — first-line folding reported 7,65 M output tokens against 14,09 M
+ * actually billed, an undercount of 1,84×.
+ *
+ * The maximum is taken PER COUNTER, independently, for two reasons: a counter that first
+ * appears on a later line is not lost, and no counter is double-counted the way summing
+ * the lines would (that inflates the raw total by 38 %). The rule was checked against the
+ * raw transcripts rather than assumed: `input_tokens` never varies within a response,
+ * `cache_read_input_tokens` varies in one response and rises, and the ONE case where a
+ * counter falls is the model fallback `lineUsage` handles above — there the drop is a
+ * SECOND billed API call restarting the count, not a snapshot going backwards.
+ *
+ * Fields that are not counters are carried from the first line unchanged.
+ */
+export function foldUsage(usages = []) {
+  const list = (Array.isArray(usages) ? usages : []).filter(Boolean)
+  if (!list.length) return {}
+  const folded = { ...list[0] }
+  for (const field of USAGE_FIELDS) folded[field] = Math.max(...list.map((u) => lineUsage(u, field)))
+  return folded
+}
+
 /** One turn's weighted spend, and the context it ran in. PURE. */
 export function turnCost(usage = {}) {
   const n = (v) => (Number.isFinite(v) && v > 0 ? v : 0)
